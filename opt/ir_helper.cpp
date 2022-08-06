@@ -38,7 +38,7 @@ namespace xoc {
 //Dump IR list with a logging header-notation.
 //Dump both its kids and siblings.
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
-                 UINT dumpflag)
+                 DumpFlag dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==---- DUMP IR List ----==");
@@ -48,7 +48,7 @@ void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
 
 //Dump IR, and both its kids and siblings.
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr,
-                UINT dumpflag)
+                DumpFlag dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "");
@@ -309,11 +309,11 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
 }
 
 
-void dumpGETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpGETELEM(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -332,15 +332,15 @@ void dumpGETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpSETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpSETELEM(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
-    LogMgr * lm = rg->getLogMgr(); 
+    LogMgr * lm = rg->getLogMgr();
     note(rg, "setelem %s%d:%s", PR_TYPE_CHAR, SETELEM_prno(ir),
          xtm->dump_type(d, buf));
     DUMPADDR(ir);
@@ -355,42 +355,42 @@ void dumpSETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpBREAK(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpBREAK(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     note(rg, "break");
     DUMPADDR(ir);
     prt(rg, "%s", attr);
 }
 
 
-void dumpCONTINUE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpCONTINUE(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                   CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     note(rg, "continue");
     DUMPADDR(ir);
     prt(rg, "%s", attr);
 }
 
 
-void dumpGOTO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpGOTO(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
               CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     note(rg, "goto ");
     dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
     DUMPADDR(ir);
-    prt(rg, "%s", attr); 
+    prt(rg, "%s", attr);
 }
 
 
-void dumpRETURN(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpRETURN(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "return");
     DUMPADDR(ir);
@@ -403,11 +403,11 @@ void dumpRETURN(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpREGION(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpREGION(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_inner_region = dumpflag.have(IR_DUMP_INNER_REGION);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "region");
     if (REGION_ru(ir)->getRegionVar() != nullptr) {
@@ -434,11 +434,11 @@ void dumpREGION(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpFALSEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpFALSEBR(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "falsebr ");
     dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
@@ -452,11 +452,11 @@ void dumpFALSEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpTRUEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpTRUEBR(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "truebr ");
     dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
@@ -470,28 +470,23 @@ void dumpTRUEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpARRAY(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
- 
-    StrBuf buf2(64);
-    if (ARR_ofst(ir) != 0) {
-        note(rg, "array (%s:offset(%d), ety:%s)",
-             xtm->dump_type(d, buf),
-             ARR_ofst(ir),
-             xtm->dump_type(ARR_elemtype(ir), buf2));
-    } else {
-        note(rg, "array (%s, ety:%s)",
-             xtm->dump_type(d, buf),
-             xtm->dump_type(ARR_elemtype(ir), buf2));
-    }
 
+    StrBuf buf2(64);
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    if (ARR_ofst(ir) != 0) {
+        prt(rg, ":offset(%d)", ARR_ofst(ir));
+    }
+    prt(rg, " (elemtype:%s)", xtm->dump_type(ARR_elemtype(ir), buf2));
+ 
     DUMPADDR(ir);
     prt(rg, "%s", attr);
     if (ARR_sub_list(ir) != nullptr && dump_kid) {
@@ -532,10 +527,10 @@ void dumpARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpCASE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpCASE(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
               CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     LogMgr * lm = rg->getLogMgr();
  
     ASSERT0(CASE_vexp(ir));
@@ -552,11 +547,11 @@ void dumpCASE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpSWITCH(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpSWITCH(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
 
     note(rg, "switch");
@@ -586,11 +581,11 @@ void dumpSWITCH(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpPHI(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpPHI(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
              CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -614,11 +609,11 @@ void dumpPHI(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpLDA(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpLDA(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
              CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_var_decl = dumpflag.have(IR_DUMP_VAR_DECL);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -647,11 +642,11 @@ void dumpLDA(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpSELECT(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpSELECT(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -676,10 +671,10 @@ void dumpSELECT(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpLABEL(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpLABEL(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     LabelInfo const* li = LAB_lab(ir);
     if (LABELINFO_type(li) == L_ILABEL) {
         note(rg, "label " ILABEL_STR_FORMAT "",
@@ -722,11 +717,11 @@ void dumpLABEL(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpIGOTO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpIGOTO(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "igoto");
     DUMPADDR(ir);
@@ -737,18 +732,17 @@ void dumpIGOTO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     dumpIRList(IGOTO_vexp(ir), rg, nullptr, dumpflag);
     lm->decIndent(dn);
 
-    note(rg, "\ncase_list");
     lm->incIndent(dn);
     dumpIRList(IGOTO_case_list(ir), rg, nullptr, dumpflag);
     lm->decIndent(dn);
 }
 
 
-void dumpDOLOOP(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpDOLOOP(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                 CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "doloop");
     DUMPADDR(ir);
@@ -784,11 +778,11 @@ void dumpDOLOOP(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpWHILEDO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpWHILEDO(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "whiledo");
     DUMPADDR(ir);
@@ -810,11 +804,11 @@ void dumpWHILEDO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpDOWHILE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpDOWHILE(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "dowhile");
     DUMPADDR(ir);
@@ -835,11 +829,11 @@ void dumpDOWHILE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpIF(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpIF(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
             CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
     note(rg, "if");
     DUMPADDR(ir);
@@ -867,11 +861,11 @@ void dumpIF(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpBinAndUna(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpBinAndUna(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                    CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -895,11 +889,11 @@ void dumpBinAndUna(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpID(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpID(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
             CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_var_decl = dumpflag.have(IR_DUMP_VAR_DECL);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -921,10 +915,10 @@ void dumpID(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpPR(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
             CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -934,11 +928,11 @@ void dumpPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpILD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpILD(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
              CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -961,11 +955,11 @@ void dumpILD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpLD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpLD(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
             CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_var_decl = dumpflag.have(IR_DUMP_VAR_DECL);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -993,11 +987,11 @@ void dumpLD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpIST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpIST(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
              CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -1022,27 +1016,22 @@ void dumpIST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpSTARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpSTARRAY(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                  CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
 
-    StrBuf buf2(64); 
+    StrBuf buf2(64);
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
     if (ARR_ofst(ir) != 0) {
-        note(rg, "starray (%s:offset(%d), ety:%s)",
-             xtm->dump_type(d, buf),
-             ARR_ofst(ir),
-             xtm->dump_type(ARR_elemtype(ir), buf2));
-    } else {
-        note(rg, "starray (%s, ety:%s)",
-             xtm->dump_type(d, buf),
-             xtm->dump_type(ARR_elemtype(ir), buf2));
+        prt(rg, ":offset(%d)", ARR_ofst(ir));
     }
+    prt(rg, " (elemtype:%s)", xtm->dump_type(ARR_elemtype(ir), buf2));
 
     DUMPADDR(ir);
     prt(rg, "%s", attr);
@@ -1084,11 +1073,11 @@ void dumpSTARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpSTPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpSTPR(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
               CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -1105,12 +1094,12 @@ void dumpSTPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpST(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
             CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
-    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
+    bool dump_var_decl = dumpflag.have(IR_DUMP_VAR_DECL);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -1144,12 +1133,12 @@ void dumpST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
 }
 
 
-void dumpCallStmt(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+void dumpCallStmt(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag,
                   CHAR * attr)
 {
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
-    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
-    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = dumpflag.have(IR_DUMP_KID);
+    bool dump_var_decl = dumpflag.have(IR_DUMP_VAR_DECL);
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
@@ -1290,11 +1279,11 @@ void dumpConst(IR const* ir, Region const* rg)
 
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
-void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
+void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, DumpFlag dumpflag)
 {
-    bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);
-    bool dump_newline = !HAVE_FLAG(dumpflag, IR_DUMP_NO_NEWLINE);
-    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_src_line = dumpflag.have(IR_DUMP_SRC_LINE);
+    bool dump_newline = !dumpflag.have(IR_DUMP_NO_NEWLINE);
+    bool dump_addr = dumpflag.have(IR_DUMP_ADDR);
     TypeMgr * tm = rg->getTypeMgr();
     LogMgr * lm = rg->getLogMgr();
     ASSERT0(tm);
@@ -1438,7 +1427,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         dumpLDA(ir, rg, dn, dumpflag, attr);
         break;
     case IR_PHI:
-        //Dump PHI function. 
+        //Dump PHI function.
         dumpPHI(ir, rg, dn, dumpflag, attr);
         break;
     case IR_SWITCH:
@@ -1469,15 +1458,16 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         prt(rg, "%s", attr);
         break;
     default:
-        ASSERTN(0, ("unknown IR type:%s", IRNAME(ir)));
+        ASSERTN(0, ("unknown IR code:%s", IRNAME(ir)));
         return ;
     }
 }
 
 
 //Iterative access ir tree. This funtion initialize the iterator.
-//'ir': the root ir of the tree.
-//'it': iterator. It should be clean already.
+//ir: the root ir of the tree.
+//it: iterator. It should be clean already.
+//iter_next: true if the function expect iterate the sibling IR.
 //Readonly function.
 IR const* iterInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
 {
@@ -1497,7 +1487,8 @@ IR const* iterInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
 
 //Iterative access ir tree.
 //This function return the next IR node accroding to 'it'.
-//'it': iterator.
+//it: iterator.
+//iter_next: true if the function expect iterate the sibling IR.
 //Readonly function.
 IR const* iterNextC(MOD ConstIRIter & it, bool iter_next)
 {
@@ -1520,9 +1511,11 @@ IR const* iterNextC(MOD ConstIRIter & it, bool iter_next)
 //This funtion initialize the iterator.
 //ir: the root ir of the tree, it must be stmt.
 //it: iterator. It should be clean already.
+//iter_next: true to iterate the next IR of ir in current iteration.
 //The function is a readonly function.
 //Use iterExpNextC to iter next IR.
-IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
+//Note the function does not iterate inner stmt, e.g:stmts in body of IR_IF.
+IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_stmt());
@@ -1546,18 +1539,13 @@ IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
             it.append_tail(kid);
         }
     }
-    if (iter_next && IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
+    if (firstkid->get_next() != nullptr) {
+        it.append_tail(firstkid->get_next());
     }
     return firstkid;
 }
 
 
-//Iterative access the ir tree that start with 'ir'.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it may be either stmt or expression.
-//'it': iterator. It should be clean already.
-//Note this function is NOT readonly, the returnd IR may be modified.
 IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next)
 {
     if (ir == nullptr) { return nullptr; }
@@ -1573,10 +1561,7 @@ IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next)
     return ir;
 }
 
-//Iterative access the ir tree.
-//This funtion return the next IR node accroding to 'it'.
-//'it': iterator.
-//Note this function is NOT readonly, the returnd IR may be modified.
+
 IR * iterNext(MOD IRIter & it, bool iter_next)
 {
     IR * ir = it.remove_head();
@@ -1594,12 +1579,7 @@ IR * iterNext(MOD IRIter & it, bool iter_next)
 }
 
 
-//Iterative access the right-hand-side expression of stmt.
-//This funtion initialize the iterator.
-//ir: the root ir of the tree, it must be stmt.
-//it: iterator. It should be clean already.
-//Use iterExpNextC to iter next IR.
-IR * iterExpInit(IR * ir, OUT IRIter & it, bool iter_next)
+IR * iterExpInit(IR const* ir, OUT IRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_stmt());
@@ -1624,52 +1604,17 @@ IR * iterExpInit(IR * ir, OUT IRIter & it, bool iter_next)
             it.append_tail(kid);
         }
     }
-    if (iter_next && IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
+    if (firstkid->get_next() != nullptr) {
+        it.append_tail(firstkid->get_next());
     }
-
     return firstkid;
 }
 
 
-//Iterative access the right-hand-side expression of stmt.
-//This funtion initialize the iterator.
-//ir: the root ir of the tree, it must be stmt.
-//it: iterator. It should be clean already.
-//Use iterExpNextC to iter next IR.
 IR * iterExpOfStmtInit(IR * ir, OUT IRIter & it)
 {
     ASSERT0(ir->is_stmt());
     IR * firstkid = nullptr;
-    switch (ir->getCode()) {
-    case IR_IST:
-        ASSERT0(IST_base(ir));
-        firstkid = IST_base(ir);
-        it.append_tail(firstkid);
-        break;
-    case IR_STARRAY:
-        ASSERT0(STARR_base(ir));
-        firstkid = STARR_base(ir);
-        it.append_tail(firstkid);
-        if (STARR_sub_list(ir) != nullptr) {
-            it.append_tail(STARR_sub_list(ir));
-        }
-        break;
-    default:;
-    }
-    return firstkid;
-}
-
-
-//Iterative access the right-hand-side expression of stmt.
-//This funtion initialize the iterator.
-//ir: the root ir of the tree, it must be stmt.
-//it: iterator. It should be clean already.
-//Use iterExpNextC to iter next IR.
-IR const* iterExpOfStmtInitC(IR * ir, OUT ConstIRIter & it)
-{
-    ASSERT0(ir->is_stmt());
-    IR const* firstkid = nullptr;
     switch (ir->getCode()) {
     case IR_IST:
         ASSERT0(IST_base(ir));

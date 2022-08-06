@@ -39,11 +39,11 @@ namespace xoc {
 //
 //START CfsMgr
 //
-CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
+CFS_INFO * CfsMgr::new_cfs_info(IR_CODE ircode)
 {
     CFS_INFO * ci = (CFS_INFO*)xmalloc(sizeof(CFS_INFO));
-    CFS_INFO_cfs_type(ci) = irtype;
-    switch (irtype) {
+    CFS_INFO_cfs_type(ci) = ircode;
+    switch (ircode) {
     case IR_IF:
         CFS_INFO_true_body(ci) = m_bs_mgr.create();
         CFS_INFO_false_body(ci) = m_bs_mgr.create();

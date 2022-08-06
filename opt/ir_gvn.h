@@ -86,7 +86,7 @@ public:
         LONGLONG iv;
         double dv;
         Sym const* str;
-        IR_TYPE op; //operation
+        IR_CODE op; //operation
     } u1;
 
 public:
@@ -517,7 +517,9 @@ protected:
     //different VN, that may misjudge the equivalence of two MemRef
     //e.g: given ld a, ld b, which VN is VN1, VN2 respectively. We could say
     //the value of a is not equal to b if VN1 != VN2. However, they may equal
-    //if a and b are parameter.
+    //if a and b are parameter. The default value is FALSE for conservative
+    //purpose. GVN also try to set livein MD with different VN if the MD is
+    //'restrict'.
     BYTE m_is_alloc_livein_vn:1;
 
     DUMgr * m_du;
@@ -531,7 +533,7 @@ protected:
     SMemPool * m_pool;
     UINT m_vn_count;
     IR2VN m_ir2vn;
-    Vector<void*> m_irt_vec;
+    Vector<void*> m_irc_vec;
     LONGLONG2VN_MAP m_ll2vn;
     LONGLONGMC2VN_MAP m_llmc2vn;
     FP2VN_MAP m_fp2vn;
@@ -576,10 +578,18 @@ protected:
     void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
 
-    virtual bool isUnary(IR_TYPE irt) const;
-    virtual bool isBinary(IR_TYPE irt) const;
-    virtual bool isTriple(IR_TYPE irt) const;
-    virtual bool isQuad(IR_TYPE irt) const;
+    //Return true if the value of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
+    bool hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const;
+    bool hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const;
+    bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
+
+    bool isSameMemLocForArrayOp(IR const* ir1, IR const* ir2) const;
+    bool isSameMemLocForIndirectOp(IR const* ir1, IR const* ir2) const;
+    virtual bool isUnary(IR_CODE irt) const;
+    virtual bool isBinary(IR_CODE irt) const;
+    virtual bool isTriple(IR_CODE irt) const;
+    virtual bool isQuad(IR_CODE irt) const;
 
     void * xmalloc(UINT size)
     {
@@ -589,12 +599,12 @@ protected:
         return p;
     }
 
-    VN * registerQuadVN(IR_TYPE irt, VN const* v0, VN const* v1,
+    VN * registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
                         VN const* v2, VN const* v3);
-    VN * registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
+    VN * registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
                           VN const* v2);
-    VN * registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1);
-    VN * registerUnaVN(IR_TYPE irt, VN const* v0);
+    VN * registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
+    VN * registerUnaVN(IR_CODE irt, VN const* v0);
     VN * registerVNviaMD(MD const* md);
     VN * registerVNviaMC(LONGLONG v);
     VN * registerVNviaINT(LONGLONG v);
@@ -661,6 +671,7 @@ public:
     //Note this function does NOT consider data type
     //that ir1 or ir2 referrenced.
     bool isSameMemLoc(IR const* ir1, IR const* ir2) const;
+
     //Return true if ir1 and ir2 represent different memory location, otherwise
     //return false to tell caller we do not know more about these object.
     //Note this function will consider data type that ir1 or ir2 referrenced.

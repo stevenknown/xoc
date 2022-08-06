@@ -46,6 +46,9 @@ public:
     // Return the number of allocable float register.
     virtual UINT getNumOfAllocableFloatRegister() const = 0;
 
+    // Return the number of thread.
+    virtual UINT getNumOfThread() const = 0;
+
     //Return byte size of data cache.
     virtual UINT getDCacheSize() const = 0;
 

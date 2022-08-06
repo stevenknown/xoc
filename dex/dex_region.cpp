@@ -169,7 +169,7 @@ void DexRegion::processSimply()
     ASSERT0(g_cst_bb_list);
     IRCFG * cfg = (IRCFG*)passmgr->registerPass(PASS_CFG);
     ASSERT0(cfg);
-    cfg->initCfg(oc);
+    cfg->initCFG(oc);
     ASSERT0(g_do_cfg_dom);
     cfg->LoopAnalysis(oc);
 
@@ -234,7 +234,7 @@ bool DexRegion::process(OptCtx * oc)
 
     ASSERT0(verifyIRandBB(bbl, this));
 
-    RefineCtx rf;
+    RefineCtx rf(&oc);
     RC_insert_cvt(rf) = false; //Do not insert cvt for DEX code.
     refineBBlist(bbl, rf);
     ASSERT0(verifyIRandBB(bbl, this));

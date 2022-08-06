@@ -199,11 +199,19 @@ protected:
     //Set true to return the newline charactors as normal character.
     bool m_use_newline_char;
 
-    //Indicate current processing character during parsing.
+    //Record a character to be processed during current parsing.
     CHAR m_cur_char;
+
+    //Record current token that has been parsed.
     TOKEN m_cur_token;
+
+    //Record length of current token string that has been parsed.
     UINT m_cur_token_string_len;
+
+    //Record byte index in token-string-buffer that has been parsed.
+    //for local used.
     UINT m_cur_token_string_pos;
+
     //Record the line number that may be backed tracking from the latest line.
     UINT m_real_line_num;
 
@@ -231,10 +239,11 @@ protected:
     //Record length of offset table.
     LONG m_ofst_tab_byte_size;
 
-    //The buffer that hold the token content.
-    CHAR * m_cur_token_string; //for local used.
+    //Record current token string that has been parsed.
+    //for local used.
+    CHAR * m_cur_token_string;
 
-    //Inpute source file handler.
+    //Record input source file handler.
     FILE * m_src_file;
 
     //Current parsing line of src file
@@ -244,8 +253,10 @@ protected:
     LONG * m_ofst_tab;
 
     SMemPool * m_pool;
+
     //Buffer to hold the prefected byte from src file.
     CHAR m_file_buf[LEX_MAX_BUF_LINE];
+
     //String2Token m_str2token;
     TMap<CHAR const*, TOKEN, CompareStringFunc> m_str2token;
     List<LexErrorMsg*> m_err_msg_list;
@@ -274,12 +285,17 @@ protected:
     Lexer::STATUS readLine(OUT bool & is_some_chars_in_cur_line,
                            MOD UINT & pos_in_cur_buf);
 
+    //Token dispatch functions.
+    TOKEN t_div(CHAR next_char);
     CHAR t_escape_string();
     TOKEN t_num();
     TOKEN t_string(CHAR stop_char);
     TOKEN t_char_list();
     TOKEN t_id();
     TOKEN t_solidus(bool * is_restart);
+    TOKEN t_solidus_equ(CHAR c);
+    TOKEN t_solidus_solidus(bool * is_restart);
+    TOKEN t_solidus_asterisk(bool * is_restart);
     TOKEN t_dot();
     TOKEN t_lead_by_neg();
     TOKEN t_lead_by_lt();

@@ -65,7 +65,7 @@ static CHAR const* g_fmt_name[] = {
 
 class OP_MATCH {
 public:
-    bool match_bin_r_rr(IR_TYPE irt, IR * ir, IR ** res, IR ** op0, IR ** op1)
+    bool match_bin_r_rr(IR_CODE irt, IR * ir, IR ** res, IR ** op0, IR ** op1)
     {
         if (!ir->is_stpr()) return false;
         if (res != nullptr) { *res = ir; }
@@ -98,7 +98,7 @@ public:
         return true;
     }
 
-    bool match_uni_r_r(IR_TYPE irt, IR * ir, IR ** res, IR ** op0)
+    bool match_uni_r_r(IR_CODE irt, IR * ir, IR ** res, IR ** op0)
     {
         if (!ir->is_stpr()) { return false; }
         if (res != nullptr) { *res = ir; }
@@ -1525,7 +1525,7 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
     Vertex const* vex  = pthis->getVertex(LT_uid(lt));
     if (vex == nullptr) { return; }
 
-    xcom::EdgeC * el = VERTEX_in_list(vex);
+    xcom::EdgeC * el = vex->getInList();
     while (el != nullptr) {
         INT v = el->getFromId();
         LT * ni = m_ltm->getLifeTime(v);
@@ -1536,7 +1536,7 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
         el = EC_next(el);
     }
 
-    el = VERTEX_out_list(vex);
+    el = vex->getOutList();
     while (el != nullptr) {
         INT v = el->getToId();
         LT * ni = m_ltm->getLifeTime(v);
@@ -2364,7 +2364,7 @@ void LTMgr::buildGroup(ConstIRIter & cii)
     //Add two point for live in exposed use and live out exposed use.
     m_max_lt_len = m_bb->getNumOfIR() * 2 + 2 + get_first_pos();
     BitSet * lived_lt = m_gltm->getBitSetMgr()->create();
-    C<IR*> * ct;
+    BBIRListIter ct;
     IR * ir = BB_irlist(m_bb).get_tail(&ct);
     UINT pos = m_max_lt_len - 2;
     for (; ir != nullptr; ir = BB_irlist(m_bb).get_prev(&ct), pos--) {
@@ -2409,7 +2409,7 @@ void LTMgr::build(
     #endif
 
     IR * ir;
-    C<IR*> * ct;
+    BBIRListIter ct;
     for (pos = m_max_lt_len - 2, ir = BB_irlist(m_bb).get_tail(&ct);
          ir != nullptr; ir = BB_irlist(m_bb).get_prev(&ct), pos--) {
         m_pos2ir.set(pos, ir);
@@ -2879,7 +2879,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         //Dump occurrences.
         BSIdx start = LT_range(lt)->get_first();
         BSIdx end = LT_range(lt)->get_last();
-        for (INT j = get_first_pos(); j < (INT)m_max_lt_len; j++) {
+        for (UINT j = get_first_pos(); j < m_max_lt_len; j++) {
             if (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(j)) {
                 if (lt->is_def(j)) {
                     fprintf(h, "DEF,");
@@ -3007,7 +3007,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
         fprintf(h, "\nDESC:");
         BSIdx start = LT_occ(lt)->get_first();
         BSIdx end = LT_occ(lt)->get_last();
-        for (INT j = get_first_pos(); j < (INT)m_max_lt_len; j++) {
+        for (UINT j = get_first_pos(); j < m_max_lt_len; j++) {
             if (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(j)) {
                 if (lt->is_def(j)) {
                     fprintf(h, "DEF,");
@@ -3263,7 +3263,7 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
     //Preferred the minmum.
     BSIdx m = usable->get_last();
     bool succ = false;
-    for (INT i = FIRST_PHY_REG; i <= m; i++) {
+    for (UINT i = FIRST_PHY_REG; i <= m; i++) {
         if (!unusable->is_contain(i)) {
             if (LT_rg_sz(l) > 1) {
                 ASSERTN(LT_rg_sz(l) == RG_PAIR_SZ, ("to support more size"));
@@ -3310,8 +3310,7 @@ bool BBRA::getMaxHole(OUT BSIdx * startpos, OUT BSIdx * endpos, LT const* lt)
 {
     *startpos = 0;
     *endpos = 0;
-
-    INT maxlen = 0;
+    UINT maxlen = 0;
     BSIdx next_i = BS_UNDEF;
     UINT first = m_ltm->get_first_pos();
     UINT last = m_ltm->get_last_pos();
@@ -3330,12 +3329,10 @@ bool BBRA::getMaxHole(OUT BSIdx * startpos, OUT BSIdx * endpos, LT const* lt)
             (i == last &&
              LT_range(lt)->is_contain(last)) || //life time live out.
             (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(i))) {
-            if (i > start) {
-                if (maxlen < (i - start)) {
-                    maxlen = i - start;
-                    *startpos = start;
-                    *endpos = i;
-                }
+            if (i > start && maxlen < (i - start)) {
+                maxlen = i - start;
+                *startpos = start;
+                *endpos = i;
             }
             start = i;
         }
@@ -3352,7 +3349,7 @@ bool BBRA::getMaxHole(OUT BSIdx * startpos, OUT BSIdx * endpos, LT const* lt)
 //Only compute the longest hole for each of life times.
 void BBRA::computeLTResideInHole(OUT List<LT*> & reside_in, LT const* lt)
 {
-    INT hole_startpos, hole_endpos;
+    BSIdx hole_startpos, hole_endpos;
     getMaxHole(&hole_startpos, &hole_endpos, lt);
 
     BitSet * hole = m_gltm->getBitSetMgr()->create();
@@ -3784,8 +3781,8 @@ void BBRA::renameOpndInRange(LT * lt, IR * newpr, BSIdx start, BSIdx end)
 {
     ASSERT0(lt && newpr && newpr->is_pr());
     UNREACHABLE();
-    INT firstpos = m_ltm->get_first_pos();
-    INT lastpos = m_ltm->get_last_pos();
+    UINT firstpos = m_ltm->get_first_pos();
+    UINT lastpos = m_ltm->get_last_pos();
     if (start == BS_UNDEF) { start = firstpos; }
     if (end == BS_UNDEF) { end = lastpos; }
     ASSERT0(start >= firstpos && start <= lastpos);
@@ -4360,7 +4357,7 @@ bool RA::assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2)
 
     bool succ = false;
     BSIdx m = usable->get_last();
-    for (INT i = FIRST_PHY_REG; i <= m; i++) {
+    for (UINT i = FIRST_PHY_REG; i <= m; i++) {
         if (!unusable->is_contain(i)) {
             if (GLT_rg_sz(g) != 1) {
                 ASSERTN(GLT_rg_sz(g) == RG_PAIR_SZ, ("to support more size"));
@@ -5811,7 +5808,7 @@ bool RA::perform(OptCtx & oc)
     START_TIMER(t, "GRA");
 
     ASSERT0(m_var2pr);
-    m_liveness_mgr.setVAR2PR(m_var2pr);
+    m_liveness_mgr.setVar2PR(m_var2pr);
     m_liveness_mgr.perform(oc);
     m_cfg->computeExitList();
     m_gltm.set_consider_local_interf(true);

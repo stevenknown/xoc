@@ -349,8 +349,6 @@ bool MDSet::is_contain_only_taken_addr(MD const* md) const
 //Return true if md is overlap with the elements in set.
 bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
 {
-    ASSERT0(current_ru);
-
     if (md->is_global() && DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
@@ -369,6 +367,7 @@ bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
     //    return true;
     //}
 
+    ASSERT0(current_ru);
     if (DefSBitSetCore::is_contain(MD_IMPORT_VAR) &&
         !current_ru->isRegionVAR(md->get_base())) {
         //If current MDSet contains imported variable, it
@@ -503,6 +502,16 @@ void MDSet::dump(MDSystem * ms, bool detail) const
             md->dump(ms->getTypeMgr());
         }
     }
+}
+
+
+MD * MDSet::get_unique_md(MDSystem const* ms) const
+{
+    MDSetIter it = nullptr;
+    BSIdx first = get_first(&it);
+    if (first == BS_UNDEF) { return nullptr; }
+    BSIdx second = get_next(first, &it);
+    return second != BS_UNDEF ? nullptr : ms->getMD((MDIdx)first);
 }
 //END MDSet
 

@@ -37,119 +37,119 @@ class XCodeInfo {
 public:
     X_CODE code;
     CHAR const* name;
-    IR_TYPE irtype;
+    IR_CODE ircode;
 };
 
 
 //Define keywords of XOC IR.
 static XCodeInfo g_keyword_info[] = {
-    { X_UNDEF,       "",                 },
-    { X_ID,          "id",               },
-    { X_LD,          "ld",               },
-    { X_ILD,         "ild",              },
-    { X_ARRAY,       "array",            },
-    { X_ST,          "st",               },
-    { X_STRP,        "stpr",             },
-    { X_STARRAY,     "starray",          },
-    { X_SETELEM,     "setelem",          },
-    { X_GETELEM,     "getelem",          },
-    { X_IST,         "ist",              },
-    { X_CALL,        "call",             },
-    { X_ICALL,       "icall",            },
-    { X_LDA,         "lda",              },
-    { X_ADD,         "add",              },
-    { X_SUB,         "sub",              },
-    { X_MUL,         "mul",              },
-    { X_DIV,         "div",              },
-    { X_REM,         "rem",              },
-    { X_MOD,         "mod",              },
-    { X_LAND,        "land",             },
-    { X_LOR,         "lor",              },
-    { X_BAND,        "band",             },
-    { X_BOR,         "bor",              },
-    { X_XOR,         "xor",              },
-    { X_ASR,         "asr",              },
-    { X_LSR,         "lsr",              },
-    { X_LSL,         "lsl",              },
-    { X_LT,          "lt",               },
-    { X_LE,          "le",               },
-    { X_GT,          "gt",               },
-    { X_GE,          "ge",               },
-    { X_EQ,          "eq",               },
-    { X_NE,          "ne",               },
-    { X_BNOT,        "bnot",             },
-    { X_LNOT,        "lnot",             },
-    { X_NEG,         "neg",              },
-    { X_CVT,         "cvt",              },
-    { X_GOTO,        "goto",             },
-    { X_IGOTO,       "igoto",            },
-    { X_DO,          "do",               },
-    { X_WHILE,       "while",            },
-    { X_DO_LOOP,     "doloop",           },
-    { X_LABEL,       "label",            },
-    { X_TRUEBR,      "truebr",           },
-    { X_FALSEBR,     "falsebr",          },
-    { X_SELECT,      "select",           },
-    { X_PHI,         "phi",              },
-    { X_REGION,      "region",           },
-    { X_IF,          "if",               },
-    { X_ELSE,        "else",             },
-    { X_BREAK,       "break",            },
-    { X_RETURN,      "return",           },
-    { X_CONTINUE,    "continue",         },
-    { X_SWITCH,      "switch",           },
-    { X_CASE,        "case",             },
-    { X_DEFAULT,     "default",          },
-    { X_VAR,         "var",              },
-    { X_FUNC,        "func",             },
-    { X_PROGRAM,     "program",          },
-    { X_INNER,       "inner",            },
-    { X_BLACKBOX,    "blackbox",         },
-    { X_I8,          "i8",               },
-    { X_U8,          "u8",               },
-    { X_I16,         "i16",              },
-    { X_U16,         "u16",              },
-    { X_I32,         "i32",              },
-    { X_U32,         "u32",              },
-    { X_I64,         "i64",              },
-    { X_U64,         "u64",              },
-    { X_I128,        "i128",             },
-    { X_U128,        "u128",             },
-    { X_F32,         "f32",              },
-    { X_F64,         "f64",              },
-    { X_F80,         "f80",              },
-    { X_F128,        "f128",             },
-    { X_MC,          "mc",               },
-    { X_STR,         "str",              },
-    { X_VEC,         "vec",              },
-    { X_BOOL,        "bool",             },
-    { X_ANY,         "any",              },
-    { X_READONLY,    "readonly",         },
-    { X_TRY_START,   "try_start",        },
-    { X_TRY_END,     "try_end",          },
-    { X_TERMINATE,   "terminate",        },
-    { X_CATCH_START, "catch_start",      },
-    { X_ATOM,        "atom",             },
-    { X_RMW,         "rmw",              },
-    { X_THROW,       "throw",            },
-    { X_SIDEEFFECT,  "sideeffect",       },
-    { X_NOMOVE,      "nomove",           },
-    { X_USE,         "use",              },
-    { X_DEF,         "def",              },
-    { X_PRIVATE,     "private",          },
-    { X_RESTRICT,    "restrict",         },
-    { X_VOLATILE,    "volatile",         },
-    { X_FUNC_DECL,   "func_decl",        },
-    { X_FAKE,        "fake",             },
-    { X_GLOBAL,      "global",           },
-    { X_UNDEFINED,   "undefined",        },
-    { X_STRING,      "string",           },
-    { X_BYTE,        "byte",             },
-    { X_ELEMTYPE,    "elemtype",         },
-    { X_DIM,         "dim",              },
-    { X_UNALLOCABLE, "unallocable",      },
-    { X_ALIGN,       "align",            },
-    { X_LAST,        "",                 },
+    { X_UNDEF, "", },
+    { X_ID, "id", }, 
+    { X_LD, "ld", }, 
+    { X_ILD, "ild", }, 
+    { X_ARRAY, "array", }, 
+    { X_ST, "st", }, 
+    { X_STRP, "stpr", }, 
+    { X_STARRAY, "starray", }, 
+    { X_SETELEM, "setelem", }, 
+    { X_GETELEM, "getelem", }, 
+    { X_IST, "ist", }, 
+    { X_CALL, "call", }, 
+    { X_ICALL, "icall", }, 
+    { X_LDA, "lda", }, 
+    { X_ADD, "add", }, 
+    { X_SUB, "sub", }, 
+    { X_MUL, "mul", }, 
+    { X_DIV, "div", }, 
+    { X_REM, "rem", }, 
+    { X_MOD, "mod", }, 
+    { X_LAND, "land", }, 
+    { X_LOR, "lor", }, 
+    { X_BAND, "band", }, 
+    { X_BOR, "bor", }, 
+    { X_XOR, "xor", }, 
+    { X_ASR, "asr", }, 
+    { X_LSR, "lsr", }, 
+    { X_LSL, "lsl", }, 
+    { X_LT, "lt", }, 
+    { X_LE, "le", }, 
+    { X_GT, "gt", }, 
+    { X_GE, "ge", }, 
+    { X_EQ, "eq", }, 
+    { X_NE, "ne", }, 
+    { X_BNOT, "bnot", }, 
+    { X_LNOT, "lnot", }, 
+    { X_NEG, "neg", }, 
+    { X_CVT, "cvt", }, 
+    { X_GOTO, "goto", }, 
+    { X_IGOTO, "igoto", }, 
+    { X_DO, "do", }, 
+    { X_WHILE, "while", }, 
+    { X_DO_LOOP, "doloop", }, 
+    { X_LABEL, "label", }, 
+    { X_TRUEBR, "truebr", }, 
+    { X_FALSEBR, "falsebr", }, 
+    { X_SELECT, "select", }, 
+    { X_PHI, "phi", }, 
+    { X_REGION, "region", }, 
+    { X_IF, "if", }, 
+    { X_ELSE, "else", }, 
+    { X_BREAK, "break", }, 
+    { X_RETURN, "return", }, 
+    { X_CONTINUE, "continue", }, 
+    { X_SWITCH, "switch", }, 
+    { X_CASE, "case", }, 
+    { X_DEFAULT, "default", }, 
+    { X_VAR, "var", }, 
+    { X_FUNC, "func", }, 
+    { X_PROGRAM, "program", }, 
+    { X_INNER, "inner", }, 
+    { X_BLACKBOX, "blackbox", }, 
+    { X_I8, "i8", }, 
+    { X_U8, "u8", }, 
+    { X_I16, "i16", }, 
+    { X_U16, "u16", }, 
+    { X_I32, "i32", }, 
+    { X_U32, "u32", }, 
+    { X_I64, "i64", }, 
+    { X_U64, "u64", }, 
+    { X_I128, "i128", }, 
+    { X_U128, "u128", }, 
+    { X_F32, "f32", }, 
+    { X_F64, "f64", }, 
+    { X_F80, "f80", }, 
+    { X_F128, "f128", }, 
+    { X_MC, "mc", }, 
+    { X_STR, "str", }, 
+    { X_VEC, "vec", }, 
+    { X_BOOL, "bool", }, 
+    { X_ANY, "any", }, 
+    { X_READONLY, "readonly", }, 
+    { X_TRY_START, "try_start", }, 
+    { X_TRY_END, "try_end", }, 
+    { X_TERMINATE, "terminate", }, 
+    { X_CATCH_START, "catch_start", }, 
+    { X_ATOM, "atom", }, 
+    { X_RMW, "rmw", }, 
+    { X_THROW, "throw", }, 
+    { X_SIDEEFFECT, "sideeffect", }, 
+    { X_NOMOVE, "nomove", }, 
+    { X_USE, "use", }, 
+    { X_DEF, "def", }, 
+    { X_PRIVATE, "private", }, 
+    { X_RESTRICT, "restrict", }, 
+    { X_VOLATILE, "volatile", }, 
+    { X_FAKE, "fake", }, 
+    { X_GLOBAL, "global", }, 
+    { X_UNDEFINED, "undefined", }, 
+    { X_STRING, "string", }, 
+    { X_BYTE, "byte", }, 
+    { X_ELEMTYPE, "elemtype", }, 
+    { X_DIM, "dim", }, 
+    { X_UNALLOCABLE, "unallocable", }, 
+    { X_ALIGN, "align", }, 
+    { X_DECL, "decl", }, 
+    { X_LAST, "", }, 
 };
 
 
@@ -707,7 +707,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     if (!ctx->has_phi) { return true; }
     Region * rg = ctx->current_region;
     rg->constructBBList();
-    OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region->id());
+    OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region);
     ASSERT0(oc);
     rg->initPassMgr();
     PassMgr * pm = rg->getPassMgr();
@@ -720,11 +720,16 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     pm->checkValidAndRecompute(oc, PASS_CFG, PASS_UNDEF);
     OC_do_merge_label(*oc) = loc.do_merge_label();
     rg->getCFG()->reorderPhiEdge(ctx->getIR2Label());
-    PRSSAMgr * prssamgr = (PRSSAMgr*)pm->registerPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * prssamgr = (PRSSAMgr*)pm->registerPass(PASS_PRSSA_MGR);
     ASSERT0(prssamgr);
     prssamgr->genSSAInfoForRegion();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(rg));
-    prssamgr->refinePhi();
+    prssamgr->refinePhi(*oc);
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {
+        START_TIMER(tdump, "IRParser: PRSSA: Dump After Pass");
+        prssamgr->dump();
+        END_TIMER(tdump, "IRParser: PRSSA: Dump After Pass");
+    }
     return true;
 }
 
@@ -747,14 +752,14 @@ bool IRParser::parseRegionName(Region * region, UINT flag, ParseCtx * ctx)
             m_rumgr->getTypeMgr()->getAny(), 1, flag);
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
-            VAR_is_func_decl(regionvar) = true;
+            regionvar->setflag(VAR_IS_FUNC);
         }
     }
     region->setRegionVar(regionvar);
     if (ctx->current_region != nullptr) {
         ctx->current_region->addToVarTab(regionvar);
     }
-    if (!regionvar->is_func_decl() &&
+    if (!regionvar->is_func() &&
         (region->is_function() || region->is_program())) {
         error("var %s should be func_decl", SYM_name(sym));
     }
@@ -801,9 +806,12 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     START_TIMER_FMT(w, ("Parse Region(%d):%s",
                         region->id(), region->getRegionName()));
     if (!parseRegionBody(&newctx)) {
+        END_TIMER_FMT(w, ("Parse Region(%d):%s",
+                          region->id(), region->getRegionName()));
         return false;
     }
-    END_TIMER(w, "");
+    END_TIMER_FMT(w,("Parse Region(%d):%s",
+                     region->id(), region->getRegionName()));
 
     if (!checkLabel(newctx.stmt_list, newctx)) {
         return false;
@@ -2121,7 +2129,7 @@ bool IRParser::isExp()
 }
 
 
-bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
+bool IRParser::parseBinaryOp(IR_CODE code, ParseCtx * ctx)
 {
     ASSERT0(isBinaryOp(code));
     TOKEN tok = m_lexer->getNextToken();
@@ -2236,7 +2244,7 @@ bool IRParser::parseCvt(ParseCtx * ctx)
 }
 
 
-bool IRParser::parseUnaryOp(IR_TYPE code, ParseCtx * ctx)
+bool IRParser::parseUnaryOp(IR_CODE code, ParseCtx * ctx)
 {
     ASSERT0(isUnaryOp(code));
     TOKEN tok = m_lexer->getNextToken();
@@ -2857,7 +2865,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "can not find region %s", SYM_name(name));
             return false;
         }
-        if (!callee_var->is_func_decl()) {
+        if (!callee_var->is_func()) {
             error(tok, "%s is not function type region", SYM_name(name));
             return false;
         }
@@ -3815,7 +3823,7 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
             tok = m_lexer->getNextToken();
         } else if (declareVar(ctx, &v)) {
             ASSERT0(v);
-            VAR_is_formal_param(v) = true;
+            v->setflag(VAR_IS_FORMAL_PARAM);
             VAR_formal_param_pos(v) = i;
         } else {
             error(tok, "invalide parameter list");
@@ -4052,9 +4060,13 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
     for (;;) {
         switch (tok) {
         case T_VOLATILE:
-            VAR_is_volatile(var) = true;
+            var->setflag(VAR_VOLATILE);
             tok = m_lexer->getNextToken();
             break;
+        case T_RESTRICT:
+            var->setflag(VAR_IS_RESTRICT);
+             tok = m_lexer->getNextToken();
+             break;
         case T_RPAREN:
         case T_UNDEF:
         case T_END:
@@ -4062,35 +4074,35 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
         case T_IDENTIFIER:
             switch (getCurrentXCode()) {
             case X_READONLY:
-                VAR_is_readonly(var) = true;
+                var->setflag(VAR_READONLY);
                 tok = m_lexer->getNextToken();
                 break;
             case X_PRIVATE:
-                VAR_is_private(var) = true;
+                var->setflag(VAR_PRIVATE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_VOLATILE:
-                VAR_is_volatile(var) = true;
+                var->setflag(VAR_VOLATILE);
                 tok = m_lexer->getNextToken();
                 break;
-            case X_RESTRICT:
-                VAR_is_restrict(var) = true;
-                tok = m_lexer->getNextToken();
-                break;
-            case X_FUNC_DECL:
-                VAR_is_func_decl(var) = true;
+            case X_FUNC:
+                var->setflag(VAR_IS_FUNC);
                 tok = m_lexer->getNextToken();
                 break;
             case X_FAKE:
-                VAR_is_fake(var) = true;
+                var->setflag(VAR_FAKE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_GLOBAL:
-                VAR_is_global(var) = true;
+                var->setflag(VAR_GLOBAL);
                 tok = m_lexer->getNextToken();
                 break;
             case X_ARRAY:
-                VAR_is_array(var) = true;
+                var->setflag(VAR_IS_ARRAY);
+                tok = m_lexer->getNextToken();
+                break;
+            case X_RESTRICT:
+                var->setflag(VAR_IS_RESTRICT);
                 tok = m_lexer->getNextToken();
                 break;
             case X_STRING:
@@ -4104,7 +4116,11 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
                 }
                 break;
             case X_UNALLOCABLE:
-                VAR_is_unallocable(var) = true;
+                var->setflag(VAR_IS_UNALLOCABLE);
+                tok = m_lexer->getNextToken();
+                break;
+            case X_DECL:
+                var->setflag(VAR_IS_DECL);
                 tok = m_lexer->getNextToken();
                 break;
             case X_ALIGN:
@@ -4200,7 +4216,7 @@ bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
         }
     }
     VAR_byte_val(var) = ctx->current_region->allocByteBuf(bytesize);
-    VAR_has_init_val(var) = true;
+    var->setflag(VAR_HAS_INIT_VAL);
     ::memcpy(BYTEBUF_buffer(VAR_byte_val(var)), buf.get_vec(), bytesize);
     if (m_lexer->getCurrentToken() != T_RPAREN) {
         error(tok, "miss ')'");
@@ -4229,7 +4245,7 @@ bool IRParser::parseStringValue(Var * var, ParseCtx *)
         return false;
     }
     VAR_string(var) = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
-    VAR_has_init_val(var) = true;
+    var->setflag(VAR_HAS_INIT_VAL);
     tok = m_lexer->getNextToken();
     if (tok != T_RPAREN) {
         error(tok, "miss ')'");
@@ -4396,7 +4412,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                     ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_REGION) {
                     error(tok, "%s does not have READONLY property",
-                          IRTNAME(ctx->ircode));
+                          IRCNAME(ctx->ircode));
                     return false;
                 }
                 ps.readonly = true;
@@ -4433,7 +4449,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 if (ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_ICALL &&
                     ctx->ircode != IR_REGION) {
-                    error(tok, "%s does have USE property", IRTNAME(ctx->ircode));
+                    error(tok, "%s does have USE property", IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseUseProperty(ps, ctx)) {
@@ -4445,7 +4461,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 if (ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_ICALL &&
                     ctx->ircode != IR_REGION) {
-                    error(tok, "%s does have DEF property", IRTNAME(ctx->ircode));
+                    error(tok, "%s does have DEF property", IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseDefProperty(ps, ctx)) {
@@ -4456,7 +4472,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 ASSERT0(ctx);
                 if (ctx->ircode != IR_STARRAY && ctx->ircode != IR_ARRAY) {
                     error(tok, "%s does have elemtype property",
-                        IRTNAME(ctx->ircode));
+                        IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseElemTypeProperty(ps, ctx)) {
@@ -4467,7 +4483,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 ASSERT0(ctx);
                 if (ctx->ircode != IR_STARRAY && ctx->ircode != IR_ARRAY) {
                     error(tok, "%s does have dim property",
-                        IRTNAME(ctx->ircode));
+                        IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseDimProperty(ps, ctx)) {

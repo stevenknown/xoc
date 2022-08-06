@@ -612,7 +612,7 @@ bool LCSE::perform(OptCtx & oc)
 
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
+        PASS_PRSSA_MGR));
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
@@ -625,7 +625,7 @@ bool LCSE::perform(OptCtx & oc)
 
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
+        PASS_MDSSA_MGR));
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {

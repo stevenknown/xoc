@@ -89,7 +89,6 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
     if (!checkTypeConsistency(exp, cand_exp)) {
         return;
     }
-
     //The memory that 'exp' pointed to is same to 'cand_exp' because
     //cand_exp has been garanteed that will not change in propagation
     //interval.
@@ -107,8 +106,13 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
     ASSERT0(cand_exp->getStmt());
     IR * newir = m_rg->dupIRTree(cand_exp);
     xoc::addUseForTree(newir, cand_exp, m_rg);
-    xoc::removeUseForTree(exp, m_rg);
+    xoc::removeUseForTree(exp, m_rg, *getOptCtx());
     CPC_change(ctx) = true;
+    if (newir->mustBePointerType()) {
+        ASSERT0(newir->is_ptr());
+    } else {
+        newir->setType(exp->getType());
+    }
 
     if (exp->is_id()) {
         ASSERT0(ID_phi(exp));
@@ -123,7 +127,8 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
     //Fixup DUChain.
     IR * stmt = newir->getStmt();
     IRBB * stmtbb = stmt->getBB();
-    xoc::findAndSetLiveInDef(newir, stmtbb->getPrevIR(stmt), stmtbb, m_rg);
+    xoc::findAndSetLiveInDef(newir, stmtbb->getPrevIR(stmt), stmtbb,
+                             m_rg, *getOptCtx());
 }
 
 
@@ -162,27 +167,17 @@ bool CopyProp::isCopyOR(IR * ir) const
 bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
                                  IRBB const* meetup) const
 {
-    xcom::List<IRBB const*> wl;
-    m_cfg->get_preds(wl, start);
-    xcom::TTab<UINT> visited;
-    while (wl.get_elem_count() != 0) {
-        IRBB const* t = wl.remove_head();
-        if (t == meetup) { continue; }
-
-        IRListIter tir_holder = nullptr;
-        for (IR const* tir = BB_irlist(t).get_head(&tir_holder);
-             tir != nullptr; tir = BB_irlist(t).get_next(&tir_holder)) {
+    GraphIterIn iterin(*m_cfg, start->getVex());
+    for (Vertex const* t = iterin.get_first();
+         t != nullptr; t = iterin.get_next(t)) {
+        if (t == meetup->getVex()) { continue; }
+        IRListIter irit = nullptr;
+        IRBB * tbb = m_cfg->getBB(t->id());
+        ASSERT0(tbb);
+        for (IR const* tir = tbb->getIRList().get_head(&irit);
+             tir != nullptr; tir = tbb->getIRList().get_next(&irit)) {
             if (m_du->isMayDef(tir, exp, true)) {
                 return true;
-            }
-        }
-
-        visited.append(t->id());
-        for (xcom::EdgeC * el = m_cfg->getVertex(t->id())->getInList();
-             el != nullptr; el = el->get_next()) {
-            UINT pred = (UINT)el->getFromId();
-            if (!visited.find(pred)) {
-                wl.append_tail(m_cfg->getBB(pred));
             }
         }
     }
@@ -414,9 +409,8 @@ bool CopyProp::doPropForNormalStmt(IRListIter cur_iter, IRListIter * next_iter,
 }
 
 
-void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
-                                         IR const* prop_value,
-                                         IR const* use)
+void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
+                                  IR const* use)
 {
     if (!getRegion()->isLogMgrInit()) { return; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
@@ -554,7 +548,8 @@ IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
     if ((prop_value->is_int() && leaf->is_fp()) ||
         (prop_value->is_fp() && leaf->is_int())) {
         //TBD:Can we safely discard the float<->integer conversion?
-        //return prop_value;
+        //For now, we will not disgard CVT for conservative purpose.
+        return prop_value;
     }
     //Regard leaf expression as the propagate candidate.
     return leaf;
@@ -640,7 +635,7 @@ bool CopyProp::doPropUseSet(IRSet const* useset, IR const* def_stmt,
                                                  prssadu, mdssadu);
         if (new_prop_value == nullptr) { continue; }
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
-            dumpCopyPropagationAction(def_stmt, new_prop_value, use);
+            dumpCopyPropAction(def_stmt, new_prop_value, use);
         }
         if (use->is_id()) {
             change |= doPropForMDPhi(new_prop_value, use);
@@ -697,10 +692,10 @@ bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet * useset)
 
 static void refinement(Region * rg, OptCtx & oc)
 {
-    RefineCtx rf;
+    RefineCtx rf(&oc);
     RC_insert_cvt(rf) = false;
     Refine * refine = (Refine*)rg->getPassMgr()->registerPass(PASS_REFINE);
-    refine->refineBBlist(rg->getBBList(), rf, oc);
+    refine->refineBBlist(rg->getBBList(), rf);
 }
 
 
@@ -713,8 +708,16 @@ bool CopyProp::perform(OptCtx & oc)
     DUMMYUSE(is_org_pr_du_chain_valid);
     DUMMYUSE(is_org_nonpr_du_chain_valid);
     if (!oc.is_ref_valid()) { return false; }
-    m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
-    if (m_gvn == nullptr || !m_gvn->is_valid()) { return false; }
+    m_oc = &oc;
+    m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);
+    if (!m_gvn->is_valid()) {
+        if (allowInexactMD()) {
+            //Aggressive CP need GVN.
+            m_gvn->perform(oc);
+        } else {
+            return false;
+        }
+    }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
@@ -728,8 +731,7 @@ bool CopyProp::perform(OptCtx & oc)
         return false;
     }
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-
-    m_rg->getLogMgr()->startBuffer();
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     bool changed = false;
     IRBB * entry = m_rg->getCFG()->getEntry();
     ASSERTN(entry, ("Not unique entry, invalid Region"));
@@ -763,16 +765,14 @@ bool CopyProp::perform(OptCtx & oc)
 
     if (!changed) {
         m_rg->getLogMgr()->cleanBuffer();
-        m_rg->getLogMgr()->endBuffer();
         return false;
     }
-    m_rg->getLogMgr()->endBuffer();
     OC_is_expr_tab_valid(oc) = false;
     OC_is_aa_valid(oc) = false;
     OC_is_ref_valid(oc) = true; //already update.
     ASSERT0(m_rg->verifyMDRef());
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg));
-    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg));
+    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     return true;
 }
 //END CopyProp

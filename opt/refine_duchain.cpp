@@ -55,7 +55,7 @@ bool RefineDUChain::dump() const
 bool RefineDUChain::processBB(IRBB const* bb)
 {
     ASSERT0(bb);
-    C<IR*> * ct = nullptr;
+    BBIRListIter ct = nullptr;
     ConstIRIter ii;
     bool change = false;
     for (IR * ir = BB_irlist(bb).get_head(&ct);

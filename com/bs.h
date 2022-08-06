@@ -36,16 +36,16 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define BS_UNDEF ((BSIdx)-1) //The maximum unsigned integer
 #define BS_ZERO 0
-#define BS_DUMP_BITSET 1
-#define BS_DUMP_POS 2
-#define BITS_PER_BYTE 8
 #define BYTES_PER_UNIT sizeof(BSUNIT)
 #define IS_BSUNDEF(x) ((BSIdx)x == BS_UNDEF)
 
+enum BS_DUMP_FLAG {
+    BS_DUMP_BITSET = 0x1,
+    BS_DUMP_POS = 0x2,
+};
+
 typedef UINT BSUNIT;
-typedef UINT BSIdx;
 
 class BitSet;
 class BitSetMgr;
@@ -133,14 +133,15 @@ public:
 
     //Dump bit value and position.
     void dump(CHAR const* name = nullptr, bool is_del = false,
-              UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
+              UFlag f = UFlag(BS_DUMP_BITSET|BS_DUMP_POS),
               BSIdx last_pos = BS_UNDEF) const;
 
     //Dump bit value and position.
-    void dump(FILE * h, UINT flag, BSIdx last_pos) const;
+    void dump(FILE * h, UFlag flag, BSIdx last_pos) const;
 
     //Dump bit value and position.
-    void dump(FILE * h) const { dump(h, BS_DUMP_BITSET|BS_DUMP_POS, BS_UNDEF); }
+    void dump(FILE * h) const
+    { dump(h, UFlag(BS_DUMP_BITSET|BS_DUMP_POS), BS_UNDEF); }
 
     //Return the element count in 'set'
     //Add up the population count of each byte in the set.  We get the
@@ -228,11 +229,11 @@ public:
 
     //Dump bit value and position.
     void dump(CHAR const* name = nullptr, bool is_del = false,
-              UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
+              UFlag f = UFlag(BS_DUMP_BITSET|BS_DUMP_POS),
               BSIdx last_pos = BS_UNDEF) const
-    { BitSet::dump(name, is_del, flag, last_pos); }
+    { BitSet::dump(name, is_del, f, last_pos); }
     //Dump bit value and position.
-    void dump(FILE * h, UINT flag, BSIdx last_pos) const
+    void dump(FILE * h, UFlag flag, BSIdx last_pos) const
     { BitSet::dump(h, flag, last_pos); }
     //Dump bit value and position.
     void dump(FILE * h) const { BitSet::dump(h); }

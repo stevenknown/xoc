@@ -34,9 +34,9 @@ author: Su Zhenyu
 #ifndef __GRA_H__
 #define __GRA_H__
 
-#define LT_FIRST_POS    0
-#define RG_PAIR_SZ         2
-#define FIRST_PHY_REG    0
+#define LT_FIRST_POS 0
+#define RG_PAIR_SZ 2
+#define FIRST_PHY_REG 0
 
 class GLT;
 class LTMgr;
@@ -824,7 +824,7 @@ protected:
     TypeIndexRep * m_tr;
     Vreg2PR * m_v2pr;
     Prno2Vreg * m_pr2v;
-    VAR2PR * m_var2pr;
+    Var2PR * m_var2pr;
     UINT m_param_num; //record the number of param.
     UINT m_param_reg_start;
     UINT m_vregnum; //record the number of original vreg.
@@ -903,13 +903,8 @@ protected:
     void reviseParam();
     bool overlapParam(LT const* l) const;
 public:
-    RA(Region * rg,
-       TypeIndexRep * tr,
-       UINT param_num,
-       UINT vregnum,
-       Vreg2PR * v2pr,
-       Prno2Vreg * pr2v,
-       VAR2PR * var2pr) :
+    RA(Region * rg, TypeIndexRep * tr, UINT param_num, UINT vregnum,
+       Vreg2PR * v2pr, Prno2Vreg * pr2v, Var2PR * var2pr) :
            m_liveness_mgr(rg), m_gltm(rg, &m_liveness_mgr, self()),
            m_ig(rg, &m_gltm), m_rsc(&m_gltm)
     {

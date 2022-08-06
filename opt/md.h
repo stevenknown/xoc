@@ -138,7 +138,7 @@ typedef UINT MDIdx;
 #define MD_ty(md) ((md)->u2.s1.type)
 
 //The memory object is a PR.
-#define MD_is_pr(md) (VAR_is_pr(MD_base(md)))
+#define MD_is_pr(md) (MD_base(md)->is_pr())
 
 //True indicates MD will not be effect MD, namely,
 //the MD only could be put in MayDef or MayUse md set.
@@ -212,7 +212,7 @@ public:
     //NOTE: Effect inexact MD represents the memory object which may or may
     //not exist. If some stmt modified effect but inexact MD, it will be
     //non-killing definition.
-    bool is_effect() const { return !VAR_is_fake(MD_base(this)); }
+    bool is_effect() const { return !MD_base(this)->is_fake(); }
 
     //Return true if md is exact object.
     //Exact MD represent must and killing-DEF or USE.
@@ -222,10 +222,14 @@ public:
     bool is_unbound() const { return MD_ty(this) == MD_UNBOUND; }
 
     //Return true if md is global variable.
-    bool is_global() const { return VAR_is_global(MD_base(this)); }
+    bool is_global() const { return MD_base(this)->is_global(); }
 
     //Return true if md is volatile memory.
-    bool is_volatile() const { return VAR_is_volatile(MD_base(this)); }
+    bool is_volatile() const { return MD_base(this)->is_volatile(); }
+
+    //Return true if user hint guarranteed that the MD does not overlap
+    //with other MDs.
+    bool is_restrict() const { return MD_base(this)->is_restrict(); }
 
     //If MD is range, MD_base + MD_ofst indicate the start address,
     //MD_size indicate the range.
@@ -506,11 +510,15 @@ public:
         }
         return nullptr;
     }
+
     //Get unique MD that is not fake memory object,
     //but its offset might be invalid.
     //Note the MDSet can only contain one element.
     //Return the effect MD if found, otherwise return nullptr.
     MD * get_effect_md(MDSystem * ms) const;
+
+    //Return the unique MD if current set has only one element.
+    MD * get_unique_md(MDSystem const* ms) const;
 };
 
 
@@ -706,7 +714,7 @@ public:
 
     //Get registered MD.
     //NOTICE: DO NOT free the return value, because it is the registered one.
-    MD * getMD(MDIdx id)
+    MD * getMD(MDIdx id) const
     {
         ASSERT0(id != MD_UNDEF);
         MD * md = m_id2md_map.get(id);

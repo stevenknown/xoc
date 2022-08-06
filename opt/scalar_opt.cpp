@@ -38,7 +38,6 @@ bool ScalarOpt::perform(OptCtx & oc)
     SimpCtx simp;
     if (g_do_gvn) { m_pass_mgr->registerPass(PASS_GVN); }
     if (g_do_vrp) { m_pass_mgr->registerPass(PASS_VRP); }
-
     if (g_do_pre) {
         //Do PRE individually.
         //Since it will incur the opposite effect with Copy-Propagation.
@@ -46,19 +45,16 @@ bool ScalarOpt::perform(OptCtx & oc)
         pre->perform(oc);
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     }
-
     if (g_do_dce || g_do_dce_aggressive) {
         DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
         dce->set_elim_cfs(g_do_dce_aggressive);
         passlist.append_tail(dce);
     }
-
     bool in_ssa_form = false;
     PRSSAMgr * ssamgr = m_rg->getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         in_ssa_form = true;
     }
-
     if (!in_ssa_form) {
         //RP can reduce the memory operations and
         //improve the effect of PR SSA, so perform
@@ -69,51 +65,40 @@ bool ScalarOpt::perform(OptCtx & oc)
             passlist.append_tail(m_pass_mgr->registerPass(PASS_RP));
         }
     }
-
     if (g_do_cp || g_do_cp_aggressive) {
         CopyProp * pass = (CopyProp*)m_pass_mgr->registerPass(PASS_CP);
         pass->setPropagationKind(g_do_cp_aggressive ?
                                  CP_PROP_UNARY_AND_SIMPLEX : CP_PROP_SIMPLEX);
         passlist.append_tail(pass);
     }
-
+    if (g_do_rce) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_RCE));
+    }
+    if (g_do_licm) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_LICM));
+    }
     if (g_do_rp) {
         //Second RP.
         passlist.append_tail(m_pass_mgr->registerPass(PASS_RP));
     }
-
     if (g_do_gcse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_GCSE));
     }
-
     if (g_do_lcse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LCSE));
     }
-
-    if (g_do_rce) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_RCE));
-    }
-
     if (g_do_dse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_DSE));
     }
-
-    if (g_do_licm) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_LICM));
-    }
-
     if (g_do_ivr) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_IVR));
     }
-
     if (g_do_loop_convert) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LOOP_CVT));
     }
-
     if (g_do_lftr) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LFTR));
     }
-
     bool res = false;
     bool change;
     UINT count = 0;
@@ -132,10 +117,20 @@ bool ScalarOpt::perform(OptCtx & oc)
                 ASSERT0(verifyIRandBB(bbl, m_rg));
                 ASSERT0(cfg->verify());
             }
-            RefineCtx rc;
-            refine->refineBBlist(bbl, rc, oc);
+            RefineCtx rc(&oc);
+            refine->refineBBlist(bbl, rc);
             ASSERT0(m_cfg->verifyRPO(oc));
+            ASSERT0(m_cfg->verifyLoopInfo(oc));
         }
+        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+        ASSERT0(cfg->verify());
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+        ASSERT0(cfg->verifyRPO(oc));
+        ASSERT0(m_cfg->verifyLoopInfo(oc));
+        ASSERT0(cfg->verifyDomAndPdom(oc));
         count++;
         res |= change;
     } while (change && count < 20);

@@ -68,9 +68,9 @@ namespace xcom {
     #define ASSERTL(a, filename, line, b) \
         ((a) ? (void)0 : (void)(m522138(filename, line), m518087 b))
     #define ASSERT0(a) \
-        ((a) ? (void)0 : (void)(m522138(__FILE__, __LINE__), m518087 ("")))
+        ((a) ? (void)0 : (void)(m522138(__FILE__, __LINE__), m518087("")))
     #define ASSERTL0(a, filename, line) \
-        ((a) ? (void)0 : (void)(m522138(filename, line), m518087 ("")))
+        ((a) ? (void)0 : (void)(m522138(filename, line), m518087("")))
 #else
     #define ASSERTN(a, b)
     #define ASSERTL(a, filename, line, b)

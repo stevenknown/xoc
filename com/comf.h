@@ -199,7 +199,15 @@ void prim(INT m, OUT INT * buf);
 LONG revlong(LONG d);
 
 //Reverse the string.
-UCHAR * reverseString(UCHAR * v);
+CHAR * reverseString(CHAR * v);
+
+//The function rotates string in buf.
+//e.g: given string "xyzmn", n is 2, after rotation,
+//the buf will be "zmnxy".
+//buf: record the string.
+//buflen: byte length of buf.
+//n: rotate times.
+CHAR * rotateString(MOD CHAR * str, UINT n);
 
 //Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
@@ -250,7 +258,7 @@ LONGLONG xatoll(CHAR const* nptr, bool is_oct);
 INT xctoi(CHAR const* cl);
 
 //Convert long to string.
-UCHAR * xltoa(LONG v, OUT UCHAR * buf);
+CHAR * xltoa(LONG v, OUT CHAR * buf);
 
 //Cacluates the smallest integral value that is not less than
 //the division of a, b.

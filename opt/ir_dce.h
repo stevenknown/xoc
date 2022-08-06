@@ -64,7 +64,6 @@ class DeadCodeElim : public Pass {
     //       /         |
     //       V         V
     //  md1v3<-        md1v4<-
-    //
     BYTE m_is_reserve_phi:1;
 
     //Whether utilize MD du chain to find effect stmt.
@@ -78,6 +77,7 @@ class DeadCodeElim : public Pass {
     DUMgr * m_dumgr;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
+    OptCtx * m_oc;
     ConstIRIter m_citer;
     EffectStmt m_is_stmt_effect;
     EffectMDDef m_is_mddef_effect;
@@ -86,6 +86,7 @@ class DeadCodeElim : public Pass {
     //if it contains effect stmt.
     xcom::BitSet m_is_bb_effect;
 
+    void checkValidAndRecomputeCDG();
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
     bool collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
@@ -96,7 +97,6 @@ class DeadCodeElim : public Pass {
     bool collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2);
     bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2);
 
-    void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
     //Return true if there are effect BBs that controlled by ir's BB.
     //ir: stmt.
     bool find_effect_kid_condbr(IR const* ir) const;
@@ -108,8 +108,8 @@ class DeadCodeElim : public Pass {
     bool isEffectBB(UINT id) const { return m_is_bb_effect.is_contain(id); }
     bool isEffectBB(IRBB const* bb) const { return isEffectBB(bb->id()); }
     bool is_effect_write(Var * v) const
-    { return VAR_is_global(v) || VAR_is_volatile(v); }
-    bool is_effect_read(Var * v) const { return VAR_is_volatile(v); }
+    { return v->is_global() || v->is_volatile(); }
+    bool is_effect_read(Var * v) const { return v->is_volatile(); }
     bool is_cfs(IR const* ir) const
     {
         switch (ir->getCode()) {
@@ -181,6 +181,7 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
+    OptCtx * getOptCtx() const { return m_oc; }
     IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }

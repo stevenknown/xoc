@@ -44,9 +44,9 @@ void AGraph::buildAdjacentMatrix(Matrix<UINT> & adj_mat)
 }
 
 
-/* Nonrecursive algo to compute the shorest-path.
-See <Shortest_Path-Dijkstra.txt>
-'infinite': the value indiates infinity. */
+//Nonrecursive algo to compute the shorest-path.
+//See <Shortest_Path-Dijkstra.txt>
+//infinite: the value indiates infinity.
 void AGraph::ShortestPath(UINT infinite)
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));

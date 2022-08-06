@@ -35,6 +35,7 @@ author: Su Zhenyu
 #include "comopt.h"
 
 namespace xoc {
+
 //
 //START BBIRList
 //
@@ -83,6 +84,27 @@ IRListIter BBIRList::append_tail_ex(IR * ir)
     return EList<IR*, IR2Holder>::insert_after(ir, ct);
 }
 //END BBIRList
+
+
+//
+//START BBList
+//
+//Return true if 'prev' is the previous BB of given BB in BBList.
+//it: BBListIter of given BB.
+bool BBList::isPrevBB(IRBB const* prev, IRBB const* next) const
+{
+    BBListIter nextit;
+    find(const_cast<IRBB*>(next), &nextit);
+    ASSERT0(nextit);
+    return isPrevBB(prev, nextit);
+}
+
+
+bool BBList::isPrevBB(IRBB const* prev, BBListIter nextit) const
+{
+    return prev == get_prev(&nextit);
+}
+//END BBList
 
 
 //
@@ -237,12 +259,19 @@ void IRBB::dumpLabelList(Region const* rg) const
 }
 
 
+void IRBB::dumpDigest(Region const* rg) const
+{
+    note(rg, "\n----- BB%d --- rpo:%d -----", id(),
+         getVex() != nullptr ? rpo() : RPO_UNDEF);
+    dumpLabelList(rg);
+    dumpAttr(rg);
+}
+
+
 void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
     if (!rg->isLogMgrInit()) { return; }
-    note(rg, "\n----- BB%d --- rpo:%d -----", id(), rpo());
-    dumpLabelList(rg);
-    dumpAttr(rg);
+    dumpDigest(rg);
     dumpIRList(rg, dump_inner_region);
 }
 
@@ -281,21 +310,19 @@ bool IRBB::verify(Region const* rg) const
 //Return true if one of bb's successor has a phi.
 bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->getVertex(id());
-    ASSERT0(vex);
     MDSSAMgr * mdssamgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
     if (mdssamgr != nullptr && !mdssamgr->is_valid()) {
         mdssamgr = nullptr;
     }
-    for (xcom::EdgeC * out = vex->getOutList();
-         out != nullptr; out = out->get_next()) {
-        xcom::Vertex * succ_vex = out->getTo();
+    xcom::AdjVertexIter it;
+    for (xcom::Vertex * succ_vex = Graph::get_first_out_vertex(getVex(), it);
+         succ_vex != nullptr; succ_vex = Graph::get_next_out_vertex(it)) {
         IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
         if ((mdssamgr != nullptr && mdssamgr->hasPhi(succ)) ||
             PRSSAMgr::hasPhi(succ)) {
             return true;
-        } 
+        }
     }
     return false;
 }
@@ -306,14 +333,11 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
-    xcom::Vertex * vex = ircfg->getVertex(id());
-    ASSERT0(vex);
-    for (xcom::EdgeC * out = vex->getOutList();
-         out != nullptr; out = out->get_next()) {
-        xcom::Vertex * succ_vex = out->getTo();
+    xcom::AdjVertexIter it;
+    for (xcom::Vertex * succ_vex = Graph::get_first_out_vertex(getVex(), it);
+         succ_vex != nullptr; succ_vex = Graph::get_next_out_vertex(it)) {
         IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
-
         for (IR * ir = BB_first_ir(succ);
              ir != nullptr; ir = BB_next_ir(succ)) {
             if (!ir->is_phi()) { break; }
@@ -340,30 +364,6 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
             ((CPhi*)ir)->addOpnd(newopnd);
         }
     }
-}
-
-
-UINT IRBB::getNumOfPred(CFG<IRBB, IR> const* cfg) const
-{
-    ASSERT0(cfg);
-    xcom::Vertex const* vex = cfg->getVertex(id());
-    ASSERT0(vex);
-    UINT n = 0;
-    for (xcom::EdgeC const* in = VERTEX_in_list(vex);
-         in != nullptr; in = EC_next(in), n++);
-    return n;
-}
-
-
-UINT IRBB::getNumOfSucc(CFG<IRBB, IR> const* cfg) const
-{
-    ASSERT0(cfg);
-    xcom::Vertex const* vex = cfg->getVertex(id());
-    ASSERT0(vex);
-    UINT n = 0;
-    for (xcom::EdgeC const* out = VERTEX_out_list(vex);
-         out != nullptr; out = EC_next(out), n++);
-    return n;
 }
 
 
@@ -414,27 +414,147 @@ bool IRBB::hasMDPhi(CFG<IRBB, IR> const* cfg) const
     MDSSAMgr * mgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
     return mgr != nullptr && mgr->hasPhi(this);
 }
+
+
+bool IRBB::verifyTerminate() const
+{
+    bool find = false;
+    IRBB * pthis = const_cast<IRBB*>(this);
+    for (LabelInfo const* li = pthis->getLabelList().get_head();
+         li != nullptr; li = pthis->getLabelList().get_next()) {
+        if (LABELINFO_is_terminate(li)) {
+            find = true;
+            break;
+        }
+    }
+    ASSERT0(BB_is_terminate(this) == find);
+    return true; 
+}
+
+
+bool IRBB::verifyExpHandler() const
+{
+    bool find = false;
+    IRBB * pthis = const_cast<IRBB*>(this);
+    for (LabelInfo const* li = pthis->getLabelList().get_head();
+         li != nullptr; li = pthis->getLabelList().get_next()) {
+        if (LABELINFO_is_catch_start(li)) {
+            find = true;
+            break;
+        }
+    }
+    ASSERT0(BB_is_catch_start(this) == find);
+    return true;
+}
+
+
+bool IRBB::verifyTryEnd() const
+{
+    bool find = false;
+    IRBB * pthis = const_cast<IRBB*>(this);
+    for (LabelInfo const* li = pthis->getLabelList().get_head();
+         li != nullptr; li = pthis->getLabelList().get_next()) {
+        if (LABELINFO_is_try_end(li)) {
+            find = true;
+            break;
+        }
+    }
+    ASSERT0(BB_is_try_end(this) == find);
+    return true; 
+}
+
+
+bool IRBB::verifyTryStart() const
+{
+    bool find = false;
+    IRBB * pthis = const_cast<IRBB*>(this);
+    for (LabelInfo const* li = pthis->getLabelList().get_head();
+         li != nullptr; li = pthis->getLabelList().get_next()) {
+        if (LABELINFO_is_try_start(li)) {
+            find = true;
+            break;
+        }
+    }
+    ASSERT0(BB_is_try_start(this) == find);
+    return true; 
+}
 //END IRBB
+
+
+//
+//START IRBBMgr
+//
+IRBBMgr::~IRBBMgr()
+{
+    for (IRBB * bb = m_bbs_list.get_head();
+         bb != nullptr; bb = m_bbs_list.get_next()) {
+        delete bb;
+    }
+    //BB in free list will also be recorded in m_bbs_list.
+}
+
+
+IRBB * IRBBMgr::allocBB()
+{
+    IRBB * bb = m_free_list.remove_head();
+    if (bb == nullptr) {
+        bb = new IRBB();
+        BB_id(bb) = m_bb_count++;
+        m_bbs_list.append_tail(bb);
+    }
+    return bb;
+}
+
+
+void IRBBMgr::destroyBB(IRBB * bb)
+{
+    ASSERT0(bb);
+    ASSERTN(!m_free_list.find(bb), ("double destroy"));
+    bb->clean();
+    m_bbs_list.remove(bb);
+    delete bb;
+}
+
+
+void IRBBMgr::freeBB(IRBB * bb)
+{
+    ASSERT0(bb);
+    ASSERTN(!m_free_list.find(bb), ("double free"));
+    bb->clean();
+    m_free_list.append_head(bb);
+}
+
+
+//Count memory usage for current object.
+size_t IRBBMgr::count_mem() const
+{
+    size_t count = 0;
+    BBListIter bbit;
+    for (IRBB * bb = m_bbs_list.get_head(&bbit);
+         bb != nullptr; bb = m_bbs_list.get_next(&bbit)) {
+        count += bb->count_mem();
+    }
+    return count;
+}
+//END IRBBMgr
 
 
 void dumpBBLabel(LabelInfoList & lablist, Region const* rg)
 {
-    FILE * h = rg->getLogMgr()->getFileHandler();
-    ASSERT0(h);
     xcom::C<LabelInfo const*> * ct;
     for (lablist.get_head(&ct); ct != lablist.end();
          ct = lablist.get_next(ct)) {
         LabelInfo const* li = ct->val();
         switch (LABELINFO_type(li)) {
         case L_CLABEL:
-            fprintf(h, CLABEL_STR_FORMAT, CLABEL_CONT(li));
+            note(rg, CLABEL_STR_FORMAT, CLABEL_CONT(li));
             break;
         case L_ILABEL:
-            fprintf(h, ILABEL_STR_FORMAT, ILABEL_CONT(li));
+            note(rg, ILABEL_STR_FORMAT, ILABEL_CONT(li));
             break;
         case L_PRAGMA:
             ASSERT0(LABELINFO_pragma(li));
-            fprintf(h, "%s", SYM_name(LABELINFO_pragma(li)));
+            note(rg, "%s", SYM_name(LABELINFO_pragma(li)));
             break;
         default: UNREACHABLE();
         }

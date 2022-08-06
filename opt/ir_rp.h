@@ -219,7 +219,7 @@ public:
         m_deletab.initMem(gvn);
         m_pool = smpoolCreate(4 * sizeof(xcom::SC<IR*>), MEM_COMM);
         m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-            PASS_MD_SSA_MGR));
+            PASS_MDSSA_MGR));
     }
     ~DelegateMgr() { clean(); }
 
@@ -403,35 +403,40 @@ private:
     //Return true if the loop is promotable.
     bool analyszLoop(LI<IRBB> const* li, ExactAccTab & exact_tab,
                      InexactAccTab & inexact_tab);
-    void addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb);
+    void addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb,
+                              RPCtx const& ctx);
     void addSSADUChainForExpOfRestore(IR const* dele,
-                                      DelegateMgr const& delemgr);
-    void addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt);
+                                      DelegateMgr const& delemgr,
+                                      RPCtx const& ctx);
+    void addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
+                                   RPCtx const& ctx);
     //Build DU chain for initialization-def and outside loop exposed-use.
     void addDUChainForInitDefAndExposedUse(IR const* dele,
                                            IR * init_stmt,
-                                           DelegateMgr const& delemgr);
+                                           DelegateMgr const& delemgr,
+                                           RPCtx const& ctx);
     //Build DU chain for intra-loop-def and its USE.
     void addDUChainForIntraDefAndUseSet(Occ2Occ const& occ2newocc,
                                         IRSet const& useset,
-                                        IR * newocc_def);
+                                        IR * newocc_def, RPCtx const& ctx);
     //Process inexact access tab.
     //Build DU chain for initialization-def and intra-loop-use.
     void addDUChainForInitDef(IR const* dele, IR * init_stmt,
                               Occ2Occ const& occ2newocc,
                               InexactAccTab const& inexact_tab,
-                              OUT IRList & deflst);
+                              OUT IRList & deflst, RPCtx const& ctx);
     //Process exact access tab.
     //Build DU chain for initialization-def and intra-loop-use.
     void addDUChainForInitDef(IR const* dele, IR * init_stmt,
                               Occ2Occ const& occ2newocc,
                               ExactAccTab const& exact_tab,
-                              OUT IRList & deflst);
+                              OUT IRList & deflst, RPCtx const& ctx);
     //Build DU chain for intra-loop-def and its USE.
     void addDUChainForIntraDef(Occ2Occ const& occ2newocc,
-                               IRList const& deflst);
+                               IRList const& deflst, RPCtx const& ctx);
     void addDUChainForRestoreToOutsideUse(IR const* dele,
-                                          DelegateMgr const& delemgr);
+                                          DelegateMgr const& delemgr,
+                                          RPCtx const& ctx);
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
     void addExactAccess(OUT ExactAccTab & exact_tab,
@@ -455,8 +460,8 @@ private:
                                    IRBB * preheader,
                                    LI<IRBB> const* li);
 
-    void buildDUChainOnDemandForPROp(IR * def, IR * use);
-    void buildDUChainOnDemand(IR * def, IR * use);
+    void buildDUChainOnDemandForPROp(IR * def, IR * use, RPCtx const& ctx);
+    void buildDUChainOnDemand(IR * def, IR * use, RPCtx const& ctx);
     //Return true if success.
     bool buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
                                         DelegateMgr const& delemgr,
@@ -502,29 +507,29 @@ private:
                              InexactAccTab & inexact_tab,
                              OUT ConstIRTab & restore2mem,
                              OUT Occ2Occ & occ2newocc,
-                             InexactAccTabIter & ti);
+                             InexactAccTabIter & ti, RPCtx const& ctx);
     void handleExactAccOcc(IR const* dele,
                            MOD DelegateMgr & delemgr,
                            LI<IRBB> const* li,
                            OUT ConstIRTab & restore2mem,
                            OUT Occ2Occ & occ2newocc,
                            IRIter & ii,
-                           ExactAccTab & exact_tab);
+                           ExactAccTab & exact_tab, RPCtx const& ctx);
     void handleExpInBody(IR * ref, IR const* delegate,
                          DelegateMgr const& delemgr,
-                         OUT Occ2Occ & occ2newocc);
+                         OUT Occ2Occ & occ2newocc, RPCtx const& ctx);
 
     //restore2mem: record the delegate that need to restore.
     void handleStmtInBody(IR * ref, IR const* delegate,
                           MOD DelegateMgr & delemgr,
                           OUT ConstIRTab & restore2mem,
-                          OUT Occ2Occ & occ2newocc);
+                          OUT Occ2Occ & occ2newocc, RPCtx const& ctx);
 
     //restore2mem: record the delegate that need to restore.
     void handleAccessInBody(IR * ref, IR const* delegate,
                             MOD DelegateMgr & delemgr,
                             OUT ConstIRTab & restore2mem,
-                            OUT Occ2Occ & occ2newocc);
+                            OUT Occ2Occ & occ2newocc, RPCtx const& ctx);
 
     //Generate code to fulfill epilog of delegate.
     void handleEpilog(ConstIRTab const& restore2mem, DelegateMgr & delemgr,
@@ -535,14 +540,16 @@ private:
     //to the sebsequent function, it will be done at
     //buildDUChainForDeleRelatedPR().
     void handlePrologForExp(IR const* delegate, IR const* promoted_pr,
-                            DelegateMgr & delemgr, IRBB * preheader);
+                            DelegateMgr & delemgr, IR * rhs,
+                            IRBB * preheader);
 
     //The function generates iniailization code of promoted PR.
     //Note the function leaves the work that to build DU chain of PR and STPR
     //to the sebsequent function, it will be done at
     //buildDUChainForDeleRelatedPR().
     void handlePrologForStmt(IR const* delegate, IR const* promoted_pr,
-                             DelegateMgr & delemgr, IRBB * preheader);
+                             DelegateMgr & delemgr, IR * rhs,
+                             IRBB * preheader);
 
     //The function generates iniailization code of PR that is corresponding to
     //each delegate. And building DU chain between all USE occurrences of
@@ -594,21 +601,25 @@ private:
     //The function sweep out the Access Expression or Stmt from 'exact_tab' and
     //'inexact_tab' which MD reference may or must overlaped with given 'ir'
     //except the ones that are exactly covered by 'ir'.
-    //This function consider both MustRef MD and MayRef MDSet.
-    void sweepOutAccess(IR * ir, MOD ExactAccTab & exact_tab,
+    //The function uses MD reference and consider both MustRef MD and MayRef
+    //MDSet, whereas will not consider special characters of ir.
+    //Return true if find overlapped reference with 'ir'.
+    bool sweepOutAccess(IR * ir, MOD ExactAccTab & exact_tab,
                         MOD InexactAccTab & inexact_tab);
 
     //The function sweep out the Access Expression or Stmt from 'exact_tab'
     //which MD reference may or must overlaped with given 'ir'
     //except the ones that are exactly covered by 'ir'.
     //This function consider both MustRef MD and MayRef MDSet.
-    void sweepOutExactAccess(IR * ir, MOD ExactAccTab & exact_tab);
+    //Return true if find overlapped reference with 'ir'.
+    bool sweepOutExactAccess(IR * ir, MOD ExactAccTab & exact_tab);
 
     //The function sweep out the Access Expression or Stmt from 'inexact_tab'
     //which MD reference may or must overlaped with given 'ir'
     //except the ones that are exactly covered by 'ir'.
     //This function consider both MustRef MD and MayRef MDSet.
-    void sweepOutInexactAccess(IR * ir, MOD InexactAccTab & inexact_tab);
+    //Return true if find overlapped reference with 'ir'.
+    bool sweepOutInexactAccess(IR * ir, MOD InexactAccTab & inexact_tab);
     bool scanIRTreeList(IR * root, LI<IRBB> const* li,
                         OUT ExactAccTab & exact_tab,
                         OUT InexactAccTab & inexact_tab);
@@ -659,10 +670,11 @@ private:
     void promote(LI<IRBB> const* li, IRBB * exit_bb, IRBB * preheader,
                  IRIter & ii, ExactAccTab & exact_tab,
                  InexactAccTab & inexact_tab, MOD RPCtx & ctx);
+    bool preventByDontPromoteTab(IR const* ir);
 
     //Fixup DU chain if there is untrue dependence.
     //occ2newocc: record the IR stmt/exp that need to fixup.
-    void removeDUChainForOrgOcc(Occ2Occ & occ2newocc);
+    void removeDUChainForOrgOcc(Occ2Occ & occ2newocc, RPCtx const& ctx);
     void removeMDPhiDUChain(IR const* dele, LI<IRBB> const* li,
                             DelegateMgr const& delemgr);
     void removeMDPhiForInexactAcc(DelegateMgr const& delemgr,
@@ -671,9 +683,8 @@ private:
     void removeRedundantDUForInexactAcc(Occ2Occ & occ2newocc,
                                         DelegateMgr const& delemgr,
                                         InexactAccTab & inexact_tab,
-                                        LI<IRBB> const* li);
-
-    void setNewDefForExpOfRestore(IR * restore);
+                                        LI<IRBB> const* li,
+                                        RPCtx const& ctx);
 
     //The function try to insert stub-BB before 'exit_bb' if there is MDPhi in
     //the BB.

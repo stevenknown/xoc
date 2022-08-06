@@ -36,6 +36,16 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//Map BB id to IR.
+typedef TMap<UINT, IR*> Pred2Opnd;
+
+//Map IR to BB id.
+class Opnd2Pred : public TMap<IR*, UINT> {
+public:
+    //Collect the mapping informatino for Phi list in bb.
+    void collect(IRBB * bb, IRCFG * cfg);
+};
+
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
@@ -47,23 +57,31 @@ protected:
     Lab2BB m_lab2bb;
     TypeMgr * m_tm;
     CFG_SHAPE m_cs;
-
 protected:
+    UINT afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
+                                 List<UINT> const& newpreds,
+                                 OUT CfgOptCtx & ctx,
+                                 UINT orgpos, UINT orgnum,
+                                 UINT newpredstartpos);
+    UINT afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
+                                 List<UINT> const& newpreds,
+                                 OUT CfgOptCtx & ctx,
+                                 UINT orgpos, UINT orgnum,
+                                 UINT newpredstartpos);
+
+    void dumpGraph(FILE * h) const;
+    void dumpForTest(UINT flag) const;
+
+    virtual void preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx);
+
+    //The function will remove given edge from->to while maintaining the
+    //DomInfo if 'ctx' asked.
+    void removeEdge(Vertex const* from, Vertex const* to,
+                    OUT CfgOptCtx & ctx);
+    void removeAllInEdge(IRBB const* bb, OUT CfgOptCtx & ctx);
+    void removeAllOutEdge(IRBB const* bb, OUT CfgOptCtx & ctx);
     void remove_bb_impl(C<IRBB*> * bbct);
-    //CASE: Given pred1->bb, fallthrough edge,
-    //  and pred2->bb, jumping edge.
-    //  bb:
-    //      goto L1
-    //  next of bb:
-    //      L1:
-    //      ...
-    //      ...
-    //Remove bb and revise CFG.
-    //ct: container in m_bb_list of CFG.
-    //    It will be updated if related BB removed.
-    bool removeTrampolinBBCase1(BBListIter * ct, CfgOptCtx const& ctx);
-    bool removeTrampolinEdgeCase1(BBListIter bbct);
-    bool removeTrampolinEdgeCase2(BBListIter bbct);
+    virtual void recomputeDomInfo(MOD OptCtx & ctx);
 
     //Remove trampoline branch.
     //Note the pass is different from what removeTrampolinEdge() does.
@@ -81,13 +99,23 @@ protected:
     //    L4:
     //    st = ...
     //    L3:
-    bool removeTrampolinBranchForBB(BBListIter & it, CfgOptCtx const& ctx);
-    bool removeTrampolinBranch(CfgOptCtx const& ctx);
+    bool removeTrampolinBranchForBB(BBListIter & it, OUT CfgOptCtx & ctx);
+    bool removeTrampolinBranch(OUT CfgOptCtx & ctx);
+
+    //The function remove all stmt in 'bb'.
+    //Note caller should guarrantee stmt is useless and removable.
+    void removeAllStmt(IRBB * bb, CfgOptCtx const& ctx);
 
     //The function remove all MDPhis in 'bb'.
     //Note caller should guarrantee phi is useless and removable.
-    void removeAllMDPhi(IRBB * bb);
-    void removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos);
+    void removeAllMDPhi(IRBB * bb, CfgOptCtx const& ctx);
+    void removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
+                                     CfgOptCtx const& ctx);
+
+    //Remove bb from LoopInfo tree.
+    void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
+    static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
+                               MOD OptCtx * oc);
 
     //Sort the order of predecessor of given BB according to PHI operand layout.
     void sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label);
@@ -114,9 +142,11 @@ public:
         //Set label->bb map.
         m_lab2bb.setAlways(li, src);
     }
-    virtual xcom::Edge * addEdge(IRBB * from, IRBB * to);
-    xcom::Edge * addEdge(UINT from, UINT to)
-    { return DGraph::addEdge(from, to); }
+
+    //Note if dominfo is not maintained, SSA update can not prove to be
+    //correct.
+    //ctx: CFG optimizer will perform operations follow the 'ctx' mandate.
+    xcom::Edge * addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx);
 
     //Add new IRBB into CFG, but the BB list should be modified
     //out of this function.
@@ -127,7 +157,8 @@ public:
         ASSERT0(bb && m_bb_vec.get(bb->id()) == nullptr);
         ASSERTN(bb->id() != 0, ("bb id should start at 1"));
         m_bb_vec.set(bb->id(), bb);
-        addVertex(bb->id());
+        Vertex * v = addVertex(bb->id());
+        setVertex(bb, v);
     }
 
     //After adding new bb or change bb successor,
@@ -152,6 +183,17 @@ public:
     void computePdomAndIpdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
     void computeRPO(OptCtx & oc);
 
+    //The function insert a tampolining BB bewteen prev and bb, that will
+    //make prev no longer fallthrough to bb.
+    //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
+    //next: the next BB in BBList.
+    IRBB * changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
+                                       BBListIter const nextit,
+                                       OptCtx * oc);
+
+    //The function insert a tampolining BB bewteen bb and its next BB.
+    IRBB * changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc);
+
     void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
     void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
     void dumpDOT(FILE * h, UINT flag) const;
@@ -171,7 +213,7 @@ public:
     void findAllTryRegions(OUT xcom::BitSet & trybbs);
 
     //Allocate and initialize control flow graph.
-    void initCfg(OptCtx & oc);
+    void initCFG(OptCtx & oc);
     void initEntryAndExit(CFG_SHAPE cs);
     virtual bool if_opt(IRBB * bb);
     virtual bool isRegionEntry(IRBB * bb) const { return BB_is_entry(bb); }
@@ -193,13 +235,13 @@ public:
     //function may break up fallthrough edge of 'to' if necessary.
     void insertBBbetween(IN IRBB * from, IN BBListIter from_it,
                          IN IRBB * to, IN BBListIter to_it,
-                         IN IRBB * newbb);
-    //The function insert a tampolining BB bewteen prev and bb, that will
-    //make prev no longer fallthrough to bb.
-    //prev: the previous BB of bb, note prev must fallthrough to bb.
-    IRBB * insertTrampolinBB(IRBB * prev, MOD IRBB * bb, BBListIter const bbit,
-                             MOD BBList * bblst);
-    bool isRPOValid() const;
+                         IN IRBB * newbb, MOD OptCtx * oc);
+
+    //The function is a simpler version to insert a new BB.
+    //Insert 'newbb' between 'from' and 'to'.
+    //e.g: given edge from->to, the result is from->newbb->to.
+    void insertBBbetween(IRBB * from, IRBB * to, IRBB * newbb,
+                         OUT CfgOptCtx & ctx);
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
@@ -214,12 +256,9 @@ public:
         ASSERT0(bb && m_bb_vec.get(bb->id()));
         return BB_last_ir(bb);
     }
-    UINT getNumOfBB() const { return getVertexNum(); }
-    UINT getNumOfSucc(IRBB const* bb) const
-    { return getVertex(bb->id())->getOutDegree(); }
-    UINT getNumOfPred(IRBB const* bb) const
-    { return getVertex(bb->id())->getInDegree(); }
-    BBList * getBBList() { return m_bb_list; }
+    UINT getNumOfBB() const
+    { return const_cast<IRCFG*>(this)->getBBList()->get_elem_count(); }
+    BBList * getBBList() { return (BBList*)m_bb_list; }
     Lab2BB * getLabel2BBMap() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
@@ -227,44 +266,80 @@ public:
     virtual PASS_TYPE getPassType() const { return PASS_CFG; }
 
     //Find natural loop and scan loop body to find call and early exit, etc.
-    void LoopAnalysis(OptCtx & oc);
+    void LoopAnalysis(OUT OptCtx & oc);
 
     //Compute which predecessor is pred to bb.
     //e.g: If pred is the first predecessor, return 0.
     //pred: BB id of predecessor.
     //Note 'pred' must be one of predecessors of 'bb'.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
-    {
-        xcom::Vertex * bb_vex = getVertex(bb->id());
-        ASSERT0(bb_vex);
-        return Graph::WhichPred(pred->id(), bb_vex);
-    }
+    { return Graph::WhichPred(pred->id(), bb->getVex()); }
 
-    virtual void removeDomInfo(C<IRBB*> * bbct, CfgOptCtx const& ctx);
+    //Note maintain DomInfo may be costly.
+    virtual void removeDomInfo(C<IRBB*> * bbct, MOD CfgOptCtx & ctx);
 
     //You should clean the relation between Label and BB before removing BB.
-    virtual void removeBB(C<IRBB*> * bbct, CfgOptCtx const& ctx);
+    virtual void removeBB(C<IRBB*> * bbct, OUT CfgOptCtx & ctx);
 
     //We only remove 'bb' from CFG, vector and bb-list.
     //You should clean the relation between Label and BB before removing BB.
-    virtual void removeBB(IRBB * bb, CfgOptCtx const& ctx)
+    virtual void removeBB(IRBB * bb, OUT CfgOptCtx & ctx)
     {
         ASSERT0(bb);
         C<IRBB*> * bbct;
         m_bb_list->find(bb, &bbct);
         removeBB(bbct, ctx);
     }
-    void remove_xr(IRBB * bb, IR * ir);
-    virtual void removeEdge(IRBB * from, IRBB * to);
+    virtual void remove_xr(IRBB * bb, IR * ir, CfgOptCtx const& ctx);
+
+    //The function will remove given edge from->to while maintaining the
+    //DomInfo if 'ctx' asked.
+    //Note if dominfo is not maintained, SSA update can not prove to be
+    //correct.
+    //ctx: CFG optimizer will perform default updation
+    //and transform, otherwise perform operations follow the 'ctx' mandate.
+    void removeEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx);
+
     //The function remove labels that no one referenced.
     bool removeRedundantLabel();
-    bool removeTrampolinEdge();
-    bool removeTrampolinBB(CfgOptCtx const& ctx);
-    bool removeRedundantBranch();
 
-    //Before removing bb or change bb successor,
-    //you need remove the related PHI operand if BB successor has PHI stmt.
-    void removeRelatedSuccBBPhiOpnd(IRBB * bb);
+    //Remove trampoline edge.
+    //e.g:BB1:
+    //    goto BB3;
+    //    BB2:
+    //    some-code1;
+    //    BB3:
+    //    some-code2;
+    //  where BB1->BB2->BB3 are fallthrough path.
+    //stmt of BB2 is just 'goto bb3', then BB1->BB2 is tramp-edge.
+    //And the resulting edges are BB1->BB3, BB2->BB3 respectively.
+    //Return true if at least one tramp-edge removed.
+    bool removeTrampolinEdge(OUT CfgOptCtx & ctx);
+
+    //Remove trampoline BB.
+    //e.g: bb1->bb2->bb3
+    //    stmt of bb2 is just 'goto bb3', and bb3 is the NEXT BB
+    //    of bb2 in BBList.
+    //    Then bb2 is tramp BB.
+    //Return true if at least one tramp BB removed.
+    //
+    //ALGO:
+    //    for each pred of BB
+    //        if (pred is fallthrough && prev of BB == pred)
+    //            remove edge pred->BB.
+    //            add edge pred->BB's next.
+    //            continue;
+    //        end if
+    //        duplicate LabelInfo from BB to BB's next.
+    //        revise LabelInfo of pred to new target BB.
+    //        remove edge pred->BB.
+    //        add edge pred->BB's next.
+    //    end for
+    bool removeTrampolinBB(OUT CfgOptCtx & ctx);
+    bool removeRedundantBranch(OUT CfgOptCtx & ctx);
+
+    //Rebuild CFG.
+    //Note if CFG rebuild, SSAInfo and MDSSAInfo should be recomputed.
     void rebuild(OptCtx & oc);
 
     //Cut off the mapping relation between Labels and BB.
@@ -273,24 +348,38 @@ public:
     //Remove related PHI operand from successor BB.
     //Before removing current BB or change BB's successor,
     //you need remove the related PHI operand if BB successor has PHI.
-    virtual void removeSuccPhiOpnd(IRBB const* bb);
+    //Note if dominfo is not maintained, SSA update can not prove to be
+    //correct.
+    //ctx: if it is nullptr, CFG optimizer will perform default updation
+    //and transform, otherwise perform operations follow the 'ctx' mandate.
+    void removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx);
 
     //Construct CFG edge for BB has phi.
     void reorderPhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     //The function replaces original predecessor with a list of
     //new predecessors.
-    //Return the position of 'from' that is in the predecessor list of 'to'.
-    virtual UINT replacePred(IRBB const* bb, IRBB const* succ,
-                             List<UINT> const& newpreds);
+    //bb: the predecessor will be replaced.
+    //succ: the target BB.
+    //newpreds: list of new predecessors.
+    //Return the position of 'bb' that is in the predecessor list of 'succ'.
+    virtual UINT replacePredWith(IRBB const* bb, IRBB const* succ,
+                                 List<UINT> const& newpreds,
+                                 OUT CfgOptCtx & ctx);
 
     //Fix out-edges if BB becomes fallthrough BB.
     //The function will remove out-edges of bb except the fallthrough edge, and
     //try adding fallthrough edge if it doesn't exist.
     //Note it is illegal if empty BB has non-taken branch.
-    void reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter & bbit);
+    void reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter const& bbit,
+                                       OUT CfgOptCtx & ctx);
+    void reviseStmtMDSSA(VexTab const& vextab, Vertex const* root);
 
-     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
+    virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
+    virtual void setVertex(IRBB * bb, Vertex * v) { BB_vex(bb) = v; }
+    virtual void setVertex(IRBB * from, IRBB * to, Edge * e)
+    { BB_vex(from) = e->from(); BB_vex(to) = e->to(); }
+
     //Split BB into two BBs.
     //bb: BB to be splited.
     //split_point: the ir in 'bb' used to mark the split point that followed IRs
@@ -307,10 +396,14 @@ public:
     //    ...
     IRBB * splitBB(IRBB * bb, IRListIter split_point, OptCtx & oc);
 
-    //Some optimization may append stmt into BB which has down-boundary stmt.
-    //That makes BB invalid. Split such invalid BB into two or more BBs.
+    //Some optimizations may append stmt into BB which has already down-boundary
+    //stmt. That makes BB invalid. Split such invalid BB into two or more BBs.
     //The function will try to maintain RPO and DOM info.
     bool splitBBIfNeeded(IRBB * bb, OptCtx & oc);
+
+    //Sort PHI operand in order of predecessors of BB of PHI.
+    //pred2opnd: record a map between predecessor to operand.
+    void sortPhiOpnd(IR * phi, Pred2Opnd & pred2opnd);
 
     //Try to update RPO of newbb accroding to RPO of marker.
     //newbb_prior_marker: true if newbb's lexicographical order is prior to
@@ -319,6 +412,9 @@ public:
     //return false.
     bool tryUpdateRPO(IRBB * newbb, IRBB const* marker,
                       bool newbb_prior_marker);
+    bool tryUpdateRPOBeforeCFGChanged(IRBB * newbb, IRBB const* marker,
+                                      bool newbb_prior_marker,
+                                      MOD OptCtx * oc);
 
     //Move all Labels which attached on src BB to tgt BB.
     virtual void moveLabels(IRBB * src, IRBB * tgt);
@@ -335,19 +431,21 @@ public:
     bool performMiscOpt(OptCtx & oc)
     {
         CfgOptCtx ctx(oc);
-        CFGOPTCTX_update_dominfo(&ctx) = true;
         return performMiscOpt(ctx);
     }
-    bool performMiscOpt(CfgOptCtx const& ctx);
+    bool performMiscOpt(MOD CfgOptCtx & ctx);
 
     //The function verify whether the branch target is match to the BB.
     bool verifyBranchTarget() const;
+
     //The function verify the relationship between BB and LabelInfo.
     bool verifyLabel2BB() const;
+
     //Verification at building SSA mode by ir parser.
     bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const;
     bool verifyDomAndPdom(OptCtx const& oc) const;
     bool verifyRPO(OptCtx const& oc) const;
+    bool verifyLoopInfo(OptCtx const& oc) const;
     bool verify() const;
 };
 

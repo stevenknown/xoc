@@ -36,20 +36,18 @@ namespace xoc {
 class IR;
 class IRBB;
 
-typedef xcom::List<IRBB*> BBList;
-typedef xcom::C<IRBB*> * BBListIter;
-typedef xcom::List<IR const*> ConstIRIter;
-typedef xcom::List<IR*> IRIter;
+typedef xcom::List<IR const*> ConstIRIter; //the iter to iterate IR Tree.
+typedef xcom::List<IR*> IRIter; //the iter to iterate IR Tree.
 
 //Map IR to its Holder during instrument operation.
 typedef xcom::TMap<IR*, xcom::C<IR*>*> IR2Holder;
 typedef xcom::EList<IR*, IR2Holder> IREList;
 
 typedef xcom::List<IR*> IRList;
-typedef xcom::C<IR*> * IRListIter;
+typedef xcom::List<IR*>::Iter IRListIter;
 
 typedef xcom::List<IR const*> CIRList;
-typedef xcom::C<IR const*> * CIRListIter;
+typedef xcom::List<IR const*>::Iter CIRListIter;
 
 //Type to describe the Prno of PR operation.
 typedef UINT PRNO;

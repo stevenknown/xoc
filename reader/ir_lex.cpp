@@ -721,76 +721,107 @@ TOKEN Lexer::t_id()
 }
 
 
+TOKEN Lexer::t_solidus_equ(CHAR c)
+{
+    m_cur_token_string[m_cur_token_string_pos++] = '/';
+    m_cur_token_string[m_cur_token_string_pos++] = c;
+    m_cur_token_string[m_cur_token_string_pos] = 0;
+    m_cur_char = getNextChar();
+    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+    return T_DIVEQU;
+}
+
+
+TOKEN Lexer::t_div(CHAR next_char)
+{
+    m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+    m_cur_token_string[m_cur_token_string_pos] = 0;
+    m_cur_char = next_char; //update char-recorder to next parsing.
+    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+    return T_DIV;
+}
+
+
+TOKEN Lexer::t_solidus_solidus(bool * is_restart)
+{
+    TOKEN t = T_UNDEF;
+    Lexer::STATUS st = getLine();
+    if (st == LEX_SUCC) {
+        //We meet a lot of continuous single comments that leading by '//',
+        //change the parsing state to normal.
+        //CASE: solidus.gr, Do NOT recursive call t_solidus() if meeting
+        //right-next single comment. Avoid stack overflow.
+        //t = t_solidus(is_restart);
+        m_cur_char = getNextChar();
+        ASSERT0(is_restart);
+        *is_restart = true;
+        ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+        return T_UNDEF;        
+    }
+    if (st == LEX_EOF) {
+        t = T_END;
+    }
+    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+    return t;
+}
+
+
+TOKEN Lexer::t_solidus_asterisk(bool * is_restart)
+{
+    UINT cur_line_num = m_src_line_num;
+    CHAR c = getNextChar();
+    CHAR c1 = 0;
+    for (;;) {
+        cur_line_num = m_src_line_num;
+        c1 = getNextChar();
+        if (c == '*' && c1 == '/') {
+            if (m_src_line_num == cur_line_num) {
+                //We meet the multiple comment that terminated by '*/',
+                //change the parsing state to normal.
+                m_cur_char = getNextChar();
+
+                //CASE: recur_lex.c, Do NOT recursive call into
+                //getNextToken() if meeting end of comments.
+                //Avoid stack overflow.
+                //return getNextToken();
+                ASSERT0(is_restart);
+                *is_restart = true;
+                ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+                return T_UNDEF;
+            }
+            c = c1;
+            continue;
+        }
+        if (c == LEX_EOF || c1 == LEX_EOF) {
+            ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+            //User may miss the righ-hand-side '*/' which lead the reading
+            //charactor keep going till the file end.
+            return T_END;
+        }
+        c = c1;
+    }
+    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+    return T_UNDEF;
+}
+
+
 //'m_cur_char' hold the current charactor right now.
 //You should assign 'm_cur_char' the next valid charactor before
 //the function return.
 TOKEN Lexer::t_solidus(bool * is_restart)
 {
-    TOKEN t = T_UNDEF;
-    Lexer::STATUS st;
-    CHAR c = getNextChar();
-    if (c == '=') { // /=
-        t = T_DIVEQU;
-        m_cur_token_string[m_cur_token_string_pos++] = '/';
-        m_cur_token_string[m_cur_token_string_pos++] = c;
-        m_cur_token_string[m_cur_token_string_pos] = 0;
-        m_cur_char = getNextChar();
-    } else if (c == '/') { //single comment line
-        if ((st = getLine()) == LEX_SUCC) {
-            m_cur_char = m_cur_line[m_cur_line_pos];
-            m_cur_line_pos++;
-            if (m_cur_char == '/'){ // another single comment line
-                t = t_solidus(is_restart);
-                goto FIN;
-            } else {
-                t = getNextToken();
-                goto FIN;
-             }
-        } else if (st == LEX_EOF) {
-            t = T_END;
-            goto FIN;
-        }
-    } else if (c == '*') {//multi comment line
-        UINT cur_line_num = m_src_line_num;
-        c = getNextChar();
-        CHAR c1 = 0;
-        for (;;) {
-            cur_line_num = m_src_line_num;
-            c1 = getNextChar();
-            if (c == '*' && c1 == '/') {
-                if (m_src_line_num == cur_line_num) {
-                    //We meet the multipul comment terminated token '*/',
-                    //so change the parsing state to normal.
-                    m_cur_char = getNextChar();
-
-                    //CASE: recur_lex.c, Do NOT recursive call into
-                    //getNextToken() if meeting end of comments.
-                    //Avoid stack overflow.
-                    //t = getNextToken();
-                    t = T_UNDEF;
-                    ASSERT0(is_restart);
-                    *is_restart = true;
-                    goto FIN;
-                } else {
-                    c = c1;
-                    continue;
-                }
-            } else if (c == LEX_EOF || c1 == LEX_EOF) {
-                t = T_END;
-                goto FIN;
-            } else {
-                c = c1;
-            }
-        }
-    } else {
-        t = T_DIV;
-        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
-        m_cur_token_string[m_cur_token_string_pos] = 0;
-        m_cur_char = c;
+    CHAR next_char = getNextChar();
+    switch (next_char) {
+    case '=': // /=
+        return t_solidus_equ(next_char);
+    case '/': //single comment line
+        return t_solidus_solidus(is_restart);
+    case '*': //multi comment line
+        return t_solidus_asterisk(is_restart);
+    default:
+        return t_div(next_char);
     }
-FIN:
-    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
-    return t;
+    return T_UNDEF;
 }
 
 

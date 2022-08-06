@@ -70,7 +70,7 @@ static bool readGR(CHAR * gr_file_name)
         }
         if (rg->getPassMgr() != NULL) {
             xoc::PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
-                                         PASS_PR_SSA_MGR);
+                                         PASS_PRSSA_MGR);
             if (ssamgr != NULL && ssamgr->is_valid()) {
                 ssamgr->destruction();
             }

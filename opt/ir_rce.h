@@ -39,12 +39,14 @@ namespace xoc {
 //Perform Redundant Code Elimination.
 class RCE : public Pass {
     COPY_CONSTRUCTOR(RCE);
+public:
     class RCECtx {
     public:
-        OptCtx * oc;
         bool cfg_mod;
+        bool retry_bblist;
+        OptCtx * oc;
     public:
-        RCECtx(OptCtx * t) : oc(t), cfg_mod(false) {}
+        RCECtx(OptCtx * t) : cfg_mod(false), retry_bblist(false), oc(t) {}
         ~RCECtx() {}
     };
 protected:
@@ -63,6 +65,10 @@ private:
     IR * processFalsebr(IR * ir, IR * new_det, bool must_true,
                         bool must_false, bool changed, MOD RCECtx & ctx);
     bool performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx);
+    IR * processStore(IR * ir, RCECtx const& ctx);
+    IR * processStorePR(IR * ir, RCECtx const& ctx);
+    IR * processBranch(IR * ir, MOD RCECtx & ctx);
+    bool performSimplyRCE(MOD RCECtx & ctx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -88,13 +94,14 @@ public:
     //Return true if this function is able to determine the result of 'ir',
     //otherwise return false that it does know nothing about ir.
     bool calcCondMustVal(IR const* ir, OUT bool & must_true,
-                         OUT bool & must_false) const;
+                         OUT bool & must_false, OptCtx const& oc) const;
 
     //If 'ir' is always true, set 'must_true', or if it is
     //always false, set 'must_false'.
     //Return the changed ir.
-    IR * calcCondMustVal(IN IR * ir, OUT bool & must_true,
-                         OUT bool & must_false, OUT bool & changed);
+    IR * calcCondMustVal(MOD IR * ir, OUT bool & must_true,
+                         OUT bool & must_false, OUT bool & changed,
+                         MOD OptCtx & oc);
 
     virtual bool dump() const { return true; }
 
@@ -102,15 +109,12 @@ public:
     { return "Redundant Code Elimination"; }
     PASS_TYPE getPassType() const { return PASS_RCE; }
     GVN * getGVN() const { return m_gvn; }
+    IRCFG * getCFG() const { return m_cfg; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 
     void set_use_gvn(bool use_gvn) { m_use_gvn = use_gvn; }
 
-    IR * processStore(IR * ir);
-    IR * processStorePR(IR * ir);
-    IR * processBranch(IR * ir, MOD RCECtx & ctx);
-    bool performSimplyRCE(MOD RCECtx & ctx);
     virtual bool perform(OptCtx & oc);
 };
 

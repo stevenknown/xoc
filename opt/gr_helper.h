@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class BBList;
+
 //The class represents options during GR dump.
 class DumpGRCtx {
 public:

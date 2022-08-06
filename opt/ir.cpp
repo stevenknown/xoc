@@ -42,192 +42,192 @@ IRDesc const g_ir_desc[] = {
       0,},
 
     { IR_CONST, "const", CConst::kid_map, CConst::kid_num, sizeof(CConst),
-      IRT_IS_LEAF,},
+      IRC_IS_LEAF,},
 
     { IR_ID, "id", CId::kid_map, CId::kid_num, sizeof(CId),
-      IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|
-      IRT_IS_MEM_OPND|IRT_HAS_DU },
+      IRC_HAS_IDINFO|IRC_IS_MEM_REF|IRC_IS_LEAF|IRC_IS_NON_PR_MEMREF|
+      IRC_IS_MEM_OPND|IRC_HAS_DU },
 
     { IR_LD, "ld", CLd::kid_map, CLd::kid_num, sizeof(CLd),
-      IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
-      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_HAS_IDINFO|IRC_IS_MEM_REF|IRC_IS_MEM_OPND|IRC_IS_LEAF|
+      IRC_IS_NON_PR_MEMREF|IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_ILD, "ild", CILd::kid_map, CILd::kid_num, sizeof(CILd),
-      IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
-      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_IS_UNA|IRC_IS_MEM_REF|IRC_IS_MEM_OPND|
+      IRC_IS_NON_PR_MEMREF|IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_PR, "pr", CPr::kid_map, CPr::kid_num, sizeof(CPr),
-      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU },
+      IRC_IS_MEM_REF|IRC_IS_MEM_OPND|IRC_IS_LEAF|IRC_HAS_DU },
 
     { IR_ARRAY, "array", CArray::kid_map, CArray::kid_num, sizeof(CArray),
-      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_NON_PR_MEMREF|
-      IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_IS_MEM_REF|IRC_IS_MEM_OPND|IRC_IS_NON_PR_MEMREF|
+      IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_ST, "st", CSt::kid_map, CSt::kid_num, sizeof(CSt),
-      IRT_HAS_IDINFO|IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_HAS_IDINFO|IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_IS_NON_PR_MEMREF|IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_STPR, "stpr", CStpr::kid_map, CStpr::kid_num, sizeof(CStpr),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_HAS_DU|IRC_WRITE_PR|IRC_WRITE_WHOLE_PR },
 
     { IR_STARRAY, "starray", CStArray::kid_map, CStArray::kid_num,
       sizeof(CStArray),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_IS_NON_PR_MEMREF|IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_IST, "ist", CISt::kid_map, CISt::kid_num, sizeof(CISt),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_IS_NON_PR_MEMREF|IRC_HAS_DU|IRC_HAS_OFFSET },
 
     { IR_SETELEM, "setelem", CSetElem::kid_map, CSetElem::kid_num,
       sizeof(CSetElem),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_HAS_DU|IRC_WRITE_PR },
 
     { IR_GETELEM, "getelem", CGetElem::kid_map, CGetElem::kid_num,
       sizeof(CGetElem),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_HAS_DU|IRC_WRITE_PR|IRC_WRITE_WHOLE_PR },
 
     //CALL might not def PR if there is not return value.
     { IR_CALL, "call", CCall::kid_map, CCall::kid_num, sizeof(CCall),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU },
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_HAS_IDINFO|IRC_IS_STMT_IN_BB|IRC_HAS_DU },
 
     { IR_ICALL, "icall", CICall::kid_map, CICall::kid_num, sizeof(CICall),
-      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU }, //ICALL might not def PR if
+      IRC_IS_STMT|IRC_IS_MEM_REF|IRC_HAS_RESULT|
+      IRC_IS_STMT_IN_BB|IRC_HAS_DU }, //ICALL might not def PR if
                                       //there is not return value.
 
     { IR_LDA, "lda", CLda::kid_map, CLda::kid_num, sizeof(CLda),
-      IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET },
+      IRC_HAS_IDINFO|IRC_IS_UNA|IRC_IS_LEAF|IRC_HAS_OFFSET },
 
     { IR_ADD, "add", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE },
 
     { IR_SUB, "sub", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE },
 
     { IR_MUL, "mul", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE },
 
     { IR_DIV, "div", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_REM, "rem", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_MOD, "mod", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_LAND, "land", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_LOGICAL },
+      IRC_IS_BIN|IRC_IS_LOGICAL },
 
     { IR_LOR, "lor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_LOGICAL },
+      IRC_IS_BIN|IRC_IS_LOGICAL },
 
     { IR_BAND, "band", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE },
 
     { IR_BOR, "bor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE },
 
     { IR_XOR, "xor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE },
 
     { IR_ASR, "asr", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_LSR, "lsr", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_LSL, "lsl", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN },
+      IRC_IS_BIN },
 
     { IR_LT, "lt", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_RELATION },
 
     { IR_LE, "le", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_RELATION },
 
     { IR_GT, "gt", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_RELATION },
 
     { IR_GE, "ge", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_RELATION },
 
     { IR_EQ, "eq", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE|IRC_IS_RELATION },
 
     { IR_NE, "ne", CBin::kid_map, CBin::kid_num, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
+      IRC_IS_BIN|IRC_IS_ASSOCIATIVE|IRC_IS_COMMUTATIVE|IRC_IS_RELATION },
 
     { IR_BNOT, "bnot", CUna::kid_map, CUna::kid_num, sizeof(CUna),
-      IRT_IS_UNA },
+      IRC_IS_UNA },
 
     { IR_LNOT, "lnot", CUna::kid_map, CUna::kid_num, sizeof(CUna),
-      IRT_IS_UNA|IRT_IS_LOGICAL },
+      IRC_IS_UNA|IRC_IS_LOGICAL },
 
     { IR_NEG, "neg", CUna::kid_map, CUna::kid_num, sizeof(CUna),
-      IRT_IS_UNA },
+      IRC_IS_UNA },
 
     { IR_CVT, "cvt", CCvt::kid_map, CCvt::kid_num, sizeof(CCvt),
-      IRT_IS_UNA },
+      IRC_IS_UNA },
 
     { IR_GOTO, "goto", CGoto::kid_map, CGoto::kid_num, sizeof(CGoto),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_IGOTO, "igoto", CIGoto::kid_map, CIGoto::kid_num, sizeof(CIGoto),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_DO_WHILE, "dowhile", CDoWhile::kid_map, CDoWhile::kid_num,
-      sizeof(CDoWhile), IRT_IS_STMT },
+      sizeof(CDoWhile), IRC_IS_STMT },
 
     { IR_WHILE_DO, "whiledo", CWhileDo::kid_map, CWhileDo::kid_num,
-      sizeof(CWhileDo), IRT_IS_STMT },
+      sizeof(CWhileDo), IRC_IS_STMT },
 
     { IR_DO_LOOP, "doloop", CDoLoop::kid_map, CDoLoop::kid_num,
-       sizeof(CDoLoop), IRT_IS_STMT },
+       sizeof(CDoLoop), IRC_IS_STMT },
 
     { IR_IF, "if", CIf::kid_map, CIf::kid_num, sizeof(CIf),
-      IRT_IS_STMT },
+      IRC_IS_STMT },
 
     { IR_LABEL, "label", CLab::kid_map, CLab::kid_num, sizeof(CLab),
-      IRT_IS_STMT },
+      IRC_IS_STMT },
 
     { IR_SWITCH, "switch", CSwitch::kid_map, CSwitch::kid_num, sizeof(CSwitch),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_CASE, "case", CCase::kid_map, CCase::kid_num, sizeof(CCase),
       0, },
 
     { IR_TRUEBR, "truebr", CTruebr::kid_map, CTruebr::kid_num, sizeof(CTruebr),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_FALSEBR, "falsebr", CFalsebr::kid_map, CFalsebr::kid_num,
-      sizeof(CFalsebr), IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      sizeof(CFalsebr), IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_RETURN, "return", CRet::kid_map, CRet::kid_num, sizeof(CRet),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
     { IR_SELECT, "select", CSelect::kid_map, CSelect::kid_num, sizeof(CSelect),
       0, },
 
     { IR_BREAK, "break", CBreak::kid_map, CBreak::kid_num, sizeof(CBreak),
-      IRT_IS_STMT },
+      IRC_IS_STMT },
 
     { IR_CONTINUE, "continue", CContinue::kid_map, CContinue::kid_num,
-      sizeof(CContinue), IRT_IS_STMT },
+      sizeof(CContinue), IRC_IS_STMT },
 
     { IR_PHI, "phi", CPhi::kid_map, CPhi::kid_num, sizeof(CPhi),
-      IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
+      IRC_IS_STMT|IRC_HAS_RESULT|IRC_IS_MEM_REF|
+      IRC_IS_STMT_IN_BB|IRC_HAS_DU|IRC_WRITE_PR|IRC_WRITE_WHOLE_PR },
 
     { IR_REGION, "region", CRegion::kid_map, CRegion::kid_num, sizeof(CRegion),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+      IRC_IS_STMT|IRC_IS_STMT_IN_BB },
 
-    { IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
+    { IR_CODE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
 };
 
 RoundDesc const g_round_desc[] = {
@@ -336,53 +336,53 @@ INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line)
 }
 
 
-INT checkKidNumIRtype(IR const* ir, UINT n, IR_TYPE irty,
+INT checkKidNumIRCode(IR const* ir, UINT n, IR_CODE irc,
                       CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
             ("%d is beyond maximum IR kids num %d", n, x));
-    ASSERT0(ir->getCode() == irty);
+    ASSERT0(ir->getCode() == irc);
     return n;
 }
 
 
-IR const* checkIRT(IR const* ir, IR_TYPE irt)
+IR * checkIRC(IR * ir, IR_CODE irc)
 {
-    ASSERTN(ir->getCode() == irt, ("current ir is not '%s'", IRTNAME(irt)));
+    ASSERTN(ir->getCode() == irc, ("current ir is not '%s'", IRCNAME(irc)));
     return ir;
 }
 
 
-IR const* checkIRTBranch(IR const* ir)
+IR * checkIRCBranch(IR * ir)
 {
     ASSERT0(ir->isConditionalBr());
     return ir;
 }
 
 
-IR const* checkIRTCall(IR const* ir)
+IR * checkIRCCall(IR * ir)
 {
     ASSERT0(ir->isCallStmt());
     return ir;
 }
 
 
-IR const* checkIRTArray(IR const* ir)
+IR * checkIRCArray(IR * ir)
 {
     ASSERT0(ir->is_array() || ir->is_starray());
     return ir;
 }
 
 
-IR const* checkIRTOnlyCall(IR const* ir)
+IR * checkIRCOnlyCall(IR * ir)
 {
     ASSERT0(ir->is_call());
     return ir;
 }
 
 
-IR const* checkIRTOnlyICall(IR const* ir)
+IR * checkIRCOnlyICall(IR * ir)
 {
     ASSERT0(ir->is_icall());
     return ir;
@@ -416,9 +416,9 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 //
 //START IRDesc
 //
-bool IRDesc::mustExist(IR_TYPE irtype, UINT kididx)
+bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
 {
-    return HAVE_FLAG(IRDES_kid_map(g_ir_desc[irtype]), 1 << kididx);
+    return HAVE_FLAG(IRDES_kid_map(g_ir_desc[irc]), 1 << kididx);
 }
 //END IRDesc
 
@@ -433,7 +433,7 @@ void setParentPointerForIRList(IR * ir_list)
 
 
 //Return the arthmetic precedence.
-UINT getArithPrecedence(IR_TYPE ty)
+UINT getArithPrecedence(IR_CODE ty)
 {
     UINT p = 0;
     switch (ty) {
@@ -523,7 +523,7 @@ size_t IR::count_mem() const
     ConstIRIter it;
     for (IR const* k = iterInitC(this, it);
          k != nullptr; k = iterNextC(it)) {
-        size += IRTSIZE(k->getCode());
+        size += IRCSIZE(k->getCode());
     }
     return size;
 }
@@ -650,10 +650,12 @@ bool IR::verify(Region const* rg) const
     case IR_LDA:
         ASSERT0(LDA_idinfo(this));
         ASSERT0(d);
-        ASSERTN(d->getDType() != D_UNDEF, ("size of load value cannot be zero"));
+        ASSERTN(d->getDType() != D_UNDEF,
+                ("size of load value cannot be zero"));
         ASSERT0(d->is_pointer());
         //Lda base can be general Var, label, const string.
-        ASSERTN(!VAR_is_fake(LDA_idinfo(this)), ("LDA's base must be effect Var"));
+        ASSERTN(!LDA_idinfo(this)->is_fake(),
+                ("LDA's base must be effect Var"));
         break;
     case IR_CALL:
         ASSERT0(CALL_idinfo(this));
@@ -1004,17 +1006,18 @@ bool IR::isSameArrayStruct(IR const* ir) const
         ((CArray*)this)->getDimNum() != ((CArray*)ir)->getDimNum()) {
         return false;
     }
-    if ((ARR_elem_num_buf(this) == nullptr) || (ARR_elem_num_buf(ir) == nullptr)) {
+    if ((ARR_elem_num_buf(this) == nullptr) ||
+        (ARR_elem_num_buf(ir) == nullptr)) {
         //Array is any dimension.
         return false;
     }
     UINT dim = 0;
     for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next()) {
-        dim++;
         if (((CArray*)this)->getElementNumOfDim(dim) !=
             ((CArray*)ir)->getElementNumOfDim(dim)) {
             return false;
         }
+        dim++;
     }
     return true;
 }
@@ -1143,16 +1146,18 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
                            bool is_cmp_kid, bool identical)
 {
     if (ir == src) { return true; }
-    if (identical && ir->getCode() != src->getCode()) { return false; }
     switch (src->getCode()) {
     case IR_CONST: //Constant value: include integer, float, string.
+        if (ir->getCode() != src->getCode()) { return false; }
         if (CONST_int_val(ir) != CONST_int_val(src)) { return false; }
         break;
     case IR_ID:
+        if (ir->getCode() != src->getCode()) { return false; }
         if (ID_info(ir) != ID_info(src)) { return false; }
         break;
-     case IR_ST:
+    case IR_ST:
     case IR_LD:
+        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->is_st() && !ir->is_ld()) { return false; }
         if (ir->getIdinfo() != src->getIdinfo() ||
             ir->getOffset() != src->getOffset() ||
@@ -1162,6 +1167,7 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         break;
     case IR_IST:
     case IR_ILD:
+        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->is_ist() && !ir->is_ild()) { return false; }
         if (ir->getOffset() != src->getOffset() ||
             ir->getType() != src->getType()) {
@@ -1170,6 +1176,7 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         break;
     case IR_STPR:
     case IR_PR:
+        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->is_stpr() && !ir->is_pr()) { return false; }
         if (ir->getType() != src->getType() ||
             ir->getPrno() != src->getPrno()) {
@@ -1178,6 +1185,7 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         break;
     case IR_STARRAY:
     case IR_ARRAY:
+        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->is_starray() && !ir->is_array()) { return false; }
         if (ARR_ofst(ir) != ARR_ofst(src) ||
             ir->getType() != src->getType()) {
@@ -1200,6 +1208,7 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         }
         break;
     case IR_LDA:
+        if (ir->getCode() != src->getCode()) { return false; }
         if (LDA_idinfo(ir) != LDA_idinfo(src) ||
             LDA_ofst(ir) != LDA_ofst(src) ||
             ir->getType() != src->getType()) {
@@ -1207,13 +1216,14 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         }
         break;
     case IR_CALL:
+        if (ir->getCode() != src->getCode()) { return false; }
         if (CALL_idinfo(ir) != CALL_idinfo(src)) { return false; }
         break;
     case IR_ICALL:
         break;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
-        if (ir->getType() != src->getType()) { return false; }
+        if (ir->getCode() != src->getCode()) { return false; }
         break;
     case IR_GOTO:
     case IR_IGOTO:
@@ -1223,6 +1233,7 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
     case IR_IF:
         break;
     case IR_LABEL:
+        if (ir->getCode() != src->getCode()) { return false; }
         if (LAB_lab(ir) != LAB_lab(src)) { return false; }
         break;
     case IR_SWITCH:
@@ -1231,9 +1242,8 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
     case IR_TRUEBR:
     case IR_FALSEBR:
     case IR_SELECT:
-        if (ir->getType() != src->getType()) {
-            return false;
-        }
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (ir->getType() != src->getType()) { return false; }
         break;
     case IR_RETURN:
         break;
@@ -1251,18 +1261,16 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
     if (!is_cmp_kid) { return true; }
 
     //Compare kids.
-    for (INT i = 0;
-         i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
+    UINT i;
+    for (i = 0; i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
         IR * kid1 = ir->getKid(i);
         IR * kid2 = src->getKid(i);
-
         if (src->isCallStmt() &&
             (kid1 == CALL_dummyuse(ir) ||
              kid2 == CALL_dummyuse(src))) {
             //Do NOT check the equality of dummyuses.
             continue;
         }
-
         if ((kid1 != nullptr) ^ (kid2 != nullptr)) {
             return false;
         }
@@ -1270,6 +1278,8 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
             return false;
         }
     }
+    //Note there is no need to ask the number of ir and src must be same.
+    //ASSERT0(i == IR_MAX_KID_NUM(ir) && i == IR_MAX_KID_NUM(src));
     return true;
 }
 
@@ -1506,31 +1516,6 @@ void IR::freeDUset(DUMgr * dumgr)
 }
 
 
-//This function only handle Call/ICall stmt, it find PR and remove
-//them out of UseSet.
-//Note this function does not maintain DU chain between call and its use.
-void IR::removePRFromUseset(Region * rg)
-{
-    ASSERT0(isCallStmt() && rg);
-    DUMgr * dumgr = rg->getDUMgr();
-    DUSet * useset = getDUSet();
-    if (useset == nullptr) { return; }
-
-    DefMiscBitSetMgr * sbs_mgr = dumgr->getSBSMgr();
-    DUSetIter di = nullptr;
-    BSIdx lnext = BS_UNDEF;
-    for (BSIdx i = useset->get_first(&di); i != BS_UNDEF; i = lnext) {
-        lnext = useset->get_next(i, &di);
-        IR const* exp = rg->getIR(i);
-        ASSERT0(exp->is_exp());
-        if (!exp->isReadPR()) { continue; }
-
-        ASSERT0(dumgr);
-        useset->remove(i, *sbs_mgr);
-    }
-}
-
-
 static void removeSSAUseRecur(IR * ir)
 {
     if (ir->is_stmt()) {
@@ -1704,8 +1689,7 @@ bool IR::isDiffMemLoc(IR const* ir2) const
     if (ir1->isArrayOp() && ir2->isArrayOp()) {
         IR const* base1 = ARR_base(ir1);
         IR const* base2 = ARR_base(ir2);
-        if (base1->is_lda() &&
-            base2->is_lda() &&
+        if (base1->is_lda() && base2->is_lda() &&
             base1->getIdinfo() != base2->getIdinfo()) {
             return true;
         }
@@ -1769,7 +1753,7 @@ bool IR::isNotOverlap(IR const* ir2, Region const* rg) const
     ASSERT0(rg);
     IR const* ir1 = this;
     ASSERT0(ir1 && ir2);
-    if (!ir1->getType()->is_scalar() | !ir2->getType()->is_scalar() ||
+    if ((!ir1->getType()->is_scalar() | !ir2->getType()->is_scalar()) ||
         !ir1->hasOffset() || !ir2->hasOffset()) {
         return false;
     }
@@ -1817,7 +1801,7 @@ bool IR::isCover(IR const* ir2, Region const* rg) const
 
 
 //Set prno, and update SSAInfo meanwhile.
-void IR::setPrnoConsiderSSAInfo(PRNO prno)
+void IR::setPrnoAndUpdateSSAInfo(PRNO prno)
 {
     ASSERT0(prno != getPrno());
     if (getSSAInfo() != nullptr) {
@@ -2076,8 +2060,8 @@ bool IR::isReadOnly() const
     case IR_ICALL: return ICALL_is_readonly(this);
     case IR_CVT: return CVT_exp(this)->isReadOnly();
     case IR_LD:
-        if (VAR_is_readonly(LD_idinfo(this)) &&
-            !VAR_is_volatile(LD_idinfo(this))) {
+        if (LD_idinfo(this)->is_readonly() &&
+            !LD_idinfo(this)->is_volatile()) {
             return true;
         }
         return false;
@@ -2093,7 +2077,7 @@ bool IR::is_volatile() const
     if (is_id()) {
         Var * id_info = ID_info(this);
         ASSERT0(id_info != nullptr);
-        return VAR_is_volatile(id_info);
+        return id_info->is_volatile();
     }
     return false;
 }
@@ -2229,11 +2213,11 @@ IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 
 //The function only invoked at debug mode.
 //Make sure IR_ICALL is the largest ir.
-bool checkMaxIRType()
+bool checkMaxIRCode()
 {
     //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
-    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
-        ASSERT0(IRTSIZE(i) <= IRTSIZE(IR_ICALL));
+    for (UINT i = IR_UNDEF; i < IR_CODE_NUM; i++) {
+        ASSERT0(IRCSIZE(i) <= IRCSIZE(IR_ICALL));
     }
     return true;
 }
@@ -2242,14 +2226,14 @@ bool checkMaxIRType()
 //The function only invoked at debug mode.
 bool checkIRDesc()
 {
-    UINT sz = (UINT)(1 << IR_TYPE_BIT_SIZE);
-    ASSERTN(IR_TYPE_NUM <= sz, ("code field is too small"));
+    UINT sz = (UINT)(1 << IR_CODE_BIT_SIZE);
+    ASSERTN(IR_CODE_NUM <= sz, ("code field is too small"));
     DUMMYUSE(sz);
-    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
+    for (UINT i = IR_UNDEF; i < IR_CODE_NUM; i++) {
         ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
     }
     UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
-    CHECKN_DUMMYUSE(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
+    CHECKN_DUMMYUSE(descnum - 1 == IR_CODE_NUM, ("miss IRDesc declaration"));
     return true;
 }
 

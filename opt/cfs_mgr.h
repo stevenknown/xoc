@@ -102,7 +102,7 @@ public:
 #define CFS_INFO_loop_body(ci)           ((ci)->u1.loop_info.loop_body_ir_set)
 class CFS_INFO {
 public:
-    IR_TYPE cfs_type;
+    IR_CODE cfs_type;
     union {
         struct {
             xcom::BitSet * true_body_ir_set; //TRUE BODY
@@ -163,7 +163,7 @@ public:
     CFS_INFO * map_ir2cfsinfo(IR * ir);
     AbsNode * map_bb2abs(IRBB const* bb);
 
-    CFS_INFO * new_cfs_info(IR_TYPE irtype);
+    CFS_INFO * new_cfs_info(IR_CODE ircode);
     AbsNode * new_abs_node(ABS_TYPE ty);
 
     void set_map_ir2cfsinfo(IR * ir, CFS_INFO * ci);

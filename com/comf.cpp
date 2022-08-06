@@ -536,29 +536,28 @@ void xstrcpy(CHAR * tgt, CHAR const* src, size_t size)
 }
 
 
-//Reverse the string.
-UCHAR * reverseString(UCHAR * v)
+CHAR * rotateString(MOD CHAR * str, UINT n)
 {
-    INT end = (INT)strlen((CHAR*)v) - 1;
-    INT start = 0;
-    while (start <= end - 1) {
-        BYTE b = v[start];
-        v[start] = v[end];
-        v[end] = b;
-        start++;
-        end--;
-    }
+    xcom::rotate_buffer(str, ::strlen(str), n);
+    return str;
+}
+
+
+//Reverse the string.
+CHAR * reverseString(CHAR * v)
+{
+    xcom::reverse_buffer(v, ::strlen(v));
     return v;
 }
 
 
 //Convert long to string.
-UCHAR * xltoa(LONG v, OUT UCHAR * buf)
+CHAR * xltoa(LONG v, OUT CHAR * buf)
 {
     UCHAR const p [] = {'0','1','2','3','4','5','6','7','8','9'};
     bool sign = false;
     if (v < 0) { v = -v; sign = true; }
-    UCHAR * str = buf;
+    CHAR * str = buf;
 
     LONG rem = 0;
     while (v != 0) {

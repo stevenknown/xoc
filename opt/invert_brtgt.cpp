@@ -99,12 +99,13 @@ bool InvertBrTgt::invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
     IRCFG * cfg = invt->getRegion()->getCFG();
     void * vi1 = cfg->getEdge(br->getBB()->id(), br_tgt->id())->info();
     void * vi2 = cfg->getEdge(jmp->getBB()->id(), jmp_tgt->id())->info();
-    
-    cfg->removeEdge(br->getBB(), br_tgt);
-    cfg->removeEdge(jmp->getBB(), jmp_tgt);
+   
+    CfgOptCtx ctx(*invt->getOptCtx()); 
+    cfg->removeEdge(br->getBB(), br_tgt, ctx);
+    cfg->removeEdge(jmp->getBB(), jmp_tgt, ctx);
 
-    xcom::Edge * e1 = cfg->addEdge(br->getBB(), jmp_tgt);
-    xcom::Edge * e2 = cfg->addEdge(jmp->getBB(), br_tgt);
+    xcom::Edge * e1 = cfg->addEdge(br->getBB(), jmp_tgt, ctx);
+    xcom::Edge * e2 = cfg->addEdge(jmp->getBB(), br_tgt, ctx);
 
     EDGE_info(e1) = vi2;
     EDGE_info(e2) = vi1;
@@ -112,17 +113,18 @@ bool InvertBrTgt::invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
 }
 
 
+//Return true if there is loop changed.
 static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
 {
     IRBB * head = li->getLoopHead();
-    ASSERT0(head && cfg->getVertex(head->id()));
+    ASSERT0(head && head->getVex());
     UINT backedge_pred = VERTEX_UNDEF;
     UINT backedge_num = 0;
-    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
-         ec != nullptr; ec = ec->get_next()) {
-        UINT pred = ec->getFromId();
-        if (li->isInsideLoop(pred)) {
-            backedge_pred = pred;
+    AdjVertexIter it;
+    for (Vertex const* in = Graph::get_first_in_vertex(head->getVex(), it);
+         in != nullptr; in = Graph::get_next_in_vertex(it)) {
+        if (li->isInsideLoop(in->id())) {
+            backedge_pred = in->id();
             backedge_num++;
         }
     }
@@ -132,7 +134,11 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
     IRBB * backedge_start = cfg->getBB(backedge_pred);
     ASSERT0(!backedge_start->isExceptionHandler());
     IR * jmp = cfg->get_first_xr(const_cast<IRBB*>(backedge_start));
-    ASSERT0(jmp);
+    if (jmp == nullptr) {
+        //Uncanonical loop structure.
+        //e.g:compile/preheader.c, backedge_start BB is empty.
+        return false;
+    }
     if (!jmp->is_goto()) { return false; }
     if (!head->hasLabel(GOTO_lab(jmp))) { return false; }
 
@@ -157,6 +163,7 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
 
 
 //Tranform trampoline branch.
+//Return true if there is loop changed.
 //Note the pass is different from what IRCFG::removeTrampolinEdge() does.
 //e.g:L1:
 //    ...
@@ -171,8 +178,7 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
 //    goto L2
 //    ...
 //    L2:st = ...
-static bool iterLoopTree(InvertBrTgt * invt, IRCFG * cfg,
-                                 LI<IRBB> const* li)
+static bool iterLoopTree(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
 {
     if (li == nullptr) { return false; }
     bool changed = false;
@@ -187,16 +193,13 @@ static bool iterLoopTree(InvertBrTgt * invt, IRCFG * cfg,
 bool InvertBrTgt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
+    m_oc = &oc;
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
                                                PASS_UNDEF);
     if (!oc.is_loopinfo_valid()) { return false; }
     dumpInit();
-    bool changed = false;
-    BBList * bbl = m_rg->getBBList();
-    if (bbl != nullptr && bbl->get_elem_count() != 0) {
-        changed |= iterLoopTree(this, m_rg->getCFG(),
+    bool changed = iterLoopTree(this, m_rg->getCFG(),
                                 m_rg->getCFG()->getLoopInfo());
-    }
     if (!changed) {
         dumpFini();
         END_TIMER(t, getPassName());
@@ -205,7 +208,11 @@ bool InvertBrTgt::perform(OptCtx & oc)
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
         dump();
     }
+    oc.setInvalidIfCFGChanged();
     dumpFini();
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     END_TIMER(t, getPassName());
     return true;
 }

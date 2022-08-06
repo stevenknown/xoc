@@ -94,6 +94,7 @@ public:
         SSA_uses(this).clean();
     }
     void cleanUseSet() { SSA_uses(this).clean(); }
+    void copyUseSet(SSAInfo const& src) { SSA_uses(this).copy(src.getUses()); }
 
     //Get SSAInfo id.
     UINT id() const { return uid; }

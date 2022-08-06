@@ -169,7 +169,7 @@ protected:
     //Generate IR, invoke freeIR() or freeIRTree() if it is useless.
     //NOTE: Do NOT invoke ::free() to free IR, because all
     //    IR are allocated in the pool.
-    IR * allocIR(IR_TYPE irt);
+    IR * allocIR(IR_CODE irt);
 
     void doBasicAnalysis(OptCtx & oc);
 
@@ -182,7 +182,7 @@ protected:
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
 
-    virtual void postSimplify(SimpCtx const& simp, MOD OptCtx & oc);
+    virtual void postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
     void prescanIRList(IR const* ir);
@@ -212,7 +212,8 @@ public:
         BYTE s1b1;
     } m_u2;
 public:
-    explicit Region(REGION_TYPE rt, RegionMgr * rm) { init(rt, rm); }
+    explicit Region(REGION_TYPE rt, RegionMgr * rm)
+    { m_pool = nullptr; init(rt, rm); }
     virtual ~Region() { destroy(); }
 
     //Add var which used inside current or inner Region.
@@ -222,6 +223,11 @@ public:
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
     { xcom::add_next(&ANA_INS_ir_list(getAnalysisInstrument()), irs); }
+
+    //The function generates new MD for the IR tree that rooted by 'root'.
+    //sibling: true if the function have to walk the sibling node of 'root'.
+    //It should be called if new IR tree generated in optimzations.
+    void allocRefForIRTree(IR * root, bool sibling);
 
     //The function generates new MD for all operations to PR.
     //It should be called if new PR generated in optimzations.
@@ -437,10 +443,10 @@ public:
     //The function will check and build pointer arithmetic operation.
     //To build pointer arithemtic, the addend of pointer must be
     //product of the pointer-base-size and rchild if lchild is pointer.
-    IR * buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild);
+    IR * buildPointerOp(IR_CODE irt, IR * lchild, IR * rchild);
 
     //Build compare operation.
-    IR * buildCmp(IR_TYPE irt, IR * lchild, IR * rchild);
+    IR * buildCmp(IR_CODE irt, IR * lchild, IR * rchild);
     //Build judgement operation.
     //This function build operation that comparing with 0 by NE node.
     //e.g: output is (exp != 0).
@@ -449,29 +455,29 @@ public:
     IR * buildJudge(IR * exp);
 
     //Build binary operation without considering pointer arithmetic.
-    IR * buildBinaryOpSimp(IR_TYPE irt, Type const* type, IR * lchild,
+    IR * buildBinaryOpSimp(IR_CODE irt, Type const* type, IR * lchild,
                            IR * rchild);
 
     //Build binary operation.
     //If rchild/lchild is pointer, the function will attemp to generate pointer
     //arithmetic operation instead of normal binary operation.
-    IR * buildBinaryOp(IR_TYPE irt, Type const* type, IN IR * lchild,
+    IR * buildBinaryOp(IR_CODE irt, Type const* type, IN IR * lchild,
                        IN IR * rchild);
-    IR * buildBinaryOp(IR_TYPE irt, DATA_TYPE dt, IN IR * lchild,
+    IR * buildBinaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * lchild,
                        IN IR * rchild);
 
     //Build unary operation.
-    IR * buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd);
+    IR * buildUnaryOp(IR_CODE irt, Type const* type, IN IR * opnd);
 
     //Build unary operation.
-    IR * buildUnaryOp(IR_TYPE irt, DATA_TYPE dt, IN IR * opnd)
+    IR * buildUnaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * opnd)
     { return buildUnaryOp(irt, getTypeMgr()->getSimplexType(dt), opnd); }
 
     //Build IR_LNOT operation.
     IR * buildLogicalNot(IR * opnd0);
 
     //Build Logical operations, include IR_LAND, IR_LOR, IR_XOR.
-    IR * buildLogicalOp(IR_TYPE irt, IR * opnd0, IR * opnd1);
+    IR * buildLogicalOp(IR_CODE irt, IR * opnd0, IR * opnd1);
 
     //Build IR_CONST operation.
     //The expression indicates an integer.
@@ -943,14 +949,14 @@ public:
     MDSSAMgr * getMDSSAMgr() const
     {
         return getPassMgr() != nullptr ?
-               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : nullptr;
+               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MDSSA_MGR) : nullptr;
     }
 
     //Return PRSSA manager.
     PRSSAMgr * getPRSSAMgr() const
     {
         return getPassMgr() != nullptr ?
-               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : nullptr;
+               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PRSSA_MGR) : nullptr;
     }
 
     Region * getParent() const { return REGION_parent(this); }
@@ -1053,7 +1059,7 @@ public:
     }
 
     //Use HOST_INT type describes the value.
-    //The value can not exceed ir type's value range.
+    //The value can not exceed IR type's value range.
     HOST_INT getIntegerInDataTypeValueRange(IR * ir) const;
     HOST_INT getMaxInteger(UINT bitsize, bool is_signed) const;
     HOST_INT getMinInteger(UINT bitsize, bool is_signed) const;

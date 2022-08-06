@@ -197,7 +197,17 @@ inline void remove(T ** pheader, T * t)
 }
 
 
-//Swap t1 t2 in list.
+//Swap value of t1 and t2.
+template <class T>
+inline void swap(T & t1, T & t2)
+{
+    T t = t1;
+    t1 = t2;
+    t2 = t;
+}
+
+
+//Swap t1 and t2 in list.
 template <class T>
 inline void swap(T ** pheader, T * t1, T * t2)
 {
@@ -443,6 +453,32 @@ inline void insertafter(T ** marker, T * t)
 }
 
 
+//The function reverse the order of elements in buf.
+//e.g: given buf is <a,b,c,d,e>, after reversing the buf become <e,d,c,b,a>.
+template <class T>
+inline void reverse_buffer(MOD T * buf, size_t buflen)
+{
+    for (INT start = 0, end = ((INT)buflen) - 1;
+         start <= end - 1; start++, end--) {
+        xcom::swap(buf[start], buf[end]);
+    }
+}
+
+
+//The function does cyclic shift to elements in buf.
+//e.g: given buf is <a,b,c,d,e>, n is 2, after rotation the buf become
+//<d,e,a,b,c>.
+//n: rotate times.
+template <class T>
+void rotate_buffer(MOD T * buf, size_t buflen, UINT n)
+{
+    ASSERT0(buf && n <= buflen);
+    xcom::reverse_buffer(buf, buflen);
+    xcom::reverse_buffer(buf, n);
+    xcom::reverse_buffer(buf + n, buflen - n);
+}
+
+
 //Reverse list, return the new list-head.
 template <class T>
 inline T * reverse_list(T * t)
@@ -594,7 +630,7 @@ public:
 //    container, then APPEND it at list.
 template <class T, class Allocator = allocator<T> > class List {
 public:
-    typedef C<T>* Iter;
+    typedef C<T>* Iter; //the iter to iterate element in list.
 protected:
     COPY_CONSTRUCTOR(List);
     UINT m_elem_count;
@@ -1412,6 +1448,8 @@ public:
         return false;
     }
 
+    void reinit() { destroy(); init(); }
+
     //Reverse list.
     void reverse()
     {
@@ -1561,7 +1599,6 @@ template <class T> class SListCore {
 protected:
     UINT m_elem_count; //list elements counter.
     SC<T> m_head; //list head.
-
 protected:
     SC<T> * new_sc_container(SMemPool * pool)
     {
@@ -2401,6 +2438,8 @@ template <class T, class MapTypename2Holder> class EList : public List<T> {
 protected:
     MapTypename2Holder m_typename2holder; //map typename 'T' to its list holder.
 public:
+    typedef C<T>* Iter; //the iter to iterate element in list.
+public:
     EList() {}
     virtual ~EList() {} //MapTypename2Holder has virtual function.
 
@@ -2668,15 +2707,11 @@ typedef INT VecIdx; //VecIdx must be signed integer type.
 
 template <class T> class Vector {
 protected:
-    UINT m_elem_num:31; //The number of element in vector.
-
-    //The number of element when vector is growing.
-    UINT m_is_init:1;
-
+    typedef UINT ElemNumTy;
+    ElemNumTy m_elem_num:31; //The number of element in vector.
+    UINT m_is_init:1; //To make sure functions are idempotent.
     VecIdx m_last_idx; //Last element idx
-public:
     T * m_vec;
-
 public:
     Vector()
     {
@@ -2723,7 +2758,7 @@ public:
     {
         ASSERT0(vec.m_elem_num > 0 ||
                 (vec.m_elem_num == 0 && vec.m_last_idx == VEC_UNDEF));
-        UINT n = vec.m_elem_num;
+        ElemNumTy n = vec.m_elem_num;
         if (m_elem_num < n) {
             destroy();
             init(n);
@@ -2775,7 +2810,8 @@ public:
     T get(VecIdx index) const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        return (index >= (VecIdx)m_elem_num) ? T(0) : m_vec[index];
+        return (((ElemNumTy)index) >= m_elem_num) ?
+               T(0) : m_vec[(ElemNumTy)index];
     }
 
     //Return vector buffer that hold elements.
@@ -2796,63 +2832,14 @@ public:
         m_vec = (T*)::malloc(sizeof(T) * size);
         ASSERT0(m_vec);
         ::memset(m_vec, 0, sizeof(T) * size);
-        m_elem_num = size;
+        m_elem_num = (ElemNumTy)size;
         m_last_idx = VEC_UNDEF;
         m_is_init = true;
     }
     bool is_init() const { return m_is_init; }
 
-    //Overloaded [] for CONST array reference create an rvalue.
-    //Similar to 'get()', the difference between this operation
-    //and get() is [] opeartion does not allow index is greater than
-    //or equal to m_elem_num.
-    //Note this operation can not be used to create lvalue.
-    //e.g: Vector<int> const v;
-    //    int ex = v[i];
-    T const operator[](VecIdx index) const
-    {
-        ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERTN(index < (VecIdx)m_elem_num, ("array subscript over boundary."));
-        return m_vec[index];
-    }
-
-    //Overloaded [] for non-const array reference create an lvalue.
-    //Similar to set(), the difference between this operation
-    //and set() is [] opeartion does not allow index is greater than
-    //or equal to m_elem_num.
-    inline T & operator[](VecIdx index)
-    {
-        ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERTN(index < (VecIdx)m_elem_num, ("array subscript over boundary."));
-        m_last_idx = MAX((VecIdx)index, m_last_idx);
-        return m_vec[index];
-    }
-
-    //Place elem to vector according to index.
-    //Growing vector if 'index' is greater than m_elem_num.
-    void set(VecIdx index, T elem)
-    {
-        ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        if (index >= (VecIdx)m_elem_num) {
-            grow(getNearestPowerOf2((UINT)index) + 2);
-        }
-        m_last_idx = MAX((VecIdx)index, m_last_idx);
-        m_vec[index] = elem;
-        return;
-    }
-
-    //Set vector buffer that will used to hold element.
-    //vec: vector buffer pointer
-    //     Note if vec is nullptr, that means reset vector buffer to be nullptr.
-    //elem_num: the number of element that could store into buffer.
-    //          Note the byte size of buffer is equal to elem_num*sizeof(T).
-    void set_vec(T * vec, UINT elem_num)
-    {
-        ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERT0((vec && elem_num > 0) || (vec == nullptr && elem_num == 0));
-        m_vec = vec;
-        m_elem_num = elem_num;
-    }
+    //Return true if there is not any element.
+    bool is_empty() const { return get_last_idx() == VEC_UNDEF; }
 
     //Return the number of element the vector could hold.
     UINT get_capacity() const
@@ -2884,11 +2871,11 @@ public:
             m_vec = (T*)::malloc(sizeof(T) * num_of_elem);
             ASSERT0(m_vec);
             ::memset(m_vec, 0, sizeof(T) * num_of_elem);
-            m_elem_num = num_of_elem;
+            m_elem_num = (ElemNumTy)num_of_elem;
             return;
         }
 
-        ASSERT0(num_of_elem > (UINT)m_elem_num);
+        ASSERT0((ElemNumTy)num_of_elem > m_elem_num);
         T * tmp = (T*)::malloc(num_of_elem * sizeof(T));
         ASSERT0(tmp);
         ::memcpy(tmp, m_vec, m_elem_num * sizeof(T));
@@ -2899,8 +2886,61 @@ public:
         m_elem_num = num_of_elem;
     }
 
-    //Return true if there is not any element.
-    bool is_empty() const { return get_last_idx() == VEC_UNDEF; }
+    //Overloaded [] for CONST array reference create an rvalue.
+    //Similar to 'get()', the difference between this operation
+    //and get() is [] opeartion does not allow index is greater than
+    //or equal to m_elem_num.
+    //Note this operation can not be used to create lvalue.
+    //e.g: Vector<int> const v;
+    //    int ex = v[i];
+    T const operator[](VecIdx index) const
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(((ElemNumTy)index) < m_elem_num,
+                ("array subscript over boundary."));
+        return m_vec[index];
+    }
+
+    //Overloaded [] for non-const array reference create an lvalue.
+    //Similar to set(), the difference between this operation
+    //and set() is [] opeartion does not allow index is greater than
+    //or equal to m_elem_num.
+    inline T & operator[](VecIdx index)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(((ElemNumTy)index) < m_elem_num,
+                ("array subscript over boundary."));
+        m_last_idx = MAX((VecIdx)index, m_last_idx);
+        return m_vec[index];
+    }
+
+    void reinit() { destroy(); init(); }
+
+    //Place elem to vector according to index.
+    //Growing vector if 'index' is greater than m_elem_num.
+    void set(VecIdx index, T elem)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        if (((ElemNumTy)index) >= m_elem_num) {
+            grow(getNearestPowerOf2((UINT)index) + 2);
+        }
+        m_last_idx = MAX((VecIdx)index, m_last_idx);
+        m_vec[index] = elem;
+        return;
+    }
+
+    //Set vector buffer that will used to hold element.
+    //vec: vector buffer pointer
+    //     Note if vec is nullptr, that means reset vector buffer to be nullptr.
+    //elem_num: the number of element that could store into buffer.
+    //          Note the byte size of buffer is equal to elem_num*sizeof(T).
+    void set_vec(T * vec, ElemNumTy elem_num)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERT0((vec && elem_num > 0) || (vec == nullptr && elem_num == 0));
+        m_vec = vec;
+        m_elem_num = elem_num;
+    }
 };
 //END Vector
 
@@ -3035,7 +3075,7 @@ template <class T, UINT GrowSize, UINT MaxSize> class SimpleVector {
 protected:
     struct {
         UINT m_elem_num:31; //The number of element in vector.
-        UINT m_is_init:1;
+        UINT m_is_init:1; //To make sure functions are idempotent.
     } s1;
 public:
     T * m_vec; //vector's memory is allocated in outside mempool.
@@ -3054,43 +3094,6 @@ public:
     SimpleVector(SimpleVector const& src, SMemPool * pool) { copy(src, pool); }
     SimpleVector const& operator = (SimpleVector const&);
     ~SimpleVector() { destroy(); }
-
-    inline void init()
-    {
-        if (s1.m_is_init) { return; }
-        SVEC_elem_num(this) = 0;
-        m_vec = nullptr;
-        s1.m_is_init = true;
-    }
-
-    inline void init(UINT size, SMemPool * pool)
-    {
-        if (s1.m_is_init) { return; }
-        ASSERT0(size != 0 && size < MaxSize);
-        m_vec = (T*)smpoolMalloc(sizeof(T) * size, pool);
-        ASSERT0(m_vec);
-        ::memset(m_vec, 0, sizeof(T) * size);
-        SVEC_elem_num(this) = size;
-        s1.m_is_init = true;
-    }
-
-    inline void destroy()
-    {
-        if (!s1.m_is_init) { return; }
-        SVEC_elem_num(this) = 0;
-        m_vec = nullptr;
-        s1.m_is_init = false;
-    }
-
-    T get(UINT i) const
-    {
-        ASSERTN(s1.m_is_init, ("SimpleVector not yet initialized."));
-        if (i >= SVEC_elem_num(this)) { return T(0); }
-        return m_vec[i];
-    }
-    UINT getElemNum() const { return SVEC_elem_num(this); }
-    //Return vector buffer that hold elements.
-    T * get_vec() { return m_vec; }
 
     void copy(SimpleVector const& src, SMemPool * pool)
     {
@@ -3121,17 +3124,42 @@ public:
     size_t count_mem() const
     { return SVEC_elem_num(this) + sizeof(Vector<T>); }
 
-    //Return nullptr if 'i' is illegal, otherwise return 'elem'.
-    void set(UINT i, T elem, SMemPool * pool)
+    inline void init()
     {
-        ASSERTN(is_init(), ("SimpleVector not yet initialized."));
-        if (i >= SVEC_elem_num(this)) {
-            //grow(i * 2 + 1);
-            grow(i + GrowSize, pool);
-        }
-        m_vec[i] = elem;
-        return;
+        if (s1.m_is_init) { return; }
+        SVEC_elem_num(this) = 0;
+        m_vec = nullptr;
+        s1.m_is_init = true;
     }
+    inline void init(UINT size, SMemPool * pool)
+    {
+        if (s1.m_is_init) { return; }
+        ASSERT0(size != 0 && size < MaxSize);
+        m_vec = (T*)smpoolMalloc(sizeof(T) * size, pool);
+        ASSERT0(m_vec);
+        ::memset(m_vec, 0, sizeof(T) * size);
+        SVEC_elem_num(this) = size;
+        s1.m_is_init = true;
+    }
+    bool is_init() const { return s1.m_is_init; }
+
+    inline void destroy()
+    {
+        if (!s1.m_is_init) { return; }
+        SVEC_elem_num(this) = 0;
+        m_vec = nullptr;
+        s1.m_is_init = false;
+    }
+
+    T get(UINT i) const
+    {
+        ASSERTN(s1.m_is_init, ("SimpleVector not yet initialized."));
+        if (i >= SVEC_elem_num(this)) { return T(0); }
+        return m_vec[i];
+    }
+    UINT getElemNum() const { return SVEC_elem_num(this); }
+    //Return vector buffer that hold elements.
+    T * get_vec() { return m_vec; }
 
     //Return the number of element the vector could hold.
     UINT get_capacity() const
@@ -3196,8 +3224,21 @@ public:
         return m_vec[index];
     }
 
-    bool is_init() const { return s1.m_is_init; }
+    void reinit() { destroy(); init(); }
+
+    //Return nullptr if 'i' is illegal, otherwise return 'elem'.
+    void set(UINT i, T elem, SMemPool * pool)
+    {
+        ASSERTN(is_init(), ("SimpleVector not yet initialized."));
+        if (i >= SVEC_elem_num(this)) {
+            //grow(i * 2 + 1);
+            grow(i + GrowSize, pool);
+        }
+        m_vec[i] = elem;
+        return;
+    }
 };
+//END SimpleVector
 
 
 
@@ -4594,6 +4635,7 @@ public:
         return f;
     }
 
+    void reinit() { destroy(); init(); }
     Ttgt remove(Tsrc t) { return BaseType::remove(t); }
 };
 //END TMap
@@ -4822,6 +4864,8 @@ public:
 
     }
 
+    void reinit() { destroy(); init(); }
+
     //Establishing mapping in between 't' and 'mapped'.
     void set(Tsrc t, Ttgt mapped)
     {
@@ -5022,7 +5066,7 @@ template <class Tsrc, class Ttgt, class TAB_Ttgt,
 class MMap : public HMap<Tsrc, TAB_Ttgt*, HF> {
     COPY_CONSTRUCTOR(MMap);
 protected:
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
 public:
     MMap()
     {
@@ -5030,36 +5074,12 @@ public:
         init();
     }
     virtual ~MMap() { destroy(); }
+
     //Count memory usage for current object.
     size_t count_mem() const
     {
         return ((HMap<Tsrc, TAB_Ttgt*, HF>*)this)->count_mem() +
                sizeof(m_is_init);
-    }
-
-    //Establishing mapping in between 't' and 'mapped'.
-    void set(Tsrc t, Ttgt mapped)
-    {
-        if (t == Tsrc(0)) { return; }
-        TAB_Ttgt * tgttab = HMap<Tsrc, TAB_Ttgt*, HF>::get(t);
-        if (tgttab == nullptr) {
-            //Do NOT use Hash::xmalloc(sizeof(TAB_Ttgt)) to allocate memory,
-            //because __vfptr is nullptr. __vfptr points to TAB_Ttgt::vftable.
-            tgttab = new TAB_Ttgt;
-            HMap<Tsrc, TAB_Ttgt*, HF>::set(t, tgttab);
-        }
-        tgttab->append_node(mapped);
-    }
-
-    //Get mapped elements of 't'
-    TAB_Ttgt * get(Tsrc t)
-    { return HMap<Tsrc, TAB_Ttgt*, HF>::get(t); }
-
-    void init()
-    {
-        if (m_is_init) { return; }
-        HMap<Tsrc, TAB_Ttgt*, HF>::init();
-        m_is_init = true;
     }
 
     void destroy()
@@ -5077,6 +5097,32 @@ public:
 
         HMap<Tsrc, TAB_Ttgt*, HF>::destroy();
         m_is_init = false;
+    }
+
+    //Get mapped elements of 't'
+    TAB_Ttgt * get(Tsrc t) { return HMap<Tsrc, TAB_Ttgt*, HF>::get(t); }
+
+    void init()
+    {
+        if (m_is_init) { return; }
+        HMap<Tsrc, TAB_Ttgt*, HF>::init();
+        m_is_init = true;
+    }
+
+    void reinit() { destroy(); init(); }
+
+    //Establishing mapping in between 't' and 'mapped'.
+    void set(Tsrc t, Ttgt mapped)
+    {
+        if (t == Tsrc(0)) { return; }
+        TAB_Ttgt * tgttab = HMap<Tsrc, TAB_Ttgt*, HF>::get(t);
+        if (tgttab == nullptr) {
+            //Do NOT use Hash::xmalloc(sizeof(TAB_Ttgt)) to allocate memory,
+            //because __vfptr is nullptr. __vfptr points to TAB_Ttgt::vftable.
+            tgttab = new TAB_Ttgt;
+            HMap<Tsrc, TAB_Ttgt*, HF>::set(t, tgttab);
+        }
+        tgttab->append_node(mapped);
     }
 };
 

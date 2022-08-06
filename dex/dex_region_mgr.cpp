@@ -50,7 +50,7 @@ Var * DexRegionMgr::addVarForBuiltin(CHAR const* name)
 {
     Sym * sym = addToSymbolTab(name);
     return getVarMgr()->registerVar(sym, getTypeMgr()->getAny(),
-        0, VAR_FUNC_DECL|VAR_GLOBAL);
+        0, VAR_IS_FUNC|VAR_GLOBAL);
 }
 
 

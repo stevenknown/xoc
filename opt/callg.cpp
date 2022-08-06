@@ -45,7 +45,7 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
     VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
-        if (VERTEX_in_list(v) == nullptr) {
+        if (v->getInList() == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != nullptr);
             elst.append_tail(cn);
@@ -60,7 +60,7 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
     VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
-        if (VERTEX_out_list(v) == nullptr) {
+        if (v->getOutList() == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != nullptr);
             elst.append_tail(cn);

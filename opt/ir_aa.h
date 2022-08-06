@@ -366,6 +366,8 @@ protected:
     bool convertMD2MDSet2PT(OUT PtPairSet * pps, IN PtPairMgr & ppmgr,
                             IN PPSetMgr & ppsetmgr, IN MD2MDSet * mx);
     void convertExact2Unbound(MDSet const& src, MDSet * tgt);
+    void computeStmt(MOD IR * ir, MOD MD2MDSet * mx);
+    void computeBB(IRBB const* bb, MOD MD2MDSet * mx);
 
     //Do NOT public functions related to PtPair.
     //They are inavailable after AA finished.
@@ -395,6 +397,7 @@ protected:
         }
         return mx;
     }
+    MD const* genRestrictDummyVar(Var * var, MD2MDSet * mx);
 
     //Return true if POINT-TO is evaluated from LDA.
     bool evaluateFromLda(IR const* ir);
@@ -402,10 +405,18 @@ protected:
     bool isInLoop(IR const* ir);
     //Determine if flow sensitive analysis is properly.
     bool isFlowSensitiveProperly();
+    void initReferencedVarPTS(PPSetMgr & ppsetmgr, MD2MDSet * mx);
+    void initDedicatedVarPTS(PPSetMgr & ppsetmgr, MD2MDSet * mx);
     void initBBPPSet(PPSetMgr & ppsetmgr);
     void initFlowSensitiveEntryPTS(PPSetMgr & ppsetmgr);
     void initEntryPTS(PPSetMgr & ppsetmgr);
-    void initGlobalAndParameterPTS(Var * v, MD2MDSet * mx);
+
+    //The function initialize the POINT-TO set of pointer.
+    //The pointer includes global/local pointer and formal parameter pointer.
+    //var: the given variable which should be pointer.
+    //Note May-POINT-TO set must be available before call this function.
+    void initPTS(Var * var, MD2MDSet * mx);
+    void initPTSForRegisterMD(MDTab * mdt, MD const* dmd, MD2MDSet * mx);
     void inferPointerArithByHashedPTS(IR const* ir, OUT MDSet & mds,
                                       MOD AACtx * opnd0_ic);
     void inferPointerArithByUnHashedPTS(IR const* ir, OUT MDSet & mds,
@@ -429,7 +440,7 @@ protected:
                                       OUT MDSet & mds, OUT AACtx * ic);
     void inferArrayInfinite(INT ofst, bool is_ofst_pred, UINT md_size,
                             MDSet const& in, OUT MDSet & out);
-    MD const* inferArrayLdabase(IR * ir, IR * array_base, bool is_ofst_pred,
+    MD const* inferArrayLdabase(MOD IR * ir, IR * array_base, bool is_ofst_pred,
                                 UINT ofst, MOD AACtx * ic);
     void inferExpression(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
                          MOD MD2MDSet * mx);
@@ -448,20 +459,20 @@ protected:
                       MOD MD2MDSet * mx);
     void processPointerArith(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
                              MOD MD2MDSet * mx);
-    void processArray(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
+    void processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
                       MOD MD2MDSet * mx);
-    void processConst(IR * ir, MOD MDSet & mds, MOD AACtx * ic);
-    void processStore(IN IR * ir, MOD MD2MDSet * mx);
-    void processStorePR(IN IR * ir, MOD MD2MDSet * mx);
-    void processIStore(IN IR * ir, MOD MD2MDSet * mx);
-    void processStoreArray(IN IR * ir, MOD MD2MDSet * mx);
-    void processPhi(IN IR * ir, MOD MD2MDSet * mx);
+    void processConst(IR const* ir, MOD MDSet & mds, MOD AACtx * ic);
+    void processStore(IR const* ir, MOD MD2MDSet * mx);
+    void processStorePR(IR const* ir, MOD MD2MDSet * mx);
+    void processIStore(MOD IR * ir, MOD MD2MDSet * mx);
+    void processStoreArray(MOD IR * ir, MOD MD2MDSet * mx);
+    void processPhi(IR const* ir, MOD MD2MDSet * mx);
     void processCallSideeffect(MOD MD2MDSet & mx, MDSet const& by_addr_mds);
-    void processCall(IN IR * ir, MOD MD2MDSet * mx);
-    void processReturn(IN IR * ir, MOD MD2MDSet * mx);
+    void processCall(MOD IR * ir, MOD MD2MDSet * mx);
+    void processReturn(IR const* ir, MOD MD2MDSet * mx);
     void processRegionSideeffect(MOD MD2MDSet & mx);
     void processRegion(IR const* ir, MOD MD2MDSet * mx);
-    void processArrayHashed(IR * ir, MDSet const* hashed,
+    void processArrayHashed(MOD IR * ir, MDSet const* hashed,
                             MD2MDSet const* mx, OUT MDSet & mds,
                             MOD AACtx * ic);
 
@@ -496,7 +507,8 @@ protected:
     //comp_ir_pt: true if caller require to compute the POINT-TO set of ir.
     //Return POINT-TO set of ir, if comp_ir_pts is true.
     MDSet const* updateIndirectOpAddrAndPointToSet(MDSet const* refmds,
-                                                   IR * ir, bool comp_ir_pts,
+                                                   MOD IR * ir,
+                                                   bool comp_ir_pts,
                                                    MD2MDSet * mx);
     bool usePRSSADU() const;
 
@@ -529,7 +541,6 @@ public:
     MDSet const* computeMayPointToViaTBAA(IR const* pointer,
                                           MDSet const* point_to_set);
     bool computeFlowSensitive(RPOVexList const& vexlst, PPSetMgr & ppsetmgr);
-    void computeStmt(IRBB const* bb, MOD MD2MDSet * mx);
     void computeFlowInsensitive();
     //Count memory usage for current object.
     size_t count_mem() const;
@@ -579,6 +590,7 @@ public:
     MDSet const* getWorstCase() const { return getMayPointToMDSet(); }
     MD2MDSet * getUniqueMD2MDSet() { return &m_unique_md2mds; }
 
+    bool isPointToDedicatedVar(MD const* md, MD2MDSet const& mx);
     void initAliasAnalysis();
     //Return true if Alias Analysis has initialized.
     bool is_init() const { return m_maypts != nullptr; }

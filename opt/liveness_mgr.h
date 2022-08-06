@@ -36,48 +36,58 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Map between Var and PRno.
-class VAR2PR : public TMap<Var const*, UINT, CompareConstVar> {
+//Map between Var and PRNO.
+class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
 };
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);
+    BYTE m_handle_may:1; //true if consider maydef/mayuse info.
     MDSystem * m_md_sys;
-    VAR2PR * m_var2pr;
+    Var2PR * m_var2pr;
     IRCFG * m_cfg;
     DefMiscBitSetMgr m_sbs_mgr;
     Vector<DefSBitSetCore*> m_def;
     Vector<DefSBitSetCore*> m_use;
     Vector<DefSBitSetCore*> m_livein;
     Vector<DefSBitSetCore*> m_liveout;
-    BYTE m_handle_may:1; //true if consider maydef/mayuse info.
 protected:
+    void cleanLocal();
+    void cleanGlobal();
+    void computeExp(IR const* stmt, ConstIRIter & it,
+                    MOD DefSBitSetCore * use,
+                    MOD DefSBitSetCore * gen);
+    void computeStmt(IR const* stmt, ConstIRIter & it,
+                     MOD DefSBitSetCore * use,
+                     MOD DefSBitSetCore * gen);
+    void computeLocal2(IRBB const* bb, ConstIRIter & it);
+
+    DefSBitSetCore * gen_liveout(UINT bbid);
+    DefSBitSetCore * gen_livein(UINT bbid);
     DefSBitSetCore * get_def(UINT bbid) const { return m_def.get(bbid); }
-    DefSBitSetCore * gen_def(UINT bbid)
-    {
-        DefSBitSetCore * set = m_def.get(bbid);
-        if (set == nullptr) {
-            set = m_sbs_mgr.allocSBitSetCore();
-            m_def.set(bbid, set);
-        }
-        return set;
-    }
-
+    DefSBitSetCore * gen_def(UINT bbid);
     DefSBitSetCore * get_use(UINT bbid) const { return m_use.get(bbid); }
-    DefSBitSetCore * gen_use(UINT bbid)
-    {
-        DefSBitSetCore * set = m_use.get(bbid);
-        if (set == nullptr) {
-            set = m_sbs_mgr.allocSBitSetCore();
-            m_use.set(bbid, set);
-        }
-        return set;
-    }
+    DefSBitSetCore * gen_use(UINT bbid);
 
-    inline void processOpnd(IR const* exp, List<IR const*> & lst,
-                            DefSBitSetCore * use, DefSBitSetCore * gen);
-    inline void processMay(IR const* pr, DefSBitSetCore * gen,
-                           DefSBitSetCore * use, bool is_lhs);
+    void processPHI(IR const* x, ConstIRIter & it,
+                    MOD DefSBitSetCore * use,
+                    MOD DefSBitSetCore * gen);
+    void processSTPR(IR const* x, ConstIRIter & it,
+                     MOD DefSBitSetCore * use,
+                     MOD DefSBitSetCore * gen);
+    void processSETELEM(IR const* x, ConstIRIter & it,
+                        MOD DefSBitSetCore * use,
+                        MOD DefSBitSetCore * gen);
+    void processGETELEM(IR const* x, ConstIRIter & it,
+                        MOD DefSBitSetCore * use,
+                        MOD DefSBitSetCore * gen);
+    void processCallStmt(IR const* x, ConstIRIter & it,
+                         MOD DefSBitSetCore * use,
+                         MOD DefSBitSetCore * gen);
+    inline void processOpnd(IR const* exp, ConstIRIter & it,
+                            MOD DefSBitSetCore * use, MOD DefSBitSetCore * gen);
+    inline void processMay(IR const* pr, MOD DefSBitSetCore * gen,
+                           MOD DefSBitSetCore * use, bool is_lhs);
 public:
     LivenessMgr(Region * rg) : Pass(rg)
     {
@@ -86,74 +96,12 @@ public:
         m_var2pr = nullptr;
         m_handle_may = false;
     }
-    ~LivenessMgr()
-    {
-        for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-    }
+    ~LivenessMgr() { clean(); }
 
     void computeLocal(IRBB * bb, List<IR const*> & lst);
     void computeGlobal();
-    size_t count_mem() const
-    {
-        size_t count = m_sbs_mgr.count_mem();
-        count += m_def.count_mem();
-        count += m_use.count_mem();
-        count += m_livein.count_mem();
-        count += m_liveout.count_mem();
-        for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        return count;
-    }
-
-    //The function dump pass relative information before performing the pass.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    virtual bool dumpBeforePass() const;
+    size_t count_mem() const;
+    void clean() { cleanGlobal(); cleanLocal(); }
 
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
@@ -164,33 +112,15 @@ public:
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     DefSBitSetCore * get_livein(UINT bbid) const { return m_livein.get(bbid); }
-    DefSBitSetCore * gen_livein(UINT bbid)
-    {
-        DefSBitSetCore * x = m_livein.get(bbid);
-        if (x == nullptr) {
-            x = m_sbs_mgr.allocSBitSetCore();
-            m_livein.set(bbid, x);
-        }
-        return x;
-    }
     DefSBitSetCore * get_liveout(UINT bbid) const
     { return m_liveout.get(bbid); }
-    DefSBitSetCore * gen_liveout(UINT bbid)
-    {
-        DefSBitSetCore * x = m_liveout.get(bbid);
-        if (x == nullptr) {
-            x = m_sbs_mgr.allocSBitSetCore();
-            m_liveout.set(bbid, x);
-        }
-        return x;
-    }
 
     //Handle may def/use.
     void set_handle_may(bool is_handle_may)
     { m_handle_may = (BYTE)is_handle_may; }
 
     //Set map structure.
-    void setVAR2PR(VAR2PR * v2p) { m_var2pr = v2p; }
+    void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }
 
     void setPRToBeLiveout(IRBB * bb, PRNO prno)
     { gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }

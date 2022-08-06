@@ -129,11 +129,11 @@ public:
 
     bool checkLeak(UINT expected_seg_num)
     {
-        ///////////////////////////////////////////////////////////////
-        //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
-        //before destruction, otherwise it will lead SegMgr          //
-        //to complain leaking.                                       //
-        ///////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////
+        //NOTE: SBitSet or SBitSetCore's clean() should be invoked//
+        //before destruction, otherwise it will lead SegMgr       //
+        //to complain leaking.                                    //
+        ////////////////////////////////////////////////////////////
         if (seg_count != expected_seg_num) {
             //If seg_count < m_free_list.get_elem_count(), user mix in
             //unmanaged segment that is not allocated by current segment mgr.
@@ -297,6 +297,9 @@ class SBitSetCore {
 protected:
     SListEx<SEG<BitsPerSeg>*> segs;
 
+    void diff(BSIdx elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
+              TSEGIter * prev_sct, TSEGIter * sct);
+
     void * realloc(IN void * src, size_t orgsize, size_t newsize);
 public:
     SBitSetCore() {}
@@ -342,15 +345,29 @@ public:
     size_t count_mem() const;
 
     void destroySEGandClean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
-    void diff(BSIdx elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
-    void diff(BSIdx elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
-              TSEGIter * sct);
+
+    //Differetiate single 'elem' from current bitset.
+    //The simplest method to diff element.
     void diff(BSIdx elem, MiscBitSetMgr<BitsPerSeg> & m)
     { diff(elem, &m.sm, &m.scflst); }
-    void diff(BSIdx elem, TSEGIter * sct, MiscBitSetMgr<BitsPerSeg> & m)
-    { diff(elem, &m.sm, &m.scflst, sct); }
+
+    //Differetiate single 'elem' from current bitset.
+    void diff(BSIdx elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
+
+    //Differetiate single 'elem' from current bitset.
+    //The fastest method to diff element, and you have to provid previous
+    //iterator and current iterator.
+    //prev_sct: previous iterator
+    //sct: current iterator
+    void diff(BSIdx elem, TSEGIter * prev_sct, TSEGIter * sct,
+              MiscBitSetMgr<BitsPerSeg> & m)
+    { diff(elem, &m.sm, &m.scflst, prev_sct, sct); }
+
+    //Differetiate bitset 'src' from current bitset.
     void diff(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
               TSEGIter ** free_list);
+
+    //Differetiate bitset 'src' from current bitset.
     void diff(SBitSetCore<BitsPerSeg> const& src,
               MiscBitSetMgr<BitsPerSeg> & m)
     { diff(src, &m.sm, &m.scflst); }

@@ -518,7 +518,7 @@ IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
         if (ir->is_stmt()) {
             SimpCtx tcont(*ctx);
             IR * new_stmt_list = simplifyStmt(ir, &tcont);
-            ctx->unionBottomupFlag(tcont);
+            ctx->unionBottomUpInfo(tcont);
 
             #ifdef _DEBUG_
             IR * x = new_stmt_list;
@@ -534,9 +534,9 @@ IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
             ASSERT0(new_exp->is_exp());
             xcom::add_next(&ret_exp_list, new_exp);
             ctx->appendStmt(tcont);
-            ctx->unionBottomupFlag(tcont);
+            ctx->unionBottomUpInfo(tcont);
         } else {
-            ASSERTN(0, ("unknonw ir type"));
+            ASSERTN(0, ("unknonw IR code"));
         }
         ir = next;
     }
@@ -1194,7 +1194,7 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
         IR * newsub = simp->simplifyExpression(s, &tcont);
         Dbx * dbx = xoc::getDbx(s);
         ctx->appendStmt(tcont);
-        ctx->unionBottomupFlag(tcont);
+        ctx->unionBottomUpInfo(tcont);
 
         //'ir' is exact array.
         //CASE1: elem-type v[n]
@@ -1315,7 +1315,7 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = false;
     IR * newbase = simplifyExpression(ARR_base(ir), &tcont);
     ctx->appendStmt(tcont);
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
 
     ASSERT0(newbase && (newbase->is_ptr() || newbase->is_any()));
     ARR_base(ir) = nullptr;
@@ -1338,7 +1338,7 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         array_addr->setParentPointer(true);
         array_addr = simplifyExpression(array_addr, &ttcont);
         ctx->appendStmt(ttcont);
-        ctx->unionBottomupFlag(ttcont);
+        ctx->unionBottomUpInfo(ttcont);
     }
 
     if (SIMP_to_lowest_height(ctx)) {
@@ -1349,7 +1349,7 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
        SIMP_ret_array_val(&ttcont) = true;
        array_addr = simplifyExpression(array_addr, &ttcont);
        ctx->appendStmt(ttcont);
-       ctx->unionBottomupFlag(ttcont);
+       ctx->unionBottomUpInfo(ttcont);
 
        //IR * t = buildPR(array_addr->getType());
        //IR * mv = buildStorePR(PR_no(t), t->getType(), array_addr);
@@ -1410,7 +1410,7 @@ IR * IRSimp::simpToPR(IR * ir, SimpCtx * ctx)
 
     IR * stpr = m_rg->buildStorePR(PR_no(pr), pr->getType(), ir);
     m_rg->allocRefForPR(stpr);
-    xoc::buildDUChain(stpr, pr, m_rg);
+    xoc::buildDUChain(stpr, pr, m_rg, *ctx->getOptCtx());
 
     copyDbx(stpr, ir, m_rg); //keep dbg info for new STMT.
     ctx->appendStmt(stpr);
@@ -1497,7 +1497,7 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
             } else {
                 newir = simplifyLogicalAnd(ir, &tcont);
             }
-            ctx->unionBottomupFlag(tcont);
+            ctx->unionBottomUpInfo(tcont);
 
             ASSERT0(newir->is_exp());
             IR * lst = SIMP_stmtlist(&tcont);
@@ -1534,7 +1534,7 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
             lst = simplifyStmtList(lst, &t_tcont);
             ctx->appendStmt(lst);
             ir = newir;
-            ctx->unionBottomupFlag(tcont);
+            ctx->unionBottomUpInfo(tcont);
         } else {
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
                 IR * kid = ir->getKid(i);
@@ -1589,7 +1589,7 @@ IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
         ARR_base(ir) = newbase;
         IR_parent(newbase) = ir;
     }
-    ctx->unionBottomupFlag(basectx);
+    ctx->unionBottomUpInfo(basectx);
     if (SIMP_stmtlist(&basectx) != nullptr) {
         xcom::add_next(&stmtlist, &last, SIMP_stmtlist(&basectx));
     }
@@ -1612,7 +1612,7 @@ IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
         if (SIMP_stmtlist(&subctx) != nullptr) {
             xcom::add_next(&stmtlist, &last, SIMP_stmtlist(&subctx));
         }
-        ctx->unionBottomupFlag(subctx);
+        ctx->unionBottomUpInfo(subctx);
     }
     ARR_sub_list(ir) = newsublist;
     ir->setParent(newsublist);
@@ -1633,7 +1633,7 @@ void IRSimp::simplifyStoreArrayRHS(IR * ir,
         STARR_rhs(ir) = newrhs;
         IR_parent(newrhs) = ir;
     }
-    ctx->unionBottomupFlag(rhsctx);
+    ctx->unionBottomUpInfo(rhsctx);
     xcom::add_next(ret_list, last, SIMP_stmtlist(&rhsctx));
 }
 
@@ -1654,7 +1654,7 @@ IR * IRSimp::simplifyStoreArrayAddr(IR * ir,
     //Need to free ir in current function.
     IR * array_addr = simplifyArray(ir, &tcont);
 
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     xcom::add_next(ret_list, last, SIMP_stmtlist(&tcont));
     return array_addr;
 }
@@ -1770,7 +1770,7 @@ IR * IRSimp::simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx)
     //keep dbg info for new STMT.
     copyDbx(stpr, array_addr, m_rg);
     ctx->appendStmt(stpr);
-    xoc::buildDUChain(stpr, pr, m_rg);
+    xoc::buildDUChain(stpr, pr, m_rg, *ctx->getOptCtx());
     return pr;
 }
 
@@ -1880,7 +1880,7 @@ bool IRSimp::simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
     }
 
     xcom::add_next(ret_list, last, SIMP_stmtlist(&tcont));
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     return changed;
 }
 
@@ -1898,7 +1898,7 @@ IR * IRSimp::simplifyCall(IR * ir, SimpCtx * ctx)
         simplifyCalleeExp(ir, &tctx2);
         lchange |= SIMP_changed(&tctx2);
         xcom::add_next(&ret_list, SIMP_stmtlist(&tctx2));
-        ctx->unionBottomupFlag(tctx2);
+        ctx->unionBottomUpInfo(tctx2);
     }
 
     xcom::add_next(&ret_list, ir);
@@ -1925,7 +1925,7 @@ IR * IRSimp::simplifyStorePR(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     STPR_rhs(ir) = simplifyExpression(STPR_rhs(ir), &tcont);
     IR_parent(STPR_rhs(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
 
     IR * ret_list = nullptr;
     IR * last = nullptr;
@@ -1948,13 +1948,13 @@ IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     SETELEM_base(ir) = simplifyExpression(SETELEM_base(ir), &tcont);
     IR_parent(SETELEM_base(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
 
     tcont.copy(*ctx);
     SIMP_ret_array_val(&tcont) = true;
     SETELEM_val(ir) = simplifyExpression(SETELEM_val(ir), &tcont);
     IR_parent(SETELEM_val(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
 
     IR * ret_list = nullptr;
     IR * last = nullptr;
@@ -1967,7 +1967,7 @@ IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     SETELEM_ofst(ir) = simplifyExpression(SETELEM_ofst(ir), &tcont);
     IR_parent(SETELEM_ofst(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     last = nullptr;
     if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
@@ -1989,7 +1989,7 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     GETELEM_base(ir) = simplifyExpression(GETELEM_base(ir), &tcont);
     IR_parent(GETELEM_base(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
 
     IR * ret_list = nullptr;
     IR * last = nullptr;
@@ -2002,7 +2002,7 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     GETELEM_ofst(ir) = simplifyExpression(GETELEM_ofst(ir), &tcont);
     IR_parent(GETELEM_ofst(ir)) = ir;
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     last = nullptr;
     if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
@@ -2026,7 +2026,7 @@ IR * IRSimp::simplifyIStore(IR * ir, SimpCtx * ctx)
         //Reduce the tree height.
         IST_base(ir) = simplifyExpression(IST_base(ir), &basectx);
         IR_parent(IST_base(ir)) = ir;
-        ctx->unionBottomupFlag(basectx);
+        ctx->unionBottomUpInfo(basectx);
     }
 
     if (SIMP_stmtlist(&basectx) != nullptr) {
@@ -2054,7 +2054,7 @@ IR * IRSimp::simplifyIStore(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&rhsctx) = true;
     IST_rhs(ir) = simplifyExpression(IST_rhs(ir), &rhsctx);
     ir->setParent(IST_rhs(ir));
-    ctx->unionBottomupFlag(rhsctx);
+    ctx->unionBottomUpInfo(rhsctx);
 
     if (SIMP_stmtlist(&rhsctx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&rhsctx));
@@ -2076,7 +2076,7 @@ IR * IRSimp::simplifyStore(IR * ir, SimpCtx * ctx)
     ST_rhs(ir) = simplifyExpression(ST_rhs(ir), &tcont);
     IR_parent(ST_rhs(ir)) = ir;
 
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     IR * ret_list = nullptr;
     IR * last = nullptr;
     if (SIMP_stmtlist(&tcont) != nullptr) {
@@ -2112,7 +2112,7 @@ IR * IRSimp::simplifyBranch(IR * ir, SimpCtx * ctx)
         }
         xcom::add_next(&ret_list, ir);
     }
-    ctx->unionBottomupFlag(tcont);
+    ctx->unionBottomUpInfo(tcont);
     return ret_list;
 }
 
@@ -2315,7 +2315,7 @@ IR * IRSimp::simplifyStmt(IR * ir, SimpCtx * ctx)
             IR * kid = ir->getKid(i);
             if (kid != nullptr) {
                 ir->setKid(i, simplifyExpression(kid, &tcont));
-                ctx->unionBottomupFlag(tcont);
+                ctx->unionBottomUpInfo(tcont);
                 if (SIMP_stmtlist(&tcont) != nullptr) {
                     xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
                     SIMP_stmtlist(&tcont) = nullptr;

@@ -98,7 +98,8 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     newrhs_pr->setRefMD(r_md, m_rg);
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOccForTree(use);
+        MDSSAUpdateCtx ssactx(*getOptCtx());
+        m_mdssamgr->removeMDSSAOccForTree(use, ssactx);
     }
     m_rg->freeIRTree(use);
 }
@@ -147,7 +148,8 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR_may_throw(use_stmt) = false;
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOccForTree(use);
+        MDSSAUpdateCtx ssactx(*getOptCtx());
+        m_mdssamgr->removeMDSSAOccForTree(use, ssactx);
     }
     m_rg->freeIRTree(use);
 }
@@ -195,10 +197,10 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     bool f = use_stmt->replaceKid(use, use_pr, false);
     CHECK0_DUMMYUSE(f);
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOccForTree(use);
+        MDSSAUpdateCtx ssactx(*getOptCtx());
+        m_mdssamgr->removeMDSSAOccForTree(use, ssactx);
     }
     m_rg->freeIRTree(use);
-
     if (m_ssamgr != nullptr) {
         m_ssamgr->buildDUChain(gen_stmt, use_pr);
     } else {
@@ -399,7 +401,7 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
         ASSERT0(gen_stmt->getBB());
         UINT iid = expstmt->getBB()->id();
         UINT xid = gen_stmt->getBB()->id();
-        if (!m_cfg->get_dom_set(iid)->is_contain(xid)) {
+        if (!m_cfg->gen_dom_set(iid)->is_contain(xid)) {
             continue;
         }
         return elim(exp, expstmt, gen, gen_stmt);
@@ -484,7 +486,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
         }
 
         //Visit children.
-        EdgeC * el = VERTEX_out_list(v);
+        EdgeC * el = v->getOutList();
         Vertex * succ;
         while (el != nullptr) {
             succ = el->getTo();
@@ -523,7 +525,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
         }
 
         //Visit children.
-        EdgeC * el = VERTEX_out_list(v);
+        EdgeC * el = v->getOutList();
         Vertex * succ;
         while (el != nullptr) {
             succ = el->getTo();
@@ -770,9 +772,10 @@ bool GCSE::perform(OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_ref_valid()) { return false; }
+    m_oc = &oc;
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
+        PASS_PRSSA_MGR));
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
@@ -784,7 +787,7 @@ bool GCSE::perform(OptCtx & oc)
     }
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
+        PASS_MDSSA_MGR));
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {

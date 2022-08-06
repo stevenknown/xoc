@@ -601,7 +601,7 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
          i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(bb->id()));
+        ASSERT0(bb && bb->getVex());
 
         if ((UINT)i != back_start_bb->id() &&
             !m_cfg->is_dom(i, back_start_bb->id())) {
@@ -863,7 +863,7 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
     for (BSIdx i = li->getBodyBBSet()->get_first();
          i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(bb->id()));
+        ASSERT0(bb && bb->getVex());
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
             switch (ir->getCode()) {
             case IR_ST:
@@ -1051,7 +1051,6 @@ bool IVR::perform(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DOM,
                                                PASS_LOOP_INFO, PASS_RPO,
                                                PASS_UNDEF);
-
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == nullptr) {

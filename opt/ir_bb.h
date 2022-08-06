@@ -38,7 +38,6 @@ namespace xoc {
 
 class IRBB;
 template <class IRBB, class IR> class CFG;
-typedef xcom::C<IR*> * IRListIter;
 typedef IRListIter BBIRListIter;
 typedef List<LabelInfo const*> LabelInfoList;
 typedef C<LabelInfo const*> * LabelInfoListIter;
@@ -89,7 +88,7 @@ public:
     IR * getPrevIR(IR const* ir) const
     {
         ASSERT0(ir->is_stmt());
-        IRListIter irit;
+        IRListIter irit = nullptr;
         bool succ = find(const_cast<IR*>(ir), &irit);
         CHECKN_DUMMYUSE(succ, ("ir is not belong to current BB"));
         irit = get_prev(irit);
@@ -163,11 +162,26 @@ public:
 
 
 //
+//START BBList
+typedef xcom::C<IRBB*> * BBListIter;
+class BBList : public xcom::List<IRBB*> {
+public:
+    //Return true if 'prev' is the previous BB of given BB in BBList.
+    //prev: previous BB.
+    //next: next BB.
+    bool isPrevBB(IRBB const* prev, IRBB const* next) const;
+    bool isPrevBB(IRBB const* prev, BBListIter nextit) const;
+};
+//END BBList
+
+
+//
 //START IRBB
 //
 #define MAX_BB_KIDS_NUM 2
 
-#define BB_rpo(b) ((b)->m_rpo)
+#define BB_vex(b) ((b)->m_vertex)
+#define BB_rpo(b) (VERTEX_rpo(BB_vex(b)))
 #define BB_id(b) ((b)->m_id)
 #define BB_irlist(b) ((b)->ir_list)
 #define BB_first_ir(b) ((b)->ir_list.get_head())
@@ -183,6 +197,11 @@ public:
 #define BB_is_terminate(b) ((b)->u1.s1.is_terminate)
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
+private:
+    bool verifyTerminate() const;
+    bool verifyExpHandler() const;
+    bool verifyTryEnd() const;
+    bool verifyTryStart() const;
 public:
     typedef BYTE BitUnion;
     union {
@@ -198,27 +217,18 @@ public:
         BitUnion u1b1;
     } u1;
     UINT m_id; //BB's id
-    INT m_rpo; //reverse post order
+    xcom::Vertex * m_vertex;
     BBIRList ir_list; //IR list
     LabelInfoList lab_list; //Record labels attached on BB
-
 public:
     IRBB()
     {
         ir_list.setBB(this);
         m_id = 0;
         u1.u1b1 = 0;
-        m_rpo = RPO_UNDEF;
+        m_vertex = nullptr;
     }
-    ~IRBB()
-    {
-        //BB will be destructed in ~IRBBMgr().
-        //No need to free it. Or the ir_list must be clean before
-        //the deletion of BB.
-        //for (IR * ir = ir_list.get_head(); ir != nullptr; ir = ir_list.get_next()) {
-        //    m_rg->freeIRTree(ir);
-        //}
-    }
+    ~IRBB() {}
 
     inline void addLabel(LabelInfo const* li, bool at_head = false)
     {
@@ -234,6 +244,7 @@ public:
     }
 
     size_t count_mem() const;
+    void cleanVex() { BB_vex(this) = nullptr; }
     void clean()
     {
         //Do not erase BB's id because it may be reallocated later.
@@ -241,7 +252,7 @@ public:
         ir_list.clean();
         lab_list.clean();
         u1.u1b1 = 0;
-        m_rpo = RPO_UNDEF;
+        m_vertex = nullptr;
     }
 
     //Clean attached label.
@@ -255,18 +266,30 @@ public:
         BB_is_terminate(this) |= LABELINFO_is_terminate(li);
     }
 
+    void dumpDigest(Region const* rg) const;
     void dumpLabelList(Region const* rg) const;
     void dumpAttr(Region const* rg) const;
     void dumpIRList(Region const* rg, bool dump_inner_region) const;
     void dump(Region const* rg, bool dump_inner_region) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
+    Vertex * getVex() const { return BB_vex(this); }
     LabelInfoList & getLabelList() { return lab_list; }
     LabelInfoList const& getLabelListConst() const
     { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
-    UINT getNumOfPred(CFG<IRBB, IR> const* cfg) const;
-    UINT getNumOfSucc(CFG<IRBB, IR> const* cfg) const;
+    UINT getNumOfPred() const
+    {
+        xcom::Vertex const* vex = getVex();
+        ASSERT0(vex);
+        return vex->getInDegree();
+    }
+    UINT getNumOfSucc() const
+    {
+        xcom::Vertex const* vex = getVex();
+        ASSERT0(vex);
+        return vex->getOutDegree();
+    }
     BBIRList & getIRList() { return BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
     IR * getNextIR() { return BB_next_ir(this); }
@@ -339,85 +362,32 @@ public:
     bool is_try_start() const { return BB_is_try_start(this); }
     bool is_try_end() const { return BB_is_try_end(this); }
 
-    //Return true if 'prev' is the previous BB of current BB in BBList.
-    //it: BBListIter of current BB.
-    bool isPrevBB(IRBB const* prev, BBListIter const it,
-                  BBList const* bblst) const;
-
     //Return true if BB is an entry BB of TRY block.
-    inline bool isTryStart() const
+    bool isTryStart() const
     {
-        bool r = BB_is_try_start(this);
-        #ifdef _DEBUG_
-        bool find = false;
-        IRBB * pthis = const_cast<IRBB*>(this);
-        for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != nullptr; li = pthis->getLabelList().get_next()) {
-            if (LABELINFO_is_try_start(li)) {
-                find = true;
-                break;
-            }
-        }
-        ASSERT0(r == find);
-        #endif
-        return r;
+        ASSERT0(verifyTryStart());
+        return BB_is_try_start(this);
     }
 
     //Return true if BB is an exit BB of TRY block.
-    inline bool isTryEnd() const
+    bool isTryEnd() const
     {
-        bool r = BB_is_try_end(this);
-        #ifdef _DEBUG_
-        bool find = false;
-        IRBB * pthis = const_cast<IRBB*>(this);
-        for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != nullptr; li = pthis->getLabelList().get_next()) {
-            if (LABELINFO_is_try_end(li)) {
-                find = true;
-                break;
-            }
-        }
-        ASSERT0(r == find);
-        #endif
-        return r;
+        ASSERT0(verifyTryEnd());
+        return BB_is_try_end(this);
     }
 
     //Return true if BB is entry of CATCH block.
-    inline bool isExceptionHandler() const
+    bool isExceptionHandler() const
     {
-        bool r = BB_is_catch_start(this);
-        #ifdef _DEBUG_
-        bool find = false;
-        IRBB * pthis = const_cast<IRBB*>(this);
-        for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != nullptr; li = pthis->getLabelList().get_next()) {
-            if (LABELINFO_is_catch_start(li)) {
-                find = true;
-                break;
-            }
-        }
-        ASSERT0(r == find);
-        #endif
-        return r;
+        ASSERT0(verifyExpHandler());
+        return BB_is_catch_start(this);
     }
 
     //Return true if BB is terminate.
-    inline bool is_terminate() const
+    bool is_terminate() const
     {
-        bool r = BB_is_terminate(this);
-        #ifdef _DEBUG_
-        bool find = false;
-        IRBB * pthis = const_cast<IRBB*>(this);
-        for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != nullptr; li = pthis->getLabelList().get_next()) {
-            if (LABELINFO_is_terminate(li)) {
-                find = true;
-                break;
-            }
-        }
-        ASSERT0(r == find);
-        #endif
-        return r;
+        ASSERT0(verifyTerminate());
+        return BB_is_terminate(this);
     }
 
     //Could ir be looked as a boundary stmt of basic block?
@@ -459,7 +429,7 @@ public:
         UINT ir1order = order.get(ir1);
         UINT ir2order = order.get(ir2);
         ASSERTN(ir1order != 0 || ir2order != 0,
-                 ("Neither ir1 nor ir2 has an order set ")); 
+                ("Neither ir1 nor ir2 has an order set "));
         if (ir1order == 0) { return false; }
         if (ir2order == 0) { return true; }
         ASSERT0(ir1order != ir2order);
@@ -520,7 +490,7 @@ public:
     //Return true if one of bb's successor has a phi.
     bool successorHasPhi(CFG<IRBB, IR> * cfg);
 
-    INT rpo() const { return BB_rpo(this); }
+    INT rpo() const { ASSERT0(m_vertex); return m_vertex->rpo(); }
 
     bool verifyBranchLabel(Lab2BB const& lab2bb) const;
     bool verify(Region const* rg) const;
@@ -538,47 +508,18 @@ protected:
     BBList m_bbs_list;
     BBList m_free_list;
     UINT m_bb_count; //counter of IRBB.
-
 public:
     IRBBMgr() { m_bb_count = BBID_UNDEF + 1; }
-    ~IRBBMgr()
-    {
-        for (IRBB * bb = m_bbs_list.get_head();
-             bb != nullptr; bb = m_bbs_list.get_next()) {
-            delete bb;
-        }
-        //BB in free list will also be recorded in m_bbs_list.
-    }
+    ~IRBBMgr();
 
-    inline IRBB * allocBB()
-    {
-        IRBB * bb = m_free_list.remove_head();
-        if (bb == nullptr) {
-            bb = new IRBB();
-            BB_id(bb) = m_bb_count++;
-            m_bbs_list.append_tail(bb);
-        }
-        return bb;
-    }
+    IRBB * allocBB();
 
-    void freeBB(IRBB * bb)
-    {
-        ASSERT0(bb);
-        ASSERTN(!m_free_list.find(bb), ("double free"));
-        bb->clean();
-        m_free_list.append_head(bb);
-    }
     //Count memory usage for current object.
-    size_t count_mem() const
-    {
-        size_t count = 0;
-        BBListIter bbit;
-        for (IRBB * bb = m_bbs_list.get_head(&bbit);
-             bb != nullptr; bb = m_bbs_list.get_next(&bbit)) {
-            count += bb->count_mem();
-        }
-        return count;
-    }
+    size_t count_mem() const;
+
+    void destroyBB(IRBB * bb);
+
+    void freeBB(IRBB * bb);
 
     UINT getBBCount() const { return m_bb_count; }
 };

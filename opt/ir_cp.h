@@ -80,9 +80,9 @@ private:
     TypeMgr * m_tm;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-    GVN const* m_gvn;
+    GVN * m_gvn;
+    OptCtx * m_oc;
     UINT m_prop_kind;
-
 private:
     //Return true if CP allows propagating memory object with inexact MD.
     bool allowInexactMD() const
@@ -105,14 +105,15 @@ private:
                   IRListIter cur_iter, IRListIter * next_iter);
     bool doPropBB(IN IRBB * bb, IN IRSet * useset);
     void doFinalRefine(OptCtx & oc);
-    void dumpCopyPropagationAction(IR const* def_stmt, IR const* prop_value,
-                                   IR const* use);
+    void dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
+                            IR const* use);
 
     bool existMayDefTillBB(IR const* exp, IRBB const* start,
                            IRBB const* meetup) const;
 
     DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
+    OptCtx const* getOptCtx() const { return m_oc; }
 
     bool isLowCostExp(IR const* ir) const
     {
@@ -183,6 +184,7 @@ public:
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
         m_gvn = nullptr;
+        m_oc = nullptr;
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);

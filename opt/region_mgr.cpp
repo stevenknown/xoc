@@ -106,13 +106,13 @@ void * RegionMgr::xmalloc(UINT size)
 }
 
 
-OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
+OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 {
-    OptCtx * oc = m_id2optctx.get(id);
+    OptCtx * oc = m_id2optctx.get(rg->id());
     if (oc == nullptr) {
         oc = (OptCtx*)xmalloc(sizeof(OptCtx));
-        oc->init();
-        m_id2optctx.set(id, oc);
+        oc->init(rg);
+        m_id2optctx.set(rg->id(), oc);
     }
     return oc;
 }
@@ -134,8 +134,7 @@ MD const* RegionMgr::genDedicateStrMD()
         Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
         Var * sv = getVarMgr()->registerStringVar(DEDICATED_STRING_VAR_NAME, s,
                                                   MEMORY_ALIGNMENT);
-        VAR_is_unallocable(sv) = true;
-        VAR_is_addr_taken(sv) = true;
+        sv->setflag((VAR_FLAG)(VAR_IS_UNALLOCABLE|VAR_ADDR_TAKEN));
         MD md;
         MD_base(&md) = sv;
         MD_ty(&md) = MD_UNBOUND;
@@ -158,12 +157,12 @@ void RegionMgr::registerGlobalMD()
     VarVec * varvec = m_var_mgr->getVarVec();
     for (VecIdx i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
-        if (v == nullptr || VAR_is_local(v)) { continue; }
+        if (v == nullptr || v->is_local()) { continue; }
         //Note Var is regarded as VAR_GLOBAL by default if VAR_LOCAL not set.
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
-        //ASSERT0(!VAR_is_unallocable(v));
+        //ASSERT0(!v->is_unallocable());
 
         if (v->is_string() && genDedicateStrMD() != nullptr) {
             continue;
@@ -175,7 +174,7 @@ void RegionMgr::registerGlobalMD()
         MD_base(&md) = v;
         MD_ofst(&md) = 0;
         MD_size(&md) = v->is_any() ? 0 : v->getByteSize(getTypeMgr());
-        if (v->is_fake() || v->is_func_decl() || v->is_any()) {
+        if (v->is_fake() || v->is_func() || v->is_any()) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
             MD_ty(&md) = MD_EXACT;
@@ -242,7 +241,7 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
-    checkMaxIRType();
+    checkMaxIRCode();
     checkIRDesc();
     checkRoundDesc();
     ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
@@ -327,7 +326,7 @@ bool RegionMgr::verifyPreDefinedInfo()
             BYTE_PER_INT <= sizeof(HOST_UINT) &&
             BYTE_PER_INT <= sizeof(HOST_FP));
 
-    ASSERT0(IR_TYPE_NUM <= ((1<<IR_TYPE_BIT_SIZE) - 1));
+    ASSERT0(IR_CODE_NUM <= ((1<<IR_CODE_BIT_SIZE) - 1));
     return true;
 }
 

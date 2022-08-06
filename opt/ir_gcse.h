@@ -39,16 +39,12 @@ author: Su Zhenyu
 namespace xoc {
 
 class TG : public xcom::DGraph {
-protected:
     Region * m_rg;
-
 protected:
     virtual void * cloneEdgeInfo(xcom::Edge *)
     { return nullptr; }
-
     virtual void * cloneVertexInfo(xcom::Vertex *)
     { return nullptr; }
-
 public:
     explicit TG(Region * rg) { m_rg = rg; }
     COPY_CONSTRUCTOR(TG);
@@ -73,6 +69,7 @@ public:
     {
         if (!computePdomByRPO(root, nullptr)) { UNREACHABLE(); }
         if (!computeIpdom()) { UNREACHABLE(); }
+        revisePdomByIpdom();
     }
 };
 
@@ -90,6 +87,7 @@ private:
     TypeMgr * m_tm;
     GVN * m_gvn;
     TG * m_tg;
+    OptCtx const* m_oc;
     DefMiscBitSetMgr m_misc_bs_mgr;
     TMap<IR*, IR*> m_exp2pr;
     TMap<VN const*, IR*> m_vn2exp;
@@ -103,16 +101,25 @@ private:
     bool doPropVN(IRBB * bb, UINT entry_id);
     bool doPropVNInDomTreeOrder(xcom::Graph const* domtree);
     bool doPropInDomTreeOrder(xcom::Graph const* domtree);
+
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
+
     bool findAndElim(IR * exp, IR * gen);
+
+    OptCtx const* getOptCtx() const { return m_oc; }
+
     void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);
+
     bool isCseCandidate(IR * ir);
+
     void elimCseAtStore(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
+
     void processCseGen(IR * cse, IR * cse_stmt, bool & change);
     bool processCse(IR * ir, List<IR*> & livexp);
+
     bool shouldBeCse(IR * det);
 public:
     GCSE(Region * rg, GVN * gvn) : Pass(rg)
@@ -126,6 +133,7 @@ public:
         m_tm = rg->getTypeMgr();
         m_gvn = gvn;
         m_tg = nullptr;
+        m_oc = nullptr;
         m_is_in_ssa_form = false;
         m_ssamgr = nullptr;
         m_mdssamgr = nullptr;

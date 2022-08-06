@@ -37,6 +37,7 @@ class InvertBrTgt;
 class InvertBrTgt : public Pass {
     COPY_CONSTRUCTOR(InvertBrTgt);
     CIRList * m_changed_irlist; //used for dump
+    OptCtx * m_oc;
 protected:
     void addDump(IR const* ir) const;
     void dumpInit();
@@ -45,6 +46,7 @@ public:
     explicit InvertBrTgt(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
+        m_oc = nullptr;
         m_changed_irlist = nullptr;
     }
     virtual ~InvertBrTgt() { dumpFini(); }
@@ -62,6 +64,7 @@ public:
     virtual CHAR const* getPassName() const
     { return "Invert Branch Target"; }
     virtual PASS_TYPE getPassType() const { return PASS_INVERT_BRTGT; }
+    OptCtx * getOptCtx() const { return m_oc; }
 
     static bool invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
                              IR * jmp, IRBB * jmp_tgt);

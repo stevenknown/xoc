@@ -31,6 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class Region;
+typedef enum _PASS_TYPE PASS_TYPE; //forward declare PASS_TYPE
+
 //Optimization Context
 //This class record and propagate auxiliary information to optimizations.
 //These options brief describe state of Passes following an optimization
@@ -44,10 +47,8 @@ namespace xoc {
 #define OC_is_reach_def_valid(o) ((o).u1.s1.is_reach_def_valid)
 #define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
 #define OC_is_cfg_valid(o) ((o).u1.s1.is_cfg_valid)
-#define OC_is_scc_valid(o) ((o).u1.s1.is_scc_valid)
 #define OC_is_aa_valid(o) ((o).u1.s1.is_aa_result_valid)
 #define OC_is_expr_tab_valid(o) ((o).u1.s1.is_ir_expr_tab)
-#define OC_is_cdg_valid(o) ((o).u1.s1.is_cdg_valid)
 #define OC_is_dom_valid(o) ((o).u1.s1.is_dom_valid)
 #define OC_is_pdom_valid(o) ((o).u1.s1.is_pdom_valid)
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
@@ -55,99 +56,112 @@ namespace xoc {
 #define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
 #define OC_do_merge_label(o) ((o).u1.s1.do_merge_label)
 class OptCtx {
+    Region * m_rg;
+private:
+    void dumpFlag() const;
+    void dumpPass() const;
 public:
+    typedef UINT BitUnion;
     union {
-        UINT int1;
+        BitUnion int1;
         struct {
             //Record MUST-DEF, MAY-DEF, MAY-USE MDSet for each IR STMT/EXP.
-            UINT is_du_ref_valid:1;
+            BitUnion is_du_ref_valid:1;
 
             //Record DEF/USE IR stmt/exp for PR operation.
-            UINT is_pr_du_chain_valid:1;
+            BitUnion is_pr_du_chain_valid:1;
             //Record DEF/USE IR stmt/exp for NON-PR operation.
-            UINT is_nonpr_du_chain_valid:1;
-            UINT is_live_expr_valid:1;
-            UINT is_reach_def_valid:1;
-            UINT is_avail_reach_def_valid:1;
-            UINT is_aa_result_valid:1; //POINT TO info is avaiable.
-            UINT is_ir_expr_tab:1; //Liveness of ExpRep is avaliable.
-            UINT is_cfg_valid:1; //CFG is avaliable.
-            UINT is_scc_valid:1; //SCC of CFG is avaliable.
-            UINT is_cdg_valid:1; //CDG is avaliable.
+            BitUnion is_nonpr_du_chain_valid:1;
+            BitUnion is_live_expr_valid:1;
+            BitUnion is_reach_def_valid:1;
+            BitUnion is_avail_reach_def_valid:1;
+            BitUnion is_aa_result_valid:1; //POINT TO info is avaiable.
+            BitUnion is_ir_expr_tab:1; //Liveness of ExpRep is avaliable.
+            BitUnion is_cfg_valid:1; //CFG is avaliable.
 
             //Dominator Set, Immediate Dominator are avaliable.
-            UINT is_dom_valid:1;
+            BitUnion is_dom_valid:1;
 
             //Post Dominator Set, Post Immediate Dominator are avaiable.
-            UINT is_pdom_valid:1;
+            BitUnion is_pdom_valid:1;
 
-            UINT is_loopinfo_valid:1; //Loop info is avaiable.
+            BitUnion is_loopinfo_valid:1; //Loop info is avaiable.
 
-            UINT is_callg_valid:1; //Call graph is available.
+            BitUnion is_callg_valid:1; //Call graph is available.
 
-            UINT is_rpo_valid:1; //Rporder is available.
+            BitUnion is_rpo_valid:1; //Rporder is available.
 
             //If it is true, CFG optimizer will attempt to merge label to
             //next BB if current BB is empty. Default is true.
-            UINT do_merge_label:1;
+            BitUnion do_merge_label:1;
         } s1;
     } u1;
-
 public:
-    OptCtx() { init(); }
-    OptCtx const& operator = (OptCtx const&);
+    OptCtx(Region * rg) { init(rg); }
+
+    void copy(OptCtx const& src) { *this = src; }
 
     bool do_merge_label() const { return OC_do_merge_label(*this); }
+    void dump() const;
 
-    void init() { setAllInvalid(); OC_do_merge_label(*this) = true; } 
+    Region * getRegion() const { return m_rg; }
+
+    void init(Region * rg)
+    {
+        setInvalidAllFlags();
+        OC_do_merge_label(*this) = true;
+        ASSERT0(rg);
+        m_rg = rg;
+    }
     bool is_ref_valid() const { return OC_is_ref_valid(*this); }
-    bool is_du_chain_valid() const
-    { return is_pr_du_chain_valid() && is_nonpr_du_chain_valid(); }
+
+    //Return true if classic PR DU chain is valid.
     bool is_pr_du_chain_valid() const
     { return OC_is_pr_du_chain_valid(*this); }
+
+    //Return true if classic NonPR DU chain is valid.
     bool is_nonpr_du_chain_valid() const
     { return OC_is_nonpr_du_chain_valid(*this); }
+
+    //Return true if live-expression is valid.
     bool is_live_expr_valid() const { return OC_is_live_expr_valid(*this); }
+
+    //Return true if reach-definition is valid.
     bool is_reach_def_valid() const { return OC_is_reach_def_valid(*this); }
+
+    //Return true if available-reach-definition is valid.
     bool is_avail_reach_def_valid() const
     { return OC_is_avail_reach_def_valid(*this); }
+
+    //Return true if CFG is valid.
     bool is_cfg_valid() const { return OC_is_cfg_valid(*this); }
-    bool is_scc_valid() const { return OC_is_scc_valid(*this); }
+
+    //Return true if SCC information is valid.
+    bool is_scc_valid() const { return isPassValid(PASS_SCC); }
+
+    //Return true if AA information is valid.
     bool is_aa_valid() const { return OC_is_aa_valid(*this); }
+
+    //Return true if expresion hash table is valid.
     bool is_expr_tab_valid() const { return OC_is_expr_tab_valid(*this); }
-    bool is_cdg_valid() const { return OC_is_cdg_valid(*this); }
+
+    //Return true if Dominator and Immediate-Dominator are valid.
     bool is_dom_valid() const { return OC_is_dom_valid(*this); }
+
+    //Return true if Post-Dominator and Immediate-Post-Dominator are valid.
     bool is_pdom_valid() const { return OC_is_pdom_valid(*this); }
+
+    //Return true if RPO is valid.
     bool is_rpo_valid() const { return OC_is_rpo_valid(*this); }
+
+    //Return true if LoopInfo is valid.
     bool is_loopinfo_valid() const { return OC_is_loopinfo_valid(*this); }
+
+    //Return true if CallGraph is valid.
     bool is_callg_valid() const { return OC_is_callg_valid(*this); }
 
-    //The function make all flag valid.
-    void setAllValid() { u1.int1 = (UINT)-1; }
-
-    //The function make all flag invalid.
-    void setAllInvalid() { u1.int1 = 0; }
-
-    //The function will invalidate flags which may be affected when control
-    //flow changed.
-    void setInvalidIfCFGChanged()
-    {
-        //OC_is_cfg_valid(*this) = false; CFG should always be maintained.
-        OC_is_scc_valid(*this) = false;
-        OC_is_cdg_valid(*this) = false;
-        OC_is_rpo_valid(*this) = false;
-        OC_is_loopinfo_valid(*this) = false;
-        OC_is_scc_valid(*this) = false;
-        setDomValid(false);
-    }
-
-    //The function will invalidate flags which may be affected when dominator
-    //changed.
-    void setDomValid(bool valid)
-    {
-        OC_is_dom_valid(*this) = valid;
-        OC_is_pdom_valid(*this) = valid;
-    }
+    //Return true if given pass is valid.
+    bool isPassValid(PASS_TYPE pt) const;
 
     //The function will invalidate flags which may be affected when data-flow
     //changed.
@@ -159,13 +173,41 @@ public:
         OC_is_avail_reach_def_valid(*this) = false;
     }
 
-    //The function will invalidate flags which may be affected when DU chain
+    //The function will invalidate flags which may be affected when control
+    //flow changed.
+    static void setInvalidIfCFGChangedExcept(OptCtx * oc, ...);
+    void setInvalidIfCFGChanged()
+    {
+        //OC_is_cfg_valid(*this) = false; CFG should always be maintained.
+        setInvalidRPO();
+        setInvalidLoopInfo();
+        setInvalidDom();
+        setInvalidPDom();
+        setInvalidCDG();
+        setInvalidSCC();
+    }
+
+    //The function will invalidate flags which affected while DU chain
     //changed.
     void setInvalidClassicDUChain()
     {
-        OC_is_pr_du_chain_valid(*this) = false;
-        OC_is_nonpr_du_chain_valid(*this) = false;
+        setInvalidPRDU();
+        setInvalidNonPRDU();
     }
+
+    //The function make all flag invalid.
+    void setInvalidAllFlags() { u1.int1 = 0; }
+    void setInvalidDom() { OC_is_dom_valid(*this) = false; }
+    void setInvalidPDom() { OC_is_pdom_valid(*this) = false; }
+    void setInvalidPRDU() { OC_is_pr_du_chain_valid(*this) = false; }
+    void setInvalidNonPRDU() { OC_is_nonpr_du_chain_valid(*this) = false; }
+    void setInvalidRPO() { OC_is_rpo_valid(*this) = false; }
+    void setInvalidLoopInfo() { OC_is_loopinfo_valid(*this) = false; }
+    void setInvalidCDG() { setInvalidPass(PASS_CDG); }
+    void setInvalidSCC() { setInvalidPass(PASS_SCC); }
+    void setInvalidMDSSA() { setInvalidPass(PASS_MDSSA_MGR); }
+    void setInvalidPRSSA() { setInvalidPass(PASS_PRSSA_MGR); }
+    void setInvalidPass(PASS_TYPE pass);
 };
 
 } //namespace xoc

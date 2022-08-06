@@ -13,7 +13,7 @@ Contribution and License Agreement
 
 Your ideas have no limits.
   Surprisingly powerful.
-  Why let programming tools shackle your mind?
+  Why let programming tools refrain your mind?
   XOC was designed for extensibility.
   Tailoring and retargeting the compiler is easy, and fun.
 

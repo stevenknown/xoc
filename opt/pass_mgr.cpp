@@ -53,7 +53,6 @@ void PassMgr::destroyPass(Pass * pass)
     PASS_TYPE passtype = pass->getPassType();
     ASSERT0(passtype != PASS_UNDEF);
     m_registered_pass.remove(passtype);
-    m_registered_graph_based_pass.remove(passtype);
     delete pass;
 }
 
@@ -75,14 +74,24 @@ void PassMgr::destroyAllPass()
          p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
         delete p;
     }
+}
 
-    xcom::Graph * opt2;
-    GraphPassTabIter tabiter2;
-    for (m_registered_graph_based_pass.get_first(tabiter2, &opt2);
-         opt2 != nullptr;
-         m_registered_graph_based_pass.get_next(tabiter2, &opt2)) {
-        delete opt2;
+
+void PassMgr::dump() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    START_TIMER(t, "PassMgr");
+    note(m_rg, "\n==---- DUMP %s '%s' ----==", "PassMgr",
+         m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
+    PassTabIter tabiter;
+    Pass * p;
+    for (m_registered_pass.get_first(tabiter, &p);
+         p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
+        note(m_rg, "\nPASS:%s", p->getPassName());    
     }
+    m_rg->getLogMgr()->decIndent(2);
+    END_TIMER(t, "PassMgr");
 }
 
 
@@ -156,16 +165,17 @@ Pass * PassMgr::allocInvertBrTgt()
 Pass * PassMgr::allocVRP()
 {
     #ifdef FOR_IP
-    return new VRP(m_rg);
-    #else
-    return nullptr;
+    //return new VRP(m_rg);
     #endif
+    return nullptr;
 }
 
 
 Pass * PassMgr::allocDSE()
 {
+    #ifdef FOR_IP
     //return new DSE(m_rg);
+    #endif
     return nullptr;
 }
 
@@ -218,9 +228,19 @@ Pass * PassMgr::allocIRSimp()
 }
 
 
+Pass * PassMgr::allocLinearScanRA()
+{
+    #ifdef FOR_IP
+    return new LinearScanRA(m_rg);
+    #else
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocCCP()
 {
-    //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
+    //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PRSSA_MGR));
     return nullptr;
 }
 
@@ -287,6 +307,12 @@ Pass * PassMgr::allocMDSSALiveMgr()
 }
 
 
+Pass * PassMgr::allocLivenessMgr()
+{
+    return new LivenessMgr(m_rg);
+}
+
+
 Pass * PassMgr::allocMDLivenessMgr()
 {
     return new MDLivenessMgr(m_rg);
@@ -296,22 +322,6 @@ Pass * PassMgr::allocMDLivenessMgr()
 Pass * PassMgr::allocRefine()
 {
     return new Refine(m_rg);
-}
-
-
-xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
-{
-    xcom::Graph * pass = nullptr;
-    switch (opty) {
-    case PASS_CDG:
-        //pass = allocCDG();
-        break;
-    default: ASSERTN(0, ("Unsupport Optimization."));
-    }
-
-    ASSERT0(opty != PASS_UNDEF && pass);
-    m_registered_graph_based_pass.set(opty, pass);
-    return pass;
 }
 
 
@@ -366,10 +376,10 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_LOOP_CVT:
         pass = allocLoopCvt();
         break;
-    case PASS_PR_SSA_MGR:
+    case PASS_PRSSA_MGR:
         pass = allocPRSSAMgr();
         break;
-    case PASS_MD_SSA_MGR:
+    case PASS_MDSSA_MGR:
         pass = allocMDSSAMgr();
         break;
     case PASS_CCP:
@@ -399,18 +409,6 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_MDLIVENESS_MGR:
         pass = allocMDLivenessMgr();
         break;
-    case PASS_MDSSALIVE_MGR:
-        pass = allocMDSSALiveMgr();
-        break;
-    case PASS_REFINE:
-        pass = allocRefine();
-        break;
-    case PASS_GSCC:
-        pass = allocGSCC();
-        break;
-    case PASS_IRSIMP:
-        pass = allocIRSimp();
-        break;
     case PASS_LFTR:
         pass = allocLFTR();
         break;
@@ -423,7 +421,25 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_VRP:
         pass = allocVRP();
         break;
-    default: ASSERTN(0, ("Unsupport Optimization."));
+    case PASS_SCC:
+        pass = allocGSCC();
+        break;
+    case PASS_REFINE:
+        pass = allocRefine();
+        break;
+    case PASS_MDSSALIVE_MGR:
+        pass = allocMDSSALiveMgr();
+        break;
+    case PASS_IRSIMP:
+        pass = allocIRSimp();
+        break;
+    case PASS_LINEAR_SCAN_RA:
+        pass = allocLinearScanRA();
+        break;
+    case PASS_LIVENESS_MGR:
+        pass = allocLivenessMgr();
+        break;
+    default: ASSERTN(0, ("Unsupport Pass."));
     }
 
     ASSERT0(opty != PASS_UNDEF && pass);
@@ -482,23 +498,23 @@ void PassMgr::checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
         m_rg->getPassMgr()->checkValidAndRecompute(oc, optlist);
     }
 
-    UINT flag = DUOPT_UNDEF;
+    DUOptFlag flag(DUOPT_UNDEF);
     if (!oc->is_nonpr_du_chain_valid()) {
-        flag |= DUOPT_COMPUTE_NONPR_DU;
+        flag.set(DUOPT_COMPUTE_NONPR_DU);
     }
     if (!oc->is_pr_du_chain_valid()) {
-        flag |= DUOPT_COMPUTE_PR_DU;
+        flag.set(DUOPT_COMPUTE_PR_DU);
     }
 
     //TBD: compute classic DU without considering PRSSA.
     ////If PRs have already been in SSA form, compute
     ////DU chain doesn't make any sense.
-    //PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
+    //PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PRSSA_MGR);
     //if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
     //    !oc->is_pr_du_chain_valid()) {
     //    flag |= DUOPT_COMPUTE_PR_DU;
     //}
-    if (flag == DUOPT_UNDEF) {
+    if (flag.do_nothing()) {
         //Nothing need to compute.
         return;
     }
@@ -511,34 +527,31 @@ void PassMgr::checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
 
 
 void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
-                                       AliasAnalysis *& aa,
-                                       DUMgr *& dumgr,
+                                       AliasAnalysis *& aa, DUMgr *& dumgr,
                                        BitSet const& opts)
 {
     BBList * bbl = m_rg->getBBList();
-    UINT f = 0;
+    DUOptFlag f(DUOPT_UNDEF);
     if (opts.is_contain(PASS_DU_REF) && !oc->is_ref_valid()) {
-        f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
+        f.set(DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF);
     }
     if (opts.is_contain(PASS_LIVE_EXPR) && !oc->is_live_expr_valid()) {
-        f |= DUOPT_SOL_AVAIL_EXPR;
+        f.set(DUOPT_SOL_AVAIL_EXPR);
     }
     if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
         !oc->is_avail_reach_def_valid()) {
-        f |= DUOPT_SOL_AVAIL_REACH_DEF;
+        f.set(DUOPT_SOL_AVAIL_REACH_DEF);
     }
     if (opts.is_contain(PASS_REACH_DEF) && !oc->is_reach_def_valid()) {
-        f |= DUOPT_SOL_REACH_DEF;
+        f.set(DUOPT_SOL_REACH_DEF);
     }
     if (opts.is_contain(PASS_DU_CHAIN) &&
         (!oc->is_pr_du_chain_valid() || !oc->is_nonpr_du_chain_valid()) &&
         !oc->is_reach_def_valid()) {
-        f |= DUOPT_SOL_REACH_DEF;
+        f.set(DUOPT_SOL_REACH_DEF);
     }
-    if (opts.is_contain(PASS_AA) &&
-        !oc->is_aa_valid() &&
-        bbl != nullptr &&
-        bbl->get_elem_count() != 0) {
+    if (opts.is_contain(PASS_AA) && !oc->is_aa_valid() &&
+        bbl != nullptr && bbl->get_elem_count() != 0) {
         ASSERTN(cfg && oc->is_cfg_valid(),
                 ("You should make CFG available first."));
         if (aa == nullptr) {
@@ -561,19 +574,18 @@ void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
         //NOTE: assignMD(false) must be called before AA.
         aa->perform(*oc);
     }
-    if (f != DUOPT_UNDEF && bbl != nullptr && bbl->get_elem_count() != 0) {
+    if (!f.do_nothing() && bbl != nullptr && bbl->get_elem_count() != 0) {
         if (dumgr == nullptr) {
             dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
         }
         if (opts.is_contain(PASS_DU_REF)) {
-            f |= DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU;
+            f.set(DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU);
         }
         dumgr->perform(*oc, f);
-        if (HAVE_FLAG(f, DUOPT_COMPUTE_PR_REF) ||
-            HAVE_FLAG(f, DUOPT_COMPUTE_NONPR_REF)) {
+        if (f.have(DUOPT_COMPUTE_PR_REF) || f.have(DUOPT_COMPUTE_NONPR_REF)) {
             ASSERT0(m_rg->verifyMDRef());
         }
-        if (HAVE_FLAG(f, DUOPT_SOL_AVAIL_EXPR)) {
+        if (f.have(DUOPT_SOL_AVAIL_EXPR)) {
             ASSERT0(dumgr->verifyLiveinExp());
         }
     }
@@ -614,22 +626,25 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
                 if (cfg == nullptr) {
                     //CFG is not constructed.
                     cfg = (IRCFG*)registerPass(PASS_CFG);
-                    cfg->initCfg(*oc);
+                    cfg->initCFG(*oc);
                 } else {
                     //CAUTION: validation of CFG should maintained by user.
                     cfg->rebuild(*oc);
                 }
             }
             break;
-        case PASS_CDG:
-            if (!oc->is_cdg_valid()) {
-                CDG * cdg = (CDG*)registerPass(PASS_CDG);
-                ASSERT0(cdg); //cdg is not enable.
+        case PASS_CDG: {
+            CDG * cdg = (CDG*)registerPass(PASS_CDG);
+            ASSERT0(cdg); //cdg is not enable.
+            if (!cdg->is_valid()) {
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cdg->perform(*oc);
+            } else {
+                ASSERT0(cdg->verify());
             }
             break;
+        }
         case PASS_DOM:
         case PASS_PDOM:
             if (!oc->is_dom_valid()) {
@@ -657,6 +672,8 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cfg->LoopAnalysis(*oc);
+            } else {
+                cfg->verifyLoopInfo(*oc);
             }
             break;
         case PASS_RPO:
@@ -668,11 +685,11 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
                 ASSERT0(cfg->verifyRPO(*oc));
             }
             break;
-        case PASS_GSCC:
+        case PASS_SCC:
             if (!oc->is_scc_valid()) {
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
-                GSCC * gscc = (GSCC*)registerPass(PASS_GSCC);
+                GSCC * gscc = (GSCC*)registerPass(PASS_SCC);
                 ASSERT0(gscc); //scc is not enable.
                 gscc->perform(*oc);
             }

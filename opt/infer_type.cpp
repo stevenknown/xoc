@@ -75,7 +75,7 @@ void InferType::addDump(IR const* ir) const
 
 
 //Infer variable's type.
-bool InferType::inferVarTypeByIRType(IR const* ir) const
+bool InferType::inferVarTypeByIRCode(IR const* ir) const
 {
     if (ir->is_any()) { return false; }
     Var * var = nullptr;
@@ -113,14 +113,14 @@ bool InferType::inferVarTypeByIRType(IR const* ir) const
 bool InferType::inferStmtCall(IR * ir) const
 {
     ASSERT0(ir->isCallStmt());
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
 bool InferType::inferStmtPhi(IR * ir) const
 {
     ASSERT0(ir->is_phi());
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
@@ -141,7 +141,7 @@ bool InferType::inferStmtMemAcc(IR * ir)
         addDump(ir);
         addChanged(ir);
     }
-    changed |= inferVarTypeByIRType(ir);
+    changed |= inferVarTypeByIRCode(ir);
     return true;
 }
 
@@ -168,7 +168,7 @@ bool InferType::inferLeafExpMemAcc(IR * ir)
         }
         return false;
     }
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
@@ -177,7 +177,7 @@ bool InferType::inferArray(IR * ir) const
     ASSERT0(ir->is_array());
     if (!ir->is_any()) { return false; }
     //TODO: infer the array operator type via array base type.
-    return false; 
+    return false;
 }
 
 
@@ -257,6 +257,27 @@ bool InferType::inferSelect(IR * ir)
 }
 
 
+static Type const* inferPointerArith(IR const* ir, Type const* rety)
+{
+    switch (ir->getCode()) {
+    case IR_ADD:
+    case IR_SUB: {
+        IR * op0 = BIN_opnd0(ir);
+        IR * op1 = BIN_opnd1(ir);
+        if (op0->is_ptr() && !op1->is_ptr()) {
+            return op0->getType();
+        }
+        if (!op0->is_ptr() && op1->is_ptr()) {
+            return op1->getType();
+        }
+        return rety;
+    }
+    default: break;
+    }
+    return rety;
+}
+
+
 bool InferType::inferBinOP(IR * ir)
 {
     if (!ir->is_any()) { return false; }
@@ -279,8 +300,9 @@ bool InferType::inferBinOP(IR * ir)
     } else {
         rety = op1->getType();
     }
+    rety = inferPointerArith(ir, rety);
     ASSERT0(rety);
-    IR_dt(ir) = rety;
+    ir->setType(rety);
     addDump(ir);
     addChanged(ir);
     return true;
@@ -422,7 +444,7 @@ bool InferType::perform(OptCtx & oc)
     IR * irl = m_rg->getIRList();
     BBList * bbl = m_rg->getBBList();
     START_TIMER(t, getPassName());
-    m_rg->getLogMgr()->startBuffer();
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpInit();
     bool changed = false;
     do {
@@ -439,12 +461,10 @@ bool InferType::perform(OptCtx & oc)
     } while (m_wl.get_elem_count() != 0);
     if (!changed) {
         m_rg->getLogMgr()->cleanBuffer();
-        m_rg->getLogMgr()->endBuffer();
         dumpFini();
         END_TIMER(t, getPassName());
         return false;
     }
-    m_rg->getLogMgr()->endBuffer();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         dump();
     }

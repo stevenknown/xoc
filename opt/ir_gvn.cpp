@@ -89,7 +89,7 @@ GVN::~GVN()
 }
 
 
-bool GVN::isUnary(IR_TYPE irt) const
+bool GVN::isUnary(IR_CODE irt) const
 {
     switch (irt) {
     SWITCH_CASE_UNA:
@@ -100,20 +100,20 @@ bool GVN::isUnary(IR_TYPE irt) const
 }
 
 
-bool GVN::isBinary(IR_TYPE irt) const
+bool GVN::isBinary(IR_CODE irt) const
 {
     //Regard LDA as binary op.
     return xoc::isBinaryOp(irt) || irt == IR_LDA;
 }
 
 
-bool GVN::isTriple(IR_TYPE irt) const
+bool GVN::isTriple(IR_CODE irt) const
 {
     return irt == IR_ILD || irt == IR_SETELEM || irt == IR_SELECT;
 }
 
 
-bool GVN::isQuad(IR_TYPE irt) const
+bool GVN::isQuad(IR_CODE irt) const
 {
     return irt == IR_ARRAY;
 }
@@ -172,8 +172,8 @@ void GVN::destroyLocalUsed()
     m_tab_lst.destroy();
     m_tab_lst.init();
 
-    m_irt_vec.destroy();
-    m_irt_vec.init();
+    m_irc_vec.destroy();
+    m_irc_vec.init();
 }
 
 
@@ -221,9 +221,9 @@ void GVN::dumpVNHash() const
 {
     Tab2Iter it2;
     Tab3Iter it3;
-    for (VecIdx i = 0; i <= m_irt_vec.get_last_idx(); i++) {
-        if (isBinary((IR_TYPE)i)) {
-            Tab2 * tab2 = (Tab2*)m_irt_vec.get(i);
+    for (VecIdx i = 0; i <= m_irc_vec.get_last_idx(); i++) {
+        if (isBinary((IR_CODE)i)) {
+            Tab2 * tab2 = (Tab2*)m_irc_vec.get(i);
             if (tab2 == nullptr) { continue; }
 
             it2.clean();
@@ -235,14 +235,14 @@ void GVN::dumpVNHash() const
             continue;
         }
 
-        if (isUnary((IR_TYPE)i)) {
-            Tab1 * tab1 = (Tab1*)m_irt_vec.get(i);
+        if (isUnary((IR_CODE)i)) {
+            Tab1 * tab1 = (Tab1*)m_irc_vec.get(i);
             if (tab1 == nullptr) { continue; }
             continue;
         }
 
-        if (isTriple((IR_TYPE)i)) {
-            Tab3 * tab3 = (Tab3*)m_irt_vec.get(i);
+        if (isTriple((IR_CODE)i)) {
+            Tab3 * tab3 = (Tab3*)m_irc_vec.get(i);
             if (tab3 == nullptr) { continue; }
 
             it3.clean();
@@ -253,11 +253,11 @@ void GVN::dumpVNHash() const
             continue;
         }
 
-        if (isQuad((IR_TYPE)i)) {
+        if (isQuad((IR_CODE)i)) {
             continue;
         }
 
-        ASSERT0(m_irt_vec.get(i) == nullptr);
+        ASSERT0(m_irc_vec.get(i) == nullptr);
     }
 }
 
@@ -368,14 +368,14 @@ VN * GVN::registerVNviaFP(double v)
 }
 
 
-VN * GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
+VN * GVN::registerUnaVN(IR_CODE irt, VN const* v0)
 {
     ASSERT0(isUnary(irt));
-    Tab1 * tab1 = (Tab1*)m_irt_vec.get(irt);
+    Tab1 * tab1 = (Tab1*)m_irc_vec.get(irt);
     if (tab1 == nullptr) {
         tab1 = new Tab1();
         m_tab_lst.append_tail(tab1);
-        m_irt_vec.set(irt, (Tab2*)tab1);
+        m_irc_vec.set(irt, (Tab2*)tab1);
     }
 
     VN * res = tab1->get(VN_id(v0));
@@ -389,7 +389,7 @@ VN * GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 }
 
 
-VN * GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
+VN * GVN::registerBinVN(IR_CODE irt, VN const* v0, VN const* v1)
 {
     ASSERT0(v0 && v1);
     ASSERT0(isBinary(irt));
@@ -403,11 +403,11 @@ VN * GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
         return registerBinVN(IR_LE, v1, v0);
     }
 
-    Tab2 * tab2 = (Tab2*)m_irt_vec.get(irt);
+    Tab2 * tab2 = (Tab2*)m_irc_vec.get(irt);
     if (tab2 == nullptr) {
         tab2 = new Tab2();
         m_tab_lst.append_tail((Tab1*)tab2);
-        m_irt_vec.set(irt, tab2);
+        m_irc_vec.set(irt, tab2);
     }
 
     Tab1 * tab1 = tab2->get(VN_id(v0));
@@ -428,16 +428,16 @@ VN * GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
 }
 
 
-VN * GVN::registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
+VN * GVN::registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
                            VN const* v2)
 {
     ASSERT0(v0 && v1 && v2);
     ASSERT0(isTriple(irt));
-    Tab3 * tab3 = (Tab3*)m_irt_vec.get(irt);
+    Tab3 * tab3 = (Tab3*)m_irc_vec.get(irt);
     if (tab3 == nullptr) {
         tab3 = new Tab3();
         m_tab_lst.append_tail((Tab1*)tab3);
-        m_irt_vec.set(irt, (Tab2*)tab3);
+        m_irc_vec.set(irt, (Tab2*)tab3);
     }
 
     Tab2 * tab2 = tab3->get(VN_id(v0));
@@ -465,16 +465,16 @@ VN * GVN::registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
 }
 
 
-VN * GVN::registerQuadVN(IR_TYPE irt, VN const* v0, VN const* v1,
+VN * GVN::registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
                          VN const* v2, VN const* v3)
 {
     ASSERT0(v0 && v1 && v2 && v3);
     ASSERT0(isQuad(irt));
-    Tab4 * tab4 = (Tab4*)m_irt_vec.get(irt);
+    Tab4 * tab4 = (Tab4*)m_irc_vec.get(irt);
     if (tab4 == nullptr) {
         tab4 = new Tab4();
         m_tab_lst.append_tail((Tab1*)tab4);
-        m_irt_vec.set(irt, (Tab2*)tab4);
+        m_irc_vec.set(irt, (Tab2*)tab4);
     }
 
     Tab3 * tab3 = tab4->get(VN_id(v0));
@@ -532,7 +532,7 @@ VN * GVN::computePR(IR const* exp, bool & change)
     IR const* def = ssainfo->getDef();
     if (def == nullptr) {
         ASSERT0(exp->getRefMD());
-        if (isAllocLiveinVN()) {
+        if (isAllocLiveinVN() || exp->getRefMD()->is_restrict()) {
             return allocLiveinVN(exp, exp->getRefMD(), change);
         }
         return nullptr;
@@ -577,7 +577,7 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
 
     DUSet const* defset = exp->readDUSet();
     if (defset == nullptr) {
-        if (isAllocLiveinVN()) {
+        if (isAllocLiveinVN() || emd->is_restrict()) {
             return allocLiveinVN(exp, emd, change);
         }
         return nullptr;
@@ -612,7 +612,7 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
             return nullptr;
         }
     }
-    if (isAllocLiveinVN()) {
+    if (isAllocLiveinVN() || emd->is_restrict()) {
         return allocLiveinVN(exp, emd, change);
     }
     return nullptr;
@@ -999,6 +999,10 @@ VN * GVN::computeConst(IR const* exp, bool & change)
 
     if (exp->is_int()) {
         x = registerVNviaINT(CONST_int_val(exp));
+    } else if (exp->is_ptr()) {
+        //Regard PTR as INT because the bit-width of pointer of target machine
+        //is always longer than integer.
+        x = registerVNviaINT(CONST_int_val(exp));
     } else if (exp->is_mc()) {
         x = registerVNviaMC(CONST_int_val(exp));
     } else if (exp->is_fp()) {
@@ -1154,6 +1158,102 @@ void GVN::processRegion(IR const* ir, bool & change)
 }
 
 
+bool GVN::isSameMemLocForIndirectOp(IR const* ir1, IR const* ir2) const
+{
+    IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+    IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+    ASSERT0(irbase1 && irbase2);
+    VN const* base1 = getConstVN(irbase1);
+    VN const* base2 = getConstVN(irbase2);
+    return base1 == base2 && base1 != nullptr;
+}
+
+
+//Return true if the value of ir1 and ir2 are definitely same, otherwise
+//return false to indicate unknown.
+bool GVN::hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const
+{
+    if (!usePRSSADU()) { return false; }
+    return PRSSAMgr::hasSameValue(ir1, ir2);
+}
+
+
+//Return true if the value of ir1 and ir2 are definitely same, otherwise
+//return false to indicate unknown.
+bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
+{
+    if (!useMDSSADU()) { return false; }
+    return MDSSAMgr::hasSameValue(ir1, ir2);
+}
+
+
+//Return true if the value of ir1 and ir2 are definitely same, otherwise
+//return false to indicate unknown.
+bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
+{
+    if (!ir1->isIRIsomo(ir2, true)) { return false; }
+    ConstIRIter it1;
+    ConstIRIter it2;   
+    IR const* k1 = iterInitC(ir1, it1, false);
+    IR const* k2 = iterInitC(ir2, it2, false);
+    for (; k1 != nullptr; k1 = iterNextC(it1, true),
+         k2 = iterNextC(it2, true)) {
+        ASSERT0(k2);
+        if (k1->isPROp()) {
+            ASSERT0(k2->isPROp());
+            if (!hasSameValueByPRSSA(k1, k2)) {
+                return false;
+            }
+            continue;
+        }
+        if (k1->isMemoryRefNonPR()) {
+            ASSERT0(k2->isMemoryRefNonPR());
+            if (!hasSameValueByMDSSA(k1, k2)) {
+                return false;
+            }
+            continue;
+        }
+    }
+    ASSERT0(k1 == nullptr && k2 == nullptr);
+    return true;
+}
+
+
+bool GVN::isSameMemLocForArrayOp(IR const* ir1, IR const* ir2) const
+{
+    IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+    IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+    ASSERT0(irbase1 && irbase2);
+    VN const* base1 = getConstVN(irbase1);
+    VN const* base2 = getConstVN(irbase2);
+    if (base1 == nullptr || base2 == nullptr) {
+        if (!hasSameValueBySSA(irbase1, irbase2)) {
+            return false;
+        }
+    }
+    if (base1 != base2) {
+        return false;
+    }
+
+    IR const* s2 = ARR_sub_list(ir2);
+    for (IR const* s1 = ARR_sub_list(ir1); s1 != nullptr;
+         s1 = s1->get_next(), s2 = s2->get_next()) {
+        ASSERT0(s2);
+        VN const* vs1 = getConstVN(s1);
+        VN const* vs2 = getConstVN(s2);
+        if (vs1 == nullptr || vs2 == nullptr) {
+            if (!hasSameValueBySSA(s1, s2)) {
+                return false;
+            }
+        }
+        if (vs1 != vs2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
 //Return true if ir1 and ir2 represent identical memory location, otherwise
 //return false to tell caller we do not know more about these object.
 //Note this function does NOT consider data type that ir1 or ir2 referrenced.
@@ -1165,39 +1265,12 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
     if ((ir1->is_st() || ir1->is_ld()) && (ir2->is_st() || ir2->is_ld())) {
         return ir1->getIdinfo() == ir2->getIdinfo();
     }
-
     if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
-        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
-        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
-        ASSERT0(irbase1 && irbase2);
-        VN const* base1 = getConstVN(irbase1);
-        VN const* base2 = getConstVN(irbase2);
-        return base1 == base2;
+        return isSameMemLocForIndirectOp(ir1, ir2);
     }
-
     if (ir1->isArrayOp() && ir2->isArrayOp() && ir1->isSameArrayStruct(ir2)) {
-        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
-        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
-        ASSERT0(irbase1 && irbase2);
-        VN const* base1 = getConstVN(irbase1);
-        VN const* base2 = getConstVN(irbase2);
-        if (base1 != base2) {
-            return false;
-        }
-
-        IR const* s2 = ARR_sub_list(ir2);
-        for (IR const* s1 = ARR_sub_list(ir1); s1 != nullptr;
-             s1 = s1->get_next(), s2 = s2->get_next()) {
-            ASSERT0(s2);
-            VN const* vs1 = getConstVN(s1);
-            VN const* vs2 = getConstVN(s2);
-            if (vs1 != vs2) {
-                return false;
-            }
-        }
-        return true;
+        return isSameMemLocForArrayOp(ir1, ir2);
     }
-
     MD const* must1 = ir1->getRefMD();
     MD const* must2 = ir2->getRefMD();
     return must1 == must2 && must1 != nullptr;
@@ -1359,7 +1432,7 @@ void GVN::dump_h1(IR const* k, VN const* x) const
     if (k->is_pr()) {
         note(getRegion(), "\n\t$%d", PR_no(k));
     } else {
-        note(getRegion(), "\n\t%s", IRTNAME(k->getCode()));
+        note(getRegion(), "\n\t%s", IRCNAME(k->getCode()));
     }
     prt(getRegion(), " id:%d ", k->id());
     if (x != nullptr) {

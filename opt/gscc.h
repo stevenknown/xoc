@@ -32,7 +32,7 @@ namespace xoc {
 
 class Region;
 
-//This class perform peephole optimizations.
+//The class computes the SCC of graph.
 class GSCC : public Pass {
     COPY_CONSTRUCTOR(GSCC);
     SCC m_scc;
@@ -44,7 +44,7 @@ public:
     virtual ~GSCC() {}
 
     virtual CHAR const* getPassName() const { return "SCC"; }
-    virtual PASS_TYPE getPassType() const { return PASS_GSCC; }
+    virtual PASS_TYPE getPassType() const { return PASS_SCC; }
 
     bool isInSCC(IRBB const* bb) const { return m_scc.isInSCC(bb->id()); }
 

@@ -15,4 +15,9 @@ $(SRC)/com/diagnostic.o \
 $(SRC)/com/bs.o\
 $(SRC)/com/scc.o\
 $(SRC)/com/sbs.o\
-$(SRC)/com/sort.o
+$(SRC)/com/sort.o\
+$(SRC)/com/byteop.o\
+$(SRC)/com/rpo.o\
+$(SRC)/com/tree.o\
+$(SRC)/com/domtree.o\
+$(SRC)/com/lca.o

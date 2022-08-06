@@ -169,7 +169,7 @@ public:
         void clean() { ::memset(this, 0, sizeof(INHR)); }
     };
 
-    bool m_is_init;
+    BYTE m_is_init:1;
     INHR m_inhr;
     UINT m_row_size; //record row size
     UINT m_col_size; //record column size

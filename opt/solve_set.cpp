@@ -46,74 +46,74 @@ namespace xoc {
 //than RPO based algorithm.
 //#define WORK_LIST_DRIVE
 
-static char const* getSolveFlagName(UINT flag)
+static char const* getSolveFlagName(UFlag flag)
 {
     static char g_name_buf[128];
     g_name_buf[0] = 0;
     bool is_first = true;
-    if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_SOL_AVAIL_REACH_DEF");
-        REMOVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF);
+        flag.remove(DUOPT_SOL_AVAIL_REACH_DEF);
     }
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_SOL_REACH_DEF");
-        REMOVE_FLAG(flag, DUOPT_SOL_REACH_DEF);
+        flag.remove(DUOPT_SOL_REACH_DEF);
     }
-    if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+    if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_SOL_AVAIL_EXPR");
-        REMOVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR);
+        flag.remove(DUOPT_SOL_AVAIL_EXPR);
     }
-    if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REGION_REF)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_SOL_REGION_REF");
-        REMOVE_FLAG(flag, DUOPT_SOL_REGION_REF);
+        flag.remove(DUOPT_SOL_REGION_REF);
     }
-    if (HAVE_FLAG(flag, DUOPT_COMPUTE_PR_REF)) {
+    if (flag.have(DUOPT_COMPUTE_PR_REF)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_COMPUTE_PR_REF");
-        REMOVE_FLAG(flag, DUOPT_COMPUTE_PR_REF);
+        flag.remove(DUOPT_COMPUTE_PR_REF);
     }
-    if (HAVE_FLAG(flag, DUOPT_COMPUTE_NONPR_REF)) {
+    if (flag.have(DUOPT_COMPUTE_NONPR_REF)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_COMPUTE_NONPR_REF");
-        REMOVE_FLAG(flag, DUOPT_COMPUTE_NONPR_REF);
+        flag.remove(DUOPT_COMPUTE_NONPR_REF);
     }
-    if (HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU)) {
+    if (flag.have(DUOPT_COMPUTE_PR_DU)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_COMPUTE_PR_DU");
-        REMOVE_FLAG(flag, DUOPT_COMPUTE_PR_DU);
+        flag.remove(DUOPT_COMPUTE_PR_DU);
     }
-    if (HAVE_FLAG(flag, DUOPT_COMPUTE_NONPR_DU)) {
+    if (flag.have(DUOPT_COMPUTE_NONPR_DU)) {
         if (!is_first) {
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
         xcom::xstrcat(g_name_buf, 128, "DUOPT_COMPUTE_NONPR_DU");
-        REMOVE_FLAG(flag, DUOPT_COMPUTE_NONPR_DU);
+        flag.remove(DUOPT_COMPUTE_NONPR_DU);
     }
     return g_name_buf;
 }
@@ -271,8 +271,7 @@ void SolveSet::resetReachDefInSet()
 
 //This equation needs May Kill Def and Must Gen Def.
 bool SolveSet::ForAvailReachDef(UINT bbid, List<IRBB*> & preds,
-                                List<IRBB*> * lst,
-                                DefMiscBitSetMgr & bsmgr)
+                                List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr)
 {
     DUMMYUSE(lst);
     bool change = false;
@@ -429,7 +428,7 @@ bool SolveSet::ForAvailExpression(UINT bbid, List<IRBB*> & preds,
 }
 
 
-void SolveSet::solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
+void SolveSet::solveByRPO(RPOVexList const* rpovexlst, UFlag const flag,
                           MOD DefMiscBitSetMgr & bsmgr)
 {
     List<IRBB*> preds;
@@ -444,13 +443,13 @@ void SolveSet::solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
             UINT bbid = bb->id();
             preds.clean();
             m_cfg->get_preds(preds, bb);
-            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+            if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
                 change |= ForAvailReachDef(bbid, preds, nullptr, bsmgr);
             }
-            if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+            if (flag.have(DUOPT_SOL_REACH_DEF)) {
                 change |= ForReachDef(bbid, preds, nullptr, bsmgr);
             }
-            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+            if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
                 change |= ForAvailExpression(bbid, preds, nullptr, bsmgr);
             }
         }
@@ -461,7 +460,7 @@ void SolveSet::solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
 }
 
 
-void SolveSet::solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
+void SolveSet::solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
                                MOD DefMiscBitSetMgr & bsmgr)
 {
     BBListIter ct;
@@ -479,13 +478,13 @@ void SolveSet::solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
         UINT bbid = bb->id();
         preds.clean();
         m_cfg->get_preds(preds, bb);
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+        if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
             ForAvailReachDef(bbid, preds, &lst, bsmgr);
         }
-        if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+        if (flag.have(DUOPT_SOL_REACH_DEF)) {
             ForReachDef(bbid, preds, &lst, bsmgr);
         }
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+        if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
             ForAvailExpression(bbid, preds, &lst, bsmgr);
         }
         i++;
@@ -498,7 +497,7 @@ void SolveSet::solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
 //Solve reaching definitions problem for IR STMT and
 //computing LIVE IN and LIVE OUT IR expressions.
 //'expr_univers': the Universal SET for ExpRep.
-void SolveSet::solve(DefDBitSetCore const& expr_univers, UINT const flag,
+void SolveSet::solve(DefDBitSetCore const& expr_univers, UFlag const flag,
                      MOD DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t7, "Solve DU set");
@@ -507,17 +506,17 @@ void SolveSet::solve(DefDBitSetCore const& expr_univers, UINT const flag,
     ASSERT0(entry && BB_is_entry(entry));
     for (IRBB * bb = bbl->get_tail(); bb != nullptr; bb = bbl->get_prev()) {
         UINT bbid = bb->id();
-        if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+        if (flag.have(DUOPT_SOL_REACH_DEF)) {
             //Initialize reach-def IN, reach-def OUT.
             genInReachDef(bbid)->clean(*getGlobalSBSMgr());
             genOutReachDef(bbid)->clean(*getLocalSBSMgr());
         }
 
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+        if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
             genAvailInReachDef(bbid)->clean(bsmgr);
         }
 
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+        if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
             //Initialize available in, available out expression.
             //IN-SET of BB must be universal of all IR-expressions.
             DefDBitSetCore * availin = genAvailInExpr(bbid);
@@ -802,22 +801,22 @@ DefDBitSetCore * SolveSet::genAvailOutExpr(UINT bbid)
 void SolveSet::computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
                                                OUT Vector<MDSet*> * maydefmds,
                                                OUT MDSet * mayusemds,
-                                               UINT flag)
+                                               UFlag flag)
 {
     START_TIMER_FMT(t3, ("Build MustDef, MayDef, MayUse: %s",
                          getSolveFlagName(flag)));
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
         ASSERT0(mustdefmds);
     }
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         ASSERT0(maydefmds);
     }
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REGION_REF)) {
         ASSERT0(mayusemds);
     }
 
@@ -834,7 +833,7 @@ void SolveSet::computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
         UINT bbid = bb->id();
         if (mustdefmds != nullptr) {
             //if (mustdefmds != nullptr &&
-            //    HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+            //    flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
             //For now, only the computation of available-reach-def need
             //MustGenStmt information. It is very slowly when compiling large
             //region.
@@ -877,7 +876,7 @@ void SolveSet::computeMustExactDefMayDefMayUseForBB(
     OUT Vector<MDSet*> * mustdefmds, OUT Vector<MDSet*> * maydefmds,
     OUT MDSet * mayusemds, MDSet * bb_mustdefmds, MDSet * bb_maydefmds,
     DefDBitSetCore * mustgen_stmt, DefDBitSetCore * maygen_stmt,
-    UINT flag, DefMiscBitSetMgr & bsmgr)
+    UFlag flag, DefMiscBitSetMgr & bsmgr)
 {
     //may_def_mds, must_def_mds should be already clean.
     IRListIter irct;
@@ -887,14 +886,14 @@ void SolveSet::computeMustExactDefMayDefMayUseForBB(
         ASSERT0(ir);
         if (mayusemds != nullptr) {
             m_du->collectMayUseRecursive(ir, *mayusemds,
-                HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU), bsmgr);
+                                         flag.have(DUOPT_COMPUTE_PR_DU), bsmgr);
             //collectMayUse(ir, *mayusemds, isComputePRDU());
         }
 
         if (!ir->hasResult()) { continue; }
 
         //Do not compute MustExactDef/MayDef for PR.
-        if (ir->isWritePR() && !HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU)) {
+        if (ir->isWritePR() && !flag.have(DUOPT_COMPUTE_PR_DU)) {
             continue;
         }
 
@@ -915,7 +914,7 @@ void SolveSet::computeMustExactDefMayDefMayUseForBB(
             //   BB4: ... = p1           |
             //where BB1 is precessor of BB2 and BB3.
             //BB1:p1 should not reach-def at BB4.
-            //ASSERT0(HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF));
+            //ASSERT0(flag.have(DUOPT_SOL_AVAIL_REACH_DEF));
 
             ASSERT0(mustgen_stmt);
             computeMustExactDef(ir, bb_mustdefmds, mustgen_stmt, mditer,
@@ -953,30 +952,30 @@ void SolveSet::collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
 
 void SolveSet::computeMayDef(IR const* ir, MDSet * bb_maydefmds,
                              DefDBitSetCore * maygen_stmt,
-                             DefMiscBitSetMgr & bsmgr, UINT flag)
+                             DefMiscBitSetMgr & bsmgr, UFlag flag)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     case IR_ST:
     case IR_IST:
     case IR_STARRAY:
-        if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+        if (flag.have(DUOPT_SOL_REGION_REF)) {
             collectNonPRMayDef(ir, bsmgr, bb_maydefmds);
         }
-        if (!HAVE_FLAG(flag, DUOPT_COMPUTE_NONPR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_NONPR_DU)) { return; }
         break;
     case IR_CALL:
     case IR_ICALL:
-        if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+        if (flag.have(DUOPT_SOL_REGION_REF)) {
             collectNonPRMayDef(ir, bsmgr, bb_maydefmds);
         }
-        if (!HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_PR_DU)) { return; }
         break;
     case IR_STPR:
     case IR_SETELEM:
     case IR_GETELEM:
     case IR_PHI:
-        if (!HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_PR_DU)) { return; }
         break;
     case IR_REGION:
         //Region does not have any def.
@@ -1068,13 +1067,13 @@ void SolveSet::computeMustExactDef(IR const* ir,
                                    DefDBitSetCore * mustgen_stmt,
                                    ConstMDIter & mditer,
                                    DefMiscBitSetMgr & bsmgr,
-                                   UINT flag)
+                                   UFlag flag)
 {
     switch (ir->getCode()) {
     case IR_ST:
     case IR_IST:
     case IR_STARRAY:
-        if (!HAVE_FLAG(flag, DUOPT_COMPUTE_NONPR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_NONPR_DU)) { return; }
         break;
     case IR_STPR:
     case IR_SETELEM:
@@ -1082,7 +1081,7 @@ void SolveSet::computeMustExactDef(IR const* ir,
     case IR_CALL:
     case IR_ICALL:
     case IR_PHI:
-        if (!HAVE_FLAG(flag, DUOPT_COMPUTE_PR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_PR_DU)) { return; }
         break;
     case IR_REGION:
         //Region does not have any def.
@@ -1134,7 +1133,7 @@ void SolveSet::computeLiveInBB(DefMiscBitSetMgr & bsmgr)
             IRBB const* bb = m_cfg->getBB(it->val()->id());
             DefSBitSetCore * bs = genLiveInBB(bb->id());
             tmp.clean(bsmgr);
-            for (xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getInList();
+            for (xcom::EdgeC * el = bb->getVex()->getInList();
                  el != nullptr; el = el->get_next()) {
                 IRBB const* pred = m_cfg->getBB(el->getFromId());
                 if (pred == nullptr) { continue; }
@@ -2058,7 +2057,7 @@ size_t SolveSet::count_mem() const
 
 
 //Return true if region status changed.
-bool SolveSet::perform(MOD OptCtx & oc, UINT flag)
+bool SolveSet::perform(MOD OptCtx & oc, UFlag flag)
 {
     ASSERT0(oc.is_ref_valid());
     BBList * bbl = m_rg->getBBList();
@@ -2069,23 +2068,23 @@ bool SolveSet::perform(MOD OptCtx & oc, UINT flag)
     Vector<MDSet*> * mustexactdef_mds = nullptr;
     MDSet * mayuse_mds = nullptr;
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REGION_REF)) {
         mayuse_mds = new MDSet();
     }
 
     MDSet * mds_arr_for_must = nullptr;
     MDSet * mds_arr_for_may = nullptr;
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_REGION_REF)) {
         mustexactdef_mds = new Vector<MDSet*>();
     }
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR) ||
-        HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_EXPR) ||
+        flag.have(DUOPT_SOL_REGION_REF)) {
         maydef_mds = new Vector<MDSet*>();
     }
 
@@ -2115,13 +2114,13 @@ bool SolveSet::perform(MOD OptCtx & oc, UINT flag)
     DefDBitSetCoreHashAllocator dbitsetchashallocator(lbsmgr);
     DefDBitSetCoreReserveTab * dbitsetchash =
         new DefDBitSetCoreReserveTab(&dbitsetchashallocator);
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
         computeKillSet(*dbitsetchash, mustexactdef_mds, maydef_mds, *lbsmgr);
     }
 
     DefDBitSetCore expr_univers(SOL_SET_IS_SPARSE);
-    if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+    if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         //Compute GEN, KILL IR-EXPR.
         computeAuxSetForExpression(*dbitsetchash, &expr_univers, maydef_mds,
                                    *lbsmgr);
@@ -2130,14 +2129,14 @@ bool SolveSet::perform(MOD OptCtx & oc, UINT flag)
     dbitsetchash = nullptr; //destroy useless resource as soon as possible.
     resetKillSet();
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REGION_REF)) {
+    if (flag.have(DUOPT_SOL_REGION_REF)) {
         //Compute DEF,USE mds for Region.
         computeRegionMDDU(mustexactdef_mds, maydef_mds, mayuse_mds);
     }
 
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF) ||
-        HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
         solve(expr_univers, flag, *lbsmgr);
     }
@@ -2172,13 +2171,13 @@ bool SolveSet::perform(MOD OptCtx & oc, UINT flag)
     resetLocalSet();
 
     //Set opt-context variables.
-    if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
         OC_is_avail_reach_def_valid(oc) = true;
     }
-    if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+    if (flag.have(DUOPT_SOL_REACH_DEF)) {
         OC_is_reach_def_valid(oc) = true;
     }
-    if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+    if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         OC_is_live_expr_valid(oc) = true;
     }
     return false;

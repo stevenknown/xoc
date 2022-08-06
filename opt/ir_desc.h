@@ -30,72 +30,81 @@ class IR;
 class IRBB;
 
 //Describe miscellaneous information for IR.
-#define IRT_IS_STMT 0x1 //statement.
-#define IRT_IS_BIN 0x2 //binary operation.
-#define IRT_IS_UNA 0x4 //unary operation.
+enum IRDESC_FLAG {
+    IRC_IS_STMT = 0x1, //statement.
+    IRC_IS_BIN = 0x2, //binary operation.
+    IRC_IS_UNA = 0x4, //unary operation.
+    
+    //Memory reference operation. Memory reference indicates all
+    //operations which write or load memory object.
+    IRC_IS_MEM_REF = 0x8,
+    
+    //Memory operand indicates all operations which only load memory object.
+    IRC_IS_MEM_OPND = 0x10,
+    
+    IRC_IS_ASSOCIATIVE = 0x20,
+    IRC_IS_COMMUTATIVE = 0x40,
+    IRC_IS_RELATION = 0x80,
+    IRC_IS_LOGICAL = 0x100,
+    IRC_IS_LEAF = 0x200,
+    IRC_HAS_RESULT = 0x400,
+    IRC_IS_STMT_IN_BB = 0x800,
+    IRC_IS_NON_PR_MEMREF = 0x1000,
+    IRC_HAS_DU = 0x2000,
+    IRC_WRITE_PR = 0x4000,
+    IRC_WRITE_WHOLE_PR = 0x8000,
+    IRC_HAS_OFFSET = 0x10000,
+    IRC_HAS_IDINFO = 0x20000,
+};
 
-//Memory reference operation. Memory reference indicates all
-//operations which write or load memory object.
-#define IRT_IS_MEM_REF 0x8
-
-//Memory operand indicates all operations which only load memory object.
-#define IRT_IS_MEM_OPND 0x10
-
-#define IRT_IS_ASSOCIATIVE 0x20
-#define IRT_IS_COMMUTATIVE 0x40
-#define IRT_IS_RELATION 0x80
-#define IRT_IS_LOGICAL 0x100
-#define IRT_IS_LEAF 0x200
-#define IRT_HAS_RESULT 0x400
-#define IRT_IS_STMT_IN_BB 0x800
-#define IRT_IS_NON_PR_MEMREF 0x1000
-#define IRT_HAS_DU 0x2000
-#define IRT_WRITE_PR 0x4000
-#define IRT_WRITE_WHOLE_PR 0x8000
-#define IRT_HAS_OFFSET 0x10000
-#define IRT_HAS_IDINFO 0x20000
+class IRDescFlag : public UFlag {
+public:
+    IRDescFlag(UINT v) : UFlag(v) {}
+};
 
 #define IRDES_code(m) ((m).code)
 #define IRDES_name(m) ((m).name)
 #define IRDES_kid_map(m) ((m).kid_map)
 #define IRDES_kid_num(m) ((m).kid_num)
-#define IRDES_is_stmt(m) (HAVE_FLAG(((m).attr), IRT_IS_STMT))
-#define IRDES_is_bin(m) (HAVE_FLAG(((m).attr), IRT_IS_BIN))
-#define IRDES_is_una(m) (HAVE_FLAG(((m).attr), IRT_IS_UNA))
-#define IRDES_is_mem_ref(m) (HAVE_FLAG(((m).attr), IRT_IS_MEM_REF))
-#define IRDES_is_mem_opnd(m) (HAVE_FLAG(((m).attr), IRT_IS_MEM_OPND))
-#define IRDES_is_associative(m) (HAVE_FLAG(((m).attr), IRT_IS_ASSOCIATIVE))
-#define IRDES_is_commutative(m) (HAVE_FLAG(((m).attr), IRT_IS_COMMUTATIVE))
-#define IRDES_is_relation(m) (HAVE_FLAG(((m).attr), IRT_IS_RELATION))
-#define IRDES_is_logical(m) (HAVE_FLAG(((m).attr), IRT_IS_LOGICAL))
-#define IRDES_is_leaf(m) (HAVE_FLAG(((m).attr), IRT_IS_LEAF))
-#define IRDES_is_stmt_in_bb(m) (HAVE_FLAG(((m).attr), IRT_IS_STMT_IN_BB))
-#define IRDES_is_non_pr_memref(m) (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF))
-#define IRDES_has_result(m) (HAVE_FLAG(((m).attr), IRT_HAS_RESULT))
-#define IRDES_has_offset(m) (HAVE_FLAG(((m).attr), IRT_HAS_OFFSET))
-#define IRDES_has_idinfo(m) (HAVE_FLAG(((m).attr), IRT_HAS_IDINFO))
-#define IRDES_has_du(m) (HAVE_FLAG(((m).attr), IRT_HAS_DU))
-#define IRDES_is_write_pr(m) (HAVE_FLAG(((m).attr), IRT_WRITE_PR))
-#define IRDES_is_write_whole_pr(m) (HAVE_FLAG(((m).attr), IRT_WRITE_WHOLE_PR))
+#define IRDES_is_stmt(m) ((m).attr.have(IRC_IS_STMT))
+#define IRDES_is_bin(m) ((m).attr.have(IRC_IS_BIN))
+#define IRDES_is_una(m) ((m).attr.have(IRC_IS_UNA))
+#define IRDES_is_mem_ref(m) ((m).attr.have(IRC_IS_MEM_REF))
+#define IRDES_is_mem_opnd(m) ((m).attr.have(IRC_IS_MEM_OPND))
+#define IRDES_is_associative(m) ((m).attr.have(IRC_IS_ASSOCIATIVE))
+#define IRDES_is_commutative(m) ((m).attr.have(IRC_IS_COMMUTATIVE))
+#define IRDES_is_relation(m) ((m).attr.have(IRC_IS_RELATION))
+#define IRDES_is_logical(m) ((m).attr.have(IRC_IS_LOGICAL))
+#define IRDES_is_leaf(m) ((m).attr.have(IRC_IS_LEAF))
+#define IRDES_is_stmt_in_bb(m) ((m).attr.have(IRC_IS_STMT_IN_BB))
+#define IRDES_is_non_pr_memref(m) ((m).attr.have(IRC_IS_NON_PR_MEMREF))
+#define IRDES_has_result(m) ((m).attr.have(IRC_HAS_RESULT))
+#define IRDES_has_offset(m) ((m).attr.have(IRC_HAS_OFFSET))
+#define IRDES_has_idinfo(m) ((m).attr.have(IRC_HAS_IDINFO))
+#define IRDES_has_du(m) ((m).attr.have(IRC_HAS_DU))
+#define IRDES_is_write_pr(m) ((m).attr.have(IRC_WRITE_PR))
+#define IRDES_is_write_whole_pr(m) ((m).attr.have(IRC_WRITE_WHOLE_PR))
 #define IRDES_size(m) ((m).size)
 class IRDesc {
 public:
-    //NOTE: Do NOT change the layout of class members because they are
-    //corresponding to the special initializing value.
-    IR_TYPE code;
+    ////////////////////////////////////////////////////////////////////
+    //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE//
+    //CORRESPONDING TO THE SPECIAL INITIALIZING VALUE.                //
+    ////////////////////////////////////////////////////////////////////
+    IR_CODE code;
     CHAR const* name;
     BYTE kid_map;
     BYTE kid_num;
     BYTE size;
-    UINT attr;
+    IRDescFlag attr;
 public:
-    static bool mustExist(IR_TYPE irtype, UINT kididx);
+    static bool mustExist(IR_CODE irc, UINT kididx);
 };
 
 
 #define IRNAME(ir) (IRDES_name(g_ir_desc[IR_code(ir)]))
-#define IRTNAME(irt) (IRDES_name(g_ir_desc[irt]))
-#define IRTSIZE(irt) (IRDES_size(g_ir_desc[irt]))
+#define IRCNAME(irt) (IRDES_name(g_ir_desc[irt]))
+#define IRCSIZE(irt) (IRDES_size(g_ir_desc[irt]))
 #define IR_MAX_KID_NUM(ir) (IRDES_kid_num(g_ir_desc[IR_code(ir)]))
 
 //Defined rounding type that CVT operation used.

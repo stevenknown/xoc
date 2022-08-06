@@ -153,7 +153,7 @@ public:
     VarMgr * getVarMgr() const { return m_var_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
     LogMgr * getLogMgr() const { return m_logmgr; }
-    OptCtx * getAndGenOptCtx(UINT id);
+    OptCtx * getAndGenOptCtx(Region * rg);
 
     //Register exact MD for each global variable.
     //Note you should call this function as early as possible, e.g, before

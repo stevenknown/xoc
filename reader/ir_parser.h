@@ -63,7 +63,7 @@ public:
     bool has_phi;
     bool has_high_level_ir; //Control Flow Struct are high level IR.
     bool has_error;
-    IR_TYPE ircode; //for temporary used
+    IR_CODE ircode; //for temporary used
     struct {
         union {
             HOST_INT returned_imm_intval;
@@ -218,7 +218,6 @@ typedef enum {
     X_PRIVATE,
     X_RESTRICT,
     X_VOLATILE,
-    X_FUNC_DECL,
     X_FAKE,
     X_GLOBAL,
     X_UNDEFINED,
@@ -228,6 +227,7 @@ typedef enum {
     X_DIM,
     X_UNALLOCABLE,
     X_ALIGN,
+    X_DECL,
     X_LAST,
 } X_CODE;
 
@@ -374,8 +374,8 @@ protected:
     bool parseReturn(ParseCtx * ctx);
     bool parseRegionBody(ParseCtx * ctx);
     bool parseModifyPR(X_CODE code, ParseCtx * ctx);
-    bool parseBinaryOp(IR_TYPE code, ParseCtx * ctx);
-    bool parseUnaryOp(IR_TYPE code, ParseCtx * ctx);
+    bool parseBinaryOp(IR_CODE code, ParseCtx * ctx);
+    bool parseUnaryOp(IR_CODE code, ParseCtx * ctx);
     bool parseLd(ParseCtx * ctx);
     bool parseSignImm(TOKEN tok, ParseCtx * ctx);
     bool parseImmIR(ParseCtx * ctx);

@@ -49,7 +49,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
         return false;
     }
 
-    if (BB_rpo(head) > BB_rpo(*gobackbb)) {
+    if (head->rpo() > (*gobackbb)->rpo()) {
         //loop may already be do-while.
         return false;
     }
@@ -70,7 +70,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
 
 
 bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
-                          UINT succ1, UINT succ2)
+                          UINT succ1, UINT succ2, OptCtx & oc)
 {
     ASSERT0(gobackbb);
 
@@ -148,7 +148,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
-            newir = IR::invertIRType(newir, m_rg);
+            newir = IR::invertIRCode(newir, m_rg);
             ASSERTN(last_cond_br == newir, ("stmt pointer changed"));
         }
     }
@@ -156,7 +156,8 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     ASSERT0(last_cond_br);
     BB_irlist(gobackbb).remove(irct);
     m_rg->freeIR(lastir);
-    m_cfg->removeEdge(gobackbb, head); //revise cfg.
+    CfgOptCtx ctx(oc);
+    m_cfg->removeEdge(gobackbb, head, ctx); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
         loopbody_start_bb->getLabelList().get_head();
@@ -167,15 +168,15 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     last_cond_br->setLabel(loopbody_start_lab);
 
     //Add back edge.
-    m_cfg->addEdge(gobackbb->id(), loopbody_start_bb->id());
+    m_cfg->addEdge(gobackbb, loopbody_start_bb, ctx);
 
     //Add fallthrough edge.
-    m_cfg->addEdge(gobackbb->id(), next->id());
+    m_cfg->addEdge(gobackbb, next, ctx);
     return true;
 }
 
 
-bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
+bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst, OptCtx & oc)
 {
     bool change = false;
     while (worklst.get_elem_count() > 0) {
@@ -184,7 +185,7 @@ bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
         UINT succ1;
         UINT succ2;
         if (is_while_do(x, &gobackbb, &succ1, &succ2)) {
-            change |= try_convert(x, gobackbb, succ1, succ2);
+            change |= try_convert(x, gobackbb, succ1, succ2, oc);
         }
 
         x = LI_inner_list(x);
@@ -212,7 +213,7 @@ bool LoopCvt::perform(OptCtx & oc)
         li = LI_next(li);
     }
 
-    bool change = find_and_convert(worklst);
+    bool change = find_and_convert(worklst, oc);
     if (change) {
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopCVT()) {
             note(getRegion(), "\n==---- DUMP %s '%s' ----==",

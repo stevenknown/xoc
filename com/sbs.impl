@@ -259,10 +259,11 @@ size_t SBitSetCore<BitsPerSeg>::count_mem() const
 
 template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::diff(BSIdx elem, SegMgr<BitsPerSeg> * sm,
-                                   TSEGIter ** free_list, TSEGIter * sct)
+                                   TSEGIter ** free_list, TSEGIter * prev_sct,
+                                   TSEGIter * sct)
 {
     TSEGIter * next_sct = sct;
-    TSEGIter * prev_sct = nullptr;
+    //TSEGIter * prev_sct = nullptr;
     for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
         SEG<BitsPerSeg> * s = SC_val(sct);
         next_sct = segs.get_next(next_sct);
@@ -287,7 +288,7 @@ template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::diff(BSIdx elem, SegMgr<BitsPerSeg> * sm,
                                    TSEGIter ** free_list)
 {
-    diff(elem, sm, free_list, segs.get_head());
+    diff(elem, sm, free_list, nullptr, segs.get_head());
 }
 
 

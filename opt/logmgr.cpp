@@ -72,12 +72,14 @@ static size_t prt_leading_newline(LogMgr * lm, StrBuf const& buf,
                 //Print terminate lines that are left
                 //justified in DOT file.
                 if (lm->isEnableBuffer()) {
+                    ASSERT0(lm->getBuffer());
                     lm->getBuffer()->strcat(terminate_line_r);
                 } else {
                     fprintf(lm->getFileHandler(), terminate_line_r);
                 }
             } else {
                 if (lm->isEnableBuffer()) {
+                    ASSERT0(lm->getBuffer());
                     lm->getBuffer()->strcat(terminate_line);
                 } else {
                     fprintf(lm->getFileHandler(), terminate_line);
@@ -98,6 +100,7 @@ static void prt_indent(LogMgr * lm)
     UINT indent = lm->getIndent();
     for (; indent > 0; indent--) {
         if (lm->isEnableBuffer()) {
+            ASSERT0(lm->getBuffer());
             lm->getBuffer()->strcat("%c", lm->getIndentChar());
         } else {
             fprintf(lm->getFileHandler(), "%c", lm->getIndentChar());
@@ -134,6 +137,7 @@ static void note_helper(LogMgr * lm, StrBuf const& buf)
         if (cont_pos != buflen) {
             ASSERT0(cont_pos < buflen);
             if (lm->isEnableBuffer()) {
+                ASSERT0(lm->getBuffer());
                 lm->getBuffer()->strcat("%s", buf.buf + cont_pos);
             } else {
                 fprintf(h, "%s", buf.buf + cont_pos);
@@ -189,6 +193,7 @@ static void prt_helper(LogMgr * lm, CHAR const* format, va_list args)
     size_t i = prt_leading_newline(lm, buf, buflen, 0);
     if (i != buflen) {
         if (lm->isEnableBuffer()) {
+            ASSERT0(lm->getBuffer());
             lm->getBuffer()->strcat("%s", buf.buf + i);
         } else {
             fprintf(h, "%s", buf.buf + i);
@@ -322,6 +327,23 @@ void LogMgr::endBuffer()
         delete m_ctx.buffer;
         m_ctx.buffer = nullptr;
     }
+}
+
+
+void LogMgr::pauseBuffer()
+{
+    if (m_ctx.paused_buffer) { return; }
+    LogCtx tmp(getCurrentCtx());
+    push(tmp);
+    m_ctx.paused_buffer = true;
+    m_ctx.enable_buffer = false;
+}
+
+
+void LogMgr::resumeBuffer()
+{
+    if (!m_ctx.paused_buffer) { return; }
+    pop();    
 }
 
 

@@ -36,8 +36,186 @@ author: Su Zhenyu
 
 namespace xoc {
 
+static void recordInVex(Vertex const* v, VexTab & vt)
+{
+    vt.add(v);
+    AdjVertexIter it;
+    for (Vertex const* t = Graph::get_first_in_vertex(v, it);
+         t != nullptr; t = Graph::get_next_in_vertex(it)) {
+        vt.add(t);
+    }
+}
+
+
+static void recordDomVexForEachElem(IRCFG const* cfg, MOD VexTab & vt)
+{
+    VexTab tmp;
+    VexTabIter it;
+    for (Vertex const* t = vt.get_first(it);
+         t != nullptr; t = vt.get_next(it)) {
+        DomSet const* ds = cfg->get_dom_set(t->id());
+        if (ds == nullptr) {
+            //Some vertex in 'vt' has been removed from CFG.
+            continue;
+        }
+        for (BSIdx i = ds->get_first();
+             i != BS_UNDEF ; i = ds->get_next(i)) {
+            ASSERT0(i != VERTEX_UNDEF);
+            Vertex const* v = cfg->getVertex(i);
+            ASSERT0(v);
+            tmp.add(v);
+        }
+    }
+    VexTabIter it2;
+    for (Vertex const* t = tmp.get_first(it2);
+         t != nullptr; t = tmp.get_next(it2)) {
+        vt.add(t);
+    }
+}
+
+
+static void recordOutVex(Vertex const* v, VexTab & vt)
+{
+    vt.add(v);
+    AdjVertexIter it;
+    for (Vertex const* t = Graph::get_first_out_vertex(v, it);
+         t != nullptr; t = Graph::get_next_out_vertex(it)) {
+        vt.add(t);
+    }
+}
+
+
+static Vertex const* findRoot(Vertex const* from, VexTab const& vt,
+                              DGraph const* cfg)
+{
+    //CAUTION:LCA query is costly.
+    DomTree ldt;
+    cfg->genDomTree(ldt);
+    ldt.computeHeight();
+    xcom::BinLCA lca(&ldt);
+    VexTabIter it;
+    VexIdx highest = VERTEX_UNDEF;
+    for (Vertex const* t = vt.get_first(it);
+         t != nullptr; t = vt.get_next(it)) {
+        VexIdx idom = lca.query(from->id(), t->id());
+        ASSERT0(idom != VERTEX_UNDEF);
+        if (highest == VERTEX_UNDEF) {
+            highest = idom;
+            continue;
+        }
+        if (ldt.hasLowerHeight(idom, highest)) {
+            highest = idom;
+            continue;
+        }
+    }
+    ASSERT0(highest != VERTEX_UNDEF);
+    Vertex const* root = cfg->getVertex(highest);
+    ASSERT0(root);
+    return root;
+}
+
+
+static void postprocessReached(RCE * rce, Vertex const* from,
+                               Vertex const* to,
+                               MOD RCE::RCECtx & rcectx)
+{
+    VexTab modset;
+    Vertex const* root = nullptr;
+    UINT iter_times = 0;
+    rce->getCFG()->reviseDomInfoAfterAddOrRemoveEdge(from, to, &modset,
+                                                     root, iter_times);
+    ASSERT0(root);
+    if (root == from) {
+        recordOutVex(from, modset);
+        recordInVex(to, modset);
+        recordOutVex(to, modset);
+    } else if (root == to) {
+        recordOutVex(to, modset);
+        recordInVex(from, modset);
+        recordOutVex(from, modset);
+    } else {
+        recordInVex(to, modset);
+        recordOutVex(to, modset);
+        recordInVex(from, modset);
+        recordOutVex(from, modset);
+    }
+    recordDomVexForEachElem(rce->getCFG(), modset);
+    rce->getCFG()->reviseStmtMDSSA(modset, root);
+    //RPO is unchanged if only removing branch-edge.
+    //DOM may changed.
+    // BB1--->BB3------
+    //  |      |       |
+    //  |      v       v
+    //   ----BB2----->BB4
+    // If removing BB3->BB4, idom of BB4 changed.
+    // DOM has been maintained by removeEdge().
+    OptCtx::setInvalidIfCFGChangedExcept(rcectx.oc, PASS_RPO, PASS_DOM,
+                                         PASS_UNDEF);
+    rcectx.cfg_mod = true;
+    ASSERT0(rce->getCFG()->verifyDomAndPdom(*rcectx.oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(rce->getRegion(), *rcectx.oc));
+}
+
+
+static void postprocessUnreached(RCE * rce, Vertex const* from,
+                                 Vertex const* to,
+                                 MOD RCE::RCECtx & rcectx)
+{
+    //Removing edge will cause unreachable code to appear.
+    //CASE:rce2.c, licm_hoist.c.
+    CfgOptCtx ctx(*rcectx.oc);
+    //Unreachable-code will confuse DomInfo computation.
+    CFGOPTCTX_need_update_dominfo(&ctx) = false;
+    RemoveUnreachBBCtx rmunrchctx;
+    bool removed = rce->getCFG()->removeUnreachBB(ctx, &rmunrchctx);
+    ASSERT0(removed);
+    //CFG related info is incorrect if unreachable code removed.
+    //e.g:rce_updatedom2.c
+    rcectx.oc->setInvalidIfCFGChanged();
+
+    //DomInfo is necessary for subsequently SSA updation.
+    VexTab modset;
+    UINT iter_times = 0;
+    //TODO:find minimal root vertex rather than CFG entry.
+    //VexTab border;
+    //Vertex const* root = findRoot(from, border, rce->getCFG());
+    //ASSERT0(root);
+    Vertex const* root = rce->getCFG()->getEntry()->getVex();
+    rce->getCFG()->recomputeDomInfoForSubGraph(root, &modset, iter_times);
+    OC_is_dom_valid(*rcectx.oc) = true;
+    modset.add(rmunrchctx.changed_vextab);
+    recordDomVexForEachElem(rce->getCFG(), modset);
+    rce->getCFG()->reviseStmtMDSSA(modset, root);
+    rcectx.cfg_mod = true;
+    ASSERT0(rce->getCFG()->verifyDomAndPdom(*rcectx.oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(rce->getRegion(), *rcectx.oc));
+}
+
+
+static void postprocessAfterRemoveEdge(RCE * rce, Vertex const* from,
+                                       Vertex const* to,
+                                       MOD RCE::RCECtx & rcectx)
+{
+    ASSERT0(from->getInDegree() > 0);
+    ASSERT0(rce->getCFG()->getEntry());
+    Vertex const* entry = rce->getCFG()->getEntry()->getVex();
+    ASSERT0(entry);
+    bool try_failed = false;
+    bool reach = Graph::isReachIn(to, entry, (UINT)-1, try_failed);
+    ASSERTN(!try_failed, ("tried too much"));
+    if (reach) {
+        postprocessReached(rce, from, to, rcectx);
+        return;
+    }
+    postprocessUnreached(rce, from, to, rcectx);
+}
+
+
 static void dumpInit(RCE const* pass)
 {
+    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRCE()) {
+        return;
+    }
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n\n==---- DUMP %s ----==", pass->getPassName());
@@ -47,6 +225,9 @@ static void dumpInit(RCE const* pass)
 
 static void dumpFini(RCE const* pass)
 {
+    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRCE()) {
+        return;
+    }
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     rg->getLogMgr()->decIndent(2);
@@ -90,7 +271,7 @@ static void dumpChangedIR(IR const* oldir, IR const* newir, RCE const* pass)
 //Return true if this function is able to determine the result of 'ir',
 //otherwise return false that it does know nothing about ir.
 bool RCE::calcCondMustVal(IR const* ir, OUT bool & must_true,
-                          OUT bool & must_false) const
+                          OUT bool & must_false, OptCtx const& oc) const
 {
     must_true = false;
     must_false = false;
@@ -157,8 +338,9 @@ static bool regardAsMustFalse(IR const* ir)
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
 //Return the changed ir.
-IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
-                          OUT bool & must_false, OUT bool & changed)
+IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
+                          OUT bool & must_false, OUT bool & changed,
+                          MOD OptCtx & oc)
 {
     must_true = false;
     must_false = false;
@@ -173,7 +355,8 @@ IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
     case IR_LAND:
     case IR_LOR:
     case IR_LNOT: {
-        ir = m_refine->foldConst(ir, changed);
+        RefineCtx rc(&oc);
+        ir = m_refine->foldConst(ir, changed, rc);
         if (changed && ir->is_const()) {
             if (regardAsMustTrue(ir)) {
                 must_true = true;
@@ -194,13 +377,13 @@ IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
                 if (must_true) {
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
-                    xoc::removeUseForTree(ir, m_rg);
+                    xoc::removeUseForTree(ir, m_rg, oc);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
-                    xoc::removeUseForTree(ir, m_rg);
+                    xoc::removeUseForTree(ir, m_rg, oc);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(0, type);
                 }
@@ -225,20 +408,14 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         IRBB * from = ir->getBB();
         IRBB * to = m_cfg->getTargetBB(from);
         ASSERT0(from != nullptr && to != nullptr);
-        xoc::removeStmt(ir, m_rg);
+        xoc::removeStmt(ir, m_rg, *ctx.oc);
 
         //Revise the PHI operand to target successor.
         dumpRemovedEdge(from, to, this);
-        m_cfg->removeEdge(from, to);
-        ctx.cfg_mod = true;
-        //RPO is unchanged if only removing branch-edge.
-        //DOM may changed.
-        // BB1--->BB3------
-        //  |      |       |
-        //  |      v       v
-        //   ----BB2----->BB4
-        // If removing 3->4, idom of BB4 changed.
-        ctx.oc->setDomValid(false);
+        CfgOptCtx coctx(*ctx.oc);
+        m_cfg->removeEdge(from, to, coctx);
+        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        //Do NOT free old ir here, leave it to the caller.
         return nullptr;
     }
     if (must_false) {
@@ -248,24 +425,17 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         ASSERT0(from != nullptr && to != nullptr);
 
         IR * newbr = m_rg->buildGoto(BR_lab(ir));
-        xoc::removeStmt(ir, m_rg);
+        xoc::removeStmt(ir, m_rg, *ctx.oc);
 
         //Revise the PHI operand to fallthrough successor.
         //Revise m_cfg. remove fallthrough edge.
         dumpRemovedEdge(from, to, this);
-        m_cfg->removeEdge(from, to);
-        ctx.cfg_mod = true;
-        //RPO is unchanged if only removing branch-edge.
-        //DOM may changed.
-        // BB1--->BB3------
-        //  |      |       |
-        //  |      v       v
-        //   ----BB2----->BB4
-        // If removing 3->4, idom of BB4 changed.
-        ctx.oc->setDomValid(false);
+        CfgOptCtx coctx(*ctx.oc);
+        CFGOPTCTX_need_update_dominfo(&coctx) = false;
+        m_cfg->removeEdge(from, to, coctx);
+        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return newbr;
     }
-
     ASSERT0(BR_det(ir) == nullptr);
     if (changed) {
         if (!new_det->is_judge()) {
@@ -294,21 +464,13 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         IRBB * to = m_cfg->getFallThroughBB(from);
         ASSERT0(from != nullptr && to != nullptr);
         IR * newbr = m_rg->buildGoto(BR_lab(ir));
-        xoc::removeStmt(ir, m_rg);
-
+        xoc::removeStmt(ir, m_rg, *ctx.oc);
         //Revise the PHI operand to fallthrough successor.
         //Revise cfg. remove fallthrough edge.
         dumpRemovedEdge(from, to, this);
-        m_cfg->removeEdge(from, to);
-        ctx.cfg_mod = true;
-        //RPO is unchanged if only removing branch-edge.
-        //DOM may changed.
-        // BB1--->BB3------
-        //  |      |       |
-        //  |      v       v
-        //   ----BB2----->BB4
-        // If removing 3->4, idom of BB4 changed.
-        ctx.oc->setDomValid(false);
+        CfgOptCtx coctx(*ctx.oc);
+        m_cfg->removeEdge(from, to, coctx);
+        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return newbr;
     }
     if (must_false) {
@@ -317,23 +479,15 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         IRBB * from = ir->getBB();
         IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
         ASSERT0(from && to);
-        xoc::removeStmt(ir, m_rg);
+        xoc::removeStmt(ir, m_rg, *ctx.oc);
 
         //Revise the PHI operand to target successor.
         dumpRemovedEdge(from, to, this);
-        m_cfg->removeEdge(from, to);
-        ctx.cfg_mod = true;
-        //RPO is unchanged if only removing branch-edge.
-        //DOM may changed.
-        // BB1--->BB3------
-        //  |      |       |
-        //  |      v       v
-        //   ----BB2----->BB4
-        // If removing 3->4, idom of BB4 changed.
-        ctx.oc->setDomValid(false);
+        CfgOptCtx coctx(*ctx.oc);
+        m_cfg->removeEdge(from, to, coctx);
+        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return nullptr;
     }
-
     ASSERT0(BR_det(ir) == nullptr);
     if (changed) {
         if (!new_det->is_judge()) {
@@ -347,7 +501,7 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
 
     //Resume original det.
     BR_det(ir) = new_det;
-    return ir; 
+    return ir;
 }
 
 
@@ -355,22 +509,23 @@ IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
 {
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
-    IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
+    IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false,
+                                   changed, *ctx.oc);
     if (ir->is_truebr()) {
         return processTruebr(ir, new_det, must_true, must_false, changed, ctx);
     }
-    ASSERT0(ir->is_falsebr()); 
+    ASSERT0(ir->is_falsebr());
     return processFalsebr(ir, new_det, must_true, must_false, changed, ctx);
 }
 
 
 //Perform dead store elmination: x = x;
-IR * RCE::processStore(IR * ir)
+IR * RCE::processStore(IR * ir, RCECtx const& ctx)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
         dumpRemovedIR(ir, this);
-        xoc::removeUseForTree(ir, m_rg);
+        xoc::removeUseForTree(ir, m_rg, *ctx.oc);
         return nullptr;
     }
     return ir;
@@ -378,12 +533,12 @@ IR * RCE::processStore(IR * ir)
 
 
 //Perform dead store elmination: x = x;
-IR * RCE::processStorePR(IR * ir)
+IR * RCE::processStorePR(IR * ir, RCECtx const& ctx)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
         dumpRemovedIR(ir, this);
-        xoc::removeUseForTree(ir, m_rg);
+        xoc::removeUseForTree(ir, m_rg, *ctx.oc);
         return nullptr;
     }
     return ir;
@@ -473,13 +628,27 @@ bool RCE::perform(OptCtx & oc)
     if (m_gvn == nullptr || (!m_gvn->is_valid() && is_use_gvn())) {
         return false;
     }
-    m_rg->getLogMgr()->startBuffer();
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpInit(this);
     RCECtx ctx(&oc);
     bool change = performSimplyRCE(ctx);
     if (ctx.cfg_mod) {
         ASSERT0(change);
-        //DOM and RPO may changed, rebuild them when you need.
+        //CASE:rce_cfgopt.c
+        //Remove unreachable code firstly before recomputing RPO and DOM.
+        CfgOptCtx ctx(oc);
+        //Unreachable-code will confuse DomInfo computation.
+        CFGOPTCTX_need_update_dominfo(&ctx) = false;
+        bool res = m_cfg->removeUnreachBB(ctx, nullptr);
+        if (res) {
+            //CFG related info is incorrect if unreachable code removed.
+            //e.g:rce_updatedom2.c
+            oc.setInvalidIfCFGChanged();
+        }
+        //DomInfo is needed when updating SSA info.
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
+                                                   PASS_UNDEF);
+        CFGOPTCTX_need_update_dominfo(&ctx) = true;
         change |= m_cfg->performMiscOpt(oc);
     }
     if (change) {
@@ -487,14 +656,15 @@ bool RCE::perform(OptCtx & oc)
         //TODO: DO not recompute whole SSA/MDSSA. Instead, update
         //SSA/MDSSA info especially PHI operands incrementally.
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
-        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
         ASSERT0(m_cfg->verifyRPO(oc));
+        ASSERT0(m_cfg->verifyLoopInfo(oc));
         ASSERT0(m_cfg->verifyDomAndPdom(oc));
     } else {
         m_rg->getLogMgr()->cleanBuffer();
     }
     dumpFini(this);
-    m_rg->getLogMgr()->endBuffer();
     END_TIMER(t, getPassName());
     return change;
 }

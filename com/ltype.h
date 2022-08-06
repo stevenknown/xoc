@@ -98,7 +98,17 @@ namespace xcom {
 #undef SHORT
 #undef USHORT
 #undef INT
+#undef INT8
+#undef INT16
+#undef INT32
+#undef INT64
+#undef INT128
 #undef UINT
+#undef UINT8
+#undef UINT16
+#undef UINT32
+#undef UINT64
+#undef UINT128
 #undef LONG
 #undef ULONG
 #undef LONGLONG
@@ -107,18 +117,18 @@ namespace xcom {
 #undef UINT64
 #undef UINT32
 
-typedef int STATUS;
+typedef signed int STATUS;
 typedef unsigned char BYTE;
 typedef char CHAR;
 typedef unsigned char UCHAR;
-typedef short SHORT;
+typedef signed short SHORT;
 typedef unsigned short USHORT;
-typedef int INT;
+typedef signed int INT;
 typedef unsigned int UINT;
 typedef unsigned int BOOL;
-typedef long LONG;
+typedef signed long LONG;
 typedef unsigned long ULONG;
-typedef char INT8;
+typedef signed char INT8;
 typedef signed short INT16;
 typedef signed int INT32;
 typedef signed long long INT64;

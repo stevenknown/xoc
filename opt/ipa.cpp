@@ -145,7 +145,8 @@ void IPA::computeCallRefForAllRegion()
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->computeCallRef(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU);
+        dumgr->computeCallRef(DUOptFlag(DUOPT_COMPUTE_PR_DU|
+                                        DUOPT_COMPUTE_NONPR_DU));
         rg->getPassMgr()->destroyPass(dumgr);
         rg->getPassMgr()->destroyPass(aa);
     }
@@ -160,7 +161,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         if (rg == nullptr) { continue; }
         createCallDummyuse(rg);
         if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
-            OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
+            OptCtx * loc = m_rumgr->getAndGenOptCtx(rg);
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != nullptr) {
@@ -182,7 +183,8 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 {
     ASSERT0(rg);
     if (rg->getIRList() == nullptr &&
-        (rg->getBBList() == nullptr || rg->getBBList()->get_elem_count() == 0)) {
+        (rg->getBBList() == nullptr ||
+         rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
     if (rg->getPassMgr() == nullptr) {
@@ -192,7 +194,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         //DUMgr requires AliasAnalysis
         rg->getPassMgr()->registerPass(PASS_AA);
     }
-    if (g_do_md_ssa) {
+    if (g_do_mdssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
             rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
@@ -202,11 +204,11 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         //Compute typical PR du chain.
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->perform(oc, DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU);
-        dumgr->computeMDDUChain(oc, false, DUOPT_COMPUTE_PR_DU);
+        dumgr->perform(oc, DUOptFlag(DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU));
+        dumgr->computeMDDUChain(oc, false, DUOptFlag(DUOPT_COMPUTE_PR_DU));
 
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
-            PASS_MD_SSA_MGR);
+            PASS_MDSSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);

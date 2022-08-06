@@ -58,7 +58,7 @@ bool GSCC::perform(OptCtx & oc)
     START_TIMER(t, "Compute Graph SCC");
     m_scc.findSCC();
     END_TIMER(t, "Compute Graph SCC");
-    OC_is_scc_valid(oc) = true;
+    set_valid(true);
     ASSERT0(verify());
     return false;
 }

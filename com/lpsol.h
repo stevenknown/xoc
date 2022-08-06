@@ -67,7 +67,7 @@ public:
 
 class PivotPairTab {
 public:
-    bool m_is_init;
+    BYTE m_is_init:1;
     BMat m_pair; //Pairs of nv,bv.
 
     PivotPairTab(INT varnum)
@@ -216,8 +216,8 @@ inline CHAR const* getStatusName(STATUS st)
 
 
 template <class Mat, class T> class SIX : public Element<T> {
-    bool m_is_dump;
-    bool m_is_init;
+    BYTE m_is_dump:1;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     INT m_rhs_idx;
     UINT m_indent;
     UINT m_max_iter;
@@ -2094,8 +2094,8 @@ void SIX<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
 #define IP_NO_BETTER_THAN_BEST_SOL 3
 
 template <class Mat, class T> class MIP : public Element<T> {
-    bool m_is_init;
-    bool m_is_dump;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
+    BYTE m_is_dump:1;
     Mat m_cur_best_sol;
     T m_cur_best_v;
     BMat * m_allow_rational_indicator;

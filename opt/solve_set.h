@@ -203,14 +203,14 @@ private:
     void computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
                                          OUT Vector<MDSet*> * maydefmds,
                                          OUT MDSet * mayusemds,
-                                         UINT flag);
+                                         UFlag flag);
     void computeMustExactDef(IR const* ir, OUT MDSet * bb_mustdefmds,
                              DefDBitSetCore * mustgen_stmt,
                              ConstMDIter & mditer, DefMiscBitSetMgr & bsmgr,
-                             UINT flag);
+                             UFlag flag);
     void computeMayDef(IR const* ir, MDSet * bb_maydefmds,
                        DefDBitSetCore * maygen_stmt,
-                       DefMiscBitSetMgr & bsmgr, UINT flag);
+                       DefMiscBitSetMgr & bsmgr, UFlag flag);
 
     //Compute must and may killed stmt.
     //mustdefs: record must modified MD for each bb.
@@ -241,7 +241,7 @@ private:
         OUT Vector<MDSet*> * mustdefmds, OUT Vector<MDSet*> * maydefmds,
         OUT MDSet * mayusemds, MDSet * bb_mustdefmds, MDSet * bb_maydefmds,
         DefDBitSetCore * mustgen_stmt, DefDBitSetCore * maygen_stmt,
-        UINT flag, DefMiscBitSetMgr & bsmgr);
+        UFlag flag, DefMiscBitSetMgr & bsmgr);
     void collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
                             OUT MDSet * maydefmds) const;
 
@@ -293,14 +293,14 @@ private:
     void setKilledIRExpr(UINT bbid, DefDBitSetCore * set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore * set);
     void setMustKilledDef(UINT bbid, DefDBitSetCore * set);
-    void solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
+    void solveByRPO(RPOVexList const* rpovexlst, UFlag const flag,
                     MOD DefMiscBitSetMgr & bsmgr);
-    void solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
+    void solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
                          MOD DefMiscBitSetMgr & bsmgr);
     //Solve reaching definitions problem for IR STMT and
     //computing LIVE IN and LIVE OUT IR expressions.
     //'expr_univers': the Universal SET for ExpRep.
-    void solve(DefDBitSetCore const& expr_universe, UINT const flag,
+    void solve(DefDBitSetCore const& expr_universe, UFlag const flag,
                MOD DefMiscBitSetMgr & bsmgr);
 public:
     SolveSet(Region * rg)
@@ -332,7 +332,7 @@ public:
     void resetGlobalSet();
 
     //Return true if region status changed.
-    bool perform(MOD OptCtx & oc, UINT flag);
+    bool perform(MOD OptCtx & oc, UFlag flag);
 };
 
 } //namespace xoc

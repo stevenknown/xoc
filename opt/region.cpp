@@ -36,12 +36,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
-static inline UINT getIRTypeSize(IR const* ir)
+static inline UINT getIRCodeSize(IR const* ir)
 {
-    #ifdef CONST_IRT_SZ
-    return IR_irt_size(ir);
+    #ifdef CONST_IRC_SZ
+    return IR_irc_size(ir);
     #else
-    return IRTSIZE(ir->getCode());
+    return IRCSIZE(ir->getCode());
     #endif
 }
 
@@ -51,6 +51,7 @@ static inline UINT getIRTypeSize(IR const* ir)
 //
 void Region::init(REGION_TYPE rt, RegionMgr * rm)
 {
+    if (m_pool != nullptr) { return; }
     m_u2.s1b1 = 0;
     m_var = nullptr;
     m_pool = smpoolCreate(256, MEM_COMM);
@@ -72,6 +73,7 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
 
 void Region::destroy()
 {
+    if (m_pool == nullptr) { return; }
     if (!is_blackbox()) {
         destroyPassMgr();
         destroyAttachInfoMgr();
@@ -89,9 +91,7 @@ void Region::destroy()
     //Destroy all IR. IR allocated in the pool.
     smpoolDelete(m_pool);
     m_pool = nullptr;
-
     m_var = nullptr;
-
     m_rg_var_tab.destroy();
 }
 
@@ -365,7 +365,7 @@ bool Region::reconstructBBList(OptCtx & oc)
     BBList * bbl = getBBList();
     for (bbl->get_head(&ctbb); ctbb != nullptr; bbl->get_next(&ctbb)) {
         IRBB * bb = ctbb->val();
-        IRListIter ctir;
+        BBIRListIter ctir;
         BBIRList & irlst = bb->getIRList();
         IR * tail = irlst.get_tail();
         for (irlst.get_head(&ctir); ctir != nullptr; irlst.get_next(&ctir)) {
@@ -377,7 +377,7 @@ bool Region::reconstructBBList(OptCtx & oc)
                 IR * last = nullptr;
                 irlst.get_next(&ctir);
 
-                for (C<IR*> * next_ctir = ctir;
+                for (BBIRListIter next_ctir = ctir;
                      ctir != nullptr; ctir = next_ctir) {
                     irlst.get_next(&next_ctir);
                     irlst.remove(ctir);
@@ -392,7 +392,7 @@ bool Region::reconstructBBList(OptCtx & oc)
                 change = true;
                 IR * restirs = nullptr; //record rest part in bb list after 'ir'.
                 IR * last = nullptr;
-                for (C<IR*> * next_ctir = ctir;
+                for (BBIRListIter next_ctir = ctir;
                      ctir != nullptr; ctir = next_ctir) {
                     irlst.get_next(&next_ctir);
                     irlst.remove(ctir);
@@ -609,7 +609,7 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
     //For now, it is only be regarded as a pseduo-register.
     //And set it to allocable if the PR is in essence need to be
     //allocated in memory.
-    VAR_is_unallocable(pr_var) = true;
+    pr_var->setflag(VAR_IS_UNALLOCABLE);
     addToVarTab(pr_var);
     return pr_var;
 }
@@ -638,7 +638,7 @@ CHAR const* Region::getRegionName() const
 
 
 //Use HOST_INT type describes the value.
-//The value can not exceed ir type's value range.
+//The value can not exceed IR type's value range.
 HOST_INT Region::getIntegerInDataTypeValueRange(IR * ir) const
 {
     ASSERT0(ir->is_const() && ir->is_int());
@@ -765,8 +765,7 @@ void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
         //Sort parameter in declaration order.
         for (Var const* v = vt->get_first(c);
              v != nullptr; v = vt->get_next(c)) {
-            if (!VAR_is_formal_param(v)) { continue; }
-
+            if (!v->is_formal_param()) { continue; }
             xcom::C<Var const*> * ctp;
             bool find = false;
             for (Var const* p = varlst.get_head(&ctp);
@@ -787,7 +786,7 @@ void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
 
     //Unordered
     for (Var const* v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
-        if (VAR_is_formal_param(v)) {
+        if (v->is_formal_param()) {
             varlst.append_tail(v);
         }
     }
@@ -801,7 +800,7 @@ Var const* Region::findFormalParam(UINT position) const
     VarTab * vt = const_cast<Region*>(this)->getVarTab();
     ASSERT0(vt);
     for (Var const* v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
-        if (VAR_is_formal_param(v) && VAR_formal_param_pos(v) == position) {
+        if (v->is_formal_param() && v->getFormalParamPos() == position) {
             return v;
         }
     }
@@ -872,7 +871,7 @@ void Region::dumpFreeTab() const
         note(this, "\nirsize(%d), num(%d):", sz, count);
 
         for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
-            ASSERT0(getIRTypeSize(ir) == sz);
+            ASSERT0(getIRCodeSize(ir) == sz);
             prt(this, "ir(%d),", ir->id());
         }
     }
@@ -1017,7 +1016,7 @@ void Region::prescanIRList(IR const* ir)
                 Var * sv = getVarMgr()->registerStringVar(nullptr, VAR_string(v),
                                                           MEMORY_ALIGNMENT);
                 ASSERT0(sv);
-                VAR_is_addr_taken(sv) = true;
+                sv->setflag(VAR_ADDR_TAKEN);
             } else if (v->is_label()) {
                 ; //do nothing.
             } else {
@@ -1029,7 +1028,7 @@ void Region::prescanIRList(IR const* ir)
                 } else {
                     //If LDA is the base of ARRAY, say (&a)[..], its
                     //address does not need to mark as address taken.
-                    VAR_is_addr_taken(LDA_idinfo(ir)) = true;
+                    LDA_idinfo(ir)->setflag(VAR_ADDR_TAKEN);
                 }
 
                 // ...=&x.a, address of 'x.a' is taken.
@@ -1239,7 +1238,7 @@ void Region::dumpParameter() const
     for (Var * v = const_cast<Region*>(this)->getVarTab()->get_first(c);
          v != nullptr;
          v = const_cast<Region*>(this)->getVarTab()->get_next(c)) {
-        if (VAR_is_formal_param(v)) {
+        if (v->is_formal_param()) {
             ASSERT0(!v->is_pr());
             fpvec.set(v->getFormalParamPos(), v);
         }
@@ -1287,8 +1286,7 @@ void Region::dump(bool dump_inner_region) const
         note(this, "\nRegionMayUse(OuterRegion):");
         ru_mayuse->dump(getMDSystem(), true);
     }
-
-    dumpMemUsage();
+   
     if (is_blackbox()) { return; }
 
     IR * irlst = getIRList();
@@ -1682,7 +1680,7 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
         case IR_REGION:
             ASSERT0(t->getRefMD() == nullptr && t->getRefMDSet() == nullptr);
             break;
-        default: ASSERTN(0, ("unsupport ir type"));
+        default: ASSERTN(0, ("unsupport IR code"));
         }
     }
     return true;
@@ -1758,7 +1756,7 @@ static void dumpParam(Region const* rg)
     Region * prg = const_cast<Region*>(rg);
     for (Var * v = prg->getVarTab()->get_first(c);
          v != nullptr; v = prg->getVarTab()->get_next(c)) {
-        if (VAR_is_formal_param(v)) {
+        if (v->is_formal_param()) {
             fpvec.set(v->getFormalParamPos(), v);
         }
     }
@@ -1856,7 +1854,7 @@ void Region::dumpVARInRegion() const
         VarTabIter c;
         for (Var * v = pthis->getVarTab()->get_first(c);
              v != nullptr; v = pthis->getVarTab()->get_next(c)) {
-            if (VAR_is_formal_param(v)) {
+            if (v->is_formal_param()) {
                 has_param = true;
                 break;
             }
@@ -1877,7 +1875,7 @@ bool Region::partitionRegion()
         if (ir->is_label()) {
             LabelInfo const* li = LAB_lab(ir);
             if (LABELINFO_type(li) == L_CLABEL &&
-                strcmp(SYM_name(LABELINFO_name(li)), "REGION_START") == 0) {
+                ::strcmp(SYM_name(LABELINFO_name(li)), "REGION_START") == 0) {
                 start_pos = ir;
                 break;
             }
@@ -1890,7 +1888,7 @@ bool Region::partitionRegion()
         if (ir->is_label()) {
             LabelInfo const* li = LAB_lab(ir);
             if (LABELINFO_type(li) == L_CLABEL &&
-                strcmp(SYM_name(LABELINFO_name(li)), "REGION_END") == 0) {
+                ::strcmp(SYM_name(LABELINFO_name(li)), "REGION_END") == 0) {
                 end_pos = ir;
                 break;
             }
@@ -1905,7 +1903,7 @@ bool Region::partitionRegion()
     Type const* type = getTypeMgr()->getMCType(0);
     Var * ruv = getVarMgr()->registerVar("inner_ru",
         type, 1, VAR_LOCAL|VAR_FAKE);
-    VAR_is_unallocable(ruv) = true;
+    ruv->setflag(VAR_IS_UNALLOCABLE);
     addToVarTab(ruv);
 
     Region * inner_ru = getRegionMgr()->allocRegion(REGION_INNER);
@@ -1927,7 +1925,7 @@ bool Region::partitionRegion()
     insertafter_one(&start_pos, ir_ru);
     xoc::dumpIRList(getIRList(), this);
     //-------------
-    OptCtx oc;
+    OptCtx oc(this);
     bool succ = REGION_ru(ir_ru)->process(&oc);
     ASSERT0(succ);
     DUMMYUSE(succ);
@@ -2015,15 +2013,10 @@ bool Region::processIRList(OptCtx & oc)
     }
 
     if (!HighProcess(oc)) { return false; }
+    xoc::destructClassicDUChain(this, oc);
 
-    if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
-        getDUMgr()->cleanDUSet();
-        oc.setInvalidClassicDUChain();
-    } else {
-        //PRSSA may destruct classic DU chain.
-        ASSERT0(verifyMDDUChain(this, oc));
-    }
-
+    //PRSSA destruct classic DU chain.
+    ASSERT0(verifyMDDUChain(this, oc));
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref and DU chain.
         ASSERT0(verifyMDRef());
@@ -2036,16 +2029,16 @@ bool Region::processIRList(OptCtx & oc)
 static void post_process(Region * rg, OptCtx * oc)
 {
     PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR);
+        PASS_PRSSA_MGR);
     if (ssamgr != nullptr && ssamgr->is_valid()) {
-        ssamgr->destruction(oc);
+        ssamgr->destruction(*oc);
         rg->getPassMgr()->destroyPass(ssamgr);
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR);
+        PASS_MDSSA_MGR);
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-        mdssamgr->destruction(oc);
+        mdssamgr->destruction(*oc);
         rg->getPassMgr()->destroyPass(mdssamgr);
     }
 
@@ -2054,7 +2047,7 @@ static void post_process(Region * rg, OptCtx * oc)
         //O0 may not assign Var and MD for PR, but CG need PR's Var.
         rg->getMDMgr()->assignMD(true, false);
     }
-    oc->setAllInvalid();
+    oc->setInvalidAllFlags();
 
     rg->updateCallAndReturnList(true);
 
@@ -2126,7 +2119,7 @@ bool Region::process(OptCtx * oc)
 
 ERR_RETURN:
     post_process(this, oc);
-    oc->setAllInvalid();
+    oc->setInvalidAllFlags();
     return false;
 }
 //END Region

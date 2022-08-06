@@ -56,7 +56,7 @@ void addUse(IR * to, IR const* from, Region * rg);
 //The function builds DU chain from stmt 'def' to expression 'use'.
 //def: stmt
 //use: expression
-void buildDUChain(IR * def, IR * use, Region * rg);
+void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc);
 
 //DU chain operation.
 //The function changes USE of some DU chain from 'olduse' to 'newuse'.
@@ -77,7 +77,8 @@ void changeUse(IR * olduse, IR * newuse, Region * rg);
 //Note the function allows NonPR->PR or PR->NonPR.
 //The function is an extended version of 'changeUse'. The function will handle
 //the combination of different category of Memory Reference, e.g: PR<->NonPR.
-void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg);
+void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg,
+                 OptCtx const& oc);
 
 //DU chain operation.
 //The function changes DEF of some DU chain from 'olddef' to 'newdef'.
@@ -145,7 +146,14 @@ bool isKillingDef(IR const* def, MD const* usemd);
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
 //Return true if ir1 reference is may overlap to ir2.
-bool isDependent(IR const* ir1, IR const* ir2, Region const* rg);
+//Return true if def is overlaped with use's referrence.
+//def: stmt
+//use: expression
+//costly_analysis: set to true if caller expect to compute overlap for
+//                 element in MayDef/MayUse, which will iterate elements
+//                 in MDSet, and is costly.
+bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
+                 Region const* rg);
 
 //Return true if ir1 is may overlap to phi.
 bool isDependent(IR const* ir, MDPhi const* phi);
@@ -160,7 +168,8 @@ IR * findKillingDef(IR const* use, Region * rg);
 //         'startbb', then keep finding its predecessors until the
 //         CFG entry.
 //startbb: the BB that begin to do searching.
-void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg);
+void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
+                         OptCtx const& oc);
 
 //The function checks each DEF|USE occurrence of ir, remove the expired
 //expression which is not reference the memory any more that ir referenced.
@@ -180,7 +189,7 @@ bool removeExpiredDU(IR const* ir, Region * rg);
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUseForTree(IR const* exp, Region * rg);
+void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc);
 
 //Remove Use-Def chain.
 //exp: the expression to be removed.
@@ -192,12 +201,17 @@ void removeUse(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 //Note do NOT remove stmt from BBIRList before call the function.
-void removeStmt(IR * stmt, Region * rg);
+void removeStmt(IR * stmt, Region * rg, OptCtx const& oc);
 
 //The function moves IR_PHI and MDPhi from 'from' to 'to'.
 //This function often be used in updating PHI when adding new dominater BB
 //to 'to'.
 void movePhi(IRBB * from, IRBB * to, Region * rg);
+
+//The function try to destruct classic DU chain according to the
+//options in 'oc'. Usually, PRSSA will clobber the classic DUSet information.
+//User call the function to avoid the misuse of PRSSA and classic DU.
+void destructClassicDUChain(Region * rg, OptCtx const& oc);
 
 } //namespace xoc
 #endif

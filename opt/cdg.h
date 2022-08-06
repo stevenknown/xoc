@@ -76,6 +76,8 @@ public:
     virtual bool perform(OptCtx & oc);
 
     void set_allow_cycle(bool doit) { m_allow_cycle = doit; }
+
+    bool verify() const;
 };
 
 } //namespace xoc

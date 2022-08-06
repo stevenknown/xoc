@@ -740,7 +740,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         note(m_lm, "\nundef!");
         break;
     default:
-        ASSERTN(0, ("unknown IR type:%s", IRNAME(ir)));
+        ASSERTN(0, ("unknown IR code:%s", IRNAME(ir)));
         return ;
     }
 }

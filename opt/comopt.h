@@ -47,12 +47,14 @@ author: Su Zhenyu
 #include "ir_dce.h"
 #include "lftr.h"
 #include "ir_rce.h"
+#include "insert_guard_helper.h"
 #ifdef FOR_IP
 #include "ir_dse.h"
 #include "ir_poly.h"
 #include "ir_vrp.h"
 #include "ir_ccp.h"
 #include "ir_pre.h"
+#include "linear_scan.h"
 #endif
 #include "ir_cp.h"
 #include "ir_rp.h"

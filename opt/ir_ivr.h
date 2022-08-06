@@ -130,7 +130,7 @@ class LinearRep {
 public:
     IR const* coeff; //coefficient
     IR const* addend; //addend
-    IR_TYPE addend_sign; //the sign of addend
+    IR_CODE addend_sign; //the sign of addend
     IR const* var; //variable
     IV const* iv; //record BIV/DIV info
 public:

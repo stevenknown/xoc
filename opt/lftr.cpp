@@ -31,9 +31,62 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-void LFTR::analyzeBB(LI<IRBB> * li, IRBB * bb)
+//
+//START LFAnaCtx
+//
+LFAnaCtx::LFAnaCtx(LI<IRBB> const* li)
 {
-    for (IR * ir = bb->getFirstIR(); ir != nullptr; ir = bb->getNextIR()) {
+    m_li = li;
+    m_pool = smpoolCreate(sizeof(LFRInfo) * 4, MEM_COMM);
+}
+
+
+LFRInfo * LFAnaCtx::allocLFRInfo()
+{
+    return (LFRInfo*)xmalloc(sizeof(LFRInfo));
+}
+
+
+void LFAnaCtx::setMapMDAndIV(MD const* ivmd, IV const* iv)
+{
+    if (m_ivmd2ivinfo.get(ivmd) == nullptr) {
+        m_ivmd2ivinfo.set(ivmd, iv);
+    } else {
+        ASSERT0(m_ivmd2ivinfo.get(ivmd) == iv);
+    }
+}
+
+
+LFRInfo * LFAnaCtx::genLFRInfo(IR const* lf_exp)
+{
+    LFRInfo * info = m_cand_occ2info.get(lf_exp);
+    if (info == nullptr) {
+        info = allocLFRInfo();
+        setMapExpToLFRInfo(lf_exp, info);
+    }
+    return info;
+}
+
+
+void LFAnaCtx::dump(Region * rg) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\n==-- LINEAR FUNC CAND LIST of LI%d --==", m_li->id());
+    IRListIter it;
+    for (IR const* x = getCandList().get_head(&it); x != nullptr;
+         x = getCandList().get_next(&it)) {
+        dumpIR(x, rg);
+    }
+}
+//END LFAnaCtx
+
+
+void LFTR::analyzeBB(LI<IRBB> const* li, IRBB const* bb, MOD LFAnaCtx & ctx)
+{
+    BBIRListIter it;
+    for (IR * ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
+         ir != nullptr;
+         ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
         if (ir->isNoMove(true) || ir->is_phi()) {
             continue;
         }
@@ -49,7 +102,7 @@ void LFTR::analyzeBB(LI<IRBB> * li, IRBB * bb)
             IV const* iv = nullptr;
             IR const* op0 = BIN_opnd0(x);
             IR const* op1 = BIN_opnd1(x);
-            if (op0->is_ld() && m_ivr->isIV(op0, &iv)) {
+            if (op0->is_ld() && m_ivr->isIV(li, op0, &iv)) {
                 ;
             } else {
                 continue;
@@ -63,20 +116,16 @@ void LFTR::analyzeBB(LI<IRBB> * li, IRBB * bb)
                 continue;
             }
 
-            ASSERT0(op0->getRefMD());
-            ASSERT0(iv);
-            if (m_ivmd2ivinfo.get(op0->getRefMD()) == nullptr) {
-                m_ivmd2ivinfo.set(op0->getRefMD(), iv);
-            } else {
-                ASSERT0(m_ivmd2ivinfo.get(op0->getRefMD()) == iv);
-            }
-            m_cand_list.append_tail(x);
+            ASSERT0(op0->getMustRef());
+            ASSERT0(iv && iv->getLI() == li);
+            ctx.setMapMDAndIV(op0->getMustRef(), iv);
+            ctx.addCandLF(x);
         }
     }
 }
 
 
-void LFTR::analysis(LI<IRBB> * li)
+void LFTR::analysis(LI<IRBB> * li, MOD LFAnaCtx & ctx)
 {
     IRBB * head = li->getLoopHead();
     UINT headid = head->id();
@@ -89,17 +138,9 @@ void LFTR::analysis(LI<IRBB> * li)
         }
 
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(i));
-        analyzeBB(li, bb);
+        ASSERT0(bb && bb->getVex());
+        analyzeBB(li, bb, ctx);
     }
-}
-
-
-void LFTR::clean()
-{
-    m_cand_list.clean();
-    m_cand_occ2info.clean();
-    m_ivmd2ivinfo.clean();
 }
 
 
@@ -112,45 +153,45 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
     for (LI<IRBB> * tli = li; tli != nullptr; tli = tli->get_next()) {
         changed |= doLoopTree(tli->getInnerList(), du_set_info_changed,
                               insert_bb, oc);
-        clean();
-        analysis(tli);
-        if (m_cand_list.get_elem_count() == 0) { continue; }
+        LFAnaCtx ctx(tli);
+        analysis(tli, ctx);
+        if (ctx.getCandList().get_elem_count() == 0) { continue; }
 
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLFTR()) {
-            dump(tli);
+            dump(tli, ctx);
         }
 
         IRBB * preheader = nullptr;
-        if (xoc::insertPreheader(tli, m_rg, &preheader, oc, false)) {
+        if (xoc::insertPreheader(tli, m_rg, &preheader, &oc, false)) {
             m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
                                                        PASS_LOOP_INFO,
                                                        PASS_UNDEF);
             insert_bb = true;
         }
 
-        bool inserted3 = false;
-        bool replaced = doReplacement(preheader, tli, inserted3);
-        if (!replaced && !inserted3) {
+        bool li_insert_bb = false;
+        bool replaced = doReplacement(preheader, tli, li_insert_bb, ctx);
+        if (!replaced && !li_insert_bb) {
             //Nothing changed.
             continue;
         }
 
         du_set_info_changed |= replaced;
         changed |= du_set_info_changed;
-        insert_bb |= inserted3;
+        insert_bb |= li_insert_bb;
 
         //doReplacement may append stmt into BB which has down-boundary stmt.
         //That makes BB invalid. Split such invalid BB into two or more BBs.
-        bool inserted2 = m_cfg->splitBBIfNeeded(preheader, oc);
-        ASSERTN(!inserted2, ("Does this happen?"));
-        insert_bb |= inserted2;
-        if (inserted2) {
-            //Recompute DOM related info.
-            oc.setDomValid(false);
-            OC_is_cdg_valid(oc) = false;
-            OC_is_rpo_valid(oc) = false;
-            m_cfg->computeDomAndIdom(oc);
-        }
+        bool splitted = m_cfg->splitBBIfNeeded(preheader, oc);
+        ASSERTN(!splitted, ("Does this happen?"));
+        //if (splitted) {
+        //    //TODO:maintain CFG related info.
+        //    //oc.setInvalidIfCFGChanged();
+        //    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
+        //                                               PASS_UNDEF);
+        //}
+        //insert_bb |= splitted;
+        
     }
     return changed;
 }
@@ -188,32 +229,37 @@ IR * LFTR::genNewIVRef(LFRInfo const* info)
 }
 
 
-void LFTR::getLinearRepOfIV(IR const* lf_exp, IV const** iv, IR const** coeff)
+void LFTR::getLinearRepOfIV(LFAnaCtx const& ctx, IR const* lf_exp,
+                            IV const** iv, IR const** coeff)
 {
     ASSERT0(iv && coeff);
     ASSERT0(lf_exp->is_mul() && !lf_exp->hasSideEffect(true) &&
             !lf_exp->isNoMove(true));
     IR const* op0 = BIN_opnd0(lf_exp);
-    ASSERT0(op0->is_ld() && op0->getRefMD());
-    *iv = m_ivmd2ivinfo.get(op0->getRefMD());
+    ASSERT0(op0->is_ld() && op0->getMustRef());
+    *iv = ctx.getIVInfo(op0->getMustRef());
     ASSERT0(*iv);
     *coeff = BIN_opnd1(lf_exp);
-    ASSERT0((*coeff)->is_const());
 }
 
 
-void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list)
+void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list,
+                                 MOD LFAnaCtx & ctx)
 {
     List<IR*> init_val_list;
-    for (IR * cand = m_cand_list.get_head();
-         cand != nullptr; cand = m_cand_list.get_next()) {
+    IRListIter it;
+    for (IR * cand = ctx.getCandList().get_head(&it);
+         cand != nullptr; cand = ctx.getCandList().get_next(&it)) {
         //TODO: support computing step of DIV.
         IV const* ivinfo = nullptr;
         IR const* coeff = nullptr;
-        getLinearRepOfIV(cand, &ivinfo, &coeff);
+        getLinearRepOfIV(ctx, cand, &ivinfo, &coeff);
         ASSERT0(ivinfo && coeff);
-        ASSERTN(coeff->is_int(), ("TODO:only support integer currently"));
-
+        ASSERTN(coeff->is_int(), ("TODO:only support integer type now"));
+        if (!coeff->is_const()) {
+            //TODO:support variadic coeff.
+            continue;
+        }
         if (!ivinfo->is_biv()) {
             //TODO: support DIV and compute the step value of DIV.
             continue;
@@ -229,17 +275,15 @@ void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list)
             }
         }
         if (equal_exp != nullptr) {
-            LFRInfo * info = m_cand_occ2info.get(equal_exp);
+            LFRInfo * info = ctx.getLFRInfo(equal_exp);
             ASSERT0(info);
-            m_cand_occ2info.set(cand, info);
+            ctx.setMapExpToLFRInfo(cand, info);
             continue;
         }
 
-        LFRInfo * info = genLFRInfo(cand);
+        LFRInfo * info = ctx.genLFRInfo(cand);
         ASSERT0(!info->is_init());
-        info->lf_exp = cand;
-        info->ivinfo = ivinfo;
-        info->ivcoeff = coeff;
+        info->init(cand, ivinfo, coeff);
         lfrinfo_list.append_tail(info);
     }
 }
@@ -274,6 +318,8 @@ bool LFTR::insertComputingInitValCode(IRBB * preheader,
     bool changed = false;
     for (LFRInfo * info = lfrinfo_list.get_head(&it);
          info != nullptr; info = lfrinfo_list.get_next(&it)) {
+        ASSERTN(info->ivinfo->getLI() == li,
+                ("IV is not belong to LI%d", li->id()));
         //Build stmt to compute init-val at preheader.
         IR * newrhs = m_rg->dupIRTree(info->lf_exp);
         IR * comp_init_val = m_rg->buildStorePR(info->lf_exp->getType(),
@@ -297,7 +343,7 @@ void LFTR::buildClassicDUForRed(IR * init, IR * red)
     if (m_dumgr == nullptr) { return; }
 
     //Get RHS OCC of IV in reduction.
-    IR * iv_occ = red->getRHS()->getOpndMem(red->getRefMD());
+    IR * iv_occ = red->getRHS()->getOpndMem(red->getMustRef());
     ASSERT0(iv_occ && iv_occ->is_pr() && iv_occ->getPrno() == red->getPrno());
 
     m_dumgr->buildDUChain(red, iv_occ);
@@ -305,10 +351,53 @@ void LFTR::buildClassicDUForRed(IR * init, IR * red)
 }
 
 
+static void findInitAndRedPos(Vertex const* headvex, IR const* init,
+                              IR const* red, UINT & pos_of_initbb,
+                              UINT & pos_of_redbb)
+{
+    bool try_failed;
+    //Because init-value BB may not be the immeidate-predecessor of head,
+    //we need to find which predecessor to heavex that init-value livein.
+    if (Graph::isReachIn(headvex, init->getBB()->getVex(), 100, try_failed)) {
+        ASSERT0(Graph::isReachIn(headvex->getNthInVertex(1),
+                                 red->getBB()->getVex(), 100, try_failed));
+        pos_of_initbb = 0;
+        pos_of_redbb = 1;
+        return;
+    }
+    ASSERT0(Graph::isReachIn(headvex, red->getBB()->getVex(), 100,
+            try_failed));
+    pos_of_initbb = 1;
+    pos_of_redbb = 0;
+}
+
+
+//Generate SSAInfo & Build DU chain.
+static void createPRSSADU(Region * rg, PRSSAMgr * prssamgr, IR * phi,
+                          IR * iv_occ, IR * red, IR * init,
+                          IR * opnd_relate_to_red, IR * opnd_relate_to_init)
+{
+    iv_occ->setPrnoAndUpdateSSAInfo(phi->getPrno());
+
+    //Build DU chain between phi and iv.
+    prssamgr->buildDUChain(phi, iv_occ);
+
+    //Create new PR.
+    red->setPrnoAndUpdateSSAInfo(rg->buildPrno(red->getType()));
+
+    //Creat new PR for phi operand.
+    opnd_relate_to_red->setPrnoAndUpdateSSAInfo(red->getPrno());
+
+    //Build DU chain between red/init and phi operand.
+    prssamgr->buildDUChain(red, opnd_relate_to_red);
+    prssamgr->buildDUChain(init, opnd_relate_to_init);
+}
+
+
 //Insert PHI at head BB of loop for given reduction operation.
 //init: initial value stmt.
 //red: reduction stmt that is inserted at loop.
-//Return PHI stmt that is inerted.
+//Return the inserted PHI.
 IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
 {
     ASSERT0(li && red->is_stpr() && init->is_stpr());
@@ -317,12 +406,18 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     IR const* defarr[2];
     IR * opndarr[2];
     ASSERTN(m_cfg->getPredsNum(head) == 2,
-            ("TODO: support loop head with more preds"));
+            ("TODO: support loop head with more predecessors"));
 
-    //Init-value BB do not have to be immeidate-predecessor of head, however
-    //head BB should be reachable from init-value BB.
-    UINT pos_of_redbb = m_cfg->WhichPred(red->getBB(), head);
-    UINT pos_of_initbb = pos_of_redbb == 0 ? 1 : 0;
+    Vertex const* headvex = head->getVex();
+    ASSERT0(headvex);
+    UINT pos_of_initbb;
+    UINT pos_of_redbb;
+    findInitAndRedPos(headvex, init, red, pos_of_initbb, pos_of_redbb);
+
+    //Note redbb may be head itself.
+    //CASE:BB1->BB2->BB3->BB5
+    //           ^___/
+    //  BB2 is either redbb and head.
     defarr[pos_of_redbb] = red;
     defarr[pos_of_initbb] = init;
 
@@ -354,43 +449,38 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     //    PR_phi = PHI(PR_init, PR_red)
     //    PR_red = PR_phi, ...
     phi->setPrno(m_rg->buildPrno(phi->getType()));
-    m_rg->allocRefForPR(phi);
 
     //Get RHS OCC of IV in reduction.
-    IR * iv_occ = red->getRHS()->getOpndMem(red->getRefMD());
+    IR * iv_occ = red->getRHS()->getOpndMem(red->getMustRef());
     ASSERT0(iv_occ && iv_occ->is_pr() && iv_occ->getPrno() == red->getPrno());
 
-    //Generate SSAInfo & Build DU chain.
-    iv_occ->setPrnoConsiderSSAInfo(phi->getPrno());
+    IR * opnd_relate_to_red = opndarr[pos_of_redbb];
+    IR * opnd_relate_to_init = opndarr[pos_of_initbb];
+    createPRSSADU(m_rg, m_prssamgr, phi, iv_occ, red, init, opnd_relate_to_red,
+                  opnd_relate_to_init);
+    m_rg->allocRefForPR(phi);
     m_rg->allocRefForPR(iv_occ);
-    m_prssamgr->buildDUChain(phi, iv_occ);
-
-    red->setPrnoConsiderSSAInfo(m_rg->buildPrno(red->getType()));
     m_rg->allocRefForPR(red);
-
-    IR * opnd = opndarr[m_cfg->WhichPred(red->getBB(), head)];
-    opnd->setPrnoConsiderSSAInfo(red->getPrno());
-    m_rg->allocRefForPR(opnd);
-    m_prssamgr->buildDUChain(red, opnd);
-
-    m_prssamgr->buildDUChain(init, opndarr[pos_of_initbb]);
+    m_rg->allocRefForPR(opnd_relate_to_red);
+    m_rg->allocRefForPR(opnd_relate_to_init);
     return phi;
 }
 
 
 //Insert reduction code into proper BB.
 //reduction code is form as: newiv = newiv + coeff*step.
-bool LFTR::insertReductionCode(List<LFRInfo*> & lfrinfo_list)
+bool LFTR::insertReductionCode(List<LFRInfo*> const& lfrinfo_list)
 {
     bool changed = false;
-    for (LFRInfo * info = lfrinfo_list.get_head();
-         info != nullptr; info = lfrinfo_list.get_next()) {
+    List<LFRInfo*>::Iter it;
+    for (LFRInfo * info = lfrinfo_list.get_head(&it);
+         info != nullptr; info = lfrinfo_list.get_next(&it)) {
         IR * newiv = genNewIVRef(info);
         ASSERT0(newiv->is_pr());
         ASSERTN(info->ivinfo->is_biv(), ("TODO: support DIV"));
         BIV const* ivinfo = info->getBIVInfo();
         HOST_INT newiv_step = ivinfo->getStep() * info->getIVCoeff();
-        IR_TYPE op = IR_UNDEF;
+        IR_CODE op = IR_UNDEF;
         if (ivinfo->isInc()) {
             ASSERT0(newiv_step > 0);
 
@@ -429,18 +519,18 @@ bool LFTR::insertReductionCode(List<LFRInfo*> & lfrinfo_list)
 
 
 //Replace original candidate occurrence with new IV.
-bool LFTR::replaceCandByIV()
+bool LFTR::replaceCandByIV(LFAnaCtx const& ctx)
 {
     LFRInfoMapIter it;
     LFRInfo * info;
     bool changed = false;
-    for (IR const* cand = m_cand_occ2info.get_first(it, &info);
-         info != nullptr; cand = m_cand_occ2info.get_next(it, &info)) {
+    for (IR const* cand = ctx.getLFRInfoMap().get_first(it, &info);
+         info != nullptr; cand = ctx.getLFRInfoMap().get_next(it, &info)) {
         ASSERT0(cand == info->lf_exp);
         ASSERT0(info->lf_exp->is_exp());
         info->lf_exp->getStmt()->replaceKid(info->lf_exp, genNewIVRef(info),
                                             true);
-        xoc::removeUseForTree(info->lf_exp, m_rg);
+        xoc::removeUseForTree(info->lf_exp, m_rg, *getOptCtx());
         changed = true;
     }
     return changed;
@@ -451,29 +541,23 @@ bool LFTR::replaceCandByIV()
 //This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
 bool LFTR::doReplacement(OUT IRBB * preheader, OUT LI<IRBB> * li,
-                         OUT bool & insert_bb)
+                         OUT bool & insert_bb, MOD LFAnaCtx & ctx)
 {
     List<LFRInfo*> lfrinfo_list;
-    pickupProperCandidate(lfrinfo_list);
+    pickupProperCandidate(lfrinfo_list, ctx);
     bool changed = insertComputingInitValCode(preheader, lfrinfo_list, li);
     changed |= insertReductionCode(lfrinfo_list);
-    changed |= replaceCandByIV();
+    changed |= replaceCandByIV(ctx);
     return changed;
 }
 
 
-bool LFTR::dump(LI<IRBB> const* li) const
+bool LFTR::dump(LI<IRBB> const* li, LFAnaCtx const& ctx) const
 {
     if (!getRegion()->isLogMgrInit()) { return false; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
-
-    note(getRegion(), "\n==-- LINEAR FUNC CAND LIST of LI%d --==", li->id());
-    IRListIter it;
-    for (IR const* x = m_cand_list.get_head(&it); x != nullptr;
-         x = m_cand_list.get_next(&it)) {
-        dumpIR(x, m_rg);
-    }
+    ctx.dump(getRegion());
     return Pass::dump();
 }
 
@@ -508,25 +592,21 @@ bool LFTR::perform(OptCtx & oc)
     bool du_set_info_changed = false;
     bool insert_bb = false;
 
-    clean();
-    m_rg->getLogMgr()->startBuffer();
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
                              insert_bb, oc);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();
-        m_rg->getLogMgr()->endBuffer();
         END_TIMER(t, getPassName());
         return false;
     }
-    m_rg->getLogMgr()->endBuffer();
-
     //This pass does not devastate IVR information. However, new IV might be
     //inserted.
     //DU chain and DU reference should be maintained.
     ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg, oc));
     oc.setInvalidIfDUMgrLiveChanged();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
-    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     END_TIMER(t, getPassName());
     return true;
 }

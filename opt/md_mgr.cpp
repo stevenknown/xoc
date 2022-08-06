@@ -37,6 +37,25 @@ MDMgr::MDMgr(Region * rg) :
 }
 
 
+//Generate MD for Var.
+MD const* MDMgr::genMDForVAR(Var * var, Type const* type, TMWORD offset)
+{
+    ASSERT0(var && type);
+    MD md;
+    MD_base(&md) = var;
+    if (type->is_any()) {
+        MD_ty(&md) = MD_UNBOUND;
+    } else {
+        MD_size(&md) = m_tm->getByteSize(type);
+        MD_ty(&md) = MD_EXACT;
+        MD_ofst(&md) = offset;
+    }
+    MD const* e = m_mdsys->registerMD(md);
+    ASSERT0(MD_id(e) > 0);
+    return e;
+}
+
+
 //The function generates new MD for given PR.
 //It should be called if new PR generated in optimzations.
 MD const* MDMgr::allocPRMD(IR * pr)
@@ -77,18 +96,7 @@ MD const* MDMgr::allocLoadMD(IR * ir)
     MD const* t = genMDForLoad(ir);
     ASSERT0(t);
     ir->cleanRefMDSet();
-
-    //TO BE REMOVED: genMDForLoad has consider the Offset of ir.
-    //if (LD_ofst(ir) != 0) {
-    //    MD t2(*t);
-    //    ASSERT0(t2.is_exact());
-    //    MD_ofst(&t2) += LD_ofst(ir);
-    //    MD_size(&t2) = ir->getTypeSize(m_tm);
-    //    MD const* entry = m_mdsys->registerMD(t2);
-    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-    //    t = entry; //regard MD with offset as return result.
-    //}
-
+    //Note genMDForLoad has consider the Offset of ir.
     ir->setMustRef(t, m_rg);
     return t;
 }
@@ -229,7 +237,8 @@ MD const* MDMgr::allocStringMD(Sym const* string)
 
     Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
-    //VAR_is_addr_taken(v) = true;
+    //v->setflag(VAR_ADDR_TAKEN);
+    
     MD md;
     MD_base(&md) = v;
     MD_size(&md) = (UINT)strlen(SYM_name(string)) + 1;

@@ -48,7 +48,7 @@ protected:
     void dumpFini();
 
     //Infer variable's type.
-    bool inferVarTypeByIRType(IR const* ir) const;
+    bool inferVarTypeByIRCode(IR const* ir) const;
     bool inferLeafExpMemAcc(IR * ir);
     bool inferIld(IR * ir);
     bool inferArray(IR * ir) const;

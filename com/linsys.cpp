@@ -36,7 +36,7 @@ class X2V_MAP {
                         //index of the vector indicate the index of eqaution.
     VECOFVECINT m_x2neg; //record negative coeff of variable,
                         //index of the vector indicate the index of eqaution.
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     SMemPool * m_pool;
 
     void * xmalloc(INT size)

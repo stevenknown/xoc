@@ -679,22 +679,28 @@ public:
 
     //Register a memory-chunk data type.
     TypeContainer const* registerMC(Type const* ty);
+
     //Register a vector data type.
     //type: it must be D_VEC type, and the vector-element-type can not D_UNDEF,
     //e.g: vector<I8,I8,I8,I8> type, which mc_size is 32 byte, vec-type is D_I8.
     TypeContainer const* registerVector(Type const* ty);
+
     //Register a stream data type.
     //ty: it must be D_STREAM type, and the stream-element-type can not D_UNDEF,
     //e.g: stream<I8> type, which stream-element-type is D_I8.
     TypeContainer const* registerStream(Type const* ty);
+
     //Register a tensor data type.
     //'type': it must be D_TENSOR type, and the
     //tensor-element-type can not D_UNDEF.
     TypeContainer const* registerTensor(Type const* ty);
+
     //Register a pointer data type.
     TypeContainer const* registerPointer(Type const* ty);
+
     //Register simplex type container, e.g:INT, UINT, FP, BOOL.
     TypeContainer const* registerSimplex(Type const* ty);
+
     //Return data type that registered in m_type_tab.
     Type * registerType(Type const* dtd);
 
@@ -769,7 +775,7 @@ public:
     }
 
     //Return bits size of 'dtype' refers to.
-    CHAR const* getDTypeName(DATA_TYPE dtype) const
+    static CHAR const* getDTypeName(DATA_TYPE dtype)
     {
         ASSERT0(dtype < D_LAST);
         return TYDES_name(&g_type_desc[dtype]);

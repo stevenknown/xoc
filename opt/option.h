@@ -179,8 +179,8 @@ typedef enum _PASS_TYPE {
     PASS_POLY,
     PASS_LIVENESS_MGR,
     PASS_VRP,
-    PASS_PR_SSA_MGR,
-    PASS_MD_SSA_MGR,
+    PASS_PRSSA_MGR,
+    PASS_MDSSA_MGR,
     PASS_CFS_MGR,
     PASS_POLY_TRAN,
     PASS_MD_BUGPATTERN_MGR,
@@ -191,23 +191,44 @@ typedef enum _PASS_TYPE {
     PASS_MDLIVENESS_MGR,
     PASS_MDSSALIVE_MGR,
     PASS_REFINE,
-    PASS_GSCC,
+    PASS_SCC,
     PASS_IRSIMP,
+    PASS_LINEAR_SCAN_RA,
     PASS_NUM,
 } PASS_TYPE;
 
 extern CHAR * g_func_or_bb_option;
-extern INT g_opt_level; //Represent optimization level.
-extern bool g_do_refine; //Perform peephole optimizations.
+
+//Represent optimization level.
+extern INT g_opt_level;
+
+//Perform peephole optimizations.
+extern bool g_do_refine;
+
 //If true to insert IR_CVT by ir refinement.
 extern bool g_do_refine_auto_insert_cvt;
-extern bool g_is_hoist_type; //Hoist data type from less than INT to INT.
-extern bool g_do_ipa; //Perform interprocedual analysis and optimization.
-extern bool g_do_call_graph; //Build call graph.
-extern bool g_show_time; //If true to show compilation time.
-extern bool g_do_inline; //Perform function inline.
-extern UINT g_inline_threshold; //Record the limit to inline.
-extern bool g_is_opt_float; //Optimize float point operation.
+
+//If true to hoist short type to integer type.
+//Hoist data type from less than INT to INT.
+extern bool g_is_hoist_type;
+
+//Perform interprocedual analysis and optimization.
+extern bool g_do_ipa;
+
+//Build call graph.
+extern bool g_do_call_graph;
+
+//If true to show compilation time.
+extern bool g_show_time;
+
+//Perform function inline.
+extern bool g_do_inline;
+
+//Record the limit to inline.
+extern UINT g_inline_threshold;
+
+//Optimize float point operation.
+extern bool g_is_opt_float;
 
 //Lower IR to PR mode.
 //The simplification will guarrantee that all value in computation will be
@@ -230,15 +251,32 @@ extern bool g_is_lower_to_lowest_height;
 //Enable XOC support dynamic type.
 //That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be ANY.
 extern bool g_is_support_dynamic_type;
-extern bool g_do_pr_ssa; //Do optimization in SSA.
-extern bool g_do_md_ssa; //Do optimization in Memory SSA.
-extern bool g_do_cfg; //Build control flow graph.
-extern bool g_do_rpo; //Compute reverse-post-order.
-extern bool g_do_loop_ana; //loop analysis.
+
+//Build PR SSA and perform optimization based on SSA.
+extern bool g_do_prssa;
+
+//Build Memory SSA and perform optimization based on Memory SSA.
+extern bool g_do_mdssa;
+
+//Build control flow graph.
+extern bool g_do_cfg;
+
+//Compute reverse-post-order.
+extern bool g_do_rpo;
+
+//Perform loop analysis.
+extern bool g_do_loop_ana;
+
 //Perform cfg optimization: remove labels that no one referenced.
 extern bool g_do_cfg_remove_redundant_label;
+
 //Perform cfg optimization: remove empty BB.
 extern bool g_do_cfg_remove_empty_bb;
+
+//Perform cfg optimization: the maximum times to update DomInfo when removing
+//empty BB.
+extern UINT g_cfg_remove_empty_bb_maxtimes_to_update_dominfo;
+
 //Perform cfg optimization: remove unreachable BB from entry.
 extern bool g_do_cfg_remove_unreach_bb;
 
@@ -279,10 +317,18 @@ extern bool g_do_cfg_remove_trampolin_branch;
 //
 //S1 is redundant branch.
 extern bool g_do_cfg_remove_redundant_branch;
-extern bool g_do_cfg_dom; //Build dominator tree.
-extern bool g_do_cfg_pdom; //Build post dominator tree.
-extern bool g_do_cdg; //Build post dominator tree.
-extern bool g_do_aa; //Perform default alias analysis.
+
+//Build dominator tree.
+extern bool g_do_cfg_dom;
+
+//Build post dominator tree.
+extern bool g_do_cfg_pdom;
+
+//Build control dependence graph.
+extern bool g_do_cdg;
+
+//Perform default alias analysis.
+extern bool g_do_aa;
 
 //Perform DU analysis for MD to build du chain.
 extern bool g_do_md_du_analysis;
@@ -324,20 +370,46 @@ extern bool g_invert_brtgt;
 //    }
 //Aggressive DCE will remove the above dead cycle.
 extern bool g_do_dce_aggressive;
+
 //Perform linear function test replacement.
 extern bool g_do_lftr;
-extern bool g_do_cp_aggressive; //It may cost much compile time.
-extern bool g_do_cp; //Perform copy propagation.
-extern bool g_do_rp; //Perform register promotion.
-extern bool g_do_gcse; //Perform global common subexpression elimination.
-extern bool g_do_lcse; //Perform local common subexpression elimination.
-extern bool g_do_pre; //Perform partial redundant elimination.
-extern bool g_do_rce; //light weight redundant code elimination
-extern bool g_do_dse; //Perform dead store elimination.
-extern bool g_do_licm; //Perform loop invariant code motion.
-extern bool g_do_ivr; //Perform induction variable recognization.
-extern bool g_do_gvn; //Perform global value numbering.
-extern bool g_do_cfs_opt; //Perform control flow structure optimizations.
+
+//Perform aggressive copy propagation.
+//It may cost much compile time.
+extern bool g_do_cp_aggressive;
+
+//Perform copy propagation.
+extern bool g_do_cp;
+
+//Perform register promotion.
+extern bool g_do_rp;
+
+//Perform global common subexpression elimination.
+extern bool g_do_gcse;
+
+//Perform local common subexpression elimination.
+extern bool g_do_lcse;
+
+//Perform partial redundant elimination.
+extern bool g_do_pre;
+
+//Perform light weith redundant code elimination.
+extern bool g_do_rce;
+
+//Perform dead store elimination.
+extern bool g_do_dse;
+
+//Perform loop invariant code motion.
+extern bool g_do_licm;
+
+//Perform induction variable recognization.
+extern bool g_do_ivr;
+
+//Perform global value numbering.
+extern bool g_do_gvn;
+
+//Perform control flow structure optimizations.
+extern bool g_do_cfs_opt;
 
 //Build manager to reconstruct high level control flow structure IR.
 //This option is always useful if you want to perform optimization on
@@ -345,7 +417,9 @@ extern bool g_do_cfs_opt; //Perform control flow structure optimizations.
 //Note that if the CFS auxiliary information established, the
 //optimizations performed should not violate that.
 extern bool g_build_cfs;
-extern bool g_cst_bb_list; //Construct BB list.
+
+//Construct BB list.
+extern bool g_cst_bb_list;
 
 //Record the maximum limit of the number of IR to perform optimizations.
 //This is the threshold to do optimization.
@@ -363,10 +437,17 @@ extern UINT g_thres_opt_ir_num_in_bb;
 //PtPair to perform flow sensitive analysis.
 extern UINT g_thres_ptpair_num;
 
-extern bool g_do_loop_convert; //Convert while-do to do-while loop.
-extern bool g_do_poly_tran; //Polyhedral Transformations.
-extern bool g_do_refine_duchain; //Refine DefUse Chain.
-extern bool g_do_scalar_opt; //Perform versatile scalar optimizations.
+//Convert while-do to do-while loop.
+extern bool g_do_loop_convert;
+
+//Polyhedral Transformations.
+extern bool g_do_poly_tran;
+
+//Refine DefUse Chain.
+extern bool g_do_refine_duchain;
+
+//Perform versatile scalar optimizations.
+extern bool g_do_scalar_opt;
 
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;

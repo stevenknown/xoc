@@ -10,6 +10,8 @@
 #include "comm_macro.h"
 #include "smempool.h"
 using namespace xcom;
+#include "byteop.h"
+#include "flag.h"
 #include "allocator.h"
 #include "strbuf.h"
 #include "comf.h" //used by sstl.h
@@ -17,7 +19,10 @@ using namespace xcom;
 #include "bs.h"
 #include "sbs.h"
 #include "sbs_hash.h"
+#include "rpo.h"
 #include "sgraph.h"
+#include "tree.h"
+#include "domtree.h"
 #include "rational.h"
 #include "flty.h"
 #include "bigint.h"
@@ -30,6 +35,8 @@ using namespace xcom;
 #include "linsys.h"
 #include "lpsol.h"
 #include "sort.h"
+#include "search.h"
 #include "scc.h"
+#include "lca.h"
 #endif
 

@@ -105,24 +105,7 @@ public:
     { return genMDForVAR(var, var->getType(), offset); }
 
     //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, Type const* type, TMWORD offset)
-    {
-        ASSERT0(var && type);
-        MD md;
-        MD_base(&md) = var;
-
-        if (type->is_any()) {
-            MD_ty(&md) = MD_UNBOUND;
-        } else {
-            MD_size(&md) = m_tm->getByteSize(type);
-            MD_ty(&md) = MD_EXACT;
-            MD_ofst(&md) = offset;
-        }
-
-        MD const* e = m_mdsys->registerMD(md);
-        ASSERT0(MD_id(e) > 0);
-        return e;
-    }
+    MD const* genMDForVAR(Var * var, Type const* type, TMWORD offset);
 
     //Generate MD for IR_ST.
     MD const* genMDForStore(IR const* ir)

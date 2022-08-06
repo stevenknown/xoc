@@ -275,7 +275,7 @@ Var * Dex2IR::addFuncVar(UINT method_id, Type const* ty)
     pbuf = assemblyUniqueName(pbuf, class_name, func_param_type, func_name);
     Var * v = addVarByName(pbuf, ty);
     VAR_is_readonly(v) = is_readonly(func_name);
-    VAR_is_func_decl(v) = true;
+    VAR_is_func(v) = true;
     return v;
 }
 
@@ -818,7 +818,7 @@ IR * Dex2IR::convertBinaryOpAssign(IN LIR * lir)
 {
     Type const* ty = getType(lir);
     Type const* ty2 = ty;
-    IR_TYPE ir_ty = IR_UNDEF;
+    IR_CODE ir_ty = IR_UNDEF;
     switch (LIR_opcode(lir)) {
     case LOP_ADD_ASSIGN : ir_ty = IR_ADD; break;
     case LOP_SUB_ASSIGN : ir_ty = IR_SUB; break;
@@ -859,7 +859,7 @@ IR * Dex2IR::convertBinaryOpAssign(IN LIR * lir)
 IR * Dex2IR::convertBinaryOp(IN LIR * lir)
 {
     Type const* ty = getType(lir);
-    IR_TYPE ir_ty = IR_UNDEF;
+    IR_CODE ir_ty = IR_UNDEF;
     switch (LIR_opcode(lir)) {
     case LOP_ADD : ir_ty = IR_ADD; break;
     case LOP_SUB : ir_ty = IR_SUB; break;
@@ -903,7 +903,7 @@ IR * Dex2IR::convertBinaryOpLit(IN LIR * lir)
         //16bit imm
     //}
     Type const* ty = getType(lir);
-    IR_TYPE ir_ty = IR_UNDEF;
+    IR_CODE ir_ty = IR_UNDEF;
     switch (LIR_opcode(lir)) {
     case LOP_ADD_LIT : ir_ty = IR_ADD; break;
     case LOP_SUB_LIT : ir_ty = IR_SUB; break;
@@ -1559,7 +1559,7 @@ IR * Dex2IR::convertRet(IN LIR * lir)
 IR * Dex2IR::convertUnaryOp(IN LIR * lir)
 {
     Type const* ty = getType(lir);
-    IR_TYPE ir_ty = IR_UNDEF;
+    IR_CODE ir_ty = IR_UNDEF;
     switch (LIR_opcode(lir)) {
     case LOP_NEG: ir_ty = IR_NEG; break;
     case LOP_NOT: ir_ty = IR_BNOT; break;
@@ -1630,7 +1630,7 @@ IR * Dex2IR::convertGoto(IN LIR * lir)
 
 IR * Dex2IR::convertCondBr(IN LIR * lir)
 {
-    IR_TYPE rt = IR_UNDEF;
+    IR_CODE rt = IR_UNDEF;
     switch (LIR_dt(lir)) {
     case LIR_cond_EQ: rt = IR_EQ; break;
     case LIR_cond_LT: rt = IR_LT; break;
