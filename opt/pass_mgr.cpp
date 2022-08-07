@@ -165,18 +165,20 @@ Pass * PassMgr::allocInvertBrTgt()
 Pass * PassMgr::allocVRP()
 {
     #ifdef FOR_IP
-    //return new VRP(m_rg);
-    #endif
+    return new VRP(m_rg);
+    #else
     return nullptr;
+    #endif
 }
 
 
 Pass * PassMgr::allocDSE()
 {
     #ifdef FOR_IP
-    //return new DSE(m_rg);
-    #endif
+    return new DSE(m_rg);
+    #else
     return nullptr;
+    #endif
 }
 
 

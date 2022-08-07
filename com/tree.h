@@ -111,7 +111,6 @@ public:
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
     Tree const& getTree() { return (Tree const&)m_g; }
-    //Vertex * getRoot() const { return treem_root; }//hack
 };
 
 
