@@ -38,7 +38,7 @@ namespace xoc {
 
 void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
 {
-    SimpCtx simp;
+    SimpCtx simp(&oc);
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
     }
@@ -78,7 +78,8 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
 
     bool changed = reconstructBBList(oc);
     if (!changed) {
-        ASSERT0((!g_do_md_du_analysis && !g_do_mdssa) || verifyMDRef());
+        ASSERT0((!g_do_md_du_analysis && !g_do_mdssa) ||
+                getDUMgr()->verifyMDRef());
         return;
     }
     OC_is_cfg_valid(oc) = false;
@@ -87,7 +88,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     //Simplification may generate new memory operations.
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref.
-        ASSERT0(verifyMDRef());
+        ASSERT0(getDUMgr() && getDUMgr()->verifyMDRef());
     }
 
     bool need_rebuild_mdssa = false;
@@ -122,7 +123,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
         SIMP_need_rebuild_du_chain(&simp) = false;
     }
 
-    if (g_invert_brtgt) {
+    if (g_invert_branch_target) {
         getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
     }
 
@@ -134,7 +135,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
 //except the classic DU-Chain.
 bool Region::performSimplify(OptCtx & oc)
 {
-    SimpCtx simp;
+    SimpCtx simp(&oc);
     SIMP_optctx(&simp) = &oc;
     simp.setSimpCFS();
     simp.setSimpArray();
@@ -148,7 +149,7 @@ bool Region::performSimplify(OptCtx & oc)
     }
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref.
-        ASSERT0(verifyMDRef());
+        ASSERT0(getDUMgr() && getDUMgr()->verifyMDRef());
     }
     getIRSimp()->simplifyBBlist(getBBList(), &simp);
     postSimplify(simp, oc);
@@ -289,7 +290,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (g_opt_level > OPT_LEVEL0) {
         getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
-        if (g_invert_brtgt) {
+        if (g_invert_branch_target) {
             getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
         }
     }

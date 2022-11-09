@@ -248,6 +248,15 @@ void note(Region const* rg, CHAR const* format, ...)
 }
 
 
+void note_arg(Region const* rg, CHAR const* format, va_list args)
+{
+    va_list targs;
+    va_copy(targs, args);
+    note_helper(rg->getLogMgr(), format, targs);
+    va_end(targs);
+}
+
+
 //Print string with indent chars.
 void note(RegionMgr const* rm, CHAR const* format, ...)
 {
@@ -343,7 +352,7 @@ void LogMgr::pauseBuffer()
 void LogMgr::resumeBuffer()
 {
     if (!m_ctx.paused_buffer) { return; }
-    pop();    
+    pop();
 }
 
 

@@ -36,12 +36,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
-Region * IPA::findRegion(IR * call, Region * callru)
+Region * IPA::findRegion(IR * call, Region * callrg)
 {
     ASSERT0(call->is_call());
     CallGraph * cg = m_rumgr->getCallGraph();
     ASSERT0(cg);
-    CallNode * callercn = cg->mapRegion2CallNode(callru);
+    CallNode * callercn = cg->mapRegion2CallNode(callrg);
     ASSERTN(callercn, ("caller is not on graph"));
 
     Sym const* callname = CALL_idinfo(call)->get_name();
@@ -68,12 +68,12 @@ Region * IPA::findRegion(IR * call, Region * callru)
 
 
 //call: call stmt.
-//callru: the region that call stmt resident in.
+//callrg: the region that call stmt resident in.
 //Generate dummy use only if MD both exist in caller's MayDef and
 //callee's MayUse.
-void IPA::createCallDummyuse(IR * call, Region * callru)
+void IPA::createCallDummyuse(IR * call, Region * callrg)
 {
-    Region * calleeru = findRegion(call, callru);
+    Region * calleeru = findRegion(call, callrg);
     if (calleeru == nullptr || CALL_dummyuse(call) != nullptr) {
         return;
     }
@@ -81,7 +81,7 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
     MDSet const* mayuse = calleeru->getMayUse();
     if (mayuse == nullptr || mayuse->is_empty()) { return; }
 
-    MDSet const* callermaydef = callru->getMayDef();
+    MDSet const* callermaydef = callrg->getMayDef();
     if (callermaydef == nullptr || callermaydef->is_empty()) { return; }
 
     MDSetIter iter;
@@ -90,12 +90,12 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
          j != BS_UNDEF; j = mayuse->get_next(j, &iter)) {
         MD const* md = m_mdsys->getMD(j);
         ASSERT0(md);
-        if (!md->is_effect() || !callermaydef->is_contain(md)) {
+        if (!md->is_effect() || !callermaydef->is_contain(md, callrg)) {
             continue;
         }
 
-        IR * ld = callru->buildLoad(MD_base(md));
-        callru->allocRefForLoad(ld);
+        IR * ld = callrg->getIRMgr()->buildLoad(MD_base(md));
+        callrg->getMDMgr()->allocRef(ld);
         xcom::add_next(&CALL_dummyuse(call), &last, ld);
         IR_parent(ld) = call;
     }
@@ -140,6 +140,7 @@ void IPA::computeCallRefForAllRegion()
         }
 
         rg->initPassMgr();
+        rg->initIRMgr();
         AliasAnalysis * aa = (AliasAnalysis*)rg->getPassMgr()->
             registerPass(PASS_AA);
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
@@ -189,6 +190,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     }
     if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
+        rg->initIRMgr();
     }
     if (!oc.is_aa_valid()) {
         //DUMgr requires AliasAnalysis

@@ -107,12 +107,12 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     Vector<IR*> rmvec;
     for (IR * ir = BB_first_ir(head); ir != nullptr; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
-        m_du->addUseForTree(newir, ir);
+        m_dumgr->addUseForTree(newir, ir);
 
         m_ii.clean();
         for (IR const* x = xoc::iterExpInitC(ir, m_ii);
              x != nullptr; x = xoc::iterExpNextC(m_ii)) {
-            if (!x->isMemoryRef()) { continue; }
+            if (!x->isMemRef()) { continue; }
 
             UINT cnt = 0;
             if (x->isReadPR() && PR_ssainfo(x) != nullptr) {
@@ -139,7 +139,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             if (cnt != 0) {
                 for (UINT i = 0; i < cnt; i++) {
                     IR * d = rmvec.get(i);
-                    m_du->removeDUChain(d, x);
+                    m_dumgr->removeDUChain(d, x);
                 }
             }
         }
@@ -162,7 +162,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     LabelInfo const* loopbody_start_lab =
         loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == nullptr) {
-        loopbody_start_lab = ::allocInternalLabel(m_rg->get_pool());
+        loopbody_start_lab = ::allocInternalLabel(m_rg->getCommPool());
         m_cfg->addLabel(loopbody_start_bb, loopbody_start_lab);
     }
     last_cond_br->setLabel(loopbody_start_lab);
@@ -222,7 +222,7 @@ bool LoopCvt::perform(OptCtx & oc)
         }
 
         //DU reference and du chain has maintained.
-        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(m_dumgr->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg, oc));
 
         //All these changed.

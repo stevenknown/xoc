@@ -44,7 +44,7 @@ void setLineNum(IR * ir, UINT lineno, Region * rg)
     if (IR_ai(ir) == nullptr) {
         IR_ai(ir) = rg->allocAIContainer();
         da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
-                                          rg->get_pool());
+                                          rg->getCommPool());
         ASSERT0(da);
         da->init();
         IR_ai(ir)->set((BaseAttachInfo*)da, rg);
@@ -53,7 +53,7 @@ void setLineNum(IR * ir, UINT lineno, Region * rg)
         da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
         if (da == nullptr) {
             da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
-                                              rg->get_pool());
+                                              rg->getCommPool());
             ASSERT0(da);
             da->init();
             ASSERT0(da);
@@ -106,7 +106,7 @@ void setDbx(IR * ir, Dbx * dbx, Region * rg)
     }
     if (ir_da == nullptr) {
         ir_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
-                                              rg->get_pool());
+                                              rg->getCommPool());
         ASSERT0(ir_da);
         ir_da->init();
         IR_ai(ir)->set((BaseAttachInfo*)ir_da, rg);
@@ -158,7 +158,7 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
     }
     if (tgt_da == nullptr) {
         tgt_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
-                                              rg->get_pool());
+                                              rg->getCommPool());
         ASSERT0(tgt_da);
         tgt_da->init();
         IR_ai(tgt)->set((BaseAttachInfo*)tgt_da, rg);

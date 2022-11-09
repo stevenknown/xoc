@@ -142,6 +142,7 @@ public:
     virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v)
     {
         //Target Dependent Code.
+        DUMMYUSE(v);
     }
 
     //The function is a callback interface.
@@ -150,6 +151,7 @@ public:
     virtual void visitWhenFirstMeet(Vertex const* v)
     {
         //Target Dependent Code.
+        DUMMYUSE(v);
     }
 
     //Set the maximum number of vertex.

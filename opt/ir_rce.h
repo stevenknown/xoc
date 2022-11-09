@@ -53,6 +53,7 @@ protected:
     IRCFG * m_cfg;
     GVN * m_gvn;
     DUMgr * m_du;
+    IRMgr * m_irmgr;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     Refine * m_refine;
@@ -81,6 +82,7 @@ public:
         m_gvn = gvn;
         m_cfg = rg->getCFG();
         m_du = m_rg->getDUMgr();
+        m_irmgr = m_rg->getIRMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = true;
         m_prssamgr = nullptr;

@@ -108,9 +108,6 @@ public:
 };
 
 
-typedef xcom::TTab<IR*> IRTab;
-typedef xcom::TTabIter<IR*> IRTabIter;
-
 //Loop Invariant code Motion.
 //Note in order to reduce the complexity of LICM, the pass only handle the
 //scenario that whole RHS of stmt is loop-invariant. For cases that
@@ -148,11 +145,11 @@ class LICM : public Pass {
             m_free_lst.append_head(lst);
         }
     };
-private:
+protected:
     COPY_CONSTRUCTOR(LICM);
     BYTE m_is_hoist_stmt:1;
     BYTE m_is_aggressive:1; //true to apply LICM along with RCE
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     IRCFG * m_cfg;
     //LICM use RCE to determine whether a branch must-execute.
     RCE * m_rce;
@@ -181,7 +178,7 @@ private:
     //be hoisted first. Whether a exp/stmt can be hoisted will be determined
     //at hoistCand() finally.
     IRTab m_hoist_cand;
-private:
+protected:
     //Collect and analyse information of invariant-exp and invariant-stmt.
     //Whether a exp/stmt can be hoisted will be determined at
     //hoistCand() finally.
@@ -220,9 +217,6 @@ private:
     bool chooseKid(LI<IRBB> * li, IR * ir, OUT bool & all_kid_invariant,
                    IRIter & irit);
     bool chooseStmt(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseSTandSTPR(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseIST(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseSTARRAY(LI<IRBB> * li, IR * ir, IRIter & irit);
     bool chooseCallStmt(LI<IRBB> * li, IR * ir, IRIter & irit);
     bool chooseBranch(LI<IRBB> * li, IR * ir,IRIter & irit);
     bool chooseSwitch(LI<IRBB> * li, IR * ir, IRIter & irit);
@@ -293,6 +287,8 @@ private:
 
     //Process a loop.
     bool processLoop(LI<IRBB> * li, HoistCtx & ctx);
+    void postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc);
+    void postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc);
 
     //Return true if some stmts are marked as invariant-stmt.
     bool scanDirectStmt(IR * stmt, LI<IRBB> * li);
@@ -374,11 +370,11 @@ public:
     explicit LICM(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_md_sys = rg->getMDSystem();
-        ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
+        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;

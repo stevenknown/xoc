@@ -51,7 +51,13 @@ public:
     //array: elements sorted in incremental order.
     //val: search val in array.
     //valpos: record the position in array if find val.
-    bool search(Vector<T> const& data, T val, OUT VecIdx * valpos = nullptr);
+    //nearless: record the position of nearest value that is less-than 'val' if
+    //          not found 'val' in array.
+    //neargreat: record the position of nearest value that is great-than 'va' if
+    //           not found 'val' in array.
+   bool search(Vector<T> const& data, T val, OUT VecIdx * valpos = nullptr,
+                OUT VecIdx * nearless = nullptr,
+                OUT VecIdx * neargreat = nullptr);
 };
 
 
@@ -59,26 +65,40 @@ public:
 //array: elements sorted in incremental order.
 //val: search val in array.
 //valpos: record the position in array if find val.
+//nearless: record the position of nearest value that is less-than 'val' if
+//          not found 'val' in array.
+//neargreat: record the position of nearest value that is great-than 'va' if
+//           not found 'val' in array.
 template <class T, class Compare>
-bool BinarySearch<T, Compare>::search(Vector<T> const& data, T val, OUT VecIdx * valpos)
+bool BinarySearch<T, Compare>::search(Vector<T> const& data, T val,
+                                      OUT VecIdx * valpos,
+                                      OUT VecIdx * nearless,
+                                      OUT VecIdx * neargreat)
 {
     if (valpos != nullptr) { *valpos = VEC_UNDEF; }
     VecIdx n = data.get_elem_count();
     if (n == 0) { return false; }
-    if (n == 1 && !m_comp.is_equ(data[0], val)) { return false; }
-    //n >= 2
     VecIdx lo = 0;
     VecIdx hi = n - 1;
+    VecIdx posless, posgreat;
     while (lo <= hi) {
         VecIdx pos = lo + (hi - lo) / 2;
         if (m_comp.is_less(val, data.get(pos))) {
             hi = pos - 1;
+            posless = hi;
+            posgreat = pos;
         } else if (m_comp.is_great(val, data.get(pos))) {
             lo = pos + 1;
+            posless = pos;
+            posgreat = lo;
         } else {
             if (valpos != nullptr) { *valpos = pos; }
             return true;
         }
+    }
+    if (nearless != nullptr) { *nearless = posless; }
+    if (neargreat != nullptr) {
+        posgreat >= n ? *neargreat = VEC_UNDEF : *neargreat = posgreat;
     }
     return false;
 }

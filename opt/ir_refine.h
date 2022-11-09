@@ -212,6 +212,7 @@ class Refine : public Pass {
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
     bool refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc);
     IR * reassociation(IR * ir, bool & change);
+    virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc);
 
     IR * StrengthReduce(MOD IR * ir, MOD bool & change, RefineCtx & rc);
 

@@ -109,7 +109,7 @@ bool InsertGuardHelper::hasComplicatedDefForPR(LI<IRBB> const* li,
 bool InsertGuardHelper::hasComplicatedDefForNonPR(LI<IRBB> const* li,
                                                   IR const* ir) const
 {
-    ASSERT0(ir->isMemoryRefNonPR());
+    ASSERT0(ir->isMemRefNonPR());
     if (!useMDSSADU()) { return true; }
     MDSSAInfo const* info = m_mdssa->getMDSSAInfoIfAny(ir);
     ASSERT0(info);
@@ -159,6 +159,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     domtree.remove(m_guard_end->id());
     domtree.remove(m_guarded_bb->id());
 
+    //Remove stmts in guard_start.
     for (IR * ir = m_guard_start->getIRList().get_head();
          ir != nullptr; ir = m_guard_start->getIRList().get_next()) {
         xoc::removeStmt(ir, m_rg, *getOptCtx());
@@ -167,6 +168,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     m_guard_start->getIRList().clean();
     ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guard_start));
     
+    //Remove stmts in guarded_bb.
     for (IR * ir = m_guarded_bb->getIRList().get_head();
          ir != nullptr; ir = m_guarded_bb->getIRList().get_next()) {
         xoc::removeStmt(ir, m_rg, *getOptCtx());
@@ -175,6 +177,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     m_guarded_bb->getIRList().clean();
     ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guarded_bb));
 
+    //Remove stmts in guard_end.
     for (IR * ir = m_guard_end->getIRList().get_head();
          ir != nullptr; ir = m_guard_end->getIRList().get_next()) {
         xoc::removeStmt(ir, m_rg, *getOptCtx());
@@ -182,10 +185,18 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     }
     m_guard_end->getIRList().clean();
     ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guard_end));
+
+    //Remove other remained emtpy BB.
     CfgOptCtx coctx(*getOptCtx());
     m_cfg->removeEdge(m_guard_start, m_guard_end, coctx);
-    bool res = m_cfg->removeEmptyBB(coctx);
+    RemoveEmptyBBCtx rmctx;
+    bool res = m_cfg->removeEmptyBB(coctx, &rmctx);
     ASSERT0(res);
+    //Update DomTree if BB removed.
+    for (UINT bbid = rmctx.getRemovedList().get_head(); bbid != BBID_UNDEF;
+         bbid = rmctx.getRemovedList().get_next()) {
+        domtree.remove(bbid);
+    }
     //removeEmptyBB only maintained these frequently used CFG info.
     OptCtx::setInvalidIfCFGChangedExcept(getOptCtx(), PASS_RPO,
                                          PASS_DOM, PASS_LOOP_INFO,
@@ -207,7 +218,7 @@ bool InsertGuardHelper::needComplicatedGuard(LI<IRBB> const* li) const
     ConstIRIter it;
     for (IR const* x = iterInitC(head_det, it, true);
          x != nullptr; x = iterNextC(it, true)) {
-        if (!x->isPROp() && !x->isMemoryRefNonPR()) { continue; }
+        if (!x->isPROp() && !x->isMemRefNonPR()) { continue; }
         if (hasComplicatedDef(li, x)) { return true; }
     }
     return false;
@@ -273,7 +284,8 @@ IR * InsertGuardHelper::insertGuardIR(IRBB * guard_start, IRBB * nextto_end,
 
     //-- Set the target label of guard-branch.
     ASSERT0(guard_end_lab);
-    IR * guard_br = m_rg->buildBranch(false, newdet, guard_end_lab);
+    IR * guard_br = m_rg->getIRMgr()->buildBranch(false, newdet,
+                                                  guard_end_lab);
 
     //Append the guard-branch into guard_start.
     guard_start->getIRList().append_tail_ex(guard_br);
@@ -304,7 +316,7 @@ void InsertGuardHelper::updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,
 void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(IR * ir,
                                                      DomTree const& domtree)
 {
-    ASSERT0(ir->is_stmt() && ir->isMemoryRefNonPR());
+    ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(m_guard_end && m_guard_start && m_guarded_bb);
     ASSERT0(useMDSSADU());
     ASSERT0(m_oc->is_dom_valid());
@@ -338,18 +350,19 @@ IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
     IR * opnds = nullptr;
 
     //Livein PR as a placeholder which does not have any DEF.
-    IR * placeholder = m_rg->buildPR(ir->getType());
+    IR * placeholder = m_rg->getIRMgr()->buildPR(ir->getType());
     m_prssa->genSSAInfo(placeholder);
     xcom::add_next(&opnds, placeholder);
 
     //A new USE of guarded stmt.
-    IR * guardpr = m_rg->buildPRdedicated(ir->getPrno(), ir->getType());
+    IR * guardpr = m_rg->getIRMgr()->buildPRdedicated(ir->getPrno(),
+                                                      ir->getType());
     xcom::add_next(&opnds, guardpr);
 
     //A phi that merges the dummy livein and guarded PR.
-    IR * phi = m_rg->buildPhi(m_rg->buildPrno(ir->getType()), ir->getType(),
-                              opnds);
-    m_rg->allocRefForIRTree(phi, false);
+    IR * phi = m_rg->getIRMgr()->buildPhi(
+        m_rg->getIRMgr()->buildPrno(ir->getType()), ir->getType(), opnds);
+    m_rg->getMDMgr()->allocRefForIRTree(phi, false);
     m_guard_end->getIRList().append_head(phi);
 
     //Reorder phi operands in the order of predecessors of guard-end.
@@ -386,7 +399,7 @@ void InsertGuardHelper::insertPhiForGuardedBB(DomTree const& domtree)
             insertPRSSAPhiForGuardedStmt(ir);
             continue;
         }
-        if (ir->isMemoryRefNonPR() && useMDSSADU()) {
+        if (ir->isMemRefNonPR() && useMDSSADU()) {
             insertMDSSAPhiForGuardedStmt(ir, domtree);
             continue;
         }
@@ -464,7 +477,7 @@ IRBB * InsertGuardHelper::insertGuardStart(IRBB * guarded_bb)
 {
     //Add vertex to graph before updating RPO.
     IRBB * guard_start = m_rg->allocBB();
-    m_cfg->insertBBbefore(guarded_bb, guard_start);
+    m_cfg->insertBBBefore(guarded_bb, guard_start);
     if (!m_cfg->tryUpdateRPO(guard_start, guarded_bb, true)) {
         //TODO: Try update RPO incrementally to avoid recompute
         //whole RPO-Vex list in CFG.
@@ -473,7 +486,7 @@ IRBB * InsertGuardHelper::insertGuardStart(IRBB * guarded_bb)
         m_oc->setInvalidRPO();
     }
     bool add_pdom_failed = false;
-    m_cfg->addDomInfoByNewIDom(guarded_bb->id(), guard_start->id(),
+    m_cfg->addDomInfoToNewIDom(guarded_bb->id(), guard_start->id(),
                                add_pdom_failed);
     if (add_pdom_failed) {
         m_oc->setInvalidPDom();
@@ -494,7 +507,7 @@ IRBB * InsertGuardHelper::insertGuardEnd(IRBB * guarded_bb,
     BBListIter next_it;
     m_rg->getBBList()->find(next_to_guarded_bb, &next_it);
     ASSERT0(next_it);
-    m_cfg->insertBBbetween(guarded_bb, guarded_bb_it, next_to_guarded_bb,
+    m_cfg->insertBBBetween(guarded_bb, guarded_bb_it, next_to_guarded_bb,
                            next_it, guard_end, m_oc);
     if (!m_cfg->tryUpdateRPO(guard_end, guarded_bb, false)) {
         //TODO: Try update RPO incrementally to avoid recompute whole BB list.
@@ -503,7 +516,7 @@ IRBB * InsertGuardHelper::insertGuardEnd(IRBB * guarded_bb,
         m_oc->setInvalidRPO();
     }
     bool add_pdom_failed = false;
-    m_cfg->addDomInfoByNewIDom(next_to_guarded_bb->id(), guard_end->id(),
+    m_cfg->addDomInfoToNewIDom(next_to_guarded_bb->id(), guard_end->id(),
                                add_pdom_failed);
     if (add_pdom_failed) {
         m_oc->setInvalidPDom();

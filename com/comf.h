@@ -76,6 +76,18 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 //     and function return 3.
 UINT computeMaxBitSizeForValue(ULONGLONG v);
 
+//The function converts string content into set of hex and store in the 'buf'.
+//Note the content in given buf must be string format of hex, that is the
+//string can only contain "abcdefABCDEF0123456789".
+//string: a string that represents bytes, where a byte consists of two hex.
+//        e.g:ADBC5E demostrates three bytes, 0xAD, 0xBC, and 0x5E.
+void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen);
+
+//The function converts a character into hex.
+//Note the content in given buf must be string format of hex, that is 'c'
+//can only be "abcdefABCDEF0123456789".
+BYTE charToHex(CHAR c);
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);

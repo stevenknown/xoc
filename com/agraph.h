@@ -42,17 +42,14 @@ protected:
     Matrix<UINT> * m_spath_mat; //record shortest-path.
     void buildAdjacentMatrix(Matrix<UINT> & adj_mat);
 public:
-    AGraph(UINT edge_hash_size = 64, UINT vex_hash_size = 64) :
-        Graph(edge_hash_size, vex_hash_size)
+    AGraph(UINT vex_hash_size = 64) : Graph(vex_hash_size)
     {
-        m_edge_hash_size = edge_hash_size;
         m_vex_hash_size = vex_hash_size;
         m_spath_mat = nullptr;
     }
 
     AGraph(AGraph & g) : Graph(g)
     {
-        m_edge_hash_size = g.m_edge_hash_size;
         m_vex_hash_size = g.m_vex_hash_size;
         clone(g);
     }

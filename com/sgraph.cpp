@@ -118,9 +118,8 @@ Edge * CompareEdgeFunc::createKey(Edge const* ref)
 
 
 //DONT CALL Constructor directly.
-Graph::Graph(UINT edge_hash_size, UINT vex_hash_size) : m_edgetab(self())
+Graph::Graph(UINT vex_hash_size) : m_edgetab(self())
 {
-    m_edge_hash_size = edge_hash_size;
     m_vex_hash_size = vex_hash_size;
     m_ec_pool = nullptr;
     m_dense_vertex = nullptr; //default vertex layout is sparse.
@@ -131,7 +130,6 @@ Graph::Graph(UINT edge_hash_size, UINT vex_hash_size) : m_edgetab(self())
 
 Graph::Graph(Graph const& g) : m_edgetab(self())
 {
-    m_edge_hash_size = g.m_edge_hash_size;
     m_vex_hash_size = g.m_vex_hash_size;
     m_ec_pool = nullptr;
     m_dense_vertex = nullptr; //default vertex layout is sparse.
@@ -277,17 +275,19 @@ void Graph::erase()
 }
 
 
-bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
+void Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
 {
     erase();
     m_is_unique = src.m_is_unique;
     m_is_direction = src.m_is_direction;
+    set_dense(src.is_dense());
 
     //Clone vertices
     VertexIter itv = VERTEX_UNDEF;
     for (Vertex * srcv = src.get_first_vertex(itv);
          srcv != nullptr; srcv = src.get_next_vertex(itv)) {
         Vertex * v = addVertex(VERTEX_id(srcv));
+        v->clone(srcv);
 
         //Calls inherited class method.
         //Vertex info of memory should allocated by inherited class method
@@ -309,7 +309,6 @@ bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
             EDGE_info(e) = cloneEdgeInfo(srce);
         }
     }
-    return true;
 }
 
 
@@ -1104,18 +1103,27 @@ void Graph::dumpHeight(FILE * h) const
 void Graph::dumpVertexAux(FILE * h, Vertex const* v) const
 {
     //NOTE:DOT file use '\l' as newline charactor.
-    //Target Dependent Code. 
+    //Target Dependent Code.
 
     //If you dump in multiple-line, the last \l is very important to display
     //DOT file in a fine manner.
     //fprintf(h, "\\l");
 }
 
+
+void Graph::dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const
+{
+    //Just print the vertex index.
+    buf.strcat("V%d", v->id());
+}
+
+
 void Graph::dumpVertex(FILE * h, Vertex const* v) const
 {
     fprintf(h, "\nnode%d [shape = Mrecord, label=\"", v->id());
-    //Print the vertex index.
-    fprintf(h,"V%d", v->id());
+    StrBuf buf(16);
+    dumpVertexDesc(v, buf);
+    fprintf(h, buf.buf);
     dumpVertexAux(h, v);
     //The end char of properties.
     fprintf(h, "\"];");
@@ -1357,14 +1365,30 @@ Vertex * Graph::get_next_out_vertex(AdjVertexIter & it)
     it = it->get_next();
     return it == nullptr ? nullptr : it->getTo();
 }
+
+
+Edge * Graph::get_first_out_edge(Vertex const* vex, AdjEdgeIter & it)
+{
+    ASSERT0(vex);
+    it = vex->getOutList();
+    if (it == nullptr) { return nullptr; }
+    return it->getEdge();
+}
+
+
+Edge * Graph::get_next_out_edge(AdjEdgeIter & it)
+{
+    if (it == nullptr) { return nullptr; }
+    it = it->get_next();
+    return it == nullptr ? nullptr : it->getEdge();
+}
 //END Graph
 
 
 //
 //START DGraph
 //
-DGraph::DGraph(UINT edge_hash_size, UINT vex_hash_size) :
-    Graph(edge_hash_size, vex_hash_size)
+DGraph::DGraph(UINT vex_hash_size) : Graph(vex_hash_size)
 {
     set_dense(true);
     m_bs_mgr = nullptr;
@@ -1381,7 +1405,7 @@ DGraph::DGraph(DGraph const& g) : Graph(g)
 }
 
 
-bool DGraph::cloneDomAndPdom(DGraph const& src)
+void DGraph::cloneDomAndPdom(DGraph const& src)
 {
     ASSERT0(m_bs_mgr != nullptr);
     ASSERTN(src.is_dense(), ("Dominate Graph have to be dense graph"));
@@ -1404,7 +1428,6 @@ bool DGraph::cloneDomAndPdom(DGraph const& src)
     }
     m_idom_set.copy(src.m_idom_set);
     m_ipdom_set.copy(src.m_ipdom_set);
-    return true;
 }
 
 
@@ -1950,6 +1973,7 @@ bool DGraph::verifyDom(DGraph & g, RPOVexList const& rpovlst) const
         VexIdx cur = m_idom_set.get(i);
         VexIdx anti = g.m_idom_set.get(i);
         ASSERTN(cur == anti, ("unmatch idom"));
+        DUMMYUSE(cur); //Used to facilitate debugger to set breakpoint.
     }
     return true;
 }
@@ -2226,6 +2250,7 @@ void DGraph::genDomTree(OUT DomTree & dt) const
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         VexIdx vid = VERTEX_id(v);
+        dt.addVertex(vid);
         if (m_idom_set.get(vid) != VERTEX_UNDEF) {
             dt.addEdge((VexIdx)m_idom_set.get(vid), vid);
         }
@@ -2543,7 +2568,8 @@ bool DGraph::changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ)
 
 //Add vertex newid to domset and pdomset for both livein and liveout paths
 //of marker.
-//is_dom: true if newid is new dom of marker.
+//is_dom: true if newid is new dom of marker, false means newid is new pdom of
+//        marker.
 //CASE:
 //    Ventry
 //  ___| |__
@@ -2758,11 +2784,60 @@ void DGraph::reviseDomInfoAfterAddOrRemoveEdge(Vertex const* from,
 }
 
 
+//The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
+//update the related info for 'vex'.
+//vex: a marker vertex.
+//newsucc: the vertex that must be immediate successor of 'vex'.
+//e.g: vex->oldsucc, after insert newsucc, the graph will be:
+//     vex->newsucc->oldsucc, where there is only ONE edge between vex->newsucc,
+//     and newsucc->oldsucc.
+void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
+                                       Vertex const* oldsucc)
+{
+    ASSERT0(vex && newsucc && oldsucc);
+    ASSERTN(get_idom(newsucc->id()) == VERTEX_UNDEF &&
+            get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
+    ASSERT0(oldsucc->getInDegree() == 1);
+    if (get_ipdom(vex->id()) != VERTEX_UNDEF) {
+        //ipdom is meanlingless if there is no exit in graph.
+        set_ipdom(newsucc->id(), oldsucc->id());
+        if (get_ipdom(vex->id()) == oldsucc->id()) {
+            set_ipdom(vex->id(), newsucc->id());
+        }
+    }
+    if (get_idom(vex->id()) != VERTEX_UNDEF) {
+        //idom is meanlingless if there is no entry in graph.
+        set_idom(newsucc->id(), vex->id());
+        ASSERT0(get_idom(oldsucc->id()) == vex->id());
+        set_idom(oldsucc->id(), newsucc->id());
+    }
+    if (get_dom_set(newsucc->id()) == nullptr) {
+        //Copy Dom info from vex to newsucc.
+        DomSet const* ds = get_dom_set(vex->id());
+        ASSERT0(ds);
+        if (ds != nullptr) {
+            gen_dom_set(newsucc->id())->bunion(*ds);
+        }
+        gen_dom_set(newsucc->id())->bunion(vex->id());
+
+        //Copy PDom info from oldsucc to newsucc.
+        DomSet const* ds2 = get_pdom_set(oldsucc->id());
+        if (ds2 != nullptr) {
+            gen_pdom_set(newsucc->id())->bunion(*ds2);
+        }
+        gen_pdom_set(newsucc->id())->bunion(oldsucc->id());
+    }
+    //Set domset, pdomset.
+    addVexToDomAndPdomSet(this, oldsucc, newsucc->id(), true);
+}
+
+
 //The function adds Dom, Pdom, IDom, IPDom information for newipdom, whereas
 //update the related info for 'vex'.
 //vex: a marker vertex.
 //newipdom: the vertex that must be ipdom of 'vex'.
-void DGraph::addDomInfoByNewIPDom(Vertex const* vex, Vertex const* newipdom)
+void DGraph::addDomInfoToNewIPDom(Vertex const* vex, Vertex const* newipdom)
 {
     ASSERTN(get_idom(newipdom->id()) == VERTEX_UNDEF &&
             get_ipdom(newipdom->id()) == VERTEX_UNDEF, ("not new vertex"));
@@ -2799,7 +2874,7 @@ void DGraph::addDomInfoByNewIPDom(Vertex const* vex, Vertex const* newipdom)
 }
 
 
-void DGraph::addDomInfoByNewIDom(Vertex const* vex, Vertex const* newidom,
+void DGraph::addDomInfoToNewIDom(Vertex const* vex, Vertex const* newidom,
                                  bool & add_pdom_failed)
 {
     ASSERTN(get_idom(newidom->id()) == VERTEX_UNDEF &&
@@ -2912,6 +2987,7 @@ bool DGraph::removeUnreachNode(VexIdx entry_id)
 //
 GraphIterIn::GraphIterIn(Graph const& g, Vertex const* start) : m_g(g)
 {
+    ASSERT0(start);
     ASSERTN(g.getVertex(start->id()) == start,
             ("start is not vertex of graph"));
     AdjVertexIter it;
@@ -2979,5 +3055,44 @@ Vertex * GraphIterOut::get_next(Vertex const* t)
     return m_wl.remove_head();
 }
 //END GraphIterOut
+
+
+//
+//START GraphIterOutEdge
+//
+GraphIterOutEdge::GraphIterOutEdge(Graph const& g, Vertex const* start) : m_g(g)
+{
+    ASSERT0(start);
+    ASSERTN(g.getVertex(start->id()) == start,
+            ("start is not vertex of graph"));
+    AdjEdgeIter it;
+    for (Edge * e = Graph::get_first_out_edge(start, it);
+         e != nullptr; e = Graph::get_next_out_edge(it)) {
+        ASSERT0(e->from() == start);
+        m_visited.append(e->to()->id());
+        m_wl.append_tail(e);
+    }
+}
+
+
+Edge * GraphIterOutEdge::get_first()
+{
+    return m_wl.remove_head();
+}
+
+
+Edge * GraphIterOutEdge::get_next(Edge const* e)
+{
+    ASSERT0(e);
+    AdjEdgeIter it;
+    for (Edge * oute = Graph::get_first_out_edge(e->to(), it);
+         oute != nullptr; oute = Graph::get_next_out_edge(it)) {
+        if (m_visited.find(oute->to()->id())) { continue; }
+        m_visited.append(oute->to()->id());
+        m_wl.append_tail(oute);
+    }
+    return m_wl.remove_head();
+}
+//END GraphIterOutEdge
 
 } //namespace xcom

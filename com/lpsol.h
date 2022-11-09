@@ -2038,7 +2038,7 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
         // Solution is:
         //    min is -16, x1=1, x2=3, C=1
         //    v is -16.0, but dual_max is -17.0.
-        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv), ("should be equal"));//hack
+        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv), ("should be equal"));//fuck
     }
     return status;
 }

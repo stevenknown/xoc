@@ -53,7 +53,7 @@ public:
 class IRCFG : public Pass, public CFG<IRBB, IR> {
     COPY_CONSTRUCTOR(IRCFG);
 protected:
-    Vector<IRBB*> m_bb_vec;
+    Vector<IRBB*> m_bb_vec; //used to speedup querying of BB through id.
     Lab2BB m_lab2bb;
     TypeMgr * m_tm;
     CFG_SHAPE m_cs;
@@ -71,6 +71,9 @@ protected:
 
     void dumpGraph(FILE * h) const;
     void dumpForTest(UINT flag) const;
+
+    void initBBVecViaBBList();
+    void initEntryAndExit(CFG_SHAPE cs);
 
     virtual void preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx);
 
@@ -129,9 +132,11 @@ public:
         //Kind of combination of dump options.
         DUMP_COMBINE = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA,
     };
-
+public:
     IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
-          UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
+          UINT vertex_hash_size = 16);
+    IRCFG(IRCFG const& src, BBList * bbl,
+          bool clone_edge_info, bool clone_vex_info);
     virtual ~IRCFG() {}
 
     //Add Label to BB, and establish map between Label and BB.
@@ -150,7 +155,7 @@ public:
 
     //Add new IRBB into CFG, but the BB list should be modified
     //out of this function.
-    //Namely, you should use 'insertBBbetween()' to insert BB into list.
+    //Namely, you should use 'insertBBBetween()' to insert BB into list.
     //And you must consider the right insertion.
     void addBB(IRBB * bb)
     {
@@ -164,6 +169,8 @@ public:
     //After adding new bb or change bb successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ);
+    void addDomInfoToFallThroughBB(IRBB const* marker, IRBB const* newbb,
+                                   IRBB const* oldnext);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method
@@ -179,6 +186,8 @@ public:
     //Record the Exit BB here.
     virtual void computeExitList();
     virtual void cf_opt();
+    void cloneLab2BB(Lab2BB const& src);
+    void clone(IRCFG const& src, bool clone_edge_info, bool clone_vex_info);
     void computeDomAndIdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
     void computePdomAndIpdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
     void computeRPO(OptCtx & oc);
@@ -214,7 +223,6 @@ public:
 
     //Allocate and initialize control flow graph.
     void initCFG(OptCtx & oc);
-    void initEntryAndExit(CFG_SHAPE cs);
     virtual bool if_opt(IRBB * bb);
     virtual bool isRegionEntry(IRBB * bb) const { return BB_is_entry(bb); }
     virtual bool isRegionExit(IRBB * bb) const { return BB_is_exit(bb); }
@@ -229,19 +237,32 @@ public:
     //        newbb
     //         |
     //        BB4
-    void insertBBbefore(IN IRBB * bb, IN IRBB * newbb);
+    void insertBBBefore(IN IRBB * bb, IN IRBB * newbb);
+
+    //The function insert newbb after 'marker'.
+    //Return the newbb.
+    IRBB * insertFallThroughBBAfter(IRBB const* marker, MOD OptCtx * oc);
+
+    //The function insert fallthrough newbb after 'marker'.
+    void insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
+                                  MOD OptCtx * oc);
 
     //The function insert newbb bewteen 'from' and 'to'. As a result, the
     //function may break up fallthrough edge of 'to' if necessary.
-    void insertBBbetween(IN IRBB * from, IN BBListIter from_it,
-                         IN IRBB * to, IN BBListIter to_it,
-                         IN IRBB * newbb, MOD OptCtx * oc);
+    //Return trampoline BB if the function inserted it before 'to'.
+    IRBB * insertBBBetween(IN IRBB const* from, IN BBListIter from_it,
+                           MOD IRBB * to, IN BBListIter to_it,
+                           IN IRBB * newbb, MOD OptCtx * oc);
 
-    //The function is a simpler version to insert a new BB.
+    //The function is a simpler version to insert a new BB. It does not check
+    //and insert newbb into CFG's BBList. The function is usually used when
+    //caller expect to update the related Dom and SSA info exactly by themself.
     //Insert 'newbb' between 'from' and 'to'.
     //e.g: given edge from->to, the result is from->newbb->to.
-    void insertBBbetween(IRBB * from, IRBB * to, IRBB * newbb,
+    void insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
                          OUT CfgOptCtx & ctx);
+
+    CFG_SHAPE getCfgShape() const { return m_cs; }
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
@@ -258,7 +279,7 @@ public:
     }
     UINT getNumOfBB() const
     { return const_cast<IRCFG*>(this)->getBBList()->get_elem_count(); }
-    BBList * getBBList() { return (BBList*)m_bb_list; }
+    BBList * getBBList() const { return (BBList*)m_bb_list; }
     Lab2BB * getLabel2BBMap() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
@@ -343,7 +364,7 @@ public:
     void rebuild(OptCtx & oc);
 
     //Cut off the mapping relation between Labels and BB.
-    virtual void resetMapBetweenLabelAndBB(IRBB * bb);
+    virtual void removeMapBetweenLabelAndBB(IRBB * bb);
 
     //Remove related PHI operand from successor BB.
     //Before removing current BB or change BB's successor,

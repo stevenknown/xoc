@@ -627,6 +627,7 @@ protected:
     SMemPool * m_philist_sc_pool;
     SMemPool * m_mdssainfo_pool;
     Region * m_rg;
+    IRMgr * m_irmgr;
     MDSystem * m_md_sys;
     MDSSAMgr * m_mdssa_mgr;
     xcom::SC<VOpnd*> * m_free_sc_list;

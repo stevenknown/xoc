@@ -34,11 +34,12 @@ MDMgr::MDMgr(Region * rg) :
     m_rg(rg), m_rm(rg->getRegionMgr()), m_mdsys(rg->getMDSystem()),
     m_tm(rg->getTypeMgr()), m_vm(rg->getVarMgr())
 {
+    ASSERT0(m_rg && m_rm && m_mdsys && m_tm);
 }
 
 
 //Generate MD for Var.
-MD const* MDMgr::genMDForVAR(Var * var, Type const* type, TMWORD offset)
+MD const* MDMgr::genMDForVar(Var * var, Type const* type, TMWORD offset)
 {
     ASSERT0(var && type);
     MD md;
@@ -58,9 +59,10 @@ MD const* MDMgr::genMDForVAR(Var * var, Type const* type, TMWORD offset)
 
 //The function generates new MD for given PR.
 //It should be called if new PR generated in optimzations.
-MD const* MDMgr::allocPRMD(IR * pr)
+MD const* MDMgr::allocMDForPROp(IR * pr)
 {
-    ASSERT0(pr->is_pr());
+    ASSERT0(pr->isPROp());
+    if (pr->is_setelem()) { return allocSetElemMD(pr); }
     MD const* md = genMDForPR(pr);
     pr->setMustRef(md, m_rg);
     pr->cleanRefMDSet();
@@ -68,61 +70,31 @@ MD const* MDMgr::allocPRMD(IR * pr)
 }
 
 
-//The function generates new MD for given PR.
-//It should be called if new PR generated in optimzations.
-MD const* MDMgr::allocPhiMD(IR * phi)
-{
-    ASSERT0(phi->is_phi());
-    MD const* md = genMDForPR(phi);
-    phi->setMustRef(md, m_rg);
-    phi->cleanRefMDSet();
-    return md;
-}
-
-
 MD const* MDMgr::allocIdMD(IR * ir)
 {
     ASSERT0(ir->is_id());
-    MD const* t = genMDForId(ir);
+    MD const* t = genMDForVar(ir->getIdinfo(), ir->getType(), ir->getOffset());
     ir->setMustRef(t, m_rg);
     ir->cleanRefMDSet();
     return t;
 }
 
 
-MD const* MDMgr::allocLoadMD(IR * ir)
+MD const* MDMgr::allocMDForDirectMemOp(IR * ir, bool clean_mayset)
 {
-    ASSERT0(ir->is_ld());
-    MD const* t = genMDForLoad(ir);
+    ASSERT0(ir->isDirectMemOp());
+    MD const* t = genMDForDirectMemOp(ir);
     ASSERT0(t);
-    ir->cleanRefMDSet();
     //Note genMDForLoad has consider the Offset of ir.
     ir->setMustRef(t, m_rg);
+    if (clean_mayset) {
+        ir->cleanRefMDSet();
+    }
     return t;
 }
 
 
-MD const* MDMgr::allocStorePRMD(IR * ir)
-{
-    ASSERT0(ir->is_stpr());
-    MD const* md = genMDForPR(ir);
-    ir->setMustRef(md, m_rg);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* MDMgr::allocCallResultPRMD(IR * ir)
-{
-    ASSERT0(ir->isCallStmt());
-    MD const* md = genMDForPR(ir);
-    ir->setMustRef(md, m_rg);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* MDMgr::allocSetelemMD(IR * ir)
+MD const* MDMgr::allocSetElemMD(IR * ir)
 {
     ASSERT0(ir->is_setelem());
     MD const* md = genMDForPR(ir);
@@ -160,7 +132,6 @@ MD const* MDMgr::allocSetelemMD(IR * ir)
             md = entry; //regard MD with range as return result.
         }
     }
-
     ir->setMustRef(md, m_rg);
     ir->cleanRefMDSet();
     return md;
@@ -188,43 +159,6 @@ MD const* MDMgr::genMDForPR(PRNO prno, Type const* type)
     MD const* e = m_mdsys->registerMD(md);
     ASSERT0(MD_id(e) > 0);
     return e;
-}
-
-
-MD const* MDMgr::allocGetelemMD(IR * ir)
-{
-    ASSERT0(ir->is_getelem());
-    MD const* md = genMDForPR(ir);
-    ir->setMustRef(md, m_rg);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* MDMgr::allocStoreMD(IR * ir)
-{
-    ASSERT0(ir->is_st());
-    MD const* md = genMDForStore(ir);
-    ASSERT0(md);
-    ir->cleanRefMDSet();
-
-    //TO BE REMOVED: genMDForStore has considered the Offset of ir.
-    //if (ST_ofst(ir) != 0) {
-    //    //Accumulating offset of identifier.
-    //    //e.g: struct {int a,b; } s; s.a = 10
-    //    //generate: st('s', ofst:4) = 10
-    //    MD t(*md);
-    //    ASSERT0(t.is_exact());
-    //    ASSERT0(ir->getTypeSize(m_tm) > 0);
-    //    MD_ofst(&t) += ST_ofst(ir);
-    //    MD_size(&t) = ir->getTypeSize(m_tm);
-    //    MD const* entry = m_mdsys->registerMD(t);
-    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-    //    md = entry; //regard MD with offset as return result.
-    //}
-
-    ir->setMustRef(md, m_rg);
-    return md;
 }
 
 
@@ -256,45 +190,19 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
 {
     ASSERT0(x);
     switch (x->getCode()) {
-    case IR_PR:
+    SWITCH_CASE_PR_OP:
         if (assign_pr) {
-            allocPRMD(x);
+            allocMDForPROp(x);
         }
         break;
-    case IR_STPR:
-        if (assign_pr) {
-            allocStorePRMD(x);
-        }
-        break;
-    case IR_GETELEM:
-        if (assign_pr) {
-            allocGetelemMD(x);
-        }
-        break;
-    case IR_SETELEM:
-        if (assign_pr) {
-            allocSetelemMD(x);
-        }
-        break;
-    case IR_PHI:
-        if (assign_pr) {
-            allocPhiMD(x);
-        }
-        break;
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
         if (assign_pr && x->hasReturnValue()) {
-            allocCallResultPRMD(x);
+            allocMDForPROp(x);
         }
         break;
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_OP:
         if (assign_nonpr) {
-            allocStoreMD(x);
-        }
-        break;
-    case IR_LD:
-        if (assign_nonpr) {
-            allocLoadMD(x);
+            allocMDForDirectMemOp(x, true);
         }
         break;
     case IR_ID:
@@ -306,7 +214,10 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
             }
         }
         break;
-    default: ASSERT0(!x->isReadPR() && !x->isWritePR());
+    SWITCH_CASE_INDIRECT_MEM_OP:
+    SWITCH_CASE_ARRAY_OP:
+        break;
+    default: ASSERT0(!x->isMemRef());
     }
 }
 
@@ -349,8 +260,8 @@ void MDMgr::assignMDForBB(IRBB * bb, IRIter & ii,
     BBIRListIter ct;
     for (xoc::IR * ir = bb->getIRList().get_head(&ct);
          ir != nullptr; ir = bb->getIRList().get_next(&ct)) {
-        for (IR * x = xoc::iterInit(ir, ii);
-             x != nullptr; x = xoc::iterNext(ii)) {
+        for (IR * x = xoc::iterInit(ir, ii, true);
+             x != nullptr; x = xoc::iterNext(ii, true)) {
            assignMDImpl(x, assign_pr, assign_nonpr);
         }
     }
@@ -359,24 +270,55 @@ void MDMgr::assignMDForBB(IRBB * bb, IRIter & ii,
 
 void MDMgr::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
 {
-    for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
-        switch (ir->getCode()) {
-        case IR_PR:
-        case IR_LD:
-        case IR_ID:
-            assignMDImpl(ir, assign_pr, assign_nonpr);
-            break;
-        default: {
-            //Iterate rest of ir in lst.
-            IRIter ii;
-            for (IR * x = xoc::iterInit(lst, ii);
-                 x != nullptr; x = xoc::iterNext(ii)) {
-                assignMDImpl(x, assign_pr, assign_nonpr);
-            }
-            return;
-        }
+    IRIter ii;
+    for (IR * x = xoc::iterInit(lst, ii, true);
+         x != nullptr; x = xoc::iterNext(ii, true)) {
+        assignMDImpl(x, assign_pr, assign_nonpr);
+    }
+}
+
+
+//The function generates new MD for the IR tree that rooted by 'root'.
+//sibling: true if the function have to walk the sibling node of 'root'.
+//It should be called if new IR tree generated in optimzations.
+void MDMgr::allocRefForIRTree(IR * root, bool sibling)
+{
+    IR * ir = root;
+    switch (ir->getCode()) {
+    SWITCH_CASE_PR_OP:
+        allocMDForPROp(ir);
+        break;
+    SWITCH_CASE_DIRECT_MEM_OP:
+        allocMDForDirectMemOp(ir, true);
+        break;
+    default:;
+    }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * k = ir->getKid(i);
+        if (k != nullptr) {
+            allocRefForIRTree(k, true);
         }
     }
+    if (!sibling) { return; }
+    for (IR * s = ir->get_next(); s != nullptr; s = s->get_next()) {
+        allocRefForIRTree(s, false);
+    }
+}
+
+
+MD const* MDMgr::allocRef(IR * ir)
+{
+    switch (ir->getCode()) {
+    SWITCH_CASE_MAY_PR_OP:
+        return allocMDForPROp(ir);
+    SWITCH_CASE_DIRECT_MEM_OP:
+        //Do NOT clean MaySet because transformation may combine ILD(LDA)
+        //into LD and carry MDSet from ILD.
+        return allocMDForDirectMemOp(ir, false);
+    case IR_ID: return allocIdMD(ir);
+    default: UNREACHABLE();
+    }
+    return nullptr;
 }
 
 } //namespace xoc

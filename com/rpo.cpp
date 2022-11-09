@@ -147,7 +147,7 @@ static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
         if (pred->id() == newvex->id()) { continue; }
         if (pred->rpo() == RPO_UNDEF) {
             //Exist invalid rpo, recompute them first.
-            return false;
+            return RPO_UNDEF;
         }
         if (pred->rpo() >= marker->rpo()) { continue; }
         maxpredrpo = MAX(pred->rpo(), maxpredrpo);
@@ -196,7 +196,7 @@ static RPOVal compRPOIfMarkerPriorVex(Vertex const* newvex, Vertex const* marker
             if (succ->id() == newvex->id()) { continue; }
             if (succ->rpo() == RPO_UNDEF) {
                 //Exist invalid rpo, recompute them first.
-                return false;
+                return RPO_UNDEF;
             }
             if (succ->rpo() <= marker->rpo()) { continue; }
             minsuccrpo = MIN(succ->rpo(), minsuccrpo);
@@ -213,6 +213,7 @@ static RPOVal compRPOIfMarkerPriorVex(Vertex const* newvex, Vertex const* marker
     RPOVal end = minsuccrpo == MAX_HOST_INT_VALUE ?
         RPOMgr::computeNearestLessUnUsableRPO(marker->rpo()) + RPO_INTERVAL :
         minsuccrpo - 1;
+    if (begin > end) { return RPO_UNDEF; }
     rpo = rpomgr->tryFindUsableRPO(begin, end);
     #endif
     return rpo;

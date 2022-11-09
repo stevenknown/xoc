@@ -36,18 +36,18 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-void StrBuf::strcat(UINT l, CHAR const* format, va_list args)
+void StrBuf::strcat(UINT bytesize, CHAR const* format, va_list args)
 {
     size_t sl = ::strlen(buf);
-    if (buflen - sl <= l) {
+    if (buflen - sl <= bytesize) {
         CHAR * oldbuf = buf;
-        buflen += l + 1;
-        buf = (CHAR*)malloc(buflen);
+        buflen += bytesize + 1;
+        buf = (CHAR*)::malloc(buflen);
         ::memcpy(buf, oldbuf, sl);
-        free(oldbuf);
+        ::free(oldbuf);
     }
-    UINT k = VSNPRINTF(buf + sl, l + 1, format, args);
-    ASSERT0(k == l);
+    UINT k = VSNPRINTF(buf + sl, bytesize + 1, format, args);
+    ASSERT0(k == bytesize);
     DUMMYUSE(k);
 }
 
@@ -56,7 +56,7 @@ void StrBuf::strcat(UINT l, CHAR const* format, va_list args)
 //otherwise return -1.
 //source: input string.
 //substring: partial string.
-LONG StrBuf::findsubstr(CHAR const* source, CHAR const* substring)
+LONG StrBuf::findSubStr(CHAR const* source, CHAR const* substring)
 {
     return xstrstr(source, substring);
 }
@@ -110,18 +110,24 @@ void StrBuf::vsprint(CHAR const* format, va_list args)
 
 //The functions snprintf() and vsnprintf() do not write more than size
 //bytes (including the terminating null byte ('\0')).
-//size: the maximum possible byte size of string.
-void StrBuf::nstrcat(UINT size, CHAR const* format, ...)
+//bytesize: the maximum possible byte size of string.
+void StrBuf::nstrcat(UINT bytesize, CHAR const* format, ...)
 {
     va_list args;
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    if (l > size) { l = size; }
+    if (l > bytesize) { l = bytesize; }
     strcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
+}
+
+
+void StrBuf::toByteHex(OUT BYTE * outputbuf, UINT buflen)
+{
+    xcom::charToByteHex(buf, outputbuf, buflen);
 }
 
 }//namespace xcom

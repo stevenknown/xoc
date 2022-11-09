@@ -72,7 +72,7 @@ public:
     {
         TTabIter<IR const*> it;
         for (IR const* t = get_first(it); t != nullptr; t = get_next(it)) {
-            if (!t->isNotOverlapViaMDRef(ir)) {
+            if (!t->isNotOverlapViaMDRef(ir, m_rg)) {
                 return true;
             }
         }
@@ -382,7 +382,7 @@ class RegPromot : public Pass {
         }
     };
 
-private:
+protected:
     MD2MDLifeTime * m_md2lt_map;
     UINT m_mdlt_count;
     SMemPool * m_pool;
@@ -391,7 +391,7 @@ private:
     xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     IRCFG * m_cfg;
     TypeMgr * m_tm;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     GVN * m_gvn;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
@@ -399,7 +399,7 @@ private:
     xcom::BitSetMgr m_bs_mgr;
     MDLivenessMgr * m_liveness_mgr;
 
-private:
+protected:
     //Return true if the loop is promotable.
     bool analyszLoop(LI<IRBB> const* li, ExactAccTab & exact_tab,
                      InexactAccTab & inexact_tab);
@@ -709,7 +709,7 @@ public:
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_mds_mgr = rg->getMDSetMgr();
         m_misc_bs_mgr = rg->getMiscBitSetMgr();
         m_gvn = nullptr;

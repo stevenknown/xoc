@@ -31,5 +31,6 @@ namespace xcom {
 
 //The class is used to debug allocation and free of SegMgr.
 UINT g_segmgr_log_count = 0;
+UINT g_xx = 0;
 
 } //namespace xcom

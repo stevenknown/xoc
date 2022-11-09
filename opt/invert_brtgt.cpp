@@ -47,7 +47,7 @@ void InvertBrTgt::dumpInit()
 {
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
         ASSERT0(m_changed_irlist == nullptr);
-        m_changed_irlist = new CIRList();
+        m_changed_irlist = new ConstIRList();
     }
 }
 

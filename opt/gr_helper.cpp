@@ -426,7 +426,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpIRList(ILD_base(ir), ctx);
         m_lm->decIndent(dn);
         break;
-    case IR_PR:
+    SWITCH_CASE_READ_PR:
         note(m_lm, "\n$%d:%s", PR_no(ir), m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         break;
@@ -547,8 +547,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 
         note(m_lm, "\n};");
         break;
-    case IR_BREAK:
-    case IR_CONTINUE:
+    SWITCH_CASE_LOOP_ITER_CFS_OP:
         note(m_lm, "\n%s;", IRNAME(ir));
         break;
     case IR_RETURN:
@@ -596,7 +595,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpProp(ir, ctx);
 
         m_lm->incIndent(dn);
-        dumpIRList(SELECT_pred(ir), ctx);
+        dumpIRList(SELECT_det(ir), ctx);
         prt(m_lm, ",");
         m_lm->decIndent(dn);
 
@@ -671,8 +670,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 
         dumpArrSubList(ir, dn, ctx);
         break;
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
         prt(m_lm, " ");
@@ -701,8 +699,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         prt(m_lm, ")");
         prt(m_lm, ";");
         break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
         prt(m_lm, " (");

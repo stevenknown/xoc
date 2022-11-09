@@ -261,45 +261,39 @@ void ExprTab::remove_occs(IR * ir)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
-    case IR_ST: {
-        IR * stv = ST_rhs(ir);
+    case IR_STPR:
+    SWITCH_CASE_DIRECT_MEM_STMT: {
+        IR * stv = ir->getRHS();
         if (stv->is_const()) { return; }
         remove_occ(stv);
         break;
     }
-    case IR_IST: {
-        IR * stv = IST_rhs(ir);
+    SWITCH_CASE_WRITE_ARRAY:
+    SWITCH_CASE_INDIRECT_MEM_STMT: {
+        IR * stv = ir->getRHS();
         if (!stv->is_const()) {
             remove_occ(stv);
         }
-
-        IR * m = IST_base(ir);
+        IR * m = ir->getBase();
         if (m->is_const()) { return; }
         remove_occ(m);
         break;
     }
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
         for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
             if (!p->is_const()) {
                 remove_occ(p);
             }
         }
         break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         remove_occ(BR_det(ir));
         break;
-    case IR_SWITCH:
-        ASSERT0(SWITCH_vexp(ir));
-        if (!SWITCH_vexp(ir)->is_const()) {
-            remove_occ(SWITCH_vexp(ir));
-        }
-        break;
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
     case IR_IGOTO:
-        ASSERT0(IGOTO_vexp(ir));
-        if (!IGOTO_vexp(ir)->is_const()) {
-            remove_occ(IGOTO_vexp(ir));
+        ASSERT0(ir->getValExp());
+        if (!ir->getValExp()->is_const()) {
+            remove_occ(ir->getValExp());
         }
         break;
     case IR_RETURN:
@@ -310,14 +304,10 @@ void ExprTab::remove_occs(IR * ir)
         }
         break;
     case IR_GOTO:
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
+    SWITCH_CASE_CFS_OP:
+    SWITCH_CASE_LOOP_ITER_CFS_OP:
     case IR_LABEL:
     case IR_CASE:
-    case IR_BREAK:
-    case IR_CONTINUE:
     case IR_PHI:
         break;
     default: UNREACHABLE();
@@ -401,7 +391,7 @@ ExpRep * ExprTab::encode_expr(IN IR * ir)
     case IR_ILD:
     case IR_LDA:
     case IR_CONST:
-    case IR_PR:
+    SWITCH_CASE_READ_PR:
         return nullptr;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
@@ -429,60 +419,53 @@ void ExprTab::encode_bb(IRBB * bb)
          ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         ASSERT0(ir->is_stmt());
         switch (ir->getCode()) {
-        case IR_ST: {
-                ExpRep * ie = encode_expr(ST_rhs(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(ST_rhs(ir), ie);
-                }
-            }
-            break;
+        SWITCH_CASE_DIRECT_MEM_STMT:
         case IR_STPR: {
-                ExpRep * ie = encode_expr(STPR_rhs(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(STPR_rhs(ir), ie);
-                }
+            ExpRep * ie = encode_expr(ir->getRHS());
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ir->getRHS(), ie);
             }
             break;
+        }
         case IR_STARRAY: {
-                ExpRep * ie = encode_expr(ARR_base(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(ARR_base(ir), ie);
-                }
-
-                for (IR * sub = ARR_sub_list(ir);
-                     sub != nullptr; sub = sub->get_next()) {
-                    ExpRep * ie2 = encode_expr(sub);
-                    if (ie2 != nullptr) {
-                        set_map_ir2ir_expr(sub, ie2);
-                    }
-                }
-
-                ie = encode_expr(STARR_rhs(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(STARR_rhs(ir), ie);
+            ExpRep * ie = encode_expr(ir->getBase());
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ir->getBase(), ie);
+            }
+            for (IR * sub = ARR_sub_list(ir);
+                 sub != nullptr; sub = sub->get_next()) {
+                ExpRep * ie2 = encode_expr(sub);
+                if (ie2 != nullptr) {
+                    set_map_ir2ir_expr(sub, ie2);
                 }
             }
-            break;
-        case IR_IST: {
-                ExpRep * ie = encode_expr(IST_rhs(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(IST_rhs(ir), ie);
-                }
-
-                ie = encode_istore_memaddr(IST_base(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(IST_base(ir), ie);
-                }
+            ie = encode_expr(ir->getRHS());
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ir->getRHS(), ie);
             }
             break;
+        }
+        SWITCH_CASE_INDIRECT_MEM_STMT: {
+            ExpRep * ie = encode_expr(ir->getRHS());
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ir->getRHS(), ie);
+            }
+            ie = encode_istore_memaddr(ir->getBase());
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ir->getBase(), ie);
+            }
+            break;
+        }
         case IR_ICALL: { //indirective call
-                ExpRep * ie = encode_expr(ICALL_callee(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(ICALL_callee(ir), ie);
-                }
+            ExpRep * ie = encode_expr(ICALL_callee(ir));
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(ICALL_callee(ir), ie);
             }
+        }
+        //fallthrough
         case IR_CALL:
-            for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+            for (IR * p = CALL_param_list(ir);
+                 p != nullptr; p = p->get_next()) {
                 ExpRep * ie = encode_expr(p);
                 if (ie != nullptr) {
                     set_map_ir2ir_expr(p, ie);
@@ -491,17 +474,7 @@ void ExprTab::encode_bb(IRBB * bb)
             break;
         case IR_GOTO:
             break;
-        case IR_IGOTO: {
-                ExpRep * ie = encode_expr(IGOTO_vexp(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(IGOTO_vexp(ir), ie);
-                }
-            }
-            break;
-        case IR_DO_WHILE:
-        case IR_WHILE_DO:
-        case IR_DO_LOOP: //loop with init , boundary , and step info
-        case IR_IF:
+        SWITCH_CASE_CFS_OP:
             ASSERTN(0, ("High level IR should be simplified"));
             break;
         case IR_LABEL:
@@ -509,28 +482,28 @@ void ExprTab::encode_bb(IRBB * bb)
         case IR_CASE:
         case IR_REGION:
             break;
-        case IR_TRUEBR:
-        case IR_FALSEBR: {
-                ExpRep * ie = encode_expr(BR_det(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(BR_det(ir), ie);
-                }
+        SWITCH_CASE_CONDITIONAL_BRANCH_OP: {
+            ExpRep * ie = encode_expr(BR_det(ir));
+            if (ie != nullptr) {
+               set_map_ir2ir_expr(BR_det(ir), ie);
             }
             break;
-        case IR_SWITCH: {
-                ExpRep * ie = encode_expr(SWITCH_vexp(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(SWITCH_vexp(ir), ie);
-                }
+        }
+        case IR_IGOTO:
+        SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP: {
+            ExpRep * ie = encode_expr(ir->getValExp());
+            if (ie != nullptr) {
+               set_map_ir2ir_expr(ir->getValExp(), ie);
             }
             break;
+        }
         case IR_RETURN: {
-                ExpRep * ie = encode_expr(RET_exp(ir));
-                if (ie != nullptr) {
-                    set_map_ir2ir_expr(RET_exp(ir), ie);
-                }
+            ExpRep * ie = encode_expr(RET_exp(ir));
+            if (ie != nullptr) {
+                set_map_ir2ir_expr(RET_exp(ir), ie);
             }
             break;
+        }
         case IR_PHI: {
             for (IR * opnd = PHI_opnd_list(ir);
                  opnd != nullptr; opnd = opnd->get_next()) {

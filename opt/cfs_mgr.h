@@ -130,6 +130,7 @@ protected:
     SMemPool * m_pool;
     Vector<CFS_INFO*> m_map_ir2cfsinfo;
     Vector<AbsNode*> m_map_bb2abs;
+    BB2LI m_bb2li;
 protected:
     void * xmalloc(size_t size)
     {
@@ -139,7 +140,7 @@ protected:
         return p;
     }
 public:
-    CfsMgr(Region * rg) : Pass(rg) { m_pool = smpoolCreate(64, MEM_COMM); }
+    CfsMgr(Region * rg);
     ~CfsMgr() { smpoolDelete(m_pool); }
 
     AbsNode * constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,

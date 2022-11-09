@@ -89,12 +89,24 @@ IRListIter BBIRList::append_tail_ex(IR * ir)
 //
 //START BBList
 //
+IRBB * BBList::find(BBList const& lst, UINT id)
+{
+    BBListIter ct;
+    for (IRBB * t = lst.get_head(&ct); t != nullptr; t = lst.get_next(&ct)) {
+        if (t->id() == id) {
+            return t;
+        }
+    }
+    return nullptr;
+}
+
+
 //Return true if 'prev' is the previous BB of given BB in BBList.
 //it: BBListIter of given BB.
 bool BBList::isPrevBB(IRBB const* prev, IRBB const* next) const
 {
     BBListIter nextit;
-    find(const_cast<IRBB*>(next), &nextit);
+    xcom::List<IRBB*>::find(const_cast<IRBB*>(next), &nextit);
     ASSERT0(nextit);
     return isPrevBB(prev, nextit);
 }
@@ -103,6 +115,32 @@ bool BBList::isPrevBB(IRBB const* prev, IRBB const* next) const
 bool BBList::isPrevBB(IRBB const* prev, BBListIter nextit) const
 {
     return prev == get_prev(&nextit);
+}
+
+
+void BBList::clone(BBList const& src, Region * rg)
+{
+    IRBBMgr * mgr = rg->getBBMgr();
+    BBListIter srcit;
+    for (IRBB const* srcbb = src.get_head(&srcit);
+         srcbb != nullptr; srcbb = src.get_next(&srcit)) {
+        IRBB * tgtbb = mgr->allocBB();
+        tgtbb->clone(*srcbb, rg);
+        append_tail(tgtbb);
+    }
+}
+
+
+void BBList::copy(BBList const& src, Region * rg)
+{
+    IRBBMgr * mgr = rg->getBBMgr();
+    BBListIter srcit;
+    for (IRBB const* srcbb = src.get_head(&srcit);
+         srcbb != nullptr; srcbb = src.get_next(&srcit)) {
+        IRBB * tgtbb = mgr->allocBB();
+        tgtbb->copy(*srcbb, rg);
+        append_tail(tgtbb);
+    }
 }
 //END BBList
 
@@ -261,7 +299,7 @@ void IRBB::dumpLabelList(Region const* rg) const
 
 void IRBB::dumpDigest(Region const* rg) const
 {
-    note(rg, "\n----- BB%d --- rpo:%d -----", id(),
+    note(rg, "\n----- BB%u --- rpo:%d -----", id(),
          getVex() != nullptr ? rpo() : RPO_UNDEF);
     dumpLabelList(rg);
     dumpAttr(rg);
@@ -409,6 +447,12 @@ bool IRBB::verifyBranchLabel(Lab2BB const& lab2bb) const
 }
 
 
+bool IRBB::hasPRPhi() const
+{
+    return PRSSAMgr::hasPhi(this);
+}
+
+
 bool IRBB::hasMDPhi(CFG<IRBB, IR> const* cfg) const
 {
     MDSSAMgr * mgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
@@ -428,7 +472,7 @@ bool IRBB::verifyTerminate() const
         }
     }
     ASSERT0(BB_is_terminate(this) == find);
-    return true; 
+    return true;
 }
 
 
@@ -460,7 +504,7 @@ bool IRBB::verifyTryEnd() const
         }
     }
     ASSERT0(BB_is_try_end(this) == find);
-    return true; 
+    return true;
 }
 
 
@@ -476,7 +520,48 @@ bool IRBB::verifyTryStart() const
         }
     }
     ASSERT0(BB_is_try_start(this) == find);
-    return true; 
+    return true;
+}
+
+
+void IRBB::copyIRList(IRBB const& src, Region * rg)
+{
+    BBIRList & tgtirlst = getIRList();
+    ASSERT0(tgtirlst.get_elem_count() == 0);
+    BBIRList const& srcirlst = const_cast<IRBB&>(src).getIRList();
+    BBIRListIter irit;
+    for (IR const* srcir = srcirlst.get_head(&irit);
+         srcir != nullptr; srcir = srcirlst.get_next(&irit)) {
+        IR * tgtir = rg->dupIRTree(srcir);
+        tgtir->setBB(this);
+        tgtirlst.append_tail(tgtir);
+    }
+}
+
+
+void IRBB::copyLabelInfoList(IRBB const& src, SMemPool * pool)
+{
+    getLabelList().copy(const_cast<IRBB&>(src).getLabelList());
+}
+
+
+//The function will copy all contents of 'src', include BBID and Vertex info.
+void IRBB::clone(IRBB const& src, Region * rg)
+{
+    m_id = src.m_id;
+    copy(src, rg);
+}
+
+
+void IRBB::copy(IRBB const& src, Region * rg)
+{
+    /////////////////////////////////////////////////////////
+    //DO NOT COPY BB'S ID, BB ID IS UNIQUE IN GIVEN REGION.//
+    /////////////////////////////////////////////////////////
+    u1 = src.u1;
+    m_vertex = nullptr;
+    copyLabelInfoList(src, rg->getCommPool());
+    copyIRList(src, rg);
 }
 //END IRBB
 
@@ -486,11 +571,12 @@ bool IRBB::verifyTryStart() const
 //
 IRBBMgr::~IRBBMgr()
 {
-    for (IRBB * bb = m_bbs_list.get_head();
-         bb != nullptr; bb = m_bbs_list.get_next()) {
+    BBTabIter it;
+    for (IRBB * bb = m_bb_tab.get_first(it);
+         bb != nullptr; bb = m_bb_tab.get_next(it)) {
         delete bb;
     }
-    //BB in free list will also be recorded in m_bbs_list.
+    //BB in free list will also be recorded in m_bb_tab.
 }
 
 
@@ -500,7 +586,7 @@ IRBB * IRBBMgr::allocBB()
     if (bb == nullptr) {
         bb = new IRBB();
         BB_id(bb) = m_bb_count++;
-        m_bbs_list.append_tail(bb);
+        m_bb_tab.append(bb);
     }
     return bb;
 }
@@ -509,9 +595,9 @@ IRBB * IRBBMgr::allocBB()
 void IRBBMgr::destroyBB(IRBB * bb)
 {
     ASSERT0(bb);
-    ASSERTN(!m_free_list.find(bb), ("double destroy"));
+    ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb), ("double destroy"));
     bb->clean();
-    m_bbs_list.remove(bb);
+    m_bb_tab.remove(bb);
     delete bb;
 }
 
@@ -519,7 +605,7 @@ void IRBBMgr::destroyBB(IRBB * bb)
 void IRBBMgr::freeBB(IRBB * bb)
 {
     ASSERT0(bb);
-    ASSERTN(!m_free_list.find(bb), ("double free"));
+    ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb), ("double free"));
     bb->clean();
     m_free_list.append_head(bb);
 }
@@ -529,12 +615,26 @@ void IRBBMgr::freeBB(IRBB * bb)
 size_t IRBBMgr::count_mem() const
 {
     size_t count = 0;
-    BBListIter bbit;
-    for (IRBB * bb = m_bbs_list.get_head(&bbit);
-         bb != nullptr; bb = m_bbs_list.get_next(&bbit)) {
+    BBTabIter bbit;
+    for (IRBB * bb = m_bb_tab.get_first(bbit);
+         bb != nullptr; bb = m_bb_tab.get_next(bbit)) {
         count += bb->count_mem();
     }
     return count;
+}
+
+
+bool IRBBMgr::verify() const
+{
+    //Guarantee the BB id is unique.
+    xcom::TTab<UINT> idtab;
+    BBTabIter bbit;
+    for (IRBB * bb = m_bb_tab.get_first(bbit);
+         bb != nullptr; bb = m_bb_tab.get_next(bbit)) {
+        ASSERT0(!idtab.find(bb->id()));
+        idtab.append(bb->id());
+    }
+    return true;
 }
 //END IRBBMgr
 

@@ -37,6 +37,21 @@ author: Su Zhenyu
 namespace xoc {
 
 //#define STATISTIC_LIVENESS
+#ifdef STATISTIC_LIVENESS
+static UINT g_max_times = 0;
+#endif
+
+static void statistic_liveness(Region const* rg)
+{
+    #ifdef STATISTIC_LIVENESS
+    g_max_times = MAX(g_max_times, count);
+    FILE * h = fopen("liveness.sat.dump", "a+");
+    fprintf(h, "\n%s run %u times, maxtimes %u",
+            rg->getRegionName(), count, g_max_times);
+    fclose(h);
+    #endif
+}
+
 
 //
 //START LivenessMgr
@@ -44,14 +59,14 @@ namespace xoc {
 void LivenessMgr::cleanGlobal()
 {
     for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_livein.get((UINT)i);
+        PRLiveSet * bs = m_livein.get((UINT)i);
         if (bs != nullptr) {
             m_sbs_mgr.freeSBitSetCore(bs);
         }
     }
     m_livein.reinit();
     for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_liveout.get((UINT)i);
+        PRLiveSet * bs = m_liveout.get((UINT)i);
         if (bs != nullptr) {
             m_sbs_mgr.freeSBitSetCore(bs);
         }
@@ -63,41 +78,19 @@ void LivenessMgr::cleanGlobal()
 void LivenessMgr::cleanLocal()
 {
     for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_def.get((UINT)i);
+        PRLiveSet * bs = m_def.get((UINT)i);
         if (bs != nullptr) {
             m_sbs_mgr.freeSBitSetCore(bs);
         }
     }
     m_def.reinit();
     for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_use.get((UINT)i);
+        PRLiveSet * bs = m_use.get((UINT)i);
         if (bs != nullptr) {
             m_sbs_mgr.freeSBitSetCore(bs);
         }
     }
     m_use.reinit();
-}
-
-
-DefSBitSetCore * LivenessMgr::gen_use(UINT bbid)
-{
-    DefSBitSetCore * set = m_use.get(bbid);
-    if (set == nullptr) {
-        set = m_sbs_mgr.allocSBitSetCore();
-        m_use.set(bbid, set);
-    }
-    return set;
-}
-
-
-DefSBitSetCore * LivenessMgr::gen_def(UINT bbid)
-{
-    DefSBitSetCore * set = m_def.get(bbid);
-    if (set == nullptr) {
-        set = m_sbs_mgr.allocSBitSetCore();
-        m_def.set(bbid, set);
-    }
-    return set;
 }
 
 
@@ -109,23 +102,30 @@ bool LivenessMgr::dump() const
     FILE * file = getRegion()->getLogMgr()->getFileHandler();
     getRegion()->getLogMgr()->incIndent(2);
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        note(getRegion(), "\n\n\n-- BB%d --", bb->id());
-        DefSBitSetCore * live_in = get_livein(bb->id());
-        DefSBitSetCore * live_out = get_liveout(bb->id());
-        DefSBitSetCore * def = get_def(bb->id());
-        DefSBitSetCore * use = get_use(bb->id());
-
+        note(getRegion(), "\n-- BB%d --", bb->id());
+        PRLiveSet * live_in = get_livein(bb->id());
+        PRLiveSet * live_out = get_liveout(bb->id());
+        PRLiveSet * def = get_def(bb->id());
+        PRLiveSet * use = get_use(bb->id());
         note(getRegion(), "\nLIVE-IN: ");
-        live_in->dump(file);
+        if (live_in != nullptr) {
+            live_in->dump(file);
+        }
 
         note(getRegion(), "\nLIVE-OUT: ");
-        live_out->dump(file);
+        if (live_out != nullptr) {
+            live_out->dump(file);
+        }
 
         note(getRegion(), "\nDEF: ");
-        def->dump(file);
+        if (def != nullptr) {
+            def->dump(file);
+        }
 
         note(getRegion(), "\nUSE: ");
-        use->dump(file);
+        if (use != nullptr) {
+            use->dump(file);
+        }
     }
     getRegion()->getLogMgr()->decIndent(2);
     return Pass::dump();
@@ -140,25 +140,25 @@ size_t LivenessMgr::count_mem() const
     count += m_livein.count_mem();
     count += m_liveout.count_mem();
     for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_def.get((UINT)i);
+        PRLiveSet * bs = m_def.get((UINT)i);
         if (bs != nullptr) {
             count += bs->count_mem();
         }
     }
     for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_use.get((UINT)i);
+        PRLiveSet * bs = m_use.get((UINT)i);
         if (bs != nullptr) {
             count += bs->count_mem();
         }
     }
     for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_livein.get((UINT)i);
+        PRLiveSet * bs = m_livein.get((UINT)i);
         if (bs != nullptr) {
             count += bs->count_mem();
         }
     }
     for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
-        DefSBitSetCore * bs = m_liveout.get((UINT)i);
+        PRLiveSet * bs = m_liveout.get((UINT)i);
         if (bs != nullptr) {
             count += bs->count_mem();
         }
@@ -167,9 +167,31 @@ size_t LivenessMgr::count_mem() const
 }
 
 
-DefSBitSetCore * LivenessMgr::gen_livein(UINT bbid)
+PRLiveSet * LivenessMgr::gen_def(UINT bbid)
 {
-    DefSBitSetCore * x = m_livein.get(bbid);
+    PRLiveSet * x = m_def.get(bbid);
+    if (x == nullptr) {
+        x = m_sbs_mgr.allocSBitSetCore();
+        m_def.set(bbid, x);
+    }
+    return x;
+}
+
+
+PRLiveSet * LivenessMgr::gen_use(UINT bbid)
+{
+    PRLiveSet * x = m_use.get(bbid);
+    if (x == nullptr) {
+        x = m_sbs_mgr.allocSBitSetCore();
+        m_use.set(bbid, x);
+    }
+    return x;
+}
+
+
+PRLiveSet * LivenessMgr::gen_livein(UINT bbid)
+{
+    PRLiveSet * x = m_livein.get(bbid);
     if (x == nullptr) {
         x = m_sbs_mgr.allocSBitSetCore();
         m_livein.set(bbid, x);
@@ -178,9 +200,9 @@ DefSBitSetCore * LivenessMgr::gen_livein(UINT bbid)
 }
 
 
-DefSBitSetCore * LivenessMgr::gen_liveout(UINT bbid)
+PRLiveSet * LivenessMgr::gen_liveout(UINT bbid)
 {
-    DefSBitSetCore * x = m_liveout.get(bbid);
+    PRLiveSet * x = m_liveout.get(bbid);
     if (x == nullptr) {
         x = m_sbs_mgr.allocSBitSetCore();
         m_liveout.set(bbid, x);
@@ -189,8 +211,24 @@ DefSBitSetCore * LivenessMgr::gen_liveout(UINT bbid)
 }
 
 
-void LivenessMgr::processMay(IR const* pr, MOD DefSBitSetCore * gen,
-                             MOD DefSBitSetCore * use, bool is_lhs)
+void LivenessMgr::processMayDef(PRNO prno, MOD PRLiveSet * gen,
+                                MOD PRLiveSet * use)
+{
+    ASSERT0(gen && use);
+    gen->bunion((BSIdx)prno, m_sbs_mgr);
+    use->diff((BSIdx)prno, m_sbs_mgr);
+}
+
+
+void LivenessMgr::processMayUse(PRNO prno, MOD PRLiveSet * use)
+{
+    ASSERT0(use);
+    use->bunion((BSIdx)prno, m_sbs_mgr);
+}
+
+
+void LivenessMgr::processMay(IR const* pr, MOD PRLiveSet * gen,
+                             MOD PRLiveSet * use, bool is_lhs)
 {
     if (!m_handle_may) { return; }
     MDSet const* mds = pr->getMayRef();
@@ -210,20 +248,17 @@ void LivenessMgr::processMay(IR const* pr, MOD DefSBitSetCore * gen,
         PRNO prno = m_var2pr->get(MD_base(md), &find);
         ASSERT0(find);
         if (is_lhs) {
-            ASSERT0(gen && use);
-            gen->bunion((BSIdx)prno, m_sbs_mgr);
-            use->diff((BSIdx)prno, m_sbs_mgr);
+            processMayDef(prno, gen, use);
             continue;
         }
-        ASSERT0(use);
-        use->bunion((BSIdx)prno, m_sbs_mgr);
+        processMayUse(prno, use);
     }
 }
 
 
 void LivenessMgr::processOpnd(IR const* ir, ConstIRIter & it,
-                              MOD DefSBitSetCore * use,
-                              MOD DefSBitSetCore * gen)
+                              MOD PRLiveSet * use,
+                              MOD PRLiveSet * gen)
 {
     for (IR const* k = iterInitC(ir, it); k != nullptr; k = iterNextC(it)) {
         if (k->isReadPR()) {
@@ -235,8 +270,8 @@ void LivenessMgr::processOpnd(IR const* ir, ConstIRIter & it,
 
 
 void LivenessMgr::processPHI(IR const* x, ConstIRIter & it,
-                             MOD DefSBitSetCore * use,
-                             MOD DefSBitSetCore * gen)
+                             MOD PRLiveSet * use,
+                             MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)PHI_prno(x), m_sbs_mgr);
     use->diff((BSIdx)PHI_prno(x), m_sbs_mgr);
@@ -248,8 +283,8 @@ void LivenessMgr::processPHI(IR const* x, ConstIRIter & it,
 
 
 void LivenessMgr::processSTPR(IR const* x, ConstIRIter & it,
-                              MOD DefSBitSetCore * use,
-                              MOD DefSBitSetCore * gen)
+                              MOD PRLiveSet * use,
+                              MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)STPR_no(x), m_sbs_mgr);
     use->diff((BSIdx)STPR_no(x), m_sbs_mgr);
@@ -261,8 +296,8 @@ void LivenessMgr::processSTPR(IR const* x, ConstIRIter & it,
 
 
 void LivenessMgr::processSETELEM(IR const* x, ConstIRIter & it,
-                                 MOD DefSBitSetCore * use,
-                                 MOD DefSBitSetCore * gen)
+                                 MOD PRLiveSet * use,
+                                 MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)GETELEM_prno(x), m_sbs_mgr);
     use->diff((BSIdx)GETELEM_prno(x), m_sbs_mgr);
@@ -277,8 +312,8 @@ void LivenessMgr::processSETELEM(IR const* x, ConstIRIter & it,
 
 
 void LivenessMgr::processGETELEM(IR const* x, ConstIRIter & it,
-                                 MOD DefSBitSetCore * use,
-                                 MOD DefSBitSetCore * gen)
+                                 MOD PRLiveSet * use,
+                                 MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)SETELEM_prno(x), m_sbs_mgr);
     use->diff((BSIdx)SETELEM_prno(x), m_sbs_mgr);
@@ -296,8 +331,8 @@ void LivenessMgr::processGETELEM(IR const* x, ConstIRIter & it,
 
 
 void LivenessMgr::processCallStmt(IR const* x, ConstIRIter & it,
-                                  MOD DefSBitSetCore * use,
-                                  MOD DefSBitSetCore * gen)
+                                  MOD PRLiveSet * use,
+                                  MOD PRLiveSet * gen)
 {
     if (x->hasReturnValue()) {
         gen->bunion((BSIdx)CALL_prno(x), m_sbs_mgr);
@@ -316,8 +351,8 @@ void LivenessMgr::processCallStmt(IR const* x, ConstIRIter & it,
 
 
 void LivenessMgr::computeExp(IR const* stmt, ConstIRIter & it,
-                             MOD DefSBitSetCore * use,
-                             MOD DefSBitSetCore * gen)
+                             MOD PRLiveSet * use,
+                             MOD PRLiveSet * gen)
 {
     ASSERT0(stmt->is_stmt());
     it.clean();
@@ -332,8 +367,8 @@ void LivenessMgr::computeExp(IR const* stmt, ConstIRIter & it,
 
 
 void LivenessMgr::computeStmt(IR const* stmt, ConstIRIter & it,
-                              MOD DefSBitSetCore * use,
-                              MOD DefSBitSetCore * gen)
+                              MOD PRLiveSet * use,
+                              MOD PRLiveSet * gen)
 {
     ASSERT0(stmt->is_stmt());
     if (stmt->isWritePR() || stmt->isCallStmt() || stmt->is_region()) {
@@ -349,10 +384,22 @@ void LivenessMgr::computeStmt(IR const* stmt, ConstIRIter & it,
 }
 
 
-void LivenessMgr::computeLocal2(IRBB const* bb, ConstIRIter & it)
+void LivenessMgr::computeLocal(BBList const& bblst)
 {
-    DefSBitSetCore * use = gen_use(bb->id());
-    DefSBitSetCore * gen = gen_def(bb->id());
+    ConstIRIter irit;
+    BBListIter it;
+    for (bblst.get_head(&it); it != bblst.end(); it = bblst.get_next(it)) {
+        IRBB const* bb = it->val();
+        ASSERT0(bb);
+        computeLocal(bb, irit);
+    }
+}
+
+
+void LivenessMgr::computeLocal(IRBB const* bb, MOD ConstIRIter & it)
+{
+    PRLiveSet * use = gen_use(bb->id());
+    PRLiveSet * gen = gen_def(bb->id());
     use->clean(m_sbs_mgr);
     gen->clean(m_sbs_mgr);
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
@@ -364,67 +411,25 @@ void LivenessMgr::computeLocal2(IRBB const* bb, ConstIRIter & it)
 }
 
 
-void LivenessMgr::computeLocal(IRBB * bb, ConstIRIter & it)
+void LivenessMgr::init_livein(UINT bbid)
 {
-    DefSBitSetCore * gen = gen_def(bb->id());
-    DefSBitSetCore * use = gen_use(bb->id());
-    gen->clean(m_sbs_mgr);
-    use->clean(m_sbs_mgr);
-    BBIRList & irlst = bb->getIRList();
-    for (IR * x = irlst.get_tail(); x != nullptr; x = irlst.get_prev()) {
-        ASSERT0(x->is_stmt());
-        switch (x->getCode()) {
-        case IR_ST:
-            it.clean();
-            processOpnd(ST_rhs(x), it, use, gen);
-            break;
-        case IR_STPR:
-            processSTPR(x, it, use, gen);
-            break;
-        case IR_SETELEM:
-            processSETELEM(x, it, use, gen);
-            break;
-        case IR_GETELEM:
-            processGETELEM(x, it, use, gen);
-            break;
-        case IR_STARRAY:
-            it.clean();
-            processOpnd(x, it, use, gen);
-            break;
-        case IR_IST:
-            it.clean();
-            processOpnd(x, it, use, gen);
-            break;
-        case IR_SWITCH:
-            it.clean();
-            processOpnd(SWITCH_vexp(x), it, use, gen);
-            break;
-        case IR_IGOTO:
-            it.clean();
-            processOpnd(IGOTO_vexp(x), it, use, gen);
-            break;
-        case IR_GOTO:
-            break;
-        case IR_CALL:
-        case IR_ICALL:
-            processCallStmt(x, it, use, gen);
-            break;
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-            it.clean();
-            processOpnd(BR_det(x), it, use, gen);
-            break;
-        case IR_RETURN:
-            it.clean();
-            processOpnd(RET_exp(x), it, use, gen);
-            break;
-        case IR_PHI:
-            processPHI(x, it, use, gen);
-            break;
-        case IR_REGION:
-            break;
-        default: UNREACHABLE();
-        }
+    PRLiveSet const* use = get_use(bbid);
+    if (use != nullptr) {
+        gen_livein(bbid)->copy(*use, m_sbs_mgr);
+    } else {
+        gen_livein(bbid)->clean(m_sbs_mgr);
+    }
+}
+
+
+void LivenessMgr::initSet(BBList const& bblst)
+{
+    BBListIter it;
+    for (bblst.get_head(&it); it != bblst.end(); it = bblst.get_next(it)) {
+        IRBB * bb = it->val();
+        ASSERT0(bb);
+        init_livein(bb->id());
+        gen_liveout(bb->id())->clean(m_sbs_mgr);
     }
 }
 
@@ -441,101 +446,84 @@ void LivenessMgr::computeLocal(IRBB * bb, ConstIRIter & it)
 //In actually , $4 only lived out from BB1, and $3 only lived out
 //from BB2. For present, $4 both live out from BB1 and BB2, and $3
 //is similar.
-#ifdef STATISTIC_LIVENESS
-static UINT g_max_times = 0;
-#endif
-void LivenessMgr::computeGlobal()
+void LivenessMgr::computeGlobal(IRCFG const* cfg)
 {
-    ASSERT0(m_cfg->getEntry() && BB_is_entry(m_cfg->getEntry()));
-
+    ASSERT0(cfg->getEntry() && BB_is_entry(cfg->getEntry()));
     //RPO should be available.
-    RPOVexList * vlst = m_cfg->getRPOVexList();
+    RPOVexList const* vlst = const_cast<IRCFG*>(cfg)->getRPOVexList();
     ASSERT0(vlst);
-    ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
-
-    RPOVexListIter it;
-    for (vlst->get_head(&it); it != vlst->end(); it = vlst->get_next(it)) {
-        Vertex const* v = it->val();
-        IRBB * bb = m_cfg->getBB(v->id());
-        ASSERT0(bb);
-        UINT bbid = bb->id();
-        gen_livein(bbid)->clean(m_sbs_mgr);
-        gen_liveout(bbid)->clean(m_sbs_mgr);
-    }
-
+    ASSERT0(vlst->get_elem_count() == cfg->getBBList()->get_elem_count());
     bool change;
     UINT count = 0;
     UINT thres = 1000;
-    DefSBitSetCore news;
+    PRLiveSet news;
     do {
         change = false;
         RPOVexListIter ct2;
         for (vlst->get_tail(&ct2);
              ct2 != vlst->end(); ct2 = vlst->get_prev(ct2)) {
-            IRBB * bb = m_cfg->getBB(ct2->val()->id());
+            IRBB const* bb = cfg->getBB(ct2->val()->id());
             ASSERT0(bb);
             UINT bbid = bb->id();
-            xcom::DefSBitSetCore * out = get_liveout(bbid);
-            xcom::EdgeC const* ec = bb->getVex()->getOutList();
-            if (ec != nullptr) {
-                news.copy(*get_livein(ec->getToId()), m_sbs_mgr);
-                ec = ec->get_next();
-
-                for (; ec != nullptr; ec = ec->get_next()) {
-                    news.bunion(*get_livein(ec->getToId()), m_sbs_mgr);
+            PRLiveSet * out = get_liveout(bbid);
+            AdjVertexIter ito;
+            Vertex const* o = Graph::get_first_out_vertex(bb->getVex(), ito);
+            if (o != nullptr) {
+                ASSERT0(get_livein(o->id()));
+                news.copy(*get_livein(o->id()), m_sbs_mgr);
+                o = Graph::get_next_out_vertex(ito);
+                for (; o != nullptr; o = Graph::get_next_out_vertex(ito)) {
+                    ASSERTN(get_livein(o->id()), ("BB miss liveness"));
+                    news.bunion(*get_livein(o->id()), m_sbs_mgr);
                 }
-
                 if (!out->is_equal(news)) {
                     out->copy(news, m_sbs_mgr);
                     change = true;
                 }
             }
-
             //Compute in by out.
             news.copy(*out, m_sbs_mgr);
-            ASSERT0(m_def.get(bbid));
-            news.diff(*m_def.get(bbid), m_sbs_mgr);
-            news.bunion(*m_use.get(bbid), m_sbs_mgr);
+            PRLiveSet const* def = get_def(bbid);
+            if (def != nullptr) {
+                news.diff(*def, m_sbs_mgr);
+            }
+            PRLiveSet const* use = get_use(bbid);
+            if (use != nullptr) {
+                news.bunion(*use, m_sbs_mgr);
+            }
             get_livein(bbid)->copy(news, m_sbs_mgr);
         }
         count++;
     } while (change && count < thres);
     ASSERTN(!change, ("result of equation is convergent slowly"));
-
     news.clean(m_sbs_mgr);
+    statistic_liveness(m_rg);
+}
 
-    #ifdef STATISTIC_LIVENESS
-    g_max_times = MAX(g_max_times, count);
-    FILE * h = fopen("liveness.sat.dump", "a+");
-    fprintf(h, "\n%s run %u times, maxtimes %u",
-            m_rg->getRegionName(), count, g_max_times);
-    fclose(h);
-    #endif
+
+bool LivenessMgr::perform(BBList const* bblst, IRCFG const* cfg, OptCtx & oc)
+{
+    START_TIMER(t, getPassName());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    if (bblst->get_elem_count() == 0) { return false; }
+    computeLocal(*bblst);
+    initSet(*bblst);
+    computeGlobal(cfg);
+    END_TIMER(t, getPassName());
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLivenessMgr()) {
+        dump();
+    }
+    if (!m_keep_local) {
+        cleanLocal();
+    }
+    set_valid(true);
+    return false;
 }
 
 
 bool LivenessMgr::perform(OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    BBList * bbl = m_rg->getBBList();
-    if (bbl->get_elem_count() == 0) { return false; }
-    ConstIRIter it;
-    C<IRBB*> * ct;
-    for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
-        IRBB * bb = ct->val();
-        ASSERT0(bb);
-        //computeLocal(bb, it);
-        computeLocal2(bb, it);
-    }
-    computeGlobal();
-    END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLivenessMgr()) {
-        dump();
-    }
-    cleanLocal();
-    set_valid(true);
-    return false;
+    return perform(m_rg->getBBList(), m_rg->getCFG(), oc);
 }
 //END LivenessMgr
 

@@ -382,6 +382,7 @@ protected:
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
+    IRMgr * m_irmgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::DefSegMgr * m_seg_mgr;
     IRIter m_iter; //for tmp use.
@@ -593,6 +594,7 @@ public:
         cleanInConstructor();
         ASSERT0(rg);
         m_tm = rg->getTypeMgr();
+        m_irmgr = rg->getIRMgr();
         ASSERT0(m_tm);
         ASSERT0(rg->getMiscBitSetMgr());
         ASSERT0(m_seg_mgr);
@@ -857,6 +859,7 @@ public:
 
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
     IRCFG * getCFG() const { return m_cfg; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
@@ -936,7 +939,7 @@ public:
 
     //Return true if ir might have MDSSAInfo.
     static bool hasMDSSAInfo(IR const* ir)
-    { return ir->isMemoryRefNonPR() || ir->isCallStmt(); }
+    { return ir->isMemRefNonPR() || ir->isCallStmt(); }
 
     //Return true if exist USE to 'ir'.
     //The is a helper function to provid simple query, an example to

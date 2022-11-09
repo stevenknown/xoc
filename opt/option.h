@@ -92,6 +92,7 @@ public:
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
+    bool is_dump_lsra; //Dump LinearScanRA
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
     //basedump file in testsuite, because the id may be different in different
@@ -139,6 +140,7 @@ public:
     bool isDumpCDG() const;
     bool isDumpLIS() const;
     bool isDumpIRID() const;
+    bool isDumpLSRA() const;
 };
 
 
@@ -194,6 +196,7 @@ typedef enum _PASS_TYPE {
     PASS_SCC,
     PASS_IRSIMP,
     PASS_LINEAR_SCAN_RA,
+    PASS_IRMGR,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -359,7 +362,7 @@ extern bool g_do_vrp;
 extern bool g_infer_type;
 
 //Perform cfg optimization: invert branch condition and target.
-extern bool g_invert_brtgt;
+extern bool g_invert_branch_target;
 
 //Set true to eliminate control-flow-structures.
 //Note this option may incur user unexpected result:
@@ -421,6 +424,13 @@ extern bool g_build_cfs;
 //Construct BB list.
 extern bool g_cst_bb_list;
 
+//If the flag is true, MDSystem will add delegate of region local variable
+//into overlapping MDSet for each MD.
+//Note the flag is always stand for all region local variables, it's flaw
+//is that if the flag appeared in overlapping MDSet of an IR, the DU chain
+//that built by DUMgr or SSAMgr will be conservative.
+extern bool g_enable_local_var_delegate;
+
 //Record the maximum limit of the number of IR to perform optimizations.
 //This is the threshold to do optimization.
 extern UINT g_thres_opt_ir_num;
@@ -445,6 +455,9 @@ extern bool g_do_poly_tran;
 
 //Refine DefUse Chain.
 extern bool g_do_refine_duchain;
+
+//Linear Scan Register Allocation.
+extern bool g_do_lsra;
 
 //Perform versatile scalar optimizations.
 extern bool g_do_scalar_opt;

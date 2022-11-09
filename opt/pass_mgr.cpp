@@ -66,13 +66,22 @@ void PassMgr::destroyPass(PASS_TYPE passtype)
 
 
 
-void PassMgr::destroyAllPass()
+void PassMgr::destroyAllRegisteredPass()
 {
     PassTabIter tabiter;
     Pass * p;
+    Pass * irmgr = nullptr;
     for (m_registered_pass.get_first(tabiter, &p);
          p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
+        if (p->getPassType() == PASS_IRMGR) {
+            //Because some passes dependent on IRMgr, destroy it at last.
+            irmgr = p;
+            continue;
+        }
         delete p;
+    }
+    if (irmgr != nullptr) {
+        delete irmgr;
     }
 }
 
@@ -88,7 +97,7 @@ void PassMgr::dump() const
     Pass * p;
     for (m_registered_pass.get_first(tabiter, &p);
          p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
-        note(m_rg, "\nPASS:%s", p->getPassName());    
+        note(m_rg, "\nPASS:%s", p->getPassName());
     }
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER(t, "PassMgr");
@@ -230,6 +239,12 @@ Pass * PassMgr::allocIRSimp()
 }
 
 
+Pass * PassMgr::allocIRMgr()
+{
+    return new IRMgrExt(m_rg);
+}
+
+
 Pass * PassMgr::allocLinearScanRA()
 {
     #ifdef FOR_IP
@@ -287,7 +302,7 @@ Pass * PassMgr::allocCFG()
 {
     BBList * bbl = m_rg->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
-    return new IRCFG(C_SEME, bbl, m_rg, n, n);
+    return new IRCFG(C_SEME, bbl, m_rg, n);
 }
 
 
@@ -434,6 +449,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_IRSIMP:
         pass = allocIRSimp();
+        break;
+    case PASS_IRMGR:
+        pass = allocIRMgr();
         break;
     case PASS_LINEAR_SCAN_RA:
         pass = allocLinearScanRA();
@@ -585,7 +603,7 @@ void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
         }
         dumgr->perform(*oc, f);
         if (f.have(DUOPT_COMPUTE_PR_REF) || f.have(DUOPT_COMPUTE_NONPR_REF)) {
-            ASSERT0(m_rg->verifyMDRef());
+            ASSERT0(dumgr->verifyMDRef());
         }
         if (f.have(DUOPT_SOL_AVAIL_EXPR)) {
             ASSERT0(dumgr->verifyLiveinExp());

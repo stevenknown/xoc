@@ -138,6 +138,8 @@ public:
     //'bbid': id of BB.
     bool isInsideLoop(UINT bbid) const
     { return LI_bb_set(this)->is_contain(bbid); }
+    bool isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
+                          bool access_sibling) const;
 
     //Clean adjacent relation in loop-tree.
     void cleanAdjRelation()
@@ -239,7 +241,45 @@ bool LI<BB>::atLeastExecOnce(UINT bbid, xcom::DGraph const* cfg) const
     }
     return false;
 }
+
+
+template <class BB>
+bool LI<BB>::isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
+                              bool access_sibling) const
+{
+    LI<BB> const* li = this;
+    if (li == nullptr) { return false; }
+    for (LI<BB> const* tli = li; tli != nullptr; tli = tli->get_next()) {
+        if (tli->getInnerList() != nullptr &&
+            tli->getInnerList()->isInsideLoopTree(bbid, nestlevel,
+                                                  access_sibling)) {
+            nestlevel++;
+            return true;
+        }
+        if (tli->isInsideLoop(bbid)) {
+            nestlevel++;
+            return true;
+        }
+        if (!access_sibling) { break; }
+    }
+    return false;
+}
 //END LI<BB>
+
+
+class BB2LI {
+    COPY_CONSTRUCTOR(BB2LI);
+    xcom::TMap<UINT, LI<IRBB>*> m_bb2li; //map bb to LI if bb is loop header.
+public:
+    BB2LI() {}
+
+    //The function iterate whole LoopInfo tree that rooted by 'li' to create
+    //the mapping between loophead and related LoopInfo.
+    void createMap(LI<IRBB> * li);
+
+    //Return the LoopInfo which loophead is 'bb'.
+    LI<IRBB> * get(IRBB * bb) { return m_bb2li.get(bb->id()); }
+};
 
 
 //Find the bb that is the START of the unqiue backedge of loop.

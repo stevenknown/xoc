@@ -103,7 +103,7 @@ bool GVN::isUnary(IR_CODE irt) const
 bool GVN::isBinary(IR_CODE irt) const
 {
     //Regard LDA as binary op.
-    return xoc::isBinaryOp(irt) || irt == IR_LDA;
+    return xoc::isBinaryOp(irt) || irt == IR_LDA || irt == IR_GETELEM;
 }
 
 
@@ -550,7 +550,7 @@ VN * GVN::computePR(IR const* exp, bool & change)
 //Only compute memory operation's vn.
 VN * GVN::computeExactMemory(IR const* exp, bool & change)
 {
-    ASSERT0(exp->isMemoryOpnd());
+    ASSERT0(exp->isMemOpnd());
     MD const* emd = exp->getExactRef();
     if (emd == nullptr) { return nullptr; }
 
@@ -595,7 +595,7 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
         MD const* xd = const_cast<IR*>(dir)->getMustRef();
         if (xd == nullptr) {
             MDSet const* xds = const_cast<IR*>(dir)->getMayRef();
-            if (xds != nullptr && xds->is_contain(emd)) {
+            if (xds != nullptr && xds->is_contain(emd, m_rg)) {
                 ASSERT0(m_ir2vn.get(exp->id()) == nullptr);
                 //exp's value is may defined, here we can not
                 //determine if exp have an individual VN.
@@ -930,7 +930,7 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
             return nullptr;
         }
         break;
-    case IR_PR:
+    SWITCH_CASE_READ_PR:
         if (domdef->is_st() || PR_no(exp) != STPR_no(domdef)) {
             return nullptr;
         }
@@ -953,7 +953,7 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
 
 VN * GVN::computeSelect(IR const* exp, bool & change)
 {
-    VN * vn1 = computeVN(SELECT_pred(exp), change);
+    VN * vn1 = computeVN(SELECT_det(exp), change);
     VN * vn2 = computeVN(SELECT_trueexp(exp), change);
     VN * vn3 = computeVN(SELECT_falseexp(exp), change);
     if (vn1 == nullptr || vn2 == nullptr || vn3 == nullptr) {
@@ -1031,7 +1031,7 @@ VN * GVN::computeLda(IR const* exp, bool & change)
     VN * basevn = nullptr;
     if (v->is_string()) {
         if (m_is_comp_lda_string) {
-            MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
+            MD const* emd = m_rg->getMDMgr()->genMDForVar(v, LDA_ofst(exp));
             ASSERTN(emd && emd->is_effect(),
                     ("string should have effect MD"));
             basevn = registerVNviaMD(emd);
@@ -1039,7 +1039,7 @@ VN * GVN::computeLda(IR const* exp, bool & change)
             basevn = nullptr;
         }
     } else {
-        MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
+        MD const* emd = m_rg->getMDMgr()->genMDForVar(v, LDA_ofst(exp));
         ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
         basevn = registerVNviaMD(emd);
     }
@@ -1095,7 +1095,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
     //Note IR_ID should not participate in GVN analysis because it does not
     //represent a real operation.
     case IR_LD:
-    case IR_PR:
+    SWITCH_CASE_READ_PR:
         return computeScalar(exp, change);
     case IR_ARRAY:
         return computeArray(exp, change);
@@ -1191,9 +1191,9 @@ bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
 //return false to indicate unknown.
 bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
 {
-    if (!ir1->isIRIsomo(ir2, true)) { return false; }
+    if (!ir1->isIsomoTo(ir2, true)) { return false; }
     ConstIRIter it1;
-    ConstIRIter it2;   
+    ConstIRIter it2;
     IR const* k1 = iterInitC(ir1, it1, false);
     IR const* k2 = iterInitC(ir2, it2, false);
     for (; k1 != nullptr; k1 = iterNextC(it1, true),
@@ -1206,8 +1206,8 @@ bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
             }
             continue;
         }
-        if (k1->isMemoryRefNonPR()) {
-            ASSERT0(k2->isMemoryRefNonPR());
+        if (k1->isMemRefNonPR()) {
+            ASSERT0(k2->isMemRefNonPR());
             if (!hasSameValueByMDSSA(k1, k2)) {
                 return false;
             }
@@ -1282,6 +1282,7 @@ void GVN::processGETELEM(IR * ir, bool & change)
     VN * v1 = computeVN(GETELEM_base(ir), change);
     VN * v2 = computeVN(GETELEM_ofst(ir), change);
     if (v1 == nullptr || v2 == nullptr) { return; }
+    //Regard getelem as binary operation.
     VN * x = registerBinVN(IR_GETELEM, v1, v2);
     if (getConstVN(ir) != x) {
         setVN(ir, x);
@@ -1307,9 +1308,12 @@ void GVN::processSETELEM(IR * ir, bool & change)
 }
 
 
-void GVN::processSTandSTPR(IR * ir, bool & change)
+void GVN::processDirectMemOp(IR * ir, bool & change)
 {
-    VN * x = computeVN(ir->getRHS(), change);
+    ASSERT0(ir->hasRHS());
+    IR * rhs = ir->getRHS();
+    if (rhs == nullptr) { return; }
+    VN * x = computeVN(rhs, change);
     if (x == nullptr) { return; }
 
     //Do NOT clean ir's VN, because its VN may be set by its dominated
@@ -1323,36 +1327,79 @@ void GVN::processSTandSTPR(IR * ir, bool & change)
 }
 
 
-void GVN::processIST(IR * ir, bool & change)
+void GVN::processIndirectMemOp(IR * ir, bool & change)
 {
-    computeVN(IST_base(ir), change);
-    VN * x = computeVN(ir->getRHS(), change);
-    if (x == nullptr) { return; }
-
-    //Do NOT clean ir's VN, because its VN may be set by its dominated
-    //use-stmt ILD.
-    if (getConstVN(ir) != x) {
-        //ir2vn is nullptr only the first iteration computation.
-        //ASSERT0(getConstVN(ir) == nullptr);
-        m_ir2vn.setAlways(ir->id(), x);
-        change = true;
-    }
+    computeVN(ir->getBase(), change);
+    processDirectMemOp(ir, change);
 }
 
 
 void GVN::processSTARRAY(IR * ir, bool & change)
 {
     computeArrayAddrRef(ir, change);
-    VN * x = computeVN(STARR_rhs(ir), change);
-    if (x == nullptr) { return; }
+    processDirectMemOp(ir, change);
+}
 
-    //Do NOT clean ir's VN, because its VN may be set by its dominated
-    //use-stmt ILD.
-    if (getConstVN(ir) != x) {
-        //ir2vn is nullptr only the first iteration computation.
-        //ASSERT0(getConstVN(ir) == nullptr);
-        m_ir2vn.setAlways(ir->id(), x);
-        change = true;
+
+void GVN::processExtStmt(IR * ir, bool & change)
+{
+    switch (ir->getCode()) {
+    SWITCH_CASE_EXT_STMT:
+        if (ir->getCode() == IR_VSTPR) {
+            processDirectMemOp(ir, change);
+            break;
+        }
+        UNREACHABLE();
+        break;
+    default: UNREACHABLE();
+    }
+}
+
+
+void GVN::processStmt(IR * ir, bool & change)
+{
+    ASSERT0(ir);
+    switch (ir->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    case IR_STPR:
+        processDirectMemOp(ir, change);
+        return;
+    case IR_STARRAY:
+        processSTARRAY(ir, change);
+        return;
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+        processIndirectMemOp(ir, change);
+        return;
+    SWITCH_CASE_CALL:
+        processCall(ir, change);
+        return;
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
+        computeVN(BR_det(ir), change);
+        return;
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
+    case IR_IGOTO:
+        computeVN(ir->getValExp(), change);
+        return;
+    case IR_RETURN:
+        if (RET_exp(ir) != nullptr) {
+            computeVN(RET_exp(ir), change);
+        }
+        return;
+    case IR_REGION:
+        processRegion(ir, change);
+        return;
+    case IR_PHI:
+        processPhi(ir, change);
+        return;
+    case IR_SETELEM:
+        processSETELEM(ir, change);
+        return;
+    case IR_GETELEM:
+        processGETELEM(ir, change);
+        return;
+    case IR_GOTO:
+        return;
+    default: processExtStmt(ir, change);
     }
 }
 
@@ -1362,53 +1409,7 @@ void GVN::processBB(IRBB * bb, bool & change)
     IRListIter ct;
     for (BB_irlist(bb).get_head(&ct);
          ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
-        IR * ir = ct->val();
-        ASSERT0(ir);
-        switch (ir->getCode()) {
-        case IR_ST:
-        case IR_STPR:
-            processSTandSTPR(ir, change);
-            break;
-        case IR_STARRAY:
-            processSTARRAY(ir, change);
-            break;
-        case IR_IST:
-            processIST(ir, change);
-            break;
-        case IR_CALL:
-        case IR_ICALL:
-            processCall(ir, change);
-            break;
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-            computeVN(BR_det(ir), change);
-            break;
-        case IR_SWITCH:
-            computeVN(SWITCH_vexp(ir), change);
-            break;
-        case IR_IGOTO:
-            computeVN(IGOTO_vexp(ir), change);
-            break;
-        case IR_RETURN:
-            if (RET_exp(ir) != nullptr) {
-                computeVN(RET_exp(ir), change);
-            }
-            break;
-        case IR_REGION:
-            processRegion(ir, change);
-            break;
-        case IR_PHI:
-            processPhi(ir, change);
-            break;
-        case IR_SETELEM:
-            processSETELEM(ir, change);
-            break;
-        case IR_GETELEM:
-            processGETELEM(ir, change);
-            break;
-        case IR_GOTO: break;
-        default: UNREACHABLE();
-        }
+        processStmt(ct->val(), change);
     }
 }
 

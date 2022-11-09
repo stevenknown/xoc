@@ -134,13 +134,12 @@ void DeadCodeElim::checkValidAndRecomputeCDG()
 bool DeadCodeElim::check_stmt(IR const* ir)
 {
     if (ir->isMayThrow(true) || ir->hasSideEffect(true) || ir->isNoMove(true)) {
+        //TBD:For now, DCE permits remove redundant dummy operation.
         return true;
     }
-
-    if (!m_is_use_md_du && ir->isMemoryRefNonPR()) {
+    if (!m_is_use_md_du && ir->isMemRefNonPR()) {
         return true;
     }
-
     MD const* mustdef = ir->getRefMD();
     if (mustdef != nullptr) {
         if (is_effect_write(mustdef->get_base())) {
@@ -164,11 +163,11 @@ bool DeadCodeElim::check_stmt(IR const* ir)
     m_citer.clean();
     for (IR const* x = iterExpInitC(ir, m_citer);
          x != nullptr; x = iterExpNextC(m_citer)) {
-        if (!m_is_use_md_du && x->isMemoryRefNonPR()) {
+        if (!m_is_use_md_du && x->isMemRefNonPR()) {
             return true;
         }
 
-        if (!x->isMemoryRef()) { continue; }
+        if (!x->isMemRef()) { continue; }
 
         //Check if using volatile variable.
         //e.g: volatile int g = 0;
@@ -562,7 +561,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(MDDef const* tdef,
 
 bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2)
 {
-    ASSERT0(x->isMemoryRefNonPR() && useMDSSADU());
+    ASSERT0(x->isMemRefNonPR() && useMDSSADU());
     ASSERT0(x->is_exp());
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(x);
     if (mdssainfo == nullptr) {
@@ -724,7 +723,7 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, IRBB * bb,
         rg->freeIRTree(stmt);
 
         //Remove stmt from BB.
-        BB_irlist(bb).remove(ctir);
+        BB_irlist(bb).EList<IR*, IR2Holder>::remove(ctir);
         tobecheck = true;
     }
     return tobecheck;
@@ -770,7 +769,7 @@ bool DeadCodeElim::collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
     if (x->isReadPR() && useprssa) {
         return collectByPRSSA(x, pwlst2);
     }
-    if (x->isMemoryRefNonPR() && usemdssa) {
+    if (x->isMemRefNonPR() && usemdssa) {
         return collectByMDSSA(x, pwlst2);
     }
     return collectByDUSet(x, pwlst2);
@@ -797,7 +796,7 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
             m_citer.clean();
             for (IR const* x = iterExpInitC(ir, m_citer);
                  x != nullptr; x = iterExpNextC(m_citer)) {
-                if (!x->isMemoryOpnd()) { continue; }
+                if (!x->isMemOpnd()) { continue; }
                 change |= collectByDU(x, pwlst2, usemdssa, useprssa);
            }
         }
@@ -820,7 +819,7 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
 
 void DeadCodeElim::reinit()
 {
-    UINT irnum = m_rg->getIRVec()->get_elem_count() / BITS_PER_BYTE + 1;
+    UINT irnum = m_rg->getIRVec().get_elem_count() / BITS_PER_BYTE + 1;
     if (m_is_stmt_effect.get_byte_size() <= irnum) {
         m_is_stmt_effect.alloc(irnum + 1);
     }
@@ -924,7 +923,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
                 PASS_DOM, PASS_LOOP_INFO, PASS_CDG, PASS_UNDEF);
         }
         removed |= removeRedundantPhi();
-        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(m_dumgr->verifyMDRef());
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *getOptCtx()));
         change |= removed;
@@ -940,7 +939,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
 
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_rg->verifyMDRef());
+    ASSERT0(m_dumgr->verifyMDRef());
 
     if (remove_branch_stmt) {
         //Branch stmt will effect control-flow-data-structure.

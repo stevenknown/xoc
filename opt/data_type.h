@@ -877,6 +877,15 @@ public:
         return 0;
     }
 
+    //Return the type that represents the general purpose register of
+    //target machine.
+    Type const* getTargMachRegisterType() const    
+    {
+        DATA_TYPE dt = getDType(WORD_LENGTH_OF_TARGET_MACHINE, false);
+        Type const* ty = getSimplexTypeEx(dt);
+        return ty;
+    }
+
     //Return tensor type, total byte size of tensor =
     //degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
     //e.g: Get tensor with type D_F32<2x3x4x5x1>.

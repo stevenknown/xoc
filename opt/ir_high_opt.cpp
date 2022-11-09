@@ -142,7 +142,7 @@ bool Region::HighProcess(OptCtx & oc)
     note(this, "\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n",
          getRegionName());
 
-    SimpCtx simp;
+    SimpCtx simp(&oc);
     if (g_do_cfs_opt) {
         CfsOpt co(this);
         co.perform(simp);

@@ -1,0 +1,97 @@
+/*@
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Su Zhenyu nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+@*/
+{ IR_VSTPR, "vstpr", CVirStpr::kid_map, CVirStpr::kid_num,
+  sizeof(CVirStpr),
+  IRC_IS_STMT|IRC_IS_STMT_IN_BB|IRC_IS_WRITE_PR|IRC_IS_MEM_REF|IRC_HAS_DU|
+  IRC_HAS_RHS,
+  dumpVSTPR,
+  verifyVSTPR,
+  CVirStpr::accRHS,
+  NOACCIDINFOFUNC,
+  NOACCOFSTFUNC,
+  CVirStpr::accSSAInfo,
+  CVirStpr::accPrno,
+  CVirStpr::accResultPR,
+  CVirStpr::accKid,
+  CVirStpr::accBB,
+  NOACCBASEFUNC,
+  NOACCLABFUNC, 
+  NOACCDETFUNC, },
+
+{ IR_VST, "vst", CVirSt::kid_map, CVirSt::kid_num,
+  sizeof(CVirSt),
+  IRC_IS_STMT|IRC_IS_STMT_IN_BB|IRC_IS_DIRECT_MEM_OP|IRC_HAS_IDINFO|
+  IRC_IS_MEM_REF|IRC_HAS_DU|IRC_HAS_RHS|IRC_IS_NON_PR_MEMREF|IRC_HAS_OFFSET,
+  dumpGeneral,
+  verifyVST,
+  CVirSt::accRHS,
+  CVirSt::accIdinfo,
+  CVirSt::accOfst,
+  NOACCSSAINFOFUNC,
+  NOACCPRNOFUNC,
+  NOACCRESPRFUNC,
+  CVirSt::accKid,
+  CVirSt::accBB,
+  NOACCBASEFUNC,
+  NOACCLABFUNC, 
+  NOACCDETFUNC, },
+
+{ IR_VIST, "vist", CVirISt::kid_map, CVirISt::kid_num,
+  sizeof(CVirISt),
+  IRC_IS_STMT|IRC_IS_STMT_IN_BB|IRC_IS_INDIRECT_MEM_OP|IRC_IS_MEM_REF|
+  IRC_HAS_DU|IRC_HAS_RHS|IRC_IS_NON_PR_MEMREF|IRC_HAS_OFFSET,
+  dumpGeneral,
+  verifyVIST,
+  CVirISt::accRHS,
+  NOACCIDINFOFUNC,
+  CVirISt::accOfst,
+  NOACCSSAINFOFUNC,
+  NOACCPRNOFUNC,
+  NOACCRESPRFUNC,
+  CVirISt::accKid,
+  CVirISt::accBB,
+  CVirISt::accBase,
+  NOACCLABFUNC, 
+  NOACCDETFUNC, },
+
+{ IR_BROADCAST, "broadcast", CBroadCast::kid_map, CBroadCast::kid_num,
+  sizeof(CBroadCast),
+  0,
+  dumpBROADCAST,
+  verifyGeneral,
+  NOACCRHSFUNC,
+  NOACCIDINFOFUNC,
+  NOACCOFSTFUNC,
+  NOACCSSAINFOFUNC,
+  NOACCPRNOFUNC,
+  NOACCRESPRFUNC,
+  CBroadCast::accKid,
+  NOACCBBFUNC,
+  NOACCBASEFUNC,
+  NOACCLABFUNC, 
+  NOACCDETFUNC, },

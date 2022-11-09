@@ -36,7 +36,24 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//#define UPDATE_RPO_JUST_BY_SINGLE_STEP
+//
+//START Lab2BB
+//
+void Lab2BB::dump(Region * rg) const
+{
+    note(rg, "\n==-- DUMP %s --==", "LAB2BB");
+    Lab2BBIter it;
+    IRBB * bb;
+    for (LabelInfo const* li = get_first(it, &bb);
+         !it.end(); li = get_next(it, &bb)) {
+        note(rg, "\n");
+        li->dumpName(rg);
+        ASSERT0(bb);
+        prt(rg, ":BB%u", bb->id());
+    }
+}
+//END Lab2BB
+
 
 class ReviseMDSSAInDomTreeOrder : public VisitTree {
     COPY_CONSTRUCTOR(ReviseMDSSAInDomTreeOrder);
@@ -111,13 +128,21 @@ void Opnd2Pred::collect(IRBB * bb, IRCFG * cfg)
 
 //IRCFG
 IRCFG::IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
-             UINT edge_hash_size, UINT vertex_hash_size)
-    : Pass(rg), CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
+             UINT vertex_hash_size)
+    : Pass(rg), CFG<IRBB, IR>(bbl, vertex_hash_size)
 {
     m_tm = rg->getTypeMgr();
     m_cs = cs;
     setBitSetMgr(rg->getBitSetMgr());
     initEntryAndExit(m_cs);
+}
+
+
+IRCFG::IRCFG(IRCFG const& src, BBList * bbl,
+             bool clone_edge_info, bool clone_vex_info)
+    : Pass(src.getRegion()), CFG<IRBB, IR>(bbl, src.m_vex_hash_size)
+{
+    clone(src, clone_edge_info, clone_vex_info);
 }
 
 
@@ -301,7 +326,8 @@ bool IRCFG::verifyLabel2BB() const
          bb = pthis->getBBList()->get_next()) {
         for (LabelInfo const* li = bb->getLabelList().get_head();
              li != nullptr; li = bb->getLabelList().get_next()) {
-            ASSERT0(m_lab2bb.get(li) == bb);
+            IRBB * libb = m_lab2bb.get(li);
+            ASSERT0(libb == bb);
         }
         bb->verifyBranchLabel(m_lab2bb);
     }
@@ -520,7 +546,9 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
     m_bb_vec.clean();
     m_exit_list.clean();
     m_lab2bb.clean();
-    if (m_bb_list->get_elem_count() == 0) {
+    if (m_bb_list != nullptr && m_bb_list->get_elem_count() == 0) {
+        m_entry = nullptr;
+        m_exit_list.clean();
         return;
     }
 
@@ -543,7 +571,7 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
         }
     }
     if (m_entry != nullptr) {
-        //Already have entry BB.
+        //Already have entry and exit BB.
         return;
     }
     switch (cs) {
@@ -679,6 +707,7 @@ void IRCFG::removeBB(C<IRBB*> * bbct, OUT CfgOptCtx & ctx)
 {
     ASSERT0(bbct && m_bb_list->in_list(bbct));
     IRBB * bb = bbct->val();
+
     //Note the function may be costly.
     removeAllMDPhi(bb, ctx);
     removeAllStmt(bb, ctx);
@@ -722,6 +751,8 @@ void IRCFG::removeBB(C<IRBB*> * bbct, OUT CfgOptCtx & ctx)
         m_exit_list.remove(bb);
     }
     ASSERT0(!bb->is_entry());
+    //The mapping between Labels and BB has been maintained by caller's code.
+    //removeMapBetweenLabelAndBB(bb);
     m_rg->getBBMgr()->destroyBB(bb);
 }
 
@@ -767,6 +798,7 @@ bool IRCFG::removeRedundantLabel()
             LabelInfo const* li = liit->val();
             if (!useful.find(li) && !li->hasSideEffect()) {
                 lst.remove(liit);
+                getLabel2BBMap()->remove(li); 
                 change = true;
             }
         }
@@ -1147,7 +1179,7 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point, OptCtx & oc)
     addEdge(bb, newbb, ctx);
     tryUpdateRPOBeforeCFGChanged(newbb, bb, false, &oc);
     if (oc.is_dom_valid()) {
-        addDomInfoByNewIPDom(bb->id(), newbb->id());
+        addDomInfoToNewIPDom(bb->id(), newbb->id());
     }
     return newbb;
 }
@@ -1241,7 +1273,7 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
 //       newbb
 //         |
 //        BB4
-void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
+void IRCFG::insertBBBefore(IN IRBB * bb, IN IRBB * newbb)
 {
     if (getBB(newbb->id()) == nullptr) {
         addBB(newbb);
@@ -1315,11 +1347,14 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
     //        ...
     IRBB * tramp_bb = m_rg->allocBB();
     LabelInfo * li = m_rg->genILabel();
-    IR * goto_ir = m_rg->buildGoto(li);
+    IR * goto_ir = m_rg->getIRMgr()->buildGoto(li);
     tramp_bb->getIRList().append_tail(goto_ir);
     addLabel(next, li);
     addBB(tramp_bb);
     tryUpdateRPOBeforeCFGChanged(tramp_bb, prev, false, oc);
+    if (oc->is_dom_valid()) {
+        addDomInfoToNewIPDom(prev->id(), tramp_bb->id());
+    }
     getBBList()->insert_after(tramp_bb, prev);
 
     //Insert a trampolining BB between the previous BB of 'to'
@@ -1332,27 +1367,79 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
 }
 
 
+//The function insert newbb after 'marker'.
+//Return the newbb.
+IRBB * IRCFG::insertFallThroughBBAfter(IRBB const* marker, MOD OptCtx * oc)
+{
+    IRBB * newbb = m_rg->allocBB();
+    insertFallThroughBBAfter(marker, newbb, oc);
+    return newbb; 
+}
+
+
+//The function insert newbb after 'marker'. As a result.
+void IRCFG::insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
+                                     MOD OptCtx * oc)
+{
+    ASSERTN(marker->is_fallthrough(), ("can not insert fallthrough BB"));
+    if (getBB(newbb->id()) == nullptr) {
+        //Some pass has call addBB before enter the function.
+        addBB(newbb);
+    }
+    BBList * bblst = getBBList();
+    //Insert newbb into BB List.
+    BBListIter marker_it;
+    bblst->find(marker, &marker_it);
+    ASSERT0(marker_it);
+
+    //Add CFG edge if necessary.
+    BBListIter next_it = marker_it;
+    bblst->get_next(&next_it);
+    ASSERTN(next_it, ("miss fallthrough BB, illegal CFG"));
+    IRBB const* next = next_it->val();
+    ASSERTN(getEdge(marker->id(), next->id()), ("miss fallthrough edge"));
+    tryUpdateRPOBeforeCFGChanged(newbb, marker, false, oc);
+
+    //Insert newbb that should follow 'marker'.
+    bblst->insert_after(newbb, marker_it);
+    insertVertexBetween(marker->id(), next->id(), newbb->id());
+    if (oc->is_dom_valid()) {
+        addDomInfoToFallThroughBB(marker, newbb, next);
+    }
+}
+
+
+void IRCFG::addDomInfoToFallThroughBB(IRBB const* marker, IRBB const* newbb,
+                                      IRBB const* oldnext)
+{
+    addDomInfoToImmediateSucc(marker->getVex(), newbb->getVex(),
+                              oldnext->getVex());
+}
+
+
 //The function insert newbb bewteen 'from' and 'to'. As a result, the
 //function may break up fallthrough edge of 'to' if necessary.
-void IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_it,
-                            IN IRBB * to, IN BBListIter to_it,
-                            IN IRBB * newbb, MOD OptCtx * oc)
+//Return trampoline BB if the function inserted it before 'to'.
+IRBB *  IRCFG::insertBBBetween(IN IRBB const* from, IN BBListIter from_it,
+                               MOD IRBB * to, IN BBListIter to_it,
+                               IN IRBB * newbb, MOD OptCtx * oc)
 {
     ASSERT0(from_it->val() == from && to_it->val() == to);
     //Revise BB list, note that 'from' is either fall-through to 'to',
     //or jumping to 'to'.
-    BBList * bblst = getBBList();
     if (getBB(newbb->id()) == nullptr) {
         //Some pass has call addBB before enter the function.
         addBB(newbb);
     }
 
     //First, processing edge if 'from'->'to' is fallthrough.
+    BBList * bblst = getBBList();
     BBListIter tmp_it = from_it;
     if (from->is_fallthrough() && bblst->get_next(&tmp_it) == to) {
+        //Insert newbb that must be followed 'from'.
         bblst->insert_after(newbb, from_it);
         insertVertexBetween(from->id(), to->id(), newbb->id());
-        return;
+        return nullptr;
     }
 
     //Try to record the fall-through predecessor of 'to'.
@@ -1369,13 +1456,16 @@ void IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_it,
     }
 
     //Revise the target LABEL of last XR in 'from'.
-    IR * last_xr_of_from = get_last_xr(from);
+    IR * last_xr_of_from = get_last_xr(const_cast<IRBB*>(from));
     ASSERT0(last_xr_of_from->getLabel() &&
             findBBbyLabel(last_xr_of_from->getLabel()) == to);
     ASSERT0(last_xr_of_from->getLabel() != nullptr);
     LabelInfo * li = m_rg->genILabel();
     last_xr_of_from->setLabel(li);
     addLabel(newbb, li);
+
+    //Insert newbb that must be fallthrough BB prior to 'to'.
+    bblst->insert_before(newbb, to_it);
 
     //Insert newbb between 'from' and 'to' in Graph.
     insertVertexBetween(from->id(), to->id(), newbb->id());
@@ -1385,8 +1475,9 @@ void IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_it,
         //Thus we have to change original-fallthrough->to to be jump-edge to
         //keep consistency between CFG and Graph.
         ASSERT0(bblst->isPrevBB(fallthrough_pred, newbb));
-        changeFallthroughBBToJumpBB(fallthrough_pred, to, to_it, oc);
+        return changeFallthroughBBToJumpBB(fallthrough_pred, to, to_it, oc);
     }
+    return nullptr;
 }
 
 
@@ -1442,12 +1533,12 @@ void IRCFG::removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx)
 
 
 //Cut off the mapping relation between Labels and BB.
-void IRCFG::resetMapBetweenLabelAndBB(IRBB * bb)
+void IRCFG::removeMapBetweenLabelAndBB(IRBB * bb)
 {
     LabelInfoListIter it;
     for (LabelInfo const* li = bb->getLabelList().get_head(&it);
          li != nullptr; li = bb->getLabelList().get_next(&it)) {
-        m_lab2bb.setAlways(li, nullptr);
+        m_lab2bb.remove(li);
     }
     bb->cleanLabelInfoList();
 }
@@ -1491,7 +1582,7 @@ void IRCFG::reviseStmtMDSSA(VexTab const& vextab, Vertex const* root)
 }
 
 
-void IRCFG::insertBBbetween(IRBB * from, IRBB * to, IRBB * newbb,
+void IRCFG::insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
                             OUT CfgOptCtx & ctx)
 {
     Graph::insertVertexBetween(from->id(), to->id(), newbb->id());
@@ -1668,10 +1759,10 @@ static bool removeTrampolinBBCase1(IRCFG * cfg, BBListIter * ct,
             //to be normal control flow edge.
             CFGEI_is_eh(ei) = false;
         }
-    } //end for each pred of BB.
+    }
 
     //The mapping between Labels and BB has been maintained by above code.
-    //resetMapBetweenLabelAndBB(bb);
+    //removeMapBetweenLabelAndBB(bb);
 
     cfg->removeBB(*ct, ctx);
 
@@ -2001,7 +2092,7 @@ bool IRCFG::removeRedundantBranch(OUT CfgOptCtx & ctx)
             xoc::removeStmt(last_xr, m_rg, ctx.oc);
             m_rg->freeIRTree(last_xr);
 
-            IR * uncond_br = m_rg->buildGoto(tgt_li);
+            IR * uncond_br = m_rg->getIRMgr()->buildGoto(tgt_li);
             BB_irlist(bb).append_tail(uncond_br);
 
             //Remove fallthrough edge, leave branch edge.
@@ -2552,6 +2643,7 @@ bool IRCFG::dump() const
     m_rg->getLogMgr()->incIndent(2);
     //dumpDOT(getRegion()->getLogMgr()->getFileHandler(), DUMP_COMBINE);
     dumpForTest(DUMP_COMBINE);
+    m_lab2bb.dump(m_rg);
     m_rg->getLogMgr()->decIndent(2);
     if (g_dump_opt.isDumpDOM()) {
         dumpDom();
@@ -2587,6 +2679,48 @@ void IRCFG::computeExitList()
 }
 
 
+void IRCFG::cloneLab2BB(Lab2BB const& src)
+{
+    m_lab2bb.clean();
+    ASSERT0(&m_lab2bb != &src);
+    xcom::TMap<UINT, IRBB*> bbmap;
+    BBListIter it;
+    for (IRBB * bb = getBBList()->get_head(&it); bb != nullptr;
+         bb = getBBList()->get_next(&it)) {
+        bbmap.set(bb->id(), bb);
+    }
+    Lab2BBIter lit;
+    IRBB * srcbb;
+    for (LabelInfo const* li = src.get_first(lit, &srcbb);
+         !lit.end(); li = src.get_next(lit, &srcbb)) {
+        IRBB * tgtbb = bbmap.get(srcbb->id());
+        ASSERTN(tgtbb, ("src CFG is not identical to current CFG"));
+        m_lab2bb.set(li, tgtbb);
+    }
+}
+
+
+void IRCFG::initBBVecViaBBList()
+{
+    if (m_bb_list == nullptr) { return; }
+    for (IRBB * bb = m_bb_list->get_head(); bb != nullptr;
+         bb = m_bb_list->get_next()) {
+        m_bb_vec.set(bb->id(), bb);
+    }
+}
+
+
+void IRCFG::clone(IRCFG const& src, bool clone_edge_info, bool clone_vex_info)
+{
+    CFG<IRBB, IR>::clone(src, clone_edge_info, clone_vex_info);
+    m_tm = src.getRegion()->getTypeMgr();
+    m_cs = src.getCfgShape();
+    setBitSetMgr(src.getBitSetMgr());
+    cloneLab2BB(src.m_lab2bb);
+    initBBVecViaBBList();
+}
+
+
 void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 {
     if (getBBList()->get_elem_count() == 0) { return; }
@@ -2599,7 +2733,7 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     RPOVexList * vlst = getRPOVexList();
     ASSERT0(vlst);
-    ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
+    ASSERT0(vlst->get_elem_count() == getBBList()->get_elem_count());
     //xcom::DGraph::computeDom(&vlst, uni);
     //xcom::DGraph::computeIdom();
     bool f = xcom::DGraph::computeIdom2(*vlst);
@@ -2648,7 +2782,7 @@ void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     RPOVexList * vexlst = getRPOVexList();
     ASSERT0(vexlst);
-    ASSERT0(vexlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
+    ASSERT0(vexlst->get_elem_count() == getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
     for (Vertex const* v = vexlst->get_tail(); v != nullptr;

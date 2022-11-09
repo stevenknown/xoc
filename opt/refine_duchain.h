@@ -35,14 +35,22 @@ class RefineDUChain : public Pass {
     COPY_CONSTRUCTOR(RefineDUChain);
 protected:
     DUMgr * m_du;
+    TypeMgr * m_tm;
     GVN const* m_gvn;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;
 protected:
-    bool processExpressionViaMDSSA(IR const* exp);
-    bool processExpressionViaGVN(IR const* exp);
+    bool processExpViaMDSSA(IR const* exp);
+    bool processNormalExpByClassicDU(IR const* exp);
+    bool processNormalExpByMDSSA(IR const* exp);
+    bool processNormalExp(IR const* exp);
+    //Return true if DU chain changed.
+    bool processIndirectExpViaGVN(IR const* exp);
+    bool processArrayExpViaGVN(IR const* exp);
+    bool processIndirectExp(IR const* exp);
+    bool processArrayExp(IR const* exp);
     bool processBB(IRBB const* bb);
     bool process();
 
@@ -57,6 +65,7 @@ public:
     {
         ASSERT0(rg != nullptr);
         m_du = rg->getDUMgr();
+        m_tm = rg->getTypeMgr();
         m_sbs_mgr = rg->getMiscBitSetMgr();
     }
     virtual ~RefineDUChain() {}

@@ -667,16 +667,22 @@ bool IRParser::parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx)
     switch (code) {
     case X_FUNC:
         *region = m_rumgr->newRegion(REGION_FUNC);
+        (*region)->initPassMgr();
+        (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
         SET_FLAG(*flag, VAR_LOCAL);
         break;
     case X_PROGRAM:
         *region = m_rumgr->newRegion(REGION_PROGRAM);
+        (*region)->initPassMgr();
+        (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
         SET_FLAG(*flag, VAR_GLOBAL);
         break;
     case X_INNER:
         *region = m_rumgr->newRegion(REGION_INNER);
+        (*region)->initPassMgr();
+        (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
         SET_FLAG(*flag, VAR_LOCAL);
         break;
@@ -710,6 +716,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region);
     ASSERT0(oc);
     rg->initPassMgr();
+    rg->initIRMgr();
     PassMgr * pm = rg->getPassMgr();
     OptCtx loc(*oc);
 
@@ -829,7 +836,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     exitRegion(&newctx);
 
     if (ctx->current_region != nullptr) {
-        IR * ir = ctx->current_region->buildRegion(region);
+        IR * ir = ctx->current_region->getIRMgr()->buildRegion(region);
         copyProp(ir, ps, ctx);
         ctx->addIR(ir);
     }
@@ -1109,7 +1116,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         //Note if literal is larger than LONGLONG, one have to use longer type
         //instead of LONGLONG.
         ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
-        case_det = ctx->current_region->buildImmInt(
+        case_det = ctx->current_region->getIRMgr()->buildImmInt(
             (HOST_INT)xcom::xatoll(m_lexer->getCurrentTokenString(), false),
             m_tm->getSimplexType(m_tm->get_int_dtype(
                                  sizeof(HOST_INT)*BIT_PER_BYTE, true)));
@@ -1126,7 +1133,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
             tok = m_lexer->getCurrentToken();
         }
     } else if (tok == T_STRING) {
-        case_det = ctx->current_region->buildString(
+        case_det = ctx->current_region->getIRMgr()->buildString(
             m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString()));
         tok = m_lexer->getNextToken();
     } else if (tok == T_FP) {
@@ -1142,7 +1149,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         } else {
             ty = m_tm->getF64();
         }
-        case_det = ctx->current_region->buildImmFp(val, ty);
+        case_det = ctx->current_region->getIRMgr()->buildImmFp(val, ty);
         tok = m_lexer->getCurrentToken();
     } else {
         error(tok, "case determinate must be constant");
@@ -1167,7 +1174,8 @@ bool IRParser::parseCase(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    IR * case_exp = ctx->current_region->buildCase(case_det, caselab);
+    IR * case_exp = ctx->current_region->getIRMgr()->buildCase(case_det,
+                                                               caselab);
     copyProp(case_exp, ps, ctx);
     ctx->returned_exp = case_exp;
     return true;
@@ -1230,7 +1238,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         return false;
     }
 
-    IR * exp = ctx->current_region->buildSelect(det,
+    IR * exp = ctx->current_region->getIRMgr()->buildSelect(det,
         truepart, falsepart, ty == nullptr ? m_tm->getAny() : ty);
     ctx->returned_exp = exp;
     return true;
@@ -1242,7 +1250,7 @@ UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
     Sym const* sym = m_rumgr->addToSymbolTab(prid);
     UINT prno = ctx->mapSym2Prno(sym);
     if (prno == PRNO_UNDEF) {
-        prno = ctx->current_region->buildPrno(m_tm->getAny());
+        prno = ctx->current_region->getIRMgr()->buildPrno(m_tm->getAny());
         ctx->setMapSym2Prno(sym, prno);
     }
     return prno;
@@ -1270,7 +1278,8 @@ bool IRParser::parsePR(ParseCtx * ctx)
     } else {
         ty = m_tm->getAny();
     }
-    ctx->returned_exp = ctx->current_region->buildPRdedicated(prno, ty);
+    ctx->returned_exp = ctx->current_region->getIRMgr()->buildPRdedicated(
+        prno, ty);
     return true;
 }
 
@@ -1336,7 +1345,7 @@ bool IRParser::parseId(ParseCtx * ctx)
         return false;
     }
 
-    IR * id = ctx->current_region->buildId(var);
+    IR * id = ctx->current_region->getIRMgr()->buildId(var);
     ctx->returned_exp = id;
     m_lexer->getNextToken();
     return true;
@@ -1375,7 +1384,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
         return false;
     }
 
-    IR * lda = ctx->current_region->buildLda(var);
+    IR * lda = ctx->current_region->getIRMgr()->buildLda(var);
     LDA_ofst(lda) = (UINT)offset;
     ASSERT0(lda->getType());
     //IR_dt(lda) = m_tm->getPointerType(m_tm->getByteSize(var->getType()));
@@ -1521,7 +1530,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     ASSERT0(rhs);
 
     ASSERT0(ty && elem_ty);
-    IR * ir = ctx->current_region->buildStoreArray(base,
+    IR * ir = ctx->current_region->getIRMgr()->buildStoreArray(base,
         subscript_list, ty, elem_ty,
         xcom::cnt_list(subscript_list),
         elem_dim_buf, rhs);
@@ -1644,8 +1653,8 @@ bool IRParser::parseArray(ParseCtx * ctx)
         return false;
     }
 
-    IR * array = ctx->current_region->buildArray(base, subscript_list,
-        ty == nullptr ? m_tm->getAny() : ty,
+    IR * array = ctx->current_region->getIRMgr()->buildArray(base,
+        subscript_list, ty == nullptr ? m_tm->getAny() : ty,
         elem_ty == nullptr ? m_tm->getAny() : elem_ty,
         xcom::cnt_list(subscript_list), elem_dim_buf);
     ARR_ofst(array) = offset;
@@ -1712,7 +1721,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
         return false;
     }
 
-    IR * ild = ctx->current_region->buildILoad(base, ty);
+    IR * ild = ctx->current_region->getIRMgr()->buildILoad(base, ty);
     ILD_ofst(ild) = offset;
     copyProp(ild, ps, ctx);
     ctx->returned_exp = ild;
@@ -1774,7 +1783,7 @@ bool IRParser::parseLd(ParseCtx * ctx)
         return false;
     }
 
-    IR * ld = ctx->current_region->buildLoad(var,
+    IR * ld = ctx->current_region->getIRMgr()->buildLoad(var,
         ty == nullptr ? var->getType() : ty);
     LD_ofst(ld) = offset;
     ctx->returned_exp = ld;
@@ -1794,7 +1803,8 @@ bool IRParser::parseSignImm(TOKEN tok, ParseCtx * ctx)
         return res;
     case T_SUB:
         if (ctx->returned_exp->is_int()) {
-            CONST_int_val(ctx->returned_exp) = -CONST_int_val(ctx->returned_exp);
+            CONST_int_val(ctx->returned_exp) =
+                -CONST_int_val(ctx->returned_exp);
         } else if (ctx->returned_exp->is_fp()) {
             CONST_fp_val(ctx->returned_exp) = -CONST_fp_val(ctx->returned_exp);
         } else {
@@ -1834,19 +1844,19 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
 
     IR * imm = nullptr;
     if (ty->is_int()) {
-        imm = ctx->current_region->buildImmInt(v, ty);
+        imm = ctx->current_region->getIRMgr()->buildImmInt(v, ty);
     } else if (ty->is_fp()) {
         HOST_FP b = ::atof(immstr.buf);
-        imm = ctx->current_region->buildImmFp(b, ty);
+        imm = ctx->current_region->getIRMgr()->buildImmFp(b, ty);
     } else if (ty->is_any()) {
-        imm = ctx->current_region->buildImmAny(v);
+        imm = ctx->current_region->getIRMgr()->buildImmAny(v);
     } else {
         StrBuf buf(64);
         error("'%s': illegal type for immediate",
               ctx->current_region->getTypeMgr()->dump_type(ty, buf));
 
         //Build CONST even if error occur to recover parsing.
-        imm = ctx->current_region->buildImmInt(v, ty);
+        imm = ctx->current_region->getIRMgr()->buildImmInt(v, ty);
     }
     ctx->returned_exp = imm;
     return true;
@@ -1892,7 +1902,7 @@ bool IRParser::parseBool(ParseCtx * ctx)
 {
     ASSERT0(m_lexer->getCurrentToken() == T_TRUE ||
             m_lexer->getCurrentToken() == T_FALSE);
-    ctx->returned_exp = ctx->current_region->buildImmInt(
+    ctx->returned_exp = ctx->current_region->getIRMgr()->buildImmInt(
         m_lexer->getCurrentToken() == T_TRUE ? 1 : 0, m_tm->getBool());
     TOKEN tok = m_lexer->getNextToken();
     Type const* ty = nullptr;
@@ -1918,7 +1928,7 @@ bool IRParser::parseBool(ParseCtx * ctx)
 bool IRParser::parseString(ParseCtx * ctx)
 {
     ASSERT0(m_lexer->getCurrentToken() == T_STRING);
-    ctx->returned_exp = ctx->current_region->buildString(
+    ctx->returned_exp = ctx->current_region->getIRMgr()->buildString(
         m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString()));
     TOKEN tok = m_lexer->getNextToken();
     Type const* ty = nullptr;
@@ -1956,7 +1966,7 @@ bool IRParser::parseFp(ParseCtx * ctx)
     } else {
         ty = m_tm->getF64();
     }
-    IR * fp = ctx->current_region->buildImmFp(v, ty);
+    IR * fp = ctx->current_region->getIRMgr()->buildImmFp(v, ty);
     ctx->returned_exp = fp;
     return true;
 }
@@ -2203,7 +2213,8 @@ bool IRParser::parseBinaryOp(IR_CODE code, ParseCtx * ctx)
         }
     }
 
-    IR * exp = ctx->current_region->buildBinaryOpSimp(code, ty, opnd0, opnd1);
+    IR * exp = ctx->current_region->getIRMgr()->buildBinaryOpSimp(
+        code, ty, opnd0, opnd1);
     ctx->returned_exp = exp;
     copyProp(exp, ps, ctx);
     return true;
@@ -2238,7 +2249,7 @@ bool IRParser::parseCvt(ParseCtx * ctx)
         ty = m_tm->getAny();
     }
 
-    IR * exp = ctx->current_region->buildUnaryOp(IR_CVT, ty, opnd);
+    IR * exp = ctx->current_region->getIRMgr()->buildUnaryOp(IR_CVT, ty, opnd);
     ctx->returned_exp = exp;
     return true;
 }
@@ -2270,7 +2281,7 @@ bool IRParser::parseUnaryOp(IR_CODE code, ParseCtx * ctx)
         ty = m_tm->getAny();
     }
 
-    IR * exp = ctx->current_region->buildUnaryOp(code, ty, opnd);
+    IR * exp = ctx->current_region->getIRMgr()->buildUnaryOp(code, ty, opnd);
     ctx->returned_exp = exp;
     return true;
 }
@@ -2449,7 +2460,6 @@ bool IRParser::parseStore(ParseCtx * ctx)
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
     }
-
     if (var->is_readonly()) {
         ASSERT0(var->get_name());
         error("can not write readonly variable '%s'",
@@ -2464,15 +2474,17 @@ bool IRParser::parseStore(ParseCtx * ctx)
     }
 
     tok = m_lexer->getNextToken();
-    if (!parseExp(ctx)) {
+    if (!parseExp(ctx) || ctx->returned_exp == nullptr) {
+        error(tok, "illegal rhs of store");
         return false;
     }
 
     IR * ir = nullptr;
     if (ty == nullptr) {
-        ir = ctx->current_region->buildStore(var, ctx->returned_exp);
+        ir = ctx->current_region->getIRMgr()->buildStore(var, ctx->returned_exp);
     } else {
-        ir = ctx->current_region->buildStore(var, ty, ctx->returned_exp);
+        ir = ctx->current_region->getIRMgr()->buildStore(var, ty,
+                                                         ctx->returned_exp);
     }
     ST_ofst(ir) = offset;
     ctx->addIR(ir);
@@ -2537,7 +2549,8 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
 
-    IR * ir = ctx->current_region->buildStorePR(prno, ty, ctx->returned_exp);
+    IR * ir = ctx->current_region->getIRMgr()->buildStorePR(prno, ty,
+                                                            ctx->returned_exp);
     copyProp(ir, ps, ctx);
     ctx->addIR(ir);
     ctx->returned_exp = nullptr;
@@ -2615,7 +2628,8 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         IR * offset = ctx->returned_exp;
 
         //Build IR stmt.
-        ir = ctx->current_region->buildGetElem(prno, ty, base, offset);
+        ir = ctx->current_region->getIRMgr()->buildGetElem(prno, ty, base,
+                                                           offset);
     } else {
         //Parse base of setelem.
         tok = m_lexer->getNextToken();
@@ -2653,7 +2667,8 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         IR * offset = ctx->returned_exp;
 
         //Build IR stmt.
-        ir = ctx->current_region->buildSetElem(prno, ty, base, val, offset);
+        ir = ctx->current_region->getIRMgr()->buildSetElem(prno, ty, base, val,
+                                                           offset);
     }
     ctx->addIR(ir);
     ctx->returned_exp = nullptr;
@@ -2741,7 +2756,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     IR * rhs = ctx->returned_exp;
     ctx->returned_exp = nullptr;
 
-    IR * ir = ctx->current_region->buildIStore(base, rhs, ty);
+    IR * ir = ctx->current_region->getIRMgr()->buildIStore(base, rhs, ty);
     copyProp(ir, ps, ctx);
     IST_ofst(ir) = offset;
     ctx->addIR(ir);
@@ -2933,10 +2948,10 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
 
     IR * ir = nullptr;
     if (is_call) {
-        ir = ctx->current_region->buildCall(callee_var, param_list,
+        ir = ctx->current_region->getIRMgr()->buildCall(callee_var, param_list,
                                             return_prno, return_ty);
     } else {
-        ir = ctx->current_region->buildICall(callee_exp, param_list,
+        ir = ctx->current_region->getIRMgr()->buildICall(callee_exp, param_list,
                                              return_prno, return_ty);
     }
     if (ps.ir_use_list != nullptr) {
@@ -2980,7 +2995,7 @@ bool IRParser::parseGoto(ParseCtx * ctx)
         label = ctx->current_region->genCustomLabel(sym);
         ctx->setMapSym2Label(sym, label);
     }
-    IR * ir = ctx->current_region->buildGoto(label);
+    IR * ir = ctx->current_region->getIRMgr()->buildGoto(label);
     ctx->addIR(ir);
     m_lexer->getNextToken();
     copyProp(ir, ps, ctx);
@@ -3058,7 +3073,7 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
         return false;
     }
 
-    IR * ir = ctx->current_region->buildIgoto(det, case_list);
+    IR * ir = ctx->current_region->getIRMgr()->buildIgoto(det, case_list);
     copyProp(ir, ps, ctx);
     ctx->addIR(ir);
     return true;
@@ -3119,7 +3134,7 @@ bool IRParser::parseDoWhile(ParseCtx * ctx)
     ASSERT0(det);
     ctx->returned_exp = nullptr;
 
-    IR * ir = ctx->current_region->buildDoWhile(det, body);
+    IR * ir = ctx->current_region->getIRMgr()->buildDoWhile(det, body);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     ctx->returned_exp = nullptr;
@@ -3175,7 +3190,7 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
     }
     m_lexer->getNextToken();
 
-    IR * ir = ctx->current_region->buildWhileDo(det, body);
+    IR * ir = ctx->current_region->getIRMgr()->buildWhileDo(det, body);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     ctx->returned_exp = nullptr;
@@ -3265,11 +3280,11 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
 
     //if (iv->is_id()) {
-    //    det = ctx->current_region->buildCmp(IR_LE,
-    //        ctx->current_region->buildLoad(ID_info(iv)), det);
+    //    det = ctx->current_region->getIRMgr()->buildCmp(IR_LE,
+    //        ctx->current_region->getIRMgr()->buildLoad(ID_info(iv)), det);
     //} else {
     //    ASSERT0(iv->is_pr());
-    //    det = ctx->current_region->buildCmp(IR_LE,
+    //    det = ctx->current_region->getIRMgr()->buildCmp(IR_LE,
     //        ctx->current_region->dupIR(iv), det);
     //}
 
@@ -3319,7 +3334,8 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
         return false;
     }
 
-    IR * ir = ctx->current_region->buildDoLoop(iv, init, det, step, body);
+    IR * ir = ctx->current_region->getIRMgr()->buildDoLoop(iv, init, det,
+                                                           step, body);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     m_lexer->getNextToken();
@@ -3410,7 +3426,7 @@ bool IRParser::parseLabel(ParseCtx * ctx)
         }
     }
 
-    IR * ir = ctx->current_region->buildLabel(label);
+    IR * ir = ctx->current_region->getIRMgr()->buildLabel(label);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     ctx->returned_exp = nullptr;
@@ -3469,7 +3485,8 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
     }
     m_lexer->getNextToken();
 
-    IR * ir = ctx->current_region->buildBranch(is_truebr, det, label);
+    IR * ir = ctx->current_region->getIRMgr()->buildBranch(is_truebr, det,
+                                                           label);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     ctx->returned_exp = nullptr;
@@ -3576,7 +3593,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
               m_lexer->getCurrentTokenString());
     }
 
-    IR * ir = ctx->current_region->buildPhi(prno, ty, opnd_list);
+    IR * ir = ctx->current_region->getIRMgr()->buildPhi(prno, ty, opnd_list);
     ctx->addIR(ir);
     return true;
 }
@@ -3654,7 +3671,8 @@ bool IRParser::parseIf(ParseCtx * ctx)
         m_lexer->getNextToken();
     }
 
-    IR * ir = ctx->current_region->buildIf(det, truebody, falsebody);
+    IR * ir = ctx->current_region->getIRMgr()->buildIf(det, truebody,
+                                                       falsebody);
     ctx->addIR(ir);
     copyProp(ir, ps, ctx);
     ctx->returned_exp = nullptr;
@@ -3665,7 +3683,7 @@ bool IRParser::parseIf(ParseCtx * ctx)
 bool IRParser::parseBreak(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_BREAK);
-    ctx->addIR(ctx->current_region->buildBreak());
+    ctx->addIR(ctx->current_region->getIRMgr()->buildBreak());
     m_lexer->getNextToken();
     return true;
 }
@@ -3679,7 +3697,7 @@ bool IRParser::parseReturn(ParseCtx * ctx)
     if (!parseExp(ctx)) {
         return false;
     }
-    IR * ir = ctx->current_region->buildReturn(ctx->returned_exp);
+    IR * ir = ctx->current_region->getIRMgr()->buildReturn(ctx->returned_exp);
     ctx->addIR(ir);
     ctx->returned_exp = nullptr;
     return true;
@@ -3689,7 +3707,7 @@ bool IRParser::parseReturn(ParseCtx * ctx)
 bool IRParser::parseContinue(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_CONTINUE);
-    ctx->addIR(ctx->current_region->buildContinue());
+    ctx->addIR(ctx->current_region->getIRMgr()->buildContinue());
     m_lexer->getNextToken();
     return true;
 }
@@ -3799,7 +3817,8 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
     if (body != nullptr) {
         ctx->has_high_level_ir = true;
     }
-    IR * ir = ctx->current_region->buildSwitch(det, case_list, body, deflab);
+    IR * ir = ctx->current_region->getIRMgr()->buildSwitch(det, case_list,
+                                                           body, deflab);
     copyProp(ir, ps, ctx);
     ctx->addIR(ir);
     return true;
@@ -4449,7 +4468,8 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 if (ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_ICALL &&
                     ctx->ircode != IR_REGION) {
-                    error(tok, "%s does have USE property", IRCNAME(ctx->ircode));
+                    error(tok, "%s does have USE property",
+                          IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseUseProperty(ps, ctx)) {
@@ -4461,7 +4481,8 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
                 if (ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_ICALL &&
                     ctx->ircode != IR_REGION) {
-                    error(tok, "%s does have DEF property", IRCNAME(ctx->ircode));
+                    error(tok, "%s does have DEF property",
+                          IRCNAME(ctx->ircode));
                     return false;
                 }
                 if (!parseDefProperty(ps, ctx)) {

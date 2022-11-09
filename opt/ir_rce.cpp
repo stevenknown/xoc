@@ -115,7 +115,7 @@ static Vertex const* findRoot(Vertex const* from, VexTab const& vt,
 }
 
 
-static void postprocessReached(RCE * rce, Vertex const* from,
+static void postProcessReached(RCE * rce, Vertex const* from,
                                Vertex const* to,
                                MOD RCE::RCECtx & rcectx)
 {
@@ -157,7 +157,7 @@ static void postprocessReached(RCE * rce, Vertex const* from,
 }
 
 
-static void postprocessUnreached(RCE * rce, Vertex const* from,
+static void postProcessUnreached(RCE * rce, Vertex const* from,
                                  Vertex const* to,
                                  MOD RCE::RCECtx & rcectx)
 {
@@ -179,11 +179,12 @@ static void postprocessUnreached(RCE * rce, Vertex const* from,
     //TODO:find minimal root vertex rather than CFG entry.
     //VexTab border;
     //Vertex const* root = findRoot(from, border, rce->getCFG());
+    DUMMYUSE(findRoot); //Avoid gcc complaint.
     //ASSERT0(root);
     Vertex const* root = rce->getCFG()->getEntry()->getVex();
     rce->getCFG()->recomputeDomInfoForSubGraph(root, &modset, iter_times);
     OC_is_dom_valid(*rcectx.oc) = true;
-    modset.add(rmunrchctx.changed_vextab);
+    modset.add(rmunrchctx.getVexTab());
     recordDomVexForEachElem(rce->getCFG(), modset);
     rce->getCFG()->reviseStmtMDSSA(modset, root);
     rcectx.cfg_mod = true;
@@ -192,7 +193,7 @@ static void postprocessUnreached(RCE * rce, Vertex const* from,
 }
 
 
-static void postprocessAfterRemoveEdge(RCE * rce, Vertex const* from,
+static void postProcessAfterRemoveEdge(RCE * rce, Vertex const* from,
                                        Vertex const* to,
                                        MOD RCE::RCECtx & rcectx)
 {
@@ -204,10 +205,10 @@ static void postprocessAfterRemoveEdge(RCE * rce, Vertex const* from,
     bool reach = Graph::isReachIn(to, entry, (UINT)-1, try_failed);
     ASSERTN(!try_failed, ("tried too much"));
     if (reach) {
-        postprocessReached(rce, from, to, rcectx);
+        postProcessReached(rce, from, to, rcectx);
         return;
     }
-    postprocessUnreached(rce, from, to, rcectx);
+    postProcessUnreached(rce, from, to, rcectx);
 }
 
 
@@ -277,15 +278,8 @@ bool RCE::calcCondMustVal(IR const* ir, OUT bool & must_true,
     must_false = false;
     ASSERT0(ir->is_judge());
     switch (ir->getCode()) {
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_NE:
-    case IR_EQ:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_LNOT: {
+    SWITCH_CASE_COMPARE:
+    SWITCH_CASE_LOGIC: {
         if (ir->is_const()) {
             if (CONST_int_val(ir) == 1) {
                 must_true = true;
@@ -346,15 +340,8 @@ IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
     must_false = false;
     ASSERT0(ir->is_judge());
     switch (ir->getCode()) {
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_NE:
-    case IR_EQ:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_LNOT: {
+    SWITCH_CASE_COMPARE:
+    SWITCH_CASE_LOGIC: {
         RefineCtx rc(&oc);
         ir = m_refine->foldConst(ir, changed, rc);
         if (changed && ir->is_const()) {
@@ -365,7 +352,6 @@ IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
             }
             return ir;
         }
-
         if (m_gvn != nullptr && m_gvn->is_valid()) {
             if (changed) {
                 bool vn_changed = false;
@@ -379,13 +365,13 @@ IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
                     Type const* type = ir->getType();
                     xoc::removeUseForTree(ir, m_rg, oc);
                     m_rg->freeIRTree(ir);
-                    return m_rg->buildImmInt(1, type);
+                    return m_irmgr->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
                     xoc::removeUseForTree(ir, m_rg, oc);
                     m_rg->freeIRTree(ir);
-                    return m_rg->buildImmInt(0, type);
+                    return m_irmgr->buildImmInt(0, type);
                 }
             }
         }
@@ -414,7 +400,7 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         //Do NOT free old ir here, leave it to the caller.
         return nullptr;
     }
@@ -424,7 +410,7 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         IRBB * to = m_cfg->getFallThroughBB(from);
         ASSERT0(from != nullptr && to != nullptr);
 
-        IR * newbr = m_rg->buildGoto(BR_lab(ir));
+        IR * newbr = m_irmgr->buildGoto(BR_lab(ir));
         xoc::removeStmt(ir, m_rg, *ctx.oc);
 
         //Revise the PHI operand to fallthrough successor.
@@ -433,13 +419,13 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         CfgOptCtx coctx(*ctx.oc);
         CFGOPTCTX_need_update_dominfo(&coctx) = false;
         m_cfg->removeEdge(from, to, coctx);
-        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return newbr;
     }
     ASSERT0(BR_det(ir) == nullptr);
     if (changed) {
         if (!new_det->is_judge()) {
-            new_det = m_rg->buildJudge(new_det);
+            new_det = m_irmgr->buildJudge(new_det);
         }
         BR_det(ir) = new_det;
         ir->setParent(new_det);
@@ -463,14 +449,14 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         IRBB * from = ir->getBB();
         IRBB * to = m_cfg->getFallThroughBB(from);
         ASSERT0(from != nullptr && to != nullptr);
-        IR * newbr = m_rg->buildGoto(BR_lab(ir));
+        IR * newbr = m_irmgr->buildGoto(BR_lab(ir));
         xoc::removeStmt(ir, m_rg, *ctx.oc);
         //Revise the PHI operand to fallthrough successor.
         //Revise cfg. remove fallthrough edge.
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return newbr;
     }
     if (must_false) {
@@ -485,13 +471,13 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postprocessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
         return nullptr;
     }
     ASSERT0(BR_det(ir) == nullptr);
     if (changed) {
         if (!new_det->is_judge()) {
-            new_det = m_rg->buildJudge(new_det);
+            new_det = m_irmgr->buildJudge(new_det);
         }
         BR_det(ir) = new_det;
         ir->setParent(new_det);
@@ -555,17 +541,16 @@ bool RCE::performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx)
          ct != nullptr; ct = next_ct) {
         IR * ir = ct->val();
         ir_list->get_next(&next_ct);
-        if (ir->hasSideEffect(true)) { continue; }
+        if (ir->hasSideEffect(true) || ir->isDummyOp()) { continue; }
 
         IR * newir = ir;
         switch (ir->getCode()) {
-        case IR_TRUEBR:
-        case IR_FALSEBR:
+        SWITCH_CASE_CONDITIONAL_BRANCH_OP:
             newir = processBranch(ir, ctx);
             break;
 
         //This case has been dealt in ir_refine.
-        //case IR_ST:
+        //SWITCH_CASE_DIRECT_MEM_STMT:
         //    newir = processStore(ir);
         //    break;
         default:;
@@ -653,8 +638,8 @@ bool RCE::perform(OptCtx & oc)
     }
     if (change) {
         //CFG changed, remove empty BB.
-        //TODO: DO not recompute whole SSA/MDSSA. Instead, update
-        //SSA/MDSSA info especially PHI operands incrementally.
+        //TODO:DO not recompute whole SSA/MDSSA. Instead, update SSA/MDSSA
+        //info especially PHI operands incrementally.
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));

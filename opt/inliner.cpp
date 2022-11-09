@@ -82,7 +82,7 @@ IR * Inliner::replaceReturnImpl(
         case IR_RETURN:
             if (!caller_call->hasReturnValue()) {
                 if (el != nullptr) {
-                    IR * go = caller->buildGoto(el);
+                    IR * go = caller->getIRMgr()->buildGoto(el);
                     xcom::insertbefore_one(&new_irs, x, go);
                 }
                 xcom::remove(&new_irs, x);
@@ -92,14 +92,14 @@ IR * Inliner::replaceReturnImpl(
                 PRNO receive = CALL_prno(caller_call);
                 IR * mv_lst = nullptr;
                 if (send != nullptr) {
-                    IR * mv = caller->buildStorePR(receive,
+                    IR * mv = caller->getIRMgr()->buildStorePR(receive,
                         caller_call->getType(), send);
                     xcom::insertbefore_one(&mv_lst, mv_lst, mv);
                 }
                 RET_exp(x) = nullptr;
 
                 if (el != nullptr) {
-                    IR * go = caller->buildGoto(el);
+                    IR * go = caller->getIRMgr()->buildGoto(el);
                     xcom::add_next(&mv_lst, go);
                 }
 
@@ -117,10 +117,8 @@ IR * Inliner::replaceReturnImpl(
 
 
 
-void Inliner::checkRegion(
-        IN Region * rg,
-        OUT bool & need_el,
-        OUT bool & has_ret) const
+void Inliner::checkRegion(IN Region * rg, OUT bool & need_el,
+                          OUT bool & has_ret) const
 {
     need_el = false;
     has_ret = false;
@@ -200,7 +198,7 @@ IR * Inliner::replaceReturn(
     }
 
     if (el != nullptr) {
-        xcom::add_next(&new_irs, caller->buildLabel(el));
+        xcom::add_next(&new_irs, caller->getIRMgr()->buildLabel(el));
     }
     return new_irs;
 }

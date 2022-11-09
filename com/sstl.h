@@ -532,7 +532,6 @@ template <class T> class SC {
 public:
     SC<T> * next;
     T value;
-
 public:
     SC() { init(); }
     void init()
@@ -708,13 +707,14 @@ public:
         m_head = m_tail = m_cur = nullptr;
     }
 
-    void copy(IN List<T> & src)
+    void copy(List<T> const& src)
     {
         clean();
-        T t = src.get_head();
+        C<T> * it;
+        T t = src.get_head(&it);
         for (INT n = src.get_elem_count(); n > 0; n--) {
             append_tail(t);
-            t = src.get_next();
+            t = src.get_next(&it);
         }
     }
 
@@ -1725,6 +1725,7 @@ public:
 
         ASSERT0(m_elem_count == 0);
     }
+
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -1949,6 +1950,15 @@ public:
         m_slcore.init();
         m_tail = &m_slcore.m_head;
     }
+
+    //Return the element removed.
+    T remove_head(SC<T> ** free_list)
+    { return m_slcore.remove_head(free_list); }
+
+    //Return the element removed.
+    //'prev': the previous one element of 'holder'.
+    T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
+    { return m_slcore.remove(prev, holder, free_list); }
 };
 //END SListCoreEx
 
@@ -2466,6 +2476,9 @@ public:
         return count;
     }
 
+    //Note the function does NOT check whether if 't' has been in the list.
+    //User should utilize method find() to fast check before invoke the
+    //function.
     C<T> * append_tail(T t)
     {
         C<T> * c = List<T>::append_tail(t);
@@ -2473,6 +2486,9 @@ public:
         return c;
     }
 
+    //Note the function does NOT check whether if 't' has been in the list.
+    //User should utilize method find() to fast check before invoke the
+    //function.
     C<T> * append_head(T t)
     {
         C<T> * c = List<T>::append_head(t);
@@ -2480,6 +2496,9 @@ public:
         return c;
     }
 
+    //Note the function does NOT check whether if 't' has been in the list.
+    //User should utilize method find() to fast check before invoke the
+    //function.
     void append_tail(IN List<T> & list)
     {
         UINT i = 0;
@@ -2491,6 +2510,9 @@ public:
         }
     }
 
+    //Note the function does NOT check whether if 't' has been in the list.
+    //User should utilize method find() to fast check before invoke the
+    //function.
     void append_head(IN List<T> & list)
     {
         UINT i = 0;
@@ -2502,37 +2524,58 @@ public:
         }
     }
 
-    T remove(T t)
+    bool find(T t, C<T> ** holder = nullptr) const
     {
         C<T> * c = m_typename2holder.get(t);
         if (c == nullptr) {
-            return T(0);
+            return false;
         }
-        T tt = List<T>::remove(c);
-        m_typename2holder.setAlways(t, nullptr);
-        return tt;
+        if (holder != nullptr) {
+            *holder = c;
+        }
+        return true;
     }
 
-    T remove(C<T> * holder)
+    MapTypename2Holder * get_holder_map() const { return &m_typename2holder; }
+
+    T get_cur() const //Do NOT update 'm_cur'
+    { return List<T>::get_cur(); }
+
+    T get_cur(MOD C<T> ** holder) const //Do NOT update 'm_cur'
+    { return List<T>::get_cur(holder); }
+
+    T get_next() //Update 'm_cur'
+    { return List<T>::get_next(); }
+
+    T get_prev() //Update 'm_cur'
+    { return List<T>::get_prev(); }
+
+    T get_next(MOD C<T> ** holder) const //Do NOT update 'm_cur'
+    { return List<T>::get_next(holder); }
+
+    C<T> * get_next(IN C<T> * holder) const //Do NOT update 'm_cur'
+    { return List<T>::get_next(holder); }
+
+    T get_prev(MOD C<T> ** holder) const //Do NOT update 'm_cur'
+    { return List<T>::get_prev(holder); }
+
+    C<T> * get_prev(IN C<T> * holder) const //Do NOT update 'm_cur'
+    { return List<T>::get_prev(holder); }
+
+    T get_next(T marker) const //not update 'm_cur'
     {
-        ASSERT0(m_typename2holder.get(holder->val()) == holder);
-        T t = List<T>::remove(holder);
-        m_typename2holder.setAlways(t, nullptr);
-        return t;
+        C<T> * holder;
+        find(marker, &holder);
+        ASSERT0(holder != nullptr);
+        return List<T>::get_next(&holder);
     }
 
-    T remove_tail()
+    T get_prev(T marker) const //not update 'm_cur'
     {
-        T t = List<T>::remove_tail();
-        m_typename2holder.setAlways(t, nullptr);
-        return t;
-    }
-
-    T remove_head()
-    {
-        T t = List<T>::remove_head();
-        m_typename2holder.setAlways(t, nullptr);
-        return t;
+        C<T> * holder;
+        find(marker, &holder);
+        ASSERT0(holder != nullptr);
+        return List<T>::get_prev(&holder);
     }
 
     //NOTICE: 'marker' should have been in the list.
@@ -2601,60 +2644,6 @@ public:
         m_typename2holder.setAlways(c->val(), c);
     }
 
-    bool find(T t, C<T> ** holder = nullptr) const
-    {
-        C<T> * c = m_typename2holder.get(t);
-        if (c == nullptr) {
-            return false;
-        }
-        if (holder != nullptr) {
-            *holder = c;
-        }
-        return true;
-    }
-
-    MapTypename2Holder * get_holder_map() const { return &m_typename2holder; }
-
-    T get_cur() const //Do NOT update 'm_cur'
-    { return List<T>::get_cur(); }
-
-    T get_cur(MOD C<T> ** holder) const //Do NOT update 'm_cur'
-    { return List<T>::get_cur(holder); }
-
-    T get_next() //Update 'm_cur'
-    { return List<T>::get_next(); }
-
-    T get_prev() //Update 'm_cur'
-    { return List<T>::get_prev(); }
-
-    T get_next(MOD C<T> ** holder) const //Do NOT update 'm_cur'
-    { return List<T>::get_next(holder); }
-
-    C<T> * get_next(IN C<T> * holder) const //Do NOT update 'm_cur'
-    { return List<T>::get_next(holder); }
-
-    T get_prev(MOD C<T> ** holder) const //Do NOT update 'm_cur'
-    { return List<T>::get_prev(holder); }
-
-    C<T> * get_prev(IN C<T> * holder) const //Do NOT update 'm_cur'
-    { return List<T>::get_prev(holder); }
-
-    T get_next(T marker) const //not update 'm_cur'
-    {
-        C<T> * holder;
-        find(marker, &holder);
-        ASSERT0(holder != nullptr);
-        return List<T>::get_next(&holder);
-    }
-
-    T get_prev(T marker) const //not update 'm_cur'
-    {
-        C<T> * holder;
-        find(marker, &holder);
-        ASSERT0(holder != nullptr);
-        return List<T>::get_prev(&holder);
-    }
-
     //Return the container of 'newt'.
     C<T> * replace(T oldt, T newt)
     {
@@ -2669,6 +2658,39 @@ public:
         m_typename2holder.setAlways(oldt, nullptr);
         List<T>::remove(old_holder);
         return new_holder;
+    }
+
+    T remove(T t)
+    {
+        C<T> * c = m_typename2holder.get(t);
+        if (c == nullptr) {
+            return T(0);
+        }
+        T tt = List<T>::remove(c);
+        m_typename2holder.setAlways(t, nullptr);
+        return tt;
+    }
+
+    T remove(C<T> * holder)
+    {
+        ASSERT0(m_typename2holder.get(holder->val()) == holder);
+        T t = List<T>::remove(holder);
+        m_typename2holder.setAlways(t, nullptr);
+        return t;
+    }
+
+    T remove_tail()
+    {
+        T t = List<T>::remove_tail();
+        m_typename2holder.setAlways(t, nullptr);
+        return t;
+    }
+
+    T remove_head()
+    {
+        T t = List<T>::remove_head();
+        m_typename2holder.setAlways(t, nullptr);
+        return t;
     }
 };
 //END EList
@@ -2782,6 +2804,19 @@ public:
         ::memset(m_vec, 0, sizeof(T) * (get_elem_count()));
         m_last_idx = VEC_UNDEF; //No any elements
     }
+
+    //Clean element start from 'idx' to the lastidx.
+    void cleanFrom(VecIdx idx)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        if (m_last_idx == VEC_UNDEF) {
+            return;
+        }
+        ASSERT0(idx < (VecIdx)get_elem_count());
+        ::memset(&m_vec[idx], 0, sizeof(T) * (get_elem_count() - idx));
+        m_last_idx = idx == 0 ? VEC_UNDEF : idx - 1;
+    }
+
     //Count memory usage for current object.
     size_t count_mem() const
     { return m_elem_num * sizeof(T) + sizeof(Vector<T>); }
@@ -2840,6 +2875,13 @@ public:
 
     //Return true if there is not any element.
     bool is_empty() const { return get_last_idx() == VEC_UNDEF; }
+
+    //Get the address in vector of given element referred by 'idx'.
+    T * get_elem_addr(VecIdx idx) const
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        return m_vec + idx;
+    }
 
     //Return the number of element the vector could hold.
     UINT get_capacity() const
@@ -4553,12 +4595,11 @@ public:
 
     void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
     {
+        ASSERT0(this != &src);
         TMapIter<Tsrc, Ttgt> iter;
         Ttgt val;
-        UINT n = src.get_elem_count();
-        UINT i = 0;
         for (Tsrc key = src.get_first(iter, &val);
-             i < n; key = src.get_next(iter, &val), i++) {
+             !iter.end(); key = src.get_next(iter, &val)) {
             set(key, val);
         }
     }

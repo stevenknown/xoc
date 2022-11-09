@@ -20,4 +20,5 @@ $(SRC)/com/byteop.o\
 $(SRC)/com/rpo.o\
 $(SRC)/com/tree.o\
 $(SRC)/com/domtree.o\
-$(SRC)/com/lca.o
+$(SRC)/com/lca.o\
+$(SRC)/com/assemblebin.o

@@ -374,7 +374,7 @@ void MDSSAInfo::collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
             continue;
         }
 
-        ASSERT0(defstmt->isMemoryRefNonPR());
+        ASSERT0(defstmt->isMemRefNonPR());
         MD const* mustdef = defstmt->getRefMD();
         if (ref != nullptr && mustdef != nullptr &&
             ref->is_exact() && mustdef->is_exact() &&
@@ -483,7 +483,7 @@ void MDSSAInfo::addUseSet(MDSSAInfo const* src, IN UseDefMgr * mgr)
 //exp: IR expression to be added.
 void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
 {
-    ASSERT0(exp && exp->is_exp() && exp->isMemoryRefNonPR() && mgr);
+    ASSERT0(exp && exp->is_exp() && exp->isMemRefNonPR() && mgr);
     VOpndSetIter iter = nullptr;
     for (BSIdx i = getVOpndSet()->get_first(&iter);
          i != BS_UNDEF; i = getVOpndSet()->get_next(i, &iter)) {
@@ -634,7 +634,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
         }
 
         IR * use = rg->getIR(i2);
-        ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+        ASSERT0(use && (use->isMemRef() || use->is_id()));
         prt(rg, "%s(id:%d)", IRNAME(use), use->id());
     }
 }
@@ -668,7 +668,7 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
     //Generate a new ID as operand of PHI.
     MD const* res = rg->getMDSystem()->getMD(getResult()->mdid());
     ASSERT0(res);
-    IR * opnd = rg->buildId(res->get_base());
+    IR * opnd = mgr->getIRMgr()->buildId(res->get_base());
     opnd->setRefMD(res, rg);
     ASSERT0(opnd->getRefMDSet() == nullptr);
     ID_phi(opnd) = this; //Record ID's host PHI.
@@ -725,7 +725,7 @@ IR * MDPhi::getOpnd(UINT idx) const
 VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
 {
     ASSERTN(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
-    if (!opnd->is_id() && opnd->isMemoryOpnd()) { return nullptr; }
+    if (!opnd->is_id() && opnd->isMemOpnd()) { return nullptr; }
 
     ASSERT0(mgr);
     MDSSAInfo * mdssainfo = mgr->getMDSSAInfo(opnd);
@@ -762,7 +762,7 @@ void MDPhi::dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
     prt(rg, "(");
     switch (opnd->getCode()) {
     case IR_CONST:
-        dumpConst(opnd, rg);
+        dumpConstContent(opnd, rg);
         break;
     case IR_LDA:
         prt(rg, "LDA");
@@ -803,7 +803,7 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
     for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
-        ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+        ASSERT0(use && (use->isMemRef() || use->is_id()));
         prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
     }
 }
@@ -844,12 +844,12 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) :
     m_rg(rg), m_mdssa_mgr(mgr), m_sbs_mgr(mgr->getSBSMgr())
 {
     ASSERT0(m_rg && m_mdssa_mgr);
-
     m_md_sys = m_rg->getMDSystem();
+    m_irmgr = m_rg->getIRMgr();
 
     //Single List Core need user declared a mempool.
     m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4,
-        MEM_CONST_SIZE);
+                                   MEM_CONST_SIZE);
     m_phi_pool = smpoolCreate(sizeof(MDPhi) * 2, MEM_CONST_SIZE);
     m_defstmt_pool = smpoolCreate(sizeof(MDDefStmt) * 2, MEM_CONST_SIZE);
     m_defset_pool = smpoolCreate(sizeof(MDDefSet) * 2, MEM_CONST_SIZE);
@@ -857,7 +857,7 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) :
     m_vmd_pool = smpoolCreate(sizeof(VMD)*2, MEM_CONST_SIZE);
     m_philist_pool = smpoolCreate(sizeof(MDPhiList)*2, MEM_CONST_SIZE);
     m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4,
-        MEM_CONST_SIZE);
+                                     MEM_CONST_SIZE);
     m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*2, MEM_CONST_SIZE);
 
     m_free_sc_list = nullptr;
@@ -1058,7 +1058,7 @@ void UseDefMgr::buildMDPhiOpnd(MDPhi * phi, UINT mdid, UINT num_operands)
 
     //Generate operand of PHI.
     for (UINT i = 0; i < num_operands; i++) {
-        IR * opnd = m_rg->buildId(md->get_base());
+        IR * opnd = m_irmgr->buildId(md->get_base());
         opnd->setRefMD(md, m_rg);
 
         //Generate MDSSAInfo to ID.

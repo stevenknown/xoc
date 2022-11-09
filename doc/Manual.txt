@@ -938,7 +938,7 @@ Programming Guides
       where a > b is the predicator.
 
       Operands:
-      * SELECT_pred     indicate predicator expression.
+      * SELECT_det     indicate predicator expression.
       * SELECT_trueexp  indicate the true-value expressions.
       * SELECT_falseexp indicate the false-value expressions.
 

@@ -41,7 +41,7 @@ class LogMgr;
 #define LOGCTX_DEFAULT_BUFFER_SIZE 4 //bytes
 
 //This class permits copy-constructing operations.
-class LogCtx {  
+class LogCtx {
 public:
     BYTE replace_newline:1;
     BYTE prt_srcline:1;
@@ -82,7 +82,7 @@ public:
         indent = p_indent;
         logfile = p_logfile;
         logfile_name = p_logfile_name;
-        buffer = nullptr;        
+        buffer = nullptr;
     }
 
     void clean()
@@ -207,7 +207,8 @@ public:
         if (m_is_buffer_enabled_before) { return; }
         lm->startBuffer();
     }
-    ~DumpBufferSwitch()
+    ~DumpBufferSwitch() { flush(); }
+    void flush()
     {
         if (m_is_buffer_enabled_before) { return; }
         m_lm->endBuffer();
@@ -217,6 +218,7 @@ public:
 
 //Print string with indent chars.
 void note(Region const* rg, CHAR const* format, ...);
+void note_args(Region const* rg, CHAR const* format, va_list args);
 
 //Print string with indent chars.
 void note(RegionMgr const* rm, CHAR const* format, ...);

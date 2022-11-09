@@ -216,6 +216,8 @@ protected:
 
     void findBIV(LI<IRBB> const* li, IDTab & tmp);
     void findDIV(LI<IRBB> const* li, BIVList const& bivlst);
+    virtual void findDIVByStmt(IR * ir, LI<IRBB> const* li,
+                               BIVList const& bivlst, OUT IRSet & set);
 
     bool hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
                            OUT IRSet * set) const;

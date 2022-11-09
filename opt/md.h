@@ -48,16 +48,29 @@ typedef enum _MD_TYPE {
 typedef UINT MDIdx;
 
 #define MD_UNDEF 0 //Undefined.
-#define MD_FULL_MEM 1 //Represent all program memory.
+
+//Represent all program memory.
+#define MD_FULL_MEM 1
+
 #define MD_FIRST MD_FULL_MEM
-#define MD_GLOBAL_VAR 2 //Represent variables that allocated at program region
-                        //by explicit definition.
-#define MD_IMPORT_VAR 3 //Represent variables allocated at outer region
-                        //which nor program region.
-#define MD_HEAP_MEM 4 //Represent variables allocated in heap.
-#define MD_LOCAL_VAR 5 //Represent variables allocated in current region.
+
+//Represent variables that allocated at program region by explicit definition.
+#define MD_GLOBAL_VAR 2
+
+//Represent variables allocated at outer region which nor program region.
+#define MD_IMPORT_VAR 3
+
+//Represent variables allocated in current region.
+#define MD_LOCAL_VAR 4
+
+//Represent variables allocated in heap.
+#define MD_HEAP_MEM 5
+
+//Represent variables that are in local may alias set.
+#define MD_LOCAL_MAY_ALIAS 6
+
 //The first id that is allocable.
-#define MD_FIRST_ALLOCABLE (MD_IMPORT_VAR + 1)
+#define MD_FIRST_ALLOCABLE (MD_LOCAL_MAY_ALIAS + 1)
 
 //Memory Descriptor.
 //MD is an appealing property to represent exact or inexact memory object.
@@ -153,7 +166,7 @@ public:
     union {
         struct {
             BYTE type:2;
-            BYTE is_addr_taken:1;
+            BYTE is_taken_addr:1;
             BYTE is_may_reference:1;
         } s1;
         BYTE s1v;
@@ -221,8 +234,11 @@ public:
     //Return true if md is unbound.
     bool is_unbound() const { return MD_ty(this) == MD_UNBOUND; }
 
-    //Return true if md is global variable.
+    //Return true if md is program region global variable.
     bool is_global() const { return MD_base(this)->is_global(); }
+
+    //Return true if md is region local variable. Note the MD may be imported.
+    bool is_local() const { return MD_base(this)->is_local(); }
 
     //Return true if md is volatile memory.
     bool is_volatile() const { return MD_base(this)->is_volatile(); }
@@ -244,6 +260,9 @@ public:
         ASSERT0(this != &src);
         return *this == src;
     }
+
+    //Return true if md's address has been taken.
+    bool is_taken_addr() const { return get_base()->is_taken_addr(); }
 
     inline bool operator == (MD const& src) const
     {
@@ -417,23 +436,22 @@ public:
     }
 
     //Return true if set contained md.
-    bool is_contain(MD const* md) const;
+    //current_rg: the region that perform the query to MDSystem.
+    //            Note current_rg may NOT be the region that contain
+    //            the 'md'. e.g: you can query the function in inner region
+    //            with a global MD.
+    bool is_contain(MD const* md, Region const* current_rg) const;
 
-    //Return true if set only contained the md that has been taken address.
-    bool is_contain_only_taken_addr(MD const* md) const;
+    //Return true if set has delegate MD that contain the 'md'.
+    bool is_contain_by_delegate(MD const* md, Region const* rg) const;
 
     //Return true if md is overlap with the elements in set.
-    bool is_overlap(MD const* md, Region const* current_ru) const;
-
-    //Return true if md is overlap with the elements.
-    //Note this function only consider the MD that have been taken address.
-    bool is_overlap_only_taken_addr(MD const* md,
-                                    Region const* current_ru) const;
+    bool is_overlap(MD const* md, Region const* current_rg) const;
 
     //Return true if md overlaps with element in current MDSet.
     //Note this function will iterate all elements which is costly.
     //Use it carefully.
-    bool is_overlap_ex(MD const* md, Region const* current_ru,
+    bool is_overlap_ex(MD const* md, Region const* current_rg,
                        MDSystem const* mdsys) const;
     bool is_contain_inexact(MDSystem const* ms) const;
     bool is_contain_only_exact_and_str(MDSystem const* ms) const;
@@ -628,12 +646,21 @@ public:
 //NOTE: each region manager has a single MDSystem.
 class MDSystem {
     COPY_CONSTRUCTOR(MDSystem);
+    //If the flag is true, MDSystem will add delegate of region local variable
+    //into overlapping MDSet for each MD.
+    //Note the flag is always stand for all region local variables, it's flaw
+    //is that if the flag appeared in overlapping MDSet of an IR, the DU chain
+    //that built by DUMgr or SSAMgr will be conservative.
+    BYTE m_enable_local_var_delegate:1;
     SMemPool * m_pool;
     SMemPool * m_sc_mdptr_pool;
     TypeMgr * m_tm;
-    Var * m_all_mem;
-    Var * m_global_mem;
-    Var * m_import_var;
+    MD const* m_full_mem;
+    MD const * m_global_mem;
+    MD const * m_import_mem;
+    MD const * m_local_mem;
+    MD const * m_heap_mem;
+    MD const * m_local_may_alias;
     MDId2MD m_id2md_map; //Map MD id to MD.
     SList<MD*> m_free_md_list; //MD allocated in pool.
     UINT m_md_count; //generate MD index, used by registerMD().
@@ -653,13 +680,25 @@ class MDSystem {
 
     //Allocated object should be recorded in list.
     MDTab * allocMDTab() { return new MDTab(); }
-    void initGlobalMemMD(VarMgr * vm);
-    void initImportVar(VarMgr * vm);
-    void initAllMemMD(VarMgr * vm);
-
+    //MD for global memory.
+    void initGlobalMem(VarMgr * vm);
+    //MD for total memory.
+    void initFullMem(VarMgr * vm);
+    //MD for imported variables.
+    void initImportMem(VarMgr * vm);
+    //MD for local memory.
+    void initLocalMem(VarMgr * vm);
+    //MD for local may alias memory.
+    void initLocalMayAlias(VarMgr * vm);
+    //MD for HEAP memory.
+    void initHeapMem(VarMgr * vm);
+    void initDelegate(VarMgr * vm);
 public:
     MDSystem(VarMgr * vm) { init(vm); }
     ~MDSystem() { destroy(); }
+
+    void addDelegate(Region const* current_rg, MD const* md,
+                     OUT MDSet & output, DefMiscBitSetMgr & mbsmgr);
 
     void init(VarMgr * vm);
     void clean();
@@ -677,7 +716,7 @@ public:
     //            with global variables or import variables.
     //Note this function does NOT clean output, and will append result to
     //output.
-    void computeOverlap(Region * current_ru, MD const* md,
+    void computeOverlap(Region * current_rg, MD const* md,
                         OUT MDSet & output, ConstMDIter & mditer,
                         DefMiscBitSetMgr & mbsmgr, bool strictly);
 
@@ -689,7 +728,7 @@ public:
     //mditer: for local use.
     //strictly: set to true to compute if md may be overlapped with global
     //memory.
-    void computeOverlap(Region * current_ru, MOD MDSet & mds,
+    void computeOverlap(Region * current_rg, MOD MDSet & mds,
                         OUT Vector<MD const*> & added, ConstMDIter & mditer,
                         DefMiscBitSetMgr & mbsmgr, bool strictly);
 
@@ -702,7 +741,7 @@ public:
     //strictly: set to true to compute if MD may be overlapped with global
     //memory.
     //Note output do not need to clean before invoke this function.
-    void computeOverlap(Region * current_ru, MDSet const& mds,
+    void computeOverlap(Region * current_rg, MDSet const& mds,
                         OUT MDSet & output, ConstMDIter & mditer,
                         DefMiscBitSetMgr & mbsmgr, bool strictly);
 
@@ -710,6 +749,11 @@ public:
     void dump(bool only_dump_nonpr_md);
     void destroy();
 
+    //Return the MD by given delegate MDIdx.
+    MD const* getDelegate(MDIdx mdid) const;
+
+    //Return the delegate MD by given 'md'.
+    MD const* getDelegate(Region const* rg, MD const* md) const;
     TypeMgr * getTypeMgr() const { return m_tm; }
 
     //Get registered MD.
@@ -720,6 +764,23 @@ public:
         MD * md = m_id2md_map.get(id);
         ASSERT0(md == nullptr || MD_id(md) == id);
         return md;
+    }
+
+    bool isEnableLocalVarDelegate() const
+    { return m_enable_local_var_delegate; }
+
+    //Return true if md indicates region-local-delegate.
+    static bool isLocalDelegate(MDIdx mdid)
+    { return mdid == MD_LOCAL_VAR || mdid == MD_LOCAL_MAY_ALIAS; }
+
+    //Return true if md indicates an imported variable.
+    static bool isImportVar(MD const* md, Region const* rg);
+
+    //Return true if md is delegate MD.
+    static bool isDelegate(MDIdx mdid)
+    {
+        return isLocalDelegate(mdid) || mdid == MD_GLOBAL_VAR ||
+               mdid == MD_IMPORT_VAR; 
     }
 
     MD const* readMD(MDIdx id) const
@@ -759,6 +820,10 @@ public:
 
     //Remove all MDs related to specific variable 'v'.
     void removeMDforVAR(Var const* v, IN ConstMDIter & iter);
+
+    //Enable or disable the usage of region local variable delegate.
+    void setEnableLocalVarDelegate(bool enable)
+    { m_enable_local_var_delegate = enable; }
 };
 
 typedef TMapIter<MDIdx, MDSet const*> MD2MDSetIter;

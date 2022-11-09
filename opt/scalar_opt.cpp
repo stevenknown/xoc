@@ -35,7 +35,7 @@ bool ScalarOpt::perform(OptCtx & oc)
 {
     TTab<Pass*> opt_tab;
     List<Pass*> passlist;
-    SimpCtx simp;
+    SimpCtx simp(&oc);
     if (g_do_gvn) { m_pass_mgr->registerPass(PASS_GVN); }
     if (g_do_vrp) { m_pass_mgr->registerPass(PASS_VRP); }
     if (g_do_pre) {
@@ -122,7 +122,7 @@ bool ScalarOpt::perform(OptCtx & oc)
             ASSERT0(m_cfg->verifyRPO(oc));
             ASSERT0(m_cfg->verifyLoopInfo(oc));
         }
-        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(m_rg->getDUMgr() && m_rg->getDUMgr()->verifyMDRef());
         ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
         ASSERT0(cfg->verify());

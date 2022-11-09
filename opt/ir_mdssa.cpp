@@ -822,8 +822,8 @@ void MDSSAMgr::freeBBPhiList(IRBB * bb)
 
 void MDSSAMgr::freePhiList()
 {
-    for (IRBB * bb = m_rg->getBBList()->get_head();
-         bb != nullptr; bb = m_rg->getBBList()->get_next()) {
+    for (IRBB * bb = m_cfg->getBBList()->get_head();
+         bb != nullptr; bb = m_cfg->getBBList()->get_next()) {
         freeBBPhiList(bb);
     }
     m_usedef_mgr.m_philist_vec.destroy();
@@ -1119,7 +1119,7 @@ void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
 void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
                                       bool & parting_line) const
 {
-    if (!ir->is_stmt() || (!ir->isMemoryRefNonPR() && !ir->isCallStmt())) {
+    if (!ir->is_stmt() || (!ir->isMemRefNonPR() && !ir->isCallStmt())) {
         return;
     }
     VOpndSetIter iter = nullptr;
@@ -1154,7 +1154,7 @@ void MDSSAMgr::dumpIRWithMDSSAForExp(IR const* ir, UINT flag,
     List<IR const*> opnd_lst;
     for (IR const* opnd = iterExpInitC(ir, lst);
          opnd != nullptr; opnd = iterExpNextC(lst)) {
-        if (!opnd->isMemoryRefNonPR() || opnd->is_stmt()) {
+        if (!opnd->isMemRefNonPR() || opnd->is_stmt()) {
             continue;
         }
         VOpndSetIter iter = nullptr;
@@ -1211,7 +1211,7 @@ void MDSSAMgr::dumpVOpndRef() const
     Region * rg = getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP MDSSAMgr VOpndRef '%s' --==\n", rg->getRegionName());
-    BBList * bbl = m_rg->getBBList();
+    BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         note(rg, "\n--- BB%d ---", bb->id());
         dumpPhiList(getPhiList(bb->id()));
@@ -1243,7 +1243,7 @@ bool MDSSAMgr::dump() const
 //Return the VMD if found.
 VMD * MDSSAMgr::findMayRef(IR const* ir, MDIdx mdid) const
 {
-    ASSERT0(ir->isMemoryRef());
+    ASSERT0(ir->isMemRef());
     ASSERT0(ir->is_stmt() || ir->is_exp());
     MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
     ASSERTN(mdssainfo, ("miss MDSSAInfo"));
@@ -1262,7 +1262,7 @@ VMD * MDSSAMgr::findMayRef(IR const* ir, MDIdx mdid) const
 //Find the MustDef of 'ir'.
 MDDef * MDSSAMgr::findMustDef(IR const* ir) const
 {
-    ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
+    ASSERT0(ir && ir->is_exp() && ir->isMemOpnd());
     MD const* mustuse = ir->getMustRef();
     if (mustuse == nullptr || (!mustuse->is_exact() && !mustuse->is_range())) {
         return nullptr;
@@ -1286,7 +1286,7 @@ MDDef * MDSSAMgr::findMustDef(IR const* ir) const
 //Find nearest virtual DEF in VOpndSet of 'ir'.
 MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
 {
-    ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
+    ASSERT0(ir && ir->is_exp() && ir->isMemOpnd());
     MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
     ASSERTN(mdssainfo, ("miss MDSSAInfo"));
     VOpndSetIter iter = nullptr;
@@ -1391,7 +1391,7 @@ IR * MDSSAMgr::findKillingDefStmt(IR const* ir) const
 //stmt 1, 2, 3, there is no nearest killing def.
 MDDef * MDSSAMgr::findKillingMDDef(IR const* ir) const
 {
-    ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
+    ASSERT0(ir && ir->is_exp() && ir->isMemOpnd());
     MD const* opndmd = ir->getMustRef();
     if (opndmd == nullptr || (!opndmd->is_exact() && !opndmd->is_range())) {
         //TBD: For those exp who do not have MustRef, must they not
@@ -1537,7 +1537,7 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
     opnd_lst.clean();
     for (IR const* opnd = xoc::iterInit(const_cast<IR*>(ir), lst);
          opnd != nullptr; opnd = xoc::iterNext(lst)) {
-        if (!opnd->isMemoryRefNonPR() || opnd->is_stmt()) {
+        if (!opnd->isMemRefNonPR() || opnd->is_stmt()) {
             continue;
         }
 
@@ -1587,7 +1587,7 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
     for (BSIdx i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
-        ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+        ASSERT0(use && (use->isMemRef() || use->is_id()));
         prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
         //prt(rg, "(%s id:%d MD%uV%u) ", IRNAME(use), use->id(),
         //    vmd->mdid(), vmd->version());
@@ -1597,7 +1597,7 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
 
 void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
 {
-    ASSERT0(ir->isMemoryRefNonPR() || ir->isCallStmt());
+    ASSERT0(ir->isMemRefNonPR() || ir->isCallStmt());
     VOpndSetIter iter = nullptr;
     Region * rg = getRegion();
     if (!parting_line) {
@@ -1644,7 +1644,7 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir,
     getRegion()->getLogMgr()->incIndent(2);
     bool parting_line = false;
     //Handle stmt.
-    if (ir->isMemoryRefNonPR() || ir->isCallStmt()) {
+    if (ir->isMemRefNonPR() || ir->isCallStmt()) {
         dumpDUChainForStmt(ir, parting_line);
     }
     //Handle expression.
@@ -1779,7 +1779,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefMDSet & maydef)
 {
     m_iter.clean();
     ASSERT0(ir->is_stmt());
-    if (ir->isMemoryRefNonPR() ||
+    if (ir->isMemRefNonPR() ||
         (ir->isCallStmt() && !ir->isReadOnly())) {
         MD const* ref = ir->getMustRef();
         if (ref != nullptr &&
@@ -1796,7 +1796,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefMDSet & maydef)
     for (IR * t = xoc::iterExpInit(ir, m_iter);
          t != nullptr; t = xoc::iterExpNext(m_iter)) {
         ASSERT0(t->is_exp());
-        if (t->isMemoryRefNonPR()) {
+        if (t->isMemRefNonPR()) {
             genMDSSAInfoAndVOpnd(t, MDSSA_INIT_VERSION);
         }
     }
@@ -1836,12 +1836,12 @@ void MDSSAMgr::computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md)
         for (IR const* t = iterExpInitC(ir, irit);
              t != nullptr; t = iterExpNextC(irit)) {
             ASSERT0(t->is_exp());
-            if (t->isMemoryRefNonPR()) {
+            if (t->isMemRefNonPR()) {
                 collectUseMD(t, livein_md);
             }
         }
 
-        if (!ir->isMemoryRefNonPR()) { continue; }
+        if (!ir->isMemRefNonPR()) { continue; }
 
         MD const* ref = ir->getMustRef();
         if (ref == nullptr || !ref->is_exact()) { continue; }
@@ -2049,7 +2049,7 @@ void MDSSAMgr::placePhi(DfMgr const& dfm, OUT DefMDSet & effect_md,
     START_TIMER(t, "MDSSA: Place phi");
 
     //Record BBs which modified each MD.
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     //All objects allocated and recorded in md2defbb are used for local purpose,
     //and will be destoied before leaving this function.
     Vector<List<IRBB*>*> md2defbb(bblst->get_elem_count());
@@ -2416,7 +2416,7 @@ void MDSSAMgr::renameBB(IN IRBB * bb, MD2VMDStack & md2vmdstk)
         m_iter.clean();
         for (IR * opnd = xoc::iterInit(ir, m_iter);
              opnd != nullptr; opnd = xoc::iterNext(m_iter)) {
-            if (!opnd->isMemoryOpnd() || opnd->isReadPR()) {
+            if (!opnd->isMemOpnd() || opnd->isReadPR()) {
                 continue;
             }
 
@@ -2431,7 +2431,7 @@ void MDSSAMgr::renameBB(IN IRBB * bb, MD2VMDStack & md2vmdstk)
             renameUse(opnd, md2vmdstk);
         }
 
-        if (!ir->isMemoryRef() || ir->isWritePR()) { continue; }
+        if (!ir->isMemRef() || ir->isWritePR()) { continue; }
 
         //Rename result.
         renameDef(ir, bb, md2vmdstk);
@@ -2513,7 +2513,7 @@ void MDSSAMgr::rename(DefMDSet const& effect_mds, BB2DefMDSet & defed_mds_vec,
                       DomTree & domtree, MD2VMDStack & md2vmdstk)
 {
     START_TIMER(t, "MDSSA: Rename");
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     DefMDSetIter it = nullptr;
     for (BSIdx i = effect_mds.get_first(&it);
@@ -2555,7 +2555,7 @@ void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, DomTree & domtree)
 {
     xcom::Stack<IRBB*> stk;
-    UINT n = m_rg->getBBList()->get_elem_count();
+    UINT n = m_cfg->getBBList()->get_elem_count();
     xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VMDMap bb2vmdmap(n);
     IRBB * v = nullptr;
@@ -2600,7 +2600,7 @@ void MDSSAMgr::destruction(DomTree & domtree)
 {
     START_TIMER(t, "MDSSA: destruction in dom tree order");
     if (!is_valid()) { return; }
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     ASSERT0(m_cfg->getEntry());
     destructionInDomTreeOrder(m_cfg->getEntry(), domtree);
@@ -2697,7 +2697,7 @@ bool MDSSAMgr::verifyPhiOpndList(MDPhi const* phi, UINT prednum) const
 //do NOT invoke the function during the removing.
 bool MDSSAMgr::verifyPhi() const
 {
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != nullptr;
          bb = bblst->get_next()) {
@@ -2751,7 +2751,7 @@ void MDSSAMgr::collectDefinedMD(IRBB const* bb, OUT DefMDSet & maydef) const
 void MDSSAMgr::collectDefinedMDForBBList(MOD DefMiscBitSetMgr & bs_mgr,
                                          OUT BB2DefMDSet & bb2defmds) const
 {
-    BBList const* bblst = m_rg->getBBList();
+    BBList const* bblst = m_cfg->getBBList();
     BBListIter it;
     for (IRBB const* bb = bblst->get_head(&it);
          bb != nullptr; bb = bblst->get_next(&it)) {
@@ -2891,13 +2891,13 @@ static bool verifyVerBB(IRBB const* bb, MD2VMDStack & md2verstk,
         irit.clean();
         for (IR const* opnd = xoc::iterInitC(ir, irit);
              opnd != nullptr; opnd = xoc::iterNextC(irit)) {
-            if (!opnd->isMemoryOpnd() || opnd->isReadPR()) {
+            if (!opnd->isMemOpnd() || opnd->isReadPR()) {
                 continue;
             }
             verifyVerUse(opnd, md2verstk, mgr);
         }
 
-        if (!ir->isMemoryRef() || ir->isWritePR()) { continue; }
+        if (!ir->isMemRef() || ir->isWritePR()) { continue; }
 
         //Rename result.
         verifyVerDef(ir, md2verstk, mgr);
@@ -3048,7 +3048,7 @@ static void verifyIRVMD(IR const* ir, MDSSAMgr const* mgr,
     ConstIRIter irit;
     for (IR const* t = iterInitC(ir, irit);
          t != nullptr; t = iterNextC(irit)) {
-        if (!t->isMemoryRefNonPR()) { continue; }
+        if (!t->isMemRefNonPR()) { continue; }
         MDSSAInfo * ssainfo = mgr->getMDSSAInfoIfAny(t);
         ASSERT0(ssainfo);
         VOpndSet const& vset = ssainfo->readVOpndSet();
@@ -3096,7 +3096,7 @@ static void verifyPhiListVMD(MDPhiList const* philist, MDSSAMgr const* mgr,
 bool MDSSAMgr::verifyRefedVMD() const
 {
     TTab<VMD const*> visited;
-    BBList * bbl = m_rg->getBBList();
+    BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         verifyPhiListVMD(getPhiList(bb), this, visited);
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
@@ -3207,7 +3207,7 @@ void MDSSAMgr::verifyUseSet(VMD const* vopnd) const
          j = const_cast<VMD*>(vopnd)->getUseSet()->get_next(iter2)) {
         IR const* use = (IR*)m_rg->getIR(j);
         ASSERT0(use);
-        ASSERT0(use->isMemoryRef() || use->is_id());
+        ASSERT0(use->isMemRef() || use->is_id());
         bool findref = false;
         if (use->getMustRef() != nullptr &&
             use->getMustRef()->id() == vopnd->mdid()) {
@@ -3285,7 +3285,7 @@ void MDSSAMgr::verifyMDSSAInfoForIR(IR const* ir) const
 bool MDSSAMgr::verifyMDSSAInfoUniqueness() const
 {
     xcom::TMap<MDSSAInfo const*, IR const*> ir2mdssainfo;
-    for (VecIdx i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_rg->getIRVec().get_last_idx(); i++) {
         IR const* ir = m_rg->getIR(i);
         if (ir == nullptr) { continue; }
         MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
@@ -3318,7 +3318,7 @@ bool MDSSAMgr::verifyDUChainAndOcc() const
 {
     MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
     //Check version for each VMD.
-    BBList * bbl = m_rg->getBBList();
+    BBList * bbl = m_cfg->getBBList();
     BBListIter ct = nullptr;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -3341,7 +3341,7 @@ bool MDSSAMgr::verifyDUChainAndOcc() const
             pthis->m_iter.clean();
             for (IR const* x = xoc::iterInit(ir, pthis->m_iter);
                  x != nullptr; x = xoc::iterNext(pthis->m_iter)) {
-                if (x->isMemoryRefNonPR()) {
+                if (x->isMemRefNonPR()) {
                     verifyMDSSAInfoForIR(x);
                 }
             }
@@ -3410,7 +3410,7 @@ void MDSSAMgr::changeDef(IR * olddef, IR * newdef)
 {
     ASSERT0(olddef && newdef && olddef->is_stmt() && newdef->is_stmt());
     ASSERT0(olddef != newdef);
-    ASSERT0(olddef->isMemoryRefNonPR() && newdef->isMemoryRefNonPR());
+    ASSERT0(olddef->isMemRefNonPR() && newdef->isMemRefNonPR());
     MDSSAInfo * oldmdssainfo = getMDSSAInfoIfAny(olddef);
     ASSERT0(oldmdssainfo);
     VOpndSetIter it = nullptr;
@@ -3487,7 +3487,7 @@ void MDSSAMgr::changeDefToOutsideLoopDefForTree(IR * exp, LI<IRBB> const* li)
 {
     IRIter it;
     for (IR * x = iterInit(exp, it); x != nullptr; x = iterNext(it)) {
-        if (x->isMemoryRefNonPR()) {
+        if (x->isMemRefNonPR()) {
             changeDefToOutsideLoopDef(x, li);
         }
     }
@@ -3496,7 +3496,7 @@ void MDSSAMgr::changeDefToOutsideLoopDefForTree(IR * exp, LI<IRBB> const* li)
 
 void MDSSAMgr::changeDefToOutsideLoopDef(IR * exp, LI<IRBB> const* li)
 {
-    ASSERT0(exp->is_exp() && exp->isMemoryRefNonPR());
+    ASSERT0(exp->is_exp() && exp->isMemRefNonPR());
     MDSSAInfo * info = getMDSSAInfoIfAny(exp);
     ASSERT0(info && !info->readVOpndSet().is_empty());
     genMDSSAInfoToOutsideLoopDef(exp, info, li);
@@ -3510,7 +3510,7 @@ void MDSSAMgr::findAndSetLiveInDefForTree(IR * exp, IR const* startir,
     for (IR * x = iterInit(exp, it,
             false); //Do NOT iter sibling of root IR of 'exp'
          x != nullptr; x = iterNext(it, true)) {
-        if (x->isMemoryRefNonPR()) {
+        if (x->isMemRefNonPR()) {
             findAndSetLiveInDef(x, startir, startbb, oc);
         }
     }
@@ -3522,7 +3522,7 @@ void MDSSAMgr::findAndSetLiveInDef(IR * exp, IR const* startir,
                                    IRBB const* startbb, OptCtx const& oc)
 {
     ASSERT0(startir == nullptr || startir->getBB() == startbb);
-    ASSERT0(exp->is_exp() && exp->isMemoryRefNonPR());
+    ASSERT0(exp->is_exp() && exp->isMemRefNonPR());
     MDSSAInfo * info = genMDSSAInfo(exp);
     ASSERT0(info);
     List<VMD*> newvmds;
@@ -3571,7 +3571,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
 {
     ASSERT0(olduse && newuse && olduse->is_exp() && newuse->is_exp());
     ASSERTN(olduse != newuse, ("redundant operation"));
-    ASSERT0(olduse->isMemoryRefNonPR() && newuse->isMemoryRefNonPR());
+    ASSERT0(olduse->isMemRefNonPR() && newuse->isMemRefNonPR());
     MDSSAInfo * oldinfo = getMDSSAInfoIfAny(olduse);
     ASSERT0(oldinfo);
     MDSSAInfo * newinfo = copyAndAddMDSSAOcc(newuse, oldinfo);
@@ -3590,7 +3590,7 @@ void MDSSAMgr::changeUseForTree(IR * olduse, IR * newuse,
 {
     ASSERT0(olduse && newuse && olduse->is_exp() && newuse->is_exp());
     ASSERTN(olduse != newuse, ("redundant operation"));
-    ASSERT0(olduse->isMemoryRefNonPR() && newuse->isMemoryRefNonPR());
+    ASSERT0(olduse->isMemRefNonPR() && newuse->isMemRefNonPR());
     addMDSSAOccForTree(newuse, olduse);
     removeMDSSAOccForTree(olduse, ctx);
 }
@@ -3702,10 +3702,10 @@ void MDSSAMgr::copyMDSSAInfoForTree(IR * tgt, IR const* src)
     ConstIRIter it2;
     IR * x;
     IR const* y;
-    ASSERT0(tgt->isIRIsomo(src, true));
+    ASSERT0(tgt->isIsomoTo(src, true));
     for (x = iterInit(tgt, it), y = iterInitC(src, it2);
          x != nullptr; x = iterNext(it), y = iterNextC(it2)) {
-        if (x->isMemoryRefNonPR()) {
+        if (x->isMemRefNonPR()) {
             copyMDSSAInfo(x, y);
         }
     }
@@ -3919,7 +3919,7 @@ void MDSSAMgr::removeVOpndForAllUse(MOD VMD * vopnd, MDSSAUpdateCtx const& ctx)
     MDDef * vopnddef = vopnd->getDef();
     for (BSIdx i = useset->get_first(it); !it.end(); i = useset->get_next(it)) {
         IR * use = m_rg->getIR(i);
-        ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+        ASSERT0(use && (use->isMemRef() || use->is_id()));
         MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(use);
         ASSERT0(mdssainfo);
         if (use->is_id()) {
@@ -4330,7 +4330,7 @@ void MDSSAMgr::removePhiFromDDChain(MDPhi * phi, MDDef * prev)
 void MDSSAMgr::destruction(MOD OptCtx & oc)
 {
     if (!is_valid()) { return; }
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     UINT bbnum = bblst->get_elem_count();
     BBListIter bbct;
@@ -4506,7 +4506,7 @@ bool MDSSAMgr::removeRedundantPhi(OptCtx const& oc)
 bool MDSSAMgr::prunePhi(List<IRBB*> & wl, OptCtx const& oc)
 {
     START_TIMER(t, "MDSSA: Prune phi");
-    BBList * bblst = m_rg->getBBList();
+    BBList * bblst = m_cfg->getBBList();
     BBListIter ct;
 
     wl.clean();
@@ -4754,7 +4754,7 @@ MDDef const* MDSSAMgr::iterDefNextCTillKillingDef(IR const* use,
 //Clean MDSSAInfo AI of all IR.
 void MDSSAMgr::cleanMDSSAInfoAI()
 {
-    for (VecIdx i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_rg->getIRVec().get_last_idx(); i++) {
         IR * ir = m_rg->getIR(i);
         if (ir != nullptr && ir->getAI() != nullptr &&
             ir->getAI()->is_init()) {
@@ -4945,7 +4945,7 @@ void MDSSAMgr::movePhi(IRBB * from, IRBB * to)
 //return false to indicate unknown.
 bool MDSSAMgr::hasSameValue(IR const* ir1, IR const* ir2)
 {
-    ASSERT0(ir1->isMemoryRefNonPR() && ir2->isMemoryRefNonPR());
+    ASSERT0(ir1->isMemRefNonPR() && ir2->isMemRefNonPR());
     MDSSAInfo const* info1 = getMDSSAInfoIfAny(ir1);
     MDSSAInfo const* info2 = getMDSSAInfoIfAny(ir2);
     ASSERT0(info1 && info2);
@@ -4967,7 +4967,7 @@ void MDSSAMgr::recomputeDefForRHS(IR const* stmt, IRIter & it, OptCtx const& oc)
     it.clean();
     ASSERT0(stmt && stmt->is_stmt() && stmt->getBB());
     IRBB * start_bb = stmt->getBB();
-    IR * prev_stmt = start_bb->getIRList().getPrevIR(stmt);
+    IR * prev_stmt = start_bb->getPrevIR(stmt);
     for (IR * e = iterExpInit(stmt, it);
          e != nullptr; e = iterExpNext(it, true)) {
         if (MDSSAMgr::hasMDSSAInfo(e)) {
@@ -5101,7 +5101,7 @@ static bool canIgnorePhi(IR const* exp, MDPhi const* phi, MDSSAMgr const* mgr,
 //exp: expression.
 bool MDSSAMgr::isOverConservativeDUChain(MDDef const* def, IR const* exp) const
 {
-    ASSERT0(exp->is_exp() && exp->isMemoryRefNonPR());
+    ASSERT0(exp->is_exp() && exp->isMemRefNonPR());
     MD const* mustref = exp->getMustRef();
     if (mustref == nullptr) {
         //If MustRef is empty, for conservative purpose, 'def' is the MayDef
@@ -5123,13 +5123,11 @@ void MDSSAMgr::construction(OptCtx & oc)
     ASSERT0(oc.is_ref_valid());
     ASSERT0(oc.is_dom_valid());
     reinit();
-
     //Extract dominate tree of CFG.
     START_TIMER(t1, "MDSSA: Extract Dom Tree");
     DomTree domtree;
     m_cfg->genDomTree(domtree);
     END_TIMER(t1, "MDSSA: Extract Dom Tree");
-
     if (!construction(domtree, oc)) {
         return;
     }
@@ -5164,7 +5162,7 @@ bool MDSSAMgr::construction(DomTree & domtree, OptCtx & oc)
     }
     m_is_valid = true;
     ASSERT0(verify());
-    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+    ASSERT0(verifyIRandBB(m_cfg->getBBList(), m_rg));
     ASSERT0(verifyPhi() && verifyAllVMD() && verifyVersion(oc));
     return true;
 }

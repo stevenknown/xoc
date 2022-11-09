@@ -99,7 +99,6 @@ public:
 
 //The class is used to debug allocation and free of SegMgr.
 extern UINT g_segmgr_log_count;
-
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SegMgrLog {
 public:
@@ -111,7 +110,10 @@ public:
 
 public:
     bool allocExist(SEG<BitsPerSeg> const* s)
-    { allocated.set(s->id, s); return true; }
+    {
+        allocated.set(s->id, s);
+        return true;
+    }
     bool allocNew(SEG<BitsPerSeg> * s)
     {
         seg_count++;
@@ -127,18 +129,19 @@ public:
     //The function always used in Debug Mode.
     bool belongToCurrentMgr(void * obj) const { return m_segtab.find(obj); }
 
-    bool checkLeak(UINT expected_seg_num)
+    bool checkLeak(UINT recycled_seg_num)
     {
         ////////////////////////////////////////////////////////////
         //NOTE: SBitSet or SBitSetCore's clean() should be invoked//
         //before destruction, otherwise it will lead SegMgr       //
         //to complain leaking.                                    //
         ////////////////////////////////////////////////////////////
-        if (seg_count != expected_seg_num) {
-            //If seg_count < m_free_list.get_elem_count(), user mix in
-            //unmanaged segment that is not allocated by current segment mgr.
+        if (seg_count != recycled_seg_num) {
+            //NOTE if leaking happened, usually m_free_list number should less
+            //than seg_count, otherwise user intermingled someother unmanaged
+            //segment that is not allocated by current segment mgr.
             dump();
-            ASSERTN(0, ("MemLeak! There still are SEGs not freed"));
+            ASSERTN(0, ("MEMLEAK! THERE ARE STILL SEGS UNFREED"));
         }
         m_segtab.clean();
         return true;
@@ -147,18 +150,19 @@ public:
     //Dump Segs to help find leaks.
     void dump()
     {
-        FILE * h = ::fopen("dump_seg.txt", "a+");
+        FileObj f("dump_seg.txt");
+        FILE * h = f.getFileHandler();
         fprintf(h, "\n==---- DUMP NOT FREED SEG: ----==");
-        fprintf(h, "\nTOTAL SEG COUNT:%u\n", g_segmgr_log_count);
+        fprintf(h, "\nTOTAL SEG COUNT:%u", g_segmgr_log_count);
+        fprintf(h, "\nCURRENT SEG COUNT:%u", seg_count);
         for (UINT i = 0; i <= seg_count; i++) {
             if (allocated.is_contain(i)) {
                 //Seg i still not be freed.
                 SEG<BitsPerSeg> const* s = allocated.get(i);
                 ASSERT0(s->id == i);
-                fprintf(h, "<id:%d,gid:%d> ", s->id, s->gid);
+                fprintf(h, "\n  LEAKED SEG:<id:%d,gid:%d>", s->id, s->gid);
             }
         }
-        ::fclose(h);
     }
 
     //Decrease seg_count.
@@ -512,7 +516,6 @@ class DBitSetCore : public SBitSetCore<BitsPerSeg> {
     COPY_CONSTRUCTOR(DBitSetCore);
 protected:
     BYTE m_is_sparse:1; //true if bitset is sparse.
-
 protected:
     //Only read BitSet.
     BitSet const* read_bs() const

@@ -64,6 +64,31 @@ $(SRC)/opt/ir_helper.o\
 $(SRC)/opt/gr_helper.o\
 $(SRC)/opt/mdssalive_mgr.o\
 $(SRC)/opt/insert_guard_helper.o\
-$(SRC)/opt/optctx.o
+$(SRC)/opt/optctx.o\
+$(SRC)/opt/ir_dump.o\
+$(SRC)/opt/ir_dump_ext.o\
+$(SRC)/opt/ir_mgr.o\
+$(SRC)/opt/ir_mgr_ext.o\
+$(SRC)/opt/ir_verify.o\
+$(SRC)/opt/ir_verify_ext.o\
+$(SRC)/opt/ir_decl.o\
+$(SRC)/opt/ir_desc.o\
+$(SRC)/opt/ir_utils.o\
+$(SRC)/opt/cfg_lifting.o
+
+ifeq ($(FOR_IP), true)
+  $(info "ADD FOR-IP OBJS")
+  OPT_OBJS +=\
+  $(SRC)/opt/lsra_impl.o\
+  $(SRC)/opt/lsra_scan_in_pos.o\
+  $(SRC)/opt/lsra_scan_in_prio.o\
+  $(SRC)/opt/lt_interf_graph.o\
+  $(SRC)/opt/lt_prio_mgr.o\
+  $(SRC)/opt/lifetime.o\
+  $(SRC)/opt/targinfo_mgr.o\
+  $(SRC)/opt/ir_vrp.o\
+  $(SRC)/opt/ir_dse.o\
+  $(SRC)/opt/linear_scan.o
+endif
 
 CFLAGS += -Wno-unknown-pragmas

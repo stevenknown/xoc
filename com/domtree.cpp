@@ -39,9 +39,12 @@ bool DomTree::verify(DGraph const& g) const
          e != nullptr; e = get_next_edge(it)) {
         Vertex const* from = e->from();
         Vertex const* to = e->to();
-        ASSERT0(g.isVertex(from->id()));
-        ASSERT0(g.isVertex(to->id()));
-        ASSERT0(g.get_idom(to->id()) == from->id());
+        ASSERTN(g.isVertex(from->id()),
+                ("domtree vertex%u is out of date", from->id()));
+        ASSERTN(g.isVertex(to->id()),
+                ("domtree vertex%u is out of date", to->id()));
+        ASSERTN(g.get_idom(to->id()) == from->id(),
+                ("not parent-kid relation"));
     }
     return true;
 }

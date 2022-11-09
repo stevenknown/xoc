@@ -165,6 +165,7 @@ void DexRegion::processSimply()
 
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);
+    initIRMgr();
 
     ASSERT0(g_cst_bb_list);
     IRCFG * cfg = (IRCFG*)passmgr->registerPass(PASS_CFG);
@@ -207,6 +208,7 @@ bool DexRegion::process(OptCtx * oc)
     prescan(getIRList());
 
     PassMgr * passmgr = initPassMgr();
+    initIRMgr();
 
     HighProcess(*oc);
 

@@ -84,7 +84,7 @@ void MDLivenessMgr::collectMayUseMDS(IR const* ir, OUT MDSet * mayuse)
     xcom::DefMiscBitSetMgr * sbsmgr = getSBSMgr();
     for (IR const* x = iterExpInitC(ir, ii);
          x != NULL; x = iterExpNextC(ii)) {
-        if (!x->isMemoryOpnd() || x->is_pr()) { continue; }
+        if (!x->isMemOpnd() || x->is_pr()) { continue; }
 
         MD const* t = x->getRefMD();
         if (t != NULL) {

@@ -80,11 +80,10 @@ bool InferType::inferVarTypeByIRCode(IR const* ir) const
     if (ir->is_any()) { return false; }
     Var * var = nullptr;
     switch (ir->getCode()) {
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
     case IR_PHI:
     case IR_STPR:
-    case IR_PR: {
+    SWITCH_CASE_READ_PR: {
         MD const* ref = ir->getRefMD();
         if (ref != nullptr) {
             var = ref->get_base();
@@ -93,8 +92,7 @@ bool InferType::inferVarTypeByIRCode(IR const* ir) const
         var = m_rg->mapPR2Var(ir->getPrno());
         break;
     }
-    case IR_LD:
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_OP:
         var = ir->getIdinfo();
         break;
     default:;
@@ -126,7 +124,7 @@ bool InferType::inferStmtPhi(IR * ir) const
 
 bool InferType::inferStmtMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryRef() && ir->is_stmt());
+    ASSERT0(ir->isMemRef() && ir->is_stmt());
     ASSERT0(ir->getRHS());
     bool changed = false;
     if (ir->getRHS()->is_any()) {
@@ -148,7 +146,7 @@ bool InferType::inferStmtMemAcc(IR * ir)
 
 bool InferType::inferLeafExpMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryOpnd() && ir->is_exp() && ir->is_leaf());
+    ASSERT0(ir->isMemOpnd() && ir->is_exp() && ir->is_leaf());
     if (ir->is_any()) {
         MD const* ref = ir->getRefMD();
         if (ref != nullptr && !ref->get_base()->is_any()) {
@@ -200,7 +198,7 @@ bool InferType::inferIld(IR * ir)
 
 bool InferType::inferExpMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryOpnd() && ir->is_exp());
+    ASSERT0(ir->isMemOpnd() && ir->is_exp());
     if (ir->is_leaf()) {
         return inferLeafExpMemAcc(ir);
     }
@@ -328,10 +326,10 @@ bool InferType::inferIR(IR * ir)
     SWITCH_CASE_UNA:
         changed |= inferUnaOP(ir);
         return changed;
-    SWITCH_CASE_EXP_MEM_ACC:
+    SWITCH_CASE_EXP_MEM_OP:
         changed |= inferExpMemAcc(ir);
         return changed;
-    SWITCH_CASE_STMT_MEM_ACC:
+    SWITCH_CASE_STMT_MEM_OP:
         changed |= inferStmtMemAcc(ir);
         return changed;
     SWITCH_CASE_CALL:
@@ -389,7 +387,7 @@ void InferType::dumpInit()
 {
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         ASSERT0(m_changed_irlist == nullptr);
-        m_changed_irlist = new CIRList();
+        m_changed_irlist = new ConstIRList();
         ASSERT0(m_changed_varlist == nullptr);
         m_changed_varlist = new List<Var const*>();
     }

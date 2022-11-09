@@ -31,27 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-#define PR_TYPE_CHAR "$"
-
-enum IR_DUMP_FLAG {
-    IR_DUMP_DEF = 0x0, //default options to dump ir
-    IR_DUMP_KID = 0x1, //dump ir's kid
-    IR_DUMP_SRC_LINE = 0x2, //dump source line if dbx info is valid.
-    IR_DUMP_ADDR = 0x4, //dump host address of each IR
-    IR_DUMP_INNER_REGION = 0x8, //dump inner region.
-    IR_DUMP_VAR_DECL = 0x10, //dump variable declaration if exist that given
-                             //by user.
-    IR_DUMP_NO_NEWLINE = 0x20, //Do NOT dump newline
-    IR_DUMP_COMBINE = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL,
-};
-
 typedef xcom::SEGIter * IRSetIter;
-
-class DumpFlag : public UFlag {
-public:
-    DumpFlag(UINT v) : UFlag(v) {}
-};
-
 class IRSet : public DefSBitSet {
     COPY_CONSTRUCTOR(IRSet);
 public:
@@ -130,7 +110,7 @@ inline IR const* iterExpNextC(MOD ConstIRIter & it, bool iter_next = true)
 //ir: the root ir of the tree, it must be stmt.
 //it: iterator. It should be clean already.
 //iter_next: true to iterate the next IR of 'ir'.
-//Use iterExpNextC to iter next IR.
+//Use iterExpNext to iter next IR.
 IR * iterExpInit(IR const* ir, OUT IRIter & it);
 
 //Iterative access the right-hand-side expression of stmt.
@@ -166,26 +146,6 @@ inline IR * iterExpOfStmtNext(MOD IRIter & it)
 bool allBeExp(IR * irlst);
 bool allBeStmt(IR * irlst);
 
-bool checkMaxIRCode();
-bool checkIRDesc();
-bool checkRoundDesc();
-
-void dumpConst(IR const* ir, Region const* rg);
-
-void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
-            DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
-inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
-{
-    dumpIR(ir, rg, nullptr, dumpflag);
-}
-void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
-                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
-void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
-                DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
-void dumpIRList(IRList const& ir_list, Region const* rg);
-void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
-void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
-
 UINT getArithPrecedence(IR_CODE ty);
 
 inline bool isCommutative(IR_CODE irt)
@@ -201,6 +161,7 @@ inline bool isUnaryOp(IR_CODE irt)
 bool isContainNonIdentifierChar(CHAR const* name);
 
 void setParentPointerForIRList(IR * ir_list);
+
 bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
 bool verifySimp(IR * ir, SimpCtx & simp);
 

@@ -61,7 +61,7 @@ namespace xoc {
 class LoopCvt : public Pass {
 protected:
     IRCFG * m_cfg;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     ConstIRIter m_ii;
 protected:
     bool is_while_do(LI<IRBB> const* li, IRBB ** gobackbb,
@@ -73,9 +73,9 @@ public:
     explicit LoopCvt(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_cfg = m_rg->getCFG();
-        ASSERT0(m_cfg && m_du);
+        ASSERT0(m_cfg && m_dumgr);
     }
     COPY_CONSTRUCTOR(LoopCvt);
     virtual ~LoopCvt() {}

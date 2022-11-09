@@ -47,7 +47,7 @@ void Tree::insertParent(VexIdx v, VexIdx parent)
 void Tree::remove(VexIdx v)
 {
     Vertex * vex = getVertex(v);
-    ASSERT0(vex);
+    if (vex == nullptr) { return; }
     Vertex * oldparent = const_cast<Tree*>(this)->getParent(vex);
     if (oldparent == nullptr) {
         //vex is the root of the Tree.

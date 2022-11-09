@@ -36,7 +36,7 @@ class InvertBrTgt;
 //The optimization attempt to invert branch target.
 class InvertBrTgt : public Pass {
     COPY_CONSTRUCTOR(InvertBrTgt);
-    CIRList * m_changed_irlist; //used for dump
+    ConstIRList * m_changed_irlist; //used for dump
     OptCtx * m_oc;
 protected:
     void addDump(IR const* ir) const;

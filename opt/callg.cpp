@@ -296,11 +296,11 @@ bool CallGraph::build(RegionMgr * rumgr)
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
         addNode(caller);
-        CIRList * call_list = rg->getCallList();
+        ConstIRList const* call_list = rg->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 
-        xcom::C<IR const*> * ct;
+        ConstIRListIter ct;
         for (call_list->get_head(&ct);
              ct != nullptr; ct = call_list->get_next(ct)) {
             IR const* ir = ct->val();

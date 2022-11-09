@@ -44,6 +44,7 @@ class InsertPhiHelper {
     LI<IRBB> const* m_li;
     IRCFG * m_cfg;
     Region * m_rg;
+    IRMgr * m_irmgr;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     MDSystem * m_mdsys;
@@ -74,6 +75,7 @@ public:
         : m_li(li), m_cfg(cfg), m_oc(oc)
     {
         m_rg = cfg->getRegion();
+        m_irmgr = m_rg->getIRMgr();
         m_prssamgr = m_rg->getPRSSAMgr();
         m_mdssamgr = m_rg->getMDSSAMgr();
         m_mdsys = m_rg->getMDSystem();
@@ -218,9 +220,9 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     ASSERT0(phi->is_phi());
     //Generate PHI.
     //Type cast if host compiler does NOT support C11.
-    IR * newphi = m_rg->buildPhi(m_rg->buildPrno(phi->getType()),
-                                 phi->getType(), (IR*)nullptr);
-    m_rg->allocRefForPR(newphi);
+    IR * newphi = m_irmgr->buildPhi(m_irmgr->buildPrno(phi->getType()),
+                                    phi->getType(), (IR*)nullptr);
+    m_rg->getMDMgr()->allocRef(newphi);
     m_prssa_phis.append_tail(newphi);
     //BB_irlist(preheader).append_head(phi);
     IR * new_opnd_list = nullptr;
@@ -333,9 +335,9 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
         ASSERT0(oldopnd && oldopnd->isPROp() && oldopnd->getSSAInfo());
         PRSSAMgr::removePRSSAOcc(oldopnd);
 
-        IR * newopnd = m_rg->buildPRdedicated(ir_pre->getPrno(),
-                                              ir_pre->getType());
-        m_rg->allocRef(newopnd);
+        IR * newopnd = m_irmgr->buildPRdedicated(ir_pre->getPrno(),
+                                                 ir_pre->getType());
+        m_rg->getMDMgr()->allocRef(newopnd);
         m_prssamgr->buildDUChain(ir_pre, newopnd);
 
         ir_lh->replaceKid(oldopnd, newopnd, true);
@@ -395,7 +397,7 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
             lab = rg->genILabel();
             rg->getCFG()->addLabel(to, lab);
         }
-        IR * gotoir = rg->buildGoto(lab);
+        IR * gotoir = rg->getIRMgr()->buildGoto(lab);
         from->getIRList().append_tail(gotoir);
         return gotoir;
     }
@@ -487,7 +489,7 @@ static void insertAndUpdateOutterLoopEdge(LI<IRBB> const* li, Region * rg,
         CfgOptCtx ctx(*oc);
         //No need to maintain DomInfo here, it will be recomputed by caller.
         CFGOPTCTX_need_update_dominfo(&ctx) = false;
-        cfg->insertBBbetween(pred, head, preheader, ctx);
+        cfg->insertBBBetween(pred, head, preheader, ctx);
         insert_preheader = true;
         inserted_by_cur_time = true;
     }
@@ -577,7 +579,7 @@ static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
     }
     //Update DOM info at one time.
     bool add_pdom_failed = false;
-    cfg->addDomInfoByNewIDom(head->getVex(), preheader->getVex(),
+    cfg->addDomInfoToNewIDom(head->getVex(), preheader->getVex(),
                              add_pdom_failed);
     if (add_pdom_failed) {
         oc->setInvalidPDom();
@@ -846,7 +848,7 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
                                    InvStmtList const* invariant_stmt,
                                    MDSSAMgr const* mdssamgr)
 {
-    ASSERT0(ir->isMemoryRefNonPR());
+    ASSERT0(ir->isMemRefNonPR());
     MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
     ASSERT0(mdssainfo);
     VOpndSetIter iter = nullptr;
@@ -923,7 +925,7 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
         } else if (!isLoopInvariantInDUMgr(ir, li, invariant_stmt, rg)) {
             return false;
         }
-    } else if (ir->isMemoryRefNonPR() && !ir->isReadOnly()) {
+    } else if (ir->isMemRefNonPR() && !ir->isReadOnly()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             if (!isLoopInvariantInMDSSA(ir, li, invariant_stmt, mdssamgr)) {
@@ -1187,7 +1189,7 @@ bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg,
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
-        stmt->isMemoryRefNonPR()) {
+        stmt->isMemRefNonPR()) {
         return mdssamgr->isStmtDomAllUseInsideLoop(stmt, li);
     }
 
@@ -1238,5 +1240,21 @@ bool verifyLoopInfoTree(LI<IRBB> const* li, OptCtx const& oc)
     }
     return true;
 }
+
+
+//
+//START BB2LI
+//
+void BB2LI::createMap(LI<IRBB> * li)
+{
+    if (li == nullptr) { return; }
+    for (LI<IRBB> * tli = li; tli != nullptr; tli = tli->get_next()) {
+        createMap(tli->getInnerList());
+        IRBB const* h = tli->getLoopHead();
+        ASSERT0(h);
+        m_bb2li.set(h->id(), tli);
+    }
+}
+//END BB2LI
 
 } //namespace xoc

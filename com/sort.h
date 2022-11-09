@@ -310,8 +310,15 @@ template <class T> class QuickSort {
         _qsort(data, key_idx + 1, last_idx);
     }
 protected:
-    virtual T _max(T a, T aa) { return a; }
-    virtual T _min(T a, T b) { return MIN(a, b); }
+    //The function is optional to sorting, usually used in calibrating
+    //mid-value to avoid degrdating to the worst case.
+    //e.g:you can return a directly.
+    virtual T _max(T a, T b) const { return MAX(a, b); }
+
+    //The function is optional to sorting, usually used in calibrating
+    //mid-value to avoid degrdating to the worst case.
+    //e.g:you can return a directly.
+    virtual T _min(T a, T b) const { return MIN(a, b); }
     virtual bool GreatThan(T a, T b) const { return a > b; }
     virtual bool LessThan(T a, T b) const { return a < b; }
 public:

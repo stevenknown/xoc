@@ -173,9 +173,8 @@ protected:
     //Indicate whether MDSet is cached for individual MD.
     DefSBitSetCore * m_is_cached_mdset;
 
-    SolveSet m_solve_set;
+    SolveSetMgr m_solve_set_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
-
 protected:
     bool buildLocalDUChain(IRBB * bb, IR const* exp,
                            MD const* expmd, DUSet * expdu,
@@ -186,6 +185,11 @@ protected:
                                            DUSet * expdu);
 
     void cleanDUSet(UINT irid, DUSet * set);
+    void checkDefSetToBuildDUChainPR(IR const* exp, MD const* expmd,
+                                     MDSet const* expmds,
+                                     DUSet * expdu,
+                                     DefSBitSetCore const* defset,
+                                     IRBB * curbb);
     void checkDefSetToBuildDUChainNonPR(IR const* exp, MD const* expmd,
                                         MDSet const* expmds,
                                         DUSet * expdu,
@@ -212,24 +216,32 @@ protected:
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeOverlapSetForWorstCase();
     void computeArrayRefAtIStoreBase(IR * ir);
+    virtual void computeExtExpression(IR * ir, OUT MDSet * ret_mds,
+                                      CompFlag compflag, DUOptFlag duflag);
+    void computeExpressionList(IR * ir, OUT MDSet * ret_mds,
+                               CompFlag compflag, DUOptFlag duflag);
     void computeExpression(IR * ir, MDSet * ret_mds, CompFlag compflag,
                            DUOptFlag duflag);
     void computeArrayRef(IR * ir, OUT MDSet * ret_mds, CompFlag compflag,
                          DUOptFlag duflag);
     void computeLiveInBB(DefMiscBitSetMgr & bsmgr);
-    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, IRListIter ct);
+    void checkAndBuildChainForMemOp(IRBB * bb, IR * exp, IRListIter ct);
     void checkAndBuildChainRecursiveIRList(IRBB * bb, IR * exp, IRListIter ct,
                                            DUOptFlag flag);
     void checkAndBuildChainRecursive(IRBB * bb, IR * exp, IRListIter ct,
                                      DUOptFlag flag);
+    void checkAndBuildChainForAllKid(IR * ir, IRBB * bb, IRListIter ct,
+                                     DUOptFlag flag);
+    virtual void checkAndBuildChainExtStmt(IR * stmt, IRListIter ct,
+                                           DUOptFlag flag);
     void checkAndBuildChain(IR * stmt, IRListIter ct, DUOptFlag flag);
     void collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
                             OUT MDSet * maydefmds) const;
     void computeMayDef(IR const* ir, MDSet * bb_maydefmds,
-                       DefDBitSetCore * maygen_stmt,
+                       SolveSet * maygen_stmt,
                        DefMiscBitSetMgr & bsmgr, DUOptFlag flag);
     void computeMustExactDef(IR const* ir, MDSet * bb_mustdefmds,
-                             DefDBitSetCore * mustgen_stmt,
+                             SolveSet * mustgen_stmt,
                              ConstMDIter & mditer,
                              DefMiscBitSetMgr & bsmgr, DUOptFlag flag);
     void computeMustExactDefMayDefMayUseForBB(
@@ -237,7 +249,7 @@ protected:
         OUT Vector<MDSet*> * mustdefmds,
         OUT Vector<MDSet*> * maydefmds, OUT MDSet * mayusemds,
         MDSet * bb_mustdefmds, MDSet * bb_maydefmds,
-        DefDBitSetCore * mustgen_stmt, DefDBitSetCore * maygen_stmt,
+        SolveSet * mustgen_stmt, SolveSet * maygen_stmt,
         DUOptFlag flag, DefMiscBitSetMgr & bsmgr);
     void computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdef,
                                          OUT Vector<MDSet*> * maydef,
@@ -258,15 +270,13 @@ protected:
 
     bool hasSingleDefToMD(DUSet const& defset, MD const* md) const;
 
+    virtual void inferExtStmt(IR * ir, DUOptFlag duflag);
     void initMD2IRSet(IRBB const* bb);
-    void inferRegion(IR * ir, bool ruinfo_avail, IN MDSet * tmp);
-    void inferIStore(IR * ir, DUOptFlag duflag);
-    void inferStore(IR * ir, DUOptFlag duflag);
-    void inferStorePR(IR * ir, DUOptFlag duflag);
-    void inferGetelem(IR * ir, DUOptFlag duflag);
-    void inferSetelem(IR * ir, DUOptFlag duflag);
     void inferStoreArray(IR * ir, DUOptFlag duflag);
-    void inferPhi(IR * ir, DUOptFlag duflag);
+    void inferDirectMemStmt(IR * ir, DUOptFlag duflag);
+    void inferIndirectMemStmt(IR * ir, DUOptFlag duflag);
+    void inferAllKidMDRef(IR * ir, OUT MDSet * ret_mds,
+                          CompFlag compflag, DUOptFlag duflag);
     void inferCallStmtForNonPR(IR * ir, DUOptFlag duflag);
     //Return true if the output result has unify call's MayDef.
     bool inferCallStmtForNonPRViaCallGraph(IR const* ir,
@@ -287,6 +297,9 @@ protected:
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
     void updateDef(IR * ir, DUOptFlag flag);
+
+    virtual bool verifyMDRefForExtIR(IR const* ir, ConstIRIter & cii);
+    bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii);
 public:
     explicit DUMgr(Region * rg);
     ~DUMgr();
@@ -298,7 +311,7 @@ public:
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());
-        ASSERT0(def->isMemoryRef() && use->isMemoryOpnd());
+        ASSERT0(def->isMemRef() && use->isMemOpnd());
         genDUSet(def)->addUse(use, *getSBSMgr());
         genDUSet(use)->addDef(def, *getSBSMgr());
     }
@@ -321,9 +334,10 @@ public:
     //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
     void collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse);
 
-    void computeGenForBB(IN IRBB * bb, OUT DefDBitSetCore & expr_univers,
+    void computeGenForBB(IN IRBB * bb, OUT SolveSet & expr_univers,
                          DefMiscBitSetMgr & bsmgr);
-    void computeMDDUforBB(IRBB const* bb, DUOptFlag flag);
+    void computeMDRefForBB(IRBB * bb, MOD OptCtx & oc, DUOptFlag duflag);
+    void computeMDDUForBB(IRBB const* bb, DUOptFlag flag);
     void computeCallRef(DUOptFlag duflag);
     virtual void computeAtomMDRef(IR * ir);
     void computeMDRef(MOD OptCtx & oc, DUOptFlag duflag);
@@ -332,7 +346,7 @@ public:
                         Vector<MDSet*> const* maydefs,
                         DefMiscBitSetMgr & bsmgr);
     void computeAuxSetForExpression(DefDBitSetCoreReserveTab & dbitsetchash,
-                                    OUT DefDBitSetCore * expr_universe,
+                                    OUT SolveSet * expr_universe,
                                     Vector<MDSet*> const* maydefmds,
                                     DefMiscBitSetMgr & bsmgr);
     void computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
@@ -356,7 +370,7 @@ public:
     //Count the memory usage to DUMgr.
     size_t count_mem() const;
     size_t count_mem_duset();
-    size_t count_mem_local_data(DefDBitSetCore * expr_univers,
+    size_t count_mem_local_data(SolveSet * expr_univers,
                                 Vector<MDSet*> * maydef_mds,
                                 Vector<MDSet*> * mustexactdef_mds,
                                 MDSet * mayuse_mds,
@@ -365,14 +379,16 @@ public:
                                 UINT elemnum);
 
     //Collect must and may memory reference.
-    void collectMayUseRecursive(IR const* ir, MDSet & mayUse,
-                                bool computePR, DefMiscBitSetMgr & bsmgr);
-    void collectMayUseRecursiveIRList(IR const* ir, OUT MDSet & mayUse,
-                                      bool computePR,
-                                      DefMiscBitSetMgr & bsmgr);
+    static void collectMayUseRecursive(IR const* ir, Region const* rg,
+                                       bool comp_pr, DefMiscBitSetMgr & bsmgr,
+                                       OUT MDSet & mayuse);
+    static void collectMayUseRecursiveIRList(IR const* ir, Region const* rg,
+                                             bool comp_pr,
+                                             DefMiscBitSetMgr & bsmgr,
+                                             OUT MDSet & mayuse);
 
     //Collect may memory reference.
-    void collectMayUse(IR const* ir, MDSet & mayUse, bool computePR);
+    void collectMayUse(IR const* ir, MDSet & mayuse, bool comp_pr);
 
     //DU chain operation.
     //Change Def stmt from 'from' to 'to'.
@@ -391,7 +407,7 @@ public:
         for (BSIdx i = useset_of_from->get_first(&di);
              di != nullptr; i = useset_of_from->get_next(i, &di)) {
             IR const* exp = m_rg->getIR(i);
-            ASSERT0(exp->is_exp() && exp->isMemoryRef());
+            ASSERT0(exp->is_exp() && exp->isMemRef());
             DUSet * defset = exp->getDUSet();
             if (defset == nullptr) { continue; }
 
@@ -497,7 +513,7 @@ public:
     DUSet * genDUSet(IR * ir);
     //Get sparse bitset mgr.
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
-    SolveSet * getSolveSet() { return &m_solve_set; }
+    SolveSetMgr * getSolveSetMgr() { return &m_solve_set_mgr; }
     IR const* getExactAndUniqueDef(IR const* exp) const;
 
     //Return true if 'def' may or must modify MDSet that 'use' referenced.
@@ -564,9 +580,9 @@ public:
                                   IR const* exp, MD const* md,
                                   bool * has_local_nonkilling_def);
 
-    void setMustKilledDef(UINT bbid, DefDBitSetCore * set);
-    void setMayKilledDef(UINT bbid, DefDBitSetCore * set);
-    void setKilledIRExpr(UINT bbid, DefDBitSetCore * set);
+    void setMustKilledDef(UINT bbid, SolveSet * set);
+    void setMayKilledDef(UINT bbid, SolveSet * set);
+    void setKilledIRExpr(UINT bbid, SolveSet * set);
 
     //DU chain operation.
     //Cut off the chain bewteen 'def' and 'use'.
@@ -667,6 +683,8 @@ public:
     //cut off the du chain between def->u1 and def->u2.
     void removeDefFromUseset(IR const* def);
 
+    //Verify MD reference to each stmts and expressions which described memory.
+    bool verifyMDRef();
     bool verifyLiveinExp();
 
     //Verify if DU chain is correct between each Def and Use of MD.

@@ -38,22 +38,31 @@ namespace xoc {
 
 class IRBB;
 template <class IRBB, class IR> class CFG;
-typedef IRListIter BBIRListIter;
 typedef List<LabelInfo const*> LabelInfoList;
 typedef C<LabelInfo const*> * LabelInfoListIter;
 typedef TMap<IR const*, UINT> IROrder;
-typedef TMap<LabelInfo const*, IRBB*> Lab2BB;
 
 #define BBID_UNDEF VERTEX_UNDEF
+
+//
+//START Lab2BB
+//
+typedef TMapIter<LabelInfo const*, IRBB*> Lab2BBIter;
+class Lab2BB : public xcom::TMap<LabelInfo const*, IRBB*> {
+public:
+    void dump(Region * rg) const;
+};
+//END Lab2BB
+
 
 //
 //START BBIRList
 //
 //NOTE: Overload funtion when inserting or remving new IR.
-class BBIRList : public EList<IR*, IR2Holder> {
+typedef IRListIter BBIRListIter;
+class BBIRList : public xcom::EList<IR*, IR2Holder> {
     COPY_CONSTRUCTOR(BBIRList);
     IRBB * m_bb;
-
 public:
     BBIRList() { m_bb = nullptr; }
 
@@ -85,14 +94,13 @@ public:
                ((xcom::EList<IR*, IR2Holder>*)this)->count_mem();
     }
 
-    IR * getPrevIR(IR const* ir) const
+    IR * getPrevIR(IR const* ir, OUT IRListIter * irit) const
     {
-        ASSERT0(ir->is_stmt());
-        IRListIter irit = nullptr;
-        bool succ = find(const_cast<IR*>(ir), &irit);
+        ASSERT0(ir->is_stmt() && irit);
+        bool succ = find(const_cast<IR*>(ir), irit);
         CHECKN_DUMMYUSE(succ, ("ir is not belong to current BB"));
-        irit = get_prev(irit);
-        return irit == nullptr ? nullptr : irit->val();
+        *irit = get_prev(*irit);
+        return *irit == nullptr ? nullptr : (*irit)->val();
     }
 
     bool is_empty() const { return get_elem_count() == 0; }
@@ -160,12 +168,28 @@ public:
 };
 //END BBIRList
 
+typedef xcom::TTab<IRBB*> BBTab;
+typedef xcom::TTabIter<IRBB*> BBTabIter;
 
 //
 //START BBList
 typedef xcom::C<IRBB*> * BBListIter;
 class BBList : public xcom::List<IRBB*> {
 public:
+    //The function copy all BB attributes, Labels and IR stmts in 'src'.
+    //Note the function will allocate new BB according to 'src', and new
+    //BB's id which is not same to src BB.
+    //The function does NOT set mapping between new BB and Labels.
+    void copy(BBList const& src, Region * rg);
+
+    //The function clone all BB list info, also include the BB id.
+    void clone(BBList const& src, Region * rg);
+
+    //Find IRBB according to given id.
+    static IRBB * find(BBList const& lst, UINT id);
+    bool find(IRBB const* t, OUT BBListIter * holder = nullptr) const
+    { return xcom::List<IRBB*>::find(const_cast<IRBB*>(t), holder); }
+
     //Return true if 'prev' is the previous BB of given BB in BBList.
     //prev: previous BB.
     //next: next BB.
@@ -198,6 +222,9 @@ public:
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 private:
+    void copyIRList(IRBB const& src, Region * rg);
+    void copyLabelInfoList(IRBB const& src, SMemPool * pool);
+
     bool verifyTerminate() const;
     bool verifyExpHandler() const;
     bool verifyTryEnd() const;
@@ -257,6 +284,14 @@ public:
 
     //Clean attached label.
     void cleanLabelInfoList() { getLabelList().clean(); }
+
+    //The function copy attributes, labelinfo, IR stmts of 'src'.
+    void copy(IRBB const& src, Region * rg);
+
+    //The function will copy not only attributes, labelinfo, IR stmts of 'src',
+    //but also BBID and Vertex info.
+    void clone(IRBB const& src, Region * rg);
+
     void copyAttr(LabelInfo const* li)
     {
         ASSERT0(li);
@@ -294,13 +329,18 @@ public:
     IR * getFirstIR() { return BB_first_ir(this); }
     IR * getNextIR() { return BB_next_ir(this); }
     IR * getLastIR() { return BB_last_ir(this); }
-    IR * getPrevIR(IR const* ir) const
+    IR * getPrevIR(IR const* ir, OUT IRListIter * irit = nullptr) const
     {
         ASSERT0(ir->is_stmt());
-        return const_cast<IRBB*>(this)->getIRList().getPrevIR(ir);
+        IRListIter t;
+        irit == nullptr ? irit = &t : 0;
+        return const_cast<IRBB*>(this)->getIRList().getPrevIR(ir, irit);
     }
 
     bool hasMDPhi(CFG<IRBB, IR> const* cfg) const;
+    bool hasPRPhi() const;
+    bool hasPhi(CFG<IRBB, IR> const* cfg) const
+    { return hasMDPhi(cfg) || hasPRPhi(); }
 
     //Return true if BB has any label attached.
     bool hasLabel() const
@@ -505,7 +545,7 @@ public:
 class IRBBMgr {
     COPY_CONSTRUCTOR(IRBBMgr);
 protected:
-    BBList m_bbs_list;
+    BBTab m_bb_tab;
     BBList m_free_list;
     UINT m_bb_count; //counter of IRBB.
 public:
@@ -522,6 +562,8 @@ public:
     void freeBB(IRBB * bb);
 
     UINT getBBCount() const { return m_bb_count; }
+
+    bool verify() const;
 };
 //END IRBBMgr
 

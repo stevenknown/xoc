@@ -108,6 +108,7 @@ class LFTR : public Pass {
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     DUMgr * m_dumgr;
+    IRMgr * m_irmgr;
     OptCtx * m_oc;
     IRIter m_iriter; //for local using
 protected:
@@ -160,6 +161,8 @@ public:
         m_cfg = rg->getCFG();
         m_pool = smpoolCreate(sizeof(LFRInfo) * 4, MEM_COMM);
         m_oc = nullptr;
+        m_dumgr = nullptr;
+        m_irmgr = nullptr;
     }
     virtual ~LFTR() { smpoolDelete(m_pool); }
 

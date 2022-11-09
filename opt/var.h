@@ -240,7 +240,7 @@ public:
     bool is_func() const { return varflag.have(VAR_IS_FUNC); }
     bool is_volatile() const { return varflag.have(VAR_VOLATILE); }
     bool is_spill() const { return varflag.have(VAR_IS_SPILL); }
-    bool is_addr_taken() const { return varflag.have(VAR_ADDR_TAKEN); }
+    bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
     bool is_pr() const { return varflag.have(VAR_IS_PR); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_any() const

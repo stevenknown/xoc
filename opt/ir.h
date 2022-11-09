@@ -45,93 +45,7 @@ class MDSSAInfo;
 class MDPhi;
 class IRCFG;
 
-//IR code
-typedef enum {
-    IR_UNDEF = 0,
-    IR_CONST = 1, //Constant value: include integer, float, string.
-    IR_ID = 2, //Identifier of variable.
-    IR_LD = 3, //Load from variable
-    IR_ILD = 4, //Indirect load.
-
-    //Temporary Pseudo Register which can NOT be taken address, and can be
-    //regarded as both register and memory.
-    IR_PR = 5,
-    IR_ARRAY = 6, //Array operation, include base and ofst.
-    IR_ST = 7, //Store to variable.
-    IR_STPR = 8, //Store to PR.
-    IR_STARRAY = 9, //Store to array.
-    IR_IST = 10, //Indirect store.
-    IR_SETELEM = 11, //Set element of PR, where PR is memory chunk or vector.
-    IR_GETELEM = 12, //Get element of PR, where PR is memory chunk or vector.
-    IR_CALL = 13, //Direct call.
-    IR_ICALL = 14, //Indirect call.
-    IR_LDA = 15, //Move variable's address to a register.
-    IR_ADD = 16, //Addition.
-    IR_SUB = 17, //Substraction.
-    IR_MUL = 18, //Multiplication.
-    IR_DIV = 19, //Division.
-    IR_REM = 20, //Remainder operation
-    IR_MOD = 21, //Modulus operation
-    IR_LAND = 22, //Logical AND, &&
-    IR_LOR = 23, //Logical OR, ||
-    IR_BAND = 24, //Bitwise AND, &
-    IR_BOR = 25, //Bitwise OR, |
-    IR_XOR = 26, //Exclusive OR.
-    IR_ASR = 27, //Arithmetic shift right
-    IR_LSR = 28, //Logical shift right
-    IR_LSL = 29, //Logical shift left
-    IR_LT = 30, //Less than.
-    IR_LE = 31, //Less than or equal to.
-    IR_GT = 32, //Greater than.
-    IR_GE = 33, //Greater than or equal to.
-    IR_EQ = 34, //Equal to.
-    IR_NE = 35, //Not equal to.
-    IR_BNOT = 36, //Bitwise not, e.g BNOT(0x0001) = 0xFFFE
-    IR_LNOT = 37, //Boolean logical not e.g LNOT(0x0001) = 0x0000
-    IR_NEG = 38, //Negative operation.
-    IR_CVT = 39, //Data-type convert
-    IR_GOTO = 40, //Goto definitely label.
-    IR_IGOTO = 41, //Indirect Goto a list of definitely label.
-    IR_DO_WHILE = 42, //Do-While loop struct.
-    IR_WHILE_DO = 43, //While-Do loop struct.
-    
-    //A kind of loop with plainly definition of INIT(low bound), HIGH bound,
-    //LOOP-BODY and STEP of IV.
-    IR_DO_LOOP = 44,
-    IR_IF = 45, //High level IF clasuse, include det, truebody, and false body
-    IR_LABEL = 46, //Describe internal and customer defined label.
-
-    //Switch clause, include determinant expression, a list of case, and body.
-    IR_SWITCH = 47,
-    IR_CASE = 48, //CASE VALUE, this is used only within SWITCH clause.
-    IR_TRUEBR = 49, //Branch if determinant express is true.
-    IR_FALSEBR = 50, //Branch if determinant express is false.
-    IR_RETURN = 51, //Return Statement.
-
-    //Conditional select true-exp or false-exp , formalized as :
-    //determinant expression ? true-exp : false-exp
-    IR_SELECT = 52,
-
-    //Terminate current loop end switch execution, which include do-loop,
-    //do-while, while-do, and switch stmt.
-    IR_BREAK = 53,
-    
-    //Re-execute loop, which include do-loop, do-while, while-do.
-    IR_CONTINUE = 54,
-    IR_PHI = 55, //Phi statement.
-    IR_REGION = 56, //Region statement.
-
-    //////////////////////////////////////////
-    //DO NOT ADD NEW IR CODE AFTER THIS ONE.//
-    //////////////////////////////////////////
-    IR_CODE_NUM = 57 //The last IR code, the number of IR code.
-
-    /////////////////////////////////////////////////////////////////
-    //NOTE: Extend IR::code bit length if the maximum type value is//
-    //larger than 63.                                              //
-    /////////////////////////////////////////////////////////////////
-} IR_CODE;
-
+#include "ir_code.h"
 #include "ir_desc.h"
 #include "ir_debug_check.h"
 
@@ -159,6 +73,9 @@ typedef enum {
 //Indicate IR will terminate current control flow.
 //If this flag is true, the code that followed subsequently is unreachable.
 #define IR_is_terminate(ir) ((ir)->is_terminate_control_flow)
+
+//Indicate whether IR is a real operation, e.g:the dummyuse of CallStmt.
+#define IR_is_dummy(ir) ((ir)->is_dummy_operation)
 
 //Record IR code.
 #define IR_code(ir) ((ir)->code)
@@ -215,8 +132,8 @@ typedef enum {
 //If ir is immovable, it also can not be removed
 #define IR_no_move(ir) ((ir)->no_move)
 
-//Define this marco if we try to search
-//ir in free_ir_tab while invoking allocIR().
+//Define this marco if we try to do fast searching ir in
+//free_ir_tab while invoking IRMgr::allocIR(). But by default, it is disabled.
 //#define CONST_IRC_SZ
 
 #ifdef CONST_IRC_SZ
@@ -273,6 +190,9 @@ public:
     //True if IR may terminate the control flow, such as throwing an excetion.
     USHORT is_terminate_control_flow:1;
 
+    //True if IR is not real operation, e.g:the dummyuse of CallStmt.
+    USHORT is_dummy_operation:1;
+
     //True if IR may have side effect.
     USHORT has_sideeffect:1;
 
@@ -311,12 +231,12 @@ public:
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
 
     //Set ir's DU to be nullptr, return the DU pointer.
-    inline DU * cleanDU();
+    DU * cleanDU();
 
     //Set ir's PR SSA Info to be nullptr.
     //For convenient purpose, this function does not assert
     //when current IR object is not operate on PR.
-    inline void cleanSSAInfo();
+    void cleanSSAInfo();
     void cleanRefMD()
     {
         DU * du = getDU();
@@ -358,7 +278,7 @@ public:
     void copyRefForTree(IR const* src, Region * rg);
 
     //The function collects the LabelInfo for each branch-target.
-    inline void collectLabel(OUT List<LabelInfo const*> & lst) const;
+    void collectLabel(OUT List<LabelInfo const*> & lst) const;
 
     void dumpRef(Region * rg, UINT indent);
 
@@ -368,14 +288,14 @@ public:
     IR_CODE getCode() const { return (IR_CODE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
-    inline IR * getBase() const; //Get base expression if exist.
-    inline TMWORD getOffset() const; //Get byte offset if any.
-    inline Var * getIdinfo() const; //Get idinfo if any.
+    IR * getBase() const; //Get base expression if exist.
+    TMWORD getOffset() const; //Get byte offset if any.
+    Var * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
-    inline IR * getKid(UINT idx) const;
+    IR * getKid(UINT idx) const;
     UINT getKidNum() const { return IR_MAX_KID_NUM(this); }
-    inline IRBB * getBB() const;
-    inline DU * getDU() const;
+    IRBB * getBB() const;
+    DU * getDU() const;
 
     //Return STMT if current ir is expression.
     //e.g:  st(i32 a)
@@ -401,10 +321,10 @@ public:
     }
 
     //Return label info if exist.
-    inline LabelInfo const* getLabel() const;
+    LabelInfo const* getLabel() const;
 
     //Return the byte size of array element.
-    inline UINT getArrayElemDtSize(TypeMgr const* tm) const;
+    UINT getArrayElemDtSize(TypeMgr const* tm) const;
 
     //Return byte size of ir data type.
     UINT getTypeSize(TypeMgr const* tm) const
@@ -419,16 +339,16 @@ public:
 
     //Return rhs if exist. Some stmt has rhs,
     //such as IR_ST, IR_STPR and IR_IST.
-    inline IR * getRHS() const;
+    IR * getRHS() const;
 
     //Return the PR no if exist.
-    inline PRNO getPrno() const;
+    PRNO getPrno() const;
 
     //Return the SSAInfo if exist.
-    inline SSAInfo * getSSAInfo() const;
+    SSAInfo * getSSAInfo() const;
 
     //Return stmt if it writes PR as result. Otherwise return nullptr.
-    inline IR * getResultPR();
+    IR * getResultPR();
 
     //Get the stmt accroding to given prno if the stmt writes PR as a result.
     //Otherwise return nullptr.
@@ -489,13 +409,25 @@ public:
     }
 
     //Return determinate expression if any.
-    inline IR * getJudgeDet() const;
+    IR * getJudgeDet() const;
+
+    //Return the value-expression of multiple branch operations.
+    IR * getValExp() const;
 
     //Return expression if stmt has CASE list.
-    inline IR * getCaseList() const;
+    IR * getCaseList() const;
+
+    static UINT getIRCodeSize(IR const* ir)
+    {
+        #ifdef CONST_IRC_SZ
+        return IR_irc_size(ir);
+        #else
+        return IRCSIZE(ir->getCode());
+        #endif
+    }
 
     //Return true if ir has RHS. The ir always be store operation.
-    inline bool hasRHS() const;
+    bool hasRHS() const { return IRDES_has_rhs(g_ir_desc[getCode()]); }
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR has side effect.
@@ -515,15 +447,17 @@ public:
     bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
 
     //Return true if stmt has judge determinate expression.
-    inline bool hasJudgeDet() const;
+    bool hasJudgeDet() const
+    { return IRDES_has_judge_target(g_ir_desc[getCode()]); }
 
     //Return true if stmt has CASE list as kid.
-    inline bool hasCaseList() const;
+    bool hasCaseList() const
+    { return IRDES_has_case_list(g_ir_desc[getCode()]); }
 
     //Return true if ir is call and does have a return value.
-    inline bool hasReturnValue() const;
+    bool hasReturnValue() const;
 
-    //Return true if ir is branch op and has multiple jump targets.
+    //Return true if ir is branch-op and has multiple jump targets.
     bool hasMultiTarget() const;
 
     UINT id() const { return IR_id(this); }
@@ -547,7 +481,7 @@ public:
     // The function just determine overlapping of given two IR according to
     // their data-type and offset.
     bool isNotOverlap(IR const* ir2, Region const* rg) const;
-    bool isNotOverlapViaMDRef(IR const* ir2) const;
+    bool isNotOverlapViaMDRef(IR const* ir2, Region const* rg) const;
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR is no-movable.
@@ -570,21 +504,6 @@ public:
     // The function just determine overlapping of given two IR according to
     // their data-type and offset.
     bool isCover(IR const* ir2, Region const* rg) const;
-
-    //Return true if current IR may contain memory reference.
-    bool isContainMemRef() const
-    {
-        switch (getCode()) {
-        case IR_GOTO:
-        case IR_LABEL:
-        case IR_CASE:
-        case IR_BREAK:
-        case IR_CONTINUE:
-            return false;
-        default:;
-        }
-        return true;
-    }
 
     //Return true if ir's data type is vector.
     bool is_vec() const { return IR_dt(this)->is_vector(); }
@@ -641,10 +560,14 @@ public:
     //Note the function does not compare the siblings of 'src'.
     //e.g:ist (ld base) is isomorphic to ild (ld base)
     //    ist (ld base) is NOT isomorphic to ild ($base)
-    bool isIRIsomo(IR const* src, bool is_cmp_kid = true) const;
+    bool isIsomoTo(IR const* src, bool is_cmp_kid = true) const;
 
     //Return true if current ir is both PR and equal to src.
-    inline bool isPREqual(IR const* src) const;
+    bool isPREqual(IR const* src) const
+    {
+        ASSERT0(isWritePR() && src->isReadPR());
+        return getType() == src->getType() && getPrno() == src->getPrno();
+    }
 
     //Return true if ir-list are equivalent.
     bool isIRListEqual(IR const* irs, bool is_cmp_kid = true) const;
@@ -675,16 +598,23 @@ public:
     bool is_rhs(IR const* k) const { return !is_lhs(k) && k != this; }
 
     //Return true if k is the lhs of current ir.
-    inline bool is_lhs(IR const* k) const;
+    bool is_lhs(IR const* k) const;
 
     //Return true if ir terminates the control flow.
     bool is_terminate() const { return IR_is_terminate(this); }
+
+    //Return true if ir is dummy operation.
+    bool is_dummy() const { return IR_is_dummy(this); }
+    bool isDummyOp() const;
 
     //Return true if ir is volatile.
     bool is_volatile() const;
 
     //Return true if given array has same dimension structure with current ir.
     bool isSameArrayStruct(IR const* ir) const;
+
+    //Return true if may throw exceptions.
+    bool is_may_throw() const { return IR_may_throw(this); }
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR is may-throw.
@@ -698,7 +628,7 @@ public:
     bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[getCode()]); }
 
     //Return true if ir is constant expression.
-    inline bool isConstExp() const;
+    bool isConstExp() const;
 
     //Return true if ir is readonly expression or readonly call stmt.
     //If ir is expression, this function indicates that the expression does
@@ -712,8 +642,8 @@ public:
     //The pseduo register must be D_MC or vector type.
     bool is_setelem() const { return getCode() == IR_SETELEM; }
 
-    //True if picking up specified element of givne PR and store the value
-    //to a new PR. The base PR must be D_MC or vector type.
+    //Rreturn true if picking up specified element of givne PR and store the
+    //value to a new PR. The base PR must be D_MC or vector type.
     //And the result PR must be element type of base PR.
     bool is_getelem() const { return getCode() == IR_GETELEM; }
     bool is_undef() const { return getCode() == IR_UNDEF; }
@@ -769,27 +699,25 @@ public:
     bool is_bnot() const { return getCode() == IR_BNOT; }
     bool is_lnot() const { return getCode() == IR_LNOT; }
     bool is_neg() const { return getCode() == IR_NEG; }
-
-    //True if load from pseudo register.
     bool is_pr() const { return getCode() == IR_PR; }
-
-    //True if store to pseudo register.
     bool is_stpr() const { return getCode() == IR_STPR; }
 
     //Return true if ir indicate conditional branch to a label.
-    bool isConditionalBr() const { return is_truebr() || is_falsebr(); }
+    bool isConditionalBr() const
+    { return IRDES_is_conditional_br(g_ir_desc[getCode()]); }
 
     //Return true if ir is operation that read or write to an array element.
-    bool isArrayOp() const { return is_array() || is_starray(); }
+    bool isArrayOp() const { return IRDES_is_array_op(g_ir_desc[getCode()]); }
 
     //Return true if ir is base expression of array operation.
-    inline bool isArrayBase(IR const* ir) const;
+    bool isArrayBase(IR const* ir) const;
 
     //Return true if ir may jump to multiple targets.
     bool isMultiConditionalBr() const { return is_switch(); }
 
     //Return true if ir is unconditional branch.
-    bool isUnconditionalBr() const { return is_goto() || is_igoto(); }
+    bool isUnconditionalBr() const
+    { return IRDES_is_unconditional_br(g_ir_desc[getCode()]); }
 
     //Return true if ir is indirect jump to multiple targets.
     bool isIndirectBr() const { return is_igoto(); }
@@ -800,10 +728,12 @@ public:
              isUnconditionalBr() || isIndirectBr(); }
 
     //Return true if ir is indirect memory operation.
-    bool isIndirectMemOp() const { return is_ist() || is_ild(); }
+    bool isIndirectMemOp() const
+    { return IRDES_is_indirect_mem_op(g_ir_desc[getCode()]); }
 
     //Return true if ir is direct memory operation.
-    bool isDirectMemOp() const { return is_st() || is_ld(); }
+    bool isDirectMemOp() const
+    { return IRDES_is_direct_mem_op(g_ir_desc[getCode()]); }
 
     bool isCallStmt() const { return is_call() || is_icall(); }
 
@@ -814,7 +744,7 @@ public:
     bool isCallHasRetVal() const { return isCallStmt() && hasReturnValue(); }
 
     //Return true if ir is intrinsic operation.
-    inline bool isIntrinsicOp() const;
+    bool isIntrinsicOp() const;
 
     //Return true if stmt modify PR.
     //CALL/ICALL may modify PR if it has a return value.
@@ -827,7 +757,7 @@ public:
     { return IRDES_is_write_whole_pr(g_ir_desc[getCode()]); }
 
     //Return true if current expression read value from PR.
-    bool isReadPR() const  { return is_pr(); }
+    bool isReadPR() const { return is_pr(); }
 
     //Return true if current stmt/expression operates PR.
     bool isPROp() const
@@ -836,12 +766,12 @@ public:
     //Return true if current operation references memory.
     //These kinds of operation always define or use MD, thus include both PR
     //and NonPR operations.
-    bool isMemoryRef() const { return IRDES_is_mem_ref(g_ir_desc[getCode()]); }
+    bool isMemRef() const { return IRDES_is_mem_ref(g_ir_desc[getCode()]); }
 
     //Return true if current operation references memory, and
     //it is the rhs of stmt.
     //These kinds of operation always use MD.
-    bool isMemoryOpnd() const
+    bool isMemOpnd() const
     { return IRDES_is_mem_opnd(g_ir_desc[getCode()]); }
 
     //Return true if current ir is integer constant, and the number
@@ -849,24 +779,27 @@ public:
     bool isConstIntValueEqualTo(HOST_INT value) const;
 
     //Return true if current operation references memory except the PR memory.
-    bool isMemoryRefNonPR() const
+    bool isMemRefNonPR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
 
     //Return true if current ir and ir2 represent different memory location,
     //otherwise return false to tell caller we do not know more about these
     //object. Note this function will consider data type that current ir or ir2
     //referrenced.
-    bool isDiffMemLoc(IR const* ir2) const;
+    bool isDiffMemLoc(IR const* ir2, Region const* rg) const;
 
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
 
     //True if ir is read-modify-write.
     bool is_rmw() const { return IR_is_read_mod_write(this); }
+
     //True if ir is judgement operation.
     bool is_judge() const { return is_relation() || is_logical(); }
+
     //True if ir is logical operation.
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
+
     //True if ir is relation operation.
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
 
@@ -890,46 +823,50 @@ public:
     //one can access array via computational expression, which return a pointer,
     //that record the base address of array accessing. We call this
     //indirect array accessing.
-    inline bool isDirectArrayRef() const;
+    bool isDirectArrayRef() const;
 
     //This function invert the operation accroding to it semantics.
-    inline static IR * invertIRCode(IR * ir, Region * rg);
-    static IR_CODE invertIRCode(IR_CODE src)
-    {
-        switch(src) {
-        case IR_LT: return IR_GE;
-        case IR_LE: return IR_GT;
-        case IR_GT: return IR_LE;
-        case IR_GE: return IR_LT;
-        case IR_EQ: return IR_NE;
-        case IR_NE: return IR_EQ;
-        default: ASSERTN(0, ("unsupport"));
-        }
-        return IR_UNDEF;
-    }
+    static IR * invertIRCode(IR * ir, Region * rg);
+    static IR_CODE invertIRCode(IR_CODE src);
+
     //Return true if current ir can be placed in BB.
-    inline bool isStmtInBB() const;
+    bool isStmtInBB() const;
 
     //Return true if current stmt must modify 'md'.
     bool isExactDef(MD const* md) const;
     bool isExactDef(MD const* md, MDSet const* mds) const;
 
+    //Return true if RHS of current stmt reference PR with given 'prno'.
+    bool isRHSUsePR(PRNO prno) const { return getOpndPR(prno) != nullptr; }
+
+    //Return true if RHS of current stmt reference expression that is isomorphic
+    //to 'exp'.
+    bool isRHSUseIsomoExp(IR const* exp) const;
+
     //Return true if ir's date type must be pointer.
-    inline bool mustBePointerType() const;
+    bool mustBePointerType() const
+    {
+        return is_lda() ||
+               //Base of indirect operation should be pointer.
+               (getParent() != 0 && getParent()->getBase() == this);
+    }
 
     //Set prno, and update SSAInfo meanwhile.
     void setPrnoAndUpdateSSAInfo(PRNO prno);
     void setRHS(IR * rhs);
-    inline void setPrno(PRNO prno);
-    inline void setOffset(TMWORD ofst);
-    inline void setIdinfo(Var * idinfo);
-    inline void setLabel(LabelInfo const* li);
-    inline void setBB(IRBB * bb);
-    inline void setSSAInfo(SSAInfo * ssa);
-    inline void setDU(DU * du);
+    void setPrno(PRNO prno);
+    void setOffset(TMWORD ofst);
+    void setIdinfo(Var * idinfo);
+    void setLabel(LabelInfo const* li);
+    void setBB(IRBB * bb);
+    void setSSAInfo(SSAInfo * ssa);
+    void setDU(DU * du);
+    void setValExp(IR * exp);
+    void setBase(IR * exp);
+    void setJudgeDet(IR * exp);
 
     //Set 'kid' to be 'idx'th child of current ir.
-    inline void setKid(UINT idx, IR * kid);
+    void setKid(UINT idx, IR * kid);
 
     //Set the relationship between parent and its kid.
     void setParentPointer(bool recur = true);
@@ -971,6 +908,15 @@ public:
         setRefMDSet(mds, rg);
     }
 
+    static inline void setIRCodeSize(IR * ir, UINT ircsz)
+    {
+        #ifdef CONST_IRC_SZ
+        IR_irc_size(ir) = irc_sz;
+        #else
+        DUMMYUSE(ir);
+        #endif
+    }
+
     //Find and substitute 'newk' for 'oldk'.
     //Return true if replaced the 'oldk'.
     //'recur': set to true if function recusively perform
@@ -987,1794 +933,8 @@ public:
     void removeSSAUse();
 
     bool verify(Region const* rg) const;
-    bool verifyKids() const;
+    #include "ir_ext.inc"
 };
-
-
-//Record float point.
-#define CONST_fp_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_const_value)
-
-//Record the number of mantissa of float-point number.
-#define CONST_fp_mant(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_mantissa)
-
-//Record integer.
-#define CONST_int_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.int_const_value)
-
-//Record string.
-#define CONST_str_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.str_value)
-
-//Record anonymous value.
-#define CONST_anony_val(ir) \
-    (((CConst*)CK_IRC(ir, IR_CONST))->u1.anonymous_value)
-class CConst : public IR {
-    COPY_CONSTRUCTOR(CConst);
-public:
-    union {
-        //record string-const if current ir is string type.
-        Sym const* str_value;
-
-        //record integer value using a length of HOST_INT memory.
-        HOST_INT int_const_value;
-
-        //record float point value if current ir is float type.
-        struct {
-            HOST_FP fp_const_value;
-
-            //record the number of mantissa of float-point number.
-            BYTE fp_mantissa;
-        } s1;
-
-        //record customized value.
-        void * anonymous_value;
-    } u1;
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0x0;
-public:
-    HOST_FP getFP() const { return CONST_fp_val(this); }
-    BYTE getMantissa() const { return CONST_fp_mant(this); }
-    HOST_INT getInt() const { return CONST_int_val(this); }
-    Sym const* getStr() const { return CONST_str_val(this); }
-    void * getAnonymousVal() const { return CONST_anony_val(this); }
-};
-
-//Record Var property.
-class VarProp {
-    COPY_CONSTRUCTOR(VarProp);
-public:
-    //Record Var if ir is IR_LD|IR_ID.
-    Var * id_info;
-};
-
-
-//Record DU property.
-#define DUPROP_du(ir) (((DuProp*)ir)->du)
-class DuProp : public IR {
-    COPY_CONSTRUCTOR(DuProp);
-public:
-    DU * du;
-};
-
-
-//ID need DU info, some Passes requires it, e.g. GVN.
-//Note IR_ID should NOT participate in GVN analysis because it does not
-//represent a real operation.
-#define ID_info(ir) (((CId*)CK_IRC(ir, IR_ID))->id_info)
-#define ID_du(ir) (((CId*)CK_IRC(ir, IR_ID))->du)
-#define ID_phi(ir) (((CId*)CK_IRC(ir, IR_ID))->phi)
-class CId : public DuProp, public VarProp {
-    COPY_CONSTRUCTOR(CId);
-public:
-    MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0x0;
-public:
-    MDPhi * getMDPhi() const { return ID_phi(this); }
-};
-
-
-class OffsetProp {
-    COPY_CONSTRUCTOR(OffsetProp);
-public:
-    //Record accessing field. result-type-idx should be D_MC.
-    //ir is used by IR_LD|IR_ST|IR_ILD|IR_IST|IR_LDA|IR_ARRAY
-    //
-    //Usage:
-    //    LD<ofst:3>('x')                 => pr=*(&x + 3)
-    //    ILD<ofst:3>(LD('x'))            => pr=*(x + 3)
-    //    ST<ofst:3>('x', IMM:0x100)      => *(&x + 3)=0x100
-    //    IST<ofst:3>(LD('x'), IMM:0x100) => *(x + 3)=0x100
-    //    LDA<ofst:3>('x')                => pr = &x + 3
-    //    ARRAY<ofst:3>(LDA('x'), OFST:5) => *(&x[5] + 3) = pr or
-    //                                       pr = *(&x[5] + 3)
-    TMWORD field_offset;
-};
-
-
-//This class represents memory load operation.
-//LD_ofst descibe the byte offset that is the addend to variable base address.
-//
-//usage: ld(i32, ofst:10, s) with LD_ofst = 10 means:
-//    Assum a pointer p, it point to the address of variable s.
-//    The ld operation loads i32 value from the address (p + 10)
-#define LD_ofst(ir) (((CLd*)CK_IRC(ir, IR_LD))->field_offset)
-#define LD_idinfo(ir) (((CLd*)CK_IRC(ir, IR_LD))->id_info)
-#define LD_du(ir) (((CLd*)CK_IRC(ir, IR_LD))->du)
-class CLd : public DuProp, public VarProp, public OffsetProp {
-    COPY_CONSTRUCTOR(CLd);
-public:
-    static BYTE const kid_map = 0;
-    static BYTE const kid_num = 0;
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
-};
-
-
-//This class represents indirect memory load operation.
-//ILD_ofst descibe the byte offset that is the addend to address.
-//If ILD_ofst is not 0, the base memory address must add the offset.
-//
-//usage: ild p, where p is ILD_base, it must be pointer.
-//    1. res = ild (p), if ILD_ofst is 0.
-//    2. res = ild (p + ILD_ofst) if ILD_ofst is not 0.
-#define ILD_ofst(ir) (((CILd*)CK_IRC(ir, IR_ILD))->field_offset)
-#define ILD_du(ir) (((CILd*)CK_IRC(ir, IR_ILD))->du)
-#define ILD_base(ir) ILD_kid(ir, 0)
-#define ILD_kid(ir, idx) CK_KID(ir, CILd, IR_ILD, idx)
-class CILd : public DuProp, public OffsetProp {
-    COPY_CONSTRUCTOR(CILd);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
-public:
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
-
-    IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
-    IR * getBase() const { return ILD_base(this); }
-};
-
-
-//This class represents properties of stmt.
-class StmtProp {
-    COPY_CONSTRUCTOR(StmtProp);
-public:
-    IRBB * bb;
-};
-
-
-//This class represents memory store operation.
-//ST_ofst descibe the byte offset that is the addend to address.
-//ST_idinfo describe the memory variable.
-//If ST_ofst is not 0, the base memory address must add the offset.
-//
-//usage: st(lhs, rhs), p = &lhs, where p is the memory address of lhs.
-//    1. [p] = rhs, if ST_ofst is 0.
-//    2. [p + ST_ofst] = rhs if ST_ofst is not 0.
-#define ST_bb(ir) (((CSt*)CK_IRC(ir, IR_ST))->bb)
-#define ST_idinfo(ir) (((CSt*)CK_IRC(ir, IR_ST))->id_info)
-#define ST_ofst(ir) (((CSt*)CK_IRC(ir, IR_ST))->field_offset)
-#define ST_du(ir) (((CSt*)CK_IRC(ir, IR_ST))->du)
-#define ST_rhs(ir) ST_kid(ir, 0)
-#define ST_kid(ir, idx) (((CSt*)ir)->opnd[CK_KID_IRC(ir, IR_ST, idx)])
-class CSt: public CLd, public StmtProp {
-    COPY_CONSTRUCTOR(CSt);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return ST_kid(this, idx); }
-    IR * getRHS() const { return ST_rhs(this); }
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
-};
-
-
-//This class represents temporary memory store operation.
-//The temporary memory named pseudo register.
-//usage: stpr(prno:1, val), will store val to PR1.
-#define STPR_bb(ir) (((CStpr*)CK_IRC(ir, IR_STPR))->bb)
-#define STPR_no(ir) (((CStpr*)CK_IRC(ir, IR_STPR))->prno)
-#define STPR_ssainfo(ir) (((CStpr*)CK_IRC(ir, IR_STPR))->ssainfo)
-#define STPR_du(ir) (((CStpr*)CK_IRC(ir, IR_STPR))->du)
-#define STPR_rhs(ir) STPR_kid(ir, 0)
-#define STPR_kid(ir, idx) (((CStpr*)ir)->opnd[CK_KID_IRC(ir, IR_STPR, idx)])
-class CStpr: public DuProp, public StmtProp {
-    COPY_CONSTRUCTOR(CStpr);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    PRNO prno; //PR number.
-    SSAInfo * ssainfo; //Present ssa def and use set.
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return STPR_kid(this, idx); }
-    IR * getRHS() const { return STPR_rhs(this); }
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
-};
-
-
-//This class represents an operation that store value to be part of the section
-//of 'base'.
-//NOTE: Type of result PR should same with base.
-//SETELEM_ofst descibe the byte offset to the start address of result PR.
-//The the number of bytes of result PR must be an integer multiple of
-//the number of bytes of SETELEM_val if the result data type is vector.
-//
-//usage: setelem $2:vec<4*i32> = $3:vec<4*i32>, $1:i32, 4.
-//  The result PR is $2. The base value is $3. $1 is the input value.
-//  The code stores $1 that is part of $3 to be second element
-//  of $2, namely, the section of $2 that offset is 4 bytes.
-//
-//This operation will store value to the memory which offset to the
-//memory chunk or vector's base address.
-#define SETELEM_bb(ir) (((CSetElem*)CK_IRC(ir, IR_SETELEM))->bb)
-#define SETELEM_prno(ir) (((CSetElem*)CK_IRC(ir, IR_SETELEM))->prno)
-#define SETELEM_ssainfo(ir) (((CSetElem*)CK_IRC(ir, IR_SETELEM))->ssainfo)
-#define SETELEM_du(ir) (((CSetElem*)CK_IRC(ir, IR_SETELEM))->du)
-#define SETELEM_base(ir) SETELEM_kid(ir, 0)
-#define SETELEM_val(ir) SETELEM_kid(ir, 1)
-#define SETELEM_ofst(ir) SETELEM_kid(ir, 2)
-#define SETELEM_kid(ir, idx) \
-    (((CSetElem*)ir)->opnd[CK_KID_IRC(ir, IR_SETELEM, idx)])
-class CSetElem: public DuProp, public StmtProp {
-    COPY_CONSTRUCTOR(CSetElem);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const kid_num = 3;
-    PRNO prno; //PR number.
-    SSAInfo * ssainfo; //Present ssa def and use set.
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return SETELEM_kid(this, idx); }
-    IR * getBase() const { return SETELEM_base(this); }
-    IR * getVal() const { return SETELEM_val(this); }
-};
-
-
-//This class represents an operation that get an element from a base memory
-//location and store the element to a PR.
-//
-//The the number of byte of GETELEM_base must be
-//an integer multiple of the number of byte of result
-//PR if base is vector.
-//
-//usage: getelem $1:i32 $2:vec<4*i32>, 4.
-//    The base memory location is a PR, which is a vector.
-//    The example get the second element of pr2, then store it to pr1.
-#define GETELEM_bb(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->bb)
-#define GETELEM_prno(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->prno)
-#define GETELEM_ssainfo(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->ssainfo)
-#define GETELEM_du(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->du)
-#define GETELEM_base(ir) GETELEM_kid(ir, 0)
-#define GETELEM_ofst(ir) GETELEM_kid(ir, 1)
-#define GETELEM_kid(ir, idx)(((CGetElem*)ir)->opnd[CK_KID_IRC(ir, IR_GETELEM, idx)])
-class CGetElem : public DuProp, public StmtProp {
-    COPY_CONSTRUCTOR(CGetElem);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    PRNO prno; //PR number.
-    //versioned presentation or ssa def and use list in ssa mode.
-    //Note this field only avaiable if SSA information is maintained.
-    SSAInfo * ssainfo;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return GETELEM_kid(this, idx); }
-    IR * getBase() const { return GETELEM_base(this); }
-};
-
-
-//This class represents indirect memory store operation.
-//IST_ofst descibe the byte offset that is the addend to address.
-//
-//If IST_ofst is not 0, the base memory address must add the offset.
-//
-//usage: ist = ld p, rhs, where the value of p is the base memory address
-//to be stored. The followed code exhibits the behaivor of such usage.
-//    1. [p] = rhs, if IST_ofst is 0.
-//    2. [p + IST_ofst] = rhs, if IST_ofst is not 0.
-#define IST_bb(ir) (((CISt*)CK_IRC(ir, IR_IST))->bb)
-#define IST_ofst(ir) (((CISt*)CK_IRC(ir, IR_IST))->field_offset)
-#define IST_du(ir) (((CISt*)CK_IRC(ir, IR_IST))->du)
-#define IST_base(ir) IST_kid(ir, 0)
-#define IST_rhs(ir) IST_kid(ir, 1)
-#define IST_kid(ir, idx) (((CISt*)ir)->opnd[CK_KID_IRC(ir, IR_IST, idx)])
-class CISt : public DuProp, public OffsetProp, public StmtProp {
-    COPY_CONSTRUCTOR(CISt);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return IST_kid(this, idx); }
-    IR * getRHS() const { return IST_rhs(this); }
-    IR * getBase() const { return IST_base(this); }
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
-};
-
-
-//This class represents the operation to load memory variable address.
-//The base of LDA may be ID variable, LABEL variable, STRING variable.
-//NOTE: LDA_ofst describe the byte offset that is the addend to the address.
-//usage: lda(s) with LDA_ofst = 10 means:
-//    pointer p = lda(s)
-//    p = p + 10
-//    return p
-#define LDA_ofst(ir) (((CLda*)CK_IRC(ir, IR_LDA))->field_offset)
-#define LDA_idinfo(ir) (((CLda*)CK_IRC(ir, IR_LDA))->id_info)
-class CLda : public IR, public VarProp, public OffsetProp {
-    COPY_CONSTRUCTOR(CLda);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-};
-
-
-//This class uses bits to describe attributes.
-//Represents a direct function call.
-//NOTE: 'opnd' must be the last member.
-//Record the BB that CALL stmt placed.
-#define CALL_bb(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, bb)
-
-//Represents the identifier info fo the function call.
-#define CALL_idinfo(ir) CK_FLD_KIND(ir, CCall, CK_IRC_ONLY_CALL, id_info)
-
-//Return the result PRNO if any.
-//#define CALL_prno(ir) (((CCall*)CK_IRC_CALL(ir))->prno)
-#define CALL_prno(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, prno)
-
-//Access the SSA info of result PR.
-#define CALL_ssainfo(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, prssainfo)
-
-//True if this call is intrinsic operation.
-#define CALL_is_intrinsic(ir) \
-    CK_FLD_KIND(ir, CCall, CK_IRC_CALL,  m_is_intrinsic)
-
-//Record intrinsic operator if CALL_is_intrinsic is true.
-#define CALL_intrinsic_op(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, intrinsic_op)
-
-//Call does not necessarily to be BB boundary.
-#define CALL_is_not_bb_bound(ir) \
-    CK_FLD_KIND(ir, CCall, CK_IRC_CALL, m_is_not_bb_bound)
-
-//True if this call does not modify any memory.
-#define CALL_is_readonly(ir) (CALL_idinfo(ir)->is_readonly())
-
-//True if call allocated memory from heap. It always describe functions
-//like malloc() or 'new' operator.
-#define CALL_is_alloc_heap(ir) \
-    CK_FLD_KIND(ir, CCall, CK_IRC_CALL, m_is_alloc_heap)
-
-//Record MD DU information.
-#define CALL_du(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, du)
-
-//Parameter list of call.
-#define CALL_param_list(ir) CALL_kid(ir, 0)
-
-//Record dummy referenced IR.
-#define CALL_dummyuse(ir) CALL_kid(ir, 1)
-#define CALL_kid(ir, idx) CK_CALL_KID(ir, CCall, idx)
-class CCall : public DuProp, public VarProp, public StmtProp {
-    COPY_CONSTRUCTOR(CCall);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    //True if current call is intrinsic call.
-    BYTE m_is_intrinsic:1;
-
-    //True if this call do allocate memory from heap. It always the function
-    //like malloc or new.
-    BYTE m_is_alloc_heap:1;
-
-    //True if this call does not necessarily to be basic block boundary.
-    //By default, call stmt must be down boundary of basic block, but if
-    //the flag is true, the call is always be defined by customer for
-    //special purpose, e.g, intrinsic call or customized operation.
-    BYTE m_is_not_bb_bound:1;
-
-    //Record the intrinsic operation.
-    UINT intrinsic_op;
-
-    PRNO prno; //Result PR number if any.
-
-    SSAInfo * prssainfo; //indicates PR ssa def and use set.
-
-    //NOTE: 'opnd' must be the last member.
-    IR * opnd[kid_num];
-public:
-    //Build dummyuse expression to represent potential memory objects that
-    //the Call referrenced.
-    //Note dummyuse may be a list of IR.
-    void addDummyUse(Region * rg);
-
-    IR * getKid(UINT idx) const { return CALL_kid(this, idx); }
-    IR * getParamList() const { return CALL_param_list(this); }
-    IR * getDummyUse() const { return CALL_dummyuse(this); }
-    CHAR const* getCalleeNameString() const
-    { return SYM_name(CALL_idinfo(this)->get_name()); }
-    //Get the intrinsic operation code.
-    UINT getIntrinsicOp()
-    {
-        ASSERT0(CALL_is_intrinsic(this));
-        return CALL_intrinsic_op(this);
-    }
-
-    //Return true if current stmt has dummyuse.
-    bool hasDummyUse() const { return CALL_dummyuse(this) != nullptr; }
-
-    bool is_intrinsic() const { return CALL_is_intrinsic(this); }
-    bool is_readonly() const { return CALL_is_readonly(this); }
-    bool isMustBBbound()
-    {
-        #ifdef _DEBUG_
-        if (CALL_is_not_bb_bound(this)) {
-            ASSERTN(CALL_is_intrinsic(this),
-                    ("normal call stmt must be BB boundary"));
-        }
-        #endif
-        return !CALL_is_not_bb_bound(this);
-    }
-};
-
-
-
-//Represents an indirect function call.
-//This class uses macro operations of CCall.
-//Expression to compute the target function address.
-//NOTE: 'opnd_pad' must be the first member.
-
-//Indicate the callee function pointer.
-#define ICALL_callee(ir) (*(((CICall*)ir)->opnd + CK_KID_IRC(ir, IR_ICALL, 2)))
-
-//True if current call is readonly.
-#define ICALL_is_readonly(ir) (((CICall*)CK_IRC_ONLY_ICALL(ir))->m_is_readonly)
-#define ICALL_kid(ir, idx) (((CICall*)ir)->opnd[CK_KID_IRC(ir, IR_ICALL, idx)])
-class CICall : public CCall {
-    COPY_CONSTRUCTOR(CICall);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const pad_kid_num = 1;
-    static BYTE const kid_num = CCall::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member.
-    IR * opnd_pad[pad_kid_num];
-
-    //True if current call is readonly.
-    BYTE m_is_readonly:1;
-public:
-    IR * getKid(UINT idx) const { return ICALL_kid(this, idx); }
-    IR * getCallee() const { return ICALL_callee(this); }
-
-    bool is_readonly() const { return ICALL_is_readonly(this); }
-};
-
-
-//Binary Operation, includes ADD, SUB, MUL, DIV, REM, MOD,
-//LAND, LOR, BAND, BOR, XOR, LT, LE, GT, GE, EQ, NE, ASR, LSR, LSL.
-#define BIN_opnd0(ir) BIN_kid(ir, 0)
-#define BIN_opnd1(ir) BIN_kid(ir, 1)
-#define BIN_kid(ir, idx) (((CBin*)ir)->opnd[CK_KID_BIN(ir, idx)])
-class CBin : public IR {
-    COPY_CONSTRUCTOR(CBin);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return BIN_kid(this, idx); }
-    IR * getOpnd0() const { return BIN_opnd0(this); }
-    IR * getOpnd1() const { return BIN_opnd1(this); }
-};
-
-
-//Unary Operation, includes NEG, BNOT, LNOT.
-#define UNA_opnd(ir) UNA_kid(ir, 0)
-#define UNA_kid(ir, idx) (((CUna*)ir)->opnd[CK_KID_UNA(ir, idx)])
-class CUna : public IR {
-    COPY_CONSTRUCTOR(CUna);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return UNA_kid(this, idx); }
-    IR * getOpnd() const { return UNA_opnd(this); }
-};
-
-
-//This class represents goto operation, unconditional jump to target label.
-#define GOTO_bb(ir) (((CGoto*)CK_IRC(ir, IR_GOTO))->bb)
-#define GOTO_lab(ir) (((CGoto*)CK_IRC(ir, IR_GOTO))->jump_target_lab)
-class CGoto : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CGoto);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-    LabelInfo const* jump_target_lab;
-public:
-    LabelInfo const* getLab() const { return GOTO_lab(this); }
-};
-
-
-//This class represents indirect goto operation,
-//the control flow will unconditional jump to one target label of a list of
-//label which determined by value-exp.
-//usage: igoto (value-exp) case_list.
-#define IGOTO_bb(ir) (((CIGoto*)CK_IRC(ir, IR_IGOTO))->bb)
-
-//Value expression.
-#define IGOTO_vexp(ir) IGOTO_kid(ir, 0)
-
-//Record a list pairs of <case-value, jump label>.
-#define IGOTO_case_list(ir) IGOTO_kid(ir, 1)
-
-#define IGOTO_kid(ir, idx) (((CIGoto*)ir)->opnd[CK_KID_IRC(ir, IR_IGOTO, idx)])
-class CIGoto : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CIGoto);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    IR * opnd[kid_num];
-public:
-    //The function collects the LabelInfo for each branch-target.
-    void collectLabel(OUT List<LabelInfo const*> & lst) const;
-    IR * getCaseList() const { return IGOTO_case_list(this); }
-};
-
-
-//High level control loop operation.
-//usage:
-//    while (det) {
-//      body
-//    }
-//NOTE:
-//    * The member layout should be same as do_while.
-//    * 'opnd' must be the last member of CWhileDo.
-//Determinate expression. It can NOT be nullptr.
-#define LOOP_det(ir) LOOP_kid(ir, 0)
-
-//Record stmt list in loop body of IF. It can be nullptr.
-#define LOOP_body(ir) LOOP_kid(ir, 1)
-#define LOOP_kid(ir, idx) (((CWhileDo*)ir)->opnd[CK_KID_LOOP(ir, idx)])
-class CWhileDo : public IR {
-    COPY_CONSTRUCTOR(CWhileDo);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    //NOTE: 'opnd' must be the last member of CWhileDo.
-    IR * opnd[kid_num];
-public:
-    //num: the number of IR added.
-    void addToBody(UINT num, ...);
-
-    IR * getBody() const { return LOOP_body(this); }
-};
-
-
-//High level control loop operation.
-//usage:
-//    do {
-//      body
-//    } while (det)
-class CDoWhile : public CWhileDo {
-    COPY_CONSTRUCTOR(CDoWhile);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-};
-
-
-//High level control loop operation.
-//This structure represents a kind of loop with
-//plainly definition of INIT(low bound), DET(HIGH bound),
-//LOOP-BODY and STEP(Increment or Dcrement) of induction variable.
-//e.g1:
-//    do
-//      ivr: id i
-//      init: 0
-//      det: i <= 10
-//      step: i+1
-//      body {stmt_list}
-//    enddo
-//e.g2:
-//    do
-//      ivr: $1
-//      init: 0
-//      det: $1 <= 10
-//      step: $1+1
-//      body {stmt_list}
-//    enddo
-//This class uses LOOP_det access its determinate expression,
-//and LOOP_body access loop body.
-//NOTE: 'opnd_pad' must be the first member of CDoLoop.
-
-//Record the induction variable.
-//There is only one basic induction variable for do-loop.
-#define LOOP_iv(ir) (*(((CDoLoop*)ir)->opnd + CK_KID_IRC(ir, IR_DO_LOOP, 2)))
-
-//Record the expression that initialize induction variable.
-#define LOOP_init(ir) (*(((CDoLoop*)ir)->opnd + CK_KID_IRC(ir, IR_DO_LOOP, 3)))
-
-//Record the expression that update induction variable.
-#define LOOP_step(ir) (*(((CDoLoop*)ir)->opnd + CK_KID_IRC(ir, IR_DO_LOOP, 4)))
-#define DOLOOP_kid(ir, idx) (((CDoLoop*)ir)->opnd[CK_KID_IRC(ir, IR_DO_LOOP, idx)])
-
-class CDoLoop : public CWhileDo {
-    COPY_CONSTRUCTOR(CDoLoop);
-public:
-    static BYTE const kid_map = 0x1F;
-    static BYTE const pad_kid_num = 3;
-    static BYTE const kid_num = CWhileDo::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member of CDoLoop.
-    IR * opnd_pad[pad_kid_num];
-public:
-    IR * getIV() const { return LOOP_iv(this); }
-    IR * getInit() const { return LOOP_init(this); }
-    IR * getStep() const { return LOOP_step(this); }
-};
-
-
-//This class represents high level control IF operation.
-//usage:
-//    if (det)
-//      truebody
-//      falsebody
-//    endif
-//Determinate expression. It can NOT be nullptr.
-#define IF_det(ir) IF_kid(ir, 0)
-
-//Record stmt list in true body of IF. It can be nullptr.
-#define IF_truebody(ir) IF_kid(ir, 1)
-
-//Record stmt list in false body of IF. It can be nullptr.
-#define IF_falsebody(ir) IF_kid(ir, 2)
-#define IF_kid(ir, idx) (((CIf*)ir)->opnd[CK_KID_IRC(ir, IR_IF, idx)])
-class CIf : public IR {
-    COPY_CONSTRUCTOR(CIf);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const kid_num = 3;
-    IR * opnd[kid_num];
-public:
-    //num: the number of IR added.
-    void addToTrueBody(UINT num, ...);
-    //num: the number of IR added.
-    void addToFalseBody(UINT num, ...);
-
-    IR * getKid(UINT idx) const { return IF_kid(this, idx); }
-    IR * getDet() const { return IF_det(this); }
-    IR * getTrueBody() const { return IF_truebody(this); }
-    IR * getFalseBody() const { return IF_falsebody(this); }
-};
-
-
-//This class represents internal and customer defined label.
-#define LAB_lab(ir) (((CLab*)CK_IRC(ir, IR_LABEL))->label_info)
-class CLab : public IR {
-    COPY_CONSTRUCTOR(CLab);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-    LabelInfo const* label_info;
-public:
-    LabelInfo const* getLab() const { return LAB_lab(this); }
-};
-
-
-//This class represents high and middle level control flow switch operation.
-//usage:
-//    switch (value-exp)
-//    case_list
-//    body
-//    endswitch
-#define SWITCH_bb(ir) (((CSwitch*)CK_IRC(ir, IR_SWITCH))->bb)
-
-//Default label.
-//This is a label repesent the default jump target of IR_SWITCH.
-//The label is optional.
-//If there are not any cases matched, the control flow will jump to
-//the default label.
-#define SWITCH_deflab(ir) (((CSwitch*)CK_IRC(ir, IR_SWITCH))->default_label)
-
-//Value expression.
-#define SWITCH_vexp(ir) SWITCH_kid(ir, 0)
-
-//Switch body.
-#define SWITCH_body(ir) SWITCH_kid(ir, 1)
-
-//Record a list pair of <case-value, jump label>.
-#define SWITCH_case_list(ir) SWITCH_kid(ir, 2)
-
-#define SWITCH_kid(ir, idx)  (((CSwitch*)ir)->opnd[CK_KID_IRC(ir, IR_SWITCH, idx)])
-class CSwitch : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CSwitch);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const kid_num = 3;
-    IR * opnd[kid_num];
-    LabelInfo const* default_label;
-public:
-    //num: the number of IR added.
-    void addToBody(UINT num, ...);
-
-    //The function collects the LabelInfo for each branch-target.
-    //Note the default-label is collected too.
-    void collectLabel(OUT List<LabelInfo const*> & lst) const;
-
-    LabelInfo const* getDefLab() const { return SWITCH_deflab(this); }
-    IR * getKid(UINT idx) const { return SWITCH_kid(this, idx); }
-    IR * getValExp() const { return SWITCH_vexp(this); }
-    IR * getBody() const { return SWITCH_body(this); }
-    IR * getCaseList() const { return SWITCH_case_list(this); }
-};
-
-
-//This class represents the case value expression and its jump target label.
-//NOTE: this class is used only by SWITCH and IGOTO.
-#define CASE_lab(ir) (((CCase*)CK_IRC(ir, IR_CASE))->jump_target_label)
-
-//Value expression.
-#define CASE_vexp(ir) CASE_kid(ir, 0)
-#define CASE_kid(ir, idx) (((CCase*)ir)->opnd[CK_KID_IRC(ir, IR_CASE, idx)])
-class CCase : public IR {
-    COPY_CONSTRUCTOR(CCase);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num]; //case-value
-    LabelInfo const* jump_target_label; //jump lable for case.
-public:
-    LabelInfo const* getLab() const { return CASE_lab(this); }
-    IR * getValExp() const { return CASE_vexp(this); }
-    IR * getKid(UINT idx) const { return CASE_kid(this, idx); }
-};
-
-
-//This class represents array operation.
-//Base of array can be LDA, or other computational expression.
-//This operation do not perform any array bound diagnosis.
-//If array base is LDA, it denotes that the array's base is a variable with
-//array type,
-//e.g: char p[N]; (&p)[i] = ...
-//
-//If array base is computational expression, it denotes that the array's
-//base is pointer, and the pointer points to an array.
-//e.g: char * p; (p+1)[i] = ...
-//
-//ARR_elem_ty represents the type of array element. Moreover, element may be
-//array as well.
-#define ARR_elemtype(ir) (((CArray*)CK_IRC_ARR(ir))->elemtype)
-#define ARR_ofst(ir) (((CArray*)CK_IRC_ARR(ir))->field_offset)
-#define ARR_du(ir) (((CArray*)CK_IRC_ARR(ir))->du)
-
-//Get the number of element in each dimension.
-//ARR_elem_num represents the number of array element in current dimension.
-//Note the lowest dimension, which iterates most fastly, is at the 0th position
-//in 'ARR_elem_num_buf'.
-//e.g: Given array D_I32 A[10][20], the 0th dimension is the lowest dimension,
-//it has 20 elements, each element has type D_I32;
-//the 1th dimension has 10 elements, each element has type [D_I32*20], and
-//the ARR_elem_num_buf will be [10, 20], the lowest dimension at the position 0
-//in the buffer.
-//Note that if the ARR_elem_num of a dimension is 0, that means we can not
-//determine the number of element at the dimension.
-#define ARR_elem_num(ir, dim) \
-    (((CArray*)CK_IRC_ARR(ir))->elem_num[CK_ARRAY_DIM(ir, dim)])
-#define ARR_elem_num_buf(ir) (((CArray*)CK_IRC_ARR(ir))->elem_num)
-
-//Array subscript expression list.
-//If we have an array accessing, such as A[i][j], the ARR_sub_list will be
-//ld(j)->ld(i), the first expression represents the accessing of the lowest
-//dimension. By given the example, if ARR_elem_num is [10, 20].
-//the final accessing address will be lda(A) + (20 * i + j) * sizeof(D_I32).
-#define ARR_sub_list(ir) ARR_kid(ir, 1)
-
-//Array base expression.
-#define ARR_base(ir) ARR_kid(ir, 0)
-
-#define ARR_kid(ir, idx) (((CArray*)ir)->opnd[CK_KID_ARR(ir, idx)])
-class CArray : public DuProp, public OffsetProp {
-    COPY_CONSTRUCTOR(CArray);
-public:
-    static BYTE const kid_map = 0x3;
-    static BYTE const kid_num = 2;
-    //Note that if ARR_ofst is not zero, the IR_dt may not equal to
-    //ARR_elemtype. IR_dt describe the data-type of ARRAY operation + ARR_ofst.
-    //ARR_elemtype describe array element type.
-    //
-    //e.g: struct {int a, b; } s[100];
-    //     ... = s[2].b;
-    //
-    //data-type of array operation is D_I32, because ARR_ofst is 4,
-    //that means we are taking the value of second field of struct, meanwhile
-    //data-type of array element is D_MC, size is 8, (struct {int a, b;}).
-    Type const* elemtype; //record data-type of array element.
-
-    //Record the number of array element for each dimension.
-    //Note that the elem_num buffer can NOT be modified
-    //after it is created.
-    TMWORD const* elem_num;
-
-    //NOTE: 'opnd' must be the last member of CArray.
-    IR * opnd[kid_num];
-public:
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
-
-    //Return the number of dimensions.
-    UINT getDimNum() const
-    {
-        ASSERT0(isArrayOp());
-        return xcom::cnt_list(ARR_sub_list(this));
-    }
-
-    //Return the number of element in given dimension.
-    TMWORD getElementNumOfDim(UINT dimension) const
-    {
-        ASSERT0(ARR_elem_num_buf(this));
-        return ARR_elem_num(this, dimension);
-    }
-    TMWORD const* getElemNumBuf() const { return ARR_elem_num_buf(this); }
-    Type const* getElemType() const { return ARR_elemtype(this); }
-    IR * getKid(UINT idx) const { return ARR_kid(this, idx); }
-    IR * getBase() const { return ARR_base(this); }
-    IR * getSubList() const { return ARR_sub_list(this); }
-
-    //Return true if exp is array base.
-    bool is_base(IR const* exp) const { return exp == ARR_base(this); }
-
-    //Return true if exp is array subscript expression list.
-    bool isInSubList(IR const* exp) const
-    {
-        for (IR const* s = ARR_sub_list(this);
-             s != nullptr; s = s->get_next()) {
-            if (s == exp || s->is_kids(exp)) { return true; }
-        }
-        return false;
-    }
-};
-
-
-//This class represents the operation storing value to array.
-//The most operations and properties are same as CArray.
-//
-//Base of array can be LDA, or other computational expression.
-//This operation do not perform any array bound diagnosis.
-//
-//If array base is IR_LDA, it denotes that the array's base is variable with
-//array type,
-//    e.g: char p[N]; (&p)[i] = ...
-//
-//If array base is computational expression, it denotes that the array's
-//base is pointer, and the pointer point to an array.
-//    e.g: char * p; (p+1)[i] = ...
-//
-//'elem_ty' represents the type of array element.
-//Moreover, element may be also an array as well.
-//
-//'elem_num' represents the number of array element in given dimension.
-//
-#define STARR_bb(ir) (((CStArray*)CK_IRC(ir, IR_STARRAY))->stmtprop.bb)
-#define STARR_rhs(ir) \
-    (*(((CStArray*)ir)->opnd_pad + CK_KID_IRC(ir, IR_STARRAY, 0)))
-#define STARR_base(ir) ARR_base(ir)
-#define STARR_sub_list(ir) ARR_sub_list(ir)
-#define STARR_elem_type(ir) ARR_elem_type(ir)
-#define STARR_ofst(ir) ARR_ofst(ir)
-#define STARR_du(ir) ARR_du(ir)
-#define STARR_elem_num(ir, dim) ARR_elem_num(ir, dim)
-#define STARR_elem_num_buf(ir) ARR_elem_num_buf(ir)
-class CStArray: public CArray {
-    COPY_CONSTRUCTOR(CStArray);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const pad_kid_num = 1;
-    static BYTE const kid_num = CArray::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member of CStArray.
-    IR * opnd_pad[pad_kid_num];
-
-    //DO NOT PLACE MEMBER BEFORE opnd_pad
-    StmtProp stmtprop;
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
-};
-
-
-//This class represents data-type convertion.
-//Record the expression to be converted.
-#define CVT_exp(ir) (UNA_opnd(ir))
-#define CVT_kid(ir, idx) (UNA_kid(ir, idx))
-#define CVT_round(ir) (((CCvt*)ir)->round)
-class CCvt : public CUna {
-    COPY_CONSTRUCTOR(CCvt);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    ROUND_TYPE round;
-public:
-    //Get the leaf expression.
-    //e.g: cvt:i32(cvt:u8(x)), this function will return x;
-    IR * getLeafExp()
-    {
-        ASSERT0(getCode() == IR_CVT);
-        IR * v;
-        for (v = this; v->getCode() == IR_CVT; v = CVT_exp(v)) {;}
-        ASSERT0(v);
-        return v;
-    }
-    IR * getExp() const { return CVT_exp(this); }
-    IR * getKid(UINT idx) const { return CVT_kid(this, idx); }
-    ROUND_TYPE getRoundType() const { return CVT_round(this); }
-};
-
-
-//This class represents temporary memory location which named pseudo register.
-//It can be used to indicate the Region live-in register. In this case,
-//a PR may not have a definition.
-//NOTE:
-//    1.PR can not be taken address.
-//    2.PR is always allocate on stack.
-#define PR_no(ir) (((CPr*)CK_IRC(ir, IR_PR))->prno)
-#define PR_ssainfo(ir) (((CPr*)CK_IRC(ir, IR_PR))->ssainfo)
-#define PR_du(ir) (((CPr*)CK_IRC(ir, IR_PR))->du)
-class CPr : public DuProp {
-    COPY_CONSTRUCTOR(CPr);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-    PRNO prno; //PR number.
-
-    //versioned presentation or ssa def and use list in ssa mode.
-    //Note this field only avaiable if SSA information is maintained.
-    SSAInfo * ssainfo;
-public:
-    static IR * dupIRTreeByRef(IR const* src, Region * rg);
-};
-
-
-//This class represents true branch operation.
-//Branch if determinant express is true, otherwise control flow does not change.
-
-//NOTE: the lay out of truebr should same as falsebr.
-#define BR_bb(ir) (((CTruebr*)CK_IRC_BR(ir))->bb)
-#define BR_lab(ir) (((CTruebr*)CK_IRC_BR(ir))->jump_target_lab)
-
-//Determinate expression. It can NOT be nullptr.
-#define BR_det(ir) BR_kid(ir, 0)
-#define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CK_KID_BR(ir, idx)])
-class CTruebr : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CTruebr);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
-    LabelInfo const* jump_target_lab; //jump target label.
-public:
-    LabelInfo const* getLab() const { return BR_lab(this); }
-    IR * getKid(UINT idx) const { return BR_kid(this, idx); }
-    IR * getDet() const { return BR_det(this); }
-};
-
-
-//This class represents false branch operation.
-//Branch if determinant express is false, otherwise control flow does not change.
-//Also use BR_det, BR_lab access.
-//NOTE: the lay out of truebr should same as falsebr.
-class CFalsebr : public CTruebr {
-    COPY_CONSTRUCTOR(CFalsebr);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-};
-
-
-//This class represents function return operation.
-//Return value expressions.
-//usage: return a;  a is return-value expression.
-#define RET_bb(ir) (((CRet*)CK_IRC(ir, IR_RETURN))->bb)
-#define RET_exp(ir) RET_kid(ir, 0)
-#define RET_kid(ir, idx) (((CRet*)ir)->opnd[CK_KID_IRC(ir, IR_RETURN, idx)])
-class CRet : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CRet);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return RET_kid(this, idx); }
-    IR * getExp() const { return RET_exp(this); }
-};
-
-
-//This class represents conditional select operation.
-//usage: res = select(a > b), (10), (20)
-//    means:
-//    if (a > b) res = 10;
-//    else res = 20;
-//  where a > b is predicator expression.
-//This operation compute the value accroding to the result of
-//predicator expression, if the result value is true, return
-//SELECT_trueexp, otherwise return SELECT_falseexp.
-
-//Predicator expression.
-#define SELECT_pred(ir) SELECT_kid(ir, 0)
-
-//True part
-#define SELECT_trueexp(ir) SELECT_kid(ir, 1)
-
-//False part
-#define SELECT_falseexp(ir) SELECT_kid(ir, 2)
-#define SELECT_kid(ir, idx) (((CSelect*)ir)->opnd[CK_KID_IRC(ir, IR_SELECT, idx)])
-class CSelect : public IR {
-    COPY_CONSTRUCTOR(CSelect);
-public:
-    static BYTE const kid_map = 0x7;
-    static BYTE const kid_num = 3;
-    IR * opnd[kid_num];
-public:
-    IR * getKid(UINT idx) const { return SELECT_kid(this, idx); }
-    IR * getPred() const { return SELECT_pred(this); }
-    IR * getTrueExp() const { return SELECT_trueexp(this); }
-    IR * getFalseExp() const { return SELECT_falseexp(this); }
-};
-
-
-//This class represents high level control structure, that
-//terminate current loop execution immediately without any
-//other operations.
-//This operation is used by do-loop, do-while, while-do.
-class CBreak : public IR {
-    COPY_CONSTRUCTOR(CBreak);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-};
-
-
-//This class represents high level control structure, that
-//re-execute current loop immediately without any
-//other operations.
-//This operation is used by do-loop, do-while, while-do.
-class CContinue : public IR {
-    COPY_CONSTRUCTOR(CContinue);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-};
-
-
-//This class represents phi operation.
-#define PHI_bb(ir) (((CPhi*)CK_IRC(ir, IR_PHI))->bb)
-#define PHI_prno(ir) (((CPhi*)CK_IRC(ir, IR_PHI))->prno)
-#define PHI_ssainfo(ir) (((CPhi*)CK_IRC(ir, IR_PHI))->ssainfo)
-#define PHI_opnd_list(ir) PHI_kid(ir, 0)
-#define PHI_kid(ir, idx) (((CPhi*)ir)->opnd[CK_KID_IRC(ir, IR_PHI, idx)])
-class CPhi : public DuProp, public StmtProp {
-    COPY_CONSTRUCTOR(CPhi);
-public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
-    PRNO prno; //PR number.
-    SSAInfo * ssainfo; //Present ssa def and use set.
-    IR * opnd[kid_num];
-public:
-    void removeOpnd(IR * ir)
-    {
-        ASSERT0(xcom::in_list(PHI_opnd_list(this), ir));
-        xcom::remove(&PHI_opnd_list(this), ir);
-    }
-
-    //Add opnd to the tail of operand list.
-    //The opnd must correspond to the last predecessor
-    //of BB that current phi located in.
-    void addOpnd(IR * ir)
-    {
-        ASSERT0(!xcom::in_list(PHI_opnd_list(this), ir));
-        xcom::add_next(&PHI_opnd_list(this), ir);
-        IR_parent(ir) = this;
-    }
-
-    static IR * dupIRTreeByRef(IR const* src, Region * rg);
-
-    IR * getKid(UINT idx) const { return PHI_kid(this, idx); }
-    //Get the No.idx operand.
-    IR * getOpnd(UINT idx) const;
-    IR * getOpndList() const { return PHI_opnd_list(this); }
-
-    void insertOpndBefore(IR * marker, IR * exp)
-    {
-        ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
-        ASSERT0(!xcom::in_list(PHI_opnd_list(this), exp));
-        xcom::insertbefore(&PHI_opnd_list(this), marker, exp);
-        IR_parent(exp) = this;
-    }
-    void insertOpndAfter(IR * marker, IR * exp)
-    {
-        ASSERT0(marker && exp);
-        ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
-        ASSERT0(!xcom::in_list(PHI_opnd_list(this), exp));
-        xcom::insertafter(&marker, exp);
-        IR_parent(exp) = this;
-    }
-    void insertOpndAt(UINT pos, IR * exp);
-};
-
-
-//This class represents region operation.
-//NOTE: If region is in BB, it must be single entry, single exit, since
-//it might be reduced from reducible graph.
-#define REGION_bb(ir) (((CRegion*)CK_IRC(ir, IR_REGION))->bb)
-#define REGION_ru(ir) (((CRegion*)CK_IRC(ir, IR_REGION))->rg)
-class CRegion : public IR, public StmtProp {
-    COPY_CONSTRUCTOR(CRegion);
-public:
-    static BYTE const kid_map = 0x0;
-    static BYTE const kid_num = 0;
-    Region * rg;
-public:
-    //True if region is readonly.
-    //This property is very useful if region is a blackbox.
-    //And readonly region will alleviate the burden of optimizor.
-    bool is_readonly() const;
-
-    MDSet * getMayDef() const;
-    MDSet * getMayUse() const;
-    MDSet * genMayDef() const;
-    MDSet * genMayUse() const;
-    Region * getRegion() const { return REGION_ru(this); }
-};
-
-
-//Exported Functions
-
-//
-//START IR
-//
-IR * IR::getRHS() const
-{
-    switch (getCode()) {
-    case IR_ST: return ST_rhs(this);
-    case IR_STPR: return STPR_rhs(this);
-    case IR_STARRAY: return STARR_rhs(this);
-    case IR_IST: return IST_rhs(this);
-    default: ASSERTN(0, ("not store operation."));
-    }
-    return nullptr;
-}
-
-
-bool IR::hasRHS() const
-{
-    switch (getCode()) {
-    case IR_ST:
-    case IR_STPR:
-    case IR_STARRAY:
-    case IR_IST:
-       return true;
-    default:;
-    }
-    return false;
-}
-
-
-//Return true if ir is base expression of array operation.
-bool IR::isArrayBase(IR const* ir) const
-{
-    ASSERT0(isArrayOp());
-    return ((CArray*)this)->is_base(ir);
-}
-
-
-PRNO IR::getPrno() const
-{
-    switch (getCode()) {
-    case IR_PR:
-        ASSERT0(PR_no(this) != PRNO_UNDEF);
-        return PR_no(this);
-    case IR_STPR: ASSERT0(STPR_no(this) != PRNO_UNDEF); return STPR_no(this);
-    case IR_GETELEM:
-        ASSERT0(GETELEM_prno(this) != PRNO_UNDEF);
-        return GETELEM_prno(this);
-    case IR_SETELEM:
-        ASSERT0(SETELEM_prno(this) != PRNO_UNDEF);
-        return SETELEM_prno(this);
-    case IR_CALL:
-    case IR_ICALL:
-        ASSERT0(CALL_prno(this) != PRNO_UNDEF); return CALL_prno(this);
-    case IR_PHI: ASSERT0(PHI_prno(this) != PRNO_UNDEF); return PHI_prno(this);
-    default: UNREACHABLE();
-    }
-    return PRNO_UNDEF;
-}
-
-
-SSAInfo * IR::getSSAInfo() const
-{
-    switch (getCode()) {
-    case IR_PR: return PR_ssainfo(this);
-    case IR_STPR: return STPR_ssainfo(this);
-    case IR_PHI: return PHI_ssainfo(this);
-    case IR_GETELEM: return GETELEM_ssainfo(this);
-    case IR_SETELEM: return SETELEM_ssainfo(this);
-    case IR_CALL:
-    case IR_ICALL: return CALL_ssainfo(this);
-    default:
-        ASSERTN(!isReadPR() && !isWritePR() && !isWriteWholePR(),
-                ("miss switch entry"));
-        break;
-    }
-    return nullptr;
-}
-
-
-IR * IR::getKid(UINT idx) const
-{
-    switch (getCode()) {
-    case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); break;
-    case IR_ST: return ST_kid(this, idx);
-    case IR_STPR: return STPR_kid(this, idx);
-    case IR_STARRAY: return ARR_kid(this, idx);
-    case IR_SETELEM: return SETELEM_kid(this, idx);
-    case IR_GETELEM: return GETELEM_kid(this, idx);
-    case IR_ILD: return ILD_kid(this, idx);
-    case IR_IST: return IST_kid(this, idx);
-    case IR_CALL: return CALL_kid(this, idx);
-    case IR_ICALL: return ICALL_kid(this, idx);
-    SWITCH_CASE_BIN: return BIN_kid(this, idx);
-    SWITCH_CASE_UNA: return UNA_kid(this, idx);
-    case IR_IGOTO: return IGOTO_kid(this, idx);
-    case IR_DO_WHILE:
-    case IR_WHILE_DO: return LOOP_kid(this, idx);
-    case IR_DO_LOOP: return DOLOOP_kid(this, idx);
-    case IR_IF: return IF_kid(this, idx);
-    case IR_SWITCH: return SWITCH_kid(this, idx);
-    case IR_CASE: return CASE_kid(this, idx);
-    case IR_ARRAY: return ARR_kid(this, idx);
-    case IR_TRUEBR:
-    case IR_FALSEBR: return BR_kid(this, idx);
-    case IR_RETURN: return RET_kid(this, idx);
-    case IR_SELECT: return SELECT_kid(this, idx);
-    SWITCH_CASE_EXP_NO_KID:
-    SWITCH_CASE_STMT_NO_KID: return nullptr;
-    case IR_PHI: return PHI_kid(this, idx);
-    default: ASSERTN(0, ("Unknown IR code"));
-    }
-    return nullptr;
-}
-
-
-IRBB * IR::getBB() const
-{
-    switch (getCode()) {
-    case IR_ST: return ST_bb(this);
-    case IR_STPR: return STPR_bb(this);
-    case IR_STARRAY: return STARR_bb(this);
-    case IR_SETELEM: return SETELEM_bb(this);
-    case IR_GETELEM: return GETELEM_bb(this);
-    case IR_IST: return IST_bb(this);
-    case IR_CALL:
-    case IR_ICALL: return CALL_bb(this);
-    case IR_GOTO: return GOTO_bb(this);
-    case IR_IGOTO: return IGOTO_bb(this);
-    case IR_SWITCH: return SWITCH_bb(this);
-    case IR_TRUEBR:
-    case IR_FALSEBR: return BR_bb(this);
-    case IR_RETURN: return RET_bb(this);
-    case IR_PHI: return PHI_bb(this);
-    case IR_REGION: return REGION_bb(this);
-    default: ASSERTN(0, ("This stmt can not be placed in basic block."));
-    }
-    return nullptr;
-}
-
-
-Var * IR::getIdinfo() const
-{
-    ASSERT0(hasIdinfo());
-    //DO NOT ASSERT even if current IR has no offset.
-    switch (getCode()) {
-    case IR_ID: return ID_info(this);
-    case IR_LD: return LD_idinfo(this);
-    case IR_LDA: return LDA_idinfo(this);
-    case IR_ST: return ST_idinfo(this);
-    case IR_CALL: return CALL_idinfo(this);
-    default: UNREACHABLE();
-    }
-    return nullptr;
-}
-
-
-void IR::setIdinfo(Var * idinfo)
-{
-    ASSERT0(hasIdinfo());
-    //DO NOT ASSERT even if current IR has no offset.
-    switch (getCode()) {
-    case IR_ID: ID_info(this) = idinfo; break;
-    case IR_LD: LD_idinfo(this) = idinfo; break;
-    case IR_LDA: LDA_idinfo(this) = idinfo; break;
-    case IR_ST: ST_idinfo(this) = idinfo; break;
-    case IR_CALL: CALL_idinfo(this) = idinfo; break;
-    default: UNREACHABLE();
-    }
-}
-
-
-TMWORD IR::getOffset() const
-{
-    //DO NOT ASSERT even if current IR has no offset.
-    switch (getCode()) {
-    case IR_LD: return LD_ofst(this);
-    case IR_ILD: return ILD_ofst(this);
-    case IR_ARRAY: return ARR_ofst(this);
-    case IR_ST: return ST_ofst(this);
-    case IR_STARRAY: return ARR_ofst(this);
-    case IR_IST: return IST_ofst(this);
-    case IR_LDA: return LDA_ofst(this);
-    default: break;
-    }
-    return 0;
-}
-
-
-IR * IR::getBase() const
-{
-    //DO NOT ASSERT even if current IR has no offset.
-    switch (getCode()) {
-    case IR_ILD: return ILD_base(this);
-    case IR_ARRAY: return ARR_base(this);
-    case IR_STARRAY: return ARR_base(this);
-    case IR_IST: return IST_base(this);
-    default: break;
-    }
-    return nullptr;
-}
-
-
-//Return label info if exist.
-LabelInfo const* IR::getLabel() const
-{
-    switch (getCode()) {
-    case IR_TRUEBR:
-    case IR_FALSEBR: return BR_lab(this);
-    case IR_GOTO: return GOTO_lab(this);
-    case IR_IGOTO: return nullptr;
-    case IR_LABEL: return LAB_lab(this);
-    case IR_CASE: return CASE_lab(this);
-    case IR_SWITCH: return SWITCH_deflab(this);
-    default:;
-    }
-    return nullptr;
-}
-
-
-UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
-{
-    ASSERT0(is_array() || is_starray());
-    return tm->getByteSize(ARR_elemtype(this));
-}
-
-
-bool IR::isConstExp() const
-{
-    if (is_const()) { return true; }
-    if (is_cvt()) { return CVT_exp(this)->isConstExp(); }
-    return false;
-}
-
-
-bool IR::isDirectArrayRef() const
-{
-    return isArrayOp() && ARR_base(this)->is_lda();
-}
-
-
-void IR::setBB(IRBB * bb)
-{
-    switch (getCode()) {
-    case IR_ST: ST_bb(this) = bb; return;
-    case IR_STPR: STPR_bb(this) = bb; return;
-    case IR_STARRAY: STARR_bb(this) = bb; return;
-    case IR_SETELEM: SETELEM_bb(this) = bb; return;
-    case IR_GETELEM: GETELEM_bb(this) = bb; return;
-    case IR_IST: IST_bb(this) = bb; return;
-    case IR_CALL:
-    case IR_ICALL: CALL_bb(this) = bb; return;
-    case IR_GOTO: GOTO_bb(this) = bb; return;
-    case IR_IGOTO: IGOTO_bb(this) = bb; return;
-    case IR_SWITCH: SWITCH_bb(this) = bb; return;
-    case IR_TRUEBR:
-    case IR_FALSEBR: BR_bb(this) = bb; return;
-    case IR_RETURN: RET_bb(this) = bb; return;
-    case IR_PHI: PHI_bb(this) = bb; return;
-    case IR_REGION: REGION_bb(this) = bb; return;
-    default:
-        //Do not assert to facilitate coding. Just return.
-        //ASSERTN(0, ("Not stmt type"));
-        return;
-    }
-}
-
-
-void IR::setOffset(TMWORD ofst)
-{
-    ASSERT0(hasOffset());
-    switch (getCode()) {
-    case IR_LD: LD_ofst(this) = ofst; return;
-    case IR_ST: ST_ofst(this) = ofst; return;
-    case IR_ILD: ILD_ofst(this) = ofst; return;
-    case IR_STARRAY: ARR_ofst(this) = ofst; return;
-    case IR_IST: IST_ofst(this) = ofst; return;
-    case IR_LDA: LDA_ofst(this) = ofst; return;
-    case IR_ARRAY: ARR_ofst(this) = ofst; return;
-    default: return;
-    }
-}
-
-
-//Set ir's PR SSA Info to be nullptr.
-//For convenient purpose, this function does not assert
-//when current IR object is not operate on PR.
-void IR::cleanSSAInfo()
-{
-    switch (getCode()) {
-    case IR_PR: PR_ssainfo(this) = nullptr; return;
-    case IR_STPR: STPR_ssainfo(this) = nullptr; return;
-    case IR_SETELEM: SETELEM_ssainfo(this) = nullptr; return;
-    case IR_GETELEM: GETELEM_ssainfo(this) = nullptr; return;
-    case IR_CALL:
-    case IR_ICALL: CALL_ssainfo(this) = nullptr; return;
-    case IR_PHI: PHI_ssainfo(this) = nullptr; return;
-    default: break;
-    }
-}
-
-
-void IR::setSSAInfo(SSAInfo * ssa)
-{
-    switch (getCode()) {
-    case IR_PR: PR_ssainfo(this) = ssa; return;
-    case IR_STPR: STPR_ssainfo(this) = ssa; return;
-    case IR_SETELEM: SETELEM_ssainfo(this) = ssa; return;
-    case IR_GETELEM: GETELEM_ssainfo(this) = ssa; return;
-    case IR_CALL:
-    case IR_ICALL:
-        ASSERTN(CALL_prno(this) != PRNO_UNDEF, ("does not have return value"));
-        CALL_ssainfo(this) = ssa;
-        return;
-    case IR_PHI: PHI_ssainfo(this) = ssa; return;
-    default: ASSERTN(0, ("unsupport"));
-    }
-}
-
-
-void IR::setPrno(PRNO prno)
-{
-    switch (getCode()) {
-    case IR_PR: PR_no(this) = prno; return;
-    case IR_STPR: STPR_no(this) = prno; return;
-    case IR_SETELEM: SETELEM_prno(this) = prno; return;
-    case IR_GETELEM: GETELEM_prno(this) = prno; return;
-    case IR_CALL:
-    case IR_ICALL: CALL_prno(this) = prno; return;
-    case IR_PHI: PHI_prno(this) = prno; return;
-    default: ASSERTN(0, ("unsupport"));
-    }
-}
-
-
-//Return label or nullptr.
-void IR::setLabel(LabelInfo const* li)
-{
-    switch (getCode()) {
-    case IR_TRUEBR:
-    case IR_FALSEBR: BR_lab(this) = li; return;
-    case IR_GOTO: GOTO_lab(this) = li; return;
-    case IR_IGOTO:
-        ASSERTN(0, ("must specify the specific target label."));
-        return;
-    case IR_LABEL: LAB_lab(this) = li; return;
-    case IR_CASE: CASE_lab(this) = li; return;
-    case IR_SWITCH: SWITCH_deflab(this) = li; return;
-    default: ASSERTN(0, ("%s has not label", IRCNAME(getCode())));
-    }
-}
-
-
-//Set the No.idx child to be 'kid', and update the IR_parent of kid.
-void IR::setKid(UINT idx, IR * kid)
-{
-    switch (getCode()) {
-    case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); return;
-    case IR_ST: ST_kid(this, idx) = kid; break;
-    case IR_STPR: STPR_kid(this, idx) = kid; break;
-    case IR_STARRAY: ARR_kid(this, idx) = kid; break;
-    case IR_SETELEM: SETELEM_kid(this, idx) = kid; break;
-    case IR_GETELEM: GETELEM_kid(this, idx) = kid; break;
-    case IR_ILD: ILD_kid(this, idx) = kid; break;
-    case IR_IST: IST_kid(this, idx) = kid; break;
-    case IR_CALL: CALL_kid(this, idx) = kid; break;
-    case IR_ICALL: ICALL_kid(this, idx) = kid; break;
-    SWITCH_CASE_BIN: BIN_kid(this, idx) = kid; break;
-    SWITCH_CASE_UNA: UNA_kid(this, idx) = kid; break;
-    SWITCH_CASE_EXP_NO_KID:
-    SWITCH_CASE_STMT_NO_KID: return;
-    case IR_IGOTO: IGOTO_kid(this, idx) = kid; break;
-    case IR_DO_WHILE:
-    case IR_WHILE_DO: LOOP_kid(this, idx) = kid; break;
-    case IR_DO_LOOP: DOLOOP_kid(this, idx) = kid; break;
-    case IR_IF: IF_kid(this, idx) = kid; break;
-    case IR_SWITCH: SWITCH_kid(this, idx) = kid; break;
-    case IR_CASE: CASE_kid(this, idx) = kid; break;
-    case IR_ARRAY: ARR_kid(this, idx) = kid; break;
-    case IR_TRUEBR:
-    case IR_FALSEBR: BR_kid(this, idx) = kid; break;
-    case IR_RETURN: RET_kid(this, idx) = kid; break;
-    case IR_SELECT: SELECT_kid(this, idx) = kid; break;
-    case IR_PHI: PHI_kid(this, idx) = kid; break;
-    default: ASSERTN(0, ("Unknown IR code"));
-    }
-
-    for (IR * k = kid; k != nullptr; k = IR_next(k)) {
-        IR_parent(k) = this;
-    }
-}
-
-
-bool IR::isPREqual(IR const* src) const
-{
-    ASSERT0(isWritePR() && src->isReadPR());
-    return getType() == src->getType() && getPrno() == src->getPrno();
-}
-
-
-//Return true if k is the kid node of current ir.
-bool IR::is_lhs(IR const* k) const
-{
-    ASSERT0(is_stmt());
-    switch (getCode()) {
-    case IR_ST:
-    case IR_STPR:
-    case IR_STARRAY:
-    case IR_SETELEM:
-    case IR_GETELEM:
-    case IR_CALL:
-    case IR_ICALL:
-        return k == this;
-    case IR_IST:
-        return false;
-    case IR_GOTO:
-    case IR_IGOTO:
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_LABEL:
-    case IR_CASE:
-    case IR_SWITCH:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-    case IR_RETURN:
-    case IR_BREAK:
-    case IR_CONTINUE:
-        return false;
-    case IR_PHI:
-        return k == this;
-    case IR_REGION:
-        return false;
-    default: UNREACHABLE();
-    } //end switch
-    return false;
-}
-
-
-//Return true if current ir can be placed in BB.
-bool IR::isStmtInBB() const
-{
-    if (is_switch() && SWITCH_body(this) != nullptr) { return false; }
-    return IRDES_is_stmt_in_bb(g_ir_desc[getCode()]);
-}
-
-
-//Set ir DU to be nullptr, return the DU pointer.
-DU * IR::cleanDU()
-{
-    switch (getCode()) {
-    case IR_ID:
-    case IR_LD:
-    case IR_ILD:
-    case IR_PR:
-    case IR_ARRAY:
-    case IR_ST:
-    case IR_STPR:
-    case IR_STARRAY:
-    case IR_SETELEM:
-    case IR_GETELEM:
-    case IR_IST:
-    case IR_CALL:
-    case IR_ICALL: {
-        DU * du = DUPROP_du(this);
-        DUPROP_du(this) = nullptr;
-        return du;
-    }
-    default:;
-    }
-    return nullptr;
-}
-
-
-//Return stmt if it writes PR as result.
-//This function can not be const because it will return itself.
-IR * IR::getResultPR()
-{
-    ASSERT0(is_stmt());
-    switch (getCode()) {
-    case IR_ST: return nullptr;
-    case IR_STPR:
-    case IR_SETELEM:
-    case IR_GETELEM:
-        return this;
-    case IR_CALL:
-    case IR_ICALL:
-        return hasReturnValue() ? this : nullptr;
-    case IR_STARRAY:
-    case IR_IST:
-    case IR_GOTO:
-    case IR_IGOTO:
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_LABEL:
-    case IR_SWITCH:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-    case IR_RETURN:
-    case IR_BREAK:
-    case IR_CONTINUE:
-        return nullptr;
-    case IR_PHI:
-        return this;
-    case IR_REGION:
-        return nullptr;
-    default: UNREACHABLE();
-    }
-    return nullptr;
-}
-
-
-//Return true if ir is call and does have a return value.
-bool IR::hasReturnValue() const
-{
-    ASSERT0(isCallStmt());
-    return CALL_prno(this) != PRNO_UNDEF;
-}
-
-
-bool IR::isIntrinsicOp() const
-{
-    return isCallStmt() && CALL_is_intrinsic(this);
-}
-
-
-DU * IR::getDU() const
-{
-    return hasDU() ? DUPROP_du(this) : nullptr;
-}
-
-
-void IR::setDU(DU * du)
-{
-    hasDU() ? DUPROP_du(this) = du : 0;
-}
-
-
-//Return true if stmt has judge determinate expression.
-bool IR::hasCaseList() const
-{
-    //Both stmt and exp.
-    switch (getCode()) {
-    case IR_SWITCH:
-    case IR_IGOTO:
-        return true;
-    default: return false;
-    }
-    return false;
-}
-
-
-//Return expression if stmt has CASE list.
-IR * IR::getCaseList() const
-{
-    //Both stmt and exp.
-    switch (getCode()) {
-    case IR_SWITCH: return SWITCH_case_list(this);
-    case IR_IGOTO: return IGOTO_case_list(this);
-    default: UNREACHABLE();
-    }
-    return nullptr;
-}
-
-
-//The function collects the LabelInfo for each branch-target.
-void IR::collectLabel(OUT List<LabelInfo const*> & lst) const
-{
-    switch (getCode()) {
-    case IR_SWITCH: ((CSwitch*)this)->collectLabel(lst); break;
-    case IR_IGOTO: ((CIGoto*)this)->collectLabel(lst); break;
-    default: UNREACHABLE();
-    }
-}
-
-
-//Return true if stmt has judge determinate expression.
-bool IR::hasJudgeDet() const
-{
-    //Both stmt and exp.
-    switch (getCode()) {
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-    case IR_SELECT:
-        return true;
-    default: return false;
-    }
-    return false;
-}
-
-
-//Return determinate expression if any.
-IR * IR::getJudgeDet() const
-{
-    //Both stmt and exp.
-    switch (getCode()) {
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-        return LOOP_det(this);
-    case IR_IF:
-        return IF_det(this);
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        return BR_det(this);
-    case IR_SELECT:
-        return SELECT_pred(this);
-    default: UNREACHABLE();
-    }
-    return nullptr;
-}
-
-
-//This function invert the operation accroding to it semantics.
-inline IR * IR::invertIRCode(IR * ir, Region * rg)
-{
-    switch (ir->getCode()) {
-    case IR_LT: IR_code(ir) = IR_GE; break;
-    case IR_LE: IR_code(ir) = IR_GT; break;
-    case IR_GT: IR_code(ir) = IR_LE; break;
-    case IR_GE: IR_code(ir) = IR_LT; break;
-    case IR_EQ: IR_code(ir) = IR_NE; break;
-    case IR_NE: IR_code(ir) = IR_EQ; break;
-    case IR_TRUEBR: IR_code(ir) = IR_FALSEBR; break;
-    case IR_FALSEBR: IR_code(ir) = IR_TRUEBR; break;
-    case IR_LNOT: ir = UNA_opnd(ir); break;
-    case IR_LOR:
-        ir->invertLor(rg);
-        break;
-    case IR_LAND:
-        ir->invertLand(rg);
-        break;
-    default: ASSERTN(0, ("unsupport"));
-    }
-    return ir;
-}
-
-
-bool IR::mustBePointerType() const
-{
-    return is_lda() ||
-           //Base of indirect operation should be pointer.
-           (getParent() != 0 && getParent()->getBase() == this);
-}
-//END IR
 
 } //namespace xoc
 #endif

@@ -79,7 +79,7 @@ private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
     IRCFG * m_cfg;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     AliasAnalysis * m_aa;
     PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
@@ -96,7 +96,8 @@ private:
     //ONLY USED FOR DEBUG PURPOSE
     UINT m_num_of_elim;
     Vector<UINT> m_elimed;
-private:
+protected:
+    virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
     bool doProp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb, UINT entry_id);
     bool doPropVNInDomTreeOrder(xcom::Graph const* domtree);
@@ -112,7 +113,7 @@ private:
 
     bool isCseCandidate(IR * ir);
 
-    void elimCseAtStore(IR * use, IR * use_stmt, IR * gen);
+    void elimCseAtDirectMemOp(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
@@ -126,9 +127,9 @@ public:
     {
         ASSERT0(rg);
         m_cfg = rg->getCFG();
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_aa = rg->getAA();
-        ASSERT0(m_du && m_aa && m_cfg);
+        ASSERT0(m_dumgr && m_aa && m_cfg);
         m_expr_tab = nullptr;
         m_tm = rg->getTypeMgr();
         m_gvn = gvn;

@@ -43,50 +43,59 @@ protected:
 protected:
     //This is a helper function to assignMD.
     void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
+    MD const* allocSetElemMD(IR * ir);
 public:
     MDMgr(Region * rg);
     ~MDMgr() {}
 
     //The function generates new MD for given PR.
     //It should be called if new PR generated in optimzations.
-    MD const* allocPRMD(IR * pr);
-
-    //The function generates new MD for given PR.
-    //It should be called if new PR generated in optimzations.
-    MD const* allocPhiMD(IR * phi);
     MD const* allocIdMD(IR * ir);
-    MD const* allocLoadMD(IR * ir);
-    MD const* allocStorePRMD(IR * ir);
-    MD const* allocCallResultPRMD(IR * ir);
-    MD const* allocSetelemMD(IR * ir);
-    MD const* allocGetelemMD(IR * ir);
-    MD const* allocStoreMD(IR * ir);
+
     //Alloc MD for const string.
     MD const* allocStringMD(Sym const* string);
 
-    //Assign MD for ST/LD/ReadPR/WritePR operations.
+    //The function generates new MD for given direct memory reference.
+    //It should be called if new IR generated in optimzations.
+    //clean_mayset: true to clean MayRefSet of ir before function return.
+    MD const* allocMDForDirectMemOp(IR * ir, bool clean_mayset);
+
+    //The function generates new MD for given PR.
+    //It should be called if new PR generated in optimzations.
+    MD const* allocMDForPROp(IR * ir);
+
+    //The function generates new MD for the IR tree that rooted by 'root'.
+    //sibling: true if the function have to walk the sibling node of 'root'.
+    //It should be called if new IR tree generated in optimzations.
+    void allocRefForIRTree(IR * root, bool sibling);
+
+    //The function generates new MD for the given IR.
+    //NOTE the function will NOT process ir's kids and sibling.
+    MD const* allocRef(IR * ir);
+
+    //Assign MD for pr operations and nonpr direct memory operations.
     //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
     void assignMD(bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for ST/LD/ReadPR/WritePR operations.
+    //Assign MD for pr operations and nonpr direct memory operations.
     //irlist: a list of IR to be assigned.
     //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
     //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
     void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for memory reference operations.
-    //This function will iterate given bblist.
+    //Assign MD for pr operations and nonpr direct memory operations.
+    //The function will iterate given bblist.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
     void assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for memory reference operations.
-    //This function will iterate ir list in given bb.
+    //Assign MD for pr operations and nonpr direct memory operations.
+    //The function will iterate ir list in given bb.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
     void assignMDForBB(IRBB * bb, IRIter & ii,
                        bool assign_pr, bool assign_nonpr);
 
     //Assign MD for memory reference operations.
-    //This function will iterate given ir list.
+    //The function will iterate given ir list.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
     void assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr);
 
@@ -101,31 +110,17 @@ public:
     }
 
     //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, TMWORD offset)
-    { return genMDForVAR(var, var->getType(), offset); }
+    MD const* genMDForVar(Var * var, TMWORD offset)
+    { return genMDForVar(var, var->getType(), offset); }
 
     //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, Type const* type, TMWORD offset);
+    MD const* genMDForVar(Var * var, Type const* type, TMWORD offset);
 
-    //Generate MD for IR_ST.
-    MD const* genMDForStore(IR const* ir)
+    //Generate MD for direct memory operation.
+    MD const* genMDForDirectMemOp(IR const* ir)
     {
-        ASSERT0(ir->is_st());
-        return genMDForVAR(ST_idinfo(ir), ir->getType(), ST_ofst(ir));
-    }
-
-    //Generate MD for IR_LD.
-    MD const* genMDForLoad(IR const* ir)
-    {
-        ASSERT0(ir->is_ld());
-        return genMDForVAR(LD_idinfo(ir), ir->getType(), LD_ofst(ir));
-    }
-
-    //Generate MD for IR_ID.
-    MD const* genMDForId(IR const* ir)
-    {
-        ASSERT0(ir->is_id());
-        return genMDForVAR(ID_info(ir), ir->getType(), 0);
+        ASSERT0(ir->isDirectMemOp());
+        return genMDForVar(ir->getIdinfo(), ir->getType(), ir->getOffset());
     }
 };
 

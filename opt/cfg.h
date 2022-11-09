@@ -65,11 +65,29 @@ public:
 };
 
 
+//The field transfers information top-down.
+//If it is true, CFG optimizer will attempt to merge label to
+//next BB if current BB is empty. Default is true.
 #define CFGOPTCTX_do_merge_label(x) ((x)->common_info.s1.m_do_merge_label)
+
+//The field transfers information top-down.
+//Set to true if caller asks CFG optimizer to maintain DomInfo
+//on the fly.
 #define CFGOPTCTX_need_update_dominfo(x) ((x)->common_info.s1.m_update_dominfo)
+
+//The field transfers information bottom-up.
+//Collect information bottom-up to inform caller function.
+//The field informs caller the number of empty BB that has been removed.
+//Note the field only useful to function: removeEmptyBB().
 #define CFGOPTCTX_num_of_removed_empty_bb(x) \
     ((x)->remove_empty_bb_info.m_num_of_removed_empty_bb)
+
+//The field transfers information bottom-up.
+//Record the number of time that iterate CFG vertex when updating DomInfo.
+//This is local used variable to collect information bottom-up from callee
+//to caller.
 #define CFGOPTCTX_vertex_iter_time(x) ((x)->m_vertex_iter_time)
+
 class CfgOptCtx {
     CfgOptCtx const& operator = (CfgOptCtx const&);
     void reinit()
@@ -148,46 +166,19 @@ public:
 
 
 class RemoveUnreachBBCtx {
-public:
     //Record the vertexs that in/out edge changed.
-    xcom::VexTab changed_vextab;
+    xcom::VexTab m_changed_vextab;
 public:
-    void add(Vertex const* v) { changed_vextab.append(v); }
+    void add(Vertex const* v) { m_changed_vextab.append(v); }
+    xcom::VexTab & getVexTab() { return m_changed_vextab; }
 };
 
 
 class RemoveEmptyBBCtx {
+    List<UINT> m_removed_bbid_list;
 public:
-    UINT vertex_iter_time;
-    CfgOptCtx & cfgoptctx_org;
-    CfgOptCtx cfgoptctx_dup; //a duplication of original CfgOptCtx.
-public:
-    RemoveEmptyBBCtx(CfgOptCtx & coctx) :
-        vertex_iter_time(0), cfgoptctx_org(coctx),
-        cfgoptctx_dup(cfgoptctx_org) {}
-
-    CfgOptCtx & chooseCtx()
-    {
-        if (removeTooManyTimes()) {
-            //Remove DomInfo is costly function, if there are too many
-            //BB to be removed, update DomInfo at once after the
-            //optimization.
-            CFGOPTCTX_need_update_dominfo(&cfgoptctx_dup) = false;
-            return cfgoptctx_dup;
-        }
-        return cfgoptctx_org;
-    }
-
-    bool needUpdateDomInfo() const
-    { return removeTooManyTimes() &&
-             cfgoptctx_org.needUpdateDomInfo() &&
-             cfgoptctx_org.oc.is_dom_valid(); }
-
-    bool removeTooManyTimes() const
-    {
-        return vertex_iter_time >
-               g_cfg_remove_empty_bb_maxtimes_to_update_dominfo;
-    }
+    void add(UINT bbid) { m_removed_bbid_list.append_tail(bbid); }
+    List<UINT> & getRemovedList() { return m_removed_bbid_list; }
 };
 
 
@@ -198,6 +189,39 @@ public:
 //NOTE: BB should define and implement method 'id()' and member field 'm_rpo'.
 template <class BB, class XR> class CFG : public xcom::DGraph {
     COPY_CONSTRUCTOR(CFG);
+    class RemoveEmptyBBHelperCtx {
+    public:
+        UINT vertex_iter_time;
+        CfgOptCtx & cfgoptctx_org;
+        CfgOptCtx cfgoptctx_dup; //a duplication of original CfgOptCtx.
+    public:
+        RemoveEmptyBBHelperCtx(CfgOptCtx & coctx) :
+            vertex_iter_time(0), cfgoptctx_org(coctx),
+            cfgoptctx_dup(cfgoptctx_org) {}
+    
+        CfgOptCtx & chooseCtx()
+        {
+            if (removeTooManyTimes()) {
+                //Remove DomInfo is costly function, if there are too many
+                //BB to be removed, update DomInfo at once after the
+                //optimization.
+                CFGOPTCTX_need_update_dominfo(&cfgoptctx_dup) = false;
+                return cfgoptctx_dup;
+            }
+            return cfgoptctx_org;
+        }
+    
+        bool needUpdateDomInfo() const
+        { return removeTooManyTimes() &&
+                 cfgoptctx_org.needUpdateDomInfo() &&
+                 cfgoptctx_org.oc.is_dom_valid(); }
+    
+        bool removeTooManyTimes() const
+        {
+            return vertex_iter_time >
+                   g_cfg_remove_empty_bb_maxtimes_to_update_dominfo;
+        }
+    };
 protected:
     UINT m_has_eh_edge:1;
     UINT m_li_count:31; //counter to loop.
@@ -209,10 +233,12 @@ protected:
     RPOVexList * m_rpo_vexlst; //cache and record Vertex in reverse-post-order.
     xcom::BitSetMgr * m_bs_mgr;
     SMemPool * m_pool;
-    Vector<LI<BB>*> m_map_bb2li; //map bb to LI if bb is loop header.
 protected:
     //Collect loop info e.g: loop has call, loop has goto.
     void collectLoopInfo() { collectLoopInfoRecur(m_loop_info); }
+    void cloneRPOVexList(CFG<BB, XR> const& src);
+    void cloneExitList(CFG<BB, XR> const& src);
+    void cloneEntry(CFG<BB, XR> const& src);
 
     //Clean loopinfo structure before recompute loop info.
     void cleanLoopInfo();
@@ -222,6 +248,8 @@ protected:
 
     inline bool isLoopHeadRecur(LI<BB> * li, BB * bb);
     bool insertLoopTree(LI<BB> ** lilist, LI<BB> * loop);
+    void identifyNaturalLoop(UINT x, UINT y, MOD xcom::BitSet & loop,
+                             List<UINT> & tmp);
 
     //Note the function have to be invoked before CFG changed.
     void recordChangedVex(Vertex const* v, RemoveUnreachBBCtx * unrchctx) const
@@ -254,7 +282,7 @@ protected:
     //Remove empty bb, and merger label info.
     bool removeEmptyBBHelper(BB * bb, BB * next_bb,
                              C<BB*> * bbct, C<BB*> * next_ct,
-                             MOD RemoveEmptyBBCtx & rmbbctx);
+                             MOD RemoveEmptyBBHelperCtx & rmctx);
     virtual void removeRPO(BB * bb)
     {
         if (m_rpo_vexlst != nullptr) {
@@ -274,9 +302,8 @@ protected:
         return p;
     }
 public:
-    CFG(List<BB*> * bb_list, UINT edge_hash_size = 16,
-        UINT vertex_hash_size = 16)
-        : xcom::DGraph(edge_hash_size, vertex_hash_size)
+    CFG(List<BB*> * bb_list, UINT vertex_hash_size = 16)
+        : xcom::DGraph(vertex_hash_size)
     {
         ASSERTN(bb_list, ("CFG requires BB list"));
         m_bb_list = bb_list;
@@ -301,6 +328,12 @@ public:
     //Build the CFG accroding to BB list.
     void build(OptCtx & oc);
 
+    //The function clones almost all contents about graph, loopinfo, and CFG
+    //related information from 'src', except the BB list.
+    void clone(CFG<BB, XR> const& src, bool clone_edge_info,
+               bool clone_vex_info);
+
+    //uni: the universe set.
     bool computeDom(xcom::BitSet const* uni)
     {
         ASSERTN(m_entry, ("Not found entry"));
@@ -394,6 +427,7 @@ public:
     }
     void cleanBBVertex()
     {
+        if (m_bb_list == nullptr) { return; }
         xcom::C<BB*> * ct;
         for (m_bb_list->get_head(&ct);
              ct != nullptr; ct = m_bb_list->get_next(ct)) {
@@ -407,7 +441,6 @@ public:
     {
         size_t count = sizeof(*this);
         //count += m_bb_list.count_mem(); //do NOT count up BBs in bb_list.
-        count += m_map_bb2li.count_mem();
         count += m_exit_list.count_mem();
         return count;
     }
@@ -458,7 +491,8 @@ public:
     //2th parameter records a list of bb have found.
     virtual void findTargetBBOfIndirectBranch(XR const*, OUT List<BB*> &) = 0;
 
-    List<BB*> * getBBList() const { return m_bb_list; }
+    xcom::List<BB*> * getBBList() const { return m_bb_list; }
+    xcom::BitSetMgr * getBitSetMgr() const { return m_bs_mgr; }
     UINT getLoopNum() const { return m_li_count - 1; }
     void get_preds(MOD List<BB*> & preds, BB const* bb) const;
     void get_preds(MOD List<BB const*> & preds, BB const* bb) const;
@@ -494,14 +528,25 @@ public:
     //Get CFG exit BB list.
     List<BB*> * getExitList() { return &m_exit_list; }
     RPOVexList * getRPOVexList() { return m_rpo_vexlst; }
-    virtual BB * getFallThroughBB(BB * bb)
+
+    //Return the fallthrough BB of 'bb'.
+    BB * getFallThroughBB(BB * bb)
     {
         ASSERT0(bb);
         xcom::C<BB*> * ct;
         ASSERT0(m_bb_list->find(bb, &ct));
         m_bb_list->find(bb, &ct);
-        BB * res = m_bb_list->get_next(&ct);
-        return res;
+        return m_bb_list->get_next(&ct);
+    }
+
+    //Return the previous BB that fallthrough to 'bb'.
+    BB * getFallThroughPrevBB(BB const* bb)
+    {
+        ASSERT0(bb);
+        xcom::C<BB*> * ct;
+        ASSERT0(m_bb_list->find(const_cast<BB*>(bb), &ct));
+        m_bb_list->find(const_cast<BB*>(bb), &ct);
+        return m_bb_list->get_prev(&ct);
     }
 
     //Get the target bb related to the last xr of bb.
@@ -544,8 +589,6 @@ public:
 
     //Return the root node of LoopInfo tree.
     LI<BB> * getLoopInfo() const { return m_loop_info; }
-    void getKidOfIF(BB * bb, BB ** true_body, BB ** false_body, BB ** sibling);
-    void getKidOfLoop(IN BB * bb, OUT BB ** sibling, OUT BB ** body_root);
 
     //Return the last instruction of BB.
     virtual XR * get_last_xr(BB *) = 0;
@@ -556,9 +599,6 @@ public:
 
     //True if current CFG has exception-handler edge.
     bool hasEHEdge() const { return m_has_eh_edge; }
-
-    void identifyNaturalLoop(UINT x, UINT y, MOD xcom::BitSet & loop,
-                             List<UINT> & tmp);
 
     bool isCFGEntry(BB * bb) const
     { return xcom::Graph::is_graph_entry(bb->getVex()); }
@@ -594,14 +634,14 @@ public:
                != bb;
     }
 
-    LI<BB> * mapBB2LabelInfo(BB * bb) { return m_map_bb2li.get(bb->id()); }
-
     //Move all Labels which attached on src BB to tgt BB.
     virtual void moveLabels(BB * src, BB * tgt) = 0;
 
     //Remove empty BB, and merger label info.
-    //Note remove BB will not affect the usage of RPO.
-    bool removeEmptyBB(MOD CfgOptCtx & ctx);
+    //Note removing BB does NOT affect RPO.
+    //bblst: if it is not NULL, record the removed BB.
+    bool removeEmptyBB(MOD CfgOptCtx & ctx,
+                       OUT RemoveEmptyBBCtx * rmbbctx = nullptr);
 
     //Try to remove empty bb, and merger label info.
     //Note remove BB will not affect the usage of RPO.
@@ -640,7 +680,7 @@ public:
     virtual void removeBB(BB * bb, OUT CfgOptCtx & ctx) = 0;
     virtual void removeBB(xcom::C<BB*> * bbcontainer,
                           OUT CfgOptCtx & ctx) = 0;
-    virtual void resetMapBetweenLabelAndBB(BB * bb) = 0;
+    virtual void removeMapBetweenLabelAndBB(BB * bb) = 0;
 
     //The function replaces original predecessor bb with a list of
     //new predecessors.
@@ -671,11 +711,13 @@ public:
     void sortByDFS();
     void sortByBFS();
     void sortByTopological();
+    void setBBVertex();
     void setBitSetMgr(xcom::BitSetMgr * bs_mgr)
     {
         m_bs_mgr = bs_mgr;
         xcom::DGraph::setBitSetMgr(bs_mgr);
     }
+    void setBBList(List<BB*> * bblst) { m_bb_list = bblst; }
 
     //Return true if find an order of RPO for 'bb' that
     //less than order of 'ref'.
@@ -696,10 +738,25 @@ public:
 
         //The exit node can not have successors.
         C<BB*> * it;
+        xcom::TTab<UINT> bbid;
         for (BB const* bb = m_exit_list.get_head(&it);
              bb != nullptr; bb = m_exit_list.get_next(&it)) {
             xcom::Vertex const* vex2 = bb->getVex();
             CHECK0_DUMMYUSE(vex2 && vex2->getOutDegree() == 0);
+            ASSERTN(!bbid.find(bb->id()), ("bb should be unique in list"));
+            bbid.append(bb->id());
+        }
+
+        //Check the BB list.
+        if (m_bb_list == nullptr) { return true; }
+        xcom::C<BB*> * ct;
+        bbid.clean();
+        for (BB * bb = m_bb_list->get_head(&ct); bb != nullptr;
+             bb = m_bb_list->get_next(&ct)) {
+            xcom::Vertex const* vex3 = bb->getVex();
+            CHECK0_DUMMYUSE(vex3);
+            ASSERTN(!bbid.find(bb->id()), ("bb should be unique in list"));
+            bbid.append(bb->id());
         }
         return true;
     }
@@ -723,90 +780,6 @@ public:
         return true;
     }
 };
-
-
-//Find and Return LOOP_SIBLING and BODY_ROOT.
-//e.g:LOOP
-//        BODY_ROOT
-//    END_LOOP
-//    LOOP_SIBLING
-template <class BB, class XR>
-void CFG<BB, XR>::getKidOfLoop(BB * bb, OUT BB ** sibling, OUT BB ** body_root)
-{
-    LI<BB> * li = mapBB2LabelInfo(bb);
-    ASSERT0(li != nullptr && li->getLoopHead() == bb);
-    List<BB*> succs;
-    get_succs(succs, bb);
-    ASSERT0(succs.get_elem_count() == 2);
-    BB * s = succs.get_head();
-    if (sibling != nullptr) {
-        *sibling = li->isInsideLoop(s->id()) ? succs.get_tail() : s;
-    }
-
-    if (body_root != nullptr) {
-        *body_root = li->isInsideLoop(s->id()) ? s : succs.get_tail();
-    }
-}
-
-
-//Find and Return TRUE_BODY, FALSE_BODY, IF_SIBLING.
-//e.g:IF
-//        TRUE_BODY
-//    ELSE
-//        FALSE_BODY
-//    END_IF
-//    IF_SIBLING
-template <class BB, class XR>
-void CFG<BB, XR>::getKidOfIF(BB * bb, BB ** true_body, BB ** false_body,
-                             BB ** sibling)
-{
-    if (true_body != nullptr || false_body != nullptr) {
-        UINT ipdom = xcom::DGraph::get_ipdom(bb->id());
-        ASSERTN(ipdom > 0, ("bb does not have ipdom"));
-        BB * fallthrough_bb = getFallThroughBB(bb);
-        BB * target_bb = getTargetBB(bb);
-        XR * xr = get_last_xr(bb);
-        ASSERT0(xr != nullptr && xr->isConditionalBr());
-        if (xr->is_truebr()) {
-            if (true_body != nullptr) {
-                if (ipdom == target_bb->id()) {
-                    *true_body = nullptr;
-                } else {
-                    *true_body = target_bb;
-                }
-            }
-            if (false_body != nullptr) {
-                if (ipdom == fallthrough_bb->id()) {
-                    *false_body = nullptr;
-                } else {
-                    *false_body = fallthrough_bb;
-                }
-            }
-        } else {
-            ASSERT0(xr->is_falsebr());
-            if (true_body != nullptr) {
-                if (ipdom == fallthrough_bb->id()) {
-                    *true_body = nullptr;
-                } else {
-                    *true_body = fallthrough_bb;
-                }
-            }
-            if (false_body != nullptr) {
-                if (ipdom == target_bb->id()) {
-                    *false_body = nullptr;
-                } else {
-                    *false_body = target_bb;
-                }
-            }
-        } //end if
-    }
-
-    if (sibling != nullptr) {
-        UINT ipdom = xcom::DGraph::get_ipdom(bb->id());
-        ASSERTN(ipdom > 0, ("bb does not have ipdom"));
-        *sibling = getBB(ipdom);
-    }
-}
 
 
 template <class BB, class XR>
@@ -934,7 +907,7 @@ VexIdx CFG<BB, XR>::replacePredWith(BB const* bb, BB const* succ,
 template <class BB, class XR>
 bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
                                       C<BB*> * bbct, C<BB*> * next_ct,
-                                      MOD RemoveEmptyBBCtx & rmbbctx)
+                                      MOD RemoveEmptyBBHelperCtx & rmctx)
 {
     if (next_bb == nullptr) {
         //'bb' is the last empty BB.
@@ -943,14 +916,14 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
         //Some redundant CFG has multi BB which satifies cfg-entry condition.
         if (bb->getLabelList().get_elem_count() == 0 && !isRegionExit(bb)) {
             //BB does not have any label.
-            CfgOptCtx & ctx = rmbbctx.chooseCtx();
+            CfgOptCtx & ctx = rmctx.chooseCtx();
             CFGOPTCTX_vertex_iter_time(&ctx) = 0;
             preprocessBeforeRemoveBB(bb, ctx);
-            rmbbctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+            rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
 
             CFGOPTCTX_vertex_iter_time(&ctx) = 0;
             removeBB(bbct, ctx);
-            rmbbctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+            rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
             return true;
         }
         return false;
@@ -958,8 +931,8 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
 
     //Only apply restricted removing if CFG is invalid.
     //Especially BB list is ready, whereas CFG is not.
-    if (!rmbbctx.chooseCtx().oc.is_cfg_valid()) { return false; }
-    if (!rmbbctx.chooseCtx().do_merge_label() && bb->hasLabel()) {
+    if (!rmctx.chooseCtx().oc.is_cfg_valid()) { return false; }
+    if (!rmctx.chooseCtx().do_merge_label() && bb->hasLabel()) {
         return false;
     }
 
@@ -977,25 +950,25 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
     ASSERT0(getNthSucc(bb, 0) == next_bb);
 
     //The function have to be invoked before CFG change.
-    CfgOptCtx & ctx = rmbbctx.chooseCtx();
+    CfgOptCtx & ctx = rmctx.chooseCtx();
 
     //replacePredWith will revise the number of Phi operands.
     //ctx.vertex_iter_time = 0;
     //preprocessBeforeRemoveBB(bb, ctx);
-    //rmbbctx.vertex_iter_time += ctx.vertex_iter_time;
+    //rmctx.vertex_iter_time += ctx.vertex_iter_time;
 
     //Tranform CFG.
     List<UINT> newpreds;
     get_preds(newpreds, bb);
     CFGOPTCTX_vertex_iter_time(&ctx) = 0;
     replacePredWith(bb, next_bb, newpreds, ctx);
-    rmbbctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+    rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
 
     //Invoke interface to remove related BB and Vertex.
     //The map between bb and labels should have maintained in above code.
     CFGOPTCTX_vertex_iter_time(&ctx) = 0;
     removeBB(bbct, ctx);
-    rmbbctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+    rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
     return true;
 }
 
@@ -1017,11 +990,11 @@ bool CFG<BB, XR>::removeSingleEmptyBB(BB * bb, MOD CfgOptCtx & ctx)
     if (next_ct != nullptr) {
         next_bb = next_ct->val();
     }
-    RemoveEmptyBBCtx rmbbctx(ctx);
+    RemoveEmptyBBHelperCtx rmctx(ctx);
     CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
-    bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmbbctx);
+    bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
     CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
-    if (rmbbctx.needUpdateDomInfo()) {
+    if (rmctx.needUpdateDomInfo()) {
         START_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
         recomputeDomInfo(ctx.oc);
         END_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
@@ -1034,13 +1007,13 @@ bool CFG<BB, XR>::removeSingleEmptyBB(BB * bb, MOD CfgOptCtx & ctx)
 //Remove empty bb, and merger label info.
 //Note remove BB will not affect the usage of RPO.
 template <class BB, class XR>
-bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx)
+bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx, RemoveEmptyBBCtx * rmbbctx)
 {
     START_TIMER(t, "Remove Empty BB");
     xcom::C<BB*> * ct;
     xcom::C<BB*> * next_ct;
     bool doit = false;
-    RemoveEmptyBBCtx rmbbctx(ctx);
+    RemoveEmptyBBHelperCtx rmctx(ctx);
     CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != nullptr; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
@@ -1065,11 +1038,14 @@ bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx)
         //has to be updated as well.
         if (isEmptyBB(bb) && !isRegionEntry(bb) &&
             !bb->isExceptionHandler()) {
-            doit |= removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmbbctx);
+            if (rmbbctx != nullptr) {
+                rmbbctx->add(bb->id());
+            }
+            doit |= removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
             CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
         }
     }
-    if (rmbbctx.needUpdateDomInfo()) {
+    if (rmctx.needUpdateDomInfo()) {
         START_TIMER(u, "Remove Empty BB::Recompute DomInfo");
         recomputeDomInfo(ctx.oc);
         END_TIMER(u, "Remove Empty BB::Recompute DomInfo");
@@ -1337,7 +1313,7 @@ void CFG<BB, XR>::removeUnreachSingleBB(xcom::C<BB*> * bbcontainer,
     //        ("For conservative purpose, "
     //         "exception handler should be reserved."));
     BB * bb = bbcontainer->val();
-    resetMapBetweenLabelAndBB(bb);
+    removeMapBetweenLabelAndBB(bb);
     preprocessBeforeRemoveBB(bb, ctx);
     if (unrchctx != nullptr) {
         recordChangedVex(bb->getVex(), unrchctx);
@@ -1770,7 +1746,6 @@ void CFG<BB, XR>::cleanLoopInfo()
             worklst.append_tail(y);
         }
     }
-    m_map_bb2li.clean();
     m_loop_info = nullptr;
 }
 
@@ -1861,7 +1836,6 @@ bool CFG<BB, XR>::findLoop()
             LI_id(li) = m_li_count++;
             LI_bb_set(li) = loop;
             LI_loop_head(li) = succ;
-            m_map_bb2li.set(succ->id(), li);
             insertLoopTree(&m_loop_info, li);
             head2li.set(succ, li);
         }
@@ -2056,6 +2030,104 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     #endif
     OC_is_rpo_valid(oc) = true;
     END_TIMER(t, "Compute RPO");
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::setBBVertex()
+{
+    xcom::C<BB*> * ct;
+    if (m_bb_list == nullptr) { return; }
+    for (m_bb_list->get_head(&ct);
+         ct != nullptr; ct = m_bb_list->get_next(ct)) {
+        BB * bb = ct->val();
+        Vertex * v = getVertex(bb->id());
+        ASSERT0(v);
+        setVertex(bb, v);
+    }
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::cloneEntry(CFG<BB, XR> const& src)
+{
+    ASSERT0(this != &src);
+    if (m_bb_list == nullptr || src.m_entry == nullptr) { return; }
+    if (m_bb_list == src.m_bb_list) {
+        m_entry = src.m_entry;
+        return;
+    }
+    xcom::C<BB*> * ct;
+    m_entry = nullptr;
+    for (BB * bb = m_bb_list->get_head(&ct); bb != nullptr;
+         bb = m_bb_list->get_next(&ct)) {
+        if (bb->id() == src.m_entry->id()) {
+            m_entry = bb;
+            return;
+        }
+    }
+    ASSERT0(m_entry);
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::cloneExitList(CFG<BB, XR> const& src)
+{
+    ASSERT0(this != &src);
+    if (m_bb_list == nullptr) { return; }
+    if (m_bb_list == src.m_bb_list) {
+        m_exit_list.copy(src.m_exit_list);
+        return;
+    }
+    xcom::C<BB*> * ct;
+    for (BB * s = src.m_exit_list.get_head(&ct); s != nullptr;
+         s = src.m_exit_list.get_next(&ct)) {
+        BB * t = nullptr;
+        xcom::C<BB*> * ct2;
+        for (t = m_bb_list->get_head(&ct2);
+             t != nullptr; t = m_bb_list->get_next(&ct2)) {
+            if (t->id() == s->id()) {
+                break;
+            }
+        }
+        ASSERT0(t);
+        m_exit_list.append_tail(t);
+    }
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::cloneRPOVexList(CFG<BB, XR> const& src)
+{
+    ASSERT0(this != &src);
+    if (src.m_rpo_vexlst == nullptr) {
+        freeRPOVexList();
+        return;
+    }
+    if (m_rpo_vexlst == nullptr) { m_rpo_vexlst = new RPOVexList(); }
+    RPOVexListIter it;
+    for (Vertex const* s = src.m_rpo_vexlst->get_head(&it);
+         s != nullptr; s = src.m_rpo_vexlst->get_next(&it)) {
+        Vertex const* t = getVertex(s->id());
+        ASSERT0(t);
+        m_rpo_vexlst->append_tail(t);
+    }
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::clone(CFG<BB, XR> const& src, bool clone_edge_info,
+                        bool clone_vex_info)
+{
+    ASSERT0(this != &src);
+    xcom::DGraph::clone(src, clone_edge_info, clone_vex_info);
+    m_has_eh_edge = src.m_has_eh_edge;
+    m_li_count = src.m_li_count;
+    m_bb_sort_type = src.m_bb_sort_type;
+    m_loop_info = src.m_loop_info;
+    cloneEntry(src);
+    cloneExitList(src);
+    cloneRPOVexList(src);
 }
 
 } //namespace xoc

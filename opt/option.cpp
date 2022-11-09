@@ -43,6 +43,7 @@ bool g_is_hoist_type = false;
 CHAR * g_func_or_bb_option = nullptr;
 INT g_opt_level = OPT_LEVEL0;
 bool g_cst_bb_list = true;
+bool g_enable_local_var_delegate = false;
 bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
@@ -73,7 +74,7 @@ bool g_do_dce = false;
 bool g_do_dce_aggressive = false;
 bool g_infer_type = true;
 bool g_do_vrp = false;
-bool g_invert_brtgt = true;
+bool g_invert_branch_target = true;
 bool g_do_lftr = false;
 bool g_do_dse = false;
 bool g_do_gcse = false;
@@ -98,8 +99,9 @@ UINT g_thres_opt_ir_num_in_bb = 10000;
 bool g_do_loop_convert = false;
 bool g_do_poly_tran = false;
 bool g_do_refine_duchain = true;
+bool g_do_lsra = false;
 bool g_do_scalar_opt = true;
-bool g_retain_pass_mgr_for_region = false;
+bool g_retain_pass_mgr_for_region = true;
 UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
 bool g_is_search_and_copy_dbx = true;
@@ -327,6 +329,12 @@ bool DumpOpt::isDumpLivenessMgr() const
 bool DumpOpt::isDumpIRParser() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irparser);
+}
+
+
+bool DumpOpt::isDumpLSRA() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_lsra);
 }
 
 

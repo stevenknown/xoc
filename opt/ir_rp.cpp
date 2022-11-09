@@ -45,10 +45,11 @@ static inline IR * genDirectMemAccess(IR const* ir, Region * rg, bool is_load,
     ASSERT0(mustref && mustref->is_exact());
     IR * newir = nullptr;
     if (is_load) {
-        newir = rg->buildLoad(mustref->get_base(), ir->getType());
+        newir = rg->getIRMgr()->buildLoad(mustref->get_base(), ir->getType());
     } else {
         ASSERT0(rhs);
-        newir = rg->buildStore(mustref->get_base(), ir->getType(), rhs);
+        newir = rg->getIRMgr()->buildStore(mustref->get_base(),
+                                           ir->getType(), rhs);
     }
     newir->setOffset(mustref->getByteOfst());
     ASSERT0(mustref->getByteSize() == newir->getTypeSize(rg->getTypeMgr()));
@@ -65,29 +66,28 @@ static inline bool isExactMemDelegate(IR const* dele)
 
 static IR * dupMemExp(IR const* ir, Region * rg)
 {
+    IR * newir = rg->dupIsomoExpTree(ir);
+    ASSERT0(newir);
     switch (ir->getCode()) {
-    case IR_STARRAY: {
-        IR * newir = CArray::dupIRTreeByStmt(ir, rg);
+    SWITCH_CASE_ARRAY_OP:
         xoc::addUseForTree(newir->getBase(), ir->getBase(), rg);
         xoc::addUseForTree(ARR_sub_list(newir), ARR_sub_list(ir), rg);
+        if (ir->is_exp()) {
+            xoc::addUseForTree(newir, ir, rg);
+        }
         return newir;
-    }
-    case IR_IST: {
-        IR * newir = CILd::dupIRTreeByStmt(ir, rg);
+    SWITCH_CASE_INDIRECT_MEM_OP:
         xoc::addUseForTree(newir->getBase(), ir->getBase(), rg);
+        if (ir->is_exp()) {
+            xoc::addUseForTree(newir, ir, rg);
+        }
         return newir;
-    }
-    case IR_ST: {
-        return CLd::dupIRTreeByStmt(ir, rg);
-    }
-    case IR_ARRAY:
-    case IR_ILD:
-    case IR_LD: {
-        IR * newir = rg->dupIRTree(ir);
-        xoc::addUseForTree(newir, ir, rg);
+    SWITCH_CASE_DIRECT_MEM_OP:
+        if (ir->is_exp()) {
+            xoc::addUseForTree(newir, ir, rg);
+        }
         return newir;
-    }
-    default: UNREACHABLE(); //unsupport.
+    default: UNREACHABLE();
     }
     return nullptr;
 }
@@ -332,12 +332,10 @@ UINT RefHashFunc::get_hash_value(IR * t, UINT bucket_size) const
                                 (x->getDType() << 19))
     #define HASHVAR(x) (UINT)(ID_info(x)->id() * 5)
     switch (t->getCode()) {
-    case IR_LD:
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_OP:
         hval = HASHIRCODE(IR_LD, t);
         break;
-    case IR_ILD:
-    case IR_IST:
+    SWITCH_CASE_INDIRECT_MEM_OP:
         hval += HASHIRCODE(IR_ILD, t);
         for (IR const* x = iterInitC(t->getBase(), it, true);
              x != nullptr; x = iterNextC(it, true)) {
@@ -348,8 +346,7 @@ UINT RefHashFunc::get_hash_value(IR * t, UINT bucket_size) const
             hval += v;
         }
         break;
-    case IR_ARRAY:
-    case IR_STARRAY:
+    SWITCH_CASE_ARRAY_OP:
         hval += HASHIRCODE(IR_ARRAY, t);
         for (IR const* x = iterInitC(ARR_base(t), it, true);
              x != nullptr; x = iterNextC(it, true)) {
@@ -535,7 +532,7 @@ void DelegateMgr::collectOutsideLoopDef(IR const* delegate, IRSet const& set,
 void DelegateMgr::collectOutsideLoopDefUse(IR const* occ, IR const* delegate,
                                            LI<IRBB> const* li)
 {
-    ASSERT0(occ->isMemoryRefNonPR());
+    ASSERT0(occ->isMemRefNonPR());
     ASSERTN(occ->getSSAInfo() == nullptr, ("should not have SSA du"));
     IRSet irset(getSegMgr());
     if (occ->is_exp()) {
@@ -560,8 +557,8 @@ void DelegateMgr::createDelegateInfo(IR * delegate)
     //throughout the entire life-time of delegate.
     IR * pr = m_dele2pr.get(delegate);
     if (pr == nullptr) {
-        pr = m_rg->buildPR(delegate->getType());
-        m_rg->allocRefForPR(pr);
+        pr = m_rg->getIRMgr()->buildPR(delegate->getType());
+        m_rg->getMDMgr()->allocRef(pr);
         m_dele2pr.set(delegate, pr);
     }
 }
@@ -575,8 +572,8 @@ IR * DelegateMgr::genInitStmt(IR const* delegate, IR * rhs)
             ("reproduce init-stmt"));
     IR const* pr = getPR(delegate);
     ASSERT0(pr);
-    IR * stpr = m_rg->buildStorePR(PR_no(pr), pr->getType(), rhs);
-    m_rg->allocRefForPR(stpr);
+    IR * stpr = m_rg->getIRMgr()->buildStorePR(PR_no(pr), pr->getType(), rhs);
+    m_rg->getMDMgr()->allocRef(stpr);
     m_dele2init.set(const_cast<IR*>(delegate), stpr);
     return stpr;
 }
@@ -739,52 +736,17 @@ bool DelegateMgr::dump() const
 static IR * dupMemStmt(IR const* delegate, IR * rhs, Region * rg)
 {
     ASSERT0(rhs && rhs->is_pr());
-    IR * stmt = nullptr;
+    IR * stmt = rg->dupIsomoStmt(delegate, rhs);
+    ASSERT0(stmt);
     switch (delegate->getCode()) {
-    case IR_ARRAY: {
-        stmt = CStArray::dupIRTreeByExp(delegate, rhs, rg);
-        IR * newbase = stmt->getBase();
-        IR * newsublist = ARR_sub_list(stmt);
-        xoc::addUseForTree(newbase, delegate->getBase(), rg);
-        xoc::addUseForTree(newsublist, ARR_sub_list(delegate), rg);
-        //Stmt's ref already copied.
-        return stmt;
-    }
-    case IR_STARRAY: {
-        //Prepare base and subscript expression list.
-        IR * newbase = rg->dupIRTree(delegate->getBase());
-        IR * newsublist = rg->dupIRTreeList(ARR_sub_list(delegate));
-        xoc::addUseForTree(newbase, delegate->getBase(), rg);
-        xoc::addUseForTree(newsublist, ARR_sub_list(delegate), rg);
-        stmt = rg->buildStoreArray(newbase, newsublist, delegate->getType(),
-                                   ARR_elemtype(delegate),
-                                   ((CArray*)delegate)->getDimNum(),
-                                   ARR_elem_num_buf(delegate), rhs);
-        stmt->setOffset(delegate->getOffset());
-        stmt->copyRef(delegate, rg);
-        return stmt;
-    }
-    case IR_IST: {
-        IR * newbase = rg->dupIRTree(delegate->getBase());
-        stmt = rg->buildIStore(newbase, rhs, delegate->getOffset(),
-                               delegate->getType());
+    SWITCH_CASE_ARRAY_OP:
         xoc::addUseForTree(stmt->getBase(), delegate->getBase(), rg);
-        stmt->copyRef(delegate, rg);
+        xoc::addUseForTree(ARR_sub_list(stmt), ARR_sub_list(delegate), rg);
         return stmt;
-    }
-    case IR_ST:
-        stmt = rg->buildStore(ST_idinfo(delegate), delegate->getType(),
-                              delegate->getOffset(), rhs);
-        stmt->copyRef(delegate, rg);
-        return stmt;
-    case IR_ILD:
-        stmt = CISt::dupIRTreeByExp(delegate, rhs, rg);
+    SWITCH_CASE_INDIRECT_MEM_OP:
         xoc::addUseForTree(stmt->getBase(), delegate->getBase(), rg);
-        //Stmt's ref already copied.
         return stmt;
-    case IR_LD:
-        stmt = CSt::dupIRTreeByExp(delegate, rhs, rg);
-        //Stmt's ref already copied.
+    SWITCH_CASE_DIRECT_MEM_OP:
         return stmt;
     default: UNREACHABLE(); //Unsupport.
     }
@@ -1071,7 +1033,7 @@ bool RegPromot::handleGeneralRef(IR * ir, LI<IRBB> const* li,
                                  OUT InexactAccTab & inexact_tab,
                                  bool * added)
 {
-    ASSERT0(ir->isMemoryRef());
+    ASSERT0(ir->isMemRef());
     if (!isPromotable(ir)) { return true; }
     MD const* mustref = ir->getMustRef();
     if (mustref != nullptr) {
@@ -1116,7 +1078,7 @@ bool RegPromot::sweepOutExactAccess(IR * ir, MOD ExactAccTab & exact_tab)
     } else if (mayref != nullptr) {
         for (MD const* md = exact_tab.get_first(it, nullptr);
              md != nullptr; md = exact_tab.get_next(it, nullptr)) {
-            if (mayref->is_contain(md)) {
+            if (mayref->is_contain(md, m_rg)) {
                 //occ is not suite to promot any more.
                 need_to_be_removed.append(md);
             }
@@ -1238,7 +1200,7 @@ void RegPromot::clobberExactAccess(IR const* ir, MOD ExactAccTab & exact_tab)
     if (mayref != nullptr && !mayref->is_empty()) {
         for (MD const* md = exact_tab.get_first(it, nullptr);
              md != nullptr; md = exact_tab.get_next(it, nullptr)) {
-            if (mayref->is_contain(md)) {
+            if (mayref->is_contain(md, m_rg)) {
                 //Current ir may modify the candidate's md.
                 //We think the candidate is not suite to promot any more.
                 need_to_be_removed.set(cnt, md);
@@ -1391,7 +1353,7 @@ bool RegPromot::scanIRTreeList(IR * root, LI<IRBB> const* li,
 {
     for (IR * ir = root; ir != nullptr; ir = ir->get_next()) {
         bool added = false;
-        if (ir->isMemoryRefNonPR() &&
+        if (ir->isMemRefNonPR() &&
             !handleGeneralRef(ir, li, exact_tab, inexact_tab, &added)) {
             return false;
         }
@@ -1424,17 +1386,17 @@ bool RegPromot::scanStmt(IR * ir, LI<IRBB> const* li,
     //Do NOT use IR iterator to avoid adding both parent and kid IR into
     //exact_tab or inexact_tab.
     switch (ir->getCode()) {
-    case IR_ST: {
+    SWITCH_CASE_DIRECT_MEM_STMT: {
         bool added = false;
         if (!handleGeneralRef(ir, li, exact_tab, inexact_tab, &added)) {
             return false;
         }
         return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
     }
-    case IR_STPR:
+    SWITCH_CASE_WRITE_PR:
         return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
-    case IR_STARRAY:
-    case IR_IST: {
+    SWITCH_CASE_WRITE_ARRAY:
+    SWITCH_CASE_INDIRECT_MEM_STMT: {
         bool added = false;
         if (!handleGeneralRef(ir, li, exact_tab, inexact_tab, &added)) {
             return false;
@@ -1453,13 +1415,8 @@ bool RegPromot::scanStmt(IR * ir, LI<IRBB> const* li,
         //Only RHS kid tree need to be scanned to collect candidiate.
         return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
     }
-    case IR_SETELEM:
-    case IR_GETELEM:
-    case IR_IGOTO:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
     case IR_RETURN:
-    case IR_SWITCH:
+    SWITCH_CASE_BRANCH_OP:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
             if (k == nullptr) { continue; }
@@ -1477,8 +1434,6 @@ bool RegPromot::scanStmt(IR * ir, LI<IRBB> const* li,
             return false;
         }
         return scanIRTreeList(CALL_param_list(ir), li, exact_tab, inexact_tab);
-    case IR_PHI:
-    case IR_GOTO:
     case IR_REGION:
         return true;
     default: ASSERTN(0, ("unsupported IR code"));
@@ -1501,7 +1456,6 @@ bool RegPromot::scanBB(IN IRBB * bb, LI<IRBB> const* li,
                        OUT InexactAccTab & inexact_tab)
 {
     for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
-        if (!ir->isContainMemRef()) { continue; }
         if (ir->is_region()) { return false; }
         if (ir->isCallStmt() && !ir->isReadOnly()) {
             clobberAccess(ir, exact_tab, inexact_tab);
@@ -1542,12 +1496,12 @@ void RegPromot::handleEpilog(ConstIRTab const& restore2mem,
 //Note ir must be memory reference.
 bool RegPromot::isPromotable(IR const* ir) const
 {
-    ASSERT0(ir->isMemoryRef());
+    ASSERT0(ir->isMemRef());
     //If IR tree has side-effect, that means exp/stmt can not be removed or
     //changed. RegPromot does not violate no-move attribute.
     //TBD:We are inclined that IR with may-throw and no-move attribute is
     //promotable.
-    return !ir->hasSideEffect(true);
+    return !ir->hasSideEffect(true) && !ir->isDummyOp();
 }
 
 
@@ -1715,7 +1669,7 @@ void RegPromot::removeDUChainForOrgOcc(Occ2Occ & occ2newocc, RPCtx const& ctx)
     Occ2OccIter it;
     for (IR * occ = occ2newocc.get_first(it, nullptr);
          occ != nullptr; occ = occ2newocc.get_next(it, nullptr)) {
-        ASSERT0(occ->isMemoryRefNonPR());
+        ASSERT0(occ->isMemRefNonPR());
         if (occ->is_exp()) {
             xoc::removeUseForTree(occ, m_rg, *ctx.oc);
             continue;
@@ -1821,9 +1775,9 @@ void RegPromot::handleStmtInBody(IR * occ, IR const* delegate,
     xoc::removeStmt(occ, m_rg, *ctx.oc);
     
     //Substitute STPR for writing memory.
-    IR * stpr = m_rg->buildStorePR(PR_no(delegate_pr),
-                                   delegate_pr->getType(), occrhs);
-    m_rg->allocRefForPR(stpr);
+    IR * stpr = m_rg->getIRMgr()->buildStorePR(PR_no(delegate_pr),
+                                               delegate_pr->getType(), occrhs);
+    m_rg->getMDMgr()->allocRef(stpr);
     stpr->copyAI(occ, m_rg);
     m_gvn->setVN(stpr, m_gvn->getVN(occ));
 
@@ -1846,7 +1800,7 @@ void RegPromot::handleAccessInBody(IR * ref, IR const* delegate,
                                    OUT Occ2Occ & occ2newocc, RPCtx const& ctx)
 {
     ASSERT0(ref && delegate);
-    ASSERT0(ref->isMemoryRefNonPR());
+    ASSERT0(ref->isMemRefNonPR());
     if (ref->is_stmt()) {
         handleStmtInBody(ref, delegate, delemgr, restore2mem, occ2newocc, ctx);
     } else {
@@ -1933,14 +1887,14 @@ void RegPromot::handleProlog(IR const* delegate, IR const* promoted_pr,
         rhs = dupMemExp(delegate, m_rg);
     }
     switch (delegate->getCode()) {
-    case IR_STARRAY:
-    case IR_IST:
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
         handlePrologForStmt(delegate, promoted_pr, delemgr, rhs, preheader);
         return;
-    case IR_ARRAY:
-    case IR_ILD:
-    case IR_LD:
+    SWITCH_CASE_DIRECT_MEM_EXP:
+    SWITCH_CASE_INDIRECT_MEM_EXP:
+    SWITCH_CASE_READ_ARRAY:
         handlePrologForExp(delegate, promoted_pr, delemgr, rhs, preheader);
         return;
     default: UNREACHABLE(); //unsupport.
@@ -2097,7 +2051,7 @@ void RegPromot::addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb,
     IRIter it;
     for (IR * x = iterInit(root, it);
          x != nullptr; x = iterNext(it)) {
-        if (use_mdssa && x->isMemoryRefNonPR()) {
+        if (use_mdssa && x->isMemRefNonPR()) {
             m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc);
         } else if (use_prssa && x->isReadPR()) {
             m_prssamgr->findAndSetLiveinDef(x);
@@ -2113,7 +2067,7 @@ void RegPromot::addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
     //The RHS of init_stmt may not isomorphic to delegate if it has
     //must-exact ref.
     ASSERT0(dele->getExactRef() != nullptr ||
-            dele->isIRIsomo(init_stmt->getRHS(), true));
+            dele->isIsomoTo(init_stmt->getRHS(), true));
     IR * startir = init_stmt->getBB()->getPrevIR(init_stmt);
     IRBB * startbb = init_stmt->getBB();
     addDUChainForExpTree(init_stmt->getRHS(), startir, startbb, ctx);
@@ -2130,13 +2084,13 @@ void RegPromot::addSSADUChainForExpOfRestore(IR const* dele,
     IR * restore = delemgr.getRestoreStmt(dele);
     if (restore == nullptr) { return; }
     ASSERT0(restore->is_stmt());
-    ASSERT0(restore->isMemoryRefNonPR() && restore->getRHS()->isPROp());
+    ASSERT0(restore->isMemRefNonPR() && restore->getRHS()->isPROp());
     IRIter it;
     IR * startir = restore->getBB()->getPrevIR(restore);
     IRBB * startbb = restore->getBB();
     for (IR * x = iterExpOfStmtInit(restore, it);
          x != nullptr; x = iterExpOfStmtNext(it)) {
-        if (use_mdssa && x->isMemoryRefNonPR()) {
+        if (use_mdssa && x->isMemRefNonPR()) {
             m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc);
         } else if (use_prssa && x->isReadPR()) {
             m_prssamgr->findAndSetLiveinDef(x);
@@ -2227,7 +2181,7 @@ void RegPromot::addDUChainForIntraDefAndUseSet(Occ2Occ const& occ2newocc,
     for (BSIdx i = useset.get_first(&di);
          i != BS_UNDEF; i = useset.get_next(i, &di)) {
         IR * use = m_rg->getIR(i);
-        ASSERT0(use->is_exp() && use->isMemoryRefNonPR());
+        ASSERT0(use->is_exp() && use->isMemRefNonPR());
         IR * newocc_use = const_cast<Occ2Occ&>(occ2newocc).get(use);
         if (newocc_use == nullptr) { continue; }
         ASSERT0(newocc_use->is_pr());
@@ -2269,7 +2223,7 @@ void RegPromot::addDUChainForRestoreToOutsideUse(IR const* dele,
     IR * restore = delemgr.getRestoreStmt(dele);
     if (restore == nullptr) { return; }
     ASSERT0(restore->is_stmt());
-    ASSERT0(restore->isMemoryRefNonPR() && restore->getRHS()->isPROp());
+    ASSERT0(restore->isMemRefNonPR() && restore->getRHS()->isPROp());
 
     //The USE is an outside-loop USE, that should establish
     //DU chain with the restore.
@@ -2592,7 +2546,7 @@ IRBB * RegPromot::tryInsertStubExitBB(IRBB * exit_bb,
     IRBB * stub = m_rg->allocBB();
     m_cfg->addBB(stub);
     m_cfg->tryUpdateRPOBeforeCFGChanged(stub, exit_bb, true, ctx.oc);
-    m_cfg->insertBBbetween(pred, pred_it, exit_bb, exit_bb_it, stub, ctx.oc);
+    m_cfg->insertBBBetween(pred, pred_it, exit_bb, exit_bb_it, stub, ctx.oc);
     //TODO:revise dom-info incrementally.
     ctx.oc->setInvalidDom();
     ctx.oc->setInvalidPDom();
@@ -2741,7 +2695,7 @@ bool RegPromot::perform(OptCtx & oc)
     bool change = EvaluableScalarReplacement(worklst, ctx);
     if (change) {
         //DU reference and du chain has maintained.
-        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(m_dumgr->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg, oc));
 
         //Enforce following pass to recompute gvn.

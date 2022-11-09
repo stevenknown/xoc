@@ -59,7 +59,7 @@ protected:
                                   BitSet const& opts);
 public:
     PassMgr(Region * rg);
-    virtual ~PassMgr() { destroyAllPass(); }
+    virtual ~PassMgr() { destroyAllRegisteredPass(); }
 
     virtual Pass * allocCDG();
     virtual Pass * allocCFG();
@@ -96,6 +96,7 @@ public:
     virtual Pass * allocRefine();
     virtual Pass * allocGSCC();
     virtual Pass * allocIRSimp();
+    virtual Pass * allocIRMgr();
     virtual Pass * allocLinearScanRA();
 
     //This function check validation of options in oc, perform
@@ -104,7 +105,7 @@ public:
     void checkValidAndRecompute(OptCtx * oc, ...);
     void checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist);
 
-    void destroyAllPass();
+    void destroyAllRegisteredPass();
     void destroyPass(Pass * pass);
     void destroyPass(PASS_TYPE passtype);
     void dump() const;

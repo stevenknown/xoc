@@ -183,9 +183,10 @@ void RegionMgr::registerGlobalMD()
     }
 }
 
-CallGraph * RegionMgr::allocCallGraph(UINT edgenum, UINT vexnum)
+
+CallGraph * RegionMgr::allocCallGraph(UINT vexnum)
 {
-    return new CallGraph(edgenum, vexnum, this);
+    return new CallGraph(vexnum, this);
 }
 
 
@@ -220,7 +221,6 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
     } else {
         REGION_id(rg) = free_id;
     }
-
     return rg;
 }
 
@@ -241,9 +241,11 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
+    checkIRCodeBitSize();
     checkMaxIRCode();
     checkIRDesc();
     checkRoundDesc();
+    checkIRSwitchCaseHelper();
     ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0(sizeof(TMWORD) <= sizeof(HOST_UINT));
@@ -413,12 +415,13 @@ void RegionMgr::buildCallGraph(OptCtx & oc, bool scan_call,
                                bool scan_inner_region)
 {
     //Generate call-list and return-list.
-    UINT vn = 0, en = 0;
-    estimateEV(en, vn, scan_call, scan_inner_region);
+    UINT vn;
+    UINT num_call;
+    estimateEV(num_call, vn, scan_call, scan_inner_region);
 
     if (m_call_graph == nullptr) {
         //Construct call graph.
-        m_call_graph = allocCallGraph(vn, en);
+        m_call_graph = allocCallGraph(vn);
     }
     ASSERT0(m_call_graph);
 

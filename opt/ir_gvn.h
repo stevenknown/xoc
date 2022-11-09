@@ -629,9 +629,11 @@ protected:
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
-    void processIST(IR * ir, bool & change);
+    void processIndirectMemOp(IR * ir, bool & change);
+    void processDirectMemOp(IR * ir, bool & change);
     void processSTARRAY(IR * ir, bool & change);
-    void processSTandSTPR(IR * ir, bool & change);
+    virtual void processStmt(IR * ir, bool & change);
+    virtual void processExtStmt(IR * ir, bool & change);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -676,7 +678,7 @@ public:
     //return false to tell caller we do not know more about these object.
     //Note this function will consider data type that ir1 or ir2 referrenced.
     bool isDiffMemLoc(IR const* ir1, IR const* ir2) const
-    { return ir1->isDiffMemLoc(ir2); }
+    { return ir1->isDiffMemLoc(ir2, m_rg); }
 
     //Return true if GVN will alloc different VN for livein variable.
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }

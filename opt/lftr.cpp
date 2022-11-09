@@ -87,7 +87,7 @@ void LFTR::analyzeBB(LI<IRBB> const* li, IRBB const* bb, MOD LFAnaCtx & ctx)
     for (IR * ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
          ir != nullptr;
          ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
-        if (ir->isNoMove(true) || ir->is_phi()) {
+        if (ir->isNoMove(true) || ir->is_phi() || ir->isDummyOp()) {
             continue;
         }
 
@@ -95,7 +95,8 @@ void LFTR::analyzeBB(LI<IRBB> const* li, IRBB const* bb, MOD LFAnaCtx & ctx)
         m_iriter.clean();
         for (IR * x = xoc::iterInit(ir, m_iriter);
              x != nullptr; x = xoc::iterNext(m_iriter)) {
-            if (!x->is_mul() || x->hasSideEffect(true) || x->isNoMove(true)) {
+            if (!x->is_mul() || x->hasSideEffect(true) || x->isNoMove(true) ||
+                x->isDummyOp()) {
                 continue;
             }
 
@@ -204,8 +205,8 @@ IR * LFTR::genNewIVRef(LFRInfo const* info)
     Type const* ty = info->new_div->getType();
     if (info->new_div->is_stmt()) {
         ASSERTN(info->new_div->is_stpr() || info->new_div->is_phi(), ("TODO"));
-        newiv = m_rg->buildPRdedicated(info->new_div->getPrno(), ty);
-        m_rg->allocRefForPR(newiv);
+        newiv = m_irmgr->buildPRdedicated(info->new_div->getPrno(), ty);
+        m_rg->getMDMgr()->allocRef(newiv);
         if (usePRSSADU()) {
             m_prssamgr->buildDUChain(info->new_div, newiv);
         } else {
@@ -234,7 +235,7 @@ void LFTR::getLinearRepOfIV(LFAnaCtx const& ctx, IR const* lf_exp,
 {
     ASSERT0(iv && coeff);
     ASSERT0(lf_exp->is_mul() && !lf_exp->hasSideEffect(true) &&
-            !lf_exp->isNoMove(true));
+            !lf_exp->isNoMove(true) && !lf_exp->isDummyOp());
     IR const* op0 = BIN_opnd0(lf_exp);
     ASSERT0(op0->is_ld() && op0->getMustRef());
     *iv = ctx.getIVInfo(op0->getMustRef());
@@ -300,8 +301,8 @@ void LFTR::addDUChainForRHSOfInitDef(IR * newrhs, IR const* oldrhs,
     IR const* y;
     for (x = iterInit(newrhs, itnew), y = iterInitC(oldrhs, itold);
          x != nullptr; x = iterNext(itnew), y = iterNextC(itold)) {
-        if (x->isMemoryRefNonPR()) {
-            ASSERT0(y && y->isMemoryRefNonPR());
+        if (x->isMemRefNonPR()) {
+            ASSERT0(y && y->isMemRefNonPR());
             MDSSAInfo const* info = m_mdssamgr->getMDSSAInfoIfAny(y);
             ASSERT0(info);
             m_mdssamgr->genMDSSAInfoToOutsideLoopDef(x, info, li);
@@ -322,9 +323,9 @@ bool LFTR::insertComputingInitValCode(IRBB * preheader,
                 ("IV is not belong to LI%d", li->id()));
         //Build stmt to compute init-val at preheader.
         IR * newrhs = m_rg->dupIRTree(info->lf_exp);
-        IR * comp_init_val = m_rg->buildStorePR(info->lf_exp->getType(),
+        IR * comp_init_val = m_irmgr->buildStorePR(info->lf_exp->getType(),
                                                 newrhs);
-        m_rg->allocRefForPR(comp_init_val);
+        m_rg->getMDMgr()->allocRef(comp_init_val);
         addDUChainForRHSOfInitDef(newrhs, info->lf_exp, li);
         preheader->getIRList().append_tail_ex(comp_init_val);
 
@@ -383,7 +384,7 @@ static void createPRSSADU(Region * rg, PRSSAMgr * prssamgr, IR * phi,
     prssamgr->buildDUChain(phi, iv_occ);
 
     //Create new PR.
-    red->setPrnoAndUpdateSSAInfo(rg->buildPrno(red->getType()));
+    red->setPrnoAndUpdateSSAInfo(rg->getIRMgr()->buildPrno(red->getType()));
 
     //Creat new PR for phi operand.
     opnd_relate_to_red->setPrnoAndUpdateSSAInfo(red->getPrno());
@@ -432,12 +433,14 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     for (UINT i = 0; i < 2; i++) {
         PRNO prno = defarr[i]->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
-        IR * opnd = m_rg->buildPRdedicated(prno, defarr[i]->getType());
-        m_rg->allocRefForPR(opnd);
+        IR * opnd = m_irmgr->buildPRdedicated(prno,
+                                                       defarr[i]->getType());
+        m_rg->getMDMgr()->allocRef(opnd);
         xcom::add_next(&opnd_list, opnd);
         opndarr[i] = opnd;
     }
-    IR * phi = m_rg->buildPhi(red->getPrno(), red->getType(), opnd_list);
+    IR * phi = m_irmgr->buildPhi(red->getPrno(), red->getType(),
+                                          opnd_list);
     head->getIRList().append_head(phi);
 
     //Renaming.
@@ -448,7 +451,7 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     //    PR_init = ...
     //    PR_phi = PHI(PR_init, PR_red)
     //    PR_red = PR_phi, ...
-    phi->setPrno(m_rg->buildPrno(phi->getType()));
+    phi->setPrno(m_irmgr->buildPrno(phi->getType()));
 
     //Get RHS OCC of IV in reduction.
     IR * iv_occ = red->getRHS()->getOpndMem(red->getMustRef());
@@ -458,11 +461,11 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     IR * opnd_relate_to_init = opndarr[pos_of_initbb];
     createPRSSADU(m_rg, m_prssamgr, phi, iv_occ, red, init, opnd_relate_to_red,
                   opnd_relate_to_init);
-    m_rg->allocRefForPR(phi);
-    m_rg->allocRefForPR(iv_occ);
-    m_rg->allocRefForPR(red);
-    m_rg->allocRefForPR(opnd_relate_to_red);
-    m_rg->allocRefForPR(opnd_relate_to_init);
+    m_rg->getMDMgr()->allocRef(phi);
+    m_rg->getMDMgr()->allocRef(iv_occ);
+    m_rg->getMDMgr()->allocRef(red);
+    m_rg->getMDMgr()->allocRef(opnd_relate_to_red);
+    m_rg->getMDMgr()->allocRef(opnd_relate_to_init);
     return phi;
 }
 
@@ -494,11 +497,10 @@ bool LFTR::insertReductionCode(List<LFRInfo*> const& lfrinfo_list)
 
         //Build stmt to do reduction in loop body.
         Type const* ty = info->new_div->getType();
-        IR * red = m_rg->buildStorePR(newiv->getPrno(), ty,
-                                      m_rg->buildBinaryOp(op, ty,
-                                          newiv,
-                                          m_rg->buildImmInt(newiv_step, ty)));
-        m_rg->allocRefForPR(red);
+        IR * red = m_irmgr->buildStorePR(newiv->getPrno(), ty,
+            m_irmgr->buildBinaryOp(op, ty, newiv,
+                                   m_irmgr->buildImmInt(newiv_step, ty)));
+        m_rg->getMDMgr()->allocRef(red);
         IRBB * redbb = ivinfo->getRedStmt()->getBB();
         ASSERT0(redbb);
         redbb->getIRList().insert_before(red, ivinfo->getRedStmt());
@@ -571,6 +573,7 @@ bool LFTR::perform(OptCtx & oc)
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     m_dumgr = m_rg->getDUMgr();
+    m_irmgr = m_rg->getIRMgr();
 
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //LFTR use either classic PR DU chain or PRSSA.
@@ -603,7 +606,7 @@ bool LFTR::perform(OptCtx & oc)
     //This pass does not devastate IVR information. However, new IV might be
     //inserted.
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg, oc));
+    ASSERT0(m_dumgr->verifyMDRef() && verifyMDDUChain(m_rg, oc));
     oc.setInvalidIfDUMgrLiveChanged();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));

@@ -177,7 +177,7 @@ public:
     LabelInfo const* continue_label; //record the current LOOP start label.
     OptCtx const* optctx; //record current OptCtx for region.
 public:
-    SimpCtx() { init(); }
+    SimpCtx(OptCtx const* oc) { init(); SIMP_optctx(this) = oc; }
     SimpCtx(SimpCtx const& s) { copy(s); }
     SimpCtx const& operator = (SimpCtx const&);
 
@@ -208,10 +208,11 @@ public:
     {
         prop_top_down.flag_value = 0;
         prop_bottom_up.flag_value = 0;
-        ir_stmt_list = nullptr;
-        cfs_mgr = nullptr;
-        break_label = nullptr;
-        continue_label = nullptr;
+        SIMP_stmtlist(this) = nullptr;
+        SIMP_cfs_mgr(this) = nullptr;
+        SIMP_optctx(this) = nullptr;
+        SIMP_break_label(this) = nullptr;
+        SIMP_continue_label(this) = nullptr;
     }
 
     //Unify the actions which propagated top down
@@ -219,7 +220,7 @@ public:
     void copyTopdownFlag(SimpCtx const& c)
     {
         prop_top_down = c.prop_top_down;
-        cfs_mgr = c.cfs_mgr;
+        SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&c);
     }
 
     //Copy the actions which propagated bottom up
@@ -343,11 +344,31 @@ public:
 };
 
 
+//This pass is very important to multiple level IR compiler. It simplifies or
+//transforms one level IR to another lower or equivalent level IR each time.
+//The class provides default api and rules to simplify higher level IR to
+//lower level IR in XOC framework. Also provides two kinds of simplification
+//in general purpose, one is lowest height simplification, the other is PR-mode
+//simplification.
+//Lowest height means the height of IR tree in stmt will not more than 2.
+//e.g: stpr $1 = add (ld a, sub (ld b, ld c));
+//  The height of RHS of stpr is 3, after lowest-height simplification,
+//  stmt list will be:
+//     stpr $x = sub (ld b, ld c) //S2
+//     stpr $1 = add (ld a, $x)  //S1
+//  The height of RHS of S1 is 2.
+//The PR-mode means all opcode only operate PR in each expression/stmt.
+//e.g: stpr $1 = add (ld a, ld c);
+//  after PR-mode simplification, stmt list will be:
+//     stpr $x = ld a
+//     stpr $y = ld b
+//     stpr $1 = add ($x, $y)
 class IRSimp : public Pass {
     COPY_CONSTRUCTOR(IRSimp);
 private:
     TypeMgr * m_tm;
-private:
+    IRMgr * m_irmgr;
+protected:
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
     //Note that if ARRAY or ILD still not be lowered at the moment, regarding
@@ -381,8 +402,14 @@ private:
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
     bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
                                SimpCtx * ctx);
+    virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
 public:
-    explicit IRSimp(Region * rg) : Pass(rg) { m_tm = rg->getTypeMgr(); }
+    explicit IRSimp(Region * rg) : Pass(rg)
+    {
+        m_tm = rg->getTypeMgr();
+        m_irmgr = rg->getIRMgr();
+    }
     virtual ~IRSimp() {}
 
     virtual CHAR const* getPassName() const
@@ -399,14 +426,13 @@ public:
     IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
     IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
     void simplifySelectKids(IR * ir, SimpCtx * cont);
-    IR * simplifyStore(IR * ir, SimpCtx * cont);
+    IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
+    IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
     void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
-    IR * simplifyStorePR(IR * ir, SimpCtx * cont);
     IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
     IR * simplifySetelem(IR * ir, SimpCtx * ctx);
     IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyIStore(IR * ir, SimpCtx * cont);
     IR * simplifyCall(IR * ir, SimpCtx * cont);
     IR * simplifyIf(IR * ir, SimpCtx * cont);
     IR * simplifyWhileDo(IR * ir, SimpCtx * cont);

@@ -132,13 +132,14 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 }
 
 
-bool CopyProp::isCopyOR(IR * ir) const
+bool CopyProp::isCopyOP(IR * ir) const
 {
+    if (ir->isDummyOp()) { return false; }
     switch (ir->getCode()) {
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
     case IR_STPR:
-    case IR_STARRAY:
-    case IR_IST:
         if (ir->is_stpr() && !isLowCostExp(ir->getRHS())) {
             //CASE:Propagate LD/ILD through PR may degrade performance, e.g:
             //  pr1 = LD(x)
@@ -176,10 +177,79 @@ bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
         ASSERT0(tbb);
         for (IR const* tir = tbb->getIRList().get_head(&irit);
              tir != nullptr; tir = tbb->getIRList().get_next(&irit)) {
-            if (m_du->isMayDef(tir, exp, true)) {
+            if (m_dumgr->isMayDef(tir, exp, true)) {
                 return true;
             }
         }
+    }
+    return false;
+}
+
+
+//Both def_ir and use_ir are in same BB.
+static bool is_available_in_same_bb(IR const* def_stmt, IR const* use_stmt,
+                                    IR const* prop_value, DUMgr * dumgr)
+{
+    IRBB * defbb = def_stmt->getBB();
+    IRListIter it = nullptr;
+    bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &it);
+    CHECK0_DUMMYUSE(f);
+    IR * ir;
+    for (ir = BB_irlist(defbb).get_next(&it);
+         ir != use_stmt && ir != nullptr;
+         ir = BB_irlist(defbb).get_next(&it)) {
+        if (dumgr->isMayDef(ir, prop_value, false)) {
+            return false;
+        }
+    }
+    if (ir == use_stmt) {
+        return true;
+    }
+    ASSERTN(defbb == use_stmt->getBB(),
+            ("def_stmt should be in same bb with use_stmt"));
+    return false;
+}
+
+
+bool CopyProp::canBeCandidate(IR const* ir) const
+{
+    switch (m_prop_kind) {
+    case CP_PROP_CONST:
+        return ir->is_lda() || ir->isConstExp();
+    case CP_PROP_SIMPLEX:
+        switch (ir->getCode()) {
+        case IR_LDA:
+        case IR_ID:
+        case IR_CONST:
+        SWITCH_CASE_READ_PR:
+            return true;
+        default: return isSimpCVT(ir);
+        }
+    case CP_PROP_UNARY_AND_SIMPLEX:
+        switch (ir->getCode()) {
+        case IR_LDA:
+        case IR_ID:
+        case IR_CONST:
+        SWITCH_CASE_READ_PR:
+            return true;
+        case IR_LD:
+            ASSERT0(ir->getRefMD());
+            return true;
+        case IR_ILD:
+            if (ir->getRefMD() == nullptr || !ir->getRefMD()->is_exact()) {
+                //TBD:In aggressive mode, we anticipate propagating RHS
+                //expression even if it is inexact.
+                //e.g: s is MC type.
+                //    s = *p
+                //    *q = s
+                //  *p can be propagated.
+                //return false;
+            }
+            ASSERT0(ir->getRefMD() || ir->getRefMDSet());
+            return true;
+        default: return isSimpCVT(ir);
+        }
+    default: UNREACHABLE();
     }
     return false;
 }
@@ -195,8 +265,8 @@ bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
 //def_stmt: ir stmt.
 //prop_value: expression that will be propagated.
 //Note either use_phi or use_stmt is nullptr.
-bool CopyProp::is_available(IR const* def_stmt, IR const* prop_value,
-                            IR const* repexp) const
+bool CopyProp::isAvailable(IR const* def_stmt, IR const* prop_value,
+                           IR const* repexp) const
 {
     IR * use_stmt = nullptr;
     MDPhi * use_phi = nullptr;
@@ -231,34 +301,17 @@ bool CopyProp::is_available(IR const* def_stmt, IR const* prop_value,
         return false;
     }
 
-    //Both def_ir and use_ir are in same BB.
-    IRListIter ir_holder = nullptr;
-    bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &ir_holder);
-    CHECK0_DUMMYUSE(f);
-    IR * ir;
-    for (ir = BB_irlist(defbb).get_next(&ir_holder);
-         ir != nullptr && ir != use_stmt;
-         ir = BB_irlist(defbb).get_next(&ir_holder)) {
-        if (m_du->isMayDef(ir, prop_value, false)) {
-            return false;
-        }
+    if (defbb == usebb) {
+        //Both def_ir and use_ir are in same BB.
+        return is_available_in_same_bb(def_stmt, use_stmt, prop_value, m_dumgr);
     }
-
-    if (ir == use_stmt) {
-        ASSERTN(defbb == usebb,
-                ("def_stmt should be in same bb with use_stmt"));
-        return true;
-    }
-
     if (use_phi != nullptr || use_stmt->is_phi()) {
         //Propagate value to phi operand.
         //Nothing to do.
     }
-
     if (existMayDefTillBB(prop_value, usebb, defbb)) {
         return false;
     }
-
     return true;
 }
 
@@ -269,7 +322,6 @@ bool CopyProp::is_available(IR const* def_stmt, IR const* prop_value,
 bool CopyProp::isLowCostCVT(IR const* ir) const
 {
     if (!ir->is_cvt()) { return false; }
-
     for (;;) {
         if (ir->is_cvt()) {
             ir = CVT_exp(ir);
@@ -277,7 +329,7 @@ bool CopyProp::isLowCostCVT(IR const* ir) const
         }
         switch (ir->getCode()) {
         case IR_CONST:
-        case IR_PR:
+        SWITCH_CASE_READ_PR:
         case IR_LDA:
             return true;
         default:
@@ -304,7 +356,7 @@ bool CopyProp::isSimpCVT(IR const* ir) const
         switch (ir->getCode()) {
         case IR_LD:
         case IR_CONST:
-        case IR_PR:
+        SWITCH_CASE_READ_PR:
         case IR_LDA:
             return true;
         default:
@@ -330,7 +382,7 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
         switch (ir->getCode()) {
         case IR_LD:
         case IR_CONST:
-        case IR_PR:
+        SWITCH_CASE_READ_PR:
         case IR_LDA:
             return ir;
         default:
@@ -343,13 +395,10 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
 
 
 //Get the value expression that to be propagated.
-inline static IR * get_propagated_value(IR * stmt)
+IR * CopyProp::getPropagatedValue(IR * stmt)
 {
+    if (stmt->hasRHS()) { return stmt->getRHS(); }
     switch (stmt->getCode()) {
-    case IR_ST: return ST_rhs(stmt);
-    case IR_STPR: return STPR_rhs(stmt);
-    case IR_STARRAY: return STARR_rhs(stmt);
-    case IR_IST: return IST_rhs(stmt);
     case IR_PHI: return PHI_opnd_list(stmt);
     default:;
     }
@@ -496,7 +545,7 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         return nullptr;
     }
 
-    if (!is_available(def_stmt, prop_value, repexp)) {
+    if (!isAvailable(def_stmt, prop_value, repexp)) {
         //The value that will be propagated can
         //not be killed during 'def_stmt' and 'use_stmt'.
         //e.g:
@@ -509,7 +558,8 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         return nullptr;
     }
 
-    if (!prssadu && !mdssadu && !m_du->isExactAndUniqueDef(def_stmt, repexp)) {
+    if (!prssadu && !mdssadu &&
+        !m_dumgr->isExactAndUniqueDef(def_stmt, repexp)) {
         //Only single definition is allowed.
         //e.g:
         //    g = 20; //S3
@@ -560,7 +610,7 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet * useset,
                              OUT bool & prssadu, OUT bool & mdssadu)
 {
     useset->clean();
-    SSAInfo * ssainfo = def_stmt->getSSAInfo();
+    SSAInfo * ssainfo = def_stmt->isPROp() ? def_stmt->getSSAInfo() : nullptr;
     if (ssainfo != nullptr) {
         //Record use_stmt in another vector to facilitate this function
         //if it is not in use-list any more after copy-propagation.
@@ -659,7 +709,7 @@ bool CopyProp::doPropIR(IR * def_stmt, MOD IRSet * useset,
             return false;
         }
     }
-    IR const* prop_value = get_propagated_value(def_stmt);
+    IR const* prop_value = getPropagatedValue(def_stmt);
     if (!canBeCandidate(prop_value)) {
         return false;
     }
@@ -683,7 +733,7 @@ bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet * useset)
          next_iter = cur_iter; cur_iter != nullptr; cur_iter = next_iter) {
         IR * def_stmt = cur_iter->val();
         BB_irlist(bb).get_next(&next_iter);
-        if (!isCopyOR(def_stmt)) { continue; }
+        if (!isCopyOP(def_stmt)) { continue; }
         change |= doPropIR(def_stmt, useset, cur_iter, &next_iter);
     }
     return change;
@@ -770,7 +820,7 @@ bool CopyProp::perform(OptCtx & oc)
     OC_is_expr_tab_valid(oc) = false;
     OC_is_aa_valid(oc) = false;
     OC_is_ref_valid(oc) = true; //already update.
-    ASSERT0(m_rg->verifyMDRef());
+    ASSERT0(m_dumgr->verifyMDRef());
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg));
     ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     return true;

@@ -143,6 +143,7 @@ public:
 //  on program unit.
 class Region {
     friend class RegionMgr;
+    friend class IRMgr;
     COPY_CONSTRUCTOR(Region);
 protected:
     //Record the binary data for black box region.
@@ -166,14 +167,13 @@ protected:
     //Allocate AttachInfoMgr
     virtual AttachInfoMgr * allocAttachInfoMgr();
 
-    //Generate IR, invoke freeIR() or freeIRTree() if it is useless.
-    //NOTE: Do NOT invoke ::free() to free IR, because all
-    //    IR are allocated in the pool.
-    IR * allocIR(IR_CODE irt);
-
     void doBasicAnalysis(OptCtx & oc);
 
-    AnalysisInstrument * getAnalysisInstrument() const;
+    AnalysisInstrument * getAnalysisInstrument() const
+    {
+        ASSERT0(is_function() || is_program() || is_inner() || is_eh());
+        return REGION_analysis_instrument(this);
+    }
 
     void HighProcessImpl(OptCtx & oc);
 
@@ -224,69 +224,6 @@ public:
     void addToIRList(IR * irs)
     { xcom::add_next(&ANA_INS_ir_list(getAnalysisInstrument()), irs); }
 
-    //The function generates new MD for the IR tree that rooted by 'root'.
-    //sibling: true if the function have to walk the sibling node of 'root'.
-    //It should be called if new IR tree generated in optimzations.
-    void allocRefForIRTree(IR * root, bool sibling);
-
-    //The function generates new MD for all operations to PR.
-    //It should be called if new PR generated in optimzations.
-    inline MD const* allocRefForPR(IR * pr)
-    {
-        MD const* md = getMDMgr()->genMDForPR(pr);
-        pr->setRefMD(md, this);
-        pr->cleanRefMDSet();
-        return md;
-    }
-
-    //The function generates new MD for given LD.
-    //It should be called if LD generated in optimzations.
-    inline MD const* allocRefForLoad(IR * ld)
-    {
-        MD const* md = getMDMgr()->genMDForLoad(ld);
-        ld->setRefMD(md, this);
-
-        //Do NOT clean MDSet because transformation may combine ILD(LDA)
-        //into LD and carry MDSet from ILD.
-        //ld->cleanRefMDSet();
-        return md;
-    }
-
-    //The function generates new MD for given ST.
-    //It should be called if new PR generated in optimzations.
-    inline MD const* allocRefForStore(IR * st)
-    {
-        MD const* md = getMDMgr()->genMDForStore(st);
-        st->setRefMD(md, this);
-
-        //Do NOT clean MDSet because transformation may combine IST(LDA)
-        //into ST and carry MDSet from IST.
-        //st->cleanRefMDSet();
-        return md;
-    }
-
-    //The function generates new MD for given ST.
-    //It should be called if new PR generated in optimzations.
-    inline MD const* allocRefForId(IR * id)
-    {
-        MD const* md = getMDMgr()->genMDForId(id);
-        id->setRefMD(md, this);
-        id->cleanRefMDSet();
-        return md;
-    }
-
-    inline MD const* allocRef(IR * ir)
-    {
-        switch (ir->getCode()) {
-        case IR_PR: return allocRefForPR(ir);
-        case IR_LD: return allocRefForLoad(ir);
-        case IR_ST: return allocRefForStore(ir);
-        case IR_ID: return allocRefForId(ir);
-        default: UNREACHABLE();
-        }
-        return nullptr;
-    }
-
     //Allocate DU reference that describes memory reference to IR.
     inline DU * allocDU()
     {
@@ -317,407 +254,6 @@ public:
         BYTEBUF_buffer(buf) = (BYTE*)xmalloc(bytesize);
         return buf;
     }
-
-    //Build store operation to store 'rhs' to store value to be one of the
-    //element of a PR.
-    //type: data type of targe pr.
-    //offset: byte offset to the start of result PR.
-    //rhs: value expected to store.
-    IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
-
-    //Build store operation to store 'rhs' to store value to be one of the
-    //element of a PR.
-    //prno: target prno.
-    //type: data type of targe pr.
-    //base: base of source.
-    //value: value that need to be set.
-    //offset: byte offset to the start of result PR.
-    //rhs: value expected to store.
-    IR * buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
-                      IR * offset);
-
-    //Build store operation to get value from 'base', and store the result PR.
-    //prno: result prno.
-    //type: data type of targe pr.
-    //offset: byte offset to the start of PR.
-    //base: hold the value that expected to extract.
-    IR * buildGetElem(PRNO prno, Type const* type, IR * base, IR * offset);
-
-    //Build store operation to get value from 'rhs', and store the result PR.
-    //type: data type of targe pr.
-    //offset: byte offset to the start of rhs PR.
-    //base: hold the value that expected to extract.
-    IR * buildGetElem(Type const* type, IR * base, IR * offset);
-
-    //Build IR_CONTINUE operation.
-    IR * buildContinue();
-
-    //Build IR_BREAK operation.
-    IR * buildBreak();
-
-    //Build IR_CASE operation.
-    IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
-
-    //Build Do Loop stmt.
-    //iv: induction variable.
-    //det: determinate expression.
-    //loop_body: stmt list.
-    //init: record the stmt that initialize iv.
-    //step: record the stmt that update iv.
-    IR * buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body);
-
-    //Build Do While stmt.
-    //det: determinate expression.
-    //loop_body: stmt list.
-    IR * buildDoWhile(IR * det, IR * loop_body);
-
-    //Build While Do stmt.
-    //det: determinate expression.
-    //loop_body: stmt list.
-    IR * buildWhileDo(IR * det, IR * loop_body);
-
-    //Build IF stmt.
-    //det: determinate expression.
-    //true_body: stmt list.
-    //false_body: stmt list.
-    IR * buildIf(IR * det, IR * true_body, IR * false_body);
-
-    //Build SWITCH multi-select stmt.
-    //vexp: expression to determine which case entry will be target.
-    //case_list: case entry list. case entry is consist of expression and label.
-    //    Note that case list is optional.
-    //body: stmt list.
-    //default_lab: label indicates the default choice, the label is optional.
-    //
-    //NOTE: Do not set parent for stmt in 'body'.
-    IR * buildSwitch(IR * vexp, IR * case_list, IR * body,
-                     LabelInfo const* default_lab);
-
-    //Build PR and assign dedicated PRNO.
-    //Return IR_PR operation by specified prno and type id.
-    IR * buildPRdedicated(PRNO prno, Type const* type);
-
-    //Build PR that PRNO assiged by Region.
-    //Return IR_PR operation by specified type id.
-    IR * buildPR(Type const* type);
-
-    //Build PR that PRNO assiged by Region.
-    IR * buildPR(DATA_TYPE dt)
-    { return buildPR(getTypeMgr()->getSimplexType(dt)); }
-
-    //Generate a PR number by specified prno and type id.
-    //This operation will allocate new PR number.
-    //Note the function does NOT generate Var for generated PR no.
-    UINT buildPrno(Type const* type);
-
-    //Generate a PR number by specified prno and type id.
-    //This operation will allocate new PR number.
-    UINT buildPrno(DATA_TYPE dt)
-    { return buildPrno(getTypeMgr()->getSimplexType(dt)); }
-
-    //Build IR_TRUEBR or IR_FALSEBR operation.
-    IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
-
-    //Build Identifier.
-    IR * buildId(Var * var_info);
-
-    //Build internal label operation.
-    IR * buildIlabel();
-
-    //Build label operation.
-    IR * buildLabel(LabelInfo const* li);
-
-    //Build IR_CVT operation.
-    //exp: the expression to be converted.
-    //tgt_ty: the target type that you want to convert.
-    IR * buildCvt(IR * exp, Type const* tgt_ty);
-
-    //Build unconditional GOTO.
-    IR * buildGoto(LabelInfo const* li);
-
-    //Build IR_IGOTO unconditional multi-branch operation.
-    //vexp: expression to determine which case entry will be target.
-    //case_list: case entry list. case entry is consist of expression and label.
-    IR * buildIgoto(IR * vexp, IR * case_list);
-
-    //The function will check and build pointer arithmetic operation.
-    //To build pointer arithemtic, the addend of pointer must be
-    //product of the pointer-base-size and rchild if lchild is pointer.
-    IR * buildPointerOp(IR_CODE irt, IR * lchild, IR * rchild);
-
-    //Build compare operation.
-    IR * buildCmp(IR_CODE irt, IR * lchild, IR * rchild);
-    //Build judgement operation.
-    //This function build operation that comparing with 0 by NE node.
-    //e.g: output is (exp != 0).
-    //This function always used as helper function to convient to
-    //generate det-expression if it is not relational/logical.
-    IR * buildJudge(IR * exp);
-
-    //Build binary operation without considering pointer arithmetic.
-    IR * buildBinaryOpSimp(IR_CODE irt, Type const* type, IR * lchild,
-                           IR * rchild);
-
-    //Build binary operation.
-    //If rchild/lchild is pointer, the function will attemp to generate pointer
-    //arithmetic operation instead of normal binary operation.
-    IR * buildBinaryOp(IR_CODE irt, Type const* type, IN IR * lchild,
-                       IN IR * rchild);
-    IR * buildBinaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * lchild,
-                       IN IR * rchild);
-
-    //Build unary operation.
-    IR * buildUnaryOp(IR_CODE irt, Type const* type, IN IR * opnd);
-
-    //Build unary operation.
-    IR * buildUnaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * opnd)
-    { return buildUnaryOp(irt, getTypeMgr()->getSimplexType(dt), opnd); }
-
-    //Build IR_LNOT operation.
-    IR * buildLogicalNot(IR * opnd0);
-
-    //Build Logical operations, include IR_LAND, IR_LOR, IR_XOR.
-    IR * buildLogicalOp(IR_CODE irt, IR * opnd0, IR * opnd1);
-
-    //Build IR_CONST operation.
-    //The expression indicates an integer.
-    //v: value of integer.
-    //type: integer type.
-    IR * buildImmInt(HOST_INT v, Type const* type);
-
-    //Build IR_CONST operation.
-    //The expression indicates an integer.
-    //v: value of integer.
-    //type: integer type.
-    IR * buildImmInt(HOST_INT v, DATA_TYPE dt)
-    { return buildImmInt(v, getTypeMgr()->getSimplexType(dt)); }
-
-    //Build IR_CONST operation.
-    //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, Type const* type);
-
-    //Build IR_CONST operation.
-    //The expression indicates value with dynamic type.
-    IR * buildImmAny(HOST_INT v);
-
-    //Build IR_CONST operation.
-    //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, DATA_TYPE dt)
-    { return buildImmFp(fp, getTypeMgr()->getSimplexType(dt)); }
-
-    //Build IR_LDA operation.
-    //var: variable that will be taken address.
-    IR * buildLda(Var * var);
-    IR * buildLdaString(CHAR const* varname, Sym const* string);
-    IR * buildLdaString(CHAR const* varname, CHAR const * string);
-
-    //Build IR_LD operation.
-    //Load value from variable with type 'type'.
-    //var: indicates the variable which value will be loaded.
-    //ofst: memory byte offset relative to var.
-    //type: result type of value.
-    IR * buildLoad(Var * var, TMWORD ofst, Type const* type);
-
-    //Build IR_LD operation.
-    //Load value from variable with type 'type'.
-    //var: indicates the variable which value will be loaded.
-    //type: result type of value.
-    IR * buildLoad(Var * var, Type const* type)
-    { return buildLoad(var, 0, type); }
-
-    //Build IR_LD operation.
-    //Load value from variable with type 'type'.
-    //var: indicates the variable which value will be loaded.
-    //Result type of value is the type of variable carried.
-    IR * buildLoad(Var * var)
-    { ASSERT0(var); return buildLoad(var, VAR_type(var)); }
-
-    //Build IR_ILD operation.
-    //Result is either register or memory chunk, and the size of ILD
-    //result equals to 'pointer_base_size' of 'addr'.
-    //base: memory address of ILD.
-    //ofst: memory byte offset relative to base.
-    //ptbase_or_mc_size: if result of ILD is pointer, this parameter records
-    //   pointer_base_size; or if result is memory chunk, it records
-    //   the size of memory chunk.
-    //NOTICE: The ofst of ILD requires to maintain when after return.
-    IR * buildILoad(IR * base, Type const* type);
-    IR * buildILoad(IR * base, TMWORD ofst, Type const* type);
-
-    //Build IR_ST operation.
-    //lhs: memory variable, described target memory location.
-    //rhs: value expected to store.
-    IR * buildStore(Var * lhs, IR * rhs);
-
-    //Build IR_ST operation.
-    //lhs: target memory location.
-    //type: result data type.
-    //rhs: value expected to store.
-    IR * buildStore(Var * lhs, Type const* type, IR * rhs);
-
-    //Build IR_ST operation.
-    //lhs: target memory location.
-    //type: result data type.
-    //ofst: memory byte offset relative to lhs.
-    //rhs: value expected to store.
-    IR * buildStore(Var * lhs, Type const* type, TMWORD ofst, IR * rhs);
-
-    //Build store operation to store 'rhs' to new pr with type and prno.
-    //prno: target prno.
-    //type: data type of targe pr.
-    //rhs: value expected to store.
-    IR * buildStorePR(PRNO prno, Type const* type, IR * rhs);
-
-    //Build store operation to store 'rhs' to new pr with type and prno.
-    //prno: target prno.
-    //dt: the simplex data type of targe pr.
-    //rhs: value expected to store.
-    IR * buildStorePR(PRNO prno, DATA_TYPE dt, IR * rhs)
-    { return buildStorePR(prno, getTypeMgr()->getSimplexType(dt), rhs); }
-
-    //Build store operation to store 'rhs' to new pr with type.
-    //type: data type of targe pr.
-    //rhs: value expected to store.
-    IR * buildStorePR(Type const* type, IR * rhs);
-
-    //Build store operation to store 'rhs' to new pr with type.
-    //dt: the simplex data type of targe pr.
-    //rhs: value expected to store.
-    IR * buildStorePR(DATA_TYPE dt, IR * rhs)
-    { return buildStorePR(getTypeMgr()->getSimplexType(dt), rhs); }
-
-    //Build IR_IST operation.
-    //lhs: target memory location pointer.
-    //rhs: value expected to store.
-    //type: result type of indirect memory operation, note type is not the
-    //data type of lhs.
-    IR * buildIStore(IR * base, IR * rhs, Type const* type);
-    IR * buildIStore(IR * base, IR * rhs, TMWORD ofst, Type const* type);
-
-    //Build IR_CONST operation.
-    //The result IR indicates a string.
-    IR * buildString(Sym const* strtab);
-
-    //Build IR_STARRAY operation.
-    //STARRAY will write value that indicated by 'rhs' into element of array.
-    //base: base of array operation, it is either LDA or pointer.
-    //sublist: subscript expression list.
-    //type: result type of array operator.
-    //    Note that type may NOT be equal to elem_tyid, accroding to
-    //    ARR_ofst(). If ARR_ofst() is not zero, that means array
-    //    elem is MC, or VECTOR, and type should be type of member
-    //    to MC/VECTOR.
-    //    e.g: struct S{ int a,b,c,d;}
-    //        struct S pa[100];
-    //        If youe do access pa[1].c
-    //        type should be int rather than struct S.
-    //        and elem_tyid should be struct S.
-    //
-    //elem_tyid: record element-data-type.
-    //    e.g:vector<int,8> g[100];
-    //        elem_size is sizeof(vector<int,8>) = 32
-    //        elem_type is vector.
-    //    e.g1: struct S{ int a,b,c,d;}
-    //        struct S * pa[100];
-    //        elem_size is sizeof(struct S *)
-    //        elem_type is PTR.
-    //    e.g2:
-    //        struct S pa[100];
-    //        elem_size is sizeof(struct S)
-    //        elem_type is struct S
-    //
-    //dims: indicate the array dimension.
-    //elem_num: point to an integer array that indicate
-    //    the number of element for in dimension.
-    //    The length of the integer array should be equal to 'dims'.
-    //    e.g: int g[12][24];
-    //        elem_num points to an array with 2 value, [12, 24].
-    //        the 1th dimension has 12 elements, and the 2th dimension has 24
-    //        elements, which element type is D_I32.
-    //    Note the parameter may be nullptr.
-    //rhs: value expected to store.
-    IR * buildStoreArray(IR * base, IR * sublist, Type const* type,
-                         Type const* elemtype, UINT dims,
-                         TMWORD const* elem_num_buf, IR * rhs);
-
-    //Build ARRAY operation.
-    //ARRAY will load an element.
-    //base: base of array operation, it is either LDA or pointer.
-    //sublist: subscript expression list.
-    //type: result type of array operator.
-    //    Note that type may NOT be equal to elem_tyid, accroding to
-    //    ARR_ofst(). If ARR_ofst() is not zero, that means array
-    //    elem is MC, or VECTOR, and type should be type of member
-    //    to MC/VECTOR.
-    //    e.g: struct S{ int a,b,c,d;}
-    //        struct S pa[100];
-    //        If youe do access pa[1].c
-    //        type should be int rather than struct S.
-    //        and elem_tyid should be struct S.
-    //
-    //elem_tyid: record element-data-type.
-    //    e.g:vector<int,8> g[100];
-    //        elem_size is sizeof(vector<int,8>) = 32
-    //        elem_type is vector.
-    //    e.g1: struct S{ int a,b,c,d;}
-    //        struct S * pa[100];
-    //        elem_size is sizeof(struct S *)
-    //        elem_type is PTR.
-    //    e.g2:
-    //        struct S pa[100];
-    //        elem_size is sizeof(struct S)
-    //        elem_type is struct S
-    //
-    //dims: indicate the array dimension.
-    //elem_num: point to an integer array that indicate
-    //    the number of element for in dimension.
-    //    The length of the integer array should be equal to 'dims'.
-    //    e.g: int g[12][24];
-    //        elem_num points to an array with 2 value, [12, 24].
-    //        the 1th dimension has 12 elements, and the 2th dimension has 24
-    //        elements, which element type is D_I32.
-    //    Note the parameter may be nullptr.
-    IR * buildArray(IR * base, IR * sublist, Type const* type,
-                    Type const* elemtype, UINT dims,
-                    TMWORD const* elem_num_buf);
-
-    //Build IR_RETURN operation.
-    IR * buildReturn(IR * ret_exp);
-
-    //Build conditionally selected expression.
-    //The result depends on the predicator's value.
-    //e.g: x = a > b ? 10 : 100
-    //Note predicator may not be judgement expression.
-    IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
-
-    //Build IR_PHI operation.
-    //prno: result PR of PHI.
-    IR * buildPhi(PRNO prno, Type const* type, IR * opnd_list);
-    IR * buildPhi(PRNO prno, Type const* type, UINT num_opnd);
-
-    //Build IR_REGION operation.
-    IR * buildRegion(Region * rg);
-
-    //Build IR_ICALL operation.
-    //res_list: reture value list.
-    //result_prno: indicate the result PR which hold the return value.
-    //    0 means the call does not have a return value.
-    //type: result PR data type.
-    //    0 means the call does not have a return value.
-    IR * buildICall(IR * callee, IR * param_list, UINT result_prno,
-                    Type const* type);
-    IR * buildICall(IR * callee, IR * param_list)
-    { return buildICall(callee, param_list, 0, getTypeMgr()->getAny()); }
-
-    //Build IR_CALL operation.
-    //res_list: reture value list.
-    //result_prno: indicate the result PR which hold the return value.
-    //    0 means the call does not have a return value.
-    //type: result PR data type.
-    IR * buildCall(Var * callee, IR * param_list, UINT result_prno,
-                   Type const* type);
-    IR * buildCall(Var * callee,  IR * param_list)
-    { return buildCall(callee, param_list, 0, getTypeMgr()->getAny()); }
 
     //Construct IR list from BB list.
     //clean_ir_list: clean bb's ir list if it is true.
@@ -751,6 +287,18 @@ public:
     //The duplication includes AI, except DU info, SSA info.
     IR * dupIRTreeList(IR const* ir);
 
+    //Duplication 'ir' and kids, but without ir's sibling node.
+    //The function will generate the isomophic IR expression if given ir is
+    //stmt.
+    //ir: root of IR tree.
+    IR * dupIsomoExpTree(IR const* ir);
+
+    //Duplication 'ir' and kids, but without ir's sibling node.
+    //The function will generate the isomophic IR stmt if given ir is
+    //expression.
+    //ir: root of IR tree.
+    IR * dupIsomoStmt(IR const* ir, IR * rhs);
+
     //filename: dump BB list into given filename.
     void dumpBBList(CHAR const* filename, bool dump_inner_region = true) const;
     void dumpBBList(bool dump_inner_region = true) const;
@@ -764,7 +312,6 @@ public:
 
     //Dump all MD that related to Var.
     void dumpVarMD(Var * v, UINT indent) const;
-    void dumpFreeTab() const;
 
     //Dump IR and memory usage.
     void dumpMemUsage() const;
@@ -842,15 +389,15 @@ public:
     TargInfo * getTargInfo() const
     { ASSERT0(getRegionMgr()); return getRegionMgr()->getTargInfo(); }
 
-    //Get general memory pool of current region.
-    SMemPool * get_pool() const { return m_pool; }
+    //Get common memory pool of current region.
+    SMemPool * getCommPool() const { return m_pool; }
 
     //Get memory pool to allocate Single-List-Container.
     SMemPool * getSCPool() const
     { return ANA_INS_sc_labelinfo_pool(getAnalysisInstrument()); }
 
     //Get the maximum PR no.
-    UINT getPRCount() const 
+    UINT getPRCount() const
     { return ANA_INS_pr_count(getAnalysisInstrument()); }
 
     //Get the variable which represent current region.
@@ -899,8 +446,11 @@ public:
     { return ANA_INS_ir_vec(getAnalysisInstrument()).get(irid); }
 
     //Return the vector that record all allocated IRs.
-    Vector<IR*> * getIRVec() const
-    { return &ANA_INS_ir_vec(getAnalysisInstrument()); }
+    Vector<IR*> & getIRVec() const
+    { return ANA_INS_ir_vec(getAnalysisInstrument()); }
+
+    //Return IRMgr.
+    IRMgr * getIRMgr() const { return ANA_INS_ir_mgr(getAnalysisInstrument()); }
 
     //Return PassMgr.
     PassMgr * getPassMgr() const
@@ -964,19 +514,19 @@ public:
     Region * getFuncRegion();
 
     //Allocate and return all CALLs in the region.
-    inline CIRList * getCallList()
+    inline ConstIRList * getCallList()
     {
         if (ANA_INS_call_list(getAnalysisInstrument()) == nullptr) {
-            ANA_INS_call_list(getAnalysisInstrument()) = new CIRList();
+            ANA_INS_call_list(getAnalysisInstrument()) = new ConstIRList();
         }
         return ANA_INS_call_list(getAnalysisInstrument());
     }
 
     //Allocate and return a list of IR_RETURN in current Region.
-    inline CIRList * getReturnList()
+    inline ConstIRList * getReturnList()
     {
         if (ANA_INS_return_list(getAnalysisInstrument()) == nullptr) {
-            ANA_INS_return_list(getAnalysisInstrument()) = new CIRList();
+            ANA_INS_return_list(getAnalysisInstrument()) = new ConstIRList();
         }
         return ANA_INS_return_list(getAnalysisInstrument());
     }
@@ -1027,7 +577,7 @@ public:
     LabelInfo * genILabel(UINT labid)
     {
         ASSERT0(labid <= RM_label_count(getRegionMgr()));
-        LabelInfo * li = allocInternalLabel(get_pool());
+        LabelInfo * li = allocInternalLabel(getCommPool());
         LABELINFO_num(li) = labid;
         return li;
     }
@@ -1037,7 +587,7 @@ public:
     LabelInfo * genPragmaLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
-        return allocPragmaLabel(labsym, get_pool());
+        return allocPragmaLabel(labsym, getCommPool());
     }
 
     LabelInfo * genCustomLabel(CHAR const* lab)
@@ -1045,7 +595,7 @@ public:
     LabelInfo * genCustomLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
-        return allocCustomerLabel(labsym, get_pool());
+        return allocCustomerLabel(labsym, getCommPool());
     }
 
     //Allocate Var for PR.
@@ -1086,7 +636,11 @@ public:
     }
 
     //Allocate and initialize pass manager.
-    PassMgr * initPassMgr();    
+    PassMgr * initPassMgr();
+
+    //Allocate and initialize IR manager.
+    IRMgr * initIRMgr();
+
     //Allocate and initialize attachinfo manager.
     AttachInfoMgr * initAttachInfoMgr();
     bool isSafeToOptimize(IR const* ir);
@@ -1166,6 +720,9 @@ public:
     void setRegionVar(Var * v) { m_var = v; }
     void setIRList(IR * irs) { ANA_INS_ir_list(getAnalysisInstrument()) = irs; }
     void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
+    void setCommPool(SMemPool * pool) { m_pool = pool; }
+    void setIRMgr(IRMgr * mgr)
+    { ANA_INS_ir_mgr(getAnalysisInstrument()) = mgr; }
 
     //Collect information of CALL and RETURN in current region.
     //num_inner_region: count the number of inner regions.
@@ -1197,11 +754,9 @@ public:
     //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
 
-    //Verify MD reference to each stmts and expressions which described memory.
-    bool verifyMDRef();
-
     //Allocate memory from region pool.
     void * xmalloc(UINT size);
+    IR * xmallocIR(UINT size);
 };
 //END Region
 

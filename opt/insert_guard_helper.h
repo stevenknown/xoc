@@ -56,7 +56,7 @@ private:
     LabelInfo const* addJumpEdge(IRBB * guard_start, IRBB * guard_end);
 
     void chooseTargetBBOfGuard(LI<IRBB> const* li, IRCFG * cfg, IRBB * guard,
-                                OUT IRBB ** target, OUT LabelInfo const** lab);
+                               OUT IRBB ** target, OUT LabelInfo const** lab);
 
     //Return true if the determinate-expression of loop and related DU chain
     //are too complicated to analysz and recompute.

@@ -106,7 +106,6 @@ protected:
                     bool scan_call, bool scan_inner_region);
 
     void * xmalloc(UINT size);
-
 public:
     RegionMgr();
     virtual ~RegionMgr();
@@ -126,7 +125,7 @@ public:
     virtual TargInfo * allocTargInfo();
 
     //Allocate CallGraph.
-    virtual CallGraph * allocCallGraph(UINT edgenum, UINT vexnum);
+    virtual CallGraph * allocCallGraph(UINT vexnum);
 
     //Allocate IPA module.
     IPA * allocIPA(Region * program);

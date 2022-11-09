@@ -54,6 +54,10 @@ class DomTree;
 typedef EdgeC const* AdjVertexIter;
 typedef EdgeC const* AdjVertexIter;
 
+//Adjacent Vertex Iterator.
+typedef EdgeC const* AdjEdgeIter;
+typedef EdgeC const* AdjEdgeIter;
+
 #define EDGE_next(e) ((e)->next)
 #define EDGE_prev(e) ((e)->prev)
 #define EDGE_from(e) ((e)->_from)
@@ -106,6 +110,8 @@ public:
     } u1;
     void * m_info;
 public:
+    void clone(Vertex const* src) { u1 = src->u1; }
+
     void init()
     {
         prev = nullptr;
@@ -331,7 +337,6 @@ protected:
     //vertices are not more than one.
     BYTE m_is_unique:1;
     BYTE m_is_direction:1; //true if graph is direction.
-    UINT m_edge_hash_size;
     UINT m_vex_hash_size;
     UINT m_dense_vex_num; //record the number of vertex in dense mode.
     //record vertex if vertex id is densen distribution.
@@ -443,7 +448,7 @@ protected:
                                     DefMiscBitSetMgr & bs_mgr);
     Graph * self() { return this; }
 public:
-    Graph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    Graph(UINT vex_hash_size = 64);
     Graph(Graph const& g);
     Graph const& operator = (Graph const&);
     virtual ~Graph() { destroy(); }
@@ -487,7 +492,7 @@ public:
         return m_sparse_vertex->append(newVertex(vid));
     }
 
-    bool clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
+    void clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
 
     //Count memory usage for current object.
     size_t count_mem() const;
@@ -496,6 +501,7 @@ public:
     void dumpAllVertices(FILE * h) const;
     void dumpAllEdges(FILE * h) const;
     virtual void dumpVertexAux(FILE * h, Vertex const* v) const;
+    virtual void dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const;
     virtual void dumpVertex(FILE * h, Vertex const* v) const;
     virtual void dumpEdge(FILE * h, Edge const* e) const;
     void dumpDOT(CHAR const* name = nullptr) const;
@@ -638,6 +644,8 @@ public:
     static Vertex * get_next_in_vertex(AdjVertexIter & it);
     static Vertex * get_first_out_vertex(Vertex const* vex, AdjVertexIter & it);
     static Vertex * get_next_out_vertex(AdjVertexIter & it);
+    static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
+    static Edge * get_next_out_edge(AdjEdgeIter & it);
 
     void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
     Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
@@ -736,42 +744,55 @@ protected:
     bool verifyPdom(DGraph & g, RPOVexList const& rpovlst) const;
     bool verifyDom(DGraph & g, RPOVexList const& rpovlst) const;
 public:
-    DGraph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    DGraph(UINT vex_hash_size = 64);
     DGraph(DGraph const& g);
     DGraph const& operator = (DGraph const&);
+
+    //The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
+    //update the related info for 'vex'.
+    //vex: a marker vertex.
+    //newsucc: the vertex that must be immediate successor of 'vex'.
+    //e.g: vex->oldsucc, after insert newsucc, the graph will be:
+    //     vex->newsucc->oldsucc, where there is only ONE edge between vex->newsucc,
+    //     and newsucc->oldsucc.
+    void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
+                                   Vertex const* oldsucc);
 
     //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
     //update the related info for 'vex'.
     //vex: a marker vertex.
     //newidom: the vertex that must be idom of 'vex'.
     //add_pdom_failed: return true if the function add PDomInfo failed.
-    void addDomInfoByNewIDom(Vertex const* vex, Vertex const* newidom,
+    void addDomInfoToNewIDom(Vertex const* vex, Vertex const* newidom,
                              OUT bool & add_pdom_failed);
-    void addDomInfoByNewIDom(Vertex const* vex, VexIdx newidom,
+    void addDomInfoToNewIDom(Vertex const* vex, VexIdx newidom,
                              OUT bool & add_pdom_failed)
-    { addDomInfoByNewIDom(vex, addVertex(newidom), add_pdom_failed); }
+    { addDomInfoToNewIDom(vex, addVertex(newidom), add_pdom_failed); }
 
-    void addDomInfoByNewIDom(VexIdx vex, VexIdx newidom,
+    void addDomInfoToNewIDom(VexIdx vex, VexIdx newidom,
                              OUT bool & add_pdom_failed)
     {
-        addDomInfoByNewIDom(getVertex(vex), addVertex(newidom),
+        addDomInfoToNewIDom(getVertex(vex), addVertex(newidom),
                             add_pdom_failed);
     }
-    void addDomInfoByNewIPDom(Vertex const* vex, Vertex const* newipdom);
-    void addDomInfoByNewIPDom(VexIdx vex, VexIdx newipdom)
-    { addDomInfoByNewIPDom(getVertex(vex), addVertex(newipdom)); }
+    void addDomInfoToNewIPDom(Vertex const* vex, Vertex const* newipdom);
+    void addDomInfoToNewIPDom(VexIdx vex, VexIdx newipdom)
+    { addDomInfoToNewIPDom(getVertex(vex), addVertex(newipdom)); }
 
     //The function clones graph by given graph.
     //clone_edge_info: true to clone EdgeInfo of g.
     //clone_vex_info: true to clone VertexInfo of g.
-    bool clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
+    void clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
     {
+        Graph::clone(g, clone_edge_info, clone_vex_info);
         m_bs_mgr = g.m_bs_mgr;
-        return Graph::clone(g, clone_edge_info, clone_vex_info);
+        if (m_bs_mgr != nullptr) {
+            cloneDomAndPdom(g);
+        }
     }
 
     //The function clones Dom and PDom info by given graph.
-    bool cloneDomAndPdom(DGraph const& src);
+    void cloneDomAndPdom(DGraph const& src);
 
     //Vertices should have been sorted in topological order.
     //And we access them by reverse-topological order.
@@ -1004,6 +1025,19 @@ public:
     GraphIterOut(Graph const& g, Vertex const* start);
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
+};
+
+
+class GraphIterOutEdge {
+    COPY_CONSTRUCTOR(GraphIterOutEdge);
+    List<Edge*> m_wl;
+    TTab<VexIdx> m_visited;
+protected:
+    Graph const& m_g;
+public:
+    GraphIterOutEdge(Graph const& g, Vertex const* start);
+    Edge * get_first();
+    Edge * get_next(Edge const* t);
 };
 
 } //namespace xcom

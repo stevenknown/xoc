@@ -36,9 +36,14 @@ class ScalarOpt : public Pass {
 protected:
     PassMgr * m_pass_mgr;
     IRCFG * m_cfg;
+    DUMgr * m_dumgr;
 public:
     explicit ScalarOpt(Region * rg) : Pass(rg)
-    { m_pass_mgr = rg->getPassMgr(); m_cfg = rg->getCFG(); }
+    {
+        m_pass_mgr = rg->getPassMgr();
+        m_cfg = rg->getCFG();
+        m_dumgr = rg->getDUMgr();
+    }
     virtual ~ScalarOpt() {}
 
     //The function dump pass relative information before performing the pass.

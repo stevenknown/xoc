@@ -10,6 +10,7 @@
 #include "comm_macro.h"
 #include "smempool.h"
 using namespace xcom;
+#include "fileobj.h"
 #include "byteop.h"
 #include "flag.h"
 #include "allocator.h"
@@ -38,5 +39,6 @@ using namespace xcom;
 #include "search.h"
 #include "scc.h"
 #include "lca.h"
+#include "assemblebin.h"
 #endif
 

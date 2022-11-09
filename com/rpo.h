@@ -33,6 +33,8 @@ namespace xcom {
 class Graph;
 class Vertex;
 
+//Increase or decrease RPO by 1.
+//#define UPDATE_RPO_JUST_BY_SINGLE_STEP
 #define RPO_INTERVAL 10
 #define RPO_INIT_VAL 0
 #define RPO_UNDEF ((RPOVal)-1)

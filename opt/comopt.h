@@ -48,14 +48,21 @@ author: Su Zhenyu
 #include "lftr.h"
 #include "ir_rce.h"
 #include "insert_guard_helper.h"
+#include "cfg_lifting.h"
+
 #ifdef FOR_IP
 #include "ir_dse.h"
+#include "scop.h"
 #include "ir_poly.h"
 #include "ir_vrp.h"
 #include "ir_ccp.h"
 #include "ir_pre.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
 #include "linear_scan.h"
 #endif
+
 #include "ir_cp.h"
 #include "ir_rp.h"
 #include "ir_licm.h"
