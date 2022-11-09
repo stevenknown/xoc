@@ -465,13 +465,6 @@ public:
     IR * buildCall(Var * callee,  IR * param_list)
     { return buildCall(callee, param_list, 0, m_tm->getAny()); }
 
-    IR * buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
-                      Type const* ty);
-    IR * buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
-                     Type const* ty);
-    IR * buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse, Type const* ty);
-    IR * buildBroadCast(IR * src, IR * res_list, Type const* ty);
-
     size_t count_mem() const;
 
     void dumpFreeTab(Region const* rg) const;
