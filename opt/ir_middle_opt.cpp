@@ -305,9 +305,8 @@ bool Region::MiddleProcess(OptCtx & oc)
                 oc.is_nonpr_du_chain_valid()) {
                 ASSERT0(verifyMDDUChain(this, oc));
             }
-            return true;
         }
-        return false;
+        return true;
     }
     ASSERT0(verifyIRandBB(bbl, this));
     return true;

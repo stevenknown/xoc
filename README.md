@@ -35,13 +35,13 @@ Build libxoc.a on Linux:
 Default build host is Linux
 ```cmd
 	cd xoc
-	make
+	make -f Makefile.xoc
 ```
 
 Build libxoc.a on Windows:
 ```cmd
 	cd xoc
-	make WIN=1
+	make -f Makefile.xoc WIN=1
 ```
 
 How to Contribute :

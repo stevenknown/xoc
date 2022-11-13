@@ -240,11 +240,14 @@ public:
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.
     IR * refineIRlist(IR * ir_list, bool & change, RefineCtx & rc);
+
     //Perform peephole optimization to ir.
     //Return updated ir if optimization performed.
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
+
     //Perform peephole optimization to BB list.
-    //Return updated BB list if optimization performed.
+    //BB list will be updated if optimization performed.
+    //Return true if BB list changed.
     bool refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc);
 
     virtual bool perform(OptCtx & oc);

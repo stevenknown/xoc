@@ -619,6 +619,7 @@ public:
     { ASSERT0(getRegionMgr()); return getRegionMgr()->getLogMgr(); }
 
     //Perform high level optmizations.
+    //Return true if processing finish successful, otherwise return false.
     virtual bool HighProcess(OptCtx & oc);
 
     UINT id() const { return REGION_id(this); }
@@ -690,6 +691,7 @@ public:
 
     //Perform middle level IR optimizations which are implemented
     //accroding to control flow info and data flow info.
+    //Return true if processing finish successful, otherwise return false.
     virtual bool MiddleProcess(OptCtx & oc);
 
     //Map from prno to related Var.

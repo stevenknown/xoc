@@ -37,18 +37,23 @@ author: Su Zhenyu
 static void generate_region(RegionMgr * rm)
 {
     //Generate region for whole program.
-    Region * topru = rm->newRegion(REGION_PROGRAM);
-    rm->addToRegionTab(topru);
-    topru->setRegionVar(rm->getVarMgr()->registerVar(
+    Region * toprg = rm->newRegion(REGION_PROGRAM);
+    toprg->initPassMgr();
+    toprg->initIRMgr();
+  
+    rm->addToRegionTab(toprg);
+    toprg->setRegionVar(rm->getVarMgr()->registerVar(
         "program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
     //Generate region for function.
-    Region * func_ru = rm->allocRegion(REGION_FUNC);
-    func_ru->setRegionVar(rm->getVarMgr()->registerVar(
+    Region * func = rm->allocRegion(REGION_FUNC);
+    func->initPassMgr();
+    func->initIRMgr();
+    func->setRegionVar(rm->getVarMgr()->registerVar(
         ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
-    IR * ir = topru->buildRegion(func_ru);
-    topru->addToIRList(ir);
+    IR * ir = toprg->getIRMgr()->buildRegion(func);
+    toprg->addToIRList(ir);
 
     //----------
     //Generate a list IRs for demonstration.
@@ -69,54 +74,56 @@ static void generate_region(RegionMgr * rm)
             rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
     Type const* i32ty = rm->getTypeMgr()->getI32();
     Type const* u32ty = rm->getTypeMgr()->getU32();
+    IRMgr * irmgr = func->getIRMgr();
 
     //Load g with i32 type
-    IR * ld_exp = func_ru->buildLoad(g, i32ty);
+    IR * ld_exp = irmgr->buildLoad(g, i32ty);
 
     //Store q with i32 type
-    IR * st_stmt = func_ru->buildStore(q, ld_exp);
+    IR * st_stmt = irmgr->buildStore(q, ld_exp);
 
     //Record IR stmt in an IR-list of region
-    func_ru->addToIRList(st_stmt);
+    func->addToIRList(st_stmt);
 
     //Build g = g + 1
-    IR * true_stmt = func_ru->buildStore(g,
-        func_ru->buildBinaryOp(IR_ADD,
+    IR * true_stmt = irmgr->buildStore(g,
+        irmgr->buildBinaryOp(IR_ADD,
             i32ty,
-            func_ru->buildLoad(g),
-            func_ru->buildImmInt(1, i32ty)));
+            irmgr->buildLoad(g),
+            irmgr->buildImmInt(1, i32ty)));
 
     //Build g = g - 1
-    IR * false_stmt = func_ru->buildStore(g,
-        func_ru->buildBinaryOp(IR_SUB,
+    IR * false_stmt = irmgr->buildStore(g,
+        irmgr->buildBinaryOp(IR_SUB,
             i32ty,
-            func_ru->buildLoad(g),
-            func_ru->buildImmInt(1, i32ty)));
+            irmgr->buildLoad(g),
+            irmgr->buildImmInt(1, i32ty)));
 
     //Build q = 30
-    IR * false_stmt_2 = func_ru->buildStore(q,
-        func_ru->buildImmInt(30, i32ty));
+    IR * false_stmt_2 = irmgr->buildStore(q,
+        irmgr->buildImmInt(30, i32ty));
 
     //Chain false_stmt and false_stmt_2 into a list.
     add_next(&false_stmt, false_stmt_2);
 
     //Build q >= 20
-    IR * det_exp = func_ru->buildCmp(IR_GE,
-        func_ru->buildLoad(q),
-        func_ru->buildImmInt(20, i32ty));
+    IR * det_exp = irmgr->buildCmp(IR_GE,
+        irmgr->buildLoad(q),
+        irmgr->buildImmInt(20, i32ty));
 
     //Build IF stmt
-    IR * ifstmt = func_ru->buildIf(det_exp, true_stmt, false_stmt);
+    IR * ifstmt = irmgr->buildIf(det_exp, true_stmt, false_stmt);
 
     //Record IR stmt in an IR-list of region
-    func_ru->addToIRList(ifstmt);
+    func->addToIRList(ifstmt);
 
     //Build return stmt
     //Note the type of current g becomes u32
-    IR * ret = REGION_ru(ir)->buildReturn(func_ru->buildLoad(g, u32ty));
+    IR * ret = REGION_ru(ir)->getIRMgr()->buildReturn(
+        irmgr->buildLoad(g, u32ty));
 
     //Record IR stmt in an IR-list of region
-    func_ru->addToIRList(ret);
+    func->addToIRList(ret);
 }
 
 
@@ -136,10 +143,10 @@ int main(int argc, char * argv[])
 {
     g_dbx_mgr = new DbxMgr();
     RegionMgr * rm = new RegionMgr();
+    rm->getLogMgr()->init("ex.tmp", true);
     rm->initVarMgr();
-    rm->initTargInfo();
 
-    printf("\nGenerate region");
+    printf("\nGENERATE REGION");
 
     //Generate region.
     generate_region(rm);
@@ -147,10 +154,10 @@ int main(int argc, char * argv[])
     //Dump All regions to tmp.log
     rm->dump(true);
 
-    printf("\nProcess region");
+    printf("\nPROCESS REGION");
 
     //Compile region.
-    OptCtx oc;
+    OptCtx oc(rm->getRegion(1));
     bool s = rm->processProgramRegion(rm->getRegion(1), &oc);
     ASSERT0(s);
 
@@ -160,7 +167,7 @@ int main(int argc, char * argv[])
     delete rm;
     delete g_dbx_mgr;
     g_dbx_mgr = NULL;
-    printf("\nFinish\n");
+    printf("\nFINISH\n");
 
     return 0;
 }
