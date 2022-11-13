@@ -1,42 +1,57 @@
 include ./Makefile.inc
 
-ifeq ($(CFLAGS),)
-CFLAGS = \
-    -D_DEBUG_ \
-    -D_SUPPORT_C11_ \
-    -DFOR_DEX \
-	-Wno-write-strings \
-	-Wsign-promo \
-	-Wparentheses \
-    -Wformat \
-	-Wsign-compare \
-	-Wpointer-arith \
-	-Wno-multichar \
-	-Winit-self \
-	-Wuninitialized \
-    -Wstrict-aliasing=3 \
-	-Wswitch \
-	-O2 \
-	-g2 \
-	-Wall
-
-#CFLAGS+=\
-	-Werror=pointer-to-int-cast \
-	-Wmaybe-uninitialized \
-	-Wtype-limits \
-	-Wstrict-overflow \
-	-finline-limit=10000000
+ifeq ($(TARG),)
+  TARG=NO_TARG
 endif
 
-SRC = ..
+ifeq ($(CC),)
+  CC:=$(shell which clang++ > /dev/null)
+  ifndef CC
+    CC=$(if $(shell which clang),clang,gcc)
+  endif
+endif
 
-libxcom: com_objs 
-	ar rvs libxcom.a $(COM_OBJS)
-	@echo "success!!"
+ifeq ($(CFLAGS),)
+  CFLAGS+=\
+    -D$(TARG) \
+    -D_SUPPORT_C11_ \
+    -O2 \
+    -g2 \
+    -Wall \
+    -Wno-unknown-pragmas \
+    -Wno-write-strings \
+    -Wsign-promo \
+    -Wparentheses \
+    -Wformat \
+    -Wsign-compare \
+    -Wpointer-arith \
+    -Wno-multichar \
+    -Winit-self \
+    -Wswitch
+
+  #Disable -Wconversion to avoid too much complaints.
+
+  ifneq (,$(filter $(CC),g++ gcc))
+    CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
+  endif
+endif
+
+ifdef WIN
+  #Add predefined macro if build host is Windows.
+  CFLAGS+=-D_ON_WINDOWS_
+endif
+
+ifeq ($(DEBUG), true)
+  CFLAGS+=-D_DEBUG_
+endif
+
+$(COM_OUTPUT): com_objs 
+	ar rvs $(COM_OUTPUT) $(COM_OBJS)
+	@echo "SUCCESS!!"
 
 %.o:%.cpp
-	@echo "build $<"
-	$(INFER) gcc $(CFLAGS) -c $< -o $@
+	@echo "BUILD $<"
+	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
 
 com_objs: $(COM_OBJS)
 

@@ -734,7 +734,7 @@ public:
         //The entry node can not have any predecessors.
         ASSERT0(m_entry);
         xcom::Vertex const* vex = m_entry->getVex();
-        CHECK0_DUMMYUSE(vex && vex->getInDegree() == 0);
+        ASSERT0_DUMMYUSE(vex && vex->getInDegree() == 0);
 
         //The exit node can not have successors.
         C<BB*> * it;
@@ -742,7 +742,7 @@ public:
         for (BB const* bb = m_exit_list.get_head(&it);
              bb != nullptr; bb = m_exit_list.get_next(&it)) {
             xcom::Vertex const* vex2 = bb->getVex();
-            CHECK0_DUMMYUSE(vex2 && vex2->getOutDegree() == 0);
+            ASSERT0_DUMMYUSE(vex2 && vex2->getOutDegree() == 0);
             ASSERTN(!bbid.find(bb->id()), ("bb should be unique in list"));
             bbid.append(bb->id());
         }
@@ -754,7 +754,7 @@ public:
         for (BB * bb = m_bb_list->get_head(&ct); bb != nullptr;
              bb = m_bb_list->get_next(&ct)) {
             xcom::Vertex const* vex3 = bb->getVex();
-            CHECK0_DUMMYUSE(vex3);
+            ASSERT0_DUMMYUSE(vex3);
             ASSERTN(!bbid.find(bb->id()), ("bb should be unique in list"));
             bbid.append(bb->id());
         }

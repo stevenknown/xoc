@@ -2653,7 +2653,7 @@ bool MDSSAMgr::verifyPhiOpndList(MDPhi const* phi, UINT prednum) const
 {
     MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
     VMD * res = phi->getResult();
-    CHECK0_DUMMYUSE(res->is_md());
+    ASSERT0_DUMMYUSE(res->is_md());
     UINT opndnum = 0;
     for (IR const* opnd = phi->getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
@@ -2666,7 +2666,7 @@ bool MDSSAMgr::verifyPhiOpndList(MDPhi const* phi, UINT prednum) const
 
         //CASE1:Opnd may be ID, CONST or LDA.
         MD const* opnd_md = opnd->getMustRef();
-        CHECK0_DUMMYUSE(opnd_md);
+        ASSERT0_DUMMYUSE(opnd_md);
         ASSERTN(MD_id(opnd_md) == res->mdid(), ("mdid of VMD is unmatched"));
 
         //CASE2:An individual ID can NOT represent multiple versioned MD, thus
@@ -3176,7 +3176,7 @@ void MDSSAMgr::verifyDef(MDDef const* def, VMD const* vopnd) const
     //    ild : i32 //MMD13 : MD16
     //        ld : *<4> 'q'    //MMD18
     //ist changed to st. The reference MDSet changed to single MD as well.
-    //CHECK0_DUMMYUSE(findref);
+    //ASSERT0_DUMMYUSE(findref);
     DUMMYUSE(findref);
 }
 
@@ -3236,7 +3236,7 @@ void MDSSAMgr::verifyUseSet(VMD const* vopnd) const
         //      ld : *<4> 'q'    //MMD18
         //ist transformed to st. This reduce referenced MDSet to a single MD
         //as well.
-        //CHECK0_DUMMYUSE(findref);
+        //ASSERT0_DUMMYUSE(findref);
         DUMMYUSE(findref);
 
         //VOpndSet of each USE should contain vopnd.
@@ -3306,7 +3306,7 @@ bool MDSSAMgr::verifyDUChainAndOccForPhi(MDPhi const* phi) const
             continue;
         }
         MD const* opnd_md = opnd->getMustRef();
-        CHECK0_DUMMYUSE(opnd_md);
+        ASSERT0_DUMMYUSE(opnd_md);
         ASSERTN(opnd_md->id() == phi->getResult()->mdid(), ("MD not matched"));
         verifyMDSSAInfoForIR(opnd);
     }

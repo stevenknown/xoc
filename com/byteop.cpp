@@ -831,8 +831,8 @@ BSIdx ByteOp::get_next_idx(BYTE const* ptr, UINT bytesize, BSIdx idx)
     }
     BYTE byte = ptr[first_byte];
     UINT posv = MODBPB(idx) + 1; //index in 'first_byte'.
-    byte >>= posv; //Erase low 'v' bits.
-    byte <<= posv;
+    byte = (BYTE)(byte >> posv); //Erase low 'v' bits.
+    byte = (BYTE)(byte << posv);
     if (byte == 0) {
         //No elements in this byte.
         UINT i = first_byte + 1;

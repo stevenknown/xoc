@@ -118,10 +118,9 @@ void SCC::scanNoRecur(Vertex const* root, VertexSet & onpath,
                 }
                 continue;
             }
-            VexIdx succ_group = UNDEF_GROUP;
             //The successor has been visited by other path.
             //The successor may be included in other scc.
-            ASSERT0(v_group != succ_group);
+            ASSERT0(v_group != UNDEF_GROUP);
         }
         gai.set_group(v->id(), v_group);
  
@@ -168,7 +167,6 @@ void SCC::scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
         if (!visited.is_contain((BSIdx)succ->id())) {
             scanRecur(succ, onpath, visited, gai, count, group2bs, path);
         }
-
         if (onpath.is_contain((BSIdx)succ->id())) {
             VexIdx succ_group = gai.get_group(succ->id());
             v_group = MIN(v_group, succ_group);
@@ -177,11 +175,9 @@ void SCC::scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
             }
             continue;
         }
-
-        VexIdx succ_group = gai.get_group(succ->id());
         //The successor has been visited by other path.
         //The successor may be included in other scc.
-        ASSERT0(v_group != succ_group);
+        ASSERT0(v_group != gai.get_group(succ->id()));
     }
     gai.set_group(v->id(), v_group);
 

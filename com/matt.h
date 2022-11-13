@@ -3552,7 +3552,7 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
     if (det() != 0) {
         Matrix<T> p,l,u;
         bool s = plu(p,l,u);
-        CHECK0_DUMMYUSE(s); //illegal solution if s is false.
+        ASSERT0_DUMMYUSE(s); //illegal solution if s is false.
         u.inv(u);
         l.inv(l);
         x = u * l * p * b;

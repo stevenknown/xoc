@@ -363,8 +363,8 @@ void Graph::addEdgeAtPos(List<VexIdx> const& fromlist, Vertex * to, UINT pos)
         if (!m_edgetab.getCompareKeyObject()->isNewElem()) {
             continue;
         }
-        ASSERTN(m_edgetab.getCompareKeyObject()->getInEC()->getEdge() ==
-                newedge, ("unmatch EdgeC"));
+        ASSERTN_DUMMYUSE(m_edgetab.getCompareKeyObject()->getInEC()->
+                         getEdge() == newedge, ("unmatch EdgeC"));
         if (marker == nullptr) {
             EdgeC * p = to->getInList();
             for (UINT i = 0; p != nullptr; i++, p = p->get_next()) {
@@ -1123,7 +1123,7 @@ void Graph::dumpVertex(FILE * h, Vertex const* v) const
     fprintf(h, "\nnode%d [shape = Mrecord, label=\"", v->id());
     StrBuf buf(16);
     dumpVertexDesc(v, buf);
-    fprintf(h, buf.buf);
+    fprintf(h, "%s", buf.buf);
     dumpVertexAux(h, v);
     //The end char of properties.
     fprintf(h, "\"];");
@@ -1624,7 +1624,7 @@ bool DGraph::computePdomByRPO(Vertex * root, DomSet const* uni)
     } else {
         res = computePdom(vlst, uni);
     }
-    CHECK0_DUMMYUSE(res);
+    ASSERT0_DUMMYUSE(res);
     return true;
 }
 
@@ -1951,15 +1951,15 @@ bool DGraph::verifyPdom(DGraph & g, RPOVexList const& rpovlst) const
         vlst.append_tail(v);
     }
     bool f1 = g.computePdom(vlst);
-    CHECK0_DUMMYUSE(f1);
+    ASSERT0_DUMMYUSE(f1);
     bool f2 = g.computeIpdom();
-    CHECK0_DUMMYUSE(f2);
+    ASSERT0_DUMMYUSE(f2);
     g.revisePdomByIpdom();
     ASSERT0(g.m_ipdom_set.get_elem_count() == m_ipdom_set.get_elem_count());
     for (VecIdx i = 0; i <= m_ipdom_set.get_last_idx(); i++) {
         VexIdx cur = m_ipdom_set.get(i);
         VexIdx anti = g.m_ipdom_set.get(i);
-        ASSERTN(cur == anti, ("unmatch ipdom"));
+        ASSERTN_DUMMYUSE(cur == anti, ("unmatch ipdom"));
     }
     return true;
 }
@@ -1972,8 +1972,7 @@ bool DGraph::verifyDom(DGraph & g, RPOVexList const& rpovlst) const
     for (VecIdx i = 0; i <= max; i++) {
         VexIdx cur = m_idom_set.get(i);
         VexIdx anti = g.m_idom_set.get(i);
-        ASSERTN(cur == anti, ("unmatch idom"));
-        DUMMYUSE(cur); //Used to facilitate debugger to set breakpoint.
+        ASSERTN_DUMMYUSE(cur == anti, ("unmatch idom"));
     }
     return true;
 }

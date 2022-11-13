@@ -56,7 +56,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
     IRListIter pos_holder = nullptr;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
-    CHECK0_DUMMYUSE(f);
+    ASSERT0_DUMMYUSE(f);
     switch (ir_pos->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:

@@ -157,7 +157,7 @@ void BitSet::diff(BitSet const& bs)
     for (UINT i = num_of_unit * BYTES_PER_UNIT; i < minsize; i++) {
         BYTE d = bs.m_ptr[i];
         if (d != 0) {
-            m_ptr[i] &= ~d;
+            m_ptr[i] = (BYTE)(m_ptr[i] & ~d);
         }
     }
 }
@@ -197,7 +197,7 @@ void BitSet::rev(BSIdx last_bit_pos)
     }
 
     for (UINT i = n * BYTES_PER_UNIT; i < last_byte_pos; i++) {
-        m_ptr[i] = ~m_ptr[i];
+        m_ptr[i] = (BYTE)~m_ptr[i];
     }
 
     //Here we use UINT type to avoid byte truncate operation.
@@ -666,8 +666,8 @@ BitSet * BitSet::get_subset_in_range(BSIdx low, BSIdx high, OUT BitSet & subset)
             BYTE byte = m_ptr[sb_last_byte];
             UINT ofst = MODBPB(high);
             ofst = BITS_PER_BYTE - ofst - 1;
-            byte <<= ofst;
-            byte >>= ofst;
+            byte = (BYTE)(byte << ofst);
+            byte = (BYTE)(byte >> ofst);
             subset.m_ptr[sb_last_byte] = byte;
         }
         return &subset;
@@ -680,8 +680,8 @@ BitSet * BitSet::get_subset_in_range(BSIdx low, BSIdx high, OUT BitSet & subset)
     //subset: first_byte, ...
     BYTE byte = m_ptr[sb_first_byte];
     UINT ofst = MODBPB(low);
-    byte >>= ofst;
-    byte <<= ofst;
+    byte = (BYTE)(byte >> ofst);
+    byte = (BYTE)(byte << ofst);
     subset.m_ptr[sb_first_byte] = byte;
 
     start = sb_first_byte + 1;
@@ -721,8 +721,8 @@ BitSet * BitSet::get_subset_in_range(BSIdx low, BSIdx high, OUT BitSet & subset)
         }
         UINT ofst2 = MODBPB(high);
         ofst2 = BITS_PER_BYTE - ofst2 - 1;
-        byte2 <<= ofst2;
-        byte2 >>= ofst2;
+        byte2 = (BYTE)(byte2 << ofst2);
+        byte2 = (BYTE)(byte2 >> ofst2);
         subset.m_ptr[sb_last_byte] = byte2;
     }
     return &subset;

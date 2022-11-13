@@ -34,8 +34,8 @@ namespace xoc {
 #ifdef _DEBUG_
 static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 {
-    CHECK0_DUMMYUSE(v);
-    CHECK0_DUMMYUSE(vm);
+    ASSERT0_DUMMYUSE(v);
+    ASSERT0_DUMMYUSE(vm);
     if (rg->is_function() || rg->is_eh() ||
         rg->getRegionType() == REGION_INNER) {
         //If var is global but unallocable, it often be

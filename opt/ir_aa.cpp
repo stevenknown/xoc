@@ -3564,7 +3564,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
             for (BSIdx i = mayref->get_first(&iter);
                  i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
                 MD const* x = m_md_sys->getMD((MDIdx)i);
-                CHECK0_DUMMYUSE(x);
+                ASSERT0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }
         }
@@ -3585,7 +3585,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
             for (BSIdx i = mayref->get_first(&iter);
                  i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
                 MD const* x = m_md_sys->getMD((MDIdx)i);
-                CHECK0_DUMMYUSE(x);
+                ASSERT0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }
         }

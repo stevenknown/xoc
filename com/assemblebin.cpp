@@ -35,8 +35,8 @@ AssembleBinBuf::AssembleBinBuf(BYTE * buf, UINT buflen,
                                AssembleBinDescVec const& descvec)
 {
     UINT explen;
-    ASSERTN(isBufBigEnough(buflen, descvec, &explen),
-            ("expect at least buffer length %u bytes", explen));
+    ASSERTN_DUMMYUSE(isBufBigEnough(buflen, descvec, &explen),
+                     ("expect at least buffer length %u bytes", explen));
     m_bytebuf = buf;
     m_bytebuflen = buflen;
     m_cur_bitofst = 0;

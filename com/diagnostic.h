@@ -93,12 +93,12 @@ template <typename T> int dummy_use(T const&) { return 0; }
 
 #ifdef _DEBUG_ //DEBUG MODE
     //Do assert at debug mode, and do dummyuse at release mode.
-    #define CHECK0_DUMMYUSE(a) ASSERT0(a)
-    #define CHECKN_DUMMYUSE(a, b) ASSERTN(a, b)
+    #define ASSERT0_DUMMYUSE(a) ASSERT0(a)
+    #define ASSERTN_DUMMYUSE(a, b) ASSERTN(a, b)
 #else //RELEASE MODE
     //Do assert at debug mode, and do dummyuse at release mode.
-    #define CHECK0_DUMMYUSE(a) DUMMYUSE(a)
-    #define CHECKN_DUMMYUSE(a, b) DUMMYUSE(a)
+    #define ASSERT0_DUMMYUSE(a) DUMMYUSE(a)
+    #define ASSERTN_DUMMYUSE(a, b) DUMMYUSE(a)
 #endif
 
 } //namespace xcom

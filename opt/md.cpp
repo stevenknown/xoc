@@ -813,7 +813,7 @@ void MDSystem::initLocalMayAlias(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_LOCAL_MAY_ALIAS can only be May reference.
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_LOCAL_MAY_ALIAS);
     m_local_may_alias = e;
 }
@@ -833,7 +833,7 @@ void MDSystem::initLocalMem(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_LOCAL_VAR can only be may-reference.
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_LOCAL_VAR);
     m_local_mem = e;
 }
@@ -853,7 +853,7 @@ void MDSystem::initHeapMem(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_HEAP_MEM can only be May reference.
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_HEAP_MEM);
     m_heap_mem = e;
 }
@@ -873,7 +873,7 @@ void MDSystem::initGlobalMem(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_GLOBAL_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_GLOBAL_VAR);
     m_global_mem = e;
 }
@@ -914,7 +914,7 @@ void MDSystem::initImportMem(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_IMPORT_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_IMPORT_VAR);
     m_import_mem = e;
 }
@@ -934,7 +934,7 @@ void MDSystem::initFullMem(VarMgr * vm)
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD const* e = registerMD(x);
-    CHECK0_DUMMYUSE(e);
+    ASSERT0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_FULL_MEM);
     m_full_mem = e;
 }

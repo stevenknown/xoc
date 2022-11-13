@@ -1436,10 +1436,10 @@ bool LICM::hoistCandHelper(OUT IR * cand_exp, OUT IRBB * prehead,
     if (cand_stmt->hasJudgeDet() && cand_exp == cand_stmt->getJudgeDet()) {
         bool f = cand_stmt->replaceKid(cand_exp,
                                        m_rg->getIRMgr()->buildJudge(t), true);
-        CHECK0_DUMMYUSE(f);
+        ASSERT0_DUMMYUSE(f);
     } else {
         bool f = cand_stmt->replaceKid(cand_exp, t, true);
-        CHECK0_DUMMYUSE(f);
+        ASSERT0_DUMMYUSE(f);
     }
 
     IR * stpr = m_rg->getIRMgr()->buildStorePR(PR_no(t), t->getType(),

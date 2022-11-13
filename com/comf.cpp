@@ -853,7 +853,7 @@ CHAR * upper(CHAR * n)
     l--;
     while (l >= 0) {
         if (n[l] >= 'a' && n[l] <= 'z') {
-            n[l] = n[l] - 32;
+            n[l] = (CHAR)(n[l] - 32);
         }
         l--;
     }
@@ -868,7 +868,7 @@ CHAR * lower(CHAR * n)
     l--;
     while (l >= 0) {
         if (n[l] >= 'A' && n[l] <= 'Z') {
-            n[l] = n[l] + 32;
+            n[l] = (CHAR)(n[l] + 32);
         }
         l--;
     }
@@ -1508,13 +1508,13 @@ BYTE charToHex(CHAR c)
 //        e.g:ADBC5E demostrates three bytes, 0xAD, 0xBC, and 0x5E.
 void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen)
 {
-    size_t stringlen = ::strlen(string); 
+    size_t stringlen = ::strlen(string);
     ASSERTN(stringlen/2 <= buflen,
             ("buffer is too small to hold hex, expect %u bytes", stringlen/2));
     for (UINT i = 0; i < stringlen - 1; i += 2) {
         BYTE high = charToHex(string[i]);
         BYTE low = charToHex(string[i + 1]);
-        buf[i/2] = low | (high << 4); 
+        buf[i/2] = (BYTE)(low | (high << 4));
     }
 }
 

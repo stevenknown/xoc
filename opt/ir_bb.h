@@ -98,7 +98,7 @@ public:
     {
         ASSERT0(ir->is_stmt() && irit);
         bool succ = find(const_cast<IR*>(ir), irit);
-        CHECKN_DUMMYUSE(succ, ("ir is not belong to current BB"));
+        ASSERTN_DUMMYUSE(succ, ("ir is not belong to current BB"));
         *irit = get_prev(*irit);
         return *irit == nullptr ? nullptr : (*irit)->val();
     }

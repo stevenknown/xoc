@@ -3190,7 +3190,7 @@ static bool verifyMDDUChainForExp(IR const* ir, DUOptFlag duflag, Region * rg,
         for (BSIdx i = defset->get_first(&di);
              i != BS_UNDEF; i = defset->get_next(i, &di)) {
             IR const* def = rg->getIR(i);
-            CHECK0_DUMMYUSE(def);
+            ASSERT0_DUMMYUSE(def);
             ASSERT0(def->is_stmt());
 
             //Check the existence to 'def'.

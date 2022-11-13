@@ -1064,7 +1064,7 @@ bool checkIRDesc()
         ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
     }
     UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
-    CHECKN_DUMMYUSE(descnum - 1 == IR_CODE_NUM, ("miss IRDesc declaration"));
+    ASSERTN_DUMMYUSE(descnum - 1 == IR_CODE_NUM, ("miss IRDesc declaration"));
     return true;
 }
 
@@ -1076,7 +1076,7 @@ bool checkRoundDesc()
         ASSERT0(i == (UINT)ROUNDDESC_type(g_round_desc[i]));
     }
     UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
-    CHECKN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
+    ASSERTN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
     return true;
 }
 

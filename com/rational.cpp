@@ -293,7 +293,7 @@ Rational operator * (Rational const& a, Rational const& b)
     reduce_ll(rnum, rden);
 #endif
     ASSERT0(rden > 0);
-    LONGLONG trnum = abs(rnum);
+    LONGLONG trnum = (LONGLONG)::abs((int)rnum);
     if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||
         (rden >= (LONGLONG)(INT_MAX>>2))) {
         reduce_ll(trnum, rden);
@@ -347,7 +347,7 @@ Rational operator / (Rational const& a, Rational const& b)
     reduce_ll(ratnum, ratden);
 #endif
     ASSERT0(ratden > 0);
-    LONGLONG trnum = abs(ratnum);
+    LONGLONG trnum = (LONGLONG)::abs((int)ratnum);
     if ((trnum >= (LONGLONG)(INT_MAX >> 2)) ||
         (ratden >= (LONGLONG)(INT_MAX >> 2))) {
         reduce_ll(trnum, ratden);
@@ -384,7 +384,7 @@ Rational operator + (Rational const& a, Rational const& b)
     reduce_ll(rnum, rden);
 #endif
     ASSERT0(rden > 0);
-    LONGLONG trnum = abs(rnum);
+    LONGLONG trnum = (LONGLONG)::abs((int)rnum);
     if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||
         (rden >= (LONGLONG)(INT_MAX>>2))) {
         reduce_ll(trnum, rden);

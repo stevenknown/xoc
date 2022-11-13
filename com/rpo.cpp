@@ -101,10 +101,12 @@ RPOVal RPOMgr::tryFindUsableRPO(RPOVal begin, RPOVal end)
     ASSERT0(dis <= RPO_INTERVAL);
     RPOVal lower = MIN(computeNearestLessUnUsableRPO(begin),
                        computeNearestLessUnUsableRPO(end));
-    ASSERTN(computeNearestGreaterUnUsableRPO(begin) <= lower + RPO_INTERVAL,
-            ("cross interval"));
-    ASSERTN(computeNearestGreaterUnUsableRPO(end) <= lower + RPO_INTERVAL,
-            ("cross interval"));
+    ASSERTN_DUMMYUSE(computeNearestGreaterUnUsableRPO(begin) <=
+                     lower + RPO_INTERVAL,
+                     ("cross interval"));
+    ASSERTN_DUMMYUSE(computeNearestGreaterUnUsableRPO(end) <=
+                     lower + RPO_INTERVAL,
+                     ("cross interval"));
     //Note if dis is 0, there is only one candidiate.
     for (RPOVal div = 2; div <= RPO_INTERVAL; div++) {
         RPOVal newrpo = begin + dis / div;

@@ -1,4 +1,4 @@
-READER_OBJS +=\
-$(SRC)/reader/ir_lex.o\
-$(SRC)/reader/ir_parser.o\
-$(SRC)/reader/grreader.o
+READER_OBJS+=\
+ir_lex.o\
+ir_parser.o\
+grreader.o

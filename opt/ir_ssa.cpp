@@ -2019,7 +2019,7 @@ void PRSSAMgr::verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
         ASSERT0(use->is_pr());
         ASSERTN(PR_no(use) == PHI_prno(ir), ("prno is unmatch"));
         SSAInfo * use_ssainfo = PR_ssainfo(use);
-        CHECK0_DUMMYUSE(use_ssainfo);
+        ASSERT0_DUMMYUSE(use_ssainfo);
         ASSERT0(SSA_def(use_ssainfo) == ir);
     }
 }

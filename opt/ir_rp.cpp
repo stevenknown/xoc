@@ -1728,7 +1728,7 @@ void RegPromot::handleExpInBody(IR * occ, IR const* delegate,
     IR * pr = m_rg->dupIR(delemgr.getPR(delegate));
     ASSERT0(occ->getParent());
     bool r = occ->getParent()->replaceKid(occ, pr, false);
-    CHECK0_DUMMYUSE(r);
+    ASSERT0_DUMMYUSE(r);
 
     pr->copyAI(occ, m_rg);
     m_gvn->setVN(pr, m_gvn->getVN(occ));

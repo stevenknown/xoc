@@ -2730,8 +2730,8 @@ typedef INT VecIdx; //VecIdx must be signed integer type.
 template <class T> class Vector {
 protected:
     typedef UINT ElemNumTy;
-    ElemNumTy m_elem_num:31; //The number of element in vector.
-    UINT m_is_init:1; //To make sure functions are idempotent.
+    bool m_is_init; //To make sure functions are idempotent.
+    ElemNumTy m_elem_num; //The number of element in vector.
     VecIdx m_last_idx; //Last element idx
     T * m_vec;
 public:

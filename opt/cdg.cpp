@@ -174,7 +174,7 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
 
     Vector<Vertex*> top_order;
     bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
-    CHECK0_DUMMYUSE(!has_cyc);
+    ASSERT0_DUMMYUSE(!has_cyc);
 
     xcom::DefMiscBitSetMgr bs_mgr;
 

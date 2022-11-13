@@ -193,7 +193,7 @@ static bool is_available_in_same_bb(IR const* def_stmt, IR const* use_stmt,
     IRBB * defbb = def_stmt->getBB();
     IRListIter it = nullptr;
     bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &it);
-    CHECK0_DUMMYUSE(f);
+    ASSERT0_DUMMYUSE(f);
     IR * ir;
     for (ir = BB_irlist(defbb).get_next(&it);
          ir != use_stmt && ir != nullptr;
@@ -479,7 +479,7 @@ void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
     if (use->is_id()) {
         ASSERT0(m_mdssamgr);
         MDSSAInfo * mdssainfo = m_mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
-        CHECK0_DUMMYUSE(mdssainfo);
+        ASSERT0_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
         note(getRegion(), "\n");
         ID_phi(use)->dump(m_rg, m_mdssamgr->getUseDefMgr());

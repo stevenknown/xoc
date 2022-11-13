@@ -319,7 +319,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
     recomputeMayRef(ld);
 
     //The new MustRef may be not overlapped with the MayRef.
-    //CHECK0_DUMMYUSE(checkMDSetContain(ld, ld->getMustRef()));
+    //ASSERT0_DUMMYUSE(checkMDSetContain(ld, ld->getMustRef()));
     ld->copyAI(ir, m_rg);
 
     //Note: the recomputation of MustRef may generate new MD that not
@@ -558,7 +558,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         m_rg->getMDMgr()->allocRef(newrhs);
         recomputeMayRef(newrhs);
         //The new MustRef may be not overlapped with the MayRef.
-        //CHECK0_DUMMYUSE(checkMDSetContain(newrhs, newrhs->getMustRef()));
+        //ASSERT0_DUMMYUSE(checkMDSetContain(newrhs, newrhs->getMustRef()));
         newrhs->copyAI(rhs, m_rg);
 
         //Note: the recomputation of MustRef may generate new MD that not
@@ -1137,8 +1137,8 @@ IR * Refine::refineMod(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ir->is_mod());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    CHECK0_DUMMYUSE(op0);
-    CHECK0_DUMMYUSE(op1);
+    ASSERT0_DUMMYUSE(op0);
+    ASSERT0_DUMMYUSE(op1);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
         //mod X,1 => 0
         IR * tmp = ir;
@@ -1158,8 +1158,8 @@ IR * Refine::refineRem(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ir->is_rem());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    CHECK0_DUMMYUSE(op0);
-    CHECK0_DUMMYUSE(op1);
+    ASSERT0_DUMMYUSE(op0);
+    ASSERT0_DUMMYUSE(op1);
     if (op1->is_const() && op1->is_int()) {
         if (CONST_int_val(op1) == 1) {
             //rem X,1 => 0
@@ -1835,7 +1835,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
 IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
 {
     IR * newir = refineArray(ir, change, rc);
-    CHECK0_DUMMYUSE(newir == ir);
+    ASSERT0_DUMMYUSE(newir == ir);
 
     bool lchange = false;
     IR * newrhs = refineIR(ir->getRHS(), lchange, rc);
@@ -2357,7 +2357,7 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
 //Insert CVT for float if necessary.
 IR * Refine::insertCvtForFloat(IR * parent, IR * kid, bool &)
 {
-    CHECK0_DUMMYUSE(parent->is_fp() || kid->is_fp());
+    ASSERT0_DUMMYUSE(parent->is_fp() || kid->is_fp());
     //Target Dependent Code.
     return kid;
 }
