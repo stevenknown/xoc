@@ -75,14 +75,14 @@ static size_t prt_leading_newline(LogMgr * lm, StrBuf const& buf,
                     ASSERT0(lm->getBuffer());
                     lm->getBuffer()->strcat(terminate_line_r);
                 } else {
-                    fprintf(lm->getFileHandler(), terminate_line_r);
+                    fprintf(lm->getFileHandler(), "%s", terminate_line_r);
                 }
             } else {
                 if (lm->isEnableBuffer()) {
                     ASSERT0(lm->getBuffer());
                     lm->getBuffer()->strcat(terminate_line);
                 } else {
-                    fprintf(lm->getFileHandler(), terminate_line);
+                    fprintf(lm->getFileHandler(), "%s", terminate_line);
                 }
             }
         } else {

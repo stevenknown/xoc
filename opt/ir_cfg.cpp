@@ -269,10 +269,10 @@ bool IRCFG::verifyBranchTarget() const
         if (last == nullptr || !last->isBranch()) { continue; }
         if (last->isConditionalBr()) {
             LabelInfo const* lab = last->getLabel();
-            ASSERT0(lab);
+            ASSERT0_DUMMYUSE(lab);
             IRBB * succ0 = getNthSucc(bb, 0);
             IRBB * succ1 = getNthSucc(bb, 1);
-            ASSERT0(succ0 && succ1);
+            ASSERT0_DUMMYUSE(succ0 && succ1);
             BBListIter next_it = it;
             lst->get_next(&next_it);
             ASSERT0(next_it);
@@ -288,10 +288,10 @@ bool IRCFG::verifyBranchTarget() const
         if (last->isUnconditionalBr()) {
             LabelInfo const* lab = last->getLabel();
             IRBB * succ0 = getNthSucc(bb, 0);
-            ASSERT0(succ0);
+            ASSERT0_DUMMYUSE(succ0);
             //Find the taken-branch-target and check whether the label is over
             //there.
-            ASSERT0(findBBbyLabel(lab) == succ0);
+            ASSERT0_DUMMYUSE(findBBbyLabel(lab) == succ0);
             continue;
         }
         if (last->isMultiConditionalBr() || last->isIndirectBr()) {
@@ -327,7 +327,7 @@ bool IRCFG::verifyLabel2BB() const
         for (LabelInfo const* li = bb->getLabelList().get_head();
              li != nullptr; li = bb->getLabelList().get_next()) {
             IRBB * libb = m_lab2bb.get(li);
-            ASSERT0(libb == bb);
+            ASSERT0_DUMMYUSE(libb == bb);
         }
         bb->verifyBranchLabel(m_lab2bb);
     }
@@ -1943,7 +1943,7 @@ static bool removeTrampolinEdgeCase2(IRCFG * cfg, BBListIter bbct,
     IR * last_xr = cfg->get_last_xr(bb);
     ASSERT0(last_xr);
     LabelInfo const* tgt_li = last_xr->getLabel();
-    ASSERT0(tgt_li != nullptr);
+    ASSERT0_DUMMYUSE(tgt_li);
     ASSERT0(cfg->findBBbyLabel(tgt_li) == succ);
     for (IRBB * pred = preds.get_head();
          pred != nullptr; pred = preds.get_next()) {

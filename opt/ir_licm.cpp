@@ -224,7 +224,7 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
         ctx.domtree->remove(m_preheader->id());
         CfgOptCtx coctx(*m_oc);
         bool res = m_cfg->removeSingleEmptyBB(m_preheader, coctx);
-        ASSERT0(res);
+        ASSERT0_DUMMYUSE(res);
         ASSERTN(coctx.numOfRemovedEmptyBB() == 1, ("only preheader removed"));
         //removeEmptyBB only maintained these frequently used CFG info.
         OptCtx::setInvalidIfCFGChangedExcept(m_oc, PASS_RPO, PASS_DOM,
@@ -1321,10 +1321,8 @@ bool LICM::tryHoistDependentStmt(MOD IR * stmt, MOD IRBB * prehead,
         }
     }
     if (!useMDSSADU()) { return true; }
-    bool cross_loophead_phi = false;
     bool cross_nonphi_def = false;
-    cross_loophead_phi = m_mdssamgr->isCrossLoopHeadPhi(stmt, li,
-                                                        cross_nonphi_def);
+    m_mdssamgr->isCrossLoopHeadPhi(stmt, li, cross_nonphi_def);
     if (cross_nonphi_def) {
         //Illegal hoisting that violate prev-def.
         return false;

@@ -255,13 +255,13 @@ bool CDG::verify() const
     for (Vertex const* cdgv = this->get_first_vertex(it);
          cdgv != nullptr; cdgv = this->get_next_vertex(it)) {
         Vertex const* cfgv = cfg->getVertex(cdgv->id());
-        ASSERTN(cfgv, ("CDG vertex is not on CFG"));
+        ASSERTN_DUMMYUSE(cfgv, ("CDG vertex is not on CFG"));
     }
     VertexIter it2;
     for (Vertex const* cfgv = cfg->get_first_vertex(it2);
          cfgv != nullptr; cfgv = cfg->get_next_vertex(it2)) {
         Vertex const* cdgv = this->getVertex(cfgv->id());
-        ASSERTN(cdgv, ("CFG vertex is not on CDG"));
+        ASSERTN_DUMMYUSE(cdgv, ("CFG vertex is not on CDG"));
     }
     return true;
 }

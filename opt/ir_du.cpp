@@ -3018,7 +3018,7 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
                 ASSERT0(m_rg->getMDSetHash()->find(*t->getRefMDSet()));
             }
             MD const* ref = t->getRefMD();
-            ASSERT0(ref == nullptr || ref->is_pr());
+            ASSERT0_DUMMYUSE(ref == nullptr || ref->is_pr());
 
             MDSet const* may = t->getRefMDSet();
             if (may != nullptr) {
@@ -3027,7 +3027,8 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
                 for (BSIdx i = may->get_first(&iter);
                      i != BS_UNDEF; i = may->get_next((UINT)i, &iter)) {
                     MD * md = m_rg->getMDSystem()->getMD(i);
-                    ASSERTN(md && !md->is_pr(), ("PR should not in MaySet"));
+                    ASSERTN_DUMMYUSE(md && !md->is_pr(),
+                                     ("PR should not in MaySet"));
                 }
             }
             break;

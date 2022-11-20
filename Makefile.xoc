@@ -1,11 +1,9 @@
-CC:=$(shell which clang++ > /dev/null)
-ifndef CC
-  CC=$(if $(shell which clang),clang,gcc)
+ifeq ($(TARG),)
+  #SET DEFAULT TARG.
+  TARG=FOR_DEX
 endif
 
-TARG=FOR_DEX
 CFLAGS+=-Wall
-DEBUG=true
 OPT_DIR=opt
 COM_DIR=com
 READER_DIR=reader
@@ -14,21 +12,12 @@ include $(READER_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
 include $(OPT_DIR)/Makefile.inc
 include Makefile.xoc.inc
+include Makefile.option
 
-ifeq ($(DEBUG), true)
-  #Add predefined macro if build host is Windows.
-  CFLAGS+=-D_DEBUG_
-endif
-
-ifdef WIN
-  #Add predefined macro if build host is Windows.
-  CFLAGS+=-D_ON_WINDOWS_
-endif
-
+#SET DEFAULT CFLAGS.
 CFLAGS+=\
  -D$(TARG) \
- -O2 \
- -g2 \
+ -D_SUPPORT_C11_ \
  -Wno-unknown-pragmas \
  -Wno-write-strings \
  -Wsign-promo \
@@ -38,8 +27,7 @@ CFLAGS+=\
  -Wpointer-arith \
  -Wno-multichar \
  -Winit-self \
- -Wswitch \
- -D_SUPPORT_C11_
+ -Wswitch
 
 #Disable -Wconversion to avoid too much complaints.
 

@@ -64,8 +64,8 @@ static bool is_legal_ref(IR const* ir)
 {
     MDSet const* mayref = const_cast<IR*>(ir)->getMayRef();
     MD const* mustref = const_cast<IR*>(ir)->getMustRef();
-    ASSERTN(mustref || (mayref && !mayref->is_empty()),
-            ("Have no idea about what ir is."));
+    ASSERTN_DUMMYUSE(mustref || (mayref && !mayref->is_empty()),
+                     ("Have no idea about what ir is."));
     return true;
 }
 
@@ -845,7 +845,7 @@ void AliasAnalysis::computeResultSet(MDSet const& input_mds,
                                      OUT MDSet & output_mds,
                                      OUT AACtx * output_ic)
 {
-    ASSERT0(is_legal_set(input_mds, input_hashed));
+    ASSERT0_DUMMYUSE(is_legal_set(input_mds, input_hashed));
     if (input_hashed != nullptr) {
         AC_hashed_mds(output_ic) = input_hashed;
         output_mds.clean(*getSBSMgr());
@@ -1944,7 +1944,7 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
                                          AACtx const* ic,
                                          MOD MD2MDSet * mx)
 {
-    ASSERT0(is_legal_ref(ir));
+    ASSERT0_DUMMYUSE(is_legal_ref(ir));
     //Considering the indirect operation, there are three
     //situations should be handled:
     // 1.The RHS is LDA.

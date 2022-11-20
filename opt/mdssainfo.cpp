@@ -771,11 +771,11 @@ void MDPhi::dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
         VMD * vopnd = getOpndVMD(opnd, mgr);
         if (vopnd == nullptr) {
             MD const* ref = opnd->getRefMD();
-            ASSERT0(ref);
+            ASSERT0_DUMMYUSE(ref);
             prt(rg, "ID id:%u ????", opnd->id());
         } else {
             MD const* ref = opnd->getRefMD();
-            ASSERT0(ref);
+            ASSERT0_DUMMYUSE(ref);
             ASSERT0(ref->id() == vopnd->mdid());
             prt(rg, "ID id:%u MD%uV%u", opnd->id(), vopnd->mdid(),
                 vopnd->version());

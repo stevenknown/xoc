@@ -78,7 +78,8 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
         }
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                     classic_du_changed));
 }
 
 
@@ -347,7 +348,8 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
         }
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -778,7 +780,7 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
         Region * rg = mdssamgr->getRegion();
         for (BSIdx u = SSA_uses(prssainfo).get_first(&sc);
              u != BS_UNDEF; u = SSA_uses(prssainfo).get_next(u, &sc)) {
-            ASSERT0(rg->getIR(u));
+            ASSERT0_DUMMYUSE(rg->getIR(u));
             useset->bunion(u);
         }
         return;

@@ -38,7 +38,7 @@ bool verifyVST(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType()!= D_UNDEF, ("size of store value cannot be zero"));
     ASSERT0(VST_idinfo(ir));
     if (VST_rhs(ir) != nullptr) {
@@ -61,7 +61,7 @@ bool verifyVIST(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     if (!g_is_support_dynamic_type) {
         ASSERTN(VIST_base(ir)->is_ptr(), ("base must be pointer"));
         ASSERT0(tm->getPointerBaseByteSize(VIST_base(ir)->getType()) > 0);
@@ -84,7 +84,7 @@ bool verifyVSTPR(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(ir->getDType() != D_UNDEF, ("size of store value cannot be zero"));
     ASSERT0(ir->getDType() != D_UNDEF);
     ASSERT0(VSTPR_no(ir) != PRNO_UNDEF);

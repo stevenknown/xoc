@@ -81,7 +81,8 @@ bool VarFlag::verify() const
     VarFlag::Iter it;
     for (VAR_FLAG v = (VAR_FLAG)get_first_flag(it); !end(it);
          v = (VAR_FLAG)get_next_flag(it)) {
-        ASSERT0(v > VAR_UNDEF && VarFlagDesc::getDescIdx(v) < g_varflag_num);
+        ASSERT0_DUMMYUSE(v > VAR_UNDEF &&
+                         VarFlagDesc::getDescIdx(v) < g_varflag_num);
     }
     return true;
 }

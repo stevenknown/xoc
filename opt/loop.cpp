@@ -986,6 +986,7 @@ bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
                      MOD OptCtx * oc, bool force)
 {
     bool need_phi = false;
+    DUMMYUSE(need_phi);
     bool inserted = false;
     IRCFG * cfg = rg->getCFG();
     if (force) {
@@ -1211,15 +1212,16 @@ static bool verifyLoopInfo(LI<IRBB> const* li, OptCtx const& oc)
     ASSERT0(li->getLoopHead());
     ASSERT0(li->getLoopHead()->id() <=
             oc.getRegion()->getBBMgr()->getBBCount());
-    bool try_failed;
-    ASSERTN(Graph::isReachIn(li->getLoopHead()->getVex(),
-                             li->getLoopHead()->getVex(),
-                             (UINT)-1, try_failed),
-                             ("loophead is not in cycle"));
+    bool try_failed = false;
+    ASSERTN_DUMMYUSE(Graph::isReachIn(li->getLoopHead()->getVex(),
+                                      li->getLoopHead()->getVex(),
+                                      (UINT)-1, try_failed),
+                                      ("loophead is not in cycle"));
     IRCFG const* cfg = oc.getRegion()->getCFG();
     BitSet const* body = li->getBodyBBSet();
     for (BSIdx i = body->get_first(); i != BS_UNDEF; i = body->get_next(i)) {
-        ASSERTN(cfg->isVertex(i), ("BB in bodyset is not vertex of CFG"));
+        ASSERTN_DUMMYUSE(cfg->isVertex(i),
+                         ("BB in bodyset is not vertex of CFG"));
     }
     for (LI<IRBB> const* inner = li->getInnerList(); inner != nullptr;
          inner = inner->get_next()) {

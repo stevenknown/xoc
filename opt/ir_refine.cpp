@@ -512,7 +512,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         //  IST, ofst2 + 4
         //    AnyKid
         IR * newir = refineIStore1(ir, change, rc);
-        ASSERTN(newir == ir, ("stmt ir should not be changed"));
+        ASSERTN_DUMMYUSE(newir == ir, ("stmt ir should not be changed"));
         lchange |= change;
     }
 

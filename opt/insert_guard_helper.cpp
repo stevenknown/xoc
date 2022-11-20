@@ -191,7 +191,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     m_cfg->removeEdge(m_guard_start, m_guard_end, coctx);
     RemoveEmptyBBCtx rmctx;
     bool res = m_cfg->removeEmptyBB(coctx, &rmctx);
-    ASSERT0(res);
+    ASSERT0_DUMMYUSE(res);
     //Update DomTree if BB removed.
     for (UINT bbid = rmctx.getRemovedList().get_head(); bbid != BBID_UNDEF;
          bbid = rmctx.getRemovedList().get_next()) {
@@ -323,7 +323,7 @@ void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(IR * ir,
     MDSSAInfo const* mdssainfo = m_mdssa->getMDSSAInfoIfAny(ir);
     ASSERT0(mdssainfo);
     xcom::Vertex * endv = m_cfg->getVertex(m_guard_end->id());
-    ASSERT0(endv);
+    ASSERT0_DUMMYUSE(endv);
     UINT numpred = m_guard_end->getNumOfPred();
     VOpndSetIter it = nullptr;
     MDID2PhiMap mdid2phi(m_guard_end, *this);

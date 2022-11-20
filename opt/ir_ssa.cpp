@@ -919,7 +919,7 @@ void PRSSAMgr::initVPR(MOD IR * ir, PRSet const* prset)
     if (res != nullptr) {
         PRNO prno = res->getPrno();
         if (prset == nullptr ||
-            prset != nullptr && prset->is_contain((BSIdx)prno)) {
+            (prset != nullptr && prset->is_contain((BSIdx)prno))) {
             ir->setSSAInfo(allocVPR(prno, PRSSA_INIT_VERSION, res->getType()));
             if (m_prno2type.get((VecIdx)prno) == nullptr) {
                 m_prno2type.set((VecIdx)prno, ir->getType());
@@ -1027,8 +1027,7 @@ void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
         IR const* ref = col.getLiveinRef(ir);
         if (ref != nullptr) {
             if (ref->isPROp()) {
-                SSAInfo * opnd_ssainfo = ref->getSSAInfo();
-                ASSERT0(opnd_ssainfo);
+                ASSERT0(ref->getSSAInfo());
                 IR * newopnd = CPr::dupIRTreeByRef(ref, m_rg);
                 PRSSAMgr::addUse(newopnd, ref);
                 ((CPhi*)ir)->insertOpndAt(pos, newopnd);
@@ -2151,7 +2150,7 @@ static void verify_dominance(IR const* def, IR const* use, IRCFG * cfg)
     }
     IRBB const* defbb = def->getBB();
     IRBB const* usebb = use->getStmt()->getBB();
-    ASSERT0(defbb == usebb || cfg->is_dom(defbb->id(), usebb->id()));
+    ASSERT0_DUMMYUSE(defbb == usebb || cfg->is_dom(defbb->id(), usebb->id()));
 }
 
 

@@ -429,12 +429,14 @@ CHAR Lexer::getNextChar()
 }
 
 
-///////////////////////////////////////////////////////////////////////
-//You should construct the following function accroding to your lexical
-//token word.
-///////////////////////////////////////////////////////////////////////
-//START HERE.
-///////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//YOU SHOULD CONSTRUCT THE FOLLOWING FUNCTION ACCRODING TO YOUR LEXICAL TOKEN //
+//WORD.                                                                       //
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+//START HERE.                                                                 //
+////////////////////////////////////////////////////////////////////////////////
 
 //'m_cur_char' hold the current charactor right now.
 //You should assign 'm_cur_char' the next valid charactor before
@@ -756,7 +758,7 @@ TOKEN Lexer::t_solidus_solidus(bool * is_restart)
         ASSERT0(is_restart);
         *is_restart = true;
         ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
-        return T_UNDEF;        
+        return T_UNDEF;
     }
     if (st == LEX_EOF) {
         t = T_END;

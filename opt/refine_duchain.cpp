@@ -95,7 +95,7 @@ bool RefineDUChain::processNormalExpByClassicDU(IR const* exp)
         m_du->removeDUChain(stmt, exp);
         change = true;
     }
-    return false;
+    return change;
 }
 
 

@@ -1722,8 +1722,7 @@ void RegPromot::handleExpInBody(IR * occ, IR const* delegate,
 {
     ASSERT0(isExpCand(occ));
     xoc::removeUseForTree(occ, m_rg, *ctx.oc);
-    IR * stmt = occ->getStmt();
-    ASSERT0(stmt);
+    ASSERT0_DUMMYUSE(occ->getStmt());
 
     IR * pr = m_rg->dupIR(delemgr.getPR(delegate));
     ASSERT0(occ->getParent());
@@ -1824,7 +1823,7 @@ void RegPromot::handlePrologForStmt(IR const* delegate, IR const* promoted_pr,
         //avoid the complaint of sebsequent DU chain building.
         //Leave the sanity construction work to the ending of the pass.
         MDSSAInfo const* rhsinfo = m_mdssamgr->genMDSSAInfo(rhs);
-        ASSERT0(rhsinfo->readVOpndSet().is_empty());
+        ASSERT0_DUMMYUSE(rhsinfo->readVOpndSet().is_empty());
     }
  
     //Load value into PR.
@@ -2440,9 +2439,8 @@ void RegPromot::checkAndRemoveInvalidExactOcc(ExactAccTab & acctab)
         for (occs->get_head(&ct), nct = ct; ct != nullptr; ct = nct) {
             IR * occ = ct->val();
             occs->get_next(&nct);
- 
             MD const* md = occ->getMustRef();
-            ASSERT0(md && md->is_exact());
+            ASSERT0_DUMMYUSE(md && md->is_exact());
  
             //We record all MD that are not suitable for promotion in
             //m_dont_promote, and remove all related OCC in exact_list.

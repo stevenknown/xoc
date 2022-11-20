@@ -77,7 +77,7 @@ bool verifyConst(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType() != D_UNDEF, ("size of load value cannot be zero"));
     if (!ir->is_sint() &&
         !ir->is_uint() &&
@@ -100,7 +100,7 @@ bool verifyLD(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     //src of LD might be small or big compare with Reg.
     ASSERT0(LD_idinfo(ir));
     ASSERT0(d);
@@ -116,7 +116,7 @@ bool verifyST(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType()!= D_UNDEF, ("size of store value cannot be zero"));
     ASSERT0(ST_idinfo(ir));
     ASSERT0(ST_rhs(ir));
@@ -138,7 +138,7 @@ bool verifySTPR(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(ir->getDType() != D_UNDEF, ("size of store value cannot be zero"));
     ASSERT0(ir->getDType() != D_UNDEF);
     ASSERT0(STPR_no(ir) != PRNO_UNDEF);
@@ -156,7 +156,7 @@ bool verifyILD(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(ir->getDType() != D_UNDEF);
     ASSERT0(ILD_base(ir));
     if (!g_is_support_dynamic_type) {
@@ -176,7 +176,7 @@ bool verifyIST(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     if (!g_is_support_dynamic_type) {
         ASSERTN(IST_base(ir)->is_ptr(), ("base must be pointer"));
         ASSERT0(tm->getPointerBaseByteSize(IST_base(ir)->getType()) > 0);
@@ -197,7 +197,7 @@ bool verifySETELEM(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(SETELEM_base(ir) && SETELEM_val(ir) && SETELEM_ofst(ir));
     if (d->is_vector()) {
@@ -225,7 +225,7 @@ bool verifyGETELEM(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     IR const* base = GETELEM_base(ir);
     ASSERT0(base && GETELEM_ofst(ir));
@@ -247,7 +247,7 @@ bool verifyLDA(IR const* ir, Region const* rg)
     DUMMYUSE(tm);
     Type const* d = ir->getType();
     ASSERT0(LDA_idinfo(ir));
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType() != D_UNDEF,
             ("size of load value cannot be zero"));
     ASSERT0(d->is_pointer());
@@ -269,7 +269,7 @@ bool verifyCALL(IR const* ir, Region const* rg)
 
     //result type of call is the type of return value if it exist.
     //The result type may be ANY.
-    if (CALL_prno(ir) != PRNO_UNDEF) { ASSERT0(d); }
+    if (CALL_prno(ir) != PRNO_UNDEF) { ASSERT0_DUMMYUSE(d); }
 
     //Parameters should be expression.
     for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
@@ -311,7 +311,7 @@ bool verifyShift(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
@@ -334,7 +334,7 @@ bool verifyADD(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
@@ -357,7 +357,7 @@ bool verifyCompare(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(ir->is_bool());
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
@@ -374,7 +374,7 @@ bool verifyBin(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
@@ -391,7 +391,7 @@ bool verifyLNOT(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(ir->is_bool());
     ASSERT0(UNA_opnd(ir) && UNA_opnd(ir)->is_exp());
     ASSERT0(UNA_opnd(ir)->is_single());
@@ -406,7 +406,7 @@ bool verifyUna(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(UNA_opnd(ir) && UNA_opnd(ir)->is_exp());
     ASSERT0(UNA_opnd(ir)->is_single());
@@ -511,7 +511,7 @@ bool verifyArrayOp(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(ARR_base(ir)->isPtr());
     ASSERT0(ARR_elemtype(ir));
@@ -541,7 +541,7 @@ bool verifyCVT(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(CVT_exp(ir) != nullptr && CVT_exp(ir)->is_exp());
     ASSERT0(CVT_exp(ir)->is_single());
     return true;
@@ -555,7 +555,7 @@ bool verifyPR(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(ir->getDType() != D_UNDEF);
     return true;
@@ -620,7 +620,7 @@ bool verifyPHI(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(ir->getDType() != D_UNDEF);
     ASSERT0(PHI_prno(ir) != PRNO_UNDEF);

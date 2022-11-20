@@ -184,7 +184,7 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
         //doReplacement may append stmt into BB which has down-boundary stmt.
         //That makes BB invalid. Split such invalid BB into two or more BBs.
         bool splitted = m_cfg->splitBBIfNeeded(preheader, oc);
-        ASSERTN(!splitted, ("Does this happen?"));
+        ASSERTN_DUMMYUSE(!splitted, ("Does this happen?"));
         //if (splitted) {
         //    //TODO:maintain CFG related info.
         //    //oc.setInvalidIfCFGChanged();

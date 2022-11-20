@@ -168,7 +168,7 @@ static void postProcessUnreached(RCE * rce, Vertex const* from,
     CFGOPTCTX_need_update_dominfo(&ctx) = false;
     RemoveUnreachBBCtx rmunrchctx;
     bool removed = rce->getCFG()->removeUnreachBB(ctx, &rmunrchctx);
-    ASSERT0(removed);
+    ASSERT0_DUMMYUSE(removed);
     //CFG related info is incorrect if unreachable code removed.
     //e.g:rce_updatedom2.c
     rcectx.oc->setInvalidIfCFGChanged();

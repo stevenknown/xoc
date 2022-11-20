@@ -1031,10 +1031,6 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, DumpFlag dumpflag)
         g_dbx_mgr->printSrcLine(ir, &prtctx);
     }
 
-    Type const* d = nullptr;
-    if (ir->getType() != nullptr) {
-        d = ir->getType();
-    }
     if (dump_newline) {
         //Dump newline before root ir.
         prt(rg, "\n");

@@ -2162,7 +2162,7 @@ MDPhi * MDSSAMgr::genMDPhi(MDIdx mdid, IR * opnd_list, IRBB * bb, VMD * result)
         ASSERT0(opnd->getMustRef() && opnd->getMustRef()->id() == mdid);
         //Generate MDSSAInfo to ID.
         MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(opnd);
-        ASSERT0(mdssainfo && !mdssainfo->readVOpndSet().is_empty());
+        ASSERT0_DUMMYUSE(mdssainfo && !mdssainfo->readVOpndSet().is_empty());
         ASSERT0(mdssainfo->containSpecificMDOnly(mdid, getUseDefMgr()));
         ID_phi(opnd) = phi; //Record ID's host PHI.
     }
@@ -2337,7 +2337,7 @@ void MDSSAMgr::insertDefBefore(MDDef * def1, MOD MDDef * def2)
     }
     ASSERT0(def2prev == nullptr ||
             (def2prev->getNextSet() && def2prev->getNextSet()->find(def2)));
-    ASSERT0(verifyDDChainBeforeMerge(def1, def2));
+    ASSERT0_DUMMYUSE(verifyDDChainBeforeMerge(def1, def2));
     //def1 and def2 are in same DomTree path.
     if (def2prev != nullptr) {
         def2prev->getNextSet()->remove(def2, *getSBSMgr());
@@ -2674,12 +2674,12 @@ bool MDSSAMgr::verifyPhiOpndList(MDPhi const* phi, UINT prednum) const
         MDSSAInfo const* opnd_mdssainfo = getMDSSAInfoIfAny(opnd);
         ASSERT0(opnd_mdssainfo);
         UINT vopndnum = opnd_mdssainfo->readVOpndSet().get_elem_count();
-        ASSERT0(vopndnum == 1);
+        ASSERT0_DUMMYUSE(vopndnum == 1);
 
         //CASE3:some pass, e.g:DCE, will remove MDPhi step by step, thus
         //do NOT invoke the function during the removing.
         VMD * opndvmd = ((MDPhi*)phi)->getOpndVMD(opnd, pthis->getUseDefMgr());
-        ASSERTN(opndvmd, ("miss VOpnd"));
+        ASSERTN_DUMMYUSE(opndvmd, ("miss VOpnd"));
 
         //CASE4:Version 0 does not have MDDef.
         //ASSERT0(VMD_version(opndvmd) > 0);
@@ -2821,7 +2821,7 @@ static bool verifyVerUse(IR const* ir, MD2VMDStack const& md2verstk,
         ASSERT0(vmd && vmd->is_md() && vmd->id() == (UINT)i);
         if (vmd->version() == MDSSA_INIT_VERSION) { continue; }
         VMD const* topvmd = md2verstk.get_top(vmd);
-        ASSERTN(vmd == topvmd, ("use invalid version"));
+        ASSERTN_DUMMYUSE(vmd == topvmd, ("use invalid version"));
     }
     return true;
 }
@@ -2846,7 +2846,7 @@ static bool verifyVerDef(IR const* ir, MOD MD2VMDStack & md2verstk,
         if (domprev_vmd != nullptr) {
             MDDef const* exp_prev = domprev_vmd->getDef();
             MDDef const* cur_def = vmd->getDef();
-            ASSERT0(exp_prev && cur_def);
+            ASSERT0_DUMMYUSE(exp_prev && cur_def);
             ASSERTN(cur_def->getPrev() == exp_prev, ("illegal prev-def"));
             ASSERTN(exp_prev->isNext(cur_def), ("illegal next-def"));
         }
@@ -3144,9 +3144,9 @@ void MDSSAMgr::verifyDef(MDDef const* def, VMD const* vopnd) const
         ASSERT0(!vopnd->hasUse());
     } else {
         MDSSAInfo const* ssainfo = getMDSSAInfoIfAny(stmt);
-        ASSERT0(ssainfo);
+        ASSERT0_DUMMYUSE(ssainfo);
         VMD const* res = def->getResult();
-        ASSERT0(res);
+        ASSERT0_DUMMYUSE(res);
         ASSERT0(ssainfo->readVOpndSet().is_contain(res->id()));
     }
 
@@ -3241,9 +3241,9 @@ void MDSSAMgr::verifyUseSet(VMD const* vopnd) const
 
         //VOpndSet of each USE should contain vopnd.
         MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(use);
-        ASSERT0(mdssainfo);
+        ASSERT0_DUMMYUSE(mdssainfo);
         ASSERT0(mdssainfo->getVOpndSet()->find(vopnd));
-        ASSERT0(verify_dominance(defbb, use, m_cfg));
+        ASSERT0_DUMMYUSE(verify_dominance(defbb, use, m_cfg));
     }
 }
 
@@ -3575,7 +3575,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
     MDSSAInfo * oldinfo = getMDSSAInfoIfAny(olduse);
     ASSERT0(oldinfo);
     MDSSAInfo * newinfo = copyAndAddMDSSAOcc(newuse, oldinfo);
-    ASSERT0(newinfo);
+    ASSERT0_DUMMYUSE(newinfo);
     removeExpFromAllVOpnd(olduse);
 }
 
