@@ -1,42 +1,37 @@
-include ./Makefile.inc
-
-ifeq ($(CFLAGS),)
-CFLAGS = \
-    -D_DEBUG_ \
-    -D_SUPPORT_C11_ \
-    -DFOR_DEX \
-	-Wno-write-strings \
-	-Wsign-promo \
-	-Wparentheses \
-    -Wformat \
-	-Wsign-compare \
-	-Wpointer-arith \
-	-Wno-multichar \
-	-Winit-self \
-	-Wuninitialized \
-    -Wstrict-aliasing=3 \
-	-Wswitch \
-	-O2 \
-	-g2 \
-	-Wall
-
-#CFLAGS+=\
-	-Werror=pointer-to-int-cast \
-	-Wmaybe-uninitialized \
-	-Wtype-limits \
-	-Wstrict-overflow \
-	-finline-limit=10000000
+ifeq ($(TARG),)
+  TARG=NO_TARG
 endif
 
-SRC = ..
+include ./Makefile.inc
+include Makefile.option
 
-libxcom: com_objs 
-	ar rvs libxcom.a $(COM_OBJS)
-	@echo "success!!"
+#SET DEFAULT CFLAGS.
+CFLAGS+=\
+  -D$(TARG) \
+  -D_SUPPORT_C11_ \
+  -Wno-unknown-pragmas \
+  -Wno-write-strings \
+  -Wsign-promo \
+  -Wparentheses \
+  -Wformat \
+  -Wsign-compare \
+  -Wpointer-arith \
+  -Wno-multichar \
+  -Winit-self \
+  -Wswitch
+
+#Disable -Wconversion to avoid too much complaints.
+ifneq (,$(filter $(CC),g++ gcc))
+  CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
+endif
+
+$(COM_OUTPUT): com_objs 
+	ar rvs $(COM_OUTPUT) $(COM_OBJS)
+	@echo "SUCCESS!!"
 
 %.o:%.cpp
-	@echo "build $<"
-	$(INFER) gcc $(CFLAGS) -c $< -o $@
+	@echo "BUILD $<"
+	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
 
 com_objs: $(COM_OBJS)
 

@@ -220,6 +220,9 @@ public:
     //Return true if current VOpnd should have DEF stmt.
     bool hasDef() const { return version() != MDSSA_INIT_VERSION; }
 
+    //Return true if current VOpnd has at least one USE.
+    bool hasUse() const { return VMD_occs(this).get_elem_count() > 0; }
+
     //Return true if VMD is live-in version to current Region.
     bool isLiveIn() const { return version() == MDSSA_INIT_VERSION; }
 
@@ -257,32 +260,40 @@ public:
     void copy(VOpndSet const& src, xcom::DefMiscBitSetMgr & m)
     { xcom::DefSBitSetCore::copy(src, m); }
 
+    void dump(Region const* rg) const;
+
     bool find(VOpnd const* v) const
     {
         ASSERT0(v);
         return xcom::DefSBitSetCore::is_contain(v->id());
     }
 
+    //Return the unique MD if current set has only one element.
+    VOpnd * get_unique(MDSSAMgr const* mgr) const;
+
     void remove(VOpnd const* v, xcom::DefMiscBitSetMgr & m)
     {
         ASSERT0(v);
         xcom::DefSBitSetCore::diff(v->id(), m);
     }
-    void remove(VOpnd const* v, VOpndSetIter it, xcom::DefMiscBitSetMgr & m)
+    void remove(VOpnd const* v, VOpndSetIter prev_it, VOpndSetIter it,
+                xcom::DefMiscBitSetMgr & m)
     {
         ASSERT0(v);
-        xcom::DefSBitSetCore::diff(v->id(), it, m);
+        xcom::DefSBitSetCore::diff(v->id(), prev_it, it, m);
     }
 };
 
 typedef xcom::SEGIter * VOpndSetIter;
 
-#define COLLECT_UNDEF 0x0
-#define COLLECT_MAY_USE 0x1
-#define COLLECT_MAY_DEF 0x2
-#define COLLECT_MUST_USE 0x4
-#define COLLECT_MUST_DEF 0x8
-#define COLLECT_CROSS_PHI 0x10
+enum COLLECT_FLAG {
+    COLLECT_UNDEF = 0x0,
+    COLLECT_MAY_USE = 0x1,
+    COLLECT_MAY_DEF = 0x2,
+    COLLECT_MUST_USE = 0x4,
+    COLLECT_MUST_DEF = 0x8,
+    COLLECT_CROSS_PHI = 0x10,
+};
 
 //The class represents the context information to collection.
 class CollectCtx {
@@ -315,9 +326,7 @@ public:
 //very rarelly.
 class MDSSAInfo : public MDSSAInfoAttachInfo {
     COPY_CONSTRUCTOR(MDSSAInfo);
-protected:
     VOpndSet m_vopnd_set;
-
 public:
     MDSSAInfo() {}
 
@@ -355,16 +364,19 @@ public:
     //Return true if current MDSSAInfo contains given MD only.
     bool containSpecificMDOnly(MDIdx mdid, UseDefMgr const* udmgr) const;
 
-    void init() { BaseAttachInfo::init(AI_MD_SSA); }
-
-    //Return true if all definition of vopnds can reach 'exp'.
-    bool isMustDef(UseDefMgr const* udmgr, IR const* exp) const;
-
     void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
     void dump(MDSSAMgr const* mgr) const;
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
     VOpnd * getVOpndForMD(UINT mdid, MDSSAMgr const* mgr) const;
+
+    void init() { BaseAttachInfo::init(AI_MD_SSA); }
+
+    //Return true if all definition of vopnds can reach 'exp'.
+    bool isMustDef(UseDefMgr const* udmgr, IR const* exp) const;
+
+    //Return true if current ssainfo is equal to src.
+    bool isEqual(MDSSAInfo const& src) const;
 
     VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 
@@ -391,12 +403,10 @@ public:
 //A SSA definition of MD must be placed in BB. It could be either IR stmt
 //or MDPhi.
 #define MDDEF_id(m) (((MDDef*)m)->m_id)
-#define MDDEF_bb(m) (((MDDef*)m)->m_bb)
 #define MDDEF_is_phi(m) (((MDDef*)m)->m_is_phi)
 #define MDDEF_result(m) (((MDDef*)m)->m_result)
 #define MDDEF_prev(m) (((MDDef*)m)->m_prev)
 #define MDDEF_nextset(m) (((MDDef*)m)->m_nextset)
-#define MDDEF_occ(m) (((MDDef*)m)->m_occ)
 class MDDef {
     COPY_CONSTRUCTOR(MDDef);
     void eraseDefInfo()
@@ -412,8 +422,6 @@ public:
     //The nearest previous MDDef. Note MDPhi does not have previous DEF.
     MDDef * m_prev;
     MDDefSet * m_nextset; //the nearest next MDDefs.
-    IRBB * m_bb; //the BB in which phi placed.
-    IR * m_occ; //record the real IR stmt. For MDPhi, it is NULL.
 public:
     MDDef();
     //Before destruction, invoke clean() of m_nextset
@@ -429,11 +437,11 @@ public:
     }
     void cleanNextSet(UseDefMgr * mgr);
 
-    IRBB * getBB() const { return MDDEF_bb(this); }
+    IRBB * getBB() const;
+    IR * getOcc() const;
     VMD * getResult() const { return MDDEF_result(this); }
     MDDef * getPrev() const { return MDDEF_prev(this); }
     MDDefSet * getNextSet() const { return MDDEF_nextset(this); }
-    IR * getOcc() const { return MDDEF_occ(this); }
     MD const* getResultMD(MDSystem const* sys) const
     { return getResult()->getMD(sys); }
 
@@ -443,18 +451,17 @@ public:
     //Return true if n is the Next DEF of current DEF.
     bool isNext(MDDef const* n) const;
 
-    //Return true if n is the Next DEF, and n may not be the immediate-next-def to
-    //current DEF. The function will access all next DEFs recursively.
+    //Return true if n is the Next DEF, and n may not be the
+    //immediate-next-def to current DEF.
+    //The function will access all next DEFs recursively.
     bool isInNextSet(MDDef const* n, UseDefMgr const* mgr) const;
     UINT id() const { return MDDEF_id(this); }
     void init(bool is_phi)
     {
-        MDDEF_bb(this) = nullptr;
         MDDEF_result(this) = nullptr;
         MDDEF_is_phi(this) = (BYTE)is_phi;
         MDDEF_prev(this) = nullptr;
         MDDEF_nextset(this) = nullptr;
-        MDDEF_occ(this) = nullptr;
     }
     bool is_phi() const { return MDDEF_is_phi(this); }
     bool is_valid() const { return id() != MDDEF_UNDEF; }
@@ -485,8 +492,8 @@ public:
         return xcom::DefSBitSetCore::is_contain(v->id());
     }
 
-    //Return true if there is at least one element in set dominate v.
-    bool isElemDom(MDDef const* v, MDSSAMgr const* mgr) const;
+    //Return true if there is at least one element in MDDefSet that dominates v.
+    bool hasAtLeastOneElemDom(MDDef const* v, MDSSAMgr const* mgr) const;
 
     void remove(MDDef const* v, xcom::DefMiscBitSetMgr & m)
     {
@@ -496,24 +503,42 @@ public:
 };
 
 
+//This class represent MD stmt operation.
+#define MDDEFSTMT_occ(m) (((MDDefStmt*)m)->m_occ)
+class MDDefStmt : public MDDef {
+public:
+    IR * m_occ; //record the real IR stmt.
+public:
+    void clean() { init(); MDDEF_id(this) = MDDEF_UNDEF; }
+
+    void init()
+    {
+        MDDef::init(false);
+        MDDEFSTMT_occ(this) = nullptr;
+    }
+    IRBB * getBB() const { return getOcc()->getBB(); }
+    IR * getOcc() const { return MDDEFSTMT_occ(this); }
+};
+
+
 //This class represent MD phi operation.
 #define MDPHI_opnd_list(p) (((MDPhi*)p)->m_opnd_list)
+#define MDPHI_bb(m) (((MDPhi*)m)->m_bb)
 class MDPhi : public MDDef {
     COPY_CONSTRUCTOR(MDPhi);
     void dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
                   UseDefMgr const* mgr) const;
 public:
     IR * m_opnd_list;
+    IRBB * m_bb; //the BB in which phi placed.
 public:
-    MDPhi();
-    ~MDPhi();
-
     void clean() { init(); MDDEF_id(this) = MDDEF_UNDEF; }
 
     void init()
     {
         MDDef::init(true);
-        m_opnd_list = nullptr;
+        MDPHI_opnd_list(this) = nullptr;
+        MDPHI_bb(this) = nullptr;
     }
 
     void dump(Region const* rg, UseDefMgr const* mgr) const;
@@ -528,23 +553,37 @@ public:
         return i == n;
     }
 
-    //Get the No.idx operand.
+    IRBB * getBB() const { return MDPHI_bb(this); }
+
+    //Get the No.idx operand, start at 0.
     IR * getOpnd(UINT idx) const;
+
+    //Get the operand list.
     IR * getOpndList() const { return m_opnd_list; }
+
+    //Get the number of operands.
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
+
+    //Get VMD for given operand. Note 'opnd' must belong to current phi.
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
 
-    void insertOpndAfter(IR * marker, IR * exp)
+    //Return true if Phi defined real stmt at DefDef chain.
+    //Note Phi should not have previous def.
+    bool isDefRealStmt() const
+    { return getNextSet() != nullptr && !getNextSet()->is_empty(); }
+
+    void insertOpndAfter(IR * marker, IR * opnd)
     {
-        ASSERT0(marker && exp);
+        ASSERT0(marker && opnd && opnd->is_id());
         ASSERT0(xcom::in_list(MDPHI_opnd_list(this), marker));
-        ASSERT0(!xcom::in_list(MDPHI_opnd_list(this), exp));
-        ASSERT0(exp->getRefMD() && exp->getRefMDSet() == nullptr);
-        xcom::insertafter(&marker, exp);
-        ID_phi(exp) = this; //Record ID's host PHI.
+        ASSERT0(!xcom::in_list(MDPHI_opnd_list(this), opnd));
+        ASSERT0(opnd->getRefMD() && opnd->getRefMDSet() == nullptr);
+        xcom::insertafter(&marker, opnd);
+        ID_phi(opnd) = this; //Record ID's host PHI.
     }
     //Insert operand at given position.
-    IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred);
+    IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
+                      OptCtx const& oc);
 
     void replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd);
     void removeOpnd(IR * ir)
@@ -579,7 +618,7 @@ protected:
     UINT m_def_count;
     UINT m_vopnd_count;
     SMemPool * m_phi_pool;
-    SMemPool * m_def_pool;
+    SMemPool * m_defstmt_pool;
     SMemPool * m_defset_pool;
     SMemPool * m_vopnd_sc_pool;
     SMemPool * m_vconst_pool;
@@ -588,6 +627,7 @@ protected:
     SMemPool * m_philist_sc_pool;
     SMemPool * m_mdssainfo_pool;
     Region * m_rg;
+    IRMgr * m_irmgr;
     MDSystem * m_md_sys;
     MDSSAMgr * m_mdssa_mgr;
     xcom::SC<VOpnd*> * m_free_sc_list;
@@ -612,7 +652,7 @@ public:
     MDPhi * allocMDPhi(UINT mdid);
     MDSSAInfo * allocMDSSAInfo();
     MDPhi * allocMDPhi(UINT mdid, UINT num_operands);
-    MDDef * allocMDDef();
+    MDDefStmt * allocMDDefStmt();
     MDDefSet * allocMDDefSet();
     xcom::SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
     VConst * allocVConst(IR const* ir);

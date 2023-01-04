@@ -33,6 +33,7 @@ namespace xoc {
 
 class Region;
 class RegionMgr;
+class LogMgr;
 
 #define LOGMGR_INDENT_CHAR ' '
 #define LOGMGR_NEWLINE_CHAR '\n'
@@ -44,7 +45,8 @@ class LogCtx {
 public:
     BYTE replace_newline:1;
     BYTE prt_srcline:1;
-    BYTE enable_buffer:1;
+    BYTE enable_buffer:1; //record true if current ctx enabled buffer.
+    BYTE paused_buffer:1; //record true if current ctx paused buffer.
     CHAR indent_char;
     INT indent;
     FILE * logfile;
@@ -52,15 +54,21 @@ public:
     StrBuf * buffer;
 public:
     LogCtx()
-        : replace_newline(false), prt_srcline(true), enable_buffer(false),
-          indent_char(LOGMGR_INDENT_CHAR), indent(0),
-          logfile(nullptr), logfile_name(nullptr),
+        : replace_newline(false),
+          prt_srcline(true),
+          enable_buffer(false),
+          paused_buffer(false),
+          indent_char(LOGMGR_INDENT_CHAR),
+          indent(0),
+          logfile(nullptr),
+          logfile_name(nullptr),
           buffer(nullptr) {}
     LogCtx(UINT) : buffer(nullptr)
     { clean(); } //Used as UNDEFINED value in Stack<T>
     LogCtx(bool p_replace_newline,
            bool p_prt_srcline,
            bool p_enable_buffer,
+           bool p_paused_buffer,
            CHAR p_indent_char,
            INT p_indent,
            FILE * p_logfile,
@@ -69,6 +77,7 @@ public:
         replace_newline = p_replace_newline;
         prt_srcline = p_prt_srcline;
         enable_buffer = p_enable_buffer;
+        paused_buffer = p_paused_buffer;
         indent_char = p_indent_char;
         indent = p_indent;
         logfile = p_logfile;
@@ -81,6 +90,7 @@ public:
         replace_newline = false;
         prt_srcline = true;
         enable_buffer = false;
+        paused_buffer = false;
         indent_char = LOGMGR_INDENT_CHAR;
         indent = 0;
         logfile = nullptr;
@@ -110,7 +120,7 @@ public:
     void decIndent(UINT v) { m_ctx.indent -= (INT)v; }
     void dumpBuffer();
 
-    //Disable the dump buffer and output the buffer content into file.
+    //Flush out the buffer content into file, and close the buffer.
     void endBuffer();
 
     //Finalize log file.
@@ -147,6 +157,10 @@ public:
     //Return true if LogMgr enable dump buffer.
     bool isEnableBuffer() const { return m_ctx.enable_buffer; }
 
+    //Stop dump to buffer for temporary purpose. And when buffer paused, the
+    //output content will write to file.
+    void pauseBuffer();
+
     //Save current log file handler and name into stack, and set given handler
     //and filename as current.
     //h: file handler
@@ -175,10 +189,36 @@ public:
 
     //Enable and clean the dump buffer.
     void startBuffer();
+    
+    //Resume to dump to buffer. And when buffer resumed, the
+    //output content will write to buffer.
+    void resumeBuffer();
 };
+
+
+class DumpBufferSwitch {
+    BYTE m_is_buffer_enabled_before;
+    LogMgr * m_lm;
+public:
+    DumpBufferSwitch(LogMgr * lm)
+    {
+        m_lm = lm;
+        m_is_buffer_enabled_before = lm->isEnableBuffer();
+        if (m_is_buffer_enabled_before) { return; }
+        lm->startBuffer();
+    }
+    ~DumpBufferSwitch() { flush(); }
+    void flush()
+    {
+        if (m_is_buffer_enabled_before) { return; }
+        m_lm->endBuffer();
+    }
+};
+
 
 //Print string with indent chars.
 void note(Region const* rg, CHAR const* format, ...);
+void note_args(Region const* rg, CHAR const* format, va_list args);
 
 //Print string with indent chars.
 void note(RegionMgr const* rm, CHAR const* format, ...);

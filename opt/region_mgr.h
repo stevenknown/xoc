@@ -106,7 +106,6 @@ protected:
                     bool scan_call, bool scan_inner_region);
 
     void * xmalloc(UINT size);
-
 public:
     RegionMgr();
     virtual ~RegionMgr();
@@ -126,7 +125,7 @@ public:
     virtual TargInfo * allocTargInfo();
 
     //Allocate CallGraph.
-    virtual CallGraph * allocCallGraph(UINT edgenum, UINT vexnum);
+    virtual CallGraph * allocCallGraph(UINT vexnum);
 
     //Allocate IPA module.
     IPA * allocIPA(Region * program);
@@ -142,7 +141,7 @@ public:
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     xcom::DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
-    UINT getNumOfRegion() const { return (UINT)(m_id2rg.get_last_idx() + 1); }
+    UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
     RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();
@@ -153,7 +152,7 @@ public:
     VarMgr * getVarMgr() const { return m_var_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
     LogMgr * getLogMgr() const { return m_logmgr; }
-    OptCtx * getAndGenOptCtx(UINT id);
+    OptCtx * getAndGenOptCtx(Region * rg);
 
     //Register exact MD for each global variable.
     //Note you should call this function as early as possible, e.g, before

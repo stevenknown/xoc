@@ -49,7 +49,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
         return false;
     }
 
-    if (BB_rpo(head) > BB_rpo(*gobackbb)) {
+    if (head->rpo() > (*gobackbb)->rpo()) {
         //loop may already be do-while.
         return false;
     }
@@ -70,7 +70,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
 
 
 bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
-                          UINT succ1, UINT succ2)
+                          UINT succ1, UINT succ2, OptCtx & oc)
 {
     ASSERT0(gobackbb);
 
@@ -107,12 +107,12 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     Vector<IR*> rmvec;
     for (IR * ir = BB_first_ir(head); ir != nullptr; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
-        m_du->addUseForTree(newir, ir);
+        m_dumgr->addUseForTree(newir, ir);
 
         m_ii.clean();
         for (IR const* x = xoc::iterExpInitC(ir, m_ii);
              x != nullptr; x = xoc::iterExpNextC(m_ii)) {
-            if (!x->isMemoryRef()) { continue; }
+            if (!x->isMemRef()) { continue; }
 
             UINT cnt = 0;
             if (x->isReadPR() && PR_ssainfo(x) != nullptr) {
@@ -125,8 +125,8 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                 DUSet const* defset = x->readDUSet();
                 if (defset == nullptr) { continue; }
 
-                for (INT d = defset->get_first(&di);
-                     d >= 0; d = defset->get_next(d, &di)) {
+                for (BSIdx d = defset->get_first(&di);
+                     d != BS_UNDEF; d = defset->get_next(d, &di)) {
                     IR * def = m_rg->getIR(d);
 
                     ASSERT0(def->getBB());
@@ -139,7 +139,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             if (cnt != 0) {
                 for (UINT i = 0; i < cnt; i++) {
                     IR * d = rmvec.get(i);
-                    m_du->removeDUChain(d, x);
+                    m_dumgr->removeDUChain(d, x);
                 }
             }
         }
@@ -148,7 +148,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
-            newir = IR::invertIRType(newir, m_rg);
+            newir = IR::invertIRCode(newir, m_rg);
             ASSERTN(last_cond_br == newir, ("stmt pointer changed"));
         }
     }
@@ -156,26 +156,27 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     ASSERT0(last_cond_br);
     BB_irlist(gobackbb).remove(irct);
     m_rg->freeIR(lastir);
-    m_cfg->removeEdge(gobackbb, head); //revise cfg.
+    CfgOptCtx ctx(oc);
+    m_cfg->removeEdge(gobackbb, head, ctx); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
         loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == nullptr) {
-        loopbody_start_lab = ::allocInternalLabel(m_rg->get_pool());
+        loopbody_start_lab = ::allocInternalLabel(m_rg->getCommPool());
         m_cfg->addLabel(loopbody_start_bb, loopbody_start_lab);
     }
     last_cond_br->setLabel(loopbody_start_lab);
 
     //Add back edge.
-    m_cfg->addEdge(gobackbb->id(), loopbody_start_bb->id());
+    m_cfg->addEdge(gobackbb, loopbody_start_bb, ctx);
 
     //Add fallthrough edge.
-    m_cfg->addEdge(gobackbb->id(), next->id());
+    m_cfg->addEdge(gobackbb, next, ctx);
     return true;
 }
 
 
-bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
+bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst, OptCtx & oc)
 {
     bool change = false;
     while (worklst.get_elem_count() > 0) {
@@ -184,7 +185,7 @@ bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
         UINT succ1;
         UINT succ2;
         if (is_while_do(x, &gobackbb, &succ1, &succ2)) {
-            change |= try_convert(x, gobackbb, succ1, succ2);
+            change |= try_convert(x, gobackbb, succ1, succ2, oc);
         }
 
         x = LI_inner_list(x);
@@ -212,7 +213,7 @@ bool LoopCvt::perform(OptCtx & oc)
         li = LI_next(li);
     }
 
-    bool change = find_and_convert(worklst);
+    bool change = find_and_convert(worklst, oc);
     if (change) {
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopCVT()) {
             note(getRegion(), "\n==---- DUMP %s '%s' ----==",
@@ -221,8 +222,8 @@ bool LoopCvt::perform(OptCtx & oc)
         }
 
         //DU reference and du chain has maintained.
-        ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg));
+        ASSERT0(m_dumgr->verifyMDRef());
+        ASSERT0(verifyMDDUChain(m_rg, oc));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

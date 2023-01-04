@@ -86,7 +86,7 @@ public:
         LONGLONG iv;
         double dv;
         Sym const* str;
-        IR_TYPE op; //operation
+        IR_CODE op; //operation
     } u1;
 
 public:
@@ -144,11 +144,11 @@ class VNE_SC {
     //COPY_CONSTRUCTOR(VNE_SC);
 public:
     UINT mdid;
-    UINT ofst;
+    TMWORD ofst;
     UINT sz;
 
 public:
-    VNE_SC(UINT id, UINT o, UINT s)
+    VNE_SC(UINT id, TMWORD o, UINT s)
     {
         mdid = id;
         ofst = o;
@@ -167,11 +167,11 @@ public:
 class VNE_ILD {
 public:
     UINT base_vn_id;
-    UINT ofst;
+    TMWORD ofst;
     UINT sz;
 
 public:
-    VNE_ILD(UINT vnid, UINT o, UINT s)
+    VNE_ILD(UINT vnid, TMWORD o, UINT s)
     {
         base_vn_id = vnid;
         ofst = o;
@@ -202,7 +202,7 @@ public:
     UINT ofst_vn_id;
 
 public:
-    VNE_ARR(UINT bvnid, UINT ovnid, UINT o, UINT s) : VNE_ILD(bvnid, o, s)
+    VNE_ARR(UINT bvnid, UINT ovnid, TMWORD o, UINT s) : VNE_ILD(bvnid, o, s)
     { ofst_vn_id = ovnid; }
     //COPY_CONSTRUCTOR(VNE_ARR);
 
@@ -226,9 +226,9 @@ public:
 
     UINT get_hash_value(VNE_SC * x, UINT bucket_size) const
     {
-        UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
+        HOST_UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
@@ -269,7 +269,7 @@ public:
 
     virtual void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_SC * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
@@ -287,9 +287,9 @@ public:
 
     UINT get_hash_value(VNE_ILD * x, UINT bucket_size) const
     {
-        UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
+        HOST_UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
@@ -333,7 +333,7 @@ public:
 
     virtual void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_ILD * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
@@ -414,10 +414,10 @@ public:
 
     UINT get_hash_value(VNE_ARR * x, UINT bucket_size) const
     {
-        UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
-                 (x->ofst << 8) | x->sz;
+        HOST_UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
+                      (x->ofst << 8) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
@@ -458,7 +458,7 @@ public:
 
     void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_ARR * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
@@ -499,7 +499,6 @@ class GVN : public Pass {
     COPY_CONSTRUCTOR(GVN);
 protected:
     BYTE m_is_vn_fp:1; //true if compute VN for float type.
-    BYTE m_is_comp_ild_vn_by_du:1;
 
     //Set true if we want to compute the vn for LDA(ID(str)).
     //And it's default value is false.
@@ -518,7 +517,9 @@ protected:
     //different VN, that may misjudge the equivalence of two MemRef
     //e.g: given ld a, ld b, which VN is VN1, VN2 respectively. We could say
     //the value of a is not equal to b if VN1 != VN2. However, they may equal
-    //if a and b are parameter.
+    //if a and b are parameter. The default value is FALSE for conservative
+    //purpose. GVN also try to set livein MD with different VN if the MD is
+    //'restrict'.
     BYTE m_is_alloc_livein_vn:1;
 
     DUMgr * m_du;
@@ -532,7 +533,7 @@ protected:
     SMemPool * m_pool;
     UINT m_vn_count;
     IR2VN m_ir2vn;
-    Vector<void*> m_irt_vec;
+    Vector<void*> m_irc_vec;
     LONGLONG2VN_MAP m_ll2vn;
     LONGLONGMC2VN_MAP m_llmc2vn;
     FP2VN_MAP m_fp2vn;
@@ -550,6 +551,11 @@ protected:
 
     void cleanIR2VN();
     void clean();
+    VN * computeSelect(IR const* exp, bool & change);
+    VN * computeBin(IR const* exp, bool & change);
+    VN * computeConst(IR const* exp, bool & change);
+    VN * computeLda(IR const* exp, bool & change);
+    VN * computeUna(IR const* exp, bool & change);
     VN * computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
                                    bool & change);
     VN * computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,
@@ -572,6 +578,19 @@ protected:
     void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
 
+    //Return true if the value of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
+    bool hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const;
+    bool hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const;
+    bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
+
+    bool isSameMemLocForArrayOp(IR const* ir1, IR const* ir2) const;
+    bool isSameMemLocForIndirectOp(IR const* ir1, IR const* ir2) const;
+    virtual bool isUnary(IR_CODE irt) const;
+    virtual bool isBinary(IR_CODE irt) const;
+    virtual bool isTriple(IR_CODE irt) const;
+    virtual bool isQuad(IR_CODE irt) const;
+
     void * xmalloc(UINT size)
     {
         void * p = smpoolMalloc(size, m_pool);
@@ -580,12 +599,12 @@ protected:
         return p;
     }
 
-    VN * registerQuadVN(IR_TYPE irt, VN const* v0, VN const* v1,
+    VN * registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
                         VN const* v2, VN const* v3);
-    VN * registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
+    VN * registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
                           VN const* v2);
-    VN * registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1);
-    VN * registerUnaVN(IR_TYPE irt, VN const* v0);
+    VN * registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
+    VN * registerUnaVN(IR_CODE irt, VN const* v0);
     VN * registerVNviaMD(MD const* md);
     VN * registerVNviaMC(LONGLONG v);
     VN * registerVNviaINT(LONGLONG v);
@@ -604,10 +623,17 @@ protected:
         return vn;
     }
 
+    void processGETELEM(IR * ir, bool & change);
+    void processSETELEM(IR * ir, bool & change);
     void processBB(IRBB * bb, bool & change);
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
+    void processIndirectMemOp(IR * ir, bool & change);
+    void processDirectMemOp(IR * ir, bool & change);
+    void processSTARRAY(IR * ir, bool & change);
+    virtual void processStmt(IR * ir, bool & change);
+    virtual void processExtStmt(IR * ir, bool & change);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -643,39 +669,37 @@ public:
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
 
-    bool is_triple(IR_TYPE i) const { return i == IR_ILD; }
-    bool is_quad(IR_TYPE i) const { return i == IR_ARRAY; }
     //Return true if ir1 and ir2 represent identical memory location.
     //Note this function does NOT consider data type
     //that ir1 or ir2 referrenced.
     bool isSameMemLoc(IR const* ir1, IR const* ir2) const;
+
     //Return true if ir1 and ir2 represent different memory location, otherwise
     //return false to tell caller we do not know more about these object.
     //Note this function will consider data type that ir1 or ir2 referrenced.
     bool isDiffMemLoc(IR const* ir1, IR const* ir2) const
-    { return ir1->isDiffMemLoc(ir2); }
+    { return ir1->isDiffMemLoc(ir2, m_rg); }
 
     //Return true if GVN will alloc different VN for livein variable.
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }
 
     //Get VN of ir.
-    VN * mapIR2VN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+    VN * getVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+
     //Get VN of ir. Readonly function.
-    VN const* mapIR2VNConst(IR const* ir) const
-    { return m_ir2vn.get(ir->id()); }
+    VN const* getConstVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
 
     //Set true if you intend to alloc different VN for livein variable.
     void setAllocLiveinVN(bool doit) { m_is_alloc_livein_vn = doit; }
 
     //Set VN to ir.
-    void setMapIR2VN(IR const* ir, VN * vn)
-    { m_ir2vn.setAlways(ir->id(), vn); }
+    void setVN(IR const* ir, VN * vn) { m_ir2vn.setAlways(ir->id(), vn); }
 
     //Update VN to ir if ir has been mapped.
-    void setMapIR2VNIfFind(IR const* ir, VN * vn)
-    { m_ir2vn.setIfFind(ir->id(), vn); }
+    void setVNIfFind(IR const* ir, VN * vn) { m_ir2vn.setIfFind(ir->id(), vn); }
+
+    //Ask GVN to compute VN for IR with FP type.
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
-    void setComputeILoadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }
 
     virtual bool perform(OptCtx & oc);
 };

@@ -130,8 +130,8 @@ void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
         fprintf(h, "\n");
     }
     bool reverse_order = false;
-    INT last_pos = get_last_idx();
-    for (INT i = 0; i <= last_pos; i++) {
+    VecIdx last_pos = get_last_idx();
+    for (VecIdx i = 0; i <= last_pos; i++) {
         BigIntElemType val = get(i);
         if (reverse_order) {
             //Extract the lower 4-bit data from value.
@@ -191,7 +191,7 @@ bool BigInt::verify(UINT elemnum, ...)
     for (; i < elemnum; i++) {
         BigIntElemType expected_val = va_arg(ptr, BigIntElemType);
         BigIntElemType val = get(i);
-        CHECK0_DUMMYUSE(val == expected_val);
+        ASSERT0_DUMMYUSE(val == expected_val);
     }
     va_end(ptr);
     return true;
@@ -204,7 +204,7 @@ bool BigInt::verify(UINT elemnum, ...)
 //
 void BigIntMgr::clean()
 {
-    for (INT i = 0; i <= m_bi_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_bi_vec.get_last_idx(); i++) {
         BigInt * bi = m_bi_vec[i];
         ASSERT0(bi);
         delete bi;

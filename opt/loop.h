@@ -98,12 +98,16 @@ public:
     //Add bbid to the body BB set of all outer loop.
     void addBBToAllOuterLoop(UINT bbid) const;
 
+    //Return true if ir in bbid is at least execute once from loophead,
+    //otherwise return false means unknown.
+    bool atLeastExecOnce(UINT bbid, xcom::DGraph const* cfg) const;
+
     //Find the BB that is the start of the unqiue backedge of loop.
     //  BB1: loop start bb
     //  BB2: body
     //  BB3: goto loop start bb
     //BB3 is the backedge start bb.
-    UINT findBackedgeStartBB(xcom::Graph * cfg) const;
+    UINT findBackedgeStartBB(xcom::Graph const* cfg) const;
 
     //Find the first BB that is the END of loop. The end BB is outside of loop.
     //Note there could be multiple end BB if the last IR of head is
@@ -134,6 +138,8 @@ public:
     //'bbid': id of BB.
     bool isInsideLoop(UINT bbid) const
     { return LI_bb_set(this)->is_contain(bbid); }
+    bool isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
+                          bool access_sibling) const;
 
     //Clean adjacent relation in loop-tree.
     void cleanAdjRelation()
@@ -147,8 +153,8 @@ public:
     {
         note(rg, "\nLOOP%u HEAD:BB%u, BODY:", id(), getLoopHead()->id());
         if (getBodyBBSet() != nullptr) {
-            for (INT i = getBodyBBSet()->get_first();
-                 i != -1; i = getBodyBBSet()->get_next((UINT)i)) {
+            for (BSIdx i = getBodyBBSet()->get_first();
+                 i != BS_UNDEF; i = getBodyBBSet()->get_next((UINT)i)) {
                 prt(rg, "%u,", i);
             }
         }
@@ -173,13 +179,13 @@ void LI<BB>::addBBToAllOuterLoop(UINT bbid) const
 //BB3 is the backedge-start bb.
 //Return backedge BB id if found, otherwise return BBID_UNDEF.
 template <class BB>
-UINT LI<BB>::findBackedgeStartBB(xcom::Graph * cfg) const
+UINT LI<BB>::findBackedgeStartBB(xcom::Graph const* cfg) const
 {
     ASSERT0(cfg);
     BB * head = getLoopHead();
     UINT backedgebbid = BBID_UNDEF;
     UINT backedgecount = 0;
-    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
+    for (xcom::EdgeC const* ec = head->getVex()->getInList();
          ec != nullptr; ec = ec->get_next()) {
         backedgecount++;
         UINT pred = ec->getFromId();
@@ -210,7 +216,7 @@ UINT LI<BB>::findFirstLoopEndBB(xcom::Graph * cfg) const
 {
     ASSERT0(cfg);
     BB * head = getLoopHead();
-    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getOutList();
+    for (xcom::EdgeC const* ec = head->getVex()->getOutList();
          ec != nullptr; ec = ec->get_next()) {
         UINT succ = ec->getToId();
         if (!isInsideLoop(succ)) {
@@ -219,7 +225,61 @@ UINT LI<BB>::findFirstLoopEndBB(xcom::Graph * cfg) const
     }
     return BBID_UNDEF;
 }
+
+
+//Return true if ir in bbid is at least execute once from loophead,
+//otherwise return false means unknown.
+template <class BB>
+bool LI<BB>::atLeastExecOnce(UINT bbid, xcom::DGraph const* cfg) const
+{
+    BB * head = getLoopHead();
+    if (bbid == head->id()) { return true; }
+    UINT endbbid = findBackedgeStartBB(cfg);
+    if (endbbid != BBID_UNDEF &&
+        (endbbid == bbid || cfg->is_dom(bbid, endbbid))) {
+        return true;
+    }
+    return false;
+}
+
+
+template <class BB>
+bool LI<BB>::isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
+                              bool access_sibling) const
+{
+    LI<BB> const* li = this;
+    if (li == nullptr) { return false; }
+    for (LI<BB> const* tli = li; tli != nullptr; tli = tli->get_next()) {
+        if (tli->getInnerList() != nullptr &&
+            tli->getInnerList()->isInsideLoopTree(bbid, nestlevel,
+                                                  access_sibling)) {
+            nestlevel++;
+            return true;
+        }
+        if (tli->isInsideLoop(bbid)) {
+            nestlevel++;
+            return true;
+        }
+        if (!access_sibling) { break; }
+    }
+    return false;
+}
 //END LI<BB>
+
+
+class BB2LI {
+    COPY_CONSTRUCTOR(BB2LI);
+    xcom::TMap<UINT, LI<IRBB>*> m_bb2li; //map bb to LI if bb is loop header.
+public:
+    BB2LI() {}
+
+    //The function iterate whole LoopInfo tree that rooted by 'li' to create
+    //the mapping between loophead and related LoopInfo.
+    void createMap(LI<IRBB> * li);
+
+    //Return the LoopInfo which loophead is 'bb'.
+    LI<IRBB> * get(IRBB * bb) { return m_bb2li.get(bb->id()); }
+};
 
 
 //Find the bb that is the START of the unqiue backedge of loop.
@@ -249,9 +309,10 @@ IRBB * findFirstLoopEndBB(LI<IRBB> const* li, IRCFG * cfg);
 //Note if we find the preheader, the last IR of it may be call.
 //So if you are going to insert IR at the tail of preheader, the best choose is
 //force the function to insert a new bb.
-//The function will try to maintain the RPO.
+//The function try to maintain RPO under some conditions, thus user should
+//check whether preheader's PRO is valid after the function return.
 IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
-                              OUT bool & insert_bb, bool force);
+                              OUT bool & insert_bb, bool force, OptCtx * oc);
 
 //Find the bb that is the start of the unqiue backedge of loop.
 //  BB1: loop start bb
@@ -263,6 +324,8 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
 
 //List of invariant stmt.
 typedef xcom::EList<IR*, IR2Holder> InvStmtList;
+typedef xcom::EList<IR*, IR2Holder>::Iter InvStmtListIter;
+typedef xcom::List<LI<IRBB>*> LoopInfoIter;
 typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
 
 //Return true if all the expression on 'ir' tree is loop invariant.
@@ -289,19 +352,27 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
 //So if you are going to insert IR at the tail of preheader, the best choose
 //is force the function to insert a new phreader.
 bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
-                     MOD OptCtx & oc, bool force);
+                     MOD OptCtx * oc, bool force);
 
 //Iterative access LoopInfo tree. This funtion initialize the iterator.
-//'li': the root of the LoopInfo tree.
-//'it': iterator. It should be clean already.
-//Readonly function.
+//li: the root of the LoopInfo tree.
+//it: iterator. It should be clean already.
 LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it);
 
 //Iterative access LoopInfo tree.
 //This function return the next LoopInfo accroding to 'it'.
-//'it': iterator.
-//Readonly function.
-LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it);
+//it: iterator.
+LI<IRBB> const* iterNextLoopInfoC(OUT CLoopInfoIter & it);
+
+//Iterative access LoopInfo tree. This funtion initialize the iterator.
+//li: the root of the LoopInfo tree.
+//it: iterator. It should be clean already.
+LI<IRBB> * iterInitLoopInfo(LI<IRBB> * li, OUT LoopInfoIter & it);
+
+//Iterative access LoopInfo tree.
+//This function return the next LoopInfo accroding to 'it'.
+//it: iterator.
+LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it);
 
 //Return true if need to insert PHI into preheader if there are multiple
 //loop outside predecessor BB of loophead, whereas loophead has PHI.
@@ -320,7 +391,12 @@ LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it);
 //bool needInsertPhiToPreheader(LI<IRBB> const* li, IRCFG const* cfg);
 
 //Return true if stmt dominates all USE that are inside loop.
-bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg);
+bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg,
+                               OptCtx const& oc);
+
+//Verify the sanity of LoopInfo structure.
+//Return true if LoopInfo tree is sane.
+bool verifyLoopInfoTree(LI<IRBB> const* li, OptCtx const& oc);
 
 } //namespace xoc
 #endif

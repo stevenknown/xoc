@@ -90,6 +90,11 @@ namespace xcom {
     class_name(class_name const&);   \
     class_name const& operator = (class_name const&)
 
+#define BITS_PER_BYTE 8
+
+typedef UINT BSIdx;
+#define BS_UNDEF ((BSIdx)-1) //The maximum unsigned integer
+
 } //namespace xcom
 
 #endif //END __COMM_MACRO_H__

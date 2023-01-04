@@ -120,8 +120,8 @@ bool CfsOpt::transformToDoWhile(IR ** head, IR ** ir)
             isSameLabel(LAB_lab((*ir)), GOTO_lab(IF_truebody(t)))) {
 
             //Start transform.
-            IR * dowhile = m_rg->buildDoWhile(m_rg->dupIRTree(IF_det(t)),
-                                              nullptr);
+            IR * dowhile = m_rg->getIRMgr()->buildDoWhile(
+                m_rg->dupIRTree(IF_det(t)), nullptr);
             IR * if_stmt = t;
             t = (*ir)->get_next();
             while (t != nullptr && t != if_stmt) {

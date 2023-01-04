@@ -34,9 +34,9 @@ author: Su Zhenyu
 #ifndef __GRA_H__
 #define __GRA_H__
 
-#define LT_FIRST_POS    0
-#define RG_PAIR_SZ         2
-#define FIRST_PHY_REG    0
+#define LT_FIRST_POS 0
+#define RG_PAIR_SZ 2
+#define FIRST_PHY_REG 0
 
 class GLT;
 class LTMgr;
@@ -62,8 +62,8 @@ class RG;
 #define LT_rg_sz(lt)            ((lt)->reg_group_size)
 class LT {
 public:
-    UINT prno;
     UINT id;
+    PRNO prno;
     BitSet * range;
     BitSet * occ;
     BitSet const* usable;
@@ -99,8 +99,8 @@ public:
         *is_def = this->is_def(pos);
         return pos;
 
-        //for (INT i = range->get_next(pos);
-        //     i >= 0; i = range->get_next(i)) {
+        //for (BSIdx i = range->get_next(pos);
+        //     i != BS_UNDEF; i = range->get_next(i)) {
         //    IR const* p = range->get(i);
         //    if (p != nullptr) {
         //        *is_def = this->is_def(i);
@@ -112,15 +112,16 @@ public:
     }
 
     //Get forward searching def corresponds to 'pos',
-    //or return -1 if nothing find.
+    //or return BS_UNDEF if nothing find.
     //e.g:
     //    lowest_pos....pos...forward_def...highest_pos
-    inline INT getForwardOccForDEF(INT pos, INT firstpos)
+    inline BSIdx getForwardOccForDEF(BSIdx pos, BSIdx firstpos)
     {
         DUMMYUSE(firstpos);
         ASSERTN(pos >= firstpos, ("Illegal position"));
         ASSERT0(occ);
-        for (pos = occ->get_next(pos); pos >= 0; pos = occ->get_next(pos)) {
+        for (pos = occ->get_next(pos);
+             pos != BS_UNDEF; pos = occ->get_next(pos)) {
             if (is_def(pos)) {
                 return pos;
             }
@@ -131,14 +132,15 @@ public:
     //Get backward occurrences of 'pos'
     //e.g:
     //    Lowest_Pos...Backward_Occ....Pos.....Highest_Pos
-    inline INT getBackwardOcc(INT pos, OUT bool * is_d, INT firstpos)
+    inline BSIdx getBackwardOcc(BSIdx pos, OUT bool * is_d, BSIdx firstpos)
     {
         ASSERTN(pos >= firstpos, ("Illegal position"));
-        if (pos == firstpos && (occ == nullptr || occ->is_empty())) { return -1; }
-
-        INT backwpos = -1;
-        INT start = LT_range(this)->get_first();
-        for (INT i = pos - 1; i >= start; i--) {
+        if (pos == firstpos && (occ == nullptr || occ->is_empty())) {
+            return -1;
+        }
+        BSIdx backwpos = BS_UNDEF;
+        BSIdx start = LT_range(this)->get_first();
+        for (BSIdx i = pos - 1; i >= start; i--) {
             if (!occ->is_contain(i)) { continue; }
             backwpos = i;
             if (is_def(i)) {
@@ -154,10 +156,12 @@ public:
     inline INT getBackwardOccForDEF(INT pos, INT firstpos)
     {
         ASSERTN(pos >= firstpos, ("Illegal position"));
-        if (pos == firstpos && (occ == nullptr || occ->is_empty())) { return -1; }
+        if (pos == firstpos && (occ == nullptr || occ->is_empty())) {
+            return -1;
+        }
 
-        INT start = LT_range(this)->get_first();
-        for (INT i = pos - 1; i >= start; i--) {
+        BSIdx start = LT_range(this)->get_first();
+        for (BSIdx i = pos - 1; i >= start; i--) {
             if (!occ->is_contain(i)) { continue; }
             if (is_def(i)) {
                 return i;
@@ -195,13 +199,13 @@ public:
     COPY_CONSTRUCTOR(LTG);
 
     //Return the number of lt in group.
-    UINT getLiftTimeCount() const { return get_last_idx() + 1; }
+    UINT getLiftTimeCount() const { return get_elem_count(); }
 
     //Return register group size.
     UINT get_rg_sz() const
     {
         UINT rgsz = 0;
-        for (INT i = 0; i <= get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= get_last_idx(); i++) {
             LT const* l = get(i);
             ASSERT0(l);
             rgsz += LT_rg_sz(l);
@@ -210,9 +214,9 @@ public:
     }
 
     //Return true if the lt that corresponded to 'prno' is in group.
-    bool is_member(UINT prno)
+    bool is_member(PRNO prno)
     {
-        for (INT i = 0; i <= get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= get_last_idx(); i++) {
             LT * l = get(i);
             ASSERT0(l);
             if (LT_prno(l) == prno) {
@@ -317,7 +321,7 @@ protected:
     friend class RA;
     IRBB * m_bb;
     //PR2LT m_prno2lt_map;
-    TMap<UINT, LT*> m_prno2lt;
+    TMap<PRNO, LT*> m_prno2lt;
     Vector<LT*> m_lt_vec;
     Vector<IR*> m_pos2ir;
     IG m_ig;
@@ -357,7 +361,7 @@ protected:
     void processResult(IN IR * ir, INT pos, OUT BitSet & lived_lt,
                      bool group_part);
     LT * processUsePR(IR const* ir, UINT pos, OUT BitSet & lived_lt);
-    LT * processResultPR(UINT prno, UINT pos, OUT BitSet & lived_lt);
+    LT * processResultPR(PRNO prno, UINT pos, OUT BitSet & lived_lt);
     void processUseGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt);
     void processResultGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt);
 
@@ -390,8 +394,8 @@ public:
     IR * genMappedPR(UINT vid, Type const* ty);
     void genGroup(LT * first, LT * second);
     IR * genSpill(LT * lt, INT pos);
-    IR * genSpill(UINT prno, Type const* type, IR * marker, IR * spill_loc);
-    IR * genSpillSwap(IR * stmt, UINT prno, Type const* prty, IR * spill_loc);
+    IR * genSpill(PRNO prno, Type const* type, IR * marker, IR * spill_loc);
+    IR * genSpillSwap(IR * stmt, PRNO prno, Type const* prty, IR * spill_loc);
     IR * genReload(LT * lt, INT pos, IR * spill_loc);
     IR * genReload(IR * newpr, IR * marker, IR * spill_loc);
     IR * genReloadSwap(IR * newpr, IR * marker);
@@ -401,23 +405,23 @@ public:
     inline bool is_pair(IR const* ir) const
     { return m_tm->getByteSize(IR_dt(ir))== 8; }
 
-    inline bool is_livein(UINT prno) const
-    { return m_liveness_mgr->get_livein(m_bb->id())->is_contain(prno); }
+    inline bool is_livein(PRNO prno) const
+    { return m_liveness_mgr->get_livein(m_bb->id())->is_contain((BSIdx)prno); }
     inline bool is_livein(LT const* l) const
     {
         ASSERT0(LT_range(l));
         return LT_range(l)->is_contain(get_first_pos());
     }
 
-    inline bool is_liveout(UINT prno) const
-    { return m_liveness_mgr->get_liveout(m_bb->id())->is_contain(prno); }
+    inline bool is_liveout(PRNO prno) const
+    { return m_liveness_mgr->get_liveout(m_bb->id())->is_contain((BSIdx)prno); }
     inline bool is_liveout(LT const* l) const
     {
         ASSERT0(LT_range(l));
         return LT_range(l)->is_contain(get_last_pos());
     }
 
-    inline LT * map_pr2lt(UINT prno) const
+    inline LT * map_pr2lt(PRNO prno) const
     {
         if (m_prno2lt.get_elem_count() == 0) {
             return nullptr;
@@ -425,11 +429,11 @@ public:
         return m_prno2lt.get(prno);
     }
 
-    LT * newLT(UINT prno);
+    LT * newLT(PRNO prno);
 
     void removeLifeTime(LT * lt);
     void renameLT(LT * l, IR ** newpr);
-    void rename(TMap<UINT, LT*> & prno2lt, BitSet & met);
+    void rename(TMap<PRNO, LT*> & prno2lt, BitSet & met);
 
     void dump();
 };
@@ -450,7 +454,7 @@ public:
 class GLT {
 public:
     UINT id;
-    UINT prno;
+    PRNO prno;
     float prio;
     float freq;
     DefDBitSetCore * livebbs;
@@ -530,7 +534,7 @@ protected:
     BitSetMgr m_bs_mgr;
     LTGMgr m_ltgmgr;
     Vector<GLT*> m_pr2glt;
-    Vector<UINT> m_params;
+    Vector<PRNO> m_params;
     ConstIRIter m_cii; //const IR iter.
     Region * m_rg;
     RA * m_ra;
@@ -557,7 +561,7 @@ public:
     COPY_CONSTRUCTOR(GltMgr);
     ~GltMgr()
     {
-        for (INT i = 0; i <= m_bb2ltmgr.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_bb2ltmgr.get_last_idx(); i++) {
             LTMgr * l = m_bb2ltmgr.get(i);
             if (l != nullptr) {
                 delete l;
@@ -594,7 +598,7 @@ public:
     void freeGLTBitset()
     {
         Vector<GLT*> * gltv = get_gltvec();
-        for (INT i = 0; i <= gltv->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= gltv->get_last_idx(); i++) {
             GLT * g = gltv->get(i);
             if (g == nullptr) { continue; }
             m_sbs_mgr.freeDBitSetCore(GLT_bbs(g));
@@ -602,12 +606,11 @@ public:
     }
 
     RG * new_rg(UINT rnum) { return m_rg_mgr.create(rnum); }
-    GLT * new_glt(UINT prno);
+    GLT * new_glt(PRNO prno);
 
     LTMgr * map_bb2ltm(IRBB * bb);
 
-    GLT * map_pr2glt(UINT prno)
-    { return m_pr2glt.get(prno); }
+    GLT * map_pr2glt(PRNO prno) { return m_pr2glt.get((VecIdx)prno); }
 
     void renameUse(IR const* ir, LT * l, IR ** newpr);
     void renameGLT(GLT * g);
@@ -762,28 +765,26 @@ protected:
     void collectUnalloc(List<LT*> & unalloc);
 
     void dump_prio(List<LT*> & prios);
-    bool getMaxHole(OUT INT * startpos, OUT INT * endpos, LT const* lt);
+    bool getMaxHole(OUT BSIdx * startpos, OUT BSIdx * endpos, LT const* lt);
 
-    bool find_hole(OUT INT & startpos, OUT INT & endpos,
+    bool find_hole(OUT BSIdx & startpos, OUT BSIdx & endpos,
                    LT const* owner, LT const* inner);
 
     bool is_live_through(LT const* l) const;
     bool isOpndSameWithResult(IR * ir);
     bool isSatisfiedConstrain(LT * lt, LT * cand);
 
-    void selectReasonableSplitPos(
-            OUT INT & pos1,
-            OUT INT & pos2,
-            OUT bool & is_pos1_spill,
-            OUT bool & is_pos2_spill,
-            LT * lt);
-    void splitLTAt(INT start, INT end, bool is_start_spill,
-                     bool is_end_spill, LT * lt);
+    void selectReasonableSplitPos(OUT BSIdx & pos1, OUT BSIdx & pos2,
+                                  OUT bool & is_pos1_spill,
+                                  OUT bool & is_pos2_spill,
+                                  LT * lt);
+    void splitLTAt(BSIdx start, BSIdx end, bool is_start_spill,
+                   bool is_end_spill, LT * lt);
     bool split(LT * lt);
 
-    void renameResult(IR * ir, UINT old_prno, IR * newpr);
-    void renameOpnd(IR * ir, UINT old_prno, IR * newpr);
-    void renameOpndInRange(LT * lt, IR * newpr, INT start, INT end);
+    void renameResult(IR * ir, PRNO old_prno, IR * newpr);
+    void renameOpnd(IR * ir, PRNO old_prno, IR * newpr);
+    void renameOpndInRange(LT * lt, IR * newpr, BSIdx start, BSIdx end);
 public:
     BBRA(IRBB * bb, RA * ra);
     ~BBRA() {}
@@ -823,7 +824,7 @@ protected:
     TypeIndexRep * m_tr;
     Vreg2PR * m_v2pr;
     Prno2Vreg * m_pr2v;
-    VAR2PR * m_var2pr;
+    Var2PR * m_var2pr;
     UINT m_param_num; //record the number of param.
     UINT m_param_reg_start;
     UINT m_vregnum; //record the number of original vreg.
@@ -848,7 +849,7 @@ protected:
     void buildLocalIG();
     void buildPrioList(OUT List<GLT*> & prios);
 
-    inline bool checkIfNeedSpill(UINT prno, FMT fmt, LTMgr const* ltm);
+    inline bool checkIfNeedSpill(PRNO prno, FMT fmt, LTMgr const* ltm);
     UINT computeReserveRegister(IRIter & ii, List<IR*> & resolve_list);
     UINT computeNumRegister(UINT rangestart,
                             UINT rangeend,
@@ -902,13 +903,8 @@ protected:
     void reviseParam();
     bool overlapParam(LT const* l) const;
 public:
-    RA(Region * rg,
-       TypeIndexRep * tr,
-       UINT param_num,
-       UINT vregnum,
-       Vreg2PR * v2pr,
-       Prno2Vreg * pr2v,
-       VAR2PR * var2pr) :
+    RA(Region * rg, TypeIndexRep * tr, UINT param_num, UINT vregnum,
+       Vreg2PR * v2pr, Prno2Vreg * pr2v, Var2PR * var2pr) :
            m_liveness_mgr(rg), m_gltm(rg, &m_liveness_mgr, self()),
            m_ig(rg, &m_gltm), m_rsc(&m_gltm)
     {
@@ -927,14 +923,14 @@ public:
     COPY_CONSTRUCTOR(RA);
     ~RA(){}
 
-    LT * getLifeTime(UINT bbid, UINT prno)
+    LT * getLifeTime(UINT bbid, PRNO prno)
     {
         LTMgr * ltm = m_gltm.get_ltm(bbid);
         if (ltm == nullptr) { return nullptr; }
         return ltm->map_pr2lt(prno);
     }
     Region * getRegion() const { return m_rg; }
-    GLT * get_glt(UINT prno) { return m_gltm.map_pr2glt(prno); }
+    GLT * get_glt(PRNO prno) { return m_gltm.map_pr2glt(prno); }
     GltMgr * get_gltm() { return &m_gltm; }
     RSC * get_rsc() { return &m_rsc; }
     UINT get_maxreg() const { return m_maxreg; }

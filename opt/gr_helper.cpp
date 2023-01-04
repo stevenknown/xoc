@@ -197,37 +197,25 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     UINT dn = DUMP_INDENT_NUM;
     ASSERT0(ctx);
     if (ir->is_sint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        //Prefer print imm according to its type.
-        CHAR const* intfmt = "%d:%s";
- 
         //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = "%x:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
+        //CHAR const* intfmt = getIntFormat(true);
         //Prefer print imm according to its type.
-        CHAR const* intfmt = "%lld:%s";
- 
-        //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = "0x%llx:%s";
-        #else
-        #error "Need to support";
-        #endif
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
     
     if (ir->is_uint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "%u:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "%llu:%s";
-        #else
-        #error "Need to support";
-        #endif
+        //WORKAROUND:GR parser has bug in parsing large negative number.
+        //CHAR const* intfmt = getIntFormat(true);
+        //Prefer print imm according to its type.
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getUIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
@@ -270,16 +258,13 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     }
 
     if (ir->is_mc()) {
-        //Imm may be MC type.
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "%u:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "%llu:%s";
-        #else
-        #error "Need to support";
-        #endif
+        //WORKAROUND:GR parser has bug in parsing large negative number.
+        //CHAR const* intfmt = getIntFormat(true);
+        //Prefer print imm according to its type.
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getUIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
@@ -288,15 +273,10 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     //leave the sanity check to verify().
     //Note the dump format may extend or truncate the real value.
     //Imm may be MC type.
-    #if WORD_LENGTH_OF_HOST_MACHINE==32
-    CHAR const* intfmt = "%u:%s";
-    #elif WORD_LENGTH_OF_HOST_MACHINE==64
-    CHAR const* intfmt = "%llu:%s";
-    #else
-    #error "Need to support";
-    #endif
+    StrBuf fmt(16);
+    fmt.strcat("%s:%%s", getUIntFormat(false));
     m_lm->incIndent(dn);
-    prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+    prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
     m_lm->decIndent(dn);
 }
 
@@ -306,7 +286,7 @@ void GRDump::dumpPhi(IR const* ir, DumpGRCtx const* ctx) const
     TypeMgr * tm = const_cast<TypeMgr*>(m_tm);
     Type const* d = ir->getType();
     StrBuf buf(64);
-    note(m_lm, "\n%s $%d:%s = ", IRNAME(ir), PHI_prno(ir),
+    note(m_lm, "\n%s %s%d:%s = ", PR_TYPE_CHAR, IRNAME(ir), PHI_prno(ir),
          tm->dump_type(d, buf));
     UINT dn = DUMP_INDENT_NUM;
     m_lm->incIndent(dn);
@@ -362,7 +342,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_STPR:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", STPR_no(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, STPR_no(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -372,7 +353,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_SETELEM:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", SETELEM_prno(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, SETELEM_prno(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -386,7 +368,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_GETELEM:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", GETELEM_prno(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, GETELEM_prno(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -443,7 +426,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpIRList(ILD_base(ir), ctx);
         m_lm->decIndent(dn);
         break;
-    case IR_PR:
+    SWITCH_CASE_READ_PR:
         note(m_lm, "\n$%d:%s", PR_no(ir), m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         break;
@@ -564,8 +547,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 
         note(m_lm, "\n};");
         break;
-    case IR_BREAK:
-    case IR_CONTINUE:
+    SWITCH_CASE_LOOP_ITER_CFS_OP:
         note(m_lm, "\n%s;", IRNAME(ir));
         break;
     case IR_RETURN:
@@ -613,7 +595,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpProp(ir, ctx);
 
         m_lm->incIndent(dn);
-        dumpIRList(SELECT_pred(ir), ctx);
+        dumpIRList(SELECT_det(ir), ctx);
         prt(m_lm, ",");
         m_lm->decIndent(dn);
 
@@ -688,13 +670,13 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 
         dumpArrSubList(ir, dn, ctx);
         break;
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
         prt(m_lm, " ");
         if (ir->hasReturnValue()) {
-            prt(m_lm, "$%d:%s = ", CALL_prno(ir), m_tm->dump_type(d, buf));
+            prt(m_lm, "%s%d:%s = ", PR_TYPE_CHAR, CALL_prno(ir),
+                m_tm->dump_type(d, buf));
         }
         if (ir->is_icall()) {
             m_lm->incIndent(dn);
@@ -717,8 +699,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         prt(m_lm, ")");
         prt(m_lm, ";");
         break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
         prt(m_lm, " (");
@@ -756,7 +737,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         note(m_lm, "\nundef!");
         break;
     default:
-        ASSERTN(0, ("unknown IR type:%s", IRNAME(ir)));
+        ASSERTN(0, ("unknown IR code:%s", IRNAME(ir)));
         return ;
     }
 }

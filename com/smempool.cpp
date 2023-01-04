@@ -193,7 +193,7 @@ void smpoolFiniPool()
     if (g_is_pool_init && g_is_pool_hashed) {
         ASSERTN(g_mem_pool == nullptr, ("illegal init process"));
         SMemPool * next = nullptr;
-        INT c;
+        VecIdx c;
         for (SMemPool * mp = g_mem_pool_hash_tab->get_first(c);
              mp != nullptr; mp = next) {
             next = g_mem_pool_hash_tab->get_next(c);

@@ -53,37 +53,100 @@ class RegionMgr;
 //NOTE: Do *NOT* forget modify the bit-field in Var if you remove/add flag here.
 ////////////////////////////////////////////////////////////////////////////////
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
-#define VAR_UNDEF 0x0
 
-//This attribute describes the scope of variable.
-//A variable can be seen by all regions if it is GLOBAL.
-#define VAR_GLOBAL 0x1
+enum VAR_FLAG {
+    VAR_UNDEF = 0x0,
+    
+    //Variable is global.
+    //The attribute describes the scope of variable.
+    //A variable can be seen by all regions if it is GLOBAL.
+    //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
+    VAR_GLOBAL = 0x1,
+    
+    //Variable is local.
+    //The attribute defined the scope of variable.
+    //A variable can ONLY be seen by current and inner region.
+    //It always be allocated in stack or thread local storage(TLS).
+    VAR_LOCAL = 0x2,
+    
+    //The attribute describes the scope of variable.
+    //A private variable which is GLOBAL can ONLY be seen in
+    //current and inner region.
+    VAR_PRIVATE = 0x4,
+    
+    //Variable is readonly.
+    //The attribute describes the access authority of variable.
+    //A readonly variable guarantees that no operation can modify the memory.
+    VAR_READONLY = 0x8, //var is readonly
+    VAR_VOLATILE = 0x10, //var is volatile
+    VAR_HAS_INIT_VAL = 0x20, //var with initialied value.
 
-//This attribute defined the scope of variable.
-//A variable can ONLY be seen by current and inner region.
-//It always be allocated in stack or thread local storage(TLS).
-#define VAR_LOCAL 0x2
+    //Variable is aritifical or spurious that used to
+    //facilitate optimizations and analysis.
+    //Note a fake variable can not be taken address, it is always used to
+    //represent some relations between STMT/EXP, or be regarded as a placeholder.
+    VAR_FAKE = 0x40,
 
-//This attribute describes the scope of variable.
-//A private variable which is GLOBAL can ONLY be seen in
-//current and inner region.
-#define VAR_PRIVATE 0x4
+    //Variable is label.
+    VAR_IS_LABEL = 0x80,
 
-//This attribute describes the access authority of variable.
-//A readonly variable guarantees that no operation can modify the memory.
-#define VAR_READONLY 0x8 //var is readonly
-#define VAR_VOLATILE 0x10 //var is volatile
-#define VAR_HAS_INIT_VAL 0x20 //var with initialied value.
-#define VAR_FAKE 0x40 //var is fake
-#define VAR_IS_LABEL 0x80 //var is label.
-#define VAR_FUNC_DECL 0x100 //var is function region declaration.
-#define VAR_IS_ARRAY 0x200 //var is array.
-#define VAR_IS_FORMAL_PARAM 0x400 //var is formal parameter.
-#define VAR_IS_SPILL 0x800 //var is spill location.
-#define VAR_ADDR_TAKEN 0x1000 //var's address has been taken.
-#define VAR_IS_PR 0x2000 //var is pr.
-#define VAR_IS_RESTRICT 0x4000 //var is restrict.
-#define VAR_IS_UNALLOCABLE 0x8000 //var is unallocable in memory.
+    //Variable represents a function region.
+    VAR_IS_FUNC = 0x100,
+
+    //Variable describes a memory that arranged in the manner of array.
+    VAR_IS_ARRAY = 0x200,
+
+    //Variable is parameter of this region.
+    VAR_IS_FORMAL_PARAM = 0x400,
+
+    //Variable is spill location.
+    VAR_IS_SPILL = 0x800,
+
+    //Variable has been taken address.
+    VAR_ADDR_TAKEN = 0x1000,
+
+    //Variable is PR.
+    VAR_IS_PR = 0x2000,
+
+    //Variable is marked restrict, means the variable will not alias
+    //to anyother variables.
+    VAR_IS_RESTRICT = 0x4000,
+
+    //Variable is unallocable in memory.
+    //Variable should NOT be allocated in memory and
+    //it is only being a placeholder in essence.
+    VAR_IS_UNALLOCABLE = 0x8000,
+
+    //Variable is declaration.
+    VAR_IS_DECL = 0x10000,
+};
+
+class VarFlag : public UFlag {
+public:
+    VarFlag(UINT v) : UFlag(v) {}
+    bool verify() const;
+};
+
+
+class VarFlagDesc {
+public:
+    ////////////////////////////////////////////////////////////////////
+    //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE//
+    //CORRESPONDING TO THE SPECIAL INITIALIZING VALUE.                //
+    ////////////////////////////////////////////////////////////////////
+    VAR_FLAG flag;
+    CHAR const* name;
+public:
+    //Get flag's name.
+    static CHAR const* getName(VAR_FLAG flag);
+   
+    //Compute the index of 'flag' in the Desc table.
+    static UINT getDescIdx(VAR_FLAG flag);
+
+    //Get the flag by given index in enum definition.
+    static VAR_FLAG getFlag(UINT idx);
+};
+
 
 ////////////////////////////////////////////////////////
 //NOTE: DO *NOT* forget modify the bit-field in Var if//
@@ -110,38 +173,13 @@ public:
 #define VAR_name(v) ((v)->name)
 
 //Various flag.
-#define VAR_flag(v) ((v)->u2.flag)
+#define VAR_flag(v) ((v)->varflag)
 
 //Record string content if variable is string.
 #define VAR_string(v) ((v)->u1.string)
 
 //Record LabelInfo if variable is label.
 #define VAR_labinfo(v) ((v)->u1.labinfo)
-
-//Variable is label.
-#define VAR_is_label(v) ((v)->u2.s1.is_label)
-
-//Variable is global.
-//The attribute describes the scope of variable.
-//A variable can be seen by all regions if it is GLOBAL.
-//The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
-#define VAR_is_global(v) ((v)->u2.s1.is_global)
-
-//Variable is local.
-//This attribute defined the scope of variable.
-//A variable can ONLY be seen by current and inner region.
-//It always be allocated in stack or thread local storage(TLS).
-#define VAR_is_local(v) ((v)->u2.s1.is_local)
-
-//This attribute describes the scope of variable.
-//A private variable which is GLOBAL can ONLY be seen in
-//current and inner region.
-#define VAR_is_private(v) ((v)->u2.s1.is_private)
-
-//Variable is readonly.
-//This attribute describes the access authority of variable.
-//A readonly variable guarantees that no operation can modify the memory.
-#define VAR_is_readonly(v) ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
 #define VAR_byte_val(v) ((v)->u1.byte_val)
@@ -152,41 +190,8 @@ public:
 //Variable has initial value.
 #define VAR_has_init_val(v) ((v)->u2.s1.has_init_val)
 
-//Variable is function region.
-#define VAR_is_func_decl(v) ((v)->u2.s1.is_func_decl)
-
-//Variable is aritifical or spurious that used to
-//facilitate optimizations and analysis.
-//Note a fake variable can not be taken address, it is always used to
-//represent some relations between STMT/EXP, or be regarded as a placeholder.
-#define VAR_is_fake(v) ((v)->u2.s1.is_fake)
-
-//Variable is volatile.
-#define VAR_is_volatile(v) ((v)->u2.s1.is_volatile)
-
-//Variable describes a memory that arranged in the manner of array.
-#define VAR_is_array(v) ((v)->u2.s1.is_array)
-
-//Variable is parameter of this region.
-#define VAR_is_formal_param(v) ((v)->u2.s1.is_formal_param)
-
 //Record the parameter position.
 #define VAR_formal_param_pos(v) ((v)->formal_parameter_pos)
-
-//Variable is spill location.
-#define VAR_is_spill(v) ((v)->u2.s1.is_spill)
-
-//Variable has been taken address.
-#define VAR_is_addr_taken(v) ((v)->u2.s1.is_addr_taken)
-
-//Variable is PR.
-#define VAR_is_pr(v) ((v)->u2.s1.is_pr)
-
-//Variable is marked "restrict", and it always be parameter.
-#define VAR_is_restrict(v) ((v)->u2.s1.is_restrict)
-
-//Variable is not concrete, and will NOT occupy any memory.
-#define VAR_is_unallocable(v) ((v)->u2.s1.is_unallocable)
 
 //Record the alignment.
 #define VAR_align(v) ((v)->align)
@@ -204,7 +209,7 @@ public:
     UINT formal_parameter_pos;
 
     //Record prno if Var indicates a PR location.
-    UINT prno;
+    PRNO prno;
 
     union {
         //Record string contents if Var is a constant string.
@@ -216,51 +221,28 @@ public:
         //Record label related info if Var indicates a label.
         LabelInfo * labinfo;
     } u1; //record the properties that are exclusive.
-
-    union {
-        UINT flag; //Record variant properties of Var.
-        struct {
-            UINT is_global:1; //Var can be seen all program.
-            UINT is_local:1; //Var only can be seen in region.
-            UINT is_private:1; //Var only can be seen in file.
-            UINT is_readonly:1; //Var is readonly.
-            UINT is_volatile:1; //Var is volatile.
-            UINT has_init_val:1; //Var has initial value.
-            UINT is_fake:1; //Var is fake.
-            UINT is_label:1; //Var is label.
-            UINT is_func_decl:1; //Var is function unit declaration.
-            UINT is_array:1; //Var is array
-            UINT is_formal_param:1; //Var is formal parameter.
-            UINT is_spill:1; //Var is spill location in function.
-            UINT is_addr_taken:1; //Var has been taken address.
-            UINT is_pr:1; //Var is pr.
-            UINT is_restrict:1; //Var is restrict.
-
-            //True if variable should NOT be allocated in memory and
-            //it is only being a placeholder in essence.
-            UINT is_unallocable:1;
-        } s1; //Record variant properties of Var.
-    } u2; //Record variant properties of Var.
+    VarFlag varflag;
 public:
     Var();
     virtual ~Var() {}
 
     UINT id() const { return VAR_id(this); }
-    bool is_local() const { return VAR_is_local(this); }
-    bool is_global() const { return VAR_is_global(this); }
-    bool is_fake() const { return VAR_is_fake(this); }
-    bool is_label() const { return VAR_is_label(this); }
-    bool is_unallocable() const { return VAR_is_unallocable(this); }
-    bool is_array() const { return VAR_is_array(this); }
-    bool is_formal_param() const { return VAR_is_formal_param(this); }
-    bool is_private() const { return VAR_is_private(this); }
-    bool is_readonly() const { return VAR_is_readonly(this); }
-    bool is_func_decl() const { return VAR_is_func_decl(this); }
-    bool is_volatile() const { return VAR_is_volatile(this); }
-    bool is_spill() const { return VAR_is_spill(this); }
-    bool is_addr_taken() const { return VAR_is_addr_taken(this); }
-    bool is_pr() const { return VAR_is_pr(this); }
-    bool is_restrict() const { return VAR_is_restrict(this); }
+    bool is_local() const { return varflag.have(VAR_LOCAL); }
+    bool is_global() const { return varflag.have(VAR_GLOBAL); }
+    bool is_fake() const { return varflag.have(VAR_FAKE); }
+    bool is_label() const { return varflag.have(VAR_IS_LABEL); }
+    bool is_unallocable() const { return varflag.have(VAR_IS_UNALLOCABLE); }
+    bool is_decl() const { return varflag.have(VAR_IS_DECL); }
+    bool is_array() const { return varflag.have(VAR_IS_ARRAY); }
+    bool is_formal_param() const { return varflag.have(VAR_IS_FORMAL_PARAM); }
+    bool is_private() const { return varflag.have(VAR_PRIVATE); }
+    bool is_readonly() const { return varflag.have(VAR_READONLY); }
+    bool is_func() const { return varflag.have(VAR_IS_FUNC); }
+    bool is_volatile() const { return varflag.have(VAR_VOLATILE); }
+    bool is_spill() const { return varflag.have(VAR_IS_SPILL); }
+    bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
+    bool is_pr() const { return varflag.have(VAR_IS_PR); }
+    bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_any() const
     {
         ASSERT0(VAR_type(this));
@@ -302,7 +284,8 @@ public:
     bool hasGRFlag() const
     {
         return (is_unallocable() ||
-                is_func_decl() ||
+                is_func() ||
+                is_decl() ||
                 is_private() ||
                 is_readonly() ||
                 is_volatile() ||
@@ -315,7 +298,7 @@ public:
     }
 
     //Return true if variable has initial value.
-    bool has_init_val() const { return VAR_has_init_val(this); }
+    bool has_init_val() const { return VAR_flag(this).have(VAR_HAS_INIT_VAL); }
 
     //Get byte alignment.
     UINT get_align() const { return VAR_align(this); }
@@ -354,6 +337,7 @@ public:
     //You must make sure this function will not change any field of Var.
     //The information will be dumpped into 'buf'.
     virtual CHAR const* dump(OUT StrBuf & buf, TypeMgr const* dm) const;
+    void dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const;
     void dumpProp(OUT StrBuf & buf, bool grmode) const;
     CHAR const* dumpGR(OUT StrBuf & buf, TypeMgr * dm) const;
 
@@ -361,9 +345,13 @@ public:
     //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
     void setToGlobal(bool is_global)
     {
-        VAR_is_global(this) = (UINT)is_global;
-        VAR_is_local(this) = (UINT)!is_global;
+        is_global ? setflag(VAR_GLOBAL), removeflag(VAR_LOCAL) :
+                    removeflag(VAR_GLOBAL), setflag(VAR_LOCAL);
     }
+    void setToFormalParam() { setflag(VAR_IS_FORMAL_PARAM); }
+    void setflag(VAR_FLAG f) { VAR_flag(this).set(f); }
+
+    void removeflag(VAR_FLAG f) {VAR_flag(this).remove(f); }
 };
 //END Var
 
@@ -454,14 +442,10 @@ public:
     virtual Var * allocVAR() { return new Var(); }
 
     //Create variable by string name.
-    Var * registerVar(CHAR const* varname,
-                      Type const* type,
-                      UINT align,
+    Var * registerVar(CHAR const* varname, Type const* type, UINT align,
                       UINT flag);
     //Create variable by symbol name.
-    Var * registerVar(Sym const* var_name,
-                      Type const* type,
-                      UINT align,
+    Var * registerVar(Sym const* var_name, Type const* type, UINT align,
                       UINT flag);
     //Create string variable by name and string-content.
     Var * registerStringVar(CHAR const* var_name, Sym const* s, UINT align);

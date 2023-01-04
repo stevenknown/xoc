@@ -56,8 +56,8 @@ public:
 #define CST_EQ 4 //equal to
 
 class Lineq {
-    bool m_is_init;
-    bool m_is_dump;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
+    BYTE m_is_dump:1;
 
     //Index of right-hand-side, also the column index of constant coefficient
     //vector, start from zero, named by Mathematical Programming System.

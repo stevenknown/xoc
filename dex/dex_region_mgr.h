@@ -56,8 +56,8 @@ public:
     virtual Region * allocRegion(REGION_TYPE rt)
     { return new DexRegion(rt, this); }
 
-    virtual CallGraph * allocCallGraph(UINT edgenum, UINT vexnum)
-    { return new DexCallGraph(edgenum, vexnum, this); }
+    virtual CallGraph * allocCallGraph(UINT vexnum)
+    { return new DexCallGraph(vexnum, this); }
 
     Region * getProgramRegion()
     {

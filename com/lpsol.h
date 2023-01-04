@@ -67,7 +67,7 @@ public:
 
 class PivotPairTab {
 public:
-    bool m_is_init;
+    BYTE m_is_init:1;
     BMat m_pair; //Pairs of nv,bv.
 
     PivotPairTab(INT varnum)
@@ -216,8 +216,8 @@ inline CHAR const* getStatusName(STATUS st)
 
 
 template <class Mat, class T> class SIX : public Element<T> {
-    bool m_is_dump;
-    bool m_is_init;
+    BYTE m_is_dump:1;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     INT m_rhs_idx;
     UINT m_indent;
     UINT m_max_iter;
@@ -463,7 +463,7 @@ bool SIX<Mat, T>::calcSolution(MOD Mat & sol,
                                INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
-    ASSERTN(has_val.get_last_idx() + 1 == rhs_idx &&
+    ASSERTN(((INT)has_val.get_elem_count()) == rhs_idx &&
             sol.getColSize() == eqc.getColSize(), ("illegal info"));
     Mat tmpeqc = eqc;
     //Calc the number of variables which has value.
@@ -920,7 +920,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(MOD Mat & leq,
         //CASE: 'xa' might be basic variable!
         //In the sake of that each BV is relevant to an unique equation,
         //perform pivoting to pivot xa to a nv.
-        INT cand_nv;
+        VecIdx cand_nv;
         INT eqnum = bv2eqmap.get(xa);
         ASSERTN(eqnum >= 0, ("index must nonnegative"));
         for (cand_nv = 0; cand_nv <= nvset.get_last_idx(); cand_nv++) {
@@ -957,8 +957,8 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(MOD Mat & leq,
     j = 0;
     Vector<bool> tnvset, tbvset; //local use.
     Vector<INT> tbv2eqmap;
-    for (UINT i = 0; i <= (UINT)nvset.get_last_idx(); i++) {
-        if (i != xa) {
+    for (VecIdx i = 0; i <= nvset.get_last_idx(); i++) {
+        if (i != (VecIdx)xa) {
             tnvset.set(j, nvset.get(i));
             tbvset.set(j, bvset.get(i));
             tbv2eqmap.set(j, bv2eqmap.get(i));
@@ -970,7 +970,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(MOD Mat & leq,
     bv2eqmap.copy(tbv2eqmap);
 
     //Update the correspondence between eqnum and bv.
-    for (UINT i = 0; i <= (UINT)eq2bvmap.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= eq2bvmap.get_last_idx(); i++) {
         UINT bv = eq2bvmap.get(i);
         if (bv > xa) {
             eq2bvmap.set(i, bv - 1);
@@ -1078,7 +1078,7 @@ UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
                 ASSERTN(calcSolution(sol, nvset, eqc, rhs_idx),
                         ("unexpected result"));
                 #else
-                for (INT i = 0; i <= bvset.get_last_idx(); i++) {
+                for (VecIdx i = 0; i <= bvset.get_last_idx(); i++) {
                     if (bvset.get(i)) {
                         INT eqnum = bv2eqmap.get(i);
                         ASSERT0(eqnum >= 0);
@@ -1164,15 +1164,15 @@ UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
 
         #ifdef _DEBUG_
         UINT count = 0;
-        for (UINT i = 0; i <= (UINT)bvset.get_last_idx();i++) {
+        for (VecIdx i = 0; i <= bvset.get_last_idx();i++) {
             ASSERTN(bvset.get(i) != nvset.get(i), ("illegal pivoting"));
             if (bv2eqmap.get(i) != INVALID_EQNUM) {
                 count++;
-                ASSERTN((UINT)eq2bvmap.get(bv2eqmap.get(i)) == i,
+                ASSERTN((VecIdx)eq2bvmap.get(bv2eqmap.get(i)) == i,
                         ("unmatch!"));
             }
         }
-        ASSERTN((UINT)eq2bvmap.get_last_idx() + 1 ==
+        ASSERTN((UINT)eq2bvmap.get_elem_count() ==
                 eqc.getRowSize(), ("illegal pivot"));
         ASSERTN(count == eqc.getRowSize(), ("illegal pivot"));
         #endif
@@ -2038,7 +2038,7 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
         // Solution is:
         //    min is -16, x1=1, x2=3, C=1
         //    v is -16.0, but dual_max is -17.0.
-        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv), ("should be equal"));//hack
+        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv), ("should be equal"));//fuck
     }
     return status;
 }
@@ -2094,8 +2094,8 @@ void SIX<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
 #define IP_NO_BETTER_THAN_BEST_SOL 3
 
 template <class Mat, class T> class MIP : public Element<T> {
-    bool m_is_init;
-    bool m_is_dump;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
+    BYTE m_is_dump:1;
     Mat m_cur_best_sol;
     T m_cur_best_v;
     BMat * m_allow_rational_indicator;

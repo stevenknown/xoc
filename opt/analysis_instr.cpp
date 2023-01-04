@@ -34,8 +34,8 @@ namespace xoc {
 #ifdef _DEBUG_
 static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 {
-    CHECK0_DUMMYUSE(v);
-    CHECK0_DUMMYUSE(vm);
+    ASSERT0_DUMMYUSE(v);
+    ASSERT0_DUMMYUSE(vm);
     if (rg->is_function() || rg->is_eh() ||
         rg->getRegionType() == REGION_INNER) {
         //If var is global but unallocable, it often be
@@ -43,44 +43,18 @@ static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 
         //For these kind of regions, there are only local variable or
         //unablable global variable is legal.
-        ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
+        ASSERT0(v->is_local() || v->is_unallocable());
     } else if (rg->is_program()) {
         //Theoretically, only global variable is legal in program region.
         //However even if the program region there may be local
         //variables, e.g: PR, a kind of local variable.
-        //ASSERT0(VAR_is_global(v));
+        //ASSERT0(v->is_global());
     } else {
         ASSERTN(0, ("unsupport variable type."));
     }
     return true;
 }
 #endif
-
-
-//
-//START AnalysisInstrument
-//
-AnalysisInstrument::AnalysisInstrument(Region * rg) :
-    m_rg(rg),
-    m_md_mgr(rg),
-    m_mds_mgr(rg, &m_sbs_mgr),
-    m_mds_hash_allocator(&m_sbs_mgr),
-    m_mds_hash(&m_mds_hash_allocator)
-{
-    m_rg = rg;
-    m_call_list = nullptr;
-    m_return_list = nullptr;
-    m_ir_list = nullptr;
-    m_pass_mgr = nullptr;
-    m_attachinfo_mgr = nullptr;
-
-    //Counter of IR_PR, and do not use '0' as prno.
-    m_pr_count = PRNO_UNDEF + 1;
-    m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
-    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
-        MEM_CONST_SIZE);
-    ::memset(m_free_tab, 0, sizeof(m_free_tab));
-}
 
 
 //Free md's id and local-var's id back to MDSystem and VarMgr.
@@ -101,6 +75,32 @@ static void destroyVARandMD(Region * rg)
         mdsys->removeMDforVAR(v, iter);
         varmgr->destroyVar(v);
     }
+}
+
+
+//
+//START AnalysisInstrument
+//
+AnalysisInstrument::AnalysisInstrument(Region * rg) :
+    m_rg(rg),
+    m_md_mgr(rg),
+    m_mds_mgr(rg, &m_sbs_mgr),
+    m_mds_hash_allocator(&m_sbs_mgr),
+    m_mds_hash(&m_mds_hash_allocator)
+{
+    m_rg = rg;
+    m_call_list = nullptr;
+    m_return_list = nullptr;
+    m_ir_list = nullptr;
+    m_pass_mgr = nullptr;
+    m_attachinfo_mgr = nullptr;
+    m_ir_mgr = nullptr;
+
+    //Counter of IR_PR, and do not use '0' as prno.
+    m_pr_count = PRNO_UNDEF + 1;
+    m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
+    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
+                                       MEM_CONST_SIZE);
 }
 
 
@@ -169,6 +169,7 @@ AnalysisInstrument::~AnalysisInstrument()
 
     //Just set to NULL because the memory is not managed by current object.
     m_ir_list = nullptr;
+    m_ir_mgr = nullptr;
 }
 
 
@@ -186,8 +187,8 @@ size_t AnalysisInstrument::count_mem() const
     count += m_sbs_mgr.count_mem();
     count += m_mds_mgr.count_mem();
     count += m_mds_hash.count_mem();
-    count += m_ir_vector.count_mem();
     count += m_ir_bb_list.count_mem();
+    count += m_ir_mgr != nullptr ? m_ir_mgr->count_mem() : 0;
     //m_free_du_list has been counted in m_du_pool.
     return count;
 }

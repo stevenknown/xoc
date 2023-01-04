@@ -47,7 +47,7 @@ protected:
     friend RMat operator - (RMat const& a, RMat const& b);
     friend class INTMat;
     friend class BIRMat;
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
 
     void _init_hook();
 public:
@@ -94,7 +94,7 @@ INTMat operator - (INTMat const& a, INTMat const& b);
 class INTMat : public Matrix<INT> {
     friend class RMat;
     friend class BIRMat;
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     void _verify_hnf(INTMat &h) const;
     friend INTMat operator * (INTMat const& a, INTMat const& b);
     friend INTMat operator + (INTMat const& a, INTMat const& b);
@@ -146,7 +146,7 @@ public:
 FloatMat operator * (FloatMat const& a, FloatMat const& b);
 FloatMat operator - (FloatMat const& a, FloatMat const& b);
 class FloatMat : public Matrix<Float> {
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     CHAR * m_sd_str; //Descripte significant digit string.
 public:
     FloatMat();
@@ -172,7 +172,7 @@ public:
 
 ///Boolean
 class BMat : public Matrix<bool> {
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
 public:
     BMat();
     BMat(INT v); //used by template call of T(0) in Vector<Mat>

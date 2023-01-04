@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 typedef xcom::SEGIter * IRSetIter;
-
 class IRSet : public DefSBitSet {
     COPY_CONSTRUCTOR(IRSet);
 public:
@@ -57,135 +56,112 @@ public:
 };
 
 //Iterative access ir tree. This funtion initialize the iterator.
-//'ir': the root ir of the tree.
-//'it': iterator. It should be clean already.
+//ir: the root ir of the tree.
+//it: iterator. It should be clean already.
+//iter_next: true to iterate the next IR of 'ir'.
 //Readonly function.
 IR const* iterInitC(IR const* ir, OUT ConstIRIter & it,
                     bool iter_next = true);
 
 //Iterative access ir tree.
 //This function return the next IR node accroding to 'it'.
-//'it': iterator.
+//it: iterator.
+//iter_next: true to iterate the next IR of ir in current iteration.
 //Readonly function.
 IR const* iterNextC(MOD ConstIRIter & it, bool iter_next = true);
+
+//Iterative access the ir tree that start with 'ir'.
+//This funtion initialize the iterator.
+//ir: the root ir of the tree, it may be either stmt or expression.
+//it: iterator. It should be clean already.
+//iter_next: true to iterate the next IR of 'ir'.
+//Note this function is NOT readonly, the returnd IR may be modified.
+IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next = true);
+
+//Iterative access the ir tree.
+//This funtion return the next IR node accroding to 'it'.
+//it: iterator.
+//iter_next: true to iterate the next IR of ir in current iteration.
+//Note this function is NOT readonly, the returnd IR may be modified.
+IR * iterNext(MOD IRIter & it, bool iter_next = true);
 
 //Iterative access the expression of stmt.
 //This funtion initialize the iterator.
 //ir: the root ir of the tree, it must be stmt.
 //it: iterator. It should be clean already.
-//The function is a readonly function.
+//iter_next: true to iterate the next IR of 'ir'.
+//The function is a READONLY function.
 //Use iterExpNextC to iter next IR.
-IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it,
-                       bool iter_next = true);
+//Note the function does not iterate inner stmt, e.g:stmts in body of IR_IF.
+IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it);
 
 //Iterative access the right-hand-side expression of stmt.
 //This function return the next IR node accroding to 'it'.
-//'it': iterator.
+//it: iterator.
+//iter_next: true to iterate the next IR of ir in current iteration.
 //Readonly function.
 inline IR const* iterExpNextC(MOD ConstIRIter & it, bool iter_next = true)
 {
     return iterNextC(it, iter_next);
 }
 
-//Iterative access the ir tree that start with 'ir'.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it may be either stmt or expression.
-//'it': iterator. It should be clean already.
-//Note this function is NOT readonly, the returnd IR may be modified.
-IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next = true);
-
-//Iterative access the ir tree.
-//This funtion return the next IR node accroding to 'it'.
-//'it': iterator.
-//Note this function is NOT readonly, the returnd IR may be modified.
-IR * iterNext(MOD IRIter & it, bool iter_next = true);
-
 //Iterative access the right-hand-side expression of stmt.
 //This funtion initialize the iterator.
 //ir: the root ir of the tree, it must be stmt.
 //it: iterator. It should be clean already.
-//Use iterExpNextC to iter next IR.
-IR * iterExpInit(IR * ir, OUT IRIter & it, bool iter_next = true);
+//iter_next: true to iterate the next IR of 'ir'.
+//Use iterExpNext to iter next IR.
+IR * iterExpInit(IR const* ir, OUT IRIter & it);
 
 //Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'it'.
-//'it': iterator.
+//The function return the next IR node accroding to 'it'.
+//it: iterator.
+//iter_next: true to iterate the next IR of ir in current iteration.
 //This is a readonly function.
 inline IR * iterExpNext(MOD IRIter & it, bool iter_next = true)
 {
     return iterNext(it, iter_next);
 }
 
-//Iterative access the expression kid of stmt itself.
-//This funtion initialize the iterator.
+//Iterative access the expressions that is consist of LHS of stmt itself.
+//The funtion initialize the iterator.
 //ir: the stmt ir.
 //it: iterator. It should be clean by caller.
 //Use iterExpOfStmtNext to iter next IR.
+//e.g: base expression consist of the access of IST, thus the iteration does
+//not include the RHS of IST.
 IR * iterExpOfStmtInit(IR * ir, OUT IRIter & it);
 
-//Iterative access the right-hand-side expression of stmt.
+//Iterative access the expressions that is consist of LHS of stmt itself.
 //This function return the next IR node accroding to 'it'.
 //'it': iterator.
 //Readonly function.
+//e.g: base expression consist of the access of IST, thus the iteration does
+//not include the RHS of IST.
 inline IR * iterExpOfStmtNext(MOD IRIter & it)
 {
     return iterNext(it, true);
 }
 
-//Iterative access the expression kid of stmt itself.
-//This funtion initialize the iterator.
-//ir: the stmt ir.
-//it: iterator. It should be clean by caller.
-//Use iterExpOfStmtNextC to iter next IR.
-IR const* iterExpOfStmtInitC(IR * ir, OUT ConstIRIter & it);
-
-//Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'it'.
-//'it': iterator.
-//Readonly function.
-inline IR const* iterExpOfStmtNextC(MOD ConstIRIter & it)
-{
-    return iterNextC(it, true);
-}
-
 bool allBeExp(IR * irlst);
 bool allBeStmt(IR * irlst);
 
-bool checkMaxIRType();
-bool checkIRDesc();
-bool checkRoundDesc();
+UINT getArithPrecedence(IR_CODE ty);
 
-void dumpConst(IR const* ir, Region const* rg);
-
-void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
-            UINT dumpflag = IR_DUMP_COMBINE);
-inline void dumpIR(IR const* ir, Region const* rg, UINT dumpflag)
-{
-    dumpIR(ir, rg, nullptr, dumpflag);
-}
-void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
-                 UINT dumpflag = IR_DUMP_COMBINE);
-void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
-                UINT dumpflag = IR_DUMP_COMBINE);
-void dumpIRList(IRList const& ir_list, Region const* rg);
-void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
-void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
-
-UINT getArithPrecedence(IR_TYPE ty);
-
-inline bool isCommutative(IR_TYPE irt)
+inline bool isCommutative(IR_CODE irt)
 { return IRDES_is_commutative(g_ir_desc[irt]); }
 
-inline bool isBinaryOp(IR_TYPE irt)
+inline bool isBinaryOp(IR_CODE irt)
 { return IRDES_is_bin(g_ir_desc[irt]); }
 
-inline bool isUnaryOp(IR_TYPE irt)
+inline bool isUnaryOp(IR_CODE irt)
 { return IRDES_is_una(g_ir_desc[irt]); }
 
 //CASE:_$L9 is non-identifier char because of '$'.
 bool isContainNonIdentifierChar(CHAR const* name);
 
 void setParentPointerForIRList(IR * ir_list);
+
 bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
 bool verifySimp(IR * ir, SimpCtx & simp);
 

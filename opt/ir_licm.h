@@ -36,12 +36,85 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class HoistCtx {
+public:
+    //Top-down propagate information.
+    DomTree * domtree;
+
+    //Top-down and bottom-up propagate information.
+    OptCtx * oc;
+
+    //Top-down and bottom-up propagate information.
+    IRCFG const* cfg;
+
+    //Bottom-up propagate information.
+    //Record whether guard-bb of preheader has been inserted.
+    //The flag is used only for one LoopInfo.
+    bool inserted_guard_bb;
+
+    //Bottom-up collect information.
+    //Record whether the CFG changed that always because inserting BB.
+    //The flag is used for entire dom-tree.
+    bool cfg_changed;
+
+    //Bottom-up collect information.
+    //Record whether classic DUSet changed.
+    //The flag is used for entire dom-tree.
+    bool duset_changed;
+
+    //Bottom-up collect information.
+    //Record whether stmt has been hoisted or changed in-place.
+    bool stmt_changed;
+public:
+    HoistCtx(OptCtx * t, DomTree * dt, IRCFG * g) :
+        domtree(dt), oc(t), cfg(g), inserted_guard_bb(false),
+        cfg_changed(false), duset_changed(false), stmt_changed(false)
+    {}
+    HoistCtx(HoistCtx const& src) :
+        inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
+        stmt_changed(false)
+    {
+        domtree = src.domtree;
+        oc = src.oc;
+        cfg = src.cfg;
+    }
+    ~HoistCtx() {}
+    void buildDomTree(IRCFG * cfg)
+    {
+        ASSERT0(oc->is_dom_valid());
+        ASSERT0(domtree);
+        domtree->erase();
+        cfg->genDomTree(*domtree);
+    }
+
+    void cleanAfterLoop()
+    {
+        inserted_guard_bb = false;
+    }
+
+    bool is_domtree_valid() const
+    {
+        ASSERT0(domtree);
+        return domtree->verify(*cfg);
+    }
+
+    void unionBottomUpInfo(HoistCtx const& src)
+    {
+        inserted_guard_bb |= src.inserted_guard_bb;
+        cfg_changed |= src.cfg_changed;
+        duset_changed |= src.duset_changed;
+        stmt_changed |= src.stmt_changed;
+    }
+};
+
+
 //Loop Invariant code Motion.
 //Note in order to reduce the complexity of LICM, the pass only handle the
 //scenario that whole RHS of stmt is loop-invariant. For cases that
 //anticipating to scan and hoist kid IR tree in RHS, will be handled in
 //Register Promotion.
 class LICM : public Pass {
+    friend class InsertPreheaderMgr;
     class IRListMgr {
         List<IRList*> m_lst;
         List<IRList*> m_free_lst;
@@ -72,70 +145,13 @@ class LICM : public Pass {
             m_free_lst.append_head(lst);
         }
     };
-
-    class CompareFuncOfIR {
-    public:
-        bool is_less(IR * t1, IR * t2) const { return t1->id() < t2->id(); }
-        bool is_equ(IR * t1, IR * t2) const { return t1 == t2; }
-        IR * createKey(IR * t) { return t; }
-    };
-
-    class HoistCtx {
-    public:
-        //Top-down propagate information.
-        DomTree * domtree;
-
-        //Top-down and botom-up propagate information.
-        OptCtx * oc;
-
-        //Bottom-up propagate information.
-        //Record whether guard-bb of preheader has been inserted.
-        //The flag is used only for one LoopInfo.
-        bool inserted_guard_bb;
-
-        //Bottom-up collect information.
-        //Record whether the CFG changed that always because inserting BB.
-        //The flag is used for entire dom-tree.
-        bool cfg_changed;
-
-        //Bottom-up collect information.
-        //Record whether classic DUSet changed.
-        //The flag is used for entire dom-tree.
-        bool duset_changed;
-        
-        //Bottom-up propagate information.
-        //Record cand-stmt that has been hoisted out of loop.
-        List<IR*> hoisted_stmt;
-    public:
-        HoistCtx(OptCtx * t) :
-            domtree(nullptr), oc(t), inserted_guard_bb(false),
-            cfg_changed(false), duset_changed(false) {}
-        ~HoistCtx()
-        {
-            if (domtree != nullptr) {
-                delete domtree;
-                domtree = nullptr;
-            }
-        }
-        void buildDomTree(IRCFG * cfg)
-        {
-            ASSERT0(oc->is_dom_valid());
-            if (domtree == nullptr) {
-                domtree = new DomTree();
-            } else {
-                domtree->erase();
-            }
-            cfg->genDomTree(*domtree);
-        }
-        void cleanAfterLoop()
-        {
-            hoisted_stmt.clean();
-            inserted_guard_bb = false;
-        }
-    };
+protected:
     COPY_CONSTRUCTOR(LICM);
-    DUMgr * m_du;
+    BYTE m_is_hoist_stmt:1;
+    BYTE m_is_aggressive:1; //true to apply LICM along with RCE
+    DUMgr * m_dumgr;
     IRCFG * m_cfg;
+    //LICM use RCE to determine whether a branch must-execute.
     RCE * m_rce;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
@@ -144,26 +160,49 @@ class LICM : public Pass {
     SMemPool * m_pool;
     xcom::TTab<LI<IRBB> const*> m_insert_guard_bb;
     IRListMgr m_irs_mgr;
+
     //The list records stmts that are possibly invariant stmt.
     //And these stmts will be analyzed in scanResult().
     xcom::List<IR*> m_analysable_stmt_list;
     xcom::TMap<MD const*, UINT*> m_md2num;
-    //Record if the result of stmt is loop invariant
+
+    //Record if the stmt is loop invariant.
     InvStmtList m_invariant_stmt;
+
     //Record if the expression is loop invariant
-    xcom::TTab<IR*, CompareFuncOfIR> m_invariant_exp;
-    //Record if the expression is hoist candidate
-    //Note hoist-candidate is not always same as invariant-exp.
-    xcom::TTab<IR*, CompareFuncOfIR> m_hoist_cand;
-private:
-    //Post-process hoisted-stmt.
-    void addSSADUChainForHoistedStmt(HoistCtx & ctx);
+    IRTab m_invariant_exp;
+
+    //Record if the expression is hoist-candidate.
+    //Note hoist-candidate is not always can be hoisted legally at last. It
+    //depends on other conditions, such like the inside-loop DEF stmt has to
+    //be hoisted first. Whether a exp/stmt can be hoisted will be determined
+    //at hoistCand() finally.
+    IRTab m_hoist_cand;
+protected:
+    //Collect and analyse information of invariant-exp and invariant-stmt.
+    //Whether a exp/stmt can be hoisted will be determined at
+    //hoistCand() finally.
+    bool analysis(IN LI<IRBB> * li);
+
     void addInvariantStmt(IR * stmt);
     void addInvariantExp(IR * exp);
     void addInvariantExp(IRList const& list);
     void addHoistCand(IRList const& list);
-    void addSSADUChainForExp(IR * exp, HoistCtx const& ctx);
 
+    bool chooseBin(LI<IRBB> * li, IR * ir, IRIter & irit,
+                   OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool chooseUna(LI<IRBB> * li, IR * ir, IRIter & irit,
+                   OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool chooseArray(LI<IRBB> * li, IR * ir, IRIter & irit,
+                     OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool chooseILD(LI<IRBB> * li, IR * ir, IRIter & irit,
+                   OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool choosePR(LI<IRBB> * li, IR * ir, IRIter & irit,
+                  OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool chooseLD(LI<IRBB> * li, IR * ir, IRIter & irit,
+                  OUT bool * all_exp_invariant, OUT IRList * invlist);
+    bool chooseSELECT(LI<IRBB> * li, IR * ir, IRIter & irit,
+                      OUT bool * all_exp_invariant, OUT IRList * invlist);
     //Scan whole IR tree to find loop invariant expression
     //and add it into invariant expression list.
     //Return true if at least one invariant expression added into list.
@@ -172,78 +211,96 @@ private:
     //                   loop invariant.
     bool chooseExp(LI<IRBB> * li, IR * ir, IRIter & irit,
                    OUT bool * all_rhs_exp_invariant, OUT IRList * invlist);
+    bool chooseExpList(LI<IRBB> * li, IR * ir, OUT bool & all_exp_invariant,
+                       IRIter & irit);
+    //ir: may be exp or stmt.
+    bool chooseKid(LI<IRBB> * li, IR * ir, OUT bool & all_kid_invariant,
+                   IRIter & irit);
     bool chooseStmt(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseSTandSTPR(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseIST(LI<IRBB> * li, IR * ir, IRIter & irit);
-    bool chooseSTARRAY(LI<IRBB> * li, IR * ir, IRIter & irit);
     bool chooseCallStmt(LI<IRBB> * li, IR * ir, IRIter & irit);
     bool chooseBranch(LI<IRBB> * li, IR * ir,IRIter & irit);
     bool chooseSwitch(LI<IRBB> * li, IR * ir, IRIter & irit);
-    void cleanBeforeLoop();
-    void checkAndInsertGuardBB(LI<IRBB> const* li, IRBB * prehead,
-                               HoistCtx & ctx);
+    void cleanBeforeAnlysis();
+    void cleanAfterAnlysis();
+    bool canBeRegardAsInvExp(IR const* ir) const;
+    bool canBeRegardAsInvExpList(IR const* ir) const;
 
+    //Given loop info li, dump the invariant stmt and invariant expression.
+    void dumpInvariantExpStmt(LI<IRBB> const* li) const;
+    void dumpHoistedIR(IR const* ir) const;
     bool doLoopTree(LI<IRBB> * li, OUT HoistCtx & ctx);
+
+    IRTab const& getCandExpTab() const { return m_hoist_cand; }
+
+    void hoistStmt(LI<IRBB> const* li, MOD IR * def, MOD IRBB * prehead,
+                   OUT HoistCtx & ctx) const;
 
     //Return true if gurard BB of LOOP 'li' has been inserted.
     bool hasInsertedGuardBB(LI<IRBB> const* li) const;
 
-    //Return true if any stmt that is related to invariant stmt
-    //is moved outside from loop, return false if there is stmt that
+    //Return true if all DEF stmt/phi that is related to invariant stmt
+    //are moved outside from loop, return false if there is stmt that
     //prevents 'exp' from being hoisted from the loop.
-    bool handleDefByDUChain(IR const* exp,
-                            OUT IRBB * prehead,
-                            OUT LI<IRBB> * li);
-    void hoistWholeStmt(IR * cand_exp,
-                        OUT IRBB * prehead,
-                        OUT LI<IRBB> * li,
-                        OUT HoistCtx & ctx);
-    //Return true if any stmt is moved outside from loop.
-    bool hoistInvariantStmt(MOD IR * stmt,
-                            MOD IRBB * prehead,
-                            MOD LI<IRBB> * li);
+    //Note some DEF that has been hoisted by this function is recorded in 'ctx'
+    //even not all of DEF hoisted totally.
+    bool hoistDefByMDSSA(IR const* exp, OUT IRBB * prehead,
+                         OUT LI<IRBB> * li, MOD HoistCtx & ctx) const;
+    bool hoistDefByClassicDU(IR const* exp, OUT IRBB * prehead,
+                             OUT LI<IRBB> * li, MOD HoistCtx & ctx) const;
+    bool hoistDefByPRSSA(IR const* exp, OUT IRBB * prehead,
+                         OUT LI<IRBB> * li, MOD HoistCtx & ctx) const;
+    bool hoistDefByDUChain(IR const* exp, OUT IRBB * prehead,
+                           OUT LI<IRBB> * li, MOD HoistCtx & ctx) const;
+
     //Hoist candidate IR to preheader BB.
-    void hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT HoistCtx & ctx);
-    //This function will maintain RPO of generated guard BB.
+    bool hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT HoistCtx & ctx);
+
     //Return true if BB or STMT changed.
-    bool hoistCandHelper(OUT IR * cand_exp,
-                         OUT IRBB * prehead,
-                         OUT LI<IRBB> * li,
-                         OUT HoistCtx & ctx);
+    bool hoistCandHelper(OUT IR * cand_exp, OUT IRBB * prehead,
+                         OUT LI<IRBB> * li, OUT HoistCtx & ctx);
+
+    //Return true if the pass will try to hoist stmt out of loop.
+    bool isHoistStmt() const { return m_is_hoist_stmt; }
+
+    //Consider whether ir is worth hoisting.
+    inline bool isWorthHoist(IR const* ir) const
+    {
+        //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
+        //but still can be moved.
+        return !ir->isNoMove(true) && !ir->is_volatile();
+    }
+ 
+    //Return true if md modified in loop only once.
+    bool isUniqueDef(MD const* md) const;
+
+    //Return true if LICM will perform aggressive strategy with RCE.
+    //The aggressive strategy will take longer compilation time.
+    bool is_aggressive() const { return m_is_aggressive; }
 
     //Return true if stmt is marked and collected into invariant-stmt set.
     bool markedAsInvStmt(IR const* ir) const;
     //Return true if exp is marked and collected into invariant-stmt set.
     bool markedAsInvExp(IR const* ir) const;
 
-    //Return true if md modified in loop only once.
-    bool isUniqueDef(MD const* md) const;
+    //Return true if exp in list is marked and collected into invariant-exp set.
+    bool markedAsInvExpList(IR const* explst) const;
 
-    //Insert guard controlling BB to predominate the execution of 'prehead'.
-    //This function will maintain RPO of generated guard BB.
-    //prehead: preheader BB of loop.
-    IRBB * insertGuardBB(LI<IRBB> const* li, IRBB * prehead, HoistCtx & ctx);
+    //Process a loop.
+    bool processLoop(LI<IRBB> * li, HoistCtx & ctx);
+    void postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc);
+    void postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc);
 
-    //Return true if loop body is executed conditionally which is in charged of
-    //the judgement stmt in loophead BB.
-    //e.g:Return true for while-do loop, and false for do-while loop.
-    bool isLoopExecConditional(LI<IRBB> const* li) const;
+    //Return true if some stmts are marked as invariant-stmt.
+    bool scanDirectStmt(IR * stmt, LI<IRBB> * li);
 
-    //Try to move and check that each definitions of candidate has been
-    //already hoisted from loop.
-    bool tryMoveAllDefStmtOutFromLoop(IR const* c,
-                                     IRBB * prehead,
-                                     OUT LI<IRBB> * li);
+    //Return true if some stmts are marked as invariant-stmt.
+    bool scanInDirectStmt(IR * stmt, LI<IRBB> * li);
 
-    //Return true if any stmt is moved outside from loop.
-    bool tryHoistDefStmt(MOD IR * def, MOD IRBB * prehead, MOD LI<IRBB> * li);
+    //Return true if some stmts are marked as invariant-stmt.
+    bool scanArrayStmt(IR * stmt, LI<IRBB> * li);
 
-    //Try to evaluate the value of loop execution condition.
-    //Returnt true if this function evaluated successfully,
-    //otherwise return false.
-    bool tryEvalLoopExecCondition(LI<IRBB> const* li,
-                                  OUT bool & must_true,
-                                  OUT bool & must_false) const;
+    //Return true if some stmts are marked as invariant-stmt.
+    bool scanCallStmt(IR * stmt, LI<IRBB> * li);
 
     //Scan expression to find invariant candidate.
     //islegal: set to true if loop is legal to perform invariant motion.
@@ -259,16 +316,41 @@ private:
     bool scanBB(IRBB * bb, IN LI<IRBB> * li, bool * islegal, bool first_scan);
 
     //Propagate invariant property to result.
-    //This operation will generate more invariant.
-    //This function will modify m_invariant_stmt, record if the result of
-    //stmt is loop invariant.
-    //Note this function assumes whole RHS tree of stmt in
-    //analysable_stmt_list are loop invariant expressions.
-    bool scanResult();
+    //Return true if some stmts are marked as invariant-stmt.
+    //The function aim is to generate as more as invariants.
+    //The function will modify m_invariant_stmt, record if the result of
+    //stmt become loop invariant.
+    //Note the function assumes whole RHS tree of stmt in m_analysable_stmt_list
+    //are loop invariant-exp.
+    bool scanResult(LI<IRBB> * li);
 
-    //hoistCand may append stmt into BB which has down-boundary stmt.
-    //That makes BB invalid. Split such invalid BB into two or more BBs.
-    bool splitBBIfNeeded(IRBB * bb, OptCtx & oc);
+    //The funtion record the LoopInfo status until entire LICM object destroy
+    //that in order to avoid re-insert Guard BB over and over again.
+    //Return true if gurard BB of LOOP 'li' has been inserted.
+    void setLoopHasBeenGuarded(LI<IRBB> const* li);
+
+    //Try to move and check that each definitions of candidate has been
+    //already hoisted from loop.
+    //Return true if all DEF stmt of 'c' has been hoisted.
+    bool tryHoistAllDefStmt(IR const* c, IRBB * prehead,
+                            OUT LI<IRBB> * li, MOD HoistCtx & ctx);
+
+    //Return true if any stmt is moved outside from loop.
+    bool tryHoistDefStmt(MOD IR * def, MOD IRBB * prehead, MOD LI<IRBB> * li,
+                         MOD HoistCtx & ctx) const;
+
+    //Try hoisting the dependent stmt to 'stmt' firstly.
+    //Return true if all dependent stmts have been hoisted outside of loop.
+    bool tryHoistDependentStmt(MOD IR * stmt, MOD IRBB * prehead,
+                               MOD LI<IRBB> * li, OUT HoistCtx & ctx) const;
+
+    //Return true if any stmt is moved outside from loop.
+    bool tryHoistStmt(IR * stmt, OUT IRBB * prehead, OUT LI<IRBB> * li,
+                      OUT HoistCtx & ctx) const;
+
+    //The funtion should be invoked after stmt hoisted.
+    void updateMDSSADUForStmtInLoopBody(MOD IR * stmt,
+                                        HoistCtx const& ctx) const;
 
     void updateMD2Num(IR * ir);
     bool useMDSSADU() const
@@ -288,33 +370,21 @@ public:
     explicit LICM(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_md_sys = rg->getMDSystem();
-        ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
+        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
         m_rce = nullptr;
+        m_is_hoist_stmt = true;
+        m_is_aggressive = true;
     }
     virtual ~LICM() { smpoolDelete(m_pool); }
 
-    bool analysis(IN LI<IRBB> * li);
-
-    //Given loop info li, dump the invariant stmt and invariant expression.
-    void dumpInvariantExpStmt(LI<IRBB> const* li) const;
     virtual bool dump() const;
-
-    //Consider whether exp is worth hoisting.
-    bool isWorthHoist(IR * exp)
-    {
-        CHECK0_DUMMYUSE(exp);
-        ASSERT0(exp->is_exp());
-        //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
-        //but still can be moved.
-        return !exp->isNoMove(true);
-    }
 
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }

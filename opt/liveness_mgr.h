@@ -36,124 +36,80 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Map between Var and PRno.
-class VAR2PR : public TMap<Var const*, UINT, CompareConstVar> {
+//Map between Var and PRNO.
+class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
 };
+
+typedef DefSBitSetCore PRLiveSet;
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);
-    MDSystem * m_md_sys;
-    VAR2PR * m_var2pr;
-    IRCFG * m_cfg;
-    DefMiscBitSetMgr m_sbs_mgr;
-    Vector<DefSBitSetCore*> m_def;
-    Vector<DefSBitSetCore*> m_use;
-    Vector<DefSBitSetCore*> m_livein;
-    Vector<DefSBitSetCore*> m_liveout;
     BYTE m_handle_may:1; //true if consider maydef/mayuse info.
+    BYTE m_keep_local:1; //true to retain local-set info when perform() ends.
+    MDSystem * m_md_sys;
+    Var2PR * m_var2pr;
+    DefMiscBitSetMgr m_sbs_mgr;
+    Vector<PRLiveSet*> m_def;
+    Vector<PRLiveSet*> m_use;
+    Vector<PRLiveSet*> m_livein;
+    Vector<PRLiveSet*> m_liveout;
 protected:
-    DefSBitSetCore * get_def(UINT bbid) const { return m_def.get(bbid); }
-    DefSBitSetCore * gen_def(UINT bbid)
-    {
-        DefSBitSetCore * set = m_def.get(bbid);
-        if (set == nullptr) {
-            set = m_sbs_mgr.allocSBitSetCore();
-            m_def.set(bbid, set);
-        }
-        return set;
-    }
+    void cleanLocal();
+    void cleanGlobal();
+    void computeExp(IR const* stmt, ConstIRIter & it,
+                    MOD PRLiveSet * use,
+                    MOD PRLiveSet * gen);
+    void computeStmt(IR const* stmt, ConstIRIter & it,
+                     MOD PRLiveSet * use,
+                     MOD PRLiveSet * gen);
 
-    DefSBitSetCore * get_use(UINT bbid) const { return m_use.get(bbid); }
-    DefSBitSetCore * gen_use(UINT bbid)
-    {
-        DefSBitSetCore * set = m_use.get(bbid);
-        if (set == nullptr) {
-            set = m_sbs_mgr.allocSBitSetCore();
-            m_use.set(bbid, set);
-        }
-        return set;
-    }
+    PRLiveSet * gen_liveout(UINT bbid);
+    PRLiveSet * gen_livein(UINT bbid);
+    PRLiveSet * gen_def(UINT bbid);
+    PRLiveSet * gen_use(UINT bbid);
 
-    inline void processOpnd(IR const* exp, List<IR const*> & lst,
-                            DefSBitSetCore * use, DefSBitSetCore * gen);
-    inline void processMay(IR const* pr, DefSBitSetCore * gen,
-                           DefSBitSetCore * use, bool is_lhs);
+    void processPHI(IR const* x, ConstIRIter & it,
+                    MOD PRLiveSet * use,
+                    MOD PRLiveSet * gen);
+    void processSTPR(IR const* x, ConstIRIter & it,
+                     MOD PRLiveSet * use,
+                     MOD PRLiveSet * gen);
+    void processSETELEM(IR const* x, ConstIRIter & it,
+                        MOD PRLiveSet * use,
+                        MOD PRLiveSet * gen);
+    void processGETELEM(IR const* x, ConstIRIter & it,
+                        MOD PRLiveSet * use,
+                        MOD PRLiveSet * gen);
+    void processCallStmt(IR const* x, ConstIRIter & it,
+                         MOD PRLiveSet * use,
+                         MOD PRLiveSet * gen);
+    inline void processOpnd(IR const* exp, ConstIRIter & it,
+                            MOD PRLiveSet * use, MOD PRLiveSet * gen);
+    inline void processMayDef(PRNO prno, MOD PRLiveSet * gen,
+                              MOD PRLiveSet * use);
+    inline void processMay(IR const* pr, MOD PRLiveSet * gen,
+                           MOD PRLiveSet * use, bool is_lhs);
+    inline void processMayUse(PRNO prno, MOD PRLiveSet * use);
 public:
     LivenessMgr(Region * rg) : Pass(rg)
     {
         m_md_sys = rg->getMDSystem();
-        m_cfg = rg->getCFG();
         m_var2pr = nullptr;
         m_handle_may = false;
+        m_keep_local = false;
     }
-    ~LivenessMgr()
-    {
-        for (INT i = 0; i <= m_def.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (INT i = 0; i <= m_use.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-        for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != nullptr) {
-                m_sbs_mgr.freeSBitSetCore(bs);
-            }
-        }
-    }
+    ~LivenessMgr() { clean(); }
 
-    void computeLocal(IRBB * bb, List<IR const*> & lst);
-    void computeGlobal();
-    size_t count_mem() const
-    {
-        size_t count = m_sbs_mgr.count_mem();
-        count += m_def.count_mem();
-        count += m_use.count_mem();
-        count += m_livein.count_mem();
-        count += m_liveout.count_mem();
-        for (INT i = 0; i <= m_def.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (INT i = 0; i <= m_use.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
-            DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != nullptr) {
-                count += bs->count_mem();
-            }
-        }
-        return count;
-    }
+    void add_liveout(IRBB const* bb, PRNO prno)
+    { gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
+    void add_livein(IRBB const* bb, PRNO prno)
+    { gen_livein(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
 
-    //The function dump pass relative information before performing the pass.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    virtual bool dumpBeforePass() const;
+    void computeLocal(IRBB const* bb, MOD ConstIRIter & it);
+    void computeLocal(BBList const& bblst);
+    void computeGlobal(IRCFG const* cfg);
+    size_t count_mem() const;
+    void clean() { cleanGlobal(); cleanLocal(); }
 
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
@@ -163,38 +119,36 @@ public:
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
-    DefSBitSetCore * get_livein(UINT bbid) const { return m_livein.get(bbid); }
-    DefSBitSetCore * gen_livein(UINT bbid)
-    {
-        DefSBitSetCore * x = m_livein.get(bbid);
-        if (x == nullptr) {
-            x = m_sbs_mgr.allocSBitSetCore();
-            m_livein.set(bbid, x);
-        }
-        return x;
-    }
-    DefSBitSetCore * get_liveout(UINT bbid) const
+    PRLiveSet * get_def(UINT bbid) const { return m_def.get(bbid); }
+    PRLiveSet * get_use(UINT bbid) const { return m_use.get(bbid); }
+    PRLiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
+    PRLiveSet * get_liveout(UINT bbid) const
     { return m_liveout.get(bbid); }
-    DefSBitSetCore * gen_liveout(UINT bbid)
+
+    //By default, local set is initialized by computeLocal().
+    void initSet(BBList const& bblst);
+    void init_livein(UINT bbid);
+    bool is_livein(UINT bbid, PRNO prno) const
     {
-        DefSBitSetCore * x = m_liveout.get(bbid);
-        if (x == nullptr) {
-            x = m_sbs_mgr.allocSBitSetCore();
-            m_liveout.set(bbid, x);
-        }
-        return x;
+        ASSERTN(get_livein(bbid), ("miss liveness info"));
+        return get_livein(bbid)->is_contain(prno);
+    }
+    bool is_liveout(UINT bbid, PRNO prno) const
+    {
+        ASSERTN(get_liveout(bbid), ("miss liveness info"));
+        return get_liveout(bbid)->is_contain(prno);
     }
 
-    //Handle may def/use.
-    void set_handle_may(bool is_handle_may)
-    { m_handle_may = (BYTE)is_handle_may; }
+    //Set true to handle maydef and mayuse MDSet.
+    void set_handle_may(bool handle) { m_handle_may = (BYTE)handle; }
 
-    //Set map structure.
-    void setVAR2PR(VAR2PR * v2p) { m_var2pr = v2p; }
+    //Keep local-set information.
+    void set_keep_local(bool keep) { m_keep_local = (BYTE)keep; }
 
-    void setPRToBeLiveout(IRBB * bb, UINT prno)
-    { gen_liveout(bb->id())->bunion(prno, m_sbs_mgr); }
+    //Set map structure which used during the processing of maydef and mayuse.
+    void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }
 
+    bool perform(BBList const* bblst, IRCFG const* cfg, OptCtx & oc);
     virtual bool perform(OptCtx & oc);
 };
 

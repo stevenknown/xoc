@@ -64,8 +64,8 @@ public:
     bool is_only_control_self(UINT vid) const;
 
     //Return true if vertex b is control dependent on vertex a.
-    //e.g:a
-    //    |\
+    //e.g:a_
+    //    | |
     //    | b
     //    |/
     //    end
@@ -76,6 +76,8 @@ public:
     virtual bool perform(OptCtx & oc);
 
     void set_allow_cycle(bool doit) { m_allow_cycle = doit; }
+
+    bool verify() const;
 };
 
 } //namespace xoc

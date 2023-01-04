@@ -35,6 +35,94 @@ author: Su Zhenyu
 
 namespace xoc {
 
+VarFlagDesc const g_varflag_desc[] = {
+    { VAR_UNDEF, "undef", }, //idx0
+    { VAR_GLOBAL, "global", }, //idx1
+    { VAR_LOCAL, "local", }, //idx2
+    { VAR_PRIVATE, "private", }, //idx3
+    { VAR_READONLY, "readonly", }, //idx4
+    { VAR_VOLATILE, "volatile", }, //idx5
+    { VAR_HAS_INIT_VAL, "has_init_val", }, //idx6
+    { VAR_FAKE, "fake", }, //idx7
+    { VAR_IS_LABEL, "label", }, //idx8
+    { VAR_IS_FUNC, "func", }, //idx9
+    { VAR_IS_ARRAY, "array", }, //idx10
+    { VAR_IS_FORMAL_PARAM, "formal_param", }, //idx11
+    { VAR_IS_SPILL, "spill", }, //idx12
+    { VAR_ADDR_TAKEN, "addr_taken", }, //idx13
+    { VAR_IS_PR, "pr", }, //idx14
+    { VAR_IS_RESTRICT, "restrict", }, //idx15
+    { VAR_IS_UNALLOCABLE, "unallocable", }, //idx16
+    { VAR_IS_DECL, "decl", }, //idx17
+};
+static UINT g_varflag_num = sizeof(g_varflag_desc) / sizeof(g_varflag_desc[0]);
+
+//Represents flags that used in GR file.
+static VAR_FLAG g_grmode_flag[] = {
+    VAR_IS_DECL,
+    VAR_IS_UNALLOCABLE,
+    VAR_IS_FUNC,
+    VAR_PRIVATE,
+    VAR_READONLY,
+    VAR_VOLATILE,
+    VAR_IS_RESTRICT,
+    VAR_FAKE,
+    VAR_IS_LABEL,
+    VAR_IS_ARRAY,
+};
+static UINT g_grmode_flag_num = sizeof(g_grmode_flag) /
+                                sizeof(g_grmode_flag[0]);
+
+//
+//START VarFlag
+//
+bool VarFlag::verify() const
+{
+    VarFlag::Iter it;
+    for (VAR_FLAG v = (VAR_FLAG)get_first_flag(it); !end(it);
+         v = (VAR_FLAG)get_next_flag(it)) {
+        ASSERT0_DUMMYUSE(v > VAR_UNDEF &&
+                         VarFlagDesc::getDescIdx(v) < g_varflag_num);
+    }
+    return true;
+}
+//END VarFlag
+
+
+//
+//START VarFlagDesc
+//
+CHAR const* VarFlagDesc::getName(VAR_FLAG flag)
+{
+    if (flag == VAR_UNDEF) { return g_varflag_desc[0].name; }
+    VarFlag v(flag);
+    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    ASSERT0(bs.get_elem_count() == 1);
+    UINT idx = bs.get_first() + 1;
+    ASSERT0(idx < g_varflag_num);
+    return g_varflag_desc[idx].name;
+}
+
+
+UINT VarFlagDesc::getDescIdx(VAR_FLAG flag)
+{
+    if (flag == VAR_UNDEF) { return 0; }
+    VarFlag v(flag);
+    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    ASSERT0(bs.get_elem_count() == 1);
+    UINT idx = bs.get_first() + 1;
+    ASSERT0(idx < g_varflag_num);
+    return idx;
+}
+
+
+VAR_FLAG VarFlagDesc::getFlag(UINT idx)
+{
+    ASSERT0(idx < g_varflag_num);
+    return g_varflag_desc[idx].flag;
+}
+//END VarFlagDesc
+
 
 void VarTab::dump(TypeMgr const* tm) const
 {
@@ -71,13 +159,13 @@ VarMgr::VarMgr(RegionMgr * rm)
 //
 //START Var
 //
-Var::Var()
+Var::Var() : varflag(VAR_UNDEF)
 {
     VAR_id(this) = 0; //unique id;
     VAR_type(this) = UNDEF_TYID;
     VAR_name(this) = nullptr;
     VAR_string(this) = nullptr;
-    u2.flag = 0; //Record various properties of variable.
+    VAR_flag(this).clean(); //Record various properties of variable.
     align = 0;
 }
 
@@ -102,115 +190,30 @@ void Var::dump(TypeMgr const* tm) const
 }
 
 
+void Var::dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const
+{
+    BitSet grmode_flag_idx_set;
+    for (UINT i = 0; i < g_grmode_flag_num; i++) {
+        grmode_flag_idx_set.bunion(VarFlagDesc::getDescIdx(g_grmode_flag[i]));
+    }
+    VarFlag::Iter it;
+    for (VAR_FLAG v = (VAR_FLAG)VAR_flag(this).get_first_flag(it);
+         !VAR_flag(this).end(it);
+         v = (VAR_FLAG)VAR_flag(this).get_next_flag(it)) {
+        UINT idx = VarFlagDesc::getDescIdx(v);
+        if (grmode && !grmode_flag_idx_set.is_contain(idx)) { continue; }
+        if (!first) { buf.strcat(","); }
+        first = false;
+        CHAR const* name = VarFlagDesc::getName(v);
+        buf.strcat(name);
+    }
+}
+
+
 void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
 {
     bool first = true;
-    if (!grmode) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        if (HAVE_FLAG(VAR_flag(this), VAR_GLOBAL)) {
-            buf.strcat("global");
-        } else if (HAVE_FLAG(VAR_flag(this), VAR_LOCAL)) {
-            buf.strcat("local");
-        } else if (HAVE_FLAG(VAR_flag(this), VAR_FAKE)) {
-            buf.strcat("fake");
-        } else {
-            UNREACHABLE();
-        }
-        if (HAVE_FLAG(VAR_flag(this), VAR_IS_SPILL)) {
-            if (!first) {
-                buf.strcat(",");
-            }
-            first = false;
-            buf.strcat("spill_loc");
-        }
-        if (HAVE_FLAG(VAR_flag(this), VAR_ADDR_TAKEN)) {
-            if (!first) {
-                buf.strcat(",");
-            }
-            first = false;
-            buf.strcat(",addr_taken");
-        }
-        if (HAVE_FLAG(VAR_flag(this), VAR_IS_FORMAL_PARAM)) {
-            if (!first) {
-                buf.strcat(",");
-            }
-            first = false;
-            buf.strcat("formal_param");
-        }
-        if (HAVE_FLAG(VAR_flag(this), VAR_HAS_INIT_VAL)) {
-            if (!first) {
-                buf.strcat(",");
-            }
-            first = false;
-            buf.strcat("has_init_val");
-        }
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_UNALLOCABLE)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("unallocable");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_FUNC_DECL)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("func_decl");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_PRIVATE)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("private");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_READONLY)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("readonly");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_VOLATILE)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("volatile");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_RESTRICT)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("restrict");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_FAKE)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("fake");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_LABEL)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("label");
-    }
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_ARRAY)) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("array");
-    }
+    dumpFlag(buf, grmode, first);
     if (get_align() > 1) {
         if (!first) {
             buf.strcat(",");
@@ -257,7 +260,7 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
             len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
             ::free(local_buf);
         }
-    } else if (VAR_has_init_val(this)) {
+    } else if (has_init_val()) {
         ASSERT0(getByteValue());
         //Initial value can NOT be nullptr.
         if (!first) {
@@ -318,7 +321,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
         buf.strcat(",pointer,pt_base_sz:%d", TY_ptr_base_size(ltype));
     }
 
-    buf.strcat(",%s", dm->getDTypeName(TY_dtype(ltype)));
+    buf.strcat(",%s", TypeMgr::getDTypeName(TY_dtype(ltype)));
     if (TY_dtype(ltype) > D_F128) {
         if (ltype->is_any()) {
             buf.strcat(",mem_size:ANY");
@@ -330,27 +333,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
     buf.strcat(",decl:'");
     dumpVARDecl(buf);
     buf.strcat("'");
-
-    #ifdef _DEBUG_
-    UINT tmpf = VAR_flag(this);
-    REMOVE_FLAG(tmpf, VAR_GLOBAL);
-    REMOVE_FLAG(tmpf, VAR_LOCAL);
-    REMOVE_FLAG(tmpf, VAR_PRIVATE);
-    REMOVE_FLAG(tmpf, VAR_READONLY);
-    REMOVE_FLAG(tmpf, VAR_VOLATILE);
-    REMOVE_FLAG(tmpf, VAR_HAS_INIT_VAL);
-    REMOVE_FLAG(tmpf, VAR_FUNC_DECL);
-    REMOVE_FLAG(tmpf, VAR_FAKE);
-    REMOVE_FLAG(tmpf, VAR_IS_LABEL);
-    REMOVE_FLAG(tmpf, VAR_IS_ARRAY);
-    REMOVE_FLAG(tmpf, VAR_IS_FORMAL_PARAM);
-    REMOVE_FLAG(tmpf, VAR_IS_SPILL);
-    REMOVE_FLAG(tmpf, VAR_ADDR_TAKEN);
-    REMOVE_FLAG(tmpf, VAR_IS_PR);
-    REMOVE_FLAG(tmpf, VAR_IS_RESTRICT);
-    REMOVE_FLAG(tmpf, VAR_IS_UNALLOCABLE);
-    ASSERT0(tmpf == 0);
-    #endif
+    ASSERT0(VAR_flag(this).verify());
     return buf.buf;
 }
 //END Var
@@ -376,7 +359,7 @@ void VarMgr::destroyVar(Var * v)
 
 void VarMgr::destroy()
 {
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get((UINT)i);
         if (v == nullptr) { continue; }
         delete v;
@@ -395,15 +378,14 @@ bool VarMgr::isDedicatedStringVar(CHAR const* name) const
 void VarMgr::assignVarId(Var * v)
 {
     DefSBitSetIter iter = nullptr;
-    INT id = m_freelist_of_varid.get_first(&iter);
+    BSIdx id = m_freelist_of_varid.get_first(&iter);
     ASSERT0(id != VAR_ID_UNDEF);
-    if (id > 0) {
+    if (IS_BSUNDEF(id)) {
+        VAR_id(v) = (UINT)m_var_count++;
+    } else {
         m_freelist_of_varid.diff(id, *m_ru_mgr->get_sbs_mgr());
         VAR_id(v) = id;
-    } else {
-        VAR_id(v) = (UINT)m_var_count++;
     }
-
     ASSERTN(VAR_id(v) < VAR_ID_MAX, ("too many variables"));
     ASSERT0(m_var_vec.get(VAR_id(v)) == nullptr);
     m_var_vec.set(VAR_id(v), v);
@@ -415,7 +397,7 @@ void VarMgr::assignVarId(Var * v)
 //the first.
 Var * VarMgr::findVarByName(Sym const* name)
 {
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
         if (v == nullptr) { continue; }
         if (v->get_name() == name) {
@@ -487,7 +469,7 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
     VAR_string(v) = s;
     VAR_type(v) = m_tm->getString();
     VAR_align(v) = align;
-    VAR_is_global(v) = true;
+    v->setToGlobal(true);
     assignVarId(v);
     m_str_tab.set(s, v);
     return v;
@@ -502,8 +484,8 @@ void VarMgr::dumpFreeIDList() const
     prt(rm, "\nVarMgr: FREE VAR ID:");
     DefSBitSetIter iter = nullptr;
     bool first = true;
-    for (INT id = m_freelist_of_varid.get_first(&iter);
-         id != -1; id = m_freelist_of_varid.get_next(id, &iter)) {
+    for (BSIdx id = m_freelist_of_varid.get_first(&iter);
+         id != BS_UNDEF; id = m_freelist_of_varid.get_next(id, &iter)) {
         if (!first) { prt(rm, ","); }
         prt(rm, "%d", id);
         first = false;
@@ -518,7 +500,7 @@ void VarMgr::dump() const
     prt(rm, "\n\nVAR to Decl Mapping:");
 
     StrBuf buf(64);
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
         if (v == nullptr) { continue; }
 

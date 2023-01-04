@@ -70,22 +70,23 @@ class CfsMgr;
 #define SIMP_cfs_mgr(s) (s)->cfs_mgr
 class SimpCtx {
 public:
+    typedef UINT BitUnion;
     union {
-        UINT flag_value;
+        BitUnion flag_value;
         struct {
             //Propagate these flags top down to simplify IR.
-            UINT simp_if:1; //simplify IF.
-            UINT simp_do_loop:1; //simplify DO_LOOP.
-            UINT simp_do_while:1; //simplify DO_WHILE.
-            UINT simp_while_do:1; //simplify WHILE_DO.
-            UINT simp_switch:1; //simplify SWITCH.
-            UINT simp_select:1; //simplify SELECT.
-            UINT simp_array:1; //simplify ARRAY.
-            UINT simp_break:1; //simplify BREAK.
-            UINT simp_continue:1; //simplify CONTINUE.
-            UINT simp_logcial_or_and:1; //simplify LOR, LAND.
-            UINT simp_logcial_not:1; //simplify LNOT.
-            UINT simp_ild_ist:1; //simplify ILD and IST.
+            BitUnion simp_if:1; //simplify IF.
+            BitUnion simp_do_loop:1; //simplify DO_LOOP.
+            BitUnion simp_do_while:1; //simplify DO_WHILE.
+            BitUnion simp_while_do:1; //simplify WHILE_DO.
+            BitUnion simp_switch:1; //simplify SWITCH.
+            BitUnion simp_select:1; //simplify SELECT.
+            BitUnion simp_array:1; //simplify ARRAY.
+            BitUnion simp_break:1; //simplify BREAK.
+            BitUnion simp_continue:1; //simplify CONTINUE.
+            BitUnion simp_logcial_or_and:1; //simplify LOR, LAND.
+            BitUnion simp_logcial_not:1; //simplify LNOT.
+            BitUnion simp_ild_ist:1; //simplify ILD and IST.
 
             //Propagate info top down.
             //Simplify IR tree to the tree with lowest height,
@@ -96,7 +97,7 @@ public:
             //  st(id, add(ld(v2), ld(v3)))
             //Here, add is non-leaf IR, its children can
             //not be non-leaf node anymore.
-            UINT simp_to_lowest_height:1;
+            BitUnion simp_to_lowest_height:1;
 
             //Propagate info top down.
             //Operand only can be PR.
@@ -106,7 +107,7 @@ public:
             //        pr3=ild(P2)
             //        st(pr1, pr3)
             //And this IR tree is unpermittable: ADD(LD(ID1), P1)
-            UINT simp_to_pr_mode:1;
+            BitUnion simp_to_pr_mode:1;
 
             //Propagate info top down.
             //Store array value into individual PR, but keep array operation
@@ -117,7 +118,7 @@ public:
             //    pr1 = array(a)
             //    pr2 = array(b)
             //    add(pr1, pr2)
-            UINT simp_array_to_pr_mode:1;
+            BitUnion simp_array_to_pr_mode:1;
 
             //Propagate info top down.
             //If it is true function return array's value, or else return
@@ -128,36 +129,36 @@ public:
             //If the flag is false, function return the address expression:
             //    &a + i*elem_size + j,
             //Or else return ILD(&a + i*elem_size + j).
-            UINT simp_to_get_array_value:1;
+            BitUnion simp_to_get_array_value:1;
 
             //Propagate info top down.
             //If it is true, simplfy Control-Flow-Struct stmt only.
-            UINT simp_cfs_only:1;
+            BitUnion simp_cfs_only:1;
 
             //Propagate info top down.
             //Record high level Control-Flow-Struct info.
-            UINT is_record_cfs:1;
+            BitUnion is_record_cfs:1;
         } s1;
     } prop_top_down;
 
     union {
-        BYTE flag_value;
+        BitUnion flag_value;
         struct {
             //Propagate info bottom up.
             //Record whether exp or stmt has changed.
-            BYTE something_has_changed:1;
+            BitUnion something_has_changed:1;
 
             //Propagate info bottom up.
             //To inform Region to reconstruct bb list.
             //If this flag is true, DU info and
             //DU chain also need to be rebuilt.
-            BYTE need_to_reconstruct_bb_list:1;
+            BitUnion need_to_reconstruct_bb_list:1;
 
             //Propagate info bottom up.
             //To inform Region to rebuild DU chain.
             //If this flag is true, DU info and
             //DU chain also need to be rebuilt.
-            BYTE need_to_rebuild_du_chain : 1;
+            BitUnion need_to_rebuild_du_chain : 1;
         } s1;
     } prop_bottom_up;
 
@@ -175,9 +176,8 @@ public:
     LabelInfo const* break_label; //record the current LOOP/IF/SWITCH end label.
     LabelInfo const* continue_label; //record the current LOOP start label.
     OptCtx const* optctx; //record current OptCtx for region.
-
 public:
-    SimpCtx() { init(); }
+    SimpCtx(OptCtx const* oc) { init(); SIMP_optctx(this) = oc; }
     SimpCtx(SimpCtx const& s) { copy(s); }
     SimpCtx const& operator = (SimpCtx const&);
 
@@ -189,6 +189,7 @@ public:
         SIMP_continue_label(this) = SIMP_continue_label(&s);
         prop_top_down = s.prop_top_down;
         SIMP_stmtlist(this) = nullptr;
+        SIMP_optctx(this) = SIMP_optctx(&s);
     }
 
     void init() { clean(); }
@@ -207,10 +208,11 @@ public:
     {
         prop_top_down.flag_value = 0;
         prop_bottom_up.flag_value = 0;
-        ir_stmt_list = nullptr;
-        cfs_mgr = nullptr;
-        break_label = nullptr;
-        continue_label = nullptr;
+        SIMP_stmtlist(this) = nullptr;
+        SIMP_cfs_mgr(this) = nullptr;
+        SIMP_optctx(this) = nullptr;
+        SIMP_break_label(this) = nullptr;
+        SIMP_continue_label(this) = nullptr;
     }
 
     //Unify the actions which propagated top down
@@ -218,13 +220,22 @@ public:
     void copyTopdownFlag(SimpCtx const& c)
     {
         prop_top_down = c.prop_top_down;
-        cfs_mgr = c.cfs_mgr;
+        SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&c);
     }
 
     //Copy the actions which propagated bottom up
     //during processing IR tree.
     void copyBottomupFlag(SimpCtx const& c)
     { prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
+
+    //Clean the actions which propagated bottom up
+    //during processing IR tree.
+    void cleanBottomupFlag()
+    {
+        SIMP_changed(this) = false;
+        SIMP_need_recon_bblist(this) = false;
+        SIMP_need_rebuild_du_chain(this) = false;
+    }
 
     //Return the stmt list that recorded in the context.
     IR * getStmtList() { return SIMP_stmtlist(this); }
@@ -234,7 +245,7 @@ public:
 
     //Unify the actions which propagated bottom up
     //during processing IR tree.
-    void unionBottomupFlag(SimpCtx const& c)
+    void unionBottomUpInfo(SimpCtx const& c)
     {
         SIMP_changed(this) |= SIMP_changed(&c);
         SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
@@ -243,6 +254,9 @@ public:
 
     //Return true if BB list need to be reconstructed.
     bool needReconBBList() const { return SIMP_need_recon_bblist(this); }
+
+    //Return true if SSA/Classic DU chain need to be rebuild.
+    bool needRebuildDUChain() const { return SIMP_need_rebuild_du_chain(this); }
 
     //Set action flags to simplify control flow structure.
     void setSimpCFS()
@@ -330,11 +344,31 @@ public:
 };
 
 
+//This pass is very important to multiple level IR compiler. It simplifies or
+//transforms one level IR to another lower or equivalent level IR each time.
+//The class provides default api and rules to simplify higher level IR to
+//lower level IR in XOC framework. Also provides two kinds of simplification
+//in general purpose, one is lowest height simplification, the other is PR-mode
+//simplification.
+//Lowest height means the height of IR tree in stmt will not more than 2.
+//e.g: stpr $1 = add (ld a, sub (ld b, ld c));
+//  The height of RHS of stpr is 3, after lowest-height simplification,
+//  stmt list will be:
+//     stpr $x = sub (ld b, ld c) //S2
+//     stpr $1 = add (ld a, $x)  //S1
+//  The height of RHS of S1 is 2.
+//The PR-mode means all opcode only operate PR in each expression/stmt.
+//e.g: stpr $1 = add (ld a, ld c);
+//  after PR-mode simplification, stmt list will be:
+//     stpr $x = ld a
+//     stpr $y = ld b
+//     stpr $1 = add ($x, $y)
 class IRSimp : public Pass {
     COPY_CONSTRUCTOR(IRSimp);
 private:
     TypeMgr * m_tm;
-private:
+    IRMgr * m_irmgr;
+protected:
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
     //Note that if ARRAY or ILD still not be lowered at the moment, regarding
@@ -368,8 +402,14 @@ private:
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
     bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
                                SimpCtx * ctx);
+    virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
 public:
-    explicit IRSimp(Region * rg) : Pass(rg) { m_tm = rg->getTypeMgr(); }
+    explicit IRSimp(Region * rg) : Pass(rg)
+    {
+        m_tm = rg->getTypeMgr();
+        m_irmgr = rg->getIRMgr();
+    }
     virtual ~IRSimp() {}
 
     virtual CHAR const* getPassName() const
@@ -386,14 +426,13 @@ public:
     IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
     IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
     void simplifySelectKids(IR * ir, SimpCtx * cont);
-    IR * simplifyStore(IR * ir, SimpCtx * cont);
+    IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
+    IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
     void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
-    IR * simplifyStorePR(IR * ir, SimpCtx * cont);
     IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
     IR * simplifySetelem(IR * ir, SimpCtx * ctx);
     IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyIStore(IR * ir, SimpCtx * cont);
     IR * simplifyCall(IR * ir, SimpCtx * cont);
     IR * simplifyIf(IR * ir, SimpCtx * cont);
     IR * simplifyWhileDo(IR * ir, SimpCtx * cont);

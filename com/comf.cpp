@@ -173,8 +173,6 @@ UINT computeMaxBitSizeForValue(ULONGLONG value)
 //not exceed bufl.
 CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...)
 {
-    //CHAR * ptr = (CHAR*)&info;
-    //ptr += sizeof(CHAR*);
     size_t l = ::strlen(buf);
     if (l >= bufl) { return buf; }
 
@@ -536,29 +534,28 @@ void xstrcpy(CHAR * tgt, CHAR const* src, size_t size)
 }
 
 
-//Reverse the string.
-UCHAR * reverseString(UCHAR * v)
+CHAR * rotateString(MOD CHAR * str, UINT n)
 {
-    INT end = (INT)strlen((CHAR*)v) - 1;
-    INT start = 0;
-    while (start <= end - 1) {
-        BYTE b = v[start];
-        v[start] = v[end];
-        v[end] = b;
-        start++;
-        end--;
-    }
+    xcom::rotate_buffer(str, ::strlen(str), n);
+    return str;
+}
+
+
+//Reverse the string.
+CHAR * reverseString(CHAR * v)
+{
+    xcom::reverse_buffer(v, ::strlen(v));
     return v;
 }
 
 
 //Convert long to string.
-UCHAR * xltoa(LONG v, OUT UCHAR * buf)
+CHAR * xltoa(LONG v, OUT CHAR * buf)
 {
     UCHAR const p [] = {'0','1','2','3','4','5','6','7','8','9'};
     bool sign = false;
     if (v < 0) { v = -v; sign = true; }
-    UCHAR * str = buf;
+    CHAR * str = buf;
 
     LONG rem = 0;
     while (v != 0) {
@@ -856,7 +853,7 @@ CHAR * upper(CHAR * n)
     l--;
     while (l >= 0) {
         if (n[l] >= 'a' && n[l] <= 'z') {
-            n[l] = n[l] - 32;
+            n[l] = (CHAR)(n[l] - 32);
         }
         l--;
     }
@@ -871,7 +868,7 @@ CHAR * lower(CHAR * n)
     l--;
     while (l >= 0) {
         if (n[l] >= 'A' && n[l] <= 'Z') {
-            n[l] = n[l] + 32;
+            n[l] = (CHAR)(n[l] + 32);
         }
         l--;
     }
@@ -1432,6 +1429,93 @@ OVER:
     buf[buflen - 1] = '\0';
     va_end(stack_start);
     return buf;
+}
+
+
+static BYTE g_char2hex[] = {
+    0, //'0'
+    1, //'1'
+    2, //'2'
+    3, //'3'
+    4, //'4'
+    5, //'5'
+    6, //'6'
+    7, //'7'
+    8, //'8'
+    9, //'9'
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    10, //'A'
+    11, //'B'
+    12, //'C'
+    13, //'D'
+    14, //'E'
+    15, //'F'
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    10, //'a'
+    11, //'b'
+    12, //'c'
+    13, //'d'
+    14, //'e'
+    15, //'f'
+};
+
+
+//The function converts a character into hex.
+//Note the content in given buf must be string format of hex, that is 'c'
+//can only be "abcdefABCDEF0123456789".
+BYTE charToHex(CHAR c)
+{
+    ASSERT0(c >= '0' && c <= 'f');
+    return g_char2hex[c - '0'];
+}
+
+
+//The function converts string content into set of hex and store in the 'buf'.
+//Note the content in given buf must be string format of hex, that is the
+//string can only contain "abcdefABCDEF0123456789".
+//string: a string that represents bytes, where a byte consists of two hex.
+//        e.g:ADBC5E demostrates three bytes, 0xAD, 0xBC, and 0x5E.
+void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen)
+{
+    size_t stringlen = ::strlen(string);
+    ASSERTN(stringlen/2 <= buflen,
+            ("buffer is too small to hold hex, expect %u bytes", stringlen/2));
+    for (UINT i = 0; i < stringlen - 1; i += 2) {
+        BYTE high = charToHex(string[i]);
+        BYTE low = charToHex(string[i + 1]);
+        buf[i/2] = (BYTE)(low | (high << 4));
+    }
 }
 
 } //namespace xcom

@@ -42,7 +42,7 @@ class Dex2IR;
 
 class DexRegion : public Region {
 protected:
-    VAR2PR m_var2pr; //map from var id to prno.
+    Var2PR m_var2pr; //map from var to prno.
     Dex2IR * m_dex2ir;
     Prno2Vreg * m_prno2v;
     TypeIndexRep * m_type_index_rep;

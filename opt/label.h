@@ -115,10 +115,19 @@ public:
     void dump(Region const* rg) const;
     void dumpName(Region const* rg) const;
 
+    //Format and return label name which is usually used to dump.
     CHAR const* getName(MOD StrBuf * buf) const;
+
+    //Return the original label name without pretty formatting.
     Sym const* getOrgName() const { return LABELINFO_name(this); }
+
+    //Return the label number if current label is ILABEL.
     UINT getNum() const { return LABELINFO_num(this); }
+
+    //Return current label type.
     LABEL_TYPE getType() const { return LABELINFO_type(this); }
+
+    //Return pragma string if current label is pragma.
     Sym const* getPragma() const { return LABELINFO_pragma(this); }
 
     //Return true if label can not be removed.

@@ -38,15 +38,25 @@ namespace xcom {
 
 #define MAGIC_METHOD
 #define VERTEX_UNDEF 0
-#define RPO_INTERVAL 5
-#define RPO_INIT_VAL 0
-#define RPO_UNDEF -1
+
+#define HEIGHT_UNDEF ((VexIdx)-1)
+//The height of root is 0.
+#define HEIGHT_INIT_VAL 0
 
 class Vertex;
 class Edge;
 class EdgeC;
 class Graph;
 class BMat;
+class DomTree;
+
+//Adjacent Vertex Iterator.
+typedef EdgeC const* AdjVertexIter;
+typedef EdgeC const* AdjVertexIter;
+
+//Adjacent Vertex Iterator.
+typedef EdgeC const* AdjEdgeIter;
+typedef EdgeC const* AdjEdgeIter;
 
 #define EDGE_next(e) ((e)->next)
 #define EDGE_prev(e) ((e)->prev)
@@ -77,28 +87,46 @@ public:
     Vertex * to() const { return EDGE_to(this); }
 };
 
+typedef UINT VexIdx;
 
 #define VERTEX_next(v) ((v)->next)
 #define VERTEX_prev(v) ((v)->prev)
-#define VERTEX_id(v) ((v)->_id)
-#define VERTEX_rpo(v) ((v)->_rpo)
-#define VERTEX_in_list(v) ((v)->in_list)
-#define VERTEX_out_list(v) ((v)->out_list)
-#define VERTEX_info(v) ((v)->_info)
+#define VERTEX_id(v) ((v)->m_id)
+#define VERTEX_rpo(v) ((v)->u1.m_rpo)
+#define VERTEX_height(v) ((v)->u1.m_height)
+#define VERTEX_in_list(v) ((v)->m_in_list)
+#define VERTEX_out_list(v) ((v)->m_out_list)
+#define VERTEX_info(v) ((v)->m_info)
 class Vertex {
 public:
     Vertex * prev; //used by FreeList and HASH
     Vertex * next; //used by FreeList and HASH
-    EdgeC * in_list; //incoming edge list
-    EdgeC * out_list;//outgoing edge list
-    UINT _id;
-    INT _rpo;
-    void * _info;
+    EdgeC * m_in_list; //incoming edge list
+    EdgeC * m_out_list;//outgoing edge list
+    VexIdx m_id;
+    union {
+        VexIdx m_height;
+        RPOVal m_rpo;
+    } u1;
+    void * m_info;
 public:
+    void clone(Vertex const* src) { u1 = src->u1; }
+
     void init()
-    { prev = nullptr, next = nullptr, in_list = nullptr, out_list = nullptr,
-      _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = nullptr; }
-    UINT id() const { return VERTEX_id(this); }
+    {
+        prev = nullptr;
+        next = nullptr;
+        m_in_list = nullptr;
+        m_out_list = nullptr;
+        m_id = VERTEX_UNDEF;
+        //Rpo should have same initial value with height because they share
+        //same memory.
+        ASSERT0(RPO_UNDEF == (RPOVal)HEIGHT_UNDEF);
+        VERTEX_rpo(this) = RPO_UNDEF;
+        VERTEX_height(this) = HEIGHT_UNDEF;
+        m_info = nullptr;
+    }
+    VexIdx id() const { return VERTEX_id(this); }
     void * info() const { return VERTEX_info(this); }
 
     UINT getInDegree() const;
@@ -107,12 +135,16 @@ public:
     EdgeC * getInList() const { return VERTEX_in_list(this); }
 
     //Return the vertex that is the source-vertex of Nth in-edge.
-    Vertex const* getNthInVertex(UINT n) const;
+    Vertex * getNthInVertex(UINT n) const;
 
     //Return the vertex that is the sink-vertex of Nth out-edge.
-    Vertex const* getNthOutVertex(UINT n) const;
+    Vertex * getNthOutVertex(UINT n) const;
 
-    INT rpo() const { return VERTEX_rpo(this); }
+    //Return the height if current vertex is regarded as tree node.
+    VexIdx getHeight() const { return VERTEX_height(this); }
+
+    //Return RPO.
+    RPOVal rpo() const { return VERTEX_rpo(this); }
 };
 
 
@@ -129,9 +161,9 @@ public:
     void init() { next = nullptr, prev = nullptr, edge = nullptr; }
 
     Vertex * getTo() const { return EDGE_to(EC_edge(this)); }
-    UINT getToId() const { return VERTEX_id(EDGE_to(EC_edge(this))); }
+    VexIdx getToId() const { return VERTEX_id(EDGE_to(EC_edge(this))); }
     Vertex * getFrom() const { return EDGE_from(EC_edge(this)); }
-    UINT getFromId() const { return VERTEX_id(EDGE_from(EC_edge(this))); }
+    VexIdx getFromId() const { return VERTEX_id(EDGE_from(EC_edge(this))); }
     EdgeC * get_next() const { return EC_next(this); }
     EdgeC * get_prev() const { return EC_prev(this); }
     Edge * getEdge() const { return EC_edge(this); }
@@ -147,8 +179,8 @@ public:
         //This might cause much hash conflict accroding to hash
         //element value.
         ASSERT0(isPowerOf2(bs));
-        return hash32bit(MAKE_VALUE(VERTEX_id(EDGE_from(e)),
-                                    VERTEX_id(EDGE_to(e)))) & (bs - 1);
+        return hash32bit((UINT32)MAKE_VALUE(e->from()->id(), e->to()->id()))
+               & (bs - 1);
     }
 
     UINT get_hash_value(OBJTY val, UINT bs) const
@@ -232,7 +264,7 @@ public:
     UINT get_hash_value(Vertex const* vex, UINT bs) const
     {
         ASSERT0(isPowerOf2(bs));
-        return hash32bit(VERTEX_id(vex)) & (bs - 1);
+        return hash32bit((UINT32)vex->id()) & (bs - 1);
     }
 
     bool compare(Vertex * v1, Vertex * v2) const
@@ -258,7 +290,7 @@ public:
                                                       m_ec_pool);
         ASSERT0(vex);
         ::memset(vex, 0, sizeof(Vertex));
-        VERTEX_id(vex) = (UINT)(size_t)v;
+        VERTEX_id(vex) = (VexIdx)(size_t)v;
         return vex;
     }
     size_t count_mem() const
@@ -269,9 +301,21 @@ public:
 };
 
 typedef EdgeTabIter EdgeIter;
-typedef INT VertexIter;
-typedef C<Vertex const*> * RPOVexListIter;
-class RPOVexList : public List<Vertex const*> {
+typedef VecIdx VertexIter;
+
+typedef TTabIter<Vertex const*> VexTabIter;
+class VexTab : public TTab<Vertex const*> {
+public:
+    void add(Vertex const* v) { append(v); }
+    void add(VexTab const& src)
+    {
+        VexTabIter it;
+        for (Vertex const* t = src.get_first(it);
+             t != nullptr; t = src.get_next(it)) {
+            append(t);
+        }
+    }
+    void dump(FILE * h) const;
 };
 
 //A graph G = (V, E), consists of a set of vertices, V, and a set of edges, E.
@@ -293,7 +337,6 @@ protected:
     //vertices are not more than one.
     BYTE m_is_unique:1;
     BYTE m_is_direction:1; //true if graph is direction.
-    UINT m_edge_hash_size;
     UINT m_vex_hash_size;
     UINT m_dense_vex_num; //record the number of vertex in dense mode.
     //record vertex if vertex id is densen distribution.
@@ -315,7 +358,7 @@ protected:
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         ASSERT0(vex && e);
         EdgeC * last = nullptr;
-        for (EdgeC * el = VERTEX_out_list(vex); el != nullptr; el = EC_next(el)) {
+        for (EdgeC * el = vex->getOutList(); el != nullptr; el = EC_next(el)) {
             last = el;
             if (EC_edge(el) == e) { return el; }
         }
@@ -331,7 +374,7 @@ protected:
         ASSERTN(m_ec_pool, ("not yet initialized."));
         ASSERT0(vex && e);
         EdgeC * last = nullptr;
-        for (EdgeC * el = VERTEX_in_list(vex); el != nullptr; el = EC_next(el)) {
+        for (EdgeC * el = vex->getInList(); el != nullptr; el = EC_next(el)) {
             last = el;
             if (EC_edge(el) == e) { return el; }
         }
@@ -357,7 +400,7 @@ protected:
         return vex;
     }
 
-    inline Edge * newEdge(UINT from, UINT to)
+    inline Edge * newEdge(VexIdx from, VexIdx to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         Vertex * fp = addVertex(from);
@@ -365,7 +408,7 @@ protected:
         return newEdge(fp, tp);
     }
     Edge * newEdge(Vertex * from, Vertex * to);
-    Vertex * newVertex(UINT vid);
+    Vertex * newVertex(VexIdx vid);
 
     inline Edge * newEdgeImpl(Vertex * from, Vertex * to,
                               OUT EdgeC ** inec, OUT EdgeC ** outec)
@@ -405,14 +448,14 @@ protected:
                                     DefMiscBitSetMgr & bs_mgr);
     Graph * self() { return this; }
 public:
-    Graph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    Graph(UINT vex_hash_size = 64);
     Graph(Graph const& g);
     Graph const& operator = (Graph const&);
     virtual ~Graph() { destroy(); }
 
     void init();
     void destroy();
-    inline Edge * addEdge(UINT from, UINT to)
+    inline Edge * addEdge(VexIdx from, VexIdx to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return newEdge(from, to);
@@ -427,17 +470,17 @@ public:
     //     For any new edge, the default position is the last of in/out list,
     //     thus the pos should not greater than the number of predecessors + 1.
     //     e.g: there are 2 predecessors of 'to', pos can not greater than 2.
-    void addEdgeAtPos(List<UINT> const& fromlist, Vertex * to, UINT pos);
-    inline Vertex * addVertex(UINT vid)
+    void addEdgeAtPos(List<VexIdx> const& fromlist, Vertex * to, UINT pos);
+    inline Vertex * addVertex(VexIdx vid)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         if (is_dense()) {
-            Vertex * vex = m_dense_vertex->get(vid);
+            Vertex * vex = m_dense_vertex->get((VecIdx)vid);
             if (vex != nullptr) {
                 return vex;
             }
             vex = newVertex(vid);
-            m_dense_vertex->set(vid, vex);
+            m_dense_vertex->set((VecIdx)vid, vex);
             m_dense_vex_num++;
             return vex;
         }
@@ -449,14 +492,16 @@ public:
         return m_sparse_vertex->append(newVertex(vid));
     }
 
-    //Sort vertice by RPO order, and update rpo of vertex.
-    //Record sorted vertex into vlst in incremental order of RPO.
-    //NOTE: rpo start at RPO_INIT_VAL.
-    void computeRPONoRecursive(MOD Vertex * root, OUT RPOVexList & vlst) const;
-    bool clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
+    void clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
+
     //Count memory usage for current object.
     size_t count_mem() const;
 
+    void dumpHeight(FILE * h) const;
+    void dumpAllVertices(FILE * h) const;
+    void dumpAllEdges(FILE * h) const;
+    virtual void dumpVertexAux(FILE * h, Vertex const* v) const;
+    virtual void dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const;
     virtual void dumpVertex(FILE * h, Vertex const* v) const;
     virtual void dumpEdge(FILE * h, Edge const* e) const;
     void dumpDOT(CHAR const* name = nullptr) const;
@@ -468,7 +513,7 @@ public:
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
     {
-        for (EdgeC * e = VERTEX_out_list(v); e != nullptr; e = EC_next(e)) {
+        for (EdgeC * e = v->getOutList(); e != nullptr; e = EC_next(e)) {
             if (EDGE_to(EC_edge(e)) == succ) {
                 return true;
             }
@@ -479,7 +524,7 @@ public:
     //Return true if 'pred' is predecessor of 'v'.
     bool is_pred(Vertex const* v, Vertex const* pred) const
     {
-        for (EdgeC const* e = VERTEX_in_list(v); e != nullptr; e = EC_next(e)) {
+        for (EdgeC const* e = v->getInList(); e != nullptr; e = EC_next(e)) {
             if (e->getFrom() == pred) {
                 return true;
             }
@@ -494,31 +539,27 @@ public:
     //Return true if exist a path start from 'start' to 'v', which livein
     //from 'pred' vertex.
     //pred: the predecessor of v.
-    bool is_livein_from(UINT v, UINT pred, UINT start) const
+    bool is_livein_from(VexIdx v, VexIdx pred, VexIdx start) const
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return is_livein_from(getVertex(v), getVertex(pred), getVertex(start));
     }
     bool is_livein_from(Vertex const* v, Vertex const* pred,
                         Vertex const* start) const;
-    void insertVertexBetween(IN Vertex * v1,
-                             IN Vertex * v2,
-                             IN Vertex * newv,
+    void insertVertexBetween(IN Vertex * v1, IN Vertex * v2, IN Vertex * newv,
                              OUT Edge ** e1 = nullptr,
                              OUT Edge ** e2 = nullptr,
                              bool sort = true);
-    void insertVertexBetween(UINT v1,
-                             UINT v2,
-                             UINT newv,
+    void insertVertexBetween(VexIdx v1, VexIdx v2, VexIdx newv,
                              OUT Edge ** e1 = nullptr,
                              OUT Edge ** e2 = nullptr,
                              bool sort = true);
     bool is_graph_entry(Vertex const* v) const
-    { return VERTEX_in_list(v) == nullptr; }
+    { ASSERT0(v); return v->getInList() == nullptr; }
 
     //Return true if vertex is exit node of graph.
     bool is_graph_exit(Vertex const* v) const
-    { return VERTEX_out_list(v) == nullptr; }
+    { ASSERT0(v); return v->getOutList() == nullptr; }
 
     //Return true if In-Degree of 'vex' equal to 'num'.
     bool isInDegreeEqualTo(Vertex const* vex, UINT num) const;
@@ -527,24 +568,36 @@ public:
     bool isOutDegreeEqualTo(Vertex const* vex, UINT num) const;
 
     //Return true if vid indicates the graph vertex.
-    bool isVertex(UINT vid) const { return getVertex(vid) != nullptr; }
+    bool isVertex(VexIdx vid) const { return getVertex(vid) != nullptr; }
+
+    //Return true if v is the vertex that allocated in current graph.
+    bool isVertex(Vertex const* v) const { return getVertex(v->id()) == v; }
 
     //Return true if vid indicates the graph vertex.
-    bool isEdge(UINT from, UINT to) const
+    bool isEdge(VexIdx from, VexIdx to) const
     { return getEdge(from, to) != nullptr; }
 
-    //Return true if rpo is available to assign to a new vertex.
-    //And the rpo will not repeat with other vertex.
-    static bool isUsableRPO(INT rpo)
-    { return rpo >= 0 && ((rpo % RPO_INTERVAL) != 0); }
+    //The function try to answer whether 'reachin' can reach 'start' from one of
+    //in-vertexs of 'start'. Return false if it is not or unknown.
+    //try_limit: the maximum time to try.
+    //try_failed: return true if the function running exceed the try_limit.
+    static bool isReachIn(Vertex const* start, Vertex const* reachin,
+                          UINT try_limit, OUT bool & try_failed);
+
+    //Return true if vex can reach graph exit.
+    //Note the function is costly and use with caution.
+    //try_limit: the maximum time to try.
+    //try_failed: return true if the function running exceed the try_limit.
+    bool isReachExit(Vertex const* vex, UINT try_limit,
+                     OUT bool & try_failed);
 
     //Erasing graph, include all nodes and edges,
     //except for EdgeInfo and VertexInfo.
     void erase();
 
-    bool getNeighborList(MOD List<UINT> & ni_list, UINT vid) const;
-    bool getNeighborSet(OUT DefSBitSet & niset, UINT vid) const;
-    UINT getDegree(UINT vid) const
+    bool getNeighborList(MOD List<VexIdx> & ni_list, VexIdx vid) const;
+    bool getNeighborSet(OUT DefSBitSet & niset, VexIdx vid) const;
+    UINT getDegree(VexIdx vid) const
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return getDegree(getVertex(vid));
@@ -563,15 +616,15 @@ public:
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return m_edgetab.get_elem_count();
     }
-    inline Vertex * getVertex(UINT vid) const
+    inline Vertex * getVertex(VexIdx vid) const
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         if (is_dense()) {
-            return m_dense_vertex->get(vid);
+            return m_dense_vertex->get((VecIdx)vid);
         }
         return (Vertex*)m_sparse_vertex->find((OBJTY)(size_t)vid);
     }
-    Edge * getEdge(UINT from, UINT to) const;
+    Edge * getEdge(VexIdx from, VexIdx to) const;
     Edge * getEdge(Vertex const* from, Vertex const* to) const;
     Edge * get_first_edge(EdgeIter & it) const
     {
@@ -583,10 +636,16 @@ public:
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return m_edgetab.get_next(it);
     }
-    Vertex * get_first_vertex(VertexIter & cur) const;
-    Vertex * get_next_vertex(VertexIter & cur) const;
-    Vertex * get_last_vertex(VertexIter & cur) const;
-    Vertex * get_prev_vertex(VertexIter & cur) const;
+    Vertex * get_first_vertex(VertexIter & it) const;
+    Vertex * get_next_vertex(VertexIter & it) const;
+    Vertex * get_last_vertex(VertexIter & it) const;
+    Vertex * get_prev_vertex(VertexIter & it) const;
+    static Vertex * get_first_in_vertex(Vertex const* vex, AdjVertexIter & it);
+    static Vertex * get_next_in_vertex(AdjVertexIter & it);
+    static Vertex * get_first_out_vertex(Vertex const* vex, AdjVertexIter & it);
+    static Vertex * get_next_out_vertex(AdjVertexIter & it);
+    static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
+    static Edge * get_next_out_edge(AdjEdgeIter & it);
 
     void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
     Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
@@ -597,25 +656,25 @@ public:
                       OUT UINT * pos_in_inlist = nullptr);
     void removeEdgeBetween(Vertex * v1, Vertex * v2);
     Vertex * removeVertex(Vertex * vex);
-    Vertex * removeVertex(UINT vid)
+    Vertex * removeVertex(VexIdx vid)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return removeVertex(getVertex(vid));
     }
     void removeTransitiveEdge();
 
-    //Replace orginal predecessor with a list of new source vertex.
-    //Return the position of 'from' that is in the predecessor list of 'to'.
-    //newfrom: record a list of new source vertex id.
-    //from: original source vertex id
-    //to: original target vertex id
-    UINT replaceSource(UINT from, UINT to, List<UINT> const& newfrom);
+    //Replace orginal in-vertex with a list of new vertex.
+    //Return the position of 'from' that is in the in-vertex list of 'to'.
+    //newin: record a list of new vertex id.
+    //from: original in-vertex id
+    //to: original out-vertex id
+    VexIdx replaceInVertex(VexIdx from, VexIdx to, List<VexIdx> const& newin);
 
     //Sort graph vertices in topological order.
     //vex_vec: record vertics in topological order.
     //Return true if sorting success, otherwise there exist cycles in graph.
-    //Note you should NOT retrieve vertex in 'vex_vec' via vertex's index because
-    //they are stored in dense manner.
+    //Note you should NOT retrieve vertex in 'vex_vec' via vertex's index
+    //because they are stored in dense manner.
     bool sortInTopologOrder(OUT Vector<Vertex*> & vex_vec);
     void set_unique(bool is_unique)
     {
@@ -654,41 +713,13 @@ public:
         }
     }
 
-    //Return true if find an order of RPO for 'v'
-    //that less than order of 'ref'.
-    static bool tryFindLessRPO(Vertex * v, Vertex const* ref);
-
     //Compute which predecessor is pred_vex_id to 'vex'.
     //e.g: If pred_vex_id is the first predecessor, return 0.
     //pred_vex_id: vertex id of predecessor.
     //Note 'pred_vex_id' must be one of predecessors of 'vex'.
-    static UINT WhichPred(UINT pred_vex_id, Vertex const* vex)
-    {
-        UINT n = 0;
-        for (xcom::EdgeC const* c = vex->getInList();
-             c != nullptr; c = c->get_next()) {
-            xcom::Vertex const* in = c->getFrom();
-            if (in->id() == pred_vex_id) {
-                return n;
-            }
-            n++;
-        }
-        UNREACHABLE(); //pred_vex_id should be a predecessor of vex.
-        return 0;
-    }
+    static VexIdx WhichPred(VexIdx pred_vex_id, Vertex const* vex);
 };
 
-
-//This class indicate a Dominator Tree.
-class DomTree : public Graph {
-public:
-    DomTree() {}
-    Vertex const* getParent(Vertex const* v) const
-    {
-        ASSERT0(getVertex(v->id()) == v);
-        return v->getNthInVertex(0);
-    }
-};
 
 typedef BitSet DomSet;
 
@@ -697,60 +728,117 @@ typedef BitSet DomSet;
 //
 class DGraph : public Graph {
 protected:
+    BitSetMgr * m_bs_mgr;
     Vector<BitSet*> m_dom_set; //record dominator-set of each vertex.
     Vector<BitSet*> m_pdom_set; //record post-dominator-set of each vertex.
-    Vector<INT> m_idom_set; //immediate dominator.
-    Vector<INT> m_ipdom_set; //immediate post dominator.
-    BitSetMgr * m_bs_mgr;
-    void _removeUnreachNode(UINT id, BitSet & visited);
-    void freeDomPdomSet(UINT vid);
-    bool verifyPdom(DGraph & g, List<Vertex const*> const& rpovlst) const;
-    bool verifyDom(DGraph & g, List<Vertex const*> const& rpovlst) const;
+    Vector<VexIdx> m_idom_set; //immediate dominator.
+    Vector<VexIdx> m_ipdom_set; //immediate post dominator.
+    RPOMgr m_rpomgr;
+protected:
+    //The function will compute idom for subgraph that rooted by 'entry'.
+    bool computeIdom2SubGraph(Vertex const* entry,
+                              List<Vertex const*> const& vlst);
+    void freeDomSet(VexIdx vid);
+    void freePdomSet(VexIdx vid);
+    void removeUnreachNodeRecur(VexIdx id, BitSet & visited);
+    bool verifyPdom(DGraph & g, RPOVexList const& rpovlst) const;
+    bool verifyDom(DGraph & g, RPOVexList const& rpovlst) const;
 public:
-    DGraph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    DGraph(UINT vex_hash_size = 64);
     DGraph(DGraph const& g);
     DGraph const& operator = (DGraph const&);
+
+    //The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
+    //update the related info for 'vex'.
+    //vex: a marker vertex.
+    //newsucc: the vertex that must be immediate successor of 'vex'.
+    //e.g: vex->oldsucc, after insert newsucc, the graph will be:
+    //     vex->newsucc->oldsucc, where there is only ONE edge between vex->newsucc,
+    //     and newsucc->oldsucc.
+    void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
+                                   Vertex const* oldsucc);
 
     //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
     //update the related info for 'vex'.
     //vex: a marker vertex.
     //newidom: the vertex that must be idom of 'vex'.
-    void addDomInfoByNewIDom(Vertex const* vex, Vertex const* newidom);
-    void addDomInfoByNewIDom(Vertex const* vex, UINT newidom)
-    { addDomInfoByNewIDom(vex, addVertex(newidom)); }
-    void addDomInfoByNewIDom(UINT vex, UINT newidom)
-    { addDomInfoByNewIDom(getVertex(vex), addVertex(newidom)); }
-    void addDomInfoByNewIPDom(Vertex const* vex, Vertex const* newipdom);
-    void addDomInfoByNewIPDom(UINT vex, UINT newipdom)
-    { addDomInfoByNewIPDom(getVertex(vex), addVertex(newipdom)); }
+    //add_pdom_failed: return true if the function add PDomInfo failed.
+    void addDomInfoToNewIDom(Vertex const* vex, Vertex const* newidom,
+                             OUT bool & add_pdom_failed);
+    void addDomInfoToNewIDom(Vertex const* vex, VexIdx newidom,
+                             OUT bool & add_pdom_failed)
+    { addDomInfoToNewIDom(vex, addVertex(newidom), add_pdom_failed); }
+
+    void addDomInfoToNewIDom(VexIdx vex, VexIdx newidom,
+                             OUT bool & add_pdom_failed)
+    {
+        addDomInfoToNewIDom(getVertex(vex), addVertex(newidom),
+                            add_pdom_failed);
+    }
+    void addDomInfoToNewIPDom(Vertex const* vex, Vertex const* newipdom);
+    void addDomInfoToNewIPDom(VexIdx vex, VexIdx newipdom)
+    { addDomInfoToNewIPDom(getVertex(vex), addVertex(newipdom)); }
 
     //The function clones graph by given graph.
     //clone_edge_info: true to clone EdgeInfo of g.
     //clone_vex_info: true to clone VertexInfo of g.
-    bool clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
+    void clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
     {
+        Graph::clone(g, clone_edge_info, clone_vex_info);
         m_bs_mgr = g.m_bs_mgr;
-        return Graph::clone(g, clone_edge_info, clone_vex_info);
+        if (m_bs_mgr != nullptr) {
+            cloneDomAndPdom(g);
+        }
     }
 
     //The function clones Dom and PDom info by given graph.
-    bool cloneDomAndPdom(DGraph const& src);
+    void cloneDomAndPdom(DGraph const& src);
+
+    //Vertices should have been sorted in topological order.
+    //And we access them by reverse-topological order.
+    //vlst: compute dominator for vertices in vlst if it
+    //    is not empty or else compute all graph.
+    //uni: universe.
     bool computeDom3(List<Vertex const*> const* vlst, DomSet const* uni);
     bool computeDom2(List<Vertex const*> const& vlst);
+
+    //Vertices should have been sorted in topological order.
+    //And we access them by reverse-topological order.
+    //vlst: compute dominator for vertices in vlst if it
+    //    is not empty or else compute all graph.
+    //uni: universe.
     bool computeDom(List<Vertex const*> const* vlst = nullptr,
                     DomSet const* uni = nullptr);
+
+    //Compute post-dominator according to rpo.
+    //root: root node of graph.
+    //uni: universe.
+    //Note you should use this function carefully, it may be expensive, because
+    //that the function does not check if RPO is available, namely, it will
+    //always compute the RPO.
     bool computePdomByRPO(Vertex * root, DomSet const* uni);
 
-    //Compute dominate vertex.
+    //Compute post dominate vertex.
+    //Vertices should have been sorted in topological order.
+    //And we access them by reverse-topological order.
+    //vlst: vertex list.
+    //uni: universe.
+    //Note the graph may NOT have an exit vertex. If a vertex does not have an
+    //ipdom, its pdom-set is meaningless and should be clean.
+    //e.g: A cycle in a graph that will not reach to the exit vertex.
     bool computePdom(List<Vertex const*> const& vlst);
-
-    //Compute dominate vertex.
     bool computePdom(List<Vertex const*> const& vlst, DomSet const* uni);
 
     //Compute immediate dominate vertex.
     bool computeIdom();
 
     //Compute immediate dominate vertex.
+    //Vertices should have been sorted in rpo.
+    //vlst: a list of vertex which sort in rpo order.
+    //NOTE:
+    //  1. The root node has better to be the first one in 'vlst'.
+    //  2. Do not use '0' as vertex id, it is used as Undefined.
+    //  3. Entry does not have idom.
     bool computeIdom2(List<Vertex const*> const& vlst);
 
     //Compute immediate post dominate vertex.
@@ -762,7 +850,9 @@ public:
 
     //The function try to change the DOM info when given vertex has been
     //bypassed.
+    //pred: the predecessor of vex.
     //vex: the vertex id that will be bypassed.
+    //succ: the successor of vex.
     //e.g:
     //  pred->vex->succ
     //  where vex's idom is pred, vex's ipdom is succ, succ's idom is vex.
@@ -770,86 +860,99 @@ public:
     //  pred->vex->succ
     //   \         ^
     //    \_______/
-    //  succ's dom become pred.
-    bool changeDomInfoByAddBypassEdge(UINT vex);
+    //  succ's dom become pred. vex is neither DOM nor PDOM.
+    bool changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ);
 
     void dumpDom(FILE * h, bool dump_dom_tree = true) const;
+    void dumpDom(CHAR const* name, bool dump_dom_tree = true) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.
-    UINT get_idom(UINT id) const { return (UINT)m_idom_set.get(id); }
+    VexIdx get_idom(VexIdx id) const { return m_idom_set.get((VecIdx)id); }
 
     //Note graph exit node does not have ipdom.
     //id: vertex id.
-    UINT get_ipdom(UINT id) const { return (UINT)m_ipdom_set.get(id); }
+    VexIdx get_ipdom(VexIdx id) const { return m_ipdom_set.get((VecIdx)id); }
 
+    //The function generate DomTree for whole graph.
     //dt: generate dominator tree and record in it.
     void genDomTree(OUT DomTree & dt) const;
+
+    //The function generate DomTree for subgraph that all vertexs in subgraph
+    //are at least dominated by 'root'.
+    //dt: generate dominator tree and record in it.
+    void genDomTreeForSubGraph(Vertex const* root, OUT DomTree & dt,
+                               OUT UINT & iter_time) const;
+
     //pdt: generate post-dominator tree and record in it.
     void genPDomTree(OUT DomTree & pdt) const;
 
-    DomSet const* read_dom_set(UINT id) const { return m_dom_set.get(id); }
+    DomSet const* get_dom_set(VexIdx id) const
+    { return m_dom_set.get((VecIdx)id); }
+
+    RPOMgr & getRPOMgr() { return m_rpomgr; }
 
     //Get vertices who dominate vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
-    inline DomSet * get_dom_set(UINT id)
+    inline DomSet * gen_dom_set(VexIdx id)
     {
         ASSERT0(m_bs_mgr != nullptr);
-        DomSet * set = m_dom_set.get(id);
+        DomSet * set = m_dom_set.get((VecIdx)id);
         if (set == nullptr) {
             set = m_bs_mgr->create();
-            m_dom_set.set(id, set);
+            m_dom_set.set((VecIdx)id, set);
         }
         return set;
     }
 
     //Get vertices who dominate vertex 'v'.
     //NOTE: set does NOT include 'v' itself.
-    DomSet * get_dom_set(Vertex const* v)
+    DomSet * gen_dom_set(Vertex const* v)
     {
         ASSERT0(v != nullptr);
-        return get_dom_set(VERTEX_id(v));
+        return gen_dom_set(VERTEX_id(v));
     }
 
-    DomSet const* read_pdom_set(UINT id) const { return m_pdom_set.get(id); }
+    DomSet const* get_pdom_set(VexIdx id) const
+    { return m_pdom_set.get((VecIdx)id); }
 
     //Get vertices who post dominated by vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
-    inline DomSet * get_pdom_set(UINT id)
+    inline DomSet * gen_pdom_set(VexIdx id)
     {
         ASSERT0(m_bs_mgr != nullptr);
-        DomSet * set = m_pdom_set.get(id);
+        DomSet * set = m_pdom_set.get((VecIdx)id);
         if (set == nullptr) {
             set = m_bs_mgr->create();
-            m_pdom_set.set(id, set);
+            m_pdom_set.set((VecIdx)id, set);
         }
         return set;
     }
 
     //Get vertices who post dominated by vertex 'v'.
     //NOTE: set does NOT include 'v' itself.
-    DomSet * get_pdom_set(Vertex const* v)
+    DomSet * gen_pdom_set(Vertex const* v)
     {
         ASSERT0(v != nullptr);
-        return get_pdom_set(VERTEX_id(v));
+        return gen_pdom_set(VERTEX_id(v));
     }
 
     //Return true if 'v1' dominate 'v2'.
-    bool is_dom(UINT v1, UINT v2) const
+    bool is_dom(VexIdx v1, VexIdx v2) const
     {
-        ASSERTN(read_dom_set(v2), ("no DOM info about vertex%d", v2));
-        return read_dom_set(v2)->is_contain(v1);
+        ASSERTN(get_dom_set(v2), ("no DOM info about vertex%d", v2));
+        return get_dom_set(v2)->is_contain((BSIdx)v1);
     }
 
     //Return true if 'v1' post dominate 'v2'.
-    bool is_pdom(UINT v1, UINT v2) const
+    bool is_pdom(VexIdx v1, VexIdx v2) const
     {
-        ASSERTN(read_pdom_set(v2), ("no PDOM info about vertex%d", v2));
-        return read_pdom_set(v2)->is_contain(v1);
+        ASSERTN(get_pdom_set(v2), ("no PDOM info about vertex%d", v2));
+        return get_pdom_set(v2)->is_contain((BSIdx)v1);
     }
 
     //Sort node on graph in bfs-order.
-    void sortInBfsOrder(Vector<UINT> & order_buf, Vertex * root,
+    void sortInBfsOrder(Vector<VexIdx> & order_buf, Vertex * root,
                         BitSet & visit);
 
     //Sort node in dominator-tree in preorder.
@@ -859,18 +962,82 @@ public:
     //Sort in-edge of vex in given order.
     //order: record the given order of each predecessor. Note the number
     //       of elements have to equal to the number of predecessor of vex.
-    void sortPred(MOD Vertex * vex, Vector<UINT> const& order);
+    void sortPred(MOD Vertex * vex, Vector<VexIdx> const& order);
     void setBitSetMgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
-    void set_idom(UINT vid, UINT idom) { m_idom_set.set(vid, idom); }
-    void set_ipdom(UINT vid, UINT ipdom) { m_ipdom_set.set(vid, ipdom); }
+    void set_idom(VexIdx vid, VexIdx idom)
+    { m_idom_set.set((VecIdx)vid, idom); }
+    void set_ipdom(VexIdx vid, VexIdx ipdom)
+    { m_ipdom_set.set((VecIdx)vid, ipdom); }
 
-    bool removeUnreachNode(UINT entry_id);
-    void removeDomInfo(Vertex const* vex);
-    void removeDomInfo(UINT vex) { removeDomInfo(getVertex(vex)); }
+    //The function revise DomInfo after graph changed.
+    //modset: if it is not null, means user asked to collect vertex that idom
+    //        changed by the function.
+    //root: record the root vertex the of subgraph that affected by adding
+    //      or removing edge.
+    void reviseDomInfoAfterAddOrRemoveEdge(Vertex const* from, Vertex const* to,
+                                           OUT VexTab * modset,
+                                           OUT Vertex const*& root,
+                                           OUT UINT & iter_time);
+
+    //The function recompute DomInfo after subgraph changed.
+    void recomputeDomInfoForSubGraph(Vertex const* root,
+                                     OUT VexTab * modset,
+                                     OUT UINT & iter_time);
+    bool removeUnreachNode(VexIdx entry_id);
+    void revisePdomByIpdom();
+
+    //The function removes all Dom, Pdom, IDom, IPDom information about vex.
+    //Note the function may have too much cost because it will iterate vertex
+    //till meeting the entry and exit of graph.
+    //iter_pred_succ: true to remove dominfo by iterate vex's predecessors
+    //and sucessors til entry and exit.
+    //iter_time: the number of times that the function iterates graph vertex.
+    void removeDomInfo(Vertex const* vex, bool iter_pred_succ,
+                       OUT UINT & iter_time);
+    void removeDomInfo(VexIdx vex, bool iter_pred_succ, OUT UINT & iter_time)
+    { removeDomInfo(getVertex(vex), iter_pred_succ, iter_time); }
 
     bool verifyDom() const;
     bool verifyPdom() const;
     bool verifyDomAndPdom() const;
+};
+
+
+class GraphIterIn {
+    COPY_CONSTRUCTOR(GraphIterIn);
+    Graph const& m_g;
+    List<Vertex*> m_wl;
+    TTab<VexIdx> m_visited;
+public:
+    GraphIterIn(Graph const& g, Vertex const* start);
+    Vertex * get_first();
+    Vertex * get_next(Vertex const* t);
+};
+
+
+class GraphIterOut {
+    COPY_CONSTRUCTOR(GraphIterOut);
+    List<Vertex*> m_wl;
+    TTab<VexIdx> m_visited;
+protected:
+    Graph const& m_g;
+public:
+    GraphIterOut(Graph const& g, Vertex const* start);
+    Vertex * get_first();
+    Vertex * get_next(Vertex const* t);
+};
+
+
+class GraphIterOutEdge {
+    COPY_CONSTRUCTOR(GraphIterOutEdge);
+    List<Edge*> m_wl;
+    TTab<VexIdx> m_visited;
+protected:
+    Graph const& m_g;
+public:
+    GraphIterOutEdge(Graph const& g, Vertex const* start);
+    Edge * get_first();
+    Edge * get_next(Edge const* t);
 };
 
 } //namespace xcom

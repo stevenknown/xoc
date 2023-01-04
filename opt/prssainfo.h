@@ -94,6 +94,7 @@ public:
         SSA_uses(this).clean();
     }
     void cleanUseSet() { SSA_uses(this).clean(); }
+    void copyUseSet(SSAInfo const& src) { SSA_uses(this).copy(src.getUses()); }
 
     //Get SSAInfo id.
     UINT id() const { return uid; }
@@ -148,8 +149,8 @@ class VPR : public SSAInfo {
     COPY_CONSTRUCTOR(VPR);
 public:
     UINT m_version; //record Version related to original PRNO.
-    UINT m_newprno; //record renamed PRNO after SSA construction.
-    UINT m_orgprno; //record original PRNO before SSA construction.
+    PRNO m_newprno; //record renamed PRNO after SSA construction.
+    PRNO m_orgprno; //record original PRNO before SSA construction.
     Type const* m_orgpr_type; //record original PRNO data type.
 public:
     VPR(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
@@ -170,8 +171,8 @@ public:
     }
     bool is_init_version() const { return version() == PRSSA_INIT_VERSION; }
 
-    UINT newprno() const { return VPR_newprno(this); }
-    UINT orgprno() const { return VPR_orgprno(this); }
+    PRNO newprno() const { return VPR_newprno(this); }
+    PRNO orgprno() const { return VPR_orgprno(this); }
     Type const* orgpr_type() const { return VPR_orgpr_type(this); }
 
     UINT version() const { return VPR_version(this); }
@@ -192,10 +193,10 @@ public:
 
 
 //Mapping from PRNO to vector of VPR.
-typedef Vector<VPRVec*> UINT2VPRVec;
+typedef Vector<VPRVec*> PRNO2VPRVec;
 
-//Mapping from PRNO id to Stack of VPR.
-typedef Vector<Stack<VPR*>*> UINT2VPRStack;
+//Mapping from PRNO to Stack of VPR.
+typedef Vector<Stack<VPR*>*> PRNO2VPRStack;
 
 } //namespace xoc
 #endif

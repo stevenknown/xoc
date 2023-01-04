@@ -10,13 +10,13 @@ int main()
 
     printf("Loop by index:\n");
 
-    for(int i = 0; i <= SS.get_last_idx(); i++) {
+    for(VecIdx i = 0; i <= SS.get_last_idx(); i++) {
         printf("%s\n", SS[i]);
     }
 
     printf("\nReverse Iterator:\n");
 
-    for(int i = SS.get_last_idx(); i >= 0; i--) {
+    for(VecIdx i = SS.get_last_idx(); !IS_VECUNDEF(i); i--) {
         printf("%s\n", SS[i]);
     }
 

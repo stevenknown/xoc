@@ -36,12 +36,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
-Region * IPA::findRegion(IR * call, Region * callru)
+Region * IPA::findRegion(IR * call, Region * callrg)
 {
     ASSERT0(call->is_call());
     CallGraph * cg = m_rumgr->getCallGraph();
     ASSERT0(cg);
-    CallNode * callercn = cg->mapRegion2CallNode(callru);
+    CallNode * callercn = cg->mapRegion2CallNode(callrg);
     ASSERTN(callercn, ("caller is not on graph"));
 
     Sym const* callname = CALL_idinfo(call)->get_name();
@@ -68,12 +68,12 @@ Region * IPA::findRegion(IR * call, Region * callru)
 
 
 //call: call stmt.
-//callru: the region that call stmt resident in.
+//callrg: the region that call stmt resident in.
 //Generate dummy use only if MD both exist in caller's MayDef and
 //callee's MayUse.
-void IPA::createCallDummyuse(IR * call, Region * callru)
+void IPA::createCallDummyuse(IR * call, Region * callrg)
 {
-    Region * calleeru = findRegion(call, callru);
+    Region * calleeru = findRegion(call, callrg);
     if (calleeru == nullptr || CALL_dummyuse(call) != nullptr) {
         return;
     }
@@ -81,21 +81,21 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
     MDSet const* mayuse = calleeru->getMayUse();
     if (mayuse == nullptr || mayuse->is_empty()) { return; }
 
-    MDSet const* callermaydef = callru->getMayDef();
+    MDSet const* callermaydef = callrg->getMayDef();
     if (callermaydef == nullptr || callermaydef->is_empty()) { return; }
 
     MDSetIter iter;
     IR * last = nullptr;
-    for (INT j = mayuse->get_first(&iter);
-         j >= 0; j = mayuse->get_next(j, &iter)) {
+    for (BSIdx j = mayuse->get_first(&iter);
+         j != BS_UNDEF; j = mayuse->get_next(j, &iter)) {
         MD const* md = m_mdsys->getMD(j);
         ASSERT0(md);
-        if (!md->is_effect() || !callermaydef->is_contain(md)) {
+        if (!md->is_effect() || !callermaydef->is_contain(md, callrg)) {
             continue;
         }
 
-        IR * ld = callru->buildLoad(MD_base(md));
-        callru->allocRefForLoad(ld);
+        IR * ld = callrg->getIRMgr()->buildLoad(MD_base(md));
+        callrg->getMDMgr()->allocRef(ld);
         xcom::add_next(&CALL_dummyuse(call), &last, ld);
         IR_parent(ld) = call;
     }
@@ -140,12 +140,14 @@ void IPA::computeCallRefForAllRegion()
         }
 
         rg->initPassMgr();
+        rg->initIRMgr();
         AliasAnalysis * aa = (AliasAnalysis*)rg->getPassMgr()->
             registerPass(PASS_AA);
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->computeCallRef(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU);
+        dumgr->computeCallRef(DUOptFlag(DUOPT_COMPUTE_PR_DU|
+                                        DUOPT_COMPUTE_NONPR_DU));
         rg->getPassMgr()->destroyPass(dumgr);
         rg->getPassMgr()->destroyPass(aa);
     }
@@ -160,7 +162,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         if (rg == nullptr) { continue; }
         createCallDummyuse(rg);
         if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
-            OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
+            OptCtx * loc = m_rumgr->getAndGenOptCtx(rg);
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != nullptr) {
@@ -182,17 +184,19 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 {
     ASSERT0(rg);
     if (rg->getIRList() == nullptr &&
-        (rg->getBBList() == nullptr || rg->getBBList()->get_elem_count() == 0)) {
+        (rg->getBBList() == nullptr ||
+         rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
     if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
+        rg->initIRMgr();
     }
     if (!oc.is_aa_valid()) {
         //DUMgr requires AliasAnalysis
         rg->getPassMgr()->registerPass(PASS_AA);
     }
-    if (g_do_md_ssa) {
+    if (g_do_mdssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
             rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
@@ -202,11 +206,11 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         //Compute typical PR du chain.
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->perform(oc, DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU);
-        dumgr->computeMDDUChain(oc, false, DUOPT_COMPUTE_PR_DU);
+        dumgr->perform(oc, DUOptFlag(DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU));
+        dumgr->computeMDDUChain(oc, false, DUOptFlag(DUOPT_COMPUTE_PR_DU));
 
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
-            PASS_MD_SSA_MGR);
+            PASS_MDSSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);

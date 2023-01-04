@@ -60,7 +60,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
 
 RegionMgr::~RegionMgr()
 {
-    for (INT id = 0; id <= m_id2rg.get_last_idx(); id++) {
+    for (VecIdx id = 0; id <= m_id2rg.get_last_idx(); id++) {
         Region * rg = m_id2rg.get(id);
         if (rg == nullptr) { continue; }
         deleteRegion(rg, false);
@@ -106,12 +106,13 @@ void * RegionMgr::xmalloc(UINT size)
 }
 
 
-OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
+OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 {
-    OptCtx * oc = m_id2optctx.get(id);
+    OptCtx * oc = m_id2optctx.get(rg->id());
     if (oc == nullptr) {
         oc = (OptCtx*)xmalloc(sizeof(OptCtx));
-        m_id2optctx.set(id, oc);
+        oc->init(rg);
+        m_id2optctx.set(rg->id(), oc);
     }
     return oc;
 }
@@ -133,8 +134,7 @@ MD const* RegionMgr::genDedicateStrMD()
         Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
         Var * sv = getVarMgr()->registerStringVar(DEDICATED_STRING_VAR_NAME, s,
                                                   MEMORY_ALIGNMENT);
-        VAR_is_unallocable(sv) = true;
-        VAR_is_addr_taken(sv) = true;
+        sv->setflag((VAR_FLAG)(VAR_IS_UNALLOCABLE|VAR_ADDR_TAKEN));
         MD md;
         MD_base(&md) = sv;
         MD_ty(&md) = MD_UNBOUND;
@@ -155,14 +155,14 @@ void RegionMgr::registerGlobalMD()
     //Only top region can do initialize MD for global variable.
     ASSERT0(m_var_mgr);
     VarVec * varvec = m_var_mgr->getVarVec();
-    for (INT i = 0; i <= varvec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
-        if (v == nullptr || VAR_is_local(v)) { continue; }
+        if (v == nullptr || v->is_local()) { continue; }
         //Note Var is regarded as VAR_GLOBAL by default if VAR_LOCAL not set.
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
-        //ASSERT0(!VAR_is_unallocable(v));
+        //ASSERT0(!v->is_unallocable());
 
         if (v->is_string() && genDedicateStrMD() != nullptr) {
             continue;
@@ -174,7 +174,7 @@ void RegionMgr::registerGlobalMD()
         MD_base(&md) = v;
         MD_ofst(&md) = 0;
         MD_size(&md) = v->is_any() ? 0 : v->getByteSize(getTypeMgr());
-        if (v->is_fake() || v->is_func_decl() || v->is_any()) {
+        if (v->is_fake() || v->is_func() || v->is_any()) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
             MD_ty(&md) = MD_EXACT;
@@ -183,9 +183,10 @@ void RegionMgr::registerGlobalMD()
     }
 }
 
-CallGraph * RegionMgr::allocCallGraph(UINT edgenum, UINT vexnum)
+
+CallGraph * RegionMgr::allocCallGraph(UINT vexnum)
 {
-    return new CallGraph(edgenum, vexnum, this);
+    return new CallGraph(vexnum, this);
 }
 
 
@@ -220,7 +221,6 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
     } else {
         REGION_id(rg) = free_id;
     }
-
     return rg;
 }
 
@@ -231,8 +231,8 @@ void RegionMgr::addToRegionTab(Region * rg)
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
     ASSERT0(getRegion(rg->id()) == nullptr);
     ASSERT0(rg->id() < m_ru_count);
-    INT pad = xcom::getNearestPowerOf2(rg->id());
-    if (m_id2rg.get_last_idx() + 1 < pad) {
+    UINT pad = xcom::getNearestPowerOf2(rg->id());
+    if (m_id2rg.get_elem_count() < pad) {
         m_id2rg.set(pad, nullptr);
     }
     m_id2rg.set(rg->id(), rg);
@@ -241,11 +241,14 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
-    checkMaxIRType();
+    checkIRCodeBitSize();
+    checkMaxIRCode();
     checkIRDesc();
     checkRoundDesc();
+    checkIRSwitchCaseHelper();
     ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
+    ASSERT0(sizeof(TMWORD) <= sizeof(HOST_UINT));
     ASSERT0(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
     ASSERT0(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
     ASSERT0(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
@@ -325,7 +328,7 @@ bool RegionMgr::verifyPreDefinedInfo()
             BYTE_PER_INT <= sizeof(HOST_UINT) &&
             BYTE_PER_INT <= sizeof(HOST_FP));
 
-    ASSERT0(IR_TYPE_NUM <= ((1<<IR_TYPE_BIT_SIZE) - 1));
+    ASSERT0(IR_CODE_NUM <= ((1<<IR_CODE_BIT_SIZE) - 1));
     return true;
 }
 
@@ -412,12 +415,13 @@ void RegionMgr::buildCallGraph(OptCtx & oc, bool scan_call,
                                bool scan_inner_region)
 {
     //Generate call-list and return-list.
-    UINT vn = 0, en = 0;
-    estimateEV(en, vn, scan_call, scan_inner_region);
+    UINT vn;
+    UINT num_call;
+    estimateEV(num_call, vn, scan_call, scan_inner_region);
 
     if (m_call_graph == nullptr) {
         //Construct call graph.
-        m_call_graph = allocCallGraph(vn, en);
+        m_call_graph = allocCallGraph(vn);
     }
     ASSERT0(m_call_graph);
 

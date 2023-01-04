@@ -1,0 +1,7 @@
+region program "program" () {
+    var foo:any:(readonly, func, align(4));
+    region func main (var retbuf:mc<128>:(align(4))) {
+        call:(readonly) $ret:i128 = foo();
+        return $ret;
+    };
+}

@@ -109,7 +109,7 @@ bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
         LTMgr * ltm = gltm->map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
@@ -133,7 +133,7 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
         LTMgr * ltm = gltm->map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
@@ -165,11 +165,12 @@ void DexRegion::processSimply()
 
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);
+    initIRMgr();
 
     ASSERT0(g_cst_bb_list);
     IRCFG * cfg = (IRCFG*)passmgr->registerPass(PASS_CFG);
     ASSERT0(cfg);
-    cfg->initCfg(oc);
+    cfg->initCFG(oc);
     ASSERT0(g_do_cfg_dom);
     cfg->LoopAnalysis(oc);
 
@@ -207,6 +208,7 @@ bool DexRegion::process(OptCtx * oc)
     prescan(getIRList());
 
     PassMgr * passmgr = initPassMgr();
+    initIRMgr();
 
     HighProcess(*oc);
 
@@ -234,7 +236,7 @@ bool DexRegion::process(OptCtx * oc)
 
     ASSERT0(verifyIRandBB(bbl, this));
 
-    RefineCtx rf;
+    RefineCtx rf(&oc);
     RC_insert_cvt(rf) = false; //Do not insert cvt for DEX code.
     refineBBlist(bbl, rf);
     ASSERT0(verifyIRandBB(bbl, this));

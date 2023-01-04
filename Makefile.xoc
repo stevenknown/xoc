@@ -1,0 +1,95 @@
+ifeq ($(TARG),)
+  #SET DEFAULT TARG.
+  TARG=FOR_DEX
+endif
+
+CFLAGS+=-Wall
+OPT_DIR=opt
+COM_DIR=com
+READER_DIR=reader
+
+include $(READER_DIR)/Makefile.inc
+include $(COM_DIR)/Makefile.inc
+include $(OPT_DIR)/Makefile.inc
+include Makefile.xoc.inc
+include Makefile.option
+
+#SET DEFAULT CFLAGS.
+CFLAGS+=\
+ -D$(TARG) \
+ -D_SUPPORT_C11_ \
+ -Wno-unknown-pragmas \
+ -Wno-write-strings \
+ -Wsign-promo \
+ -Wparentheses \
+ -Wformat \
+ -Wsign-compare \
+ -Wpointer-arith \
+ -Wno-multichar \
+ -Winit-self \
+ -Wswitch
+
+#Disable -Wconversion to avoid too much complaints.
+
+ifneq (,$(filter $(CC),g++ gcc))
+  CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
+endif
+
+INC=-I .
+
+#Combine path of objects.
+TMP_OPT_OBJS = $(foreach n,$(OPT_OBJS),$(OPT_DIR)/$(n))
+TMP_READER_OBJS = $(foreach n,$(READER_OBJS),$(READER_DIR)/$(n))
+
+#Display internal variables.
+$(info "COMBINED OPT OBJS:$(TMP_OPT_OBJS)")
+$(info "COMBINED READER OBJS:$(TMP_READER_OBJS)")
+$(info "TARG:$(TARG)")
+$(info "TARG_DIR:$(TARG_DIR)")
+$(info "CC:$(CC)")
+$(info "INC:$(INC)")
+$(info "CFLAGS:$(CFLAGS)")
+$(info "DEBUG:$(DEBUG)")
+
+#Define rules.
+$(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
+	ar rcs $(XOC_OUTPUT) com/$(COM_OUTPUT) $(TMP_OPT_OBJS) $(TMP_READER_OBJS)
+	@echo "SUCCESS!!"
+
+%.o:%.cpp
+	@echo "BUILD $<"
+	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+
+$(COM_OUTPUT):
+	@echo "BUILD $(COM_OUTPUT)"
+	cd com && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
+
+tmp_opt_objs: $(TMP_OPT_OBJS)
+
+tmp_reader_objs: $(TMP_READER_OBJS)
+
+opt_objs: $(OPT_OBJS)
+	@echo "BUILD $(OPT_OBJS)"
+
+reader_objs: $(READER_OBJS)
+
+clean:
+	cd com && make clean -f Makefile
+	@find ./ -name "*.gcda" | xargs rm -f
+	@find ./ -name "*.gcno" | xargs rm -f
+	@find ./ -name "*.o" | xargs rm -f
+	@find ./ -name "*.a" | xargs rm -f
+	@find ./ -name "*.dot" | xargs rm -f
+	@find ./ -name "*.exe" | xargs rm -f
+	@find ./ -name "*.elf" | xargs rm -f
+	@find ./ -name "*.out" | xargs rm -f
+	@find ./ -name "*.tmp" | xargs rm -f
+	@find ./ -name "*.vcg" | xargs rm -f
+	@find ./ -name "*.cxx" | xargs rm -f
+	@find ./ -name "*.asm" | xargs rm -f
+	@find ./ -name "*.swp" | xargs rm -f
+	@find ./ -name "*.swo" | xargs rm -f
+	@find ./ -name "*.log" | xargs rm -f
+	@find ./ -name "*.LOGLOG" | xargs rm -f
+	@find ./ -name "LOGLOG" | xargs rm -f
+

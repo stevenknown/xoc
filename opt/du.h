@@ -47,6 +47,13 @@ class DUSet : public DefSBitSetCore {
 protected:
     friend class DUMgr;
     friend class IR;
+public:
+    DUSet() {}
+    ~DUSet()
+    {
+        //Do not free ref here. They are allocated in mempool,
+        //and the memory is freed when the pool destructed.
+    }
 
     void add(UINT irid, DefMiscBitSetMgr & m) { bunion(irid, m); }
     void addDef(IR const* stmt, DefMiscBitSetMgr & m);
@@ -55,14 +62,6 @@ protected:
     void remove(UINT irid, DefMiscBitSetMgr & m) { diff(irid, m); }
     void removeUse(IR const* exp, DefMiscBitSetMgr & m);
     void removeDef(IR const* stmt, DefMiscBitSetMgr & m);
-
-public:
-    DUSet() {}
-    ~DUSet()
-    {
-        //Do not free ref here. They are allocated in mempool,
-        //and the memory is freed when the pool destructed.
-    }
 };
 
 //Record DU info for ir.

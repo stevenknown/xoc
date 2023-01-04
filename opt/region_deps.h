@@ -38,16 +38,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "data_type.h"
 #include "const.h"
-//Middle level included files
+
+//FOLLOWING FILES ARE MIDDLE LEVEL INCLUDED FILES
+#include "ir_utils.h"
 #include "dbg.h"
 #include "var.h"
 #include "md.h"
 #include "pass.h"
 #include "ai.h"
 #include "du.h"
-#include "ir_utils.h"
 #include "ir.h"
+#include "ir_decl.h"
 #include "ir_helper.h"
+#include "ir_dump.h"
+#include "ir_verify.h"
 #include "gr_helper.h"
 #include "ir_bb.h"
 #include "loop.h"
@@ -55,6 +59,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "attachinfo_mgr.h"
 #include "md_mgr.h"
 #include "region_mgr.h"
+#include "ir_mgr.h"
+#include "ir_mgr_ext.h"
 #include "analysis_instr.h"
 #include "region.h"
 #endif

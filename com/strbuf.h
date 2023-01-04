@@ -52,7 +52,6 @@ public:
             ::free(buf);
         }
     }
-
     void clean()
     {
         ASSERT0(buf);
@@ -61,19 +60,29 @@ public:
     void copy(StrBuf const& src)
     {
         if (buflen < src.buflen) {
-            buflen = src.buflen;            
+            buflen = src.buflen;
             ASSERT0(buf);
             ::free(buf);
-            buf = (CHAR*)::malloc(buflen);            
+            buf = (CHAR*)::malloc(buflen);
         }
         buf[0] = 0;
         ASSERT0(src.buf);
         ::memcpy(buf, src.buf, buflen);
     }
 
+    //The function convert string content into binary.
+    //Note the content in given buf must be string format of hex, that is the
+    //string can only contain "abcdefABCDEF0123456789".
+    //outputbuf: the byte buffer that record the hex number.
+    //buflen: byte length of 'outputbuf'.
+    void toByteHex(OUT BYTE * outputbuf, UINT buflen);
+
     //String comparation.
     //Return true if s equal to current string.
     bool is_equal(CHAR const* s) const { return ::strcmp(buf, s) == 0; }
+
+    //Return true if string s is only contain one character t.
+    static bool is_equal(CHAR const* s, CHAR t) { return s[0] == t; }
 
     //Return true if string is empty.
     bool is_empty() const { return buf == nullptr || buf[0] == 0; }
@@ -89,7 +98,7 @@ public:
     //otherwise return -1.
     //source: input string.
     //substring: partial string.
-    LONG findsubstr(CHAR const* source, CHAR const* substring);
+    LONG findSubStr(CHAR const* source, CHAR const* substring);
 
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
@@ -101,8 +110,8 @@ public:
     //Appends a copy of the source string to the current string buffer,
     //the new string is consist of original string and the string formed
     //by 'format'.
-    //size: the maximum possible byte size of string.
-    void strcat(UINT l, CHAR const* format, va_list args);
+    //bytesize: the maximum possible byte size of string.
+    void strcat(UINT bytesize, CHAR const* format, va_list args);
 
     //Return byte size of current string.
     //Note the size does NOT include the end-character '\0'.
@@ -110,8 +119,8 @@ public:
 
     //The functions snprintf() and vsnprintf() do not write more than size
     //bytes (including the terminating null byte ('\0')).
-    //size: the maximum possible byte size of string.
-    void nstrcat(UINT size, CHAR const* format, ...);
+    //bytesize: the maximum possible byte size of string.
+    void nstrcat(UINT bytesize, CHAR const* format, ...);
 
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,

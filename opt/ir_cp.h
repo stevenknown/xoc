@@ -72,18 +72,18 @@ public:
 //Perform Copy Propagation
 class CopyProp : public Pass {
     COPY_CONSTRUCTOR(CopyProp);
-private:
+protected:
     MDSystem * m_md_sys;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     IRCFG * m_cfg;
     MDSetMgr * m_md_set_mgr;
     TypeMgr * m_tm;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-    GVN const* m_gvn;
+    GVN * m_gvn;
+    OptCtx * m_oc;
     UINT m_prop_kind;
-
-private:
+protected:
     //Return true if CP allows propagating memory object with inexact MD.
     bool allowInexactMD() const
     { return m_prop_kind == CP_PROP_UNARY_AND_SIMPLEX; }
@@ -105,21 +105,25 @@ private:
                   IRListIter cur_iter, IRListIter * next_iter);
     bool doPropBB(IN IRBB * bb, IN IRSet * useset);
     void doFinalRefine(OptCtx & oc);
-    void dumpCopyPropagationAction(IR const* def_stmt, IR const* prop_value,
-                                   IR const* use);
+    void dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
+                            IR const* use);
 
     bool existMayDefTillBB(IR const* exp, IRBB const* start,
                            IRBB const* meetup) const;
 
     DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
+    OptCtx const* getOptCtx() const { return m_oc; }
 
-    bool isLowCostExp(IR const* ir) const
+    //Return the value expression that to be propagated.
+    virtual IR * getPropagatedValue(IR * stmt);
+
+    virtual bool isLowCostExp(IR const* ir) const
     {
         switch (ir->getCode()) {
         case IR_LDA:
         case IR_CONST:
-        case IR_PR:
+        SWITCH_CASE_READ_PR:
             return true;
         default: return isLowCostCVT(ir);
         }
@@ -128,11 +132,12 @@ private:
     }
     //Return true if CVT with simply cvt-exp that can be regard as
     //copy-propagate candidate.
-    bool isSimpCVT(IR const* ir) const;
+    virtual bool isSimpCVT(IR const* ir) const;
+
     //Return true if ir is CVT with cvt-exp that always include low-cost
     //expression. These low-cost always profitable and may bring up new
     //optimization opportunity.
-    bool isLowCostCVT(IR const* ir) const;
+    virtual bool isLowCostCVT(IR const* ir) const;
 
     //Return true if 'prop_value' does not be modified till meeting 'use_stmt'.
     //e.g:xx = prop_value //def_stmt
@@ -144,9 +149,9 @@ private:
     //def_stmt: ir stmt.
     //prop_value: expression that will be propagated.
     //Note either use_phi or use_stmt is nullptr.
-    bool is_available(IR const* def_stmt, IR const* prop_value,
-                      IR const* repexp) const;
-    inline bool isCopyOR(IR * ir) const;
+    virtual bool isAvailable(IR const* def_stmt, IR const* prop_value,
+                             IR const* repexp) const;
+    virtual bool isCopyOP(IR * ir) const;
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
 
@@ -173,66 +178,26 @@ private:
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
-
 public:
     CopyProp(Region * rg) : Pass(rg)
     {
         m_md_sys = rg->getMDSystem();
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
         m_gvn = nullptr;
+        m_oc = nullptr;
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
-        ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
+        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
     virtual ~CopyProp() {}
 
     //Check if ir is appropriate for propagation.
-    virtual bool canBeCandidate(IR const* ir) const
-    {
-        switch (m_prop_kind) {
-        case CP_PROP_CONST:
-            return ir->is_lda() || ir->isConstExp();
-        case CP_PROP_SIMPLEX:
-            switch (ir->getCode()) {
-            case IR_LDA:
-            case IR_ID:
-            case IR_CONST:
-            case IR_PR:
-                return true;
-            default: return isSimpCVT(ir);
-            }
-        case CP_PROP_UNARY_AND_SIMPLEX:
-            switch (ir->getCode()) {
-            case IR_LDA:
-            case IR_ID:
-            case IR_CONST:
-            case IR_PR:
-                return true;
-            case IR_LD:
-                ASSERT0(ir->getRefMD());
-                return true;
-            case IR_ILD:
-                if (ir->getRefMD() == nullptr || !ir->getRefMD()->is_exact()) {
-                    //TBD:In aggressive mode, we anticipate propagating RHS
-                    //expression even if it is inexact.
-                    //e.g: s is MC type.
-                    //    s = *p
-                    //    *q = s
-                    //  *p can be propagated.
-                    //return false;
-                }
-                ASSERT0(ir->getRefMD() || ir->getRefMDSet());
-                return true;
-            default: return isSimpCVT(ir);
-            }
-        default: UNREACHABLE();
-        }
-        return false;
-    }
+    virtual bool canBeCandidate(IR const* ir) const;
+
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;

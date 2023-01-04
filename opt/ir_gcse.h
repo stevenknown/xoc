@@ -39,16 +39,12 @@ author: Su Zhenyu
 namespace xoc {
 
 class TG : public xcom::DGraph {
-protected:
     Region * m_rg;
-
 protected:
     virtual void * cloneEdgeInfo(xcom::Edge *)
     { return nullptr; }
-
     virtual void * cloneVertexInfo(xcom::Vertex *)
     { return nullptr; }
-
 public:
     explicit TG(Region * rg) { m_rg = rg; }
     COPY_CONSTRUCTOR(TG);
@@ -73,6 +69,7 @@ public:
     {
         if (!computePdomByRPO(root, nullptr)) { UNREACHABLE(); }
         if (!computeIpdom()) { UNREACHABLE(); }
+        revisePdomByIpdom();
     }
 };
 
@@ -82,7 +79,7 @@ private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
     IRCFG * m_cfg;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     AliasAnalysis * m_aa;
     PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
@@ -90,6 +87,7 @@ private:
     TypeMgr * m_tm;
     GVN * m_gvn;
     TG * m_tg;
+    OptCtx const* m_oc;
     DefMiscBitSetMgr m_misc_bs_mgr;
     TMap<IR*, IR*> m_exp2pr;
     TMap<VN const*, IR*> m_vn2exp;
@@ -98,34 +96,45 @@ private:
     //ONLY USED FOR DEBUG PURPOSE
     UINT m_num_of_elim;
     Vector<UINT> m_elimed;
-private:
+protected:
+    virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
     bool doProp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb, UINT entry_id);
     bool doPropVNInDomTreeOrder(xcom::Graph const* domtree);
     bool doPropInDomTreeOrder(xcom::Graph const* domtree);
+
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
+
     bool findAndElim(IR * exp, IR * gen);
+
+    OptCtx const* getOptCtx() const { return m_oc; }
+
     void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);
+
     bool isCseCandidate(IR * ir);
-    void elimCseAtStore(IR * use, IR * use_stmt, IR * gen);
+
+    void elimCseAtDirectMemOp(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
+
     void processCseGen(IR * cse, IR * cse_stmt, bool & change);
     bool processCse(IR * ir, List<IR*> & livexp);
+
     bool shouldBeCse(IR * det);
 public:
     GCSE(Region * rg, GVN * gvn) : Pass(rg)
     {
         ASSERT0(rg);
         m_cfg = rg->getCFG();
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_aa = rg->getAA();
-        ASSERT0(m_du && m_aa && m_cfg);
+        ASSERT0(m_dumgr && m_aa && m_cfg);
         m_expr_tab = nullptr;
         m_tm = rg->getTypeMgr();
         m_gvn = gvn;
         m_tg = nullptr;
+        m_oc = nullptr;
         m_is_in_ssa_form = false;
         m_ssamgr = nullptr;
         m_mdssamgr = nullptr;

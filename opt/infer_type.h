@@ -37,7 +37,7 @@ class InferType : public Pass {
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     IRList m_wl;
-    CIRList * m_changed_irlist; //used for dump
+    ConstIRList * m_changed_irlist; //used for dump
     List<Var const*> * m_changed_varlist; //used for dump
 protected:
     void addChanged(IR * ir);
@@ -48,7 +48,7 @@ protected:
     void dumpFini();
 
     //Infer variable's type.
-    bool inferVarTypeByIRType(IR const* ir) const;
+    bool inferVarTypeByIRCode(IR const* ir) const;
     bool inferLeafExpMemAcc(IR * ir);
     bool inferIld(IR * ir);
     bool inferArray(IR * ir) const;

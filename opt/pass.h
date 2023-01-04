@@ -55,8 +55,8 @@ public:
     virtual bool dump() const
     {
         //ASSERTN(0, ("Optimization Dependent Code"));
-        //The recommended dump format is:
-        //\n==---- DUMP PassName 'RegionName' ----==        
+        //The recommended dump headline format is:
+        //\n==---- DUMP PassName 'RegionName' ----==
         return true;
     }
 
@@ -66,21 +66,21 @@ public:
     virtual bool dumpBeforePass() const
     {
         //ASSERTN(0, ("Optimization Dependent Code"));
-        //The recommended dump format is:
-        //\n==---- DUMP PassName 'RegionName' ----==
+        //The recommended dump headline format is:
+        //\n==---- DUMP BEFORE PassName 'RegionName' ----==
         return true;
     }
 
     Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     {
-        ASSERTN(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Pass Dependent Code"));
         return nullptr;
     }
 
     virtual PASS_TYPE getPassType() const
     {
-        ASSERTN(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Pass Dependent Code"));
         return PASS_UNDEF;
     }
 
@@ -92,7 +92,7 @@ public:
     //other optimizations should be reperform again. Otherwise return false.
     virtual bool perform(OptCtx &)
     {
-        ASSERTN(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Pass Dependent Code"));
         return false;
     }
 };

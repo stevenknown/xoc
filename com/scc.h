@@ -35,23 +35,23 @@ namespace xcom {
 class GAI {
     BYTE m_is_dense:1;
     union {
-        Vector<UINT> * dense;
-        TMap<UINT, UINT> * sparse;
+        Vector<VexIdx> * dense;
+        TMap<VexIdx, VexIdx> * sparse;
     } group;
     union {
-        Vector<UINT> * dense;
-        TMap<UINT, UINT> * sparse;
+        Vector<VexIdx> * dense;
+        TMap<VexIdx, VexIdx> * sparse;
     } index;
     COPY_CONSTRUCTOR(GAI);
 public:
     GAI(bool is_dense)
     {
         if (is_dense) {
-            group.dense = new Vector<UINT>();
-            index.dense = new Vector<UINT>();
+            group.dense = new Vector<VexIdx>();
+            index.dense = new Vector<VexIdx>();
         } else {
-            group.sparse = new TMap<UINT, UINT>();
-            index.sparse = new TMap<UINT, UINT>();
+            group.sparse = new TMap<VexIdx, VexIdx>();
+            index.sparse = new TMap<VexIdx, VexIdx>();
         }
         m_is_dense = is_dense;
     }
@@ -66,36 +66,36 @@ public:
         }
     }
 
-    void set_group(UINT idx, UINT group_val)
+    void set_group(VexIdx idx, VexIdx group_val)
     {
         if (m_is_dense) {
-            group.dense->set(idx, group_val);
+            group.dense->set((VecIdx)idx, group_val);
         } else {
             group.sparse->setAlways(idx, group_val);
         }
     }
 
-    UINT get_group(UINT idx) const
+    VexIdx get_group(VexIdx idx) const
     {
         if (m_is_dense) {
-            return group.dense->get(idx);
+            return group.dense->get((VecIdx)idx);
         }
         return group.sparse->get(idx);
     }
 
-    void set_index(UINT i, UINT idx)
+    void set_index(VexIdx i, VexIdx idx)
     {
         if (m_is_dense) {
-            index.dense->set(i, idx);
+            index.dense->set((VecIdx)i, idx);
         } else {
             index.sparse->setAlways(i, idx);
         }
     }
 
-    UINT get_index(UINT i) const
+    VexIdx get_index(VexIdx i) const
     {
         if (m_is_dense) {
-            return index.dense->get(i);
+            return index.dense->get((VecIdx)i);
         }
         return index.sparse->get(i);
     }
@@ -115,7 +115,7 @@ public:
     typedef List<VertexSet const*> ConstVertexSetList;
     typedef List<VertexSet*> VertexSetList;
     typedef C<VertexSet*> * VertexSetIter;
-    typedef TMap<UINT, VertexSet*> Group2VertexSet;
+    typedef TMap<VexIdx, VertexSet*> Group2VertexSet;
 
 protected:
     //BitSetMgr m_bsmgr;
@@ -124,21 +124,21 @@ protected:
     Graph * m_g;
     VertexSetList m_scc;
 
-    void addToGroup(Vertex const* v, UINT group, Group2VertexSet & group2bs);
+    void addToGroup(Vertex const* v, VexIdx group, Group2VertexSet & group2bs);
     bool is_init() const { return m_g != nullptr; }
 
     //Searchs for scc starting from 'v'.
     //onpath: records vertices still in accessing stack.
     //visited: records vertices have been found.
     void scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
-                   GAI & gai, UINT & count, Group2VertexSet & group2bs,
+                   GAI & gai, VexIdx & count, Group2VertexSet & group2bs,
                    Stack<Vertex const*> & stk);
 
     //Searchs for SCC starting from 'root'.
     //onpath: records vertices till in accessing stack.
     //visited: records vertices that have been visited.
     void scanNoRecur(Vertex const* root, VertexSet & onpath,
-                     VertexSet & visited, GAI & gai, UINT & count,
+                     VertexSet & visited, GAI & gai, VexIdx & count,
                      Group2VertexSet & group2bs,
                      Stack<Vertex const*> & stk);
 public:
@@ -161,10 +161,10 @@ public:
     //scc_vertex_set: records the SCC if it is not NULL.
     bool isInSCC(Vertex const* v,
                  OUT VertexSet ** scc_vertex_set = nullptr) const
-    { return isInSCC(v->id(), scc_vertex_set); }
+    { return isInSCC((BSIdx)v->id(), scc_vertex_set); }
 
     //Return true if 'v' is in SCC, and records the SCC in 'scc_vertex_set'.
-    bool isInSCC(UINT vid, OUT VertexSet ** scc_vertex_set = nullptr) const;
+    bool isInSCC(BSIdx vid, OUT VertexSet ** scc_vertex_set = nullptr) const;
 
     void dump(FILE * h) const;
 };

@@ -52,15 +52,16 @@ LCSE::LCSE(Region * rg) : Pass(rg)
 
 
 //Hoist CSE's computation, and replace its occurrence with the result pr.
-IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
+IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
     IRListIter pos_holder = nullptr;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
-    CHECK0_DUMMYUSE(f);
+    ASSERT0_DUMMYUSE(f);
     switch (ir_pos->getCode()) {
-    case IR_ST:
-    case IR_STPR:
-    case IR_IST: {
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
+    case IR_STPR: {
         //return the pr that hold the cse value.
         IR * ret = nullptr;
         //Move STORE_VAL to temp PR.
@@ -68,25 +69,24 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(rhs);
         if (tie != nullptr && tie == ie) {
             //e.g: a = 10, expression of store_val is nullptr.
-            ret = m_rg->buildPR(IR_dt(rhs));
+            ret = m_rg->getIRMgr()->buildPR(rhs->getType());
             ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-            IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), rhs);
+            IR * new_st = m_rg->getIRMgr()->buildStorePR(
+                PR_no(ret), ret->getType(), rhs);
 
             //Insert into IR list of BB.
             BB_irlist(bb).insert_before(new_st, pos_holder);
             ir_pos->setRHS(ret);
-            ir_pos->setParentPointer(false);
         }
-
         if (ir_pos->is_ist()) {
             //Move MEM ADDR to Temp PR.
-            tie = m_expr_tab->map_ir2ir_expr(IST_base(ir_pos));
+            tie = m_expr_tab->map_ir2ir_expr(ir_pos->getBase());
             if (tie != nullptr && tie == ie) {
                 if (ret == nullptr) {
-                    IR * x = IST_base(ir_pos);
-                    ret = m_rg->buildPR(IR_dt(x));
+                    IR * x = ir_pos->getBase();
+                    ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
                     ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-                    IR * new_st = m_rg->buildStorePR(PR_no(ret),
+                    IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
                         ret->getType(), m_rg->dupIRTree(x));
                     new_st->setRefMD(ret->getRefMD(), m_rg);
                     //Insert into IR list of BB.
@@ -96,8 +96,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 }
 
                 //Replace orignial referenced IR with the new PR.
-                IST_base(ir_pos) = ret;
-                ir_pos->setParentPointer(false);
+                ir_pos->setBase(ret);
             }
         }
         return ret;
@@ -113,7 +112,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             if (tie != nullptr && tie == ie) {
                 bool insert_st;
                 if (ret == nullptr) {
-                    ret = m_rg->buildPR(IR_dt(p));
+                    ret = m_rg->getIRMgr()->buildPR(IR_dt(p));
                     ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
                     xcom::replace(&CALL_param_list(ir_pos), p, ret);
                     insert_st = true;
@@ -126,7 +125,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 
                 if (insert_st) {
                     ASSERT0(ret->getRefMD());
-                    IR * new_st = m_rg->buildStorePR(PR_no(ret),
+                    IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
                                                      ret->getType(), p);
                     new_st->setRefMD(ret->getRefMD(), m_rg);
                     BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -152,9 +151,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(BR_det(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = BR_det(ir_pos);
-            IR * ret = m_rg->buildPR(IR_dt(x));
+            IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
             ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-            IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
+            IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
+                                                         ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
             BR_det(ir_pos) = ret;
@@ -167,9 +167,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = IGOTO_vexp(ir_pos);
-            IR * ret = m_rg->buildPR(IR_dt(x));
+            IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
             ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-            IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
+            IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
+                                                         ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
             IGOTO_vexp(ir_pos) = ret;
@@ -182,9 +183,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(SWITCH_vexp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = SWITCH_vexp(ir_pos);
-            IR * ret = m_rg->buildPR(IR_dt(x));
+            IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
             ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-            IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
+            IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
+                                                         ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
             SWITCH_vexp(ir_pos) = ret;
@@ -197,9 +199,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(RET_exp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = RET_exp(ir_pos);
-            IR * ret = m_rg->buildPR(IR_dt(x));
+            IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
             ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-            IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
+            IR * new_st = m_rg->getIRMgr()->buildStorePR(PR_no(ret),
+                                                         ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
             RET_exp(ir_pos) = ret;
@@ -239,12 +242,12 @@ bool LCSE::processBranch(IN IRBB * bb, IN IR * ir,
                 //    =t
                 //    ...
                 //    =a||b
-                pr = hoist_cse(bb, ir_pos, ie);
+                pr = hoistCse(bb, ir_pos, ie);
                 ASSERT0(pr != nullptr);
                 map_expr2avail_pr.set(EXPR_id(ie), pr);
                 change = true;
             }
-            BR_det(ir) = m_rg->buildJudge(m_rg->dupIRTree(pr));
+            BR_det(ir) = m_rg->getIRMgr()->buildJudge(m_rg->dupIRTree(pr));
             ir->setParentPointer(false);
             change = true;
         } else {
@@ -287,7 +290,7 @@ IR * LCSE::processExp(IN IRBB * bb, IN ExpRep * ie, IN IR * stmt,
             //    =t
             //    ...
             //    =a||b
-            cse_val_pr = hoist_cse(bb, ir_pos, ie);
+            cse_val_pr = hoistCse(bb, ir_pos, ie);
             ASSERT0(cse_val_pr != nullptr);
             map_expr2avail_pr.set(EXPR_id(ie), cse_val_pr);
         }
@@ -325,12 +328,12 @@ bool LCSE::canBeCandidate(IR * ir)
 }
 
 
-bool LCSE::processRhsOfStore(IN IRBB * bb, IN IR * ir,
-                             MOD xcom::BitSet & avail_ir_expr,
-                             MOD xcom::Vector<IR*> & map_expr2avail_pos,
-                             MOD xcom::Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processRHS(IN IRBB * bb, IN IR * ir,
+                      MOD xcom::BitSet & avail_ir_expr,
+                      MOD xcom::Vector<IR*> & map_expr2avail_pos,
+                      MOD xcom::Vector<IR*> & map_expr2avail_pr)
 {
-    ASSERT0(ir->is_st() || ir->is_ist() || ir->is_stpr());
+    ASSERT0(ir->hasRHS());
     bool change = false;
     IR * rhs = ir->getRHS();
     if (!canBeCandidate(rhs)) {
@@ -353,22 +356,20 @@ bool LCSE::processRhsOfStore(IN IRBB * bb, IN IR * ir,
                 //    =t
                 //    ...
                 //    =a+b
-                pr = hoist_cse(bb, ir_pos, ie);
+                pr = hoistCse(bb, ir_pos, ie);
                 ASSERT0(pr != nullptr);
                 map_expr2avail_pr.set(EXPR_id(ie), pr);
                 change = true;
             }
             ir->setRHS(m_rg->dupIRTree(pr));
-            ir->setParentPointer(false);
             change = true;
         } else {
             //Record position of IR stmt.
             map_expr2avail_pos.set(EXPR_id(ie), ir);
         }
     }
-
-    if (ir->is_ist()) {
-        ie = m_expr_tab->map_ir2ir_expr(IST_base(ir));
+    if (ir->isIndirectMemOp()) {
+        ie = m_expr_tab->map_ir2ir_expr(ir->getBase());
         if (ie != nullptr) {
             avail_ir_expr.bunion(EXPR_id(ie));
             IR * ir_pos = map_expr2avail_pos.get(EXPR_id(ie));
@@ -384,13 +385,12 @@ bool LCSE::processRhsOfStore(IN IRBB * bb, IN IR * ir,
                     //    =t
                     //    ...
                     //    =a+b
-                    pr = hoist_cse(bb, ir_pos, ie);
+                    pr = hoistCse(bb, ir_pos, ie);
                     ASSERT0(pr != nullptr);
                     map_expr2avail_pr.set(EXPR_id(ie), pr);
                     change = true;
                 }
-                IST_base(ir) = m_rg->dupIRTree(pr);
-                ir->setParentPointer(false);
+                ir->setBase(m_rg->dupIRTree(pr));
                 change = true;
             } else {
                 map_expr2avail_pos.set(EXPR_id(ie), ir);
@@ -439,82 +439,60 @@ bool LCSE::processUse(IN IRBB * bb, IN IR * ir,
 {
     bool change = false;
     switch (ir->getCode()) {
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
     case IR_STPR:
-    case IR_IST:
-        change |= processRhsOfStore(bb, ir, avail_ir_expr, map_expr2avail_pos,
-                                    map_expr2avail_pr);
+        change |= processRHS(bb, ir, avail_ir_expr, map_expr2avail_pos,
+                             map_expr2avail_pr);
         break;
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
         change |= processParamList(bb, ir, avail_ir_expr, map_expr2avail_pos,
                                    map_expr2avail_pr);
         break;
     case IR_GOTO:
         break;
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
+    SWITCH_CASE_CFS_OP:
     case IR_LABEL:
     case IR_CASE:
         break;
-    case IR_TRUEBR:
-    case IR_FALSEBR: {
-        ASSERT0(BR_det(ir));
-        if (!canBeCandidate(BR_det(ir))) { break; }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP: {
+        ASSERT0(ir->getJudgeDet());
+        if (!canBeCandidate(ir->getJudgeDet())) { break; }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(ir->getJudgeDet());
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
                                   map_expr2avail_pos,
                                   map_expr2avail_pr);
         if (cse_val != nullptr) {
             if (!cse_val->is_judge()) {
-                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                BR_det(ir) = cse_val;
+                cse_val = m_rg->getIRMgr()->buildJudge(
+                    m_rg->dupIRTree(cse_val));
+                ir->setJudgeDet(cse_val);
             } else {
-                BR_det(ir) = m_rg->dupIRTree(cse_val);
+                ir->setJudgeDet(m_rg->dupIRTree(cse_val));
             }
-            ir->setParentPointer();
             change = true;
         }
         break;
     }
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
     case IR_IGOTO: {
-        ASSERT0(IGOTO_vexp(ir));
-        if (!canBeCandidate(IGOTO_vexp(ir))) { break; }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir));
+        ASSERT0(ir->getValExp());
+        if (!canBeCandidate(ir->getValExp())) { break; }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(ir->getValExp());
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
                                   map_expr2avail_pos,
                                   map_expr2avail_pr);
-        if (IGOTO_vexp(ir) != cse_val) {
+        if (ir->getValExp() != cse_val) {
             if (!cse_val->is_judge()) {
-                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                IGOTO_vexp(ir) = cse_val;
+                cse_val = m_rg->getIRMgr()->buildJudge(
+                    m_rg->dupIRTree(cse_val));
+                ir->setValExp(cse_val);
             } else {
-                IGOTO_vexp(ir) = m_rg->dupIRTree(cse_val);
+                ir->setValExp(m_rg->dupIRTree(cse_val));
             }
-            ir->setParentPointer();
-            change = true;
-        }
-        break;
-    }
-    case IR_SWITCH: {
-        ASSERT0(SWITCH_vexp(ir));
-        if (!canBeCandidate(SWITCH_vexp(ir))) { break; }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(SWITCH_vexp(ir));
-        ASSERT0(ie);
-        IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-            map_expr2avail_pos, map_expr2avail_pr);
-        if (SWITCH_vexp(ir) != cse_val) {
-            if (!cse_val->is_judge()) {
-                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                SWITCH_vexp(ir) = cse_val;
-            } else {
-                SWITCH_vexp(ir) = m_rg->dupIRTree(cse_val);
-            }
-            ir->setParentPointer();
             change = true;
         }
         break;
@@ -549,20 +527,20 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
 {
     bool change = false;
     switch (ir->getCode()) {
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
+    SWITCH_CASE_CALL:
     case IR_STPR:
-    case IR_IST:
-    case IR_CALL:
-    case IR_ICALL:
     case IR_RETURN: {
         //Compute killed ir-expr.
         MDSet const* maydef = ir->getMayRef();
         MD const* mustdef = ir->getMustRef();
         if ((maydef == nullptr || maydef->is_empty()) && mustdef == nullptr) {
-            break;
+            return change;
         }
-        for (INT j = avail_ir_expr.get_first();
-             j != -1; j = avail_ir_expr.get_next(j)) {
+        for (BSIdx j = avail_ir_expr.get_first();
+             j != BS_UNDEF; j = avail_ir_expr.get_next(j)) {
             ExpRep * ie = m_expr_vec->get(j);
             ASSERT0(ie != nullptr);
             for (IR * occ = EXPR_occ_list(ie).get_head();
@@ -574,30 +552,23 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
                     continue;
                 }
                 tmp.clean(m_misc_bs_mgr);
-                m_du->collectMayUseRecursive(occ,
-                    tmp, true, m_misc_bs_mgr);
+                DUMgr::collectMayUseRecursive(occ, m_rg, true,
+                                              m_misc_bs_mgr, tmp);
                 if ((maydef != nullptr && maydef->is_intersect(tmp)) ||
-                    (mustdef != nullptr && tmp.is_contain(mustdef))) {
+                    (mustdef != nullptr && tmp.is_contain(mustdef, m_rg))) {
                     avail_ir_expr.diff(EXPR_id(ie));
                     map_expr2avail_pos.set(EXPR_id(ie), nullptr);
                     map_expr2avail_pr.set(EXPR_id(ie), nullptr);
                 }
             }
         }
-        break;
+        return change;
     }
-    case IR_GOTO:
-    case IR_IGOTO:
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_SWITCH:
+    SWITCH_CASE_BRANCH_OP:
+    SWITCH_CASE_CFS_OP:
     case IR_LABEL:
     case IR_CASE:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        break;
+        return change;
     default: UNREACHABLE();
     }
     return change;
@@ -612,7 +583,7 @@ bool LCSE::perform(OptCtx & oc)
 
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
+        PASS_PRSSA_MGR));
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
@@ -625,7 +596,7 @@ bool LCSE::perform(OptCtx & oc)
 
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
+        PASS_MDSSA_MGR));
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {
@@ -666,7 +637,7 @@ bool LCSE::perform(OptCtx & oc)
         for (BB_irlist(bb).get_head(&ct);
              ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
             IR * ir = ct->val();
-            if (ir->hasSideEffect(true)) { continue; }
+            if (ir->hasSideEffect(true) || ir->isDummyOp()) { continue; }
             change |= processUse(bb, ir, avail_ir_expr,
                                  map_expr2avail_pos, map_expr2avail_pr);
             if (!ir->hasResult()) { continue; }

@@ -40,7 +40,6 @@ static bool readGR(CHAR * gr_file_name)
     ASSERT0(gr_file_name);
     xoc::RegionMgr * rm = new xoc::RegionMgr();
     rm->initVarMgr();
-    rm->initTargInfo();
     rm->getLogMgr()->init("tmp.log", true);
     bool succ = xoc::readGRAndConstructRegion(rm, gr_file_name);
     if (!succ) {
@@ -60,19 +59,18 @@ static bool readGR(CHAR * gr_file_name)
             b.strcat(".gr");
             UNLINK(b.buf);
             FILE * gr = ::fopen(b.buf, "w");
-            FILE * oldh = lm->getFileHandler();
-            CHAR const* oldname = lm->getFileName();
-            lm->changeFileHandler(gr, b.buf);
+            lm->push(gr, b.buf);
             rg->dumpGR(true);
-            lm->changeFileHandler(oldh, oldname);
+            lm->pop();
             ::fclose(gr);
             xoc::prt2C("\noutput is %s\n", b.buf);
         }
         if (rg->getPassMgr() != NULL) {
             xoc::PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
-                                         PASS_PR_SSA_MGR);
+                                         PASS_PRSSA_MGR);
             if (ssamgr != NULL && ssamgr->is_valid()) {
-                ssamgr->destruction();
+                OptCtx * loc = rm->getAndGenOptCtx(rg);
+                ssamgr->destruction(*loc);
             }
         }
     }

@@ -1,65 +1,94 @@
-OPT_OBJS +=\
-$(SRC)/opt/cfs_opt.o\
-$(SRC)/opt/dbg.o\
-$(SRC)/opt/goto_opt.o\
-$(SRC)/opt/if_opt.o \
-$(SRC)/opt/du.o\
-$(SRC)/opt/ir.o\
-$(SRC)/opt/ir_bb.o\
-$(SRC)/opt/ir_builder.o\
-$(SRC)/opt/ir_du.o\
-$(SRC)/opt/ir_cfg.o\
-$(SRC)/opt/ir_simp.o\
-$(SRC)/opt/ir_gvn.o\
-$(SRC)/opt/ir_rce.o\
-$(SRC)/opt/ir_dce.o\
-$(SRC)/opt/ir_cp.o\
-$(SRC)/opt/ir_lcse.o\
-$(SRC)/opt/ir_gcse.o\
-$(SRC)/opt/ir_licm.o\
-$(SRC)/opt/ir_middle_opt.o\
-$(SRC)/opt/ir_high_opt.o\
-$(SRC)/opt/ir_expr_tab.o\
-$(SRC)/opt/cdg.o\
-$(SRC)/opt/ir_refine.o\
-$(SRC)/opt/ir_rp.o\
-$(SRC)/opt/ir_aa.o\
-$(SRC)/opt/ir_ssa.o\
-$(SRC)/opt/ir_mdssa.o\
-$(SRC)/opt/mdssainfo.o\
-$(SRC)/opt/label.o\
-$(SRC)/opt/data_type.o \
-$(SRC)/opt/option.o\
-$(SRC)/opt/region.o\
-$(SRC)/opt/region_mgr.o\
-$(SRC)/opt/util.o\
-$(SRC)/opt/var.o\
-$(SRC)/opt/md.o\
-$(SRC)/opt/loop.o\
-$(SRC)/opt/cfs_mgr.o\
-$(SRC)/opt/pass_mgr.o\
-$(SRC)/opt/inliner.o\
-$(SRC)/opt/ipa.o\
-$(SRC)/opt/callg.o\
-$(SRC)/opt/ir_loop_cvt.o\
-$(SRC)/opt/refine_duchain.o\
-$(SRC)/opt/prssainfo.o\
-$(SRC)/opt/scalar_opt.o\
-$(SRC)/opt/liveness_mgr.o\
-$(SRC)/opt/mdliveness_mgr.o\
-$(SRC)/opt/du_helper.o\
-$(SRC)/opt/symtab.o\
-$(SRC)/opt/logmgr.o\
-$(SRC)/opt/ai.o\
-$(SRC)/opt/gscc.o\
-$(SRC)/opt/lftr.o\
-$(SRC)/opt/ir_ivr.o\
-$(SRC)/opt/md_mgr.o\
-$(SRC)/opt/solve_set.o\
-$(SRC)/opt/infer_type.o\
-$(SRC)/opt/attachinfo_mgr.o\
-$(SRC)/opt/analysis_instr.o\
-$(SRC)/opt/invert_brtgt.o\
-$(SRC)/opt/ir_helper.o\
-$(SRC)/opt/gr_helper.o\
-$(SRC)/opt/mdssalive_mgr.o
+OPT_OBJS+=\
+cfs_opt.o\
+dbg.o\
+goto_opt.o\
+if_opt.o \
+du.o\
+ir.o\
+ir_bb.o\
+ir_builder.o\
+ir_du.o\
+ir_cfg.o\
+ir_simp.o\
+ir_gvn.o\
+ir_rce.o\
+ir_dce.o\
+ir_cp.o\
+ir_lcse.o\
+ir_gcse.o\
+ir_licm.o\
+ir_middle_opt.o\
+ir_high_opt.o\
+ir_expr_tab.o\
+cdg.o\
+ir_refine.o\
+ir_rp.o\
+ir_aa.o\
+ir_ssa.o\
+ir_mdssa.o\
+mdssainfo.o\
+label.o\
+data_type.o \
+option.o\
+region.o\
+region_mgr.o\
+util.o\
+var.o\
+md.o\
+loop.o\
+cfs_mgr.o\
+pass_mgr.o\
+inliner.o\
+ipa.o\
+callg.o\
+ir_loop_cvt.o\
+refine_duchain.o\
+prssainfo.o\
+scalar_opt.o\
+liveness_mgr.o\
+mdliveness_mgr.o\
+du_helper.o\
+symtab.o\
+logmgr.o\
+ai.o\
+gscc.o\
+lftr.o\
+ir_ivr.o\
+md_mgr.o\
+solve_set.o\
+infer_type.o\
+attachinfo_mgr.o\
+analysis_instr.o\
+invert_brtgt.o\
+ir_helper.o\
+gr_helper.o\
+mdssalive_mgr.o\
+insert_guard_helper.o\
+optctx.o\
+ir_dump.o\
+ir_dump_ext.o\
+ir_mgr.o\
+ir_mgr_ext.o\
+ir_verify.o\
+ir_verify_ext.o\
+ir_decl.o\
+ir_desc.o\
+ir_utils.o\
+cfg_lifting.o
+
+ifeq ($(FOR_IP), true)
+  $(info "ADD FOR-IP OBJS")
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
+  ir_vrp.o\
+  ir_dse.o\
+  linear_scan.o
+endif
+
+CFLAGS+=-Wno-unknown-pragmas

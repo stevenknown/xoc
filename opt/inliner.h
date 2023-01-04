@@ -56,10 +56,10 @@ protected:
     CallGraph * m_call_graph;
     Region * m_program;
     TMap<Region*, InlineInfo*> m_ru2inl;
-
 protected:
-    void checkRegion(IN Region * rg,
-                     OUT bool & need_el,
+    bool doInlineImpl(Region * caller, Region * callee);
+protected:
+    void checkRegion(IN Region * rg, OUT bool & need_el,
                      OUT bool & has_ret) const;
 
     void * xmalloc(UINT size)
@@ -80,11 +80,8 @@ protected:
         return ii;
     }
 
-    IR * replaceReturnImpl(
-            Region * caller,
-            IR * caller_call,
-            IR * new_irs,
-            LabelInfo * el);
+    IR * replaceReturnImpl(Region * caller, IR * caller_call, IR * new_irs,
+                           LabelInfo * el);
 public:
     Inliner(Region * program)
     {
@@ -100,8 +97,7 @@ public:
 
     bool can_be_cand(Region * rg);
 
-    bool do_inline_c(Region * caller, Region * callee);
-    void do_inline(Region * cand);
+    void doInline(Region * cand);
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.

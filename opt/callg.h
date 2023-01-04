@@ -128,11 +128,9 @@ private:
     CallNode * newCallNode(Region * rg);
 
 public:
-    CallGraph(UINT edge_hash,
-              UINT vex_hash,
-              RegionMgr * rumgr): xcom::DGraph(edge_hash, vex_hash)
+    CallGraph(UINT vex_hash, RegionMgr * rumgr): xcom::DGraph(vex_hash)
     {
-        ASSERT0(edge_hash > 0 && vex_hash > 0);
+        ASSERT0(vex_hash > 0);
         m_ru_mgr = rumgr;
         m_tm = rumgr->getTypeMgr();
         m_cn_count = 1;
@@ -184,10 +182,11 @@ public:
 
     //Map a call/icall to its target Region.
     //rg: the region that ir resident in.
-    Region * mapCall2Region(IR const* ir, Region * rg)
+    Region * mapCall2Region(IR const* ir, Region const* rg) const
     {
         if (ir->is_call()) {
-            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(), rg);
+            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(),
+                const_cast<Region*>(rg));
             if (cn != nullptr) { return CN_ru(cn); }
             return nullptr;
         }

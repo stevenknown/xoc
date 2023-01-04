@@ -49,8 +49,8 @@ protected:
     DUMgr * m_du;
     BSVec<ExpRep*> * m_expr_vec;
     DefMiscBitSetMgr m_misc_bs_mgr;
-
-    IR * hoist_cse(IRBB * bb,  IR * ir_pos, ExpRep * ie);
+protected:
+    IR * hoistCse(IRBB * bb,  IR * ir_pos, ExpRep * ie);
     bool processUse(IN IRBB * bb, IN IR * ir,
                     MOD xcom::BitSet & avail_ir_expr,
                     MOD Vector<IR*> & map_expr2avail_pos,
@@ -72,11 +72,10 @@ protected:
                           MOD xcom::BitSet & avail_ir_expr,
                           MOD Vector<IR*> & map_expr2avail_pos,
                           MOD Vector<IR*> & map_expr2avail_pr);
-    bool processRhsOfStore(IN IRBB * bb, IN IR * ir,
-                           MOD xcom::BitSet & avail_ir_expr,
-                           MOD Vector<IR*> & map_expr2avail_pos,
-                           MOD Vector<IR*> & map_expr2avail_pr);
-
+    bool processRHS(IN IRBB * bb, IN IR * ir,
+                    MOD xcom::BitSet & avail_ir_expr,
+                    MOD Vector<IR*> & map_expr2avail_pos,
+                    MOD Vector<IR*> & map_expr2avail_pr);
 public:
     explicit LCSE(Region * rg);
     virtual ~LCSE() {}

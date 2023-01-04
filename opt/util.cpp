@@ -69,4 +69,36 @@ void prt2C(CHAR const* format, ...)
     va_end(args);
 }
 
+
+CHAR const* getIntFormat(bool hex)
+{
+    #if WORD_LENGTH_OF_HOST_MACHINE==32
+    if (hex) { return "%x"; }
+    return "%d";
+    #elif WORD_LENGTH_OF_HOST_MACHINE==64
+    if (hex) { return "%llx"; }
+    return "%lld";
+    #else
+    #error "Need to support";
+    #endif
+    UNREACHABLE();
+    return nullptr;
+}
+
+
+CHAR const* getUIntFormat(bool hex)
+{
+    #if WORD_LENGTH_OF_HOST_MACHINE==32
+    if (hex) { return "%x"; }
+    return "%u";
+    #elif WORD_LENGTH_OF_HOST_MACHINE==64
+    if (hex) { return "%llx"; }
+    return "%llu";
+    #else
+    #error "Need to support";
+    #endif
+    UNREACHABLE();
+    return nullptr;
+}
+
 } //namespace xoc

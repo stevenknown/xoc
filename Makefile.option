@@ -1,0 +1,51 @@
+#SET DEBUG FLAG
+ifeq ($(DEBUG),)
+  #Default build mode is DEBUG mode.
+  DEBUG=true
+endif
+
+ifeq ($(DEBUG), true)
+  #Add predefined macro if build host is Windows.
+  CFLAGS+=-D_DEBUG_
+  CFLAGS+=-O0 -g2
+else
+  CFLAGS+=-O2
+endif
+
+#ADD OS FLAG
+ifeq ($(WIN), true)
+  $(info "ON WINDOWS")
+  #Add predefined macro if build host is Windows.
+  CFLAGS+=-D_ON_WINDOWS_
+  ifeq ($(WSL), true)
+    CFLAGS+=-D_USE_GCC_
+  endif 
+else
+  $(info "ON LINUX OR UNIX")
+  CFLAGS+=-D_USE_GCC_
+endif
+
+#SET COMPILER
+ifeq ($(WIN), true)
+  $(info "ON WINDOWS")
+  ifeq ($(WSL), true)
+    ifndef CC
+      CC:=$(shell which clang++ > /dev/null)
+      ifndef CC
+        CC=$(if $(shell which clang),clang.exe,gcc.exe)
+      endif
+    endif
+  else
+    $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
+  endif 
+else
+  $(info "ON LINUX OR UNIX")
+  CC:=$(shell which clang++ > /dev/null)
+  ifndef CC
+    CC=$(if $(shell which clang),clang,gcc)
+  endif
+  ifndef CC
+    $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
+    #$(info "CC is defined="$(CC))
+  endif
+endif

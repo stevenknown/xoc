@@ -41,8 +41,6 @@ class DUMgr;
 
 typedef TMap<PASS_TYPE, Pass*> PassTab;
 typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
-typedef TMap<PASS_TYPE, xcom::Graph*> GraphPassTab;
-typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
 typedef List<PASS_TYPE> PassTypeList;
 
 class PassMgr {
@@ -52,7 +50,6 @@ protected:
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
     PassTab m_registered_pass;
-    GraphPassTab m_registered_graph_based_pass;
 protected:
     void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
                                   BitSet const& opts);
@@ -60,10 +57,9 @@ protected:
                                   AliasAnalysis *& aa,
                                   DUMgr *& dumgr,
                                   BitSet const& opts);
-    xcom::Graph * registerGraphBasedPass(PASS_TYPE opty);
 public:
     PassMgr(Region * rg);
-    virtual ~PassMgr() { destroyAllPass(); }
+    virtual ~PassMgr() { destroyAllRegisteredPass(); }
 
     virtual Pass * allocCDG();
     virtual Pass * allocCFG();
@@ -95,10 +91,13 @@ public:
     virtual Pass * allocRefineDUChain();
     virtual Pass * allocScalarOpt();
     virtual Pass * allocMDLivenessMgr();
+    virtual Pass * allocLivenessMgr();
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocRefine();
     virtual Pass * allocGSCC();
     virtual Pass * allocIRSimp();
+    virtual Pass * allocIRMgr();
+    virtual Pass * allocLinearScanRA();
 
     //This function check validation of options in oc, perform
     //recomputation if it is invalid.
@@ -106,9 +105,12 @@ public:
     void checkValidAndRecompute(OptCtx * oc, ...);
     void checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist);
 
-    void destroyAllPass();
+    void destroyAllRegisteredPass();
     void destroyPass(Pass * pass);
     void destroyPass(PASS_TYPE passtype);
+    void dump() const;
+
+    PassTab const& getPassTab() const { return m_registered_pass; }
 
     virtual Pass * registerPass(PASS_TYPE opty);
 

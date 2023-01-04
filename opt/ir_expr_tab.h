@@ -83,8 +83,8 @@ class ExprTab : public Pass {
     xcom::BitSetMgr * m_bs_mgr;
 
     void * xmalloc(INT size);
-    inline UINT compute_hash_key(IR const* ir);
-    inline UINT compute_hash_key_for_tree(IR * ir);
+    inline HOST_UINT compute_hash_key(IR const* ir);
+    inline HOST_UINT compute_hash_key_for_tree(IR * ir);
     inline ExpRep * encode_istore_memaddr(IN IR * ir)
     {
         ASSERT0(IR_parent(ir)->is_ist());

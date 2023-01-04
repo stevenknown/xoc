@@ -34,7 +34,6 @@ namespace xoc {
 static Type const* meetType(Type const* t1, Type const* t2, TypeMgr * tm)
 {
     //Upbound and Lowerbound is ANY type.
-    Type const* newty = tm->getAny();
     if (t1->is_any()) {
         if (t2->is_any()) { return t2; }
         return t2;
@@ -76,16 +75,15 @@ void InferType::addDump(IR const* ir) const
 
 
 //Infer variable's type.
-bool InferType::inferVarTypeByIRType(IR const* ir) const
+bool InferType::inferVarTypeByIRCode(IR const* ir) const
 {
     if (ir->is_any()) { return false; }
     Var * var = nullptr;
     switch (ir->getCode()) {
-    case IR_CALL:
-    case IR_ICALL:
+    SWITCH_CASE_CALL:
     case IR_PHI:
     case IR_STPR:
-    case IR_PR: {
+    SWITCH_CASE_READ_PR: {
         MD const* ref = ir->getRefMD();
         if (ref != nullptr) {
             var = ref->get_base();
@@ -94,8 +92,7 @@ bool InferType::inferVarTypeByIRType(IR const* ir) const
         var = m_rg->mapPR2Var(ir->getPrno());
         break;
     }
-    case IR_LD:
-    case IR_ST:
+    SWITCH_CASE_DIRECT_MEM_OP:
         var = ir->getIdinfo();
         break;
     default:;
@@ -114,20 +111,20 @@ bool InferType::inferVarTypeByIRType(IR const* ir) const
 bool InferType::inferStmtCall(IR * ir) const
 {
     ASSERT0(ir->isCallStmt());
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
 bool InferType::inferStmtPhi(IR * ir) const
 {
     ASSERT0(ir->is_phi());
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
 bool InferType::inferStmtMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryRef() && ir->is_stmt());
+    ASSERT0(ir->isMemRef() && ir->is_stmt());
     ASSERT0(ir->getRHS());
     bool changed = false;
     if (ir->getRHS()->is_any()) {
@@ -142,14 +139,14 @@ bool InferType::inferStmtMemAcc(IR * ir)
         addDump(ir);
         addChanged(ir);
     }
-    changed |= inferVarTypeByIRType(ir);
+    changed |= inferVarTypeByIRCode(ir);
     return true;
 }
 
 
 bool InferType::inferLeafExpMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryOpnd() && ir->is_exp() && ir->is_leaf());
+    ASSERT0(ir->isMemOpnd() && ir->is_exp() && ir->is_leaf());
     if (ir->is_any()) {
         MD const* ref = ir->getRefMD();
         if (ref != nullptr && !ref->get_base()->is_any()) {
@@ -169,7 +166,7 @@ bool InferType::inferLeafExpMemAcc(IR * ir)
         }
         return false;
     }
-    return inferVarTypeByIRType(ir);
+    return inferVarTypeByIRCode(ir);
 }
 
 
@@ -178,7 +175,7 @@ bool InferType::inferArray(IR * ir) const
     ASSERT0(ir->is_array());
     if (!ir->is_any()) { return false; }
     //TODO: infer the array operator type via array base type.
-    return false; 
+    return false;
 }
 
 
@@ -201,7 +198,7 @@ bool InferType::inferIld(IR * ir)
 
 bool InferType::inferExpMemAcc(IR * ir)
 {
-    ASSERT0(ir->isMemoryOpnd() && ir->is_exp());
+    ASSERT0(ir->isMemOpnd() && ir->is_exp());
     if (ir->is_leaf()) {
         return inferLeafExpMemAcc(ir);
     }
@@ -258,6 +255,27 @@ bool InferType::inferSelect(IR * ir)
 }
 
 
+static Type const* inferPointerArith(IR const* ir, Type const* rety)
+{
+    switch (ir->getCode()) {
+    case IR_ADD:
+    case IR_SUB: {
+        IR * op0 = BIN_opnd0(ir);
+        IR * op1 = BIN_opnd1(ir);
+        if (op0->is_ptr() && !op1->is_ptr()) {
+            return op0->getType();
+        }
+        if (!op0->is_ptr() && op1->is_ptr()) {
+            return op1->getType();
+        }
+        return rety;
+    }
+    default: break;
+    }
+    return rety;
+}
+
+
 bool InferType::inferBinOP(IR * ir)
 {
     if (!ir->is_any()) { return false; }
@@ -280,8 +298,9 @@ bool InferType::inferBinOP(IR * ir)
     } else {
         rety = op1->getType();
     }
+    rety = inferPointerArith(ir, rety);
     ASSERT0(rety);
-    IR_dt(ir) = rety;
+    ir->setType(rety);
     addDump(ir);
     addChanged(ir);
     return true;
@@ -307,10 +326,10 @@ bool InferType::inferIR(IR * ir)
     SWITCH_CASE_UNA:
         changed |= inferUnaOP(ir);
         return changed;
-    SWITCH_CASE_EXP_MEM_ACC:
+    SWITCH_CASE_EXP_MEM_OP:
         changed |= inferExpMemAcc(ir);
         return changed;
-    SWITCH_CASE_STMT_MEM_ACC:
+    SWITCH_CASE_STMT_MEM_OP:
         changed |= inferStmtMemAcc(ir);
         return changed;
     SWITCH_CASE_CALL:
@@ -368,7 +387,7 @@ void InferType::dumpInit()
 {
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         ASSERT0(m_changed_irlist == nullptr);
-        m_changed_irlist = new CIRList();
+        m_changed_irlist = new ConstIRList();
         ASSERT0(m_changed_varlist == nullptr);
         m_changed_varlist = new List<Var const*>();
     }
@@ -423,7 +442,7 @@ bool InferType::perform(OptCtx & oc)
     IR * irl = m_rg->getIRList();
     BBList * bbl = m_rg->getBBList();
     START_TIMER(t, getPassName());
-    m_rg->getLogMgr()->startBuffer();
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpInit();
     bool changed = false;
     do {
@@ -440,12 +459,10 @@ bool InferType::perform(OptCtx & oc)
     } while (m_wl.get_elem_count() != 0);
     if (!changed) {
         m_rg->getLogMgr()->cleanBuffer();
-        m_rg->getLogMgr()->endBuffer();
         dumpFini();
         END_TIMER(t, getPassName());
         return false;
     }
-    m_rg->getLogMgr()->endBuffer();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         dump();
     }

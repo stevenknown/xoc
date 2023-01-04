@@ -130,7 +130,7 @@ class LinearRep {
 public:
     IR const* coeff; //coefficient
     IR const* addend; //addend
-    IR_TYPE addend_sign; //the sign of addend
+    IR_CODE addend_sign; //the sign of addend
     IR const* var; //variable
     IV const* iv; //record BIV/DIV info
 public:
@@ -216,6 +216,8 @@ protected:
 
     void findBIV(LI<IRBB> const* li, IDTab & tmp);
     void findDIV(LI<IRBB> const* li, BIVList const& bivlst);
+    virtual void findDIVByStmt(IR * ir, LI<IRBB> const* li,
+                               BIVList const& bivlst, OUT IRSet & set);
 
     bool hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
                            OUT IRSet * set) const;

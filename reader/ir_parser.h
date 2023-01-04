@@ -30,7 +30,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-#define MAX_PRNO 0xffffFF
+#define MAX_PRNO 0x7fffFFFF
 
 class Lexer;
 class IRParser;
@@ -50,8 +50,10 @@ public:
 #define PARSECTX_returned_imm_fpval(p) ((p)->s1.u1.returned_imm_fpval)
 #define PARSECTX_returned_imm_ty(p) ((p)->s1.returned_imm_ty)
 class ParseCtx {
+    COPY_CONSTRUCTOR(ParseCtx);
     xcom::TMap<Sym const*, LabelInfo*> m_sym2label;
     xcom::TMap<IR*, LabelInfo*> m_ir2label;
+    xcom::TMap<Sym const*, UINT> m_id2prno;
 public:
     Region * current_region;
     IRParser * parser;
@@ -61,7 +63,7 @@ public:
     bool has_phi;
     bool has_high_level_ir; //Control Flow Struct are high level IR.
     bool has_error;
-    IR_TYPE ircode; //for temporary used
+    IR_CODE ircode; //for temporary used
     struct {
         union {
             HOST_INT returned_imm_intval;
@@ -89,16 +91,20 @@ public:
 
     void addIR(IR * stmt);
 
+    void clean();
+
     xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
 
     LabelInfo * mapSym2Label(Sym const* sym) const
     { return m_sym2label.get(sym); }
     LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label.get(ir); }
+    UINT mapSym2Prno(Sym const* sym) const { return m_id2prno.get(sym); }
 
     void setMapSym2Label(Sym const* sym, LabelInfo * label)
     { m_sym2label.set(sym, label); }
     void setMapIR2Label(IR * ir, LabelInfo * label)
     { m_ir2label.set(ir, label); }
+    void setMapSym2Prno(Sym const* sym, UINT prno) { m_id2prno.set(sym, prno); }
     void storeValue(IR ** oldvalue1, IR ** oldvalue2)
     {
         *oldvalue1 = stmt_list;
@@ -212,7 +218,6 @@ typedef enum {
     X_PRIVATE,
     X_RESTRICT,
     X_VOLATILE,
-    X_FUNC_DECL,
     X_FAKE,
     X_GLOBAL,
     X_UNDEFINED,
@@ -222,6 +227,7 @@ typedef enum {
     X_DIM,
     X_UNALLOCABLE,
     X_ALIGN,
+    X_DECL,
     X_LAST,
 } X_CODE;
 
@@ -275,6 +281,15 @@ protected:
     List<ParseErrorMsg*> m_err_list;
     TMap<Sym const*, UINT> m_id2prno;
 protected:
+    //Return true if GRReader allows user defined dedicated PRNO in GR file.
+    //e.g: stpr $200 = 0;
+    //     GRReader will directly assign Prno 200 to the stmt as a result.
+    //TODO: GRReader has to use string and immediate mapping to support the
+    //assignment to avoid both string-literal Prno and customized Prno in use.
+    //e.g: stpr $200 = 0;
+    //          ...  = $xyz;
+    bool allowCustomizePrno() { return false; }
+
     bool checkPhiOpndLabel(IR const* ir,
         xcom::TMap<LabelInfo const*, IR const*> const& labtab,
         ParseCtx const& ctx);
@@ -289,7 +304,7 @@ protected:
     bool declareRegion(ParseCtx * ctx);
 
     void enterRegion(ParseCtx *) {}
-    void exitRegion(ParseCtx *) {}
+    void exitRegion(ParseCtx * ctx) { ctx->clean(); }
     void error(UINT lineno, CHAR const* format, ...);
     void error(TOKEN tok, CHAR const* format, ...);
     void error(X_CODE xcode, CHAR const* format, ...);
@@ -318,6 +333,8 @@ protected:
 
     UINT mapID2Prno(CHAR const* prid, ParseCtx * ctx);
 
+    bool parseCustomizedPrno(UINT * prno, ParseCtx * ctx);
+    bool parseStringLiteralPrno(UINT * prno, CHAR const* str, ParseCtx * ctx);
     bool parseRegionName(Region * region, UINT flag, ParseCtx * ctx);
     bool parseRegionProp(OUT PropertySet & ps, ParseCtx * ctx);
     bool parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx);
@@ -357,8 +374,8 @@ protected:
     bool parseReturn(ParseCtx * ctx);
     bool parseRegionBody(ParseCtx * ctx);
     bool parseModifyPR(X_CODE code, ParseCtx * ctx);
-    bool parseBinaryOp(IR_TYPE code, ParseCtx * ctx);
-    bool parseUnaryOp(IR_TYPE code, ParseCtx * ctx);
+    bool parseBinaryOp(IR_CODE code, ParseCtx * ctx);
+    bool parseUnaryOp(IR_CODE code, ParseCtx * ctx);
     bool parseLd(ParseCtx * ctx);
     bool parseSignImm(TOKEN tok, ParseCtx * ctx);
     bool parseImmIR(ParseCtx * ctx);
@@ -392,7 +409,7 @@ public:
     CHAR const* getPassName() const { return "IRParser"; }
     RegionMgr * getRegionMgr() const { return m_rumgr; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
-    CHAR const* getKeywordName(X_CODE code) const;
+    CHAR const* getKeyWordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }
 
     void setLexer(Lexer * l) { m_lexer = l; }

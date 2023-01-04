@@ -179,7 +179,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
     //Regenerate try-block and catch-block informations.
     ASSERT0(lircode->trys);
-    INT i = 0;
+    VecIdx i = 0;
     for (; i <= tivec.get_last_idx(); i++) {
         TryInfo * ti = tivec[i];
         ASSERT0(ti);
@@ -243,7 +243,7 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
 
     bool change;
 
-    RefineCtx rf;
+    RefineCtx rf(&oc);
 
     //Do not insert cvt for DEX code to avoid smash the code sanity.
     RC_insert_cvt(rf) = false;
@@ -673,7 +673,7 @@ bool compileFunc(
     func_ru->setRegionVar(rm->getVarMgr()->registerVar(
                         runame,
                         rm->getTypeMgr()->getMCType(0),
-                        0, VAR_GLOBAL|VAR_FAKE|VAR_FUNC_DECL));
+                        0, VAR_GLOBAL|VAR_FAKE|VAR_IS_FUNC));
     func_ru->setParamNum(lircode->numArgs);
     func_ru->setOrgVregNum(lircode->maxVars);
     func_ru->setClassSourceFilePath(getClassSourceFilePath(df, dexclassdef));

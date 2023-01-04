@@ -141,7 +141,7 @@ public:
     public:
         HeapValVector(Vector<U> & data) { m_data = &data; }
     
-        //Return the first index in vector of legal heap value. 
+        //Return the first index in vector of legal heap value.
         UINT get_begin_idx() const { return 1; }
         UINT get_end_idx() const { return 1 + get_elem_count() - 1; }
         U get(UINT idx)
@@ -156,8 +156,7 @@ public:
             return m_data->set(idx - 1, val);
         }
     
-        UINT get_elem_count() const
-        { return m_data->get_last_idx() < 0 ? 0 : m_data->get_last_idx() + 1; }
+        UINT get_elem_count() const { return m_data->get_elem_count(); }
     };
 private:
     //The floor of integer division.
@@ -181,10 +180,11 @@ private:
         UINT r = rchild(start);
         UINT minor = l <= end ? l : 0;
         if (r <= end && minor != 0) {
-            minor = data.get(l) > data.get(r) ? r : l;
+            minor = GreatThan(data.get(l), data.get(r)) ? r : l;
         }
         if (minor == 0 || //no kid
-            data.get(start) <= data.get(minor)) { //already be min-heap
+            //already be min-heap if start <= minor.
+            LessEqualThan(data.get(start), data.get(minor))) {
             return;
         }
         swap(data, start, minor);
@@ -199,10 +199,11 @@ private:
         ASSERT0(l > start && r > start);
         UINT major = l <= end ? l : 0;
         if (r <= end && major != 0) {
-            major = data.get(l) < data.get(r) ? r : l;
+            major = LessThan(data.get(l), data.get(r)) ? r : l;
         }
         if (major == 0 || //no kid
-            data.get(start) >= data.get(major)) { //already be max-heap
+            //already be max-heap if start >= major.
+            GreatEqualThan(data.get(start), data.get(major))) {
             return;
         }
         swap(data, start, major);
@@ -228,7 +229,13 @@ private:
             max_heapify(hdata, i, hdata.get_end_idx());
         }
     }
+protected:
+    virtual bool GreatThan(T a, T b) const { return a > b; }
+    virtual bool GreatEqualThan(T a, T b) const { return a >= b; }
+    virtual bool LessThan(T a, T b) const { return a < b; }
+    virtual bool LessEqualThan(T a, T b) const { return a <= b; }
 public:
+    virtual ~HeapSort() {}
     //Sort value in 'data' incrementally.
     void sort(MOD Vector<T> & data)
     {
@@ -258,7 +265,7 @@ template <class T> class QuickSort {
     
         //Choose the mid-one to avoid worst case.
         //At worst case, stack may be bursted.
-        T key_val = MIN(MAX(first_data, mid_data), last_data);
+        T key_val = _min(_max(first_data, mid_data), last_data);
         INT key_idx;
         if (key_val == first_data) {
             key_idx = first_idx;
@@ -275,7 +282,7 @@ template <class T> class QuickSort {
         //to find the larger one and swapping with 'key_val'.
         for (INT i = left_start_idx; i <= key_idx - 1; i++) {
             T v = data.get(i);
-            if (v > key_val) {
+            if (GreatThan(v, key_val)) {
                 //Swapping
                 data.set(key_idx, v);
                 data.set(i, key_val);
@@ -290,7 +297,7 @@ template <class T> class QuickSort {
         //to find the less one and swapping with 'key_val'.
         for (INT j = right_start_idx; j >= key_idx + 1; j--) {
             T v = data.get(j);
-            if (v < key_val) {
+            if (LessThan(v, key_val)) {
                 //Swapping
                 data.set(key_idx, v);
                 data.set(j, key_val);
@@ -302,12 +309,25 @@ template <class T> class QuickSort {
         _qsort(data, first_idx, key_idx - 1);
         _qsort(data, key_idx + 1, last_idx);
     }
+protected:
+    //The function is optional to sorting, usually used in calibrating
+    //mid-value to avoid degrdating to the worst case.
+    //e.g:you can return a directly.
+    virtual T _max(T a, T b) const { return MAX(a, b); }
+
+    //The function is optional to sorting, usually used in calibrating
+    //mid-value to avoid degrdating to the worst case.
+    //e.g:you can return a directly.
+    virtual T _min(T a, T b) const { return MIN(a, b); }
+    virtual bool GreatThan(T a, T b) const { return a > b; }
+    virtual bool LessThan(T a, T b) const { return a < b; }
 public:
+    virtual ~QuickSort() {}
     //Quick Sort.
     //The output data will be ordered increment.
     void sort(MOD Vector<T> & data)
     {
-        if (data.get_last_idx() < 0 || data.get_last_idx() == 0) {
+        if (data.get_last_idx() == VEC_UNDEF || data.get_last_idx() == 0) {
             return;
         }
         _qsort(data, 0, data.get_last_idx());
@@ -317,7 +337,7 @@ public:
 
 template <class T> class MergeSort {
     //2-ways Merge Sort.
-    void _merge_sort(Vector<T> const& data, INT start_idx, INT end_idx,
+    void _merge_sort(Vector<T> const& data, VecIdx start_idx, VecIdx end_idx,
                      OUT Vector<T> & output)
     {
         if (start_idx > end_idx) {
@@ -328,7 +348,7 @@ template <class T> class MergeSort {
             return;
         }
         if (start_idx + 1 == end_idx) {
-            if (data.get(start_idx) <= data.get(end_idx)) {
+            if (LessEqualThan(data.get(start_idx), data.get(end_idx))) {
                 output.set(0, data.get(start_idx));
                 output.set(1, data.get(end_idx));
             } else {
@@ -337,21 +357,21 @@ template <class T> class MergeSort {
             }
             return;
         }
-    
-        INT mid_idx = (start_idx + end_idx + 1) / 2;
+        VecIdx mid_idx = (start_idx + end_idx + 1) / 2;
         Vector<T> left_output;
         Vector<T> right_output;
         _merge_sort(data, start_idx, mid_idx - 1, left_output);
         _merge_sort(data, mid_idx, end_idx, right_output);
-        INT lidx = 0, ridx = 0;
-        INT llen = mid_idx - start_idx, rlen = end_idx - mid_idx + 1;
+        VecIdx lidx = 0, ridx = 0;
+        VecIdx llen = mid_idx - start_idx, rlen = end_idx - mid_idx + 1;
         for (INT i = 0; i < llen + rlen; i++) {
-            if (left_output.get(lidx) <= right_output.get(ridx)) {
+            if (LessEqualThan(left_output.get(lidx), right_output.get(ridx))) {
                 output.set(i, left_output.get(lidx));
                 lidx++;
                 if (lidx >= llen) {
                     i++;
-                    for (INT j = ridx; j <= right_output.get_last_idx(); j++) {
+                    for (VecIdx j = ridx; j <= right_output.get_last_idx();
+                         j++) {
                         output.set(i, right_output.get(j));
                         i++;
                     }
@@ -364,7 +384,7 @@ template <class T> class MergeSort {
             ridx++;
             if (ridx >= rlen) {
                 i++;
-                for (INT j = lidx; j <= left_output.get_last_idx(); j++) {
+                for (VecIdx j = lidx; j <= left_output.get_last_idx(); j++) {
                     output.set(i, left_output.get(j));
                     i++;
                 }
@@ -372,7 +392,10 @@ template <class T> class MergeSort {
             }
         }
     }
+protected:
+    virtual bool LessEqualThan(T a, T b) const { return a <= b; }
 public:
+    virtual ~MergeSort() {}
     //Merge Sort.
     //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
@@ -384,157 +407,138 @@ public:
 };
 
 
-//NOTICE: compare() operator of type 'T' is necessary.
-template <class T> class Sort {
-    bool _bucket_sort_check(MOD Vector<T> & data);
-    void _insert_sort(MOD Vector<T> & data, UINT start_idx, UINT end_idx);
-
+//Bubble Sort.
+//The output data will be ordered increment.
+template <class T> class BubbleSort {
+protected:
+    virtual bool GreatThan(T a, T b) const { return a > b; }
 public:
-    void shell_sort(MOD Vector<T> & data);
-    void bucket_sort(MOD Vector<T> & data);
-    void counting_sort(MOD Vector<T> & data);
-    //Heap Sort.
-    //The output data will be ordered incrementally.
-    void heap_sort(MOD Vector<T> & data) { HeapSort<T> hs; hs.sort(data); }
-    void merge_sort(MOD Vector<T> & data) { MergeSort<T> ms; ms.sort(data); }
-    void bubble_sort(MOD Vector<T> & data);
-    //Quick Sort.
-    //The output data will be ordered incrementally.
-    void quick_sort(MOD Vector<T> & data) { QuickSort<T> qs; qs.sort(data); }
+    virtual ~BubbleSort() {}
+    void sort(MOD Vector<T> & data)
+    {
+        VecIdx n = data.get_last_idx();
+        for (VecIdx i = 0; i <= n; i++) {
+            for (VecIdx j = i+1; j <= n; j++) {
+                if (GreatThan(data.get(i), data.get(j))) {
+                    //Swap
+                    T v(data.get(i));
+                    data.set(i, data.get(j));
+                    data.set(j, v);
+                }
+            }
+        }
+    }
 };
 
 
-//Bubble Sort.
-//The output data will be ordered increment.
-template <class T>
-void Sort<T>::bubble_sort(MOD Vector<T> & data)
-{
-    INT n = data.get_last_idx();
-    for (INT i = 0; i <= n; i++) {
-        for (INT j = i+1; j <= n; j++) {
-            if (data.get(i) > data.get(j)) {
-                //Swap
-                T v(data.get(i));
-                data.set(i, data.get(j));
-                data.set(j, v);
+template <class T> class CountingSort {
+public:
+    void sort(MOD Vector<T> & data)
+    {
+        Vector<T> c; //for tmp use.
+        VecIdx n = data.get_last_idx();
+        if (n <= 0) { return; }
+        for (VecIdx i = 0; i <= n; i++) {
+            T v = data[i];
+            ASSERTN(v >= 0, ("key value should be larger than 0"));
+            c[v] = c[v] + 1;
+        }
+    
+        //Calclate the number of element whose value less or equal 'j'.
+        for (VecIdx j = 1; j <= c.get_last_idx(); j++) {
+            c[j] = c[j - 1] + c[j];
+        }
+    
+        //Sort.
+        Vector<T> res;
+        //Utilize relation between value and index.
+        for (VecIdx k = n; !IS_VECUNDEF(k); k--) {
+            T v = data[k];
+            INT idx = c[v]; //value of each input-data is index in 'c'
+            res[idx] = v;
+            c[v] = idx - 1;
+        }
+        data.copy(res);
+    }
+};
+
+
+template <class T> class BucketSort {
+    bool _bucket_sort_check(MOD Vector<T> & data)
+    {
+        for (VecIdx i = 0; i <= data.get_last_idx(); i++) {
+            T v = data[i];
+            ASSERTN(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
+        }
+        return true;
+    }
+public:
+    void sort(MOD Vector<T> & data)
+    {
+        Bucket<T> bk(data.get_elem_count());
+        ASSERT0(_bucket_sort_check(data));
+        for (VecIdx i = 0; i <= data.get_last_idx(); i++) {
+            bk.append(data[i]);
+        }
+        bk.extract_elem(data);
+    }
+};
+
+
+template <class T> class ShellSort {
+    void _insert_sort(MOD Vector<T> & data, UINT start_idx, UINT end_idx)
+    {
+        List<T> list;
+        for (UINT i = start_idx; i <= end_idx; i++) {
+            C<T> * ct = nullptr;
+            T d = data[i];
+            for (T v = list.get_head(&ct); ct; v = list.get_next(&ct)) {
+                if (LessThan(d, v)) { //in increment order
+                    break;
+                }
+            }
+            if (ct == nullptr) {
+                list.append_tail(d);
+            } else {
+                list.insert_before(d, ct);
             }
         }
+    
+        //Reflush 'data'
+        T v = list.get_head();
+        for (UINT k = start_idx; k <= end_idx; k++) {
+            data[k] = v;
+            v = list.get_next();
+        }
     }
-}
-
-
-//Counting Sort.
-template <class T>
-void Sort<T>::counting_sort(MOD Vector<T> & data)
-{
-    Vector<T> c; //for tmp use.
-    INT n = data.get_last_idx();
-    if (n <= 0) {
-        return;
-    }
-
-    //
-    for (INT i = 0; i <= n; i++) {
-        T v = data[i];
-        ASSERTN(v >= 0, ("key value should be larger than 0"));
-        c[v] = c[v] + 1;
-    }
-
-    //Calclate the number of element whose value less or equal 'j'.
-    for (INT j = 1; j <= c.get_last_idx(); j++) {
-        c[j] = c[j - 1] + c[j];
-    }
-
-    //Sort..
-    Vector<T> res;
-    //Utilize relation between value and index.
-    for (INT k = n; k >= 0; k--) {
-        T v = data[k];
-        INT idx = c[v]; //value of each input-data is index in 'c'
-        res[idx] = v;
-        c[v] = idx - 1;
-    }
-    data.copy(res);
-}
-
-
-template <class T>
-bool Sort<T>::_bucket_sort_check(MOD Vector<T> & data)
-{
-    for (INT i = 0; i <= data.get_last_idx(); i++) {
-        T v = data[i];
-        ASSERTN(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
-    }
-    return true;
-}
-
-
-template <class T>
-void Sort<T>::bucket_sort(MOD Vector<T> & data)
-{
-    Bucket<T> bk(data.get_last_idx() + 1);
-    ASSERT0(_bucket_sort_check(data));
-    for (INT i = 0; i <= data.get_last_idx(); i++) {
-        bk.append(data[i]);
-    }
-    bk.extract_elem(data);
-}
-
-
-template <class T>
-void Sort<T>::_insert_sort(MOD Vector<T> & data,
-                           UINT start_idx, UINT end_idx)
-{
-    List<T> list;
-    for (UINT i = start_idx; i <= end_idx; i++) {
-        C<T> * ct = nullptr;
-        T d = data[i];
-        for (T v = list.get_head(&ct); ct; v = list.get_next(&ct)) {
-            if (d < v) { //in increment order
+protected:
+    virtual bool LessThan(T a, T b) const { return a < b; }
+public:
+    virtual ~ShellSort() {}
+    void sort(MOD Vector<T> & data)
+    {
+        VecIdx n = data.get_elem_count();
+        if (n <= 1) {
+            return;
+        }
+        UINT gap = 2;
+        UINT rem = 0;
+        for (UINT group = n / gap; group >= 1;
+             gap *= 2, group = n / gap, rem = n % gap) {
+            rem = rem == 0 ? 0 : 1;
+            for (UINT i = 0; i < group + rem; i++) {
+                _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));
+            }
+    
+            if (group == 1) {
                 break;
             }
         }
-        if (ct == nullptr) {
-            list.append_tail(d);
-        } else {
-            list.insert_before(d, ct);
+        if (rem != 0) {
+            _insert_sort(data, 0, n - 1);
         }
     }
-
-    //Reflush 'data'
-    T v = list.get_head();
-    for (UINT k = start_idx; k <= end_idx; k++) {
-        data[k] = v;
-        v = list.get_next();
-    }
-}
-
-
-template <class T>
-void Sort<T>::shell_sort(MOD Vector<T> & data)
-{
-    INT n = data.get_last_idx() + 1;
-    if (n <= 1) {
-        return;
-    }
-    UINT gap = 2;
-    UINT rem = 0;
-    for (UINT group = n / gap; group >= 1;
-         gap *= 2, group = n / gap, rem = n % gap) {
-        rem = rem == 0 ? 0 : 1;
-        for (UINT i = 0; i < group + rem; i++) {
-            _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));
-        }
-
-        if (group == 1) {
-            break;
-        }
-    }
-
-    if (rem != 0) {
-        _insert_sort(data, 0, n - 1);
-    }
-}
+};
 
 } //namespace xcom
 #endif

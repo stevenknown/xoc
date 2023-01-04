@@ -45,7 +45,7 @@ class BIRMat : public Matrix<BIRational> {
     friend BIRMat operator - (BIRMat const& a, BIRMat const& b);
     friend class INTMat;
     friend class RMat;
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
 
     void _init_hook();
 public:

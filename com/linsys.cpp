@@ -36,7 +36,7 @@ class X2V_MAP {
                         //index of the vector indicate the index of eqaution.
     VECOFVECINT m_x2neg; //record negative coeff of variable,
                         //index of the vector indicate the index of eqaution.
-    bool m_is_init;
+    BYTE m_is_init:1; //To make sure functions are idempotent.
     SMemPool * m_pool;
 
     void * xmalloc(INT size)
@@ -72,13 +72,13 @@ public:
     void destroy()
     {
         if (!m_is_init) { return; }
-        for (INT i = 0; i <= m_x2pos.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_x2pos.get_last_idx(); i++) {
             Vector<INT> *vec = m_x2pos.get(i);
             if (vec) {
                 vec->destroy();
             }
         }
-        for (INT i = 0; i <= m_x2neg.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_x2neg.get_last_idx(); i++) {
             Vector<INT> * vec = m_x2neg.get(i);
             if (vec) {
                 vec->destroy();
@@ -102,7 +102,7 @@ public:
                 vec->init();
                 m_x2pos.set(idx_of_var, vec);
             }
-            vec->set(vec->get_last_idx() + 1, idx_of_equation);
+            vec->append(idx_of_equation);
         } else if (coeff < 0) {
             Vector<INT> * vec = m_x2neg.get(idx_of_var);
             if (vec == nullptr) {
@@ -110,7 +110,7 @@ public:
                 vec->init();
                 m_x2neg.set(idx_of_var, vec);
             }
-            vec->set(vec->get_last_idx() + 1, idx_of_equation);
+            vec->append(idx_of_equation);
         }
     }
 
@@ -415,7 +415,7 @@ bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
         Vector<INT> * poscoeff_eqt = x2v.get_pos_of_var(idx_of_var);
         if (poscoeff_eqt != nullptr) {
             //Reduction in terms of intersection/union operation on boundary.
-            for (INT k1 = 0; k1 < poscoeff_eqt->get_last_idx(); k1++) {
+            for (VecIdx k1 = 0; k1 < poscoeff_eqt->get_last_idx(); k1++) {
                 UINT idx_of_ineqt1 = poscoeff_eqt->get(k1);
                 if (removed.get(idx_of_ineqt1) == true) {
                     continue;
@@ -429,7 +429,7 @@ bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
                 }
 
                 bool ineq1_removed = false;
-                for (INT k2 = k1 + 1;
+                for (VecIdx k2 = k1 + 1;
                      k2 <= poscoeff_eqt->get_last_idx(); k2++) {
                     UINT idx_of_ineqt2 = poscoeff_eqt->get(k2);
                     if (removed.get(idx_of_ineqt2) == true) {
@@ -485,7 +485,7 @@ bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
         //Processing negitive coefficent relationship, e.g: -x <= W, -x <= V.
         Vector<INT> * negcoeff_eqt = x2v.get_neg_of_var(idx_of_var);
         if (negcoeff_eqt != nullptr) {
-            for (INT k1 = 0; k1 < negcoeff_eqt->get_last_idx(); k1++) {
+            for (VecIdx k1 = 0; k1 < negcoeff_eqt->get_last_idx(); k1++) {
                 UINT idx_of_eqt1 = negcoeff_eqt->get(k1);
                 if (removed.get(idx_of_eqt1) == true) {
                     continue;
@@ -499,7 +499,8 @@ bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
                     m.mulOfRow(idx_of_eqt1, 1/coeff);
                 }
                 bool ineq1_removed = false;
-                for (INT k2 = k1 + 1; k2 <= negcoeff_eqt->get_last_idx(); k2++) {
+                for (VecIdx k2 = k1 + 1;
+                     k2 <= negcoeff_eqt->get_last_idx(); k2++) {
                     UINT idx_of_eqt2 = negcoeff_eqt->get(k2);
                     if (removed.get(idx_of_eqt2) == true) {
                         continue;
@@ -556,13 +557,13 @@ bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
         //Verification for legitimate intersection of lower and upper boundary.
         //e.g: x <= 9 , x >= 10 is inconsistency.
         if (is_intersect && poscoeff_eqt != nullptr && negcoeff_eqt != nullptr) {
-            for (INT i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
+            for (VecIdx i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
                 INT pi = poscoeff_eqt->get(i);
                 Rational coeff = m.get(pi, idx_of_var);
                 if (coeff != 1) { //Reduce coefficent of variable to 1.
                     m.mulOfRow(pi, 1/coeff);
                 }
-                for (INT j = 0; j <= negcoeff_eqt->get_last_idx(); j++) {
+                for (VecIdx j = 0; j <= negcoeff_eqt->get_last_idx(); j++) {
                     INT ni = negcoeff_eqt->get(j);
                     coeff = m.get(ni, idx_of_var);
                     coeff = -coeff;
@@ -1405,14 +1406,13 @@ bool Lineq::omit(INTMat const& coeff,
     Vector<UINT> sczero; //record idx of single common zero columns.
     UINT sczero_count = 0;
 
-    //Exam left and right sides.
-    INT i;
-    for (i = 0; i < (INT)rhs_part; i++) {
+    //Exam left and right sides.    
+    for (INT i = 0; i < (INT)rhs_part; i++) {
         if (coeff.get(ncv, i) == 0 && coeff.get(pcv, i) == 0) {
             sczero.set(sczero_count++, i);
         }
     }
-    for (i = 0; i <= noneg.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= noneg.get_last_idx(); i++) {
         UINT c = noneg.get(i);
         if (coeff.get(ncv, c) == 0 && coeff.get(pcv, c) == 0) {
             sczero.set(sczero_count++, c);
@@ -1423,10 +1423,10 @@ bool Lineq::omit(INTMat const& coeff,
     }
 
     //Check with rules.
-    for (INT j = 0; j <= combined.get_last_idx(); j++) {
+    for (VecIdx j = 0; j <= combined.get_last_idx(); j++) {
         UINT crow = combined.get(j);
         bool all_zero = true; //intersecting all columns in zeros.
-        for (INT k = 0; k <= sczero.get_last_idx(); k++) {
+        for (VecIdx k = 0; k <= sczero.get_last_idx(); k++) {
             if (coeff.get(crow, sczero.get(k)) != 0) {
                 all_zero = false;
                 break;
@@ -1574,12 +1574,12 @@ bool Lineq::convertConstraint2Ray(OUT INTMat & gmat,
         } else { ASSERTN(0, ("Must have negative coeff")); }
         i = 0;
         INT omit_count = 0;
-        for (INT nc = 0; nc <= row_of_neg_coeff.get_last_idx(); nc++) {
+        for (VecIdx nc = 0; nc <= row_of_neg_coeff.get_last_idx(); nc++) {
             //idx of rows with negative-coeff.
             UINT ncv = row_of_neg_coeff[nc];
             combined.clean();
             combined_count = 0;
-            for (INT pc = 0; pc <= row_of_pos_coeff.get_last_idx(); pc++) {
+            for (VecIdx pc = 0; pc <= row_of_pos_coeff.get_last_idx(); pc++) {
                 UINT pcv = row_of_pos_coeff[pc];
                 if (first || !omit(coeff, ncv, pcv,
                                     rhs_part, combined, noneg)) {
@@ -1712,7 +1712,7 @@ void Lineq::removeRedRow(MOD INTMat & cs,
             }
         }
     }
-    if (rm.get_last_idx() >= 0) {
+    if (rm.get_last_idx() != VEC_UNDEF) {
         INTMat res(cs_rows - rm_count, cs.getColSize());
         UINT k = 0;
         for (UINT i = 0; i < cs_rows; i++) {
@@ -1836,12 +1836,12 @@ bool Lineq::convertRay2Constraint(INTMat const& gmat,
 
             //Compute the combination of pair of rays.
             UINT i = 0;
-            for (INT nc = 0; nc <= row_of_neg_coeff.get_last_idx(); nc++) {
+            for (VecIdx nc = 0; nc <= row_of_neg_coeff.get_last_idx(); nc++) {
                 //idx of rows with negative-coeff.
                 UINT ncv = row_of_neg_coeff[nc];
                 combined.clean();
                 combined_count = 0;
-                INT pc;
+                VecIdx pc;
                 for (pc = 0; pc <= row_of_pos_coeff.get_last_idx(); pc++) {
                     //idx of rows with positive-coeff.
                     UINT pcv = row_of_pos_coeff[pc];

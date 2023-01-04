@@ -26,7 +26,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-
+#define CASTCONST(ptr) (const_cast<IR*>(static_cast<IR const*>(ptr)))
 #ifdef _DEBUG_
 class IR;
 INT checkKidNumValid(IR const* ir, UINT n, CHAR const* file, INT lineno);
@@ -38,58 +38,71 @@ INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
 INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
                            INT line);
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumIRtype(IR const* ir, UINT n, IR_TYPE irty, CHAR const* filename,
+INT checkKidNumIRCode(IR const* ir, UINT n, IR_CODE irc, CHAR const* filename,
                       INT line);
-IR const* checkIRT(IR const* ir, IR_TYPE irt);
-IR const* checkIRTBranch(IR const* ir);
-IR const* checkIRTCall(IR const* ir);
-IR const* checkIRTArray(IR const* ir);
-IR const* checkIRTOnlyCall(IR const* ir);
-IR const* checkIRTOnlyICall(IR const* ir);
+
+//These functions check the consistency of the IR code and misellaneous
+//attributes which corresponding the code.
+IR * checkIRC(IR * ir, IR_CODE irc);
+IR * checkIRCBranch(IR * ir);
+IR * checkIRCCall(IR * ir);
+IR * checkIRCArray(IR * ir);
+IR * checkIRCOnlyCall(IR * ir);
+IR * checkIRCOnlyICall(IR * ir);
 UINT checkArrayDimension(IR const* ir, UINT n);
 #endif
 
 #ifdef _DEBUG_
 #define CK_KID_NUM(ir, n, f, l) (checkKidNumValid(ir, n, f, l))
-#define CK_KID_NUM_IRTY(ir, n, irty, f, l) \
-    (checkKidNumIRtype(ir, n, irty, f, l))
+#define CK_KID_NUM_IRC(ir, n, irc, f, l) \
+    (checkKidNumIRCode(ir, n, irc, f, l))
 #define CK_KID_NUM_UNA(ir, n, f, l) (checkKidNumValidUnary(ir, n, f, l))
 #define CK_KID_NUM_BIN(ir, n, f, l) (checkKidNumValidBinary(ir, n, f, l))
 #define CK_KID_NUM_BR(ir, n, f, l) (checkKidNumValidBranch(ir, n, f, l))
 #define CK_KID_NUM_LOOP(ir, n, f, l) (checkKidNumValidLoop(ir, n, f, l))
 #define CK_KID_NUM_CALL(ir, n, f, l) (checkKidNumValidCall(ir, n, f, l))
 #define CK_KID_NUM_ARR(ir, n, f, l) (checkKidNumValidArray(ir, n, f, l))
-#define CK_IRT(ir, irt) (checkIRT(ir, irt))
-#define CK_IRT_BR(ir) (checkIRTBranch(ir))
-#define CK_IRT_CALL(ir) (checkIRTCall(ir))
-#define CK_IRT_ARR(ir) (checkIRTArray(ir))
-#define CK_IRT_ONLY_CALL(ir) (checkIRTOnlyCall(ir))
-#define CK_IRT_ONLY_ICALL(ir) (checkIRTOnlyICall(ir))
-#define CK_ARRAY_DIM(ir, n) (checkArrayDimension(ir, n))
+#define CK_IRC(ir, irc) (checkIRC(CASTCONST(ir), irc))
+#define CK_IRC_BR(ir) (checkIRCBranch(CASTCONST(ir)))
+#define CK_IRC_CALL(ir) (checkIRCCall(CASTCONST(ir)))
+#define CK_IRC_ARR(ir) (checkIRCArray(CASTCONST(ir)))
+#define CK_IRC_ONLY_CALL(ir) (checkIRCOnlyCall(CASTCONST(ir)))
+#define CK_IRC_ONLY_ICALL(ir) (checkIRCOnlyICall(CASTCONST(ir)))
+#define CK_ARRAY_DIM(ir, n) (checkArrayDimension(CASTCONST(ir), n))
 #else
 #define CK_KID_NUM(ir, n, f, l) (n)
-#define CK_KID_NUM_IRTY(ir, n, irty, f, l) (n)
+#define CK_KID_NUM_IRC(ir, n, irc, f, l) (n)
 #define CK_KID_NUM_UNA(ir, n, f, l) (n)
 #define CK_KID_NUM_BIN(ir, n, f, l) (n)
 #define CK_KID_NUM_BR(ir, n, f, l) (n)
 #define CK_KID_NUM_LOOP(ir, n, f, l) (n)
 #define CK_KID_NUM_CALL(ir, n, f, l) (n)
 #define CK_KID_NUM_ARR(ir, n, f, l) (n)
-#define CK_IRT(ir, irt) (ir)
-#define CK_IRT_BR(ir) (ir)
-#define CK_IRT_CALL(ir) (ir)
-#define CK_IRT_ARR(ir) (ir)
-#define CK_IRT_ONLY_CALL(ir) (ir)
-#define CK_IRT_ONLY_ICALL(ir) (ir)
+#define CK_IRC(ir, irc) (CASTCONST(ir))
+#define CK_IRC_BR(ir) (CASTCONST(ir))
+#define CK_IRC_CALL(ir) (CASTCONST(ir))
+#define CK_IRC_ARR(ir) (CASTCONST(ir))
+#define CK_IRC_ONLY_CALL(ir) (CASTCONST(ir))
+#define CK_IRC_ONLY_ICALL(ir) (CASTCONST(ir))
 #define CK_ARRAY_DIM(ir, n) (n)
 #endif
 
-#define CKID_TY(ir, irty, n) CK_KID_NUM_IRTY(ir, n, irty, __FILE__, __LINE__)
-#define CKID_BR(ir, n) CK_KID_NUM_BR(ir, n, __FILE__, __LINE__)
-#define CKID_LOOP(ir, n) CK_KID_NUM_LOOP(ir, n, __FILE__, __LINE__)
-#define CKID_UNA(ir, n) CK_KID_NUM_UNA(ir, n, __FILE__, __LINE__)
-#define CKID_BIN(ir, n) CK_KID_NUM_BIN(ir, n, __FILE__, __LINE__)
-#define CKID_CALL(ir, n) CK_KID_NUM_CALL(ir, n, __FILE__, __LINE__)
-#define CKID_ARR(ir, n) CK_KID_NUM_ARR(ir, n, __FILE__, __LINE__)
+#define CK_KID_IRC(ir, irc, n) CK_KID_NUM_IRC(ir, n, irc, __FILE__, __LINE__)
+#define CK_KID_BR(ir, n) CK_KID_NUM_BR(ir, n, __FILE__, __LINE__)
+#define CK_KID_LOOP(ir, n) CK_KID_NUM_LOOP(ir, n, __FILE__, __LINE__)
+#define CK_KID_UNA(ir, n) CK_KID_NUM_UNA(ir, n, __FILE__, __LINE__)
+#define CK_KID_BIN(ir, n) CK_KID_NUM_BIN(ir, n, __FILE__, __LINE__)
+#define CK_KID_CALL(ir, n) CK_KID_NUM_CALL(ir, n, __FILE__, __LINE__)
+#define CK_KID_ARR(ir, n) CK_KID_NUM_ARR(ir, n, __FILE__, __LINE__)
 
+#define CK_KID(ir, CLASS, OPCODE, IDX) \
+    ((static_cast<CLASS*>(CASTCONST(ir)))->opnd[CK_KID_IRC(ir, OPCODE, IDX)])
 
+#define CK_CALL_KID(ir, CLASS, IDX) \
+    ((static_cast<CLASS*>(CASTCONST(ir)))->opnd[CK_KID_CALL(ir, IDX)])
+
+#define CK_FLD(ir, CLASS, OPCODE, FIELD) \
+    ((static_cast<CLASS*> CK_IRT(ir, OPCODE))->FIELD)
+
+#define CK_FLD_KIND(ir, CLASS, FUNC, FIELD) \
+    ((static_cast<CLASS*>FUNC(ir))->FIELD)

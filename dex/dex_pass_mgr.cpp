@@ -78,7 +78,7 @@ int xtime = 1;
 void DexPassMgr::performScalarOpt(OptCtx & oc)
 {
     List<Pass*> passlist; //A list of optimization.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * ssamgr = (PRSSAMgr*)registerPass(PASS_PRSSA_MGR);
     bool is_ssa_avail = false;
     if (ssamgr != nullptr) {
         is_ssa_avail = ssamgr->is_valid();

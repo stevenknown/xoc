@@ -99,7 +99,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt, CHAR const* name,
         TN * x = lst.remove_head();
         T key = T(0);
         bool is_nil = false;
-        for (INT i = 0; i <= nilvec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= nilvec.get_last_idx(); i++) {
             TN * z = nilvec.get(i);
             if (z == nullptr) { continue; }
             if (x == z) {
@@ -187,7 +187,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt, CHAR const* name,
                 (UINT)key, (UINT)nil->key);
         }
     }
-    for (INT i = 0; i <= nilvec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= nilvec.get_last_idx(); i++) {
         TN * z = nilvec.get(i);
         ASSERT0(z);
         delete z;

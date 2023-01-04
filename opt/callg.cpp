@@ -42,10 +42,10 @@ namespace xoc {
 void CallGraph::computeEntryList(List<CallNode*> & elst)
 {
     elst.clean();
-    INT c;
+    VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
-        if (VERTEX_in_list(v) == nullptr) {
+        if (v->getInList() == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != nullptr);
             elst.append_tail(cn);
@@ -57,10 +57,10 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
 void CallGraph::computeExitList(List<CallNode*> & elst)
 {
     elst.clean();
-    INT c;
+    VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
-        if (VERTEX_out_list(v) == nullptr) {
+        if (v->getOutList() == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != nullptr);
             elst.append_tail(cn);
@@ -296,11 +296,11 @@ bool CallGraph::build(RegionMgr * rumgr)
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
         addNode(caller);
-        CIRList * call_list = rg->getCallList();
+        ConstIRList const* call_list = rg->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 
-        xcom::C<IR const*> * ct;
+        ConstIRListIter ct;
         for (call_list->get_head(&ct);
              ct != nullptr; ct = call_list->get_next(ct)) {
             IR const* ir = ct->val();

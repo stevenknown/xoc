@@ -39,11 +39,21 @@ namespace xoc {
 //
 //START CfsMgr
 //
-CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
+CfsMgr::CfsMgr(Region * rg) : Pass(rg)
+{
+    m_pool = smpoolCreate(64, MEM_COMM);
+    IRCFG * cfg = rg->getCFG();
+    if (cfg != nullptr) {
+        m_bb2li.createMap(cfg->getLoopInfo());
+    }
+}
+
+
+CFS_INFO * CfsMgr::new_cfs_info(IR_CODE ircode)
 {
     CFS_INFO * ci = (CFS_INFO*)xmalloc(sizeof(CFS_INFO));
-    CFS_INFO_cfs_type(ci) = irtype;
-    switch (irtype) {
+    CFS_INFO_cfs_type(ci) = ircode;
+    switch (ircode) {
     case IR_IF:
         CFS_INFO_true_body(ci) = m_bs_mgr.create();
         CFS_INFO_false_body(ci) = m_bs_mgr.create();
@@ -159,7 +169,7 @@ AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
     DUMMYUSE(cur_region);
     ASSERT0(cur_region == nullptr || cur_region->is_contain(entry->id()));
     IRCFG * cfg = m_rg->getCFG();
-    LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
+    LI<IRBB> * li = m_bb2li.get(entry);
     ASSERT0(li != nullptr && li->getLoopHead() == entry);
 
     AbsNode * node = new_abs_node(ABS_LOOP);
@@ -167,11 +177,12 @@ AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
     ABS_NODE_parent(node) = parent;
     ABS_NODE_loop_head(node) = entry;
     IRBB * body_start;
-    cfg->getKidOfLoop(entry, nullptr, &body_start);
+    CFGLifting cfglifting(cfg);
+    cfglifting.getKidOfLoop(entry, nullptr, &body_start);
     ASSERT0(body_start != nullptr);
 
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
-    CHECK0_DUMMYUSE(ci);
+    ASSERT0_DUMMYUSE(ci);
     ASSERT0(CFS_INFO_head(ci) == entry);
 
     ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*li->getBodyBBSet()));
@@ -197,7 +208,8 @@ AbsNode * CfsMgr::constructAbsIf(IN IRBB * entry, IN AbsNode * parent,
 
     IRBB * true_body, * false_body;
     IRCFG * cfg = m_rg->getCFG();
-    cfg->getKidOfIF(entry, &true_body, &false_body, nullptr);
+    CFGLifting cfglifting(cfg);
+    cfglifting.getKidOfIF(entry, &true_body, &false_body, nullptr);
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
     ASSERT0(ci != nullptr && CFS_INFO_head(ci) == entry);
 
@@ -241,7 +253,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
             visited.clean();
             return nullptr;
         }
-        INT c;
+        VertexIter c;
         for (v = g.get_first_vertex(c); v != nullptr; v = next) {
             next = g.get_next_vertex(c);
             if (cur_region->is_contain(v->id())) {
@@ -256,7 +268,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
             cur_region->is_contain(bb->id()))) {
         AbsNode * node = nullptr;
         loc_visited.clean();
-        LI<IRBB> * li = cfg->mapBB2LabelInfo(bb);
+        LI<IRBB> * li = m_bb2li.get(bb);
         if (li != nullptr) {
             node = constructAbsLoop(bb, parent, li->getBodyBBSet(),
                                     g, loc_visited);
@@ -287,7 +299,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
         visited.bunion(loc_visited);
         //Remove visited vertex.
         next = nullptr;
-        INT c;
+        VertexIter c;
         for (v = g.get_first_vertex(c); v != nullptr; v = next) {
             next = g.get_next_vertex(c);
             if (!loc_visited.is_contain(v->id())) {
@@ -297,9 +309,11 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
         }
 
         IRBB * cand = nullptr;
-        for (v = g.get_first_vertex(c); v != nullptr; v = g.get_next_vertex(c)) {
+        for (v = g.get_first_vertex(c);
+             v != nullptr; v = g.get_next_vertex(c)) {
             if (v->getInDegree() == 0) {
-                ASSERTN(cand == nullptr, ("multiple immediate-post-dominators"));
+                ASSERTN(cand == nullptr,
+                        ("multiple immediate-post-dominators"));
                 cand = cfg->getBB(v->id());
             }
         }

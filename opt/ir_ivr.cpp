@@ -392,7 +392,8 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
         //Find an USE of 'ir' that is inside in loop 'li'.
         collectUseSet(ir, m_mdssamgr, set);
         IRSetIter it = nullptr;
-        for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
+        for (BSIdx i = set->get_first(&it);
+             i != BS_UNDEF; i = set->get_next(i, &it)) {
             IR * e = m_rg->getIR(i);
             ASSERT0(e || e->is_exp());
             IRBB const* bb = nullptr;
@@ -426,7 +427,8 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
 
     xoc::collectDefSet(exp, m_mdssamgr, set);
     IRSetIter it = nullptr;
-    for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
+    for (BSIdx i = set->get_first(&it);
+         i != BS_UNDEF; i = set->get_next(i, &it)) {
         IR * stmt = m_rg->getIR(i);
         ASSERT0(stmt || stmt->is_stmt());
         if (stmt != stmt_of_exp && li->isInsideLoop(stmt->getBB()->id())) {
@@ -493,8 +495,8 @@ bool IVR::isSelfModByDUSet(IR const* ir) const
     // x<-SelfModOP(x, 1)
     //Iterate all USEs to check if the stmt of USE is identical to 'ir'.
     DUSetIter it = nullptr;
-    for (INT i = useset->get_first(&it);
-         i >= 0; i = useset->get_next(i, &it)) {
+    for (BSIdx i = useset->get_first(&it);
+         i != BS_UNDEF; i = useset->get_next(i, &it)) {
         IR const* use = m_rg->getIR(i);
         ASSERT0(use->is_exp());
 
@@ -520,8 +522,8 @@ bool IVR::isSelfModByPRSSA(IR const* ir) const
     // pr4<-PHI(pr3, pr5)
     // pr5<-SelfModOP(pr4, 1)
     SSAUseIter it;
-    for (INT u = SSA_uses(ssainfo).get_first(&it);
-         u >= 0; u = SSA_uses(ssainfo).get_next(u, &it)) {
+    for (BSIdx u = SSA_uses(ssainfo).get_first(&it);
+         u != BS_UNDEF; u = SSA_uses(ssainfo).get_next(u, &it)) {
         IR const* use = m_rg->getIR(u);
         ASSERT0(use && use->is_exp());
 
@@ -545,10 +547,10 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
     // md4<-PHI(md3, md5)
     // md5<-SelfModOP(md4, 1)
     VOpndSetIter it;
-    for (INT u = const_cast<MDSSAInfo*>(ssainfo)->getVOpndSet()->get_first(&it);
-         u >= 0;
-         u = const_cast<MDSSAInfo*>(ssainfo)->
-            getVOpndSet()->get_next(u, &it)) {
+    for (BSIdx u = const_cast<MDSSAInfo*>(ssainfo)->getVOpndSet()->
+             get_first(&it);
+         u != BS_UNDEF; u = const_cast<MDSSAInfo*>(ssainfo)->
+             getVOpndSet()->get_next(u, &it)) {
         VMD * vopnd = (VMD*)m_mdssamgr->getVOpnd(u);
         ASSERT0(vopnd && vopnd->is_md());
 
@@ -556,7 +558,7 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
         for (INT i = vopnd->getUseSet()->get_first(vit);
              !vit.end(); i = vopnd->getUseSet()->get_next(vit)) {
             IR * use = m_rg->getIR(i);
-            ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+            ASSERT0(use && (use->isMemRef() || use->is_id()));
 
             //Only consider PHI.
             if (!use->is_id()) { continue; }
@@ -578,7 +580,7 @@ bool IVR::isSelfMod(IR const* ir) const
     if (ir->isWritePR() && usePRSSADU()) {
         return isSelfModByPRSSA(ir);
     }
-    if (ir->isMemoryRef() && useMDSSADU()) {
+    if (ir->isMemRef() && useMDSSADU()) {
         return isSelfModByMDSSA(ir);
     }
     return isSelfModByDUSet(ir);
@@ -595,11 +597,11 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
     }
 
     IRSet set(getSegMgr()); //for tmp used, it must be clean before return.
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(bb->id()));
+        ASSERT0(bb && bb->getVex());
 
         if ((UINT)i != back_start_bb->id() &&
             !m_cfg->is_dom(i, back_start_bb->id())) {
@@ -651,10 +653,10 @@ bool IVR::scanExp(IR const* ir, LI<IRBB> const* li, IDTab const& bivset)
     case IR_CONST:
     case IR_LDA:
         return true;
-    case IR_LD:
-    case IR_ILD:
-    case IR_ARRAY:
-    case IR_PR: {
+    SWITCH_CASE_DIRECT_MEM_EXP:
+    SWITCH_CASE_INDIRECT_MEM_EXP:
+    SWITCH_CASE_READ_ARRAY:
+    SWITCH_CASE_READ_PR: {
         MD const* irmd = ir->getExactRef();
         if (irmd == nullptr) { return false; }
         if (bivset.find(irmd->id())) {
@@ -665,15 +667,8 @@ bool IVR::scanExp(IR const* ir, LI<IRBB> const* li, IDTab const& bivset)
         }
         return false;
     }
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+    SWITCH_CASE_ARITH:
+    SWITCH_CASE_SHIFT:
         if (!scanExp(BIN_opnd0(ir), li, bivset)) { return false; }
         if (!scanExp(BIN_opnd1(ir), li, bivset)) { return false; }
         return true;
@@ -853,39 +848,45 @@ bool IVR::isLinearRep(LI<IRBB> const* li, IR const* ir,
 }
 
 
+void IVR::findDIVByStmt(IR * ir, LI<IRBB> const* li,
+                        BIVList const& bivlst, OUT IRSet & set)
+{
+    switch (ir->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_ARRAY:
+    case IR_STPR: {
+        MD const* ref = ir->getRefMD();
+        if (ref == nullptr || !ref->is_exact() ||
+            isBIV(li, ir, nullptr)) {
+            return;
+        }
+        LinearRep linrep;
+        if (isLinearRep(li, ir->getRHS(), &linrep) &&
+            !hasMultiDefInLoop(ir, li, &set)) {
+            //ir is DIV.
+            ASSERT0(linrep.is_valid());
+            LinearRep * r = allocLinearRep();
+            r->copy(linrep);
+            recordDIV(li, ir, r);
+        }
+        return;
+    }
+    default:;
+    }
+}
+
+
 void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
 {
     if (bivlst.get_elem_count() == 0) { return; }
-
     IRSet set(getSegMgr());
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(bb->id()));
+        ASSERT0(bb && bb->getVex());
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
-            switch (ir->getCode()) {
-            case IR_ST:
-            case IR_STPR:
-            case IR_IST:
-            case IR_STARRAY: {
-                MD const* ref = ir->getRefMD();
-                if (ref == nullptr || !ref->is_exact() ||
-                    isBIV(li, ir, nullptr)) {
-                    continue;
-                }
-                LinearRep linrep;
-                if (isLinearRep(li, ir->getRHS(), &linrep) &&
-                    !hasMultiDefInLoop(ir, li, &set)) {
-                    //ir is DIV.
-                    ASSERT0(linrep.is_valid());
-                    LinearRep * r = allocLinearRep();
-                    r->copy(linrep);
-                    recordDIV(li, ir, r);
-                }
-                break;
-            }
-            default:;
-            }
+            findDIVByStmt(ir, li, bivlst, set);
         }
     }
     set.clean();
@@ -900,8 +901,8 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
         for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
         prt(getRegion(), "LI%d:BB%d", li->id(), li->getLoopHead()->id());
         prt(getRegion(), ",BODY:");
-        for (INT i = li->getBodyBBSet()->get_first();
-             i != -1; i = li->getBodyBBSet()->get_next(i)) {
+        for (BSIdx i = li->getBodyBBSet()->get_first();
+             i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
             prt(getRegion(), "%d,", i);
         }
 
@@ -1011,12 +1012,12 @@ bool IVR::dump() const
 
 void IVR::clean()
 {
-    for (INT i = 0; i <= m_li2bivlst.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_li2bivlst.get_last_idx(); i++) {
         BIVList * ivlst = m_li2bivlst.get(i);
         if (ivlst == nullptr) { continue; }
         ivlst->clean();
     }
-    for (INT i = 0; i <= m_li2divlst.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_li2divlst.get_last_idx(); i++) {
         DIVList * ivlst = m_li2divlst.get(i);
         if (ivlst == nullptr) { continue; }
         ivlst->clean();
@@ -1049,7 +1050,6 @@ bool IVR::perform(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DOM,
                                                PASS_LOOP_INFO, PASS_RPO,
                                                PASS_UNDEF);
-
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == nullptr) {

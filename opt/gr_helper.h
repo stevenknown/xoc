@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class BBList;
+
 //The class represents options during GR dump.
 class DumpGRCtx {
 public:
@@ -64,12 +66,13 @@ private:
     void dumpPhi(IR const* ir, DumpGRCtx const* ctx) const;
 public:
     GRDump(Region const* rg);
+    virtual ~GRDump() {}
 
     static CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 
     //ctx: it can be NULL if user is not going to control the dumpping.
     //     But it must be given if 'ir' is PHI because dump PHI will using CFG.
-    void dumpIR(IR const* ir, DumpGRCtx const* ctx) const;
+    virtual void dumpIR(IR const* ir, DumpGRCtx const* ctx) const;
     void dumpIRList(IR const* irlist, DumpGRCtx const* ctx) const;
     void dumpBBList(BBList const* bblist, DumpGRCtx const* ctx) const;
     void dumpRegion(bool dump_inner_region) const;

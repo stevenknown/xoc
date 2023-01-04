@@ -61,22 +61,21 @@ namespace xoc {
 class LoopCvt : public Pass {
 protected:
     IRCFG * m_cfg;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     ConstIRIter m_ii;
-
+protected:
     bool is_while_do(LI<IRBB> const* li, IRBB ** gobackbb,
-                    UINT * succ1, UINT * succ2);
+                     UINT * succ1, UINT * succ2);
     bool try_convert(LI<IRBB> * li, IRBB * gobackbb,
-                    UINT succ1, UINT succ2);
-    bool find_and_convert(List<LI<IRBB>*> & worklst);
-
+                     UINT succ1, UINT succ2, OptCtx & oc);
+    bool find_and_convert(List<LI<IRBB>*> & worklst, OptCtx & oc);
 public:
     explicit LoopCvt(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_du = rg->getDUMgr();
+        m_dumgr = rg->getDUMgr();
         m_cfg = m_rg->getCFG();
-        ASSERT0(m_cfg && m_du);
+        ASSERT0(m_cfg && m_dumgr);
     }
     COPY_CONSTRUCTOR(LoopCvt);
     virtual ~LoopCvt() {}

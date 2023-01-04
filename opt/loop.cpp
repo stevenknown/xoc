@@ -44,9 +44,11 @@ class InsertPhiHelper {
     LI<IRBB> const* m_li;
     IRCFG * m_cfg;
     Region * m_rg;
+    IRMgr * m_irmgr;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     MDSystem * m_mdsys;
+    OptCtx const& m_oc;
     Vector<UINT> m_pred_order;
     Vector<UINT> m_pred_pos;
     List<IR*> m_prssa_phis;
@@ -56,6 +58,7 @@ private:
     void dumpPhi() const;
 
     Region * getRegion() const { return m_rg; }
+    OptCtx const& getOptCtx() const { return m_oc; }
 
     void insertPRSSAPhi(IRBB * preheader);
     void insertMDSSAPhi(IRBB * preheader);
@@ -68,10 +71,11 @@ private:
     void replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos);
     void replaceMDSSASuccOpnd(IRBB * preheader, UINT prehead_pos);
 public:
-    InsertPhiHelper(LI<IRBB> const* li, IRCFG * cfg)
-        : m_li(li), m_cfg(cfg)
+    InsertPhiHelper(LI<IRBB> const* li, IRCFG * cfg, OptCtx const& oc)
+        : m_li(li), m_cfg(cfg), m_oc(oc)
     {
         m_rg = cfg->getRegion();
+        m_irmgr = m_rg->getIRMgr();
         m_prssamgr = m_rg->getPRSSAMgr();
         m_mdssamgr = m_rg->getMDSSAMgr();
         m_mdsys = m_rg->getMDSystem();
@@ -101,7 +105,7 @@ void InsertPhiHelper::dumpOrder() const
 
 void InsertPhiHelper::dumpPhi() const
 {
-    C<IR*> * it;
+    List<IR*>::Iter it;
     for (IR * ir = m_prssa_phis.get_head(&it); ir != nullptr;
          ir = m_prssa_phis.get_next(&it)) {
         dumpIR(ir, m_rg, nullptr, IR_DUMP_KID);
@@ -162,7 +166,7 @@ bool InsertPhiHelper::preparePhiForPreheader()
 
     UINT outside_pred_num = 0;
     UINT pos = 0;
-    for (xcom::EdgeC const* ec = m_cfg->getVertex(head->id())->getInList();
+    for (xcom::EdgeC const* ec = head->getVex()->getInList();
          ec != nullptr; ec = ec->get_next(), pos++) {
         UINT pred = ec->getFromId();
         if (!m_li->isInsideLoop(pred)) {
@@ -188,7 +192,7 @@ void InsertPhiHelper::makeMDSSAPhi(MDPhi const* phi)
     for (IR * opnd = MDPHI_opnd_list(phi);
          opnd != nullptr; opnd = opnd->get_next(), i++) {
         if (c == m_pred_pos.get_elem_count()) { break; }
-        INT pos = m_pred_pos.get(c);
+        UINT pos = m_pred_pos.get(c);
         if (i != pos) { continue; }
         MDSSAInfo const* oldmdssainfo = m_mdssamgr->getMDSSAInfoIfAny(opnd);
         ASSERT0(oldmdssainfo);
@@ -216,9 +220,9 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     ASSERT0(phi->is_phi());
     //Generate PHI.
     //Type cast if host compiler does NOT support C11.
-    IR * newphi = m_rg->buildPhi(m_rg->buildPrno(phi->getType()),
-                                 phi->getType(), (IR*)nullptr);
-    m_rg->allocRefForPR(newphi);
+    IR * newphi = m_irmgr->buildPhi(m_irmgr->buildPrno(phi->getType()),
+                                    phi->getType(), (IR*)nullptr);
+    m_rg->getMDMgr()->allocRef(newphi);
     m_prssa_phis.append_tail(newphi);
     //BB_irlist(preheader).append_head(phi);
     IR * new_opnd_list = nullptr;
@@ -230,7 +234,7 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     for (IR * opnd = PHI_opnd_list(phi); opnd != nullptr; opnd = next, i++) {
         next = opnd->get_next();
         if (c == m_pred_pos.get_elem_count()) { break; }
-        INT pos = m_pred_pos.get(c);
+        UINT pos = m_pred_pos.get(c);
         if (i != pos) { continue; }
         IR * newopnd = m_rg->dupIRTree(opnd);
         ASSERT0(newopnd->getMustRef() && opnd->getSSAInfo());
@@ -259,7 +263,6 @@ void InsertPhiHelper::makePRSSAPhiForPreheader(IRBB const* head)
 
 void InsertPhiHelper::makeMDSSAPhiForPreheader(IRBB * head)
 {
-    IRBB * phead = const_cast<IRBB*>(head);
     MDPhiList const* lst = m_mdssamgr->getPhiList(head);
     if (lst == nullptr) { return; }
     for (MDPhiListIter it = lst->get_head();
@@ -271,7 +274,7 @@ void InsertPhiHelper::makeMDSSAPhiForPreheader(IRBB * head)
 
 void InsertPhiHelper::insertPRSSAPhi(IRBB * preheader)
 {
-    C<IR*> * it;
+    List<IR*>::Iter it;
     BBIRList & irlst = preheader->getIRList();
     for (IR * phi = m_prssa_phis.get_tail(&it);
          phi != nullptr; phi = m_prssa_phis.get_prev(&it)) {
@@ -283,7 +286,7 @@ void InsertPhiHelper::insertPRSSAPhi(IRBB * preheader)
 void InsertPhiHelper::insertMDSSAPhi(IRBB * preheader)
 {
     C<MDPhi*> * it;
-    MDPhiList * philst = m_mdssamgr->genPhiList(preheader);
+    MDPhiList * philst = m_mdssamgr->genPhiList(preheader->id());
     for (MDPhi * phi = m_mdssa_phis.get_tail(&it);
          phi != nullptr; phi = m_mdssa_phis.get_prev(&it)) {
         philst->append_head(phi);
@@ -303,11 +306,12 @@ void InsertPhiHelper::replaceMDSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
          prephiit = prephis->get_next(prephiit)) {
         MDPhi * prephi = prephiit->val();
         ASSERT0(prephi);
-        MDDEF_bb(prephi) = preheader; //Complete the MDPhi info.
+        MDPHI_bb(prephi) = preheader; //Complete the MDPhi info.
         IR * oldopnd = lhphi->val()->getOpnd(prehead_pos);
         ASSERT0(oldopnd && oldopnd->is_id() &&
                 MDSSAMgr::getMDSSAInfoIfAny(oldopnd));
-        m_mdssamgr->removeMDSSAOccForTree(oldopnd);
+        MDSSAUpdateCtx ctx(getOptCtx());
+        m_mdssamgr->removeMDSSAOccForTree(oldopnd, ctx);
         m_mdssamgr->buildDUChain(prephi, oldopnd);
     }
 }
@@ -331,9 +335,9 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
         ASSERT0(oldopnd && oldopnd->isPROp() && oldopnd->getSSAInfo());
         PRSSAMgr::removePRSSAOcc(oldopnd);
 
-        IR * newopnd = m_rg->buildPRdedicated(ir_pre->getPrno(),
-                                              ir_pre->getType());
-        m_rg->allocRef(newopnd);
+        IR * newopnd = m_irmgr->buildPRdedicated(ir_pre->getPrno(),
+                                                 ir_pre->getType());
+        m_rg->getMDMgr()->allocRef(newopnd);
         m_prssamgr->buildDUChain(ir_pre, newopnd);
 
         ir_lh->replaceKid(oldopnd, newopnd, true);
@@ -346,8 +350,8 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
 void InsertPhiHelper::insertPhiAtPreheader(IRBB * preheader)
 {
     IRBB * loophead = m_li->getLoopHead();
-    UINT prehead_pos = ((DGraph*)m_cfg)->WhichPred(
-        preheader->id(), m_cfg->getVertex(loophead->id()));
+    UINT prehead_pos = ((DGraph*)m_cfg)->WhichPred(preheader->id(),
+                                                   loophead->getVex());
     insertPRSSAPhi(preheader);
     replacePRSSASuccOpnd(preheader, prehead_pos);
     insertMDSSAPhi(preheader);
@@ -366,14 +370,13 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
 {
     ASSERT0(li && cfg && succ1 && succ2);
     IRBB * head = li->getLoopHead();
-
-    xcom::Vertex * headvex = cfg->getVertex(head->id());
+    xcom::Vertex * headvex = head->getVex();
     if (headvex->getOutDegree() != 2) {
         //Not natural loop.
         return false;
     }
 
-    xcom::EdgeC const* ec = VERTEX_out_list(headvex);
+    xcom::EdgeC const* ec = headvex->getOutList();
     ASSERT0(ec && EC_next(ec));
 
     *succ1 = ec->getToId();
@@ -394,7 +397,7 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
             lab = rg->genILabel();
             rg->getCFG()->addLabel(to, lab);
         }
-        IR * gotoir = rg->buildGoto(lab);
+        IR * gotoir = rg->getIRMgr()->buildGoto(lab);
         from->getIRList().append_tail(gotoir);
         return gotoir;
     }
@@ -466,10 +469,12 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
 
 //Return true if inserted a new BB.
 //insert_preheader: true if preheader has been inserted, otherwise do insertion.
-static void insertAndUpdateOutterLoopEdge(
-    LI<IRBB> const* li, Region * rg, IRBB * pred, BBListIter head_it,
-    IRBB * preheader, MOD LabelInfo const** preheader_lab,
-    OUT bool & insert_preheader)
+static void insertAndUpdateOutterLoopEdge(LI<IRBB> const* li, Region * rg,
+                                          IRBB * pred, BBListIter head_it,
+                                          IRBB * preheader,
+                                          MOD LabelInfo const** preheader_lab,
+                                          OUT bool & insert_preheader,
+                                          OptCtx * oc)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -480,13 +485,14 @@ static void insertAndUpdateOutterLoopEdge(
         BBListIter pred_it;
         cfg->getBBList()->find(pred, &pred_it);
         ASSERT0(pred_it);
-        cfg->insertVertexBetween(pred->id(), head->id(), preheader->id());
-        bool succ = cfg->tryFindLessRPO(preheader, head);
-        CHECK0_DUMMYUSE(succ);
+        cfg->tryUpdateRPOBeforeCFGChanged(preheader, head, true, oc);
+        CfgOptCtx ctx(*oc);
+        //No need to maintain DomInfo here, it will be recomputed by caller.
+        CFGOPTCTX_need_update_dominfo(&ctx) = false;
+        cfg->insertBBBetween(pred, head, preheader, ctx);
         insert_preheader = true;
         inserted_by_cur_time = true;
     }
-
     //CASE1:
     //  BB_pred(goto BB_head)---
     //                          |
@@ -505,8 +511,11 @@ static void insertAndUpdateOutterLoopEdge(
         if (!inserted_by_cur_time) {
             //Original pred is fallthrough to head.
             //Maintain pred and preheader's edge.
-            cfg->removeEdge(pred, head);
-            cfg->addEdge(pred, preheader);
+            CfgOptCtx ctx(*oc);
+            //No need to maintain DomInfo here, it will be recomputed by caller.
+            CFGOPTCTX_need_update_dominfo(&ctx) = false;
+            cfg->removeEdge(pred, head, ctx);
+            cfg->addEdge(pred, preheader, ctx);
         }
         return;
     }
@@ -522,7 +531,9 @@ static void insertAndUpdateOutterLoopEdge(
     }
 
     //Add the new label to preheader if not exist.
-    cfg->addLabel(preheader, *preheader_lab);
+    if (!preheader->hasLabel(*preheader_lab)) {
+        cfg->addLabel(preheader, *preheader_lab);
+    }
 
     //Update branch-target of last IR of predecessor.
     last_ir->setLabel(*preheader_lab);
@@ -533,10 +544,12 @@ static void insertAndUpdateOutterLoopEdge(
         ASSERT0(cfg->getEdge(pred->id(), preheader->id()));
         return;
     }
-
     //Maintain pred and preheader's edge.
-    cfg->removeEdge(pred, head);
-    cfg->addEdge(pred, preheader);
+    CfgOptCtx ctx(*oc);
+    //No need to maintain DomInfo here, it will be recomputed by caller.
+    CFGOPTCTX_need_update_dominfo(&ctx) = false;
+    cfg->removeEdge(pred, head, ctx);
+    cfg->addEdge(pred, preheader, ctx);
 }
 
 
@@ -545,7 +558,8 @@ static void insertAndUpdateOutterLoopEdge(
 //Return true if inserted a new preheader, otherwise there is no loop-outside
 //BB.
 static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
-                                BBListIter head_it, IRBB * preheader)
+                                BBListIter head_it, IRBB * preheader,
+                                OptCtx * oc)
 {
     IRCFG * cfg = rg->getCFG();
     List<IRBB*> preds;
@@ -555,13 +569,20 @@ static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
     bool insert_preheader = false;
     for (IRBB * p = preds.get_head(); p != nullptr; p = preds.get_next()) {
         if (li->isInsideLoop(p->id())) {
-            ASSERTN(cfg->getVertex(preheader->id()),
+            ASSERTN(preheader->getVex(),
                     ("vex should have been added before current function"));
             fixupInnerLoopEdgeBetweenHeadAndPreheader(li, rg, p);
             continue;
         }
         insertAndUpdateOutterLoopEdge(li, rg, p, head_it, preheader,
-                                      &preheader_lab, insert_preheader);
+                                      &preheader_lab, insert_preheader, oc);
+    }
+    //Update DOM info at one time.
+    bool add_pdom_failed = false;
+    cfg->addDomInfoToNewIDom(head->getVex(), preheader->getVex(),
+                             add_pdom_failed);
+    if (add_pdom_failed) {
+        oc->setInvalidPDom();
     }
     return insert_preheader;
 }
@@ -588,8 +609,8 @@ static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li, IRCFG * cfg,
     }
 
     //Mark labels that can not be moved to preheader BB.
-    for (INT i = li->getBodyBBSet()->get_first();
-         i >= 0; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = cfg->getBB(i);
         ASSERT0(bb);
         for (IR const* ir = BB_first_ir(bb);
@@ -641,7 +662,7 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
     if (prev == nullptr) { return nullptr; }
 
     IRBB const* head = li->getLoopHead();
-    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
+    for (xcom::EdgeC const* ec = head->getVex()->getInList();
          ec != nullptr; ec = ec->get_next()) {
         UINT pred = ec->getFromId();
         if (li->isInsideLoop(pred)) { continue; }
@@ -726,25 +747,14 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
 }
 
 
-//Find preheader BB. If it does not exist, insert one before loop 'li'.
-//Return the preheader BB.
-//insert_bb: return true if this function insert a new bb before loop,
-//           otherwise return false.
-//force: force to insert preheader BB whatever it has been exist.
-//       Return the new BB if insertion is successful.
-//Note if we find the preheader, the last IR of it may be call.
-//So if you are going to insert IR at the tail of preheader, the best choose is
-//force the function to insert a new bb.
-//The function will try to maintain the RPO.
 IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
-                              OUT bool & insert_bb, bool force)
+                              OUT bool & insert_bb, bool force, OptCtx * oc)
 {
     ASSERT0(li && rg);
     insert_bb = false;
     IRCFG * cfg = rg->getCFG();
     BBList * bblst = rg->getBBList();
     IRBB * head = li->getLoopHead();
-
     BBListIter head_it = nullptr;
     bblst->find(head, &head_it);
     ASSERT0(head_it);
@@ -763,7 +773,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
     cfg->addBB(preheader);
     //Guarrantee preheader is fallthrough to head.
     bblst->insert_before(preheader, head_it);
-    insert_bb |= insertAndUpdateEdge(li, rg, head_it, preheader);
+    insert_bb |= insertAndUpdateEdge(li, rg, head_it, preheader, oc);
     ASSERT0(cfg->getBBList()->find(preheader));
     tryMoveLabelFromHeadToPreheader(li, cfg, preheader);
     return preheader;
@@ -838,12 +848,12 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
                                    InvStmtList const* invariant_stmt,
                                    MDSSAMgr const* mdssamgr)
 {
-    ASSERT0(ir->isMemoryRefNonPR());
+    ASSERT0(ir->isMemRefNonPR());
     MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
     ASSERT0(mdssainfo);
     VOpndSetIter iter = nullptr;
-    for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
-         i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
+    for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
+         i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
         VMD const* vopnd = (VMD const*)mdssamgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         if (!vopnd->hasDef()) { continue; }
@@ -875,8 +885,8 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
     if (duset == nullptr) { return true; }
 
     DUSetIter dui = nullptr;
-    for (INT i = duset->get_first(&dui);
-         i >= 0; i = duset->get_next(i, &dui)) {
+    for (BSIdx i = duset->get_first(&dui);
+         i != BS_UNDEF; i = duset->get_next(i, &dui)) {
         IR const* def = const_cast<Region*>(rg)->getIR(i);
         ASSERT0(def->is_stmt());
         IRBB const* defbb = def->getBB();
@@ -915,7 +925,7 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
         } else if (!isLoopInvariantInDUMgr(ir, li, invariant_stmt, rg)) {
             return false;
         }
-    } else if (ir->isMemoryRefNonPR() && !ir->isReadOnly()) {
+    } else if (ir->isMemRefNonPR() && !ir->isReadOnly()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             if (!isLoopInvariantInMDSSA(ir, li, invariant_stmt, mdssamgr)) {
@@ -941,13 +951,13 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
 
 //The functin will insert PHI after inserting preheader.
 static bool forceInsertPreheader(LI<IRBB> const* li, Region * rg,
-                                 OUT IRBB ** preheader)
+                                 OUT IRBB ** preheader, OptCtx * oc)
 {
     IRCFG * cfg = rg->getCFG();
-    InsertPhiHelper helper(li, cfg);
+    InsertPhiHelper helper(li, cfg, *oc);
     bool need_phi = helper.preparePhiForPreheader();
     bool inserted = false;
-    *preheader = findAndInsertPreheader(li, rg, inserted, true);
+    *preheader = findAndInsertPreheader(li, rg, inserted, true, oc);
     ASSERT0(inserted);
     if (need_phi) {
         helper.insertPhiAtPreheader(*preheader);
@@ -973,21 +983,22 @@ static bool forceInsertPreheader(LI<IRBB> const* li, Region * rg,
 //So if you are going to insert IR at the tail of preheader, the best choose
 //is force the function to insert a new phreader.
 bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
-                     MOD OptCtx & oc, bool force)
+                     MOD OptCtx * oc, bool force)
 {
     bool need_phi = false;
+    DUMMYUSE(need_phi);
     bool inserted = false;
     IRCFG * cfg = rg->getCFG();
     if (force) {
-        need_phi = forceInsertPreheader(li, rg, preheader);
+        need_phi = forceInsertPreheader(li, rg, preheader, oc);
         inserted = true;
     } else {
-        IRBB * p = findAndInsertPreheader(li, rg, inserted, false);
+        IRBB * p = findAndInsertPreheader(li, rg, inserted, false, oc);
         if (p == nullptr || cfg->isRegionEntry(p) ||
             (p->getLastIR() != nullptr &&
              p->getLastIR()->isCallStmt() &&
              CALL_is_intrinsic(p->getLastIR()))) {
-            need_phi = forceInsertPreheader(li, rg, &p);
+            need_phi = forceInsertPreheader(li, rg, &p, oc);
             inserted = true;
         }
         ASSERT0(p);
@@ -996,34 +1007,35 @@ bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
     }
 
     if (!inserted) { return false; }
-    if (!li->isOuterMost()) {
-        //Update outer LoopInfo, add preheader to outer loop body.
-        li->addBBToAllOuterLoop((*preheader)->id());
-    }
-    ASSERT0(li->getLoopHead());
-    if (oc.is_dom_valid() || oc.is_pdom_valid()) {
-        //Update DOM info.
-        cfg->addDomInfoByNewIDom(cfg->getVertex(li->getLoopHead()->id()),
-                                 cfg->getVertex((*preheader)->id()));
-    }
-    //Try update RPO.
-    if (!oc.is_rpo_valid() ||
+    ASSERT0(*preheader);
+    if ((*preheader)->rpo() == RPO_UNDEF &&
         !cfg->tryUpdateRPO(*preheader, li->getLoopHead(), true)) {
-        OC_is_rpo_valid(oc) = false;
-        OC_is_cdg_valid(oc) = false;
+        oc->setInvalidRPO();
     }
+    //Sometime RPOMgr can not find usable RPO, e.g:guard.gr
+    //ASSERT0((*preheader)->rpo() != RPO_UNDEF);
+
+    //Update outer LoopInfo, add preheader to outer loop body.
+    li->addBBToAllOuterLoop((*preheader)->id());
+    ASSERT0(li->getLoopHead());
+    if (oc->is_dom_valid() || oc->is_pdom_valid()) {
+        ASSERTN(cfg->get_idom(*preheader) != VERTEX_UNDEF,
+                ("should be maintained"));
+    }
+    OptCtx::setInvalidIfCFGChangedExcept(oc, PASS_DOM, PASS_PDOM, PASS_RPO,
+                                         PASS_LOOP_INFO, PASS_UNDEF);
     return true;
 }
 
 
 //Iterative access LoopInfo tree. This funtion initialize the iterator.
-//'li': the root of the LoopInfo tree.
-//'it': iterator. It should be clean already.
-//Readonly function.
-LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it)
+//li: the root of the LoopInfo tree.
+//it: iterator. It should be clean already.
+template <class LoopInfoT, class LoopInfoIterT>
+LoopInfoT iterInitLoopInfoImpl(LoopInfoT li, OUT LoopInfoIterT & it)
 {
     if (li == nullptr) { return nullptr; }
-    for (LI<IRBB> const* x = li->getInnerList();
+    for (LoopInfoT x = li->getInnerList();
          x != nullptr; x = x->get_next()) {
         it.append_tail(x);
     }
@@ -1036,13 +1048,13 @@ LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it)
 
 //Iterative access LoopInfo tree.
 //This function return the next LoopInfo accroding to 'it'.
-//'it': iterator.
-//Readonly function.
-LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it)
+//it: iterator.
+template <class LoopInfoT, class LoopInfoIterT>
+LoopInfoT iterNextLoopInfoImpl(MOD LoopInfoIterT & it)
 {
-    LI<IRBB> const* li = it.remove_head();
+    LoopInfoT li = it.remove_head();
     if (li == nullptr) { return nullptr; }
-    for (LI<IRBB> const* x = li->getInnerList();
+    for (LoopInfoT x = li->getInnerList();
          x != nullptr; x = x->get_next()) {
         it.append_tail(x);
     }
@@ -1050,6 +1062,42 @@ LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it)
         it.append_tail(li->get_next());
     }
     return li;
+}
+
+
+//Iterative access LoopInfo tree. This funtion initialize the iterator.
+//li: the root of the LoopInfo tree.
+//it: iterator. It should be clean already.
+LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it)
+{
+    return iterInitLoopInfoImpl<LI<IRBB> const*, CLoopInfoIter>(li, it);
+}
+
+
+//Iterative access LoopInfo tree.
+//This function return the next LoopInfo accroding to 'it'.
+//it: iterator.
+LI<IRBB> const* iterNextLoopInfoC(OUT CLoopInfoIter & it)
+{
+    return iterNextLoopInfoImpl<LI<IRBB> const*, CLoopInfoIter>(it);
+}
+
+
+//Iterative access LoopInfo tree. This funtion initialize the iterator.
+//li: the root of the LoopInfo tree.
+//it: iterator. It should be clean already.
+LI<IRBB> * iterInitLoopInfo(LI<IRBB> * li, OUT LoopInfoIter & it)
+{
+    return iterInitLoopInfoImpl<LI<IRBB>*, LoopInfoIter>(li, it);
+}
+
+
+//Iterative access LoopInfo tree.
+//This function return the next LoopInfo accroding to 'it'.
+//it: iterator.
+LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it)
+{
+    return iterNextLoopInfoImpl<LI<IRBB>*, LoopInfoIter>(it);
 }
 
 
@@ -1090,7 +1138,7 @@ IRBB * findFirstLoopEndBB(LI<IRBB> const* li, IRCFG * cfg)
 
 
 static bool isCallDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li,
-                                      Region * rg)
+                                      Region * rg, OptCtx const& oc)
 {
     ASSERT0(stmt->isCallStmt());
     bool retval_dom_all_use = false;
@@ -1100,9 +1148,10 @@ static bool isCallDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li,
     if (stmt->isCallHasRetVal()) {
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
-            retval_dom_all_use |= prssamgr->isStmtDomAllUseInsideLoop(stmt, li);
+            retval_dom_all_use |= prssamgr->isStmtDomAllUseInsideLoop(
+                stmt, li, oc);
             retval_checked = true;
-        }   
+        }
     } else {
         retval_checked = true;
     }
@@ -1126,21 +1175,22 @@ static bool isCallDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li,
 
 
 //Return true if stmt dominates all USE that are inside loop.
-bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg)
+bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg,
+                               OptCtx const& oc)
 {
     ASSERT0(stmt->is_stmt());
     if (stmt->isCallHasRetVal()) {
-        return isCallDomAllUseInsideLoop(stmt, li, rg);
+        return isCallDomAllUseInsideLoop(stmt, li, rg, oc);
     }
 
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid() && stmt->isWritePR()) {
-        return prssamgr->isStmtDomAllUseInsideLoop(stmt, li);
+        return prssamgr->isStmtDomAllUseInsideLoop(stmt, li, oc);
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
-        stmt->isMemoryRefNonPR()) {
+        stmt->isMemRefNonPR()) {
         return mdssamgr->isStmtDomAllUseInsideLoop(stmt, li);
     }
 
@@ -1154,5 +1204,59 @@ bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg)
     //Can not determine.
     return false;
 }
+
+
+static bool verifyLoopInfo(LI<IRBB> const* li, OptCtx const& oc)
+{
+    if (li == nullptr) { return true; }
+    ASSERT0(li->getLoopHead());
+    ASSERT0(li->getLoopHead()->id() <=
+            oc.getRegion()->getBBMgr()->getBBCount());
+    bool try_failed = false;
+    ASSERTN_DUMMYUSE(Graph::isReachIn(li->getLoopHead()->getVex(),
+                                      li->getLoopHead()->getVex(),
+                                      (UINT)-1, try_failed),
+                                      ("loophead is not in cycle"));
+    IRCFG const* cfg = oc.getRegion()->getCFG();
+    BitSet const* body = li->getBodyBBSet();
+    for (BSIdx i = body->get_first(); i != BS_UNDEF; i = body->get_next(i)) {
+        ASSERTN_DUMMYUSE(cfg->isVertex(i),
+                         ("BB in bodyset is not vertex of CFG"));
+    }
+    for (LI<IRBB> const* inner = li->getInnerList(); inner != nullptr;
+         inner = inner->get_next()) {
+        verifyLoopInfoTree(inner, oc);
+        ASSERT0(body->is_contain(inner->getLoopHead()->id()));
+        ASSERT0(body->is_contain(*inner->getBodyBBSet()));
+    }
+    return true;
+}
+
+
+bool verifyLoopInfoTree(LI<IRBB> const* li, OptCtx const& oc)
+{
+    if (li == nullptr || !oc.is_loopinfo_valid()) { return true; }
+    for (LI<IRBB> const* tli = li; tli != nullptr; tli = tli->get_next()) {
+        verifyLoopInfoTree(tli->getInnerList(), oc);
+        verifyLoopInfo(tli, oc);
+    }
+    return true;
+}
+
+
+//
+//START BB2LI
+//
+void BB2LI::createMap(LI<IRBB> * li)
+{
+    if (li == nullptr) { return; }
+    for (LI<IRBB> * tli = li; tli != nullptr; tli = tli->get_next()) {
+        createMap(tli->getInnerList());
+        IRBB const* h = tli->getLoopHead();
+        ASSERT0(h);
+        m_bb2li.set(h->id(), tli);
+    }
+}
+//END BB2LI
 
 } //namespace xoc

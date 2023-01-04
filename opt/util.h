@@ -42,5 +42,11 @@ void interwarn(CHAR const* format, ...);
 //Print message to console.
 void prt2C(CHAR const* format, ...);
 
+//Return signed integer placeholder string that used in format.
+CHAR const* getIntFormat(bool hex);
+
+//Return unsigned integer placeholder string that used in format.
+CHAR const* getUIntFormat(bool hex);
+
 } //namespace xoc
 #endif

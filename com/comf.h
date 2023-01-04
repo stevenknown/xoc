@@ -76,6 +76,18 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 //     and function return 3.
 UINT computeMaxBitSizeForValue(ULONGLONG v);
 
+//The function converts string content into set of hex and store in the 'buf'.
+//Note the content in given buf must be string format of hex, that is the
+//string can only contain "abcdefABCDEF0123456789".
+//string: a string that represents bytes, where a byte consists of two hex.
+//        e.g:ADBC5E demostrates three bytes, 0xAD, 0xBC, and 0x5E.
+void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen);
+
+//The function converts a character into hex.
+//Note the content in given buf must be string format of hex, that is 'c'
+//can only be "abcdefABCDEF0123456789".
+BYTE charToHex(CHAR c);
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
@@ -161,7 +173,7 @@ float getclockend(LONG start);
 INT getFirstOneAtRightSide(INT m);
 
 //Calculate an integer hash value according to 'n'.
-inline UINT hash32bit(UINT n)
+inline UINT32 hash32bit(UINT32 n)
 {
     n = (n+0x7ed55d16) + (n<<12);
     n = (n^0xc761c23c) ^ (n>>19);
@@ -199,7 +211,15 @@ void prim(INT m, OUT INT * buf);
 LONG revlong(LONG d);
 
 //Reverse the string.
-UCHAR * reverseString(UCHAR * v);
+CHAR * reverseString(CHAR * v);
+
+//The function rotates string in buf.
+//e.g: given string "xyzmn", n is 2, after rotation,
+//the buf will be "zmnxy".
+//buf: record the string.
+//buflen: byte length of buf.
+//n: rotate times.
+CHAR * rotateString(MOD CHAR * str, UINT n);
 
 //Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
@@ -250,7 +270,7 @@ LONGLONG xatoll(CHAR const* nptr, bool is_oct);
 INT xctoi(CHAR const* cl);
 
 //Convert long to string.
-UCHAR * xltoa(LONG v, OUT UCHAR * buf);
+CHAR * xltoa(LONG v, OUT CHAR * buf);
 
 //Cacluates the smallest integral value that is not less than
 //the division of a, b.

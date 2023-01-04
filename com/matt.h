@@ -169,7 +169,7 @@ public:
         void clean() { ::memset(this, 0, sizeof(INHR)); }
     };
 
-    bool m_is_init;
+    BYTE m_is_init:1;
     INHR m_inhr;
     UINT m_row_size; //record row size
     UINT m_col_size; //record column size
@@ -2787,7 +2787,7 @@ void Matrix<T>::insertRowsBefore(UINT ridx,
         *this = tmp;
         return;
     }
-    inner(tmp, 0, 0, ridx-1, m_col_size - 1);
+    inner(tmp, 0, 0, ridx - 1, m_col_size - 1);
     tmp.growRow(m, mfrom, mto);
     tmp.growRow(*this, ridx, m_row_size - 1);
     *this = tmp;
@@ -2896,7 +2896,7 @@ void Matrix<T>::innerRow(OUT Matrix<T> & in, UINT from, UINT to) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from <= to && to < m_row_size, ("illegal parameter"));
-    inner(in, from, 0, to, m_col_size -1);
+    inner(in, from, 0, to, m_col_size - 1);
 }
 
 
@@ -3552,7 +3552,7 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
     if (det() != 0) {
         Matrix<T> p,l,u;
         bool s = plu(p,l,u);
-        CHECK0_DUMMYUSE(s); //illegal solution if s is false.
+        ASSERT0_DUMMYUSE(s); //illegal solution if s is false.
         u.inv(u);
         l.inv(l);
         x = u * l * p * b;

@@ -31,21 +31,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-//Make sure IR_ICALL is the largest ir.
-#define MAX_OFFSET_AT_FREE_TABLE (sizeof(CICall) - sizeof(IR))
-
-#define IRID_UNDEF 0 //The undefined value of IR's id.
-
 //Analysis Instrument.
 #define ANA_INS_pr_count(a) ((a)->m_pr_count)
 #define ANA_INS_du_pool(a) ((a)->m_du_pool)
 #define ANA_INS_sc_labelinfo_pool(a) ((a)->m_sc_labelinfo_pool)
 #define ANA_INS_ir_list(a) ((a)->m_ir_list)
+#define ANA_INS_ir_mgr(a) ((a)->m_ir_mgr)
 #define ANA_INS_call_list(a) ((a)->m_call_list)
 #define ANA_INS_return_list(a) ((a)->m_return_list)
 #define ANA_INS_ir_free_tab(a) ((a)->m_free_tab)
 #define ANA_INS_prno2var(a) ((a)->m_prno2var)
-#define ANA_INS_ir_vec(a) ((a)->m_ir_vector)
+#define ANA_INS_ir_vec(a) ((a)->m_ir_mgr->getIRVec())
 #define ANA_INS_bs_mgr(a) ((a)->m_bs_mgr)
 #define ANA_INS_sbs_mgr(a) ((a)->m_sbs_mgr)
 #define ANA_INS_mds_mgr(a) ((a)->m_mds_mgr)
@@ -61,6 +57,7 @@ namespace xoc {
 #define ANA_INS_ai_mgr(a) ((a)->m_attachinfo_mgr)
 class AnalysisInstrument {
     friend class Region;
+    friend class IRMgr;
     COPY_CONSTRUCTOR(AnalysisInstrument);
 protected:
     UINT m_pr_count; //counter of IR_PR.
@@ -73,9 +70,10 @@ protected:
     List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     AttachInfoMgr * m_attachinfo_mgr; //AttachInfo manager.
-    IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    Vector<Var*> m_prno2var; //map prno to related Var. prno is dense integer.
-    Vector<IR*> m_ir_vector; //record IR which have allocated. ir id is dense
+    IRMgr * m_ir_mgr;
+
+    //Mapping prno to related Var. prno is dense integer.
+    xcom::Vector<Var*> m_prno2var;
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDMgr m_md_mgr;
@@ -85,15 +83,11 @@ protected:
     List<DU*> m_free_du_list;
     IRBBMgr m_ir_bb_mgr; //Allocate the basic block.
     BBList m_ir_bb_list; //record a list of basic blocks.
-
-    #ifdef _DEBUG_
-    xcom::BitSet m_has_been_freed_irs;
-    #endif
-
 protected:
     //Count memory usage for current object.
     size_t count_mem() const;
     PassMgr * getPassMgr() const { return ANA_INS_pass_mgr(this); }
+    IRMgr * getIRMgr() const { return ANA_INS_ir_mgr(this); }
     AttachInfoMgr * getAttachInfoMgr() const { return ANA_INS_ai_mgr(this); }
 public:
     explicit AnalysisInstrument(Region * rg);

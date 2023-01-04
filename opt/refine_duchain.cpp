@@ -51,11 +51,88 @@ bool RefineDUChain::dump() const
 }
 
 
+bool RefineDUChain::processArrayExp(IR const* exp)
+{
+    ASSERT0(exp->is_exp() && exp->isArrayOp());
+    if (m_is_use_gvn) {
+        return processArrayExpViaGVN(exp);
+    }
+    //Use MDSSA.
+    return processExpViaMDSSA(exp);
+}
+
+
+bool RefineDUChain::processNormalExpByClassicDU(IR const* exp)
+{
+    if (!exp->isMemRefNonPR()) { return false; }
+    MD const* mustuse = exp->getMustRef();
+    if (mustuse == nullptr || !mustuse->is_local() ||
+        mustuse->is_taken_addr()) {
+        return false;
+    }
+    //CASE:If mustref did NOT be taken address, it should not dependent to
+    //MD_LOCAL_MAY_ALIAS.
+    DUSet const* defset = exp->getDUSet();
+    if (defset == nullptr) { return false; }
+
+    //Iterate each DEF stmt of 'exp'.
+    bool change = false;
+    DUSetIter di = nullptr;
+    BSIdx next_i = BS_UNDEF;
+    for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = next_i) {
+        next_i = defset->get_next(i, &di);
+        IR const* stmt = m_rg->getIR(i);
+        ASSERT0(stmt->is_stmt());
+        MD const* mustdef = stmt->getMustRef();
+        if (mustdef != nullptr) {
+            ASSERTN(mustdef->is_overlap(mustuse), ("redundant DU"));
+            continue;
+        }
+        MDSet const* maydef = stmt->getMayRef();
+        if (maydef != nullptr && maydef->is_contain(mustuse, m_rg)) {
+            continue;
+        }
+        m_du->removeDUChain(stmt, exp);
+        change = true;
+    }
+    return change;
+}
+
+
+bool RefineDUChain::processNormalExpByMDSSA(IR const* exp)
+{
+    if (!exp->isMemRefNonPR()) { return false; }
+    MD const* must = exp->getMustRef();
+    if (must == nullptr || !must->is_local()) { return false; }
+    //TODO:
+    return false;
+}
+
+
+bool RefineDUChain::processNormalExp(IR const* exp)
+{
+    if (useMDSSADU()) {
+        return processNormalExpByMDSSA(exp);
+    }
+    return processNormalExpByClassicDU(exp);
+}
+
+
+bool RefineDUChain::processIndirectExp(IR const* exp)
+{
+    ASSERT0(exp->is_exp() && exp->isIndirectMemOp());
+    if (m_is_use_gvn) {
+        return processIndirectExpViaGVN(exp);
+    }
+    return processExpViaMDSSA(exp);
+}
+
+
 //Return true if DU chain changed.
 bool RefineDUChain::processBB(IRBB const* bb)
 {
     ASSERT0(bb);
-    C<IR*> * ct = nullptr;
+    BBIRListIter ct = nullptr;
     ConstIRIter ii;
     bool change = false;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
@@ -63,13 +140,20 @@ bool RefineDUChain::processBB(IRBB const* bb)
         ii.clean();
         for (IR const* exp = iterExpInitC(ir, ii);
              exp != nullptr; exp = iterExpNextC(ii)) {
-            if (!exp->is_ild()) { continue; }
-            if (m_is_use_gvn) {
-                change |= processExpressionViaGVN(exp);
+            if (exp->isIndirectMemOp()) {
+                change |= processIndirectExp(exp);
+                if (!change) {
+                    change |= processNormalExp(exp);
+                }
                 continue;
             }
-            //Use MDSSA.
-            change |= processExpressionViaMDSSA(exp);
+            if (exp->is_array()) {
+                change |= processArrayExp(exp);
+                if (!change) {
+                    change |= processNormalExp(exp);
+                }
+                continue;
+            }
         }
     }
     return change;
@@ -124,18 +208,18 @@ bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
+bool RefineDUChain::processExpViaMDSSA(IR const* exp)
 {
-    ASSERT0(exp && exp->is_ild());
+    ASSERT0(exp);
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
     if (mdssainfo == nullptr) { return false; }
 
     //Iterate each VOpnd.
     VOpndSetIter iter = nullptr;
-    INT next_i = -1;
+    BSIdx next_i = BS_UNDEF;
     bool change = false;
-    for (INT i = mdssainfo->readVOpndSet().get_first(&iter);
-         i >= 0; i = next_i) {
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
+         i != BS_UNDEF; i = next_i) {
         next_i = mdssainfo->readVOpndSet().get_next(i, &iter);
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
@@ -170,9 +254,17 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processExpressionViaGVN(IR const* exp)
+bool RefineDUChain::processArrayExpViaGVN(IR const* exp)
 {
-    ASSERT0(exp->is_exp());
+    //TODO:remove DUChain if subexp's GVN is not the same.
+    return false;
+}
+
+
+//Return true if DU chain changed.
+bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
+{
+    ASSERT0(exp->is_exp() && exp->isIndirectMemOp());
     //Find the base expression that is not ILD.
     //e.g: given ILD(ILD(ILD(p))), the following loop will
     //reason out 'p'.
@@ -189,26 +281,38 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
     //Iterate each DEF stmt of 'exp'.
     bool change = false;
     DUSetIter di = nullptr;
-    INT next_i = -1;
-    for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
+    BSIdx next_i = BS_UNDEF;
+    for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = next_i) {
         next_i = defset->get_next(i, &di);
         IR const* stmt = m_rg->getIR(i);
         ASSERT0(stmt->is_stmt());
         //Only deal with IR_IST.
         if (!stmt->is_ist()) { continue; }
+        if (m_tm->getByteSize(exp->getType()) != 1 ||
+            m_tm->getByteSize(stmt->getType()) != 1) {
+            //ist and ild may be overlapp.
+            //e.g:refine_duchain2.c
+            // ist(p): |----|
+            // ild(q):  |----|
+            //  even if p and q have different VN, the ist and ild are
+            //  dependent.
+            continue;
+        }
 
         //Get VN of IST's base expression.
         UINT ist_star_level = 0;
         VN const* vn_of_ist_base = getVNOfIndirectOp(stmt, &ist_star_level,
                                                      m_gvn);
         if (vn_of_ist_base == nullptr) {
-            //It is no need to analyze DEF stmt with have no VN.
+            //No need to analyze DEF stmt with have no VN.
             continue;
         }
-
-        //VN is not match OR indirect level is not match
-        if (vn_of_ist_base != vn_of_ild_base ||
-            ild_star_level != ist_star_level) {
+        if (ild_star_level != ist_star_level) {
+            //Indirect level is not match.
+            continue;
+        }
+        if (vn_of_ist_base == vn_of_ild_base) {
+            //VN is same, accessing same place.
             continue;
         }
         m_du->removeDUChain(stmt, exp);
