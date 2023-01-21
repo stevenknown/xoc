@@ -197,6 +197,7 @@ typedef enum _PASS_TYPE {
     PASS_IRSIMP,
     PASS_LINEAR_SCAN_RA,
     PASS_IRMGR,
+    PASS_CALL_GRAPH,
     PASS_NUM,
 } PASS_TYPE;
 

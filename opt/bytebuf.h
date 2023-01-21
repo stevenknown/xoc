@@ -26,45 +26,32 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-//Represents a virtual sttore to PR.
-IR_VSTPR = IR_LAST_UNDERLYING_CODE + 1,
+#ifndef _BYTEBUF_H_
+#define _BYTEBUF_H_
 
-//Represents a virtual store to Var.
-IR_VST,
+namespace xoc {
 
-//Represents a virtual indirect store.
-IR_VIST,
+#define BYTEBUF_size(b) ((b)->m_byte_size)
+#define BYTEBUF_buffer(b) ((b)->m_byte_buffer)
+class ByteBuf {
+    COPY_CONSTRUCTOR(ByteBuf);
+public:
+    UINT m_byte_size;
+    BYTE * m_byte_buffer;
+public:
+    static void dump(OUT FileObj & fo, BYTE const* buf, UINT len);
+    void dump(OUT FileObj & fo) const;
 
-//Represent broadcast operation.
-IR_BROADCAST,
+    BYTE * getBuffer() const { return m_byte_buffer; }
+    UINT getSize() const { return m_byte_size; }
 
-//PCX CODE START
-IR_ABS,
-IR_MIN,
-IR_MAX,
-IR_CNTONE,
-IR_CNTLEADZERO,
-IR_CNTTAILZERO,
-IR_FINDMSB,
-IR_ZAP,
-IR_ZAPNOT,
-IR_ROTLEFT,
-IR_CMP,
-IR_RECIP,
-IR_SQRT,
-IR_RSQRT,
-IR_SIN,
-IR_COS,
-IR_TANH,
-IR_LOG2,
-IR_EXP2,
-IR_CONJ,
-IR_INSERT,
-IR_EXTRACT,
-IR_MATMUL,
-IR_BRDCAST,
-IR_MEMCPY,
-IR_TILE,
-//PCX CODE END
- 
-IR_LAST_EXT_CODE = IR_TILE,
+    //Set given value into current byte-buffer.
+    //byteofst: the byte offset from current buffer. New value will be set
+    //          start from it.
+    //val: the buffer that record new value to be set.
+    //valbytesize: the bytesize of new value.
+    void setVal(UINT byteofst, BYTE const* val, UINT valbytesize);
+};
+
+} //namespace xoc
+#endif

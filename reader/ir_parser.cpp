@@ -29,10 +29,13 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../opt/cominc.h"
 #include "../opt/comopt.h"
 #include "ir_lex.h"
+#include "xcode.h"
 #include "ir_parser.h"
 
 namespace xoc {
 
+#define XCODEINFO_code(i) ((i).code)
+#define XCODEINFO_name(i) ((i).name)
 class XCodeInfo {
 public:
     X_CODE code;
@@ -43,7 +46,7 @@ public:
 
 //Define keywords of XOC IR.
 static XCodeInfo g_keyword_info[] = {
-    { X_UNDEF, "", },
+    { X_CODE_UNDEF, "", },
     { X_ID, "id", },
     { X_LD, "ld", },
     { X_ILD, "ild", },
@@ -149,7 +152,7 @@ static XCodeInfo g_keyword_info[] = {
     { X_UNALLOCABLE, "unallocable", },
     { X_ALIGN, "align", },
     { X_DECL, "decl", },
-    { X_LAST, "", },
+    { X_CODE_LAST, "", },
 };
 
 
@@ -256,10 +259,47 @@ static X_CODE g_type_code [] = {
 //
 //START ParseCtx
 //
+ParseCtx::ParseCtx(IRParser * p)
+{
+    ASSERT0(p);
+    clean();
+    parser = p;
+    m_iden2prno = new Sym2Prno();
+    m_ir2label = new IR2Lab();
+    m_sym2label = new Sym2Lab();
+    id = parser->genParseCtxId();
+}
+
+
+ParseCtx::ParseCtx(ParseCtx * ctx)
+{
+    ASSERT0(this != ctx);
+    clean();
+    previous_ctx = ctx;
+    copyTopDownInfo(*ctx);
+    id = parser->genParseCtxId();
+}
+
+
+ParseCtx::~ParseCtx()
+{
+    if (previous_ctx != nullptr) {
+        previous_ctx->unionBottomUpInfo(*this);
+        return;
+    }
+    ASSERT0(m_iden2prno);
+    delete m_iden2prno;
+    ASSERT0(m_ir2label);
+    delete m_ir2label;
+    ASSERT0(m_sym2label);
+    delete m_sym2label;
+}
+
+
 void ParseCtx::addIR(IR * stmt)
 {
     ASSERT0(stmt->is_stmt());
-    xcom::add_next(&stmt_list, &last, stmt);
+    xcom::add_next(&stmt_list, stmt);
 
     //Set lineno for debug info.
     ASSERT0(current_region);
@@ -268,10 +308,140 @@ void ParseCtx::addIR(IR * stmt)
 }
 
 
+void ParseCtx::copyTopDownInfo(ParseCtx const& ctx)
+{
+    parser = ctx.parser;
+    current_region = ctx.current_region;
+    m_iden2prno = ctx.m_iden2prno;
+    m_ir2label = ctx.m_ir2label;
+    m_sym2label = ctx.m_sym2label;
+}
+
+
+void ParseCtx::unionBottomUpInfo(ParseCtx const& ctx)
+{
+    ASSERT0(returned_exp == nullptr);
+    returned_exp = ctx.returned_exp;
+    xcom::add_next(&stmt_list, ctx.stmt_list);
+    has_phi |= ctx.has_phi;
+    has_scf |= ctx.has_scf;
+    has_error |= ctx.has_error;
+}
+
+
 void ParseCtx::clean()
 {
-    m_id2prno.destroy();
-    m_id2prno.init();
+    parser = nullptr;
+    current_region = nullptr;
+    returned_exp = nullptr;
+    stmt_list = nullptr;
+    previous_ctx = nullptr;
+    has_phi = false;
+    has_scf = false;
+    has_error = false;
+    ircode = IR_UNDEF;
+    m_iden2prno = nullptr;
+    m_ir2label = nullptr;
+    m_sym2label = nullptr;
+    ::memset(&s1, 0, sizeof(s1));
+}
+
+
+void ParseCtx::dumpWithPrevCtx() const
+{
+    dump();
+    if (previous_ctx != nullptr) {
+        ASSERT0(current_region);
+        note(current_region, "\n-- PREVIOUS_CTX --");
+        previous_ctx->dumpWithPrevCtx();
+    }
+}
+
+
+void ParseCtx::dump() const
+{
+    ASSERT0(current_region);
+    Region * rg = current_region;
+    LogMgr * lm = rg->getLogMgr();
+    if (lm == nullptr || !lm->is_init()) { return; }
+    note(rg, "\n==-- DUMP ParseCtx:%u --==", id);
+    note(rg, "\ncurrent_region:%s", current_region->getRegionName());
+    note(rg, "\nreturned_exp:");
+    if (returned_exp != nullptr) {
+        lm->incIndent(2);
+        xoc::dumpIR(returned_exp, current_region);
+        lm->decIndent(2);
+    }
+    note(rg, "\nstmt_list:");
+    if (stmt_list != nullptr) {
+        lm->incIndent(2);
+        xoc::dumpIRList(stmt_list, current_region);
+        lm->decIndent(2);
+    }
+    note(rg, "\nhas_phi:%s", has_phi ? "true" : "false");
+    note(rg, "\nhas_scf:%s", has_scf ? "true" : "false");
+    note(rg, "\nhas_error:%s", has_error ? "true" : "false");
+    note(rg, "\nir_code:%s", IRCNAME(ircode));
+    note(rg, "\nreturned_imm_ty:");
+    if (PARSECTX_returned_imm_ty(this) != nullptr) {
+        PARSECTX_returned_imm_ty(this)->dump(rg->getTypeMgr());
+    }
+    StrBuf outbuf(16);
+    Type const* intty = rg->getTypeMgr()->getIntType(
+        sizeof(HOST_INT) * HOST_BIT_PER_BYTE, true);
+    ASSERT0(intty);
+    xoc::dumpHostInt(PARSECTX_returned_imm_intval(this), intty, rg, outbuf);
+    note(rg, "\nreturned_imm_intval:%s", outbuf.buf);
+
+    Type const* fpty = rg->getTypeMgr()->getFPType(
+        sizeof(HOST_FP) * HOST_BIT_PER_BYTE);
+    ASSERT0(intty);
+    xoc::dumpHostFP(PARSECTX_returned_imm_fpval(this), fpty,
+                    DEFAULT_MANTISSA_NUM, rg, outbuf);
+    note(rg, "\nreturned_imm_fpval:%s", outbuf.buf);
+
+    note(rg, "\nsym2label:");
+    if (m_sym2label != nullptr) {
+        lm->incIndent(2);
+        Sym2LabIter it;
+        LabelInfo * mapped = nullptr;
+        for (Sym const* sym = m_sym2label->get_first(it, &mapped);
+             sym != nullptr; sym = m_sym2label->get_next(it, &mapped)) {
+            ASSERT0(mapped);
+            outbuf.clean();
+            note(rg, "\n'%s'->%s", sym->getStr(), mapped->getName(outbuf));
+        }
+        lm->decIndent(2);
+    }
+
+    note(rg, "\nir2label:");
+    if (m_ir2label != nullptr) {
+        lm->incIndent(2);
+        IR2LabIter it;
+        LabelInfo * mapped = nullptr;
+        for (IR * ir = m_ir2label->get_first(it, &mapped);
+             ir != nullptr; ir = m_ir2label->get_next(it, &mapped)) {
+            ASSERT0(mapped);
+            outbuf.clean();
+            note(rg, "\n%s:%d->%s", IRNAME(ir), ir->id(),
+                 mapped->getName(outbuf));
+        }
+        lm->decIndent(2);
+    }
+
+    note(rg, "\niden2prno:");
+    if (m_iden2prno != nullptr) {
+        lm->incIndent(2);
+        Sym2PrnoIter it;
+        PRNO mapped = PRNO_UNDEF;
+        for (Sym const* iden = m_iden2prno->get_first(it, &mapped);
+             iden != nullptr; iden = m_iden2prno->get_next(it, &mapped)) {
+            ASSERT0(mapped);
+            note(rg, "\n'%s%s'->%s%u", PR_TYPE_CHAR, iden->getStr(),
+                 PR_TYPE_CHAR, mapped);
+        }
+        lm->decIndent(2);
+    }
 }
 //END ParseCtx
 
@@ -324,9 +494,18 @@ IRParser::~IRParser()
 }
 
 
+bool IRParser::checkKeyWordMap()
+{
+    for (UINT i = X_CODE_UNDEF; i < X_CODE_LAST; i++) {
+        ASSERT0(i == (UINT)XCODEINFO_code(g_keyword_info[i]));
+    }
+    return true;
+}
+
+
 void IRParser::initKeyWordMap()
 {
-    for (UINT i = X_UNDEF + 1; i < X_LAST; i++) {
+    for (UINT i = X_CODE_UNDEF + 1; i < X_CODE_LAST; i++) {
         m_str2xcode.set(g_keyword_info[i].name, (X_CODE)i);
     }
     for (UINT i = 0; i < (sizeof(g_property_code) /
@@ -354,7 +533,7 @@ void IRParser::initKeyWordMap()
 
 CHAR const* IRParser::getKeyWordName(X_CODE code) const
 {
-    ASSERT0(code >= X_UNDEF && code < X_LAST);
+    ASSERT0(code >= X_CODE_UNDEF && code < X_CODE_LAST);
     return g_keyword_info[code].name;
 }
 
@@ -393,7 +572,7 @@ Var * IRParser::findVar(ParseCtx * ctx, Sym const* name)
 
 X_CODE IRParser::getXCode(TOKEN tok, CHAR const* tok_string)
 {
-    if (tok != T_IDENTIFIER) { return X_UNDEF; }
+    if (tok != T_IDENTIFIER) { return X_CODE_UNDEF; }
     return m_str2xcode.get(tok_string);
 }
 
@@ -571,7 +750,7 @@ bool IRParser::checkPhiOpndLabel(IR const* ir,
 
         StrBuf buf(32);
         error(xoc::getLineNum(ir), "use undefined label %s",
-              li->getName(&buf));
+              li->getName(buf));
         return false;
 
     }
@@ -586,8 +765,8 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
     ConstIRIter it;
     xcom::TMap<LabelInfo const*, IR const*> labtab;
     bool error_occur = false;
-    for (IR const* ir = iterInitC(irlist, it);
-         ir != nullptr; ir = iterNextC(it)) {
+    for (IR const* ir = iterInitC(irlist, it, true);
+         ir != nullptr; ir = iterNextC(it, true)) {
         if (!ir->is_label()) { continue; }
 
         LabelInfo const* lab = ir->getLabel();
@@ -598,15 +777,15 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
             StrBuf buf(32);
             error(xoc::getLineNum(ir),
                   "duplicated label %s, and has been defined at line:%d",
-                  lab->getName(&buf), xoc::getLineNum(mapped));
+                  lab->getName(buf), xoc::getLineNum(mapped));
             error_occur = true;
         }
 
         labtab.set(lab, ir);
     }
 
-    for (IR const* ir = iterInitC(irlist, it);
-         ir != nullptr; ir = iterNextC(it)) {
+    for (IR const* ir = iterInitC(irlist, it, true);
+         ir != nullptr; ir = iterNextC(it, true)) {
         if (ir->is_label()) { continue; }
         if (ir->is_phi()) {
             if (!checkPhiOpndLabel(ir, labtab, ctx)) {
@@ -628,7 +807,7 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
         else { stmt = ir->getStmt(); }
         ASSERT0(stmt && stmt->is_stmt());
         error(xoc::getLineNum(stmt), "use undefined label %s",
-              lab->getName(&buf));
+              lab->getName(buf));
         error_occur = true;
     }
  
@@ -660,7 +839,7 @@ bool IRParser::parseRegionProp(OUT PropertySet & ps, ParseCtx * ctx)
 }
 
 
-bool IRParser::parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx)
+bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
 {
     TOKEN tok = m_lexer->getCurrentToken();
     X_CODE code = getXCode(tok, m_lexer->getCurrentTokenString());
@@ -670,25 +849,25 @@ bool IRParser::parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx)
         (*region)->initPassMgr();
         (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
-        SET_FLAG(*flag, VAR_LOCAL);
+        //SET_FLAG(*flag, VAR_LOCAL);
         break;
     case X_PROGRAM:
         *region = m_rumgr->newRegion(REGION_PROGRAM);
         (*region)->initPassMgr();
         (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
-        SET_FLAG(*flag, VAR_GLOBAL);
+        //SET_FLAG(*flag, VAR_GLOBAL);
         break;
     case X_INNER:
         *region = m_rumgr->newRegion(REGION_INNER);
         (*region)->initPassMgr();
         (*region)->initIRMgr();
         (*region)->initAttachInfoMgr();
-        SET_FLAG(*flag, VAR_LOCAL);
+        //SET_FLAG(*flag, VAR_LOCAL);
         break;
     case X_BLACKBOX:
         *region = m_rumgr->newRegion(REGION_BLACKBOX);
-        SET_FLAG(*flag, VAR_LOCAL);
+        //SET_FLAG(*flag, VAR_LOCAL);
         break;
     default:
         error(tok, "miss valid region type");
@@ -708,7 +887,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     //TODO: build CFG by given parameters.
     if (ctx->has_phi) {
         //GR should not include CFS when PHI is in used.
-        ASSERT0(!ctx->has_high_level_ir);
+        ASSERT0(!ctx->has_scf);
     }
     if (!ctx->has_phi) { return true; }
     Region * rg = ctx->current_region;
@@ -741,7 +920,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
 }
 
 
-bool IRParser::parseRegionName(Region * region, UINT flag, ParseCtx * ctx)
+bool IRParser::parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx)
 {
     TOKEN tok = m_lexer->getNextToken();
     if (!regardAsId(tok)) {
@@ -756,7 +935,8 @@ bool IRParser::parseRegionName(Region * region, UINT flag, ParseCtx * ctx)
     }
     if (regionvar == nullptr) {
         regionvar = m_rumgr->getVarMgr()->registerVar(sym,
-            m_rumgr->getTypeMgr()->getAny(), 1, flag);
+            m_rumgr->getTypeMgr()->getAny(), 1, (VarFlag&)flag);
+        regionvar->setflag((VAR_FLAG)(VAR_IS_DECL|VAR_IS_REGION));
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
             regionvar->setflag(VAR_IS_FUNC);
@@ -788,8 +968,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     //Region Type
     Region * region = nullptr;
-    UINT flag = 0;
-    if (!parseRegionType(&region, &flag, ctx)) {
+    VarFlag flag(0);
+    if (!parseRegionType(&region, flag, ctx)) {
         return false;
     }
     ASSERT0(region);
@@ -801,7 +981,6 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     ParseCtx newctx(this);
     newctx.current_region = region;
-    enterRegion(&newctx);
 
     //Region Parameters
     m_lexer->getNextToken();
@@ -819,7 +998,6 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     }
     END_TIMER_FMT(w,("Parse Region(%d):%s",
                      region->id(), region->getRegionName()));
-
     if (!checkLabel(newctx.stmt_list, newctx)) {
         return false;
     }
@@ -832,9 +1010,6 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         ASSERT0(verifyIRList(newctx.current_region->getIRList(),
                 nullptr, newctx.current_region));
     }
-
-    exitRegion(&newctx);
-
     if (ctx->current_region != nullptr) {
         IR * ir = ctx->current_region->getIRMgr()->buildRegion(region);
         copyProp(ir, ps, ctx);
@@ -901,7 +1076,7 @@ bool IRParser::parseRegionBody(ParseCtx * ctx)
 bool IRParser::parseStmtList(ParseCtx * ctx)
 {
     TOKEN tok = m_lexer->getCurrentToken();
-    bool has_high_level_ir = false;
+    bool has_scf = false;
     bool has_phi = false;
     for (;;) {
         X_CODE code = getCurrentStmtCode();
@@ -940,15 +1115,15 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             break;
         case X_DO:
             res = parseDoWhile(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_WHILE:
             res = parseWhileDo(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_DO_LOOP:
             res = parseDoLoop(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_LABEL:
             res = parseLabel(ctx);
@@ -965,18 +1140,18 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             break;
         case X_IF:
             res = parseIf(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_BREAK:
             res = parseBreak(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_RETURN:
             res = parseReturn(ctx);
             break;
         case X_CONTINUE:
             res = parseContinue(ctx);
-            has_high_level_ir = true;
+            has_scf = true;
             break;
         case X_SWITCH:
             res = parseSwitch(ctx);
@@ -984,14 +1159,14 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
         default:
             if (isEndOfScope() || isEndOfAll()) {
                 ctx->has_phi |= has_phi;
-                ctx->has_high_level_ir |= has_high_level_ir;
+                ctx->has_scf |= has_scf;
                 return !ctx->has_error;
             }
             error(tok, "not stmt operation");
             res = false;
         }
 
-        if (has_high_level_ir && has_phi) {
+        if (has_scf && has_phi) {
             error(tok, "phi can not be compatible with high level ir");
             ctx->has_error = true;
         }
@@ -1007,7 +1182,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
 
         if (isTooManyError()) {
             ctx->has_phi |= has_phi;
-            ctx->has_high_level_ir |= has_high_level_ir;
+            ctx->has_scf |= has_scf;
             return false;
         }
 
@@ -1118,7 +1293,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
         case_det = ctx->current_region->getIRMgr()->buildImmInt(
             (HOST_INT)xcom::xatoll(m_lexer->getCurrentTokenString(), false),
-            m_tm->getSimplexType(m_tm->get_int_dtype(
+            m_tm->getSimplexType(m_tm->getIntDType(
                                  sizeof(HOST_INT)*BIT_PER_BYTE, true)));
         tok = m_lexer->getNextToken();
 
@@ -1245,10 +1420,10 @@ bool IRParser::parseSelect(ParseCtx * ctx)
 }
 
 
-UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
+PRNO IRParser::mapIden2Prno(CHAR const* prid, ParseCtx * ctx)
 {
     Sym const* sym = m_rumgr->addToSymbolTab(prid);
-    UINT prno = ctx->mapSym2Prno(sym);
+    PRNO prno = ctx->mapSym2Prno(sym);
     if (prno == PRNO_UNDEF) {
         prno = ctx->current_region->getIRMgr()->buildPrno(m_tm->getAny());
         ctx->setMapSym2Prno(sym, prno);
@@ -1261,8 +1436,8 @@ bool IRParser::parsePR(ParseCtx * ctx)
 {
     ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
-            ("miss $ before PR expression"));
-    UINT prno = PRNO_UNDEF;
+            ("miss %s before PR expression", PR_TYPE_CHAR));
+    PRNO prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -2011,7 +2186,7 @@ bool IRParser::parseExp(ParseCtx * ctx)
         m_lexer->getNextToken();
         return true;
     case T_IDENTIFIER:
-        if (getCurrentXCode() != X_UNDEF) {
+        if (getCurrentXCode() != X_CODE_UNDEF) {
             return parseXOperator(ctx);
         }
         break;
@@ -2027,7 +2202,7 @@ bool IRParser::parseExp(ParseCtx * ctx)
     case T_TRUE:
     case T_FALSE:
         return parseBool(ctx);
-    case T_DOLLAR: //$
+    case T_DOLLAR:
         return parsePR(ctx);
     default:;
     }
@@ -2111,27 +2286,27 @@ bool IRParser::isExp()
     case T_STRING:
     case T_TRUE:
     case T_FALSE:
-    case T_ADD:          // +
-    case T_SUB:          // -
-    case T_ASTERISK:     // *
-    case T_DIV:          // /
-    case T_AND:          // &&
-    case T_OR:           // ||
-    case T_BITAND:       // &
-    case T_BITOR:        // |
-    case T_LESSTHAN:     // <
-    case T_MORETHAN:     // >
-    case T_RSHIFT:       // >>
-    case T_LSHIFT:       // <<
-    case T_NOMORETHAN:   // <=
-    case T_NOLESSTHAN:   // >=
-    case T_NOEQU:        // !=
-    case T_NOT:          // !
-    case T_EQU:          // ==
-    case T_XOR:          // ^
-    case T_MOD:          // %
-    case T_REV:          // ~ reverse  e.g:a = ~a
-    case T_DOLLAR:       //$
+    case T_ADD: // +
+    case T_SUB: // -
+    case T_ASTERISK: // *
+    case T_DIV: // /
+    case T_AND: // &&
+    case T_OR: // ||
+    case T_BITAND: // &
+    case T_BITOR: // |
+    case T_LESSTHAN: // <
+    case T_MORETHAN: // >
+    case T_RSHIFT: // >>
+    case T_LSHIFT: // <<
+    case T_NOMORETHAN: // <=
+    case T_NOLESSTHAN: // >=
+    case T_NOEQU: // !=
+    case T_NOT: // !
+    case T_EQU: // ==
+    case T_XOR: // ^
+    case T_MOD: // %
+    case T_REV: // ~ reverse  e.g:a = ~a
+    case T_DOLLAR: //$
         return true;
     default:;
     }
@@ -2498,13 +2673,14 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_STRP);
     TOKEN tok = m_lexer->getNextToken();
+    ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     if (tok != T_DOLLAR) {
-        error(tok, "miss $ specifier");
+        error(tok, "miss %s specifier", PR_TYPE_CHAR);
         return false;
     }
 
     //PR no
-    UINT prno = PRNO_UNDEF;
+    PRNO prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -2562,11 +2738,12 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
 {
     ASSERT0(code == X_SETELEM || code == X_GETELEM);
     TOKEN tok = m_lexer->getNextToken();
+    ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     if (tok != T_DOLLAR) {
         error(tok, "miss '$' specifier after %s", getKeyWordName(code));
         return false;
     }
-    UINT prno = PRNO_UNDEF;
+    PRNO prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -2764,10 +2941,10 @@ bool IRParser::parseIStore(ParseCtx * ctx)
 }
 
 
-bool IRParser::parseStringLiteralPrno(UINT * prno, CHAR const* str,
+bool IRParser::parseStringLiteralPrno(PRNO * prno, CHAR const* str,
                                       ParseCtx * ctx)
 {
-    *prno = mapID2Prno(str, ctx);
+    *prno = mapIden2Prno(str, ctx);
     if (*prno == PRNO_UNDEF) {
         error("use invalid PR number %u", *prno);
         return false;
@@ -2776,9 +2953,9 @@ bool IRParser::parseStringLiteralPrno(UINT * prno, CHAR const* str,
 }
 
 
-bool IRParser::parseCustomizedPrno(UINT * prno, ParseCtx * ctx)
+bool IRParser::parseCustomizedPrno(PRNO * prno, ParseCtx * ctx)
 {
-    *prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+    *prno = (PRNO)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
     if (*prno > MAX_PRNO) {
         error("too large PR number %u", *prno);
         return false;
@@ -2793,8 +2970,9 @@ bool IRParser::parseCustomizedPrno(UINT * prno, ParseCtx * ctx)
 }
 
 
-bool IRParser::parsePrno(UINT * prno, ParseCtx * ctx)
+bool IRParser::parsePrno(PRNO * prno, ParseCtx * ctx)
 {
+    ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
             ("miss $ before PR expression"));
     TOKEN tok = m_lexer->getNextToken();
@@ -2880,8 +3058,8 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "can not find region %s", SYM_name(name));
             return false;
         }
-        if (!callee_var->is_func()) {
-            error(tok, "%s is not function type region", SYM_name(name));
+        if (!callee_var->is_func() && !callee_var->is_region()) {
+            error(tok, "%s is not region type region", SYM_name(name));
             return false;
         }
         if (ps.readonly != callee_var->is_readonly()) {
@@ -3106,12 +3284,13 @@ bool IRParser::parseDoWhile(ParseCtx * ctx)
     }
     m_lexer->getNextToken();
 
-    IR * oldvalue1;
-    IR * oldvalue2;
-    ctx->storeValue(&oldvalue1, &oldvalue2);
-    parseStmtList(ctx);
-    IR * body = ctx->stmt_list;
-    ctx->reloadValue(oldvalue1, oldvalue2);
+    IR * body = nullptr;
+    {
+        ParseCtx tmpctx(ctx);
+        parseStmtList(&tmpctx);
+        body = tmpctx.stmt_list;
+        tmpctx.stmt_list = nullptr;
+    }
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_RLPAREN) {
@@ -3176,12 +3355,13 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
     }
     m_lexer->getNextToken();
 
-    IR * oldvalue1;
-    IR * oldvalue2;
-    ctx->storeValue(&oldvalue1, &oldvalue2);
-    parseStmtList(ctx);
-    IR * body = ctx->stmt_list;
-    ctx->reloadValue(oldvalue1, oldvalue2);
+    IR * body = nullptr;
+    {
+        ParseCtx tmpctx(ctx);
+        parseStmtList(&tmpctx);
+        body = tmpctx.stmt_list;
+        tmpctx.stmt_list = nullptr;
+    }
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_RLPAREN) {
@@ -3321,13 +3501,13 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    IR * oldvalue1;
-    IR * oldvalue2;
-    ctx->storeValue(&oldvalue1, &oldvalue2);
-    parseStmtList(ctx);
-    IR * body = ctx->stmt_list;
-    ctx->reloadValue(oldvalue1, oldvalue2);
-
+    IR * body = nullptr;
+    {
+        ParseCtx tmpctx(ctx);
+        parseStmtList(&tmpctx);
+        body = tmpctx.stmt_list;
+        tmpctx.stmt_list = nullptr;
+    }
     tok = m_lexer->getCurrentToken();
     if (tok != T_RLPAREN) {
         error(tok, "miss '}' after doloop body");
@@ -3500,12 +3680,13 @@ bool IRParser::parsePhi(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Result
+    ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     if (tok != T_DOLLAR) {
         error(tok, "miss $ specifier");
         return false;
     }
 
-    UINT prno = PRNO_UNDEF;
+    PRNO prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -3633,12 +3814,13 @@ bool IRParser::parseIf(ParseCtx * ctx)
     }
     m_lexer->getNextToken();
 
-    IR * oldvalue1;
-    IR * oldvalue2;
-    ctx->storeValue(&oldvalue1, &oldvalue2);
-    parseStmtList(ctx);
-    IR * truebody = ctx->stmt_list;
-    ctx->reloadValue(oldvalue1, oldvalue2);
+    IR * truebody = nullptr;
+    {
+        ParseCtx tmpctx(ctx);
+        parseStmtList(&tmpctx);
+        truebody = tmpctx.stmt_list;
+        tmpctx.stmt_list = nullptr;
+    }
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_RLPAREN) {
@@ -3656,12 +3838,12 @@ bool IRParser::parseIf(ParseCtx * ctx)
         }
         m_lexer->getNextToken();
 
-        IR * oldvalue3;
-        IR * oldvalue4;
-        ctx->storeValue(&oldvalue3, &oldvalue4);
-        parseStmtList(ctx);
-        falsebody = ctx->stmt_list;
-        ctx->reloadValue(oldvalue3, oldvalue4);
+        {
+            ParseCtx tmpctx(ctx);
+            parseStmtList(&tmpctx);
+            falsebody = tmpctx.stmt_list;
+            tmpctx.stmt_list = nullptr;
+        }
 
         tok = m_lexer->getCurrentToken();
         if (tok != T_RLPAREN) {
@@ -3732,7 +3914,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
         tok = m_lexer->getCurrentToken();
     }
 
-    //Switch determinate expression
+    //Switch value expression
     if (!parseExp(ctx)) {
         return false;
     }
@@ -3799,12 +3981,12 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
         }
         tok = m_lexer->getNextToken();
 
-        IR * oldvalue1;
-        IR * oldvalue2;
-        ctx->storeValue(&oldvalue1, &oldvalue2);
-        parseStmtList(ctx);
-        body = ctx->stmt_list;
-        ctx->reloadValue(oldvalue1, oldvalue2);
+        {
+            ParseCtx tmpctx(ctx);
+            parseStmtList(&tmpctx);
+            body = tmpctx.stmt_list;
+            tmpctx.stmt_list = nullptr;
+        }
 
         tok = m_lexer->getCurrentToken();
         if (tok != T_RLPAREN) {
@@ -3815,7 +3997,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
     }
 
     if (body != nullptr) {
-        ctx->has_high_level_ir = true;
+        ctx->has_scf = true;
     }
     IR * ir = ctx->current_region->getIRMgr()->buildSwitch(det, case_list,
                                                            body, deflab);
@@ -4105,7 +4287,7 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
                 tok = m_lexer->getNextToken();
                 break;
             case X_FUNC:
-                var->setflag(VAR_IS_FUNC);
+                var->setflag((VAR_FLAG)(VAR_IS_FUNC|VAR_IS_REGION));
                 tok = m_lexer->getNextToken();
                 break;
             case X_FAKE:
@@ -4413,7 +4595,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
 {
     if (m_lexer->getCurrentToken() != T_LPAREN) {
         error(m_lexer->getCurrentToken(),
-            "miss '(' before property declaration");
+              "miss '(' before property declaration");
         return false;
     }
     TOKEN tok = m_lexer->getNextToken();

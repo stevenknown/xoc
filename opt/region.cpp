@@ -1749,6 +1749,27 @@ bool Region::processBBList(OptCtx & oc)
 }
 
 
+CallGraph * Region::getProgramRegionCallGraph() const
+{
+    Region * program = getRegionMgr()->getProgramRegion();
+    return program != nullptr ? program->getCallGraph() : nullptr;
+}
+
+
+CallGraph * Region::getCallGraphPreferProgramRegion() const
+{
+    CallGraph * callg = nullptr;
+    Region * program = getRegionMgr()->getProgramRegion();
+    if (program != nullptr) {
+        callg = program->getCallGraph();
+    }
+    if (callg == nullptr) {
+        callg = getCallGraph();
+    }
+    return callg;
+}
+
+
 bool Region::processIRList(OptCtx & oc)
 {
     if (getIRList() == nullptr) { return true; }
@@ -1763,8 +1784,7 @@ bool Region::processIRList(OptCtx & oc)
         getLogMgr()->decIndent(2);
     }
 
-    if (!HighProcess(oc)) { return false; }
-    xoc::destructClassicDUChain(this, oc);
+    if (!HighProcess(oc)) { return false; }    
 
     //PRSSA destruct classic DU chain.
     ASSERT0(verifyMDDUChain(this, oc));
@@ -1810,13 +1830,15 @@ static void post_process(Region * rg, OptCtx * oc)
 
 static void do_ipa(Region * rg, OptCtx * oc)
 {
-    if (!oc->is_callg_valid()) {
+    if (!oc->is_callgraph_valid()) {
         //processFuncRegion has scanned and collected call-list.
         //Thus it does not need to scan call-list here.
-        rg->getRegionMgr()->buildCallGraph(*oc, true, true);
+        ASSERT0(rg->getPassMgr());
+        rg->getPassMgr()->registerPass(PASS_CALL_GRAPH);
+        rg->getCallGraph()->perform(*oc);
     }
 
-    if (oc->is_callg_valid()) {
+    if (oc->is_callgraph_valid()) {
         IPA * ipa = (IPA*)rg->getPassMgr()->registerPass(PASS_IPA);
         ipa->perform(*oc);
         rg->getPassMgr()->destroyPass(ipa);
@@ -1826,9 +1848,13 @@ static void do_ipa(Region * rg, OptCtx * oc)
 
 static void do_inline(Region * rg, OptCtx * oc)
 {
-    //Need to scan call-list.
-    rg->getRegionMgr()->buildCallGraph(*oc, true, true);
-    if (oc->is_callg_valid()) {
+    if (!oc->is_callgraph_valid()) {
+        //Need to scan call-list.
+        ASSERT0(rg->getPassMgr());
+        rg->getPassMgr()->registerPass(PASS_CALL_GRAPH);
+        rg->getCallGraph()->perform(*oc);
+    }
+    if (oc->is_callgraph_valid()) {
         Inliner * inl = (Inliner*)rg->getPassMgr()->registerPass(PASS_INLINER);
         inl->perform(*oc);
         rg->getPassMgr()->destroyPass(inl);
@@ -1844,7 +1870,6 @@ bool Region::process(OptCtx * oc)
     if (getIRList() == nullptr && getBBList()->get_elem_count() == 0) {
         return true;
     }
-
     initPassMgr();
     initAttachInfoMgr();
     initIRMgr();

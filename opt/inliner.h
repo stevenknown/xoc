@@ -89,8 +89,8 @@ public:
         m_rumgr = program->getRegionMgr();
         ASSERT0(m_rumgr);
         m_program = program;
-        m_call_graph = m_rumgr->getCallGraph();
-        ASSERT0(m_call_graph);
+        m_call_graph = m_program->getCallGraph();
+        ASSERTN(m_call_graph, ("Inliner need callgraph"));
         m_pool = smpoolCreate(16, MEM_COMM);
     }
     virtual ~Inliner() { smpoolDelete(m_pool); }

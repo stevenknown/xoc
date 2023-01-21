@@ -53,7 +53,6 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         olddef->isMemRefNonPR()) {
@@ -228,7 +227,8 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
         }
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -267,7 +267,8 @@ void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc)
         classic_du_changed = dumgr->buildDUChain(def, use, oc);
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -309,7 +310,8 @@ bool removeExpiredDU(IR const* ir, Region * rg)
         mdssa_changed = true;
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                     classic_du_changed));
     return change;
 }
 
@@ -384,7 +386,8 @@ void removeUse(IR const* exp, Region * rg)
         mdssa_changed = true;
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -424,7 +427,8 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
         mdssa_changed = true;
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -461,7 +465,8 @@ void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
         mdssa_changed = true;
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -528,7 +533,8 @@ void addUse(IR * to, IR const* from, Region * rg)
         classic_du_changed = true;
     }
 
-    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                                 classic_du_changed));
 }
 
 
@@ -1051,6 +1057,24 @@ void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
 }
 
 
+static void removeUseOfNonPR(IR const* call, Region const* rg,
+                             MOD DUMgr * dumgr)
+{
+    ASSERT0(call->isCallStmt());
+    DUSet * useset = call->getDUSet();
+    if (useset == nullptr) { return; }
+    DUSetIter di = nullptr;
+    BSIdx nexti;
+    for (BSIdx i = useset->get_first(&di); i != BS_UNDEF; i = nexti) {
+        nexti = useset->get_next(i, &di);
+        IR const* use = rg->getIR(i);
+        if (use->isMemRefNonPR()) {
+            useset->remove(i, *dumgr->getSBSMgr());
+        }
+    }
+}
+
+
 static void removeUseOfPR(IR const* call, Region const* rg, MOD DUMgr * dumgr)
 {
     ASSERT0(call->isCallStmt());
@@ -1097,17 +1121,80 @@ static void removeClassicPRDUChainForCallStmt(Region * rg)
 }
 
 
-//The function try to destruct classic DU chain according to the
-//options in 'oc'. Usually, PRSSA will clobber the classic DUSet information.
-//User call the function to avoid the misuse of PRSSA and classic DU.
-void destructClassicDUChain(Region * rg, OptCtx const& oc)
+static inline void removeClassicDUChainForIR(IR * ir, Region * rg,
+                                             DUMgr * dumgr,
+                                             bool rmprdu, bool rmnonprdu)
 {
-    if (rg->getDUMgr() != nullptr) {
-        rg->getDUMgr()->cleanDUSet(oc);
+    ASSERT0(rmprdu ^ rmnonprdu);
+    if (ir->isCallStmt()) {
+        if (rmprdu) {
+            //If classic NonPR DU chain is retained, then CallStmt's DUSet
+            //can not be freed, because it DUSet also contain NonPR MD, and
+            //it still be DEF to some memory-ref operation.
+            removeUseOfPR(ir, rg, dumgr);
+            return;
+        }
+        //If classic PR DU chain is retained, then CallStmt's DUSet
+        //can not be freed, because it DUSet also contain PR MD, and
+        //it still be DEF to some PR operation.
+        ASSERT0(ir->hasDU());
+        removeUseOfNonPR(ir, rg, dumgr);
+        return;
     }
-    if (!oc.is_pr_du_chain_valid()) {
-        removeClassicPRDUChainForCallStmt(rg);
+    if (rmprdu && ir->isPROp()) {
+        ASSERT0(ir->hasDU());
+        ir->freeDUset(dumgr);
     }
+    if (rmnonprdu && ir->isMemRef()) {
+        ASSERT0(ir->hasDU());
+        ir->freeDUset(dumgr);
+    }
+}
+
+
+void removeClassicDUChain(Region * rg, bool rmprdu, bool rmnonprdu)
+{
+    if (!rmprdu && !rmnonprdu) { return; }
+    if (rmprdu && rmnonprdu) {
+        //Remove all DUSets at once.
+        if (rg->getDUMgr() != nullptr) {
+            rg->getDUMgr()->cleanDUSet();
+        }
+        return;
+    }
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr == nullptr) { return; }
+    if (rg->getIRList() != nullptr) {
+        IRIter it;
+        for (IR * ir = iterInit(rg->getIRList(), it, true);
+             ir != nullptr; ir = iterNext(it, true)) {
+            removeClassicDUChainForIR(ir, rg, dumgr, rmprdu, rmnonprdu);
+        }
+        return;
+    }
+    BBList * bblst = rg->getBBList();
+    if (bblst == nullptr) { return; }
+    IRIter it;
+    for (IRBB const* bb = bblst->get_head(); bb != nullptr;
+         bb = bblst->get_next()) {
+        for (IR * ir = const_cast<IRBB*>(bb)->getIRList().get_head();
+             ir != nullptr;
+             ir = const_cast<IRBB*>(bb)->getIRList().get_next()) {
+            it.clean();
+            for (IR * t = iterInit(ir, it, true);
+                 t != nullptr; t = iterNext(it, true)) {
+                removeClassicDUChainForIR(t, rg, dumgr, rmprdu,
+                                          rmnonprdu);
+            }
+        }
+    }
+}
+
+
+void destructInvalidClassicDUChain(Region * rg, OptCtx const& oc)
+{
+    removeClassicDUChain(rg, !oc.is_pr_du_chain_valid(),
+                         !oc.is_nonpr_du_chain_valid());
 }
 
 } //namespace xoc

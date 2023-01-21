@@ -89,7 +89,8 @@ public:
                               DomTree const& domtree,
                               IRCFG const* cfg, MDSSAMgr * mgr) :
         VisitTree(domtree, root->id()),
-        m_vextab(vextab), m_mdssamgr(mgr), m_cfg(cfg) {}
+        m_vextab(vextab), m_mdssamgr(mgr), m_cfg(cfg)
+    { ASSERT0(mgr); }
     //v: the vertex on DomTree.
     virtual void visitWhenFirstMeet(Vertex const* v)
     {
@@ -257,6 +258,22 @@ void IRCFG::buildEHEdgeNaive()
 }
 
 
+bool IRCFG::useMDSSADU() const
+{
+    //MDSSAMgr may be changed during the CFG lifetime.
+    MDSSAMgr * mgr = getRegion()->getMDSSAMgr();
+    return mgr != nullptr && mgr->is_valid();
+}
+
+
+bool IRCFG::usePRSSADU() const
+{
+    //PRSSAMgr may be changed during the CFG lifetime.
+    PRSSAMgr * mgr = getRegion()->getPRSSAMgr();
+    return mgr != nullptr && mgr->is_valid();
+}
+
+
 //The function verify whether the branch target is match to the BB.
 bool IRCFG::verifyBranchTarget() const
 {
@@ -309,7 +326,7 @@ bool IRCFG::verifyBranchTarget() const
                         break;
                     }
                 }
-                ASSERT0(find);
+                ASSERT0_DUMMYUSE(find);
             }
             continue;
         }
@@ -397,16 +414,14 @@ UINT IRCFG::afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
     ASSERT0(newpreds.get_elem_count() > 1);
     PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
     MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
-    bool useprssa = prssamgr != nullptr && prssamgr->is_valid();
-    bool usemdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     //Update phi operation.
     //Copy the operand that is in the replacement position. The original
     //livein value of the operand should livein from new predecessors as well.
-    if (useprssa) {
+    if (usePRSSADU()) {
         prssamgr->dupAndInsertPhiOpnd(succ, newpredstartpos,
                                       newpreds.get_elem_count());
     }
-    if (usemdssa) {
+    if (useMDSSADU()) {
         mdssamgr->dupAndInsertPhiOpnd(succ, newpredstartpos,
                                       newpreds.get_elem_count());
     }
@@ -1505,12 +1520,12 @@ void IRCFG::removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
 {
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB 'succ' has PHI.
-    PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
-    if (prssamgr != nullptr && prssamgr->is_valid()) {
+    if (usePRSSADU()) {
+        PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
         prssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos);
     }
-    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    if (useMDSSADU()) {
+        MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
         MDSSAUpdateCtx ssactx(const_cast<CfgOptCtx&>(ctx).getOptCtx());
         if (!ctx.needUpdateDomInfo()) {
             MDSSAUPDATECTX_update_duchain(&ssactx) = false;
@@ -1574,6 +1589,7 @@ void IRCFG::removeAllMDPhi(IRBB * bb, CfgOptCtx const& ctx)
 
 void IRCFG::reviseStmtMDSSA(VexTab const& vextab, Vertex const* root)
 {
+    if (!useMDSSADU()) { return; }
     DomTree domtree;
     genDomTree(domtree);
     ReviseMDSSAInDomTreeOrder rn(root, vextab, domtree, this,
@@ -1628,9 +1644,8 @@ void IRCFG::removeEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 {
     PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
-    bool useprssa = prssamgr != nullptr && prssamgr->is_valid();
     PRSSAInfoCollect col;
-    if (useprssa && ctx.needUpdateDomInfo()) {
+    if (usePRSSADU() && ctx.needUpdateDomInfo()) {
         //Note if dominfo is not maintained, SSA update can not prove to be
         //correct.
         col.init(prssamgr, ctx.getOptCtx());
@@ -1658,12 +1673,12 @@ xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
     //Note if DomInfo is not maintained, SSA update can not prove to be
     //correct. However, for now we keep doing the update to maintain
     //PHI's operand in order to tolerate subsequently processing of CFG.
-    if (useprssa) {
+    if (usePRSSADU()) {
         ASSERT0(prssamgr);
         prssamgr->addSuccessorDesignatedPhiOpnd(from, to, col);
     }
-    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    if (useMDSSADU()) {
+        MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
         mdssamgr->addSuccessorDesignatedPhiOpnd(from, to, ctx.getOptCtx());
     }
     return e;

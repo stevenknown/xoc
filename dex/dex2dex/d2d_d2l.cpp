@@ -876,7 +876,7 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilena
         OptCtx oc;
         bool s = rumgr->processProgramRegion(topru, &oc);
 
-        Region * program = ((DexRegionMgr*)rumgr)->getProgramRegion();
+        Region * program = rumgr->getProgramRegion();
         ASSERT0(program);
         dumpGR(program, dexfilename);
 

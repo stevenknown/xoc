@@ -696,7 +696,7 @@ public:
     {
         erase();
         UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
-        resize(newsz, newsz);
+        resize(newsz);
         build(oc);
 
         //One should call removeEmptyBB() immediately after this function,

@@ -581,7 +581,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     TypeMgr * dm = m_tm;
     //pr = 1
     Type const* t = dm->getSimplexTypeEx(
-        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
+        dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(1, t);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
     m_rg->getMDMgr()->allocRef(x);
@@ -597,7 +597,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
 
     //pr = 0
     Type const* t2 = dm->getSimplexTypeEx(
-        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
+        dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(0, t2);
 
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -637,7 +637,7 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     m_rg->getMDMgr()->allocRef(pr);
     IR * ret_list = simplifyLogicalAndAtTruebr(ir, label1);
     TypeMgr * tm = m_tm;
-    Type const* t = tm->getSimplexTypeEx(tm->getDType(
+    Type const* t = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, t);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
@@ -648,7 +648,7 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     LabelInfo * label2 = m_rg->genILabel();
     xcom::add_next(&ret_list, m_irmgr->buildGoto(label2));
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label1));
-    Type const* t2 = tm->getSimplexTypeEx(tm->getDType(
+    Type const* t2 = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, t2);
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -863,7 +863,7 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     m_rg->getMDMgr()->allocRef(pr);
     IR * ret_list = simplifyLogicalOrAtTruebr(ir, label1);
     TypeMgr * dm = m_tm;
-    Type const* type = dm->getSimplexTypeEx(dm->getDType(
+    Type const* type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, type);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
@@ -875,7 +875,7 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildGoto(label2));
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label1));
 
-    type = dm->getSimplexTypeEx(dm->getDType(
+    type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, type);
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);

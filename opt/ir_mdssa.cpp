@@ -375,7 +375,7 @@ void RenameDef::iterSuccBB(Vertex const* defvex, MOD LiveSet & liveset)
                 break;
             }
         }
-        ASSERTN(find, ("not found related pred"));
+        ASSERTN_DUMMYUSE(find, ("not found related pred"));
         //Replace opnd of PHI of 'succ' with lived SSA version.
         iterSuccBBPhiListToRename(defvex, m_cfg->getBB(succv->id()),
                                   opnd_idx, liveset);

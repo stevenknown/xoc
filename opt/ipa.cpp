@@ -39,8 +39,8 @@ namespace xoc {
 Region * IPA::findRegion(IR * call, Region * callrg)
 {
     ASSERT0(call->is_call());
-    CallGraph * cg = m_rumgr->getCallGraph();
-    ASSERT0(cg);
+    CallGraph * cg = m_program->getCallGraph();
+    ASSERTN(cg, ("IPA need call-graph"));
     CallNode * callercn = cg->mapRegion2CallNode(callrg);
     ASSERTN(callercn, ("caller is not on graph"));
 
@@ -50,7 +50,7 @@ Region * IPA::findRegion(IR * call, Region * callrg)
     ASSERT0(cg->getVertex(CN_id(callercn)));
     for (xcom::EdgeC const* ec = cg->getVertex(CN_id(callercn))->getOutList();
          ec != nullptr; ec = ec->get_next()) {
-        CallNode * calleecn = cg->mapId2CallNode(ec->getToId());
+        CallNode * calleecn = cg->getCallNode(ec->getToId());
         ASSERT0(calleecn);
 
         Region * callee = CN_ru(calleecn);
@@ -250,7 +250,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 bool IPA::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    ASSERT0(OC_is_callg_valid(oc));
+    ASSERT0(oc.is_callgraph_valid());
     ASSERT0(m_program && m_program->is_program());
     createCallDummyuse(oc);
     END_TIMER(t, getPassName());

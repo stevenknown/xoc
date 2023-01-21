@@ -119,7 +119,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     }
     if (need_rebuild_prssa) {
         prssamgr->construction(oc);
-        xoc::destructClassicDUChain(this, oc);
+        oc.setInvalidPRDU();
         SIMP_need_rebuild_du_chain(&simp) = false;
     }
 
@@ -154,7 +154,6 @@ bool Region::performSimplify(OptCtx & oc)
     getIRSimp()->simplifyBBlist(getBBList(), &simp);
     postSimplify(simp, oc);
     if (simp.needRebuildDUChain()) {
-        //ONLY rebuild SSA DU-Chain for speedup compilation.
         MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
             PASS_MDSSA_MGR);
         if (mdssamgr != nullptr) {
@@ -167,7 +166,12 @@ bool Region::performSimplify(OptCtx & oc)
             prssamgr->destruction(oc);
             prssamgr->construction(oc);
         }
-        xoc::destructClassicDUChain(this, oc);        
+        DUMgr * dumgr = getDUMgr();
+        if (dumgr != nullptr) {
+            //NOTE rebuild classic DU-Chain is costly.
+            //Especially compilation speed is considerable.
+            dumgr->checkAndComputeClassicDUChain(oc);
+        }
     }
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(verifyMDDUChain(this, oc));
@@ -209,11 +213,12 @@ void Region::doBasicAnalysis(OptCtx & oc)
             f |= DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_NONPR_DU;
         }
         bool succ = dumgr->perform(oc, f);
-        ASSERT0(oc.is_ref_valid());
-        if (HAVE_FLAG(f, DUOPT_SOL_REACH_DEF) && succ) {
-            dumgr->computeMDDUChain(oc, false, f);
+        ASSERT0(oc.is_ref_valid());        
+        if (succ) {
+            //NOTE rebuild classic DU-Chain is costly.
+            //Especially compilation speed is considerable.
+            dumgr->checkAndComputeClassicDUChain(oc);
         }
-
         if (g_do_prssa) {
             PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
                 PASS_PRSSA_MGR);
@@ -229,9 +234,9 @@ void Region::doBasicAnalysis(OptCtx & oc)
             ASSERT0(mdssamgr);
             if (!mdssamgr->is_valid()) {
                 mdssamgr->construction(oc);
-            }            
-        }
-        xoc::destructClassicDUChain(this, oc);
+            }
+            oc.setInvalidNonPRDU();
+        }        
         if (g_do_refine_duchain) {
             RefineDUChain * refdu = (RefineDUChain*)getPassMgr()->
                 registerPass(PASS_REFINE_DUCHAIN);

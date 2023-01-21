@@ -26,45 +26,32 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-//Represents a virtual sttore to PR.
-IR_VSTPR = IR_LAST_UNDERLYING_CODE + 1,
+#ifndef _STORAGE_SPACE_H_
+#define _STORAGE_SPACE_H_
 
-//Represents a virtual store to Var.
-IR_VST,
+namespace xoc {
 
-//Represents a virtual indirect store.
-IR_VIST,
+//The storage space represents property for memory operations.
+typedef enum tagStorageSpace {
+    SS_UNDEF = 0,
+    SS_GLOBAL,
+    SS_REG,
+    SS_SPM,
+    SS_PARAM,
+    SS_SHARED,
+    SS_STACK,
+    SS_READONLY,
+} StorageSpace;
 
-//Represent broadcast operation.
-IR_BROADCAST,
+class StorageSpaceDesc {
+public:
+    StorageSpace ss;
+    CHAR const* name;
+public:
+    //Get flag's name.
+    static CHAR const* getName(StorageSpace ss);
+};
 
-//PCX CODE START
-IR_ABS,
-IR_MIN,
-IR_MAX,
-IR_CNTONE,
-IR_CNTLEADZERO,
-IR_CNTTAILZERO,
-IR_FINDMSB,
-IR_ZAP,
-IR_ZAPNOT,
-IR_ROTLEFT,
-IR_CMP,
-IR_RECIP,
-IR_SQRT,
-IR_RSQRT,
-IR_SIN,
-IR_COS,
-IR_TANH,
-IR_LOG2,
-IR_EXP2,
-IR_CONJ,
-IR_INSERT,
-IR_EXTRACT,
-IR_MATMUL,
-IR_BRDCAST,
-IR_MEMCPY,
-IR_TILE,
-//PCX CODE END
- 
-IR_LAST_EXT_CODE = IR_TILE,
+} //namespace xoc
+
+#endif

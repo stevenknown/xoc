@@ -57,7 +57,8 @@ bool verifyGeneral(IR const* ir, Region const* rg)
     if (d->is_vector()) {
         TMWORD ofst = ir->getOffset();
         if (ofst != 0) {
-            ASSERT0((ofst % tm->getDTypeByteSize(d->getVectorElemType())) == 0);
+            ASSERT0((ofst % tm->getDTypeByteSize(d->getVectorElemDType()))
+                    == 0);
         }
     }
     return true;
@@ -87,7 +88,7 @@ bool verifyConst(IR const* ir, Region const* rg)
         !ir->is_any() &&
         !ir->is_ptr() && //immediate can be pointer, e.g: int * p = 0;
         !ir->is_str()) {
-        ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", ir->getDType()));
+        ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", d->getDType()));
     }
     return true;
 }
@@ -123,9 +124,11 @@ bool verifyST(IR const* ir, Region const* rg)
     ASSERT0(ST_rhs(ir)->is_exp());
     ASSERT0(ST_rhs(ir)->is_single());
     if (d->is_vector()) {
-        ASSERT0(d->getVectorElemType() != D_UNDEF);
-        ASSERT0(tm->getDTypeByteSize(d->getVectorElemType()) >=
-                tm->getByteSize(ST_rhs(ir)->getType()));
+        ASSERT0(d->getVectorElemDType() != D_UNDEF);
+        ASSERT0(d->getVectorElemNum(tm) > 0);
+        //CASE: RHS may be the same size with ST.
+        //ASSERT0(tm->getDTypeByteSize(d->getVectorElemDType()) >=
+        //        tm->getByteSize(ST_rhs(ir)->getType()));
     }
     return true;
 }
@@ -201,11 +204,11 @@ bool verifySETELEM(IR const* ir, Region const* rg)
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(SETELEM_base(ir) && SETELEM_val(ir) && SETELEM_ofst(ir));
     if (d->is_vector()) {
-        ASSERT0(d->getVectorElemType() != D_UNDEF);
+        ASSERT0(d->getVectorElemDType() != D_UNDEF);
 
         //Note if the value size less than elemsize, it will be hoist to
         //elemsize.
-        ASSERT0(tm->getDTypeByteSize(d->getVectorElemType()) >=
+        ASSERT0(tm->getDTypeByteSize(d->getVectorElemDType()) >=
                 tm->getByteSize(SETELEM_val(ir)->getType()));
     }
     ASSERT0(SETELEM_base(ir)->is_exp());
@@ -231,8 +234,8 @@ bool verifyGETELEM(IR const* ir, Region const* rg)
     ASSERT0(base && GETELEM_ofst(ir));
     Type const* basedtd = base->getType();
     if (basedtd->is_vector()) {
-        ASSERT0(basedtd->getVectorElemType() != D_UNDEF);
-        ASSERT0(tm->getDTypeByteSize(basedtd->getVectorElemType()) >=
+        ASSERT0(basedtd->getVectorElemDType() != D_UNDEF);
+        ASSERT0(tm->getDTypeByteSize(basedtd->getVectorElemDType()) >=
                 tm->getByteSize(d));
     }
     return true;
@@ -597,7 +600,7 @@ bool verifySELECT(IR const* ir, Region const* rg)
     DUMMYUSE(tm);
     //true_exp's type might not equal to false_exp's.
     Type const* d = ir->getType();
-    ASSERT0(d && d->getDType() != D_UNDEF);
+    ASSERT0_DUMMYUSE(d && d->getDType() != D_UNDEF);
     ASSERT0(SELECT_det(ir) &&
             SELECT_det(ir)->is_bool() &&
             SELECT_det(ir)->is_single());

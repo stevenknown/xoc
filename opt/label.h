@@ -116,7 +116,7 @@ public:
     void dumpName(Region const* rg) const;
 
     //Format and return label name which is usually used to dump.
-    CHAR const* getName(MOD StrBuf * buf) const;
+    CHAR const* getName(OUT StrBuf & buf) const;
 
     //Return the original label name without pretty formatting.
     Sym const* getOrgName() const { return LABELINFO_name(this); }

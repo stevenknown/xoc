@@ -942,7 +942,7 @@ void AliasAnalysis::processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
     }
     ic->copyBottomUpFlag(tic);
 
-    ASSERT0(is_legal_set(mds, &tic));
+    ASSERT0_DUMMYUSE(is_legal_set(mds, &tic));
 
     if (mds.is_empty()) {
         ASSERT0(tic.get_hashed());
@@ -1732,7 +1732,7 @@ void AliasAnalysis::processILoad(IR * ir, MOD MDSet & mds,
     //Compute the memory address that ILD described.
     inferExpression(ILD_base(ir), mds, &tic, mx);
 
-    ASSERT0(is_legal_set(mds, &tic));
+    ASSERT0_DUMMYUSE(is_legal_set(mds, &tic));
     if (mds.is_empty()) {
         //Compute ILD ref MDSet and POINT-TO set.
         //If mds is empty, the inaccurate POINT-TO set
@@ -1970,7 +1970,7 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
         inferExpression(rhs, rhsrefmds, &rhsic, mx);
     }
     if (rhsic.is_comp_pts()) {
-        ASSERT0(is_legal_set(rhsrefmds, &rhsic));
+        ASSERT0_DUMMYUSE(is_legal_set(rhsrefmds, &rhsic));
     } else {
         //Both rhs's mds and hashed_mds are empty if RHS is constant.
     }
@@ -2054,7 +2054,7 @@ void AliasAnalysis::processPhiOpndPTS(IR const* ir, bool phi_pts_is_worst,
             continue;
         }
  
-        ASSERT0(is_legal_set(tmp, &tic));
+        ASSERT0_DUMMYUSE(is_legal_set(tmp, &tic));
         if (tmp.is_empty()) {
             ASSERT0(tic.get_hashed());
             phi_pts_is_worst = true;
@@ -2357,7 +2357,7 @@ void AliasAnalysis::processIndirectMemOp(MOD IR * ir, IN MD2MDSet * mx)
 
     //Compute where base may point to.
     inferExpression(base, base_maypts, &ic, mx);
-    ASSERT0(is_legal_set(base_maypts, &ic));
+    ASSERT0_DUMMYUSE(is_legal_set(base_maypts, &ic));
 
     //In fact, The POINT-TO set of base-expression indicates what IST
     //may reference.
@@ -2698,7 +2698,7 @@ void AliasAnalysis::inferExtExpression(IR * ir, MOD MDSet & mds,
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
-    case IR_BROADCAST: {
+    SWITCH_CASE_EXT_EXP: {
         AACtx tic(*ic);
         AC_comp_pts(&tic) = false;
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {

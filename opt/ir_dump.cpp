@@ -923,6 +923,29 @@ void dumpConst(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
+void dumpHostFP(HOST_FP fpval, Type const* ty, BYTE mantissa, Region const* rg,
+                OUT StrBuf & outbuf)
+{
+    CHAR fpformat[128];
+    ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", mantissa);
+    StrBuf buf(16);
+    outbuf.sprint(fpformat, rg->getTypeMgr()->dump_type(ty, buf), fpval);
+}
+
+
+void dumpHostInt(HOST_INT intval, Type const* ty, Region const* rg,
+                 OUT StrBuf & outbuf)
+{
+    CHAR const* intfmt = getIntFormat(false);
+    CHAR const* hexintfmt = getIntFormat(true);
+    StrBuf fmt(16);
+    fmt.sprint("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+    StrBuf buf(16);
+    outbuf.sprint(fmt.buf, rg->getTypeMgr()->dump_type(ty, buf),
+                  intval, intval);
+}
+
+
 void dumpConstContent(IR const* ir, Region const* rg)
 {
     StrBuf buf(64);

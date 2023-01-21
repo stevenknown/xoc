@@ -13,7 +13,6 @@ birational.o\
 bigint.o\
 flty.o\
 linsys.o\
-diagnostic.o\
 bs.o\
 scc.o\
 sbs.o\
@@ -23,6 +22,8 @@ rpo.o\
 tree.o\
 domtree.o\
 lca.o\
-assemblebin.o
+assemblebin.o\
+fileobj.o\
+diagnostic.o
 
 COM_OUTPUT=libxcom.a

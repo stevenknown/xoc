@@ -114,6 +114,16 @@ IR * IRMgrExt::buildBroadCast(IR * src, IR * res_list, Type const* ty)
 }
 
 
+bool IRMgrExt::hasMultiRes(IR * stmt) const
+{
+    switch (stmt->getCode()) {
+    case IR_BROADCAST: return true;
+    default:;
+    }
+    return false;
+}
+
+
 IR * IRMgrExt::getAlterResDescList(IR * stmt) const
 {
     switch (stmt->getCode()) {

@@ -3051,26 +3051,6 @@ void PRSSAMgr::changeDef(IR * olddef, IR * newdef)
 }
 
 
-//The function revise classic PRDU if PRSSA constructed.
-static void removeClassicPRDUForCallStmt(Region * rg)
-{
-    DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr == nullptr) { return; }
-    BBList const* bblist = rg->getBBList();
-    BBListIter bbit;
-    for (IRBB * bb = bblist->get_head(&bbit);
-         bb != nullptr; bb = bblist->get_next(&bbit)) {
-        BBIRListIter irit;
-        for (IR const* ir = bb->getIRList().get_head(&irit);
-             ir != nullptr; ir = bb->getIRList().get_next(&irit)) {
-            if (ir->isCallStmt()) {
-                dumgr->removePRFromDUSet(ir);
-            }
-        }
-    }
-}
-
-
 void PRSSAMgr::construction(OptCtx & oc)
 {
     reinit();
@@ -3087,7 +3067,8 @@ void PRSSAMgr::construction(OptCtx & oc)
     }
     set_valid(true);
     if (haveToMaintainClassicPRDU(oc)) {
-        removeClassicPRDUForCallStmt(m_rg);
+        //Revise classic PRDU if PRSSA constructed.
+        xoc::removeClassicDUChain(m_rg, true, false);
     }
     //The construction of PRSSA will destruct DUSet which built by DUMgr.
     oc.setInvalidPRDU();

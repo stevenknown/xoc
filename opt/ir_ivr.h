@@ -106,7 +106,7 @@ public:
 public:
     BIV() { ::memset(this, 0, sizeof(BIV)); }
 
-    bool has_init_val() const { return BIV_initv_int(this) != nullptr; }
+    bool hasInitVal() const { return BIV_initv_int(this) != nullptr; }
 
     //Return true if initial value is const.
     bool isInitConst() const

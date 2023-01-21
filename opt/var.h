@@ -119,6 +119,12 @@ enum VAR_FLAG {
 
     //Variable is declaration.
     VAR_IS_DECL = 0x10000,
+
+    //Variable is visible while assembling in binary file, e.g:ELF.
+    VAR_IS_VISIBLE = 0x20000,
+
+    //Variable is region.
+    VAR_IS_REGION = 0x40000,
 };
 
 class VarFlag : public UFlag {
@@ -152,18 +158,6 @@ public:
 //NOTE: DO *NOT* forget modify the bit-field in Var if//
 //you remove/add flag here.                           //
 ////////////////////////////////////////////////////////
-#define BYTEBUF_size(b) ((b)->m_byte_size)
-#define BYTEBUF_buffer(b) ((b)->m_byte_buffer)
-class ByteBuf {
-    COPY_CONSTRUCTOR(ByteBuf);
-public:
-    UINT m_byte_size;
-    BYTE * m_byte_buffer;
-public:
-    BYTE * getBuffer() const { return m_byte_buffer; }
-    UINT getSize() const { return m_byte_size; }
-};
-
 //Variable unique id.
 #define VAR_id(v) ((v)->uid)
 
@@ -178,9 +172,6 @@ public:
 //Record string content if variable is string.
 #define VAR_string(v) ((v)->u1.string)
 
-//Record LabelInfo if variable is label.
-#define VAR_labinfo(v) ((v)->u1.labinfo)
-
 //Record the initial valud index.
 #define VAR_byte_val(v) ((v)->u1.byte_val)
 
@@ -188,13 +179,16 @@ public:
 #define VAR_prno(v) ((v)->prno)
 
 //Variable has initial value.
-#define VAR_has_init_val(v) ((v)->u2.s1.has_init_val)
+#define VAR_has_init_val(v) ((v)->u2.s1.hasInitVal)
 
 //Record the parameter position.
 #define VAR_formal_param_pos(v) ((v)->formal_parameter_pos)
 
 //Record the alignment.
 #define VAR_align(v) ((v)->align)
+
+//Record the storage space.
+#define VAR_storage_space(v) ((v)->storage_space)
 
 class Var {
     COPY_CONSTRUCTOR(Var);
@@ -211,15 +205,15 @@ public:
     //Record prno if Var indicates a PR location.
     PRNO prno;
 
+    //Record the storage space if var is memory object.
+    StorageSpace storage_space;
+
     union {
         //Record string contents if Var is a constant string.
         Sym const* string;
 
         //Record byte code if Var has constant initial value.
         ByteBuf * byte_val;
-
-        //Record label related info if Var indicates a label.
-        LabelInfo * labinfo;
     } u1; //record the properties that are exclusive.
     VarFlag varflag;
 public:
@@ -233,6 +227,7 @@ public:
     bool is_label() const { return varflag.have(VAR_IS_LABEL); }
     bool is_unallocable() const { return varflag.have(VAR_IS_UNALLOCABLE); }
     bool is_decl() const { return varflag.have(VAR_IS_DECL); }
+    bool is_visible() const { return varflag.have(VAR_IS_VISIBLE); }
     bool is_array() const { return varflag.have(VAR_IS_ARRAY); }
     bool is_formal_param() const { return varflag.have(VAR_IS_FORMAL_PARAM); }
     bool is_private() const { return varflag.have(VAR_PRIVATE); }
@@ -242,6 +237,7 @@ public:
     bool is_spill() const { return varflag.have(VAR_IS_SPILL); }
     bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
     bool is_pr() const { return varflag.have(VAR_IS_PR); }
+    bool is_region() const { return varflag.have(VAR_IS_REGION); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_any() const
     {
@@ -297,8 +293,16 @@ public:
                 getByteValue() != nullptr);
     }
 
-    //Return true if variable has initial value.
-    bool has_init_val() const { return VAR_flag(this).have(VAR_HAS_INIT_VAL); }
+    //Return true if variable has initial byte value that stored in ByteBuf.
+    bool hasInitVal() const { return VAR_flag(this).have(VAR_HAS_INIT_VAL); }
+
+    //Return true if variable has initial string value that stored
+    //in VAR_string.
+    //Note if the variable is string type and it has initial string value, then
+    //the initial string value should be recorded in VAR_string, not in
+    //VAR_byte_val.
+    bool hasInitString() const
+    { return hasInitVal() && is_string() && getString() != nullptr; }
 
     //Get byte alignment.
     UINT get_align() const { return VAR_align(this); }
@@ -316,17 +320,28 @@ public:
     }
 
     //Get string contents.
-    Sym const* getString() const { return VAR_string(this); }
+    Sym const* getString() const
+    {
+        ASSERT0(is_string());
+        return VAR_string(this);
+    }
 
     //Get initial value.
-    ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
+    ByteBuf const* getByteValue() const
+    {
+        ASSERT0(hasInitVal());
+        return VAR_byte_val(this);
+    }
+
+    //Get the storage space.
+    StorageSpace getStorageSpace() const { return VAR_storage_space(this); }
 
     //Return the byte size of variable accroding type.
     UINT getByteSize(TypeMgr const* dm) const
     {
         //Length of string var should include '\0'.
-        return is_string() ? getStringLength() + 1:
-                             dm->getByteSize(VAR_type(this));
+        return is_string() && !hasInitVal() ?
+            getStringLength() + 1 : dm->getByteSize(VAR_type(this));
     }
 
     //The interface to dump declaration information when current
@@ -338,6 +353,7 @@ public:
     //The information will be dumpped into 'buf'.
     virtual CHAR const* dump(OUT StrBuf & buf, TypeMgr const* dm) const;
     void dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const;
+    void dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const;
     void dumpProp(OUT StrBuf & buf, bool grmode) const;
     CHAR const* dumpGR(OUT StrBuf & buf, TypeMgr * dm) const;
 
@@ -441,13 +457,30 @@ public:
     //Customer could specify additional attributions for specific purpose.
     virtual Var * allocVAR() { return new Var(); }
 
-    //Create variable by string name.
+    //Create variable by string name.    
+    //Add Var into VarTab.
+    //Note you should call this function cafefully, and make sure
+    //the Var is unique. This function does not keep the uniqueness
+    //related to properties.
+    //var_name: name of the variable, it is optional.
     Var * registerVar(CHAR const* varname, Type const* type, UINT align,
-                      UINT flag);
+                      VarFlag const& flag);
+
     //Create variable by symbol name.
+    //Add Var into VarTab.
+    //Note you should call this function cafefully, and make sure
+    //the Var is unique. This function does not keep the uniqueness
+    //related to properties.
+    //var_name: name of the variable, it is optional.
     Var * registerVar(Sym const* var_name, Type const* type, UINT align,
-                      UINT flag);
+                      VarFlag const& flag);
+
     //Create string variable by name and string-content.
+    //Register Var for const string.
+    //Return Var if there is already related to 's',
+    //otherwise create a new Var.
+    //var_name: name of the variable, it is optional.
+    //s: string's content.
     Var * registerStringVar(CHAR const* var_name, Sym const* s, UINT align);
 };
 

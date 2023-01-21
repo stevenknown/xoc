@@ -44,6 +44,7 @@ class IRDumpCtx;
 #define NOACCBASEFUNC nullptr
 #define NOACCLABFUNC nullptr
 #define NOACCDETFUNC nullptr
+#define NOACCSSFUNC nullptr
 
 typedef void(*IRDumpFuncType)(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 typedef bool(*IRVerifyFuncType)(IR const* ir, Region const* rg);
@@ -58,6 +59,7 @@ typedef IRBB *& (*IRAccBBFuncType)(IR * ir);
 typedef IR *& (*IRAccBaseFuncType)(IR * ir);
 typedef LabelInfo const*& (*IRAccLabFuncType)(IR * ir);
 typedef IR *& (*IRAccDetFuncType)(IR * ir);
+typedef StorageSpace & (*IRAccStorageSpaceFuncType)(IR * ir);
 
 //Describe miscellaneous information for IR.
 enum IRDESC_FLAG {
@@ -136,6 +138,9 @@ enum IRDESC_FLAG {
 
     //Indicates the operation has a case list.
     IRC_HAS_CASE_LIST = 0x2000000,
+
+    //Indicates the operation has storage space information.
+    IRC_HAS_STORAGE_SPACE = 0x4000000,
 };
 
 class IRDescFlag : public UFlag {
@@ -165,6 +170,7 @@ public:
 #define IRDES_has_du(m) ((m).attr.have(IRC_HAS_DU))
 #define IRDES_has_rhs(m) ((m).attr.have(IRC_HAS_RHS))
 #define IRDES_has_judge_target(m) ((m).attr.have(IRC_HAS_JUDGE_TARGET))
+#define IRDES_has_storage_space(m) ((m).attr.have(IRC_HAS_STORAGE_SPACE))
 #define IRDES_has_case_list(m) ((m).attr.have(IRC_HAS_CASE_LIST))
 #define IRDES_is_write_pr(m) ((m).attr.have(IRC_IS_WRITE_PR))
 #define IRDES_is_write_whole_pr(m) ((m).attr.have(IRC_IS_WRITE_WHOLE_PR))
@@ -181,6 +187,7 @@ public:
 #define IRDES_accofstfunc(m) ((m).accofstfunc)
 #define IRDES_accssainfofunc(m) ((m).accssainfofunc)
 #define IRDES_accprnofunc(m) ((m).accprnofunc)
+#define IRDES_accssfunc(m) ((m).accssfunc)
 #define IRDES_accresultprfunc(m) ((m).accresultprfunc)
 #define IRDES_acckidfunc(m) ((m).acckidfunc)
 #define IRDES_accbbfunc(m) ((m).accbbfunc)
@@ -203,19 +210,23 @@ public:
     BYTE kid_num;
     BYTE size;
     IRDescFlag attr;
-    IRDumpFuncType dumpfunc;
-    IRVerifyFuncType verifyfunc;
-    IRAccRHSFuncType accrhsfunc;
-    IRAccIdinfoFuncType accidinfofunc;
-    IRAccOfstFuncType accofstfunc;
-    IRAccSSAInfoFuncType accssainfofunc;
-    IRAccPrnoFuncType accprnofunc;
-    IRAccResultPRFuncType accresultprfunc;
-    IRAccKidFuncType acckidfunc;
-    IRAccBBFuncType accbbfunc;
-    IRAccBaseFuncType accbasefunc;
-    IRAccLabFuncType acclabelfunc;
-    IRAccDetFuncType accjudgedetfunc;
+
+    //Following function pointer record the corresponding the utility function
+    //if exiist for specific IR code.
+    IRDumpFuncType dumpfunc; //record the dump function.
+    IRVerifyFuncType verifyfunc; //record the verify function.
+    IRAccRHSFuncType accrhsfunc; //record the getRHS function.
+    IRAccIdinfoFuncType accidinfofunc; //record the getIdinfo function.
+    IRAccOfstFuncType accofstfunc; //record the getOfst function.
+    IRAccSSAInfoFuncType accssainfofunc; //record the getSSAInfo function.
+    IRAccPrnoFuncType accprnofunc; //record the getPrno function.
+    IRAccResultPRFuncType accresultprfunc; //record the getResultPR function.
+    IRAccKidFuncType acckidfunc; //record the getKid function.
+    IRAccBBFuncType accbbfunc; //record the getBB function.
+    IRAccBaseFuncType accbasefunc; //record the getBase function.
+    IRAccLabFuncType acclabelfunc; //record the getLabel function.
+    IRAccDetFuncType accjudgedetfunc; //record the getJudgeDet function.
+    IRAccStorageSpaceFuncType accssfunc; //record the getStorageSpace function.
 public:
     //Return true if the No.kididx kid of operation 'irc' can not be NULL.
     static bool mustExist(IR_CODE irc, UINT kididx);

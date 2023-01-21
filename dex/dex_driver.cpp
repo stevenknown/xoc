@@ -683,7 +683,7 @@ bool compileFunc(
     handleRegion(func_ru, df, lircode, fupool, dexm, dexcode, offsetvec);
 
     if (g_do_ipa) {
-        Region * program = ((DexRegionMgr*)rumgr)->getProgramRegion();
+        Region * program = rumgr->getProgramRegion();
         ASSERT0(program);
         REGION_parent(func_ru) = program;
         program->addToVarTab(func_ru->getRegionVar());

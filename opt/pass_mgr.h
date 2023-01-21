@@ -98,6 +98,7 @@ public:
     virtual Pass * allocIRSimp();
     virtual Pass * allocIRMgr();
     virtual Pass * allocLinearScanRA();
+    virtual Pass * allocCallGraph();
 
     //This function check validation of options in oc, perform
     //recomputation if it is invalid.

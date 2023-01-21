@@ -87,17 +87,16 @@ typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 #define CALLG_DUMP_IR 1
 #define CALLG_DUMP_SRC_LINE 2
 #define CALLG_DUMP_INNER_REGION 4
-class CallGraph : public xcom::DGraph {
+class CallGraph : public Pass, public xcom::DGraph {
     COPY_CONSTRUCTOR(CallGraph);
 private:
-    RegionMgr * m_ru_mgr;
+    RegionMgr * m_rm;
     TypeMgr * m_tm;
     SMemPool * m_cn_pool; //pool for call node.
     UINT m_cn_count;
     Vector<CallNode*> m_cnid2cn;
     Vector<CallNode*> m_ruid2cn;
     Region2SYM2CN m_ru2sym2cn;
-
 private:
     CallNode * allocCallNode()
     {
@@ -109,8 +108,11 @@ private:
         return p;
     }
 
+    void collectInfo(OUT UINT & num_call, OUT UINT & num_ru,
+                     bool scan_call, bool scan_inner_region);
+
     //Generate map between Symbol and CallNode for current region.
-    SYM2CN * genSYM2CN(Region * rg)
+    SYM2CN * genSym2CallNode(Region * rg)
     {
         ASSERT0(rg);
         SYM2CN * sym2cn = m_ru2sym2cn.get(rg);
@@ -122,17 +124,22 @@ private:
     }
 
     //Read map between Symbol and CallNode for current region if exist.
-    SYM2CN * getSYM2CN(Region * rg) const { return m_ru2sym2cn.get(rg); }
+    SYM2CN * getSym2CallNode(Region * rg) const { return m_ru2sym2cn.get(rg); }
 
-    CallNode * newCallNode(IR const* ir, Region * rg);
-    CallNode * newCallNode(Region * rg);
-
+    //Create a CallNode accroding to caller.
+    //This CallNode will corresponding to an unqiue Region.
+    //Ensure CallNode for Region is unique.
+    //rg: the region that ir resident in.
+    CallNode * genCallNode(IR const* ir, Region * rg);
+    CallNode * genCallNode(Region * rg);
 public:
-    CallGraph(UINT vex_hash, RegionMgr * rumgr): xcom::DGraph(vex_hash)
+    explicit CallGraph(Region * rg, UINT vex_hash = 16) :
+        xcom::DGraph(vex_hash)
     {
         ASSERT0(vex_hash > 0);
-        m_ru_mgr = rumgr;
-        m_tm = rumgr->getTypeMgr();
+        m_rg = rg;
+        m_rm = rg->getRegionMgr();
+        m_tm = m_rm->getTypeMgr();
         m_cn_count = 1;
         m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
     }
@@ -152,7 +159,20 @@ public:
         m_cnid2cn.set(CN_id(cn), cn);
         addVertex(CN_id(cn));
     }
-    bool build(RegionMgr * rumgr);
+
+    //Add edge from  call/icall stmt to its target(callee) Region.
+    //Return the callee region.
+    //ir: call/icall stmt.
+    //rg: the region that ir resident in.
+    Region * addEdgeCaller2Callee(IR * ir, Region * rg);
+
+    //Build call-graph for all regions that record in RegionMgr.
+    //The function will scan call site.
+    //scan_call: true to scan CallStmt for each Region before building
+    //           CallGraph.
+    //scan_inner_region: true to scan inner region.
+    bool buildCallGraphForAllRegion(bool scan_call, bool scan_inner_region);
+
     void computeEntryList(List<CallNode*> & elst);
     void computeExitList(List<CallNode*> & elst);
 
@@ -161,18 +181,19 @@ public:
     //        with completely information.
     void dumpVCG(CHAR const* name = nullptr, INT flag = -1);
 
-    RegionMgr * getRegionMgr() const { return m_ru_mgr; }
-    CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
-    CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
-    { return m_cnid2cn.get(v->id()); }
+    //Clean entire call-graph.
+    void erase()
+    {
+        m_cnid2cn.clean();
+        xcom::Graph::erase();
+    }
 
-    CallNode * mapRegion2CallNode(Region const* rg) const
-    { return m_ruid2cn.get(rg->id()); }
-
-    CallNode * mapSym2CallNode(Sym const* sym, Region * start) const
+    //Find CallNode by given symbol.
+    //Note the function will iterate from 'start' region and its parents.
+    CallNode * findCallNode(Sym const* sym, Region * start) const
     {
         for (; start != nullptr; start = start->getParent()) {
-            SYM2CN * sym2cn = getSYM2CN(start);
+            SYM2CN * sym2cn = getSym2CallNode(start);
             if (sym2cn == nullptr) { continue; }
             CallNode * cn = sym2cn->get(sym);
             if (cn != nullptr) { return cn; }
@@ -180,28 +201,38 @@ public:
         return nullptr;
     }
 
-    //Map a call/icall to its target Region.
-    //rg: the region that ir resident in.
-    Region * mapCall2Region(IR const* ir, Region const* rg) const
+    //Get CallNode via id.
+    CallNode * getCallNode(UINT id) const { return m_cnid2cn.get(id); }
+    virtual CHAR const* getPassName() const { return "CallGraph"; }
+    virtual PASS_TYPE getPassType() const { return PASS_CALL_GRAPH; }
+    RegionMgr * getRegionMgr() const { return m_rm; }
+
+    //Get the target(callee) Region for given call/icall stmt.
+    //rg: the region that 'ir' resident in.
+    Region * getCalleeRegion(IR const* ir, Region const* rg) const
     {
         if (ir->is_call()) {
-            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(),
+            CallNode * cn = findCallNode(CALL_idinfo(ir)->get_name(),
                 const_cast<Region*>(rg));
             if (cn != nullptr) { return CN_ru(cn); }
             return nullptr;
         }
-        ASSERT0(ir->is_icall());
+        ASSERTN(ir->is_icall(), ("TODO"));
         return nullptr; //TODO: implement icall analysis.
     }
 
-    void erase()
-    {
-        m_cnid2cn.clean();
-        xcom::Graph::erase();
-    }
+    //Map vertex on call-graph to corresponding CallNode.
+    CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
+    { return m_cnid2cn.get(v->id()); }
+
+    //Map region to corresponding CallNode.
+    CallNode * mapRegion2CallNode(Region const* rg) const
+    { return m_ruid2cn.get(rg->id()); }
+
+    virtual bool perform(OptCtx & oc);
 
     //This is an interface.
-    //Return true if an edge is needed bewteen the caller and the ir.
+    //Return true if an edge can be added bewteen the caller and the ir.
     //Note ir must be a function call.
     virtual bool shouldAddEdge(IR const* ir) const
     {

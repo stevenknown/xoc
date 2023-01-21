@@ -916,7 +916,7 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
                 for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
                 prt(getRegion(), "BIV(MD%d", iv->getOccMD()->id());
 
-                if (iv->has_init_val()) {
+                if (iv->hasInitVal()) {
                     if (iv->isInitConst()) {
                         prt(getRegion(), ",init=%lld",
                             (BIVIntType)*iv->getInitValInt());

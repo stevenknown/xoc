@@ -61,23 +61,23 @@ class Lineq {
 
     //Index of right-hand-side, also the column index of constant coefficient
     //vector, start from zero, named by Mathematical Programming System.
-    //If 'rhs_idx' does not equal to 'm_col_size - 1', it means,
-    //each column from 'rhs_idx + 1' to 'm_col_size -1' represent one
+    //If 'cst_col' does not equal to 'm_col_size - 1', it means,
+    //each column from 'cst_col + 1' to 'm_col_size -1' represent one
     //constant symbol.
     //e.g: x+y <= 10 + M + N, where M, N represent constant symbols respectively.
     //Default value is -1, indicate last column is constant vector.
-    INT m_rhs_idx;
+    INT m_cst_col;
 
     //Record coeff of inequality: Ax <= b+C(x), where C(x) is function of
     //symbolic constant.
     RMat * m_coeff;
 
     INT compareConstIterm(RMat const& m,
-                          UINT rhs_idx,
+                          UINT cst_col,
                           INT idx_of_eqt1,
                           Rational v);
     INT compareConstIterm(RMat const& m,
-                          UINT rhs_idx,
+                          UINT cst_col,
                           INT idx_of_eqt1,
                           INT idx_of_eqt2);
     INT selectLeadingColumn(INTMat const& coeff,
@@ -105,9 +105,9 @@ class Lineq {
                       INTMat const& org_cone,
                       UINT rhs_part);
 public:
-    Lineq(RMat * m, INT rhs_idx = -1);
+    Lineq(RMat * m, INT cst_col = CST_COL_UNDEF);
     ~Lineq();
-    void init(RMat * m, INT rhs_idx = -1);
+    void init(RMat * m, INT cst_col = CST_COL_UNDEF);
     void destroy();
 
     void appendEquation(RMat const& eq);
@@ -118,12 +118,12 @@ public:
     void dumps_var_bound(UINT u);
 
     //Set index of const column and coeff matrix.
-    void setParam(RMat * m, INT rhs_idx = -1);
+    void setParam(RMat * m, INT cst_col = CST_COL_UNDEF);
     void set_dump(bool is_dump) { m_is_dump = is_dump; }
-    bool reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect);
+    bool reduce(MOD RMat & m, UINT cst_col, bool is_intersect);
     void ConvexHullUnionAndIntersect(OUT RMat & res,
                                      IN List<RMat*> & chulls,
-                                     UINT rhs_idx,
+                                     UINT cst_col,
                                      bool is_intersect);
 
     //Fourier-Motzkin elimination
@@ -132,14 +132,14 @@ public:
     bool has_solution(RMat const& leq,
                       RMat const& eq,
                       RMat const& vc,
-                      UINT rhs_idx,
+                      UINT cst_col,
                       bool is_int_sol,
                       bool is_unique_sol);
     void initVarConstraint(Vector<INT> const& sign,
                            MOD RMat & vc,
-                           UINT rhs_idx);
+                           UINT cst_col);
     void substituteAndExpand(MOD RMat & coeff,
-                             UINT rhs_idx,
+                             UINT cst_col,
                              RMat const& p,
                              UINT sub_var);
     //Represent variable, forms as
@@ -149,13 +149,13 @@ public:
     bool calcBound(MOD List<RMat*> & limits);
 
     void move2cstsym(IN RMat & ieq,
-                     UINT rhs_idx,
+                     UINT cst_col,
                      UINT first_var,
                      UINT last_var,
                      OUT UINT * first_sym_idx,
                      OUT UINT * last_sym_idx);
     void move2var(IN RMat & ieq,
-                  UINT rhs_idx,
+                  UINT cst_col,
                   UINT first_sym,
                   UINT last_sym,
                   OUT UINT * first_var_idx,
@@ -165,14 +165,14 @@ public:
     //Polyhedra operation
     bool convertConstraint2Ray(OUT INTMat & gmat,
                                INTMat const& cs,
-                               UINT rhs_idx,
+                               UINT cst_col,
                                UINT raylimit = 1000);
     bool convertRay2Constraint(INTMat const& gmat,
                                OUT INTMat & cs,
                                UINT cslimit = 100);
-    void PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT rhs_idx);
-    void PolyImage(OUT RMat & res, IN RMat & a, UINT rhs_idx);
-    void EhartPoly(OUT RMat & res, IN RMat & a, UINT rhs_idx);
+    void PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT cst_col);
+    void PolyImage(OUT RMat & res, IN RMat & a, UINT cst_col);
+    void EhartPoly(OUT RMat & res, IN RMat & a, UINT cst_col);
 
 };
 

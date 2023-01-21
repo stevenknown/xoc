@@ -191,6 +191,11 @@ bool removeExpiredDU(IR const* ir, Region * rg);
 //updated as well.
 void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc);
 
+//The function remove classic DU chain for region's IRList or IRBBList.
+//rmprdu: true to remove all PR operations classic DU chain.
+//rmnonprdu: true to remove all NonPR operations classic DU chain.
+void removeClassicDUChain(Region * rg, bool rmprdu, bool rmnonprdu);
+
 //Remove Use-Def chain.
 //exp: the expression to be removed.
 //e.g: ir = ...
@@ -210,7 +215,8 @@ void movePhi(IRBB * from, IRBB * to, Region * rg);
 
 //The function try to destruct classic DU chain according to the
 //options in 'oc'. Usually, PRSSA will clobber the classic DUSet information.
-//User call the function to avoid the misuse of PRSSA and classic DU.
+//User call the function to avoid the misuse of PRSSA and classic DU in the
+//meanwhile.
 void destructClassicDUChain(Region * rg, OptCtx const& oc);
 
 } //namespace xoc

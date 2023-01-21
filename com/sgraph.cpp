@@ -169,21 +169,22 @@ void Graph::init()
 
 
 //Reconstruct vertex hash table, and edge hash table with new bucket size.
-//'vertex_hash_sz': new vertex table size to be resized.
-//'edge_hash_sz': new edge table size to be resized.
-//NOTE: mem pool should have been initialized.
-void Graph::resize(UINT vertex_hash_sz, UINT edge_hash_sz)
+//vertex_hash_sz: new vertex table size to be resized.
+//NOTE:
+//  1. mem pool should have been initialized
+//  2. Graph should be erased before resize. 
+void Graph::resize(UINT vertex_hash_sz)
 {
     ASSERT0(m_ec_pool);
-    if (!is_dense()) {
+    if (is_dense()) {
         //Dense vertex vector does not need resize.
-        ASSERTN(getVertexNum() == 0, ("graph is not empty"));
-        if (m_vex_hash_size != vertex_hash_sz) {
-            m_sparse_vertex->destroy();
-            m_sparse_vertex->init(vertex_hash_sz);
-            m_vex_hash_size = vertex_hash_sz;
-        }
+        return;
     }
+    ASSERTN(getVertexNum() == 0, ("should erase graph before resize"));
+    if (m_vex_hash_size == vertex_hash_sz) { return; }
+    m_sparse_vertex->destroy();
+    m_sparse_vertex->init(vertex_hash_sz);
+    m_vex_hash_size = vertex_hash_sz;
 }
 
 

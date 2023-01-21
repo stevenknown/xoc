@@ -51,8 +51,8 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_md_sys = nullptr;
     m_is_regard_str_as_same_md = true;
     m_str_md = nullptr;
-    m_call_graph = nullptr;
     m_targinfo = nullptr;
+    m_program = nullptr;
     m_pool = smpoolCreate(64, MEM_COMM);
     m_logmgr = new LogMgr();
 }
@@ -75,22 +75,13 @@ RegionMgr::~RegionMgr()
         delete m_md_sys;
         m_md_sys = nullptr;
     }
-
     if (m_var_mgr != nullptr) {
         delete m_var_mgr;
         m_var_mgr = nullptr;
     }
-
-    if (m_call_graph != nullptr) {
-        delete m_call_graph;
-        m_call_graph = nullptr;
-    }
-
     m_id2optctx.clean();
-
     smpoolDelete(m_pool);
     m_pool = nullptr;
-
     delete m_logmgr;
     m_logmgr = nullptr;
 }
@@ -181,12 +172,6 @@ void RegionMgr::registerGlobalMD()
         }
         m_md_sys->registerMD(md);
     }
-}
-
-
-CallGraph * RegionMgr::allocCallGraph(UINT vexnum)
-{
-    return new CallGraph(vexnum, this);
 }
 
 
@@ -385,47 +370,6 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     #endif
 
     END_TIMER_FMT(t, ("Delete Region"));
-}
-
-
-void RegionMgr::estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
-                           bool scan_call, bool scan_inner_region)
-{
-    for (UINT i = 0; i < getNumOfRegion(); i++) {
-        Region * rg = getRegion(i);
-        if (rg == nullptr) { continue; }
-
-        num_ru++;
-
-        ASSERT0(rg->is_function() || rg->is_program());
-        if (scan_call) {
-            rg->scanCallAndReturnList(num_ru, scan_inner_region);
-        }
-
-        num_call += rg->getCallList()->get_elem_count();
-    }
-    num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
-    num_call = MAX(4, xcom::getNearestPowerOf2(num_call));
-}
-
-
-//Scan call site and build call graph.
-//Return true if building graph successfully, otherwise return false.
-void RegionMgr::buildCallGraph(OptCtx & oc, bool scan_call,
-                               bool scan_inner_region)
-{
-    //Generate call-list and return-list.
-    UINT vn;
-    UINT num_call;
-    estimateEV(num_call, vn, scan_call, scan_inner_region);
-
-    if (m_call_graph == nullptr) {
-        //Construct call graph.
-        m_call_graph = allocCallGraph(vn);
-    }
-    ASSERT0(m_call_graph);
-
-    OC_is_callg_valid(oc) = m_call_graph->build(this);
 }
 
 

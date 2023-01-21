@@ -43,7 +43,8 @@ static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 
         //For these kind of regions, there are only local variable or
         //unablable global variable is legal.
-        ASSERT0(v->is_local() || v->is_unallocable());
+        ASSERT0(v->is_local() || v->is_unallocable() || v->is_func() ||
+                v->is_decl() || v->is_region());
     } else if (rg->is_program()) {
         //Theoretically, only global variable is legal in program region.
         //However even if the program region there may be local

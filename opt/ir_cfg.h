@@ -122,6 +122,9 @@ protected:
 
     //Sort the order of predecessor of given BB according to PHI operand layout.
     void sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label);
+
+    bool useMDSSADU() const;
+    bool usePRSSADU() const;
 public:
     enum {
         DUMP_DEF = 0x0U, //the default dump option.

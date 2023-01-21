@@ -256,7 +256,7 @@ protected:
                                          OUT MDSet * mayuse,
                                          DUOptFlag flag);
 
-    void freeDUSetForAllIR(OptCtx const& oc);
+    void freeDUSetForAllIR();
 
     void genDummyuseForCallStmt(IR * ir, MDSet const* mayref);
 
@@ -334,6 +334,9 @@ public:
     //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
     void collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse);
 
+    //The function check user command options and determine whether the
+    //compiler should perform classic PR DUChain and NonPR DUChain.
+    bool checkAndComputeClassicDUChain(MOD OptCtx & oc);
     void computeGenForBB(IN IRBB * bb, OUT SolveSet & expr_univers,
                          DefMiscBitSetMgr & bsmgr);
     void computeMDRefForBB(IRBB * bb, MOD OptCtx & oc, DUOptFlag duflag);
@@ -355,7 +358,7 @@ public:
                            Vector<MDSet*> const* maydefmds,
                            MDSet const* mayusemds);
     //The function will free DUSet for all IRs in region.
-    void cleanDUSet(OptCtx const& oc) { freeDUSetForAllIR(oc); }
+    void cleanDUSet() { freeDUSetForAllIR(); }
 
     //The function copy MustUse and MayUse mds from tree 'from' to tree 'to'
     //and build new DU chain for 'to'.

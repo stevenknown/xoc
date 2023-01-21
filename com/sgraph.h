@@ -647,7 +647,12 @@ public:
     static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
     static Edge * get_next_out_edge(AdjEdgeIter & it);
 
-    void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
+    //Reconstruct vertex hash table, and edge hash table with new bucket size.
+    //vertex_hash_sz: new vertex table size to be resized.
+    //NOTE:
+    //  1. mem pool should have been initialized
+    //  2. Graph should be erased before resize.
+    void resize(UINT vertex_hash_sz);
     Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
     void reverseEdges(); //Reverse all edges.
     //pos_in_outlist: optional, record the position in outlist of 'from' of 'e'

@@ -70,6 +70,15 @@ public:
         ::memcpy(buf, src.buf, buflen);
     }
 
+    //Find sub-string in 'source', return the index if sub-string found,
+    //otherwise return -1.
+    //source: input string.
+    //substring: partial string.
+    LONG findSubStr(CHAR const* source, CHAR const* substring);
+
+    //Return the string buffer byte length.
+    UINT getBufLen() const { return buflen; }
+
     //The function convert string content into binary.
     //Note the content in given buf must be string format of hex, that is the
     //string can only contain "abcdefABCDEF0123456789".
@@ -87,18 +96,24 @@ public:
     //Return true if string is empty.
     bool is_empty() const { return buf == nullptr || buf[0] == 0; }
 
+    //Grow buffer to the byte length that no less than 'len'.
+    //Note the function will clobber the content in original buffer.
+    void growBuf(UINT len)
+    {
+        if (buflen >= len) { return; }
+        buflen = len;
+        ASSERT0(buf);
+        ::free(buf);
+        buf = (CHAR*)::malloc(buflen);
+        buf[0] = 0;
+    }
+
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
 
     //This function print string according to 'format'.
     //args: a list of argument store in stack.
     void vsprint(CHAR const* format, va_list args);
-
-    //Find sub-string in 'source', return the index if sub-string found,
-    //otherwise return -1.
-    //source: input string.
-    //substring: partial string.
-    LONG findSubStr(CHAR const* source, CHAR const* substring);
 
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,

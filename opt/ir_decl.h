@@ -139,15 +139,21 @@ public:
 //    The ld operation loads i32 value from the address (p + 10)
 #define LD_ofst(ir) (((CLd*)CK_IRC(ir, IR_LD))->field_offset)
 #define LD_idinfo(ir) (((CLd*)CK_IRC(ir, IR_LD))->id_info)
+#define LD_align(ir) (((CLd*)CK_IRC(ir, IR_LD))->align)
 #define LD_du(ir) (((CLd*)CK_IRC(ir, IR_LD))->du)
+
+//Return the storage space if any.
+#define LD_storage_space(ir) VAR_storage_space(LD_idinfo(ir))
 class CLd : public DuProp, public VarProp, public OffsetProp {
     COPY_CONSTRUCTOR(CLd);
 public:
     static BYTE const kid_map = 0;
     static BYTE const kid_num = 0;
+    UINT align;
 public:
     static inline Var *& accIdinfo(IR * ir) { return LD_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LD_ofst(ir); }
+    static inline StorageSpace & accSS(IR * ir) { return LD_storage_space(ir); }
     static IR * dupIRTreeByStmt(IR const* src, Region * rg);
 };
 
@@ -163,16 +169,22 @@ public:
 #define ILD_du(ir) (((CILd*)CK_IRC(ir, IR_ILD))->du)
 #define ILD_base(ir) ILD_kid(ir, 0)
 #define ILD_kid(ir, idx) CK_KID(ir, CILd, IR_ILD, idx)
+#define ILD_storage_space(ir) (((CILd*)CK_IRC(ir, IR_ILD))->storage_space)
+#define ILD_align(ir) (((CILd*)CK_IRC(ir, IR_ILD))->alignment)
 class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    UINT alignment;
+    StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
     static inline TMWORD & accOfst(IR * ir) { return ILD_ofst(ir); }
     static inline IR *& accKid(IR * ir, UINT idx) { return ILD_kid(ir, idx); }
     static inline IR *& accBase(IR * ir) { return ILD_base(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return ILD_storage_space(ir); }
 
     static IR * dupIRTreeByStmt(IR const* src, Region * rg);
 
@@ -199,7 +211,11 @@ public:
 //    2. [p + ST_ofst] = rhs if ST_ofst is not 0.
 #define ST_bb(ir) (((CSt*)CK_IRC(ir, IR_ST))->bb)
 #define ST_idinfo(ir) (((CSt*)CK_IRC(ir, IR_ST))->id_info)
+#define ST_align(ir) (((CSt*)CK_IRC(ir, IR_ST))->alignment)
 #define ST_ofst(ir) (((CSt*)CK_IRC(ir, IR_ST))->field_offset)
+
+//Return the storage space if any.
+#define ST_storage_space(ir) VAR_storage_space(ST_idinfo(ir))
 #define ST_du(ir) (((CSt*)CK_IRC(ir, IR_ST))->du)
 #define ST_rhs(ir) ST_kid(ir, 0)
 #define ST_kid(ir, idx) (((CSt*)ir)->opnd[CK_KID_IRC(ir, IR_ST, idx)])
@@ -208,11 +224,13 @@ class CSt : public CLd, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    UINT alignment;
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return ST_rhs(ir); }
     static inline Var *& accIdinfo(IR * ir) { return ST_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return ST_ofst(ir); }
+    static inline StorageSpace & accSS(IR * ir) { return ST_storage_space(ir); }
     static inline IR *& accKid(IR * ir, UINT idx) { return ST_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return ST_bb(ir); }
 
@@ -354,12 +372,16 @@ public:
 #define IST_du(ir) (((CISt*)CK_IRC(ir, IR_IST))->du)
 #define IST_base(ir) IST_kid(ir, 0)
 #define IST_rhs(ir) IST_kid(ir, 1)
+#define IST_storage_space(ir) (((CISt*)CK_IRC(ir, IR_IST))->storage_space)
+#define IST_align(ir) (((CISt*)CK_IRC(ir, IR_IST))->alignment)
 #define IST_kid(ir, idx) (((CISt*)ir)->opnd[CK_KID_IRC(ir, IR_IST, idx)])
 class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    UINT alignment;
+    StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return IST_rhs(ir); }
@@ -367,6 +389,8 @@ public:
     static inline IR *& accKid(IR * ir, UINT idx) { return IST_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return IST_bb(ir); }
     static inline IR *& accBase(IR * ir) { return IST_base(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return IST_storage_space(ir); }
 
     static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 
@@ -385,6 +409,7 @@ public:
 //    return p
 #define LDA_ofst(ir) (((CLda*)CK_IRC(ir, IR_LDA))->field_offset)
 #define LDA_idinfo(ir) (((CLda*)CK_IRC(ir, IR_LDA))->id_info)
+#define LDA_storage_space(ir) VAR_storage_space(LDA_idinfo(ir))
 class CLda : public IR, public VarProp, public OffsetProp {
     COPY_CONSTRUCTOR(CLda);
 public:
@@ -393,6 +418,8 @@ public:
 public:
     static inline Var *& accIdinfo(IR * ir) { return LDA_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LDA_ofst(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return LDA_storage_space(ir); }
 };
 
 
@@ -408,6 +435,9 @@ public:
 //Return the result PRNO if any.
 //#define CALL_prno(ir) (((CCall*)CK_IRC_CALL(ir))->prno)
 #define CALL_prno(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, prno)
+
+//Return the storage space if any.
+#define CALL_storage_space(ir) VAR_storage_space(CALL_idinfo(ir))
 
 //Access the SSA info of result PR.
 #define CALL_ssainfo(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, prssainfo)
@@ -475,6 +505,8 @@ public:
     static inline Var *& accIdinfo(IR * ir) { return CALL_idinfo(ir); }
     static inline SSAInfo *& accSSAInfo(IR * ir) { return CALL_ssainfo(ir); }
     static inline PRNO & accPrno(IR * ir) { return CALL_prno(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return CALL_storage_space(ir); }
     static inline IR * accResultPR(IR * ir)
     { return ir->hasReturnValue() ? ir : nullptr; }
     static inline IR *& accKid(IR * ir, UINT idx) { return CALL_kid(ir, idx); }
@@ -874,6 +906,7 @@ public:
 #define ARR_elemtype(ir) (((CArray*)CK_IRC_ARR(ir))->elemtype)
 #define ARR_ofst(ir) (((CArray*)CK_IRC_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRC_ARR(ir))->du)
+#define ARR_align(ir) (((CArray*)CK_IRC_ARR(ir))->alignment)
 
 //Get the number of element in each dimension.
 //ARR_elem_num represents the number of array element in current dimension.
@@ -900,12 +933,17 @@ public:
 //Array base expression.
 #define ARR_base(ir) ARR_kid(ir, 0)
 
+//Return the storage space if any.
+#define ARR_storage_space(ir) (((CArray*)CK_IRC_ARR(ir))->storage_space)
+
 #define ARR_kid(ir, idx) (((CArray*)ir)->opnd[CK_KID_ARR(ir, idx)])
 class CArray : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CArray);
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    UINT alignment;
+
     //Note that if ARR_ofst is not zero, the IR_dt may not equal to
     //ARR_elemtype. IR_dt describe the data-type of ARRAY operation + ARR_ofst.
     //ARR_elemtype describe array element type.
@@ -923,12 +961,17 @@ public:
     //after it is created.
     TMWORD const* elem_num;
 
+    //Record the storage space if any.
+    StorageSpace storage_space;
+
     //NOTE: 'opnd' must be the last member of CArray.
     IR * opnd[kid_num];
 public:
     static inline TMWORD & accOfst(IR * ir) { return ARR_ofst(ir); }
     static inline IR *& accKid(IR * ir, UINT idx) { return ARR_kid(ir, idx); }
     static inline IR *& accBase(IR * ir) { return ARR_base(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return ARR_storage_space(ir); }
 
     static IR * dupIRTreeByStmt(IR const* src, Region * rg);
 
@@ -992,7 +1035,9 @@ public:
 #define STARR_sub_list(ir) ARR_sub_list(ir)
 #define STARR_elem_type(ir) ARR_elem_type(ir)
 #define STARR_ofst(ir) ARR_ofst(ir)
+#define STARR_align(ir) ARR_align(ir)
 #define STARR_du(ir) ARR_du(ir)
+#define STARR_storage_space(ir) ARR_storage_space(ir)
 #define STARR_elem_num(ir, dim) ARR_elem_num(ir, dim)
 #define STARR_elem_num_buf(ir) ARR_elem_num_buf(ir)
 class CStArray : public CArray {
@@ -1012,6 +1057,8 @@ public:
     static inline IR *& accKid(IR * ir, UINT idx) { return ARR_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return STARR_bb(ir); }
     static inline IR *& accBase(IR * ir) { return ARR_base(ir); }
+    static inline StorageSpace & accSS(IR * ir)
+    { return STARR_storage_space(ir); }
 
     static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 };

@@ -74,7 +74,9 @@ ir_verify_ext.o\
 ir_decl.o\
 ir_desc.o\
 ir_utils.o\
-cfg_lifting.o
+cfg_lifting.o\
+bytebuf.o\
+storage_space.o
 
 ifeq ($(FOR_IP), true)
   $(info "ADD FOR-IP OBJS")

@@ -25,8 +25,8 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#ifndef _IR_PARSER_
-#define _IR_PARSER_
+#ifndef _IR_PARSER_H_
+#define _IR_PARSER_H_
 
 namespace xoc {
 
@@ -42,7 +42,7 @@ public:
     TOKEN error_token;
     xcom::StrBuf * error_msg;
 public:
-    ParseErrorMsg(UINT msglen) { error_msg = new StrBuf(msglen); }
+    ParseErrorMsg(UINT msglen) { error_msg = new xcom::StrBuf(msglen); }
     ~ParseErrorMsg() { delete error_msg; }
 };
 
@@ -50,20 +50,58 @@ public:
 #define PARSECTX_returned_imm_fpval(p) ((p)->s1.u1.returned_imm_fpval)
 #define PARSECTX_returned_imm_ty(p) ((p)->s1.returned_imm_ty)
 class ParseCtx {
+    typedef xcom::TMap<Sym const*, LabelInfo*> Sym2Lab;
+    typedef xcom::TMapIter<Sym const*, LabelInfo*> Sym2LabIter;
+    typedef xcom::TMap<IR*, LabelInfo*> IR2Lab;
+    typedef xcom::TMapIter<IR*, LabelInfo*> IR2LabIter;
+    typedef xcom::TMap<Sym const*, PRNO> Sym2Prno;
+    typedef xcom::TMapIter<Sym const*, PRNO> Sym2PrnoIter;
+protected:
     COPY_CONSTRUCTOR(ParseCtx);
-    xcom::TMap<Sym const*, LabelInfo*> m_sym2label;
-    xcom::TMap<IR*, LabelInfo*> m_ir2label;
-    xcom::TMap<Sym const*, UINT> m_id2prno;
+    UINT id; //the unique id for each ctx.
+    Sym2Lab * m_sym2label;
+    IR2Lab * m_ir2label;
+    Sym2Prno * m_iden2prno;
 public:
+    //Top down propagate information.
+    //Record the previous declared ParseCtx.
+    //User can retrive the related context during parsing.
+    ParseCtx * previous_ctx;
+
+    //Top down propagate information.
+    //Record the generated region.
     Region * current_region;
+
+    //Top down propagate information.
     IRParser * parser;
+
+    //Bottom up propagate information.
+    //Record the generated IR expression.
     IR * returned_exp;
+
+    //Bottom up propagate information.
+    //Record the generated IR stmt list.
     IR * stmt_list;
-    IR * last;
+
+    //Bottom up propagate information.
+    //Record whether the current region contained IR_PHI.
     bool has_phi;
-    bool has_high_level_ir; //Control Flow Struct are high level IR.
+
+    //Bottom up propagate information.
+    //Record whether the current region contained Structure Control Flow
+    //IR stmt.
+    bool has_scf;
+
+    //Bottom up propagate information.
+    //Record whether if error occurred.
     bool has_error;
-    IR_CODE ircode; //for temporary used
+
+    //Top down propagate information.
+    //Record the IR code that has parsed.
+    IR_CODE ircode;
+
+    //Bottom up propagate information.
+    //Record the generated immediate.
     struct {
         union {
             HOST_INT returned_imm_intval;
@@ -71,165 +109,35 @@ public:
         } u1;
         Type const* returned_imm_ty;
     } s1;
-
 public:
-    ParseCtx(IRParser * p)
-    {
-        ASSERT0(p);
-        parser = p;
-        current_region = nullptr;
-        returned_exp = nullptr;
-        stmt_list = nullptr;
-        last = nullptr;
-        has_phi = false;
-        has_high_level_ir = false;
-        has_error = false;
-        ircode = IR_UNDEF;
-        PARSECTX_returned_imm_ty(this) = nullptr;
-    }
-    ~ParseCtx() {}
+    ParseCtx(IRParser * p);
+    ParseCtx(ParseCtx * ctx);
+    ~ParseCtx();
 
     void addIR(IR * stmt);
 
     void clean();
+    void copyTopDownInfo(ParseCtx const& ctx);
 
-    xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
+    void dumpWithPrevCtx() const;
+    void dump() const;
+
+    IR2Lab & getIR2Label() { return *m_ir2label; }
 
     LabelInfo * mapSym2Label(Sym const* sym) const
-    { return m_sym2label.get(sym); }
-    LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label.get(ir); }
-    UINT mapSym2Prno(Sym const* sym) const { return m_id2prno.get(sym); }
+    { return m_sym2label->get(sym); }
+    LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label->get(ir); }
+    PRNO mapSym2Prno(Sym const* sym) const { return m_iden2prno->get(sym); }
 
     void setMapSym2Label(Sym const* sym, LabelInfo * label)
-    { m_sym2label.set(sym, label); }
+    { m_sym2label->set(sym, label); }
     void setMapIR2Label(IR * ir, LabelInfo * label)
-    { m_ir2label.set(ir, label); }
-    void setMapSym2Prno(Sym const* sym, UINT prno) { m_id2prno.set(sym, prno); }
-    void storeValue(IR ** oldvalue1, IR ** oldvalue2)
-    {
-        *oldvalue1 = stmt_list;
-        *oldvalue2 = last;
-        stmt_list = nullptr;
-        last = nullptr;
-    }
+    { m_ir2label->set(ir, label); }
+    void setMapSym2Prno(Sym const* sym, PRNO prno)
+    { m_iden2prno->set(sym, prno); }
 
-    void reloadValue(IR * oldvalue1, IR * oldvalue2)
-    {
-        stmt_list = oldvalue1;
-        last = oldvalue2;
-    }
+    void unionBottomUpInfo(ParseCtx const& ctx);
 };
-
-
-typedef enum {
-    X_UNDEF,
-    X_ID,
-    X_LD,
-    X_ILD,
-    X_ARRAY,
-    X_ST,
-    X_STRP,
-    X_STARRAY,
-    X_SETELEM,
-    X_GETELEM,
-    X_IST,
-    X_CALL,
-    X_ICALL,
-    X_LDA,
-    X_ADD,
-    X_SUB,
-    X_MUL,
-    X_DIV,
-    X_REM,
-    X_MOD,
-    X_LAND,
-    X_LOR,
-    X_BAND,
-    X_BOR,
-    X_XOR,
-    X_ASR,
-    X_LSR,
-    X_LSL,
-    X_LT,
-    X_LE,
-    X_GT,
-    X_GE,
-    X_EQ,
-    X_NE,
-    X_BNOT,
-    X_LNOT,
-    X_NEG,
-    X_CVT,
-    X_GOTO,
-    X_IGOTO,
-    X_DO,
-    X_WHILE,
-    X_DO_LOOP,
-    X_LABEL,
-    X_TRUEBR,
-    X_FALSEBR,
-    X_SELECT,
-    X_PHI,
-    X_REGION,
-    X_IF,
-    X_ELSE,
-    X_BREAK,
-    X_RETURN,
-    X_CONTINUE,
-    X_SWITCH,
-    X_CASE,
-    X_DEFAULT,
-    X_VAR,
-    X_FUNC,
-    X_PROGRAM,
-    X_INNER,
-    X_BLACKBOX,
-    X_I8,
-    X_U8,
-    X_I16,
-    X_U16,
-    X_I32,
-    X_U32,
-    X_I64,
-    X_U64,
-    X_I128,
-    X_U128,
-    X_F32,
-    X_F64,
-    X_F80,
-    X_F128,
-    X_MC,
-    X_STR,
-    X_VEC,
-    X_BOOL,
-    X_ANY,
-    X_READONLY,
-    X_TRY_START,
-    X_TRY_END,
-    X_TERMINATE,
-    X_CATCH_START,
-    X_ATOM,
-    X_RMW, //ReadModifyWrite
-    X_THROW,
-    X_SIDEEFFECT, //SideEffect
-    X_NOMOVE,
-    X_USE,
-    X_DEF,
-    X_PRIVATE,
-    X_RESTRICT,
-    X_VOLATILE,
-    X_FAKE,
-    X_GLOBAL,
-    X_UNDEFINED,
-    X_STRING,
-    X_BYTE,
-    X_ELEMTYPE,
-    X_DIM,
-    X_UNALLOCABLE,
-    X_ALIGN,
-    X_DECL,
-    X_LAST,
-} X_CODE;
 
 
 class PropertySet {
@@ -275,11 +183,11 @@ protected:
     TMap<CHAR const*, X_CODE, CompareStringFunc> m_stmt2xcode;
     TMap<CHAR const*, X_CODE, CompareStringFunc> m_exp2xcode;
     TMap<CHAR const*, X_CODE, CompareStringFunc> m_type2xcode;
+    UINT m_ctx_id; //used to count the number of ParseCtx occurred.
     TypeMgr * m_tm;
     Lexer * m_lexer;
     RegionMgr * m_rumgr;
     List<ParseErrorMsg*> m_err_list;
-    TMap<Sym const*, UINT> m_id2prno;
 protected:
     //Return true if GRReader allows user defined dedicated PRNO in GR file.
     //e.g: stpr $200 = 0;
@@ -290,6 +198,7 @@ protected:
     //          ...  = $xyz;
     bool allowCustomizePrno() { return false; }
 
+    bool checkKeyWordMap();
     bool checkPhiOpndLabel(IR const* ir,
         xcom::TMap<LabelInfo const*, IR const*> const& labtab,
         ParseCtx const& ctx);
@@ -303,8 +212,6 @@ protected:
     bool declareVar(ParseCtx * ctx, Var ** var);
     bool declareRegion(ParseCtx * ctx);
 
-    void enterRegion(ParseCtx *) {}
-    void exitRegion(ParseCtx * ctx) { ctx->clean(); }
     void error(UINT lineno, CHAR const* format, ...);
     void error(TOKEN tok, CHAR const* format, ...);
     void error(X_CODE xcode, CHAR const* format, ...);
@@ -326,18 +233,19 @@ protected:
     { return m_lexer->getCurrentToken() == T_RLPAREN; }
     bool isEndOfAll() const
     { return m_lexer->getCurrentToken() == T_END; }
+    bool isEndOfAll(TOKEN tok) const { return tok == T_END; }
     bool isLabelDeclaration() const;
     bool isExp(X_CODE code);
     bool isExp();
     bool isTerminator(TOKEN tok);
 
-    UINT mapID2Prno(CHAR const* prid, ParseCtx * ctx);
+    UINT mapIden2Prno(CHAR const* prid, ParseCtx * ctx);
 
-    bool parseCustomizedPrno(UINT * prno, ParseCtx * ctx);
-    bool parseStringLiteralPrno(UINT * prno, CHAR const* str, ParseCtx * ctx);
-    bool parseRegionName(Region * region, UINT flag, ParseCtx * ctx);
+    bool parseCustomizedPrno(PRNO * prno, ParseCtx * ctx);
+    bool parseStringLiteralPrno(PRNO * prno, CHAR const* str, ParseCtx * ctx);
+    bool parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx);
     bool parseRegionProp(OUT PropertySet & ps, ParseCtx * ctx);
-    bool parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx);
+    bool parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx);
     bool parseDimProperty(PropertySet & ps, ParseCtx * ctx);
     bool parseElemTypeProperty(PropertySet & ps, ParseCtx * ctx);
     bool parseAlign(Var * var, ParseCtx * ctx);
@@ -383,7 +291,7 @@ protected:
     bool parseFp(ParseCtx * ctx);
     bool parseString(ParseCtx * ctx);
     bool parseBool(ParseCtx * ctx);
-    bool parsePrno(UINT * prno, ParseCtx * ctx);
+    bool parsePrno(PRNO * prno, ParseCtx * ctx);
     bool parsePR(ParseCtx * ctx);
     bool parseIf(ParseCtx * ctx);
     bool parseParameterList(ParseCtx * ctx);
@@ -398,7 +306,9 @@ protected:
 public:
     IRParser(RegionMgr * rumgr) : m_lexer(nullptr), m_rumgr(rumgr)
     {
+        m_ctx_id = 0;
         m_tm = rumgr->getTypeMgr();
+        ASSERT0(checkKeyWordMap());
         initKeyWordMap();
     }
     COPY_CONSTRUCTOR(IRParser);
@@ -411,6 +321,7 @@ public:
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
     CHAR const* getKeyWordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }
+    UINT genParseCtxId() { return ++m_ctx_id; }
 
     void setLexer(Lexer * l) { m_lexer = l; }
 

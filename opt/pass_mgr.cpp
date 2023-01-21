@@ -245,6 +245,12 @@ Pass * PassMgr::allocIRMgr()
 }
 
 
+Pass * PassMgr::allocCallGraph()
+{
+    return new CallGraph(m_rg);
+}
+
+
 Pass * PassMgr::allocLinearScanRA()
 {
     #ifdef FOR_IP
@@ -458,6 +464,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_LIVENESS_MGR:
         pass = allocLivenessMgr();
+        break;
+    case PASS_CALL_GRAPH:
+        pass = allocCallGraph();
         break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }

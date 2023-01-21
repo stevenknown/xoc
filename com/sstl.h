@@ -129,49 +129,81 @@ inline T * get_first(T * t)
 }
 
 
+//t: may be single element or list.
 template <class T>
 inline void add_next(T ** pheader, T * t)
 {
-    if (pheader == nullptr || t == nullptr) { return; }
-    T * p = nullptr;
+    ASSERT0(pheader);
+    if (t == nullptr) { return; }
     t->prev = nullptr;
     if ((*pheader) == nullptr) {
         *pheader = t;
-    } else {
-        p = (*pheader)->next;
-        ASSERTN(t != *pheader, ("\n<add_next> : overlap list member\n"));
-        if (p == nullptr) {
-            (*pheader)->next = t;
-            t->prev = *pheader;
-        } else {
-            while (p->next != nullptr) {
-                p = p->next;
-                ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
-            }
-            p->next = t;
-            t->prev = p;
-        }
+        return;
     }
+    T * p = *pheader;
+    ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
+    while (p->next != nullptr) {
+        p = p->next;
+        ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
+    }
+    p->next = t;
+    t->prev = p;
+}
+
+
+//t: may be single element or list.
+template <class T>
+inline void add_next_single_list(MOD T ** pheader, T * t)
+{
+    if (t == nullptr) { return; }
+	if (nullptr == (*pheader)){
+	    *pheader = t;
+        return;
+	}
+    T * p = *pheader;
+    ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
+	for (; p->next != nullptr; p = p->next) {
+        ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
+    }
+    p->next = t;
+}
+
+
+//t: may be single element or list.
+template <class T>
+inline void add_next(MOD T ** pheader, MOD T ** last, IN T * t)
+{
+    if (t == nullptr) { return; }
+    ASSERT0(pheader && last);
+    t->prev = nullptr;
+    if ((*pheader) == nullptr) {
+        *pheader = t;
+        while (t->next != nullptr) { t = t->next; }
+        *last = t;
+        return;
+    }
+    ASSERTN(*last && (*last)->next == nullptr, ("must be the last"));
+    (*last)->next = t;
+    t->prev = *last;
+    while (t->next != nullptr) { t = t->next; }
+    *last = t;
 }
 
 
 template <class T>
-inline void add_next(MOD T ** pheader, MOD T ** last, IN T * t)
+inline void add_next_single_list(MOD T ** pheader, MOD T ** last, T * t)
 {
-    if (pheader == nullptr || t == nullptr) { return; }
-
-    t->prev = nullptr;
-    if ((*pheader) == nullptr) {
-        *pheader = t;
-        while (t->next != nullptr) { t = t->next; }
+    if (t == nullptr) { return; }
+    ASSERT0(pheader && last);
+	if (nullptr == (*pheader)){
+	    *pheader = t;
         *last = t;
-    } else {
-        ASSERTN(last && *last && (*last)->next == nullptr, ("must be the last"));
-        (*last)->next = t;
-        t->prev = *last;
-        while (t->next != nullptr) { t = t->next; }
-        *last = t;
-    }
+        return;
+	}
+    ASSERTN(*last && (*last)->next == nullptr, ("must be the last"));
+    (*last)->next = t;
+    while (t->next != nullptr) { t = t->next; }
+    *last = t;
 }
 
 
@@ -4589,11 +4621,8 @@ public:
     TMap(SMemPool * pool = nullptr) : RBT<Tsrc, Ttgt, CompareKey>(pool) {}
     ~TMap() {}
 
-    //This function should be invoked if TMap is initialized manually.
-    void init(SMemPool * pool = nullptr)
-    { RBT<Tsrc, Ttgt, CompareKey>::init(pool); }
-
-    void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
+    //Append <key, mapped> pair of 'src' to current object.
+    void append(TMap<Tsrc, Ttgt, CompareKey> const& src)
     {
         ASSERT0(this != &src);
         TMapIter<Tsrc, Ttgt> iter;
@@ -4602,6 +4631,17 @@ public:
              !iter.end(); key = src.get_next(iter, &val)) {
             set(key, val);
         }
+    }
+
+    //This function should be invoked if TMap is initialized manually.
+    void init(SMemPool * pool = nullptr)
+    { RBT<Tsrc, Ttgt, CompareKey>::init(pool); }
+
+    void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
+    {
+        ASSERT0(this != &src);
+        RBT<Tsrc, Ttgt, CompareKey>::clean();
+        append(src);
     }
 
     //This function should be invoked if TMap is destroied manually.

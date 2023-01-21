@@ -53,7 +53,7 @@ $(info "DEBUG:$(DEBUG)")
 
 #Define rules.
 $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
-	ar rcs $(XOC_OUTPUT) com/$(COM_OUTPUT) $(TMP_OPT_OBJS) $(TMP_READER_OBJS)
+	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) $(TMP_READER_OBJS)
 	@echo "SUCCESS!!"
 
 %.o:%.cpp
@@ -62,7 +62,7 @@ $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
 
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
-	cd com && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
 
 tmp_opt_objs: $(TMP_OPT_OBJS)
 
@@ -74,7 +74,7 @@ opt_objs: $(OPT_OBJS)
 reader_objs: $(READER_OBJS)
 
 clean:
-	cd com && make clean -f Makefile
+	cd $(COM_DIR) && make clean -f Makefile
 	@find ./ -name "*.gcda" | xargs rm -f
 	@find ./ -name "*.gcno" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f

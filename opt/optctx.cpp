@@ -82,7 +82,8 @@ void OptCtx::dumpFlag() const
     note(m_rg, "\nFLAG:pdom:%s", is_pdom_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:rpo:%s", is_rpo_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:loopinfo:%s", is_loopinfo_valid() ? "valid":"invalid");
-    note(m_rg, "\nFLAG:callg:%s", is_callg_valid() ? "valid":"invalid");
+    note(m_rg, "\nFLAG:callgraph:%s",
+         is_callgraph_valid() ? "valid":"invalid");
 }
 
 

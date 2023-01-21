@@ -471,7 +471,7 @@ bool IRBB::verifyTerminate() const
             break;
         }
     }
-    ASSERT0(BB_is_terminate(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_terminate(this) == find);
     return true;
 }
 
@@ -487,7 +487,7 @@ bool IRBB::verifyExpHandler() const
             break;
         }
     }
-    ASSERT0(BB_is_catch_start(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_catch_start(this) == find);
     return true;
 }
 
@@ -503,7 +503,7 @@ bool IRBB::verifyTryEnd() const
             break;
         }
     }
-    ASSERT0(BB_is_try_end(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_try_end(this) == find);    
     return true;
 }
 
@@ -519,7 +519,7 @@ bool IRBB::verifyTryStart() const
             break;
         }
     }
-    ASSERT0(BB_is_try_start(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_try_start(this) == find);
     return true;
 }
 

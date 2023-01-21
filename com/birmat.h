@@ -80,7 +80,7 @@ public:
     void substit(BIRMat const& exp,
                  UINT v,
                  bool is_eq = true,
-                 INT rhs_idx = -1);
+                 INT cst_col = CST_COL_UNDEF);
     void intlize(INT row = -1); //Converting rational element to integer.
     BIRMat & operator = (BIRMat const& m);
     BIRational reduce(UINT row, UINT col);

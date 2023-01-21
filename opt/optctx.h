@@ -53,7 +53,6 @@ typedef enum _PASS_TYPE PASS_TYPE; //forward declare PASS_TYPE
 #define OC_is_pdom_valid(o) ((o).u1.s1.is_pdom_valid)
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
 #define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
-#define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
 #define OC_do_merge_label(o) ((o).u1.s1.do_merge_label)
 class OptCtx {
     Region * m_rg;
@@ -86,8 +85,6 @@ public:
             BitUnion is_pdom_valid:1;
 
             BitUnion is_loopinfo_valid:1; //Loop info is avaiable.
-
-            BitUnion is_callg_valid:1; //Call graph is available.
 
             BitUnion is_rpo_valid:1; //Rporder is available.
 
@@ -158,7 +155,7 @@ public:
     bool is_loopinfo_valid() const { return OC_is_loopinfo_valid(*this); }
 
     //Return true if CallGraph is valid.
-    bool is_callg_valid() const { return OC_is_callg_valid(*this); }
+    bool is_callgraph_valid() const { return isPassValid(PASS_CALL_GRAPH); }
 
     //Return true if given pass is valid.
     bool isPassValid(PASS_TYPE pt) const;

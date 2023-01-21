@@ -45,6 +45,9 @@ public:
     bool isWordValid() const { return bitsize <= BIN_WORD_SIZE; }
     bool isBufValid() const { return !isWordValid(); }
 public:
+    //bs: bit size of given binary value.
+    //w: store the binary value.
+    //e.g:if we describe binary value 0x3, then bs is 2, w is 0x3.
     AssembleBinDesc(UINT bs, BinWord w) : bitsize(bs), bitvalword(w) {}
     AssembleBinDesc(UINT bs, BYTE const* f) : bitsize(bs)
     {
@@ -84,10 +87,11 @@ public:
     //buf: the output buffer that hold the binary.
     //buflen: the byte length of 'buf'.
     //descvec: a vector that describe each bin-field.
-    AssembleBinBuf(BYTE * buf, UINT buflen, AssembleBinDescVec const& descvec);
+    AssembleBinBuf(OUT BYTE * buf, UINT buflen,
+                   AssembleBinDescVec const& descvec);
 
-    static void dump(FILE * h, BYTE const* buf, UINT len);
-    void dump(FILE * h) const;
+    static void dump(FileObj & fo, BYTE const* buf, UINT len);
+    void dump(FileObj & fo) const;
 
     //Return true if given buffer size is big enough to hold all bits
     //in descvec.

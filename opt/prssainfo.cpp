@@ -65,6 +65,7 @@ void SSAInfo::dump(Region const* rg) const
 
     //PR SSAInfo
     PRNO defprno = PRNO_UNDEF;
+    DUMMYUSE(defprno);
     if (def != nullptr) {
         ASSERT0(def->is_stmt());
         prt(rg, "DEF:%s", IRNAME(def));

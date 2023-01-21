@@ -68,7 +68,7 @@ static bool is_dex_source_file(CHAR const* fn)
 {
     UINT len = strlen(fn) + 1;
     CHAR * buf = (CHAR*)ALLOCA(len);
-    buf = xcom::getfilesuffix(fn, buf, len);
+    buf = xcom::getFileSuffix(fn, buf, len);
 
     if (buf == nullptr) { return false; }
 

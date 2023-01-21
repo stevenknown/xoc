@@ -1673,9 +1673,10 @@ IR * Refine::reassociation(IR * ir, bool & change)
                                 CONST_int_val(op1));
         DATA_TYPE dt = ir->is_ptr() ?
             m_tm->getPointerSizeDtype() :
-            ir->is_mc() ? m_tm->getDType(WORD_BITSIZE, true) :
+            ir->is_mc() ? m_tm->getAlignedDType(WORD_BITSIZE, true) :
                           op1->getDType();
-        IR * new_const = m_rg->getIRMgr()->buildImmInt(v, m_tm->getSimplexTypeEx(dt));
+        IR * new_const = m_rg->getIRMgr()->buildImmInt(v,
+            m_tm->getSimplexTypeEx(dt));
         copyDbx(new_const, BIN_opnd0(ir), m_rg);
         IR_parent(op0) = nullptr;
         BIN_opnd0(ir) = nullptr;
@@ -1919,7 +1920,8 @@ IR * Refine::refineLoad(IR * ir)
         //then LD(a,U32) means load 32bit element from a,
         //e.g: load a[0]. So do not convert LD into LDA.
         //IR * rm = ir;
-        //ir = m_rg->getIRMgr()->buildLda(m_rg->getIRMgr()->buildId(LD_info(ir)));
+        //ir = m_rg->getIRMgr()->buildLda(m_rg->getIRMgr()->
+        //    buildId(LD_info(ir)));
         //m_rg->freeIR(rm);
     }
     return ir;
@@ -2296,7 +2298,8 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
             ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
                     ("illegal pointer arith"));
             DATA_TYPE t = m_tm->getPointerSizeDtype();
-            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1, m_tm->getSimplexTypeEx(t));
+            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1,
+                m_tm->getSimplexTypeEx(t));
             copyDbx(BIN_opnd1(ir), op1, m_rg);
             ir->setParentPointer(false);
             change = true;
@@ -2326,7 +2329,7 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
     ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
 
     //Both op0 and op1 are NOT vector type.
-    Type const* type = m_tm->hoistDtypeForBinop(op0, op1);
+    Type const* type = m_tm->hoistDTypeForBinOp(op0, op1);
     UINT dt_size = m_tm->getByteSize(type);
     if (op0->getTypeSize(m_tm) != dt_size) {
         BIN_opnd0(ir) = m_rg->getIRMgr()->buildCvt(op0, type);
@@ -2523,7 +2526,7 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
         } else if (ir->is_fp()) {
             //The result type of binary operation is
             //float point, inserting IR_CVT.
-            Type const* ty = m_tm->hoistDtypeForBinop(BIN_opnd0(ir),
+            Type const* ty = m_tm->hoistDTypeForBinOp(BIN_opnd0(ir),
                                                       BIN_opnd1(ir));
             x = m_rg->getIRMgr()->buildCvt(m_rg->getIRMgr()->buildImmInt(
                     calcIntVal(ir->getCode(), v0, v1), ty), ir->getType());
@@ -2540,8 +2543,8 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
     }
     case IR_LSR: {
         ASSERT0(ir->is_int());
-        IR * x = m_rg->getIRMgr()->buildImmInt(calcLSRIntVal(ir->getType(), v0, v1),
-                                   ir->getType());
+        IR * x = m_rg->getIRMgr()->buildImmInt(
+            calcLSRIntVal(ir->getType(), v0, v1), ir->getType());
         copyDbx(x, ir, m_rg);
         m_rg->freeIRTree(ir);
         ir = x;

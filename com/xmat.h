@@ -48,7 +48,7 @@ protected:
     friend class INTMat;
     friend class BIRMat;
     BYTE m_is_init:1; //To make sure functions are idempotent.
-
+protected:
     void _init_hook();
 public:
     RMat();
@@ -78,7 +78,7 @@ public:
     void substit(RMat const& exp,
                  UINT v,
                  bool is_eq = true,
-                 INT rhs_idx = -1);
+                 INT cst_col = CST_COL_UNDEF);
     void intlize(INT row = -1); //Converting rational element to integer.
     RMat & operator = (RMat const& m);
     Rational reduce(UINT row, UINT col);
@@ -160,7 +160,7 @@ public:
     void setie(UINT num, ...);
     FloatMat& operator = (FloatMat const& m);
     void setSigDigitDesc(UINT sd); //Redefine the significant digit.
-    void substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx);
+    void substit(IN FloatMat const& exp, UINT v, bool is_eq, INT cst_col);
     bool is_imat(UINT * row, UINT * col);
 
     //Get the significant digit description string.

@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../com/xcominc.h"
 #include "../opt/cominc.h"
 #include "ir_lex.h"
+#include "xcode.h"
 #include "ir_parser.h"
 #include "grreader.h"
 

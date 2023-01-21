@@ -105,6 +105,7 @@ IRMgr::IRMgr(Region * rg) : Pass(rg)
     m_tm = rg->getTypeMgr();
     m_rm = rg->getRegionMgr();
     m_vm = rg->getVarMgr();
+    m_init_placeholder_var = nullptr;
 }
 
 
@@ -249,6 +250,18 @@ void IRMgr::dumpFreeTab(Region const* rg) const
             prt(rg, "ir(%d),", ir->id());
         }
     }
+}
+
+
+Var * IRMgr::genInitPlaceHolderVar()
+{
+    if (m_init_placeholder_var == nullptr) {
+        ASSERT0(m_vm);
+        m_init_placeholder_var = m_vm->registerVar("#init_placeholder",
+                                                   m_tm->getAny(), 1,
+                                                   VAR_LOCAL|VAR_FAKE);
+    }
+    return m_init_placeholder_var;
 }
 
 
@@ -489,16 +502,24 @@ IR * IRMgr::buildCall(Var * callee, IR * param_list, UINT result_prno,
 }
 
 
+IR * IRMgr::buildInitPlaceHolder(IR * exp)
+{
+    Var * placeholder_var = genInitPlaceHolderVar();
+    ASSERT0(placeholder_var);
+    IR * call = buildCall(placeholder_var, exp);
+    CALL_is_intrinsic(call) = true;
+    return call;
+}
+
+
 //Build IR_ICALL operation.
 //res_list: reture value list.
 //result_prno: indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
 //type: result PR data type.
 //    0 means the call does not have a return value.
-IR * IRMgr::buildICall(IR * callee,
-                        IR * param_list,
-                        UINT result_prno,
-                        Type const* type)
+IR * IRMgr::buildICall(IR * callee, IR * param_list, UINT result_prno,
+                       Type const* type)
 {
     ASSERT0(type);
     ASSERT0(callee);
@@ -1318,13 +1339,13 @@ IR * IRMgr::buildPointerOp(IR_CODE irc, IR * lchild, IR * rchild)
             IR * ret = allocIR(IR_SUB);
             BIN_opnd0(ret) = lchild;
             BIN_opnd1(ret) = rchild;
-            IR_dt(ret) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE, true));
+            IR_dt(ret) = dm->getSimplexTypeEx(dm->getAlignedDType(WORD_BITSIZE, true));
             if (TY_ptr_base_size(d0) > BYTE_PER_CHAR) {
                 IR * div = allocIR(IR_DIV);
                 BIN_opnd0(div) = ret;
                 BIN_opnd1(div) = buildImmInt(TY_ptr_base_size(d0),
                                              ret->getType());
-                IR_dt(div) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE,
+                IR_dt(div) = dm->getSimplexTypeEx(dm->getAlignedDType(WORD_BITSIZE,
                                                                true));
                 ret = div;
             }
@@ -1527,6 +1548,50 @@ IR * IRMgr::buildBinaryOp(IR_CODE irc, Type const* type, IR * lchild,
     #endif
 
     return buildBinaryOpSimp(irc, type, lchild, rchild);
+}
+
+
+IR * IRMgr::buildMemcpy(IR * src, IR * len)
+{
+    ASSERT0(src && src->is_exp());
+    IR * ir = allocIR(IR_MEMCPY);
+    MEMCPY_src(ir) = src;
+    MEMCPY_len(ir) = len;
+    IR_dt(ir) = src->getType();
+    IR_parent(src) = ir;
+    IR_parent(len) = ir;
+    return ir;
+}
+
+
+IR * IRMgr::buildMatMul(IR * in, IR * weight, IR * row_in, IR * col_in,
+                        IR * row_weight, IR * col_weight, IR * accum,
+                        Type const* ty)
+{
+    ASSERT0(ty);
+    ASSERT0(in && in->is_exp());
+    ASSERT0(weight && weight->is_exp());
+    ASSERT0(row_in && row_in->is_exp());
+    ASSERT0(col_in && col_in->is_exp());
+    ASSERT0(row_weight && row_weight->is_exp());
+    ASSERT0(col_weight && col_weight->is_exp());
+    IR * ir = allocIR(IR_MATMUL);
+    MATMUL_in(ir) = in;
+    MATMUL_weight(ir) = weight;
+    MATMUL_row_in(ir) = row_in;
+    MATMUL_col_in(ir) = col_in;
+    MATMUL_row_weight(ir) = row_weight;
+    MATMUL_col_weight(ir) = col_weight;
+    MATMUL_accum(ir) = accum;
+    IR_parent(in) = ir;
+    IR_parent(weight) = ir;
+    IR_parent(row_in) = ir;
+    IR_parent(col_in) = ir;
+    IR_parent(row_weight) = ir;
+    IR_parent(col_weight) = ir;
+    IR_parent(accum) = ir;
+    IR_dt(ir) = ty;
+    return ir;
 }
 
 } //namespace xoc

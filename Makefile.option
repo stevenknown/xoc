@@ -40,10 +40,12 @@ ifeq ($(WIN), true)
   endif 
 else
   $(info "ON LINUX OR UNIX")
-  CC:=$(shell which clang++ > /dev/null)
   ifndef CC
-    CC=$(if $(shell which clang),clang,gcc)
-  endif
+    CC:=$(shell which clang++ > /dev/null)
+    ifndef CC
+      CC=$(if $(shell which clang),clang,gcc)
+    endif
+  endif 
   ifndef CC
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
     #$(info "CC is defined="$(CC))

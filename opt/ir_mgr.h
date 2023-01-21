@@ -38,6 +38,7 @@ namespace xoc {
 
 class IRMgr : public Pass {
     COPY_CONSTRUCTOR(IRMgr);
+protected:
     UINT m_ir_count;
     SMemPool * m_ir_pool;
     TypeMgr * m_tm;
@@ -45,6 +46,7 @@ class IRMgr : public Pass {
     VarMgr * m_vm;
     Vector<IR*> m_ir_vec; //record IR which have allocated. ir id is dense
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
+    Var * m_init_placeholder_var;
     #ifdef _DEBUG_
     xcom::BitSet m_has_been_freed_irs;
     #endif
@@ -465,6 +467,32 @@ public:
     IR * buildCall(Var * callee,  IR * param_list)
     { return buildCall(callee, param_list, 0, m_tm->getAny()); }
 
+    //Build a placeholder operation that is used to remark a lexicographic
+    //order in IR list.
+    IR * buildInitPlaceHolder(IR * exp);
+
+    //Build a memcpy operation that is used to remark a lexicographic
+    //order in IR list.
+    //src: source memory expression.
+    //len: an expression indicates the byte number to copy.
+    //Note the target memory type should same with 'src'.
+    IR * buildMemcpy(IR * src, IR * len);
+
+    //Build a matrix multiplication operation.
+    //in: input data
+    //weight: weight data
+    //row_in: the row of input data.
+    //col_in: the column of input data.
+    //row_weight: the row of weight data.
+    //col_weight: the column of weight data.
+    //accum: the accumulate flag.
+    //       if it is true, the matrix-mul operation will accumulate the result
+    //       into original data, says, res += in * weight,
+    //       otherwise res = in * weight.
+    IR * buildMatMul(IR * in, IR * weight, IR * row_in, IR * col_in,
+                     IR * row_weight, IR * col_weight, IR * accum,
+                     Type const* ty);
+
     size_t count_mem() const;
 
     void dumpFreeTab(Region const* rg) const;
@@ -476,8 +504,7 @@ public:
     //Note that this function does NOT free ir's kids and siblings.
     void freeIR(IR * ir);
 
-    virtual CHAR const* getPassName() const
-    { return "IRMgr"; }
+    virtual CHAR const* getPassName() const { return "IRMgr"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRMGR; }
     IR * getFreeTabIRHead(UINT idx)
     {
@@ -488,6 +515,9 @@ public:
     //Return the vector that record all allocated IRs.
     Vector<IR*> & getIRVec() { return m_ir_vec; }
     UINT getIRCount() const { return m_ir_count; }
+
+    //Generate a variable to inform compiler that this is a placeholder.
+    Var * genInitPlaceHolderVar();
 
     //Note if the ir-count changed, the new generated IR id will start from the
     //new ir-count.

@@ -195,23 +195,23 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 //Create a CallNode accroding to caller.
 //This CallNode will corresponding to an unqiue Region.
 //Ensure CallNode for Region is unique.
-//'rg': the region that ir resident in.
-CallNode * CallGraph::newCallNode(IR const* ir, Region * rg)
+//rg: the region that ir resident in.
+CallNode * CallGraph::genCallNode(IR const* ir, Region * rg)
 {
     ASSERT0(ir->isCallStmt() && rg);
     if (ir->is_call()) {
-        Sym const* name = CALL_idinfo(ir)->get_name();
-        CallNode * cn  = mapSym2CallNode(name, rg);
-        if (cn != nullptr) { return cn; }
+        Sym const* callee_name = CALL_idinfo(ir)->get_name();
+        CallNode * callee_cn = findCallNode(callee_name, rg);
+        if (callee_cn != nullptr) { return callee_cn; }
 
         //ir invoked imported region.
-        cn = allocCallNode();
-        CN_sym(cn) = name;
-        CN_id(cn) = m_cn_count++;
-        genSYM2CN(rg->getTopRegion())->set(name, cn);
-        return cn;
+        callee_cn = allocCallNode();
+        CN_sym(callee_cn) = callee_name;
+        CN_id(callee_cn) = m_cn_count++;
+        genSym2CallNode(rg->getTopRegion())->set(callee_name, callee_cn);
+        return callee_cn;
     }
-
+    //Generate an anonymous CallNode.
     CallNode * cn = allocCallNode();
     CN_id(cn) = m_cn_count++;
     return cn;
@@ -220,7 +220,7 @@ CallNode * CallGraph::newCallNode(IR const* ir, Region * rg)
 
 //Create a CallNode for given Region.
 //To guarantee CallNode of Region is unique.
-CallNode * CallGraph::newCallNode(Region * rg)
+CallNode * CallGraph::genCallNode(Region * rg)
 {
     ASSERT0(rg);
     ASSERT0(rg->getRegionVar() && rg->getRegionVar()->get_name());
@@ -240,58 +240,72 @@ CallNode * CallGraph::newCallNode(Region * rg)
         return cn;
     }
 
-    ASSERT0(genSYM2CN(rg->getParent()));
+    ASSERT0(genSym2CallNode(rg->getParent()));
 
     CallNode * cn = allocCallNode();
     CN_sym(cn) = name;
     CN_id(cn) = m_cn_count++;
     CN_ru(cn) = rg;
-    genSYM2CN(rg->getParent())->set(name, cn);
+    genSym2CallNode(rg->getParent())->set(name, cn);
     ASSERT0(m_ruid2cn.get(rg->id()) == nullptr);
     m_ruid2cn.set(rg->id(), cn);
     return cn;
 }
 
 
-//Build call graph.
-bool CallGraph::build(RegionMgr * rumgr)
+Region * CallGraph::addEdgeCaller2Callee(IR * ir, Region * caller_rg)
 {
-    for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
-        Region * rg = rumgr->getRegion(i);
+    ASSERT0(ir->is_call());
+    Region * callee_rg = getCalleeRegion(ir, caller_rg);
+    if (callee_rg != nullptr) { return callee_rg; }
+    CallNode * caller_cn = genCallNode(ir, caller_rg);
+    ASSERT0(getSym2CallNode(caller_rg));
+    CallNode * callee_cn = getSym2CallNode(caller_rg)->get(
+        CALL_idinfo(ir)->get_name());
+    ASSERT0(callee_cn);
+    if (callee_cn == nullptr) { return nullptr; }
+    addEdge(caller_cn->id(), callee_cn->id());
+    return callee_rg;
+}
+
+
+bool CallGraph::buildCallGraphForAllRegion(bool scan_call,
+                                           bool scan_inner_region)
+{
+    //Generate call-list and return-list.
+    UINT vexnum;
+    UINT callnum;
+    collectInfo(callnum, vexnum, scan_call, scan_inner_region);
+    erase();
+    resize(vexnum);
+    RegionMgr * rm = getRegionMgr();
+    for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
+        Region * rg = rm->getRegion(i);
         if (rg == nullptr) { continue; }
-        ASSERT0(rg->is_function() || rg->is_program());
-
         if (rg->getParent() != nullptr) {
-            SYM2CN * sym2cn = genSYM2CN(rg->getParent());
+            SYM2CN * sym2cn = genSym2CallNode(rg->getParent());
             ASSERT0(sym2cn);
-
             Sym const* name = rg->getRegionVar()->get_name();
             ASSERT0(name);
-
             CallNode * cn = sym2cn->get(name);
             if (cn != nullptr) {
                 if (cn->region() == nullptr) {
                     CN_ru(cn) = rg;
                     m_ruid2cn.set(rg->id(), cn);
                 }
-
                 if (cn->region() != rg) {
                     //more than one regions has the same id.
                     //UNREACHABLE();
                     return false;
                 }
-
                 continue;
             }
         }
-
-        addNode(newCallNode(rg));
+        addNode(genCallNode(rg));
     }
-
-    for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
-        Region * rg = rumgr->getRegion(i);
+    for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
+        Region * rg = rm->getRegion(i);
         if (rg == nullptr) { continue; }
-
         ASSERT0(rg->is_function() || rg->is_program());
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
@@ -306,20 +320,43 @@ bool CallGraph::build(RegionMgr * rumgr)
             IR const* ir = ct->val();
             ASSERT0(ir && ir->isCallStmt());
             ASSERT0(!CALL_is_intrinsic(ir));
-
             if (!shouldAddEdge(ir)) { continue; }
-
-            CallNode * callee = newCallNode(ir, rg);
+            CallNode * callee = genCallNode(ir, rg);
             if (ir->is_icall()) {
                 //Indirect call.
                 CN_unknown_callee(callee) = true;
             }
             addNode(callee);
-            addEdge(CN_id(caller), CN_id(callee));
+            addEdge(caller->id(), callee->id());
         }
     }
-
     return true;
+}
+
+
+void CallGraph::collectInfo(OUT UINT & num_call, OUT UINT & num_ru,
+                            bool scan_call, bool scan_inner_region)
+{
+    for (UINT i = 0; i < m_rm->getNumOfRegion(); i++) {
+        Region * rg = m_rm->getRegion(i);
+        if (rg == nullptr) { continue; }
+        num_ru++;
+        ASSERT0(rg->is_function() || rg->is_program());
+        if (scan_call) {
+            rg->scanCallAndReturnList(num_ru, scan_inner_region);
+        }
+        num_call += rg->getCallList()->get_elem_count();
+    }
+    num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
+    num_call = MAX(4, xcom::getNearestPowerOf2(num_call));
+}
+
+
+bool CallGraph::perform(OptCtx & oc)
+{
+    bool succ = buildCallGraphForAllRegion(true, true);
+    set_valid(true);
+    return succ;
 }
 //END CallGraph
 
