@@ -605,7 +605,7 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
     //For now, it is only be regarded as a pseduo-register.
     //And set it to allocable if the PR is in essence need to be
     //allocated in memory.
-    pr_var->setflag(VAR_IS_UNALLOCABLE);
+    pr_var->setFlag(VAR_IS_UNALLOCABLE);
     addToVarTab(pr_var);
     return pr_var;
 }
@@ -979,7 +979,7 @@ void Region::prescanIRList(IR const* ir)
                                                           VAR_string(v),
                                                           MEMORY_ALIGNMENT);
                 ASSERT0(sv);
-                sv->setflag(VAR_ADDR_TAKEN);
+                sv->setFlag(VAR_ADDR_TAKEN);
             } else if (v->is_label()) {
                 ; //do nothing.
             } else {
@@ -991,7 +991,7 @@ void Region::prescanIRList(IR const* ir)
                 } else {
                     //If LDA is the base of ARRAY, say (&a)[..], its
                     //address does not need to mark as address taken.
-                    LDA_idinfo(ir)->setflag(VAR_ADDR_TAKEN);
+                    LDA_idinfo(ir)->setFlag(VAR_ADDR_TAKEN);
                 }
 
                 // ...=&x.a, address of 'x.a' is taken.
@@ -1654,7 +1654,7 @@ bool Region::partitionRegion()
     Type const* type = getTypeMgr()->getMCType(0);
     Var * ruv = getVarMgr()->registerVar("inner_ru",
         type, 1, VAR_LOCAL|VAR_FAKE);
-    ruv->setflag(VAR_IS_UNALLOCABLE);
+    ruv->setFlag(VAR_IS_UNALLOCABLE);
     addToVarTab(ruv);
 
     Region * inner_ru = getRegionMgr()->allocRegion(REGION_INNER);

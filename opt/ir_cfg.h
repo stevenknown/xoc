@@ -200,7 +200,6 @@ public:
     //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
     //next: the next BB in BBList.
     IRBB * changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
-                                       BBListIter const nextit,
                                        OptCtx * oc);
 
     //The function insert a tampolining BB bewteen bb and its next BB.

@@ -99,7 +99,7 @@ CHAR const* VarFlagDesc::getName(VAR_FLAG flag)
 {
     if (flag == VAR_UNDEF) { return g_varflag_desc[0].name; }
     VarFlag v(flag);
-    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    xcom::ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
     ASSERT0(bs.get_elem_count() == 1);
     UINT idx = bs.get_first() + 1;
     ASSERT0(idx < g_varflag_num);
@@ -111,7 +111,7 @@ UINT VarFlagDesc::getDescIdx(VAR_FLAG flag)
 {
     if (flag == VAR_UNDEF) { return 0; }
     VarFlag v(flag);
-    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    xcom::ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
     ASSERT0(bs.get_elem_count() == 1);
     UINT idx = bs.get_first() + 1;
     ASSERT0(idx < g_varflag_num);

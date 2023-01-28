@@ -271,7 +271,7 @@ protected:
     //The function preprocesses the Dom, SSA, and some other information that
     //related CFG before CFG changed during RemoveBB.
     //Note the function have to be invoked before CFG change.
-    virtual void preprocessBeforeRemoveBB(BB * bb, MOD CfgOptCtx & ctx)
+    virtual void preprocessBeforeRemoveBB(BB *, MOD CfgOptCtx &)
     { ASSERTN(0, ("Target Dependent Code")); }
 
     bool removeRedundantBranchCase2(BB *RESTRICT bb, BB const*RESTRICT next_bb,
@@ -889,7 +889,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
 template <class BB, class XR>
 VexIdx CFG<BB, XR>::replacePredWith(BB const* bb, BB const* succ,
                                     List<UINT> const& newpreds,
-                                    OUT CfgOptCtx & ctx)
+                                    OUT CfgOptCtx &)
 {
     //If bb removed, the number of its successors will decrease.
     //Then the number of PHI of bb's successors must be replaced.
@@ -912,6 +912,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
     if (next_bb == nullptr) {
         //'bb' is the last empty BB.
         ASSERT0(next_ct == nullptr);
+        DUMMYUSE(next_ct);
         //CASE:Do NOT remove entry or exit.
         //Some redundant CFG has multi BB which satifies cfg-entry condition.
         if (bb->getLabelList().get_elem_count() == 0 && !isRegionExit(bb)) {
@@ -1342,7 +1343,7 @@ bool CFG<BB, XR>::removeUnreachBB(MOD CfgOptCtx & ctx,
     ASSERT0(m_bb_list);
     if (m_bb_list->get_elem_count() == 0) { return false; }
 
-    START_TIMER(t, "Remove Unreach BB");
+    START_TIMER(ti, "Remove Unreach BB");
     //There is only one entry point.
     xcom::BitSet visited;
     visited.bunion(m_bb_list->get_elem_count());
@@ -1364,7 +1365,7 @@ bool CFG<BB, XR>::removeUnreachBB(MOD CfgOptCtx & ctx,
             removed = true;
         }
     }
-    END_TIMER(t, "Remove Unreach BB");
+    END_TIMER(ti, "Remove Unreach BB");
     return removed;
 }
 

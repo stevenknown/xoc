@@ -254,7 +254,7 @@ bool RefineDUChain::processExpViaMDSSA(IR const* exp)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processArrayExpViaGVN(IR const* exp)
+bool RefineDUChain::processArrayExpViaGVN(IR const*)
 {
     //TODO:remove DUChain if subexp's GVN is not the same.
     return false;

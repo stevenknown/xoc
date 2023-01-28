@@ -34,10 +34,20 @@ FileObj::FileObj(CHAR const* filename, bool is_del)
 {
     ASSERT0(filename);
     if (is_del) { UNLINK(filename); }
-    m_file_handler = ::fopen(filename, "ab+");
-    m_is_opened = true;
+    createNew(filename);
+    m_file_handler = ::fopen(filename, "rb+");
     ASSERTN(m_file_handler, ("prejudge the file existence"));
+    m_is_opened = true;
     m_file_name = filename;
+}
+
+
+void FileObj::createNew(CHAR const* filename)
+{
+    m_file_handler = ::fopen(filename, "ab+");
+    ASSERTN(m_file_handler, ("file IO exception"));
+    ::fclose(m_file_handler);
+    m_file_handler = nullptr;
 }
 
 

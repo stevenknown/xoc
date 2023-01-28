@@ -79,12 +79,12 @@ public:
         cfg = src.cfg;
     }
     ~HoistCtx() {}
-    void buildDomTree(IRCFG * cfg)
+    void buildDomTree(IRCFG * c)
     {
         ASSERT0(oc->is_dom_valid());
         ASSERT0(domtree);
         domtree->erase();
-        cfg->genDomTree(*domtree);
+        c->genDomTree(*domtree);
     }
 
     void cleanAfterLoop()

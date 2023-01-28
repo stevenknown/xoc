@@ -495,7 +495,9 @@ public:
 
     SSAInfo * prssainfo; //indicates PR ssa def and use set.
 
-    //NOTE: 'opnd' must be the last member.
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd' must be the last member.                                   //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd[kid_num];
 public:
     //Build dummyuse expression to represent potential memory objects that
@@ -680,7 +682,9 @@ class CWhileDo : public IR {
 public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const kid_num = 2;
-    //NOTE: 'opnd' must be the last member of CWhileDo.
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd' must be the last member of CWhileDo.                       //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd[kid_num];
 public:
     //num: the number of IR added.
@@ -964,7 +968,9 @@ public:
     //Record the storage space if any.
     StorageSpace storage_space;
 
-    //NOTE: 'opnd' must be the last member of CArray.
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd' must be the last member of CArray.                         //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd[kid_num];
 public:
     static inline TMWORD & accOfst(IR * ir) { return ARR_ofst(ir); }

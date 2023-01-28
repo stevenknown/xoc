@@ -2049,6 +2049,46 @@ IR * IRSimp::simplifyDirectMemOp(IR * ir, SimpCtx * ctx)
 }
 
 
+IR * IRSimp::simplifyGoto(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyCase(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyNormal(IR * ir, SimpCtx * ctx)
+{
+    IR * ret_list = nullptr;
+    SimpCtx tcont(*ctx);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    SIMP_ret_array_val(&tcont) = true;
+    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            ir->setKid(i, simplifyExpression(kid, &tcont));
+            ctx->unionBottomUpInfo(tcont);
+            if (SIMP_stmtlist(&tcont) != nullptr) {
+                xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
+                SIMP_stmtlist(&tcont) = nullptr;
+            }
+        }
+    }
+    xcom::add_next(&ret_list, ir);
+    return ret_list;
+}
+
+
+IR * IRSimp::simplifyReturn(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
+}
+
+
 IR * IRSimp::simplifyBranch(IR * ir, SimpCtx * ctx)
 {
     IR * ret_list = nullptr;
@@ -2288,26 +2328,17 @@ IR * IRSimp::simplifyStmt(IR * ir, SimpCtx * ctx)
         ret_list = simplifyIgoto(ir, ctx);
         break;
     case IR_GOTO:
-    case IR_LABEL:
-    case IR_CASE:
-    case IR_RETURN: {
-        SimpCtx tcont(*ctx);
-        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
-        SIMP_ret_array_val(&tcont) = true;
-        for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-            IR * kid = ir->getKid(i);
-            if (kid != nullptr) {
-                ir->setKid(i, simplifyExpression(kid, &tcont));
-                ctx->unionBottomUpInfo(tcont);
-                if (SIMP_stmtlist(&tcont) != nullptr) {
-                    xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
-                    SIMP_stmtlist(&tcont) = nullptr;
-                }
-            }
-        }
-        xcom::add_next(&ret_list, ir);
+        ret_list = simplifyGoto(ir, ctx);
         break;
-    }
+    case IR_LABEL:
+        ret_list = simplifyNormal(ir, ctx);
+        break;
+    case IR_CASE:
+        ret_list = simplifyCase(ir, ctx);
+        break;
+    case IR_RETURN:
+        ret_list = simplifyReturn(ir, ctx);
+        break;
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         ret_list = simplifyBranch(ir, ctx);
         break;

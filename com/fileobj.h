@@ -32,6 +32,8 @@ namespace xcom {
 
 class FileObj {
     COPY_CONSTRUCTOR(FileObj);
+protected:
+    void createNew(CHAR const* filename);
 public:
     typedef enum {
         FO_SUCC = 0,
@@ -54,7 +56,7 @@ public:
     //size: the byte size that expect to write.
     //wr: optional, it records the actual byte size that has wrote.
     FO_STATUS append(BYTE const* buf, size_t size, OUT size_t * wr);
-    
+
     FILE * getFileHandler() const { return m_file_handler; }
     size_t getFileSize() const;
     CHAR const* getFileName() const { return m_file_name; }

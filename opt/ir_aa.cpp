@@ -2527,7 +2527,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
     //For now, it is only be regarded as a placeholder.
     //And set it to allocable if the var is in essence need to be
     //allocated in memory.
-    tv->setflag(VAR_IS_UNALLOCABLE);
+    tv->setFlag(VAR_IS_UNALLOCABLE);
 
     //Will be freed region destruction.
     m_rg->addToVarTab(tv);
@@ -3764,7 +3764,7 @@ MD const* AliasAnalysis::genRestrictDummyVar(Var * var, MD2MDSet * mx)
     //For now, it is only be regarded as a pseduo-register.
     //And set it to allocable if the PR is in essence need to be
     //allocated in memory.
-    tv->setflag(VAR_IS_UNALLOCABLE);
+    tv->setFlag(VAR_IS_UNALLOCABLE);
     m_rg->addToVarTab(tv);
 
     MD md;

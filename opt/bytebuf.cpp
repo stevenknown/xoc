@@ -76,12 +76,27 @@ void ByteBuf::setVal(UINT byteofst, BYTE const* val, UINT valbytesize)
 }
 
 
+void ByteBuf::dump(OUT StrBuf & strbuf, BYTE const* buf, UINT len)
+{
+    strbuf.strcat("\n");
+    for (UINT i = 0; i < len; i++) {
+        strbuf.strcat("0x%02x,", buf[i]);
+    }
+}
+
+
 void ByteBuf::dump(OUT FileObj & fo, BYTE const* buf, UINT len)
 {
     fo.prt("\n");
     for (UINT i = 0; i < len; i++) {
         fo.prt("0x%02x,", buf[i]);
     }
+}
+
+
+void ByteBuf::dump(OUT StrBuf & strbuf) const
+{
+    dump(strbuf, m_byte_buffer, m_byte_size);
 }
 
 

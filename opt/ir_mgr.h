@@ -522,7 +522,7 @@ public:
     //Note if the ir-count changed, the new generated IR id will start from the
     //new ir-count.
     void setIRCount(UINT cnt) { m_ir_count = cnt; }
-    virtual bool perform(OptCtx & oc) { return false; }
+    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 };
 
 } //namespace xoc

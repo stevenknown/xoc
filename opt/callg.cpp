@@ -352,7 +352,7 @@ void CallGraph::collectInfo(OUT UINT & num_call, OUT UINT & num_ru,
 }
 
 
-bool CallGraph::perform(OptCtx & oc)
+bool CallGraph::perform(OptCtx &)
 {
     bool succ = buildCallGraphForAllRegion(true, true);
     set_valid(true);

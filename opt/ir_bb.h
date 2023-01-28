@@ -39,7 +39,7 @@ namespace xoc {
 class IRBB;
 template <class IRBB, class IR> class CFG;
 typedef List<LabelInfo const*> LabelInfoList;
-typedef C<LabelInfo const*> * LabelInfoListIter;
+typedef LabelInfoList::Iter LabelInfoListIter;
 typedef TMap<IR const*, UINT> IROrder;
 
 #define BBID_UNDEF VERTEX_UNDEF

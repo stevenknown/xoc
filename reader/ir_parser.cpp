@@ -936,10 +936,10 @@ bool IRParser::parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx)
     if (regionvar == nullptr) {
         regionvar = m_rumgr->getVarMgr()->registerVar(sym,
             m_rumgr->getTypeMgr()->getAny(), 1, (VarFlag&)flag);
-        regionvar->setflag((VAR_FLAG)(VAR_IS_DECL|VAR_IS_REGION));
+        regionvar->setFlag((VAR_FLAG)(VAR_IS_DECL|VAR_IS_REGION));
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
-            regionvar->setflag(VAR_IS_FUNC);
+            regionvar->setFlag(VAR_IS_FUNC);
         }
     }
     region->setRegionVar(regionvar);
@@ -4024,7 +4024,7 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
             tok = m_lexer->getNextToken();
         } else if (declareVar(ctx, &v)) {
             ASSERT0(v);
-            v->setflag(VAR_IS_FORMAL_PARAM);
+            v->setFlag(VAR_IS_FORMAL_PARAM);
             VAR_formal_param_pos(v) = i;
         } else {
             error(tok, "invalide parameter list");
@@ -4261,11 +4261,11 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
     for (;;) {
         switch (tok) {
         case T_VOLATILE:
-            var->setflag(VAR_VOLATILE);
+            var->setFlag(VAR_VOLATILE);
             tok = m_lexer->getNextToken();
             break;
         case T_RESTRICT:
-            var->setflag(VAR_IS_RESTRICT);
+            var->setFlag(VAR_IS_RESTRICT);
              tok = m_lexer->getNextToken();
              break;
         case T_RPAREN:
@@ -4275,35 +4275,35 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
         case T_IDENTIFIER:
             switch (getCurrentXCode()) {
             case X_READONLY:
-                var->setflag(VAR_READONLY);
+                var->setFlag(VAR_READONLY);
                 tok = m_lexer->getNextToken();
                 break;
             case X_PRIVATE:
-                var->setflag(VAR_PRIVATE);
+                var->setFlag(VAR_PRIVATE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_VOLATILE:
-                var->setflag(VAR_VOLATILE);
+                var->setFlag(VAR_VOLATILE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_FUNC:
-                var->setflag((VAR_FLAG)(VAR_IS_FUNC|VAR_IS_REGION));
+                var->setFlag((VAR_FLAG)(VAR_IS_FUNC|VAR_IS_REGION));
                 tok = m_lexer->getNextToken();
                 break;
             case X_FAKE:
-                var->setflag(VAR_FAKE);
+                var->setFlag(VAR_FAKE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_GLOBAL:
-                var->setflag(VAR_GLOBAL);
+                var->setFlag(VAR_GLOBAL);
                 tok = m_lexer->getNextToken();
                 break;
             case X_ARRAY:
-                var->setflag(VAR_IS_ARRAY);
+                var->setFlag(VAR_IS_ARRAY);
                 tok = m_lexer->getNextToken();
                 break;
             case X_RESTRICT:
-                var->setflag(VAR_IS_RESTRICT);
+                var->setFlag(VAR_IS_RESTRICT);
                 tok = m_lexer->getNextToken();
                 break;
             case X_STRING:
@@ -4317,11 +4317,11 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
                 }
                 break;
             case X_UNALLOCABLE:
-                var->setflag(VAR_IS_UNALLOCABLE);
+                var->setFlag(VAR_IS_UNALLOCABLE);
                 tok = m_lexer->getNextToken();
                 break;
             case X_DECL:
-                var->setflag(VAR_IS_DECL);
+                var->setFlag(VAR_IS_DECL);
                 tok = m_lexer->getNextToken();
                 break;
             case X_ALIGN:
@@ -4417,7 +4417,7 @@ bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
         }
     }
     VAR_byte_val(var) = ctx->current_region->allocByteBuf(bytesize);
-    var->setflag(VAR_HAS_INIT_VAL);
+    var->setFlag(VAR_HAS_INIT_VAL);
     ::memcpy(BYTEBUF_buffer(VAR_byte_val(var)), buf.get_vec(), bytesize);
     if (m_lexer->getCurrentToken() != T_RPAREN) {
         error(tok, "miss ')'");
@@ -4446,7 +4446,7 @@ bool IRParser::parseStringValue(Var * var, ParseCtx *)
         return false;
     }
     VAR_string(var) = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
-    var->setflag(VAR_HAS_INIT_VAL);
+    var->setFlag(VAR_HAS_INIT_VAL);
     tok = m_lexer->getNextToken();
     if (tok != T_RPAREN) {
         error(tok, "miss ')'");

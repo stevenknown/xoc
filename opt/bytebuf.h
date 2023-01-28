@@ -40,6 +40,8 @@ public:
     BYTE * m_byte_buffer;
 public:
     static void dump(OUT FileObj & fo, BYTE const* buf, UINT len);
+    static void dump(OUT StrBuf & strbuf, BYTE const* buf, UINT len);
+    void dump(OUT StrBuf & strbuf) const;
     void dump(OUT FileObj & fo) const;
 
     BYTE * getBuffer() const { return m_byte_buffer; }

@@ -940,7 +940,7 @@ public:
         #ifdef CONST_IRC_SZ
         IR_irc_size(ir) = irc_sz;
         #else
-        DUMMYUSE(ir);
+        DUMMYUSE((ir, ircsz));
         #endif
     }
 

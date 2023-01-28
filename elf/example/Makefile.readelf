@@ -1,0 +1,81 @@
+ifeq ($(TARG),)
+  #SET DEFAULT TARG.
+  TARG=FOR_DEX
+endif
+
+ifeq ($(DEBUG),)
+  DEBUG=true
+endif
+
+CFLAGS+=-Wall
+COM_DIR=../../com
+ELF_DIR=..
+READELF_OUTPUT=readelf.exe
+
+include $(ELF_DIR)/Makefile.inc
+include $(COM_DIR)/Makefile.inc
+
+CFLAGS+=\
+  -D$(TARG) \
+  -Wno-unknown-pragmas \
+  -Wno-write-strings \
+  -Wsign-promo \
+  -Wparentheses \
+  -Wformat \
+  -Wsign-compare \
+  -Wpointer-arith \
+  -Wno-multichar \
+  -Winit-self \
+  -Wswitch \
+  -D_SUPPORT_C11_
+
+#Disable -Wconversion to avoid too much complaints.
+
+ifneq (,$(filter $(CC),g++ gcc))
+  CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
+endif
+
+TMP_ELF_OBJS=$(foreach n,$(ELF_OBJS),$(ELF_DIR)/$(n))
+
+READELF_OBJS+=\
+readelf.o\
+
+#Display internal variables.
+$(info "CC:$(CC)")
+$(info "INC:$(INC)")
+$(info "CFLAGS:$(CFLAGS)")
+$(info "DEBUG:$(DEBUG)")
+$(info "TMP_ELF_OBJS:$(TMP_ELF_OBJS)")
+
+#Define rules.
+$(READELF_OUTPUT): tmp_elf_objs $(COM_OUTPUT) $(READELF_OBJS)
+	$(CC) $(TMP_ELF_OBJS) $(READELF_OBJS) -Xlinker "-(" \
+      $(COM_DIR)/$(COM_OUTPUT) \
+      -Xlinker "-)" \
+      $(CFLAGS) \
+      -o $@ -lstdc++ -lm  #-lgcov -lgcc
+	@echo "SUCCESS!!"
+
+$(COM_OUTPUT):
+	@echo "BUILD $(COM_OUTPUT)"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
+
+%.o:%.cpp
+	@echo "BUILD $<"
+	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
+
+tmp_elf_objs: $(TMP_ELF_OBJS)
+
+clean:
+	@find ../ -name "*.o" | xargs rm -f
+	@find ../ -name "*.a" | xargs rm -f
+	@find ../ -name "*.exe" | xargs rm -f
+	@find ../ -name "*.elf" | xargs rm -f
+	@find ../ -name "*.out" | xargs rm -f
+	@find ../ -name "*.tmp" | xargs rm -f
+	@find ../ -name "*.asm" | xargs rm -f
+	@find ../ -name "*.swp" | xargs rm -f
+	@find ../ -name "*.swo" | xargs rm -f
+	@find ../ -name "*.log" | xargs rm -f
+	@find ../ -name "*.LOGLOG" | xargs rm -f
+	@find ../ -name "LOGLOG" | xargs rm -f

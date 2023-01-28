@@ -182,6 +182,7 @@ template <class BB>
 UINT LI<BB>::findBackedgeStartBB(xcom::Graph const* cfg) const
 {
     ASSERT0(cfg);
+    DUMMYUSE(cfg);
     BB * head = getLoopHead();
     UINT backedgebbid = BBID_UNDEF;
     UINT backedgecount = 0;

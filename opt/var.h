@@ -361,13 +361,13 @@ public:
     //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
     void setToGlobal(bool is_global)
     {
-        is_global ? setflag(VAR_GLOBAL), removeflag(VAR_LOCAL) :
-                    removeflag(VAR_GLOBAL), setflag(VAR_LOCAL);
+        is_global ? setFlag(VAR_GLOBAL), removeFlag(VAR_LOCAL) :
+                    removeFlag(VAR_GLOBAL), setFlag(VAR_LOCAL);
     }
-    void setToFormalParam() { setflag(VAR_IS_FORMAL_PARAM); }
-    void setflag(VAR_FLAG f) { VAR_flag(this).set(f); }
+    void setToFormalParam() { setFlag(VAR_IS_FORMAL_PARAM); }
+    void setFlag(VAR_FLAG f) { VAR_flag(this).set(f); }
 
-    void removeflag(VAR_FLAG f) {VAR_flag(this).remove(f); }
+    void removeFlag(VAR_FLAG f) {VAR_flag(this).remove(f); }
 };
 //END Var
 

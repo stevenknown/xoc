@@ -130,6 +130,7 @@ public:
     Var * genSpillLoc(PRNO prno, Type const* ty);
     Var * genFuncLevelVar(Type const* type, UINT align);
     Reg getReg(PRNO prno) const;
+    REGFILE getRegFile(Reg r) const;
     Reg getReg(LifeTime const* lt) const;
     LifeTime * getLT(PRNO prno) const;
     CHAR const* getRegName(Reg r) const;

@@ -1092,35 +1092,6 @@ static void removeUseOfPR(IR const* call, Region const* rg, MOD DUMgr * dumgr)
 }
 
 
-static void removeClassicPRDUChainForCallStmt(Region * rg)
-{
-    DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr == nullptr) { return; }
-    if (rg->getIRList() != nullptr) {
-        ConstIRIter it;
-        for (IR const* ir = iterInitC(rg->getIRList(), it, true);
-             ir != nullptr; ir = iterNextC(it, true)) {
-            if (ir->isCallStmt()) {
-                removeUseOfPR(ir, rg, dumgr);
-            }
-        }
-        return;
-    }
-    BBList * bblst = rg->getBBList();
-    if (bblst == nullptr) { return; }
-    for (IRBB const* bb = bblst->get_head(); bb != nullptr;
-         bb = bblst->get_next()) {
-        for (IR const* ir = const_cast<IRBB*>(bb)->getIRList().get_head();
-             ir != nullptr;
-             ir = const_cast<IRBB*>(bb)->getIRList().get_next()) {
-            if (ir->isCallStmt()) {
-                removeUseOfPR(ir, rg, dumgr);
-            }
-        }
-    }
-}
-
-
 static inline void removeClassicDUChainForIR(IR * ir, Region * rg,
                                              DUMgr * dumgr,
                                              bool rmprdu, bool rmnonprdu)

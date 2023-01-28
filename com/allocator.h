@@ -35,6 +35,6 @@ inline void * operator new(size_t size, xcom::SMemPool * handler)
 
 inline void operator delete(void *, xcom::SMemPool * handler)
 {
-    ASSERT0(handler);
+    ASSERT0_DUMMYUSE(handler);
 }
 

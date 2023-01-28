@@ -435,9 +435,9 @@ UINT IRCFG::afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
         reviseStmtMDSSA(modset, root);
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
         List<UINT>::Iter it;
+        modset.clean();
         for (UINT bbid = newpreds.get_head(&it);
              bbid != BBID_UNDEF; bbid = newpreds.get_next(&it)) {
-            VexTab modset;
             Vertex const* root = nullptr;
             UINT iter_time = 0;
             reviseDomInfoAfterAddOrRemoveEdge(getVertex(bbid), succ->getVex(),
@@ -1328,7 +1328,7 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc)
     ASSERTN(it, ("BB%d is not in BBList", bb->id()));
     it = bblst->get_next(it);
     ASSERT0(it);
-    return changeFallthroughBBToJumpBB(bb, it->val(), it, oc);
+    return changeFallthroughBBToJumpBB(bb, it->val(), oc);
 }
 
 
@@ -1337,7 +1337,6 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc)
 //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
 //next: the next BB in BBList.
 IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
-                                          BBListIter const nextit,
                                           OptCtx * oc)
 {
     ASSERT0(prev && next);
@@ -1490,7 +1489,7 @@ IRBB *  IRCFG::insertBBBetween(IN IRBB const* from, IN BBListIter from_it,
         //Thus we have to change original-fallthrough->to to be jump-edge to
         //keep consistency between CFG and Graph.
         ASSERT0(bblst->isPrevBB(fallthrough_pred, newbb));
-        return changeFallthroughBBToJumpBB(fallthrough_pred, to, to_it, oc);
+        return changeFallthroughBBToJumpBB(fallthrough_pred, to, oc);
     }
     return nullptr;
 }

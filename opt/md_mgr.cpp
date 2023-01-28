@@ -171,7 +171,7 @@ MD const* MDMgr::allocStringMD(Sym const* string)
 
     Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
-    //v->setflag(VAR_ADDR_TAKEN);
+    //v->setFlag(VAR_ADDR_TAKEN);
     
     MD md;
     MD_base(&md) = v;
