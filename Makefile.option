@@ -12,6 +12,13 @@ else
   CFLAGS+=-O2
 endif
 
+#To conveninently use DUMMYUSE, some compiler will complain for comma
+#expression.
+USE_DUMMYUSE=true
+ifeq ($(USE_DUMMYUSE), true)
+  CFLAGS+=-Wno-unused-value
+endif
+
 #ADD OS FLAG
 ifeq ($(WIN), true)
   $(info "ON WINDOWS")
@@ -19,7 +26,7 @@ ifeq ($(WIN), true)
   CFLAGS+=-D_ON_WINDOWS_
   ifeq ($(WSL), true)
     CFLAGS+=-D_USE_GCC_
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
   CFLAGS+=-D_USE_GCC_
@@ -37,7 +44,7 @@ ifeq ($(WIN), true)
     endif
   else
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
   ifndef CC
@@ -45,7 +52,7 @@ else
     ifndef CC
       CC=$(if $(shell which clang),clang,gcc)
     endif
-  endif 
+  endif
   ifndef CC
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
     #$(info "CC is defined="$(CC))

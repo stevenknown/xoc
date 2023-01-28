@@ -36,7 +36,6 @@ void MiscELFMgr::allocTargInfo()
     case EM_386: m_ti = new X86ELFTargInfo(this); break;
     case EM_X86_64: m_ti = new X64ELFTargInfo(this); break;
     case EM_SCORE7: m_ti = new Score7ELFTargInfo(this); break;
-    case EM_SWAI_64: m_ti = new TECOELFTargInfo(this); break;
     default:;
     }
 }
