@@ -1329,7 +1329,6 @@ void ELFMgr::setSectHeaderNameOffset(OffVec const& offvec)
     for (UINT i = 0; i < hdr.e_shnum; i++) {
         ELFSHdr * shdr = getSectHeader(i);
         shdr->s_name = (Word32)offvec[i];
-int a=0;;//hack
     }
 }
 

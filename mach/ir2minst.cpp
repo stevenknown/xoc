@@ -120,7 +120,6 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->verify(m_rg));
     RecycMIList tmis(getRecycMIListMgr());
-dumpIR(ir, m_rg);//hack
     switch (ir->getCode()) {
     case IR_ST:
         convertStoreVar(ir, tmis, cont);
@@ -159,7 +158,6 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst)
     ASSERT0(ir_bb_list);
     IMCtx cont;
     BBListIter bbit;
-m_rg->getRegionMgr()->getProgramRegion()->dump(true);//hack
     for (IRBB * bb = ir_bb_list->get_head(&bbit);
          bb != nullptr; bb = ir_bb_list->get_next(&bbit)) {
         convertBBLabel(bb, milst);
