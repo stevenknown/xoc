@@ -108,6 +108,7 @@ public:
     //e.g: given fieldtype is { FT_A:0x10, FT_B:0x20, FT_C:0x30 },
     //     if idx is 2, return 0x30.
     TMWORD getFieldValue(UINT idx) const;
+    TMWORD getFieldValue(FIELD_TYPE ft) const;
 
     //Return the abstract code descriptor.
     MI_CODE getCode() const { return m_code; }
@@ -126,7 +127,7 @@ public:
     void removeFlag(MI_FLAG f) {MI_flag(this).remove(f); }
 
     void setFlag(MI_FLAG f) { MI_flag(this).set(f); }
-    void set(FIELD_TYPE ft, TMWORD val);
+    void setFieldValue(FIELD_TYPE ft, TMWORD val);
 };
 
 } //namespace

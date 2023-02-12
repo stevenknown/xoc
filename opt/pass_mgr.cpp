@@ -253,9 +253,10 @@ Pass * PassMgr::allocCallGraph()
 
 Pass * PassMgr::allocLinearScanRA()
 {
-    #ifdef FOR_IP
+    #ifdef REF_TARGMACH_INFO
     return new LinearScanRA(m_rg);
     #else
+    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }

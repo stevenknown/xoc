@@ -437,11 +437,15 @@ public:
 class CompareTypeMC {
 public:
     bool is_less(Type const* t1, Type const* t2) const
-    { return TY_mc_size(t1) < TY_mc_size(t2); }
-
+    {
+        ASSERT0(t1 && t2);
+        return TY_mc_size(t1) < TY_mc_size(t2);
+    }
     bool is_equ(Type const* t1, Type const* t2) const
-    { return TY_mc_size(t1) == TY_mc_size(t2); }
-
+    {
+        ASSERT0(t1 && t2);
+        return TY_mc_size(t1) == TY_mc_size(t2);
+    }
     Type const* createKey(Type const* t) { return t; }
 };
 

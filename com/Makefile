@@ -1,6 +1,10 @@
+$(info "====---- START Makefile.xcom ----====")
+
 ifeq ($(TARG),)
   TARG=NO_TARG
 endif
+
+COM_DIR=.
 
 include ./Makefile.inc
 include Makefile.option
@@ -26,16 +30,25 @@ ifneq (,$(filter $(CC),g++ gcc))
 endif
 
 $(COM_OUTPUT): com_objs 
+	@echo "BUILD $(COM_OUTPUT)!!"
+	@echo "EXEC:"
 	ar rvs $(COM_OUTPUT) $(COM_OBJS)
-	@echo "SUCCESS!!"
+	@echo "SUCCESS TO GENERATE $(COM_OUTPUT)!!"
 
 %.o:%.cpp
 	@echo "BUILD $<"
+	@echo "EXEC:"
 	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
 
 com_objs: $(COM_OBJS)
+	@echo "EXEC:com_objs: $(COM_OBJS)"
 
 clean:
 	@find ./ -name "*.a" | xargs rm -f
+	@find ./ -name "*.d" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f
 	@find ./ -name "*.tmp" | xargs rm -f
+
+-include $(COM_DIR)/*.d
+
+$(info "====---- END Makefile.xcom ----====")

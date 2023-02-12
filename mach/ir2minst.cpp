@@ -142,6 +142,16 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 }
 
 
+//Extract the constant value from 'val' that the size is conform to given
+//field type.
+TMWORD IR2MInst::extractImm(HOST_INT val, FIELD_TYPE ft)
+{
+    UINT start = 0;
+    UINT end = getMIMgr()->getFieldSize(ft) - 1;
+    return (TMWORD)xcom::extractBitRangeValue((ULONGLONG)val, start, end);
+}
+
+
 void IR2MInst::convertIRListToMIList(OUT RecycMIList & milst)
 {
     IMCtx cont;

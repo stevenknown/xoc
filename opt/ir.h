@@ -330,6 +330,10 @@ public:
     UINT getTypeSize(TypeMgr const* tm) const
     { return tm->getByteSize(getType()); }
 
+    //Return bit size of ir data type.
+    UINT getTypeBitSize(TypeMgr const* tm) const
+    { return tm->getByteSize(getType()) * BIT_PER_BYTE; }
+
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
 
     //Return data type descriptor.

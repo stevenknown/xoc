@@ -28,14 +28,48 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "../elf/elfinc.h"
 
+//The target machines that ELFMgr supported.
+#ifdef FOR_ARM
+#include "../arm/arm_elf_targinfo.h"
+#endif
+
+#ifdef FOR_SCORE
+#include "../score/score_elf_targinfo.h"
+#endif
+
+#ifdef FOR_X86
+#include "../x86/x86_elf_targinfo.h"
+#endif
+
+#ifdef FOR_X64
+#include "../x64/x64_elf_targinfo.h"
+#endif
+
+#ifdef FOR_TECO
+#include "../teco/teco_elf_targinfo.h"
+#endif
+
 namespace elf {
 
 void MiscELFMgr::allocTargInfo()
 {
     switch (m_elf_hdr.e_machine) {
+    case EM_NONE: ASSERTN(0, ("illegal machine information"));
+    #ifdef FOR_ARM
+    case EM_ARM: m_ti = new ARMELFTargInfo(this); break;
+    #endif
+    #ifdef FOR_X86
     case EM_386: m_ti = new X86ELFTargInfo(this); break;
-    case EM_X86_64: m_ti = new X64ELFTargInfo(this); break;
+    #endif
+    #ifdef FOR_SCORE
     case EM_SCORE7: m_ti = new Score7ELFTargInfo(this); break;
+    #endif
+    #ifdef FOR_X64
+    case EM_X86_64: m_ti = new X64ELFTargInfo(this); break;
+    #endif
+    #ifdef FOR_TECO
+    case EM_SWAI_64: m_ti = new TECOELFTargInfo(this); break;
+    #endif
     default:;
     }
 }

@@ -28,8 +28,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
 #include "lsra_impl.h"
 #include "lsra_scan_in_pos.h"
+#include "lt_prio_mgr.h"
+#include "lsra_scan_in_prio.h"
 
 namespace xoc {
 
@@ -107,12 +113,13 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     ASSERT0(lt);
     if (lt->is_dedicated()) {
         Reg antireg = m_ra.getDedicatedReg(prno);
-        ASSERT0(antireg != REG_UNDEF);
+        ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
         ASSERT0(m_impl.isAvailAllocable(antireg));
     }
 
     UINT need_newreg_num = 1; //there is only ONE result by default.
-    ASSERT0(need_newreg_num <= m_impl.getAvailAllocable().get_elem_count());
+    ASSERT0_DUMMYUSE(need_newreg_num <=
+                     m_impl.getAvailAllocable().get_elem_count());
     return true;
 }
 
@@ -134,7 +141,7 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         ASSERT0(lt);
         if (lt->is_dedicated()) {
             Reg antireg = m_ra.getDedicatedReg(prno);
-            ASSERT0(antireg != REG_UNDEF);
+            ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
             ASSERT0(m_impl.isAvailAllocable(antireg));
         }
 
@@ -147,7 +154,7 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         need_newreg_num++;
     }
     UINT totalreg = need_newreg_num + regmap.get_elem_count();
-    ASSERT0(totalreg <= m_impl.getAvailAllocable().get_elem_count());
+    ASSERT0_DUMMYUSE(totalreg <= m_impl.getAvailAllocable().get_elem_count());
     return true;
 }
 
@@ -186,7 +193,8 @@ void ScanInPosOrder::scanIR(IR * ir, UpdatePos & up, ConstIRIter & irit)
 }
 
 
-void ScanInPosOrder::scanIRList(BBIRList & irlst, UpdatePos & up, ConstIRIter & irit)
+void ScanInPosOrder::scanIRList(BBIRList & irlst, UpdatePos & up,
+                                ConstIRIter & irit)
 {
     BBIRListIter bbirit;
     for (IR * ir = irlst.get_head(&bbirit);
@@ -218,10 +226,14 @@ void ScanInPosOrder::scanBBList(BBList * bblst)
         //BB end position
         Pos dpos_end, upos_end;
         up.updateAtBBExit(dpos_end, upos_end);
+        m_impl.transferInActive(upos_end);
+        m_impl.transferActive(upos_end);
     }
     Pos dpos_end, upos_end;
     bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
     ASSERT0_DUMMYUSE(valid2);
+    m_impl.transferInActive(upos_end);
+    m_impl.transferActive(upos_end);
 }
 
 } //namespace xoc

@@ -202,19 +202,26 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
             rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
                                                      PASS_CFG, PASS_UNDEF);
         }
-
-        //Compute typical PR du chain.
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->perform(oc, DUOptFlag(DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU));
         dumgr->computeMDDUChain(oc, false, DUOptFlag(DUOPT_COMPUTE_PR_DU));
-
+        bool rmprdu = false;
+        bool rmnonprdu = false;
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
             PASS_MDSSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);
+            //If SSA is enabled, disable classic DU Chain.
+            //Since we do not maintain both them as some passes.
+            //e.g:In RCE, remove PHI's operand will not update the
+            //operand DEF's DUSet.
+            //CASE:compiler.gr/alias.loop.gr
+            oc.setInvalidNonPRDU();
+            rmnonprdu = true;
         }
+        xoc::removeClassicDUChain(rg, rmprdu, rmnonprdu);
         return;
     }
 

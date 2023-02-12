@@ -471,28 +471,6 @@ public:
     //order in IR list.
     IR * buildInitPlaceHolder(IR * exp);
 
-    //Build a memcpy operation that is used to remark a lexicographic
-    //order in IR list.
-    //src: source memory expression.
-    //len: an expression indicates the byte number to copy.
-    //Note the target memory type should same with 'src'.
-    IR * buildMemcpy(IR * src, IR * len);
-
-    //Build a matrix multiplication operation.
-    //in: input data
-    //weight: weight data
-    //row_in: the row of input data.
-    //col_in: the column of input data.
-    //row_weight: the row of weight data.
-    //col_weight: the column of weight data.
-    //accum: the accumulate flag.
-    //       if it is true, the matrix-mul operation will accumulate the result
-    //       into original data, says, res += in * weight,
-    //       otherwise res = in * weight.
-    IR * buildMatMul(IR * in, IR * weight, IR * row_in, IR * col_in,
-                     IR * row_weight, IR * col_weight, IR * accum,
-                     Type const* ty);
-
     size_t count_mem() const;
 
     void dumpFreeTab(Region const* rg) const;

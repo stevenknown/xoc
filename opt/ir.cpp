@@ -215,6 +215,15 @@ bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
 //END IRDesc
 
 
+//The function clean the IR_parent for each elements in 'irlst'.
+void cleanParentForIRList(IR * irlst)
+{
+    for (IR * t = irlst; t != nullptr; t = t->get_next()) {
+        IR_parent(t) = nullptr;
+    }
+}
+
+
 void setParentPointerForIRList(IR * ir_list)
 {
     while (ir_list != nullptr) {

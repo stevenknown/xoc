@@ -28,7 +28,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
+#include "lsra_impl.h"
+#include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
+#include "lsra_scan_in_prio.h"
 
 namespace xoc {
 

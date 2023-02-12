@@ -2244,7 +2244,7 @@ bool Refine::refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc)
             ir_list.append_tail(newir);
         }
     }
-    rc.cleanBottomupFlag();
+    rc.cleanBottomUpFlag();
     return change;
 }
 

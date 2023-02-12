@@ -120,6 +120,12 @@ void MInst::dump(FileObj & fo, MInstMgr const& mgr) const
 }
 
 
+TMWORD MInst::getFieldValue(FIELD_TYPE ft) const
+{
+    return getFieldValue(getInstDesc()->getFieldIdx(ft));
+}
+
+
 TMWORD MInst::getFieldValue(UINT idx) const
 {
     ASSERT0(m_inst_desc);
@@ -128,7 +134,7 @@ TMWORD MInst::getFieldValue(UINT idx) const
 }
 
 
-void MInst::set(FIELD_TYPE ft, TMWORD val)
+void MInst::setFieldValue(FIELD_TYPE ft, TMWORD val)
 {
     ASSERT0(m_inst_desc);
     ASSERTN_DUMMYUSE(!xcom::isExcedeBitWidth(

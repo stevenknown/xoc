@@ -30,105 +30,110 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-bool checkIRSwitchCaseHelper()
+bool RegionMgr::checkIRSwitchCaseInterface(IR_CODE c) const
+{
+    ASSERTN(0, ("miss entry")); //Target Dependent Code.
+    return true;
+}
+
+
+bool RegionMgr::checkIRSwitchCaseEntry() const
 {
     for (UINT i = IR_UNDEF + 1; i < IR_CODE_NUM; i++) {
         switch ((IR_CODE)i) {
         SWITCH_CASE_STMT:
         SWITCH_CASE_EXP:
             break;
-        default: ASSERTN(0, ("miss entry"));
+        default: checkIRSwitchCaseInterface((IR_CODE)i);
         }
         if (IRDES_is_stmt(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_STMT:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         } else {
             switch ((IR_CODE)i) {
             SWITCH_CASE_EXP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_direct_mem_op(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_DIRECT_MEM_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_indirect_mem_op(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_INDIRECT_MEM_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_write_pr(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_WRITE_PR:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_array_op(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_ARRAY_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_conditional_br(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_CONDITIONAL_BRANCH_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_unconditional_br(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_bin(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_BIN:
-            SWITCH_CASE_EXT_BIN:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_una(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_UNA:
-            SWITCH_CASE_EXT_UNA:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_stmt_in_bb(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_STMT_IN_BB:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_non_pr_memref(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_MEM_NONPR_OP:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_has_du(g_ir_desc[i])) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_HAS_DU:
                 break;
-            default: ASSERTN(0, ("miss entry"));
+            default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
     }

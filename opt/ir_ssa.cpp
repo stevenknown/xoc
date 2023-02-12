@@ -39,7 +39,7 @@ namespace xoc {
 static bool haveToMaintainClassicPRDU(OptCtx const& oc)
 {
     //After PRSSA, classic PRDU is invalid. However, if classic NonPRDU is
-    //still in use, we have to maintain the DU chain for CallStmt, because
+    //still in use, we can not free DUSet of CallStmt, because
     //both PRDU and NonPRDU are recorded in its DUSet.
     //CASE:prssa_duset.c
     return oc.is_nonpr_du_chain_valid();
@@ -2216,6 +2216,7 @@ static void verify_ssainfo_helper(IR * ir, xcom::BitSet & defset, Region * rg)
 {
     ASSERT0(ir);
     SSAInfo * ssainfo = ir->getSSAInfo();
+    ASSERTN(ssainfo, ("%s miss SSA info.", IRNAME(ir)));
     PRNO defprno = PRNO_UNDEF;
     verify_def(ir, defset, ssainfo, rg, defprno);
     PRNO opndprno = PRNO_UNDEF;
@@ -3071,6 +3072,11 @@ void PRSSAMgr::construction(OptCtx & oc)
         xoc::removeClassicDUChain(m_rg, true, false);
     }
     //The construction of PRSSA will destruct DUSet which built by DUMgr.
+    //If SSA is enabled, disable classic DU Chain.
+    //Since we do not maintain both them as some passes.
+    //e.g:In RCE, remove PHI's operand will not update the
+    //operand DEF's DUSet.
+    //CASE:compiler.gr/alias.loop.gr
     oc.setInvalidPRDU();
 }
 

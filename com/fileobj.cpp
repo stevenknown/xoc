@@ -29,25 +29,80 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+CHAR const* g_fo_name[] = {
+    "succ",
+    "read error",
+    "write error",
+    "excede file end",
+    "not exist",
+    "can not create new file",
+};
+size_t g_fo_num = sizeof(g_fo_name) / sizeof(g_fo_name[0]);
+
+CHAR const* FileObj::getFileStatusName(FO_STATUS st)
+{
+    ASSERT0(st < g_fo_num);
+    return g_fo_name[st];
+}
+
+
 //is_del: true to delete the file with same name.
-FileObj::FileObj(CHAR const* filename, bool is_del)
+FileObj::FileObj(CHAR const* filename,  bool is_del, bool is_readonly,
+                 OUT FO_STATUS * st)
 {
     ASSERT0(filename);
-    if (is_del) { UNLINK(filename); }
-    createNew(filename);
+    FO_STATUS tmpst;
+    if (st == nullptr) { st = &tmpst; }
+    if (is_del) {
+        ASSERT0(!is_readonly);
+        UNLINK(filename);
+    }
+    m_is_readonly = is_readonly;
+    if (m_is_readonly) {
+        *st = openWithReadOnly(filename);
+        return;
+    }
+    *st = openWithWritable(filename);
+}
+
+
+FO_STATUS FileObj::openWithReadOnly(CHAR const* filename)
+{
+    ASSERT0(m_is_readonly);
+    m_file_handler = ::fopen(filename, "rb");
+    if (m_file_handler == 0) {
+        //prejudge the file existence
+        return FO_NOT_EXIST;
+    }
+    m_is_opened = true;
+    m_file_name = filename;
+    return FO_SUCC;
+}
+
+
+FO_STATUS FileObj::openWithWritable(CHAR const* filename)
+{
+    ASSERT0(!m_is_readonly);
+    FO_STATUS st = createNew(filename);
+    if (st != FO_SUCC) { return st; }
     m_file_handler = ::fopen(filename, "rb+");
     ASSERTN(m_file_handler, ("prejudge the file existence"));
     m_is_opened = true;
     m_file_name = filename;
+    return FO_SUCC;
 }
 
 
-void FileObj::createNew(CHAR const* filename)
+FO_STATUS FileObj::createNew(CHAR const* filename)
 {
     m_file_handler = ::fopen(filename, "ab+");
-    ASSERTN(m_file_handler, ("file IO exception"));
+    if (m_file_handler == nullptr) {
+        //file IO exception
+        return FO_CAN_NOT_CREATE_NEW_FILE;
+    }
     ::fclose(m_file_handler);
     m_file_handler = nullptr;
+    return FO_SUCC;
 }
 
 
@@ -74,7 +129,7 @@ FileObj::~FileObj()
 
 bool FileObj::isFileExist(CHAR const* filename)
 {
-    ASSERT0(filename);  
+    ASSERT0(filename);
     FILE * h = ::fopen(filename, "rb");
     bool exist = false;
     if (h != nullptr) {
@@ -110,8 +165,8 @@ size_t FileObj::getFileSize() const
 }
 
 
-FileObj::FO_STATUS FileObj::read(OUT BYTE * buf, size_t offset, size_t size,
-                                 OUT size_t * rd)
+FO_STATUS FileObj::read(OUT BYTE * buf, size_t offset, size_t size,
+                        OUT size_t * rd)
 {
     ASSERT0(buf);
     if (size == 0) { return FO_SUCC; }
@@ -124,7 +179,7 @@ FileObj::FO_STATUS FileObj::read(OUT BYTE * buf, size_t offset, size_t size,
 }
 
 
-FileObj::FO_STATUS FileObj::append(BYTE const* buf, size_t size, OUT size_t * wr)
+FO_STATUS FileObj::append(BYTE const* buf, size_t size, OUT size_t * wr)
 {
     ASSERT0(buf);
     if (size == 0) { return FO_SUCC; }
@@ -137,8 +192,8 @@ FileObj::FO_STATUS FileObj::append(BYTE const* buf, size_t size, OUT size_t * wr
 }
 
 
-FileObj::FO_STATUS FileObj::write(BYTE const* buf, size_t offset, size_t size,
-                                  OUT size_t * wr)
+FO_STATUS FileObj::write(BYTE const* buf, size_t offset, size_t size,
+                         OUT size_t * wr)
 {
     ASSERT0(buf);
     if (size == 0) { return FO_SUCC; }

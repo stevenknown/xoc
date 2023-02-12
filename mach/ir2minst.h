@@ -346,8 +346,14 @@ public:
     virtual void convert(IR const* ir, OUT RecycMIList & mis,
                          MOD IMCtx * cont);
 
+    MInstMgr * getMIMgr() const { return m_mimgr; }
     TypeMgr const* getTypeMgr() const { return m_tm; }
     RecycMIListMgr * getRecycMIListMgr() { return &m_recyc_orlist_mgr; }
+
+    //Extract the constant value from 'val' that the size is conform to given
+    //field type.
+    //Note the function will truncate the val according the bit size of 'ft'.
+    TMWORD extractImm(HOST_INT val, FIELD_TYPE ft);
 
     //Return target-machine-word for given register.
     //The tmword is always used in assembly or machine code generation.

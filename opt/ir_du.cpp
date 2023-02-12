@@ -2449,7 +2449,12 @@ void DUMgr::checkAndBuildChain(IR * stmt, IRListIter ct, DUOptFlag flag)
         }
         checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
         return;
-    SWITCH_CASE_MAY_PR_OP:
+    SWITCH_CASE_CALL:
+        checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
+        return;
+    SWITCH_CASE_PR_OP:
+    //SWITCH_CASE_MAY_PR_OP:
+        //CASE:Do NOT remove DUSet of CallStmt because NonPRDU may be needed.
         if (flag.have(DUOPT_COMPUTE_PR_DU)) {
             DUSet * du = genDUSet(stmt);
             cleanDUSet(stmt->id(), du);
@@ -2947,6 +2952,7 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
             verifyDirectMemOpImpl(t, m_rg);
             break;
         SWITCH_CASE_DIRECT_MEM_STMT:
+            ASSERT0(t->getMustRef());
             ASSERT0(!t->getMustRef()->get_base()->is_readonly());
             verifyDirectMemOpImpl(t, m_rg);
             break;
@@ -3103,19 +3109,16 @@ static bool verifyMDDUChainForLHS(IR const* ir, DUOptFlag duflag, Region * rg,
     if (ir->isCallStmt()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU) &&
             !duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     } else if (ir->isPROp()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     } else {
         ASSERT0(ir->isMemRefNonPR());
         if (!duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     }
 

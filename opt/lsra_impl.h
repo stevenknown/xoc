@@ -75,7 +75,7 @@ public:
         CONSIST_INVALID = 1,
         CONSIST_VALID = 2,
     } CONSIST_STATUS;
-private:
+protected:
     COPY_CONSTRUCTOR(LTConsistencyMgr);
     Region * m_rg;
     BBList * m_bb_list;
@@ -87,7 +87,7 @@ private:
     typedef TMap<LifeTime const*, CONSIST_STATUS> LT2ST;
     Vector<LT2ST*> m_lt2st_in_vec;
     Vector<LT2ST*> m_lt2st_out_vec;
-private:
+protected:
     void addInStatus(LifeTime const* lt, CONSIST_STATUS st, UINT bbid)
     { genInTab(bbid)->setAlways(lt, st); }
     void addOutStatus(LifeTime const* lt, CONSIST_STATUS st, UINT bbid)
@@ -95,6 +95,8 @@ private:
 
     void computeLTConsistency();
     void computeEdgeConsistency(OUT InConsistPairList & inconsist_lst);
+    void computeEdgeConsistencyImpl(xcom::Edge const* e,
+                                    OUT InConsistPairList & inconsist_lst);
 
     CHAR const* getStName(CONSIST_STATUS st) const
     {

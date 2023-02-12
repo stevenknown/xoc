@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
 
 namespace xoc {
 

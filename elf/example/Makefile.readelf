@@ -1,5 +1,7 @@
+$(info "====---- START Makefile.readelf ----====")
+
 ifeq ($(TARG),)
-  #SET DEFAULT TARG.
+  #SET DEFAULT TARG. TARG INFORM IS USELESS TO READELF.EXE
   TARG=FOR_DEX
 endif
 
@@ -10,10 +12,19 @@ endif
 CFLAGS+=-Wall
 COM_DIR=../../com
 ELF_DIR=..
+READELF_DIR=.
 READELF_OUTPUT=readelf.exe
 
 include $(ELF_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
+
+MISC_TARG_MACH_ELF_OBJS+=\
+$(ELF_DIR)/misc_elf_mgr.o\
+../arm/arm_elf_targinfo.o\
+../score/score_elf_targinfo.o\
+../x64/x64_elf_targinfo.o\
+../x86/x86_elf_targinfo.o
+../teco/teco_elf_targinfo.o
 
 CFLAGS+=\
   -D$(TARG) \
@@ -48,26 +59,36 @@ $(info "DEBUG:$(DEBUG)")
 $(info "TMP_ELF_OBJS:$(TMP_ELF_OBJS)")
 
 #Define rules.
-$(READELF_OUTPUT): tmp_elf_objs $(COM_OUTPUT) $(READELF_OBJS)
-	$(CC) $(TMP_ELF_OBJS) $(READELF_OBJS) -Xlinker "-(" \
+$(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) $(READELF_OBJS)
+	@echo "BUILD $(READELF_OUTPUT)"
+	@echo "EXEC:"
+	$(CC) $(TMP_ELF_OBJS) $(MISC_TARG_MACH_ELF_OBJS) $(READELF_OBJS) \
+      -Xlinker "-(" \
       $(COM_DIR)/$(COM_OUTPUT) \
       -Xlinker "-)" \
       $(CFLAGS) \
       -o $@ -lstdc++ -lm  #-lgcov -lgcc
-	@echo "SUCCESS!!"
+	@echo "SUCCESS TO GENERATE $(READELF_OUTPUT)!!"
 
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
+	@echo "EXEC:"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
 
 %.o:%.cpp
 	@echo "BUILD $<"
+	@echo "EXEC:"
 	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
 
 tmp_elf_objs: $(TMP_ELF_OBJS)
+	@echo "EXEC:tmp_elf_objs:$(TMP_ELF_OBJS)"
+
+misc_targ_mach_elf_objs: $(MISC_TARG_MACH_ELF_OBJS)
+	@echo "EXEC:misc_targ_mach_elf_objs:$(MISC_TARG_MACH_ELF_OBJS)"
 
 clean:
 	@find ../ -name "*.o" | xargs rm -f
+	@find ../ -name "*.d" | xargs rm -f
 	@find ../ -name "*.a" | xargs rm -f
 	@find ../ -name "*.exe" | xargs rm -f
 	@find ../ -name "*.elf" | xargs rm -f
@@ -79,3 +100,9 @@ clean:
 	@find ../ -name "*.log" | xargs rm -f
 	@find ../ -name "*.LOGLOG" | xargs rm -f
 	@find ../ -name "LOGLOG" | xargs rm -f
+
+-include $(COM_DIR)/*.d
+-include $(ELF_DIR)/*.d
+-include $(READELF_DIR)/*.d
+
+$(info "====---- END Makefile.readelf ----====")

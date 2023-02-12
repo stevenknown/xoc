@@ -112,6 +112,12 @@ public:
     LabelInstDesc(mach::MInstMgr const& im) : MInstDesc(im) {}
 };
 
+
+class MemAccInstDesc : public mach::MInstDesc {
+public:
+    MemAccInstDesc(mach::MInstMgr const& im) : MInstDesc(im) {}
+};
+
 } //namespace
 
 #endif

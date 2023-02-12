@@ -125,6 +125,10 @@ public:
     //Allocate IPA module.
     IPA * allocIPA(Region * program);
 
+    //Check switch-case entry for each IR.
+    virtual bool checkIRSwitchCaseInterface(IR_CODE c) const;
+    bool checkIRSwitchCaseEntry() const;
+
     //Destroy specific region by given id.
     void deleteRegion(Region * rg, bool collect_id = true);
 
@@ -176,6 +180,7 @@ public:
         ASSERTN(m_targinfo == nullptr, ("TargInfo already initialized"));
         m_targinfo = allocTargInfo();
         ASSERT0(m_targinfo);
+        ASSERT0(verifyPreDefinedInfo());
     }
     bool isLogMgrInit() const
     { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }

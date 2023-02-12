@@ -1550,48 +1550,4 @@ IR * IRMgr::buildBinaryOp(IR_CODE irc, Type const* type, IR * lchild,
     return buildBinaryOpSimp(irc, type, lchild, rchild);
 }
 
-
-IR * IRMgr::buildMemcpy(IR * src, IR * len)
-{
-    ASSERT0(src && src->is_exp());
-    IR * ir = allocIR(IR_MEMCPY);
-    MEMCPY_src(ir) = src;
-    MEMCPY_len(ir) = len;
-    IR_dt(ir) = src->getType();
-    IR_parent(src) = ir;
-    IR_parent(len) = ir;
-    return ir;
-}
-
-
-IR * IRMgr::buildMatMul(IR * in, IR * weight, IR * row_in, IR * col_in,
-                        IR * row_weight, IR * col_weight, IR * accum,
-                        Type const* ty)
-{
-    ASSERT0(ty);
-    ASSERT0(in && in->is_exp());
-    ASSERT0(weight && weight->is_exp());
-    ASSERT0(row_in && row_in->is_exp());
-    ASSERT0(col_in && col_in->is_exp());
-    ASSERT0(row_weight && row_weight->is_exp());
-    ASSERT0(col_weight && col_weight->is_exp());
-    IR * ir = allocIR(IR_MATMUL);
-    MATMUL_in(ir) = in;
-    MATMUL_weight(ir) = weight;
-    MATMUL_row_in(ir) = row_in;
-    MATMUL_col_in(ir) = col_in;
-    MATMUL_row_weight(ir) = row_weight;
-    MATMUL_col_weight(ir) = col_weight;
-    MATMUL_accum(ir) = accum;
-    IR_parent(in) = ir;
-    IR_parent(weight) = ir;
-    IR_parent(row_in) = ir;
-    IR_parent(col_in) = ir;
-    IR_parent(row_weight) = ir;
-    IR_parent(col_weight) = ir;
-    IR_parent(accum) = ir;
-    IR_dt(ir) = ty;
-    return ir;
-}
-
 } //namespace xoc

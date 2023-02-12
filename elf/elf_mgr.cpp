@@ -55,17 +55,19 @@ static void formatTabColInfo(TabCol * tabcol, UINT tabcolnum,
 }
 
 
-//Hashing Function
-//A hash table of Elf32_Word objects supports symbol table access.
+//Symbol name hash function.
+//The function accepts a symbol name and returns a value that may be used to
+//compute a bucket index.
 //The same table layout is used for both the 32-bit and 64-bit file class.
-//Labels appear below to help explain the hash table organization, but they are
-//not part of the specification.
-static ULONG elf_hash(UCHAR const* name)
+//http://osr507doc.sco.com/en/topics/ELF_hashtbl.html#ELF_symb_hash_tabl
+//explain the hash table organization, but they are not part of the
+//specification.
+static ULONG elf_string_hash(UCHAR const* name)
 {
     ULONG h = 0, g;
     while (*name) {
         h = (h << 4) + *name++;
-        if (g = h & 0xf0000000) {
+        if ((g = (h & 0xf0000000))) {
             h ^= g >> 24;
         }
         h &= ~g;
@@ -444,7 +446,7 @@ EM_STATUS ELFMgr::read(BYTE * buf, size_t offset, size_t size)
 {
     ASSERT0(m_file);
     size_t actual_rd = 0;
-    if (m_file->read(buf, offset, size, &actual_rd) != FileObj::FO_SUCC ||
+    if (m_file->read(buf, offset, size, &actual_rd) != xcom::FO_SUCC ||
         actual_rd != size) {
         return EM_RD_ERR;
     }
@@ -456,7 +458,7 @@ EM_STATUS ELFMgr::write(BYTE const* buf, size_t offset, size_t size)
 {
     ASSERT0(m_file);
     size_t actual_wr = 0;
-    if (m_file->write(buf, offset, size, &actual_wr) != FileObj::FO_SUCC ||
+    if (m_file->write(buf, offset, size, &actual_wr) != xcom::FO_SUCC ||
         actual_wr != size) {
         return EM_WR_ERR;
     }
@@ -468,7 +470,7 @@ EM_STATUS ELFMgr::append(BYTE const* buf, size_t size)
 {
     ASSERT0(m_file);
     size_t actual_wr = 0;
-    if (m_file->append(buf, size, &actual_wr) != FileObj::FO_SUCC ||
+    if (m_file->append(buf, size, &actual_wr) != xcom::FO_SUCC ||
         actual_wr != size) {
         return EM_WR_ERR;
     }
@@ -806,6 +808,7 @@ EM_STATUS ELFMgr::readDynStrTabContent()
     for (ELFSHdr * p = m_dyntab_sect_list.get_head();
          p != nullptr; p  = m_dyntab_sect_list.get_next()) {
         EM_STATUS st = readRelatedStrTabContent(p);
+		if (st != EM_SUCC) { return st; }
     }
     return EM_SUCC;
 }
@@ -1485,7 +1488,7 @@ EM_STATUS ELFMgr::readELF(CHAR const* filename, bool read_all_content)
     if (st != EM_SUCC) { return st; }
 
     if (read_all_content) {
-        readAllSectContent();
+        st = readAllSectContent();
     } else {
         //Only read the section contents that are used to display.
         st = readSymTabContent();
@@ -1508,7 +1511,7 @@ EM_STATUS ELFMgr::readELF(CHAR const* filename, bool read_all_content)
     }
     dump();
     closeELF();
-    return EM_SUCC;
+    return st;
 }
 
 
@@ -1564,12 +1567,12 @@ EM_STATUS ELFMgr::writePad(size_t padsize)
     for (; i < padsize / LEN; i += LEN) {
         if (EM_SUCC != append(pad, LEN)) {
             return EM_WR_ERR;
-        }        
+        }
     }
     for (; i < padsize; i ++) {
         if (EM_SUCC != append(&pad[0], 1)) {
             return EM_WR_ERR;
-        }        
+        }
     }
     return EM_SUCC;
 }

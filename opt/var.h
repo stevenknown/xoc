@@ -290,7 +290,7 @@ public:
                 is_label() ||
                 is_array() ||
                 (is_string() && getString() != nullptr) ||
-                getByteValue() != nullptr);
+                (hasInitVal() && getByteValue() != nullptr));
     }
 
     //Return true if variable has initial byte value that stored in ByteBuf.

@@ -41,7 +41,6 @@ namespace xoc {
 //
 RegionMgr::RegionMgr() : m_type_mgr(this)
 {
-    ASSERT0(verifyPreDefinedInfo());
     #ifdef _DEBUG_
     m_num_allocated = 0;
     #endif
@@ -230,7 +229,7 @@ bool RegionMgr::verifyPreDefinedInfo()
     checkMaxIRCode();
     checkIRDesc();
     checkRoundDesc();
-    checkIRSwitchCaseHelper();
+    checkIRSwitchCaseEntry();
     ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0(sizeof(TMWORD) <= sizeof(HOST_UINT));

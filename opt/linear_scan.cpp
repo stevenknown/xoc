@@ -28,13 +28,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
 #include "lsra_impl.h"
+#include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
-
-#define DEBUG_LSRA
+#include "lsra_scan_in_prio.h"
 
 namespace xoc {
-
 
 //
 //START ActMgr
@@ -473,19 +476,26 @@ CHAR const* LinearScanRA::genFuncLevelNewVarName(OUT xcom::StrBuf & name)
 
 void LinearScanRA::updateSSA(OptCtx & oc) const
 {
+    bool rmprdu = false;
+    bool rmnonprdu = false;
     //TODO:update SSA incrementally.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(
         PASS_MDSSA_MGR);
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->destruction(oc);
         mdssamgr->construction(oc);
+        oc.setInvalidNonPRDU();
+        rmprdu = true;
     }
     PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(
         PASS_PRSSA_MGR);
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         prssamgr->destruction(oc);
         prssamgr->construction(oc);
+        oc.setInvalidPRDU();
+        rmnonprdu = true;
     }
+    xoc::removeClassicDUChain(m_rg, rmprdu, rmnonprdu);
 }
 
 

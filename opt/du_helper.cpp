@@ -1116,7 +1116,7 @@ static inline void removeClassicDUChainForIR(IR * ir, Region * rg,
         ASSERT0(ir->hasDU());
         ir->freeDUset(dumgr);
     }
-    if (rmnonprdu && ir->isMemRef()) {
+    if (rmnonprdu && ir->isMemRefNonPR()) {
         ASSERT0(ir->hasDU());
         ir->freeDUset(dumgr);
     }
@@ -1129,7 +1129,7 @@ void removeClassicDUChain(Region * rg, bool rmprdu, bool rmnonprdu)
     if (rmprdu && rmnonprdu) {
         //Remove all DUSets at once.
         if (rg->getDUMgr() != nullptr) {
-            rg->getDUMgr()->cleanDUSet();
+            rg->getDUMgr()->removeAllDUChain();
         }
         return;
     }

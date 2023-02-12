@@ -175,26 +175,6 @@ typedef UINT PRNO;
     case IR_CALL: \
     case IR_ICALL
 
-//Defined the entry for extened expression ir code.
-#define SWITCH_CASE_EXT_EXP \
-    case IR_BROADCAST: \
-    SWITCH_CASE_PCX_CODE
-
-//Defined the entry for extened virtual stmt ir code.
-#define SWITCH_CASE_EXT_VSTMT \
-    SWITCH_CASE_EXT_WRITE_PR: \
-    SWITCH_CASE_EXT_DIRECT_MEM_VSTMT: \
-    SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT
-
-//Defined the entry for extened stmt ir code.
-#define SWITCH_CASE_EXT_STMT \
-    SWITCH_CASE_EXT_VSTMT
-
-//Defined the entry for extened ir code.
-#define SWITCH_CASE_EXT \
-    SWITCH_CASE_EXT_STMT: \
-    SWITCH_CASE_EXT_EXP
-
 #define SWITCH_CASE_WRITE_ARRAY \
     case IR_STARRAY
 
@@ -229,12 +209,6 @@ typedef UINT PRNO;
 
 #define SWITCH_CASE_DIRECT_MEM_EXP \
     case IR_LD
-
-#define SWITCH_CASE_EXT_WRITE_PR \
-    case IR_VSTPR
-
-#define SWITCH_CASE_EXT_DIRECT_MEM_VSTMT \
-    case IR_VST
 
 #define SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT \
     case IR_VIST
@@ -332,48 +306,6 @@ typedef UINT PRNO;
     case IR_CONST: \
     SWITCH_CASE_EXT_EXP
 
-//Defined the entry for PCX code.
-#define SWITCH_CASE_PCX_CODE \
-    SWITCH_CASE_EXT_UNA: \
-    SWITCH_CASE_EXT_BIN: \
-    SWITCH_CASE_PCX_REST_EXP
-
-//Defined the entry for PCX code except BIN and UNA code
-#define SWITCH_CASE_PCX_REST_EXP \
-    case IR_CONJ: \
-    case IR_INSERT: \
-    case IR_EXTRACT: \
-    case IR_MATMUL: \
-    case IR_BRDCAST: \
-    case IR_MEMCPY
-
-//Defined the entry for extened expression unary code.
-#define SWITCH_CASE_EXT_UNA \
-    case IR_ABS: \
-    case IR_CNTONE: \
-    case IR_CNTLEADZERO: \
-    case IR_CNTTAILZERO: \
-    case IR_FINDMSB: \
-    case IR_RECIP: \
-    case IR_SQRT: \
-    case IR_RSQRT: \
-    case IR_SIN: \
-    case IR_COS: \
-    case IR_TANH: \
-    case IR_LOG2: \
-    case IR_EXP2: \
-    case IR_TILE
-
-//Defined the entry for extened expression binary code.
-#define SWITCH_CASE_EXT_BIN \
-    case IR_MIN: \
-    case IR_MAX: \
-    case IR_ZAP: \
-    case IR_ZAPNOT: \
-    case IR_ROTLEFT: \
-    case IR_CMP
-
-bool checkIRSwitchCaseHelper();
-
 } //namespace xoc
+
 #endif

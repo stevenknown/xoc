@@ -30,23 +30,28 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+typedef enum {
+    FO_SUCC = 0,
+    FO_READ_ERROR,
+    FO_WRITE_ERROR,
+    FO_EXCEDE_FILE_END,
+    FO_NOT_EXIST,
+    FO_CAN_NOT_CREATE_NEW_FILE,
+} FO_STATUS;
+
 class FileObj {
     COPY_CONSTRUCTOR(FileObj);
 protected:
-    void createNew(CHAR const* filename);
+    FO_STATUS createNew(CHAR const* filename);
 public:
-    typedef enum {
-        FO_SUCC = 0,
-        FO_READ_ERROR,
-        FO_WRITE_ERROR,
-        FO_EXCEDE_FILE_END,
-    } FO_STATUS;
     bool m_is_opened;
+    bool m_is_readonly;
     FILE * m_file_handler;
     CHAR const* m_file_name;
 public:
     //is_del: true to delete the file with same name.
-    FileObj(CHAR const* filename, bool is_del = false);
+    FileObj(CHAR const* filename, bool is_del = false,
+            bool is_readonly = false, OUT FO_STATUS * st = nullptr);
     FileObj(FILE * h);
     ~FileObj();
 
@@ -60,6 +65,7 @@ public:
     FILE * getFileHandler() const { return m_file_handler; }
     size_t getFileSize() const;
     CHAR const* getFileName() const { return m_file_name; }
+    static CHAR const* getFileStatusName(FO_STATUS st);
 
     //Return true if current file object is IO stream, e.g: stdout.
     bool isIOStream() const;
@@ -68,6 +74,9 @@ public:
     static bool isFileExist(CHAR const* filename);
 
     void prt(CHAR const* format, ...);
+
+    FO_STATUS openWithReadOnly(CHAR const* filename);
+    FO_STATUS openWithWritable(CHAR const* filename);
 
     //Read binary data from file object.
     //Return the status.

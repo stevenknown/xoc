@@ -1352,5 +1352,3 @@ bool checkMaxIRCode();
 } //namespace xoc
 
 #endif
-
-#include "ir_decl_ext.h"

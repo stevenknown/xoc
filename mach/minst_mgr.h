@@ -114,19 +114,27 @@ class MInstMgr {
     COPY_CONSTRUCTOR(MInstMgr);
     MFieldMgr const& m_field_mgr;
     LabelInstDesc m_label_instdesc;
+    MemAccInstDesc m_memacc_instdesc;
     SMemPool * m_pool;
 protected:
     template<class T>
     MInst * allocMInst(UINT fieldnum)
     {
         MInst * mi = (MInst*)xmalloc(sizeof(T));
+        ASSERTN(fieldnum > 0, ("instruction can not be empty"));
         MI_field_vec(mi) = (MField*)xmalloc(sizeof(MField) * fieldnum);
         return mi;
-    }   
+    }
+
+    LabelInstDesc & getLabelInstDesc() { return m_label_instdesc; }
+    MemAccInstDesc & getMemAccInstDesc() { return m_memacc_instdesc; }
+
     void * xmalloc(UINT size);
     MInstMgr * self() { return this; }
 public:
-    MInstMgr(MFieldMgr const& fm) : m_field_mgr(fm), m_label_instdesc(*self())
+    MInstMgr(MFieldMgr const& fm) : m_field_mgr(fm),
+        m_label_instdesc(*self()),
+        m_memacc_instdesc(*self())
     { m_pool = smpoolCreate(64, MEM_COMM); }
     virtual ~MInstMgr() { smpoolDelete(m_pool); }
 
@@ -151,10 +159,10 @@ public:
         return mi;
      }
 
-    //Build a dummy machine instruction that indicates a label.
+    //Build a dummy machine instruction that indicates a memory access.
     virtual MInst * buildMemAcc(MI_CODE c)
     {
-        MInst * mi = buildMInst<MemAccMInst>(c, &m_label_instdesc);
+        MInst * mi = buildMInst<MemAccMInst>(c, &m_memacc_instdesc);
         mi->setFlag(MI_FLAG_HAS_VAR);
         return mi;
     }
@@ -166,6 +174,14 @@ public:
     //Return the bit width of given field type.
     UINT getFieldSize(FIELD_TYPE ft) const
     { return getFieldMgr().getFieldSize(ft); }
+
+    //Return the start bit position of given field type.
+    UINT getFieldStart(FIELD_TYPE ft) const
+    { return getFieldMgr().getFieldStart(ft); }
+
+    //Return the end bit position of given field type.
+    UINT getFieldEnd(FIELD_TYPE ft) const
+    { return getFieldMgr().getFieldEnd(ft); }
 
     MFieldMgr const& getFieldMgr() const { return m_field_mgr; }
 

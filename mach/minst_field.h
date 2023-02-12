@@ -64,6 +64,20 @@ public:
     //Get the number of field descriptions.
     UINT getFieldDescNum() const { return m_fieldtype_desc.get_elem_count(); }
 
+    //Return the start bit position of given field type.
+    UINT getFieldStart(FIELD_TYPE ft) const
+    {
+        ASSERT0((UINT)ft < getFieldDescNum());
+        return m_fieldtype_desc[ft].start;
+    }
+
+    //Return the end bit position of given field type.
+    UINT getFieldEnd(FIELD_TYPE ft) const
+    {
+        ASSERT0((UINT)ft < getFieldDescNum());
+        return m_fieldtype_desc[ft].end;
+    }
+
     //Get the field name.
     virtual CHAR const* getFieldName(FIELD_TYPE ft) const;
 

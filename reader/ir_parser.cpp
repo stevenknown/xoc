@@ -973,10 +973,20 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         return false;
     }
     ASSERT0(region);
-
     //Region name
     if (!parseRegionName(region, flag, ctx)) {
         return false;
+    }
+
+    if (region->is_program()) {
+        if (m_rumgr->getProgramRegion() != nullptr) {
+            error(m_lexer->getCurrentLineNum(),
+                  "duplicated program region %s, previous is %s",
+                  region->getRegionName(),
+                  m_rumgr->getProgramRegion()->getRegionName());
+            return false;
+        }
+        m_rumgr->setProgramRegion(region);
     }
 
     ParseCtx newctx(this);
@@ -1008,7 +1018,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     if (!newctx.current_region->is_blackbox()) {
         ASSERT0(verifyIRList(newctx.current_region->getIRList(),
-                nullptr, newctx.current_region));
+                             nullptr, newctx.current_region));
     }
     if (ctx->current_region != nullptr) {
         IR * ir = ctx->current_region->getIRMgr()->buildRegion(region);

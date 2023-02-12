@@ -1,4 +1,4 @@
-ï»??xml version="1.0" encoding="utf-8"?>
+ï»¿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -155,6 +155,7 @@
     <ClCompile Include="..\..\..\com\smempool.cpp" />
     <ClCompile Include="..\..\..\com\strbuf.cpp" />
     <ClCompile Include="..\..\..\score\score_elf_targinfo.cpp" />
+    <ClCompile Include="..\..\..\teco\teco_elf_targinfo.cpp" />
     <ClCompile Include="..\..\..\x64\x64_elf_targinfo.cpp" />
     <ClCompile Include="..\..\..\x86\x86_elf_targinfo.cpp" />
     <ClCompile Include="..\..\elf_header.cpp" />
@@ -172,6 +173,7 @@
     <ClInclude Include="..\..\..\com\smempool.h" />
     <ClInclude Include="..\..\..\com\strbuf.h" />
     <ClInclude Include="..\..\..\score\score_elf_targinfo.h" />
+    <ClInclude Include="..\..\..\teco\teco_elf_targinfo.h" />
     <ClInclude Include="..\..\..\x64\x64_elf_targinfo.h" />
     <ClInclude Include="..\..\..\x86\x86_elf_targinfo.h" />
     <ClInclude Include="..\..\elf32.h" />

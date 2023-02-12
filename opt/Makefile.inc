@@ -78,8 +78,21 @@ cfg_lifting.o\
 bytebuf.o\
 storage_space.o
 
-ifeq ($(FOR_IP), true)
-  $(info "ADD FOR-IP OBJS")
+ifeq ($(TARG),)
+  $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
+endif
+
+ifeq ($(TARG), FOR_TECO)
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
+  linear_scan.o
+else ifeq ($(FOR_IP), true)
   OPT_OBJS+=\
   lsra_impl.o\
   lsra_scan_in_pos.o\

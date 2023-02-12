@@ -600,6 +600,9 @@ public:
         if (defset != nullptr) { defset->remove(def->id(), *getSBSMgr()); }
     }
 
+    //The function will remove DU Chain for all IRs.
+    void removeAllDUChain() { cleanDUSet(); }
+
     //Check if the DEF of stmt's operands still modify the same memory object.
     //e.g: Revise DU chain if stmt's rhs has been changed.
     //    x=10 //S1

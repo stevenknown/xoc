@@ -40,10 +40,7 @@ class EffectStmt : public xcom::BitSet {
 public:
     EffectStmt() {}
     COPY_CONSTRUCTOR(EffectStmt);
-    void bunion(INT elem)
-    {
-        xcom::BitSet::bunion(elem);
-    }
+    void bunion(INT elem) { xcom::BitSet::bunion(elem); }
 };
 
 typedef TTab<MDDef const*> EffectMDDef;

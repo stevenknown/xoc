@@ -28,6 +28,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
 #include "lsra_impl.h"
 #include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
@@ -256,17 +260,26 @@ void LTConsistencyMgr::dump() const
         LT2STIter it;
         CONSIST_STATUS st;
         note(rg, "\nLT2ST-IN:");
-        for (LifeTime const* lt = intab->get_first(it, &st);
-             lt != nullptr; lt = intab->get_next(it, &st)) {
-            ASSERT0(st != CONSIST_UNDEF);
-            note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+        if (intab != nullptr) {
+            rg->getLogMgr()->incIndent(ind);
+            for (LifeTime const* lt = intab->get_first(it, &st);
+                 lt != nullptr; lt = intab->get_next(it, &st)) {
+                ASSERT0(st != CONSIST_UNDEF);
+                note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+            }
+            rg->getLogMgr()->decIndent(ind);
         }
+
         LT2ST const* outtab = getOutTab(bbid);
         note(rg, "\nLT2ST-OUT:");
-        for (LifeTime const* lt = outtab->get_first(it, &st);
-             lt != nullptr; lt = outtab->get_next(it, &st)) {
-            ASSERT0(st != CONSIST_UNDEF);
-            note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+        if (outtab != nullptr) {
+            rg->getLogMgr()->incIndent(ind);
+            for (LifeTime const* lt = outtab->get_first(it, &st);
+                 lt != nullptr; lt = outtab->get_next(it, &st)) {
+                ASSERT0(st != CONSIST_UNDEF);
+                note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+            }
+            rg->getLogMgr()->decIndent(ind);
         }
     }
     rg->getLogMgr()->decIndent(ind);
@@ -275,37 +288,95 @@ void LTConsistencyMgr::dump() const
 
 void LTConsistencyMgr::computeLTConsistency()
 {
+    List<LifeTime const*> const& splitlst = m_impl.getSplittedLTList();
     BBListIter bbit;
     for (IRBB * bb = m_bb_list->get_head(&bbit);
          bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
         xcom::List<LifeTime const*>::Iter ltit;
         Pos startpos = m_impl.getLTMgr().getBBStartPos(bb->id());
         Pos endpos = m_impl.getLTMgr().getBBEndPos(bb->id());
-        for (LifeTime const* newlt = m_impl.getSplittedLTList().get_head(&ltit);
-             newlt != nullptr;
-             newlt = m_impl.getSplittedLTList().get_next(&ltit)) {
+        for (LifeTime const* newlt = splitlst.get_head(&ltit);
+             newlt != nullptr; newlt = splitlst.get_next(&ltit)) {
             LifeTime const* anct = newlt->getAncestor();
             ASSERT0(anct);
-            if (newlt->is_contain(startpos)) {
+            if (newlt->is_cover(startpos)) {
                 addInStatus(newlt, LTConsistencyMgr::CONSIST_VALID, bb->id());
             } else {
-                addInStatus(newlt, LTConsistencyMgr::CONSIST_INVALID, bb->id());
+                addInStatus(newlt, LTConsistencyMgr::CONSIST_INVALID,
+                            bb->id());
+            }
+            if (newlt->is_cover(endpos)) {
+                addOutStatus(newlt, LTConsistencyMgr::CONSIST_VALID, bb->id());
+            } else {
+                addOutStatus(newlt, LTConsistencyMgr::CONSIST_INVALID,
+                             bb->id());
             }
             if (anct->is_cover(startpos)) {
                 addInStatus(anct, LTConsistencyMgr::CONSIST_VALID, bb->id());
             } else {
                 addInStatus(anct, LTConsistencyMgr::CONSIST_INVALID, bb->id());
             }
-            if (newlt->is_cover(endpos)) {
-                addOutStatus(newlt, LTConsistencyMgr::CONSIST_VALID, bb->id());
-            } else {
-                addOutStatus(newlt, LTConsistencyMgr::CONSIST_INVALID, bb->id());
-            }
             if (anct->is_cover(endpos)) {
                 addOutStatus(anct, LTConsistencyMgr::CONSIST_VALID, bb->id());
             } else {
-                addOutStatus(anct, LTConsistencyMgr::CONSIST_INVALID, bb->id());
+                addOutStatus(anct, LTConsistencyMgr::CONSIST_INVALID,
+                             bb->id());
             }
+        }
+    }
+}
+
+
+void LTConsistencyMgr::computeEdgeConsistencyImpl(
+    xcom::Edge const* e,
+    OUT InConsistPairList & inconsist_lst)
+{
+    List<LifeTime const*> const& splitlst = m_impl.getSplittedLTList();
+    List<LifeTime const*>::Iter ltit;
+    xcom::VexIdx from = e->from()->id();
+    xcom::VexIdx to = e->to()->id();
+    for (LifeTime const* newlt = splitlst.get_head(&ltit);
+         newlt != nullptr; newlt = splitlst.get_next(&ltit)) {
+        LifeTime const* anct = newlt->getAncestor();
+        ASSERT0(anct);
+        CONSIST_STATUS fromst1 = getOutSt(newlt, from);
+        CONSIST_STATUS tost1 = getInSt(newlt, to);
+        if (tost1 == CONSIST_VALID && fromst1 != CONSIST_VALID) {
+            if (getOutSt(anct, from) != CONSIST_VALID) {
+                //CASE:lsra_fix_inconsist.gr
+                //Ancestor is not live-out from 'from' BB, it may be
+                //localized in 'from' BB. Thus there is dispensable to insert
+                //the copy operation.
+                continue;
+            }
+            //Insert copy anct->newlt.
+            InConsistPair pair;
+            pair.from_vex_id = from;
+            pair.to_vex_id = to;
+            pair.from_lt = anct;
+            pair.to_lt = newlt;
+            inconsist_lst.append_tail(pair);
+            continue;
+        }
+
+        CONSIST_STATUS fromst2 = getOutSt(anct, from);
+        CONSIST_STATUS tost2 = getInSt(anct, to);
+        if (tost2 == CONSIST_VALID && fromst2 != CONSIST_VALID) {
+            if (getOutSt(newlt, from) != CONSIST_VALID) {
+                //CASE:lsra_fix_inconsist.gr
+                //'newlt' is not live-out from 'from' BB, it may be
+                //localized in 'from' BB. Thus there is dispensable to insert
+                //the copy operation.
+                continue;
+            }
+            //Insert copy newlt->anct.
+            InConsistPair pair;
+            pair.from_vex_id = from;
+            pair.to_vex_id = to;
+            pair.from_lt = newlt;
+            pair.to_lt = anct;
+            inconsist_lst.append_tail(pair);
+            continue;
         }
     }
 }
@@ -314,45 +385,10 @@ void LTConsistencyMgr::computeLTConsistency()
 void LTConsistencyMgr::computeEdgeConsistency(
     OUT InConsistPairList & inconsist_lst)
 {
-    List<LifeTime const*> const& splitlst = m_impl.getSplittedLTList();
     xcom::EdgeIter it;
-    for (Edge * e = m_cfg->get_first_edge(it); e != nullptr;
+    for (xcom::Edge * e = m_cfg->get_first_edge(it); e != nullptr;
          e = m_cfg->get_next_edge(it)) {
-        List<LifeTime const*>::Iter ltit;
-        for (LifeTime const* newlt = splitlst.get_head(&ltit);
-             newlt != nullptr; newlt = splitlst.get_next(&ltit)) {
-            LifeTime const* anct = newlt->getAncestor();
-            ASSERT0(anct);
-            Vertex const* from = e->from();
-            Vertex const* to = e->to();
-            CONSIST_STATUS fromst = getOutSt(newlt, from->id());
-            CONSIST_STATUS tost = getInSt(newlt, to->id());
-            if (tost == CONSIST_VALID && fromst != CONSIST_VALID) {
-                ASSERT0(getOutSt(anct, from->id()) == CONSIST_VALID);
-                //Insert copy anct->newlt.
-                InConsistPair pair;
-                pair.from_vex_id = from->id();
-                pair.to_vex_id = to->id();
-                pair.from_lt = anct;
-                pair.to_lt = newlt;
-                inconsist_lst.append_tail(pair);
-                continue;
-            }
-
-            fromst = getOutSt(anct, from->id());
-            tost = getInSt(anct, to->id());
-            if (tost == CONSIST_VALID && fromst != CONSIST_VALID) {
-                ASSERT0(getOutSt(newlt, from->id()) == CONSIST_VALID);
-                //Insert copy newlt->anct.
-                InConsistPair pair;
-                pair.from_vex_id = from->id();
-                pair.to_vex_id = to->id();
-                pair.from_lt = newlt;
-                pair.to_lt = anct;
-                inconsist_lst.append_tail(pair);
-                continue;
-            }
-        }
+        computeEdgeConsistencyImpl(e, inconsist_lst);
     }
 }
 
@@ -489,7 +525,6 @@ LifeTime * SplitMgr::selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
     Range furthest_range(POS_UNDEF);
     LifeTime * cand = nullptr;
     VecIdx cnt = 0;
-    VecIdx cand_cnt = VEC_UNDEF;
     for (LifeTime * t = lst.get_head(&it);
          t != nullptr; t = lst.get_next(&it), cnt++) {
         VecIdx ridx, less, great;
@@ -507,7 +542,6 @@ LifeTime * SplitMgr::selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
                 r3.start() > furthest_range.start()) {
                 furthest_range = r3;
                 cand = t;
-                cand_cnt = cnt;
             }
             continue;
         }
@@ -521,13 +555,12 @@ LifeTime * SplitMgr::selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
             r2.start() > furthest_range.start()) {
             furthest_range = r2;
             cand = t;
-            cand_cnt = cnt;
         }
     }
     if (cand == nullptr) { return nullptr; }
     OccListIter it2;
     bool succ = cand->findOcc(furthest_range.start(), it2);
-    ASSERT0(succ);
+    ASSERT0_DUMMYUSE(succ);
     reload_occ = it2->val();
     dumpSelectSplitCand(m_impl, cand, pos, true,
                         "$%u has furthest next range", cand->getPrno());
@@ -817,15 +850,15 @@ LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
 //
 void LSRAImpl::initRegSet()
 {
+    //#define DEBUG_LSRA
     #ifdef DEBUG_LSRA
     //User can customize the register set that used in register allocation.
-    //e.g: given calling convention has 3 regisetr allocable, one is callee, 
-    // one is caller, and the other is link-register.
-    //m_avail_callee.bunion(5);
-    //m_avail_caller.bunion(6);
-    //m_avail_caller.bunion(getLink());
-    //m_avail_allocable.bunion(m_avail_callee);
-    //m_avail_allocable.bunion(m_avail_caller);
+    //e.g: given calling convention only has 1 regisetr allocable.
+    m_avail_callee.bunion(CALLEE_SAVED_REG_START);
+    m_avail_callee.bunion(CALLEE_SAVED_REG_START + 1);
+    m_avail_caller.clean();
+    m_avail_allocable.bunion(m_avail_callee);
+    m_avail_allocable.bunion(m_avail_caller);
     #else
     m_avail_callee.copy(getTIMgr().getCallee());
     m_avail_caller.copy(getTIMgr().getCaller());
@@ -955,7 +988,7 @@ void LSRAImpl::splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
         bool canbe = spltmgr.checkIfCanBeSplitCand(t, ctx.split_pos,
                                                    ctx.reload_pos,
                                                    ctx.reload_occ);
-        ASSERT0(canbe);
+        ASSERT0_DUMMYUSE(canbe);
         dumpSelectSplitCand(*this, t, curpos, true,
                             "split $%u that assigned %s",
                             t->getPrno(), m_ra.getRegName(r));
@@ -1075,6 +1108,7 @@ void LSRAImpl::transferInActive(Pos curpos)
             //Transfer lt to active.
             inact.remove(it);
             act.append_tail(lt);
+            continue;
         }
     }
 }
@@ -1096,13 +1130,14 @@ void LSRAImpl::transferActive(Pos curpos)
             act.remove(it);
             handled.append_tail(lt);
             freeReg(lt);
-            return;
+            continue;
         }
         if (!lt->is_contain(curpos)) {
             //lt convers 'curpos' but in a hole.
             //Transfer lt to inactive.
             act.remove(it);
             inact.append_tail(lt);
+            continue;
         }
     }
 }

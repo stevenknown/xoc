@@ -587,7 +587,7 @@ Programming Guides
           program unit.
 
       Operands:
-      * REGION_ru  indicate the REGION structure.
+      * REGION_ru  indicate the Region structure.
 
   ¡ñ  IR_SWITCH
       This operation represents multiple target branch.
@@ -1096,7 +1096,7 @@ Programming Guides
   Stmt operations which can be placed in basic block are:
     IR_ST, IR_STPR, IR_STARRAY, IR_SETELEM, IR_GETELEM, IR_IST, IR_CALL,
     IR_ICALL, IR_GOTO, IR_IGOTO, IR_SWITCH, IR_TRUEBR, IR_FALSEBR,
-    IR_RETURN, IR_PHI, IR_REGION.
+    IR_RETURN, IR_PHI, IR_REGION, IR_VST, IR_VSTPR, IR_VIST.
 
 
 ¡ö Control Flow Graph (CFG)
@@ -1156,47 +1156,28 @@ Programming Guides
        tweaked to get a better understanding of how the module works.
 
       * These functions manipulate the reference of IR.
-          IR may reference MD, or MDSet, or both MD and MDSet.
+        IR may reference MD, or MDSet, or both MD and MDSet.
 
-      add_referred_mds
-      compute_overlap_def_mds
-      compute_overlap_use_mds
-      collect_must_use
-      collect_must_may_use
-      clean_du_and_mds
-      copy_ir_tree_use_mds
-      copy_referred_mds
-      clean_use_mds
-      clean_def_mds
-      get_exact_unique_def
-      free_mds
-      map_call2mayuse
-      set_map_call2mayuse
-      has_no_du
-      isMayDef
-      isMayKill
-      isMustKill
-      is_must_def
-      is_exact_unique_def
+        collectMayUse
+        collectMayUseRecursive
+        changeUse
+        changeDef
+        getExactAndUniqueDef
+        isMayDef
+        isExactAndUniqueDef
+        isCallMayDef
 
       * These functions manipulate the DU chain.
 
-      build_du_chain
-      clean_du_and_mds
-      copy_du_info
-      get_du
-      get_du_c
-      free_du_info
-      union_use
-      union_useset
-      union_def
-      union_defset
-      remove_du_chain
-      remove_expired_du_chain
-      remove_def
-      remove_use_out_from_defset
-      remove_def_out_from_useset
-      remove_ir_out_from_du_mgr
+        addUse
+        buildDUChain
+        genDUSet
+        removeDUChain
+        removeExpiredDU
+        removeDef
+        removeUseFromDefset
+        removeDefFromUseset
+        removeIRFromDUMgr
 
   ¡ñ SSA Manager
     The SSA form is based on the premise that program variables are assigned
@@ -1246,49 +1227,49 @@ Programming Guides
     void main(int argc, char * argv[])
     {
         //Create region manager, since it is the top data structure of XOC.
-        REGION_MGR rm;
+        RegionMgr rm;
         rm.init_var_mgr();
 
-        //Generate IR list, Var and REGION accroding to user input.
-        generate_ir_list(&rm);
-        generate_var_tab(&rm);
+        //Generate IR list, Var and Region accroding to user input.
+        generateIRList(&rm);
+        generateVarTab(&rm);
 
         //Process all REGIONs, and do specified analysis and transformation.
         rm.process();
 
-        //Delete REGION_MGR
+        //Delete RegionMgr
         delete rm;
     }
 
   ¡ñ How to write a pass
     This is an example to demostrate how to write a pass.
     Note the header file cominc.h is important and necessary.
-    New pass must public derived from class IR_OPT, it is the base class.
+    New pass must public derived from class Pass, it is the base class.
     Note the following three functions must be implement by user,
-    class destructor, get_opt_name, and perform, all of them must be
+    class destructor, getPassName, and perform, all of them must be
     virtual.
 
     #include "cominc.h"
-    class MY_OPT : public IR_OPT {
-    REGION * m_ru;
+    class MyPass : public Pass {
+    Region * m_rg;
     public:
-        MY_OPT(REGION * ru) { m_ru = ru; }
-        virtual ~MY_OPT () {}
-        virtual CHAR const* get_opt_name()
+        MyPass(Region * ru) { m_rg = ru; }
+        virtual ~MyPass () {}
+        virtual CHAR const* getPassName()
         {
-            return ¡±My optimization¡±;
+            return "My optimization";
         }
 
-        virtual bool perform(OPT_CONT & opt_cont)
+        virtual bool perform(OptCtx & opt_cont)
         {
             //Do nothing.
             return false;
         }
     };
 
-    Now we declare our pass, MY_OPT.
+    Now we declare our pass, MyPass.
     If we add it into pass_manager optimization list, it is a working class,
-    and class member function get_opt_name() will be invoked when the class
+    and class member function getPassName() will be invoked when the class
     is running.
 
     Let's make our pass fully-fledged. If the global option g_show_comp_time
@@ -1297,9 +1278,9 @@ Programming Guides
     execution time of the pass. They are declared in comf.h. Following code
     fragment is a demo to use them.
 
-        virtual bool perform(OPT_CONT & opt_cont)
+        virtual bool perform(OptCtx & opt_cont)
         {
-            START_TIMER(get_opt_name());
+            START_TIMER(getPassName());
 
             //Do nothing.
 
@@ -1309,22 +1290,22 @@ Programming Guides
 
     For now, the most important thing you should do is decide what
     information should be avaiable for your class. For example, our
-    MY_OPT class need DU reference information, and DU chain for its
+    MyPass class need DU reference information, and DU chain for its
     implementation, the general step is to utilize the input parameter
     opt_cont,
 
-        virtual bool perform(OPT_CONT & opt_cont)
+        virtual bool perform(OptCtx & opt_cont)
         {
-            START_TIMER(get_opt_name());
+            START_TIMER(getPassName());
             if (!OPTC_is_du_chain_valid(oc)) {
                 if (!OPTC_is_ref_valid(oc)) {
                     if (!OPTC_is_aa_valid(oc)) {
-                        m_ru->getAA()->perform(oc);
+                        m_rg->getAA()->perform(oc);
                     }
-                    m_ru->getDUMgr()->perform(oc, SOL_REF);
+                    m_rg->getDUMgr()->perform(oc, SOL_REF);
                 }
-                IS_TRUE0(m_ru->getDUMgr()->verify());
-                m_ru->getDUMgr()->compute_du_chain(oc);
+                IS_TRUE0(m_rg->getDUMgr()->verify());
+                m_rg->getDUMgr()->computeDUChain(oc);
             }
 
             //Do nothing.

@@ -31,9 +31,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "elf_targinfo.h"
 #include "elf_mgr.h"
 #include "misc_elf_mgr.h"
-
-//The target machines that ELFMgr supported.
-#include "../arm/arm_elf_targinfo.h"
-#include "../score/score_elf_targinfo.h"
-#include "../x86/x86_elf_targinfo.h"
-#include "../x64/x64_elf_targinfo.h"

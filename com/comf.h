@@ -100,6 +100,12 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator);
 //e.g: Given string is a\b\c, separator is '\', return a;
 void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 
+//Extract the bit value from 'val' by given range that between 'start' bit
+//position and 'end' bit position.
+//The bit position start at 0.
+//e.g: Given start is 2, end is 4, val is 0b110101111, return 0b010.
+ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end);
+
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
 

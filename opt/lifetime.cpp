@@ -28,6 +28,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
+#include "lsra_impl.h"
+#include "lsra_scan_in_pos.h"
+#include "lt_prio_mgr.h"
+#include "lsra_scan_in_prio.h"
 
 namespace xoc {
 
@@ -271,7 +279,7 @@ void LifeTime::moveRangeVecFrom(LifeTime * src, Pos pos)
     Range srcr(POS_UNDEF);
     VecIdx rangeidx;
     bool f = src->findRange(pos, srcr, rangeidx);
-    ASSERT0(f);
+    ASSERT0_DUMMYUSE(f);
     Pos newr_start = pos;
     Pos newr_end = srcr.end();
     addRange(newr_start, newr_end);
@@ -539,7 +547,8 @@ static bool verifyOccList(LifeTime const* lt)
          it != plt->getOccList().end(); it = plt->getOccList().get_next(it)) {
         Occ occ = it->val();
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
-        ASSERTN(prev_pos <= occ.pos(), ("pos should be incremental order"));
+        ASSERTN_DUMMYUSE(prev_pos <= occ.pos(),
+                         ("pos should be incremental order"));
         prev_pos = occ.pos();
     }
     return true;
@@ -749,7 +758,7 @@ void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                                     DedicatedMgr const& dedmgr,
                                     Pos livein_def, IRIter & irit)
 {
-    Pos dpos_bb_start, upos_bb_start;
+    Pos dpos_bb_start = 0, upos_bb_start = 0;
     up.updateAtBBEntry(dpos_bb_start, upos_bb_start);
     m_bb_entry_pos.set(bb->id(), dpos_bb_start);
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
@@ -763,7 +772,7 @@ void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
         computeRHS(ir, *this, upos, livein_def, irit, dedmgr);
         computeLHS(ir, *this, dpos, dedmgr);
     }
-    Pos dpos_bb_end, upos_bb_end;
+    Pos dpos_bb_end = 0, upos_bb_end = 0;
     up.updateAtBBExit(dpos_bb_end, upos_bb_end);
     m_bb_exit_pos.set(bb->id(), upos_bb_end);
 }
@@ -800,6 +809,7 @@ static void dumpStmt(IR const* ir, Region const* rg, Pos dpos, Pos upos,
                      ConstIRIter & irit)
 {
     note(rg, "\n");
+    //Dump LHS.
     prt(rg, "[%u] ", dpos);
     IR * res = const_cast<IR*>(ir)->getResultPR();
     if (res != nullptr) { prt(rg, "$%u", res->getPrno()); }
@@ -807,7 +817,7 @@ static void dumpStmt(IR const* ir, Region const* rg, Pos dpos, Pos upos,
 
     prt(rg, " <= ");
 
-    prt(rg, "[%u] ", upos);
+    //Dump RHS.
     bool find_readpr = false;
     irit.clean();
     for (IR const* e = xoc::iterExpInitC(ir, irit);
@@ -822,6 +832,7 @@ static void dumpStmt(IR const* ir, Region const* rg, Pos dpos, Pos upos,
     if (!find_readpr) {
         prt(rg, "--");
     }
+    prt(rg, " [%u]", upos);
 }
 
 
@@ -832,7 +843,7 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
     Pos dpos_start, upos_start;
     bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
     if (valid) {
-        note(rg, "\n[%u] RegionExposedDef <= [%u] --", dpos_start, upos_start);
+        note(rg, "\n[%u] RegionExposedDef <= -- [%u]", dpos_start, upos_start);
     }
     BBListIter bbit;
     ConstIRIter irit;
@@ -843,7 +854,7 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
         bb->dumpDigest(rg);
         Pos dpos_bb_start, upos_bb_start;
         if (up.updateAtBBEntry(dpos_bb_start, upos_bb_start)) {
-            note(rg, "\n[%u] ExposedDef <= [%u] --",
+            note(rg, "\n[%u] ExposedDef <= -- [%u]",
                  dpos_bb_start, upos_bb_start);
         }
         for (IR * ir = irlst.get_head(&bbirit);
@@ -862,14 +873,14 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
         }
         Pos dpos_bb_end, upos_bb_end;
         if (up.updateAtBBExit(dpos_bb_end, upos_bb_end)) {
-            note(rg, "\n[%u] -- <= [%u] ExposedUse", dpos_bb_end, upos_bb_end);
+            note(rg, "\n[%u] -- <= ExposedUse [%u]", dpos_bb_end, upos_bb_end);
         }
         note(rg, "\n");
     }
     Pos dpos_end, upos_end;
     bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
     if (valid2) {
-        note(rg, "\n[%u] RegionExposedUse <= [%u] --", dpos_end, upos_end);
+        note(rg, "\n[%u] RegionExposedUse <= -- [%u]", dpos_end, upos_end);
     }
 }
 

@@ -523,7 +523,7 @@ bool verifyArrayOp(IR const* ir, Region const* rg)
         UINT result_data_size = tm->getByteSize(d);
         DUMMYUSE(elem_data_size | result_data_size);
         ASSERTN(result_data_size + ARR_ofst(ir) <= elem_data_size,
-            ("result data size should be less than element data size"));
+                ("result data size should be less than element data size"));
     }
     ASSERT0(ARR_base(ir)->is_single());
     ASSERTN(ARR_sub_list(ir), ("subscript expression can not be null"));

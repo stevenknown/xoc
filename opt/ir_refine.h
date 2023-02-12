@@ -115,7 +115,7 @@ public:
     RefineCtx const& operator = (RefineCtx const&);
 
     //Clean the actions which propagated bottom up during refinement.
-    void cleanBottomupFlag() { RC_stmt_removed(*this) = false; }
+    void cleanBottomUpFlag() { RC_stmt_removed(*this) = false; }
 
     //Return the OptCtx.
     OptCtx * getOptCtx() const { return RC_optctx(*this); }

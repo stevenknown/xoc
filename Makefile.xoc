@@ -1,3 +1,5 @@
+$(info "====---- START Makefile.xoc ----====")
+
 ifeq ($(TARG),)
   #SET DEFAULT TARG.
   TARG=FOR_DEX
@@ -53,8 +55,10 @@ $(info "DEBUG:$(DEBUG)")
 
 #Define rules.
 $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
+	@echo "BUILD $(XOC_OUTPUT)"
+	@echo "EXEC:"
 	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) $(TMP_READER_OBJS)
-	@echo "SUCCESS!!"
+	@echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"
 
 %.o:%.cpp
 	@echo "BUILD $<"
@@ -62,22 +66,27 @@ $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
 
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG)
+	@echo "EXEC:"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
 
 tmp_opt_objs: $(TMP_OPT_OBJS)
+	@echo "EXEC:tmp_opt_objs:$(TMP_OPT_OBJS)"
 
 tmp_reader_objs: $(TMP_READER_OBJS)
+	@echo "EXEC:tmp_reader_objs:$(TMP_READER_OBJS)"
 
 opt_objs: $(OPT_OBJS)
-	@echo "BUILD $(OPT_OBJS)"
+	@echo "EXEC:opt_objs:$(OPT_OBJS)"
 
 reader_objs: $(READER_OBJS)
+	@echo "EXEC:reader_objs:$(READER_OBJS)"
 
 clean:
-	cd $(COM_DIR) && make clean -f Makefile
+	cd $(COM_DIR) && make clean -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
 	@find ./ -name "*.gcda" | xargs rm -f
 	@find ./ -name "*.gcno" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f
+	@find ./ -name "*.d" | xargs rm -f
 	@find ./ -name "*.a" | xargs rm -f
 	@find ./ -name "*.dot" | xargs rm -f
 	@find ./ -name "*.exe" | xargs rm -f
@@ -93,3 +102,8 @@ clean:
 	@find ./ -name "*.LOGLOG" | xargs rm -f
 	@find ./ -name "LOGLOG" | xargs rm -f
 
+-include $(READER_DIR)/*.d
+-include $(COM_DIR)/*.d
+-include $(OPT_DIR)/*.d
+
+$(info "====---- END Makefile.xoc ----====")

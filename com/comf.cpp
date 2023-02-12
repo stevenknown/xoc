@@ -809,6 +809,19 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 }
 
 
+ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end)
+{
+    ASSERT0(start < sizeof(ULONGLONG) * BITS_PER_BYTE);
+    ASSERT0(end < sizeof(ULONGLONG) * BITS_PER_BYTE);
+    ASSERT0(start <= end);
+    UINT lastbit = sizeof(ULONGLONG) * BITS_PER_BYTE - 1;
+    UINT size = end - start;    
+    val = val << (lastbit - end);
+    val = val >> (lastbit - size);
+    return val;
+}
+
+
 //Extract the left most sub-string which separated by 'separator' from string.
 void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator)
 {

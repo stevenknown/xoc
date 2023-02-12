@@ -35,4 +35,6 @@ namespace mach {
 
 bool g_do_migen = true;
 
+bool g_is_dump_migen = false;
+
 } //namespace

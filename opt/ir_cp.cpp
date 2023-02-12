@@ -770,6 +770,8 @@ bool CopyProp::perform(OptCtx & oc)
     }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
+    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.

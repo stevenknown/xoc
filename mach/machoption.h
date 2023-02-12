@@ -36,6 +36,9 @@ namespace mach {
 //Perform Machine Insruction Generation.
 extern bool g_do_migen;
 
+//Dump Machine Insruction Generation.
+extern bool g_is_dump_migen;
+
 } //namespace
 
 #endif
