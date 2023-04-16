@@ -34,8 +34,10 @@ class StrBuf {
     COPY_CONSTRUCTOR(StrBuf);
 public:
     CHAR * buf; //the buffer that holds the string.
-    UINT buflen; //the byte length of the buffer. Note the buffer may longer
-                 //than the string needed.
+
+    //The byte length of the buffer. Note the buffer may longer
+    //than the string needed.
+    UINT buflen;
 public:
     //initsize: the byte size that string buffer expected to be.
     //Note the buffer may be longer than a string needed.
@@ -78,6 +80,9 @@ public:
 
     //Return the string buffer byte length.
     UINT getBufLen() const { return buflen; }
+
+    //Return the string buffer.
+    CHAR const* getBuf() const { return buf; }
 
     //The function convert string content into binary.
     //Note the content in given buf must be string format of hex, that is the

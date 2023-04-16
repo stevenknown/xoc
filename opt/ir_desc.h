@@ -66,7 +66,7 @@ enum IRDESC_FLAG {
     IRC_IS_STMT = 0x1, //statement.
     IRC_IS_BIN = 0x2, //binary operation.
     IRC_IS_UNA = 0x4, //unary operation.
-    
+
     //Memory reference operation. Memory reference indicates all
     //operations which write or load memory object.
     IRC_IS_MEM_REF = 0x8,
@@ -204,11 +204,24 @@ public:
     //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE       //
     //CORRESPONDING TO THE DEDICATED INITIALIZING VALUE.                     //
     ///////////////////////////////////////////////////////////////////////////
-    IR_CODE code;
-    CHAR const* name;
+    IR_CODE code; //the unique code of IR.
+    CHAR const* name; //the name of IR.
+
+    //The kid_map indicates the existence of each kid of current IR.
+    //It is always used in verification of the sanity of IR. Each bit of
+    //kid_map indicates whether the corresponding indexed kid can be empty.
+    //e.g: the kid_map of IR_IST is 0x3, means the 0th kid and 1th kid can not
+    //be emtpy, meanwhile IR_IF's kid_map is 0x1, means only 0th kid can not
+    //be emtpy.
     BYTE kid_map;
+
+    //The number of kid of IR.
     BYTE kid_num;
+
+    //The byte size of the class object of IR.
     BYTE size;
+
+    //The attributes of IR.
     IRDescFlag attr;
 
     //Following function pointer record the corresponding the utility function

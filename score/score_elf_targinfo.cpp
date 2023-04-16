@@ -41,7 +41,7 @@ static CHAR const* g_reltype_name[] = {
     "R_SCORE7_GP16",
     "R_SCORE7_ABS32",
 };
- 
+
 CHAR const* Score7ELFTargInfo::getRelTypeName(elf::Word r) const
 {
     switch (r) {

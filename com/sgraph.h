@@ -619,6 +619,7 @@ public:
     inline Vertex * getVertex(VexIdx vid) const
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        ASSERT0(vid != VERTEX_UNDEF);
         if (is_dense()) {
             return m_dense_vertex->get((VecIdx)vid);
         }
@@ -640,10 +641,16 @@ public:
     Vertex * get_next_vertex(VertexIter & it) const;
     Vertex * get_last_vertex(VertexIter & it) const;
     Vertex * get_prev_vertex(VertexIter & it) const;
+
+    //The function will iterate all predecessors vertex of 'vex'.
     static Vertex * get_first_in_vertex(Vertex const* vex, AdjVertexIter & it);
     static Vertex * get_next_in_vertex(AdjVertexIter & it);
+
+    //The function will iterate all successors vertex of 'vex'.
     static Vertex * get_first_out_vertex(Vertex const* vex, AdjVertexIter & it);
     static Vertex * get_next_out_vertex(AdjVertexIter & it);
+
+    //The function will iterate all out-edge of successors of 'vex'.
     static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
     static Edge * get_next_out_edge(AdjEdgeIter & it);
 
@@ -741,8 +748,13 @@ protected:
     RPOMgr m_rpomgr;
 protected:
     //The function will compute idom for subgraph that rooted by 'entry'.
-    bool computeIdom2SubGraph(Vertex const* entry,
-                              List<Vertex const*> const& vlst);
+    //entry: the entry vertex of subgraph. Note there can be only ONE entry.
+    //vlst: the Vertex list that belong to the subgraph.
+    void computeIdomForSubGraph(Vertex const* entry,
+                                List<Vertex const*> const& vlst);
+
+    //Return true if idom-set status changed.
+    bool computeIdomForFullGraph(List<Vertex const*> const& vlst);
     void freeDomSet(VexIdx vid);
     void freePdomSet(VexIdx vid);
     void removeUnreachNodeRecur(VexIdx id, BitSet & visited);
@@ -796,6 +808,9 @@ public:
         }
     }
 
+    //The function compute the entry vertex.
+    void computeEntryList(OUT List<Vertex const*> & lst) const;
+
     //The function clones Dom and PDom info by given graph.
     void cloneDomAndPdom(DGraph const& src);
 
@@ -809,8 +824,8 @@ public:
 
     //Vertices should have been sorted in topological order.
     //And we access them by reverse-topological order.
-    //vlst: compute dominator for vertices in vlst if it
-    //    is not empty or else compute all graph.
+    //vlst: compute dominator for vertices in vlst if it is not empty or else
+    //      compute all graph.
     //uni: universe.
     bool computeDom(List<Vertex const*> const* vlst = nullptr,
                     DomSet const* uni = nullptr);
@@ -842,8 +857,7 @@ public:
     //vlst: a list of vertex which sort in rpo order.
     //NOTE:
     //  1. The root node has better to be the first one in 'vlst'.
-    //  2. Do not use '0' as vertex id, it is used as Undefined.
-    //  3. Entry does not have idom.
+    //  2. Entry vertex does not have idom.
     bool computeIdom2(List<Vertex const*> const& vlst);
 
     //Compute immediate post dominate vertex.
@@ -869,7 +883,7 @@ public:
     bool changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ);
 
     void dumpDom(FILE * h, bool dump_dom_tree = true) const;
-    void dumpDom(CHAR const* name, bool dump_dom_tree = true) const;
+    void dumpDom(CHAR const* name = nullptr, bool dump_dom_tree = true) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.
@@ -975,6 +989,7 @@ public:
     { m_ipdom_set.set((VecIdx)vid, ipdom); }
 
     //The function revise DomInfo after graph changed.
+    //Note the RPO must be available.
     //modset: if it is not null, means user asked to collect vertex that idom
     //        changed by the function.
     //root: record the root vertex the of subgraph that affected by adding
@@ -985,7 +1000,9 @@ public:
                                            OUT UINT & iter_time);
 
     //The function recompute DomInfo after subgraph changed.
-    void recomputeDomInfoForSubGraph(Vertex const* root,
+    //Return true if all vertex rooted by 'root' has idom.
+    //Note the RPO must be available.
+    bool recomputeDomInfoForSubGraph(Vertex const* root,
                                      OUT VexTab * modset,
                                      OUT UINT & iter_time);
     bool removeUnreachNode(VexIdx entry_id);
@@ -1008,18 +1025,29 @@ public:
 };
 
 
+//The class provides helper functions to convenient iterate vertex on graph.
+//If 'start' vertex is given, the class will visit all predecessors start from
+//'start' until reach entries of graph.
 class GraphIterIn {
     COPY_CONSTRUCTOR(GraphIterIn);
     Graph const& m_g;
+    Vertex const* m_stop;
     List<Vertex*> m_wl;
     TTab<VexIdx> m_visited;
 public:
-    GraphIterIn(Graph const& g, Vertex const* start);
+    //stop: if stop vertex is given, the iterator will not iterate
+    //      stop's in-vertex.
+    GraphIterIn(Graph const& g, Vertex const* start,
+                Vertex const* stop = nullptr);
+    void clean();
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
 };
 
 
+//The class provides helper functions to convenient iterate vertex on graph.
+//If 'start' vertex is given, the class will visit all successors start from
+//'start' until reach exits of graph.
 class GraphIterOut {
     COPY_CONSTRUCTOR(GraphIterOut);
     List<Vertex*> m_wl;
@@ -1028,11 +1056,15 @@ protected:
     Graph const& m_g;
 public:
     GraphIterOut(Graph const& g, Vertex const* start);
+    void clean();
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
 };
 
 
+//The class provides helper functions to convenient iterate edge on graph.
+//If 'start' vertex is given, the class will visit all out-edge of vertex
+//start from 'start' until reach exits of graph.
 class GraphIterOutEdge {
     COPY_CONSTRUCTOR(GraphIterOutEdge);
     List<Edge*> m_wl;

@@ -681,7 +681,7 @@ void AliasAnalysis::inferArrayExpBase(IR * ir, IR * array_base,
     AC_comp_pts(&tic) = false;
 
     inferExpression(array_base, tmp, &tic, mx);
-    
+
     //Acquire TBAA to determine MD reference.
     MD const* typed_md = queryTBAA(array_base);
     if (typed_md != nullptr) {
@@ -2053,14 +2053,14 @@ void AliasAnalysis::processPhiOpndPTS(IR const* ir, bool phi_pts_is_worst,
             tmp.clean(*getSBSMgr());
             continue;
         }
- 
+
         ASSERT0_DUMMYUSE(is_legal_set(tmp, &tic));
         if (tmp.is_empty()) {
             ASSERT0(tic.get_hashed());
             phi_pts_is_worst = true;
             continue;
         }
- 
+
         //phi result PR may point to the union set of each operand.
         phi_pts.bunion(tmp, *getSBSMgr());
 

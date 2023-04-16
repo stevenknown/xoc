@@ -198,7 +198,7 @@ template <class BB, class XR> class CFG : public xcom::DGraph {
         RemoveEmptyBBHelperCtx(CfgOptCtx & coctx) :
             vertex_iter_time(0), cfgoptctx_org(coctx),
             cfgoptctx_dup(cfgoptctx_org) {}
-    
+
         CfgOptCtx & chooseCtx()
         {
             if (removeTooManyTimes()) {
@@ -210,12 +210,12 @@ template <class BB, class XR> class CFG : public xcom::DGraph {
             }
             return cfgoptctx_org;
         }
-    
+
         bool needUpdateDomInfo() const
         { return removeTooManyTimes() &&
                  cfgoptctx_org.needUpdateDomInfo() &&
                  cfgoptctx_org.oc.is_dom_valid(); }
-    
+
         bool removeTooManyTimes() const
         {
             return vertex_iter_time >
@@ -287,6 +287,10 @@ protected:
     {
         if (m_rpo_vexlst != nullptr) {
             m_rpo_vexlst->remove(bb->getVex());
+        }
+        xcom::RPOVal rpo = bb->getVex()->rpo();
+        if (rpo != RPO_UNDEF) {
+            getRPOMgr().freeRPO(rpo);
         }
     }
     virtual void recomputeDomInfo(MOD OptCtx & oc) = 0;
@@ -465,7 +469,7 @@ public:
         if (!rg->isLogMgrInit()) { return; }
         xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), true);
     }
-    
+
     void freeRPOVexList()
     {
         if (m_rpo_vexlst != nullptr) {
@@ -992,7 +996,6 @@ bool CFG<BB, XR>::removeSingleEmptyBB(BB * bb, MOD CfgOptCtx & ctx)
         next_bb = next_ct->val();
     }
     RemoveEmptyBBHelperCtx rmctx(ctx);
-    CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
     bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
     CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
     if (rmctx.needUpdateDomInfo()) {
@@ -1015,7 +1018,6 @@ bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx, RemoveEmptyBBCtx * rmbbctx)
     xcom::C<BB*> * next_ct;
     bool doit = false;
     RemoveEmptyBBHelperCtx rmctx(ctx);
-    CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != nullptr; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
         BB * bb = ct->val();
@@ -2027,7 +2029,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     INT order = RPO_INIT_VAL + m_bb_list->get_elem_count() * RPO_INTERVAL;
     computeRPOImpl(is_visited, m_entry->getVex(), order);
     #else
-    getRPOMgr().computeRPO(this, m_entry->getVex(), *m_rpo_vexlst);
+    getRPOMgr().computeRPO(*this, m_entry->getVex(), *m_rpo_vexlst);
     #endif
     OC_is_rpo_valid(oc) = true;
     END_TIMER(t, "Compute RPO");

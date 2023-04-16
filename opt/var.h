@@ -56,24 +56,24 @@ class RegionMgr;
 
 enum VAR_FLAG {
     VAR_UNDEF = 0x0,
-    
+
     //Variable is global.
     //The attribute describes the scope of variable.
     //A variable can be seen by all regions if it is GLOBAL.
     //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
     VAR_GLOBAL = 0x1,
-    
+
     //Variable is local.
     //The attribute defined the scope of variable.
     //A variable can ONLY be seen by current and inner region.
     //It always be allocated in stack or thread local storage(TLS).
     VAR_LOCAL = 0x2,
-    
+
     //The attribute describes the scope of variable.
     //A private variable which is GLOBAL can ONLY be seen in
     //current and inner region.
     VAR_PRIVATE = 0x4,
-    
+
     //Variable is readonly.
     //The attribute describes the access authority of variable.
     //A readonly variable guarantees that no operation can modify the memory.
@@ -145,7 +145,7 @@ public:
 public:
     //Get flag's name.
     static CHAR const* getName(VAR_FLAG flag);
-   
+
     //Compute the index of 'flag' in the Desc table.
     static UINT getDescIdx(VAR_FLAG flag);
 
@@ -457,7 +457,7 @@ public:
     //Customer could specify additional attributions for specific purpose.
     virtual Var * allocVAR() { return new Var(); }
 
-    //Create variable by string name.    
+    //Create variable by string name.
     //Add Var into VarTab.
     //Note you should call this function cafefully, and make sure
     //the Var is unique. This function does not keep the uniqueness

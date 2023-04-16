@@ -121,8 +121,11 @@ protected:
     MInst * allocMInst(UINT fieldnum)
     {
         MInst * mi = (MInst*)xmalloc(sizeof(T));
-        ASSERTN(fieldnum > 0, ("instruction can not be empty"));
-        MI_field_vec(mi) = (MField*)xmalloc(sizeof(MField) * fieldnum);
+        //CASE:MI_label does not have any field.
+        //ASSERTN(fieldnum > 0, ("instruction can not be empty"));
+        if (fieldnum > 0) {
+            MI_field_vec(mi) = (MField*)xmalloc(sizeof(MField) * fieldnum);
+        }
         return mi;
     }
 

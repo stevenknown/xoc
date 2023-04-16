@@ -64,7 +64,7 @@ class X64ELFTargInfo : public X86ELFTargInfo {
 public:
     X64ELFTargInfo(elf::ELFMgr * mgr) : X86ELFTargInfo(mgr) {}
     virtual ~X64ELFTargInfo() {}
- 
+
     //Return the machine type.
     virtual CHAR const* getMachineTypeName() const { return "X86-64"; }
 

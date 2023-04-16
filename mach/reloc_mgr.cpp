@@ -46,7 +46,7 @@ TMWORD Var2Offset::getOrAddVarOffset(xoc::Var const* v)
     off = m_cur_offset;
     set(v, off);
     m_cur_offset += v->getByteSize(m_tm);
-    return off; 
+    return off;
 }
 
 

@@ -722,7 +722,7 @@ void SolveSetMgr::computeMustExactDefMayDefMayUseForBB(
 
 void SolveSetMgr::collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
                                   OUT MDSet * maydefmds) const
-                          
+
 {
     if (ir->isWritePR()) {
         //Note call-stmt does not belong to WritePR.
@@ -1005,7 +1005,7 @@ void SolveSetMgr::computeKillSetByLiveInBB(UINT bbid, bool comp_must,
     }
 }
 
- 
+
 //Compute must and may killed stmt.
 //mustdefs: record must modified MD for each bb.
 //maydefs: record may modified MD for each bb.
@@ -1188,14 +1188,14 @@ void SolveSetMgr::computeGenExprForStmt(IR const* ir,
             expr_univers.bunion(IR_id(IGOTO_vexp(ir)), bsmgr);
         }
         break;
-    SWITCH_CASE_CONDITIONAL_BRANCH_OP: 
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         //Compute the generated expressions.
         if (canBeLiveExprCand(BR_det(ir))) {
             bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(BR_det(ir)));
             expr_univers.bunion(IR_id(BR_det(ir)), bsmgr);
         }
         break;
-    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP: 
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
         //Compute the generated expressions.
         if (canBeLiveExprCand(SWITCH_vexp(ir))) {
             bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(SWITCH_vexp(ir)));

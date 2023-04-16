@@ -61,22 +61,14 @@ class Float {
 protected:
     PRECISION_TYPE m_f;
 public:
-    Float()
-    {
-        m_f = PRECISION_TYPE(0);
-    }
-
+    Float() { m_f = PRECISION_TYPE(0); }
     Float(Float const& f)
     {
         //Sometimes, r does not require to initialize always.
         //ASSERTN(r.m_den != 0, ("denominator is 0!"));
         m_f = f.m_f;
     }
-
-    Float(PRECISION_TYPE f)
-    {
-        m_f = f;
-    }
+    Float(PRECISION_TYPE f) { m_f = f; }
 
     Float & operator = (Float const& a)
     {
@@ -85,16 +77,13 @@ public:
     }
 
     //Calculate the floor boundary.
-    INT typecast2int()
-    {
-        return (INT)m_f;
-    }
+    INT typecast2int() { return (INT)m_f; }
 
     bool is_int();
     PRECISION_TYPE f() const { return m_f; }
-    PRECISION_TYPE& f() { return m_f; }
+    PRECISION_TYPE & f() { return m_f; }
     void reduce() {}
-    CHAR const* format(StrBuf & buf) const;
+    CHAR const* dump(StrBuf & buf) const;
     void dump() const;
 };
 
@@ -126,12 +115,14 @@ inline Float operator + (Float const& a, Float const& b)
     //return Float(integralize(integralize(a.m_f) + integralize(b.m_f)));
     return Float(a.m_f + b.m_f);
 }
+
 //Subtration operation
 inline Float operator - (Float const& a, Float const& b)
 {
     //return Float(integralize(integralize(a.m_f) - integralize(b.m_f)));
     return Float(a.m_f - b.m_f);
 }
+
 //Minus operation
 inline Float operator - (Float a)
 {

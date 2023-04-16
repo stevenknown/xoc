@@ -44,6 +44,7 @@ namespace xoc {
 //
 void DedicatedMgr::dump(Region const* rg, TargInfoMgr const& timgr) const
 {
+    if (get_elem_count() == 0) { return; }
     note(rg, "\n==-- DUMP %s --==", "DedicatedMgr");
     PRNO2RegIter it;
     Reg r;
@@ -371,7 +372,7 @@ bool LifeTime::findRange(Pos pos, OUT Range & r, OUT VecIdx & ridx,
     return true;
 }
 
- 
+
 bool LifeTime::findOcc(Pos pos, OUT OccListIter & it) const
 {
     OccList & ol = const_cast<LifeTime*>(this)->getOccList();
@@ -799,23 +800,46 @@ void LifeTimeMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
 }
 
 
-static void dumpPlaceHolder(Region const* rg)
+static void dumpPhyReg(PRNO prno, LinearScanRA const& ra, Region const* rg)
 {
-    note(rg, "\n[?] =========== [?]");
+    Reg r = ra.getReg(prno);
+    if (r == REG_UNDEF) { return; }
+    REGFILE rf = ra.getRegFile(r);
+    ASSERT0(rf != RF_UNDEF);
+    prt(rg, ":%s(%s)", ra.getRegName(r), ra.getRegFileName(rf));
 }
 
 
-static void dumpStmt(IR const* ir, Region const* rg, Pos dpos, Pos upos,
-                     ConstIRIter & irit)
+//in_lt: true if ir is part of a lifetime.
+static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
+                          Pos dpos, Pos upos, LinearScanRA const& ra,
+                          ConstIRIter & irit)
 {
     note(rg, "\n");
     //Dump LHS.
-    prt(rg, "[%u] ", dpos);
+    if (in_lt) {
+        prt(rg, "[%u] ", dpos);
+    } else {
+        prt(rg, "[?] ");
+    }
     IR * res = const_cast<IR*>(ir)->getResultPR();
-    if (res != nullptr) { prt(rg, "$%u", res->getPrno()); }
-    else { prt(rg, "--"); }
+    if (res != nullptr) {
+        prt(rg, "$%u", res->getPrno());
+        dumpPhyReg(res->getPrno(), ra, rg);
+    } else { prt(rg, "--"); }
 
     prt(rg, " <= ");
+    if (!in_lt) {
+        ASSERT0(ra.isSpillOp(ir) || ra.isReloadOp(ir) ||
+                ra.isRematOp(ir) || ra.isMoveOp(ir));
+        CHAR const* role = nullptr;
+        if (ra.isSpillOp(ir)) { role = "spill"; }
+        else if (ra.isReloadOp(ir)) { role = "reload"; }
+        else if (ra.isRematOp(ir)) { role = "remat"; }
+        else if (ra.isMoveOp(ir)) { role = "move"; }
+        else { UNREACHABLE(); }
+        prt(rg, "%s == ", role);
+    }
 
     //Dump RHS.
     bool find_readpr = false;
@@ -828,11 +852,16 @@ static void dumpStmt(IR const* ir, Region const* rg, Pos dpos, Pos upos,
         }
         find_readpr = true;
         prt(rg, "$%u", e->getPrno());
+        dumpPhyReg(e->getPrno(), ra, rg);
     }
     if (!find_readpr) {
         prt(rg, "--");
     }
-    prt(rg, " [%u]", upos);
+    if (in_lt) {
+        prt(rg, " [%u]", upos);
+    } else {
+        prt(rg, " [?]");
+    }
 }
 
 
@@ -860,11 +889,8 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
         for (IR * ir = irlst.get_head(&bbirit);
              ir != nullptr; ir = irlst.get_next(&bbirit)) {
             Pos upos, dpos;
-            if (up.updateAtIR(ir, dpos, upos)) {
-                dumpStmt(ir, rg, dpos, upos, irit);
-            } else {
-                dumpPlaceHolder(rg);
-            }
+            bool in_lt = up.updateAtIR(ir, dpos, upos);
+            dumpStmtUsage(ir, rg, in_lt, dpos, upos, up.getRA(), irit);
             if (dumpir) {
                 rg->getLogMgr()->incIndent(4);
                 xoc::dumpIR(ir, rg);
@@ -908,9 +934,12 @@ void LifeTimeMgr::dump() const
 void LifeTimeMgr::dumpAllLT(UpdatePos & up, BBList const* bblst,
                             bool dumpir) const
 {
-    note(m_rg, "\n==-- DUMP %s --==", "ALL LifeTime");
+    if (m_lt_list.get_elem_count() == 0) { return; }
+    note(m_rg, "\n==-- DUMP ALL LifeTime --==");
+    m_rg->getLogMgr()->incIndent(2);
     dumpPROverView(m_rg, bblst, dumpir, up);
     m_lt_list.dump(m_rg);
+    m_rg->getLogMgr()->decIndent(2);
 }
 
 

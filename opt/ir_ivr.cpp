@@ -36,11 +36,196 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//
+//START BIV
+//
+IR * BIV::genInitExp(IRMgr * irmgr) const
+{
+    ASSERT0(getInitValType());
+    if (isInitConstInt()) {
+        ASSERT0(getInitValInt());
+        return irmgr->buildImmInt(*getInitValInt(), getInitValType());
+    }
+    if (isInitConstFP()) {
+        ASSERT0(getInitValFP());
+        return irmgr->buildImmFP(*getInitValFP(), getInitValType());
+    }
+    if (isInitVar()) {
+        ASSERT0(getInitValMD());
+        return irmgr->buildLoad(getInitValMD()->get_base(), getInitValType());
+    }
+    ASSERT0(0); //TODO:need to support.
+    return nullptr;
+}
+
+
+IR * BIV::genStepExp(IRMgr * irmgr) const
+{
+    ASSERT0(getInitValType());
+    Type const* ty = getInitValType();
+    IR_CODE irc = is_inc() ? IR_ADD : IR_SUB;
+    return irmgr->buildBinaryOp(irc, ty,
+        irmgr->buildLoad(getOccMD()->get_base(), ty),
+        irmgr->buildImmInt(getStep(), ty));
+}
+
+
+IR * BIV::genBoundExp(IVBoundInfo const& boundinfo, IVR const* ivr,
+                      IRMgr * irmgr, Region * rg) const
+{
+    IR const* ivref = nullptr;
+    IR const* bexp = nullptr;
+    bool is_closed_range = false;
+    ivr->extractIVBoundExpFromStmt(this, boundinfo.getBound(), &ivref, &bexp,
+                                   &is_closed_range);
+    ASSERT0(ivref && bexp);
+    if (is_inc()) {
+        IR_CODE irc;
+        if (is_closed_range) {
+            irc = IR_LE;
+        } else {
+            irc = IR_LT;
+        }
+        return irmgr->buildCmp(irc, rg->dupIRTree(ivref), rg->dupIRTree(bexp));
+    }
+    IR_CODE irc;
+    if (is_closed_range) {
+        irc = IR_GE;
+    } else {
+        irc = IR_GT;
+    }
+    return irmgr->buildCmp(irc, rg->dupIRTree(ivref), rg->dupIRTree(bexp));
+}
+
+
+void BIV::dump(Region const* rg) const
+{
+    BIV * iv = const_cast<BIV*>(this);
+    note(rg, "\nBIV(MD%d", iv->getOccMD()->id());
+
+    //Dump initval.
+    if (iv->hasInitVal()) {
+        if (iv->isInitConstInt()) {
+            prt(rg, ",init=%lld",
+                (BIVIntType)*iv->getInitValInt());
+        } else if (iv->isInitConstFP()) {
+            prt(rg, ",init=%f",
+                (BIVFpType)*iv->getInitValFP());
+        } else {
+            prt(rg, ",init=MD%u",
+                (MDIdx)iv->getInitValMD()->id());
+        }
+    }
+
+    //Dump monotone direction.
+    if (iv->is_inc()) {
+        prt(rg, ",step=%lld", (BIVIntType)iv->getStep());
+    } else {
+        prt(rg, ",step=-%lld", (BIVIntType)iv->getStep());
+    }
+
+    prt(rg, ")");
+    rg->getLogMgr()->incIndent(2);
+
+    //Dump BIV's def-stmt.
+    note(rg, "\nDEF-STMT:");
+    ASSERT0(iv->getRedStmt());
+    rg->getLogMgr()->incIndent(2);
+    dumpIR(iv->getRedStmt(), rg, nullptr, IR_DUMP_KID);
+    rg->getLogMgr()->decIndent(2);
+
+    //Dump BIV's occ-exp.
+    note(rg, "\nOCC-EXP:");
+    ASSERT0(iv->getRedStmt());
+    rg->getLogMgr()->incIndent(2);
+    dumpIR(iv->getRedStmt(), rg, nullptr, IR_DUMP_KID);
+    rg->getLogMgr()->decIndent(2);
+
+    //Dump BIV's init-stmt.
+    if (iv->getInitStmt() != nullptr) {
+        note(rg, "\nINIT-STMT:");
+        rg->getLogMgr()->incIndent(2);
+        dumpIR(iv->getInitStmt(), rg, nullptr, IR_DUMP_KID);
+        rg->getLogMgr()->decIndent(2);
+    }
+    rg->getLogMgr()->decIndent(2);
+}
+//END BIV
+
+
+//
+//START DIV
+//
+void DIV::dump(Region const* rg) const
+{
+    DIV * iv = const_cast<DIV*>(this);
+    ASSERT0(iv && iv->getRedStmt());
+    note(rg, "\nDIV");
+
+    //Dump div occurrence.
+    rg->getLogMgr()->incIndent(2);
+    note(rg, "\nOCC:");
+
+    rg->getLogMgr()->incIndent(2);
+    dumpIR(iv->getRedStmt(), rg, nullptr, IR_DUMP_KID);
+    rg->getLogMgr()->decIndent(2);
+
+    rg->getLogMgr()->decIndent(2);
+
+    //Dump linear-representation of div.
+    rg->getLogMgr()->incIndent(2);
+    note(rg, "\nLINREP:");
+    iv->getLinRep()->dump(rg);
+    rg->getLogMgr()->decIndent(2);
+}
+//END DIV
+
+
+//
+//START IVBoundInfo
+//
+void IVBoundInfo::dump(Region const* rg) const
+{
+    ASSERT0(rg);
+    note(rg, "\n==-- DUMP IVBoundInfo --==");
+    BIV const* iv = IVBI_iv(*this);
+    iv->dump(rg);
+    xcom::StrBuf lbuf(32);
+    xcom::StrBuf buf(32);
+    if (IVBI_is_tc_imm(*this)) {
+        xoc::dumpHostInt(IVBI_tc_imm(*this), false, false, lbuf);
+        buf.strcat("\nTRIPCOUNT IS IMM:%s", lbuf.buf);
+
+        lbuf.clean();
+        xoc::dumpHostInt(IVBI_tc_init_val_imm(*this), false, false, lbuf);
+        buf.strcat("\nINIT_VAL IS IMM:%s", lbuf.buf);
+
+        lbuf.clean();
+        xoc::dumpHostInt(IVBI_tc_end_val_imm(*this), false, false, lbuf);
+        buf.strcat("\nEND_VAL IS IMM:%s", lbuf.buf);
+    } else {
+        IR const* exp = IVBI_tc_exp(*this);
+        ASSERT0(exp && exp->is_exp());
+        buf.strcat("\nTRIPCOUNT IS EXP:", IRNAME(exp), exp->id());
+        {
+            DumpBufferSwitch buff(rg->getLogMgr());
+            xoc::dumpIR(exp, rg);
+            ASSERT0(rg->getLogMgr()->getBuffer());
+            buf.strcat(rg->getLogMgr()->getBuffer()->getBuf());
+        }
+    }
+    lbuf.clean();
+    xoc::dumpHostInt((HOST_INT)iv->getStep(), false, false, lbuf);
+    buf.strcat("\nSTEP IS IMM:%s", lbuf.buf);
+    note(rg, buf.buf);
+}
+//END IVBoundInfo
+
+
 //Return true if IV is increment, otherwise return false.
 bool IV::isInc() const
 {
     if (is_biv()) { return ((BIV*)this)->is_inc(); }
-
     ASSERT0(0); //TODO
     return false;
 }
@@ -54,6 +239,15 @@ IR const* IV::getRhsOccOfRedStmt() const
     ASSERT0(ref);
     //There should be only single occurrences in RHS of reduction.
     return ref;
+}
+
+
+bool LinearRep::isCoeffEqualTo(HOST_INT v) const
+{
+    if (coeff == nullptr) { return false; }
+    ASSERT0(coeff->is_const());
+    if (!coeff->is_int()) { return false; }
+    return CONST_int_val(coeff) == v;
 }
 
 
@@ -116,7 +310,7 @@ bool IVR::computeInitVal(IR const* ir, OUT BIV * iv)
     BIV_initv_data_type(iv) = v->getType();
     if (v->is_const()) {
         if (v->is_int()) {
-            if (iv->getInitValInt() == nullptr) {
+            if (!iv->hasInitVal()) {
                 BIV_initv_int(iv) = (BIVIntType*)xmalloc(sizeof(BIVIntType));
             }
             *BIV_initv_int(iv) = CONST_int_val(v);
@@ -124,7 +318,7 @@ bool IVR::computeInitVal(IR const* ir, OUT BIV * iv)
             return true;
         }
         if (v->is_fp()) {
-            if (iv->getInitValFp() == nullptr) {
+            if (!iv->hasInitVal()) {
                 BIV_initv_fp(iv) = (BIVFpType*)xmalloc(sizeof(BIVFpType));
             }
             *BIV_initv_fp(iv) = CONST_fp_val(v);
@@ -590,7 +784,7 @@ bool IVR::isSelfMod(IR const* ir) const
 //Find Basic IV.
 void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
 {
-    IRBB const* back_start_bb = findBackedgeStartBB(li, m_cfg);
+    IRBB const* back_start_bb = xoc::findBackEdgeStartBB(li, m_cfg);
     if (back_start_bb == nullptr) {
         //TODO: support more sophisiticated CFG pattern.
         return;
@@ -760,14 +954,19 @@ bool IVR::isLinearRepOfMD(LI<IRBB> const* li, IR const* ir, MD const* selfmd,
 }
 
 
-
-//Return true if ir is linear-representation of BIV.
-//e.g: if i is IV, a*i is the linear-represetation of i.
 bool IVR::isLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
-                          LinearRep * linrep) const
+                          OUT LinearRep * linrep) const
 {
     ASSERT0(ir->is_exp());
     IV const* iv = nullptr;
+    if (isIV(li, ir, &iv)) {
+        if (linrep != nullptr) {
+            linrep->coeff = m_irmgr->buildImmInt(1, ir->getType());
+            linrep->iv = iv;
+            linrep->var = ir;
+        }
+        return true;
+    }
     if (ir->is_mul()) {
         if (isIV(li, BIN_opnd0(ir), &iv) && isCoeff(li, BIN_opnd1(ir))) {
             if (linrep != nullptr) {
@@ -786,14 +985,6 @@ bool IVR::isLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
             return true;
         }
     }
-    if (isIV(li, ir, &iv)) {
-        //1*i is linear-rep of i.
-        if (linrep != nullptr) {
-            linrep->iv = iv;
-            linrep->var = ir;
-        }
-        return true;
-    }
     return false;
 }
 
@@ -808,6 +999,7 @@ bool IVR::isLinearRep(LI<IRBB> const* li, IR const* ir,
         if (isLinearRepOfIV(li, BIN_opnd0(ir), linrep) &&
             isAddend(li, BIN_opnd1(ir))) {
             if (linrep != nullptr) {
+                ASSERT0(linrep->iv);
                 linrep->addend = BIN_opnd1(ir);
                 linrep->addend_sign = ir->getCode();
             }
@@ -816,6 +1008,7 @@ bool IVR::isLinearRep(LI<IRBB> const* li, IR const* ir,
         if (isLinearRepOfIV(li, BIN_opnd1(ir), linrep) &&
             isAddend(li, BIN_opnd0(ir))) {
             if (linrep != nullptr) {
+                ASSERT0(linrep->iv);
                 linrep->addend = BIN_opnd0(ir);
                 linrep->addend_sign = ir->getCode();
             }
@@ -895,11 +1088,13 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
 
 void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
 {
+    Region const* rg = getRegion();
+    INT orgindent = rg->getLogMgr()->getIndent();
     while (li != nullptr) {
         note(getRegion(), "\n\n==-- LOOP INFO --==\n");
         //Dump loopinfo.
-        for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
-        prt(getRegion(), "LI%d:BB%d", li->id(), li->getLoopHead()->id());
+        //for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+        note(getRegion(), "\nLI%d:BB%d", li->id(), li->getLoopHead()->id());
         prt(getRegion(), ",BODY:");
         for (BSIdx i = li->getBodyBBSet()->get_first();
              i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
@@ -912,58 +1107,7 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
                  it != bivlst->end(); it = bivlst->get_next(it)) {
                 BIV const* iv = it->val();
                 ASSERT0(iv);
-                note(getRegion(), "\n");
-                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
-                prt(getRegion(), "BIV(MD%d", iv->getOccMD()->id());
-
-                if (iv->hasInitVal()) {
-                    if (iv->isInitConst()) {
-                        prt(getRegion(), ",init=%lld",
-                            (BIVIntType)*iv->getInitValInt());
-                    } else {
-                        prt(getRegion(), ",init=MD%d",
-                            (INT)iv->getInitValMD()->id());
-                    }
-                }
-
-                if (iv->is_inc()) {
-                    prt(getRegion(), ",step=%lld", (BIVIntType)iv->getStep());
-                } else {
-                    prt(getRegion(), ",step=-%lld", (BIVIntType)iv->getStep());
-                }
-
-                prt(getRegion(), ")");
-                getRegion()->getLogMgr()->incIndent(2);
-
-                //Dump BIV's def-stmt.
-                note(getRegion(), "\n");
-                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
-                prt(getRegion(), "DEF-STMT:");
-                ASSERT0(iv->getRedStmt());
-                getRegion()->getLogMgr()->incIndent(2);
-                dumpIR(iv->getRedStmt(), m_rg, nullptr, IR_DUMP_KID);
-                getRegion()->getLogMgr()->decIndent(2);
-
-                //Dump BIV's occ-exp.
-                note(getRegion(), "\n");
-                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
-                prt(getRegion(), "OCC-EXP:");
-                ASSERT0(iv->getRedStmt());
-                getRegion()->getLogMgr()->incIndent(2);
-                dumpIR(iv->getRedStmt(), m_rg, nullptr, IR_DUMP_KID);
-                getRegion()->getLogMgr()->decIndent(2);
-
-                //Dump BIV's init-stmt.
-                if (iv->getInitStmt() != nullptr) {
-                    note(getRegion(), "\n");
-                    for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
-                    prt(getRegion(), "INIT-STMT:");
-                    getRegion()->getLogMgr()->incIndent(2);
-                    dumpIR(iv->getInitStmt(), m_rg, nullptr, IR_DUMP_KID);
-                    getRegion()->getLogMgr()->decIndent(2);
-                }
-
-                getRegion()->getLogMgr()->decIndent(2);
+                iv->dump(getRegion());
             }
         }
 
@@ -972,30 +1116,14 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
             for (DIVListIter it = divlst->get_head();
                  it != divlst->end(); it = divlst->get_next(it)) {
                 DIV const* iv = it->val();
-                ASSERT0(iv && iv->getRedStmt());
-                note(getRegion(), "\nDIV");
-
-                //Dump div occurrence.
-                getRegion()->getLogMgr()->incIndent(2);
-                note(getRegion(), "\nOCC:");
-
-                getRegion()->getLogMgr()->incIndent(2);
-                dumpIR(iv->getRedStmt(), m_rg, nullptr, IR_DUMP_KID);
-                getRegion()->getLogMgr()->decIndent(2);
-
-                getRegion()->getLogMgr()->decIndent(2);
-
-                //Dump linear-representation of div.
-                getRegion()->getLogMgr()->incIndent(2);
-                note(getRegion(), "\nLINREP:");
-                iv->getLinRep()->dump(m_rg);
-                getRegion()->getLogMgr()->decIndent(2);
+                iv->dump(getRegion());
             }
         }
 
         dump_recur(LI_inner_list(li), indent + 2);
         li = LI_next(li);
     }
+    rg->getLogMgr()->setIndent(orgindent);
 }
 
 
@@ -1025,6 +1153,360 @@ void IVR::clean()
 }
 
 
+IR const* IVR::findBIVBoundStmt(LI<IRBB> const* li,
+                                OUT BIV const** biv) const
+{
+    ASSERT0(li);
+    BIVList const* bivlst = getBIVList(li);
+    if (bivlst == nullptr) {
+        //There is no biv.
+        return nullptr;
+    }
+    //Loop head can not change the control flow of loop.
+    //The loop head must be inside the loop body.
+    List<UINT> endlst;
+    li->findAllLoopEndBB(m_cfg, endlst);
+    if (endlst.get_elem_count() > 1) {
+        //Multiple exit BB.
+        return nullptr;
+    }
+    UINT bbid = endlst.get_head();
+    ASSERT0(bbid != BBID_UNDEF);
+    IRBB * bb = m_cfg->getBB(bbid);
+    ASSERT0(bb);
+    IR * bstmt = bb->getLastIR();
+    ASSERTN(bstmt && bstmt->isConditionalBr(), ("weird exit BB"));
+    for (BIVListIter it = bivlst->get_head();
+         it != bivlst->end(); it = bivlst->get_next(it)) {
+        BIV const* iv = it->val();
+        ASSERT0(iv);
+        if (isBIVBoundStmt(iv, li, bstmt)) {
+            if (biv != nullptr) { *biv = iv; }
+            return bstmt;
+        }
+    }
+    if (biv != nullptr) { *biv = nullptr; }
+    return nullptr;
+}
+
+
+bool IVR::extractIVBoundExpFromStmt(IV const* iv, IR const* stmt,
+                                    OUT IR const** ivref,
+                                    OUT IR const** bexp,
+                                    OUT bool * is_closed_range) const
+{
+    ASSERT0(iv && stmt && stmt->is_stmt());
+    if (!stmt->isConditionalBr()) { return false; }
+    IR const* compare_exp = BR_det(stmt);
+    if (!compare_exp->is_relation()) { return false; }
+    switch (compare_exp->getCode()) {
+    case IR_LE:
+    case IR_GE:
+        *is_closed_range = true;
+    default:
+        *is_closed_range = false;
+    }
+    if (!extractIVBoundExp(iv, compare_exp, ivref, bexp)) {
+        return false;
+    }
+    ASSERT0(ivref && bexp);
+    return true;
+}
+
+
+bool IVR::extractIVBoundExp(IV const* iv, IR const* compare_exp,
+                            OUT IR const** ivref,
+                            OUT IR const** bexp) const
+{
+    ASSERT0(compare_exp && compare_exp->is_relation());
+    IR const* opnd0 = BIN_opnd0(compare_exp);
+    IR const* opnd1 = BIN_opnd1(compare_exp);
+    ASSERT0(ivref && bexp);
+    *ivref = nullptr;
+    *bexp = nullptr;
+    if (opnd0->isMemOpnd()) {
+        MD const* mustref = opnd0->getMustRef();
+        if (mustref == nullptr) { return false; }
+        if (mustref == iv->getOccMD()) {
+            *ivref = opnd0;
+            *bexp = opnd1;
+            return true;
+        }
+    }
+    if (opnd1->isMemOpnd()) {
+        MD const* mustref = opnd1->getMustRef();
+        if (mustref == nullptr) { return false; }
+        if (mustref == iv->getOccMD()) {
+            *ivref = opnd1;
+            *bexp = opnd0;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool IVR::isBIVBoundExp(BIV const* biv, IR const* compare_exp,
+                        IR const* ivref) const
+{
+    ASSERT0(biv && compare_exp->is_exp() && ivref->is_exp() &&
+            ivref->getParent() == compare_exp);
+    if (!compare_exp->is_relation()) { return false; }
+    IR const* opnd0 = BIN_opnd0(compare_exp);
+    IR const* opnd1 = BIN_opnd1(compare_exp);
+    if (biv->isInc()) {
+        //Basic IV is in incremental order.
+        if (ivref == opnd0 &&
+           (compare_exp->is_lt() || compare_exp->is_le() ||
+            compare_exp->is_ne())) {
+            //compare_exp may be: iv<UB, iv<=UB, or iv!=UB.
+            return true;
+        }
+        if (ivref == opnd1 &&
+           (compare_exp->is_gt() || compare_exp->is_ge() ||
+            compare_exp->is_ne())) {
+            //compare_exp may be: UB>iv, UB>=iv, or UB!=iv.
+            return true;
+        }
+        return false;
+    }
+    //Basic IV is in decremental order.
+    if (ivref == opnd0 &&
+        (compare_exp->is_gt() || compare_exp->is_ge() ||
+         compare_exp->is_ne())) {
+         //compare_exp may be: iv>UB, iv>=UB, or iv!=UB.
+         return true;
+    }
+    if (ivref == opnd1 &&
+        (compare_exp->is_lt() || compare_exp->is_le() ||
+         compare_exp->is_ne())) {
+         //compare_exp may be: UB<iv, UB<=iv, or UB!=iv.
+         return true;
+    }
+    return false;
+}
+
+
+bool IVR::isBIVBoundStmt(BIV const* biv, LI<IRBB> const* li,
+                         IR const* stmt) const
+{
+    IR const* ivref = nullptr;
+    IR const* bexp = nullptr;
+    bool is_closed_range = false;
+    if (!extractIVBoundExpFromStmt(biv, stmt, &ivref, &bexp,
+                                   &is_closed_range)) {
+        return false;
+    }
+    ASSERT0(ivref && bexp);
+    DUMMYUSE(is_closed_range);
+    ASSERT0(stmt->isConditionalBr());
+    IR const* compare_exp = BR_det(stmt);
+    if (stmt->is_falsebr() &&
+        xoc::isBranchTargetOutSideLoop(li, m_cfg, stmt) &&
+        isBIVBoundExp(biv, compare_exp, ivref)) {
+        return true;
+    }
+    if (stmt->is_truebr() &&
+        xoc::isBranchTargetOutSideLoop(li, m_cfg, stmt)) {
+        IR * newir = IR::invertIRCode(const_cast<IR*>(compare_exp), m_rg);
+        ASSERT0_DUMMYUSE(newir == compare_exp);
+        bool res = isBIVBoundExp(biv, compare_exp, ivref);
+        IR::invertIRCode(const_cast<IR*>(compare_exp), m_rg);
+        return res;
+    }
+    return false;
+}
+
+
+bool IVR::computeConstValOfExp(IR const* exp, OUT HOST_INT & val) const
+{
+    ASSERT0(exp && exp->is_exp());
+    if (exp->isConstInt()) {
+        //Bound expression is constant.
+        val = CONST_int_val(exp);
+        return true;
+    }
+    if (useGVN()) {
+        //Determine whether the expression has constant value.
+        ASSERT0(m_gvn);
+        VN const* vn = m_gvn->getVN(exp);
+        if (vn == nullptr) {
+            //We know nothing about value of exp.
+            return false;
+        }
+        if (vn->getType() != VN_INT) {
+            return false;
+        }
+        val = VN_int_val(vn);
+        return true;
+    }
+    return false;
+}
+
+
+bool IVR::computeConstInitValOfBIV(BIV const* biv, OUT HOST_INT & val) const
+{
+    if (biv->isInitVar() && useGVN()) {
+        ASSERT0(m_gvn);
+        IR const* initval = biv->getInitStmt();
+        ASSERT0(initval && initval->hasRHS());
+        VN const* vn = m_gvn->getVN(initval->getRHS());
+        if (vn == nullptr) {
+            //We know nothing about initial value of IV.
+            return false;
+        }
+        if (vn->getType() != VN_INT) {
+            return false;
+        }
+        val = VN_int_val(vn);
+        return true;
+    }
+    if (biv->isInitConstInt()) {
+        val = *biv->getInitValInt();
+        return true;
+    }
+    return false;
+}
+
+
+void IVR::setAggressive(bool doit)
+{
+    m_is_aggressive = doit;
+    m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);
+}
+
+
+bool IVR::computeIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
+                         MOD IVRCtx & ivrctx) const
+{
+    if (computeConstIVBound(li, bi)) { return true; }
+    if (computeExpIVBound(li, bi, ivrctx)) { return true; }
+    return false;
+}
+
+
+IR * IVR::genTripCountExp(BIV const* biv, IR const* initexp,
+                          IR const* boundexp, HOST_INT step,
+                          MOD IVRCtx & ivrctx) const
+{
+    IR const* iv_initval = nullptr;
+    IR const* iv_endval = nullptr;
+    if (biv->is_inc()) {
+        iv_initval = initexp;
+        iv_endval = boundexp;
+    } else {
+        iv_initval = boundexp;
+        iv_endval = initexp;
+    }
+    DUMMYUSE(iv_initval);
+    Type const* ty = iv_endval->getType();
+    IR * tripcount_exp = m_irmgr->buildBinaryOp(IR_DIV, ty,
+        m_irmgr->buildBinaryOp(IR_SUB, ty,
+                               m_rg->dupIRTree(boundexp),
+                               m_rg->dupIRTree(initexp)),
+        m_irmgr->buildImmInt(step, ty));
+    Refine * refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
+    if (refine != nullptr) {
+        //Perform peephole optimization to ir.
+        //Return updated ir if optimization performed.
+        IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
+        RefineCtx rc(ivrctx.getOptCtx());
+        bool change;
+        tripcount_exp = refine->refineIRUntilUnchange(tripcount_exp,
+                                                      change, rc);
+    }
+    return tripcount_exp;
+}
+
+
+bool IVR::computeExpIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
+                            MOD IVRCtx & ivrctx) const
+{
+    BIV const* biv = nullptr;
+    IR const* ubstmt = findBIVBoundStmt(li, &biv);
+    if (ubstmt == nullptr) {
+        //The shape of 'li' is denormal, we almost can not figure the result
+        //out in a high probability.
+        return false;
+    }
+    ASSERT0(ubstmt->is_stmt());
+    ASSERT0(biv);
+    HOST_INT step = (HOST_INT)biv->getStep();
+    if (step == 0) {
+        //Step is 0, may cause infinit loop.
+        return false;
+    }
+    ASSERT0(biv);
+    if (!biv->hasInitVal()) { return false; }
+
+    //Get the initial value of IV.
+    IR const* initexp = biv->getInitExp();
+
+    //Compute the finish value of IV.
+    IR const* ivref = nullptr;
+    IR const* bexp = nullptr;
+    bool is_closed_range = false;
+    extractIVBoundExpFromStmt(biv, ubstmt, &ivref, &bexp, &is_closed_range);
+    ASSERT0(ivref && bexp);
+    IR * tripcount_exp = genTripCountExp(biv, initexp, bexp, step, ivrctx);
+    ASSERT0(tripcount_exp);
+    IVBI_is_tc_imm(bi) = false;
+    IVBI_tc_exp(bi) = tripcount_exp;
+    IVBI_iv(bi) = biv;
+    IVBI_iv_end_bound_stmt(bi) = ubstmt;
+    IVBI_is_end_bound_closed(bi) = is_closed_range;
+    return true;
+}
+
+
+bool IVR::computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi) const
+{
+    BIV const* biv = nullptr;
+    IR const* ubstmt = findBIVBoundStmt(li, &biv);
+    if (ubstmt == nullptr) {
+        //The shape of 'li' is denormal, we almost can not figure the result
+        //out in a high probability.
+        return false;
+    }
+    ASSERT0(biv);
+    if (!biv->hasInitVal()) { return false; }
+
+    //Compute the initial value of IV.
+    HOST_INT iv_initval = 0;
+    if (!computeConstInitValOfBIV(biv, iv_initval)) { return false; }
+
+    //Compute the finish value of IV.
+    IR const* ivref = nullptr;
+    IR const* bexp = nullptr;
+    bool is_closed_range = false;
+    extractIVBoundExpFromStmt(biv, ubstmt, &ivref, &bexp, &is_closed_range);
+    ASSERT0(ivref && bexp);
+    HOST_INT iv_endval = 0;
+    //Whether the end bound is constant value.
+    if (!computeConstValOfExp(bexp, iv_endval)) { return false; }
+    HOST_INT step = (HOST_INT)biv->getStep();
+    if (step == 0) {
+        //Step is 0, may cause infinit loop.
+        return false;
+    }
+    HOST_INT trip_count;
+    if (biv->is_inc()) {
+        trip_count = (iv_endval - iv_initval) / step;
+    } else {
+        trip_count = (iv_initval - iv_endval) / step;
+    }
+    if (trip_count < 0) { return false; }
+    IVBI_is_tc_imm(bi) = true;
+    IVBI_tc_imm(bi) = trip_count;
+    IVBI_iv(bi) = biv;
+    IVBI_tc_init_val_imm(bi) = iv_initval;
+    IVBI_tc_end_val_imm(bi) = iv_endval;
+    IVBI_iv_end_bound_stmt(bi) = ubstmt;
+    IVBI_is_end_bound_closed(bi) = is_closed_range;
+    return true;
+}
+
+
 bool IVR::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
@@ -1051,6 +1533,11 @@ bool IVR::perform(OptCtx & oc)
                                                PASS_LOOP_INFO, PASS_RPO,
                                                PASS_UNDEF);
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
+    if (is_aggressive() && !useGVN()) {
+        m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_GVN, PASS_UNDEF);
+        ASSERT0(useGVN());
+    }
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == nullptr) {
         END_TIMER(t, getPassName());

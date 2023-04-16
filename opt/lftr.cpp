@@ -192,7 +192,7 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
         //                                               PASS_UNDEF);
         //}
         //insert_bb |= splitted;
-        
+
     }
     return changed;
 }

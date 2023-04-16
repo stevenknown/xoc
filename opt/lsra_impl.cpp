@@ -401,7 +401,7 @@ IRBB * LTConsistencyMgr::insertLatch(IRBB const* from, MOD IRBB * to)
     m_bb_list->find(from, &fromit);
     m_bb_list->find(to, &toit);
     ASSERT0(fromit && toit);
- 
+
     //Insert newbb that must be fallthrough BB prior to occbb.
     IRBB * tramp = m_cfg->insertBBBetween(from, fromit, to, toit,
                                           newbb, m_oc);
@@ -1253,7 +1253,7 @@ void LSRAImpl::insertRematBefore(IR * remat, IR const* marker)
     m_ra.setRemat(remat);
     IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
     ASSERT0(stmt->is_stmt());
-    ASSERT0(!stmt->is_phi());
+    ASSERTN(!stmt->is_phi(), ("LSRA does not support SSA mode"));
     stmt->getBB()->getIRList().insert_before(remat, stmt);
 }
 
@@ -1264,7 +1264,7 @@ void LSRAImpl::insertReloadBefore(IR * reload, IR const* marker)
     m_ra.setReload(reload);
     IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
     ASSERT0(stmt->is_stmt());
-    ASSERT0(!stmt->is_phi());
+    ASSERTN(!stmt->is_phi(), ("LSRA does not support SSA mode"));
     stmt->getBB()->getIRList().insert_before(reload, stmt);
 }
 
@@ -1391,7 +1391,7 @@ void LSRAImpl::insertSpillBefore(IR * spill, IR const* marker)
     ASSERT0(isSpillLikeOp(spill) && marker);
     m_ra.setSpill(spill);
     IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
-    ASSERT0(!stmt->is_phi());
+    ASSERTN(!stmt->is_phi(), ("LSRA does not support SSA mode"));
     BBIRList & irlst = stmt->getBB()->getIRList();
     BBIRListIter it = nullptr;
     irlst.find(const_cast<IR*>(stmt), &it);

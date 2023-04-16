@@ -54,13 +54,9 @@ public:
     DumpFlag(UINT v) : UFlag(v) {}
 };
 
-void dumpHostInt(HOST_INT intval, Type const* ty, Region const* rg,
-                 OUT StrBuf & outbuf);
-void dumpHostFP(HOST_FP fpval, Type const* ty, BYTE mantissa, Region const* rg,
-                OUT StrBuf & outbuf);
 void dumpConstContent(IR const* ir, Region const* rg);
 
-void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
+void dumpIR(IR const* ir, Region const* rg, CHAR const* attr = nullptr,
             DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
 {

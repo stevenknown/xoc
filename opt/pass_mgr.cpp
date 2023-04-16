@@ -50,38 +50,49 @@ PassMgr::PassMgr(Region * rg)
 void PassMgr::destroyPass(Pass * pass)
 {
     ASSERT0(pass);
-    PASS_TYPE passtype = pass->getPassType();
-    ASSERT0(passtype != PASS_UNDEF);
-    m_registered_pass.remove(passtype);
+    ASSERT0(pass->getPassType() != PASS_UNDEF);
+    m_allocated_pass.remove(pass);
     delete pass;
 }
 
 
-void PassMgr::destroyPass(PASS_TYPE passtype)
+void PassMgr::destroyRegisteredPass(PASS_TYPE passtype)
 {
     Pass * pass = queryPass(passtype);
     if (pass == nullptr) { return; }
+    ASSERT0(pass->getPassType() == passtype);
+    m_registered_pass.remove(passtype);
     destroyPass(pass);
 }
 
 
-
-void PassMgr::destroyAllRegisteredPass()
+Pass * PassMgr::replacePass(PASS_TYPE passty, Pass * newpass)
 {
-    PassTabIter tabiter;
-    Pass * p;
-    Pass * irmgr = nullptr;
-    for (m_registered_pass.get_first(tabiter, &p);
-         p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
+    ASSERTN(newpass, ("should not set empty pass object"));
+    Pass * oldpass = queryPass(passty);
+    if (oldpass == nullptr) { return nullptr; }
+    m_registered_pass.setAlways(passty, newpass);
+    return oldpass;
+}
+
+
+void PassMgr::destroyAllPass()
+{
+    xcom::List<Pass*> irmgr_pass_lst;
+    xcom::TTabIter<Pass*> it;
+    for (Pass * p = m_allocated_pass.get_first(it);
+         p != nullptr; p = m_allocated_pass.get_next(it)) {
         if (p->getPassType() == PASS_IRMGR) {
             //Because some passes dependent on IRMgr, destroy it at last.
-            irmgr = p;
+            //Note user may allocate multiple IRMgrs for dedicated usage.
+            irmgr_pass_lst.append_tail(p);
             continue;
         }
         delete p;
     }
-    if (irmgr != nullptr) {
-        delete irmgr;
+    for (Pass * p = irmgr_pass_lst.get_head();
+         p != nullptr; p = irmgr_pass_lst.get_next()) {
+        delete p;
     }
 }
 
@@ -251,6 +262,16 @@ Pass * PassMgr::allocCallGraph()
 }
 
 
+Pass * PassMgr::allocVectorization()
+{
+    #ifdef FOR_IP
+    return new Vectorization(m_rg);
+    #else
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocLinearScanRA()
 {
     #ifdef REF_TARGMACH_INFO
@@ -349,12 +370,21 @@ Pass * PassMgr::allocRefine()
 }
 
 
-Pass * PassMgr::registerPass(PASS_TYPE opty)
+Pass * PassMgr::registerPass(PASS_TYPE passty)
 {
-    Pass * pass = queryPass(opty);
+    ASSERT0(passty != PASS_UNDEF);
+    Pass * pass = queryPass(passty);
     if (pass != nullptr) { return pass; }
+    pass = allocPass(passty);
+    ASSERT0(pass);
+    m_registered_pass.set(passty, pass);
+    return pass;
+}
 
-    switch (opty) {
+Pass * PassMgr::allocPass(PASS_TYPE passty)
+{
+    Pass * pass = nullptr;
+    switch (passty) {
     case PASS_CFG:
         pass = allocCFG();
         break;
@@ -469,11 +499,12 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_CALL_GRAPH:
         pass = allocCallGraph();
         break;
+    case PASS_VECT:
+        pass = allocVectorization();
+        break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }
-
-    ASSERT0(opty != PASS_UNDEF && pass);
-    m_registered_pass.set(opty, pass);
+    m_allocated_pass.append(pass);
     return pass;
 }
 
@@ -487,13 +518,13 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
     UINT num = 0;
     va_list ptr;
     va_start(ptr, oc);
-    PASS_TYPE opty = (PASS_TYPE)va_arg(ptr, UINT);
-    while (opty != PASS_UNDEF && num < 1000) {
-        ASSERTN(opty < PASS_NUM,
+    PASS_TYPE passty = (PASS_TYPE)va_arg(ptr, UINT);
+    while (passty != PASS_UNDEF && num < 1000) {
+        ASSERTN(passty < PASS_NUM,
                 ("You should append PASS_UNDEF to pass list."));
-        optlist.append_tail(opty);
+        optlist.append_tail(passty);
         num++;
-        opty = (PASS_TYPE)va_arg(ptr, UINT);
+        passty = (PASS_TYPE)va_arg(ptr, UINT);
     }
     va_end(ptr);
     checkValidAndRecompute(oc, optlist);
@@ -631,11 +662,11 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
     BitSet opts;
     C<PASS_TYPE> * it;
     for (optlist.get_head(&it); it != nullptr; optlist.get_next(&it)) {
-        PASS_TYPE opty = it->val();
-        if (opty == PASS_UNDEF) { continue; }
-        ASSERTN(opty < PASS_NUM,
+        PASS_TYPE passty = it->val();
+        if (passty == PASS_UNDEF) { continue; }
+        ASSERTN(passty < PASS_NUM,
                 ("You should append PASS_UNDEF to pass list."));
-        opts.bunion(opty);
+        opts.bunion(passty);
     }
     if (opts.is_contain(PASS_DOM) || opts.is_contain(PASS_PDOM)) {
         //Incremental DOM info update need both DOM and PDOM available.

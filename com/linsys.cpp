@@ -1406,7 +1406,7 @@ bool Lineq::omit(INTMat const& coeff,
     Vector<UINT> sczero; //record idx of single common zero columns.
     UINT sczero_count = 0;
 
-    //Exam left and right sides.    
+    //Exam left and right sides.
     for (INT i = 0; i < (INT)rhs_part; i++) {
         if (coeff.get(ncv, i) == 0 && coeff.get(pcv, i) == 0) {
             sczero.set(sczero_count++, i);

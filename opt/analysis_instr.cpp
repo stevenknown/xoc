@@ -96,12 +96,14 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_pass_mgr = nullptr;
     m_attachinfo_mgr = nullptr;
     m_ir_mgr = nullptr;
+    m_ir_bb_mgr = nullptr;
 
     //Counter of IR_PR, and do not use '0' as prno.
     m_pr_count = PRNO_UNDEF + 1;
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
     m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
                                        MEM_CONST_SIZE);
+    m_ir_bb_list = new BBList();
 }
 
 
@@ -168,9 +170,12 @@ AnalysisInstrument::~AnalysisInstrument()
     smpoolDelete(m_sc_labelinfo_pool);
     m_sc_labelinfo_pool = nullptr;
 
-    //Just set to NULL because the memory is not managed by current object.
+    //Just set to NULL because these objects are not managed by 'this'.
     m_ir_list = nullptr;
     m_ir_mgr = nullptr;
+
+    delete m_ir_bb_list;
+    m_ir_bb_mgr = nullptr;
 }
 
 
@@ -182,14 +187,14 @@ size_t AnalysisInstrument::count_mem() const
     }
     count += smpoolGetPoolSize(m_du_pool);
     count += smpoolGetPoolSize(m_sc_labelinfo_pool);
-    count += m_ir_bb_mgr.count_mem();
     count += m_prno2var.count_mem();
     count += m_bs_mgr.count_mem();
     count += m_sbs_mgr.count_mem();
     count += m_mds_mgr.count_mem();
     count += m_mds_hash.count_mem();
-    count += m_ir_bb_list.count_mem();
+    count += m_ir_bb_list != nullptr ? m_ir_bb_list->count_mem(): 0;
     count += m_ir_mgr != nullptr ? m_ir_mgr->count_mem() : 0;
+    count += m_ir_bb_mgr != nullptr ? m_ir_bb_mgr->count_mem() : 0;
     //m_free_du_list has been counted in m_du_pool.
     return count;
 }

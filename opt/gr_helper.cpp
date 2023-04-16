@@ -198,22 +198,22 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     ASSERT0(ctx);
     if (ir->is_sint()) {
         //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = getIntFormat(true);
+        //CHAR const* intfmt = getHostIntFormat(true);
         //Prefer print imm according to its type.
         StrBuf fmt(16);
-        fmt.strcat("%s:%%s", getIntFormat(false));
+        fmt.strcat("%s:%%s", getHostIntFormat(false));
         m_lm->incIndent(dn);
         prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
-    
+
     if (ir->is_uint()) {
         //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = getIntFormat(true);
+        //CHAR const* intfmt = getHostIntFormat(true);
         //Prefer print imm according to its type.
         StrBuf fmt(16);
-        fmt.strcat("%s:%%s", getUIntFormat(false));
+        fmt.strcat("%s:%%s", getHostUIntFormat(false));
         m_lm->incIndent(dn);
         prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
@@ -259,10 +259,10 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
 
     if (ir->is_mc()) {
         //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = getIntFormat(true);
+        //CHAR const* intfmt = getHostIntFormat(true);
         //Prefer print imm according to its type.
         StrBuf fmt(16);
-        fmt.strcat("%s:%%s", getUIntFormat(false));
+        fmt.strcat("%s:%%s", getHostUIntFormat(false));
         m_lm->incIndent(dn);
         prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
@@ -274,7 +274,7 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     //Note the dump format may extend or truncate the real value.
     //Imm may be MC type.
     StrBuf fmt(16);
-    fmt.strcat("%s:%%s", getUIntFormat(false));
+    fmt.strcat("%s:%%s", getHostUIntFormat(false));
     m_lm->incIndent(dn);
     prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
     m_lm->decIndent(dn);
@@ -324,7 +324,6 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 {
     UINT dn = DUMP_INDENT_NUM;
     if (!m_rg->isLogMgrInit() || ir == nullptr) { return; }
-
     StrBuf buf(64);
     StrBuf buf2(64);
     Type const* d = ir->getType();

@@ -427,6 +427,9 @@ public:
     //Return the number of alignment.
     UINT getAlign() const;
 
+    static CHAR const* getIRName(IR const* ir)
+    { return getIRCodeName(ir->getCode()); }
+    static CHAR const* getIRCodeName(IR_CODE irc) { return IRCNAME(irc); }
     static UINT getIRCodeSize(IR const* ir)
     {
         #ifdef CONST_IRC_SZ
@@ -640,9 +643,11 @@ public:
 
     //Return true if current ir is binary operation.
     bool isBinaryOp() const { return IRDES_is_bin(g_ir_desc[getCode()]); }
+    static bool isBinaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
 
     //Return true if current ir is unary operation.
     bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[getCode()]); }
+    static bool isUnaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
 
     //Return true if ir is constant expression.
     bool isConstExp() const;
@@ -922,6 +927,7 @@ public:
     }
     void setType(Type const* ty)
     {
+        ASSERT0(ty);
         ASSERT0(!mustBePointerType() || ty->is_pointer());
         IR_dt(this) = ty;
     }

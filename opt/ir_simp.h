@@ -70,6 +70,10 @@ class CfsMgr;
 #define SIMP_need_rebuild_nonpr_du_chain(s) \
     (s)->prop_bottom_up.s1.need_to_rebuild_nonpr_du_chain
 #define SIMP_cfs_mgr(s) (s)->cfs_mgr
+
+//The class represents the simplification behaviors.
+//Each behavior has an option corresponding to it.
+//Enable or disable options to control the related simplification.
 class SimpCtx {
 public:
     typedef UINT BitUnion;

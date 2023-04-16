@@ -418,7 +418,7 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 //  FALSEBR L1
 //  BODY-STMT
 //  LABEL: step
-//  STEP
+//  STEP-STMT
 //  GOTO start
 //  LABEL: L1
 IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
@@ -1202,7 +1202,7 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
                 newsub = irmgr->buildBinaryOp(IR_MUL, indextyid, newsub,
                     irmgr->buildImmInt(elemnum, indextyid));
 
-                if (dbx != nullptr) { 
+                if (dbx != nullptr) {
                     xoc::copyDbxForList(newsub, s, rg);
                 }
             }
@@ -1213,7 +1213,7 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
         } else {
             ofst_exp = irmgr->buildBinaryOpSimp(IR_ADD, indextyid,
                                                 ofst_exp, newsub);
-            if (dbx != nullptr) { 
+            if (dbx != nullptr) {
                 xoc::copyDbxForList(ofst_exp, s, rg);
             }
         }
@@ -2419,7 +2419,7 @@ IR * IRSimp::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
         note(m_rg, "\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
         m_rg->getLogMgr()->incIndent(2);
         xoc::dumpIRList(ret_list, m_rg);
-        m_rg->getLogMgr()->decIndent(2);    
+        m_rg->getLogMgr()->decIndent(2);
     }
     return ret_list;
 }

@@ -186,7 +186,7 @@ public:
     Type() { data_type = D_UNDEF; }
 
     void copy(Type const& src) { data_type = src.data_type; }
-    
+
     inline void dump(TypeMgr const* tm) const;
 
     //Return data type.
@@ -291,7 +291,8 @@ public:
     { return TY_dtype(this) >= D_F16 && TY_dtype(this) <= D_F128; }
 
     //Return true if the type can be used to represent the
-    //pointer's addend. e.g:The pointer arith, int * p; p = p + (type)value.
+    //pointer's addend.
+    //e.g:The pointer arith, int * p; p = p + (type)value. value is addend.
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
 

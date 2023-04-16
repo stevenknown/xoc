@@ -182,7 +182,9 @@ public:
     virtual void convertReturn(IR const* ir, OUT RecycMIList & mis,
                                MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-
+    virtual void convertCall(IR const* ir, OUT RecycMIList & mis,
+                             MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertAdd(IR const* ir, OUT RecycMIList & mis,
                             MOD IMCtx * cont)
     {

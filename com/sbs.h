@@ -862,7 +862,7 @@ protected:
     //The function always used in Debug Mode.
     bool belongToCurrentMgr(void const* obj) const
     { return m_settab.find(obj); }
-    
+
     //Record 'obj' is allocated by current mgr.
     //The function always used in Debug Mode.
     bool recordObj(void const* obj) { m_settab.append(obj); return true; }

@@ -51,7 +51,7 @@ class Score7ELFTargInfo : public elf::ELFTargInfo {
 public:
     Score7ELFTargInfo(elf::ELFMgr * mgr) : elf::ELFTargInfo(mgr) {}
     virtual ~Score7ELFTargInfo() {}
- 
+
     //Return the machine type.
     virtual CHAR const* getMachineTypeName() const { return "Score7"; }
 

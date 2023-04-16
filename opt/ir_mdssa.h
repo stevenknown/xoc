@@ -212,7 +212,7 @@ public:
             liveset->getSet().copy(src, m_sbsmgr);
         }
         return liveset;
-        
+
     }
     LiveSet * genAndCopy(UINT bbid, VMD const* vmd)
     {
@@ -233,12 +233,15 @@ public:
 //
 //START RenameDef
 //
-//The class generates VMD for 'newstmt' or 'newphi', then insert VMD into DefDef
-//chain, rename following USE as well.
+//The class generates VMD for 'newstmt' or 'newphi', then insert VMD into
+//DefDef chain, rename following USE as well.
 class RenameDef {
     COPY_CONSTRUCTOR(RenameDef);
     bool m_is_build_ddchain; //true to build DefDef chain with DomTree.
-    IR const* m_newstmt; //record the stmt that inserted
+
+    //Record the stmt that inserted.
+    //The class will generate MDSSAInfo if it does not have one.
+    IR * m_newstmt;
     MDPhi const* m_newphi; //record the phi that inserted
     DomTree const& m_domtree;
     LiveSet * m_liveset;
@@ -270,7 +273,7 @@ private:
     void iterBBPhiListToKillLivedVMD(IRBB const* bb, LiveSet & liveset);
     void iterSuccBBPhiListToRename(Vertex const* defvex, IRBB const* succ,
                                    UINT opnd_idx, MOD LiveSet & liveset);
-    //v: vertex on DomTree.
+    //defvex: domtree vertex.
     void iterSuccBB(Vertex const* defvev, MOD LiveSet & liveset);
 
     void killLivedVMD(MDPhi const* phi, MOD LiveSet & liveset);
@@ -325,7 +328,7 @@ private:
     bool tryInsertDDChainForStmt(IR * ir, bool before, MOD LiveSet & liveset);
     bool tryInsertDDChainForPhi(MDPhi * phi, MOD LiveSet & liveset);
 public:
-    RenameDef(IR const* stmt, DomTree const& dt, bool build_ddchain,
+    RenameDef(MOD IR * stmt, DomTree const& dt, bool build_ddchain,
               MDSSAMgr * mgr);
     RenameDef(MDPhi const* phi, DomTree const& dt, bool build_ddchain,
               MDSSAMgr * mgr);
@@ -335,6 +338,38 @@ public:
     void perform();
 };
 //END RenameDef
+
+
+//The class reconstruct MDSSA info for given region in DomTree order.
+//The region recorded in 'm_vextab'
+class ReconstructMDSSA : public VisitTree {
+    COPY_CONSTRUCTOR(ReconstructMDSSA);
+    //Record the vertex on CFG that need to revise.
+    xcom::VexTab const& m_vextab;
+    MDSSAMgr * m_mdssamgr;
+    xcom::Graph const* m_cfg;
+    Region const* m_rg;
+private:
+    void renameBBIRList(IRBB const* bb) const;
+    void renameBBPhiList(IRBB const* bb) const;
+public:
+    ReconstructMDSSA(xcom::Vertex const* root, xcom::VexTab const& vextab,
+                     xcom::DomTree const& domtree, xcom::Graph const* cfg,
+                     MDSSAMgr * mgr);
+
+    //The interface of VisitTree to access each Vertex.
+    //v: the vertex on DomTree.
+    virtual void visitWhenFirstMeet(Vertex const* v)
+    {
+        Vertex const* cfgv = m_cfg->getVertex(v->id());
+        ASSERT0(cfgv);
+        if (!m_vextab.find(cfgv)) { return; }
+        IRBB * bb = m_rg->getBB(cfgv->id());
+        ASSERT0(bb);
+        renameBBPhiList(bb);
+        renameBBIRList(bb);
+    }
+};
 
 
 //MDSSA Update Context
@@ -744,6 +779,9 @@ public:
     //Dump MDSSA VOpnd reference.
     void dumpVOpndRef() const;
 
+    //Dump IRBB list with MDSSA info.
+    void dumpBBList() const;
+
     //The function dumps VMD structure and SSA DU info.
     void dumpAllVMD() const;
 
@@ -845,9 +883,10 @@ public:
     //         'startbb', then keep finding its predecessors until the
     //         CFG entry.
     //startbb: the BB that begin to do searching.
-    void findAndSetLiveInDef(IR * exp, IR const* startir,
+    void findAndSetLiveInDef(MOD IR * exp, IR const* startir,
                              IRBB const* startbb, OptCtx const& oc);
-    void findAndSetLiveInDef(IR * exp, IRBB const* startbb, OptCtx const& oc)
+    void findAndSetLiveInDef(MOD IR * exp, IRBB const* startbb,
+                             OptCtx const& oc)
     {
         findAndSetLiveInDef(exp, const_cast<IRBB*>(startbb)->getLastIR(),
                             startbb, oc);
@@ -900,9 +939,11 @@ public:
 
     //Generate MDSSAInfo and generate VOpnd for referrenced MD that both
     //include must-ref MD and may-ref MDs.
+    //ir: must be stmt.
     MDSSAInfo * genMDSSAInfoAndNewVesionVMD(IR * ir);
 
-    MDSSAInfo * genMDSSAInfo(IR * ir)
+    //The function is a wrapper of UseDefMgr's function.
+    MDSSAInfo * genMDSSAInfo(MOD IR * ir)
     { return getUseDefMgr()->genMDSSAInfo(ir); }
 
     //The function will generate new version which is used to idenify MD.

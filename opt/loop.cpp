@@ -802,6 +802,16 @@ static bool isLoopInvariantInPRSSA(IR const* ir, LI<IRBB> const* li,
 }
 
 
+static bool isRealMDDef(MDDef const* mddef, IR const* use,
+                        MDSSAMgr const* mdssamgr)
+{
+    IR const* defocc = mddef->getOcc();
+    ASSERT0(defocc);
+    bool const is_aggressive = true;
+    return xoc::isDependent(defocc, use, is_aggressive, mdssamgr->getRegion());
+}
+
+
 static bool isRealMDDefInvariant(MDDef const* mddef, LI<IRBB> const* li,
                                  InvStmtList const* invariant_stmt,
                                  MDSSAMgr const* mdssamgr)
@@ -836,6 +846,9 @@ static bool isMDPhiInvariant(MDDef const* start,
         if (def->is_phi() || def == start) {
             continue;
         }
+        if (!isRealMDDef(def, use, mdssamgr)) {
+            continue;
+        }
         if (!isRealMDDefInvariant(def, li, invariant_stmt, mdssamgr)) {
             return false;
         }
@@ -868,6 +881,9 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
             //not regard PHI as real definition.
             continue;
         }
+        if (!isRealMDDef(mddef, ir, mdssamgr)) {
+            continue;
+        }
         if (!isRealMDDefInvariant(mddef, li, invariant_stmt, mdssamgr)) {
             return false;
         }
@@ -890,7 +906,10 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
         IR const* def = const_cast<Region*>(rg)->getIR(i);
         ASSERT0(def->is_stmt());
         IRBB const* defbb = def->getBB();
-
+        bool const is_aggressive = true;
+        if (!xoc::isDependent(def, ir, is_aggressive, rg)) {
+            continue;
+        }
         if (!li->isInsideLoop(defbb->id())) { continue; }
         if (invariant_stmt == nullptr ||
             (invariant_stmt != nullptr &&
@@ -902,16 +921,6 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
 }
 
 
-//Return true if all the expression on 'ir' tree is loop invariant.
-//ir: root node of IR
-//li: loop structure
-//check_tree: true to perform check recusively for entire IR tree.
-//invariant_stmt: a list that records the stmt that is invariant in loop.
-//    e.g:loop() {
-//          a = b; //S1
-//       }
-//    stmt S1 is invariant because b is invariant.
-//Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
                      InvStmtList const* invariant_stmt, bool check_tree)
 {
@@ -944,7 +953,6 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
             return false;
         }
     }
-
     return true;
 }
 
@@ -1107,9 +1115,9 @@ LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it)
 //  BB3: goto loop-start bb
 //BB3 is the backedge-start bb.
 //Return backedge BB id if found, otherwise return BBID_UNDEF.
-IRBB * findBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
+IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
 {
-    UINT bbid = li->findBackedgeStartBB(cfg);
+    UINT bbid = li->findBackEdgeStartBB(cfg);
     if (bbid != BBID_UNDEF) {
         return cfg->getBB(bbid);
     }
@@ -1241,6 +1249,16 @@ bool verifyLoopInfoTree(LI<IRBB> const* li, OptCtx const& oc)
         verifyLoopInfo(tli, oc);
     }
     return true;
+}
+
+
+bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt)
+{
+    LabelInfo const* lab = stmt->getLabel();
+    ASSERTN(lab, ("stmt does not have target label"));
+    IRBB const* tbb = cfg->findBBbyLabel(lab);
+    ASSERT0(tbb);
+    return !li->isInsideLoop(tbb->id());
 }
 
 

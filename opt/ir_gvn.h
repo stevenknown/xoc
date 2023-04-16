@@ -83,12 +83,11 @@ public:
     UINT m_id;
     VN_TYPE m_vn_type; //value type
     union {
-        LONGLONG iv;
-        double dv;
+        HOST_INT iv;
+        HOST_FP dv;
         Sym const* str;
         IR_CODE op; //operation
     } u1;
-
 public:
     VN() { clean(); }
 
@@ -130,12 +129,19 @@ public:
 };
 
 
-typedef TMapIter<UINT, VN*> IR2VNIter;
-
-class IR2VN : public TMap<UINT, VN*> {
+typedef TMapIter<UINT, VN const*> IR2VNIter;
+class IR2VN : public TMap<UINT, VN const*> {
     COPY_CONSTRUCTOR(IR2VN);
 public:
     IR2VN() {}
+};
+
+
+typedef TMapIter<UINT, VN const*> MDPhi2VNIter;
+class MDPhi2VN : public TMap<UINT, VN const*> {
+    COPY_CONSTRUCTOR(MDPhi2VN);
+public:
+    MDPhi2VN() {}
 };
 
 
@@ -146,7 +152,6 @@ public:
     UINT mdid;
     TMWORD ofst;
     UINT sz;
-
 public:
     VNE_SC(UINT id, TMWORD o, UINT s)
     {
@@ -169,7 +174,6 @@ public:
     UINT base_vn_id;
     TMWORD ofst;
     UINT sz;
-
 public:
     VNE_ILD(UINT vnid, TMWORD o, UINT s)
     {
@@ -200,7 +204,6 @@ public:
 class VNE_ARR : public VNE_ILD {
 public:
     UINT ofst_vn_id;
-
 public:
     VNE_ARR(UINT bvnid, UINT ovnid, TMWORD o, UINT s) : VNE_ILD(bvnid, o, s)
     { ofst_vn_id = ovnid; }
@@ -247,7 +250,6 @@ class SCVNE2VN : public HMap<VNE_SC*, VN*, VNE_SC_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_SC*> m_free_lst;
-
 public:
     SCVNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_SC*, VN*, VNE_SC_HF>(bsize)
@@ -308,7 +310,6 @@ class ILD_VNE2VN : public HMap<VNE_ILD*, VN*, VNE_ILD_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_ILD*> m_free_lst;
-
 public:
     ILD_VNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_ILD*, VN*, VNE_ILD_HF>(bsize)
@@ -436,7 +437,6 @@ class ARR_VNE2VN : public HMap<VNE_ARR*, VN*, VNE_ARR_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_ARR*> m_free_lst;
-
 public:
     ARR_VNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_ARR*, VN*, VNE_ARR_HF>(bsize)
@@ -521,7 +521,6 @@ protected:
     //purpose. GVN also try to set livein MD with different VN if the MD is
     //'restrict'.
     BYTE m_is_alloc_livein_vn:1;
-
     DUMgr * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
@@ -531,8 +530,10 @@ protected:
     VN * m_zero_vn;
     VN * m_mc_zero_vn;
     SMemPool * m_pool;
+    OptCtx * m_oc;
     UINT m_vn_count;
     IR2VN m_ir2vn;
+    MDPhi2VN m_mdphi2vn;
     Vector<void*> m_irc_vec;
     LONGLONG2VN_MAP m_ll2vn;
     LONGLONGMC2VN_MAP m_llmc2vn;
@@ -547,30 +548,46 @@ protected:
     IR2SCVNE m_def2sctab;
     IR2IR m_stmt2domdef;
 protected:
-    VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
+    void assignRHSVN();
+    VN const* allocLiveinVN(IR const* exp, MD const* emd, bool & change);
+    inline VN * allocVN()
+    {
+        VN * vn = m_free_lst.remove_head();
+        if (vn == nullptr) {
+            vn = (VN*)xmalloc(sizeof(VN));
+        } else {
+            vn->clean();
+        }
+        VN_id(vn) = m_vn_count++;
+        return vn;
+    }
 
     void cleanIR2VN();
     void clean();
-    VN * computeSelect(IR const* exp, bool & change);
-    VN * computeBin(IR const* exp, bool & change);
-    VN * computeConst(IR const* exp, bool & change);
-    VN * computeLda(IR const* exp, bool & change);
-    VN * computeUna(IR const* exp, bool & change);
-    VN * computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
-                                   bool & change);
-    VN * computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,
-                                  IR const* domdef, bool & change);
-    VN * computeArrayByAnonDomDef(IR const* arr, VN const* basevn,
-                                  VN const* ofstvn, IR const* domdef,
-                                  bool & change);
+    VN const* computeSelect(IR const* exp, bool & change);
+    VN const* computeBin(IR const* exp, bool & change);
+    VN const* computeConst(IR const* exp, bool & change);
+    VN const* computeLda(IR const* exp, bool & change);
+    VN const* computeUna(IR const* exp, bool & change);
+    VN const* computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
+                                        bool & change);
+    VN const* computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,
+                                       IR const* domdef, bool & change);
+    VN const* computeArrayByAnonDomDef(IR const* arr, VN const* basevn,
+                                       VN const* ofstvn, IR const* domdef,
+                                       bool & change);
     IR const* computeDomDef(IR const* exp, IR const* exp_stmt,
                             SList<IR*> * defs);
     void computeArrayAddrRef(IR const* ir, bool & change);
-    VN * computeArray(IR const* exp, bool & change);
-    VN * computeScalar(IR const* exp, bool & change);
-    VN * computeILoad(IR const* exp, bool & change);
-    VN * computeExactMemory(IR const* exp, bool & change);
-    VN * computePR(IR const* exp, bool & change);    
+    VN const* computeArray(IR const* exp, bool & change);
+    VN const* computeScalar(IR const* exp, bool & change);
+    VN const* computeILoad(IR const* exp, bool & change);
+    VN const* computeExactMemory(IR const* exp, bool & change);
+    VN const* computePR(IR const* exp, bool & change);
+    VN const* computeMDPhiMemOpnd(IR const* exp, bool & change);
+    VN const* computeMDPhiOpnd(IR const* exp, bool & change);
+    VN const* computePhiPROpnd(IR const* exp, bool & change);
+    VN const* computePhiOpnd(IR const* exp, bool & change);
 
     void dumpBB(UINT bbid) const;
     void dumpIR2VN() const;
@@ -578,12 +595,32 @@ protected:
     void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
 
+    OptCtx const* getOptCtx() const { return m_oc; }
+
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
     bool hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const;
     bool hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const;
     bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
+    bool hasOverlappedDef(IR const* exp) const;
 
+    //Infer the VN of 'exp' via killing def.
+    //exp: expression.
+    //kdef: killing-def.
+    VN const* inferVNViaKillingDef(IR const* exp, IR const* kdef,
+                                   OUT bool & change);
+
+    //Infer the VN of 'exp' via dominated-killing-def.
+    //exp: expression.
+    //kdef: killing-def.
+    VN const* inferVNViaDomKillingDef(IR const* exp, IR const* kdef,
+                                      OUT bool & change);
+    VN const* inferVNViaMDPhi(IR const* exp, MDPhi const* phi, bool & change);
+    VN const* inferVNThroughCFG(IR const* exp, bool & change);
+    VN const* inferVNViaPhi(IR const* exp, IR const* phi, bool & change);
+    VN const* inferVNViaHint(IR const* exp, MD const* md, bool & change);
+    VN const* inferPRVNViaHint(IR const* exp, bool & change);
+    VN const* inferNonPRVNViaHint(IR const* exp, bool & change);
     bool isSameMemLocForArrayOp(IR const* ir1, IR const* ir2) const;
     bool isSameMemLocForIndirectOp(IR const* ir1, IR const* ir2) const;
     virtual bool isUnary(IR_CODE irt) const;
@@ -599,33 +636,24 @@ protected:
         return p;
     }
 
-    VN * registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
-                        VN const* v2, VN const* v3);
-    VN * registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
-                          VN const* v2);
-    VN * registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
-    VN * registerUnaVN(IR_CODE irt, VN const* v0);
-    VN * registerVNviaMD(MD const* md);
-    VN * registerVNviaMC(LONGLONG v);
-    VN * registerVNviaINT(LONGLONG v);
-    VN * registerVNviaFP(double v);
-    VN * registerVNviaSTR(Sym const* v);
+    VN const* registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
+                             VN const* v2, VN const* v3);
+    VN const* registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
+                               VN const* v2);
+    VN const* registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
+    VN const* registerUnaVN(IR_CODE irt, VN const* v0);
+    VN const* registerVNviaMD(MD const* md);
+    VN const* registerVNviaMC(LONGLONG v);
+    VN const* registerVNviaINT(LONGLONG v);
+    VN const* registerVNviaFP(double v);
+    VN const* registerVNviaSTR(Sym const* v);
 
-    inline VN * newVN()
-    {
-        VN * vn = m_free_lst.remove_head();
-        if (vn == nullptr) {
-            vn = (VN*)xmalloc(sizeof(VN));
-        } else {
-            vn->clean();
-        }
-        VN_id(vn) = m_vn_count++;
-        return vn;
-    }
-
+    void processMDPhi(IRBB * bb, bool & change);
+    void processMDPhi(MDPhi const* phi, bool & change);
     void processGETELEM(IR * ir, bool & change);
     void processSETELEM(IR * ir, bool & change);
     void processBB(IRBB * bb, bool & change);
+    void processBBListInRPO();
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
@@ -635,6 +663,11 @@ protected:
     virtual void processStmt(IR * ir, bool & change);
     virtual void processExtStmt(IR * ir, bool & change);
 
+    bool useClassicDU() const
+    { return useClassicPRDU() || useClassicNonPRDU(); }
+    bool useClassicPRDU() const { return getOptCtx()->is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU() const
+    { return getOptCtx()->is_nonpr_du_chain_valid(); }
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
@@ -651,10 +684,11 @@ public:
     bool calcCondMustVal(IR const* ir, bool & must_true,
                          bool & must_false) const;
     void cleanIRTreeVN(IR const* ir);
+    void copyVN(IR const* from, IR const* to);
 
     //Compute VN to given exp.
     //change: set to true if new VN generated.
-    VN * computeVN(IR const* exp, bool & change);
+    VN const* computeVN(IR const* exp, bool & change);
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -684,19 +718,24 @@ public:
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }
 
     //Get VN of ir.
-    VN * getVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
-
-    //Get VN of ir. Readonly function.
-    VN const* getConstVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+    VN const* getVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+    VN const* getVN(MDPhi const* phi) const
+    { return m_mdphi2vn.get(phi->id()); }
 
     //Set true if you intend to alloc different VN for livein variable.
     void setAllocLiveinVN(bool doit) { m_is_alloc_livein_vn = doit; }
 
     //Set VN to ir.
-    void setVN(IR const* ir, VN * vn) { m_ir2vn.setAlways(ir->id(), vn); }
+    void setVN(IR const* ir, VN const* vn) { m_ir2vn.setAlways(ir->id(), vn); }
+    void setVN(MDPhi const* phi, VN const* vn)
+    { m_mdphi2vn.setAlways(phi->id(), vn); }
+
+    //Set VN to ir only once.
+    void setVNOnce(IR const* ir, VN const* vn) { m_ir2vn.set(ir->id(), vn); }
 
     //Update VN to ir if ir has been mapped.
-    void setVNIfFind(IR const* ir, VN * vn) { m_ir2vn.setIfFind(ir->id(), vn); }
+    void setVNIfFind(IR const* ir, VN const* vn)
+    { m_ir2vn.setIfFind(ir->id(), vn); }
 
     //Ask GVN to compute VN for IR with FP type.
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }

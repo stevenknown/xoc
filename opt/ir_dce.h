@@ -36,18 +36,73 @@ author: Su Zhenyu
 
 namespace xoc {
 
+typedef TTab<MDDef const*> EffectMDDef;
+
 class EffectStmt : public xcom::BitSet {
 public:
     EffectStmt() {}
     COPY_CONSTRUCTOR(EffectStmt);
-    void bunion(INT elem) { xcom::BitSet::bunion(elem); }
+    void bunion(BSIdx elem) { xcom::BitSet::bunion(elem); }
 };
 
-typedef TTab<MDDef const*> EffectMDDef;
+class EffectBB : public xcom::BitSet {
+public:
+    EffectBB() {}
+    COPY_CONSTRUCTOR(EffectBB);
+    void bunion(BSIdx elem) { xcom::BitSet::bunion(elem); }
+};
+
+class DCECtx {
+    COPY_CONSTRUCTOR(DCECtx);
+public:
+    OptCtx * m_oc;
+
+    //Record if BB is effect. Note the BB effect info is not always
+    //identical to Stmt effect info, one BB may be not be marked as Effect even
+    //if it contains effect stmt.
+    EffectBB m_effect_bb;
+    EffectStmt m_effect_stmt;
+public:
+    DCECtx(OptCtx * oc) { m_oc = oc; }
+
+    void addEffectStmt(IR const* stmt) { m_effect_stmt.bunion(stmt->id()); }
+    void addEffectBB(IRBB const* bb) { m_effect_bb.bunion(bb->id()); }
+
+    void dump(Region const* rg) const;
+
+    OptCtx * getOptCtx() const { return m_oc; }
+
+    bool isEffectStmt(IR const* ir) const
+    { return m_effect_stmt.is_contain(ir->id()); }
+    bool isEffectBB(UINT id) const { return m_effect_bb.is_contain(id); }
+    bool isEffectBB(IRBB const* bb) const { return isEffectBB(bb->id()); }
+
+    void reinit(Region const* rg)
+    {
+        UINT irnum = rg->getIRVec().get_elem_count();
+        UINT bbnum = rg->getBBList()->get_elem_count();
+        reinit(irnum, bbnum);
+    }
+    void reinit(UINT irnum, UINT bbnum)
+    {
+        UINT bsnum = irnum / BITS_PER_BYTE + 1;
+        if (m_effect_stmt.get_byte_size() <= bsnum) {
+            m_effect_stmt.alloc(bsnum + 1);
+        }
+        m_effect_stmt.clean();
+        UINT bsnum2 = bbnum / BITS_PER_BYTE + 1;
+        if (m_effect_bb.get_byte_size() <= bsnum2) {
+            m_effect_bb.alloc(bsnum2 + 1);
+        }
+        m_effect_bb.clean();
+    }
+};
+
 
 //Perform dead code and redundant control flow elimination.
 class DeadCodeElim : public Pass {
     COPY_CONSTRUCTOR(DeadCodeElim);
+protected:
     BYTE m_is_elim_cfs:1; //Eliminate control flow structure if necessary.
 
     //Sometime, we might expect to keep PHI there even it does not even have
@@ -76,76 +131,61 @@ class DeadCodeElim : public Pass {
     PRSSAMgr * m_prssamgr;
     OptCtx * m_oc;
     ConstIRIter m_citer;
-    EffectStmt m_is_stmt_effect;
     EffectMDDef m_is_mddef_effect;
-    //Record if BB is effect. Note the BB effect info is not always
-    //identical to Stmt effect info, one BB may be not be marked as Effect even
-    //if it contains effect stmt.
-    xcom::BitSet m_is_bb_effect;
-
+protected:
     void checkValidAndRecomputeCDG();
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
     bool collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
+                     MOD DCECtx & dcectx,
                      bool usemdssa, bool useprssa);
-    bool collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2);
+    bool collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2,
+                        MOD DCECtx & dcectx);
     bool collectAllDefThroughDefChain(MDDef const* tdef, IR const* use,
-                                      MOD List<IR const*> * pwlst2);
-    bool collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2);
-    bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2);
+                                      MOD List<IR const*> * pwlst2,
+                                      MOD DCECtx & dcectx);
+    bool collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
+                        MOD DCECtx & dcectx);
+    bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2,
+                        MOD DCECtx & dcectx);
 
     //Return true if there are effect BBs that controlled by ir's BB.
     //ir: stmt.
-    bool find_effect_kid_condbr(IR const* ir) const;
+    bool find_effect_kid_condbr(IR const* ir, MOD DCECtx & dcectx) const;
+
     //Return true if there are effect BBs that controlled by ir's BB.
     //ir: stmt.
-    bool find_effect_kid_uncondbr(IR const* ir) const;
-    bool find_effect_kid(IR const* ir) const;
+    bool find_effect_kid_uncondbr(IR const* ir, MOD DCECtx & dcectx) const;
+    bool find_effect_kid(IR const* ir, MOD DCECtx & dcectx) const;
 
-    bool isEffectBB(UINT id) const { return m_is_bb_effect.is_contain(id); }
-    bool isEffectBB(IRBB const* bb) const { return isEffectBB(bb->id()); }
     bool is_effect_write(Var * v) const
     { return v->is_global() || v->is_volatile(); }
     bool is_effect_read(Var * v) const { return v->is_volatile(); }
-    bool is_cfs(IR const* ir) const
-    {
-        switch (ir->getCode()) {
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-        case IR_GOTO:
-        case IR_IGOTO:
-            return true;
-        default: ASSERT0(ir->isStmtInBB());
-        }
-        return false;
-    }
-    void iter_collect(MOD List<IR const*> & work_list);
+    void iter_collect(MOD List<IR const*> & work_list, MOD DCECtx & dcectx);
 
-    void mark_effect_ir(MOD List<IR const*> & work_list);
+    void mark_effect_ir(MOD List<IR const*> & work_list, MOD DCECtx & dcectx);
 
-    bool preserve_cd(MOD List<IR const*> & act_ir_lst);
+    bool preserve_cd(MOD List<IR const*> & act_ir_lst, MOD DCECtx & dcectx);
 
-    void reinit();
-    bool removeIneffectIR(OUT bool & remove_branch_stmt);
-    bool removeRedundantPhi();
-
-    bool tryMarkBranch(IRBB const* bb, OUT List<IR const*> & act_ir_lst);
+    bool tryMarkBranch(IRBB const* bb, OUT List<IR const*> & act_ir_lst,
+                       MOD DCECtx & dcectx);
     bool tryMarkUnconditionalBranch(IRBB const* bb,
-                                    MOD List<IR const*> & act_ir_lst);
+                                    MOD List<IR const*> & act_ir_lst,
+                                    MOD DCECtx & dcectx);
 
     //The function marks possible predecessor in CFG to be effect BB,
     //e.g back-edge.
-    bool markCFGPred(IRBB const* bb);
+    bool markCFGPred(IRBB const* bb, MOD DCECtx & dcectx);
     bool markControlPredAndStmt(IRBB const* bb,
-                                OUT List<IR const*> & act_ir_lst);
+                                OUT List<IR const*> & act_ir_lst,
+                                MOD DCECtx & dcectx);
 
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
-                                   MOD List<IR const*> & act_ir_lst);
-    void setEffectBB(IRBB const* bb) { m_is_bb_effect.bunion(bb->id()); }
-    void setEffectStmt(IR const* stmt, OUT xcom::BitSet * is_bb_effect,
-                       OUT List<IR const*> * act_ir_lst);
-    void setEffectMDDef(MDDef const* mddef, OUT xcom::BitSet * is_bb_effect);
+                                   MOD List<IR const*> & act_ir_lst,
+                                   MOD DCECtx & dcectx);
+    void setEffectStmt(IR const* stmt, bool set_bb_effect,
+                       OUT List<IR const*> * act_ir_lst, MOD DCECtx & dcectx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -176,7 +216,7 @@ public:
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
-    virtual bool dump() const;
+    bool dump(DCECtx const& dcectx) const;
 
     OptCtx * getOptCtx() const { return m_oc; }
     IRCFG * getCFG() const { return m_cfg; }
@@ -184,14 +224,17 @@ public:
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
-    bool isEffectStmt(IR const* ir) const
-    { return m_is_stmt_effect.is_contain(ir->id()); }
+    bool is_aggressive() const { return m_is_elim_cfs; }
 
     void set_reserve_phi(bool reserve) { m_is_reserve_phi = reserve; }
     void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
     void set_use_md_du(bool use_md_du) { m_is_use_md_du = use_md_du; }
+    void setAggressive(bool doit) { set_elim_cfs(doit); }
 
     virtual bool perform(OptCtx & oc);
+
+    bool removeIneffectIR(DCECtx const& dcectx, OUT bool & remove_branch_stmt);
+    bool removeRedundantPhi(MOD OptCtx & oc);
 };
 
 } //namespace xoc

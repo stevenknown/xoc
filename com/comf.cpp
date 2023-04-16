@@ -815,7 +815,7 @@ ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end)
     ASSERT0(end < sizeof(ULONGLONG) * BITS_PER_BYTE);
     ASSERT0(start <= end);
     UINT lastbit = sizeof(ULONGLONG) * BITS_PER_BYTE - 1;
-    UINT size = end - start;    
+    UINT size = end - start;
     val = val << (lastbit - end);
     val = val >> (lastbit - size);
     return val;

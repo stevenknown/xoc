@@ -86,7 +86,7 @@ void GCSE::elimCseAtDirectMemOp(IR * use, IR * use_stmt, IR * gen)
 
     //Assign the identical vn to newrhs.
     if (m_gvn != nullptr) {
-        VN * vn = m_gvn->getVN(gen);
+        VN const* vn = m_gvn->getVN(gen);
         ASSERT0(vn);
         m_gvn->setVN(newrhs_pr, vn);
         m_gvn->setVN(use_stmt, vn);
@@ -132,7 +132,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 
     //Assign the idential vn to r.
     ASSERT0(m_gvn);
-    VN * vn = m_gvn->getVN(gen);
+    VN const* vn = m_gvn->getVN(gen);
     ASSERT0(vn);
     m_gvn->setVN(new_pr, vn);
 
@@ -184,7 +184,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     //Set identical vn to use_pr with CSE.
     IR * gen_stmt = gen->getStmt();
     ASSERT0(m_gvn);
-    VN * vn = m_gvn->getVN(gen);
+    VN const* vn = m_gvn->getVN(gen);
     ASSERT0(vn);
     m_gvn->setVN(use_pr, vn);
 

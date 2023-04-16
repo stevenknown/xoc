@@ -197,6 +197,7 @@ public:
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     MDIdx id() const { return MD_id(this); }
+
     //Return true if current md may cover 'm', such as:
     //current md: |-...-----...---|
     //m:            |---...-|

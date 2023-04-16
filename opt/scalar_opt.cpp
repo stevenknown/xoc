@@ -67,9 +67,14 @@ bool ScalarOpt::perform(OptCtx & oc)
     }
     if (g_do_cp || g_do_cp_aggressive) {
         CopyProp * pass = (CopyProp*)m_pass_mgr->registerPass(PASS_CP);
-        pass->setPropagationKind(g_do_cp_aggressive ?
-                                 CP_PROP_UNARY_AND_SIMPLEX : CP_PROP_SIMPLEX);
+        if (g_do_cp_aggressive) {
+            pass->setPropagationKind(CP_PROP_UNARY|CP_PROP_NONPR|
+                                     CP_PROP_INEXACT_MEM);
+        }
         passlist.append_tail(pass);
+    }
+    if (g_do_vect) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_VECT));
     }
     if (g_do_rce) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_RCE));

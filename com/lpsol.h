@@ -351,8 +351,7 @@ public:
                                         MOD Vector<INT> & eq2bvmap,
                                         MOD INT & cst_col);
 
-    FILE * dump_open_file() const;
-    bool dump_prt_indent(FILE * h) const;
+    bool dump_prt_indent(FileObj & fo) const;
     bool dump_str(CHAR const* format, ...) const;
 
     bool is_feasible(Mat const& sol,
@@ -393,21 +392,10 @@ void SIX<Mat, T>::newPPT(INT var_num)
 
 
 template <class Mat, class T>
-FILE * SIX<Mat, T>::dump_open_file() const
+bool SIX<Mat, T>::dump_prt_indent(FileObj & fo) const
 {
-    if (!m_is_dump) { return nullptr; }
-    FILE * h = fopen(SIX_DUMP_NAME, "a+");
-    ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
-    return h;
-}
-
-
-template <class Mat, class T>
-bool SIX<Mat, T>::dump_prt_indent(FILE * h) const
-{
-    ASSERT0(h);
     for (UINT i = 0; i < m_indent; i++) {
-        fprintf(h, "  ");
+        fo.prt("  ");
     }
     return true;
 }
@@ -418,8 +406,10 @@ template <class Mat, class T>
 bool SIX<Mat, T>::dump_str(CHAR const* format, ...) const
 {
     if (format == nullptr) { return true; }
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
+    if (!m_is_dump) { return true; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
 
     StrBuf buf(64);
     va_list arg;
@@ -430,20 +420,18 @@ bool SIX<Mat, T>::dump_str(CHAR const* format, ...) const
     size_t i = 0;
     while (i < buf.strlen()) {
         if (buf.buf[i] == '\n') {
-            fprintf(h, "\n");
+            fo.prt("\n");
         } else {
             break;
         }
         i++;
     }
-    dump_prt_indent(h);
+    dump_prt_indent(fo);
     if (i == buf.strlen()) {
-        fclose(h);
         va_end(arg);
         return true;
     }
-    fprintf(h, "%s", buf.buf + i);
-    fclose(h);
+    fo.prt("%s", buf.buf + i);
     va_end(arg);
     return true;
 }
@@ -2174,8 +2162,7 @@ public:
                           Mat const& eq,
                           Mat const& leq,
                           INT cst_col);
-    virtual FILE * dump_open_file() const;
-    virtual bool dump_prt_indent(FILE * h) const;
+    virtual bool dump_prt_indent(FileObj & fo) const;
     virtual bool dump_start_six(Mat const& tgtf,
                                 Mat const& vc,
                                 Mat const& eq,
@@ -2187,23 +2174,11 @@ public:
 };
 
 
-//This function create file handler for dumpping.
-//Start dump functions
 template <class Mat, class T>
-FILE * MIP<Mat, T>::dump_open_file() const
-{
-    if (!m_is_dump) { return nullptr; }
-    FILE * h = ::fopen(SIX_DUMP_NAME, "a+");
-    ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
-    return h;
-}
-
-
-template <class Mat, class T>
-bool MIP<Mat, T>::dump_prt_indent(FILE * h) const
+bool MIP<Mat, T>::dump_prt_indent(FileObj & fo) const
 {
     for (UINT i = 0; i < m_indent; i++) {
-        fprintf(h, "  ");
+        fo.prt("  ");
     }
     return true;
 }
@@ -2215,16 +2190,17 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
                                  Mat const&, //equations.
                                  Mat const&) const //inequalities.
 {
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
+    if (!m_is_dump) { return nullptr; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
     if (m_times == 0) {
-        fprintf(h, "\n");
+        fo.prt("\n");
     }
-    dump_prt_indent(h);
-    fprintf(h, "TIME=%u...\n", m_times);
-    dump_prt_indent(h);
-    fprintf(h, "BEGIN SIX...\n");
-    fclose(h);
+    dump_prt_indent(fo);
+    fo.prt("TIME=%u...\n", m_times);
+    dump_prt_indent(fo);
+    fo.prt("BEGIN SIX...\n");
     return true;
 }
 
@@ -2232,19 +2208,20 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 {
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
+    if (!m_is_dump) { return nullptr; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
     StrBuf buf(32);
-    dump_prt_indent(h);
-    fprintf(h, "\nEND SIX,status=%s,%s_value=%s,solution={",
-            getStatusName(status),
-            is_maxm ? "max" : "min",
-            v.format(buf));
+    dump_prt_indent(fo);
+    fo.prt("\nEND SIX,status=%s,%s_value=%s,solution={",
+           getStatusName(status),
+           is_maxm ? "max" : "min",
+           v.dump(buf));
     for (UINT i = 0; i < sol.getColSize(); i++) {
-        fprintf(h, "%s,", sol.get(0, i).format(buf));
+        fo.prt("%s,", sol.get(0, i).dump(buf));
     }
-    fprintf(h, "}\n");
-    fclose(h);
+    fo.prt("}\n");
     return true;
 }
 
@@ -2252,11 +2229,12 @@ bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_is_satisfying() const
 {
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
-    dump_prt_indent(h);
-    fprintf(h, "SOL Satisfying!!! return IP_SUCC.\n");
-    fclose(h);
+    if (!m_is_dump) { return nullptr; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
+    dump_prt_indent(fo);
+    fo.prt("SOL Satisfying!!! return IP_SUCC.\n");
     return true;
 }
 
@@ -2264,12 +2242,13 @@ bool MIP<Mat, T>::dump_is_satisfying() const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_floor_branch(INT floor) const
 {
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
-    fprintf(h, "\n");
-    dump_prt_indent(h);
-    fprintf(h, "ENTER floor(left) branch, floor_value=%d\n", floor);
-    fclose(h);
+    if (!m_is_dump) { return nullptr; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
+    fo.prt("\n");
+    dump_prt_indent(fo);
+    fo.prt("ENTER floor(left) branch, floor_value=%d\n", floor);
     return true;
 }
 
@@ -2277,12 +2256,13 @@ bool MIP<Mat, T>::dump_floor_branch(INT floor) const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_ceiling_branch(INT ceil) const
 {
-    FILE * h = dump_open_file();
-    if (h == nullptr) { return true; }
-    fprintf(h, "\n");
-    dump_prt_indent(h);
-    fprintf(h, "ENTER ceiling(right) branch, ceiling_value=%d\n", ceil);
-    fclose(h);
+    if (!m_is_dump) { return nullptr; }
+    FO_STATUS ft;
+    FileObj fo(SIX_DUMP_NAME, false, false, &ft);
+    if (ft != FO_SUCC) { return true; }
+    fo.prt("\n");
+    dump_prt_indent(fo);
+    fo.prt("ENTER ceiling(right) branch, ceiling_value=%d\n", ceil);
     return true;
 }
 
@@ -2323,19 +2303,15 @@ void MIP<Mat, T>::checkAndInitConst(Mat const& leq,
     }
 
     UINT num_cols_of_const_term = max_cols - m_cst_col;
-
     DUMMYUSE(num_cols_of_const_term);
     ASSERTN(num_cols_of_const_term == 1,
             ("No yet support const term with multi-columns."));
-
     ASSERTN(tgtf.is_vec() &&
             tgtf.getColSize() == (UINT)max_cols,
             ("multi target functions"));
-
     ASSERTN(vc.getRowSize() == (UINT)m_cst_col &&
             vc.getColSize() == (UINT)max_cols,
             ("unmatch variables constraints"));
-
     if (m_allow_rational_indicator != nullptr) {
         ASSERTN(m_allow_rational_indicator->getColSize() == (UINT)max_cols,
                 ("unmatch variable"));

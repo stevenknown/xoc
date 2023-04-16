@@ -988,6 +988,22 @@ public:
         return xcom::cnt_list(ARR_sub_list(this));
     }
 
+    //Return the number of element of the lowest dimension.
+    TMWORD getElementNumOfLowestDim() const { return getElementNumOfDim(0); }
+
+    //Return the number of element of the hightest dimension.
+    TMWORD getElementNumOfHighestDim() const
+    {
+        ASSERT0(getDimNum() > 0);
+        return getElementNumOfDim(getDimNum() - 1);
+    }
+
+    //Return the subscript expression of the lowest dimension.
+    IR * getSubExpOfLowestDim() const { return getSubList(); }
+
+    //Return the subscript expression of the highest dimension.
+    IR * getSubExpOfHighestDim() const { return xcom::get_last(getSubList()); }
+
     //Return the number of element in given dimension.
     TMWORD getElementNumOfDim(UINT dimension) const
     {

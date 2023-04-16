@@ -1,5 +1,26 @@
 $(info "====---- START Makefile.readelf ----====")
 
+#SET THE DEFAULT TARGET MACHINES.
+ifndef FOR_ARM
+FOR_ARM=true
+endif
+
+ifndef FOR_X86
+FOR_X86=true
+endif
+
+ifndef FOR_X64
+FOR_X64=true
+endif
+
+ifndef FOR_SCORE
+FOR_SCORE=true
+endif
+
+ifndef FOR_TECO
+FOR_TECO=true
+endif
+
 ifeq ($(TARG),)
   #SET DEFAULT TARG. TARG INFORM IS USELESS TO READELF.EXE
   TARG=FOR_DEX
@@ -10,6 +31,7 @@ ifeq ($(DEBUG),)
 endif
 
 CFLAGS+=-Wall
+ROOT_DIR=../..
 COM_DIR=../../com
 ELF_DIR=..
 READELF_DIR=.
@@ -17,14 +39,45 @@ READELF_OUTPUT=readelf.exe
 
 include $(ELF_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
+include $(ROOT_DIR)/Makefile.option
 
 MISC_TARG_MACH_ELF_OBJS+=\
-$(ELF_DIR)/misc_elf_mgr.o\
-../arm/arm_elf_targinfo.o\
-../score/score_elf_targinfo.o\
-../x64/x64_elf_targinfo.o\
-../x86/x86_elf_targinfo.o
-../teco/teco_elf_targinfo.o
+$(ELF_DIR)/misc_elf_mgr.o
+
+ifeq ($(FOR_ARM),true)
+  TARG_ARM_DIR=../../arm
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_ARM_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_ARM
+  -include $(TARG_ARM_DIR)/arm_elf_targinfo.d
+endif
+
+ifdef FOR_X86
+  TARG_X86_DIR=../../x86
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_X86_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_X86
+  -include $(TARG_X86_DIR)/*_elf_targinfo.d
+endif
+
+ifdef FOR_X64
+  TARG_X64_DIR=../../x64
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_X64_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_X64
+  -include $(TARG_X64_DIR)/*_elf_targinfo.d
+endif
+
+ifeq ($(FOR_SCORE),true)
+  TARG_SCORE_DIR=../../score
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_SCORE_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_SCORE
+  -include $(TARG_SCORE_DIR)/*_elf_targinfo.d
+endif
+
+ifdef FOR_TECO
+  TARG_TECO_DIR=../../teco
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_TECO
+  -include $(TARG_TECO_DIR)/*_elf_targinfo.d
+endif
 
 CFLAGS+=\
   -D$(TARG) \

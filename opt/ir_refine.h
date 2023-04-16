@@ -245,6 +245,11 @@ public:
     //Return updated ir if optimization performed.
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
 
+    //Perform peephole optimization to ir over and over again until the result
+    //ir does not change any more.
+    //Return updated ir if optimization performed.
+    IR * refineIRUntilUnchange(IR * ir, bool & change, RefineCtx & rc);
+
     //Perform peephole optimization to BB list.
     //BB list will be updated if optimization performed.
     //Return true if BB list changed.

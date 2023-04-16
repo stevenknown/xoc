@@ -124,7 +124,7 @@ FRAC_TYPE Rational::_gcd(FRAC_TYPE x, FRAC_TYPE y)
 }
 
 
-CHAR const* Rational::format(StrBuf & buf) const
+CHAR const* Rational::dump(StrBuf & buf) const
 {
     if (m_den == 1) {
         buf.sprint("%d", m_num);
@@ -138,7 +138,7 @@ CHAR const* Rational::format(StrBuf & buf) const
 void Rational::dump() const
 {
     StrBuf buf(16);
-    format(buf);
+    dump(buf);
     fprintf(stdout, "%s", buf.buf);
 }
 
@@ -162,11 +162,9 @@ static inline LONGLONG gcdf(LONGLONG x, LONGLONG y)
 }
 
 
-LONGLONG g_red_count = 0;
 //Reduction of 64bit longlong integer.
 static inline void reduce_ll(LONGLONG & num, LONGLONG & den)
 {
-    g_red_count++;
     if (num == 0) {
         den = 1;
         return;
@@ -189,10 +187,8 @@ static inline void reduce_ll(LONGLONG & num, LONGLONG & den)
 
 
 //Calculate the approximate rational number.
-LONGLONG g_appro_count = 0;
 static inline void appro(LONGLONG & num, LONGLONG & den)
 {
-    g_appro_count++;
     float v = float(num) / float(den);
     if (v < 100.0) {
         v = v * 1000000;
@@ -289,9 +285,9 @@ Rational operator * (Rational const& a, Rational const& b)
     if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
     if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
     if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }
-#ifdef REDUCE
+    #ifdef REDUCE
     reduce_ll(rnum, rden);
-#endif
+    #endif
     ASSERT0(rden > 0);
     LONGLONG trnum = (LONGLONG)::abs((int)rnum);
     if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||
@@ -343,9 +339,9 @@ Rational operator / (Rational const& a, Rational const& b)
     if ((ratnum < 0 && ratden < 0) || ratden < 0) {
         ratnum = -ratnum; ratden = -ratden;
     }
-#ifdef REDUCE
+    #ifdef REDUCE
     reduce_ll(ratnum, ratden);
-#endif
+    #endif
     ASSERT0(ratden > 0);
     LONGLONG trnum = (LONGLONG)::abs((int)ratnum);
     if ((trnum >= (LONGLONG)(INT_MAX >> 2)) ||
@@ -380,9 +376,9 @@ Rational operator + (Rational const& a, Rational const& b)
     if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
     if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
     if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }
-#ifdef REDUCE
+    #ifdef REDUCE
     reduce_ll(rnum, rden);
-#endif
+    #endif
     ASSERT0(rden > 0);
     LONGLONG trnum = (LONGLONG)::abs((int)rnum);
     if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||

@@ -45,7 +45,7 @@ void AttachInfoMgr::copyAI(OUT IR * tgtir, IR const* srcir)
     for (UINT i = 0; i < sz; i++) {
         BaseAttachInfo * srcac = src->getContainer()->get(i);
         if (srcac == nullptr) { continue; }
-        
+
         switch (srcac->getType()) {
         case AI_DBX:
         case AI_PROF:

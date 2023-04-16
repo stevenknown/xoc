@@ -34,6 +34,7 @@ author: Su Zhenyu
 #ifndef __COMINC_H__
 #define __COMINC_H__
 #include "commoninc.h"
+#include "literal.h"
 #include "region_deps.h"
 #include "ir_refine.h"
 #include "ir_simp.h"

@@ -70,7 +70,12 @@ protected:
     List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     AttachInfoMgr * m_attachinfo_mgr; //AttachInfo manager.
+
+    //These field is used to speed up the accessing of IRMgr since the IRMgr
+    //always be created at the begin of the processing of a region.
     IRMgr * m_ir_mgr;
+    IRBBMgr * m_ir_bb_mgr;
+    BBList * m_ir_bb_list; //record a list of basic blocks.
 
     //Mapping prno to related Var. prno is dense integer.
     xcom::Vector<Var*> m_prno2var;
@@ -81,13 +86,12 @@ protected:
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;
     List<DU*> m_free_du_list;
-    IRBBMgr m_ir_bb_mgr; //Allocate the basic block.
-    BBList m_ir_bb_list; //record a list of basic blocks.
 protected:
     //Count memory usage for current object.
     size_t count_mem() const;
     PassMgr * getPassMgr() const { return ANA_INS_pass_mgr(this); }
     IRMgr * getIRMgr() const { return ANA_INS_ir_mgr(this); }
+    IRBBMgr * getIRBBMgr() const { return ANA_INS_ir_bb_mgr(this); }
     AttachInfoMgr * getAttachInfoMgr() const { return ANA_INS_ai_mgr(this); }
 public:
     explicit AnalysisInstrument(Region * rg);

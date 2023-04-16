@@ -33,7 +33,7 @@ template <class T>
 class DumpHeap : public Graph {
     class HeapNode {
     public:
-        UINT id; 
+        UINT id;
         T val;
     };
 
@@ -71,7 +71,7 @@ public:
                 HeapNode * lhn = allocHeapNode();
                 lhn->id = l;
                 lhn->val = hdata.get(l);
-                Vertex * v = addVertex(lhn->id); 
+                Vertex * v = addVertex(lhn->id);
                 VERTEX_info(v) = lhn;
                 addEdge(hn->id, lhn->id);
             }
@@ -79,7 +79,7 @@ public:
                 HeapNode * rhn = allocHeapNode();
                 rhn->id = r;
                 rhn->val = hdata.get(r);
-                Vertex * v = addVertex(rhn->id); 
+                Vertex * v = addVertex(rhn->id);
                 VERTEX_info(v) = rhn;
                 addEdge(hn->id, rhn->id);
             }

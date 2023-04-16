@@ -63,7 +63,7 @@ public:
 public:
     //Get flag's name.
     static CHAR const* getName(MI_FLAG flag);
-   
+
     //Compute the index of 'flag' in the Desc table.
     static UINT getDescIdx(MI_FLAG flag);
 

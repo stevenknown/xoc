@@ -256,7 +256,7 @@ public:
                                  OUT OffVec & offvec,
                                  StringList const& strlst);
 
-    //Extract all section headers' string name and make up a string-table. 
+    //Extract all section headers' string name and make up a string-table.
     //charvec: the generated string table.
     //offvec: record the byte offset to each string name.
     void genSectHeaderNameStrTabContent(OUT CHARVec & charvec,

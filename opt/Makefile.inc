@@ -76,7 +76,8 @@ ir_desc.o\
 ir_utils.o\
 cfg_lifting.o\
 bytebuf.o\
-storage_space.o
+storage_space.o\
+literal.o
 
 ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
@@ -103,7 +104,8 @@ else ifeq ($(FOR_IP), true)
   targinfo_mgr.o\
   ir_vrp.o\
   ir_dse.o\
-  linear_scan.o
+  linear_scan.o\
+  ir_vect.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

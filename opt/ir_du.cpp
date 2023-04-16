@@ -1193,7 +1193,7 @@ bool DUMgr::removeExpiredDU(IR const* ir)
             if (xoc::isDependent(ir, ref, false, m_rg)) {
                 continue;
             }
- 
+
             //There is no DU chain bewteen stmt and use. Cutoff the DU.
             removeDUChain(ir, ref);
             change = true;
@@ -1207,7 +1207,7 @@ bool DUMgr::removeExpiredDU(IR const* ir)
         IR const* def = m_rg->getIR(i);
         ASSERT0(def->is_stmt());
         if (xoc::isDependent(def, ir, false, m_rg)) { continue; }
- 
+
         //There is no DU chain bewteen stmt and use. Cutoff the DU.
         removeDUChain(def, ir);
         change = true;
@@ -1409,7 +1409,7 @@ size_t DUMgr::count_mem() const
     count += m_solve_set_mgr.count_mem();
     return count;
 }
- 
+
 //Count up memory of DUSet for all irs.
 size_t DUMgr::count_mem_duset()
 {
@@ -1450,7 +1450,7 @@ void DUMgr::coalesceDUChain(IR const* from, IR const* to)
     //Def stmt set of 'to'.
     DUSet * defs = to->getDUSet();
     defs->remove(from->id(), *getSBSMgr());
-   
+
     //Iterate each DEF of 'to', remove 'to' from their UseSet.
     DUSetIter it = nullptr;
     for (BSIdx i = defs->get_first(&it);

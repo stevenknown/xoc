@@ -25,52 +25,55 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "../elfinc.h"
+#include "cominc.h"
 
-static void usage()
+namespace xoc {
+
+void dumpHostFP(HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
+                OUT StrBuf & buf)
 {
-    ::fprintf(stdout,
-              "\nUsage: readelf.exe file [options]"
-              "\noptions: "
-              "\n <dumpfile>      output file name"
-              "\n");
+    CHAR fpformat[128];
+    ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", mantissa);
+    xcom::StrBuf lbuf(16);
+    buf.sprint(fpformat, rg->getTypeMgr()->dump_type(ty, lbuf), val);
 }
 
 
-int main(int argc, char const* argv[])
+void dumpHostInt(HOST_INT val, Type const* ty, Region const* rg,
+                 OUT StrBuf & buf)
 {
-    if (argc < 2) { usage(); return 0; }
-    CHAR const* elffile = argv[1];
-    CHAR const* dumpfile = nullptr;
-    if (argc >= 3) {
-        dumpfile = argv[2];
-    }
-    elf::MiscELFMgr em;
-    if (dumpfile != nullptr) {
-        em.initdumpfile(dumpfile, true);
-    } else {
-        em.initdumpscr();
-    }
-    if (!FileObj::isFileExist(elffile)) {
-        printf("\nerror:%s not exist\n", elffile);
-        return 1;
-    }
-    if (em.readELF(elffile, true) != elf::EM_SUCC) {
-        printf("\nerror:%s read failed\n", elffile);
-        return 2;
-    }
-    bool demo_how_to_write_elf = false;
-    if (demo_how_to_write_elf) {
-        //Demo write elf.
-        xcom::StrBuf buf(32);
-        buf.strcat("%s.new.elf", elffile);
-        em.writeELF(buf.buf);
-
-        elf::MiscELFMgr em2;
-        if (dumpfile != nullptr) {
-            em2.initdumpfile("a.elf.dump2", true);
-        }
-        em2.readELF(buf.buf);
-    }
-    return 0;
+    CHAR const* intfmt = getHostIntFormat(false);
+    CHAR const* hexintfmt = getHostIntFormat(true);
+    StrBuf fmt(16);
+    fmt.sprint("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+    xcom::StrBuf lbuf(16);
+    buf.sprint(fmt.buf, rg->getTypeMgr()->dump_type(ty, lbuf), val, val);
 }
+
+
+void dumpHostFP(HOST_FP val, OUT StrBuf & buf, BYTE mantissa)
+{
+    ASSERT0(mantissa < DEFAULT_MANTISSA_NUM);
+    CHAR fmt[128];
+    ::snprintf(fmt, 127, "%%.%df", mantissa);
+    buf.strcat(fmt, val);
+}
+
+
+void dumpHostInt(HOST_INT val, bool is_signed, bool is_hex, OUT StrBuf & buf)
+{
+    if (is_hex) {
+        CHAR const* fmt = getHostUIntFormat(true);
+        buf.strcat(fmt, val);
+        return;
+    }
+    if (is_signed) {
+        CHAR const* fmt = getHostIntFormat(false);
+        buf.strcat(fmt, val);
+        return;
+    }
+    CHAR const* fmt = getHostUIntFormat(false);
+    buf.strcat(fmt, val);
+}
+
+} //namespace xoc

@@ -77,6 +77,7 @@ public:
     bool is_dump_infertype; //Dump Infer Type.
     bool is_dump_invert_brtgt; //Dump Invert Branch Target.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
+    bool is_dump_vectorization; //Dump IR Vectorization.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subscript Expression.
     bool is_dump_ivr; //Dump Induction Variable Recognization.
@@ -121,6 +122,7 @@ public:
     bool isDumpInferType() const;
     bool isDumpInvertBrTgt() const;
     bool isDumpLFTR() const;
+    bool isDumpVectorization() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
     bool isDumpIVR() const;
@@ -198,6 +200,7 @@ typedef enum _PASS_TYPE {
     PASS_LINEAR_SCAN_RA,
     PASS_IRMGR,
     PASS_CALL_GRAPH,
+    PASS_VECT,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -400,6 +403,9 @@ extern bool g_do_pre;
 //Perform light weith redundant code elimination.
 extern bool g_do_rce;
 
+//Perform auto vectorization.
+extern bool g_do_vect;
+
 //Perform dead store elimination.
 extern bool g_do_dse;
 
@@ -494,6 +500,9 @@ extern bool g_is_simplify_parameter;
 extern bool g_is_search_and_copy_dbx;
 
 //Set true to generate variable when building a PR.
+//Usually, we assign variable to PR to indicate its identity in order to
+//enable the pass that dependent on the analysis of MD.
+//If user only consider PRNO in pass, Var and MD is dispensable.
 extern bool g_generate_var_for_pr;
 
 //Record dump options for each Pass.

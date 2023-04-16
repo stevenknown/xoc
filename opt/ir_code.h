@@ -74,7 +74,7 @@ typedef enum {
     IR_IGOTO, //Indirect Goto a list of definitely label.
     IR_DO_WHILE, //Do-While loop struct.
     IR_WHILE_DO, //While-Do loop struct.
-    
+
     //A kind of loop with plainly definition of INIT(low bound), HIGH bound,
     //LOOP-BODY and STEP of IV.
     IR_DO_LOOP,
@@ -95,7 +95,7 @@ typedef enum {
     //Terminate current loop end switch execution, which include do-loop,
     //do-while, while-do, and switch stmt.
     IR_BREAK,
-    
+
     //Re-execute loop, which include do-loop, do-while, while-do.
     IR_CONTINUE,
     IR_PHI, //Phi statement.

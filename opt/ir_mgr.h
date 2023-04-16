@@ -105,11 +105,11 @@ public:
     IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
 
     //Build Do Loop stmt.
-    //iv: induction variable.
-    //det: determinate expression.
+    //iv: the induction variable.
+    //det: the determinate expression of iv.
     //loop_body: stmt list.
-    //init: record the stmt that initialize iv.
-    //step: record the stmt that update iv.
+    //init: record the expression that represent the initial value of iv.
+    //step: record the expression that represent the update behavior of iv.
     IR * buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body);
 
     //Build Do While stmt.
@@ -240,7 +240,7 @@ public:
 
     //Build IR_CONST operation.
     //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, Type const* type);
+    IR * buildImmFP(HOST_FP fp, Type const* type);
 
     //Build IR_CONST operation.
     //The expression indicates value with dynamic type.
@@ -248,8 +248,8 @@ public:
 
     //Build IR_CONST operation.
     //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, DATA_TYPE dt)
-    { return buildImmFp(fp, m_tm->getSimplexType(dt)); }
+    IR * buildImmFP(HOST_FP fp, DATA_TYPE dt)
+    { return buildImmFP(fp, m_tm->getSimplexType(dt)); }
 
     //Build IR_LDA operation.
     //var: variable that will be taken address.
@@ -473,8 +473,8 @@ public:
 
     size_t count_mem() const;
 
-    void dumpFreeTab(Region const* rg) const;
-    void dump(Region const* rg) const;
+    void dumpFreeTab() const;
+    virtual bool dump() const;
 
     //This function erases all informations of ir and
     //append it into free_list for next allocation.

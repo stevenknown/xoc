@@ -51,6 +51,7 @@ author: Su Zhenyu
 #include "cfg_lifting.h"
 
 #ifdef FOR_IP
+#include "ir_vect.h"
 #include "ir_dse.h"
 #include "scop.h"
 #include "ir_poly.h"

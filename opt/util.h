@@ -43,10 +43,10 @@ void interwarn(CHAR const* format, ...);
 void prt2C(CHAR const* format, ...);
 
 //Return signed integer placeholder string that used in format.
-CHAR const* getIntFormat(bool hex);
+CHAR const* getHostIntFormat(bool hex);
 
 //Return unsigned integer placeholder string that used in format.
-CHAR const* getUIntFormat(bool hex);
+CHAR const* getHostUIntFormat(bool hex);
 
 } //namespace xoc
 #endif

@@ -138,18 +138,15 @@ void IPA::computeCallRefForAllRegion()
              rg->getBBList()->get_elem_count() == 0)) {
             continue;
         }
-
         rg->initPassMgr();
         rg->initIRMgr();
-        AliasAnalysis * aa = (AliasAnalysis*)rg->getPassMgr()->
-            registerPass(PASS_AA);
-        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
-            registerPass(PASS_DU_MGR);
+        rg->initIRBBMgr();
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->computeCallRef(DUOptFlag(DUOPT_COMPUTE_PR_DU|
                                         DUOPT_COMPUTE_NONPR_DU));
-        rg->getPassMgr()->destroyPass(dumgr);
-        rg->getPassMgr()->destroyPass(aa);
+        rg->getPassMgr()->destroyRegisteredPass(PASS_DU_MGR);
+        rg->getPassMgr()->destroyRegisteredPass(PASS_AA);
     }
     END_TIMER(t, "Compute CallRef for all regions");
 }
@@ -166,7 +163,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != nullptr) {
-                rg->getPassMgr()->destroyPass(PASS_DU_MGR);
+                rg->getPassMgr()->destroyRegisteredPass(PASS_DU_MGR);
             }
         }
     }
@@ -191,6 +188,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
         rg->initIRMgr();
+        rg->initIRBBMgr();
     }
     if (!oc.is_aa_valid()) {
         //DUMgr requires AliasAnalysis

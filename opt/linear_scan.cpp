@@ -67,12 +67,15 @@ void ActMgr::dump(CHAR const* format, ...)
 
 void ActMgr::dumpAll() const
 {
-    note(m_rg, "\n==-- DUMP %s --==", "ALL ACT");
+    if (m_act_list.get_elem_count() == 0) { return; }
+    note(m_rg, "\n==-- DUMP ALL ACT --==");
+    m_rg->getLogMgr()->incIndent(2);
     xcom::List<xcom::StrBuf*>::Iter it;
     for (xcom::StrBuf * buf = m_act_list.get_head(&it);
          buf != nullptr; buf = m_act_list.get_next(&it)) {
         note(m_rg, "\n%s", buf->buf);
     }
+    m_rg->getLogMgr()->decIndent(2);
 }
 //END ActMgr
 
@@ -210,6 +213,12 @@ bool LinearScanRA::hasReg(LifeTime const* lt) const
 bool LinearScanRA::hasReg(PRNO prno) const
 {
     return getReg(prno) != REG_UNDEF;
+}
+
+
+CHAR const* LinearScanRA::getRegFileName(REGFILE rf) const
+{
+    return const_cast<LinearScanRA*>(this)->getTIMgr().getRegFileName(rf);
 }
 
 
@@ -356,9 +365,16 @@ void LinearScanRA::dumpPR2Reg(PRNO p) const
     LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
     REGFILE rf = pthis->getTIMgr().getRegFile(r);
     LifeTime const* lt = getLT(p);
-    if (lt ==  nullptr) { return; }
-    ASSERT0(lt->getPrno() == p);
-    note(m_rg, "\nLT:$%u:%s(%s)", lt->getPrno(), getRegName(r),
+    if (lt != nullptr) {
+        ASSERT0(lt->getPrno() == p);
+        note(m_rg, "\nLT:$%u:%s(%s)", lt->getPrno(), getRegName(r),
+             pthis->getTIMgr().getRegFileName(rf));
+        return;
+    }
+    //PRNO without allocated a lifetime. The prno may be appeared as a
+    //temporate pseduo register, e.g:the PR that indicates the region
+    //livein callee-saved physical register.
+    note(m_rg, "\n--:$%u:%s(%s)", p, getRegName(r),
          pthis->getTIMgr().getRegFileName(rf));
 }
 
@@ -366,9 +382,11 @@ void LinearScanRA::dumpPR2Reg(PRNO p) const
 void LinearScanRA::dumpPR2Reg() const
 {
     note(m_rg, "\n==-- DUMP %s --==", "PR2Reg");
+    m_rg->getLogMgr()->incIndent(2);
     for (PRNO p = PRNO_UNDEF + 1; p < m_prno2reg.get_elem_count(); p++) {
         dumpPR2Reg(p);
     }
+    m_rg->getLogMgr()->decIndent(2);
 }
 
 
@@ -506,8 +524,32 @@ void LinearScanRA::collectDedicatedPR(BBList const* bblst,
     //e.g: designate $3 have to be allocate physical register REG-5.
     //mgr.add((PRNO)3, (Reg)5);
     DUMMYUSE(bblst);
-    DUMMYUSE(mgr);    
+    DUMMYUSE(mgr);
 }
+
+
+//The class switch IRBBMgr of given region.
+class UseNewIRBBMgr {
+    IRBBMgr * m_org_bbmgr;
+    IRBBMgr * m_new_bbmgr;
+    Region * m_rg;
+public:
+    UseNewIRBBMgr(Region * rg, IRBBMgr * bbmgr)
+    {
+        m_rg = rg;
+        m_org_bbmgr = bbmgr;
+        m_new_bbmgr = new IRBBMgr();
+        m_rg->setBBMgr(m_new_bbmgr);
+    }
+    ~UseNewIRBBMgr()
+    {
+        ASSERT0(m_org_bbmgr && m_new_bbmgr);
+        m_rg->setBBMgr(m_org_bbmgr);
+        delete m_new_bbmgr;
+    }
+    IRBBMgr * getNewIRBBMgr() const { return m_new_bbmgr; }
+    IRBBMgr * getOrgIRBBMgr() const { return m_org_bbmgr; }
+};
 
 
 //The class switch IRMgr of given region.
@@ -516,59 +558,93 @@ class UseNewIRMgr {
     IRMgr * m_new_mgr;
     Region * m_rg;
 public:
-    UseNewIRMgr(Region * rg)
+    UseNewIRMgr(Region * rg, IRMgr * irmgr)
     {
         m_rg = rg;
-        m_org_mgr = rg->getIRMgr();
-        ASSERT0(rg->getPassMgr());
-        m_new_mgr = (IRMgr*)rg->getPassMgr()->allocIRMgr();
+        m_org_mgr = irmgr;
+        ASSERT0(m_rg->getPassMgr());
+        m_new_mgr = (IRMgr*)m_rg->getPassMgr()->allocPass(PASS_IRMGR);
         m_new_mgr->setIRCount(m_org_mgr->getIRCount());
-        rg->setIRMgr(m_new_mgr);
+        m_rg->setIRMgr(m_new_mgr);
     }
     ~UseNewIRMgr()
     {
         ASSERT0(m_org_mgr && m_new_mgr);
         m_rg->setIRMgr(m_org_mgr);
-        delete m_new_mgr;
+        m_rg->getPassMgr()->destroyPass(m_new_mgr);
     }
+    IRMgr * getNewIRMgr() const { return m_new_mgr; }
+    IRMgr * getOrgIRMgr() const { return m_org_mgr; }
 };
 
 
-//The class clones given CFG and BB List.
-class CloneCFGAndBB {
-    IRCFG * m_cloned_cfg;
-    BBList * m_cloned_bblst;
+//The class switch BBList of given region.
+//Note the class will clone new BB via given IRBBMgr.
+class UseNewBBList {
+    BBList * m_org_bblst;
+    BBList * m_new_bblst;
+    IRBBMgr * m_org_bbmgr;
     Region * m_rg;
 public:
-    CloneCFGAndBB(IRCFG const& srccfg, BBList const& srcbblst, Region * rg)
+    UseNewBBList(Region * rg, BBList * bblst, MOD IRBBMgr * bbmgr)
+    {
+        ASSERT0(bbmgr);
+        m_rg = rg;
+        m_org_bblst = bblst;
+        m_org_bbmgr = bbmgr;
+        m_new_bblst = new BBList();
+        m_new_bblst->clone(*bblst, bbmgr, rg);
+        m_rg->setBBList(m_new_bblst);
+    }
+    ~UseNewBBList()
+    {
+        m_rg->setBBList(m_org_bblst);
+        BBListIter it;
+        for (IRBB * bb = m_new_bblst->get_head(&it);
+             bb != nullptr; bb = m_new_bblst->get_next(&it)) {
+            m_org_bbmgr->destroyBB(bb);
+        }
+        delete m_new_bblst;
+    }
+    BBList * getNewBBList() const { return m_new_bblst; }
+    BBList * getOrgBBList() const { return m_org_bblst; }
+};
+
+
+//The class switch IRCFG of given region.
+class UseNewCFG {
+    IRCFG * m_org_cfg;
+    IRCFG * m_new_cfg;
+    Region * m_rg;
+public:
+    UseNewCFG(Region * rg, IRCFG * cfg, BBList * bblst)
     {
         m_rg = rg;
-        m_cloned_bblst = new BBList();
-        m_cloned_bblst->clone(srcbblst, rg);
-        m_cloned_cfg = new IRCFG(srccfg, m_cloned_bblst, false, false);
-        m_cloned_cfg->setBBVertex();
+        m_org_cfg = cfg;
+        ASSERT0(m_rg->getPassMgr());
+        //m_new_cfg = (IRCFG*)m_rg->getPassMgr()->allocPass(PASS_CFG);
+        m_new_cfg = new IRCFG(*cfg, bblst, false, false);
+        m_new_cfg->setBBVertex();
+        m_rg->setCFG(m_new_cfg);
     }
-    ~CloneCFGAndBB()
+    ~UseNewCFG()
     {
-        IRBBMgr * bbmgr = m_rg->getBBMgr();
-        BBListIter it;
-        for (IRBB * bb = m_cloned_bblst->get_head(&it);
-             bb != nullptr; bb = m_cloned_bblst->get_next(&it)) {
-            bbmgr->destroyBB(bb);
-        }
-        delete m_cloned_bblst;
-        m_cloned_cfg->setBBList(nullptr);
-        delete m_cloned_cfg;
+        ASSERT0(m_org_cfg && m_new_cfg);
+        m_rg->setCFG(m_org_cfg);
+        m_new_cfg->setBBList(nullptr);
+        delete m_new_cfg;
     }
-    IRCFG * getClonedCFG() const { return m_cloned_cfg; }
-    BBList * getClonedBBList() const { return m_cloned_bblst; }
+    IRCFG * getNewCFG() const { return m_new_cfg; }
+    IRCFG * getOrgCFG() const { return m_org_cfg; }
 };
 
 
 class ApplyToRegion {
     COPY_CONSTRUCTOR(ApplyToRegion);
     xcom::Stack<UseNewIRMgr*> m_irmgr_stack;
-    xcom::Stack<CloneCFGAndBB*> m_cfg_and_bblst_stack;
+    xcom::Stack<UseNewIRBBMgr*> m_bbmgr_stack;
+    xcom::Stack<UseNewBBList*> m_bblist_stack;
+    xcom::Stack<UseNewCFG*> m_cfg_stack;
     Region * m_rg;
 public:
     ApplyToRegion(Region * rg) { m_rg = rg; }
@@ -576,37 +652,49 @@ public:
     {
         for (; m_irmgr_stack.get_top() != nullptr;) {
             m_irmgr_stack.pop();
-            m_cfg_and_bblst_stack.pop();
+            m_bbmgr_stack.pop();
+            m_bblist_stack.pop();
+            m_cfg_stack.pop();
         }
-        ASSERT0(m_cfg_and_bblst_stack.get_top() == nullptr);
+        ASSERT0(m_irmgr_stack.get_top() == nullptr);
+        ASSERT0(m_bbmgr_stack.get_top() == nullptr);
+        ASSERT0(m_bblist_stack.get_top() == nullptr);
+        ASSERT0(m_cfg_stack.get_top() == nullptr);
     }
-    void push(MOD IRCFG *& cfg, MOD BBList *& bb_list)
+    void push()
     {
-        UseNewIRMgr * usenewirmgr = new UseNewIRMgr(m_rg);
+        //Push current IRMgr of region and adopt a new.
+        UseNewIRMgr * usenewirmgr = new UseNewIRMgr(m_rg, m_rg->getIRMgr());
         m_irmgr_stack.push(usenewirmgr);
-        CloneCFGAndBB * cloned = new CloneCFGAndBB(*cfg, *bb_list, m_rg);
-        m_cfg_and_bblst_stack.push(cloned);
-        cfg = cloned->getClonedCFG();
-        bb_list = cloned->getClonedBBList();
+
+        //Push current IRBBMgr of region and adopt a new.
+        UseNewIRBBMgr * usenewbbmgr = new UseNewIRBBMgr(
+            m_rg, m_rg->getBBMgr());
+        m_bbmgr_stack.push(usenewbbmgr);
+
+        //Push current BBList of region and adopt a new.
+        UseNewBBList * usenewbblst = new UseNewBBList(
+            m_rg, m_rg->getBBList(), m_rg->getBBMgr());
+        m_bblist_stack.push(usenewbblst);
+
+        //Push current CFG of region and adopt a new.
+        UseNewCFG * usenewcfg = new UseNewCFG(
+            m_rg, m_rg->getCFG(), m_rg->getBBList());
+        m_cfg_stack.push(usenewcfg);
     }
-    void pop(MOD IRCFG *& cfg, MOD BBList *& bb_list)
+    void pop()
     {
-        UseNewIRMgr * usenewirmgr = m_irmgr_stack.pop();
-        if (usenewirmgr != nullptr) {
-            delete usenewirmgr;
-        }
-        CloneCFGAndBB * cloned = m_cfg_and_bblst_stack.pop();
-        if (cloned != nullptr) {
-            delete cloned;
-        }
-        cloned = m_cfg_and_bblst_stack.get_top();
-        if (cloned != nullptr) {
-            cfg = cloned->getClonedCFG();
-            bb_list = cloned->getClonedBBList();
-            return;
-        }
-        cfg = nullptr;
-        bb_list = nullptr;
+        UseNewCFG * usecfg = m_cfg_stack.pop();
+        if (usecfg != nullptr) { delete usecfg; }
+
+        UseNewBBList * usebblst = m_bblist_stack.pop();
+        if (usebblst != nullptr) { delete usebblst; }
+
+        UseNewIRBBMgr * usebbmgr = m_bbmgr_stack.pop();
+        if (usebbmgr != nullptr) { delete usebbmgr; }
+
+        UseNewIRMgr * useirmgr = m_irmgr_stack.pop();
+        if (useirmgr != nullptr) { delete useirmgr; }
     }
 };
 
@@ -631,10 +719,11 @@ bool LinearScanRA::perform(OptCtx & oc)
     ApplyToRegion apply(m_rg);
     if (!m_is_apply_to_region) {
         //Stash current region information.
-        apply.push(m_cfg, m_bb_list);
+        apply.push();
+        m_cfg = m_rg->getCFG();
+        m_bb_list = m_rg->getBBList();
         ASSERT0(m_cfg->verify());
     }
-
     //Enable the dump-buffer.
     DumpBufferSwitch buff(m_rg->getLogMgr());
     UpdatePos up(*this);
@@ -653,13 +742,15 @@ bool LinearScanRA::perform(OptCtx & oc)
         dump(false);
     }
     if (!m_is_apply_to_region) {
-        apply.pop(m_cfg, m_bb_list);
+        apply.pop();
+        m_cfg = nullptr;
+        m_bb_list = nullptr;
     }
     ASSERTN(getRegion()->getCFG()->verifyRPO(oc),
             ("make sure original RPO is legal"));
     ASSERTN(getRegion()->getCFG()->verifyDomAndPdom(oc),
             ("make sure original DOM/PDOM is legal"));
-    if (!changed) {
+    if (!changed || !m_is_apply_to_region) {
         ASSERT0(m_rg->getBBMgr()->verify());
         END_TIMER(t, getPassName());
         return false;

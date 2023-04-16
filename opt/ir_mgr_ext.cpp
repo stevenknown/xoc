@@ -94,7 +94,7 @@ IR * IRMgrExt::buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse,
     if (dummyuse != nullptr) {
         IR_is_dummy(dummyuse) = true;
         IR_parent(dummyuse) = ir;
-    }    
+    }
     return ir;
 }
 
@@ -106,7 +106,7 @@ IR * IRMgrExt::buildBroadCast(IR * src, IR * res_list, Type const* ty)
     BROADCAST_src(ir) = src;
     IR_parent(src) = ir;
     BROADCAST_alter_res_desc_list(ir) = res_list;
-    for (IR * res = res_list; res != nullptr; res = res->get_next()) {        
+    for (IR * res = res_list; res != nullptr; res = res->get_next()) {
         IR_parent(res) = ir;
     }
     IR_dt(ir) = ty;

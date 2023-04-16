@@ -156,7 +156,8 @@ IR * MDDef::getOcc() const
 IRBB * MDDef::getBB() const
 {
     ASSERT0(is_phi() ? MDPHI_bb(this) != nullptr :
-                       MDDEFSTMT_occ(this) != nullptr);
+                       (MDDEFSTMT_occ(this) != nullptr &&
+                        MDDEFSTMT_occ(this)->is_stmt()));
     return is_phi() ? MDPHI_bb(this) : MDDEFSTMT_occ(this)->getBB();
 }
 //END MDDef
@@ -634,7 +635,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
         }
 
         IR * use = rg->getIR(i2);
-        ASSERT0(use && (use->isMemRef() || use->is_id()));
+        ASSERT0(use && use->isMemRef());
         prt(rg, "%s(id:%d)", IRNAME(use), use->id());
     }
 }
@@ -803,7 +804,7 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
     for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
-        ASSERT0(use && (use->isMemRef() || use->is_id()));
+        ASSERT0(use && use->isMemRef());
         prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
     }
 }
@@ -995,12 +996,7 @@ void UseDefMgr::cleanMDSSAInfo(IR * ir)
 
 
 
-//Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
-//has its own specific MDSSA Memory Reference information.
-//It sounds there might be some waste to memory if many IRs mdssa-reference
-//could be represented by same MDSSAInfo. Nevertheless, the postulation
-//is quite experimentally, and in practical very rarelly.
-MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
+MDSSAInfo * UseDefMgr::genMDSSAInfo(MOD IR * ir)
 {
     ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == nullptr) {

@@ -96,7 +96,7 @@ PRECISION_TYPE integralize(PRECISION_TYPE const& a)
 }
 
 
-CHAR const* Float::format(StrBuf & buf) const
+CHAR const* Float::dump(StrBuf & buf) const
 {
     buf.sprint("%f", m_f);
     return buf.buf;
@@ -128,7 +128,7 @@ bool Float::is_int()
 void Float::dump() const
 {
     StrBuf buf(16);
-    format(buf);
+    dump(buf);
     fprintf(stdout, "%s", buf.buf);
 }
 

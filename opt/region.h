@@ -274,6 +274,7 @@ public:
     virtual void destroy();
     void destroyPassMgr();
     void destroyAttachInfoMgr();
+    void destroyIRBBMgr();
 
     //Duplication all contents of 'src', includes AttachInfo, except DU info,
     //SSA info, kids and siblings IR.
@@ -306,7 +307,7 @@ public:
     void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
 
     //Dump all irs and ordering by IR_id.
-    void dumpAllocatedIR() const;
+    void dumpAllIR() const { getIRMgr()->dump(); }
 
     //Dump each Var in current region's Var table.
     void dumpVARInRegion() const;
@@ -432,11 +433,14 @@ public:
 
     //Get IRBB list if any.
     BBList * getBBList() const
-    { return &ANA_INS_ir_bb_list(getAnalysisInstrument()); }
+    { return ANA_INS_ir_bb_list(getAnalysisInstrument()); }
 
     //Get IRBBMgr of current region.
     IRBBMgr * getBBMgr() const
-    { return &ANA_INS_ir_bb_mgr(getAnalysisInstrument()); }
+    { return ANA_INS_ir_bb_mgr(getAnalysisInstrument()); }
+
+    //Get the BB by given bbid.
+    IRBB * getBB(UINT bbid) const { return getBBMgr()->getBB(bbid); }
 
     //Get MDSetHash.
     MDSetHash * getMDSetHash() const
@@ -658,6 +662,9 @@ public:
     //Allocate and initialize IR manager.
     IRMgr * initIRMgr();
 
+    //Allocate and initialize IRBB manager.
+    IRBBMgr * initIRBBMgr();
+
     //Allocate and initialize attachinfo manager.
     AttachInfoMgr * initAttachInfoMgr();
     bool isSafeToOptimize(IR const* ir);
@@ -741,6 +748,11 @@ public:
     void setCommPool(SMemPool * pool) { m_pool = pool; }
     void setIRMgr(IRMgr * mgr)
     { ANA_INS_ir_mgr(getAnalysisInstrument()) = mgr; }
+    void setBBMgr(IRBBMgr * mgr)
+    { ANA_INS_ir_bb_mgr(getAnalysisInstrument()) = mgr; }
+    void setBBList(BBList * bblst)
+    { ANA_INS_ir_bb_list(getAnalysisInstrument()) = bblst; }
+    void setCFG(IRCFG * newcfg);
 
     //Collect information of CALL and RETURN in current region.
     //num_inner_region: count the number of inner regions.

@@ -134,6 +134,7 @@ public:
     Reg getReg(LifeTime const* lt) const;
     LifeTime * getLT(PRNO prno) const;
     CHAR const* getRegName(Reg r) const;
+    CHAR const* getRegFileName(REGFILE rf) const;
     LTSet & getUnhandled() { return m_unhandled; }
     LTSet & getActive() { return m_active; }
     LTSet & getInActive() { return m_inactive; }
@@ -154,7 +155,7 @@ public:
     virtual CHAR const* getPassName() const
     { return "Linear Scan Register Allocation"; }
     PASS_TYPE getPassType() const { return PASS_LINEAR_SCAN_RA; }
- 
+
     bool isInsertOp() const
     {
         LinearScanRA * pthis = const_cast<LinearScanRA*>(this);

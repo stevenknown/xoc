@@ -394,7 +394,7 @@ public:
 
     //Get current token.
     TOKEN getCurrentToken() const { return m_cur_token; }
-    
+
     //Get index offset in line table of current line.
     UINT getOffsetTabLineNum() const
     { return m_ofst_tab_byte_size / sizeof(LONG); }

@@ -289,7 +289,7 @@ public:
     //be split at 'split_pos' or there is no properly reload position.
     bool checkIfCanBeSplitCand(LifeTime const* lt, Pos split_pos,
                                OUT Pos & reload_pos, OUT Occ & reload_occ);
- 
+
     //Split lt into two lifetime accroding to the information given in 'ctx'.
     //Note after splitting the second half of 'lt' will be renamed to a newlt.
     //Return the newlt.

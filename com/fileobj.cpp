@@ -41,7 +41,7 @@ size_t g_fo_num = sizeof(g_fo_name) / sizeof(g_fo_name[0]);
 
 CHAR const* FileObj::getFileStatusName(FO_STATUS st)
 {
-    ASSERT0(st < g_fo_num);
+    ASSERT0(((size_t)st) < g_fo_num);
     return g_fo_name[st];
 }
 

@@ -810,7 +810,7 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
               lab->getName(buf));
         error_occur = true;
     }
- 
+
     return error_occur ? false : true;
 }
 
@@ -848,6 +848,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
         *region = m_rumgr->newRegion(REGION_FUNC);
         (*region)->initPassMgr();
         (*region)->initIRMgr();
+        (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
         //SET_FLAG(*flag, VAR_LOCAL);
         break;
@@ -855,6 +856,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
         *region = m_rumgr->newRegion(REGION_PROGRAM);
         (*region)->initPassMgr();
         (*region)->initIRMgr();
+        (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
         //SET_FLAG(*flag, VAR_GLOBAL);
         break;
@@ -862,6 +864,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
         *region = m_rumgr->newRegion(REGION_INNER);
         (*region)->initPassMgr();
         (*region)->initIRMgr();
+        (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
         //SET_FLAG(*flag, VAR_LOCAL);
         break;
@@ -896,6 +899,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     ASSERT0(oc);
     rg->initPassMgr();
     rg->initIRMgr();
+    rg->initIRBBMgr();
     PassMgr * pm = rg->getPassMgr();
     OptCtx loc(*oc);
 
@@ -1334,7 +1338,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         } else {
             ty = m_tm->getF64();
         }
-        case_det = ctx->current_region->getIRMgr()->buildImmFp(val, ty);
+        case_det = ctx->current_region->getIRMgr()->buildImmFP(val, ty);
         tok = m_lexer->getCurrentToken();
     } else {
         error(tok, "case determinate must be constant");
@@ -2032,7 +2036,7 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
         imm = ctx->current_region->getIRMgr()->buildImmInt(v, ty);
     } else if (ty->is_fp()) {
         HOST_FP b = ::atof(immstr.buf);
-        imm = ctx->current_region->getIRMgr()->buildImmFp(b, ty);
+        imm = ctx->current_region->getIRMgr()->buildImmFP(b, ty);
     } else if (ty->is_any()) {
         imm = ctx->current_region->getIRMgr()->buildImmAny(v);
     } else {
@@ -2151,7 +2155,7 @@ bool IRParser::parseFp(ParseCtx * ctx)
     } else {
         ty = m_tm->getF64();
     }
-    IR * fp = ctx->current_region->getIRMgr()->buildImmFp(v, ty);
+    IR * fp = ctx->current_region->getIRMgr()->buildImmFP(v, ty);
     ctx->returned_exp = fp;
     return true;
 }

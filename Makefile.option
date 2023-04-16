@@ -14,6 +14,10 @@ else
   CFLAGS+=-MMD #Ask compiler generate dependent files information.
 endif
 
+ifeq ($(REF_TARGMACH_INFO),true)
+  CFLAGS+=-DREF_TARGMACH_INFO #LSRA use targmach info
+endif
+
 #To conveninently use DUMMYUSE, some compiler will complain for comma
 #expression.
 USE_DUMMYUSE=true

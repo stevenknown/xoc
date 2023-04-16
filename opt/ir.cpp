@@ -66,7 +66,7 @@ INT checkKidNumValid(IR const* ir, UINT n, CHAR const* filename, INT line)
 
 
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
-                           INT line)
+                          INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
@@ -77,7 +77,7 @@ INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
 
 
 INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
-                            INT line)
+                           INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
@@ -88,7 +88,7 @@ INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
 
 
 INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
-                            INT line)
+                           INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,

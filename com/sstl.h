@@ -3153,7 +3153,6 @@ protected:
     } s1;
 public:
     T * m_vec; //vector's memory is allocated in outside mempool.
-
 public:
     SimpleVector()
     {
@@ -3169,6 +3168,8 @@ public:
     SimpleVector const& operator = (SimpleVector const&);
     ~SimpleVector() { destroy(); }
 
+    //Copy element of src.
+    //pool: the vector buffer allocated in the pool.
     void copy(SimpleVector const& src, SMemPool * pool)
     {
         UINT n = SVEC_elem_num(&src);
@@ -3194,6 +3195,7 @@ public:
         ASSERTN(s1.m_is_init, ("SimpleVector not yet initialized."));
         ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
+
     //Count memory usage for current object.
     size_t count_mem() const
     { return SVEC_elem_num(this) + sizeof(Vector<T>); }
@@ -3231,11 +3233,14 @@ public:
         if (i >= SVEC_elem_num(this)) { return T(0); }
         return m_vec[i];
     }
+
+    //Return the number of element in the vector.
     UINT getElemNum() const { return SVEC_elem_num(this); }
-    //Return vector buffer that hold elements.
+
+    //Return the vector buffer that hold elements.
     T * get_vec() { return m_vec; }
 
-    //Return the number of element the vector could hold.
+    //Return the maximum number of element the vector could hold.
     UINT get_capacity() const
     {
         ASSERTN(is_init(), ("SimpleVector not yet initialized."));

@@ -115,9 +115,8 @@ static Vertex const* findRoot(Vertex const* from, VexTab const& vt,
 }
 
 
-static void postProcessReached(RCE * rce, Vertex const* from,
-                               Vertex const* to,
-                               MOD RCE::RCECtx & rcectx)
+static void postProcessReached(Vertex const* from, Vertex const* to,
+                               MOD RCE * rce, MOD RCE::RCECtx & rcectx)
 {
     VexTab modset;
     Vertex const* root = nullptr;
@@ -140,7 +139,8 @@ static void postProcessReached(RCE * rce, Vertex const* from,
         recordOutVex(from, modset);
     }
     recordDomVexForEachElem(rce->getCFG(), modset);
-    rce->getCFG()->reviseStmtMDSSA(modset, root);
+    rce->getCFG()->reviseMDSSA(modset, root);
+
     //RPO is unchanged if only removing branch-edge.
     //DOM may changed.
     // BB1--->BB3------
@@ -157,18 +157,32 @@ static void postProcessReached(RCE * rce, Vertex const* from,
 }
 
 
-static void postProcessUnreached(RCE * rce, Vertex const* from,
-                                 Vertex const* to,
-                                 MOD RCE::RCECtx & rcectx)
+static Vertex const* findMinimalRoot(RCE const* rce)
+{
+    //TODO:find minimal root vertex rather than CFG entry.
+    //VexTab border;
+    //Vertex const* root = findRoot(from, border, rce->getCFG());
+    //ASSERT0(root);
+    DUMMYUSE(findRoot); //Avoid gcc complaint.
+
+    //WORDAROUND:Use cfg's entry as root.
+    return rce->getCFG()->getEntry()->getVex();
+}
+
+
+static void postProcessUnreached(Vertex const* from, Vertex const* to,
+                                 MOD RCE * rce, MOD RCE::RCECtx & rcectx)
 {
     //Removing edge will cause unreachable code to appear.
     //CASE:rce2.c, licm_hoist.c.
     CfgOptCtx ctx(*rcectx.oc);
+
     //Unreachable-code will confuse DomInfo computation.
     CFGOPTCTX_need_update_dominfo(&ctx) = false;
     RemoveUnreachBBCtx rmunrchctx;
     bool removed = rce->getCFG()->removeUnreachBB(ctx, &rmunrchctx);
     ASSERT0_DUMMYUSE(removed);
+
     //CFG related info is incorrect if unreachable code removed.
     //e.g:rce_updatedom2.c
     rcectx.oc->setInvalidIfCFGChanged();
@@ -176,26 +190,34 @@ static void postProcessUnreached(RCE * rce, Vertex const* from,
     //DomInfo is necessary for subsequently SSA updation.
     VexTab modset;
     UINT iter_times = 0;
-    //TODO:find minimal root vertex rather than CFG entry.
-    //VexTab border;
-    //Vertex const* root = findRoot(from, border, rce->getCFG());
-    DUMMYUSE(findRoot); //Avoid gcc complaint.
-    //ASSERT0(root);
-    Vertex const* root = rce->getCFG()->getEntry()->getVex();
+    Vertex const* root = findMinimalRoot(rce);
+
+    //Recompute DOM need RPO.
+    rce->getRegion()->getPassMgr()->checkValidAndRecompute(
+        rcectx.oc, PASS_RPO, PASS_UNDEF);
+
+    //Recompute the DOM for subgraph.
     rce->getCFG()->recomputeDomInfoForSubGraph(root, &modset, iter_times);
     OC_is_dom_valid(*rcectx.oc) = true;
+
+    //Update the vertex's DomInfo as a result.
     modset.add(rmunrchctx.getVexTab());
     recordDomVexForEachElem(rce->getCFG(), modset);
-    rce->getCFG()->reviseStmtMDSSA(modset, root);
+
+    //Fixup SSA info according DOM.
+    rce->getCFG()->reviseMDSSA(modset, root);
+
+    //Update status of CFG of RCECtx.
     rcectx.cfg_mod = true;
+
+    //Do some verification at last.
     ASSERT0(rce->getCFG()->verifyDomAndPdom(*rcectx.oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(rce->getRegion(), *rcectx.oc));
 }
 
 
-static void postProcessAfterRemoveEdge(RCE * rce, Vertex const* from,
-                                       Vertex const* to,
-                                       MOD RCE::RCECtx & rcectx)
+static void postProcessAfterRemoveEdge(Vertex const* from, Vertex const* to,
+                                       MOD RCE * rce, MOD RCE::RCECtx & rcectx)
 {
     ASSERT0(from->getInDegree() > 0);
     ASSERT0(rce->getCFG()->getEntry());
@@ -205,10 +227,10 @@ static void postProcessAfterRemoveEdge(RCE * rce, Vertex const* from,
     bool reach = Graph::isReachIn(to, entry, (UINT)-1, try_failed);
     ASSERTN(!try_failed, ("tried too much"));
     if (reach) {
-        postProcessReached(rce, from, to, rcectx);
+        postProcessReached(from, to, rce, rcectx);
         return;
     }
-    postProcessUnreached(rce, from, to, rcectx);
+    postProcessUnreached(from, to, rce, rcectx);
 }
 
 
@@ -400,7 +422,7 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(from->getVex(), to->getVex(), this, ctx);
         //Do NOT free old ir here, leave it to the caller.
         return nullptr;
     }
@@ -419,7 +441,7 @@ IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
         CfgOptCtx coctx(*ctx.oc);
         CFGOPTCTX_need_update_dominfo(&coctx) = false;
         m_cfg->removeEdge(from, to, coctx);
-        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(from->getVex(), to->getVex(), this, ctx);
         return newbr;
     }
     ASSERT0(BR_det(ir) == nullptr);
@@ -456,7 +478,7 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(from->getVex(), to->getVex(), this, ctx);
         return newbr;
     }
     if (must_false) {
@@ -471,7 +493,7 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
-        postProcessAfterRemoveEdge(this, from->getVex(), to->getVex(), ctx);
+        postProcessAfterRemoveEdge(from->getVex(), to->getVex(), this, ctx);
         return nullptr;
     }
     ASSERT0(BR_det(ir) == nullptr);
@@ -613,6 +635,8 @@ bool RCE::perform(OptCtx & oc)
     if (m_gvn == nullptr || (!m_gvn->is_valid() && is_use_gvn())) {
         return false;
     }
+    //Incremental update DOM need RPO.
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpInit(this);
     RCECtx ctx(&oc);
@@ -633,8 +657,18 @@ bool RCE::perform(OptCtx & oc)
         //DomInfo is needed when updating SSA info.
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
                                                    PASS_UNDEF);
+
+        //TBD:Sometimes, CFG is complicated, maintain Dom and SSA is costly.
+        //Thus you should apply a cost-model to drive the updation of Dom and
+        //SSA. For now, we still choose to update Dom and SSA as much as
+        //possible, whereas the compilation time can be unbearable.
+        //CASE:Do NOT update Dom Info and SSA Info, because abnormal insane
+        //CFG will confuse the Dom and SSA algorithm. When a edge removed and
+        //there may have unreachable BB appeared, which MDSSAMgr does not known
+        //these abnormal predecessors.
+        //e.g:alias.loop.c
         CFGOPTCTX_need_update_dominfo(&ctx) = true;
-        change |= m_cfg->performMiscOpt(oc);
+        change |= m_cfg->performMiscOpt(ctx);
     }
     if (change) {
         //CFG changed, remove empty BB.

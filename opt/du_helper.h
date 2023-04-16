@@ -131,6 +131,30 @@ IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
 VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
                             GVN const* gvn);
 
+//Return true if both ir1 and ir2 have same unique def.
+//ir1: expression.
+//ir2: expression.
+bool hasSameUniqueMustDef(IR const* ir1, IR const* ir2, Region const* rg);
+
+//Return true if both IR tree that start at ir1 and IR tree that start at ir2
+//have same unique def.
+//ir1: root expression.
+//ir2: root expression.
+bool hasSameUniqueMustDefForTree(IR const* ir1, IR const* ir2,
+                                 Region const* rg);
+
+//Return true if all kid of isomorphic IR tree that start at ir1 and ir2
+//have same unique def.
+//ir1: stmt or expression.
+//ir2: stmt or expression.
+bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
+                                         Region const* rg);
+
+//Return true if both ir1 and ir2 have region livein def.
+//ir1: expression.
+//ir2: expression.
+bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2, Region const* rg);
+
 //Return true if def is killing-def of use.
 //Note this function does not check if there is DU chain between def and use.
 //gvn: if it is not NULL, the function will attempt to reason out the
@@ -146,20 +170,46 @@ bool isKillingDef(IR const* def, MD const* usemd);
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
 //Return true if ir1 reference is may overlap to ir2.
-//Return true if def is overlaped with use's referrence.
-//def: stmt
-//use: expression
+//ir1: stmt or expression.
+//ir2: stmt or expression.
 //costly_analysis: set to true if caller expect to compute overlap for
 //                 element in MayDef/MayUse, which will iterate elements
 //                 in MDSet, and is costly.
 bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
                  Region const* rg);
 
+//Return true if ir1 reference is may overlap to whole IR tree that root at ir2.
+//ir1: stmt or expression.
+//ir2: the root stmt or expression of IR tree.
+//costly_analysis: set to true if caller expect to compute overlap for
+//                 element in MayDef/MayUse, which will iterate elements
+//                 in MDSet, and is costly.
+bool isDependentForTree(IR const* ir1, IR const* ir2, bool costly_analysis,
+                        Region const* rg);
+
 //Return true if ir1 is may overlap to phi.
 bool isDependent(IR const* ir, MDPhi const* phi);
 
+//Return true if both ir1 and ir2 are in loop 'li', and there is only
+//loop-independent dependence between ir1 and ir2, not loop-carried dependence.
+//ir1: stmt or expression.
+//ir2: stmt or expression.
+//costly_analysis: set to true if caller expect to compute overlap for
+//                 element in MayDef/MayUse, which will iterate elements
+//                 in MDSet, and is costly.
+//li: loop info.
+bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
+                       LI<IRBB> const* li, Region const* rg);
+
 //The function try to find the killing-def for 'use'.
-IR * findKillingDef(IR const* use, Region * rg);
+//To find the killing-def, the function prefer use SSA info.
+IR * findKillingDef(IR const* use, Region const* rg);
+
+//The function try to find the unique must-def for 'use'.
+//Note must-def is the DEF that overlapped with 'use', but may not be
+//killing-def.
+//To find the killing-def, the function prefer use SSA info.
+IR * findUniqueMustDef(IR const* use, Region const* rg);
 
 //Note DOM info must be available.
 //exp: the expression that expected to set livein.

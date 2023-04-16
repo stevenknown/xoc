@@ -189,7 +189,7 @@ public:
 
     //Enable and clean the dump buffer.
     void startBuffer();
-    
+
     //Resume to dump to buffer. And when buffer resumed, the
     //output content will write to buffer.
     void resumeBuffer();

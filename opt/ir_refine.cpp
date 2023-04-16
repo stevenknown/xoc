@@ -525,6 +525,9 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         IR * newir = m_rg->getIRMgr()->buildStore(LDA_idinfo(base),
             ir->getType(), LDA_ofst(base) + IST_ofst(ir), IST_rhs(ir));
         newir->copyRef(ir, m_rg);
+        //Direct memory opertion must have MustRef, however ir's MustRef
+        //may be empty.
+        m_rg->getMDMgr()->allocRef(newir);
         recomputeMayRef(ir);
         newir->copyAI(ir, m_rg);
 
@@ -554,7 +557,8 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         ir->setRHS(newrhs);
         copyDbx(newrhs, rhs, m_rg);
         newrhs->copyRef(rhs, m_rg);
-
+        //Direct memory opertion must have MustRef, however ir's MustRef
+        //may be empty.
         m_rg->getMDMgr()->allocRef(newrhs);
         recomputeMayRef(newrhs);
         //The new MustRef may be not overlapped with the MayRef.
@@ -1102,7 +1106,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         }
 
         if (ty->is_fp()) {
-            ir = m_rg->getIRMgr()->buildImmFp(1.0f, ty);
+            ir = m_rg->getIRMgr()->buildImmFP(1.0f, ty);
         } else {
             ir = m_rg->getIRMgr()->buildImmInt(1, ty);
         }
@@ -1474,7 +1478,7 @@ IR * Refine::refineSub(IR * ir, bool & change, RefineCtx & rc)
         }
 
         if (ty->is_fp()) {
-            ir = m_rg->getIRMgr()->buildImmFp(HOST_FP(0.0f), ty);
+            ir = m_rg->getIRMgr()->buildImmFP(HOST_FP(0.0f), ty);
         } else {
             ir = m_rg->getIRMgr()->buildImmInt(0, ty);
         }
@@ -1779,7 +1783,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         break;
     case IR_LT:
         if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
-            BIN_opnd1(ir)->is_ptr() || BIN_opnd1(ir)->is_any()) {
+            (!BIN_opnd0(ir)->isPtr() && BIN_opnd1(ir)->isPtr())) {
             //Invert code: 0 < a ==> a > 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
@@ -1789,7 +1793,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         break;
     case IR_LE:
         if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
-            BIN_opnd1(ir)->is_ptr() || BIN_opnd1(ir)->is_any()) {
+            (!BIN_opnd0(ir)->isPtr() && BIN_opnd1(ir)->isPtr())) {
             //Invert code: 0 <= a ==> a >= 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
@@ -1799,7 +1803,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         break;
     case IR_GT:
         if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
-            BIN_opnd1(ir)->is_ptr() || BIN_opnd1(ir)->is_any()) {
+            (!BIN_opnd0(ir)->isPtr() && BIN_opnd1(ir)->isPtr())) {
             //Invert code: 0 > a ==> a < 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
@@ -1809,7 +1813,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         break;
     case IR_GE:
         if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
-            BIN_opnd1(ir)->is_ptr() || BIN_opnd1(ir)->is_any()) {
+            (!BIN_opnd0(ir)->isPtr() && BIN_opnd1(ir)->isPtr())) {
             //Invert code: 0 >= a ==> a <= 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
@@ -2013,6 +2017,22 @@ IR * Refine::refineDetViaSSAdu(IR * ir, bool & change)
     m_rg->freeIRTree(ir);
     change = true;
     return m_rg->getIRMgr()->buildImmInt(1, ty);
+}
+
+
+IR * Refine::refineIRUntilUnchange(IR * ir, bool & change, RefineCtx & rc)
+{
+    bool lchange = true;
+    IR * newir = nullptr;
+    for (; lchange;) {
+        lchange = false;
+        newir = refineIR(ir, lchange, rc);
+        if (lchange) {
+            ir = newir;
+            change = true;
+        }
+    }
+    return newir;
 }
 
 
@@ -2227,7 +2247,7 @@ bool Refine::refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc)
 
         bool lchange = false;
         RefineCtx lrc(rc);
-        IR * newir = refineIR(ir, lchange, lrc);
+        IR * newir = refineIRUntilUnchange(ir, lchange, lrc);
         change |= lchange;
         if (newir == ir) { continue; }
         change = true;
@@ -2402,7 +2422,7 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
 
         if (parent->is_vec() || kid->is_vec()) {
             //Do not do hoisting for vector type.
-            ASSERTN(tgt_size == src_size, ("different size vector"));
+            ASSERTN(tgt_size >= src_size, ("size is overflowed"));
             return kid;
         }
 
@@ -2564,7 +2584,7 @@ IR * Refine::foldConstFloatUnary(IR * ir, bool & change)
     if (ir->is_neg()) {
         ASSERTN(m_tm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
-        ir = m_rg->getIRMgr()->buildImmFp(-CONST_fp_val(UNA_opnd(ir)),
+        ir = m_rg->getIRMgr()->buildImmFP(-CONST_fp_val(UNA_opnd(ir)),
                                           ir->getType());
         copyDbx(ir, oldir, m_rg);
         m_rg->freeIRTree(oldir);
@@ -2579,7 +2599,7 @@ IR * Refine::foldConstFloatUnary(IR * ir, bool & change)
         } else {
             t = HOST_FP(0.0);
         }
-        ir = m_rg->getIRMgr()->buildImmFp(t, ir->getType());
+        ir = m_rg->getIRMgr()->buildImmFP(t, ir->getType());
         copyDbx(ir, oldir, m_rg);
         m_rg->freeIRTree(oldir);
         change = true;
@@ -2609,7 +2629,7 @@ IR * Refine::foldConstFloatBinary(IR * ir, bool & change)
     case IR_SUB:
     case IR_MUL:
     case IR_DIV:
-        ir = m_rg->getIRMgr()->buildImmFp(calcFloatVal(ir->getCode(), v0, v1),
+        ir = m_rg->getIRMgr()->buildImmFP(calcFloatVal(ir->getCode(), v0, v1),
                               ir->getType());
         copyDbx(ir, oldir, m_rg);
         lchange = true;

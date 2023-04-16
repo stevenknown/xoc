@@ -56,7 +56,7 @@ void OptCtx::dumpPass() const
     for (passtab.get_first(tabiter, &p);
          p != nullptr; passtab.get_next(tabiter, &p)) {
         note(m_rg, "\nPASS:%s:%s", p->getPassName(),
-             p->is_valid() ? "valid":"invalid");    
+             p->is_valid() ? "valid":"invalid");
     }
 }
 
@@ -94,7 +94,7 @@ void OptCtx::dump() const
     note(m_rg, "\n==---- DUMP %s '%s' ----==", "OptCtx",
          m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    dumpFlag(); 
+    dumpFlag();
     dumpPass();
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER(t, "OptCtx: Dump");
@@ -115,7 +115,7 @@ static void setInvalidIfCFGChangedExceptImpl(OptCtx * oc,
         ASSERTN(opty < PASS_NUM,
                 ("You should append PASS_UNDEF to pass list."));
         exclude.bunion(opty);
-    }        
+    }
     if (!exclude.is_contain(PASS_RPO)) { oc->setInvalidRPO(); }
     if (!exclude.is_contain(PASS_LOOP_INFO)) { oc->setInvalidLoopInfo(); }
     if (!exclude.is_contain(PASS_DOM)) { oc->setInvalidDom(); }

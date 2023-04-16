@@ -112,7 +112,7 @@ bool CDG::is_control(Vertex const* a, Vertex const* b) const
          out != nullptr; out = Graph::get_next_out_vertex(it)) {
         if (out == b) {
             return true;
-        }            
+        }
     }
     return false;
 }

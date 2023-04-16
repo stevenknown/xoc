@@ -662,8 +662,12 @@ public:
     size_t count_mem() const;
     void cleanMDSSAInfo(IR * ir);
 
-    //Get MDSSAInfo of ir.
-    MDSSAInfo * genMDSSAInfo(IR * ir);
+    //Generate MDSSAInfo for individual Non-PR IR stmt/exp since each IR
+    //has its own specific MDSSA Memory Reference information.
+    //It sounds there might be some waste to memory if many IRs mdssa-reference
+    //could be represented by same MDSSAInfo. Nevertheless, the postulation
+    //is quite experimentally, and in practical very rarelly.
+    MDSSAInfo * genMDSSAInfo(MOD IR * ir);
     static MDSSAInfo * getMDSSAInfo(IR const* ir);
     Region * getRegion() const { return m_rg; }
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }

@@ -72,6 +72,7 @@ public:
     UpdatePos(LinearScanRA const& ra) : m_ra(ra)
     { m_use_expose = true; m_pos = POS_INIT_VAL; }
     Pos getPos() const { return m_pos; }
+    LinearScanRA const& getRA() const { return m_ra; }
 
     //Decrease position in step.
     static void dec(MOD Pos & pos) { pos--; }

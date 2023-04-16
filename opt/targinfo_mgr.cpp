@@ -86,7 +86,8 @@ RegSet const& TargInfoMgr::getCallee() const
 void TargInfoMgr::dump(Region const* rg) const
 {
     note(rg, "\n==-- DUMP %s --==", "TargInfoMgr");
-    StrBuf buf(32);
+    rg->getLogMgr()->incIndent(2);
+    xcom::StrBuf buf(32);
     const_cast<TargInfoMgr*>(this)->getAllocable().dump(buf);
     note(rg, "\nALLOCABLE:%s", buf.buf);
 
@@ -107,6 +108,7 @@ void TargInfoMgr::dump(Region const* rg) const
     note(rg, "\nRETURN_VALUE:%s", buf.buf);
 
     note(rg, "\nLINK:%s", getRegName(getLink()));
+    rg->getLogMgr()->decIndent(2);
 }
 
 

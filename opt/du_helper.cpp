@@ -127,7 +127,7 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg,
             xoc::changeUse(olduse, newuse, rg);
             return;
         }
- 
+
         if (olduse->isReadPR() && newuse->isReadPR()) {
             //CASE1:$x -> $y
             if (olduse->getSSAInfo() != nullptr &&
@@ -145,7 +145,7 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg,
             xoc::changeUse(olduse, newuse, rg);
             return;
         }
- 
+
         if ((olduse->isMemRefNonPR() && newuse->isReadPR()) ||
             (newuse->isMemRefNonPR() && olduse->isReadPR())) {
             //CASE2:ld x -> $y
@@ -216,7 +216,7 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
     }
 
     if (olduse->isPROp() || newuse->isPROp()) {
-        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             SSAInfo * oldssainfo = olduse->getSSAInfo();
             SSAInfo * newssainfo = newuse->getSSAInfo();
@@ -288,7 +288,7 @@ bool removeExpiredDU(IR const* ir, Region * rg)
     bool classic_du_changed = false;
     bool change = false;
     if (ir->isPROp()) {
-        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             change |= PRSSAMgr::removeExpiredDU(ir, rg);
             prssa_changed = true;
@@ -368,7 +368,7 @@ void removeUse(IR const* exp, Region * rg)
     bool prssa_changed = false;
     bool classic_du_changed = false;
 
-    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::removeUse(exp);
         prssa_changed = true;
@@ -406,7 +406,7 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
     bool prssa_changed = false;
     bool classic_du_changed = false;
 
-    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
         PRSSAMgr::removePRSSAOcc(exp);
@@ -448,7 +448,7 @@ void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
         classic_du_changed = true;
     }
 
-    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::removePRSSAOcc(stmt);
         prssa_changed = true;
@@ -553,6 +553,7 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
     DUMgr * dumgr = rg->getDUMgr();
     ConstIRIter cit;
     IRIter it;
+    //Only iterate the IR tree that root are from and to.
     IR const* from_ir = xoc::iterInitC(from, cit, false);
     IR * to_ir = xoc::iterInit(to, it, false);
     ASSERT0(cit.get_elem_count() == it.get_elem_count());
@@ -595,7 +596,84 @@ VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
     ASSERT0(base);
 
     //Get the VN of base expression.
-    return const_cast<GVN*>(gvn)->getConstVN(base);
+    return const_cast<GVN*>(gvn)->getVN(base);
+}
+
+
+bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2, Region const* rg)
+{
+    ASSERT0(ir1 && ir2 && ir1->is_exp() && ir2->is_exp());
+    ASSERT0(ir1->isMemOpnd() && ir2->isMemOpnd());
+    //Prefer PRSSA and MDSSA DU.
+    if (ir1->isReadPR()) {
+        ASSERT0(ir2->isReadPR());
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            ASSERT0(ir1->getSSAInfo() && ir2->getSSAInfo());
+            return ir1->getSSAInfo() == ir2->getSSAInfo();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (ir1->isMemRefNonPR()) {
+        ASSERT0(ir2->isMemRefNonPR());
+        MDSSAMgr const* mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            MDSSAInfo * si1 = mdssamgr->getMDSSAInfoIfAny(ir1);
+            MDSSAInfo * si2 = mdssamgr->getMDSSAInfoIfAny(ir2);
+            ASSERT0(si1 && si2);
+            return si1->getVOpndSet()->is_equal(*si2->getVOpndSet());
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    //TODO:Determine livein via classic du chain.
+    return false;
+}
+
+
+bool hasSameUniqueMustDefForTree(IR const* ir1, IR const* ir2,
+                                 Region const* rg)
+{
+    ASSERT0(ir1 && ir2 && ir1->is_exp() && ir2->is_exp());
+    if (ir1->isMemOpnd() && ir2->isMemOpnd()) {
+        if (hasSameUniqueMustDef(ir1, ir2, rg)) {
+            //CASE:given kid1 is ILD, kid2 is ARRAY, if DEF of them are same
+            //stmt, there is no need to analyze the kid of ILD and ARRAY.
+            return true;
+        }
+        return false;
+    }
+    if (ir1->getCode() != ir2->getCode()) { return false; }
+    if (IR_MAX_KID_NUM(ir1) != IR_MAX_KID_NUM(ir2)) { return false; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir1); i++) {
+        IR const* kid1 = ir1->getKid(i);
+        IR const* kid2 = ir2->getKid(i);
+        if (!hasSameUniqueMustDefForTree(kid1, kid2, rg)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+bool hasSameUniqueMustDef(IR const* ir1, IR const* ir2, Region const* rg)
+{
+    ASSERT0(ir1 && ir2 && ir1->is_exp() && ir2->is_exp());
+    ASSERT0(ir1->isMemOpnd() && ir2->isMemOpnd());
+    //For convservative purpose, some exp, such as livein variable,
+    //there is no VN about it. Try infer the equality through DU chain.
+    IR const* def1 = xoc::findUniqueMustDef(ir1, rg);
+    IR const* def2 = xoc::findUniqueMustDef(ir2, rg);
+    if (def1 == def2) {
+        if (def1 != nullptr) { return true; }
+        if ((ir1->isPROp() && ir2->isPROp()) ||
+            (ir1->isMemRefNonPR() && ir2->isMemRefNonPR())) {
+            return hasSameRegionLiveIn(ir1, ir2, rg);
+        }
+    }
+    return false;
 }
 
 
@@ -607,24 +685,32 @@ static bool hasSameValueArrayOp(IR const* ir1, IR const* ir2, GVN const* gvn)
     IR const* sub2 = ARR_sub_list(ir2);
     for (; sub1 != nullptr && sub2 != nullptr;
          sub1 = sub1->get_next(), sub2 = sub2->get_next()) {
-        VN const* v1 = gvn->getConstVN(sub1);
-        VN const* v2 = gvn->getConstVN(sub2);
-        if (v1 != v2) { return false; }
+        VN const* v1 = gvn->getVN(sub1);
+        VN const* v2 = gvn->getVN(sub2);
+        if (v1 != nullptr && v1 == v2) { continue; }
+        if (!hasSameUniqueMustDefForTree(sub1, sub2, gvn->getRegion())) {
+            return false;
+        }
     }
-
-    VN const* v1 = gvn->getConstVN(ARR_base(ir1));
-    VN const* v2 = gvn->getConstVN(ARR_base(ir2));
-    if (v1 != v2) { return false; }
-
-    if (ir1->isCover(ir2, gvn->getRegion())) {
-        return true;
+    if (sub1 != nullptr || sub2 != nullptr) {
+        //Dimension is different.
+        return false;
     }
-    return false;
+    IR const* base1 = ARR_base(ir1);
+    IR const* base2 = ARR_base(ir2);
+    VN const* v1 = gvn->getVN(base1);
+    VN const* v2 = gvn->getVN(base2);
+    if ((v1 != v2 || v1 == nullptr) &&
+        !hasSameUniqueMustDefForTree(base1, base2, gvn->getRegion())) {
+        return false;
+    }
+    return ir1->isCover(ir2, gvn->getRegion());
 }
 
 
 static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
 {
+    ASSERT0(ir1->isIndirectMemOp() && ir2->isIndirectMemOp());
     //Find the base expression that is not IndirectOp.
     //e.g: given ILD(ILD(ILD(p))), the function will reason out 'p'.
 
@@ -632,35 +718,74 @@ static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
     //e.g: given ILD(ILD(ILD(p))), indirect_num is 3.
     UINT indirect_num1 = 0;
     VN const* basevn1 = getVNOfIndirectOp(ir1, &indirect_num1, gvn);
-    if (basevn1 == nullptr) {
-        //No need to keep analyzing if there is no VN provided.
-        return false;
-    }
-
     UINT indirect_num2 = 0;
     VN const* basevn2 = getVNOfIndirectOp(ir2, &indirect_num2, gvn);
-    if (basevn2 == nullptr) {
-        //No need to keep analyzing if there is no VN provided.
-        return false;
-    }
 
-    //VN is not match OR indirect level is not match
-    if (basevn1 == basevn2 && indirect_num1 == indirect_num2) {
+    //VN is not match or indirect level is not match
+    if (basevn1 == basevn2 && basevn1 != nullptr &&
+        indirect_num1 == indirect_num2) {
         return true;
     }
-    return false;
+    IR const* base1 = ir1->getBase();
+    IR const* base2 = ir2->getBase();
+    if (!hasSameUniqueMustDefForTree(base1, base2, gvn->getRegion())) {
+        return false;
+    }
+    return ir1->isCover(ir2, gvn->getRegion());
 }
 
 
-//The function try to find the killing-def for 'use'.
-//To find the killing-def, the function prefer use SSA info.
-IR * findKillingDef(IR const* exp, Region * rg)
+IR * findUniqueMustDef(IR const* exp, Region const* rg)
 {
     ASSERT0(exp->is_exp());
     ASSERTN(exp->isMemOpnd(), ("should not query its DU"));
     //Prefer PRSSA and MDSSA DU.
     if (exp->isReadPR()) {
-        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            IR * d = PR_ssainfo(exp)->getDef();
+            if (d != nullptr) {
+                ASSERT0(d->getMustRef());
+                return d;
+            }
+            return nullptr;
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemRefNonPR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
+                    ("exp does not have MDSSAInfo"));
+            MDDef const* mddef = mdssamgr->findMustDef(exp);
+            if (mddef == nullptr || mddef->is_phi()) { return nullptr; }
+            return mddef->getOcc();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    if (rg->getDUMgr() != nullptr) {
+        DUSet const* du = exp->readDUSet();
+        if (du != nullptr) {
+            IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
+            return rg->getDUMgr()->findNearestDomDef(exp, exp_stmt, du);
+        }
+        return nullptr;
+    }
+    ASSERTN(0, ("DU Chain is not available"));
+    return nullptr;
+}
+
+
+IR * findKillingDef(IR const* exp, Region const* rg)
+{
+    ASSERT0(exp->is_exp());
+    ASSERTN(exp->isMemOpnd(), ("should not query its DU"));
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             IR * d = PR_ssainfo(exp)->getDef();
             if (d != nullptr && d->getExactRef() != nullptr) {
@@ -705,24 +830,18 @@ CLASSIC_DU:
 bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 {
     ASSERT0(def && use);
-    ASSERTN(def->isMemRef() && use->isMemRef(),
-            ("should not query its DU"));
-
-    MD const* mustusemd = use->getRefMD();
+    ASSERTN(def->isMemRef() && use->isMemRef(), ("should not query its DU"));
+    MD const* mustusemd = use->getMustRef();
     if (mustusemd != nullptr && isKillingDef(def, mustusemd)) {
         return true;
     }
-
     if (gvn == nullptr || !gvn->is_valid()) { return false; }
-
     if (def->isIndirectMemOp() && use->isIndirectMemOp()) {
         return hasSameValueIndirectOp(def, use, gvn);
     }
-
     if (def->isArrayOp() && use->isArrayOp()) {
         return hasSameValueArrayOp(def, use, gvn);
     }
- 
     return false;
 }
 
@@ -732,7 +851,7 @@ bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 bool isKillingDef(IR const* def, MD const* usemd)
 {
     ASSERT0(def && usemd);
-    MD const* mustdefmd = def->getRefMD();
+    MD const* mustdefmd = def->getMustRef();
     if (mustdefmd == nullptr) { return false; }
     return isKillingDef(mustdefmd, usemd);
 }
@@ -759,7 +878,7 @@ bool isKillingDef(MD const* defmd, MD const* usemd)
 void movePhi(IRBB * from, IRBB * to, Region * rg)
 {
     ASSERT0(from && to);
-    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::movePhi(from, to);
     }
@@ -834,7 +953,7 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
     }
     if (mdssainfo != nullptr) {
         CollectCtx ctx(COLLECT_CROSS_PHI);
-        mdssainfo->collectDef(mdssamgr, use->getRefMD(), ctx, defset);
+        mdssainfo->collectDef(mdssamgr, use->getMustRef(), ctx, defset);
         return;
     }
 
@@ -921,9 +1040,73 @@ void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg)
 }
 
 
+bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
+                                         Region const* rg)
+{
+    if (ir1 == ir2) { return true; }
+    ASSERT0(ir1->isIsomoTo(ir2, true));
+    switch (ir1->getCode()) {
+    SWITCH_CASE_INDIRECT_MEM_OP:
+        ASSERT0(ir2->isIndirectMemOp());
+        return hasSameUniqueMustDefForTree(ir1->getBase(), ir2->getBase(), rg);
+    SWITCH_CASE_ARRAY_OP: {
+        ASSERT0(ir2->isArrayOp());
+        if (!xoc::hasSameUniqueMustDefForTree(ir1->getBase(), ir2->getBase(),
+                                              rg)) {
+            return false;
+        }
+        IR const* sub1 = ARR_sub_list(ir1);
+        IR const* sub2 = ARR_sub_list(ir2);
+        for (; sub1 != nullptr && sub2 != nullptr;
+             sub1 = sub1->get_next(), sub2 = sub2->get_next()) {
+            if (!hasSameUniqueMustDefForTree(sub1, sub2, rg)) {
+                return false;
+            }
+        }
+        ASSERTN(sub1 == nullptr && sub2 == nullptr, ("not isomo"));
+        return true;
+    }
+    default:
+        ASSERTN(IR_MAX_KID_NUM(ir1) == IR_MAX_KID_NUM(ir2),
+                ("should be handled"));
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir1); i++) {
+            IR const* kid1 = ir1->getKid(i);
+            IR const* kid2 = ir2->getKid(i);
+            if (!hasSameUniqueMustDefForTree(kid1, kid2, rg)) {
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
+
+bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
+                       LI<IRBB> const* li, Region const* rg)
+{
+    if (!ir1->isMemRef() || !ir2->isMemRef()) { return false; }
+    if (!xoc::isDependent(ir1, ir2, costly_analysis, rg)) { return true; }
+    IRBB const* ir1bb = ir1->is_stmt() ? ir1->getBB() : ir1->getStmt()->getBB();
+    IRBB const* ir2bb = ir2->is_stmt() ? ir2->getBB() : ir2->getStmt()->getBB();
+    ASSERT0(ir1bb && ir2bb);
+    if (!li->isInsideLoop(ir1bb->id()) || !li->isInsideLoop(ir2bb->id())) {
+        return true;
+    }
+    MD const* ir1ref = ir1->getExactRef();
+    MD const* ir2ref = ir2->getExactRef();
+    if (ir1ref && ir2ref && ir1ref == ir2ref) { return true; }
+    if (!ir1->isIsomoTo(ir2, true)) {
+        //TODO:handle the comparison between ILD/IST and ARRAY.
+        return false;
+    }
+    return hasSameUniqueMustDefForIsomoKidTree(ir1, ir2, rg);
+}
+
+
 //Return true if ir1 is may overlap to phi.
 bool isDependent(IR const* ir, MDPhi const* phi)
 {
+    ASSERT0(ir && phi);
     MD const* irmust = ir->getMustRef();
     MDSet const* irmay = ir->getMayRef();
     MDIdx phimdid = phi->getResult()->mdid();
@@ -938,14 +1121,14 @@ bool isDependent(IR const* ir, MDPhi const* phi)
 
 //CALL, ICALL may have sideeffect, we are not only check
 //the MustRef, but also consider the overlapping between MayRef.
-static bool isDependentForCallStmt(IR const* def, IR const* use,
-                                    bool costly_analysis, Region const* rg)
+static bool isDependentForCallStmt(IR const* ir1, IR const* ir2,
+                                   bool costly_analysis, Region const* rg)
 {
-    ASSERT0(def->isCallStmt() && use->is_exp());
-    MD const* mustdef = def->getRefMD();
-    MDSet const* maydef = def->getRefMDSet();
-    MD const* mustuse = use->getRefMD();
-    MDSet const* mayuse = use->getRefMDSet();
+    ASSERT0(ir1->isCallStmt() && !ir2->is_undef());
+    MD const* mustdef = ir1->getMustRef();
+    MDSet const* maydef = ir1->getMayRef();
+    MD const* mustuse = ir2->getMustRef();
+    MDSet const* mayuse = ir2->getMayRef();
     //Compare MustRef firstly.
     if (mustdef != nullptr) {
         if (mustuse != nullptr) {
@@ -959,7 +1142,6 @@ static bool isDependentForCallStmt(IR const* def, IR const* use,
                 mayuse->is_intersect(*maydef)) {
                 return true;
             }
-            UNREACHABLE();
             return false;
         }
         if (mayuse != nullptr) {
@@ -994,43 +1176,58 @@ static bool isDependentForCallStmt(IR const* def, IR const* use,
 }
 
 
-bool isDependent(IR const* def, IR const* use, bool costly_analysis,
+bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
                  Region const* rg)
 {
-    ASSERT0(def->is_stmt() && use->is_exp());
-    if (def->isCallStmt()) {
-       return isDependentForCallStmt(def, use, costly_analysis, rg);
+    ASSERT0(!ir1->is_undef() && !ir2->is_undef());
+    if (ir1->isCallStmt()) {
+       return isDependentForCallStmt(ir1, ir2, costly_analysis, rg);
     }
-    MD const* mustdef = def->getRefMD();
-    MDSet const* maydef = def->getRefMDSet();
-    MD const* mustuse = use->getRefMD();
-    MDSet const* mayuse = use->getRefMDSet();
+    MD const* must1 = ir1->getMustRef();
+    MDSet const* may1 = ir1->getMayRef();
+    MD const* must2 = ir2->getMustRef();
+    MDSet const* may2 = ir2->getMayRef();
     //Compare MustRef firstly.
-    if (mustdef != nullptr) {
-        if (mustuse != nullptr) {
-            return mustdef == mustuse || mustdef->is_overlap(mustuse);
+    if (must1 != nullptr) {
+        if (must2 != nullptr) {
+            return must1 == must2 || must1->is_overlap(must2);
         }
-        if (mayuse != nullptr) {
+        if (may2 != nullptr) {
             if (costly_analysis) {
                 //The function will iterate elements in MDSet, which is costly.
-                return mayuse->is_overlap_ex(mustdef, rg, rg->getMDSystem());
+                return may2->is_overlap_ex(must1, rg, rg->getMDSystem());
             }
-            return mayuse->is_contain(mustdef, rg);
+            return may2->is_contain(must1, rg);
         }
         return false;
     }
-    if (maydef != nullptr) {
-        if (mustuse != nullptr) {
+    if (may1 != nullptr) {
+        if (must2 != nullptr) {
             if (costly_analysis) {
                 //The function will iterate elements in MDSet, which is costly.
-                return maydef->is_overlap_ex(mustuse, rg, rg->getMDSystem());
+                return may1->is_overlap_ex(must2, rg, rg->getMDSystem());
             }
-            return maydef->is_contain(mustuse, rg);
+            return may1->is_contain(must2, rg);
         }
-        if (mayuse != nullptr) {
-            return mayuse == maydef || mayuse->is_intersect(*maydef);
+        if (may2 != nullptr) {
+            return may2 == may1 || may2->is_intersect(*may1);
         }
         return false;
+    }
+    return false;
+}
+
+
+bool isDependentForTree(IR const* ir1, IR const* ir2, bool costly_analysis,
+                        Region const* rg)
+{
+    ConstIRIter it;
+    //Only iterate the IR tree that root is ir2.
+    for (IR const* x = iterInitC(ir2, it, false);
+         x != nullptr; x = iterNextC(it, true)) {
+        if (!x->isMemOpnd()) { continue; }
+        if (x == ir1) { return true; }
+        if (isDependent(ir1, x, costly_analysis, rg)) { return true; }
     }
     return false;
 }
@@ -1046,8 +1243,8 @@ void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
     bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     if (!use_prssa && !use_mdssa) { return; }
     IRIter it;
-    for (IR * x = iterInit(root, it);
-         x != nullptr; x = iterNext(it)) {
+    for (IR * x = iterInit(root, it, true);
+         x != nullptr; x = iterNext(it, true)) {
         if (use_mdssa && x->isMemRefNonPR()) {
             mdssamgr->findAndSetLiveInDef(x, startir, startbb, oc);
         } else if (use_prssa && x->isReadPR()) {

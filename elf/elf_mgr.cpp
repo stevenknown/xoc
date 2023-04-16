@@ -64,6 +64,7 @@ static void formatTabColInfo(TabCol * tabcol, UINT tabcolnum,
 //specification.
 static ULONG elf_string_hash(UCHAR const* name)
 {
+    DUMMYUSE(elf_string_hash);
     ULONG h = 0, g;
     while (*name) {
         h = (h << 4) + *name++;
@@ -1243,7 +1244,7 @@ void ELFMgr::dumpSectHeaderTab() const
       { S_VERNEED, "VERNEED", },
     };
     static UINT g_sectinfo_num = sizeof(g_sectinfo) / sizeof(g_sectinfo[0]);
-    
+
     typedef struct {
         Word flag;
         CHAR const* name;

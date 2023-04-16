@@ -1,8 +1,11 @@
 $(info "====---- START Makefile.xoc ----====")
 
 ifeq ($(TARG),)
-  #SET DEFAULT TARG.
-  TARG=FOR_DEX
+  $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
+endif
+
+ifeq ($(TARG_DIR),)
+  $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
 endif
 
 CFLAGS+=-Wall

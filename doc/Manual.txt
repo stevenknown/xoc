@@ -62,7 +62,7 @@ Programming Guides
   Features of xcom:
     A template library to support almost all basic algorithms and structures
     such as String, Vector, List, TMap(Tree Map), HMap(Hash Map), Dense Bitset,
-    Sparse Bitset, Graph, Mempool mananger, Big-Integer, Linear Algebraic
+    Sparse Bitset, Graph, Mempool Mananger, Big-Integer, Linear Algebraic
     library, Linear Programming Solver, Integer Linear Programming solver,
     Sort function, a number of utilities as well.
 
@@ -107,18 +107,19 @@ Programming Guides
       Most of optimizations apply on function unit. In general, the
       compilation of region unit include following phases:
         * Prescan IR list to specify which variable is taken address.
-        * High level process to perform miscellaneous high
+        * High level process to perform miscellaneous higher
           level IR transformations accroding to syntactics analysis.
-          This process is also responsible to simpify high level IR
-          down to low level, and construct basic blocks.
-        * Both high level and middle level will perform these passes,
+          This process is also responsible to simpify higher level IR
+          down to lower level, and construct basic blocks.
+        * Both high level and middle level could perform these passes,
           * Build control flow graph.
           * Flow sensitive or insensitive alias analysis.
           * Def-Use analysis.
           * Control dependence analysis.
-        * Middle level optimizations are all based on low level IR,
-          such as copy propagation, dead code elimination, global value
-          numbering, and global common subexpression elimination.
+        * Middle level optimizations are almost applied on IRs that can
+          be placed in basic block and control flow graph, such as copy
+          propagation, dead code elimination, global value numbering, and
+          global common subexpression elimination.
 
     * program unit
       The region represent all program unit. A program unit contains a
