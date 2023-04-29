@@ -770,8 +770,8 @@ public:
     //vex: a marker vertex.
     //newsucc: the vertex that must be immediate successor of 'vex'.
     //e.g: vex->oldsucc, after insert newsucc, the graph will be:
-    //     vex->newsucc->oldsucc, where there is only ONE edge between vex->newsucc,
-    //     and newsucc->oldsucc.
+    //     vex->newsucc->oldsucc, where there is only ONE edge between
+    //     vex->newsucc, and newsucc->oldsucc.
     void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
                                    Vertex const* oldsucc);
 

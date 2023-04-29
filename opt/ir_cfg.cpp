@@ -777,7 +777,6 @@ bool IRCFG::refineCFG(MOD CfgOptCtx & optctx)
     bool change = false;
     bool lchange = true;
     UINT count = 0;
-    OptCtx & oc = optctx.getOptCtx();
     while (lchange && count < 20) {
         lchange = false;
         if (g_do_cfg_remove_empty_bb && removeEmptyBB(optctx)) {
@@ -1708,7 +1707,8 @@ bool IRCFG::removeTrampolinBB(OUT CfgOptCtx & ctx)
     BBListIter ct;
     List<IRBB*> succs;
     List<IRBB*> preds;
-    for (m_bb_list->get_head(&ct); ct != nullptr; ct = m_bb_list->get_next(ct)) {
+    for (m_bb_list->get_head(&ct); ct != nullptr;
+         ct = m_bb_list->get_next(ct)) {
         IRBB const* bb = ct->val();
         if (bb->isExceptionHandler()) { continue; }
 

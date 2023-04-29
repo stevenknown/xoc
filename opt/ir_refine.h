@@ -190,7 +190,6 @@ class Refine : public Pass {
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
     IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBranch(IR * ir);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
@@ -254,6 +253,9 @@ public:
     //BB list will be updated if optimization performed.
     //Return true if BB list changed.
     bool refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc);
+
+    //Refine select for different architectures.
+    virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
 
     virtual bool perform(OptCtx & oc);
 };

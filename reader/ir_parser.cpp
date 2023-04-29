@@ -2670,7 +2670,8 @@ bool IRParser::parseStore(ParseCtx * ctx)
 
     IR * ir = nullptr;
     if (ty == nullptr) {
-        ir = ctx->current_region->getIRMgr()->buildStore(var, ctx->returned_exp);
+        ir = ctx->current_region->getIRMgr()->buildStore(var,
+                                                         ctx->returned_exp);
     } else {
         ir = ctx->current_region->getIRMgr()->buildStore(var, ty,
                                                          ctx->returned_exp);

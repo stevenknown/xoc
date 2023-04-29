@@ -117,7 +117,6 @@ void Bucket<T>::extract_elem(OUT Vector<T> & data)
 template <class T>
 void Bucket<T>::dump()
 {
-    INT j = 0;
     printf("\nBUCKET");
     for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
         printf("\n\tB%ud:", i);

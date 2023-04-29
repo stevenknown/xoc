@@ -2021,7 +2021,8 @@ public:
 //       Compared to dual linked list, single linked list allocate containers
 //       in a const size pool.
 //       Invoke init() to do initialization if you allocate SList by malloc().
-//    5. Compare the iterator with end() to determine if meeting the end of list.
+//    5. Compare the iterator with end() to determine if meeting the end
+//       of list.
 //    6. Byte size of element in Const Pool is equal to sizeof(SC<T>).
 //
 //    Usage:SMemPool * pool = smpoolCreate(sizeof(SC<T>) * n, MEM_CONST_SIZE);
@@ -2146,7 +2147,6 @@ protected:
     UINT m_elem_count;
     SC<T> * m_head;
     SC<T> * m_tail;
-
 protected:
     SC<T> * new_sc_container(SMemPool * pool)
     {
@@ -3327,24 +3327,19 @@ public:
 //which is used in order to speed up accessing hashed elements.
 //
 //NOTICE:
-//    1.T(0) is defined as default nullptr in Hash, so do not use T(0) as element.
-//
+//    1.T(0) is defined as default nullptr in Hash, so do not use T(0)
+//      as element.
 //    2.There are four hash function classes are given as default, and
 //      if you are going to define you own hash function class, the
 //      following member functions you should supply according to your needs.
-//
 //        * Return hash-key deduced from 'val'.
 //            UINT get_hash_value(OBJTY val) const
-//
 //        * Return hash-key deduced from 't'.
 //            UINT get_hash_value(T * t) const
-//
 //        * Compare t1, t2 when inserting a new element.
 //            bool compare(T * t1, T * t2) const
-//
 //        * Compare t1, val when inserting a new element.
 //            bool compare(T * t1, OBJTY val) const
-//
 //    3.Use 'new'/'delete' operator to allocate/free the memory
 //      of dynamic object and the virtual function pointers.
 #define HC_val(c) (c)->val
@@ -3917,12 +3912,13 @@ public:
     {
         ASSERTN(m_bucket != nullptr, ("Hash not yet initialized."));
         UINT hashv = m_hf.get_hash_value(val, m_bucket_size);
-        ASSERTN(hashv < m_bucket_size, ("hash value must less than bucket size"));
+        ASSERTN(hashv < m_bucket_size,
+                ("hash value must less than bucket size"));
         HC<T> const* elemhc = (HC<T> const*)HB_member(m_bucket[hashv]);
         if (elemhc != nullptr) {
             while (elemhc != nullptr) {
                 ASSERTN(HC_val(elemhc) != T(0),
-                       ("Hash element has so far as to be overrided!"));
+                        ("Hash element has so far as to be overrided!"));
                 if (m_hf.compare(HC_val(elemhc), val)) {
                     return HC_val(elemhc);
                 }
@@ -4613,7 +4609,8 @@ public:
 //    };
 //
 //NOTICE:
-//    1. Tsrc(0) is defined as default nullptr in TMap, do NOT use T(0) as element.
+//    1. Tsrc(0) is defined as default nullptr in TMap, do NOT use T(0)
+//       as element.
 //    2. Keep the key *UNIQUE* .
 //    3. Overload operator == and operator < if Tsrc is neither basic type
 //       nor pointer type.
@@ -4867,7 +4864,8 @@ public:
         if (t == Tsrc(0)) { return; }
         HC<Tsrc> * elemhc = nullptr;
         Hash<Tsrc, HF>::append(t, &elemhc, nullptr);
-        ASSERTN(elemhc != nullptr, ("Element does not append into hash table."));
+        ASSERTN(elemhc != nullptr,
+                ("Element does not append into hash table."));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }
 

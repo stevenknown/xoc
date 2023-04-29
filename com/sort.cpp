@@ -56,11 +56,9 @@ public:
         if (data.get_last_idx() < 0) { return; }
         HeapSort<INT>::HeapValVector<T> hdata(data);
         m_pool = smpoolCreate(64, MEM_COMM);
-        UINT node_count = 1;
         for (UINT i = hdata.get_begin_idx(); i <= hdata.get_end_idx(); i++) {
             UINT l = lchild(i);
             UINT r = rchild(i);
-            UINT p = parent(i);
             HeapNode * hn = allocHeapNode();
             hn->id = i;
             hn->val = hdata.get(i);

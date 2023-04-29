@@ -551,8 +551,8 @@ protected:
     //The function remove and clean all informations of 'vmd' from MDSSAMgr.
     void removeVMD(VMD * vmd) { getUseDefMgr()->removeVMD(vmd); }
 
-    //Remove all VMD in set from MDSSAMgr. The function will clean all information
-    //about these VMDs.
+    //Remove all VMD in set from MDSSAMgr. The function will clean all
+    //information about these VMDs.
     void removeVMDInSet(VOpndSet const& set);
 
     //wl: is an optional parameter to record BB which expected to deal with.
@@ -654,7 +654,8 @@ public:
 
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
-    void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ, OptCtx const& oc);
+    void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
+                                       OptCtx const& oc);
     void addStmtToMDSSAMgr(IR * ir, IR const* ref);
 
     //Build DU chain from 'def' to 'exp'.

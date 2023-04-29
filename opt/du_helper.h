@@ -166,7 +166,8 @@ bool isKillingDef(IR const* def, IR const* use, GVN const* gvn);
 bool isKillingDef(IR const* def, MD const* usemd);
 
 //Return true if defmd is killing-def MD of usemd.
-//Note this function does not check if there is DU chain between defmd and usemd.
+//Note this function does not check if there is DU chain between defmd
+//and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
 //Return true if ir1 reference is may overlap to ir2.

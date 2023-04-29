@@ -2010,8 +2010,8 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
         }
     }
 
-    IR * substitue_phi = m_rg->getIRMgr()->buildStorePR(PHI_prno(phi), phi->getType(),
-                                            phicopy);
+    IR * substitue_phi = m_rg->getIRMgr()->buildStorePR(
+        PHI_prno(phi), phi->getType(), phicopy);
     substitue_phi->copyRef(phi, m_rg);
     BB_irlist(bb).insert_before(substitue_phi, phict);
     PHI_ssainfo(phi) = nullptr;

@@ -32,7 +32,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace elf {
 
-static BYTE g_magic[EI_MAG_NUM] = { 0x7f, 'E', 'L', 'F' };
+static BYTE g_magic[EI_MAG_NUM] = { EI_MAG_HEAD, 'E', 'L', 'F' };
 
 //START ELFHdr
 UINT ELFHdr::getSize(ELFMgr const* mgr)
@@ -68,6 +68,9 @@ void ELFHdr::insert(BYTE const* buf, ELFMgr const* mgr)
         hdr->e_class =e_class;
         hdr->e_data = e_data;
         hdr->e_hversion = e_hversion;
+        for (UINT i = 0; i < E_PAD_SIZE; i++) {
+            hdr->e_pad[i] = E_PAD_ZERO;
+        }
         hdr->e_type = e_type;
         hdr->e_machine = e_machine;
         hdr->e_version = e_version;
@@ -114,7 +117,6 @@ void ELFHdr::extract(BYTE const* buf, ELFMgr const* mgr)
         e_class = hdr->e_class;
         e_data = hdr->e_data;
         e_hversion = hdr->e_hversion;
-        //e_pad[9] = hdr->e_pad[9]
         e_type = hdr->e_type;
         e_machine = hdr->e_machine;
         e_version = hdr->e_version;
@@ -136,7 +138,6 @@ void ELFHdr::extract(BYTE const* buf, ELFMgr const* mgr)
     e_class = hdr->e_class;
     e_data = hdr->e_data;
     e_hversion = hdr->e_hversion;
-    //e_pad[9] = hdr->e_pad[9]
     e_type = hdr->e_type;
     e_machine = hdr->e_machine;
     e_version = hdr->e_version;

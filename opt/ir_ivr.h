@@ -397,8 +397,8 @@ protected:
     DefSegMgr * getSegMgr() { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
 
-    //Return true if compare_exp is the BIV upper-bound expression and ivref is the
-    //BIV reference.
+    //Return true if compare_exp is the BIV upper-bound expression and ivref
+    //is the BIV reference.
     //compare_exp: the expression that indicates the upper-bound of IV.
     //ivref: IV reference in 'compare_exp'. It must be kid of 'compare_exp'.
     virtual bool isBIVBoundExp(BIV const* biv, IR const* compare_exp,

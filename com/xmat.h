@@ -147,7 +147,6 @@ FloatMat operator * (FloatMat const& a, FloatMat const& b);
 FloatMat operator - (FloatMat const& a, FloatMat const& b);
 class FloatMat : public Matrix<Float> {
     BYTE m_is_init:1; //To make sure functions are idempotent.
-    CHAR * m_sd_str; //Descripte significant digit string.
 public:
     FloatMat();
     FloatMat(INT v); //used by template call of T(0) in Vector<Mat>

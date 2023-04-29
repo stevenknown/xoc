@@ -2691,7 +2691,7 @@ bool RegPromot::perform(OptCtx & oc)
     }
     if (!m_gvn->is_valid()) { return false; }
 
-    //hack DumpBufferSwitch buff(m_rg->getLogMgr());
+    DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpBeforePass();
     init();
     List<LI<IRBB> const*> worklst;

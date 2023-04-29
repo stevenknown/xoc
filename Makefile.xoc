@@ -60,7 +60,8 @@ $(info "DEBUG:$(DEBUG)")
 $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
 	@echo "BUILD $(XOC_OUTPUT)"
 	@echo "EXEC:"
-	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) $(TMP_READER_OBJS)
+	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) \
+      $(TMP_READER_OBJS)
 	@echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"
 
 %.o:%.cpp
@@ -70,7 +71,8 @@ $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
+      CFLAGS="$(CFLAGS)"
 
 tmp_opt_objs: $(TMP_OPT_OBJS)
 	@echo "EXEC:tmp_opt_objs:$(TMP_OPT_OBJS)"
@@ -85,7 +87,8 @@ reader_objs: $(READER_OBJS)
 	@echo "EXEC:reader_objs:$(READER_OBJS)"
 
 clean:
-	cd $(COM_DIR) && make clean -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
+	cd $(COM_DIR) && make clean -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
+      CFLAGS="$(CFLAGS)"
 	@find ./ -name "*.gcda" | xargs rm -f
 	@find ./ -name "*.gcno" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f

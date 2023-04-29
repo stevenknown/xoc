@@ -33,7 +33,6 @@ namespace elf {
 
 class ELFMgr;
 
-//ELF HEADER MAGIC NUMBER
 #define EI_MAG_HEAD 0x7f
 #define EI_MAG_NUM  4
 #define E_PAD_SIZE  9

@@ -1,5 +1,5 @@
 #include "stdio.h"
-#include "xcominc.h"
+#include "../xcominc.h"
 void use_slist_core()
 {
     //Single List Core need user declared a mempool.
@@ -14,7 +14,8 @@ void use_slist_core()
     //You need to invoke the init() to do initialization.
     l->init();
 
-    SC<int> * ct = l->append_head(4, &free_list, pool); //append a new element at the beginning.
+    //Append a new element at the beginning.
+    SC<int> * ct = l->append_head(4, &free_list, pool);
 
     //Insert "5" after position of first element
     //place before second element.

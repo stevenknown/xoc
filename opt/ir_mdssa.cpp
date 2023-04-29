@@ -468,7 +468,8 @@ void RenameDef::renameIRTillNextDef(IRBB const* bb,
 //bb: the BB that to be renamed
 //dompred: indicates the predecessor of 'bb' in DomTree
 //Note stmtbbid have to dominate 'bb'.
-void RenameDef::connectDefInBBTillPrevDef(IRBB const* bb, BBIRListIter & irlistit,
+void RenameDef::connectDefInBBTillPrevDef(IRBB const* bb,
+                                          BBIRListIter & irlistit,
                                           MOD LiveSet & liveset)
 {
     connectIRTillPrevDef(bb, irlistit, liveset);

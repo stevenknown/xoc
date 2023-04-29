@@ -33,6 +33,29 @@ author: Su Zhenyu
 
 namespace mach {
 
+//This structure records common information of symbols
+//for different architectures, which is then used to generate
+//relocation information and write elf files.
+typedef struct {
+    CHAR const* name; //Symbol name.
+    UCHAR type:4;     //Symbol type(1:variable, 2:function. .eg).
+    UINT64 index;     //Top-down index of current symbol in all.
+    UINT64 size;      //Size(byte) of current symbol.
+    UINT64 offset;    //Location(byte) of current symbol in generated mi list.
+} SYMBOL;
+//This structure saved all symbol info defined or used in current function
+//region. Note that the first element of this vector always be the function
+//symbol defined by current function region because of the top-down symbol
+//info collection. For example:
+//            void test0() {
+//                global_var = 1; // global_var is a global variable
+//                test1();        // test1() is a function
+//            }
+//SymVec will save three SYMBOL(test0, global_var and test1) in order, in
+//which the test0 is defined by current function region, global_var and
+//test1 is used by current function region.
+typedef xcom::Vector<SYMBOL> SymVec;
+
 //
 //START IMCtx
 //
@@ -45,6 +68,8 @@ namespace mach {
 #define IMCTX_param_size(cont) ((cont)->u1.param_size)
 #define IMCTX_mem_byte_size(cont) ((cont)->u1.mem_byte_size)
 #define IMCTX_int_imm(cont) ((cont)->u1.int_imm)
+#define IMCTX_symbol_vec(cont) ((cont)->sym_vec)
+#define IMCTX_func_name(cont) ((cont)->func_name)
 class IMCtx {
 public:
     //Propagate info bottom up.
@@ -73,12 +98,32 @@ public:
         } s1;
         UINT u2val;
     } u2;
+
+    //Propagate info top down.
+    //Used to save info of symbols.
+    //It's set by TECOIR2MInst::extractVarSymRelInfo() and
+    //TECOIR2MInst::extractFuncSymRelInfo().
+    //It's used by TECOMIGen class to construct info of symbols
+    //writen to elf file.
+    SymVec sym_vec;
+
+    //Propagate info top down.
+    //Used to save name of current function region.
+    //It's set by TECOIR2MInst::adjustGlobalPointer() and used by
+    //TECOMIGen class to construct section header name of elf file.
+    CHAR const * func_name;
 public:
     IMCtx()
     {
         ::memset(&u1, 0, sizeof(u1));;
         ::memset(&u2, 0, sizeof(u2));;
         micode = MI_UNDEF;
+
+        //Init symbol vector.
+        sym_vec.init();
+
+        //Init function region name.
+        func_name = nullptr;
     }
     IMCtx(IMCtx const& src) { clean(); copy_topdown(src); }
     IMCtx const& operator = (IMCtx const&);
@@ -89,6 +134,12 @@ public:
         ::memset(&u1, 0, sizeof(u1));;
         ::memset(&u2, 0, sizeof(u2));;
         micode = MI_UNDEF;
+
+        //Init symbol vector.
+        sym_vec.init();
+
+        //Init function region name.
+        func_name = nullptr;
     }
     virtual void copy_topdown(IMCtx const& src)
     {
@@ -108,6 +159,23 @@ public:
     MI_CODE get_micode() const { return micode; }
 
     virtual void set_micode(MI_CODE ort) { micode = ort; }
+public:
+    void setFuncRegionName(CHAR const* name) { IMCTX_func_name(this) = name; }
+
+    SYMBOL getSymbol(UINT index) { return IMCTX_symbol_vec(this)[index]; }
+
+    CHAR const* getSymbolName(UINT index) { return getSymbol(index).name; }
+
+    //The first element of sym_vec always be the function symbol defined
+    //by current function region since the symbol info collection is top-down
+    //and saving is in order.
+    SYMBOL getDefinedSymbol() { return getSymbol(0); }
+
+    void setDefinedSymbolSize(UINT64 val) {
+        SYMBOL symbol = getDefinedSymbol();
+        symbol.size = val;
+        IMCTX_symbol_vec(this).set(0, symbol);
+    }
 };
 //END IMCtx
 
@@ -120,8 +188,8 @@ protected:
     MInstMgr * m_mimgr;
     RecycMIListMgr m_recyc_orlist_mgr;
 protected:
-    void convertIRListToMIList(OUT RecycMIList & milst);
-    void convertIRBBListToMIList(OUT RecycMIList & milst);
+    void convertIRListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
+    void convertIRBBListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
 
     //Load constant float value into register.
     void convertLoadConstFP(IR const* ir, OUT RecycMIList & mis,
@@ -156,6 +224,8 @@ public:
     IR2MInst(Region * rg, MInstMgr * mgr);
     virtual ~IR2MInst() {}
 
+    virtual void adjustGlobalPointer(OUT RecycMIList & milst,
+                                     MOD IMCtx * cont) = 0;
     virtual void convertLabel(IR const* ir, OUT RecycMIList & mis);
     virtual void convertBBLabel(IRBB const* bb, OUT RecycMIList & mis);
     virtual void convertStorePR(IR const* ir, OUT RecycMIList & mis,
@@ -166,7 +236,6 @@ public:
                                 MOD IMCtx * cont);
     virtual void convertBinaryOp(IR const* ir, OUT RecycMIList & mis,
                                  MOD IMCtx * cont);
-
     ///Generate compare operations and return the comparation result registers.
     //The output registers in IMCtx are ResultSR,
     //TruePredicatedSR, FalsePredicatedSR.
@@ -344,7 +413,7 @@ public:
     }
 
     //Translate IR in IRBB to a list of MInst.
-    void convertToMIList(OUT RecycMIList & milst);
+    void convertToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
     virtual void convert(IR const* ir, OUT RecycMIList & mis,
                          MOD IMCtx * cont);
 

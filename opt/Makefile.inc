@@ -83,17 +83,8 @@ ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
 endif
 
-ifeq ($(TARG), FOR_TECO)
-  OPT_OBJS+=\
-  lsra_impl.o\
-  lsra_scan_in_pos.o\
-  lsra_scan_in_prio.o\
-  lt_interf_graph.o\
-  lt_prio_mgr.o\
-  lifetime.o\
-  targinfo_mgr.o\
-  linear_scan.o
-else ifeq ($(FOR_IP), true)
+ifeq ($(FOR_IP), true)
+  $(info "CONDBR:opt/Makefile.inc:FOR_IP=$(FOR_IP)")
   OPT_OBJS+=\
   lsra_impl.o\
   lsra_scan_in_pos.o\
@@ -106,6 +97,28 @@ else ifeq ($(FOR_IP), true)
   ir_dse.o\
   linear_scan.o\
   ir_vect.o
+else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
+  $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
+  linear_scan.o
+else ifneq ($(findstring $(TARG), FOR_RISCV FOR_ARM),)
+  $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
+  linear_scan.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

@@ -119,26 +119,27 @@ void IR2MInst::convertBBLabel(IRBB const* bb, OUT RecycMIList & mis)
 void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->verify(m_rg));
-    RecycMIList tmis(getRecycMIListMgr());
     switch (ir->getCode()) {
     case IR_ST:
-        convertStoreVar(ir, tmis, cont);
+        convertStoreVar(ir, mis, cont);
         break;
     case IR_STPR:
-        convertStorePR(ir, tmis, cont);
+        convertStorePR(ir, mis, cont);
         break;
     case IR_TRUEBR:
-        convertTruebr(ir, tmis, cont);
+        convertTruebr(ir, mis, cont);
         break;
     case IR_FALSEBR:
-        convertFalsebr(ir, tmis, cont);
+        convertFalsebr(ir, mis, cont);
         break;
     case IR_RETURN:
-        convertReturn(ir, tmis, cont);
+        convertReturn(ir, mis, cont);
         break;
-    default: convertExtStmt(ir, tmis, cont);
+    case IR_CALL:
+        convertCall(ir, mis, cont);
+        break;
+    default: convertExtStmt(ir, mis, cont);
     }
-    mis.move_tail(tmis);
 }
 
 
@@ -152,22 +153,23 @@ TMWORD IR2MInst::extractImm(HOST_INT val, FIELD_TYPE ft)
 }
 
 
-void IR2MInst::convertIRListToMIList(OUT RecycMIList & milst)
+void IR2MInst::convertIRListToMIList(OUT RecycMIList & milst,
+                                     MOD IMCtx * cont)
 {
-    IMCtx cont;
     for (IR * ir = m_rg->getIRList(); ir != nullptr; ir = ir->get_next()) {
-        cont.clean();
-        convert(ir, milst, &cont);
+        cont->clean();
+        convert(ir, milst, cont);
     }
 }
 
 
-void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst)
+void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
+                                       MOD IMCtx * cont)
 {
     BBList * ir_bb_list = m_rg->getBBList();
     ASSERT0(ir_bb_list);
-    IMCtx cont;
     BBListIter bbit;
+    adjustGlobalPointer(milst, cont);
     for (IRBB * bb = ir_bb_list->get_head(&bbit);
          bb != nullptr; bb = ir_bb_list->get_next(&bbit)) {
         convertBBLabel(bb, milst);
@@ -175,15 +177,17 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst)
         for (bb->getIRList().get_head(&irit);
              irit != BB_irlist(bb).end();
              irit = bb->getIRList().get_next(irit)) {
-            cont.clean();
-            convert(irit->val(), milst, &cont);
+            convert(irit->val(), milst, cont);
         }
     }
+    cont->setFuncRegionName(m_rg->getRegionName());
+    cont->setDefinedSymbolSize(milst.getList().get_elem_count());
 }
 
 
 //Translate IR in IRBB to a list of MInst
-void IR2MInst::convertToMIList(OUT RecycMIList & milst)
+void IR2MInst::convertToMIList(OUT RecycMIList & milst,
+                               MOD IMCtx * cont)
 {
     START_TIMER(t, "Convert IR to MInst");
     ASSERT0(m_rg);
@@ -191,10 +195,10 @@ void IR2MInst::convertToMIList(OUT RecycMIList & milst)
     if (ir_list != nullptr) {
         ASSERT0(m_rg->getBBList() == nullptr ||
                 m_rg->getBBList()->get_elem_count() == 0);
-        convertIRListToMIList(milst);
+        convertIRListToMIList(milst, cont);
         return;
     }
-    convertIRBBListToMIList(milst);
+    convertIRBBListToMIList(milst, cont);
     END_TIMER(t, "Convert IR to MInst");
 }
 
