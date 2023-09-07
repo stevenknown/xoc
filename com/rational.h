@@ -36,6 +36,10 @@ author: Su Zhenyu
 
 namespace xcom {
 
+#ifndef INT_MAX
+#define INT_MAX 0x7fffFFFF
+#endif
+
 typedef INT FRAC_TYPE;
 
 class Rational {
@@ -50,10 +54,10 @@ class Rational {
     friend Rational operator + (Rational const& a, Rational const& b);
     friend Rational operator - (Rational const& a, Rational const& b);
     friend Rational operator - (Rational const& a);
-
+protected:
     FRAC_TYPE m_num;
     FRAC_TYPE m_den;
-
+protected:
     FRAC_TYPE _gcd(FRAC_TYPE x, FRAC_TYPE y);
 public:
     Rational();
@@ -65,17 +69,12 @@ public:
     void reduce();
     Rational abs();
     FRAC_TYPE num() const { return m_num; }
-    FRAC_TYPE& num() { return m_num; }
+    FRAC_TYPE & num() { return m_num; }
     FRAC_TYPE den() const { return m_den; }
-    FRAC_TYPE& den() { return m_den; }
-    CHAR const* format(StrBuf & buf) const;
+    FRAC_TYPE & den() { return m_den; }
+    CHAR const* dump(StrBuf & buf) const;
     void dump() const;
 };
-
-
-#ifndef INT_MAX
-#define INT_MAX        0x7fffFFFF
-#endif
 
 
 //Exported Functions
@@ -94,11 +93,11 @@ Rational operator / (Rational const& a, Rational const& b);
 Rational operator + (Rational const& a, Rational const& b);
 Rational operator - (Rational const& a, Rational const& b);
 Rational operator - (Rational const& a);
-//Subtraction
+//Subtraction operation
 inline Rational operator - (Rational const& a, Rational const& b)
 { return a + (-b); }
 
-//Minus
+//Minus operation
 inline Rational operator - (Rational const& a)
 {
     Rational b = a;

@@ -123,7 +123,7 @@ void SCC::scanNoRecur(Vertex const* root, VertexSet & onpath,
             ASSERT0(v_group != UNDEF_GROUP);
         }
         gai.set_group(v->id(), v_group);
- 
+
         if (find_scc) {
             addToGroup(v, v_group, group2bs);
         }
@@ -184,7 +184,7 @@ void SCC::scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
     if (find_scc) {
         addToGroup(v, v_group, group2bs);
     }
- 
+
     if (v_group == gai.get_index(v->id())) {
         for (Vertex const* t = path.get_top(); t != v;) {
             onpath.diff((BSIdx)t->id());

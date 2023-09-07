@@ -3568,7 +3568,7 @@ bool BBRA::find_hole(OUT BSIdx & startpos, OUT BSIdx & endpos,
 
         //Current pos is not a point of life time.
         if (!owner_range->is_contain(i)) {
-            next_i = owner_range->get_next(i); //'next_i' may be BS_UNDEF 
+            next_i = owner_range->get_next(i); //'next_i' may be BS_UNDEF
             start = next_i;
             continue;
         }

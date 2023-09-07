@@ -273,10 +273,7 @@ IR * IRSimp::simplifyIfSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, det);
     xcom::add_next(&ret_list, truebody);
     xcom::add_next(&ret_list, elsebody);
-    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
-
+    xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
@@ -294,7 +291,7 @@ IR * IRSimp::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == nullptr) return nullptr;
     SimpCtx local(ctx->getOptCtx());
-    local.copyTopdownFlag(*ctx);
+    local.copyTopDownFlag(*ctx);
     IR * ret_list = nullptr;
     ASSERTN(ir->is_whiledo(), ("expect IR_WHILE_DO node"));
     LabelInfo * startl = m_rg->genILabel();
@@ -341,9 +338,7 @@ IR * IRSimp::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, det);
     xcom::add_next(&ret_list, body);
     xcom::add_next(&ret_list, m_irmgr->buildLabel(BR_lab(falsebr)));
-    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
+    xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
@@ -360,7 +355,7 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == nullptr) return nullptr;
     SimpCtx local(ctx->getOptCtx());
-    local.copyTopdownFlag(*ctx);
+    local.copyTopDownFlag(*ctx);
     IR * ret_list = nullptr;
     ASSERTN(ir->is_dowhile(), ("expect IR_DO_WHILE node"));
 
@@ -409,9 +404,7 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, &last, m_irmgr->buildLabel(det_startl));
     xcom::add_next(&ret_list, &last, det);
     xcom::add_next(&ret_list, &last, m_irmgr->buildLabel(endl));
-    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
+    xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
@@ -425,14 +418,14 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 //  FALSEBR L1
 //  BODY-STMT
 //  LABEL: step
-//  STEP
+//  STEP-STMT
 //  GOTO start
 //  LABEL: L1
 IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == nullptr) return nullptr;
     SimpCtx local(ctx->getOptCtx());
-    local.copyTopdownFlag(*ctx);
+    local.copyTopDownFlag(*ctx);
     IR * ret_list = nullptr;
     ASSERTN(ir->is_doloop(), ("expect IR_DO_LOOP node"));
 
@@ -497,10 +490,7 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, falsebr);
     xcom::add_next(&ret_list, body);
     xcom::add_next(&ret_list, m_irmgr->buildLabel(BR_lab(falsebr)));
-    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
-        ASSERT0(p->is_stmt());
-        IR_parent(p) = nullptr;
-    }
+    xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
@@ -541,9 +531,7 @@ IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
         }
         ir = next;
     }
-    for (IR * p = ret_exp_list; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
+    xoc::cleanParentForIRList(ret_exp_list);
     return ret_exp_list;
 }
 
@@ -581,7 +569,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     TypeMgr * dm = m_tm;
     //pr = 1
     Type const* t = dm->getSimplexTypeEx(
-        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
+        dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(1, t);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
     m_rg->getMDMgr()->allocRef(x);
@@ -597,7 +585,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
 
     //pr = 0
     Type const* t2 = dm->getSimplexTypeEx(
-        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
+        dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(0, t2);
 
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -637,7 +625,7 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     m_rg->getMDMgr()->allocRef(pr);
     IR * ret_list = simplifyLogicalAndAtTruebr(ir, label1);
     TypeMgr * tm = m_tm;
-    Type const* t = tm->getSimplexTypeEx(tm->getDType(
+    Type const* t = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, t);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
@@ -648,7 +636,7 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     LabelInfo * label2 = m_rg->genILabel();
     xcom::add_next(&ret_list, m_irmgr->buildGoto(label2));
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label1));
-    Type const* t2 = tm->getSimplexTypeEx(tm->getDType(
+    Type const* t2 = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, t2);
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -863,7 +851,7 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     m_rg->getMDMgr()->allocRef(pr);
     IR * ret_list = simplifyLogicalOrAtTruebr(ir, label1);
     TypeMgr * dm = m_tm;
-    Type const* type = dm->getSimplexTypeEx(dm->getDType(
+    Type const* type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, type);
     IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
@@ -875,7 +863,7 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildGoto(label2));
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label1));
 
-    type = dm->getSimplexTypeEx(dm->getDType(
+    type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, type);
     IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -1000,7 +988,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
     SimpCtx predctx(*ctx);
     SIMP_ret_array_val(&predctx) = true;
 
-    //Predicator.
+    //Simplify determinant.
     ASSERT0(SELECT_det(ir));
     IR * newpred = simplifyExpression(SELECT_det(ir), &predctx);
     ASSERT0(newpred->is_single());
@@ -1022,49 +1010,42 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
     IR * res = m_irmgr->buildPR(ir->getType());
     m_rg->getMDMgr()->allocRef(res);
 
-    //Simp true exp.
+    //Simplify true exp.
     SimpCtx truectx(*ctx);
     SIMP_ret_array_val(&truectx) = true;
     IR * true_exp = simplifyExpression(SELECT_trueexp(ir), &truectx);
     ctx->appendStmt(truectx);
-    IR * mv = m_irmgr->buildStorePR(PR_no(res), res->getType(),
-                                             true_exp);
+    IR * mv = m_irmgr->buildStorePR(PR_no(res), res->getType(), true_exp);
     m_rg->getMDMgr()->allocRef(mv);
     copyDbx(mv, true_exp, m_rg);
     xcom::add_next(&lst, &last, mv);
 
-    //---
-    //Simp false expression
+    //Simplify false expression.
     ASSERT0(SELECT_falseexp(ir) != nullptr);
     //append GOTO following end of true body
     IR * gotoend = m_irmgr->buildGoto(m_rg->genILabel());
     copyDbx(gotoend, SELECT_det(ir), m_rg);
     xcom::add_next(&lst, &last, gotoend);
 
-    //true body end label
+    //Generate true body END label.
     xcom::add_next(&lst, &last, m_irmgr->buildLabel(BR_lab(falsebr)));
 
-    //simplify false expression
+    //Simplify false expression.
     SimpCtx falsectx(*ctx);
     SIMP_ret_array_val(&falsectx) = true;
     IR * else_exp = simplifyExpression(SELECT_falseexp(ir), &falsectx);
     ctx->appendStmt(falsectx);
-    IR * mv2 = m_irmgr->buildStorePR(PR_no(res), res->getType(),
-                                              else_exp);
+    IR * mv2 = m_irmgr->buildStorePR(PR_no(res), res->getType(), else_exp);
     m_rg->getMDMgr()->allocRef(mv2);
     copyDbx(mv2, else_exp, m_rg);
     xcom::add_next(&lst, &last, mv2);
     //---
 
-    //generate END label.
+    //Generate the last END label.
     xcom::add_next(&lst, &last, m_irmgr->buildLabel(GOTO_lab(gotoend)));
-    //
 
-    for (IR * p = lst; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
+    xoc::cleanParentForIRList(lst);
     ctx->appendStmt(lst);
-
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
     if (SIMP_is_record_cfs(ctx)) {
@@ -1077,6 +1058,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
         SIMP_cfs_mgr(ctx)->recordStmt(true_exp, *CFS_INFO_true_body(ci));
         SIMP_cfs_mgr(ctx)->recordStmt(else_exp, *CFS_INFO_false_body(ci));
     }
+    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
     return res;
 }
 
@@ -1161,10 +1143,7 @@ IR * IRSimp::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
         prev_ir_tree = simplifyStmtList(prev_ir_tree, &tctx);
     }
 
-    for (IR * p = prev_ir_tree; p != nullptr; p = p->get_next()) {
-        IR_parent(p) = nullptr;
-    }
-
+    xoc::cleanParentForIRList(prev_ir_tree);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
 
@@ -1223,7 +1202,7 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
                 newsub = irmgr->buildBinaryOp(IR_MUL, indextyid, newsub,
                     irmgr->buildImmInt(elemnum, indextyid));
 
-                if (dbx != nullptr) { 
+                if (dbx != nullptr) {
                     xoc::copyDbxForList(newsub, s, rg);
                 }
             }
@@ -1234,7 +1213,7 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
         } else {
             ofst_exp = irmgr->buildBinaryOpSimp(IR_ADD, indextyid,
                                                 ofst_exp, newsub);
-            if (dbx != nullptr) { 
+            if (dbx != nullptr) {
                 xoc::copyDbxForList(ofst_exp, s, rg);
             }
         }
@@ -1921,27 +1900,27 @@ IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
     IR_parent(SETELEM_base(ir)) = ir;
     ctx->unionBottomUpInfo(tcont);
 
-    tcont.copy(*ctx);
-    SIMP_ret_array_val(&tcont) = true;
-    SETELEM_val(ir) = simplifyExpression(SETELEM_val(ir), &tcont);
+    SimpCtx tcont2(*ctx);
+    SIMP_ret_array_val(&tcont2) = true;
+    SETELEM_val(ir) = simplifyExpression(SETELEM_val(ir), &tcont2);
     IR_parent(SETELEM_val(ir)) = ir;
-    ctx->unionBottomUpInfo(tcont);
+    ctx->unionBottomUpInfo(tcont2);
 
     IR * ret_list = nullptr;
     IR * last = nullptr;
-    if (SIMP_stmtlist(&tcont) != nullptr) {
-        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
+    if (SIMP_stmtlist(&tcont2) != nullptr) {
+        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont2));
     }
 
     //Process offset.
-    tcont.copy(*ctx);
-    SIMP_ret_array_val(&tcont) = true;
-    SETELEM_ofst(ir) = simplifyExpression(SETELEM_ofst(ir), &tcont);
+    SimpCtx tcont3(*ctx);
+    SIMP_ret_array_val(&tcont3) = true;
+    SETELEM_ofst(ir) = simplifyExpression(SETELEM_ofst(ir), &tcont3);
     IR_parent(SETELEM_ofst(ir)) = ir;
-    ctx->unionBottomUpInfo(tcont);
+    ctx->unionBottomUpInfo(tcont3);
     last = nullptr;
-    if (SIMP_stmtlist(&tcont) != nullptr) {
-        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
+    if (SIMP_stmtlist(&tcont3) != nullptr) {
+        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont3));
     }
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
@@ -1969,14 +1948,14 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
     }
 
     //Process offset.
-    tcont.copy(*ctx);
-    SIMP_ret_array_val(&tcont) = true;
-    GETELEM_ofst(ir) = simplifyExpression(GETELEM_ofst(ir), &tcont);
+    SimpCtx tcont2(*ctx);
+    SIMP_ret_array_val(&tcont2) = true;
+    GETELEM_ofst(ir) = simplifyExpression(GETELEM_ofst(ir), &tcont2);
     IR_parent(GETELEM_ofst(ir)) = ir;
-    ctx->unionBottomUpInfo(tcont);
+    ctx->unionBottomUpInfo(tcont2);
     last = nullptr;
-    if (SIMP_stmtlist(&tcont) != nullptr) {
-        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
+    if (SIMP_stmtlist(&tcont2) != nullptr) {
+        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont2));
     }
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
@@ -2046,6 +2025,46 @@ IR * IRSimp::simplifyDirectMemOp(IR * ir, SimpCtx * ctx)
     }
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
+}
+
+
+IR * IRSimp::simplifyGoto(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyCase(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyNormal(IR * ir, SimpCtx * ctx)
+{
+    IR * ret_list = nullptr;
+    SimpCtx tcont(*ctx);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    SIMP_ret_array_val(&tcont) = true;
+    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            ir->setKid(i, simplifyExpression(kid, &tcont));
+            ctx->unionBottomUpInfo(tcont);
+            if (SIMP_stmtlist(&tcont) != nullptr) {
+                xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
+                SIMP_stmtlist(&tcont) = nullptr;
+            }
+        }
+    }
+    xcom::add_next(&ret_list, ir);
+    return ret_list;
+}
+
+
+IR * IRSimp::simplifyReturn(IR * ir, SimpCtx * ctx)
+{
+    return simplifyNormal(ir, ctx);
 }
 
 
@@ -2214,9 +2233,7 @@ IR * IRSimp::simplifySwitch(IR * ir, SimpCtx * ctx)
     SWITCH_body(ir) = nullptr;
     body = simplifyStmtList(body, ctx);
     if (ir->getParent() == nullptr) {
-        for (IR * t = body; t != nullptr; t = t->get_next()) {
-            IR_parent(t) = nullptr;
-        }
+        xoc::cleanParentForIRList(body);
     }
     xcom::add_next(&ir, body);
 
@@ -2288,26 +2305,17 @@ IR * IRSimp::simplifyStmt(IR * ir, SimpCtx * ctx)
         ret_list = simplifyIgoto(ir, ctx);
         break;
     case IR_GOTO:
-    case IR_LABEL:
-    case IR_CASE:
-    case IR_RETURN: {
-        SimpCtx tcont(*ctx);
-        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
-        SIMP_ret_array_val(&tcont) = true;
-        for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-            IR * kid = ir->getKid(i);
-            if (kid != nullptr) {
-                ir->setKid(i, simplifyExpression(kid, &tcont));
-                ctx->unionBottomUpInfo(tcont);
-                if (SIMP_stmtlist(&tcont) != nullptr) {
-                    xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
-                    SIMP_stmtlist(&tcont) = nullptr;
-                }
-            }
-        }
-        xcom::add_next(&ret_list, ir);
+        ret_list = simplifyGoto(ir, ctx);
         break;
-    }
+    case IR_LABEL:
+        ret_list = simplifyNormal(ir, ctx);
+        break;
+    case IR_CASE:
+        ret_list = simplifyCase(ir, ctx);
+        break;
+    case IR_RETURN:
+        ret_list = simplifyReturn(ir, ctx);
+        break;
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         ret_list = simplifyBranch(ir, ctx);
         break;
@@ -2411,7 +2419,7 @@ IR * IRSimp::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
         note(m_rg, "\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
         m_rg->getLogMgr()->incIndent(2);
         xoc::dumpIRList(ret_list, m_rg);
-        m_rg->getLogMgr()->decIndent(2);    
+        m_rg->getLogMgr()->decIndent(2);
     }
     return ret_list;
 }

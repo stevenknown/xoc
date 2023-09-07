@@ -73,31 +73,41 @@ public:
     //NOTE the function will NOT process ir's kids and sibling.
     MD const* allocRef(IR * ir);
 
-    //Assign MD for pr operations and nonpr direct memory operations.
-    //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //Assign MD for PR operations and NonPR direct memory operations for
+    //both IRList and BBList.
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
     void assignMD(bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for pr operations and nonpr direct memory operations.
+    //Assign MD for PR operations and NonPR direct memory operations.
     //irlist: a list of IR to be assigned.
     //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
     //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
     void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for pr operations and nonpr direct memory operations.
+    //Assign MD for PR operations and NonPR direct memory operations.
+    //irlist: a list of IR to be assigned.
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //ii: the iterator of IR Tree. Only used as function local variable.
+    void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr,
+                  MOD IRIter & ii);
+    void assignMD(xcom::List<IR*> const& irlist, bool assign_pr,
+                  bool assign_nonpr);
+
+    //Assign MD for PR operations and NonPR direct memory operations.
     //The function will iterate given bblist.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr);
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
+    void assignMD(BBList * lst, bool assign_pr, bool assign_nonpr);
 
-    //Assign MD for pr operations and nonpr direct memory operations.
+    //Assign MD for PR operations and NonPR direct memory operations.
     //The function will iterate ir list in given bb.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForBB(IRBB * bb, IRIter & ii,
-                       bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for memory reference operations.
-    //The function will iterate given ir list.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr);
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //ii: the iterator of IR Tree. Only used as function local variable.
+    void assignMD(IRBB * bb, bool assign_pr, bool assign_nonpr,
+                  MOD IRIter & ii);
 
     //Allocate MD for PR.
     MD const* genMDForPR(PRNO prno, Type const* type);

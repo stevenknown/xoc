@@ -197,6 +197,7 @@ public:
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     MDIdx id() const { return MD_id(this); }
+
     //Return true if current md may cover 'm', such as:
     //current md: |-...-----...---|
     //m:            |---...-|
@@ -780,7 +781,7 @@ public:
     static bool isDelegate(MDIdx mdid)
     {
         return isLocalDelegate(mdid) || mdid == MD_GLOBAL_VAR ||
-               mdid == MD_IMPORT_VAR; 
+               mdid == MD_IMPORT_VAR;
     }
 
     MD const* readMD(MDIdx id) const
@@ -846,6 +847,7 @@ public:
     //Compute the number of PtPair that recorded in current MD2MDSet.
     UINT computePtPairNum(MDSystem const& mdsys) const
     {
+        DUMMYUSE(mdsys);
         UINT num_of_tgt_md = 0;
         MD2MDSetIter mxiter;
         MDSet const* from_md_pts = nullptr;

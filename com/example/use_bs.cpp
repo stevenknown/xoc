@@ -1,5 +1,5 @@
 #include "stdio.h"
-#include "xcominc.h"
+#include "../xcominc.h"
 void bs()
 {
     BitSet bs;

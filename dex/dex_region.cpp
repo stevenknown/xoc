@@ -166,6 +166,7 @@ void DexRegion::processSimply()
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);
     initIRMgr();
+    initIRBBMgr();
 
     ASSERT0(g_cst_bb_list);
     IRCFG * cfg = (IRCFG*)passmgr->registerPass(PASS_CFG);
@@ -209,11 +210,9 @@ bool DexRegion::process(OptCtx * oc)
 
     PassMgr * passmgr = initPassMgr();
     initIRMgr();
-
+    initIRBBMgr();
     HighProcess(*oc);
-
     MiddleProcess(*oc);
-
     ASSERT0(getPassMgr());
     PRSSAMgr * ssamgr = getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {

@@ -47,7 +47,10 @@ public:
     //Return expression list that describe multiple isomorphic result.
     virtual IR * getAlterResDescList(IR * stmt) const;
 
-    virtual bool perform(OptCtx & oc) { return false; }
+    //Return true if stmt has multiple results.
+    virtual bool hasMultiRes(IR * stmt) const;
+
+    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 
     virtual void setAlterResDescList(IR * stmt, IR * lst) const;
 };

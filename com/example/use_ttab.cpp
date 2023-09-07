@@ -1,5 +1,5 @@
 #include "stdio.h"
-#include "xcominc.h"
+#include "../xcominc.h"
 class CompareString {
 public:
     bool is_equ(char const* s1, char const* s2) const

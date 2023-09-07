@@ -37,9 +37,10 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRBB;
+class IRBBMgr;
 template <class IRBB, class IR> class CFG;
 typedef List<LabelInfo const*> LabelInfoList;
-typedef C<LabelInfo const*> * LabelInfoListIter;
+typedef LabelInfoList::Iter LabelInfoListIter;
 typedef TMap<IR const*, UINT> IROrder;
 
 #define BBID_UNDEF VERTEX_UNDEF
@@ -84,6 +85,11 @@ public:
 
     //Insert ir prior to cond_br, uncond_br, call, return.
     IRListIter append_tail_ex(IR * ir);
+
+    //Insert ir prior to cond_br, uncond_br, call, return.
+    //Note the function will NOT set BB pointer of ir.
+    IRListIter append_tail_ex_without_set_bb(IR * ir);
+
     //Insert ir after phi operations.
     IRListIter append_head_ex(IR * ir);
 
@@ -170,6 +176,7 @@ public:
 
 typedef xcom::TTab<IRBB*> BBTab;
 typedef xcom::TTabIter<IRBB*> BBTabIter;
+typedef xcom::Vector<IRBB*> BBVec;
 
 //
 //START BBList
@@ -183,7 +190,7 @@ public:
     void copy(BBList const& src, Region * rg);
 
     //The function clone all BB list info, also include the BB id.
-    void clone(BBList const& src, Region * rg);
+    void clone(BBList const& src, MOD IRBBMgr * bbmgr, Region * rg);
 
     //Find IRBB according to given id.
     static IRBB * find(BBList const& lst, UINT id);
@@ -545,9 +552,9 @@ public:
 class IRBBMgr {
     COPY_CONSTRUCTOR(IRBBMgr);
 protected:
-    BBTab m_bb_tab;
-    BBList m_free_list;
     UINT m_bb_count; //counter of IRBB.
+    BBVec m_bb_vec;
+    BBList m_free_list;
 public:
     IRBBMgr() { m_bb_count = BBID_UNDEF + 1; }
     ~IRBBMgr();
@@ -557,11 +564,18 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
+    //The function will copy not only attributes, labelinfo, IR stmts of 'src',
+    //but also BBID and Vertex info. After the clone, bb counter update to
+    //the maximum between current counter and src's id.
+    IRBB * cloneBB(IRBB const& src, Region * rg);
+
     void destroyBB(IRBB * bb);
 
     void freeBB(IRBB * bb);
 
     UINT getBBCount() const { return m_bb_count; }
+    IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
+    BBVec * getBBVec() { return &m_bb_vec; }
 
     bool verify() const;
 };

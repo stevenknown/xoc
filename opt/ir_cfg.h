@@ -53,7 +53,6 @@ public:
 class IRCFG : public Pass, public CFG<IRBB, IR> {
     COPY_CONSTRUCTOR(IRCFG);
 protected:
-    Vector<IRBB*> m_bb_vec; //used to speedup querying of BB through id.
     Lab2BB m_lab2bb;
     TypeMgr * m_tm;
     CFG_SHAPE m_cs;
@@ -72,7 +71,6 @@ protected:
     void dumpGraph(FILE * h) const;
     void dumpForTest(UINT flag) const;
 
-    void initBBVecViaBBList();
     void initEntryAndExit(CFG_SHAPE cs);
 
     virtual void preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx);
@@ -115,6 +113,10 @@ protected:
     void removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
                                      CfgOptCtx const& ctx);
 
+    //Perform list of light-weight CFG optimizations to improve
+    //the CFG's clarity.
+    bool refineCFG(CfgOptCtx & optctx);
+
     //Remove bb from LoopInfo tree.
     void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
     static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
@@ -122,6 +124,9 @@ protected:
 
     //Sort the order of predecessor of given BB according to PHI operand layout.
     void sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label);
+
+    bool useMDSSADU() const;
+    bool usePRSSADU() const;
 public:
     enum {
         DUMP_DEF = 0x0U, //the default dump option.
@@ -159,9 +164,8 @@ public:
     //And you must consider the right insertion.
     void addBB(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(bb->id()) == nullptr);
-        ASSERTN(bb->id() != 0, ("bb id should start at 1"));
-        m_bb_vec.set(bb->id(), bb);
+        ASSERT0(bb);
+        ASSERTN(bb->id() != BBID_UNDEF, ("invalid bb id"));
         Vertex * v = addVertex(bb->id());
         setVertex(bb, v);
     }
@@ -197,7 +201,6 @@ public:
     //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
     //next: the next BB in BBList.
     IRBB * changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
-                                       BBListIter const nextit,
                                        OptCtx * oc);
 
     //The function insert a tampolining BB bewteen bb and its next BB.
@@ -205,6 +208,8 @@ public:
 
     void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
     void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
+    void dumpDOTNoSSA() const
+    { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
     void dumpDOT(FILE * h, UINT flag) const;
     void dumpDom() const { CFG<IRBB, IR>::dumpDom(m_rg); }
     void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg); }
@@ -267,21 +272,21 @@ public:
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(bb->id()));
+        ASSERT0(bb);
         return BB_first_ir(bb);
     }
 
     //Return the last operation of 'bb'.
     IR * get_last_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(bb->id()));
+        ASSERT0(bb);
         return BB_last_ir(bb);
     }
     UINT getNumOfBB() const
     { return const_cast<IRCFG*>(this)->getBBList()->get_elem_count(); }
     BBList * getBBList() const { return (BBList*)m_bb_list; }
     Lab2BB * getLabel2BBMap() { return &m_lab2bb; }
-    IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
+    IRBB * getBB(UINT id) const { return getRegion()->getBB(id); }
     virtual bool goto_opt(IRBB * bb);
     virtual CHAR const* getPassName() const { return "CFG"; }
     virtual PASS_TYPE getPassType() const { return PASS_CFG; }
@@ -394,17 +399,23 @@ public:
     //Note it is illegal if empty BB has non-taken branch.
     void reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter const& bbit,
                                        OUT CfgOptCtx & ctx);
-    void reviseStmtMDSSA(VexTab const& vextab, Vertex const* root);
+
+    //The function will update the MDSSA version for stmt and phi.
+    void reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
-    virtual void setVertex(IRBB * bb, Vertex * v) { BB_vex(bb) = v; }
+    virtual void setVertex(IRBB * bb, Vertex * v)
+    {
+        ASSERT0(BB_vex(bb) == nullptr || BB_vex(bb)->id() == v->id());
+        BB_vex(bb) = v;
+    }
     virtual void setVertex(IRBB * from, IRBB * to, Edge * e)
     { BB_vex(from) = e->from(); BB_vex(to) = e->to(); }
 
     //Split BB into two BBs.
     //bb: BB to be splited.
-    //split_point: the ir in 'bb' used to mark the split point that followed IRs
-    //             will be moved to fallthrough newbb.
+    //split_point: the ir in 'bb' used to mark the split point that followed
+    //             IRs will be moved to fallthrough newbb.
     //e.g:bb:
     //    ...
     //    split_point;

@@ -65,9 +65,15 @@ class CfsMgr;
 #define SIMP_changed(s) (s)->prop_bottom_up.s1.something_has_changed
 #define SIMP_need_recon_bblist(s) \
     (s)->prop_bottom_up.s1.need_to_reconstruct_bb_list
-#define SIMP_need_rebuild_du_chain(s) \
-    (s)->prop_bottom_up.s1.need_to_rebuild_du_chain
+#define SIMP_need_rebuild_pr_du_chain(s) \
+    (s)->prop_bottom_up.s1.need_to_rebuild_pr_du_chain
+#define SIMP_need_rebuild_nonpr_du_chain(s) \
+    (s)->prop_bottom_up.s1.need_to_rebuild_nonpr_du_chain
 #define SIMP_cfs_mgr(s) (s)->cfs_mgr
+
+//The class represents the simplification behaviors.
+//Each behavior has an option corresponding to it.
+//Enable or disable options to control the related simplification.
 class SimpCtx {
 public:
     typedef UINT BitUnion;
@@ -155,10 +161,18 @@ public:
             BitUnion need_to_reconstruct_bb_list:1;
 
             //Propagate info bottom up.
-            //To inform Region to rebuild DU chain.
+            //To inform Region to rebuild PR DU chain.
+            //The DU chain is either classic DU chain or PRSSA.
             //If this flag is true, DU info and
             //DU chain also need to be rebuilt.
-            BitUnion need_to_rebuild_du_chain : 1;
+            BitUnion need_to_rebuild_pr_du_chain : 1;
+
+            //Propagate info bottom up.
+            //To inform Region to rebuild NonPR DU chain.
+            //The DU chain is either classic DU chain or MDSSA.
+            //If this flag is true, DU info and
+            //DU chain also need to be rebuilt.
+            BitUnion need_to_rebuild_nonpr_du_chain : 1;
         } s1;
     } prop_bottom_up;
 
@@ -178,18 +192,10 @@ public:
     OptCtx const* optctx; //record current OptCtx for region.
 public:
     SimpCtx(OptCtx const* oc) { init(); SIMP_optctx(this) = oc; }
-    SimpCtx(SimpCtx const& s) { copy(s); }
-    SimpCtx const& operator = (SimpCtx const&);
-
-    //Only copy top-down informations.
-    void copy(SimpCtx const& s)
+    SimpCtx(SimpCtx const& s)
     {
-        SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&s);
-        SIMP_break_label(this) = SIMP_break_label(&s);
-        SIMP_continue_label(this) = SIMP_continue_label(&s);
-        prop_top_down = s.prop_top_down;
-        SIMP_stmtlist(this) = nullptr;
-        SIMP_optctx(this) = SIMP_optctx(&s);
+        clean();
+        copyTopDownFlag(s); //only copy topdown information.
     }
 
     void init() { clean(); }
@@ -217,24 +223,30 @@ public:
 
     //Unify the actions which propagated top down
     //during processing IR tree.
-    void copyTopdownFlag(SimpCtx const& c)
+    void copyTopDownFlag(SimpCtx const& c)
     {
         prop_top_down = c.prop_top_down;
         SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&c);
+        SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&c);
+        SIMP_break_label(this) = SIMP_break_label(&c);
+        SIMP_continue_label(this) = SIMP_continue_label(&c);
+        SIMP_optctx(this) = SIMP_optctx(&c);
+        SIMP_stmtlist(this) = nullptr;
     }
 
     //Copy the actions which propagated bottom up
     //during processing IR tree.
-    void copyBottomupFlag(SimpCtx const& c)
+    void copyBottomUpFlag(SimpCtx const& c)
     { prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
 
     //Clean the actions which propagated bottom up
     //during processing IR tree.
-    void cleanBottomupFlag()
+    void cleanBottomUpFlag()
     {
         SIMP_changed(this) = false;
         SIMP_need_recon_bblist(this) = false;
-        SIMP_need_rebuild_du_chain(this) = false;
+        SIMP_need_rebuild_pr_du_chain(this) = false;
+        SIMP_need_rebuild_nonpr_du_chain(this) = false;
     }
 
     //Return the stmt list that recorded in the context.
@@ -249,14 +261,29 @@ public:
     {
         SIMP_changed(this) |= SIMP_changed(&c);
         SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
-        SIMP_need_rebuild_du_chain(this) |= SIMP_need_rebuild_du_chain(&c);
+        SIMP_need_rebuild_pr_du_chain(this) |=
+            SIMP_need_rebuild_pr_du_chain(&c);
+        SIMP_need_rebuild_nonpr_du_chain(this) |=
+            SIMP_need_rebuild_nonpr_du_chain(&c);
     }
 
     //Return true if BB list need to be reconstructed.
-    bool needReconBBList() const { return SIMP_need_recon_bblist(this); }
+    bool needReconstructBBList() const { return SIMP_need_recon_bblist(this); }
 
     //Return true if SSA/Classic DU chain need to be rebuild.
-    bool needRebuildDUChain() const { return SIMP_need_rebuild_du_chain(this); }
+    bool needRebuildDUChain() const
+    {
+        return SIMP_need_rebuild_pr_du_chain(this) ||
+               SIMP_need_rebuild_nonpr_du_chain(this);
+    }
+
+    //Return true if PR SSA/Classic DU chain need to be rebuild.
+    bool needRebuildPRDUChain() const
+    { return SIMP_need_rebuild_pr_du_chain(this); }
+
+    //Return true if NonPR SSA/Classic DU chain need to be rebuild.
+    bool needRebuildNonPRDUChain() const
+    { return SIMP_need_rebuild_nonpr_du_chain(this); }
 
     //Set action flags to simplify control flow structure.
     void setSimpCFS()
@@ -384,18 +411,13 @@ protected:
     //At lowest mode, the array base, array subscript-expression must be leaf.
     bool isLowestHeightArrayOp(IR const* ir) const;
 
-    void simplifyStoreArrayRHS(IR * ir,
-                               OUT IR ** ret_list,
-                               OUT IR ** last,
-                               SimpCtx * ctx);
-    IR * simplifyStoreArrayAddr(IR * ir,
-                                OUT IR ** ret_list,
-                                OUT IR ** last,
-                                SimpCtx * ctx);
-    IR * simplifyStoreArrayLHS(IR * ir,
-                               OUT IR ** ret_list,
-                               OUT IR ** last,
-                               SimpCtx * ctx);
+    IR * simplifyNormal(IR * ir, SimpCtx * ctx);
+    void simplifyStoreArrayRHS(IR * ir, OUT IR ** ret_list,
+                               OUT IR ** last, SimpCtx * ctx);
+    IR * simplifyStoreArrayAddr(IR * ir, OUT IR ** ret_list,
+                                OUT IR ** last, SimpCtx * ctx);
+    IR * simplifyStoreArrayLHS(IR * ir, OUT IR ** ret_list,
+                               OUT IR ** last, SimpCtx * ctx);
     IR * simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx);
@@ -415,56 +437,64 @@ public:
     virtual CHAR const* getPassName() const
     { return "IR Simplification"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRSIMP; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Series of helper functions to simplify
     //ir according to given specification.
-    IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
-    IR * simplifyBranch(IR * ir, SimpCtx * ctx);
-    IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyDoWhileSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyWhileDoSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
-    void simplifySelectKids(IR * ir, SimpCtx * cont);
-    IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
-    IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
-    void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
-    IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
-    IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
-    IR * simplifySetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyCall(IR * ir, SimpCtx * cont);
-    IR * simplifyIf(IR * ir, SimpCtx * cont);
-    IR * simplifyWhileDo(IR * ir, SimpCtx * cont);
-    IR * simplifyDoWhile (IR * ir, SimpCtx * cont);
-    IR * simplifyDoLoop(IR * ir, SimpCtx * cont);
-    IR * simplifyDet(IR * ir, SimpCtx * cont);
-    IR * simplifyJudgeDet(IR * ir, SimpCtx * cont);
-    IR * simplifySelect(IR * ir, SimpCtx * cont);
-    IR * simplifySwitch (IR * ir, SimpCtx * cont);
-    IR * simplifyIgoto(IR * ir, SimpCtx * cont);
-    IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
-    IR * simplifyArray(IR * ir, SimpCtx * cont);
-    IR * simplifyExpression(IR * ir, SimpCtx * cont);
-    IR * simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx);
-    IR * simplifyStmt(IR * ir, SimpCtx * cont);
-    IR * simplifyStmtList(IR * ir, SimpCtx * cont);
-    void simplifyBB(IRBB * bb, SimpCtx * cont);
-    void simplifyBBlist(BBList * bbl, SimpCtx * cont);
-    void simplifyIRList(SimpCtx * cont);
-    IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalOrAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalOrAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalOr(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalAndAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalAndAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyBranch(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDoWhileSelf(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyWhileDoSelf(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
+    virtual void simplifySelectKids(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
+    virtual void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySetelem(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyCall(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyIf(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyWhileDo(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyDoWhile (IR * ir, SimpCtx * cont);
+    virtual IR * simplifyDoLoop(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyDet(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyJudgeDet(IR * ir, SimpCtx * cont);
+    virtual IR * simplifySelect(IR * ir, SimpCtx * cont);
+    virtual IR * simplifySwitch (IR * ir, SimpCtx * cont);
+    virtual IR * simplifyReturn(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyCase(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyGoto(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyIgoto(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyArray(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyExpression(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyStmt(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyStmtList(IR * ir, SimpCtx * cont);
+    virtual void simplifyBB(IRBB * bb, SimpCtx * cont);
+    virtual void simplifyBBlist(BBList * bbl, SimpCtx * cont);
+    virtual void simplifyIRList(SimpCtx * cont);
+    virtual IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLogicalOrAtFalsebr(IN IR * ir,
+                                            LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalOrAtTruebr(IN IR * ir,
+                                           LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalOr(IN IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLogicalAndAtTruebr(IN IR * ir,
+                                            LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalAndAtFalsebr(IN IR * ir,
+                                             LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
 
     //Simplify ir to PR mode.
-    IR * simpToPR(IR * ir, SimpCtx * ctx);
+    virtual IR * simpToPR(IR * ir, SimpCtx * ctx);
 
-    virtual bool perform(OptCtx & oc) { return false; }
+    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 };
 
 } //namespace xoc

@@ -171,8 +171,8 @@ MD const* MDMgr::allocStringMD(Sym const* string)
 
     Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
-    //v->setflag(VAR_ADDR_TAKEN);
-    
+    //v->setFlag(VAR_ADDR_TAKEN);
+
     MD md;
     MD_base(&md) = v;
     MD_size(&md) = (UINT)strlen(SYM_name(string)) + 1;
@@ -217,7 +217,7 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
     SWITCH_CASE_INDIRECT_MEM_OP:
     SWITCH_CASE_ARRAY_OP:
         break;
-    default: ASSERT0(!x->isMemRef());
+    default: ASSERTN(!x->isMemRef(), ("TODO:need to support"));
     }
 }
 
@@ -227,53 +227,66 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
 void MDMgr::assignMD(bool assign_pr, bool assign_nonpr)
 {
     if (m_rg->getIRList() != nullptr) {
-        assignMDForIRList(m_rg->getIRList(), assign_pr, assign_nonpr);
+        assignMD(m_rg->getIRList(), assign_pr, assign_nonpr);
         return;
     }
     if (m_rg->getBBList() != nullptr) {
-        assignMDForBBList(m_rg->getBBList(), assign_pr, assign_nonpr);
+        assignMD(m_rg->getBBList(), assign_pr, assign_nonpr);
     }
 }
 
 
-//Assign MD for ST/LD/ReadPR/WritePR operations.
-//is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-void MDMgr::assignMD(IR * irlist, bool assign_pr, bool assign_nonpr)
+void MDMgr::assignMD(IR * irlist, bool assign_pr, bool assign_nonpr,
+                     MOD IRIter & ii)
 {
-    assignMDForIRList(irlist, assign_pr, assign_nonpr);
+    ii.clean();
+    for (IR * x = xoc::iterInit(irlist, ii, true);
+         x != nullptr; x = xoc::iterNext(ii, true)) {
+        assignMDImpl(x, assign_pr, assign_nonpr);
+    }
 }
 
 
-void MDMgr::assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr)
+void MDMgr::assignMD(IR * irlist, bool assign_pr, bool assign_nonpr)
+{
+    IRIter ii;
+    assignMD(irlist, assign_pr, assign_nonpr, ii);
+}
+
+
+void MDMgr::assignMD(xcom::List<IR*> const& irlist, bool assign_pr,
+                     bool assign_nonpr)
+{
+    IRIter ii;
+    xcom::List<IR*>::Iter ct;
+    for (xoc::IR * ir = irlist.get_head(&ct);
+         ir != nullptr; ir = irlist.get_next(&ct)) {
+        assignMD(ir, assign_pr, assign_nonpr, ii);
+    }
+}
+
+
+void MDMgr::assignMD(BBList * lst, bool assign_pr, bool assign_nonpr)
 {
     ASSERT0(lst);
     IRIter ii;
     for (IRBB * bb = lst->get_head(); bb != nullptr; bb = lst->get_next()) {
-        assignMDForBB(bb, ii, assign_pr, assign_nonpr);
+        assignMD(bb, assign_pr, assign_nonpr, ii);
     }
 }
 
 
-void MDMgr::assignMDForBB(IRBB * bb, IRIter & ii,
-                           bool assign_pr, bool assign_nonpr)
+void MDMgr::assignMD(IRBB * bb, bool assign_pr, bool assign_nonpr,
+                     MOD IRIter & ii)
 {
     BBIRListIter ct;
     for (xoc::IR * ir = bb->getIRList().get_head(&ct);
          ir != nullptr; ir = bb->getIRList().get_next(&ct)) {
+        ii.clean();
         for (IR * x = xoc::iterInit(ir, ii, true);
              x != nullptr; x = xoc::iterNext(ii, true)) {
            assignMDImpl(x, assign_pr, assign_nonpr);
         }
-    }
-}
-
-
-void MDMgr::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
-{
-    IRIter ii;
-    for (IR * x = xoc::iterInit(lst, ii, true);
-         x != nullptr; x = xoc::iterNext(ii, true)) {
-        assignMDImpl(x, assign_pr, assign_nonpr);
     }
 }
 

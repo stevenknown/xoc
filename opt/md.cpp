@@ -138,7 +138,7 @@ CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
     buf.strcat("MD%d -- base:", MD_id(this));
     ASSERT0(MD_base(this) != nullptr);
     MD_base(this)->dump(buf, dm);
-    CHAR const* ofstfmt = getUIntFormat(false);
+    CHAR const* ofstfmt = getHostUIntFormat(false);
     TMWORD lofst = MD_ofst(this);
     if (MD_ty(this) == MD_EXACT) {
         StrBuf fmt(16);
@@ -1215,7 +1215,7 @@ void MDSystem::computeOverlap(Region * current_rg, MDSet const& mds,
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != nullptr);
-    
+
         //Record the category of variable.
         if (md->is_global()) {
             has_global = true;

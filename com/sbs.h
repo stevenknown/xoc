@@ -64,7 +64,6 @@ public:
     UINT id;
     UINT gid;
     #endif
-
 public:
     SEG() { clean(); }
     SEG(SEG const& src) { copy(src); }
@@ -99,6 +98,7 @@ public:
 
 //The class is used to debug allocation and free of SegMgr.
 extern UINT g_segmgr_log_count;
+
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SegMgrLog {
 public:
@@ -107,7 +107,6 @@ public:
     UINT seg_count;
     BSVec<SEG<BitsPerSeg> const*> allocated;
     static UINT g_seg_count;
-
 public:
     bool allocExist(SEG<BitsPerSeg> const* s)
     {
@@ -206,7 +205,6 @@ class SegMgr {
     COPY_CONSTRUCTOR(SegMgr);
     MiscBitSetMgr<BitsPerSeg> * m_sbs_mgr;
     SList<SEG<BitsPerSeg>*> m_free_list;
-
 public:
     #ifdef DEBUG_SEG
     SegMgrLog<BitsPerSeg> logger;
@@ -300,7 +298,7 @@ class SBitSetCore {
     COPY_CONSTRUCTOR(SBitSetCore);
 protected:
     SListEx<SEG<BitsPerSeg>*> segs;
-
+protected:
     void diff(BSIdx elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
               TSEGIter * prev_sct, TSEGIter * sct);
 
@@ -709,14 +707,12 @@ public:
     BSIdx get_first(TSEGIter ** cur) const
     {
         ASSERT0(cur);
-
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
             *cur = nullptr;
             return BS_UNDEF;
         }
-
         *cur = sc;
         ASSERT0(sc->val());
         SEG<BitsPerSeg> * s = sc->val();
@@ -731,11 +727,13 @@ public:
     {
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_tail();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
-            ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
+            //When user query the last element in set, the SEG elements in
+            //SBitSetCore::segs may not be empty, because user does not call
+            //diff() to reduce the number of elements in segs.
+            //ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
             *cur = nullptr;
             return BS_UNDEF;
         }
-
         ASSERT0(cur);
         *cur = sc;
         ASSERT0(sc->val());
@@ -847,22 +845,23 @@ class MiscBitSetMgr {
     friend class DBitSet<BitsPerSeg>;
     COPY_CONSTRUCTOR(MiscBitSetMgr);
 protected:
+    SMemPool * m_sbitsetcore_pool;
+    SMemPool * m_dbitsetcore_pool;
+
+    //Record the object that is allocated by current mgr.
+    TTab<void const*> m_settab;
+    SList<SBitSet<BitsPerSeg>*> m_free_sbitset_list;
+    SList<DBitSet<BitsPerSeg>*> m_free_dbitset_list;
     SList<SBitSet<BitsPerSeg>*> m_sbitset_list;
     SList<DBitSet<BitsPerSeg>*> m_dbitset_list;
     SList<SBitSetCore<BitsPerSeg>*> m_free_sbitsetcore_list;
-    SList<SBitSet<BitsPerSeg>*> m_free_sbitset_list;
-    SList<DBitSet<BitsPerSeg>*> m_free_dbitset_list;
     SList<DBitSetCore<BitsPerSeg>*> m_free_dbitsetcore_list;
-    SMemPool * m_sbitsetcore_pool;
-    SMemPool * m_dbitsetcore_pool;
-    TTab<void const*> m_settab; //record the object that is allocated by
-                                //current mgr.
 protected:
     //Return true if 'obj' is allocated by current mgr.
     //The function always used in Debug Mode.
     bool belongToCurrentMgr(void const* obj) const
     { return m_settab.find(obj); }
-    
+
     //Record 'obj' is allocated by current mgr.
     //The function always used in Debug Mode.
     bool recordObj(void const* obj) { m_settab.append(obj); return true; }
@@ -899,7 +898,6 @@ public:
 
     //Only used to allocate SEGIter.
     SMemPool * ptr_pool;
-
 public:
     MiscBitSetMgr() : sm(self()) { ptr_pool = nullptr; init(); }
     ~MiscBitSetMgr() { destroy(); }
@@ -907,20 +905,17 @@ public:
     void init()
     {
         if (ptr_pool != nullptr) { return; }
-
         ptr_pool = smpoolCreate(sizeof(TSEGIter) * 10, MEM_CONST_SIZE);
         m_sbitsetcore_pool = smpoolCreate(sizeof(SBitSetCore<BitsPerSeg>) * 10,
                                           MEM_CONST_SIZE);
         m_dbitsetcore_pool = smpoolCreate(sizeof(DBitSetCore<BitsPerSeg>) * 10,
                                           MEM_CONST_SIZE);
-
         m_sbitset_list.set_pool(ptr_pool);
         m_dbitset_list.set_pool(ptr_pool);
         m_free_sbitsetcore_list.set_pool(ptr_pool);
         m_free_sbitset_list.set_pool(ptr_pool);
         m_free_dbitset_list.set_pool(ptr_pool);
         m_free_dbitsetcore_list.set_pool(ptr_pool);
-
         scflst = nullptr;
         sm.init();
     }
@@ -928,7 +923,6 @@ public:
     void destroy()
     {
         if (ptr_pool == nullptr) { return; }
-
         for (SC<SBitSet<BitsPerSeg>*> * st = m_sbitset_list.get_head();
              st != m_sbitset_list.end();
              st = m_sbitset_list.get_next(st)) {
@@ -936,7 +930,6 @@ public:
             ASSERT0(s);
             delete s;
         }
-
         for (SC<DBitSet<BitsPerSeg>*> * dt = m_dbitset_list.get_head();
              dt != m_dbitset_list.end();
              dt = m_dbitset_list.get_next(dt)) {
@@ -944,7 +937,6 @@ public:
             ASSERT0(d);
             delete d;
         }
-
         m_sbitset_list.clean();
         m_dbitset_list.clean();
         m_free_sbitset_list.clean();

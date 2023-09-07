@@ -49,18 +49,13 @@ protected:
     Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
+
+    //Record all allocated pass.
+    //When PassMgr destructed, the table guarantees objects that allocated
+    //by the mananger are destroied at all.
+    xcom::TTab<Pass*> m_allocated_pass;
     PassTab m_registered_pass;
 protected:
-    void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
-                                  BitSet const& opts);
-    void checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
-                                  AliasAnalysis *& aa,
-                                  DUMgr *& dumgr,
-                                  BitSet const& opts);
-public:
-    PassMgr(Region * rg);
-    virtual ~PassMgr() { destroyAllRegisteredPass(); }
-
     virtual Pass * allocCDG();
     virtual Pass * allocCFG();
     virtual Pass * allocAA();
@@ -98,6 +93,23 @@ public:
     virtual Pass * allocIRSimp();
     virtual Pass * allocIRMgr();
     virtual Pass * allocLinearScanRA();
+    virtual Pass * allocCallGraph();
+    virtual Pass * allocVectorization();
+protected:
+    void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
+                                  BitSet const& opts);
+    void checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
+                                  AliasAnalysis *& aa,
+                                  DUMgr *& dumgr,
+                                  BitSet const& opts);
+public:
+    PassMgr(Region * rg);
+    virtual ~PassMgr() { destroyAllPass(); }
+
+    //The function allocate pass object by given pass type.
+    //Note the pass object returned by this function will NOT be registered in
+    //registered-pass-set.
+    virtual Pass * allocPass(PASS_TYPE passty);
 
     //This function check validation of options in oc, perform
     //recomputation if it is invalid.
@@ -105,17 +117,26 @@ public:
     void checkValidAndRecompute(OptCtx * oc, ...);
     void checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist);
 
-    void destroyAllRegisteredPass();
+    void destroyAllPass();
+
+    //Destory dedicated pass.
+    //Note the function only destroy the given pass object, the registered
+    //pass-set still not removed.
     void destroyPass(Pass * pass);
-    void destroyPass(PASS_TYPE passtype);
+
+    //The function remove the pass object from registered pass set.
+    //Note the user allocate pass
+    void destroyRegisteredPass(PASS_TYPE passtype);
     void dump() const;
 
     PassTab const& getPassTab() const { return m_registered_pass; }
 
-    virtual Pass * registerPass(PASS_TYPE opty);
+    virtual Pass * registerPass(PASS_TYPE passty);
 
-    virtual Pass * queryPass(PASS_TYPE opty)
-    { return m_registered_pass.get(opty); }
+    virtual Pass * queryPass(PASS_TYPE passty)
+    { return m_registered_pass.get(passty); }
+
+    virtual Pass * replacePass(PASS_TYPE passty, Pass * newpass);
 };
 
 } //namespace xoc

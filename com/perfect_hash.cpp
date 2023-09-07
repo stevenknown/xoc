@@ -139,7 +139,7 @@ void findPerfectHash(xcom::Vector<CHAR const*> & input)
     g_bucket_sz = str_num + 5;
     g_gap = 10;
 
-    //xcom::getNearestPowerOf2((UINT)g_bucket_sz);    
+    //xcom::getNearestPowerOf2((UINT)g_bucket_sz);
     UINT bucket_sz = g_bucket_sz + g_gap;
     PerfectStringHashMap pshmap(bucket_sz);
     pshmap.addAllString(input);

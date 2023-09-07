@@ -50,6 +50,7 @@ TypeDesc const g_type_desc[] = {
     {D_U64, "u64", 64},
     {D_U128, "u128", 128},
 
+    {D_F16, "f16", 16}, //float point 32 bits
     {D_F32, "f32", 32}, //float point 32 bits
     {D_F64, "f64", 64},
     {D_F80, "f80", 80},
@@ -121,7 +122,7 @@ void TensorType::copy(TensorType const& src, TypeMgr * mgr)
 //4. (else) Is any operand unsigned int? Convert the other to unsigned int.
 //
 //NOTE: The function does NOT hoist vector type.
-Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
+Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
 {
     Type const* d0 = opnd0->getType();
     Type const* d1 = opnd1->getType();
@@ -164,11 +165,11 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
     INT bitsize = MAX(getDTypeBitSize(t0), getDTypeBitSize(t1));
     DATA_TYPE res;
     if (IS_FP(t0) || IS_FP(t1)) {
-        res = get_fp_dtype(bitsize);
+        res = getFPDType(bitsize);
     } else if (IS_SINT(t0) || IS_SINT(t1)) {
-        res = get_int_dtype(bitsize, true);
+        res = getIntDType(bitsize, true);
     } else {
-        res = get_int_dtype(bitsize, false);
+        res = getIntDType(bitsize, false);
     }
 
     ASSERT0(res != D_UNDEF);
@@ -501,21 +502,9 @@ UINT TypeMgr::getByteSize(Type const* type) const
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
+    SWITCH_CASE_INT_DTYPE:
+    SWITCH_CASE_FP_DTYPE:
     case D_B:
-    case D_I8:
-    case D_I16:
-    case D_I32:
-    case D_I64:
-    case D_I128:
-    case D_U8:
-    case D_U16:
-    case D_U32:
-    case D_U64:
-    case D_U128:
-    case D_F32:
-    case D_F64:
-    case D_F80:
-    case D_F128:
     case D_STR:
         return getDTypeByteSize(dt);
     case D_ANY:
@@ -543,21 +532,9 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf) const
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
+    SWITCH_CASE_INT_DTYPE:
+    SWITCH_CASE_FP_DTYPE:
     case D_B:
-    case D_I8:
-    case D_I16:
-    case D_I32:
-    case D_I64:
-    case D_I128:
-    case D_U8:
-    case D_U16:
-    case D_U32:
-    case D_U64:
-    case D_U128:
-    case D_F32:
-    case D_F64:
-    case D_F80:
-    case D_F128:
     case D_STR:
         buf.strcat("%s", DTNAME(dt));
         break;
@@ -572,7 +549,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf) const
         ASSERT0(elem_byte_size != 0);
         ASSERT0(getByteSize(type) % elem_byte_size == 0);
         UINT elemnum = getByteSize(type) / elem_byte_size;
-        buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
+        buf.strcat("%s<%s*%u>", DTNAME(dt), DTNAME(TY_vec_ety(type)), elemnum);
         break;
     }
     case D_TENSOR: {
@@ -655,43 +632,10 @@ bool Type::verify(TypeMgr const* tm) const
         ASSERTN(IS_SIMPLEX(TY_vec_ety(this)) || IS_PTR(TY_vec_ety(this)),
                 ("illegal vector elem type"));
         ASSERT0((TY_vec_size(this) >= tm->getDTypeByteSize(TY_vec_ety(this))) &&
-            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));
+                (TY_vec_size(this) %
+                 tm->getDTypeByteSize(TY_vec_ety(this)) == 0));
     }
     return true;
-}
-
-
-//Return the number of elements in the vector.
-UINT Type::getVectorElemNum(TypeMgr const* tm) const
-{
-    return TY_vec_size(this) / tm->getDTypeByteSize(TY_vec_ety(this));
-}
-
-
-//Return byte size of element.
-UINT Type::getVectorElemSize(TypeMgr const* tm) const
-{
-    return tm->getDTypeByteSize(TY_vec_ety(this));
-}
-
-
-//Return element type of element.
-DATA_TYPE Type::getVectorElemType() const
-{
-    return TY_vec_ety(this);
-}
-
-
-//Return element type of element.
-DATA_TYPE Type::getStreamElemType() const
-{
-    return TY_vec_ety(this);
-}
-
-
-void Type::dump(TypeMgr const* tm) const
-{
-    tm->dump_type(this);
 }
 //END Type
 

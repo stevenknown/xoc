@@ -100,6 +100,12 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator);
 //e.g: Given string is a\b\c, separator is '\', return a;
 void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 
+//Extract the bit value from 'val' by given range that between 'start' bit
+//position and 'end' bit position.
+//The bit position start at 0.
+//e.g: Given start is 2, end is 4, val is 0b110101111, return 0b010.
+ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end);
+
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
 
@@ -153,15 +159,15 @@ UINT getPowerOf2(ULONGLONG v);
 
 //Extract file suffix.
 //e.g: Given a.foo, return foo.
-CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl);
+CHAR * getFileSuffix(CHAR const* n, OUT CHAR * buf, UINT bufl);
 
 //Extract file path.
 //e.g: Given /xx/yy/zz.file, return /xx/yy
-CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl);
+CHAR * getFilePath(CHAR const* n, OUT CHAR * buf, UINT bufl);
 
 //Extract file name.
 //e.g: Given /xx/yy/zz.foo, return zz.
-CHAR * getfilename(CHAR const* n, OUT CHAR * buf, UINT bufl);
+CHAR * getFileName(CHAR const* n, OUT CHAR * buf, UINT bufl);
 
 //Get current micro-second.
 ULONGLONG getusec();
@@ -183,6 +189,9 @@ inline UINT32 hash32bit(UINT32 n)
     n = (n^0xb55a4f09) ^ (n>>16);
     return n;
 }
+
+//Return true if val excede the range that can be described with 'bitsize'.
+bool isExcedeBitWidth(ULONGLONG val, UINT bitwidth);
 
 //Judge if 'f' is integer conform to IEEE754 spec.
 bool isIntegerF(float f);
@@ -263,7 +272,7 @@ CHAR * xsprintf(MOD CHAR * buf, UINT buflen, CHAR const* format, ...);
 //e.g: cl = '1','2','3','4','5'
 //return 12345.
 //'is_oct': if true, nptr is octal digits.
-LONGLONG xatoll(CHAR const* nptr, bool is_oct);
+LONGLONG xatoll(CHAR const* nptr, bool is_oct = false);
 
 //Convert char value into binary.
 //e.g: char p = ' '; p is blank.
@@ -302,8 +311,19 @@ void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
 //Return true if 'c' is blank space or TAB character.
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
 
-//Return true if 'c' is decimal.
+//Return true if char 'c' is decimal.
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
+
+//Return true if string 'str' is decimal.
+inline bool xisdigit(CHAR const* str)
+{
+    for (; *str != 0; str++) {
+        if (!xisdigit(*str)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 //Return true if 'c' is hex decimal.
 inline bool xisdigithex(CHAR d)

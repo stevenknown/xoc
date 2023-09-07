@@ -42,7 +42,7 @@ VarFlagDesc const g_varflag_desc[] = {
     { VAR_PRIVATE, "private", }, //idx3
     { VAR_READONLY, "readonly", }, //idx4
     { VAR_VOLATILE, "volatile", }, //idx5
-    { VAR_HAS_INIT_VAL, "has_init_val", }, //idx6
+    { VAR_HAS_INIT_VAL, "hasInitVal", }, //idx6
     { VAR_FAKE, "fake", }, //idx7
     { VAR_IS_LABEL, "label", }, //idx8
     { VAR_IS_FUNC, "func", }, //idx9
@@ -54,6 +54,8 @@ VarFlagDesc const g_varflag_desc[] = {
     { VAR_IS_RESTRICT, "restrict", }, //idx15
     { VAR_IS_UNALLOCABLE, "unallocable", }, //idx16
     { VAR_IS_DECL, "decl", }, //idx17
+    { VAR_IS_VISIBLE, "visible", }, //idx18
+    { VAR_IS_REGION, "region", }, //idx19
 };
 static UINT g_varflag_num = sizeof(g_varflag_desc) / sizeof(g_varflag_desc[0]);
 
@@ -69,6 +71,7 @@ static VAR_FLAG g_grmode_flag[] = {
     VAR_FAKE,
     VAR_IS_LABEL,
     VAR_IS_ARRAY,
+    VAR_IS_VISIBLE,
 };
 static UINT g_grmode_flag_num = sizeof(g_grmode_flag) /
                                 sizeof(g_grmode_flag[0]);
@@ -96,7 +99,7 @@ CHAR const* VarFlagDesc::getName(VAR_FLAG flag)
 {
     if (flag == VAR_UNDEF) { return g_varflag_desc[0].name; }
     VarFlag v(flag);
-    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    xcom::ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
     ASSERT0(bs.get_elem_count() == 1);
     UINT idx = bs.get_first() + 1;
     ASSERT0(idx < g_varflag_num);
@@ -108,7 +111,7 @@ UINT VarFlagDesc::getDescIdx(VAR_FLAG flag)
 {
     if (flag == VAR_UNDEF) { return 0; }
     VarFlag v(flag);
-    ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
+    xcom::ROBitSet bs((BYTE const*)&v.getFlagSet(), v.getFlagSetSize());
     ASSERT0(bs.get_elem_count() == 1);
     UINT idx = bs.get_first() + 1;
     ASSERT0(idx < g_varflag_num);
@@ -165,6 +168,7 @@ Var::Var() : varflag(VAR_UNDEF)
     VAR_type(this) = UNDEF_TYID;
     VAR_name(this) = nullptr;
     VAR_string(this) = nullptr;
+    VAR_storage_space(this) = SS_UNDEF;
     VAR_flag(this).clean(); //Record various properties of variable.
     align = 0;
 }
@@ -210,25 +214,17 @@ void Var::dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const
 }
 
 
-void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
+void Var::dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const
 {
-    bool first = true;
-    dumpFlag(buf, grmode, first);
-    if (get_align() > 1) {
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("align(%d)", get_align());
-    }
-    if (is_string() && getString() != nullptr) {
+    if (hasInitString()) {
+        ASSERT0(is_string());
         if (!first) {
             buf.strcat(",");
         }
         first = false;
 
         //Add back-slash to translate '"' and '\\'.
-        CHAR const* local_string = SYM_name(getString());
+        CHAR const* local_string = getString()->getStr();
         UINT quote_num = 0;
         UINT len = 0;
         for (CHAR const* p = local_string; *p != 0; p++, len++) {
@@ -260,7 +256,11 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
             len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
             ::free(local_buf);
         }
-    } else if (has_init_val()) {
+        return;
+    }
+    if (hasInitVal()) {
+        ASSERTN(!is_string(),
+                ("initial string value should be recorded in VAR_string"));
         ASSERT0(getByteValue());
         //Initial value can NOT be nullptr.
         if (!first) {
@@ -278,6 +278,21 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
         }
         buf.strcat(")");
     }
+}
+
+
+void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
+{
+    bool first = true;
+    dumpFlag(buf, grmode, first);
+    if (get_align() > 1) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("align(%d)", get_align());
+    }
+    dumpInitVal(first, buf, grmode);
 }
 
 
@@ -330,6 +345,11 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
         }
     }
 
+    if (getStorageSpace() != SS_UNDEF) {
+        buf.strcat(",storage_space:%s",
+                   StorageSpaceDesc::getName(getStorageSpace()));
+    }
+
     buf.strcat(",decl:'");
     dumpVARDecl(buf);
     buf.strcat("'");
@@ -348,7 +368,7 @@ void VarMgr::destroyVar(Var * v)
     ASSERT0(v->id() != VAR_ID_UNDEF);
     m_freelist_of_varid.bunion(v->id(), *m_ru_mgr->get_sbs_mgr());
     m_var_vec.set(v->id(), nullptr);
-    if (v->is_string() && v->getString() != nullptr) {
+    if (v->is_string() && v->hasInitString()) {
         //User may declare a empty string.
         //e.g: var gc:str:(fake,align(4));
         m_str_tab.remove(v->getString());
@@ -408,13 +428,8 @@ Var * VarMgr::findVarByName(Sym const* name)
 }
 
 
-//Add Var into VarTab.
-//Note you should call this function cafefully, and make sure
-//the Var is unique. This function does not keep the uniqueness
-//related to properties.
-//'var_name': name of the variable, it is optional.
 Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
-                          UINT flag)
+                          VarFlag const& flag)
 {
     ASSERT0(varname);
     Sym const* sym = m_ru_mgr->addToSymbolTab(varname);
@@ -422,13 +437,8 @@ Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
 }
 
 
-//Add Var into VarTab.
-//Note you should call this function cafefully, and make sure
-//the Var is unique. This function does not keep the uniqueness
-//related to properties.
-//'var_name': name of the variable, it is optional.
 Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
-                          UINT flag)
+                          VarFlag const& flag)
 {
     ASSERT0(type);
     ASSERTN(var_name, ("variable need a name"));
@@ -446,11 +456,6 @@ Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
 }
 
 
-//Register Var for const string.
-//Return Var if there is already related to 's',
-//otherwise create a new Var.
-//'var_name': name of the variable, it is optional.
-//'s': string's content.
 Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
 {
     ASSERT0(s);

@@ -66,7 +66,14 @@ public:
     //Sort vertice by RPO order, and update rpo of vertex.
     //Record sorted vertex into vlst in incremental order of RPO.
     //NOTE: rpo start at RPO_INIT_VAL.
-    void computeRPO(Graph const* g, Vertex * root, OUT RPOVexList & vlst);
+    void computeRPO(Graph const& g, MOD Vertex * root, OUT RPOVexList & vlst);
+
+    //Free RPO for next allocation.
+    void freeRPO(RPOVal rpo)
+    {
+        ASSERT0(rpo != RPO_UNDEF);
+        m_used_rpo.remove(rpo);
+    }
 
     //Return true if rpo is available to assign to a new vertex.
     //And the rpo will not repeat with other vertex.
@@ -78,7 +85,7 @@ public:
 
     //Return true if find an order of RPO for 'v' that less than order of 'ref'.
     bool tryFindLessRPO(Vertex * v, Vertex const* ref);
-    
+
     //Try to find an usable RPO that is between 'begin' and 'end'.
     //Note the algorithm has assigned positive integers as RPO to each vertex
     //by every RPO_INTERVAL numbers. These assigned integers are regarded as

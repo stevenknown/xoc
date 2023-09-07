@@ -39,8 +39,8 @@ namespace xoc {
 Region * IPA::findRegion(IR * call, Region * callrg)
 {
     ASSERT0(call->is_call());
-    CallGraph * cg = m_rumgr->getCallGraph();
-    ASSERT0(cg);
+    CallGraph * cg = m_program->getCallGraph();
+    ASSERTN(cg, ("IPA need call-graph"));
     CallNode * callercn = cg->mapRegion2CallNode(callrg);
     ASSERTN(callercn, ("caller is not on graph"));
 
@@ -50,7 +50,7 @@ Region * IPA::findRegion(IR * call, Region * callrg)
     ASSERT0(cg->getVertex(CN_id(callercn)));
     for (xcom::EdgeC const* ec = cg->getVertex(CN_id(callercn))->getOutList();
          ec != nullptr; ec = ec->get_next()) {
-        CallNode * calleecn = cg->mapId2CallNode(ec->getToId());
+        CallNode * calleecn = cg->getCallNode(ec->getToId());
         ASSERT0(calleecn);
 
         Region * callee = CN_ru(calleecn);
@@ -138,18 +138,15 @@ void IPA::computeCallRefForAllRegion()
              rg->getBBList()->get_elem_count() == 0)) {
             continue;
         }
-
         rg->initPassMgr();
         rg->initIRMgr();
-        AliasAnalysis * aa = (AliasAnalysis*)rg->getPassMgr()->
-            registerPass(PASS_AA);
-        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
-            registerPass(PASS_DU_MGR);
+        rg->initIRBBMgr();
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->computeCallRef(DUOptFlag(DUOPT_COMPUTE_PR_DU|
                                         DUOPT_COMPUTE_NONPR_DU));
-        rg->getPassMgr()->destroyPass(dumgr);
-        rg->getPassMgr()->destroyPass(aa);
+        rg->getPassMgr()->destroyRegisteredPass(PASS_DU_MGR);
+        rg->getPassMgr()->destroyRegisteredPass(PASS_AA);
     }
     END_TIMER(t, "Compute CallRef for all regions");
 }
@@ -166,7 +163,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != nullptr) {
-                rg->getPassMgr()->destroyPass(PASS_DU_MGR);
+                rg->getPassMgr()->destroyRegisteredPass(PASS_DU_MGR);
             }
         }
     }
@@ -191,6 +188,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
         rg->initIRMgr();
+        rg->initIRBBMgr();
     }
     if (!oc.is_aa_valid()) {
         //DUMgr requires AliasAnalysis
@@ -202,19 +200,26 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
             rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
                                                      PASS_CFG, PASS_UNDEF);
         }
-
-        //Compute typical PR du chain.
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->perform(oc, DUOptFlag(DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU));
         dumgr->computeMDDUChain(oc, false, DUOptFlag(DUOPT_COMPUTE_PR_DU));
-
+        bool rmprdu = false;
+        bool rmnonprdu = false;
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
             PASS_MDSSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);
+            //If SSA is enabled, disable classic DU Chain.
+            //Since we do not maintain both them as some passes.
+            //e.g:In RCE, remove PHI's operand will not update the
+            //operand DEF's DUSet.
+            //CASE:compiler.gr/alias.loop.gr
+            oc.setInvalidNonPRDU();
+            rmnonprdu = true;
         }
+        xoc::removeClassicDUChain(rg, rmprdu, rmnonprdu);
         return;
     }
 
@@ -250,7 +255,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 bool IPA::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    ASSERT0(OC_is_callg_valid(oc));
+    ASSERT0(oc.is_callgraph_valid());
     ASSERT0(m_program && m_program->is_program());
     createCallDummyuse(oc);
     END_TIMER(t, getPassName());

@@ -376,8 +376,8 @@ bool RefHashFunc::compareArray(IR * t1, IR * t2) const
     ASSERT0(m_gvn);
     if (t1 == t2) { return true; }
 
-    VN const* vn1 = m_gvn->getConstVN(ARR_base(t1));
-    VN const* vn2 = m_gvn->getConstVN(ARR_base(t2));
+    VN const* vn1 = m_gvn->getVN(ARR_base(t1));
+    VN const* vn2 = m_gvn->getVN(ARR_base(t2));
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -390,8 +390,8 @@ bool RefHashFunc::compareArray(IR * t1, IR * t2) const
     IR * s2 = ARR_sub_list(t2);
     for (; s1 != nullptr && s2 != nullptr;
          s1 = IR_next(s1), s2 = IR_next(s2)) {
-        VN const* vn1 = m_gvn->getConstVN(s1);
-        VN const* vn2 = m_gvn->getConstVN(s2);
+        VN const* vn1 = m_gvn->getVN(s1);
+        VN const* vn2 = m_gvn->getVN(s2);
         if (vn1 == nullptr || vn1 != vn2) {
             return false;
         }
@@ -415,8 +415,8 @@ bool RefHashFunc::compareIndirectAccess(IR * t1, IR * t2) const
     IR const* base2 = t2->getBase();
     ASSERT0(base2);
 
-    VN const* vn1 = m_gvn->getConstVN(base1);
-    VN const* vn2 = m_gvn->getConstVN(base2);
+    VN const* vn1 = m_gvn->getVN(base1);
+    VN const* vn2 = m_gvn->getVN(base2);
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -431,8 +431,8 @@ bool RefHashFunc::compareDirectAccess(IR * t1, IR * t2) const
     ASSERT0(m_gvn);
     if (t1 == t2) { return true; }
 
-    VN const* vn1 = m_gvn->getConstVN(t1);
-    VN const* vn2 = m_gvn->getConstVN(t2);
+    VN const* vn1 = m_gvn->getVN(t1);
+    VN const* vn2 = m_gvn->getVN(t2);
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -533,7 +533,6 @@ void DelegateMgr::collectOutsideLoopDefUse(IR const* occ, IR const* delegate,
                                            LI<IRBB> const* li)
 {
     ASSERT0(occ->isMemRefNonPR());
-    ASSERTN(occ->getSSAInfo() == nullptr, ("should not have SSA du"));
     IRSet irset(getSegMgr());
     if (occ->is_exp()) {
         //occ is USE.
@@ -886,7 +885,7 @@ bool RegPromot::handleArrayRef(IN IR * ir, LI<IRBB> const* li,
             }
             //May clobber overlapped access.
         } else if (st == RP_DIFFERENT_ARRAY) { continue; }
- 
+
         //The result can not be promoted.
         //Check the promotable candidates if current stmt modify
         //the related MD.
@@ -1329,8 +1328,8 @@ UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
 
     ASSERT0(m_gvn);
 
-    VN const* vn1 = m_gvn->getConstVN(base1);
-    VN const* vn2 = m_gvn->getConstVN(base2);
+    VN const* vn1 = m_gvn->getVN(base1);
+    VN const* vn2 = m_gvn->getVN(base2);
     if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
 
     UINT tysz1 = ref1->getTypeSize(m_tm);
@@ -1393,8 +1392,6 @@ bool RegPromot::scanStmt(IR * ir, LI<IRBB> const* li,
         }
         return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
     }
-    SWITCH_CASE_WRITE_PR:
-        return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
     SWITCH_CASE_WRITE_ARRAY:
     SWITCH_CASE_INDIRECT_MEM_STMT: {
         bool added = false;
@@ -1416,6 +1413,7 @@ bool RegPromot::scanStmt(IR * ir, LI<IRBB> const* li,
         return scanIRTreeList(ir->getRHS(), li, exact_tab, inexact_tab);
     }
     case IR_RETURN:
+    SWITCH_CASE_WRITE_PR:
     SWITCH_CASE_BRANCH_OP:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
@@ -1730,7 +1728,7 @@ void RegPromot::handleExpInBody(IR * occ, IR const* delegate,
     ASSERT0_DUMMYUSE(r);
 
     pr->copyAI(occ, m_rg);
-    m_gvn->setVN(pr, m_gvn->getVN(occ));
+    m_gvn->copyVN(pr, occ);
 
     //DU chain between init-stmt and delegated-pr will be maintained in
     //addDUChainForInitDef().
@@ -1772,13 +1770,12 @@ void RegPromot::handleStmtInBody(IR * occ, IR const* delegate,
     IR * occrhs = occ->getRHS();
     occ->setRHS(nullptr); //Do NOT remove the DU chain of RHS of occ.
     xoc::removeStmt(occ, m_rg, *ctx.oc);
-    
     //Substitute STPR for writing memory.
     IR * stpr = m_rg->getIRMgr()->buildStorePR(PR_no(delegate_pr),
                                                delegate_pr->getType(), occrhs);
     m_rg->getMDMgr()->allocRef(stpr);
     stpr->copyAI(occ, m_rg);
-    m_gvn->setVN(stpr, m_gvn->getVN(occ));
+    m_gvn->copyVN(stpr, occ);
 
     IRBB * refbb = occ->getBB();
     ASSERT0(refbb);
@@ -1825,7 +1822,6 @@ void RegPromot::handlePrologForStmt(IR const* delegate, IR const* promoted_pr,
         MDSSAInfo const* rhsinfo = m_mdssamgr->genMDSSAInfo(rhs);
         ASSERT0_DUMMYUSE(rhsinfo->readVOpndSet().is_empty());
     }
- 
     //Load value into PR.
     IR * stpr = delemgr.genInitStmt(delegate, rhs);
     BBIRList & irs = preheader->getIRList();
@@ -1911,8 +1907,16 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
 {
     if (!usePRSSADU()) { return false; }
     PRSSARegion ssarg(getSBSMgr(), ctx.oc);
+
+    //Add all BB of loop to PRSSARegion.
     ssarg.add(*li->getBodyBBSet());
-    ssarg.setRootBB(preheader);
+
+    //Set root of PRSSARegion.
+    ASSERT0(ctx.domtree);
+    ssarg.setRootBB(ssarg.findRootBB(*ctx.domtree, m_rg, preheader));
+
+    //Add STPR/PR which has prno 'deleprno' in init-stmt and restore-stmt
+    //to PRSSARegion.
     RefTab const* deletab = const_cast<DelegateMgr&>(delemgr).getDelegateTab();
     RefTabIter it;
     for (IR const* dele = deletab->get_first(it);
@@ -1931,6 +1935,8 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
             ssarg.add(deleprno, rest);
         }
     }
+
+    //Add all newocc IRs into PRSSARegion.
     Occ2OccIter occit;
     IR * newocc = nullptr;
     for (IR * occ = occ2newocc.get_first(occit, &newocc);
@@ -1940,13 +1946,15 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
     }
 
     if (m_cfg->get_dom_set(preheader->id()) == nullptr) {
-        //preheader is just inserted, SSA needs its domset.        
+        //preheader is just inserted, SSA needs its domset.
         ctx.oc->setInvalidDom();
         ctx.oc->setInvalidPDom();
         m_rg->getPassMgr()->checkValidAndRecompute(ctx.oc, PASS_DOM,
                                                    PASS_UNDEF);
     }
-    ASSERT0(ctx.domtree);
+
+    //Infer and add those BBs that should be also handled in PRSSA construction.
+    ssarg.inferAndAddRelatedBB(m_rg, m_cfg);
     m_prssamgr->constructDesignatedRegion(ssarg, *ctx.domtree);
     OC_is_pr_du_chain_valid(*ctx.oc) = false;
     return true;
@@ -1963,22 +1971,30 @@ bool RegPromot::buildPRSSADUChainForExactAcc(IR const* dele,
                                              MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    IR const* pr = delemgr.getPR(dele);
-    ASSERT0(pr && m_prssamgr);
-    PRNO deleprno = pr->getPrno();
     PRSSARegion ssarg(getSBSMgr(), ctx.oc);
+
+    //Add all BB of loop to PRSSARegion.
     ssarg.add(*li->getBodyBBSet());
+
+    IR const* pr = delemgr.getPR(dele);
+    ASSERT0(pr);
+    PRNO deleprno = pr->getPrno();
     IR * init = delemgr.getInitStmt(dele);
     ASSERT0(init);
-    ssarg.add(deleprno, init);
-    ssarg.setRootBB(init->getBB());
+    //Set root of PRSSARegion.
+    ssarg.setRootBB(ssarg.findRootBB(*ctx.domtree, m_rg, init->getBB()));
 
+    //Add STPR/PR which has prno 'deleprno' in init IR tree to PRSSARegion.
+    ssarg.add(deleprno, init);
+
+    //Add STPR/PR which has prno 'deleprno' in rest IR tree to PRSSARegion.
     IR * rest = delemgr.getRestoreStmt(dele);
     if (rest != nullptr) {
         ASSERT0(rest->getRHS()->isPROp());
         ssarg.add(deleprno, rest);
     }
 
+    //Add all newocc IRs into PRSSARegion.
     Occ2OccIter it;
     IR * newocc = nullptr;
     for (IR * occ = occ2newocc.get_first(it, &newocc);
@@ -1986,9 +2002,14 @@ bool RegPromot::buildPRSSADUChainForExactAcc(IR const* dele,
         ASSERT0(newocc->isPROp());
         ssarg.add(newocc);
     }
+
+    //Infer and add those BBs that should be also handled in PRSSA construction.
+    ssarg.inferAndAddRelatedBB(m_rg, m_cfg);
+
     ASSERTN(m_cfg->get_dom_set(preheader->id()),
             ("dominfo of preheader must have been maintained"));
     ASSERT0(ctx.domtree);
+    ASSERT0(m_prssamgr);
     m_prssamgr->constructDesignatedRegion(ssarg, *ctx.domtree);
     OC_is_pr_du_chain_valid(*ctx.oc) = false;
     return true;
@@ -2416,8 +2437,8 @@ UINT RegPromot::analyzeArrayStatus(IR const* ref1, IR const* ref2)
     if (m_gvn->isSameMemLoc(ref1, ref2)) { return RP_SAME_ARRAY; }
     if (m_gvn->isDiffMemLoc(ref1, ref2)) { return RP_DIFFERENT_ARRAY; }
 
-    VN const* vn1 = m_gvn->getConstVN(base1);
-    VN const* vn2 = m_gvn->getConstVN(base2);
+    VN const* vn1 = m_gvn->getVN(base1);
+    VN const* vn2 = m_gvn->getVN(base2);
     if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
     if (vn1 == vn2) { return RP_SAME_ARRAY; }
     return RP_DIFFERENT_ARRAY;
@@ -2441,7 +2462,7 @@ void RegPromot::checkAndRemoveInvalidExactOcc(ExactAccTab & acctab)
             occs->get_next(&nct);
             MD const* md = occ->getMustRef();
             ASSERT0_DUMMYUSE(md && md->is_exact());
- 
+
             //We record all MD that are not suitable for promotion in
             //m_dont_promote, and remove all related OCC in exact_list.
             //The MD of promotable candidate must not overlapped each other.
@@ -2511,6 +2532,7 @@ bool RegPromot::tryPromoteLoop(LI<IRBB> const* li, IRIter & ii,
         ctx.buildDomTree(m_cfg);
     }
     promote(li, exit_bb, preheader, ii, exact_tab, inexact_tab, ctx);
+
     //promote() has maintaind PRSSA and MDSSA.
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg));
     ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *ctx.oc));
@@ -2649,7 +2671,10 @@ bool RegPromot::perform(OptCtx & oc)
         //At least one kind of DU chain should be available.
         return false;
     }
-
+    if (!usePRSSADU() || !useMDSSADU()) {
+        //Classic DU is costly.
+        return false;
+    }
     START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
                                                PASS_UNDEF);
@@ -2676,20 +2701,6 @@ bool RegPromot::perform(OptCtx & oc)
     }
     //buildLifeTime();
     RPCtx ctx(&oc);
-    bool prssa_valid = usePRSSADU();
-    bool mdssa_valid = useMDSSADU();
-    if (!prssa_valid && g_do_prssa) {
-        m_prssamgr->perform(oc);
-    } else {
-        //Classic DU is costly.
-       return false;
-    }
-    if (!mdssa_valid && g_do_mdssa) {
-        m_mdssamgr->perform(oc);
-    } else {
-        //Classic DU is costly.
-        return false;
-    }
     bool change = EvaluableScalarReplacement(worklst, ctx);
     if (change) {
         //DU reference and du chain has maintained.
@@ -2699,8 +2710,8 @@ bool RegPromot::perform(OptCtx & oc)
         //Enforce following pass to recompute gvn.
         m_gvn->set_valid(false);
         oc.setInvalidIfDUMgrLiveChanged();
-        ASSERT0(!prssa_valid || PRSSAMgr::verifyPRSSAInfo(m_rg));
-        ASSERT0(!mdssa_valid || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+        ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
         ASSERT0(m_cfg->verifyRPO(oc));
         ASSERT0(m_cfg->verifyLoopInfo(oc));
         ASSERT0(m_cfg->verifyDomAndPdom(oc));

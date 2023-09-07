@@ -137,6 +137,7 @@ public:
               BSIdx last_pos = BS_UNDEF) const;
 
     //Dump bit value and position.
+    void dump(FileObj & fo, UFlag flag, BSIdx last_pos) const;
     void dump(FILE * h, UFlag flag, BSIdx last_pos) const;
 
     //Dump bit value and position.
@@ -560,7 +561,7 @@ public:
         smpoolDelete(m_pool);
         m_pool = nullptr;
     }
-    void dump(FILE * h);
+    void dump(FileObj & fo);
 
     inline void free(IN BSVec<T> * bs) //free bs for next use.
     {
@@ -570,9 +571,9 @@ public:
     }
 };
 
-template <class T> void BSVecMgr<T>::dump(FILE * h)
+template <class T> void BSVecMgr<T>::dump(FileObj & fo)
 {
-    if (h == nullptr) { return; }
+    if (fo.getFileHandler() == nullptr) { return; }
 
     //Dump mem usage into file.
     List<UINT> lst;
@@ -594,25 +595,23 @@ template <class T> void BSVecMgr<T>::dump(FILE * h)
         }
     }
     UINT v = lst.get_head();
-    fprintf(h, "\n== DUMP BitSetMgr: total %d "
-               "bitsets, mem usage are:\n",
-               m_bs_list.get_elem_count());
+    fo.prt("\n== DUMP BitSetMgr: total %d bitsets, mem usage are:\n",
+           m_bs_list.get_elem_count());
     UINT b = 0;
     UINT n = lst.get_elem_count();
     for (UINT i = 0; i < n; i++, v = lst.get_next(), b++) {
         if (b == 20) {
-            fprintf(h, "\n");
+            fo.prt("\n");
             b = 0;
         }
         if (v < 1024) {
-            fprintf(h, "%dB,", v);
+            fo.prt("%dB,", v);
         } else if (v < 1024 * 1024) {
-            fprintf(h, "%dKB,", v/1024);
+            fo.prt("%dKB,", v/1024);
         } else {
-            fprintf(h, "%dMB,", v/1024/1024);
+            fo.prt("%dMB,", v/1024/1024);
         }
     }
-    fflush(h);
 }
 //END BSVecMgr
 

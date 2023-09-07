@@ -44,7 +44,6 @@ protected:
 protected:
     Var * addVarForBuiltin(CHAR const* name);
     void initBuiltin();
-
 public:
     DexRegionMgr()
     { m_pool = smpoolCreate(128, MEM_COMM); }
@@ -59,7 +58,7 @@ public:
     virtual CallGraph * allocCallGraph(UINT vexnum)
     { return new DexCallGraph(vexnum, this); }
 
-    Region * getProgramRegion()
+    virtual Region * getProgramRegion() const
     {
         //The first region should be program-region.
         return getRegion(1);

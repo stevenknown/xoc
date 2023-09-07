@@ -69,10 +69,10 @@ void MDSSALiveMgr::clean()
 VMD * MDSSALiveMgr::getLiveinVMD(MDIdx mdid, IRBB const* bb) const
 {
     ASSERT0(0);
-    return nullptr; 
+    return nullptr;
 }
 
- 
+
 bool MDSSALiveMgr::perform(OptCtx & oc)
 {
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);

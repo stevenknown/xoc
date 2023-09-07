@@ -48,7 +48,7 @@ class RegionMgr;
 
 #define IS_INT(t) ((t) >= D_I8 && (t) <= D_U128)
 #define IS_SINT(t) ((t) >= D_I8 && (t) <= D_I128)
-#define IS_FP(t) ((t) >= D_F32 && (t) <= D_F128)
+#define IS_FP(t) ((t) >= D_F16 && (t) <= D_F128)
 #define IS_BOOL(t) ((t) == D_B)
 #define IS_MC(t) ((t) == D_MC)
 #define IS_VEC(t) ((t) == D_VEC)
@@ -56,6 +56,38 @@ class RegionMgr;
 #define IS_PTR(t) ((t) == D_PTR)
 #define IS_SIMPLEX(t) (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
                       t == D_STR || t == D_ANY)
+
+#define SWITCH_CASE_FP_DTYPE \
+    case D_F16: \
+    case D_F32: \
+    case D_F64: \
+    case D_F80: \
+    case D_F128
+
+#define SWITCH_CASE_SINT_DTYPE \
+    case D_I8: \
+    case D_I16: \
+    case D_I32: \
+    case D_I64: \
+    case D_I128
+
+#define SWITCH_CASE_UINT_DTYPE \
+    case D_U8: \
+    case D_U16: \
+    case D_U32: \
+    case D_U64: \
+    case D_U128
+
+#define SWITCH_CASE_INT_DTYPE \
+    SWITCH_CASE_SINT_DTYPE: \
+    SWITCH_CASE_UINT_DTYPE
+
+#define SWITCH_CASE_SIMPLEX_DTYPE \
+    SWITCH_CASE_INT_DTYPE: \
+    SWITCH_CASE_FP_DTYPE: \
+    case D_B: \
+    case D_STR: \
+    case D_ANY
 
 //Data Type, represented with bit length.
 //
@@ -71,37 +103,34 @@ typedef enum _DATA_TYPE {
     D_UNDEF = 0,
 
     //Note the type between D_B and D_U128 must be integer.
-    D_B = 1, //Boolean
-    D_I8 = 2, //Signed integer 8 bit
-    D_I16 = 3,
-    D_I32 = 4,
-    D_I64 = 5,
-    D_I128 = 6,
-    D_U8 = 7, //Unsigned integer 8 bit
-    D_U16 = 8,
-    D_U32 = 9,
-    D_U64 = 10,
-    D_U128 = 11,
+    D_B, //Boolean
+    D_I8, //Signed integer 8 bit
+    D_I16,
+    D_I32,
+    D_I64,
+    D_I128,
+    D_U8, //Unsigned integer 8 bit
+    D_U16,
+    D_U32,
+    D_U64,
+    D_U128,
 
     //Float type.
-    D_F32 = 12, //Float point 32 bit
-    D_F64 = 13, //Float point 64 bit
-    D_F80 = 14, //Float point 96 bit
-    D_F128 = 15, //Float point 128 bit
+    D_F16, //Float point 16 bit
+    D_F32, //Float point 32 bit
+    D_F64, //Float point 64 bit
+    D_F80, //Float point 96 bit
+    D_F128, //Float point 128 bit
+    //NOTE ALL ABOVE TYPES ARE SCALAR.
 
-    //Note all above types are scalar.
-
-    D_MC = 16, //MemoryChunk, used to represent structure/union/block type.
-    D_STR = 17, //String
-    D_PTR = 18, //Pointer
-    D_VEC = 19, //Vector
-    D_ANY = 20, //Any
-    D_TENSOR = 21, //Tensor
-    D_STREAM = 22, //Stream
-    D_LAST = 23,
-    ///////////////////////////////////////////////////////////////////////////
-    //Note:Extend IR::rtype bit length if it extends type value large than 31//
-    ///////////////////////////////////////////////////////////////////////////
+    D_MC, //MemoryChunk, used to represent structure/union/block type.
+    D_STR, //String
+    D_PTR, //Pointer
+    D_VEC, //Vector
+    D_ANY, //Any
+    D_TENSOR, //Tensor
+    D_STREAM, //Stream
+    D_LAST,
 } DATA_TYPE;
 
 class TypeDesc {
@@ -157,23 +186,26 @@ public:
     Type() { data_type = D_UNDEF; }
 
     void copy(Type const& src) { data_type = src.data_type; }
-    
-    void dump(TypeMgr const* tm) const;
 
-    //Return the number of elements in the vector.
-    UINT getVectorElemNum(TypeMgr const* tm) const;
+    inline void dump(TypeMgr const* tm) const;
 
     //Return data type.
     DATA_TYPE getDType() const { return TY_dtype(this); }
 
+    //Return the number of elements in the vector.
+    inline UINT getVectorElemNum(TypeMgr const* tm) const;
+
+    //Return element data-type of element.
+    inline DATA_TYPE getVectorElemDType() const;
+
     //Return element type of element.
-    DATA_TYPE getVectorElemType() const;
+    inline Type const* getVectorElemType(TypeMgr const* tm) const;
 
     //Return byte size of element.
-    UINT getVectorElemSize(TypeMgr const* tm) const;
+    inline UINT getVectorElemSize(TypeMgr const* tm) const;
 
     //Return element type of element.
-    DATA_TYPE getStreamElemType() const;
+    inline DATA_TYPE getStreamElemType() const;
 
     //Return true if data type is simplex type.
     bool is_simplex() const { return IS_SIMPLEX(TY_dtype(this)); }
@@ -211,6 +243,7 @@ public:
     bool is_u32() const { return TY_dtype(this) == D_U32; }
     bool is_u64() const { return TY_dtype(this) == D_U64; }
     bool is_u128() const { return TY_dtype(this) == D_U128; }
+    bool is_f16() const { return TY_dtype(this) == D_F16; }
     bool is_f32() const { return TY_dtype(this) == D_F32; }
     bool is_f64() const { return TY_dtype(this) == D_F64; }
     bool is_f128() const { return TY_dtype(this) == D_F128; }
@@ -223,7 +256,7 @@ public:
     inline bool is_signed() const
     {
         if ((TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128) ||
-            (TY_dtype(this) >= D_F32 && TY_dtype(this) <= D_F128)) {
+            (TY_dtype(this) >= D_F16 && TY_dtype(this) <= D_F128)) {
             return true;
         }
         return false;
@@ -255,10 +288,11 @@ public:
 
     //Return true if ir data type is float.
     bool is_fp() const
-    { return TY_dtype(this) >= D_F32 && TY_dtype(this) <= D_F128; }
+    { return TY_dtype(this) >= D_F16 && TY_dtype(this) <= D_F128; }
 
     //Return true if the type can be used to represent the
-    //pointer's addend. e.g:The pointer arith, int * p; p = p + (type)value.
+    //pointer's addend.
+    //e.g:The pointer arith, int * p; p = p + (type)value. value is addend.
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
 
@@ -404,11 +438,15 @@ public:
 class CompareTypeMC {
 public:
     bool is_less(Type const* t1, Type const* t2) const
-    { return TY_mc_size(t1) < TY_mc_size(t2); }
-
+    {
+        ASSERT0(t1 && t2);
+        return TY_mc_size(t1) < TY_mc_size(t2);
+    }
     bool is_equ(Type const* t1, Type const* t2) const
-    { return TY_mc_size(t1) == TY_mc_size(t2); }
-
+    {
+        ASSERT0(t1 && t2);
+        return TY_mc_size(t1) == TY_mc_size(t2);
+    }
     Type const* createKey(Type const* t) { return t; }
 };
 
@@ -586,6 +624,7 @@ class TypeMgr {
     Type const* m_u32;
     Type const* m_u64;
     Type const* m_u128;
+    Type const* m_f16;
     Type const* m_f32;
     Type const* m_f64;
     Type const* m_f80;
@@ -648,6 +687,7 @@ public:
         m_u32 = getSimplexType(D_U32);
         m_u64 = getSimplexType(D_U64);
         m_u128 = getSimplexType(D_U128);
+        m_f16 = getSimplexType(D_F16);
         m_f32 = getSimplexType(D_F32);
         m_f64 = getSimplexType(D_F64);
         m_f80 = getSimplexType(D_F80);
@@ -713,14 +753,15 @@ public:
     DATA_TYPE hoistDtype(UINT bit_size, OUT UINT * hoisted_data_size);
     DATA_TYPE hoistDtype(DATA_TYPE stype) const;
 
-    Type const* hoistDtypeForBinop(IR const* opnd0, IR const* opnd1);
+    Type const* hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1);
 
     RegionMgr * getRegionMgr() const { return m_rm; }
 
     //Return DATA_TYPE which 'bitsize' corresponding to
-    inline DATA_TYPE get_fp_dtype(INT bitsize) const
+    DATA_TYPE getFPDType(UINT bitsize) const
     {
         switch (bitsize) {
+        case 16: return D_F16;
         case 32: return D_F32;
         case 64: return D_F64;
         case 128: return D_F128;
@@ -729,14 +770,10 @@ public:
         return D_UNDEF;
     }
 
-    //Return DATA-Type according to given byte size.
-    DATA_TYPE get_uint_dtype(UINT bytesize) const
-    { return get_int_dtype(bytesize * BIT_PER_BYTE, false); }
-
-    //Return DATA-Type according to given bit size and sign.
+    //Return Data-Type according to given bit size and sign.
     //If bitsize is not equal to 1, 8, 16, 32, 64, 128, this
     //function will return D_MC.
-    DATA_TYPE get_int_dtype(UINT bitsize, bool is_signed) const
+    DATA_TYPE getIntDType(UINT bitsize, bool is_signed) const
     {
         switch (bitsize) {
         case 1: return D_B;
@@ -750,21 +787,32 @@ public:
         return D_MC;
     }
 
+    Type const* getFPType(UINT bitsize) const
+    { return getSimplexTypeEx(getFPDType(bitsize)); }
+
     //Return Integer Type according to given bit size and sign.
     //e.g: given bitsize is 32, is_signed is true, return D_I32 type.
     Type const* getIntType(UINT bitsize, bool is_signed) const
-    { return getSimplexTypeEx(get_int_dtype(bitsize, is_signed)); }
+    { return getSimplexTypeEx(getIntDType(bitsize, is_signed)); }
+
+    //Return Unsigned Integer Data-Type according to given byte size.
+    DATA_TYPE getUIntDType(UINT bytesize) const
+    { return getIntDType(bytesize * BIT_PER_BYTE, false); }
+
+    //Return Signed Integer Data-Type according to given byte size.
+    DATA_TYPE getSIntDType(UINT bytesize) const
+    { return getIntDType(bytesize * BIT_PER_BYTE, true); }
 
     //Return Unsigned Integer or MemoryChunk Type according to given byte size.
     Type const* getUIntType(UINT bytesize)
     {
-        DATA_TYPE dt = get_int_dtype(bytesize * BITS_PER_BYTE, false);
+        DATA_TYPE dt = getIntDType(bytesize * BITS_PER_BYTE, false);
         return dt == D_MC ? getMCType(bytesize) : getSimplexTypeEx(dt);
     }
 
-    //Return DATA-Type according to given bit size and sign.
+    //Return Data-Type according to given bit size and sign.
     //Note the bit size will be aligned to power of 2.
-    DATA_TYPE getDType(UINT bit_size, bool is_signed) const
+    DATA_TYPE getAlignedDType(UINT bit_size, bool is_signed) const
     { return hoistBSdtype(bit_size, is_signed); }
 
     //Return bits size of 'dtype' refers to.
@@ -793,7 +841,7 @@ public:
     //Return DATA-Type that has identical byte-size to pointer.
     //e.g: 32bit processor return U4, 64bit processor return U8.
     DATA_TYPE getPointerSizeDtype() const
-    { return get_int_dtype(BYTE_PER_POINTER * BIT_PER_BYTE, false); }
+    { return getIntDType(BYTE_PER_POINTER * BIT_PER_BYTE, false); }
 
     //Return Type that has identical byte-size to pointer.
     //e.g: 32bit processor return U4, 64bit processor return U8.
@@ -835,6 +883,7 @@ public:
     Type const* getU32() const { return m_u32; }
     Type const* getU64() const { return m_u64; }
     Type const* getU128() const { return m_u128; }
+    Type const* getF16() const { return m_f16; }
     Type const* getF32() const { return m_f32; }
     Type const* getF64() const { return m_f64; }
     Type const* getF80() const { return m_f80; }
@@ -866,6 +915,7 @@ public:
         case D_U32: return m_u32;
         case D_U64: return m_u64;
         case D_U128: return m_u128;
+        case D_F16: return m_f16;
         case D_F32: return m_f32;
         case D_F64: return m_f64;
         case D_F80: return m_f80;
@@ -879,9 +929,9 @@ public:
 
     //Return the type that represents the general purpose register of
     //target machine.
-    Type const* getTargMachRegisterType() const    
+    Type const* getTargMachRegisterType() const
     {
-        DATA_TYPE dt = getDType(WORD_LENGTH_OF_TARGET_MACHINE, false);
+        DATA_TYPE dt = getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, false);
         Type const* ty = getSimplexTypeEx(dt);
         return ty;
     }
@@ -987,6 +1037,46 @@ public:
     //Return true if data type is Vector.
     bool is_vec(UINT tyid) const { return getType(tyid)->is_vector(); }
 };
+
+
+//
+//START Type
+//
+Type const* Type::getVectorElemType(TypeMgr const* tm) const
+{
+    return tm->getSimplexTypeEx(TY_vec_ety(this));
+}
+
+
+UINT Type::getVectorElemSize(TypeMgr const* tm) const
+{
+    return tm->getDTypeByteSize(TY_vec_ety(this));
+}
+
+
+DATA_TYPE Type::getVectorElemDType() const
+{
+    return TY_vec_ety(this);
+}
+
+
+DATA_TYPE Type::getStreamElemType() const
+{
+    return TY_vec_ety(this);
+}
+
+
+void Type::dump(TypeMgr const* tm) const
+{
+    tm->dump_type(this);
+}
+
+
+UINT Type::getVectorElemNum(TypeMgr const* tm) const
+{
+    return TY_vec_size(this) / tm->getDTypeByteSize(TY_vec_ety(this));
+}
+//END Type
 
 } //namespace xoc
 #endif

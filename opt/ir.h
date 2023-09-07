@@ -51,7 +51,7 @@ class IRCFG;
 
 //The maximum integer value that can described by bits of IR_CODE_BIT_SIZE
 //should larger than IR_CODE_NUM.
-#define IR_CODE_BIT_SIZE 6
+#define IR_CODE_BIT_SIZE 7
 
 //Each IR at same Region has it own unique id.
 #define IR_id(ir) ((ir)->uid)
@@ -74,7 +74,7 @@ class IRCFG;
 //If this flag is true, the code that followed subsequently is unreachable.
 #define IR_is_terminate(ir) ((ir)->is_terminate_control_flow)
 
-//Indicate whether IR is a real operation, e.g:the dummyuse of CallStmt.
+//Indicate whether IR is a real operation, e.g: the dummyuse of CallStmt.
 #define IR_is_dummy(ir) ((ir)->is_dummy_operation)
 
 //Record IR code.
@@ -330,6 +330,10 @@ public:
     UINT getTypeSize(TypeMgr const* tm) const
     { return tm->getByteSize(getType()); }
 
+    //Return bit size of ir data type.
+    UINT getTypeBitSize(TypeMgr const* tm) const
+    { return tm->getByteSize(getType()) * BIT_PER_BYTE; }
+
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
 
     //Return data type descriptor.
@@ -343,6 +347,9 @@ public:
 
     //Return the PR no if exist.
     PRNO getPrno() const;
+
+    //Return the storage space if exist.
+    StorageSpace getStorageSpace() const;
 
     //Return the SSAInfo if exist.
     SSAInfo * getSSAInfo() const;
@@ -417,6 +424,12 @@ public:
     //Return expression if stmt has CASE list.
     IR * getCaseList() const;
 
+    //Return the number of alignment.
+    UINT getAlign() const;
+
+    static CHAR const* getIRName(IR const* ir)
+    { return getIRCodeName(ir->getCode()); }
+    static CHAR const* getIRCodeName(IR_CODE irc) { return IRCNAME(irc); }
     static UINT getIRCodeSize(IR const* ir)
     {
         #ifdef CONST_IRC_SZ
@@ -440,8 +453,15 @@ public:
     //Return true if ir has constant offset.
     bool hasOffset() const { return IRDES_has_offset(g_ir_desc[getCode()]); }
 
+    //Return true if ir has address-alignment property.
+    bool hasAlign() const;
+
     //Return true if ir has idinfo.
     bool hasIdinfo() const { return IRDES_has_idinfo(g_ir_desc[getCode()]); }
+
+    //Return true if ir has stroage space.
+    bool hasStorageSpace() const
+    { return IRDES_has_storage_space(g_ir_desc[getCode()]); }
 
     //Return true if ir has DU Info.
     bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
@@ -623,12 +643,23 @@ public:
 
     //Return true if current ir is binary operation.
     bool isBinaryOp() const { return IRDES_is_bin(g_ir_desc[getCode()]); }
+    static bool isBinaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
 
     //Return true if current ir is unary operation.
     bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[getCode()]); }
+    static bool isUnaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
 
     //Return true if ir is constant expression.
     bool isConstExp() const;
+
+    //Return true if ir is integer immediate.
+    bool isConstInt() const { return is_const() && is_int(); }
+
+    //Return true if ir is float-point immediate.
+    bool isConstFp() const { return is_const() && is_fp(); }
+
+    //Return true if ir is string.
+    bool isConstStr() const { return is_const() && is_str(); }
 
     //Return true if ir is readonly expression or readonly call stmt.
     //If ir is expression, this function indicates that the expression does
@@ -832,6 +863,9 @@ public:
     //Return true if current ir can be placed in BB.
     bool isStmtInBB() const;
 
+    //Return true if current ir operates on memory object with alignged address.
+    bool isAligned() const { return getAlign() != 0; }
+
     //Return true if current stmt must modify 'md'.
     bool isExactDef(MD const* md) const;
     bool isExactDef(MD const* md, MDSet const* mds) const;
@@ -855,6 +889,7 @@ public:
     void setPrnoAndUpdateSSAInfo(PRNO prno);
     void setRHS(IR * rhs);
     void setPrno(PRNO prno);
+    void setStorageSpace(StorageSpace ss);
     void setOffset(TMWORD ofst);
     void setIdinfo(Var * idinfo);
     void setLabel(LabelInfo const* li);
@@ -864,6 +899,7 @@ public:
     void setValExp(IR * exp);
     void setBase(IR * exp);
     void setJudgeDet(IR * exp);
+    void setAlign(UINT align_bytenum);
 
     //Set 'kid' to be 'idx'th child of current ir.
     void setKid(UINT idx, IR * kid);
@@ -891,6 +927,7 @@ public:
     }
     void setType(Type const* ty)
     {
+        ASSERT0(ty);
         ASSERT0(!mustBePointerType() || ty->is_pointer());
         IR_dt(this) = ty;
     }
@@ -913,7 +950,7 @@ public:
         #ifdef CONST_IRC_SZ
         IR_irc_size(ir) = irc_sz;
         #else
-        DUMMYUSE(ir);
+        DUMMYUSE((ir, ircsz));
         #endif
     }
 

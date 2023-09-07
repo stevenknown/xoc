@@ -681,7 +681,7 @@ void AliasAnalysis::inferArrayExpBase(IR * ir, IR * array_base,
     AC_comp_pts(&tic) = false;
 
     inferExpression(array_base, tmp, &tic, mx);
-    
+
     //Acquire TBAA to determine MD reference.
     MD const* typed_md = queryTBAA(array_base);
     if (typed_md != nullptr) {
@@ -942,7 +942,7 @@ void AliasAnalysis::processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
     }
     ic->copyBottomUpFlag(tic);
 
-    ASSERT0(is_legal_set(mds, &tic));
+    ASSERT0_DUMMYUSE(is_legal_set(mds, &tic));
 
     if (mds.is_empty()) {
         ASSERT0(tic.get_hashed());
@@ -1732,7 +1732,7 @@ void AliasAnalysis::processILoad(IR * ir, MOD MDSet & mds,
     //Compute the memory address that ILD described.
     inferExpression(ILD_base(ir), mds, &tic, mx);
 
-    ASSERT0(is_legal_set(mds, &tic));
+    ASSERT0_DUMMYUSE(is_legal_set(mds, &tic));
     if (mds.is_empty()) {
         //Compute ILD ref MDSet and POINT-TO set.
         //If mds is empty, the inaccurate POINT-TO set
@@ -1970,7 +1970,7 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
         inferExpression(rhs, rhsrefmds, &rhsic, mx);
     }
     if (rhsic.is_comp_pts()) {
-        ASSERT0(is_legal_set(rhsrefmds, &rhsic));
+        ASSERT0_DUMMYUSE(is_legal_set(rhsrefmds, &rhsic));
     } else {
         //Both rhs's mds and hashed_mds are empty if RHS is constant.
     }
@@ -2053,14 +2053,14 @@ void AliasAnalysis::processPhiOpndPTS(IR const* ir, bool phi_pts_is_worst,
             tmp.clean(*getSBSMgr());
             continue;
         }
- 
-        ASSERT0(is_legal_set(tmp, &tic));
+
+        ASSERT0_DUMMYUSE(is_legal_set(tmp, &tic));
         if (tmp.is_empty()) {
             ASSERT0(tic.get_hashed());
             phi_pts_is_worst = true;
             continue;
         }
- 
+
         //phi result PR may point to the union set of each operand.
         phi_pts.bunion(tmp, *getSBSMgr());
 
@@ -2357,7 +2357,7 @@ void AliasAnalysis::processIndirectMemOp(MOD IR * ir, IN MD2MDSet * mx)
 
     //Compute where base may point to.
     inferExpression(base, base_maypts, &ic, mx);
-    ASSERT0(is_legal_set(base_maypts, &ic));
+    ASSERT0_DUMMYUSE(is_legal_set(base_maypts, &ic));
 
     //In fact, The POINT-TO set of base-expression indicates what IST
     //may reference.
@@ -2527,7 +2527,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
     //For now, it is only be regarded as a placeholder.
     //And set it to allocable if the var is in essence need to be
     //allocated in memory.
-    tv->setflag(VAR_IS_UNALLOCABLE);
+    tv->setFlag(VAR_IS_UNALLOCABLE);
 
     //Will be freed region destruction.
     m_rg->addToVarTab(tv);
@@ -2698,7 +2698,7 @@ void AliasAnalysis::inferExtExpression(IR * ir, MOD MDSet & mds,
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
-    case IR_BROADCAST: {
+    SWITCH_CASE_EXT_EXP: {
         AACtx tic(*ic);
         AC_comp_pts(&tic) = false;
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -3764,7 +3764,7 @@ MD const* AliasAnalysis::genRestrictDummyVar(Var * var, MD2MDSet * mx)
     //For now, it is only be regarded as a pseduo-register.
     //And set it to allocable if the PR is in essence need to be
     //allocated in memory.
-    tv->setflag(VAR_IS_UNALLOCABLE);
+    tv->setFlag(VAR_IS_UNALLOCABLE);
     m_rg->addToVarTab(tv);
 
     MD md;

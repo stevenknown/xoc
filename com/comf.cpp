@@ -41,6 +41,10 @@ author: Su Zhenyu
 #include "math.h"
 #include "xcominc.h"
 
+#ifndef BITS_PER_BYTE
+#define BITS_PER_BYTE 8
+#endif
+
 namespace xcom {
 
 static CHAR g_hexdigits[] = "0123456789ABCDEF";
@@ -152,7 +156,7 @@ ASCII g_asc1[] = {
 UINT computeMaxBitSizeForValue(ULONGLONG value)
 {
     if (value == 0) { return 1; }
-    UINT bitwidth = sizeof(value) * 8; //Assume BITS_PER_BYTE is 8
+    UINT bitwidth = sizeof(value) * BITS_PER_BYTE;
     UINT half_bitwidth = bitwidth / 2;
     for (; value < computeUnsignedMaxValue<ULONGLONG>(half_bitwidth); ) {
         bitwidth /= 2;
@@ -679,7 +683,7 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align)
 
 //Extract file path.
 //e.g: Given /xx/yy/zz.file, return /xx/yy
-CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
+CHAR * getFilePath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
     if (n == nullptr) { return nullptr; }
 
@@ -736,7 +740,7 @@ void strshift(MOD CHAR * string, INT ofst)
 
 //Extract file name.
 //e.g: Given /xx/yy/zz.foo, return zz.
-CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
+CHAR * getFileName(CHAR const* path, OUT CHAR * buf, UINT bufl)
 {
     DUMMYUSE(bufl);
     if (path == nullptr) { return nullptr; }
@@ -770,7 +774,7 @@ CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 
 //Extract file suffix.
 //e.g: Given a.foo, return foo.
-CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
+CHAR * getFileSuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
     if (n == nullptr) { return nullptr; }
 
@@ -802,6 +806,19 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 
     //Not found method name.
     return p;
+}
+
+
+ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end)
+{
+    ASSERT0(start < sizeof(ULONGLONG) * BITS_PER_BYTE);
+    ASSERT0(end < sizeof(ULONGLONG) * BITS_PER_BYTE);
+    ASSERT0(start <= end);
+    UINT lastbit = sizeof(ULONGLONG) * BITS_PER_BYTE - 1;
+    UINT size = end - start;
+    val = val << (lastbit - end);
+    val = val >> (lastbit - size);
+    return val;
 }
 
 
@@ -885,6 +902,14 @@ INT getFirstOneAtRightSide(INT m)
       31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
     return dbitpos[((UINT)((m & -m) * 0x077CB531U)) >> 27];
+}
+
+
+bool isExcedeBitWidth(ULONGLONG val, UINT bitwidth)
+{
+    ASSERTN(bitwidth <= sizeof(ULONGLONG) * BITS_PER_BYTE, ("TODO"));
+    if (bitwidth == sizeof(ULONGLONG) * BITS_PER_BYTE) { return true; }
+    return val > ((((ULONGLONG)1) << bitwidth) - 1);
 }
 
 

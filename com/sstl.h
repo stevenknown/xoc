@@ -129,49 +129,81 @@ inline T * get_first(T * t)
 }
 
 
+//t: may be single element or list.
 template <class T>
 inline void add_next(T ** pheader, T * t)
 {
-    if (pheader == nullptr || t == nullptr) { return; }
-    T * p = nullptr;
+    ASSERT0(pheader);
+    if (t == nullptr) { return; }
     t->prev = nullptr;
     if ((*pheader) == nullptr) {
         *pheader = t;
-    } else {
-        p = (*pheader)->next;
-        ASSERTN(t != *pheader, ("\n<add_next> : overlap list member\n"));
-        if (p == nullptr) {
-            (*pheader)->next = t;
-            t->prev = *pheader;
-        } else {
-            while (p->next != nullptr) {
-                p = p->next;
-                ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
-            }
-            p->next = t;
-            t->prev = p;
-        }
+        return;
     }
+    T * p = *pheader;
+    ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
+    while (p->next != nullptr) {
+        p = p->next;
+        ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
+    }
+    p->next = t;
+    t->prev = p;
+}
+
+
+//t: may be single element or list.
+template <class T>
+inline void add_next_single_list(MOD T ** pheader, T * t)
+{
+    if (t == nullptr) { return; }
+	if (nullptr == (*pheader)){
+	    *pheader = t;
+        return;
+	}
+    T * p = *pheader;
+    ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
+	for (; p->next != nullptr; p = p->next) {
+        ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
+    }
+    p->next = t;
+}
+
+
+//t: may be single element or list.
+template <class T>
+inline void add_next(MOD T ** pheader, MOD T ** last, IN T * t)
+{
+    if (t == nullptr) { return; }
+    ASSERT0(pheader && last);
+    t->prev = nullptr;
+    if ((*pheader) == nullptr) {
+        *pheader = t;
+        while (t->next != nullptr) { t = t->next; }
+        *last = t;
+        return;
+    }
+    ASSERTN(*last && (*last)->next == nullptr, ("must be the last"));
+    (*last)->next = t;
+    t->prev = *last;
+    while (t->next != nullptr) { t = t->next; }
+    *last = t;
 }
 
 
 template <class T>
-inline void add_next(MOD T ** pheader, MOD T ** last, IN T * t)
+inline void add_next_single_list(MOD T ** pheader, MOD T ** last, T * t)
 {
-    if (pheader == nullptr || t == nullptr) { return; }
-
-    t->prev = nullptr;
-    if ((*pheader) == nullptr) {
-        *pheader = t;
-        while (t->next != nullptr) { t = t->next; }
+    if (t == nullptr) { return; }
+    ASSERT0(pheader && last);
+	if (nullptr == (*pheader)){
+	    *pheader = t;
         *last = t;
-    } else {
-        ASSERTN(last && *last && (*last)->next == nullptr, ("must be the last"));
-        (*last)->next = t;
-        t->prev = *last;
-        while (t->next != nullptr) { t = t->next; }
-        *last = t;
-    }
+        return;
+	}
+    ASSERTN(*last && (*last)->next == nullptr, ("must be the last"));
+    (*last)->next = t;
+    while (t->next != nullptr) { t = t->next; }
+    *last = t;
 }
 
 
@@ -1989,7 +2021,8 @@ public:
 //       Compared to dual linked list, single linked list allocate containers
 //       in a const size pool.
 //       Invoke init() to do initialization if you allocate SList by malloc().
-//    5. Compare the iterator with end() to determine if meeting the end of list.
+//    5. Compare the iterator with end() to determine if meeting the end
+//       of list.
 //    6. Byte size of element in Const Pool is equal to sizeof(SC<T>).
 //
 //    Usage:SMemPool * pool = smpoolCreate(sizeof(SC<T>) * n, MEM_CONST_SIZE);
@@ -2114,7 +2147,6 @@ protected:
     UINT m_elem_count;
     SC<T> * m_head;
     SC<T> * m_tail;
-
 protected:
     SC<T> * new_sc_container(SMemPool * pool)
     {
@@ -3121,7 +3153,6 @@ protected:
     } s1;
 public:
     T * m_vec; //vector's memory is allocated in outside mempool.
-
 public:
     SimpleVector()
     {
@@ -3137,6 +3168,8 @@ public:
     SimpleVector const& operator = (SimpleVector const&);
     ~SimpleVector() { destroy(); }
 
+    //Copy element of src.
+    //pool: the vector buffer allocated in the pool.
     void copy(SimpleVector const& src, SMemPool * pool)
     {
         UINT n = SVEC_elem_num(&src);
@@ -3162,6 +3195,7 @@ public:
         ASSERTN(s1.m_is_init, ("SimpleVector not yet initialized."));
         ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
+
     //Count memory usage for current object.
     size_t count_mem() const
     { return SVEC_elem_num(this) + sizeof(Vector<T>); }
@@ -3199,11 +3233,14 @@ public:
         if (i >= SVEC_elem_num(this)) { return T(0); }
         return m_vec[i];
     }
+
+    //Return the number of element in the vector.
     UINT getElemNum() const { return SVEC_elem_num(this); }
-    //Return vector buffer that hold elements.
+
+    //Return the vector buffer that hold elements.
     T * get_vec() { return m_vec; }
 
-    //Return the number of element the vector could hold.
+    //Return the maximum number of element the vector could hold.
     UINT get_capacity() const
     {
         ASSERTN(is_init(), ("SimpleVector not yet initialized."));
@@ -3290,24 +3327,19 @@ public:
 //which is used in order to speed up accessing hashed elements.
 //
 //NOTICE:
-//    1.T(0) is defined as default nullptr in Hash, so do not use T(0) as element.
-//
+//    1.T(0) is defined as default nullptr in Hash, so do not use T(0)
+//      as element.
 //    2.There are four hash function classes are given as default, and
 //      if you are going to define you own hash function class, the
 //      following member functions you should supply according to your needs.
-//
 //        * Return hash-key deduced from 'val'.
 //            UINT get_hash_value(OBJTY val) const
-//
 //        * Return hash-key deduced from 't'.
 //            UINT get_hash_value(T * t) const
-//
 //        * Compare t1, t2 when inserting a new element.
 //            bool compare(T * t1, T * t2) const
-//
 //        * Compare t1, val when inserting a new element.
 //            bool compare(T * t1, OBJTY val) const
-//
 //    3.Use 'new'/'delete' operator to allocate/free the memory
 //      of dynamic object and the virtual function pointers.
 #define HC_val(c) (c)->val
@@ -3880,12 +3912,13 @@ public:
     {
         ASSERTN(m_bucket != nullptr, ("Hash not yet initialized."));
         UINT hashv = m_hf.get_hash_value(val, m_bucket_size);
-        ASSERTN(hashv < m_bucket_size, ("hash value must less than bucket size"));
+        ASSERTN(hashv < m_bucket_size,
+                ("hash value must less than bucket size"));
         HC<T> const* elemhc = (HC<T> const*)HB_member(m_bucket[hashv]);
         if (elemhc != nullptr) {
             while (elemhc != nullptr) {
                 ASSERTN(HC_val(elemhc) != T(0),
-                       ("Hash element has so far as to be overrided!"));
+                        ("Hash element has so far as to be overrided!"));
                 if (m_hf.compare(HC_val(elemhc), val)) {
                     return HC_val(elemhc);
                 }
@@ -4576,7 +4609,8 @@ public:
 //    };
 //
 //NOTICE:
-//    1. Tsrc(0) is defined as default nullptr in TMap, do NOT use T(0) as element.
+//    1. Tsrc(0) is defined as default nullptr in TMap, do NOT use T(0)
+//       as element.
 //    2. Keep the key *UNIQUE* .
 //    3. Overload operator == and operator < if Tsrc is neither basic type
 //       nor pointer type.
@@ -4589,11 +4623,8 @@ public:
     TMap(SMemPool * pool = nullptr) : RBT<Tsrc, Ttgt, CompareKey>(pool) {}
     ~TMap() {}
 
-    //This function should be invoked if TMap is initialized manually.
-    void init(SMemPool * pool = nullptr)
-    { RBT<Tsrc, Ttgt, CompareKey>::init(pool); }
-
-    void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
+    //Append <key, mapped> pair of 'src' to current object.
+    void append(TMap<Tsrc, Ttgt, CompareKey> const& src)
     {
         ASSERT0(this != &src);
         TMapIter<Tsrc, Ttgt> iter;
@@ -4602,6 +4633,17 @@ public:
              !iter.end(); key = src.get_next(iter, &val)) {
             set(key, val);
         }
+    }
+
+    //This function should be invoked if TMap is initialized manually.
+    void init(SMemPool * pool = nullptr)
+    { RBT<Tsrc, Ttgt, CompareKey>::init(pool); }
+
+    void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
+    {
+        ASSERT0(this != &src);
+        RBT<Tsrc, Ttgt, CompareKey>::clean();
+        append(src);
     }
 
     //This function should be invoked if TMap is destroied manually.
@@ -4822,7 +4864,8 @@ public:
         if (t == Tsrc(0)) { return; }
         HC<Tsrc> * elemhc = nullptr;
         Hash<Tsrc, HF>::append(t, &elemhc, nullptr);
-        ASSERTN(elemhc != nullptr, ("Element does not append into hash table."));
+        ASSERTN(elemhc != nullptr,
+                ("Element does not append into hash table."));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }
 

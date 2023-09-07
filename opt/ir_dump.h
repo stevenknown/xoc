@@ -56,7 +56,7 @@ public:
 
 void dumpConstContent(IR const* ir, Region const* rg);
 
-void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
+void dumpIR(IR const* ir, Region const* rg, CHAR const* attr = nullptr,
             DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
 {

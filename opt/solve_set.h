@@ -432,7 +432,7 @@ public:
     Region * getRegion() const { return m_rg; }
     xcom::DefMiscBitSetMgr * getLocalSBSMgr() { return &m_local_sbs_mgr; }
     xcom::DefMiscBitSetMgr * getGlobalSBSMgr() { return &m_global_sbs_mgr; }
- 
+
     void resetReachDefInSet();
     void resetGlobalSet();
 

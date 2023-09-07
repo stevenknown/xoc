@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../com/xcominc.h"
 #include "../opt/cominc.h"
 #include "ir_lex.h"
+#include "xcode.h"
 #include "ir_parser.h"
 #include "grreader.h"
 
@@ -73,15 +74,13 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
     //START_TIMER(t, "lexer dump");
     //reader.getLexer()->dump(grfile, nullptr);
     //END_TIMER(t, "lexer dump");
-
-    FILE * h = ::fopen(grfile, "r");
-    if (h == nullptr) {
-        return false;
-    }
-    reader.setSrcFile(h);
+    FO_STATUS st;
+    xcom::FileObj fo(grfile, false, true, &st);
+    if (st != FO_SUCC) { return false; }
+    ASSERT0(fo.getFileHandler());
+    reader.setSrcFile(fo.getFileHandler());
     bool succ = reader.parse();
     END_TIMER(t, "readGRAndConstructRegion");
-    fclose(h);
     return succ;
 }
 

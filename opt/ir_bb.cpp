@@ -63,25 +63,32 @@ IRListIter BBIRList::append_head_ex(IR * ir)
 
 
 //Insert ir prior to cond_br, uncond_br, call, return.
-IRListIter BBIRList::append_tail_ex(IR * ir)
+//Note the function will NOT set BB pointer of ir.
+IRListIter BBIRList::append_tail_ex_without_set_bb(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
-
     IRListIter ct;
-    for (List<IR*>::get_tail(&ct);
-         ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
-        if (!IRBB::isLowerBoundary(ct->val())) {
-            break;
-        }
+    List<IR*>::get_tail(&ct);
+    if (ct != List<IR*>::end() && IRBB::isLowerBoundary(ct->val())) {
+        //Skip over the last lower-bound IR.
+        ct = List<IR*>::get_prev(ct);
     }
-
-    ASSERT0(m_bb);
-    ir->setBB(m_bb);
-    if (ct == nullptr) {
+    if (ct == List<IR*>::end()) {
         //The only one stmt of BB is down boundary or bb is empty.
         return EList<IR*, IR2Holder>::append_head(ir);
     }
     return EList<IR*, IR2Holder>::insert_after(ir, ct);
+}
+
+
+//Insert ir prior to cond_br, uncond_br, call, return.
+IRListIter BBIRList::append_tail_ex(IR * ir)
+{
+    if (ir == nullptr) { return nullptr; }
+    IRListIter it = append_tail_ex_without_set_bb(ir);
+    ASSERT0(m_bb);
+    ir->setBB(m_bb);
+    return it;
 }
 //END BBIRList
 
@@ -118,14 +125,12 @@ bool BBList::isPrevBB(IRBB const* prev, BBListIter nextit) const
 }
 
 
-void BBList::clone(BBList const& src, Region * rg)
+void BBList::clone(BBList const& src, MOD IRBBMgr * bbmgr, Region * rg)
 {
-    IRBBMgr * mgr = rg->getBBMgr();
     BBListIter srcit;
     for (IRBB const* srcbb = src.get_head(&srcit);
          srcbb != nullptr; srcbb = src.get_next(&srcit)) {
-        IRBB * tgtbb = mgr->allocBB();
-        tgtbb->clone(*srcbb, rg);
+        IRBB * tgtbb = bbmgr->cloneBB(*srcbb, rg);
         append_tail(tgtbb);
     }
 }
@@ -471,7 +476,7 @@ bool IRBB::verifyTerminate() const
             break;
         }
     }
-    ASSERT0(BB_is_terminate(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_terminate(this) == find);
     return true;
 }
 
@@ -487,7 +492,7 @@ bool IRBB::verifyExpHandler() const
             break;
         }
     }
-    ASSERT0(BB_is_catch_start(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_catch_start(this) == find);
     return true;
 }
 
@@ -503,7 +508,7 @@ bool IRBB::verifyTryEnd() const
             break;
         }
     }
-    ASSERT0(BB_is_try_end(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_try_end(this) == find);
     return true;
 }
 
@@ -519,7 +524,7 @@ bool IRBB::verifyTryStart() const
             break;
         }
     }
-    ASSERT0(BB_is_try_start(this) == find);
+    ASSERT0_DUMMYUSE(BB_is_try_start(this) == find);
     return true;
 }
 
@@ -546,6 +551,7 @@ void IRBB::copyLabelInfoList(IRBB const& src, SMemPool * pool)
 
 
 //The function will copy all contents of 'src', include BBID and Vertex info.
+//This is the difference that compare to IRBB::copy().
 void IRBB::clone(IRBB const& src, Region * rg)
 {
     m_id = src.m_id;
@@ -555,9 +561,9 @@ void IRBB::clone(IRBB const& src, Region * rg)
 
 void IRBB::copy(IRBB const& src, Region * rg)
 {
-    /////////////////////////////////////////////////////////
-    //DO NOT COPY BB'S ID, BB ID IS UNIQUE IN GIVEN REGION.//
-    /////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    //DO NOT COPY BB'S ID, BB ID IS UNIQUE IN GIVEN REGION.                  //
+    ///////////////////////////////////////////////////////////////////////////
     u1 = src.u1;
     m_vertex = nullptr;
     copyLabelInfoList(src, rg->getCommPool());
@@ -571,12 +577,24 @@ void IRBB::copy(IRBB const& src, Region * rg)
 //
 IRBBMgr::~IRBBMgr()
 {
-    BBTabIter it;
-    for (IRBB * bb = m_bb_tab.get_first(it);
-         bb != nullptr; bb = m_bb_tab.get_next(it)) {
+    for (VecIdx i = 0; i < (VecIdx)m_bb_vec.get_elem_count(); i++) {
+        IRBB const* bb = m_bb_vec.get(i);
+        if (bb == nullptr) { continue; }
         delete bb;
     }
     //BB in free list will also be recorded in m_bb_tab.
+}
+
+
+IRBB * IRBBMgr::cloneBB(IRBB const& src, Region * rg)
+{
+    ASSERTN(m_bb_vec.get(src.id()) == nullptr,
+            ("BB%d has been allocated", src.id()));
+    IRBB * tgtbb = new IRBB();
+    tgtbb->clone(src, rg);
+    m_bb_vec.set(tgtbb->id(), tgtbb);
+    m_bb_count = MAX(m_bb_count, (tgtbb->id() + 1));
+    return tgtbb;
 }
 
 
@@ -586,7 +604,8 @@ IRBB * IRBBMgr::allocBB()
     if (bb == nullptr) {
         bb = new IRBB();
         BB_id(bb) = m_bb_count++;
-        m_bb_tab.append(bb);
+        ASSERT0(m_bb_vec.get(bb->id()) == nullptr);
+        m_bb_vec.set(bb->id(), bb);
     }
     return bb;
 }
@@ -594,10 +613,10 @@ IRBB * IRBBMgr::allocBB()
 
 void IRBBMgr::destroyBB(IRBB * bb)
 {
-    ASSERT0(bb);
+    ASSERT0(bb && bb->id() != BBID_UNDEF);
+    m_bb_vec.set(bb->id(), nullptr);
     ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb), ("double destroy"));
     bb->clean();
-    m_bb_tab.remove(bb);
     delete bb;
 }
 
@@ -615,9 +634,9 @@ void IRBBMgr::freeBB(IRBB * bb)
 size_t IRBBMgr::count_mem() const
 {
     size_t count = 0;
-    BBTabIter bbit;
-    for (IRBB * bb = m_bb_tab.get_first(bbit);
-         bb != nullptr; bb = m_bb_tab.get_next(bbit)) {
+    for (VecIdx i = 0; i < (VecIdx)m_bb_vec.get_elem_count(); i++) {
+        IRBB const* bb = m_bb_vec.get(i);
+        if (bb == nullptr) { continue; }
         count += bb->count_mem();
     }
     return count;
@@ -628,9 +647,9 @@ bool IRBBMgr::verify() const
 {
     //Guarantee the BB id is unique.
     xcom::TTab<UINT> idtab;
-    BBTabIter bbit;
-    for (IRBB * bb = m_bb_tab.get_first(bbit);
-         bb != nullptr; bb = m_bb_tab.get_next(bbit)) {
+    for (VecIdx i = 0; i < (VecIdx)m_bb_vec.get_elem_count(); i++) {
+        IRBB const* bb = m_bb_vec.get(i);
+        if (bb == nullptr) { continue; }
         ASSERT0(!idtab.find(bb->id()));
         idtab.append(bb->id());
     }

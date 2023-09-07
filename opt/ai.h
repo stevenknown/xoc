@@ -99,7 +99,7 @@ public:
     void cleanContainer() { cont.clean(); }
     void clean(AI_TYPE type)
     {
-        ASSERT0(is_init());
+        if (!is_init()) { return; }
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
         for (UINT i = 0; i < cont.get_capacity(); i++) {
             BaseAttachInfo * ac = cont.get(i);

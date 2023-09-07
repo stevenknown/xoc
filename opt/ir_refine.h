@@ -115,7 +115,7 @@ public:
     RefineCtx const& operator = (RefineCtx const&);
 
     //Clean the actions which propagated bottom up during refinement.
-    void cleanBottomupFlag() { RC_stmt_removed(*this) = false; }
+    void cleanBottomUpFlag() { RC_stmt_removed(*this) = false; }
 
     //Return the OptCtx.
     OptCtx * getOptCtx() const { return RC_optctx(*this); }
@@ -190,7 +190,6 @@ class Refine : public Pass {
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
     IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBranch(IR * ir);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
@@ -245,10 +244,18 @@ public:
     //Return updated ir if optimization performed.
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
 
+    //Perform peephole optimization to ir over and over again until the result
+    //ir does not change any more.
+    //Return updated ir if optimization performed.
+    IR * refineIRUntilUnchange(IR * ir, bool & change, RefineCtx & rc);
+
     //Perform peephole optimization to BB list.
     //BB list will be updated if optimization performed.
     //Return true if BB list changed.
     bool refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc);
+
+    //Refine select for different architectures.
+    virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
 
     virtual bool perform(OptCtx & oc);
 };

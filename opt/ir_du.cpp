@@ -242,9 +242,7 @@ DUMgr::~DUMgr()
     ASSERT0(m_is_init == nullptr);
     ASSERT0(m_md2irs == nullptr);
     m_solve_set_mgr.resetGlobalSet();
-    OptCtx oc(m_rg);
-    oc.setInvalidClassicDUChain();
-    freeDUSetForAllIR(oc);
+    freeDUSetForAllIR();
     smpoolDelete(m_pool);
 
     //Explicitly free SEG to DefSegMgr,
@@ -261,7 +259,7 @@ DUMgr::~DUMgr()
 }
 
 
-void DUMgr::freeDUSetForAllIR(OptCtx const& oc)
+void DUMgr::freeDUSetForAllIR()
 {
     //Free AIContainer's internal structure.
     //The vector of AIContainer must be destroied explicitly.
@@ -1195,7 +1193,7 @@ bool DUMgr::removeExpiredDU(IR const* ir)
             if (xoc::isDependent(ir, ref, false, m_rg)) {
                 continue;
             }
- 
+
             //There is no DU chain bewteen stmt and use. Cutoff the DU.
             removeDUChain(ir, ref);
             change = true;
@@ -1209,7 +1207,7 @@ bool DUMgr::removeExpiredDU(IR const* ir)
         IR const* def = m_rg->getIR(i);
         ASSERT0(def->is_stmt());
         if (xoc::isDependent(def, ir, false, m_rg)) { continue; }
- 
+
         //There is no DU chain bewteen stmt and use. Cutoff the DU.
         removeDUChain(def, ir);
         change = true;
@@ -1411,7 +1409,7 @@ size_t DUMgr::count_mem() const
     count += m_solve_set_mgr.count_mem();
     return count;
 }
- 
+
 //Count up memory of DUSet for all irs.
 size_t DUMgr::count_mem_duset()
 {
@@ -1452,7 +1450,7 @@ void DUMgr::coalesceDUChain(IR const* from, IR const* to)
     //Def stmt set of 'to'.
     DUSet * defs = to->getDUSet();
     defs->remove(from->id(), *getSBSMgr());
-   
+
     //Iterate each DEF of 'to', remove 'to' from their UseSet.
     DUSetIter it = nullptr;
     for (BSIdx i = defs->get_first(&it);
@@ -1587,10 +1585,10 @@ bool DUMgr::inferCallStmtForNonPRViaCallGraph(IR const* ir,
                                               OUT MDSet & maydefuse)
 {
     //Prefer to use calllee's MayDef if callee region has been processed.
-    CallGraph * callg = m_rg->getRegionMgr()->getCallGraph();
+    CallGraph * callg = m_rg->getCallGraphPreferProgramRegion();
     if (callg == nullptr) { return false; }
 
-    Region const* callee = callg->mapCall2Region(ir, m_rg);
+    Region const* callee = callg->getCalleeRegion(ir, m_rg);
     if (callee == nullptr || !callee->is_ref_valid()) { return false; }
 
     MDSet const* maydef = callee->getMayDef();
@@ -1801,9 +1799,9 @@ void DUMgr::collectMayUse(IR const* ir, MDSet & mayuse, bool comp_pr)
         if (ir->isCallStmt()) {
             //Handle CALL/ICALL stmt sideeffect.
             bool done = false;
-            CallGraph * callg = m_rg->getRegionMgr()->getCallGraph();
+            CallGraph * callg = m_rg->getCallGraphPreferProgramRegion();
             if (callg != nullptr) {
-                Region * rg = callg->mapCall2Region(ir, m_rg);
+                Region * rg = callg->getCalleeRegion(ir, m_rg);
                 if (rg != nullptr && rg->is_ref_valid()) {
                     MDSet const* muse = rg->getMayUse();
                     if (muse != nullptr) {
@@ -1879,6 +1877,7 @@ void DUMgr::collectMayUseRecursive(IR const* ir, Region const* rg,
     case IR_SELECT:
     case IR_CASE:
     case IR_LABEL:
+    SWITCH_CASE_EXT_EXP:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
             if (k == nullptr) { continue; }
@@ -1908,9 +1907,9 @@ void DUMgr::collectMayUseRecursive(IR const* ir, Region const* rg,
             collectMayUseRecursiveIRList(k, rg, comp_pr, bsmgr, mayuse);
         }
         bool done = false;
-        CallGraph * callg = rg->getRegionMgr()->getCallGraph();
+        CallGraph * callg = rg->getCallGraphPreferProgramRegion();
         if (callg != nullptr) {
-            Region * calleerg = callg->mapCall2Region(ir, rg);
+            Region * calleerg = callg->getCalleeRegion(ir, rg);
             if (calleerg != nullptr && calleerg->is_ref_valid()) {
                 MDSet const* muse = calleerg->getMayUse();
                 if (muse != nullptr) {
@@ -2450,7 +2449,12 @@ void DUMgr::checkAndBuildChain(IR * stmt, IRListIter ct, DUOptFlag flag)
         }
         checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
         return;
-    SWITCH_CASE_MAY_PR_OP:
+    SWITCH_CASE_CALL:
+        checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
+        return;
+    SWITCH_CASE_PR_OP:
+    //SWITCH_CASE_MAY_PR_OP:
+        //CASE:Do NOT remove DUSet of CallStmt because NonPRDU may be needed.
         if (flag.have(DUOPT_COMPUTE_PR_DU)) {
             DUSet * du = genDUSet(stmt);
             cleanDUSet(stmt->id(), du);
@@ -2948,6 +2952,7 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
             verifyDirectMemOpImpl(t, m_rg);
             break;
         SWITCH_CASE_DIRECT_MEM_STMT:
+            ASSERT0(t->getMustRef());
             ASSERT0(!t->getMustRef()->get_base()->is_readonly());
             verifyDirectMemOpImpl(t, m_rg);
             break;
@@ -3104,19 +3109,16 @@ static bool verifyMDDUChainForLHS(IR const* ir, DUOptFlag duflag, Region * rg,
     if (ir->isCallStmt()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU) &&
             !duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     } else if (ir->isPROp()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     } else {
         ASSERT0(ir->isMemRefNonPR());
         if (!duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            //DUSet should be NULL.
-            ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+            ASSERTN(0, ("DUSet should be NULL"));
         }
     }
 
@@ -3438,7 +3440,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
                              DUOptFlag duflag)
 {
     ASSERTN(duflag.have(DUOPT_COMPUTE_PR_DU) ||
-            duflag.have(DUOPT_COMPUTE_NONPR_DU), ("at least one DU"));
+            duflag.have(DUOPT_COMPUTE_NONPR_DU), ("at least one kind of IR"));
     if (m_rg->getBBList()->get_elem_count() == 0) { return; }
 
     START_TIMER(t, "Build DU chain");
@@ -3518,6 +3520,30 @@ void DUMgr::computeOverlapSetForWorstCase()
 void DUMgr::solveSet(MOD OptCtx & oc, DUOptFlag flag)
 {
     m_solve_set_mgr.perform(oc, flag);
+}
+
+
+bool DUMgr::checkAndComputeClassicDUChain(MOD OptCtx & oc)
+{
+    ASSERTN(oc.is_ref_valid(), ("should make sure MDRef is available"));
+    DUOptFlag f(DUOPT_UNDEF);
+    if (g_compute_pr_du_chain && !oc.is_pr_du_chain_valid()) {
+        f.set(DUOPT_COMPUTE_PR_DU);
+    }
+    if (g_compute_nonpr_du_chain && !oc.is_nonpr_du_chain_valid()) {
+        f.set(DUOPT_COMPUTE_NONPR_DU);
+    }
+    if (!f.have(DUOPT_COMPUTE_PR_DU) && !f.have(DUOPT_COMPUTE_NONPR_DU)) {
+        return true;
+    }
+    if (!oc.is_reach_def_valid()) {
+        //Note the computation of ReachDef is costly.
+        DUOptFlag h(DUOPT_SOL_REACH_DEF);
+        bool succ = perform(oc, h);
+        ASSERT0_DUMMYUSE(succ);
+    }
+    computeMDDUChain(oc, false, f);
+    return true;
 }
 
 

@@ -175,25 +175,6 @@ typedef UINT PRNO;
     case IR_CALL: \
     case IR_ICALL
 
-//Defined the entry for extened expression ir code.
-#define SWITCH_CASE_EXT_EXP \
-    case IR_BROADCAST
-
-//Defined the entry for extened virtual stmt ir code.
-#define SWITCH_CASE_EXT_VSTMT \
-    SWITCH_CASE_EXT_WRITE_PR: \
-    SWITCH_CASE_EXT_DIRECT_MEM_VSTMT: \
-    SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT
-
-//Defined the entry for extened stmt ir code.
-#define SWITCH_CASE_EXT_STMT \
-    SWITCH_CASE_EXT_VSTMT
-
-//Defined the entry for extened ir code.
-#define SWITCH_CASE_EXT \
-    SWITCH_CASE_EXT_STMT: \
-    SWITCH_CASE_EXT_EXP
-
 #define SWITCH_CASE_WRITE_ARRAY \
     case IR_STARRAY
 
@@ -228,12 +209,6 @@ typedef UINT PRNO;
 
 #define SWITCH_CASE_DIRECT_MEM_EXP \
     case IR_LD
-
-#define SWITCH_CASE_EXT_WRITE_PR \
-    case IR_VSTPR
-
-#define SWITCH_CASE_EXT_DIRECT_MEM_VSTMT \
-    case IR_VST
 
 #define SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT \
     case IR_VIST
@@ -324,14 +299,13 @@ typedef UINT PRNO;
     SWITCH_CASE_READ_PR: \
     SWITCH_CASE_BIN: \
     SWITCH_CASE_UNA: \
-    SWITCH_CASE_EXT_EXP: \
     case IR_CASE: \
     case IR_SELECT: \
     case IR_LDA: \
     case IR_ID: \
-    case IR_CONST
-
-bool checkIRSwitchCaseHelper();
+    case IR_CONST: \
+    SWITCH_CASE_EXT_EXP
 
 } //namespace xoc
+
 #endif

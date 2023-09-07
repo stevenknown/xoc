@@ -46,6 +46,7 @@ class Pass;
 class PassMgr;
 class IRSimp;
 class CDG;
+class CallGraph;
 
 //Region MD referrence info.
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)
@@ -273,6 +274,7 @@ public:
     virtual void destroy();
     void destroyPassMgr();
     void destroyAttachInfoMgr();
+    void destroyIRBBMgr();
 
     //Duplication all contents of 'src', includes AttachInfo, except DU info,
     //SSA info, kids and siblings IR.
@@ -305,7 +307,7 @@ public:
     void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
 
     //Dump all irs and ordering by IR_id.
-    void dumpAllocatedIR() const;
+    void dumpAllIR() const { getIRMgr()->dump(); }
 
     //Dump each Var in current region's Var table.
     void dumpVARInRegion() const;
@@ -431,11 +433,14 @@ public:
 
     //Get IRBB list if any.
     BBList * getBBList() const
-    { return &ANA_INS_ir_bb_list(getAnalysisInstrument()); }
+    { return ANA_INS_ir_bb_list(getAnalysisInstrument()); }
 
     //Get IRBBMgr of current region.
     IRBBMgr * getBBMgr() const
-    { return &ANA_INS_ir_bb_mgr(getAnalysisInstrument()); }
+    { return ANA_INS_ir_bb_mgr(getAnalysisInstrument()); }
+
+    //Get the BB by given bbid.
+    IRBB * getBB(UINT bbid) const { return getBBMgr()->getBB(bbid); }
 
     //Get MDSetHash.
     MDSetHash * getMDSetHash() const
@@ -480,6 +485,21 @@ public:
         return getPassMgr() != nullptr ?
                (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : nullptr;
     }
+
+    //Return CallGraph.
+    CallGraph * getCallGraph() const
+    {
+        return getPassMgr() != nullptr ?
+               (CallGraph*)getPassMgr()->queryPass(PASS_CALL_GRAPH) : nullptr;
+    }
+
+    //If program region exist, return the CallGraph of it, otherwise return
+    //NULL.
+    CallGraph * getProgramRegionCallGraph() const;
+
+    //The function try to get program region CallGraph. If there is no
+    //Callgraph, return current region CallGraph.
+    CallGraph * getCallGraphPreferProgramRegion() const;
 
     //Get Alias Analysis.
     AliasAnalysis * getAA() const
@@ -605,7 +625,7 @@ public:
     inline Type const* getTargetMachineArrayIndexType()
     {
         return getTypeMgr()->getSimplexTypeEx(
-            getTypeMgr()->getDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
+            getTypeMgr()->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
     }
 
     //Use HOST_INT type describes the value.
@@ -641,6 +661,9 @@ public:
 
     //Allocate and initialize IR manager.
     IRMgr * initIRMgr();
+
+    //Allocate and initialize IRBB manager.
+    IRBBMgr * initIRBBMgr();
 
     //Allocate and initialize attachinfo manager.
     AttachInfoMgr * initAttachInfoMgr();
@@ -725,6 +748,11 @@ public:
     void setCommPool(SMemPool * pool) { m_pool = pool; }
     void setIRMgr(IRMgr * mgr)
     { ANA_INS_ir_mgr(getAnalysisInstrument()) = mgr; }
+    void setBBMgr(IRBBMgr * mgr)
+    { ANA_INS_ir_bb_mgr(getAnalysisInstrument()) = mgr; }
+    void setBBList(BBList * bblst)
+    { ANA_INS_ir_bb_list(getAnalysisInstrument()) = bblst; }
+    void setCFG(IRCFG * newcfg);
 
     //Collect information of CALL and RETURN in current region.
     //num_inner_region: count the number of inner regions.

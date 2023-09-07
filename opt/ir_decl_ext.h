@@ -129,4 +129,7 @@ public:
 };
 
 } //namespace xoc
+
+#include "targ_decl_ext.h"
+
 #endif

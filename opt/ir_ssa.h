@@ -76,29 +76,67 @@ public:
     PRSSARegion(xcom::DefMiscBitSetMgr * sbs, OptCtx * oc) :
         m_bbset(sbs->getSegMgr()), m_root(nullptr), m_oc(oc) {}
 
-    //Find PR in 'ir' and add them that has 'prno' into SSA construction region.
-    void add(PRNO prno, IR * ir);
+    //The function will find PR that assigned 'prno' into current
+    //SSA construction region.
+    //ir: stmt or expression start to find.
+    void add(PRNO prno, IR * start);
 
-    //Add ir that expected to transform to SSA mode.
+    //Add ir to current SSA construction region that expected to transform
+    //to SSA mode.
     //Note ir must be PR op.
     void add(IR * ir);
 
-    //Add bbset into SSA construction region.
+    //Add BB into current SSA construction region.
+    //Note even if there is no occurrence of PR operation in 'bb', the BB that
+    //belong to the SSARegion also should be add into bbset.
+    void add(IRBB const* bb) { ASSERT0(bb); getBBSet().bunion(bb->id()); }
+
+    //Add a set of BB into current SSA construction region.
+    //The construction will not exceed these BBs.
     void add(BitSet const& bbset) { getBBSet().bunion(bbset); }
 
+    //Walk through each predecessors from 'start' to guarrantee all vertexs in
+    //path from root to start have been added.
+    void addPredBBUntillRoot(IRBB const* start, IRCFG const* cfg);
+
+    //Return true if bb can be regarded as the root of SSA region.
+    bool canBeRoot(IRBB const* bb) const;
+
     void dump(Region const* rg) const;
+
+    //The function attempt to find properly root BB of SSA region.
+    //A properly root BB either does not have any PHI operation, or all
+    //predecessors of root BBs are located within current SSA region.
+    IRBB * findRootBB(xcom::DomTree const& domtree, Region const* rg,
+                      IRBB * start);
 
     //Get the bbset of region.
     BBSet & getBBSet() { return m_bbset; }
 
-    //Get the irlist of region.
+    //Get the irlist of current SSA construction region.
     IRList & getIRList() { return m_irlist; }
+
+    //Get the root BB of current SSA construction region.
     IRBB * getRootBB() const { return m_root; }
     OptCtx * getOptCtx() const { return m_oc; }
 
+    //Return true if BB id is in the SSA region.
+    //id: the BB id.
+    bool isInRegion(UINT id) const { return m_bbset.is_contain(id); }
+
+    //Return true if all predecessors of 'bb' are located in SSA region.
+    bool isAllPredInRegion(IRBB const* bb) const;
+
+    //Infer and add those BBs that should be also handled in PRSSA construction.
+    void inferAndAddRelatedBB(Region const* rg, IRCFG const* cfg);
+
+    //Set the root BB of current SSA construction region.
     //root: root BB for CFG region that is consisted of BB which is
-    //in SSA region.
-    void setRootBB(IRBB * root) { m_root = root; }
+    //in SSA construction region.
+    void setRootBB(IRBB * root) { add(root); m_root = root; }
+
+    //Verify whether the SSA region is legal enough to construct.
+    bool verify() const;
 };
 //END PRSSARegion
 
@@ -125,7 +163,7 @@ protected:
     UINT m_thres;
 
     void buildRecur(xcom::Vertex const* v, xcom::DGraph const& g,
-                    DomTree const& domtree);
+                    xcom::DomTree const& domtree);
 
     //Generate the DF control set
     xcom::BitSet * genDFControlSet(UINT vid);
@@ -134,8 +172,11 @@ public:
     explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
         m_thres(thres) {}
 
+    //This function compute dominance frontier to graph g.
     void build(xcom::DGraph const& g);
-    void build(xcom::DGraph const& g, DomTree const& domtree);
+
+    //This function compute dominance frontier to graph g recursively.
+    void build(xcom::DGraph const& g, xcom::DomTree const& domtree);
     void clean();
     void dump(xcom::DGraph const& g, Region * rg) const;
 
@@ -197,6 +238,7 @@ public:
 
 //Perform SSA based optimizations.
 class PRSSAMgr : public Pass {
+    friend class SSAGraph;
     class PR2DefBBSet {
         COPY_CONSTRUCTOR(PR2DefBBSet);
         //All objects allocated and recorded in pr2defbb are used
@@ -288,6 +330,18 @@ private:
         ::memset(p, 0, sizeof(VPR));
         return p;
     }
+
+    //Allocate VPR and ensure it is unique according to 'version' and 'prno'.
+    //orgprno: describ the PRNO that expect to be versioned.
+    //version: current version of Versioned PR
+    //orgtype: data type of orginal prno
+    VPR * allocVPR(PRNO orgprno, UINT version, Type const* orgtype);
+
+    //Allocate SSAInfo and ensure it is unique according to prno.
+    //prno: the function will generate SSAInfo for the prno.
+    //version: expect version of given prno.
+    //type: data type of prno.
+    SSAInfo * allocSSAInfo(PRNO prno, Type const* type);
     VPR * allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
                        Type const* orgtype, VPRVec * vprvec);
 
@@ -308,27 +362,48 @@ private:
         m_vp_pool = nullptr;
         m_livemgr = nullptr;
     }
+    //Clean VPR info for IR in 'lst'.
+    //The function always used in initialization in partial computation to
+    //SSAInfo of given IR.
+    void cleanPRNO2VPRForIRList(IRList const& lst);
     void cleanPRNO2MaxVersion();
+
+    //Set SSAInfo of IR to be nullptr to inform optimizer that IR is
+    //not in SSA form.
     void cleanPRSSAInfo();
     void cleanPRNO2VPRStack();
     void cleanPRNO2Type();
+    //definedprs: record PRs which defined in 'bb'.
     void collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & mustdef_pr);
-    void collectPRAndInitVPRForList(IRList const& irlist, BBSet const& bbset,
-                                    MOD DefMiscBitSetMgr & sm,
-                                    OUT BB2PRSet & bb2definedprs,
-                                    OUT PRSet & prset);
+    void collectPRAndInitVPRForIRList(IRList const& irlist, BBSet const& bbset,
+                                      MOD DefMiscBitSetMgr & sm,
+                                      OUT BB2PRSet & bb2definedprs,
+                                      OUT PRSet & prset);
     void constructMDDUChainForPR();
     void computeDefinedPR(IRList const& irlist, MOD DefMiscBitSetMgr & sm,
                           OUT BB2PRSet & bb2definedprs,
                           OUT PRSet & prset, OUT BBSet & bbset);
 
     void destructBBSSAInfo(IRBB * bb, OptCtx const& oc);
-    void destructionInDomTreeOrder(IRBB * root, DomTree & domtree,
+    void destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
                                    OptCtx const& oc);
 
+    VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
+    VPR * getVPR(PRNO prno, UINT version) const
+    {
+        VPRVec const* vprvec = getVPRVecByPRNO(prno);
+        return vprvec != nullptr ? vprvec->get(version) : nullptr;
+    }
+
+    //Map PRNO to VPRVec that recorded all VPR during SSA.
+    VPRVec const* getVPRVecByPRNO(PRNO prno) const
+    { return m_prno2vprvec.get((VecIdx)prno); }
     void genSSAInfoForExp();
     SSAInfo * genSSAInfoForExp(IR * exp);
     void genSSAInfoForBBList();
+    VPRVec const * getVPRVec() const { return &m_vpr_vec; }
+    VPR * getVPRByPRNO(PRNO prno) const
+    { return m_prno2vpr.get((VecIdx)prno); }
 
     //The function rename PR in BB.
     //defined_prs: record the PR set that defined in 'bb' if exist.
@@ -375,13 +450,13 @@ private:
                        MOD List<IRBB*> & wl, MOD BitSet & in_list,
                        IRListIter irct, OptCtx const& oc);
     void rename(PRSet const& effect_prs, BB2PRSet const& bb2definedprs,
-                DomTree const& domtree);
+                xcom::DomTree const& domtree);
     void renameBB(IRBB const* bb, PRSet const* prset);
     //Linear renaming algorithm.
     //bb2definedprs: for each BB, indicate PRs which has been defined.
     //bbset: if not null, indicates perform the renaming inside designated
     //       BB set.
-    void renameInDomTreeOrder(MOD IRBB * root, DomTree const& domtree,
+    void renameInDomTreeOrder(MOD IRBB * root, xcom::DomTree const& domtree,
                               BB2PRSet const& bb2definedprs,
                               BBSet const* bbset, PRSet const* prset);
     void removePhiList();
@@ -437,17 +512,6 @@ public:
         destroy(false);
     }
 
-    //Allocate VPR and ensure it is unique according to 'version' and 'prno'.
-    //orgprno: describ the PRNO that expect to be versioned.
-    //version: current version of Versioned PR
-    //orgtype: data type of orginal prno
-    VPR * allocVPR(PRNO orgprno, UINT version, Type const* orgtype);
-
-    //Allocate SSAInfo and ensure it is unique according to prno.
-    //prno: the function will generate SSAInfo for the prno.
-    //type: data type of prno.
-    SSAInfo * allocSSAInfo(PRNO prno, Type const* type);
-
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
@@ -479,11 +543,12 @@ public:
     //       SSA mode. It specified a set of BB that is used to describing
     //       the region.
     bool constructDesignatedRegion(PRSSARegion & ssarg,
-                                   DomTree const& domtree);
+                                   xcom::DomTree const& domtree);
+
     //Note: Non-SSA DU Chains of read/write PR will be clean and
     //unusable after SSA construction.
     void construction(OptCtx & oc);
-    bool construction(DomTree & domtree, OptCtx & oc);
+    bool construction(xcom::DomTree & domtree, OptCtx & oc);
     size_t count_mem() const;
 
     //DU chain operation.
@@ -495,11 +560,26 @@ public:
 
     //is_reinit: this function is invoked in reinit().
     void destroy(bool is_reinit);
-    void destruction(DomTree & domtree, OptCtx const& oc);
+
+    //This function perform SSA destruction via scanning BB in preorder
+    //traverse dominator tree.
+    //Return true if inserting copy at the head of fallthrough BB
+    //of current BB's predessor.
+    void destruction(xcom::DomTree & domtree, OptCtx const& oc);
+
+    //This function perform SSA destruction via scanning BB in sequential order.
+    //Note PRSSA will change PR no during PRSSA destruction. If classic DU chain
+    //is valid meanwhile, it might be disrupted as well. A better way is user
+    //maintain the classic DU chain, alternatively a conservative way to
+    //avoid subsequent verification complaining is set the prdu invalid.
     void destruction(MOD OptCtx & oc);
+
     //The function dump PR info rather than specific IR stmt and exp details.
     bool dumpBrief() const;
     virtual bool dump() const;
+
+    //This function dumps VPR structure and SSA DU info.
+    //have_renamed: set true if PRs have been renamed in construction.
     void dumpAllVPR() const;
     CHAR * dumpVPR(VPR const* v, OUT CHAR * buf) const;
     void dumpSSAGraph(CHAR const* name = nullptr) const;
@@ -513,7 +593,6 @@ public:
     void dupAndInsertPhiOpnd(IRBB const* bb, UINT pos, UINT num);
 
     //exp: the expression that expected to set livein.
-    void findAndSetLiveinDefForTree(IR * exp);
     void findAndSetLiveinDef(IR * exp);
 
     //Compute SSAInfo for IRs in region that are in SSA mode.
@@ -525,22 +604,9 @@ public:
         if (ir->is_exp()) { return genSSAInfoForExp(ir); }
         return genSSAInfoForStmt(ir);
     }
-    VPRVec const * getVPRVec() const { return &m_vpr_vec; }
-    VPR * getVPRByPRNO(PRNO prno) const
-    { return m_prno2vpr.get((VecIdx)prno); }
-    VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
-    VPR * getVPR(PRNO prno, UINT version) const
-    {
-        VPRVec const* vprvec = getVPRVecByPRNO(prno);
-        return vprvec != nullptr ? vprvec->get(version) : nullptr;
-    }
     SSAInfo * getSSAInfoByPRNO(PRNO prno) const { return getVPRByPRNO(prno); }
     virtual CHAR const* getPassName() const { return "PRSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_PRSSA_MGR; }
-
-    //Map PRNO to VPRVec that recorded all VPR during SSA.
-    VPRVec const* getVPRVecByPRNO(PRNO prno) const
-    { return m_prno2vprvec.get((VecIdx)prno); }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.
@@ -641,6 +707,9 @@ public:
     static void removeDUChain(IR * def, IR * use);
 
     bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const;
+
+    //The verification check the DU info in SSA form.
+    //Current IR must be in SSA form.
     bool verifySSAInfo() const; //Can be used in any module.
     static bool verifyPRSSAInfo(Region const* rg);
 

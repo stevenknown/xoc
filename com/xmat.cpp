@@ -30,6 +30,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+static bool g_is_dump_comma = true;
+
 Matrix<Rational> operator * (Matrix<Rational> const& a,
                              Matrix<Rational> const& b)
 {
@@ -226,28 +228,43 @@ static Rational rat_sqrt(Rational)
 }
 
 
+static void padTo(MOD StrBuf & buf, UINT len)
+{
+    for (INT i = 0; i < ((INT)len) - ((INT)buf.strlen()); i++) {
+        buf.strcat(" ");
+    }
+}
+
+
 static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h, ("dump file handle is nullptr"));
     RMat * pthis = (RMat*)pbasis;
     fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
+    StrBuf strbuf(32);
+    UINT elemprtlen = 7;
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
         for (UINT j = 0; j < pthis->getColSize(); j++) {
             Rational rat = pthis->get(i, j);
-            CHAR const* blank = "      ";
+            strbuf.clean();
             if (rat.den() == 1) {
-                fprintf(h, "%5d%s", (INT)rat.num(), blank);
+                strbuf.strcat("%d", (INT)rat.num());
             } else if (rat.den() == -1) {
-                fprintf(h, "%5d%s", -((INT)rat.num()), blank);
+                strbuf.strcat("%5d", -((INT)rat.num()));
             } else if (rat.num() == 0) {
                 if (rat.den() == 1) {
-                    fprintf(h, "%5d %s", 0, blank);
+                    strbuf.strcat("0");
                 } else {
-                    fprintf(h, "%5d/%-5d", (INT)rat.num(), (INT)rat.den());
+                    strbuf.strcat("%5d/%-5d", (INT)rat.num(), (INT)rat.den());
                 }
             } else {
-                fprintf(h, "%5d/%-5d", (INT)rat.num(), (INT)rat.den());
+                strbuf.strcat("%5d/%-5d", (INT)rat.num(), (INT)rat.den());
             }
+            if (g_is_dump_comma) {
+                strbuf.strcat(",");
+            }
+            padTo(strbuf, elemprtlen);
+            fprintf(h, "%s", strbuf.buf);
         }
         fprintf(h, "\n");
     }
@@ -261,7 +278,6 @@ static void rmat_dumpf(void const* pbasis, CHAR const* name, bool is_del)
     if (is_del) {
         UNLINK(name);
     }
-
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
     rmat_dumpf_by_handle(pbasis, h);
@@ -269,32 +285,10 @@ static void rmat_dumpf(void const* pbasis, CHAR const* name, bool is_del)
 }
 
 
-#define PRT_COMMA ","
 static void rmat_dumps(void const* pbasis)
 {
     printf("\n");
-    RMat * pthis = (RMat*)pbasis;
-    for (UINT i = 0; i < pthis->getRowSize(); i++) {
-        for (UINT j = 0; j < pthis->getColSize(); j++) {
-            Rational rat = pthis->get(i, j);
-            CHAR const* blank = "      ";
-            if (rat.den() == 1) {
-                printf("%5d%s%s", (INT)rat.num(), PRT_COMMA, blank);
-            } else if (rat.den() == -1) {
-                printf("%5d%s%s", -((INT)rat.num()), PRT_COMMA, blank);
-            } else if (rat.num() == 0) {
-                if (rat.den() == 1) {
-                    printf("%5d %s%s", 0, PRT_COMMA, blank);
-                } else {
-                    printf("%5d/%-5d%s",
-                           (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
-                }
-            } else {
-                printf("%5d/%-5d%s", (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
-            }
-        }
-        printf("\n");
-    }
+    rmat_dumpf_by_handle(pbasis, stdout);
     printf("\n");
 }
 
@@ -511,8 +505,8 @@ bool RMat::inv(OUT RMat & e) const
 
 //Reduce matrix elements to a common denominator.
 //Return the common denominator.
-//'row': Row to reduce
-//'col': The starting column to reduce.
+//row: Row to reduce
+//col: The starting column to reduce.
 UINT RMat::comden(UINT row, UINT col)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
@@ -546,9 +540,9 @@ UINT RMat::comden(UINT row, UINT col)
 
 
 //Substituting variable 'v' with expression 'exp'.
-//'exp': system of equations
-//'v': varible id, the column number.
-//'is_eq': set to true indicate that each rows of matrix represents
+//exp: system of equations
+//v: varible id, the column number.
+//is_eq: set to true indicate that each rows of matrix represents
 //    an equations, or the false value only represent a right-hand of
 //    a linear function,
 //    e.g: if 'is_eq' is false, matrix is a vector, [1, 7, -2, -10], that
@@ -556,15 +550,15 @@ UINT RMat::comden(UINT row, UINT col)
 //        f(x) = x1 + 7x2 - 2x3 - 10,
 //    and if 'is_eq' is true, matrix repesented an equation,
 //        x1 + 7x2 - 2x3  = -10
-void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT rhs_idx)
+void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT cst_col)
 {
     ASSERTN(m_is_init && exp.m_is_init, ("not yet initialize."));
     ASSERTN(m_col_size == exp.m_col_size && v < m_col_size &&
             exp.is_rowvec(), ("unmatch matrix"));
 
     if (!is_eq) {
-        ASSERT0(rhs_idx >= 1 && rhs_idx < (INT)m_col_size);
-        mulOfColumns(rhs_idx, m_col_size - 1, -1);
+        ASSERT0(cst_col >= 1 && cst_col < (INT)m_col_size);
+        mulOfColumns(cst_col, m_col_size - 1, -1);
     }
     for (UINT i = 0; i < m_row_size; i++) {
         if (get(i, v) != 0) {
@@ -581,7 +575,7 @@ void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT rhs_idx)
         }
     }
     if (!is_eq) {
-        mulOfColumns(rhs_idx, m_col_size - 1, -1);
+        mulOfColumns(cst_col, m_col_size - 1, -1);
     }
 }
 
@@ -666,7 +660,7 @@ RMat operator - (RMat const& a, RMat const& b)
 //and lower bounds of x is guaranteed to be greater than
 //or equals 1.
 //e.g: L <= x <= U , to ( L + 1) <= U.
-//'c': constant vector.
+//c: constant vector.
 void RMat::ds(RMat const&)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
@@ -674,7 +668,7 @@ void RMat::ds(RMat const&)
 
 
 //Converting rational element to integer for row vector.
-//'row': number of row to integral
+//row: number of row to integral
 //NOTICE: This function uses row convention.
 void RMat::intlize(INT row)
 {
@@ -864,7 +858,7 @@ void INTMat::genElimMat(UINT row, UINT col, OUT INTMat & elim)
     //Construct unimodular to eliminate aij.
     //Satisfied: det(uni) = x * ((x*aii+y*aij)/x*gcd) = 1
     elim.reinit(m_col_size, m_col_size, &m_inhr);
-    elim.eye(1);
+    elim.initIden(1);
     elim.set(row, row, x);
     elim.set(col, row, y);
     elim.set(row, col, -aij/gcd);
@@ -915,7 +909,7 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     u.reinit(m_col_size, m_col_size);
-    u.eye(1); //unimodular matrix
+    u.initIden(1); //unimodular matrix
     h = *this;
 
     //Eliminiate non-zero upper diagonal elements.
@@ -939,7 +933,7 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u) const
         //2. Make diagonal element positive.
         if (h.get(i, i) < 0) {
             INTMat neg(h.m_row_size, h.m_col_size);
-            neg.eye(1);
+            neg.initIden(1);
             neg.set(i, i, -1);
             h = h * neg;
             u = u * neg;
@@ -960,7 +954,7 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u) const
                     v = abs(h.get(i,j) / h.get(i,i)) + 1;
                 }
                 INTMat elim(m_col_size, m_col_size); //'this' may be m*n
-                elim.eye(1);
+                elim.initIden(1);
                 elim.set(i, j, v);
                 h = h * elim;
                 u = u * elim;
@@ -983,7 +977,7 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u) const
             if (h.get(i, j) >= h.get(i, i)) {
                 INT d = h.get(i, j) / h.get(i, i); //Get
                 INTMat elim(m_col_size, m_col_size);
-                elim.eye(1);
+                elim.initIden(1);
                 elim.set(i, j, -d);
                 h = h * elim;
                 u = u * elim;
@@ -1033,8 +1027,8 @@ void INTMat::gcd()
 
 
 //Find maximum convex hull of a set of 2-dimension points.(Graham scan)
-//'c': coordinates of a set of points.
-//'idx': 1*n matrix, indices of coordinates of convex hull.
+//: coordinates of a set of points.
+//idx: 1*n matrix, indices of coordinates of convex hull.
 //Note 'this' is a n*2 matrix that each row indicate one coordinate as (x,y).
 void INTMat::cvexhull(OUT INTMat & hull)
 {
@@ -1425,7 +1419,7 @@ void FloatMat::destroy()
 
 
 //Set value of elements one by one.
-//'num': indicate the number of variant parameters.
+//num: indicate the number of variant parameters.
 //NOTICE:
 // Arguments after 'num' must be float/double.
 // e.g: sete(NUM, 2.0, 3.0...)
@@ -1475,7 +1469,7 @@ void FloatMat::sete(UINT num, ...)
 
 
 //Set value of elements one by one.
-//'num': indicate the number of variant parameters.
+//num: indicate the number of variant parameters.
 //NOTICE:
 //  Pamaters after 'num' must be integer.
 //  e.g: setie(NUM, 2, 3...)
@@ -1511,7 +1505,7 @@ FloatMat& FloatMat::operator = (FloatMat const& m)
 }
 
 
-void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx)
+void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT cst_col)
 {
     ASSERTN(m_is_init && exp.m_is_init,
                             ("not yet initialize."));
@@ -1519,8 +1513,8 @@ void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx)
         exp.is_rowvec(), ("unmatch matrix"));
 
     if (!is_eq) {
-        ASSERT0(rhs_idx >= 1 && rhs_idx < (INT)m_col_size);
-        mulOfColumns(rhs_idx, m_col_size - 1, -1);
+        ASSERT0(cst_col >= 1 && cst_col < (INT)m_col_size);
+        mulOfColumns(cst_col, m_col_size - 1, -1);
     }
     for (UINT i = 0; i < m_row_size; i++) {
         if (get(i, v) != 0) {
@@ -1537,7 +1531,7 @@ void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx)
         }
     }
     if (!is_eq) {
-        mulOfColumns(rhs_idx, m_col_size - 1, -1);
+        mulOfColumns(cst_col, m_col_size - 1, -1);
     }
 }
 

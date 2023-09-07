@@ -235,7 +235,7 @@ public:
     //The function using RefTab to create delegate for 'ref' to keep the
     //delegate is unique. Note the delegate may be 'ref' itself.
     IR * createUniqueDelegate(IR * ref);
-    
+
     void dumpDele2Restore() const;
     bool dump() const;
 
@@ -328,7 +328,7 @@ public:
 
     //Return true if ir in occs list is unique.
     bool isOccUnique(DefMiscBitSetMgr * sm) const;
-    
+
     void remove(MD const* md);
 
     bool verify() const;

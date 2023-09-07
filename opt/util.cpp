@@ -70,7 +70,7 @@ void prt2C(CHAR const* format, ...)
 }
 
 
-CHAR const* getIntFormat(bool hex)
+CHAR const* getHostIntFormat(bool hex)
 {
     #if WORD_LENGTH_OF_HOST_MACHINE==32
     if (hex) { return "%x"; }
@@ -86,7 +86,7 @@ CHAR const* getIntFormat(bool hex)
 }
 
 
-CHAR const* getUIntFormat(bool hex)
+CHAR const* getHostUIntFormat(bool hex)
 {
     #if WORD_LENGTH_OF_HOST_MACHINE==32
     if (hex) { return "%x"; }

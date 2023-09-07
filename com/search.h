@@ -80,7 +80,7 @@ bool BinarySearch<T, Compare>::search(Vector<T> const& data, T val,
     if (n == 0) { return false; }
     VecIdx lo = 0;
     VecIdx hi = n - 1;
-    VecIdx posless, posgreat;
+    VecIdx posless = VEC_UNDEF, posgreat = VEC_UNDEF;
     while (lo <= hi) {
         VecIdx pos = lo + (hi - lo) / 2;
         if (m_comp.is_less(val, data.get(pos))) {

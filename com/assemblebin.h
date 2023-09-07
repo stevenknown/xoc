@@ -45,6 +45,9 @@ public:
     bool isWordValid() const { return bitsize <= BIN_WORD_SIZE; }
     bool isBufValid() const { return !isWordValid(); }
 public:
+    //bs: bit size of given binary value.
+    //w: store the binary value.
+    //e.g:if we describe binary value 0x3, then bs is 2, w is 0x3.
     AssembleBinDesc(UINT bs, BinWord w) : bitsize(bs), bitvalword(w) {}
     AssembleBinDesc(UINT bs, BYTE const* f) : bitsize(bs)
     {
@@ -56,8 +59,31 @@ public:
             bitvalbuf = f;
         }
     }
+    UINT getBitSize() const { return bitsize; }
+    UINT getByteSize() const { return xceiling((INT)bitsize, BITS_PER_BYTE); }
 };
-typedef Vector<AssembleBinDesc> AssembleBinDescVec;
+
+
+//The class is used to record a vector of sorted Descriptors of assembled
+//binary. Note the bitvalue recorded by each BinDesc will be written in
+//buffer in order.
+class AssembleBinDescVec : public Vector<AssembleBinDesc> {
+public:
+    UINT getTotalBitSize() const
+    {
+        UINT totalbitsize = 0;
+        for (UINT i = 0; i < get_elem_count(); i++) {
+            totalbitsize += (*this)[i].getBitSize();
+        }
+        return totalbitsize;
+    }
+    UINT getTotalByteSize() const
+    {
+        UINT bs = getTotalBitSize();
+        return xcom::xceiling((INT)bs, BITS_PER_BYTE);
+    }
+};
+
 
 //The class converts string style hex number into binary style hex.
 //e.g: string style hex numbers is "A0B1", the class will output hex number
@@ -84,10 +110,11 @@ public:
     //buf: the output buffer that hold the binary.
     //buflen: the byte length of 'buf'.
     //descvec: a vector that describe each bin-field.
-    AssembleBinBuf(BYTE * buf, UINT buflen, AssembleBinDescVec const& descvec);
+    AssembleBinBuf(OUT BYTE * buf, UINT buflen,
+                   AssembleBinDescVec const& descvec);
 
-    static void dump(FILE * h, BYTE const* buf, UINT len);
-    void dump(FILE * h) const;
+    static void dump(FileObj & fo, BYTE const* buf, UINT len);
+    void dump(FileObj & fo) const;
 
     //Return true if given buffer size is big enough to hold all bits
     //in descvec.
@@ -96,8 +123,10 @@ public:
                                AssembleBinDescVec const& descvec,
                                OUT UINT * expectbuflen = nullptr);
 
-    //Return true if 'word' contains non-zero value, namely impurity, beyond
-    //'bitsize' number of bit.
+    //Return true if 'word' contains non-zero value beyond 'bitsize' number
+    //of bit, namely impurity.
+    //e.g:If given bitsize is 2, but the value in 'word' is 0x7, the function
+    //will return true.
     static bool isImpure(BinWord word, UINT bitsize);
 
     //Remove the impurity.

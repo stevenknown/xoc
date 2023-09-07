@@ -117,7 +117,6 @@ void Bucket<T>::extract_elem(OUT Vector<T> & data)
 template <class T>
 void Bucket<T>::dump()
 {
-    INT j = 0;
     printf("\nBUCKET");
     for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
         printf("\n\tB%ud:", i);
@@ -136,11 +135,11 @@ public:
     template <class U> class HeapValVector : public Vector<U> {
         U const operator[](UINT index) const;
         U & operator[](UINT index);
-     
+
         Vector<U> * m_data;
     public:
         HeapValVector(Vector<U> & data) { m_data = &data; }
-    
+
         //Return the first index in vector of legal heap value.
         UINT get_begin_idx() const { return 1; }
         UINT get_end_idx() const { return 1 + get_elem_count() - 1; }
@@ -149,13 +148,13 @@ public:
             ASSERTN(idx > 0, ("head value start from 1"));
             return m_data->get(idx - 1);
         }
-    
+
         void set(UINT idx, U val)
         {
             ASSERTN(idx > 0, ("head value start from 1"));
             return m_data->set(idx - 1, val);
         }
-    
+
         UINT get_elem_count() const { return m_data->get_elem_count(); }
     };
 private:
@@ -262,7 +261,7 @@ template <class T> class QuickSort {
         T first_data = data[first_idx];
         T last_data = data[last_idx];
         T mid_data = data[mid_idx];
-    
+
         //Choose the mid-one to avoid worst case.
         //At worst case, stack may be bursted.
         T key_val = _min(_max(first_data, mid_data), last_data);
@@ -274,7 +273,7 @@ template <class T> class QuickSort {
         } else {
             key_idx = last_idx;
         }
-    
+
         INT right_start_idx = last_idx;
         INT left_start_idx = first_idx;
     FROM_LEFT:
@@ -291,7 +290,7 @@ template <class T> class QuickSort {
                 goto FROM_RIGHT;
             }
         }
-    
+
     FROM_RIGHT:
         //Search from right_start_idx to 'key_idx' + 1
         //to find the less one and swapping with 'key_val'.
@@ -379,7 +378,7 @@ template <class T> class MergeSort {
                 }
                 continue;
             }
-    
+
             output.set(i, right_output.get(ridx));
             ridx++;
             if (ridx >= rlen) {
@@ -443,12 +442,12 @@ public:
             ASSERTN(v >= 0, ("key value should be larger than 0"));
             c[v] = c[v] + 1;
         }
-    
+
         //Calclate the number of element whose value less or equal 'j'.
         for (VecIdx j = 1; j <= c.get_last_idx(); j++) {
             c[j] = c[j - 1] + c[j];
         }
-    
+
         //Sort.
         Vector<T> res;
         //Utilize relation between value and index.
@@ -503,7 +502,7 @@ template <class T> class ShellSort {
                 list.insert_before(d, ct);
             }
         }
-    
+
         //Reflush 'data'
         T v = list.get_head();
         for (UINT k = start_idx; k <= end_idx; k++) {
@@ -529,7 +528,7 @@ public:
             for (UINT i = 0; i < group + rem; i++) {
                 _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));
             }
-    
+
             if (group == 1) {
                 break;
             }

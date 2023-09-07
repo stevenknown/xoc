@@ -55,6 +55,9 @@ public:
     }
 };
 
+//The function clean the IR_parent for each elements in 'irlst'.
+void cleanParentForIRList(IR * irlst);
+
 //Iterative access ir tree. This funtion initialize the iterator.
 //ir: the root ir of the tree.
 //it: iterator. It should be clean already.

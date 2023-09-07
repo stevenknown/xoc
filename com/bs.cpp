@@ -35,6 +35,8 @@ author: Su Zhenyu
 
 namespace xcom {
 
+#define BS_DEF_DUMP_FILE "zbs.log"
+
 //
 //START BitSet
 //
@@ -792,36 +794,37 @@ BitSet const& BitSet::operator = (BitSet const& src)
 void BitSet::dump(CHAR const* name, bool is_del, UFlag flag,
                   BSIdx last_pos) const
 {
-    if (name == nullptr) {
-        name = "zbs.cxx";
-    }
-    if (is_del) {
-        UNLINK(name);
-    }
-    FILE * h = fopen(name, "a+");
-    ASSERTN(h != nullptr, ("%s create failed!!!", name));
-    dump(h, flag, last_pos);
-    fclose(h);
+    if (name == nullptr) { name = BS_DEF_DUMP_FILE; }
+    FO_STATUS ft;
+    FileObj fo(name, is_del, false, &ft);
+    ASSERTN(ft == FO_SUCC, ("%s create failed!!!", name));
+    dump(fo, flag, last_pos);
 }
 
 
 void BitSet::dump(FILE * h, UFlag flag, BSIdx last_pos) const
 {
     if (h == nullptr) { return; }
-    ASSERT0(last_pos == BS_UNDEF || ((UINT)last_pos / BITS_PER_BYTE) < m_size);
+    FileObj fo(h);
+    dump(fo, flag, last_pos);
+}
 
+
+void BitSet::dump(FileObj & fo, UFlag flag, BSIdx last_pos) const
+{
+    ASSERT0(fo.getFileHandler());
+    ASSERT0(last_pos == BS_UNDEF || ((UINT)last_pos / BITS_PER_BYTE) < m_size);
     BSIdx elem = get_last();
     if (last_pos != BS_UNDEF) {
         elem = last_pos;
     }
     if (elem == BS_UNDEF) {
         if (flag.have(BS_DUMP_BITSET)) {
-            fprintf(h, "\nbitset:[]");
+            fo.prt("\nbitset:[]");
         }
         if (flag.have(BS_DUMP_POS)) {
-            fprintf(h, "\npos(start at 0):");
+            fo.prt("\npos(start at 0):");
         }
-        fflush(h);
         return;
     }
     //fprintf(h, "\nbitset(hex):\n\t");
@@ -833,25 +836,24 @@ void BitSet::dump(FILE * h, UFlag flag, BSIdx last_pos) const
 
     //Print as binary
     if (flag.have(BS_DUMP_BITSET)) {
-        fprintf(h, "\nbitset:[");
+        fo.prt("\nbitset:[");
         for (BSIdx i = 0; i <= elem; i++) {
             if (is_contain(i)) {
-                fprintf(h, "1");
+                fo.prt("1");
             } else {
-                fprintf(h, "0");
+                fo.prt("0");
             }
         }
-        fprintf(h, "]");
+        fo.prt("]");
     }
 
     //Print as position.
     if (flag.have(BS_DUMP_POS)) {
-        fprintf(h, "\npos(start at 0):");
+        fo.prt("\npos(start at 0):");
         for (BSIdx j = get_first(); j != BS_UNDEF; j = get_next(j)) {
-            fprintf(h, "%u ", elem);
+            fo.prt("%u ", elem);
         }
     }
-    fflush(h);
 }
 //END BitSet
 

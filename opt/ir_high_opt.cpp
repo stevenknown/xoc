@@ -68,14 +68,13 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_prssa) {
         ASSERT0(getPassMgr());
-        PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
+        PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
             PASS_PRSSA_MGR);
-        ASSERT0(ssamgr);
-        if (!ssamgr->is_valid()) {
-            ssamgr->construction(oc);
+        ASSERT0(prssamgr);
+        if (!prssamgr->is_valid()) {
+            prssamgr->construction(oc);
         }
         oc.setInvalidPRDU();
-        xoc::destructClassicDUChain(this, oc);
     }
 
     if (g_infer_type) {

@@ -45,8 +45,7 @@ Build libxoc.a on Windows:
 ```
 
 How to Contribute :
-	All contributors must sign a contributor license agreement (CLA). A CLA 
-	basically says that you own the rights to any code you contribute, and 
+	All contributors should own the rights to any code you contribute, and 
 	that you give us permission to use that code in XOC. 
 	You maintain the copyright on that code. 
 	Submit a pull request for your changes. A project developer will review 

@@ -112,7 +112,7 @@ void MDLivenessMgr::computeLocalLiveness(IRBB * bb)
         if (def != NULL) {
             gen->bunion(def->id(), *sbsmgr);
             use->diffAllOverlapped(def->id(), *sbsmgr, mdsys);
-        }        
+        }
         collectMayUseMDS(ir, use);
     }
 }

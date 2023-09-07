@@ -33,7 +33,7 @@ template <class T>
 class DumpHeap : public Graph {
     class HeapNode {
     public:
-        UINT id; 
+        UINT id;
         T val;
     };
 
@@ -56,11 +56,9 @@ public:
         if (data.get_last_idx() < 0) { return; }
         HeapSort<INT>::HeapValVector<T> hdata(data);
         m_pool = smpoolCreate(64, MEM_COMM);
-        UINT node_count = 1;
         for (UINT i = hdata.get_begin_idx(); i <= hdata.get_end_idx(); i++) {
             UINT l = lchild(i);
             UINT r = rchild(i);
-            UINT p = parent(i);
             HeapNode * hn = allocHeapNode();
             hn->id = i;
             hn->val = hdata.get(i);
@@ -71,7 +69,7 @@ public:
                 HeapNode * lhn = allocHeapNode();
                 lhn->id = l;
                 lhn->val = hdata.get(l);
-                Vertex * v = addVertex(lhn->id); 
+                Vertex * v = addVertex(lhn->id);
                 VERTEX_info(v) = lhn;
                 addEdge(hn->id, lhn->id);
             }
@@ -79,7 +77,7 @@ public:
                 HeapNode * rhn = allocHeapNode();
                 rhn->id = r;
                 rhn->val = hdata.get(r);
-                Vertex * v = addVertex(rhn->id); 
+                Vertex * v = addVertex(rhn->id);
                 VERTEX_info(v) = rhn;
                 addEdge(hn->id, rhn->id);
             }

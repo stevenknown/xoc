@@ -32,15 +32,16 @@ namespace xcom {
 //Sort vertice by RPO order, and update rpo of vertex.
 //Record sorted vertex into vlst in incremental order of RPO.
 //NOTE: rpo start at RPO_INIT_VAL.
-void RPOMgr::computeRPO(Graph const* g, Vertex * root, OUT RPOVexList & vlst)
+void RPOMgr::computeRPO(Graph const& g, MOD Vertex * root,
+                        OUT RPOVexList & vlst)
 {
-    ASSERT0(root && g->is_graph_entry(root));
+    ASSERT0(root && g.is_graph_entry(root));
     m_used_rpo.clean();
     BitSet is_visited;
     Stack<Vertex*> stk;
     stk.push(root);
     Vertex * v;
-    RPOUVal order = RPO_INIT_VAL + g->getVertexNum() * RPO_INTERVAL;
+    RPOUVal order = RPO_INIT_VAL + g.getVertexNum() * RPO_INTERVAL;
     vlst.clean();
     while ((v = stk.get_top()) != nullptr) {
         is_visited.bunion((BSIdx)VERTEX_id(v));
@@ -53,7 +54,7 @@ void RPOMgr::computeRPO(Graph const* g, Vertex * root, OUT RPOVexList & vlst)
                 find = true;
                 break;
             }
-        }        
+        }
         if (!find) {
             stk.pop();
             vlst.append_head(v);
@@ -170,13 +171,13 @@ static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
         //CASE:compile.gr/guard.gr
         // newvex is V14, marker is V2
         // VEX13 rpo:19
-        //  | 
+        //  |
         //  v v．．．．．．．．．．
         // VEX2 rpo:20    |
         //  |             |
         //  v             |
         // VEX4 rpo:30----
-        return RPO_UNDEF; 
+        return RPO_UNDEF;
     }
     rpo = rpomgr->tryFindUsableRPO(begin, end);
     #endif

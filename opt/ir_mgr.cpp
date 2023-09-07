@@ -105,6 +105,7 @@ IRMgr::IRMgr(Region * rg) : Pass(rg)
     m_tm = rg->getTypeMgr();
     m_rm = rg->getRegionMgr();
     m_vm = rg->getVarMgr();
+    m_init_placeholder_var = nullptr;
 }
 
 
@@ -136,9 +137,78 @@ size_t IRMgr::count_mem() const
 }
 
 
-void IRMgr::dump(Region const* rg) const
+bool IRMgr::dump() const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    Region const* rg = getRegion();
+    if (!rg->isLogMgrInit()) { return true; }
+    note(rg, "\n==---- DUMP ALL IR INFO ----==");
+    IRMgr * pthis = const_cast<IRMgr*>(this);
+    UINT n = pthis->getIRVec().get_elem_count();
+    rg->getLogMgr()->incIndent(2);
+    UINT num_has_du = 0;
+
+    //Dump which IR has allocate DU structure.
+    for (VecIdx i = IRID_UNDEF; ((UINT)i) < n; i++) {
+        IR * ir = pthis->getIRVec().get(i);
+        //IRMgr may allocate IR id with a given start index.
+        //ASSERT0(ir);
+        if (ir == nullptr) { continue; }
+        DU * du = ir->getDU();
+        if (du != nullptr) {
+            num_has_du++;
+        }
+    }
+    if (n > 0) {
+        note(rg, "\nTotal IR %d, total DU allocated %d, rate:(%.1f)%%",
+             n, num_has_du, (float)num_has_du / (float)n * 100);
+    }
+
+    //Dump IR dispers in free tab.
+    note(rg, "\n==---- DUMP IR DISPERSED IN FREE TAB ----==");
+    for (UINT w = 0; w < MAX_OFFSET_AT_FREE_TABLE + 1; w++) {
+        IR * lst = pthis->getFreeTabIRHead(w);
+        note(rg, "\nbyte(%d)", (INT)(w + sizeof(IR)));
+        if (lst == nullptr) { continue; }
+        UINT num = 0;
+        IR * p = lst;
+        while (p != nullptr) { p = p->get_next(); num++; }
+        prt(rg, ", num%d : ", num);
+        while (lst != nullptr) {
+            prt(rg, "%s", IRNAME(lst));
+            lst = IR_next(lst);
+            if (lst != nullptr) {
+                prt(rg, ", ");
+            }
+        }
+    }
+    note(rg, "\n==---- DUMP IR ALLOCATED ----==");
+    StrBuf buf(64); //record data-type.
+    for (VecIdx i = IRID_UNDEF; ((UINT)i) < n; i++) {
+        IR * ir = pthis->getIRVec().get(i);
+        //IRMgr may allocate IR id with a given start index.
+        //ASSERT0(ir);
+        if (ir == nullptr) { continue; }
+        Type const* d = nullptr;
+        if (!ir->is_undef()) {
+            d = IR_dt(ir);
+            ASSERT0(d);
+            if (d == nullptr) {
+                note(rg, "\nid(%d): %s 0x%.8x", ir->id(), IRNAME(ir), ir);
+            } else {
+                buf.clean();
+                note(rg, "\nid(%d): %s r:%s 0x%.8x",
+                     ir->id(), IRNAME(ir), m_tm->dump_type(d, buf), ir);
+            }
+        } else {
+            note(rg, "\nid(%d): undef 0x%.8x", ir->id(), ir);
+        }
+        DU * du = ir->getDU();
+        if (du != nullptr) {
+            prt(rg, " has du");
+        }
+    }
+    rg->getLogMgr()->decIndent(2);
+    return true;
 }
 
 
@@ -231,8 +301,9 @@ IR * IRMgr::pickFreeIR(UINT idx, bool lookup)
 }
 
 
-void IRMgr::dumpFreeTab(Region const* rg) const
+void IRMgr::dumpFreeTab() const
 {
+    Region const* rg = getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP Region Free Table --==");
     for (UINT i = 0; i <= MAX_OFFSET_AT_FREE_TABLE; i++) {
@@ -249,6 +320,18 @@ void IRMgr::dumpFreeTab(Region const* rg) const
             prt(rg, "ir(%d),", ir->id());
         }
     }
+}
+
+
+Var * IRMgr::genInitPlaceHolderVar()
+{
+    if (m_init_placeholder_var == nullptr) {
+        ASSERT0(m_vm);
+        m_init_placeholder_var = m_vm->registerVar("#init_placeholder",
+                                                   m_tm->getAny(), 1,
+                                                   VAR_LOCAL|VAR_FAKE);
+    }
+    return m_init_placeholder_var;
 }
 
 
@@ -367,10 +450,8 @@ IR * IRMgr::buildString(Sym const* strtab)
 //The result depends on the predicator's value.
 //e.g: x = a > b ? 10 : 100
 //Note predicator may not be judgement expression.
-IR * IRMgr::buildSelect(IR * pred,
-                         IR * true_exp,
-                         IR * false_exp,
-                         Type const* type)
+IR * IRMgr::buildSelect(IR * pred, IR * true_exp, IR * false_exp,
+                        Type const* type)
 {
     ASSERT0(type);
     ASSERT0(pred && pred->is_single() && true_exp && false_exp);
@@ -472,7 +553,7 @@ IR * IRMgr::buildPhi(PRNO prno, Type const* type, IR * opnd_list)
 //    0 means the call does not have a return value.
 //type: result PR data type.
 IR * IRMgr::buildCall(Var * callee, IR * param_list, UINT result_prno,
-                       Type const* type)
+                      Type const* type)
 {
     ASSERT0(type);
     ASSERT0(callee);
@@ -489,16 +570,24 @@ IR * IRMgr::buildCall(Var * callee, IR * param_list, UINT result_prno,
 }
 
 
+IR * IRMgr::buildInitPlaceHolder(IR * exp)
+{
+    Var * placeholder_var = genInitPlaceHolderVar();
+    ASSERT0(placeholder_var);
+    IR * call = buildCall(placeholder_var, exp);
+    CALL_is_intrinsic(call) = true;
+    return call;
+}
+
+
 //Build IR_ICALL operation.
 //res_list: reture value list.
 //result_prno: indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
 //type: result PR data type.
 //    0 means the call does not have a return value.
-IR * IRMgr::buildICall(IR * callee,
-                        IR * param_list,
-                        UINT result_prno,
-                        Type const* type)
+IR * IRMgr::buildICall(IR * callee, IR * param_list, UINT result_prno,
+                       Type const* type)
 {
     ASSERT0(type);
     ASSERT0(callee);
@@ -594,8 +683,7 @@ IR * IRMgr::buildLoad(Var * var, TMWORD ofst, Type const* type)
     DATA_TYPE dt = ir->getDType();
     if (IS_SIMPLEX(dt)) {
         //Hoist data-type from less than INT to INT.
-        IR_dt(ir) = m_tm->getSimplexTypeEx(m_tm->
-                                                   hoistDtype(dt));
+        IR_dt(ir) = m_tm->getSimplexTypeEx(m_tm->hoistDtype(dt));
     }
     return ir;
 }
@@ -673,7 +761,7 @@ IR * IRMgr::buildGetElem(Type const* type, IR * base, IR * offset)
 //offset: byte offset to the start of result PR.
 //rhs: value expected to store.
 IR * IRMgr::buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
-                          IR * offset)
+                         IR * offset)
 {
     ASSERT0(type && offset && val && prno != PRNO_UNDEF && val->is_exp());
     IR * ir = allocIR(IR_SETELEM);
@@ -842,8 +930,8 @@ IR * IRMgr::buildIStore(IR * base, IR * rhs, Type const* type)
 //        the 1th dimension has 12 elements, and the 2th dimension has 24
 //        elements, which element type is D_I32.
 IR * IRMgr::buildArray(IR * base, IR * sublist, Type const* type,
-                        Type const* elemtype, UINT dims,
-                        TMWORD const* elem_num_buf)
+                       Type const* elemtype, UINT dims,
+                       TMWORD const* elem_num_buf)
 {
     ASSERT0(type);
     ASSERT0(base && sublist && elemtype);
@@ -909,8 +997,8 @@ IR * IRMgr::buildArray(IR * base, IR * sublist, Type const* type,
 //    Note the parameter may be nullptr.
 //rhs: value expected to store.
 IR * IRMgr::buildStoreArray(IR * base, IR * sublist, Type const* type,
-                             Type const* elemtype, UINT dims,
-                             TMWORD const* elem_num_buf, IR * rhs)
+                            Type const* elemtype, UINT dims,
+                            TMWORD const* elem_num_buf, IR * rhs)
 {
     ASSERT0(base && sublist && type);
     ASSERT0(base->is_exp() && base->isPtr());
@@ -1000,11 +1088,7 @@ IR * IRMgr::buildCase(IR * casev_exp, LabelInfo const* jump_lab)
 //loop_body: stmt list.
 //init: record the stmt that initialize iv.
 //step: record the stmt that update iv.
-IR * IRMgr::buildDoLoop(IR * iv,
-                         IR * init,
-                         IR * det,
-                         IR * step,
-                         IR * loop_body)
+IR * IRMgr::buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body)
 {
     ASSERT0(det &&
             (det->is_lt() ||
@@ -1128,7 +1212,7 @@ IR * IRMgr::buildIf(IR * det, IR * true_body, IR * false_body)
 //
 //NOTE: Do not set parent for stmt in 'body'.
 IR * IRMgr::buildSwitch(IR * vexp, IR * case_list, IR * body,
-                         LabelInfo const* default_lab)
+                        LabelInfo const* default_lab)
 {
     ASSERT0(vexp && vexp->is_exp());
     IR * ir = allocIR(IR_SWITCH);
@@ -1176,7 +1260,7 @@ IR * IRMgr::buildBranch(bool is_true_br, IR * det, LabelInfo const* lab)
 
 //Build IR_CONST operation.
 //The expression indicates a float point number.
-IR * IRMgr::buildImmFp(HOST_FP fp, Type const* type)
+IR * IRMgr::buildImmFP(HOST_FP fp, Type const* type)
 {
     ASSERT0(type);
     IR * imm = allocIR(IR_CONST);
@@ -1209,7 +1293,8 @@ IR * IRMgr::buildImmAny(HOST_INT v)
 IR * IRMgr::buildImmInt(HOST_INT v, Type const* type)
 {
     ASSERT0(type);
-    ASSERT0(type->is_int() || type->is_mc());
+    ASSERT0(type->is_int() || type->is_mc() || type->is_pointer() ||
+            type->is_ptr_addend());
     IR * imm = allocIR(IR_CONST);
     if (type->is_int()) {
         //Make sure value is sign-extended.
@@ -1318,14 +1403,15 @@ IR * IRMgr::buildPointerOp(IR_CODE irc, IR * lchild, IR * rchild)
             IR * ret = allocIR(IR_SUB);
             BIN_opnd0(ret) = lchild;
             BIN_opnd1(ret) = rchild;
-            IR_dt(ret) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE, true));
+            IR_dt(ret) = dm->getSimplexTypeEx(dm->getAlignedDType(
+                WORD_BITSIZE, true));
             if (TY_ptr_base_size(d0) > BYTE_PER_CHAR) {
                 IR * div = allocIR(IR_DIV);
                 BIN_opnd0(div) = ret;
                 BIN_opnd1(div) = buildImmInt(TY_ptr_base_size(d0),
                                              ret->getType());
-                IR_dt(div) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE,
-                                                               true));
+                IR_dt(div) = dm->getSimplexTypeEx(
+                    dm->getAlignedDType(WORD_BITSIZE, true));
                 ret = div;
             }
 
@@ -1418,13 +1504,11 @@ IR * IRMgr::buildJudge(IR * exp)
     if (exp->is_ptr()) {
         type = dm->getSimplexTypeEx(dm->getPointerSizeDtype());
     }
-
     if (!type->is_fp() && !type->is_int() && !type->is_mc()) {
         type = dm->getI32();
     }
-
     return buildCmp(IR_NE, exp, type->is_fp() ?
-           buildImmFp(HOST_FP(0), type) : buildImmInt(0, type));
+           buildImmFP(HOST_FP(0), type) : buildImmInt(0, type));
 }
 
 
@@ -1469,7 +1553,7 @@ IR * IRMgr::buildUnaryOp(IR_CODE irc, Type const* type, IN IR * opnd)
 
 //Build binary operation without considering pointer arithmetic.
 IR * IRMgr::buildBinaryOpSimp(IR_CODE irc, Type const* type,
-                               IR * lchild, IR * rchild)
+                              IR * lchild, IR * rchild)
 {
     ASSERT0(type);
     if (lchild->is_const() && !rchild->is_const() &&
@@ -1506,7 +1590,7 @@ IR * IRMgr::buildBinaryOp(IR_CODE irc, DATA_TYPE dt, IR * lchild, IR * rchild)
 //If rchild/lchild is pointer, the function will attemp to generate pointer
 //arithmetic operation instead of normal binary operation.
 IR * IRMgr::buildBinaryOp(IR_CODE irc, Type const* type, IR * lchild,
-                           IR * rchild)
+                          IR * rchild)
 {
     ASSERT0(type);
     ASSERT0(checkLogicalOp(irc, type, m_tm));

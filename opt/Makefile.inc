@@ -74,10 +74,17 @@ ir_verify_ext.o\
 ir_decl.o\
 ir_desc.o\
 ir_utils.o\
-cfg_lifting.o
+cfg_lifting.o\
+bytebuf.o\
+storage_space.o\
+literal.o
+
+ifeq ($(TARG),)
+  $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
+endif
 
 ifeq ($(FOR_IP), true)
-  $(info "ADD FOR-IP OBJS")
+  $(info "CONDBR:opt/Makefile.inc:FOR_IP=$(FOR_IP)")
   OPT_OBJS+=\
   lsra_impl.o\
   lsra_scan_in_pos.o\
@@ -88,6 +95,29 @@ ifeq ($(FOR_IP), true)
   targinfo_mgr.o\
   ir_vrp.o\
   ir_dse.o\
+  linear_scan.o\
+  ir_vect.o
+else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
+  $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
+  linear_scan.o
+else ifneq ($(findstring $(TARG), FOR_RISCV FOR_ARM),)
+  $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
+  OPT_OBJS+=\
+  lsra_impl.o\
+  lsra_scan_in_pos.o\
+  lsra_scan_in_prio.o\
+  lt_interf_graph.o\
+  lt_prio_mgr.o\
+  lifetime.o\
+  targinfo_mgr.o\
   linear_scan.o
 endif
 

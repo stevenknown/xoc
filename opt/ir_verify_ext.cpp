@@ -46,8 +46,8 @@ bool verifyVST(IR const* ir, Region const* rg)
         ASSERT0(VST_rhs(ir)->is_single());
     }
     if (d->is_vector()) {
-        ASSERT0(d->getVectorElemType() != D_UNDEF);
-        ASSERT0(tm->getDTypeByteSize(d->getVectorElemType()) >=
+        ASSERT0(d->getVectorElemDType() != D_UNDEF);
+        ASSERT0(tm->getDTypeByteSize(d->getVectorElemDType()) >=
                 tm->getByteSize(VST_rhs(ir)->getType()));
     }
     return true;
@@ -103,7 +103,7 @@ bool verifyBROADCAST(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     Type const* d = ir->getType();
-    ASSERT0(d);
+    ASSERT0_DUMMYUSE(d);
     ASSERT0(d->getDType() != D_UNDEF);
     ASSERT0(BROADCAST_src(ir) && BROADCAST_src(ir)->is_exp());
     ASSERT0(BROADCAST_src(ir)->is_single());

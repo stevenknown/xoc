@@ -198,7 +198,7 @@ template <class BB, class XR> class CFG : public xcom::DGraph {
         RemoveEmptyBBHelperCtx(CfgOptCtx & coctx) :
             vertex_iter_time(0), cfgoptctx_org(coctx),
             cfgoptctx_dup(cfgoptctx_org) {}
-    
+
         CfgOptCtx & chooseCtx()
         {
             if (removeTooManyTimes()) {
@@ -210,12 +210,12 @@ template <class BB, class XR> class CFG : public xcom::DGraph {
             }
             return cfgoptctx_org;
         }
-    
+
         bool needUpdateDomInfo() const
         { return removeTooManyTimes() &&
                  cfgoptctx_org.needUpdateDomInfo() &&
                  cfgoptctx_org.oc.is_dom_valid(); }
-    
+
         bool removeTooManyTimes() const
         {
             return vertex_iter_time >
@@ -271,7 +271,7 @@ protected:
     //The function preprocesses the Dom, SSA, and some other information that
     //related CFG before CFG changed during RemoveBB.
     //Note the function have to be invoked before CFG change.
-    virtual void preprocessBeforeRemoveBB(BB * bb, MOD CfgOptCtx & ctx)
+    virtual void preprocessBeforeRemoveBB(BB *, MOD CfgOptCtx &)
     { ASSERTN(0, ("Target Dependent Code")); }
 
     bool removeRedundantBranchCase2(BB *RESTRICT bb, BB const*RESTRICT next_bb,
@@ -287,6 +287,10 @@ protected:
     {
         if (m_rpo_vexlst != nullptr) {
             m_rpo_vexlst->remove(bb->getVex());
+        }
+        xcom::RPOVal rpo = bb->getVex()->rpo();
+        if (rpo != RPO_UNDEF) {
+            getRPOMgr().freeRPO(rpo);
         }
     }
     virtual void recomputeDomInfo(MOD OptCtx & oc) = 0;
@@ -465,7 +469,7 @@ public:
         if (!rg->isLogMgrInit()) { return; }
         xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), true);
     }
-    
+
     void freeRPOVexList()
     {
         if (m_rpo_vexlst != nullptr) {
@@ -696,7 +700,7 @@ public:
     {
         erase();
         UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
-        resize(newsz, newsz);
+        resize(newsz);
         build(oc);
 
         //One should call removeEmptyBB() immediately after this function,
@@ -889,7 +893,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
 template <class BB, class XR>
 VexIdx CFG<BB, XR>::replacePredWith(BB const* bb, BB const* succ,
                                     List<UINT> const& newpreds,
-                                    OUT CfgOptCtx & ctx)
+                                    OUT CfgOptCtx &)
 {
     //If bb removed, the number of its successors will decrease.
     //Then the number of PHI of bb's successors must be replaced.
@@ -912,6 +916,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
     if (next_bb == nullptr) {
         //'bb' is the last empty BB.
         ASSERT0(next_ct == nullptr);
+        DUMMYUSE(next_ct);
         //CASE:Do NOT remove entry or exit.
         //Some redundant CFG has multi BB which satifies cfg-entry condition.
         if (bb->getLabelList().get_elem_count() == 0 && !isRegionExit(bb)) {
@@ -991,7 +996,6 @@ bool CFG<BB, XR>::removeSingleEmptyBB(BB * bb, MOD CfgOptCtx & ctx)
         next_bb = next_ct->val();
     }
     RemoveEmptyBBHelperCtx rmctx(ctx);
-    CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
     bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
     CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
     if (rmctx.needUpdateDomInfo()) {
@@ -1014,7 +1018,6 @@ bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx, RemoveEmptyBBCtx * rmbbctx)
     xcom::C<BB*> * next_ct;
     bool doit = false;
     RemoveEmptyBBHelperCtx rmctx(ctx);
-    CFGOPTCTX_num_of_removed_empty_bb(&ctx) = 0;
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != nullptr; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
         BB * bb = ct->val();
@@ -1342,7 +1345,7 @@ bool CFG<BB, XR>::removeUnreachBB(MOD CfgOptCtx & ctx,
     ASSERT0(m_bb_list);
     if (m_bb_list->get_elem_count() == 0) { return false; }
 
-    START_TIMER(t, "Remove Unreach BB");
+    START_TIMER(ti, "Remove Unreach BB");
     //There is only one entry point.
     xcom::BitSet visited;
     visited.bunion(m_bb_list->get_elem_count());
@@ -1364,7 +1367,7 @@ bool CFG<BB, XR>::removeUnreachBB(MOD CfgOptCtx & ctx,
             removed = true;
         }
     }
-    END_TIMER(t, "Remove Unreach BB");
+    END_TIMER(ti, "Remove Unreach BB");
     return removed;
 }
 
@@ -2026,7 +2029,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     INT order = RPO_INIT_VAL + m_bb_list->get_elem_count() * RPO_INTERVAL;
     computeRPOImpl(is_visited, m_entry->getVex(), order);
     #else
-    getRPOMgr().computeRPO(this, m_entry->getVex(), *m_rpo_vexlst);
+    getRPOMgr().computeRPO(*this, m_entry->getVex(), *m_rpo_vexlst);
     #endif
     OC_is_rpo_valid(oc) = true;
     END_TIMER(t, "Compute RPO");

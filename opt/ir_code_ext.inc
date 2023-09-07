@@ -38,4 +38,4 @@ IR_VIST,
 //Represent broadcast operation.
 IR_BROADCAST,
 
-IR_LAST_EXT_CODE = IR_BROADCAST,
+#include "targ_code_ext.inc"

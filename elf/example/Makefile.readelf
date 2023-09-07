@@ -1,0 +1,161 @@
+$(info "====---- START Makefile.readelf ----====")
+
+#SET THE DEFAULT TARGET MACHINES.
+ifndef FOR_ARM
+FOR_ARM=true
+endif
+
+ifndef FOR_X86
+FOR_X86=true
+endif
+
+ifndef FOR_X64
+FOR_X64=true
+endif
+
+ifndef FOR_SCORE
+FOR_SCORE=true
+endif
+
+ifndef FOR_TECO
+FOR_TECO=true
+endif
+
+ifeq ($(TARG),)
+  #SET DEFAULT TARG. TARG INFORM IS USELESS TO READELF.EXE
+  TARG=FOR_DEX
+endif
+
+ifeq ($(DEBUG),)
+  DEBUG=true
+endif
+
+CFLAGS+=-Wall
+ROOT_DIR=../..
+COM_DIR=../../com
+ELF_DIR=..
+READELF_DIR=.
+READELF_OUTPUT=readelf.exe
+
+include $(ELF_DIR)/Makefile.inc
+include $(COM_DIR)/Makefile.inc
+include $(ROOT_DIR)/Makefile.option
+
+MISC_TARG_MACH_ELF_OBJS+=\
+$(ELF_DIR)/misc_elf_mgr.o
+
+ifeq ($(FOR_ARM),true)
+  TARG_ARM_DIR=../../arm
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_ARM_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_ARM
+  -include $(TARG_ARM_DIR)/arm_elf_targinfo.d
+endif
+
+ifdef FOR_X86
+  TARG_X86_DIR=../../x86
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_X86_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_X86
+  -include $(TARG_X86_DIR)/*_elf_targinfo.d
+endif
+
+ifdef FOR_X64
+  TARG_X64_DIR=../../x64
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_X64_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_X64
+  -include $(TARG_X64_DIR)/*_elf_targinfo.d
+endif
+
+ifeq ($(FOR_SCORE),true)
+  TARG_SCORE_DIR=../../score
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_SCORE_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_SCORE
+  -include $(TARG_SCORE_DIR)/*_elf_targinfo.d
+endif
+
+ifdef FOR_TECO
+  TARG_TECO_DIR=../../teco
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
+  CFLAGS+=-DFOR_TECO
+  -include $(TARG_TECO_DIR)/*_elf_targinfo.d
+endif
+
+CFLAGS+=\
+  -D$(TARG) \
+  -Wno-unknown-pragmas \
+  -Wno-write-strings \
+  -Wsign-promo \
+  -Wparentheses \
+  -Wformat \
+  -Wsign-compare \
+  -Wpointer-arith \
+  -Wno-multichar \
+  -Winit-self \
+  -Wswitch \
+  -D_SUPPORT_C11_
+
+#Disable -Wconversion to avoid too much complaints.
+
+ifneq (,$(filter $(CC),g++ gcc))
+  CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
+endif
+
+TMP_ELF_OBJS=$(foreach n,$(ELF_OBJS),$(ELF_DIR)/$(n))
+
+READELF_OBJS+=\
+readelf.o\
+
+#Display internal variables.
+$(info "CC:$(CC)")
+$(info "INC:$(INC)")
+$(info "CFLAGS:$(CFLAGS)")
+$(info "DEBUG:$(DEBUG)")
+$(info "TMP_ELF_OBJS:$(TMP_ELF_OBJS)")
+
+#Define rules.
+$(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) $(READELF_OBJS)
+	@echo "BUILD $(READELF_OUTPUT)"
+	@echo "EXEC:"
+	$(CC) $(TMP_ELF_OBJS) $(MISC_TARG_MACH_ELF_OBJS) $(READELF_OBJS) \
+      -Xlinker "-(" \
+      $(COM_DIR)/$(COM_OUTPUT) \
+      -Xlinker "-)" \
+      $(CFLAGS) \
+      -o $@ -lstdc++ -lm  #-lgcov -lgcc
+	@echo "SUCCESS TO GENERATE $(READELF_OUTPUT)!!"
+
+$(COM_OUTPUT):
+	@echo "BUILD $(COM_OUTPUT)"
+	@echo "EXEC:"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
+
+%.o:%.cpp
+	@echo "BUILD $<"
+	@echo "EXEC:"
+	$(INFER) $(CC) $(CFLAGS) -c $< -o $@
+
+tmp_elf_objs: $(TMP_ELF_OBJS)
+	@echo "EXEC:tmp_elf_objs:$(TMP_ELF_OBJS)"
+
+misc_targ_mach_elf_objs: $(MISC_TARG_MACH_ELF_OBJS)
+	@echo "EXEC:misc_targ_mach_elf_objs:$(MISC_TARG_MACH_ELF_OBJS)"
+
+clean:
+	@find ../ -name "*.o" | xargs rm -f
+	@find ../ -name "*.d" | xargs rm -f
+	@find ../ -name "*.a" | xargs rm -f
+	@find ../ -name "*.exe" | xargs rm -f
+	@find ../ -name "*.elf" | xargs rm -f
+	@find ../ -name "*.out" | xargs rm -f
+	@find ../ -name "*.tmp" | xargs rm -f
+	@find ../ -name "*.asm" | xargs rm -f
+	@find ../ -name "*.swp" | xargs rm -f
+	@find ../ -name "*.swo" | xargs rm -f
+	@find ../ -name "*.log" | xargs rm -f
+	@find ../ -name "*.LOGLOG" | xargs rm -f
+	@find ../ -name "LOGLOG" | xargs rm -f
+
+-include $(COM_DIR)/*.d
+-include $(ELF_DIR)/*.d
+-include $(READELF_DIR)/*.d
+
+$(info "====---- END Makefile.readelf ----====")

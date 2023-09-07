@@ -94,7 +94,7 @@ class ExprTab : public Pass {
         return encode_expr(ir);
     }
 public:
-    explicit ExprTab(Region * rg);    
+    explicit ExprTab(Region * rg);
     ~ExprTab();
 
     ExpRep * append_expr(IR * ir);

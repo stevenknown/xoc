@@ -43,7 +43,7 @@ class CPCtx {
 public:
     bool change;
     bool need_recompute_alias_info;
-
+public:
     CPCtx()
     {
         change = false;
@@ -59,15 +59,32 @@ public:
 };
 
 
-//Propagate the constant operation, include CONST, LDA, CVT for const.
-#define CP_PROP_CONST 1
+//These flags define the IR category that can be propagation candidate.
+//Propagate nothing.
+#define CP_PROP_UNDEF 0x0
 
-//Propagate the simplex operation, include CONST, PR, LDA, CVT for simplex.
-#define CP_PROP_SIMPLEX 2
+//Propagate the constant operation, include CONST, LDA, CVT(CONST), CVT(LDA).
+#define CP_PROP_CONST 0x1
 
-//Propagate unary and simplex operations, include CONST, PR, LDA, CVT, LD,
-//ID, NEG, BNOT, LNOT, ILD.
-#define CP_PROP_UNARY_AND_SIMPLEX 3
+//Propagate the PR and CVT(PR) operation.
+#define CP_PROP_PR 0x2
+
+//Propagate unary operations, include NEG, BNOT, LNOT, CVT.
+#define CP_PROP_UNARY 0x4
+
+//Propagate non-PR operations, include LD, ID, ILD, ARRAY.
+#define CP_PROP_NONPR 0x8
+
+//Propagate inexact non-PR operations.
+//The option allow CP propagate expression even if it references inexact
+//memory.
+//e.g: there is no knowledge about p and q's point-to, however *p and 20 can be
+//propagation candidate.
+//  s = *p
+//  ... = s
+//  *q = 20
+//  ... = *q
+#define CP_PROP_INEXACT_MEM 0x10
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
@@ -82,17 +99,18 @@ protected:
     MDSSAMgr * m_mdssamgr;
     GVN * m_gvn;
     OptCtx * m_oc;
-    UINT m_prop_kind;
+    UFlag m_prop_kind;
 protected:
     //Return true if CP allows propagating memory object with inexact MD.
     bool allowInexactMD() const
-    { return m_prop_kind == CP_PROP_UNARY_AND_SIMPLEX; }
+    { return m_prop_kind.have(CP_PROP_INEXACT_MEM); }
 
-    bool computeUseSet(IR const* def_stmt, OUT IRSet * useset,
+    void copyVN(IR const* from, IR const* to) const;
+    bool computeUseSet(IR const* def_stmt, OUT IRSet & useset,
                        OUT bool & prssadu, OUT bool & mdssadu);
     bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
-    bool doPropUseSet(IRSet const* useset, IR const* def_stmt,
+    bool doPropUseSet(IRSet const& useset, IR const* def_stmt,
                       IR const* prop_value, IRListIter cur_iter,
                       IRListIter * next_iter,
                       bool prssadu, bool mdssadu);
@@ -100,20 +118,27 @@ protected:
     bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
                              IR const* prop_value, MOD IR * use,
                              IRBB * def_bb);
+    //cpop: the copy operation.
     //useset: for local used.
-    bool doPropIR(IR * def_stmt, IN IRSet * useset,
-                  IRListIter cur_iter, IRListIter * next_iter);
-    bool doPropBB(IN IRBB * bb, IN IRSet * useset);
+    bool doPropStmt(IR * cpop, MOD IRSet & useset,
+                    IRListIter cur_iter, IRListIter * next_iter);
+    bool doPropBB(IN IRBB * bb, MOD IRSet & useset);
+    bool doPropBBListInDomTreeOrder();
     void doFinalRefine(OptCtx & oc);
     void dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
                             IR const* use);
 
+    //def_stmt: the stmt of 'prop_value'.
+    //prop_value: the expression to be propagated.
+    //cur_iter: the IR list iter of  'def_stmt'.
+    bool existMayDefTillEndOfCurBB(IR const* def_stmt, IR const* prop_value,
+                                   IRListIter const& cur_iter) const;
     bool existMayDefTillBB(IR const* exp, IRBB const* start,
                            IRBB const* meetup) const;
 
     DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
-    OptCtx const* getOptCtx() const { return m_oc; }
+    OptCtx * getOptCtx() const { return m_oc; }
 
     //Return the value expression that to be propagated.
     virtual IR * getPropagatedValue(IR * stmt);
@@ -134,6 +159,11 @@ protected:
     //copy-propagate candidate.
     virtual bool isSimpCVT(IR const* ir) const;
 
+    //Return true if CVT with cvt-exp that can be regard as
+    //copy-propagate candidate.
+    bool isPRCVT(IR const* ir) const;
+    bool isLDACVT(IR const* ir) const;
+
     //Return true if ir is CVT with cvt-exp that always include low-cost
     //expression. These low-cost always profitable and may bring up new
     //optimization opportunity.
@@ -147,22 +177,33 @@ protected:
     //    yy = xx  //use_stmt|use_phi
     //
     //def_stmt: ir stmt.
+    //cur_iter: the IR list iter of 'def_stmt'.
     //prop_value: expression that will be propagated.
     //Note either use_phi or use_stmt is nullptr.
     virtual bool isAvailable(IR const* def_stmt, IR const* prop_value,
-                             IR const* repexp) const;
+                             IR const* repexp,
+                             IRListIter const& cur_iter) const;
+
+    //cur_iter: the IR list iter of 'def_stmt'.
+    //Both def_stmt and use_stmt are in same BB.
+    bool isAvailableInSameBB(IR const* def_stmt, IR const* use_stmt,
+                             IR const* prop_value,
+                             IRListIter const& cur_iter) const;
     virtual bool isCopyOP(IR * ir) const;
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
 
+    //The function pick up legal and available candidate prop_value from the
+    //root expression 'prop_value'.
     //prop_value: the expression that is going to propagate.
     //repexp: the expression that is expected to be replaced.
     //def_stmt: the stmt of prop_value.
     //The layout of parameters is:
     //  def_stmt <- prop_value
     //       ... <- repexp
-    IR const* pickupCandExp(IR const* prop_value, IR const* repexp,
+    IR const* pickUpCandExp(IR const* prop_value, IR const* repexp,
                             IR const* def_stmt,
+                            IRListIter const& next_iter,
                             bool prssadu, bool mdssadu) const;
 
     void replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
@@ -179,7 +220,7 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    CopyProp(Region * rg) : Pass(rg)
+    CopyProp(Region * rg) : Pass(rg), m_prop_kind(CP_PROP_UNDEF)
     {
         m_md_sys = rg->getMDSystem();
         m_dumgr = rg->getDUMgr();
@@ -191,7 +232,7 @@ public:
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
         ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm && m_md_set_mgr);
-        m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
+        m_prop_kind.set(CP_PROP_CONST|CP_PROP_PR|CP_PROP_NONPR);
     }
     virtual ~CopyProp() {}
 
@@ -202,7 +243,10 @@ public:
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;
 
-    void setPropagationKind(UINT kind) { m_prop_kind = kind; }
+    bool is_aggressive() const
+    { return m_prop_kind.have(CP_PROP_NONPR) || allowInexactMD(); }
+
+    void setPropagationKind(UINT kind) { m_prop_kind.set(kind); }
 
     virtual bool perform(OptCtx & oc);
 };

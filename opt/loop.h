@@ -39,6 +39,13 @@ namespace xoc {
 class IRBB;
 class Region;
 class IRCFG;
+template <class BB> class LI;
+
+//List of invariant stmt.
+typedef xcom::EList<IR*, IR2Holder> InvStmtList;
+typedef xcom::EList<IR*, IR2Holder>::Iter InvStmtListIter;
+typedef xcom::List<LI<IRBB>*> LoopInfoIter;
+typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
 
 //
 //START LI<BB>
@@ -88,10 +95,9 @@ public:
     LI * outer; //outer loop
     UCHAR has_early_exit:1;
     UCHAR has_call:1;
-    BB * loop_head; //loop head node, the only one header
-                    //indicates a natural loop.
+    //Loop head node, the only one header indicates a natural loop.
+    BB * loop_head;
     xcom::BitSet * bb_set; //loop body elements
-
 public:
     LI() {}
 
@@ -107,18 +113,32 @@ public:
     //  BB2: body
     //  BB3: goto loop start bb
     //BB3 is the backedge start bb.
-    UINT findBackedgeStartBB(xcom::Graph const* cfg) const;
+    UINT findBackEdgeStartBB(xcom::Graph const* cfg) const;
 
     //Find the first BB that is the END of loop. The end BB is outside of loop.
     //Note there could be multiple end BB if the last IR of head is
     //multipl-conditional branch, namely, SWTICH or IGOTO.
-    //  BB1: loop start bb
+    //  BB1: loop start BB
     //       falsebr END
     //  BB2: body
-    //  BB3: goto loop start bb
+    //  BB3: goto loop start BB
     //  BB4: END
-    //BB4 is the loopend bb.
+    //BB4 is the loopend BB.
     UINT findFirstLoopEndBB(xcom::Graph * cfg) const;
+
+    //Find all END BB of loop. End BB is outside of loop.
+    //Note there could be multiple end BB if the last IR of head is
+    //multipl-conditional branch, namely, SWTICH or IGOTO.
+    //  BB1: loop start bb
+    //  BB2: body
+    //  BB3: falsebr cond1 END
+    //  BB4: falsebr cond2 END
+    //  BB5: falsebr cond3 END
+    //  BB6: goto loop start bb
+    //  BB7: END
+    //BB3, BB4, BB5 are loopend BBs.
+    void findAllLoopEndBB(xcom::Graph const* cfg,
+                          OUT List<UINT> & endlst) const;
 
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
@@ -133,6 +153,7 @@ public:
     UINT id() const { return uid; }
     bool isLoopReduction() const { return !has_early_exit; }
     bool isOuterMost() const { return getOuter() == nullptr; }
+    bool isInnerMost() const { return getInnerList() == nullptr; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.
@@ -179,9 +200,10 @@ void LI<BB>::addBBToAllOuterLoop(UINT bbid) const
 //BB3 is the backedge-start bb.
 //Return backedge BB id if found, otherwise return BBID_UNDEF.
 template <class BB>
-UINT LI<BB>::findBackedgeStartBB(xcom::Graph const* cfg) const
+UINT LI<BB>::findBackEdgeStartBB(xcom::Graph const* cfg) const
 {
     ASSERT0(cfg);
+    DUMMYUSE(cfg);
     BB * head = getLoopHead();
     UINT backedgebbid = BBID_UNDEF;
     UINT backedgecount = 0;
@@ -227,6 +249,27 @@ UINT LI<BB>::findFirstLoopEndBB(xcom::Graph * cfg) const
 }
 
 
+template <class BB>
+void LI<BB>::findAllLoopEndBB(xcom::Graph const* cfg,
+                              OUT List<UINT> & endlst) const
+{
+    ASSERT0(getBodyBBSet());
+    for (BSIdx i = getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = getBodyBBSet()->get_next(i)) {
+        Vertex const* vex = cfg->getVertex(i);
+        ASSERT0(vex);
+        AdjVertexIter it;
+        for (Vertex * succ = xcom::Graph::get_first_out_vertex(vex, it);
+             succ != nullptr; succ = xcom::Graph::get_next_out_vertex(it)) {
+            if (!isInsideLoop(succ->id())) {
+                endlst.append_tail((UINT)i);
+                break;
+            }
+        }
+    }
+}
+
+
 //Return true if ir in bbid is at least execute once from loophead,
 //otherwise return false means unknown.
 template <class BB>
@@ -234,7 +277,7 @@ bool LI<BB>::atLeastExecOnce(UINT bbid, xcom::DGraph const* cfg) const
 {
     BB * head = getLoopHead();
     if (bbid == head->id()) { return true; }
-    UINT endbbid = findBackedgeStartBB(cfg);
+    UINT endbbid = findBackEdgeStartBB(cfg);
     if (endbbid != BBID_UNDEF &&
         (endbbid == bbid || cfg->is_dom(bbid, endbbid))) {
         return true;
@@ -287,7 +330,7 @@ public:
 //  BB2: body
 //  BB3: goto loop-start bb
 //BB3 is the backedge-start bb.
-IRBB * findBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
+IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
 
 //Find the first BB that is the END of loop. The end BB is outside of loop.
 //Note there could be multiple end BB if the last IR of head is
@@ -322,24 +365,24 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
                                     UINT * succ1, UINT * succ2);
 
-//List of invariant stmt.
-typedef xcom::EList<IR*, IR2Holder> InvStmtList;
-typedef xcom::EList<IR*, IR2Holder>::Iter InvStmtListIter;
-typedef xcom::List<LI<IRBB>*> LoopInfoIter;
-typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
-
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR
 //li: loop structure
 //check_tree: true to perform check recusively for entire IR tree.
-//invariant_stmt: a list that records the stmt that is invariant in loop.
+//invariant_stmt: optional parameter, can be nullptr.
+//    It is a list that records the stmt that is invariant in loop.
 //    e.g:loop() {
 //          a = b; //S1
 //       }
 //    stmt S1 is invariant because b is invariant.
+//    If it is nullptr, the function will reason out conservative answer.
 //Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
                      InvStmtList const* invariant_stmt, bool check_tree);
+
+//Return true if the target BB of branch-stmt 'stmt' is outside the given
+//loop 'li'.
+bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt);
 
 //Try inserting preheader BB of loop 'li'.
 //The function will try to maintain the RPO, DOM, and

@@ -93,7 +93,7 @@ void copyDbxForList(IR * tgt_list, IR const* src, Region * rg)
 //Set dbx to 'ir'.
 void setDbx(IR * ir, Dbx * dbx, Region * rg)
 {
-    ASSERT0(ir && dbx && rg);    
+    ASSERT0(ir && dbx && rg);
     if (ir->getAI() == nullptr) {
         IR_ai(ir) = rg->allocAIContainer();
     } else {
@@ -118,7 +118,7 @@ void setDbx(IR * ir, Dbx * dbx, Region * rg)
 //Copy dbx from 'src' to 'tgt'.
 void copyDbx(IR * tgt, IR const* src, Region * rg)
 {
-    ASSERT0(tgt && src && rg);    
+    ASSERT0(tgt && src && rg);
     if (src->getAI() == nullptr) {
         if (g_is_search_and_copy_dbx && src->is_exp() &&
             src->getParent() != nullptr) {

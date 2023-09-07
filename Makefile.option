@@ -8,8 +8,21 @@ ifeq ($(DEBUG), true)
   #Add predefined macro if build host is Windows.
   CFLAGS+=-D_DEBUG_
   CFLAGS+=-O0 -g2
+  CFLAGS+=-MMD #Ask compiler generate dependent files information.
 else
   CFLAGS+=-O2
+  CFLAGS+=-MMD #Ask compiler generate dependent files information.
+endif
+
+ifeq ($(REF_TARGMACH_INFO),true)
+  CFLAGS+=-DREF_TARGMACH_INFO #LSRA use targmach info
+endif
+
+#To conveninently use DUMMYUSE, some compiler will complain for comma
+#expression.
+USE_DUMMYUSE=true
+ifeq ($(USE_DUMMYUSE), true)
+  CFLAGS+=-Wno-unused-value
 endif
 
 #ADD OS FLAG
@@ -19,7 +32,7 @@ ifeq ($(WIN), true)
   CFLAGS+=-D_ON_WINDOWS_
   ifeq ($(WSL), true)
     CFLAGS+=-D_USE_GCC_
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
   CFLAGS+=-D_USE_GCC_
@@ -37,12 +50,14 @@ ifeq ($(WIN), true)
     endif
   else
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
-  CC:=$(shell which clang++ > /dev/null)
   ifndef CC
-    CC=$(if $(shell which clang),clang,gcc)
+    CC:=$(shell which clang++ > /dev/null)
+    ifndef CC
+      CC=$(if $(shell which clang),clang,gcc)
+    endif
   endif
   ifndef CC
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")

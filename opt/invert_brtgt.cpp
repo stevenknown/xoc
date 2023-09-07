@@ -99,8 +99,8 @@ bool InvertBrTgt::invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
     IRCFG * cfg = invt->getRegion()->getCFG();
     void * vi1 = cfg->getEdge(br->getBB()->id(), br_tgt->id())->info();
     void * vi2 = cfg->getEdge(jmp->getBB()->id(), jmp_tgt->id())->info();
-   
-    CfgOptCtx ctx(*invt->getOptCtx()); 
+
+    CfgOptCtx ctx(*invt->getOptCtx());
     cfg->removeEdge(br->getBB(), br_tgt, ctx);
     cfg->removeEdge(jmp->getBB(), jmp_tgt, ctx);
 

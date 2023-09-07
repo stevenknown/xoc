@@ -89,6 +89,7 @@ bool g_do_licm = false;
 bool g_do_gvn = true;
 bool g_do_pre = false;
 bool g_do_rce = false;
+bool g_do_vect = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
 bool g_do_mdssa = false;
@@ -128,6 +129,7 @@ DumpOpt::DumpOpt()
     is_dump_dce = false;
     is_dump_vrp = false;
     is_dump_lftr = false;
+    is_dump_vectorization = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
     is_dump_ivr = false;
@@ -160,13 +162,13 @@ bool DumpOpt::isDumpNothing() const
 
 
 bool DumpOpt::isDumpBeforePass() const
-{    
+{
     return is_dump_before_pass;
 }
 
 
 bool DumpOpt::isDumpAfterPass() const
-{    
+{
     return is_dump_after_pass;
 }
 
@@ -258,6 +260,12 @@ bool DumpOpt::isDumpRCE() const
 bool DumpOpt::isDumpLFTR() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_lftr);
+}
+
+
+bool DumpOpt::isDumpVectorization() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_vectorization);
 }
 
 

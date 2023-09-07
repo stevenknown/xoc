@@ -41,7 +41,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //FOLLOWING FILES ARE MIDDLE LEVEL INCLUDED FILES
 #include "ir_utils.h"
+#include "ir_utils_ext.h"
 #include "dbg.h"
+#include "bytebuf.h"
+#include "storage_space.h"
 #include "var.h"
 #include "md.h"
 #include "pass.h"
@@ -49,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "du.h"
 #include "ir.h"
 #include "ir_decl.h"
+#include "ir_decl_ext.h"
 #include "ir_helper.h"
 #include "ir_dump.h"
 #include "ir_verify.h"

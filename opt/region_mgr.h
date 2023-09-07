@@ -64,7 +64,6 @@ typedef enum {
 } REGION_TYPE;
 
 class Region;
-class CallGraph;
 class IPA;
 class TargInfo;
 
@@ -92,7 +91,6 @@ protected:
     VarMgr * m_var_mgr;
     MD const* m_str_md;
     MDSystem * m_md_sys;
-    CallGraph * m_call_graph;
     UINT m_ru_count;
     List<UINT> m_free_ru_id;
     UINT m_label_count;
@@ -100,7 +98,7 @@ protected:
     TargInfo * m_targinfo;
     SMemPool * m_pool;
     LogMgr * m_logmgr;
-
+    Region * m_program;
 protected:
     void estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
                     bool scan_call, bool scan_inner_region);
@@ -124,11 +122,12 @@ public:
     //Allocate TargInfo.
     virtual TargInfo * allocTargInfo();
 
-    //Allocate CallGraph.
-    virtual CallGraph * allocCallGraph(UINT vexnum);
-
     //Allocate IPA module.
     IPA * allocIPA(Region * program);
+
+    //Check switch-case entry for each IR.
+    virtual bool checkIRSwitchCaseInterface(IR_CODE c) const;
+    bool checkIRSwitchCaseEntry() const;
 
     //Destroy specific region by given id.
     void deleteRegion(Region * rg, bool collect_id = true);
@@ -145,14 +144,15 @@ public:
     RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();
+
     MDSystem * getMDSystem() { return m_md_sys; }
     SymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
-    CallGraph * getCallGraph() const { return m_call_graph; }
     VarMgr * getVarMgr() const { return m_var_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
     LogMgr * getLogMgr() const { return m_logmgr; }
     OptCtx * getAndGenOptCtx(Region * rg);
+    virtual Region * getProgramRegion() const { return m_program; }
 
     //Register exact MD for each global variable.
     //Note you should call this function as early as possible, e.g, before
@@ -180,12 +180,10 @@ public:
         ASSERTN(m_targinfo == nullptr, ("TargInfo already initialized"));
         m_targinfo = allocTargInfo();
         ASSERT0(m_targinfo);
+        ASSERT0(verifyPreDefinedInfo());
     }
     bool isLogMgrInit() const
     { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }
-
-    //Scan call site and build call graph.
-    void buildCallGraph(OptCtx & oc, bool scan_call, bool scan_inner_region);
 
     Region * newRegion(REGION_TYPE rt);
 
@@ -204,6 +202,8 @@ public:
     //Process top-level region unit.
     //Top level region unit should be program unit.
     virtual bool processProgramRegion(IN Region * program, OptCtx * oc);
+
+    void setProgramRegion(Region * rg) { m_program = rg; }
 
     bool verifyPreDefinedInfo();
 };

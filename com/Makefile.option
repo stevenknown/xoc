@@ -19,7 +19,7 @@ ifeq ($(WIN), true)
   CFLAGS+=-D_ON_WINDOWS_
   ifeq ($(WSL), true)
     CFLAGS+=-D_USE_GCC_
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
   CFLAGS+=-D_USE_GCC_
@@ -37,7 +37,7 @@ ifeq ($(WIN), true)
     endif
   else
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
-  endif 
+  endif
 else
   $(info "ON LINUX OR UNIX")
   CC:=$(shell which clang++ > /dev/null)

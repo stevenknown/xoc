@@ -192,7 +192,7 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
         //                                               PASS_UNDEF);
         //}
         //insert_bb |= splitted;
-        
+
     }
     return changed;
 }
@@ -528,7 +528,7 @@ bool LFTR::replaceCandByIV(LFAnaCtx const& ctx)
     bool changed = false;
     for (IR const* cand = ctx.getLFRInfoMap().get_first(it, &info);
          info != nullptr; cand = ctx.getLFRInfoMap().get_next(it, &info)) {
-        ASSERT0(cand == info->lf_exp);
+        ASSERT0_DUMMYUSE(cand == info->lf_exp);
         ASSERT0(info->lf_exp->is_exp());
         info->lf_exp->getStmt()->replaceKid(info->lf_exp, genNewIVRef(info),
                                             true);

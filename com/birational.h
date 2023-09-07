@@ -42,14 +42,11 @@ class BIRational {
     friend BIRational operator + (BIRational const& a, BIRational const& b);
     friend BIRational operator - (BIRational const& a, BIRational const& b);
     friend BIRational operator - (BIRational const& a);
-
 private:
     BigInt m_num;
     BigInt m_den;
-
 private:
     void _gcd(BigInt const& a, BigInt const& b, BigInt & gcd);
-
 public:
     BIRational() { m_num = BigInt(1, 0); m_den = BigInt(1, 1); }
     BIRational(BIRational const& src)

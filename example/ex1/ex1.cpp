@@ -40,7 +40,7 @@ static void generate_region(RegionMgr * rm)
     Region * toprg = rm->newRegion(REGION_PROGRAM);
     toprg->initPassMgr();
     toprg->initIRMgr();
-  
+    toprg->initIRBBMgr();
     rm->addToRegionTab(toprg);
     toprg->setRegionVar(rm->getVarMgr()->registerVar(
         "program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
@@ -49,6 +49,7 @@ static void generate_region(RegionMgr * rm)
     Region * func = rm->allocRegion(REGION_FUNC);
     func->initPassMgr();
     func->initIRMgr();
+    func->initIRBBMgr();
     func->setRegionVar(rm->getVarMgr()->registerVar(
         ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 

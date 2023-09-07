@@ -117,7 +117,9 @@ void AssembleBinBuf::writeWord(BinWord word, UINT bitsize)
 {
     UINT start_bit_in_word = m_cur_bitofst % BIN_WORD_SIZE;
     UINT wordofst = m_cur_bitofst / BIN_WORD_SIZE;
-    ASSERT0(!isImpure(word, bitsize));
+    ASSERTN(!isImpure(word, bitsize),
+            ("word:0x%x contain extra value that exceed the maximum number"
+             " of %ubits can represent", word, bitsize));
     if (start_bit_in_word == 0) {
         #ifdef WORD_SIZE_ALIGN
         writeEntireWord(((BinWord*)m_bytebuf) + wordofst, word);
@@ -193,19 +195,18 @@ void AssembleBinBuf::writeBuf(BYTE const* bitvalbuf, UINT bitsize)
 }
 
 
-void AssembleBinBuf::dump(FILE * h, BYTE const* buf, UINT len)
+void AssembleBinBuf::dump(FileObj & fo, BYTE const* buf, UINT len)
 {
-    ::fprintf(h, "\n");
+    fo.prt("\n");
     for (UINT i = 0; i < len; i++) {
-        ::fprintf(h, "0x%02x,", buf[i]);
+        fo.prt("0x%02x,", buf[i]);
     }
-    ::fflush(h);
 }
 
 
-void AssembleBinBuf::dump(FILE * h) const
+void AssembleBinBuf::dump(FileObj & fo) const
 {
-    dump(h, m_bytebuf, m_bytebuflen);
+    dump(fo, m_bytebuf, m_bytebuflen);
 }
 
 } //namespace xcom

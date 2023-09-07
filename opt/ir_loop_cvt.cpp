@@ -43,7 +43,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
     IRBB * head = li->getLoopHead();
     ASSERT0(head);
 
-    *gobackbb = findBackedgeStartBB(li, m_cfg);
+    *gobackbb = findBackEdgeStartBB(li, m_cfg);
     if (*gobackbb == nullptr) {
         //loop may be too messy.
         return false;

@@ -1,4 +1,4 @@
-Build all examples:
+Build and run all examples:
     ./build.sh
 
 If you are building testbs.cpp, the macro -D_LINUX_ is needed.

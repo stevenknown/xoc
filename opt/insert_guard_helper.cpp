@@ -167,7 +167,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     }
     m_guard_start->getIRList().clean();
     ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guard_start));
-    
+
     //Remove stmts in guarded_bb.
     for (IR * ir = m_guarded_bb->getIRList().get_head();
          ir != nullptr; ir = m_guarded_bb->getIRList().get_next()) {
@@ -298,7 +298,7 @@ void InsertGuardHelper::updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,
                                            IR * loophead_br)
 {
     //Assign MD for all generated new IRs.
-    m_rg->getMDMgr()->assignMDForIRList(guard_br, true, true);
+    m_rg->getMDMgr()->assignMD(guard_br, true, true);
     if (m_du != nullptr) {
         //Copy the DU chain for generated IR.
         m_du->addUseForTree(BR_det(guard_br), BR_det(loophead_br));
@@ -465,7 +465,8 @@ void InsertGuardHelper::reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
         ASSERT0(marker);
         xoc::removeUse(y, m_rg);
         IR * newy = m_rg->dupIR(marker);
-        guard_det->replaceKid(y, newy, false);
+        bool change = guard_det->replaceKid(y, newy, true);
+        ASSERT0_DUMMYUSE(change);
         xoc::addUse(newy, marker, m_rg);
         m_rg->freeIR(y);
     }
@@ -554,6 +555,10 @@ IRBB * InsertGuardHelper::insertGuard(LI<IRBB> const* li, IRBB * prehead)
     IRBB * loophead = li->getLoopHead();
     IRBB * guard_start = insertGuardStart(prehead);
     IRBB * guard_end = insertGuardEnd(prehead, loophead);
+    if (!getOptCtx()->is_rpo_valid()) {
+        //Recompute or maintain the DOM need RPO.
+        m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_RPO, PASS_UNDEF);
+    }
 
     //Preheader does not have PDOM any more.
     LabelInfo const* guard_end_lab = addJumpEdge(guard_start, guard_end);

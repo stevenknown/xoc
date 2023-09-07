@@ -86,7 +86,7 @@ public:
 
     void dump(Region * rg) const;
 
-    IV const* getIVInfo(MD const* md) const { return m_ivmd2ivinfo.get(md); } 
+    IV const* getIVInfo(MD const* md) const { return m_ivmd2ivinfo.get(md); }
     LFRInfo * genLFRInfo(IR const* lf_exp);
     IRList const& getCandList() const { return m_cand_list; }
     LFRInfoMap const& getLFRInfoMap() const { return m_cand_occ2info; }

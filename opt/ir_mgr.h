@@ -38,6 +38,7 @@ namespace xoc {
 
 class IRMgr : public Pass {
     COPY_CONSTRUCTOR(IRMgr);
+protected:
     UINT m_ir_count;
     SMemPool * m_ir_pool;
     TypeMgr * m_tm;
@@ -45,6 +46,7 @@ class IRMgr : public Pass {
     VarMgr * m_vm;
     Vector<IR*> m_ir_vec; //record IR which have allocated. ir id is dense
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
+    Var * m_init_placeholder_var;
     #ifdef _DEBUG_
     xcom::BitSet m_has_been_freed_irs;
     #endif
@@ -103,11 +105,11 @@ public:
     IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
 
     //Build Do Loop stmt.
-    //iv: induction variable.
-    //det: determinate expression.
+    //iv: the induction variable.
+    //det: the determinate expression of iv.
     //loop_body: stmt list.
-    //init: record the stmt that initialize iv.
-    //step: record the stmt that update iv.
+    //init: record the expression that represent the initial value of iv.
+    //step: record the expression that represent the update behavior of iv.
     IR * buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body);
 
     //Build Do While stmt.
@@ -238,7 +240,7 @@ public:
 
     //Build IR_CONST operation.
     //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, Type const* type);
+    IR * buildImmFP(HOST_FP fp, Type const* type);
 
     //Build IR_CONST operation.
     //The expression indicates value with dynamic type.
@@ -246,8 +248,8 @@ public:
 
     //Build IR_CONST operation.
     //The expression indicates a float point number.
-    IR * buildImmFp(HOST_FP fp, DATA_TYPE dt)
-    { return buildImmFp(fp, m_tm->getSimplexType(dt)); }
+    IR * buildImmFP(HOST_FP fp, DATA_TYPE dt)
+    { return buildImmFP(fp, m_tm->getSimplexType(dt)); }
 
     //Build IR_LDA operation.
     //var: variable that will be taken address.
@@ -465,10 +467,14 @@ public:
     IR * buildCall(Var * callee,  IR * param_list)
     { return buildCall(callee, param_list, 0, m_tm->getAny()); }
 
+    //Build a placeholder operation that is used to remark a lexicographic
+    //order in IR list.
+    IR * buildInitPlaceHolder(IR * exp);
+
     size_t count_mem() const;
 
-    void dumpFreeTab(Region const* rg) const;
-    void dump(Region const* rg) const;
+    void dumpFreeTab() const;
+    virtual bool dump() const;
 
     //This function erases all informations of ir and
     //append it into free_list for next allocation.
@@ -476,8 +482,7 @@ public:
     //Note that this function does NOT free ir's kids and siblings.
     void freeIR(IR * ir);
 
-    virtual CHAR const* getPassName() const
-    { return "IRMgr"; }
+    virtual CHAR const* getPassName() const { return "IRMgr"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRMGR; }
     IR * getFreeTabIRHead(UINT idx)
     {
@@ -489,10 +494,13 @@ public:
     Vector<IR*> & getIRVec() { return m_ir_vec; }
     UINT getIRCount() const { return m_ir_count; }
 
+    //Generate a variable to inform compiler that this is a placeholder.
+    Var * genInitPlaceHolderVar();
+
     //Note if the ir-count changed, the new generated IR id will start from the
     //new ir-count.
     void setIRCount(UINT cnt) { m_ir_count = cnt; }
-    virtual bool perform(OptCtx & oc) { return false; }
+    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 };
 
 } //namespace xoc

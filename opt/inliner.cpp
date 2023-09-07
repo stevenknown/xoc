@@ -43,7 +43,7 @@ bool Inliner::is_call_site(IR * call, Region * rg)
 {
     ASSERT0(call->isCallStmt());
     CallNode const* cn1 =
-        m_call_graph->mapSym2CallNode(CALL_idinfo(call)->get_name(), rg);
+        m_call_graph->findCallNode(CALL_idinfo(call)->get_name(), rg);
     CallNode const* cn2 = m_call_graph->mapRegion2CallNode(rg);
     return cn1 == cn2;
 }
@@ -271,7 +271,7 @@ bool Inliner::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     DUMMYUSE(oc);
-    ASSERT0(OC_is_callg_valid(oc));
+    ASSERT0(oc.is_callgraph_valid());
     ASSERT0(m_program && m_program->is_program());
     IR * irs = m_program->getIRList();
     while (irs != nullptr) {

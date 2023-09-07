@@ -51,6 +51,7 @@ author: Su Zhenyu
 #include "cfg_lifting.h"
 
 #ifdef FOR_IP
+#include "ir_vect.h"
 #include "ir_dse.h"
 #include "scop.h"
 #include "ir_poly.h"
@@ -61,6 +62,17 @@ author: Su Zhenyu
 #include "lifetime.h"
 #include "lt_interf_graph.h"
 #include "linear_scan.h"
+#endif
+
+#ifdef REF_TARGMACH_INFO
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
+#include "lsra_impl.h"
+#include "lsra_scan_in_pos.h"
+#include "lt_prio_mgr.h"
+#include "lsra_scan_in_prio.h"
 #endif
 
 #include "ir_cp.h"

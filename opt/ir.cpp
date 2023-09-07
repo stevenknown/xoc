@@ -66,7 +66,7 @@ INT checkKidNumValid(IR const* ir, UINT n, CHAR const* filename, INT line)
 
 
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
-                           INT line)
+                          INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
@@ -77,7 +77,7 @@ INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
 
 
 INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
-                            INT line)
+                           INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
@@ -88,7 +88,7 @@ INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
 
 
 INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
-                            INT line)
+                           INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
@@ -213,6 +213,15 @@ bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
     return HAVE_FLAG(IRDES_kid_map(g_ir_desc[irc]), 1 << kididx);
 }
 //END IRDesc
+
+
+//The function clean the IR_parent for each elements in 'irlst'.
+void cleanParentForIRList(IR * irlst)
+{
+    for (IR * t = irlst; t != nullptr; t = t->get_next()) {
+        IR_parent(t) = nullptr;
+    }
+}
 
 
 void setParentPointerForIRList(IR * ir_list)
@@ -708,6 +717,7 @@ void IR::setRefMD(MD const* md, Region * rg)
 //Copy the set of MD that ir referenced accroding to 'mds'.
 void IR::setRefMDSet(MDSet const* mds, Region * rg)
 {
+    ASSERT0(!is_region());
     DU * du = getDU();
     if (du == nullptr) {
         if (mds == nullptr) { return; }
@@ -875,9 +885,9 @@ void IR::dumpRef(Region * rg, UINT indent)
 
     if (isCallStmt()) {
         bool doit = false;
-        CallGraph * callg = rg->getRegionMgr()->getCallGraph();
+        CallGraph * callg = rg->getCallGraphPreferProgramRegion();
         if (callg != nullptr) {
-            Region * callee = callg->mapCall2Region(this, rg);
+            Region * callee = callg->getCalleeRegion(this, rg);
             if (callee != nullptr && callee->is_ref_valid()) {
                 MDSet const* muse = callee->getMayUse();
                 //May use
@@ -1467,6 +1477,20 @@ void IR::setPrno(PRNO prno)
 }
 
 
+void IR::setStorageSpace(StorageSpace ss)
+{
+    ASSERT0(IRDES_accssfunc(g_ir_desc[getCode()]));
+    (*IRDES_accssfunc(g_ir_desc[getCode()]))(this) = ss;
+}
+
+
+StorageSpace IR::getStorageSpace() const
+{
+    ASSERT0(IRDES_accssfunc(g_ir_desc[getCode()]));
+    return (*IRDES_accssfunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+}
+
+
 //Return label or nullptr.
 void IR::setLabel(LabelInfo const* li)
 {
@@ -1600,6 +1624,51 @@ void IR::setValExp(IR * exp)
     default: UNREACHABLE();
     }
     IR_parent(exp) = this;
+}
+
+
+bool IR::hasAlign() const
+{
+    switch (getCode()) {
+    case IR_LD:
+    case IR_ST:
+    case IR_ARRAY:
+    case IR_STARRAY:
+    case IR_ILD:
+    case IR_IST:
+        return true;
+    default: return false;
+    }
+    return false;
+}
+
+
+UINT IR::getAlign() const
+{
+    switch (getCode()) {
+    case IR_LD: return LD_align(this);
+    case IR_ST: return ST_align(this);
+    case IR_ARRAY: return ARR_align(this);
+    case IR_STARRAY: return STARR_align(this);
+    case IR_ILD: return ILD_align(this);
+    case IR_IST: return IST_align(this);
+    default: ASSERT0(0); //TODO
+    }
+    return false;
+}
+
+
+void IR::setAlign(UINT align_bytenum)
+{
+    switch (getCode()) {
+    case IR_LD: LD_align(this) = align_bytenum; return;
+    case IR_ST: ST_align(this) = align_bytenum; return;
+    case IR_ARRAY: ARR_align(this) = align_bytenum; return;
+    case IR_STARRAY: STARR_align(this) = align_bytenum; return;
+    case IR_ILD: ILD_align(this) = align_bytenum; return;
+    case IR_IST: IST_align(this) = align_bytenum; return;
+    default: ASSERT0(0); //TODO
+    }
 }
 
 

@@ -72,7 +72,7 @@ public:
     // a controls b.
     bool is_control(UINT a, UINT b) const
     { return is_control(getVertex(a), getVertex(b)); }
- 
+
     virtual bool perform(OptCtx & oc);
 
     void set_allow_cycle(bool doit) { m_allow_cycle = doit; }
