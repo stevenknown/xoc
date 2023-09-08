@@ -1,3 +1,5 @@
+[![Linux Build](https://github.com/onecoolx/xoc/actions/workflows/linux_make.yml/badge.svg)](https://github.com/onecoolx/xoc/actions/workflows/linux_make.yml)
+
 xoc
 =====
 
