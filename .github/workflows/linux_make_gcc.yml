@@ -16,4 +16,4 @@ jobs:
        CC: gcc
        CXX: g++
       run: 
-        export TARG=FOR_X86; export TARG_DIR=x86; make -f Makefile.xoc
+        export TARG=FOR_X86; export TARG_DIR=x86; make -f Makefile.xoc CC=gcc CXX=g++
