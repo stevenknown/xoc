@@ -1,0 +1,19 @@
+name: Linux GCC Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      env:
+       CC: gcc
+       CXX: g++
+      run: 
+        export TARG=FOR_X86; export TARG_DIR=x86; make -f Makefile.xoc
