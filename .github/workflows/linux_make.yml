@@ -13,4 +13,4 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: 
-        export TARG=FOR_x64; export TARG_DIR=x64; make -f Makefile.xoc
+        export TARG=FOR_X86; export TARG_DIR=x86; make -f Makefile.xoc
