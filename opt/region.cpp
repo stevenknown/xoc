@@ -92,7 +92,7 @@ void * Region::xmalloc(UINT size)
     ASSERTN(m_pool != nullptr, ("pool does not initialized"));
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 
@@ -371,20 +371,9 @@ bool Region::reconstructBBList(OptCtx & oc)
             IR * ir = ctir->val();
             if (IRBB::isLowerBoundary(ir) && ir != tail) {
                 change = true;
+
                 //Record rest part in bb list after 'ir'.
-                IR * restirs = nullptr;
-                IR * last = nullptr;
-                irlst.get_next(&ctir);
-                for (BBIRListIter next_ctir = ctir;
-                     ctir != nullptr; ctir = next_ctir) {
-                    irlst.get_next(&next_ctir);
-
-                    //CASE:some ctir in irlst may not have BB attribute,
-                    //e.g:Label.
-                    irlst.EList<IR*, IR2Holder>::remove(ctir);
-                    xcom::add_next(&restirs, &last, ctir->val());
-                }
-
+                IR * restirs = irlst.extractRestIRIntoList(ctir, false);
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb, oc);
                 break;
             }
@@ -392,17 +381,7 @@ bool Region::reconstructBBList(OptCtx & oc)
                 ASSERT0(ir->is_label());
                 change = true;
                 //Record rest part in bb list after 'ir'.
-                IR * restirs = nullptr;
-                IR * last = nullptr;
-                for (BBIRListIter next_ctir = ctir;
-                     ctir != nullptr; ctir = next_ctir) {
-                    irlst.get_next(&next_ctir);
-
-                    //CASE:some ctir in irlst may not have BB attribute,
-                    //e.g:Label.
-                    irlst.EList<IR*, IR2Holder>::remove(ctir);
-                    xcom::add_next(&restirs, &last, ctir->val());
-                }
+                IR * restirs = irlst.extractRestIRIntoList(ctir, true);
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb, oc);
                 break;
             }
@@ -598,9 +577,9 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
 
     //Create a new PR Var.
     CHAR name[128];
-    sprintf(name, "pr%u", prno);
-    ASSERT0(strlen(name) < 128);
-    pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL | VAR_IS_PR);
+    ::sprintf(name, "%s%u", VarFlagDesc::getName(VAR_IS_PR), prno);
+    ASSERT0(::strlen(name) < sizeof(name));
+    pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL|VAR_IS_PR);
     setMapPR2Var(prno, pr_var);
     VAR_prno(pr_var) = prno;
 
@@ -1244,13 +1223,13 @@ void Region::dump(bool dump_inner_region) const
     MDSet * ru_maydef = getMayDef();
     if (ru_maydef != nullptr) {
         note(this, "\nRegionMayDef(OuterRegion):");
-        ru_maydef->dump(getMDSystem(), true);
+        ru_maydef->dump(getMDSystem(), getVarMgr(), true);
     }
 
     MDSet * ru_mayuse = getMayUse();
     if (ru_mayuse != nullptr) {
         note(this, "\nRegionMayUse(OuterRegion):");
-        ru_mayuse->dump(getMDSystem(), true);
+        ru_mayuse->dump(getMDSystem(), getVarMgr(), true);
     }
 
     if (is_blackbox()) { return; }
@@ -1277,7 +1256,7 @@ void Region::dumpRef(UINT indent) const
     BBList * bbs = getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
-        getMDSystem()->dump(false);
+        getMDSystem()->dump(getVarMgr(), false);
     }
 
     //Dump imported variables referenced.
@@ -1285,13 +1264,13 @@ void Region::dumpRef(UINT indent) const
     MDSet * ru_maydef = getMayDef();
     if (ru_maydef != nullptr) {
         note(this, "\nRegionMayDef(OuterRegion):");
-        ru_maydef->dump(getMDSystem(), true);
+        ru_maydef->dump(getMDSystem(), getVarMgr(), true);
     }
 
     MDSet * ru_mayuse = getMayUse();
     if (ru_mayuse != nullptr) {
         note(this, "\nRegionMayUse(OuterRegion):");
-        ru_mayuse->dump(getMDSystem(), true);
+        ru_mayuse->dump(getMDSystem(), getVarMgr(), true);
     }
 
     for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
@@ -1420,7 +1399,7 @@ void Region::dumpVarMD(Var * v, UINT indent) const
         if (x != nullptr) {
             prtIndent(this, indent);
             buf.clean();
-            x->dump(buf, getTypeMgr());
+            x->dump(buf, getVarMgr());
             note(this, "\n%s", buf.buf);
         }
 
@@ -1432,7 +1411,7 @@ void Region::dumpVarMD(Var * v, UINT indent) const
                  md != nullptr; md = ofstab->get_next(iter, nullptr)) {
                 prtIndent(this, indent);
                 buf.clean();
-                md->dump(buf, getTypeMgr());
+                md->dump(buf, getVarMgr());
                 note(this, "\n%s", buf.buf);
             }
         }
@@ -1466,7 +1445,7 @@ static void dumpParam(Region const* rg)
             continue;
         }
         buf.clean();
-        v->dump(buf, rg->getTypeMgr());
+        v->dump(buf, rg->getVarMgr());
         lm->incIndent(2);
         note(rg, "\n%s", buf.buf);
         prt(rg, " param%d", i);
@@ -1515,7 +1494,7 @@ static void dumpLocalVar(Region const* rg)
     for (varlst.get_head(&ct); ct != nullptr; ct = varlst.get_next(ct)) {
         Var * v = C_val(ct);
         buf.clean();
-        v->dump(buf, rg->getTypeMgr());
+        v->dump(buf, rg->getVarMgr());
         note(rg, "\n%s", buf.buf);
         lm->incIndent(2);
         rg->dumpVarMD(v, lm->getIndent());
@@ -1535,7 +1514,7 @@ void Region::dumpVARInRegion() const
         LogMgr * lm = getLogMgr();
         note(this, "\nREGION VAR:");
         StrBuf buf(64);
-        getRegionVar()->dump(buf, getTypeMgr());
+        getRegionVar()->dump(buf, getVarMgr());
         lm->incIndent(2);
         note(this, "\n%s", buf.buf);
         lm->decIndent(2);

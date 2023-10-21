@@ -112,20 +112,19 @@ void VisitTree::perform()
 {
     ASSERT0(m_root);
     xcom::Stack<Vertex const*> stk;
-    xcom::BitSet visited(m_maxnum / BITS_PER_BYTE);
     Vertex const* v;
     stk.push(m_root);
-    while ((v = stk.get_top()) != nullptr) {
-        if (!visited.is_contain(v->id())) {
-            visited.bunion(v->id());
-            visitWhenFirstMeet(v);
+    while ((v = stk.get_top()) != nullptr && !is_terminate()) {
+        if (!isVisited(v->id())) {
+            setVisited(v->id());
+            if (!visitWhenFirstMeet(v, stk)) { continue; }
         }
         bool all_visited = true;
         AdjVertexIter oit;
         for (Vertex const* kid = Graph::get_first_out_vertex(v, oit);
              kid != nullptr; kid = Graph::get_next_out_vertex(oit)) {
             if (kid == v) { continue; }
-            if (!visited.is_contain(kid->id())) {
+            if (!isVisited(kid->id())) {
                 all_visited = false;
                 stk.push(kid);
                 break;
@@ -134,7 +133,7 @@ void VisitTree::perform()
         if (all_visited) {
             stk.pop();
             //Do post-processing while all kids of vertex has been processed.
-            visitWhenAllKidHaveBeenVisited(v);
+            visitWhenAllKidHaveBeenVisited(v, stk);
         }
     }
 }

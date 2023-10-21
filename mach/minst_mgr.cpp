@@ -122,7 +122,7 @@ void * MInstMgr::xmalloc(UINT size)
     ASSERTN(m_pool != nullptr, ("pool does not initialized"));
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 //END MInstMgr

@@ -44,7 +44,7 @@ class X2V_MAP {
         ASSERTN(m_is_init == true, ("List not yet initialized."));
         void * p = smpoolMalloc(size, m_pool);
         if (!p) return nullptr;
-        ::memset(p,0,size);
+        ::memset((void*)p,0,size);
         return p;
     }
 
@@ -91,7 +91,8 @@ public:
     }
 
     //Map the equation/inequality to the variable that the
-    //equation only has single variable, and the coefficient of variable if 'coeff'.
+    //equation only has single variable, and the coefficient of
+    //variable if 'coeff'.
     void map(UINT idx_of_var, UINT idx_of_equation, Rational coeff)
     {
         if (coeff > 0) {
@@ -556,7 +557,8 @@ bool Lineq::reduce(MOD RMat & m, UINT cst_col, bool is_intersect)
 
         //Verification for legitimate intersection of lower and upper boundary.
         //e.g: x <= 9 , x >= 10 is inconsistency.
-        if (is_intersect && poscoeff_eqt != nullptr && negcoeff_eqt != nullptr) {
+        if (is_intersect && poscoeff_eqt != nullptr &&
+            negcoeff_eqt != nullptr) {
             for (VecIdx i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
                 INT pi = poscoeff_eqt->get(i);
                 Rational coeff = m.get(pi, idx_of_var);
@@ -638,7 +640,8 @@ FIN:
 bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    ASSERTN(m_coeff != nullptr && m_coeff != &res, ("illegal parameter of fme"));
+    ASSERTN(m_coeff != nullptr && m_coeff != &res,
+            ("illegal parameter of fme"));
     ASSERTN(m_cst_col != -1, ("not yet initialize."));
     if (m_coeff->size() == 0) {
         res.deleteAllElem();
@@ -1063,7 +1066,8 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 
 
 //Compute each variable's boundary by system of inequlities.
-//Return true if all of variables boundary are available, otherwise return false.
+//Return true if all of variables boundary are available, otherwise
+//return false.
 //    e.g: Given inequalities:
 //            1 <= i1 <= 4
 //            5-i1 <= i2 <= 12-i1

@@ -140,6 +140,7 @@ public:
 #define LD_ofst(ir) (((CLd*)CK_IRC(ir, IR_LD))->field_offset)
 #define LD_idinfo(ir) (((CLd*)CK_IRC(ir, IR_LD))->id_info)
 #define LD_align(ir) (((CLd*)CK_IRC(ir, IR_LD))->align)
+#define LD_is_aligned(ir) (((CLd*)CK_IRC(ir, IR_LD))->is_aligned)
 #define LD_du(ir) (((CLd*)CK_IRC(ir, IR_LD))->du)
 
 //Return the storage space if any.
@@ -150,6 +151,7 @@ public:
     static BYTE const kid_map = 0;
     static BYTE const kid_num = 0;
     UINT align;
+    bool is_aligned;
 public:
     static inline Var *& accIdinfo(IR * ir) { return LD_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LD_ofst(ir); }
@@ -171,12 +173,14 @@ public:
 #define ILD_kid(ir, idx) CK_KID(ir, CILd, IR_ILD, idx)
 #define ILD_storage_space(ir) (((CILd*)CK_IRC(ir, IR_ILD))->storage_space)
 #define ILD_align(ir) (((CILd*)CK_IRC(ir, IR_ILD))->alignment)
+#define ILD_is_aligned(ir) (((CILd*)CK_IRC(ir, IR_ILD))->is_aligned)
 class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
     UINT alignment;
+    bool is_aligned;
     StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
@@ -212,6 +216,7 @@ public:
 #define ST_bb(ir) (((CSt*)CK_IRC(ir, IR_ST))->bb)
 #define ST_idinfo(ir) (((CSt*)CK_IRC(ir, IR_ST))->id_info)
 #define ST_align(ir) (((CSt*)CK_IRC(ir, IR_ST))->alignment)
+#define ST_is_aligned(ir) (((CSt*)CK_IRC(ir, IR_ST))->is_aligned)
 #define ST_ofst(ir) (((CSt*)CK_IRC(ir, IR_ST))->field_offset)
 
 //Return the storage space if any.
@@ -225,6 +230,7 @@ public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
     UINT alignment;
+    bool is_aligned;
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return ST_rhs(ir); }
@@ -279,10 +285,12 @@ public:
 //The the number of bytes of result PR must be an integer multiple of
 //the number of bytes of SETELEM_val if the result data type is vector.
 //
-//usage: setelem $2:vec<4*i32> = $3:vec<4*i32>, $1:i32, 4.
-//  The result PR is $2. The base value is $3. $1 is the input value.
+//usage: stpr $ofst = 4;
+//       setelem $2:vec<4*i32> = $3:vec<4*i32>, $1:i32, $ofst.
+//  The result PR is $2, the base value is $3, $1 is the input value, and $ofst
+//  record the byte offset which is 4.
 //  The code stores $1 that is part of $3 to be second element
-//  of $2, namely, the section of $2 that offset is 4 bytes.
+//  of $2. In this case, the second element's offset in $2 is 4 bytes.
 //
 //This operation will store value to the memory which offset to the
 //memory chunk or vector's base address.
@@ -320,13 +328,16 @@ public:
 //This class represents an operation that get an element from a base memory
 //location and store the element to a PR.
 //
+//GETELEM_ofst descibe the byte offset to the start address of GETELEM_base.
+//The byte offset must be an integer multiple of the byte size of element
+//in GETELEM_base.
+
 //The the number of byte of GETELEM_base must be
-//an integer multiple of the number of byte of result
-//PR if base is vector.
+//an integer multiple of the number of byte of result PR if base is vector.
 //
 //usage: getelem $1:i32 $2:vec<4*i32>, 4.
-//    The base memory location is a PR, which is a vector.
-//    The example get the second element of pr2, then store it to pr1.
+//    The base object is a PR $2, which is a vector.
+//    The example get the second element of $2, then store it to $1.
 #define GETELEM_bb(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->bb)
 #define GETELEM_prno(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->prno)
 #define GETELEM_ssainfo(ir) (((CGetElem*)CK_IRC(ir, IR_GETELEM))->ssainfo)
@@ -374,6 +385,7 @@ public:
 #define IST_rhs(ir) IST_kid(ir, 1)
 #define IST_storage_space(ir) (((CISt*)CK_IRC(ir, IR_IST))->storage_space)
 #define IST_align(ir) (((CISt*)CK_IRC(ir, IR_IST))->alignment)
+#define IST_is_aligned(ir) (((CISt*)CK_IRC(ir, IR_IST))->is_aligned)
 #define IST_kid(ir, idx) (((CISt*)ir)->opnd[CK_KID_IRC(ir, IR_IST, idx)])
 class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
@@ -381,6 +393,7 @@ public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
     UINT alignment;
+    bool is_aligned;
     StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
@@ -911,6 +924,7 @@ public:
 #define ARR_ofst(ir) (((CArray*)CK_IRC_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRC_ARR(ir))->du)
 #define ARR_align(ir) (((CArray*)CK_IRC_ARR(ir))->alignment)
+#define ARR_is_aligned(ir) (((CArray*)CK_IRC_ARR(ir))->is_aligned)
 
 //Get the number of element in each dimension.
 //ARR_elem_num represents the number of array element in current dimension.
@@ -947,6 +961,8 @@ public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
     UINT alignment;
+
+    bool is_aligned;
 
     //Note that if ARR_ofst is not zero, the IR_dt may not equal to
     //ARR_elemtype. IR_dt describe the data-type of ARRAY operation + ARR_ofst.
@@ -1058,6 +1074,7 @@ public:
 #define STARR_elem_type(ir) ARR_elem_type(ir)
 #define STARR_ofst(ir) ARR_ofst(ir)
 #define STARR_align(ir) ARR_align(ir)
+#define STARR_is_aligned(ir) ARR_is_aligned(ir)
 #define STARR_du(ir) ARR_du(ir)
 #define STARR_storage_space(ir) ARR_storage_space(ir)
 #define STARR_elem_num(ir, dim) ARR_elem_num(ir, dim)
@@ -1174,7 +1191,8 @@ public:
 
 
 //This class represents false branch operation.
-//Branch if determinant express is false, otherwise control flow does not change.
+//Branch if determinant express is false,
+//otherwise control flow does not change.
 //Also use BR_det, BR_lab access.
 //NOTE: the lay out of truebr should same as falsebr.
 class CFalsebr : public CTruebr {
@@ -1238,7 +1256,8 @@ public:
     static BYTE const kid_num = 3;
     IR * opnd[kid_num];
 public:
-    static inline IR *& accKid(IR * ir, UINT idx) { return SELECT_kid(ir, idx); }
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return SELECT_kid(ir, idx); }
     static inline IR *& accDet(IR * ir) { return SELECT_det(ir); }
 
     IR * getKid(UINT idx) const { return SELECT_kid(this, idx); }
@@ -1316,6 +1335,7 @@ public:
     //Get the No.idx operand.
     IR * getOpnd(UINT idx) const;
     IR * getOpndList() const { return PHI_opnd_list(this); }
+    UINT getOpndNum() const { return xcom::cnt_list(PHI_opnd_list(this)); }
 
     void insertOpndBefore(IR * marker, IR * exp)
     {

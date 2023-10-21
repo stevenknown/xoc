@@ -330,7 +330,7 @@ public:
 //  BB2: body
 //  BB3: goto loop-start bb
 //BB3 is the backedge-start bb.
-IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
+IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG const* cfg);
 
 //Find the first BB that is the END of loop. The end BB is outside of loop.
 //Note there could be multiple end BB if the last IR of head is
@@ -362,7 +362,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 //  BB2: body start bb
 //  BB3: goto loop start bb
 //BB2 is the loop header fallthrough bb.
-bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
+bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG const* cfg,
                                     UINT * succ1, UINT * succ2);
 
 //Return true if all the expression on 'ir' tree is loop invariant.
@@ -377,7 +377,7 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
 //    stmt S1 is invariant because b is invariant.
 //    If it is nullptr, the function will reason out conservative answer.
 //Note the function does not check the sibling node of 'ir'.
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
+bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
                      InvStmtList const* invariant_stmt, bool check_tree);
 
 //Return true if the target BB of branch-stmt 'stmt' is outside the given

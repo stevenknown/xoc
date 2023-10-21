@@ -100,6 +100,22 @@ public:
                ((xcom::EList<IR*, IR2Holder>*)this)->count_mem();
     }
 
+    //The function extracts the rest of IR in 'irlst' into a new list. And
+    //return the new IR list.
+    //marker: IRs that after 'marker' will be moved out of 'irlst' and
+    //        return as a IR list.
+    //include_marker: true to extract marker itself into return IR list.
+    IR * extractRestIRIntoList(MOD BBIRListIter marker, bool include_marker);
+
+    //The function extracts the rest of IR in 'irlst' into a new list. And
+    //return the new IR list.
+    //marker: IRs that after 'marker' will be moved out of 'irlst' and
+    //        record in newlst.
+    //include_marker: true to extract marker itself into 'newlst'.
+    //newlst: record the extracted IR.
+    void extractRestIRIntoList(MOD BBIRListIter marker, bool include_marker,
+                               OUT BBIRList & newlst);
+
     IR * getPrevIR(IR const* ir, OUT IRListIter * irit) const
     {
         ASSERT0(ir->is_stmt() && irit);

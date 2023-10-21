@@ -286,7 +286,7 @@ void GRDump::dumpPhi(IR const* ir, DumpGRCtx const* ctx) const
     TypeMgr * tm = const_cast<TypeMgr*>(m_tm);
     Type const* d = ir->getType();
     StrBuf buf(64);
-    note(m_lm, "\n%s %s%d:%s = ", PR_TYPE_CHAR, IRNAME(ir), PHI_prno(ir),
+    note(m_lm, "\n%s %s%d:%s = ", IRNAME(ir), PR_TYPE_CHAR, PHI_prno(ir),
          tm->dump_type(d, buf));
     UINT dn = DUMP_INDENT_NUM;
     m_lm->incIndent(dn);

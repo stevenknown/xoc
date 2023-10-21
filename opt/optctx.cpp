@@ -77,7 +77,6 @@ void OptCtx::dumpFlag() const
     note(m_rg, "\nFLAG:cfg:%s", is_cfg_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:scc:%s", is_scc_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:aa:%s", is_aa_valid() ? "valid":"invalid");
-    note(m_rg, "\nFLAG:expr_tab:%s", is_expr_tab_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:dom:%s", is_dom_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:pdom:%s", is_pdom_valid() ? "valid":"invalid");
     note(m_rg, "\nFLAG:rpo:%s", is_rpo_valid() ? "valid":"invalid");

@@ -115,6 +115,9 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     ASSERT0(getCFG()->verify());
     if (need_rebuild_mdssa) {
         mdssamgr->construction(oc);
+        //CASE:Since MDSSA does not affect the real IR stmt and exp.
+        //Here we prefer to do not invalid classic NonPRDU.
+        //oc.setInvalidNonPRDU();
         SIMP_need_rebuild_nonpr_du_chain(&simp) = false;
     }
     if (need_rebuild_prssa) {
@@ -138,7 +141,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
 //except the classic DU-Chain.
 bool Region::performSimplify(OptCtx & oc)
 {
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     SimpCtx simp(&oc);
     SIMP_optctx(&simp) = &oc;
@@ -148,7 +151,9 @@ bool Region::performSimplify(OptCtx & oc)
     simp.setSimpLandLor();
     simp.setSimpLnot();
     simp.setSimpILdISt();
-    simp.setSimpToLowestHeight();
+    if (g_is_lower_to_lowest_height) {
+        simp.setSimpToLowestHeight();
+    }
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
     }
@@ -192,7 +197,7 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(verifyMDDUChain(this, oc));
     }
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
@@ -311,28 +316,22 @@ bool Region::MiddleProcess(OptCtx & oc)
 {
     BBList * bbl = getBBList();
     if (bbl->get_elem_count() == 0) { return true; }
-
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(verifyMDDUChain(this, oc));
     }
-
     if (g_opt_level > OPT_LEVEL0) {
         //Do analysis before simplification.
         doBasicAnalysis(oc);
     }
-
-    if (getPRSSAMgr() == nullptr || !getPRSSAMgr()->is_valid() ||
-        g_is_lower_to_lowest_height) {
+    if (g_is_lower_to_lowest_height || g_is_lower_to_pr_mode) {
         performSimplify(oc);
     }
-
     if (g_opt_level > OPT_LEVEL0) {
         getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
         if (g_invert_branch_target) {
             getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
         }
     }
-
     ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf(&oc);

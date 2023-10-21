@@ -49,6 +49,30 @@ class IRCFG;
 #include "ir_desc.h"
 #include "ir_debug_check.h"
 
+//Define the condition of isomophic checking.
+typedef enum tagISOMO_COND {
+    ISOMO_UNDEF = 0,
+    ISOMO_CK_PRNO = 0x1, //Check the PRNO for each PR operation.
+    ISOMO_CK_TYPE = 0x2, //Check the Data Type for each operation.
+
+    //Check the IR code for each operation.
+    //Note the flag is set, the IR code have to exactly equal.
+    //e.g. the comparison of IST and ILD will return false.
+    ISOMO_CK_CODE = 0x4,
+    ISOMO_CK_CONST_VAL = 0x8, //Check the constant value.
+    ISOMO_CK_IDINFO = 0x10, //Check the Idinfo for each direct operation.
+
+    //Check the prno and idinfo for memory reference operation.
+    //Both the checking information must be strictly identical.
+    ISOMO_CK_MEMREF_NAME = ISOMO_CK_PRNO|ISOMO_CK_IDINFO,
+    ISOMO_CK_ALL = 0xFFFFffff, //Perform all kind of checking.
+} ISOMO_COND;
+
+class IsomoFlag : public UFlag {
+public:
+    IsomoFlag(UINT v) : UFlag(v) {}
+};
+
 //The maximum integer value that can described by bits of IR_CODE_BIT_SIZE
 //should larger than IR_CODE_NUM.
 #define IR_CODE_BIT_SIZE 7
@@ -409,6 +433,13 @@ public:
     }
 
     //Return exact MD if ir defined.
+    MD const* getEffectRef() const
+    {
+        MD const* md = getRefMD();
+        return (md == nullptr || !md->is_effect()) ? nullptr : md;
+    }
+
+    //Return exact MD if ir defined.
     MD const* getExactRef() const
     {
         MD const* md = getRefMD();
@@ -580,9 +611,10 @@ public:
     //Note the function does not compare the siblings of 'src'.
     //e.g:ist (ld base) is isomorphic to ild (ld base)
     //    ist (ld base) is NOT isomorphic to ild ($base)
-    bool isIsomoTo(IR const* src, bool is_cmp_kid = true) const;
+    bool isIsomoTo(IR const* src, bool is_cmp_kid = true,
+                   IsomoFlag const& flag = IsomoFlag(ISOMO_UNDEF)) const;
 
-    //Return true if current ir is both PR and equal to src.
+    //Return true if current ir is PR and equal to src.
     bool isPREqual(IR const* src) const
     {
         ASSERT0(isWritePR() && src->isReadPR());
@@ -656,7 +688,7 @@ public:
     bool isConstInt() const { return is_const() && is_int(); }
 
     //Return true if ir is float-point immediate.
-    bool isConstFp() const { return is_const() && is_fp(); }
+    bool isConstFP() const { return is_const() && is_fp(); }
 
     //Return true if ir is string.
     bool isConstStr() const { return is_const() && is_str(); }
@@ -783,7 +815,7 @@ public:
 
     //Return true if current stmt exactly modifies a PR.
     //CALL/ICALL may modify PR if it has a return value.
-    //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole.
+    //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole IR.
     bool isWriteWholePR() const
     { return IRDES_is_write_whole_pr(g_ir_desc[getCode()]); }
 
@@ -808,6 +840,10 @@ public:
     //Return true if current ir is integer constant, and the number
     //is equal to 'value'.
     bool isConstIntValueEqualTo(HOST_INT value) const;
+
+    //Return true if current ir is integer constant, and the number
+    //is equal to 'value'.
+    bool isConstFPValueEqualTo(HOST_FP value) const;
 
     //Return true if current operation references memory except the PR memory.
     bool isMemRefNonPR() const
@@ -846,7 +882,7 @@ public:
     //Leaf node must be expression node and it does not have any kids.
     bool is_leaf() const { return IRDES_is_leaf(g_ir_desc[getCode()]); }
 
-    //Return true if kid is the kid node of current ir.
+    //Return true if 'exp' is kid node of current ir tree.
     bool is_kids(IR const* exp) const;
 
     //Return true if array base is IR_LDA. This exactly clerifies which array
@@ -863,8 +899,11 @@ public:
     //Return true if current ir can be placed in BB.
     bool isStmtInBB() const;
 
-    //Return true if current ir operates on memory object with alignged address.
-    bool isAligned() const { return getAlign() != 0; }
+    //Return true if current ir operates on memory object with alignged address
+    //or has the attribute of aligned.
+    bool isAligned() const { return getAlign() != 0 || hasAlignedAttr(); }
+    //Return true if current ir has the attribute of aligned.
+    bool hasAlignedAttr() const;
 
     //Return true if current stmt must modify 'md'.
     bool isExactDef(MD const* md) const;
@@ -877,7 +916,10 @@ public:
     //to 'exp'.
     bool isRHSUseIsomoExp(IR const* exp) const;
 
-    //Return true if ir's date type must be pointer.
+    //Return true if ir's data type must be bool.
+    bool mustBeBoolType() const { return is_judge(); }
+
+    //Return true if ir's data type must be pointer.
     bool mustBePointerType() const
     {
         return is_lda() ||
@@ -900,6 +942,7 @@ public:
     void setBase(IR * exp);
     void setJudgeDet(IR * exp);
     void setAlign(UINT align_bytenum);
+    void setAligned(bool is_aligned);
 
     //Set 'kid' to be 'idx'th child of current ir.
     void setKid(UINT idx, IR * kid);
@@ -929,6 +972,7 @@ public:
     {
         ASSERT0(ty);
         ASSERT0(!mustBePointerType() || ty->is_pointer());
+        ASSERT0(!mustBeBoolType() || ty->is_bool());
         IR_dt(this) = ty;
     }
     void setRefMD(MD const* md, Region * rg);

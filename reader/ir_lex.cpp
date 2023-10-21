@@ -229,7 +229,7 @@ Lexer::STATUS Lexer::readLineBuf(bool is_some_chars_in_cur_line)
             //'0xD,0xA'.
             //TODO:Take a consideration of the corner case, we
             //should process the last characters in 'm_cur_line'
-            //properly and correctly rather than return 'EOF' directly.
+            //properly and correctly rather than returning 'EOF' directly.
             return LEX_EOF;
         } else {
             return LEX_SUCC;
@@ -331,11 +331,11 @@ Lexer::STATUS Lexer::getLine()
     if (m_ofst_tab == nullptr) {
         m_ofst_tab_byte_size = LEX_MAX_OFST_BUF_LEN * sizeof(LONG);
         m_ofst_tab = (LONG*)::malloc(m_ofst_tab_byte_size);
-        ::memset(m_ofst_tab, 0, m_ofst_tab_byte_size);
+        ::memset((void*)m_ofst_tab, 0, m_ofst_tab_byte_size);
     } else if (getOffsetTabLineNum() < (m_src_line_num + 10)) {
         m_ofst_tab = (LONG*)::realloc(m_ofst_tab,
             m_ofst_tab_byte_size + LEX_MAX_OFST_BUF_LEN * sizeof(LONG));
-        ::memset(((BYTE*)m_ofst_tab) + m_ofst_tab_byte_size,
+        ::memset((void*)(((BYTE*)m_ofst_tab) + m_ofst_tab_byte_size),
                  0, LEX_MAX_OFST_BUF_LEN * sizeof(LONG));
         m_ofst_tab_byte_size += LEX_MAX_OFST_BUF_LEN * sizeof(LONG);
     }

@@ -467,7 +467,8 @@ template <class T> class BucketSort {
     {
         for (VecIdx i = 0; i <= data.get_last_idx(); i++) {
             T v = data[i];
-            ASSERTN(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
+            ASSERTN(v < 1 && v >= 0,
+                    ("The range of elem-value should be [0,1)"));
         }
         return true;
     }

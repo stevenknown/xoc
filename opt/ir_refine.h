@@ -47,7 +47,7 @@ class Region;
 #define RC_insert_cvt(r) ((r).u1.s1.insertCvt)
 #define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
-#define RC_update_mdref(r) ((r).u1.s1.update_mdref)
+#define RC_maintain_du(r) ((r).u1.s1.maintain_du)
 #define RC_optctx(r) ((r).m_oc)
 class RefineCtx {
 public:
@@ -82,9 +82,9 @@ public:
             //where lnot indicates logical-not.
             BitUnion hoist_to_lnot:1;
 
-            //Pass info top-down. True to compute and update MD reference
+            //Pass info top-down. True to update DefUse chain
             //when memory operation generated or modified.
-            BitUnion update_mdref:1;
+            BitUnion maintain_du:1;
 
             //Collect information bottom-up to inform caller function
             //that current stmt has been removed from the BB.
@@ -102,7 +102,7 @@ public:
         RC_refine_mul_const(*this) = false;
         RC_refine_stmt(*this) = true;
         RC_do_fold_const(*this) = true;
-        RC_update_mdref(*this) = true;
+        RC_maintain_du(*this) = true;
         if (g_do_refine_auto_insert_cvt) {
             RC_insert_cvt(*this) = true;
         } else {
@@ -147,8 +147,8 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
-
-    bool update_mdref() const { return RC_update_mdref(*this); }
+    //Return true if refinement need to maintain DefUse chain.
+    bool maintainDU() const { return RC_maintain_du(*this); }
 };
 
 
@@ -156,9 +156,16 @@ public:
 class Refine : public Pass {
     COPY_CONSTRUCTOR(Refine);
 
+    //The function prefer to compute ir's const value by float point type.
     IR * foldConstFloatUnary(IR * ir, bool & change);
+
+    //The function prefer to compute ir's const value by float point type.
     IR * foldConstFloatBinary(IR * ir, bool & change);
+
+    //The function prefer to compute ir's const value by integer point type.
     IR * foldConstIntUnary(IR * ir, bool & change);
+
+    //The function prefer to compute ir's const value by integer point type.
     IR * foldConstIntBinary(IR * ir, bool & change);
 
     //Check and insert data type CVT if it is necessary.
@@ -197,6 +204,7 @@ class Refine : public Pass {
     IR * refineAsr(IR * ir, bool & change);
     IR * refineLsl(IR * ir, bool & change);
     IR * refineLsr(IR * ir, bool & change);
+    IR * refineComparisonAndLogic(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);
@@ -242,10 +250,10 @@ public:
 
     //Perform peephole optimization to ir.
     //Return updated ir if optimization performed.
-    IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
 
     //Perform peephole optimization to ir over and over again until the result
-    //ir does not change any more.
+    //ir do not change any more.
     //Return updated ir if optimization performed.
     IR * refineIRUntilUnchange(IR * ir, bool & change, RefineCtx & rc);
 

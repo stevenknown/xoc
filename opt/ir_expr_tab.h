@@ -36,29 +36,28 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define EXPR_id(i) (i)->id
-#define EXPR_ir(i) (i)->ir
-#define EXPR_next(i) (i)->next
-#define EXPR_prev(i) (i)->prev
-#define EXPR_occ_list(i) (i)->occ_list
-class ExpRep {
+#define EXPR_id(i) ((i)->id)
+#define EXPR_ir(i) ((i)->ir)
+#define EXPR_next(i) ((i)->next)
+#define EXPR_prev(i) ((i)->prev)
+#define EXPR_occ_list(i) ((i)->occ_list)
+class ExprRep {
+    COPY_CONSTRUCTOR(ExprRep);
 public:
     UINT id;
     IR * ir;
-    ExpRep * next;
-    ExpRep * prev;
+    ExprRep * next;
+    ExprRep * prev;
     IREList occ_list;
-
 public:
-    ExpRep()
-    {
-        id = 0;
-        next = prev = nullptr;
-    }
-    COPY_CONSTRUCTOR(ExpRep);
-    ~ExpRep() {}
+    ExprRep() { id = 0; next = prev = nullptr; }
+    void clean();
+    void dump(Region const* rg) const;
+    IREList & getOccList() { return occ_list; }
 };
 
+
+typedef BSVec<ExprRep*> ExprRepVec;
 
 //IR Expression Table, scanning statement to
 //evaluate the hash value of expression.
@@ -67,58 +66,77 @@ public:
 #define IR_EXPR_TAB_LEVEL2_HASH_BUCKET 128
 class ExprTab : public Pass {
     COPY_CONSTRUCTOR(ExprTab);
-    UINT m_expr_count; //the encode-number expression.
+protected:
+    UINT m_expr_count; //the encodeExp-number expression.
     TypeMgr * m_tm;
-    BSVec<ExpRep*> m_ir_expr_vec;
-
-    //Record allocated object. used by destructor.
-    SList<ExpRep*> m_ir_expr_lst;
-
-    ConstIRIter m_iter; //for tmp use.
+    xcom::BitSetMgr * m_bs_mgr;
     SMemPool * m_pool;
     SMemPool * m_sc_pool;
-    ExpRep ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
-    Vector<ExpRep*> m_map_ir2ir_expr;
     MDSetMgr * m_md_set_mgr; //alloca MS_SET.
-    xcom::BitSetMgr * m_bs_mgr;
-
-    void * xmalloc(INT size);
-    inline HOST_UINT compute_hash_key(IR const* ir);
-    inline HOST_UINT compute_hash_key_for_tree(IR * ir);
-    inline ExpRep * encode_istore_memaddr(IN IR * ir)
+    ExprRepVec m_ir_expr_vec;
+    //Record allocated object. used by destructor.
+    SList<ExprRep*> m_ir_expr_lst;
+    ConstIRIter m_iter; //for tmp use.
+    Vector<ExprRep*> m_map_ir2exprep;
+    ExprRep ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
+protected:
+    ExprRep * allocExprRep();
+    void cleanHashTab();
+    HOST_UINT compute_hash_key(IR const* ir) const;
+    HOST_UINT compute_hash_key_for_tree(IR const* ir);
+    ExprRep * encodeBaseOfIST(IR * ir)
     {
-        ASSERT0(IR_parent(ir)->is_ist());
-        if (ir->is_array()) {
-            return nullptr;
-        }
-        return encode_expr(ir);
+        ASSERT0(ir->getParent()->is_ist());
+        if (ir->is_array()) { return nullptr; }
+        return encodeExp(ir);
     }
+    void reset();
+    void * xmalloc(INT size);
 public:
     explicit ExprTab(Region * rg);
-    ~ExprTab();
+    virtual ~ExprTab();
 
-    ExpRep * append_expr(IR * ir);
-    void clean_occ_list();
+    //Append IR tree expression into HASH table and return the entry-info.
+    //If 'ir' has already been inserted in the table with an ExprRep,
+    //get that and return.
+    ExprRep * appendExp(IR * ir);
+
     size_t count_mem() const;
 
-    void dump_ir_expr_tab();
-    ExpRep * encode_expr(IN IR * ir);
-    void encode_bb(IRBB * bb);
+    bool dump() const;
 
-    ExpRep * find_expr(IR * ir);
+    ExprRep * encodeExp(IR * ir);
+    void encodeStmt(IR const* ir);
 
-    ExpRep * get_expr(UINT id) { return m_ir_expr_vec.get(id); }
-    BSVec<ExpRep*> * get_expr_vec() { return &m_ir_expr_vec; }
+    //Encode expression for single BB.
+    //Scan IR statement literally, and encoding it for generating
+    //the unique id for each individual expressions, and update
+    //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
+    void encodeBB(IRBB const* bb);
 
-    ExpRep * map_ir2ir_expr(IR const* ir);
-    ExpRep * new_ir_expr();
+    //Return entry-info if expression has been entered into HASH table,
+    //otherwise return nullptr.
+    ExprRep * findExp(IR * ir);
 
-    IR * remove_occ(IR * occ);
-    void remove_occs(IR * ir);
-    ExpRep * remove_expr(IR * ir);
-    void reperform(MOD OptCtx & oc);
+    //Return ExprRep by given id.
+    ExprRep * getExp(UINT id) const { return m_ir_expr_vec.get(id); }
+    ExprRepVec & getExpVec() { return m_ir_expr_vec; }
 
-    void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
+    //If 'ir' has been inserted in the table with an ExprRep,
+    //get that and return.
+    ExprRep * mapIR2ExprRep(IR const* ir) const;
+
+    //Remove occurence of ExprRep.
+    IR * removeOcc(IR * occ);
+
+    //Remove all exp for given stmt out of occ list in expr-tab.
+    void removeOccs(IR * ir);
+
+    //Remove IR tree expression out of HASH table and return the removed
+    //entry-info if it was existed.
+    ExprRep * removeExp(IR * ir);
+
+    void setMapIR2ExprRep(IR const* ir, ExprRep * ie);
 
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
     virtual CHAR const* getPassName() const { return "Expr Table"; }

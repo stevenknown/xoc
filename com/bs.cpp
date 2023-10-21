@@ -51,9 +51,9 @@ void * BitSet::realloc(IN void * src, size_t orgsize, size_t newsize)
         ASSERT0(orgsize > 0);
         ::memcpy(p, src, orgsize);
         ::free(src);
-        ::memset(((BYTE*)p) + orgsize, 0, newsize - orgsize);
+        ::memset((void*)(((BYTE*)p) + orgsize), 0, newsize - orgsize);
     } else {
-        ::memset(p, 0, newsize);
+        ::memset((void*)p, 0, newsize);
     }
     return p;
 }
@@ -66,7 +66,7 @@ void BitSet::alloc(UINT size)
     if (m_ptr != nullptr) { ::free(m_ptr); }
     if (size != 0) {
         m_ptr = (BYTE*)::malloc(size);
-        ::memset(m_ptr, 0, m_size);
+        ::memset((void*)m_ptr, 0, m_size);
     } else {
         m_ptr = nullptr;
     }
@@ -174,7 +174,7 @@ void BitSet::intersect(BitSet const& bs)
         for (UINT i = 0; i < bs.m_size; i++) {
             m_ptr[i] &= bs.m_ptr[i];
         }
-        ::memset(m_ptr + bs.m_size, 0, m_size - bs.m_size);
+        ::memset((void*)(m_ptr + bs.m_size), 0, m_size - bs.m_size);
     } else {
         for (UINT i = 0; i < m_size; i++) {
             m_ptr[i] &= bs.m_ptr[i];
@@ -743,7 +743,7 @@ BSIdx BitSet::get_next(BSIdx elem) const
 void BitSet::clean()
 {
     if (m_ptr == nullptr) { return; }
-    ::memset(m_ptr, 0, m_size);
+    ::memset((void*)m_ptr, 0, m_size);
 }
 
 
@@ -752,7 +752,7 @@ void BitSet::copy(BitSet const& src)
 {
     ASSERTN(this != &src, ("copy self"));
     if (src.m_size == 0) {
-        ::memset(m_ptr, 0, m_size);
+        ::memset((void*)m_ptr, 0, m_size);
         return;
     }
 
@@ -761,7 +761,7 @@ void BitSet::copy(BitSet const& src)
         //src's last byte pos.
         BSIdx l = src.get_last();
         if (l == BS_UNDEF) {
-            ::memset(m_ptr, 0, m_size);
+            ::memset((void*)m_ptr, 0, m_size);
             return;
         }
 
@@ -771,11 +771,11 @@ void BitSet::copy(BitSet const& src)
             m_ptr = (BYTE*)::malloc(cp_sz);
             m_size = cp_sz;
         } else if (m_size > cp_sz) {
-            ::memset(m_ptr + cp_sz, 0, m_size - cp_sz);
+            ::memset((void*)(m_ptr + cp_sz), 0, m_size - cp_sz);
         }
     } else if (m_size > src.m_size) {
         cp_sz = src.m_size;
-        ::memset(m_ptr + cp_sz, 0, m_size - cp_sz);
+        ::memset((void*)(m_ptr + cp_sz), 0, m_size - cp_sz);
     }
 
     ASSERTN(m_ptr != nullptr, ("not yet init"));
@@ -951,7 +951,8 @@ BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 
 
 //Subtracting set2 from set1
-//Returns a new set which is { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
+//Returns a new set which is:
+//{ x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
 BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
     ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr &&

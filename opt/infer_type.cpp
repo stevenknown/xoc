@@ -118,7 +118,24 @@ bool InferType::inferStmtCall(IR * ir) const
 bool InferType::inferStmtPhi(IR * ir) const
 {
     ASSERT0(ir->is_phi());
-    return inferVarTypeByIRCode(ir);
+    bool change = false;
+    if (ir->is_any()) {
+        Type const* newty = nullptr;
+        for (IR const* opnd = PHI_opnd_list(ir);
+             opnd != nullptr; opnd = opnd->get_next()) {
+            if (opnd->is_any()) { break; }
+            if (newty == nullptr) { newty = opnd->getType(); continue; }
+            newty = meetType(newty, opnd->getType(), m_tm);
+        }
+        if (newty != nullptr && newty != ir->getType()) {
+            IR_dt(ir) = newty;
+            addDump(ir);
+            const_cast<InferType*>(this)->addChanged(ir);
+            change = true;
+        }
+    }
+    change |= inferVarTypeByIRCode(ir);
+    return change;
 }
 
 
@@ -314,7 +331,7 @@ bool InferType::inferIR(IR * ir)
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid == nullptr) { continue; }
-        changed |= inferIR(kid);
+        changed |= inferIRList(kid);
     }
     switch (ir->getCode()) {
     case IR_SELECT:
@@ -377,6 +394,7 @@ bool InferType::inferChangedList()
     IRListIter it;
     for (IR * ir = m_wl.get_head(&it);
          ir != nullptr; ir = m_wl.get_next(&it)) {
+        //No need to infer ir's sibling since it is added as single IR.
         changed |= inferIR(ir);
     }
     return changed;
@@ -427,7 +445,7 @@ bool InferType::dump() const
         note(getRegion(), "\n==-- CHANGED VAR --==");
         for (Var const* var = m_changed_varlist->get_head();
              var != nullptr; var = m_changed_varlist->get_next()) {
-            var->dump(m_tm);
+            var->dump(m_vm);
         }
     }
     note(getRegion(), "\n");

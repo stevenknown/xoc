@@ -205,7 +205,7 @@ class SolveSetMgr {
 private:
     //The macro declares a series of functions to operate given SolveSet.
     //Note LocalSet will be destroy and reinialized after perform(), whereas
-    //GlobalSet will reserve all information until the manager destructed.
+    //GlobalSet will reserve all information until the manager is destructed.
     //e.g:given SolveSet is ReachDefIn, functions include:
     //Return true if given set will be allocated as GlobalSet.
     //bool isKeepReachDefIn() const;

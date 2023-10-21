@@ -104,6 +104,10 @@ bool verifyLD(IR const* ir, Region const* rg)
     ASSERT0_DUMMYUSE(d);
     //src of LD might be small or big compare with Reg.
     ASSERT0(LD_idinfo(ir));
+    Var const* var = LD_idinfo(ir);
+    DUMMYUSE(var);
+    ASSERTN(VAR_prno(var) == PRNO_UNDEF,
+            ("VAR_prno(var) of load must be PRNO_UNDEF"));
     ASSERT0(d);
     ASSERTN(d->getDType() != D_UNDEF, ("size of load value cannot be zero"));
     return true;
@@ -120,6 +124,10 @@ bool verifyST(IR const* ir, Region const* rg)
     ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType()!= D_UNDEF, ("size of store value cannot be zero"));
     ASSERT0(ST_idinfo(ir));
+    Var const* var = ST_idinfo(ir);
+    DUMMYUSE(var);
+    ASSERTN(VAR_prno(var) == PRNO_UNDEF,
+            ("VAR_prno(var) of store must be PRNO_UNDEF"));
     ASSERT0(ST_rhs(ir));
     ASSERT0(ST_rhs(ir)->is_exp());
     ASSERT0(ST_rhs(ir)->is_single());
@@ -361,7 +369,7 @@ bool verifyCompare(IR const* ir, Region const* rg)
     DUMMYUSE(tm);
     Type const* d = ir->getType();
     ASSERT0_DUMMYUSE(d);
-    ASSERT0(ir->is_bool());
+    ASSERT0(ir->is_bool() || d->getVectorElemType(tm) == tm->getBool());
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
     ASSERT0(((CBin*)ir)->getOpnd0()->is_single());

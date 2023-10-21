@@ -27,6 +27,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "machinc.h"
+#include "../opt/comopt.h"
 
 namespace mach {
 
@@ -104,14 +105,19 @@ void IR2MInst::convertRelationOp(IR const* ir, OUT RecycMIList & mis,
 }
 
 
-void IR2MInst::convertBBLabel(IRBB const* bb, OUT RecycMIList & mis)
+void IR2MInst::convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
+                              MOD IMCtx * cont)
 {
     ASSERT0(bb);
     LabelInfoListIter it;
-    for (bb->getLabelListConst().get_head(&it);
+    for (LabelInfo const* li = bb->getLabelListConst().get_head(&it);
          it != bb->getLabelListConst().end();
-         bb->getLabelListConst().get_next(&it)) {
-        mis.append_tail(m_mimgr->buildLabel());
+         li = bb->getLabelListConst().get_next(&it)) {
+        MInst * mi = m_mimgr->buildLabel();
+        ASSERT0(mi && li);
+        MI_lab(mi) = li;
+        mis.append_tail(mi);
+        IMCTX_label_num(cont)++;
     }
 }
 
@@ -122,6 +128,9 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     switch (ir->getCode()) {
     case IR_ST:
         convertStoreVar(ir, mis, cont);
+        break;
+    case IR_IST:
+        convertIStoreVar(ir, mis, cont);
         break;
     case IR_STPR:
         convertStorePR(ir, mis, cont);
@@ -137,6 +146,18 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
         break;
     case IR_CALL:
         convertCall(ir, mis, cont);
+        break;
+    case IR_ICALL:
+        convertICall(ir, mis, cont);
+        break;
+    case IR_GETELEM:
+        convertExtract(ir, mis, cont);
+        break;
+    case IR_SETELEM:
+        convertSetElem(ir, mis, cont);
+        break;
+    case IR_GOTO:
+        convertGoto(ir, mis, cont);
         break;
     default: convertExtStmt(ir, mis, cont);
     }
@@ -169,10 +190,10 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
     BBList * ir_bb_list = m_rg->getBBList();
     ASSERT0(ir_bb_list);
     BBListIter bbit;
-    adjustGlobalPointer(milst, cont);
+
     for (IRBB * bb = ir_bb_list->get_head(&bbit);
          bb != nullptr; bb = ir_bb_list->get_next(&bbit)) {
-        convertBBLabel(bb, milst);
+        convertBBLabel(bb, milst, cont);
         IRListIter irit;
         for (bb->getIRList().get_head(&irit);
              irit != BB_irlist(bb).end();
@@ -180,8 +201,6 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
             convert(irit->val(), milst, cont);
         }
     }
-    cont->setFuncRegionName(m_rg->getRegionName());
-    cont->setDefinedSymbolSize(milst.getList().get_elem_count());
 }
 
 

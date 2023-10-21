@@ -550,17 +550,7 @@ protected:
 protected:
     void assignRHSVN();
     VN const* allocLiveinVN(IR const* exp, MD const* emd, bool & change);
-    inline VN * allocVN()
-    {
-        VN * vn = m_free_lst.remove_head();
-        if (vn == nullptr) {
-            vn = (VN*)xmalloc(sizeof(VN));
-        } else {
-            vn->clean();
-        }
-        VN_id(vn) = m_vn_count++;
-        return vn;
-    }
+    VN * allocVN();
 
     void cleanIR2VN();
     void clean();
@@ -600,8 +590,10 @@ protected:
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
     bool hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const;
+
+    //Return true if the value of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
     bool hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const;
-    bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
     bool hasOverlappedDef(IR const* exp) const;
 
     //Infer the VN of 'exp' via killing def.
@@ -632,7 +624,7 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 
@@ -702,6 +694,12 @@ public:
 
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
+
+    //Return true if the value of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
+    //The function will retrieve dependence through SSA, thus MDSSA and PRSSA
+    //have to be avaiable.
+    bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
 
     //Return true if ir1 and ir2 represent identical memory location.
     //Note this function does NOT consider data type

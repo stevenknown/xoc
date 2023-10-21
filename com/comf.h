@@ -36,6 +36,9 @@ author: Su Zhenyu
 
 namespace xcom {
 
+class StrBuf;
+class StrBufVec;
+
 //Forward Declaration
 template <class T> class Vector;
 
@@ -106,8 +109,21 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 //e.g: Given start is 2, end is 4, val is 0b110101111, return 0b010.
 ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end);
 
+//Extract the valid value according to the bitwidth.
+//e.g: given value is 7 and bitwidth is 2, return 3 as result.
+//Note ValueType should be unsigned integer type.
+template <class ValueType>
+inline ValueType extractValidValueViaBitWidth(ValueType value,
+                                              UINT bitwidth)
+{
+    return (value & computeUnsignedMaxValue<ValueType>(bitwidth));
+}
+
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
+
+//convert float to ESP64(64-bit extended single precision) format.
+UINT64 float2ESP64(UINT64 val);
 
 //Great common divisor for number of values.
 INT gcdm(UINT num, ...);
@@ -178,6 +194,31 @@ float getclockend(LONG start);
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
 
+//Get low 16-bit value of signal 32-bit value.
+//For example:
+//val:     0b 0100010......1000 0111 0101 1011
+//                         &
+//0xffff:  0b 0000000......1111 1111 1111 1111
+//                         =
+//         0b 0000000......1000 0111 0101 1011
+//                         ^
+//0x8000:  0b 0000000......1000 0000 0000 0000
+//                         =
+//         0b 0000000......0000 0111 0101 1011
+//                         -
+//0x8000:  0b 0000000......1000 0000 0000 0000
+//                         =
+//         0b 1111111......1000 0111 0101 1011
+INT getSign32BitLow16BitVal(INT32 val);
+
+//Get low 16-bit value of signal 64-bit value.
+//The principle is similar to getSign32BitLow16BitVal().
+INT getSign64BitLow16BitVal(INT64 val);
+
+//Get low 32-bit value of signal 64-bit value.
+//The principle is similar to getSign32BitLow16BitVal().
+INT getSign64BitLow32BitVal(INT64 val);
+
 //Calculate an integer hash value according to 'n'.
 inline UINT32 hash32bit(UINT32 n)
 {
@@ -189,6 +230,9 @@ inline UINT32 hash32bit(UINT32 n)
     n = (n^0xb55a4f09) ^ (n>>16);
     return n;
 }
+
+//convert half to EHP64(64-bit extended half-precision) format.
+UINT64 half2EHP64(UINT64 val);
 
 //Return true if val excede the range that can be described with 'bitsize'.
 bool isExcedeBitWidth(ULONGLONG val, UINT bitwidth);
@@ -242,6 +286,13 @@ INT sgcd(INT x, INT y);
 //Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y);
 
+//Get 0~15(part1), 16~31(part2), 32~47(part3), 48~63(part4) bits value of
+//signal 64-bit value.
+//This function uses getSign64BitLow16BitVal(), getSign64BitLow32BitVal(),
+//and shift operation to iteratively fetch each value.
+void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
+                               OUT INT & part3, OUT INT & part4);
+
 //Shift a string to right side or left side.
 //ofst: great than zero means shifting string to right side,
 //   and the displacement is abs(ofst); negative
@@ -261,7 +312,8 @@ UINT xstrlen(CHAR const* p);
 
 //Compare the first 'n' characters of two string.
 //Return true if equal.
-bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n);
+//e.g: return true if p1 is "aaa", p2 is "aaab".
+bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n);
 
 //Format string and record in buf.
 //'buf': output buffer record string.
@@ -297,16 +349,19 @@ INT xfloor(INT a, INT b);
 //par: partial string.
 LONG xstrstr(CHAR const* src, CHAR const* par);
 
-//Split string by given separetor, and return the number of substring.
+//Split string by given separator, and return the number of substring.
 //str: input string.
 //ret: record each substring which separated by sep.
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
-UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep);
+//e.g:given str "a/b/c", sep is '/', ret will store three StrBuf, "a", "b"
+//and "c".
+UINT xsplit(CHAR const* str, CHAR const* sep, OUT StrBufVec & ret);
 
-//The function copies byte size of 'size' of the string pointed to by 'src'
-//to destination 'tgt', including the '\0'.
-void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
+//The function copies 'bytesize' of the string pointed by 'src'
+//to destination StrBuf 'tgt', including the '\0'.
+//The function also return buffer pointer of 'tgt'.
+CHAR const* xstrcpy(CHAR const* src, size_t bytesize, OUT StrBuf & tgt);
 
 //Return true if 'c' is blank space or TAB character.
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }

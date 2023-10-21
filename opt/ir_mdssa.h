@@ -35,12 +35,99 @@ typedef xcom::TMap<UINT, VMD*> MD2VMD;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 typedef xcom::List<MDDef*> MDDefIter;
-typedef TTab<UINT> LiveInMDTab;
-typedef TTabIter<UINT> LiveInMDTabIter;
+typedef xcom::TTab<UINT> LiveInMDTab;
+typedef xcom::TTabIter<UINT> LiveInMDTabIter;
 typedef xcom::DefSBitSet DefMDSet;
 typedef xcom::DefSBitSetIter DefMDSetIter;
+typedef xcom::Stack<VMD*> VMDStack;
 
-class BB2DefMDSet : public Vector<DefMDSet*> {
+enum COLLECT_FLAG {
+    COLLECT_UNDEF = 0x0,
+    COLLECT_MAY_USE = 0x1,
+    COLLECT_MAY_DEF = 0x2,
+    COLLECT_MUST_USE = 0x4,
+    COLLECT_MUST_DEF = 0x8,
+
+    //Do collection cross PHI operand.
+    COLLECT_CROSS_PHI = 0x10,
+
+    //Do collection inside the given loop region.
+    COLLECT_INSIDE_LOOP = 0x20,
+};
+
+class CollectFlag : public UFlag {
+public:
+    CollectFlag(UINT v) : UFlag(v) {}
+};
+
+//The class represents the context information to collection.
+class CollectCtx {
+public:
+    LI<IRBB> const* m_li;
+    CollectFlag flag;
+public:
+    CollectCtx(CollectFlag f) : m_li(nullptr), flag(f) {}
+    LI<IRBB> const* getLI() const { return m_li; }
+    void setLI(LI<IRBB> const* li) { m_li = li; }
+};
+
+//Collect all DEFs that overlapped with 'ref'.
+//The collection will conform rules that declared in 'ctx'.
+//Note the function will not clear 'set' because caller may perform unify
+//operation.
+class CollectDef {
+    COPY_CONSTRUCTOR(CollectDef);
+    MDSSAMgr const* m_mgr;
+    MDSSAInfo const* m_info;
+    CollectCtx const& m_ctx;
+    MD const* m_ref;
+    UseDefMgr const* m_udmgr;
+protected:
+    void collect(OUT IRSet * set) const;
+    void collectDefThroughDefChain(MDDef const* def, OUT IRSet * set) const;
+public:
+    //ref: given MD, if it is NULL, the function will collect all DEFs.
+    //     Otherwise, the collection continues until encounter the
+    //     killing-def of 'ref'.
+    //ctx: if the collection will keep iterating DEF according to rules
+    //     declared in ctx. e.g: do collection by cross PHI operand.
+    //set: record the return result.
+    CollectDef(MDSSAMgr const* mgr, MDSSAInfo const* info,
+               CollectCtx const& ctx, MD const* ref, OUT IRSet * set);
+};
+
+//Collect all USE, where USE is IR expression.
+//Note the function will not clear 'set' because caller may perform unify
+//operation.
+class CollectUse {
+    COPY_CONSTRUCTOR(CollectUse);
+    class MDDefVisitor : public xcom::TTab<UINT>  {
+    public:
+        bool is_visited(UINT id) const { return find(id); }
+        void set_visited(UINT id) { append(id); }
+    };
+    MDSSAMgr const* m_mgr;
+    MDSSAInfo const* m_info;
+    CollectCtx const& m_ctx;
+    MD const* m_ref;
+    UseDefMgr const* m_udmgr;
+protected:
+    void collect(OUT IRSet * set) const;
+    void collectUseCrossPhi(MDPhi const* phi, MOD MDDefVisitor & vis,
+                            OUT IRSet * set) const;
+    void collectUseForVOpnd(VMD const* vopnd, MOD MDDefVisitor & vis,
+                            OUT IRSet * set) const;
+public:
+    //ctx: indicates the terminating condition that the function should
+    //     stop and behaviors what the collector should take when encountering
+    //     specific IR operator. e.g: do collection by cross PHI operand.
+    //set: record the return result.
+    CollectUse(MDSSAMgr const* mgr, MDSSAInfo const* info,
+               CollectCtx const& ctx, OUT IRSet * set);
+};
+
+
+class BB2DefMDSet : public xcom::Vector<DefMDSet*> {
     COPY_CONSTRUCTOR(BB2DefMDSet);
 public:
     BB2DefMDSet() {}
@@ -48,7 +135,7 @@ public:
 };
 
 
-class BB2VMDMap : public Vector<MD2VMD*> {
+class BB2VMDMap : public xcom::Vector<MD2VMD*> {
     COPY_CONSTRUCTOR(BB2VMDMap);
     bool checkClean()
     {
@@ -87,18 +174,18 @@ public:
 
 
 //Mapping from MD id to Stack of VMD.
-class MD2VMDStack : public Vector<Stack<VMD*>*> {
+class MD2VMDStack : public xcom::Vector<VMDStack*> {
     COPY_CONSTRUCTOR(MD2VMDStack);
 public:
     MD2VMDStack() {}
     ~MD2VMDStack() { destroy(); }
 
-    void clean() { destroy(); Vector<Stack<VMD*>*>::init(); }
+    void clean() { destroy(); Vector<VMDStack*>::init(); }
 
     void dump(Region const* rg) const;
     void destroy();
 
-    Stack<VMD*> * gen(UINT mdid);
+    VMDStack * gen(UINT mdid);
     VMD * get_top(VMD const* md) const { return get_top(md->mdid()); }
     VMD * get_top(UINT mdid) const;
 
@@ -112,18 +199,17 @@ public:
 class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
 public:
-    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr),
-        current_pos_in_vopndset(BS_UNDEF),
-        current_pos_in_useset(BS_UNDEF),
-        current_useset(nullptr) {}
-
     VOpndSet * vopndset;
     VOpndSetIter vopndset_iter;
     BSIdx current_pos_in_vopndset;
     VMD::UseSetIter useset_iter;
     BSIdx current_pos_in_useset;
     VMD::UseSet const* current_useset;
-
+public:
+    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr),
+        current_pos_in_vopndset(BS_UNDEF),
+        current_pos_in_useset(BS_UNDEF),
+        current_useset(nullptr) {}
     void clean()
     {
         vopndset_iter = nullptr;
@@ -137,7 +223,7 @@ public:
 
 class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);
-    TTab<UINT> m_is_visited;
+    xcom::TTab<UINT> m_is_visited;
 public:
     ConstMDDefIter() {}
     bool is_visited(MDDef const* def) const
@@ -236,6 +322,7 @@ public:
 //The class generates VMD for 'newstmt' or 'newphi', then insert VMD into
 //DefDef chain, rename following USE as well.
 class RenameDef {
+    friend class RenameDefVisit;
     COPY_CONSTRUCTOR(RenameDef);
     bool m_is_build_ddchain; //true to build DefDef chain with DomTree.
 
@@ -269,6 +356,8 @@ private:
     void connectDefInterBBTillPrevDef(Vertex const* defvex,
                                       MOD LiveSet & stmtliveset,
                                       IRBB const* start_bb);
+
+    Vertex2LiveSet & getVex2LiveSet() { return m_vex2liveset; }
 
     void iterBBPhiListToKillLivedVMD(IRBB const* bb, LiveSet & liveset);
     void iterSuccBBPhiListToRename(Vertex const* defvex, IRBB const* succ,
@@ -307,12 +396,15 @@ private:
                                   bool include_philist,
                                   BBIRListIter & irlistit,
                                   OUT LiveSet & liveset);
+
     //start_ir: if it is nullptr, the renaming will start at the first IR in bb.
     //          otherwise the renaming will start at the NEXT IR of start_ir.
     void renameFollowUseIntraBBTillNextDef(Vertex const* defvex,
                                            MOD LiveSet & stmtliveset,
                                            IRBB const* start_bb,
                                            IR const* start_ir);
+
+    //defvex: root vertex of domtree region that is being renamed.
     void renameFollowUseInterBBTillNextDef(Vertex const* defvex,
                                            MOD LiveSet & stmtliveset,
                                            IRBB const* start_bb);
@@ -349,7 +441,7 @@ class ReconstructMDSSA : public VisitTree {
     MDSSAMgr * m_mdssamgr;
     xcom::Graph const* m_cfg;
     Region const* m_rg;
-private:
+protected:
     void renameBBIRList(IRBB const* bb) const;
     void renameBBPhiList(IRBB const* bb) const;
 public:
@@ -359,16 +451,19 @@ public:
 
     //The interface of VisitTree to access each Vertex.
     //v: the vertex on DomTree.
-    virtual void visitWhenFirstMeet(Vertex const* v)
+    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         Vertex const* cfgv = m_cfg->getVertex(v->id());
         ASSERT0(cfgv);
-        if (!m_vextab.find(cfgv)) { return; }
+        if (!m_vextab.find(cfgv)) { return true; }
         IRBB * bb = m_rg->getBB(cfgv->id());
         ASSERT0(bb);
         renameBBPhiList(bb);
         renameBBIRList(bb);
+        return true;
     }
+    virtual void visitWhenAllKidHaveBeenVisited(
+        Vertex const*, Stack<Vertex const*> &) {}
 };
 
 
@@ -410,7 +505,7 @@ public:
 //IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
     friend class MDPhi;
-    friend class RenameInDomTree;
+    friend class MDSSAConstructRenameVisit;
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     BYTE m_is_semi_pruned:1;
@@ -527,15 +622,14 @@ protected:
     //Return true if stmt dominate use's stmt, otherwise return false.
     bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
                                 LI<IRBB> const* li) const;
+    void initVMDStack(DefMDSet const& defmds, OUT MD2VMDStack & md2verstk);
 
     void renamePhiOpndInSuccBB(IRBB * bb, MD2VMDStack & md2vmdstk);
     void renamePhiResult(IN IRBB * bb, MD2VMDStack & md2vmdstk);
     void renameUse(IR * ir, MD2VMDStack & md2vmdstk);
     void renameDef(IR * ir, IRBB * bb, MD2VMDStack & md2vmdstk);
-    void rename(DefMDSet const& effect_mds,
-                BB2DefMDSet & defed_mds_vec,
-                DomTree & domtree,
-                MD2VMDStack & md2vmdstk);
+    void rename(DefMDSet const& effect_mds, BB2DefMDSet & bb2defmds,
+                DomTree const& domtree, MOD MD2VMDStack & md2vmdstk);
     void renameBB(IRBB * bb, MD2VMDStack & md2vmdstk);
 
     //The function remove 'vopnd' from MDSSAInfo of each ir in its UsetSet.
@@ -602,6 +696,9 @@ protected:
                        DfMgr const& dfm, xcom::BitSet & visited,
                        List<IRBB*> & wl,
                        BB2DefMDSet & defmds_vec);
+
+    //Place phi and assign the v0 for each PR.
+    //effect_md: record the MD which need to versioning.
     void placePhi(DfMgr const& dfm, MOD DefMDSet & effect_md,
                   DefMiscBitSetMgr & bs_mgr,
                   BB2DefMDSet & defined_md_vec,
@@ -755,6 +852,10 @@ public:
     //exp: expression.
     bool isOverConservativeDUChain(MDDef const* def, IR const* exp) const;
 
+    //Initial VMD stack for each MD in 'bb2defmds'.
+    void initVMDStack(BB2DefMDSet const& bb2defmds,
+                      OUT MD2VMDStack & md2verstk);
+
     //Return true if the DU chain between 'def' and 'use' can be ignored during
     //DU chain manipulation.
     //ir1: related DEF or USE to same VMD, can be stmt/exp.
@@ -815,7 +916,7 @@ public:
     //stmt 1, 2, 3, there is no nearest killing def.
     IR * findKillingDefStmt(IR const* ir) const;
 
-    //Find killing must-def Virtual-DEF for expression ir.
+    //Find killing must-def virtual DEF of ir.
     //Return the MDDef if found.
     //e.g: g is global variable, it is exact.
     //x is a pointer that we do not know where it pointed to.
@@ -827,11 +928,11 @@ public:
     //stmt 1, 2, 3, there is no nearest killing def.
     MDDef * findKillingMDDef(IR const* ir) const;
 
-    //Find nearest virtual DEF in VOpndSet of 'ir'.
+    //Find the nearest virtual DEF of 'ir'.
     MDDef * findNearestDef(IR const* ir) const;
 
     //Find the MustDef of 'ir'.
-    MDDef * findMustDef(IR const* ir) const;
+    MDDef * findMustMDDef(IR const* ir) const;
 
     //Find VMD from ir list and phi list.
     VMD * findLastMayDef(IRBB const* bb, MDIdx mdid) const;
@@ -839,6 +940,12 @@ public:
     //Find VMD from ir list and phi list.
     VMD * findLastMayDefFrom(IRBB const* bb, IR const* start, MDIdx mdid) const;
     VMD * findVMDFromPhiList(IRBB const* bb, MDIdx mdid) const;
+
+    //Find the unique DEF of 'exp' that is inside given loop.
+    //set: it is optional, if it is not NULL, the function will record all DEF
+    //     found into the set as a return result.
+    IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                       Region const* rg, OUT IRSet * set) const;
 
     //The function try to find the unique MDDef for given def that is outside
     //of the loop.
@@ -850,7 +957,7 @@ public:
     //Note DOM info must be available.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
-    //         'startbb', then keep finding its predecessors until the
+    //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching.
     VMD * findDomLiveInDefFrom(MDIdx mdid, IR const* startir,
@@ -865,7 +972,7 @@ public:
     //exp: the expression that expected to set livein.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
-    //         'startbb', then keep finding its predecessors until the
+    //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching.
     void findAndSetLiveInDefForTree(IR * exp, IR const* startir,
@@ -881,7 +988,7 @@ public:
     //exp: the expression that expected to set livein.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
-    //         'startbb', then keep finding its predecessors until the
+    //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching.
     void findAndSetLiveInDef(MOD IR * exp, IR const* startir,

@@ -272,10 +272,7 @@ public:
 
     //Return true if SSA/Classic DU chain need to be rebuild.
     bool needRebuildDUChain() const
-    {
-        return SIMP_need_rebuild_pr_du_chain(this) ||
-               SIMP_need_rebuild_nonpr_du_chain(this);
-    }
+    { return needRebuildPRDUChain() || needRebuildNonPRDUChain(); }
 
     //Return true if PR SSA/Classic DU chain need to be rebuild.
     bool needRebuildPRDUChain() const
@@ -401,17 +398,30 @@ protected:
     //Note that if ARRAY or ILD still not be lowered at the moment, regarding
     //it as a whole node. e.g: a[1][2] + b is the lowest height.
     bool isLowestHeight(IR const* ir, SimpCtx const* ctx) const;
-    bool isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const;
+    virtual bool isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const;
 
     //At lowest mode, the predicator, trueexp, falseexp must be leaf.
     //Note the lowest height means tree height is more than 2.
     //e.g: ... = add ld a, ld b; ADD is the lowest height.
     bool isLowestHeightSelect(IR const* ir) const;
 
+    bool isLowest(IR const* ir) const;
+
     //At lowest mode, the array base, array subscript-expression must be leaf.
     bool isLowestHeightArrayOp(IR const* ir) const;
 
+    //Return true if current simplification should maintain the DU chain as
+    //much as possible, otherwise the function have to inform the PRSSAMgr,
+    //MDSSAMgr, and Classic DUMgr to rebuild DU chain.
+    bool needMaintainDUChain(SimpCtx const& ctx);
+
     IR * simplifyNormal(IR * ir, SimpCtx * ctx);
+
+    //Simplfy RHS in prmode.
+    //Convert st x = rhs --> stpr1 = rhs, st x = pr1.
+    //Note the function only handle ir's RHS, return NULL if there is no
+    //stmt generated.
+    virtual IR * simplifyRHSInPRMode(IR * ir, SimpCtx * ctx);
     void simplifyStoreArrayRHS(IR * ir, OUT IR ** ret_list,
                                OUT IR ** last, SimpCtx * ctx);
     IR * simplifyStoreArrayAddr(IR * ir, OUT IR ** ret_list,
@@ -424,6 +434,8 @@ protected:
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
     bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
                                SimpCtx * ctx);
+    virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx * ctx)
+    { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
 public:
@@ -492,7 +504,7 @@ public:
     virtual IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
 
     //Simplify ir to PR mode.
-    virtual IR * simpToPR(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyToPR(IR * ir, SimpCtx * ctx);
 
     virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 };

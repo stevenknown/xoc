@@ -169,7 +169,7 @@ public:
         INHR const& operator = (INHR const& src) { copy(src); return *this; }
 
         void copy(INHR const& src) { ::memcpy(this, &src, sizeof(INHR)); }
-        void clean() { ::memset(this, 0, sizeof(INHR)); }
+        void clean() { ::memset((void*)this, 0, sizeof(INHR)); }
     };
 
     BYTE m_is_init:1;
@@ -647,6 +647,9 @@ public:
     //LU Decomposition.
     //Non-pivot triangular decomposition
     //Compute L,U in terms of the formula: A = LU,
+    //A=|A  ||DDD|
+    //  |AB || EE|
+    //  |ABC||  F|
     //where L:Lower triangular matrix, U: upper triangular matrix.
     //NOTICE: The precision of 'T' may has serious effect.
     bool lu(Matrix<T> & l, Matrix<T> & u);
@@ -760,10 +763,13 @@ public:
     //Permute QR Decomposition.
     //Function produces a permutation matrix p, an upper triangular
     //matrix R of the same dimension as A and a unitary matrix Q so that
-    //AP = Q*R.
+    //A*P = Q*R.
+    //A=|ABC||o  ||AAA|
+    //  |ABC|| o ||BBB|
+    //  |ABC||  o||CCC|
     //The column permutation p is chosen so that abs(diag(R)) is decreasing.
     //NOTICE: The precision of 'T' may has serious effect.
-    bool pqr(Matrix<T> & p, Matrix<T> & q, Matrix<T> & r);
+    bool pqr(OUT Matrix<T> & p, OUT Matrix<T> & q, OUT Matrix<T> & r);
 
     //Compute projection of vector 'v' in row space of 'this'.
     //p: projection of v
@@ -799,7 +805,9 @@ public:
     //Function produces an upper triangular matrix R of the same
     //dimension as row of A and a unitary matrix Q(orthonomal basis)
     //so that A = Q*R.
-    //
+    //A=|ABC||ooo|
+    //  |ABC|| oo|
+    //  |ABC||  o|
     //Space of row vector of A that can be descripte by number of basis,
     //also could be represented by number of orthogonal basis with
     //relatived coefficient.
@@ -970,6 +978,9 @@ public:
 
     //Strange Value decomposition
     //A = u*s*eigx, 'this' is m*n matrix.
+    //A=|ABC||o ||DD|
+    //  |ABC|| o||EE|
+    //  |ABC|
     //u: is m*m orthonormal matrix, col vector form arrangement.
     //s: m*n stanger value matrix, diagonal matrix.
     //eigx: n*n  orthonormal matrix,  row vector form arrangement.
@@ -982,7 +993,7 @@ public:
     void trans();
 
     void zero(); //Set each entry to zero
-    void fzero(); //Fast zeroization, ::memset(0) invoked
+    void fzero(); //Fast zeroization, ::memset((void*)0) invoked
 };
 
 
@@ -1966,7 +1977,7 @@ T Matrix<T>::FullPermutation(UINT n)
     ASSERTN(n > 1, ("Invalid number"));
     INT * posbuf = new INT[n];
     T det = T(0);
-    ::memset(posbuf, 0, sizeof(INT) * n);
+    ::memset((void*)posbuf, 0, sizeof(INT) * n);
     for (UINT i = 0; i < n; i++) {
         posbuf[i] = 1;
         FullPermutationRecur(2, posbuf, n, n, det);
@@ -2815,7 +2826,8 @@ void Matrix<T>::nullspace(OUT Matrix<T> & ns)
     //using free(unconstrained) variables as the weight of vector.
     //e.g:
     // The combination of vectors:
-    // [x1,x2,x3,x4] = x1*[0,0,0,0] + x2*[2,1,0,0] + x3*[0,0,0,0] + x4*[1,0,-2,1]
+    // [x1,x2,x3,x4] = x1*[0,0,0,0] + x2*[2,1,0,0] +
+    //                 x3*[0,0,0,0] + x4*[1,0,-2,1]
     ns.initIden(1);
     //INT unum = tmp.m_col_size; //Number of variable.
     for (UINT nsrow = 0, row = 0; row < tmp.m_row_size; row++) {
@@ -4159,7 +4171,7 @@ void Matrix<T>::dumpf(FILE * h) const
 template <class T>
 void Matrix<T>::padTo(MOD StrBuf & buf, UINT len)
 {
-    for (INT i = 0; i < (INT)len - buf.strlen(); i++) {
+    for (INT i = 0; i < (INT)(len - (UINT)buf.strlen()); i++) {
         buf.strcat(" ");
     }
 }

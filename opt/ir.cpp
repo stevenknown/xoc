@@ -306,9 +306,10 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
 
 
 //Return true if ir-list are equivalent.
-//'is_cmp_kid': it is true if comparing kids as well.
+//is_cmp_kid: it is true if comparing kids as well.
 bool IR::isIRListEqual(IR const* irs, bool is_cmp_kid) const
 {
+    if (this == irs) { return true; }
     IR const* pthis = this;
     while (irs != nullptr && pthis != nullptr) {
         if (!pthis->isIREqual(irs, is_cmp_kid)) {
@@ -417,48 +418,97 @@ bool IR::isMemRefEqual(IR const* src) const
 
 
 static bool isIRIsomorphic(IR const* ir, IR const* src,
-                           bool is_cmp_kid, bool identical)
+                           bool is_cmp_kid, IsomoFlag const& flag);
+
+static bool isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
+                               bool is_cmp_kid, IsomoFlag const& flag)
+{
+    IR const* ir1 = ir1lst;
+    IR const* ir2 = ir2lst;
+    for (; ir1 != nullptr && ir2 != nullptr;
+         ir1 = ir1->get_next(), ir2 = ir2->get_next()) {
+        if (!isIRIsomorphic(ir1, ir2, is_cmp_kid, flag)) {
+            return false;
+        }
+    }
+    if ((ir1 != nullptr) ^ (ir2 != nullptr)) {
+        return false;
+    }
+    return true;
+}
+
+
+//flag: record the checking condition while compare two given ir expression
+//      or stmt.
+//      e.g: If ISOMO_CK_CODE is set, the comparison of IST and ILD will
+//      return false.
+static bool isIRIsomorphic(IR const* ir, IR const* src,
+                           bool is_cmp_kid, IsomoFlag const& flag)
 {
     if (ir == src) { return true; }
     switch (src->getCode()) {
     case IR_CONST: //Constant value: include integer, float, string.
         if (ir->getCode() != src->getCode()) { return false; }
-        if (CONST_int_val(ir) != CONST_int_val(src)) { return false; }
+        if (flag.have(ISOMO_CK_CONST_VAL) &&
+            CONST_int_val(ir) != CONST_int_val(src)) {
+            return false;
+        }
         break;
     case IR_ID:
         if (ir->getCode() != src->getCode()) { return false; }
         if (ID_info(ir) != ID_info(src)) { return false; }
         break;
     SWITCH_CASE_DIRECT_MEM_OP:
-        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->isDirectMemOp()) { return false; }
-        if (ir->getIdinfo() != src->getIdinfo() ||
-            ir->getOffset() != src->getOffset() ||
-            ir->getType() != src->getType()) {
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_IDINFO) &&
+            ir->getIdinfo() != src->getIdinfo()) {
+            return false;
+        }
+        if (ir->getOffset() != src->getOffset()) {
             return false;
         }
         break;
     SWITCH_CASE_INDIRECT_MEM_OP:
-        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->isIndirectMemOp()) { return false; }
-        if (ir->getOffset() != src->getOffset() ||
-            ir->getType() != src->getType()) {
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
             return false;
         }
-        break;
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (ir->getOffset() != src->getOffset()) {
+            return false;
+        }
+        ASSERT0(ir->getBase() && src->getBase());
+        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
     SWITCH_CASE_PR_OP:
-        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->isPROp()) { return false; }
-        if (ir->getType() != src->getType() ||
-            ir->getPrno() != src->getPrno()) {
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_PRNO) && ir->getPrno() != src->getPrno()) {
             return false;
         }
         break;
     SWITCH_CASE_ARRAY_OP:
-        if (identical && ir->getCode() != src->getCode()) { return false; }
         if (!ir->isArrayOp()) { return false; }
-        if (ir->getOffset() != src->getOffset() ||
-            ir->getType() != src->getType()) {
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            //Not diff exp or stmt.
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (ir->getOffset() != src->getOffset()) {
             return false;
         }
         if ((ARR_elem_num_buf(src) != nullptr) ^
@@ -476,12 +526,15 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
                 }
             }
         }
-        break;
+        ASSERT0(ir->getBase() && src->getBase());
+        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
     case IR_LDA:
         if (ir->getCode() != src->getCode()) { return false; }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
         if (LDA_idinfo(ir) != LDA_idinfo(src) ||
-            LDA_ofst(ir) != LDA_ofst(src) ||
-            ir->getType() != src->getType()) {
+            LDA_ofst(ir) != LDA_ofst(src)) {
             return false;
         }
         break;
@@ -503,7 +556,9 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
     case IR_FALSEBR:
     case IR_SELECT:
         if (ir->getCode() != src->getCode()) { return false; }
-        if (ir->getType() != src->getType()) { return false; }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
         break;
     case IR_REGION:
         //One should implement comparation function for your own region.
@@ -524,18 +579,15 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
     }
     if (!is_cmp_kid) { return true; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
-        IR * kid1 = ir->getKid(i);
-        IR * kid2 = src->getKid(i);
+        IR const* kid1 = ir->getKid(i);
+        IR const* kid2 = src->getKid(i);
         if (src->isCallStmt() &&
             (kid1 == CALL_dummyuse(ir) ||
              kid2 == CALL_dummyuse(src))) {
             //Do NOT check the equality of dummyuses.
             continue;
         }
-        if ((kid1 != nullptr) ^ (kid2 != nullptr)) {
-            return false;
-        }
-        if (kid1 != nullptr && !kid1->isIRListEqual(kid2, is_cmp_kid)) {
+        if (!isIRListIsomorphic(kid1, kid2, is_cmp_kid, flag)) {
             return false;
         }
     }
@@ -549,9 +601,9 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
 //src: root of IR tree.
 //is_cmp_kid: it is true if comparing kids as well.
 //Note the function does not compare the siblings of 'src'.
-bool IR::isIsomoTo(IR const* src, bool is_cmp_kid) const
+bool IR::isIsomoTo(IR const* src, bool is_cmp_kid, IsomoFlag const& flag) const
 {
-    return isIRIsomorphic(this, src, is_cmp_kid, false);
+    return isIRIsomorphic(this, src, is_cmp_kid, flag);
 }
 
 
@@ -561,7 +613,7 @@ bool IR::isIsomoTo(IR const* src, bool is_cmp_kid) const
 //Note the function does not compare the siblings of 'src'.
 bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
 {
-    return isIRIsomorphic(this, src, is_cmp_kid, true);
+    return isIRIsomorphic(this, src, is_cmp_kid, IsomoFlag(ISOMO_CK_ALL));
 }
 
 
@@ -878,7 +930,7 @@ void IR::dumpRef(Region * rg, UINT indent)
         prt(rg, " : ");
         if (!isReadOnly()) {
             if (mds != nullptr && !mds->is_empty()) {
-                mds->dump(rg->getMDSystem());
+                mds->dump(rg->getMDSystem(), rg->getVarMgr());
             }
         }
     }
@@ -893,7 +945,7 @@ void IR::dumpRef(Region * rg, UINT indent)
                 //May use
                 prt(rg, " <-- ");
                 if (muse != nullptr && !muse->is_empty()) {
-                    muse->dump(callee->getMDSystem());
+                    muse->dump(callee->getMDSystem(), rg->getVarMgr());
                     doit = true;
                 }
             }
@@ -904,7 +956,7 @@ void IR::dumpRef(Region * rg, UINT indent)
             prt(rg, " <-- ");
             MDSet const* x = getRefMDSet();
             if (x != nullptr && !x->is_empty()) {
-                x->dump(rg->getMDSystem());
+                x->dump(rg->getMDSystem(), rg->getVarMgr());
             }
         }
     }
@@ -1212,6 +1264,21 @@ bool IR::isExactDef(MD const* md) const
         return true;
     }
     return false;
+}
+
+
+//Return true if current ir is integer constant, and the number
+//is equal to 'value'.
+bool IR::isConstFPValueEqualTo(HOST_FP value) const
+{
+    if (!isConstExp()) { return false; }
+    IR const* p = this;
+    while (!p->is_const()) {
+        ASSERTN(p->is_cvt(), ("const expression only include CVT and CONST."));
+        p = CVT_exp(p);
+        ASSERT0(p);
+    }
+    return p->is_fp() && TypeMgr::isEqual(CONST_fp_val(p), value);
 }
 
 
@@ -1668,6 +1735,35 @@ void IR::setAlign(UINT align_bytenum)
     case IR_ILD: ILD_align(this) = align_bytenum; return;
     case IR_IST: IST_align(this) = align_bytenum; return;
     default: ASSERT0(0); //TODO
+    }
+}
+
+
+bool IR::hasAlignedAttr() const
+{
+    switch (getCode()) {
+    case IR_LD: return LD_is_aligned(this);
+    case IR_ST: return ST_is_aligned(this);
+    case IR_ARRAY: return ARR_is_aligned(this);
+    case IR_STARRAY: return STARR_is_aligned(this);
+    case IR_ILD: return ILD_is_aligned(this);
+    case IR_IST: return IST_is_aligned(this);
+    default: return false;
+    }
+    return false;
+}
+
+
+void IR::setAligned(bool is_aligned)
+{
+    switch (getCode()) {
+    case IR_LD: LD_is_aligned(this) = is_aligned; return;
+    case IR_ST: ST_is_aligned(this) = is_aligned; return;
+    case IR_ARRAY: ARR_is_aligned(this) = is_aligned; return;
+    case IR_STARRAY: STARR_is_aligned(this) = is_aligned; return;
+    case IR_ILD: ILD_is_aligned(this) = is_aligned; return;
+    case IR_IST: IST_is_aligned(this) = is_aligned; return;
+    default: return;
     }
 }
 

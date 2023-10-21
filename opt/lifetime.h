@@ -126,6 +126,7 @@ public:
     Pos m_end;
 public:
     //Range is point.
+    Range() : m_start(0), m_end(0) {}
     Range(Pos p) : m_start(p), m_end(p) {}
     Range(Pos s, Pos e) : m_start(s), m_end(e) {}
 
@@ -205,14 +206,23 @@ class LifeTime {
     COPY_CONSTRUCTOR(LifeTime);
     bool m_is_dedicated;
     PRNO m_prno;
+
+    //Used to record the number of calls intersected with the whole lifetime
+    //except holes.
+    UINT m_calls_crossed_num;
     LifeTime const* m_ancestor;
     double m_priority;
     double m_spill_cost;
     RangeVec m_range_vec;
     OccList m_occ_list;
+    //Used to save the the positions of crossed calls in incremental order
+    //during the whole lifetime.
+    Vector<Pos> m_call_pos_vec;
 public:
     LifeTime(PRNO prno) :
-        m_is_dedicated(false), m_prno(prno), m_ancestor(nullptr) {}
+        m_is_dedicated(false), m_prno(prno),
+        m_calls_crossed_num(0), m_ancestor(nullptr)
+    {}
     Range addRange(Pos start, Pos end);
     Range addRange(Pos start) { return addRange(start, start); }
     void addOcc(Occ occ, LifeTimeMgr & mgr);
@@ -224,6 +234,31 @@ public:
     //the function do nothing.
     void cleanRangeFrom(Pos pos);
 
+    //This func will move the cross call info of 'src' from the position.
+    //position 'pos' (include pos) into current lifetime.
+    // e.g. 1:
+    // input:  src.m_calls_crossed_num = 4
+    //         src.m_call_pos_vec = {4ï¼?10ï¼? 30ï¼? 35}
+    //                             | -   -     -     - |
+    //                                         ^
+    //                                         |
+    //                                         pos = 30
+    // output: src.m_calls_crossed_num = 2
+    //         src.m_call_pos_vec = {4ï¼?10}
+    //         cur.m_calls_crossed_num = 2
+    //         cur.m_call_pos_vec = {30ï¼?35}
+    // e.g. 2:
+    // input:  src.m_calls_crossed_num = 4
+    //         src.m_call_pos_vec = {4ï¼?10ï¼? 30ï¼? 35}
+    //                             | -   -     -     - |
+    //                                              ^
+    //                                              |
+    //                                              pos = 34
+    // output: src.m_calls_crossed_num = 3
+    //         src.m_call_pos_vec =  {4ï¼?10ï¼?30}
+    //         cur.m_calls_crossed_num = 1
+    //         cur.m_call_pos_vec = {35}
+    void moveCrossedCallInfoFrom(LifeTime * src, Pos pos);
     //The function will move Range and Occ of 'src' that starting from
     //position 'pos' (include pos) into current lifetime.
     void moveRangeVecFrom(LifeTime * src, Pos pos);
@@ -246,6 +281,8 @@ public:
                    OUT VecIdx * less = nullptr,
                    OUT VecIdx * great = nullptr) const;
 
+    UINT getCallCrossedNum() const { return m_calls_crossed_num; }
+    Vector<Pos> const& getCallPosVec() const { return m_call_pos_vec; }
     UINT getRangeNum() const
     { return const_cast<LifeTime*>(this)->getRangeVec().get_elem_count(); }
     Pos getFirstPos() const { return getFirstRange().start(); }
@@ -282,6 +319,24 @@ public:
     {
         ASSERT0(getLastPos() >= getFirstPos());
         return getLastPos() - getFirstPos() + 1;
+    }
+
+    //Updated the crossed call info.
+    void updateCallCrossedInfo(Pos pos)
+    {
+        ASSERT0(pos != POS_UNDEF);
+        m_calls_crossed_num++;
+        m_call_pos_vec.append(pos);
+    }
+
+    //Remove the call postion in m_call_pos_vec from idx, and update the
+    //m_calls_crossed_num at the same time.
+    void removeCallPosVecFrom(VecIdx idx)
+    {
+        ASSERT0(m_calls_crossed_num == m_call_pos_vec.get_elem_count());
+        ASSERT0(idx < (VecIdx)m_call_pos_vec.get_elem_count());
+        m_call_pos_vec.cleanFrom(idx);
+        m_calls_crossed_num -= m_call_pos_vec.get_elem_count() - idx - 1;
     }
 
     //Return true if current lifetime contains the position.
@@ -357,10 +412,12 @@ public:
     bool verify() const;
 };
 
+typedef xcom::TMap<IR const*, Pos> Call2PosMap;
+typedef xcom::TMapIter<IR const*, Pos> Call2PosMapIter;
+typedef Vector<LifeTime*> PRNO2LT;
 class LifeTimeMgr {
     friend class OccList;
     COPY_CONSTRUCTOR(LifeTimeMgr);
-    typedef Vector<LifeTime*> PRNO2LT;
     bool m_use_expose; //true to compute exposed def/use for each BB.
     Region * m_rg;
     SMemPool * m_pool;
@@ -377,7 +434,8 @@ private:
     LifeTime * allocLifeTime(PRNO prno);
     void computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                            DedicatedMgr const& dedicated_mgr,
-                           Pos livein_def, IRIter & irit);
+                           Pos livein_def, IRIter & irit,
+                           OUT Call2PosMap & call2pos);
     void destroy();
     void init(Region * rg);
     void * xmalloc(size_t size);
@@ -400,11 +458,15 @@ public:
                    bool dumpir = true) const;
     void dump() const;
 
+    //This func generates the call crossed info for each life time.
+    void genCallCrossedInfo(BBList const* bblst, Call2PosMap const& call2pos);
+
     LifeTime * genLifeTime(PRNO prno);
     LifeTime * getLifeTime(PRNO prno) const { return m_prno2lt.get(prno); }
     LTList const& getLTList() const { return m_lt_list; }
     Pos getBBStartPos(UINT bbid) const { return m_bb_entry_pos.get(bbid); }
     Pos getBBEndPos(UINT bbid) const { return m_bb_exit_pos.get(bbid); }
+    PRNO2LT const& getPrno2LT() const { return m_prno2lt; }
 
     //Clean the lifetime info before computation.
     void reset();

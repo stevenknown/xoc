@@ -89,7 +89,8 @@ static bool checkLogicalOp(IR_CODE irc, Type const* type, TypeMgr * tm)
     case IR_NE:
     case IR_LAND:
     case IR_LOR:
-        ASSERT0(type == tm->getBool());
+        ASSERT0(type == tm->getBool() ||
+                type->getVectorElemType(tm) == tm->getBool());
         break;
     default:;
     }
@@ -101,7 +102,7 @@ IRMgr::IRMgr(Region * rg) : Pass(rg)
 {
     m_ir_count = IRID_UNDEF + 1;
     m_ir_pool = xcom::smpoolCreate(256, MEM_COMM);
-    ::memset(m_free_tab, 0, sizeof(m_free_tab));
+    ::memset((void*)m_free_tab, 0, sizeof(m_free_tab));
     m_tm = rg->getTypeMgr();
     m_rm = rg->getRegionMgr();
     m_vm = rg->getVarMgr();
@@ -121,7 +122,7 @@ IR * IRMgr::xmalloc(UINT size)
     ASSERTN(m_ir_pool, ("pool does not initialized"));
     IR * p = (IR*)xcom::smpoolMalloc(size, m_ir_pool);
     ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 
@@ -223,7 +224,7 @@ void IRMgr::freeIR(IR * ir)
     //Zero clearing all data fields, except the IRID and CodeSize.
     UINT res_id = ir->id();
     UINT res_irc_sz = IR::getIRCodeSize(ir);
-    ::memset(ir, 0, res_irc_sz);
+    ::memset((void*)ir, 0, res_irc_sz);
     IR_id(ir) = res_id;
     IR::setIRCodeSize(ir, res_irc_sz);
 

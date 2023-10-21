@@ -151,6 +151,7 @@ class DUMgr : public Pass {
     friend class DUSet;
 protected:
     TypeMgr * m_tm;
+    VarMgr * m_vm;
     AliasAnalysis * m_aa;
     IRCFG * m_cfg;
     MDSystem * m_md_sys;
@@ -264,7 +265,7 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 
@@ -413,7 +414,6 @@ public:
             ASSERT0(exp->is_exp() && exp->isMemRef());
             DUSet * defset = exp->getDUSet();
             if (defset == nullptr) { continue; }
-
             defset->diff(from, *getSBSMgr());
             defset->bunion(to, *getSBSMgr());
         }
@@ -431,7 +431,6 @@ public:
         ASSERT0(to && from && to->is_stmt() && from->is_stmt());
         DUSet * useset_of_from = from->getDUSet();
         if (useset_of_from == nullptr) { return; }
-
         DUSet * useset_of_to = genDUSet(to);
         changeDef(to->id(), from->id(), useset_of_to, useset_of_from,
                   getSBSMgr());
@@ -456,7 +455,6 @@ public:
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
             if (useset == nullptr) { continue; }
-
             useset->diff(from, *getSBSMgr());
             useset->bunion(to, *getSBSMgr());
         }
@@ -474,7 +472,6 @@ public:
         ASSERT0(to && from && to->is_exp() && from->is_exp());
         DUSet * defset_of_from = from->getDUSet();
         if (defset_of_from == nullptr) { return; }
-
         DUSet * defset_of_to = genDUSet(to);
         changeUse(to->id(), from->id(), defset_of_to, defset_of_from,
                   getSBSMgr());
@@ -582,6 +579,16 @@ public:
     IR const* findKillingLocalDef(IRBB * bb, xcom::C<IR*> const* ct,
                                   IR const* exp, MD const* md,
                                   bool * has_local_nonkilling_def);
+    //Find the unique DEF of 'exp' that is inside given loop.
+    //Note the DEF may not be killing-def of 'exp'.
+    static IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                              Region const* rg,
+                                              OUT IRSet * set = nullptr);
+
+    //Find all USEs of stmt that is inside the given loop.
+    //useset: record USEs that is inside the loop as return result.
+    static bool findUseInLoop(IR const* stmt, LI<IRBB> const* li,
+                              Region const* rg, OUT IRSet * useset);
 
     void setMustKilledDef(UINT bbid, SolveSet * set);
     void setMayKilledDef(UINT bbid, SolveSet * set);

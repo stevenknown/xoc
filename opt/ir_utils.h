@@ -42,6 +42,7 @@ typedef xcom::List<IR*> IRIter; //the iter to iterate IR Tree.
 //Map IR to its Holder during instrument operation.
 typedef xcom::TMap<IR*, xcom::C<IR*>*> IR2Holder;
 typedef xcom::EList<IR*, IR2Holder> IREList;
+typedef xcom::EList<IR*, IR2Holder>::Iter IREListIter;
 
 typedef xcom::List<IR*> IRList;
 typedef xcom::List<IR*>::Iter IRListIter;

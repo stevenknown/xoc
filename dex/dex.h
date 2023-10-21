@@ -186,7 +186,8 @@ public:
             INT cur;
             for (INT i = 0; i <= maxreg; i++) {
                 bool find = false;
-                for (PRNO prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
+                for (PRNO prno = get_first(cur);
+                     cur >= 0; prno = get_next(cur)) {
                     UINT v = get(prno);
                     if (v == (UINT)i) {
                         note(rg, "\nPR%d -> v%d", prno, v);
@@ -226,7 +227,8 @@ public:
 
 class Str2BuiltinType : public HMap<CHAR const*, BLTIN_TYPE, HashFuncString> {
 public:
-    Str2BuiltinType(UINT sz = 13) : HMap<CHAR const*, BLTIN_TYPE, HashFuncString>(sz)
+    Str2BuiltinType(UINT sz = 13) :
+        HMap<CHAR const*, BLTIN_TYPE, HashFuncString>(sz)
     {
         for (UINT i = BLTIN_UNDEF + 1; i < g_builtin_num; i++) {
             set(BLTIN_name((BLTIN_TYPE)i), (BLTIN_TYPE)i);
@@ -310,7 +312,7 @@ public:
     Type const* int64x2;
 
 public:
-    TypeIndexRep() { ::memset(this, 0, sizeof(TypeIndexRep)); }
+    TypeIndexRep() { ::memset((void*)this, 0, sizeof(TypeIndexRep)); }
 };
 
 //Perform Dex register allocation.

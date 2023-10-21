@@ -62,7 +62,7 @@ public:
     } u1;
 
 public:
-    CallNode() { ::memset(this, 0, sizeof(CallNode)); }
+    CallNode() { ::memset((void*)this, 0, sizeof(CallNode)); }
 
     bool hasUnknownCallee() const { return CN_unknown_callee(this); }
 
@@ -92,6 +92,7 @@ class CallGraph : public Pass, public xcom::DGraph {
 private:
     RegionMgr * m_rm;
     TypeMgr * m_tm;
+    VarMgr * m_vm;
     SMemPool * m_cn_pool; //pool for call node.
     UINT m_cn_count;
     Vector<CallNode*> m_cnid2cn;
@@ -104,7 +105,7 @@ private:
         CallNode * p = (CallNode*)smpoolMallocConstSize(
             sizeof(CallNode), m_cn_pool);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(CallNode));
+        ::memset((void*)p, 0, sizeof(CallNode));
         return p;
     }
 
@@ -139,6 +140,7 @@ public:
         ASSERT0(vex_hash > 0);
         m_rg = rg;
         m_rm = rg->getRegionMgr();
+        m_vm = m_rm->getVarMgr();
         m_tm = m_rm->getTypeMgr();
         m_cn_count = 1;
         m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
@@ -206,6 +208,7 @@ public:
     virtual CHAR const* getPassName() const { return "CallGraph"; }
     virtual PASS_TYPE getPassType() const { return PASS_CALL_GRAPH; }
     RegionMgr * getRegionMgr() const { return m_rm; }
+    VarMgr * getVarMgr() const { return m_vm; }
 
     //Get the target(callee) Region for given call/icall stmt.
     //rg: the region that 'ir' resident in.

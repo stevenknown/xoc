@@ -111,6 +111,26 @@ void SSAInfo::dump(Region const* rg) const
 
 
 //
+//START VPR
+//
+CHAR const* VPR::dumpBuf(OUT StrBuf & buf) const
+{
+    if (orgprno() != PRNO_UNDEF) {
+        buf.sprint("%s%uv%u", PR_TYPE_CHAR, orgprno(), version());
+    } else {
+        buf.sprint("-v%u", version());
+    }
+    if (newprno() != PRNO_UNDEF) {
+        buf.strcat("%s%u", PR_TYPE_CHAR, newprno());
+    } else {
+        buf.strcat("--");
+    }
+    return buf.buf;
+}
+//END VPRVec
+
+
+//
 //START VPRVec
 //
 //Find the VPR that have PR defined at given BB.

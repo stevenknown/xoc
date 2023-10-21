@@ -37,6 +37,8 @@ author: Su Zhenyu
 namespace xoc {
 
 class PassMgr;
+class LogMgr;
+class RegionMgr;
 
 #define OPT_LEVEL0 0
 #define OPT_LEVEL1 1
@@ -79,9 +81,10 @@ public:
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_vectorization; //Dump IR Vectorization.
     bool is_dump_gvn; //Dump Global Value Numbering.
-    bool is_dump_gcse; //Dump Global Common Subscript Expression.
+    bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
     bool is_dump_ivr; //Dump Induction Variable Recognization.
     bool is_dump_licm; //Dump Loop Invariant Code Motion.
+    bool is_dump_exprtab; //Dump Expr Tab.
     bool is_dump_loopcvt; //Dump Loop Convertion.
     bool is_dump_simplification; //Dump IR simplification.
     bool is_dump_prssamgr; //Dump PRSSAMgr.
@@ -94,11 +97,14 @@ public:
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
     bool is_dump_lsra; //Dump LinearScanRA
+    bool is_dump_pelog; //Dump PrologueEpilogue
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
     //basedump file in testsuite, because the id may be different in different
     //compilation.
     bool is_dump_ir_id;
+    bool is_dump_gp_adjustment; //Dump GlobalPointerAdjustment
+    bool is_dump_relaxation; //Dump ir after relaxation.
 public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
@@ -127,6 +133,7 @@ public:
     bool isDumpGCSE() const;
     bool isDumpIVR() const;
     bool isDumpLICM() const;
+    bool isDumpExprTab() const;
     bool isDumpLoopCVT() const;
     bool isDumpSimp() const;
     bool isDumpPRSSAMgr() const;
@@ -143,8 +150,25 @@ public:
     bool isDumpLIS() const;
     bool isDumpIRID() const;
     bool isDumpLSRA() const;
+    bool isDumpPElog() const;
+    bool isDumpGPAdjustment() const;
+    bool isDumpRelaxation() const;
 };
 
+class Option {
+public:
+    Option() {}
+
+    //The function dump all options information.
+    static void dump(MOD LogMgr * lm);
+    static void dump(RegionMgr * rm);
+
+    //The function return the string name of given optimization level.
+    static CHAR const* getOptLevelName(UINT optlevel);
+
+    //The function return the string name of given verification level.
+    static CHAR const* getVerifyLevelName(UINT verifylevel);
+};
 
 //Declare the optimization.
 typedef enum _PASS_TYPE {
@@ -201,6 +225,9 @@ typedef enum _PASS_TYPE {
     PASS_IRMGR,
     PASS_CALL_GRAPH,
     PASS_VECT,
+    PASS_PROLOGUE_EPILOGUE,
+    PASS_GP_ADJUSTMENT,
+    PASS_RELAXATION,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -412,6 +439,9 @@ extern bool g_do_dse;
 //Perform loop invariant code motion.
 extern bool g_do_licm;
 
+//Perform loop invariant code motion without inserting loop guard.
+extern bool g_do_licm_no_guard;
+
 //Perform induction variable recognization.
 extern bool g_do_ivr;
 
@@ -466,8 +496,17 @@ extern bool g_do_refine_duchain;
 //Linear Scan Register Allocation.
 extern bool g_do_lsra;
 
+//Insert prologue and epilogue code.
+extern bool g_do_pelog;
+
 //Perform versatile scalar optimizations.
 extern bool g_do_scalar_opt;
+
+//Perform global pointer adjustment.
+extern bool g_do_gp_adjustment;
+
+//Perform relaxation.
+extern bool g_do_relaxation;
 
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;
@@ -516,6 +555,7 @@ extern bool g_redirect_stdout_to_dump_file;
 //in serial execution when there are multiple RegionMgrs doing compilation
 //simultaneously.
 extern FILE * g_unique_dumpfile;
+extern CHAR const* g_unique_dumpfile_name;
 
 } //namespace xoc
 #endif

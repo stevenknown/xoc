@@ -48,7 +48,7 @@ public:
     //Supply CFG when dumpping PHI.
     IRCFG const* cfg;
 public:
-    DumpGRCtx() { ::memset(this, 0, sizeof(DumpGRCtx)); }
+    DumpGRCtx() { ::memset((void*)this, 0, sizeof(DumpGRCtx)); }
 };
 
 class GRDump {

@@ -91,7 +91,7 @@ void * RegionMgr::xmalloc(UINT size)
     ASSERTN(m_pool != nullptr, ("pool not initialized"));
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 
@@ -109,7 +109,8 @@ OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 
 
 //Try to generate a MD to represent dedicated string md.
-//In case, e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+//In case,
+//e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
 //There is a function allocates 3000+ string variable.
 //Each string has been taken address.
 //That will inflate may_point_to_set too much.

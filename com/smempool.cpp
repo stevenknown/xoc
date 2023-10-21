@@ -96,8 +96,9 @@ static SMemPool * new_mem_pool(size_t size, MEMPOOLTYPE mpt)
 
     SMemPool * mp = (SMemPool*)malloc(size_mp + size + END_BOUND_BYTE);
     ASSERTN(mp, ("create mem pool failed, no enough memory"));
-    ::memset(mp, 0, size_mp);
-    ::memset(((BYTE*)mp) + size_mp + size, BOUNDARY_NUM, END_BOUND_BYTE);
+    ::memset((void*)mp, 0, size_mp);
+    ::memset((void*)(((BYTE*)mp) + size_mp + size),
+             BOUNDARY_NUM, END_BOUND_BYTE);
 
     MEMPOOL_type(mp) = mpt;
     #ifdef _DEBUG_
@@ -248,7 +249,8 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
         idx = (MEMPOOLIDX)rand();
         do {
             if (idx != 0 &&
-                g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)idx) == nullptr) {
+                g_mem_pool_hash_tab->find(
+                    (xcom::OBJTY)(size_t)idx) == nullptr) {
                  //Unique pool idx
                 break;
             }
@@ -479,7 +481,8 @@ FIN:
 
 
 //Quering memory space from pool via pool index.
-void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_size)
+void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx,
+                                size_t grow_size)
 {
     ASSERTN(size > 0, ("request size can not be 0"));
     SMemPool * mp = g_mem_pool;

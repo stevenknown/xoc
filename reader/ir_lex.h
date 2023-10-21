@@ -314,7 +314,7 @@ protected:
         ASSERTN(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
         ASSERTN(p, ("malloc failed"));
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 public:

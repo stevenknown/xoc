@@ -250,7 +250,7 @@ static void convertClassData(
 static D2Dpool* poolInfoInit()
 {
     D2Dpool* pool = (D2Dpool*)malloc(sizeof(D2Dpool));
-    ::memset(pool, 0, sizeof(D2Dpool));
+    ::memset((void*)pool, 0, sizeof(D2Dpool));
 
     pool->classDataCbs = cbsInitialize(0);
     pool->lbs = cbsInitialize(0);
@@ -290,7 +290,7 @@ static Int32 writeToFile(D2Dpool* pool, int outFd, long* fileLen, bool ifOpt)
     if (ifOpt) {
         UInt32 optSize = sizeof(DexOptHeader);
         char buff[optSize];
-        ::memset(buff, 0xff, optSize);
+        ::memset((void*)buff, 0xff, optSize);
         cIOWrite(outFd, buff, optSize);
     }
 
@@ -319,7 +319,7 @@ static void createHeader(DexFile* pDexFile, D2Dpool* pool)
 {
     const DexHeader* header = pDexFile->pHeader;
     BYTE signatur[20];
-    ::memset(signatur, 0, sizeof(BYTE)*20);
+    ::memset((void*)signatur, 0, sizeof(BYTE)*20);
     int ENDIAN_CONSTANT = 0x12345678;
 
     ASSERT0(pool->currentSize == 0);
@@ -833,7 +833,7 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilena
 
     ASSERT0(pool->currentSize == cbsGetSize(pool->lbs));
     DexClassDef nDexCd;
-    ::memset(&nDexCd, 0, sizeof(DexClassDef));
+    ::memset((void*)&nDexCd, 0, sizeof(DexClassDef));
 
     pool->codeItemOff = pool->currentSize;
     UInt32 size = 0;

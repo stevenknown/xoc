@@ -42,7 +42,7 @@ class DumpHeap : public Graph {
     {
         void * p = smpoolMalloc(size, m_pool);
         if (p == nullptr) { return nullptr; }
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 
@@ -107,38 +107,5 @@ public:
         fprintf(h, "}\"];");
     }
 };
-
-
-///int footest() {
-///    int arr[] = { 3, 5, 3, 0, 8, 6, 1, 5, 8, 6, 2, 4, 9, 4, 7, 0, 1, 8, 9, 7, 3, 1, 2, 5, 9, 7, 4, 0, 2, 6 };
-///    int len = (int) sizeof(arr) / sizeof(*arr);
-///    //heap_sort(arr, len);
-///    int i;
-///    printf("\nfootest:\n");
-///    for (i = 0; i < len; i++) { printf("%d ", arr[i]); }
-///    printf("\n");
-///
-///    Vector<INT> data(30);
-///    data.clean();
-///    //INT in[] = { 3, 5, 3, 0, 8, 6, 1, 5, 8, 6, 2, 4, 9, 4, 7, 0, 1, 8, 9, 7, 3, 1, 2, 5, 9, 7, 4, 0, 2, 6 };
-///    INT in[] = { 20, 12, 35, 15, 10, 80, 30, 17, 2, 1, -9, 999, 77, 11, 0, 45, };
-///    //for (int i = 0; i < sizeof(arr)/sizeof(arr[0]); i++) {
-///    //    data[i] = arr[i];
-///    //}
-///    for (int i = 0; i < sizeof(in)/sizeof(in[0]); i++) {
-///        data[i] = in[i];
-///    }
-///    printf("\nfootest2:\n");
-///    for (int i = 0; i < data.get_elem_count(); i++) { printf("%d ", data[i]); }
-///    DumpHeap<INT> dh2(data);
-///
-///    HeapSort<INT> hs;
-///    hs.sort(data);
-///    printf("\nfootest5:\n");
-///    for (int i = 0; i < data.get_elem_count(); i++) { printf("%d ", data[i]); }
-///    DumpHeap<INT> dh5(data);
-///
-///    return 0;
-///}
 
 } //namespace xcom

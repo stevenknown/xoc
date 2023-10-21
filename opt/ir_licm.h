@@ -92,12 +92,6 @@ public:
         inserted_guard_bb = false;
     }
 
-    bool is_domtree_valid() const
-    {
-        ASSERT0(domtree);
-        return domtree->verify(*cfg);
-    }
-
     void unionBottomUpInfo(HoistCtx const& src)
     {
         inserted_guard_bb |= src.inserted_guard_bb;
@@ -105,17 +99,40 @@ public:
         duset_changed |= src.duset_changed;
         stmt_changed |= src.stmt_changed;
     }
+
+    bool verifyDomTree() const
+    {
+        ASSERT0(domtree);
+        return domtree->verify(*cfg);
+    }
 };
 
 
 class LICMAnaCtx {
-public:
+    COPY_CONSTRUCTOR(LICMAnaCtx);
+protected:
     //Record if the stmt is loop invariant.
     InvStmtList m_invariant_stmt;
 
     //Record if the expression is loop invariant
     IRTab m_invariant_exp;
+
+    //The list records stmts that are possibly invariant stmt.
+    //And these stmts will be analyzed in scanResult().
+    //It is used for temporary purpose.
+    IRList m_analysable_stmt_list;
+
+    //Record if the expression is hoist-candidate.
+    //Note hoist-candidate is not always can be hoisted legally at last. It
+    //depends on other conditions, such like the inside-loop DEF stmt has to
+    //be hoisted first. Whether a exp/stmt can be hoisted will be determined
+    //at hoistCand() finally.
+    IRTab m_hoist_cand;
+    ComputeMD2DefCnt m_md2defcnt;
 public:
+    LICMAnaCtx(Region const* rg, LI<IRBB> const* li) :
+        m_md2defcnt(rg, li) {}
+
     void addInvStmt(IR * stmt)
     {
         ASSERT0(!m_invariant_stmt.find(stmt));
@@ -126,13 +143,19 @@ public:
         ASSERT0(!m_invariant_exp.find(exp));
         m_invariant_exp.append(exp);
     }
+    void addHoistCand(IRList const& list);
+    void addHoistCand(IR * ir);
 
     void dump(Region const* rg) const;
 
-    InvStmtList & getInvStmt() { return m_invariant_stmt; }
-    InvStmtList const& getInvStmt() const { return m_invariant_stmt; }
-    IRTab & getInvExp() { return m_invariant_exp; }
-    IRTab const& getInvExp() const { return m_invariant_exp; }
+    InvStmtList & getInvStmtList() { return m_invariant_stmt; }
+    InvStmtList const& getInvStmtList() const { return m_invariant_stmt; }
+    IRTab & getInvExpTab() { return m_invariant_exp; }
+    IRTab const& getInvExpTab() const { return m_invariant_exp; }
+    IRTab & getCandTab() { return m_hoist_cand; }
+    IRTab const& getConstCandTab() const { return m_hoist_cand; }
+    IRList & getAnaStmtList() { return m_analysable_stmt_list; }
+    ComputeMD2DefCnt & getMD2DefCnt() { return m_md2defcnt; }
 
     //Return true if stmt is marked and collected into invariant-stmt set.
     bool isInvStmt(IR const* stmt) const
@@ -147,6 +170,9 @@ public:
         ASSERT0(exp->is_exp());
         return m_invariant_exp.find(const_cast<IR*>(exp));
     }
+
+    //Return true if ir is the unqiue DEF stmt of MustRef in the loop.
+    bool isUniqueDef(IR const* ir) const { return m_md2defcnt.isUniqueDef(ir); }
 };
 
 
@@ -202,21 +228,9 @@ protected:
     SMemPool * m_pool;
     xcom::TTab<LI<IRBB> const*> m_insert_guard_bb;
     IRListMgr m_irs_mgr;
-
-    //The list records stmts that are possibly invariant stmt.
-    //And these stmts will be analyzed in scanResult().
-    xcom::List<IR*> m_analysable_stmt_list;
-    xcom::TMap<MD const*, UINT*> m_md2num;
-
-    //Record if the expression is hoist-candidate.
-    //Note hoist-candidate is not always can be hoisted legally at last. It
-    //depends on other conditions, such like the inside-loop DEF stmt has to
-    //be hoisted first. Whether a exp/stmt can be hoisted will be determined
-    //at hoistCand() finally.
-    IRTab m_hoist_cand;
 protected:
-    void addHoistCand(IRList const& list);
-
+    bool chooseConst(IR * ir, OUT bool * all_exp_invariant,
+                     OUT LICMAnaCtx & anactx);
     bool chooseBin(LI<IRBB> const* li, IR * ir, IRIter & irit,
                    OUT bool * all_exp_invariant, OUT IRList * invlist,
                    OUT LICMAnaCtx & anactx);
@@ -244,6 +258,7 @@ protected:
     //ir: the root IR.
     //all_exp_invariant: true if all IR expressions start at 'ir' are
     //                   loop invariant.
+    //invlist: record the invariant exp|stmt that found.
     bool chooseExp(LI<IRBB> const* li, IR * ir, IRIter & irit,
                    OUT bool * all_rhs_exp_invariant, OUT IRList * invlist,
                    OUT LICMAnaCtx & anactx);
@@ -261,8 +276,6 @@ protected:
                       OUT LICMAnaCtx & anactx);
     bool chooseSwitch(LI<IRBB> const* li, IR * ir, IRIter & irit,
                       OUT LICMAnaCtx & anactx);
-    void cleanBeforeAnlysis();
-    void cleanAfterAnlysis();
     bool canBeRegardAsInvExp(IR const* ir, LICMAnaCtx const& anactx) const;
     bool canBeRegardAsInvExpList(IR const* ir, LICMAnaCtx const& anactx) const;
 
@@ -270,12 +283,16 @@ protected:
     void dumpInvariantExpStmt(LI<IRBB> const* li,
                               LICMAnaCtx const& anactx) const;
     void dumpHoistedIR(IR const* ir) const;
+    //Return true if code motion happened.
+    //The funtion will maintain LoopInfo.
     bool doLoopTree(LI<IRBB> * li, OUT HoistCtx & ctx);
 
-    IRTab const& getCandExpTab() const { return m_hoist_cand; }
-
-    void hoistStmt(LI<IRBB> const* li, MOD IR * def, MOD IRBB * prehead,
-                   OUT HoistCtx & ctx) const;
+    //These functions will maintain RPO if new BB inserted.
+    //Return true if BB or STMT changed.
+    bool hoistStmtCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
+                       OUT LI<IRBB> * li, OUT HoistCtx & ctx);
+    bool hoistExpCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
+                      OUT LI<IRBB> * li, OUT HoistCtx & ctx);
 
     //Return true if gurard BB of LOOP 'li' has been inserted.
     bool hasInsertedGuardBB(LI<IRBB> const* li) const;
@@ -299,7 +316,7 @@ protected:
                            MOD HoistCtx & ctx) const;
 
     //Hoist candidate IR to preheader BB.
-    bool hoistCand(LICMAnaCtx const& anactcx, OUT IRBB * prehead,
+    bool hoistCand(MOD LICMAnaCtx & anactcx, OUT IRBB * prehead,
                    OUT LI<IRBB> * li, OUT HoistCtx & ctx);
 
     //Return true if BB or STMT changed.
@@ -318,14 +335,15 @@ protected:
         return !ir->isNoMove(true) && !ir->is_volatile();
     }
 
-    //Return true if md modified in loop only once.
-    bool isUniqueDef(MD const* md) const;
-
     //Return true if LICM will perform aggressive strategy with RCE.
     //The aggressive strategy will take longer compilation time.
     bool is_aggressive() const { return m_is_aggressive; }
 
+    void moveStmtToPreheader(MOD IR * stmt, MOD IRBB * prehead,
+                             OUT HoistCtx & ctx) const;
     //Process a loop.
+    //Return true if code motion happened.
+    //The funtion will maintain LoopInfo.
     bool processLoop(LI<IRBB> * li, HoistCtx & ctx);
     void postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc);
     void postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc);
@@ -346,15 +364,16 @@ protected:
     //islegal: set to true if loop is legal to perform invariant motion.
     //         otherwise set to false to prohibit code motion.
     //Return true if find loop invariant expression.
-    bool scanLoopBody(LI<IRBB> const* li, bool * islegal, bool first_scan,
+    bool scanLoopBody(LI<IRBB> const* li, bool * islegal,
                       OUT LICMAnaCtx & anactx);
 
     //Return true if find loop invariant expression.
+    //Note that finding loop invariant does not mean finding hoist candidate.
     //Note the function try to recognize the loop invariant expression and stmt.
     //So far, the function only regard whole RHS IR tree as loop invariant ONLY
     //if all kid IR trees in RHS are loop invariant.
     //TODO: recognize the partial IR tree that is loop invariant.
-    bool scanBB(IRBB * bb, LI<IRBB> const* li, bool * islegal, bool first_scan,
+    bool scanBB(IRBB * bb, LI<IRBB> const* li, bool * islegal,
                 OUT LICMAnaCtx & anactx);
 
     //Propagate invariant property to result.
@@ -366,10 +385,18 @@ protected:
     //are loop invariant-exp.
     bool scanResult(LI<IRBB> const* li, OUT LICMAnaCtx & anactx);
 
-    //The funtion record the LoopInfo status until entire LICM object destroy
+    //The funtion record the LoopInfo status until it get to the entire LICM
+    //object is destroyed.
     //that in order to avoid re-insert Guard BB over and over again.
     //Return true if gurard BB of LOOP 'li' has been inserted.
     void setLoopHasBeenGuarded(LI<IRBB> const* li);
+
+    //The function try to pick-up invariant expression for kid of 'c'.
+    //Note c is hoist-candidate, but for some reason, it can not be hoist.
+    //The function is going to append its kid, also invariant exp, to be new
+    //hoist-candidate.
+    void tryPickKidInvExp(LICMAnaCtx const& anactx, IR * c,
+                          OUT xcom::Vector<IR*> & tryagain) const;
 
     //Try to move and check that each definitions of candidate has been
     //already hoisted from loop.
@@ -398,7 +425,6 @@ protected:
     void updateMDSSADUForStmtInLoopBody(MOD IR * stmt,
                                         HoistCtx const& ctx) const;
 
-    void updateMD2Num(IR * ir);
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
@@ -409,7 +435,7 @@ protected:
         ASSERT0(m_pool != nullptr);
         void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
         ASSERT0(p != nullptr);
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 public:
@@ -432,6 +458,7 @@ public:
 
     //Analysis invariant expression and stmt for given loop.
     //Return true if find them, otherwise return false.
+    //Note that finding loop invariant does not mean finding hoist candidate.
     //Collect and analyse information of invariant-exp and invariant-stmt.
     //Whether a exp/stmt can be hoisted will be determined at
     //hoistCand() finally.

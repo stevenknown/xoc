@@ -14,9 +14,9 @@ using namespace xcom;
 #include "byteop.h"
 #include "flag.h"
 #include "allocator.h"
-#include "strbuf.h"
 #include "comf.h" //used by sstl.h
 #include "sstl.h"
+#include "strbuf.h"
 #include "bs.h"
 #include "sbs.h"
 #include "sbs_hash.h"

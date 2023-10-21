@@ -89,6 +89,19 @@ GVN::~GVN()
 }
 
 
+VN * GVN::allocVN()
+{
+    VN * vn = m_free_lst.remove_head();
+    if (vn == nullptr) {
+        vn = (VN*)xmalloc(sizeof(VN));
+    } else {
+        vn->clean();
+    }
+    VN_id(vn) = m_vn_count++;
+    return vn;
+}
+
+
 bool GVN::isUnary(IR_CODE irt) const
 {
     switch (irt) {
@@ -701,7 +714,7 @@ VN const* GVN::inferVNThroughCFG(IR const* exp, bool & change)
     if (exp->isMemRefNonPR()) {
         if (!useMDSSADU()) { goto CLASSIC_DU; }
         ASSERT0(m_mdssamgr->getMDSSAInfoIfAny(exp));
-        MDDef const* d = m_mdssamgr->findMustDef(exp);
+        MDDef const* d = m_mdssamgr->findMustMDDef(exp);
         if (d != nullptr && d->is_phi()) {
             return inferVNViaMDPhi(exp, (MDPhi const*)d, change);
         }
@@ -1284,7 +1297,10 @@ bool GVN::isSameMemLocForIndirectOp(IR const* ir1, IR const* ir2) const
     ASSERT0(irbase1 && irbase2);
     VN const* base1 = getVN(irbase1);
     VN const* base2 = getVN(irbase2);
-    return base1 == base2 && base1 != nullptr;
+    if (base1 == nullptr || base2 == nullptr) {
+        return hasSameValueBySSA(irbase1, irbase2);
+    }
+    return base1 == base2;
 }
 
 
@@ -1297,8 +1313,6 @@ bool GVN::hasSameValueByPRSSA(IR const* ir1, IR const* ir2) const
 }
 
 
-//Return true if the value of ir1 and ir2 are definitely same, otherwise
-//return false to indicate unknown.
 bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
 {
     if (!useMDSSADU()) { return false; }
@@ -1306,11 +1320,13 @@ bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
 }
 
 
-//Return true if the value of ir1 and ir2 are definitely same, otherwise
-//return false to indicate unknown.
 bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
 {
-    if (!ir1->isIsomoTo(ir2, true)) { return false; }
+    if (!ir1->isIsomoTo(ir2, true,
+                        IsomoFlag(ISOMO_UNDEF|ISOMO_CK_CONST_VAL))) {
+        //Only check the IR tree structure and type.
+        return false;
+    }
     ConstIRIter it1;
     ConstIRIter it2;
     IR const* k1 = iterInitC(ir1, it1, false);
@@ -1318,22 +1334,65 @@ bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
     for (; k1 != nullptr; k1 = iterNextC(it1, true),
          k2 = iterNextC(it2, true)) {
         ASSERT0(k2);
+        if (!k1->isMemRef()) {
+            ASSERT0(!k2->isMemRef());
+            continue;
+        }
         if (k1->isPROp()) {
             ASSERT0(k2->isPROp());
-            if (!hasSameValueByPRSSA(k1, k2)) {
-                return false;
+            //Try determining by DU chain.
+            if (hasSameValueByPRSSA(k1, k2)) {
+                continue;
             }
-            continue;
+            //Try determining by VN.
+            VN const* k1vn = getVN(k1);
+            VN const* k2vn = getVN(k2);
+            if (k1vn != nullptr && k2vn != nullptr && k1vn == k2vn) {
+                continue;
+            }
+            //We have no knowledge about k1 and k2.
+            return false;
         }
         if (k1->isMemRefNonPR()) {
             ASSERT0(k2->isMemRefNonPR());
-            if (!hasSameValueByMDSSA(k1, k2)) {
-                return false;
+            //Try determining by DU chain.
+            if (hasSameValueByMDSSA(k1, k2)) {
+                continue;
             }
-            continue;
+            //Try determining by VN.
+            VN const* k1vn = getVN(k1);
+            VN const* k2vn = getVN(k2);
+            if (k1vn != nullptr && k2vn != nullptr && k1vn == k2vn) {
+                continue;
+            }
+            //We have no knowledge about k1 and k2.
+            return false;
         }
+        UNREACHABLE();
     }
     ASSERT0(k1 == nullptr && k2 == nullptr);
+    return true;
+}
+
+
+static bool isSameMemLocForIRList(IR const* irlst1, IR const* irlst2,
+                                  GVN const* gvn)
+{
+    IR const* s2 = irlst2;
+    for (IR const* s1 = irlst1; s1 != nullptr;
+         s1 = s1->get_next(), s2 = s2->get_next()) {
+        ASSERT0(s2);
+        VN const* vs1 = gvn->getVN(s1);
+        VN const* vs2 = gvn->getVN(s2);
+        if (vs1 == nullptr || vs2 == nullptr) {
+            if (!gvn->hasSameValueBySSA(s1, s2)) {
+                return false;
+            }
+        }
+        if (vs1 != vs2) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -1345,31 +1404,14 @@ bool GVN::isSameMemLocForArrayOp(IR const* ir1, IR const* ir2) const
     ASSERT0(irbase1 && irbase2);
     VN const* base1 = getVN(irbase1);
     VN const* base2 = getVN(irbase2);
-    if (base1 == nullptr || base2 == nullptr) {
-        if (!hasSameValueBySSA(irbase1, irbase2)) {
-            return false;
-        }
+    if ((base1 == nullptr || base2 == nullptr) &&
+        !hasSameValueBySSA(irbase1, irbase2)) {
+        return false;
     }
     if (base1 != base2) {
         return false;
     }
-
-    IR const* s2 = ARR_sub_list(ir2);
-    for (IR const* s1 = ARR_sub_list(ir1); s1 != nullptr;
-         s1 = s1->get_next(), s2 = s2->get_next()) {
-        ASSERT0(s2);
-        VN const* vs1 = getVN(s1);
-        VN const* vs2 = getVN(s2);
-        if (vs1 == nullptr || vs2 == nullptr) {
-            if (!hasSameValueBySSA(s1, s2)) {
-                return false;
-            }
-        }
-        if (vs1 != vs2) {
-            return false;
-        }
-    }
-    return true;
+    return isSameMemLocForIRList(ARR_sub_list(ir1), ARR_sub_list(ir2), this);
 }
 
 
@@ -1442,15 +1484,8 @@ void GVN::processDirectMemOp(IR * ir, bool & change)
     if (rhs == nullptr) { return; }
     VN const* x = computeVN(rhs, change);
     if (x == nullptr) {
-        VN const* resvn = getVN(ir);
-        if (resvn == nullptr) {
-            VN * t = allocVN();
-            VN_type(t) = VN_VAR;
-            change = true;
-            resvn = t;
-            setVN(ir, resvn);
-        }
-        //setVN(rhs, resvn);
+        //CASE:Any VN indicates the unique value, thus do NOT assign VN to an
+        //IR if we can not determine its unique value.
         return;
     }
     //Do NOT clean ir's VN, because its VN may be set by its dominated

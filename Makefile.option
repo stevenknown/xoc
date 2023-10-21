@@ -18,6 +18,21 @@ ifeq ($(REF_TARGMACH_INFO),true)
   CFLAGS+=-DREF_TARGMACH_INFO #LSRA use targmach info
 endif
 
+#The code attemps to compile an empty C++ file with the warning option, and
+#return YES if compilation is successful, otherwise return NO. The return info
+#is record in a makefile variable.
+CC_SUPPORTS_WNO_MISMATCHED_NEW_DELETE := $(shell echo "" | \
+  $(CC) -Wno-mismatched-new-delete -c -x c++ \
+  - > /dev/null 2>&1 && echo YES || echo NO)
+ifeq ($(CC_SUPPORTS_WNO_MISMATCHED_NEW_DELETE),YES)
+  $(info "NOTE:$(CC) SUPPORT -Wno-mismatched-new-delete")
+  #The warning is NOT effect without optimization, thus code must be
+  #compiled with the -O2 option in order for GCC to find the bug.
+  CFLAGS+=-Wno-mismatched-new-delete
+else
+  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-mismatched-new-delete")
+endif
+
 #To conveninently use DUMMYUSE, some compiler will complain for comma
 #expression.
 USE_DUMMYUSE=true
@@ -51,6 +66,10 @@ ifeq ($(WIN), true)
   else
     $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
   endif
+  ifndef CC
+    $(error "THERE IS NO CC COMPILER AVAIABLE")
+    #$(info "CC is defined="$(CC))
+  endif
 else
   $(info "ON LINUX OR UNIX")
   ifndef CC
@@ -60,7 +79,6 @@ else
     endif
   endif
   ifndef CC
-    $(error "THERE IS NO CC COMPILER AVAIABLE WITHOUT WSL ENVIRONMENT")
-    #$(info "CC is defined="$(CC))
+    $(error "THERE IS NO CC COMPILER AVAIABLE")
   endif
 endif

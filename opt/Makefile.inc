@@ -75,9 +75,13 @@ ir_decl.o\
 ir_desc.o\
 ir_utils.o\
 cfg_lifting.o\
+revise_cfg.o\
 bytebuf.o\
+linear_rep.o\
 storage_space.o\
-literal.o
+literal.o\
+chain_recur.o\
+act_mgr.o
 
 ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
@@ -96,7 +100,11 @@ ifeq ($(FOR_IP), true)
   ir_vrp.o\
   ir_dse.o\
   linear_scan.o\
-  ir_vect.o
+  ir_vect.o\
+  prologue_epilogue_inserter.o\
+  arg_passer.o\
+  gp_adjustment.o\
+  relaxation.o
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
   OPT_OBJS+=\
@@ -107,8 +115,12 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   lt_prio_mgr.o\
   lifetime.o\
   targinfo_mgr.o\
-  linear_scan.o
-else ifneq ($(findstring $(TARG), FOR_RISCV FOR_ARM),)
+  linear_scan.o\
+  prologue_epilogue_inserter.o\
+  arg_passer.o\
+  gp_adjustment.o\
+  relaxation.o
+else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
   OPT_OBJS+=\
   lsra_impl.o\
@@ -118,7 +130,11 @@ else ifneq ($(findstring $(TARG), FOR_RISCV FOR_ARM),)
   lt_prio_mgr.o\
   lifetime.o\
   targinfo_mgr.o\
-  linear_scan.o
+  linear_scan.o\
+  prologue_epilogue_inserter.o\
+  arg_passer.o\
+  gp_adjustment.o\
+  relaxation.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

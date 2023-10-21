@@ -2792,7 +2792,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
 
         //Collects position info.
         CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
-        ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
+        ::memset((void*)pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
         for (BSIdx j = LT_range(lt)->get_first();
              j != BS_UNDEF; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);
@@ -2980,7 +2980,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
 
         //Collects position info.
         CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
-        ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
+        ::memset((void*)pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
         for (BSIdx j = LT_range(lt)->get_first();
              j != BS_UNDEF; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);

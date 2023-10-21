@@ -36,7 +36,8 @@ author: Su Zhenyu
 
 class CVAR : public Var {
 public:
-    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf) const { return NULL; }
+    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf, VarMgr const* vm) const
+    { return nullptr; }
 };
 
 

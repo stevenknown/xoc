@@ -289,7 +289,7 @@ public:
         Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
                                                       m_ec_pool);
         ASSERT0(vex);
-        ::memset(vex, 0, sizeof(Vertex));
+        ::memset((void*)vex, 0, sizeof(Vertex));
         VERTEX_id(vex) = (VexIdx)(size_t)v;
         return vex;
     }
@@ -395,7 +395,7 @@ protected:
         Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
                                                       m_vertex_pool);
         ASSERT0(vex);
-        ::memset(vex, 0, sizeof(Vertex));
+        ::memset((void*)vex, 0, sizeof(Vertex));
         vex->init();
         return vex;
     }
@@ -416,7 +416,7 @@ protected:
         Edge * e = m_e_free_list.get_free_elem();
         if (e == nullptr) {
             e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
-            ::memset(e, 0, sizeof(Edge));
+            ::memset((void*)e, 0, sizeof(Edge));
         }
         e->init();
         EDGE_from(e) = from;
@@ -435,7 +435,7 @@ protected:
         EdgeC * el = m_el_free_list.get_free_elem();
         if (el == nullptr) {
             el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
-            ::memset(el, 0, sizeof(EdgeC));
+            ::memset((void*)el, 0, sizeof(EdgeC));
         }
         el->init();
         EC_edge(el) = e;
@@ -510,9 +510,11 @@ public:
 
     //Return true if graph vertex id is dense.
     bool is_dense() const { return m_dense_vertex != nullptr; }
+
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
     {
+        ASSERT0(v && succ);
         for (EdgeC * e = v->getOutList(); e != nullptr; e = EC_next(e)) {
             if (EDGE_to(EC_edge(e)) == succ) {
                 return true;
@@ -524,6 +526,7 @@ public:
     //Return true if 'pred' is predecessor of 'v'.
     bool is_pred(Vertex const* v, Vertex const* pred) const
     {
+        ASSERT0(v && pred);
         for (EdgeC const* e = v->getInList(); e != nullptr; e = EC_next(e)) {
             if (e->getFrom() == pred) {
                 return true;
@@ -725,11 +728,15 @@ public:
         }
     }
 
-    //Compute which predecessor is pred_vex_id to 'vex'.
+    //Find which predecessor is pred_vex_id to 'vex'.
+    //Return the position of 'vex', position start at 0.
     //e.g: If pred_vex_id is the first predecessor, return 0.
     //pred_vex_id: vertex id of predecessor.
+    //is_pred: set to true if pred_vex_id is one of predecessor of 'vex',
+    //         otherwise set false.
     //Note 'pred_vex_id' must be one of predecessors of 'vex'.
-    static VexIdx WhichPred(VexIdx pred_vex_id, Vertex const* vex);
+    static UINT WhichPred(VexIdx pred_vex_id, Vertex const* vex,
+                          OUT bool & is_pred);
 };
 
 
@@ -882,8 +889,10 @@ public:
     //  succ's dom become pred. vex is neither DOM nor PDOM.
     bool changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ);
 
-    void dumpDom(FILE * h, bool dump_dom_tree = true) const;
-    void dumpDom(CHAR const* name = nullptr, bool dump_dom_tree = true) const;
+    void dumpDom(FILE * h, bool dump_dom_tree = true,
+                 bool dump_pdom_tree = true) const;
+    void dumpDom(CHAR const* name = nullptr, bool dump_dom_tree = true,
+                 bool dump_pdom_tree = true) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.
@@ -1027,7 +1036,7 @@ public:
 
 //The class provides helper functions to convenient iterate vertex on graph.
 //If 'start' vertex is given, the class will visit all predecessors start from
-//'start' until reach entries of graph.
+//'start' until reach one of entries of graph.
 class GraphIterIn {
     COPY_CONSTRUCTOR(GraphIterIn);
     Graph const& m_g;
@@ -1047,7 +1056,7 @@ public:
 
 //The class provides helper functions to convenient iterate vertex on graph.
 //If 'start' vertex is given, the class will visit all successors start from
-//'start' until reach exits of graph.
+//'start' until reach one of exit of graph.
 class GraphIterOut {
     COPY_CONSTRUCTOR(GraphIterOut);
     List<Vertex*> m_wl;
@@ -1064,7 +1073,7 @@ public:
 
 //The class provides helper functions to convenient iterate edge on graph.
 //If 'start' vertex is given, the class will visit all out-edge of vertex
-//start from 'start' until reach exits of graph.
+//start from 'start' until reach one of exit of graph.
 class GraphIterOutEdge {
     COPY_CONSTRUCTOR(GraphIterOutEdge);
     List<Edge*> m_wl;

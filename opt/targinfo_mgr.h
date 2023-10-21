@@ -39,6 +39,8 @@ using namespace xgen;
 
 namespace xoc {
 
+//The class represents register set and calling convention information for
+//target machine. It is an wrapper of interfaces under target/precompile.
 class TargInfoMgr {
     COPY_CONSTRUCTOR(TargInfoMgr);
 private:
@@ -51,20 +53,70 @@ public:
     void destroy();
 
     REGFILE getRegFile(Reg r) const;
-    RegSet const& getAllocable() const;
-    RegSet const& getCallee() const;
-    RegSet const& getCaller() const;
-    RegSet const& getReturnValue() const;
-    RegSet const& getParam() const;
+    RegSet const* getAllocable() const;
+    RegSet const* getCallee() const;
+    RegSet const* getCaller() const;
+    RegSet const* getReturnValue() const;
+    RegSet const* getParam() const;
+    RegSet const* getVectorAllocable() const;
+    RegSet const* getVectorReturnValue() const;
+    RegSet const* getVectorParam() const;
+    RegSet const* getVectorCaller() const;
+    RegSet const* getVectorCallee() const;
     Reg getLink() const { return m_link; }
     virtual CHAR const* getRegName(Reg r) const;
     virtual CHAR const* getRegFileName(REGFILE rf) const;
 
-    bool isAllocable(Reg r) const { return getAllocable().is_contain(r); }
-    bool isCallee(Reg r) const { return getCallee().is_contain(r); }
-    bool isCaller(Reg r) const { return getCaller().is_contain(r); }
-    bool isReturnValue(Reg r) const { return getReturnValue().is_contain(r); }
-    bool isParam(Reg r) const { return getParam().is_contain(r); }
+    bool isAllocable(Reg r) const
+    {
+        RegSet const* s = getAllocable();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isCallee(Reg r) const
+    {
+        RegSet const* s = getCallee();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isCaller(Reg r) const
+    {
+        RegSet const* s = getCaller();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isReturnValue(Reg r) const
+    {
+        RegSet const* s = getReturnValue();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isParam(Reg r) const
+    {
+        RegSet const* s = getParam();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isVectorAllocable(Reg r) const
+    {
+        RegSet const* s = getVectorAllocable();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isVectorCallee(Reg r) const
+    {
+        RegSet const* s = getVectorCallee();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isVectorCaller(Reg r) const
+    {
+        RegSet const* s = getVectorCaller();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isVectorReturnValue(Reg r) const
+    {
+        RegSet const* s = getVectorReturnValue();
+        return s == nullptr ? false : s->is_contain(r);
+    }
+    bool isVectorParam(Reg r) const
+    {
+        RegSet const* s = getVectorParam();
+        return s == nullptr ? false : s->is_contain(r);
+    }
     bool isLink(Reg r) const { return getLink() == r; }
     void init();
 

@@ -283,6 +283,7 @@ public:
 
 
 //Sparse BitSet Core
+//NOTE: User must invoke clean() to free resource before destruction.
 //e.g1:
 //    MiscBitSetMgr<33> mbsm;
 //    SBitSetCore<33> * x = mbsm.allocSBitSetCore() ;
@@ -400,14 +401,14 @@ public:
 //Sparse BitSet
 //This class encapsulates operations of SBitSetCore, and
 //simply the usage of them.
-//e.g1:
+//e.g1: No need invoke clean().
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> x(mbsm.getSegMgr());
 //    x.bunion(100);
 //    //No need to explicit invoke x.clean() to free resource, destructor of x
 //    //will do it automatically.
 //
-//e.g2:
+//e.g2: Must invoke clean() to free resource before destruction.
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);
@@ -875,7 +876,7 @@ protected:
             (SBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(SBitSetCore<BitsPerSeg>), m_sbitsetcore_pool);
         ASSERTN(p, ("malloc failed"));
-        ::memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
+        ::memset((void*)p, 0, sizeof(SBitSetCore<BitsPerSeg>));
         return p;
     }
 
@@ -886,7 +887,7 @@ protected:
             (DBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(DBitSetCore<BitsPerSeg>), m_dbitsetcore_pool);
         ASSERTN(p, ("malloc failed"));
-        ::memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
+        ::memset((void*)p, 0, sizeof(DBitSetCore<BitsPerSeg>));
         return p;
     }
 public:

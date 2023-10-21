@@ -85,7 +85,8 @@ bool RefineDUChain::processNormalExpByClassicDU(IR const* exp)
         ASSERT0(stmt->is_stmt());
         MD const* mustdef = stmt->getMustRef();
         if (mustdef != nullptr) {
-            ASSERTN(mustdef->is_overlap(mustuse), ("redundant DU"));
+            ASSERTN(mustdef == mustuse || mustdef->is_overlap(mustuse),
+                    ("the DU does not have any effect"));
             continue;
         }
         MDSet const* maydef = stmt->getMayRef();

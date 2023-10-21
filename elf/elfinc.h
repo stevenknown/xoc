@@ -27,6 +27,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "../com/xcominc.h"
+#include "../opt/cominc.h"
 #include "elf_header.h"
 #include "elf_targinfo.h"
 #include "elf_mgr.h"

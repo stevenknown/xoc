@@ -482,7 +482,7 @@ bool LFTR::insertReductionCode(List<LFRInfo*> const& lfrinfo_list)
         ASSERT0(newiv->is_pr());
         ASSERTN(info->ivinfo->is_biv(), ("TODO: support DIV"));
         BIV const* ivinfo = info->getBIVInfo();
-        HOST_INT newiv_step = ivinfo->getStep() * info->getIVCoeff();
+        HOST_INT newiv_step = ivinfo->getStepValInt() * info->getIVCoeff();
         IR_CODE op = IR_UNDEF;
         if (ivinfo->isInc()) {
             ASSERT0(newiv_step > 0);
@@ -608,7 +608,7 @@ bool LFTR::perform(OptCtx & oc)
     //DU chain and DU reference should be maintained.
     ASSERT0(m_dumgr->verifyMDRef() && verifyMDDUChain(m_rg, oc));
     oc.setInvalidIfDUMgrLiveChanged();
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     END_TIMER(t, getPassName());
     return true;

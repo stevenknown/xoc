@@ -52,13 +52,13 @@ public:
 class ParseCtx {
     typedef xcom::TMap<Sym const*, LabelInfo*> Sym2Lab;
     typedef xcom::TMapIter<Sym const*, LabelInfo*> Sym2LabIter;
-    typedef xcom::TMap<IR*, LabelInfo*> IR2Lab;
-    typedef xcom::TMapIter<IR*, LabelInfo*> IR2LabIter;
     typedef xcom::TMap<Sym const*, PRNO> Sym2Prno;
     typedef xcom::TMapIter<Sym const*, PRNO> Sym2PrnoIter;
 protected:
     COPY_CONSTRUCTOR(ParseCtx);
     UINT id; //the unique id for each ctx.
+    //The following fields are unique to each region.
+    //Clean them before parsing of new region body.
     Sym2Lab * m_sym2label;
     IR2Lab * m_ir2label;
     Sym2Prno * m_iden2prno;
@@ -119,6 +119,9 @@ public:
     void clean();
     void copyTopDownInfo(ParseCtx const& ctx);
 
+    //The function reset region local info before parsing the region body.
+    void cleanRegionUniqueInfo();
+
     void dumpWithPrevCtx() const;
     void dump() const;
 
@@ -126,12 +129,13 @@ public:
 
     LabelInfo * mapSym2Label(Sym const* sym) const
     { return m_sym2label->get(sym); }
-    LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label->get(ir); }
+    LabelInfo const* mapIR2Label(IR const* ir) const
+    { return m_ir2label->get(ir); }
     PRNO mapSym2Prno(Sym const* sym) const { return m_iden2prno->get(sym); }
 
     void setMapSym2Label(Sym const* sym, LabelInfo * label)
     { m_sym2label->set(sym, label); }
-    void setMapIR2Label(IR * ir, LabelInfo * label)
+    void setMapIR2Label(IR const* ir, LabelInfo const* label)
     { m_ir2label->set(ir, label); }
     void setMapSym2Prno(Sym const* sym, PRNO prno)
     { m_iden2prno->set(sym, prno); }
@@ -155,7 +159,7 @@ public:
     IR * ir_def_list;
     Type const* elemtype;
     List<TMWORD> * dim_list;
-
+public:
     PropertySet()
     {
         readonly = false;
@@ -186,7 +190,7 @@ protected:
     UINT m_ctx_id; //used to count the number of ParseCtx occurred.
     TypeMgr * m_tm;
     Lexer * m_lexer;
-    RegionMgr * m_rumgr;
+    RegionMgr * m_rm;
     List<ParseErrorMsg*> m_err_list;
 protected:
     //Return true if GRReader allows user defined dedicated PRNO in GR file.
@@ -288,7 +292,7 @@ protected:
     bool parseSignImm(TOKEN tok, ParseCtx * ctx);
     bool parseImmIR(ParseCtx * ctx);
     bool parseImmVal(ParseCtx * ctx);
-    bool parseFp(ParseCtx * ctx);
+    bool parseFP(ParseCtx * ctx);
     bool parseString(ParseCtx * ctx);
     bool parseBool(ParseCtx * ctx);
     bool parsePrno(PRNO * prno, ParseCtx * ctx);
@@ -304,7 +308,7 @@ protected:
     bool parseExp(ParseCtx * ctx);
     bool parseExpList(ParseCtx * ctx);
 public:
-    IRParser(RegionMgr * rumgr) : m_lexer(nullptr), m_rumgr(rumgr)
+    IRParser(RegionMgr * rumgr) : m_lexer(nullptr), m_rm(rumgr)
     {
         m_ctx_id = 0;
         m_tm = rumgr->getTypeMgr();
@@ -317,7 +321,7 @@ public:
     bool dump() const;
 
     CHAR const* getPassName() const { return "IRParser"; }
-    RegionMgr * getRegionMgr() const { return m_rumgr; }
+    RegionMgr * getRegionMgr() const { return m_rm; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
     CHAR const* getKeyWordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }

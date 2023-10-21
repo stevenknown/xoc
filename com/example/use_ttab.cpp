@@ -4,7 +4,7 @@ class CompareString {
 public:
     bool is_equ(char const* s1, char const* s2) const
     {
-        return strcmp(s1, s2) == 0;
+        return xcom::xstrcmp(s1, s2) == 0;
     }
 
     bool is_less(char const* s1, char const* s2) const

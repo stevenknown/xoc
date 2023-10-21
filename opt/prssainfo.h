@@ -44,7 +44,7 @@ namespace xoc {
 
 //Verisoned Presentation.
 //For each version of each prno, VPR is unique.
-typedef SEGIter * SSAUseIter;
+typedef IRSetIter SSAUseIter;
 
 #define SSA_id(ssainfo) ((ssainfo)->uid)
 #define SSA_def(ssainfo) ((ssainfo)->def_stmt)
@@ -61,7 +61,6 @@ public:
     UINT uid;
     IR * def_stmt;
     IRSet use_exp_set;
-
 public:
     SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
 
@@ -129,6 +128,7 @@ public:
         ASSERT0(ir && ir->isReadPR());
         SSA_uses(this).remove(ir);
     }
+    void removeUse(IRSet const& set) { SSA_uses(this).remove(set); }
 };
 
 
@@ -164,6 +164,8 @@ public:
         m_orgpr_type = nullptr;
     }
 
+    CHAR const* dumpBuf(OUT StrBuf & buf) const;
+
     void init(DefSegMgr * sm)
     {
         cleanMember();
@@ -190,13 +192,6 @@ public:
     //Find the initial version VPR.
     VPR * getInitVersion() const;
 };
-
-
-//Mapping from PRNO to vector of VPR.
-typedef Vector<VPRVec*> PRNO2VPRVec;
-
-//Mapping from PRNO to Stack of VPR.
-typedef Vector<Stack<VPR*>*> PRNO2VPRStack;
 
 } //namespace xoc
 #endif

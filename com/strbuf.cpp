@@ -75,6 +75,12 @@ void StrBuf::strcat(CHAR const* format, ...)
 }
 
 
+void StrBuf::strcat(StrBuf const& another)
+{
+    strcat("%s", another.getBuf());
+}
+
+
 void StrBuf::vstrcat(CHAR const* format, va_list args)
 {
     va_list org_args;
@@ -125,9 +131,9 @@ void StrBuf::nstrcat(UINT bytesize, CHAR const* format, ...)
 }
 
 
-void StrBuf::toByteHex(OUT BYTE * outputbuf, UINT buflen)
+void StrBuf::toByteHex(OUT BYTE * outputbuf, UINT bufl)
 {
-    xcom::charToByteHex(buf, outputbuf, buflen);
+    xcom::charToByteHex(buf, outputbuf, bufl);
 }
 
 }//namespace xcom

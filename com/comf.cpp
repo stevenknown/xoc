@@ -338,6 +338,49 @@ UINT fact(UINT n)
 }
 
 
+
+//float:
+//x    xxxxxxxx xxxxxxxxxxxxxxxxxxx
+//sign exponent    mantissa
+//31   30 ~ 23     22 ~ 0
+//ESP64:
+//x    1000xxxxxxx xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
+//x    0111xxxxxxx xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
+UINT64 float2ESP64(UINT64 val)
+{
+    if (val == 0) { return 0; }
+    //sign
+    UINT64 esp64_val = (val & 0x80000000) << 32;
+    //exponent
+    esp64_val |= ((val & 0x40000000) > 0) ?
+        (UINT64)0x4000000000000000ULL : (UINT64)0x3800000000000000ULL;
+    //mantissa
+    esp64_val |= (val & 0x3FFFFFFF) << 29;
+    return esp64_val;
+}
+
+
+//half:
+//x    xxxxx       xxxxxxxxxx
+//sign exponent    mantissa
+//15   14 ~ 10     9 ~ 0
+//EHP64:
+//x    1000000xxxx xxxxxxxxxx000000000000000000000000000000000000000000
+//x    0111111xxxx xxxxxxxxxx000000000000000000000000000000000000000000
+UINT64 half2EHP64(UINT64 val)
+{
+    if (val == 0) { return 0; }
+    //sign
+    UINT64 ehp64_val = (val & 0x8000) << 48;
+    //exponent
+    ehp64_val |= ((val & 0x4000) > 0) ?
+        (UINT64)0x4000000000000000ULL : (UINT64)0x3F00000000000000ULL;
+    //mantissa
+    ehp64_val |= (val & 0x3FFF) << 42;
+    return ehp64_val;
+}
+
+
 //Arrangement
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
 UINT arra(UINT n, UINT m)
@@ -383,8 +426,8 @@ INT xctoi(CHAR const* cl)
         #define BIT_PER_BYTE 8
     #endif
 
-    if (cl == nullptr || strcmp(cl, "") == 0) { return 0; }
-    INT l = (INT)strlen(cl);
+    if (cl == nullptr || xstrcmp(cl, "", 1)) { return 0; }
+    INT l = (INT)::strlen(cl);
     if (l > BYTE_PER_INT) {
         ASSERTN(0, ("too many characters in integer"));
         return 0;
@@ -487,54 +530,48 @@ LONG xstrstr(CHAR const* src, CHAR const* par)
 }
 
 
-//Split string by given separetor, and return the number of substring.
+//Split string by given separator, and return the number of substring.
 //str: input string.
 //ret: record each substring which separated by sep.
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
-UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep)
+UINT xsplit(CHAR const* str, CHAR const* sep, OUT StrBufVec & ret)
 {
     ASSERT0(str);
-    ASSERTN(strlen(sep) == 1, ("separator must be single character"));
+    ASSERTN(::strlen(sep) == 1, ("separator must be single character"));
     CHAR const* start = str;
     CHAR const* end = str;
-
     UINT num = 0;
     UINT len = 0;
     for (; *end != 0;) {
         if (*end != *sep) { len++; end++; continue; }
-
-        CHAR * substr = (CHAR*)::malloc(len + 1);
-        ::memcpy(substr, start, len);
-        substr[len] = 0;
-        ret.set(num, substr);
+        StrBuf * substrbuf = ret.genStrBuf(num);
+        substrbuf->growBuf(len + 1);
+        ::memcpy(substrbuf->buf, start, len);
+        substrbuf->buf[len] = 0;
         num++;
         len = 0;
         end++;
         start = end;
     }
-
-    CHAR * substr = (CHAR*)::malloc(len + 1);
-    ::memcpy(substr, start, len);
-    substr[len] = 0;
-    ret.set(num, substr);
+    StrBuf * substrbuf2 = ret.genStrBuf(num);
+    substrbuf2->growBuf(len + 1);
+    ::memcpy(substrbuf2->buf, start, len);
+    substrbuf2->buf[len] = 0;
     num++;
-    len = 0;
     end++;
     start = end;
-
     return num;
 }
 
 
-void xstrcpy(CHAR * tgt, CHAR const* src, size_t size)
+CHAR const* xstrcpy(CHAR const* src, size_t bytesize, OUT StrBuf & tgt)
 {
-    size_t l = strlen(src);
-    if (l >= size) {
-        l = size - 1;
-    }
-    ::memcpy(tgt, src, l);
-    tgt[l] = 0;
+    size_t l = MIN(::strlen(src), bytesize);
+    tgt.growBuf((UINT)(l + 1)); //include '\0'.
+    ::memcpy(tgt.buf, src, l);
+    tgt.buf[l] = 0;
+    return tgt.getBuf();
 }
 
 
@@ -688,7 +725,7 @@ CHAR * getFilePath(CHAR const* n, OUT CHAR * buf, UINT bufl)
     if (n == nullptr) { return nullptr; }
 
     ASSERT0(buf);
-    INT l = (INT)strlen(n);
+    INT l = (INT)::strlen(n);
     INT i = l;
     while (n[i] != '\\' && n[i] != '/' && i >= 0) {
         i--;
@@ -712,7 +749,7 @@ CHAR * getFilePath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 //   means shifting string to left.
 void strshift(MOD CHAR * string, INT ofst)
 {
-    INT len = (INT)strlen(string), i;
+    INT len = (INT)::strlen(string), i;
     if (string == nullptr) { return; }
 
     if (ofst >= 0) { //shift to right
@@ -744,7 +781,7 @@ CHAR * getFileName(CHAR const* path, OUT CHAR * buf, UINT bufl)
 {
     DUMMYUSE(bufl);
     if (path == nullptr) { return nullptr; }
-    INT l = (INT)strlen(path);
+    INT l = (INT)::strlen(path);
     INT i = l;
     INT dotpos = -1;
     while (path[i] != '\\' && path[i] != '/' && i >= 0) {
@@ -778,7 +815,7 @@ CHAR * getFileSuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
     if (n == nullptr) { return nullptr; }
 
-    INT l = (INT)strlen(n);
+    INT l = (INT)::strlen(n);
     INT i = l;
     while (n[i] != '.' && i >= 0) {
         i--;
@@ -796,7 +833,7 @@ CHAR * getFileSuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 //e.g: Given string is a\b\c, separator is '\', return c;
 CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 {
-    size_t l = strlen(string);
+    size_t l = ::strlen(string);
     CHAR const* p = string + l;
     for (; l != 0; l--, p--) {
         if (*p == separator) {
@@ -853,9 +890,7 @@ UINT xstrlen(CHAR const* p)
 }
 
 
-//Compare the first 'n' char of two string.
-//Return true if equal.
-bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
+bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n)
 {
     //Note it does not have to judge whether current char is terminate char.
     while (n-- > 0 && *p1++ == *p2++) {}
@@ -866,7 +901,7 @@ bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
 CHAR * upper(CHAR * n)
 {
     if (n == nullptr) { return nullptr; }
-    LONG l = (LONG)strlen(n);
+    LONG l = (LONG)::strlen(n);
     l--;
     while (l >= 0) {
         if (n[l] >= 'a' && n[l] <= 'z') {
@@ -881,7 +916,7 @@ CHAR * upper(CHAR * n)
 CHAR * lower(CHAR * n)
 {
     if (n == nullptr) { return nullptr; }
-    LONG l = (LONG)strlen(n);
+    LONG l = (LONG)::strlen(n);
     l--;
     while (l >= 0) {
         if (n[l] >= 'A' && n[l] <= 'Z') {
@@ -930,11 +965,13 @@ bool isIntegerF(float f)
 //Judge if 'd' is integer conform to IEEE754 spec.
 bool isIntegerD(double d)
 {
-    //0000 0000 0000 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 //mantissa
+    //0000 0000 0000 1111 1111 1111 1111 1111 1111 1111 1111
+    //1111 1111 1111 1111 1111 //mantissa
     double * p = &d;
     LONGLONG i = *(LONGLONG*)p;
     LONGLONG m = i & 0x000FFFFFffffffffull; //mantissa
-    INT n = (INT)((i & 0x7FF0000000000000ull) >> 52) - 1023; //number of exponential
+    //number of exponential
+    INT n = (INT)((i & 0x7FF0000000000000ull) >> 52) - 1023;
     INT j = 0;
     while (j < 52) {
         if ((m & 0x1) == 1) { break; }
@@ -949,8 +986,13 @@ bool isIntegerD(double d)
 //f: is conform to IEEE754 spec.
 bool isFiniteD(double f)
 {
-    //0000 0000 0000 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 //mantissa
-    //11111111111111 0000000000000000000000000000000000000000000000000000000000000000 //exponential
+    //mantissa
+    //0000 0000 0000
+    //1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111
+
+    //exponential
+    //11111111111111
+    //0000000000000000000000000000000000000000000000000000000000000000
     double * p = &f;
     LONGLONG i = *(LONGLONG*)p;
     LONGLONG mask = 0x7FF0000000000000ull; //mask indicates bits of infinite.
@@ -1541,6 +1583,52 @@ void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen)
         BYTE low = charToHex(string[i + 1]);
         buf[i/2] = (BYTE)(low | (high << 4));
     }
+}
+
+
+INT getSign32BitLow16BitVal(INT32 val)
+{
+    return ((val & 0xffff) ^ 0x8000) - 0x8000;
+}
+
+
+INT getSign64BitLow16BitVal(INT64 val)
+{
+    return ((val & 0xffff) ^ 0x8000) - 0x8000;
+}
+
+
+INT getSign64BitLow32BitVal(INT64 val)
+{
+    return ((val & 0xffffffff) ^ 0x80000000) - 0x80000000;
+}
+
+
+void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
+                               OUT INT & part3, OUT INT & part4)
+{
+    //Get 0~15 bits number.
+    part1 = getSign64BitLow16BitVal(val);
+
+    val -= part1;
+
+    //Get 0~31 bits number.
+    part2 = getSign64BitLow32BitVal(val);
+
+    //Get 32~63 bits number.
+    val = (val - part2) >> 32;
+
+    //Get 15~31 bits number.
+    part2 >>= 16;
+
+    //Get 32~47 bits number.
+    part3 = getSign64BitLow16BitVal(val);
+
+    val -= part3;
+
+    //Get 47~63 bits number.
+    part4 = getSign64BitLow32BitVal(val);
+    part4 >>= 16;
 }
 
 } //namespace xcom

@@ -34,6 +34,7 @@ namespace xoc {
 class LifeTime;
 class LifeTimeMgr;
 class TargInfoMgr;
+class ArgPasser;
 
 //
 //START RematCtx
@@ -45,17 +46,6 @@ public:
 };
 //END RematCtx
 
-
-class ActMgr {
-    Region * m_rg;
-    xcom::List<xcom::StrBuf*> m_act_list;
-    UINT m_cnt;
-public:
-    ActMgr(Region * rg) : m_rg(rg) { m_cnt = 1; }
-    ~ActMgr();
-    void dump(CHAR const* format, ...);
-    void dumpAll() const;
-};
 
 typedef List<LifeTime*>::Iter LTSetIter;
 typedef xcom::TMap<LifeTime*, xcom::C<LifeTime*>*> LT2Holder;
@@ -69,10 +59,12 @@ typedef xcom::TTabIter<LifeTime*> LTTabIter;
 class LTTab : public xcom::TTab<LifeTime*> {
 };
 
+typedef TMap<PRNO, Var*> PRNO2Var;
+typedef TMapIter<PRNO, Var*> PRNO2VarIter;
+
 //The class represents the basic structure and interface of linear-scan register
 //allocation.
 class LinearScanRA : public Pass {
-    typedef TMap<PRNO, Var*> PRNO2Var;
     COPY_CONSTRUCTOR(LinearScanRA);
     bool m_is_apply_to_region;
     LifeTimeMgr * m_lt_mgr;
@@ -109,6 +101,11 @@ public:
     virtual IR * buildSpill(PRNO prno, Type const* ty);
     virtual IR * buildReload(PRNO prno, Var * spill_loc, Type const* ty);
 
+    //Should be called before register allocation.
+    PRNO buildPrnoDedicated(Type const* type, Reg reg);
+    //Should be called after register allocation.
+    PRNO buildPrno(Type const* type, Reg reg);
+
     //The function check whether 'lt' value is simple enough to rematerialize.
     //And return the information through rematctx.
     virtual bool checkLTCanBeRematerialized(LifeTime const* lt,
@@ -129,6 +126,7 @@ public:
     Var * getSpillLoc(PRNO prno);
     Var * genSpillLoc(PRNO prno, Type const* ty);
     Var * genFuncLevelVar(Type const* type, UINT align);
+    PRNO2Var const& getPrno2Var() const { return m_prno2var; }
     Reg getReg(PRNO prno) const;
     REGFILE getRegFile(Reg r) const;
     Reg getReg(LifeTime const* lt) const;
@@ -156,6 +154,38 @@ public:
     { return "Linear Scan Register Allocation"; }
     PASS_TYPE getPassType() const { return PASS_LINEAR_SCAN_RA; }
 
+    virtual ArgPasser * getArgPasser() const {
+        ASSERTN(0, ("Target Dependent Code"));
+        return nullptr;
+    }
+
+    //Get target physical registers.
+    virtual Reg getFP() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getBP() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getRA() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getSP() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getGP() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getTA() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getRegisterZero() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual Reg getScalarArgRegStart() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    bool hasReg(PRNO prno) const;
+    bool hasReg(LifeTime const* lt) const;
+
+    //Return true if register r1 alias to r2.
+    virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
+    virtual bool isCalleePermitted(LifeTime const* lt) const;
+    bool isDedicated(PRNO prno) const
+    { return m_dedicated_mgr.is_dedicated(prno); }
+
     bool isInsertOp() const
     {
         LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
@@ -164,23 +194,16 @@ public:
                pthis->getMoveTab().get_elem_count() != 0;
     }
 
+    bool isMoveOp(IR const* ir) const;
     //Return true if ir is rematerializing operation.
     virtual bool isRematLikeOp(IR const* ir) const;
-    bool isSpillOp(IR const* ir) const;
     bool isReloadOp(IR const* ir) const;
     bool isRematOp(IR const* ir) const;
-    bool isMoveOp(IR const* ir) const;
-    bool isDedicated(PRNO prno) const
-    { return m_dedicated_mgr.is_dedicated(prno); }
+    bool isSpillOp(IR const* ir) const;
 
-    //Return true if register r1 alias to r2.
-    virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
 
-    bool hasReg(PRNO prno) const;
-    bool hasReg(LifeTime const* lt) const;
-
-    virtual bool preferCallee(LifeTime const* lt) const;
     virtual bool perform(OptCtx & oc);
+    virtual bool performLsraImpl(OptCtx & oc);
 
     //Reset all resource before allocation.
     void reset();

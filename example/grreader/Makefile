@@ -8,7 +8,8 @@ OBJS+=main.o
 CFLAGS=-DFOR_DEX -D_DEBUG_ -O0 -g2 -D_SUPPORT_C11_
 
 grreader: objs
-	$(CC) $(OBJS) $(CFLAGS) -L../.. -lxoc -L../../com -lxcom -o grreader.exe -lstdc++ -lm
+	$(CC) $(OBJS) $(CFLAGS) -L../.. -lxoc -L../../com -lxcom -o \
+      grreader.exe -lstdc++ -lm
 	@echo "SUCCESS!!"
 
 INC=-I .

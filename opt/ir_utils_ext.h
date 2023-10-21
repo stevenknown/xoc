@@ -58,6 +58,13 @@ namespace xoc {
 #define SWITCH_CASE_EXT_DIRECT_MEM_VSTMT \
     case IR_VST
 
+//No extended UNA for now.
+#define SWITCH_CASE_EXT_UNA
+#define SWITCH_CASE_EXT_BIN
+
+//In order to conform the compatibility of origin IR code, user can undef
+//original SWITCH_CASE_<NAME>, then redefine the same MACRO with new IR code
+//and followed by origin IR code.
 #include "targ_utils_ext.h"
 
 } //namespace xoc

@@ -35,6 +35,7 @@ namespace xoc {
 class InferType : public Pass {
     COPY_CONSTRUCTOR(InferType);
     TypeMgr * m_tm;
+    VarMgr * m_vm;
     IRCFG * m_cfg;
     IRList m_wl;
     ConstIRList * m_changed_irlist; //used for dump
@@ -69,6 +70,7 @@ public:
         ASSERT0(rg != nullptr);
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
+        m_vm = rg->getVarMgr();
         m_changed_irlist = nullptr;
         m_changed_varlist = nullptr;
     }

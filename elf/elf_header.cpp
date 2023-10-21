@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "../com/xcominc.h"
+#include "../opt/cominc.h"
 #include "elf_header.h"
 #include "elf_targinfo.h"
 #include "elf_mgr.h"
@@ -37,6 +38,7 @@ static BYTE g_magic[EI_MAG_NUM] = { EI_MAG_HEAD, 'E', 'L', 'F' };
 //START ELFHdr
 UINT ELFHdr::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFHdr64) : sizeof(ELFHdr32);
 }
 
@@ -86,6 +88,7 @@ void ELFHdr::insert(BYTE const* buf, ELFMgr const* mgr)
         hdr->e_shstrndx = e_shstrndx;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFHdr32 * hdr = (ELFHdr32*)buf;
     ::memcpy(&hdr->e_ident, &e_ident, EI_MAG_NUM);
     hdr->e_class = e_class;
@@ -132,6 +135,7 @@ void ELFHdr::extract(BYTE const* buf, ELFMgr const* mgr)
         e_shstrndx = hdr->e_shstrndx;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFHdr32 * hdr = (ELFHdr32*)buf;
     ::memcpy(&e_ident, &hdr->e_ident, EI_MAG_NUM);
     e_class = hdr->e_class;
@@ -157,6 +161,7 @@ void ELFHdr::extract(BYTE const* buf, ELFMgr const* mgr)
 //START ELFPHdr
 UINT ELFPHdr::getMachBitWidth(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFPHdr64) : sizeof(ELFPHdr32);
 }
 
@@ -175,6 +180,7 @@ void ELFPHdr::insert(BYTE const* buf, ELFMgr const* mgr)
         p->p_align = p_align;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFPHdr32 * p = (ELFPHdr32*)buf;
     p->p_type = p_type;
     p->p_offset = (Off32)p_offset;
@@ -201,6 +207,7 @@ void ELFPHdr::extract(BYTE const* buf, ELFMgr const* mgr)
         p_align = p->p_align;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFPHdr32 * p = (ELFPHdr32*)buf;
     p_type = p->p_type;
     p_offset = p->p_offset;
@@ -216,6 +223,7 @@ void ELFPHdr::extract(BYTE const* buf, ELFMgr const* mgr)
 //START ELFSHdr
 UINT ELFSHdr::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFSHdr64) : sizeof(ELFSHdr32);
 }
 
@@ -257,6 +265,7 @@ void ELFSHdr::insert(BYTE const* buf, ELFMgr const* mgr)
         p->s_entry_size = s_entry_size;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFSHdr32 * p = (ELFSHdr32*)buf;
     p->s_name = s_name;
     p->s_type = s_type;
@@ -287,6 +296,7 @@ void ELFSHdr::extract(BYTE const* buf, ELFMgr const* mgr)
         s_entry_size = p->s_entry_size;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFSHdr32 * p = (ELFSHdr32*)buf;
     s_name = p->s_name;
     s_type = p->s_type;
@@ -304,6 +314,7 @@ void ELFSHdr::extract(BYTE const* buf, ELFMgr const* mgr)
 //START ELFSym
 UINT ELFSym::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFSym64) : sizeof(ELFSym32);
 }
 
@@ -321,6 +332,7 @@ void ELFSym::extract(BYTE const* buf, ELFMgr const* mgr)
         st_shndx = p->st_shndx;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFSym32 * p = (ELFSym32*)buf;
     st_name = p->st_name;
     st_value = p->st_value;
@@ -332,9 +344,35 @@ void ELFSym::extract(BYTE const* buf, ELFMgr const* mgr)
 }
 
 
+void ELFSym::insert(BYTE const* buf, ELFMgr const* mgr)
+{
+    if (mgr->is64bit()) {
+        ELFSym64 * p = (ELFSym64*)buf;
+        p->st_name = (Word32)st_name;
+        p->st_value = st_value;
+        p->st_size = st_size;
+        p->st_type = st_type;
+        p->st_bind = st_bind;
+        p->st_other = st_other;
+        p->st_shndx = st_shndx;
+        return;
+    }
+    ASSERT0(mgr->is32bit());
+    ELFSym32 * p = (ELFSym32*)buf;
+    p->st_name = (Word32)st_name;
+    p->st_value = (Addr32)st_value;
+    p->st_size = (Word32)st_size;
+    p->st_type = st_type;
+    p->st_bind = st_bind;
+    p->st_other = st_other;
+    p->st_shndx = st_shndx;
+}
+
+
 //START ELFDyn
 UINT ELFDyn::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFDyn64) : sizeof(ELFDyn32);
 }
 
@@ -347,6 +385,7 @@ void ELFDyn::extract(BYTE const* buf, ELFMgr const* mgr)
         d_val = p->d_un.d_val;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFDyn32 * p = (ELFDyn32*)buf;
     d_tag = p->d_tag;
     d_val = p->d_un.d_val;
@@ -356,6 +395,7 @@ void ELFDyn::extract(BYTE const* buf, ELFMgr const* mgr)
 //START ELFRel
 UINT ELFRel::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFRel64) : sizeof(ELFRel32);
 }
 
@@ -369,6 +409,7 @@ void ELFRel::extract(BYTE const* buf, ELFMgr const* mgr)
         r_sym = p->r_sym;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFRel32 * p = (ELFRel32*)buf;
     r_offset = p->r_offset;
     r_type = p->r_type;
@@ -385,6 +426,7 @@ void ELFRel::insert(BYTE const* buf, ELFMgr const* mgr)
         p->r_sym = (Word32)r_sym;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFRel32 * p = (ELFRel32*)buf;
     p->r_offset = (Addr32)r_offset;
     p->r_sym = r_sym;
@@ -394,6 +436,7 @@ void ELFRel::insert(BYTE const* buf, ELFMgr const* mgr)
 //START ELFRela
 UINT ELFRela::getSize(ELFMgr const* mgr)
 {
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFRela64) : sizeof(ELFRela32);
 }
 
@@ -408,6 +451,7 @@ void ELFRela::extract(BYTE const* buf, ELFMgr const* mgr)
         r_addend = p->r_addend;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFRela32 * p = (ELFRela32*)buf;
     r_offset = p->r_offset;
     r_type = p->r_type;
@@ -426,6 +470,7 @@ void ELFRela::insert(BYTE const* buf, ELFMgr const* mgr)
         p->r_addend = r_addend;
         return;
     }
+    ASSERT0(mgr->is32bit());
     ELFRela32 * p = (ELFRela32*)buf;
     p->r_offset = (Addr32)r_offset;
     p->r_type = r_type;

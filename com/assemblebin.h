@@ -35,6 +35,9 @@ namespace xcom {
 
 typedef UINT64 BinWord;
 
+//The class describes binary value in Word Mode or Buffer Mode.
+//If given binary bit size is less than BIN_WORD_SIZE, the binary will be in
+//Word Mode, otherwise in Buffer Mode.
 class AssembleBinDesc {
 public:
     UINT bitsize;
@@ -49,24 +52,33 @@ public:
     //w: store the binary value.
     //e.g:if we describe binary value 0x3, then bs is 2, w is 0x3.
     AssembleBinDesc(UINT bs, BinWord w) : bitsize(bs), bitvalword(w) {}
-    AssembleBinDesc(UINT bs, BYTE const* f) : bitsize(bs)
+
+    //bs: bit size of given binary value.
+    //buf: a buffer that hold the binary value. Note user should have to
+    //     guarrantee that 'bs' and 'buf' match each other.
+    //e.g:if we describe binary value 0xAAAABBBBCCCCDDDDEE in 'buf',
+    //then bs should be 72.
+    //Note if the binary bit size is less than BIN_WORD_SIZE, the constructor
+    //will describe binary in Word Mode.
+    AssembleBinDesc(UINT bs, BYTE const* buf) : bitsize(bs)
     {
         if (isWordValid()) {
             ASSERTN(bs % BITS_PER_BYTE == 0,
                     ("bitsize must be interal multiple of BYTE"));
-            ::memcpy(&bitvalword, f, bs / BITS_PER_BYTE);
-        } else {
-            bitvalbuf = f;
+            bitvalword = 0;
+            ::memcpy(&bitvalword, buf, bs / BITS_PER_BYTE);
+            return;
         }
+        bitvalbuf = buf;
     }
     UINT getBitSize() const { return bitsize; }
     UINT getByteSize() const { return xceiling((INT)bitsize, BITS_PER_BYTE); }
 };
 
 
-//The class is used to record a vector of sorted Descriptors of assembled
-//binary. Note the bitvalue recorded by each BinDesc will be written in
-//buffer in order.
+//The class is used to record a vector of sorted Binary Descriptors of
+//assembled binary. Note the bit-value recorded by each BinDesc will be
+//written in Buffer in order.
 class AssembleBinDescVec : public Vector<AssembleBinDesc> {
 public:
     UINT getTotalBitSize() const

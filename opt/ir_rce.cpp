@@ -674,7 +674,7 @@ bool RCE::perform(OptCtx & oc)
         //CFG changed, remove empty BB.
         //TODO:DO not recompute whole SSA/MDSSA. Instead, update SSA/MDSSA
         //info especially PHI operands incrementally.
-        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
         ASSERT0(m_cfg->verifyRPO(oc));

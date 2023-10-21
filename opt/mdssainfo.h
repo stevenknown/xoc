@@ -179,7 +179,7 @@ public:
 class VMD : public VOpnd {
     COPY_CONSTRUCTOR(VMD);
 public:
-    class UseSet : public TTab<UINT> {
+    class UseSet : public xcom::TTab<UINT> {
     public:
         UINT append(UINT irid)
         {
@@ -188,13 +188,12 @@ public:
         }
         void dump(Region const* rg) const;
     };
-    typedef TTabIter<UINT> UseSetIter;
+    typedef xcom::TTabIter<UINT> UseSetIter;
 
     UINT m_version; //unique version of MD.
     UINT m_mdid; //id of current virtual MD.
     MDDef * m_def_stmt; //each versioned MD has an unique Definition.
     UseSet m_occs; //each versioned MD has a set of USE occurrences.
-
 public:
     //Add an USE occurrence.
     void addUse(IR const* ir) { VMD_occs(this).append(ir->id()); }
@@ -286,28 +285,6 @@ public:
 
 typedef xcom::SEGIter * VOpndSetIter;
 
-enum COLLECT_FLAG {
-    COLLECT_UNDEF = 0x0,
-    COLLECT_MAY_USE = 0x1,
-    COLLECT_MAY_DEF = 0x2,
-    COLLECT_MUST_USE = 0x4,
-    COLLECT_MUST_DEF = 0x8,
-    COLLECT_CROSS_PHI = 0x10,
-};
-
-//The class represents the context information to collection.
-class CollectCtx {
-public:
-    TTab<UINT> m_visited;
-    UINT flag;
-public:
-    CollectCtx(UINT f) : flag(f) {}
-    void clean() { m_visited.clean(); }
-    bool is_visited(UINT id) const { return m_visited.find(id); }
-    void set_visited(UINT id) { m_visited.append(id); }
-};
-
-
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
 //It sounds there might be some waste to memory if many IRs mdssa-reference
@@ -336,14 +313,6 @@ public:
     void addUseSet(MDSSAInfo const* src, UseDefMgr * mgr);
     void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
-    //Collect all USE, where USE is IR expression.
-    //Note the function will not clear 'set' because caller may perform unify
-    //operation.
-    //ctx: indicates the terminating condition that the function should
-    //     stop and behaviors what the collector should take when
-    //     meeting specific IR operator.
-    void collectUse(UseDefMgr const* udmgr, CollectCtx & ctx,
-                    OUT IRSet * set) const;
     void cleanVOpndSet(UseDefMgr * mgr);
     void copyVOpndSet(VOpndSet const& src, UseDefMgr * mgr);
     void copy(MDSSAInfo const& src, UseDefMgr * mgr)
@@ -351,15 +320,6 @@ public:
         ASSERT0(this != &src);
         copyVOpndSet(src.readVOpndSet(), mgr);
     }
-
-    //Collect all DEF that overlapped with 'ref', where DEF is IR expression.
-    //Note the function will not clear 'set' because caller may perform unify
-    //operation.
-    //ref: given MD, if it is NULL, the function will collect all DEFs.
-    //collect_flag: if the collection will keep iterating DEF by crossing PHI
-    //              operand.
-    void collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
-                    CollectCtx const& ctx, OUT IRSet * set) const;
 
     //Return true if current MDSSAInfo contains given MD only.
     bool containSpecificMDOnly(MDIdx mdid, UseDefMgr const* udmgr) const;
@@ -660,6 +620,8 @@ public:
 
     //Count memory usage for current object.
     size_t count_mem() const;
+
+    //Remove MDSSAInfo of 'ir'.
     void cleanMDSSAInfo(IR * ir);
 
     //Generate MDSSAInfo for individual Non-PR IR stmt/exp since each IR
@@ -668,9 +630,15 @@ public:
     //could be represented by same MDSSAInfo. Nevertheless, the postulation
     //is quite experimentally, and in practical very rarelly.
     MDSSAInfo * genMDSSAInfo(MOD IR * ir);
+
+    //Get MDSSAInfo of 'ir' if any.
     static MDSSAInfo * getMDSSAInfo(IR const* ir);
     Region * getRegion() const { return m_rg; }
+
+    //Get a cached SC container to manipulate VOpnd.
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
+
+    //Get a vector that record all VOpnds.
     VOpndVec * getVOpndVec() { return &m_vopnd_vec; }
 
     //Get specific VOpnd.
@@ -695,12 +663,16 @@ public:
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr;  }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssa_mgr; }
 
+    //Reinitialize current object rather than destruction.
     void reinit() { cleanOrDestroy(true); }
+
     //The function remove and clean all information of 'vmd' from MDSSAMgr.
     void removeVMD(VMD * vmd);
+
+    //The function remove and clean all information of a DEF from MDSSAMgr.
     void removeMDDef(MDDef * def);
 
-    //Set MDSSAInfo of ir.
+    //Set 'mdssainfo' to ir.
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);
 };
 

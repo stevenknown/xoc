@@ -2190,7 +2190,7 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
                                  Mat const&, //equations.
                                  Mat const&) const //inequalities.
 {
-    if (!m_is_dump) { return nullptr; }
+    if (!m_is_dump) { return true; }
     FO_STATUS ft;
     FileObj fo(SIX_DUMP_NAME, false, false, &ft);
     if (ft != FO_SUCC) { return true; }
@@ -2208,7 +2208,7 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 {
-    if (!m_is_dump) { return nullptr; }
+    if (!m_is_dump) { return true; }
     FO_STATUS ft;
     FileObj fo(SIX_DUMP_NAME, false, false, &ft);
     if (ft != FO_SUCC) { return true; }
@@ -2229,7 +2229,7 @@ bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_is_satisfying() const
 {
-    if (!m_is_dump) { return nullptr; }
+    if (!m_is_dump) { return true; }
     FO_STATUS ft;
     FileObj fo(SIX_DUMP_NAME, false, false, &ft);
     if (ft != FO_SUCC) { return true; }
@@ -2242,7 +2242,7 @@ bool MIP<Mat, T>::dump_is_satisfying() const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_floor_branch(INT floor) const
 {
-    if (!m_is_dump) { return nullptr; }
+    if (!m_is_dump) { return true; }
     FO_STATUS ft;
     FileObj fo(SIX_DUMP_NAME, false, false, &ft);
     if (ft != FO_SUCC) { return true; }
@@ -2256,7 +2256,7 @@ bool MIP<Mat, T>::dump_floor_branch(INT floor) const
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_ceiling_branch(INT ceil) const
 {
-    if (!m_is_dump) { return nullptr; }
+    if (!m_is_dump) { return true; }
     FO_STATUS ft;
     FileObj fo(SIX_DUMP_NAME, false, false, &ft);
     if (ft != FO_SUCC) { return true; }

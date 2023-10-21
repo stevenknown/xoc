@@ -125,7 +125,7 @@ static void dumpVarDecl(IR const* ir, Region const* rg)
     if (!ir->hasIdinfo()) { return; }
     ASSERT0(ir->getIdinfo());
     StrBuf buf(64);
-    if (ir->getIdinfo()->dumpVARDecl(buf) != nullptr) {
+    if (ir->getIdinfo()->dumpVARDecl(buf, rg->getVarMgr()) != nullptr) {
         prt(rg, " decl:%s", buf.buf);
     }
 }
@@ -1046,6 +1046,40 @@ void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
     ctx.dumpflag = dumpflag;
     ctx.attr = lattr.getBuf();
     (*dumpfunc)(ir, rg, ctx);
+}
+
+
+void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
+                 DumpFlag dumpflag)
+{
+    ASSERT0(rg && ir);
+    LogCtx tctx; //Define a tmp logctx.
+
+    //Copy current LogCtx info except the dump buffer, because the tmp ctx
+    //will open a new dump buffer to redirect the dumping.
+    tctx.copyWithOutBuffer(rg->getLogMgr()->getCurrentCtx());
+
+    //Push current LogCtx and enable tmp ctx as the present one.
+    rg->getLogMgr()->push(tctx);
+
+    //Open a new buffer for the tmp ctx.
+    rg->getLogMgr()->startBuffer();
+
+    //Dump IR info to dump buffer of the tmp ctx.
+    dumpIR(ir, rg, nullptr, dumpflag);
+
+    //Get the dump buffer.
+    xcom::StrBuf const* tmplogbuf = rg->getLogMgr()->getBuffer();
+    ASSERT0(tmplogbuf);
+
+    //Append the string in dump buffer into 'outbuf'.
+    outbuf.strcat(tmplogbuf->getBuf());
+
+    //Close the dump buffer.
+    rg->getLogMgr()->endBuffer(false);
+
+    //Pop the tmp ctx and restore original LogCtx.
+    rg->getLogMgr()->pop();
 }
 
 } //namespace xoc

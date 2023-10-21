@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-static bool needBuildDUChain(SimpCtx const& ctx)
+bool IRSimp::needMaintainDUChain(SimpCtx const& ctx)
 {
     Region const* rg = ctx.getOptCtx()->getRegion();
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
@@ -57,7 +57,7 @@ static bool needBuildDUChain(SimpCtx const& ctx)
 }
 
 
-static bool isLowest(IR const* ir)
+bool IRSimp::isLowest(IR const* ir) const
 {
     ASSERT0(ir->is_exp());
     if (ir->is_leaf()) { return true; }
@@ -456,8 +456,9 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     IR * init = simplifyExpression(LOOP_init(ir), &local);
     if (iv->is_id()) {
         init = m_irmgr->buildStore(ID_info(iv), init);
+        init->copyRef(iv, m_rg);
     } else {
-        init = m_irmgr->buildStorePR(PR_no(iv), iv->getType(), init);
+        init = m_rg->dupIsomoStmt(iv, init);
     }
     IR * step = simplifyExpression(LOOP_step(ir), &local);
     IR * body = simplifyStmtList(LOOP_body(ir), &local);
@@ -465,10 +466,12 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     //step label, for simp 'continue' used
     xcom::add_next(&body, m_irmgr->buildLabel(stepl));
     if (iv->is_id()) {
-        xcom::add_next(&body, m_irmgr->buildStore(ID_info(iv), step));
+        IR * stepstmt = m_irmgr->buildStore(ID_info(iv), step);
+        stepstmt->copyRef(iv, m_rg);
+        xcom::add_next(&body, stepstmt);
     } else {
-        xcom::add_next(&body, m_irmgr->buildStorePR(PR_no(iv),
-                                                    iv->getType(), step));
+        IR * stepstmt = m_rg->dupIsomoStmt(iv, step);
+        xcom::add_next(&body, stepstmt);
     }
     xcom::add_next(&body, m_irmgr->buildGoto(startl));
 
@@ -571,8 +574,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     Type const* t = dm->getSimplexTypeEx(
         dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(1, t);
-    IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
-    m_rg->getMDMgr()->allocRef(x);
+    IR * x = m_rg->dupIsomoStmt(pr, imm0);
     copyDbx(x, imm0, m_rg);
     xcom::add_next(&ret_list, x);
 
@@ -588,8 +590,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
         dm->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(0, t2);
 
-    IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
-    m_rg->getMDMgr()->allocRef(x2);
+    IR * x2 = m_rg->dupIsomoStmt(pr, imm1);
     copyDbx(x2, imm1, m_rg);
     xcom::add_next(&ret_list, x2);
 
@@ -599,6 +600,7 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     m_rg->freeIRTree(ir);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
+    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
     return pr;
 }
 
@@ -628,8 +630,7 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     Type const* t = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, t);
-    IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
-    m_rg->getMDMgr()->allocRef(x);
+    IR * x = m_rg->dupIsomoStmt(pr, imm0);
     copyDbx(x, imm0, m_rg);
     xcom::add_next(&ret_list, x);
 
@@ -639,14 +640,17 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     Type const* t2 = tm->getSimplexTypeEx(tm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, t2);
-    IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
-    m_rg->getMDMgr()->allocRef(x2);
+    IR * x2 = m_rg->dupIsomoStmt(pr, imm1);
     copyDbx(x2, imm1, m_rg);
     xcom::add_next(&ret_list, x2);
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label2));
     ctx->appendStmt(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
+    //Note the function generated more than two STPR to write to same PR.
+    //If PRSSA is constructed, a PHI need to be inserted to make SSA form
+    //legal. Thus the function ask to rebuild PRSSA later.
+    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
     return pr;
 }
 
@@ -820,7 +824,7 @@ IR * IRSimp::simplifyLogicalOrAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 
 
 //Return expression's value.
-//e.g: a = b||c, where rhs would be translated to:
+//e.g: a = b||c, where RHS would be translated to:
 //  ----------
 //  truebr(b != 0), L1
 //  truebr(c != 0), L1
@@ -842,7 +846,7 @@ IR * IRSimp::simplifyLogicalOrAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 //  ----------
 //  a = pr
 //
-//In the case, return 'pr'.
+//In the case, return 'pr' as output result.
 IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_lor());
@@ -854,8 +858,7 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     Type const* type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = m_irmgr->buildImmInt(0, type);
-    IR * x = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm0);
-    m_rg->getMDMgr()->allocRef(x);
+    IR * x = m_rg->dupIsomoStmt(pr, imm0);
     copyDbx(x, imm0, m_rg);
     xcom::add_next(&ret_list, x);
 
@@ -866,14 +869,14 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     type = dm->getSimplexTypeEx(dm->getAlignedDType(
         WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = m_irmgr->buildImmInt(1, type);
-    IR * x2 = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), imm1);
-    m_rg->getMDMgr()->allocRef(x2);
+    IR * x2 = m_rg->dupIsomoStmt(pr, imm1);
     copyDbx(x2, imm1, m_rg);
     xcom::add_next(&ret_list, x2);
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label2));
     ctx->appendStmt(ret_list);
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
+    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
     return pr;
 }
 
@@ -953,7 +956,7 @@ void IRSimp::simplifySelectKids(IR * ir, SimpCtx * ctx)
         if (SIMP_to_lowest_height(ctx)) {
             if (!new_kid->is_leaf()) {
                 //Lower new_kid to PR.
-                ir->setKid(i, simpToPR(new_kid, ctx));
+                ir->setKid(i, simplifyToPR(new_kid, ctx));
                 continue;
             }
         }
@@ -975,7 +978,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
         }
 
         //Lower SELECT as a leaf node.
-        return simpToPR(ir, ctx);
+        return simplifyToPR(ir, ctx);
     }
 
     //Transform SELECT to:
@@ -1015,8 +1018,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&truectx) = true;
     IR * true_exp = simplifyExpression(SELECT_trueexp(ir), &truectx);
     ctx->appendStmt(truectx);
-    IR * mv = m_irmgr->buildStorePR(PR_no(res), res->getType(), true_exp);
-    m_rg->getMDMgr()->allocRef(mv);
+    IR * mv = m_rg->dupIsomoStmt(res, true_exp);
     copyDbx(mv, true_exp, m_rg);
     xcom::add_next(&lst, &last, mv);
 
@@ -1035,8 +1037,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&falsectx) = true;
     IR * else_exp = simplifyExpression(SELECT_falseexp(ir), &falsectx);
     ctx->appendStmt(falsectx);
-    IR * mv2 = m_irmgr->buildStorePR(PR_no(res), res->getType(), else_exp);
-    m_rg->getMDMgr()->allocRef(mv2);
+    IR * mv2 = m_rg->dupIsomoStmt(res, else_exp);
     copyDbx(mv2, else_exp, m_rg);
     xcom::add_next(&lst, &last, mv2);
     //---
@@ -1082,7 +1083,7 @@ IR * IRSimp::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
     IR * swt_val = SWITCH_vexp(ir);
     if (!swt_val->is_pr()) {
         SimpCtx vexpctx(ctx->getOptCtx());
-        swt_val = simpToPR(swt_val, &vexpctx);
+        swt_val = simplifyToPR(swt_val, &vexpctx);
         vexp_stmt = SIMP_stmtlist(&vexpctx);
     }
     SWITCH_vexp(ir) = nullptr;
@@ -1337,8 +1338,8 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
        ctx->unionBottomUpInfo(ttcont);
 
        //IR * t = buildPR(array_addr->getType());
-       //IR * mv = buildStorePR(PR_no(t), t->getType(), array_addr);
-       //allocRefForPR(mv);
+       //IR * mv = m_rg->dupIsomoStmt(t, array_addr);
+       //copyDbx(mv, array_addr, m_rg);
        //ctx->appendStmt(mv);
        //array_addr = t;
     }
@@ -1379,32 +1380,50 @@ IR * IRSimp::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
         //  t2 = b[i]
         //  t1 + t2
         if (SIMP_array_to_pr_mode(ctx) && k->is_array()) {
-            ir->setKid(i, simpToPR(k, ctx));
+            ir->setKid(i, simplifyToPR(k, ctx));
         }
     }
 
-    return simpToPR(ir, ctx);
+    return simplifyToPR(ir, ctx);
 }
 
 
-IR * IRSimp::simpToPR(IR * ir, SimpCtx * ctx)
+IR * IRSimp::simplifyToPR(IR * ir, SimpCtx * ctx)
 {
     IR * pr = m_irmgr->buildPR(ir->getType());
     m_rg->getMDMgr()->allocRef(pr);
     copyDbx(pr, ir, m_rg); //keep dbg info for new EXP.
-
-    IR * stpr = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), ir);
-    m_rg->getMDMgr()->allocRef(stpr);
-    if (needBuildDUChain(*ctx)) {
+    IR * stpr = m_rg->dupIsomoStmt(pr, ir);
+    if (needMaintainDUChain(*ctx)) {
         xoc::buildDUChain(stpr, pr, m_rg, *ctx->getOptCtx());
     }
-
     copyDbx(stpr, ir, m_rg); //keep dbg info for new STMT.
     ctx->appendStmt(stpr);
     SIMP_changed(ctx) = true;
 
     //Do NOT free ir here, caller will do that.
     return pr;
+}
+
+
+//Simplfy RHS in prmode.
+//Convert st x = rhs --> stpr1 = rhs, st x = pr1.
+IR * IRSimp::simplifyRHSInPRMode(IR * ir, SimpCtx * ctx)
+{
+    if (!SIMP_to_pr_mode(ctx)) { return nullptr; }
+    ASSERT0(ir->hasRHS());
+    IR * rhs = ir->getRHS();
+    if (rhs->is_leaf()) { return nullptr; }
+    SimpCtx tcont(*ctx);
+    IR * newrhs = simplifyToPR(rhs, &tcont);
+    ir->setRHS(newrhs);
+    ctx->unionBottomUpInfo(tcont);
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
+        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
+    }
+    return ret_list;
 }
 
 
@@ -1422,14 +1441,14 @@ IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_ID: return ir;
     SWITCH_CASE_DIRECT_MEM_EXP:
         if (SIMP_to_pr_mode(ctx)) {
-            return simpToPR(ir, ctx);
+            return simplifyToPR(ir, ctx);
         }
         return ir;
     SWITCH_CASE_READ_PR: return ir;
     SWITCH_CASE_READ_ARRAY: return simplifyArray(ir, ctx);
     case IR_LDA: //&sym, get address of 'sym'
         if (SIMP_to_pr_mode(ctx)) {
-            return simpToPR(ir, ctx);
+            return simplifyToPR(ir, ctx);
         }
         return ir;
     SWITCH_CASE_LOGIC:
@@ -1486,7 +1505,7 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         }
 
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simpToPR(ir, ctx);
+            ir = simplifyToPR(ir, ctx);
         }
         return ir;
     }
@@ -1515,7 +1534,7 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         }
 
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simpToPR(ir, ctx);
+            ir = simplifyToPR(ir, ctx);
         }
         return ir;
     case IR_EQ:
@@ -1533,7 +1552,7 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         }
 
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simpToPR(ir, ctx);
+            ir = simplifyToPR(ir, ctx);
         }
         return ir;
     }
@@ -1574,7 +1593,7 @@ IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
         IR * news = simplifyExpression(s, &subctx);
 
         if (SIMP_to_lowest_height(ctx) && !news->is_leaf()) {
-            news = simpToPR(news, &subctx);
+            news = simplifyToPR(news, &subctx);
         }
 
         xcom::add_next(&newsublist, &newsublast, news);
@@ -1590,21 +1609,20 @@ IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
 }
 
 
-void IRSimp::simplifyStoreArrayRHS(IR * ir,
-                                   OUT IR ** ret_list,
-                                   OUT IR ** last,
-                                   SimpCtx * ctx)
+void IRSimp::simplifyStoreArrayRHS(IR * ir, OUT IR ** ret_list,
+                                   OUT IR ** last, SimpCtx * ctx)
 {
     ASSERT0(ir->is_starray());
     SimpCtx rhsctx(*ctx);
     SIMP_ret_array_val(&rhsctx) = true;
     IR * newrhs = simplifyExpression(STARR_rhs(ir), &rhsctx);
-    if (SIMP_changed(&rhsctx)) {
-        STARR_rhs(ir) = newrhs;
-        IR_parent(newrhs) = ir;
-    }
+    ir->setRHS(newrhs);
     ctx->unionBottomUpInfo(rhsctx);
     xcom::add_next(ret_list, last, SIMP_stmtlist(&rhsctx));
+    if (SIMP_to_pr_mode(ctx)) {
+        IR * retlst2 = simplifyRHSInPRMode(ir, ctx);
+        xcom::add_next(ret_list, last, retlst2);
+    }
 }
 
 
@@ -1643,7 +1661,9 @@ IR * IRSimp::simplifyStoreArrayLHS(IR * ir,
     ret->copyRef(ir, m_rg);
     xoc::copyDbx(ret, ir, m_rg);
     ret->copyAI(ir, m_rg);
-    xoc::changeDef(ir, ret, m_rg);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::changeDef(ir, ret, m_rg);
+    }
     m_rg->freeIRTree(ir);
     return ret;
 }
@@ -1661,17 +1681,17 @@ IR * IRSimp::simplifyStoreArray(IR * ir, SimpCtx * ctx)
             xcom::add_next(&ret_list, &last, stmtlst);
         }
     }
-
     simplifyStoreArrayRHS(ir, &ret_list, &last, ctx);
 
-    IR * ret = nullptr;
+    //Simplify LHS of Array Write Operation.
+    IR * retlst1 = nullptr;
     if (SIMP_array(ctx)) {
-        ret = simplifyStoreArrayLHS(ir, &ret_list, &last, ctx);
+        retlst1 = simplifyStoreArrayLHS(ir, &ret_list, &last, ctx);
     } else {
-        ret = ir;
+        retlst1 = ir;
     }
-    ASSERT0(ret->is_stmt());
-    xcom::add_next(&ret_list, &last, ret);
+    ASSERT0(retlst1->is_stmt());
+    xcom::add_next(&ret_list, &last, retlst1);
     return ret_list;
 }
 
@@ -1684,7 +1704,9 @@ IR * IRSimp::simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx)
     //Load variable which is an array.
     ld->copyRef(ir, m_rg);
     ld->copyAI(ir, m_rg);
-    xoc::changeUse(ir, ld, m_rg);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::changeUse(ir, ld, m_rg);
+    }
     m_rg->freeIRTree(ir);
     m_rg->freeIRTree(array_addr);
     return ld;
@@ -1695,25 +1717,28 @@ IR * IRSimp::simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
     if (!array_addr->is_pr()) {
-        array_addr = simpToPR(array_addr, ctx);
+        array_addr = simplifyToPR(array_addr, ctx);
     }
 
     //Load array element value.
     IR * elem_val = m_irmgr->buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, m_rg);
     elem_val->copyAI(ir, m_rg);
-    xoc::changeUse(ir, elem_val, m_rg);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::changeUse(ir, elem_val, m_rg);
+    }
     m_rg->freeIRTree(ir);
 
     IR * pr = m_irmgr->buildPR(elem_val->getType());
     m_rg->getMDMgr()->allocRef(pr);
-
-    IR * stpr = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), elem_val);
-    m_rg->getMDMgr()->allocRef(stpr);
+    IR * stpr = m_rg->dupIsomoStmt(pr, elem_val);
 
     //keep dbg info for new STMT.
     copyDbx(stpr, elem_val, m_rg);
     ctx->appendStmt(stpr);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::buildDUChain(stpr, pr, m_rg, *ctx->getOptCtx());
+    }
     return pr;
 }
 
@@ -1722,26 +1747,26 @@ IR * IRSimp::simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
     if (!array_addr->is_leaf()) {
-        array_addr = simpToPR(array_addr, ctx);
+        array_addr = simplifyToPR(array_addr, ctx);
     }
 
     //Load array element's value.
     IR * elem_val = m_irmgr->buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, m_rg);
     elem_val->copyAI(ir, m_rg);
-    xoc::changeUse(ir, elem_val, m_rg);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::changeUse(ir, elem_val, m_rg);
+    }
     m_rg->freeIRTree(ir);
 
     IR * pr = m_irmgr->buildPR(elem_val->getType());
     m_rg->getMDMgr()->allocRef(pr);
-
-    IR * stpr = m_irmgr->buildStorePR(PR_no(pr), pr->getType(), elem_val);
-    m_rg->getMDMgr()->allocRef(stpr);
+    IR * stpr = m_rg->dupIsomoStmt(pr, elem_val);
 
     //keep dbg info for new STMT.
     copyDbx(stpr, array_addr, m_rg);
     ctx->appendStmt(stpr);
-    if (needBuildDUChain(*ctx)) {
+    if (needMaintainDUChain(*ctx)) {
         xoc::buildDUChain(stpr, pr, m_rg, *ctx->getOptCtx());
     }
     return pr;
@@ -1754,7 +1779,9 @@ IR * IRSimp::simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx)
     //Load array element value.
     IR * elem_val = m_irmgr->buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, m_rg);
-    xoc::changeUse(ir, elem_val, m_rg);
+    if (needMaintainDUChain(*ctx)) {
+        xoc::changeUse(ir, elem_val, m_rg);
+    }
     elem_val->copyAI(ir, m_rg);
     m_rg->freeIRTree(ir);
     return elem_val;
@@ -1831,7 +1858,7 @@ bool IRSimp::simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
         p = simplifyExpression(p, &tcont);
 
         if (SIMP_to_lowest_height(&tcont) && !p->is_leaf()) {
-            p = simpToPR(p, &tcont);
+            p = simplifyToPR(p, &tcont);
         }
 
         SIMP_to_lowest_height(&tcont) = origin_to_lowest_height;
@@ -1862,6 +1889,13 @@ IR * IRSimp::simplifyCall(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->isCallStmt());
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    if (ir->is_call()) {
+        Sym const* callee_name = CALL_idinfo(ir)->get_name();
+        if ((m_irmgr->getInitPlaceHolderVar() != nullptr) &&
+            (callee_name == m_irmgr->getInitPlaceHolderVar()->get_name())) {
+            return simplifyCallPlaceholder(ir, ctx);
+        }
+    }
     IR * ret_list = nullptr;
     IR * last = nullptr;
     bool lchange = simplifyCallParamList(ir, &ret_list, &last, ctx);
@@ -1873,7 +1907,6 @@ IR * IRSimp::simplifyCall(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, SIMP_stmtlist(&tctx2));
         ctx->unionBottomUpInfo(tctx2);
     }
-
     xcom::add_next(&ret_list, ir);
     SIMP_changed(ctx) |= lchange;
     return ret_list;
@@ -1890,24 +1923,24 @@ void IRSimp::simplifyCalleeExp(IR * ir, SimpCtx * ctx)
 IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_setelem());
-
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
-
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
     SimpCtx tcont(*ctx);
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
     SETELEM_base(ir) = simplifyExpression(SETELEM_base(ir), &tcont);
     IR_parent(SETELEM_base(ir)) = ir;
     ctx->unionBottomUpInfo(tcont);
+    if (SIMP_stmtlist(&tcont) != nullptr) {
+        xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
+    }
 
     SimpCtx tcont2(*ctx);
     SIMP_ret_array_val(&tcont2) = true;
     SETELEM_val(ir) = simplifyExpression(SETELEM_val(ir), &tcont2);
     IR_parent(SETELEM_val(ir)) = ir;
     ctx->unionBottomUpInfo(tcont2);
-
-    IR * ret_list = nullptr;
-    IR * last = nullptr;
     if (SIMP_stmtlist(&tcont2) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont2));
     }
@@ -1918,7 +1951,6 @@ IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
     SETELEM_ofst(ir) = simplifyExpression(SETELEM_ofst(ir), &tcont3);
     IR_parent(SETELEM_ofst(ir)) = ir;
     ctx->unionBottomUpInfo(tcont3);
-    last = nullptr;
     if (SIMP_stmtlist(&tcont3) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont3));
     }
@@ -1930,8 +1962,9 @@ IR * IRSimp::simplifySetelem(IR * ir, SimpCtx * ctx)
 IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_getelem());
-
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
 
     //Process base.
     SimpCtx tcont(*ctx);
@@ -1940,9 +1973,6 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
     GETELEM_base(ir) = simplifyExpression(GETELEM_base(ir), &tcont);
     IR_parent(GETELEM_base(ir)) = ir;
     ctx->unionBottomUpInfo(tcont);
-
-    IR * ret_list = nullptr;
-    IR * last = nullptr;
     if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
@@ -1953,7 +1983,6 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
     GETELEM_ofst(ir) = simplifyExpression(GETELEM_ofst(ir), &tcont2);
     IR_parent(GETELEM_ofst(ir)) = ir;
     ctx->unionBottomUpInfo(tcont2);
-    last = nullptr;
     if (SIMP_stmtlist(&tcont2) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont2));
     }
@@ -1988,7 +2017,7 @@ IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
         //  PR2 = ILD(PR1)
         //  IST(PR2, ...)
         SimpCtx istbasectx(ctx->getOptCtx());
-        ir->setBase(simpToPR(ir->getBase(), &istbasectx));
+        ir->setBase(simplifyToPR(ir->getBase(), &istbasectx));
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&istbasectx));
         SIMP_changed(ctx) = true;
     }
@@ -1999,10 +2028,16 @@ IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&rhsctx) = true;
     ir->setRHS(simplifyExpression(ir->getRHS(), &rhsctx));
     ctx->unionBottomUpInfo(rhsctx);
-
     if (SIMP_stmtlist(&rhsctx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&rhsctx));
     }
+    if (SIMP_to_pr_mode(ctx)) {
+        //We allow the simplest PR write operation in LHS.
+        IR * retlst2 = simplifyRHSInPRMode(ir, ctx);
+        xcom::add_next(&ret_list, &last, retlst2);
+    }
+
+    //Add original ir as the last new IR.
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
 }
@@ -2012,17 +2047,25 @@ IR * IRSimp::simplifyDirectMemOp(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->hasRHS());
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
     SimpCtx tcont(*ctx);
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
-    ir->setRHS(simplifyExpression(ir->getRHS(), &tcont));
+    IR * newrhs = simplifyExpression(ir->getRHS(), &tcont);
+    ASSERTN(newrhs,
+            ("expression simplification must return original IR at least"));
     ctx->unionBottomUpInfo(tcont);
-
-    IR * ret_list = nullptr;
-    IR * last = nullptr;
     if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
+    ir->setRHS(newrhs);
+    if (ir->isMemRefNonPR() && SIMP_to_pr_mode(ctx)) {
+        IR * retlst2 = simplifyRHSInPRMode(ir, ctx);
+        xcom::add_next(&ret_list, &last, retlst2);
+    }
+
+    //Add original ir as the last new IR.
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
 }

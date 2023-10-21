@@ -30,3 +30,4 @@ bool is_vst() const { return getCode() == IR_VST; }
 bool is_vstpr() const { return getCode() == IR_VSTPR; }
 bool is_vist() const { return getCode() == IR_VIST; }
 bool is_broadcast() const { return getCode() == IR_BROADCAST; }
+bool isVirtualOp() const { return is_vst() || is_vstpr() || is_vist(); }

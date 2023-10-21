@@ -46,13 +46,12 @@ LCSE::LCSE(Region * rg) : Pass(rg)
     m_du = m_rg->getDUMgr();
     ASSERT0(m_du && m_tm);
     m_expr_tab = nullptr;
-    m_expr_vec = nullptr;
     m_enable_filter = true;
 }
 
 
 //Hoist CSE's computation, and replace its occurrence with the result pr.
-IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
+IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExprRep * ie)
 {
     IRListIter pos_holder = nullptr;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
@@ -66,7 +65,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         IR * ret = nullptr;
         //Move STORE_VAL to temp PR.
         IR * rhs = ir_pos->getRHS();
-        ExpRep * tie = m_expr_tab->map_ir2ir_expr(rhs);
+        ExprRep * tie = m_expr_tab->mapIR2ExprRep(rhs);
         if (tie != nullptr && tie == ie) {
             //e.g: a = 10, expression of store_val is nullptr.
             ret = m_rg->getIRMgr()->buildPR(rhs->getType());
@@ -80,7 +79,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         }
         if (ir_pos->is_ist()) {
             //Move MEM ADDR to Temp PR.
-            tie = m_expr_tab->map_ir2ir_expr(ir_pos->getBase());
+            tie = m_expr_tab->mapIR2ExprRep(ir_pos->getBase());
             if (tie != nullptr && tie == ie) {
                 if (ret == nullptr) {
                     IR * x = ir_pos->getBase();
@@ -108,7 +107,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         IR * next_parm = nullptr;
         while (p != nullptr) {
             next_parm = p->get_next();
-            ExpRep * tie = m_expr_tab->map_ir2ir_expr(p);
+            ExprRep * tie = m_expr_tab->mapIR2ExprRep(p);
             if (tie != nullptr && tie == ie) {
                 bool insert_st;
                 if (ret == nullptr) {
@@ -148,7 +147,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         break;
     case IR_TRUEBR:
     case IR_FALSEBR: {
-        ExpRep * tie = m_expr_tab->map_ir2ir_expr(BR_det(ir_pos));
+        ExprRep * tie = m_expr_tab->mapIR2ExprRep(BR_det(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = BR_det(ir_pos);
             IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
@@ -164,7 +163,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         break;
     }
     case IR_IGOTO: {
-        ExpRep * tie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir_pos));
+        ExprRep * tie = m_expr_tab->mapIR2ExprRep(IGOTO_vexp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = IGOTO_vexp(ir_pos);
             IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
@@ -180,7 +179,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         break;
     }
     case IR_SWITCH: {
-        ExpRep * tie = m_expr_tab->map_ir2ir_expr(SWITCH_vexp(ir_pos));
+        ExprRep * tie = m_expr_tab->mapIR2ExprRep(SWITCH_vexp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = SWITCH_vexp(ir_pos);
             IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
@@ -196,7 +195,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         break;
     }
     case IR_RETURN: {
-        ExpRep * tie = m_expr_tab->map_ir2ir_expr(RET_exp(ir_pos));
+        ExprRep * tie = m_expr_tab->mapIR2ExprRep(RET_exp(ir_pos));
         if (tie != nullptr && tie == ie) {
             IR * x = RET_exp(ir_pos);
             IR * ret = m_rg->getIRMgr()->buildPR(IR_dt(x));
@@ -226,7 +225,7 @@ bool LCSE::processBranch(IN IRBB * bb, IN IR * ir,
     ASSERT0(ir->isConditionalBr());
     bool change = false;
     if (!canBeCandidate(BR_det(ir))) { return false; }
-    ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
+    ExprRep * ie = m_expr_tab->mapIR2ExprRep(BR_det(ir));
     if (ie != nullptr) {
         avail_ir_expr.bunion(EXPR_id(ie));
         IR * ir_pos = map_expr2avail_pos.get(EXPR_id(ie));
@@ -267,7 +266,7 @@ bool LCSE::processBranch(IN IRBB * bb, IN IR * ir,
 //    return p1 as new expression.
 //'ie': cse candidate expression indicator.
 //'stmt': the stmt contains 'exp'.
-IR * LCSE::processExp(IN IRBB * bb, IN ExpRep * ie, IN IR * stmt,
+IR * LCSE::processExp(IN IRBB * bb, IN ExprRep * ie, IN IR * stmt,
                       MOD xcom::BitSet & avail_ir_expr,
                       MOD Vector<IR*> & map_expr2avail_pos,
                       MOD Vector<IR*> & map_expr2avail_pr)
@@ -339,7 +338,7 @@ bool LCSE::processRHS(IN IRBB * bb, IN IR * ir,
     if (!canBeCandidate(rhs)) {
         return false;
     }
-    ExpRep * ie = m_expr_tab->map_ir2ir_expr(rhs);
+    ExprRep * ie = m_expr_tab->mapIR2ExprRep(rhs);
     if (ie != nullptr) {
         avail_ir_expr.bunion(EXPR_id(ie));
         //e.g: a = 10, expression of store_val is nullptr.
@@ -369,7 +368,7 @@ bool LCSE::processRHS(IN IRBB * bb, IN IR * ir,
         }
     }
     if (ir->isIndirectMemOp()) {
-        ie = m_expr_tab->map_ir2ir_expr(ir->getBase());
+        ie = m_expr_tab->mapIR2ExprRep(ir->getBase());
         if (ie != nullptr) {
             avail_ir_expr.bunion(EXPR_id(ie));
             IR * ir_pos = map_expr2avail_pos.get(EXPR_id(ie));
@@ -415,7 +414,7 @@ bool LCSE::processParamList(IN IRBB * bb, IN IR * ir,
         lchange = false;
         while (p != nullptr) {
             if (canBeCandidate(p)) {
-                ExpRep * ie = m_expr_tab->map_ir2ir_expr(p);
+                ExprRep * ie = m_expr_tab->mapIR2ExprRep(p);
                 IR * newparam = processExp(bb, ie, ir,
                                            avail_ir_expr, map_expr2avail_pos,
                                            map_expr2avail_pr);
@@ -459,7 +458,7 @@ bool LCSE::processUse(IN IRBB * bb, IN IR * ir,
     SWITCH_CASE_CONDITIONAL_BRANCH_OP: {
         ASSERT0(ir->getJudgeDet());
         if (!canBeCandidate(ir->getJudgeDet())) { break; }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(ir->getJudgeDet());
+        ExprRep * ie = m_expr_tab->mapIR2ExprRep(ir->getJudgeDet());
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
                                   map_expr2avail_pos,
@@ -480,7 +479,7 @@ bool LCSE::processUse(IN IRBB * bb, IN IR * ir,
     case IR_IGOTO: {
         ASSERT0(ir->getValExp());
         if (!canBeCandidate(ir->getValExp())) { break; }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(ir->getValExp());
+        ExprRep * ie = m_expr_tab->mapIR2ExprRep(ir->getValExp());
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
                                   map_expr2avail_pos,
@@ -501,7 +500,7 @@ bool LCSE::processUse(IN IRBB * bb, IN IR * ir,
         if (RET_exp(ir) == nullptr || !canBeCandidate(RET_exp(ir))) {
             break;
         }
-        ExpRep * ie = m_expr_tab->map_ir2ir_expr(RET_exp(ir));
+        ExprRep * ie = m_expr_tab->mapIR2ExprRep(RET_exp(ir));
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
                                   map_expr2avail_pos, map_expr2avail_pr);
@@ -541,7 +540,7 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
         }
         for (BSIdx j = avail_ir_expr.get_first();
              j != BS_UNDEF; j = avail_ir_expr.get_next(j)) {
-            ExpRep * ie = m_expr_vec->get(j);
+            ExprRep * ie = m_expr_tab->getExpVec().get(j);
             ASSERT0(ie != nullptr);
             for (IR * occ = EXPR_occ_list(ie).get_head();
                  occ != nullptr; occ = EXPR_occ_list(ie).get_next()) {
@@ -611,10 +610,6 @@ bool LCSE::perform(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
-
-    m_expr_vec = m_expr_tab->get_expr_vec();
-    ASSERT0(m_expr_vec);
-
     bool change = false;
 
     //Record lived expression during analysis.
@@ -653,7 +648,7 @@ bool LCSE::perform(OptCtx & oc)
     ASSERT0(verifyIRandBB(bbl, m_rg));
     if (change) {
         //Found CSE and processed them.
-        OC_is_expr_tab_valid(oc) = false;
+        oc.setInvalidPass(PASS_EXPR_TAB);
         OC_is_aa_valid(oc) = false;
         OC_is_pr_du_chain_valid(oc) = false;
         OC_is_nonpr_du_chain_valid(oc) = false;

@@ -37,7 +37,7 @@ namespace xoc {
 
 TypeDesc const g_type_desc[] = {
     {D_UNDEF, "none",  0},
-    {D_B, "bool", 8}, //BOOL
+    {D_B, "bool", 8}, //bool
     {D_I8, "i8", 8}, //signed integer 8 bits
     {D_I16, "i16", 16},
     {D_I32, "i32", 32},
@@ -50,7 +50,8 @@ TypeDesc const g_type_desc[] = {
     {D_U64, "u64", 64},
     {D_U128, "u128", 128},
 
-    {D_F16, "f16", 16}, //float point 32 bits
+    {D_BF16, "bf16", 16}, //bfloat point 16 bits
+    {D_F16, "f16", 16}, //float point 16 bits
     {D_F32, "f32", 32}, //float point 32 bits
     {D_F64, "f64", 64},
     {D_F80, "f80", 80},
@@ -131,14 +132,12 @@ Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
             ("Can not hoist vector type."));
     ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
             ("Can not hoist pointer type."));
-
     DATA_TYPE t0 = TY_dtype(d0);
     DATA_TYPE t1 = TY_dtype(d1);
     if (t0 == D_MC && t1 == D_MC) {
         ASSERT0(TY_mc_size(d0) == TY_mc_size(d1));
         return opnd0->getType();
     }
-
     if (t0 == D_MC) {
         ASSERT0(TY_mc_size(d0) != 0);
         UINT ty_size = MAX(TY_mc_size(d0), getByteSize(d1));
@@ -147,7 +146,6 @@ Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
         }
         return opnd1->getType();
     }
-
     if (t1 == D_MC) {
         ASSERT0(TY_mc_size(d1) != 0);
         UINT ty_size = MAX(TY_mc_size(d1), getByteSize(d0));
@@ -165,13 +163,12 @@ Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
     INT bitsize = MAX(getDTypeBitSize(t0), getDTypeBitSize(t1));
     DATA_TYPE res;
     if (IS_FP(t0) || IS_FP(t1)) {
-        res = getFPDType(bitsize);
+        res = getFPDType(bitsize, false);
     } else if (IS_SINT(t0) || IS_SINT(t1)) {
         res = getIntDType(bitsize, true);
     } else {
         res = getIntDType(bitsize, false);
     }
-
     ASSERT0(res != D_UNDEF);
     ASSERT0(IS_SIMPLEX(res));
     return getSimplexType(res);
@@ -431,7 +428,7 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
 }
 
 
-//Register simplex type, e.g:INT, UINT, FP, BOOL.
+//Register simplex type, e.g:INT, UINT, FP, bool.
 TypeContainer const* TypeMgr::registerSimplex(Type const* type)
 {
     ASSERT0(type);
@@ -638,5 +635,62 @@ bool Type::verify(TypeMgr const* tm) const
     return true;
 }
 //END Type
+
+
+//
+//START TypeMgr
+//
+TypeMgr::TypeMgr(RegionMgr * rm)
+{
+    ASSERT0(rm);
+    m_rm = rm;
+    m_type_tab.clean();
+    m_pool = smpoolCreate(sizeof(Type) * 8, MEM_COMM);
+    m_type_count = 1;
+    ::memset((void*)m_simplex_type, 0, sizeof(m_simplex_type));
+    m_b = getSimplexType(D_B);
+    m_i8 = getSimplexType(D_I8);
+    m_i16 = getSimplexType(D_I16);
+    m_i32 = getSimplexType(D_I32);
+    m_i64 = getSimplexType(D_I64);
+    m_i128 = getSimplexType(D_I128);
+    m_u8 = getSimplexType(D_U8);
+    m_u16 = getSimplexType(D_U16);
+    m_u32 = getSimplexType(D_U32);
+    m_u64 = getSimplexType(D_U64);
+    m_u128 = getSimplexType(D_U128);
+    m_bf16 = getSimplexType(D_BF16);
+    m_f16 = getSimplexType(D_F16);
+    m_f32 = getSimplexType(D_F32);
+    m_f64 = getSimplexType(D_F64);
+    m_f80 = getSimplexType(D_F80);
+    m_f128 = getSimplexType(D_F128);
+    m_str = getSimplexType(D_STR);
+    m_any = getSimplexType(D_ANY);
+}
+
+
+TypeMgr::~TypeMgr()
+{
+    smpoolDelete(m_pool);
+    m_pool = nullptr;
+
+    VectorElemTypeTabIter iter;
+    VectorElemTypeTab * tab;
+    for (Type const* d = m_vector_type_tab.get_first(iter, &tab);
+         d != nullptr; d = m_vector_type_tab.get_next(iter, &tab)) {
+        ASSERT0(tab);
+        delete tab;
+    }
+
+    TensorElemTypeTabIter iter2;
+    TensorElemTypeTab * tab2;
+    for (Type const* d = m_tensor_type_tab.get_first(iter2, &tab2);
+         d != nullptr; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
+        ASSERT0(tab2);
+        delete tab2;
+    }
+}
+//END TypeMgr
 
 } //namespace xoc

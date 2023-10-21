@@ -56,12 +56,17 @@ public:
 
 void dumpConstContent(IR const* ir, Region const* rg);
 
+//The function dump IR info into LogCtx of current LogMgr.
 void dumpIR(IR const* ir, Region const* rg, CHAR const* attr = nullptr,
             DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
 {
     dumpIR(ir, rg, nullptr, dumpflag);
 }
+
+//The function dump IR info into given buffer.
+void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
+                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
                  DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,

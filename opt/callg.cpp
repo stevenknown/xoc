@@ -156,7 +156,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
             cn->region()->findFormalParam(formalparamlst, true);
             for (Var const* param = formalparamlst.get_head(); param != nullptr;
                  param = formalparamlst.get_next()) {
-                param->dump(m_tm);
+                param->dump(getVarMgr());
             }
 
             IR * irs = cn->region()->getIRList();

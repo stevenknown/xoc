@@ -116,48 +116,86 @@ public:
 
 class VisitTree {
     COPY_CONSTRUCTOR(VisitTree);
+public:
+    typedef TTab<VexIdx> VisitedTab;
+    typedef BitSet VisitedSet;
+protected:
+    bool m_is_terminate;
     Tree const& m_tree;
 
     //Record the root vertex on Tree.
     Vertex const* m_root;
+    VisitedTab * m_visitedtab;
+    VisitedSet * m_visitedset;
+protected:
+    bool isVisited(VexIdx vid) const
+    {
+        return is_dense() ?
+            m_visitedset->is_contain(vid) : m_visitedtab->find(vid);
+    }
+    bool is_dense() const { return m_visitedset != nullptr; }
+    bool is_terminate() const { return m_is_terminate; }
 
-    //Record the maximum number of vertex.
-    //Note it is not necessary to set this field when running the pass.
-    //It is just used to achieve better performance.
-    UINT m_maxnum;
+    void setVisited(VexIdx vid)
+    {
+        if (is_dense()) { m_visitedset->bunion(vid); }
+        else { m_visitedtab->append(vid); }
+    }
+
+    //Inform visitor to stop visiting.
+    void setTerminate() { m_is_terminate = true; }
 public:
-    VisitTree(Tree const& dt, VexIdx root) : m_tree(dt)
+    VisitTree(Tree const& dt, VexIdx root) : m_is_terminate(false), m_tree(dt)
     {
         m_root = dt.getVertex(root);
         ASSERT0(m_root);
-        m_maxnum = 10;
+        if (dt.is_dense()) {
+            m_visitedset = new VisitedSet();
+            m_visitedtab = nullptr;
+        } else {
+            m_visitedtab = new VisitedTab();
+            m_visitedset = nullptr;
+        }
     }
-    virtual ~VisitTree() {}
+    virtual ~VisitTree()
+    {
+        if (m_visitedtab != nullptr) { delete m_visitedtab; }
+        if (m_visitedset != nullptr) { delete m_visitedset; }
+    }
 
+    //Return the visit tree.
     Tree const& getTree() const { return m_tree; }
+
+    //Return the root of tree.
+    Vertex const* getRoot() const { return m_root; }
 
     //The function is a callback interface.
     //The function will be invoked when all kid of v have been accessed.
     //v: the vertex on Tree.
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v)
+    //stk: the visiting stack of vertex. Usually, user does not need to
+    //     manipulate the element in stk.
+    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
+                                                Stack<Vertex const*> & stk)
     {
-        //Target Dependent Code.
         DUMMYUSE(v);
+        DUMMYUSE(stk);
+        ASSERTN(0, ("Target Dependent Code"));
     }
 
     //The function is a callback interface.
     //The function will be invoked when first accessing the vertex v.
+    //Return true to process the kid vertex on tree.
     //v: the vertex on Tree.
-    virtual void visitWhenFirstMeet(Vertex const* v)
+    //stk: the visiting stack of vertex. Usually, user does not need to
+    //     manipulate the element in stk.
+    virtual bool visitWhenFirstMeet(Vertex const* v,
+                                    Stack<Vertex const*> & stk)
     {
-        //Target Dependent Code.
         DUMMYUSE(v);
+        DUMMYUSE(stk);
+        ASSERTN(0, ("Target Dependent Code"));
+        return true;
     }
-
-    //Set the maximum number of vertex.
-    //Note it is not necessary to set this field when running the pass.
-    //It is just used to achieve better performance.
-    void setMaxNumOfVertex(UINT maxnum) { m_maxnum = maxnum; }
 
     void perform();
 };

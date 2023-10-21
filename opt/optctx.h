@@ -48,7 +48,6 @@ typedef enum _PASS_TYPE PASS_TYPE; //forward declare PASS_TYPE
 #define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
 #define OC_is_cfg_valid(o) ((o).u1.s1.is_cfg_valid)
 #define OC_is_aa_valid(o) ((o).u1.s1.is_aa_result_valid)
-#define OC_is_expr_tab_valid(o) ((o).u1.s1.is_ir_expr_tab)
 #define OC_is_dom_valid(o) ((o).u1.s1.is_dom_valid)
 #define OC_is_pdom_valid(o) ((o).u1.s1.is_pdom_valid)
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
@@ -75,7 +74,6 @@ public:
             BitUnion is_reach_def_valid:1;
             BitUnion is_avail_reach_def_valid:1;
             BitUnion is_aa_result_valid:1; //POINT TO info is avaiable.
-            BitUnion is_ir_expr_tab:1; //Liveness of ExpRep is avaliable.
             BitUnion is_cfg_valid:1; //CFG is avaliable.
 
             //Dominator Set, Immediate Dominator are avaliable.
@@ -139,9 +137,6 @@ public:
     //Return true if AA information is valid.
     bool is_aa_valid() const { return OC_is_aa_valid(*this); }
 
-    //Return true if expresion hash table is valid.
-    bool is_expr_tab_valid() const { return OC_is_expr_tab_valid(*this); }
-
     //Return true if Dominator and Immediate-Dominator are valid.
     bool is_dom_valid() const { return OC_is_dom_valid(*this); }
 
@@ -164,7 +159,7 @@ public:
     //changed.
     void setInvalidIfDUMgrLiveChanged()
     {
-        OC_is_expr_tab_valid(*this) = false;
+        setInvalidPass(PASS_EXPR_TAB);
         OC_is_live_expr_valid(*this) = false;
         OC_is_reach_def_valid(*this) = false;
         OC_is_avail_reach_def_valid(*this) = false;

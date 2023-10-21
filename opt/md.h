@@ -67,6 +67,9 @@ typedef UINT MDIdx;
 #define MD_HEAP_MEM 5
 
 //Represent variables that are in local may alias set.
+//Usually, variables what belong to may alias set are always be taken address.
+//Thus MD that is not taken address should NOT be added to MayDef|MayUse set
+//when computing overlap.
 #define MD_LOCAL_MAY_ALIAS 6
 
 //The first id that is allocable.
@@ -215,6 +218,10 @@ public:
     //Return true if current md intersect but may be not cover 'm', such as:
     //current md: |-------|
     //m:            |-------|
+    //NOTE: Do NOT compare 'm' with Delegate MD, the function will NOT check
+    //whether 'm' overlaps with MDSet which reperented by Delegate.
+    //e.g:even if current MD indicates a normal global var, the function may
+    //return false if m is Global Delegate.
     bool is_overlap(MD const* m) const;
 
     //Return true if md can ONLY be put in MayDef or MayUse.
@@ -274,10 +281,10 @@ public:
     }
 
     //Dump md into 'buf', 'bufl' indicate the byte length of the buffer.
-    CHAR * dump(StrBuf & buf,  TypeMgr * dm) const;
+    CHAR * dump(StrBuf & buf, VarMgr const* vm) const;
 
     //Dump md to file.
-    void dump(TypeMgr * dm) const;
+    void dump(VarMgr const* vm) const;
 
     inline void clean()
     {
@@ -475,8 +482,8 @@ public:
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
         //and MD2 dependence.
-        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //           #represented in Program Region.
+        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable
+        //           #that represented in Program Region.
         //     foo(); #maydef={MD2, MD10}
         //if ((DefSBitSetCore::is_contain(MD_FULL_MEM) && !mds.is_empty()) ||
         //    (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM) &&
@@ -503,9 +510,13 @@ public:
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
         //and MD2 dependence.
-        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //           #represented in Program Region.
-        //     foo(); #maydef={MD2, MD10}
+        //e.g:
+        //  #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+        //  #represented in Program Region.
+        //  g=10;
+        //
+        //  #maydef={MD2, MD10}
+        //  foo();
         //if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
         //    clean(m);
         //    return;
@@ -516,7 +527,7 @@ public:
     //overlapped elements.
     //Note this function is very costly.
     void diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys);
-    void dump(MDSystem * ms, bool detail = false) const;
+    void dump(MDSystem * ms, VarMgr const* vm, bool detail = false) const;
 
     //Get unique MD that is effective, and offset must be valid.
     //Note the MDSet can only contain one element.
@@ -563,7 +574,7 @@ public:
         if (mds == nullptr) {
             mds = (MDSet*)smpoolMallocConstSize(sizeof(MDSet), m_mds_pool);
             ASSERT0(mds);
-            ::memset(mds, 0, sizeof(MDSet));
+            ::memset((void*)mds, 0, sizeof(MDSet));
             m_md_set_list.append_head(mds);
         }
         return mds;
@@ -647,6 +658,7 @@ public:
 //NOTE: each region manager has a single MDSystem.
 class MDSystem {
     COPY_CONSTRUCTOR(MDSystem);
+protected:
     //If the flag is true, MDSystem will add delegate of region local variable
     //into overlapping MDSet for each MD.
     //Note the flag is always stand for all region local variables, it's flaw
@@ -668,7 +680,7 @@ class MDSystem {
     typedef TMap<Var const*, MDTab*, CompareConstVar> Var2MDTab;
     typedef TMapIter<Var const*, MDTab*> Var2MDTabIter;
     Var2MDTab m_var2mdtab; //map Var to MDTab.
-
+protected:
     inline MD * allocMD()
     {
         MD * md = m_free_md_list.remove_head();
@@ -681,16 +693,22 @@ class MDSystem {
 
     //Allocated object should be recorded in list.
     MDTab * allocMDTab() { return new MDTab(); }
+
     //MD for global memory.
     void initGlobalMem(VarMgr * vm);
+
     //MD for total memory.
     void initFullMem(VarMgr * vm);
+
     //MD for imported variables.
     void initImportMem(VarMgr * vm);
+
     //MD for local memory.
     void initLocalMem(VarMgr * vm);
+
     //MD for local may alias memory.
     void initLocalMayAlias(VarMgr * vm);
+
     //MD for HEAP memory.
     void initHeapMem(VarMgr * vm);
     void initDelegate(VarMgr * vm);
@@ -701,7 +719,6 @@ public:
     void addDelegate(Region const* current_rg, MD const* md,
                      OUT MDSet & output, DefMiscBitSetMgr & mbsmgr);
 
-    void init(VarMgr * vm);
     void clean();
     void computeOverlapExactMD(MD const* md, OUT MDSet * output,
                                ConstMDIter & mditer,
@@ -747,7 +764,7 @@ public:
                         DefMiscBitSetMgr & mbsmgr, bool strictly);
 
     //Dump all registered MDs.
-    void dump(bool only_dump_nonpr_md);
+    void dump(VarMgr const* vm, bool only_dump_nonpr_md);
     void destroy();
 
     //Return the MD by given delegate MDIdx.
@@ -767,6 +784,8 @@ public:
         return md;
     }
 
+    //The initialization of MDSystem.
+    void init(VarMgr * vm);
     bool isEnableLocalVarDelegate() const
     { return m_enable_local_var_delegate; }
 
@@ -808,7 +827,7 @@ public:
         if (md == nullptr) { return; }
         m_id2md_map.remove(MD_id(md));
         MDIdx mdid = MD_id(md);
-        ::memset(md, 0, sizeof(MD));
+        ::memset((void*)md, 0, sizeof(MD));
         MD_id(md) = mdid;
         m_free_md_list.append_head(md);
     }

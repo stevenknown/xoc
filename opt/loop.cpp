@@ -245,7 +245,7 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     ASSERT0(c == m_pred_pos.get_elem_count());
     PHI_opnd_list(newphi) = new_opnd_list;
     newphi->setParent(new_opnd_list);
-    m_prssamgr->genSSAInfoForStmt(newphi);
+    m_prssamgr->genNewVersionSSAInfoForStmt(newphi);
 }
 
 
@@ -350,8 +350,10 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
 void InsertPhiHelper::insertPhiAtPreheader(IRBB * preheader)
 {
     IRBB * loophead = m_li->getLoopHead();
-    UINT prehead_pos = ((DGraph*)m_cfg)->WhichPred(preheader->id(),
-                                                   loophead->getVex());
+    bool is_pred;
+    UINT prehead_pos = ((DGraph*)m_cfg)->WhichPred(
+        preheader->id(), loophead->getVex(), is_pred);
+    ASSERT0_DUMMYUSE(is_pred);
     insertPRSSAPhi(preheader);
     replacePRSSASuccOpnd(preheader, prehead_pos);
     insertMDSSAPhi(preheader);
@@ -365,7 +367,7 @@ void InsertPhiHelper::insertPhiAtPreheader(IRBB * preheader)
 //  BB2: body start bb
 //  BB3: goto loop start bb
 //BB2 is the loop header fallthrough bb.
-bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
+bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG const* cfg,
                                     UINT * succ1, UINT * succ2)
 {
     ASSERT0(li && cfg && succ1 && succ2);
@@ -832,16 +834,17 @@ static bool isRealMDDefInvariant(MDDef const* mddef, LI<IRBB> const* li,
 
 
 //Return true if 'use' is loop invariant.
-static bool isMDPhiInvariant(MDDef const* start,
-                             IR const* use,
+//Note if use's DEF is a PHI, we will not simply just check whether
+//the DEF's BB is inside the loop, because PHI is not real DEF.
+static bool isMDPhiInvariant(MDDef const* start, IR const* use,
                              LI<IRBB> const* li,
                              InvStmtList const* invariant_stmt,
                              MDSSAMgr const* mdssamgr)
 {
     ASSERT0(start && start->is_phi() && mdssamgr);
     ConstMDDefIter ii;
-    for (MDDef const* def =
-            mdssamgr->iterDefInitCTillKillingDef(start, use, ii);
+    for (MDDef const* def = mdssamgr->iterDefInitCTillKillingDef(
+            start, use, ii);
          def != nullptr; def = mdssamgr->iterDefNextCTillKillingDef(use, ii)) {
         if (def->is_phi() || def == start) {
             continue;
@@ -874,6 +877,8 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
         MDDef const* mddef = vopnd->getDef();
         ASSERT0(mddef);
         if (mddef->is_phi()) {
+            //If ir's DEF is a PHI, we will not simply just check whether
+            //the DEF's BB is inside the loop, because PHI is not real DEF.
             if (!isMDPhiInvariant(mddef, ir, li, invariant_stmt, mdssamgr)) {
                 return false;
             }
@@ -921,7 +926,7 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
 }
 
 
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
+bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
                      InvStmtList const* invariant_stmt, bool check_tree)
 {
     ASSERT0(ir && ir->is_exp());
@@ -1115,7 +1120,7 @@ LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it)
 //  BB3: goto loop-start bb
 //BB3 is the backedge-start bb.
 //Return backedge BB id if found, otherwise return BBID_UNDEF.
-IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
+IRBB * findBackEdgeStartBB(LI<IRBB> const* li, IRCFG const* cfg)
 {
     UINT bbid = li->findBackEdgeStartBB(cfg);
     if (bbid != BBID_UNDEF) {

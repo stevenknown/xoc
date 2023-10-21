@@ -53,58 +53,99 @@ void TargInfoMgr::reset()
 }
 
 
-RegSet const& TargInfoMgr::getAllocable() const
+RegSet const* TargInfoMgr::getAllocable() const
 {
-    return *xgen::tmGetRegSetAllocable();
+    return xgen::tmGetRegSetAllocable();
 }
 
 
-RegSet const& TargInfoMgr::getReturnValue() const
+RegSet const* TargInfoMgr::getReturnValue() const
 {
-    return *xgen::tmGetRegSetOfReturnValue();
+    return xgen::tmGetRegSetOfReturnValue();
 }
 
 
-RegSet const& TargInfoMgr::getParam() const
+RegSet const* TargInfoMgr::getParam() const
 {
-    return *xgen::tmGetRegSetOfArgument();
+    return xgen::tmGetRegSetOfArgument();
 }
 
 
-RegSet const& TargInfoMgr::getCaller() const
+RegSet const* TargInfoMgr::getCaller() const
 {
-    return *xgen::tmGetRegSetOfCallerSaved();
+    return xgen::tmGetRegSetOfCallerSaved();
 }
 
 
-RegSet const& TargInfoMgr::getCallee() const
+RegSet const* TargInfoMgr::getCallee() const
 {
-    return *xgen::tmGetRegSetOfCalleeSaved();
+    return xgen::tmGetRegSetOfCalleeSaved();
+}
+
+
+RegSet const* TargInfoMgr::getVectorAllocable() const
+{
+    return xgen::tmGetVectorRegSetAllocable();
+}
+
+
+RegSet const* TargInfoMgr::getVectorReturnValue() const
+{
+    return xgen::tmGetVectorRegSetOfReturnValue();
+}
+
+
+RegSet const* TargInfoMgr::getVectorParam() const
+{
+    return xgen::tmGetVectorRegSetOfArgument();
+}
+
+
+RegSet const* TargInfoMgr::getVectorCaller() const
+{
+    return xgen::tmGetVectorRegSetOfCallerSaved();
+}
+
+
+RegSet const* TargInfoMgr::getVectorCallee() const
+{
+    return xgen::tmGetVectorRegSetOfCalleeSaved();
 }
 
 
 void TargInfoMgr::dump(Region const* rg) const
 {
     note(rg, "\n==-- DUMP %s --==", "TargInfoMgr");
+    TargInfoMgr * pthis = const_cast<TargInfoMgr*>(this);
     rg->getLogMgr()->incIndent(2);
     xcom::StrBuf buf(32);
-    const_cast<TargInfoMgr*>(this)->getAllocable().dump(buf);
+    if (pthis->getAllocable() != nullptr) {
+        pthis->getAllocable()->dump(buf);
+    }
     note(rg, "\nALLOCABLE:%s", buf.buf);
 
     buf.clean();
-    const_cast<TargInfoMgr*>(this)->getCaller().dump(buf);
+    if (pthis->getCaller() != nullptr) {
+        pthis->getCaller()->dump(buf);
+    }
     note(rg, "\nCALLER:%s", buf.buf);
 
     buf.clean();
-    const_cast<TargInfoMgr*>(this)->getCallee().dump(buf);
+    if (pthis->getCallee() != nullptr) {
+        pthis->getCallee()->dump(buf);
+    }
     note(rg, "\nCALLEE:%s", buf.buf);
 
     buf.clean();
-    const_cast<TargInfoMgr*>(this)->getParam().dump(buf);
+    if (pthis->getParam() != nullptr) {
+        pthis->getParam()->dump(buf);
+    }
     note(rg, "\nPARAM:%s", buf.buf);
 
     buf.clean();
-    const_cast<TargInfoMgr*>(this)->getReturnValue().dump(buf);
+    if (pthis->getReturnValue() != nullptr) {
+        pthis->getReturnValue()->dump(buf);
+    }
     note(rg, "\nRETURN_VALUE:%s", buf.buf);
 
     note(rg, "\nLINK:%s", getRegName(getLink()));

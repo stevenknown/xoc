@@ -40,6 +40,7 @@ namespace xoc {
 #define VAR_ID_MAX 5000000
 
 class RegionMgr;
+class VarMgr;
 
 //
 //START Var
@@ -84,7 +85,8 @@ enum VAR_FLAG {
     //Variable is aritifical or spurious that used to
     //facilitate optimizations and analysis.
     //Note a fake variable can not be taken address, it is always used to
-    //represent some relations between STMT/EXP, or be regarded as a placeholder.
+    //represent some relations between STMT/EXP,
+    //or be regarded as a placeholder.
     VAR_FAKE = 0x40,
 
     //Variable is label.
@@ -120,11 +122,11 @@ enum VAR_FLAG {
     //Variable is declaration.
     VAR_IS_DECL = 0x10000,
 
-    //Variable is visible while assembling in binary file, e.g:ELF.
-    VAR_IS_VISIBLE = 0x20000,
-
     //Variable is region.
-    VAR_IS_REGION = 0x40000,
+    VAR_IS_REGION = 0x20000,
+
+    //Variable is entry function.
+    VAR_IS_ENTRY = 0x40000,
 };
 
 class VarFlag : public UFlag {
@@ -194,20 +196,18 @@ class Var {
     COPY_CONSTRUCTOR(Var);
 public:
     UINT uid; //unique id.
-    Type const* type; //data type.
     UINT align; //memory alignment of Var.
-    Sym const* name; //record name of Var.
-
     //Record the formal parameter position if Var is parameter.
     //The position start from 0.
     UINT formal_parameter_pos;
 
     //Record prno if Var indicates a PR location.
     PRNO prno;
+    Type const* type; //data type.
+    Sym const* name; //record name of Var.
 
     //Record the storage space if var is memory object.
     StorageSpace storage_space;
-
     union {
         //Record string contents if Var is a constant string.
         Sym const* string;
@@ -227,7 +227,6 @@ public:
     bool is_label() const { return varflag.have(VAR_IS_LABEL); }
     bool is_unallocable() const { return varflag.have(VAR_IS_UNALLOCABLE); }
     bool is_decl() const { return varflag.have(VAR_IS_DECL); }
-    bool is_visible() const { return varflag.have(VAR_IS_VISIBLE); }
     bool is_array() const { return varflag.have(VAR_IS_ARRAY); }
     bool is_formal_param() const { return varflag.have(VAR_IS_FORMAL_PARAM); }
     bool is_private() const { return varflag.have(VAR_PRIVATE); }
@@ -239,6 +238,7 @@ public:
     bool is_pr() const { return varflag.have(VAR_IS_PR); }
     bool is_region() const { return varflag.have(VAR_IS_REGION); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
+    bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
     bool is_any() const
     {
         ASSERT0(VAR_type(this));
@@ -326,6 +326,13 @@ public:
         return VAR_string(this);
     }
 
+    //Get PRNO if Var is PR.
+    PRNO getPrno() const
+    {
+        ASSERT0(is_pr());
+        return VAR_prno(this);
+    }
+
     //Get initial value.
     ByteBuf const* getByteValue() const
     {
@@ -346,12 +353,13 @@ public:
 
     //The interface to dump declaration information when current
     //variable dumpped. This is target dependent code.
-    virtual CHAR const* dumpVARDecl(StrBuf &) const { return nullptr; }
-    virtual void dump(TypeMgr const* tm) const;
+    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf, VarMgr const* vm) const
+    { return nullptr; }
+    virtual void dump(VarMgr const* vm) const;
 
     //You must make sure this function will not change any field of Var.
     //The information will be dumpped into 'buf'.
-    virtual CHAR const* dump(OUT StrBuf & buf, TypeMgr const* dm) const;
+    virtual CHAR const* dump(OUT StrBuf & buf, VarMgr const* vm) const;
     void dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const;
     void dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const;
     void dumpProp(OUT StrBuf & buf, bool grmode) const;
@@ -395,13 +403,13 @@ class VarTab : public TTab<Var*, CompareVar> {
     COPY_CONSTRUCTOR(VarTab);
 public:
     VarTab() {}
-    void dump(TypeMgr const* tm) const;
+    void dump(VarMgr const* vm) const;
 };
 
 
 class ConstVarTab : public TTab<Var const*, CompareConstVar> {
 public:
-    void dump(TypeMgr * tm);
+    void dump(VarMgr const* vm) const;
 };
 
 
@@ -416,14 +424,15 @@ typedef Vector<Var*> VarVec;
 //it in the same way.
 class VarMgr {
     COPY_CONSTRUCTOR(VarMgr);
+protected:
     size_t m_var_count;
     VarVec m_var_vec;
     ConstSym2Var m_str_tab;
     size_t m_str_count;
     DefSBitSetCore m_freelist_of_varid;
-    RegionMgr * m_ru_mgr;
+    RegionMgr * m_rm;
     TypeMgr * m_tm;
-
+protected:
     //Assign an unique ID to given variable.
     void assignVarId(Var * v);
     void dumpFreeIDList() const;
@@ -433,22 +442,28 @@ public:
 
     //Destroy holistic variable manager.
     void destroy();
+
     //Destroy specific variable and recycle its ID for next allocation.
-    void destroyVar(Var * v); //Free Var memory.
+    void destroyVar(Var * v);
     void dump() const;
 
     TypeMgr * getTypeMgr() const { return m_tm; }
+    RegionMgr * getRegionMgr() const { return m_rm; }
+
     //Returnt the vector that holds all variables registered.
     VarVec * getVarVec() { return &m_var_vec; }
+
     //Get variable via var-id.
     Var * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
     //Find string-variable via specific string content.
     Var * findStringVar(Sym const* str) { return m_str_tab.get(str); }
+
     //Find variable by variable's name.
     //Note there may be multiple variable with same name, this function return
     //the first one.
     Var * findVarByName(Sym const* name);
+
     //Return true if the 'name' is the name of recorded unique
     //dedicated string variable.
     bool isDedicatedStringVar(CHAR const* name) const;

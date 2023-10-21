@@ -88,6 +88,7 @@ public:
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
+    friend class PropVisit;
     COPY_CONSTRUCTOR(CopyProp);
 protected:
     MDSystem * m_md_sys;
@@ -123,7 +124,7 @@ protected:
     bool doPropStmt(IR * cpop, MOD IRSet & useset,
                     IRListIter cur_iter, IRListIter * next_iter);
     bool doPropBB(IN IRBB * bb, MOD IRSet & useset);
-    bool doPropBBListInDomTreeOrder();
+    bool doPropBBInDomTreeOrder();
     void doFinalRefine(OptCtx & oc);
     void dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
                             IR const* use);
@@ -136,8 +137,8 @@ protected:
     bool existMayDefTillBB(IR const* exp, IRBB const* start,
                            IRBB const* meetup) const;
 
-    DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
-    DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
+    DefSegMgr * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
+    DefMiscBitSetMgr * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
     OptCtx * getOptCtx() const { return m_oc; }
 
     //Return the value expression that to be propagated.

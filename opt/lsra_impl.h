@@ -220,6 +220,12 @@ private:
     //The function shrinks lifetime to properly position.
     void cutoffLTFromSpillPos(LifeTime * lt, Pos pos);
 
+    //The function do all actions for the spill after the split position
+    IR * doSpillAfterSplitPos(LifeTime * lt, SplitCtx const& ctx);
+
+    //The function do all actions for the spill before the split position
+    IR * doSpillBeforeSplitPos(LifeTime * lt, SplitCtx const& ctx);
+
     //The function inserts spill operation before or after split_pos.
     IR * insertSpillAroundSplitPos(LifeTime * lt, SplitCtx const& ctx);
     void insertSpillDuringSplitting(LifeTime * lt, SplitCtx const& ctx,
@@ -303,11 +309,47 @@ public:
 
 
 //
+//START IterPrno
+//
+class IterPrno : public VisitIRTree {
+    Type * m_pr_type;
+    PRNO m_prno;
+protected:
+    virtual bool visitIR(IR const* ir)
+    {
+        if (ir->is_pr() && (ir->getPrno() == m_prno)) {
+            m_pr_type = const_cast<Type*>(ir->getType());
+            return false;
+        }
+        return true;
+    }
+public:
+    IterPrno(IR const* ir, PRNO prno) : m_pr_type(nullptr), m_prno(prno)
+    {
+        ASSERT0(m_prno != REG_UNDEF);
+        visit(ir);
+    }
+    Type const* getPrType() const { return m_pr_type; }
+};
+//END IterPrno
+
+
+//
 //START LSARImpl
 //
 //The class implements a default linear-scan algorithm.
 class LSRAImpl {
+public:
+    enum REG_PREFER{
+        PREFER_UNDEF = 0,
+        PREFER_CALLER = 1,
+        PREFER_CALLEE = 2,
+    };
+    typedef xcom::TMap<LifeTime const*, REG_PREFER> LT2Prefer;
+    typedef xcom::TMapIter<LifeTime const*, REG_PREFER> LT2PreferIter;
+private:
     COPY_CONSTRUCTOR(LSRAImpl);
+protected:
     bool m_is_insert_bb;
     bool m_use_expose;
     LinearScanRA & m_ra;
@@ -324,19 +366,32 @@ class LSRAImpl {
     RegSet m_avail_return_value;
     RegSet m_avail_allocable;
     RegSet m_used_callee; //record the used callee-saved register.
+    RegSet m_avail_callee_vector;
+    RegSet m_avail_caller_vector;
+    RegSet m_avail_param_vector;
+    RegSet m_avail_return_value_vector;
+    RegSet m_avail_allocable_vector;
+    RegSet m_used_callee_vector;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
-private:
+    LT2Prefer m_lt2prefer;
+protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
 
     void computeUsedCaller(OUT RegSet & used);
+    void computeUsedVectorCaller(OUT RegSet & used);
 
     //The function assigns lt focibly with given reg.
-    void forceAssignRegister(LifeTime const* lt, Reg reg);
-    void freeReg(Reg reg);
+    virtual void forceAssignRegister(LifeTime const* lt, Reg reg);
+
+    virtual void freeReg(Reg reg);
     void freeReg(LifeTime const* lt);
 
-    void initRegSet();
+
+    REG_PREFER const getLTPrefer(LifeTime const* lt) const
+    { return m_lt2prefer.get(lt); }
+
+    virtual void initRegSet();
     IR * insertSpillAtEntry(Reg r);
     void insertReloadAtExit(Reg r, Var * spill_loc);
     IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
@@ -350,8 +405,9 @@ private:
 
     //Record the allocation of callee.
     void recordUsedCallee(Reg r) { m_used_callee.bunion(r); }
+    void recordUsedVectorCallee(Reg r) { m_used_callee_vector.bunion(r); }
 
-    void saveCallee();
+
 public:
     LSRAImpl(LinearScanRA & ra, bool use_expose = false) : m_ra(ra)
     {
@@ -366,12 +422,15 @@ public:
         m_oc = nullptr;
         initRegSet();
     }
-    ~LSRAImpl() {}
+    virtual ~LSRAImpl() {}
+    void computeRAPrefer();
+    void computeLTPrefer(LifeTime const* lt);
 
     void dumpAvailRegSet() const;
     void dumpBBList() const;
     void dump() const;
-
+    static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
+        CHAR const* format, ...);
     static Var * findSpillLoc(IR const* ir);
 
     RegSet const& getAvailAllocable() const { return m_avail_allocable; }
@@ -390,11 +449,15 @@ public:
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
 
+    bool isAvailAllocable(Reg r) const {
+        return m_avail_allocable.is_contain(r) ||
+            m_avail_allocable_vector.is_contain(r);
+    }
+
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
     static bool isReloadLikeOp(IR const* ir);
-    bool isAvailAllocable(Reg r) const
-    { return m_avail_allocable.is_contain(r); }
+
     void insertRematBefore(IR * remat, IR const* marker);
     void insertRematBefore(PRNO newres, RematCtx const& rematctx,
                            Type const* loadvalty, IR const* marker);
@@ -410,6 +473,13 @@ public:
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
 
+    static Reg pickReg(RegSet & set);
+    static Reg pickReg(RegSet & set, Reg r);
+    bool perform(OptCtx & oc);
+
+    Type const* queryRegTypeForSpillAfter(PRNO prno, IR const* split_ir);
+    Type const* queryRegTypeForSpillBefore(PRNO prno, IR const* split_ir);
+
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
 
@@ -420,49 +490,59 @@ public:
     //consistency.
     void reviseLTConsistency();
 
-    void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker);
-    void tryUpdateDom(IRBB const* newbb, IRBB const* marker);
-    void tryUpdateLiveness(IRBB const* newbb, IRBB const* marker);
+    virtual void saveCallee();
+
+    LifeTime * selectAssignDefCand(Pos curpos, IR const* curstmt);
+    LifeTime * selectAssignUseCand(Pos curpos, IR const* curstmt,
+                                   OUT IR const** curir);
+
+    //lt: split or spill other lifetime to make register for lt.
+    //curpos: the position that need a register.
+    //curir: the stmt/exp that need a register.
+    void solveConflict(LifeTime * lt, Pos curpos, IR const* curir);
+
+    //The function split all lifetimes in Active LifeTime Set that assigned
+    //given register 'r' before 'ir'.
+    void splitActiveLTWithReg(Pos curpos, IR const* ir, Reg r);
+    //Spill LT that assigned referred register in given LTSet.
+    void splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
+                           MOD LTSet & set);
+
+    //The function split all lifetime that assigned caller-saved register
+    //before call-stmt.
+    void splitCallerSavedLT(Pos curpos, IR const* ir);
+
+    //The function split all lifetimes in InActive LifeTime Set that assigned
+    //given register 'r' before 'ir'.
+    void splitInActiveLTWithReg(Pos curpos, IR const* ir, Reg r);
+
+    //The function split all lifetimes that assigned link register
+    //before call-stmt.
+    void splitLinkLT(Pos curpos, IR const* ir);
+
     void transferActive(Pos curpos);
     void transferInActive(Pos curpos);
+
+    virtual bool tryAssignCallee(LifeTime const* lt, RegSet & avail_reg);
+    virtual bool tryAssignCaller(LifeTime const* lt, RegSet & avail_reg);
     bool tryAssignDedicatedRegister(LifeTime const* lt);
-    bool tryAssignCallee(LifeTime const* lt);
-    bool tryAssignCaller(LifeTime const* lt);
-    bool tryAssignRegister(LifeTime const* lt);
 
     //Try assign register for given ir which at 'pos'.
     //ir: may be expression or stmt.
     //lt: lifetime that corresponding to 'ir'.
     void tryAssignRegForIR(Pos pos, IR const* ir, LifeTime * lt);
 
-    //Spill LT that assigned referred register in given LTSet.
-    void splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
-                           MOD LTSet & set);
-    //The function split all lifetime that assigned caller-saved register
-    //before call-stmt.
-    void splitCallerSavedLT(Pos curpos, IR const* ir);
+    //Default register assign oder.
+    virtual bool tryAssignRegister(IR const* ir, LifeTime const* lt);
 
-    //The function split all lifetimes that assigned link register
-    //before call-stmt.
-    void splitLinkLT(Pos curpos, IR const* ir);
+    bool tryAssignScalarRegister(LifeTime const* lt);
+    bool tryAssignScalarRegisterByPrefer(LifeTime const* lt);
+    bool tryAssignVectorRegister(LifeTime const* lt);
+    bool tryAssignVectorRegisterByPrefer(LifeTime const* lt);
 
-    //The function split all lifetimes in Active LifeTime Set that assigned
-    //given register 'r' before 'ir'.
-    void splitActiveLTWithReg(Pos curpos, IR const* ir, Reg r);
-
-    //The function split all lifetimes in InActive LifeTime Set that assigned
-    //given register 'r' before 'ir'.
-    void splitInActiveLTWithReg(Pos curpos, IR const* ir, Reg r);
-
-    //lt: split or spill other lifetime to make register for lt.
-    //curpos: the position that need a register.
-    //curir: the stmt/exp that need a register.
-    void solveConflict(LifeTime * lt, Pos curpos, IR const* curir);
-    LifeTime * selectAssignUseCand(Pos curpos, IR const* curstmt,
-                                   OUT IR const** curir);
-    LifeTime * selectAssignDefCand(Pos curpos, IR const* curstmt);
-
-    bool perform(OptCtx & oc);
+    void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker);
+    void tryUpdateDom(IRBB const* newbb, IRBB const* marker);
+    void tryUpdateLiveness(IRBB const* newbb, IRBB const* marker);
 };
 //END LSARImpl
 

@@ -40,31 +40,47 @@ class LogMgr;
 #define DUMP_INDENT_NUM 4
 #define LOGCTX_DEFAULT_BUFFER_SIZE 4 //bytes
 
-//This class permits copy-constructing operations.
 class LogCtx {
+    //This class permits Copy Constructing to facilitate stack operations.
+    //COPY_CONSTRUCTOR(LogCtx);
 public:
+    //True if current context will replace newline with specific character.
     BYTE replace_newline:1;
+
+    //True if current context enable dump source file line.
     BYTE prt_srcline:1;
-    BYTE enable_buffer:1; //record true if current ctx enabled buffer.
-    BYTE paused_buffer:1; //record true if current ctx paused buffer.
+
+    //Set to true if current context enabled dump buffer.
+    BYTE enable_buffer:1;
+
+    //Set to true if current context paused the using of dump buffer.
+    BYTE paused_buffer:1;
+
+    //Record the character that used to fill indent space.
     CHAR indent_char;
+
+    //Record the number of character that used to fill indent space.
     INT indent;
+
+    //Record the log file handler.
     FILE * logfile;
+
+    //Record the log file name.
     CHAR const* logfile_name;
-    StrBuf * buffer;
+
+    //Record the dump buffer if it is enabled. If dump buffer enabled,
+    //'enable_buffer' is true.
+    xcom::StrBuf * buffer;
 public:
-    LogCtx()
-        : replace_newline(false),
-          prt_srcline(true),
-          enable_buffer(false),
-          paused_buffer(false),
-          indent_char(LOGMGR_INDENT_CHAR),
-          indent(0),
-          logfile(nullptr),
-          logfile_name(nullptr),
-          buffer(nullptr) {}
+    //Construct LogCtx with default parameters.
+    LogCtx() : buffer(nullptr) { clean(); }
+
+    //Construct LogCtx with given integer.
+    //The constructor is used to satisify sstl.h's default operations.
     LogCtx(UINT) : buffer(nullptr)
     { clean(); } //Used as UNDEFINED value in Stack<T>
+
+    //Construct LogCtx with given parameters.
     LogCtx(bool p_replace_newline,
            bool p_prt_srcline,
            bool p_enable_buffer,
@@ -85,6 +101,22 @@ public:
         buffer = nullptr;
     }
 
+    //The function copy options from 'src' except the dump buffer related
+    //options.
+    //The function is always used in the scenario that user is going to
+    //redirect the logging into another buffer or file.
+    void copyWithOutBuffer(LogCtx const& src)
+    {
+        replace_newline = src.replace_newline;
+        prt_srcline = src.prt_srcline;
+        indent_char = src.indent_char;
+        indent = src.indent;
+        logfile = src.logfile;
+        logfile_name = src.logfile_name;
+    }
+
+    //The function clean class member to default value,
+    //without destroy any memory.
     void clean()
     {
         replace_newline = false;
@@ -99,15 +131,25 @@ public:
             buffer->clean();
         }
     }
+
+    //The function close the dump file of current context.
+    //The function always used to free resource when context changed.
+    void closeLogFile()
+    {
+        if (logfile == nullptr) { return; }
+        ::fclose(logfile);
+        logfile = nullptr;
+        logfile_name = nullptr;
+    }
 };
 
 
 class LogMgr {
     COPY_CONSTRUCTOR(LogMgr);
 protected:
-    LogCtx m_ctx;
+    LogCtx m_ctx; //record the current LogCtx.
     Stack<LogCtx> m_ctx_stack;
-    TTab<StrBuf*> m_buftab;
+    TTab<xcom::StrBuf*> m_buftab;
 public:
     LogMgr() { init(nullptr, false); }
     LogMgr(CHAR const* logfilename, bool is_del) { init(logfilename, is_del); }
@@ -117,11 +159,17 @@ public:
     void cleanBuffer();
 
     //Decrease indent by value v.
-    void decIndent(UINT v) { m_ctx.indent -= (INT)v; }
+    void decIndent(UINT v)
+    {
+        m_ctx.indent -= (INT)v;
+        ASSERT0(m_ctx.indent >= 0);
+    }
     void dumpBuffer();
 
-    //Flush out the buffer content into file, and close the buffer.
-    void endBuffer();
+    //The function will close buffer and flush out the buffer content
+    //into file.
+    //is_flush_out_buffer: true to flush out the buffer to file.
+    void endBuffer(bool is_flush_out_buffer = true);
 
     //Finalize log file.
     //Note after finialization, log mgr will not dump any information.
@@ -132,12 +180,12 @@ public:
     //The function flush buffer content to file, whereas clean the buffer.
     void flushBuffer();
 
-    LogCtx const& getCurrentCtx() const { return m_ctx; }
+    LogCtx & getCurrentCtx() { return m_ctx; }
     FILE * getFileHandler() const { return m_ctx.logfile; }
     CHAR const* getFileName() const { return m_ctx.logfile_name; }
     INT getIndent() const { return m_ctx.indent; }
     CHAR getIndentChar() const { return m_ctx.indent_char; }
-    StrBuf * getBuffer() { return m_ctx.buffer; }
+    xcom::StrBuf * getBuffer() { return m_ctx.buffer; }
 
     //Return true if replace 'newline' charactor with '\l' when
     //dumpping DOT file.
@@ -173,11 +221,9 @@ public:
     //is_del: true to delete the same name file.
     bool pushAndCreate(CHAR const* filename, bool is_del);
 
-    //The function will pop and discard the top object on the stack and destroy
-    //the related resource.
-    void popAndDestroy();
-
     //Restore file handler and filename that is in top of stack.
+    //The function discard the current CTX object that is on the top of stack,
+    //and restore file handler and filename.
     void pop();
 
     //Set indent by value v.
@@ -218,7 +264,6 @@ public:
 
 //Print string with indent chars.
 void note(Region const* rg, CHAR const* format, ...);
-void note_args(Region const* rg, CHAR const* format, va_list args);
 
 //Print string with indent chars.
 void note(RegionMgr const* rm, CHAR const* format, ...);

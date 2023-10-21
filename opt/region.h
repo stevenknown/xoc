@@ -232,7 +232,7 @@ public:
         if (du == nullptr) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
                 ANA_INS_du_pool(getAnalysisInstrument()));
-            ::memset(du, 0, sizeof(DU));
+            ::memset((void*)du, 0, sizeof(DU));
         }
         return du;
     }
@@ -335,7 +335,7 @@ public:
 
     //This function erases all informations of ir and
     //append it into free_list for next allocation.
-    //If Attach Info exist, this function will erase it rather than delete.
+    //If Attach Info exist, this function will erase it rather than deletion.
     //If DU info exist, this function will retrieve it back
     //to region for next allocation.
     //Note that this function does NOT free ir's kids and siblings.
@@ -621,11 +621,13 @@ public:
     //Allocate Var for PR.
     Var * genVarForPR(PRNO prno, Type const* type);
 
-    //Return the tyid for array index, the default is unsigned 32bit.
+    //Return the type for array index, the default is WORD length of target
+    //machine.
     inline Type const* getTargetMachineArrayIndexType()
     {
         return getTypeMgr()->getSimplexTypeEx(
-            getTypeMgr()->getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
+            getTypeMgr()->getAlignedDType(
+            WORD_LENGTH_OF_TARGET_MACHINE, false));
     }
 
     //Use HOST_INT type describes the value.

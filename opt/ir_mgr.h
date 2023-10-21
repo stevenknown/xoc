@@ -478,7 +478,7 @@ public:
 
     //This function erases all informations of ir and
     //append it into free_list for next allocation.
-    //If Attach Info exist, this function will erase it rather than delete.
+    //If Attach Info exist, this function will erase it rather than deletion.
     //Note that this function does NOT free ir's kids and siblings.
     void freeIR(IR * ir);
 
@@ -496,6 +496,7 @@ public:
 
     //Generate a variable to inform compiler that this is a placeholder.
     Var * genInitPlaceHolderVar();
+    Var * getInitPlaceHolderVar() const { return m_init_placeholder_var; }
 
     //Note if the ir-count changed, the new generated IR id will start from the
     //new ir-count.

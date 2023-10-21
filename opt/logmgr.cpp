@@ -36,7 +36,7 @@ namespace xoc {
 //to start of 'buf'.
 //Return -1 if not find newline.
 //start: the byte offset to 'buf'.
-static INT find_newline_pos(StrBuf const& buf, UINT buflen, UINT start)
+static INT find_newline_pos(xcom::StrBuf const& buf, UINT buflen, UINT start)
 {
     ASSERT0(buflen <= (UINT)buf.strlen());
     UINT i = start;
@@ -52,7 +52,7 @@ static INT find_newline_pos(StrBuf const& buf, UINT buflen, UINT start)
 
 //Print leading '\n'.
 //Return the byte offset of content that related to string buffer.
-static size_t prt_leading_newline(LogMgr * lm, StrBuf const& buf,
+static size_t prt_leading_newline(LogMgr * lm, xcom::StrBuf const& buf,
                                   UINT buflen, UINT start)
 {
     size_t i = start;
@@ -112,7 +112,7 @@ static void prt_indent(LogMgr * lm)
 }
 
 
-static void note_helper(LogMgr * lm, StrBuf const& buf)
+static void note_helper(LogMgr * lm, xcom::StrBuf const& buf)
 {
     ASSERT0(lm);
     FILE * h = lm->getFileHandler();
@@ -167,7 +167,7 @@ static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
     va_list targs;
     va_copy(targs, args);
-    StrBuf buf(64);
+    xcom::StrBuf buf(64);
     buf.vstrcat(format, targs);
     va_end(targs);
     note_helper(lm, buf);
@@ -185,7 +185,7 @@ static void prt_helper(LogMgr * lm, CHAR const* format, va_list args)
 
     va_list targs;
     va_copy(targs, args);
-    StrBuf buf(64);
+    xcom::StrBuf buf(64);
     buf.vstrcat(format, targs);
     va_end(targs);
 
@@ -322,15 +322,17 @@ void LogMgr::startBuffer()
         m_ctx.buffer->clean();
         return;
     }
-    m_ctx.buffer = new StrBuf(LOGCTX_DEFAULT_BUFFER_SIZE);
+    m_ctx.buffer = new xcom::StrBuf(LOGCTX_DEFAULT_BUFFER_SIZE);
     m_buftab.append(m_ctx.buffer);
 }
 
 
-void LogMgr::endBuffer()
+void LogMgr::endBuffer(bool is_flush_out_buffer)
 {
     m_ctx.enable_buffer = false;
-    dumpBuffer();
+    if (is_flush_out_buffer) {
+        dumpBuffer();
+    }
     if (m_ctx.buffer != nullptr) {
         m_buftab.remove(m_ctx.buffer);
         delete m_ctx.buffer;
@@ -400,8 +402,8 @@ void LogMgr::fini()
         m_ctx.clean();
     }
 
-    TTabIter<StrBuf*> it;
-    for (StrBuf * buf = m_buftab.get_first(it);
+    TTabIter<xcom::StrBuf*> it;
+    for (xcom::StrBuf * buf = m_buftab.get_first(it);
          buf != nullptr; buf = m_buftab.get_next(it)) {
         delete buf;
     }
@@ -425,18 +427,6 @@ bool LogMgr::pushAndCreate(CHAR const* filename, bool is_del)
 }
 
 
-//The function will pop and discard the top object on the stack and destroy
-//the related resource.
-void LogMgr::popAndDestroy()
-{
-    LogCtx lc = getCurrentCtx();
-    pop();
-    if (lc.logfile != nullptr) {
-        ::fclose(lc.logfile);
-    }
-}
-
-
 //Save current log file handler and name into stack, and set given handler
 //and filename as current.
 //h: file handler
@@ -452,19 +442,19 @@ void LogMgr::push(FILE * h, CHAR const* filename)
 }
 
 
-//Save current log file handler and name into stack, and set given handler
-//and filename as current.
 void LogMgr::push(LogCtx const& ctx)
 {
+    ASSERT0(&ctx != &m_ctx);
+    //Note m_ctx record the current LogCtx, the old ctx is placed into stack.
     m_ctx_stack.push(m_ctx);
     m_ctx = ctx;
 }
 
 
-//The function discard the current CTX object that is on the top of stack, and
-//restore file handler and filename.
 void LogMgr::pop()
 {
+    //Use the ctx in stack as the current LogCtx, meanwhile m_ctx
+    //will be overlapped.
     m_ctx = m_ctx_stack.pop();
 }
 //END LogMgr

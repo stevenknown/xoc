@@ -41,6 +41,7 @@ void Region::HighProcessImpl(OptCtx & oc)
     if (g_do_cfg) {
         ASSERT0(g_cst_bb_list);
         getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
+
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
@@ -52,11 +53,10 @@ void Region::HighProcessImpl(OptCtx & oc)
         ASSERT0(getCFG()->verify());
 
         bool org = g_do_cfg_remove_unreach_bb;
+
         //Unreachable BB have to removed before RPO computation.
         g_do_cfg_remove_unreach_bb = true;
-
         getCFG()->performMiscOpt(oc);
-
         g_do_cfg_remove_unreach_bb = org;
 
         //Build DOM after CFG be optimized.

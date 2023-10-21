@@ -169,12 +169,13 @@ void MD2IRSet::append(MDIdx mdid, UINT irid)
 void MD2IRSet::dump() const
 {
     if (!m_rg->isLogMgrInit()) { return; }
-    m_md_sys->dump(false);
+    VarMgr const* vm = m_rg->getVarMgr();
+    m_md_sys->dump(vm, false);
     note(getRegion(), "\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
         MD const * md = m_md_sys->getMD(mdid);
-        md->dump(m_md_sys->getTypeMgr());
+        md->dump(vm);
 
         DefSBitSetCore * irs = get(mdid);
         if (irs == nullptr || irs->get_elem_count() == 0) { continue; }
@@ -215,6 +216,7 @@ DUMgr::DUMgr(Region * rg) : Pass(rg), m_solve_set_mgr(rg)
     m_tm = rg->getTypeMgr();
     m_md_sys = rg->getMDSystem();
     m_aa = rg->getAA();
+    m_vm = rg->getVarMgr();
     m_cfg = rg->getCFG();
     m_mds_mgr = rg->getMDSetMgr();
     m_mds_hash = rg->getMDSetHash();
@@ -1071,7 +1073,7 @@ void DUMgr::dumpDUChain() const
             prt(getRegion(), "USE(");
             pthis->collectMayUseRecursive(ir, m_rg, true, bsmgr, mds);
             if (!mds.is_empty()) {
-                mds.dump(m_md_sys);
+                mds.dump(m_md_sys, m_vm);
             } else {
                 prt(getRegion(), "--");
             }
@@ -2189,6 +2191,60 @@ UINT DUMgr::checkIsLocalKillingDefForIndirectAccess(IR const* stmt,
         return CK_NOT_OVERLAP;
     }
     return CK_OVERLAP;
+}
+
+
+bool DUMgr::findUseInLoop(IR const* stmt, LI<IRBB> const* li, Region const* rg,
+                          OUT IRSet * useset)
+{
+    ASSERT0(stmt && stmt->is_stmt());
+    DUSet const* du = stmt->readDUSet();
+    if (du == nullptr) { return nullptr; }
+    ASSERT0(useset);
+    DUSetIter it = nullptr;
+    bool find = false;
+    for (BSIdx i = du->get_first(&it);
+         i != BS_UNDEF; i = du->get_next(i, &it)) {
+        IR * use = rg->getIR(i);
+        ASSERT0(use && use->is_exp() && use->getStmt());
+        if (li->isInsideLoop(use->getStmt()->getBB()->id())) {
+            useset->bunion(i);
+            find = true;
+        }
+    }
+    return find;
+}
+
+
+
+
+IR * DUMgr::findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                          Region const* rg, OUT IRSet * set)
+{
+    ASSERT0(exp && exp->is_exp() && exp->isMemRef());
+    DUSet const* du = exp->readDUSet();
+    if (du == nullptr) { return nullptr; }
+    DUSetIter it = nullptr;
+    IR * firstdef = nullptr;
+    MD const* mustuse = exp->getMustRef();
+    if (mustuse == nullptr) { return nullptr; }
+    for (BSIdx i = du->get_first(&it);
+         i != BS_UNDEF; i = du->get_next(i, &it)) {
+        IR * def = rg->getIR(i);
+        ASSERT0(def || def->is_stmt());
+        if (!li->isInsideLoop(def->getBB()->id())) { continue; }
+        MD const* mustdef = def->getMustRef();
+        if (mustdef != nullptr &&
+            mustdef != mustuse &&
+            !mustdef->is_overlap(mustuse)) {
+            //No need consider MayRef.
+            continue;
+        }
+        if (firstdef != nullptr) { return nullptr; }
+        firstdef = def;
+        if (set != nullptr) { set->append(def); }
+    }
+    return firstdef;
 }
 
 
@@ -3490,7 +3546,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         START_TIMER_FMT(t, ("DUMP DU Chain"));
         note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
              m_rg->getRegionName());
-        m_md_sys->dump(true);
+        m_md_sys->dump(m_vm, true);
         dumpDUChainDetail();
         END_TIMER_FMT(t, ("DUMP DU Chain"));
     }

@@ -35,7 +35,7 @@ namespace xoc {
 //
 //This function erases all informations of ir and
 //append it into free_list for next allocation.
-//If Attach Info exist, this function will erase it rather than delete.
+//If Attach Info exist, this function will erase it rather than deletion.
 //If DU info exist, this function will retrieve it back
 //to region for next allocation.
 //Note that this function does NOT free ir's kids and siblings.
@@ -131,7 +131,7 @@ IR * Region::dupIR(IR const* src)
     UINT res_id = IR_id(res);
     AIContainer * res_ai = IR_ai(res);
     UINT res_irc_sz = IR::getIRCodeSize(res);
-    ::memcpy(res, src, IRCSIZE(irc));
+    ::memcpy((void*)res, src, IRCSIZE(irc));
     IR_id(res) = res_id;
     IR_ai(res) = res_ai;
     IR::setIRCodeSize(res, res_irc_sz);

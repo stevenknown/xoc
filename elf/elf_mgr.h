@@ -33,10 +33,69 @@ namespace elf {
 
 #define ELF_SIZE_4GB 0xFFFFffff
 
+#define BASE_SEC_NUM      5  //Number of basic section header. Basic section
+                             //header include .null, .text, .shdr_strtab,
+                             //.symtab and .strtab.
+#define ELF_VERSION       1  //.version field in ELF header.
+#define RELA_ALIGN        8  //Align val of .rel.text.xxx section.
+#define STEXT_ALIGN       1  //Align val of .text.xxx section.
+#define SYMSTR_ADDR_ALIGN 1  //Align val of address field of .symtab section.
+#define SYM_SH_ALIGN      8  //Align val of .symtab section.
+#define SYM_BYTE          24 //Byte size of s_entry_size field of .stmstr.
+#define TEXT_ALIGN        4  //Align val of .text.
+#define ELF_VAL_UNDEF     0  //Common used zero.
+//Record section names of each section.
+#define CONST_SH_NAME           ".const"
+#define BSS_SH_NAME             ".bss"
+#define DATA_SH_NAME            ".data"
+#define ELF_FILE_NAME           "mi.test.elf"
+#define RELA_SH_NAME            ".rela.text."
+#define RELA_KERNEL_SH_NAME     ".rela.aitext."
+#define SBSS_SH_NAME            ".sbss"
+#define SDATA_SH_NAME           ".sdata"
+#define SHSTR_SH_NAME           ".shdr_strtab"
+#define SPM_SH_NAME             ".spm"
+#define STR_UNDEF               ""
+#define SUBTEXT_SH_PRE          ".text."
+#define SUBTEXT_ENTRY_SH_PRE    ".aitext."
+#define SYMSTR_SH_NAME          ".strtab"
+#define SYMTAB_SH_NAME          ".symtab"
+#define TEXT_SH_NAME            ".text"
+//Indicates the number of members contained in the ELFRela64 structure.
+//Defined in "pcxac/elf/elf64.h":
+//   typedef struct {
+//       Addr64 r_offset;
+//       Word32 r_type;    //describ the relocation type
+//       Word32 r_sym;     //describ the symbol index
+//       SWord64 r_addend;
+//   } ELFRela64;
+#define STRUCT_ELFRELA64_MEMBER_NUM  4
+
+class SymbolLinkAttrFlag;
+
+//Since one function region may call multiple symbols (including function and
+//global variables), this structure established a mapping mechanism of each
+//calling in program region.
+typedef struct {
+    CHAR const* caller; //Record name of caller.
+    CHAR const* callee; //Record name of callee.
+    UINT call_location; //Record the location of callee is called.
+    UINT reloc_type;    //Record the relocation type.
+} RELOCATION_INFO;
+
 typedef xcom::Vector<CHAR> CHARVec;
 typedef xcom::Vector<Off> OffVec;
+typedef xcom::Vector<CHAR const*> StringVec;
+typedef xcom::Vector<BYTE> BYTEVec;
 typedef xcom::List<CHAR const*> StringList;
 typedef xcom::List<ELFSHdr*> SHdrList;
+typedef xcom::List<Var*> VarList;
+//Record the link attribute of symbol for elf .symtab.
+typedef xcom::TMap<xoc::Var const*, SymbolLinkAttrFlag> SymbolLinkAttrMap;
+//Record number of BYTE of generated machine code of each function.
+typedef xcom::Vector<UINT> FUNC_SIZE;
+//Record relocation info in program region.
+typedef xcom::Vector<RELOCATION_INFO> FUNC_RELOCATION;
 
 typedef enum tagEM_STATUS {
     EM_SUCC = 0,
@@ -87,6 +146,136 @@ typedef enum tagEM_STATUS {
     EM_UNKNOWN_MACHINE,
 } EM_STATUS;
 
+//The link attribute flag of symbol in generating elf .symtab.
+typedef enum _SYMBOL_LINK_ATTR_FLAG {
+    //Undefine value.
+    SYMBOL_ATTR_UNDEF   = 0x0,
+    //.weak modifier. Indicate the value of bind field in .symtab.
+    SYMBOL_ATTR_WEAK    = 0x1,
+    //.visible modifier. Indicate the value of visbility field in .symtab.
+    SYMBOL_ATTR_VISIBLE = 0x2,
+    //.extern modifier. Indicate the value of st_shndx/st_size field in .symtab.
+    SYMBOL_ATTR_EXTERN  = 0x4,
+} SYMBOL_LINK_ATTR_FLAG;
+
+//This structure records the type of symbols in region.
+typedef enum _SYMBOL_TYPE {
+    SYMBOL_NOTYPE = 0, //Symbol of NOTYPE.
+    SYMBOL_OBJECT,     //Symbol of type object.
+    SYMBOL_FUNC,       //Symnol of type function.
+} SYMBOL_TYPE;
+
+//This structure records the addend value of different relocation types.
+typedef enum _RELOC_ADDEND {
+    RELOC_ADDEND_DEFAULT = 0x0, //Addend value of some relocation type:
+                                //LITERAL, SPM_HIGH, SPM_LOW.
+    RELOC_ADDEND_LITUSE = 0x3,  //Addend value of relocation type LITUSE.
+    RELOC_ADDEND_GPDISP = 0x4,  //Addend value of relocation type GPDISP.
+} RELOC_ADDEND;
+
+//This structure store sections where symbols should be saved.
+typedef enum _SYMBOL_SECTION {
+    SYMBOL_DEFAULT = 0x0,
+    SYMBOL_SBSS,  //symbols saving in .sbss section
+    SYMBOL_SDATA, //symbols saving in .sdata section
+    SYMBOL_BSS,   //symbols saving in .bss section
+    SYMBOL_DATA,  //symbols saving in .data section
+    SYMBOL_SPM,   //symbols saving in .spm section
+    SYMBOL_CONST, //symbols saving in .const section
+    SYMBOL_TEXT,  //symbols saving in .text.xxx section
+} SYMBOL_SECTION;
+
+class SymbolLinkAttrFlag : public UFlag {
+public:
+    SymbolLinkAttrFlag() : UFlag(0) {}
+    SymbolLinkAttrFlag(UINT v) : UFlag(v) {}
+};
+
+//Record section info when generating elf.
+class ELFSectionInfo {
+private:
+    //Record whether section exists.
+    bool m_has_sbss;  //Save whether .sbss exists.
+    bool m_has_sdata; //Save whether .sdata exists.
+    bool m_has_bss;   //Save whether .bss exists.
+    bool m_has_data;  //Save whether .data exists.
+    bool m_has_spm;   //Save whether .spm exists.
+    bool m_has_const; //Save whether .const exists.
+
+    //Record section align.
+    UINT m_sbss_align;  //Save align value of .sbss.
+    UINT m_sdata_align; //Save align value of .sdata.
+    UINT m_bss_align;   //Save align value of .bss.
+    UINT m_data_align;  //Save align value of .data.
+    UINT m_spm_align;   //Save align value of .spm.
+    UINT m_const_align; //Save align value of .const.
+
+    UINT m_shdr_num; //Save section numbers of elf file.
+
+public:
+    ELFSectionInfo();
+    virtual ~ELFSectionInfo() {}
+
+    UINT get_sbss_align() const { return m_sbss_align; }
+    UINT get_sdata_align() const { return m_sdata_align; }
+    UINT get_bss_align() const { return m_bss_align; }
+    UINT get_data_align() const { return m_data_align; }
+    UINT get_spm_align() const { return m_spm_align; }
+    UINT get_const_align() const { return m_const_align; }
+    UINT get_shdr_num() const { return m_shdr_num; }
+
+    bool has_sbss() const { return m_has_sbss; }
+    bool has_sdata() const { return m_has_sdata; }
+    bool has_bss() const { return m_has_bss; }
+    bool has_data() const { return m_has_data; }
+    bool has_spm() const { return m_has_spm; }
+    bool has_const() const { return m_has_const; }
+
+    void set_sbss(bool v) { m_has_sbss = v; }
+    void set_sdata(bool v) { m_has_sdata = v; }
+    void set_bss(bool v) { m_has_bss = v; }
+    void set_data(bool v) { m_has_data = v; }
+    void set_spm(bool v) { m_has_spm = v; }
+    void set_const(bool v) { m_has_const = v; }
+
+    void set_sbss_align(UINT v) { m_sbss_align = v; }
+    void set_sdata_align(UINT v) { m_sdata_align = v; }
+    void set_bss_align(UINT v) { m_bss_align = v; }
+    void set_data_align(UINT v) { m_data_align = v; }
+    void set_spm_align(UINT v) { m_spm_align = v; }
+    void set_const_align(UINT v) { m_const_align = v; }
+    void set_shdr_num(UINT v) { m_shdr_num = v; }
+};
+
+//Reference struct ELFSym64.
+//Record the symbol position info when construct symbol table.
+struct ELFSymbolOff {
+    UINT var_name_off; //var name index.
+    UINT text_ind;     //.text section index.
+    UINT func_off;     //func symbol index.
+    UINT sdata_off;    //.sdata section offset.
+    UINT sbss_off;     //.sbss section offset.
+    UINT bss_off;      //.bss section offset.
+    UINT data_off;     //.data section offset.
+    UINT spm_off;      //.spm section offset.
+    UINT const_off;    //.const section offset.
+
+    ELFSymbolOff() {
+        ::memset((void*)this, 0, sizeof(ELFSymbolOff));
+    }
+};
+
+//Record variables in program region need to be wrote into ELF file.
+#define ELFMgr_saving_var_list(e) ((e)->m_saving_var_list)
+
+//Record sizes of all functions.
+#define ELFMgr_func_size(e) ((e)->m_func_size)
+
+//Record codes generated in current program region.
+#define ELFMgr_func_code(e) ((e)->m_func_code)
+
+//Record relocation info in current program region.
+#define ELFMgr_func_relocation(e) ((e)->m_func_relocation)
 class ELFMgr {
     friend class ELFTargInfo;
 protected:
@@ -162,6 +351,27 @@ protected:
 
     //Record all sections that indicate writable data.
     List<ELFSHdr*> m_bss_sect_list;
+
+    //Record symbol link attr.
+    SymbolLinkAttrMap m_symbol_link_attr_map;
+
+    //Record section info for generating elf.
+    ELFSectionInfo * m_sect_info;
+
+    //Record the var of entry function.
+    Var * m_entry_var;
+public:
+    ////Record variables in program region need to be wrote into ELF file.
+    VarList m_saving_var_list;
+
+    //Record sizes of all functions top-down.
+    FUNC_SIZE m_func_size;
+
+    //Record codes generated in current program region.
+    BYTEVec m_func_code;
+
+    //Record relocation info in current program region.
+    FUNC_RELOCATION m_func_relocation;
 protected:
     virtual void allocTargInfo() = 0;
     EM_STATUS append(BYTE const* buf, size_t size);
@@ -240,21 +450,146 @@ protected:
     void * xmalloc(size_t size);
 public:
     ELFMgr();
-    ~ELFMgr();
+    virtual ~ELFMgr();
 
     void allocSectHeaderTab(UINT shnum);
+
+    //Assemble symbol to .data .sdata or .const section.
+    void assembleVarToContent(OUT AssembleBinDescVec & content_desc_vec,
+                              Var const* var);
+
+    //Collector some factors about .sbss, .sdata, .bss, .data, .spm
+    //sections and section number of ELF file.
+    //sym_name: save names of all symbols.
+    //func_name: save names of all function.
+    //sect_info: save some info of sections.
+    void collectELFFactor(OUT StringList & sym_name, OUT StringVec & func_name,
+                          OUT ELFSectionInfo * sect_info);
+
+    //Compute a vector saving relocation data index of each function region.
+    void computeFuncRelocIndex(OUT xcom::Vector<UINT> & begin);
+
+    //Construct .bss section.
+    void constructELFBssSection(MOD ELFSHdr * bss_shdr, BYTEVec & bss,
+                                UINT bss_align);
+
+    //Construct .const section.
+    void constructELFConstSection(MOD ELFSHdr * const_shdr,
+                                  BYTEVec & const_data,
+                                  UINT const_align);
+
+    //Construct .data section.
+    void constructELFDataSection(MOD ELFSHdr * data_shdr, BYTEVec & data,
+                                 UINT data_align);
+
+    //Construct .text.xxx section.
+    void constructELFFuncSection(MOD ELFSHdr * func_shdr, BYTEVec & code,
+                                 CHAR const* name, MOD BYTE * text_space);
+
+    //Construct ELF header based on the section header number.
+    void constructELFHeader(UINT sthr_num);
+
+    //Construct null section header. It always be first section in all
+    //sections and its values are all zero.
+    void constructELFNullSection(MOD ELFSHdr * null_shdr);
+
+    //Construct .rel.text.xxx section.
+    void constructELFRelSection(MOD ELFSHdr * rel_shdr,
+                                ELFSHdr const* sym_shdr,
+                                ELFSHdr const* func_shdr, BYTEVec & rel,
+                                CHAR const* name, MOD BYTE * rel_space);
+
+    //Construct .sbss section.
+    void constructELFSbssSection(MOD ELFSHdr * sbss_shdr, BYTEVec & sbss,
+                                 UINT sbss_align);
+
+    //Construct .sdata section.
+    void constructELFSdataSection(MOD ELFSHdr * sdata_shdr, BYTEVec & sdata,
+                                  UINT sdata_align);
+
+    //Construct section header indexs.
+    void constructELFShIndex(OUT CHARVec & charvec, OUT OffVec & offvec);
+
+    //Construct .shdr_strtab section.
+    void constructELFShStrSection(MOD ELFSHdr * shstr_shdr);
+
+    //Construct .spm section.
+    void constructELFSpmSection(MOD ELFSHdr * spm_shdr, BYTEVec & spm,
+                                UINT spm_align);
+
+    //Construct .symstr section.
+    void constructELFStrTabSection(MOD ELFSHdr * symstr_shdr,
+                                   CHARVec & sym_str);
+
+    //Construct .symtab section.
+    void constructELFSymTabSection(MOD ELFSHdr * symtab_shdr,
+                                   ELFSHdr const* symstr_shdr,
+                                   ELFSHdr const* text_shdr, BYTEVec & sym);
+
+    //Construct .text section.
+    void constructELFTextSection(MOD ELFSHdr * text_shdr);
+
+    //A helper function to save rela into rel_desc_vec.
+    //Since one function region may have multiple relocation entries, "index"
+    //is used to determine where a relocation entry is written to rel_desc_vec.
+    void constructRelAssBinDescVec(OUT AssembleBinDescVec & rel_desc_vec,
+                                   ELFRela64 const& rela, UINT index);
+
+    //Construct null symbol. It always be the first symbol in all symbols and
+    //its values are all zero.
+    void constructSymbolNull(OUT BYTEVec & bytevec);
+
+    //Construct unull symbol using info of global variables.
+    void constructSymbolUnull(OUT BYTEVec & bytevec, OffVec const& sym_str_off,
+                              ELFSectionInfo const* sect_info);
 
     void dump() const;
     void dumpStrTabContent(CHAR const* strtab, Addr size) const;
 
-    //The function generate the content of string table by given string list.
-    //It will compose string in 'strlst' into a char-vector, and record the
-    //byte offset into 'offvec' for each string in 'charvec'.
-    //charvec: record a char buffer.
-    //offvec: record the byte offset.
-    static void genStrTabContent(OUT CHARVec & charvec,
-                                 OUT OffVec & offvec,
-                                 StringList const& strlst);
+    //A helper function to extract info from abdv and save it into content.
+    void extractAssBinDescVec(OUT BYTEVec & bytevec,
+                              AssembleBinDescVec const& abdv);
+
+    //Since user-defined functions have been wirtten into m_saving_var_vec,
+    //we need to extract available variables except them.
+    void extractSavingVarExceptUserDefFunc();
+
+    //Generate contents for .bss section.
+    void genBssContent(OUT BYTEVec & bytevec);
+
+    //Generate contents for .data section.
+    void genDataContent(OUT BYTEVec & bytevec);
+
+    //Generate contents for .spm section.
+    void genSpmContent(OUT BYTEVec & bytevec);
+
+    //Generate contents for .const section.
+    void genConstContent(OUT BYTEVec & bytevec);
+
+    //Generate contents for .rel.text.xxx section.
+    //bytevec: binary code of relocation info of function.
+    //names: names of all symbols to help to compute symbol index.
+    //begin: relocation data begin index of function regions.
+    //index: function index in all functions.
+    void genFuncRelContent(OUT BYTEVec & bytevec, StringList const& names,
+                           xcom::Vector<UINT> const& begin, UINT index);
+
+    //Generate contents for .text.xxx section.
+    //bytevec: binary code of binary code of function.
+    //index: function index in all functions.
+    void genFuncTextContent(OUT BYTEVec & bytevec, UINT index);
+
+    //Get relocation addend value of relocation type for different arch.
+    //Target dependent code.
+    //index: index number of current relocation entry in in m_func_relocation.
+    virtual UINT getRelocAddend(UINT index)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Generate contents for .sbss section.
+    void genSbssContent(OUT BYTEVec & bytevec);
+
+    //Generate contents for .sdata section.
+    void genSdataContent(OUT BYTEVec & bytevec);
 
     //Extract all section headers' string name and make up a string-table.
     //charvec: the generated string table.
@@ -262,14 +597,60 @@ public:
     void genSectHeaderNameStrTabContent(OUT CHARVec & charvec,
                                         OUT OffVec & offvec);
 
-    //Compute and set the section index in ELFHdr according to the section
-    //header pointer.
-    void setSectHeaderNameStrTabIdx();
-    CHAR const* getSectName(size_t idx) const;
-    CHAR const* getSectName(ELFSHdr const* sh) const;
-    size_t getSectHeaderIdx(ELFSHdr const* sh) const;
+    //The function generate the content of string table by given string list.
+    //It will compose string in 'strlst' into a char-vector, and record the
+    //byte offset into 'offvec' for each string in 'charvec'.
+    //charvec: record a char buffer.
+    //offvec: record the byte offset.
+    void genStrTabContent(OUT CHARVec & charvec, OUT OffVec & offvec,
+                          StringList const& strlst);
+
+    //Generate contents for .symtab section.
+    //bytevec: binary code of .symtab section content.
+    //offvec: record the byte offset.
+    //sect_info: save some info of sections.
+    void genSymTabContent(OUT BYTEVec & bytevec, OffVec const& offvec,
+                          ELFSectionInfo const* sect_info);
+
+    //Return ELF file bit-width type.
+    CHAR const* getClassName() const;
+
+    //Return endian name.
+    CHAR const* getEndianName() const;
+
+    //Return ELF file type.
+    CHAR const* getFileTypeName() const;
+
+    //Get relocation begin and end indexs of function region. These indexs
+    //are used to extract relocation info.
+    //begin_ind: begin index of relocation entry for current function.
+    //end_ind: end index of relocation entry for current function.
+    //begin: save relocation info indexs of each function region.
+    //ind: index of function in all functions.
+    virtual void getFuncRelocIndex(OUT UINT & begin_ind, OUT UINT & end_ind,
+                                   xcom::Vector<UINT> const& begin,
+                                   UINT ind);
+
     ELFHdr & getHdr() { return m_elf_hdr; }
-    ELFSHdr * getSectHeader(size_t idx) const;
+
+    //Get architecture specific region.
+    //Target dependent code.
+    virtual Region * getRegion()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
+    //Get relocation info based on given index.
+    //offset: location that relocation need to be performed.
+    //sym_ind: symbol index in all symbols.
+    //type: relocation type.
+    //addend: relocation addend value.
+    //names: save names of all symbols.
+    //index: index of current function in all functions.
+    void getRelocInfo(OUT Addr64 & offset, OUT Word32 & sym_ind,
+                      OUT Word32 & type, OUT SWord64 & addend,
+                      StringList const& names, UINT index);
+
+    //Compute section actual size rely on symbol mapping table
+    ULONG getSectActualSize(size_t sectidx) const;
 
     //Return the section content correspond to 'sh'.
     BYTE * getSectContent(ELFSHdr const* sh) const;
@@ -277,22 +658,19 @@ public:
     //Return the section content that correspondint to section header 'idx'.
     BYTE * getSectContent(size_t idx) const;
 
-    //Compute section actual size rely on symbol mapping table
-    ULONG getSectActualSize(size_t sectidx) const;
+    ELFSHdr * getSectHeader(size_t idx) const;
+    size_t getSectHeaderIdx(ELFSHdr const* sh) const;
+    CHAR const* getSectName(size_t idx) const;
+    CHAR const* getSectName(ELFSHdr const* sh) const;
 
-    //Return the name of section that defined the symbol.
-    CHAR const* getSymDefinedSectName(ELFSym const& sym) const;
+    //Get spm section name.
+    virtual CHAR const* getSpmSHName() const { return SPM_SH_NAME; }
 
     //Retriving string from symbol table which identified by 'symtab_header_idx'
     //via 'idx'.
     //symtab_header_idx: the index to symbol table section header.
     //idx: the element idx in symbol table.
     CHAR const* getStrFromSymTab(size_t symtab_header_idx, size_t idx) const;
-
-    //Retriving string from symbol table or section name which defined the
-    //symbol.
-    CHAR const* getSymNameFromStrTabOrDefinedSection(
-        ELFSym const& sym, ELFSHdr const* strtab) const;
 
     //Retriving string from symbol table which identified by 'symtab' via 'idx'.
     //symtab: the symbol table section header.
@@ -304,46 +682,103 @@ public:
     //idx: the byte offset to the begin of the string table content.
     CHAR const* getStrFromStrTab(ELFSHdr const* strtab, size_t idx) const;
 
-    //Return ELF file type.
-    CHAR const* getFileTypeName() const;
+    //Return the name of section that defined the symbol.
+    CHAR const* getSymDefinedSectName(ELFSym const& sym) const;
 
-    //Return ELF file bit-width type.
-    CHAR const* getClassName() const;
+    //Retriving string from symbol table or section name which defined the
+    //symbol.
+    CHAR const* getSymNameFromStrTabOrDefinedSection(
+        ELFSym const& sym, ELFSHdr const* strtab) const;
 
-    //Return endian name.
-    CHAR const* getEndianName() const;
+    //Get some other info of symbol for different architecture.
+    //Target dependent code.
+    virtual UINT getSymOtherInfo()
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     EM_STATUS initdumpfile(CHAR const* filename, bool is_del = false);
     EM_STATUS initdumpfile(FILE * filehandler);
     EM_STATUS initdumpscr();
+
     bool is64bit() const { return m_elf_hdr.is64bit(); }
     bool is32bit() const { return m_elf_hdr.is32bit(); }
+
     bool isExecutable() const;
 
+    //Whether variable is aligned by given value.
+    bool isSizeAligned(UINT sz, UINT val) { return sz % val == 0; }
+
+    //Judge whether size of variable is valid by less than or equal to judging
+    //whether the value is less than or equal to BIN_WORD_SIZE;
+    bool isSizeValid(UINT sz) { return sz <= BIN_WORD_SIZE; }
+
+    //Whether current variable is user-defined variable.
+    bool isUserDefinedFunction(Var const* var);
+
+    //Whether info of var should be wrote into ELF file.
+    bool isVarAvailable(Var const* var)
+    {
+        return var && (var->is_global() || var->is_func()) &&
+            !var->is_fake() && !var->is_unallocable();
+    }
+
+    //Generate contents for .text.xxx and .rel.text.xxx and construct them
+    //using generated data.
+    //symtab_shdr: .symtab section header
+    //func_name: save names of all functions.
+    //sym_name: save names of all symbols.
+    //si: index of current section header in all section headers.
+    void processELFTextRelSection(ELFSHdr const* symtab_shdr,
+                                  StringVec const& func_name,
+                                  StringList const& sym_name, OUT UINT & si);
+
+    EM_STATUS readAllSectContent();
     //Read the ELF information.
     //read_all_content: true to read section content for all section headers.
     //                  Note this may consume much of memory.
     EM_STATUS readELF(CHAR const* filename, bool read_all_content = false);
-    EM_STATUS readAllSectContent();
 
     //Set section header content offset.
     //Note section content size should be ready.
     void setSectContentOffset();
-    void setSectHeaderNameStrTabContent(BYTE * content, Addr size);
+    void setSectHeaderNameOffset(OffVec const& offvec);
     void setSectHeaderNameStrTab(ELFSHdr * shdr)
     {
         ASSERT0(m_elf_shstrtab == nullptr);
         m_elf_shstrtab = shdr;
     }
-    void setSectHeaderNameOffset(OffVec const& offvec);
+    void setSectHeaderNameStrTabContent(BYTE * content, Addr size);
 
-    EM_STATUS writeELFHeader(OUT Word & elfhdr_offset);
-    EM_STATUS writeProgramHeader();
-    EM_STATUS writeSectHeaderTab();
-    EM_STATUS writeSectContent();
-    EM_STATUS writePad(size_t padsize);
-    EM_STATUS writeELFHeaderAt(Word elfhdr_offset);
+    //Compute and set the section index in ELFHdr according to the section
+    //header pointer.
+    void setSectHeaderNameStrTabIdx();
+
+    //Set symbol info.
+    void setSymbol(MOD BYTE * sym, MOD ELFSymbolOff & symbol_off,
+                   Var const* var, ELFSectionInfo const* sect_info,
+                   Word const& name, UCHAR const& bind, UCHAR const& other,
+                   Addr const& size);
+
+    //Set symbol link attribute into attr table.
+    void setSymbolLinkAttr(xoc::Var const* var, SYMBOL_LINK_ATTR_FLAG sym_attr);
+
+    //A helper function to set symbol fields using given values.
+    void setSymbolValue(BYTE const* sym, Word st_name,
+                        xcom::UCHAR st_bind, xcom::UCHAR st_type,
+                        xcom::UCHAR st_other, Half st_shndx,
+                        Addr st_value, Addr st_size);
+
     EM_STATUS writeELF(CHAR const* filename);
+    EM_STATUS writeELFHeader(OUT Word & elfhdr_offset);
+    EM_STATUS writeELFHeaderAt(Word elfhdr_offset);
+    EM_STATUS writePad(size_t padsize);
+    EM_STATUS writeProgramHeader();
+    EM_STATUS writeSectContent();
+    EM_STATUS writeSectHeaderTab();
+
+    //An common used ELF generation process for different architectures,
+    //different architectures only need to implement the info collection
+    //functions.
+    void write2ELF();
 };
 
 }

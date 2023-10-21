@@ -710,7 +710,7 @@ public:
     //Record the name string of the section.
     CHAR const* s_name_str;
 public:
-    ELFSHdr() { ::memset(this, 0, sizeof(ELFSHdr)); }
+    ELFSHdr() { ::memset((void*)this, 0, sizeof(ELFSHdr)); }
 
     //Get the packed byte size of a section header structure in 32bit or 64bit
     //machine.
@@ -799,6 +799,18 @@ public:
 #define STT_IMPORT 11 //reference to a symbol in another module
 #define STT_LOPROC 13 //processor specific semantics
 #define STT_HIPROC 15
+
+//VISIBLITY SUBFIELD CONTENTS
+//
+//These attribute flags are the value of Vis field in
+//generating elf symtab.
+//-------------------- .symtab -----------------------
+//Num: | Value | Size | Type | Bind | Vis | Ndx | Name
+//----------------------------------------------------
+#define STV_DEFAULT   0 //Default symbol visibility rules.
+#define STV_INTERNAL  1 //Processor specific hidden class.
+#define STV_HIDDEN    2 //Symbol unavailable in other modules.
+#define STV_PROTECTED 3 //Not preemptible, not exported.
 
 class ELFSym {
 public:

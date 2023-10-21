@@ -75,13 +75,15 @@ public:
 
 
 class GCSE : public Pass {
+    friend class PropVNVisit;
+    friend class PropExpVisit;
 private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
     IRCFG * m_cfg;
     DUMgr * m_dumgr;
     AliasAnalysis * m_aa;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     ExprTab * m_expr_tab;
     TypeMgr * m_tm;
@@ -94,34 +96,60 @@ private:
     List<IR*> m_newst_lst;
 
     //ONLY USED FOR DEBUG PURPOSE
-    UINT m_num_of_elim;
     Vector<UINT> m_elimed;
 protected:
+    //ONLY USED FOR DEBUG PURPOSE
+    bool addElim(UINT id) { m_elimed.append(id); return true; }
+
+    void copyVN(IR const* newir, IR const* oldir);
+
     virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
-    bool doProp(IRBB * bb, List<IR*> & livexp);
-    bool doPropVN(IRBB * bb, UINT entry_id);
-    bool doPropVNInDomTreeOrder(xcom::Graph const* domtree);
-    bool doPropInDomTreeOrder(xcom::Graph const* domtree);
+    bool doPropExp(IRBB * bb, List<IR*> & livexp);
+    bool doPropVN(IRBB * bb);
+    bool doPropVNInDomTreeOrder(xcom::DomTree const& domtree);
+    bool doPropExpInDomTreeOrder(xcom::DomTree const& domtree);
 
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
 
+    // If find 'exp' is CSE, replace it with related PR.
+    //NOTE: exp should be freed.
     bool findAndElim(IR * exp, IR * gen);
 
     OptCtx const* getOptCtx() const { return m_oc; }
 
-    void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);
+    bool handleCandidate(IR * exp, IRBB * bb);
+    bool handleCandidateByExprRep(IR * exp);
+    bool hasSideEffect(IR const* ir) const;
 
-    bool isCseCandidate(IR * ir);
+    virtual bool isCseCandidate(IR * ir);
+    bool isDom(IR const* exp_stmt, IR const* gen_stmt) const;
 
-    void elimCseAtDirectMemOp(IR * use, IR * use_stmt, IR * gen);
-    void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
-    void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
-    void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
+    //Replace 'use' CSE with PR that related to 'gen' CSE.
+    //e.g: ...=a+b <--generate CSE
+    //     ...
+    //     ...=a+b <--use CSE
+    //This function do replacement via gvn info.
+    //use: the referrence of cse.
+    //use_stmt: the stmt contains use.
+    //gen: the referrence of cse.
+    //NOTE: 'use' should be freed.
+    //      'use' must be rhs of 'use_stmt'.
+    void elimCse(IR * use, IR * use_stmt, IR * gen);
+    void elimCseOfBranch(IR * use, IR * use_stmt, IR * gen);
+    void elimCseOfAssignment(IR * use, IR * use_stmt, IR * gen);
+
+    //Reset local used data.
+    void reset();
 
     void processCseGen(IR * cse, IR * cse_stmt, bool & change);
     bool processCse(IR * ir, List<IR*> & livexp);
 
-    bool shouldBeCse(IR * det);
+    virtual bool shouldBeCse(IR * det);
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     GCSE(Region * rg, GVN * gvn) : Pass(rg)
     {
@@ -136,9 +164,8 @@ public:
         m_tg = nullptr;
         m_oc = nullptr;
         m_is_in_ssa_form = false;
-        m_ssamgr = nullptr;
+        m_prssamgr = nullptr;
         m_mdssamgr = nullptr;
-        m_num_of_elim = 0;
     }
     COPY_CONSTRUCTOR(GCSE);
     virtual ~GCSE() {}

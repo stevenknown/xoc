@@ -47,10 +47,9 @@ protected:
     TypeMgr * m_tm;
     ExprTab * m_expr_tab;
     DUMgr * m_du;
-    BSVec<ExpRep*> * m_expr_vec;
     DefMiscBitSetMgr m_misc_bs_mgr;
 protected:
-    IR * hoistCse(IRBB * bb,  IR * ir_pos, ExpRep * ie);
+    IR * hoistCse(IRBB * bb,  IR * ir_pos, ExprRep * ie);
     bool processUse(IN IRBB * bb, IN IR * ir,
                     MOD xcom::BitSet & avail_ir_expr,
                     MOD Vector<IR*> & map_expr2avail_pos,
@@ -64,7 +63,7 @@ protected:
                        MOD xcom::BitSet & avail_ir_expr,
                        MOD Vector<IR*> & map_expr2avail_pos,
                        MOD Vector<IR*> & map_expr2avail_pr);
-    IR * processExp(IN IRBB * bb, IN ExpRep * ie,
+    IR * processExp(IN IRBB * bb, IN ExprRep * ie,
                     IN IR * stmt, MOD xcom::BitSet & avail_ir_expr,
                     MOD Vector<IR*> & map_expr2avail_pos,
                     MOD Vector<IR*> & map_expr2avail_pr);

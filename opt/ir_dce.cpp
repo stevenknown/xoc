@@ -36,6 +36,23 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class IterSideEffect : public VisitIRTree {
+    bool m_has_sideeffect;
+protected:
+    virtual bool visitIR(IR const* ir)
+    {
+        if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
+            ir->isNoMove(false)) {
+            m_has_sideeffect = true;
+            return false;
+        }
+        return true;
+    }
+public:
+    IterSideEffect(IR const* ir) : m_has_sideeffect(false) { visit(ir); }
+    bool hasSideEffect() const { return m_has_sideeffect; }
+};
+
 //
 //START DCECtx
 //
@@ -137,7 +154,8 @@ void DeadCodeElim::checkValidAndRecomputeCDG()
 //Return true if ir can be optimized.
 bool DeadCodeElim::check_stmt(IR const* ir)
 {
-    if (ir->isMayThrow(true) || ir->hasSideEffect(true) || ir->isNoMove(true)) {
+    IterSideEffect it(ir);
+    if (it.hasSideEffect()) {
         //TBD:For now, DCE permits remove redundant dummy operation.
         return true;
     }
@@ -634,7 +652,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
             //         =USE
             //CASE2:???=
             //         =USE
-            //Both cases need to collect all DEFs until
+            //Both cases need to collect all DEFs until meet
             //the dominated killing-def.
             change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
             continue;
@@ -923,7 +941,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         }
         removed |= removeRedundantPhi(oc);
         ASSERT0(m_dumgr->verifyMDRef());
-        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
         change |= removed;
     } while (removed && count < max_iter);
@@ -946,7 +964,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
     oc.setInvalidIfDUMgrLiveChanged();
     ASSERT0(verifyMDDUChain(m_rg, oc));
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     ASSERT0(m_cfg->verifyDom());
     END_TIMER(t, getPassName());

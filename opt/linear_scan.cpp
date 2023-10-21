@@ -40,47 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 //
-//START ActMgr
-//
-ActMgr::~ActMgr()
-{
-    for (xcom::StrBuf * buf = m_act_list.get_head();
-         buf != nullptr; buf = m_act_list.get_next()) {
-        delete buf;
-    }
-}
-
-
-void ActMgr::dump(CHAR const* format, ...)
-{
-    if (!m_rg->isLogMgrInit()) { return; }
-    StrBuf * buf = new StrBuf(64);
-    buf->strcat("ACT%u:", m_cnt);
-    m_cnt++;
-    va_list args;
-    va_start(args, format);
-    buf->vstrcat(format, args);
-    m_act_list.append_tail(buf);
-    va_end(args);
-}
-
-
-void ActMgr::dumpAll() const
-{
-    if (m_act_list.get_elem_count() == 0) { return; }
-    note(m_rg, "\n==-- DUMP ALL ACT --==");
-    m_rg->getLogMgr()->incIndent(2);
-    xcom::List<xcom::StrBuf*>::Iter it;
-    for (xcom::StrBuf * buf = m_act_list.get_head(&it);
-         buf != nullptr; buf = m_act_list.get_next(&it)) {
-        note(m_rg, "\n%s", buf->buf);
-    }
-    m_rg->getLogMgr()->decIndent(2);
-}
-//END ActMgr
-
-
-//
 //START LinearScanRA
 //
 LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
@@ -103,7 +62,7 @@ LinearScanRA::~LinearScanRA()
 }
 
 
-bool LinearScanRA::preferCallee(LifeTime const* lt) const
+bool LinearScanRA::isCalleePermitted(LifeTime const* lt) const
 {
     //The first priority allocable register set is callee-saved. Callee
     //is the best choose if lt crossed function-call as well.
@@ -129,8 +88,8 @@ void LinearScanRA::reset()
     m_reload_tab.clean();
     m_remat_tab.clean();
     m_move_tab.clean();
-    m_dedicated_mgr.clean();
     m_prno2var.clean();
+    m_act_mgr.clean();
 }
 
 
@@ -144,10 +103,28 @@ Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 {
     Var * v = getSpillLoc(prno);
     if (v == nullptr) {
-        v = genFuncLevelVar(ty, STACK_ALIGNMENT);
+        //The alignment of vector register is greater than STACK_ALIGNMENT.
+        v = genFuncLevelVar(ty, MAX(
+            m_rg->getTypeMgr()->getByteSize(ty), STACK_ALIGNMENT));
         m_prno2var.set(prno, v);
     }
     return v;
+}
+
+
+PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
+{
+    PRNO prno = m_irmgr->buildPrno(type);
+    setDedicatedReg(prno, reg);
+    return prno;
+}
+
+
+PRNO LinearScanRA::buildPrno(Type const* type, Reg reg)
+{
+    PRNO prno = m_irmgr->buildPrno(type);
+    setReg(prno, reg);
+    return prno;
 }
 
 
@@ -159,6 +136,8 @@ IR * LinearScanRA::buildSpill(PRNO prno, Type const* ty)
     m_rg->getMDMgr()->allocRef(pr);
     IR * stmt = m_irmgr->buildStore(spill_loc, pr);
     m_rg->getMDMgr()->allocRef(stmt);
+    m_rg->addToVarTab(spill_loc);
+    if (!spill_loc->is_vector()) { stmt->setAligned(true); }
     return stmt;
 }
 
@@ -170,6 +149,7 @@ IR * LinearScanRA::buildReload(PRNO prno, Var * spill_loc, Type const* ty)
     m_rg->getMDMgr()->allocRef(ld);
     IR * stmt = m_irmgr->buildStorePR(prno, ty, ld);
     m_rg->getMDMgr()->allocRef(stmt);
+    if (!spill_loc->is_vector()) { ld->setAligned(true); }
     return stmt;
 }
 
@@ -405,7 +385,7 @@ bool LinearScanRA::dump(bool dumpir) const
     pthis->getLTMgr().dumpAllLT(up, m_bb_list, dumpir);
     dumpPR2Reg();
     dump4List();
-    m_act_mgr.dumpAll();
+    m_act_mgr.dump();
     //---------
     Pass::dump();
     //m_rg->getLogMgr()->decIndent(2);
@@ -699,6 +679,16 @@ public:
 };
 
 
+bool LinearScanRA::performLsraImpl(OptCtx & oc)
+{
+    //The default linear-scan implementation.
+    LSRAImpl impl(*this);
+    bool changed = impl.perform(oc);
+    ASSERT0(verifyAfterRA());
+    return changed;
+}
+
+
 //TODO: rematerialization and spill-store-elimination
 bool LinearScanRA::perform(OptCtx & oc)
 {
@@ -731,13 +721,7 @@ bool LinearScanRA::perform(OptCtx & oc)
     getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);
     LTPriorityMgr priomgr(m_cfg, getTIMgr());
     priomgr.computePriority(getLTMgr());
-    bool changed = false;
-    {
-        //The default linear-scan implementation.
-        LSRAImpl impl(*this);
-        changed = impl.perform(oc);
-        ASSERT0(verifyAfterRA());
-    }
+    bool changed = performLsraImpl(oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         dump(false);
     }

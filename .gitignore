@@ -1,4 +1,6 @@
+*.d
 *.o
 *.a
-*.s
+*.exe
+*.log
 test

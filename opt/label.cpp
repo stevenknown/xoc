@@ -67,7 +67,7 @@ LabelInfo * allocLabel(SMemPool * pool)
 {
     LabelInfo * p = (LabelInfo*)smpoolMalloc(sizeof(LabelInfo), pool);
     ASSERT0(p);
-    ::memset(p, 0, sizeof(LabelInfo));
+    ::memset((void*)p, 0, sizeof(LabelInfo));
     return p;
 }
 

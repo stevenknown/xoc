@@ -46,6 +46,9 @@ public:
     // Return the number of allocable float register.
     virtual UINT getNumOfAllocableFloatRegister() const = 0;
 
+    // Return the number of group.
+    virtual UINT getNumOfGroup() const = 0;
+
     // Return the number of thread.
     virtual UINT getNumOfThread() const = 0;
 

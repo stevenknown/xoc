@@ -85,7 +85,7 @@ class PPSetMgr {
         PtPairSet * p = (PtPairSet*)smpoolMallocConstSize(
             sizeof(PtPairSet), m_ppset_pool);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(PtPairSet));
+        ::memset((void*)p, 0, sizeof(PtPairSet));
         p->init();
         return p;
     }
@@ -135,7 +135,7 @@ class PtPairMgr {
         PtPair * p = (PtPair*)smpoolMallocConstSize(sizeof(PtPair),
                                                     m_pool_pt_pair);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(PtPair));
+        ::memset((void*)p, 0, sizeof(PtPair));
         return p;
     }
 
@@ -144,7 +144,7 @@ class PtPairMgr {
         TMap<UINT, PtPair*> * p = (TMap<UINT, PtPair*>*)smpoolMallocConstSize(
             sizeof(TMap<UINT, PtPair*>), m_pool_tmap);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(TMap<UINT, PtPair*>));
+        ::memset((void*)p, 0, sizeof(TMap<UINT, PtPair*>));
         return p;
     }
 
@@ -241,14 +241,12 @@ public:
         } s1;
         UINT i1;
     } u1;
-
     union {
         //Transfer hashed POINT-TO set bottom up when finish processing kids.
         //Note inference of POINT-TO set can transfer the middle result either
         //through 'hashed_mds' or 'mds' of parameter.
         MDSet const* hashed_mds;
     } u2;
-
 public:
     AACtx() { clean(); }
     AACtx const& operator = (AACtx const&);
@@ -314,7 +312,7 @@ protected:
     BYTE m_flow_sensitive:1;
     IRCFG * m_cfg;
     GSCC * m_scc;
-    VarMgr * m_var_mgr;
+    VarMgr * m_vm;
     TypeMgr * m_tm;
     RegionMgr * m_rgmgr;
     MDSystem * m_md_sys;
@@ -430,11 +428,13 @@ protected:
                               MOD MD2MDSet * mx);
     void inferStoreValue(IR const* ir, IR * rhs, MD const* lhs_md,
                          AACtx const* ic, IN MD2MDSet * mx);
-    //The function compute may memory address or point-to set for array operation.
-    //Note the function handle the worst case when infer Point-To for array base
-    //expression.
-    //'ir': array|starray operator.
-    //'is_ofst_predicable': true if array element offset is constant.
+
+    //The function compute may memory address or point-to set for
+    //array operation.
+    //Note the function handle the worst case when infer Point-To for
+    //array base expression.
+    //ir: array|starray operator.
+    //is_ofst_predicable: true if array element offset is constant.
     //This function will set the Ref MD and Ref MD set of array operation.
     void inferArrayExpBaseHashedMDSet(IR * ir, MDSet const* hashed_mds,
                                       OUT MDSet & mds, OUT AACtx * ic);
@@ -463,6 +463,8 @@ protected:
     void processSetElem(IR * ir, MOD MD2MDSet * mx);
     void processILoad(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
                       MOD MD2MDSet * mx);
+    void processAddSub(IR * ir, MOD MDSet & mds,
+                       MOD AACtx * ic, MOD MD2MDSet * mx);
     void processPointerArith(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
                              MOD MD2MDSet * mx);
     void processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
@@ -523,7 +525,7 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 

@@ -210,7 +210,7 @@ bool InvertBrTgt::perform(OptCtx & oc)
     }
     oc.setInvalidIfCFGChanged();
     dumpFini();
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     END_TIMER(t, getPassName());

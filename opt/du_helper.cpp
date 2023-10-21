@@ -45,6 +45,46 @@ static bool checkChange(Region const* rg, bool mdssa_changed,
 }
 
 
+void changeDefForPartialUseSet(IR * olddef, IR * newdef,
+                               IRSet const& partial_useset, Region * rg)
+{
+    ASSERT0(olddef->is_stmt() && newdef->is_stmt());
+    ASSERTN(olddef->isMemRef() && newdef->isMemRef(),
+            ("should not query its DU"));
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        olddef->isMemRefNonPR()) {
+        //mdssamgr->changeDefForPartialUseSet(olddef, newdef, partial_useset);
+        ASSERT0(0);//hack TODO
+        mdssa_changed = true;
+    }
+
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid() &&
+        olddef->isPROp()) {
+        ASSERTN(newdef->isPROp(), ("unsupport"));
+        prssamgr->changeDefForPartialUseSet(olddef, newdef, partial_useset);
+        prssa_changed = true;
+    }
+
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr) {
+        DUSet * oldduse = olddef->getDUSet();
+        if (oldduse != nullptr) {
+            //dumgr->changeDefForPartialUseSet(newdef, olddef, partial_useset);
+            ASSERT0(0);//hack TODO
+        }
+        classic_du_changed = true;
+    }
+
+    ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
+                     classic_du_changed));
+}
+
+
 void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
@@ -70,11 +110,13 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        DUSet * oldduset = olddef->getDUSet();
-        if (oldduset != nullptr) {
+        DUSet * oldduse = olddef->getDUSet();
+        if (oldduse != nullptr) {
             dumgr->changeDef(newdef, olddef);
-            classic_du_changed = true;
+        } else {
+            //There is no USE if olddef's DUSet is nullptr or empty.
         }
+        classic_du_changed = true;
     }
 
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
@@ -194,7 +236,6 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         olduse->isMemRefNonPR()) {
@@ -208,13 +249,15 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
         }
         mdssa_changed = true;
     }
-
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != nullptr && olduse->getDUSet() != nullptr) {
-        dumgr->changeUse(newuse, olduse);
+    if (dumgr != nullptr) {
+        if (olduse->getDUSet() != nullptr) {
+            dumgr->changeUse(newuse, olduse);
+        } else {
+            //There is no DEF if olduse's DUSet is nullptr or empty.
+        }
         classic_du_changed = true;
     }
-
     if (olduse->isPROp() || newuse->isPROp()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
@@ -226,7 +269,6 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
             prssa_changed = true;
         }
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
@@ -252,7 +294,6 @@ void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc)
             mdssa_changed = true;
         }
     }
-
     if (def->isPROp()) {
         ASSERT0(use->isPROp());
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
@@ -261,12 +302,10 @@ void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc)
             prssa_changed = true;
         }
     }
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         classic_du_changed = dumgr->buildDUChain(def, use, oc);
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
@@ -294,13 +333,11 @@ bool removeExpiredDU(IR const* ir, Region * rg)
             prssa_changed = true;
         }
     }
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         change |= dumgr->removeExpiredDU(ir);
         classic_du_changed = true;
     }
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         ir->isMemRefNonPR()) {
@@ -309,7 +346,6 @@ bool removeExpiredDU(IR const* ir, Region * rg)
         change |= mdssamgr->removeExpiredDU(ir);
         mdssa_changed = true;
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                      classic_du_changed));
     return change;
@@ -334,13 +370,11 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->coalesceDUChain(from, to);
         classic_du_changed = true;
     }
-
     if (from->isMemRefNonPR()) {
         ASSERT0(to->isMemRefNonPR());
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
@@ -349,43 +383,32 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
             mdssa_changed = true;
         }
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
 
 
-//Remove Use-Def chain.
-//exp: the expression to be removed.
-//e.g: ir = ...
-//    = ir //S1
-//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-//NOTE: the function only process exp itself.
 void removeUse(IR const* exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::removeUse(exp);
         prssa_changed = true;
     }
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->removeUse(exp);
         classic_du_changed = true;
     }
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->removeUse(exp);
         mdssa_changed = true;
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
@@ -405,20 +428,17 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
         PRSSAMgr::removePRSSAOcc(exp);
         prssa_changed = true;
     }
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->removeUseFromDefset(exp);
         classic_du_changed = true;
     }
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
@@ -426,34 +446,28 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
         mdssamgr->removeMDSSAOccForTree(exp, ctx);
         mdssa_changed = true;
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
 
 
-//Remove all DU info of 'stmt'.
-//Note do NOT remove stmt from BBIRList before call the function.
 void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
 {
     ASSERT0(stmt->is_stmt());
     bool mdssa_changed = false;
     bool prssa_changed = false;
     bool classic_du_changed = false;
-
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr &&
         (oc.is_pr_du_chain_valid() || oc.is_nonpr_du_chain_valid())) {
         dumgr->removeIRFromDUMgr(stmt);
         classic_du_changed = true;
     }
-
     PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::removePRSSAOcc(stmt);
         prssa_changed = true;
     }
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Remove stmt and its RHS.
@@ -464,7 +478,6 @@ void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
         mdssamgr->removeMDSSAOccForTree(stmt, ctx);
         mdssa_changed = true;
     }
-
     ASSERT0_DUMMYUSE(checkChange(rg, mdssa_changed, prssa_changed,
                                  classic_du_changed));
 }
@@ -582,7 +595,7 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
 //Return the VN if found, and the indirect operation level.
 //e.g: given ILD(ILD(p)), return p and indirect_level is 2.
 //e.g2: given IST(ILD(q)), return q and indirect_level is 2.
-VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
+VN const* getVNOfIndirectOp(IR const* ir, OUT UINT * indirect_level,
                             GVN const* gvn)
 {
     ASSERT0(ir && ir->isIndirectMemOp());
@@ -645,7 +658,7 @@ bool hasSameUniqueMustDefForTree(IR const* ir1, IR const* ir2,
         }
         return false;
     }
-    if (ir1->getCode() != ir2->getCode()) { return false; }
+    if (!ir1->isIREqual(ir2, false)) { return false; }
     if (IR_MAX_KID_NUM(ir1) != IR_MAX_KID_NUM(ir2)) { return false; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir1); i++) {
         IR const* kid1 = ir1->getKid(i);
@@ -666,12 +679,10 @@ bool hasSameUniqueMustDef(IR const* ir1, IR const* ir2, Region const* rg)
     //there is no VN about it. Try infer the equality through DU chain.
     IR const* def1 = xoc::findUniqueMustDef(ir1, rg);
     IR const* def2 = xoc::findUniqueMustDef(ir2, rg);
-    if (def1 == def2) {
-        if (def1 != nullptr) { return true; }
-        if ((ir1->isPROp() && ir2->isPROp()) ||
-            (ir1->isMemRefNonPR() && ir2->isMemRefNonPR())) {
-            return hasSameRegionLiveIn(ir1, ir2, rg);
-        }
+    if (def1 == def2 && def1 != nullptr) { return true; }
+    if ((ir1->isPROp() && ir2->isPROp()) ||
+        (ir1->isMemRefNonPR() && ir2->isMemRefNonPR())) {
+        return hasSameRegionLiveIn(ir1, ir2, rg);
     }
     return false;
 }
@@ -758,7 +769,7 @@ IR * findUniqueMustDef(IR const* exp, Region const* rg)
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
                     ("exp does not have MDSSAInfo"));
-            MDDef const* mddef = mdssamgr->findMustDef(exp);
+            MDDef const* mddef = mdssamgr->findMustMDDef(exp);
             if (mddef == nullptr || mddef->is_phi()) { return nullptr; }
             return mddef->getOcc();
         }
@@ -779,10 +790,45 @@ CLASSIC_DU:
 }
 
 
+IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                   Region const* rg, OUT IRSet * set)
+{
+    ASSERT0(li && exp && exp->is_exp());
+    ASSERTN(exp->isMemRef(), ("not memref operation"));
+    MD const* mustref = exp->getMustRef();
+    if (mustref == nullptr) { return nullptr; }
+
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            return prssamgr->findUniqueDefInLoopForMustRef(exp, li, rg, set);
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemRefNonPR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            return mdssamgr->findUniqueDefInLoopForMustRef(exp, li, rg, set);
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    if (rg->getDUMgr() != nullptr) {
+        return DUMgr::findUniqueDefInLoopForMustRef(exp, li, rg, set);
+    }
+    ASSERTN(0, ("DU Chain is not available"));
+    return nullptr;
+}
+
+
 IR * findKillingDef(IR const* exp, Region const* rg)
 {
     ASSERT0(exp->is_exp());
     ASSERTN(exp->isMemOpnd(), ("should not query its DU"));
+
     //Prefer PRSSA and MDSSA DU.
     if (exp->isReadPR()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
@@ -796,7 +842,6 @@ IR * findKillingDef(IR const* exp, Region const* rg)
         //Try classic DU.
         goto CLASSIC_DU;
     }
-
     if (exp->isMemRefNonPR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
@@ -807,7 +852,6 @@ IR * findKillingDef(IR const* exp, Region const* rg)
         //Try classic DU.
         goto CLASSIC_DU;
     }
-
 CLASSIC_DU:
     if (rg->getDUMgr() != nullptr) {
         DUSet const* du = exp->readDUSet();
@@ -820,6 +864,36 @@ CLASSIC_DU:
 
     ASSERTN(0, ("DU Chain is not available"));
     return nullptr;
+}
+
+
+bool isUniqueDefInLoopForMustRef(IR const* ir, LI<IRBB> const* li,
+                                 Region const* rg,
+                                 MOD DefMiscBitSetMgr & sbsmgr)
+{
+    ASSERT0(ir && ir->is_stmt());
+    ASSERTN(ir->isMemRef(), ("not memref operation"));
+    MD const* mustref = ir->getMustRef();
+    if (mustref == nullptr) { return false; }
+    IRSet set(sbsmgr.getSegMgr());
+    xoc::collectUseSetInLoop(ir, rg, li, &set);
+    IRSetIter it = nullptr;
+    BSIdx i = set.get_first(&it);
+    if (i == BS_UNDEF) { return false; }
+    bool is_unique = true;
+    //Each USE of 'ir' has to have an unique DEF.
+    for (; i != BS_UNDEF; i = set.get_next(i, &it)) {
+        IR * exp = rg->getIR(i);
+        ASSERT0(exp && exp->is_exp());
+        IR const* def = xoc::findUniqueDefInLoopForMustRef(exp, li,
+                                                           rg, nullptr);
+        if (def == nullptr) {
+            //Note exp should have at least one DEF, that is 'ir'.
+            is_unique = false;
+            break;
+        }
+    }
+    return is_unique;
 }
 
 
@@ -890,19 +964,59 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
 }
 
 
-//Collect all USE expressions of 'def' into 'useset'.
+//Collect all USE expressions that inside loop of 'def' into 'useset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain in doing collection.
-void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
+void collectUseSetInLoop(IR const* def, Region const* rg, LI<IRBB> const* li,
+                         OUT IRSet * useset)
 {
     ASSERT0(def->is_stmt());
     ASSERTN(def->isMemRef(), ("should not query its DU"));
     useset->clean();
-
     SSAInfo const* prssainfo = def->isPROp() ? def->getSSAInfo() : nullptr;
     if (prssainfo != nullptr) {
+        ASSERT0(rg->getPRSSAMgr() && rg->getPRSSAMgr()->is_valid());
         SSAUseIter sc;
-        Region * rg = mdssamgr->getRegion();
+        for (BSIdx u = SSA_uses(prssainfo).get_first(&sc);
+             u != BS_UNDEF; u = SSA_uses(prssainfo).get_next(u, &sc)) {
+            ASSERT0_DUMMYUSE(rg->getIR(u));
+            IR * stmt = rg->getIR(u)->getStmt();
+            if (li->isInsideLoop(stmt->getBB()->id())) {
+                useset->bunion(u);
+            }
+        }
+        return;
+    }
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        MDSSAInfo const* mdssainfo = mdssamgr->getMDSSAInfoIfAny(def);
+        if (mdssainfo != nullptr) {
+            CollectCtx ctx(COLLECT_CROSS_PHI|COLLECT_INSIDE_LOOP);
+            ctx.setLI(li);
+            CollectUse cu(mdssamgr, mdssainfo, ctx, useset);
+            return;
+        }
+    }
+    if (rg->getDUMgr() != nullptr) {
+        DUMgr::findUseInLoop(def, li, rg, useset);
+        return;
+    }
+    ASSERTN(0, ("DU Chain is not available"));
+}
+
+
+//Collect all USE expressions of 'def' into 'useset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain in doing collection.
+void collectUseSet(IR const* def, Region const* rg, OUT IRSet * useset)
+{
+    ASSERT0(def->is_stmt());
+    ASSERTN(def->isMemRef(), ("should not query its DU"));
+    useset->clean();
+    SSAInfo const* prssainfo = def->isPROp() ? def->getSSAInfo() : nullptr;
+    if (prssainfo != nullptr) {
+        ASSERT0(rg->getPRSSAMgr() && rg->getPRSSAMgr()->is_valid());
+        SSAUseIter sc;
         for (BSIdx u = SSA_uses(prssainfo).get_first(&sc);
              u != BS_UNDEF; u = SSA_uses(prssainfo).get_next(u, &sc)) {
             ASSERT0_DUMMYUSE(rg->getIR(u));
@@ -910,22 +1024,19 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
         }
         return;
     }
-
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         MDSSAInfo const* mdssainfo = mdssamgr->getMDSSAInfoIfAny(def);
         if (mdssainfo != nullptr) {
             CollectCtx ctx(COLLECT_CROSS_PHI);
-            mdssainfo->collectUse(
-                const_cast<MDSSAMgr*>(mdssamgr)->getUseDefMgr(), ctx, useset);
+            CollectUse cu(mdssamgr, mdssainfo, ctx, useset);
             return;
         }
     }
-
     if (def->readDUSet() != nullptr) {
         useset->copy((DefSBitSetCore&)*def->readDUSet());
         return;
     }
-
     ASSERTN(0, ("DU Chain is not available"));
 }
 
@@ -934,7 +1045,7 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain in doing collection.
 //The function will keep iterating DEF of PHI operand.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
+void collectDefSet(IR const* use, Region const* rg, OUT IRSet * defset)
 {
     ASSERT0(defset && use->is_exp());
     ASSERTN(use->isMemRef(), ("should not query its DU"));
@@ -943,17 +1054,19 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
     SSAInfo const* prssainfo = use->isPROp() ? use->getSSAInfo() : nullptr;
     if (prssainfo != nullptr &&
         prssainfo->getDef()) { //PR may not have a DEF, e.g: parameter PR.
+        ASSERT0(rg->getPRSSAMgr() && rg->getPRSSAMgr()->is_valid());
         defset->bunion(prssainfo->getDef()->id());
         return;
     }
 
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     MDSSAInfo const* mdssainfo = nullptr;
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssainfo = mdssamgr->getMDSSAInfoIfAny(use);
     }
     if (mdssainfo != nullptr) {
         CollectCtx ctx(COLLECT_CROSS_PHI);
-        mdssainfo->collectDef(mdssamgr, use->getMustRef(), ctx, defset);
+        CollectDef cd(mdssamgr, mdssainfo, ctx, use->getMustRef(), defset);
         return;
     }
 
@@ -1044,7 +1157,12 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
                                          Region const* rg)
 {
     if (ir1 == ir2) { return true; }
-    ASSERT0(ir1->isIsomoTo(ir2, true));
+
+    //No need to ask memory ref have to be same name, the function will
+    //determine their equality by retrieving its value.
+    //e.g: ild(x) is non-isomo to ist(y), but they may describe the same
+    //memory if x's value is equal to y.
+    ASSERT0(ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_UNDEF)));
     switch (ir1->getCode()) {
     SWITCH_CASE_INDIRECT_MEM_OP:
         ASSERT0(ir2->isIndirectMemOp());
@@ -1081,8 +1199,226 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
 }
 
 
+bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
+                   bool include_itselfstmt, LI<IRBB> const* li, GVN const* gvn)
+{
+    ASSERT0(li);
+    xcom::List<IR*> lst;
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
+        IRBB * bb = rg->getBB(i);
+        ASSERT0(bb);
+        for (IR * stmt = BB_first_ir(bb);
+             stmt != nullptr; stmt = BB_next_ir(bb)) {
+            lst.append_tail(stmt);
+        }
+    }
+    return isLoopCarried(ir, rg, is_aggressive, include_itselfstmt,
+                         lst, li, gvn);
+}
+
+
+bool isLoopCarried(IR const* ir1, IR const* ir2, bool costly_analysis,
+                   LI<IRBB> const* li, Region const* rg, GVN const* gvn)
+{
+    if (!xoc::isDependent(ir1, ir2, costly_analysis, rg)) {
+        return false;
+    }
+    if (!xoc::isLoopIndependent(ir1, ir2, costly_analysis, li, rg, gvn)) {
+        return true;
+    }
+    return false;
+}
+
+
+static bool hasLoopReduceDepInPRSSA(IR const* ir, Region const* rg,
+                                    LI<IRBB> const* li,
+                                    PRSSAMgr const* prssamgr)
+{
+    ASSERT0(ir->is_exp() && ir->isPROp());
+    ASSERT0(ir->getSSAInfo());
+    IR const* def = ir->getSSAInfo()->getDef();
+    if (def == nullptr) { return false; }
+    ASSERT0(def->getBB());
+    if (!li->isInsideLoop(def->getBB()->id())) {  return false; }
+    if (def->is_phi()) {
+        //TODO:phi may not be in loopheader. If phi is place in loop body,
+        //it may not be loop-carried.
+        return true;
+    }
+    MD const* defmd = def->getMustRef();
+    ASSERT0(defmd);
+    MD const* irmd = ir->getMustRef();
+    ASSERT0(irmd);
+    if (isKillingDef(defmd, irmd)) { return false; }
+
+    //It may be exist loop carried dependence if there is a MayDef between
+    //ir and its Def in the DefDef Chain.
+    return true;
+}
+
+
+static bool hasLoopReduceDepInMDSSA(IR const* ir, Region const* rg,
+                                    LI<IRBB> const* li,
+                                    MDSSAMgr const* mdssamgr)
+{
+    ASSERT0(ir->is_exp() && ir->isMemRef());
+    ASSERT0(mdssamgr->hasMDSSAInfo(ir));
+    MDDef * def = mdssamgr->findMustMDDef(ir);
+    if (def == nullptr) { return false; }
+    ASSERT0(def->getBB());
+    if (!li->isInsideLoop(def->getBB()->id())) {  return false; }
+    if (def->is_phi()) {
+        //TODO:phi may not be in loopheader. If phi is place in loop body,
+        //it may not be loop-carried.
+        return true;
+    }
+    ASSERT0(def->getOcc());
+    MD const* defmd = def->getOcc()->getMustRef();
+    ASSERT0(defmd);
+    MD const* irmd = ir->getMustRef();
+    ASSERT0(irmd);
+    if (isKillingDef(defmd, irmd)) { return false; }
+
+    //It may be exist loop carried dependence if there is a MayDef between
+    //ir and its Def in the DefDef Chain.
+    return true;
+}
+
+
+bool hasLoopReduceDep(IR const* ir, Region const* rg, LI<IRBB> const* li)
+{
+    ASSERT0(ir->is_exp() && ir->isMemRef());
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        ir->isMemRefNonPR()) {
+        ASSERT0(mdssamgr->hasMDSSAInfo(ir));
+        return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr);
+    }
+
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr && ir->getDUSet() != nullptr) {
+        ASSERT0(0); //TODO:
+    }
+
+    if (ir->isPROp()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            return hasLoopReduceDepInPRSSA(ir, rg, li, prssamgr);
+        }
+    }
+    return true;
+}
+
+
+bool hasLoopReduceDepForIRTree(IR const* ir, Region const* rg,
+                               LI<IRBB> const* li)
+{
+    ASSERT0(ir->is_exp());
+    ConstIRIter it;
+    for (IR const* x = xoc::iterInitC(ir, it, false);
+         x != nullptr; x = xoc::iterNextC(it, true)) {
+        if (!x->isMemRef()) { continue; }
+        if (hasLoopReduceDep(x, rg, li)) {
+            //TODO:Handle overlapped stmt by applying loop peeling or
+            //loop fission.
+            return true;
+        }
+    }
+    return false;
+}
+
+
+static bool hasMoreThanOneDefInBBForMustRef(IR const* ir, IRBB const* bb,
+                                            Region const* rg, OUT UINT & defcnt)
+{
+    ASSERT0(defcnt <= 1);
+    IRIter irit;
+    IRBB * pbb = const_cast<IRBB*>(bb);
+    for (IR const* t = BB_first_ir(pbb); t != nullptr; t = BB_next_ir(pbb)) {
+        if (t == ir || xoc::isDependent(t, ir, true, rg)) {
+            defcnt++;
+            if (defcnt > 1) { return true; }
+        }
+    }
+    return true;
+}
+
+
+bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
+                                       LI<IRBB> const* li, OUT UINT & defcnt)
+{
+    ASSERT0(ir->isMemRef());
+    defcnt = 0;
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
+        IRBB * bb = rg->getBB(i);
+        ASSERT0(bb);
+        if (hasMoreThanOneDefInBBForMustRef(ir, bb, rg, defcnt)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool hasUniqueDefInLoopForMustRef(IR const* ir, Region const* rg,
+                                  LI<IRBB> const* li)
+{
+    ASSERT0(ir && ir->isMemRef() && ir->getMustRef());
+    if (ir->is_stmt()) {
+        DefMiscBitSetMgr sbsmgr;
+        return xoc::isUniqueDefInLoopForMustRef(ir, li, rg, sbsmgr);
+    }
+    ASSERT0(ir->is_exp());
+    IR const* def = xoc::findUniqueDefInLoopForMustRef(ir, li, rg, nullptr);
+    return def != nullptr;
+}
+
+
+bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
+                            bool is_aggressive, bool include_itselfstmt,
+                            xcom::List<IR*> const& lst,
+                            LI<IRBB> const* li, GVN const* gvn)
+{
+    ConstIRIter it;
+    for (IR const* x = xoc::iterInitC(ir, it, false);
+         x != nullptr; x = xoc::iterNextC(it, true)) {
+        if (!x->isMemRefNonPR()) { continue; }
+        if (isLoopCarried(x, rg, is_aggressive, include_itselfstmt,
+                          lst, li, gvn)) {
+            //TODO:Handle overlapped stmt by applying loop peeling or
+            //loop fission.
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool isLoopCarried(IR const* ir, Region const* rg,
+                   bool is_aggressive, bool include_itselfstmt,
+                   xcom::List<IR*> const& lst,
+                   LI<IRBB> const* li, GVN const* gvn)
+{
+    ASSERT0(ir);
+    IR const* irstmt = ir->is_stmt() ? ir : ir->getStmt();
+    ASSERT0(irstmt);
+    xcom::List<IR*>::Iter it;
+    for (IR * cand = lst.get_head(&it);
+         cand != nullptr; cand = lst.get_next(&it)) {
+        if (cand == ir) { continue; }
+        if (cand == irstmt && !include_itselfstmt) { continue; }
+        if (xoc::isLoopCarried(ir, cand, is_aggressive, li, rg, gvn)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
-                       LI<IRBB> const* li, Region const* rg)
+                       LI<IRBB> const* li, Region const* rg, GVN const* gvn)
 {
     if (!ir1->isMemRef() || !ir2->isMemRef()) { return false; }
     if (!xoc::isDependent(ir1, ir2, costly_analysis, rg)) { return true; }
@@ -1095,10 +1431,14 @@ bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
     MD const* ir1ref = ir1->getExactRef();
     MD const* ir2ref = ir2->getExactRef();
     if (ir1ref && ir2ref && ir1ref == ir2ref) { return true; }
-    if (!ir1->isIsomoTo(ir2, true)) {
-        //TODO:handle the comparison between ILD/IST and ARRAY.
-        return false;
+    if (ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_CK_MEMREF_NAME))) {
+        return true;
     }
+    if (gvn != nullptr && gvn->is_valid() && gvn->isSameMemLoc(ir1, ir2)) {
+        return true;
+    }
+    if (!ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_UNDEF))) { return false; }
+    //TODO:handle the comparison between ILD/IST and ARRAY.
     return hasSameUniqueMustDefForIsomoKidTree(ir1, ir2, rg);
 }
 
@@ -1364,5 +1704,195 @@ void destructInvalidClassicDUChain(Region * rg, OptCtx const& oc)
     removeClassicDUChain(rg, !oc.is_pr_du_chain_valid(),
                          !oc.is_nonpr_du_chain_valid());
 }
+
+
+//
+//START CopmuteMD2DefCnt
+//
+void ComputeMD2DefCnt::dump() const
+{
+    if (!m_rg->getLogMgr()->is_init()) { return; }
+    MD2UINTPtrIter it;
+    UINT * cnt;
+    note(m_rg, "\n==-- MD2DefCnt --==");
+    m_rg->getLogMgr()->incIndent(2);
+    for (MD const* md = m_md2defcnt.get_first(it, &cnt);
+         !it.end(); md = m_md2defcnt.get_next(it, &cnt)) {
+        ASSERT0(md && cnt);
+        note(m_rg, "\nMD%u,'%s',DEFCNT:%u", md->id(),
+             md->get_base()->get_name()->getStr(), *cnt);
+    }
+    m_rg->getLogMgr()->decIndent(2);
+}
+
+
+void ComputeMD2DefCnt::computeBB(IRBB const* bb, OUT ConstIRList & only_maydef)
+{
+    IRBB * pbb = const_cast<IRBB*>(bb);
+    for (IR const* ir = BB_first_ir(pbb);
+         ir != nullptr; ir = BB_next_ir(pbb)) {
+        updateMD2DefCnt(ir, only_maydef);
+    }
+}
+
+
+void ComputeMD2DefCnt::applyMayDefEffect(ConstIRList const& only_maydef)
+{
+    ConstIRListIter irit;
+    for (IR const* ir = only_maydef.get_head(&irit);
+         ir != nullptr; ir = only_maydef.get_next(&irit)) {
+        ASSERT0(ir->getMustRef() == nullptr || ir->isCallStmt());
+        MDSet const* mds = ir->getMayRef();
+        if (mds == nullptr) { continue; }
+        MD2UINTPtrIter it;
+        UINT * cnt = nullptr;
+        for (MD const* md = m_md2defcnt.get_first(it, &cnt);
+             !it.end(); md = m_md2defcnt.get_next(it, &cnt)) {
+            ASSERT0(md && cnt);
+            if (mds->is_contain(md, m_rg)) {
+                (*cnt)++;
+            }
+        }
+    }
+    for (IR const* ir = only_maydef.get_head(&irit);
+         ir != nullptr; ir = only_maydef.get_next(&irit)) {
+        MDSet const* mds = ir->getMayRef();
+        if (mds == nullptr) { continue; }
+        updateMDSet2DefCnt(mds, nullptr);
+    }
+}
+
+
+void ComputeMD2DefCnt::updateMDSet2DefCnt(MDSet const* may, MD const* must)
+{
+    ASSERT0(may);
+    MDSetIter iter;
+    for (BSIdx i = may->get_first(&iter);
+         i != BS_UNDEF; i = may->get_next(i, &iter)) {
+        MD * t = m_md_sys->getMD(i);
+        if (t == must) {
+            //MayDef set allows containing must-ref.
+            continue;
+        }
+        UINT * n = m_md2defcnt.get(t);
+        if (n == nullptr) {
+            n = (UINT*)xmalloc(sizeof(UINT));
+            m_md2defcnt.set(t, n);
+        }
+        (*n)++;
+    }
+}
+
+
+void ComputeMD2DefCnt::updateMD2DefCnt(IR const* ir,
+                                       OUT ConstIRList & only_maydef)
+{
+    if (!ir->hasResult()) {
+        ASSERTN(!ir->isMemRef(), ("TODO"));
+        return;
+    }
+    MD const* must = ir->getMustRef();
+    if (must != nullptr) {
+        UINT * n = m_md2defcnt.get(const_cast<MD*>(must));
+        if (n == nullptr) {
+            n = (UINT*)xmalloc(sizeof(UINT));
+            m_md2defcnt.set(must, n);
+        }
+        (*n)++;
+    } else {
+        only_maydef.append_tail(ir);
+        return; //Leave the MayDef counting to applyMayDefEffect().
+    }
+    if (ir->isCallStmt() && !ir->isReadOnly()) {
+        //Leave the CALL's MayDef counting to applyMayDefEffect().
+        only_maydef.append_tail(ir);
+    }
+    MDSet const* mds = ir->getMayRef();
+    if (mds == nullptr) { return; }
+    updateMDSet2DefCnt(mds, must);
+}
+
+
+bool ComputeMD2DefCnt::isUniqueDef(IR const* ir) const
+{
+    ASSERT0(ir->getMustRef());
+    UINT cnt = getMustRefDefCnt(ir);
+    return cnt == 1;
+}
+
+
+bool ComputeMD2DefCnt::isUniqueDefStrict(IR const* ir) const
+{
+    MD const* md = ir->getMustRef();
+    if (md == nullptr) {
+        //Can not determine the count of MayDef MDs.
+        return false;
+    }
+    UINT * n = m_md2defcnt.get(md);
+    ASSERTN(n, ("should call updateMD2Num() first"));
+    if (*n > 1) { return false; }
+
+    MDTab * mdt = const_cast<MDSystem*>(m_md_sys)->getMDTab(MD_base(md));
+    if (mdt == nullptr) { return true; }
+
+    MD const* x = mdt->get_effect_md();
+    if (x != nullptr && x != md && x->is_overlap(md)) {
+        UINT * n2 = m_md2defcnt.get(x);
+        if (n2 != nullptr && *n2 > 1) { return false; }
+    }
+
+    OffsetTab * ofstab = mdt->get_ofst_tab();
+    if (ofstab == nullptr) { return true; }
+    if (ofstab->get_elem_count() == 0) { return true; }
+
+    ConstMDIter mditer;
+    for (MD const* x2 = ofstab->get_first(mditer, nullptr);
+         x2 != nullptr; x2 = ofstab->get_next(mditer, nullptr)) {
+        if (x2 != md && x2->is_overlap(md)) {
+            UINT * n2 = m_md2defcnt.get(x2);
+            if (n2 != nullptr && *n2 > 1) { return false; }
+        }
+    }
+    return true;
+}
+
+
+UINT ComputeMD2DefCnt::getMDDefCnt(MD const* md) const
+{
+    ASSERT0(md);
+    UINT * np = m_md2defcnt.get(md);
+    return np != nullptr ? *np : 0;
+}
+
+
+UINT ComputeMD2DefCnt::getMustRefDefCnt(IR const* ir) const
+{
+    MD const* md = ir->getMustRef();
+    ASSERTN(md, ("can not determine the count of MayDef MDs."));
+    return getMDDefCnt(md);
+}
+
+
+void ComputeMD2DefCnt::compute()
+{
+    IRBB * head = m_li->getLoopHead();
+    ASSERTN(head, ("loopinfo is invalid"));
+    UINT headid = head->id();
+    ConstIRList only_maydef; //record the stmt that only have MayDef.
+    for (BSIdx i = m_li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = m_li->getBodyBBSet()->get_next(i)) {
+        if (i != (BSIdx)headid && !m_cfg->is_dom(headid, i)) {
+            //The BB that does not affect loop body will be skipped.
+            //Note loop head will take particapate in the computation.
+            //The candidate BB must dominate all other loop body BBs.
+            continue;
+        }
+        IRBB * bb = m_cfg->getBB(i);
+        ASSERT0(bb && bb->getVex());
+        computeBB(bb, only_maydef);
+    }
+    applyMayDefEffect(only_maydef);
+}
+//END ComputeMD2DefCnt
 
 } //namespace xoc

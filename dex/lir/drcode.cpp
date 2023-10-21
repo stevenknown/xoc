@@ -168,7 +168,7 @@ void genInstruction(
         UInt8 flags = gDIR2LIRInfo.flags[opcode];
         UInt32 formats = gLIROpcodeInfo.formats[lirOpcode];
         DIRDecodedInsn dInsn;
-        ::memset(&dInsn,0,sizeof(DIRDecodedInsn));
+        ::memset((void*)&dInsn,0,sizeof(DIRDecodedInsn));
         DIRDecodeInstruction(codePtr,&dInsn);
 
         switch(formats) {
@@ -636,7 +636,7 @@ bool aotDrGenCode(
 
     lirList = (LIRBaseOp**)LIRMALLOC(instrCount * sizeof(LIRBaseOp*));
 
-    ::memset(lirList, 0 ,instrCount*sizeof(LIRBaseOp*));
+    ::memset((void*)lirList, 0 ,instrCount*sizeof(LIRBaseOp*));
 
     lircode->instrCount = instrCount;
     lircode->lirList = lirList;
@@ -823,7 +823,7 @@ void d2rMethod(
     positionMap.posNum = instrCount + 1;
 
     lirList = (LIRBaseOp**)LIRMALLOC(instrCount * sizeof(LIRBaseOp*));
-    ::memset(lirList, 0, instrCount * sizeof(LIRBaseOp*));
+    ::memset((void*)lirList, 0, instrCount * sizeof(LIRBaseOp*));
 
     lircode->instrCount = instrCount;
     lircode->lirList = lirList;

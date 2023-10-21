@@ -107,6 +107,9 @@ bool MD::is_exact_cover(MD const* m) const
 bool MD::is_overlap(MD const* m) const
 {
     ASSERT0(m && this != m);
+    //NOTE: If one is going to compare m with Delegate, the best choice is to
+    //use MDSet::is_contain() rather than comparing MD one by one.
+    //
     //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
@@ -133,11 +136,11 @@ bool MD::is_overlap(MD const* m) const
 }
 
 
-CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
+CHAR * MD::dump(StrBuf & buf, VarMgr const* vm) const
 {
     buf.strcat("MD%d -- base:", MD_id(this));
     ASSERT0(MD_base(this) != nullptr);
-    MD_base(this)->dump(buf, dm);
+    MD_base(this)->dump(buf, vm);
     CHAR const* ofstfmt = getHostUIntFormat(false);
     TMWORD lofst = MD_ofst(this);
     if (MD_ty(this) == MD_EXACT) {
@@ -156,11 +159,11 @@ CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
 }
 
 
-void MD::dump(TypeMgr * dm) const
+void MD::dump(VarMgr const* vm) const
 {
-    if (!dm->getRegionMgr()->getLogMgr()->is_init()) { return; }
+    if (!vm->getRegionMgr()->getLogMgr()->is_init()) { return; }
     StrBuf buf(64);
-    note(dm->getRegionMgr(), "\n%s", dump(buf, dm));
+    note(vm->getRegionMgr(), "\n%s", dump(buf, vm));
 }
 //END MD
 
@@ -449,7 +452,7 @@ void MDSet::diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m,
 }
 
 
-void MDSet::dump(MDSystem * ms, bool detail) const
+void MDSet::dump(MDSystem * ms, VarMgr const* vm, bool detail) const
 {
     if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(ms);
@@ -466,7 +469,7 @@ void MDSet::dump(MDSystem * ms, bool detail) const
              i != BS_UNDEF; i = get_next(i, &iter)) {
             MD const* md = ms->getMD((MDIdx)i);
             ASSERT0(md);
-            md->dump(ms->getTypeMgr());
+            md->dump(vm);
         }
     }
 }
@@ -642,7 +645,6 @@ void MDSetMgr::dump()
 void MD2MDSet::dump(Region * rg)
 {
     StrBuf buf(64);
-
     if (!rg->isLogMgrInit()) { return; }
 
     note(rg, "\n==---- DUMP MD2MDSet ----==");
@@ -660,7 +662,7 @@ void MD2MDSet::dump(Region * rg)
         ASSERT0(md);
 
         buf.clean();
-        note(rg, "\n\t%s", md->dump(buf, rg->getTypeMgr()));
+        note(rg, "\n\t%s", md->dump(buf, rg->getVarMgr()));
 
         //Dumps MDSet related to 'md'.
 
@@ -673,7 +675,7 @@ void MD2MDSet::dump(Region * rg)
             ASSERT0(mmd);
             buf.clean();
             prt(rg, "\t\t\t%s\n",
-                mmd->dump(buf, rg->getTypeMgr()));
+                mmd->dump(buf, rg->getVarMgr()));
         }
     }
 
@@ -689,7 +691,7 @@ void MD2MDSet::dump(Region * rg)
         MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
-        note(rg, "\n\t%s", v->dump(buf, rg->getTypeMgr()));
+        note(rg, "\n\t%s", v->dump(buf, rg->getVarMgr()));
 
         if (mdtab == nullptr || mdtab->get_elem_count() == 0) { continue; }
 
@@ -700,10 +702,9 @@ void MD2MDSet::dump(Region * rg)
         for (VecIdx i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
             MD const* md = mdv.get(i2);
             buf.clean();
-            note(rg, "\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
+            note(rg, "\n\t\t%s", md->dump(buf, rg->getVarMgr()));
         }
     }
-
     note(rg, "\n");
 }
 //END MD2MD_SET_MAP
@@ -752,9 +753,13 @@ MD const* MDSystem::registerMD(MD const& m)
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
         //and MD2 dependence.
-        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //           #represented in Program Region.
-        //     foo(); #maydef={MD2, MD10}
+        //e.g:
+        //  #mustdef=MD10, maydef={MD2, MD10}, g is global
+        //  #variable that represented in Program Region.
+        //  g=10,
+        //
+        //  #maydef={MD2, MD10}
+        //  foo();
         //if (MD_base(&m) == m_all_mem) {
         //    return getMD(MD_FULL_MEM);
         //}
@@ -1280,7 +1285,7 @@ void MDSystem::clean()
 }
 
 
-void MDSystem::dump(bool only_dump_nonpr_md)
+void MDSystem::dump(VarMgr const* vm, bool only_dump_nonpr_md)
 {
     if (!getRegionMgr()->isLogMgrInit()) { return; }
     if (only_dump_nonpr_md) {
@@ -1295,7 +1300,7 @@ void MDSystem::dump(bool only_dump_nonpr_md)
             continue;
         }
         ASSERT0(MD_id(md) == (MDIdx)i);
-        md->dump(getTypeMgr());
+        md->dump(vm);
     }
 }
 

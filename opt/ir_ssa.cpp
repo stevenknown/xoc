@@ -46,8 +46,124 @@ static bool haveToMaintainClassicPRDU(OptCtx const& oc)
 }
 
 
+//Assign versioned SSAInfo to expression if exist, or else assign init-version
+//SSAInfo.
+static void genSSAInfoForExpInBBList(BBList * bblst, MOD PRSSAMgr * mgr)
+{
+    IRIter ii;
+    BBListIter bbct = nullptr;
+    for (bblst->get_head(&bbct);
+         bbct != bblst->end(); bblst->get_next(&bbct)) {
+        IRBB * bb = bbct->val();
+        IRListIter irct = nullptr;
+        for (BB_irlist(bb).get_head(&irct); irct != BB_irlist(bb).end();
+             irct = BB_irlist(bb).get_next(irct)) {
+            IR * ir = irct->val();
+            ii.clean();
+            for (IR * x = xoc::iterExpInit(ir, ii);
+                 x != nullptr; x = xoc::iterExpNext(ii)) {
+                if (!x->isPROp()) { continue; }
+                ASSERT0(x->getSSAInfo() == nullptr);
+                if (!x->isReadPR()) { continue; }
+                SSAInfo * ssainfo = mgr->getSSAInfoByPRNO(x->getPrno());
+                if (ssainfo == nullptr) {
+                    ssainfo = mgr->allocInitVersionSSAInfo(
+                        x->getPrno(), x->getType());
+                } else if (ssainfo->getDef() != nullptr) {
+                    ASSERT0(ssainfo->getDef()->isPROp() &&
+                            ssainfo->getDef()->getPrno() == x->getPrno());
+                } else {
+                    //The PR is region livein.
+                }
+                ssainfo->addUseAndSSAInfo(x);
+            }
+        }
+    }
+}
+
+
+static void genSSAInfoForStmtInBBList(BBList * bblst, PRSSAMgr * mgr)
+{
+    BBListIter bbct = nullptr;
+    for (bblst->get_head(&bbct);
+         bbct != bblst->end(); bblst->get_next(&bbct)) {
+        IRBB * bb = bbct->val();
+        IRListIter irct = nullptr;
+        for (BB_irlist(bb).get_head(&irct);
+             irct != BB_irlist(bb).end();
+             irct = BB_irlist(bb).get_next(irct)) {
+            IR * ir = irct->val();
+            if (!ir->isPROp()) { continue; }
+            mgr->genNewVersionSSAInfoForStmt(ir);
+        }
+    }
+}
+
+
 //
-//START BB2APRSet
+//START PRSSAConstructRenameVisit
+//
+class PRSSAConstructRenameVisit : public xcom::VisitTree {
+    COPY_CONSTRUCTOR(PRSSAConstructRenameVisit);
+    BBSet const* m_bbset;
+    PRSet const* m_prset;
+    PRSSAMgr * m_mgr;
+    Region const* m_rg;
+    BB2PRSet const& m_bb2defprs;
+    BB2VPRMap & m_bb2vprmap;
+    ConstructCtx & m_cstctx;
+public:
+    PRSSAConstructRenameVisit(BBSet const* bbset,
+                              PRSet const* prset,
+                              IRBB * root,
+                              DomTree const& domtree,
+                              BB2PRSet const& bb2definedprs,
+                              ConstructCtx & cstctx,
+                              BB2VPRMap & bb2vprmap,
+                              PRSSAMgr * mgr) :
+        VisitTree(domtree, root->id()), m_bbset(bbset), m_prset(prset),
+        m_mgr(mgr), m_bb2defprs(bb2definedprs), m_bb2vprmap(bb2vprmap),
+        m_cstctx(cstctx)
+    { m_rg = m_mgr->getRegion(); }
+    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
+                                                Stack<Vertex const*> &)
+    {
+        //Do post-processing while all kids of BB has been processed.
+        PRNO2VPR * prno2vpr = m_bb2vprmap.get(v->id());
+        ASSERT0(prno2vpr);
+        PRSet const* defined_prs = m_bb2defprs.get(v->id());
+        if (defined_prs != nullptr) {
+            DefSBitSetIter cur = nullptr;
+            for (BSIdx i = defined_prs->get_first(&cur);
+                 i != BS_UNDEF; i = defined_prs->get_next(i, &cur)) {
+                VPRStack * vs = m_cstctx.genVPRStack((PRNO)i);
+                ASSERT0(vs->get_bottom() != nullptr);
+                VPR * vpr = prno2vpr->get(vs->get_top()->orgprno());
+                while (vs->get_top() != vpr) {
+                    vs->pop();
+                }
+            }
+        }
+
+        //vprmap is useless from now on.
+        m_bb2vprmap.destoryPRNO2VPR(v->id());
+    }
+    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    {
+        IRBB * bb = m_rg->getBB(v->id());
+        m_mgr->handleBBRename(m_bb2defprs.get(v->id()), m_bbset,
+                              m_prset, m_cstctx, bb, m_bb2vprmap);
+        if (m_bbset != nullptr && !m_bbset->is_contain(v->id())) {
+            return false;
+        }
+        return true;
+    }
+};
+//END PRSSAConstructRenameVisit
+
+
+//
+//START BB2PRSet
 //
 void BB2PRSet::addDefBB(PRNO prno, UINT bbid)
 {
@@ -83,14 +199,276 @@ void BB2PRSet::genPRSet(BBSet const& bbset)
         }
     }
 }
-//END BB2APRSet
+//END BB2PRSet
+
+
+//
+//START VersionVerification
+//
+class VersionVerification {
+protected:
+    DomTree const& m_domtree;
+    PRSSAMgr const* m_mgr;
+protected:
+    void collectDefinedPR(IRBB const* bb, OUT BB2PRSet & bb2defprs) const;
+    void collectDefinedPRForBBList(BBList const* bblst,
+                                   OUT BB2PRSet & bb2defprs) const;
+    //Record the top version before enter into BB.
+    void recordTopVer(IRBB const* bb, PRSet const* defprs,
+                      PRNO2VPRStack const& pr2verstk,
+                      MOD BB2VPRMap & bb2vpr) const;
+    bool verifyVerPhiResult(IRBB const* bb,
+                            MOD PRNO2VPRStack & pr2verstk) const;
+    bool verifyVerUse(IR const* ir, PRNO2VPRStack const& pr2verstk) const;
+    bool verifyVerDef(IR const* ir, MOD PRNO2VPRStack & pr2verstk) const;
+    bool verifyVerPhiInSuccBB(IRBB const* succ, UINT opnd_idx,
+                              PRNO2VPRStack const& pr2verstk) const;
+    bool verifyPhiOpndInSuccBB(IRBB const* bb,
+                               PRNO2VPRStack const& pr2verstk) const;
+    bool verifyVerBB(IRBB const* bb, MOD PRNO2VPRStack & pr2verstk) const;
+public:
+    VersionVerification(DomTree const& dt, PRSSAMgr const* mgr) :
+        m_domtree(dt), m_mgr(mgr) {}
+    bool verify() const;
+};
+
+bool VersionVerification::verifyVerPhiResult(
+    IRBB const* bb, MOD PRNO2VPRStack & pr2verstk) const
+{
+    ASSERT0(bb);
+    for (IR const* ir = BB_first_ir(const_cast<IRBB*>(bb));
+         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+        if (!ir->is_phi()) { return true; }
+        SSAInfo * info = ir->getSSAInfo();
+        ASSERT0(info);
+        pr2verstk.push(ir->getPrno(), (VPR*)info);
+    }
+    return true;
+}
+
+
+bool VersionVerification::verifyVerUse(
+    IR const* ir, PRNO2VPRStack const& pr2verstk) const
+{
+    ASSERT0(ir->isReadPR());
+    VPR const* curvpr = (VPR*)ir->getSSAInfo();
+    ASSERTN(curvpr, ("miss SSAInfo"));
+    VPR const* topvpr = pr2verstk.get_top(ir->getPrno());
+    if (curvpr->is_init_version()) {
+        //Since the generation of VPR in verification is some different to
+        //construction, namely, if some IR referrenced initial-version VPR in
+        //SSA construction, the VPR on stack top in verification will be
+        //NULL correspondingly, because verification does not put a
+        //zero-version VPR on the stack.
+        ASSERT0(topvpr == nullptr);
+    } else {
+        ASSERTN_DUMMYUSE(curvpr == topvpr, ("use invalid version VPR"));
+    }
+    return true;
+}
+
+
+bool VersionVerification::verifyVerDef(
+    IR const* ir, MOD PRNO2VPRStack & pr2verstk) const
+{
+    ASSERT0(ir->is_stmt() && const_cast<IR*>(ir)->getResultPR());
+    SSAInfo * info = ir->getSSAInfo();
+    ASSERT0(info);
+    pr2verstk.push(ir->getPrno(), (VPR*)info);
+    return true;
+}
+
+
+bool VersionVerification::verifyVerPhiInSuccBB(
+    IRBB const* succ, UINT opnd_idx, PRNO2VPRStack const& pr2verstk) const
+{
+    for (IR const* ir = BB_first_ir(const_cast<IRBB*>(succ));
+         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(succ))) {
+        if (!ir->is_phi()) { return true; }
+        IR const* opnd = ((CPhi const*)ir)->getOpnd(opnd_idx);
+        ASSERT0(opnd && PRSSAMgr::isValidPhiOpnd(opnd));
+        if (opnd->isConstExp() || opnd->is_lda()) { continue; }
+        ASSERTN(opnd->isReadPR(), ("illegal phi operand"));
+        VPR * curvpr = (VPR*)opnd->getSSAInfo();
+        ASSERTN(curvpr, ("miss phi opnd"));
+        VPR const* topvpr = pr2verstk.get_top(opnd->getPrno());
+        if (curvpr->is_init_version()) {
+            //Since the generation of VPR in verification is some different to
+            //construction, namely, if some IR referrenced initial-version VPR
+            //in SSA construction, the VPR on stack top in verification will be
+            //NULL correspondingly, because verification does not put a
+            //zero-version VPR on the stack.
+            ASSERT0(topvpr == nullptr);
+        } else {
+            ASSERTN_DUMMYUSE(curvpr == topvpr, ("use invalid version VPR"));
+        }
+    }
+    return true;
+}
+
+
+bool VersionVerification::verifyPhiOpndInSuccBB(
+    IRBB const* bb, PRNO2VPRStack const& pr2verstk) const
+{
+    IRCFG * cfg = m_mgr->getRegion()->getCFG();
+    ASSERT0(bb->getVex());
+    for (EdgeC const* bbel = bb->getVex()->getOutList();
+         bbel != nullptr; bbel = bbel->get_next()) {
+        UINT opnd_idx = 0; //the index of corresponding predecessor.
+        Vertex const* succv = bbel->getTo();
+        EdgeC const* sel;
+        for (sel = succv->getInList();
+             sel != nullptr; sel = sel->get_next(), opnd_idx++) {
+            if (sel->getFromId() == bb->id()) {
+                break;
+            }
+        }
+        ASSERTN(sel, ("not found related pred"));
+        verifyVerPhiInSuccBB(cfg->getBB(succv->id()), opnd_idx, pr2verstk);
+    }
+    return true;
+}
+
+
+bool VersionVerification::verifyVerBB(
+    IRBB const* bb, MOD PRNO2VPRStack & pr2verstk) const
+{
+    verifyVerPhiResult(bb, pr2verstk);
+    ConstIRIter irit;
+    for (IR * ir = BB_first_ir(const_cast<IRBB*>(bb));
+         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+        //Rename opnd, not include phi.
+        //Walk through rhs expression IR tree to rename VPR.
+        if (ir->is_phi()) { continue; }
+        irit.clean();
+        for (IR const* opnd = xoc::iterInitC(ir, irit);
+             opnd != nullptr; opnd = xoc::iterNextC(irit)) {
+            if (!opnd->isReadPR()) { continue; }
+            verifyVerUse(opnd, pr2verstk);
+        }
+        if (!ir->isPROp()) { continue; }
+        ASSERT0(ir->getResultPR());
+
+        //Rename result.
+        verifyVerDef(ir, pr2verstk);
+    }
+    verifyPhiOpndInSuccBB(bb, pr2verstk);
+    return true;
+}
+
+
+void VersionVerification::recordTopVer(
+    IRBB const* bb, PRSet const* defprs,
+    PRNO2VPRStack const& pr2verstk, MOD BB2VPRMap & bb2vpr) const
+{
+    ASSERT0(bb2vpr.get(bb->id()) == nullptr);
+    PRNO2VPR * prno2vpr = bb2vpr.allocPRNO2VPR(bb->id());
+    PRSetIter it = nullptr;
+    for (BSIdx i = defprs->get_first(&it);
+         i != BS_UNDEF; i = defprs->get_next(i, &it)) {
+        VPR * vpr = pr2verstk.get_top((PRNO)i);
+        if (vpr != nullptr) {
+            prno2vpr->set((PRNO)i, vpr);
+        }
+    }
+}
+
+
+void VersionVerification::collectDefinedPR(
+    IRBB const* bb, OUT BB2PRSet & bb2defprs) const
+{
+    for (IR * ir = BB_first_ir(const_cast<IRBB*>(bb));
+         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+        if (!ir->isPROp()) { continue; }
+        ASSERT0(ir->getResultPR());
+        bb2defprs.addDefBB(ir->getPrno(), bb->id());
+    }
+}
+
+
+void VersionVerification::collectDefinedPRForBBList(
+    BBList const* bblst, OUT BB2PRSet & bb2defprs) const
+{
+    BBListIter it;
+    for (IRBB const* bb = bblst->get_head(&it);
+         bb != nullptr; bb = bblst->get_next(&it)) {
+        collectDefinedPR(bb, bb2defprs);
+    }
+}
+
+
+bool VersionVerification::verify() const
+{
+    DefMiscBitSetMgr sm;
+    BB2PRSet bb2defprs(&sm);
+    collectDefinedPRForBBList(m_mgr->getRegion()->getBBList(), bb2defprs);
+    IRCFG const* cfg = m_mgr->getRegion()->getCFG();
+    IRBB const* root = cfg->getEntry();
+    ASSERT0(root);
+    xcom::Stack<IRBB const*> stk;
+    UINT n = m_mgr->getRegion()->getBBList()->get_elem_count();
+    xcom::BitSet visited(n / BIT_PER_BYTE);
+    BB2VPRMap bb2vpr(n);
+    IRBB const* bb = nullptr;
+    stk.push(root);
+    PRNO2VPRStack pr2verstk;
+    while ((bb = stk.get_top()) != nullptr) {
+        if (!visited.is_contain(bb->id())) {
+            visited.bunion(bb->id());
+            PRSet const* prs = bb2defprs.get(bb->id());
+            if (prs != nullptr) {
+                //bb may not have any WritePR operations.
+                recordTopVer(bb, prs, pr2verstk, bb2vpr);
+            }
+            verifyVerBB(bb, pr2verstk);
+        }
+        xcom::Vertex const* bbv = m_domtree.getVertex(bb->id());
+        bool all_visited = true;
+        for (xcom::EdgeC const* c = bbv->getOutList();
+             c != nullptr; c = c->get_next()) {
+            xcom::Vertex const* dom_succ = c->getTo();
+            if (dom_succ == bbv) { continue; }
+            if (!visited.is_contain(dom_succ->id())) {
+                ASSERT0(cfg->getBB(dom_succ->id()));
+                all_visited = false;
+                stk.push(cfg->getBB(dom_succ->id()));
+                break;
+            }
+        }
+
+        if (all_visited) {
+            stk.pop();
+
+            //Do post-processing while all kids of BB has been processed.
+            PRNO2VPR * prno2vpr = bb2vpr.get(bb->id());
+            //bb may not have any WritePR operations.
+            //ASSERT0(prno2vpr);
+            PRSet * defprs = bb2defprs.get(bb->id());
+            if (defprs != nullptr) {
+                DefSBitSetIter it = nullptr;
+                for (BSIdx i = defprs->get_first(&it);
+                     i != BS_UNDEF; i = defprs->get_next(i, &it)) {
+                    VPRStack * verstk = pr2verstk.get(i);
+                    ASSERT0(verstk && verstk->get_bottom());
+                    VPR const* vpr = prno2vpr->get(i);
+                    while (verstk->get_top() != vpr) {
+                        verstk->pop();
+                    }
+                }
+            }
+
+            //vprmap is useless from now on.
+            bb2vpr.destoryPRNO2VPR(bb->id());
+        }
+    }
+    return true;
+}
+//END VersionVerification
 
 
 //
 //START PRSSARegion
 //
-//The function will find PR that assigned 'prno' into current SSARegion.
-//ir: stmt or expression start to find.
 void PRSSARegion::add(PRNO prno, IR * start)
 {
     IRIter it;
@@ -102,7 +480,6 @@ void PRSSARegion::add(PRNO prno, IR * start)
 }
 
 
-//Find ir into irlist and ir must be PR op.
 void PRSSARegion::add(IR * ir)
 {
     ASSERT0(ir->isPROp());
@@ -117,35 +494,34 @@ void PRSSARegion::add(IR * ir)
 }
 
 
-void PRSSARegion::dump(Region const* rg) const
+void PRSSARegion::dump() const
 {
-    if (!rg->isLogMgrInit()) { return; }
-    note(rg, "\n==-- DUMP PRSSARegion --==");
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(m_rg, "\n==-- DUMP PRSSARegion --==");
     ASSERT0(getRootBB());
-    note(rg, "\nROOT:BB%d", getRootBB()->id());
-    note(rg, "\nBBSET:");
+    note(m_rg, "\nROOT:BB%d", getRootBB()->id());
+    note(m_rg, "\nBBSET:");
     PRSSARegion * pthis = const_cast<PRSSARegion*>(this);
-    pthis->getBBSet().dump(rg->getLogMgr()->getFileHandler());
-    note(rg, "\nIRLIST:");
-    rg->getLogMgr()->incIndent(2);
+    pthis->getBBSet().dump(m_rg->getLogMgr()->getFileHandler());
+    note(m_rg, "\nIRLIST:");
+    m_rg->getLogMgr()->incIndent(2);
     for (IR const* ir = pthis->getIRList().get_head(); ir != nullptr;
          ir = pthis->getIRList().get_next()) {
-        dumpIR(ir, rg, nullptr, IR_DUMP_DEF);
+        dumpIR(ir, m_rg, nullptr, IR_DUMP_DEF);
     }
-    rg->getLogMgr()->decIndent(2);
+    m_rg->getLogMgr()->decIndent(2);
 }
 
 
-IRBB * PRSSARegion::findRootBB(xcom::DomTree const& domtree,
-                               Region const* rg, IRBB * start)
+IRBB * PRSSARegion::findRootBB(IRBB * start)
 {
     ASSERT0(start);
     while (!canBeRoot(start)) {
-        xcom::Vertex const* treev = domtree.getVertex(start->id());
+        xcom::Vertex const* treev = m_domtree.getVertex(start->id());
         ASSERT0(treev);
-        xcom::Vertex const* idomv = domtree.getParent(treev);
+        xcom::Vertex const* idomv = m_domtree.getParent(treev);
         if (idomv != nullptr) {
-            start = rg->getBB(idomv->id());
+            start = m_rg->getBB(idomv->id());
             ASSERT0(start);
             continue;
         }
@@ -179,30 +555,43 @@ bool PRSSARegion::canBeRoot(IRBB const* bb) const
 }
 
 
-void PRSSARegion::addPredBBUntillRoot(IRBB const* start, IRCFG const* cfg)
+void PRSSARegion::addAllBBUnderRootInDomTree()
 {
     IRBB const* root = getRootBB();
     ASSERT0(root && root->getVex());
-    xcom::GraphIterIn iterin(*cfg, start->getVex(), root->getVex());
-    for (Vertex const* t = iterin.get_first();
-         t != nullptr; t = iterin.get_next(t)) {
-        if (isInRegion(t->id())) { continue; }
-        ASSERTN(cfg->is_dom(root->id(), t->id()),
-                ("root must dominate all other vertex in SSA region"));
-        add(cfg->getBB(t->id()));
+    xcom::GraphIterOut iterout(m_domtree, m_domtree.getVertex(root->id()));
+    for (Vertex const* t = iterout.get_first();
+         t != nullptr; t = iterout.get_next(t)) {
+        add(m_cfg->getBB(t->id()));
     }
 }
 
 
-void PRSSARegion::inferAndAddRelatedBB(Region const* rg, IRCFG const* cfg)
+void PRSSARegion::addPredBBTillRoot(IRBB const* start)
+{
+    IRBB const* root = getRootBB();
+    ASSERT0(root && root->getVex());
+    ASSERT0(m_cfg);
+    xcom::GraphIterIn iterin(*m_cfg, start->getVex(), root->getVex());
+    for (Vertex const* t = iterin.get_first();
+         t != nullptr; t = iterin.get_next(t)) {
+        if (isInRegion(t->id())) { continue; }
+        ASSERTN(m_cfg->is_dom(root->id(), t->id()),
+                ("root must dominate all other vertex in SSA region"));
+        add(m_cfg->getBB(t->id()));
+    }
+}
+
+
+void PRSSARegion::inferAndAddRelatedBB()
 {
     BBSetIter bbit;
     for (BSIdx i = getBBSet().get_first(&bbit);
          i != BS_UNDEF; i = getBBSet().get_next(i, &bbit)) {
-        IRBB const* bb = rg->getBB(i);
+        IRBB const* bb = m_rg->getBB(i);
         ASSERT0(bb);
         if (!bb->hasPRPhi()) { continue; }
-        addPredBBUntillRoot(bb, cfg);
+        addPredBBTillRoot(bb);
     }
 }
 
@@ -216,35 +605,36 @@ bool PRSSARegion::verify() const
 
 
 //
-//START BB2VPMap
+//START BB2VPRMap
 //
 //The allocated object will be destroied at destoryPRNO2VPR().
-PRNO2VPR * BB2VPMap::allocPRNO2VPR(UINT bbid)
+PRNO2VPR * BB2VPRMap::allocPRNO2VPR(UINT bbid)
 {
-    PRNO2VPR * prno2vp = new PRNO2VPR();
-    set(bbid, prno2vp);
-    return prno2vp;
+    PRNO2VPR * prno2vpr = new PRNO2VPR();
+    set(bbid, prno2vpr);
+    return prno2vpr;
 }
 
 
-void BB2VPMap::destoryPRNO2VPR(UINT bbid)
+void BB2VPRMap::destoryPRNO2VPR(UINT bbid)
 {
-    PRNO2VPR * prno2vp = get(bbid);
-    ASSERT0(prno2vp);
-    set(bbid, nullptr);
-    delete prno2vp;
+    PRNO2VPR * prno2vpr = get(bbid);
+    if (prno2vpr != nullptr) {
+        set(bbid, nullptr);
+        delete prno2vpr;
+    }
 }
 
 
-//Verify if vpmap of each BB has been deleted.
-bool BB2VPMap::verify()
+//Verify if vprmap of each BB has been deleted.
+bool BB2VPRMap::verify()
 {
     for (VecIdx i = 0; i <= get_last_idx(); i++) {
         ASSERT0(get(i) == nullptr);
     }
     return true;
 }
-//END BB2VPMap
+//END BB2VPRMap
 
 
 //
@@ -278,7 +668,7 @@ void DfMgr::dump(xcom::DGraph const& g, Region * rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==---- DUMP Dominator Frontier Control Set ----==\n");
-    VertexIter c;
+    xcom::VertexIter c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != nullptr; v = g.get_next_vertex(c)) {
         UINT vid = v->id();
@@ -338,7 +728,7 @@ void DfMgr::buildRecur(xcom::Vertex const* v, xcom::DGraph const& g,
 
 void DfMgr::build(xcom::DGraph const& g, xcom::DomTree const& domtree)
 {
-    VertexIter c;
+    xcom::VertexIter c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != nullptr; v = g.get_next_vertex(c)) {
         buildRecur(v, g, domtree);
@@ -348,8 +738,8 @@ void DfMgr::build(xcom::DGraph const& g, xcom::DomTree const& domtree)
 
 bool DfMgr::hasHighDFDensityVertex(xcom::DGraph const& g)
 {
-    Vector<UINT> counter_of_vex(g.getVertexNum());
-    VertexIter c;
+    xcom::Vector<UINT> counter_of_vex(g.getVertexNum());
+    xcom::VertexIter c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != nullptr; v = g.get_next_vertex(c)) {
         xcom::BitSet const* dfset = getDFControlSet(v->id());
@@ -370,7 +760,7 @@ bool DfMgr::hasHighDFDensityVertex(xcom::DGraph const& g)
 
 void DfMgr::build(xcom::DGraph const& g)
 {
-    VertexIter c;
+    xcom::VertexIter c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != nullptr; v = g.get_next_vertex(c)) {
         xcom::BitSet const* v_dom = g.get_dom_set(v->id());
@@ -484,36 +874,40 @@ SSAGraph::SSAGraph(Region * rg, PRSSAMgr * ssamgr) :
 {
     ASSERT0(rg && ssamgr);
     m_ssa_mgr = ssamgr;
-    VPRVec const* vpr_vec = ssamgr->getVPRVec();
+    ConstIRIter ii;
+    BBList const* bblst = m_rg->getBBList();
+    BBListIter ct;
     UINT inputcount = 1;
-    for (VecIdx i = 1; i <= vpr_vec->get_last_idx(); i++) {
-        VPR * v = vpr_vec->get(i);
-        ASSERT0(v != nullptr);
-        IR * def = SSA_def(v);
-        if (def == nullptr) {
-            ASSERT0(VPR_version(v) == PRSSA_INIT_VERSION);
-            UINT vdef = 0xffffFFFF - inputcount;
-            inputcount++;
-            addVertex(vdef);
-            m_vdefs.set(vdef, v);
-
-            //May be input parameters.
-            SSAUseIter vit = nullptr;
-            for (BSIdx i2 = SSA_uses(v).get_first(&vit);
-                 vit != nullptr; i2 = SSA_uses(v).get_next(i2, &vit)) {
-                IR * use = m_rg->getIR(i2);
-                ASSERT0(use->is_pr());
-                addEdge(vdef, IR_id(use->getStmt()));
-            }
-        } else {
-            ASSERT0(def->is_stmt());
-            addVertex(def->id());
-            SSAUseIter vit = nullptr;
-            for (BSIdx i2 = SSA_uses(v).get_first(&vit);
-                 vit != nullptr; i2 = SSA_uses(v).get_next(i2, &vit)) {
-                IR * use = m_rg->getIR(i2);
-                ASSERT0(use->is_pr());
-                addEdge(def->id(), IR_id(use->getStmt()));
+    xcom::TTab<SSAInfo const*> visited;
+    for (IRBB * bb = bblst->get_head(&ct);
+         bb != nullptr; bb = bblst->get_next(&ct)) {
+        for (IR const* ir = bb->getFirstIR();
+             ir != nullptr; ir = bb->getNextIR()) {
+            ii.clean();
+            for (IR const* x = iterInitC(ir, ii);
+                x != nullptr; x = iterNextC(ii)) {
+                if (!x->isPROp()) { continue; }
+                SSAInfo const* info = x->getSSAInfo();
+                ASSERT0(info);
+                if (visited.find(info)) { continue; }
+                visited.append(info);
+                VexIdx defirid = VERTEX_UNDEF;
+                if (info->getDef() == nullptr) {
+                    defirid = ((VexIdx)-1) - inputcount;
+                    inputcount++;
+                    addVertex(defirid);
+                    m_vdefs.set(defirid, (VPR*)info);
+                } else {
+                    defirid = info->getDef()->id();
+                }
+                SSAUseIter vit = nullptr;
+                for (BSIdx i = info->getUses().get_first(&vit);
+                     vit != nullptr; i = info->getUses().get_next(i, &vit)) {
+                    IR * use = m_rg->getIR(i);
+                    ASSERT0(use->isReadPR());
+                    ASSERT0(use->getStmt());
+                    addEdge(defirid, use->getStmt()->id());
+                }
             }
         }
     }
@@ -581,15 +975,16 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
     //Print node
     List<IR const*> lst;
     VertexIter itv = VERTEX_UNDEF;
-    for (xcom::Vertex * v = get_first_vertex(itv);
+    xcom::StrBuf tmp(16);
+    for (xcom::Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
-        VPR * vp = m_vdefs.get(v->id());
-        if (vp != nullptr) {
+        VPR const* vpr = m_vdefs.get(v->id());
+        if (vpr != nullptr) {
             //Print virtual def for parameter.
             fprintf(h,
                     "\nnode: { title:\"%u\" shape:hexagon fontname:\"courB\" "
-                    "color:lightgrey label:\" param:P%uV%uP%u \"}",
-                    v->id(), vp->orgprno(), vp->version(), vp->newprno());
+                    "color:lightgrey label:\" param:%s \"}",
+                    v->id(), vpr->dumpBuf(tmp));
             continue;
         }
 
@@ -600,9 +995,8 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
             fprintf(h, "\nnode: { title:\"%d\" shape:box fontname:\"courB\" "
                         "color:gold label:\"", def->id());
             for (IR * r = res; r != nullptr; r = r->get_next()) {
-                VPR * vp2 = (VPR*)r->getSSAInfo();
-                fprintf(h, "P%uV%uP%u ", vp2->orgprno(),
-                        vp2->version(), vp2->newprno());
+                VPR * vpr2 = (VPR*)r->getSSAInfo();
+                fprintf(h, "%s ", vpr2->dumpBuf(tmp));
             }
             fprintf(h, " <-- ");
         } else {
@@ -617,9 +1011,8 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
              if (!def->is_rhs(opnd) || !opnd->is_pr()) {
                  continue;
              }
-             VPR * use_vp = (VPR*)PR_ssainfo(opnd);
-             fprintf(h, "%s%uv%u%s%u, ", PR_TYPE_CHAR, use_vp->orgprno(),
-                     use_vp->version(), PR_TYPE_CHAR, use_vp->newprno());
+             VPR * use_vpr = (VPR*)PR_ssainfo(opnd);
+             fprintf(h, "%s, ", use_vpr->dumpBuf(tmp));
         }
         if (detail) {
             //TODO: implement dump_ir_buf();
@@ -645,6 +1038,54 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
 //END SSAGraph
 
 
+//
+//START ConstructCtx
+//
+//Clean version stack.
+void ConstructCtx::cleanPRNO2VPRStack()
+{
+    for (VecIdx i = 0; i <= m_prno2stack.get_last_idx(); i++) {
+        VPRStack * s = m_prno2stack.get(i);
+        if (s != nullptr) { delete s; }
+    }
+    m_prno2stack.clean();
+}
+
+
+void ConstructCtx::cleanPRNO2MaxVersion()
+{
+    m_prno2maxversion.clean();
+}
+
+
+void ConstructCtx::cleanPRNO2Type()
+{
+    //No need to free irs in m_prno2type.
+    m_prno2type.clean();
+}
+
+
+VPRStack * ConstructCtx::genVPRStack(PRNO prno)
+{
+    VPRStack * stack = m_prno2stack.get((VecIdx)prno);
+    if (stack == nullptr) {
+        stack = new VPRStack();
+        m_prno2stack.set((VecIdx)prno, stack);
+    }
+    return stack;
+}
+
+
+size_t ConstructCtx::count_mem() const
+{
+    size_t count = 0;
+    count += m_prno2stack.count_mem();
+    count += m_prno2maxversion.count_mem();
+    count += m_prno2type.count_mem();
+    return count;
+}
+//END ConstructCtx
+
 
 //
 //START PRSSAMgr
@@ -654,43 +1095,17 @@ size_t PRSSAMgr::count_mem() const
     size_t count = 0;
     count += smpoolGetPoolSize(m_vp_pool);
     count += m_prno2vprvec.count_mem();
-    count += m_prno2stack.count_mem();
     count += sizeof(m_vp_count);
     count += m_vpr_vec.count_mem();
     count += m_prno2vpr.count_mem();
-    count += m_prno2maxversion.count_mem();
-    count += m_prno2type.count_mem();
     count += sizeof(m_rg);
     return count;
 }
 
 
-void PRSSAMgr::setVPR(PRNO prno, VPR * vp)
+void PRSSAMgr::setVPRByPRNO(PRNO prno, VPR * vpr)
 {
-    m_prno2vpr.set((VecIdx)prno, vp);
-}
-
-
-//Clean version stack.
-void PRSSAMgr::cleanPRNO2VPRStack()
-{
-    for (VecIdx i = 0; i <= m_prno2stack.get_last_idx(); i++) {
-        Stack<VPR*> * s = m_prno2stack.get(i);
-        if (s != nullptr) { delete s; }
-    }
-    m_prno2stack.clean();
-}
-
-
-void PRSSAMgr::cleanPRNO2MaxVersion()
-{
-    m_prno2maxversion.clean();
-}
-
-
-void PRSSAMgr::cleanPRNO2Type()
-{
-    m_prno2type.clean();
+    m_prno2vpr.set((VecIdx)prno, vpr);
 }
 
 
@@ -700,7 +1115,7 @@ void PRSSAMgr::cleanPRNO2VPRForIRList(IRList const& lst)
     for (IR const* ir = lst.get_head(&it);
          ir != nullptr; ir = lst.get_next(&it)) {
         ASSERT0(ir->isPROp());
-        setVPR(ir->getPrno(), nullptr);
+        setVPRByPRNO(ir->getPrno(), nullptr);
     }
 }
 
@@ -710,14 +1125,6 @@ void PRSSAMgr::dumpSSAGraph(CHAR const* name) const
 {
     SSAGraph sa(m_rg, const_cast<PRSSAMgr*>(this));
     sa.dump(name, true);
-}
-
-
-CHAR * PRSSAMgr::dumpVPR(VPR const* v, OUT CHAR * buf) const
-{
-    sprintf(buf, "%s%uV%u%s%u", PR_TYPE_CHAR, v->orgprno(), v->version(),
-            PR_TYPE_CHAR, v->newprno());
-    return buf;
 }
 
 
@@ -735,11 +1142,13 @@ void PRSSAMgr::dumpAllVPR() const
 }
 
 VPR * PRSSAMgr::allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
-                             Type const* orgtype, VPRVec * vprvec)
+                             Type const* orgtype, MOD VPRVec * vprvec)
 {
     ASSERTN(m_seg_mgr, ("SSA manager is not initialized"));
     VPR * v = allocVPR();
     if (vprvec != nullptr) {
+        //If version is available, establisth the mapping between version and
+        //VPR object to enable the retrieve.
         vprvec->set(version, v);
     }
     v->initNoClean(m_seg_mgr);
@@ -754,12 +1163,29 @@ VPR * PRSSAMgr::allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
 }
 
 
-SSAInfo * PRSSAMgr::allocSSAInfo(PRNO prno, Type const* type)
+SSAInfo * PRSSAMgr::allocInitVersionSSAInfo(PRNO prno, Type const* type)
 {
     ASSERT0(prno != PRNO_UNDEF);
     ASSERT0(getVPRByPRNO(prno) == nullptr);
-    VPR * vpr = allocVPRImpl(prno, prno, PRSSA_INIT_VERSION + 1, type, nullptr);
-    setVPR(prno, vpr);
+    //The initial-version SSAInfo always used to represent the live-in PR
+    //of a region. Thus there is no new-version of prno.
+    VPR * vpr = allocVPRImpl(prno, PRNO_UNDEF, PRSSA_INIT_VERSION,
+                             type, nullptr);
+    setVPRByPRNO(prno, vpr);
+    return vpr;
+}
+
+
+SSAInfo * PRSSAMgr::allocNewVersionSSAInfo(PRNO prno, Type const* type)
+{
+    ASSERT0(prno != PRNO_UNDEF);
+    ASSERT0(getVPRByPRNO(prno) == nullptr);
+    //PR stmt operation always create a new version from initial-version.
+    //There is no previous DEF of prno, the newprno is equal to the original
+    //version.
+    VPR * vpr = allocVPRImpl(prno, prno, PRSSA_INIT_VERSION + 1,
+                             type, nullptr);
+    setVPRByPRNO(prno, vpr);
     return vpr;
 }
 
@@ -767,15 +1193,9 @@ SSAInfo * PRSSAMgr::allocSSAInfo(PRNO prno, Type const* type)
 VPR * PRSSAMgr::allocVPR(PRNO orgprno, UINT version, Type const* orgtype)
 {
     ASSERT0(orgprno != PRNO_UNDEF);
-    VPRVec * vec = m_prno2vprvec.get((VecIdx)orgprno);
-    if (vec == nullptr) {
-        vec = new VPRVec();
-        m_prno2vprvec.set((VecIdx)orgprno, vec);
-    }
+    VPRVec * vec = genVPRVecByPRNO(orgprno);
     VPR * v = vec->get(version);
-    if (v != nullptr) {
-        return v;
-    }
+    if (v != nullptr) { return v; }
     return allocVPRImpl(orgprno, PRNO_UNDEF, version, orgtype, vec);
 }
 
@@ -788,7 +1208,7 @@ void PRSSAMgr::buildDUChain(MOD IR * def, MOD IR * use)
     ASSERT0(def->getPrno() == use->getPrno());
     SSAInfo * defssainfo = def->getSSAInfo();
     if (defssainfo == nullptr) {
-        defssainfo = allocSSAInfo(def->getPrno(), def->getType());
+        defssainfo = allocNewVersionSSAInfo(def->getPrno(), def->getType());
         def->setSSAInfo(defssainfo);
         SSA_def(defssainfo) = def;
     } else {
@@ -823,8 +1243,6 @@ void PRSSAMgr::destroy(bool is_reinit)
         if (vpv != nullptr) { delete vpv; }
     }
 
-    cleanPRNO2VPRStack();
-
     for (VecIdx i = 0; i <= m_vpr_vec.get_last_idx(); i++) {
         VPR * v = m_vpr_vec.get((UINT)i);
         if (v != nullptr) {
@@ -836,13 +1254,10 @@ void PRSSAMgr::destroy(bool is_reinit)
         m_prno2vprvec.clean();
         m_vpr_vec.clean();
         m_prno2vpr.clean();
-        m_prno2maxversion.clean();
-        m_prno2type.clean();
     }
 
     removePhiList();
 
-    //Do not free irs in m_prno2type.
     smpoolDelete(m_vp_pool);
     m_vp_pool = nullptr;
 }
@@ -854,11 +1269,11 @@ static void dumpBriefStmt(IR const* ir, Region const* rg)
     note(rg, "\n");
     IR * res = const_cast<IR*>(ir)->getResultPR();
     if (res != nullptr) {
-        VPR * vp = (VPR*)res->getSSAInfo();
-        if (vp == nullptr) {
+        VPR * vpr = (VPR*)res->getSSAInfo();
+        if (vpr == nullptr) {
             prt(rg, "NOSSAINFO!!");
         } else {
-            prt(rg, "%s%d", PR_TYPE_CHAR, res->getPrno());
+            prt(rg, "%s%u", PR_TYPE_CHAR, res->getPrno());
         }
     } else {
         prt(rg, "--");
@@ -871,11 +1286,11 @@ static void dumpBriefStmt(IR const* ir, Region const* rg)
          opnd != nullptr; opnd = xoc::iterNextC(it)) {
         if (!opnd->is_pr()) { continue; }
         if (!first) { prt(rg, ","); }
-        VPR * vp = (VPR*)PR_ssainfo(opnd);
-        if (vp == nullptr) {
+        VPR * vpr = (VPR*)PR_ssainfo(opnd);
+        if (vpr == nullptr) {
             prt(rg, "NOSSAINFO!!");
         } else {
-            prt(rg, "%s%d", PR_TYPE_CHAR, opnd->getPrno());
+            prt(rg, "%s%u", PR_TYPE_CHAR, opnd->getPrno());
         }
         find = true;
         first = false;
@@ -895,7 +1310,7 @@ bool PRSSAMgr::dumpBrief() const
     dumpAllVPR();
     note(getRegion(), "\n==---- DUMP PRSSAMgr:VPR REF '%s' ----==",
          m_rg->getRegionName());
-    BBList * bbl = m_cfg->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         bb->dumpDigest(getRegion());
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
@@ -914,9 +1329,10 @@ bool PRSSAMgr::dump() const
     dumpAllVPR();
     note(getRegion(), "\n==---- DUMP PRSSAMgr:VPR REF '%s' ----==",
          m_rg->getRegionName());
-    BBList * bbl = m_cfg->getBBList();
+    BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
+    xcom::StrBuf tmp(16);
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         bb->dumpDigest(getRegion());
         for (IR * ir = BB_first_ir(bb);
@@ -937,13 +1353,11 @@ bool PRSSAMgr::dump() const
             IR * res = ir->getResultPR();
             note(getRegion(), "\nVP:");
             if (res != nullptr) {
-                VPR * vp = (VPR*)res->getSSAInfo();
-                if (vp == nullptr) {
+                VPR * vpr = (VPR*)res->getSSAInfo();
+                if (vpr == nullptr) {
                     prt(getRegion(), "NOSSAINFO!!");
                 } else {
-                    prt(getRegion(), "%s%dv%d%s%d ",
-                        PR_TYPE_CHAR, vp->orgprno(),
-                        vp->version(), PR_TYPE_CHAR, vp->newprno());
+                    prt(getRegion(), "%s ", vpr->dumpBuf(tmp));
                 }
             } else {
                 prt(getRegion(), "--");
@@ -953,13 +1367,11 @@ bool PRSSAMgr::dump() const
                 UINT i = 0, n = opnd_lst.get_elem_count() - 1;
                 for (IR const* opnd = opnd_lst.get_head(); opnd != nullptr;
                      opnd = opnd_lst.get_next(), i++) {
-                    VPR * vp = (VPR*)PR_ssainfo(opnd);
-                    if (vp == nullptr) {
+                    VPR * vpr = (VPR*)PR_ssainfo(opnd);
+                    if (vpr == nullptr) {
                         prt(getRegion(), "NOSSAINFO!!");
                     } else {
-                        prt(getRegion(), "%s%dv%d%s%d",
-                            PR_TYPE_CHAR, vp->orgprno(),
-                            vp->version(), PR_TYPE_CHAR, vp->newprno());
+                        prt(getRegion(), "%s", vpr->dumpBuf(tmp));
                     }
                     if (i < n) { prt(getRegion(), ","); }
                 }
@@ -977,7 +1389,8 @@ bool PRSSAMgr::dump() const
 //ir can be stmt or expression.
 //Note the function record the type that first met as the initial type of
 //specific Prno.
-void PRSSAMgr::initVPR(MOD IR * ir, PRSet const* prset)
+void PRSSAMgr::initVPR(MOD IR * ir, PRSet const* prset,
+                       OUT ConstructCtx & cstctx)
 {
     IR * res = nullptr;
     if (ir->is_stmt()) {
@@ -989,11 +1402,11 @@ void PRSSAMgr::initVPR(MOD IR * ir, PRSet const* prset)
         if (prset == nullptr ||
             (prset != nullptr && prset->is_contain((BSIdx)prno))) {
             ir->setSSAInfo(allocVPR(prno, PRSSA_INIT_VERSION, res->getType()));
-            if (m_prno2type.get((VecIdx)prno) == nullptr) {
+            if (cstctx.getPRNOType(prno) == nullptr) {
                 //Always record the type as the type of PRNO when meeting
                 //the PR at the first time. May be inaccurate if other
                 //occurrence's type is not identical.
-                m_prno2type.set((VecIdx)prno, ir->getType());
+                cstctx.setPRNOType(prno, ir->getType());
             }
         }
     }
@@ -1006,11 +1419,11 @@ void PRSSAMgr::initVPR(MOD IR * ir, PRSet const* prset)
         if (prset != nullptr && !prset->is_contain((BSIdx)kidno)) { continue; }
         kid->setSSAInfo(allocVPR(kidno, PRSSA_INIT_VERSION,
                                  kid->getType()));
-        if (m_prno2type.get((VecIdx)kidno) == nullptr) {
+        if (cstctx.getPRNOType(kidno) == nullptr) {
             //Always record the type as the type of PRNO when meeting
             //the PR at the first time. May be inaccurate if other occurrence's
             //type is not identical.
-            m_prno2type.set((VecIdx)kidno, kid->getType());
+            cstctx.setPRNOType(kidno, kid->getType());
         }
     }
 }
@@ -1024,25 +1437,27 @@ bool PRSSAMgr::isLiveOut(PRNO prno, UINT bbid)
 
 
 //definedprs: record PRs which defined in 'bb'.
-void PRSSAMgr::collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & definedprs)
+void PRSSAMgr::collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & definedprs,
+                                        OUT ConstructCtx & cstctx)
 {
     BBIRList const& lst = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter it;
     for (IR * ir = lst.get_head(&it); ir != nullptr; ir = lst.get_next(&it)) {
         //Generate VPR for non-phi stmt.
         ASSERT0(!ir->is_phi());
-        initVPR(ir, nullptr);
-        if (ir->getResultPR() == nullptr) { continue; }
-        ASSERT0(ir->getResultPR()->is_single());
-        PRNO prno = ir->getPrno();
-        definedprs.bunion((BSIdx)prno);
+        initVPR(ir, nullptr, cstctx);
+        IR const* respr = ir->getResultPR();
+        if (respr == nullptr) { continue; }
+        ASSERT0(respr->is_single());
+        ASSERT0(respr->getPrno() != PRNO_UNDEF);
+        definedprs.bunion((BSIdx)respr->getPrno());
     }
 }
 
 
-IR * PRSSAMgr::insertPhi(PRNO prno, MOD IRBB * bb)
+IR * PRSSAMgr::insertPhi(PRNO prno, MOD IRBB * bb, OUT ConstructCtx & cstctx)
 {
-    Type const* prtype = mapPRNO2Type(prno);
+    Type const* prtype = cstctx.getPRNOType(prno);
     ASSERT0(prtype);
     UINT num_opnd = bb->getVex()->getInDegree();
     ASSERT0(num_opnd > 0);
@@ -1056,7 +1471,7 @@ IR * PRSSAMgr::insertPhi(PRNO prno, MOD IRBB * bb)
         opnd->copyRef(phi, m_rg);
     }
     BB_irlist(bb).append_head(phi);
-    initVPR(phi, nullptr);
+    initVPR(phi, nullptr, cstctx);
     return phi;
 }
 
@@ -1093,7 +1508,9 @@ void PRSSAMgr::addUseForTree(IR * to, IR const* from)
 void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
                                              PRSSAInfoCollect const& col)
 {
-    UINT pos = m_cfg->WhichPred(bb, succ);
+    bool is_pred;
+    UINT pos = m_cfg->WhichPred(bb, succ, is_pred);
+    ASSERT0_DUMMYUSE(is_pred);
     IRListIter it;
     for (IR * ir = BB_irlist(succ).get_head(&it);
          ir != nullptr; ir = BB_irlist(succ).get_next(&it)) {
@@ -1118,7 +1535,7 @@ void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
         //ASSERTN(col.getOptCtx()->is_dom_valid(), ("invalid dominfo"));
         IR * newopnd = m_rg->getIRMgr()->buildPR(ir->getType());
         m_rg->getMDMgr()->allocRef(newopnd);
-        genSSAInfoForExp(newopnd);
+        genInitVersionSSAInfoForExp(newopnd);
         ((CPhi*)ir)->insertOpndAt(pos, newopnd);
     }
 }
@@ -1126,7 +1543,8 @@ void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
 
 //Insert phi for PR.
 //defbbs: record a list of BB that defined given PR identified by 'prno'.
-void PRSSAMgr::placePhiForPR(PRNO prno, List<IRBB*> const* defbbs,
+void PRSSAMgr::placePhiForPR(PRNO prno, OUT ConstructCtx & cstctx,
+                             List<IRBB*> const* defbbs,
                              DfMgr const& dfm, xcom::BitSet & visited,
                              List<IRBB*> & wl, BB2PRSet const& bb2definedprs,
                              BBSet const* bbset)
@@ -1150,7 +1568,6 @@ void PRSSAMgr::placePhiForPR(PRNO prno, List<IRBB*> const* defbbs,
         //Each BB in Set dfcs is in dominance frontier of 'defbb'.
         xcom::BitSet const* dfcs = dfm.getDFControlSet(defbb->id());
         if (dfcs == nullptr) { continue; }
-
         for (BSIdx i = dfcs->get_first(); i != BS_UNDEF;
              i = dfcs->get_next(i)) {
             if (visited.is_contain(i)) {
@@ -1167,7 +1584,7 @@ void PRSSAMgr::placePhiForPR(PRNO prno, List<IRBB*> const* defbbs,
             ASSERT0(ibb);
 
             //Redundant phi will be removed during refinePhi().
-            insertPhi(prno, ibb);
+            insertPhi(prno, ibb, cstctx);
             PRSet * prset = bb2definedprs.get(i);
             ASSERT0(prset);
             prset->bunion((BSIdx)prno); //Add phi to defined PRSet.
@@ -1246,25 +1663,26 @@ static bool hasCommonDef(IR const* phi, OUT IR ** common_def,
 static bool isRedundantPHI(IR const* phi, OUT IR ** common_def,
                            OUT IR ** common_livein)
 {
-    VPR * vp = (VPR*)PHI_ssainfo(phi);
-    ASSERT0(vp);
-    if (SSA_uses(vp).get_elem_count() == 0) { return true; }
+    VPR * vpr = (VPR*)PHI_ssainfo(phi);
+    ASSERT0(vpr);
+    if (SSA_uses(vpr).get_elem_count() == 0) { return true; }
     return hasCommonDef(phi, common_def, common_livein);
 }
 
 
 void PRSSAMgr::initMapInfo(DefMiscBitSetMgr & bs_mgr,
                            OUT BB2PRSet & bb2definedprs,
-                           OUT PRSet & prset)
+                           OUT PRSet & prset, OUT ConstructCtx & cstctx)
 {
     START_TIMER(t, "PRSSA: Init Map Info");
     //Record modified PR for each BB.
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     for (IRBB * bb = bblst->get_head(); bb != nullptr; bb = bblst->get_next()) {
         PRSet * bbprs = bb2definedprs.genPRSet(bb->id());
-        collectPRAndInitVPRForBB(bb, *bbprs);
+        collectPRAndInitVPRForBB(bb, *bbprs, cstctx);
 
-        //Regard all defined PR as effect, and they will be versioned later.
+        //Regard all defined-PR as effect PR, include the partial defined PR
+        //as well, such as SETELEM, and they will be versioned later.
         prset.bunion(*bbprs);
     }
     END_TIMER(t, "PRSSA: Init Map Info");
@@ -1273,67 +1691,77 @@ void PRSSAMgr::initMapInfo(DefMiscBitSetMgr & bs_mgr,
 
 //Place phi and assign the v0 for each PR.
 //prset: record set of PR which need to version.
-void PRSSAMgr::placePhiHelper(DfMgr const& dfm, PRSet const& prset,
+void PRSSAMgr::placePhiHelper(OUT ConstructCtx & cstctx,
+                              DfMgr const& dfm, PRSet const& prset,
                               BBSet const* bbset,
                               PR2DefBBSet const& pr2defbbset,
                               BB2PRSet const& bb2definedprs)
 {
     //Place phi for lived effect prs.
     xcom::BitSet visited; //for tmp used
-    List<IRBB*> wl; //for tmp used
-    DefSBitSetIter cur = nullptr;
-    for (BSIdx i = prset.get_first(&cur); i != BS_UNDEF;
-         i = prset.get_next(i, &cur)) {
+    xcom::List<IRBB*> wl; //for tmp used
+    xcom::DefSBitSetIter cur = nullptr;
+    for (BSIdx i = prset.get_first(&cur);
+         i != BS_UNDEF; i = prset.get_next(i, &cur)) {
         ASSERT0(i != PRNO_UNDEF);
-        List<IRBB*> const* defbbs = pr2defbbset.get(i);
-        ASSERTN(defbbs, ("PR that without any DEF should not get to here."));
-        placePhiForPR((PRNO)i, defbbs, dfm, visited, wl, bb2definedprs, bbset);
+        xcom::List<IRBB*> const* defbbs = pr2defbbset.get(i);
+
+        //NOTE: At some cases, e.g:vect9_4.c, SSARegion construction will
+        //collect both Write and Read PR into 'prset'. Thus if there is no
+        //defbbs about to PR i, just skip the PHI placement, and the process
+        //has been proven to be correct.
+        //ASSERTN(defbbs, ("PR that without any DEF should not get to here."));
+        if (defbbs == nullptr) { continue; }
+        placePhiForPR((PRNO)i, cstctx, defbbs, dfm, visited, wl,
+                      bb2definedprs, bbset);
     }
 }
 
 
 //Place phi and assign the v0 for each PR.
 //prset: record set of PR which need to version.
-void PRSSAMgr::placePhi(DfMgr const& dfm, PRSet const& prset,
+void PRSSAMgr::placePhi(OUT ConstructCtx & cstctx,
+                        DfMgr const& dfm, PRSet const& prset,
                         BBList const& bblist, BB2PRSet const& bb2definedprs)
 {
     START_TIMER(t, "PRSSA: Place Phi");
     //Place phi for lived effect prs.
     PR2DefBBSet pr2defbbset(&bblist, bb2definedprs);
-    placePhiHelper(dfm, prset, nullptr, pr2defbbset, bb2definedprs);
+    placePhiHelper(cstctx, dfm, prset, nullptr, pr2defbbset, bb2definedprs);
     END_TIMER(t, "PRSSA: Place Phi");
 }
 
 
 //Place phi and assign the v0 for each PR.
 //prset: record set of PR which need to version.
-void PRSSAMgr::placePhi(DfMgr const& dfm, PRSet const& prset,
+void PRSSAMgr::placePhi(OUT ConstructCtx & cstctx,
+                        DfMgr const& dfm, PRSet const& prset,
                         BBSet const& bbset, BB2PRSet const& bb2definedprs)
 {
     START_TIMER(t, "PRSSA: Place Phi");
     //Place phi for lived effect prs.
     PR2DefBBSet pr2defbbset(bbset, bb2definedprs, m_rg);
-    placePhiHelper(dfm, prset, &bbset, pr2defbbset, bb2definedprs);
+    placePhiHelper(cstctx, dfm, prset, &bbset, pr2defbbset, bb2definedprs);
     END_TIMER(t, "PRSSA: Place Phi");
 }
 
 
 //Rename opnd, except PHI.
 //Walk through RHS expression of 'ir' to rename PR's VPR.
-void PRSSAMgr::renameRHS(MOD IR * ir, PRSet const* prset)
+void PRSSAMgr::renameRHS(MOD IR * ir, PRSet const* prset,
+                         MOD ConstructCtx & cstctx)
 {
     ASSERT0(ir->is_stmt() && !ir->is_phi());
     m_iter.clean();
     for (IR * opnd = xoc::iterInit(ir, m_iter);
          opnd != nullptr; opnd = xoc::iterNext(m_iter)) {
         if (!opnd->isReadPR()) { continue; }
-
         PRNO opndprno = opnd->getPrno();
         if (prset != nullptr && !prset->is_contain((BSIdx)opndprno)) {
             continue;
         }
         //Get the top-version on stack.
-        Stack<VPR*> * vs = mapPRNO2VPRStack(opndprno);
+        VPRStack * vs = cstctx.genVPRStack(opndprno);
         ASSERT0(vs);
         VPR * topv = vs->get_top();
         if (topv == nullptr) {
@@ -1347,11 +1775,17 @@ void PRSSAMgr::renameRHS(MOD IR * ir, PRSet const* prset)
             continue;
         }
 
-        //e.g: pr1 = pr2(vp1)
-        //    vp1 will be renamed to vp2, so vp1 does not
+        //e.g: pr1 = pr2(vpr1)
+        //    vpr1 will be renamed to vpr2, so vpr1 does not
         //    occur in current IR any more.
         VPR * curv = (VPR*)opnd->getSSAInfo();
-        ASSERT0(curv && curv->orgprno() == opndprno);
+        ASSERT0(curv);
+
+        //CASE:PR current prno may not equal to VPR's orgprno, because its VPR
+        //may NOT be reinitialized when renaming occurred in SSARegion
+        //construction. Thus always use PR's current prno to retrieve info
+        //rather than orgprno.
+        //ASSERT0(curv->orgprno() == opndprno);
 
         //Let latest version VPR regard current opnd as an USE.
         if (VPR_version(topv) == PRSSA_INIT_VERSION) {
@@ -1513,7 +1947,8 @@ bool PRSSAMgr::removeExpiredDUForStmt(IR const* stmt, Region * rg)
 
 
 //ir: may be Phi.
-void PRSSAMgr::renameLHS(MOD IR * ir, PRSet const* prset)
+void PRSSAMgr::renameLHS(MOD IR * ir, PRSet const* prset,
+                         MOD ConstructCtx & cstctx)
 {
     ASSERT0(ir->is_stmt());
     IR * res = ir->getResultPR();
@@ -1524,14 +1959,21 @@ void PRSSAMgr::renameLHS(MOD IR * ir, PRSet const* prset)
     }
     //Rename result, include phi.
     ASSERT0(res->is_single());
-    VPR * resvp = (VPR*)res->getSSAInfo();
-    ASSERT0(resvp);
-    PRNO orgprno = resvp->orgprno();
-    ASSERTN(orgprno == resprno, ("PRNO is unchanged until stripping version"));
-    UINT maxv = m_prno2maxversion.get((VecIdx)orgprno);
-    VPR * new_v = allocVPR(orgprno, maxv + 1, res->getType());
-    m_prno2maxversion.set((VecIdx)orgprno, maxv + 1);
-    mapPRNO2VPRStack(orgprno)->push(new_v);
+    VPR * resvpr = (VPR*)res->getSSAInfo();
+    ASSERT0(resvpr);
+
+    //CASE:PR current prno may not equal to VPR's orgprno, because its VPR
+    //may NOT be reinitialized when renaming occurred in SSARegion
+    //construction. Thus always use PR's current prno to retrieve info
+    //rather than orgprno.
+    //PRNO orgprno = resvpr->orgprno();
+    //ASSERTN(orgprno == resprno,
+    //        ("PRNO is unchanged until stripping version"));
+    UINT maxv = cstctx.getMaxVersion(resprno);
+    VPR * new_v = allocVPR(resprno, maxv + 1, res->getType());
+    cstctx.setMaxVersion(resprno, maxv + 1);
+    ASSERT0(cstctx.getVPRStack(resprno));
+    cstctx.getVPRStack(resprno)->push(new_v);
     res->setSSAInfo(new_v);
     SSA_def(new_v) = ir;
     new_v->cleanUseSet();
@@ -1539,33 +1981,24 @@ void PRSSAMgr::renameLHS(MOD IR * ir, PRSet const* prset)
 
 
 //Rename VPR from current version to the top-version on stack if it exist.
-void PRSSAMgr::renameBB(IRBB const* bb, PRSet const* prset)
+void PRSSAMgr::renameBB(IRBB const* bb, PRSet const* prset,
+                        MOD ConstructCtx & cstctx)
 {
     BBIRList & irlist = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter it;
     for (IR * ir = irlist.get_head(&it);
          ir != nullptr; ir = irlist.get_next(&it)) {
        if (!ir->is_phi()) {
-           renameRHS(ir, prset);
+           renameRHS(ir, prset, cstctx);
        }
-       renameLHS(ir, prset);
+       renameLHS(ir, prset, cstctx);
     }
-}
-
-
-Stack<VPR*> * PRSSAMgr::mapPRNO2VPRStack(PRNO prno)
-{
-    Stack<VPR*> * stack = m_prno2stack.get((VecIdx)prno);
-    if (stack == nullptr) {
-        stack = new Stack<VPR*>();
-        m_prno2stack.set((VecIdx)prno, stack);
-    }
-    return stack;
 }
 
 
 //idx: index of operand, start from 0.
-void PRSSAMgr::handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset)
+void PRSSAMgr::handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset,
+                                   ConstructCtx const& cstctx)
 {
     ASSERT0(ir->is_phi());
     //Update version for same PR.
@@ -1582,9 +2015,10 @@ void PRSSAMgr::handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset)
     }
 
     VPR * old = (VPR*)PR_ssainfo(opnd);
-    ASSERT0(old != nullptr);
-    VPR * topv = mapPRNO2VPRStack(old->orgprno())->get_top();
-    ASSERT0(topv != nullptr);
+    ASSERT0(old);
+    ASSERT0(cstctx.getVPRStack(old->orgprno()));
+    VPR * topv = cstctx.getVPRStack(old->orgprno())->get_top();
+    ASSERT0(topv);
 
     old->removeUse(opnd);
     if (SSA_def(topv) != nullptr) {
@@ -1614,7 +2048,7 @@ void PRSSAMgr::handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset)
 
 
 void PRSSAMgr::handleSuccOfBB(IRBB * bb, BBSet const* bbset,
-                              PRSet const* prset)
+                              PRSet const* prset, ConstructCtx const& cstctx)
 {
     //Replace the jth opnd of PHI with 'topv' which in bb's successor.
     for (xcom::EdgeC const* ec = bb->getVex()->getOutList();
@@ -1627,14 +2061,15 @@ void PRSSAMgr::handleSuccOfBB(IRBB * bb, BBSet const* bbset,
         ASSERT0(succ);
         //Compute which predecessor 'bb' is with respect to its successor.
         //the index of corresponding predecessor.
-        UINT idx = xcom::Graph::WhichPred(bb->id(), succv);
+        bool is_pred;
+        UINT idx = xcom::Graph::WhichPred(bb->id(), succv, is_pred);
 
         //Replace opnd of PHI of 'succ' with top SSA version.
         IRListIter ct;
         for (IR * ir = BB_irlist(succ).get_head(&ct);
              ir != nullptr; ir = BB_irlist(succ).get_next(&ct)) {
             if (!ir->is_phi()) { break; }
-            handlePhiOpndInSucc(ir, idx, prset);
+            handlePhiOpndInSucc(ir, idx, prset, cstctx);
         }
     }
 }
@@ -1644,23 +2079,25 @@ void PRSSAMgr::handleSuccOfBB(IRBB * bb, BBSet const* bbset,
 //defined_prs: record the PR set that defined in 'bb' if exist.
 void PRSSAMgr::handleBBRename(PRSet const* defined_prs,
                               BBSet const* bbset, PRSet const* prset,
-                              MOD IRBB * bb, MOD BB2VPMap & bb2vp)
+                              MOD ConstructCtx & cstctx,
+                              MOD IRBB * bb, MOD BB2VPRMap & bb2vpr)
 {
-    ASSERT0(bb2vp.get(bb->id()) == nullptr);
-    PRNO2VPR * prno2vp = bb2vp.allocPRNO2VPR(bb->id());
+    ASSERT0(bb2vpr.get(bb->id()) == nullptr);
+    PRNO2VPR * prno2vpr = bb2vpr.allocPRNO2VPR(bb->id());
     DefSBitSetIter cur = nullptr;
     if (defined_prs != nullptr) {
         for (BSIdx prno = defined_prs->get_first(&cur);
              prno != BS_UNDEF; prno = defined_prs->get_next(prno, &cur)) {
-            VPR * vp = mapPRNO2VPRStack((PRNO)prno)->get_top();
-            ASSERT0(vp);
-            prno2vp->set(vp->orgprno(), vp);
+            ASSERT0(cstctx.getVPRStack((PRNO)prno));
+            VPR * vpr = cstctx.getVPRStack((PRNO)prno)->get_top();
+            ASSERT0(vpr);
+            prno2vpr->set(vpr->orgprno(), vpr);
         }
     }
-    renameBB(bb, prset);
+    renameBB(bb, prset, cstctx);
 
     //Rename PHI operand in which successor BB placed.
-    handleSuccOfBB(bb, bbset, prset);
+    handleSuccOfBB(bb, bbset, prset, cstctx);
 }
 
 
@@ -1671,66 +2108,19 @@ void PRSSAMgr::renameInDomTreeOrder(MOD IRBB * root,
                                     xcom::DomTree const& domtree,
                                     BB2PRSet const& bb2definedprs,
                                     BBSet const* bbset,
-                                    PRSet const* prset)
+                                    PRSet const* prset,
+                                    MOD ConstructCtx & cstctx)
 {
     ASSERTN(root, ("SSA region must have root BB"));
-    Stack<IRBB*> stk;
-    UINT n = m_cfg->getBBList()->get_elem_count();
-    xcom::BitSet visited(n / BIT_PER_BYTE);
-    BB2VPMap bb2vpmap(n);
+    BBList * bblst = m_rg->getBBList();
+    if (bblst->get_elem_count() == 0) { return; }
+    ASSERT0(m_cfg->getEntry());
     ASSERT0(bbset == nullptr || bbset->is_contain(root->id()));
-    IRBB * v;
-    stk.push(root);
-    List<IR*> lst; //for tmp use.
-    while ((v = stk.get_top()) != nullptr) {
-        if (!visited.is_contain(v->id())) {
-            visited.bunion(v->id());
-            handleBBRename(bb2definedprs.get(v->id()), bbset, prset, v,
-                           bb2vpmap);
-        }
-
-        xcom::Vertex const* bbv = domtree.getVertex(v->id());
-        bool all_visited = true;
-        for (xcom::EdgeC const* c = bbv->getOutList();
-             c != nullptr; c = c->get_next()) {
-            xcom::Vertex * dom_succ = c->getTo();
-            if (dom_succ == bbv || visited.is_contain(VERTEX_id(dom_succ))) {
-                continue;
-            }
-            if (bbset != nullptr && !bbset->is_contain(dom_succ->id())) {
-                continue;
-            }
-
-            ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
-            all_visited = false;
-            stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
-            break;
-        }
-        if (!all_visited) { continue; }
-
-        stk.pop();
-
-        //Do post-processing while all kids of BB has been processed.
-        PRNO2VPR * prno2vp = bb2vpmap.get(v->id());
-        ASSERT0(prno2vp);
-        PRSet const* defined_prs = bb2definedprs.get(v->id());
-        if (defined_prs != nullptr) {
-            DefSBitSetIter cur = nullptr;
-            for (BSIdx i = defined_prs->get_first(&cur);
-                 i != BS_UNDEF; i = defined_prs->get_next(i, &cur)) {
-                Stack<VPR*> * vs = mapPRNO2VPRStack((PRNO)i);
-                ASSERT0(vs->get_bottom() != nullptr);
-                VPR * vp = prno2vp->get(vs->get_top()->orgprno());
-                while (vs->get_top() != vp) {
-                    vs->pop();
-                }
-            }
-        }
-
-        //vpmap is useless from now on.
-        bb2vpmap.destoryPRNO2VPR(v->id());
-    }
-    ASSERT0(bb2vpmap.verify());
+    BB2VPRMap bb2vprmap(m_rg->getBBList()->get_elem_count());
+    PRSSAConstructRenameVisit visit(bbset, prset, root, domtree, bb2definedprs,
+                                    cstctx, bb2vprmap, this);
+    visit.perform();
+    ASSERT0(bb2vprmap.verify());
 }
 
 
@@ -1738,7 +2128,8 @@ void PRSSAMgr::collectPRAndInitVPRForIRList(IRList const& irlist,
                                             BBSet const& bbset,
                                             MOD DefMiscBitSetMgr & sm,
                                             OUT BB2PRSet & bb2definedprs,
-                                            OUT PRSet & prset)
+                                            OUT PRSet & prset,
+                                            OUT ConstructCtx & cstctx)
 {
     IRListIter it;
     for (IR * ir = irlist.get_head(&it);
@@ -1746,7 +2137,7 @@ void PRSSAMgr::collectPRAndInitVPRForIRList(IRList const& irlist,
         ASSERT0(ir->isPROp());
         PRNO prno = ir->getPrno();
         prset.bunion((BSIdx)prno);
-        initVPR(ir, &prset);
+        initVPR(ir, &prset, cstctx);
         if (ir->is_exp()) {
             //Only initialize VPR for DEF.
             ASSERTN(bbset.is_contain(ir->getStmt()->getBB()->id()),
@@ -1771,9 +2162,7 @@ bool PRSSAMgr::constructDesignatedRegion(PRSSARegion & ssarg,
     START_TIMER(t, "PRSSA: Rename Designated PRSet");
     ASSERT0(ssarg.verify());
     //Do necessary initialization for PRSet renaming.
-    cleanPRNO2MaxVersion();
-    cleanPRNO2VPRStack();
-    cleanPRNO2Type();
+    ConstructCtx cstctx(m_rg);
     IRList & irlist = ssarg.getIRList();
     cleanPRNO2VPRForIRList(irlist);
 
@@ -1797,21 +2186,22 @@ bool PRSSAMgr::constructDesignatedRegion(PRSSARegion & ssarg,
     DefMiscBitSetMgr sm;
     PRSet prset(sm.getSegMgr());
     BB2PRSet bb2definedprs(&sm);
-    collectPRAndInitVPRForIRList(irlist, bbset, sm, bb2definedprs, prset);
-    placePhi(dfm, prset, bbset, bb2definedprs);
+    collectPRAndInitVPRForIRList(irlist, bbset, sm, bb2definedprs,
+                                 prset, cstctx);
+    placePhi(cstctx, dfm, prset, bbset, bb2definedprs);
 
     //Initialize VPR stack for given Prno.
-    initVPRStack(prset);
+    initVPRStack(prset, cstctx);
     ASSERT0(m_cfg->getEntry());
     renameInDomTreeOrder(ssarg.getRootBB(), domtree, bb2definedprs,
-                         &bbset, &prset);
+                         &bbset, &prset, cstctx);
 
     //Clean version stack after renaming.
-    cleanPRNO2VPRStack();
+    cstctx.cleanPRNO2VPRStack();
 
     //Clean the mapping after renaming, and recompute the map if ssa needs
     //reconstruct.
-    cleanPRNO2Type();
+    cstctx.cleanPRNO2Type();
     stripVersionForBBSet(bbset, &prset);
     if (m_livemgr != nullptr) {
         m_livemgr->clean();
@@ -1821,27 +2211,28 @@ bool PRSSAMgr::constructDesignatedRegion(PRSSARegion & ssarg,
 }
 
 
-void PRSSAMgr::initVPRStack(PRSet const& prset)
+void PRSSAMgr::initVPRStack(PRSet const& prset, OUT ConstructCtx & cstctx)
 {
     DefSBitSetIter cur = nullptr;
     for (BSIdx prno = prset.get_first(&cur);
          prno != BS_UNDEF; prno = prset.get_next(prno, &cur)) {
-        VPR * vp = allocVPR((PRNO)prno, PRSSA_INIT_VERSION, m_tm->getAny());
-        mapPRNO2VPRStack(prno)->push(vp);
+        VPR * vpr = allocVPR((PRNO)prno, PRSSA_INIT_VERSION, m_tm->getAny());
+        cstctx.genVPRStack(prno)->push(vpr);
     }
 }
 
 
 //Rename PR.
-void PRSSAMgr::rename(PRSet const& effect_prs, BB2PRSet const& bb2definedprs,
+void PRSSAMgr::rename(OUT ConstructCtx & cstctx,
+                      PRSet const& effect_prs, BB2PRSet const& bb2definedprs,
                       xcom::DomTree const& domtree)
 {
     START_TIMER(t, "PRSSA: Rename");
-    if (m_cfg->getBBList()->get_elem_count() == 0) { return; }
-    initVPRStack(effect_prs);
+    if (m_rg->getBBList()->get_elem_count() == 0) { return; }
+    initVPRStack(effect_prs, cstctx);
     ASSERT0(m_cfg->getEntry());
     renameInDomTreeOrder(m_cfg->getEntry(), domtree, bb2definedprs,
-                         nullptr, nullptr);
+                         nullptr, nullptr, cstctx);
     END_TIMER(t, "PRSSA: Rename");
 }
 
@@ -1867,10 +2258,10 @@ void PRSSAMgr::destructBBSSAInfo(IRBB * bb, OptCtx const& oc)
 void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
                                          OptCtx const& oc)
 {
-    Stack<IRBB*> stk;
-    UINT n = m_cfg->getBBList()->get_elem_count();
+    xcom::Stack<IRBB*> stk;
+    UINT n = m_rg->getBBList()->get_elem_count();
     xcom::BitSet visited(n / BIT_PER_BYTE);
-    BB2VPMap bb2vp(n);
+    BB2VPRMap bb2vpr(n);
     IRBB * v;
     stk.push(root);
     while ((v = stk.get_top()) != nullptr) {
@@ -1911,7 +2302,7 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
 void PRSSAMgr::destruction(xcom::DomTree & domtree, OptCtx const& oc)
 {
     START_TIMER(t, "PRSSA: destruction in dom tree order");
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     ASSERT0(m_cfg->getEntry());
     destructionInDomTreeOrder(m_cfg->getEntry(), domtree, oc);
@@ -1945,7 +2336,7 @@ void PRSSAMgr::insertCopy(IRBB * pred, IR * store_to_phicopy)
         }
         //Insert basic block to hold the copy.
         IRBB * newbb = m_rg->allocBB();
-        m_cfg->getBBList()->insert_after(newbb, pred);
+        m_rg->getBBList()->insert_after(newbb, pred);
         m_cfg->addBB(newbb);
         m_cfg->insertVertexBetween(pred->id(), fallthrough->id(),
                                    newbb->id());
@@ -2048,10 +2439,10 @@ void PRSSAMgr::verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
 {
     ASSERT0(ir->is_phi());
     //Check phi result.
-    VPR * resvp = (VPR*)PHI_ssainfo(ir);
+    VPR * resvpr = (VPR*)PHI_ssainfo(ir);
     if (is_vpinfo_avail) {
         ASSERTN(before_strip_version ?
-                    resvp->orgprno() : resvp->newprno() == PHI_prno(ir),
+                    resvpr->orgprno() : resvpr->newprno() == PHI_prno(ir),
                 ("prno of VPR is unmatched"));
     }
 
@@ -2083,8 +2474,8 @@ void PRSSAMgr::verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
 
     //Check SSA uses.
     SSAUseIter vit = nullptr;
-    for (BSIdx i = SSA_uses(resvp).get_first(&vit);
-         vit != nullptr; i = SSA_uses(resvp).get_next(i, &vit)) {
+    for (BSIdx i = SSA_uses(resvpr).get_first(&vit);
+         vit != nullptr; i = SSA_uses(resvpr).get_next(i, &vit)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use->is_pr());
         ASSERTN(PR_no(use) == PHI_prno(ir), ("prno is unmatch"));
@@ -2102,7 +2493,7 @@ void PRSSAMgr::verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
 bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const
 {
     DUMMYUSE(is_vpinfo_avail);
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != nullptr; bb = bblst->get_next()) {
         m_cfg->get_preds(preds, bb);
@@ -2125,7 +2516,7 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const
 bool PRSSAMgr::verifyPrnoOfVPR() const
 {
     ConstIRIter ii;
-    BBList const* bblst = m_cfg->getBBList();
+    BBList const* bblst = m_rg->getBBList();
     BBListIter ct;
     for (IRBB * bb = bblst->get_head(&ct);
          bb != nullptr; bb = bblst->get_next(&ct)) {
@@ -2138,7 +2529,7 @@ bool PRSSAMgr::verifyPrnoOfVPR() const
                 }
             }
          }
-     }
+    }
     return true;
 }
 
@@ -2207,6 +2598,23 @@ bool PRSSAMgr::verifyVPR() const
 }
 
 
+//Note the verification is relatively slow.
+bool PRSSAMgr::verifyVersion(OptCtx const& oc) const
+{
+    //Extract dominate tree of CFG.
+    START_TIMER(t, "PRSSA: verifyVersion");
+    ASSERT0(oc.is_dom_valid());
+    DomTree domtree;
+    m_cfg->genDomTree(domtree);
+    VersionVerification vv(domtree, this);
+    if (!vv.verify()) {
+        return false;
+    }
+    END_TIMER(t, "PRSSA: verifyVersion");
+    return true;
+}
+
+
 static void verify_dominance(IR const* def, IR const* use, IRCFG * cfg)
 {
     ASSERT0(def && use);
@@ -2271,7 +2679,6 @@ static void verify_def(IR * ir, xcom::BitSet & defset, SSAInfo * ssainfo,
                 ("DEF for each PR must be unique."));
         defset.bunion(def->id());
     }
-
     IR const* respr = nullptr;
     if (def != nullptr) {
         ASSERT0(def->is_stmt());
@@ -2306,7 +2713,7 @@ bool PRSSAMgr::verifySSAInfo() const
     PRSSAMgr * pthis = const_cast<PRSSAMgr*>(this);
     //Check version for each vp.
     xcom::BitSet defset;
-    BBList * bbl = m_cfg->getBBList();
+    BBList * bbl = m_rg->getBBList();
     BBListIter ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -2335,7 +2742,7 @@ bool PRSSAMgr::verifySSAInfo() const
 void PRSSAMgr::destruction(MOD OptCtx & oc)
 {
     if (!is_valid()) { return; }
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     UINT bbcnt = bblst->get_elem_count();
     BBListIter bbct;
@@ -2357,7 +2764,7 @@ void PRSSAMgr::destruction(MOD OptCtx & oc)
 
 void PRSSAMgr::cleanPRSSAInfo()
 {
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     BBListIter bbct = nullptr;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
@@ -2514,7 +2921,7 @@ bool PRSSAMgr::refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
 bool PRSSAMgr::refinePhi(OptCtx const& oc)
 {
     START_TIMER(t, "PRSSA: Refine phi");
-    BBList * bblst = m_cfg->getBBList();
+    BBList * bblst = m_rg->getBBList();
     BBListIter ct = nullptr;
 
     List<IRBB*> wl;
@@ -2623,7 +3030,7 @@ void PRSSAMgr::stripVersionForBBSet(BBSet const& bbset, PRSet const* prset)
     xcom::BitSet visited;
 
     //Ensure the first allocation of bitset could
-    //accommodata the last vp id.
+    //accommodata the last vpr id.
     visited.alloc(m_vp_count / BITS_PER_BYTE + 1);
 
     //Why not strip all VPR at once by iterating m_vpr_vec?
@@ -2665,7 +3072,7 @@ void PRSSAMgr::stripVersionForBBList(BBList const& bblst)
     xcom::BitSet visited;
 
     //Ensure the first allocation of bitset could
-    //accommodata the last vp id.
+    //accommodata the last vpr id.
     visited.alloc(m_vp_count / BITS_PER_BYTE + 1);
 
     //Why not strip all VPR at once by iterating m_vpr_vec?
@@ -2711,17 +3118,17 @@ static IR * replaceResultPR(IR * stmt, PRNO oldprno, PRNO newprno,
 
 
 //Strip specified VPR's version.
-void PRSSAMgr::stripSpecificVPR(VPR * vp)
+void PRSSAMgr::stripSpecificVPR(VPR * vpr)
 {
-    IR * def = vp->getDef();
-    PRNO orgprno = vp->orgprno();
+    IR * def = vpr->getDef();
+    PRNO orgprno = vpr->orgprno();
     if (def == nullptr) {
-        ASSERT0(VPR_version(vp) == PRSSA_INIT_VERSION);
-        setVPR(orgprno, vp);
+        ASSERT0(VPR_version(vpr) == PRSSA_INIT_VERSION);
+        setVPRByPRNO(orgprno, vpr);
         return;
     }
 
-    ASSERT0(VPR_version(vp) != PRSSA_INIT_VERSION);
+    ASSERT0(VPR_version(vpr) != PRSSA_INIT_VERSION);
     ASSERTN(getVPRByPRNO(orgprno) == nullptr ||
             getVPRByPRNO(orgprno)->version() == PRSSA_INIT_VERSION,
             ("orgprno does not have VPR and version"));
@@ -2734,8 +3141,8 @@ void PRSSAMgr::stripSpecificVPR(VPR * vp)
     MD const* md = m_rg->getMDMgr()->genMDForPR(newprno, newprty);
     replaced_one->setMustRef(md, m_rg);
     SSAUseIter vit = nullptr;
-    for (BSIdx i = SSA_uses(vp).get_first(&vit);
-         vit != nullptr; i = SSA_uses(vp).get_next(i, &vit)) {
+    for (BSIdx i = SSA_uses(vpr).get_first(&vit);
+         vit != nullptr; i = SSA_uses(vpr).get_next(i, &vit)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use->is_pr());
 
@@ -2752,8 +3159,24 @@ void PRSSAMgr::stripSpecificVPR(VPR * vp)
     //Record the newprno to avoid verifyVPR() assertion.
     //However, checking VPR_orgprno after strip_version is dispensable.
     //Original prno will useful when PHI operand update incrementally.
-    VPR_newprno(vp) = newprno;
-    setVPR(newprno, vp);
+    VPR_newprno(vpr) = newprno;
+    setVPRByPRNO(newprno, vpr);
+}
+
+
+IR * PRSSAMgr::findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                             Region const* rg,
+                                             OUT IRSet * set) const
+{
+    ASSERT0(exp && exp->is_pr());
+    ASSERT0(exp->getSSAInfo());
+    IR * d = exp->getSSAInfo()->getDef();
+    //PR operation always has must-ref.
+    if (d != nullptr && li->isInsideLoop(d->getBB()->id())) {
+        if (set != nullptr) { set->append(d); }
+        return d;
+    }
+    return nullptr;
 }
 
 
@@ -2774,13 +3197,13 @@ void PRSSAMgr::stripStmtVersion(IR * stmt, PRSet const* prset,
     ASSERT0(stmt->is_stmt());
     if (stmt->getResultPR() != nullptr &&
         (prset == nullptr || prset->is_contain((BSIdx)stmt->getPrno()))) {
-        VPR * vp = (VPR*)stmt->getSSAInfo();
-        ASSERT0(vp);
-        if (!visited.is_contain(vp->id())) {
-            ASSERT0(vp->version() != PRSSA_INIT_VERSION);
+        VPR * vpr = (VPR*)stmt->getSSAInfo();
+        ASSERT0(vpr);
+        if (!visited.is_contain(vpr->id())) {
+            ASSERT0(vpr->version() != PRSSA_INIT_VERSION);
             //Avoid restriping again.
-            visited.bunion(vp->id());
-            stripSpecificVPR(vp);
+            visited.bunion(vpr->id());
+            stripSpecificVPR(vpr);
         }
     }
 
@@ -2792,16 +3215,16 @@ void PRSSAMgr::stripStmtVersion(IR * stmt, PRSet const* prset,
         if (prset != nullptr && !prset->is_contain((BSIdx)k->getPrno())) {
             continue;
         }
-        VPR * vp = (VPR*)k->getSSAInfo();
-        ASSERT0(vp);
-        if (!visited.is_contain(vp->id())) {
+        VPR * vpr = (VPR*)k->getSSAInfo();
+        ASSERT0(vpr);
+        if (!visited.is_contain(vpr->id())) {
             //Version may be zero if there is not any DEF for k.
-            //ASSERT0(VPR_version(vp) != PRSSA_INIT_VERSION);
+            //ASSERT0(VPR_version(vpr) != PRSSA_INIT_VERSION);
 
             //Avoid restriping again.
-            visited.bunion(vp->id());
+            visited.bunion(vpr->id());
 
-            stripSpecificVPR(vp);
+            stripSpecificVPR(vpr);
         }
     }
 }
@@ -2829,7 +3252,7 @@ void PRSSAMgr::constructMDDUChainForPR()
 }
 
 
-SSAInfo * PRSSAMgr::genSSAInfoForStmt(IR * stmt)
+SSAInfo * PRSSAMgr::genNewVersionSSAInfoForStmt(IR * stmt)
 {
     ASSERT0(stmt->is_stmt() && stmt->isPROp());
     ASSERT0(stmt->getSSAInfo() == nullptr);
@@ -2837,7 +3260,8 @@ SSAInfo * PRSSAMgr::genSSAInfoForStmt(IR * stmt)
     //Check if same PR has been defined multiple times.
     ASSERTN(getSSAInfoByPRNO(stmt->getPrno()) == nullptr,
             ("found multi-definition, ir is not in SSA mode"));
-    SSAInfo * ssainfo = allocSSAInfo(stmt->getPrno(), stmt->getType());
+    SSAInfo * ssainfo = allocNewVersionSSAInfo(stmt->getPrno(),
+                                               stmt->getType());
     ASSERTN(SSA_def(ssainfo) == nullptr,
             ("multidefinition in for PR%d", stmt->getPrno()));
     SSA_def(ssainfo) = stmt;
@@ -2846,7 +3270,7 @@ SSAInfo * PRSSAMgr::genSSAInfoForStmt(IR * stmt)
 }
 
 
-SSAInfo * PRSSAMgr::genSSAInfoForExp(IR * exp)
+SSAInfo * PRSSAMgr::genInitVersionSSAInfoForExp(IR * exp)
 {
     ASSERT0(exp->is_exp() && exp->isPROp());
     ASSERT0(exp->getSSAInfo() == nullptr);
@@ -2854,72 +3278,21 @@ SSAInfo * PRSSAMgr::genSSAInfoForExp(IR * exp)
     //Check if same PR has been defined multiple times.
     ASSERTN(getSSAInfoByPRNO(exp->getPrno()) == nullptr,
             ("found duplicated SSAInfo for same PRNO"));
-    SSAInfo * ssainfo = allocSSAInfo(exp->getPrno(), exp->getType());
+    SSAInfo * ssainfo = allocInitVersionSSAInfo(exp->getPrno(), exp->getType());
     ASSERT0(SSA_def(ssainfo) == nullptr);
     exp->setSSAInfo(ssainfo);
     ssainfo->addUse(exp);
     return ssainfo;
 }
 
-
-void PRSSAMgr::genSSAInfoForBBList()
-{
-    BBListIter bbct = nullptr;
-    BBList * bblst = m_cfg->getBBList();
-    for (bblst->get_head(&bbct); bbct != bblst->end(); bblst->get_next(&bbct)) {
-        IRBB * bb = bbct->val();
-        IRListIter irct = nullptr;
-        for (BB_irlist(bb).get_head(&irct);
-             irct != BB_irlist(bb).end();
-             irct = BB_irlist(bb).get_next(irct)) {
-            IR * ir = irct->val();
-            if (!ir->isPROp()) { continue; }
-            genSSAInfoForStmt(ir);
-        }
-    }
-}
-
-
-void PRSSAMgr::genSSAInfoForExp()
-{
-    IRIter ii;
-    BBListIter bbct = nullptr;
-    BBList * bblst = m_cfg->getBBList();
-    for (bblst->get_head(&bbct); bbct != bblst->end(); bblst->get_next(&bbct)) {
-        IRBB * bb = bbct->val();
-        IRListIter irct = nullptr;
-        for (BB_irlist(bb).get_head(&irct); irct != BB_irlist(bb).end();
-             irct = BB_irlist(bb).get_next(irct)) {
-            IR * ir = irct->val();
-            ii.clean();
-            for (IR * x = xoc::iterExpInit(ir, ii);
-                 x != nullptr; x = xoc::iterExpNext(ii)) {
-                if (!x->isPROp()) { continue; }
-                ASSERT0(x->getSSAInfo() == nullptr);
-                if (!x->isReadPR()) { continue; }
-                SSAInfo * ssainfo = getSSAInfoByPRNO(x->getPrno());
-                if (ssainfo == nullptr) {
-                    ssainfo = allocSSAInfo(x->getPrno(), x->getType());
-                } else if (ssainfo->getDef() != nullptr) {
-                    ASSERT0(ssainfo->getDef()->isPROp() &&
-                            ssainfo->getDef()->getPrno() == x->getPrno());
-                } else {
-                    //The PR is region livein.
-                }
-                ssainfo->addUseAndSSAInfo(x);
-            }
-        }
-    }
-}
-
-
 //Compute SSAInfo for IRs in region that are in SSA mode.
 //Note the function does NOT maintain Version info for PR.
 void PRSSAMgr::genSSAInfoForRegion()
 {
     reinit();
-    genSSAInfoForBBList();
-    genSSAInfoForExp();
+    BBList * bblst = m_rg->getBBList();
+    genSSAInfoForStmtInBBList(bblst, this);
+    genSSAInfoForExpInBBList(bblst, this);
     set_valid(true);
 }
 
@@ -3011,12 +3384,17 @@ void PRSSAMgr::movePhi(IRBB * from, IRBB * to)
 }
 
 
-bool PRSSAMgr::verifyPRSSAInfo(Region const* rg)
+bool PRSSAMgr::verifyPRSSAInfo(Region const* rg, OptCtx const& oc)
 {
     PRSSAMgr const* ssamgr = rg->getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false, false));
+        if (oc.is_dom_valid()) {
+            //Dom info is not available after some optimizations, e.g:RCE.
+            //Only perform version verification when Dom info is ready.
+            ASSERT0(ssamgr->verifyVersion(oc));
+        }
         //TBD:Do we have to verify VPR here?
         //ASSERT0(ssamgr->verifyVPR());
     }
@@ -3081,6 +3459,39 @@ bool PRSSAMgr::hasSameValue(IR const* ir1, IR const* ir2)
 }
 
 
+void PRSSAMgr::changeDefForPartialUseSet(IR * olddef, IR * newdef,
+                                         IRSet const& partial_useset)
+{
+    ASSERT0(olddef && newdef && olddef->isPROp() && newdef->isPROp());
+    ASSERT0(olddef->is_stmt() && newdef->is_stmt());
+    ASSERT0(olddef != newdef);
+    SSAInfo * oldssainfo = olddef->getSSAInfo();
+    ASSERT0(oldssainfo);
+    SSAInfo * newssainfo = newdef->getSSAInfo();
+    if (newssainfo == nullptr) {
+        newssainfo = allocNewVersionSSAInfo(newdef->getPrno(),
+                                            newdef->getType());
+        newdef->setSSAInfo(newssainfo);
+        SSA_def(newssainfo) = newdef;
+    }
+    PRNO newprno = newdef->getPrno();
+    SSAUseIter itold;
+    for (BSIdx i = oldssainfo->getUses().get_first(&itold);
+         itold != nullptr; i = oldssainfo->getUses().get_next(i, &itold)) {
+        IR * use = m_rg->getIR(i);
+        if (!use->isPROp()) { continue; }
+        if (!partial_useset.is_contain(use->id())) { continue; }
+        ASSERTN(use->getPrno() == olddef->getPrno(), ("prno is unmatch"));
+        ASSERT0(use->getSSAInfo() == oldssainfo);
+        use->setPrno(newprno);
+        use->setSSAInfo(newssainfo);
+        use->copyRef(newdef, m_rg);
+        newssainfo->addUse(use);
+    }
+    oldssainfo->removeUse(partial_useset);
+}
+
+
 void PRSSAMgr::changeDef(IR * olddef, IR * newdef)
 {
     ASSERT0(olddef && newdef && olddef->isPROp() && newdef->isPROp());
@@ -3090,7 +3501,8 @@ void PRSSAMgr::changeDef(IR * olddef, IR * newdef)
     ASSERT0(oldssainfo);
     SSAInfo * newssainfo = newdef->getSSAInfo();
     if (newssainfo == nullptr) {
-        newssainfo = allocSSAInfo(newdef->getPrno(), newdef->getType());
+        newssainfo = allocNewVersionSSAInfo(newdef->getPrno(),
+                                            newdef->getType());
         newdef->setSSAInfo(newssainfo);
         SSA_def(newssainfo) = newdef;
     }
@@ -3162,18 +3574,19 @@ bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
     DefMiscBitSetMgr sm;
     PRSet prset(sm.getSegMgr());
     BB2PRSet bb2definedprs(&sm);
-    initMapInfo(sm, bb2definedprs, prset);
-    placePhi(dfm, prset, *m_cfg->getBBList(), bb2definedprs);
-    rename(prset, bb2definedprs, domtree);
+    ConstructCtx cstctx(m_rg);
+    initMapInfo(sm, bb2definedprs, prset, cstctx);
+    placePhi(cstctx, dfm, prset, *m_rg->getBBList(), bb2definedprs);
+    rename(cstctx, prset, bb2definedprs, domtree);
     ASSERT0(verifyPhi(true, true) && verifyPrnoOfVPR());
 
     //Clean version stack after renaming.
-    cleanPRNO2VPRStack();
+    cstctx.cleanPRNO2VPRStack();
 
     //Recompute the map if ssa needs reconstruct.
-    cleanPRNO2Type();
+    cstctx.cleanPRNO2Type();
 
-    stripVersionForBBList(*m_cfg->getBBList());
+    stripVersionForBBList(*m_rg->getBBList());
     refinePhi(oc);
     if (m_livemgr != nullptr) {
         m_livemgr->clean();
@@ -3184,7 +3597,7 @@ bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
         dfm.dump((xcom::DGraph&)*m_cfg, getRegion());
         END_TIMER(tdump, "PRSSA: Dump After Pass");
     }
-    ASSERT0(verifyIRandBB(m_cfg->getBBList(), m_rg));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false, false) && verifyVPR() && verifySSAInfo());
     set_valid(true);
     return true;

@@ -58,6 +58,10 @@ private:
     void chooseTargetBBOfGuard(LI<IRBB> const* li, IRCFG * cfg, IRBB * guard,
                                OUT IRBB ** target, OUT LabelInfo const** lab);
 
+    //Return true if all USE expression of 'ir' have been move to guard-BB.
+    bool haveAllUseMoveToGuardBBInPRSSA(IR const* ir) const;
+    bool haveAllUseMoveToGuardBBInMDSSA(IR const* ir) const;
+
     //Return true if the determinate-expression of loop and related DU chain
     //are too complicated to analysz and recompute.
     bool hasComplicatedDefForPR(LI<IRBB> const* li, IR const* ir) const;
@@ -68,10 +72,30 @@ private:
                        LabelInfo const* guard_end_lab);
     IRBB * insertGuardStart(IRBB * guarded_bb);
     IRBB * insertGuardEnd(IRBB * guarded_bb, IRBB * next_to_guarded_bb);
+
     //Note DOM info must be valid.
     void insertMDSSAPhiForGuardedStmt(IR * ir, DomTree const& domtree);
+
+    //e.g:given guarded stmt in loop body is $15=...
+    //  after moving to guarded BB, the layout will be:
+    //       GuardBranchCondition
+    //      /       |
+    //  #GuardBB:   |
+    //  $15=...     |
+    //      \       |
+    //       $45 phi=...
     IR * insertPRSSAPhiForGuardedStmt(IR * ir);
 
+    //Replace the USE of original stmt to PHI.
+    //e.g:given guarded stmt in loop body is $15=...
+    //  after moving to guarded BB, the layout will be:
+    //       GuardBranchCondition
+    //      /       |
+    //  #GuardBB:   |
+    //  $15=...     |
+    //      \       |
+    //       $45 phi=...
+    //  Replace the USE of $15 to $45.
     void replaceUseOfGuardedStmt(IR * guarded, IR * phi) const;
     void reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
                              IRBB * guard_end);
@@ -125,6 +149,14 @@ public:
 
     //Insert PHI for stmt in guarded BB to keep legality of SSA information.
     //Note DOM info must be valid.
+    //e.g:given guarded stmt in loop body is $15=...
+    //  after moving to guarded BB, the layout will be:
+    //       GuardBranchCondition
+    //      /       |
+    //  #GuardBB:   |
+    //  $15=...     |
+    //      \       |
+    //       $45 phi=...
     void insertPhiForGuardedBB(DomTree const& domtree);
 
     //Return true if the determinate expression in guard will be too

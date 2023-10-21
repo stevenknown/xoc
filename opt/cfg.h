@@ -302,7 +302,7 @@ protected:
         ASSERT0(m_pool);
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 public:
@@ -457,17 +457,23 @@ public:
         dumpLoopTree(m_loop_info, 0, rg);
     }
     virtual void dumpVCG(CHAR const* name = nullptr) const;
-    void dumpDom(Region * rg) const
+
+    //Dump Dom Info to dump file.
+    void dumpDomSet(Region * rg) const
     {
         //Do not dump if LogMr is not initialized.
         if (!rg->isLogMgrInit()) { return; }
-        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), false);
+        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), false, false);
     }
-    void dumpDomTree(Region * rg) const
+
+    //Dump Dom Info to dump file and dump dom-tree graph into file.
+    void dumpDomTree(Region * rg, bool dump_dom_tree,
+                     bool dump_pdom_tree) const
     {
         //Do not dump if LogMr is not initialized.
         if (!rg->isLogMgrInit()) { return; }
-        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), true);
+        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(),
+                              dump_dom_tree, dump_pdom_tree);
     }
 
     void freeRPOVexList()
@@ -702,10 +708,10 @@ public:
         UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
         resize(newsz);
         build(oc);
-
-        //One should call removeEmptyBB() immediately after this function,
-        //because rebuilding cfg may generate redundant empty bb, it
-        //disturb the computation of entry and exit.
+        //NOTE:one should invoke removeEmptyBB() immediately after this
+        //function return, because the rebuilding of CFG may generate
+        //redundant empty BBs, thus it will disturb the computation of
+        //entry and exit.
     }
 
     //Set RPO for BB.
@@ -997,11 +1003,13 @@ bool CFG<BB, XR>::removeSingleEmptyBB(BB * bb, MOD CfgOptCtx & ctx)
     }
     RemoveEmptyBBHelperCtx rmctx(ctx);
     bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
-    CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
-    if (rmctx.needUpdateDomInfo()) {
-        START_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
-        recomputeDomInfo(ctx.oc);
-        END_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
+    if (doit) {
+        CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
+        if (rmctx.needUpdateDomInfo()) {
+            START_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
+            recomputeDomInfo(ctx.oc);
+            END_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
+        }
     }
     END_TIMER(t, "Remove Single Empty BB");
     return doit;
@@ -1041,11 +1049,16 @@ bool CFG<BB, XR>::removeEmptyBB(MOD CfgOptCtx & ctx, RemoveEmptyBBCtx * rmbbctx)
         //has to be updated as well.
         if (isEmptyBB(bb) && !isRegionEntry(bb) &&
             !bb->isExceptionHandler()) {
-            if (rmbbctx != nullptr) {
-                rmbbctx->add(bb->id());
+            UINT bbid = bb->id();
+            bool removed = removeEmptyBBHelper(
+                bb, next_bb, ct, next_ct, rmctx);
+            if (removed) {
+                CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
+                if (rmbbctx != nullptr) {
+                    rmbbctx->add(bbid);
+                }
             }
-            doit |= removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
-            CFGOPTCTX_num_of_removed_empty_bb(&ctx)++;
+            doit |= removed;
         }
     }
     if (rmctx.needUpdateDomInfo()) {

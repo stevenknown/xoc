@@ -34,6 +34,63 @@ namespace xoc {
 class VN;
 class GVN;
 
+//The class computes the number of DEF of MustRef and MayRef for each IR
+//in given loop.
+class ComputeMD2DefCnt {
+    COPY_CONSTRUCTOR(ComputeMD2DefCnt);
+protected:
+    SMemPool * m_pool;
+    Region const* m_rg;
+    IRCFG const* m_cfg;
+    LI<IRBB> const* m_li;
+    MDSystem const* m_md_sys;
+    typedef xcom::TMap<MD const*, UINT*> MD2UINTPtr;
+    typedef xcom::TMapIter<MD const*, UINT*> MD2UINTPtrIter;
+    MD2UINTPtr m_md2defcnt;
+protected:
+    void applyMayDefEffect(ConstIRList const& only_maydef);
+    void computeBB(IRBB const* bb, OUT ConstIRList & only_maydef);
+
+    //must: can be nullptr if there is no MustRef.
+    void updateMDSet2DefCnt(MDSet const* may, MD const* must);
+    void updateMD2DefCnt(IR const* ir, OUT ConstIRList & only_maydef);
+    void * xmalloc(UINT size)
+    {
+        ASSERT0(m_pool != nullptr);
+        void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
+        ASSERT0(p != nullptr);
+        ::memset((void*)p, 0, size);
+        return p;
+    }
+public:
+    ComputeMD2DefCnt(Region const* rg, LI<IRBB> const* li) : m_rg(rg), m_li(li)
+    {
+        m_cfg = rg->getCFG();
+        m_md_sys = rg->getMDSystem();
+        m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
+    }
+    ComputeMD2DefCnt() { smpoolDelete(m_pool); }
+
+    void compute();
+
+    void dump() const;
+
+    //Return the count of definition of MD reference of 'ir' in given loop.
+    UINT getMustRefDefCnt(IR const* ir) const;
+
+    //Return the count of definition of 'md' in given loop.
+    UINT getMDDefCnt(MD const* md) const;
+
+    //Return true if ir is the unqiue DEF stmt of MustRef in the loop.
+    bool isUniqueDef(IR const* ir) const;
+
+    //Return true if ir is the unqiue DEF stmt of MustRef in the loop.
+    //The function is not only check MustRef's DEF count but also the MD in
+    //MayDef. Return true if both MustRef and MayRef have unique DEF.
+    bool isUniqueDefStrict(IR const* ir) const;
+};
+
+
 //The function manipulates DU chain. It adds DU chain from tree 'from' to
 //tree 'to',  and the function will establish new DU chain between DEF of
 //'from' and expression 'to'.
@@ -87,6 +144,16 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg,
 //e.g: given 'olddef'->USE, the result is 'newdef'->USE.
 void changeDef(IR * olddef, IR * newdef, Region * rg);
 
+//DU chain operation.
+//The function changes DEF of PRSSA DU chain from 'olddef' to 'newdef'.
+//Note the function only changes the DU chain for the USE in
+//'partial_useset', the rest of IRs in use-set of 'olddef' will unchanged.
+//olddef: original stmt.
+//newdef: new stmt.
+//e.g: given 'olddef'->USE, the result is 'newdef'->USE.
+void changeDefForPartialUseSet(IR * olddef, IR * newdef,
+                               IRSet const& partial_useset, Region * rg);
+
 //The function coalesces DU chain of 'from' to 'to'.
 //The function replaces definition of USE of 'from' to defintion of 'to',
 //just behaved like copy-propagation.
@@ -104,7 +171,13 @@ void coalesceDUChain(IR * from, IR * to, Region * rg);
 //The function collects all USE expressions into 'useset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
-void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset);
+void collectUseSet(IR const* def, Region const* rg, OUT IRSet * useset);
+
+//Collect all USE expressions that inside loop of 'def' into 'useset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain in doing collection.
+void collectUseSetInLoop(IR const* def, Region const* rg, LI<IRBB> const* li,
+                         OUT IRSet * useset);
 
 //The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
 //the new MDSSAInfo.
@@ -114,7 +187,7 @@ void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg);
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
 //The function will keep iterating DEF of PHI operand.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
+void collectDefSet(IR const* use, Region const* rg, OUT IRSet * defset);
 
 //The function finds the nearest dominated DEF stmt of 'exp'.
 //Note RPO of BB must be available.
@@ -124,11 +197,36 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
 IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
                        bool omit_self);
 
+//The function try to find the killing-def for 'use'.
+//To find the killing-def, the function prefer use SSA info.
+IR * findKillingDef(IR const* use, Region const* rg);
+
+//Find the unique DEF of 'exp' that is inside given loop.
+//set: it is optional, if it is not NULL, the function will record all DEF
+//     found into the set as a return result.
+IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
+                                   Region const* rg, OUT IRSet * set = nullptr);
+
+//The function try to find the unique must-def for 'use'.
+//Note must-def is the DEF that overlapped with 'use', but may not be
+//killing-def.
+//To find the killing-def, the function prefer use SSA info.
+IR * findUniqueMustDef(IR const* use, Region const* rg);
+
+//Note DOM info must be available.
+//exp: the expression that expected to set livein.
+//startir: the start position in 'startbb', it can be NULL.
+//         If it is NULL, the function first finding the Phi list of
+//         'startbb', then keep finding its predecessors until meet CFG entry.
+//startbb: the BB that begin to do searching.
+void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
+                         OptCtx const& oc);
+
 //This function try to require VN of base of ir.
 //Return the VN if found, and the indirect operation level.
 //e.g: given ILD(ILD(p)), return p and indirect_level is 2.
 //e.g2: given IST(ILD(q)), return q and indirect_level is 2.
-VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
+VN const* getVNOfIndirectOp(IR const* ir, OUT UINT * indirect_level,
                             GVN const* gvn);
 
 //Return true if both ir1 and ir2 have same unique def.
@@ -154,6 +252,30 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
 //ir1: expression.
 //ir2: expression.
 bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2, Region const* rg);
+
+//Return true if there is loop-reduce dependence between ir and its DEF.
+//ir: exp or stmt.
+bool hasLoopReduceDep(IR const* ir, Region const* rg, LI<IRBB> const* li);
+
+//Return true if there is loop-reduce dependence between each IR that rooted
+//by 'ir' and elements in 'lst'.
+//ir: the root of IR tree, it may be exp or stmt.
+//lst: a list of IR stmt
+bool hasLoopReduceDepForIRTree(IR const* ir, Region const* rg,
+                               LI<IRBB> const* li);
+
+//Return true if there are multiple-definition of MD reference represeted
+//by 'ir' inside given loop 'li'.
+//set: record the DEF stmt set of reduction variable.
+bool hasUniqueDefInLoopForMustRef(IR const* ir, Region const* rg,
+                                  LI<IRBB> const* li);
+
+//Return true if there are more than one definition of MD reference represeted
+//by 'ir' inside given loop 'li'.
+//defcnt: return the count of definition found.
+//        Note it may be equal to 0 if there is not any DEF in loop.
+bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
+                                       LI<IRBB> const* li, OUT UINT & defcnt);
 
 //Return true if def is killing-def of use.
 //Note this function does not check if there is DU chain between def and use.
@@ -200,27 +322,62 @@ bool isDependent(IR const* ir, MDPhi const* phi);
 //                 in MDSet, and is costly.
 //li: loop info.
 bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
-                       LI<IRBB> const* li, Region const* rg);
+                       LI<IRBB> const* li, Region const* rg, GVN const* gvn);
 
-//The function try to find the killing-def for 'use'.
-//To find the killing-def, the function prefer use SSA info.
-IR * findKillingDef(IR const* use, Region const* rg);
+//Return true if both ir1 and ir2 are in loop 'li', and there is at least
+//loop-carried dependence between ir1 and ir2.
+//ir1: stmt or expression.
+//ir2: stmt or expression.
+//costly_analysis: set to true if caller expect to compute overlap for
+//                 element in MayDef/MayUse, which will iterate elements
+//                 in MDSet, and is costly.
+//li: loop info.
+//Note the function does not check PR operation.
+bool isLoopCarried(IR const* ir1, IR const* ir2, bool costly_analysis,
+                   LI<IRBB> const* li, Region const* rg, GVN const* gvn);
 
-//The function try to find the unique must-def for 'use'.
-//Note must-def is the DEF that overlapped with 'use', but may not be
-//killing-def.
-//To find the killing-def, the function prefer use SSA info.
-IR * findUniqueMustDef(IR const* use, Region const* rg);
+//Return true if there is loop-carried dependence between ir and stmt in loop.
+//ir: exp or stmt.
+//include_itselfstmt: True if the function ignores stmt that is parent of 'ir'.
+//Note the function will check the dependence between ir and every stmt in
+//given loop.
+//Note the function does not check PR operation.
+bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
+                   bool include_itselfstmt, LI<IRBB> const* li, GVN const* gvn);
 
-//Note DOM info must be available.
-//exp: the expression that expected to set livein.
-//startir: the start position in 'startbb', it can be NULL.
-//         If it is NULL, the function first finding the Phi list of
-//         'startbb', then keep finding its predecessors until the
-//         CFG entry.
-//startbb: the BB that begin to do searching.
-void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
-                         OptCtx const& oc);
+//Return true if there is loop-carried dependence between ir and elements in
+//'lst'.
+//ir: exp or stmt.
+//include_itselfstmt: True if the function ignores stmt that is parent of 'ir'.
+//lst: a list of IR stmt
+//Note the function does not check PR operation.
+bool isLoopCarried(IR const* ir, Region const* rg,
+                   bool is_aggressive, bool include_itselfstmt,
+                   xcom::List<IR*> const& lst, LI<IRBB> const* li,
+                   GVN const* gvn);
+
+//Return true if there is loop-carried dependence between each IR that rooted
+//by 'ir' and elements in 'lst'.
+//ir: the root of IR tree, it may be exp or stmt.
+//include_itselfstmt: True if the function ignores stmt that is parent of 'ir'.
+//lst: a list of IR stmt
+//Note the function does not check PR operation.
+bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
+                            bool is_aggressive, bool include_itselfstmt,
+                            xcom::List<IR*> const& lst,
+                            LI<IRBB> const* li, GVN const* gvn);
+
+//Return true if ir is the unique DEF of its must-ref MD in given loop.
+//The function also consider the MayRef of each stmt in loop.
+//e.g: loop {
+//        t1 = .. //t1 reference MD10
+//        t2 = .. //t1 reference MD22
+//        *p = .. //*p reference MD21, MD22
+//     }
+//     t1 is the unique def of MD10, and t2 is NOT the unique def of MD22.
+bool isUniqueDefInLoopForMustRef(IR const* ir, LI<IRBB> const* li,
+                                 Region const* rg,
+                                 MOD DefMiscBitSetMgr & sbsmgr);
 
 //The function checks each DEF|USE occurrence of ir, remove the expired
 //expression which is not reference the memory any more that ir referenced.
@@ -236,7 +393,8 @@ bool removeExpiredDU(IR const* ir, Region * rg);
 //exp: it is the root of IR tree that to be removed.
 //e.g: ir = ...
 //        = exp //S1
-//If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
+//If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo,
+//SSAInfo and Classic DU info.
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
@@ -251,7 +409,8 @@ void removeClassicDUChain(Region * rg, bool rmprdu, bool rmnonprdu);
 //exp: the expression to be removed.
 //e.g: ir = ...
 //    = ir //S1
-//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo,
+//SSAInfo and Classic DU info.
 //NOTE: the function only process exp itself.
 void removeUse(IR const* exp, Region * rg);
 

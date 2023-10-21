@@ -280,7 +280,7 @@ bool operator < (BigInt const& a, BigInt const& b)
 {
     bool is_a_neg = a.is_neg();
     bool is_b_neg = b.is_neg();
-    if (!is_a_neg && !is_a_neg) {
+    if (!is_a_neg && !is_b_neg) {
         if (a.getSigPos() < b.getSigPos()) { return true; }
         if (a.getSigPos() > b.getSigPos()) { return false; }
         for (INT i = 0; i <= a.getSigPos(); i++) {
@@ -329,7 +329,7 @@ bool operator <= (BigInt const& a, BigInt const& b)
 
     bool is_a_neg = a.is_neg();
     bool is_b_neg = b.is_neg();
-    if (!is_a_neg && !is_a_neg) {
+    if (!is_a_neg && !is_b_neg) {
         //Both a, b are positive.
         if (a.getSigPos() > b.getSigPos()) { return false; }
         if (a.getSigPos() < b.getSigPos()) { return true; }
@@ -739,7 +739,6 @@ void biDivRem(IN BigInt const& a, IN BigInt const& b,
         biuDivRem(a, b, quo, rem);
         return;
     }
-
     BigInt abs_a;
     BigInt abs_b;
     BigInt * pa = const_cast<BigInt*>(&a);

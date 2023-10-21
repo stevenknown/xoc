@@ -42,7 +42,7 @@ public:
     MInstDesc(MInstMgr const& im) : m_inst_mgr(im)
     {
         ASSERT0(FT_NUM < MAX_FT_NUM);
-        ::memset(m_field_idx, 0, sizeof(m_field_idx));
+        ::memset((void*)m_field_idx, 0, sizeof(m_field_idx));
     }
     virtual ~MInstDesc() {}
 

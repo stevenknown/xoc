@@ -47,15 +47,16 @@ class BinarySearch {
     COPY_CONSTRUCTOR(BinarySearch);
 public:
     BinarySearch() {}
-    //Return true if found val in array.
-    //array: elements sorted in incremental order.
-    //val: search val in array.
-    //valpos: record the position in array if find val.
-    //nearless: record the position of nearest value that is less-than 'val' if
-    //          not found 'val' in array.
-    //neargreat: record the position of nearest value that is great-than 'va' if
-    //           not found 'val' in array.
-   bool search(Vector<T> const& data, T val, OUT VecIdx * valpos = nullptr,
+
+    //Return true if found val in data.
+    //data: elements sorted in incremental order.
+    //val: search val in data.
+    //valpos: optional, record the position in data if found val.
+    //nearless: optional, record position of the nearest value that is
+    //          less-than 'val' if not found 'val' in data.
+    //neargreat: optional, record position of the nearest value that is
+    //           great-than 'va' if not found 'val' in data.
+    bool search(Vector<T> const& data, T val, OUT VecIdx * valpos = nullptr,
                 OUT VecIdx * nearless = nullptr,
                 OUT VecIdx * neargreat = nullptr);
 };

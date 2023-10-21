@@ -50,12 +50,12 @@ VarFlagDesc const g_varflag_desc[] = {
     { VAR_IS_FORMAL_PARAM, "formal_param", }, //idx11
     { VAR_IS_SPILL, "spill", }, //idx12
     { VAR_ADDR_TAKEN, "addr_taken", }, //idx13
-    { VAR_IS_PR, "pr", }, //idx14
+    { VAR_IS_PR, "$", }, //idx14
     { VAR_IS_RESTRICT, "restrict", }, //idx15
     { VAR_IS_UNALLOCABLE, "unallocable", }, //idx16
     { VAR_IS_DECL, "decl", }, //idx17
-    { VAR_IS_VISIBLE, "visible", }, //idx18
-    { VAR_IS_REGION, "region", }, //idx19
+    { VAR_IS_REGION, "region", }, //idx18
+    { VAR_IS_ENTRY, "entry", }, //idx19
 };
 static UINT g_varflag_num = sizeof(g_varflag_desc) / sizeof(g_varflag_desc[0]);
 
@@ -71,7 +71,6 @@ static VAR_FLAG g_grmode_flag[] = {
     VAR_FAKE,
     VAR_IS_LABEL,
     VAR_IS_ARRAY,
-    VAR_IS_VISIBLE,
 };
 static UINT g_grmode_flag_num = sizeof(g_grmode_flag) /
                                 sizeof(g_grmode_flag[0]);
@@ -127,24 +126,24 @@ VAR_FLAG VarFlagDesc::getFlag(UINT idx)
 //END VarFlagDesc
 
 
-void VarTab::dump(TypeMgr const* tm) const
+void VarTab::dump(VarMgr const* vm) const
 {
-    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
-    ASSERT0(tm);
+    if (!vm->getRegionMgr()->isLogMgrInit()) { return; }
+    ASSERT0(vm);
     VarTabIter iter;
     for (Var * v = get_first(iter); v != nullptr; v = get_next(iter)) {
-        v->dump(tm);
+        v->dump(vm);
     }
 }
 
 
-void ConstVarTab::dump(TypeMgr * tm)
+void ConstVarTab::dump(VarMgr const* vm) const
 {
-    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
-    ASSERT0(tm);
+    if (!vm->getRegionMgr()->isLogMgrInit()) { return; }
+    ASSERT0(vm);
     ConstVarTabIter iter;
     for (Var const* v = get_first(iter); v != nullptr; v = get_next(iter)) {
-        v->dump(tm);
+        v->dump(vm);
     }
 }
 
@@ -154,7 +153,7 @@ VarMgr::VarMgr(RegionMgr * rm)
     ASSERT0(rm);
     m_var_count = VAR_ID_UNDEF + 1; //for enjoying bitset.
     m_str_count = 1;
-    m_ru_mgr = rm;
+    m_rm = rm;
     m_tm = rm->getTypeMgr();
 }
 
@@ -183,14 +182,14 @@ static void dumpIndent(LogMgr * lm)
 }
 
 
-void Var::dump(TypeMgr const* tm) const
+void Var::dump(VarMgr const* vm) const
 {
-    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
-    note(tm->getRegionMgr(), "\n");
-    dumpIndent(tm->getRegionMgr()->getLogMgr());
+    if (!vm->getRegionMgr()->isLogMgrInit()) { return; }
+    note(vm->getRegionMgr(), "\n");
+    dumpIndent(vm->getRegionMgr()->getLogMgr());
 
     StrBuf buf(64);
-    prt(tm->getRegionMgr(), "%s", dump(buf, tm));
+    prt(vm->getRegionMgr(), "%s", dump(buf, vm));
 }
 
 
@@ -312,11 +311,11 @@ CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 
 
 //You must make sure this function will not change any field of Var.
-CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
+CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
 {
     CHAR * lname = SYM_name(VAR_name(this));
     CHAR tt[43];
-    if (xstrlen(lname) > 43) {
+    if (xcom::xstrlen(lname) > 43) {
         ::memcpy(tt, lname, 43);
         tt[39] = '.';
         tt[40] = '.';
@@ -341,7 +340,8 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
         if (ltype->is_any()) {
             buf.strcat(",mem_size:ANY");
         } else {
-            buf.strcat(",mem_size:%d", getByteSize(dm));
+            buf.strcat(",mem_size:%d",
+                getByteSize(vm->getRegionMgr()->getTypeMgr()));
         }
     }
 
@@ -351,7 +351,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
     }
 
     buf.strcat(",decl:'");
-    dumpVARDecl(buf);
+    dumpVARDecl(buf, vm);
     buf.strcat("'");
     ASSERT0(VAR_flag(this).verify());
     return buf.buf;
@@ -366,7 +366,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
 void VarMgr::destroyVar(Var * v)
 {
     ASSERT0(v->id() != VAR_ID_UNDEF);
-    m_freelist_of_varid.bunion(v->id(), *m_ru_mgr->get_sbs_mgr());
+    m_freelist_of_varid.bunion(v->id(), *m_rm->get_sbs_mgr());
     m_var_vec.set(v->id(), nullptr);
     if (v->is_string() && v->hasInitString()) {
         //User may declare a empty string.
@@ -385,7 +385,7 @@ void VarMgr::destroy()
         delete v;
     }
 
-    m_freelist_of_varid.clean(*m_ru_mgr->get_sbs_mgr());
+    m_freelist_of_varid.clean(*m_rm->get_sbs_mgr());
 }
 
 
@@ -403,7 +403,7 @@ void VarMgr::assignVarId(Var * v)
     if (IS_BSUNDEF(id)) {
         VAR_id(v) = (UINT)m_var_count++;
     } else {
-        m_freelist_of_varid.diff(id, *m_ru_mgr->get_sbs_mgr());
+        m_freelist_of_varid.diff(id, *m_rm->get_sbs_mgr());
         VAR_id(v) = id;
     }
     ASSERTN(VAR_id(v) < VAR_ID_MAX, ("too many variables"));
@@ -432,7 +432,7 @@ Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
                           VarFlag const& flag)
 {
     ASSERT0(varname);
-    Sym const* sym = m_ru_mgr->addToSymbolTab(varname);
+    Sym const* sym = m_rm->addToSymbolTab(varname);
     return registerVar(sym, type, align, flag);
 }
 
@@ -467,9 +467,9 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
     if (var_name == nullptr) {
         StrBuf buf(64);
         buf.sprint("_const_string_%lu", (ULONG)m_str_count++);
-        VAR_name(v) = m_ru_mgr->addToSymbolTab(buf.buf);
+        VAR_name(v) = m_rm->addToSymbolTab(buf.buf);
     } else {
-        VAR_name(v) = m_ru_mgr->addToSymbolTab(var_name);
+        VAR_name(v) = m_rm->addToSymbolTab(var_name);
     }
     VAR_string(v) = s;
     VAR_type(v) = m_tm->getString();
@@ -510,7 +510,7 @@ void VarMgr::dump() const
         if (v == nullptr) { continue; }
 
         buf.clean();
-        prt(rm, "\n%s", v->dump(buf, m_tm));
+        prt(rm, "\n%s", v->dump(buf, this));
     }
     prt(rm, "\n");
     dumpFreeIDList();

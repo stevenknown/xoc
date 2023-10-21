@@ -45,6 +45,7 @@ author: Su Zhenyu
 #include "mdssainfo.h"
 #include "cdg.h"
 #include "cfg.h"
+#include "revise_cfg.h"
 #include "ir_cfg.h"
 #include "solve_set.h"
 #include "ir_du.h"

@@ -30,9 +30,14 @@ ifeq ($(DEBUG),)
   DEBUG=true
 endif
 
+ifeq ($(OPEN_COVERAGE),true)
+  CFLAGS+=--coverage
+endif
+
 CFLAGS+=-Wall
 ROOT_DIR=../..
 COM_DIR=../../com
+OPT_DIR=../../opt
 ELF_DIR=..
 READELF_DIR=.
 READELF_OUTPUT=readelf.exe
@@ -40,6 +45,7 @@ READELF_OUTPUT=readelf.exe
 include $(ELF_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
 include $(ROOT_DIR)/Makefile.option
+include $(OPT_DIR)/Makefile.inc
 
 MISC_TARG_MACH_ELF_OBJS+=\
 $(ELF_DIR)/misc_elf_mgr.o
@@ -51,14 +57,14 @@ ifeq ($(FOR_ARM),true)
   -include $(TARG_ARM_DIR)/arm_elf_targinfo.d
 endif
 
-ifdef FOR_X86
+ifeq ($(FOR_X86),true)
   TARG_X86_DIR=../../x86
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_X86_DIR)/*_elf_targinfo.o
   CFLAGS+=-DFOR_X86
   -include $(TARG_X86_DIR)/*_elf_targinfo.d
 endif
 
-ifdef FOR_X64
+ifeq ($(FOR_X64),true)
   TARG_X64_DIR=../../x64
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_X64_DIR)/*_elf_targinfo.o
   CFLAGS+=-DFOR_X64
@@ -72,7 +78,11 @@ ifeq ($(FOR_SCORE),true)
   -include $(TARG_SCORE_DIR)/*_elf_targinfo.d
 endif
 
-ifdef FOR_TECO
+OPT_DEP_OBJS+=\
+$(OPT_DIR)/data_type.o\
+$(OPT_DIR)/logmgr.o
+
+ifeq ($(FOR_TECO),true)
   TARG_TECO_DIR=../../teco
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
   CFLAGS+=-DFOR_TECO
@@ -112,10 +122,12 @@ $(info "DEBUG:$(DEBUG)")
 $(info "TMP_ELF_OBJS:$(TMP_ELF_OBJS)")
 
 #Define rules.
-$(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) $(READELF_OBJS)
+$(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) \
+  $(READELF_OBJS)
 	@echo "BUILD $(READELF_OUTPUT)"
 	@echo "EXEC:"
 	$(CC) $(TMP_ELF_OBJS) $(MISC_TARG_MACH_ELF_OBJS) $(READELF_OBJS) \
+      $(OPT_DEP_OBJS) \
       -Xlinker "-(" \
       $(COM_DIR)/$(COM_OUTPUT) \
       -Xlinker "-)" \
@@ -126,7 +138,8 @@ $(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) $(READELF_
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
+      CFLAGS="$(CFLAGS)"
 
 %.o:%.cpp
 	@echo "BUILD $<"

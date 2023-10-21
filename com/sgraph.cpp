@@ -1317,20 +1317,23 @@ bool Graph::isReachIn(Vertex const* start, Vertex const* reachin,
 }
 
 
-VexIdx Graph::WhichPred(VexIdx pred_vex_id, Vertex const* vex)
+UINT Graph::WhichPred(VexIdx pred_vex_id, Vertex const* vex,
+                      OUT bool & is_pred)
 {
     ASSERT0(vex);
     UINT n = 0;
     AdjVertexIter it;
+    is_pred = false;
     for (Vertex const* in = get_first_in_vertex(vex, it); in != nullptr;
          in = get_next_in_vertex(it)) {
         if (in->id() == pred_vex_id) {
+            is_pred = true;
             return n;
         }
         n++;
     }
-    UNREACHABLE(); //pred_vex_id should be a predecessor of vex.
-    return 0;
+    //UNREACHABLE(); //pred_vex_id should be a predecessor of vex.
+    return VERTEX_UNDEF;
 }
 
 
@@ -2420,8 +2423,10 @@ void DGraph::genDomTree(OUT DomTree & dt) const
          v != nullptr; v = get_next_vertex(c)) {
         VexIdx vid = VERTEX_id(v);
         dt.addVertex(vid);
-        if (m_idom_set.get(vid) != VERTEX_UNDEF) {
-            dt.addEdge((VexIdx)m_idom_set.get(vid), vid);
+        VexIdx idom = m_idom_set.get(vid);
+        if (idom != VERTEX_UNDEF) {
+            ASSERTN(isVertex(idom), ("idom set is out of date"));
+            dt.addEdge(idom, vid);
         }
     }
     VertexIter it;
@@ -2442,14 +2447,17 @@ void DGraph::genPDomTree(OUT DomTree & pdt) const
          v != nullptr; v = get_next_vertex(c)) {
         VexIdx vid = v->id();
         pdt.addVertex(vid);
-        if (m_ipdom_set.get(vid) != VERTEX_UNDEF) { //id of vex starting at 1.
-            pdt.addEdge((VexIdx)m_ipdom_set.get(vid), vid);
+        VexIdx ipdom = m_ipdom_set.get(vid);
+        if (ipdom != VERTEX_UNDEF) {
+            ASSERTN(isVertex(ipdom), ("ipdom set is out of date"));
+            pdt.addEdge(ipdom, vid);
         }
     }
 }
 
 
-void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree) const
+void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree,
+                     bool dump_pdom_tree) const
 {
     if (name == nullptr) {
         name = "graph_dom.txt";
@@ -2457,7 +2465,7 @@ void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree) const
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!",name));
-    dumpDom(h, dump_dom_tree);
+    dumpDom(h, dump_dom_tree, dump_pdom_tree);
     fclose(h);
 }
 
@@ -2465,7 +2473,7 @@ void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree) const
 //Dump dom set, pdom set, idom, ipdom.
 //'dump_dom_tree': set to be true to dump dominate
 //  tree, and post dominate Tree.
-void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
+void DGraph::dumpDom(FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
 {
     if (h == nullptr) { return; }
     fprintf(h, "\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
@@ -2513,7 +2521,9 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
         DomTree dom;
         genDomTree(dom);
         dom.dumpDOT("graph_dom_tree.dot");
-        dom.erase();
+    }
+    if (dump_pdom_tree) {
+        DomTree dom;
         genPDomTree(dom);
         dom.dumpDOT("graph_pdom_tree.dot");
     }
@@ -2955,7 +2965,14 @@ void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
     ASSERTN(get_idom(newsucc->id()) == VERTEX_UNDEF &&
             get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
     ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
-    ASSERT0(oldsucc->getInDegree() == 1);
+
+    //TBD:Do we have to restrict the in-degree of oldsucc? User has guarrantee
+    //that vex is the idom of oldsucc, and there is only ONE path from vex to
+    //oldsucc.
+    //e.g:licm.gr, LICM insert BB11 between BB10->BB2, BB11 is the fallthrough
+    //BB of BB10, and BB2 has more than one predecessors. The case is legal.
+    //ASSERT0(oldsucc->getInDegree() == 1);
+
     if (get_ipdom(vex->id()) != VERTEX_UNDEF) {
         //ipdom is meanlingless if there is no exit in graph.
         set_ipdom(newsucc->id(), oldsucc->id());

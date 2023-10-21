@@ -380,30 +380,122 @@ IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
 }
 
 
+//Replace the USE of original stmt to PHI.
+//e.g:given guarded stmt in loop body is $15=...
+//  after moving to guarded BB, the layout will be:
+//       GuardBranchCondition
+//      /       |
+//  #GuardBB:   |
+//  $15=...     |
+//      \       |
+//       $45 phi=...
+//  Replace the USE of $15 to $45.
 void InsertGuardHelper::replaceUseOfGuardedStmt(IR * guarded, IR * phi) const
 {
-    ASSERT0(guarded->is_stmt());
-    xoc::changeDef(guarded, phi, m_rg);
+    ASSERT0(guarded->isPROp());
+    DefMiscBitSetMgr sm;
+    IRSet useset(sm.getSegMgr());
+    xoc::collectUseSet(guarded, m_rg, &useset);
+    IRSetIter it;
+    BSIdx ni = BS_UNDEF;
+    for (BSIdx i = useset.get_first(&it); it != nullptr; i = ni) {
+        ni = useset.get_next(i, &it);
+        IR * use = m_rg->getIR(i);
+        ASSERT0(use->isPROp());
+        IR const* stmt = use->getStmt();
+        ASSERT0(stmt && stmt->getBB());
+        if (stmt->getBB() == m_guarded_bb) {
+            //Some USEs of guarded-stmt have been moved to guarded BB also.
+            //Their DU chain do not need change.
+            //e.g:licm_insert_guard.gr
+            useset.diff(i);
+        }
+    }
+    xoc::changeDefForPartialUseSet(guarded, phi, useset, m_rg);
 }
 
 
 //Insert PHI for stmt in guarded BB to keep legality of SSA information.
 //Note DOM info must be valid.
+//e.g:given guarded stmt in loop body is $15=...
+//  after moving to guarded BB, the layout will be:
+//       GuardBranchCondition
+//      /       |
+//  #GuardBB:   |
+//  $15=...     |
+//      \       |
+//       $45 phi=...
 void InsertGuardHelper::insertPhiForGuardedBB(DomTree const& domtree)
 {
     ASSERT0(m_guarded_bb);
     BBIRListIter it;
     for (IR * ir = m_guarded_bb->getIRList().get_head(&it);
          ir != nullptr; ir = m_guarded_bb->getIRList().get_next(&it)) {
-        if (ir->isPROp() && usePRSSADU()) {
+        if (ir->isPROp() && usePRSSADU() &&
+            !haveAllUseMoveToGuardBBInPRSSA(ir)) {
             insertPRSSAPhiForGuardedStmt(ir);
             continue;
         }
-        if (ir->isMemRefNonPR() && useMDSSADU()) {
+        if (ir->isMemRefNonPR() && useMDSSADU() &&
+            !haveAllUseMoveToGuardBBInMDSSA(ir)) {
             insertMDSSAPhiForGuardedStmt(ir, domtree);
             continue;
         }
     }
+}
+
+
+bool InsertGuardHelper::haveAllUseMoveToGuardBBInPRSSA(IR const* ir) const
+{
+    ASSERT0(ir->is_stmt() && ir->isPROp());
+    ASSERT0(usePRSSADU());
+    SSAInfo const* info = ir->getSSAInfo();
+    ASSERT0(info);
+    SSAUseIter uit = nullptr;
+    for (BSIdx i = info->getUses().get_first(&uit);
+         uit != nullptr; i = info->getUses().get_next(i, &uit)) {
+        IR * use = m_rg->getIR(i);
+        ASSERT0(use->isReadPR());
+        ASSERT0(use->getStmt() && use->getStmt()->getBB());
+        if (use->getStmt()->getBB() != m_guarded_bb) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+bool InsertGuardHelper::haveAllUseMoveToGuardBBInMDSSA(IR const* ir) const
+{
+    ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
+    ASSERT0(useMDSSADU());
+    MDSSAInfo const* mdssainfo = m_mdssa->getMDSSAInfoIfAny(ir);
+    ASSERT0(mdssainfo);
+    VOpndSetIter it = nullptr;
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&it);
+        i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &it)) {
+        VMD * vmd = m_mdssa->getVMD(i);
+        ASSERT0(vmd && vmd->is_md());
+        VMD::UseSetIter vuit;
+        for (UINT i = vmd->getUseSet()->get_first(vuit);
+             !vuit.end(); i = vmd->getUseSet()->get_next(vuit)) {
+            IR const* use = m_rg->getIR(i);
+            ASSERT0(use && !use->is_undef());
+            if (use->is_id()) {
+                MDPhi const* phi = ((CId*)use)->getMDPhi();
+                ASSERT0(phi && phi->getBB());
+                if (phi->getBB() != m_guarded_bb) {
+                    return false;
+                }
+                continue;
+            }
+            ASSERT0(use->getStmt() && use->getStmt()->getBB());
+            if (use->getStmt()->getBB() != m_guarded_bb) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 
@@ -418,7 +510,9 @@ void InsertGuardHelper::reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
     IR * nextto_br = loophead->getLastIR();
     ASSERT0(nextto_br && nextto_br->isConditionalBr());
     ASSERT0(nextto_br->is_single());
-    UINT pos = m_cfg->WhichPred(guard_end, loophead);
+    bool is_pred;
+    UINT pos = m_cfg->WhichPred(guard_end, loophead, is_pred);
+    ASSERT0_DUMMYUSE(is_pred);
     ConstIRIter ith;
     IRIter itg;
 

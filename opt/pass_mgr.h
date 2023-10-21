@@ -95,6 +95,9 @@ protected:
     virtual Pass * allocLinearScanRA();
     virtual Pass * allocCallGraph();
     virtual Pass * allocVectorization();
+    virtual Pass * allocPrologueEpilogue();
+    virtual Pass * allocGPAdjustment();
+    virtual Pass * allocRelaxation();
 protected:
     void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
                                   BitSet const& opts);

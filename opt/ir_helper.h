@@ -32,12 +32,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 typedef xcom::SEGIter * IRSetIter;
-class IRSet : public DefSBitSet {
+class IRSet : public xcom::DefSBitSet {
     COPY_CONSTRUCTOR(IRSet);
 public:
     IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
 
-    void append(IR const* v) { DefSBitSet::bunion(IR_id(v)); }
+    void append(IR const* v) { DefSBitSet::bunion(v->id()); }
     bool allElemBeExp(Region const* rg) const;
 
     void dump(Region const* rg) const;
@@ -45,14 +45,54 @@ public:
     bool find(IR const* v) const
     {
         ASSERT0(v);
-        return DefSBitSet::is_contain(IR_id(v));
+        return DefSBitSet::is_contain(v->id());
     }
 
+    //The function remove all IRs in the 'set'.
+    void remove(IRSet const& set) { diff(set); }
     void remove(IR const* v)
     {
         ASSERT0(v);
-        DefSBitSet::diff(IR_id(v));
+        DefSBitSet::diff(v->id());
     }
+};
+
+class VisitIRTree {
+    COPY_CONSTRUCTOR(VisitIRTree);
+protected:
+    bool m_is_terminate;
+protected:
+    template<class T> void iter(T ir)
+    {
+        if (!visitIR(ir)) { return; }
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            T tmplst = ir->getKid(i);
+            if (tmplst == nullptr) { continue; }
+            for (T tmp = tmplst; tmp != nullptr; tmp = tmp->get_next()) {
+                if (is_terminate()) { return; }
+                iter(tmp);
+            }
+        }
+    }
+    bool is_terminate() const { return m_is_terminate; }
+    void setTerminate() { m_is_terminate = true; }
+protected:
+    //Return true to process the kid IR on tree.
+    virtual bool visitIR(IR *)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+    virtual bool visitIR(IR const*)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+public:
+    VisitIRTree() : m_is_terminate(false) {}
+    virtual ~VisitIRTree() {}
+
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function does NOT access the sibling IR of 'ir'.
+    void visit(IR * ir) { iter<IR*>(ir); }
+
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function does NOT access the sibling IR of 'ir'.
+    void visit(IR const* ir) { iter<IR const*>(ir); }
 };
 
 //The function clean the IR_parent for each elements in 'irlst'.

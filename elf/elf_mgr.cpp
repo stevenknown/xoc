@@ -27,9 +27,6 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "elfinc.h"
 
-#define PHASE(a)
-#define RET_ERR(det,info,retcode) if (det) { PHASE(info); return (retcode); }
-
 namespace elf {
 
 typedef struct {
@@ -74,6 +71,25 @@ static ULONG elf_string_hash(UCHAR const* name)
         h &= ~g;
     }
     return h;
+}
+
+
+ELFSectionInfo::ELFSectionInfo() {
+    m_has_sbss = false;
+    m_has_sdata = false;
+    m_has_bss = false;
+    m_has_data = false;
+    m_has_spm = false;
+    m_has_const = false;
+
+    m_sbss_align = 0;
+    m_sdata_align = 0;
+    m_bss_align = 0;
+    m_data_align = 0;
+    m_spm_align = 0;
+    m_const_align = 0;
+
+    m_shdr_num = 0;
 }
 
 
@@ -320,6 +336,8 @@ ELFMgr::ELFMgr()
     m_pool = nullptr;
     clean();
     m_pool = smpoolCreate(64, MEM_COMM);
+    m_sect_info = new ELFSectionInfo();
+    m_entry_var = nullptr;
 }
 
 
@@ -328,6 +346,7 @@ ELFMgr::~ELFMgr()
     if (m_file != nullptr) { delete m_file; m_file = nullptr; }
     if (m_dump != nullptr) { delete m_dump; m_dump = nullptr; }
     if (m_ti != nullptr) { delete m_ti; m_ti = nullptr; }
+    if (m_sect_info != nullptr) { delete m_sect_info; m_sect_info = nullptr; }
     smpoolDelete(m_pool);
     m_pool = nullptr;
 }
@@ -335,7 +354,7 @@ ELFMgr::~ELFMgr()
 
 void ELFMgr::clean()
 {
-    ::memset(&m_elf_hdr, 0, sizeof(ELFHdr));
+    ::memset((void*)&m_elf_hdr, 0, sizeof(ELFHdr));
     if (m_ti != nullptr) { delete m_ti; m_ti = nullptr; }
     m_elf_sectheader = nullptr;
     m_elf_phdr = nullptr;
@@ -369,7 +388,7 @@ void * ELFMgr::xmalloc(size_t size)
     ASSERTN(size < ELF_SIZE_4GB, ("too big"));
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 
@@ -537,8 +556,8 @@ void ELFMgr::genStrTabContent(OUT CHARVec & charvec,
 
 void ELFMgr::setSectContentOffset()
 {
-    Off off = elf::ELFHdr::getSize(this);
-    off += getHdr().e_shnum * elf::ELFSHdr::getSize(this);
+    Off off = ELFHdr::getSize(this);
+    off += getHdr().e_shnum * ELFSHdr::getSize(this);
     ASSERTN(m_elf_sectheader, ("should build section header info firstly"));
     for (UINT i = 0; i < getHdr().e_shnum; i++) {
         ELFSHdr * shdr = getSectHeader(i);
@@ -672,7 +691,7 @@ EM_STATUS ELFMgr::readSectHeaderTab()
     UINT sz = ELFSHdr::getSize(this);
     BYTE * buf = (BYTE*)ALLOCA(sz);
     for (UINT i = 0; i < m_elf_hdr.e_shnum; i++) {
-        ::memset(buf, 0, sz);
+        ::memset((void*)buf, 0, sz);
         if (EM_SUCC != read(buf, (size_t)m_elf_hdr.e_shoff + i * sz, sz)) {
             return EM_RD_ERR;
         }
@@ -884,11 +903,12 @@ EM_STATUS ELFMgr::readSectContent(size_t idx)
     //Read the section content if it still not yet loaded.
     if (nullptr == m_elf_sectheader[idx].s_content) {
         //ASSERTN(!isSectionAllocable(idx),
-        //        ("space loadable section should not be allocated by xmalloc"));
+        //        ("space loadable section should not be allocated by
+        //         xmalloc"));
         //CASE:Sometimes, user expect to read all section contents.
 
         m_elf_sectheader[idx].s_content = (BYTE*)xmalloc(
-            m_elf_sectheader[idx].s_size);
+            (size_t)m_elf_sectheader[idx].s_size);
     }
 
     //Read section data.
@@ -1349,7 +1369,8 @@ void ELFMgr::formatSymWithAddend(OUT StrBuf & buf, ELFRela const& rela,
                                  ELFSHdr const* symtab)
 {
     ELFSHdr const* strtab = symtab->getRelatedStrTab(this);
-    ASSERTN(strtab, ("no strint table correspond to '%s'", getSectName(symtab)));
+    ASSERTN(strtab, ("no strint table correspond to '%s'",
+            getSectName(symtab)));
     CHAR const* str = getStrFromStrTab(strtab, (size_t)rela.r_sym);
     buf.strcat("%s %d", str, rela.r_addend);
 }
@@ -1520,7 +1541,7 @@ EM_STATUS ELFMgr::writeELFHeaderAt(Word elfhdr_offset)
 {
     BYTE * buf = (BYTE*)ALLOCA(ELFHdr::getSize(this));
     m_elf_hdr.insert(buf, this);
-    if (EM_SUCC != write(buf, elfhdr_offset, ELFHdr::getSize(this))) {
+    if (EM_SUCC != write(buf, (size_t)elfhdr_offset, ELFHdr::getSize(this))) {
         return EM_WR_ERR;
     }
     return EM_SUCC;
@@ -1589,14 +1610,14 @@ EM_STATUS ELFMgr::writeSectContent()
         Off curoffset = m_file->getFileSize();
         shdr->s_offset = xcom::ceil_align(curoffset, shdr->s_addr_align);
         if (shdr->s_offset != curoffset) {
-            writePad(shdr->s_offset - curoffset);
+            writePad((size_t)(shdr->s_offset - curoffset));
         }
         if (shdr->s_size == 0) { continue; }
         ASSERTN(shdr->s_content, ("miss section content"));
         ASSERT0(shdr->s_offset == m_file->getFileSize());
         //Update and record the file byte offset to section header.
         //The section headers will be appended to file after its content.
-        if (EM_SUCC != append(shdr->s_content, shdr->s_size)) {
+        if (EM_SUCC != append(shdr->s_content, (size_t)shdr->s_size)) {
             return EM_WR_ERR;
         }
     }
@@ -1615,7 +1636,7 @@ EM_STATUS ELFMgr::writeSectHeaderTab()
     UINT sz = ELFSHdr::getSize(this);
     BYTE * buf = (BYTE*)ALLOCA(sz);
     for (UINT i = 0; i < m_elf_hdr.e_shnum; i++) {
-        ::memset(buf, 0, sz);
+        ::memset((void*)buf, 0, sz);
         m_elf_sectheader[i].insert(buf, this);
         if (EM_SUCC != append(buf, sz)) {
             return EM_WR_ERR;
@@ -1651,6 +1672,1081 @@ EM_STATUS ELFMgr::writeELF(CHAR const* filename)
 
     closeELF();
     return EM_SUCC;
+}
+
+
+void ELFMgr::extractAssBinDescVec(OUT BYTEVec & content,
+                                  AssembleBinDescVec const& abdv)
+{
+    UINT sz = abdv.getTotalByteSize();
+    BYTEVec tmp(sz);
+    xcom::AssembleBinBuf as(&(tmp[0]), sz, abdv);
+    for (UINT i = 0; i < sz; i++) { content.set(i, tmp[i]); }
+}
+
+
+void ELFMgr::setSymbolValue(BYTE const* space, Word st_name,
+                            xcom::UCHAR st_bind, xcom::UCHAR st_type,
+                            xcom::UCHAR st_other, Half st_shndx,
+                            Addr st_value, Addr st_size)
+{
+    ELFSym sym;
+    sym.st_value = st_value;
+    sym.st_size = st_size;
+    sym.st_name = st_name;
+    sym.st_bind = st_bind;
+    sym.st_type = st_type;
+    sym.st_other = st_other;
+    sym.st_shndx = st_shndx;
+
+    sym.insert(space, this);
+}
+
+
+void ELFMgr::constructRelAssBinDescVec(OUT AssembleBinDescVec & rel_desc_vec,
+                                       ELFRela64 const& rela, UINT index)
+{
+    AssembleBinDesc d0(sizeof(rela.r_offset) * BITS_PER_BYTE, rela.r_offset);
+    AssembleBinDesc d1(sizeof(rela.r_type) * BITS_PER_BYTE, rela.r_type);
+    AssembleBinDesc d2(sizeof(rela.r_sym) * BITS_PER_BYTE, rela.r_sym);
+    AssembleBinDesc d3(sizeof(rela.r_addend) * BITS_PER_BYTE, rela.r_addend);
+
+    rel_desc_vec.set(index * STRUCT_ELFRELA64_MEMBER_NUM, d0);
+    rel_desc_vec.set(index * STRUCT_ELFRELA64_MEMBER_NUM + 1, d1);
+    rel_desc_vec.set(index * STRUCT_ELFRELA64_MEMBER_NUM + 2, d2);
+    rel_desc_vec.set(index * STRUCT_ELFRELA64_MEMBER_NUM + 3, d3);
+}
+
+
+void ELFMgr::constructSymbolNull(OUT BYTEVec & bytevec)
+{
+    BYTE * sym = (BYTE *)ALLOCA(ELFSym::getSize(this));
+
+    setSymbolValue(sym, ELF_VAL_UNDEF, ELF_VAL_UNDEF, SYMBOL_NOTYPE,
+                   ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF);
+
+    for (UINT i = 0; i < ELFSym::getSize(this); i++) {
+        bytevec.set(i, sym[i]);
+    }
+}
+
+
+void ELFMgr::constructELFHeader(UINT sthr_num)
+{
+    ELFHdr & hdr = getHdr();
+    hdr.setMagic();
+    hdr.e_class = EC_64BIT;
+    hdr.e_data = ED_LITTLE;
+    hdr.e_hversion = ELF_VERSION;
+    hdr.e_type = ET_REL;
+    hdr.e_machine = EM_SWAI_64;
+    hdr.e_version = ELF_VERSION;
+    hdr.e_entry = ELF_VAL_UNDEF;
+    hdr.e_phoff = ELF_VAL_UNDEF;
+    hdr.e_shoff = ELFSHdr::getSize(this);
+    hdr.e_flags = ELF_VAL_UNDEF;
+    hdr.e_ehsize = ELFHdr::getSize(this);
+    hdr.e_phensize = ELF_VAL_UNDEF;
+    hdr.e_phnum = ELF_VAL_UNDEF;
+    hdr.e_shensize = ELFSHdr::getSize(this);
+    hdr.e_shnum = sthr_num;
+    allocSectHeaderTab(sthr_num);
+}
+
+
+void ELFMgr::constructELFNullSection(MOD ELFSHdr * null_shdr)
+{
+    null_shdr->s_type = S_UNDEF;
+    null_shdr->s_addr = ELF_VAL_UNDEF;
+    null_shdr->s_size = ELF_VAL_UNDEF;
+    null_shdr->s_entry_size = ELF_VAL_UNDEF;
+    null_shdr->s_name_str = STR_UNDEF;
+}
+
+
+void ELFMgr::constructELFTextSection(MOD ELFSHdr * text_shdr)
+{
+    BYTEVec text_char_vec;
+    text_char_vec.set(0, ELF_VAL_UNDEF);
+    text_shdr->s_type = S_PROGBITS;
+    text_shdr->s_addr = ELF_VAL_UNDEF;
+    text_shdr->s_size = ELF_VAL_UNDEF;
+    text_shdr->s_entry_size = ELF_VAL_UNDEF;
+    text_shdr->s_addr_align = TEXT_ALIGN;
+    text_shdr->s_content = (BYTE *)text_char_vec.get_vec();
+    text_shdr->s_name_str = TEXT_SH_NAME;
+    SET_FLAG(text_shdr->s_flags, SF_ALLOC|SF_EXECINSTR);
+}
+
+
+void ELFMgr::constructELFShStrSection(MOD ELFSHdr * shstr_shdr)
+{
+    shstr_shdr->s_type = S_STRTAB;
+    shstr_shdr->s_name_str = SHSTR_SH_NAME;
+    setSectHeaderNameStrTab(shstr_shdr);
+}
+
+
+void ELFMgr::constructELFSymTabSection(MOD ELFSHdr * symtab_shdr,
+                                       ELFSHdr const* strtab_shdr,
+                                       ELFSHdr const* text_shdr,
+                                       BYTEVec & sym)
+{
+    symtab_shdr->s_type = S_SYMTAB;
+    symtab_shdr->s_addr = ELF_VAL_UNDEF;
+    symtab_shdr->s_size = sym.get_elem_count();
+    symtab_shdr->s_link = (Word32)getSectHeaderIdx(strtab_shdr);
+    symtab_shdr->s_info = (Word32)getSectHeaderIdx(text_shdr);
+    symtab_shdr->s_addr_align = SYM_SH_ALIGN;
+    symtab_shdr->s_entry_size = ELFSym::getSize(this);
+    symtab_shdr->s_content = (BYTE*)sym.get_vec();
+    symtab_shdr->s_name_str = SYMTAB_SH_NAME;
+}
+
+
+void ELFMgr::constructELFStrTabSection(MOD ELFSHdr * strtab_shdr,
+                                       CHARVec & sym_str)
+{
+    strtab_shdr->s_type = S_STRTAB;
+    strtab_shdr->s_addr = ELF_VAL_UNDEF;
+    strtab_shdr->s_size = sym_str.get_elem_count();
+    strtab_shdr->s_entry_size = SYM_BYTE;
+    strtab_shdr->s_addr_align = SYMSTR_ADDR_ALIGN;
+    strtab_shdr->s_content = (BYTE *)sym_str.get_vec();
+    strtab_shdr->s_name_str = SYMSTR_SH_NAME;
+}
+
+
+void ELFMgr::constructELFSbssSection(MOD ELFSHdr * sbss_shdr,
+                                     BYTEVec & sbss,
+                                     UINT sbss_align)
+{
+    sbss_shdr->s_type = S_NOBITS;
+    sbss_shdr->s_addr = ELF_VAL_UNDEF;
+    sbss_shdr->s_size = sbss.get_capacity();
+    sbss_shdr->s_entry_size = ELF_VAL_UNDEF;
+    sbss_shdr->s_addr_align = sbss_align;
+    sbss_shdr->s_content = (BYTE *)sbss.get_vec();
+    sbss_shdr->s_name_str = SBSS_SH_NAME;
+    SET_FLAG(sbss_shdr->s_flags, SF_WRITE|SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFSdataSection(MOD ELFSHdr * sdata_shdr,
+                                      BYTEVec & sdata,
+                                      UINT sdata_align)
+{
+    sdata_shdr->s_type = S_PROGBITS;
+    sdata_shdr->s_addr = ELF_VAL_UNDEF;
+    sdata_shdr->s_size = sdata.get_elem_count();
+    sdata_shdr->s_entry_size = ELF_VAL_UNDEF;
+    sdata_shdr->s_addr_align = sdata_align;
+    sdata_shdr->s_content = (BYTE*)sdata.get_vec();
+    sdata_shdr->s_name_str = SDATA_SH_NAME;
+    SET_FLAG(sdata_shdr->s_flags, SF_WRITE|SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFBssSection(MOD ELFSHdr * bss_shdr,
+                                    BYTEVec & bss,
+                                    UINT bss_align)
+{
+    bss_shdr->s_type = S_NOBITS;
+    bss_shdr->s_addr = ELF_VAL_UNDEF;
+    bss_shdr->s_size = bss.get_capacity();
+    bss_shdr->s_entry_size = ELF_VAL_UNDEF;
+    bss_shdr->s_addr_align = bss_align;
+    bss_shdr->s_content = (BYTE*)bss.get_vec();
+    bss_shdr->s_name_str = BSS_SH_NAME;
+    SET_FLAG(bss_shdr->s_flags, SF_WRITE|SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFDataSection(MOD ELFSHdr * data_shdr,
+                                     BYTEVec & data,
+                                     UINT data_align)
+{
+    data_shdr->s_type = S_PROGBITS;
+    data_shdr->s_addr = ELF_VAL_UNDEF;
+    data_shdr->s_size = data.get_elem_count();
+    data_shdr->s_entry_size = ELF_VAL_UNDEF;
+    data_shdr->s_addr_align = data_align;
+    data_shdr->s_content = (BYTE*)data.get_vec();
+    data_shdr->s_name_str = DATA_SH_NAME;
+    SET_FLAG(data_shdr->s_flags, SF_WRITE|SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFSpmSection(MOD ELFSHdr * spm_shdr,
+                                    BYTEVec & spm,
+                                    UINT spm_align)
+{
+    spm_shdr->s_type = S_PROGBITS;
+    spm_shdr->s_addr = ELF_VAL_UNDEF;
+    spm_shdr->s_size = spm.get_elem_count();
+    spm_shdr->s_entry_size = ELF_VAL_UNDEF;
+    spm_shdr->s_addr_align = spm_align;
+    spm_shdr->s_content = (BYTE*)spm.get_vec();
+    spm_shdr->s_name_str = getSpmSHName();
+    SET_FLAG(spm_shdr->s_flags, SF_WRITE|SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFConstSection(MOD ELFSHdr * const_shdr,
+                                      BYTEVec & const_data,
+                                      UINT const_align)
+{
+    const_shdr->s_type = S_PROGBITS;
+    const_shdr->s_addr = ELF_VAL_UNDEF;
+    const_shdr->s_size = const_data.get_elem_count();
+    const_shdr->s_entry_size = ELF_VAL_UNDEF;
+    const_shdr->s_addr_align = const_align;
+    const_shdr->s_content = (BYTE*)const_data.get_vec();
+    const_shdr->s_name_str = CONST_SH_NAME;
+    SET_FLAG(const_shdr->s_flags, SF_ALLOC);
+}
+
+
+void ELFMgr::constructELFFuncSection(ELFSHdr * func_shdr, BYTEVec & code,
+                                     CHAR const* name, MOD BYTE * text_space)
+{
+    //Since program region may has multiple functions that need to be wrote
+    //into ELF, new space should be created to prevent being released.
+    ::memcpy(text_space, (BYTE *)(code.get_vec()), code.get_elem_count());
+
+    func_shdr->s_type = S_PROGBITS;
+    func_shdr->s_addr = ELF_VAL_UNDEF;
+    func_shdr->s_size = code.get_elem_count();
+    func_shdr->s_addr_align = STEXT_ALIGN;
+    func_shdr->s_entry_size = ELF_VAL_UNDEF;
+    func_shdr->s_content = text_space;
+    func_shdr->s_name_str = name;
+    SET_FLAG(func_shdr->s_flags, SF_ALLOC|SF_EXECINSTR);
+}
+
+
+void ELFMgr::constructELFRelSection(MOD ELFSHdr * rela_shdr,
+                                    ELFSHdr const* sym_shdr,
+                                    ELFSHdr const* text_func_shdr,
+                                    BYTEVec & rel, CHAR const* name,
+                                    MOD BYTE * rel_space)
+{
+    //Since program region may has multiple functions that need to be wrote
+    //into ELF, new space should be created to prevent being released.
+    ::memcpy(rel_space, (BYTE *)(rel.get_vec()), rel.get_elem_count());
+
+    rela_shdr->s_type = S_RELA;
+    rela_shdr->s_addr = ELF_VAL_UNDEF;
+    rela_shdr->s_size = rel.get_elem_count();
+    rela_shdr->s_entry_size = ELFRela::getSize(this);
+    rela_shdr->s_link = (Word32)getSectHeaderIdx(sym_shdr);
+    rela_shdr->s_info = (Word32)getSectHeaderIdx(text_func_shdr);
+    rela_shdr->s_addr_align = RELA_ALIGN;
+    rela_shdr->s_content = rel_space;
+    rela_shdr->s_name_str = name;
+    SET_FLAG(rela_shdr->s_flags, SF_INFO_LINK);
+}
+
+
+void ELFMgr::processELFTextRelSection(ELFSHdr const* symtab_shdr,
+                                      StringVec const& func_name,
+                                      StringList const& sym_name,
+                                      OUT UINT & si)
+{
+    xcom::Vector<UINT> rel_begin;
+    //Compute a vector saving relocation data begin index of function.
+    computeFuncRelocIndex(rel_begin);
+
+    for (UINT i = 0; i < func_name.get_elem_count(); i++) {
+        CHAR const* name = func_name[i];
+
+        //Get function name and generate section names of .text.xxx and
+        //.rel.text.xxx.
+        //The section names of kernel function are .aitext.xxx
+        //and .rel.aitext.xxx.
+        bool is_entry_function = (m_entry_var != nullptr) &&
+            (name == m_entry_var->get_name()->getStr());
+        CHAR const* subtext_section_name = is_entry_function ?
+            SUBTEXT_ENTRY_SH_PRE : SUBTEXT_SH_PRE;
+        CHAR const* rela_section_name = is_entry_function ?
+            RELA_KERNEL_SH_NAME : RELA_SH_NAME;
+
+        xcom::StrBuf buf0(32);
+        buf0.strcat(subtext_section_name);
+        buf0.strcat(name);
+
+        xcom::StrBuf buf1(32);
+        buf1.strcat(rela_section_name);
+        buf1.strcat(name);
+
+        //Generate content for .text.xxx.
+        BYTEVec text_content;
+        genFuncTextContent(text_content, i);
+
+        BYTEVec rel_content;
+        genFuncRelContent(rel_content, sym_name, rel_begin, i);
+
+        //Malloc some spaces to save intermediate data of function region data
+        //processing. It is necessary because tmporary space will be freed.
+        CHAR * text_name_space = (CHAR *)(xmalloc(buf0.buflen));
+        ::memcpy(text_name_space, buf0.buf, buf0.buflen);
+        CHAR * rel_name_space = (CHAR *)(xmalloc(buf1.buflen));
+        ::memcpy(rel_name_space, buf1.buf, buf1.buflen);
+        BYTE * text_space = (BYTE *)(xmalloc(text_content.get_elem_count()));
+        BYTE * rel_space = (BYTE *)(xmalloc(rel_content.get_elem_count()));
+
+        //Construct .text.xxx and .rel.text.xxx section headers and sections.
+        ELFSHdr * func_shdr = getSectHeader(si++);
+        constructELFFuncSection(func_shdr, text_content, text_name_space,
+                                text_space);
+
+        ELFSHdr * rel_shdr = getSectHeader(si++);
+        constructELFRelSection(rel_shdr, symtab_shdr, func_shdr, rel_content,
+                               rel_name_space, rel_space);
+    }
+}
+
+
+void ELFMgr::constructELFShIndex(OUT CHARVec & charvec,
+                                 OUT OffVec & offvec)
+{
+    genSectHeaderNameStrTabContent(charvec, offvec);
+    setSectHeaderNameStrTabIdx();
+    setSectHeaderNameOffset(offvec);
+    setSectHeaderNameStrTabContent((BYTE *)charvec.get_vec(),
+                                   charvec.get_elem_count());
+    setSectContentOffset();
+}
+
+
+static SymbolLinkAttrFlag mapSymbolLinkAttr(
+    SymbolLinkAttrMap const& symbol_link_attr_map, xoc::Var const* var)
+{
+    ASSERT0(var);
+
+    return symbol_link_attr_map.get(var);
+}
+
+
+void ELFMgr::setSymbolLinkAttr(xoc::Var const* var,
+                               SYMBOL_LINK_ATTR_FLAG sym_attr)
+{
+    ASSERT0(var);
+
+    if (m_symbol_link_attr_map.find(var)) {
+        SymbolLinkAttrFlag sym_flag =
+            mapSymbolLinkAttr(m_symbol_link_attr_map, var);
+        sym_flag.set(sym_attr);
+        m_symbol_link_attr_map.remove(var);
+        m_symbol_link_attr_map.set(var, sym_flag);
+    } else {
+        m_symbol_link_attr_map.set(var, SymbolLinkAttrFlag(sym_attr));
+    }
+}
+
+
+void ELFMgr::assembleVarToContent(OUT AssembleBinDescVec & content_desc_vec,
+                                  Var const* var)
+{
+    ASSERT0(var && var->hasInitVal());
+
+    //String and vecotr data belong to .data or .const section.
+    //Single type data belong to .sdata or .const section.
+    if (var->is_string() || var->is_vector()) {
+        //Class AssembleBinDesc need bit size of given binary value.
+        UINT sz = var->is_string() ?
+            ((UINT)::strlen(VAR_string(var)->getStr()) * BITS_PER_BYTE) :
+            ((var->getByteValue())->getSize() * BITS_PER_BYTE);
+        BYTE const* byte = var->is_string() ?
+            ((BYTE*)VAR_string(var)->getStr()) :
+            (var->getByteValue()->getBuffer());
+
+        AssembleBinDesc asbd(sz, byte);
+        content_desc_vec.append(asbd);
+        return;
+    }
+
+    BinWord word = 0;
+    UINT size = var->getByteValue()->getSize() * BITS_PER_BYTE;
+    if (var->getType()->is_fp()) {
+        word = var->getType()->is_f16() ?
+            *((UINT16*)(var->getByteValue()->getBuffer())) :
+            (var->getType()->is_f32() ?
+             *((UINT32*)(var->getByteValue()->getBuffer())) :
+             *((BinWord*)(var->getByteValue()->getBuffer())));
+    } else {
+        //Class AssembleBinDesc need bit size of given binary value.
+        word = ((BinWord*)(var->getByteValue()->getBuffer()))[0];
+        if (size != BIN_WORD_SIZE) {
+            word = extractValidValueViaBitWidth<BinWord>(word, size);
+        }
+    }
+
+    AssembleBinDesc asbd(size, word);
+    content_desc_vec.append(asbd);
+}
+
+
+static SYMBOL_SECTION judgeSymbolSection(
+    SymbolLinkAttrMap const& symbol_link_attr_map, Var const* var)
+{
+    if (var->is_func()) {
+        return ((mapSymbolLinkAttr(
+                 symbol_link_attr_map, var).have(SYMBOL_ATTR_EXTERN) ||
+                 !var->is_global()) ? SYMBOL_DEFAULT : SYMBOL_TEXT);
+    }
+    if (var->getStorageSpace() == SS_SPM) { return SYMBOL_SPM; }
+    if (var->is_readonly()) { return SYMBOL_CONST; }
+    if (var->is_vector() || var->is_string()) {
+        return var->hasInitVal() ? SYMBOL_DATA : SYMBOL_BSS;
+    }
+    return var->hasInitVal() ? SYMBOL_SDATA : SYMBOL_SBSS;
+}
+
+
+static Addr computeVarSize(Var const* var, TypeMgr const* tm)
+{
+    if (var->is_func()) { return 0; }
+    if (var->is_string()) { return strlen(var->getString()->getStr()); }
+    return var->getByteSize(tm);
+
+}
+
+
+static void setSectionInfo(OUT StringVec & func_name,
+                           OUT ELFSectionInfo * sect_info,
+                           OUT UINT & func_num,
+                           SymbolLinkAttrMap const& symbol_link_attr_map,
+                           Var const* var,
+                           UINT const& align)
+{
+    switch (judgeSymbolSection(symbol_link_attr_map, var)) {
+    //.text.xxx
+    case SYMBOL_TEXT: {
+        func_name.append(var->get_name()->getStr());
+        func_num++;
+        break;
+    }
+    //.sbss
+    case SYMBOL_SBSS: {
+        sect_info->set_sbss(true);
+        sect_info->set_sbss_align(MAX(sect_info->get_sbss_align(), align));
+        break;
+    }
+    //.sdata
+    case SYMBOL_SDATA: {
+        sect_info->set_sdata(true);
+        sect_info->set_sdata_align(MAX(sect_info->get_sdata_align(), align));
+        break;
+    }
+    //.bss
+    case SYMBOL_BSS: {
+        sect_info->set_bss(true);
+        sect_info->set_bss_align(MAX(sect_info->get_bss_align(), align));
+        break;
+    }
+    //.data
+    case SYMBOL_DATA: {
+        sect_info->set_data(true);
+        sect_info->set_data_align(MAX(sect_info->get_data_align(), align));
+        break;
+    }
+    //.spm
+    case SYMBOL_SPM: {
+        sect_info->set_spm(true);
+        sect_info->set_spm_align(MAX(sect_info->get_spm_align(), align));
+        break;
+    }
+    //.const
+    case SYMBOL_CONST: {
+        sect_info->set_const(true);
+        sect_info->set_const_align(MAX(sect_info->get_spm_align(), align));
+        break;
+    }
+    default: break; //Variable is not available.;
+    }
+}
+
+
+void ELFMgr::setSymbol(MOD BYTE * sym, MOD ELFSymbolOff & symbol_off,
+                       Var const* var, ELFSectionInfo const* sect_info,
+                       Word const& name, UCHAR const& bind, UCHAR const& other,
+                       Addr const& size)
+{
+    switch (judgeSymbolSection(m_symbol_link_attr_map, var)) {
+    case SYMBOL_DEFAULT: {
+        setSymbolValue(sym, name, STB_GLOBAL, ELF_VAL_UNDEF, ELF_VAL_UNDEF,
+                       ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF);
+        break;
+    }
+    case SYMBOL_SBSS: {
+        //If there is extern attribute of the symbol, the value of
+        //st_shndx and st_size field are UNDEF(means that the symbol
+        //is undefined in this object file).
+        Half index = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_EXTERN) ?
+            ELF_VAL_UNDEF : BASE_SEC_NUM;
+        Addr sz = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_EXTERN) ?
+            ELF_VAL_UNDEF : size;
+        setSymbolValue(sym, name, bind, SYMBOL_OBJECT, other, index,
+                       symbol_off.sbss_off, sz);
+        symbol_off.sbss_off += (UINT)MAX(sect_info->get_sbss_align(), sz);
+        break;
+    }
+    case SYMBOL_SDATA: {
+        Half index = BASE_SEC_NUM + sect_info->has_sbss();
+        setSymbolValue(sym, name, bind, SYMBOL_OBJECT, other, index,
+                       symbol_off.sdata_off, size);
+        symbol_off.sdata_off += (UINT)MAX(sect_info->get_sdata_align(), size);
+        break;
+    }
+    case SYMBOL_BSS: {
+        //If there is extern attribute of the symbol, the value of
+        //st_shndx and st_size field are UNDEF(means that the symbol
+        //is undefined in this object file).
+        Half index = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_EXTERN) ?
+            ELF_VAL_UNDEF : BASE_SEC_NUM + sect_info->has_sbss() +
+            sect_info->has_sdata();
+        Addr sz = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_EXTERN) ?
+            ELF_VAL_UNDEF : size;
+        setSymbolValue(sym, name, bind, SYMBOL_OBJECT, other, index,
+                       symbol_off.bss_off, sz);
+        symbol_off.bss_off += (UINT)MAX(sect_info->get_bss_align(), sz);
+        break;
+    }
+    case SYMBOL_DATA: {
+        Half index = BASE_SEC_NUM + sect_info->has_sbss() +
+            sect_info->has_sdata() + sect_info->has_bss();
+        setSymbolValue(sym, name, bind, SYMBOL_OBJECT, other, index,
+                       symbol_off.data_off, size);
+        symbol_off.data_off += (UINT)MAX(sect_info->get_data_align(), size);
+        break;
+    }
+    case SYMBOL_SPM: {
+        Half index = BASE_SEC_NUM + sect_info->has_sbss() +
+            sect_info->has_sdata() + sect_info->has_bss() +
+            sect_info->has_data();
+        setSymbolValue(sym, name, bind, SYMBOL_OBJECT, other, index,
+                       symbol_off.spm_off, size);
+        symbol_off.spm_off += (UINT)MAX(sect_info->get_spm_align(), size);
+        break;
+    }
+    case SYMBOL_CONST: {
+        Half index = BASE_SEC_NUM + sect_info->has_sbss() +
+            sect_info->has_sdata() + sect_info->has_bss() +
+            sect_info->has_data() + sect_info->has_spm();
+        setSymbolValue(sym, name, STB_GLOBAL, SYMBOL_OBJECT, ELF_VAL_UNDEF,
+                       index, symbol_off.const_off, size);
+        symbol_off.const_off += (UINT)MAX(sect_info->get_const_align(), size);
+        break;
+    }
+    case SYMBOL_TEXT: {
+        setSymbolValue(sym, name, bind, SYMBOL_FUNC,
+                       getSymOtherInfo() | other, symbol_off.text_ind,
+                       ELF_VAL_UNDEF, m_func_size[symbol_off.func_off]);
+        //.text.xxx and .rel.text.xxx section headers are always together.
+        symbol_off.text_ind += 2;
+        symbol_off.func_off++;
+        break;
+    }
+    default: ASSERT0(0); //Variable is not available.
+    }
+}
+
+
+void ELFMgr::constructSymbolUnull(OUT BYTEVec & bytevec,
+                                  OffVec const& sym_str_off,
+                                  ELFSectionInfo const* sect_info)
+{
+    ASSERT0(sect_info);
+
+    struct ELFSymbolOff symbol_off;
+    symbol_off.text_ind = BASE_SEC_NUM + sect_info->has_sbss() +
+        sect_info->has_sdata() + sect_info->has_bss() +
+        sect_info->has_data() + sect_info->has_spm() +
+        sect_info->has_const();
+
+    TMWORD ind = ELFSym::getSize(this);
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        BYTE * sym = (BYTE *)ALLOCA(ELFSym::getSize(this));
+
+        //Get some common attributes: name, bind, other, size
+        Word name = sym_str_off[symbol_off.var_name_off];
+        UCHAR bind = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_WEAK) ?
+            STB_WEAK : (var->is_global() ? STB_GLOBAL : STB_LOCAL);
+        UCHAR other = mapSymbolLinkAttr(
+            m_symbol_link_attr_map, var).have(SYMBOL_ATTR_VISIBLE) ?
+            STV_DEFAULT : STV_HIDDEN;
+        Addr size = computeVarSize(var, getRegion()->getTypeMgr());
+
+        //Set info of symbol.
+        setSymbol(sym, symbol_off, var, sect_info, name, bind, other, size);
+
+        for (UINT i = 0; i < ELFSym::getSize(this); i++) {
+            bytevec.set(ind + i, sym[i]);
+        }
+
+        ind += ELFSym::getSize(this);
+        symbol_off.var_name_off++;
+    }
+}
+
+
+void ELFMgr::genSymTabContent(OUT BYTEVec & bytevec,
+                              OffVec const& offvec,
+                              ELFSectionInfo const* sect_info)
+{
+    AssembleBinDescVec sym_desc_vec;
+
+    bytevec.grow(m_saving_var_list.get_elem_count() * ELFSym::getSize(this));
+
+    constructSymbolNull(bytevec);
+
+    constructSymbolUnull(bytevec, offvec, sect_info);
+}
+
+
+void ELFMgr::genSbssContent(OUT BYTEVec & sbss_content)
+{
+    HOST_UINT totalbytesize = 0;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        if (var->is_func() || var->getType()->is_vector() ||
+            var->hasInitVal()) {
+            continue;
+        }
+
+        totalbytesize += var->getByteSize(getRegion()->getTypeMgr());
+    }
+
+    sbss_content.grow((UINT)totalbytesize);
+}
+
+
+void ELFMgr::genSdataContent(OUT BYTEVec & bytevec)
+{
+    AssembleBinDescVec sdata_desc_vec;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        //Skip variables unuseful.
+        if (var->is_func() || var->getType()->is_vector() ||
+            !var->hasInitVal() || var->is_string()) {
+            continue;
+        }
+
+        assembleVarToContent(sdata_desc_vec, var);
+    }
+
+    extractAssBinDescVec(bytevec, sdata_desc_vec);
+}
+
+
+void ELFMgr::genBssContent(OUT BYTEVec & bytevec)
+{
+    HOST_UINT totalbytesize = 0;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        if (var->is_func() || !var->getType()->is_vector() ||
+            var->hasInitVal()) {
+            continue;
+        }
+
+        totalbytesize += var->getByteSize(getRegion()->getTypeMgr());
+    }
+
+    bytevec.grow((UINT)totalbytesize);
+}
+
+
+void ELFMgr::genDataContent(OUT BYTEVec & bytevec)
+{
+    AssembleBinDescVec data_desc_vec;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        //Skip variables unuseful.
+        if (var->is_func() || (!var->getType()->is_vector() &&
+            !var->is_string()) || !var->hasInitVal()) {
+            continue;
+        }
+
+        assembleVarToContent(data_desc_vec, var);
+    }
+
+    extractAssBinDescVec(bytevec, data_desc_vec);
+}
+
+
+void ELFMgr::genSpmContent(OUT BYTEVec & bytevec)
+{
+    AssembleBinDescVec spm_desc_vec;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        //Skip variables unuseful.
+        if (var->getStorageSpace() != SS_SPM) { continue; }
+
+        if (var->is_string() && var->hasInitString()) {
+            UINT sz = (UINT)strlen(VAR_string(var)->getStr()) * BITS_PER_BYTE;
+            AssembleBinDesc asbd(sz, (BYTE *)(VAR_string(var)->getStr()));
+            spm_desc_vec.append(asbd);
+        } else if (!var->is_string() && var->hasInitVal()) {
+            UINT sz = var->getByteValue()->getSize() * BITS_PER_BYTE;
+            AssembleBinDesc asbd(sz, var->getByteValue()->getBuffer());
+            spm_desc_vec.append(asbd);
+        } else {
+            UINT sz = var->getByteSize(getRegion()->getTypeMgr()) *
+                BITS_PER_BYTE;
+            if (isSizeValid(sz)) {
+                AssembleBinDesc asbd(sz, BinWord(0));
+                spm_desc_vec.append(asbd);
+            } else {
+                ASSERT0(isSizeAligned(sz, BIN_WORD_SIZE));
+                for (UINT j = 0; j < (sz / BIN_WORD_SIZE); j++) {
+                    AssembleBinDesc asbd(BIN_WORD_SIZE, BinWord(0));
+                    spm_desc_vec.append(asbd);
+                }
+            }
+        }
+    }
+    extractAssBinDescVec(bytevec, spm_desc_vec);
+}
+
+
+void ELFMgr::genConstContent(OUT BYTEVec & bytevec)
+{
+    AssembleBinDescVec data_desc_vec;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        //Skip variables unuseful.
+        if (var->is_func() || !var->hasInitVal() || !var->is_readonly()) {
+            continue;
+        }
+
+        assembleVarToContent(data_desc_vec, var);
+    }
+
+    extractAssBinDescVec(bytevec, data_desc_vec);
+}
+
+
+void ELFMgr::genFuncRelContent(OUT BYTEVec & bytevec,
+                               StringList const& names,
+                               xcom::Vector<UINT> const& begin,
+                               UINT ind)
+{
+    AssembleBinDescVec rel_desc_vec;
+
+    //Compute begin and end index of relocation info of current function
+    //region.
+    UINT begin_ind = 0;
+    UINT end_ind = 0;
+    Addr64 offset = 0;
+    Word32 sym_ind = 0;
+    Word32 type = 0;
+    SWord64 addend = 0;
+
+    //Compute begin and end index of relocation info for different function.
+    getFuncRelocIndex(begin_ind, end_ind, begin, ind);
+
+    rel_desc_vec.grow(end_ind * STRUCT_ELFRELA64_MEMBER_NUM);
+
+    for (UINT i = begin_ind; i < end_ind; i++) {
+        ELFRela64 rela;
+        getRelocInfo(offset, sym_ind, type, addend, names, i);
+
+        rela.r_offset = offset;
+        rela.r_sym = sym_ind;
+        rela.r_type = type;
+        rela.r_addend = addend;
+
+        constructRelAssBinDescVec(rel_desc_vec, rela, i);
+    }
+
+    extractAssBinDescVec(bytevec, rel_desc_vec);
+}
+
+
+//Compute a vector saving function and its relocation data begin index.
+void ELFMgr::computeFuncRelocIndex(OUT xcom::Vector<UINT> & begin)
+{
+    CHAR const* name = "";
+
+    for (UINT i = 0; i < m_func_relocation.get_elem_count(); i++) {
+        if (::strcmp(m_func_relocation[i].caller, name) != 0) {
+            name = m_func_relocation[i].caller;
+            begin.append(i);
+        }
+    }
+}
+
+
+void ELFMgr::getFuncRelocIndex(OUT UINT & begin_ind, OUT UINT & end_ind,
+                               xcom::Vector<UINT> const& begin,
+                               UINT ind)
+{
+    //compute begin index
+    begin_ind = begin[ind];
+
+    //compute end index
+    end_ind = (ind == (begin.get_elem_count() - 1)) ?
+        m_func_relocation.get_elem_count() : begin[ind + 1];
+}
+
+
+//Get size of current function region and extract codes of size from all
+//generated codes.
+void ELFMgr::genFuncTextContent(OUT BYTEVec & bytevec,
+                                UINT index)
+{
+    UINT offset = 0;
+    for (UINT i = 0; i < index; i++) { offset += m_func_size[i]; }
+
+    bytevec.grow(m_func_size[index]);
+
+    for (UINT i = 0; i < m_func_size[index]; i++) {
+        bytevec.set(i, m_func_code[i + offset]);
+    }
+}
+
+
+static UINT findPosition(StringList const& strlst, CHAR const* str)
+{
+    StringList::Iter it;
+    UINT ind = 0;
+    ASSERT0(strlst.get_head(&it) && str);
+
+    for (CHAR const* s = strlst.get_head(&it); s != nullptr;
+        ind++, s = strlst.get_next(&it)) {
+        if (!::strcmp(s, str)) { return ind; }
+    }
+
+    UNREACHABLE(); //not find.
+    return 0;
+}
+
+
+void ELFMgr::getRelocInfo(OUT Addr64 & offset,
+                          OUT Word32 & sym_ind,
+                          OUT Word32 & type,
+                          OUT SWord64 & addend,
+                          StringList const& names,
+                          UINT index)
+{
+    offset = m_func_relocation[index].call_location;
+    type = m_func_relocation[index].reloc_type;
+
+    //Index of name of current symbol in all names.
+    sym_ind = findPosition(names, m_func_relocation[index].callee) + 1;
+
+    //Get relocation addend value based relocation type.
+    addend = getRelocAddend(index);
+}
+
+
+static UINT computeAlignVal(Var const* var, TypeMgr const* tm)
+{
+    return var->is_func() ? 0 : var->get_align();
+}
+
+
+void ELFMgr::collectELFFactor(OUT StringList & sym_name,
+                              OUT StringVec & func_name,
+                              OUT ELFSectionInfo * sect_info)
+{
+    TypeMgr const* tm = getRegion()->getTypeMgr();
+    UINT func_num = 0;
+
+    for (Var const* var = m_saving_var_list.get_head();
+        var != nullptr; var = m_saving_var_list.get_next()) {
+
+        if (var->is_entry()) { m_entry_var = (Var*)var;}
+
+        //Collector names of all available symbols.
+        sym_name.append_tail(var->get_name()->getStr());
+
+        //Compute align value based different type of variable.
+        UINT align = computeAlignVal(var, tm);
+        //Align value bust be power-of-2 number.
+        if (!var->is_func()) { ASSERT0(xcom::isPowerOf2(align)); }
+        else { ASSERT0(align == 0); }
+
+        //Set section info based different type of variable.
+        setSectionInfo(func_name, sect_info, func_num,
+                       m_symbol_link_attr_map, var, align);
+    }
+
+    //Note: "func_num * 2" : A device func will generate
+    //two sections like .text.xxx and .rel.text.xxx.
+    sect_info->set_shdr_num(BASE_SEC_NUM + sect_info->has_sdata() +
+        sect_info->has_sbss() + sect_info->has_data() + sect_info->has_bss() +
+        sect_info->has_spm() + sect_info->has_const() + (func_num * 2));
+}
+
+
+//If a variable is user-defined function, it must be global and not have
+//.extern attribute.
+bool ELFMgr::isUserDefinedFunction(Var const* var)
+{
+    return isVarAvailable(var) && var->is_func() && var->is_global() &&
+        !mapSymbolLinkAttr(m_symbol_link_attr_map, var).
+        have(SYMBOL_ATTR_EXTERN);
+}
+
+
+void ELFMgr::extractSavingVarExceptUserDefFunc()
+{
+    VarVec const* var_vec = getRegion()->getVarMgr()->getVarVec();
+    for (UINT i = 0; i < var_vec->get_elem_count(); i++) {
+        Var * var = var_vec->get(i);
+
+        //Since user-defined functions have been wirtten into
+        //m_saving_var_vec, we need to extract available variables except them.
+        if (isVarAvailable(var) && !isUserDefinedFunction(var)) {
+            m_saving_var_list.append_tail(var);
+        }
+    }
+}
+
+
+void ELFMgr::write2ELF()
+{
+    //Define some structures recording contents of elf sections.
+    CHARVec strtab_content; //Save content for .strtab.
+    BYTEVec symtab_content; //Save content for .symtab.
+    BYTEVec sbss_content;   //Save content for .sbss.
+    BYTEVec sdata_content;  //Save content for .sdata.
+    BYTEVec bss_content;    //Save content for .bss.
+    BYTEVec data_content;   //Save content for .data.
+    BYTEVec spm_content;    //Save content for .spm.
+    BYTEVec reloc_content;  //Save content for .rel.text.xxx.
+    BYTEVec text_content;   //Save content for .text.xxx.
+    BYTEVec const_content;  //Save content for .const.
+
+    OffVec symstr_off;      //Save offsets of name of each symbol.
+
+    CHARVec charvec;        //Save names of all section headers.
+    OffVec offvec;          //Save offsets of section header names.
+
+    //Define some structures recording name of symbols.
+    StringList sym_name;    //Save names of all symbols.
+    StringVec func_name;    //Save names of function symbols.
+
+    //Bug fix: If declaration of function is before definition of function,
+    //data written into ELF will be wrong due to out-of-order.
+    extractSavingVarExceptUserDefFunc();
+
+    //Collect names of all symbols and compute some factors.
+    collectELFFactor(sym_name, func_name, m_sect_info);
+
+    //Construct ELF header.
+    constructELFHeader(m_sect_info->get_shdr_num());
+
+    //Generate contents for some sections including .symstr, .symtab,
+    //.sbss, .sdata, .data and .const.
+    genStrTabContent(strtab_content, symstr_off, sym_name);
+    genSymTabContent(symtab_content, symstr_off, m_sect_info);
+
+    if (m_sect_info->has_sbss()) { genSbssContent(sbss_content); }
+    if (m_sect_info->has_sdata()) { genSdataContent(sdata_content); }
+    if (m_sect_info->has_bss()) { genBssContent(bss_content); }
+    if (m_sect_info->has_data()) { genDataContent(data_content); }
+    if (m_sect_info->has_spm()) { genSpmContent(spm_content); }
+    if (m_sect_info->has_const()) { genConstContent(const_content); }
+
+    //Construct ELF section headers and sections.
+    UINT si = 0;
+
+    // Construct NULL section header and section.
+    ELFSHdr * null_shdr = getSectHeader(si++);
+    constructELFNullSection(null_shdr);
+
+    // Construct .text section header and section.
+    ELFSHdr * text_shdr = getSectHeader(si++);
+    constructELFTextSection(text_shdr);
+
+    // Construct .shdr_strtab section header and section.
+    ELFSHdr * shstr_shdr = getSectHeader(si++);
+    constructELFShStrSection(shstr_shdr);
+
+    // Construct .strtab section header and section.
+    ELFSHdr * strtab_shdr = getSectHeader(si++);
+    constructELFStrTabSection(strtab_shdr, strtab_content);
+
+    // Construct .symtab section header and section.
+    ELFSHdr * symtab_shdr = getSectHeader(si++);
+    constructELFSymTabSection(symtab_shdr, strtab_shdr, text_shdr,
+                              symtab_content);
+
+    // Construct .sbss section header and section.
+    if (m_sect_info->has_sbss()) {
+        ELFSHdr * sbss_shdr = getSectHeader(si++);
+        constructELFSbssSection(sbss_shdr, sbss_content,
+                                m_sect_info->get_sbss_align());
+    }
+
+    // Construct .sdata section header and sections.
+    if (m_sect_info->has_sdata()) {
+        ELFSHdr * sdata_shdr = getSectHeader(si++);
+        constructELFSdataSection(sdata_shdr, sdata_content,
+                                 m_sect_info->get_sdata_align());
+    }
+
+    //Construct .bss section header and sections.
+    if (m_sect_info->has_bss()) {
+        ELFSHdr * bss_shdr = getSectHeader(si++);
+        constructELFBssSection(bss_shdr, bss_content,
+                               m_sect_info->get_bss_align());
+    }
+
+    //Construct .data section header and sections.
+    if (m_sect_info->has_data()) {
+        ELFSHdr * data_shdr = getSectHeader(si++);
+        constructELFDataSection(data_shdr, data_content,
+                                m_sect_info->get_data_align());
+    }
+
+    //Construct .spm section header and sections.
+    if (m_sect_info->has_spm()) {
+        ELFSHdr * spm_shdr = getSectHeader(si++);
+        constructELFSpmSection(spm_shdr, spm_content,
+                               m_sect_info->get_spm_align());
+    }
+
+    //Construct .const section header and sections.
+    if (m_sect_info->has_const()) {
+        ELFSHdr * const_shdr = getSectHeader(si++);
+        constructELFConstSection(const_shdr, const_content,
+                                 m_sect_info->get_const_align());
+    }
+
+    //Generate contents for .text.xxx and .rel.text.xxx and construct them
+    //using generated data.
+    processELFTextRelSection(symtab_shdr, func_name, sym_name, si);
+
+    //Construct section header indexs.
+    constructELFShIndex(charvec, offvec);
+
+    //Write data intto ELF file.
+    xcom::StrBuf buf(32);
+    buf.strcat(ELF_FILE_NAME);
+    writeELF(buf.buf);
 }
 
 } //namespace elf

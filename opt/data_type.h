@@ -48,7 +48,7 @@ class RegionMgr;
 
 #define IS_INT(t) ((t) >= D_I8 && (t) <= D_U128)
 #define IS_SINT(t) ((t) >= D_I8 && (t) <= D_I128)
-#define IS_FP(t) ((t) >= D_F16 && (t) <= D_F128)
+#define IS_FP(t) ((t) >= D_BF16 && (t) <= D_F128)
 #define IS_BOOL(t) ((t) == D_B)
 #define IS_MC(t) ((t) == D_MC)
 #define IS_VEC(t) ((t) == D_VEC)
@@ -58,6 +58,7 @@ class RegionMgr;
                       t == D_STR || t == D_ANY)
 
 #define SWITCH_CASE_FP_DTYPE \
+    case D_BF16: \
     case D_F16: \
     case D_F32: \
     case D_F64: \
@@ -116,6 +117,7 @@ typedef enum _DATA_TYPE {
     D_U128,
 
     //Float type.
+    D_BF16, //BFloat point 16 bit
     D_F16, //Float point 16 bit
     D_F32, //Float point 32 bit
     D_F64, //Float point 64 bit
@@ -243,6 +245,7 @@ public:
     bool is_u32() const { return TY_dtype(this) == D_U32; }
     bool is_u64() const { return TY_dtype(this) == D_U64; }
     bool is_u128() const { return TY_dtype(this) == D_U128; }
+    bool is_bf16() const { return TY_dtype(this) == D_BF16; }
     bool is_f16() const { return TY_dtype(this) == D_F16; }
     bool is_f32() const { return TY_dtype(this) == D_F32; }
     bool is_f64() const { return TY_dtype(this) == D_F64; }
@@ -256,7 +259,7 @@ public:
     inline bool is_signed() const
     {
         if ((TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128) ||
-            (TY_dtype(this) >= D_F16 && TY_dtype(this) <= D_F128)) {
+            (TY_dtype(this) >= D_BF16 && TY_dtype(this) <= D_F128)) {
             return true;
         }
         return false;
@@ -288,7 +291,7 @@ public:
 
     //Return true if ir data type is float.
     bool is_fp() const
-    { return TY_dtype(this) >= D_F16 && TY_dtype(this) <= D_F128; }
+    { return TY_dtype(this) >= D_BF16 && TY_dtype(this) <= D_F128; }
 
     //Return true if the type can be used to represent the
     //pointer's addend.
@@ -426,11 +429,11 @@ public:
 
 
 //Container of Type.
-#define TC_type(c)          ((c)->dtd)
-#define TC_typeid(c)        ((c)->tyid)
+#define TC_type(c) ((c)->ty)
+#define TC_typeid(c) ((c)->tyid)
 class TypeContainer {
 public:
-    Type * dtd;
+    Type * ty;
     UINT tyid;
 };
 
@@ -601,7 +604,7 @@ extern TypeDesc const g_type_desc[];
 class TypeMgr {
     COPY_CONSTRUCTOR(TypeMgr);
     friend class TensorType;
-
+protected:
     RegionMgr * m_rm;
     xcom::Vector<Type*> m_type_tab;
     SMemPool * m_pool;
@@ -624,20 +627,15 @@ class TypeMgr {
     Type const* m_u32;
     Type const* m_u64;
     Type const* m_u128;
+    Type const* m_bf16;
     Type const* m_f16;
     Type const* m_f32;
     Type const* m_f64;
     Type const* m_f80;
     Type const* m_f128;
     Type const* m_str;
-
-    void * xmalloc(size_t size)
-    {
-        void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p);
-        ::memset(p, 0, size);
-        return p;
-    }
+protected:
+    SMemPool * get_pool() const { return m_pool; }
 
     Type * newType() { return (Type*)xmalloc(sizeof(Type)); }
 
@@ -663,89 +661,19 @@ class TypeMgr {
     TypeContainer * newTC()
     { return (TypeContainer*)xmalloc(sizeof(TypeContainer)); }
 
-protected:
-    SMemPool * get_pool() const { return m_pool; }
-
+    void * xmalloc(size_t size)
+    {
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        ::memset((void*)p, 0, size);
+        return p;
+    }
 public:
-    TypeMgr(RegionMgr * rm)
-    {
-        ASSERT0(rm);
-        m_rm = rm;
-        m_type_tab.clean();
-        m_pool = smpoolCreate(sizeof(Type) * 8, MEM_COMM);
-        m_type_count = 1;
-        ::memset(m_simplex_type, 0, sizeof(m_simplex_type));
+    TypeMgr(RegionMgr * rm);
+    virtual ~TypeMgr();
 
-        m_b = getSimplexType(D_B);
-        m_i8 = getSimplexType(D_I8);
-        m_i16 = getSimplexType(D_I16);
-        m_i32 = getSimplexType(D_I32);
-        m_i64 = getSimplexType(D_I64);
-        m_i128 = getSimplexType(D_I128);
-        m_u8 = getSimplexType(D_U8);
-        m_u16 = getSimplexType(D_U16);
-        m_u32 = getSimplexType(D_U32);
-        m_u64 = getSimplexType(D_U64);
-        m_u128 = getSimplexType(D_U128);
-        m_f16 = getSimplexType(D_F16);
-        m_f32 = getSimplexType(D_F32);
-        m_f64 = getSimplexType(D_F64);
-        m_f80 = getSimplexType(D_F80);
-        m_f128 = getSimplexType(D_F128);
-        m_str = getSimplexType(D_STR);
-        m_any = getSimplexType(D_ANY);
-    }
-    ~TypeMgr()
-    {
-        smpoolDelete(m_pool);
-        m_pool = nullptr;
-
-        VectorElemTypeTabIter iter;
-        VectorElemTypeTab * tab;
-        for (Type const* d = m_vector_type_tab.get_first(iter, &tab);
-             d != nullptr; d = m_vector_type_tab.get_next(iter, &tab)) {
-            ASSERT0(tab);
-            delete tab;
-        }
-
-        TensorElemTypeTabIter iter2;
-        TensorElemTypeTab * tab2;
-        for (Type const* d = m_tensor_type_tab.get_first(iter2, &tab2);
-             d != nullptr; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
-            ASSERT0(tab2);
-            delete tab2;
-        }
-    }
-
-    //Register a memory-chunk data type.
-    TypeContainer const* registerMC(Type const* ty);
-
-    //Register a vector data type.
-    //type: it must be D_VEC type, and the vector-element-type can not D_UNDEF,
-    //e.g: vector<I8,I8,I8,I8> type, which mc_size is 32 byte, vec-type is D_I8.
-    TypeContainer const* registerVector(Type const* ty);
-
-    //Register a stream data type.
-    //ty: it must be D_STREAM type, and the stream-element-type can not D_UNDEF,
-    //e.g: stream<I8> type, which stream-element-type is D_I8.
-    TypeContainer const* registerStream(Type const* ty);
-
-    //Register a tensor data type.
-    //'type': it must be D_TENSOR type, and the
-    //tensor-element-type can not D_UNDEF.
-    TypeContainer const* registerTensor(Type const* ty);
-
-    //Register a pointer data type.
-    TypeContainer const* registerPointer(Type const* ty);
-
-    //Register simplex type container, e.g:INT, UINT, FP, BOOL.
-    TypeContainer const* registerSimplex(Type const* ty);
-
-    //Return data type that registered in m_type_tab.
-    Type * registerType(Type const* dtd);
-
-    CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf) const;
-    void dump_type(Type const* dtd) const;
+    CHAR const* dump_type(Type const* ty, OUT StrBuf & buf) const;
+    void dump_type(Type const* ty) const;
     void dump_type(UINT tyid) const;
     void dump_type_tab() const;
 
@@ -757,11 +685,12 @@ public:
 
     RegionMgr * getRegionMgr() const { return m_rm; }
 
-    //Return DATA_TYPE which 'bitsize' corresponding to
-    DATA_TYPE getFPDType(UINT bitsize) const
+    //Return DATA_TYPE which 'bitsize' corresponding to.
+    //is_bf: set to true if current type is bfloat.
+    DATA_TYPE getFPDType(UINT bitsize, bool is_bf) const
     {
         switch (bitsize) {
-        case 16: return D_F16;
+        case 16: return is_bf ? D_BF16 : D_F16;
         case 32: return D_F32;
         case 64: return D_F64;
         case 128: return D_F128;
@@ -787,13 +716,29 @@ public:
         return D_MC;
     }
 
-    Type const* getFPType(UINT bitsize) const
-    { return getSimplexTypeEx(getFPDType(bitsize)); }
+    //Return DATA_TYPE which 'bitsize' corresponding to.
+    //is_bf: set to true if current type is bfloat.
+    Type const* getFPType(UINT bitsize, bool is_bf) const
+    { return getSimplexTypeEx(getFPDType(bitsize, is_bf)); }
 
     //Return Integer Type according to given bit size and sign.
     //e.g: given bitsize is 32, is_signed is true, return D_I32 type.
     Type const* getIntType(UINT bitsize, bool is_signed) const
     { return getSimplexTypeEx(getIntDType(bitsize, is_signed)); }
+
+    //Return Signed Integer Type of host machine.
+    Type const* getHostIntType() const
+    { return getIntType(sizeof(HOST_INT) * HOST_BIT_PER_BYTE, true); }
+
+    //Return Unsigned Integer Type of host machine.
+    Type const* getHostUIntType() const
+    { return getIntType(sizeof(HOST_UINT) * HOST_BIT_PER_BYTE, false); }
+
+    //Return Float-Point Type of host machine.
+    //is_bf: set to true if current type is bfloat. By default, host
+    //       float-point type is usually be float or double.
+    virtual Type const* getHostFPType(bool is_bf = false) const
+    { return getFPType(sizeof(HOST_FP) * HOST_BIT_PER_BYTE, is_bf); }
 
     //Return Unsigned Integer Data-Type according to given byte size.
     DATA_TYPE getUIntDType(UINT bytesize) const
@@ -803,12 +748,22 @@ public:
     DATA_TYPE getSIntDType(UINT bytesize) const
     { return getIntDType(bytesize * BIT_PER_BYTE, true); }
 
+    //Return Signed Integer Type that has same byte size with given 'ty'.
+    //e.g: given ty is F64, return I64.
+    Type const* getSIntTypeWithSameSize(Type const* ty) const
+    { return getIntType(getBitSize(ty), true); }
+
     //Return Unsigned Integer or MemoryChunk Type according to given byte size.
     Type const* getUIntType(UINT bytesize)
     {
         DATA_TYPE dt = getIntDType(bytesize * BITS_PER_BYTE, false);
         return dt == D_MC ? getMCType(bytesize) : getSimplexTypeEx(dt);
     }
+
+    //Return Unsigned Integer Type that has same byte size with given 'ty'.
+    //e.g: given ty is F64, return U64.
+    Type const* getUIntTypeWithSameSize(Type const* ty) const
+    { return getIntType(getBitSize(ty), false); }
 
     //Return Data-Type according to given bit size and sign.
     //Note the bit size will be aligned to power of 2.
@@ -849,10 +804,10 @@ public:
     { return getSimplexTypeEx(getPointerSizeDtype()); }
 
     //Return the byte size of pointer's base.
-    UINT getPointerBaseByteSize(Type const* type) const
+    UINT getPointerBaseByteSize(Type const* ty) const
     {
-        ASSERT0(type->is_pointer());
-        return TY_ptr_base_size(type);
+        ASSERT0(ty->is_pointer());
+        return TY_ptr_base_size(ty);
     }
 
     //Return bytes size of 'dtype' refer to.
@@ -883,6 +838,7 @@ public:
     Type const* getU32() const { return m_u32; }
     Type const* getU64() const { return m_u64; }
     Type const* getU128() const { return m_u128; }
+    Type const* getBF16() const { return m_bf16; }
     Type const* getF16() const { return m_f16; }
     Type const* getF32() const { return m_f32; }
     Type const* getF64() const { return m_f64; }
@@ -915,6 +871,7 @@ public:
         case D_U32: return m_u32;
         case D_U64: return m_u64;
         case D_U128: return m_u128;
+        case D_BF16: return m_bf16;
         case D_F16: return m_f16;
         case D_F32: return m_f32;
         case D_F64: return m_f64;
@@ -996,14 +953,14 @@ public:
     }
 
     //Return byte size according to given Type.
-    UINT getByteSize(Type const* dtd) const;
+    UINT getByteSize(Type const* ty) const;
 
     //Return byte size according to given tyid.
     UINT getByteSize(UINT tyid) const { return getByteSize(getType(tyid)); }
 
     //Return byte size according to given Type.
-    UINT getBitSize(Type const* dtd) const
-    { return getByteSize(dtd) * BITS_PER_BYTE; }
+    UINT getBitSize(Type const* ty) const
+    { return getByteSize(ty) * BITS_PER_BYTE; }
 
     bool is_scalar(UINT tyid) { return tyid >= D_B && tyid <= D_F128; }
 
@@ -1036,6 +993,38 @@ public:
 
     //Return true if data type is Vector.
     bool is_vec(UINT tyid) const { return getType(tyid)->is_vector(); }
+
+    //Return true if host-float-point value a is equal to b.
+    //epsilon: error range.
+    static bool isEqual(HOST_FP a, HOST_FP b, HOST_FP epsilon = EPSILON)
+    { return ::fabs(a - b) < epsilon; }
+
+    //Register a memory-chunk data type.
+    TypeContainer const* registerMC(Type const* ty);
+
+    //Register a vector data type.
+    //type: it must be D_VEC type, and the vector-element-type can not D_UNDEF,
+    //e.g: vector<I8,I8,I8,I8> type, which mc_size is 32 byte, vec-type is D_I8.
+    TypeContainer const* registerVector(Type const* ty);
+
+    //Register a stream data type.
+    //ty: it must be D_STREAM type, and the stream-element-type can not D_UNDEF,
+    //e.g: stream<I8> type, which stream-element-type is D_I8.
+    TypeContainer const* registerStream(Type const* ty);
+
+    //Register a tensor data type.
+    //'type': it must be D_TENSOR type, and the
+    //tensor-element-type can not D_UNDEF.
+    TypeContainer const* registerTensor(Type const* ty);
+
+    //Register a pointer data type.
+    TypeContainer const* registerPointer(Type const* ty);
+
+    //Register simplex type container, e.g:INT, UINT, FP, bool.
+    TypeContainer const* registerSimplex(Type const* ty);
+
+    //Return data type that registered in m_type_tab.
+    Type * registerType(Type const* ty);
 };
 
 

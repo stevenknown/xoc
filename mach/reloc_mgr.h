@@ -31,6 +31,10 @@ author: Su Zhenyu
 #ifndef _RELOC_H_
 #define _RELOC_H_
 
+namespace xoc { class LinearScanRA; }
+
+namespace xoc { class PrologueEpilogueInserter; }
+
 namespace mach {
 
 typedef xcom::TMap<xoc::LabelInfo const*, TMWORD> Label2Offset;
@@ -55,7 +59,15 @@ public:
     //of 'v' if find. Otherwise, the function will compute the layout of 'v'
     //and add 'v' to current variable table.
     TMWORD getOrAddVarOffset(xoc::Var const* v);
+
+    //If fp is used, variables need to be addressed via fp.
+    TMWORD getOrAddVarOffsetRelatedFP(xoc::Var const* v, UINT stack_size);
+
     TMWORD getAlign() const { return m_align; }
+
+    //m_cur_offset can only be reset when meeting function call,
+    //and current m_cur_offset must represent the offset in argument space.
+    void resetCurOffset() { m_cur_offset = 0; }
 
     //Set the alignment.
     //The byte offset of each Variable will aligned in 'align'.
@@ -69,24 +81,61 @@ protected:
     Region * m_rg;
     TypeMgr * m_tm;
     MInstMgr * m_mimgr;
+    PrologueEpilogueInserter * m_pelog;
+    LinearScanRA * m_ra;
     TMWORD m_code_align;
     TMWORD m_data_align;
 protected:
     void computeCodeOffset(MOD MIList & milst,
                            OUT Label2Offset & lab2off);
-    void computeDataOffset(MOD MIList & milst,
-                           OUT Var2Offset & var2off,
-                           Label2Offset const& lab2off);
+
+    //All callees of a caller share the same argument space,
+    //so when a call instruction is meeting, the arg space
+    //it occupies should be cleared.
+    void resetArgSpaceOffset(MInst * mi, OUT Var2Offset & var2off);
 public:
     RelocMgr(Region * rg, MInstMgr * imgr, TMWORD align);
     virtual ~RelocMgr() {}
+    virtual void computeDataOffset(MOD MIList & milst,
+                                   OUT Var2Offset & var2off,
+                                   Label2Offset const& lab2off);
+
+    //Compute the offset of var in argument space.
+    TMWORD computeArgVarOffset(MInst * mi, OUT Var2Offset & var2off);
+
+    //Compute the offset of param var.
+    void computeParamOffset(OUT Var2Offset & var2off);
+
+    //Compute the offset of var in local var space.
+    TMWORD computeVarOffset(MInst * mi, OUT Var2Offset & var2off);
+
+    //Compute the offset of param var form var2off.
+    TMWORD getParamOffset(MInst * mi, Var2Offset & var2off) const;
+
     MInstMgr * getMIMgr() const { return m_mimgr; }
     TMWORD getCodeAlign() const { return m_code_align; }
     TMWORD getDataAlign() const { return m_data_align; }
     virtual UINT getMInstRelocType(MI_CODE c) = 0;
 
+    //True if the input var is argument.
+    bool isArgument(Var const* var) const;
+
+    //True if the input mi is function call.
+    virtual bool isCall(MInst * mi) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //True if the input var is formal parameter.
+    bool isParameter(Var const* var) const;
+
+    //Return true if the register is spilled in prologue/epilogue,
+    //such as callee, return register and fp.
+    virtual bool isSpilledRegRelatedFP(MInst * mi) const { return false; }
+
     //Set the data or code byte offset according to relocation type.
     virtual void setValueViaRelocType(OUT MInst * mi, TMWORD offset) = 0;
+
+    //Set the data or code byte offset according to mi code.
+    virtual void setValueViaMICode(OUT MInst * mi, TMWORD offset) = 0;
 
     //Set the code alignment.
     //The byte offset of each Machine Instruction will aligned in 'align'.

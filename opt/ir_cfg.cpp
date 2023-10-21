@@ -55,28 +55,6 @@ void Lab2BB::dump(Region * rg) const
 //END Lab2BB
 
 
-//
-//START Opnd2Pred
-//
-void Opnd2Pred::collect(IRBB * bb, IRCFG * cfg)
-{
-    IRListIter it;
-    for (IR * ir = bb->getIRList().get_head(&it); ir != nullptr;
-         ir = bb->getIRList().get_next(&it)) {
-        if (!ir->is_phi()) { break; }
-        xcom::AdjVertexIter vit;
-        Vertex const* in = cfg->get_first_in_vertex(bb->getVex(), vit);
-        for (IR * opnd = PHI_opnd_list(ir); opnd != nullptr;
-             opnd = opnd->get_next(), in = cfg->get_next_in_vertex(vit)) {
-            ASSERT0(in);
-            set(opnd, in->id());
-        }
-        break; //only record info for the first phi.
-    }
-}
-//END Opnd2Pred
-
-
 //IRCFG
 IRCFG::IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
              UINT vertex_hash_size)
@@ -304,15 +282,16 @@ bool IRCFG::verifyLabel2BB() const
 
 
 //Verification at building SSA mode by ir parser.
-bool IRCFG::verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const
+static bool verifyPhiEdgeImpl(IRCFG const* cfg, IR const* phi,
+                              IR2Lab const& ir2lab)
 {
     xcom::Vertex * bbvex = phi->getBB()->getVex();
     xcom::EdgeC * opnd_pred = bbvex->getInList();
     IR * opnd = PHI_opnd_list(phi);
     for (; opnd != nullptr && opnd_pred != nullptr;
          opnd = opnd->get_next(), opnd_pred = EC_next(opnd_pred)) {
-        LabelInfo * opnd_label = ir2label.get(opnd);
-        IRBB * incoming_bb = findBBbyLabel(opnd_label);
+        LabelInfo const* opnd_label = ir2lab.get(opnd);
+        IRBB * incoming_bb = cfg->findBBbyLabel(opnd_label);
         ASSERT0(incoming_bb);
         if (opnd_pred->getFromId() != incoming_bb->id()) {
             return false;
@@ -323,36 +302,35 @@ bool IRCFG::verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const
 }
 
 
-//Sort the order of predecessor of given BB according to PHI operand layout.
-void IRCFG::sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label)
+bool IRCFG::verifyPhiEdge(IR2Lab const& ir2lab) const
 {
-    //Sort in-edge of bb to guarantee the order of them are same
-    //with the phi-operands.
-    xcom::Vertex * bbvex = bb->getVex();
-    xcom::EdgeC * opnd_pred = bbvex->getInList();
-    for (IR * opnd = PHI_opnd_list(phi);
-         opnd != nullptr; opnd = opnd->get_next()) {
-        LabelInfo * opnd_label = ir2label.get(opnd);
-        IRBB * incoming_bb = findBBbyLabel(opnd_label);
-        ASSERT0(incoming_bb);
-        if (opnd_pred->getFromId() == incoming_bb->id()) {
-            opnd_pred = opnd_pred->get_next();
-            continue;
-        }
-
-        xcom::EdgeC * q;
-        for (q = opnd_pred->get_next();
-             q != nullptr; q = q->get_next()) {
-            if (q->getFromId() == incoming_bb->id()) {
-                break;
+    BBListIter ct;
+    BBList * bblst = getBBList();
+    ASSERT0(bblst);
+    for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
+        IRBB const* bb = ct->val();
+        INT phi_opnd_num = -1;
+        IRListIter ct2;
+        for (BB_irlist(const_cast<IRBB*>(bb)).get_head(&ct2);
+             ct2 != nullptr; BB_irlist(const_cast<IRBB*>(bb)).get_next(&ct2)) {
+            IR * x = ct2->val();
+            ASSERT0(x);
+            if (!x->is_phi()) { break; }
+            if (phi_opnd_num == -1) {
+                //Only sort predecessor once.
+                phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
             }
-        }
-        ASSERTN(q, ("can not find expected in-edge for BB%d", bb->id()));
-        xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
-        opnd_pred = q->get_next();
-    }
 
-    ASSERT0(verifyPhiEdge(phi, ir2label));
+            //Verify all PHI have the same number of operands.
+            //Verify whether the others PHI's operands are in correct order.
+            ASSERTN((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
+                    ("the number of operand is inconsistent"));
+            ASSERT0((UINT)phi_opnd_num == bb->getVex()->getInDegree());
+            ASSERT0(verifyPhiEdgeImpl(this, x, ir2lab));
+            DUMMYUSE(verifyPhiEdgeImpl);
+        }
+    }
+    return true;
 }
 
 
@@ -383,6 +361,10 @@ UINT IRCFG::afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
         UINT iter_time = 0;
         reviseDomInfoAfterAddOrRemoveEdge(bb->getVex(), succ->getVex(),
                                           &modset, root, iter_time);
+        //Since PDom info is not important as Dom info, recompute pdom
+        //whenever you need it.
+        ctx.getOptCtx().setInvalidPDom();
+
         ASSERT0(root);
         reviseMDSSA(modset, root);
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
@@ -438,6 +420,10 @@ UINT IRCFG::afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
         UINT iter_time = 0;
         reviseDomInfoAfterAddOrRemoveEdge(getVertex(bbid), succ->getVex(),
                                           &modset, root, iter_time);
+        //Since PDom info is not important as Dom info, recompute pdom
+        //whenever you need it.
+        ctx.getOptCtx().setInvalidPDom();
+
         ASSERT0(root);
         reviseMDSSA(modset, root);
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
@@ -457,7 +443,9 @@ UINT IRCFG::replacePredWith(IRBB const* bb, IRBB const* succ,
                             List<UINT> const& newpreds,
                             OUT CfgOptCtx & ctx)
 {
-    UINT orgpos = WhichPred(bb, succ);
+    bool is_pred;
+    UINT orgpos = WhichPred(bb, succ, is_pred);
+    ASSERT0(is_pred);
     UINT orgnum = getPredsNum(succ);
     UINT newpredstartpos = CFG<IRBB, IR>::replacePredWith(bb, succ,
                                                           newpreds, ctx);
@@ -467,44 +455,6 @@ UINT IRCFG::replacePredWith(IRBB const* bb, IRBB const* succ,
     }
     return afterReplacePredInCase2(bb, succ, newpreds, ctx, orgpos,
                                    orgnum, newpredstartpos);
-}
-
-
-//Revise CFG edge for BB has phi.
-//NOTE:CFG should have been built before revise Vertex order.
-void IRCFG::reorderPhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
-{
-    ASSERTN(m_bb_list, ("bb_list is emt"));
-    BBListIter ct;
-    for (m_bb_list->get_head(&ct);
-         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
-        IRBB const* bb = ct->val();
-        if (BB_irlist(bb).get_elem_count() == 0) {
-            continue;
-        }
-
-        //Used to verify all PHI have the same number of operands.
-        INT phi_opnd_num = -1;
-        IRListIter ct2;
-        for (BB_irlist(const_cast<IRBB*>(bb)).get_head(&ct2);
-             ct2 != nullptr; BB_irlist(const_cast<IRBB*>(bb)).get_next(&ct2)) {
-            IR * x = ct2->val();
-            ASSERT0(x);
-            if (!x->is_phi()) { continue; }
-            if (phi_opnd_num == -1) {
-                //Only sort predecessor once.
-                phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
-                sortPred(bb, x, ir2label);
-                continue;
-            }
-
-            //Verify whether the others PHI's operands are in correct order.
-            ASSERTN((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
-                    ("the number of operand is inconsistent"));
-            ASSERT0((UINT)phi_opnd_num == bb->getVex()->getInDegree());
-            ASSERT0(verifyPhiEdge(x, ir2label));
-        }
-    }
 }
 
 
@@ -822,8 +772,11 @@ void IRCFG::rebuild(OptCtx & oc)
 {
     ASSERT0(m_cs != C_UNDEF);
     initEntryAndExit(m_cs);
+    SortPredByBBId sortpred(this);
+    sortpred.collectPhiOpnd2PredBB();
     CFG<IRBB, IR>::rebuild(oc);
     buildEHEdge();
+    sortpred.sort();
 
     //After CFG rebuilding, empty BB should be removed because empty BB disturb
     //the computation of entry and exit.
@@ -1077,47 +1030,9 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point, OptCtx & oc)
     IRBB * newbb = m_rg->allocBB();
 
     //Move rest IRs from bb to newbb.
-    for (bb->getIRList().get_next(&split_point); split_point != nullptr;) {
-        IRListIter rm = split_point;
-        bb->getIRList().get_next(&split_point);
-        bb->getIRList().remove(rm);
-        ASSERT0(rm->val());
-        newbb->getIRList().append_tail(rm->val());
-    }
-
-    //Update CFG info.
-    addBB(newbb);
-
-    //Update BB List.
-    getBBList()->insert_after(newbb, bb);
-
-    //Move EdgeInfo from old edges to new edges.
-    xcom::Vertex const* v = bb->getVex();
-    ASSERT0(v);
-    INT minsuccrpo = MAX_HOST_INT_VALUE;
-    xcom::EdgeC * next_el;
-    CfgOptCtx ctx(oc);
-    for (xcom::EdgeC * el = v->getOutList(); el != nullptr; el = next_el) {
-        next_el = el->get_next();
-        xcom::Edge * e = el->getEdge();
-        UINT succ = e->to()->id();
-        xcom::Edge * newe = addEdge(newbb, getBB(succ), ctx);
-        newe->copyEdgeInfo(e);
-        xcom::Graph::removeEdge(e);
-
-        //Collect the minimal RPO.
-        if (succ != bb->id()) {
-            IRBB const* succbb = getBB(succ);
-            ASSERT0(succbb);
-            minsuccrpo = MIN(succbb->rpo(), minsuccrpo);
-        }
-    }
-
-    addEdge(bb, newbb, ctx);
-    tryUpdateRPOBeforeCFGChanged(newbb, bb, false, &oc);
-    if (oc.is_dom_valid()) {
-        addDomInfoToNewIPDom(bb->id(), newbb->id());
-    }
+    bb->getIRList().extractRestIRIntoList(split_point, false,
+                                          newbb->getIRList());
+    insertFallThroughBBAfter(bb, newbb, &oc);
     return newbb;
 }
 
@@ -1310,7 +1225,6 @@ IRBB * IRCFG::insertFallThroughBBAfter(IRBB const* marker, MOD OptCtx * oc)
 }
 
 
-//The function insert newbb after 'marker'. As a result.
 void IRCFG::insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
                                      MOD OptCtx * oc)
 {
@@ -1454,7 +1368,10 @@ void IRCFG::removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx)
     for (Vertex const* t = Graph::get_first_out_vertex(bb->getVex(), it);
          t != nullptr; t = Graph::get_next_out_vertex(it), pos++) {
         IRBB * succ = getBB(t->id());
-        removeSuccDesignatedPhiOpnd(succ, WhichPred(bb, succ), ctx);
+        bool is_pred;
+        UINT npred = WhichPred(bb, succ, is_pred);
+        ASSERT0_DUMMYUSE(is_pred);
+        removeSuccDesignatedPhiOpnd(succ, npred, ctx);
     }
 }
 
@@ -1521,6 +1438,10 @@ void IRCFG::insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
         UINT iter_time = 0;
         reviseDomInfoAfterAddOrRemoveEdge(from->getVex(), to->getVex(),
                                           &modset, root, iter_time);
+        //Since PDom info is not important as Dom info, recompute pdom
+        //whenever you need it.
+        ctx.getOptCtx().setInvalidPDom();
+
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
         ASSERT0(root);
         reviseMDSSA(modset, root);
@@ -1540,6 +1461,10 @@ void IRCFG::removeEdge(Vertex const* from, Vertex const* to,
         xcom::Vertex const* root = nullptr;
         UINT iter_time = 0;
         reviseDomInfoAfterAddOrRemoveEdge(from, to, &modset, root, iter_time);
+        //Since PDom info is not important as Dom info, recompute pdom
+        //whenever you need it.
+        ctx.getOptCtx().setInvalidPDom();
+
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
         ASSERT0(root);
         reviseMDSSA(modset, root);
@@ -1549,7 +1474,10 @@ void IRCFG::removeEdge(Vertex const* from, Vertex const* to,
 
 void IRCFG::removeEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 {
-    removeSuccDesignatedPhiOpnd(to, WhichPred(from, to), ctx);
+    bool is_pred;
+    UINT npred = WhichPred(from, to, is_pred);
+    ASSERT0_DUMMYUSE(is_pred);
+    removeSuccDesignatedPhiOpnd(to, npred, ctx);
     removeEdge(from->getVex(), to->getVex(), ctx);
 }
 
@@ -1591,6 +1519,10 @@ xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
         UINT iter_time = 0;
         reviseDomInfoAfterAddOrRemoveEdge(from->getVex(), to->getVex(),
                                           &modset, root, iter_time);
+        //Since PDom info is not important as Dom info, recompute pdom
+        //whenever you need it.
+        ctx.getOptCtx().setInvalidPDom();
+
         CFGOPTCTX_vertex_iter_time(&ctx) += iter_time;
         ASSERT0(root);
         reviseMDSSA(modset, root);
@@ -2580,7 +2512,7 @@ bool IRCFG::dump() const
     m_lab2bb.dump(m_rg);
     m_rg->getLogMgr()->decIndent(2);
     if (g_dump_opt.isDumpDOM()) {
-        dumpDom();
+        dumpDomSet();
     }
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
@@ -2671,7 +2603,7 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
     END_TIMER(t, "Compute Dom, IDom");
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
         note(m_rg, "\n==---- DUMP DOM&IDOM IN IRCFG ----==");
-        dumpDom();
+        dumpDomSet();
     }
 }
 
@@ -2730,7 +2662,7 @@ void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
     END_TIMER(t, "Compute PDom,IPDom");
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
         note(m_rg, "\n==---- DUMP PDOM&IPDOM IN IRCFG ----==");
-        dumpDom();
+        dumpDomSet();
     }
 }
 
@@ -2911,9 +2843,7 @@ bool IRCFG::removeTrampolinBranchForBB(BBListIter & it, OUT CfgOptCtx & ctx)
 }
 
 
-//Sort PHI operand in order of predecessors of BB of PHI.
-//pred2opnd: record a map between predecessor to operand.
-void IRCFG::sortPhiOpnd(IR * phi, Pred2Opnd & pred2opnd)
+void IRCFG::sortPhiOpnd(IR * phi, Pred2Opnd const& pred2opnd)
 {
     ASSERT0(phi->getBB());
     IR * newopnds = nullptr;
@@ -2922,7 +2852,7 @@ void IRCFG::sortPhiOpnd(IR * phi, Pred2Opnd & pred2opnd)
     for (Vertex const* in = Graph::get_first_in_vertex(
             phi->getBB()->getVex(), it);
          in != nullptr; in = Graph::get_next_in_vertex(it)) {
-        IR * opnd = pred2opnd.get(in->id());
+        IR * opnd = const_cast<Pred2Opnd&>(pred2opnd).get(in->id());
         ASSERT0(opnd);
         ASSERT0(xcom::in_list(PHI_opnd_list(phi), opnd));
         xcom::remove(&PHI_opnd_list(phi), opnd);
@@ -3098,7 +3028,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
         //SSAInfo is invalid by adding new-edge to BB.
         //This will confuse phi insertion.
         //CFG optimization should maintain Phi information.
-        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, ctx.getOptCtx()));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, ctx.getOptCtx()));
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
             dump();

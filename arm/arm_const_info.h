@@ -562,4 +562,5 @@ typedef enum _OR_CODE {
 } OR_CODE;
 #define OR_NUM OR_LAST
 
+#include "arm_mach_def.h"
 #endif

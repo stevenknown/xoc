@@ -75,7 +75,7 @@ void CFGLifting::getKidOfIF(IRBB * irbb, IRBB ** true_body, IRBB ** false_body,
 {
     if (true_body != nullptr || false_body != nullptr) {
         IRBB * ipdom = m_cfg->get_ipdom(irbb);
-        ASSERTN(ipdom > 0, ("IRBB does not have ipdom"));
+        ASSERTN(ipdom, ("IRBB does not have ipdom"));
         IRBB * fallthrough_bb = m_cfg->getFallThroughBB(irbb);
         IRBB * target_bb = m_cfg->getTargetBB(irbb);
         IR * xr = m_cfg->get_last_xr(irbb);
@@ -116,7 +116,7 @@ void CFGLifting::getKidOfIF(IRBB * irbb, IRBB ** true_body, IRBB ** false_body,
 
     if (sibling != nullptr) {
         IRBB * ipdom = m_cfg->get_ipdom(irbb);
-        ASSERTN(ipdom > 0, ("irbb does not have ipdom"));
+        ASSERTN(ipdom, ("irbb does not have ipdom"));
         *sibling = ipdom;
     }
 }

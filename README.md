@@ -3,12 +3,12 @@ xoc
 
 Welcome to use XOC
 
-What does XOC mean? 
+What does XOC mean?
 	eXtremely Optimizing Compiler.
 	We build XOC compiler that intent to be a finely honed tool to squeezing
 	the last performance out of ordinary code.
 
-Contribution and License Agreement. 
+Contribution and License Agreement.
 	The XOC Repo is licensed under the BSD license.
 	If you contribute code to this project, you are implicitly allowing your
 	code to be distributed under the BSD license.
@@ -45,8 +45,8 @@ Build libxoc.a on Windows:
 ```
 
 How to Contribute :
-	All contributors should own the rights to any code you contribute, and 
-	that you give us permission to use that code in XOC. 
-	You maintain the copyright on that code. 
-	Submit a pull request for your changes. A project developer will review 
+	All contributors should own the rights to any code you contribute, and
+	that you give us permission to use that code in XOC.
+	You maintain the copyright on that code.
+	Submit a pull request for your changes. A project developer will review
 	your work and then merge your request into the project.

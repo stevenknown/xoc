@@ -90,6 +90,51 @@ IRListIter BBIRList::append_tail_ex(IR * ir)
     ir->setBB(m_bb);
     return it;
 }
+
+
+IR * BBIRList::extractRestIRIntoList(MOD BBIRListIter marker,
+                                     bool include_marker)
+{
+    IR * restirs = nullptr;
+    IR * last = nullptr;
+    if (!include_marker) {
+        this->get_next(&marker);
+    }
+    for (BBIRListIter next_ctir = marker;
+         marker != nullptr; marker = next_ctir) {
+        this->get_next(&next_ctir);
+
+        //CASE:some IR in irlst may not have BB attribute,
+        //e.g:Label.
+        EList<IR*, IR2Holder>::remove(marker);
+        xcom::add_next(&restirs, &last, marker->val());
+    }
+    return restirs;
+}
+
+
+void BBIRList::extractRestIRIntoList(MOD BBIRListIter marker,
+                                     bool include_marker,
+                                     OUT BBIRList & newlst)
+{
+    ASSERT0(marker);
+    BBIRListIter curlstit;
+    this->get_tail(&curlstit);
+    ASSERT0(curlstit);
+    for (BBIRListIter prevlstit = curlstit;
+         curlstit != marker; curlstit = prevlstit) {
+        this->get_prev(&prevlstit);
+        //CASE:some IR in current IR list may not have BB attribute,
+        //e.g:Label.
+        EList<IR*, IR2Holder>::remove(curlstit);
+        newlst.append_head(curlstit->val());
+    }
+    ASSERT0(curlstit == marker);
+    if (include_marker) {
+        EList<IR*, IR2Holder>::remove(curlstit);
+        newlst.append_head(curlstit->val());
+    }
+}
 //END BBIRList
 
 

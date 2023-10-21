@@ -230,6 +230,7 @@ inline void remove(T ** pheader, T * t)
 
 
 //Swap value of t1 and t2.
+//Note the copy constructor may be invoked if T is object type.
 template <class T>
 inline void swap(T & t1, T & t2)
 {
@@ -538,7 +539,6 @@ public:
     C<T> * prev;
     C<T> * next;
     T value;
-
 public:
     C() { init(); }
     void init()
@@ -592,7 +592,7 @@ template <class T>
 class FreeList {
     COPY_CONSTRUCTOR(FreeList);
 public:
-    BOOL m_is_clean;
+    bool m_is_clean;
     T * m_tail;
 
 public:
@@ -631,11 +631,11 @@ public:
         if (m_tail != nullptr) {
             ASSERT0(t->next == nullptr);
             m_tail->next = nullptr;
-            m_is_clean ? ::memset(t, 0, sizeof(T)) : t->prev = nullptr;
+            m_is_clean ? ::memset((void*)t, 0, sizeof(T)) : t->prev = nullptr;
         } else {
             ASSERT0(t->prev == nullptr && t->next == nullptr);
             if (m_is_clean) {
-                ::memset(t, 0, sizeof(T));
+                ::memset((void*)t, 0, sizeof(T));
             }
         }
         return t;
@@ -773,6 +773,7 @@ public:
         return count;
     }
 
+    //Return the list node container of 't'.
     inline C<T> * append_tail(T t)
     {
         C<T> * c = newc();
@@ -831,6 +832,7 @@ public:
     }
 
     //Append value t to head of list.
+    //Return the list node container of 't'.
     inline C<T> * append_head(T t)
     {
         C<T> * c  = newc();
@@ -955,6 +957,7 @@ public:
     //Insert value t before marker.
     //Note this function will do searching for t and marker, so it is
     //a costly function, and used it be carefully.
+    //Return the list node container of 't'.
     C<T> * insert_before(T t, T marker)
     {
         ASSERTN(t != marker, ("element of list cannot be identical"));
@@ -1021,6 +1024,7 @@ public:
     }
 
     //Insert 't' into list before the 'marker'.
+    //Return the list node container of 't'.
     inline C<T> * insert_before(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
@@ -1110,6 +1114,7 @@ public:
     //Insert value t after marker.
     //Note this function will do searching for t and marker, so it is
     //a costly function, and used it be carefully.
+    //Return the list node container of 't'.
     C<T> * insert_after(T t, T marker)
     {
         ASSERTN(t != marker,("element of list cannot be identical"));
@@ -1173,6 +1178,7 @@ public:
     }
 
     //Insert 't' into list after the 'marker'.
+    //Return the list node container of 't'.
     inline C<T> * insert_after(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
@@ -1340,7 +1346,7 @@ public:
         return m_cur->val();
     }
 
-    //Return next container.
+    //Return next list node container of 'holder'.
     //Caller could get the element via C_val or val().
     //This function does not modify m_cur.
     inline C<T> * get_next(IN C<T> * holder) const
@@ -1385,7 +1391,7 @@ public:
         return T(0);
     }
 
-    //Return prev container.
+    //Return prev list node container of 'holder'.
     //Caller could get the element via C_val or val().
     //This function does not modify m_cur.
     inline C<T> * get_prev(IN C<T> * holder) const
@@ -1638,7 +1644,7 @@ protected:
         ASSERTN(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
         SC<T> * p = (SC<T>*)smpoolMallocConstSize(sizeof(SC<T>), pool);
         ASSERT0(p != nullptr);
-        ::memset(p, 0, sizeof(SC<T>));
+        ::memset((void*)p, 0, sizeof(SC<T>));
         return p;
     }
 
@@ -2154,7 +2160,7 @@ protected:
         ASSERTN(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
         SC<T> * p = (SC<T>*)smpoolMallocConstSize(sizeof(SC<T>), pool);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(SC<T>));
+        ::memset((void*)p, 0, sizeof(SC<T>));
         return p;
     }
 
@@ -2750,8 +2756,11 @@ public:
 //This class represents vector. The size of vector is extended dynamically.
 //T: refer to element type.
 //NOTE:
-//    1. T(0) is treated as the default nullptr when we determine the element
-//    existence.
+//    1. T() or T(0) are treated as the default object when we determine the
+//    element existence. Class T should provide a class-constructor
+//    that indicates the default choice. Member functions will return an
+//    object that constructed by the default constructor when encountering
+//    exception.
 //    2. The object allocated in heap.
 //    3. Zero is reserved and regard it as the default nullptr when we
 //    determine whether an element is exist.
@@ -2833,7 +2842,7 @@ public:
         if (m_last_idx == VEC_UNDEF) {
             return;
         }
-        ::memset(m_vec, 0, sizeof(T) * (get_elem_count()));
+        ::memset((void*)m_vec, 0, sizeof(T) * (get_elem_count()));
         m_last_idx = VEC_UNDEF; //No any elements
     }
 
@@ -2845,7 +2854,7 @@ public:
             return;
         }
         ASSERT0(idx < (VecIdx)get_elem_count());
-        ::memset(&m_vec[idx], 0, sizeof(T) * (get_elem_count() - idx));
+        ::memset((void*)&m_vec[idx], 0, sizeof(T) * (get_elem_count() - idx));
         m_last_idx = idx == 0 ? VEC_UNDEF : idx - 1;
     }
 
@@ -2874,6 +2883,10 @@ public:
         }
     }
 
+    //The function return the element in vector that indexed by 'index'.
+    //Note class-name T should provide a default class-constructor that
+    //without any parameters. The function will return an object that
+    //constructed by the default constructor if 'index' is out of range.
     T get(VecIdx index) const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
@@ -2898,7 +2911,7 @@ public:
         ASSERT0(size != 0);
         m_vec = (T*)::malloc(sizeof(T) * size);
         ASSERT0(m_vec);
-        ::memset(m_vec, 0, sizeof(T) * size);
+        ::memset((void*)m_vec, 0, sizeof(T) * size);
         m_elem_num = (ElemNumTy)size;
         m_last_idx = VEC_UNDEF;
         m_is_init = true;
@@ -2930,6 +2943,10 @@ public:
         return m_last_idx;
     }
 
+    //Return the number of elements in vector.
+    //Note the function computes the number by return the last element
+    //index + 1.
+    //e.g: the vector has elements <null, x, y, z>, the function return 4.
     UINT get_elem_count() const { return (UINT)(get_last_idx() + 1); }
 
     //Growing vector up to hold the most num_of_elem elements.
@@ -2944,7 +2961,7 @@ public:
                     ("vector should be nullptr if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * num_of_elem);
             ASSERT0(m_vec);
-            ::memset(m_vec, 0, sizeof(T) * num_of_elem);
+            ::memset((void*)m_vec, 0, sizeof(T) * num_of_elem);
             m_elem_num = (ElemNumTy)num_of_elem;
             return;
         }
@@ -2952,8 +2969,8 @@ public:
         ASSERT0((ElemNumTy)num_of_elem > m_elem_num);
         T * tmp = (T*)::malloc(num_of_elem * sizeof(T));
         ASSERT0(tmp);
-        ::memcpy(tmp, m_vec, m_elem_num * sizeof(T));
-        ::memset(((CHAR*)tmp) + m_elem_num * sizeof(T), 0,
+        ::memcpy((void*)tmp, m_vec, m_elem_num * sizeof(T));
+        ::memset((void*)(((CHAR*)tmp) + m_elem_num * sizeof(T)), 0,
                  (num_of_elem - m_elem_num)* sizeof(T));
         ::free(m_vec);
         m_vec = tmp;
@@ -3178,7 +3195,7 @@ public:
             destroy();
             init(n, pool);
         } else if (tgtn > n) {
-            ::memset(((BYTE*)m_vec) + sizeof(T) * n, 0,
+            ::memset((void*)(((BYTE*)m_vec) + sizeof(T) * n), 0,
                      sizeof(T) * (tgtn - n));
         }
         if (n > 0) {
@@ -3193,7 +3210,7 @@ public:
     void clean()
     {
         ASSERTN(s1.m_is_init, ("SimpleVector not yet initialized."));
-        ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
+        ::memset((void*)m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
 
     //Count memory usage for current object.
@@ -3213,7 +3230,7 @@ public:
         ASSERT0(size != 0 && size < MaxSize);
         m_vec = (T*)smpoolMalloc(sizeof(T) * size, pool);
         ASSERT0(m_vec);
-        ::memset(m_vec, 0, sizeof(T) * size);
+        ::memset((void*)m_vec, 0, sizeof(T) * size);
         SVEC_elem_num(this) = size;
         s1.m_is_init = true;
     }
@@ -3259,7 +3276,7 @@ public:
             ASSERT0(size < MaxSize);
             m_vec = (T*)smpoolMalloc(sizeof(T) * size, pool);
             ASSERT0(m_vec);
-            ::memset(m_vec, 0, sizeof(T) * size);
+            ::memset((void*)m_vec, 0, sizeof(T) * size);
             SVEC_elem_num(this) = size;
             return;
         }
@@ -3268,7 +3285,7 @@ public:
         T * tmp = (T*)smpoolMalloc(sizeof(T) * size, pool);
         ASSERT0(tmp);
         ::memcpy(tmp, m_vec, SVEC_elem_num(this) * sizeof(T));
-        ::memset(((CHAR*)tmp) + SVEC_elem_num(this) * sizeof(T),
+        ::memset((void*)(((CHAR*)tmp) + SVEC_elem_num(this) * sizeof(T)),
                  0, (size - SVEC_elem_num(this))* sizeof(T));
         m_vec = tmp;
         SVEC_elem_num(this) = size;
@@ -3469,7 +3486,7 @@ protected:
         if (c == nullptr) {
             c = (HC<T>*)smpoolMallocConstSize(sizeof(HC<T>), m_free_list_pool);
             ASSERT0(c);
-            ::memset(c, 0, sizeof(HC<T>));
+            ::memset((void*)c, 0, sizeof(HC<T>));
         }
         return c;
     }
@@ -3641,7 +3658,7 @@ public:
     void clean()
     {
         if (m_bucket == nullptr) { return; }
-        ::memset(m_bucket, 0, sizeof(HashBucket) * m_bucket_size);
+        ::memset((void*)m_bucket, 0, sizeof(HashBucket) * m_bucket_size);
         m_elem_count = 0;
         m_elem_vector.clean();
     }
@@ -3760,7 +3777,7 @@ public:
     {
         if (m_bucket != nullptr || bsize == 0) { return; }
         m_bucket = (HashBucket*)::malloc(sizeof(HashBucket) * bsize);
-        ::memset(m_bucket, 0, sizeof(HashBucket) * bsize);
+        ::memset((void*)m_bucket, 0, sizeof(HashBucket) * bsize);
         m_bucket_size = bsize;
         m_elem_count = 0;
         m_free_list_pool = smpoolCreate(sizeof(HC<T>) * 4, MEM_CONST_SIZE);
@@ -3819,23 +3836,22 @@ public:
         ASSERTN(hashv < m_bucket_size,
                 ("hash value must less than bucket size"));
         HC<T> * elemhc = (HC<T>*)HB_member(m_bucket[hashv]);
+        if (elemhc == nullptr) { return T(0); }
+        while (elemhc != nullptr) {
+            ASSERTN(HC_val(elemhc) != T(0),
+                    ("Hash element has so far as to be overrided!"));
+            if (m_hf.compare(HC_val(elemhc), t)) {
+                break;
+            }
+            elemhc = HC_next(elemhc);
+        }
         if (elemhc != nullptr) {
-            while (elemhc != nullptr) {
-                ASSERTN(HC_val(elemhc) != T(0),
-                        ("Hash element has so far as to be overrided!"));
-                if (m_hf.compare(HC_val(elemhc), t)) {
-                    break;
-                }
-                elemhc = HC_next(elemhc);
-            }
-            if (elemhc != nullptr) {
-                m_elem_vector.set(HC_vec_idx(elemhc), T(0));
-                xcom::remove((HC<T>**)&HB_member(m_bucket[hashv]), elemhc);
-                m_free_list.add_free_elem(elemhc);
-                HB_count(m_bucket[hashv])--;
-                m_elem_count--;
-                return t;
-            }
+            m_elem_vector.set(HC_vec_idx(elemhc), T(0));
+            xcom::remove((HC<T>**)&HB_member(m_bucket[hashv]), elemhc);
+            m_free_list.add_free_elem(elemhc);
+            HB_count(m_bucket[hashv])--;
+            m_elem_count--;
+            return t;
         }
         return T(0);
     }
@@ -3858,7 +3874,7 @@ public:
 
         HashBucket * new_bucket =
             (HashBucket*)::malloc(sizeof(HashBucket) * bsize);
-        ::memset(new_bucket, 0, sizeof(HashBucket) * bsize);
+        ::memset((void*)new_bucket, 0, sizeof(HashBucket) * bsize);
         if (m_elem_count == 0) {
             ::free(m_bucket);
             m_bucket = new_bucket;
@@ -3943,18 +3959,16 @@ public:
         ASSERTN(hashv < m_bucket_size,
                ("hash value must less than bucket size"));
         HC<T> const* elemhc = (HC<T> const*)HB_member(m_bucket[hashv]);
-        if (elemhc != nullptr) {
-            while (elemhc != nullptr) {
-                ASSERTN(HC_val(elemhc) != T(0),
-                       ("Hash element has so far as to be overrided!"));
-                if (m_hf.compare(HC_val(elemhc), t)) {
-                    if (ct != nullptr) {
-                        *ct = elemhc;
-                    }
-                    return true;
+        while (elemhc != nullptr) {
+            ASSERTN(HC_val(elemhc) != T(0),
+                   ("Hash element has so far as to be overrided!"));
+            if (m_hf.compare(HC_val(elemhc), t)) {
+                if (ct != nullptr) {
+                    *ct = elemhc;
                 }
-                elemhc = HC_next(elemhc);
+                return true;
             }
+            elemhc = HC_next(elemhc);
         }
         return false;
     }
@@ -4047,7 +4061,7 @@ protected:
         RBTNType * p = (RBTNType*)smpoolMallocConstSize(sizeof(RBTNType),
                                                         m_pool);
         ASSERT0(p);
-        ::memset(p, 0, sizeof(RBTNType));
+        ::memset((void*)p, 0, sizeof(RBTNType));
         return p;
     }
 

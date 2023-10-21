@@ -37,14 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //Map BB id to IR.
-typedef TMap<UINT, IR*> Pred2Opnd;
-
-//Map IR to BB id.
-class Opnd2Pred : public TMap<IR*, UINT> {
-public:
-    //Collect the mapping informatino for Phi list in bb.
-    void collect(IRBB * bb, IRCFG * cfg);
-};
+typedef xcom::TMap<UINT, IR*> Pred2Opnd;
 
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
@@ -121,10 +114,6 @@ protected:
     void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
     static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
                                MOD OptCtx * oc);
-
-    //Sort the order of predecessor of given BB according to PHI operand layout.
-    void sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label);
-
     bool useMDSSADU() const;
     bool usePRSSADU() const;
 public:
@@ -211,8 +200,10 @@ public:
     void dumpDOTNoSSA() const
     { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
     void dumpDOT(FILE * h, UINT flag) const;
-    void dumpDom() const { CFG<IRBB, IR>::dumpDom(m_rg); }
-    void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg); }
+    void dumpDomSet() const { CFG<IRBB, IR>::dumpDomSet(m_rg); }
+    void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg, true, false); }
+    void dumpPDomTree() const
+    { CFG<IRBB, IR>::dumpDomTree(m_rg, false, true); }
     virtual bool dump() const;
 
     void erase();
@@ -294,12 +285,15 @@ public:
     //Find natural loop and scan loop body to find call and early exit, etc.
     void LoopAnalysis(OUT OptCtx & oc);
 
-    //Compute which predecessor is pred to bb.
+    //Find which predecessor is pred to bb.
+    //Return the position of 'bb', position start at 0.
     //e.g: If pred is the first predecessor, return 0.
     //pred: BB id of predecessor.
+    //is_pred: set to true if pred_vex_id is one of predecessor of 'vex',
+    //         otherwise set false.
     //Note 'pred' must be one of predecessors of 'bb'.
-    UINT WhichPred(IRBB const* pred, IRBB const* bb) const
-    { return Graph::WhichPred(pred->id(), bb->getVex()); }
+    UINT WhichPred(IRBB const* pred, IRBB const* bb, OUT bool & is_pred) const
+    { return Graph::WhichPred(pred->id(), bb->getVex(), is_pred); }
 
     //Note maintain DomInfo may be costly.
     virtual void removeDomInfo(C<IRBB*> * bbct, MOD CfgOptCtx & ctx);
@@ -380,9 +374,6 @@ public:
     //and transform, otherwise perform operations follow the 'ctx' mandate.
     void removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx);
 
-    //Construct CFG edge for BB has phi.
-    void reorderPhiEdge(TMap<IR*, LabelInfo*> & ir2label);
-
     //The function replaces original predecessor with a list of
     //new predecessors.
     //bb: the predecessor will be replaced.
@@ -434,8 +425,8 @@ public:
     bool splitBBIfNeeded(IRBB * bb, OptCtx & oc);
 
     //Sort PHI operand in order of predecessors of BB of PHI.
-    //pred2opnd: record a map between predecessor to operand.
-    void sortPhiOpnd(IR * phi, Pred2Opnd & pred2opnd);
+    //pred2opnd: a map between predecessor to operand, used to retrieve info.
+    void sortPhiOpnd(IR * phi, Pred2Opnd const& pred2opnd);
 
     //Try to update RPO of newbb accroding to RPO of marker.
     //newbb_prior_marker: true if newbb's lexicographical order is prior to
@@ -474,7 +465,7 @@ public:
     bool verifyLabel2BB() const;
 
     //Verification at building SSA mode by ir parser.
-    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const;
+    bool verifyPhiEdge(IR2Lab const& ir2lab) const;
     bool verifyDomAndPdom(OptCtx const& oc) const;
     bool verifyRPO(OptCtx const& oc) const;
     bool verifyLoopInfo(OptCtx const& oc) const;

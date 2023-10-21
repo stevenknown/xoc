@@ -279,7 +279,7 @@ static void convertLIR2Dex(
 {
     DexCode const* dexcode = dexGetCode(df, dexm);
     DexCode x; //only for local used.
-    ::memset(&x, 0, sizeof(DexCode));
+    ::memset((void*)&x, 0, sizeof(DexCode));
 
     //Transform LIR to DEX.
     CBSHandle transformed_dex_code = transformCode(lircode, &x);
@@ -325,7 +325,7 @@ static void convertIR2LIR(
     lircode->lirList = (LIR**)LIRMALLOC(u * sizeof(LIR*));
     lircode->maxVars = func_ru->getPrno2Vreg()->maxreg + 1;
     ASSERT0(lircode->numArgs == func_ru->getPrno2Vreg()->paramnum);
-    ::memset(lircode->lirList, 0, u * sizeof(LIR*));
+    ::memset((void*)lircode->lirList, 0, u * sizeof(LIR*));
     UINT i = 0;
     for (LIR * l = newlirs.get_head(); l != nullptr; l = newlirs.get_next()) {
         ASSERT0(l);
@@ -366,7 +366,7 @@ public:
         ASSERT0(pool);
         DexDbx * dd = (DexDbx*)smpoolMalloc(sizeof(DexDbx), pool);
         ASSERT0(dd);
-        ::memset(dd, 0, sizeof(DexDbx));
+        ::memset((void*)dd, 0, sizeof(DexDbx));
         dd->init(AI_DBX);
         return dd;
     }

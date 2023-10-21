@@ -84,7 +84,7 @@ public:
         m_size = init_pool_size;
         if (init_pool_size == 0) { return; }
         m_ptr = (BYTE*)::malloc(init_pool_size);
-        ::memset(m_ptr, 0, m_size);
+        ::memset((void*)m_ptr, 0, m_size);
     }
 
     //Destroy bit buffer memory.
@@ -209,7 +209,7 @@ public:
     bool is_empty() const;
 
     //Set each byte in BitSet to 'val'.
-    void set(BYTE val) { ::memset(m_ptr, val, m_size); }
+    void set(BYTE val) { ::memset((void*)m_ptr, val, m_size); }
 
     //Reverse each bit.
     //e.g: 1001 to 0110
@@ -273,7 +273,7 @@ protected:
         ASSERTN(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
         ASSERTN(p, ("malloc failed"));
-        ::memset(p, 0, size);
+        ::memset((void*)p, 0, size);
         return p;
     }
 public:
@@ -465,11 +465,14 @@ public:
         return m_bs.get_next(curidx);
     }
 
-    //Get number of elements in vector.
+    //Return the number of elements in vector.
+    //Note the function computes the number by return the last element
+    //index + 1.
+    //e.g: the vector has elements <null, x, y, z>, the function return 4.
     UINT get_elem_count() const
     {
         ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
-        return m_bs.get_elem_count();
+        return Vector<T>::get_elem_count();
     }
 
     BitSet * get_bs() { return &m_bs; }
@@ -512,7 +515,7 @@ public:
         BSVec<T> * p = m_free_list.remove_head();
         if (p == nullptr) {
             p = (BSVec<T>*)::malloc(sizeof(BSVec<T>));
-            ::memset(p, 0, sizeof(BSVec<T>));
+            ::memset((void*)p, 0, sizeof(BSVec<T>));
             p->init();
             m_bs_list.append_head(p);
         }

@@ -381,7 +381,7 @@ public:
 #define DX_PCOUNT 5  //Parameter count
 class DXC {
 public:
-    DXC() { ::memset(this, 0, sizeof(DXC)); }
+    DXC() { ::memset((void*)this, 0, sizeof(DXC)); }
 
     DX_OPC opc;
     INT vA;
@@ -454,8 +454,10 @@ public:
     void decode_dx(USHORT const* cptr, MOD DXC & dc);
     void dump_dx(DXC const& dc, FILE * h, INT ofst);
     void dump_method(IN DX_INFO const& dxinfo, IN FILE * h);
-    virtual CHAR const* get_string(UINT str_idx) { UNREACHABLE(); return nullptr; }
-    virtual CHAR const* get_type_name(UINT idx) { UNREACHABLE(); return nullptr; }
+    virtual CHAR const* get_string(UINT str_idx)
+    { UNREACHABLE(); return nullptr; }
+    virtual CHAR const* get_type_name(UINT idx)
+    { UNREACHABLE(); return nullptr; }
     virtual CHAR const* get_field_name(UINT field_idx)
     { UNREACHABLE(); return nullptr; }
     virtual CHAR const* get_method_name(UINT method_idx)

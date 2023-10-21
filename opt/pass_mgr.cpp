@@ -283,6 +283,31 @@ Pass * PassMgr::allocLinearScanRA()
 }
 
 
+Pass * PassMgr::allocPrologueEpilogue()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new PrologueEpilogueInserter(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocGPAdjustment()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocRelaxation()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
 Pass * PassMgr::allocCCP()
 {
     //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PRSSA_MGR));
@@ -502,6 +527,15 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_VECT:
         pass = allocVectorization();
         break;
+    case PASS_PROLOGUE_EPILOGUE:
+        pass = allocPrologueEpilogue();
+        break;
+    case PASS_GP_ADJUSTMENT:
+        pass = allocGPAdjustment();
+        break;
+    case PASS_RELAXATION:
+        pass = allocRelaxation();
+        break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }
     m_allocated_pass.append(pass);
@@ -720,12 +754,12 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
             }
             break;
         case PASS_EXPR_TAB:
-            if (!oc->is_expr_tab_valid() &&
+            if (!oc->isPassValid(PASS_EXPR_TAB) &&
                 m_rg->getBBList() != nullptr &&
                 m_rg->getBBList()->get_elem_count() != 0) {
                 ExprTab * exprtab = (ExprTab*)registerPass(PASS_EXPR_TAB);
                 ASSERT0(exprtab);
-                exprtab->reperform(*oc);
+                exprtab->perform(*oc);
             }
             break;
         case PASS_LOOP_INFO:

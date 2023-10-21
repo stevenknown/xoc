@@ -88,8 +88,8 @@ public:
     //Note the content in given buf must be string format of hex, that is the
     //string can only contain "abcdefABCDEF0123456789".
     //outputbuf: the byte buffer that record the hex number.
-    //buflen: byte length of 'outputbuf'.
-    void toByteHex(OUT BYTE * outputbuf, UINT buflen);
+    //bufl: byte length of 'outputbuf'.
+    void toByteHex(OUT BYTE * outputbuf, UINT bufl);
 
     //String comparation.
     //Return true if s equal to current string.
@@ -126,6 +126,9 @@ public:
     //by 'format'.
     void strcat(CHAR const* format, ...);
 
+    //Concatenate another string to current string.
+    void strcat(StrBuf const& another);
+
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
     //the new string is consist of original string and the string formed
@@ -147,6 +150,43 @@ public:
     //the new string is consist of original string and the string formed
     //by 'args'.
     void vstrcat(CHAR const* format, va_list args);
+};
+
+
+//The class represent a vector that record a set of StrBuf.
+//Note the class maintains the memory of each StrBuf in the vector, and
+//guarrantees all allocated memory will be freed during destruction.
+class StrBufVec {
+    COPY_CONSTRUCTOR(StrBufVec);
+protected:
+    Vector<StrBuf*> m_strbufvec;
+public:
+    StrBufVec() {}
+    ~StrBufVec()
+    {
+        for (UINT i = 0; i < m_strbufvec.get_elem_count(); i++) {
+            StrBuf * strbuf = m_strbufvec[i];
+            if (strbuf != nullptr) { delete strbuf; }
+        }
+    }
+
+    //Get the No.'n' StrBuf in the vector.
+    //Return null if it does not exist.
+    StrBuf * getStrBuf(UINT n) const { return m_strbufvec.get(n); }
+
+    //Get the No.'n' StrBuf in the vector. The function will allocate a new
+    //StrBuf if it does not exist.
+    //bufinitsize: the byte size to initialize new StrBuf.
+    StrBuf * genStrBuf(UINT n, UINT bufinitsize = 8)
+    {
+        StrBuf * strbuf = m_strbufvec.get(n);
+        if (strbuf == nullptr) {
+            strbuf = new StrBuf(8);
+            m_strbufvec.set(n, strbuf);
+        }
+        return strbuf;
+    }
+    UINT getStrBufNum() const { return m_strbufvec.get_elem_count(); }
 };
 
 } //namespace xcom

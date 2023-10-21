@@ -1302,13 +1302,13 @@ static float fast_sqrt_float(float n)
     //WARNING: dereferencing type-punned pointer will break
     //strict-aliasing rules [-Wstrict-aliasing]
     float * py = &y;
-    LONG i = *(LONG*)py;
+    UINT32 i = *(UINT32*)py;
 
     i  = 0x5f3759df - (i >> 1);
 
     //WARNING: dereferencing type-punned pointer will break
     //strict-aliasing rules [-Wstrict-aliasing]
-    LONG * pi = &i;
+    UINT32 * pi = &i;
     y  = *(float*)pi;
 
     //May be need more iters for higher precision?

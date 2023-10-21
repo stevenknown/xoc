@@ -42,7 +42,7 @@ namespace xoc {
 static void dumpInsertMove(LSRAImpl & lsra, IRBB const* mvbb, IR const* mv,
                            CHAR const* format, ...)
 {
-    StrBuf buf(64);
+    xcom::StrBuf buf(64);
     va_list args;
     va_start(args, format);
     buf.vstrcat(format, args);
@@ -56,7 +56,7 @@ static void dumpInsertMove(LSRAImpl & lsra, IRBB const* mvbb, IR const* mv,
 static void dumpInsertBB(LSRAImpl & lsra, IRBB const* from, IRBB const* to,
                          IRBB const* newbb, CHAR const* format, ...)
 {
-    StrBuf buf(64);
+    xcom::StrBuf buf(64);
     va_list args;
     va_start(args, format);
     buf.vstrcat(format, args);
@@ -82,20 +82,21 @@ static void dumpSplitTwo(LSRAImpl & lsra, LifeTime const* lt,
 static void dumpSpill(LSRAImpl & lsra, IR const* spill, Reg reg,
                       IRBB const* bb, CHAR const* format, ...)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
-        StrBuf buf(64);
         va_list args;
         va_start(args, format);
-        buf.vstrcat(format, args);
+        tmpbuf.vstrcat(format, args);
         va_end(args);
-        lsra.getActMgr().dump(
-            "SPILL:insert spill ir id:%u at BB%u to spill %s, reason:%s",
-            spill->id(), bb->id(), lsra.getTIMgr().getRegName(reg), buf.buf);
-        return;
     }
-    lsra.getActMgr().dump(
+    ActHandler acth = lsra.getActMgr().dump(
         "SPILL:insert spill ir id:%u at BB%u to spill %s",
         spill->id(), bb->id(), lsra.getTIMgr().getRegName(reg));
+    if (format != nullptr) {
+        ASSERT0(acth.info);
+        acth.info->strcat(", reason:%s", tmpbuf.getBuf());
+    }
 }
 
 
@@ -112,21 +113,21 @@ static void dumpSpill(LSRAImpl & lsra, IR const* spill, LifeTime const* lt,
 static void dumpReload(LSRAImpl & lsra, IR const* reload, Reg reg,
                        IRBB const* bb, CHAR const* format, ...)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
-        StrBuf buf(64);
         va_list args;
         va_start(args, format);
-        buf.vstrcat(format, args);
+        tmpbuf.vstrcat(format, args);
         va_end(args);
-        lsra.getActMgr().dump(
-            "RELOAD:insert reload ir id:%u at BB%u to reload %s, reason:%s",
-            reload->id(), bb->id(), lsra.getTIMgr().getRegName(reg),
-            buf.buf);
-        return;
     }
-    lsra.getActMgr().dump(
+    ActHandler acth = lsra.getActMgr().dump(
         "RELOAD:insert reload ir id:%u at BB%u to reload %s",
         reload->id(), bb->id(), lsra.getTIMgr().getRegName(reg));
+    if (format != nullptr) {
+        ASSERT0(acth.info);
+        acth.info->strcat(", reason:%s", tmpbuf.getBuf());
+    }
 }
 
 
@@ -141,43 +142,25 @@ static void dumpReload(LSRAImpl & lsra, IR const* reload, LifeTime const* lt,
 }
 
 
-static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
-                       CHAR const* format, ...)
-{
-    Reg r = lsra.getReg(lt);
-    if (format != nullptr) {
-        va_list args;
-        va_start(args, format);
-        StrBuf buf(64);
-        buf.vstrcat(format, args);
-        va_end(args);
-        lsra.getActMgr().dump("ASSIGN:$%u with %s, reason:%s",
-            lt->getPrno(), lsra.getRegName(r), buf.buf);
-    } else {
-        lsra.getActMgr().dump("ASSIGN:$%u with %s",
-            lt->getPrno(), lsra.getRegName(r));
-    }
-}
-
-
 static void dumpSelectSplitCand(LSRAImpl & lsra, LifeTime const* lt,
                                 Pos split_pos,
                                 bool canbe, CHAR const* format, ...)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf tmpbuf(64);
     if (canbe) {
         if (format != nullptr) {
             va_list args;
             va_start(args, format);
-            StrBuf buf(64);
-            buf.vstrcat(format, args);
+            tmpbuf.vstrcat(format, args);
             va_end(args);
-            lsra.getActMgr().dump(
-                "SELECT_SPLIT_CAND:$%u is split-candidate at pos:%u, reason:%s",
-                lt->getPrno(), split_pos, buf.buf);
-        } else {
-            lsra.getActMgr().dump(
-                "SELECT_SPLIT_CAND:$%u is split-candidate at pos:%u",
-                lt->getPrno(), split_pos);
+        }
+        ActHandler acth = lsra.getActMgr().dump(
+            "SELECT_SPLIT_CAND:$%u is split-candidate at pos:%u",
+            lt->getPrno(), split_pos);
+        if (format != nullptr) {
+            ASSERT0(acth.info);
+            acth.info->strcat(", reason:%s", tmpbuf.getBuf());
         }
         return;
     }
@@ -185,12 +168,11 @@ static void dumpSelectSplitCand(LSRAImpl & lsra, LifeTime const* lt,
     ASSERT0(format);
     va_list args;
     va_start(args, format);
-    StrBuf buf(64);
-    buf.vstrcat(format, args);
+    tmpbuf.vstrcat(format, args);
     va_end(args);
     lsra.getActMgr().dump(
         "SELECT_SPLIT_CAND:$%u can NOT be splitted at pos:%u, reason:%s",
-        lt->getPrno(), split_pos, buf.buf);
+        lt->getPrno(), split_pos, tmpbuf.getBuf());
 }
 
 
@@ -210,28 +192,6 @@ static LifeTime * pickFromSet(PRNO prno, MOD LTSet & set)
 }
 
 
-//Pick up a physical register from allocable register set.
-static Reg pickReg(RegSet & set)
-{
-    BSIdx i = set.get_first();
-    if (i == BS_UNDEF) {
-        return REG_UNDEF;
-    }
-    set.diff(i);
-    return (Reg)i;
-}
-
-
-static Reg pickReg(RegSet & set, Reg r)
-{
-    if (set.is_contain(r)) {
-        set.diff(r);
-        return r;
-    }
-    return REG_UNDEF;
-}
-
-
 //
 //START LTConsistencyMgr
 //
@@ -243,6 +203,7 @@ LTConsistencyMgr::LTConsistencyMgr(LSRAImpl & impl) : m_impl(impl)
     m_oc = impl.getOptCtx();
     m_is_insert_bb = false;
 }
+
 
 void LTConsistencyMgr::dump() const
 {
@@ -742,32 +703,54 @@ bool SplitMgr::isDefLT(IR const* stmt, LifeTime const* lt) const
 }
 
 
+IR * SplitMgr::doSpillAfterSplitPos(LifeTime * lt, SplitCtx const& ctx)
+{
+    //There is no need to insert spill code in some cases:
+    //1. split_pos is in a hole of lt.
+    //Even if split_pos is DEF position, spill code is also needed, e.g:
+    //spill caller-saved register at call-stmt, the position indicates
+    //the call-stmt which is DEF position.
+    IR * spill = nullptr;
+    cutoffLTFromSpillPos(lt, ctx.split_pos);
+
+    //Prepare the correct register type for spill
+    Type const* reg_type =
+        m_impl.queryRegTypeForSpillAfter(lt->getPrno(), ctx.split_pos_ir);
+    ASSERT0(reg_type);
+
+    spill = m_impl.insertSpillAfter(lt->getPrno(), reg_type, ctx.split_pos_ir);
+    ASSERT0(spill);
+    dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, false);
+    return spill;
+}
+
+
+IR * SplitMgr::doSpillBeforeSplitPos(LifeTime * lt, SplitCtx const& ctx)
+{
+    IR * spill = nullptr;
+    //Prepare the correct register type for spill
+    Type const* reg_type =
+        m_impl.queryRegTypeForSpillBefore(lt->getPrno(), ctx.split_pos_ir);
+    ASSERT0(reg_type);
+
+    shrinkLTToSplitPos(lt, ctx.split_pos, ctx.split_pos_ir);
+    spill = m_impl.insertSpillBefore(lt->getPrno(), reg_type, ctx.split_pos_ir);
+    ASSERT0(spill);
+    dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, true);
+    return spill;
+}
+
+
 IR * SplitMgr::insertSpillAroundSplitPos(LifeTime * lt, SplitCtx const& ctx)
 {
     ASSERT0(lt->is_contain(ctx.split_pos));
-    IR * spill = nullptr;
     ASSERT0(ctx.split_pos_ir);
+
     if (UpdatePos::isDef(ctx.split_pos) && lt->isDefOcc(ctx.split_pos_ir)) {
-        //There is no need to insert spill code in some cases:
-        //1. split_pos is in a hole of lt.
-        //Even if split_pos is DEF position, spill code is also needed, e.g:
-        //spill caller-saved register at call-stmt, the position indicates
-        //the call-stmt which is DEF position.
-        cutoffLTFromSpillPos(lt, ctx.split_pos);
-        spill = m_impl.insertSpillAfter(lt->getPrno(),
-                                        ctx.split_pos_ir->getType(),
-                                        ctx.split_pos_ir);
-        ASSERT0(spill);
-        dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, false);
-    } else {
-        shrinkLTToSplitPos(lt, ctx.split_pos, ctx.split_pos_ir);
-        spill = m_impl.insertSpillBefore(lt->getPrno(),
-                                         ctx.split_pos_ir->getType(),
-                                         ctx.split_pos_ir);
-        ASSERT0(spill);
-        dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, true);
+        return doSpillAfterSplitPos(lt, ctx);
     }
-    return spill;
+
+    return doSpillBeforeSplitPos(lt, ctx);
 }
 
 
@@ -854,26 +837,103 @@ void LSRAImpl::initRegSet()
     #ifdef DEBUG_LSRA
     //User can customize the register set that used in register allocation.
     //e.g: given calling convention only has 1 regisetr allocable.
-    m_avail_callee.bunion(CALLEE_SAVED_REG_START);
-    m_avail_callee.bunion(CALLEE_SAVED_REG_START + 1);
+    m_avail_callee.bunion(SCALAR_CALLEE_SAVED_REG_START);
+    m_avail_callee.bunion(SCALAR_CALLEE_SAVED_REG_START + 1);
     m_avail_caller.clean();
     m_avail_allocable.bunion(m_avail_callee);
     m_avail_allocable.bunion(m_avail_caller);
+    m_avail_callee_vector.bunion(VECTOR_CALLEE_SAVED_REG_START);
+    m_avail_callee_vector.bunion(VECTOR_CALLEE_SAVED_REG_START + 1);
+    m_avail_caller_vector.clean();
+    m_avail_allocable_vector.bunion(m_avail_callee_vector);
+    m_avail_allocable_vector.bunion(m_avail_caller_vector);
     #else
-    m_avail_callee.copy(getTIMgr().getCallee());
-    m_avail_caller.copy(getTIMgr().getCaller());
-    m_avail_param.copy(getTIMgr().getParam());
-    m_avail_return_value.copy(getTIMgr().getReturnValue());
-    m_avail_allocable.copy(getTIMgr().getAllocable());
+    if (getTIMgr().getCallee() != nullptr) {
+        m_avail_callee.copy(*getTIMgr().getCallee());
+    }
+    if (getTIMgr().getCaller() != nullptr) {
+        m_avail_caller.copy(*getTIMgr().getCaller());
+    }
+    if (getTIMgr().getParam() != nullptr) {
+        m_avail_param.copy(*getTIMgr().getParam());
+    }
+    if (getTIMgr().getReturnValue() != nullptr) {
+        m_avail_return_value.copy(*getTIMgr().getReturnValue());
+    }
+    if (getTIMgr().getAllocable() != nullptr) {
+        m_avail_allocable.copy(*getTIMgr().getAllocable());
+    }
+    if (getTIMgr().getVectorCallee() != nullptr) {
+        m_avail_callee_vector.copy(*getTIMgr().getVectorCallee());
+    }
+    if (getTIMgr().getVectorCaller() != nullptr) {
+        m_avail_caller_vector.copy(*getTIMgr().getVectorCaller());
+    }
+    if (getTIMgr().getVectorParam() != nullptr) {
+        m_avail_param_vector.copy(*getTIMgr().getVectorParam());
+    }
+    if (getTIMgr().getVectorReturnValue() != nullptr) {
+        m_avail_return_value_vector.copy(*getTIMgr().getVectorReturnValue());
+    }
+    if (getTIMgr().getVectorAllocable() != nullptr) {
+        m_avail_allocable_vector.copy(*getTIMgr().getVectorAllocable());
+    }
     #endif
+}
+
+
+//Pick up a physical register from allocable register set.
+Reg LSRAImpl::pickReg(RegSet & set)
+{
+    BSIdx i = set.get_first();
+    if (i == BS_UNDEF) {
+        return REG_UNDEF;
+    }
+    set.diff(i);
+    return (Reg)i;
+}
+
+
+Reg LSRAImpl::pickReg(RegSet & set, Reg r)
+{
+    if (set.is_contain(r)) {
+        set.diff(r);
+        return r;
+    }
+    return REG_UNDEF;
 }
 
 
 void LSRAImpl::pickRegFromAllocable(Reg reg)
 {
     ASSERT0(isAvailAllocable(reg));
-    pickReg(m_avail_callee, reg);
     pickReg(m_avail_caller, reg);
+    pickReg(m_avail_param, reg);
+    pickReg(m_avail_return_value, reg);
+    pickReg(m_avail_callee, reg);
+    pickReg(m_avail_caller_vector, reg);
+    pickReg(m_avail_param_vector, reg);
+    pickReg(m_avail_return_value_vector, reg);
+    pickReg(m_avail_callee_vector, reg);
+}
+
+
+void LSRAImpl::dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
+                          CHAR const* format, ...)
+{
+    Reg r = lsra.getReg(lt);
+    if (format != nullptr) {
+        va_list args;
+        va_start(args, format);
+        StrBuf buf(64);
+        buf.vstrcat(format, args);
+        va_end(args);
+        lsra.getActMgr().dump("ASSIGN:$%u with %s, reason:%s",
+            lt->getPrno(), lsra.getRegName(r), buf.buf);
+    } else {
+        lsra.getActMgr().dump("ASSIGN:$%u with %s",
+            lt->getPrno(), lsra.getRegName(r));
+    }
 }
 
 
@@ -889,18 +949,28 @@ void LSRAImpl::forceAssignRegister(LifeTime const* lt, Reg reg)
     if (getTIMgr().isCallee(reg)) {
         recordUsedCallee(reg);
     }
+    if (getTIMgr().isVectorCallee(reg)) {
+        recordUsedVectorCallee(reg);
+    }
     m_ra.setReg(lt->getPrno(), reg);
     dumpAssign(*this, lt, "assign dedicated register");
 }
 
 
-bool LSRAImpl::tryAssignCallee(LifeTime const* lt)
+bool LSRAImpl::tryAssignCallee(LifeTime const* lt, RegSet & avail_reg)
 {
-    Reg r = pickReg(m_avail_callee);
+    if (!m_ra.isCalleePermitted(lt)) { return false; }
+
+    Reg r = pickReg(avail_reg);
     if (r != REG_UNDEF) {
         ASSERT0(isAvailAllocable(r));
         m_ra.setReg(lt->getPrno(), r);
-        recordUsedCallee(r);
+        if (getTIMgr().isCallee(r)) {
+            recordUsedCallee(r);
+        }
+        if (getTIMgr().isVectorCallee(r)) {
+            recordUsedVectorCallee(r);
+        }
         dumpAssign(*this, lt, nullptr);
         return true;
     }
@@ -908,9 +978,9 @@ bool LSRAImpl::tryAssignCallee(LifeTime const* lt)
 }
 
 
-bool LSRAImpl::tryAssignCaller(LifeTime const* lt)
+bool LSRAImpl::tryAssignCaller(LifeTime const* lt, RegSet & avail_reg)
 {
-    Reg r = pickReg(m_avail_caller);
+    Reg r = pickReg(avail_reg);
     if (r != REG_UNDEF) {
         m_ra.setReg(lt->getPrno(), r);
         dumpAssign(*this, lt, nullptr);
@@ -920,16 +990,88 @@ bool LSRAImpl::tryAssignCaller(LifeTime const* lt)
 }
 
 
-bool LSRAImpl::tryAssignRegister(LifeTime const* lt)
+bool LSRAImpl::tryAssignRegister(IR const* ir, LifeTime const* lt)
 {
     ASSERT0(!lt->is_dedicated());
-    if (m_ra.preferCallee(lt) && tryAssignCallee(lt)) {
-        return true;
+    if (ir->is_vec()) {
+        return (getLTPrefer(lt) == PREFER_UNDEF) ?
+            tryAssignVectorRegister(lt) : tryAssignVectorRegisterByPrefer(lt);
     }
-    if (tryAssignCaller(lt)) {
-        return true;
+
+    return (getLTPrefer(lt) == PREFER_UNDEF) ?
+        tryAssignScalarRegister(lt) : tryAssignScalarRegisterByPrefer(lt);
+}
+
+
+bool LSRAImpl::tryAssignScalarRegisterByPrefer(LifeTime const* lt)
+{
+    ASSERT0(!lt->is_dedicated());
+    ASSERT0(getLTPrefer(lt) != PREFER_UNDEF);
+
+    if (getLTPrefer(lt) == PREFER_CALLEE) {
+        if (tryAssignCallee(lt, m_avail_callee)) { return true; }
+        if (tryAssignCaller(lt, m_avail_caller)) { return true; }
+        if (tryAssignCaller(lt, m_avail_param)) { return true; }
+        if (tryAssignCaller(lt, m_avail_return_value)) { return true; }
     }
+
+    if (getLTPrefer(lt) == PREFER_CALLER) {
+        return tryAssignScalarRegister(lt);
+    }
+
     getActMgr().dump("ASSIGN:can NOT find register for $%u",
+                      lt->getPrno());
+    return false;
+}
+
+
+bool LSRAImpl::tryAssignVectorRegisterByPrefer(LifeTime const* lt)
+{
+    ASSERT0(!lt->is_dedicated());
+    ASSERT0(getLTPrefer(lt) != PREFER_UNDEF);
+
+    if (getLTPrefer(lt) == PREFER_CALLEE) {
+        if (tryAssignCallee(lt, m_avail_callee_vector)) { return  true; }
+        if (tryAssignCaller(lt, m_avail_caller_vector)) { return true; }
+        if (tryAssignCaller(lt, m_avail_param_vector)) { return true; }
+        if (tryAssignCaller(lt, m_avail_return_value_vector)) { return true; }
+    }
+
+    if (getLTPrefer(lt) == PREFER_CALLER) {
+        return tryAssignVectorRegister(lt);
+    }
+
+    getActMgr().dump("ASSIGN:can NOT find vec register for $%u",
+                     lt->getPrno());
+    return false;
+}
+
+
+bool LSRAImpl::tryAssignScalarRegister(LifeTime const* lt)
+{
+    ASSERT0(!lt->is_dedicated());
+
+    if (tryAssignCaller(lt, m_avail_caller)) { return true; }
+    if (tryAssignCaller(lt, m_avail_param)) {  return true; }
+    if (tryAssignCaller(lt, m_avail_return_value)) { return true; }
+    if (tryAssignCallee(lt, m_avail_callee)) { return true; }
+
+    getActMgr().dump("ASSIGN:can NOT find register for $%u",
+                      lt->getPrno());
+    return false;
+}
+
+
+bool LSRAImpl::tryAssignVectorRegister(LifeTime const* lt)
+{
+    ASSERT0(!lt->is_dedicated());
+
+    if (tryAssignCaller(lt, m_avail_caller_vector)) { return true; }
+    if (tryAssignCaller(lt, m_avail_param_vector)) { return true; }
+    if (tryAssignCaller(lt, m_avail_return_value_vector)) { return true; }
+    if (tryAssignCallee(lt, m_avail_callee_vector)) { return true; }
+
+    getActMgr().dump("ASSIGN:can NOT find vec register for $%u",
                      lt->getPrno());
     return false;
 }
@@ -965,7 +1107,23 @@ LifeTime * LSRAImpl::selectAssignUseCand(Pos curpos, IR const* curstmt,
 
 void LSRAImpl::computeUsedCaller(OUT RegSet & used)
 {
-    xcom::bs_diff(getTIMgr().getCaller(), m_avail_caller, used);
+    if (getTIMgr().getCaller() == nullptr) {
+        ASSERTN(m_avail_caller.get_elem_count() == 0, ("should empty"));
+        used.clean();
+        return;
+    }
+    xcom::bs_diff(*getTIMgr().getCaller(), m_avail_caller, used);
+}
+
+
+void LSRAImpl::computeUsedVectorCaller(OUT RegSet & used)
+{
+    if (getTIMgr().getVectorCaller() == nullptr) {
+        ASSERTN(m_avail_caller_vector.get_elem_count() == 0, ("should empty"));
+        used.clean();
+        return;
+    }
+    xcom::bs_diff(*getTIMgr().getVectorCaller(), m_avail_caller_vector, used);
 }
 
 
@@ -993,6 +1151,7 @@ void LSRAImpl::splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
                             "split $%u that assigned %s",
                             t->getPrno(), m_ra.getRegName(r));
         LifeTime * newlt = spltmgr.splitAt(t, ctx);
+        computeLTPrefer(newlt);
         m_ra.addUnhandled(newlt);
         set.remove(it);
         m_ra.getHandled().append_tail(t);
@@ -1032,6 +1191,11 @@ void LSRAImpl::splitCallerSavedLT(Pos curpos, IR const* ir)
         ASSERT0(i != REG_UNDEF);
         splitAllLTWithReg(curpos, ir, (Reg)i, m_ra.getActive());
     }
+    computeUsedVectorCaller(used);
+    for (BSIdx i = used.get_first(); i != BS_UNDEF; i = used.get_next(i)) {
+        ASSERT0(i != REG_UNDEF);
+        splitAllLTWithReg(curpos, ir, (Reg)i, m_ra.getActive());
+    }
 }
 
 
@@ -1040,6 +1204,12 @@ void LSRAImpl::saveCallee()
     for (BSIdx i = m_used_callee.get_first();
          i != BS_UNDEF; i = m_used_callee.get_next(i)) {
         ASSERT0(getTIMgr().isCallee(i));
+        IR * spill = insertSpillAtEntry((Reg)i);
+        insertReloadAtExit(i, findSpillLoc(spill));
+    }
+    for (BSIdx i = m_used_callee_vector.get_first();
+         i != BS_UNDEF; i = m_used_callee_vector.get_next(i)) {
+        ASSERT0(getTIMgr().isVectorCallee(i));
         IR * spill = insertSpillAtEntry((Reg)i);
         insertReloadAtExit(i, findSpillLoc(spill));
     }
@@ -1072,7 +1242,7 @@ void LSRAImpl::tryAssignRegForIR(Pos pos, IR const* ir, LifeTime * lt)
         return;
     }
     //Normal lifetime.
-    if (tryAssignRegister(lt)) {
+    if (tryAssignRegister(ir, lt)) {
         Reg r = getReg(lt);
         ASSERT0(r != REG_UNDEF);
         splitInActiveLTWithReg(pos, ir, r);
@@ -1211,6 +1381,43 @@ void LSRAImpl::insertReloadAtExit(Reg r, Var * spill_loc)
         IR * reload = insertReloadAtBB(prno, spill_loc, ty, bb, false);
         dumpReload(*this, reload, r, bb, "reload callee-saved at exit");
     }
+}
+
+
+Type const* LSRAImpl::queryRegTypeForSpillBefore(PRNO prno, IR const* split_ir)
+{
+    //Here need to find the register number to be spilled in the split_pos_ir,
+    //and then use type of the register ir in the split_pos_ir as the for the
+    //next spill operation.
+    IterPrno iter_prno(split_ir, prno);
+    return iter_prno.getPrType() ? iter_prno.getPrType() :
+        m_rg->getTypeMgr()->getTargMachRegisterType();
+}
+
+
+Type const* LSRAImpl::queryRegTypeForSpillAfter(PRNO prno, IR const* split_ir)
+{
+    IR const* result_pr = const_cast<IR*>(split_ir)->getResultPR();
+    if ((result_pr != nullptr) && (result_pr->getPrno() != REG_UNDEF)) {
+        //The ASSERT here is not mandatory, the reason for this assert is
+        //that the position of spilt should be right after the split_pos_ir
+        //if it has a new define for the reg to be spilled, which can
+        //maximize the benifits of the spill operation.
+        //Please double check the strategy of choosing the split position
+        //for this purpose if the assert is triggered.
+        ASSERT0(prno == result_pr->getPrno());
+
+        //When spill after the split_pos_ir, since there is a result ir
+        //of the split_pos_ir, so the type of the new defined result should
+        //be used for next spill operation.
+        return result_pr->getType();
+    }
+
+    //Here need to find the register number to be spilled in the split_pos_ir,
+    //and then use type of the register ir in the split_pos_ir as the for the
+    //next spill operation.
+    IterPrno iter_prno(split_ir, prno);
+    return iter_prno.getPrType();
 }
 
 
@@ -1416,12 +1623,44 @@ IR * LSRAImpl::insertReloadBefore(PRNO newres, Var * spill_loc,
 
 void LSRAImpl::freeReg(Reg reg)
 {
-    if (getTIMgr().getCallee().is_contain(reg)) {
+    if (getTIMgr().isCaller(reg)) {
+        m_avail_caller.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isParam(reg)) {
+        m_avail_param.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isReturnValue(reg)) {
+        m_avail_return_value.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isCallee(reg)) {
         m_avail_callee.bunion((BSIdx)reg);
         return;
     }
-    if (getTIMgr().getCaller().is_contain(reg)) {
-        m_avail_caller.bunion((BSIdx)reg);
+    if (getTIMgr().isAllocable(reg)) {
+        m_avail_allocable.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isVectorCaller(reg)) {
+        m_avail_caller_vector.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isVectorParam(reg)) {
+        m_avail_param_vector.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isVectorReturnValue(reg)) {
+        m_avail_return_value_vector.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isVectorCallee(reg)) {
+        m_avail_callee_vector.bunion((BSIdx)reg);
+        return;
+    }
+    if (getTIMgr().isVectorAllocable(reg)) {
+        m_avail_allocable_vector.bunion((BSIdx)reg);
         return;
     }
     UNREACHABLE();
@@ -1466,10 +1705,15 @@ void LSRAImpl::solveConflict(LifeTime * lt, Pos curpos, IR const* curir)
         } else {
             //CASE:lt may be assigning-candidate, whereas lt is selected as the
             //splitting-candidate meanwhile. Thus after the function return, lt
-            //will be assigned a register and newlt will be waiting for assigning.
+            //will be assigned a register and newlt will be waiting for
+            //assigning.
             //ASSERT0(m_ra.getUnhandled().find(lt));
+
+            //Update the lifetime prefer only if it is not handled.
+            computeLTPrefer(cand);
         }
-        succ = tryAssignRegister(lt);
+        computeLTPrefer(newlt);
+        succ = tryAssignRegister(curir, lt);
         count++;
     } while (!succ && count < 20);
     ASSERT0(succ);
@@ -1511,6 +1755,31 @@ void LSRAImpl::dump() const
 }
 
 
+void LSRAImpl::computeRAPrefer()
+{
+    PRNO2LT const& prno2lt = getRA().getLTMgr().getPrno2LT();
+
+    for (VecIdx i = 0; i <= prno2lt.get_last_idx(); i++) {
+        if (prno2lt[i] == nullptr) { continue; }
+        computeLTPrefer(prno2lt[i]);
+    }
+}
+
+
+void LSRAImpl::computeLTPrefer(LifeTime const* lt)
+{
+    REG_PREFER prefer = PREFER_UNDEF;
+
+    if (lt->getCallCrossedNum() > 1) {
+        prefer = PREFER_CALLEE;
+    }
+    if (lt->getCallCrossedNum() == 1) {
+        prefer = PREFER_CALLER;
+    }
+    m_lt2prefer.setAlways(lt, prefer);
+}
+
+
 bool LSRAImpl::perform(OptCtx & oc)
 {
     m_oc = &oc;
@@ -1518,6 +1787,9 @@ bool LSRAImpl::perform(OptCtx & oc)
                                                PASS_UNDEF);
     m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
     ASSERT0(m_live_mgr && m_live_mgr->is_valid());
+
+    //Compute the lifetime prefer for Register Allocation.
+    computeRAPrefer();
     ScanInPosOrder scan(*this);
     scan.perform();
     reviseLTConsistency();

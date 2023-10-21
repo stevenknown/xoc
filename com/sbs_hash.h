@@ -117,7 +117,7 @@ protected:
         B2NType * mn = new B2NType(MD2NODE2_INIT_SZ);
         #else
         B2NType * mn = (B2NType*)smpoolMallocConstSize(sizeof(B2NType), m_pool);
-        ::memset(mn, 0, sizeof(B2NType));
+        ::memset((void*)mn, 0, sizeof(B2NType));
         mn->init(m_rbtn_pool);
         #endif
 

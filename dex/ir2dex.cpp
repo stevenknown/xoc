@@ -54,7 +54,7 @@ void * IR2Dex::ymalloc(UINT size)
 {
     void * p = LIRMALLOC(size);
     ASSERT0(p);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 

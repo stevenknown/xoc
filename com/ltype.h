@@ -125,7 +125,6 @@ typedef signed short SHORT;
 typedef unsigned short USHORT;
 typedef signed int INT;
 typedef unsigned int UINT;
-typedef unsigned int BOOL;
 typedef signed long LONG;
 typedef unsigned long ULONG;
 typedef signed char INT8;

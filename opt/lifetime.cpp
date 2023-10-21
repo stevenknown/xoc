@@ -311,6 +311,32 @@ void LifeTime::moveRangeVecFrom(LifeTime * src, Pos pos)
 }
 
 
+void LifeTime::moveCrossedCallInfoFrom(LifeTime * src, Pos pos)
+{
+    if (src->getCallCrossedNum() == 0) { return; }
+
+    //Since the cross call pos vector is incremental, so the binary search
+    //can be used to find the proper vector index.
+    VecIdx remove_start = VEC_UNDEF;
+    VecIdx great = VEC_UNDEF;
+    Vector<Pos> const& lt_call_pos_vec = src->getCallPosVec();
+    xcom::BinarySearch<Pos> bs;
+    if (!bs.search(lt_call_pos_vec, pos, &remove_start, nullptr, &great)) {
+        //If the specified pos is not in the cross call pos vector, use the vec
+        //index right greater than the specified pos as the start position for
+        //removal.
+        remove_start = great;
+    }
+
+    //If the POS is after any call position, do nothing.
+    if (remove_start == VEC_UNDEF) { return; }
+
+    if (remove_start < (VecIdx)src->getCallPosVec().get_elem_count()) {
+        src->removeCallPosVecFrom(remove_start);
+    }
+}
+
+
 void LifeTime::removeOccFrom(OccListIter prev, OccListIter it,
                              MOD LifeTimeMgr & mgr)
 {
@@ -355,6 +381,7 @@ void LifeTime::moveFrom(LifeTime * src, Pos pos, LifeTimeMgr & mgr)
 {
     moveRangeVecFrom(src, pos);
     moveOccListFrom(src, pos, mgr);
+    moveCrossedCallInfoFrom(src, pos);
 }
 
 
@@ -528,7 +555,11 @@ static void dumpRangeVecG(RangeVec const& rv, Region const* rg)
 
 void LifeTime::dump(Region const* rg) const
 {
-    note(rg, "\nLT:$%u,prio:%0.2f:", getPrno(), getPriority());
+    note(rg, "\nLT:$%u,prio:%0.2f,", getPrno(), getPriority());
+    if (getCallCrossedNum() != 0) {
+        prt(rg, "cross_call_num:%u,", getCallCrossedNum());
+    }
+    prt(rg, "range:");
     dumpRangeVec(m_range_vec, rg);
     //note(rg, "\n |");
     //dumpOccList(m_occ_list, rg);
@@ -608,7 +639,7 @@ void * LifeTimeMgr::xmalloc(size_t size)
 {
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p);
-    ::memset(p, 0, size);
+    ::memset((void*)p, 0, size);
     return p;
 }
 
@@ -755,9 +786,28 @@ bool LifeTimeMgr::verifyPos(IR const* ir, Pos pos) const
 }
 
 
+void LifeTimeMgr::genCallCrossedInfo(BBList const* bblst,
+                                     Call2PosMap const& call2pos)
+{
+    if (call2pos.get_elem_count() == 0) { return; }
+
+    for (VecIdx i = 0; i <= m_prno2lt.get_last_idx(); i++) {
+        if (m_prno2lt[i] == nullptr) { continue; }
+        Call2PosMapIter it;
+        Pos pos = POS_UNDEF;
+        for (call2pos.get_first(it, &pos); pos != POS_UNDEF;
+            call2pos.get_next(it, &pos)) {
+            if (!m_prno2lt[i]->is_contain(pos)) { continue; }
+            m_prno2lt[i]->updateCallCrossedInfo(pos);
+        }
+    }
+}
+
+
 void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                                     DedicatedMgr const& dedmgr,
-                                    Pos livein_def, IRIter & irit)
+                                    Pos livein_def, IRIter & irit,
+                                    OUT Call2PosMap & call2pos)
 {
     Pos dpos_bb_start = 0, upos_bb_start = 0;
     up.updateAtBBEntry(dpos_bb_start, upos_bb_start);
@@ -772,6 +822,10 @@ void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
         }
         computeRHS(ir, *this, upos, livein_def, irit, dedmgr);
         computeLHS(ir, *this, dpos, dedmgr);
+        //Record the call IR and the position info.
+        if (ir->isCallStmt() && !CALL_is_intrinsic(ir)) {
+            call2pos.set(ir, dpos);
+        }
     }
     Pos dpos_bb_end = 0, upos_bb_end = 0;
     up.updateAtBBExit(dpos_bb_end, upos_bb_end);
@@ -786,13 +840,15 @@ void LifeTimeMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
     Pos dpos_start, upos_start;
     bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
     ASSERT0_DUMMYUSE(valid);
+    Call2PosMap call2pos;
     Pos livein_def = dpos_start;
     BBListIter bbit;
     IRIter irit;
     for (IRBB * bb = bblst->get_head(&bbit);
          bb != nullptr; bb = bblst->get_next(&bbit)) {
-        computeLifeTimeBB(up, bb, dedmgr, livein_def, irit);
+        computeLifeTimeBB(up, bb, dedmgr, livein_def, irit, call2pos);
     }
+    genCallCrossedInfo(bblst, call2pos);
     Pos dpos_end, upos_end;
     bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
     ASSERT0_DUMMYUSE(valid2);
