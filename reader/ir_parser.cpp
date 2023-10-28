@@ -966,7 +966,7 @@ bool IRParser::parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx)
     }
     if (regionvar == nullptr) {
         regionvar = m_rm->getVarMgr()->registerVar(sym,
-            m_rm->getTypeMgr()->getAny(), 1, (VarFlag&)flag);
+            m_rm->getTypeMgr()->getAny(), CODE_ALIGNMENT, (VarFlag&)flag);
         regionvar->setFlag((VAR_FLAG)(VAR_IS_DECL|VAR_IS_REGION));
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
@@ -3105,13 +3105,14 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "%s is not region type region", SYM_name(name));
             return false;
         }
-        if (ps.readonly != callee_var->is_readonly()) {
-            error(tok, "unmatch property, %s is %s",
+        if (ps.readonly && !callee_var->is_readonly()) {
+            error(tok, "unmatch function call property, %s is %s",
                   SYM_name(name),
                   callee_var->is_readonly() ? "readonly" : "not readonly");
             return false;
         }
     } else {
+        //Icall
         if (!parseExp(ctx)) {
             error(tok, "illegal callee expression");
             return false;
@@ -4818,13 +4819,18 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
             return false;
         }
     }
-
-    if (!v->is_unallocable() &&
-        (v->get_align() % MEMORY_ALIGNMENT) != 0) {
-        error("variable alignment should be divided by %d", MEMORY_ALIGNMENT);
-        return false;
+    if (!v->is_unallocable()) {
+        if (v->is_func() && (v->get_align() % CODE_ALIGNMENT) != 0) {
+            error("function variable alignment should be divided by %d",
+                  CODE_ALIGNMENT);
+            return false;
+        }
+        if ((v->get_align() % MEMORY_ALIGNMENT) != 0) {
+            error("variable alignment should be divided by %d",
+                  MEMORY_ALIGNMENT);
+            return false;
+        }
     }
-
     return true;
 }
 

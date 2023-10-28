@@ -309,32 +309,6 @@ public:
 
 
 //
-//START IterPrno
-//
-class IterPrno : public VisitIRTree {
-    Type * m_pr_type;
-    PRNO m_prno;
-protected:
-    virtual bool visitIR(IR const* ir)
-    {
-        if (ir->is_pr() && (ir->getPrno() == m_prno)) {
-            m_pr_type = const_cast<Type*>(ir->getType());
-            return false;
-        }
-        return true;
-    }
-public:
-    IterPrno(IR const* ir, PRNO prno) : m_pr_type(nullptr), m_prno(prno)
-    {
-        ASSERT0(m_prno != REG_UNDEF);
-        visit(ir);
-    }
-    Type const* getPrType() const { return m_pr_type; }
-};
-//END IterPrno
-
-
-//
 //START LSARImpl
 //
 //The class implements a default linear-scan algorithm.
@@ -353,6 +327,7 @@ protected:
     bool m_is_insert_bb;
     bool m_use_expose;
     LinearScanRA & m_ra;
+    RegSetImpl & m_rsimpl;
     Region * m_rg;
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
@@ -360,38 +335,18 @@ protected:
     BBList * m_bb_list;
     IRCFG * m_cfg;
     OptCtx * m_oc;
-    RegSet m_avail_callee;
-    RegSet m_avail_caller;
-    RegSet m_avail_param;
-    RegSet m_avail_return_value;
-    RegSet m_avail_allocable;
-    RegSet m_used_callee; //record the used callee-saved register.
-    RegSet m_avail_callee_vector;
-    RegSet m_avail_caller_vector;
-    RegSet m_avail_param_vector;
-    RegSet m_avail_return_value_vector;
-    RegSet m_avail_allocable_vector;
-    RegSet m_used_callee_vector;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
 protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
 
-    void computeUsedCaller(OUT RegSet & used);
-    void computeUsedVectorCaller(OUT RegSet & used);
-
     //The function assigns lt focibly with given reg.
-    virtual void forceAssignRegister(LifeTime const* lt, Reg reg);
-
-    virtual void freeReg(Reg reg);
-    void freeReg(LifeTime const* lt);
-
+    void forceAssignRegister(LifeTime const* lt, Reg reg);
 
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
 
-    virtual void initRegSet();
     IR * insertSpillAtEntry(Reg r);
     void insertReloadAtExit(Reg r, Var * spill_loc);
     IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
@@ -399,17 +354,9 @@ protected:
     IRListIter insertReloadAtBB(IR * reload, IRBB * bb, bool start);
     IR * insertReloadAtBB(PRNO prno, Var * spill_loc, Type const* ty,
                           IRBB * bb, bool start);
-
-    //Pick reg from all allocable register sets.
-    void pickRegFromAllocable(Reg reg);
-
-    //Record the allocation of callee.
-    void recordUsedCallee(Reg r) { m_used_callee.bunion(r); }
-    void recordUsedVectorCallee(Reg r) { m_used_callee_vector.bunion(r); }
-
-
 public:
-    LSRAImpl(LinearScanRA & ra, bool use_expose = false) : m_ra(ra)
+    LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose = false)
+        : m_ra(ra), m_rsimpl(rsimpl)
     {
         m_is_insert_bb = false;
         m_use_expose = use_expose;
@@ -420,20 +367,18 @@ public:
         m_bb_list = m_ra.getBBList();
         m_live_mgr = nullptr;
         m_oc = nullptr;
-        initRegSet();
     }
-    virtual ~LSRAImpl() {}
+    ~LSRAImpl() {}
     void computeRAPrefer();
     void computeLTPrefer(LifeTime const* lt);
 
-    void dumpAvailRegSet() const;
     void dumpBBList() const;
     void dump() const;
     static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
-        CHAR const* format, ...);
+                           CHAR const* format, ...);
+
     static Var * findSpillLoc(IR const* ir);
 
-    RegSet const& getAvailAllocable() const { return m_avail_allocable; }
     TargInfoMgr & getTIMgr() const { return m_ra.getTIMgr(); }
     LivenessMgr * getLiveMgr() const { return m_live_mgr; }
     LinearScanRA & getRA() const { return m_ra; }
@@ -446,13 +391,9 @@ public:
     CHAR const* getRegName(Reg r) const { return m_ra.getRegName(r); }
     BBList * getBBList() const { return m_bb_list; }
     IRCFG * getCFG() const { return m_cfg; }
+    RegSetImpl & getRegSetImpl() const { return m_rsimpl; }
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
-
-    bool isAvailAllocable(Reg r) const {
-        return m_avail_allocable.is_contain(r) ||
-            m_avail_allocable_vector.is_contain(r);
-    }
 
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
@@ -472,13 +413,7 @@ public:
     void insertReloadBefore(IR * reload, IR const* marker);
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
-
-    static Reg pickReg(RegSet & set);
-    static Reg pickReg(RegSet & set, Reg r);
     bool perform(OptCtx & oc);
-
-    Type const* queryRegTypeForSpillAfter(PRNO prno, IR const* split_ir);
-    Type const* queryRegTypeForSpillBefore(PRNO prno, IR const* split_ir);
 
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
@@ -490,7 +425,7 @@ public:
     //consistency.
     void reviseLTConsistency();
 
-    virtual void saveCallee();
+    void saveCallee();
 
     LifeTime * selectAssignDefCand(Pos curpos, IR const* curstmt);
     LifeTime * selectAssignUseCand(Pos curpos, IR const* curstmt,
@@ -523,8 +458,8 @@ public:
     void transferActive(Pos curpos);
     void transferInActive(Pos curpos);
 
-    virtual bool tryAssignCallee(LifeTime const* lt, RegSet & avail_reg);
-    virtual bool tryAssignCaller(LifeTime const* lt, RegSet & avail_reg);
+    bool tryAssignCallee(IR const* ir, LifeTime const* lt);
+    bool tryAssignCaller(IR const* ir, LifeTime const* lt);
     bool tryAssignDedicatedRegister(LifeTime const* lt);
 
     //Try assign register for given ir which at 'pos'.
@@ -533,12 +468,10 @@ public:
     void tryAssignRegForIR(Pos pos, IR const* ir, LifeTime * lt);
 
     //Default register assign oder.
-    virtual bool tryAssignRegister(IR const* ir, LifeTime const* lt);
+    bool tryAssignRegister(IR const* ir, LifeTime const* lt);
 
-    bool tryAssignScalarRegister(LifeTime const* lt);
-    bool tryAssignScalarRegisterByPrefer(LifeTime const* lt);
-    bool tryAssignVectorRegister(LifeTime const* lt);
-    bool tryAssignVectorRegisterByPrefer(LifeTime const* lt);
+    bool tryAssignRegisterDefault(IR const* ir, LifeTime const* lt);
+    bool tryAssignRegisterByPrefer(IR const* ir, LifeTime const* lt);
 
     void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker);
     void tryUpdateDom(IRBB const* newbb, IRBB const* marker);

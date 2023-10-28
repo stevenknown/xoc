@@ -8,6 +8,10 @@ ifeq ($(TARG_DIR),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
 endif
 
+ifeq ($(THREAD_NUM),)
+  THREAD_NUM=1
+endif
+
 CFLAGS+=-Wall
 OPT_DIR=opt
 COM_DIR=com
@@ -64,6 +68,7 @@ $(info "CC:$(CC)")
 $(info "INC:$(INC)")
 $(info "CFLAGS:$(CFLAGS)")
 $(info "DEBUG:$(DEBUG)")
+$(info "THREAD_NUM:$(THREAD_NUM)")
 
 #Define rules.
 $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs tmp_mach_objs
@@ -80,8 +85,8 @@ $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs tmp_mach_objs
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
-      CFLAGS="$(CFLAGS)"
+	cd $(COM_DIR) && make -j$(THREAD_NUM) -f Makefile TARG=$(TARG) \
+	  DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)" THREAD_NUM=$(THREAD_NUM)
 
 tmp_opt_objs: $(TMP_OPT_OBJS)
 	@echo "EXEC:tmp_opt_objs:$(TMP_OPT_OBJS)"

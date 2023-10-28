@@ -41,6 +41,7 @@ class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
 };
 
 typedef DefSBitSetCore PRLiveSet;
+typedef SEGIter PRLiveSetIter;
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);

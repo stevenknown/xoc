@@ -93,10 +93,17 @@ author: Su Zhenyu
 //Note TMIWORD must be unsigned.
 #define TMIWORD UINT32
 
-//Define target machine memory and stack alignment.
+//Define the minimum target machine memory operations alignment.
 //The alignment is power of 2 on ARM.
 #define MEMORY_ALIGNMENT 4
+
+//Define the minimum target machine stack variable alignment.
+//The alignment is power of 2 on ARM.
 #define STACK_ALIGNMENT 4
+
+//Define the minimum target machine code alignment.
+//The alignment is power of 2 on ARM.
+#define CODE_ALIGNMENT 4
 
 //Define target machine stack pointer adjustment operation's alignment.
 //The alignment should not less than STACK_ALIGNMENT.

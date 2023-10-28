@@ -39,6 +39,7 @@ StorageSpaceDesc const g_storagespace_desc[] = {
     { SS_SHARED, "shared", },
     { SS_STACK, "stack", },
     { SS_READONLY, "readonly", },
+    { SS_ANY, "any", },
 };
 
 CHAR const* StorageSpaceDesc::getName(StorageSpace ss)

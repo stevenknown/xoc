@@ -60,9 +60,6 @@ public:
     //and add 'v' to current variable table.
     TMWORD getOrAddVarOffset(xoc::Var const* v);
 
-    //If fp is used, variables need to be addressed via fp.
-    TMWORD getOrAddVarOffsetRelatedFP(xoc::Var const* v, UINT stack_size);
-
     TMWORD getAlign() const { return m_align; }
 
     //m_cur_offset can only be reset when meeting function call,
@@ -103,6 +100,9 @@ public:
     //Compute the offset of var in argument space.
     TMWORD computeArgVarOffset(MInst * mi, OUT Var2Offset & var2off);
 
+    //Compute the offset of spill var in entry bb.
+    TMWORD computeSpillVarInEntryBBOffset(MInst * mi, OUT Var2Offset & var2off);
+
     //Compute the offset of param var.
     void computeParamOffset(OUT Var2Offset & var2off);
 
@@ -120,9 +120,8 @@ public:
     //True if the input var is argument.
     bool isArgument(Var const* var) const;
 
-    //True if the input mi is function call.
-    virtual bool isCall(MInst * mi) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
+    //True if the input var is the spill var in entry bb.
+    bool isSpillVarInEntryBB(Var const* var) const;
 
     //True if the input var is formal parameter.
     bool isParameter(Var const* var) const;

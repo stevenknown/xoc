@@ -347,7 +347,7 @@ public:
     UINT getByteSize(TypeMgr const* dm) const
     {
         //Length of string var should include '\0'.
-        return is_string() && !hasInitVal() ?
+        return is_string() && hasInitVal() ?
             getStringLength() + 1 : dm->getByteSize(VAR_type(this));
     }
 

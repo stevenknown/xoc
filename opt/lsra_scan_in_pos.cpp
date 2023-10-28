@@ -114,12 +114,12 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     if (lt->is_dedicated()) {
         Reg antireg = m_ra.getDedicatedReg(prno);
         ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
-        ASSERT0(m_impl.isAvailAllocable(antireg));
+        ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
     }
 
     UINT need_newreg_num = 1; //there is only ONE result by default.
     ASSERT0_DUMMYUSE(need_newreg_num <=
-                     m_impl.getAvailAllocable().get_elem_count());
+        m_impl.getRegSetImpl().getAvailAllocable().get_elem_count());
     return true;
 }
 
@@ -142,7 +142,7 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         if (lt->is_dedicated()) {
             Reg antireg = m_ra.getDedicatedReg(prno);
             ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
-            ASSERT0(m_impl.isAvailAllocable(antireg));
+            ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
         }
 
         Reg r = m_ra.getReg(prno);
@@ -154,7 +154,8 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         need_newreg_num++;
     }
     UINT totalreg = need_newreg_num + regmap.get_elem_count();
-    ASSERT0_DUMMYUSE(totalreg <= m_impl.getAvailAllocable().get_elem_count());
+    ASSERT0_DUMMYUSE(totalreg <=
+        m_impl.getRegSetImpl().getAvailAllocable().get_elem_count());
     return true;
 }
 

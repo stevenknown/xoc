@@ -37,13 +37,7 @@ namespace elf {
                              //header include .null, .text, .shdr_strtab,
                              //.symtab and .strtab.
 #define ELF_VERSION       1  //.version field in ELF header.
-#define RELA_ALIGN        8  //Align val of .rel.text.xxx section.
-#define STEXT_ALIGN       1  //Align val of .text.xxx section.
-#define SYMSTR_ADDR_ALIGN 1  //Align val of address field of .symtab section.
-#define SYM_SH_ALIGN      8  //Align val of .symtab section.
-#define SYM_BYTE          24 //Byte size of s_entry_size field of .stmstr.
-#define TEXT_ALIGN        4  //Align val of .text.
-#define ELF_VAL_UNDEF     0  //Common used zero.
+
 //Record section names of each section.
 #define CONST_SH_NAME           ".const"
 #define BSS_SH_NAME             ".bss"
@@ -55,7 +49,6 @@ namespace elf {
 #define SDATA_SH_NAME           ".sdata"
 #define SHSTR_SH_NAME           ".shdr_strtab"
 #define SPM_SH_NAME             ".spm"
-#define STR_UNDEF               ""
 #define SUBTEXT_SH_PRE          ".text."
 #define SUBTEXT_ENTRY_SH_PRE    ".aitext."
 #define SYMSTR_SH_NAME          ".strtab"
@@ -96,7 +89,8 @@ typedef xcom::TMap<xoc::Var const*, SymbolLinkAttrFlag> SymbolLinkAttrMap;
 typedef xcom::Vector<UINT> FUNC_SIZE;
 //Record relocation info in program region.
 typedef xcom::Vector<RELOCATION_INFO> FUNC_RELOCATION;
-
+//Record whether function is an entry function.
+typedef xcom::TMap<UINT, bool> EntryFuncMap;
 typedef enum tagEM_STATUS {
     EM_SUCC = 0,
     EM_ERR,
@@ -216,35 +210,45 @@ public:
     ELFSectionInfo();
     virtual ~ELFSectionInfo() {}
 
-    UINT get_sbss_align() const { return m_sbss_align; }
-    UINT get_sdata_align() const { return m_sdata_align; }
-    UINT get_bss_align() const { return m_bss_align; }
-    UINT get_data_align() const { return m_data_align; }
-    UINT get_spm_align() const { return m_spm_align; }
-    UINT get_const_align() const { return m_const_align; }
-    UINT get_shdr_num() const { return m_shdr_num; }
+    UINT getBssAlign() const { return m_bss_align; }
+    UINT getConstAlign() const { return m_const_align; }
+    UINT getDataAlign() const { return m_data_align; }
+    UINT getSbssAlign() const { return m_sbss_align; }
+    UINT getSdataAlign() const { return m_sdata_align; }
+    UINT getShdrNum() const { return m_shdr_num; }
+    UINT getSpmAlign() const { return m_spm_align; }
 
-    bool has_sbss() const { return m_has_sbss; }
-    bool has_sdata() const { return m_has_sdata; }
-    bool has_bss() const { return m_has_bss; }
-    bool has_data() const { return m_has_data; }
-    bool has_spm() const { return m_has_spm; }
-    bool has_const() const { return m_has_const; }
+    //Judge section type of given variable and return align value of this
+    //section.
+    UINT getVarAlign(SymbolLinkAttrMap const& symbol_link_attr_map,
+                     Var const* var);
 
-    void set_sbss(bool v) { m_has_sbss = v; }
-    void set_sdata(bool v) { m_has_sdata = v; }
-    void set_bss(bool v) { m_has_bss = v; }
-    void set_data(bool v) { m_has_data = v; }
-    void set_spm(bool v) { m_has_spm = v; }
-    void set_const(bool v) { m_has_const = v; }
+    bool hasBss() const { return m_has_bss; }
+    bool hasConst() const { return m_has_const; }
+    bool hasData() const { return m_has_data; }
+    bool hasSbss() const { return m_has_sbss; }
+    bool hasSdata() const { return m_has_sdata; }
+    bool hasSpm() const { return m_has_spm; }
 
-    void set_sbss_align(UINT v) { m_sbss_align = v; }
-    void set_sdata_align(UINT v) { m_sdata_align = v; }
-    void set_bss_align(UINT v) { m_bss_align = v; }
-    void set_data_align(UINT v) { m_data_align = v; }
-    void set_spm_align(UINT v) { m_spm_align = v; }
-    void set_const_align(UINT v) { m_const_align = v; }
-    void set_shdr_num(UINT v) { m_shdr_num = v; }
+    void setBss(bool v) { m_has_bss = v; }
+    void setBssAlign(UINT v) { m_bss_align = v; }
+
+    void setConst(bool v) { m_has_const = v; }
+    void setConstAlign(UINT v) { m_const_align = v; }
+
+    void setData(bool v) { m_has_data = v; }
+    void setDataAlign(UINT v) { m_data_align = v; }
+
+    void setSbss(bool v) { m_has_sbss = v; }
+    void setSbssAlign(UINT v) { m_sbss_align = v; }
+
+    void setSdata(bool v) { m_has_sdata = v; }
+    void setSdataAlign(UINT v) { m_sdata_align = v; }
+
+    void setShdrNum(UINT v) { m_shdr_num = v; }
+
+    void setSpm(bool v) { m_has_spm = v; }
+    void setSpmAlign(UINT v) { m_spm_align = v; }
 };
 
 //Reference struct ELFSym64.
@@ -357,9 +361,6 @@ protected:
 
     //Record section info for generating elf.
     ELFSectionInfo * m_sect_info;
-
-    //Record the var of entry function.
-    Var * m_entry_var;
 public:
     ////Record variables in program region need to be wrote into ELF file.
     VarList m_saving_var_list;
@@ -372,6 +373,9 @@ public:
 
     //Record relocation info in current program region.
     FUNC_RELOCATION m_func_relocation;
+
+    //Record name of generated binary file.
+    CHAR const* m_output_file_name;
 protected:
     virtual void allocTargInfo() = 0;
     EM_STATUS append(BYTE const* buf, size_t size);
@@ -462,8 +466,10 @@ public:
     //sections and section number of ELF file.
     //sym_name: save names of all symbols.
     //func_name: save names of all function.
+    //entry_func_map: record whether function is an entry function.
     //sect_info: save some info of sections.
     void collectELFFactor(OUT StringList & sym_name, OUT StringVec & func_name,
+                          EntryFuncMap & entry_func_map,
                           OUT ELFSectionInfo * sect_info);
 
     //Compute a vector saving relocation data index of each function region.
@@ -695,6 +701,10 @@ public:
     virtual UINT getSymOtherInfo()
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
+    //Get align value of .text section.
+    virtual Addr getTextSectAlign()
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
     EM_STATUS initdumpfile(CHAR const* filename, bool is_del = false);
     EM_STATUS initdumpfile(FILE * filehandler);
     EM_STATUS initdumpscr();
@@ -725,10 +735,12 @@ public:
     //using generated data.
     //symtab_shdr: .symtab section header
     //func_name: save names of all functions.
+    //entry_func_map: record whether function is an entry function.
     //sym_name: save names of all symbols.
     //si: index of current section header in all section headers.
     void processELFTextRelSection(ELFSHdr const* symtab_shdr,
                                   StringVec const& func_name,
+                                  EntryFuncMap const& entry_func_map,
                                   StringList const& sym_name, OUT UINT & si);
 
     EM_STATUS readAllSectContent();
@@ -736,6 +748,13 @@ public:
     //read_all_content: true to read section content for all section headers.
     //                  Note this may consume much of memory.
     EM_STATUS readELF(CHAR const* filename, bool read_all_content = false);
+
+    //Set name of generated binary file.
+    void setOutputFileName(CHAR const* name)
+    {
+        m_output_file_name = (CHAR*)xmalloc(::strlen(name) + 1);
+        ::memcpy((void*)m_output_file_name, name, ::strlen(name) + 1);
+    }
 
     //Set section header content offset.
     //Note section content size should be ready.

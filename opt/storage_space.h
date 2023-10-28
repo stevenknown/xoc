@@ -41,6 +41,7 @@ typedef enum tagStorageSpace {
     SS_SHARED,
     SS_STACK,
     SS_READONLY,
+    SS_ANY,
 } StorageSpace;
 
 class StorageSpaceDesc {

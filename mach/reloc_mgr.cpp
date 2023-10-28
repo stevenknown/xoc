@@ -51,112 +51,9 @@ TMWORD Var2Offset::getOrAddVarOffset(xoc::Var const* v)
 
     m_cur_offset = (TMWORD)xcom::ceil_align(m_cur_offset,
         MAX(v->get_align(), getAlign()));
-
     off = m_cur_offset;
     set(v, off);
     m_cur_offset += v->getByteSize(m_tm);
-    return off;
-}
-
-
-// ---------------------------------
-// | FP |var0|var1| ...       | SP |
-//      ^    ^    ^                ^
-//      A    B    C                D
-// ---------------------------------
-// sp_rel_offset = C - D
-// address(var1) = address(SP) + sp_rel_offset
-//
-// Equals:
-//
-// fp_rel_offset = A - C
-// address(var1) = address(FP) - fp_rel_offset
-// address(var1) = address(FP) - (stack_size - sp_rel_offset)
-TMWORD Var2Offset::getOrAddVarOffsetRelatedFP(xoc::Var const* v,
-                                              UINT stack_size)
-{
-    bool find = false;
-    TMWORD off = get(v, &find);
-    if (find) { return off; }
-
-    // Why minus v->get_align() ?
-    // eg:
-    // stack_size: 896
-    // m_cur_offset: 16
-    //
-    // var1: bytesize(8), align(8)
-    // var2: bytesize(64), align(64)
-    //
-    // CASE1: No minus v->get_align().
-    // [var1]:
-    // fp_rel_offset = 896 - 16 = 880
-    // after align: fp_rel_offset = 880
-    // m_cur_offset = 896 - 880 + 8 = 24
-    // [var2]:
-    // fp_rel_offset = 896 - 24 = 872
-    // after align: fp_rel_offset = 896
-    // Result is error!
-    // fp_rel_offset of var2 shouldn't be greater than that of var1.
-
-    // CASE2: With minus v->get_align().
-    // [var1]:
-    // fp_rel_offset = 896 - 8 - 16 = 872
-    // after align: fp_rel_offset = 872
-    // m_cur_offset = 896 - 872 + 16 = 32
-    // [var2]:
-    // fp_rel_offset = 896 - 64 - 32 = 800
-    // after align: fp_rel_offset = 832
-    // Result is correct!
-    // 832 is less than 872 and meets the alignment requirements.
-
-    // NOTE: calculating the offset of var1 also subtracts alignment,
-    // which causing memory wasted.
-    // Therefore, only when m_cur_offset is not aligned with v->get_align(),
-    // fp_rel_offset = stack_size - v->get_align() - m_cur_offset;
-
-    TMWORD fp_rel_offset;
-    if ((m_cur_offset % v->get_align()) != 0) {
-        fp_rel_offset = stack_size - v->get_align() - m_cur_offset;
-    } else {
-        fp_rel_offset = stack_size - m_cur_offset;
-    }
-
-    fp_rel_offset = (TMWORD)xcom::ceil_align(fp_rel_offset,
-        MAX(v->get_align(), getAlign()));
-
-    off = fp_rel_offset;
-    set(v, off);
-
-    m_cur_offset = stack_size - fp_rel_offset +
-        v->getByteSize(m_tm);
-
-    // m_cur_offset should also be aligned according to the STACK_ALIGNMENT.
-    // eg:
-    // var1: bytesize(12), align(8)
-    // var2: bytesize(8), align(8)
-
-    // CASE1: No align:
-    // [var1]:
-    // fp_rel_offset = 896 - 16 = 880
-    // after align: fp_rel_offset = 880
-    // m_cur_offset = 896 - 880 + 12 = 28
-    // [var2]:
-    // fp_rel_offset = 896 - 28 = 868
-    // after align: fp_rel_offset = 872
-    // --> Result is error!  880 - 872 < 12
-
-    // CASE2: With align:
-    // [var1]:
-    // fp_rel_offset = 896 - 16 = 880
-    // after align: fp_rel_offset = 880
-    // m_cur_offset = 896 - 880 + 12 = 28
-    // after align: m_cur_offset = 32
-    // [var2]:
-    // fp_rel_offset = 896 - 32 = 868
-    // after align: fp_rel_offset = 864
-    // --> Result is correct!  880 - 864 > 12
-
-    m_cur_offset = (TMWORD)xcom::ceil_align(m_cur_offset, STACK_ALIGNMENT);
     return off;
 }
 
@@ -199,58 +96,57 @@ RelocMgr::RelocMgr(Region * rg, MInstMgr * imgr, TMWORD align) :
 
 bool RelocMgr::isParameter(Var const* var) const
 {
-    bool is_param =
-        m_ra->getArgPasser()->getStackParamList()->find((Var*)var);
-
-    return is_param;
+    return m_ra->getArgPasser()->getStackParamList()->find(var);
 }
 
 
 bool RelocMgr::isArgument(Var const* var) const
 {
-    bool is_arg =
-        m_ra->getArgPasser()->getStackArgList()->find((Var*)var);
-
-    return is_arg;
+    return m_ra->getArgPasser()->getStackArgList()->find(var);
 }
 
 
-TMWORD RelocMgr::computeVarOffset(MInst * mi, OUT Var2Offset & var2off)
+bool RelocMgr::isSpillVarInEntryBB(Var const* var) const
+{
+    return m_ra->getEntryBBSpillVarList()->find(var);
+}
+
+
+TMWORD RelocMgr::computeSpillVarInEntryBBOffset(MInst * mi,
+    OUT Var2Offset & var2off)
 {
     Var const* var = MI_var(mi);
     TMWORD var_offset = 0;
 
-    bool is_related_fp = (m_pelog->isUsedFP() &&
-        isSpilledRegRelatedFP(mi)) ? true : false;
-
-    if (is_related_fp) {
-
-        //local_var_space_size =
-        //    total_stack_size(sp - oldsp) - arg_space_size - maxalignment.
-        //
-        //  |    |------local var space-------|---arg space---|
-        //  ^    ^                                            ^
-        //oldsp  fp                                           sp
-        //
-        // The unavailable space between oldsp and fp,
-        // is generated at stack realignment, the code is:
-        //  srl     $FP, shift_mount, $FP
-        //  sll     $FP, shift_mount, $FP
-        UINT local_var_space_size = m_pelog->getStackSpaceSize() -
-            m_ra->getArgPasser()->getMaxArgSize() -
-            m_pelog->getMaxAlignment();
-
-        var_offset = -(UINT64)var2off.getOrAddVarOffsetRelatedFP(var,
-            local_var_space_size);
-    } else {
-        var_offset = var2off.getOrAddVarOffset(var) +
-            m_ra->getArgPasser()->getMaxArgSize();
-    }
+    //When there are stack realignment or variable-size variables,
+    //the top of the stack would adjusts dynamically, while the bottom
+    //of the stack is fixed, so these spill var in entry bb are stored
+    //at the bottom of the stack.
+    var_offset = m_pelog->getStackSpaceSize()
+        - var2off.getOrAddVarOffset(var) - var->getByteSize(m_tm);
 
     return var_offset;
 }
 
 
+//Compute local var offset.
+TMWORD RelocMgr::computeVarOffset(MInst * mi, OUT Var2Offset & var2off)
+{
+    Var const* var = MI_var(mi);
+    TMWORD var_offset = 0;
+
+    //NOTE: MaxArgSize is the argument space size, The offset of the local var
+    //needs to accumulate the MaxArgSize, so the MaxArgSize needs to satisfy
+    //the alignment requirements.
+    var_offset = var2off.getOrAddVarOffset(var) +
+        xcom::ceil_align(m_ra->getArgPasser()->getMaxArgSize(),
+        m_pelog->getMaxAlignment());
+
+    return var_offset;
+}
+
+
+//Compute argument var offset.
 TMWORD RelocMgr::computeArgVarOffset(MInst * mi, OUT Var2Offset & var2off)
 {
     Var const* var = MI_var(mi);
@@ -262,7 +158,7 @@ TMWORD RelocMgr::computeArgVarOffset(MInst * mi, OUT Var2Offset & var2off)
 
 void RelocMgr::resetArgSpaceOffset(MInst * mi, OUT Var2Offset & var2off)
 {
-    ASSERT0(isCall(mi));
+    ASSERT0(m_mimgr->isCall(mi));
     var2off.resetCurOffset();
 }
 
@@ -283,10 +179,10 @@ void RelocMgr::computeParamOffset(OUT Var2Offset & var2off)
 
     for (xoc::Var const* v = param_list.get_head();
          v != nullptr; v = param_list.get_next()) {
-        bool is_param =
-            m_ra->getArgPasser()->getStackParamList()->find((Var*)v);
+        bool is_passed_on_stack =
+            m_ra->getArgPasser()->getStackParamList()->find(v);
 
-        if (!is_param) { continue; }
+        if (!is_passed_on_stack) { continue; }
 
         var2off.getOrAddVarOffset(v);
     }
@@ -305,15 +201,16 @@ static bool isMIAlignedByWordLength(TMWORD offset, UINT length)
 //target label and current instruction. The formula is as follows:
 //   offset = (PC_target_label - PC_jump_instruction) / SIZE_instruction;
 //Note that, PC values must be aligned by size of instructions.
-static TMWORD computeJumpOff(Label2Offset const& lab2off, MInst const* mi)
+static TMWORD computeJumpOff(MInstMgr * mimgr, Label2Offset const& lab2off,
+                             MInst const* mi)
 {
     TMWORD label_pc = lab2off.get(MI_lab(mi));
     TMWORD inst_pc = MI_pc(mi);
     TMWORD inst_size = mi->getWordBufLen();
 
-    ASSERT0(isMIAlignedByWordLength(label_pc, inst_size));
-    ASSERT0(isMIAlignedByWordLength(inst_pc, inst_size));
-    ASSERT0(isMIAlignedByWordLength(label_pc - inst_pc, inst_size));
+    ASSERT0(isMIAlignedByWordLength(label_pc, (UINT)inst_size));
+    ASSERT0(isMIAlignedByWordLength(inst_pc, (UINT)inst_size));
+    ASSERT0(isMIAlignedByWordLength(label_pc - inst_pc, (UINT)inst_size));
 
     //Label is a custom label.
     if (lab2off.find(MI_lab(mi))) {
@@ -334,7 +231,7 @@ static TMWORD computeJumpOff(Label2Offset const& lab2off, MInst const* mi)
     //    addl $63, $28, $28
     //    jmp  $31, $28, 0x1
     //    ......
-    return 0;
+    return mimgr->isUncondBr(mi) ? 0 : 1;
 }
 
 
@@ -371,25 +268,28 @@ void RelocMgr::computeDataOffset(MOD MIList & milst,
     MIListIter it;
     TMWORD offset = 0;
 
-    //var2off: local var space
-    //param2off: parameter space
-    //arg2off: argument space
+    //var2off: local var space.
+    //param2off: parameter space.
+    //arg2off: argument space.
+    //spillvar2off: offset of spill var in entry bb.
     Var2Offset param2off(getDataAlign(), m_tm);
     Var2Offset arg2off(getDataAlign(), m_tm);
+    Var2Offset spillvar2off(getDataAlign(), m_tm);
 
     computeParamOffset(param2off);
     for (MInst * mi = milst.get_head(&it);
          mi != nullptr; mi = milst.get_next(&it)) {
-        if (mi->getCode() == MI_label) {
-            continue;
-        }
-        if (mi->hasLab()) {
-            ASSERT0(MI_lab(mi));
-            setValueViaMICode(mi, computeJumpOff(lab2off, mi));
+        if (m_mimgr->isLabel(mi)) {
             continue;
         }
 
-        if (isCall(mi)) {
+        if (mi->hasLab()) {
+            ASSERT0(MI_lab(mi));
+            setValueViaMICode(mi, computeJumpOff(m_mimgr, lab2off, mi));
+            continue;
+        }
+
+        if (m_mimgr->isCall(mi)) {
             resetArgSpaceOffset(mi, arg2off);
         }
 
@@ -401,6 +301,8 @@ void RelocMgr::computeDataOffset(MOD MIList & milst,
             var_offset = getParamOffset(mi, param2off);
         } else if (isArgument(var)) {
             var_offset = computeArgVarOffset(mi, arg2off);
+        } else if (isSpillVarInEntryBB(var)) {
+            var_offset = computeSpillVarInEntryBBOffset(mi, spillvar2off);
         } else {
             var_offset = computeVarOffset(mi, var2off);
         }
@@ -421,7 +323,7 @@ void RelocMgr::computeCodeOffset(MOD MIList & milst,
     TMWORD offset = 0;
     for (MInst * mi = milst.get_head(&it);
          mi != nullptr; mi = milst.get_next(&it), mic++) {
-        if (mi->getCode() == MI_label) {
+        if (m_mimgr->isLabel(mi)) {
             ASSERT0(MI_lab(mi));
             lab2off.set(MI_lab(mi), offset);
             continue;

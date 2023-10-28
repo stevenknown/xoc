@@ -156,13 +156,13 @@ template <class T>
 inline void add_next_single_list(MOD T ** pheader, T * t)
 {
     if (t == nullptr) { return; }
-	if (nullptr == (*pheader)){
-	    *pheader = t;
+    if (nullptr == (*pheader)) {
+        *pheader = t;
         return;
-	}
+    }
     T * p = *pheader;
     ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
-	for (; p->next != nullptr; p = p->next) {
+    for (; p->next != nullptr; p = p->next) {
         ASSERTN(p != t, ("\n<add_next_single_list> : overlap list member\n"));
     }
     p->next = t;
@@ -195,11 +195,11 @@ inline void add_next_single_list(MOD T ** pheader, MOD T ** last, T * t)
 {
     if (t == nullptr) { return; }
     ASSERT0(pheader && last);
-	if (nullptr == (*pheader)){
-	    *pheader = t;
+    if (nullptr == (*pheader)) {
+        *pheader = t;
         *last = t;
         return;
-	}
+    }
     ASSERTN(*last && (*last)->next == nullptr, ("must be the last"));
     (*last)->next = t;
     while (t->next != nullptr) { t = t->next; }

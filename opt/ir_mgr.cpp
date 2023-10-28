@@ -1614,4 +1614,12 @@ IR * IRMgr::buildBinaryOp(IR_CODE irc, Type const* type, IR * lchild,
     return buildBinaryOpSimp(irc, type, lchild, rchild);
 }
 
+
+IR * IRMgr::buildStprFromConst(IR * ir, Type const* tp)
+{
+    ASSERT0(ir && ir->is_const() && tp);
+
+    return buildStorePR(buildPrno(tp), tp, ir);
+}
+
 } //namespace xoc

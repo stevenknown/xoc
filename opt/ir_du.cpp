@@ -2199,7 +2199,7 @@ bool DUMgr::findUseInLoop(IR const* stmt, LI<IRBB> const* li, Region const* rg,
 {
     ASSERT0(stmt && stmt->is_stmt());
     DUSet const* du = stmt->readDUSet();
-    if (du == nullptr) { return nullptr; }
+    if (du == nullptr) { return false; }
     ASSERT0(useset);
     DUSetIter it = nullptr;
     bool find = false;

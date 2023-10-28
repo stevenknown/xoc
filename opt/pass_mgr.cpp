@@ -296,15 +296,23 @@ Pass * PassMgr::allocPrologueEpilogue()
 
 Pass * PassMgr::allocGPAdjustment()
 {
+    #ifdef REF_TARGMACH_INFO
+    return new GlobalPointerAdjustment(m_rg);
+    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
+    #endif
 }
 
 
 Pass * PassMgr::allocRelaxation()
 {
+    #ifdef REF_TARGMACH_INFO
+    return new Relaxation(m_rg);
+    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
+    #endif
 }
 
 

@@ -191,11 +191,23 @@ public:
 
     //Return the name of machine instruction.
     //Target Dependent Code.
-    virtual CHAR const* getMInstName(MInst const* mi) const { return "NONAME"; }
+    virtual CHAR const* getMInstName(MInst const* mi) const
+    { return "NONAME"; }
 
     //Return the length of machine instruction in BYTE.
     //Target Dependent Code.
     virtual UINT getMInstWordLength() const { return 0; }
+
+    //Whether the mi is function call.
+    virtual bool isCall(MInst const* mi) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Whether the mi is label.
+    bool isLabel(MInst const* mi) const { return mi->getCode() == MI_label; }
+
+    //Whether the mi is unconditional br.
+    virtual bool isUncondBr(MInst const* mi) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
 };
 
 } //namespace

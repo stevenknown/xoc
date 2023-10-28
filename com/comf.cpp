@@ -1631,4 +1631,33 @@ void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
     part4 >>= 16;
 }
 
+
+UINT getSignBit(UINT bitsize)
+{
+    //Note that bitsize should be greater than or equal to 8 and be a
+    //multiple of 8.
+    ASSERTN(bitsize >= 8, ("Type bitsize is too small.\n"));
+    ASSERTN(bitsize % 8 == 0, ("Type bitsize must be multiple of 8.\n"));
+
+    return bitsize - 1;
+}
+
+
+void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
+                           OUT StrBuf & new_file_name)
+{
+    //Get prefix of given file name (or file path name).
+    //For example: "yyy.c" -> "yyy" or "/tmp/xxx.cpp" -> "xxx"
+    CHAR * prefix = (CHAR*)::malloc(::strlen(org_file_name));
+    prefix = getFileName(org_file_name, prefix, (UINT)::strlen(org_file_name));
+    ASSERT0(::strlen(prefix) != 0);
+
+    //Concat prefix with suffix to get new file name.
+    //For example: prefix: "xxx", suffix: ".o", new file name: "xxx.o".
+    new_file_name.strcat(prefix);
+    new_file_name.strcat(new_suffix);
+
+    ::free(prefix);
+}
+
 } //namespace xcom

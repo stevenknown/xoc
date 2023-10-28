@@ -164,12 +164,14 @@ VarMgr::VarMgr(RegionMgr * rm)
 Var::Var() : varflag(VAR_UNDEF)
 {
     VAR_id(this) = 0; //unique id;
+    VAR_align(this) = 0;
+    VAR_formal_param_pos(this) = 0;
+    VAR_prno(this) = PRNO_UNDEF;
     VAR_type(this) = UNDEF_TYID;
     VAR_name(this) = nullptr;
-    VAR_string(this) = nullptr;
     VAR_storage_space(this) = SS_UNDEF;
+    VAR_string(this) = nullptr;
     VAR_flag(this).clean(); //Record various properties of variable.
-    align = 0;
 }
 
 

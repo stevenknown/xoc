@@ -205,8 +205,7 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
 
 
 //Translate IR in IRBB to a list of MInst
-void IR2MInst::convertToMIList(OUT RecycMIList & milst,
-                               MOD IMCtx * cont)
+void IR2MInst::convertToMIList(OUT RecycMIList & milst, MOD IMCtx * cont)
 {
     START_TIMER(t, "Convert IR to MInst");
     ASSERT0(m_rg);

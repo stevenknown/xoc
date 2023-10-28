@@ -1125,8 +1125,9 @@ UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
                 //Can not find any basic variable to swap out.
                 //Try another non-basic variable.
                 m_ppt->disableNV(pivot_nv_idx);
-                ASSERT0(dump_str("\nNOT FIND BV bv=%d,nv=%d,number_of_iter=%u\n",
-                                 pivot_bv_idx, pivot_nv_idx, cnt));
+                ASSERT0(dump_str(
+                    "\nNOT FIND BV bv=%d,nv=%d,number_of_iter=%u\n",
+                    pivot_bv_idx, pivot_nv_idx, cnt));
                 continue;
             }
         }
@@ -2026,7 +2027,8 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
         // Solution is:
         //    min is -16, x1=1, x2=3, C=1
         //    v is -16.0, but dual_max is -17.0.
-        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv), ("should be equal"));//fuck
+        //ASSERTN(IS_EQ(maxv_of_two_stage_iter, maxv),
+        //        ("should be equal")); //hack
     }
     return status;
 }

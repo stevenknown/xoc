@@ -1714,7 +1714,6 @@ bool Region::processIRList(OptCtx & oc)
         //O0 does not build DU ref and DU chain.
         ASSERT0(getDUMgr() && getDUMgr()->verifyMDRef());
     }
-
     return MiddleProcess(oc);
 }
 

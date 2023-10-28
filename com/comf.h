@@ -194,6 +194,31 @@ float getclockend(LONG start);
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
 
+//Get the sign bit of given bitsize.
+//                      |
+//                      V
+//8bit integer:         0 00000000
+//                        |<-7 ->|
+//16bit integer:        0 000000000000000
+//                        |<-   15    ->|
+//32bit integer:        0 0000000000000000000000000000000
+//                        |<-            31           ->|
+//64bit integer:        0 0000000000....00000000000000000
+//                        |<-            63           ->|
+//128bit integer:       0 0000000000....00000000000000000
+//                        |<-            127          ->|
+//16bit floating point: 0 00000 0000000000 *f16*
+//                        | 5 | |<- 10 ->|
+//                      0 00000000 0000000 *bf16*
+//                        |<- 8->| |<-7->|
+//32bit floating point: 0 00000000 00000000000000000000000
+//                        |<- 8->| |<-       23        ->|
+//64bit floating point: 0 00000000000 0000000...0000000000
+//                        |<-  11 ->| |<-     52       ->|
+//128bit floating point:0 0000...0000 0000000...0000000000
+//                        |<-  15 ->| |<-     112      ->|
+UINT getSignBit(UINT bitsize);
+
 //Get low 16-bit value of signal 32-bit value.
 //For example:
 //val:     0b 0100010......1000 0111 0101 1011
@@ -279,6 +304,14 @@ CHAR * upper(CHAR * n);
 
 //Replace letters in 'n' to lowercase letter.
 CHAR * lower(CHAR * n);
+
+//Replace the suffix of the file name(or path name) using given suffix name.
+//For example:
+//org_file_name: "xxx.c" or "/tmp/xxx.cpp"
+//new_suffix: ".o"
+//new_file_name: "xxx.o"
+void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
+                           OUT StrBuf & new_file_name);
 
 //Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y);

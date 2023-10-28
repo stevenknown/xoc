@@ -329,7 +329,7 @@ public:
         m_call_pos_vec.append(pos);
     }
 
-    //Remove the call postion in m_call_pos_vec from idx, and update the
+    //Remove the call position in m_call_pos_vec from idx, and update the
     //m_calls_crossed_num at the same time.
     void removeCallPosVecFrom(VecIdx idx)
     {

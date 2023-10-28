@@ -471,6 +471,9 @@ public:
     //order in IR list.
     IR * buildInitPlaceHolder(IR * exp);
 
+    //Build a STPR IR to save const value of given IR.
+    IR * buildStprFromConst(IR * ir, Type const* tp);
+
     size_t count_mem() const;
 
     void dumpFreeTab() const;

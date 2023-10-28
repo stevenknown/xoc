@@ -86,10 +86,17 @@ author: Su Zhenyu
 //Represent target machine word with host type.
 #define TMWORD UINT
 
-//Define target machine memory and stack alignment.
-//The alignment is power of 2 on PAC.
+//Define the minimum target machine memory operations alignment.
+//The alignment is power of 2.
 #define MEMORY_ALIGNMENT 4
-#define STACK_ALIGNMENT MEMORY_ALIGNMENT
+
+//Define the minimum target machine stack variable alignment.
+//The alignment is power of 2.
+#define STACK_ALIGNMENT 4
+
+//Define the minimum target machine code alignment.
+//The alignment is power of 2.
+#define CODE_ALIGNMENT 4
 
 //Setting for compiler build-environment. Byte length.
 #define HOST_BIT_PER_BYTE 8

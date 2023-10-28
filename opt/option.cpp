@@ -37,7 +37,7 @@ namespace xoc {
 
 bool g_is_opt_float = true;
 bool g_is_lower_to_pr_mode = false;
-bool g_is_lower_to_lowest_height = false;
+bool g_is_lower_to_lowest_height = true;
 bool g_is_support_dynamic_type = false;
 bool g_is_hoist_type = false;
 CHAR * g_func_or_bb_option = nullptr;
