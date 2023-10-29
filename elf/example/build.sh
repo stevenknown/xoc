@@ -5,5 +5,6 @@ else
     OPEN_COVERAGE=false
 fi
 
-#make -f Makefile.readelf FOR_ARM=true FOR_X86=true FOR_X64=true FOR_SCORE=true FOR_TECO=true DEBUG=false
-make readelf.exe -f Makefile.readelf DEBUG=true FOR_ARM=true FOR_X86=true FOR_X64=true FOR_SCORE=true FOR_TECO=true
+make readelf.exe -f Makefile.readelf DEBUG=true FOR_ARM=false FOR_X86=false \
+  FOR_X64=false FOR_SCORE=false FOR_DEX=false FOR_JS=false FOR_TECO=false \
+  TARG=FOR_DEX OPEN_COVERAGE=$OPEN_COVERAGE

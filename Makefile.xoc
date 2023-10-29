@@ -57,7 +57,6 @@ else
   TMP_MACH_OBJS =
 endif
 
-
 #Display internal variables.
 $(info "COMBINED OPT OBJS:$(TMP_OPT_OBJS)")
 $(info "COMBINED READER OBJS:$(TMP_READER_OBJS)")
@@ -72,10 +71,11 @@ $(info "THREAD_NUM:$(THREAD_NUM)")
 
 #Define rules.
 $(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs tmp_mach_objs
-	@echo "BUILD $(XOC_OUTPUT)"
+	@echo "START BUILD $(XOC_OUTPUT)"
 	@echo "EXEC:"
 	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) \
       $(TMP_READER_OBJS) $(TMP_MACH_OBJS)
+	@echo "END BUILD $(XOC_OUTPUT)"
 	@echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"
 
 %.o:%.cpp

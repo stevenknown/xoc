@@ -1,6 +1,6 @@
 $(info "====---- START Makefile.readelf ----====")
 
-#SET THE DEFAULT TARGET MACHINES.
+#ADD ALL TARGET MACHINES INTO DEFAULT TARGET SET.
 ifndef FOR_ARM
 FOR_ARM=true
 endif
@@ -21,11 +21,6 @@ ifndef FOR_TECO
 FOR_TECO=true
 endif
 
-ifeq ($(TARG),)
-  #SET DEFAULT TARG. TARG INFORM IS USELESS TO READELF.EXE
-  TARG=FOR_DEX
-endif
-
 ifeq ($(DEBUG),)
   DEBUG=true
 endif
@@ -42,6 +37,12 @@ ELF_DIR=..
 READELF_DIR=.
 READELF_OUTPUT=readelf.exe
 
+#NOTE SET $TARG BEFORE INCLUDE OTHER MODULES.
+ifeq ($(TARG),)
+  #SET DEFAULT TARG. TARG INFORM IS USELESS TO READELF.EXE
+  TARG=FOR_DEX
+endif
+
 include $(ELF_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
 include $(ROOT_DIR)/Makefile.option
@@ -50,44 +51,40 @@ include $(OPT_DIR)/Makefile.inc
 MISC_TARG_MACH_ELF_OBJS+=\
 $(ELF_DIR)/misc_elf_mgr.o
 
+#ADD SPECIFIC TARGET DEPENDENT OBJECTS IF REFERRED BY PARAMETERS.
 ifeq ($(FOR_ARM),true)
   TARG_ARM_DIR=../../arm
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_ARM_DIR)/*_elf_targinfo.o
-  CFLAGS+=-DFOR_ARM
   -include $(TARG_ARM_DIR)/arm_elf_targinfo.d
 endif
 
 ifeq ($(FOR_X86),true)
   TARG_X86_DIR=../../x86
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_X86_DIR)/*_elf_targinfo.o
-  CFLAGS+=-DFOR_X86
   -include $(TARG_X86_DIR)/*_elf_targinfo.d
 endif
 
 ifeq ($(FOR_X64),true)
   TARG_X64_DIR=../../x64
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_X64_DIR)/*_elf_targinfo.o
-  CFLAGS+=-DFOR_X64
   -include $(TARG_X64_DIR)/*_elf_targinfo.d
 endif
 
 ifeq ($(FOR_SCORE),true)
   TARG_SCORE_DIR=../../score
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_SCORE_DIR)/*_elf_targinfo.o
-  CFLAGS+=-DFOR_SCORE
   -include $(TARG_SCORE_DIR)/*_elf_targinfo.d
+endif
+
+ifeq ($(FOR_TECO),true)
+  TARG_TECO_DIR=../../teco
+  MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
+  -include $(TARG_TECO_DIR)/*_elf_targinfo.d
 endif
 
 OPT_DEP_OBJS+=\
 $(OPT_DIR)/data_type.o\
 $(OPT_DIR)/logmgr.o
-
-ifeq ($(FOR_TECO),true)
-  TARG_TECO_DIR=../../teco
-  MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
-  CFLAGS+=-DFOR_TECO
-  -include $(TARG_TECO_DIR)/*_elf_targinfo.d
-endif
 
 CFLAGS+=\
   -D$(TARG) \

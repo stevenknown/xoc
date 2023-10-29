@@ -29,6 +29,16 @@ ifneq (,$(filter $(CC),g++ gcc))
   CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
 endif
 
+#Display internal variables.
+$(info "WIN=$(WIN),WSL=$(WSL)")
+$(info "TARG:$(TARG)")
+$(info "TARG_DIR:$(TARG_DIR)")
+$(info "CC:$(CC)")
+$(info "INC:$(INC)")
+$(info "CFLAGS:$(CFLAGS)")
+$(info "DEBUG:$(DEBUG)")
+$(info "THREAD_NUM:$(THREAD_NUM)")
+
 $(COM_OUTPUT): com_objs 
 	@echo "BUILD $(COM_OUTPUT)!!"
 	@echo "EXEC:"

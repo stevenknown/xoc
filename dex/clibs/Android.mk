@@ -51,7 +51,9 @@ LOCAL_CFLAGS += $(MY_LOCAL_CFLAGS)
 
 LOCAL_C_INCLUDES := $(MY_INCLUDE_FILES)
 
-LOCAL_SRC_FILES := $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)),$(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
+LOCAL_SRC_FILES := \
+  $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)),\
+    $(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
 
 LOCAL_PRELINK_MODULE 	:= false
 LOCAL_SHARED_LIBRARIES  := \
@@ -88,7 +90,9 @@ LOCAL_CFLAGS += $(MY_LOCAL_CFLAGS)
 LOCAL_CFLAGS += -DHOST_LEMUR
 
 LOCAL_C_INCLUDES += $(MY_INCLUDE_FILES)
-LOCAL_SRC_FILES := $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)),$(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
+LOCAL_SRC_FILES := \
+  $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)), \
+    $(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := libaoc_clibs
@@ -111,7 +115,9 @@ LOCAL_CFLAGS += $(MY_LOCAL_CFLAGS)
 LOCAL_CFLAGS += -DHOST_LEMUR
 
 LOCAL_C_INCLUDES += $(MY_INCLUDE_FILES)
-LOCAL_SRC_FILES := $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)),$(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
+LOCAL_SRC_FILES := \
+  $(foreach F, $(MY_SRC_FILES), $(addprefix $(dir $(F)), \
+    $(notdir $(wildcard $(LOCAL_PATH)/$(F)))))
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := libaoc_clibs
