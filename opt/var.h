@@ -353,7 +353,7 @@ public:
 
     //The interface to dump declaration information when current
     //variable dumpped. This is target dependent code.
-    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf, VarMgr const* vm) const
+    virtual CHAR const* dumpVARDecl(OUT StrBuf &, VarMgr const*) const
     { return nullptr; }
     virtual void dump(VarMgr const* vm) const;
 
@@ -369,8 +369,8 @@ public:
     //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
     void setToGlobal(bool is_global)
     {
-        is_global ? setFlag(VAR_GLOBAL), removeFlag(VAR_LOCAL) :
-                    removeFlag(VAR_GLOBAL), setFlag(VAR_LOCAL);
+        is_global ? (setFlag(VAR_GLOBAL), removeFlag(VAR_LOCAL)) :
+                    (removeFlag(VAR_GLOBAL), setFlag(VAR_LOCAL));
     }
     void setToFormalParam() { setFlag(VAR_IS_FORMAL_PARAM); }
     void setFlag(VAR_FLAG f) { VAR_flag(this).set(f); }
@@ -497,6 +497,12 @@ public:
     //var_name: name of the variable, it is optional.
     //s: string's content.
     Var * registerStringVar(CHAR const* var_name, Sym const* s, UINT align);
+
+    //The function verify that the given variable information is sane.
+    bool verifyVar(Var const* v) const;
+
+    //The function verify all variables generated to guarrantee they are sane.
+    bool verifyAllVar() const;
 };
 
 } //namespace xoc

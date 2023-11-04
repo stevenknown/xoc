@@ -181,7 +181,7 @@ public:
     {
         StrBuf * strbuf = m_strbufvec.get(n);
         if (strbuf == nullptr) {
-            strbuf = new StrBuf(8);
+            strbuf = new StrBuf(bufinitsize);
             m_strbufvec.set(n, strbuf);
         }
         return strbuf;

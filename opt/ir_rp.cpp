@@ -1688,7 +1688,7 @@ void RegPromot::promoteExactAccess(LI<IRBB> const* li, IRIter & ii,
     ASSERT0(!li->getBodyBBSet()->is_empty());
 
     //Create delegate info for each given delegates.
-    DelegateMgr delemgr(this, m_rg, m_gvn, exact_tab.get_elem_count());
+    DelegateMgr delemgr(this, m_rg, m_gvn);
     ExactAccTabIter mi;
     IR * dele = nullptr;
     MD const* next_md;
@@ -2472,8 +2472,7 @@ void RegPromot::promoteInexactAccess(LI<IRBB> const* li,
                                      InexactAccTab & inexact_tab,
                                      IRIter & ii, MOD RPCtx & ctx)
 {
-    DelegateMgr delemgr(this, m_rg, m_gvn,
-        xcom::getNearestPowerOf2(inexact_tab.get_elem_count()));
+    DelegateMgr delemgr(this, m_rg, m_gvn);
     InexactAccTabIter ti;
     //Prepare delegate table and related information.
     for (IR * occ = inexact_tab.get_first(ti);
@@ -2792,7 +2791,7 @@ bool RegPromot::perform(OptCtx & oc)
         li = LI_next(li);
     }
     //buildLifeTime();
-    RPCtx ctx(getRegion(), &oc, &getActMgr());
+    RPCtx ctx(&oc, &getActMgr());
     bool change = EvaluableScalarReplacement(worklst, ctx);
     if (change) {
         //DU reference and du chain has maintained.

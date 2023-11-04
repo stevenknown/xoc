@@ -434,7 +434,7 @@ protected:
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
     bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
                                SimpCtx * ctx);
-    virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx * ctx)
+    virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx *)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);

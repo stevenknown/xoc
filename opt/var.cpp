@@ -505,17 +505,33 @@ void VarMgr::dump() const
 {
     RegionMgr * rm = m_tm->getRegionMgr();
     prt(rm, "\n\nVAR to Decl Mapping:");
-
     StrBuf buf(64);
     for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
-        Var * v = m_var_vec.get(i);
+        Var const* v = m_var_vec.get(i);
         if (v == nullptr) { continue; }
-
         buf.clean();
         prt(rm, "\n%s", v->dump(buf, this));
     }
     prt(rm, "\n");
     dumpFreeIDList();
+}
+
+
+bool VarMgr::verifyVar(Var const* v) const
+{
+    ASSERTN(v->is_global() ^ v->is_local(), ("Var flag is conflict"));
+    return true;
+}
+
+
+bool VarMgr::verifyAllVar() const
+{
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
+        Var const* v = m_var_vec.get(i);
+        if (v == nullptr) { continue; }
+        verifyVar(v);
+    }
+    return true;
 }
 //END VarMgr
 

@@ -178,7 +178,7 @@ public:
     //The field records outside loop DEF for 'delegate' if delegate is exp.
     TMap<IR const*, DUSet*> m_dele2outsidedefset;
 public:
-    DelegateMgr(RegPromot * rp, Region * rg, GVN * gvn, UINT acc_num)
+    DelegateMgr(RegPromot * rp, Region * rg, GVN * gvn)
     {
         m_is_restore_duchain_built = false;
         m_rp = rp;
@@ -338,7 +338,7 @@ public:
     DomTree * domtree;
     OptCtx * oc;
 public:
-    RPCtx(Region const* rg, OptCtx * t, RPActMgr * am = nullptr) :
+    RPCtx(OptCtx * t, RPActMgr * am = nullptr) :
         m_act_mgr(am), need_rebuild_domtree(false),
         domtree(nullptr), oc(t) {}
     ~RPCtx()
