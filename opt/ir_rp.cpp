@@ -846,67 +846,10 @@ IR * DelegateMgr::genRestoreStmt(IR const* delegate, IR * rhs)
 //
 //START RegPromot
 //
-MDLT * RegPromot::getMDLifeTime(MD * md)
-{
-    MDLT * lt;
-    if ((lt = m_md2lt_map->get(md)) != nullptr) {
-        return lt;
-    }
-    lt = (MDLT*)xmalloc(sizeof(MDLT));
-    MDLT_id(lt) = ++m_mdlt_count;
-    MDLT_md(lt) = md;
-    MDLT_livebbs(lt) = m_bs_mgr.create();
-    m_md2lt_map->set(md, lt);
-    return lt;
-}
-
-
-void RegPromot::cleanLiveBBSet()
-{
-    //Clean.
-    Vector<MDLT*> * bs_vec = m_md2lt_map->get_tgt_elem_vec();
-    for (VecIdx i = 0; i <= bs_vec->get_last_idx(); i++) {
-        MDLT * lt = bs_vec->get(i);
-        if (lt != nullptr) {
-            ASSERT0(MDLT_livebbs(lt) != nullptr);
-            MDLT_livebbs(lt)->clean();
-        }
-    }
-}
-
-
 void RegPromot::clean()
 {
-    cleanLiveBBSet();
     m_dont_promote.destroy();
     m_dont_promote.init();
-}
-
-
-void RegPromot::buildLifeTime()
-{
-    cleanLiveBBSet();
-
-    //Rebuild life time.
-    BBList * bbl = m_rg->getBBList();
-    MDLivenessMgr * livemgr = getMDLivenessMgr();
-    BBListIter itbb;
-    for (IRBB * bb = bbl->get_head(&itbb);
-         bb != nullptr; bb = bbl->get_next(&itbb)) {
-        MDSet * livein = livemgr->getLiveInMDSet(bb);
-        MDSet * liveout = livemgr->getLiveOutMDSet(bb);
-        if (livein->is_empty() && liveout->is_empty()) { continue; }
-
-        MDSetIter it;
-        for (BSIdx i = livein->get_first(&it);
-             i != BS_UNDEF; i = livein->get_next(i, &it)) {
-            MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(bb->id());
-        }
-        for (BSIdx i = liveout->get_first(&it);
-             i != BS_UNDEF; i = liveout->get_next(i, &it)) {
-            MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(bb->id());
-        }
-    }
 }
 
 
@@ -2731,6 +2674,7 @@ bool RegPromot::dump() const
     m_rg->getLogMgr()->incIndent(2);
     Pass::dump();
     m_dont_promote.dump();
+    m_act_mgr.dump();
     m_rg->getLogMgr()->decIndent(2);
     m_rg->getLogMgr()->resumeBuffer();
     return true;

@@ -319,7 +319,7 @@ static bool is_contain_by_import_delegate(MDSet const* set, MD const* md,
     if (!set->is_contain_pure(MD_IMPORT_VAR)) { return false; }
     if (MDSystem::isLocalDelegate(md->id())) { return false; }
     ASSERT0(md->is_local());
-    return rg->isRegionVAR(md->get_base());
+    return !rg->isRegionVAR(md->get_base());
 }
 
 
@@ -449,6 +449,12 @@ void MDSet::diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m,
             diff(i, m);
         }
     }
+}
+
+
+void MDSet::dump(Region * rg) const
+{
+    dump(rg->getMDSystem(), rg->getVarMgr(), false);
 }
 
 

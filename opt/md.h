@@ -528,6 +528,7 @@ public:
     //Note this function is very costly.
     void diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys);
     void dump(MDSystem * ms, VarMgr const* vm, bool detail = false) const;
+    void dump(Region * rg) const;
 
     //Get unique MD that is effective, and offset must be valid.
     //Note the MDSet can only contain one element.

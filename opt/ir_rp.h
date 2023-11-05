@@ -381,8 +381,6 @@ class RegPromot : public Pass {
     typedef DMapEx<IR*, IR*>::Tsrc2TtgtIter Occ2OccIter;
 protected:
     UINT m_mdlt_count;
-    MD2MDLifeTime * m_md2lt_map;
-    MDLivenessMgr * m_liveness_mgr;
     SMemPool * m_pool;
     MDSystem * m_md_sys;
     MDSetMgr * m_mds_mgr;
@@ -473,7 +471,6 @@ protected:
                                       MOD RPCtx & ctx);
 
     void clean();
-    void cleanLiveBBSet();
     void checkAndRemoveInvalidExactOcc(ExactAccTab & acctab, MOD RPCtx & ctx);
     void clobberExactAccess(IR const* ir, MOD ExactAccTab & exact_tab,
                             MOD RPCtx & ctx);
@@ -498,8 +495,6 @@ protected:
 
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_misc_bs_mgr; }
     xcom::DefSegMgr * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
-    MDLivenessMgr * getMDLivenessMgr() const { return m_liveness_mgr; }
-    MDLT * getMDLifeTime(MD * md);
     RPActMgr & getActMgr() { return m_act_mgr; }
 
     void handleInexactAccOcc(MOD DelegateMgr & delemgr,
@@ -723,22 +718,11 @@ public:
         m_gvn = nullptr;
         m_prssamgr = nullptr;
         m_mdssamgr = nullptr;
-        m_liveness_mgr = (MDLivenessMgr*)m_rg->getPassMgr()->registerPass(
-                             PASS_MDLIVENESS_MGR);
-
         UINT c = MAX(11, m_rg->getMDSystem()->getNumOfMD());
-        m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MDLT), MEM_COMM);
     }
-    virtual ~RegPromot()
-    {
-        delete m_md2lt_map;
-        m_md2lt_map = nullptr;
-        smpoolDelete(m_pool);
-    }
-
-    void buildLifeTime();
+    virtual ~RegPromot() { smpoolDelete(m_pool); }
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
