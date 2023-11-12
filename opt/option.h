@@ -50,7 +50,40 @@ class RegionMgr;
 #define VERIFY_LEVEL_2 2 //do more aggressive check.
 #define VERIFY_LEVEL_3 3 //do all verifications.
 
-class DumpOpt {
+class StrTabOption : public SymTab {
+    COPY_CONSTRUCTOR(StrTabOption);
+protected:
+    CHAR m_split_char;
+protected:
+    void parse();
+public:
+    StrTabOption()
+    {
+        //By default, the split character is ','.
+        m_split_char = ',';
+    }
+    void addString(CHAR const* str);
+    void addString(xcom::StrBuf const& str) { addString(str.getBuf()); }
+
+    void dump(MOD LogMgr * lm) const;
+    void dump(RegionMgr * rm) const;
+
+    //Return true if current options includes the given 'str'.
+    bool find(CHAR const* str);
+
+    //Return true if current options includes the given 'sym'.
+    bool find(Sym const* sym) { return find(const_cast<Sym*>(sym)); }
+
+    //Return true if current string table is empty.
+    bool isEmpty() const { return get_elem_count() == 0; }
+
+    //Set the split character when splitting the input string into a list of
+    //name.
+    void setSplitChar(CHAR c) { m_split_char = c; }
+};
+
+
+class DumpOption {
 public:
     //Dump all information.
     //Note is_dump_all and is_dump_nothing can not all be true.
@@ -106,8 +139,8 @@ public:
     bool is_dump_gp_adjustment; //Dump GlobalPointerAdjustment
     bool is_dump_relaxation; //Dump ir after relaxation.
 public:
-    DumpOpt();
-    DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
+    DumpOption();
+    DumpOption const& operator = (DumpOption const&); //Disable operator =.
 
     bool isDumpAll() const;
     bool isDumpNothing() const;
@@ -508,6 +541,14 @@ extern bool g_do_gp_adjustment;
 //Perform relaxation.
 extern bool g_do_relaxation;
 
+#ifdef FOR_TECO_IP
+//Forced relaxation of cond-br to uncond-br.
+extern bool g_do_relaxation2uncondbr;
+
+//Forced relaxation of cond-br or uncond-br to jmp.
+extern bool g_do_relaxation2jmp;
+#endif
+
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;
 
@@ -545,7 +586,7 @@ extern bool g_is_search_and_copy_dbx;
 extern bool g_generate_var_for_pr;
 
 //Record dump options for each Pass.
-extern DumpOpt g_dump_opt;
+extern DumpOption g_dump_opt;
 
 //Redirect output information to stdout to dump file if exist.
 extern bool g_redirect_stdout_to_dump_file;
@@ -556,6 +597,12 @@ extern bool g_redirect_stdout_to_dump_file;
 //simultaneously.
 extern FILE * g_unique_dumpfile;
 extern CHAR const* g_unique_dumpfile_name;
+
+//Rocord a list of Region that should participate in optimization.
+extern StrTabOption g_include_region;
+
+//Rocord a list of Region that should NOT participate in optimization.
+extern StrTabOption g_exclude_region;
 
 } //namespace xoc
 #endif

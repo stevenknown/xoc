@@ -4793,13 +4793,11 @@ public:
     T append_and_retrieve(T t)
     {
         ASSERT0(t != T(0));
-
         bool find = false;
         T mapped = BaseTMap::get(t, &find);
         if (find) {
             return mapped;
         }
-
         return BaseTMap::setAlways(t, t);
     }
 

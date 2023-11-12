@@ -718,7 +718,6 @@ public:
         m_gvn = nullptr;
         m_prssamgr = nullptr;
         m_mdssamgr = nullptr;
-        UINT c = MAX(11, m_rg->getMDSystem()->getNumOfMD());
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MDLT), MEM_COMM);
     }

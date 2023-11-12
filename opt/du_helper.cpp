@@ -777,16 +777,8 @@ IR * findUniqueMustDef(IR const* exp, Region const* rg)
         goto CLASSIC_DU;
     }
 CLASSIC_DU:
-    if (rg->getDUMgr() != nullptr) {
-        DUSet const* du = exp->readDUSet();
-        if (du != nullptr) {
-            IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-            return rg->getDUMgr()->findNearestDomDef(exp, exp_stmt, du);
-        }
-        return nullptr;
-    }
-    ASSERTN(0, ("DU Chain is not available"));
-    return nullptr;
+    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    return rg->getDUMgr()->findNearestDomDef(exp);
 }
 
 
@@ -833,11 +825,8 @@ IR * findKillingDef(IR const* exp, Region const* rg)
     if (exp->isReadPR()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
-            IR * d = PR_ssainfo(exp)->getDef();
-            if (d != nullptr && d->getExactRef() != nullptr) {
-                return d;
-            }
-            return nullptr;
+            ASSERT0(exp->getSSAInfo());
+            return prssamgr->findKillingDefStmt(exp);
         }
         //Try classic DU.
         goto CLASSIC_DU;
@@ -853,16 +842,12 @@ IR * findKillingDef(IR const* exp, Region const* rg)
         goto CLASSIC_DU;
     }
 CLASSIC_DU:
-    if (rg->getDUMgr() != nullptr) {
-        DUSet const* du = exp->readDUSet();
-        if (du != nullptr) {
-            IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-            return rg->getDUMgr()->findNearestDomDef(exp, exp_stmt, du);
-        }
-        return nullptr;
+    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    GVN * gvn = (GVN*)rg->getPassMgr()->queryPass(PASS_GVN);
+    IR * domdef = rg->getDUMgr()->findNearestDomDef(exp);
+    if (isKillingDef(domdef, exp, gvn)) {
+        return domdef;
     }
-
-    ASSERTN(0, ("DU Chain is not available"));
     return nullptr;
 }
 
@@ -905,6 +890,11 @@ bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 {
     ASSERT0(def && use);
     ASSERTN(def->isMemRef() && use->isMemRef(), ("should not query its DU"));
+    if (def->isCallStmt() && def->getMayRef() != nullptr &&
+        !def->getMayRef()->is_empty()) {
+        //Can not determine whether call-stmt must def 'use'.
+        return false;
+    }
     MD const* mustusemd = use->getMustRef();
     if (mustusemd != nullptr && isKillingDef(def, mustusemd)) {
         return true;
@@ -1079,63 +1069,44 @@ void collectDefSet(IR const* use, Region const* rg, OUT IRSet * defset)
 }
 
 
+IR * findNearestDomDef(IR const* exp, Region const* rg)
+{
+    ASSERT0(exp && rg);
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            ASSERT0(exp->getSSAInfo());
+            return exp->getSSAInfo()->getDef();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemRefNonPR()) {
+        ASSERT0(exp->isMemRefNonPR());
+        MDSSAMgr const* mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            MDDef const* mddef = mdssamgr->findNearestDef(exp);
+            ASSERT0(mddef);
+            return mddef->is_phi() ? nullptr : mddef->getOcc();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    return rg->getDUMgr()->findNearestDomDef(exp);
+}
+
+
 //Find the nearest dominated DEF stmt of 'exp'.
 //Note RPO of BB must be available.
 //exp: given expression.
 //defset: DEF stmt set of 'exp'.
-//omit_self: true if we do not consider the stmt of 'exp' itself.
-IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
-                       bool omit_self)
+IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg)
 {
-    ASSERT0(exp->is_exp());
-    IR const* stmt_of_exp = exp->getStmt();
-    INT stmt_rpo = stmt_of_exp->getBB()->rpo();
-    ASSERT0(stmt_rpo != RPO_UNDEF);
-    IR * last = nullptr;
-    INT lastrpo = RPO_UNDEF;
-    IRSetIter it = nullptr;
-    for (BSIdx i = defset.get_first(&it);
-         i != BS_UNDEF; i = defset.get_next(i, &it)) {
-        IR * d = rg->getIR(i);
-        ASSERT0(d->is_stmt());
-        if (omit_self && d == stmt_of_exp) {
-            continue;
-        }
-
-        if (last == nullptr) {
-            last = d;
-            lastrpo = d->getBB()->rpo();
-            ASSERT0(lastrpo >= 0);
-            continue;
-        }
-
-        IRBB * dbb = d->getBB();
-        ASSERT0(dbb);
-        ASSERT0(dbb->rpo() >= 0);
-        if (dbb->rpo() < stmt_rpo && dbb->rpo() > lastrpo) {
-            last = d;
-            lastrpo = dbb->rpo();
-        } else if (dbb == last->getBB() && dbb->is_dom(last, d, true)) {
-            last = d;
-            lastrpo = dbb->rpo();
-        }
-    }
-    if (last == nullptr) { return nullptr; }
-
-    IRBB const* last_bb = last->getBB();
-    IRBB const* exp_bb = stmt_of_exp->getBB();
-    if (!rg->getCFG()->is_dom(last_bb->id(), exp_bb->id())) {
-        return nullptr;
-    }
-
-    //e.g: *p = *p + 1
-    //Def and Use in same stmt, in this situation,
-    //the stmt can not be regarded as dom-def.
-    if (exp_bb == last_bb && !exp_bb->is_dom(last, stmt_of_exp, true)) {
-        return nullptr;
-    }
-    ASSERT0(last != stmt_of_exp);
-    return last;
+    ASSERTN(rg->getDUMgr(), ("DUMgr is not available"));
+    return rg->getDUMgr()->findNearestDomDef(exp, &defset);
 }
 
 

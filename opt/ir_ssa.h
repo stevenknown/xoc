@@ -716,6 +716,21 @@ public:
     //number predecessors of BB of Phi.
     void dupAndInsertPhiOpnd(IRBB const* bb, UINT pos, UINT num);
 
+    //Find killing must-def IR stmt for expression ir.
+    //Return the IR stmt if found.
+    //e.g: stpr $1 = ...;
+    //     ...     = $1; stpr is the killing-def of $1
+    //e.g2 setelem $2:vec<4*i32> = $3:vec<4*i32>, $1:i32, 4;
+    //     ... = $2;
+    //     setelem is not be kill-def of $2 because it is partial def $2.
+    IR * findKillingDefStmt(IR const* exp) const
+    {
+        ASSERT0(exp->isReadPR() && PR_ssainfo(exp));
+        IR * d = PR_ssainfo(exp)->getDef();
+        return d != nullptr && d->isWriteWholePR() &&
+               d->getExactRef() != nullptr ? d : nullptr;
+    }
+
     //exp: the expression that expected to set livein.
     void findAndSetLiveinDef(IR * exp);
 

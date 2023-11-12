@@ -31,10 +31,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+bool ScalarOpt::isParticipateInOpt() const
+{
+    if (g_exclude_region.find(m_rg->getRegionName())) { return false; }
+    if (g_include_region.isEmpty()) { return true; }
+    return g_include_region.find(m_rg->getRegionName());
+}
+
+
 bool ScalarOpt::perform(OptCtx & oc)
 {
-    TTab<Pass*> opt_tab;
-    List<Pass*> passlist;
+    if (!isParticipateInOpt()) { return false; }
+    xcom::TTab<Pass*> opt_tab;
+    xcom::List<Pass*> passlist;
     SimpCtx simp(&oc);
     if (g_do_gvn) { m_pass_mgr->registerPass(PASS_GVN); }
     if (g_do_vrp) { m_pass_mgr->registerPass(PASS_VRP); }

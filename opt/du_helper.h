@@ -194,8 +194,8 @@ void collectDefSet(IR const* use, Region const* rg, OUT IRSet * defset);
 //exp: given expression.
 //defset: DEF stmt set of 'exp'.
 //omit_self: true if we do not consider the stmt of 'exp' itself.
-IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
-                       bool omit_self);
+IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg);
+IR * findNearestDomDef(IR const* exp, Region const* rg);
 
 //The function try to find the killing-def for 'use'.
 //To find the killing-def, the function prefer use SSA info.

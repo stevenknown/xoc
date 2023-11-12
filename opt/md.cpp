@@ -143,17 +143,24 @@ CHAR * MD::dump(StrBuf & buf, VarMgr const* vm) const
     MD_base(this)->dump(buf, vm);
     CHAR const* ofstfmt = getHostUIntFormat(false);
     TMWORD lofst = MD_ofst(this);
-    if (MD_ty(this) == MD_EXACT) {
+    switch (MD_ty(this)) {
+    case MD_EXACT: {
         StrBuf fmt(16);
         fmt.strcat(" -- ofst:%s -- size:%s", ofstfmt, ofstfmt);
-        buf.strcat(fmt.buf, lofst, MD_size(this));
-    } else if (MD_ty(this) == MD_RANGE) {
+        buf.strcat(fmt.buf, (HOST_UINT)lofst, (HOST_UINT)MD_size(this));
+        return buf.buf;
+    }
+    case MD_RANGE: {
         StrBuf fmt(16);
         fmt.strcat(" -- start:%s -- end:%s", ofstfmt, ofstfmt);
-        buf.strcat(fmt.buf, lofst, lofst + MD_size(this));
+        buf.strcat(fmt.buf, (HOST_UINT)lofst,
+                   (HOST_UINT)(lofst + MD_size(this)));
         buf.strcat(" -- range");
-    } else {
+        return buf.buf;
+    }
+    default:
         buf.strcat(" -- ofst:unbound");
+        return buf.buf;
     }
     return buf.buf;
 }

@@ -533,7 +533,6 @@ bool DUMgr::isMayDef(IR const* def, IR const* use, bool is_recur)
     if (def->isCallStmt()) {
         return isCallMayDef(def, use, is_recur);
     }
-
     MD const* mustdef = const_cast<IR*>(def)->getMustRef();
     MDSet const* maydef = const_cast<IR*>(def)->getMayRef();
     if (is_recur) {
@@ -3322,36 +3321,30 @@ bool verifyMDDUChain(Region * rg, DUOptFlag duflag)
 //'exp_stmt': stmt that exp is belong to.
 //'expdu': def set of exp.
 //'omit_self': true if we do not consider the 'exp_stmt' itself.
-IR * DUMgr::findNearestDomDef(IR const* exp, IR const* exp_stmt,
-                              DUSet const* expdefset)
+IR * DUMgr::findNearestDomDef(IR const* exp, DUSet const* defset) const
 {
-    ASSERT0(exp->is_exp() && exp_stmt->is_stmt());
+    if (defset == nullptr) { return nullptr; } 
+    ASSERT0(exp && exp->is_exp());
     ASSERT0(const_cast<IR*>(exp)->getMayRef() ||
             const_cast<IR*>(exp)->getMustRef());
     IR * last = nullptr;
+    IR const* exp_stmt = exp->getStmt();
     INT stmt_rpo = exp_stmt->getBB()->rpo();
     ASSERT0(stmt_rpo != RPO_UNDEF);
     INT lastrpo = RPO_UNDEF;
     DUSetIter di = nullptr;
-    for (BSIdx i = expdefset->get_first(&di);
-         i != BS_UNDEF; i = expdefset->get_next(i, &di)) {
+    for (BSIdx i = defset->get_first(&di);
+         i != BS_UNDEF; i = defset->get_next(i, &di)) {
         IR * d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
-        if (!isMayDef(d, exp, false)) {
-            continue;
-        }
-
-        if (d == exp_stmt) {
-            continue;
-        }
-
+        if (!const_cast<DUMgr*>(this)->isMayDef(d, exp, false)) { continue; }
+        if (d == exp_stmt) { continue; }
         if (last == nullptr) {
             last = d;
             lastrpo = d->getBB()->rpo();
             ASSERT0(lastrpo != RPO_UNDEF);
             continue;
         }
-
         IRBB * dbb = d->getBB();
         ASSERT0(dbb);
         ASSERT0(dbb->rpo() != RPO_UNDEF);
@@ -3367,6 +3360,7 @@ IR * DUMgr::findNearestDomDef(IR const* exp, IR const* exp_stmt,
     }
     if (last == nullptr) { return nullptr; }
 
+    //Check whether the last stmt is dominate exp_stmt.
     IRBB const* last_bb = last->getBB();
     IRBB const* exp_bb = exp_stmt->getBB();
     if (exp_bb == last_bb) {

@@ -564,7 +564,6 @@ bool RCE::performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx)
         IR * ir = ct->val();
         ir_list->get_next(&next_ct);
         if (ir->hasSideEffect(true) || ir->isDummyOp()) { continue; }
-
         IR * newir = ir;
         switch (ir->getCode()) {
         SWITCH_CASE_CONDITIONAL_BRANCH_OP:
@@ -630,9 +629,8 @@ bool RCE::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
     START_TIMER(t, getPassName());
-    if (m_gvn == nullptr || (!m_gvn->is_valid() && is_use_gvn())) {
+    if (is_use_gvn() && (m_gvn == nullptr || !m_gvn->is_valid())) {
         return false;
     }
     //Incremental update DOM need RPO.

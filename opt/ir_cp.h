@@ -216,6 +216,7 @@ protected:
     //more policies.
     virtual IR const* tryDiscardCVT(IR const* prop_value) const;
 
+    bool useGVN() const { return m_gvn != nullptr && m_gvn->is_valid(); }
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const

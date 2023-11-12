@@ -76,7 +76,7 @@ GVN::GVN(Region * rg) : Pass(rg)
     m_cfg = m_rg->getCFG();
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
     m_is_vn_fp = false;
-    m_is_comp_lda_string = false;
+    m_is_comp_lda_string = !m_rg->getRegionMgr()->isRegardAllStringAsSameMD();
     m_is_alloc_livein_vn = false;
     m_pool = nullptr;
     init();
@@ -812,7 +812,7 @@ VN const* GVN::computeILoad(IR const* exp, bool & change)
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     IR const* domdef = m_stmt2domdef.get(exp_stmt);
     if (domdef == nullptr) {
-        domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
+        domdef = m_du->findNearestDomDef(exp, du);
         if (domdef != nullptr) {
             m_stmt2domdef.set(exp_stmt, domdef);
         }
@@ -938,10 +938,7 @@ VN const* GVN::computeArray(IR const* exp, bool & change)
         }
         return x;
     }
-
-    IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-    ASSERT0(exp_stmt->is_stmt());
-    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
+    IR const* domdef = m_du->findNearestDomDef(exp, du);
     if (domdef == nullptr) {
         return nullptr;
     }
@@ -1017,37 +1014,15 @@ VN const* GVN::computeScalarByAnonDomDef(IR const* exp, IR const* domdef,
 }
 
 
-VN const* GVN::computeScalar(IR const* exp, bool & change)
+VN const* GVN::computeInexactScalarByClassicDU(IR const* exp, bool & change)
 {
-    ASSERT0(exp && exp->is_exp());
-    VN const* evn = getVN(exp);
-    if (evn != nullptr) { return evn; }
-
-    if (exp->isReadPR() && usePRSSADU()) {
-        return computePR(exp, change);
-    }
-
-    evn = computeExactMemory(exp, change);
-    if (evn != nullptr) { return evn; }
-
-    if (exp->getExactRef() == nullptr) {
-        //Can not handle inexact MD.
-        return nullptr;
-    }
-
     DUSet const* du = exp->readDUSet();
     if (du == nullptr || du->get_elem_count() == 0) {
         //If exact MD DU is empty, should keep it as unknown status.
         return nullptr;
     }
-
-    IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
-    if (domdef == nullptr) {
-        return nullptr;
-    }
-    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
-        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+    IR const* domdef = m_du->findNearestDomDef(exp, du);
+    if (domdef == nullptr || domdef->getExactRef() == nullptr) {
         return nullptr;
     }
     if (domdef->is_st() && ST_ofst(domdef) != exp->getOffset()) {
@@ -1056,7 +1031,6 @@ VN const* GVN::computeScalar(IR const* exp, bool & change)
     if (!domdef->is_st() && !domdef->is_stpr()) {
         return computeScalarByAnonDomDef(exp, domdef, change);
     }
-
     switch (exp->getCode()) {
     case IR_LD:
         if (domdef->is_stpr() || (LD_idinfo(exp) != ST_idinfo(domdef))) {
@@ -1070,7 +1044,6 @@ VN const* GVN::computeScalar(IR const* exp, bool & change)
         break;
     default: ASSERTN(0, ("unsupport"));
     }
-
     VN const* uni_vn = getVN(domdef);
     if (uni_vn == nullptr) {
         VN * t = allocVN();
@@ -1081,6 +1054,28 @@ VN const* GVN::computeScalar(IR const* exp, bool & change)
     setVNOnce(exp, uni_vn);
     change = true;
     return uni_vn;
+}
+
+
+VN const* GVN::computeScalar(IR const* exp, bool & change)
+{
+    ASSERT0(exp && exp->is_exp());
+    VN const* evn = getVN(exp);
+    if (evn != nullptr) { return evn; }
+    if (exp->isReadPR() && usePRSSADU()) {
+        return computePR(exp, change);
+    }
+    evn = computeExactMemory(exp, change);
+    if (evn != nullptr) { return evn; }
+    if (exp->getExactRef() == nullptr) {
+        //Can not handle inexact MD.
+        return nullptr;
+    }
+
+    //TBD:does it necessary to compute nearest-dom-def again to judge whether
+    //the inexact-ref of 'exp' has VN?
+    //return computeInexactScalarByClassicDU(exp, change);
+    return nullptr;
 }
 
 
@@ -1271,14 +1266,16 @@ void GVN::processCall(IR const* ir, bool & change)
     for (IR const* p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
         computeVN(p, change);
     }
-    VN const* x = getVN(ir);
-    if (x == nullptr) {
-        VN * t = allocVN();
-        VN_type(t) = VN_VAR;
-        change = true;
-        x = t;
-        setVNOnce(ir, x);
-    }
+    //CASE:the VN of a call's result PR should be determined by its use.
+    //TBD:readonly call's VN could be computed through hashing each parameters.
+    //VN const* x = getVN(ir);
+    //if (x == nullptr) {
+    //    VN * t = allocVN();
+    //    VN_type(t) = VN_VAR;
+    //    change = true;
+    //    x = t;
+    //    setVNOnce(ir, x);
+    //}
     return;
 }
 

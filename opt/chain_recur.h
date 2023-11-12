@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define CRID_UNDEF 0
+
 class IV;
 class BIV;
 class DIV;
@@ -232,16 +234,18 @@ public:
 typedef xcom::Vector<IVVal> IVValVec;
 
 #define CR_code(cr) ((cr)->m_code)
+#define CR_id(cr) ((cr)->m_id)
 #define CR_init(cr) ((cr)->m_init)
 #define CR_step(cr) ((cr)->m_step)
 class ChainRec {
     //The class allows copy-construction.
 public:
     IR_CODE m_code;
+    UINT m_id;
     IVVal m_init;
     IVVal m_step;
 public:
-    ChainRec() : m_code(IR_UNDEF) {}
+    ChainRec() : m_code(IR_UNDEF), m_id(CRID_UNDEF) {}
     ChainRec(IVVal const& init, IVVal const& step)
     { CR_init(this) = init; CR_step(this) = step; CR_code(this) = IR_ADD; }
     ChainRec(IVVal const& init, IVVal const& step, IR_CODE code)
@@ -269,6 +273,8 @@ public:
     IVVal const& getStep() const { return m_step; }
     IVVal const& getInit() const { return m_init; }
     IR_CODE getCode() const { return m_code; }
+
+    UINT id() const { return m_id; }
 
     //Return true if current chain-rec is equal to src.
     bool isEqual(ChainRec const& src) const;
@@ -300,6 +306,7 @@ public:
 class ChainRecMgr {
     COPY_CONSTRUCTOR(ChainRecMgr);
 protected:
+    UINT m_cr_count;
     SMemPool * m_pool;
     Region * m_rg;
     TypeMgr * m_tm;
@@ -323,7 +330,7 @@ public:
     ChainRecMgr(Region * rg, OptCtx const* oc);
     ~ChainRecMgr();
 
-    ChainRec * allocChainRec() { return (ChainRec*)xmalloc(sizeof(ChainRec)); }
+    ChainRec * allocChainRec();
 
     //The function compute the first 'num' value that represented by 'cr'.
     //Return true if the computation is successful, otherwise false which

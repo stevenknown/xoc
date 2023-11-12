@@ -929,6 +929,7 @@ public:
     MDDef * findKillingMDDef(IR const* ir) const;
 
     //Find the nearest virtual DEF of 'ir'.
+    //ir: expression.
     MDDef * findNearestDef(IR const* ir) const;
 
     //Find the MustDef of 'ir'.

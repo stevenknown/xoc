@@ -72,15 +72,12 @@ void prt2C(CHAR const* format, ...)
 
 CHAR const* getHostIntFormat(bool hex)
 {
-    #if WORD_LENGTH_OF_HOST_MACHINE==32
-    if (hex) { return "%x"; }
-    return "%d";
-    #elif WORD_LENGTH_OF_HOST_MACHINE==64
-    if (hex) { return "%llx"; }
-    return "%lld";
-    #else
-    #error "Need to support";
-    #endif
+    if (sizeof(HOST_INT) * HOST_BIT_PER_BYTE == 32) {
+        return hex ? "%x" : "%d";
+    }
+    if (sizeof(HOST_INT) * HOST_BIT_PER_BYTE == 64) {
+        return hex ? "%llx" : "%lld";
+    }
     UNREACHABLE();
     return nullptr;
 }
@@ -88,15 +85,12 @@ CHAR const* getHostIntFormat(bool hex)
 
 CHAR const* getHostUIntFormat(bool hex)
 {
-    #if WORD_LENGTH_OF_HOST_MACHINE==32
-    if (hex) { return "%x"; }
-    return "%u";
-    #elif WORD_LENGTH_OF_HOST_MACHINE==64
-    if (hex) { return "%llx"; }
-    return "%llu";
-    #else
-    #error "Need to support";
-    #endif
+    if (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE == 32) {
+        return hex ? "%x" : "%u";
+    }
+    if (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE == 64) {
+        return hex ? "%llx" : "%llu";
+    }
     UNREACHABLE();
     return nullptr;
 }

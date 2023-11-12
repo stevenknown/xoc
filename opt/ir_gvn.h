@@ -559,6 +559,7 @@ protected:
     VN const* computeConst(IR const* exp, bool & change);
     VN const* computeLda(IR const* exp, bool & change);
     VN const* computeUna(IR const* exp, bool & change);
+    VN const* computeInexactScalarByClassicDU(IR const* exp, bool & change);
     VN const* computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
                                         bool & change);
     VN const* computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,

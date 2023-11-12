@@ -522,6 +522,18 @@ static bool doAddOrMulFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     case IVVal::VAL_IS_EXP:
         if (code == IR_ADD) { return IVVal::doAdd(v1, v0, res, mgr); }
         return IVVal::doMul(v1, v0, res, mgr);
+    case IVVal::VAL_IS_CR: {
+        ChainRec * rescr = mgr.allocChainRec();
+        bool succ = false;
+        if (code == IR_ADD) {
+            succ = mgr.doAdd(*v1.getCR(), v0, *rescr);
+        } else {
+            succ = mgr.doMul(*v1.getCR(), v0, *rescr);
+        }
+        if (!succ) { return false; }
+        res.setToCR(rescr, rescr->getInit().getDType());
+        return true;
+    }
     default: UNREACHABLE();
     }
     return false;
@@ -730,7 +742,7 @@ bool IVVal::isEqual(IVVal const& v) const
 //
 void ChainRec::dump(Region const* rg) const
 {
-    note(rg, "\nChainRec:");
+    note(rg, "\nChainRec(id:%u):", id());
     rg->getLogMgr()->incIndent(2);
     note(rg, "\nINIT:");
     const_cast<ChainRec*>(this)->getInit().dump(rg);
@@ -815,12 +827,14 @@ void ChainRec::clean(MOD ChainRecMgr & mgr)
     CR_init(this).clean(mgr);
     CR_step(this).clean(mgr);
     CR_code(this) = IR_UNDEF;
+    //DO NOT CLEAN CRID.
 }
 
 
 void ChainRec::copyExclusive(ChainRec const& src, MOD ChainRecMgr & mgr)
 {
-    *this = src;
+    //DO NOT COPY CRID.
+    CR_code(this) = CR_code(&src);
     CR_init(this).copyExclusive(src.getInit(), mgr);
     CR_step(this).copyExclusive(src.getStep(), mgr);
 }
@@ -954,6 +968,7 @@ ChainRecMgr::ChainRecMgr(Region * rg, OptCtx const* oc) : m_rg(rg), m_oc(oc)
     m_pool = smpoolCreate(sizeof(ChainRec) * 4, MEM_COMM);
     m_tm = rg->getTypeMgr();
     m_irmgr = rg->getIRMgr();
+    m_cr_count = CRID_UNDEF;
 }
 
 
@@ -968,6 +983,12 @@ ChainRecMgr::~ChainRecMgr()
 }
 
 
+ChainRec * ChainRecMgr::allocChainRec()
+{
+    ChainRec * cr = (ChainRec*)xmalloc(sizeof(ChainRec));
+    CR_id(cr) = ++m_cr_count;
+    return cr;
+}
 bool ChainRecMgr::doAdd(ChainRec const& cr0, ChainRec const& cr1,
                         OUT ChainRec & res)
 {

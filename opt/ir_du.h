@@ -556,12 +556,14 @@ public:
 
     //Find the nearest dominated DEF stmt of 'exp'.
     //NOTE: RPO of bb of stmt must be available.
-    //'exp': expression
-    //'exp_stmt': stmt that exp is belong to.
-    //'expdu': def set of exp.
-    //'omit_self': true if we do not consider the 'exp_stmt' itself.
-    IR * findNearestDomDef(IR const* exp, IR const* exp_stmt,
-                           DUSet const* expdefset);
+    //exp: expression
+    //defset: def set of exp.
+    //omit_self: true if we do not consider the 'exp_stmt' itself.
+    IR * findNearestDomDef(IR const* exp, DUSet const* defset) const;
+    IR * findNearestDomDef(IR const* exp, IRSet const* defset) const
+    { return findNearestDomDef(exp, (DUSet const*)defset); }
+    IR * findNearestDomDef(IR const* exp) const
+    { return findNearestDomDef(exp, exp->getDUSet()); }
 
     //Find nearest killing def to expmd in its bb.
     //Here we search exactly killing DEF from current stmt to previous

@@ -1679,12 +1679,10 @@ MDDef * MDSSAMgr::findKillingMDDef(IR const* ir) const
         //have killing-def?
         return nullptr;
     }
-    MDDef * def = findMustMDDef(ir);
+    MDDef * def = findNearestDef(ir);
     if (def == nullptr || def->is_phi()) { return nullptr; }
     ASSERT0(def->getOcc());
-    MD const* defmd = def->getOcc()->getMustRef();
-    if (defmd != nullptr && isKillingDef(defmd, opndmd)) { return def; }
-    return nullptr;
+    return xoc::isKillingDef(def->getOcc(), ir, nullptr) ? def : nullptr;
 }
 
 

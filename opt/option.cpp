@@ -111,15 +111,80 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
 bool g_is_search_and_copy_dbx = true;
 bool g_generate_var_for_pr = true;
-DumpOpt g_dump_opt;
+DumpOption g_dump_opt;
 bool g_redirect_stdout_to_dump_file = false;
 FILE * g_unique_dumpfile = nullptr;
 CHAR const* g_unique_dumpfile_name = nullptr;
+StrTabOption g_include_region;
+StrTabOption g_exclude_region;
 
 //
-//START DumpOpt
+//START StrTabOption
 //
-DumpOpt::DumpOpt()
+void StrTabOption::addString(CHAR const* str)
+{
+    if (str == nullptr) { return; }
+    xcom::StrBuf tmp((UINT)::strlen(str) + 1);
+    UINT charpos = 0;
+    for (CHAR const* p = str; *p != 0; p++) {
+        if (*p != m_split_char) {
+            tmp.buf[charpos] = *p;
+            charpos++;
+            continue;
+        }
+        if (charpos == 0){
+            //Empty string.
+            continue;
+        }
+        tmp.buf[charpos] = 0;
+        add(tmp.buf);
+        charpos = 0;
+    }
+    if (charpos != 0) {
+        tmp.buf[charpos] = 0;
+        add(tmp.buf);
+        charpos = 0;
+    }
+}
+
+
+bool StrTabOption::find(CHAR const* str)
+{
+    SymTabIter it;
+    for (Sym const* sym = get_first(it);
+         sym != nullptr; sym = get_next(it)) {
+        if (::strcmp(sym->getStr(), str) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+void StrTabOption::dump(MOD LogMgr * lm) const
+{
+    if (lm == nullptr || !lm->is_init()) { return; }
+    SymTabIter it;
+    lm->incIndent(2);
+    for (Sym const* sym = get_first(it);
+         sym != nullptr; sym = get_next(it)) {
+        note(lm, "\n%s", sym->getStr());
+    }
+    lm->decIndent(2);
+}
+
+
+void StrTabOption::dump(RegionMgr * rm) const
+{
+    dump(rm->getLogMgr());
+}
+//END StrTabOption
+
+
+//
+//START DumpOption
+//
+DumpOption::DumpOption()
 {
     is_dump_all = false;
     is_dump_nothing = false;
@@ -155,7 +220,7 @@ DumpOpt::DumpOpt()
 }
 
 
-bool DumpOpt::isDumpAll() const
+bool DumpOption::isDumpAll() const
 {
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
@@ -163,7 +228,7 @@ bool DumpOpt::isDumpAll() const
 }
 
 
-bool DumpOpt::isDumpNothing() const
+bool DumpOption::isDumpNothing() const
 {
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
@@ -171,238 +236,238 @@ bool DumpOpt::isDumpNothing() const
 }
 
 
-bool DumpOpt::isDumpBeforePass() const
+bool DumpOption::isDumpBeforePass() const
 {
     return is_dump_before_pass;
 }
 
 
-bool DumpOpt::isDumpAfterPass() const
+bool DumpOption::isDumpAfterPass() const
 {
     return is_dump_after_pass;
 }
 
 
-bool DumpOpt::isDumpAA() const
+bool DumpOption::isDumpAA() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_aa);
 }
 
 
-bool DumpOpt::isDumpDUMgr() const
+bool DumpOption::isDumpDUMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dumgr);
 }
 
 
-bool DumpOpt::isDumpMDSetHash() const
+bool DumpOption::isDumpMDSetHash() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdset_hash);
 }
 
 
-bool DumpOpt::isDumpCFG() const
+bool DumpOption::isDumpCFG() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cfg);
 }
 
 
-bool DumpOpt::isDumpCFGOpt() const
+bool DumpOption::isDumpCFGOpt() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cfgopt);
 }
 
 
-bool DumpOpt::isDumpDOM() const
+bool DumpOption::isDumpDOM() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dom);
 }
 
 
-bool DumpOpt::isDumpRPO() const
+bool DumpOption::isDumpRPO() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_rpo);
 }
 
 
-bool DumpOpt::isDumpCP() const
+bool DumpOption::isDumpCP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cp);
 }
 
 
-bool DumpOpt::isDumpRP() const
+bool DumpOption::isDumpRP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_rp);
 }
 
 
-bool DumpOpt::isDumpInferType() const
+bool DumpOption::isDumpInferType() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_infertype);
 }
 
 
-bool DumpOpt::isDumpInvertBrTgt() const
+bool DumpOption::isDumpInvertBrTgt() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_invert_brtgt);
 }
 
 
-bool DumpOpt::isDumpVRP() const
+bool DumpOption::isDumpVRP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_vrp);
 }
 
 
-bool DumpOpt::isDumpDCE() const
+bool DumpOption::isDumpDCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dce);
 }
 
 
-bool DumpOpt::isDumpRCE() const
+bool DumpOption::isDumpRCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_rce);
 }
 
 
-bool DumpOpt::isDumpLFTR() const
+bool DumpOption::isDumpLFTR() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_lftr);
 }
 
 
-bool DumpOpt::isDumpVectorization() const
+bool DumpOption::isDumpVectorization() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_vectorization);
 }
 
 
-bool DumpOpt::isDumpCDG() const
+bool DumpOption::isDumpCDG() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cdg);
 }
 
 
-bool DumpOpt::isDumpGVN() const
+bool DumpOption::isDumpGVN() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gvn);
 }
 
 
-bool DumpOpt::isDumpGCSE() const
+bool DumpOption::isDumpGCSE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gcse);
 }
 
 
-bool DumpOpt::isDumpIVR() const
+bool DumpOption::isDumpIVR() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_ivr);
 }
 
 
-bool DumpOpt::isDumpLICM() const
+bool DumpOption::isDumpLICM() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_licm);
 }
 
 
-bool DumpOpt::isDumpExprTab() const
+bool DumpOption::isDumpExprTab() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_exprtab);
 }
 
 
-bool DumpOpt::isDumpLoopCVT() const
+bool DumpOption::isDumpLoopCVT() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_loopcvt);
 }
 
 
-bool DumpOpt::isDumpSimp() const
+bool DumpOption::isDumpSimp() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_simplification);
 }
 
 
-bool DumpOpt::isDumpPRSSAMgr() const
+bool DumpOption::isDumpPRSSAMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_prssamgr);
 }
 
 
-bool DumpOpt::isDumpMDSSAMgr() const
+bool DumpOption::isDumpMDSSAMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdssamgr);
 }
 
 
-bool DumpOpt::isDumpMemUsage() const
+bool DumpOption::isDumpMemUsage() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_memusage);
 }
 
 
-bool DumpOpt::isDumpLivenessMgr() const
+bool DumpOption::isDumpLivenessMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_livenessmgr);
 }
 
 
-bool DumpOpt::isDumpIRParser() const
+bool DumpOption::isDumpIRParser() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irparser);
 }
 
 
-bool DumpOpt::isDumpLSRA() const
+bool DumpOption::isDumpLSRA() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_lsra);
 }
 
 
-bool DumpOpt::isDumpIRID() const
+bool DumpOption::isDumpIRID() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_ir_id);
 }
 
 
-bool DumpOpt::isDumpRefineDUChain() const
+bool DumpOption::isDumpRefineDUChain() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine_duchain);
 }
 
 
-bool DumpOpt::isDumpRefine() const
+bool DumpOption::isDumpRefine() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine);
 }
 
 
-bool DumpOpt::isDumpGSCC() const
+bool DumpOption::isDumpGSCC() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gscc);
 }
 
 
-bool DumpOpt::isDumpPElog() const
+bool DumpOption::isDumpPElog() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_pelog);
 }
 
 
-bool DumpOpt::isDumpGPAdjustment() const
+bool DumpOption::isDumpGPAdjustment() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gp_adjustment);
 }
 
-bool DumpOpt::isDumpRelaxation() const
+bool DumpOption::isDumpRelaxation() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_relaxation);
 }
-//END DumpOpt
+//END DumpOption
 
 
 //
@@ -518,6 +583,10 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_unique_dumpfile = 0x%x", g_unique_dumpfile);
     note(lm, "\ng_unique_dumpfile_name = %s",
          g_unique_dumpfile_name != nullptr ? g_unique_dumpfile_name : "");
+    note(lm, "\ng_include_option =");
+    g_include_region.dump(lm);
+    note(lm, "\ng_exclude_option =");
+    g_exclude_region.dump(lm);
     lm->decIndent(2);
 }
 

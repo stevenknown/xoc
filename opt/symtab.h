@@ -44,6 +44,7 @@ class Sym {
 public:
     CHAR * s;
 public:
+    Sym() {}
     CHAR const* getStr() const { return s; }
 };
 
@@ -194,8 +195,9 @@ public:
 //
 //START SymTab based on Map
 //
-class CompareSymTab {
-    COPY_CONSTRUCTOR(CompareSymTab);
+class CompareFuncSymTab {
+    COPY_CONSTRUCTOR(CompareFuncSymTab);
+protected:
     CHAR * xstrdup(CHAR const* s)
     {
         if (s == nullptr) {
@@ -207,12 +209,10 @@ class CompareSymTab {
         ns[l] = 0;
         return ns;
     }
-
 public:
     SMemPool * m_pool;
-
 public:
-    CompareSymTab() {}
+    CompareFuncSymTab() {}
 
     bool is_less(Sym const* t1, Sym const* t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
@@ -229,26 +229,34 @@ public:
     }
 };
 
+typedef xcom::TTabIter<Sym*> SymTabIter;
 
-//Note the symbol might be modified by CompareSymTab::createKey(), thus the
+//Note the symbol might be modified by CompareFuncSymTab::createKey(), thus the
 //'const' qualifier of 'Sym*' is unusable.
-class SymTab : public TTab<Sym*, CompareSymTab> {
+class SymTab : public xcom::TTab<Sym*, CompareFuncSymTab> {
     COPY_CONSTRUCTOR(SymTab);
+protected:
     Sym * m_free_one;
     SMemPool * m_pool;
-
 public:
     SymTab()
     {
         m_pool = smpoolCreate(64, MEM_COMM);
         m_free_one = nullptr;
-        TTab<Sym*, CompareSymTab>::m_ck.m_pool = m_pool;
+        xcom::TTab<Sym*, CompareFuncSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
     }
     virtual ~SymTab() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.
     Sym const* add(CHAR const* s);
+
+    //Find const string in symbol table.
+    //Return the Symbol if string existed.
+    Sym * find(CHAR const* s) const;
+
+    //Remove const string from symbol table.
+    void remove(CHAR const* s);
 };
 //END SymTab
 

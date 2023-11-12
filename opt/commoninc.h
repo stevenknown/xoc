@@ -40,12 +40,12 @@ author: Su Zhenyu
 #include <string.h>
 #include <math.h>
 #include "../com/xcominc.h" //libxcom
+#include "symtab.h"
 #include "option.h"
 #include "optctx.h"
 #include "targ_const_info.h"
 #include "logmgr.h"
 #include "util.h"
-#include "symtab.h"
 #include "label.h"
 #include "timer.h"
 #endif

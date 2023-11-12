@@ -40,7 +40,7 @@ Sym const* SymTab::add(CHAR const* s)
         sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
     }
     SYM_name(sym) = const_cast<CHAR*>(s);
-    Sym const* appended_one = TTab<Sym*, CompareSymTab>::append(sym);
+    Sym const* appended_one = xcom::TTab<Sym*, CompareFuncSymTab>::append(sym);
     ASSERT0(m_free_one == nullptr || m_free_one == sym);
     if (appended_one != sym) {
         //'s' has already been appended.
@@ -52,6 +52,25 @@ Sym const* SymTab::add(CHAR const* s)
         m_free_one = nullptr;
     }
     return appended_one;
+}
+
+
+//Find const string in symbol table.
+Sym * SymTab::find(CHAR const* s) const
+{
+    ASSERT0(s);
+    Sym sym;
+    SYM_name(&sym) = const_cast<CHAR*>(s);
+    bool find = false;
+    return xcom::TTab<Sym*, CompareFuncSymTab>::get(&sym, &find);
+}
+
+
+void SymTab::remove(CHAR const* s)
+{
+    Sym * sym = find(s);
+    if (sym == nullptr) { return; }
+    xcom::TTab<Sym*, CompareFuncSymTab>::remove(sym);
 }
 
 } //namespace xoc

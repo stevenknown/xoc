@@ -37,6 +37,10 @@ protected:
     PassMgr * m_pass_mgr;
     IRCFG * m_cfg;
     DUMgr * m_dumgr;
+protected:
+    //The function return true if current region should participate in
+    //optimizations.
+    virtual bool isParticipateInOpt() const;
 public:
     explicit ScalarOpt(Region * rg) : Pass(rg)
     {

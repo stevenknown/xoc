@@ -744,11 +744,12 @@ IR const* FindBIVByRedOp::findInitStmtByClassicDU(IR const* redexp,
                                                   MD const* ivoccmd) const
 {
     //For tmp used, it must be clean before return.
-    IRSet defset(const_cast<IVR*>(m_ivr)->getSegMgr());
-    xoc::collectDefSet(redexp, m_rg, &defset);
-    IR const* domdef = xoc::findNearestDomDef(redexp, defset, m_rg, true);
+    //IRSet defset(const_cast<IVR*>(m_ivr)->getSegMgr());
+    //xoc::collectDefSet(redexp, m_rg, &defset);
+    //CASE: avoid collecting DefSet whenever possible.
+    //IR const* domdef = xoc::findNearestDomDef(redexp, defset, m_rg);
+    IR const* domdef = xoc::findNearestDomDef(redexp, m_rg);
     if (domdef == nullptr) { return nullptr; }
-
     MD const* emd = nullptr;
     if (m_is_only_handle_exact_md) {
         emd = domdef->getExactRef();

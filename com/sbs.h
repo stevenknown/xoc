@@ -401,14 +401,14 @@ public:
 //Sparse BitSet
 //This class encapsulates operations of SBitSetCore, and
 //simply the usage of them.
-//e.g1: No need invoke clean().
+//e.g1: No need to call clean().
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> x(mbsm.getSegMgr());
 //    x.bunion(100);
 //    //No need to explicit invoke x.clean() to free resource, destructor of x
 //    //will do it automatically.
 //
-//e.g2: Must invoke clean() to free resource before destruction.
+//e.g2: Must call clean() to free resource before destruction.
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);

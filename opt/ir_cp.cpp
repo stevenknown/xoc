@@ -99,11 +99,10 @@ bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const
 }
 
 
+//The function try to maintain VN when copy occurred.
 void CopyProp::copyVN(IR const* from, IR const* to) const
 {
-    ASSERT0(m_gvn);
-    if (!m_gvn->is_valid()) { return; }
-    m_gvn->copyVN(from, to);
+    if (useGVN()) { m_gvn->copyVN(from, to); }
 }
 
 
@@ -429,6 +428,7 @@ bool CopyProp::isSimpCVT(IR const* ir) const
 {
     ASSERT0(ir);
     if (!ir->is_cvt()) { return false; }
+    IR const* orgcvt = ir;
     for (;;) {
         if (ir->is_cvt()) {
             ir = CVT_exp(ir);
@@ -439,6 +439,14 @@ bool CopyProp::isSimpCVT(IR const* ir) const
         SWITCH_CASE_DIRECT_MEM_EXP:
         case IR_CONST:
         case IR_LDA:
+            if (orgcvt->is_fp() && ir->is_fp() &&
+                orgcvt->getType() != ir->getType()) {
+                //Different float point type conversion can not be skipped.
+                //CASE: $1:f64 = cvt:fp64 ($2:fp32)
+                //      ... = $1:64 #USE
+                //Where $2:f32 can NOT be propagated to $1 because of type.
+                return false;
+            }
             return true;
         default:
             return false;
@@ -453,7 +461,7 @@ bool CopyProp::isSimpCVT(IR const* ir) const
 IR const* CopyProp::getSimpCVTValue(IR const* ir) const
 {
     if (!ir->is_cvt()) { return nullptr; }
-
+    IR const* orgcvt = ir;
     for (;;) {
         if (ir->is_cvt()) {
             ir = CVT_exp(ir);
@@ -464,6 +472,14 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
         SWITCH_CASE_READ_PR:
         case IR_CONST:
         case IR_LDA:
+            if (orgcvt->is_fp() && ir->is_fp() &&
+                orgcvt->getType() != ir->getType()) {
+                //Different float point type conversion can not be skipped.
+                //CASE: $1:f64 = cvt:fp64 ($2:fp32)
+                //      ... = $1:64 #USE
+                //Where $2:f32 can NOT be propagated to $1 because of type.
+                ASSERT0(0);
+            }
             return ir;
         default:
             return nullptr;
@@ -673,6 +689,14 @@ IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
         //For now, we will not disgard CVT for conservative purpose.
         return prop_value;
     }
+    if (prop_value->is_fp() && leaf->is_fp() &&
+        prop_value->getType() != leaf->getType()) {
+        //Different float point type conversion can not be skipped.
+        //CASE: $1:f64 = cvt:fp64 ($2:fp32)
+        //      ... = $1:64 #USE
+        //Where $2:f32 can NOT be propagated to $1 because of type.
+        return prop_value;
+    }
     //Regard leaf expression as the propagate candidate.
     return leaf;
 }
@@ -755,6 +779,8 @@ bool CopyProp::doPropUseSet(IRSet const& useset, IR const* def_stmt,
         IR const* new_prop_value = pickUpCandExp(prop_value, use, def_stmt,
                                                  curit, prssadu, mdssadu);
         if (new_prop_value == nullptr) { continue; }
+        IR const* nearest_def = xoc::findNearestDomDef(use, m_rg);
+        if (nearest_def != def_stmt) { continue; }
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
             dumpCopyPropAction(def_stmt, new_prop_value, use);
         }
@@ -817,6 +843,7 @@ bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet & useset)
 
 static void refinement(Region * rg, OptCtx & oc)
 {
+    if (!g_do_refine) { return; }
     RefineCtx rf(&oc);
     RC_insert_cvt(rf) = false;
     Refine * refine = (Refine*)rg->getPassMgr()->registerPass(PASS_REFINE);
@@ -858,9 +885,12 @@ bool CopyProp::perform(OptCtx & oc)
     DUMMYUSE(is_org_pr_du_chain_valid);
     DUMMYUSE(is_org_nonpr_du_chain_valid);
     if (!oc.is_ref_valid()) { return false; }
+    if (is_aggressive() && g_do_gvn) {
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_GVN, PASS_UNDEF);
+    }
     m_oc = &oc;
-    m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);
-    if (!m_gvn->is_valid()) {
+    m_gvn = (GVN*)m_rg->getPassMgr()->queryPass(PASS_GVN);
+    if (m_gvn != nullptr && !m_gvn->is_valid()) {
         if (allowInexactMD()) {
             //Aggressive CP need GVN.
             m_gvn->perform(oc);

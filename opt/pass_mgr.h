@@ -39,9 +39,9 @@ namespace xoc {
 class AliasAnalysis;
 class DUMgr;
 
-typedef TMap<PASS_TYPE, Pass*> PassTab;
-typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
-typedef List<PASS_TYPE> PassTypeList;
+typedef xcom::TMap<PASS_TYPE, Pass*> PassTab;
+typedef xcom::TMapIter<PASS_TYPE, Pass*> PassTabIter;
+typedef xcom::List<PASS_TYPE> PassTypeList;
 
 class PassMgr {
     COPY_CONSTRUCTOR(PassMgr);

@@ -2429,7 +2429,7 @@ IR * Refine::refineDet(IR * ir, bool & change, RefineCtx & rc)
 //NOTICE:
 //  While m_rg function completed, IR's parent-pointer would be
 //  overrided, setParentPointer() should be invoked at all.
-IR * Refine::refineIRlist(IR * ir_list, bool & change, RefineCtx & rc)
+IR * Refine::refineIRlist(IR * ir_list, bool & change, MOD RefineCtx & rc)
 {
     bool lchange = true; //local flag
     while (lchange) {
@@ -3001,13 +3001,12 @@ bool Refine::dump() const
 }
 
 
-bool Refine::perform(OptCtx & oc)
+bool Refine::perform(OptCtx & oc, MOD RefineCtx & rc)
 {
     bool change = false;
     if (m_rg->getIRList() != nullptr) {
         //Do primitive refinement.
         START_TIMER(t, "Do Primitive Refinement");
-        RefineCtx rc(&oc);
         IR * irs = refineIRlist(m_rg->getIRList(), change, rc);
         ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
         m_rg->setIRList(irs);
@@ -3020,13 +3019,19 @@ bool Refine::perform(OptCtx & oc)
 
     //Do primitive refinement.
     START_TIMER(t, "Do Primitive Refinement");
-    RefineCtx rf(&oc);
-    change = refineBBlist(m_rg->getBBList(), rf);
+    change = refineBBlist(m_rg->getBBList(), rc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefine()) {
         dump();
     }
     END_TIMER(t, "Do Primitive Refinement");
     return change;
+}
+
+
+bool Refine::perform(OptCtx & oc)
+{
+    RefineCtx rc(&oc);
+    return perform(oc, rc);
 }
 //END Refine
 

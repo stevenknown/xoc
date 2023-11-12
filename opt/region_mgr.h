@@ -143,8 +143,16 @@ public:
     UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
     RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
-    MD const* genDedicateStrMD();
 
+    //The function generates a dedicated MD to intend to represent string md.
+    //Note the function regards all string variables as the same unbound MD.
+    //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+    //There is a function allocates 3000+ string variable.
+    //Each string has been taken address.
+    //That will inflate may_point_to_set too much.
+    //In this situation, AA can be conservatively regard all string variables
+    //as same unbounded MD.
+    MD const* genDedicateStrMD();
     MDSystem * getMDSystem() { return m_md_sys; }
     SymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
@@ -185,6 +193,17 @@ public:
     bool isLogMgrInit() const
     { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }
 
+    //Return true if all compilation process to regard all
+    //string variables as a same unbound MD.
+    //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+    //There is a function allocates 3000+ string variable.
+    //Each string has been taken address.
+    //That will inflate may_point_to_set too much.
+    //In this situation, AA can be conservatively regard all string variables
+    //as same unbounded MD.
+    bool isRegardAllStringAsSameMD() const
+    { return m_is_regard_str_as_same_md; }
+
     Region * newRegion(REGION_TYPE rt);
 
     //Note m_targinfo will be destructed when RegionMgr is destructed.
@@ -204,6 +223,17 @@ public:
     virtual bool processProgramRegion(IN Region * program, OptCtx * oc);
 
     void setProgramRegion(Region * rg) { m_program = rg; }
+
+    //The function will demand all compilation process to regard all
+    //string variables as a same unbound MD.
+    //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+    //There is a function allocates 3000+ string variable.
+    //Each string has been taken address.
+    //That will inflate may_point_to_set too much.
+    //In this situation, AA can be conservatively regard all string variables
+    //as same unbounded MD.
+    void setRegardAllStringAsSameMD(bool doit)
+    { m_is_regard_str_as_same_md = doit; }
 
     bool verifyPreDefinedInfo();
 };

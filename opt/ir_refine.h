@@ -246,16 +246,16 @@ public:
 
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.
-    IR * refineIRlist(IR * ir_list, bool & change, RefineCtx & rc);
+    IR * refineIRlist(IR * ir_list, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to ir.
     //Return updated ir if optimization performed.
-    virtual IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineIR(IR * ir, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to ir over and over again until the result
     //ir do not change any more.
     //Return updated ir if optimization performed.
-    IR * refineIRUntilUnchange(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIRUntilUnchange(IR * ir, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to BB list.
     //BB list will be updated if optimization performed.
@@ -265,6 +265,7 @@ public:
     //Refine select for different architectures.
     virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
 
+    bool perform(OptCtx & oc, MOD RefineCtx & rc);
     virtual bool perform(OptCtx & oc);
 };
 

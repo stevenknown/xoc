@@ -1752,15 +1752,14 @@ bool LICM::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
+    PassTypeList optlist;
+    optlist.append_tail(PASS_DOM);
+    optlist.append_tail(PASS_LOOP_INFO);
     if (is_aggressive()) {
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_GVN,
-                                                   PASS_RCE, PASS_LOOP_INFO,
-                                                   PASS_UNDEF);
-    } else {
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_GVN,
-                                                   PASS_LOOP_INFO,
-                                                   PASS_UNDEF);
+        if (g_do_gvn) { optlist.append_tail(PASS_GVN); }
+        if (g_do_rce) { optlist.append_tail(PASS_DOM); }
     }
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, optlist);
     m_rce = (RCE*)m_rg->getPassMgr()->queryPass(PASS_RCE);
     if (m_rce != nullptr && m_rce->is_use_gvn()) {
         GVN * gvn = (GVN*)m_rg->getPassMgr()->queryPass(PASS_GVN);

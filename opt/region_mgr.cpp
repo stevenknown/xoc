@@ -48,7 +48,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_label_count = LABEL_ID_UNDEF + 1;
     m_var_mgr = nullptr;
     m_md_sys = nullptr;
-    m_is_regard_str_as_same_md = true;
+    m_is_regard_str_as_same_md = false;
     m_str_md = nullptr;
     m_targinfo = nullptr;
     m_program = nullptr;
@@ -108,14 +108,6 @@ OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 }
 
 
-//Try to generate a MD to represent dedicated string md.
-//In case,
-//e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
-//There is a function allocates 3000+ string variable.
-//Each string has been taken address.
-//That will inflate may_point_to_set too much.
-//In this situation, AA can be conservatively regard all string variables
-//as same unbounded MD.
 MD const* RegionMgr::genDedicateStrMD()
 {
     if (!m_is_regard_str_as_same_md) { return nullptr; }

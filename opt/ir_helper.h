@@ -32,6 +32,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 typedef xcom::SEGIter * IRSetIter;
+
+//The class repesents a set of IR stmt.
+//Note the class will free resource before destruction and no need to call
+//clean().
 class IRSet : public xcom::DefSBitSet {
     COPY_CONSTRUCTOR(IRSet);
 public:
