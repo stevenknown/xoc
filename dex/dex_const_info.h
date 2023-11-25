@@ -109,9 +109,6 @@ author: Su Zhenyu
 //false: from left to right
 #define PUSH_PARAM_FROM_RIGHT_TO_LEFT true
 
-//The number of registers which be used to store return value.
-#define NUM_OF_RETURN_VAL_REGISTERS 2
-
 //Define whether target machine support predicate register.
 //Note the first opnd must be predicate register if target support.
 #define HAS_PREDICATE_REGISTER false

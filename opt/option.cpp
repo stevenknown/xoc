@@ -47,7 +47,7 @@ bool g_enable_local_var_delegate = false;
 bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
-bool g_do_refine_auto_insert_cvt = false;
+bool g_insert_cvt = false;
 bool g_do_loop_ana = true;
 bool g_do_cfg_remove_redundant_label = true;
 bool g_do_cfg_remove_empty_bb = true;
@@ -440,6 +440,12 @@ bool DumpOption::isDumpRefineDUChain() const
 }
 
 
+bool DumpOption::isDumpInsertCvt() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_insert_cvt);
+}
+
+
 bool DumpOption::isDumpRefine() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine);
@@ -494,8 +500,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_cfg = %s", g_do_cfg ? "true":"false");
     note(lm, "\ng_do_rpo = %s", g_do_rpo ? "true":"false");
     note(lm, "\ng_do_refine = %s", g_do_refine ? "true":"false");
-    note(lm, "\ng_do_refine_auto_insert_cvt = %s",
-         g_do_refine_auto_insert_cvt ? "true":"false");
+    note(lm, "\ng_insert_cvt = %s",
+         g_insert_cvt ? "true":"false");
     note(lm, "\ng_do_loop_ana = %s", g_do_loop_ana ? "true":"false");
     note(lm, "\ng_do_cfg_remove_redundant_label = %s",
          g_do_cfg_remove_redundant_label ? "true":"false");

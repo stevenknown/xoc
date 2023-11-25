@@ -283,14 +283,19 @@ bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
 //     relation between 'def' and 'use' through gvn info.
 bool isKillingDef(IR const* def, IR const* use, GVN const* gvn);
 
-//Return true if def is killing-def of usemd.
-//Note this function does not check if there is DU chain between def and usemd.
-bool isKillingDef(IR const* def, MD const* usemd);
+//Return true if ir1's MD reference exactly cover ir2's MD reference.
+//Note the function does not check if there is DU chain between ir1 and ir2.
+//gvn:if it is not NULL, the function will attempt to reason out the
+//    relation between 'ir1' and 'ir2' through gvn info.
+bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn);
 
-//Return true if defmd is killing-def MD of usemd.
-//Note this function does not check if there is DU chain between defmd
-//and usemd.
-bool isKillingDef(MD const* defmd, MD const* usemd);
+//Return true if ir1's MD reference exactly cover md2.
+//Note the functin does not check if there is DU chain between ir1 and md2.
+bool isCover(IR const* ir1, MD const* md2);
+
+//Return true if md1 exactly cover md2.
+//Note the functin does not check if there is DU chain between md1 and md2.
+bool isCover(MD const* md1, MD const* md2);
 
 //Return true if ir1 reference is may overlap to ir2.
 //ir1: stmt or expression.

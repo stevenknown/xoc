@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #ifndef __MACH_OPTION_H__
-#define __NACH_OPTION_H__
+#define __MACH_OPTION_H__
 
 namespace mach {
 

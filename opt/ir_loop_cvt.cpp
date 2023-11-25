@@ -105,15 +105,15 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     IR * last_cond_br = nullptr;
     DUSetIter di = nullptr;
     Vector<IR*> rmvec;
-    for (IR * ir = BB_first_ir(head); ir != nullptr; ir = BB_next_ir(head)) {
+    BBIRListIter it;
+    for (IR * ir = head->getIRList().get_head(&it);
+         ir != nullptr; ir = head->getIRList().get_next(&it)) {
         IR * newir = m_rg->dupIRTree(ir);
         m_dumgr->addUseForTree(newir, ir);
-
         m_ii.clean();
         for (IR const* x = xoc::iterExpInitC(ir, m_ii);
              x != nullptr; x = xoc::iterExpNextC(m_ii)) {
             if (!x->isMemRef()) { continue; }
-
             UINT cnt = 0;
             if (x->isReadPR() && PR_ssainfo(x) != nullptr) {
                 IR * def = SSA_def(PR_ssainfo(x));
@@ -135,7 +135,6 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                     }
                 }
             }
-
             if (cnt != 0) {
                 for (UINT i = 0; i < cnt; i++) {
                     IR * d = rmvec.get(i);

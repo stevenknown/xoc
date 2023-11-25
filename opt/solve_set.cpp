@@ -1382,7 +1382,7 @@ static void dumpIRSet(Region const* rg, SolveSet const* set,
 {
     if (set == nullptr) { return; }
     ASSERT0(rg->isLogMgrInit());
-    StrBuf buf(32);
+    xcom::StrBuf buf(32);
     buf.strcat("%s:(%lubyte) ", set_name, (ULONG)set->count_mem());
     note(rg, "\n%s", buf.buf);
     SolveSetIter it = nullptr;
@@ -1390,7 +1390,7 @@ static void dumpIRSet(Region const* rg, SolveSet const* set,
          i != BS_UNDEF; i = set->get_next(i, &it)) {
         IR * ir = rg->getIR(i);
         ASSERT0(ir);
-        prt(rg, "%s(id:%d), ", IRNAME(ir), ir->id());
+        prt(rg, "%s, ", dumpIRName(ir, buf));
     }
     if (is_dump_bs) {
         rg->getLogMgr()->incIndent(ind);

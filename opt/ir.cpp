@@ -970,57 +970,24 @@ void IR::dumpRef(Region * rg, UINT indent)
 }
 
 
-//Return true if current ir and ir2 represent different memory location,
-//otherwise return false to tell caller we do not know more about these object.
-//Note this function will consider data type that current ir or ir2
-//referrenced.
-bool IR::isDiffMemLoc(IR const* ir2, Region const* rg) const
-{
-    IR const* ir1 = this;
-    ASSERT0(ir1 && ir2);
-    if (ir1 == ir2) { return false; }
-    if (ir1->isDirectMemOp() && ir2->isDirectMemOp()) {
-        return ir1->isNotOverlapViaMDRef(ir2, rg);
-    }
-    if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
-        return ir1->isNotOverlapViaMDRef(ir2, rg);
-    }
-    if (ir1->isArrayOp() && ir2->isArrayOp()) {
-        IR const* base1 = ARR_base(ir1);
-        IR const* base2 = ARR_base(ir2);
-        if (base1->is_lda() && base2->is_lda() &&
-            base1->getIdinfo() != base2->getIdinfo()) {
-            return true;
-        }
-        return ir1->isNotOverlapViaMDRef(ir2, rg);
-    }
-    return ir1->isNotOverlapViaMDRef(ir2, rg);
-}
-
-
 //Return true if current ir does not overlap to ir2.
 //ir2: stmt or expression to be compared.
 //Note this function is different to isNotOverlap(), it determines overlapping
 //through MD and MDSet references.
-bool IR::isNotOverlapViaMDRef(IR const* ir2, Region const* rg) const
+bool IR::isNotOverlapByMDRef(IR const* ir2, Region const* rg) const
 {
     MD const* must1 = getRefMD();
     MD const* must2 = ir2->getRefMD();
     MDSet const* may1 = getRefMDSet();
     MDSet const* may2 = ir2->getRefMDSet();
     if (must1 != nullptr && must2 != nullptr) {
-        if (!must1->is_may() && !must2->is_may()) {
-            //CASE: the MustRef of ID may be GLOBAL_MEM or IMPORT_MEM.
-            return !(must1 == must2 || must1->is_overlap(must2));
-        }
-        //Need to do more judgement.
+        //CASE: the MustRef of ID may be GLOBAL_MEM or IMPORT_MEM.
+        return !(must1 == must2 || must1->is_overlap(must2));
     }
-    if (must1 != nullptr && may2 != nullptr && must1->is_taken_addr() &&
-        may2->is_contain(must1, rg)) {
+    if (must1 != nullptr && may2 != nullptr && may2->is_contain(must1, rg)) {
         return false;
     }
-    if (must2 != nullptr && may1 != nullptr && must2->is_taken_addr() &&
-        may1->is_contain(must2, rg)) {
+    if (must2 != nullptr && may1 != nullptr && may1->is_contain(must2, rg)) {
         return false;
     }
     if (may1 != nullptr && may2 != nullptr &&

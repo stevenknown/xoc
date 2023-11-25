@@ -415,16 +415,6 @@ void InsertGuardHelper::replaceUseOfGuardedStmt(IR * guarded, IR * phi) const
 }
 
 
-//Insert PHI for stmt in guarded BB to keep legality of SSA information.
-//Note DOM info must be valid.
-//e.g:given guarded stmt in loop body is $15=...
-//  after moving to guarded BB, the layout will be:
-//       GuardBranchCondition
-//      /       |
-//  #GuardBB:   |
-//  $15=...     |
-//      \       |
-//       $45 phi=...
 void InsertGuardHelper::insertPhiForGuardedBB(DomTree const& domtree)
 {
     ASSERT0(m_guarded_bb);

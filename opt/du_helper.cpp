@@ -845,7 +845,7 @@ CLASSIC_DU:
     ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
     GVN * gvn = (GVN*)rg->getPassMgr()->queryPass(PASS_GVN);
     IR * domdef = rg->getDUMgr()->findNearestDomDef(exp);
-    if (isKillingDef(domdef, exp, gvn)) {
+    if (domdef != nullptr && isKillingDef(domdef, exp, gvn)) {
         return domdef;
     }
     return nullptr;
@@ -882,6 +882,27 @@ bool isUniqueDefInLoopForMustRef(IR const* ir, LI<IRBB> const* li,
 }
 
 
+//Return true if ir1 is exact-cover of ir2 MD reference.
+//Note this function does not check if there is DU chain between ir1 and ir2.
+//gvn:if it is not NULL, the function will attempt to reason out the
+//    relation between 'ir1' and 'ir2' through GVN info.
+static bool isCoverExcludeCallStmt(IR const* ir1, IR const* ir2, GVN const* gvn)
+{
+    MD const* mustir2md = ir2->getMustRef();
+    if (mustir2md != nullptr && isCover(ir1, mustir2md)) {
+        return true;
+    }
+    if (gvn == nullptr || !gvn->is_valid()) { return false; }
+    if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
+        return hasSameValueIndirectOp(ir1, ir2, gvn);
+    }
+    if (ir1->isArrayOp() && ir2->isArrayOp()) {
+        return hasSameValueArrayOp(ir1, ir2, gvn);
+    }
+    return false;
+}
+
+
 //Return true if def is killing-def of use.
 //Note this functin does not check if there is DU chain between def and use.
 //gvn: if it is not NULL, the function will attempt to reason out the
@@ -895,42 +916,53 @@ bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
         //Can not determine whether call-stmt must def 'use'.
         return false;
     }
-    MD const* mustusemd = use->getMustRef();
-    if (mustusemd != nullptr && isKillingDef(def, mustusemd)) {
-        return true;
-    }
-    if (gvn == nullptr || !gvn->is_valid()) { return false; }
-    if (def->isIndirectMemOp() && use->isIndirectMemOp()) {
-        return hasSameValueIndirectOp(def, use, gvn);
-    }
-    if (def->isArrayOp() && use->isArrayOp()) {
-        return hasSameValueArrayOp(def, use, gvn);
-    }
-    return false;
+    return isCoverExcludeCallStmt(def, use, gvn);
 }
 
 
-//Return true if def is killing-def of usemd.
-//Note this functin does not check if there is DU chain between def and usemd.
-bool isKillingDef(IR const* def, MD const* usemd)
+//Return true if ir1's MD reference exactly cover ir2's MD reference.
+//Note the function does not check if there is DU chain between ir1 and ir2.
+//gvn:if it is not NULL, the function will attempt to reason out the
+//    relation between 'ir1' and 'ir2' through gvn info.
+bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn)
 {
-    ASSERT0(def && usemd);
-    MD const* mustdefmd = def->getMustRef();
-    if (mustdefmd == nullptr) { return false; }
-    return isKillingDef(mustdefmd, usemd);
+    if (ir1->is_stmt() && ir2->is_exp()) {
+        return isKillingDef(ir1, ir2, gvn);
+    }
+    if (ir2->is_stmt() && ir1->is_exp()) {
+        return isKillingDef(ir2, ir1, gvn);
+    }
+    ASSERTN((ir1->is_stmt() && ir2->is_stmt()) ||
+            (ir1->is_exp() && ir2->is_exp()),
+            ("ir1 and ir2 must both be stmt or exp"));
+    if (ir1->isCallStmt() && const_cast<IR*>(ir1)->getResultPR() == nullptr) {
+        //Only return-value of call-stmt may generate covering info.
+        return false;
+    }
+    if (ir2->isCallStmt() && const_cast<IR*>(ir2)->getResultPR() == nullptr) {
+        //Only return-value of call-stmt may generate covering info.
+        return false;
+    }
+    return isCoverExcludeCallStmt(ir1, ir2, gvn);
 }
 
 
-//Return true if defmd is killing-def MD of usemd.
-//Note this functin does not check if there is DU chain between defmd and usemd.
-bool isKillingDef(MD const* defmd, MD const* usemd)
+//Return true if ir1's MD reference exactly cover md2.
+//Note the functin does not check if there is DU chain between ir1 and md2.
+bool isCover(IR const* ir1, MD const* md2)
 {
-    ASSERT0(defmd && usemd);
-    if (defmd != nullptr &&
-        usemd != nullptr &&
-        defmd->is_exact() &&
-        (defmd == usemd || defmd->is_exact_cover(usemd))) {
-        //def is killing must-def.
+    ASSERT0(ir1 && md2);
+    MD const* mustir1md = ir1->getMustRef();
+    if (mustir1md == nullptr) { return false; }
+    return isCover(mustir1md, md2);
+}
+
+
+bool isCover(MD const* md1, MD const* md2)
+{
+    ASSERT0(md1 && md2);
+    if (md1 != nullptr && md2 != nullptr && md1->is_exact() &&
+        (md1 == md2 || md1->is_exact_cover(md2))) {
         return true;
     }
     return false;
@@ -946,7 +978,6 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         PRSSAMgr::movePhi(from, to);
     }
-
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->movePhi(from, to);
@@ -1221,7 +1252,7 @@ static bool hasLoopReduceDepInPRSSA(IR const* ir, Region const* rg,
     ASSERT0(defmd);
     MD const* irmd = ir->getMustRef();
     ASSERT0(irmd);
-    if (isKillingDef(defmd, irmd)) { return false; }
+    if (isCover(defmd, irmd)) { return false; }
 
     //It may be exist loop carried dependence if there is a MayDef between
     //ir and its Def in the DefDef Chain.
@@ -1249,7 +1280,7 @@ static bool hasLoopReduceDepInMDSSA(IR const* ir, Region const* rg,
     ASSERT0(defmd);
     MD const* irmd = ir->getMustRef();
     ASSERT0(irmd);
-    if (isKillingDef(defmd, irmd)) { return false; }
+    if (isCover(defmd, irmd)) { return false; }
 
     //It may be exist loop carried dependence if there is a MayDef between
     //ir and its Def in the DefDef Chain.
@@ -1498,14 +1529,15 @@ bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
     MDSet const* may1 = ir1->getMayRef();
     MD const* must2 = ir2->getMustRef();
     MDSet const* may2 = ir2->getMayRef();
-    //Compare MustRef firstly.
     if (must1 != nullptr) {
-        if (must2 != nullptr) {
+        if (must2 != nullptr && !must1->is_may() && !must2->is_may()) {
+            //CASE: the MustRef of ID may be GLOBAL_MEM or IMPORT_MEM.
             return must1 == must2 || must1->is_overlap(must2);
         }
         if (may2 != nullptr) {
             if (costly_analysis) {
-                //The function will iterate elements in MDSet, which is costly.
+                //The function will iterate all elements in MDSet,
+                //which is costly.
                 return may2->is_overlap_ex(must1, rg, rg->getMDSystem());
             }
             return may2->is_contain(must1, rg);
@@ -1515,7 +1547,8 @@ bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
     if (may1 != nullptr) {
         if (must2 != nullptr) {
             if (costly_analysis) {
-                //The function will iterate elements in MDSet, which is costly.
+                //The function will iterate all elements in MDSet,
+                //which is costly.
                 return may1->is_overlap_ex(must2, rg, rg->getMDSystem());
             }
             return may1->is_contain(must2, rg);
@@ -1700,8 +1733,9 @@ void ComputeMD2DefCnt::dump() const
 void ComputeMD2DefCnt::computeBB(IRBB const* bb, OUT ConstIRList & only_maydef)
 {
     IRBB * pbb = const_cast<IRBB*>(bb);
-    for (IR const* ir = BB_first_ir(pbb);
-         ir != nullptr; ir = BB_next_ir(pbb)) {
+    BBIRListIter it;
+    for (IR * ir = pbb->getIRList().get_head(&it);
+         ir != nullptr; ir = pbb->getIRList().get_next(&it)) {
         updateMD2DefCnt(ir, only_maydef);
     }
 }

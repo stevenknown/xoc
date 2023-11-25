@@ -532,7 +532,7 @@ public:
     // The function just determine overlapping of given two IR according to
     // their data-type and offset.
     bool isNotOverlap(IR const* ir2, Region const* rg) const;
-    bool isNotOverlapViaMDRef(IR const* ir2, Region const* rg) const;
+    bool isNotOverlapByMDRef(IR const* ir2, Region const* rg) const;
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR is no-movable.
@@ -848,12 +848,6 @@ public:
     //Return true if current operation references memory except the PR memory.
     bool isMemRefNonPR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
-
-    //Return true if current ir and ir2 represent different memory location,
-    //otherwise return false to tell caller we do not know more about these
-    //object. Note this function will consider data type that current ir or ir2
-    //referrenced.
-    bool isDiffMemLoc(IR const* ir2, Region const* rg) const;
 
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }

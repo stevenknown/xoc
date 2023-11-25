@@ -557,8 +557,9 @@ void FindBIVByChainRec::findByPRSSA()
     IRBB * head = m_li->getLoopHead();
     ASSERT0(head);
     if (m_cfg->getPredsNum(head) != 2) { return; }
-    for (IR const* phi = BB_first_ir(head);
-         phi != nullptr; phi = BB_next_ir(head)) {
+    BBIRListIter it;
+    for (IR const* phi = head->getIRList().get_head(&it);
+         phi != nullptr; phi = head->getIRList().get_next(&it)) {
         if (!phi->is_phi()) { break; }
         IR const* init = nullptr;
         IR const* step = nullptr;
@@ -816,6 +817,7 @@ bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
 {
     IR const* def = nullptr;
     ASSERT0(ir->isMemRef());
+    xcom::StrBuf tmp(8);
     if (ir->isPROp() && usePRSSADU()) {
         def = findInitStmtByPRSSA(ir, li);
     } else if (useMDSSADU()) {
@@ -830,9 +832,9 @@ bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
         return m_ivr->computeInitVal(def, val);
     }
     ctx.dumpAct(
-        "FIND_BIV_INIT_VAL:IR %s id:%u is BIV, however can not find "
+        "FIND_BIV_INIT_VAL:IR %s is BIV, however can not find "
         "its initial value",
-        IRNAME(ir), ir->id());
+        dumpIRName(ir, tmp));
     return false;
 }
 
@@ -885,12 +887,13 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
     ASSERT0(def->is_stmt());
     if (!lr.isValidAddendSign()) { return false; }
     if (!lr.hasVar()) { return false; }
+    xcom::StrBuf tmp(8);
     MD const* bivref = def->getMustRef();
     if (m_is_only_handle_exact_md &&
         (!bivref->is_exact() || lr.getVarExp()->getExactRef() == nullptr)) {
         ctx.dumpAct(
-            "FIND_BIV:IR %s id:%u in LOOP%u does not have exact MD",
-            IRNAME(def), def->id(), m_li->id());
+            "FIND_BIV:%s in LOOP%u does not have exact MD",
+            dumpIRName(def, tmp), m_li->id());
         return false;
     }
     IR const* addend = lr.addend;
@@ -898,8 +901,8 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
         ASSERT0(m_ivr->canBeAddend(li, addend));
     } else if (g_is_support_dynamic_type && addend->is_const()) {
         //TODO: support dynamic const type as the addend of ADD/SUB.
-        ctx.dumpAct("FIND_BIV:Addend IR %s id:%u is any-type",
-                    IRNAME(addend), addend->id());
+        ctx.dumpAct("FIND_BIV:Addend %s is ANY-type",
+                    dumpIRName(addend, tmp));
         return false;
     } else {
         return false;
@@ -1126,6 +1129,7 @@ void FindBIVByRedOp::find()
             "FIND_BIV:LOOP%u does not have back-edge BB", m_li->id());
         return;
     }
+    xcom::StrBuf tmp(8);
     for (BSIdx i = m_li->getBodyBBSet()->get_first();
          i != BS_UNDEF; i = m_li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
@@ -1135,7 +1139,9 @@ void FindBIVByRedOp::find()
             m_ivrctx.dumpAct("FIND_BIV:BB%u is not in necessary path", i);
             continue;
         }
-        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter it;
+        for (IR * ir = bb->getIRList().get_head(&it);
+             ir != nullptr; ir = bb->getIRList().get_next(&it)) {
             if (ir->isCallStmt()) {
                 //TODO: callstmt may be intrinsic operation.
                 continue;
@@ -1148,8 +1154,8 @@ void FindBIVByRedOp::find()
             IVLinearRep lr;
             if (!isReductionOp(ir, m_li, &lr)) {
                 m_ivrctx.dumpAct(
-                    "FIND_BIV:IR %s id:%u in LOOP%u is not reduction-op",
-                    IRNAME(ir), ir->id(), m_li->id());
+                    "FIND_BIV:%s in LOOP%u is not reduction-op",
+                    dumpIRName(ir, tmp), m_li->id());
                 continue;
             }
             BIV * biv = nullptr;
@@ -1272,10 +1278,11 @@ bool FindDIV::findByCRRecur(IR const* ir, OUT ChainRec & cr)
 bool FindDIV::findByCR(IR const* ir)
 {
     ChainRec cr;
+    xcom::StrBuf tmp(8);
     if (!findByCRRecur(ir, cr)) {
         m_ivrctx.dumpAct(
-            "FIND_DIV:IR %s id:%u in LOOP%u is not chain-rec of any IV",
-            IRNAME(ir), ir->id(), m_li->id());
+            "FIND_DIV:%s in LOOP%u is not chain-rec of any IV",
+            dumpIRName(ir, tmp), m_li->id());
         return false;
     }
     ChainRec * pcr = m_ivr->allocChainRec();
@@ -1314,10 +1321,11 @@ bool FindDIV::findByLinRep(IR const* ir)
 {
     ASSERT0(ir->is_exp());
     IVLinearRep lr;
+    xcom::StrBuf tmp(8);
     if (!m_ivr->isLinearRepOfIV(m_li, ir, &lr)) {
         m_ivrctx.dumpAct(
-            "FIND_DIV:IR %s id:%u in LOOP%u is not linear-rep of any IV",
-            IRNAME(ir), ir->id(), m_li->id());
+            "FIND_DIV:%s in LOOP%u is not linear-rep of any IV",
+            dumpIRName(ir, tmp), m_li->id());
         return false;
     }
     ASSERT0(lr.is_valid());
@@ -1332,6 +1340,7 @@ bool FindDIV::findByLinRep(IR const* ir)
 void FindDIV::findByStmt(IR * ir, ComputeMD2DefCnt const& md2defcnt,
                          OUT IRSet & set)
 {
+    xcom::StrBuf tmp(8);
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
@@ -1343,8 +1352,8 @@ void FindDIV::findByStmt(IR * ir, ComputeMD2DefCnt const& md2defcnt,
         }
         if (!md2defcnt.isUniqueDef(ir)) {
             m_ivrctx.dumpAct(
-                "FIND_DIV:IR %s id:%u in LOOP%u does not have unique DEF",
-                IRNAME(ir), ir->id(), m_li->id());
+                "FIND_DIV:%s in LOOP%u does not have unique DEF",
+                dumpIRName(ir, tmp), m_li->id());
             return;
         }
         if (findByLinRep(ir->getRHS())) {
@@ -1603,7 +1612,7 @@ void IVBoundInfo::dump(Region const* rg) const
     } else {
         IR const* exp = IVBI_tc_exp(*this);
         ASSERT0(exp && exp->is_exp());
-        buf.strcat("\nTRIPCOUNT IS EXP:", IRNAME(exp), exp->id());
+        buf.strcat("\nTRIPCOUNT IS EXP:");
         {
             DumpBufferSwitch buff(rg->getLogMgr());
             xoc::dumpIR(exp, rg);
@@ -2000,7 +2009,7 @@ IR const* IVR::findBIVBoundStmt(LI<IRBB> const* li, OUT BIV const** biv,
     }
     //Loop head can not change the control flow of loop.
     //The loop head must be inside the loop body.
-    List<UINT> endlst;
+    xcom::List<UINT> endlst;
     li->findAllLoopEndBB(m_cfg, endlst);
     if (endlst.get_elem_count() > 1) {
         ivrctx.dumpAct("there are multiple exit BBs in LoopInfo %u", li->id());
@@ -2023,8 +2032,9 @@ IR const* IVR::findBIVBoundStmt(LI<IRBB> const* li, OUT BIV const** biv,
         }
     }
     if (biv != nullptr) { *biv = nullptr; }
-    ivrctx.dumpAct("IR %s id:%u in BB%u is not end-bound-stmt for any IV",
-                   IRNAME(bstmt), bstmt->id(), bbid);
+    xcom::StrBuf tmp(8);
+    ivrctx.dumpAct("%s in BB%u is not end-bound-stmt for any IV",
+                   dumpIRName(bstmt, tmp), bbid);
     return nullptr;
 }
 

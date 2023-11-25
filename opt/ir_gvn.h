@@ -707,12 +707,6 @@ public:
     //that ir1 or ir2 referrenced.
     bool isSameMemLoc(IR const* ir1, IR const* ir2) const;
 
-    //Return true if ir1 and ir2 represent different memory location, otherwise
-    //return false to tell caller we do not know more about these object.
-    //Note this function will consider data type that ir1 or ir2 referrenced.
-    bool isDiffMemLoc(IR const* ir1, IR const* ir2) const
-    { return ir1->isDiffMemLoc(ir2, m_rg); }
-
     //Return true if GVN will alloc different VN for livein variable.
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }
 

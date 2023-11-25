@@ -58,6 +58,7 @@ public:
 //
 void DCECtx::dump(Region const* rg) const
 {
+    xcom::StrBuf tmp(8);
     note(rg, "\n==-- DUMP DCECtx --==");
     note(rg, "\nEFFECT BB:");
     for (BSIdx i = m_effect_bb.get_first();
@@ -71,7 +72,7 @@ void DCECtx::dump(Region const* rg) const
          i != BS_UNDEF; i = m_effect_stmt.get_next(i)) {
         IR const* ir = rg->getIR(i);
         ASSERT0(ir);
-        prt(rg, "%s:%u ", IRNAME(ir), ir->id());
+        prt(rg, "%s ", dumpIRName(ir, tmp));
     }
 }
 //END DCECtx
@@ -234,8 +235,9 @@ void DeadCodeElim::mark_effect_ir(MOD List<IR const*> & work_list,
     BBListIter ct;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != nullptr; bb = bbl->get_next(&ct)) {
-        for (IR const* ir = BB_first_ir(bb);
-             ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter irit;
+        for (IR const* ir = bb->getIRList().get_head(&irit);
+             ir != nullptr; ir = bb->getIRList().get_next(&irit)) {
             switch (ir->getCode()) {
             case IR_REGION:
                 //The redundant of Region should be processed in IPA

@@ -403,6 +403,12 @@ Pass * PassMgr::allocRefine()
 }
 
 
+Pass * PassMgr::allocInsertCvt()
+{
+    return new InsertCvt(m_rg);
+}
+
+
 Pass * PassMgr::registerPass(PASS_TYPE passty)
 {
     ASSERT0(passty != PASS_UNDEF);
@@ -513,6 +519,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_REFINE:
         pass = allocRefine();
+        break;
+    case PASS_INSERT_CVT:
+        pass = allocInsertCvt();
         break;
     case PASS_MDSSALIVE_MGR:
         pass = allocMDSSALiveMgr();

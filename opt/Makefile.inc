@@ -81,6 +81,7 @@ linear_rep.o\
 storage_space.o\
 literal.o\
 chain_recur.o\
+insert_cvt.o\
 act_mgr.o
 
 ifeq ($(TARG),)

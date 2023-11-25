@@ -615,8 +615,9 @@ static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li, IRCFG * cfg,
          i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = cfg->getBB(i);
         ASSERT0(bb);
-        for (IR const* ir = BB_first_ir(bb);
-             ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter it;
+        for (IR const* ir = bb->getIRList().get_head(&it);
+             ir != nullptr; ir = bb->getIRList().get_next(&it)) {
             if (ir->is_switch()) {
                 for (IR * c = SWITCH_case_list(ir);
                      c != nullptr; c = c->get_next()) {

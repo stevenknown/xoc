@@ -481,7 +481,7 @@ void Refine::recomputeMayRef(IR * ir)
 
 IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
 {
-    ASSERT0(ir->is_ist());
+    ASSERT0(ir->isIndirectMemOp());
     bool t = false;
     bool lchange = false;
     IST_base(ir) = refineIR(IST_base(ir), t, rc);
@@ -580,15 +580,9 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         lchange = true;
         rhs = newrhs;
     }
-
-    if (RC_insert_cvt(rc)) {
-        ir->setRHS(insertCvt(ir, rhs, change));
-    }
-
     if (lchange) {
         ir->setParentPointer(false);
     }
-
     change |= lchange;
     return ir;
 }
@@ -609,9 +603,9 @@ static inline bool is_redundant_cvt(IR * ir)
 #endif
 
 
-IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
+IR * Refine::refineDirectStore(IR * ir, bool & change, RefineCtx & rc)
 {
-    ASSERT0(ir->hasRHS());
+    ASSERT0((ir->isDirectMemOp() || ir->is_stpr()) && ir->hasRHS());
     if (ir->isDummyOp()) { return ir; }
     bool lchange = false;
     IR * rhs = ir->getRHS();
@@ -619,9 +613,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
         //VirtualOp may not have RHS.
         return ir;
     }
-    if (RC_refine_stmt(rc) &&
-        rhs->is_pr() &&
-        ir->is_stpr() &&
+    if (RC_refine_stmt(rc) && rhs->is_pr() && ir->is_stpr() &&
         PR_no(rhs) == STPR_no(ir)) {
         //Remove pr1 = pr1.
         if (rc.maintainDU() && needBuildDUChain(rc)) {
@@ -665,10 +657,6 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
                 return nullptr;
             }
         }
-    }
-
-    if (RC_insert_cvt(rc)) {
-        ir->setRHS(insertCvt(ir, ir->getRHS(), lchange));
     }
     change |= lchange;
     if (lchange) {
@@ -719,6 +707,7 @@ IR * Refine::refineGetelem(IR * ir, bool & change, RefineCtx & rc)
 
 IR * Refine::refineCall(IR * ir, bool & change, RefineCtx & rc)
 {
+    ASSERT0(ir->isCallStmt());
     bool lchange = false;
     if (CALL_param_list(ir) != nullptr) {
         IR * param = xcom::removehead(&CALL_param_list(ir));
@@ -2037,14 +2026,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         break;
     default: UNREACHABLE();
     }
-
-    //Insert convert if need.
-    if (ir->isBinaryOp() && RC_insert_cvt(rc)) {
-        BIN_opnd0(ir) = insertCvt(ir, BIN_opnd0(ir), change);
-        BIN_opnd1(ir) = insertCvt(ir, BIN_opnd1(ir), change);
-        if (change) { ir->setParentPointer(false); }
-        insertCvtForBinaryOp(ir, change);
-    } else if (change) {
+    if (change) {
         ir->setParentPointer(false);
     }
     return ir;
@@ -2053,6 +2035,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
 
 IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
 {
+    ASSERT0(ir->isArrayOp());
     IR * newir = refineArray(ir, change, rc);
     ASSERT0_DUMMYUSE(newir == ir);
 
@@ -2191,7 +2174,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
-IR * Refine::refineDetViaSSAdu(IR * ir, bool & change)
+IR * Refine::refineDetViaSSADU(IR * ir, bool & change)
 {
     ASSERT0(ir->is_judge());
     IR * op0 = BIN_opnd0(ir);
@@ -2271,7 +2254,7 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
         break;
     SWITCH_CASE_DIRECT_MEM_STMT:
     case IR_STPR:
-        ir = refineStore(ir, tmpc, rc);
+        ir = refineDirectStore(ir, tmpc, rc);
         break;
     case IR_SETELEM:
         ir = refineSetelem(ir, tmpc, rc);
@@ -2316,7 +2299,7 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
         RC_do_fold_const(t) = false;
         ir = refineBinaryOp(ir, tmpc, t);
         if (!ir->is_const()) {
-            ir = refineDetViaSSAdu(ir, tmpc);
+            ir = refineDetViaSSADU(ir, tmpc);
         }
         break;
     }
@@ -2507,191 +2490,6 @@ bool Refine::refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc)
     OC_is_live_expr_valid(*rc.getOptCtx()) = false;
     OC_is_reach_def_valid(*rc.getOptCtx()) = false;
     return true;
-}
-
-
-void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
-{
-    ASSERT0(ir->isBinaryOp());
-    IR * op0 = BIN_opnd0(ir);
-    IR * op1 = BIN_opnd1(ir);
-    if (op0->is_any() || op1->is_any()) { return; }
-    if (op0->getType() == op1->getType()) {
-        if (op0->is_mc()) {
-            ASSERTN(TY_mc_size(op0->getType()) == TY_mc_size(op1->getType()),
-                    ("invalid binop for two D_MC operands"));
-        }
-        return;
-    }
-
-    if (op0->is_ptr()) {
-        if (op1->getTypeSize(m_tm) > op0->getTypeSize(m_tm)) {
-            //If longer data type is compared with pointer, it always have to
-            //be truncated to the same size of pointer. Otherwise, the pointer
-            //comparison is meaningless.
-            ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
-                    ("illegal pointer arith"));
-            DATA_TYPE t = m_tm->getPointerSizeDtype();
-            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1,
-                m_tm->getSimplexTypeEx(t));
-            copyDbx(BIN_opnd1(ir), op1, m_rg);
-            ir->setParentPointer(false);
-            change = true;
-            return;
-        }
-
-        //Smaller data size no need to process.
-        //e.g: char * p; if (p:ptr < a:i8) { ... }
-        //     CVT of a:i8 is dispensable.
-        return;
-    }
-
-    if (ir->is_logical()) {
-        //Type of operand of logical operation does not need to be consistent.
-        return;
-    }
-
-    //Both op0 and op1 are NOT pointer.
-    if (op0->is_vec() || op1->is_vec()) {
-        //ASSERT0(op0->getType() == op1->getType());
-        //op0 may be vector and op1 may be MC.
-        return;
-    }
-
-    //If ir is relation operation, op1 should have been swapped to first
-    //operand if it is a pointer.
-    ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
-
-    //Both op0 and op1 are NOT vector type.
-    Type const* type = m_tm->hoistDTypeForBinOp(op0, op1);
-    UINT dt_size = m_tm->getByteSize(type);
-    if (op0->getTypeSize(m_tm) != dt_size) {
-        BIN_opnd0(ir) = m_rg->getIRMgr()->buildCvt(op0, type);
-        copyDbx(BIN_opnd0(ir), op0, m_rg);
-        change = true;
-        ir->setParentPointer(false);
-    }
-
-    if (op1->getTypeSize(m_tm) != dt_size) {
-        if (ir->is_asr() || ir->is_lsl() || ir->is_lsr()) {
-            //CASE:Second operand of Shift operantion need NOT to be converted.
-            //     Second operand indicates the bit that expected to be shifted.
-            //e.g: $2(u64) = $8(u64) >> j(u32);
-            //  stpr $2:u64 id:37 attachinfo:Dbx
-            //      lsr:u64 id:31 attachinfo:Dbx
-            //          $8:u64 id:59
-            //          ld:u32 'j' id:30 attachinfo:Dbx,MDSSA
-        } else {
-            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1, type);
-            copyDbx(BIN_opnd1(ir), op1, m_rg);
-            change = true;
-            ir->setParentPointer(false);
-        }
-    }
-}
-
-
-//Insert CVT for float if necessary.
-IR * Refine::insertCvtForFloat(IR * parent, IR * kid, bool &)
-{
-    ASSERT0_DUMMYUSE(parent->is_fp() || kid->is_fp());
-    //Target Dependent Code.
-    return kid;
-}
-
-
-//Insert CVT between 'parent' and 'kid' if need, otherwise return kid.
-IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
-{
-    switch (parent->getCode()) {
-    SWITCH_CASE_COMPARE:
-    SWITCH_CASE_LOGIC_BIN:
-        return kid;
-    SWITCH_CASE_DIRECT_MEM_OP:
-    SWITCH_CASE_INDIRECT_MEM_OP:
-    SWITCH_CASE_CALL:
-    SWITCH_CASE_ARITH:
-    SWITCH_CASE_BITWISE:
-    SWITCH_CASE_LOGIC_UNA:
-    SWITCH_CASE_CFS_OP:
-    SWITCH_CASE_BRANCH_OP:
-    SWITCH_CASE_SHIFT:
-    case IR_STPR:
-    case IR_LDA:
-    case IR_NEG:
-    case IR_LABEL:
-    case IR_CASE:
-    case IR_ARRAY:
-    case IR_CVT:
-    case IR_RETURN:
-    case IR_SELECT: {
-        Type const* tgt_ty = parent->getType();
-        if (tgt_ty->is_any() || kid->getType()->is_any()) {
-            //Nothing need to do if converting to ANY.
-            return kid;
-        }
-
-        UINT tgt_size = parent->getTypeSize(m_tm);
-        UINT src_size = kid->getTypeSize(m_tm);
-
-        if (parent->is_vec() || kid->is_vec()) {
-            //Do not do hoisting for vector type.
-            ASSERTN(tgt_size >= src_size, ("size is overflowed"));
-            return kid;
-        }
-
-        if (parent->is_fp() || kid->is_fp()) {
-            return insertCvtForFloat(parent, kid, change);
-        }
-
-        if (tgt_size <= src_size) {
-            //Do not hoist type.
-            return kid;
-        }
-
-        if (parent->is_ptr() && parent->is_add() &&
-            BIN_opnd0(parent)->is_ptr()) {
-            //Skip pointer arithmetics.
-            return kid;
-        }
-
-        if ((parent->is_asr() || parent->is_lsl() || parent->is_lsr()) &&
-            kid == BIN_opnd1(parent)) {
-            //CASE: Second operand of Shift operantion need NOT to be converted.
-            //      Second operand indicates the bit that expected to be
-            //      shifted.
-            //e.g: $2(u64) = $8(u64) >> j(u32);
-            //  stpr $2 : u64 id:37
-            //      lsr : u64 id:31
-            //          $8 : u64 id:59
-            //          ld : u32 'j' id:30
-            return kid;
-        }
-
-        if (kid->is_const() && kid->is_int()) {
-            //kid is integer literal.
-            if (tgt_ty->is_pointer()) {
-                IR_dt(kid) = m_tm->getSimplexTypeEx(
-                    m_tm->getPointerSizeDtype());
-            } else if (tgt_ty->is_string()) {
-                IR * new_kid = m_rg->getIRMgr()->buildCvt(kid, tgt_ty);
-                copyDbx(new_kid, kid, m_rg);
-                kid = new_kid;
-            } else {
-                IR_dt(kid) = tgt_ty;
-            }
-            change = true;
-            return kid;
-        }
-
-        IR * new_kid = m_rg->getIRMgr()->buildCvt(kid, parent->getType());
-        copyDbx(new_kid, kid, m_rg);
-        change = true;
-        return new_kid;
-    }
-    default: UNREACHABLE();
-    }
-    return nullptr;
 }
 
 

@@ -55,11 +55,12 @@ void ExprRep::dump(Region const* rg) const
     note(rg, "\n  OCC:");
     IREListIter eit;
     bool first = true;
+    xcom::StrBuf tmp(8);
     for (IR const* occ = EXPR_occ_list(this).get_head(&eit);
          occ != nullptr; occ = EXPR_occ_list(this).get_next(&eit)) {
         if (first) { first = false; }
         else { prt(rg, ","); }
-        prt(rg, "%s:%u", IRNAME(occ), occ->id());
+        prt(rg, "%s", dumpIRName(occ, tmp));
         MDSet const* use_mds = occ->getMayRef();
         if (use_mds != nullptr) {
             prt(rg, "(use:");

@@ -418,8 +418,9 @@ IR * Region::constructIRlist(bool clean_ir_list)
             LabelInfo const* li = lct->val();
             xcom::add_next(&ret_list, &last, getIRMgr()->buildLabel(li));
         }
-
-        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter it;
+        for (IR * ir = bb->getIRList().get_head(&it);
+             ir != nullptr; ir = bb->getIRList().get_next(&it)) {
             xcom::add_next(&ret_list, &last, ir);
             if (clean_ir_list) {
                 ir->setBB(nullptr);

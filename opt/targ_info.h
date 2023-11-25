@@ -40,6 +40,9 @@ public:
     TargInfo() {}
     virtual ~TargInfo() {}
 
+    // Return the number of return-value integer register.
+    virtual UINT getNumOfReturnValueRegister() const = 0;
+
     // Return the number of allocable integer register.
     virtual UINT getNumOfAllocableIntegerRegister() const = 0;
 

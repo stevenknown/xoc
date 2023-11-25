@@ -228,7 +228,9 @@ protected:
     SMemPool * m_pool;
     xcom::TTab<LI<IRBB> const*> m_insert_guard_bb;
     IRListMgr m_irs_mgr;
+    ActMgr m_act_mgr;
 protected:
+    void clean();
     bool chooseConst(IR * ir, OUT bool * all_exp_invariant,
                      OUT LICMAnaCtx & anactx);
     bool chooseBin(LI<IRBB> const* li, IR * ir, IRIter & irit,
@@ -287,7 +289,6 @@ protected:
     //The funtion will maintain LoopInfo.
     bool doLoopTree(LI<IRBB> * li, OUT HoistCtx & ctx);
 
-    //These functions will maintain RPO if new BB inserted.
     //Return true if BB or STMT changed.
     bool hoistStmtCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
                        OUT LI<IRBB> * li, OUT HoistCtx & ctx);
@@ -439,7 +440,7 @@ protected:
         return p;
     }
 public:
-    explicit LICM(Region * rg) : Pass(rg)
+    explicit LICM(Region * rg) : Pass(rg), m_act_mgr(rg)
     {
         ASSERT0(rg != nullptr);
         m_dumgr = rg->getDUMgr();
@@ -466,6 +467,7 @@ public:
 
     virtual bool dump() const;
 
+    ActMgr & getActMgr() { return m_act_mgr; }
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }

@@ -64,6 +64,10 @@ inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
     dumpIR(ir, rg, nullptr, dumpflag);
 }
 
+//The function dump IR's name and id into the given buffer.
+//Return the buffer address.
+CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf);
+
 //The function dump IR info into given buffer.
 void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
                  DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));

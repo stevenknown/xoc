@@ -120,9 +120,6 @@ author: Su Zhenyu
 //false: from left to right
 #define PUSH_PARAM_FROM_RIGHT_TO_LEFT true
 
-//The number of registers which are used to store return-value.
-#define NUM_OF_RETURN_VAL_REGISTERS 2
-
 //Define whether target machine support predicate register.
 //Note the first opnd must be predicate register if target support.
 #define HAS_PREDICATE_REGISTER true
@@ -334,7 +331,7 @@ typedef enum _REGFILE {
 
 //Define reigsters to pass return value.
 #define RETVAL_REG_START REG_R0
-#define RETVAL_REG_END REG_R3
+#define RETVAL_REG_END REG_R1
 
 //Define callee saved reigsters.
 #define CALLEE_SAVED_REG_START REG_R4

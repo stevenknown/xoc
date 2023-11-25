@@ -127,6 +127,7 @@ public:
     bool is_dump_irparser; //Dump IRParser.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
+    bool is_dump_insert_cvt; //Dump InsertCvt.
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
     bool is_dump_lsra; //Dump LinearScanRA
@@ -178,6 +179,7 @@ public:
     bool isDumpIRParser() const;
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
+    bool isDumpInsertCvt() const;
     bool isDumpGSCC() const;
     bool isDumpCDG() const;
     bool isDumpLIS() const;
@@ -252,6 +254,7 @@ typedef enum _PASS_TYPE {
     PASS_MDLIVENESS_MGR,
     PASS_MDSSALIVE_MGR,
     PASS_REFINE,
+    PASS_INSERT_CVT,
     PASS_SCC,
     PASS_IRSIMP,
     PASS_LINEAR_SCAN_RA,
@@ -272,8 +275,8 @@ extern INT g_opt_level;
 //Perform peephole optimizations.
 extern bool g_do_refine;
 
-//If true to insert IR_CVT by ir refinement.
-extern bool g_do_refine_auto_insert_cvt;
+//If true to insert IR_CVT if necessary.
+extern bool g_insert_cvt;
 
 //If true to hoist short type to integer type.
 //Hoist data type from less than INT to INT.

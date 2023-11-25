@@ -464,24 +464,20 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
     } else {
         prt(rg, ",-");
     }
-    //prt(rg, ")");
 
     //Dump OccSet
     prt(rg, "|USESET:");
     bool first = true;
     VMD * pthis = const_cast<VMD*>(this);
     VMD::UseSetIter vit;
+    xcom::StrBuf tmp(8);
     for (UINT i2 = pthis->getUseSet()->get_first(vit);
          !vit.end(); i2 = pthis->getUseSet()->get_next(vit)) {
-        if (first) {
-            first = false;
-        } else {
-            prt(rg, ",");
-        }
-
+        if (first) { first = false; }
+        else { prt(rg, ","); }
         IR * use = rg->getIR(i2);
         ASSERT0(use && use->isMemRef());
-        prt(rg, "%s(id:%d)", IRNAME(use), use->id());
+        prt(rg, "%s", dumpIRName(use, tmp));
     }
 }
 //END VMD
@@ -646,11 +642,12 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
     ASSERT0(vmd);
     note(rg, "|USESET:");
     VMD::UseSetIter vit;
+    xcom::StrBuf tmp(8);
     for (UINT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
         ASSERT0(use && use->isMemRef());
-        prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
+        prt(rg, "(%s) ", dumpIRName(use, tmp));
     }
 }
 

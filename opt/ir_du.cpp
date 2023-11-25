@@ -787,6 +787,7 @@ void DUMgr::dumpMemUsageForMDRef() const
     size_t count = 0;
     CHAR const* str = nullptr;
     ConstIRIter citer;
+    xcom::StrBuf tmp(8);
     for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
         note(getRegion(), "\n--- BB%d ---", bb->id());
         for (IR * ir = BB_first_ir(bb);
@@ -796,7 +797,7 @@ void DUMgr::dumpMemUsageForMDRef() const
             citer.clean();
             for (IR const* x = iterInitC(ir, citer);
                  x != nullptr; x = iterNextC(citer)) {
-                note(getRegion(), "\n\t%s(%d)::", IRNAME(x), IR_id(x));
+                note(getRegion(), "\n\t%s::", dumpIRName(x, tmp));
                 if (x->is_stmt()) {
                     //MustDef
                     MD const* md = const_cast<IR*>(x)->getMustRef();
@@ -1010,6 +1011,113 @@ void DUMgr::dumpDUChainDetail() const
 }
 
 
+static void dumpDUChainOfStmt(IR const* ir, MOD xcom::DefMiscBitSetMgr & bsmgr,
+                              MOD ConstIRIter & citer, MDSet & mds,
+                              StrBuf & tmp, DUMgr const* dumgr)
+{
+    Region const* rg = dumgr->getRegion();
+    DUMgr * pthis = const_cast<DUMgr*>(dumgr);
+    MDSystem const* mdsys = rg->getMDSystem();
+    VarMgr const* vm = rg->getVarMgr();
+    dumpIR(ir, rg);
+    note(rg, "\n>>");
+
+    //MustDef
+    prt(rg, "DEF(");
+    bool has_prt_something = false;
+    MD const* md = ir->getMustRef();
+    if (md != nullptr) {
+        prt(rg, "EMD%d", md->id());
+        has_prt_something = true;
+    }
+
+    //MayDef
+    if (const_cast<IR*>(ir)->getMayRef() != nullptr) {
+        mds.clean(bsmgr);
+        MDSet const* x = ir->getMayRef();
+        if (x != nullptr) {
+            if (has_prt_something) {
+                prt(rg, ",");
+            }
+            MDSetIter iter;
+            for (BSIdx i = x->get_first(&iter); i != BS_UNDEF;) {
+                prt(rg, "MD%d", i);
+                i = x->get_next(i, &iter);
+                if (i != BS_UNDEF) {
+                    prt(rg, ",");
+                }
+            }
+            has_prt_something = true;
+        }
+    }
+    if (!has_prt_something) {
+        prt(rg, "--");
+    }
+    prt(rg, ")");
+
+    //MayUse
+    prt(rg, " <= ");
+    mds.clean(bsmgr);
+
+    prt(rg, "USE(");
+    pthis->collectMayUseRecursive(ir, rg, true, bsmgr, mds);
+    if (!mds.is_empty()) {
+        mds.dump(mdsys, vm);
+    } else {
+        prt(rg, "--");
+    }
+    prt(rg, ")");
+
+    //Dump def chain.
+    citer.clean();
+    bool first = true;
+    for (IR const* x = iterExpInitC(ir, citer);
+         x != nullptr; x = iterExpNextC(citer)) {
+        if (!x->isMemOpnd()) { continue; }
+        DUSet const* defset = x->readDUSet();
+        if (defset == nullptr || defset->get_elem_count() == 0) {
+            continue;
+        }
+        if (first) {
+            note(rg, "\n>>DEFLIST:");
+            first = false;
+        }
+        DUSetIter di = nullptr;
+        for (BSIdx i = defset->get_first(&di);
+             i != BS_UNDEF; i = defset->get_next(i, &di)) {
+            IR const* def = rg->getIR(i);
+            prt(rg, "%s, ", dumpIRName(def, tmp));
+        }
+    }
+
+    //Dump USE set.
+    DUSet const* useset = ir->readDUSet();
+    if (useset == nullptr || useset->get_elem_count() == 0) {
+        return;
+    }
+    note(rg, "\n>>USELIST:");
+    DUSetIter di = nullptr;
+    for (BSIdx i = useset->get_first(&di);
+         i != BS_UNDEF; i = useset->get_next(i, &di)) {
+        IR const* u = rg->getIR(i);
+        prt(rg, "%s, ", dumpIRName(u, tmp));
+    }
+}
+
+
+static void dumpDUChainOfBB(IRBB const* bb, MOD xcom::DefMiscBitSetMgr & bsmgr,
+                            MOD ConstIRIter & citer, MDSet & mds,
+                            StrBuf & tmp, DUMgr const* dumgr)
+{
+    note(dumgr->getRegion(), "\n--- BB%d ---", bb->id());
+    BBIRListIter it;
+    for (IR * ir = BB_irlist(bb).get_head(&it);
+         ir != nullptr; ir = BB_irlist(bb).get_next(&it)) {
+        dumpDUChainOfStmt(ir, bsmgr, citer, mds, tmp, dumgr);
+    }
+}
+
+
 //Dump DU chain only for stmt.
 //This function collects must and may USE of MD and regard stmt as a whole.
 //So this function does not distingwish individual memory operand inside the
@@ -1019,105 +1127,14 @@ void DUMgr::dumpDUChain() const
     if (!m_rg->isLogMgrInit()) { return; }
     note(getRegion(), "\n\n==---- DUMP DUMgr DU CHAIN '%s' ----==\n",
          m_rg->getRegionName());
+    xcom::StrBuf tmp(8);
     MDSet mds;
-    DefMiscBitSetMgr bsmgr;
+    xcom::DefMiscBitSetMgr bsmgr;
     BBList * bbl = m_rg->getBBList();
-    DUMgr * pthis = const_cast<DUMgr*>(this);
     ConstIRIter citer;
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        note(getRegion(), "\n--- BB%d ---", bb->id());
-        for (IR * ir = BB_irlist(bb).get_head();
-             ir != nullptr; ir = BB_irlist(bb).get_next()) {
-            dumpIR(ir, m_rg);
-            note(getRegion(), "\n>>");
-
-            //MustDef
-            prt(getRegion(), "DEF(");
-            bool has_prt_something = false;
-            MD const* md = ir->getMustRef();
-            if (md != nullptr) {
-                prt(getRegion(), "EMD%d", md->id());
-                has_prt_something = true;
-            }
-
-            //MayDef
-            if (const_cast<IR*>(ir)->getMayRef() != nullptr) {
-                mds.clean(bsmgr);
-                MDSet const* x = ir->getMayRef();
-                if (x != nullptr) {
-                    if (has_prt_something) {
-                        prt(getRegion(), ",");
-                    }
-
-                    MDSetIter iter;
-                    for (BSIdx i = x->get_first(&iter); i != BS_UNDEF;) {
-                        prt(getRegion(), "MD%d", i);
-                        i = x->get_next(i, &iter);
-                        if (i != BS_UNDEF) {
-                            prt(getRegion(), ",");
-                        }
-                    }
-                    has_prt_something = true;
-                }
-            }
-            if (!has_prt_something) {
-                prt(getRegion(), "--");
-            }
-            prt(getRegion(), ")");
-
-            //MayUse
-            prt(getRegion(), " <= ");
-            mds.clean(bsmgr);
-
-            prt(getRegion(), "USE(");
-            pthis->collectMayUseRecursive(ir, m_rg, true, bsmgr, mds);
-            if (!mds.is_empty()) {
-                mds.dump(m_md_sys, m_vm);
-            } else {
-                prt(getRegion(), "--");
-            }
-            prt(getRegion(), ")");
-
-            //Dump def chain.
-            citer.clean();
-            bool first = true;
-            for (IR const* x = iterExpInitC(ir, citer);
-                 x != nullptr; x = iterExpNextC(citer)) {
-                 if (!x->isMemOpnd()) { continue; }
-
-                DUSet const* defset = x->readDUSet();
-                if (defset == nullptr || defset->get_elem_count() == 0) {
-                    continue;
-                }
-
-                if (first) {
-                    note(getRegion(), "\n>>DEFLIST:");
-                    first = false;
-                }
-
-                DUSetIter di = nullptr;
-                for (BSIdx i = defset->get_first(&di);
-                     i != BS_UNDEF; i = defset->get_next(i, &di)) {
-                    IR const* def = m_rg->getIR(i);
-                    prt(getRegion(), "%s(id:%d), ", IRNAME(def), def->id());
-                }
-            }
-
-            //Dump USE set.
-            DUSet const* useset = ir->readDUSet();
-            if (useset == nullptr || useset->get_elem_count() == 0) {
-                continue;
-            }
-
-            note(getRegion(), "\n>>USELIST:");
-            DUSetIter di = nullptr;
-            for (BSIdx i = useset->get_first(&di);
-                 i != BS_UNDEF; i = useset->get_next(i, &di)) {
-                IR const* u = m_rg->getIR(i);
-                prt(getRegion(), "%s(id:%d), ", IRNAME(u), IR_id(u));
-            }
-        } //end for each IR
-    } //end for each BB
+        dumpDUChainOfBB(bb, bsmgr, citer, mds, tmp, this);
+    }
     mds.clean(bsmgr);
 }
 
@@ -3121,7 +3138,9 @@ bool DUMgr::verifyMDRef()
     ConstIRIter cii;
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter it;
+        for (IR * ir = bb->getIRList().get_head(&it);
+             ir != nullptr; ir = bb->getIRList().get_next(&it)) {
             cii.clean();
             verifyMDRefForIR(ir, cii);
         }
@@ -3323,7 +3342,7 @@ bool verifyMDDUChain(Region * rg, DUOptFlag duflag)
 //'omit_self': true if we do not consider the 'exp_stmt' itself.
 IR * DUMgr::findNearestDomDef(IR const* exp, DUSet const* defset) const
 {
-    if (defset == nullptr) { return nullptr; } 
+    if (defset == nullptr) { return nullptr; }
     ASSERT0(exp && exp->is_exp());
     ASSERT0(const_cast<IR*>(exp)->getMayRef() ||
             const_cast<IR*>(exp)->getMustRef());

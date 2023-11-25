@@ -1013,6 +1013,16 @@ void dumpConstContent(IR const* ir, Region const* rg)
 }
 
 
+CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf)
+{
+    buf.sprint("%s", IRNAME(ir));
+    if (g_dump_opt.isDumpIRID()) {
+        buf.strcat("(id:%u)", ir->id());
+    }
+    return buf.getBuf();
+}
+
+
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
 void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)

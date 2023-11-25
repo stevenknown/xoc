@@ -44,7 +44,6 @@ class Region;
 #define RC_refine_mul_const(r) ((r).u1.s1.refine_mul_const)
 #define RC_do_fold_const(r) ((r).u1.s1.do_fold_const)
 #define RC_hoist_to_lnot(r) ((r).u1.s1.hoist_to_lnot)
-#define RC_insert_cvt(r) ((r).u1.s1.insertCvt)
 #define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 #define RC_maintain_du(r) ((r).u1.s1.maintain_du)
@@ -69,13 +68,6 @@ public:
             //Pass info top-down. True to do following refinement.
             //e.g: int a; a=2+3 => a=5
             BitUnion do_fold_const:1;
-
-            //Pass info top-down.
-            //If the flag is true, the process will insert IR_CVT
-            //if kid's type size is smaller then parent's type size.
-            //e.g: parent:I32 = kid:I8 will be
-            //     parent:I32 = cvt:I32 (kid:I8)
-            BitUnion insertCvt:1;
 
             //Pass info top-down. True to transform comparison stmt to lnot
             //e.g: transform $1!=0?0:1 to lnot($1),
@@ -103,11 +95,6 @@ public:
         RC_refine_stmt(*this) = true;
         RC_do_fold_const(*this) = true;
         RC_maintain_du(*this) = true;
-        if (g_do_refine_auto_insert_cvt) {
-            RC_insert_cvt(*this) = true;
-        } else {
-            RC_insert_cvt(*this) = false;
-        }
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = true;
         m_oc = oc;
@@ -124,8 +111,6 @@ public:
 
     bool hoist_to_lnot() const { return RC_hoist_to_lnot(*this); }
 
-    bool insert_cvt() const { return RC_insert_cvt(*this); }
-
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
     bool refind_mul_const() const { return RC_refine_mul_const(*this); }
@@ -137,13 +122,6 @@ public:
         RC_refine_mul_const(*this) = false;
         RC_refine_stmt(*this) = false;
         RC_do_fold_const(*this) = false;
-
-        if (g_do_refine_auto_insert_cvt) {
-            RC_insert_cvt(*this) = true;
-        } else {
-            RC_insert_cvt(*this) = false;
-        }
-
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
@@ -167,12 +145,6 @@ class Refine : public Pass {
 
     //The function prefer to compute ir's const value by integer point type.
     IR * foldConstIntBinary(IR * ir, bool & change);
-
-    //Check and insert data type CVT if it is necessary.
-    IR * insertCvt(IR * parent, IR * kid, bool & change);
-    void insertCvtForBinaryOp(IR * ir, bool & change);
-    //Insert CVT for float if necessary.
-    virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
 
     //Peephole optimizations.
     IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
@@ -211,9 +183,9 @@ class Refine : public Pass {
     IR * refineILoad2(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad3(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineDetViaSSAdu(IR * ir, bool & change);
+    IR * refineDetViaSSADU(IR * ir, bool & change);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
-    IR * refineStore(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineDirectStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);

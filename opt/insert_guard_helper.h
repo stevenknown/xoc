@@ -147,7 +147,8 @@ public:
     //Return the new guard controlling BB.
      IRBB * insertGuard(LI<IRBB> const* li, IRBB * prehead);
 
-    //Insert PHI for stmt in guarded BB to keep legality of SSA information.
+    //Insert PHI to guard_end BB for stmts in guarded BB to keep legality of
+    //SSA information.
     //Note DOM info must be valid.
     //e.g:given guarded stmt in loop body is $15=...
     //  after moving to guarded BB, the layout will be:

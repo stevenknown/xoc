@@ -613,7 +613,6 @@ bool RCE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-
     if (!oc.is_cfg_valid()) { return false; }
     if (!oc.is_ref_valid()) { return false; }
     m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
@@ -653,8 +652,7 @@ bool RCE::perform(OptCtx & oc)
             oc.setInvalidIfCFGChanged();
         }
         //DomInfo is needed when updating SSA info.
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
-                                                   PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
         //TBD:Sometimes, CFG is complicated, maintain Dom and SSA is costly.
         //Thus you should apply a cost-model to drive the updation of Dom and

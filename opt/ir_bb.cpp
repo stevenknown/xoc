@@ -426,12 +426,11 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
          succ_vex != nullptr; succ_vex = Graph::get_next_out_vertex(it)) {
         IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
-        for (IR * ir = BB_first_ir(succ);
-             ir != nullptr; ir = BB_next_ir(succ)) {
+        BBIRListIter it;
+        for (IR * ir = succ->getIRList().get_head(&it);
+             ir != nullptr; ir = succ->getIRList().get_next(&it)) {
             if (!ir->is_phi()) { break; }
-
             ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) >= opnd_pos);
-
             IR * opnd;
             UINT lpos = opnd_pos;
             for (opnd = PHI_opnd_list(ir);

@@ -110,8 +110,9 @@ void IPA::createCallDummyuse(Region * rg)
         BBList * bbl = rg->getBBList();
         if (bbl == nullptr) { return; }
         for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-            for (IR * ir2 = BB_first_ir(bb);
-                 ir2 != nullptr; ir2 = BB_next_ir(bb)) {
+            BBIRListIter it;
+            for (IR * ir2 = bb->getIRList().get_head(&it);
+                 ir2 != nullptr; ir2 = bb->getIRList().get_next(&it)) {
                 if (!ir2->is_call()) { continue; }
                 //TODO: handle icall.
                 createCallDummyuse(ir2, rg);

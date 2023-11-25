@@ -942,10 +942,11 @@ void VMD::UseSet::dump(Region const* rg) const
     if (!rg->isLogMgrInit()) { return; }
     VMD::UseSetIter it;
     note(rg, "\nVMD::UseSet:");
+    xcom::StrBuf tmp(8);
     for (UINT i = get_first(it); !it.end(); i = get_next(it)) {
         IR const* ir = rg->getIR(i);
         ASSERT0(ir);
-        prt(rg, "<%s,id:%d> ", IRNAME(ir), i);
+        prt(rg, "<%s> ", dumpIRName(ir, tmp));
     }
 }
 //END VMD::UseSet
@@ -1109,6 +1110,7 @@ void MDSSAMgr::dumpAllVMD() const
          m_rg->getRegionName());
     VOpndVec * vec = const_cast<MDSSAMgr*>(this)->getUseDefMgr()->
         getVOpndVec();
+    xcom::StrBuf tmp(8);
     for (VecIdx i = 1; i <= vec->get_last_idx(); i++) {
         VMD * v = (VMD*)vec->get(i);
         if (v == nullptr) {
@@ -1133,7 +1135,7 @@ void MDSSAMgr::dumpAllVMD() const
                 //The stmt may have been removed, and the VMD is obsoleted.
                 //If the stmt removed, its UseSet should be empty.
                 //ASSERT0(stmt->is_stmt() && !stmt->isWritePR());
-                prt(getRegion(), "DEF:(%s,id:%d)", IRNAME(stmt), stmt->id());
+                prt(getRegion(), "DEF:(%s)", dumpIRName(stmt, tmp));
             }
         } else {
             prt(getRegion(), "DEF:---");
@@ -1147,7 +1149,7 @@ void MDSSAMgr::dumpAllVMD() const
             nexti = v->getUseSet()->get_next(it);
             IR * use = m_rg->getIR(j);
             ASSERT0(use && !use->isReadPR());
-            prt(getRegion(), "(%s,id:%d)", IRNAME(use), use->id());
+            prt(getRegion(), "(%s)", dumpIRName(use, tmp));
             if (nexti != BS_UNDEF) {
                 prt(getRegion(), ",");
             }
@@ -1738,8 +1740,8 @@ static void dumpDef(MDDef const* def, MD const* vopndmd, UseDefMgr const* mgr,
         if (has_dump_something) {
             prt(rg, " ");
         }
-        prt(rg, "(%s id:%d)",
-            IRNAME(def->getOcc()), def->getOcc()->id());
+        xcom::StrBuf tmp(8);
+        prt(rg, "(%s)", dumpIRName(def->getOcc(),tmp));
         has_dump_something = true;
     }
 
@@ -1811,6 +1813,7 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
     xcom::List<MDDef const*> wl;
     lst.clean();
     opnd_lst.clean();
+    xcom::StrBuf tmp(8);
     for (IR const* opnd = xoc::iterInit(const_cast<IR*>(ir), lst);
          opnd != nullptr; opnd = xoc::iterNext(lst)) {
         if (!opnd->isMemRefNonPR() || opnd->is_stmt()) {
@@ -1823,7 +1826,7 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
             (*parting_line) = true;
         }
         note(getRegion(), "\n");
-        prt(getRegion(), "%s(id:%d)", IRNAME(opnd), opnd->id());
+        prt(getRegion(), "%s", dumpIRName(opnd, tmp));
 
         MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(opnd);
         if (mdssainfo == nullptr) {
@@ -1832,8 +1835,7 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
         }
         MDDef * kdef = findKillingMDDef(opnd);
         if (kdef != nullptr) {
-            prt(getRegion(), " KDEF:%s(id:%d)", IRNAME(kdef->getOcc()),
-                kdef->getOcc()->id());
+            prt(getRegion(), " KDEF:%s", dumpIRName(kdef->getOcc(), tmp));
         }
 
         //Not found killing def, thus dump total define-chain.
@@ -1860,13 +1862,12 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
 {
     ASSERT0(vmd);
     VMD::UseSetIter vit;
+    xcom::StrBuf tmp(8);
     for (BSIdx i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
         ASSERT0(use && (use->isMemRef() || use->is_id()));
-        prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
-        //prt(rg, "(%s id:%d MD%uV%u) ", IRNAME(use), use->id(),
-        //    vmd->mdid(), vmd->version());
+        prt(rg, "(%s) ", dumpIRName(use, tmp));
     }
 }
 
@@ -1880,9 +1881,9 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
         note(rg, "\n%s", g_parting_line_char);
         parting_line = true;
     }
-
     note(rg, "\n");
-    prt(rg, "%s(id:%d)", IRNAME(ir), ir->id());
+    xcom::StrBuf tmp(8);
+    prt(rg, "%s", dumpIRName(ir, tmp));
 
     MDSSAMgr * pmgr = const_cast<MDSSAMgr*>(this);
     MDSSAInfo * mdssainfo = pmgr->getMDSSAInfoIfAny(ir);
@@ -2138,7 +2139,9 @@ void MDSSAMgr::computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md)
 void MDSSAMgr::collectDefinedMDAndInitVMD(IN IRBB * bb,
                                           OUT DefMDSet & maydef)
 {
-    for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+    BBIRListIter it;
+    for (IR * ir = bb->getIRList().get_head(&it);
+         ir != nullptr; ir = bb->getIRList().get_next(&it)) {
         initVMD(ir, maydef);
     }
 }
@@ -2680,7 +2683,9 @@ void MDSSAMgr::renamePhiResult(IN IRBB * bb, MD2VMDStack & md2vmdstk)
 void MDSSAMgr::renameBB(IN IRBB * bb, MD2VMDStack & md2vmdstk)
 {
     renamePhiResult(bb, md2vmdstk);
-    for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+    BBIRListIter it;
+    for (IR * ir = bb->getIRList().get_head(&it);
+         ir != nullptr; ir = bb->getIRList().get_next(&it)) {
         //Rename opnd, not include phi.
         //Walk through rhs expression IR tree to rename memory's VMD.
         m_iter.clean();
@@ -3018,8 +3023,10 @@ void MDSSAMgr::collectDefinedMD(IRBB const* bb, OUT DefMDSet & maydef) const
             maydef.bunion(it->val()->getResult()->mdid());
         }
     }
-    for (IR const* ir = BB_first_ir(const_cast<IRBB*>(bb));
-         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+
+    BBIRListIter it;
+    for (IR const* ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
+         ir != nullptr; ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
         if (ir->isCallReadOnly() || !MDSSAMgr::hasMDSSAInfo(ir)) {
             continue;
         }

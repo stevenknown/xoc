@@ -1681,11 +1681,12 @@ void GVN::processBB(IRBB * bb, bool & change)
 void GVN::assignRHSVN()
 {
     BBList const* bbl = m_rg->getBBList();
-    BBList::Iter it;
+    BBListIter it;
     for (IRBB * bb = bbl->get_head(&it);
          bb != nullptr; bb = bbl->get_next(&it)) {
-        for (IR const* ir = BB_first_ir(bb);
-             ir != nullptr; ir = BB_next_ir(bb)) {
+        BBIRListIter irit;
+        for (IR const* ir = bb->getIRList().get_head(&irit);
+             ir != nullptr; ir = bb->getIRList().get_next(&irit)) {
             if (!ir->hasRHS()) { continue; }
             VN const* resvn = getVN(ir);
             if (resvn == nullptr) {

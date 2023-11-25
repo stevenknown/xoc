@@ -44,24 +44,33 @@ static bool isImmRHS(IR const* exp, IR const* stmt)
 
 
 static void updateDomTreeByPreheader(LI<IRBB> const* li, IRBB const* preheader,
-                                     DomTree & domtree)
+                                     DomTree & domtree, ActMgr & actmgr)
 {
     ASSERT0(preheader);
     //Only insert preheader into domtree.
     domtree.insertParent(li->getLoopHead()->id(), preheader->id());
+    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
+                preheader->id(), li->getLoopHead()->id());
 }
 
 
 static void updateDomTreeByGuardRegion(LI<IRBB> const* li,
                                        InsertGuardHelper const& help,
-                                       DomTree & domtree)
+                                       DomTree & domtree, ActMgr & actmgr)
 {
     ASSERT0(help.getGuardEnd());
     domtree.insertParent(li->getLoopHead()->id(), help.getGuardEnd()->id());
+    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
+                help.getGuardEnd()->id(), li->getLoopHead()->id());
+
     domtree.insertParent(help.getGuardEnd()->id(),
                          help.getGuardStart()->id());
-    domtree.insertKid(help.getGuardStart()->id(), help.getGuardedBB()->id());
+    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
+                help.getGuardStart()->id(), help.getGuardEnd()->id());
 
+    domtree.insertKid(help.getGuardStart()->id(), help.getGuardedBB()->id());
+    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
+                help.getGuardedBB()->id(), help.getGuardStart()->id());
 }
 
 
@@ -125,12 +134,13 @@ class InsertPreheaderMgr {
     IRBB * m_preheader;
     MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
+    LICM * m_licm;
+    RCE const* m_rce;
     LICMAnaCtx const& m_anactx;
     InsertGuardHelper m_gdhelp;
 private:
     //rce: RCE object, may be null.
-    void checkAndInsertGuardBB(IRTab const& irtab, OUT LICM * licm,
-                               RCE const* rce, OUT HoistCtx & ctx);
+    void checkAndInsertGuardBB(IRTab const& irtab, OUT HoistCtx & ctx);
 
     //Return true if loop body is executed conditionally which is in charged of
     //the judgement stmt in loophead BB.
@@ -140,13 +150,14 @@ private:
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
     //otherwise return false.
-    bool tryEvalLoopExecCondition(RCE const* rce,
-                                  OUT bool & must_true,
+    bool tryEvalLoopExecCondition(OUT bool & must_true,
                                   OUT bool & must_false,
                                   HoistCtx const& ctx) const;
 
     //The funtion should be invoked after exp hoisted.
     void updateMDSSADUForExpInPreHeader();
+    void updateMDSSADUForExpInGuardStart();
+    void updateMDSSADUForExpInBB(IRBB const* bb);
 
     //The funtion should be invoked after phi modified.
     void updateMDSSADUForLoopHeadPhi(HoistCtx const& ctx);
@@ -155,25 +166,38 @@ private:
     void updateDomTree(DomTree & domtree);
 public:
     InsertPreheaderMgr(Region * rg, OptCtx * oc, LI<IRBB> const* li,
-                       LICMAnaCtx const& anactx) :
-        m_rg(rg), m_oc(oc), m_li(li), m_preheader(nullptr), m_anactx(anactx),
-        m_gdhelp(rg, oc)
+                       LICM * licm, RCE const* rce, LICMAnaCtx const& anactx) :
+        m_rg(rg), m_oc(oc), m_li(li), m_preheader(nullptr), m_licm(licm),
+        m_rce(rce), m_anactx(anactx), m_gdhelp(rg, oc)
     { m_mdssamgr = m_rg->getMDSSAMgr(); m_cfg = m_rg->getCFG(); }
 
     IRBB * getPreheader() const { return m_preheader; }
+    InsertGuardHelper const& getInsertGuardHelper() const { return m_gdhelp; }
 
     bool needComplicatedGuard() const
     { return m_gdhelp.needComplicatedGuard(m_li); }
 
     void reviseSSADU(HoistCtx const& ctx);
 
+    //The function will check whether stmts which is placed in 'guarded_bb'
+    //should be moved to guard_start BB.
+    //e.g: given loop struct falsebr (i < n) {...}, after hoisting and
+    //inserting guard, the IR list will be:
+    //  falsebr i < n, L1
+    //  $1 = n //S1
+    //  L1:
+    //  falsebr (i < $1) //S2
+    //  {...}
+    //In above case, stmt S1 should always execute at least once. Otherwise,
+    //stmt S2 will reference an undefined $1 when i >= n.
+    void reviseStmtExecAtLeastOnce();
+
     void undoCFGChange(HoistCtx & ctx);
 
     //The function insert preheader before loop.
     //Return true if the function inserted a new BB as preheader, otherwise
     //regard an existing BB as preheader.
-    bool perform(IRTab const& irtab, RCE const* rce, OUT LICM * licm,
-                 MOD HoistCtx & ctx);
+    bool perform(IRTab const& irtab, MOD HoistCtx & ctx);
 };
 
 
@@ -191,37 +215,34 @@ bool InsertPreheaderMgr::isLoopExecConditional() const
 
 //Try to evaluate the value of loop execution condition.
 //Returnt true if this function evaluated successfully, otherwise return false.
-bool InsertPreheaderMgr::tryEvalLoopExecCondition(RCE const* rce,
-                                                  OUT bool & must_true,
+bool InsertPreheaderMgr::tryEvalLoopExecCondition(OUT bool & must_true,
                                                   OUT bool & must_false,
                                                   HoistCtx const& ctx) const
 {
-    if (rce == nullptr) { return false; }
+    //rce: RCE object, may be null.
+    if (m_rce == nullptr) { return false; }
     IRBB const* head = m_li->getLoopHead();
     ASSERT0(head);
     IR const* last = const_cast<IRBB*>(head)->getLastIR();
     ASSERT0(last && last->isConditionalBr());
 
     //Try to evaluate the value of judgement operation.
-    return rce->calcCondMustVal(BR_det(last), must_true, must_false, *m_oc);
+    return m_rce->calcCondMustVal(BR_det(last), must_true, must_false, *m_oc);
 }
 
 
-//rce: RCE object, may be null.
 void InsertPreheaderMgr::checkAndInsertGuardBB(IRTab const& irtab,
-                                               OUT LICM * licm, RCE const* rce,
                                                OUT HoistCtx & ctx)
  {
     if (xoc::g_do_licm_no_guard || !isLoopExecConditional()) { return; }
-    ASSERT0(licm);
+    ASSERT0(m_licm);
     bool must_true, must_false;
-    if (tryEvalLoopExecCondition(rce, must_true, must_false, ctx) &&
-        must_true) {
+    if (tryEvalLoopExecCondition(must_true, must_false, ctx) && must_true) {
         return; //guard BB is unnecessary
     }
     IRTabIter it;
-    for (IR const* c = irtab.get_first(it); c != nullptr;
-         c = irtab.get_next(it)) {
+    for (IR const* c = irtab.get_first(it);
+         c != nullptr; c = irtab.get_next(it)) {
         ASSERT0(c->is_exp() || c->is_stmt());
         IR const* stmt = nullptr;
         if (c->is_exp()) {
@@ -237,11 +258,15 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(IRTab const& irtab,
             continue;
         }
         if (stmt->getBB() == m_li->getLoopHead()) { continue; }
-        if (licm->hasInsertedGuardBB(m_li)) { continue; }
+        if (m_licm->hasInsertedGuardBB(m_li)) { continue; }
         //Guard BB is necessary.
         IRBB * guard = m_gdhelp.insertGuard(m_li, m_preheader);
+        m_licm->getActMgr().dump("insert guard BB%u before prheader BB%u",
+            guard->id(), m_preheader->id());
+
+        //Move PRPHI and MDPHI from original preheader BB to guard BB.
         xoc::movePhi(m_preheader, guard, m_rg);
-        licm->setLoopHasBeenGuarded(m_li);
+        m_licm->setLoopHasBeenGuarded(m_li);
         ctx.inserted_guard_bb = true;
         ctx.cfg_changed = true;
         return;
@@ -275,16 +300,17 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
 }
 
 
-void InsertPreheaderMgr::updateMDSSADUForExpInPreHeader()
+void InsertPreheaderMgr::updateMDSSADUForExpInBB(IRBB const* bb)
 {
     ASSERT0(useMDSSADU());
     ASSERT0(m_mdssamgr);
     ASSERTN(m_oc->is_dom_valid(), ("DOM info must be available"));
+    ASSERT0(bb);
     //Note Phi operand in preheader should have been renamed
     //in InsertPhiHellper.
     BBIRListIter it;
     IRIter irit;
-    BBIRList const& irlst = const_cast<IRBB*>(m_preheader)->getIRList();
+    BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
     IR * prev = nullptr;
     for (IR * ir = irlst.get_head(&it); ir != nullptr;
          prev = ir, ir = irlst.get_next(&it)) {
@@ -293,8 +319,96 @@ void InsertPreheaderMgr::updateMDSSADUForExpInPreHeader()
              e != nullptr; e = xoc::iterExpNext(irit)) {
             ASSERT0(e->is_exp());
             if (!e->isMemRefNonPR()) { continue; }
-            m_mdssamgr->findAndSetLiveInDef(e, prev, m_preheader, *m_oc);
+            m_mdssamgr->findAndSetLiveInDef(e, prev, bb, *m_oc);
         }
+    }
+}
+
+
+void InsertPreheaderMgr::updateMDSSADUForExpInGuardStart()
+{
+    ASSERT0(m_gdhelp.getGuardStart());
+    updateMDSSADUForExpInBB(m_gdhelp.getGuardStart());
+}
+
+
+void InsertPreheaderMgr::updateMDSSADUForExpInPreHeader()
+{
+    //Note Phi operand in preheader should have been renamed
+    //in InsertPhiHellper.
+    updateMDSSADUForExpInBB(m_preheader);
+}
+
+
+static bool refHoistedPR(IRBB const* loophead, IR const* ir)
+{
+    ASSERT0(ir->is_stpr());
+    BBIRListIter it;
+    ConstIRIter tit;
+    PRNO irprno = ir->getPrno();
+    for (IR const* t = const_cast<IRBB*>(loophead)->getIRList().get_head(&it);
+         t != nullptr;
+         t = const_cast<IRBB*>(loophead)->getIRList().get_next(&it)) {
+        if (t->is_phi()) {
+            //Do not consider PHI because it is not real USE of PR. PHI is
+            //only used to converge PR value from diferent predecessors.
+            //e.g:licm3.c
+            //                 GUAARD_START:
+            //                 stpr $33 = ...
+            //      ___________| |
+            //     V             |
+            //GUARDED:           |
+            //stpr $34 = ... S1  |
+            // |                 |
+            // |____             |
+            //      |            |
+            //      V            V
+            //      __________________
+            //      LOOPHEAD:
+            //      phi $32 = $33, $34
+            //      falsebr $9 != 0
+            //Even if $34 is referenced by phi, the stmt S1 should not be move
+            //to GUARD_START BB.
+            continue;
+        }
+        tit.clean();
+        for (IR const* k = xoc::iterInitC(t, tit, true);
+             k != nullptr; k = xoc::iterNextC(tit, true)) {
+            if (k->is_pr() && k->getPrno() == irprno) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+void InsertPreheaderMgr::reviseStmtExecAtLeastOnce()
+{
+    if (!getInsertGuardHelper().hasInsertedGuard()) { return; }
+    IRBB * loophead = m_li->getLoopHead();
+    ASSERT0(loophead);
+    BBIRListIter it;
+    BBIRListIter nextit;
+    xcom::StrBuf tmp(8);
+    IRBB * guarded_bb = m_gdhelp.getGuardedBB();
+    IRBB * guard_start = m_gdhelp.getGuardStart();
+    ASSERT0(guarded_bb && guard_start);
+    for (guarded_bb->getIRList().get_head(&it);
+         it != nullptr; it = nextit) {
+        IR * ir = it->val();
+        nextit = it;
+        guarded_bb->getIRList().get_next(&nextit);
+        if (!ir->isPROp()) { continue; }
+        if (!refHoistedPR(loophead, ir)) { continue; }
+
+        //The result PR will be referenced at least the first access of
+        //loophead.
+        m_licm->getActMgr().dump(
+            "%s executes at least once, thus it is moved from BB%u to BB%u",
+            dumpIRName(ir, tmp), guarded_bb->id(), guard_start->id());
+        guarded_bb->getIRList().remove(it);
+        guard_start->getIRList().append_tail_ex(ir);
     }
 }
 
@@ -325,6 +439,9 @@ void InsertPreheaderMgr::reviseSSADU(HoistCtx const& ctx)
         updateMDSSADUForExpInPreHeader();
         updateMDSSADUForLoopHeadPhi(ctx);
     }
+    if (m_gdhelp.hasInsertedGuard() && useMDSSADU()) {
+        updateMDSSADUForExpInGuardStart();
+    }
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, *m_oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *m_oc));
 }
@@ -333,28 +450,31 @@ void InsertPreheaderMgr::reviseSSADU(HoistCtx const& ctx)
 void InsertPreheaderMgr::updateDomTree(DomTree & domtree)
 {
     if (m_gdhelp.hasInsertedGuard()) {
-        updateDomTreeByGuardRegion(m_li, m_gdhelp, domtree);
+        updateDomTreeByGuardRegion(m_li, m_gdhelp, domtree,
+                                   m_licm->getActMgr());
         return;
     }
-    if (m_preheader != nullptr) {
-        updateDomTreeByPreheader(m_li, m_preheader, domtree);
-    }
+    if (m_preheader == nullptr) { return; }
+    updateDomTreeByPreheader(m_li, m_preheader, domtree, m_licm->getActMgr());
 }
 
 
-bool InsertPreheaderMgr::perform(IRTab const& irtab, RCE const* rce,
-                                 OUT LICM * licm, MOD HoistCtx & ctx)
+bool InsertPreheaderMgr::perform(IRTab const& irtab,MOD HoistCtx & ctx)
 {
     //Always insert a preheader to facilitate the insertion of guard-BB.
     m_preheader = nullptr;
     bool insert_prehead = xoc::insertPreheader(m_li, m_rg, &m_preheader, m_oc,
                                                true);
     ctx.cfg_changed |= insert_prehead;
+    if (insert_prehead) {
+        m_licm->getActMgr().dump("insert preheader BB%u of LOOP%u",
+            m_preheader->id(), m_li->id());
+    }
     ASSERT0(!insert_prehead || m_preheader);
     if (!m_oc->is_dom_valid()) {
         m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_DOM, PASS_UNDEF);
     }
-    checkAndInsertGuardBB(irtab, licm, rce, ctx);
+    checkAndInsertGuardBB(irtab, ctx);
     updateDomTree(*ctx.domtree);
     ASSERT0(m_oc->is_dom_valid());
     ASSERT0(ctx.verifyDomTree());
@@ -366,6 +486,13 @@ bool InsertPreheaderMgr::perform(IRTab const& irtab, RCE const* rce,
 //
 //START LICM
 //
+void LICM::clean()
+{
+    m_irs_mgr.clean();
+    m_act_mgr.clean();
+}
+
+
 //Return true if find loop invariant expression.
 //Note that finding loop invariant does not mean finding hoist candidate.
 //Note the function try to recognize the loop invariant expression and stmt.
@@ -377,7 +504,9 @@ bool LICM::scanBB(IRBB * bb, LI<IRBB> const* li, bool * islegal,
 {
     bool find = false;
     IRIter irit;
-    for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+    BBIRListIter it;
+    for (IR * ir = bb->getIRList().get_head(&it);
+         ir != nullptr; ir = bb->getIRList().get_next(&it)) {
         if (!isWorthHoist(ir)) { continue; }
         if ((ir->isCallStmt() && !ir->isReadOnly()) || ir->is_region()) {
             //TODO: support call/region.
@@ -1442,7 +1571,6 @@ bool LICM::tryHoistAllDefStmt(LICMAnaCtx const& anactx, IR const* c,
 }
 
 
-//This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
 bool LICM::hoistStmtCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
                          OUT LI<IRBB> * li, OUT HoistCtx & ctx)
@@ -1517,7 +1645,6 @@ void LICM::tryPickKidInvExp(LICMAnaCtx const& anactx, IR * c,
 }
 
 
-//This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
 bool LICM::hoistExpCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
                         OUT LI<IRBB> * li, OUT HoistCtx & ctx)
@@ -1609,17 +1736,23 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
     ASSERT0(ctx.oc->is_loopinfo_valid());
     LICMAnaCtx anactx(m_rg, li);
     anactx.getMD2DefCnt().compute();
+
+    //First of all, do analysis that collects all hoisting candidiates.
     if (!analysisInvariantOp(li, anactx)) { return false; }
     if (anactx.getCandTab().get_elem_count() == 0) {
         //Note that finding loop invariant does not mean finding
         //hoist candidate.
         return false;
     }
-    InsertPreheaderMgr insertmgr(m_rg, ctx.oc, li, anactx);
+    InsertPreheaderMgr insertmgr(m_rg, ctx.oc, li, this, m_rce, anactx);
     if (insertmgr.needComplicatedGuard()) { return false; }
-    bool insert_prehead = insertmgr.perform(anactx.getConstCandTab(), m_rce,
-                                            this, ctx);
+
+    //Check whether the LOOP need a preheader BB. And inserting guard region
+    //if current loop's trip-count is undetermined.
+    bool insert_prehead = insertmgr.perform(anactx.getConstCandTab(), ctx);
     IRBB * preheader = insertmgr.getPreheader();
+
+    //Hoist candidates that may include expressions and stmts.
     bool succ_hoisted = hoistCand(anactx, preheader, li, ctx);
     bool changed = false;
     if (!succ_hoisted) {
@@ -1627,6 +1760,9 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
         //Note PDom may not be maintained.
         return false;
     }
+    ASSERT0(ctx.inserted_guard_bb ==
+            insertmgr.getInsertGuardHelper().hasInsertedGuard());
+    insertmgr.reviseStmtExecAtLeastOnce();
     insertmgr.reviseSSADU(ctx);
     changed |= insert_prehead;
     changed |= ctx.duset_changed;
@@ -1667,6 +1803,7 @@ bool LICM::dump() const
     m_rg->getLogMgr()->pauseBuffer();
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    m_act_mgr.dump();
     //Invariant Variable info has been dumpped during the transformation.
     Pass::dump();
     m_rg->getLogMgr()->resumeBuffer();
@@ -1773,7 +1910,7 @@ bool LICM::perform(OptCtx & oc)
     ctx.buildDomTree(m_cfg);
     bool change = doLoopTree(m_cfg->getLoopInfo(), ctx);
     postProcess(ctx, change, oc);
-    m_irs_mgr.clean();
+    clean();
     set_valid(true);
     END_TIMER(t, getPassName());
     return change;

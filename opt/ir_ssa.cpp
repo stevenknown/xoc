@@ -377,8 +377,9 @@ void VersionVerification::recordTopVer(
 void VersionVerification::collectDefinedPR(
     IRBB const* bb, OUT BB2PRSet & bb2defprs) const
 {
-    for (IR * ir = BB_first_ir(const_cast<IRBB*>(bb));
-         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+    BBIRListIter it;
+    for (IR * ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
+         ir != nullptr; ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
         if (!ir->isPROp()) { continue; }
         ASSERT0(ir->getResultPR());
         bb2defprs.addDefBB(ir->getPrno(), bb->id());
@@ -2996,8 +2997,10 @@ void PRSSAMgr::dupAndInsertPhiOpnd(IRBB const* bb, UINT pos, UINT num)
 void PRSSAMgr::removeSuccessorDesignatedPhiOpnd(IRBB const* succ, UINT pos)
 {
     ASSERT0(succ);
-    for (IR * ir = BB_first_ir(const_cast<IRBB*>(succ));
-         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(succ))) {
+    BBIRListIter it;
+    for (IR * ir = const_cast<IRBB*>(succ)->getIRList().get_head(&it);
+         ir != nullptr;
+         ir = const_cast<IRBB*>(succ)->getIRList().get_next(&it)) {
         if (!ir->is_phi()) { break; }
 
         //CASE:CFG optimization may have already remove the predecessor of

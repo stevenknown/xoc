@@ -465,7 +465,7 @@ void MDSet::dump(Region * rg) const
 }
 
 
-void MDSet::dump(MDSystem * ms, VarMgr const* vm, bool detail) const
+void MDSet::dump(MDSystem const* ms, VarMgr const* vm, bool detail) const
 {
     if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(ms);

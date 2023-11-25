@@ -557,23 +557,17 @@ void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
                                   IR const* use)
 {
     if (!getRegion()->isLogMgrInit()) { return; }
-    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+    note(getRegion(), "\n==-- DUMP %s '%s' --==",
          getPassName(), m_rg->getRegionName());
+    xcom::StrBuf tmp(8);
     note(getRegion(),
-         "\nPROPAGATING CANDIDATE: %s(id:%d) THAT LOCATED IN STMT:",
-         IRNAME(prop_value), prop_value->id());
-
+         "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
+         dumpIRName(prop_value, tmp));
     m_rg->getLogMgr()->incIndent(4);
     dumpIR(def_stmt, m_rg, nullptr, IR_DUMP_KID|IR_DUMP_VAR_DECL);
     m_rg->getLogMgr()->decIndent(4);
-    if (g_dump_opt.isDumpIRID()) {
-        note(getRegion(), "\nWILL REPLACE %s(id:%d) THAT LOCATED IN STMT:",
-             IRNAME(use), use->id());
-    } else {
-        note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
-             IRNAME(use));
-    }
-
+    note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
+         dumpIRName(use, tmp));
     m_rg->getLogMgr()->incIndent(4);
     if (use->is_id()) {
         ASSERT0(m_mdssamgr);
@@ -845,7 +839,6 @@ static void refinement(Region * rg, OptCtx & oc)
 {
     if (!g_do_refine) { return; }
     RefineCtx rf(&oc);
-    RC_insert_cvt(rf) = false;
     Refine * refine = (Refine*)rg->getPassMgr()->registerPass(PASS_REFINE);
     refine->refineBBlist(rg->getBBList(), rf);
 }
