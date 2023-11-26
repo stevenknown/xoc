@@ -261,7 +261,8 @@ IR * InsertCvt::convertArray(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
-IR * InsertCvt::convertIRUntilUnchange(IR * ir, bool & change, InsertCvtCtx & rc)
+IR * InsertCvt::convertIRUntilUnchange(IR * ir, bool & change,
+                                       InsertCvtCtx & rc)
 {
     bool lchange = true;
     IR * newir = nullptr;
@@ -416,7 +417,8 @@ IR * InsertCvt::convertDet(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
-IR * InsertCvt::convertIRlist(IR * ir_list, bool & change, MOD InsertCvtCtx & rc)
+IR * InsertCvt::convertIRlist(IR * ir_list, bool & change,
+                              MOD InsertCvtCtx & rc)
 {
     bool lchange = true; //local flag
     while (lchange) {
@@ -492,6 +494,36 @@ bool InsertCvt::convertBBlist(MOD BBList * ir_bb_list, MOD InsertCvtCtx & rc)
 }
 
 
+void InsertCvt::insertCvtForBinaryOpByPtrType(IR * ir, bool & change)
+{
+    IR * op0 = BIN_opnd0(ir);
+    IR * op1 = BIN_opnd1(ir);
+    ASSERT0(op0->is_ptr() || op1->is_ptr());
+    if (!op0->is_ptr() && op1->is_ptr()) {
+        xcom::swap(op0, op1);
+    }
+    ASSERT0(op0->is_ptr());
+    if (op1->getTypeSize(m_tm) > op0->getTypeSize(m_tm)) {
+        //If longer data type is compared with pointer, it always have to
+        //be truncated to the same size of pointer. Otherwise, the pointer
+        //comparison is meaningless.
+        ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
+                ("illegal pointer arith"));
+        DATA_TYPE t = m_tm->getPointerSizeDtype();
+        IR * newop1 = m_rg->getIRMgr()->buildCvt(op1,
+            m_tm->getSimplexTypeEx(t));
+        bool find = ir->replaceKid(op1, newop1, false);
+        ASSERT0_DUMMYUSE(find);
+        copyDbx(newop1, op1, m_rg);
+        change = true;
+        return;
+    }
+    //Smaller data size no need to process.
+    //e.g: char * p; if (p:ptr < a:i8) { ... }
+    //     CVT of a:i8 is dispensable.
+}
+
+
 void InsertCvt::insertCvtForBinaryOp(IR * ir, bool & change)
 {
     ASSERT0(ir->isBinaryOp());
@@ -505,25 +537,8 @@ void InsertCvt::insertCvtForBinaryOp(IR * ir, bool & change)
         }
         return;
     }
-    if (op0->is_ptr()) {
-        if (op1->getTypeSize(m_tm) > op0->getTypeSize(m_tm)) {
-            //If longer data type is compared with pointer, it always have to
-            //be truncated to the same size of pointer. Otherwise, the pointer
-            //comparison is meaningless.
-            ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
-                    ("illegal pointer arith"));
-            DATA_TYPE t = m_tm->getPointerSizeDtype();
-            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1,
-                m_tm->getSimplexTypeEx(t));
-            copyDbx(BIN_opnd1(ir), op1, m_rg);
-            ir->setParentPointer(false);
-            change = true;
-            return;
-        }
-
-        //Smaller data size no need to process.
-        //e.g: char * p; if (p:ptr < a:i8) { ... }
-        //     CVT of a:i8 is dispensable.
+    if (op0->is_ptr() || op1->is_ptr()) {
+        insertCvtForBinaryOpByPtrType(ir, change);
         return;
     }
     if (ir->is_logical()) {

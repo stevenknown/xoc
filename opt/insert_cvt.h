@@ -119,6 +119,7 @@ class InsertCvt : public Pass {
 
     //Insert CVT for float if necessary.
     virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
+    void insertCvtForBinaryOpByPtrType(IR * ir, bool & change);
 protected:
     TypeMgr * m_tm;
 public:
