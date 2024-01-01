@@ -133,6 +133,12 @@ public:
 //This class perform peephole optimizations.
 class Refine : public Pass {
     COPY_CONSTRUCTOR(Refine);
+protected:
+    TypeMgr * m_tm;
+protected:
+    //The function try to choose proper data-type for judgement operation.
+    //The data type is used to fold-const with specific judge operations.
+    virtual Type const* chooseValueIntTypeOfJudgeOp(IR const* exp) const;
 
     //The function prefer to compute ir's const value by float point type.
     IR * foldConstFloatUnary(IR * ir, bool & change);
@@ -198,11 +204,17 @@ class Refine : public Pass {
     //The function will attempt to recompute the MD reference for given 'ir'.
     //Note the computation require that DUMgr has been ready.
     void recomputeMayRef(IR * ir);
-protected:
-    TypeMgr * m_tm;
 public:
     explicit Refine(Region * rg);
     virtual ~Refine() {}
+
+    //Calculate the value according to given binary code and type.
+    HOST_INT calcBinIntVal(IR const* ir, HOST_INT v0, HOST_INT v1);
+
+    //The function computes the copmile-time constant according to target
+    //machine signed integer type.
+    virtual HOST_INT calcBinSignedIntVal(IR_CODE code, Type const* ty,
+                                         HOST_INT v0, HOST_INT v1);
 
     virtual bool dump() const;
 

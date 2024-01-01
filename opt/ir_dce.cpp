@@ -81,8 +81,7 @@ void DCECtx::dump(Region const* rg) const
 //
 //START DeadCodeElim
 //
-void DeadCodeElim::setEffectStmt(IR const* stmt,
-                                 bool set_bb_effect,
+void DeadCodeElim::setEffectStmt(IR const* stmt, bool set_bb_effect,
                                  MOD List<IR const*> * act_ir_lst,
                                  DCECtx & dcectx)
 {
@@ -152,8 +151,7 @@ void DeadCodeElim::checkValidAndRecomputeCDG()
 }
 
 
-//Return true if ir can be optimized.
-bool DeadCodeElim::check_stmt(IR const* ir)
+bool DeadCodeElim::checkEffectStmt(IR const* ir)
 {
     IterSideEffect it(ir);
     if (it.hasSideEffect()) {
@@ -182,14 +180,12 @@ bool DeadCodeElim::check_stmt(IR const* ir)
             }
         }
     }
-
-    m_citer.clean();
-    for (IR const* x = iterExpInitC(ir, m_citer);
-         x != nullptr; x = iterExpNextC(m_citer)) {
+    ConstIRIter citer;
+    for (IR const* x = iterExpInitC(ir, citer);
+         x != nullptr; x = iterExpNextC(citer)) {
         if (!m_is_use_md_du && x->isMemRefNonPR()) {
             return true;
         }
-
         if (!x->isMemRef()) { continue; }
 
         //Check if using volatile variable.
@@ -200,18 +196,17 @@ bool DeadCodeElim::check_stmt(IR const* ir)
             if (is_effect_read(md->get_base())) {
                 return true;
             }
-        } else {
-            MDSet const* mds = x->getRefMDSet();
-            if (mds != nullptr) {
-                MDSetIter iter;
-                for (BSIdx i = mds->get_first(&iter);
-                     i != BS_UNDEF; i = mds->get_next(i, &iter)) {
-                    MD * md2 = m_md_sys->getMD(i);
-                    ASSERT0(md2 != nullptr);
-                    if (is_effect_read(md2->get_base())) {
-                        return true;
-                    }
-                }
+            continue;
+        }
+        MDSet const* mds = x->getRefMDSet();
+        if (mds == nullptr) { continue; }
+        MDSetIter iter;
+        for (BSIdx i = mds->get_first(&iter);
+             i != BS_UNDEF; i = mds->get_next(i, &iter)) {
+            MD * md2 = m_md_sys->getMD(i);
+            ASSERT0(md2 != nullptr);
+            if (is_effect_read(md2->get_base())) {
+                return true;
             }
         }
     }
@@ -220,7 +215,7 @@ bool DeadCodeElim::check_stmt(IR const* ir)
 
 
 //Return true if ir is effect.
-bool DeadCodeElim::check_call(IR const* ir) const
+bool DeadCodeElim::checkCall(IR const* ir) const
 {
     ASSERT0(ir->isCallStmt());
     return !ir->isReadOnly() || IR_has_sideeffect(ir) || IR_no_move(ir);
@@ -254,7 +249,7 @@ void DeadCodeElim::mark_effect_ir(MOD List<IR const*> & work_list,
                 setEffectStmt(ir, true, &work_list, dcectx);
                 break;
             SWITCH_CASE_CALL:
-                if (check_call(ir)) {
+                if (checkCall(ir)) {
                     setEffectStmt(ir, true, &work_list, dcectx);
                 }
                 break;
@@ -264,7 +259,7 @@ void DeadCodeElim::mark_effect_ir(MOD List<IR const*> & work_list,
                 }
                 break;
             default:
-                if (check_stmt(ir)) {
+                if (checkEffectStmt(ir)) {
                     setEffectStmt(ir, true, &work_list, dcectx);
                 }
             }
@@ -491,13 +486,19 @@ bool DeadCodeElim::tryMarkBranch(IRBB const* bb,
     //If last ir of effect BB is branch operation, try to mark effect stmts
     //that controlled by current bb.
     IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
-    if (last_ir != nullptr &&
-        last_ir->isBranch() &&
-        !dcectx.isEffectStmt(last_ir) &&
-        find_effect_kid(last_ir, dcectx)) {
-        //IR_SWTICH might have multiple successors BB.
-        setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
-        return true;
+    if (last_ir != nullptr && last_ir->isBranch() &&
+        !dcectx.isEffectStmt(last_ir)) {
+        if (find_effect_kid(last_ir, dcectx)) {
+            //IR_SWTICH might have multiple successors BB.
+            setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
+            return true;
+        }
+        if (!getCFG()->isValidToKeepSSAIfRemoveBB(bb)) {
+            //Branch stmt and BB can NOT be removed becasue that will make SSA
+            //structure invalid.
+            setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
+            return true;
+        }
     }
     return false;
 }
@@ -652,7 +653,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
             //TODO:
             //CASE1:DEF=
             //         =USE
-            //CASE2:???=
+            //CASE2:...=
             //         =USE
             //Both cases need to collect all DEFs until meet
             //the dominated killing-def.
@@ -660,10 +661,10 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
             continue;
         }
 
-        //CASE1:???=
-        //         =???
+        //CASE1:...=
+        //         =...
         //CASE2:DEF=
-        //         =???
+        //         =...
         //Both cases need to collect all DEFs through def-chain.
         change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
     }
@@ -715,12 +716,15 @@ static void tryReviseAnalysisInfo(IR const* stmt, DeadCodeElim const* dce,
     default: break;
     }
     //We can not revise the DomInfo because the controlflow modification is
-    //compilcate.
+    //too compilcate.
     //e.g:BB1->BB2->BB3
     //     |         ^
     //     \________/
     //BB1 is the idom of BB3, after removing BB1->BB3, BB2 is add to the BB3's
     //DomSet, and being the idom of BB3 as well.
+    //Note the invalidation to DomInfo and MDSSA cause costly recomputation of
+    //all the necessary data-structure and information which will increase
+    //dramatically the compilation time.
     dcectx.getOptCtx()->setInvalidIfCFGChanged();
     dcectx.getOptCtx()->setInvalidMDSSA();
 }
@@ -734,6 +738,7 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
     IRListIter next = nullptr;
     bool tobecheck = false;
     Region * rg = dce->getRegion();
+    IRCFG * cfg = dce->getCFG();
     for (BB_irlist(bb).get_head(&ctir), next = ctir;
          ctir != nullptr; ctir = next) {
         IR * stmt = ctir->val();
@@ -745,16 +750,15 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
         //the SSA_uses and make sure they are all removable.
         //Use SSA related API.
         xoc::removeStmt(stmt, rg, *dcectx.getOptCtx());
-
         if (stmt->isConditionalBr() ||
             stmt->isUnconditionalBr() ||
             stmt->isMultiConditionalBr()) {
             remove_branch_stmt = true;
             tryReviseAnalysisInfo(stmt, dce, dcectx);
-            //No need verify PHI here, because SSA will rebuild
+            //No need verify PHI here, because SSA will be rebuilt
             //after this function.
             CfgOptCtx ctx(*dcectx.getOptCtx());
-            dce->getCFG()->reviseOutEdgeForFallthroughBB(bb, bbit, ctx);
+            cfg->changeToBeFallthroughBB(bb, bbit, ctx);
         }
         //Now, stmt is safe to free.
         rg->freeIRTree(stmt);
@@ -775,26 +779,29 @@ bool DeadCodeElim::removeIneffectIR(DCECtx const& dcectx,
     bool change = false;
     for (IRBB * bb = bbl->get_head(&bbit);
          bb != nullptr; bb = bbl->get_next(&bbit)) {
-        change |= removeIneffectIRImpl(this, dcectx, bb, bbit,
-                                       remove_branch_stmt);
-        if (useMDSSADU() && dcectx.getOptCtx()->is_dom_valid()) {
-            //Note MDSSA operation need DomInfo available.
+        change |= removeIneffectIRImpl(
+            this, dcectx, bb, bbit, remove_branch_stmt);
+        if (!useMDSSADU() || !dcectx.getOptCtx()->is_dom_valid()) {
+            //Optimize MDSSA operations, such as PHI, need valid DomInfo.
+            continue;
+        }
+        if (m_is_reserve_phi) {
             //TBD:Do we need to remove MDPHI which witout any USE?
             //I think keeping PHI there could maintain Def-Chain, e.g:
-            //md1v1, md1v2, md1v3, md1v4 are in different BB, PHI is acted as
-            //a disjoint dominate point to diverge data flow to md1v3
-            //and md1v4.
-            //        md1v1<-
-            //          |
-            //          V
-            //        md1v2<-PHI
-            //       /         |
-            //       V         V
-            //  md1v3<-        md1v4<-
-            if (!m_is_reserve_phi &&
-                 m_mdssamgr->removeRedundantPhi(bb, *dcectx.getOptCtx())) {
-                change = true;
-            }
+            //md1v1, md1v2, md1v3, md1v4 are in different BBs. Here PHI
+            //is acted as a disjoint dominator point to diverge data flow
+            //to md1v3 and md1v4.
+            //e.g:md1v1<-...
+            //      |
+            //      V
+            //    md1v2<-PHI
+            //    |        |
+            //    V        V
+            // md1v3<-...  md1v4<-...
+            continue;
+        }
+        if (m_mdssamgr->removeRedundantPhi(bb, *dcectx.getOptCtx())) {
+            change = true;
         }
     }
     return change;
@@ -830,28 +837,23 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list,
     List<IRBB*> succs;
     UINT const maxtry = 0xFFFF;
     UINT count = 0;
+    ConstIRIter citer;
     while (change && count < maxtry) {
         change = false;
         for (IR const* ir = pwlst1->get_head();
              ir != nullptr; ir = pwlst1->get_next()) {
-            m_citer.clean();
-            for (IR const* x = iterExpInitC(ir, m_citer);
-                 x != nullptr; x = iterExpNextC(m_citer)) {
+            citer.clean();
+            for (IR const* x = iterExpInitC(ir, citer);
+                 x != nullptr; x = iterExpNextC(citer)) {
                 if (!x->isMemOpnd()) { continue; }
                 change |= collectByDU(x, pwlst2, dcectx, usemdssa, useprssa);
            }
         }
-
-        //dumpIRList((IREList&)*pwlst2);
         if (m_is_elim_cfs) {
             change |= preserve_cd(*pwlst2, dcectx);
         }
-
-        //dumpIRList((IREList&)*pwlst2);
         pwlst1->clean();
-        List<IR const*> * tmp = pwlst1;
-        pwlst1 = pwlst2;
-        pwlst2 = tmp;
+        xcom::swap(pwlst1, pwlst2);
         count++;
     }
     ASSERT0(count < maxtry);
@@ -875,38 +877,15 @@ bool DeadCodeElim::removeRedundantPhi(MOD OptCtx & oc)
 }
 
 
-//An aggressive algo will be used if CDG is avaliable.
-bool DeadCodeElim::perform(OptCtx & oc)
+bool DeadCodeElim::elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
+                            OUT bool & remove_branch_stmt)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-    if (!oc.is_ref_valid()) { return false; }
-    m_oc = &oc;
-    m_mdssamgr = m_rg->getMDSSAMgr();
-    m_prssamgr = m_rg->getPRSSAMgr();
-    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
-        //DCE use either classic PR DU chain or PRSSA.
-        //At least one kind of DU chain should be avaiable.
-        return false;
-    }
-    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
-        //DCE use either classic MD DU chain or MDSSA.
-        //At least one kind of DU chain should be avaiable.
-        return false;
-    }
-    START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-    DumpBufferSwitch buff(m_rg->getLogMgr());
-    if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
-        dumpBeforePass();
-    }
     bool change = false;
     bool removed = false;
     UINT count = 0;
     List<IR const*> work_list;
     UINT const max_iter = 0xFFFF;
-    bool remove_branch_stmt = false;
-    DCECtx dcectx(&oc);
+    remove_branch_stmt = false;
     do {
         dcectx.reinit(m_rg);
         checkValidAndRecomputeCDG();
@@ -918,6 +897,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         iter_collect(work_list, dcectx);
 
         //Remove ineffect IRs.
+        //dcectx.setRemoveCFS(false);
         removed = removeIneffectIR(dcectx, remove_branch_stmt);
 
         //Remove dissociated vertex.
@@ -948,6 +928,38 @@ bool DeadCodeElim::perform(OptCtx & oc)
         change |= removed;
     } while (removed && count < max_iter);
     ASSERT0(!removed);
+    return change;
+}
+
+
+//An aggressive algo will be used if CDG is avaliable.
+bool DeadCodeElim::perform(OptCtx & oc)
+{
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
+    m_oc = &oc;
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
+    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    START_TIMER(t, getPassName());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
+        dumpBeforePass();
+    }
+    bool remove_branch_stmt = false;
+    DCECtx dcectx(&oc);
+    bool change = elimImpl(oc, dcectx, remove_branch_stmt);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();
         END_TIMER(t, getPassName());

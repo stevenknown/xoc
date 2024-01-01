@@ -281,21 +281,28 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
         CfgOptCtx coctx(*m_oc);
         m_gdhelp.removeGuardRegion(*ctx.domtree);
         ASSERT0(!m_cfg->isVertex(m_preheader->id()));
+
         //Useless preheader has been removed.
         ctx.cleanAfterLoop();
+        ASSERT0(ctx.verifyDomTree());
         return;
     }
     if (m_preheader != nullptr) {
-        //Remove the preheader just inserted.
+        //Update DomTree before BB structure removed, because its id is freed.
         ctx.domtree->remove(m_preheader->id());
+
+        //Remove the preheader just inserted.
         CfgOptCtx coctx(*m_oc);
-        bool res = m_cfg->removeSingleEmptyBB(m_preheader, coctx);
+        RemoveEmptyBBCtx rmctx(coctx);
+        rmctx.setForceRemove(true);
+        bool res = m_cfg->removeSingleEmptyBB(m_preheader, rmctx);
         ASSERT0_DUMMYUSE(res);
-        ASSERTN(coctx.numOfRemovedEmptyBB() == 1, ("only preheader removed"));
+
         //removeEmptyBB only maintained these frequently used CFG info.
         OptCtx::setInvalidIfCFGChangedExcept(m_oc, PASS_RPO, PASS_DOM,
                                              PASS_LOOP_INFO, PASS_UNDEF);
     }
+    ASSERT0(ctx.verifyDomTree());
     ctx.cleanAfterLoop();
 }
 
@@ -1747,6 +1754,7 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
     InsertPreheaderMgr insertmgr(m_rg, ctx.oc, li, this, m_rce, anactx);
     if (insertmgr.needComplicatedGuard()) { return false; }
 
+    ASSERT0(ctx.verifyDomTree());
     //Check whether the LOOP need a preheader BB. And inserting guard region
     //if current loop's trip-count is undetermined.
     bool insert_prehead = insertmgr.perform(anactx.getConstCandTab(), ctx);

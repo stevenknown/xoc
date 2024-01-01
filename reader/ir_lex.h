@@ -35,8 +35,10 @@ typedef enum _TOKEN {
     T_IDENTIFIER, // (A-Z|a-z)(A-Z|a-z|0-9)*
     T_IMM, // 0~9
     T_IMML, // 0~9L
+    T_IMMLL, // 0~9LL
     T_IMMU, // unsigned
     T_IMMUL, // unsigned long
+    T_IMMULL, // unsigned long long
     T_FP, // double type decimal e.g 3.14
     T_FPF, // float type decimal e.g 3.14
     T_FPLD, // long double type decimal e.g 3.14
@@ -279,6 +281,13 @@ protected:
     }
     Lexer::STATUS getLine();
     CHAR getNextChar();
+
+    //The function is always used as post-process when parsing a token.
+    //If given token is an immediate, the function will parse and check whether
+    //the suffix if exist is legal.
+    //e.g:0x7fffull, 1.1f, etc.
+    //t: the latest token that has been parsed by previous functions.
+    TOKEN parse_suffix(TOKEN t);
 
     //Read LEX_MAX_BUF_LINE characters from src file.
     Lexer::STATUS readLineBuf(bool is_some_chars_in_cur_line);

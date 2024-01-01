@@ -474,12 +474,10 @@ static bool is_call_may_def_helper(IR const* call, IR const* use,
     if (call->isExactDef(use_md, use_mds)) {
         return true;
     }
-
     if (call_maydef != nullptr) {
         if (use_md != nullptr && call_maydef->is_contain(use_md, rg)) {
             return true;
         }
-
         if (use_mds != nullptr &&
             (use_mds == call_maydef || call_maydef->is_intersect(*use_mds))) {
             return true;
@@ -506,7 +504,6 @@ bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur)
         for (IR const* x = iterInitC(use, m_citer);
              x != nullptr; x = iterNextC(m_citer)) {
             if (!x->isMemOpnd()) { continue; }
-
             if (is_call_may_def_helper(call, x, call_maydef, m_rg)) {
                 return true;
             }
@@ -589,7 +586,6 @@ void DUMgr::computeArrayRef(IR * ir, OUT MDSet * ret_mds, CompFlag compflag,
         ASSERT0((ir->getRefMDSet() && !ir->getRefMDSet()->is_empty()) ||
                 ir->getRefMD());
     }
-
     if (compflag.have(COMP_EXP_RECOMPUTE)) {
         //if (duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
         //    computeOverlapMDSet(ir, false);
@@ -599,25 +595,24 @@ void DUMgr::computeArrayRef(IR * ir, OUT MDSet * ret_mds, CompFlag compflag,
         //only ReachDef of PR is required by user.
         computeOverlapMDSet(ir, false);
 
-        //Compute referred MDs to subscript expression.
+        //Compute refered MDs to subscript expression.
         for (IR * s = ARR_sub_list(ir); s != nullptr; s = s->get_next()) {
             computeExpression(s, ret_mds, compflag, duflag);
         }
         computeExpression(ARR_base(ir), ret_mds, compflag, duflag);
         return;
     }
-
     if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
         for (IR * s = ARR_sub_list(ir); s != nullptr; s = s->get_next()) {
             computeExpression(s, ret_mds, compflag, duflag);
         }
         computeExpression(ARR_base(ir), ret_mds, compflag, duflag);
-
         if (duflag.have(DUOPT_COMPUTE_NONPR_DU) && ir->is_array()) {
-            //USE-MDs may be nullptr, if array base is NOT an LDA(ID).
+            //USE-MayRef may be nullptr, if array base is NOT an LDA(ID).
             //e.g: given (*p)[1], p is pointer that point to an array.
             MD const* use = ir->getExactRef();
             if (use != nullptr) {
+                ASSERT0(ret_mds);
                 ret_mds->bunion(use, *getSBSMgr());
             }
         }
@@ -659,12 +654,6 @@ void DUMgr::computeExtExpression(IR * ir, OUT MDSet * ret_mds,
 }
 
 
-//Walk through IR tree to compute or collect referrenced MD.
-//'ret_mds': In COMP_EXP_RECOMPUTE mode, it is used as tmp;
-//  and in COMP_EXP_COLLECT_MUST_USE mode, it is
-//  used to collect MUST-USE MD.
-//Note this function will update ir's RefMD and RefMDSet if duflag contain
-//COMP_EXP_RECOMPUTE
 void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
                               CompFlag compflag, DUOptFlag duflag)
 {
@@ -676,7 +665,7 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
         if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
             ; //It does not use MD.
         }
-        break;
+        return;
     SWITCH_CASE_DIRECT_MEM_EXP:
         if (compflag.have(COMP_EXP_RECOMPUTE)) {
             //The reference MD should be assigned first.
@@ -691,15 +680,19 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
             //because DURef also have to compute NON-PR MD even if
             //only ReachDef of PR is required by user.
             computeOverlapMDSet(ir, false);
-        } else if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            return;
+        }
+        if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            ASSERT0(ret_mds);
             //Collect the exact MD that current ir 'must' reference.
             MD const* t = ir->getRefMD();
             ASSERT0(t);
             if (t->is_exact()) {
                 ret_mds->bunion_pure(t->id(), *getSBSMgr());
             }
+            return;
         }
-        break;
+        return;
     SWITCH_CASE_INDIRECT_MEM_EXP:
         if (compflag.have(COMP_EXP_RECOMPUTE)) {
             //Sideeffect information should have been computed by AA.
@@ -714,7 +707,10 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
             //because DURef also have to compute NON-PR MD even if
             //only ReachDef of PR is required by user.
             computeOverlapMDSet(ir, false);
-        } else if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            return;
+        }
+        if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            ASSERT0(ret_mds);
             //Collect the exact MD that current ir 'must' reference.
             MD const* t = ir->getRefMD();
             if (t != nullptr && t->is_exact()) {
@@ -730,8 +726,9 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
                 ret_mds->bunion(use, *getSBSMgr());
             }
             computeExpression(ir->getBase(), ret_mds, compflag, duflag);
+            return;
         }
-        break;
+        return;
     case IR_LDA:
         if (compflag.have(COMP_EXP_RECOMPUTE)) {
             //LDA do NOT reference any MD.
@@ -744,29 +741,32 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
             //ASSERT0(ir->getRefMD());
             ASSERT0(ir->getRefMD() == nullptr);
             ASSERT0(ir->getRefMDSet() == nullptr);
-        } else if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            return;
+        }
+        if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
             ; //LDA does not use MD.
         }
-        break;
+        return;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
     case IR_SELECT:
         inferAllKidMDRef(ir, ret_mds, compflag, duflag);
         ASSERT0(ir->getDU() == nullptr);
-        break;
+        return;
     case IR_LABEL:
-        break;
+        return;
     SWITCH_CASE_READ_ARRAY:
         computeArrayRef(ir, ret_mds, compflag, duflag);
-        break;
+        return;
     SWITCH_CASE_READ_PR:
         ASSERT0(ir->getRefMDSet() == nullptr);
         if (compflag.have(COMP_EXP_COLLECT_MUST_USE)) {
+            ASSERT0(ret_mds);
             MD const* t = ir->getRefMD();
             ASSERT0(t);
             ret_mds->bunion(t, *getSBSMgr());
         }
-        break;
+        return;
     default: computeExtExpression(ir, ret_mds, compflag, duflag);
     }
 }
@@ -1598,7 +1598,6 @@ void DUMgr::inferIndirectMemStmt(IR * ir, DUOptFlag duflag)
 }
 
 
-//Return true if the output result has united call's MayDef.
 bool DUMgr::inferCallStmtForNonPRViaCallGraph(IR const* ir,
                                               OUT MDSet & maydefuse)
 {
@@ -1642,7 +1641,7 @@ void DUMgr::setToWorstCase(IR * ir)
     //variable that do not be taken address can not be changed by call.
     //In order to improve precision, we have to query MayDef/MayUse
     //info from CallGraph.
-    ir->setMayRef(m_aa->getMayPointToMDSet(), m_rg);
+    ir->setMayRef(m_aa->getWorstCase(), m_rg);
 }
 
 
@@ -1658,21 +1657,44 @@ void DUMgr::setToConservative(OUT MDSet & maydefuse)
 
 void DUMgr::genDummyuseForCallStmt(IR * ir, MDSet const* mayref)
 {
-    //Build dummyuse for call.
+    //Build dummyuse IR expressions for CallStmt.
     if (!((CCall*)ir)->hasDummyUse() || !CALL_dummyuse(ir)->is_ild()) {
         //TODO:consider append DefUse info on existed dummyuse.
         ((CCall*)ir)->addDummyUse(m_rg);
     }
-
     ASSERTN(CALL_dummyuse(ir)->is_ild(),
-            ("ild can better present MD that based on different VAR"));
+            ("ILD could better present MD that based on different Var"));
     CALL_dummyuse(ir)->setMayRef(mayref, m_rg);
+}
+
+
+static MDSet const* collectParamMayPointTo(
+    OUT MDSet & maypt, MOD xcom::DefMiscBitSetMgr & sbs,
+    IR const* irlst, AliasAnalysis const* aa)
+{
+    ASSERT0(irlst);
+    MD2MDSet const* mx = nullptr;
+    if (aa->isFlowSensitive()) {
+        mx = aa->mapBBToMD2MDSet(irlst->getStmt()->getBB()->id());
+    } else {
+        mx = const_cast<AliasAnalysis*>(aa)->getUniqueMD2MDSet();
+    }
+    ASSERT0(mx);
+    MDSet const* worst = nullptr;
+    for (IR const* p = irlst; p != nullptr; p = p->get_next()) {
+        ASSERT0(p->is_exp());
+        worst = aa->collectMayPointTo(maypt, sbs, p, *mx);
+        if (worst != nullptr) { return worst; }
+    }
+    return worst;
 }
 
 
 void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
 {
     //Compute MD Reference for NonPR.
+    //If call's ref is not the worst, the structure is used to record the
+    //MD references of CallStmt.
     MDSet maydefuse;
     MDSet const* worst = nullptr;
     if (m_aa->isWorstCase(ir->getMayRef())) {
@@ -1681,19 +1703,25 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
         maydefuse.bunion(*ir->getMayRef(), *getSBSMgr());
     }
 
-    //Analysis and set MustRef and MayRef for parameters.
+    //CASE:AA's point-to data structure has been destoried after AA::perform().
+    //Therefore, the MayRef that considered the parameter's point-to has
+    //computed during AA.
+    //worst = collectParamMayPointTo(
+    //  maydefuse, *getSBSMgr(), CALL_param_list(ir), m_aa);
+    DUMMYUSE(collectParamMayPointTo); //to avoid gcc warning complaint.
+
+    //Compute MustRef and MayRef for each parameters.
     for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
         computeExpression(p, nullptr, COMP_EXP_RECOMPUTE, duflag);
     }
 
-    //Regard MDSet of dummyuse as the MayRef of current CallStmt.
+    //Regard dummyuse's MD references as the MayRef of CallStmt.
     for (IR * d = CALL_dummyuse(ir); d != nullptr; d = d->get_next()) {
         computeExpression(d, nullptr, COMP_EXP_RECOMPUTE, duflag);
         if (worst != nullptr) {
-            //maydefuse already be the worst case.
+            //ir's MD ref is already the worst.
             continue;
         }
-
         if (d->getRefMD() != nullptr) {
             maydefuse.bunion_pure(d->getRefMD()->id(), *getSBSMgr());
         }
@@ -1701,30 +1729,29 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
             maydefuse.bunion_pure(*d->getRefMDSet(), *getSBSMgr());
         }
     }
-
-    if (ir->isReadOnly() ||
-        inferCallStmtForNonPRViaCallGraph(ir, maydefuse)) {
-        //Hash the MDSet.
+    if (ir->isReadOnly() || inferCallStmtForNonPRViaCallGraph(ir, maydefuse)) {
         //Regard both USE and DEF as ir's MayRef.
-        //TODO:differetiate the USE set and DEF set of CALL stmt
-        //     for better DefUse precision.
-        Vector<MD const*> tmp;
+        //TODO:differetiate the USE set and DEF set of CallStmt
+        //to get more precise DefUse chain precision.
+        xcom::Vector<MD const*> tmp;
         m_md_sys->computeOverlap(m_rg, maydefuse, tmp,
                                  m_tab_iter, *getSBSMgr(), true);
         if (maydefuse.is_empty()) {
+            //Call does not have any MayRef.
             ir->cleanMayRef();
-        } else {
-            MDSet const* hashed = m_mds_hash->append(maydefuse);
-            ir->setMayRef(hashed, m_rg);
-            genDummyuseForCallStmt(ir, hashed);
-            maydefuse.clean(*getSBSMgr());
+            return;
         }
+        //Hash the MDSet and set the hashed MDSet as call's MayRef.
+        MDSet const* hashed = m_mds_hash->append(maydefuse);
+        ir->setMayRef(hashed, m_rg);
+        genDummyuseForCallStmt(ir, hashed);
+        maydefuse.clean(*getSBSMgr());
         return;
     }
-
     if (worst == nullptr) {
+        //ir's MD ref is NOT the worst.
         setToConservative(maydefuse);
-        Vector<MD const*> tmpvec;
+        xcom::Vector<MD const*> tmpvec;
         m_md_sys->computeOverlap(m_rg, maydefuse, tmpvec, m_tab_iter,
                                  *getSBSMgr(), true);
 
@@ -1735,12 +1762,11 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
         MDSet const* hashed = m_mds_hash->append(maydefuse);
         ir->setMayRef(hashed, m_rg);
     } else {
-        //ir already to be worst case.
+        //ir's MD ref is the worst.
         ASSERT0(m_aa->isWorstCase(ir->getMayRef()));
         //setToWorstCase(ir);
     }
-
-    genDummyuseForCallStmt(ir, m_aa->getMayPointToMDSet());
+    genDummyuseForCallStmt(ir, m_aa->getWorstCase());
     maydefuse.clean(*getSBSMgr());
 }
 
@@ -1757,6 +1783,13 @@ void DUMgr::inferCallStmt(IR * ir, DUOptFlag duflag)
         computeExpression(ICALL_callee(ir), nullptr,
                           COMP_EXP_RECOMPUTE, duflag);
     }
+    //CASE:Always compute the MD reference for parameters and dummy-use,
+    //because even user did not ask to compute NonPR Ref, the MDSSA also need
+    //the MD reference information to build correct MDSSAInfo.
+    //e.g:exec/array_alias.c
+    //  call foo(lda ga); #S1
+    //  In this case, foo may define ga, thus the MD references should contain
+    //  all MDs that pointed by ga.
     if (!duflag.have(DUOPT_COMPUTE_NONPR_REF)) {
         //Only compute DU reference for PR.
         for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
@@ -2834,6 +2867,7 @@ void DUMgr::cleanDUSet(UINT irid, DUSet * set)
 void DUMgr::updateDefSetAccordingToMayRef(IR * ir, MD const* mustexact)
 {
     ASSERT0(mustexact && mustexact->is_exact());
+
     //Pick off stmt from md's DEF set.
     //e.g: Assume the MD of struct {int a;} s, is MD13, and s.a is MD4,
     //then MD4 and MD13 are overlapped.
@@ -2854,7 +2888,7 @@ void DUMgr::updateDefSetAccordingToMayRef(IR * ir, MD const* mustexact)
 
         //Iterate stmt in def-list of MD in maydef-set.
         //Check if current stmt 'ir' killed stmt in def-list of
-        //referred md.
+        //referenced md.
         DefSBitSetCore * dlst = m_md2irs->get((MDIdx)i);
         if (dlst != nullptr) {
             DefSBitSetIter sc = nullptr;
@@ -3567,13 +3601,39 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
 }
 
 
+//The function replaces the MayRef by given new MDSet.
+//Return true if at least one IR's MayRef has been relpaced.
+static bool replaceMayRef(
+    MOD Region * rg, BBList const* bblst, MDSet const* oldset,
+    MDSet const* newset)
+{
+    BBListIter bbit;
+    IRIter irit;
+    bool change = false;
+    for (IRBB * bb = bblst->get_head(&bbit);
+         bb != nullptr; bb = bblst->get_next(&bbit)) {
+        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
+            irit.clean();
+            for (IR * x = xoc::iterInit(ir, irit, true);
+                 x != nullptr; x = xoc::iterNext(irit)) {
+                if (!x->isMemRef()) { continue; }
+                if (x->getMayRef() == oldset) {
+                    x->setMayRef(newset, rg);
+                    change = true;
+                }
+            }
+        }
+    }
+    return change;
+}
+
+
 void DUMgr::computeOverlapSetForWorstCase()
 {
     ASSERT0(m_aa);
-    MDSet const* worst = m_aa->getMayPointToMDSet();
+    MDSet const* worst = m_aa->getWorstCase();
     if (worst == nullptr) { return; }
-
-    Vector<MD const*> tmpvec;
+    xcom::Vector<MD const*> tmpvec;
     MDSet tmpmds;
     m_md_sys->computeOverlap(m_rg, *worst, tmpmds, m_tab_iter,
                              *getSBSMgr(), true);
@@ -3581,7 +3641,16 @@ void DUMgr::computeOverlapSetForWorstCase()
 
     //Register the MDSet.
     tmpmds.bunion(*worst, *getSBSMgr());
-    m_aa->setMayPointToMDSet(m_mds_hash->append(tmpmds));
+
+    //CASE:Change the worst case MDSet with recomputed value.
+    //Note here we just overwrite the content of
+    //original MDSet pointer rather than change the MDSet pointer in AA with
+    //a hashed new pointer. The reason is that some IRs has recorded the worst
+    //case MDSet pointer as their MayRef. And we are not going to iterate all
+    //IRs to update their MayRef with the new hashed pointer.
+    MDSet const* newworst = m_mds_hash->append(tmpmds);
+    m_aa->setMayPointToMDSet(newworst);
+    replaceMayRef(m_rg, m_rg->getBBList(), worst, newworst);
     tmpmds.clean(*getSBSMgr());
 }
 
@@ -3629,7 +3698,8 @@ bool DUMgr::perform(MOD OptCtx & oc, DUOptFlag flag)
     }
     ASSERT0(oc.is_cfg_valid()); //First, only cfg is needed.
 
-    computeOverlapSetForWorstCase();
+    //TBD:Does it necessary to compute the overlapped MDSet to worst case?
+    //computeOverlapSetForWorstCase();
     if (flag.have(DUOPT_COMPUTE_PR_REF) || flag.have(DUOPT_COMPUTE_NONPR_REF)) {
         ASSERT0(oc.is_aa_valid());
         computeMDRef(oc, flag);

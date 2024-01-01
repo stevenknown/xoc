@@ -53,6 +53,7 @@ static VNTypeDesc g_vntype_desc[] = {
     { VN_FP, "FP", },
     { VN_STR, "STR", },
     { VN_MC_INT, "MC_INT", },
+    { VN_CONST, "CONST", },
     { VN_NUM, "", },
 };
 
@@ -62,6 +63,16 @@ CHAR const* VNTypeDesc::getVTName(VN_TYPE vt)
     ASSERT0(vt > VN_UNKNOWN && vt < VN_NUM);
     return g_vntype_desc[vt].vt_name;
 }
+
+
+//
+//START VN
+//
+void VN::dump(Region const* rg) const
+{
+    prt(rg, "VN%u,%s", id(), VNTypeDesc::getVTName(getType()));
+}
+//END VN
 
 
 //
@@ -79,6 +90,8 @@ GVN::GVN(Region * rg) : Pass(rg)
     m_is_comp_lda_string = !m_rg->getRegionMgr()->isRegardAllStringAsSameMD();
     m_is_alloc_livein_vn = false;
     m_pool = nullptr;
+    m_vn_vec = nullptr;
+    m_refine = nullptr;
     init();
 }
 
@@ -98,6 +111,9 @@ VN * GVN::allocVN()
         vn->clean();
     }
     VN_id(vn) = m_vn_count++;
+    if (m_vn_vec != nullptr) {
+        m_vn_vec->set(vn->id(), vn);
+    }
     return vn;
 }
 
@@ -148,6 +164,11 @@ void GVN::init()
     }
     m_stmt2domdef.init(MAX(4, xcom::getNearestPowerOf2(n/2)));
     m_pool = smpoolCreate(sizeof(VN) * 4, MEM_COMM);
+    if (g_dump_opt.isDumpGVN()) {
+        m_vn_vec = new xcom::Vector<VN const*>(32);
+    } else {
+        m_vn_vec = nullptr;
+    }
 }
 
 
@@ -157,6 +178,10 @@ void GVN::destroy()
     destroyLocalUsed();
     smpoolDelete(m_pool);
     m_pool = nullptr;
+    if (m_vn_vec != nullptr) {
+        delete m_vn_vec;
+        m_vn_vec = nullptr;
+    }
 }
 
 
@@ -241,52 +266,110 @@ void GVN::clean()
 }
 
 
-void GVN::dumpVNHash() const
+void GVN::dumpAllVN() const
 {
-    Tab2Iter it2;
-    Tab3Iter it3;
-    for (VecIdx i = 0; i <= m_irc_vec.get_last_idx(); i++) {
-        if (isBinary((IR_CODE)i)) {
-            Tab2 * tab2 = (Tab2*)m_irc_vec.get(i);
-            if (tab2 == nullptr) { continue; }
+    if (m_vn_vec == nullptr) { return; }
+    note(getRegion(), "\n==-- DUMP ALL VN --==");
+    m_rg->getLogMgr()->incIndent(2);
+    for (UINT i = 0; i < m_vn_vec->get_elem_count(); i++) {
+        VN const* vn = m_vn_vec->get(i);
+        if (vn == nullptr) { continue; }
+        note(m_rg, "\n");
+        vn->dump(m_rg);
+    }
+    m_rg->getLogMgr()->decIndent(2);
+}
 
-            it2.clean();
-            Tab1 * tab1;
-            for (tab2->get_first(it2, &tab1); tab1 != nullptr;
-                 tab2->get_next(it2, &tab1)) {
-                if (tab1 == nullptr) { continue; }
-            }
-            continue;
+
+void GVN::dumpMiscMap() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==-- DUMP IR2VN --==");
+    {
+        m_rg->getLogMgr()->incIndent(2);
+        xcom::StrBuf buf(16);
+        IR2VNIter it;
+        VN const* vn;
+        for (UINT irid = m_ir2vn.get_first(it, &vn);
+             vn != nullptr; irid = m_ir2vn.get_next(it, &vn)) {
+            IR const* ir = m_rg->getIR(irid);
+            ASSERT0(ir);
+            note(m_rg, "\n%s:", dumpIRName(ir, buf));
+            vn->dump(m_rg);
         }
-
-        if (isUnary((IR_CODE)i)) {
-            Tab1 * tab1 = (Tab1*)m_irc_vec.get(i);
-            if (tab1 == nullptr) { continue; }
-            continue;
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP MDPhi2VN --==");
+    {
+        m_rg->getLogMgr()->incIndent(2);
+        MDPhi2VNIter it;
+        VN const* vn;
+        for (UINT phiid = m_mdphi2vn.get_first(it, &vn);
+             vn != nullptr; phiid = m_mdphi2vn.get_next(it, &vn)) {
+            note(m_rg, "\nMDPhi%u:", phiid);
+            vn->dump(m_rg);
         }
-
-        if (isTriple((IR_CODE)i)) {
-            Tab3 * tab3 = (Tab3*)m_irc_vec.get(i);
-            if (tab3 == nullptr) { continue; }
-
-            it3.clean();
-            Tab2 * tab2;
-            for (tab3->get_first(it3, &tab2); tab2 != nullptr;
-                 tab3->get_next(it3, &tab2)) {
-            }
-            continue;
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP Longlong2VN --==");
+    if (m_ll2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        Longlong2VNIter it;
+        for (VN const* vn = m_ll2vn.get_first_elem(it);
+             vn != nullptr; vn = m_ll2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
         }
-
-        if (isQuad((IR_CODE)i)) {
-            continue;
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP LonglongMC2VN --==");
+    if (m_llmc2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        LonglongMC2VNIter it;
+        for (VN const* vn = m_llmc2vn.get_first_elem(it);
+             vn != nullptr; vn = m_llmc2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
         }
-
-        ASSERT0(m_irc_vec.get(i) == nullptr);
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP FP2VN --==");
+    if (m_fp2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        FP2VNIter it;
+        for (VN const* vn = m_fp2vn.get_first_elem(it);
+             vn != nullptr; vn = m_fp2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
+        }
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP Str2VN --==");
+    if (m_str2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        Sym2VNIter it;
+        for (VN const* vn = m_str2vn.get_first_elem(it);
+             vn != nullptr; vn = m_str2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
+        }
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP MD2VN --==");
+    if (m_md2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        MD2VNIter it;
+        for (VN const* vn = m_md2vn.get_first_elem(it);
+             vn != nullptr; vn = m_md2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
+        }
+        m_rg->getLogMgr()->decIndent(2);
     }
 }
 
 
-VN const* GVN::registerVNviaMD(MD const* md)
+VN * GVN::registerVNviaMD(MD const* md)
 {
     if (m_md2vn.get_bucket_size() == 0) {
         m_md2vn.init(10); //to be evaluated
@@ -301,7 +384,7 @@ VN const* GVN::registerVNviaMD(MD const* md)
 }
 
 
-VN const* GVN::registerVNviaINT(LONGLONG v)
+VN * GVN::registerVNviaINT(LONGLONG v)
 {
     if (v == 0) {
         if (m_zero_vn == nullptr) {
@@ -311,16 +394,13 @@ VN const* GVN::registerVNviaINT(LONGLONG v)
         }
         return m_zero_vn;
     }
-
     if (m_ll2vn.get_bucket_size() == 0) {
         m_ll2vn.init(10); //To be reevaluated
     }
-
     VN * vn = m_ll2vn.get(v);
     if (vn != nullptr) {
         return vn;
     }
-
     vn = allocVN();
     VN_type(vn) = VN_INT;
     VN_int_val(vn) = v;
@@ -329,7 +409,7 @@ VN const* GVN::registerVNviaINT(LONGLONG v)
 }
 
 
-VN const* GVN::registerVNviaMC(LONGLONG v)
+VN * GVN::registerVNviaMC(LONGLONG v)
 {
     if (v == 0) {
         if (m_mc_zero_vn == nullptr) {
@@ -357,7 +437,7 @@ VN const* GVN::registerVNviaMC(LONGLONG v)
 }
 
 
-VN const* GVN::registerVNviaSTR(Sym const* v)
+VN * GVN::registerVNviaSTR(Sym const* v)
 {
     if (m_str2vn.get_bucket_size() == 0) {
         m_str2vn.init(16/*TO reevaluate*/);
@@ -375,7 +455,7 @@ VN const* GVN::registerVNviaSTR(Sym const* v)
 }
 
 
-VN const* GVN::registerVNviaFP(double v)
+VN * GVN::registerVNviaFP(double v)
 {
     if (m_fp2vn.get_bucket_size() == 0) {
         m_fp2vn.init(10/*TO reevaluate*/);
@@ -392,14 +472,14 @@ VN const* GVN::registerVNviaFP(double v)
 }
 
 
-VN const* GVN::registerUnaVN(IR_CODE irt, VN const* v0)
+VN * GVN::registerUnaVN(IR_CODE irt, VN const* v0)
 {
     ASSERT0(isUnary(irt));
     Tab1 * tab1 = (Tab1*)m_irc_vec.get(irt);
     if (tab1 == nullptr) {
         tab1 = new Tab1();
         m_tab_lst.append_tail(tab1);
-        m_irc_vec.set(irt, (Tab2*)tab1);
+        m_irc_vec.set(irt, (void*)tab1);
     }
 
     VN * res = tab1->get(VN_id(v0));
@@ -413,7 +493,7 @@ VN const* GVN::registerUnaVN(IR_CODE irt, VN const* v0)
 }
 
 
-VN const* GVN::registerBinVN(IR_CODE irt, VN const* v0, VN const* v1)
+VN * GVN::registerBinVN(IR_CODE irt, VN const* v0, VN const* v1)
 {
     ASSERT0(v0 && v1);
     ASSERT0(isBinary(irt));
@@ -431,7 +511,7 @@ VN const* GVN::registerBinVN(IR_CODE irt, VN const* v0, VN const* v1)
     if (tab2 == nullptr) {
         tab2 = new Tab2();
         m_tab_lst.append_tail((Tab1*)tab2);
-        m_irc_vec.set(irt, tab2);
+        m_irc_vec.set(irt, (void*)tab2);
     }
 
     Tab1 * tab1 = tab2->get(VN_id(v0));
@@ -452,8 +532,8 @@ VN const* GVN::registerBinVN(IR_CODE irt, VN const* v0, VN const* v1)
 }
 
 
-VN const* GVN::registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
-                                VN const* v2)
+VN * GVN::registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
+                           VN const* v2)
 {
     ASSERT0(v0 && v1 && v2);
     ASSERT0(isTriple(irt));
@@ -461,7 +541,7 @@ VN const* GVN::registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
     if (tab3 == nullptr) {
         tab3 = new Tab3();
         m_tab_lst.append_tail((Tab1*)tab3);
-        m_irc_vec.set(irt, (Tab2*)tab3);
+        m_irc_vec.set(irt, (void*)tab3);
     }
 
     Tab2 * tab2 = tab3->get(VN_id(v0));
@@ -489,8 +569,8 @@ VN const* GVN::registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
 }
 
 
-VN const* GVN::registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
-                              VN const* v2, VN const* v3)
+VN * GVN::registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
+                         VN const* v2, VN const* v3)
 {
     ASSERT0(v0 && v1 && v2 && v3);
     ASSERT0(isQuad(irt));
@@ -498,7 +578,7 @@ VN const* GVN::registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
     if (tab4 == nullptr) {
         tab4 = new Tab4();
         m_tab_lst.append_tail((Tab1*)tab4);
-        m_irc_vec.set(irt, (Tab2*)tab4);
+        m_irc_vec.set(irt, (void*)tab4);
     }
 
     Tab3 * tab3 = tab4->get(VN_id(v0));
@@ -535,14 +615,12 @@ VN const* GVN::registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
 
 //Memory location may be parameter or global variable.
 //'emd': exact md
-VN const* GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
+VN * GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
 {
-    VN const* x = getVN(exp);
-    if (x == nullptr) {
-        x = registerVNviaMD(emd);
-        change = true;
-        setVNOnce(exp, x);
-    }
+    ASSERT0(getVN(exp) == nullptr);
+    VN * x = registerVNviaMD(emd);
+    change = true;
+    setVNOnce(exp, x);
     return x;
 }
 
@@ -556,7 +634,15 @@ VN const* GVN::computePR(IR const* exp, bool & change)
     if (def == nullptr) {
         ASSERT0(exp->getRefMD());
         if (isAllocLiveinVN() || exp->getRefMD()->is_restrict()) {
-            return allocLiveinVN(exp, exp->getRefMD(), change);
+            VN const* expv = getVN(exp);
+            if (expv != nullptr) { return expv; }
+            VN * x = allocLiveinVN(exp, exp->getRefMD(), change);
+            if (exp->getRefMD()->is_restrict()) {
+                //The restrict hint tell us that exp's value is unique
+                //and constant.
+                VN_type(x) = VN_CONST;
+            }
+            return x;
         }
         return nullptr;
     }
@@ -680,7 +766,15 @@ VN const* GVN::inferVNViaHint(IR const* exp, MD const* md, bool & change)
 {
     ASSERT0(exp && md);
     if (isAllocLiveinVN() || md->is_restrict()) {
-        return allocLiveinVN(exp, md, change);
+        VN const* expx = getVN(exp);
+        if (expx != nullptr) { return expx; }
+        VN * x = allocLiveinVN(exp, md, change);
+        if (md->is_restrict()) {
+            //The restrict hint tell us that exp's value is unique
+            //and constant.
+            VN_type(x) = VN_CONST;
+        }
+        return x;
     }
     return nullptr;
 }
@@ -718,6 +812,8 @@ VN const* GVN::inferVNThroughCFG(IR const* exp, bool & change)
         if (d != nullptr && d->is_phi()) {
             return inferVNViaMDPhi(exp, (MDPhi const*)d, change);
         }
+        //Infer the nonpr-memref's VN through region livein information if
+        //exp does not have any DEF.
         return inferNonPRVNViaHint(exp, change);
     }
 CLASSIC_DU:
@@ -731,6 +827,8 @@ CLASSIC_DU:
         if (hasOverlappedDef(exp)) {
             return nullptr;
         }
+        //Infer the nonpr-memref's VN through region livein information if
+        //exp does not have any DEF.
         return inferNonPRVNViaHint(exp, change);
     }
     return nullptr;
@@ -812,7 +910,7 @@ VN const* GVN::computeILoad(IR const* exp, bool & change)
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     IR const* domdef = m_stmt2domdef.get(exp_stmt);
     if (domdef == nullptr) {
-        domdef = m_du->findNearestDomDef(exp, du);
+        domdef = xoc::findNearestDomDef(exp, m_rg);
         if (domdef != nullptr) {
             m_stmt2domdef.set(exp_stmt, domdef);
         }
@@ -1111,7 +1209,14 @@ VN const* GVN::computeBin(IR const* exp, bool & change)
         }
         return nullptr;
     }
-    VN const* x = registerBinVN(exp->getCode(), vn1, vn2);
+    VN const* x = nullptr;
+    if (vn1->is_int() && vn2->is_int()) {
+        HOST_INT val = m_refine->calcBinIntVal(
+            exp, VN_int_val(vn1), VN_int_val(vn2));
+        x = computeIntConst(val);
+    } else {
+        x = registerBinVN(exp->getCode(), vn1, vn2);
+    }
     if (getVN(exp) != x) {
         setVN(exp, x);
         change = true;
@@ -1120,11 +1225,16 @@ VN const* GVN::computeBin(IR const* exp, bool & change)
 }
 
 
+VN const* GVN::computeIntConst(HOST_INT val)
+{
+    return registerVNviaINT(val);
+}
+
+
 VN const* GVN::computeConst(IR const* exp, bool & change)
 {
     VN const* x = getVN(exp);
     if (x != nullptr) { return x; }
-
     if (exp->is_int()) {
         x = registerVNviaINT(CONST_int_val(exp));
     } else if (exp->is_ptr()) {
@@ -1155,6 +1265,7 @@ VN const* GVN::computeConst(IR const* exp, bool & change)
 
 VN const* GVN::computeLda(IR const* exp, bool & change)
 {
+    ASSERT0(exp->is_lda());
     Var * v = LDA_idinfo(exp);
     VN const* basevn = nullptr;
     if (v->is_string()) {
@@ -1168,22 +1279,54 @@ VN const* GVN::computeLda(IR const* exp, bool & change)
         }
     } else {
         MD const* emd = m_rg->getMDMgr()->genMDForVar(v, LDA_ofst(exp));
-        ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
+        ASSERTN(emd && emd->is_effect(), ("expect effect MD"));
         basevn = registerVNviaMD(emd);
     }
-
     if (basevn == nullptr) {
-        if (getVN(exp) != nullptr) {
+        VN const* vn = getVN(exp);
+        if (vn != nullptr) {
+            ASSERT0(vn->is_const());
             setVN(exp, nullptr);
             change = true;
         }
         return nullptr;
     }
-
     VN const* ofstvn = registerVNviaINT(LDA_ofst(exp));
-    VN const* x = registerBinVN(IR_LDA, basevn, ofstvn);
+    VN * x = registerBinVN(IR_LDA, basevn, ofstvn);
+
+    //LDA is always unique and constant for individual Var.
+    VN_type(x) = VN_CONST;
     if (getVN(exp) != x) {
         setVN(exp, x);
+        change = true;
+    }
+    return x;
+}
+
+
+VN const* GVN::computeCvt(IR const* cvt, bool & change)
+{
+    ASSERT0(cvt->is_cvt());
+    IR const* cvtexp = CVT_exp(cvt);
+    VN const* x = computeVN(cvtexp, change);
+    if (x == nullptr) {
+        if (getVN(cvt) != nullptr) {
+            setVN(cvt, nullptr);
+            change = true;
+        }
+        return nullptr;
+    }
+    if ((cvt->is_int() || cvt->is_ptr()) &&
+        (cvtexp->is_int() || cvtexp->is_ptr())) {
+        if (getVN(cvt) != x) {
+            setVN(cvt, x);
+            change = true;
+        }
+        return x;
+    }
+    x = registerUnaVN(cvt->getCode(), x);
+    if (getVN(cvt) != x) {
+        setVN(cvt, x);
         change = true;
     }
     return x;
@@ -1212,6 +1355,7 @@ VN const* GVN::computeUna(IR const* exp, bool & change)
 VN const* GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
+    if (exp->is_cvt()) { return computeCvt(exp, change); }
     switch (exp->getCode()) {
     SWITCH_CASE_BIN:
         return computeBin(exp, change);
@@ -1314,6 +1458,53 @@ bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
 {
     if (!useMDSSADU()) { return false; }
     return MDSSAMgr::hasSameValue(ir1, ir2);
+}
+
+
+bool GVN::hasDifferentValue(VN const* vn1, IR const* ir1,
+                            VN const* vn2, IR const* ir2) const
+{
+    return isConstVN(vn1, ir1) && isConstVN(vn2, ir2) && vn1 != vn2;
+}
+
+
+bool GVN::hasDifferentValue(VN const* vn1, VN const* vn2) const
+{
+    ASSERT0(vn1 && vn2);
+    return vn1->is_const() && vn2->is_const() && vn1 != vn2;
+}
+
+
+bool GVN::isConstVN(VN const* irvn, IR const* ir) const
+{
+    ASSERT0(ir && irvn);
+    if (irvn->is_const()) {
+        ASSERT0(getVN(ir) == irvn);
+        return true;
+    }
+    if (ir->is_cvt()) {
+        IR const* leaf = ((CCvt*)ir)->getLeafExp();
+        ASSERT0(leaf);
+        VN const* leafvn = getVN(leaf);
+        return leafvn != nullptr && leafvn->is_const();
+    }
+    return irvn->is_const();
+
+}
+
+
+bool GVN::hasConstVN(IR const* ir) const
+{
+    ASSERT0(ir);
+    VN const* vn = getVN(ir);
+    if (vn == nullptr) { return false; }
+    if (ir->is_cvt()) {
+        IR const* leaf = ((CCvt*)ir)->getLeafExp();
+        ASSERT0(leaf);
+        VN const* leafvn = getVN(leaf);
+        return leafvn != nullptr && leafvn->is_const();
+    }
+    return vn->is_const();
 }
 
 
@@ -1733,19 +1924,19 @@ void GVN::dumpIR2VN() const
 }
 
 
-void GVN::dump_h1(IR const* k, VN const* x) const
+static void dumpIR2VNImpl(IR const* k, VN const* x, Region const* rg)
 {
     ASSERT0(k);
     if (k->is_pr()) {
-        note(getRegion(), "\n\t$%d", PR_no(k));
+        note(rg, "\n\t$%d", PR_no(k));
     } else {
-        note(getRegion(), "\n\t%s", IRCNAME(k->getCode()));
+        note(rg, "\n\t%s", IRCNAME(k->getCode()));
     }
-    prt(getRegion(), " id:%d ", k->id());
+    prt(rg, " id:%d ", k->id());
     if (x != nullptr) {
-        prt(getRegion(), "vn%d", x->id());
+        prt(rg, "vn%d", x->id());
     } else {
-        prt(getRegion(), "--");
+        prt(rg, "--");
     }
 }
 
@@ -1775,7 +1966,7 @@ void GVN::dumpBB(UINT bbid) const
              k != nullptr; k = iterNextC(ii)) {
             dumped = true;
             VN const* vn = getVN(k);
-            dump_h1(k, vn);
+            dumpIR2VNImpl(k, vn, m_rg);
         }
         if (dumped) {
             note(getRegion(), "\n");
@@ -1803,6 +1994,259 @@ bool GVN::dump() const
 }
 
 
+bool GVN::calcCondMustValEQ(IR const* ir, bool & must_true,
+                            bool & must_false) const
+{
+    ASSERT0(ir->is_eq());
+    IR const* op0 = BIN_opnd0(ir);
+    IR const* op1 = BIN_opnd1(ir);
+    VN const* v1 = getVN(op0);
+    VN const* v2 = getVN(op1);
+    if (v1 == nullptr || v2 == nullptr) { return false; }
+    if (hasSameValue(v1, v2)) {
+        must_true = true;
+        must_false = false;
+        return true;
+    }
+    if (hasDifferentValue(v1, op0, v2, op1)) {
+        must_true = false;
+        must_false = true;
+        return true;
+    }
+    return false;
+}
+
+
+bool GVN::calcCondMustValNE(IR const* ir, bool & must_true,
+                            bool & must_false) const
+{
+    ASSERT0(ir->is_ne());
+    IR const* op0 = BIN_opnd0(ir);
+    IR const* op1 = BIN_opnd1(ir);
+    VN const* v1 = getVN(op0);
+    VN const* v2 = getVN(op1);
+    if (v1 == nullptr || v2 == nullptr) { return false; }
+    if (hasDifferentValue(v1, op0, v2, op1)) {
+        must_true = true;
+        must_false = false;
+        return true;
+    }
+    if (hasSameValue(v1, v2)) {
+        must_true = false;
+        must_false = true;
+        return true;
+    }
+    return false;
+}
+
+
+bool GVN::calcCondMustValLAndLOr(IR const* ir, bool & must_true,
+                                 bool & must_false) const
+{
+    ASSERT0(ir->is_land() || ir->is_lor());
+    IR const* op0 = BIN_opnd0(ir);
+    IR const* op1 = BIN_opnd1(ir);
+    VN const* v1 = getVN(op0);
+    VN const* v2 = getVN(op1);
+    if (v1 == nullptr || v2 == nullptr) { return false; }
+    if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
+        //CASE: given two operand, the comparision rule is that if one of
+        //operands is unsigned, the comparision will treat both two operand as
+        //unsigned integer value.
+        //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
+        //comparision result is op0 < op1.
+        bool is_unsigned = op0->is_uint() || op1->is_uint();
+        if (is_unsigned) {
+            HOST_UINT uv1 = (HOST_UINT)VN_int_val(v1);
+            HOST_UINT uv2 = (HOST_UINT)VN_int_val(v2);
+            if (uv1 && uv2) {
+                must_true = true;
+                must_false = false;
+            } else {
+                must_true = false;
+                must_false = true;
+            }
+            return true;
+        }
+        if (VN_int_val(v1) && VN_int_val(v2)) {
+            must_true = true;
+            must_false = false;
+        } else {
+            must_true = false;
+            must_false = true;
+        }
+        return true;
+    }
+    return false;
+}
+
+
+bool GVN::calcCondMustValLEGE(IR const* ir, bool & must_true,
+                              bool & must_false) const
+{
+    ASSERT0(ir->is_le() || ir->is_ge());
+    IR const* op0 = BIN_opnd0(ir);
+    IR const* op1 = BIN_opnd1(ir);
+    VN const* v1 = getVN(op0);
+    VN const* v2 = getVN(op1);
+    if (v1 == nullptr || v2 == nullptr) { return false; }
+    if (v1 == v2) {
+        must_true = true;
+        must_false = false;
+        return true;
+    }
+    if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
+        //CASE: given two operand, the comparision rule is that if one of
+        //operands is unsigned, the comparision will treat both two operand as
+        //unsigned integer value.
+        //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
+        //comparision result is op0 < op1.
+        bool is_unsigned = op0->is_uint() || op1->is_uint();
+        if (ir->is_le()) {
+            if (is_unsigned) {
+                HOST_UINT uv1 = (HOST_UINT)VN_int_val(v1);
+                HOST_UINT uv2 = (HOST_UINT)VN_int_val(v2);
+                if (uv1 <= uv2) {
+                    must_true = true;
+                    must_false = false;
+                } else {
+                    must_true = false;
+                    must_false = true;
+                }
+                return true;
+            }
+            if (VN_int_val(v1) <= VN_int_val(v2)) {
+                must_true = true;
+                must_false = false;
+            } else {
+                must_true = false;
+                must_false = true;
+            }
+            return true;
+        }
+        if (ir->is_ge()) {
+            if (is_unsigned) {
+                HOST_UINT uv1 = (HOST_UINT)VN_int_val(v1);
+                HOST_UINT uv2 = (HOST_UINT)VN_int_val(v2);
+                if (uv1 >= uv2) {
+                    must_true = true;
+                    must_false = false;
+                } else {
+                    must_true = false;
+                    must_false = true;
+                }
+                return true;
+            }
+            if (VN_int_val(v1) >= VN_int_val(v2)) {
+                must_true = true;
+                must_false = false;
+            } else {
+                must_true = false;
+                must_false = true;
+            }
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+
+bool GVN::calcCondMustValLTGT(IR const* ir, bool & must_true,
+                              bool & must_false) const
+{
+    ASSERT0(ir->is_lt() || ir->is_gt());
+    IR const* op0 = BIN_opnd0(ir);
+    IR const* op1 = BIN_opnd1(ir);
+    VN const* v1 = getVN(op0);
+    VN const* v2 = getVN(op1);
+    if (v1 == nullptr || v2 == nullptr) { return false; }
+    if (v1 == v2) {
+        must_true = false;
+        must_false = true;
+        return true;
+    }
+    if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
+        //CASE: given two operand, the comparision rule is that if one of
+        //operands is unsigned, the comparision will treat both two operand as
+        //unsigned integer value.
+        //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
+        //comparision result is op0 < op1.
+        bool is_unsigned = op0->is_uint() || op1->is_uint();
+        if (ir->is_lt()) {
+            if (is_unsigned) {
+                HOST_UINT uv1 = (HOST_UINT)VN_int_val(v1);
+                HOST_UINT uv2 = (HOST_UINT)VN_int_val(v2);
+                if (uv1 < uv2) {
+                    must_true = true;
+                    must_false = false;
+                } else {
+                    must_true = false;
+                    must_false = true;
+                }
+                return true;
+            }
+            if (VN_int_val(v1) < VN_int_val(v2)) {
+                must_true = true;
+                must_false = false;
+            } else {
+                must_true = false;
+                must_false = true;
+            }
+            return true;
+        }
+        if (ir->is_gt()) {
+            if (is_unsigned) {
+                HOST_UINT uv1 = (HOST_UINT)VN_int_val(v1);
+                HOST_UINT uv2 = (HOST_UINT)VN_int_val(v2);
+                if (uv1 > uv2) {
+                    must_true = true;
+                    must_false = false;
+                } else {
+                    must_true = false;
+                    must_false = true;
+                }
+                return true;
+            }
+            if (VN_int_val(v1) > VN_int_val(v2)) {
+                must_true = true;
+                must_false = false;
+            } else {
+                must_true = false;
+                must_false = true;
+            }
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+
+bool GVN::calcCondMustValBin(IR const* ir, bool & must_true,
+                             bool & must_false) const
+{
+    ASSERT0(ir->isBinaryOp());
+    switch (ir->getCode()) {
+    case IR_LAND:
+    case IR_LOR:
+        return calcCondMustValLAndLOr(ir, must_true, must_false);
+    case IR_LT:
+    case IR_GT:
+        return calcCondMustValLTGT(ir, must_true, must_false);
+    case IR_LE:
+    case IR_GE:
+        return calcCondMustValLEGE(ir, must_true, must_false);
+    case IR_NE:
+        return calcCondMustValNE(ir, must_true, must_false);
+    case IR_EQ:
+        return calcCondMustValEQ(ir, must_true, must_false);
+    default: UNREACHABLE();
+    }
+    return false;
+}
+
+
 //Return true if GVN is able to determine the result of 'ir', otherwise
 //return false that GVN know nothing about ir.
 bool GVN::calcCondMustVal(IR const* ir, bool & must_true,
@@ -1814,7 +2258,6 @@ bool GVN::calcCondMustVal(IR const* ir, bool & must_true,
     if (ir->is_lnot()) {
         VN const* v = getVN(UNA_opnd(ir));
         if (v == nullptr) { return false; }
-
         if (VN_type(v) == VN_INT) {
             if (!VN_int_val(v)) {
                 must_true = true;
@@ -1825,129 +2268,25 @@ bool GVN::calcCondMustVal(IR const* ir, bool & must_true,
             }
             return true;
         }
-
         if (VN_type(v) == VN_FP) {
             if (VN_fp_val(v) == 0.0) {
                 must_true = true;
                 must_false = false;
                 return true;
             }
-
             must_true = false;
             must_false = true;
             return true;
         }
-
         if (VN_type(v) == VN_STR) {
             must_true = false;
             must_false = true;
             return true;
         }
-
         return false;
     }
-
-    VN const* v1 = getVN(BIN_opnd0(ir));
-    VN const* v2 = getVN(BIN_opnd1(ir));
-    if (v1 == nullptr || v2 == nullptr) { return false; }
-
-    switch (ir->getCode()) {
-    case IR_LAND:
-    case IR_LOR:
-        if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-            if (VN_int_val(v1) && VN_int_val(v2)) {
-                must_true = true;
-                must_false = false;
-            } else {
-                must_true = false;
-                must_false = true;
-            }
-            return true;
-        }
-        break;
-    case IR_LT:
-    case IR_GT:
-        if (v1 == v2) {
-            must_true = false;
-            must_false = true;
-            return true;
-        }
-
-        if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-            if (ir->is_lt()) {
-                if (VN_int_val(v1) < VN_int_val(v2)) {
-                    must_true = true;
-                    must_false = false;
-                } else {
-                    must_true = false;
-                    must_false = true;
-                }
-                return true;
-            } else if (ir->is_gt()) {
-                if (VN_int_val(v1) > VN_int_val(v2)) {
-                    must_true = true;
-                    must_false = false;
-                } else {
-                    must_true = false;
-                    must_false = true;
-                }
-                return true;
-            }
-        }
-        break;
-    case IR_LE:
-    case IR_GE:
-        if (v1 == v2) {
-            must_true = true;
-            must_false = false;
-            return true;
-        }
-
-        if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-            if (ir->is_le()) {
-                if (VN_int_val(v1) <= VN_int_val(v2)) {
-                    must_true = true;
-                    must_false = false;
-                } else {
-                    must_true = false;
-                    must_false = true;
-                }
-                return true;
-            } else if (ir->is_ge()) {
-                if (VN_int_val(v1) >= VN_int_val(v2)) {
-                    must_true = true;
-                    must_false = false;
-                } else {
-                    must_true = false;
-                    must_false = true;
-                }
-                return true;
-            }
-        }
-        break;
-    case IR_NE:
-        if (v1 != v2) {
-            must_true = true;
-            must_false = false;
-            return true;
-        }
-
-        must_true = false;
-        must_false = true;
-        return true;
-    case IR_EQ:
-        if (v1 == v2) {
-            must_true = true;
-            must_false = false;
-            return true;
-        }
-
-        must_true = false;
-        must_false = true;
-        return true;
-    default: UNREACHABLE();
-    }
-    return false;
+    ASSERT0(ir->isBinaryOp());
+    return calcCondMustValBin(ir, must_true, must_false);
 }
 
 
@@ -1958,6 +2297,8 @@ bool GVN::perform(OptCtx & oc)
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
+    m_refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
+    ASSERT0(m_refine);
     m_oc = &oc;
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //GVN use either classic PR DU chain or PRSSA.

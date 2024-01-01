@@ -570,6 +570,16 @@ public:
     //Return true if Out-Degree of 'vex' equal to 'num'.
     bool isOutDegreeEqualTo(Vertex const* vex, UINT num) const;
 
+    //Return true if In-Degree of 'vex' is more than 'num'.
+    //e.g: given in-degree of vex is 2, if num is 0,1,2 return false,
+    //otherwise return true.
+    bool isInDegreeMoreThan(Vertex const* vex, UINT num) const;
+
+    //Return true if Out-Degree of 'vex' is more than 'num'.
+    //e.g: given out-degree of vex is 2, if num is 0,1,2 return false,
+    //otherwise return true.
+    bool isOutDegreeMoreThan(Vertex const* vex, UINT num) const;
+
     //Return true if vid indicates the graph vertex.
     bool isVertex(VexIdx vid) const { return getVertex(vid) != nullptr; }
 

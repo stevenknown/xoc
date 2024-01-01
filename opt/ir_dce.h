@@ -55,6 +55,7 @@ public:
 class DCECtx {
     COPY_CONSTRUCTOR(DCECtx);
 public:
+    bool m_is_remove_cfs;
     OptCtx * m_oc;
 
     //Record if BB is effect. Note the BB effect info is not always
@@ -63,7 +64,7 @@ public:
     EffectBB m_effect_bb;
     EffectStmt m_effect_stmt;
 public:
-    DCECtx(OptCtx * oc) { m_oc = oc; }
+    DCECtx(OptCtx * oc) { m_oc = oc; m_is_remove_cfs = true; }
 
     void addEffectStmt(IR const* stmt) { m_effect_stmt.bunion(stmt->id()); }
     void addEffectBB(IRBB const* bb) { m_effect_bb.bunion(bb->id()); }
@@ -72,6 +73,7 @@ public:
 
     OptCtx * getOptCtx() const { return m_oc; }
 
+    bool isRemoveCFS() const { return m_is_remove_cfs; }
     bool isEffectStmt(IR const* ir) const
     { return m_effect_stmt.is_contain(ir->id()); }
     bool isEffectBB(UINT id) const { return m_effect_bb.is_contain(id); }
@@ -96,6 +98,9 @@ public:
         }
         m_effect_bb.clean();
     }
+
+    //Demand DCE pass whether to remove control-flow-structure.
+    void setRemoveCFS(bool remove) { m_is_remove_cfs = remove; }
 };
 
 
@@ -130,12 +135,14 @@ protected:
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
     OptCtx * m_oc;
-    ConstIRIter m_citer;
     EffectMDDef m_is_mddef_effect;
 protected:
+    //Return true if ir is effect.
+    bool checkEffectStmt(IR const* ir);
+
+    //Return true if ir is effect.
+    bool checkCall(IR const* ir) const;
     void checkValidAndRecomputeCDG();
-    bool check_stmt(IR const* ir);
-    bool check_call(IR const* ir) const;
     bool collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
                      MOD DCECtx & dcectx,
                      bool usemdssa, bool useprssa);
@@ -148,6 +155,9 @@ protected:
                         MOD DCECtx & dcectx);
     bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2,
                         MOD DCECtx & dcectx);
+
+    bool elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
+                  OUT bool & remove_branch_stmt);
 
     //Return true if there are effect BBs that controlled by ir's BB.
     //ir: stmt.

@@ -552,6 +552,13 @@ public:
     //Return true if pointer pointed to MAY-POINT-TO set.
     MDSet const* computeMayPointToViaTBAA(IR const* pointer,
                                           MDSet const* point_to_set);
+
+    //The function collects all MDs that ir may pointed to.
+    //Return the worst case MDSet if ir may pointed to it. If ir pointed to the
+    //worst case, the content of 'set' is meaningless, thus can be ignored.
+    MDSet const* collectMayPointTo(
+        OUT MDSet & set, MOD xcom::DefMiscBitSetMgr & sbs,
+        IR const* ir, MD2MDSet const& mx) const;
     bool computeFlowSensitive(RPOVexList const& vexlst, PPSetMgr & ppsetmgr);
     void computeFlowInsensitive();
     //Count memory usage for current object.
@@ -560,6 +567,7 @@ public:
     void cleanContext();
 
     void destroyContext();
+    void dumpWorstCase() const;
     void dumpDirectStore(IR const* ir, bool dump_kid,
                          MD2MDSet const* mx) const;
     void dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const;
@@ -620,6 +628,7 @@ public:
     }
     //Return true if the MD of each PR corresponded is unique.
     void initMayPointToSet();
+
     //Return true if the set indicates the worst case of MD reference set.
     bool isWorstCase(MDSet const* set) const { return set == getWorstCase(); }
 
@@ -716,7 +725,7 @@ public:
 
     //Function return the POINT-TO pair for each BB.
     //Only used in flow-sensitive analysis.
-    MD2MDSet * mapBBtoMD2MDSet(UINT bbid) const
+    MD2MDSet * mapBBToMD2MDSet(UINT bbid) const
     { return m_md2mds_vec.get(bbid); }
 
     //This function update LHS's POINT-TO set accroding to RHS.

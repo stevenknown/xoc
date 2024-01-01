@@ -91,6 +91,22 @@ void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen);
 //can only be "abcdefABCDEF0123456789".
 BYTE charToHex(CHAR c);
 
+//Return the number of leading zero.
+//pos: record the bit position of the leading zero.
+//e.g:given a is 0b00110, where the left size is the highest bit.
+//the function return 2, indicates there are two leading zeros counting from
+//high to low side about given number.
+UINT countLeadingZero(UINT64 a);
+UINT countLeadingZero(UINT32 a);
+
+//Return true if found leading one.
+//pos: record the bit position of the leading one.
+//e.g:given a is 0b11110, where the left size is the highest bit.
+//the function return 4, indicates there are four leading one counting from
+//high to low side about given number.
+UINT countLeadingOne(UINT64 a);
+UINT countLeadingOne(UINT32 a);
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
@@ -301,9 +317,13 @@ CHAR * rotateString(MOD CHAR * str, UINT n);
 
 //Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
+inline CHAR upper(CHAR n)
+{ return (n >= 'a' && n <= 'z') ? (CHAR)(n - 32) : n; }
 
 //Replace letters in 'n' to lowercase letter.
 CHAR * lower(CHAR * n);
+inline CHAR lower(CHAR n)
+{ return (n >= 'A' && n <= 'Z') ? (CHAR)(n + 32) : n; }
 
 //Replace the suffix of the file name(or path name) using given suffix name.
 //For example:
@@ -414,16 +434,15 @@ inline bool xisdigit(CHAR const* str)
 }
 
 //Return true if 'c' is hex decimal.
-inline bool xisdigithex(CHAR d)
+inline bool xisdigithex(CHAR c)
 {
-    if (xisdigit(d)) { return true; }
-    else if ((d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F')) { return true; }
+    if (xisdigit(c)) { return true; }
+    else if (upper(c) >= 'A' && upper(c) <= 'F') { return true; }
     return false;
 }
 
 //Return true if 'c' is letter.
-inline bool xisalpha(CHAR c)
-{ return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+inline bool xisalpha(CHAR c) { return upper(c) >= 'A' && upper(c) <= 'Z'; }
 
 //Return abs value of 'a'.
 LONGLONG xabs(LONGLONG a);

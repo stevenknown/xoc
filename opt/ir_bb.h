@@ -365,6 +365,11 @@ public:
     bool hasPhi(CFG<IRBB, IR> const* cfg) const
     { return hasMDPhi(cfg) || hasPRPhi(); }
 
+    //Return true if current bb has Phi with all same operand.
+    //e.g: phi $1 = ($2, $2, $2), return true.
+    //     phi $1 = (0x3, $2, $2), return false.
+    bool hasPhiWithAllSameOperand(CFG<IRBB, IR> const* cfg) const;
+
     //Return true if BB has any label attached.
     bool hasLabel() const
     { return const_cast<IRBB*>(this)->getLabelList().get_elem_count() != 0; }
@@ -397,8 +402,7 @@ public:
         }
         return false;
     }
-
-    inline bool hasReturn() const
+    bool hasReturn() const
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
@@ -409,6 +413,8 @@ public:
         }
         return false;
     }
+    //Return true if one of current bb's successors has a phi.
+    bool hasPhiInSuccBB(CFG<IRBB, IR> const* cfg) const;
 
     UINT id() const { return BB_id(this); }
     bool is_entry() const { return BB_is_entry(this); }
@@ -549,12 +555,7 @@ public:
         getLabelList().move_head(src->getLabelList());
         ASSERT0(src->getLabelList().get_elem_count() == 0);
     }
-
-    //Return true if one of bb's successor has a phi.
-    bool successorHasPhi(CFG<IRBB, IR> * cfg);
-
     INT rpo() const { ASSERT0(m_vertex); return m_vertex->rpo(); }
-
     bool verifyBranchLabel(Lab2BB const& lab2bb) const;
     bool verify(Region const* rg) const;
 };

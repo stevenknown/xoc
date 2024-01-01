@@ -43,15 +43,25 @@ static CHAR const* g_msg_no_mdssainfo = " NOMDSSAINFO!!";
 //
 CollectUse::CollectUse(MDSSAMgr const* mgr, MDSSAInfo const* info,
                        CollectCtx const& ctx, OUT IRSet * set)
-    : m_mgr(mgr), m_info(info), m_ctx(ctx)
+    : m_mgr(mgr), m_ctx(ctx)
 {
     m_udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
     ASSERT0(set);
-    collect(set);
+    collectForMDSSAInfo(info, set);
 }
 
 
-void CollectUse::collectUseForVOpnd(VMD const* vopnd, MOD MDDefVisitor & vis,
+CollectUse::CollectUse(MDSSAMgr const* mgr, VMD const* vmd,
+                       CollectCtx const& ctx, OUT IRSet * set)
+    : m_mgr(mgr), m_ctx(ctx)
+{
+    m_udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
+    ASSERT0(set);
+    collectForVOpnd(vmd, set);
+}
+
+
+void CollectUse::collectUseForVOpnd(VOpnd const* vopnd, MOD MDDefVisitor & vis,
                                     OUT IRSet * set) const
 {
     VMD::UseSetIter vit;
@@ -59,7 +69,8 @@ void CollectUse::collectUseForVOpnd(VMD const* vopnd, MOD MDDefVisitor & vis,
     bool must_inside_loop = m_ctx.flag.have(COLLECT_INSIDE_LOOP);
     LI<IRBB> const* li = m_ctx.getLI();
     if (must_inside_loop) { ASSERT0(li); }
-    VMD * pvopnd = const_cast<VMD*>(vopnd);
+    ASSERT0(vopnd->is_md());
+    VMD * pvopnd = const_cast<VMD *>((VMD const*)vopnd);
     Region * rg = m_udmgr->getRegion();
     for (UINT i = pvopnd->getUseSet()->get_first(vit);
          !vit.end(); i = pvopnd->getUseSet()->get_next(vit)) {
@@ -98,12 +109,22 @@ void CollectUse::collectUseCrossPhi(MDPhi const* phi, MOD MDDefVisitor & vis,
 }
 
 
-void CollectUse::collect(OUT IRSet * set) const
+void CollectUse::collectForVOpnd(VOpnd const* vopnd, OUT IRSet * set) const
 {
     //DO NOT CLEAN SET
-    ASSERT0(set);
+    ASSERT0(set && vopnd && vopnd->is_md());
+    MDDefVisitor vis;
+    collectUseForVOpnd(vopnd, vis, set);
+}
+
+
+void CollectUse::collectForMDSSAInfo(
+    MDSSAInfo const* info, OUT IRSet * set) const
+{
+    //DO NOT CLEAN SET
+    ASSERT0(set && info);
     VOpndSetIter it = nullptr;
-    VOpndSet const& vset = m_info->readVOpndSet();
+    VOpndSet const& vset = info->readVOpndSet();
     MDDefVisitor vis;
     for (BSIdx i = vset.get_first(&it);
          i != BS_UNDEF; i = vset.get_next(i, &it)) {
@@ -1279,7 +1300,7 @@ VMD * MDSSAMgr::findLastMayDefFrom(IRBB const* bb, IR const* start,
 }
 
 
-//The function do searching that begin at the IDom BB of marker.
+//The function does searching that begin at the IDom BB of marker.
 //Note DOM info must be available.
 VMD * MDSSAMgr::findDomLiveInDefFromIDomOf(IRBB const* marker, MDIdx mdid,
                                            OptCtx const& oc) const
@@ -1781,6 +1802,25 @@ void MDSSAMgr::dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
 }
 
 
+bool MDSSAMgr::hasPhiWithAllSameOperand(IRBB const* bb) const
+{
+    MDPhiList * philist = getPhiList(bb->id());
+    if (philist == nullptr) { return true; }
+    for (MDPhiListIter it = philist->get_head();
+         it != philist->end(); it = philist->get_next(it)) {
+        MDPhi * phi = it->val();
+        ASSERT0(phi);
+        IR const* first_opnd = phi->getOpndList();
+        for (IR const* opnd = first_opnd->get_next();
+             opnd != nullptr; opnd = opnd->get_next()) {
+            if (first_opnd->isIREqual(opnd, false)) { continue; }
+            return false;
+        }
+    }
+    return true;
+}
+
+
 //Return true if exist USE to 'ir'.
 //This is a helper function to provid simple query, an example to
 //show how to retrieval VOpnd and USE occurences as well.
@@ -1819,7 +1859,6 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
         if (!opnd->isMemRefNonPR() || opnd->is_stmt()) {
             continue;
         }
-
         VOpndSetIter iter = nullptr;
         if (!(*parting_line)) {
             note(getRegion(), "\n%s", g_parting_line_char);
@@ -3899,18 +3938,6 @@ void MDSSAMgr::changeUseForTree(IR * olduse, IR * newuse,
 }
 
 
-//Coalesce DU chain, actually the version of MD, from 'src' to 'tgt'.
-//'src' and 'tgt' refered the same MD.
-//This function replace definition of USE of src to tgt's defintion.
-//There is always removeStmt() following the function call.
-//'src' and 'tgt' is the form of copy operation.
-//e.g: p0 =...
-//     p1 = p0
-//     ...= p1
-//=> after coalescing, p1 is src, p0 is tgt
-//     p0 = ...
-//     ------ //removed
-//     ... = p0
 void MDSSAMgr::coalesceDUChain(IR const* src, IR const* tgt)
 {
     ASSERT0(src && tgt);
@@ -3958,10 +3985,6 @@ void MDSSAMgr::coalesceDUChain(IR const* src, IR const* tgt)
 }
 
 
-//Add ir to given mdssainfo as an USE.
-//ir: occurence to be added.
-//mdssainfo: add ir to the UseSet of VOpnd that recorded in 'mdssainfo'.
-//Note mdssainfo must be unique for each IR.
 void MDSSAMgr::addUseToMDSSAInfo(IR const* ir, MDSSAInfo * mdssainfo)
 {
     ASSERT0(mdssainfo);
@@ -3969,8 +3992,20 @@ void MDSSAMgr::addUseToMDSSAInfo(IR const* ir, MDSSAInfo * mdssainfo)
 }
 
 
-//The function copy MDSSAInfo from 'src' to ir. Then add ir as an USE of the
-//new MDSSAInfo, and return the new MDSSAInfo.
+void MDSSAMgr::addUseSetToMDSSAInfo(IRSet const& set, MDSSAInfo * mdssainfo)
+{
+    ASSERT0(mdssainfo);
+    mdssainfo->addUseSet(set, getUseDefMgr());
+}
+
+
+void MDSSAMgr::addUseSetToVMD(IRSet const& set, MOD VMD * vmd)
+{
+    ASSERT0(vmd && vmd->is_md());
+    vmd->addUseSet(set, m_rg);
+}
+
+
 MDSSAInfo * MDSSAMgr::copyAndAddMDSSAOcc(IR * ir, MDSSAInfo const* src)
 {
     //User may retain IRTree in transformation, however the MDSSAInfo has been
@@ -4021,12 +4056,38 @@ void MDSSAMgr::addStmtToMDSSAMgr(IR * ir, IR const* ref)
 }
 
 
-//Build DU chain from 'def' to 'exp'.
-//The function will add VOpnd of phi to 'exp'.
+void MDSSAMgr::buildDUChain(MDDef const* def, IRSet const& set)
+{
+    IRSetIter it = nullptr;
+    for (BSIdx i = set.get_first(&it);
+         i != BS_UNDEF; i = set.get_next(i, &it)) {
+        IR * exp = m_rg->getIR(i);
+        ASSERT0(exp);
+        if (exp->is_undef()) {
+            //CASE:During some passes, the optimizer will collect UseSet at
+            //first, then performing the optimization, such as Phi-Elimination,
+            //lead to some irs in UseSet freed after the elimination. However,
+            //the UseSet is not updated at the same time. This caused IR_UNDEF
+            //to be in UseSet.
+            //e.g: given 'def' is Phi MD13V2,
+            //  MDPhi: MD13V2 <-(id:29 MD13V1 BB10), (id:30 MD13V2 BB3)
+            //  the UseSet includes id:30. After removePhiFromMDSSAMgr(def),
+            //  id:30 which is in UseSet will be UNDEF.
+            //For the sake of speed-up of compilation, we just skip IR_UNDEF
+            //rather than asking caller remove them before invoking the
+            //function.
+            continue;
+        }
+        buildDUChain(def, exp);
+    }
+}
+
+
 void MDSSAMgr::buildDUChain(MDDef const* def, MOD IR * exp)
 {
     ASSERT0(exp->is_exp());
     ASSERTN(def->getResult(), ("does not have occurrence"));
+    if (def->isUse(exp)) { return; }
     def->getResult()->addUse(exp);
     MDSSAInfo * info = genMDSSAInfo(exp);
     ASSERT0(info);
@@ -4084,8 +4145,6 @@ void MDSSAMgr::removeMDSSAOccForTree(IR const* ir, MDSSAUpdateCtx const& ctx)
 }
 
 
-//Remove DU chain from 'def' to 'exp'.
-//The function will add VOpnd of phi to 'exp'.
 void MDSSAMgr::removeDUChain(MDDef const* def, IR * exp)
 {
     ASSERT0(exp->is_exp());
@@ -4098,10 +4157,6 @@ void MDSSAMgr::removeDUChain(MDDef const* def, IR * exp)
 }
 
 
-//Remove DU chain if exist in between 'stmt' and 'exp'.
-//The function will remove 'exp' from occurence set.
-//stmt: IR stmt that may be DEF of 'exp'.
-//exp: IR expression to be removed.
 void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
 {
     ASSERT0(stmt && exp && stmt->is_stmt() && exp->is_exp());
@@ -4126,8 +4181,6 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
 }
 
 
-//Remove all virtual USEs of 'stmt'.
-//stmt will have not any USE expression when function returned.
 void MDSSAMgr::removeAllUse(IR const* stmt, MDSSAUpdateCtx const& ctx)
 {
     ASSERT0(stmt && stmt->is_stmt());
@@ -4155,9 +4208,6 @@ void MDSSAMgr::removeAllUse(IR const* stmt, MDSSAUpdateCtx const& ctx)
 }
 
 
-//The function changes VOpnd of 'from' to 'to', for each elements in 'from'
-//UseSet.
-//Note all elements in UseSet of 'from' will be removed.
 void MDSSAMgr::replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from)
 {
     ASSERT0(to->is_md() && from->is_md());
@@ -4176,9 +4226,6 @@ void MDSSAMgr::replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from)
 }
 
 
-//id: input ID.
-//ssainfo: MDSSAInfo of id.
-//olddef: old DEF of id.
 void MDSSAMgr::findNewDefForID(IR * id, MDSSAInfo * ssainfo, MDDef * olddef,
                                OptCtx const& oc)
 {
@@ -4186,9 +4233,9 @@ void MDSSAMgr::findNewDefForID(IR * id, MDSSAInfo * ssainfo, MDDef * olddef,
     if (ID_phi(id) == nullptr) { return; }
 
     ASSERT0(getMDSSAInfoIfAny(id) == ssainfo);
-    //CASE: to avoid assertions that raised by verify() which is used
+    //CASE: To avoid assertions that raised by verify() which is used
     //to guanrantee operand of MDPhi is not NULL, replace the removed
-    //vopnd of operand with initial-versiond vopnd.
+    //vopnd of operand with initial-version vopnd.
     ASSERT0(olddef);
     VMD * oldres = olddef->getResult();
     MDIdx defmdid = oldres->mdid();
@@ -4211,9 +4258,6 @@ void MDSSAMgr::findNewDefForID(IR * id, MDSSAInfo * ssainfo, MDDef * olddef,
 }
 
 
-//The function remove 'vopnd' from MDSSAInfo of each ir its UseSet.
-//Note the UseSet will be clean.
-//ctx: if ctx is nullptr, the function perform normal update.
 void MDSSAMgr::removeVOpndForAllUse(MOD VMD * vopnd, MDSSAUpdateCtx const& ctx)
 {
     ASSERT0(vopnd && vopnd->is_md());
@@ -4249,23 +4293,12 @@ void MDSSAMgr::removeVOpndForAllUse(MOD VMD * vopnd, MDSSAUpdateCtx const& ctx)
 }
 
 
-//The function handle the DU chain and cut off the DU chain between MDPHI
-//and its USE expression.
-//Remove 'phi' from its use's vopnd-list.
-//e.g:u1, u2 are its use expressions.
-//cut off the DU chain between def->u1 and def->u2.
 void MDSSAMgr::removeDefFromUseSet(MDPhi const* phi, MDSSAUpdateCtx const& ctx)
 {
     removeVOpndForAllUse(phi->getResult(), ctx);
 }
 
 
-//The function removes 'phi' from MDSSAMgr.
-//It will cut off DU chain of each phi's operands, and the DU chain of phi
-//itself as well, then free all resource.
-//phi: to be removed.
-//prev: previous DEF that is used to maintain DefDef chain, and it can be
-//      NULL if there is no previous DEF.
 void MDSSAMgr::removePhiFromMDSSAMgr(MDPhi * phi, MDDef * prev,
                                      MDSSAUpdateCtx const& ctx)
 {
@@ -4275,18 +4308,16 @@ void MDSSAMgr::removePhiFromMDSSAMgr(MDPhi * phi, MDDef * prev,
         //Update the MDSSAInfo for each phi opnd.
         removeMDSSAOccForTree(opnd, ctx);
     }
-    VMD * vopnd = phi->getResult();
-    //Note VOpnd should be removed first of all because it use DD-Chain.
-    removeVOpndForAllUse(vopnd, ctx);
+    VMD * phires = phi->getResult();
+    //Note phires-vopnd should be removed first of all because it use DD-Chain.
+    removeVOpndForAllUse(phires, ctx);
     removePhiFromDDChain(phi, prev);
     m_rg->freeIRTreeList(phi->getOpndList());
     MDPHI_opnd_list(phi) = nullptr;
-    removeVMD(vopnd);
+    removeVMD(phires);
 }
 
 
-//The function remove all MDPhis in 'bb'.
-//Note caller should guarrantee phi is useless and removable.
 void MDSSAMgr::removePhiList(IRBB * bb, MDSSAUpdateCtx const& ctx)
 {
     MDPhiList * philist = getPhiList(bb);
@@ -4669,22 +4700,17 @@ bool MDSSAMgr::removePhiHasCommonDef(List<IRBB*> * wl, MDPhi * phi,
     for (IR * opnd = phi->getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
         VMD * vopnd = phi->getOpndVMD(opnd, &m_usedef_mgr);
-        //if (vopnd == nullptr) {
-        //    //VOpnd may have been removed from MDSSAMgr, thus the VOpnd that
-        //    //corresponding to current ID is NULL.
-        //    continue;
-        //}
-        ASSERTN(vopnd, ("init-version should be placed if vopnd removed"));
-
+        ASSERTN(vopnd,
+            ("at least init-version VOpnd should be attached in the 'opnd'"
+             "if original non-init-version VOpnd removed"));
         ASSERT0(vopnd->is_md());
         if (wl != nullptr && vopnd->getDef() != nullptr) {
             ASSERT0(vopnd->getDef()->getBB());
             wl->append_tail(vopnd->getDef()->getBB());
         }
     }
-
     if (common_def != phi->getResult() && common_def != nullptr) {
-        //Change DEF from PHI to common_def to UseList.
+        //Change DEF from PHI to common_def to elements in UseList.
         ASSERT0(common_def->is_md());
 
         //CASE: Be careful that 'prev' should not belong to the NextSet of
@@ -4692,16 +4718,28 @@ bool MDSSAMgr::removePhiHasCommonDef(List<IRBB*> * wl, MDPhi * phi,
         //will construct a cycle in Def-Def chain, which is illegal.
         //e.g: for (i = 0; i < 10; i++) {;}, where i's MD is MD5.
         //  MD5V2 <-- PHI(MD5V--, MD5V3)
-        //  MD5V3 <-- MD5V2 + 1
-        // If we regard MD5V3 as the common-def, PHI as the 'mddef', a cycle
-        // will appeared.
+        //  MD5V3 <-- MD5V2 + 1 #S1
+        //Assume above code told us that MD5V3 is the common_def, whereas we
+        //are going to remove PHI because its operands have a common_def. If
+        //we set #S1 (the common_def) to be previous DEF in def-def chain of
+        //MD5, a def-def cycle will appeared, of course it is invalid.
         MDDef * prev = common_def->getDef();
         ASSERT0(prev);
         if (phi->isInNextSet(prev, getUseDefMgr())) {
+            //Avoid making a def-def cycle.
             prev = nullptr;
+        }
+        CollectCtx clctx(COLLECT_UNDEF);
+        IRSet useset(getSBSMgr()->getSegMgr());
+        if (prev != nullptr) {
+            CollectUse cu(this, phi->getResult(), clctx, &useset);
         }
         MDSSAUpdateCtx ctx(oc);
         removePhiFromMDSSAMgr(phi, prev, ctx);
+        if (prev != nullptr) {
+            //Set UseSet of PHI to be the USE of previous DEF.
+            buildDUChain(prev, useset);
+        }
         return true;
     }
     MDSSAUpdateCtx ctx(oc);
@@ -4721,7 +4759,6 @@ bool MDSSAMgr::removePhiHasNoValidDef(List<IRBB*> * wl, MDPhi * phi,
     if (doOpndHaveValidDef(phi)) {
         return false;
     }
-
     for (IR * opnd = phi->getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
         VMD * vopnd = phi->getOpndVMD(opnd, &m_usedef_mgr);
@@ -4738,9 +4775,17 @@ bool MDSSAMgr::removePhiHasNoValidDef(List<IRBB*> * wl, MDPhi * phi,
             wl->append_tail(vopnd->getDef()->getBB());
         }
     }
-
+    CollectCtx clctx(COLLECT_UNDEF);
+    IRSet useset(getSBSMgr()->getSegMgr());
+    if (phi->getPrev() != nullptr) {
+        CollectUse cu(this, phi->getResult(), clctx, &useset);
+    }
     MDSSAUpdateCtx ctx(oc);
     removePhiFromMDSSAMgr(phi, phi->getPrev(), ctx);
+    if (phi->getPrev() != nullptr) {
+        //Set UseSet of PHI to be the USE of previous DEF.
+        buildDUChain(phi->getPrev(), useset);
+    }
     return true;
 }
 
@@ -4765,7 +4810,6 @@ bool MDSSAMgr::prunePhiForBB(IRBB const* bb, List<IRBB*> * wl, OptCtx const& oc)
             philist->remove(prev, it);
             continue;
         }
-
         if (removePhiHasNoValidDef(wl, phi, oc)) {
             remove = true;
             philist->remove(prev, it);

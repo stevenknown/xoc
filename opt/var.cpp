@@ -368,7 +368,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
 void VarMgr::destroyVar(Var * v)
 {
     ASSERT0(v->id() != VAR_ID_UNDEF);
-    m_freelist_of_varid.bunion(v->id(), *m_rm->get_sbs_mgr());
+    m_freelist_of_varid.bunion(v->id(), *m_rm->getSBSMgr());
     m_var_vec.set(v->id(), nullptr);
     if (v->is_string() && v->hasInitString()) {
         //User may declare a empty string.
@@ -387,7 +387,7 @@ void VarMgr::destroy()
         delete v;
     }
 
-    m_freelist_of_varid.clean(*m_rm->get_sbs_mgr());
+    m_freelist_of_varid.clean(*m_rm->getSBSMgr());
 }
 
 
@@ -405,7 +405,7 @@ void VarMgr::assignVarId(Var * v)
     if (IS_BSUNDEF(id)) {
         VAR_id(v) = (UINT)m_var_count++;
     } else {
-        m_freelist_of_varid.diff(id, *m_rm->get_sbs_mgr());
+        m_freelist_of_varid.diff(id, *m_rm->getSBSMgr());
         VAR_id(v) = id;
     }
     ASSERTN(VAR_id(v) < VAR_ID_MAX, ("too many variables"));

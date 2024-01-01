@@ -57,82 +57,6 @@ static bool needBuildDUChain(RefineCtx const& ctx)
 }
 
 
-static HOST_INT calcIntVal(IR_CODE ty, HOST_INT v0, HOST_INT v1)
-{
-    switch (ty) {
-    case IR_ADD:
-        v1 = v0 + v1;
-        break;
-    case IR_SUB:
-        v1 = v0 - v1;
-        break;
-    case IR_MUL:
-        v1 = v0 * v1;
-        break;
-    case IR_DIV:
-        v1 = v0 / v1;
-        break;
-    case IR_REM:
-        v1 = v0 % v1;
-        break;
-    case IR_MOD:
-        v1 = v0 % v1;
-        break;
-    case IR_LAND:
-        v1 = v0 && v1;
-        break;
-    case IR_LOR:
-        v1 = v0 || v1;
-        break;
-    case IR_BAND:
-        v1 = v0 & v1;
-        break;
-    case IR_BOR:
-        v1 = v0 | v1;
-        break;
-    case IR_XOR:
-        v1 = v0 ^ v1;
-        break;
-    case IR_BNOT:
-        v1 = ~v0;
-        break;
-    case IR_LNOT:
-        v1 = !v0;
-        break;
-    case IR_LT:
-        v1 = v0 < v1;
-        break;
-    case IR_LE:
-        v1 = v0 <= v1;
-        break;
-    case IR_GT:
-        v1 = v0 > v1;
-        break;
-    case IR_GE:
-        v1 = v0 >= v1;
-        break;
-    case IR_EQ:
-        v1 = v0 == v1;
-        break;
-    case IR_NE:
-        v1 = v0 != v1;
-        break;
-    case IR_ASR:
-        v1 = v0 >> v1;
-        break;
-    case IR_LSR:
-        ASSERTN(0, ("the case must be handled in calcLSRIntVal()"));
-        //v1 = ((HOST_UINT)v0) >> v1;
-        break;
-    case IR_LSL:
-        v1 = v0 << v1;
-        break;
-    default: UNREACHABLE();
-    }
-    return v1;
-}
-
-
 //Make sure v0 is sign-extended if its bits length less than HOST_INT.
 static HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
 {
@@ -259,6 +183,143 @@ Refine::Refine(Region * rg) : Pass(rg)
 {
     ASSERT0(rg != nullptr);
     m_tm = rg->getTypeMgr();
+}
+
+
+template <class T>
+static T calcBinIntValImpl(IR_CODE code, T v0, T v1)
+{
+    switch (code) {
+    case IR_ADD:
+        v1 = v0 + v1;
+        break;
+    case IR_SUB:
+        v1 = v0 - v1;
+        break;
+    case IR_MUL:
+        v1 = v0 * v1;
+        break;
+    case IR_DIV:
+        v1 = v0 / v1;
+        break;
+    case IR_REM:
+        v1 = v0 % v1;
+        break;
+    case IR_MOD:
+        v1 = v0 % v1;
+        break;
+    case IR_LAND:
+        v1 = v0 && v1;
+        break;
+    case IR_LOR:
+        v1 = v0 || v1;
+        break;
+    case IR_BAND:
+        v1 = v0 & v1;
+        break;
+    case IR_BOR:
+        v1 = v0 | v1;
+        break;
+    case IR_XOR:
+        v1 = v0 ^ v1;
+        break;
+    case IR_BNOT:
+        v1 = ~v0;
+        break;
+    case IR_LNOT:
+        v1 = !v0;
+        break;
+    case IR_LT:
+        v1 = v0 < v1;
+        break;
+    case IR_LE:
+        v1 = v0 <= v1;
+        break;
+    case IR_GT:
+        v1 = v0 > v1;
+        break;
+    case IR_GE:
+        v1 = v0 >= v1;
+        break;
+    case IR_EQ:
+        v1 = v0 == v1;
+        break;
+    case IR_NE:
+        v1 = v0 != v1;
+        break;
+    case IR_ASR:
+        v1 = v0 >> v1;
+        break;
+    case IR_LSL:
+        v1 = v0 << v1;
+        break;
+    case IR_LSR:
+        ASSERTN(0, ("should invoke calcLSRIntVal()"));
+        break;
+    default: UNREACHABLE();
+    }
+    return v1;
+}
+
+
+HOST_INT Refine::calcBinSignedIntVal(IR_CODE code, Type const* ty,
+                                     HOST_INT v0, HOST_INT v1)
+{
+    ASSERT0(ty->is_sint());
+    //Use properly signed type according to target machine.
+    switch (sizeof(TMWORD) * BIT_PER_BYTE) {
+    case 32: return calcBinIntValImpl(code, (INT32)v0, (INT32)v1);
+    case 64: return calcBinIntValImpl(code, (INT64)v0, (INT64)v1);
+    default: ASSERTN(0, ("Target Dependent Code"));
+    }
+    UNREACHABLE();
+    return 0;
+}
+
+
+Type const* Refine::chooseValueIntTypeOfJudgeOp(IR const* exp) const
+{
+    ASSERT0(exp->is_judge());
+    IR const* op0 = BIN_opnd0(exp);
+    IR const* op1 = BIN_opnd1(exp);
+    if (op0->getType() == op1->getType()) { return op0->getType(); }
+    if (op0->is_sint() && !op1->is_sint()) {
+        //Prefer unsigned integer type if one of binary operands is signed.
+        return op1->getType();
+    }
+    if (!op0->is_sint() && op1->is_sint()) {
+        //Prefer unsigned integer type if one of binary operands is signed.
+        return op0->getType();
+    }
+    return op0->getType();
+}
+
+
+HOST_INT Refine::calcBinIntVal(IR const* ir,
+                               HOST_INT v0, HOST_INT v1)
+{
+    ASSERT0(ir->isBinaryOp());
+    ASSERT0(BIN_opnd0(ir)->getType()->is_int() ||
+            BIN_opnd0(ir)->getType()->is_bool() ||
+            BIN_opnd0(ir)->getType()->is_pointer());
+    ASSERT0(BIN_opnd1(ir)->getType()->is_int() ||
+            BIN_opnd1(ir)->getType()->is_bool() ||
+            BIN_opnd1(ir)->getType()->is_pointer());
+    Type const* valty = nullptr;
+    if (ir->is_judge()) {
+        valty = chooseValueIntTypeOfJudgeOp(ir);
+    } else {
+        valty = ir->getType();
+    }
+    ASSERT0(valty);
+    if (ir->getCode() == IR_LSR) {
+        return calcLSRIntVal(valty, v0, v1);
+    }
+    if (valty->is_sint()) {
+        return calcBinSignedIntVal(ir->getCode(), valty, v0, v1);
+    }
+    ASSERT0(valty->is_uint() || valty->is_bool() || valty->is_pointer());
+    return calcBinIntValImpl(ir->getCode(), (HOST_UINT)v0, (HOST_UINT)v1);
 }
 
 
@@ -1874,10 +1935,10 @@ IR * Refine::reassociation(IR * ir, bool & change)
             return ir;
         }
 
-        //If n1,n2 is int const. OP1((OP2 X,n1), n2) => OP2(X, OP1(n1,n2))
+        //If n1, n2 is int const. OP1((OP2 X,n1), n2) => OP2(X, OP1(n1,n2))
         //where OP1, OP2 must be identical precedence.
-        HOST_INT v = calcIntVal(opt1, CONST_int_val(BIN_opnd1(op0)),
-                                CONST_int_val(op1));
+        HOST_INT v = calcBinIntVal(ir,
+            CONST_int_val(BIN_opnd1(op0)), CONST_int_val(op1));
         DATA_TYPE dt = ir->is_ptr() ?
             m_tm->getPointerSizeDtype() :
             ir->is_mc() ? m_tm->getAlignedDType(WORD_BITSIZE, true) :
@@ -2553,19 +2614,22 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
     case IR_LSL: {
         IR * x = nullptr;
         if (ir->is_bool()) {
-            x = m_rg->getIRMgr()->buildImmInt(calcIntVal(ir->getCode(), v0, v1),
-                    m_tm->getSimplexTypeEx(D_U32));
+            x = m_rg->getIRMgr()->buildImmInt(
+                calcBinIntVal(ir, v0, v1),
+                m_tm->getSimplexTypeEx(D_U32));
         } else if (ir->is_fp()) {
             //The result type of binary operation is
             //float point, inserting IR_CVT.
             Type const* ty = m_tm->hoistDTypeForBinOp(BIN_opnd0(ir),
                                                       BIN_opnd1(ir));
             x = m_rg->getIRMgr()->buildCvt(m_rg->getIRMgr()->buildImmInt(
-                    calcIntVal(ir->getCode(), v0, v1), ty), ir->getType());
+                calcBinIntVal(ir, v0, v1), ty),
+                ir->getType());
         } else {
             ASSERT0(ir->is_int());
-            x = m_rg->getIRMgr()->buildImmInt(calcIntVal(ir->getCode(), v0, v1),
-                                  ir->getType());
+            x = m_rg->getIRMgr()->buildImmInt(
+                calcBinIntVal(ir, v0, v1),
+                ir->getType());
         }
         copyDbx(x, ir, m_rg);
         m_rg->freeIRTree(ir);

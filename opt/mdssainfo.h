@@ -120,7 +120,6 @@ class VOpnd {
 public:
     VOPND_CODE m_code;
     UINT m_id;
-
 public:
     VOpnd();
     ~VOpnd();
@@ -197,10 +196,14 @@ public:
 public:
     //Add an USE occurrence.
     void addUse(IR const* ir) { VMD_occs(this).append(ir->id()); }
+    void addUseSet(IRSet const& set, Region const* rg);
 
     void clean();
     void cleanUseSet() { VMD_occs(this).clean(); }
 
+    //Return true if ir is an USE of current VMD.
+    bool isUse(IR const* ir) const
+    { return const_cast<VMD*>(this)->getUseSet()->find(ir->id()); }
     void init() { VMD_occs(this).init(); clean(); }
 
     void destroy() { VMD_occs(this).destroy(); }
@@ -311,6 +314,7 @@ public:
     //exp: IR expression to be added.
     void addUse(IR const* exp, UseDefMgr * mgr);
     void addUseSet(MDSSAInfo const* src, UseDefMgr * mgr);
+    void addUseSet(IRSet const& set, IN UseDefMgr * mgr);
     void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
     void cleanVOpndSet(UseDefMgr * mgr);
@@ -337,6 +341,10 @@ public:
 
     //Return true if current ssainfo is equal to src.
     bool isEqual(MDSSAInfo const& src) const;
+
+    //Return true if 'ir' is an USE of one of VOpnds of current MDSSAInfo.
+    //vmd: optional, if it is not NULL, record the VMD if ir is USE of the VMD.
+    bool isUse(OUT VMD const** vmd, IR const* ir, MDSSAMgr const* mgr) const;
 
     VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 
@@ -410,6 +418,9 @@ public:
 
     //Return true if n is the Next DEF of current DEF.
     bool isNext(MDDef const* n) const;
+
+    //Return true if ir is an USE of current MDDef.
+    bool isUse(IR const* ir) const { return getResult()->isUse(ir); }
 
     //Return true if n is the Next DEF, and n may not be the
     //immediate-next-def to current DEF.

@@ -76,7 +76,7 @@ public:
 #define CP_PROP_NONPR 0x8
 
 //Propagate inexact non-PR operations.
-//The option allow CP propagate expression even if it references inexact
+//The option allow CP propagates expression even if it references inexact
 //memory.
 //e.g: there is no knowledge about p and q's point-to, however *p and 20 can be
 //propagation candidate.
@@ -85,6 +85,22 @@ public:
 //  *q = 20
 //  ... = *q
 #define CP_PROP_INEXACT_MEM 0x10
+
+//Propagate value to PHI's operands.
+//The option allow CP propagates expression to operand of PHI operation.
+//e.g: if the flag is set, CP will propagates 0x1 and 0x2 to PHI's operand.
+//  BB1:
+//  stpr $x = 0x1;
+//  ...
+//  BB2:
+//  stpr $y = 0x2;
+//  ...
+//  BB3:
+//  phi $z = ($x, BB1), ($y, BB2);
+//after copy-propagation, phi will be:
+//  BB3:
+//  phi $z = (0x1, BB1), (0x2, BB2);
+#define CP_PROP_CONST_TO_PHI_OPND 0x20
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
@@ -105,6 +121,10 @@ protected:
     //Return true if CP allows propagating memory object with inexact MD.
     bool allowInexactMD() const
     { return m_prop_kind.have(CP_PROP_INEXACT_MEM); }
+
+    //Return true if CP allows propagating value to phi's operand.
+    bool allowPropConstToPhiOpnd() const
+    { return m_prop_kind.have(CP_PROP_CONST_TO_PHI_OPND); }
 
     void copyVN(IR const* from, IR const* to) const;
     bool computeUseSet(IR const* def_stmt, OUT IRSet & useset,
@@ -222,20 +242,7 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    CopyProp(Region * rg) : Pass(rg), m_prop_kind(CP_PROP_UNDEF)
-    {
-        m_md_sys = rg->getMDSystem();
-        m_dumgr = rg->getDUMgr();
-        m_cfg = rg->getCFG();
-        m_md_set_mgr = rg->getMDSetMgr();
-        m_tm = rg->getTypeMgr();
-        m_gvn = nullptr;
-        m_oc = nullptr;
-        m_mdssamgr = nullptr;
-        m_prssamgr = nullptr;
-        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm && m_md_set_mgr);
-        m_prop_kind.set(CP_PROP_CONST|CP_PROP_PR|CP_PROP_NONPR);
-    }
+    CopyProp(Region * rg);
     virtual ~CopyProp() {}
 
     //Check if ir is appropriate for propagation.

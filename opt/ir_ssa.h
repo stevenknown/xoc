@@ -765,6 +765,12 @@ public:
         return ir != nullptr && ir->is_phi();
     }
 
+    //Return true if current bb has Phi with all same operand.
+    //e.g: phi $1 = ($2, $2, $2), return true.
+    //     phi $1 = (0x3, $2, $2), return false.
+    //Note if 'bb' does NOT have any PHI, the function will return true.
+    static bool hasPhiWithAllSameOperand(IRBB const* bb);
+
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);

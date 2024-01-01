@@ -685,6 +685,32 @@ UINT Graph::getDegree(Vertex const* vex) const
 }
 
 
+bool Graph::isInDegreeMoreThan(Vertex const* vex, UINT num) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
+    UINT degree = 0;
+    for (EdgeC * el = vex->getInList(); el != nullptr; el = EC_next(el)) {
+        degree++;
+        if (degree > num) { return true; }
+    }
+    return degree > num; //Both degree and num may be 0.
+}
+
+
+bool Graph::isOutDegreeMoreThan(Vertex const* vex, UINT num) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
+    UINT degree = 0;
+    for (EdgeC * el = vex->getOutList(); el != nullptr; el = EC_next(el)) {
+        degree++;
+        if (degree > num) { return true; }
+    }
+    return degree > num; //Both degree and num may be 0.
+}
+
+
 bool Graph::isInDegreeEqualTo(Vertex const* vex, UINT num) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));

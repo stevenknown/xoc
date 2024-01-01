@@ -110,7 +110,8 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
 
     //Before CFG rebuilding.
     CfgOptCtx ctx(oc);
-    getCFG()->removeEmptyBB(ctx);
+    RemoveEmptyBBCtx rmctx(ctx);
+    getCFG()->removeEmptyBB(rmctx);
     getCFG()->rebuild(oc);
     ASSERT0(getCFG()->verify());
     if (need_rebuild_mdssa) {

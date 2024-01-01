@@ -1252,7 +1252,7 @@ void Region::dump(bool dump_inner_region) const
 void Region::dumpRef(UINT indent) const
 {
     if (!isLogMgrInit()) { return; }
-    note(this, "\n\n==---- DUMP DUMgr: IR REFERENCE '%s' ----==\n",
+    note(this, "\n\n==---- DUMP IR MD REFERENCE '%s' ----==\n",
          getRegionName());
     BBList * bbs = getBBList();
     ASSERT0(bbs);

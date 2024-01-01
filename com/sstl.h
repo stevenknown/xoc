@@ -4913,6 +4913,8 @@ public:
         return count;
     }
 
+    //Return true if current hash initialized.
+    bool is_init() const { return m_mapped_elem_table.is_init(); }
     void init(UINT bsize = MAX_SHASH_BUCKET)
     {
         //Only do initialization while m_bucket is nullptr.
@@ -4937,7 +4939,6 @@ public:
                 return t;
             }
         }
-
         pos = VEC_UNDEF;
         return Ttgt(0);
     }
@@ -4954,10 +4955,8 @@ public:
                 return t;
             }
         }
-
         pos = VEC_UNDEF;
         return Ttgt(0);
-
     }
 
     void reinit() { destroy(); init(); }

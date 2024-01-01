@@ -107,22 +107,27 @@ class CollectUse {
         void set_visited(UINT id) { append(id); }
     };
     MDSSAMgr const* m_mgr;
-    MDSSAInfo const* m_info;
     CollectCtx const& m_ctx;
     MD const* m_ref;
     UseDefMgr const* m_udmgr;
 protected:
-    void collect(OUT IRSet * set) const;
+    void collectForVOpnd(VOpnd const* vopnd, OUT IRSet * set) const;
+    void collectForMDSSAInfo(MDSSAInfo const* info, OUT IRSet * set) const;
     void collectUseCrossPhi(MDPhi const* phi, MOD MDDefVisitor & vis,
                             OUT IRSet * set) const;
-    void collectUseForVOpnd(VMD const* vopnd, MOD MDDefVisitor & vis,
+    void collectUseForVOpnd(VOpnd const* vopnd, MOD MDDefVisitor & vis,
                             OUT IRSet * set) const;
 public:
     //ctx: indicates the terminating condition that the function should
     //     stop and behaviors what the collector should take when encountering
     //     specific IR operator. e.g: do collection by cross PHI operand.
     //set: record the return result.
+    //info: collect USE for each VOpnd of 'info'.
     CollectUse(MDSSAMgr const* mgr, MDSSAInfo const* info,
+               CollectCtx const& ctx, OUT IRSet * set);
+
+    //vopnd: collect USE for 'vopnd'.
+    CollectUse(MDSSAMgr const* mgr, VMD const* vmd,
                CollectCtx const& ctx, OUT IRSet * set);
 };
 
@@ -530,6 +535,8 @@ protected:
     //mdssainfo: add ir to the UseSet of VOpnd that recorded in 'mdssainfo'.
     //Note mdssainfo must be unique for each IR.
     void addUseToMDSSAInfo(IR const* ir, MDSSAInfo * mdssainfo);
+    void addUseSetToMDSSAInfo(IRSet const& set, MDSSAInfo * mdssainfo);
+    void addUseSetToVMD(IRSet const& set, MOD VMD * vmd);
     void addDefChain(MDDef * def1, MDDef * def2);
 
     //NOTE the function only should be called at constructor.
@@ -579,6 +586,7 @@ protected:
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
+    //The function finds DEF for ID of Phi by walking through DomInfo.
     //id: input ID.
     //ssainfo: MDSSAInfo of id.
     //olddef: old DEF of id.
@@ -632,9 +640,8 @@ protected:
                 DomTree const& domtree, MOD MD2VMDStack & md2vmdstk);
     void renameBB(IRBB * bb, MD2VMDStack & md2vmdstk);
 
-    //The function remove 'vopnd' from MDSSAInfo of each ir in its UsetSet.
+    //The function removes 'vopnd' from MDSSAInfo of each ir in its UseSet.
     //Note the UseSet will be clean.
-    //ctx: if ctx is nullptr, the function perform normal update.
     void removeVOpndForAllUse(MOD VMD * vopnd, MDSSAUpdateCtx const& ctx);
 
     //The function changes VOpnd of 'from' to 'to', for each elements in 'from'
@@ -652,12 +659,14 @@ protected:
     //wl: is an optional parameter to record BB which expected to deal with.
     //    It is a work-list that is used to drive iterative collection and
     //    elimination of redundant PHI.
+    //Return true if phi removed.
     bool removePhiHasNoValidDef(List<IRBB*> * wl, MDPhi * phi,
                                 OptCtx const& oc);
 
     //wl: is an optional parameter to record BB which expected to deal with.
     //    It is a work-list that is used to drive iterative collection and
     //    elimination of redundant PHI.
+    //Return true if phi removed.
     bool removePhiHasCommonDef(List<IRBB*> * wl, MDPhi * phi, OptCtx const& oc);
 
     //Remove PHI that without any USE.
@@ -756,8 +765,12 @@ public:
     void addStmtToMDSSAMgr(IR * ir, IR const* ref);
 
     //Build DU chain from 'def' to 'exp'.
-    //The function will add VOpnd of phi to 'exp'.
+    //The function will add VOpnd of 'def' to 'exp'.
     void buildDUChain(MDDef const* def, MOD IR * exp);
+
+    //Build DU chain from 'def' to each IR in set.
+    //The function will add VOpnd of 'def' to 'exp'.
+    void buildDUChain(MDDef const* def, IRSet const& set);
 
     //Construction of MDSSA form.
     //Note: Non-SSA DU Chains will be maintained after construction.
@@ -1105,6 +1118,12 @@ public:
     }
     bool hasPhi(IRBB const* bb) const { return hasPhi(bb->id()); }
 
+    //Return true if current bb has Phi with all same operand.
+    //e.g: mdphi IDx = (IDy, IDy, IDy), return true.
+    //     mdphi IDx = (0x3, IDy, IDy), return false.
+    //Note if 'bb' does NOT have any PHI, the function will return true.
+    bool hasPhiWithAllSameOperand(IRBB const* bb) const;
+
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);
@@ -1231,6 +1250,10 @@ public:
     //exp: IR expression to be removed.
     void removeDUChain(IR const* stmt, IR const* exp);
 
+    //Remove DU chain from 'def' to 'exp'.
+    //The function will add VOpnd of phi to 'exp'.
+    void removeDUChain(MDDef const* def, IR * exp);
+
     //Remove all virtual USEs of 'stmt'.
     //stmt' will not have any USE expression when function returned.
     void removeAllUse(IR const* stmt, MDSSAUpdateCtx const& ctx);
@@ -1256,8 +1279,8 @@ public:
     //NOTE: the function only process exp itself.
     void removeUse(IR const* exp);
 
-    //The function remove 'phi' out from MDSSA system.
-    //It will cut off DU chain of phi's operands, and the DU chain of phi
+    //The function removes 'phi' from MDSSAMgr.
+    //It will cut off DU chain of each phi's operands, and the DU chain of phi
     //itself as well, then free all resource.
     //phi: to be removed.
     //prev: previous DEF that is used to maintain DefDef chain, and it can be
@@ -1301,15 +1324,11 @@ public:
     //Return true if DU changed.
     bool removeExpiredDU(IR const* ir);
 
-    //Remove DU chain from 'def' to 'exp'.
-    //The function will add VOpnd of phi to 'exp'.
-    void removeDUChain(MDDef const* def, IR * exp);
-
-    //The function handle the DU chain and cut off the DU chain between MDPHI
-    //and its USE expression.
-    //Remove 'phi' from its use's vopnd-list.
-    //e.g:u1, u2 are its use expressions.
-    //cut off the DU chain between def->u1 and def->u2.
+    //The function handles the DU chain and cuts off the DU chain between Phi
+    //and its USE expressions.
+    //Remove 'phi' from its USE's vopnd-list.
+    //e.g:u1, u2 are its USE expressions.
+    //The function will cut off the DU chain between phi->u1 and phi->u2.
     void removeDefFromUseSet(MDPhi const* phi, MDSSAUpdateCtx const& ctx);
     void recomputeDUAndDDChain(MDPhi const* phi, DomTree const& domtree);
     void recomputeDUAndDDChain(MDPhiList const* philist,

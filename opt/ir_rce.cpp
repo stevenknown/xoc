@@ -282,10 +282,16 @@ static void dumpChangedIR(IR const* oldir, IR const* newir, RCE const* pass)
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\nCHANGE:");
+    rg->getLogMgr()->incIndent(2);
     note(rg, "\nOLD:");
     dumpIR(oldir, rg, IR_DUMP_KID);
     note(rg, "\nNEW:");
-    dumpIR(newir, rg, IR_DUMP_KID);
+    if (newir != nullptr) {
+        dumpIR(newir, rg, IR_DUMP_KID);
+    } else {
+        note(rg, "\nNULL");
+    }
+    rg->getLogMgr()->decIndent(2);
 }
 
 
@@ -474,7 +480,7 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
         IR * newbr = m_irmgr->buildGoto(BR_lab(ir));
         xoc::removeStmt(ir, m_rg, *ctx.oc);
         //Revise the PHI operand to fallthrough successor.
-        //Revise cfg. remove fallthrough edge.
+        //Revise CFG. Remove fallthrough edge.
         dumpRemovedEdge(from, to, this);
         CfgOptCtx coctx(*ctx.oc);
         m_cfg->removeEdge(from, to, coctx);
@@ -483,7 +489,7 @@ IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
     }
     if (must_false) {
         //TRUEBR(0x0), never jump.
-        //Revise cfg. remove branch edge.
+        //Revise CFG. Remove branch edge.
         IRBB * from = ir->getBB();
         IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
         ASSERT0(from && to);
@@ -629,11 +635,14 @@ bool RCE::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
-    if (is_use_gvn() && (m_gvn == nullptr || !m_gvn->is_valid())) {
+    if (is_use_gvn() && m_gvn == nullptr) {
+        //GVN is not ready.
         return false;
     }
     //Incremental update DOM need RPO.
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_RPO, PASS_GVN, PASS_UNDEF);
+    ASSERT0(m_gvn->is_valid());
     DumpBufferSwitch buff(m_rg->getLogMgr());
     dumpInit(this);
     RCECtx ctx(&oc);

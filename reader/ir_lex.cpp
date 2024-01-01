@@ -40,8 +40,10 @@ static TokenInfo g_token_info[] = {
     { T_IDENTIFIER, "identifier", },
     { T_IMM, "imm", },
     { T_IMML, "long imm", },
+    { T_IMMLL, "long long imm", },
     { T_IMMU, "unsigned imm", },
     { T_IMMUL, "unsigned long imm", },
+    { T_IMMULL, "unsigned long long imm", },
     { T_FP, "double decimal", },
     { T_FPF, "float decimal", },
     { T_FPLD, "long double decimal", },
@@ -231,12 +233,10 @@ Lexer::STATUS Lexer::readLineBuf(bool is_some_chars_in_cur_line)
             //should process the last characters in 'm_cur_line'
             //properly and correctly rather than returning 'EOF' directly.
             return LEX_EOF;
-        } else {
-            return LEX_SUCC;
         }
-    } else {
-        m_last_read_num = dw;
+        return LEX_SUCC;
     }
+    m_last_read_num = dw;
     m_last_read_num = MIN(m_last_read_num, LEX_MAX_BUF_LINE);
     m_file_buf_pos = 0;
     return LEX_NEXT;
@@ -309,7 +309,7 @@ Lexer::STATUS Lexer::readLine(OUT bool & is_some_chars_in_cur_line,
             return LEX_SUCC;
         }
         if (pos_in_cur_buf >= m_cur_line_len) {
-            //Escalate line buffer.
+            //Escalate the line buffer.
             m_cur_line_len += LEX_MAX_BUF_LINE;
             m_cur_line = (CHAR*)::realloc(m_cur_line, m_cur_line_len);
         }
@@ -339,7 +339,6 @@ Lexer::STATUS Lexer::getLine()
                  0, LEX_MAX_OFST_BUF_LEN * sizeof(LONG));
         m_ofst_tab_byte_size += LEX_MAX_OFST_BUF_LEN * sizeof(LONG);
     }
-
     UINT pos_in_cur_buf = 0;
     bool is_some_chars_in_cur_line = false;
     for (;;) {
@@ -366,10 +365,8 @@ FIN:
     m_cur_line_num = (UINT)::strlen(m_cur_line);
     m_cur_line_pos = 0;
     return LEX_SUCC;
-
 FAILED:
     return LEX_ERR;
-
 FEOF:
     m_src_line_num++;
     m_cur_line[pos_in_cur_buf] = 0;
@@ -437,6 +434,82 @@ CHAR Lexer::getNextChar()
 ////////////////////////////////////////////////////////////////////////////////
 //START HERE.                                                                 //
 ////////////////////////////////////////////////////////////////////////////////
+TOKEN Lexer::parse_suffix(TOKEN t)
+{
+    ASSERT0(t != T_UNDEF);
+    if (xcom::upper(m_cur_char) == 'L') {
+        //e.g: 1000L
+        //t is long integer.
+        if (t == T_IMM) {
+            t = T_IMML;
+            m_cur_char = getNextChar();
+            if (xcom::upper(m_cur_char) == 'L') {
+                //e.g: 1000LL
+                t = T_IMMLL;
+                m_cur_char = getNextChar();
+                if (xcom::upper(m_cur_char) == 'U') {
+                    //e.g: 1000LLU <=> 1000ULL
+                    t = T_IMMULL;
+                    m_cur_char = getNextChar();
+                }
+                return t;
+            }
+            if (xcom::upper(m_cur_char) == 'U') {
+                //e.g: 1000LU <=> 1000UL
+                m_cur_char = getNextChar();
+                return T_IMMUL;
+            }
+            return t;
+        }
+        if (t == T_FP) {
+            //e.g: 1.11L
+            //If suffixed by the letter L, imm has type with long double.
+            m_cur_char = getNextChar();
+            return T_FPLD;
+        }
+        return t;
+    }
+    if (xcom::upper(m_cur_char) == 'U') {
+        if (t == T_IMM) {
+            //e.g: 1000U
+            //t is unsigned integer.
+            t = T_IMMU;
+            m_cur_char = getNextChar();
+            if (xcom::upper(m_cur_char) == 'L') {
+                //e.g: 1000UL
+                t = T_IMMUL;
+                m_cur_char = getNextChar();
+                if (xcom::upper(m_cur_char) == 'L') {
+                    //e.g: 1000ULL
+                    t = T_IMMULL;
+                    m_cur_char = getNextChar();
+                }
+                return t;
+            }
+            return t;
+        }
+        ASSERT0(t == T_FP);
+        error(m_real_line_num, "invalid suffix \"%c\" on float constant",
+              m_cur_char);
+        m_cur_char = getNextChar();
+        return t;
+    }
+    if (xcom::upper(m_cur_char) == 'F') {
+        //e.g:1.0F, emphasize that immeidate is float rather than double.
+        if (t == T_IMM) {
+            error(m_real_line_num, "invalid suffix \"%c\" on integer constant",
+                  m_cur_char);
+            return t;
+        }
+        ASSERT0(t == T_FP);
+        m_cur_char = getNextChar();
+        t = T_FPF;
+        return t;
+    }
+    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
+    return t;
+}
+
 
 //'m_cur_char' hold the current charactor right now.
 //You should assign 'm_cur_char' the next valid charactor before
@@ -446,8 +519,8 @@ TOKEN Lexer::t_num()
     CHAR c = getNextChar();
     bool b_is_fp = false;
     TOKEN t = T_UNDEF;
-    if (m_cur_char == '0' && (c == 'x' || c == 'X')) {
-        //hex
+    if (m_cur_char == '0' && xcom::upper(c) == 'X') {
+        //meet up hex
         m_cur_token_string[m_cur_token_string_pos++] = c;
         while (xcom::xisdigithex(c = getNextChar())) {
             m_cur_token_string[m_cur_token_string_pos++] = c;
@@ -455,9 +528,8 @@ TOKEN Lexer::t_num()
         m_cur_token_string[m_cur_token_string_pos] = 0;
         m_cur_char = c;
         t = T_IMM;
-        goto FIN;
+        goto SUFFIX;
     }
-
     if (xisdigit(c) || c == '.') {
         //'c' is decimal.
         if (c == '.') {
@@ -489,48 +561,8 @@ TOKEN Lexer::t_num()
         m_cur_char = c;
         t = T_IMM; //t is '0','1','2','3','4','5','6','7','8','9'
     }
-
-FIN:
-    if (m_cur_char == 'L' || m_cur_char == 'l') {
-        //e.g: 1000L
-        //t is long integer.
-        if (t == T_IMM) {
-            t = T_IMML;
-            m_cur_char = getNextChar();
-            if (m_cur_char == 'L' || m_cur_char == 'l') {
-                //e.g: 1000LL
-                m_cur_char = getNextChar();
-                if (m_cur_char == 'U' || m_cur_char == 'u') {
-                    //e.g: 1000LLU
-                    m_cur_char = getNextChar();
-                }
-            } else if (m_cur_char == 'U' || m_cur_char == 'u') {
-                //e.g: 1000LU
-                m_cur_char = getNextChar();
-                t = T_IMMUL;
-            }
-        } else if (t == T_FP) {
-            //If suffixed by the letter l or L, it has type long double.
-            m_cur_char = getNextChar();
-            t = T_FPLD;
-        }
-    } else if (m_cur_char == 'U' || m_cur_char == 'u') {
-        //imm is unsigned.
-        m_cur_char = getNextChar();
-        t = T_IMMU;
-    } else if (m_cur_char == 'F' || m_cur_char == 'f') {
-        //e.g: 1.0F, float
-        if (t == T_IMM) {
-            error(m_real_line_num, "invalid suffix \"%c\" on integer constant",
-                  m_cur_char);
-        } else {
-            ASSERT0(t == T_FP);
-            m_cur_char = getNextChar();
-            t = T_FPF;
-        }
-    }
-    ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
-    return t;
+SUFFIX:
+    return parse_suffix(t);
 }
 
 
@@ -634,7 +666,7 @@ CHAR Lexer::t_escape_string()
     case 'Z': {
         //'\xdd' or '\aabb'
         bool only_allow_two_hex = false;
-        if (c == 'x' || c == 'X') {
+        if (xcom::upper(c) == 'X') {
             only_allow_two_hex = true;
             c = getNextChar();
         }

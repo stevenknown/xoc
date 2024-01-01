@@ -68,6 +68,70 @@ public:
 //
 //START CopyProp
 //
+CopyProp::CopyProp(Region * rg) : Pass(rg), m_prop_kind(CP_PROP_UNDEF)
+{
+    m_md_sys = rg->getMDSystem();
+    m_dumgr = rg->getDUMgr();
+    m_cfg = rg->getCFG();
+    m_md_set_mgr = rg->getMDSetMgr();
+    m_tm = rg->getTypeMgr();
+    m_gvn = nullptr;
+    m_oc = nullptr;
+    m_mdssamgr = nullptr;
+    m_prssamgr = nullptr;
+    ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm && m_md_set_mgr);
+    UINT flag = CP_PROP_CONST|CP_PROP_PR|CP_PROP_NONPR;
+
+    //CASE:By default, we do not intend to add CP_PROP_TO_PHI_OPND to be
+    //propagation-kind. The reason is propagating Constant Value to phi operand
+    //will produce two or more empty predecessors BBs, which will confuse DCE
+    //functions when removing an ineffect Branch Stmt(such as TrueBr). And this
+    //will lead to incorrect removing of PHI operand. Finally, causing
+    //incorrect behaviors during PRSSA destruction.
+    //e.g:exec/cse.c, with cmdline -O3 -only-rce -cp_aggr -gvn -cfgopt
+    //-dce_aggr
+    //Before propagation:
+    //  BB13
+    //  falsebr _$L7 ne $3, 0
+    //   | |______________
+    //   V                |
+    //  BB16:             |
+    //  stpr $4 = 0;      |
+    //  goto _$L8;        |
+    //   |                |
+    //   V                |
+    //  BB18:_$L7         |
+    //  stpr $5 = -1;     |
+    //   |  ______________|
+    //   | |
+    //   V V
+    //  BB19:_$L8
+    //  phi $6 = ($4, BB16), ($5, BB18)
+    //  return $6;
+    //
+    //After propagation, RCE pass and removing all STPR that without any USE,
+    //the BB list will be:
+    //  BB13:
+    //  falsebr _$L8 ne $3, 0; #S1
+    //   | |______________
+    //   V                |
+    //  BB18: //empty BB  |
+    //   |  ______________|
+    //   | |
+    //   V V
+    //  BB19:_$L8
+    //  phi $6 = (0, BB13), (-1, BB18);
+    //  return $6;
+    //During DCE pass, it should remove #S1, edge BB13->BB19, BB18->BB19, and
+    //PHI simultaneously. However, for now, DCE can not perform the expected
+    //removing behaviour. For the sake of avoiding propagate constant to PHI
+    //operand could prevent DCE's incorrect optimization, and leave the job of
+    //removing FALSEBR to RCE pass.
+    //flag |= CP_PROP_CONST_TO_PHI_OPND;
+    m_prop_kind.set(flag);
+}
+ 
+
 //Return true if ir's type is consistent with 'cand_exp'.
 bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const
 {
@@ -680,18 +744,33 @@ IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
     if ((prop_value->is_int() && leaf->is_fp()) ||
         (prop_value->is_fp() && leaf->is_int())) {
         //TBD:Can we safely discard the float<->integer conversion?
-        //For now, we will not disgard CVT for conservative purpose.
+        //For now, we do NOT disgard CVT for conservative purpose.
         return prop_value;
     }
     if (prop_value->is_fp() && leaf->is_fp() &&
         prop_value->getType() != leaf->getType()) {
-        //Different float point type conversion can not be skipped.
-        //CASE: $1:f64 = cvt:fp64 ($2:fp32)
-        //      ... = $1:64 #USE
+        //CASE: Different float point type conversion can not be skipped.
+        //e.g: $1:f64 = cvt:fp64 ($2:fp32)
+        //     ... = $1:64 #USE
         //Where $2:f32 can NOT be propagated to $1 because of type.
         return prop_value;
     }
-    //Regard leaf expression as the propagate candidate.
+    UINT tgt_size = prop_value->getTypeSize(m_tm);
+    UINT src_size = leaf->getTypeSize(m_tm);
+    if (tgt_size > src_size) {
+        //CASE: If leaf is PR or NonPR memory reference, we should not skip the
+        //CVT if tgt_size is bigger than leaf's Var size.
+        //e.g:exec/array_alias2.c
+        //  st:i64 b = cvt:i64( $8:i32 )
+        //  printf("%llu", b:i64); #S1
+        //where $8's Var size is i32.
+        //After CP propagates $8 to #S1, the code will be:
+        //  printf("%llu", $8:i64); #S2
+        //However, $8's Var declaration's type is i32, the PR operation in #S2
+        //will generate incorrect i64 memory read.
+        return prop_value;
+    }
+    //The CVT can be skipped.
     return leaf;
 }
 
@@ -777,6 +856,10 @@ bool CopyProp::doPropUseSet(IRSet const& useset, IR const* def_stmt,
         if (nearest_def != def_stmt) { continue; }
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
             dumpCopyPropAction(def_stmt, new_prop_value, use);
+        }
+        if (!allowPropConstToPhiOpnd() && use->getStmt()->is_phi() &&
+            prop_value->isConstExp()) {
+            continue;
         }
         if (use->is_id()) {
             change |= doPropForMDPhi(new_prop_value, use);

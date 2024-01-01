@@ -43,7 +43,7 @@ typedef xcom::TMap<UINT, IR*> Pred2Opnd;
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
 //   topological order.
-class IRCFG : public Pass, public CFG<IRBB, IR> {
+class IRCFG : public Pass, public OptimizedCFG<IRBB, IR> {
     COPY_CONSTRUCTOR(IRCFG);
 protected:
     Lab2BB m_lab2bb;
@@ -191,6 +191,13 @@ public:
     //next: the next BB in BBList.
     IRBB * changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
                                        OptCtx * oc);
+
+    //The function will remove all out-jump-edges of bb except the fallthrough
+    //edge, and try adding fallthrough edge if there is not a fallthrough edge.
+    //Fix up out-edges if BB becomes fallthrough BB.
+    //Note it is illegal case if an empty BB does not have fallthrough edge.
+    void changeToBeFallthroughBB(IRBB * bb, BBListIter const& bbit,
+                                 OUT CfgOptCtx & ctx);
 
     //The function insert a tampolining BB bewteen bb and its next BB.
     IRBB * changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc);
@@ -383,13 +390,6 @@ public:
     virtual UINT replacePredWith(IRBB const* bb, IRBB const* succ,
                                  List<UINT> const& newpreds,
                                  OUT CfgOptCtx & ctx);
-
-    //Fix out-edges if BB becomes fallthrough BB.
-    //The function will remove out-edges of bb except the fallthrough edge, and
-    //try adding fallthrough edge if it doesn't exist.
-    //Note it is illegal if empty BB has non-taken branch.
-    void reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter const& bbit,
-                                       OUT CfgOptCtx & ctx);
 
     //The function will update the MDSSA version for stmt and phi.
     void reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root);

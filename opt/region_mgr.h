@@ -74,31 +74,31 @@ class TargInfo;
 #define RM_label_count(r) ((r)->m_label_count)
 class RegionMgr {
 public:
-    typedef Vector<Region*> RegionTab;
+    typedef xcom::Vector<Region*> RegionTab;
 private:
     COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
 protected:
+    bool m_is_regard_str_as_same_md;
 #ifdef _DEBUG_
     UINT m_num_allocated;
 #endif
-    RegionTab m_id2rg;
-    Vector<OptCtx*> m_id2optctx;
-    xcom::BitSetMgr m_bs_mgr;
-    xcom::DefMiscBitSetMgr m_sbs_mgr;
-    SymTab m_sym_tab;
-    TypeMgr m_type_mgr;
+    UINT m_ru_count;
+    UINT m_label_count;
     VarMgr * m_var_mgr;
     MD const* m_str_md;
     MDSystem * m_md_sys;
-    UINT m_ru_count;
-    List<UINT> m_free_ru_id;
-    UINT m_label_count;
-    bool m_is_regard_str_as_same_md;
     TargInfo * m_targinfo;
-    SMemPool * m_pool;
+    xcom::SMemPool * m_pool;
     LogMgr * m_logmgr;
     Region * m_program;
+    RegionTab m_id2rg;
+    SymTab m_sym_tab;
+    TypeMgr m_type_mgr;
+    xcom::Vector<OptCtx*> m_id2optctx;
+    xcom::BitSetMgr m_bs_mgr;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
+    xcom::List<UINT> m_free_ru_id;
 protected:
     void estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
                     bool scan_call, bool scan_inner_region);
@@ -138,7 +138,7 @@ public:
     void dump(bool dump_inner_region);
 
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
-    xcom::DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
+    xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
     UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
     RegionTab * getRegionTab() { return &m_id2rg; }
@@ -170,7 +170,7 @@ public:
 
     //Initialize VarMgr structure and MD system.
     //It is the first thing you should do after you declared a RegionMgr.
-    inline void initVarMgr()
+    void initVarMgr()
     {
         ASSERTN(m_var_mgr == nullptr, ("VarMgr already initialized"));
         m_var_mgr = allocVarMgr();

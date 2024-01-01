@@ -396,7 +396,7 @@ bool IRBB::verify(Region const* rg) const
 
 
 //Return true if one of bb's successor has a phi.
-bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
+bool IRBB::hasPhiInSuccBB(CFG<IRBB, IR> const* cfg) const
 {
     MDSSAMgr * mdssamgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
     if (mdssamgr != nullptr && !mdssamgr->is_valid()) {
@@ -499,6 +499,14 @@ bool IRBB::verifyBranchLabel(Lab2BB const& lab2bb) const
 bool IRBB::hasPRPhi() const
 {
     return PRSSAMgr::hasPhi(this);
+}
+
+
+bool IRBB::hasPhiWithAllSameOperand(CFG<IRBB, IR> const* cfg) const
+{
+    if (!PRSSAMgr::hasPhiWithAllSameOperand(this)) { return false; }
+    MDSSAMgr * mgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
+    return mgr->hasPhiWithAllSameOperand(this);
 }
 
 

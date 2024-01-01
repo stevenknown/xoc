@@ -172,6 +172,48 @@ UINT computeMaxBitSizeForValue(ULONGLONG value)
 }
 
 
+UINT countLeadingOne(UINT64 a)
+{
+    UINT32 hi = a >> (sizeof(UINT32) * BITS_PER_BYTE);
+    if (hi != (UINT32)-1) { return countLeadingOne(hi); }
+    return (sizeof(UINT32) * BITS_PER_BYTE) +
+           countLeadingOne((UINT32)a);
+}
+
+
+UINT countLeadingOne(UINT32 a)
+{
+    UINT32 marker = 1 << (sizeof(UINT32) * BITS_PER_BYTE - 1);
+    UINT i = 0;
+    for (; i < sizeof(UINT32) * BITS_PER_BYTE; i++) {
+        if ((marker & a) == 0) { break; }
+        marker = marker >> 1;
+    }
+    return i;
+}
+
+
+UINT countLeadingZero(UINT64 a)
+{
+    UINT32 hi = a >> (sizeof(UINT32) * BITS_PER_BYTE);
+    if (hi != 0) { return countLeadingZero(hi); }
+    return (sizeof(UINT32) * BITS_PER_BYTE) +
+           countLeadingZero((UINT32)a);
+}
+
+
+UINT countLeadingZero(UINT32 a)
+{
+    UINT32 marker = 1 << (sizeof(UINT32) * BITS_PER_BYTE - 1);
+    UINT i = 0;
+    for (; i < sizeof(UINT32) * BITS_PER_BYTE; i++) {
+        if ((marker & a) == marker) { break; }
+        marker = marker >> 1;
+    }
+    return i;
+}
+
+
 //Append string to buf.
 //This function will guarantee that the length of string does
 //not exceed bufl.
@@ -904,9 +946,7 @@ CHAR * upper(CHAR * n)
     LONG l = (LONG)::strlen(n);
     l--;
     while (l >= 0) {
-        if (n[l] >= 'a' && n[l] <= 'z') {
-            n[l] = (CHAR)(n[l] - 32);
-        }
+        n[l] = upper(n[l]);
         l--;
     }
     return n;
@@ -919,9 +959,7 @@ CHAR * lower(CHAR * n)
     LONG l = (LONG)::strlen(n);
     l--;
     while (l >= 0) {
-        if (n[l] >= 'A' && n[l] <= 'Z') {
-            n[l] = (CHAR)(n[l] + 32);
-        }
+        n[l] = lower(n[l]);
         l--;
     }
     return n;

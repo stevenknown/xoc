@@ -221,6 +221,13 @@ protected:
                                       CompFlag compflag, DUOptFlag duflag);
     void computeExpressionList(IR * ir, OUT MDSet * ret_mds,
                                CompFlag compflag, DUOptFlag duflag);
+
+    //Walk through IR tree to compute or collect referrenced MD.
+    //ret_mds:In COMP_EXP_RECOMPUTE mode, it is used as tmp;
+    //        and in COMP_EXP_COLLECT_MUST_USE mode, it is
+    //        used to collect MUST-USE MD.
+    //Note the function will update ir's RefMD and RefMDSet if duflag contain
+    //COMP_EXP_RECOMPUTE.
     void computeExpression(IR * ir, MDSet * ret_mds, CompFlag compflag,
                            DUOptFlag duflag);
     void computeArrayRef(IR * ir, OUT MDSet * ret_mds, CompFlag compflag,
@@ -279,6 +286,7 @@ protected:
     void inferAllKidMDRef(IR * ir, OUT MDSet * ret_mds,
                           CompFlag compflag, DUOptFlag duflag);
     void inferCallStmtForNonPR(IR * ir, DUOptFlag duflag);
+
     //Return true if the output result has unify call's MayDef.
     bool inferCallStmtForNonPRViaCallGraph(IR const* ir,
                                            OUT MDSet & maydefuse);

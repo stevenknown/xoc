@@ -3435,6 +3435,24 @@ static void iterPhiToGenLab(IRBB const* bb, IRCFG const* cfg,
 }
 
 
+bool PRSSAMgr::hasPhiWithAllSameOperand(IRBB const* bb)
+{
+    BBIRListIter it;
+    bool hasphi = false;
+    for (IR const* ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
+         ir != nullptr; ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
+        if (!ir->is_phi()) { break; }
+        hasphi = true;
+        IR const* first_opnd = PHI_opnd_list(ir);
+        for (IR const* opnd = first_opnd->get_next();
+             opnd != nullptr; opnd = opnd->get_next()) {
+            if (first_opnd->isIREqual(opnd, false)) { continue; }
+            return false;
+        }
+    }
+    return hasphi ? true : false;
+}
+
 //Generate Label for the predecessor BB that corresponding to the specific
 //phi operand.
 void PRSSAMgr::genLabForInputBBOfPhiOpnd(IRCFG const* cfg)

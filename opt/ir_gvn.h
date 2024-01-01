@@ -37,34 +37,39 @@ author: Su Zhenyu
 namespace xoc {
 class VN;
 
+//Note the key-value pair type of Tab1, Tab2, ... TabN must be <UINT, pointer>.
 typedef xcom::TMapIter<UINT, VN*> Tab1Iter;
-
 class Tab1 : public xcom::TMap<UINT, VN*> {
 };
 
+//Note the key-value pair type of Tab1, Tab2, ... TabN must be <UINT, pointer>.
 typedef xcom::TMapIter<UINT, Tab1*> Tab2Iter;
-
 class Tab2 : public xcom::TMap<UINT, Tab1*> {
 };
 
+//Note the key-value pair type of Tab1, Tab2, ... TabN must be <UINT, pointer>.
 typedef xcom::TMapIter<UINT, Tab2*> Tab3Iter;
-
 class Tab3 : public xcom::TMap<UINT, Tab2*> {
 };
 
+//Note the key-value pair type of Tab1, Tab2, ... TabN must be <UINT, pointer>.
 typedef xcom::TMapIter<UINT, Tab3*> Tab4Iter;
-
 class Tab4 : public xcom::TMap<UINT, Tab3*> {
 };
 
 typedef enum _VN_TYPE {
     VN_UNKNOWN = 0,
-    VN_OP,
-    VN_VAR,
-    VN_INT,
-    VN_FP,
-    VN_STR,
-    VN_MC_INT,
+    VN_OP, //The numbered value reasoned from IR stmt or expression.
+    VN_VAR, //The numbered value reasoned from Var or MD.
+    VN_INT, //The numbered value reasoned from Integer.
+    VN_FP, //The numbered value reasoned from Float-Point.
+    VN_STR, //The numbered value reasoned from String.
+    VN_MC_INT, //The numbered value reasoned from MC typed value.
+
+    //The numbered value reasoned from IR, Var, MD or constant which is unique.
+    //When we compare two VNs which both are CONST, they are absolutely not
+    //equal.
+    VN_CONST,
     VN_NUM,
 } VN_TYPE;
 
@@ -76,7 +81,8 @@ typedef enum _VN_TYPE {
 #define VN_str_val(v) ((v)->u1.str)
 #define VN_op(v) ((v)->u1.op)
 #define VN_is_cst(v) (VN_type(v) == VN_INT || VN_type(v) == VN_MC_INT || \
-                      VN_type(v) == VN_FP || VN_type(v) == VN_STR)
+                      VN_type(v) == VN_FP || VN_type(v) == VN_STR || \
+                      VN_type(v) == VN_CONST)
 class VN {
     COPY_CONSTRUCTOR(VN);
 public:
@@ -98,8 +104,24 @@ public:
         u1.iv = 0;
     }
 
+    void dump(Region const* rg) const;
+
     UINT id() const { return VN_id(this); }
 
+    //Return true if VN reasoned from constant and unique value.
+    bool is_const() const { return VN_is_cst(this); }
+
+    //Return true if VN reasoned from integer value.
+    bool is_int() const
+    { return VN_type(this) == VN_INT || VN_type(this) == VN_MC_INT; }
+
+    //Return true if VN reasoned from float-point value.
+    bool is_fp() const { return VN_type(this) == VN_FP; }
+
+    //Return true if VN reasoned from string value.
+    bool is_str() const { return VN_type(this) == VN_STR; }
+
+    //Get the value-number type.
     VN_TYPE getType() const { return VN_type(this); }
 };
 
@@ -116,16 +138,24 @@ public:
     }
 };
 
-typedef HMap<double, VN*, DoubleHashFunc> FP2VN_MAP;
-typedef HMap<LONGLONG, VN*> LONGLONG2VN_MAP;
-typedef HMap<LONGLONG, VN*> LONGLONGMC2VN_MAP;
-typedef HMap<MD const*, VN*> MD2VN_MAP;
+typedef VecIdx FP2VNIter;
+typedef HMap<double, VN*, DoubleHashFunc> FP2VN;
+
+typedef VecIdx Longlong2VNIter;
+typedef HMap<LONGLONG, VN*> Longlong2VN;
+
+typedef VecIdx LonglongMC2VNIter;
+typedef HMap<LONGLONG, VN*> LonglongMC2VN;
+
+typedef VecIdx MD2VNIter;
+typedef HMap<MD const*, VN*> MD2VN;
 
 //Note: SymbolHashFunc request bucket size must be the power of 2.
-class SYM2VN_MAP : public HMap<Sym const*, VN*, SymbolHashFunc> {
-    COPY_CONSTRUCTOR(SYM2VN_MAP);
+typedef VecIdx Sym2VNIter;
+class Sym2VN : public HMap<Sym const*, VN*, SymbolHashFunc> {
+    COPY_CONSTRUCTOR(Sym2VN);
 public:
-    SYM2VN_MAP() : HMap<Sym const*, VN*, SymbolHashFunc>(0) {}
+    Sym2VN() : HMap<Sym const*, VN*, SymbolHashFunc>(0) {}
 };
 
 
@@ -527,37 +557,52 @@ protected:
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
+    Refine * m_refine;
     VN * m_zero_vn;
     VN * m_mc_zero_vn;
-    SMemPool * m_pool;
+    xcom::SMemPool * m_pool;
+    xcom::Vector<VN const*> * m_vn_vec; //optional, usually used to dump.
     OptCtx * m_oc;
     UINT m_vn_count;
     IR2VN m_ir2vn;
     MDPhi2VN m_mdphi2vn;
-    Vector<void*> m_irc_vec;
-    LONGLONG2VN_MAP m_ll2vn;
-    LONGLONGMC2VN_MAP m_llmc2vn;
-    FP2VN_MAP m_fp2vn;
-    SYM2VN_MAP m_str2vn;
-    List<IR const*> m_tmp;
-    List<VN*> m_free_lst;
-    List<Tab1*> m_tab_lst;
-    MD2VN_MAP m_md2vn;
+    Longlong2VN m_ll2vn;
+    LonglongMC2VN m_llmc2vn;
+    FP2VN m_fp2vn;
+    Sym2VN m_str2vn;
+    MD2VN m_md2vn;
+    xcom::List<VN*> m_free_lst;
+    xcom::List<Tab1*> m_tab_lst;
+    xcom::Vector<void*> m_irc_vec;
     IR2ILDVNE m_def2ildtab;
     IR2ARRVNE m_def2arrtab;
     IR2SCVNE m_def2sctab;
     IR2IR m_stmt2domdef;
 protected:
     void assignRHSVN();
-    VN const* allocLiveinVN(IR const* exp, MD const* emd, bool & change);
+    VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
     VN * allocVN();
 
+    bool calcCondMustValEQ(IR const* ir, bool & must_true,
+                           bool & must_false) const;
+    bool calcCondMustValNE(IR const* ir, bool & must_true,
+                           bool & must_false) const;
+    bool calcCondMustValLAndLOr(IR const* ir, bool & must_true,
+                                bool & must_false) const;
+    bool calcCondMustValLEGE(IR const* ir, bool & must_true,
+                             bool & must_false) const;
+    bool calcCondMustValLTGT(IR const* ir, bool & must_true,
+                             bool & must_false) const;
+    bool calcCondMustValBin(IR const* ir, bool & must_true,
+                            bool & must_false) const;
     void cleanIR2VN();
     void clean();
+    VN const* computeIntConst(HOST_INT val);
     VN const* computeSelect(IR const* exp, bool & change);
     VN const* computeBin(IR const* exp, bool & change);
     VN const* computeConst(IR const* exp, bool & change);
     VN const* computeLda(IR const* exp, bool & change);
+    VN const* computeCvt(IR const* cvt, bool & change);
     VN const* computeUna(IR const* exp, bool & change);
     VN const* computeInexactScalarByClassicDU(IR const* exp, bool & change);
     VN const* computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
@@ -582,8 +627,6 @@ protected:
 
     void dumpBB(UINT bbid) const;
     void dumpIR2VN() const;
-    void dumpVNHash() const;
-    void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
 
     OptCtx const* getOptCtx() const { return m_oc; }
@@ -629,17 +672,17 @@ protected:
         return p;
     }
 
-    VN const* registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
-                             VN const* v2, VN const* v3);
-    VN const* registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
-                               VN const* v2);
-    VN const* registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
-    VN const* registerUnaVN(IR_CODE irt, VN const* v0);
-    VN const* registerVNviaMD(MD const* md);
-    VN const* registerVNviaMC(LONGLONG v);
-    VN const* registerVNviaINT(LONGLONG v);
-    VN const* registerVNviaFP(double v);
-    VN const* registerVNviaSTR(Sym const* v);
+    VN * registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
+                        VN const* v2, VN const* v3);
+    VN * registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
+                          VN const* v2);
+    VN * registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
+    VN * registerUnaVN(IR_CODE irt, VN const* v0);
+    VN * registerVNviaMD(MD const* md);
+    VN * registerVNviaMC(LONGLONG v);
+    VN * registerVNviaINT(LONGLONG v);
+    VN * registerVNviaFP(double v);
+    VN * registerVNviaSTR(Sym const* v);
 
     void processMDPhi(IRBB * bb, bool & change);
     void processMDPhi(MDPhi const* phi, bool & change);
@@ -692,6 +735,8 @@ public:
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
+    void dumpAllVN() const;
+    void dumpMiscMap() const;
 
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
@@ -701,6 +746,31 @@ public:
     //The function will retrieve dependence through SSA, thus MDSSA and PRSSA
     //have to be avaiable.
     bool hasSameValueBySSA(IR const* ir1, IR const* ir2) const;
+
+    //Return true if vn1 is exactly equal to vn2.
+    //e.g:if vn1 of ir1 reasoned from a ILD, and vn2 of ir2 reasoned from
+    //a ARRAY, we can conclude that ir1's value is equal to ir2 if vn1 == vn2.
+    //Note both vn1 and vn2 can not be NULL.
+    bool hasSameValue(VN const* vn1, VN const* vn2) const
+    {
+        ASSERT0(vn1 && vn2);
+        return vn1 == vn2;
+    }
+
+    //Return true if ir has unique and constant VN.
+    bool hasConstVN(IR const* ir) const;
+
+    //Return true if vn1 is exactly not equal to vn2.
+    //e.g:if vn1 of ir1 reasoned from a ILD, and vn2 of ir2 reasoned from
+    //a ARRAY, we can not simply conclude that ir1's value is exactly NOT
+    //equal to ir2 even if vn1 != vn2.
+    bool hasDifferentValue(VN const* vn1, IR const* ir1,
+                           VN const* vn2, IR const* ir2) const;
+    bool hasDifferentValue(VN const* vn1, VN const* vn2) const;
+
+    //Return true if ir has unique and constant VN.
+    //ir: the stmt or exp that has the VN 'irvn'.
+    bool isConstVN(VN const* irvn, IR const* ir) const;
 
     //Return true if ir1 and ir2 represent identical memory location.
     //Note this function does NOT consider data type
@@ -720,6 +790,8 @@ public:
 
     //Set VN to ir.
     void setVN(IR const* ir, VN const* vn) { m_ir2vn.setAlways(ir->id(), vn); }
+
+    //Set VN to MDPhi.
     void setVN(MDPhi const* phi, VN const* vn)
     { m_mdphi2vn.setAlways(phi->id(), vn); }
 

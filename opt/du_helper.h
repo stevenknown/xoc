@@ -90,20 +90,29 @@ public:
     bool isUniqueDefStrict(IR const* ir) const;
 };
 
-
-//The function manipulates DU chain. It adds DU chain from tree 'from' to
-//tree 'to',  and the function will establish new DU chain between DEF of
-//'from' and expression 'to'.
+//The function manipulates DU chain.
+//The function will establish new DU chain between DEF of 'from' and
+//expression 'to'.
+//e.g:stpr $1=... #S1
+//    ...=$1 + 1 $S2
+//    ...=$1 - 3 #S3
+//By giving 'from' is $1 in $S2, 'to' is $1 in S3, the function will add $1 in
+//#S3 to be USE of #S1.
 //to: root expression of target tree.
 //from: root expression of source tree.
 //NOTE:IR tree 'to' and 'from' must be isomorphic structure.
-//     The function will NOT iterate sibling IR if 'from' is a list.
+//     The function will NOT iterate sibling IR if 'from' is a IR list.
 //Both 'to' and 'from' must be expression.
 void addUseForTree(IR * to, IR const* from, Region * rg);
 
-//The function manipulates DU chain. It adds DU chain from 'from' to
-//'to',  and the function will establish new DU chain between DEF of
-//'from' and expression 'to'.
+//The function manipulates DU chain.
+//The function will establish new DU chain between DEF of 'from' and
+//expression 'to'.
+//e.g:stpr $1=... #S1
+//    ...=$1 + 1 $S2
+//    ...=$1 - 3 #S3
+//By giving 'from' is $1 in $S2, 'to' is $1 in S3, the function will add $1 in
+//#S3 to be USE of #S1.
 //to: target IR expression.
 //from: source IR expression.
 //Both 'to' and 'from' must be expression.

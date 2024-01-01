@@ -325,6 +325,19 @@ void MDSSAInfo::addUseSet(MDSSAInfo const* src, IN UseDefMgr * mgr)
 }
 
 
+void MDSSAInfo::addUseSet(IRSet const& set, IN UseDefMgr * mgr)
+{
+    IRSetIter it = nullptr;
+    Region const* rg = mgr->getRegion();
+    for (BSIdx i = set.get_first(&it);
+         i != BS_UNDEF; i = set.get_next(i, &it)) {
+        IR * exp = rg->getIR(i);
+        ASSERT0(exp && exp->is_exp());
+        addUse(exp, mgr);
+    }
+}
+
+
 //Add given IR expression to occurence set.
 //exp: IR expression to be added.
 void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
@@ -337,6 +350,24 @@ void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
         ASSERT0(vopnd && vopnd->is_md());
         vopnd->addUse(exp);
     }
+}
+
+
+bool MDSSAInfo::isUse(OUT VMD const** vmd, IR const* ir, MDSSAMgr const* mgr) const
+{
+    //Iterate each VOpnd.
+    VOpndSetIter iter = nullptr;
+    for (BSIdx i = readVOpndSet().get_first(&iter);
+         i != BS_UNDEF; i = readVOpndSet().get_next(i, &iter)) {
+        VMD const* t = (VMD*)const_cast<MDSSAMgr*>(mgr)->
+            getUseDefMgr()->getVOpnd(i);
+        ASSERT0(t && t->is_md());
+        if (t->isUse(ir)) {
+            if (vmd != nullptr) { *vmd = t; }
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -478,6 +509,18 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
         IR * use = rg->getIR(i2);
         ASSERT0(use && use->isMemRef());
         prt(rg, "%s", dumpIRName(use, tmp));
+    }
+}
+
+
+void VMD::addUseSet(IRSet const& set, Region const* rg)
+{
+    IRSetIter it = nullptr;
+    for (BSIdx i = set.get_first(&it);
+         i != BS_UNDEF; i = set.get_next(i, &it)) {
+        IR * exp = rg->getIR(i);
+        ASSERT0(exp && exp->is_exp());
+        addUse(exp);
     }
 }
 //END VMD

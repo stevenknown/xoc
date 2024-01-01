@@ -154,11 +154,6 @@ bool InsertGuardHelper::hasComplicatedDef(LI<IRBB> const* li,
 void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
 {
     ASSERT0(m_guard_start && m_guarded_bb && m_guard_end);
-    //Update DomTree.
-    domtree.remove(m_guard_start->id());
-    domtree.remove(m_guard_end->id());
-    domtree.remove(m_guarded_bb->id());
-
     //Remove stmts in guard_start.
     for (IR * ir = m_guard_start->getIRList().get_head();
          ir != nullptr; ir = m_guard_start->getIRList().get_next()) {
@@ -189,15 +184,20 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     //Remove other remained emtpy BB.
     CfgOptCtx coctx(*getOptCtx());
     m_cfg->removeEdge(m_guard_start, m_guard_end, coctx);
-    RemoveEmptyBBCtx rmctx;
-    bool res = m_cfg->removeEmptyBB(coctx, &rmctx);
+    RemoveEmptyBBCtx rmctx(coctx);
+    rmctx.setRecordRemovedBB();
+    bool res = m_cfg->removeEmptyBB(rmctx);
     ASSERT0_DUMMYUSE(res);
+
     //Update DomTree if BB removed.
-    for (UINT bbid = rmctx.getRemovedList().get_head(); bbid != BBID_UNDEF;
-         bbid = rmctx.getRemovedList().get_next()) {
+    ASSERT0(rmctx.getRemovedList());
+    for (UINT bbid = rmctx.getRemovedList()->get_head();
+         bbid != BBID_UNDEF; bbid = rmctx.getRemovedList()->get_next()) {
         domtree.remove(bbid);
     }
-    //removeEmptyBB only maintained these frequently used CFG info.
+
+    //CFG's removeEmptyBB optimization only maintained these frequently
+    //used CFG info. Make sure they are maintained well.
     OptCtx::setInvalidIfCFGChangedExcept(getOptCtx(), PASS_RPO,
                                          PASS_DOM, PASS_LOOP_INFO,
                                          PASS_UNDEF);

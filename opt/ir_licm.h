@@ -39,6 +39,7 @@ namespace xoc {
 class HoistCtx {
 public:
     //Top-down propagate information.
+    //All inherited context shares the same DomTree object.
     DomTree * domtree;
 
     //Top-down and bottom-up propagate information.
@@ -73,12 +74,9 @@ public:
     HoistCtx(HoistCtx const& src) :
         inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
         stmt_changed(false)
-    {
-        domtree = src.domtree;
-        oc = src.oc;
-        cfg = src.cfg;
-    }
+    { copyTopDownInfo(src); }
     ~HoistCtx() {}
+
     void buildDomTree(IRCFG * c)
     {
         ASSERT0(oc->is_dom_valid());
@@ -87,9 +85,12 @@ public:
         c->genDomTree(*domtree);
     }
 
-    void cleanAfterLoop()
+    void cleanAfterLoop() { inserted_guard_bb = false; }
+    void copyTopDownInfo(HoistCtx const& src)
     {
-        inserted_guard_bb = false;
+        domtree = src.domtree;
+        oc = src.oc;
+        cfg = src.cfg;
     }
 
     void unionBottomUpInfo(HoistCtx const& src)

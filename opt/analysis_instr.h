@@ -62,12 +62,12 @@ class AnalysisInstrument {
 protected:
     UINT m_pr_count; //counter of IR_PR.
     Region * m_rg;
-    SMemPool * m_du_pool;
-    SMemPool * m_sc_labelinfo_pool;
+    xcom::SMemPool * m_du_pool;
+    xcom::SMemPool * m_sc_labelinfo_pool;
     //Indicate a list of IR.
     IR * m_ir_list;
-    List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    List<IR const*> * m_return_list; //record RETURN in region.
+    xcom::List<IR const*> * m_call_list; //record CALL/ICALL in region.
+    xcom::List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     AttachInfoMgr * m_attachinfo_mgr; //AttachInfo manager.
 
@@ -85,7 +85,7 @@ protected:
     MDSetMgr m_mds_mgr;
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;
-    List<DU*> m_free_du_list;
+    xcom::List<DU*> m_free_du_list;
 protected:
     //Count memory usage for current object.
     size_t count_mem() const;

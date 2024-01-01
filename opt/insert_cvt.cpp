@@ -446,7 +446,6 @@ bool InsertCvt::convertStmtList(MOD BBIRList & ir_list, MOD InsertCvtCtx & rc)
     for (; ct != nullptr; ct = next_ct) {
         IR * ir = ct->val();
         next_ct = ir_list.get_next(next_ct);
-
         bool lchange = false;
         InsertCvtCtx lrc(rc);
         IR * newir = convertIRUntilUnchange(ir, lchange, lrc);
@@ -672,6 +671,7 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
         return kid;
     SWITCH_CASE_DIRECT_MEM_OP:
     SWITCH_CASE_INDIRECT_MEM_OP:
+    SWITCH_CASE_WRITE_ARRAY:
     SWITCH_CASE_CALL:
     SWITCH_CASE_ARITH:
     SWITCH_CASE_BITWISE:

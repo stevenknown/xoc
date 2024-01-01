@@ -2619,7 +2619,6 @@ static void setMayDefSetForCall(IR * ir, AliasAnalysis * aa)
         //     then foo() may use {p, x, y, z}.
         //NOTE that POINT-TO is only available for the
         //last stmt of BB. The call is just in the situation.
-        //ASSERT0(aa);
         //MDSet maydefuse;
         //MDSet const* hashed = nullptr;
         //aa->computeMayPointTo(p, maydefuse, &hashed);
@@ -2627,7 +2626,7 @@ static void setMayDefSetForCall(IR * ir, AliasAnalysis * aa)
         //CASE1: bar(p); where p->{x,y}, x->{w} we can not only collect
         //the MD that p pointed to, because bar() may modify w through
         //pointer x. Thus there will be a conservative result, the
-        //whole may-point-to set modif.
+        //whole worst-case MDSet, namely may-point-to set.
         //
         //CASE2: For conservative purpose.
         //void foo(size_t v)
@@ -2645,11 +2644,12 @@ static void setMayDefSetForCall(IR * ir, AliasAnalysis * aa)
         //    foo((size_t)&p); //both i and p changed.
         //    return i;
         //}
-        //This is a case to WORST PRECISION: A call should not
+        //This is a case to the WORST PRECISION: A call should not
         //reference all elements in may-point-to set, because local
-        //variable that do not be taken address can not be changed by call.
-        //In order to improve precision, we have to query MayDef/MayUse
-        //info from CallGraph.
+        //variables that are not be taken address can not be accessed through
+        //call. In order to improve precision, we have to query MayDef/MayUse
+        //from CallGraph.
+        ASSERT0(aa->getWorstCase());
         ir->setMayRef(aa->getWorstCase(), aa->getRegion());
         return;
     }
@@ -2660,13 +2660,18 @@ static void setMayDefSetForCall(IR * ir, AliasAnalysis * aa)
 void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->isCallStmt());
+    if (ir->hasReturnValue() && !m_is_visit.is_contain(ir->id())) {
+        //Generate MustRef if call has return-value.
+        m_is_visit.bunion(ir->id());
+        m_rg->getMDMgr()->allocRef(ir);
+    }
     MDSet tmp;
     if (ir->is_icall()) {
         AACtx tic;
         inferExpression(ICALL_callee(ir), tmp, &tic, mx);
     }
 
-    //Analyze parameters.
+    //Analyze the point-to of each parameters.
     MDSet by_addr_mds;
     for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
         AACtx tic;
@@ -2687,6 +2692,7 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
         }
     }
 
+    //Infer the MD reference of each parameters.
     for (IR * p = CALL_dummyuse(ir); p != nullptr; p = p->get_next()) {
         AACtx tic;
         inferExpression(p, tmp, &tic, mx);
@@ -2696,13 +2702,8 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
 
     if (CALL_is_alloc_heap(ir)) {
         if (ir->hasReturnValue()) {
-            MD const* t;
-            if (!m_is_visit.is_contain(ir->id())) {
-                m_is_visit.bunion(ir->id());
-                t = m_rg->getMDMgr()->allocRef(ir);
-            } else {
-                t = ir->getMustRef();
-            }
+            //The return-value pointed to HEAP memory.
+            MD const* t = ir->getMustRef();
             ASSERT0(t);
             setPointToUniqueMD(t->id(), *mx, allocHeapobj(ir));
         }
@@ -2713,19 +2714,10 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
         by_addr_mds.clean(*getSBSMgr());
         return;
     }
-
-    //Analyze return-values.
     if (ir->hasReturnValue()) {
-        MD const* t = nullptr;
-        if (!m_is_visit.is_contain(ir->id())) {
-            m_is_visit.bunion(ir->id());
-            t = m_rg->getMDMgr()->allocRef(ir);
-        } else {
-            t = ir->getMustRef();
-        }
-
-        ASSERTN(t, ("result of call miss exact MD."));
-
+        //Analyze return-value.
+        MD const* t = ir->getMustRef();
+        ASSERTN(t, ("result of call must be exact PR MD."));
         if (ir->isPtr()) {
             //Try to improve the precsion via typed alias info or
             //set ir pointed to May-Point-To set for conservative purpose.
@@ -2741,7 +2733,6 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
             cleanPointTo(t->id(), *mx);
         }
     }
-
     if (ir->isReadOnly()) {
         //Readonly call does not modify any point-to informations.
         tmp.clean(*getSBSMgr());
@@ -2749,7 +2740,6 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
         by_addr_mds.clean(*getSBSMgr());
         return;
     }
-
     processCallSideeffect(*mx, by_addr_mds);
     tmp.clean(*getSBSMgr());
     by_addr_mds.clean(*getSBSMgr());
@@ -3030,6 +3020,36 @@ void AliasAnalysis::dumpPtPairSet(PtPairSet const& pps) const
 }
 
 
+//The function collects all MDs that ir may pointed to.
+//Return the worst case MDSet if ir may pointed to it. If ir pointed to the
+//worst case, the content of 'set' is meaningless, thus can be ignored.
+MDSet const* AliasAnalysis::collectMayPointTo(
+    OUT MDSet & set, MOD xcom::DefMiscBitSetMgr & sbs,
+    IR const* ir, MD2MDSet const& mx) const
+{
+    ASSERT0(ir);
+    MDSet const* worst = nullptr;
+    MD const* must = ir->getMustRef();
+    if (must != nullptr) {
+        MDSet const* pt = getPointTo(must->id(), mx);
+        if (isWorstCase(pt)) { return pt; }
+        set.bunion_pure(*pt, sbs);
+    }
+    MDSet const* may = ir->getMayRef();
+    if (may == nullptr) { return worst; }
+    MDSetIter iter;
+    for (BSIdx i = may->get_first(&iter);
+         i != BS_UNDEF; i = may->get_next(i, &iter)) {
+        MD const* md = m_md_sys->getMD((MDIdx)i);
+        ASSERT0(md);
+        MDSet const* pt = getPointTo(md->id(), mx);
+        if (isWorstCase(pt)) { return pt; }
+        set.bunion_pure(*pt, sbs);
+    }
+    return nullptr;
+}
+
+
 //Dump 'ir' point-to according to 'mx'.
 //'dump_kid': dump kid's memory object if it exist.
 void AliasAnalysis::dumpIRPointTo(IR const* ir,
@@ -3037,8 +3057,8 @@ void AliasAnalysis::dumpIRPointTo(IR const* ir,
                                   MD2MDSet const* mx) const
 {
     if (ir == nullptr || !m_rg->isLogMgrInit()) { return; }
-    MD const* must = const_cast<IR*>(ir)->getMustRef();
-    MDSet const* may = const_cast<IR*>(ir)->getMayRef();
+    MD const* must = ir->getMustRef();
+    MDSet const* may = ir->getMayRef();
     if (must != nullptr ||
         (may != nullptr && may->get_elem_count() > 0)) {
         dumpIR(ir, m_rg, nullptr, 0);
@@ -3291,7 +3311,7 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
     IRListIter ct;
     MD2MDSet const* mx;
     if (m_flow_sensitive) {
-        mx = mapBBtoMD2MDSet(bb->id());
+        mx = mapBBToMD2MDSet(bb->id());
     } else {
         mx = &m_unique_md2mds;
     }
@@ -3330,10 +3350,6 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
 void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid) const
 {
     if (!m_rg->isLogMgrInit()) { return; }
-    note(getRegion(), "\n-- DUMP WORSTCASE POINT-TO --\n");
-    ASSERT0(getWorstCase());
-    getWorstCase()->dump(m_md_sys, m_vm, true);
-
     note(getRegion(), "\n-- DUMP IR POINT-TO FOR BB --");
     BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
@@ -3350,6 +3366,7 @@ bool AliasAnalysis::dump() const
          m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     m_md_sys->dump(m_vm, false);
+    dumpWorstCase();
     dumpMD2MDSetForRegion(false);
     dumpIRPointToForRegion(true);
     m_rg->getLogMgr()->decIndent(2);
@@ -3370,7 +3387,7 @@ void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph) const
         BBList * bbl = m_cfg->getBBList();
         for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
             note(getRegion(), "\n--- BB%u ---", bb->id());
-            dumpMD2MDSet(mapBBtoMD2MDSet(bb->id()),
+            dumpMD2MDSet(mapBBToMD2MDSet(bb->id()),
                         false); //each BB has its own graph.
         }
         return;
@@ -3412,6 +3429,18 @@ void AliasAnalysis::dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const
     if (dump_ptg) {
         g.dumpVCG("graph_point_to.vcg");
     }
+}
+
+
+//Dump the worst case MDSet.
+void AliasAnalysis::dumpWorstCase() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n-- DUMP WORST CASE --\n");
+    m_rg->getLogMgr()->incIndent(2);
+    ASSERT0(getWorstCase());
+    getWorstCase()->dump(m_md_sys, m_vm, true);
+    m_rg->getLogMgr()->decIndent(2);
 }
 
 
@@ -4154,7 +4183,6 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
     }
     OC_is_aa_valid(oc) = true;
-
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAA()) {
         dump();
     }
