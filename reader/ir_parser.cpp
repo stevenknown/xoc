@@ -4801,7 +4801,10 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
     ASSERT0(ctx->current_region);
     Var * v = nullptr;
     if (m_rm->getVarMgr()->isDedicatedStringVar(sym->getStr())) {
+        //User's GR file need the flag to be true.
+        m_rm->setRegardAllStringAsSameMD(true);
         MD const* md = m_rm->genDedicateStrMD();
+        ASSERT0(md);
         v = md->get_base();
     } else {
         v = m_rm->getVarMgr()->registerVar(sym, ty,

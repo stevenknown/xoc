@@ -288,6 +288,9 @@ bool VersionVerification::verifyVerPhiInSuccBB(
         IR const* opnd = ((CPhi const*)ir)->getOpnd(opnd_idx);
         ASSERT0(opnd && PRSSAMgr::isValidPhiOpnd(opnd));
         if (opnd->isConstExp() || opnd->is_lda()) { continue; }
+        if (opnd->is_cvt()) {
+            opnd = CVT_leaf_exp(opnd);
+        }
         ASSERTN(opnd->isReadPR(), ("illegal phi operand"));
         VPR * curvpr = (VPR*)opnd->getSSAInfo();
         ASSERTN(curvpr, ("miss phi opnd"));

@@ -277,21 +277,24 @@ public:
         return false;
     }
 
-    //Return true if ir data type is signed integer.
+    //Return true if data type is signed integer.
     bool is_sint() const
     { return TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128; }
 
-    //Return true if ir data type is unsgined integer.
+    //Return true if data type is unsgined integer.
     bool is_uint() const
     { return TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128; }
 
-    //Return true if ir data type is integer.
+    //Return true if data type is integer.
     bool is_int() const
     { return TY_dtype(this) >= D_B && TY_dtype(this) <= D_U128; }
 
-    //Return true if ir data type is float.
+    //Return true if data type is float.
     bool is_fp() const
     { return TY_dtype(this) >= D_BF16 && TY_dtype(this) <= D_F128; }
+
+    //Return true if data type can be regarded as integer.
+    bool isInt() const { return is_int() || is_bool() || is_pointer(); }
 
     //Return true if the type can be used to represent the
     //pointer's addend.

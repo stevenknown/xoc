@@ -144,7 +144,7 @@ public:
     RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
 
-    //The function generates a dedicated MD to intend to represent string md.
+    //The function generates a dedicated MD to represent string md.
     //Note the function regards all string variables as the same unbound MD.
     //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
     //There is a function allocates 3000+ string variable.

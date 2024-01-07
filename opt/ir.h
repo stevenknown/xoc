@@ -565,6 +565,9 @@ public:
     //Return true if ir's data type can be regarded as pointer.
     bool isPtr() const { return is_ptr() || is_any(); }
 
+    //Return true if ir's data type can be regarded as integer.
+    bool isInt() const { return is_int() || is_bool() || is_ptr(); }
+
     //Return true if ir's data type is string.
     bool is_str() const { return IR_dt(this)->is_string(); }
 

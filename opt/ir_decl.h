@@ -1106,6 +1106,7 @@ public:
 //This class represents data-type convertion.
 //Record the expression to be converted.
 #define CVT_exp(ir) (UNA_opnd(ir))
+#define CVT_leaf_exp(ir) (((CCvt*)ir)->getLeafExp())
 #define CVT_kid(ir, idx) (UNA_kid(ir, idx))
 #define CVT_round(ir) (((CCvt*)ir)->round)
 class CCvt : public CUna {

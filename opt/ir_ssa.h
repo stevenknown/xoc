@@ -794,7 +794,10 @@ public:
 
     //Return true if ir can be viewed as operand of PHI.
     static bool isValidPhiOpnd(IR const* ir)
-    { return ir->isConstExp() || ir->isReadPR() || ir->is_lda(); }
+    {
+        return ir->isConstExp() || ir->isReadPR() || ir->is_lda() ||
+               (ir->is_cvt() && CVT_leaf_exp(ir)->isReadPR());
+    }
 
     //Move IR_PHI from 'from' to 'to'.
     //This function often used in updating PHI when adding new dominater

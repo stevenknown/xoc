@@ -725,6 +725,8 @@ public:
 
     //Construct BB list by destructing CFG.
     bool reconstructBBList(OptCtx & oc);
+
+    //Register global variable located in program region.
     void registerGlobalVAR();
 
     //Split IR list into list of basic blocks.

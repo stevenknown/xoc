@@ -228,6 +228,12 @@ public:
     //Invert condition for relation operation.
     static void invertCondition(IR ** cond, Region * rg);
 
+    //Return true if given code may cause a runtime exception by
+    //given v0 and v1.
+    //The function is always used for avoiding different behaviours under -O3
+    //when performing optimizations.
+    bool mayCauseHardWareException(IR_CODE code, HOST_INT v0, HOST_INT v1);
+
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.
     IR * refineIRlist(IR * ir_list, bool & change, MOD RefineCtx & rc);

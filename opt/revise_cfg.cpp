@@ -141,7 +141,8 @@ void SortPredByLab::sort(IRBB const* bb, IR2Lab const& ir2lab) const
                 break;
             }
         }
-        ASSERTN(q, ("can not find expected in-edge for BB%d", bb->id()));
+        ASSERTN(q,
+            ("can not find expected predecessor for %s", IR::getIRName(opnd)));
         xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
         opnd_pred = q->get_next();
     }

@@ -313,7 +313,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
 }
 
 
-//Register gloval variable located in program region.
+//Register global variable located in program region.
 void Region::registerGlobalVAR()
 {
     MD const * common_string_var_md = getRegionMgr()->genDedicateStrMD();
@@ -449,7 +449,6 @@ void Region::constructBBList()
         IR * cur_ir = pointer;
         pointer = IR_next(pointer);
         IR_next(cur_ir) = IR_prev(cur_ir) = nullptr;
-
         if (IRBB::isLowerBoundary(cur_ir)) {
             if (cur_bb == nullptr) { cur_bb = allocBB(); }
             BB_irlist(cur_bb).append_tail(cur_ir);
@@ -458,16 +457,20 @@ void Region::constructBBList()
             cur_bb = allocBB();
             continue;
         }
-
         if (cur_ir->is_label()) {
             if (cur_bb != nullptr) {
-                getBBList()->append_tail(cur_bb);
+                if (cur_bb->getNumOfIR() != 0) {
+                    getBBList()->append_tail(cur_bb);
+                    //Split IR list here, generate a new BB.
+                    cur_bb = allocBB();
+                }
+            } else {
+                cur_bb = allocBB();
             }
-            //Generate new BB.
-            cur_bb = allocBB();
 
-            //label info be seen as add-on info attached on bb, and
-            //'ir' be dropped off.
+            //Attach as many as possible labels to current BB.
+            //label is treated as an add-on which attached on BB, and
+            //label-ir itself is recycled.
             bool not_merge_label = true;
             for (;;) {
                 cur_bb->addLabel(LAB_lab(cur_ir));
@@ -483,11 +486,9 @@ void Region::constructBBList()
                     break;
                 }
             }
-
             BB_is_target(cur_bb) = true;
             continue;
         }
-
         if (cur_ir->isMayThrow(false)) {
             if (cur_bb == nullptr) { cur_bb = allocBB(); }
             BB_irlist(cur_bb).append_tail(cur_ir);
@@ -956,12 +957,11 @@ void Region::prescanIRList(IR const* ir)
             Var * v = LDA_idinfo(ir);
             if (v->is_string()) {
                 if (getRegionMgr()->genDedicateStrMD() != nullptr) {
-                    //Treat all string variable as the same one.
+                    //Treat all string variables as the same one.
                     break;
                 }
-                Var * sv = getVarMgr()->registerStringVar(nullptr,
-                                                          VAR_string(v),
-                                                          MEMORY_ALIGNMENT);
+                Var * sv = getVarMgr()->registerStringVar(
+                    nullptr, VAR_string(v), MEMORY_ALIGNMENT);
                 ASSERT0(sv);
                 sv->setFlag(VAR_ADDR_TAKEN);
             } else if (v->is_label()) {
@@ -1799,21 +1799,18 @@ bool Region::process(OptCtx * oc)
     if (g_do_inline && is_program()) {
         do_inline(this, oc);
     }
-
     getPassMgr()->registerPass(PASS_REFINE)->perform(*oc);
     if (getIRList() != nullptr) {
         if (!processIRList(*oc)) { goto ERR_RETURN; }
     } else {
         if (!processBBList(*oc)) { goto ERR_RETURN; }
     }
-
     if (g_do_ipa && is_program()) {
         do_ipa(this, oc);
     }
     if (g_infer_type) {
         getPassMgr()->registerPass(PASS_INFER_TYPE)->perform(*oc);
     }
-
     post_process(this, oc);
     return true;
 ERR_RETURN:

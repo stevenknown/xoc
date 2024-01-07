@@ -148,6 +148,7 @@ void RegionMgr::registerGlobalMD()
         //ASSERT0(!v->is_unallocable());
 
         if (v->is_string() && genDedicateStrMD() != nullptr) {
+            //Treat all string variables as the same one.
             continue;
         }
 

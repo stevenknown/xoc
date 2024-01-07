@@ -353,7 +353,8 @@ void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
 }
 
 
-bool MDSSAInfo::isUse(OUT VMD const** vmd, IR const* ir, MDSSAMgr const* mgr) const
+bool MDSSAInfo::isUse(OUT VMD const** vmd, IR const* ir,
+                      MDSSAMgr const* mgr) const
 {
     //Iterate each VOpnd.
     VOpndSetIter iter = nullptr;

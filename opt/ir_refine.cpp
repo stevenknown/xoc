@@ -295,26 +295,27 @@ Type const* Refine::chooseValueIntTypeOfJudgeOp(IR const* exp) const
 }
 
 
-HOST_INT Refine::calcBinIntVal(IR const* ir,
-                               HOST_INT v0, HOST_INT v1)
+HOST_INT Refine::calcBinIntVal(IR const* ir, HOST_INT v0, HOST_INT v1)
 {
     ASSERT0(ir->isBinaryOp());
-    ASSERT0(BIN_opnd0(ir)->getType()->is_int() ||
-            BIN_opnd0(ir)->getType()->is_bool() ||
-            BIN_opnd0(ir)->getType()->is_pointer());
-    ASSERT0(BIN_opnd1(ir)->getType()->is_int() ||
-            BIN_opnd1(ir)->getType()->is_bool() ||
-            BIN_opnd1(ir)->getType()->is_pointer());
+    ASSERT0(BIN_opnd0(ir)->isInt() && BIN_opnd1(ir)->isInt());
     Type const* valty = nullptr;
     if (ir->is_judge()) {
         valty = chooseValueIntTypeOfJudgeOp(ir);
-    } else {
+    } else if (ir->isInt()) {
         valty = ir->getType();
+    } else {
+        IR const* op0 = BIN_opnd0(ir);
+        IR const* op1 = BIN_opnd1(ir);
+        valty = m_tm->hoistDTypeForBinOp(op0, op1);
+        ASSERT0(valty && valty->isInt());
     }
     ASSERT0(valty);
     if (ir->getCode() == IR_LSR) {
         return calcLSRIntVal(valty, v0, v1);
     }
+    ASSERTN(!((ir->getCode() == IR_DIV) && (v1 == 0)),
+            ("divisor can not be zero"));
     if (valty->is_sint()) {
         return calcBinSignedIntVal(ir->getCode(), valty, v0, v1);
     }
@@ -1905,14 +1906,15 @@ IR * Refine::refineLsr(IR * ir, bool & change)
     return ir;
 }
 
-static bool mayCauseHardWareException(IR_CODE ty, HOST_INT v0, HOST_INT v1)
+
+bool Refine::mayCauseHardWareException(IR_CODE code, HOST_INT v0, HOST_INT v1)
 {
-    switch (ty) {
+    switch (code) {
     case IR_DIV:
     case IR_REM:
     case IR_MOD:
         return v1 == 0;
-    default:;
+    default: return false;
     }
     return false;
 }

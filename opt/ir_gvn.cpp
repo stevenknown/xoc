@@ -1210,7 +1210,9 @@ VN const* GVN::computeBin(IR const* exp, bool & change)
         return nullptr;
     }
     VN const* x = nullptr;
-    if (vn1->is_int() && vn2->is_int()) {
+    if (vn1->is_int() && vn2->is_int() &&
+        !m_refine->mayCauseHardWareException(
+            exp->getCode(), VN_int_val(vn1), VN_int_val(vn2))) {
         HOST_INT val = m_refine->calcBinIntVal(
             exp, VN_int_val(vn1), VN_int_val(vn2));
         x = computeIntConst(val);

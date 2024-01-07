@@ -171,8 +171,11 @@ bool verifyILD(IR const* ir, Region const* rg)
     ASSERT0(ir->getDType() != D_UNDEF);
     ASSERT0(ILD_base(ir));
     if (!g_is_support_dynamic_type) {
-        ASSERTN(ILD_base(ir)->is_ptr(), ("base must be pointer"));
-        ASSERT0(tm->getPointerBaseByteSize(ILD_base(ir)->getType()) > 0);
+        ASSERTN(ILD_base(ir)->isPtr(), ("base must be pointer"));
+        if (!ILD_base(ir)->is_any()) {
+            //ANY type's base pointer size is unknown.
+            ASSERT0(tm->getPointerBaseByteSize(ILD_base(ir)->getType()) > 0);
+        }
     }
     ASSERT0(ILD_base(ir)->is_exp());
     ASSERT0(ILD_base(ir)->is_single());
