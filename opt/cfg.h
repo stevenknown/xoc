@@ -1283,8 +1283,8 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name) const
     if (!name) {
         name = "graph_cfg.vcg";
     }
-    UNLINK(name);
-    FILE * hvcg = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * hvcg = fo.getFileHandler();
     ASSERTN(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"
             "title: \"Graph\"\n"
@@ -1363,7 +1363,6 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name) const
         }
     }
     fprintf(hvcg, "\n}\n");
-    fclose(hvcg);
 }
 
 

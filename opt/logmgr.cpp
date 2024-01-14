@@ -385,7 +385,7 @@ void LogMgr::init(CHAR const* logfilename, bool is_del)
     if (is_del) {
         UNLINK(logfilename);
     }
-    m_ctx.logfile = fopen(logfilename, "a+");
+    m_ctx.logfile = ::fopen(logfilename, "a+");
     if (m_ctx.logfile == nullptr) {
         fprintf(stderr,
                 "\ncan not open dump file %s, errno:%d, errstring:\'%s\'\n",

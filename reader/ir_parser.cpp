@@ -2477,7 +2477,6 @@ bool IRParser::parseUnaryOp(IR_CODE code, ParseCtx * ctx)
     ASSERT0(isUnaryOp(code));
     TOKEN tok = m_lexer->getNextToken();
     ctx->returned_exp = nullptr;
-
     Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
@@ -2486,18 +2485,18 @@ bool IRParser::parseUnaryOp(IR_CODE code, ParseCtx * ctx)
             return false;
         }
     }
-
     if (!parseExp(ctx)) {
         return false;
     }
-
     IR * opnd = ctx->returned_exp;
     ASSERT0(opnd);
-
     if (ty == nullptr) {
-        ty = m_tm->getAny();
+        if (IR::mustBeBoolType(code)) {
+            ty = m_tm->getBool();    
+        } else {
+            ty = m_tm->getAny();
+        }
     }
-
     IR * exp = ctx->current_region->getIRMgr()->buildUnaryOp(code, ty, opnd);
     ctx->returned_exp = exp;
     return true;

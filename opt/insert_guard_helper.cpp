@@ -336,7 +336,7 @@ void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(IR * ir,
             phi = m_mdssa->insertPhiWithNewVersion(vmd->mdid(),
                                                    m_guard_end, numpred);
         }
-        m_mdssa->recomputeDUAndDDChain(phi, domtree);
+        m_mdssa->recomputeDefDefAndDefUseChain(phi, domtree);
         m_mdssa->recomputeDefForOpnd(phi, *getOptCtx());
     }
 }

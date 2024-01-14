@@ -759,11 +759,11 @@ void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
                 bool dump_inner_region)
 {
     ASSERT0(filename);
-    FILE * h = fopen(filename, "a+");
+    FileObj fo(filename, true, false);
+    FILE * h = fo.getFileHandler();
     rg->getLogMgr()->push(h, filename);
     dumpBBList(bbl, rg, dump_inner_region);
     rg->getLogMgr()->pop();
-    fclose(h);
 }
 
 

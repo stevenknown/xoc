@@ -45,10 +45,9 @@ static void statistic_liveness(Region const* rg)
 {
     #ifdef STATISTIC_LIVENESS
     g_max_times = MAX(g_max_times, count);
-    FILE * h = fopen("liveness.sat.dump", "a+");
-    fprintf(h, "\n%s run %u times, maxtimes %u",
+    FileObj fo("liveness.sat.dump", false, false);
+    fprintf(fo.getFileHandler(), "\n%s run %u times, maxtimes %u",
             rg->getRegionName(), count, g_max_times);
-    fclose(h);
     #endif
 }
 

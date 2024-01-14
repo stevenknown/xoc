@@ -46,9 +46,17 @@ CHAR const* FileObj::getFileStatusName(FO_STATUS st)
 }
 
 
-//is_del: true to delete the file with same name.
-FileObj::FileObj(CHAR const* filename,  bool is_del, bool is_readonly,
-                 OUT FO_STATUS * st)
+FileObj::FileObj()
+{
+    m_is_opened = false;
+    m_is_readonly = false;
+    m_file_name = nullptr;
+    m_file_handler = nullptr;
+}
+
+
+void FileObj::init(CHAR const* filename, bool is_del,
+                   bool is_readonly, OUT FO_STATUS * st)
 {
     ASSERT0(filename);
     FO_STATUS tmpst;
@@ -115,7 +123,7 @@ FileObj::FileObj(FILE * h)
 }
 
 
-FileObj::~FileObj()
+void FileObj::destroy()
 {
     if (m_file_handler == nullptr) { return; }
     if (isIOStream()) {

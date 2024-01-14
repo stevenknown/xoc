@@ -77,8 +77,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     if (name == nullptr) {
         name = "graph_call_graph.vcg";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h != nullptr, ("%s create failed!!!",name));
     UINT org = getRegionMgr()->getLogMgr()->getIndent();
     getRegionMgr()->getLogMgr()->decIndent(org);
@@ -188,7 +188,6 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     getRegionMgr()->getLogMgr()->pop();
     getRegionMgr()->getLogMgr()->incIndent(org);
     fprintf(h, "\n}\n");
-    fclose(h);
 }
 
 

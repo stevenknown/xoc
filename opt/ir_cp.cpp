@@ -802,15 +802,13 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
     }
     ASSERT0(def_stmt->isMemRefNonPR());
     if (useMDSSADU()) {
-        MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(def_stmt);
-        ASSERT0(mdssainfo);
         if (def_stmt->getExactRef() == nullptr && !allowInexactMD()) {
             //Do NOT progate value through inexact memory reference,
             //except PR.
             return false;
         }
-        CollectCtx ctx(COLLECT_UNDEF); //Do NOT do collection crossing PHI.
-        CollectUse cu(m_mdssamgr, mdssainfo, ctx, &useset);
+        //Do NOT do collection crossing PHI.
+        m_mdssamgr->collectUseSet(def_stmt, COLLECT_IMM_USE, &useset);
         mdssadu = true;
         return true;
     }

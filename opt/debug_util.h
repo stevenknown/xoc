@@ -49,8 +49,8 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt, CHAR const* name,
 {
     typedef RBTNode<T, Ttgt> TN;
     Vector<TN*> nilvec;
-    UNLINK(name);
-    FILE * hvcg = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * hvcg = fo.getFileHandler();
     ASSERTN(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"
               "title: \"Tree\"\n"
@@ -193,7 +193,6 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt, CHAR const* name,
         delete z;
     }
     fprintf(hvcg, "\n}\n");
-    fclose(hvcg);
 }
 
 } //namespace xoc

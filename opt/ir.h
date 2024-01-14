@@ -861,11 +861,21 @@ public:
     //True if ir is judgement operation.
     bool is_judge() const { return is_relation() || is_logical(); }
 
+    //True if ir code is judgement operation.
+    static bool is_judge(IR_CODE c) { return is_relation(c) || is_logical(c); }
+
     //True if ir is logical operation.
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
 
+    //True if ir code is logical operation.
+    static bool is_logical(IR_CODE c) { return IRDES_is_logical(g_ir_desc[c]); }
+
     //True if ir is relation operation.
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
+
+    //True if ir code is relation operation.
+    static bool is_relation(IR_CODE c)
+    { return IRDES_is_relation(g_ir_desc[c]); }
 
     //IR meet commutative, e.g: a+b = b+a
     bool is_commutative() const
@@ -915,6 +925,9 @@ public:
 
     //Return true if ir's data type must be bool.
     bool mustBeBoolType() const { return is_judge(); }
+
+    //Return true if ir code's data type must be bool.
+    static bool mustBeBoolType(IR_CODE c) { return is_judge(c); }
 
     //Return true if ir's data type must be pointer.
     bool mustBePointerType() const

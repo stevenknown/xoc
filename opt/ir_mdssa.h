@@ -43,16 +43,32 @@ typedef xcom::Stack<VMD*> VMDStack;
 
 enum COLLECT_FLAG {
     COLLECT_UNDEF = 0x0,
-    COLLECT_MAY_USE = 0x1,
-    COLLECT_MAY_DEF = 0x2,
-    COLLECT_MUST_USE = 0x4,
-    COLLECT_MUST_DEF = 0x8,
+
+    //Collect immediate USEs of the DEF.
+    //The collection does not cross PHI.
+    COLLECT_IMM_USE = 0x1,
 
     //Do collection cross PHI operand.
-    COLLECT_CROSS_PHI = 0x10,
+    COLLECT_CROSS_PHI = 0x2,
 
     //Do collection inside the given loop region.
-    COLLECT_INSIDE_LOOP = 0x20,
+    COLLECT_INSIDE_LOOP = 0x4,
+
+    //Do collection to the outside-immediate USE to the given loop region.
+    //e.g:given loop which has an outside-immeidate USE.
+    //  t3=1
+    //  LOOP_START:
+    //  t1=MDPhi(t2,t3)
+    //  truebr ... LOOP_END
+    //  t2=t1
+    //  goto LOOP_START
+    //
+    //  LOOP_END:
+    //  t5=MDPhi(t1,t6) #S1
+    //  t7=t5 #S2
+    //In this example, #S1's t1 is the outside-immediate USE.
+    //Note #S2 refers t5, but the t5 is not outside-immediate USE.
+    COLLECT_OUTSIDE_LOOP_IMM_USE = 0x8,
 };
 
 class CollectFlag : public UFlag {
@@ -69,6 +85,7 @@ public:
     CollectCtx(CollectFlag f) : m_li(nullptr), flag(f) {}
     LI<IRBB> const* getLI() const { return m_li; }
     void setLI(LI<IRBB> const* li) { m_li = li; }
+    bool verify() const;
 };
 
 //Collect all DEFs that overlapped with 'ref'.
@@ -115,6 +132,8 @@ protected:
     void collectForMDSSAInfo(MDSSAInfo const* info, OUT IRSet * set) const;
     void collectUseCrossPhi(MDPhi const* phi, MOD MDDefVisitor & vis,
                             OUT IRSet * set) const;
+    void collectOutsideLoopImmUseForVOpnd(
+        VOpnd const* vopnd, MOD MDDefVisitor & vis, OUT IRSet * set) const;
     void collectUseForVOpnd(VOpnd const* vopnd, MOD MDDefVisitor & vis,
                             OUT IRSet * set) const;
 public:
@@ -324,8 +343,11 @@ public:
 //
 //START RenameDef
 //
-//The class generates VMD for 'newstmt' or 'newphi', then insert VMD into
-//DefDef chain, rename following USE as well.
+//The class generates VMD for new Stmt or new MDPhi, then inserts VMD into
+//DefDef chain and renames all immediate USEs of the original DEF meanwhile.
+//Note after renaming, if the class find a memory reference that references
+//same version MD with new Stmt or new MDPhi, the class will build a DefUse
+//chain between the memory reference and the new Stmt or new MDPhi.
 class RenameDef {
     friend class RenameDefVisit;
     COPY_CONSTRUCTOR(RenameDef);
@@ -349,24 +371,22 @@ private:
     //bb: the BB that to be renamed
     //dompred: indicates the predecessor of 'bb' in DomTree
     //Note stmtbbid have to dominate 'bb'.
-    void connectDefInBBTillPrevDef(IRBB const* bb,
-                                   BBIRListIter & irlistit,
-                                   MOD LiveSet & liveset);
-    void connectIRTillPrevDef(IRBB const* bb,
-                              BBIRListIter & irlistit,
-                              MOD LiveSet & liveset);
-    void connectPhiTillPrevDef(IRBB const* bb,
-                               BBIRListIter & irlistit,
-                               MOD LiveSet & liveset);
-    void connectDefInterBBTillPrevDef(Vertex const* defvex,
-                                      MOD LiveSet & stmtliveset,
-                                      IRBB const* start_bb);
+    void connectDefInBBTillPrevDef(
+        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+    void connectIRTillPrevDef(
+        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+    void connectPhiTillPrevDef(
+        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+    void connectDefInterBBTillPrevDef(
+        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb);
 
     Vertex2LiveSet & getVex2LiveSet() { return m_vex2liveset; }
 
     void iterBBPhiListToKillLivedVMD(IRBB const* bb, LiveSet & liveset);
-    void iterSuccBBPhiListToRename(Vertex const* defvex, IRBB const* succ,
-                                   UINT opnd_idx, MOD LiveSet & liveset);
+    void iterSuccBBPhiListToRename(
+        Vertex const* defvex, IRBB const* succ,
+        UINT opnd_idx, MOD LiveSet & liveset);
+
     //defvex: domtree vertex.
     void iterSuccBB(Vertex const* defvev, MOD LiveSet & liveset);
 
@@ -388,40 +408,38 @@ private:
                             bool & no_exp_has_ssainfo);
     //ir: may be stmt or exp
     //irit: for local used.
-    void renameLivedVMDForIRTree(IR * ir, MOD IRIter & irit,
-                                 LiveSet const& liveset);
-    void renameIRTillNextDef(IRBB const* bb, BBIRListIter & irlistit,
-                             MOD LiveSet & liveset);
+    void renameLivedVMDForIRTree(
+        IR * ir, MOD IRIter & irit, LiveSet const& liveset);
+    void renameIRTillNextDef(
+        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
 
     //stmtbbid: indicates the BB of inserted stmt
     //bb: the BB that to be renamed
     //dompred: indicates the predecessor of 'bb' in DomTree
     //Note stmtbbid have to dominate 'bb'.
-    void renameUseInBBTillNextDef(Vertex const* defvex, IRBB const* bb,
-                                  bool include_philist,
-                                  BBIRListIter & irlistit,
-                                  OUT LiveSet & liveset);
+    void renameUseInBBTillNextDef(
+        Vertex const* defvex, IRBB const* bb, bool include_philist,
+        BBIRListIter & irlistit, OUT LiveSet & liveset);
 
     //start_ir: if it is nullptr, the renaming will start at the first IR in bb.
     //          otherwise the renaming will start at the NEXT IR of start_ir.
-    void renameFollowUseIntraBBTillNextDef(Vertex const* defvex,
-                                           MOD LiveSet & stmtliveset,
-                                           IRBB const* start_bb,
-                                           IR const* start_ir);
+    void renameFollowUseIntraBBTillNextDef(
+        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb,
+        IR const* start_ir);
 
     //defvex: root vertex of domtree region that is being renamed.
-    void renameFollowUseInterBBTillNextDef(Vertex const* defvex,
-                                           MOD LiveSet & stmtliveset,
-                                           IRBB const* start_bb);
+    void renameFollowUseInterBBTillNextDef(
+        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb);
     void rename(Vertex const* defvex, LiveSet * defliveset,
                 IRBB const* start_bb, IR const* start_ir);
 
-    bool tryInsertDDChainForDesigatedVMD(MDPhi * phi, VMD * vmd,
-                                         MOD LiveSet & liveset);
+    bool tryInsertDDChainForDesigatedVMD(
+        MDPhi * phi, VMD * vmd, MOD LiveSet & liveset);
+
     //vmd: new generated VMD that to be inserted.
     //before: true to insert 'vmd' in front of 'ir'.
-    bool tryInsertDDChainForDesigatedVMD(IR * ir, VMD * vmd, bool before,
-                                         MOD LiveSet & liveset);
+    bool tryInsertDDChainForDesigatedVMD(
+        IR * ir, VMD * vmd, bool before, MOD LiveSet & liveset);
     bool tryInsertDDChainForStmt(IR * ir, bool before, MOD LiveSet & liveset);
     bool tryInsertDDChainForPhi(MDPhi * phi, MOD LiveSet & liveset);
 public:
@@ -530,11 +548,11 @@ protected:
 
     UseDefMgr m_usedef_mgr;
 protected:
-    //Add ir to given mdssainfo as an USE.
-    //ir: occurence to be added.
-    //mdssainfo: add ir to the UseSet of VOpnd that recorded in 'mdssainfo'.
+    //Add an USE to given mdssainfo.
+    //use: occurence to be added.
+    //mdssainfo: add 'use' to the UseSet of VOpnd that recorded in 'mdssainfo'.
     //Note mdssainfo must be unique for each IR.
-    void addUseToMDSSAInfo(IR const* ir, MDSSAInfo * mdssainfo);
+    void addUseToMDSSAInfo(IR const* use, MDSSAInfo * mdssainfo);
     void addUseSetToMDSSAInfo(IRSet const& set, MDSSAInfo * mdssainfo);
     void addUseSetToVMD(IRSet const& set, MOD VMD * vmd);
     void addDefChain(MDDef * def1, MDDef * def2);
@@ -571,18 +589,17 @@ protected:
     //Def Chain.
     void dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
                                VMD const* vopnd) const;
-    void dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
-                            List<IR*> & opnd_lst,
-                            OUT bool * parting_line) const;
+    void dumpExpDUChainIter(
+        IR const* ir, List<IR*> & lst, List<IR*> & opnd_lst,
+        OUT bool * parting_line) const;
     void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
-    void dumpDUChainForStmt(IR const* ir,
-                            xcom::List<IR*> & lst,
-                            xcom::List<IR*> & opnd_lst) const;
+    void dumpDUChainForStmt(
+        IR const* ir, xcom::List<IR*> & lst, xcom::List<IR*> & opnd_lst) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
-    void dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
-                                bool & parting_line) const;
-    void dumpIRWithMDSSAForExp(IR const* ir, UINT flag,
-                               bool & parting_line) const;
+    void dumpIRWithMDSSAForStmt(
+        IR const* ir, UINT flag, bool & parting_line) const;
+    void dumpIRWithMDSSAForExp(
+        IR const* ir, UINT flag, bool & parting_line) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
@@ -590,11 +607,11 @@ protected:
     //id: input ID.
     //ssainfo: MDSSAInfo of id.
     //olddef: old DEF of id.
-    void findNewDefForID(IR * id, MDSSAInfo * ssainfo, MDDef * olddef,
-                         OptCtx const& oc);
-    VMD * findLiveInDefFrom(IRBB const* bb, MDIdx mdid, IR const* startir,
-                            IRBB const* startbb,
-                            VMDVec const* vmdvec) const;
+    void findNewDefForID(
+        IR * id, MDSSAInfo * ssainfo, MDDef * olddef, OptCtx const& oc);
+    VMD * findLiveInDefFrom(
+        IRBB const* bb, MDIdx mdid, IR const* startir, IRBB const* startbb,
+        VMDVec const* vmdvec) const;
     void freeBBPhiList(IRBB * bb);
     void freePhiList();
 
@@ -853,6 +870,16 @@ public:
     MDSSAInfo * copyAndAddMDSSAOcc(IR * ir, MDSSAInfo const* src);
     void collectDefinedMDForBBList(MOD DefMiscBitSetMgr & bs_mgr,
                                    OUT BB2DefMDSet & bb2defmds) const;
+
+    //The function collects all USE expressions of 'def' into 'useset'.
+    //def: stmt that defined NonPR memory reference.
+    void collectUseSet(IR const* def, CollectFlag f, OUT IRSet * useset);
+
+    //The function collects all USE expressions of 'def' into 'useset'.
+    //def: stmt that defined NonPR memory reference.
+    //li: loopinfo. If 'f' contained loop related flags, li can not be NULL.
+    void collectUseSet(IR const* def, LI<IRBB> const* li,
+                       CollectFlag f, OUT IRSet * useset);
 
     //Return true if VMDs of stmt cross version when moving stmt
     //outside of loop.
@@ -1330,15 +1357,29 @@ public:
     //e.g:u1, u2 are its USE expressions.
     //The function will cut off the DU chain between phi->u1 and phi->u2.
     void removeDefFromUseSet(MDPhi const* phi, MDSSAUpdateCtx const& ctx);
-    void recomputeDUAndDDChain(MDPhi const* phi, DomTree const& domtree);
-    void recomputeDUAndDDChain(MDPhiList const* philist,
-                               DomTree const& domtree);
-    void recomputeDUAndDDChain(MOD IR * stmt, DomTree const& domtree,
-                               OptCtx const& oc);
-    void recomputeDUAndDDChain(List<IR*> const& irlist, DomTree const& domtree,
-                               OptCtx const& oc);
+
+    //These functions compute the DefDef chain and the DefUse chain for
+    //given Stmt|MDPhi.
+    //Note these functions are often invoked when new Stmt or new MDPhi
+    //generated.
+    //These functions will insert given Stmt|MDPhi into DefDef chain of each
+    //VMD and iterate all memory references which are related to the VMD that
+    //given Stmt|MDPhi carried from the start BB (Stmt|MDPhi's BB) to the next
+    //versioned VMD DEF. During the iteration of VMD, these functions also
+    //build DefUse chain to ensure the correctness of dependence of the new
+    //Stmt|MDPhi.
+    void recomputeDefDefAndDefUseChain(
+        MDPhi const* phi, xcom::DomTree const& domtree);
+    void recomputeDefDefAndDefUseChain(
+        MDPhiList const* philist, xcom::DomTree const& domtree);
+    void recomputeDefDefAndDefUseChain(
+        MOD IR * stmt, xcom::DomTree const& domtree, OptCtx const& oc);
+    void recomputeDefDefAndDefUseChain(
+        xcom::List<IR*> const& irlist, xcom::DomTree const& domtree,
+        OptCtx const& oc);
     void recomputeDefForOpnd(MDPhi const* phi, OptCtx const& oc);
     void recomputeDefForOpnd(MDPhiList const* philist, OptCtx const& oc);
+
     //irit: for local used.
     void recomputeDefForRHS(IR const* stmt, IRIter & it, OptCtx const& oc);
 

@@ -1204,14 +1204,13 @@ void Graph::dumpDOT(CHAR const* name) const
     if (name == nullptr) {
         name = "graph.dot";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h, ("%s create failed!!!", name));
     fprintf(h, "digraph G {\n");
     dumpAllVertices(h);
     dumpAllEdges(h);
     fprintf(h, "\n}\n");
-    fclose(h);
 }
 
 
@@ -1221,8 +1220,8 @@ void Graph::dumpVCG(CHAR const* name) const
     if (name == nullptr) {
         name = "graph.vcg";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h, ("%s create failed!!!",name));
     fprintf(h, "graph: {"
               "title: \"Graph\"\n"
@@ -1278,7 +1277,6 @@ void Graph::dumpVCG(CHAR const* name) const
                 m_is_direction ? "" : "arrowstyle:none" );
     }
     fprintf(h, "\n}\n");
-    fclose(h);
 }
 
 
@@ -2488,11 +2486,10 @@ void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree,
     if (name == nullptr) {
         name = "graph_dom.txt";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h, ("%s create failed!!!",name));
     dumpDom(h, dump_dom_tree, dump_pdom_tree);
-    fclose(h);
 }
 
 

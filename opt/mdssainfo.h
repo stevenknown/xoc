@@ -324,6 +324,9 @@ public:
         ASSERT0(this != &src);
         copyVOpndSet(src.readVOpndSet(), mgr);
     }
+    //The function copies partial contents in 'src' that are related to
+    //specific MD 'md' to current MDSSAInfo.
+    void copyBySpecificMD(MDSSAInfo const& src, MD const* md, UseDefMgr * mgr);
 
     //Return true if current MDSSAInfo contains given MD only.
     bool containSpecificMDOnly(MDIdx mdid, UseDefMgr const* udmgr) const;
@@ -345,6 +348,9 @@ public:
     //Return true if 'ir' is an USE of one of VOpnds of current MDSSAInfo.
     //vmd: optional, if it is not NULL, record the VMD if ir is USE of the VMD.
     bool isUse(OUT VMD const** vmd, IR const* ir, MDSSAMgr const* mgr) const;
+
+    //Return true if current MDSSAInfo does not have any VOpnd.
+    bool isEmptyVOpndSet() const { return readVOpndSet().is_empty(); }
 
     VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 

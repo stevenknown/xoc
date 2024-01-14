@@ -429,7 +429,7 @@ void InsertPreheaderMgr::updateMDSSADUForLoopHeadPhi(HoistCtx const& ctx)
     IRBB * loophead = m_li->getLoopHead();
     MDPhiList const* philist = m_mdssamgr->getPhiList(loophead);
     if (philist == nullptr) { return; }
-    m_mdssamgr->recomputeDUAndDDChain(philist, *ctx.domtree);
+    m_mdssamgr->recomputeDefDefAndDefUseChain(philist, *ctx.domtree);
     m_mdssamgr->recomputeDefForOpnd(philist, *m_oc);
 }
 
@@ -1444,7 +1444,7 @@ void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt,
     if (!useMDSSADU()) { return; }
     ASSERT0(ctx.oc->is_dom_valid());
     if (MDSSAMgr::hasMDSSAInfo(stmt)) {
-        m_mdssamgr->recomputeDUAndDDChain(stmt, *ctx.domtree, *ctx.oc);
+        m_mdssamgr->recomputeDefDefAndDefUseChain(stmt, *ctx.domtree, *ctx.oc);
     }
     IR * startir = stmt->getBB()->getPrevIR(stmt);
     IRIter it;

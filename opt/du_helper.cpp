@@ -288,6 +288,7 @@ void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc)
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             ASSERT0(use->isMemRefNonPR());
+dumpIR(def,rg);//hac
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
             mdssamgr->copyAndAddMDSSAOcc(use, info);

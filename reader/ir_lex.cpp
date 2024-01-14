@@ -1378,7 +1378,8 @@ CHAR const* Lexer::getTokenName(TOKEN tok) const
 void Lexer::dump(CHAR const* input, FILE * output)
 {
     ASSERT0(input && output);
-    FILE * h = fopen(input, "r");
+    FileObj fo(input, false, false);
+    FILE * h = fo.getFileHandler();
     if (h == nullptr) { return; }
     setSrcFile(h);
     TOKEN tok = getNextToken();
@@ -1402,7 +1403,6 @@ void Lexer::dump(CHAR const* input, FILE * output)
         fprintf(output, "\n\n\n");
         fflush(output);
     }
-    fclose(h);
 }
 
 } //namespace xoc

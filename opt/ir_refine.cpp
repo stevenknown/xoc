@@ -1164,6 +1164,10 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         return ir; //No need to update DU.
     }
     if (op0->isIREqual(op1, true)) {
+        //CASE: div inf, inf
+        //The result of div is nan not 1.0f, which cannot be optimized.
+        if (ir->is_fp() && !g_is_opt_float) { return ir; }
+
         //X/X => 1.
         IR * tmp = ir;
         Type const* ty;
@@ -1172,15 +1176,13 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         } else {
             ty = op0->getType();
         }
-
         if (ty->is_fp()) {
             ir = m_rg->getIRMgr()->buildImmFP(1.0f, ty);
         } else {
             ir = m_rg->getIRMgr()->buildImmInt(1, ty);
         }
-
         if (rc.maintainDU()) {
-            //Cut du chain for opnd0, opnd1 and their def-stmt.
+            //Cut DU chain for opnd0, opnd1 and their def-stmt.
             xoc::removeUseForTree(tmp, m_rg, *rc.getOptCtx());
         }
         copyDbx(ir, tmp, m_rg);
@@ -1203,7 +1205,6 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         }
         return ir;
     }
-
     return ir;
 }
 
@@ -1724,6 +1725,10 @@ IR * Refine::refineSub(IR * ir, bool & change, RefineCtx & rc)
     IR * op1 = BIN_opnd1(ir);
     ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op0->isIRListEqual(op1)) {
+        //CASE: sub inf, inf
+        //The result of sub is nan, not 0.0f, which cannot be optimized.
+        if (ir->is_fp() && !g_is_opt_float) { return ir; }
+
         //sub X,X => 0
         if (rc.maintainDU()) {
             xoc::removeUseForTree(ir, m_rg, *rc.getOptCtx());

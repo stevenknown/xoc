@@ -51,9 +51,11 @@ public:
 public:
     //is_del: true to delete the file with same name.
     FileObj(CHAR const* filename, bool is_del = false,
-            bool is_readonly = false, OUT FO_STATUS * st = nullptr);
+            bool is_readonly = false, OUT FO_STATUS * st = nullptr)
+    { init(filename, is_del, is_readonly, st); }
     FileObj(FILE * h);
-    ~FileObj();
+    FileObj();
+    ~FileObj() { destroy(); }
 
     //Append binary data to the end of file object.
     //Return the status.
@@ -61,6 +63,16 @@ public:
     //size: the byte size that expect to write.
     //wr: optional, it records the actual byte size that has wrote.
     FO_STATUS append(BYTE const* buf, size_t size, OUT size_t * wr);
+
+    //Initialize a file object by given file name.
+    //is_del: true to delete the file with same name.
+    //is_readonly: true to create a readonly file.
+    //st: record the return-status of file creating process.
+    void init(CHAR const* filename, bool is_del,
+              bool is_readonly, OUT FO_STATUS * st);
+
+    //Close and free file resource.
+    void destroy();
 
     FILE * getFileHandler() const { return m_file_handler; }
     size_t getFileSize() const;

@@ -48,8 +48,8 @@ static inline IR * genDirectMemAccess(IR const* ir, Region * rg, bool is_load,
         newir = rg->getIRMgr()->buildLoad(mustref->get_base(), ir->getType());
     } else {
         ASSERT0(rhs);
-        newir = rg->getIRMgr()->buildStore(mustref->get_base(),
-                                           ir->getType(), rhs);
+        newir = rg->getIRMgr()->buildStore(
+            mustref->get_base(), ir->getType(), rhs);
     }
     newir->setOffset(mustref->getByteOfst());
     ASSERT0(mustref->getByteSize() == newir->getTypeSize(rg->getTypeMgr()));
@@ -569,7 +569,6 @@ void DelegateMgr::collectOutsideLoopUse(IR const* dele, IRSet const& set,
             }
             continue;
         }
-
         if (!li->isInsideLoop(u->getStmt()->getBB()->id())) {
             if (useset == nullptr) {
                 useset = genOutsideUseSet(dele);
@@ -608,15 +607,15 @@ void DelegateMgr::collectOutsideLoopDefUse(IR const* occ, IR const* dele,
     ASSERT0(occ->isMemRefNonPR());
     IRSet irset(getSegMgr());
     if (occ->is_exp()) {
-        //occ is USE.
+        //Collect DEFs. Of cources, there is only one DEF in SSA mode.
         xoc::collectDefSet(occ, m_rg, &irset);
         collectOutsideLoopDef(dele, irset, li);
         return;
     }
-
-    //occ is DEF.
+    //Collect USEs.
     ASSERT0(occ->is_stmt());
-    xoc::collectUseSet(occ, m_rg, &irset);
+    m_mdssamgr->collectUseSet(
+        occ, li, COLLECT_OUTSIDE_LOOP_IMM_USE, &irset);
     collectOutsideLoopUse(dele, irset, li);
 }
 
@@ -1463,7 +1462,15 @@ void RegPromot::handleEpilog(RestoreTab & restore2mem,
         BB_irlist(exit_bb).append_head_ex(restore);
         if (useMDSSADU()) {
             ASSERT0(m_mdssamgr->getMDSSAInfoIfAny(restore) == nullptr);
-            m_mdssamgr->recomputeDUAndDDChain(restore, *ctx.domtree, *ctx.oc);
+
+            //Generate MDSSAInfo and insert new stmt 'restore' into the
+            //DefDef chain. The function also add Def-Use chain from 'restore'
+            //to original USEs of 'dele' that located outside of the loop.
+            m_mdssamgr->recomputeDefDefAndDefUseChain(
+                restore, *ctx.domtree, *ctx.oc);
+
+            //Inform caller that the DUChain of restore has been built, no need
+            //to worry about DU sanity.
             delemgr.setRestoreDUChainBuilt(true);
         }
     }
@@ -1646,8 +1653,6 @@ void RegPromot::removeMDPhiDUChain(IR const* dele, LI<IRBB> const* li,
 }
 
 
-//Fixup DU chain if there is untrue dependence.
-//occ2newocc: record the IR stmt/exp that need to fixup.
 void RegPromot::removeDUChainForOrgOcc(Occ2Occ & occ2newocc, RPCtx const& ctx)
 {
     Occ2OccIter it;
@@ -1694,8 +1699,8 @@ void RegPromot::removeRedundantDUForInexactAcc(Occ2Occ & occ2newocc,
 {
     removeDUChainForOrgOcc(occ2newocc, ctx);
 
-    //CASE: Do not remove outside loop USE, because that will incur
-    //the VOpndSet is empty when the USE is and IR_ID. And empty
+    //CASE: Do not remove outside loop USEs, because that will incur
+    //the VOpndSet is empty when USEs are IR_ID. Moreover an empty
     //VOpndSet will incur assertion in verify().
     //removeMDPhiForInexactAcc(delemgr, inexact_tab, li);
 }
@@ -1856,9 +1861,6 @@ void RegPromot::handlePrologForExp(IR const* dele, IR const* promoted_pr,
 }
 
 
-//The function generates iniailization code of promoted PR.
-//Note the function leaves the work that to build DU chain of PR and STPR to
-//the sebsequent function, it will be done at buildDUChainForDeleRelatedPR().
 void RegPromot::handleProlog(IR const* dele, IR const* promoted_pr,
                              DelegateMgr & delemgr, IRBB * preheader)
 {
@@ -1884,14 +1886,10 @@ void RegPromot::handleProlog(IR const* dele, IR const* promoted_pr,
 }
 
 
-//The function insert Phi for init-stmt PR or reconstruct SSA overall.
-//Return true if PRSSA changed.
-bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
-                                               DelegateMgr const& delemgr,
-                                               RestoreTab const& restore2mem,
-                                               LI<IRBB> const* li,
-                                               IRBB * preheader,
-                                               MOD RPCtx & ctx)
+bool RegPromot::buildPRSSADUChainForInexactAcc(
+    Occ2Occ const& occ2newocc, DelegateMgr const& delemgr,
+    RestoreTab const& restore2mem, LI<IRBB> const* li,
+    IRBB * preheader, MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
     PRSSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
@@ -1937,8 +1935,8 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
         //preheader is just inserted, SSA needs its domset.
         ctx.oc->setInvalidDom();
         ctx.oc->setInvalidPDom();
-        m_rg->getPassMgr()->checkValidAndRecompute(ctx.oc, PASS_DOM,
-                                                   PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(
+            ctx.oc, PASS_DOM, PASS_UNDEF);
     }
 
     //Infer and add those BBs that should be also handled in PRSSA construction.
@@ -2005,23 +2003,18 @@ bool RegPromot::buildPRSSADUChainForExactAcc(IR const* dele,
 }
 
 
-void RegPromot::addDUChainForInexactAcc(DelegateMgr const& delemgr,
-                                        RestoreTab const& restore2mem,
-                                        Occ2Occ const& occ2newocc,
-                                        InexactAccTab const& inexact_tab,
-                                        LI<IRBB> const* li,
-                                        IRBB * preheader,
-                                        MOD RPCtx & ctx)
+void RegPromot::addDUChainForInexactAcc(
+    DelegateMgr const& delemgr, RestoreTab const& restore2mem,
+    Occ2Occ const& occ2newocc, InexactAccTab const& inexact_tab,
+    LI<IRBB> const* li, IRBB * preheader, MOD RPCtx & ctx)
 {
     DeleTab const& deletab = const_cast<DelegateMgr&>(delemgr).getDeleTab();
     if (deletab.get_elem_count() == 0) { return; }
     DeleTabIter it;
     for (IR * dele = deletab.get_first(it);
          dele != nullptr; dele = deletab.get_next(it)) {
-        if (delemgr.getInitStmt(dele) != nullptr) {
-            addDUChainForInexactAccDele(dele, delemgr, restore2mem, occ2newocc,
-                                        inexact_tab, ctx);
-        }
+        addDUChainForInexactAccDele(dele, delemgr, restore2mem, occ2newocc,
+                                    inexact_tab, ctx);
     }
     buildPRSSADUChainForInexactAcc(occ2newocc, delemgr, restore2mem,
                                    li, preheader, ctx);
@@ -2036,7 +2029,7 @@ void RegPromot::addDUChainForInexactAccDele(IR const* dele,
                                             MOD RPCtx & ctx)
 {
     ASSERT0(delemgr.isDelegate(dele));
-    //dele may not have exact-must-MD.
+    //An inexatc delegate may NOT have exact-must-MD.
     IR * init_stmt = delemgr.getInitStmt(dele);
     ASSERT0(init_stmt && init_stmt->is_stpr());
     addDUChainForInitDefAndExposedUse(dele, init_stmt, delemgr,
@@ -2049,7 +2042,9 @@ void RegPromot::addDUChainForInexactAccDele(IR const* dele,
 
     //Build DU chain for intra-loop-def and its USE.
     addDUChainForIntraDef(occ2newocc, deflst, ctx);
-    addSSADUChainForExpOfRestore(dele, delemgr, restore2mem, ctx);
+    addSSADUChainForExpOfRestoreLHS(dele, delemgr, restore2mem, ctx);
+
+    //Make sure DefDef chain and DefUse chain are sane.
     addDUChainForRestoreToOutsideUse(dele, delemgr, restore2mem, ctx);
 }
 
@@ -2087,10 +2082,9 @@ void RegPromot::addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
 }
 
 
-void RegPromot::addSSADUChainForExpOfRestore(IR const* dele,
-                                             DelegateMgr const& delemgr,
-                                             RestoreTab const& restore2mem,
-                                             RPCtx const& ctx)
+void RegPromot::addSSADUChainForExpOfRestoreLHS(
+    IR const* dele, DelegateMgr const& delemgr,
+    RestoreTab const& restore2mem, RPCtx const& ctx)
 {
     bool use_prssa = usePRSSADU();
     bool use_mdssa = useMDSSADU();
@@ -2227,21 +2221,17 @@ void RegPromot::buildDUChainOnDemand(IR * def, IR * use, RPCtx const& ctx)
 }
 
 
-void RegPromot::addDUChainForRestoreToOutsideUse(IR const* dele,
-                                                 DelegateMgr const& delemgr,
-                                                 RestoreTab const& restore2mem,
-                                                 RPCtx const& ctx)
+void RegPromot::addDUChainForRestoreToOutsideUse(
+    IR * restore, IR const* dele, DelegateMgr const& delemgr, RPCtx const& ctx)
 {
-    if (delemgr.isRestoreDUChainBuilt()) { return; }
-    IR * restore = restore2mem.getRestore(dele);
-    if (restore == nullptr) { return; }
+    ASSERT0(restore);
     ASSERT0(restore->is_stmt());
     ASSERT0(restore->isMemRefNonPR() && restore->getRHS()->isPROp());
-
-    //The USE is an outside-loop USE, that should establish
-    //DU chain with the restore.
     DUSet const* useset = delemgr.getOutsideUseSet(dele);
     if (useset == nullptr) { return; }
+
+    //These USEs are located outside of loop, which should be establish
+    //DU chain to the restore.
     DUSetIter it;
     for (BSIdx i = useset->get_first(&it);
          i != BS_UNDEF; i = useset->get_next(i, &it)) {
@@ -2250,6 +2240,21 @@ void RegPromot::addDUChainForRestoreToOutsideUse(IR const* dele,
         xoc::removeUseForTree(u, m_rg, *ctx.oc);
         xoc::buildDUChain(restore, u, m_rg, *ctx.oc);
     }
+}
+
+
+void RegPromot::addDUChainForRestoreToOutsideUse(
+    IR const* dele, DelegateMgr const& delemgr, RestoreTab const& restore2mem,
+    RPCtx const& ctx)
+{
+    if (delemgr.isRestoreDUChainBuilt()) {
+        //MDSSAMgr will maintain DefDef chain and DefUse chain in time.
+        //Classic DUMgr may fix the DU chain here.
+        return;
+    }
+    IR * restore = restore2mem.getRestore(dele);
+    if (restore == nullptr) { return; }
+    addDUChainForRestoreToOutsideUse(restore, dele, delemgr, ctx);
 }
 
 
@@ -2296,18 +2301,19 @@ void RegPromot::addDUChainForExactAccDele(IR const* dele,
 
     //Build DU chain for intra-loop-def and its USE.
     addDUChainForIntraDef(occ2newocc, deflst, ctx);
-    addSSADUChainForExpOfRestore(dele, delemgr, restore2mem, ctx);
+    addSSADUChainForExpOfRestoreLHS(dele, delemgr, restore2mem, ctx);
+
+    //Make sure DefDef chain and DefUse chain are sane.
     addDUChainForRestoreToOutsideUse(dele, delemgr, restore2mem, ctx);
     buildPRSSADUChainForExactAcc(dele, occ2newocc, delemgr, restore2mem,
                                  li, preheader, ctx);
 }
 
 
-void RegPromot::handleInexactAccOcc(MOD DelegateMgr & delemgr,
-                                    InexactAccTab & inexact_tab,
-                                    OUT RestoreTab & restore2mem,
-                                    OUT Occ2Occ & occ2newocc,
-                                    InexactAccTabIter & ti, RPCtx const& ctx)
+void RegPromot::handleInexactAccOcc(
+    MOD DelegateMgr & delemgr, InexactAccTab & inexact_tab,
+    OUT RestoreTab & restore2mem, OUT Occ2Occ & occ2newocc,
+    InexactAccTabIter & ti, RPCtx const& ctx)
 {
     ti.clean();
     IR * nextocc = nullptr;
@@ -2317,7 +2323,8 @@ void RegPromot::handleInexactAccOcc(MOD DelegateMgr & delemgr,
         //Get the unique delegate.
         IR * dele = ref2dele.get(occ);
         if (dele == nullptr) {
-            //If delegate does not exist, the reference can not be promoted.
+            //If delegate does not exist, the reference 'occ' can not
+            //be promoted.
             inexact_tab.remove(occ);
             continue;
         }
@@ -2347,7 +2354,8 @@ bool RegPromot::promoteInexactAccessDelegate(DelegateMgr & delemgr,
         IR * dele = ref2dele.get(occ);
         ASSERT0(dele);
         if (delemgr.getInitStmt(dele) != nullptr) {
-            //If delegate does not exist, the reference can not be promoted.
+            //If the init-stmt of given delegate has been built, go ahead to
+            //next.
             continue;
         }
         IR const* pr = delemgr.getPR(dele);
@@ -2404,8 +2412,8 @@ void RegPromot::promoteInexactAccess(LI<IRBB> const* li, IRBB * preheader,
     }
     promoteInexactAccessDelegate(delemgr, li, preheader, exit_bb,
                                  inexact_tab, ii, ctx);
-    //Note the delegate is one of reference in 'inexact_tab'.
-    //All delegates are recorded in one table.
+    //Note the delegate is one of references in 'inexact_tab'.
+    //All delegates are recorded in same one table.
     freeInexactOccs(inexact_tab, m_rg, m_gvn);
 }
 
@@ -2528,8 +2536,7 @@ bool RegPromot::tryPromoteLoop(LI<IRBB> const* li, IRIter & ii,
     }
     bool change_ir = promote(li, exit_bb, preheader, ii,
                              exact_tab, inexact_tab, ctx);
-
-    //promote() has maintaind PRSSA and MDSSA.
+    //promote() should maintaind PRSSA and MDSSA.
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *ctx.oc));
     ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *ctx.oc));
     return change_cfg || change_ir;

@@ -537,7 +537,31 @@ void FindBIVByChainRec::genBIV(TermInfo const& ti, ChainRec const& cr,
 {
     BIV * biv = m_ivr->allocBIV();
     IV_li(biv) = m_li;
+    ASSERT0(ti.getRedStmt());
     IV_reduction_stmt(biv) = ti.getRedStmt();
+
+    //CASE: Reduction Expression may be not exist.
+    //e.g:compile/ivr_noredexp.c, and here is a simplified code snippet:
+    //  stpr $8 = ld gdd; #S1
+    //  label L1;
+    //  phi $13 = ($12,L3),($14,L4);
+    //  phi $9 = ($8,L3),($10,L4); #S2
+    //  falsebr (le $13, $7), L2;
+    //  label L4;
+    //  stpr $10 = 20.000000:f64; #S3
+    //  goto L1;
+    //  label L2;
+    //  st gdd = $9;
+    //In the example, $10 is the BIV, #S1, #S2 and #S3 together form a BIV use
+    //case. Among them, #S1 represents the init-stmt, #S2 represents the
+    //jion-point of init-stmt and step-stmt, #S3 represents the step-stmt.
+    //#S3 is recognized as Reduction Stmt. However, the RHS of #S3 is CONST
+    //operation, this will lead that the inference of Reduction Expression
+    //will be terminated when the inferring-function meets the RHS CONST.
+    //Thus Reduction Expression is NULL in this case.
+    //Note even if Reduction Expression of $10 may be NULL, the ChainRec of
+    //$10 is available.
+    //ASSERT0(ti.getRedExp());
     IV_reduction_exp(biv) = ti.getRedExp();
     BIV_stepv(biv) = const_cast<ChainRec&>(cr).getStep();
     ASSERT0(cr.getCode() == IR_ADD || cr.getCode() == IR_SUB);
@@ -799,6 +823,7 @@ bool FindBIVByRedOp::findInitValByRedOp(LI<IRBB> const* li, OUT BIV * iv,
                                         IVRCtx const& ctx) const
 {
     IR const* redexp = iv->getRedExp();
+    ASSERT0(redexp);
     ASSERT0(redexp->isMemRef() && redexp->getMustRef());
     ASSERT0(iv && iv->getRedStmt()->is_stmt());
     return findInitValByRedOp(redexp, li, BIV_initv(iv),
@@ -914,6 +939,7 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
     IV_reduction_exp(*biv) = lr.getVarExp();
     BIV_stepv(*biv).extractFrom(addend);
     m_crmgr->refine(BIV_stepv(*biv));
+
     //Find and infer the initial value.
     //Note IV may not have an initial value, e.g:parameter.
     return findInitValByRedOp(m_li, *biv, m_ivrctx);
@@ -1465,10 +1491,18 @@ IR * BIV::genBoundExp(IVBoundInfo const& boundinfo, IVR const* ivr,
 void BIV::dump(Region const* rg) const
 {
     BIV * iv = const_cast<BIV*>(this);
-    ASSERT0(iv->getRedStmt() && iv->getRedExp());
-    note(rg, "\nBIV(STMTOCC:MD%d,'%s')(EXPOCC:MD%d,'%s')",
-         iv->getStmtOccMD()->id(), iv->getStmtOccVarName(),
-         iv->getExpOccMD()->id(), iv->getExpOccVarName());
+    ASSERT0(iv->getRedStmt());
+    note(rg, "\nBIV(STMTOCC:MD%d,'%s')",
+         iv->getStmtOccMD()->id(), iv->getStmtOccVarName());
+
+    //See FindBIVByChainRec::genBIV() for details.
+    //ASSERT0(iv->getRedExp());
+    if (iv->getRedExp() != nullptr) {
+        prt(rg, "(EXPOCC:MD%d,'%s')",
+            iv->getExpOccMD()->id(), iv->getExpOccVarName());
+    } else {
+        prt(rg, "(EXPOCC:--)");
+    }
     rg->getLogMgr()->incIndent(2);
 
     //Dump initval.
@@ -1494,10 +1528,15 @@ void BIV::dump(Region const* rg) const
 
     //Dump BIV's occ-exp.
     note(rg, "\nREDUCTION-EXP:");
-    ASSERT0(iv->getRedExp());
-    rg->getLogMgr()->incIndent(2);
-    dumpIR(iv->getRedExp(), rg, nullptr, IR_DUMP_KID);
-    rg->getLogMgr()->decIndent(2);
+    //See FindBIVByChainRec::genBIV() for details.
+    //ASSERT0(iv->getRedExp());
+    if (iv->getRedExp() != nullptr) {
+        rg->getLogMgr()->incIndent(2);
+        dumpIR(iv->getRedExp(), rg, nullptr, IR_DUMP_KID);
+        rg->getLogMgr()->decIndent(2);
+    } else {
+        prt(rg, "--");
+    }
 
     //Dump BIV's init-stmt.
     if (iv->getInitStmt() != nullptr) {

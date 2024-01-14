@@ -183,7 +183,7 @@ UINT countLeadingOne(UINT64 a)
 
 UINT countLeadingOne(UINT32 a)
 {
-    UINT32 marker = 1 << (sizeof(UINT32) * BITS_PER_BYTE - 1);
+    UINT32 marker = (UINT32)(1 << (sizeof(UINT32) * BITS_PER_BYTE - 1));
     UINT i = 0;
     for (; i < sizeof(UINT32) * BITS_PER_BYTE; i++) {
         if ((marker & a) == 0) { break; }
@@ -204,7 +204,7 @@ UINT countLeadingZero(UINT64 a)
 
 UINT countLeadingZero(UINT32 a)
 {
-    UINT32 marker = 1 << (sizeof(UINT32) * BITS_PER_BYTE - 1);
+    UINT32 marker = (UINT32)(1 << (sizeof(UINT32) * BITS_PER_BYTE - 1));
     UINT i = 0;
     for (; i < sizeof(UINT32) * BITS_PER_BYTE; i++) {
         if ((marker & a) == marker) { break; }

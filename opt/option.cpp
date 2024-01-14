@@ -35,7 +35,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool g_is_opt_float = true;
+bool g_is_opt_float = false;
 bool g_is_lower_to_pr_mode = false;
 bool g_is_lower_to_lowest_height = true;
 bool g_is_support_dynamic_type = false;

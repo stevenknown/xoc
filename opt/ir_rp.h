@@ -124,6 +124,10 @@ class DelegateMgr {
     COPY_CONSTRUCTOR(DelegateMgr);
 
     //True if DUChain of restore has been built.
+    //Usually, if MDSSA enabled, it will recompute DefDef chain and DefUse chain
+    //when processing restore-stmt. The flag is often used by Classic DUMgr
+    //because it builds classic DefUse chain after the restore-stmt processing
+    //in usually.
     bool m_is_restore_duchain_built;
     RegPromot * m_rp;
 
@@ -267,6 +271,7 @@ public:
     //Return true if dele is a delegate.
     bool isDelegate(IR const* dele) const
     { return getInitStmt(dele) != nullptr; }
+
     //Return true if DUChain of restore has been built.
     bool isRestoreDUChainBuilt() const { return m_is_restore_duchain_built; }
 
@@ -416,10 +421,9 @@ protected:
                      InexactAccTab & inexact_tab, MOD RPCtx & ctx);
     void addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb,
                               RPCtx const& ctx);
-    void addSSADUChainForExpOfRestore(IR const* dele,
-                                      DelegateMgr const& delemgr,
-                                      RestoreTab const& restore2mem,
-                                      RPCtx const& ctx);
+    void addSSADUChainForExpOfRestoreLHS(
+        IR const* dele, DelegateMgr const& delemgr,
+        RestoreTab const& restore2mem, RPCtx const& ctx);
     void addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
                                    RPCtx const& ctx);
     //Build DU chain for initialization-def and outside loop exposed-use.
@@ -447,10 +451,12 @@ protected:
     //Build DU chain for intra-loop-def and its USE.
     void addDUChainForIntraDef(Occ2Occ const& occ2newocc,
                                IRList const& deflst, RPCtx const& ctx);
-    void addDUChainForRestoreToOutsideUse(IR const* dele,
-                                          DelegateMgr const& delemgr,
-                                          RestoreTab const& restore2mem,
-                                          RPCtx const& ctx);
+    void addDUChainForRestoreToOutsideUse(
+        IR const* dele, DelegateMgr const& delemgr,
+        RestoreTab const& restore2mem, RPCtx const& ctx);
+    void addDUChainForRestoreToOutsideUse(
+        IR * restore, IR const* dele, DelegateMgr const& delemgr,
+        RPCtx const& ctx);
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
     void addExactAccess(OUT ExactAccTab & exact_tab,
@@ -480,7 +486,9 @@ protected:
 
     void buildDUChainOnDemandForPROp(IR * def, IR * use, RPCtx const& ctx);
     void buildDUChainOnDemand(IR * def, IR * use, RPCtx const& ctx);
-    //Return true if success.
+
+    //The function inserts Phi for init-stmt PR or reconstructs SSA overall.
+    //Return true if PRSSA changed.
     bool buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
                                         DelegateMgr const& delemgr,
                                         RestoreTab const& restore2mem,
@@ -570,9 +578,10 @@ protected:
                              DelegateMgr & delemgr, IR * rhs,
                              IRBB * preheader);
 
-    //The function generates iniailization code of PR that is corresponding to
-    //each delegate. And building DU chain between all USE occurrences of
-    //the PR.
+    //The function generates iniailization code of promoted PR.
+    //Note the function leaves the work which building DU chain of PR and STPR
+    //to the sebsequent functions, and that work will be done at
+    //buildDUChainForDeleRelatedPR() later.
     void handleProlog(IR const* dele, IR const* pr, DelegateMgr & delemgr,
                       IRBB * preheader);
     bool handleArrayRef(IN IR * ir, LI<IRBB> const* li,
@@ -675,7 +684,7 @@ protected:
                  IRIter & ii, ExactAccTab & exact_tab,
                  InexactAccTab & inexact_tab, MOD RPCtx & ctx);
 
-    //Fixup DU chain if there is untrue dependence.
+    //Remove DU chain if there is untrue dependence.
     //occ2newocc: record the IR stmt/exp that need to fixup.
     void removeDUChainForOrgOcc(Occ2Occ & occ2newocc, RPCtx const& ctx);
     void removeMDPhiDUChain(IR const* dele, LI<IRBB> const* li,

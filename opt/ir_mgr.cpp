@@ -1543,7 +1543,7 @@ IR * IRMgr::buildUnaryOp(IR_CODE irc, Type const* type, IN IR * opnd)
     ASSERT0(type);
     ASSERT0(isUnaryOp(irc));
     ASSERT0(opnd && opnd->is_exp());
-    ASSERT0(irc != IR_LNOT || type->is_bool());
+    //Note 'type' may be vector or tensor type.
     IR * ir = allocIR(irc);
     UNA_opnd(ir) = opnd;
     IR_dt(ir) = type;

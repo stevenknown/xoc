@@ -226,6 +226,25 @@ bool MDSSAInfo::isEqual(MDSSAInfo const& src) const
 }
 
 
+void MDSSAInfo::copyBySpecificMD(
+    MDSSAInfo const& src, MD const* md, UseDefMgr * mgr)
+{
+    VOpndSetIter it = nullptr;
+    bool added = false;
+    cleanVOpndSet(mgr);
+    for (BSIdx i = src.readVOpndSet().get_first(&it);
+         i != BS_UNDEF; i = src.readVOpndSet().get_next(i, &it)) {
+        VMD const* t = (VMD const*)mgr->getVOpnd(i);
+        ASSERT0(t);
+        if (t->is_md() && t->mdid() == md->id()) {
+            addVOpnd((VOpnd const*)t, mgr);
+            added = true;
+        }
+    }
+    ASSERTN(added, ("no VOpnd corresponded to MD%u", md->id()));
+}
+
+
 void MDSSAInfo::copyVOpndSet(VOpndSet const& src, UseDefMgr * mgr)
 {
     getVOpndSet()->copy(src, *mgr->getSBSMgr());
@@ -286,6 +305,7 @@ bool MDSSAInfo::renameSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr)
         }
     }
     if (do_rename) {
+        //Note addUse() will build DefUse chain between 'vmd' and 'exp'.
         vmd->addUse(exp);
         addVOpnd(vmd, mgr);
     }
@@ -343,6 +363,11 @@ void MDSSAInfo::addUseSet(IRSet const& set, IN UseDefMgr * mgr)
 void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
 {
     ASSERT0(exp && exp->is_exp() && exp->isMemRefNonPR() && mgr);
+    if (exp->is_id()) {
+        //IR_ID represents an individual versioned MD, thus each IR_ID only
+        //can have one VOpnd.
+        ASSERT0(getVOpndSet()->get_elem_count() == 1);
+    }
     VOpndSetIter iter = nullptr;
     for (BSIdx i = getVOpndSet()->get_first(&iter);
          i != BS_UNDEF; i = getVOpndSet()->get_next(i, &iter)) {

@@ -923,8 +923,8 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
     if (name == nullptr) {
         name = "graph_ssa_graph.vcg";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h != nullptr, ("%s create failed!!!",name));
 
     //Print comment
@@ -1036,8 +1036,6 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
     }
     fprintf(h, "\n}\n");
     m_rg->getLogMgr()->pop();
-
-    fclose(h);
 }
 //END SSAGraph
 

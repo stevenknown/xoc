@@ -2046,11 +2046,10 @@ void IRCFG::dumpDOT(CHAR const* name, UINT flag) const
     if (name == nullptr) {
         name = "graph_cfg.dot";
     }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h, ("%s create failed!!!", name));
     dumpDOT(h, flag);
-    fclose(h);
 }
 
 
@@ -2463,8 +2462,8 @@ void IRCFG::dumpVCG(CHAR const* name, UINT flag) const
 
     //Note this function does not use LogMgr as output.
     //So it is dispensable to check LogMgr.
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
+    FileObj fo(name, true, false);
+    FILE * h = fo.getFileHandler();
     ASSERTN(h != nullptr, ("%s create failed!!!",name));
     dumpVCGHead(h);
 
@@ -2480,7 +2479,6 @@ void IRCFG::dumpVCG(CHAR const* name, UINT flag) const
     dumpVCGEdge(flag, this);
     getRegion()->getLogMgr()->pop();
     fprintf(h, "\n}\n");
-    fclose(h);
 }
 
 
