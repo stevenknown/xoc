@@ -48,6 +48,8 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_label_count = LABEL_ID_UNDEF + 1;
     m_var_mgr = nullptr;
     m_md_sys = nullptr;
+
+    //Set to false by default to get more opportunities to optimizations.
     m_is_regard_str_as_same_md = false;
     m_str_md = nullptr;
     m_targinfo = nullptr;

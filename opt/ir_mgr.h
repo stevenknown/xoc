@@ -255,7 +255,7 @@ public:
     //var: variable that will be taken address.
     IR * buildLda(Var * var);
     IR * buildLdaString(CHAR const* varname, Sym const* string);
-    IR * buildLdaString(CHAR const* varname, CHAR const * string);
+    IR * buildLdaString(CHAR const* varname, CHAR const* string);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.

@@ -159,6 +159,10 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     case IR_GOTO:
         convertGoto(ir, mis, cont);
         break;
+    case IR_IGOTO:
+        convertIgoto(ir, mis, cont);
+        break;
+    case IR_LABEL: break;
     default: convertExtStmt(ir, mis, cont);
     }
 }

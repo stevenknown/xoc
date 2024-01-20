@@ -1590,7 +1590,7 @@ void CFG<BB, XR>::cleanBBVertex()
     }
 }
 
- 
+
 template <class BB, class XR>
 BB * CFG<BB, XR>::getFallThroughBB(BB * bb)
 {

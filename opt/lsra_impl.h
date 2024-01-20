@@ -32,12 +32,59 @@ namespace xoc {
 
 class LSRAImpl;
 
+//This enum is used to indicate the different inconsistent type after the
+//linear scan register allocation.
+typedef enum {
+    //Inconsistent type is undefined.
+    INCONSIST_UNDEF = 0,
+
+    //Inconsistent type from PR to PR.
+    //e.g: $p is split and renamed to $q. For an edge of CFG, $p is used in
+    //the source BB, and $q is used in the destination BB, $p and $q are
+    //inconsistent if they are assigned to different registers during LSRA,
+    //the value of $q is not same as $p.
+    INCONSIST_PR2PR = 1,
+
+    //Inconsistent type from memory location of spilled PR to the new PR.
+    //e.g: $p is split and renamed to $q. For an edge of CFG, $p is spilled to
+    //memory in the source BB, and $q is used in the destination BB, memory of
+    //$p and $q are inconsistent because the value of $p is in memory, not
+    //in $q in in source BB.
+    INCONSIST_MEM2PR = 2,
+
+    //Inconsistent type from spilled PR to memory location of spilled PR.
+    //e.g: $p is split and renamed to $q. For an edge of CFG, $p is used
+    //in the source BB, and the spilled memory of $p is reloaded to $q in the
+    //destination BB, $p and the spilled memory of $p are inconsistent because
+    //the $p is not spilled to that memory in source BB.
+    INCONSIST_PR2MEM = 3,
+} INCONSIST_TYPE;
+
+//CASE:Define local used type in global scope because some compiler
+//complained 'uses local type'.
+typedef struct tagVexPair {
+    VexIdx fromid;
+    VexIdx toid;
+} VexPair;
+class CompareVexPair {
+public:
+    bool is_less(VexPair t1, VexPair t2) const
+    { return t1.fromid < t2.fromid || t1.toid < t2.toid; }
+    bool is_equ(VexPair t1, VexPair t2) const
+    { return t1.fromid == t2.fromid && t1.toid == t2.toid; }
+    VexPair createKey(VexPair t) { return t; }
+};
+
 class InConsistPair {
 public:
     VexIdx from_vex_id;
     VexIdx to_vex_id;
     LifeTime const* from_lt;
     LifeTime const* to_lt;
+
+    //The spilled memory location var.
+    Var const* mem_var;
+    INCONSIST_TYPE type;
 public:
     InConsistPair() {}
     InConsistPair(UINT id)
@@ -46,6 +93,8 @@ public:
         to_vex_id = VERTEX_UNDEF;
         from_lt = nullptr;
         to_lt = nullptr;
+        mem_var = nullptr;
+        type = INCONSIST_UNDEF;
     }
 };
 
@@ -59,22 +108,68 @@ public:
         UINT i = 0;
         for (InConsistPair pair = get_head(&it);
              i < get_elem_count(); pair = get_next(&it), i++) {
-            ASSERT0(pair.from_lt && pair.to_lt);
-            note(rg,
-                 "\nNEED insert bb between BB%u and BB%u, and move:$%u->$%u",
-                 pair.from_vex_id, pair.to_vex_id,
-                 pair.from_lt->getPrno(), pair.to_lt->getPrno());
+            switch (pair.type) {
+            case INCONSIST_PR2PR:
+                ASSERT0(pair.from_lt && pair.to_lt);
+                note(rg,
+                    "\nNEED insert bb between BB%u and BB%u, and move:$%u->$%u",
+                    pair.from_vex_id, pair.to_vex_id,
+                    pair.from_lt->getPrno(), pair.to_lt->getPrno());
+                break;
+            case INCONSIST_MEM2PR:
+                ASSERT0(pair.mem_var && pair.to_lt);
+                note(rg,
+                    "\nNEED insert bb between BB%u and BB%u, and copy:$%s->$%u",
+                    pair.from_vex_id, pair.to_vex_id,
+                    pair.mem_var->get_name()->getStr(), pair.to_lt->getPrno());
+                break;
+            case INCONSIST_PR2MEM:
+                ASSERT0(pair.mem_var && pair.from_lt);
+                note(rg,
+                    "\nNEED insert bb between BB%u and BB%u, and copy:$%u->$%s",
+                    pair.from_vex_id, pair.to_vex_id, pair.from_lt->getPrno(),
+                    pair.mem_var->get_name()->getStr());
+                break;
+            default: UNREACHABLE(); break;
+            }
         }
     }
 };
 
+//
+//START LTConsistencyMgr
+//
 class LTConsistencyMgr {
 public:
+    //This enum is used to describe the status of the PR for a BB.
     typedef enum tagCONSIST_STATUS {
+        //Initial state for PR consistency status.
         CONSIST_UNDEF = 0,
+
+        //The PR does not cross the boundary of a BB.
         CONSIST_INVALID = 1,
+
+        //The PR crosses the boundary of a BB.
         CONSIST_VALID = 2,
     } CONSIST_STATUS;
+
+    //This enum is used to describe the status of the PR in a BB.
+    typedef enum tagPR_STATUS {
+        //The PR status is undefined for the current BB.
+        PR_STATUS_UNDEF = 0,
+
+        //The PR is spilled in the current BB.
+        PR_STATUS_SPILLED = 1,
+
+        //The PR is reloaded in the current BB.
+        PR_STATUS_RELOADED = 2,
+
+        //The PR is spilled and reloaded in the current BB.
+        PR_STATUS_SPILLED_AND_RELOAD = 3,
+
+        //The PR is already in memory for the current BB.
+        PR_STATUS_IN_MEMORY = 4,
+    } PR_STATUS;
 protected:
     COPY_CONSTRUCTOR(LTConsistencyMgr);
     Region * m_rg;
@@ -83,36 +178,121 @@ protected:
     OptCtx * m_oc;
     LSRAImpl & m_impl;
     bool m_is_insert_bb;
+    typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
     typedef TMapIter<LifeTime const*, CONSIST_STATUS> LT2STIter;
     typedef TMap<LifeTime const*, CONSIST_STATUS> LT2ST;
+    typedef TMap<Var const*, PR_STATUS> Var2PRST;
     Vector<LT2ST*> m_lt2st_in_vec;
     Vector<LT2ST*> m_lt2st_out_vec;
+    Vector<Var2PRST*> m_var2prst_vec;
 protected:
     void addInStatus(LifeTime const* lt, CONSIST_STATUS st, UINT bbid)
     { genInTab(bbid)->setAlways(lt, st); }
     void addOutStatus(LifeTime const* lt, CONSIST_STATUS st, UINT bbid)
     { genOutTab(bbid)->setAlways(lt, st); }
 
+    //This function will be used to record the status a PR through the var
+    //generated by the PR spilling operation.
+    //v: the var generated by the PR spilling operation, it is possible to be
+    //   a null pointer if the spilling and reloaded is not required during the
+    //   splitting.
+    //st: the status of the PR in current BB.
+    //bbid: the bbid of current BB.
+    void addPRStatus(Var const* v, PR_STATUS st, UINT bbid)
+    { genPRTab(bbid)->setAlways(v, st); }
+
+    //This function shall add the status of PR for current BB per the spill and
+    //reload bbid information.
+    //
+    //There are some rules need to be followed:
+    //  1. If the PR in current BB is not related to spilling and reloading,
+    //     set the status to PR_STATUS_UNDEF.
+    //  2. If the PR is spilled in current BB, set the status to
+    //     PR_STATUS_SPILLED.
+    //  3. If the PR is reloaded in current BB, set the status to
+    //     PR_STATUS_RELOADED.
+    //  4. If the PR is spilled and reloaded in current BB, set the status to
+    //     PR_STATUS_SPILLED_AND_RELOAD.
+    //  5. If the start position and the end position of cur_bbid are included
+    //     in the range from the end of anct lifetime to the start of new
+    //     lifetime, that means the PR status is PR_STATUS_IN_MEMORY in
+    //     cur_bbid, because the PR has already been spilled into memory in this
+    //     range.
+    //anct: the ancestor lifetime of the PR.
+    //newlt: the new lifetime of the PR.
+    //cur_bbid: current bbid.
+    void addPRStatus(LifeTime const* anct, LifeTime const* newlt,
+                     UINT cur_bbid);
+
+    //Add the consist status for BB per the specified position, if the lifetime
+    //of PR cross the pos, the status is CONSIST_VALID, or else is
+    //CONSIST_INVALID.
+    //lt: the lifetime of a PR.
+    //start: the start position, it should be the start boundary of a BB.
+    //end: the end position, it should be the end boundary of a BB.
+    //bbid: current bbid.
+    void addConsistStatus(LifeTime const* lt, Pos start, Pos end, UINT bbid);
+
     void computeLTConsistency();
     void computeEdgeConsistency(OUT InConsistPairList & inconsist_lst);
     void computeEdgeConsistencyImpl(xcom::Edge const* e,
                                     OUT InConsistPairList & inconsist_lst);
 
-    CHAR const* getStName(CONSIST_STATUS st) const
-    {
-        switch (st) {
-        case CONSIST_INVALID: return "invalid";
-        case CONSIST_VALID: return "valid";
-        default: UNREACHABLE();
-        }
-        return nullptr;
-    }
+    //This function implements the inconsistency on forward edge.
+    //anct: the ancestor lifetime of the PR.
+    //newlt: the new lifetime of the PR after splited.
+    //from: the source BBID of the edge in CFG.
+    //to: the destination BBID of the edge in CFG.
+    //inconsist_lst: the list to record the inconsistency information.
+    //Returen value: return true if there is no inconsistency problem or
+    //  the inconsistency is found on this edge; return false if it is
+    //  uncertain about the check inside the function.
+    bool computeForwardEdgeConsistencyImpl(LifeTime const* anct,
+        LifeTime const* newlt, UINT from, UINT to,
+        OUT InConsistPairList & inconsist_lst);
+
+    //This function implements the inconsistency on backward edge.
+    //anct: the ancestor lifetime of the PR.
+    //newlt: the new lifetime of the PR after splited.
+    //from: the source BBID of the edge in CFG.
+    //to: the destination BBID of the edge in CFG.
+    //inconsist_lst: the list to record the inconsistency information.
+    void computeBackwardEdgeConsistencyImpl(LifeTime const* anct,
+        LifeTime const* newlt, UINT from, UINT to,
+        OUT InConsistPairList & inconsist_lst);
+
     LT2ST * genInTab(UINT bbid)
     {
         LT2ST * tab = m_lt2st_in_vec.get(bbid);
         if (tab == nullptr) {
             tab = new LT2ST();
             m_lt2st_in_vec.set(bbid, tab);
+        }
+        return tab;
+    }
+    //This function generates and inserts a latch BB to hold the IRs for
+    //inconsistency recovery.
+    //The latch BB is a BB that need to be inserted on an edge in CFG.
+    // For example: The latch BB below will be inserted between BB FROM and TO.
+    //
+    //       BB: FROM
+    //       ...
+    //          |
+    //          V
+    //       BB: LATCH
+    //       ...
+    //          |
+    //          V
+    //       BB: TO
+    //       ...
+    //
+    IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const& pair);
+    Var2PRST * genPRTab(UINT bbid)
+    {
+        Var2PRST * tab = m_var2prst_vec.get(bbid);
+        if (tab == nullptr) {
+            tab = new Var2PRST();
+            m_var2prst_vec.set(bbid, tab);
         }
         return tab;
     }
@@ -127,6 +307,8 @@ protected:
     }
     LT2ST * getInTab(UINT bbid) const
     { return m_lt2st_in_vec.get(bbid); }
+    Var2PRST * getPRTab(UINT bbid) const
+    { return m_var2prst_vec.get(bbid); }
     LT2ST * getOutTab(UINT bbid) const
     { return m_lt2st_out_vec.get(bbid); }
     CONSIST_STATUS getInSt(LifeTime const* lt, UINT bbid) const
@@ -135,16 +317,34 @@ protected:
         ASSERT0(tab);
         return tab->get(lt);
     }
+    PR_STATUS getPRSt(Var const* v, UINT bbid) const
+    {
+        Var2PRST * tab = getPRTab(bbid);
+        ASSERT0(tab);
+        return tab->get(v);
+    }
     CONSIST_STATUS getOutSt(LifeTime const* lt, UINT bbid) const
     {
         LT2ST * tab = getOutTab(bbid);
         ASSERT0(tab);
         return tab->get(lt);
     }
+    CHAR const* getStName(CONSIST_STATUS st) const
+    {
+        switch (st) {
+        case CONSIST_INVALID: return "invalid";
+        case CONSIST_VALID: return "valid";
+        default: UNREACHABLE();
+        }
+        return nullptr;
+    }
 
     IRBB * insertLatch(IRBB const* from, MOD IRBB * to);
 
     void reviseEdgeConsistency(InConsistPairList const& inconsist_lst);
+    void reviseTypeMEM2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
+    void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const& pair);
+    void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
 public:
     LTConsistencyMgr(LSRAImpl & impl);
     ~LTConsistencyMgr()
@@ -154,6 +354,8 @@ public:
             if (in != nullptr) { delete in; }
             LT2ST * out = m_lt2st_out_vec.get(i);
             if (out != nullptr) { delete out; }
+            Var2PRST * prtbl = m_var2prst_vec.get(i);
+            if (prtbl != nullptr) { delete prtbl; }
         }
     }
 
@@ -161,6 +363,7 @@ public:
 
     void perform();
 };
+//END LTConsistencyMgr
 
 
 //
@@ -307,6 +510,20 @@ public:
 };
 //END SplitMgr
 
+//This union is used to describe the split info of a PR if it was split in
+//LSRA, that should be include the BBID of the spilled position, and the BBID
+//of the reload position.
+typedef union {
+    //The complete data for the whole info.
+    UINT64 value;
+    struct {
+        //The BBID of spilled position.
+        UINT spill_bbid;
+
+        //The BBID of reloaded position.
+        UINT reload_bbid;
+    } bb;
+} PRSplitBB;
 
 //
 //START LSARImpl
@@ -314,13 +531,14 @@ public:
 //The class implements a default linear-scan algorithm.
 class LSRAImpl {
 public:
-    enum REG_PREFER{
+    enum REG_PREFER {
         PREFER_UNDEF = 0,
         PREFER_CALLER = 1,
         PREFER_CALLEE = 2,
     };
     typedef xcom::TMap<LifeTime const*, REG_PREFER> LT2Prefer;
     typedef xcom::TMapIter<LifeTime const*, REG_PREFER> LT2PreferIter;
+    typedef xcom::TMap<Var const*, UINT64> Var2Split;
 private:
     COPY_CONSTRUCTOR(LSRAImpl);
 protected:
@@ -337,6 +555,7 @@ protected:
     OptCtx * m_oc;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
+    Var2Split m_var2split;
 protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
@@ -349,7 +568,6 @@ protected:
 
     IR * insertSpillAtEntry(Reg r);
     void insertReloadAtExit(Reg r, Var * spill_loc);
-    IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
     IRListIter insertSpillAtBBEnd(IR * spill, IRBB * bb);
     IRListIter insertReloadAtBB(IR * reload, IRBB * bb, bool start);
     IR * insertReloadAtBB(PRNO prno, Var * spill_loc, Type const* ty,
@@ -394,6 +612,12 @@ public:
     RegSetImpl & getRegSetImpl() const { return m_rsimpl; }
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
+    PRSplitBB getPrSplitBB(Var const* v) const
+    {
+        PRSplitBB splitbb;
+        splitbb.value = m_var2split.get(v);
+        return splitbb;
+    }
 
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
@@ -404,12 +628,14 @@ public:
                            Type const* loadvalty, IR const* marker);
     IR * insertMove(PRNO from, PRNO to, Type const* fromty, Type const* toty,
                     IRBB * bb);
+    IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
     void insertSpillAtHead(IR * spill, MOD IRBB * bb);
     void insertSpillAfter(IR * spill, IR const* marker);
     IR * insertSpillAfter(PRNO prno, Type const* ty, IR const* marker);
     void insertSpillBefore(IR * spill, IR const* marker);
     IR * insertSpillBefore(PRNO prno, Type const* ty, IR const* marker);
     IR * insertSpillBefore(Reg r, IR const* marker);
+    IR * insertReload(PRNO to, Var * v, Type const* ty, IRBB * bb);
     void insertReloadBefore(IR * reload, IR const* marker);
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
@@ -417,6 +643,13 @@ public:
 
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
+    void recordVar2Split(Var const* v, UINT spill_bbid, UINT reload_bbid)
+    {
+        PRSplitBB splitbb;
+        splitbb.bb.spill_bbid = spill_bbid;
+        splitbb.bb.reload_bbid = reload_bbid;
+        m_var2split.set(v, splitbb.value);
+    }
 
     //The function check each CFG edge to fixup the lifetime conflict while the
     //linearization allocation flattening the CFG.

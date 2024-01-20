@@ -179,7 +179,7 @@ Type const* checkType(Type const* ty, DATA_TYPE dt);
 //Indicate the stream element data type.
 #define TY_stream_ety(d) (((StreamType*)CK_TY(d, D_STREAM))->stream_elem_type)
 
-//Date Type Description.
+//Data Type Description.
 class Type {
     COPY_CONSTRUCTOR(Type);
 public:

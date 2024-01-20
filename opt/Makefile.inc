@@ -105,7 +105,8 @@ ifeq ($(FOR_IP), true)
   prologue_epilogue_inserter.o\
   arg_passer.o\
   gp_adjustment.o\
-  relaxation.o
+  br_opt.o\
+  workaround.o
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
   OPT_OBJS+=\
@@ -120,7 +121,8 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   prologue_epilogue_inserter.o\
   arg_passer.o\
   gp_adjustment.o\
-  relaxation.o
+  br_opt.o\
+  workaround.o
 else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
   OPT_OBJS+=\
@@ -135,7 +137,8 @@ else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   prologue_epilogue_inserter.o\
   arg_passer.o\
   gp_adjustment.o\
-  relaxation.o
+  br_opt.o\
+  workaround.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

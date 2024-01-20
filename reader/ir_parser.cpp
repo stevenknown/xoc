@@ -2492,7 +2492,7 @@ bool IRParser::parseUnaryOp(IR_CODE code, ParseCtx * ctx)
     ASSERT0(opnd);
     if (ty == nullptr) {
         if (IR::mustBeBoolType(code)) {
-            ty = m_tm->getBool();    
+            ty = m_tm->getBool();
         } else {
             ty = m_tm->getAny();
         }

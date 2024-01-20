@@ -447,6 +447,9 @@ inline bool xisalpha(CHAR c) { return upper(c) >= 'A' && upper(c) <= 'Z'; }
 //Return abs value of 'a'.
 LONGLONG xabs(LONGLONG a);
 
+//Return true if the imm is valid for the limited bitsize.
+bool isValidImmForBitsize(UINT bitsize, UINT64 imm);
+
 //Exported Data Structures
 class ASCII {
 public:

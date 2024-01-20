@@ -282,6 +282,7 @@ typedef enum _REGFILE {
 #define REG_R2 3
 #define REG_R3 4
 #define REG_R4 5
+#define REG_R5 6
 #define REG_R11 12
 #define REG_R15 16
 #define REG_FP 8 //R7

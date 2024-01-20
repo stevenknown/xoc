@@ -108,7 +108,9 @@ bool RelocMgr::isArgument(Var const* var) const
 
 bool RelocMgr::isSpillVarInEntryBB(Var const* var) const
 {
-    return m_ra->getEntryBBSpillVarList()->find(var);
+    //The offset of the spill var of fp and ra should be calculated separately,
+    //as these two are spilled before sp realignment.
+    return var == m_pelog->getFPVar() || var == m_pelog->getRAVar();
 }
 
 

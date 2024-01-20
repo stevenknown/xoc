@@ -79,6 +79,17 @@ public:
 class InsertCvt : public Pass {
     COPY_CONSTRUCTOR(InsertCvt);
 
+    //Check size for vector data type.
+    virtual IR * checkSizeForVector(IR * parent, IR * kid) const
+    {
+        ASSERT0(parent && kid);
+        UINT tgt_size = parent->getTypeSize(m_tm);
+        UINT src_size = kid->getTypeSize(m_tm);
+        //Do not do hoisting for vector type.
+        ASSERTN(tgt_size >= src_size, ("size is overflowed"));
+        return kid;
+    }
+
     //Try to convert constant expression.
     //Return updated ir if type converted.
     IR * convertConstExp(IR * ir, bool & change, InsertCvtCtx const& rc);
@@ -92,7 +103,7 @@ class InsertCvt : public Pass {
     IR * convertArray(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertNeg(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertNot(IR * ir, bool & change, InsertCvtCtx & rc);
-    IR * convertBinaryOp(IR * ir, bool & change);
+    IR * convertBinaryOp(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertILoad(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertDet(IR * ir_list, bool & change, InsertCvtCtx & rc);
     IR * convertDirectStore(IR * ir, bool & change, InsertCvtCtx & rc);

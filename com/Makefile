@@ -39,7 +39,7 @@ $(info "CFLAGS:$(CFLAGS)")
 $(info "DEBUG:$(DEBUG)")
 $(info "THREAD_NUM:$(THREAD_NUM)")
 
-$(COM_OUTPUT): com_objs 
+$(COM_OUTPUT): com_objs
 	@echo "BUILD $(COM_OUTPUT)!!"
 	@echo "EXEC:"
 	ar rvs $(COM_OUTPUT) $(COM_OBJS)

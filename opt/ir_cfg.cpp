@@ -2694,7 +2694,7 @@ static void reviseTrampolinBranchEdge(IRBB * bb, IRBB * next, IRBB * nextnext,
     IR * jmp = cfg->get_first_xr(next);
     ASSERT0(jmp && jmp->is_goto());
     br->setLabel(GOTO_lab(jmp));
- 
+
     //Clean 'next' BB to empty BB.
     cfg->remove_xr(next, jmp, ctx);
 

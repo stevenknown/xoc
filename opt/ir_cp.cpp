@@ -130,7 +130,7 @@ CopyProp::CopyProp(Region * rg) : Pass(rg), m_prop_kind(CP_PROP_UNDEF)
     //flag |= CP_PROP_CONST_TO_PHI_OPND;
     m_prop_kind.set(flag);
 }
- 
+
 
 //Return true if ir's type is consistent with 'cand_exp'.
 bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const

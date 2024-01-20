@@ -1696,7 +1696,6 @@ CallGraph * Region::getCallGraphPreferProgramRegion() const
 bool Region::processIRList(OptCtx & oc)
 {
     if (getIRList() == nullptr) { return true; }
-
     START_TIMER(t, "PreScan");
     prescanIRList(getIRList());
     END_TIMER(t, "PreScan");
@@ -1784,6 +1783,77 @@ static void do_inline(Region * rg, OptCtx * oc)
 }
 
 
+bool Region::processRegionIRInIRList(OptCtx & oc)
+{
+    return processRegionIRInIRList(getIRList());
+}
+
+
+bool Region::processRegionIR(IR const* ir)
+{
+    ASSERT0(ir->is_region());
+    Region * inner_rg = REGION_ru(ir);
+    ASSERT0(inner_rg && inner_rg != this);
+    OptCtx * inner_oc = getRegionMgr()->getAndGenOptCtx(inner_rg);
+    ASSERT0(inner_oc);
+    return inner_rg->process(inner_oc);
+}
+
+
+bool Region::processRegionIRInBBList(OptCtx & oc)
+{
+    BBListIter bbit;
+    for (IRBB const* bb = getBBList()->get_head(&bbit);
+         bb != nullptr; bb = getBBList()->get_next(&bbit)) {
+        IRListIter irit;
+        for (IR const* ir =
+                const_cast<IRBB*>(bb)->getIRList().get_head(&irit);
+             ir != nullptr;
+             ir = const_cast<IRBB*>(bb)->getIRList().get_next(&irit)) {
+            if (!ir->is_region()) { continue; }
+            if (!processRegionIR(ir)) { return false; }
+        }
+    }
+    return true;
+}
+
+
+bool Region::processRegionIRInIRList(IR const* ir)
+{
+    for (; ir != nullptr; ir = ir->get_next()) {
+        switch (ir->getCode()) {
+        case IR_REGION:
+            if (!processRegionIR(ir)) { return false; }
+            break;
+        default:
+            if (!ir->is_stmt()) { break; }
+            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+                IR * k = ir->getKid(i);
+                if (k != nullptr) {
+                    ASSERT0(IR_parent(k) == ir);
+                    prescanIRList(k);
+                }
+            }
+        }
+    }
+    return true;
+}
+
+
+bool Region::processInnerRegion(OptCtx * oc)
+{
+    if (getIRList() != nullptr) {
+        if (!processRegionIRInIRList(*oc)) { goto ERR_RETURN; }
+    } else {
+        if (!processRegionIRInBBList(*oc)) { goto ERR_RETURN; }
+    }
+    return true;
+ERR_RETURN:
+    oc->setInvalidAllFlags();
+    return false;
+}
+
+
 //Return true if all passes finished normally, otherwise return false.
 bool Region::process(OptCtx * oc)
 {
@@ -1800,6 +1870,10 @@ bool Region::process(OptCtx * oc)
         do_inline(this, oc);
     }
     getPassMgr()->registerPass(PASS_REFINE)->perform(*oc);
+    if (g_insert_cvt) {
+        //Insert CVT if necessary.
+        getPassMgr()->registerPass(PASS_INSERT_CVT)->perform(*oc);
+    }
     if (getIRList() != nullptr) {
         if (!processIRList(*oc)) { goto ERR_RETURN; }
     } else {

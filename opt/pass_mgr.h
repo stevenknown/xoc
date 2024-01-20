@@ -98,7 +98,8 @@ protected:
     virtual Pass * allocVectorization();
     virtual Pass * allocPrologueEpilogue();
     virtual Pass * allocGPAdjustment();
-    virtual Pass * allocRelaxation();
+    virtual Pass * allocBROpt();
+    virtual Pass * allocWorkaround();
 protected:
     void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
                                   BitSet const& opts);

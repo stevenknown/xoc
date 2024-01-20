@@ -115,6 +115,9 @@ DumpOption g_dump_opt;
 bool g_redirect_stdout_to_dump_file = false;
 FILE * g_unique_dumpfile = nullptr;
 CHAR const* g_unique_dumpfile_name = nullptr;
+bool g_do_lsra_debug = false;
+UINT g_debug_reg_num = 0;
+
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
 
@@ -593,6 +596,8 @@ void Option::dump(MOD LogMgr * lm)
     g_include_region.dump(lm);
     note(lm, "\ng_exclude_option =");
     g_exclude_region.dump(lm);
+    note(lm, "\ng_do_lsra_debug = %s", g_do_lsra_debug ? "true":"false");
+    note(lm, "\ng_debug_reg_num = %u", g_debug_reg_num);
     lm->decIndent(2);
 }
 

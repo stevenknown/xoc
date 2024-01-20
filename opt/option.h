@@ -263,7 +263,8 @@ typedef enum _PASS_TYPE {
     PASS_VECT,
     PASS_PROLOGUE_EPILOGUE,
     PASS_GP_ADJUSTMENT,
-    PASS_RELAXATION,
+    PASS_BR_OPT,
+    PASS_WORKAROUND,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -543,14 +544,6 @@ extern bool g_do_gp_adjustment;
 
 //Perform relaxation.
 extern bool g_do_relaxation;
-
-#ifdef FOR_TECO_IP
-//Forced relaxation of cond-br to uncond-br.
-extern bool g_do_relaxation2uncondbr;
-
-//Forced relaxation of cond-br or uncond-br to jmp.
-extern bool g_do_relaxation2jmp;
-#endif
 
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;

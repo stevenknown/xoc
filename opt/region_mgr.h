@@ -227,7 +227,7 @@ public:
     //The function will demand all compilation process to regard all
     //string variables as a same unbound MD.
     //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
-    //There is a function allocates 3000+ string variable.
+    //There is a function that allocated 3000+ string variables.
     //Each string has been taken address.
     //That will inflate may_point_to_set too much.
     //In this situation, AA can be conservatively regard all string variables

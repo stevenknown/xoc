@@ -185,6 +185,8 @@ public:
                                    MOD IMCtx * cont);
     virtual void convertGoto(IR const* ir, OUT RecycMIList & mis,
                              MOD IMCtx * cont) = 0;
+    virtual void convertIgoto(IR const* ir, OUT RecycMIList & mis,
+                              MOD IMCtx * cont) = 0;
     virtual void convertTruebr(IR const* ir, OUT RecycMIList & mis,
                                MOD IMCtx * cont) = 0;
     virtual void convertFalsebr(IR const* ir, OUT RecycMIList & mis,

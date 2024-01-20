@@ -1023,6 +1023,12 @@ CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf)
 }
 
 
+void dumpIRCombine(IR const* ir, Region const* rg)
+{
+    dumpIR(ir, rg, nullptr, DumpFlag(IR_DUMP_COMBINE));
+}
+
+
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
 void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)

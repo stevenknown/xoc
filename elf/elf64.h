@@ -75,13 +75,15 @@ typedef struct {
 //Program header
 typedef struct {
     Word32 p_type; //Segment type
+    Word32 p_flags; //Segment flags
+
     Off64 p_offset; //Segment file offset
     Addr64 p_vaddr; //Segment virtual address
     Addr64 p_paddr; //Segment physical address
-    Word32 p_filesz; //Segment size in file
-    Word32 p_memsz; //Segment size in memory
-    Word32 p_flags; //Segment flags
-    Word32 p_align; //Segment alignment
+
+    Word64 p_filesz; //Segment size in file
+    Word64 p_memsz; //Segment size in memory
+    Word64 p_align; //Segment alignment
 } ELFPHdr64;
 
 //Section table entry
@@ -142,11 +144,11 @@ typedef struct {
 } ELFSym64;
 
 typedef struct {
-	SWord64	d_tag;
-   	union {
-   	    Addr64	d_val;
-   		Addr64	d_ptr;
-	} d_un;
+    SWord64 d_tag;
+    union {
+        Addr64 d_val;
+        Addr64 d_ptr;
+    } d_un;
 } ELFDyn64;
 
 typedef struct {

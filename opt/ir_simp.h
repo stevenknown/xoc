@@ -392,6 +392,8 @@ class IRSimp : public Pass {
 private:
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
 protected:
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
@@ -438,11 +440,16 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
+
+    bool useMDSSADU() const;
+    bool usePRSSADU() const;
 public:
     explicit IRSimp(Region * rg) : Pass(rg)
     {
         m_tm = rg->getTypeMgr();
         m_irmgr = rg->getIRMgr();
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
     }
     virtual ~IRSimp() {}
 

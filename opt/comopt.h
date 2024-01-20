@@ -76,7 +76,7 @@ author: Su Zhenyu
 #include "lsra_scan_in_prio.h"
 #include "gp_adjustment.h"
 #include "prologue_epilogue_inserter.h"
-#include "relaxation.h"
+#include "br_opt.h"
 #endif
 
 #include "ir_cp.h"

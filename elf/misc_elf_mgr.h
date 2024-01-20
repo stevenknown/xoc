@@ -36,29 +36,10 @@ class MiscELFMgr : public elf::ELFMgr {
 protected:
     virtual void allocTargInfo();
 
-    //Collector some factors about .sbss, .sdata, .bss, .data, .dl_spm
-    //sections and section number of elf file for different architectures.
-    virtual void collectELFFactor(OUT StringList & sym_name,
-                                  OUT StringVec & func_name,
-                                  OUT bool & has_sbss, OUT bool & has_sdata,
-                                  OUT bool & has_bss, OUT bool & has_data,
-                                  OUT bool & has_dlspm, OUT UINT & sbss_align,
-                                  OUT UINT & sdata_align, OUT UINT & bss_align,
-                                  OUT UINT & data_align,
-                                  OUT UINT & dlspm_align,
-                                  OUT UINT & shdr_num)
-    { ASSERTN(0, ("TODO")); }
-
-    //Compute a map saving function and its relocation data indexs.
-    virtual void computeFuncRelInd(OUT xcom::Vector<UINT> & begin)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .data section for SW architectures.
-    virtual void genBssContent(OUT elf::BYTEVec & bytevec)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .data section for SW architectures.
-    virtual void genDataContent(OUT elf::BYTEVec & bytevec)
+    //Collect following info:
+    //(1) Names(string) of all symbols.
+    //(2) Section info.
+    virtual void collectELFFactor(OUT StringList & sym_name)
     { ASSERTN(0, ("TODO")); }
 
     //Generate contents for .dl_spm section. This function needs to be
@@ -66,34 +47,10 @@ protected:
     virtual void genDlSpmContent(OUT BYTEVec & bytevec)
     { ASSERTN(0, ("TODO")); }
 
-    //Generate contents for .rel.text.xxx section for SW architectures.
-    virtual void genFuncRelContent(OUT elf::BYTEVec & bytevec,
-                                   elf::StringList const& names,
-                                   xcom::Vector<UINT> const& begin,
-                                   UINT const& i)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .text.xxx section for SW architectures.
-    virtual void genFuncTextContent(OUT elf::BYTEVec & bytevec, UINT & ind)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .sbss section for SW architectures.
-    virtual void genSbssContent(OUT elf::BYTEVec & bytevec)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .sdata section for SW architectures.
-    virtual void genSdataContent(OUT elf::BYTEVec & bytevec)
-    { ASSERTN(0, ("TODO")); }
-
-    //Generate contents for .symtab section. This function needs to be
-    //implemented by subclasses according to different architectures.
-    virtual void genSymTabContent(OUT elf::BYTEVec & bytevec,
-                                  elf::OffVec const& offvec,
-                                  bool & has_sbss, bool & has_sdata,
-                                  bool & has_bss, bool & has_data,
-                                  bool & has_dlspm, UINT & sbss_align,
-                                  UINT & sdata_align, UINT & bss_align,
-                                  UINT & data_align, UINT & dlspm_align)
+    //Generate contents for .symtab section.
+    //bytevec: binary code of .symtab section content.
+    //offvec: record the byte offset.
+    void genSymTabContent(OUT BYTEVec & bytevec, OffVec const& offvec)
     { ASSERTN(0, ("TODO")); }
 public:
     MiscELFMgr() {}

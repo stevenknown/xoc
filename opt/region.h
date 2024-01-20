@@ -190,6 +190,10 @@ protected:
     void prescanBBList(BBList const* bblst);
     bool partitionRegion();
     bool performSimplify(OptCtx & oc);
+    bool processRegionIRInIRList(IR const* ir);
+    bool processRegionIRInIRList(OptCtx & oc);
+    bool processRegionIRInBBList(OptCtx & oc);
+    bool processRegionIR(IR const* ir);
 public:
     REGION_TYPE m_rg_type; //region type.
     UINT m_id; //region unique id.
@@ -779,7 +783,12 @@ public:
     void lowerIRTreeToLowestHeight(OptCtx & oc);
 
     //This function is main entry to process current region.
+    //Return true if the processing is successful.
     virtual bool process(OptCtx * oc);
+
+    //This function is the entry to process inner region.
+    //Return true if the processing is successful.
+    virtual bool processInnerRegion(OptCtx * oc);
 
     //The function collect information that IPA may used.
     //Check and rescan call-list of region if something changed.

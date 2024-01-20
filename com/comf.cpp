@@ -1698,4 +1698,11 @@ void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
     ::free(prefix);
 }
 
+
+bool isValidImmForBitsize(UINT bitsize, UINT64 imm)
+{
+    UINT64 mask = (((UINT64)1) << bitsize) - 1;
+    return (mask & imm) == imm;
+}
+
 } //namespace xcom

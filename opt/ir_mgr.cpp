@@ -367,6 +367,9 @@ UINT IRMgr::buildPrno(Type const* type)
     DUMMYUSE(type);
     UINT prno = m_rg->getAnalysisInstrument()->m_pr_count;
     m_rg->getAnalysisInstrument()->m_pr_count++;
+    if (g_generate_var_for_pr) {
+        m_rg->genVarForPR(prno, type);
+    }
     return prno;
 }
 
@@ -405,7 +408,7 @@ IR * IRMgr::buildId(Var * var)
 }
 
 
-IR * IRMgr::buildLdaString(CHAR const* varname, CHAR const * string)
+IR * IRMgr::buildLdaString(CHAR const* varname, CHAR const* string)
 {
     return buildLdaString(varname, m_rm->addToSymbolTab(string));
 }

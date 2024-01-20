@@ -40,6 +40,24 @@ public:
     TargInfo() {}
     virtual ~TargInfo() {}
 
+    //Approximate the cycles to execute ir operation.
+    virtual UINT estimateNumOfCycles(IR const*) const = 0;
+
+    // Return the alignment parameter in memory.
+    virtual UINT getAlignMem() const = 0;
+
+    //Return byte size of data cache.
+    virtual UINT getDCacheSize() const = 0;
+
+    //Return byte size of cache line.
+    virtual UINT getDCacheLineSize() const = 0;
+
+    //Return byte size of instruction cache.
+    virtual UINT getICacheSize() const = 0;
+
+    //Return byte size of instruction cache line.
+    virtual UINT getICacheLineSize() const = 0;
+
     // Return the number of return-value integer register.
     virtual UINT getNumOfReturnValueRegister() const = 0;
 
@@ -55,23 +73,11 @@ public:
     // Return the number of thread.
     virtual UINT getNumOfThread() const = 0;
 
-    //Return byte size of data cache.
-    virtual UINT getDCacheSize() const = 0;
-
-    //Return byte size of instruction cache.
-    virtual UINT getICacheSize() const = 0;
-
-    //Return byte size of cache line.
-    virtual UINT getDCacheLineSize() const = 0;
-
-    //Return byte size of instruction cache line.
-    virtual UINT getICacheLineSize() const = 0;
+    //Return the alignment parameter for matrix.
+    virtual UINT getMemAlginOfMatrix() const = 0;
 
     //Return byte size of TLB if any.
     virtual UINT getTLBSize() const = 0;
-
-    //Approximate the cycles to execute ir operation.
-    virtual UINT estimateNumOfCycles(IR const*) const = 0;
 };
 
 } //namespace xoc

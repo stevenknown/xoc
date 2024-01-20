@@ -201,10 +201,10 @@ void ELFPHdr::extract(BYTE const* buf, ELFMgr const* mgr)
         p_offset = p->p_offset;
         p_vaddr = p->p_vaddr;
         p_paddr = p->p_paddr;
-        p_filesz = p->p_filesz;
-        p_memsz = p->p_memsz;
+        p_filesz = (Word32)p->p_filesz;
+        p_memsz = (Word32)p->p_memsz;
         p_flags = p->p_flags;
-        p_align = p->p_align;
+        p_align = (Word32)p->p_align;
         return;
     }
     ASSERT0(mgr->is32bit());
@@ -316,6 +316,13 @@ UINT ELFSym::getSize(ELFMgr const* mgr)
 {
     ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFSym64) : sizeof(ELFSym32);
+}
+
+
+UINT ELFSym::getAlign(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    return mgr->is64bit() ? sizeof(Addr64) : sizeof(Word32);
 }
 
 
@@ -438,6 +445,45 @@ UINT ELFRela::getSize(ELFMgr const* mgr)
 {
     ASSERT0(mgr->is64bit() || mgr->is32bit());
     return mgr->is64bit() ? sizeof(ELFRela64) : sizeof(ELFRela32);
+}
+
+
+UINT ELFRela::getAlign(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    return mgr->is64bit() ? sizeof(Addr64) : sizeof(Addr32);
+}
+
+
+UINT ELFRela::getAddendSize(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    return mgr->is64bit() ? sizeof(SWord64) * BITS_PER_BYTE :
+        sizeof(SWord32) * BITS_PER_BYTE;
+}
+
+
+UINT ELFRela::getOffsetSize(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    return mgr->is64bit() ? sizeof(Addr64) * BITS_PER_BYTE :
+        sizeof(Addr32) * BITS_PER_BYTE;
+}
+
+
+UINT ELFRela::getSymbolSize(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    UINT const sym_size_32 = 24; //Word32 r_sym:24;
+    return mgr->is64bit() ? sizeof(Word32) * BITS_PER_BYTE : sym_size_32;
+}
+
+
+UINT ELFRela::getTypeSize(ELFMgr const* mgr)
+{
+    ASSERT0(mgr->is64bit() || mgr->is32bit());
+    UINT const type_size_32 = 8; //Word32 r_type:8;
+    return mgr->is64bit() ? sizeof(Word32) * BITS_PER_BYTE : type_size_32;
 }
 
 

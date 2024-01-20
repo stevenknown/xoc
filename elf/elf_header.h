@@ -851,10 +851,29 @@ public:
     //section index is one of ABS, COMMON or UNDEF.
     Half st_shndx;
 public:
+    void extract(BYTE const* buf, ELFMgr const* mgr);
+
+    //Get the align value of elements in ELFSym.
+    //
+    // Defined in "elf/elf64.h".          Defined in "elf/elf32.h".
+    //   typedef struct {                   typedef struct {
+    //       Word32 st_name;                    Word32 st_name;
+    //       UCHAR st_type:4;                   UCHAR st_type:4;
+    //       UCHAR st_bind:4;                   UCHAR st_bind:4;
+    //       UCHAR st_other;                    UCHAR st_other;
+    //       Half st_shndx;                     Half st_shndx;
+    //       union {                            union {
+    //           Addr64 st_value;                   Addr32 st_value;
+    //           Addr64 st_align;                   Addr32 st_align;
+    //       };                                 };
+    //       Addr64 st_size;                    Word32 st_size;
+    //   } ELFSym64;                         } ELFSym32;
+    // Align with sizeof(Addr64).          Align with sizeof(Word32).
+    static UINT getAlign(ELFMgr const* mgr);
+
     //Get the packed byte size of a symbol structure in 32bit or 64bit machine.
     static UINT getSize(ELFMgr const* mgr);
 
-    void extract(BYTE const* buf, ELFMgr const* mgr);
     void insert(BYTE const* buf, ELFMgr const* mgr);
 };
 
@@ -1063,10 +1082,43 @@ public:
     //stored into the relocatable field.
     SWord r_addend;
 public:
+    void extract(BYTE const* buf, ELFMgr const* mgr);
+
+    //Get the bit size of the r_addend.
+    //Type "SWord64" for elf64 and type "Addr32" for elf32.
+    static UINT getAddendSize(ELFMgr const* mgr);
+
+    //Get the align value of elements in ELFRela.
+    //
+    // Defined in "elf/elf64.h".          Defined in "elf/elf32.h".
+    //   typedef struct {                   typedef struct {
+    //       Addr64 r_offset;                   Addr32 r_offset;
+    //       Word32 r_type;                     Word32 r_type:8;
+    //       Word32 r_sym;                      Word32 r_sym:24;
+    //       SWord64 r_addend;                  SWord32 r_addend;
+    //   } ELFRela64;                       } ELFRela32;
+    // Align with sizeof(Addr64).         Align with sizeof(Addr32).
+    static UINT getAlign(ELFMgr const* mgr);
+
+    //ELFRela has 4 members.
+    static UINT getMemberNum() { return 4; }
+
+    //Get the bit size of the r_offset.
+    //Type "Addr64" for elf64 and type "SWord32" for elf32.
+    static UINT getOffsetSize(ELFMgr const* mgr);
+
     //Get the packed byte size of a relocation structure in 32bit or 64bit
     //machine.
     static UINT getSize(ELFMgr const* mgr);
-    void extract(BYTE const* buf, ELFMgr const* mgr);
+
+    //Get the bit size of the r_sym.
+    //Type "Word32" for elf64 and type "Word32:24" for elf32.
+    static UINT getSymbolSize(ELFMgr const* mgr);
+
+    //Get the bit size of the r_type.
+    //Type "Word32" for elf64 and type "Word32:8" for elf32.
+    static UINT getTypeSize(ELFMgr const* mgr);
+
     void insert(BYTE const* buf, ELFMgr const* mgr);
 };
 

@@ -57,6 +57,18 @@ bool IRSimp::needMaintainDUChain(SimpCtx const& ctx)
 }
 
 
+bool IRSimp::useMDSSADU() const
+{
+    return m_mdssamgr != nullptr && m_mdssamgr->is_valid();
+}
+
+
+bool IRSimp::usePRSSADU() const
+{
+    return m_prssamgr != nullptr && m_prssamgr->is_valid();
+}
+
+
 bool IRSimp::isLowest(IR const* ir) const
 {
     ASSERT0(ir->is_exp());
@@ -2498,6 +2510,8 @@ void IRSimp::simplifyBB(IRBB * bb, SimpCtx * ctx)
 
 void IRSimp::simplifyIRList(SimpCtx * ctx)
 {
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
     m_rg->setIRList(simplifyStmtList(m_rg->getIRList(), ctx));
     ASSERT0(verifySimp(m_rg->getIRList(), *ctx));
     ASSERT0(verifyIRList(m_rg->getIRList(), nullptr, m_rg));
@@ -2508,6 +2522,8 @@ void IRSimp::simplifyIRList(SimpCtx * ctx)
 void IRSimp::simplifyBBlist(BBList * bbl, SimpCtx * ctx)
 {
     START_TIMER(t, "Simplify IRBB list");
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
     BBListIter ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();

@@ -305,10 +305,21 @@ Pass * PassMgr::allocGPAdjustment()
 }
 
 
-Pass * PassMgr::allocRelaxation()
+Pass * PassMgr::allocBROpt()
 {
     #ifdef REF_TARGMACH_INFO
-    return new Relaxation(m_rg);
+    return new BROpt(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocWorkaround()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new Workaround(m_rg);
     #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
@@ -550,8 +561,11 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_GP_ADJUSTMENT:
         pass = allocGPAdjustment();
         break;
-    case PASS_RELAXATION:
-        pass = allocRelaxation();
+    case PASS_BR_OPT:
+        pass = allocBROpt();
+        break;
+    case PASS_WORKAROUND:
+        pass = allocWorkaround();
         break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }

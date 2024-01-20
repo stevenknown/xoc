@@ -207,6 +207,7 @@ IR * InsertCvt::convertNeg(IR * ir, bool & change, InsertCvtCtx & rc)
 IR * InsertCvt::convertNot(IR * ir, bool & change, InsertCvtCtx & rc)
 {
     ASSERT0(ir->is_lnot() || ir->is_bnot());
+    ASSERT0(UNA_opnd(ir)->is_single());
     bool lchange = false;
     UNA_opnd(ir) = convertIR(UNA_opnd(ir), lchange, rc);
     if (lchange) {
@@ -218,12 +219,25 @@ IR * InsertCvt::convertNot(IR * ir, bool & change, InsertCvtCtx & rc)
 
 
 //InsertCvt binary operations.
-IR * InsertCvt::convertBinaryOp(IR * ir, bool & change)
+IR * InsertCvt::convertBinaryOp(IR * ir, bool & change, InsertCvtCtx & rc)
 {
     ASSERT0(ir->isBinaryOp());
-    BIN_opnd0(ir) = insertCvtImpl(ir, BIN_opnd0(ir), change);
-    BIN_opnd1(ir) = insertCvtImpl(ir, BIN_opnd1(ir), change);
-    if (change) { ir->setParentPointer(false); }
+    ASSERT0(BIN_opnd0(ir)->is_single());
+    ASSERT0(BIN_opnd1(ir)->is_single());
+    bool lchange = false;
+    BIN_opnd0(ir) = convertIR(BIN_opnd0(ir), lchange, rc);
+    BIN_opnd1(ir) = convertIR(BIN_opnd1(ir), lchange, rc);
+    if (lchange) {
+        change |= lchange;
+        ir->setParentPointer(false);
+    }
+    bool lchange2 = false;
+    BIN_opnd0(ir) = insertCvtImpl(ir, BIN_opnd0(ir), lchange2);
+    BIN_opnd1(ir) = insertCvtImpl(ir, BIN_opnd1(ir), lchange2);
+    if (lchange2) {
+        change |= lchange2;
+        ir->setParentPointer(false);
+    }
     insertCvtForBinaryOp(ir, change);
     return ir;
 }
@@ -318,7 +332,7 @@ IR * InsertCvt::convertIR(IR * ir, bool & change, InsertCvtCtx & rc)
     SWITCH_CASE_LOGIC_BIN:
     SWITCH_CASE_SHIFT:
     SWITCH_CASE_BITWISE_BIN:
-        ir = convertBinaryOp(ir, tmpc);
+        ir = convertBinaryOp(ir, tmpc, rc);
         break;
     case IR_BNOT:
     case IR_LNOT:
@@ -334,7 +348,7 @@ IR * InsertCvt::convertIR(IR * ir, bool & change, InsertCvtCtx & rc)
         BIN_opnd1(ir) = convertIR(BIN_opnd1(ir), lchange, rc);
         if (lchange) { ir->setParentPointer(false); }
         change |= lchange;
-        ir = convertBinaryOp(ir, tmpc);
+        ir = convertBinaryOp(ir, tmpc, rc);
         break;
     }
     case IR_DO_WHILE:
@@ -696,9 +710,7 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
         UINT tgt_size = parent->getTypeSize(m_tm);
         UINT src_size = kid->getTypeSize(m_tm);
         if (parent->is_vec() || kid->is_vec()) {
-            //Do not do hoisting for vector type.
-            ASSERTN(tgt_size >= src_size, ("size is overflowed"));
-            return kid;
+            return checkSizeForVector(parent, kid);
         }
         if (parent->is_fp() || kid->is_fp()) {
             return insertCvtForFloat(parent, kid, change);
