@@ -41,8 +41,9 @@ namespace xcom {
 #define IS_BSUNDEF(x) ((BSIdx)x == BS_UNDEF)
 
 enum BS_DUMP_FLAG {
-    BS_DUMP_BITSET = 0x1,
-    BS_DUMP_POS = 0x2,
+    BS_DUMP_BITSET = 0x1, //Dump bitset in binary format.
+    BS_DUMP_POS = 0x2, //Dump position of each elements in bitset.
+    BS_DUMP_HEX = 0x4, //Dump bitset in hex format.
 };
 
 typedef UINT BSUNIT;

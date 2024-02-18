@@ -89,6 +89,28 @@ IR * CArray::dupIRTreeByStmt(IR const* src, Region * rg)
     ARR_sub_list(arr)->copyRefForTree(ARR_sub_list(src), rg);
     return arr;
 }
+
+
+bool CArray::isIsomoArrayStructTo(IR const* src) const
+{
+    ASSERT0(isArrayOp() && src->isArrayOp());
+    ASSERT0(getBase() && src->getBase());
+    if (ARR_elem_num_buf(this) == nullptr ||
+        ARR_elem_num_buf(src) == nullptr) {
+        //We have no knowledge about array dimensions.
+        return false;
+    }
+    TMWORD cur_dimnum = getDimNum();
+    TMWORD src_dimnum = ((CArray*)src)->getDimNum();
+    if (cur_dimnum != src_dimnum) { return false; }
+    for (UINT i = 0; i < cur_dimnum; i++) {
+        if (getElementNumOfDim(i) != ((CArray*)src)->getElementNumOfDim(i)) {
+            return false;
+        }
+    }
+    //There is no need to check each subscript expressions.
+    return true;
+}
 //END CArray
 
 

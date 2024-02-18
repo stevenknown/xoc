@@ -209,6 +209,7 @@ public:
     void destroy() { VMD_occs(this).destroy(); }
     void dump(Region const* rg) const; //Concisely dump
     void dump(Region const* rg, UseDefMgr const* udmgr) const;
+    CHAR const* dump(OUT xcom::StrBuf & buf) const;
 
     //Return true 'exp' is in the UseSet.
     //exp: IR expression to be found.
@@ -351,6 +352,9 @@ public:
 
     //Return true if current MDSSAInfo does not have any VOpnd.
     bool isEmptyVOpndSet() const { return readVOpndSet().is_empty(); }
+
+    //Return true if all VOpnds in current MDSSAInfo are live-in version.
+    bool isLiveInVOpndSet(UseDefMgr const* mgr) const;
 
     VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 

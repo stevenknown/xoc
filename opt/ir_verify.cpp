@@ -331,9 +331,13 @@ bool verifyShift(IR const* ir, Region const* rg)
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
 
     //Check that shift operations only have integer type.
-    ASSERT0(ir->is_int() && //the result must be integer type.
-            BIN_opnd0(ir)->is_int() &&
-            BIN_opnd1(ir)->is_int());
+    //Note the shift operations may be operate on vector or tensor type.
+    //e.g: lsl:vec (ld:vec x, 3:u32)
+    //The lsl operation shift-left each elements in x by 3 bits.
+    //ASSERT0(ir->is_int()); //the result may be integer and vector type.
+    //the first operand may be integer and vector type.
+    //ASSERT0(BIN_opnd0(ir)->is_int());
+    ASSERT0(BIN_opnd1(ir)->is_int());
 
     ASSERT0(BIN_opnd0(ir)->is_single());
     ASSERT0(BIN_opnd1(ir)->is_single());

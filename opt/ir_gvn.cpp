@@ -48,6 +48,8 @@ public:
 static VNTypeDesc g_vntype_desc[] = {
     { VN_UNKNOWN, "", },
     { VN_OP, "OP", },
+    { VN_MDDEF, "MDDEF", },
+    { VN_VMD, "VMD", },
     { VN_VAR, "VAR", },
     { VN_INT, "INT", },
     { VN_FP, "FP", },
@@ -73,6 +75,590 @@ void VN::dump(Region const* rg) const
     prt(rg, "VN%u,%s", id(), VNTypeDesc::getVTName(getType()));
 }
 //END VN
+
+
+//
+//START VNHashTab
+//
+VNHashTab::~VNHashTab()
+{
+}
+
+
+VN const* VNHashTab::registerIntList(IR_CODE irt, UINT num, ...)
+{
+    ASSERT0(num >= 1);
+    va_list ptr;
+    va_start(ptr, num);
+    UINT i = 0;
+    ASSERT0(m_tmp_ilst.get_elem_count() == 0);
+    m_tmp_ilst.append_tail((IntType)irt);
+    for (IntType intval = va_arg(ptr, IntType);
+         i < num; intval = va_arg(ptr, IntType), i++) {
+        m_tmp_ilst.append_tail(intval);
+    }
+    va_end(ptr);
+    VN * newvn = registerVN(m_tmp_ilst);
+    m_tmp_ilst.clean();
+    VN_type(newvn) = VN_OP;
+    VN_op(newvn) = irt;
+    return newvn;
+}
+
+
+VN const* VNHashTab::registerVN(IR_CODE irt, UINT vnnum, ...)
+{
+    ASSERT0(vnnum >= 1);
+    va_list ptr;
+    va_start(ptr, vnnum);
+    UINT i = 0;
+    ASSERT0(m_tmp_ilst.get_elem_count() == 0);
+    m_tmp_ilst.append_tail((IntType)irt);
+    for (VN const* vn = va_arg(ptr, VN const*);
+         i < vnnum; vn = va_arg(ptr, VN const*), i++) {
+        ASSERT0(vn);
+        m_tmp_ilst.append_tail((IntType)vn->id());
+    }
+    va_end(ptr);
+    VN * newvn = registerVN(m_tmp_ilst);
+    m_tmp_ilst.clean();
+    VN_type(newvn) = VN_OP;
+    VN_op(newvn) = irt;
+    return newvn;
+}
+
+
+VN const* VNHashTab::registerVN(IR_CODE irt, VNList const& vnlst)
+{
+    ASSERT0(m_tmp_ilst.get_elem_count() == 0);
+    m_tmp_ilst.append_tail((IntType)irt);
+    VNListIter it;
+    for (VN const* vn = vnlst.get_head(&it);
+         vn != nullptr; vn = vnlst.get_next(&it)) {
+        m_tmp_ilst.append_tail((IntType)vn->id());
+    }
+    VN * newvn = registerVN(m_tmp_ilst);
+    m_tmp_ilst.clean();
+    VN_type(newvn) = VN_OP;
+    VN_op(newvn) = irt;
+    return newvn;
+}
+
+
+VN * VNHashTab::registerVN(IntList const& ilst)
+{
+    VN * vn = nullptr;
+    bool find = m_intset2vn.find(ilst, vn);
+    if (find) { ASSERT0(vn); return vn; }
+    VN * newvn = m_gvn->allocVN();
+    m_intset2vn.set(ilst, newvn);
+    return newvn;
+}
+
+
+void VNHashTab::dump(Region const* rg, UINT indent) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    m_intset2vn.dump(rg->getLogMgr()->getFileHandler(), indent);
+}
+//END VNHashTab
+
+
+//
+//START InferEVN
+//
+InferEVN::InferEVN(GVN * gvn) : m_gvn(gvn), m_vnhashtab(m_gvn)
+{
+    ASSERT0(gvn);
+    m_rg = gvn->getRegion();
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
+}
+
+
+void InferEVN::dump() const
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==-- DUMP InferEVN --==");
+    m_rg->getLogMgr()->incIndent(2);
+    VN const* x = nullptr;
+    note(getRegion(), "\n-- IR2VN --");
+    IR2VNIter it1;
+    for (UINT id = m_irid2vn.get_first(it1, &x);
+         x != nullptr; id = m_irid2vn.get_next(it1, &x)) {
+        IR const* ir = getRegion()->getIR(id);
+        ASSERT0(ir);
+        note(getRegion(), "\n%s:", DumpIRName().dump(ir));
+        x->dump(m_rg);
+    }
+
+    note(getRegion(), "\n-- MDPhi2VN --");
+    MDPhi2VNIter it2;
+    for (UINT id = m_mdphi2vn.get_first(it2, &x);
+         x != nullptr; id = m_mdphi2vn.get_next(it2, &x)) {
+        note(getRegion(), "\nmdphi%u:", id);
+        x->dump(m_rg);
+    }
+
+    note(getRegion(), "\n-- VMD2VN --");
+    VMD2VNIter it3;
+    for (UINT id = m_vmd2vn.get_first(it3, &x);
+         x != nullptr; id = m_irid2vn.get_next(it3, &x)) {
+        VMD const* vmd = m_mdssamgr->getVMD(id);
+        ASSERT0(vmd && vmd->is_md());
+        note(getRegion(), "\n");
+        vmd->dump(m_rg);
+        note(getRegion(), ":");
+        x->dump(m_rg);
+    }
+
+    note(getRegion(), "\n-- VNHashTab --");
+    m_vnhashtab.dump(m_rg, m_rg->getLogMgr()->getIndent());
+    m_rg->getLogMgr()->decIndent(2);
+}
+
+
+VN const* InferEVN::allocVNForExtStmt(IR const* ir, InferCtx & ctx)
+{
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    VN * newvn = m_gvn->allocVN();
+    VN_type(newvn) = VN_OP;
+    VN_op(newvn) = ir->getCode();
+    setVN(ir, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::allocVNForMDDef(MDDef const* mddef, InferCtx & ctx)
+{
+    VN const* vn = getVN(mddef);
+    if (vn != nullptr) { return vn; }
+    VN * newvn = m_gvn->allocVN();
+    VN_type(newvn) = VN_MDDEF;
+    VN_mddef(newvn) = mddef;
+    setVN(mddef, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::allocVNForVMD(VMD const* vmd, InferCtx & ctx)
+{
+    VN const* vn = getVN(vmd);
+    if (vn != nullptr) { return vn; }
+    VN * newvn = m_gvn->allocVN();
+    VN_type(newvn) = VN_VMD;
+    VN_vmd(newvn) = vmd;
+    setVN(vmd, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::allocVNForStmt(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_stmt());
+    switch (ir->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_WRITE_PR:
+    SWITCH_CASE_WRITE_ARRAY:
+    SWITCH_CASE_CALL:
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
+    SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:
+    case IR_RETURN:
+    case IR_REGION: {
+        VN const* vn = getVN(ir);
+        if (vn != nullptr) { return vn; }
+        VN * newvn = m_gvn->allocVN();
+        VN_type(newvn) = VN_OP;
+        VN_op(newvn) = ir->getCode();
+        setVN(ir, newvn);
+        return newvn;
+    }
+    default: allocVNForExtStmt(ir, ctx);
+    }
+    return nullptr;
+}
+
+
+VN const* InferEVN::inferVNViaBase(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->isIndirectMemOp() || ir->isArrayOp());
+    ASSERTN(getVN(ir) == nullptr, ("no need to infer VN"));
+    IR const* base = ir->getBase();
+    ASSERT0(base);
+    VN const* basevn = inferExp(base, ctx);
+    if (basevn == nullptr) { return nullptr; }
+    VN const* vn = m_vnhashtab.registerIntList(
+        ir->getCode(), 2, (VNHashInt)basevn->id(),
+        (VNHashInt)ir->getOffset());
+    ASSERT0(vn);
+    setVN(ir, vn);
+    return vn;
+}
+
+
+IR_CODE InferEVN::mapMDDef2IRCode(MDDef const* mddef) const
+{
+    ASSERT0(mddef->is_phi());
+    return IR_CODE_NUM;
+}
+
+
+VN const* InferEVN::inferMDPhi(MDPhi const* phi, InferCtx & ctx)
+{
+    ASSERT0(phi->is_phi());
+    VN const* vn = getVN(phi);
+    if (vn != nullptr) { return vn; }
+    if (ctx.isVisited(phi)) {
+        return allocVNForMDDef(phi, ctx);
+    }
+    ctx.setVisitMDPhi(phi);
+    VNHashTab::VNList lst;
+    for (IR const* id = phi->getOpndList();
+         id != nullptr; id = id->get_next()) {
+        VN const* vn = inferExp(id, ctx);
+        if (vn == nullptr) { return nullptr; }
+        lst.append_tail(vn);
+    }
+    VN const* newvn = getVN(phi);
+    if (newvn != nullptr) {
+        //CASE:The inference processing encountered a cycle when infering the
+        //second operand MD17v2 of phi. The inference meets the 'phi' first,
+        //then perform inference to each operands of phi. When
+        //operand-inference returned, 'phi' may have already assigned a VN if
+        //there exist a DefUse chain cycle of MD17.
+        //e.g:MD17v1 = MDPhi(MD17v0, MD17v2);
+        //    MD17v2 = NEG(MD17v1);
+        return newvn;
+    }
+    newvn = m_vnhashtab.registerVN(mapMDDef2IRCode(phi), lst);
+    setVN(phi, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::inferIndirectStmt(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir->isIndirectMemOp());
+    VN const* vn1 = inferExp(ir->getRHS(), ctx);
+    if (vn1 == nullptr) { return nullptr; }
+    VN const* vn2 = inferExp(ir->getBase(), ctx);
+    if (vn2 == nullptr) { return nullptr; }
+    VN const* newvn = m_vnhashtab.registerIntList(
+        ir->getCode(), 3, (VNHashInt)vn1->id(),
+        (VNHashInt)vn2->id(), (VNHashInt)ir->getOffset());
+    return newvn;
+}
+
+
+VN const* InferEVN::inferStmt(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_stmt());
+    switch (ir->getCode()) {
+    case IR_STPR:
+    SWITCH_CASE_DIRECT_MEM_STMT: {
+        VN const* vn = inferExp(ir->getRHS(), ctx);
+        if (vn == nullptr) { return nullptr; }
+        //VN const* newvn = m_vnhashtab.registerIntList(
+        //    ir->getCode(), 2, (VNHashInt)vn->id(),
+        //    (VNHashInt)ir->getOffset());
+        //setVN(ir, newvn);
+        //return newvn;
+        setVN(ir, vn);
+        return vn;
+    }
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+        return inferIndirectStmt(ir, ctx);
+    case IR_GETELEM:
+    case IR_SETELEM:
+    case IR_PHI:
+    SWITCH_CASE_EXT_WRITE_PR:
+        return inferVNByIterKid(ir, ctx);
+    SWITCH_CASE_WRITE_ARRAY:
+        return inferWriteArray(ir, ctx);
+    SWITCH_CASE_CALL:
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
+    SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
+    SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:
+    case IR_RETURN:
+    case IR_REGION:
+        ASSERT0(0);
+        return nullptr;
+    default: inferExtStmt(ir, ctx);
+    }
+    return nullptr;
+}
+
+
+VN const* InferEVN::inferLiveinPR(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->isReadPR());
+    ASSERT0(usePRSSADU());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    VN * newvn = m_gvn->allocVN();
+    VN_type(newvn) = VN_OP;
+    VN_op(newvn) = ir->getCode();
+    setVN(ir, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_exp());
+    ASSERT0(ir->isDirectMemOp() || ir->is_id());
+    ASSERT0(useMDSSADU());
+    MDSSAInfo const* mdssainfo = MDSSAMgr::getMDSSAInfoIfAny(ir);
+    ASSERT0(mdssainfo);
+    VOpndSetIter it = nullptr;
+    VMD const* liveinvmd = nullptr;
+    UseDefMgr const* udmgr = m_mdssamgr->getUseDefMgr();
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&it);
+        i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &it)) {
+        VMD const* vopnd = (VMD*)udmgr->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        if (vopnd->isLiveIn()) {
+            liveinvmd = vopnd;
+            ASSERT0(mdssainfo->isLiveInVOpndSet(udmgr));
+            break;
+        }
+    }
+    if (liveinvmd == nullptr) { return nullptr; }
+    return allocVNForVMD(liveinvmd, ctx);
+}
+
+
+VN const* InferEVN::inferDirectExpViaMDSSA(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_exp());
+    ASSERT0(ir->isDirectMemOp() || ir->isReadPR() || ir->is_id());
+    if (!useMDSSADU()) { return nullptr; }
+    MDDef const* mdssadef = m_mdssamgr->findNearestDef(ir);
+    if (mdssadef == nullptr) {
+        return inferLiveinVMDForDirectExp(ir, ctx);
+    }
+    VN const* expsvn = nullptr;
+
+    //Only inferring Phi for now.
+    if (mdssadef->is_phi() && allowCrossPhi()) {
+        expsvn = inferMDPhi((MDPhi const*)mdssadef, ctx);
+    }
+    if (expsvn != nullptr) {
+        ASSERT0(getVN(mdssadef) == expsvn);
+        setVN(ir, expsvn);
+        return expsvn;
+    }
+    VN const* kdefvn = allocVNForMDDef(mdssadef, ctx);
+    if (kdefvn == nullptr) { return nullptr; }
+    setVN(ir, kdefvn);
+    return kdefvn;
+}
+
+
+VN const* InferEVN::inferDirectExpViaPRSSA(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->isReadPR());
+    if (!usePRSSADU()) { return nullptr; }
+    IR const* prssadef = m_prssamgr->findKillingDefStmt(ir);
+    if (prssadef == nullptr) {
+        return inferLiveinPR(ir, ctx);
+    }
+    //PR's DefUse check should be handled by findKillingDef().
+    return nullptr;
+}
+
+
+VN const* InferEVN::inferDirectExpViaSSA(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_exp());
+    if (ir->isReadPR()) {
+        return inferDirectExpViaPRSSA(ir, ctx);
+    }
+    ASSERT0(ir->isDirectMemOp() || ir->is_id());
+    return inferDirectExpViaMDSSA(ir, ctx);
+}
+
+
+VN const* InferEVN::inferDirectExp(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_exp());
+    ASSERT0(ir->isDirectMemOp() || ir->isReadPR() || ir->is_id());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    IR * kdef = xoc::findKillingDef(ir, m_rg);
+    if (kdef == nullptr) {
+        return inferDirectExpViaSSA(ir, ctx);
+    }
+    ASSERT0(kdef->hasResult());
+    VN const* expsvn = inferStmt(kdef, ctx);
+    if (expsvn != nullptr) {
+        ASSERT0(getVN(kdef) == expsvn);
+        setVN(ir, expsvn);
+        return expsvn;
+    }
+    VN const* kdefvn = allocVNForStmt(kdef, ctx);
+    if (kdefvn == nullptr) { return nullptr; }
+    setVN(ir, kdefvn);
+    return kdefvn;
+}
+
+
+VN const* InferEVN::inferArrayKidOp(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->isArrayOp() && (ir->is_stmt() || ir->is_exp()));
+    VN const* basevn = inferExp(ir->getBase(), ctx);
+    if (basevn == nullptr) { return nullptr; }
+    VNHashTab::VNList lst;
+    lst.append_tail(basevn);
+    for (IR const* sub = ARR_sub_list(ir);
+         sub != nullptr; sub = sub->get_next()) {
+        VN const* subvn = inferExp(sub, ctx);
+        if (subvn == nullptr) { return nullptr; }
+        lst.append_tail(subvn);
+    }
+    return m_vnhashtab.registerVN(ir->getCode(), lst);
+}
+
+
+VN const* InferEVN::inferWriteArray(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_stmt());
+    VN const* kidvn = inferArrayKidOp(ir, ctx);
+    if (kidvn == nullptr) { return nullptr; }
+    VN const* rhsvn = inferExp(ir->getRHS(), ctx);
+    if (rhsvn == nullptr) { return nullptr; }
+    VN const* vn = m_vnhashtab.registerIntList(
+            ir->getCode(), 3, (VNHashInt)kidvn->id(),
+            (VNHashInt)rhsvn->id(), (VNHashInt)ir->getOffset());
+    setVN(ir, vn);
+    return vn;
+}
+
+
+VN const* InferEVN::inferArray(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->isArrayOp() && ir->is_exp());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return nullptr; }
+    IR * kdef = xoc::findKillingDef(ir, m_rg);
+    if (kdef == nullptr) {
+        return inferVNViaBase(ir, ctx);
+    }
+    VN const* kdefvn = getVN(kdef);
+    if (kdefvn != nullptr) {
+        setVN(ir, kdefvn);
+        return kdefvn;
+    }
+    kdefvn = allocVNForStmt(kdef, ctx);
+    if (kdefvn != nullptr) {
+        setVN(ir, kdefvn);
+        return kdefvn;
+    }
+    VN const* kidvn = inferArrayKidOp(ir, ctx);
+    VN const* newvn = m_vnhashtab.registerIntList(
+        ir->getCode(), 2, (VNHashInt)kidvn->id(), (VNHashInt)ir->getOffset());
+    setVN(ir, newvn);
+    return newvn;
+}
+
+
+VN const* InferEVN::inferIndirectMemExp(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->isIndirectMemOp() && ir->is_exp());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    IR * kdef = xoc::findKillingDef(ir, m_rg);
+    if (kdef == nullptr) {
+        return inferVNViaBase(ir, ctx);
+    }
+    VN const* kdefvn = getVN(kdef);
+    if (kdefvn != nullptr) {
+        setVN(ir, kdefvn);
+        return kdefvn;
+    }
+    kdefvn = allocVNForStmt(kdef, ctx);
+    if (kdefvn != nullptr) {
+        setVN(ir, kdefvn);
+        return kdefvn;
+    }
+    return inferVNViaBase(ir, ctx);
+}
+
+
+VN const* InferEVN::inferExtStmt(IR const* ir, InferCtx & ctx)
+{
+    return inferVNByIterKid(ir, ctx);
+}
+
+
+VN const* InferEVN::inferVNByIterKid(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->is_stmt() || ir->is_exp());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return nullptr; }
+    VNHashTab::VNList lst;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        for (IR const* x = kid; x != nullptr; x = x->get_next()) {
+            VN const* vn = inferExp(x, ctx);
+            if (vn == nullptr) {
+                return nullptr;
+            }
+            ASSERT0(!vn->is_unknown());
+            lst.append_tail(vn);
+        }
+    }
+    vn = m_vnhashtab.registerVN(ir->getCode(), lst);
+    setVN(ir, vn);
+    return vn;
+}
+
+
+VN const* InferEVN::inferExp(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir && ir->is_exp());
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    switch (ir->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_EXP:
+    SWITCH_CASE_READ_PR:
+    case IR_ID: {
+        //Althrough IR_ID does not represent a real operation, it still
+        //take participate in EVN analysis because it may describe the
+        //possible VN live-in MDPhi.
+        return inferDirectExp(ir, ctx);
+    }
+    SWITCH_CASE_INDIRECT_MEM_EXP:
+        return inferIndirectMemExp(ir, ctx);
+    SWITCH_CASE_READ_ARRAY:
+        return inferArray(ir, ctx);
+    case IR_LDA: {
+        bool change;
+        return m_gvn->computeConst(ir, change);
+    }
+    case IR_CONST: {
+        bool change;
+        return m_gvn->computeConst(ir, change);
+    }
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
+    SWITCH_CASE_EXT_EXP:
+    case IR_SELECT:
+        return inferVNByIterKid(ir, ctx);
+    default: UNREACHABLE();
+    }
+    return nullptr;
+}
+//END InferEVN
 
 
 //
@@ -120,12 +706,7 @@ VN * GVN::allocVN()
 
 bool GVN::isUnary(IR_CODE irt) const
 {
-    switch (irt) {
-    SWITCH_CASE_UNA:
-        return true;
-    default: break;
-    }
-    return false;
+    return xoc::isUnaryOp(irt);
 }
 
 
@@ -221,7 +802,7 @@ void GVN::cleanIRTreeVN(IR const* ir)
 {
     if (ir == nullptr) { return; }
     ASSERTN(!ir->is_undef(), ("ir has been freed"));
-    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid != nullptr) {
             cleanIRTreeVN(kid);
@@ -1257,7 +1838,6 @@ VN const* GVN::computeConst(IR const* exp, bool & change)
     } else  {
         ASSERTN(0, ("unsupport const type"));
     }
-
     ASSERT0(x);
     setVN(exp, x);
     change = true;
@@ -1380,7 +1960,8 @@ VN const* GVN::computeVN(IR const* exp, bool & change)
         return computeSelect(exp, change);
     case IR_CONST:
         return computeConst(exp, change);
-    default: break;
+    default:
+        return computeExtExp(exp, change);
     }
     return nullptr;
 }
@@ -2052,7 +2633,7 @@ bool GVN::calcCondMustValLAndLOr(IR const* ir, bool & must_true,
     VN const* v2 = getVN(op1);
     if (v1 == nullptr || v2 == nullptr) { return false; }
     if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-        //CASE: given two operand, the comparision rule is that if one of
+        //CASE:given two operand, the comparision rule is that if one of
         //operands is unsigned, the comparision will treat both two operand as
         //unsigned integer value.
         //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
@@ -2098,7 +2679,7 @@ bool GVN::calcCondMustValLEGE(IR const* ir, bool & must_true,
         return true;
     }
     if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-        //CASE: given two operand, the comparision rule is that if one of
+        //CASE:given two operand, the comparision rule is that if one of
         //operands is unsigned, the comparision will treat both two operand as
         //unsigned integer value.
         //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
@@ -2169,7 +2750,7 @@ bool GVN::calcCondMustValLTGT(IR const* ir, bool & must_true,
         return true;
     }
     if (VN_type(v1) == VN_INT && VN_type(v2) == VN_INT) {
-        //CASE: given two operand, the comparision rule is that if one of
+        //CASE:given two operand, the comparision rule is that if one of
         //operands is unsigned, the comparision will treat both two operand as
         //unsigned integer value.
         //e.g: given op0 is unsigned value 0, op1 is signed value -1, the
@@ -2312,16 +2893,14 @@ bool GVN::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
     START_TIMER(t, getPassName());
     clean();
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
-                                               PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
     processBBListInRPO();
     assignRHSVN();
     destroyLocalUsed();
     END_TIMER(t, getPassName());
-
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGVN()) {
        dump();
     }

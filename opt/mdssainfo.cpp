@@ -429,6 +429,19 @@ void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 }
 
 
+bool MDSSAInfo::isLiveInVOpndSet(UseDefMgr const* mgr) const
+{
+    VOpndSetIter it = nullptr;
+    for (BSIdx i = readVOpndSet().get_first(&it);
+        i != BS_UNDEF; i = readVOpndSet().get_next(i, &it)) {
+        VMD const* vopnd = (VMD*)mgr->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        if (!vopnd->isLiveIn()) { return false; }
+    }
+    return true;
+}
+
+
 void MDSSAInfo::addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr)
 {
     m_vopnd_set.append(vopnd, *mgr->getSBSMgr());
@@ -466,6 +479,13 @@ size_t UINT2VMDVec::count_mem() const
 void VMD::dump(Region const* rg) const
 {
     prt(rg, "MD%dV%d", mdid(), version());
+}
+
+
+CHAR const* VMD::dump(OUT xcom::StrBuf & buf) const
+{
+    buf.strcat("MD%dV%d", mdid(), version());
+    return buf.buf;
 }
 
 

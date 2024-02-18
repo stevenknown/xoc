@@ -76,10 +76,12 @@ public:
     IR const* getAddend() const { return addend; }
 
     //Return the variable of linear expression.
-    Var const* getVar() const
+    Var const* getVar(Region const* rg) const
     {
-        ASSERT0(hasVar() && var_exp->hasIdinfo());
-        return var_exp->getIdinfo();
+        ASSERT0(hasVar());
+        if (var_exp->hasIdinfo()) { return var_exp->getIdinfo(); }
+        ASSERT0(getVarExp()->is_pr());
+        return rg->mapPR2Var(getVarExp()->getPrno());
     }
 
     //Return the variable expression of linear expression.
@@ -107,11 +109,7 @@ public:
 
     //Return true if coeff is integer immediate.
     bool hasIntCoeff() const
-    {
-        if (coeff == nullptr) { return false; }
-        ASSERT0(coeff->is_const());
-        return coeff->is_int();
-    }
+    { return coeff != nullptr && coeff->is_const() && coeff->is_int(); }
 
     //Return true if coeff is float-point immediate.
     bool hasFPCoeff() const;

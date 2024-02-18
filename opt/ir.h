@@ -296,6 +296,9 @@ public:
     //Copy AttachInfo from 'src' to current ir, not include kid and sibling.
     void copyAI(IR const* src, Region * rg);
 
+    //Copy data-type from 'src' to current ir, not include kid and sibling.
+    void copyType(IR const* src) { setType(src->getType()); }
+
     //Copy each memory reference for whole ir tree.
     //'src': copy MD reference from 'src', it must be equal to current ir tree.
     //'copy_kid_ref': copy MD reference for kid recursively.
@@ -682,7 +685,7 @@ public:
 
     //Return true if current ir is unary operation.
     bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[getCode()]); }
-    static bool isUnaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
+    static bool isUnaryOp(IR_CODE c) { return IRDES_is_una(g_ir_desc[c]); }
 
     //Return true if ir is constant expression.
     bool isConstExp() const;

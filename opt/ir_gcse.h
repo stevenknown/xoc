@@ -94,13 +94,8 @@ private:
     TMap<IR*, IR*> m_exp2pr;
     TMap<VN const*, IR*> m_vn2exp;
     List<IR*> m_newst_lst;
-
-    //ONLY USED FOR DEBUG PURPOSE
-    Vector<UINT> m_elimed;
+    ActMgr m_actmgr;
 protected:
-    //ONLY USED FOR DEBUG PURPOSE
-    bool addElim(UINT id) { m_elimed.append(id); return true; }
-
     void copyVN(IR const* newir, IR const* oldir);
 
     virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
@@ -108,6 +103,7 @@ protected:
     bool doPropVN(IRBB * bb);
     bool doPropVNInDomTreeOrder(xcom::DomTree const& domtree);
     bool doPropExpInDomTreeOrder(xcom::DomTree const& domtree);
+    void dumpAct(IR const* oldexp, IR const* newexp);
 
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
 
@@ -151,7 +147,7 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    GCSE(Region * rg, GVN * gvn) : Pass(rg)
+    GCSE(Region * rg, GVN * gvn) : Pass(rg), m_actmgr(rg)
     {
         ASSERT0(rg);
         m_cfg = rg->getCFG();

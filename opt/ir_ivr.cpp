@@ -842,7 +842,6 @@ bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
 {
     IR const* def = nullptr;
     ASSERT0(ir->isMemRef());
-    xcom::StrBuf tmp(8);
     if (ir->isPROp() && usePRSSADU()) {
         def = findInitStmtByPRSSA(ir, li);
     } else if (useMDSSADU()) {
@@ -859,7 +858,7 @@ bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
     ctx.dumpAct(
         "FIND_BIV_INIT_VAL:IR %s is BIV, however can not find "
         "its initial value",
-        dumpIRName(ir, tmp));
+        DumpIRName().dump(ir));
     return false;
 }
 
@@ -912,13 +911,12 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
     ASSERT0(def->is_stmt());
     if (!lr.isValidAddendSign()) { return false; }
     if (!lr.hasVar()) { return false; }
-    xcom::StrBuf tmp(8);
     MD const* bivref = def->getMustRef();
     if (m_is_only_handle_exact_md &&
         (!bivref->is_exact() || lr.getVarExp()->getExactRef() == nullptr)) {
         ctx.dumpAct(
             "FIND_BIV:%s in LOOP%u does not have exact MD",
-            dumpIRName(def, tmp), m_li->id());
+            DumpIRName().dump(def), m_li->id());
         return false;
     }
     IR const* addend = lr.addend;
@@ -927,7 +925,7 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
     } else if (g_is_support_dynamic_type && addend->is_const()) {
         //TODO: support dynamic const type as the addend of ADD/SUB.
         ctx.dumpAct("FIND_BIV:Addend %s is ANY-type",
-                    dumpIRName(addend, tmp));
+                    DumpIRName().dump(addend));
         return false;
     } else {
         return false;
@@ -1332,6 +1330,7 @@ void FindDIV::computeCRByLinRep(IVLinearRep const& lr, OUT ChainRec & rescr,
         tmp.extractFrom(biv);
         orgcr = &tmp;
     } else {
+        ASSERT0(iv->is_div());
         DIV const* div = (DIV const*)iv;
         ChainRec const* divcr = div->getChainRec();
         ASSERT0(divcr);
@@ -1585,7 +1584,7 @@ void DIV::dump(Region const* rg) const
     rg->getLogMgr()->decIndent(2);
 
     //Dump linear-representation by other BIV or DIV.
-    note(rg, "\nLINREP:");
+    note(rg, "\nLINEAR-REP:");
     rg->getLogMgr()->incIndent(2);
     iv->getChainRec()->dump(rg);
     rg->getLogMgr()->decIndent(2);
@@ -1627,12 +1626,33 @@ IV::INCDIR DIV::getIncDir() const
 
 
 //
+//START IVLinearRep
+//
+void IVLinearRep::dump(Region const* rg) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    UINT const ind = 2;
+    if (getIV() != nullptr) {
+        note(rg, "\n");
+        prt(rg, "IV:");
+        rg->getLogMgr()->incIndent(ind);
+        getIV()->dump(rg);
+        rg->getLogMgr()->decIndent(ind);
+    } else { note(rg, "\nNOADDEND"); }
+    LinearRep::dump(rg);
+}
+//END IVLinearRep
+
+
+//
 //START IVBoundInfo
 //
 void IVBoundInfo::dump(Region const* rg) const
 {
     ASSERT0(rg);
+    if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP IVBoundInfo --==");
+    rg->getLogMgr()->incIndent(2);
     BIV const* iv = IVBI_iv(*this);
     iv->dump(rg);
     xcom::StrBuf lbuf(32);
@@ -1657,12 +1677,14 @@ void IVBoundInfo::dump(Region const* rg) const
             xoc::dumpIR(exp, rg);
             ASSERT0(rg->getLogMgr()->getBuffer());
             buf.strcat(rg->getLogMgr()->getBuffer()->getBuf());
+            rg->getLogMgr()->cleanBuffer();
         }
     }
     lbuf.clean();
     xoc::dumpHostInt((HOST_INT)iv->getStepValInt(), false, false, lbuf);
     buf.strcat("\nSTEP IS IMM:%s", lbuf.buf);
     note(rg, buf.buf);
+    rg->getLogMgr()->decIndent(2);
 }
 //END IVBoundInfo
 
@@ -1684,6 +1706,27 @@ bool IV::isRefIV(IR const* ir) const
     if (irref == nullptr) { return false; }
     ASSERT0(getStmtOccMD() && getExpOccMD());
     return isRefIV(irref);
+}
+
+
+void IV::dump(Region const* rg) const
+{
+    if (is_biv()) { ((BIV const*)this)->dump(rg); return; }
+    ASSERT0(is_div());
+    ((DIV const*)this)->dump(rg);
+}
+
+
+CHAR const* IV::dump(VarMgr const* vm, OUT xcom::StrBuf & buf) const
+{
+    Var const* stmtvar = getStmtOccVar();
+    Var const* expvar = getExpOccVar();
+    ASSERT0(stmtvar && expvar);
+    xcom::StrBuf tmp(32);
+    buf.strcat("stmtocc:(%s), ", stmtvar->dump(tmp, vm));
+    tmp.clean();
+    buf.strcat("expocc:(%s)", expvar->dump(tmp, vm));
+    return buf.buf;
 }
 //END IV
 
@@ -2420,9 +2463,8 @@ bool IVR::perform(OptCtx & oc)
     }
     START_TIMER(t, getPassName());
     clean();
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DOM,
-                                               PASS_LOOP_INFO, PASS_RPO,
-                                               PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
     if (is_aggressive() && !useGVN()) {
         m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);

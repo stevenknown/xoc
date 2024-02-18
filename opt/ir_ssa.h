@@ -89,7 +89,7 @@ public:
 
     //The function will find PR that assigned 'prno' into current
     //SSA construction region.
-    //ir: stmt or expression start to find.
+    //start: stmt or expression start to find.
     void add(PRNO prno, IR * start);
 
     //Add ir to current SSA construction region that expected to transform
@@ -642,6 +642,16 @@ public:
     //to: target IR expression.
     //from: source IR, can be stmt or expression.
     static void addUseForTree(IR * to, IR const* from);
+
+    //The function add 'exp' to be the USE of 'prno'.
+    void addUseToDedicatedPRNO(IR * exp)
+    {
+        ASSERT0(exp && exp->is_pr() && exp->getPrno() != PRNO_UNDEF);
+        SSAInfo * ssainfo = getSSAInfoByPRNO(exp->getPrno());
+        ASSERT0(ssainfo);
+        exp->setSSAInfo(ssainfo);
+        ssainfo->addUse(exp);
+    }
 
     //Build Def-Use chain for 'def' and 'use'.
     //def: def stmt that writes PR.

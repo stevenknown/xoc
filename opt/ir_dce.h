@@ -144,13 +144,12 @@ protected:
     bool checkCall(IR const* ir) const;
     void checkValidAndRecomputeCDG();
     bool collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
-                     MOD DCECtx & dcectx,
-                     bool usemdssa, bool useprssa);
+                     MOD DCECtx & dcectx, bool usemdssa, bool useprssa);
     bool collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2,
                         MOD DCECtx & dcectx);
-    bool collectAllDefThroughDefChain(MDDef const* tdef, IR const* use,
-                                      MOD List<IR const*> * pwlst2,
-                                      MOD DCECtx & dcectx);
+    bool collectAllDefThroughDefChain(
+        MDDef const* tdef, IR const* use, MOD List<IR const*> * pwlst2,
+        MOD DCECtx & dcectx);
     bool collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
                         MOD DCECtx & dcectx);
     bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2,
@@ -179,21 +178,20 @@ protected:
 
     bool tryMarkBranch(IRBB const* bb, OUT List<IR const*> & act_ir_lst,
                        MOD DCECtx & dcectx);
-    bool tryMarkUnconditionalBranch(IRBB const* bb,
-                                    MOD List<IR const*> & act_ir_lst,
-                                    MOD DCECtx & dcectx);
+    bool tryMarkUnconditionalBranch(
+        IRBB const* bb, MOD List<IR const*> & act_ir_lst, MOD DCECtx & dcectx);
 
     //The function marks possible predecessor in CFG to be effect BB,
     //e.g back-edge.
     bool markCFGPred(IRBB const* bb, MOD DCECtx & dcectx);
-    bool markControlPredAndStmt(IRBB const* bb,
-                                OUT List<IR const*> & act_ir_lst,
-                                MOD DCECtx & dcectx);
+    bool markControlPredAndStmt(
+        IRBB const* bb, OUT List<IR const*> & act_ir_lst, MOD DCECtx & dcectx);
 
-    //Set control-dep bb to be effective.
-    bool setControlDepBBToBeEffect(IRBB const* bb,
-                                   MOD List<IR const*> & act_ir_lst,
-                                   MOD DCECtx & dcectx);
+    //Set control-dep BB to be effective.
+    bool setControlDepBBToBeEffect(
+        IRBB const* bb, MOD List<IR const*> & act_ir_lst, MOD DCECtx & dcectx);
+
+    //Set stmt to be effect.
     void setEffectStmt(IR const* stmt, bool set_bb_effect,
                        OUT List<IR const*> * act_ir_lst, MOD DCECtx & dcectx);
 
@@ -243,7 +241,20 @@ public:
 
     virtual bool perform(OptCtx & oc);
 
+    //The function is an interface to eliminate ineffect IR that are not
+    //recorded in 'dcectx'.
+    //remove_branch_stmt: true to tell the interface function to remove
+    //    branch stmt, such as truebr, goto control-flow-stmt.
+    //Return true if some IR removed.
+    //Note:DefUse chains have to be available before calling the function.
+    //The function will maintain DefUse chain.
     bool removeIneffectIR(DCECtx const& dcectx, OUT bool & remove_branch_stmt);
+
+    //The function is an interface to remove reundant PHI, include PRSSA Phi
+    //and MDSSA Phi.
+    //Return true if some PHI removed.
+    //Note:DefUse chains have to be available before calling the function.
+    //The function will maintain DefUse chain.
     bool removeRedundantPhi(MOD OptCtx & oc);
 };
 

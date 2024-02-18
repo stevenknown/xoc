@@ -41,7 +41,7 @@ namespace xcom {
 //The precision of 'double' is too high to
 //some operation of those value that approaching infinitesimal.
 //e.g: when the value is 0.00000000000000066613381477509392,
-//it should approximately equals to 0 in actually.
+//it should approximately equal to 0 in actually.
 //#define INFINITESIMAL 0.00000000000000001
 #define INFINITESIMAL 0.000001
 
@@ -70,21 +70,24 @@ public:
     }
     Float(PRECISION_TYPE f) { m_f = f; }
 
+    CHAR const* dump(StrBuf & buf) const;
+    void dump() const;
+
+    bool is_int();
+
     Float & operator = (Float const& a)
     {
         m_f = a.m_f;
         return *this;
     }
 
+    void reduce() {}
+
     //Calculate the floor boundary.
     INT typecast2int() { return (INT)m_f; }
 
-    bool is_int();
-    PRECISION_TYPE f() const { return m_f; }
-    PRECISION_TYPE & f() { return m_f; }
-    void reduce() {}
-    CHAR const* dump(StrBuf & buf) const;
-    void dump() const;
+    PRECISION_TYPE val() const { return m_f; }
+    PRECISION_TYPE & val() { return m_f; }
 };
 
 

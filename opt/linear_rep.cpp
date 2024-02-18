@@ -68,7 +68,7 @@ bool LinearRep::isCoeffEqualTo(HOST_INT v) const
 void LinearRep::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
-    UINT const ind = 4;
+    UINT const ind = 2;
 
     //Print coefficent.
     if (coeff != nullptr) {
@@ -252,7 +252,7 @@ IR const* LinearRepMgr::constructCoeffByMul(LinearRep const& lr0,
                                             OUT LRInferCtx & ctx)
 {
     if (lr0.hasVar() && lr1.hasVar()) {
-        ASSERT0(lr0.getVar() == lr1.getVar());
+        ASSERT0(lr0.getVar(m_rg) == lr1.getVar(m_rg));
         //Non-linear representation.
         return nullptr;
     }
@@ -313,7 +313,8 @@ IR const* LinearRepMgr::constructCoeff(IR_CODE code, LinearRep const& lr0,
     ASSERT0(IR::isBinaryOp(code));
     if (!lr0.hasCoeff()) { return lr1.getCoeff(); }
     if (!lr1.hasCoeff()) { return lr0.getCoeff(); }
-    ASSERT0(lr0.hasVar() && lr1.hasVar() && lr0.getVar() == lr1.getVar());
+    ASSERT0(lr0.hasVar() && lr1.hasVar() &&
+            lr0.getVar(m_rg) == lr1.getVar(m_rg));
     //Both lr0 and lr1 has coeff.
     IR const* c0 = lr0.getCoeff();
     IR const* c1 = lr1.getCoeff();
@@ -329,7 +330,8 @@ bool LinearRepMgr::combinLinearRep(IR_CODE code, LinearRep const& lr0,
                                    OUT LinearRep & reslr,
                                    OUT LRInferCtx & ctx)
 {
-    if (lr0.hasVar() && lr1.hasVar() && lr0.getVar() != lr1.getVar()) {
+    if (lr0.hasVar() && lr1.hasVar() &&
+        lr0.getVar(m_rg) != lr1.getVar(m_rg)) {
         //Different variable.
         return false;
     }

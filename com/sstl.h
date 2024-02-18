@@ -660,10 +660,10 @@ public:
 //    allocate a new container memory space, record your elements in
 //    container, then APPEND it at list.
 template <class T, class Allocator = allocator<T> > class List {
+    COPY_CONSTRUCTOR(List);
 public:
     typedef C<T>* Iter; //the iter to iterate element in list.
 protected:
-    COPY_CONSTRUCTOR(List);
     UINT m_elem_count;
     C<T> * m_head;
     C<T> * m_tail;

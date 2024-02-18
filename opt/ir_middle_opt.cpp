@@ -138,20 +138,8 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
 }
 
 
-//Simplification will maintain CFG, PRSSA, MDSSA, and DU Ref information,
-//except the classic DU-Chain.
-bool Region::performSimplify(OptCtx & oc)
+bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
 {
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
-    ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
-    SimpCtx simp(&oc);
-    SIMP_optctx(&simp) = &oc;
-    simp.setSimpCFS();
-    simp.setSimpArray();
-    simp.setSimpSelect();
-    simp.setSimpLandLor();
-    simp.setSimpLnot();
-    simp.setSimpILdISt();
     if (g_is_lower_to_lowest_height) {
         simp.setSimpToLowestHeight();
     }
@@ -200,11 +188,47 @@ bool Region::performSimplify(OptCtx & oc)
     }
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    return true;
+}
+
+
+bool Region::performSimplifyArrayIngredient(OptCtx & oc)
+{
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    SimpCtx simp(&oc);
+    SIMP_optctx(&simp) = &oc;
+
+    //Only simplify the expression of array ingredient to lowest height to
+    //faciitate LICM, RP and VECT.
+    SIMP_to_lowest_height(&simp) = true;
+    bool change = performSimplifyImpl(simp, oc);
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
+        note(this, "\n==---- DUMP AFTER SIMPLIFY ARRAY INGREDIENT ----==");
+        dumpBBList();
+    }
+    return change;
+}
+
+
+bool Region::performSimplify(OptCtx & oc)
+{
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    SimpCtx simp(&oc);
+    SIMP_optctx(&simp) = &oc;
+    simp.setSimpCFS();
+    simp.setSimpArray();
+    simp.setSimpSelect();
+    simp.setSimpLandLor();
+    simp.setSimpLnot();
+    simp.setSimpILdISt();
+    bool change = performSimplifyImpl(simp, oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }
-    return true;
+    return change;
 }
 
 
@@ -326,6 +350,8 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
     if (g_is_lower_to_lowest_height || g_is_lower_to_pr_mode) {
         performSimplify(oc);
+    } else if (g_is_simplify_array_ingredient) {
+        performSimplifyArrayIngredient(oc);
     }
     if (g_opt_level > OPT_LEVEL0) {
         getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);

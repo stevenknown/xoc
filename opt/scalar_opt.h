@@ -41,6 +41,11 @@ protected:
     //The function return true if current region should participate in
     //optimizations.
     virtual bool isParticipateInOpt() const;
+
+    void updateCounter(Pass const* pass, UINT & cp_count,
+                       UINT & licm_count, UINT & rp_count);
+    bool worthToDo(Pass const* pass, UINT cp_count,
+                   UINT licm_count, UINT rp_count);
 public:
     explicit ScalarOpt(Region * rg) : Pass(rg)
     {

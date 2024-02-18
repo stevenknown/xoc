@@ -64,6 +64,25 @@ void IVVal::dump(Region const* rg) const
 }
 
 
+CHAR const* IVVal::dump(Region const* rg, UINT indent,
+                        OUT xcom::StrBuf & buf) const
+{
+    LogCtx tmplogctx;
+    tmplogctx.copyWithOutBuffer(rg->getLogMgr()->getCurrentCtx());
+    rg->getLogMgr()->push(tmplogctx);
+    {
+    DumpBufferSwitch tmpbuff(rg->getLogMgr());
+    rg->getLogMgr()->incIndent(indent);
+    dump(rg);
+    rg->getLogMgr()->decIndent(indent);
+    buf.copy(*rg->getLogMgr()->getBuffer());
+    rg->getLogMgr()->cleanBuffer();
+    }
+    rg->getLogMgr()->pop();
+    return buf.getBuf();
+}
+
+
 void IVVal::clean(MOD ChainRecMgr & mgr)
 {
     switch (getKind()) {
@@ -763,7 +782,7 @@ void ChainRec::setCodeByIV(IV const* iv)
         CR_code(this) = IR_ADD;
         return;
     }
-    //iv is DIV.
+    ASSERTN(iv->is_div(), ("iv is DIV"));
     DIV const* div = (DIV const*)iv;
     CR_code(this) = div->getChainRec()->getCode();
 }
@@ -843,6 +862,7 @@ void ChainRec::copyExclusive(ChainRec const& src, MOD ChainRecMgr & mgr)
 void ChainRec::extractFrom(IV const* iv)
 {
     if (iv->is_biv()) { extractFrom((BIV const*)iv); return; }
+    ASSERT0(iv->is_div());
     extractFrom((DIV const*)iv);
     ASSERT0(isSanity());
 }
@@ -868,7 +888,7 @@ void ChainRec::dumpComputedValue(MOD ChainRecMgr & mgr) const
         xcom::StrBuf * buf = rg->getLogMgr()->getBuffer();
         ASSERT0(buf);
         tmp.copy(*buf);
-        buf->clean();
+        rg->getLogMgr()->cleanBuffer();
     }
     rg->getLogMgr()->incIndent(2);
     note(rg, tmp.getBuf());

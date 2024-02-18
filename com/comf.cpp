@@ -535,12 +535,6 @@ LONGLONG xatoll(CHAR const* nptr, bool is_oct)
 }
 
 
-LONGLONG xabs(LONGLONG a)
-{
-    return a >= 0 ? a : -a;
-}
-
-
 //Find partial string, return the subscript-index if substring found,
 //otherwise return -1.
 //src: input string.
@@ -1703,6 +1697,33 @@ bool isValidImmForBitsize(UINT bitsize, UINT64 imm)
 {
     UINT64 mask = (((UINT64)1) << bitsize) - 1;
     return (mask & imm) == imm;
+}
+
+
+float xsqrt(float num)
+{
+    if (num <= float(0.0)) {
+        return float(0.0);
+    }
+    float epsilon = float(0.00001);
+    float guess = num;
+    while (xfabs(guess * guess - num) >= epsilon) {
+        guess = (guess + num / guess) / float(2.0);
+    }
+    return guess;
+}
+
+
+double xsqrt(double num)
+{
+    double x = num;
+    double y = (x + num / x) / double(2.0);
+    double epsilon = double(0.000000001);
+    while (xfabs(y - x) > epsilon) {
+        x = y;
+        y = (x + num / x) / double(2.0);
+    }
+    return y;
 }
 
 } //namespace xcom

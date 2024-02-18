@@ -60,6 +60,8 @@ class Tab4 : public xcom::TMap<UINT, Tab3*> {
 typedef enum _VN_TYPE {
     VN_UNKNOWN = 0,
     VN_OP, //The numbered value reasoned from IR stmt or expression.
+    VN_MDDEF, //The numbered value reasoned from MDDef.
+    VN_VMD, //The numbered value reasoned from VMD.
     VN_VAR, //The numbered value reasoned from Var or MD.
     VN_INT, //The numbered value reasoned from Integer.
     VN_FP, //The numbered value reasoned from Float-Point.
@@ -80,6 +82,8 @@ typedef enum _VN_TYPE {
 #define VN_fp_val(v) ((v)->u1.dv)
 #define VN_str_val(v) ((v)->u1.str)
 #define VN_op(v) ((v)->u1.op)
+#define VN_mddef(v) ((v)->u1.mddef)
+#define VN_vmd(v) ((v)->u1.vmd)
 #define VN_is_cst(v) (VN_type(v) == VN_INT || VN_type(v) == VN_MC_INT || \
                       VN_type(v) == VN_FP || VN_type(v) == VN_STR || \
                       VN_type(v) == VN_CONST)
@@ -92,6 +96,8 @@ public:
         HOST_INT iv;
         HOST_FP dv;
         Sym const* str;
+        MDDef const* mddef;
+        VMD const* vmd;
         IR_CODE op; //operation
     } u1;
 public:
@@ -121,6 +127,15 @@ public:
     //Return true if VN reasoned from string value.
     bool is_str() const { return VN_type(this) == VN_STR; }
 
+    //Return true if VN reasoned from MDDef.
+    bool is_mddef() const { return VN_type(this) == VN_MDDEF; }
+
+    //Return true if VN reasoned from VMD.
+    bool is_vmd() const { return VN_type(this) == VN_VMD; }
+
+    //Return true if VN is undetermined.
+    bool is_unknown() const { return VN_type(this) == VN_UNKNOWN; }
+
     //Get the value-number type.
     VN_TYPE getType() const { return VN_type(this); }
 };
@@ -138,42 +153,46 @@ public:
     }
 };
 
-typedef VecIdx FP2VNIter;
-typedef HMap<double, VN*, DoubleHashFunc> FP2VN;
+typedef xcom::VecIdx FP2VNIter;
+typedef xcom::HMap<double, VN*, DoubleHashFunc> FP2VN;
 
 typedef VecIdx Longlong2VNIter;
-typedef HMap<LONGLONG, VN*> Longlong2VN;
+typedef xcom::HMap<LONGLONG, VN*> Longlong2VN;
 
 typedef VecIdx LonglongMC2VNIter;
-typedef HMap<LONGLONG, VN*> LonglongMC2VN;
+typedef xcom::HMap<LONGLONG, VN*> LonglongMC2VN;
 
 typedef VecIdx MD2VNIter;
-typedef HMap<MD const*, VN*> MD2VN;
+typedef xcom::HMap<MD const*, VN*> MD2VN;
 
 //Note: SymbolHashFunc request bucket size must be the power of 2.
 typedef VecIdx Sym2VNIter;
-class Sym2VN : public HMap<Sym const*, VN*, SymbolHashFunc> {
+class Sym2VN : public xcom::HMap<Sym const*, VN*, SymbolHashFunc> {
     COPY_CONSTRUCTOR(Sym2VN);
 public:
     Sym2VN() : HMap<Sym const*, VN*, SymbolHashFunc>(0) {}
 };
 
-
 typedef TMapIter<UINT, VN const*> IR2VNIter;
-class IR2VN : public TMap<UINT, VN const*> {
+class IR2VN : public xcom::TMap<UINT, VN const*> {
     COPY_CONSTRUCTOR(IR2VN);
 public:
     IR2VN() {}
 };
 
-
 typedef TMapIter<UINT, VN const*> MDPhi2VNIter;
-class MDPhi2VN : public TMap<UINT, VN const*> {
+class MDPhi2VN : public xcom::TMap<UINT, VN const*> {
     COPY_CONSTRUCTOR(MDPhi2VN);
 public:
     MDPhi2VN() {}
 };
 
+typedef TMapIter<UINT, VN const*> VMD2VNIter;
+class VMD2VN : public xcom::TMap<UINT, VN const*> {
+    COPY_CONSTRUCTOR(VMD2VN);
+public:
+    VMD2VN() {}
+};
 
 //VN Expression of Scalar
 class VNE_SC {
@@ -405,7 +424,7 @@ public:
 };
 
 
-class IR2ILDVNE : public TMap<IR const*, ILD_VNE2VN*> {
+class IR2ILDVNE : public xcom::TMap<IR const*, ILD_VNE2VN*> {
     COPY_CONSTRUCTOR(IR2ILDVNE);
 public:
     IR2ILDVNE() {}
@@ -443,6 +462,12 @@ class VNE_ARR_HF {
 public:
     VNE_ARR_HF() {}
 
+    bool compare(VNE_ARR * x1, OBJTY x2) const
+    { return x1->is_equ(*(VNE_ARR*)x2); }
+
+    bool compare(VNE_ARR * x1, VNE_ARR * x2) const
+    { return x1->is_equ(*(VNE_ARR*)x2); }
+
     UINT get_hash_value(VNE_ARR * x, UINT bucket_size) const
     {
         HOST_UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
@@ -453,12 +478,6 @@ public:
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
     { return get_hash_value((VNE_ARR*)v, bucket_size); }
-
-    bool compare(VNE_ARR * x1, OBJTY x2) const
-    { return x1->is_equ(*(VNE_ARR*)x2); }
-
-    bool compare(VNE_ARR * x1, VNE_ARR * x2) const
-    { return x1->is_equ(*(VNE_ARR*)x2); }
 };
 
 
@@ -524,8 +543,149 @@ public:
 };
 
 
+template <typename IntType>
+class IntSet2VN : public IntSetMap<IntType, VN*> {
+public:
+    //The target dependent code to dump the content of user defined
+    //MappedObject.
+    virtual void dumpMappedObj(FILE * h, UINT indent, VN * const& mapped) const
+    {
+        if (mapped == nullptr) { return; }
+        xcom::log(h, 0, ":VN%u", mapped->id());
+    }
+};
+
+
+class VNHashTab {
+public:
+    typedef HOST_UINT IntType;
+    typedef xcom::List<IntType> IntList;
+    typedef xcom::List<IntType>::Iter IntListIter;
+    typedef xcom::List<VN const*> VNList;
+    typedef xcom::List<VN const*>::Iter VNListIter;
+protected:
+    GVN * m_gvn;
+    IntSet2VN<IntType> m_intset2vn;
+    IntList m_tmp_ilst; //just used for temporary purpose.
+protected:
+    VN * registerVN(IntList const& ilst);
+public:
+    VNHashTab(GVN * gvn) : m_gvn(gvn) {}
+    ~VNHashTab();
+
+    void dump(Region const* rg, UINT indent) const;
+
+    VN const* registerVN(IR_CODE irt, UINT vnnum, ...);
+    VN const* registerVN(IR_CODE irt, VNList const& ilst);
+    VN const* registerIntList(IR_CODE irt, UINT num, ...);
+};
+
+typedef VNHashTab::IntType VNHashInt;
+
+class InferCtx {
+protected:
+    xcom::TTab<UINT> m_mdphi_tab;
+public:
+    InferCtx() {}
+
+    void clean() { m_mdphi_tab.clean(); }
+
+    bool isVisited(MDPhi const* phi) const
+    { return m_mdphi_tab.find(phi->id()); }
+
+    void setVisitMDPhi(MDPhi const* phi) { m_mdphi_tab.append(phi->id()); }
+};
+
+
+//The class inferences Equal VN via walk through DefUse chain.
+//Equal VN describes a kind of VN comparasion strategy when determining whether
+//two given IR exps's value are equal. The passes can reason out that
+//that two IR expressions have same runtime value if their Equal VN are the
+//same one.
+//ONE KEY NOTE: the Equal VN is different to normal VN as GVN computed. If
+//given two IR expressions's Equal VN is different, we can NOT exactly say the
+//IR expressions have different runtime value. On the contrary, VN could
+//exactly say the IR expressions have different runtime value.
+//e.g: given two IR expressions ld x and $y, if InferVN reasoned out that
+//ld x has EVN1, and $y has EVN2, we just tell optimizer that we have
+//no knowledge about ld x and $y's value.
+class InferEVN {
+    COPY_CONSTRUCTOR(InferEVN);
+protected:
+    GVN * m_gvn;
+    Region * m_rg;
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
+    IR2VN m_irid2vn;
+    VMD2VN m_vmd2vn;
+    MDPhi2VN m_mdphi2vn;
+    VNHashTab m_vnhashtab;
+protected:
+    //Return true if the inference will try to infer Phi's EVN via inferring
+    //each operands of Phi respectively.
+    virtual bool allowCrossPhi() { return true; }
+
+    //The function allocates a VN given stmt.
+    VN const* allocVNForStmt(IR const* ir, InferCtx & ctx);
+    VN const* allocVNForMDDef(MDDef const* mddef, InferCtx & ctx);
+    VN const* allocVNForVMD(VMD const* vmd, InferCtx & ctx);
+
+    //The function allocates a VN given extended stmt.
+    virtual VN const* allocVNForExtStmt(IR const* ir, InferCtx & ctx);
+
+    VN const* getVN(IR const* ir) { return m_irid2vn.get(ir->id()); }
+    VN const* getVN(MDDef const* mddef)
+    { return m_mdphi2vn.get(mddef->id()); }
+    VN const* getVN(VMD const* vmd) { return m_vmd2vn.get(vmd->id()); }
+    Region * getRegion() const { return m_rg; }
+
+    virtual VN const* inferExtStmt(IR const* ir, InferCtx & ctx);
+    VN const* inferIndirectStmt(IR const* ir, InferCtx & ctx);
+    VN const* inferLiveinPR(IR const* ir, InferCtx & ctx);
+    VN const* inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx);
+    VN const* inferVNByIterKid(IR const* ir, InferCtx & ctx);
+    VN const* inferArrayKidOp(IR const* ir, InferCtx & ctx);
+    VN const* inferWriteArray(IR const* ir, InferCtx & ctx);
+    VN const* inferStmt(IR const* ir, InferCtx & ctx);
+    VN const* inferMDPhi(MDPhi const* phi, InferCtx & ctx);
+    VN const* inferVNViaBase(IR const* ir, InferCtx & ctx);
+    VN const* inferDirectExp(IR const* ir, InferCtx & ctx);
+    VN const* inferArray(IR const* ir, InferCtx & ctx);
+    VN const* inferIndirectMemExp(IR const* ir, InferCtx & ctx);
+    VN const* inferDirectExpViaMDSSA(IR const* ir, InferCtx & ctx);
+    VN const* inferDirectExpViaPRSSA(IR const* ir, InferCtx & ctx);
+    VN const* inferDirectExpViaSSA(IR const* ir, InferCtx & ctx);
+
+    //The function maps given mddef information into an unique IR_CODE.
+    //The mapped ir-code is used to conform the hashing-rules when registers
+    //a MDDef and a set of integers.
+    IR_CODE mapMDDef2IRCode(MDDef const* mddef) const;
+
+    void setVN(IR const* ir, VN const* vn)
+    {
+        ASSERT0(!vn->is_unknown());
+        m_irid2vn.set(ir->id(), vn);
+    }
+    void setVN(MDDef const* mddef, VN const* vn)
+    { m_mdphi2vn.set(mddef->id(), vn); }
+    void setVN(VMD const* vmd, VN const* vn)
+    { m_vmd2vn.set(vmd->id(), vn); }
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+public:
+    InferEVN(GVN * gvn);
+    virtual ~InferEVN() {}
+    void dump() const;
+    VN const* inferExp(IR const* ir, InferCtx & ctx);
+};
+
+
 //Perform Global Value Numbering.
 class GVN : public Pass {
+    friend class InferEVN;
     COPY_CONSTRUCTOR(GVN);
 protected:
     BYTE m_is_vn_fp:1; //true if compute VN for float type.
@@ -580,7 +740,6 @@ protected:
 protected:
     void assignRHSVN();
     VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
-    VN * allocVN();
 
     bool calcCondMustValEQ(IR const* ir, bool & must_true,
                            bool & must_false) const;
@@ -711,8 +870,7 @@ public:
     explicit GVN(Region * rg);
     virtual ~GVN();
 
-    void init();
-    void destroy();
+    VN * allocVN();
 
     //Return true if GVN is able to determine the result of 'ir', otherwise
     //return false that GVN know nothing about ir.
@@ -725,6 +883,13 @@ public:
     //change: set to true if new VN generated.
     VN const* computeVN(IR const* exp, bool & change);
 
+    //Compute VN to extend IR expression.
+    virtual VN const* computeExtExp(IR const* exp, bool & change)
+    {
+        //Target Dependent Code.
+        return nullptr;
+    }
+
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
@@ -736,6 +901,7 @@ public:
     virtual bool dump() const;
     void dumpAllVN() const;
     void dumpMiscMap() const;
+    void destroy();
 
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
@@ -766,6 +932,8 @@ public:
     bool hasDifferentValue(VN const* vn1, IR const* ir1,
                            VN const* vn2, IR const* ir2) const;
     bool hasDifferentValue(VN const* vn1, VN const* vn2) const;
+
+    void init();
 
     //Return true if ir has unique and constant VN.
     //ir: the stmt or exp that has the VN 'irvn'.

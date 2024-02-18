@@ -2144,7 +2144,7 @@ void ELFMgr::processELFTextRelSection(ELFSHdr const* symtab_shdr,
         buf1.strcat(SYMINFO_name(sym_info)->getStr());
 
         //Generate content for .text.xxx.
-        BYTEVec text_content = SYMINFO_func(sym_info).getCode();
+        BYTEVec & text_content = SYMINFO_func(sym_info).getCode();
 
         //Generate content for .rela.text.xxx.
         BYTEVec rel_content;

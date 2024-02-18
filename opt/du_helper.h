@@ -33,6 +33,7 @@ namespace xoc {
 
 class VN;
 class GVN;
+class LoopDepInfo;
 
 //The class computes the number of DEF of MustRef and MayRef for each IR
 //in given loop.
@@ -254,8 +255,8 @@ bool hasSameUniqueMustDefForTree(IR const* ir1, IR const* ir2,
 //have same unique def.
 //ir1: stmt or expression.
 //ir2: stmt or expression.
-bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
-                                         Region const* rg);
+bool hasSameUniqueMustDefForIsomoKidTree(
+    IR const* ir1, IR const* ir2, Region const* rg);
 
 //Return true if both ir1 and ir2 have region livein def.
 //ir1: expression.
@@ -264,27 +265,28 @@ bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2, Region const* rg);
 
 //Return true if there is loop-reduce dependence between ir and its DEF.
 //ir: exp or stmt.
-bool hasLoopReduceDep(IR const* ir, Region const* rg, LI<IRBB> const* li);
+bool hasLoopReduceDep(
+    IR const* ir, Region const* rg, LI<IRBB> const* li, OUT LoopDepInfo & info);
 
 //Return true if there is loop-reduce dependence between each IR that rooted
 //by 'ir' and elements in 'lst'.
 //ir: the root of IR tree, it may be exp or stmt.
 //lst: a list of IR stmt
-bool hasLoopReduceDepForIRTree(IR const* ir, Region const* rg,
-                               LI<IRBB> const* li);
+bool hasLoopReduceDepForIRTree(
+    IR const* ir, Region const* rg, LI<IRBB> const* li);
 
 //Return true if there are multiple-definition of MD reference represeted
 //by 'ir' inside given loop 'li'.
 //set: record the DEF stmt set of reduction variable.
-bool hasUniqueDefInLoopForMustRef(IR const* ir, Region const* rg,
-                                  LI<IRBB> const* li);
+bool hasUniqueDefInLoopForMustRef(
+    IR const* ir, Region const* rg, LI<IRBB> const* li);
 
 //Return true if there are more than one definition of MD reference represeted
 //by 'ir' inside given loop 'li'.
 //defcnt: return the count of definition found.
 //        Note it may be equal to 0 if there is not any DEF in loop.
-bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
-                                       LI<IRBB> const* li, OUT UINT & defcnt);
+bool hasMoreThanOneDefInLoopForMustRef(
+    IR const* ir, Region const* rg, LI<IRBB> const* li, OUT UINT & defcnt);
 
 //Return true if def is killing-def of use.
 //Note this function does not check if there is DU chain between def and use.
@@ -347,8 +349,9 @@ bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
 //                 in MDSet, and is costly.
 //li: loop info.
 //Note the function does not check PR operation.
-bool isLoopCarried(IR const* ir1, IR const* ir2, bool costly_analysis,
-                   LI<IRBB> const* li, Region const* rg, GVN const* gvn);
+bool isLoopCarried(
+    IR const* ir1, IR const* ir2, bool costly_analysis, LI<IRBB> const* li,
+    Region const* rg, GVN const* gvn, OUT LoopDepInfo & info);
 
 //Return true if there is loop-carried dependence between ir and stmt in loop.
 //ir: exp or stmt.
@@ -356,8 +359,9 @@ bool isLoopCarried(IR const* ir1, IR const* ir2, bool costly_analysis,
 //Note the function will check the dependence between ir and every stmt in
 //given loop.
 //Note the function does not check PR operation.
-bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
-                   bool include_itselfstmt, LI<IRBB> const* li, GVN const* gvn);
+bool isLoopCarried(
+    IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
+    LI<IRBB> const* li, GVN const* gvn, OUT LoopDepInfo & info);
 
 //Return true if there is loop-carried dependence between ir and elements in
 //'lst'.
@@ -365,10 +369,10 @@ bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
 //include_itselfstmt: True if the function ignores stmt that is parent of 'ir'.
 //lst: a list of IR stmt
 //Note the function does not check PR operation.
-bool isLoopCarried(IR const* ir, Region const* rg,
-                   bool is_aggressive, bool include_itselfstmt,
-                   xcom::List<IR*> const& lst, LI<IRBB> const* li,
-                   GVN const* gvn);
+bool isLoopCarried(
+    IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
+    xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
+    OUT LoopDepInfo & info);
 
 //Return true if there is loop-carried dependence between each IR that rooted
 //by 'ir' and elements in 'lst'.
@@ -376,10 +380,10 @@ bool isLoopCarried(IR const* ir, Region const* rg,
 //include_itselfstmt: True if the function ignores stmt that is parent of 'ir'.
 //lst: a list of IR stmt
 //Note the function does not check PR operation.
-bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
-                            bool is_aggressive, bool include_itselfstmt,
-                            xcom::List<IR*> const& lst,
-                            LI<IRBB> const* li, GVN const* gvn);
+bool isLoopCarriedForIRTree(
+    IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
+    xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
+    OUT LoopDepInfo & info);
 
 //Return true if ir is the unique DEF of its must-ref MD in given loop.
 //The function also consider the MayRef of each stmt in loop.
@@ -389,9 +393,9 @@ bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
 //        *p = .. //*p reference MD21, MD22
 //     }
 //     t1 is the unique def of MD10, and t2 is NOT the unique def of MD22.
-bool isUniqueDefInLoopForMustRef(IR const* ir, LI<IRBB> const* li,
-                                 Region const* rg,
-                                 MOD DefMiscBitSetMgr & sbsmgr);
+bool isUniqueDefInLoopForMustRef(
+    IR const* ir, LI<IRBB> const* li, Region const* rg,
+    MOD DefMiscBitSetMgr & sbsmgr);
 
 //The function checks each DEF|USE occurrence of ir, remove the expired
 //expression which is not reference the memory any more that ir referenced.

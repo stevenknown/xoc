@@ -1140,7 +1140,7 @@ UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
         //inferred by column index.
         //'pivot_bv_idx' refers to 'swap-out' variable, as well as the variables
         //inferred by row index.
-        //Since our algorithme is definitely, there may be exist a cyclic when
+        //Since our algorithme is definitely, there may exist a cyclic when
         //pivoting a pair of 'swap-in', 'swap-out' variables.
         //    e.g: Assuming that at time t1, the swap-in is xi, swap-out is xj,
         //    and at time t2, the swap-in may become xj, swap-out  xi.
@@ -2051,10 +2051,8 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
 //  Set the coefficient of variable in 'tgtf' to be 0 if no
 //  constraints related with it.
 template <class Mat, class T>
-void SIX<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
-                                   Mat const& eq,
-                                   Mat const& leq,
-                                   INT cst_col)
+void SIX<Mat, T>::reviseTargetFunc(
+    MOD Mat & tgtf, Mat const& eq, Mat const& leq, INT cst_col)
 {
     Vector<bool> is_nonzero;
     for (INT j = 0; j < cst_col; j++) {
@@ -2364,11 +2362,12 @@ bool MIP<Mat, T>::is_satisfying(OUT UINT & row,
                         col = j;
                         return false;
                     }
-                } //end if
-            } //end for
-        } //end for
+                }
+            }
+        }
         return true;
-    } else if (is_bin) {
+    }
+    if (is_bin) {
         for (UINT i = 0; i < sol.getRowSize(); i++) {
             for (UINT j = 0; j < sol.getColSize(); j++) {
                 T v = sol.reduce(i, j);
@@ -2397,8 +2396,8 @@ void MIP<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
 
 
 //Recursive subroutine.
-//'is_max': true refers to solve the maximum problem
-//'is_bin': true refers to solve the binary(0-1) programming
+//is_max: true refers to solve the maximum problem
+//is_bin: true refers to solve the binary(0-1) programming
 template <class Mat, class T>
 UINT MIP<Mat, T>::RecusivePart(OUT T & v,
                                OUT Mat & sol,
@@ -2566,7 +2565,8 @@ UINT MIP<Mat, T>::RecusivePart(OUT T & v,
         }
         m_indent--;
         return IP_SUCC;
-    } else if (tmp_sol.size() != 0) {
+    }
+    if (tmp_sol.size() != 0) {
         v = tmpv;
         sol = tmp_sol;
         if (is_max) {
@@ -2591,21 +2591,20 @@ UINT MIP<Mat, T>::RecusivePart(OUT T & v,
 //Compute maximum solution of mixed integer programming.
 //
 //Return the result.
-//    SUCC: Get maximum solution.
-//    UNBOUND: Target function is unbound.
-//'sol': optimum feasible solution.
-//'vc': variable constraints, one variable one row.
-//'eq': equalites which the solution should subject to .
-//'leq': inequalites which the solution should subject to .
-//'is_bin': true refers to solve the binary(0-1) programming,
-//    else to solve integer programming.
-//'rational_indicator': if it is not nullptr, TRUE element means
-//    the solution permits to be rational.
-//    e.g: If rational_indicator(0, j) is TRUE, the element j
-//    of solution could be rational.
-//'cst_col': index number of constant column.
-//    e.g: Given tgtf as [ax1, bx2, cx3, 100], then cst_col is 3.
-//
+//  SUCC: Get maximum solution.
+//  UNBOUND: Target function is unbound.
+//sol: optimum feasible solution.
+//vc: variable constraints, one variable one row.
+//eq: equalites which the solution should subject to .
+//leq: inequalites which the solution should subject to .
+//is_bin: true refers to solve the binary(0-1) programming,
+//  else to solve integer programming.
+//rational_indicator: if it is not nullptr, TRUE element means
+//  the solution permits to be rational.
+//  e.g: If rational_indicator(0, j) is TRUE, the element j
+//  of solution could be rational.
+//cst_col: index number of constant column.
+//  e.g: Given tgtf as [ax1, bx2, cx3, 100], then cst_col is 3.//
 //NOTICE:
 //    The columns size of 'sol', 'tgtf', 'vc', 'eq', 'leq' must be same.
 template <class Mat, class T>
@@ -2635,20 +2634,20 @@ UINT MIP<Mat, T>::maxm(OUT T & maxv,
 //Solve the minimum solution of mixed integer programming.
 //
 //Return the result.
-//    SUCC: Get minimum solution.
-//    UNBOUND: Target function is unbound.
-//'sol': optimum feasible solution.
-//'vc': variable constraints, one variable one row.
-//'eq': equalites which the solution should subject to .
-//'leq': inequalites which the solution should subject to .
-//'is_bin': true refers to solve the binary(0-1) programming,
-//        else to solve integer programming.
-//'rational_indicator': if it is not nullptr, TRUE element means
-//        the solution permits to be rational.
-//    e.g: If rational_indicator(0, j) is TRUE, the element j
-//        of solution could be rational.
-//'cst_col': index number of constant column.
-//    e.g: Given tgtf as [ax1, bx2, cx3, 100], then cst_col is 3.
+//  SUCC: Get minimum solution.
+//  UNBOUND: Target function is unbound.
+//sol: optimum feasible solution.
+//vc: variable constraints, one variable one row.
+//eq: equalites which the solution should subject to .
+//leq: inequalites which the solution should subject to .
+//is_bin: true refers to solve the binary(0-1) programming,
+//  else to solve integer programming.
+//rational_indicator: if it is not nullptr, TRUE element means the solution
+//  permits to be rational.
+//  e.g: If rational_indicator(0, j) is TRUE, the element j of solution could
+//  be rational.
+//cst_col: index number of constant column.
+//  e.g: Given tgtf as [ax1, bx2, cx3, 100], then cst_col is 3.
 //
 //NOTICE:
 //    The columns size of 'sol', 'tgtf', 'vc', 'eq', 'leq' must be same.

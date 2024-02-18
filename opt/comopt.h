@@ -53,6 +53,7 @@ author: Su Zhenyu
 #include "ir_rce.h"
 #include "insert_guard_helper.h"
 #include "cfg_lifting.h"
+#include "loop_dep_ana.h"
 
 #ifdef FOR_IP
 #include "ir_vect.h"
@@ -77,6 +78,7 @@ author: Su Zhenyu
 #include "gp_adjustment.h"
 #include "prologue_epilogue_inserter.h"
 #include "br_opt.h"
+#include "workaround.h"
 #endif
 
 #include "ir_cp.h"

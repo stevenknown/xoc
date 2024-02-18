@@ -53,6 +53,9 @@ typedef xcom::List<IR const*>::Iter ConstIRListIter;
 typedef xcom::TTab<IR*> IRTab;
 typedef xcom::TTabIter<IR*> IRTabIter;
 
+typedef xcom::TTab<IR const*> ConstIRTab;
+typedef xcom::TTabIter<IR const*> ConstIRTabIter;
+
 //Type to describe the Prno of PR operation.
 typedef UINT PRNO;
 

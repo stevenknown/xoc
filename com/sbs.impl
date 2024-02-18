@@ -344,20 +344,6 @@ void SBitSetCore<BitsPerSeg>::diff(SBitSetCore const& src,
 
 
 template <UINT BitsPerSeg>
-void SBitSetCore<BitsPerSeg>::dump2(FILE * h) const
-{
-    ASSERT0(h);
-    fprintf(h, "\n");
-    if (segs.get_elem_count() == 0) {
-        fprintf(h, "empty");
-        fflush(h);
-        return;
-    }
-    dump(h);
-}
-
-
-template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::dump(FILE * h) const
 {
     ASSERT0(h);

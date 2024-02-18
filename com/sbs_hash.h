@@ -379,7 +379,8 @@ public:
 
         #ifdef _DEBUG_
         fprintf(h, "\n---- NumOfNode:%d ----",
-                m_num_node + 1 /*The first node is m_bit2node*/);
+                //The first node is m_bit2node
+                m_num_node + 1);
         #endif
 
         dump_helper(h, get_root(), 1);

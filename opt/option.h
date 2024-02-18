@@ -113,6 +113,7 @@ public:
     bool is_dump_invert_brtgt; //Dump Invert Branch Target.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_vectorization; //Dump IR Vectorization.
+    bool is_dump_loop_dep_ana; //Dump Loop Dependence Analysis.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
     bool is_dump_ivr; //Dump Induction Variable Recognization.
@@ -163,6 +164,7 @@ public:
     bool isDumpInvertBrTgt() const;
     bool isDumpLFTR() const;
     bool isDumpVectorization() const;
+    bool isDumpLoopDepAna() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
     bool isDumpIVR() const;
@@ -261,6 +263,7 @@ typedef enum _PASS_TYPE {
     PASS_IRMGR,
     PASS_CALL_GRAPH,
     PASS_VECT,
+    PASS_LOOP_DEP_ANA,
     PASS_PROLOGUE_EPILOGUE,
     PASS_GP_ADJUSTMENT,
     PASS_BR_OPT,
@@ -470,6 +473,9 @@ extern bool g_do_rce;
 //Perform auto vectorization.
 extern bool g_do_vect;
 
+//Perform loop dependence analysis.
+extern bool g_do_loop_dep_ana;
+
 //Perform dead store elimination.
 extern bool g_do_dse;
 
@@ -570,6 +576,10 @@ extern UINT g_verify_level;
 //Note user should definitely confirm that the point-to information
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
+
+//Set true to simplify array ingredients, such as, subscript expression, array
+//base expression to lower height.
+extern bool g_is_simplify_array_ingredient;
 
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.

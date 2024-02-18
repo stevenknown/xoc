@@ -438,6 +438,46 @@ static bool isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
 }
 
 
+static bool isArrayIsomorphic(IR const* ir, IR const* src,
+                              bool is_cmp_kid, IsomoFlag const& flag)
+{
+    if (!ir->isArrayOp()) { return false; }
+    if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+        //Not diff exp or stmt.
+        return false;
+    }
+    if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+        return false;
+    }
+    if (ir->getOffset() != src->getOffset()) {
+        return false;
+    }
+    if (ARR_elem_num_buf(src) == nullptr || ARR_elem_num_buf(ir) == nullptr) {
+        //We have no knowledge about the array.
+        return false;
+    }
+    TMWORD dimnum = ((CArray*)ir)->getDimNum();
+    if (((CArray*)src)->getDimNum() != dimnum) { return false; }
+    for (UINT i = 0; i < dimnum; i++) {
+        if (((CArray*)ir)->getElementNumOfDim(i) !=
+            ((CArray*)src)->getElementNumOfDim(i)) {
+            return false;
+        }
+    }
+    IR const* cursub = ARR_sub_list(ir);
+    IR const* srcsub = ARR_sub_list(src);
+    for (; cursub != nullptr; cursub = cursub->get_next(),
+         srcsub = srcsub->get_next()) {
+        ASSERT0(srcsub);
+        if (!isIRIsomorphic(cursub, srcsub, is_cmp_kid, flag)) {
+            return false;
+        }
+    }
+    ASSERT0(ir->getBase() && src->getBase());
+    return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
+}
+
+
 //flag: record the checking condition while compare two given ir expression
 //      or stmt.
 //      e.g: If ISOMO_CK_CODE is set, the comparison of IST and ILD will
@@ -500,34 +540,8 @@ static bool isIRIsomorphic(IR const* ir, IR const* src,
         }
         break;
     SWITCH_CASE_ARRAY_OP:
-        if (!ir->isArrayOp()) { return false; }
-        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
-            //Not diff exp or stmt.
-            return false;
-        }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        if (ir->getOffset() != src->getOffset()) {
-            return false;
-        }
-        if ((ARR_elem_num_buf(src) != nullptr) ^
-            (ARR_elem_num_buf(ir) != nullptr)) {
-            return false;
-        }
-        if (ARR_elem_num_buf(src) != nullptr) {
-            ASSERT0(ARR_elem_num_buf(ir));
-            TMWORD dimnum = ((CArray*)ir)->getDimNum();
-            if (((CArray*)src)->getDimNum() != dimnum) { return false; }
-            for (UINT i = 0; i < dimnum; i++) {
-                if (((CArray*)ir)->getElementNumOfDim(i) !=
-                    ((CArray*)src)->getElementNumOfDim(i)) {
-                    return false;
-                }
-            }
-        }
-        ASSERT0(ir->getBase() && src->getBase());
-        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
+        if (!isArrayIsomorphic(ir, src, is_cmp_kid, flag)) { return false; }
+        break;
     case IR_LDA:
         if (ir->getCode() != src->getCode()) { return false; }
         if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {

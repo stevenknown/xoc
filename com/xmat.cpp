@@ -1231,7 +1231,7 @@ static void val_adjust(Matrix<Float> * pbasis)
     StrBuf buf(64);
     for (UINT i = 0; i < pbasis->getRowSize(); i++) {
         for (UINT j = 0; j < pbasis->getColSize(); j++) {
-            buf.sprint(g_sd_str, pbasis->get(i,j).f());
+            buf.sprint(g_sd_str, pbasis->get(i,j).val());
             pbasis->set(i, j, atof(buf.buf));
         }
     }
@@ -1240,7 +1240,7 @@ static void val_adjust(Matrix<Float> * pbasis)
 
 static Float val_sqrt(Float a)
 {
-    Float v = ::sqrt(a.f());
+    Float v = ::sqrt(a.val());
     return v;
 }
 
@@ -1254,7 +1254,7 @@ static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
         fprintf(h, "\t");
         for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = " ";
-            fprintf(h, "%10f%s", pthis->get(i,j).f(), blank);
+            fprintf(h, "%10f%s", pthis->get(i,j).val(), blank);
         }
         fprintf(h, "\n");
     }
@@ -1284,7 +1284,7 @@ static void flt_dumps(void const* pbasis)
         printf("\t");
         for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = "           ";
-            printf("%5f%s", pthis->get(i,j).f(), blank);
+            printf("%5f%s", pthis->get(i,j).val(), blank);
         }
         printf("\n");
     }
@@ -1321,7 +1321,7 @@ static float fast_sqrt_float(float n)
 
 static Float fast_sqrt(Float n)
 {
-    return Float(fast_sqrt_float((float)n.f()));
+    return Float(fast_sqrt_float((float)n.val()));
 }
 #endif
 

@@ -261,7 +261,7 @@ void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list,
             //TODO:support variadic coeff.
             continue;
         }
-        if (!ivinfo->is_biv()) {
+        if (ivinfo->is_div()) {
             //TODO: support DIV and compute the step value of DIV.
             continue;
         }

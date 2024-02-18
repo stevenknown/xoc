@@ -198,9 +198,8 @@ void RPCtx::dumpSweepOut(IR const* ir1, IR const* ir2,
         tmpbuf.vstrcat(format, args);
         va_end(args);
     }
-    StrBuf tmp1(8), tmp2(8);
     ActHandler ach = m_act_mgr->dump("%s is swept out by %s",
-        dumpIRName(ir1, tmp1), dumpIRName(ir2, tmp2));
+        DumpIRName().dump(ir1), DumpIRName().dump(ir2));
     if (format != nullptr) {
         ASSERT0(ach.info);
         ach.info->strcat(", because:%s", tmpbuf.getBuf());
@@ -1719,6 +1718,7 @@ void RegPromot::handleExpInBody(IR * occ, IR const* dele,
     bool r = occ->getParent()->replaceKid(occ, pr, false);
     ASSERT0_DUMMYUSE(r);
 
+    pr->copyType(occ);
     pr->copyAI(occ, m_rg);
     m_gvn->copyVN(pr, occ);
 
@@ -1729,9 +1729,9 @@ void RegPromot::handleExpInBody(IR * occ, IR const* dele,
 }
 
 
-void RegPromot::findAndRecordRestore(IR * occ, IR const* dele,
-                                     MOD DelegateMgr & delemgr,
-                                     OUT RestoreTab & restore2mem)
+void RegPromot::findAndRecordRestore(
+    IR * occ, IR const* dele, MOD DelegateMgr & delemgr,
+    OUT RestoreTab & restore2mem)
 {
     //Note, may be some USE of 'occ' has already been promoted to
     //PR, but it doesn't matter, you don't need to check the truely
@@ -1748,11 +1748,9 @@ void RegPromot::findAndRecordRestore(IR * occ, IR const* dele,
 
 
 //restore2mem: record the delegate that need to restore.
-void RegPromot::handleStmtInBody(IR * occ, IR const* dele,
-                                 MOD DelegateMgr & delemgr,
-                                 OUT RestoreTab & restore2mem,
-                                 OUT Occ2Occ & occ2newocc,
-                                 RPCtx const& ctx)
+void RegPromot::handleStmtInBody(
+    IR * occ, IR const* dele, MOD DelegateMgr & delemgr,
+    OUT RestoreTab & restore2mem, OUT Occ2Occ & occ2newocc, RPCtx const& ctx)
 {
     ASSERT0(isStmtCand(occ));
     ASSERTN(occ->getRHS(), ("must be store operation"));
@@ -1782,10 +1780,9 @@ void RegPromot::handleStmtInBody(IR * occ, IR const* dele,
 
 
 //restore2mem: record the delegate that need to restore.
-void RegPromot::handleAccessInBody(IR * ref, IR const* dele,
-                                   DelegateMgr & delemgr,
-                                   OUT RestoreTab & restore2mem,
-                                   OUT Occ2Occ & occ2newocc, RPCtx const& ctx)
+void RegPromot::handleAccessInBody(
+    IR * ref, IR const* dele, DelegateMgr & delemgr,
+    OUT RestoreTab & restore2mem, OUT Occ2Occ & occ2newocc, RPCtx const& ctx)
 {
     ASSERT0(ref && dele);
     ASSERT0(ref->isMemRefNonPR());
@@ -1800,9 +1797,9 @@ void RegPromot::handleAccessInBody(IR * ref, IR const* dele,
 //The function generates iniailization code of promoted PR.
 //Note the function leaves the work that to build DU chain of PR and STPR to
 //the sebsequent function, it will be done at buildDUChainForDeleRelatedPR().
-void RegPromot::handlePrologForStmt(IR const* dele, IR const* promoted_pr,
-                                    DelegateMgr & delemgr, IR * rhs,
-                                    IRBB * preheader)
+void RegPromot::handlePrologForStmt(
+    IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr, IR * rhs,
+    IRBB * preheader)
 {
     ASSERT0(dele->is_stmt());
     ASSERT0(rhs && rhs->is_exp());

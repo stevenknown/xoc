@@ -39,51 +39,66 @@ bool ScalarOpt::isParticipateInOpt() const
 }
 
 
+bool ScalarOpt::worthToDo(Pass const* pass, UINT cp_count,
+                          UINT licm_count, UINT rp_count)
+{
+    if (pass->getPassType() == PASS_LICM && licm_count > 1 && cp_count > 1) {
+        //LICM has performed at least once.
+        //Sometime, LICM doing the counter-effect to CP.
+        //We make the simplest choose that if both LICM and CP have performed
+        //more than once, says twice, it is not worthy to do any more.
+        return false;
+    }
+    if (pass->getPassType() == PASS_RP && rp_count > 1 && cp_count > 1) {
+        //RP has performed at least once.
+        //Sometime, RP doing the counter-effect to CP.
+        //We make the simplest choose that if both RP and CP have performed
+        //more than once, says twice, it is not worthy to do any more.
+        return false;
+    }
+    if (pass->getPassType() == PASS_CP && licm_count > 1 && cp_count > 1) {
+        //CP has performed at least once.
+        //Sometime, LICM doing the counter-effect to CP.
+        //We make the simplest choose that if both LICM and CP have performed
+        //more than once, says twice, it is not worthy to do any more.
+        return false;
+    }
+    return true;
+}
+
+
+void ScalarOpt::updateCounter(Pass const* pass, UINT & cp_count,
+                              UINT & licm_count, UINT & rp_count)
+{
+    licm_count += pass->getPassType() == PASS_LICM ? 1 : 0;
+    rp_count += pass->getPassType() == PASS_RP ? 1 : 0;
+    cp_count += pass->getPassType() == PASS_CP ? 1 : 0;
+}
+
+
 bool ScalarOpt::perform(OptCtx & oc)
 {
     if (!isParticipateInOpt()) { return false; }
-    xcom::TTab<Pass*> opt_tab;
-    xcom::List<Pass*> passlist;
-    SimpCtx simp(&oc);
-    if (g_do_gvn) { m_pass_mgr->registerPass(PASS_GVN); }
-    if (g_do_vrp) { m_pass_mgr->registerPass(PASS_VRP); }
-    if (g_do_pre) {
-        //Do PRE individually.
-        //Since it will incur the opposite effect with Copy-Propagation.
-        Pass * pre = m_pass_mgr->registerPass(PASS_PRE);
-        pre->perform(oc);
-        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+    ASSERT0(oc.is_cfg_valid());
+    ASSERT0(m_rg && m_rg->getCFG()->verify());
+    List<Pass*> passlist; //A list of Optimization.
+    if (g_do_gvn) {
+        m_pass_mgr->registerPass(PASS_GVN);
     }
-    if (g_do_dce || g_do_dce_aggressive) {
-        DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
-        dce->set_elim_cfs(g_do_dce_aggressive);
-        passlist.append_tail(dce);
+    if (g_do_vrp) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_VRP));
     }
-    bool in_ssa_form = false;
-    PRSSAMgr * ssamgr = m_rg->getPRSSAMgr();
-    if (ssamgr != nullptr && ssamgr->is_valid()) {
-        in_ssa_form = true;
+    if (g_do_ivr) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_IVR));
     }
-    if (!in_ssa_form) {
-        //RP can reduce the memory operations and
-        //improve the effect of PR SSA, so perform
-        //RP before SSA construction.
-        //TODO: Do SSA renaming when after register promotion done.
-        if (g_do_rp) {
-            //First RP.
-            passlist.append_tail(m_pass_mgr->registerPass(PASS_RP));
-        }
-    }
+    CopyProp * cp = nullptr;
     if (g_do_cp || g_do_cp_aggressive) {
-        CopyProp * pass = (CopyProp*)m_pass_mgr->registerPass(PASS_CP);
+        cp = (CopyProp*)m_pass_mgr->registerPass(PASS_CP);
         if (g_do_cp_aggressive) {
-            pass->setPropagationKind(CP_PROP_UNARY|CP_PROP_NONPR|
-                                     CP_PROP_INEXACT_MEM);
+            cp->setPropagationKind(CP_PROP_UNARY|CP_PROP_NONPR|
+                                   CP_PROP_INEXACT_MEM);
         }
-        passlist.append_tail(pass);
-    }
-    if (g_do_vect) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_VECT));
+        passlist.append_tail(cp);
     }
     if (g_do_rce) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_RCE));
@@ -92,20 +107,33 @@ bool ScalarOpt::perform(OptCtx & oc)
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LICM));
     }
     if (g_do_rp) {
-        //Second RP.
+        //RP can reduce the memory operations and
+        //improve the effect of PR SSA, so perform
+        //RP before SSA construction.
         passlist.append_tail(m_pass_mgr->registerPass(PASS_RP));
     }
     if (g_do_gcse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_GCSE));
     }
-    if (g_do_lcse) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_LCSE));
+    if (g_do_cp || g_do_cp_aggressive) {
+        ASSERT0(cp);
+        passlist.append_tail(cp);
+    }
+    if (g_do_dce || g_do_dce_aggressive) {
+        DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
+        dce->set_elim_cfs(g_do_dce_aggressive);
+        passlist.append_tail(dce);
     }
     if (g_do_dse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_DSE));
     }
-    if (g_do_ivr) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_IVR));
+    if (g_do_vect) {
+        //Vectorization expects that CP, DCE, LICM, RP and CfgOpt
+        //have been performed.
+        Vectorization * pass = (Vectorization*)m_pass_mgr->
+            registerPass(PASS_VECT);
+        if (g_opt_level >= OPT_LEVEL3) { pass->setAggressive(true); }
+        passlist.append_tail(pass);
     }
     if (g_do_loop_convert) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LOOP_CVT));
@@ -113,53 +141,52 @@ bool ScalarOpt::perform(OptCtx & oc)
     if (g_do_lftr) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LFTR));
     }
+    ASSERT0(m_dumgr->verifyMDRef());
+    ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+    ASSERT0(m_rg->getCFG()->verify());
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0(m_cfg->verifyRPO(oc));
+    ASSERT0(m_cfg->verifyLoopInfo(oc));
+    ASSERT0(m_cfg->verifyDomAndPdom(oc));
+    ASSERT0(!m_rg->getLogMgr()->isEnableBuffer());
     bool res = false;
     bool change;
     UINT count = 0;
-    BBList * bbl = m_rg->getBBList();
-    IRCFG * cfg = m_rg->getCFG();
-    DUMMYUSE(cfg);
-    Refine * refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
+    UINT cp_count = 0;
+    UINT licm_count = 0;
+    UINT rp_count = 0;
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
              pass != nullptr; pass = passlist.get_next()) {
-            ASSERT0(verifyIRandBB(bbl, m_rg));
-            bool doit = pass->perform(oc);
+            ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+            CHAR const* passname = pass->getPassName();
+            DUMMYUSE(passname);
+            bool doit = false;
+            if (worthToDo(pass, cp_count, licm_count, rp_count)) {
+                doit = pass->perform(oc);
+            }
             if (doit) {
                 change = true;
-                ASSERT0(verifyIRandBB(bbl, m_rg));
-                ASSERT0(cfg->verify());
+                updateCounter(pass, cp_count, licm_count, rp_count);
             }
-            RefineCtx rc(&oc);
-            refine->refineBBlist(bbl, rc);
+            res |= doit;
+            ASSERT0(m_dumgr->verifyMDRef());
+            ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+            ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+            ASSERT0(m_rg->getCFG()->verify());
+            ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+            ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
             ASSERT0(m_cfg->verifyRPO(oc));
             ASSERT0(m_cfg->verifyLoopInfo(oc));
+            ASSERT0(m_cfg->verifyDomAndPdom(oc));
+            ASSERT0(!m_rg->getLogMgr()->isEnableBuffer());
         }
-        ASSERT0(m_rg->getDUMgr() && m_rg->getDUMgr()->verifyMDRef());
-        ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
-        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
-        ASSERT0(cfg->verify());
-        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
-        ASSERT0(cfg->verifyRPO(oc));
-        ASSERT0(m_cfg->verifyLoopInfo(oc));
-        ASSERT0(cfg->verifyDomAndPdom(oc));
         count++;
-        res |= change;
     } while (change && count < 20);
     ASSERT0(!change);
-
-    if (g_do_lcse) {
-        LCSE * lcse = (LCSE*)m_pass_mgr->registerPass(PASS_LCSE);
-        lcse->set_enable_filter(false);
-        res |= lcse->perform(oc);
-    }
-
-    if (g_do_rp) {
-        RegPromot * r = (RegPromot*)m_pass_mgr->registerPass(PASS_RP);
-        res |= r->perform(oc);
-    }
     return res;
 }
 

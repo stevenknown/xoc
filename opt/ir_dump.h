@@ -89,6 +89,14 @@ public:
     CHAR const* attr;
 };
 
+class DumpIRName {
+    COPY_CONSTRUCTOR(DumpIRName);
+    xcom::StrBuf m_buf;
+public:
+    DumpIRName(UINT initsize = 8) : m_buf(initsize) {}
+    CHAR const* dump(IR const* ir) { return xoc::dumpIRName(ir, m_buf); }
+};
+
 void dumpUNDEF(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpMemRefGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);

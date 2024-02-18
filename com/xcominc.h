@@ -27,6 +27,7 @@ using namespace xcom;
 #include "rational.h"
 #include "flty.h"
 #include "bigint.h"
+#include "numdiff.h"
 #include "birational.h"
 #include "matt_dump.h"
 #include "matt.h"
@@ -40,5 +41,7 @@ using namespace xcom;
 #include "scc.h"
 #include "lca.h"
 #include "assemblebin.h"
+#include "int_hash.h"
+#include "log.h"
 #endif
 

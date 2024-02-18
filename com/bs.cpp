@@ -827,12 +827,15 @@ void BitSet::dump(FileObj & fo, UFlag flag, BSIdx last_pos) const
         }
         return;
     }
-    //fprintf(h, "\nbitset(hex):\n\t");
-    //fprintf(h, "[0x");
-    //for (BYTE byte = m_ptr[i]; i <= DIVBPB(elem); byte = m_ptr[++i]) {
-    //    fprintf(h, "%x", byte);
-    //}
-    //fprintf(h, "]");
+    if (flag.have(BS_DUMP_HEX)) {
+        fo.prt("\nbitset(hex):\n\t");
+        fo.prt("[0x");
+        UINT i = 0;
+        for (BYTE byte = m_ptr[i]; i <= DIVBPB(elem); byte = m_ptr[++i]) {
+            fo.prt("%x", byte);
+        }
+        fo.prt("]");
+    }
 
     //Print as binary
     if (flag.have(BS_DUMP_BITSET)) {

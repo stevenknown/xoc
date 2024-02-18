@@ -189,6 +189,17 @@ protected:
     void prescanIRList(IR const* ir);
     void prescanBBList(BBList const* bblst);
     bool partitionRegion();
+    bool performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc);
+
+    //The function only simplies array ingredient operations.
+    //Simplification will maintain CFG, PRSSA, MDSSA, and DU Ref information,
+    //excepts the classic DU-Chain.
+    bool performSimplifyArrayIngredient(OptCtx & oc);
+
+    //The function perform normal simplifications, include CFG,
+    //array operations etc.
+    //Simplification will maintain CFG, PRSSA, MDSSA, and DU Ref information,
+    //excepts the classic DU-Chain.
     bool performSimplify(OptCtx & oc);
     bool processRegionIRInIRList(IR const* ir);
     bool processRegionIRInIRList(OptCtx & oc);
@@ -724,7 +735,7 @@ public:
     virtual bool MiddleProcess(OptCtx & oc);
 
     //Map from prno to related Var.
-    Var * mapPR2Var(PRNO prno)
+    Var * mapPR2Var(PRNO prno) const
     { return ANA_INS_prno2var(getAnalysisInstrument()).get((VecIdx)prno); }
 
     //Construct BB list by destructing CFG.

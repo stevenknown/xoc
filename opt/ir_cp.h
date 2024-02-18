@@ -211,6 +211,11 @@ protected:
                              IR const* prop_value,
                              IRListIter const& cur_iter) const;
     virtual bool isCopyOP(IR * ir) const;
+    bool isLegalToPhiOpnd(IR const* ir) const
+    {
+        ASSERT0(ir->is_exp());
+        return ir->isPhiOpnd();
+    }
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
 

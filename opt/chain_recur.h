@@ -108,6 +108,8 @@ public:
     static bool doDiv(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
                       MOD ChainRecMgr & mgr);
     void dump(Region const* rg) const;
+    CHAR const* dump(Region const* rg, UINT indent,
+                     OUT xcom::StrBuf & buf) const;
 
     //The function extract value from given 'ir'.
     //Return true if extract value successfully.

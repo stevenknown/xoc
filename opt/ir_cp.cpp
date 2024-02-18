@@ -239,8 +239,9 @@ bool CopyProp::isCopyOP(IR * ir) const
     SWITCH_CASE_INDIRECT_MEM_STMT:
     SWITCH_CASE_WRITE_ARRAY:
     case IR_STPR:
-        if (ir->is_stpr() && !isLowCostExp(ir->getRHS())) {
-            //CASE:Propagate LD/ILD through PR may degrade performance, e.g:
+        if (ir->is_stpr() && !is_aggressive() && !isLowCostExp(ir->getRHS())) {
+            //CASE:Under unaggressive mode, propagating LD/ILD through PR may
+            //degrade performance, e.g:
             //  pr1 = LD(x)
             //  while (..) {
             //     = pr1
@@ -345,14 +346,14 @@ bool CopyProp::canBeCandidate(IR const* ir) const
     default:;
     }
     if (ir->isMemRefNonPR() && m_prop_kind.have(CP_PROP_NONPR)) {
+        //TODO:In aggressive mode, we anticipate propagating RHS
+        //expression even if it is inexact.
+        //e.g: s is MC type.
+        //    s = *p
+        //    *q = s
+        //  *p can be propagated.
         if (ir->getExactRef() == nullptr && !allowInexactMD()) {
-            //TODO:In aggressive mode, we anticipate propagating RHS
-            //expression even if it is inexact.
-            //e.g: s is MC type.
-            //    s = *p
-            //    *q = s
-            //  *p can be propagated.
-            return false;
+           return false;
         }
         return true;
     }
@@ -623,15 +624,14 @@ void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
     if (!getRegion()->isLogMgrInit()) { return; }
     note(getRegion(), "\n==-- DUMP %s '%s' --==",
          getPassName(), m_rg->getRegionName());
-    xcom::StrBuf tmp(8);
     note(getRegion(),
          "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
-         dumpIRName(prop_value, tmp));
+         DumpIRName().dump(prop_value));
     m_rg->getLogMgr()->incIndent(4);
     dumpIR(def_stmt, m_rg, nullptr, IR_DUMP_KID|IR_DUMP_VAR_DECL);
     m_rg->getLogMgr()->decIndent(4);
     note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
-         dumpIRName(use, tmp));
+         DumpIRName().dump(use));
     m_rg->getLogMgr()->incIndent(4);
     if (use->is_id()) {
         ASSERT0(m_mdssamgr);
@@ -857,6 +857,9 @@ bool CopyProp::doPropUseSet(IRSet const& useset, IR const* def_stmt,
         }
         if (!allowPropConstToPhiOpnd() && use->getStmt()->is_phi() &&
             prop_value->isConstExp()) {
+            continue;
+        }
+        if (use->getStmt()->is_phi() && !isLegalToPhiOpnd(new_prop_value)) {
             continue;
         }
         if (use->is_id()) {

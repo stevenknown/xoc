@@ -109,16 +109,16 @@ void bs_test2(FILE * h)
     xcom::SBitSet<BITS_PER_SEG> a(&sm), b(&sm);
     a.bunion(8);
     a.bunion(512);
-    a.dump2(h);
+    a.dump(h);
     a.intersect(b);
-    a.dump2(h);
+    a.dump(h);
 
     xcom::SBitSet<BITS_PER_SEG> c(&sm), d(&sm);
     c.bunion(8);
     c.bunion(512);
-    c.dump2(h);
+    c.dump(h);
     d.diff(c);
-    d.dump2(h);
+    d.dump(h);
 
     xcom::BitSet e,f;
     e.bunion(64);
@@ -128,7 +128,7 @@ void bs_test2(FILE * h)
     g.bunion(100);
     g.bunion(600);
     g.bunion(1500);
-    g.dump2(h);
+    g.dump(h);
     m.bunion(1501);
     m.bunion(2500);
     m.bunion(3500);

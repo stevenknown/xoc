@@ -91,6 +91,7 @@ bool g_do_gvn = true;
 bool g_do_pre = false;
 bool g_do_rce = false;
 bool g_do_vect = false;
+bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
 bool g_do_mdssa = false;
@@ -109,6 +110,7 @@ bool g_do_relaxation = false;
 bool g_retain_pass_mgr_for_region = true;
 UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
+bool g_is_simplify_array_ingredient = true;
 bool g_is_search_and_copy_dbx = true;
 bool g_generate_var_for_pr = true;
 DumpOption g_dump_opt;
@@ -206,6 +208,7 @@ DumpOption::DumpOption()
     is_dump_vrp = false;
     is_dump_lftr = false;
     is_dump_vectorization = false;
+    is_dump_loop_dep_ana = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
     is_dump_ivr = false;
@@ -344,6 +347,12 @@ bool DumpOption::isDumpLFTR() const
 bool DumpOption::isDumpVectorization() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_vectorization);
+}
+
+
+bool DumpOption::isDumpLoopDepAna() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_loop_dep_ana);
 }
 
 
@@ -562,6 +571,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_pre = %s", g_do_pre ? "true":"false");
     note(lm, "\ng_do_rce = %s", g_do_rce ? "true":"false");
     note(lm, "\ng_do_vect = %s", g_do_vect ? "true":"false");
+    note(lm, "\ng_do_loop_dep_ana = %s", g_do_loop_dep_ana ? "true":"false");
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
     note(lm, "\ng_do_mdssa = %s", g_do_mdssa ? "true":"false");
@@ -583,6 +593,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_verify_level = %s", Option::getOptLevelName(g_verify_level));
     note(lm, "\ng_is_simplify_parameter = %s",
          g_is_simplify_parameter ? "true":"false");
+    note(lm, "\ng_is_simplify_array_ingredient = %s",
+         g_is_simplify_array_ingredient ? "true":"false");
     note(lm, "\ng_is_search_and_copy_dbx = %s",
          g_is_search_and_copy_dbx ? "true":"false");
     note(lm, "\ng_generate_var_for_pr = %s",

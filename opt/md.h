@@ -47,7 +47,7 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 typedef UINT MDIdx;
 
-#define MD_UNDEF 0 //Undefined.
+#define MD_UNDEF 0 //Undefined MD index
 
 //Represent all program memory.
 #define MD_FULL_MEM 1
@@ -174,7 +174,7 @@ public:
         } s1;
         BYTE s1v;
     } u2;
-
+public:
     MD() { clean(); }
     MD(MD const& md)
     {
@@ -182,7 +182,6 @@ public:
         MD_id(this) = 0;
         copy(&md);
     }
-    MD const& operator = (MD const&);
 
     inline void copy(MD const* md)
     {
@@ -272,6 +271,7 @@ public:
     //Return true if md's address has been taken.
     bool is_taken_addr() const { return get_base()->is_taken_addr(); }
 
+    MD const& operator = (MD const&);
     inline bool operator == (MD const& src) const
     {
         ASSERT0(this != &src);
@@ -302,6 +302,7 @@ typedef TMapIter<MD const*, MD const*> ConstMDIter;
 
 class CompareOffset {
 public:
+    MD const* createKey(MD const* t) { return t; }
     bool is_less(MD const* t1, MD const*  t2) const
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
@@ -312,7 +313,6 @@ public:
                 (((ULONGLONG)MD_ofst(t2)) << 1) |
                 (((ULONGLONG)MD_size(t2)) << 32));
     }
-
     bool is_equ(MD const* t1, MD const* t2) const
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
@@ -323,8 +323,6 @@ public:
                 (((ULONGLONG)MD_ofst(t2)) << 1) |
                 (((ULONGLONG)MD_size(t2)) << 32));
     }
-
-    MD const* createKey(MD const* t) { return t; }
 };
 
 
@@ -346,11 +344,19 @@ class MDTab {
 protected:
     OffsetTab m_ofst_tab;
     MD const* m_invalid_ofst_md; //record MD with invalid ofst
-
 public:
     MDTab() { m_invalid_ofst_md = nullptr; }
 
-    void init(UINT hash_bucket_size);
+    void append(MD const* md)
+    {
+        if (md->is_exact() || md->is_range()) {
+            m_ofst_tab.append(md);
+            return;
+        }
+        ASSERT0(m_invalid_ofst_md == nullptr);
+        m_invalid_ofst_md = md;
+    }
+
     void clean()
     {
         m_invalid_ofst_md = nullptr;
@@ -368,16 +374,8 @@ public:
         return m_invalid_ofst_md;
     }
 
-    void append(MD const* md)
-    {
-        if (md->is_exact() || md->is_range()) {
-            m_ofst_tab.append(md);
-            return;
-        }
-        ASSERT0(m_invalid_ofst_md == nullptr);
-        m_invalid_ofst_md = md;
-    }
-
+    OffsetTab * get_ofst_tab() {  return &m_ofst_tab; }
+    MD const* get_effect_md() { return m_invalid_ofst_md; }
     UINT get_elem_count()
     {
         UINT elems = 0;
@@ -387,9 +385,6 @@ public:
         elems += m_ofst_tab.get_elem_count();
         return elems;
     }
-
-    OffsetTab * get_ofst_tab() {  return &m_ofst_tab; }
-    MD const* get_effect_md() { return m_invalid_ofst_md; }
     void get_elems(OUT Vector<MD const*> & mdv, ConstMDIter & iter)
     {
         MDIdx idx = MD_UNDEF;
@@ -401,6 +396,8 @@ public:
             mdv.set(idx++, md);
         }
     }
+
+    void init(UINT hash_bucket_size);
 };
 
 
@@ -422,6 +419,42 @@ public:
     { DefSBitSetCore::bunion(mdid, m); }
     void bunion_pure(MDSet const& mds, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(mds, m); }
+
+    void diff(MD const* md, DefMiscBitSetMgr & m)
+    {
+        ASSERT0(md);
+        DefSBitSetCore::diff(MD_id(md), m);
+    }
+    void diff(MDIdx id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
+    void diff(MDSet const& mds, DefMiscBitSetMgr & m)
+    {
+        ASSERT0(this != &mds);
+        ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
+
+        //TBD: Does it necessary to judge if either current
+        //MD or input MD is FULL_MEM?
+        //As we observed, passes that utilize MD relationship add
+        //MD2 to accroding IR's MDSet, which can keep global variables
+        //and MD2 dependence.
+        //e.g:
+        //  #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+        //  #represented in Program Region.
+        //  g=10;
+        //
+        //  #maydef={MD2, MD10}
+        //  foo();
+        //if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
+        //    clean(m);
+        //    return;
+        //}
+        DefSBitSetCore::diff(mds, m);
+    }
+    //This function will walk through whole current MDSet and differenciate
+    //overlapped elements.
+    //Note this function is very costly.
+    void diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys);
+    void dump(MDSystem const* ms, VarMgr const* vm, bool detail = false) const;
+    void dump(Region * rg) const;
 
     bool is_contain_pure(MDIdx mdid) const
     { return DefSBitSetCore::is_contain(mdid); }
@@ -493,42 +526,6 @@ public:
 
         return DefSBitSetCore::is_intersect(mds);
     }
-
-    void diff(MD const* md, DefMiscBitSetMgr & m)
-    {
-        ASSERT0(md);
-        DefSBitSetCore::diff(MD_id(md), m);
-    }
-    void diff(MDIdx id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
-    void diff(MDSet const& mds, DefMiscBitSetMgr & m)
-    {
-        ASSERT0(this != &mds);
-        ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
-
-        //TBD: Does it necessary to judge if either current
-        //MD or input MD is FULL_MEM?
-        //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
-        //and MD2 dependence.
-        //e.g:
-        //  #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //  #represented in Program Region.
-        //  g=10;
-        //
-        //  #maydef={MD2, MD10}
-        //  foo();
-        //if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
-        //    clean(m);
-        //    return;
-        //}
-        DefSBitSetCore::diff(mds, m);
-    }
-    //This function will walk through whole current MDSet and differenciate
-    //overlapped elements.
-    //Note this function is very costly.
-    void diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys);
-    void dump(MDSystem const* ms, VarMgr const* vm, bool detail = false) const;
-    void dump(Region * rg) const;
 
     //Get unique MD that is effective, and offset must be valid.
     //Note the MDSet can only contain one element.

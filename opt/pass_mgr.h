@@ -96,6 +96,7 @@ protected:
     virtual Pass * allocLinearScanRA();
     virtual Pass * allocCallGraph();
     virtual Pass * allocVectorization();
+    virtual Pass * allocLoopDepAna();
     virtual Pass * allocPrologueEpilogue();
     virtual Pass * allocGPAdjustment();
     virtual Pass * allocBROpt();

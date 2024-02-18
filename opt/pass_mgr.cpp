@@ -272,6 +272,16 @@ Pass * PassMgr::allocVectorization()
 }
 
 
+Pass * PassMgr::allocLoopDepAna()
+{
+    #ifdef FOR_IP
+    return new LoopDepAna(m_rg, (GVN*)registerPass(PASS_GVN));
+    #else
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocLinearScanRA()
 {
     #ifdef REF_TARGMACH_INFO
@@ -554,6 +564,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_VECT:
         pass = allocVectorization();
+        break;
+    case PASS_LOOP_DEP_ANA:
+        pass = allocLoopDepAna();
         break;
     case PASS_PROLOGUE_EPILOGUE:
         pass = allocPrologueEpilogue();

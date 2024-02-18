@@ -1480,7 +1480,6 @@ void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
     if (!ir->is_stmt() || (!ir->isMemRefNonPR() && !ir->isCallStmt())) {
         return;
     }
-    VOpndSetIter iter = nullptr;
     if (!parting_line) {
         note(getRegion(), "\n----");
         parting_line = true;
@@ -1490,17 +1489,18 @@ void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
     MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(ir);
     if (mdssainfo == nullptr || mdssainfo->isEmptyVOpndSet()) {
         prt(getRegion(), "%s", g_msg_no_mdssainfo);
-    } else {
-        for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
-            i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
-            note(getRegion(), "\n--DEF:");
-            VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
-            ASSERT0(vopnd && vopnd->is_md());
-            if (vopnd->getDef() != nullptr) {
-                ASSERT0(vopnd->getDef()->getOcc() == ir);
-            }
-            vopnd->dump(m_rg, &m_usedef_mgr);
+        return;
+    }
+    VOpndSetIter iter = nullptr;
+    for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
+        i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
+        note(getRegion(), "\n--DEF:");
+        VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        if (vopnd->getDef() != nullptr) {
+            ASSERT0(vopnd->getDef()->getOcc() == ir);
         }
+        vopnd->dump(m_rg, &m_usedef_mgr);
     }
 }
 
@@ -1820,8 +1820,7 @@ static void dumpDef(MDDef const* def, MD const* vopndmd, UseDefMgr const* mgr,
         if (has_dump_something) {
             prt(rg, " ");
         }
-        xcom::StrBuf tmp(8);
-        prt(rg, "(%s)", dumpIRName(def->getOcc(),tmp));
+        prt(rg, "(%s)", DumpIRName().dump(def->getOcc()));
         has_dump_something = true;
     }
 
@@ -1977,8 +1976,7 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
         parting_line = true;
     }
     note(rg, "\n");
-    xcom::StrBuf tmp(8);
-    prt(rg, "%s", dumpIRName(ir, tmp));
+    prt(rg, "%s", DumpIRName().dump(ir));
 
     MDSSAMgr * pmgr = const_cast<MDSSAMgr*>(this);
     MDSSAInfo * mdssainfo = pmgr->getMDSSAInfoIfAny(ir);

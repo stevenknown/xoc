@@ -376,7 +376,6 @@ public:
     { diff(src, &m.sm, &m.scflst); }
 
     void dump(FILE * h) const;
-    void dump2(FILE * h) const;
 
     UINT get_elem_count() const;
     BSIdx get_first(TSEGIter ** cur) const;

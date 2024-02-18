@@ -132,10 +132,17 @@ void GCSE::copyVN(IR const* newir, IR const* oldir)
 }
 
 
+void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+    m_actmgr.dump("%s is CSE and will be replaced by %s",
+        DumpIRName().dump(oldexp), DumpIRName().dump(newexp));
+}
+
+
 void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
 {
     ASSERT0(use_stmt->is_kids(use));
-    ASSERTN(addElim(use->id()), ("only for statistic"));
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //gen_pr hold the CSE value come from gen-stmt.
@@ -143,6 +150,7 @@ void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr && gen_pr->is_pr());
     IR * new_pr = m_rg->dupIRTree(gen_pr);
+    dumpAct(use, new_pr);
     bool f = use_stmt->replaceKid(use, new_pr, true);
     ASSERT0_DUMMYUSE(f);
 
@@ -164,7 +172,6 @@ void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
 void GCSE::elimCseOfBranch(IR * use, IR * use_stmt, IN IR * gen)
 {
     ASSERT0(use_stmt->is_kids(use));
-    ASSERTN(addElim(use->id()), ("only for statistic"));
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //gen_pr hold the CSE value come from gen-stmt.
@@ -172,6 +179,7 @@ void GCSE::elimCseOfBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr);
     IR * new_pr = m_rg->dupIRTree(gen_pr);
+    dumpAct(use, new_pr);
 
     //Det of branch stmt have to be judgement operation.
     ASSERT0(use == BR_det(use_stmt));
@@ -661,21 +669,13 @@ bool GCSE::dump() const
 {
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
-    note(getRegion(), "\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
-    note(getRegion(), "\nELIMINATED IR: ");
-    for (VecIdx i = 0; i <= m_elimed.get_last_idx(); i++) {
-        if (i != 0) {
-            note(getRegion(), ",");
-        }
-        note(getRegion(), "id:%d", m_elimed.get(i));
-    }
+    m_actmgr.dump();
     return Pass::dump();
 }
 
 
 void GCSE::reset()
 {
-    m_elimed.clean();
     m_vn2exp.clean();
     m_exp2pr.clean();
 }

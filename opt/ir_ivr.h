@@ -57,6 +57,8 @@ public:
     void copy(IVLinearRep const& src)
     { LinearRep::copy(src); m_iv = src.m_iv; }
 
+    void dump(Region const* rg) const;
+
     IV const* getIV() const { return m_iv; }
 
     bool is_valid() const
@@ -108,19 +110,39 @@ public:
 public:
     IV() { memset((void*)this, 0, sizeof(IV)); }
 
+    void dump(Region const* rg) const;
+    CHAR const* dump(VarMgr const* vm, OUT xcom::StrBuf & buf) const;
+
     //Return the LoopInfo that IV located in.
     LI<IRBB> const* getLI() const { return IV_li(this); }
 
-    //Return the MD of IV occcurrence.
+    //Get the MD of IR stmt that represents the IV in reduction operation.
     MD const* getStmtOccMD() const
     {
         ASSERT0(getRedStmt());
         return getRedStmt()->getRefMD();
     }
+
+    //Get the Var of IR stmt that represents the IV in reduction operation.
+    Var const* getStmtOccVar() const
+    {
+        ASSERT0(getStmtOccMD());
+        return getStmtOccMD()->get_base();
+    }
+
+    //Get the MD of IR expression that represents the IV in reduction operation.
     MD const* getExpOccMD() const
     {
         //Reduction exp may be NULL if current IV is DIV.
         return getRedExp() != nullptr ? getRedExp()->getRefMD() : nullptr;
+    }
+
+    //Get the Var of IR expression that represents the IV in
+    //reduction operation.
+    Var const* getExpOccVar() const
+    {
+        ASSERT0(getExpOccMD());
+        return getExpOccMD()->get_base();
     }
 
     //Return the string name of stmt IV variable.
@@ -148,17 +170,40 @@ public:
     IVVal const& getInitVal() const { return IV_initv(this); }
     IVVal const& getStepVal() const { return IV_stepv(this); }
 
+    //Get the IV step integer value.
+    //Note the float-point type step value should able to be converted to
+    //integer, otherwise, step computation, such as: i+=1.5f, is not
+    //supported by IVR.
+    HOST_INT getStepValInt() const
+    {
+        ASSERT0(isStepValInt());
+        return getStepVal().getInt();
+    }
+
+    //Return true if IV found initial-value.
     bool hasInitVal() const { return !IV_initv(this).is_undef(); }
+
+    //Return true if IV found step-value.
     bool hasStepVal() const { return !IV_stepv(this).is_undef(); }
 
     //Return true if current IV is basic IV.
     bool is_biv() const { return m_is_biv; }
+
+    //Return true if current IV is derived IV.
+    bool is_div() const { return !is_biv(); }
 
     //Return true if 'ir' represent the reference of current IV.
     bool isRefIV(IR const* ir) const;
 
     //Return true if 'ref' represent the reference of current IV.
     bool isRefIV(MD const* ref) const;
+
+    //Return true if step value is integer.
+    bool isStepValInt() const { return getStepVal().is_int(); }
+    bool isStepValFP() const { return getStepVal().is_fp(); }
+    bool isStepValVar() const { return getStepVal().is_var(); }
+    bool isStepValExp() const { return getStepVal().is_exp(); }
+    bool isStepValCR() const { return getStepVal().is_cr(); }
 };
 
 
@@ -191,8 +236,11 @@ public:
     bool isInitExp() const
     { return getInitVal().getKind() == IVVal::VAL_IS_EXP; }
 
-    //Return true if step value is integer.
-    bool isStepValInt() const { return getStepVal().is_int(); }
+    //Return true if ir represents a reference to current BIV.
+    bool isRefBIV(IR const* ir) const { return isRefIV(ir); }
+
+    //Return true if md represents a reference to current BIV.
+    bool isRefBIV(MD const* md) const { return isRefIV(md); }
 
     //Return true if IV is increasing positive.
     //Otherwise the function know nothing about the direction.
@@ -260,12 +308,6 @@ public:
         return getInitVal().getMD();
     }
 
-    //Get the IV step integer value.
-    //Note the float-point type step value should able to be converted to
-    //integer, otherwise, step computation, such as: i+=1.5f, is not
-    //supported by IVR.
-    HOST_INT getStepValInt() const { return getStepVal().getInt(); }
-
     //Generate the IR expression of initial value of BIV.
     IR * genInitExp(IRMgr * irmgr) const;
 
@@ -298,6 +340,9 @@ public:
     IV::INCDIR getIncDir() const;
 
     ChainRec const* getChainRec() const { return DIV_chain_rec(this); }
+
+    //Return true if ir represents a reference to current DIV.
+    bool isRefDIV(IR const* ir) const { return isRefIV(ir); }
 
     //Return true if IV is increasing positive.
     //Otherwise the function know nothing about the direction.

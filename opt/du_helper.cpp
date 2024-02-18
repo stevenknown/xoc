@@ -853,9 +853,9 @@ CLASSIC_DU:
 }
 
 
-bool isUniqueDefInLoopForMustRef(IR const* ir, LI<IRBB> const* li,
-                                 Region const* rg,
-                                 MOD DefMiscBitSetMgr & sbsmgr)
+bool isUniqueDefInLoopForMustRef(
+    IR const* ir, LI<IRBB> const* li, Region const* rg,
+    MOD DefMiscBitSetMgr & sbsmgr)
 {
     ASSERT0(ir && ir->is_stmt());
     ASSERTN(ir->isMemRef(), ("not memref operation"));
@@ -1203,7 +1203,8 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
 
 
 bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
-                   bool include_itselfstmt, LI<IRBB> const* li, GVN const* gvn)
+                   bool include_itselfstmt, LI<IRBB> const* li, GVN const* gvn,
+                   OUT LoopDepInfo & info)
 {
     ASSERT0(li);
     xcom::List<IR*> lst;
@@ -1217,26 +1218,30 @@ bool isLoopCarried(IR const* ir, Region const* rg, bool is_aggressive,
         }
     }
     return isLoopCarried(ir, rg, is_aggressive, include_itselfstmt,
-                         lst, li, gvn);
+                         lst, li, gvn, info);
 }
 
 
 bool isLoopCarried(IR const* ir1, IR const* ir2, bool costly_analysis,
-                   LI<IRBB> const* li, Region const* rg, GVN const* gvn)
+                   LI<IRBB> const* li, Region const* rg, GVN const* gvn,
+                   OUT LoopDepInfo & info)
 {
     if (!xoc::isDependent(ir1, ir2, costly_analysis, rg)) {
         return false;
     }
     if (!xoc::isLoopIndependent(ir1, ir2, costly_analysis, li, rg, gvn)) {
+        LDI_kind(&info) = LOOP_DEP_CARRIED;
+        LDI_src(&info) = ir1;
+        info.setTgtIR(ir2);
         return true;
     }
     return false;
 }
 
 
-static bool hasLoopReduceDepInPRSSA(IR const* ir, Region const* rg,
-                                    LI<IRBB> const* li,
-                                    PRSSAMgr const* prssamgr)
+static bool hasLoopReduceDepInPRSSA(
+    IR const* ir, Region const* rg, LI<IRBB> const* li,
+    PRSSAMgr const* prssamgr, OUT LoopDepInfo & info)
 {
     ASSERT0(ir->is_exp() && ir->isPROp());
     ASSERT0(ir->getSSAInfo());
@@ -1247,6 +1252,9 @@ static bool hasLoopReduceDepInPRSSA(IR const* ir, Region const* rg,
     if (def->is_phi()) {
         //TODO:phi may not be in loopheader. If phi is place in loop body,
         //it may not be loop-carried.
+        LDI_kind(&info) = LOOP_DEP_REDUCE;
+        LDI_src(&info) = ir;
+        info.setTgtIR(def);
         return true;
     }
     MD const* defmd = def->getMustRef();
@@ -1255,15 +1263,18 @@ static bool hasLoopReduceDepInPRSSA(IR const* ir, Region const* rg,
     ASSERT0(irmd);
     if (isCover(defmd, irmd)) { return false; }
 
-    //It may be exist loop carried dependence if there is a MayDef between
+    //It may exist loop carried dependence if there is a MayDef between
     //ir and its Def in the DefDef Chain.
+    LDI_kind(&info) = LOOP_DEP_REDUCE;
+    LDI_src(&info) = ir;
+    info.setTgtIR(def);
     return true;
 }
 
 
-static bool hasLoopReduceDepInMDSSA(IR const* ir, Region const* rg,
-                                    LI<IRBB> const* li,
-                                    MDSSAMgr const* mdssamgr)
+static bool hasLoopReduceDepInMDSSA(
+    IR const* ir, Region const* rg, LI<IRBB> const* li,
+    MDSSAMgr const* mdssamgr, OUT LoopDepInfo & info)
 {
     ASSERT0(ir->is_exp() && ir->isMemRef());
     ASSERT0(mdssamgr->hasMDSSAInfo(ir));
@@ -1274,6 +1285,11 @@ static bool hasLoopReduceDepInMDSSA(IR const* ir, Region const* rg,
     if (def->is_phi()) {
         //TODO:phi may not be in loopheader. If phi is place in loop body,
         //it may not be loop-carried.
+        //e.g:It may exist loop carried dependence if there is a MayDef between
+        //ir and its Def in the DefDef Chain.
+        LDI_kind(&info) = LOOP_DEP_REDUCE;
+        LDI_src(&info) = ir;
+        info.setTgtMDDef(def);
         return true;
     }
     ASSERT0(def->getOcc());
@@ -1283,20 +1299,24 @@ static bool hasLoopReduceDepInMDSSA(IR const* ir, Region const* rg,
     ASSERT0(irmd);
     if (isCover(defmd, irmd)) { return false; }
 
-    //It may be exist loop carried dependence if there is a MayDef between
+    //It may exist loop carried dependence if there is a MayDef between
     //ir and its Def in the DefDef Chain.
+    LDI_kind(&info) = LOOP_DEP_REDUCE;
+    LDI_src(&info) = ir;
+    info.setTgtIR(def->getOcc());
     return true;
 }
 
 
-bool hasLoopReduceDep(IR const* ir, Region const* rg, LI<IRBB> const* li)
+bool hasLoopReduceDep(
+    IR const* ir, Region const* rg, LI<IRBB> const* li, OUT LoopDepInfo & info)
 {
     ASSERT0(ir->is_exp() && ir->isMemRef());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         ir->isMemRefNonPR()) {
         ASSERT0(mdssamgr->hasMDSSAInfo(ir));
-        return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr);
+        return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr, info);
     }
 
     DUMgr * dumgr = rg->getDUMgr();
@@ -1307,7 +1327,7 @@ bool hasLoopReduceDep(IR const* ir, Region const* rg, LI<IRBB> const* li)
     if (ir->isPROp()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
-            return hasLoopReduceDepInPRSSA(ir, rg, li, prssamgr);
+            return hasLoopReduceDepInPRSSA(ir, rg, li, prssamgr, info);
         }
     }
     return true;
@@ -1319,10 +1339,11 @@ bool hasLoopReduceDepForIRTree(IR const* ir, Region const* rg,
 {
     ASSERT0(ir->is_exp());
     ConstIRIter it;
+    LoopDepInfo tmp;
     for (IR const* x = xoc::iterInitC(ir, it, false);
          x != nullptr; x = xoc::iterNextC(it, true)) {
         if (!x->isMemRef()) { continue; }
-        if (hasLoopReduceDep(x, rg, li)) {
+        if (hasLoopReduceDep(x, rg, li, tmp)) {
             //TODO:Handle overlapped stmt by applying loop peeling or
             //loop fission.
             return true;
@@ -1332,8 +1353,8 @@ bool hasLoopReduceDepForIRTree(IR const* ir, Region const* rg,
 }
 
 
-static bool hasMoreThanOneDefInBBForMustRef(IR const* ir, IRBB const* bb,
-                                            Region const* rg, OUT UINT & defcnt)
+static bool hasMoreThanOneDefInBBForMustRef(
+    IR const* ir, IRBB const* bb, Region const* rg, OUT UINT & defcnt)
 {
     ASSERT0(defcnt <= 1);
     IRIter irit;
@@ -1348,8 +1369,8 @@ static bool hasMoreThanOneDefInBBForMustRef(IR const* ir, IRBB const* bb,
 }
 
 
-bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
-                                       LI<IRBB> const* li, OUT UINT & defcnt)
+bool hasMoreThanOneDefInLoopForMustRef(
+    IR const* ir, Region const* rg, LI<IRBB> const* li, OUT UINT & defcnt)
 {
     ASSERT0(ir->isMemRef());
     defcnt = 0;
@@ -1365,8 +1386,8 @@ bool hasMoreThanOneDefInLoopForMustRef(IR const* ir, Region const* rg,
 }
 
 
-bool hasUniqueDefInLoopForMustRef(IR const* ir, Region const* rg,
-                                  LI<IRBB> const* li)
+bool hasUniqueDefInLoopForMustRef(
+    IR const* ir, Region const* rg, LI<IRBB> const* li)
 {
     ASSERT0(ir && ir->isMemRef() && ir->getMustRef());
     if (ir->is_stmt()) {
@@ -1379,17 +1400,17 @@ bool hasUniqueDefInLoopForMustRef(IR const* ir, Region const* rg,
 }
 
 
-bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
-                            bool is_aggressive, bool include_itselfstmt,
-                            xcom::List<IR*> const& lst,
-                            LI<IRBB> const* li, GVN const* gvn)
+bool isLoopCarriedForIRTree(
+    IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
+    xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
+    OUT LoopDepInfo & info)
 {
     ConstIRIter it;
     for (IR const* x = xoc::iterInitC(ir, it, false);
          x != nullptr; x = xoc::iterNextC(it, true)) {
         if (!x->isMemRefNonPR()) { continue; }
         if (isLoopCarried(x, rg, is_aggressive, include_itselfstmt,
-                          lst, li, gvn)) {
+                          lst, li, gvn, info)) {
             //TODO:Handle overlapped stmt by applying loop peeling or
             //loop fission.
             return true;
@@ -1399,10 +1420,10 @@ bool isLoopCarriedForIRTree(IR const* ir, Region const* rg,
 }
 
 
-bool isLoopCarried(IR const* ir, Region const* rg,
-                   bool is_aggressive, bool include_itselfstmt,
-                   xcom::List<IR*> const& lst,
-                   LI<IRBB> const* li, GVN const* gvn)
+bool isLoopCarried(
+    IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
+    xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
+    OUT LoopDepInfo & info)
 {
     ASSERT0(ir);
     IR const* irstmt = ir->is_stmt() ? ir : ir->getStmt();
@@ -1412,7 +1433,7 @@ bool isLoopCarried(IR const* ir, Region const* rg,
          cand != nullptr; cand = lst.get_next(&it)) {
         if (cand == ir) { continue; }
         if (cand == irstmt && !include_itselfstmt) { continue; }
-        if (xoc::isLoopCarried(ir, cand, is_aggressive, li, rg, gvn)) {
+        if (xoc::isLoopCarried(ir, cand, is_aggressive, li, rg, gvn, info)) {
             return true;
         }
     }
@@ -1634,9 +1655,8 @@ static void removeUseOfPR(IR const* call, Region const* rg, MOD DUMgr * dumgr)
 }
 
 
-static inline void removeClassicDUChainForIR(IR * ir, Region * rg,
-                                             DUMgr * dumgr,
-                                             bool rmprdu, bool rmnonprdu)
+static inline void removeClassicDUChainForIR(
+    IR * ir, Region * rg, DUMgr * dumgr, bool rmprdu, bool rmnonprdu)
 {
     ASSERT0(rmprdu ^ rmnonprdu);
     if (ir->isCallStmt()) {
@@ -1790,8 +1810,8 @@ void ComputeMD2DefCnt::updateMDSet2DefCnt(MDSet const* may, MD const* must)
 }
 
 
-void ComputeMD2DefCnt::updateMD2DefCnt(IR const* ir,
-                                       OUT ConstIRList & only_maydef)
+void ComputeMD2DefCnt::updateMD2DefCnt(
+    IR const* ir, OUT ConstIRList & only_maydef)
 {
     if (!ir->hasResult()) {
         ASSERTN(!ir->isMemRef(), ("TODO"));

@@ -1032,6 +1032,13 @@ public:
     IR * getBase() const { return ARR_base(this); }
     IR * getSubList() const { return ARR_sub_list(this); }
 
+    //Return true if given array op 'src' has isomophic array structure that
+    //corresponds to current array, otherwise return false to tell caller we
+    //have no knowledge about the array structure.
+    //The array structure represented by dimensions and the number of
+    //elements in each dimensions.
+    bool isIsomoArrayStructTo(IR const* src) const;
+
     //Return true if exp is array base.
     bool is_base(IR const* exp) const { return exp == ARR_base(this); }
 

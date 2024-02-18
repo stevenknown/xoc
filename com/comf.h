@@ -445,7 +445,13 @@ inline bool xisdigithex(CHAR c)
 inline bool xisalpha(CHAR c) { return upper(c) >= 'A' && upper(c) <= 'Z'; }
 
 //Return abs value of 'a'.
-LONGLONG xabs(LONGLONG a);
+inline LONGLONG xabs(LONGLONG a) { return a >= LONGLONG(0) ? a : -a; }
+inline float xfabs(float a) { return (a < float(0.0)) ? -a : a; }
+inline double xfabs(double a) { return (a < double(0.0)) ? -a : a; }
+
+//Return sqrt value of 'num'.
+float xsqrt(float num);
+double xsqrt(double num);
 
 //Return true if the imm is valid for the limited bitsize.
 bool isValidImmForBitsize(UINT bitsize, UINT64 imm);

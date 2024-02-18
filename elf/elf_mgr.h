@@ -67,15 +67,62 @@ class FunctionInfo;
 
 ///////////////// Define some useful types. /////////////////
 
-typedef xcom::Vector<CHAR> CHARVec;
-typedef xcom::Vector<Off> OffVec;
-typedef xcom::Vector<CHAR const*> StringVec;
-typedef xcom::Vector<BYTE> BYTEVec;
-typedef xcom::List<CHAR const*> StringList;
-typedef xcom::Vector<SWord> SWordVec;
-typedef xcom::Vector<Word> WordVec;
-typedef xcom::Vector<Addr> AddrVec;
-typedef xcom::Vector<Sym const*> SymVec;
+class CHARVec : public xcom::Vector<BYTE> {
+    COPY_CONSTRUCTOR(CHARVec);
+public:
+    CHARVec() {}
+    CHARVec(UINT size) : xcom::Vector<BYTE>(size) {}
+};
+
+class OffVec : public xcom::Vector<Off> {
+    COPY_CONSTRUCTOR(OffVec);
+public:
+    OffVec() {}
+    OffVec(UINT size) : xcom::Vector<Off>(size) {}
+};
+
+class StringVec : public xcom::Vector<CHAR const*> {
+    COPY_CONSTRUCTOR(StringVec);
+public:
+    StringVec() {}
+    StringVec(UINT size) : xcom::Vector<CHAR const*>(size) {}
+};
+
+class BYTEVec : public xcom::Vector<BYTE> {
+    COPY_CONSTRUCTOR(BYTEVec);
+public:
+    BYTEVec() {}
+    BYTEVec(UINT size) : xcom::Vector<BYTE>(size) {}
+};
+
+class SWordVec : public xcom::Vector<SWord> {
+    COPY_CONSTRUCTOR(SWordVec);
+public:
+    SWordVec() {}
+    SWordVec(UINT size) : xcom::Vector<SWord>(size) {}
+};
+
+class WordVec : public xcom::Vector<Word> {
+    COPY_CONSTRUCTOR(WordVec);
+public:
+    WordVec() {}
+    WordVec(UINT size) : xcom::Vector<Word>(size) {}
+};
+
+class AddrVec : public xcom::Vector<Addr> {
+    COPY_CONSTRUCTOR(AddrVec);
+public:
+    AddrVec() {}
+    AddrVec(UINT size) : xcom::Vector<Addr>(size) {}
+};
+
+class SymVec : public xcom::Vector<Sym const*> {
+    COPY_CONSTRUCTOR(SymVec);
+public:
+    SymVec() {}
+    SymVec(UINT size) : xcom::Vector<Sym const*>(size) {}
+};
+
 //Record the link attribute of symbol for elf .symtab.
 typedef xcom::TMap<Sym const*, SymbolLinkAttrFlag> SymbolLinkAttrMap;
 typedef xcom::TMap<Sym const*, SymbolInfo*> SymbolInfoMap;
@@ -84,6 +131,8 @@ typedef xcom::TMap<Sym const*, SymbolInfoMap*> SymtabInfoMap;
 typedef xcom::TMapIter<Sym const*, SymbolInfoMap*> SymtabInfoIter;
 typedef xcom::TMap<Sym const*, Vector<FunctionInfo*>*> FuncInfoMap;
 typedef xcom::TMapIter<Sym const*, Vector<FunctionInfo*>*> FuncInfoIter;
+typedef xcom::List<CHAR const*> StringList;
+
 typedef enum tagEM_STATUS {
     EM_SUCC = 0,
     EM_ERR,

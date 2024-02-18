@@ -55,6 +55,7 @@ static INT find_newline_pos(xcom::StrBuf const& buf, UINT buflen, UINT start)
 static size_t prt_leading_newline(LogMgr * lm, xcom::StrBuf const& buf,
                                   UINT buflen, UINT start)
 {
+    ASSERT0(lm->is_init());
     size_t i = start;
     ASSERT0(buf.strlen() <= buflen);
     CHAR const* terminate_line_r = nullptr;
@@ -96,7 +97,7 @@ static size_t prt_leading_newline(LogMgr * lm, xcom::StrBuf const& buf,
 
 static void prt_indent(LogMgr * lm)
 {
-    if (lm->getFileHandler() == nullptr) { return; }
+    ASSERT0(lm->is_init());
     UINT indent = lm->getIndent();
     for (; indent > 0; indent--) {
         if (lm->isEnableBuffer()) {
@@ -115,9 +116,9 @@ static void prt_indent(LogMgr * lm)
 static void note_helper(LogMgr * lm, xcom::StrBuf const& buf)
 {
     ASSERT0(lm);
+    if (!lm->is_init()) { return; }
     FILE * h = lm->getFileHandler();
-    if (h == nullptr && !lm->isEnableBuffer()) { return; }
-
+    ASSERT0(h || lm->getBuffer());
     UINT const buflen = (UINT)buf.strlen();
     //Print leading \n.
     UINT cont_pos = (UINT)prt_leading_newline(lm, buf, buflen, 0);
@@ -165,6 +166,7 @@ static void note_helper(LogMgr * lm, xcom::StrBuf const& buf)
 
 static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
+    if (!lm->is_init()) { return; }
     va_list targs;
     va_copy(targs, args);
     xcom::StrBuf buf(64);
@@ -178,10 +180,9 @@ static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
 static void prt_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
     ASSERT0(lm);
+    if (!lm->is_init() || format == nullptr) { return; }
     FILE * h = lm->getFileHandler();
-    if ((h == nullptr && !lm->isEnableBuffer()) || format == nullptr) {
-        return;
-    }
+    ASSERT0(h || lm->getBuffer());
 
     va_list targs;
     va_copy(targs, args);
@@ -296,6 +297,7 @@ void note(FILE * h, UINT indent, CHAR const* format, ...)
 
 void prtIndent(Region const* rg, UINT indent)
 {
+    if (!rg->getLogMgr()->is_init()) { return; }
     prt_indent(rg->getLogMgr());
 }
 

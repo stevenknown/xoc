@@ -1578,7 +1578,6 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
 IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() || ir->is_starray());
-
     IR * stmtlist = nullptr;
     IR * last = nullptr;
 
@@ -1660,10 +1659,8 @@ IR * IRSimp::simplifyStoreArrayAddr(IR * ir,
 }
 
 
-IR * IRSimp::simplifyStoreArrayLHS(IR * ir,
-                                   OUT IR ** ret_list,
-                                   OUT IR ** last,
-                                   SimpCtx * ctx)
+IR * IRSimp::simplifyStoreArrayLHS(
+    IR * ir, OUT IR ** ret_list, OUT IR ** last, SimpCtx * ctx)
 {
     ASSERT0(ir->is_starray());
     Type const* type = ir->getType();
@@ -1800,7 +1797,7 @@ IR * IRSimp::simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx)
 }
 
 
-//Simplify array operator.
+//Simplify array operation.
 //Note ir may be freed.
 IR * IRSimp::simplifyArray(IR * ir, SimpCtx * ctx)
 {

@@ -58,7 +58,7 @@ public:
 //
 void DCECtx::dump(Region const* rg) const
 {
-    xcom::StrBuf tmp(8);
+    if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP DCECtx --==");
     note(rg, "\nEFFECT BB:");
     for (BSIdx i = m_effect_bb.get_first();
@@ -68,12 +68,14 @@ void DCECtx::dump(Region const* rg) const
         prt(rg, "%u ", bb->id());
     }
     note(rg, "\nEFFECT STMT:");
+    rg->getLogMgr()->incIndent(2);
     for (BSIdx i = m_effect_stmt.get_first();
          i != BS_UNDEF; i = m_effect_stmt.get_next(i)) {
         IR const* ir = rg->getIR(i);
         ASSERT0(ir);
-        prt(rg, "%s ", dumpIRName(ir, tmp));
+        note(rg, "\n%s ", DumpIRName().dump(ir));
     }
+    rg->getLogMgr()->decIndent(2);
 }
 //END DCECtx
 
@@ -771,8 +773,8 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
 }
 
 
-bool DeadCodeElim::removeIneffectIR(DCECtx const& dcectx,
-                                    OUT bool & remove_branch_stmt)
+bool DeadCodeElim::removeIneffectIR(
+    DCECtx const& dcectx, OUT bool & remove_branch_stmt)
 {
     BBListIter bbit = nullptr;
     List<IRBB*> * bbl = m_rg->getBBList();
@@ -808,9 +810,9 @@ bool DeadCodeElim::removeIneffectIR(DCECtx const& dcectx,
 }
 
 
-bool DeadCodeElim::collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
-                               MOD DCECtx & dcectx,
-                               bool usemdssa, bool useprssa)
+bool DeadCodeElim::collectByDU(
+    IR const* x, MOD List<IR const*> * pwlst2, MOD DCECtx & dcectx,
+    bool usemdssa, bool useprssa)
 {
     ASSERT0(x->is_exp());
     if (x->isReadPR() && useprssa) {

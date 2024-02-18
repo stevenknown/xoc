@@ -191,7 +191,7 @@ public:
     //dumpping DOT file.
     bool isReplaceNewline() const { return m_ctx.replace_newline; }
 
-    //Initialze log file.
+    //Initialize a log file.
     //logfilename: the file name of log file.
     //is_del: set to true if mananger expects to remove the file with same name.
     void init(CHAR const* logfilename, bool is_del);
@@ -200,10 +200,13 @@ public:
     void incIndent(UINT v) { m_ctx.indent += (INT)v; }
 
     //Return true if LogMgr has initialized.
-    bool is_init() const { return m_ctx.logfile != nullptr; }
+    bool is_init() const { return isInitLogFile(); }
 
-    //Return true if LogMgr enable dump buffer.
+    //Return true if LogMgr enables dump buffer.
     bool isEnableBuffer() const { return m_ctx.enable_buffer; }
+
+    //Return true if LogMgr enables dump file.
+    bool isInitLogFile() const { return m_ctx.logfile != nullptr; }
 
     //Stop dump to buffer for temporary purpose. And when buffer paused, the
     //output content will write to file.

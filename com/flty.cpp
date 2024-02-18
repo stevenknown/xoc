@@ -44,14 +44,14 @@ bool operator == (Float const& a, Float const& b)
     }
     if (av < 0) { av = -av; }
     if (bv < 0) { bv = -bv; }
-    if((av == PRECISION_TYPE(0) && bv <= INFINITESIMAL) ||
-       (bv == PRECISION_TYPE(0) && av <= INFINITESIMAL)) {
+    if((av == PRECISION_TYPE(0) && bv < INFINITESIMAL) ||
+       (bv == PRECISION_TYPE(0) && av < INFINITESIMAL)) {
         return true;
     }
     if (av > bv) {
-        return (av - bv) <= INFINITESIMAL;
+        return (av - bv) < INFINITESIMAL;
     }
-    return (bv - av) <= INFINITESIMAL;
+    return (bv - av) < INFINITESIMAL;
 }
 
 
