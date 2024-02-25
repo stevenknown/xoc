@@ -138,6 +138,15 @@ public:
 
     //Get the value-number type.
     VN_TYPE getType() const { return VN_type(this); }
+
+    //Get the value-number type.
+    HOST_INT getVNIntVal() const { return VN_int_val(this); }
+
+    //Get the value of VN of misc type.
+    HOST_FP getVNFPVal() const { return VN_fp_val(this); }
+    Sym const* getVNStrVal() const { return VN_str_val(this); }
+    MDDef const* getVNMDDef() const { return VN_mddef(this); }
+    VMD const* getVNVMD() const { return VN_vmd(this); }
 };
 
 
@@ -931,6 +940,8 @@ public:
     //equal to ir2 even if vn1 != vn2.
     bool hasDifferentValue(VN const* vn1, IR const* ir1,
                            VN const* vn2, IR const* ir2) const;
+    bool hasDifferentValue(VN const* vn1, Type const* vn1type,
+                           VN const* vn2, Type const* vn2type) const;
     bool hasDifferentValue(VN const* vn1, VN const* vn2) const;
 
     void init();

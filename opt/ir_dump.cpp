@@ -941,38 +941,20 @@ void dumpConstContent(IR const* ir, Region const* rg)
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
-    if (ir->is_sint()) {
-        CHAR const* intfmt = getHostIntFormat(false);
-        CHAR const* hexintfmt = getHostIntFormat(true);
-        StrBuf fmt(16);
-        fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
-        prt(rg, fmt.buf, xtm->dump_type(d, buf),
-            CONST_int_val(ir), CONST_int_val(ir));
+    if (ir->is_sint() || ir->is_uint()) {
+        xoc::dumpHostInteger(CONST_int_val(ir), d, rg, xtm, ir->is_sint());
         return;
     }
-
-    if (ir->is_uint()) {
-        CHAR const* intfmt = getHostUIntFormat(false);
-        CHAR const* hexintfmt = getHostUIntFormat(true);
-        StrBuf fmt(16);
-        fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
-        prt(rg, fmt.buf, xtm->dump_type(d, buf), CONST_int_val(ir),
-            CONST_int_val(ir));
-        return;
-    }
-
     if (ir->is_fp()) {
         CHAR fpformat[128];
         ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", CONST_fp_mant(ir));
         prt(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
         return;
     }
-
     if (ir->is_bool()) {
         prt(rg, "boolconst:%s %d", xtm->dump_type(d, buf), CONST_int_val(ir));
         return;
     }
-
     if (ir->is_str()) {
         UINT const tbuflen = 40;
         CHAR tbuf[tbuflen];
@@ -993,7 +975,6 @@ void dumpConstContent(IR const* ir, Region const* rg)
         }
         return;
     }
-
     if (ir->is_mc()) {
         //Imm may be MC type.
         CHAR const* intfmt = getHostUIntFormat(false);

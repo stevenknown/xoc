@@ -1175,13 +1175,6 @@ void MDSSAMgr::cleanLocalUsedData()
 }
 
 
-CHAR * MDSSAMgr::dumpVMD(IN VMD * v, OUT CHAR * buf) const
-{
-    sprintf(buf, "MD%dV%d", v->mdid(), v->version());
-    return buf;
-}
-
-
 //This function dumps VMD structure and SSA DU info.
 void MDSSAMgr::dumpAllVMD() const
 {

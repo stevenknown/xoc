@@ -58,8 +58,18 @@ static bool needBuildDUChain(RefineCtx const& ctx)
 
 
 //Make sure v0 is sign-extended if its bits length less than HOST_INT.
-static HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
+static HOST_INT calcLSRIntVal(Type const* type, TypeMgr const* tm,
+                              HOST_INT v0, HOST_INT v1)
 {
+    if (v1 >= tm->getBitSize(tm->getHostIntType())) {
+        //NOTE:Some host-machine performs unexpected behaviours. Therefore we
+        //handle LSR operation in a special way.
+        //e.g:Usually, given 64 bit unsigned integer 0x8FFFffff12345678,
+        //perform the 64 bits arith-shift-right operation, the result should
+        //equal to 0. However, x86 machine outputs 0x8FFFffff12345678.
+        //In contrast, ARM machine can run the results we expect.
+        return 0;
+    }
     HOST_INT res = 0;
     switch (TY_dtype(type)) {
     case D_B:
@@ -248,7 +258,8 @@ static T calcBinIntValImpl(IR_CODE code, T v0, T v1)
         v1 = v0 != v1;
         break;
     case IR_ASR:
-        v1 = v0 >> v1;
+        //See calcASRUIntValImpl() for details.
+        UNREACHABLE();
         break;
     case IR_LSL:
         v1 = v0 << v1;
@@ -262,10 +273,57 @@ static T calcBinIntValImpl(IR_CODE code, T v0, T v1)
 }
 
 
-HOST_INT Refine::calcBinSignedIntVal(IR_CODE code, Type const* ty,
-                                     HOST_INT v0, HOST_INT v1)
+//NOTE:Some host-machine performs unexpected behaviours. Therefore we
+//handle ASR operation in a special way.
+//e.g:Usually, given 32 bit signed integer 0x8000FFFF, perform the 32
+//bits arith-shift-right operation, the result should equal to
+//0xFFFFffff.
+//However, x86 machine outputs 0x8000FFFF. In contrast, ARM machine
+//can run the results we expect.
+static HOST_UINT calcASRUIntValImpl(
+    TypeMgr const* tm, HOST_UINT v0, HOST_UINT v1)
+{
+    UINT hostintbitsize = tm->getBitSize(tm->getHostIntType());
+    if (v1 >= hostintbitsize) { return 0; }
+    return v0 >> v1;
+}
+
+
+//NOTE:Some host-machine performs unexpected behaviours. Therefore we
+//handle ASR operation in a special way.
+//e.g:Usually, given 32 bit signed integer 0x8000FFFF, perform the 32
+//bits arith-shift-right operation, the result should equal to
+//0xFFFFffff.
+//However, x86 machine outputs 0x8000FFFF. In contrast, ARM machine
+//can run the results we expect.
+static HOST_INT calcASRSIntValImpl(TypeMgr const* tm, HOST_INT v0, HOST_INT v1)
+{
+    UINT hostintbitsize = tm->getBitSize(tm->getHostIntType());
+    if (v1 >= hostintbitsize) { return v0 >> (hostintbitsize - 1); }
+    return v0 >> v1;
+}
+
+
+HOST_UINT Refine::calcBinUIntVal(IR_CODE code, Type const* ty,
+                                 HOST_UINT v0, HOST_UINT v1)
+{
+    if (code == IR_ASR) {
+        return calcASRUIntValImpl(m_tm, v0, v1);
+    }
+    return calcBinIntValImpl(code, (HOST_UINT)v0, (HOST_UINT)v1);
+}
+
+
+HOST_INT Refine::calcBinSIntVal(IR_CODE code, Type const* ty,
+                                HOST_INT v0, HOST_INT v1)
 {
     ASSERT0(ty->is_sint());
+    ASSERTN(m_tm->getByteSize(ty) <=
+            m_tm->getByteSize(m_tm->getHostIntType()),
+            ("host machine integer type is smaller than target machine"));
+    if (code == IR_ASR) {
+        return calcASRSIntValImpl(m_tm, v0, v1);
+    }
     //Use properly signed type according to target machine.
     switch (sizeof(TMWORD) * BIT_PER_BYTE) {
     case 32: return calcBinIntValImpl(code, (INT32)v0, (INT32)v1);
@@ -312,15 +370,16 @@ HOST_INT Refine::calcBinIntVal(IR const* ir, HOST_INT v0, HOST_INT v1)
     }
     ASSERT0(valty);
     if (ir->getCode() == IR_LSR) {
-        return calcLSRIntVal(valty, v0, v1);
+        return calcLSRIntVal(valty, m_tm, v0, v1);
     }
     ASSERTN(!((ir->getCode() == IR_DIV) && (v1 == 0)),
             ("divisor can not be zero"));
     if (valty->is_sint()) {
-        return calcBinSignedIntVal(ir->getCode(), valty, v0, v1);
+        return calcBinSIntVal(ir->getCode(), valty, v0, v1);
     }
     ASSERT0(valty->is_uint() || valty->is_bool() || valty->is_pointer());
-    return calcBinIntValImpl(ir->getCode(), (HOST_UINT)v0, (HOST_UINT)v1);
+    return calcBinUIntVal(ir->getCode(), ir->getType(),
+                          (HOST_UINT)v0, (HOST_UINT)v1);
 }
 
 
@@ -2647,7 +2706,7 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
     case IR_LSR: {
         ASSERT0(ir->is_int());
         IR * x = m_rg->getIRMgr()->buildImmInt(
-            calcLSRIntVal(ir->getType(), v0, v1), ir->getType());
+            calcLSRIntVal(ir->getType(), m_tm, v0, v1), ir->getType());
         copyDbx(x, ir, m_rg);
         m_rg->freeIRTree(ir);
         ir = x;

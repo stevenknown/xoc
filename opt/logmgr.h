@@ -254,6 +254,7 @@ public:
         m_lm = lm;
         m_is_buffer_enabled_before = lm->isEnableBuffer();
         if (m_is_buffer_enabled_before) { return; }
+        if (!lm->is_init()) { return; }
         lm->startBuffer();
     }
     ~DumpBufferSwitch() { flush(); }

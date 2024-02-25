@@ -41,7 +41,7 @@ using namespace xcom;
 #include "scc.h"
 #include "lca.h"
 #include "assemblebin.h"
-#include "int_hash.h"
 #include "log.h"
+#include "int_hash.h"
 #endif
 

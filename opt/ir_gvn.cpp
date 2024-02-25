@@ -73,6 +73,41 @@ CHAR const* VNTypeDesc::getVTName(VN_TYPE vt)
 void VN::dump(Region const* rg) const
 {
     prt(rg, "VN%u,%s", id(), VNTypeDesc::getVTName(getType()));
+    switch (getType()) {
+    case VN_OP:
+    case VN_VAR:
+    case VN_MC_INT:
+    case VN_CONST:
+        break;
+    case VN_MDDEF:
+        ASSERT0(getVNMDDef());
+        prt(rg, ":mddef%u", getVNMDDef()->id());
+        break;
+    case VN_VMD: {
+        ASSERT0(getVNVMD());
+        xcom::StrBuf buf(32);
+        prt(rg, ":%s", getVNVMD()->dump(buf));
+        break;
+    }
+    case VN_INT: {
+        Type const* d = rg->getTypeMgr()->getHostIntType();
+        prt(rg, ":");
+        xoc::dumpHostInteger(getVNIntVal(), d, rg, rg->getTypeMgr(), false);
+        break;
+    }
+    case VN_FP: {
+        Type const* d = rg->getTypeMgr()->getHostFPType();
+        prt(rg, ":");
+        xoc::dumpHostFP(getVNFPVal(), d, rg, rg->getTypeMgr());
+        break;
+    }
+    case VN_STR:
+        ASSERT0(getVNStrVal());
+        ASSERT0(getVNStrVal()->getStr());
+        prt(rg, ":'%s'", getVNStrVal()->getStr());
+        break;
+    default: UNREACHABLE();
+    }
 }
 //END VN
 
@@ -2044,10 +2079,21 @@ bool GVN::hasSameValueByMDSSA(IR const* ir1, IR const* ir2) const
 }
 
 
+bool GVN::hasDifferentValue(VN const* vn1, Type const* vn1type,
+                            VN const* vn2, Type const* vn2type) const
+{
+    if (vn1 == vn2) { return false; }
+    if (!vn1type->is_int() || !vn2type->is_int()) { return false; }
+    //For now, only support integer type VN comparison.
+    return false;
+}
+
+
 bool GVN::hasDifferentValue(VN const* vn1, IR const* ir1,
                             VN const* vn2, IR const* ir2) const
 {
-    return isConstVN(vn1, ir1) && isConstVN(vn2, ir2) && vn1 != vn2;
+    return isConstVN(vn1, ir1) && isConstVN(vn2, ir2) &&
+           hasDifferentValue(vn1, ir1->getType(), vn2, ir2->getType());
 }
 
 

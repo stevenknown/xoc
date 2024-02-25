@@ -36,6 +36,17 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class Type;
+class TypeMgr;
+
+//Dump host-machine integer value.
+void dumpHostInteger(HOST_UINT intval, Type const* ty, Region const* rg,
+                     TypeMgr const* tm, bool is_sign);
+
+//Dump host-machine float-point value.
+void dumpHostFP(HOST_FP fpval, Type const* ty, Region const* rg,
+                TypeMgr const* tm);
+
 //Report internal warning.
 void interwarn(CHAR const* format, ...);
 
@@ -47,6 +58,9 @@ CHAR const* getHostIntFormat(bool hex);
 
 //Return unsigned integer placeholder string that used in format.
 CHAR const* getHostUIntFormat(bool hex);
+
+//Return float-point placeholder string that used in format.
+CHAR const* getHostFPFormat();
 
 } //namespace xoc
 #endif

@@ -213,8 +213,10 @@ public:
 
     //The function computes the copmile-time constant according to target
     //machine signed integer type.
-    virtual HOST_INT calcBinSignedIntVal(IR_CODE code, Type const* ty,
-                                         HOST_INT v0, HOST_INT v1);
+    virtual HOST_INT calcBinSIntVal(IR_CODE code, Type const* ty,
+                                    HOST_INT v0, HOST_INT v1);
+    virtual HOST_UINT calcBinUIntVal(IR_CODE code, Type const* ty,
+                                     HOST_UINT v0, HOST_UINT v1);
 
     virtual bool dump() const;
 

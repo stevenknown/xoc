@@ -127,6 +127,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     if (g_do_dse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_DSE));
     }
+    #ifdef FOR_IP
     if (g_do_vect) {
         //Vectorization expects that CP, DCE, LICM, RP and CfgOpt
         //have been performed.
@@ -135,6 +136,7 @@ bool ScalarOpt::perform(OptCtx & oc)
         if (g_opt_level >= OPT_LEVEL3) { pass->setAggressive(true); }
         passlist.append_tail(pass);
     }
+    #endif
     if (g_do_loop_convert) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LOOP_CVT));
     }

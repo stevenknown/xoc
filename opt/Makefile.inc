@@ -62,6 +62,7 @@ analysis_instr.o\
 invert_brtgt.o\
 ir_helper.o\
 gr_helper.o\
+loop_dep_ana.o\
 mdssalive_mgr.o\
 insert_guard_helper.o\
 optctx.o\

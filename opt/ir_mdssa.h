@@ -927,10 +927,6 @@ public:
     //The function dumps VMD structure and SSA DU info.
     void dumpAllVMD() const;
 
-    //Dump VMD info into given buffer.
-    //Note the buffer have to at least 128 bytes.
-    CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf) const;
-
     //Dump IR tree and MDSSAInfo if any.
     //ir: can be stmt or expression.
     //flag: the flag to dump IR.

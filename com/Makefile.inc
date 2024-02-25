@@ -14,6 +14,8 @@ bigint.o\
 flty.o\
 linsys.o\
 bs.o\
+log.o\
+numdiff.o\
 scc.o\
 sbs.o\
 sort.o\

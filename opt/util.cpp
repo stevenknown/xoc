@@ -31,8 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "../com/xcominc.h"
-#include "commoninc.h"
+#include "cominc.h"
 
 namespace xoc {
 
@@ -93,6 +92,42 @@ CHAR const* getHostUIntFormat(bool hex)
     }
     UNREACHABLE();
     return nullptr;
+}
+
+
+CHAR const* getHostFPFormat()
+{
+    return "%f";
+}
+
+
+void dumpHostFP(HOST_FP fpval, Type const* ty, Region const* rg,
+                TypeMgr const* tm)
+{
+    CHAR const* fpfmt = getHostFPFormat();
+    CHAR fpformat[128];
+    ::snprintf(fpformat, 127, "fpconst:%%s %s", fpfmt);
+    xcom::StrBuf buf(16);
+    prt(rg, fpformat, tm->dump_type(ty, buf), fpval);
+}
+
+
+void dumpHostInteger(HOST_UINT intval, Type const* ty, Region const* rg,
+                     TypeMgr const* tm, bool is_sign)
+{
+    CHAR const* intfmt = nullptr;
+    CHAR const* hexintfmt = nullptr;
+    if (is_sign) {
+        intfmt = getHostIntFormat(false);
+        hexintfmt = getHostIntFormat(true);
+    } else {
+        intfmt = getHostUIntFormat(false);
+        hexintfmt = getHostUIntFormat(true);
+    }
+    xcom::StrBuf fmt(64);
+    xcom::StrBuf buf(64);
+    fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+    prt(rg, fmt.buf, tm->dump_type(ty, buf), intval, intval);
 }
 
 } //namespace xoc

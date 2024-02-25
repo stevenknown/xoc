@@ -107,7 +107,7 @@ protected:
     void dump_helper(FILE * h, V2NMap const* mn, UINT indent) const
     {
         ASSERT0(mn);
-        V2NMap::NextSetIter ti;
+        typename V2NMap::NextSetIter ti;
         Stack<V2NMap const*> mn_stack;
         Stack<UINT> indent_stack;
         Stack<IntType> ival_stack;
