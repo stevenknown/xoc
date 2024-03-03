@@ -711,6 +711,8 @@ public:
     //The pseduo register must be D_MC or vector type.
     bool is_setelem() const { return getCode() == IR_SETELEM; }
 
+    bool is_alloca() const { return getCode() == IR_ALLOCA; }
+
     //Rreturn true if picking up specified element of givne PR and store the
     //value to a new PR. The base PR must be D_MC or vector type.
     //And the result PR must be element type of base PR.

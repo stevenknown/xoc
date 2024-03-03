@@ -43,5 +43,5 @@ author: Su Zhenyu
 #include "minst_mgr.h"
 #include "minst_field.h"
 #include "ir2minst.h"
-#include "reloc_mgr.h"
+#include "mi_reloc_mgr.h"
 #include "machoption.h"

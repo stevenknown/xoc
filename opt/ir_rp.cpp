@@ -1946,13 +1946,10 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
 
 //The function insert Phi for init-stmt PR or reconstruct SSA overall.
 //Return true if PRSSA changed.
-bool RegPromot::buildPRSSADUChainForExactAcc(IR const* dele,
-                                             Occ2Occ const& occ2newocc,
-                                             DelegateMgr const& delemgr,
-                                             RestoreTab const& restore2mem,
-                                             LI<IRBB> const* li,
-                                             IRBB * preheader,
-                                             MOD RPCtx & ctx)
+bool RegPromot::buildPRSSADUChainForExactAcc(
+    IR const* dele, Occ2Occ const& occ2newocc, DelegateMgr const& delemgr,
+    RestoreTab const& restore2mem, LI<IRBB> const* li, IRBB * preheader,
+    MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
     PRSSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);

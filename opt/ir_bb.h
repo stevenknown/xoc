@@ -93,6 +93,22 @@ public:
     //Insert ir after phi operations.
     IRListIter append_head_ex(IR * ir);
 
+    void copy(IN List<IR*> & src)
+    {
+        clean();
+        IR * ir = src.get_head();
+        for (INT n = src.get_elem_count(); n > 0; n--) {
+            xcom::EList<IR*, IR2Holder>::append_tail(ir);
+            ASSERT0(m_bb != nullptr);
+            if (ir->isStmtInBB()) {
+                ir->setBB(m_bb);
+            } else {
+                ASSERT0(ir->is_lab());
+            }
+            ir = src.get_next();
+        }
+    }
+
     //Count up memory size of BBIRList
     size_t count_mem() const
     {

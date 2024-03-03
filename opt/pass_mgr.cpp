@@ -274,11 +274,7 @@ Pass * PassMgr::allocVectorization()
 
 Pass * PassMgr::allocLoopDepAna()
 {
-    #ifdef FOR_IP
     return new LoopDepAna(m_rg, (GVN*)registerPass(PASS_GVN));
-    #else
-    return nullptr;
-    #endif
 }
 
 
@@ -330,6 +326,28 @@ Pass * PassMgr::allocWorkaround()
 {
     #ifdef REF_TARGMACH_INFO
     return new Workaround(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocDynamicStack()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new DynamicStack(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocIRReloc()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new IRRelocMgr(m_rg);
     #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
@@ -579,6 +597,12 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_WORKAROUND:
         pass = allocWorkaround();
+        break;
+    case PASS_DYNAMIC_STACK:
+        pass = allocDynamicStack();
+        break;
+    case PASS_IRRELOC:
+        pass = allocIRReloc();
         break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }

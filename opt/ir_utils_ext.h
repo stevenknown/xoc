@@ -33,21 +33,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-//Defined the entry for extened expression ir code.
+//Defined the entry for extended expression ir code.
 #define SWITCH_CASE_EXT_EXP \
     case IR_BROADCAST
 
-//Defined the entry for extened virtual stmt ir code.
+//Defined the entry for extended virtual stmt ir code.
 #define SWITCH_CASE_EXT_VSTMT \
     SWITCH_CASE_EXT_WRITE_PR: \
     SWITCH_CASE_EXT_DIRECT_MEM_VSTMT: \
     SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT
 
-//Defined the entry for extened stmt ir code.
+//Defined the entry for extended stmt ir code.
 #define SWITCH_CASE_EXT_STMT \
     SWITCH_CASE_EXT_VSTMT
 
-//Defined the entry for extened ir code.
+//Defined the entry for extended ir code.
 #define SWITCH_CASE_EXT \
     SWITCH_CASE_EXT_STMT: \
     SWITCH_CASE_EXT_EXP
@@ -58,9 +58,11 @@ namespace xoc {
 #define SWITCH_CASE_EXT_DIRECT_MEM_VSTMT \
     case IR_VST
 
-//No extended UNA for now.
-#define SWITCH_CASE_EXT_UNA
-#define SWITCH_CASE_EXT_BIN
+//Defined the entry for extended UNA ir code.
+#define SWITCH_CASE_EXT_UNA EMPTY_MACRO
+
+//No extended BIN for now.
+#define SWITCH_CASE_EXT_BIN EMPTY_MACRO
 
 //In order to conform the compatibility of origin IR code, user can undef
 //original SWITCH_CASE_<NAME>, then redefine the same MACRO with new IR code

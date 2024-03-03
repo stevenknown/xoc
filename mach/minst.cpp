@@ -137,9 +137,9 @@ TMWORD MInst::getFieldValue(UINT idx) const
 void MInst::setFieldValue(FIELD_TYPE ft, TMWORD val)
 {
     ASSERT0(m_inst_desc);
-    ASSERTN_DUMMYUSE(!xcom::isExcedeBitWidth(
+    ASSERTN_DUMMYUSE(!xcom::isExceedBitWidth(
                         val, m_inst_desc->getFieldSizeByFT(ft)),
-                     ("val %u excede bitwidth %u",
+                     ("val %u exceed bitwidth %u",
                       val, m_inst_desc->getFieldSizeByFT(ft)));
     UINT idx = m_inst_desc->getFieldIdx(ft);
     m_field_vec[idx].value = val;

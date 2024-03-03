@@ -385,10 +385,12 @@ bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
 bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt);
 
 //Try inserting preheader BB of loop 'li'.
-//The function will try to maintain the RPO, DOM, and
+//The function will try to maintain the RPO, DOM, then
 //updating PHI at loophead and preheader, after inserting preheader.
 //preheader: record the preheader either inserted BB or existed BB.
 //force: force to insert preheader BB whatever it has been exist.
+//       If 'force' is false, the function only inserts new preheader if it
+//       cand not find an appropriate BB to be preheader.
 //       Return the new BB if insertion is successful.
 //Return true if inserting a new BB before loop, otherwise false.
 //CASE: if we find a preheader, the last IR in it may be CallStmt.

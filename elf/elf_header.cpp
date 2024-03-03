@@ -25,11 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "../com/xcominc.h"
-#include "../opt/cominc.h"
-#include "elf_header.h"
-#include "elf_targinfo.h"
-#include "elf_mgr.h"
+#include "elfinc.h"
 
 namespace elf {
 

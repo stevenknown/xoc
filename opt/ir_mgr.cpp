@@ -1625,4 +1625,15 @@ IR * IRMgr::buildStprFromConst(IR * ir, Type const* tp)
     return buildStorePR(buildPrno(tp), tp, ir);
 }
 
+
+IR * IRMgr::buildAlloca(IR * size)
+{
+    ASSERT0(size);
+    IR * ir = allocIR(IR_ALLOCA);
+    ALLOCA_size(ir) = size;
+    IR_parent(size) = ir;
+    IR_dt(ir) = m_tm->getPointerType(1);
+    return ir;
+}
+
 } //namespace xoc

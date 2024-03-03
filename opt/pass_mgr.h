@@ -101,6 +101,8 @@ protected:
     virtual Pass * allocGPAdjustment();
     virtual Pass * allocBROpt();
     virtual Pass * allocWorkaround();
+    virtual Pass * allocDynamicStack();
+    virtual Pass * allocIRReloc();
 protected:
     void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
                                   BitSet const& opts);

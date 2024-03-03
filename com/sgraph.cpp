@@ -1719,7 +1719,8 @@ bool DGraph::computePdom(List<Vertex const*> const& vlst, DomSet const* uni)
     bool change = true;
     DomSet tmp;
     UINT count = 0;
-    while (change && count < 10) {
+    //The previous max count limit is 10, and change to 13 due to some cases.
+    while (change && count < 13) {
         count++;
         change = false;
         C<Vertex const*> * ct2;

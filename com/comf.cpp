@@ -214,6 +214,36 @@ UINT countLeadingZero(UINT32 a)
 }
 
 
+UINT countTrailingZero(UINT64 val)
+{
+    if (val & 0x1) { return 0; }
+    UINT64 trail = 0;
+    UINT64 size = sizeof(UINT64) * BITS_PER_BYTE;
+    for (UINT64 i = 0; i < size; i++) {
+        if ((val >> i) & 1) {
+            break;
+        }
+        trail++;
+    }
+    return (UINT)trail;
+}
+
+
+UINT countTrailingZero(UINT32 val)
+{
+    if (val & 0x1) { return 0; }
+    UINT32 trail = 0;
+    UINT32 size = sizeof(UINT32) * BITS_PER_BYTE;
+    for (UINT32 i = 0; i < size; i++) {
+        if ((val >> i) & 1) {
+            break;
+        }
+        trail++;
+    }
+    return (UINT)trail;
+}
+
+
 //Append string to buf.
 //This function will guarantee that the length of string does
 //not exceed bufl.
@@ -972,7 +1002,7 @@ INT getFirstOneAtRightSide(INT m)
 }
 
 
-bool isExcedeBitWidth(ULONGLONG val, UINT bitwidth)
+bool isExceedBitWidth(ULONGLONG val, UINT bitwidth)
 {
     ASSERTN(bitwidth <= sizeof(ULONGLONG) * BITS_PER_BYTE, ("TODO"));
     if (bitwidth == sizeof(ULONGLONG) * BITS_PER_BYTE) { return true; }

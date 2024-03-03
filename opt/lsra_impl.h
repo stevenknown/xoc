@@ -238,26 +238,29 @@ protected:
     void computeEdgeConsistencyImpl(xcom::Edge const* e,
                                     OUT InConsistPairList & inconsist_lst);
 
-    //This function implements the inconsistency on forward edge.
+    //This function implements the inconsistency check based on forward
+    //analysis.
     //anct: the ancestor lifetime of the PR.
     //newlt: the new lifetime of the PR after splited.
     //from: the source BBID of the edge in CFG.
     //to: the destination BBID of the edge in CFG.
     //inconsist_lst: the list to record the inconsistency information.
-    //Returen value: return true if there is no inconsistency problem or
-    //  the inconsistency is found on this edge; return false if it is
-    //  uncertain about the check inside the function.
-    bool computeForwardEdgeConsistencyImpl(LifeTime const* anct,
+    //Returen value: return true if there is no inconsistency problem for
+    //  anct and newlt; return false if it is uncertain that there is no
+    //  inconsistency problem althrough current check passed, but the further
+    //  check is still required.
+    bool computeForwardConsistencyImpl(LifeTime const* anct,
         LifeTime const* newlt, UINT from, UINT to,
         OUT InConsistPairList & inconsist_lst);
 
-    //This function implements the inconsistency on backward edge.
+    //This function implements the inconsistency check based on backward
+    //analysis.
     //anct: the ancestor lifetime of the PR.
     //newlt: the new lifetime of the PR after splited.
     //from: the source BBID of the edge in CFG.
     //to: the destination BBID of the edge in CFG.
     //inconsist_lst: the list to record the inconsistency information.
-    void computeBackwardEdgeConsistencyImpl(LifeTime const* anct,
+    void computeBackwardConsistencyImpl(LifeTime const* anct,
         LifeTime const* newlt, UINT from, UINT to,
         OUT InConsistPairList & inconsist_lst);
 
@@ -629,6 +632,7 @@ public:
     IR * insertMove(PRNO from, PRNO to, Type const* fromty, Type const* toty,
                     IRBB * bb);
     IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
+    IR * insertSpillAtBBEnd(PRNO prno, Var * var, Type const* ty, IRBB * bb);
     void insertSpillAtHead(IR * spill, MOD IRBB * bb);
     void insertSpillAfter(IR * spill, IR const* marker);
     IR * insertSpillAfter(PRNO prno, Type const* ty, IR const* marker);
@@ -706,7 +710,8 @@ public:
     bool tryAssignRegisterDefault(IR const* ir, LifeTime const* lt);
     bool tryAssignRegisterByPrefer(IR const* ir, LifeTime const* lt);
 
-    void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker);
+    void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker,
+                      bool newbb_prior_marker);
     void tryUpdateDom(IRBB const* newbb, IRBB const* marker);
     void tryUpdateLiveness(IRBB const* newbb, IRBB const* marker);
 };

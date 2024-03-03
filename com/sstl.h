@@ -1916,7 +1916,7 @@ public:
 //END SListCore
 
 
-//Exteneded Single Linked List Core.
+//Extended Single Linked List Core.
 //This class extends the data structure of SListCore through
 //add a tail pointer. That allows you accessing tail element directly
 //via get_tail(). This will be useful if you
@@ -4044,7 +4044,15 @@ public:
     T createKey(T t) { return t; }
 };
 
-template <class T, class Ttgt, class CompareKey = CompareKeyBase<T> >
+
+template <class T, class Ttgt> class GenMappedBase {
+public:
+    Ttgt createMapped(T t) { return Ttgt(0); }
+};
+
+
+template <class T, class Ttgt, class CompareKey = CompareKeyBase<T>,
+          class GenMapped = GenMappedBase<T, Ttgt> >
 class RBT {
     COPY_CONSTRUCTOR(RBT);
 protected:
@@ -4055,6 +4063,7 @@ protected:
     SMemPool * m_pool;
     RBTNType * m_free_list;
     CompareKey m_ck;
+    GenMapped m_gm;
 protected:
     RBTNType * new_tn()
     {
@@ -4628,13 +4637,15 @@ public:
 //    2. Keep the key *UNIQUE* .
 //    3. Overload operator == and operator < if Tsrc is neither basic type
 //       nor pointer type.
-template <class Tsrc, class Ttgt, class CompareKey = CompareKeyBase<Tsrc> >
-class TMap : public RBT<Tsrc, Ttgt, CompareKey> {
+template <class Tsrc, class Ttgt, class CompareKey = CompareKeyBase<Tsrc>,
+          class GenMapped = GenMappedBase<Tsrc, Ttgt> >
+class TMap : public RBT<Tsrc, Ttgt, CompareKey, GenMapped> {
     COPY_CONSTRUCTOR(TMap);
 public:
-    typedef RBT<Tsrc, Ttgt, CompareKey> BaseType;
+    typedef RBT<Tsrc, Ttgt, CompareKey, GenMapped> BaseType;
     typedef RBTNode<Tsrc, Ttgt> RBTNType;
-    TMap(SMemPool * pool = nullptr) : RBT<Tsrc, Ttgt, CompareKey>(pool) {}
+    TMap(SMemPool * pool = nullptr) :
+        RBT<Tsrc, Ttgt, CompareKey, GenMapped>(pool) {}
     ~TMap() {}
 
     //Append <key, mapped> pair of 'src' to current object.
@@ -4715,6 +4726,30 @@ public:
         if (f != nullptr) {
             *f = true;
         }
+        return z->mapped;
+    }
+
+    //Get mapped element of 't'. If there isn't 't' in TMap, 't' and
+    //it's mapped element will be created. 'f' will be set according
+    //to the results of found 't'. The function can reduce the number
+    //of lookups RBT via merged 'get' and 'generated' function.
+    //e.g.
+    //  Before:
+    //      mapped = TMap.get(t);
+    //      if (!mapped) {
+    //          mapped = createMapped();
+    //          TMap.set(t, mapped);
+    //      }
+    //  After:
+    //      mapped = TMap.getAndGen(t, f);
+    Ttgt getAndGen(Tsrc t, bool * f = nullptr)
+    {
+        RBTNType * z = BaseType::insert(t, f);
+        ASSERT0(z);
+        if (*f) {
+            return z->mapped;
+        }
+        z->mapped = BaseType::m_gm.createMapped(t);
         return z->mapped;
     }
 

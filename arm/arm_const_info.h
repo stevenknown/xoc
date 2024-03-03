@@ -287,6 +287,7 @@ typedef enum _REGFILE {
 #define REG_R15 16
 #define REG_FP 8 //R7
 #define REG_TMP 13 //R12, Scratch Register, the synonym is IP register.
+#define REG_ZERO REG_R0
 #define REG_SP 14
 #define REG_D0 17
 #define REG_D31 48

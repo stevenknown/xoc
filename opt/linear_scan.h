@@ -781,7 +781,7 @@ public:
 //                | rule 5 |  undef        |  good         |  good       |
 //                | rule 6 |  good         |  good         |  TABLE2     |
 //                ________________________________________________________
-//                                  TABLE1
+//                                       TABLE1
 //
 //                For the rule 6 in TABLE1, the merged check state should be
 //                updated per the TABLE2 below:
@@ -794,7 +794,7 @@ public:
 //                |  rule 6.3 |      USE      |     USE       |  good       |
 //                |  rule 6.4 |      DEF      |     DEF       |  good       |
 //                ___________________________________________________________
-//                                  TABLE2
+//                                       TABLE2
 //
 //            [NOTE2]: When the merged check state is conflicted, the defined
 //                     BBID will be recorded as a marker to indicate where the
@@ -1216,6 +1216,8 @@ class LinearScanRA : public Pass {
     COPY_CONSTRUCTOR(LinearScanRA);
 protected:
     bool m_is_apply_to_region;
+    //Used to control the FP can be allocable or not based on the user's input.
+    bool m_is_fp_allocable_allowed;
     LifeTimeMgr * m_lt_mgr;
     TargInfoMgr * m_ti_mgr;
     IRCFG * m_cfg;
@@ -1250,6 +1252,7 @@ public:
     virtual IR * buildMove(PRNO from, PRNO to, Type const* fromty,
                            Type const* toty);
     virtual IR * buildSpill(PRNO prno, Type const* ty);
+    virtual IR * buildSpillByLoc(PRNO prno, Var * spill_loc, Type const* ty);
     virtual IR * buildReload(PRNO prno, Var * spill_loc, Type const* ty);
 
     //Should be called before register allocation.
@@ -1327,6 +1330,11 @@ public:
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
     virtual Reg getTA() const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    //The temporary register is a reserved register that used to save a
+    //temporary value, which is usually used after the register allocation
+    //and does not be assigned in the register allocation.
+    virtual Reg getTMP() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
     virtual Reg getRegisterZero() const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
     virtual Reg getScalarArgRegStart() const
@@ -1340,6 +1348,9 @@ public:
     virtual bool isCalleePermitted(LifeTime const* lt) const;
     bool isDedicated(PRNO prno) const
     { return m_dedicated_mgr.is_dedicated(prno); }
+
+    //Check the Frame Pointer Register can be allocable or not.
+    bool isFPAllocableAllowed() const { return m_is_fp_allocable_allowed; }
 
     bool isInsertOp() const
     {
@@ -1366,6 +1377,15 @@ public:
 
     void setApplyToRegion(bool doit) { m_is_apply_to_region = doit; }
     void setDedicatedReg(PRNO prno, Reg r) { m_dedicated_mgr.add(prno, r); }
+
+    //Normally m_is_fp_allocable_allowed can be set to false only, because the
+    //default value is true, it will be set to false if we find the fp is used
+    //to implement the alloca on stack, debug option or special register, and
+    //it is not expected to be allocable to other PRs in register allocation. In
+    //other situations, it should be participated to the register allocation as
+    //the regular registers.
+    void setFPAllocableAllowed(bool allowed)
+    { m_is_fp_allocable_allowed = allowed; }
     void setMove(IR * ir) { m_move_tab.append(ir); }
     void setReg(PRNO prno, Reg reg);
     void setReload(IR * ir) { m_reload_tab.append(ir); }

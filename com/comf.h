@@ -107,6 +107,11 @@ UINT countLeadingZero(UINT32 a);
 UINT countLeadingOne(UINT64 a);
 UINT countLeadingOne(UINT32 a);
 
+//Count the trailing zeros of val.
+//e.g: given 0b1011000, the number of trailing zeros is 3.
+UINT countTrailingZero(UINT64 val);
+UINT countTrailingZero(UINT32 val);
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
@@ -275,8 +280,27 @@ inline UINT32 hash32bit(UINT32 n)
 //convert half to EHP64(64-bit extended half-precision) format.
 UINT64 half2EHP64(UINT64 val);
 
-//Return true if val excede the range that can be described with 'bitsize'.
-bool isExcedeBitWidth(ULONGLONG val, UINT bitwidth);
+//Return true if val exceed the range that can be described with 'bitsize'.
+bool isExceedBitWidth(ULONGLONG val, UINT bitwidth);
+
+//Return true if 'c' is an extended character.
+//
+//For example:
+//  The special character "À" is expressed in unicode form as: \u00C0.
+//  According to the following rules:
+//
+//  ---------------------------------------------------------------
+//  |  Unicode hexadecimal  |            UTF-8 binary             |
+//  |-------------------------------------------------------------|
+//  | 0000 0000 ~ 0000 007F | 0xxxxxxx                            |
+//  | 0000 0080 ~ 0000 07FF | 110xxxxx 10xxxxxx                   |
+//  | 0000 0800 ~ 0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx          |
+//  | 0001 0000 ~ 0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx |
+//  ---------------------------------------------------------------
+//
+//  The special character "À" is expressed in UTF-8 form as: "0xC3 0x80".
+inline bool xisextchar(CHAR c)
+{ return (c & 0x80) != 0; }
 
 //Judge if 'f' is integer conform to IEEE754 spec.
 bool isIntegerF(float f);

@@ -64,6 +64,10 @@ public:
     IR * allocIR(IR_CODE irc);
     IR * allocIR(IR_CODE irc, bool lookup);
 
+    //Build alloca ir.
+    //Allocate stack space based on the size.
+    IR * buildAlloca(IR * size);
+
     //Build store operation to store 'rhs' to store value to be one of the
     //element of a PR.
     //type: data type of targe pr.

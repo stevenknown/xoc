@@ -34,6 +34,14 @@ namespace xcom {
 class DomTree : public Tree {
     friend class DGraph;
 public:
+    //Return true if v1 dominates v2.
+    //Note the function is costly, use it carefully.
+    bool is_dom(Vertex const* v1, Vertex const* v2) const
+    {
+        bool try_failed;
+        return Graph::isReachIn(v2, v1, getVertexNum(), try_failed);
+    }
+
     //Verify whether current domtree is valid to given graph.
     bool verify(DGraph const& g) const;
 };

@@ -412,6 +412,16 @@ protected:
     //At lowest mode, the array base, array subscript-expression must be leaf.
     bool isLowestHeightArrayOp(IR const* ir) const;
 
+    //Check the call is used for special register or not.
+    //Some target will define an intrinsic-call to operate target special
+    //register, such as IO configure register. The interface is used to
+    //determine whether current call-stmt is need to simplify.
+    virtual bool isSpecialRegCall(IR const* ir) const
+    {
+        //Target Dependent Code
+        return false;
+    }
+
     //Return true if current simplification should maintain the DU chain as
     //much as possible, otherwise the function have to inform the PRSSAMgr,
     //MDSSAMgr, and Classic DUMgr to rebuild DU chain.
@@ -440,6 +450,8 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySpecialRegCall(IR * ir, SimpCtx * ctx)
+    { ASSERTN(0, ("Target Dependent Code")); return ir; }
 
     bool useMDSSADU() const;
     bool usePRSSADU() const;

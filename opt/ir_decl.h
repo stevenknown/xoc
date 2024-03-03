@@ -1299,6 +1299,27 @@ public:
 };
 
 
+//This class represents alloca operation.
+//e.g: alloca $ptr, size.
+#define ALLOCA_align(ir) (((CAlloca*)CK_IRC(ir, IR_ALLOCA))->align)
+#define ALLOCA_size(ir) ALLOCA_kid(ir, 0)
+#define ALLOCA_kid(ir, idx) \
+    (((CAlloca*)ir)->opnd[CK_KID_IRC(ir, IR_ALLOCA, idx)])
+class CAlloca : public IR {
+    COPY_CONSTRUCTOR(CAlloca);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+    IR * opnd[kid_num];
+    UINT align;
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return ALLOCA_kid(ir, idx); }
+
+    IR * getKid(UINT idx) const { return ALLOCA_kid(this, idx); }
+};
+
+
 //This class represents phi operation.
 #define PHI_bb(ir) (((CPhi*)CK_IRC(ir, IR_PHI))->bb)
 #define PHI_prno(ir) (((CPhi*)CK_IRC(ir, IR_PHI))->prno)

@@ -133,6 +133,7 @@ public:
     //Get the root BB of current SSA construction region.
     IRBB * getRootBB() const { return m_root; }
     OptCtx * getOptCtx() const { return m_oc; }
+    DomTree const& getDomTree() const { return m_domtree; }
 
     //Return true if BB id is in the SSA region.
     //id: the BB id.

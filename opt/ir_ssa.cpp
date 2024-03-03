@@ -602,7 +602,20 @@ void PRSSARegion::inferAndAddRelatedBB()
 
 bool PRSSARegion::verify() const
 {
-    ASSERT0(canBeRoot(getRootBB()));
+    PRSSARegion * pthis = const_cast<PRSSARegion*>(this);
+    //Root must dominate all other BBs.
+    IRBB const* root = getRootBB();
+    ASSERT0(canBeRoot(root));
+    ASSERT0(root && root->getVex());
+    DomTree const& domtree = getDomTree();
+    BBSetIter bbit;
+    for (BSIdx i = pthis->getBBSet().get_first(&bbit);
+         i != BS_UNDEF; i = pthis->getBBSet().get_next(i, &bbit)) {
+        IRBB const* bb = m_rg->getBB(i);
+        ASSERT0(bb);
+        if (bb == root) { continue; }
+        ASSERT0(domtree.is_dom(root->getVex(), bb->getVex()));
+    }
     return true;
 }
 //END PRSSARegion

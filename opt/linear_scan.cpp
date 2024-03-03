@@ -37,8 +37,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
 
-#define IS_HAVE_BRANCH(out_degree) ((out_degree) >= 2)
-
 namespace xoc {
 
 static inline PR2Info * getPrStateInHolder(BB2PRHolder const* h, BBID bbid)
@@ -527,7 +525,7 @@ bool PosAttrLifeTimeProc::processAttrLTNoTerminatedAfter(BBPos const& pos,
         VecIdx next = i + 1;
         if (next <= lt->getRangeVec().get_last_idx()) {
             Range next_r = lt->getRange(next);
-            //There is a hole between current range and next range，extend
+            //There is a hole between current range and next range, extend
             //the lifetime to the next definition.
             if (next_r.start() > r.end() + 1) {
                 RG_end(r) = next_r.start() - 1;
@@ -1474,7 +1472,7 @@ void BrHoleFinder::mergePrInfo(MOD PRInfo * pr_info1, PRInfo const* pr_info2,
     //    | rule 4 |  good         |  conflict     |  conflict   |
     //    | rule 5 |  undef        |  good         |  good       |
     //    | rule 6 |  good         |  good         |  TABLE2     |
-    //    _______________________________________________________
+    //    ________________________________________________________
     //                           TABLE1
     //    For the rule 6 in TABLE1, the merged check state should be
     //    updated per the TABLE2 below:
@@ -1680,9 +1678,11 @@ bool BrHoleFinder::check()
     ASSERT0(vlst->get_elem_count() == cfg->getBBList()->get_elem_count());
 
     RPOVexListIter ct;
+    UINT branch_out_degree_threshold = 1;
     UINT count = 0;
     UINT thres = 30;
     bool change = true;
+    BB2PRHolder * holder_new = m_resmgr.allocBB2PRHolder();
     do {
         change = false;
         for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
@@ -1692,8 +1692,8 @@ bool BrHoleFinder::check()
             Vertex const* in = Graph::get_first_in_vertex(bb->getVex(), ito);
             //If there is no predecessor, ignore directly.
             if (in == nullptr) { continue; }
-            BB2PRHolder * holder_new = m_resmgr.allocBB2PRHolder();
-            if (IS_HAVE_BRANCH(in->getOutDegree())) {
+            holder_new->clean();
+            if (cfg->isOutDegreeMoreThan(in, branch_out_degree_threshold)) {
                 //If the ancestor BB has multiple kids, that is to say it is a
                 //start point of a branch, then generate a holder for the new
                 //branch.
@@ -1771,7 +1771,7 @@ void BrHoleFinder::postProcess()
     }
 }
 
-//The entry function of BrHoleFinder，which will drive the whole processes to
+//The entry function of BrHoleFinder, which will drive the whole processes to
 //find and fix the branch lifetime holes.
 void BrHoleFinder::run()
 {
@@ -2252,6 +2252,7 @@ LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
     m_ti_mgr = new TargInfoMgr();
     m_func_level_var_count = 0;
     m_is_apply_to_region = false;
+    m_is_fp_allocable_allowed = true;
 }
 
 
@@ -2315,6 +2316,8 @@ Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 
 PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
 {
+    ASSERT0(type);
+    ASSERT0(reg != REG_UNDEF);
     PRNO prno = m_irmgr->buildPrno(type);
     setDedicatedReg(prno, reg);
     return prno;
@@ -2323,16 +2326,18 @@ PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
 
 PRNO LinearScanRA::buildPrno(Type const* type, Reg reg)
 {
+    ASSERT0(type);
+    ASSERT0(reg != REG_UNDEF);
     PRNO prno = m_irmgr->buildPrno(type);
     setReg(prno, reg);
     return prno;
 }
 
 
-IR * LinearScanRA::buildSpill(PRNO prno, Type const* ty)
+IR * LinearScanRA::buildSpillByLoc(PRNO prno, Var * spill_loc, Type const* ty)
 {
-    Var * spill_loc = genSpillLoc(prno, ty);
-    ASSERT0(spill_loc);
+    ASSERT0(spill_loc && ty);
+    ASSERT0(prno != PRNO_UNDEF);
     IR * pr = m_irmgr->buildPRdedicated(prno, ty);
     m_rg->getMDMgr()->allocRef(pr);
     IR * stmt = m_irmgr->buildStore(spill_loc, pr);
@@ -2343,9 +2348,20 @@ IR * LinearScanRA::buildSpill(PRNO prno, Type const* ty)
 }
 
 
+IR * LinearScanRA::buildSpill(PRNO prno, Type const* ty)
+{
+    ASSERT0(ty);
+    ASSERT0(prno != PRNO_UNDEF);
+    Var * spill_loc = genSpillLoc(prno, ty);
+    ASSERT0(spill_loc);
+    return buildSpillByLoc(prno, spill_loc, ty);
+}
+
+
 IR * LinearScanRA::buildReload(PRNO prno, Var * spill_loc, Type const* ty)
 {
-    ASSERT0(spill_loc);
+    ASSERT0(spill_loc && ty);
+    ASSERT0(prno != PRNO_UNDEF);
     IR * ld = m_irmgr->buildLoad(spill_loc, ty);
     m_rg->getMDMgr()->allocRef(ld);
     IR * stmt = m_irmgr->buildStorePR(prno, ty, ld);

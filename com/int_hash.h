@@ -164,63 +164,6 @@ public:
         smpoolDelete(m_pool);
     }
 
-    //The function maps an integer set to a given object 'mapped'.
-    //iset: an integer set.
-    //mapped: an object that corresponding to 'iset'.
-    void set(Vector<IntType> const& iset, MappedObj mapped)
-    {
-        UINT num = iset.get_elem_count();
-        if (num == 0) { return; }
-        VecIdx i = 0;
-        IntType ival = iset.get(i);
-        V2NMap * mn = m_root_val2node->next.get(ival);
-        if (mn == nullptr) {
-            mn = allocV2NMap();
-            m_root_val2node->next.set(ival, mn);
-        }
-        for (i++; i < (VecIdx)num; i++) {
-            IntType ival = iset.get(i);
-            V2NMap * nextmn = mn->next.get(ival);
-            if (nextmn == nullptr) {
-                nextmn = allocV2NMap();
-                mn->next.set(ival, nextmn);
-            }
-            mn = nextmn;
-        }
-        ASSERT0(mn);
-        ASSERT0(mn->mapped == mapped || mn->mapped == MappedObj(0));
-        mn->mapped = mapped;
-    }
-
-    //The function maps an integer set to a given object 'mapped'.
-    //iset: an integer set.
-    //mapped: an object that corresponding to 'set'.
-    void set(List<IntType> const& iset, MappedObj mapped)
-    {
-        UINT num = iset.get_elem_count();
-        if (num == 0) { return; }
-        VecIdx i = 0;
-        typename List<IntType>::Iter it;
-        IntType ival = iset.get_head(&it);
-        V2NMap * mn = m_root_val2node->next.get(ival);
-        if (mn == nullptr) {
-            mn = allocV2NMap();
-            m_root_val2node->next.set(ival, mn);
-        }
-        for (i++; i < (VecIdx)num; i++) {
-            IntType ival = iset.get_next(&it);
-            V2NMap * nextmn = mn->next.get(ival);
-            if (nextmn == nullptr) {
-                nextmn = allocV2NMap();
-                mn->next.set(ival, nextmn);
-            }
-            mn = nextmn;
-        }
-        ASSERT0(mn);
-        ASSERT0(mn->mapped == mapped || mn->mapped == MappedObj(0));
-        mn->mapped = mapped;
-    }
-
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -289,6 +232,63 @@ public:
         }
         mapped = mn->mapped;
         return true;
+    }
+
+    //The function maps an integer set to a given object 'mapped'.
+    //iset: an integer set.
+    //mapped: an object that corresponding to 'iset'.
+    void set(Vector<IntType> const& iset, MappedObj mapped)
+    {
+        UINT num = iset.get_elem_count();
+        if (num == 0) { return; }
+        VecIdx i = 0;
+        IntType ival = iset.get(i);
+        V2NMap * mn = m_root_val2node->next.get(ival);
+        if (mn == nullptr) {
+            mn = allocV2NMap();
+            m_root_val2node->next.set(ival, mn);
+        }
+        for (i++; i < (VecIdx)num; i++) {
+            IntType ival = iset.get(i);
+            V2NMap * nextmn = mn->next.get(ival);
+            if (nextmn == nullptr) {
+                nextmn = allocV2NMap();
+                mn->next.set(ival, nextmn);
+            }
+            mn = nextmn;
+        }
+        ASSERT0(mn);
+        ASSERT0(mn->mapped == mapped || mn->mapped == MappedObj(0));
+        mn->mapped = mapped;
+    }
+
+    //The function maps an integer set to a given object 'mapped'.
+    //iset: an integer set.
+    //mapped: an object that corresponding to 'set'.
+    void set(List<IntType> const& iset, MappedObj mapped)
+    {
+        UINT num = iset.get_elem_count();
+        if (num == 0) { return; }
+        VecIdx i = 0;
+        typename List<IntType>::Iter it;
+        IntType ival = iset.get_head(&it);
+        V2NMap * mn = m_root_val2node->next.get(ival);
+        if (mn == nullptr) {
+            mn = allocV2NMap();
+            m_root_val2node->next.set(ival, mn);
+        }
+        for (i++; i < (VecIdx)num; i++) {
+            IntType ival = iset.get_next(&it);
+            V2NMap * nextmn = mn->next.get(ival);
+            if (nextmn == nullptr) {
+                nextmn = allocV2NMap();
+                mn->next.set(ival, nextmn);
+            }
+            mn = nextmn;
+        }
+        ASSERT0(mn);
+        ASSERT0(mn->mapped == mapped || mn->mapped == MappedObj(0));
+        mn->mapped = mapped;
     }
 };
 

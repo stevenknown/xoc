@@ -155,6 +155,45 @@ public:
     static VAR_FLAG getFlag(UINT idx);
 };
 
+//Link-related attributes of variable.
+enum VAR_LINK_ATTR {
+    //Undefined.
+    VAR_LINK_ATTR_UNDEF   = 0x0,
+    //".weak" modifier.
+    VAR_LINK_ATTR_WEAK    = 0x1,
+    //".visible" modifier.
+    VAR_LINK_ATTR_VISIBLE = 0x2,
+    //".extern" modifier.
+    VAR_LINK_ATTR_EXTERN  = 0x4,
+};
+
+
+class VarLinkAttr : public UFlag {
+public:
+    VarLinkAttr(UINT v) : UFlag(v) {}
+    bool verify() const;
+};
+
+
+class VarLinkAttrDesc {
+public:
+    ////////////////////////////////////////////////////////////////////
+    //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE//
+    //CORRESPONDING TO THE SPECIAL INITIALIZING VALUE.                //
+    ////////////////////////////////////////////////////////////////////
+    VAR_LINK_ATTR attr;
+    CHAR const* name;
+public:
+    //Get the attribute by given index in enum definition.
+    static VAR_LINK_ATTR getAttr(UINT idx);
+
+    //Compute the index of 'attr' in the Desc table.
+    static UINT getDescIdx(VAR_LINK_ATTR attr);
+
+    //Get link attribute's name.
+    static CHAR const* getName(VAR_LINK_ATTR attr);
+};
+
 
 ////////////////////////////////////////////////////////
 //NOTE: DO *NOT* forget modify the bit-field in Var if//
@@ -192,6 +231,9 @@ public:
 //Record the storage space.
 #define VAR_storage_space(v) ((v)->storage_space)
 
+//Record the link attributes.
+#define VAR_link_attr(v) ((v)->var_link_attr)
+
 class Var {
     COPY_CONSTRUCTOR(Var);
 public:
@@ -216,6 +258,8 @@ public:
         ByteBuf * byte_val;
     } u1; //record the properties that are exclusive.
     VarFlag varflag;
+    //Record the attributes of the current variable related to the link.
+    VarLinkAttr var_link_attr;
 public:
     Var();
     virtual ~Var() {}
@@ -239,6 +283,11 @@ public:
     bool is_region() const { return varflag.have(VAR_IS_REGION); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
+    bool is_weak() const { return var_link_attr.have(VAR_LINK_ATTR_WEAK); }
+    bool is_extern() const { return var_link_attr.have(VAR_LINK_ATTR_EXTERN); }
+    bool is_visible() const {
+        return var_link_attr.have(VAR_LINK_ATTR_VISIBLE);
+    }
     bool is_any() const
     {
         ASSERT0(VAR_type(this));
@@ -374,8 +423,13 @@ public:
     }
     void setToFormalParam() { setFlag(VAR_IS_FORMAL_PARAM); }
     void setFlag(VAR_FLAG f) { VAR_flag(this).set(f); }
+    void setLinkAttr(VAR_LINK_ATTR attr) { VAR_link_attr(this).set(attr); }
 
     void removeFlag(VAR_FLAG f) {VAR_flag(this).remove(f); }
+    void removeLinkAttr(VAR_LINK_ATTR attr)
+    {
+        VAR_link_attr(this).remove(attr);
+    }
 };
 //END Var
 

@@ -107,7 +107,10 @@ ifeq ($(FOR_IP), true)
   arg_passer.o\
   gp_adjustment.o\
   br_opt.o\
-  workaround.o
+  workaround.o\
+  dynamic_stack.o\
+  var2offset.o\
+  ir_reloc_mgr.o
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
   OPT_OBJS+=\
@@ -123,7 +126,10 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   arg_passer.o\
   gp_adjustment.o\
   br_opt.o\
-  workaround.o
+  workaround.o\
+  dynamic_stack.o\
+  var2offset.o\
+  ir_reloc_mgr.o
 else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
   OPT_OBJS+=\
@@ -139,7 +145,10 @@ else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   arg_passer.o\
   gp_adjustment.o\
   br_opt.o\
-  workaround.o
+  workaround.o\
+  dynamic_stack.o\
+  var2offset.o\
+  ir_reloc_mgr.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

@@ -128,7 +128,8 @@ typedef UINT PRNO;
     SWITCH_CASE_LOGIC_UNA: \
     SWITCH_CASE_BITWISE_UNA: \
     case IR_NEG: \
-    case IR_CVT
+    case IR_CVT: \
+    case IR_ALLOCA
 
 #define SWITCH_CASE_STMT_IN_BB \
     SWITCH_CASE_DIRECT_MEM_STMT: \

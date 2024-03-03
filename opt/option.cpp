@@ -119,6 +119,10 @@ FILE * g_unique_dumpfile = nullptr;
 CHAR const* g_unique_dumpfile_name = nullptr;
 bool g_do_lsra_debug = false;
 UINT g_debug_reg_num = 0;
+bool g_force_use_fp_as_sp = false;
+bool g_support_alloca = true;
+bool g_do_ir_reloc = false;
+
 
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
@@ -610,6 +614,10 @@ void Option::dump(MOD LogMgr * lm)
     g_exclude_region.dump(lm);
     note(lm, "\ng_do_lsra_debug = %s", g_do_lsra_debug ? "true":"false");
     note(lm, "\ng_debug_reg_num = %u", g_debug_reg_num);
+    note(lm, "\ng_force_use_fp_as_stack_pointer = %u",
+         g_force_use_fp_as_sp ? "true":"false");
+    note(lm, "\ng_support_alloca = %u", g_support_alloca ? "true":"false");
+    note(lm, "\ng_do_ir_reloc = %u", g_do_ir_reloc);
     lm->decIndent(2);
 }
 

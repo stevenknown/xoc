@@ -740,7 +740,8 @@ void Lexer::checkAndGrowCurTokenString()
 TOKEN Lexer::t_id()
 {
     CHAR c = getNextChar();
-    while (xcom::xisalpha(c) || c == '_' || xcom::xisdigit(c)) {
+    while (xcom::xisalpha(c) || c == '_' || xcom::xisdigit(c) ||
+           xcom::xisextchar(c)) {
         m_cur_token_string[m_cur_token_string_pos++] = c;
         c = getNextChar();
     }
@@ -1329,7 +1330,8 @@ START:
         token = t_dot();
         break;
     default:
-        if (xcom::xisalpha(m_cur_char) || m_cur_char == '_') { //identifier
+        if (xcom::xisalpha(m_cur_char) || m_cur_char == '_' ||
+            xcom::xisextchar(m_cur_char)) { //identifier
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             token = t_id();
             if (m_enable_true_false_token &&

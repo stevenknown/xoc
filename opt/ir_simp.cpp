@@ -1904,6 +1904,9 @@ IR * IRSimp::simplifyCall(IR * ir, SimpCtx * ctx)
             (callee_name == m_irmgr->getInitPlaceHolderVar()->get_name())) {
             return simplifyCallPlaceholder(ir, ctx);
         }
+        if (isSpecialRegCall(ir)) {
+            return simplifySpecialRegCall(ir, ctx);
+        }
     }
     IR * ret_list = nullptr;
     IR * last = nullptr;

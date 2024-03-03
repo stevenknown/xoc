@@ -79,6 +79,9 @@ author: Su Zhenyu
 #include "prologue_epilogue_inserter.h"
 #include "br_opt.h"
 #include "workaround.h"
+#include "dynamic_stack.h"
+#include "var2offset.h"
+#include "ir_reloc_mgr.h"
 #endif
 
 #include "ir_cp.h"

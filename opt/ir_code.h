@@ -98,6 +98,10 @@ typedef enum {
 
     //Re-execute loop, which include do-loop, do-while, while-do.
     IR_CONTINUE,
+
+    //Dynamically allocate stack memory.
+    IR_ALLOCA,
+
     IR_PHI, //Phi statement.
     IR_REGION, //Region statement.
     IR_LAST_UNDERLYING_CODE = IR_REGION,

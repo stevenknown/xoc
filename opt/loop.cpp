@@ -656,20 +656,19 @@ static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li, IRCFG * cfg,
 
 //Find appropriate BB to be preheader.
 //Return the appropriate BB if found it.
-//head: loophead of loop.
 //prev: the previous BB of 'head' in BB list.
 static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
                                        IRBB * prev)
 {
     IRBB * appropriate_bb = nullptr;
     if (prev == nullptr) { return nullptr; }
-
     IRBB const* head = li->getLoopHead();
+    UINT outsidebbnum = 0;
     for (xcom::EdgeC const* ec = head->getVex()->getInList();
          ec != nullptr; ec = ec->get_next()) {
         UINT pred = ec->getFromId();
         if (li->isInsideLoop(pred)) { continue; }
-
+        outsidebbnum++;
         if (pred == prev->id()) {
             //Try to find fallthrough prev BB.
             //CASE:BB_prev is suitable for preheader of head.
@@ -681,11 +680,12 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
             if (last == nullptr ||
                 (last->isUnconditionalBr() && head->isTarget(last))) {
                 //prev fallthrough to head BB.
-                if (appropriate_bb == nullptr) {
+                if (appropriate_bb == nullptr && outsidebbnum <= 1) {
                     appropriate_bb = prev;
                 } else {
                     //There are multiple outside-loop predecessor BBs, thus
                     //no appropriate preheader BB.
+                    ASSERT0(outsidebbnum >= 2);
                     return nullptr;
                 }
                 continue;
@@ -693,23 +693,23 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
             if (!IRBB::isLowerBoundary(const_cast<IRBB*>(prev)->getLastIR())) {
                 //prev should fallthrough to head BB.
                 //Otherwise can not append IR to prev BB.
-                if (appropriate_bb == nullptr) {
+                if (appropriate_bb == nullptr && outsidebbnum <= 1) {
                     appropriate_bb = prev;
                 } else {
                     //There are multiple outside-loop predecessor BBs, thus
                     //no appropriate preheader BB.
+                    ASSERT0(outsidebbnum >= 2);
                     return nullptr;
                 }
                 continue;
             }
-            if (appropriate_bb != nullptr) {
+            if (outsidebbnum >= 2) {
                 //There are multiple outside-loop predecessor BBs, thus
                 //no appropriate preheader BB.
                 return nullptr;
             }
             continue;
         }
-
         if (pred != prev->id()) {
             ASSERT0(cfg->getBB(pred));
             IR const* last_ir_of_pred = cfg->getBB(pred)->getLastIR();
@@ -729,16 +729,17 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li, IRCFG * cfg,
                 //  |      v
                 //   ---BB_end
                 ASSERT0(head->isTarget(last_ir_of_pred));
-                if (appropriate_bb == nullptr) {
+                if (appropriate_bb == nullptr && outsidebbnum <= 1) {
                     appropriate_bb = cfg->getBB(pred);
                 } else {
                     //There are multiple outside-loop predecessor BBs, thus
                     //no appropriate preheader BB.
+                    ASSERT0(outsidebbnum >= 2);
                     return nullptr;
                 }
                 continue;
             }
-            if (appropriate_bb != nullptr) {
+            if (outsidebbnum >= 2) {
                 //There are multiple outside-loop predecessor BBs, thus
                 //no appropriate preheader BB.
                 return nullptr;
@@ -991,6 +992,8 @@ static bool forceInsertPreheader(LI<IRBB> const* li, Region * rg,
 //updating PHI at loophead and preheader, after inserting preheader.
 //preheader: record the preheader either inserted BB or existed BB.
 //force: force to insert preheader BB whatever it has been exist.
+//       If 'force' is false, the function only inserts new preheader if it
+//       cand not find an appropriate BB to be preheader.
 //       Return the new BB if insertion is successful.
 //Return true if inserting a new BB before loop, otherwise false.
 //CASE: if we find a preheader, the last IR in it may be CallStmt.

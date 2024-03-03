@@ -126,6 +126,71 @@ VAR_FLAG VarFlagDesc::getFlag(UINT idx)
 //END VarFlagDesc
 
 
+VarLinkAttrDesc const g_var_link_attr_desc[] = {
+    { VAR_LINK_ATTR_UNDEF, "undef", }, //idx0
+    { VAR_LINK_ATTR_WEAK, "weak", }, //idx1
+    { VAR_LINK_ATTR_VISIBLE, "visible", }, //idx2
+    { VAR_LINK_ATTR_EXTERN, "extern", }, //idx3
+};
+
+static UINT g_var_link_attr_num = sizeof(g_var_link_attr_desc) /
+                                  sizeof(g_var_link_attr_desc[0]);
+
+
+//
+//START VarLinkAttr
+//
+bool VarLinkAttr::verify() const
+{
+    VarLinkAttr::Iter it;
+    for (VAR_LINK_ATTR attr = (VAR_LINK_ATTR)get_first_flag(it); !end(it);
+         attr = (VAR_LINK_ATTR)get_next_flag(it)) {
+        ASSERT0_DUMMYUSE(attr > VAR_LINK_ATTR_UNDEF &&
+                         VarLinkAttrDesc::getDescIdx(attr) <
+                         g_var_link_attr_num);
+    }
+    return true;
+}
+//END VarLinkAttr
+
+
+//
+//START VarLinkAttrDesc
+//
+CHAR const* VarLinkAttrDesc::getName(VAR_LINK_ATTR link_attr)
+{
+    if (link_attr == VAR_LINK_ATTR_UNDEF) {
+        return g_var_link_attr_desc[0].name;
+    }
+    VarLinkAttr attr(link_attr);
+    xcom::ROBitSet bs((BYTE const*)&attr.getFlagSet(), attr.getFlagSetSize());
+    ASSERT0(bs.get_elem_count() == 1);
+    UINT idx = bs.get_first() + 1;
+    ASSERT0(idx < g_var_link_attr_num);
+    return g_var_link_attr_desc[idx].name;
+}
+
+
+UINT VarLinkAttrDesc::getDescIdx(VAR_LINK_ATTR link_attr)
+{
+    if (link_attr == VAR_LINK_ATTR_UNDEF) { return 0; }
+    VarLinkAttr attr(link_attr);
+    xcom::ROBitSet bs((BYTE const*)&attr.getFlagSet(), attr.getFlagSetSize());
+    ASSERT0(bs.get_elem_count() == 1);
+    UINT idx = bs.get_first() + 1;
+    ASSERT0(idx < g_var_link_attr_num);
+    return idx;
+}
+
+
+VAR_LINK_ATTR VarLinkAttrDesc::getAttr(UINT idx)
+{
+    ASSERT0(idx < g_var_link_attr_num);
+    return g_var_link_attr_desc[idx].attr;
+}
+//END VarLinkAttrDesc
+
+
 void VarTab::dump(VarMgr const* vm) const
 {
     if (!vm->getRegionMgr()->isLogMgrInit()) { return; }
@@ -161,7 +226,7 @@ VarMgr::VarMgr(RegionMgr * rm)
 //
 //START Var
 //
-Var::Var() : varflag(VAR_UNDEF)
+Var::Var() : varflag(VAR_UNDEF), var_link_attr(VAR_LINK_ATTR_UNDEF)
 {
     VAR_id(this) = 0; //unique id;
     VAR_align(this) = 0;
@@ -356,6 +421,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
     dumpVARDecl(buf, vm);
     buf.strcat("'");
     ASSERT0(VAR_flag(this).verify());
+    ASSERT0(VAR_link_attr(this).verify());
     return buf.buf;
 }
 //END Var

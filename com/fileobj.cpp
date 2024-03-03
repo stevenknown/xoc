@@ -33,7 +33,7 @@ CHAR const* g_fo_name[] = {
     "succ",
     "read error",
     "write error",
-    "excede file end",
+    "exceed file end",
     "not exist",
     "can not create new file",
 };
