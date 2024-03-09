@@ -520,4 +520,52 @@ void ELFRela::insert(BYTE const* buf, ELFMgr const* mgr)
     p->r_addend = (SWord32)r_addend;
 }
 
+
+void ELFRela::setOffset(BYTE const* buf, Addr v, ELFMgr const* mgr)
+{
+    ASSERT0(mgr && buf);
+
+    if (mgr->is64bit()) {
+        ((ELFRela64*)buf)->r_offset = v;
+        return;
+    }
+    ((ELFRela32*)buf)->r_offset = (Addr32)v;
+}
+
+
+void ELFRela::setType(BYTE const* buf, Word v, ELFMgr const* mgr)
+{
+    ASSERT0(mgr && buf);
+
+    if (mgr->is64bit()) {
+        ((ELFRela64*)buf)->r_type = (Word32)v;
+        return;
+    }
+    ((ELFRela32*)buf)->r_type = v;
+}
+
+
+void ELFRela::setAddend(BYTE const* buf, SWord v, ELFMgr const* mgr)
+{
+    ASSERT0(mgr && buf);
+
+    if (mgr->is64bit()) {
+        ((ELFRela64*)buf)->r_addend = v;
+        return;
+    }
+    ((ELFRela32*)buf)->r_addend = (SWord32)v;
+}
+
+
+void ELFRela::setSym(BYTE const* buf, Word v, ELFMgr const* mgr)
+{
+    ASSERT0(mgr && buf);
+
+    if (mgr->is64bit()) {
+        ((ELFRela64*)buf)->r_sym = (Word32)v;
+        return;
+    }
+    ((ELFRela32*)buf)->r_sym = v;
+}
+
 } //namespace elf

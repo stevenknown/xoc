@@ -2834,6 +2834,7 @@ void AliasAnalysis::inferExpression(IR * expr, MOD MDSet & mds,
     SWITCH_CASE_BITWISE:
     case IR_SELECT:
     case IR_NEG:
+    case IR_ALLOCA:
     case IR_MUL:
     case IR_DIV:
     case IR_REM:

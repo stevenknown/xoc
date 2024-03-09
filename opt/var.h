@@ -467,6 +467,195 @@ public:
 };
 
 
+//
+//Start class LabelRefill.
+//
+//This class is used to record the use of labels to initialize variables.
+//Because some variables are initialized in the following form:
+//
+//e.g.
+//    u32 var0 = func.label0 - func.label1
+//    u64 var1 = { 123, func.label0 - func.label1 }
+//
+//Note that only "-" is supported.
+//
+//Where "label0" and "label1" are labels in a function and "var0" and "var1"
+//are global variables defined outside this function.
+//
+//For the first case, "var0" is initialized using the difference between the PC
+//values of "label0" and "label1" defined in a function.
+//
+//For the second case, the second element of "var1" is initialized using the
+//difference of the PC values of the "label0" and "label1" defined in the same
+//function.
+//
+//Since the difference of PC values of two labels defined in the same function
+//can be determined during compilation, the information stored in this class
+//will be used to calculate specific values and refill the initial value of
+//variables.
+#define LABELREFILL_function(lr) ((lr)->m_function)
+#define LABELREFILL_label_0(lr)  ((lr)->m_label_0)
+#define LABELREFILL_label_1(lr)  ((lr)->m_label_1)
+#define LABELREFILL_offset(lr)   ((lr)->m_offset)
+#define LABELREFILL_type(lr)     ((lr)->m_type)
+#define LABELREFILL_var(lr)      ((lr)->m_var)
+class LabelRefill {
+    COPY_CONSTRUCTOR(LabelRefill);
+public:
+    //The location of the variable that needs to be refilled.
+    UINT m_offset;
+    //Variables that need to be refilled with initial values.
+    Var const* m_var;
+    //Type of the initial value for refilling which must be scalar type.
+    Type const* m_type;
+    //Which function labels are defined.
+    Sym const* m_function;
+    //Two labels used to calculate initial value.
+    LabelInfo const* m_label_0;
+    LabelInfo const* m_label_1;
+public:
+    LabelRefill() {}
+    ~LabelRefill() {}
+
+    void setFunction(Sym const* func) { ASSERT0(func); m_function = func; }
+    void setLabel0(LabelInfo const* li) { ASSERT0(li); m_label_0 = li; }
+    void setLabel1(LabelInfo const* li) { ASSERT0(li); m_label_1 = li; }
+    void setOffset(UINT offset) { m_offset = offset; }
+    void setType(Type const* tp) { ASSERT0(tp); m_type = tp; }
+    void setVar(Var const* var) { ASSERT0(var); m_var = var; }
+};
+//End class LabelRefill.
+
+
+//
+//Start class LabelReloc.
+//
+//This class records all cases where single label is used to initialize global
+//variables.
+//For example:
+//
+//    u32 var0 = func.label0;
+//    u64 var1 = { 1, func.label1 };
+//
+//Since the PC values ​​represented by "label0" and "label1" can only be
+//obtained at linking time, we first add the relocation of the variables to
+//point to the location of the code segment represented by label.
+//
+//For the first case, "var0" points to the location of "label0" in the "func"
+//code segment.
+//
+//For the second case, the second element of "var1" points to the location of
+//"label1" in the "func" code segment.
+#define LABELRELOC_offset(lr)     ((lr)->m_offset)
+#define LABELRELOC_current(lr)    ((lr)->m_current)
+#define LABELRELOC_other(lr)      ((lr)->m_other)
+#define LABELRELOC_label(lr)      ((lr)->m_label)
+class LabelReloc {
+    COPY_CONSTRUCTOR(LabelReloc);
+public:
+    //The position of the relocated symbol.
+    UINT m_offset;
+    //Which symbol needs to be relocated.
+    Sym const* m_current;
+    //Which symbol will be relocated to.
+    Sym const* m_other;
+    //The label defined in the function which is used to calculate the location
+    //of the code segment pointed to by the relocation.
+    LabelInfo const* m_label;
+public:
+    LabelReloc() {}
+    ~LabelReloc() {}
+
+    void setCurrent(Sym const* sym) { ASSERT0(sym); m_current = sym; }
+    void setLabel(LabelInfo const* li) { ASSERT0(li); m_label = li; }
+    void setOther(Sym const* sym) { ASSERT0(sym); m_other = sym; }
+    void setOffset(UINT offset) { m_offset = offset; }
+};
+//End class LabelReloc.
+
+
+//
+//Start class VarLabelRelationMgr.
+//
+#define VarLabelRelationMgr_label_refill(vlrm) ((vlrm)->m_var_label_refill)
+#define VarLabelRelationMgr_label_reloc(vlrm)  ((vlrm)->m_var_label_reloc)
+class VarLabelRelationMgr {
+    COPY_CONSTRUCTOR(VarLabelRelationMgr);
+public:
+    //Stored all entries that use the label difference to initialize global
+    //variables.
+    //Note that RegionMgr will save all information from program region and
+    //each function region will extract related information and process it.
+    xcom::List<LabelRefill*> m_var_label_refill;
+    //Stored all entries that use the single label to initialize global
+    //variables.
+    xcom::List<LabelReloc*> m_var_label_reloc;
+protected:
+    //Allocate LabelRefill.
+    LabelRefill * allocLabelRefill();
+
+    //Allocate LabelReloc.
+    LabelReloc * allocLabelReloc();
+public:
+    VarLabelRelationMgr() {}
+    ~VarLabelRelationMgr();
+
+    //This function will add an entry of using label difference to initialize
+    //a global variable(scalar) or a location of a global variable(vector).
+    //
+    //For example:
+    //
+    //  u32 var0 = { func0.label_b - func0.label_a,
+    //               func1.label_d - func1.label_c }
+    //
+    //  function func0()       function func1()
+    //  {                      {
+    //      ......                 ......
+    //      label_a                label_c
+    //      ......                 ......
+    //      label_b                label_d
+    //      ......                 ......
+    //  }                      }
+    //
+    //Where the first element of "var0" is initialized using the difference
+    //between "label_b" and "label_a" defined in "func0", and the second
+    //element is initialized using the difference between "label_d" and
+    //"label_c" defined in "func1".
+    //
+    //When processing the first element, the parameters are:
+    //  var: var0; offset: 0(Byte); tp: u32; function: func0;
+    //  label0: label_b; label1: label_a;
+    //
+    //When processing the second element, the parameters are:
+    //  var: var0; offset: 4(Byte); tp: u32; function: func1;
+    //  label0: label_d; label1: label_c;
+    //
+    void addVarLabelRefill(Var const* var, UINT offset, Type const* tp,
+        Sym const* function, LabelInfo const* label0, LabelInfo const* label1);
+
+    //Add relocation items using label for symbols.
+    //
+    //parameters:
+    //    current: Symbol initialized with label.
+    //    other:   Symbol that label defined in.
+    //    offset:  Location where current symbol occurs.
+    //    li:      Label used for initialization.
+    //
+    //e.g.
+    //    u32 arr0 = { 1, foo.label0 };
+    //    function foo()
+    //    {
+    //        ......
+    //        .label label0
+    //        ......
+    //    }
+    //
+    //    current is "arr0", other is "foo", offset is 4(B), li is "label0".
+    void addVarLabelRelocation(Sym const* current, Sym const* other,
+        UINT offset, LabelInfo const* li);
+};
+
+
 //Map from const Sym to Var.
 typedef TMap<Sym const*, Var*> ConstSym2Var;
 

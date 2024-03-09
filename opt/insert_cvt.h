@@ -103,6 +103,7 @@ class InsertCvt : public Pass {
     IR * convertArray(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertNeg(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertNot(IR * ir, bool & change, InsertCvtCtx & rc);
+    IR * convertUnaryOp(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertBinaryOp(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertILoad(IR * ir, bool & change, InsertCvtCtx & rc);
     IR * convertDet(IR * ir_list, bool & change, InsertCvtCtx & rc);

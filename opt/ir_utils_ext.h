@@ -59,10 +59,10 @@ namespace xoc {
     case IR_VST
 
 //Defined the entry for extended UNA ir code.
-#define SWITCH_CASE_EXT_UNA EMPTY_MACRO
+#define SWITCH_CASE_EXT_UNA PLACEHOLDER_LABEL1
 
 //No extended BIN for now.
-#define SWITCH_CASE_EXT_BIN EMPTY_MACRO
+#define SWITCH_CASE_EXT_BIN PLACEHOLDER_LABEL2
 
 //In order to conform the compatibility of origin IR code, user can undef
 //original SWITCH_CASE_<NAME>, then redefine the same MACRO with new IR code

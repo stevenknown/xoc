@@ -47,6 +47,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_ru_count = REGION_ID_UNDEF + 1;
     m_label_count = LABEL_ID_UNDEF + 1;
     m_var_mgr = nullptr;
+    m_var_label_relation_mgr = nullptr;
     m_md_sys = nullptr;
 
     //Set to false by default to get more opportunities to optimizations.
@@ -79,6 +80,10 @@ RegionMgr::~RegionMgr()
     if (m_var_mgr != nullptr) {
         delete m_var_mgr;
         m_var_mgr = nullptr;
+    }
+    if (m_var_label_relation_mgr != nullptr) {
+        delete m_var_label_relation_mgr;
+        m_var_label_relation_mgr = nullptr;
     }
     m_id2optctx.clean();
     smpoolDelete(m_pool);
@@ -173,6 +178,12 @@ void RegionMgr::registerGlobalMD()
 VarMgr * RegionMgr::allocVarMgr()
 {
     return new VarMgr(this);
+}
+
+
+VarLabelRelationMgr * RegionMgr::allocVarLabelRelationMgr()
+{
+    return new VarLabelRelationMgr();
 }
 
 

@@ -102,14 +102,16 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             }
         }
         if (IRDES_is_bin(g_ir_desc[i])) {
+            DUMMYUSE_LABEL(SWITCH_CASE_EXT_BIN);
             switch ((IR_CODE)i) {
             SWITCH_CASE_BIN:
-            //SWITCH_CASE_EXT_BIN:
+            SWITCH_CASE_EXT_BIN:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
         if (IRDES_is_una(g_ir_desc[i])) {
+            DUMMYUSE_LABEL(SWITCH_CASE_EXT_UNA);
             switch ((IR_CODE)i) {
             SWITCH_CASE_UNA:
             SWITCH_CASE_EXT_UNA:

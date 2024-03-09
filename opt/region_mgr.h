@@ -86,6 +86,7 @@ protected:
     UINT m_ru_count;
     UINT m_label_count;
     VarMgr * m_var_mgr;
+    VarLabelRelationMgr * m_var_label_relation_mgr;
     MD const* m_str_md;
     MDSystem * m_md_sys;
     TargInfo * m_targinfo;
@@ -118,6 +119,9 @@ public:
 
     //Allocate VarMgr.
     virtual VarMgr * allocVarMgr();
+
+    //Allocate VarLabelRelationMgr.
+    virtual VarLabelRelationMgr * allocVarLabelRelationMgr();
 
     //Allocate TargInfo.
     virtual TargInfo * allocTargInfo();
@@ -157,6 +161,8 @@ public:
     SymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
     VarMgr * getVarMgr() const { return m_var_mgr; }
+    VarLabelRelationMgr * getVarLabelRelationMgr() const
+    { return m_var_label_relation_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
     LogMgr * getLogMgr() const { return m_logmgr; }
     OptCtx * getAndGenOptCtx(Region * rg);
@@ -179,6 +185,17 @@ public:
         ASSERTN(m_md_sys == nullptr, ("MDSystem already initialized"));
         m_md_sys = new MDSystem(m_var_mgr);
         ASSERT0(m_md_sys);
+    }
+
+    //Initialize VarLabelRelationMgr structure.
+    //You should do after you declared a RegionMgr if variable and label need
+    //to be establish relationships.
+    void initVarLabelRelationMgr()
+    {
+        ASSERTN(m_var_label_relation_mgr == nullptr,
+                ("VarLabelRelationMgr already initialized"));
+        m_var_label_relation_mgr = allocVarLabelRelationMgr();
+        ASSERT0(m_var_label_relation_mgr);
     }
 
     //Initialize TargInfo.

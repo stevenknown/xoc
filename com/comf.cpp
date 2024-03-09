@@ -514,6 +514,52 @@ INT xctoi(CHAR const* cl)
 }
 
 
+static LONGLONG hextoll(CHAR const* nptr)
+{
+    LONGLONG res = 0;
+    UCHAR c = *nptr;
+    while (xisdigithex(c)) {
+        if ((c >= '0') & (c <= '9')) {
+            res = 16 * res + c - '0';
+            c = *++nptr;
+            continue;
+        }
+        c = upper(c);
+        if ((c >= 'A') & (c <= 'F')) {
+            res = 16 * res + c - 'A' + 10;
+            c = *++nptr;
+            continue;
+        }
+        return 0; //Just return 0 to do error recovery.
+    }
+    return res;
+}
+
+
+static LONGLONG bintoll(CHAR const* nptr)
+{
+    LONGLONG res = 0;
+    UCHAR c = *nptr;
+    while (xisdigitbin(c)) {
+        res = 2 * res + c - '0';
+        c = *++nptr;
+    }
+    //LONGLONG res = 0;
+    //UCHAR c = *nptr;
+    //if (!xisdigitbin(c)) {
+    //    return 0; //Just return 0 to do error recovery.
+    //}
+    //LONGLONG powof2 = 1;
+    //res = c - '0';
+    //c = *++nptr;
+    //while (xisdigitbin(c)) {
+    //    res = powof2 * (c - '0') + res;
+    //    c = *++nptr;
+    //}
+    return res;
+}
+
+
 //Convert a string into long integer.
 //e.g: cl = '1','2','3','4','5'
 //return 12345.
@@ -529,23 +575,12 @@ LONGLONG xatoll(CHAR const* nptr, bool is_oct)
         nptr++;
     }
     LONGLONG res = 0;
-    if (nptr[0] == '0' && (nptr[1] == 'x' || nptr[1] == 'X')) { //hex
+    if (nptr[0] == '0' && upper(nptr[1]) == 'X') { //hex
         nptr += 2;
-        UCHAR c = *nptr;
-        while ((c >= 'a' && c <= 'f') ||
-               (c >= 'A' && c <= 'F') ||
-               (c >= '0' && c <= '9')) {
-            if (c >= '0' && c <= '9') {
-                res = 16 * res + c - '0';
-            } else if (c >= 'A' && c <= 'F') {
-                res = 16 * res + c - 'A' + 10;
-            } else if (c >= 'a' && c <= 'f') {
-                res = 16 * res + c - 'a' + 10;
-            } else {
-                return 0;
-            }
-            c = *++nptr;
-        }
+        res = hextoll(nptr);
+    } else if (nptr[0] == '0' && upper(nptr[1]) == 'B') { //binary
+        nptr += 2;
+        res = bintoll(nptr);
     } else if (is_oct) { //octal
         while (*nptr >= '0' && *nptr <= '7') {
             res = 8 * res + (*nptr - '0');
@@ -557,7 +592,6 @@ LONGLONG xatoll(CHAR const* nptr, bool is_oct)
             nptr++;
         }
     }
-
     if (sign == '-') {
         return -res;
     }

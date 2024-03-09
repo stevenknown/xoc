@@ -61,7 +61,8 @@ namespace xcom {
     #endif
     #include "stdio.h"
     EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
-    EXTERN_C INT m522138(CHAR const* filename, INT line) CLANG_ANALYZER_NORETURN;
+    EXTERN_C INT m522138(CHAR const* filename, INT line)
+        CLANG_ANALYZER_NORETURN;
 
     #define ASSERTN(a, b) \
         ((a) ? (void)0 : (void)(m522138(__FILE__, __LINE__), m518087 b))
@@ -81,15 +82,16 @@ namespace xcom {
 #undef UNREACHABLE
 #define UNREACHABLE()  ASSERTN(0, ("Unreachable."))
 
-////////////////////////////////////////////////////////////////////////////
-//Following macros defined the interface that may be used in release mode.//
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//FOLLOWING MACROS DEFINED THE INTERFACE THAT MAY BE USED IN RELEASE MODE.    //
+////////////////////////////////////////////////////////////////////////////////
 
 //CHECK
 //Used to avoid warning: unreferenced variable if set
 //-Werror=unused-variable.
 template <typename T> int dummy_use(T const&) { return 0; }
 #define DUMMYUSE(v) xcom::dummy_use(v)
+#define DUMMYUSE_LABEL(label) if(0) { goto label; }
 
 #ifdef _DEBUG_ //DEBUG MODE
     //Do assert at debug mode, and do dummyuse at release mode.

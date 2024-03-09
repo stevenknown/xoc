@@ -83,6 +83,7 @@ static XCodeInfo g_keyword_info[] = {
     { X_BNOT, "bnot", },
     { X_LNOT, "lnot", },
     { X_NEG, "neg", },
+    { X_ALLOCA, "alloca", },
     { X_CVT, "cvt", },
     { X_GOTO, "goto", },
     { X_IGOTO, "igoto", },
@@ -228,6 +229,7 @@ static X_CODE g_exp_code [] = {
     X_BNOT,
     X_LNOT,
     X_NEG,
+    X_ALLOCA,
     X_CVT,
     X_SELECT,
     X_CASE
@@ -1296,6 +1298,8 @@ bool IRParser::parseXOperator(ParseCtx * ctx)
         return parseUnaryOp(IR_LNOT, ctx);
     case X_NEG:
         return parseUnaryOp(IR_NEG, ctx);
+    case X_ALLOCA:
+        return parseUnaryOp(IR_ALLOCA, ctx);
     case X_CVT:
         return parseCvt(ctx);
     case X_SELECT:
@@ -2285,6 +2289,7 @@ bool IRParser::isExp(X_CODE code)
     case X_BNOT:
     case X_LNOT:
     case X_NEG:
+    case X_ALLOCA:
     case X_CVT:
     case X_SELECT:
         return true;

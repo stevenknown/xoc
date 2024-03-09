@@ -123,13 +123,16 @@ typedef UINT PRNO;
     case IR_EQ: \
     case IR_NE
 
+#define SWITCH_CASE_UNA_REST \
+    case IR_NEG: \
+    case IR_CVT: \
+    case IR_ALLOCA
+
 //Defined the entry for expression that is unary operation.
 #define SWITCH_CASE_UNA \
     SWITCH_CASE_LOGIC_UNA: \
     SWITCH_CASE_BITWISE_UNA: \
-    case IR_NEG: \
-    case IR_CVT: \
-    case IR_ALLOCA
+    SWITCH_CASE_UNA_REST
 
 #define SWITCH_CASE_STMT_IN_BB \
     SWITCH_CASE_DIRECT_MEM_STMT: \

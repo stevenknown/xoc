@@ -569,4 +569,18 @@ typedef enum _OR_CODE {
 #define OR_NUM OR_LAST
 
 #include "arm_mach_def.h"
+
+#define BYTE_2ND 1
+#define BYTE_1ST 2
+#define BYTE_3RD 3
+#define GET_INST_1ST_BYTE(val) ((val) & 0x000000FF)
+#define GET_INST_2ND_BYTE(val) (((val) & 0x0000FF00) >> 8)
+#define GET_INST_3RD_BYTE(val) (((val) & 0x00FF0000) >> 16)
+#define GET_INST_4TH_BYTE(val) (((val) & 0xFF000000) >> 24)
+//Get 1st and 2nd bits.
+#define GET_INST_LOW16_BITS(val) ((val) & 0x0000FFFF)
+//Get 3rd and 4th bits.
+#define GET_INST_HIGH16_BITS(val) (((val) & 0xFFFF0000) >> 16)
+#define GET_VALUE_LOW4_BITS(val) ((val) & 0x0000000F)
+
 #endif

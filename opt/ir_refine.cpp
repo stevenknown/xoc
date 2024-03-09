@@ -1118,6 +1118,22 @@ IR * Refine::refineSelect(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
+IR * Refine::refineAllKids(IR * ir, bool & change, RefineCtx & rc)
+{
+    bool doit = false;
+    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        IR * new_kid = refineIR(kid, change, rc);
+        if (new_kid != kid) {
+            doit = true;
+            ir->setKid(i, new_kid);
+        }
+    }
+    return ir;
+}
+
+
 IR * Refine::refineNeg(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_neg());
@@ -2410,6 +2426,9 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
         break;
     case IR_NEG:
         ir = refineNeg(ir, tmpc, rc);
+        break;
+    case IR_ALLOCA:
+        ir = refineAllKids(ir, tmpc, rc);
         break;
     SWITCH_CASE_COMPARE: {
         //According input setting to do refinement.

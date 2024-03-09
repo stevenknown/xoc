@@ -280,12 +280,9 @@ UINT getArithPrecedence(IR_CODE ty)
     case IR_ARRAY:
         p = 1;
         break;
-    case IR_NEG:
-    case IR_BNOT:
-    case IR_LNOT:
+    SWITCH_CASE_UNA:
     case IR_ILD:
     case IR_LDA:
-    case IR_CVT:
         p = 2;
         break;
     case IR_MUL:

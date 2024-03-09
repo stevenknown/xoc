@@ -167,6 +167,19 @@ IR * InsertCvt::convertBr(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
+IR * InsertCvt::convertUnaryOp(IR * ir, bool & change, InsertCvtCtx & rc)
+{
+    ASSERT0(ir->isUnaryOp());
+    bool lchange = false;
+    UNA_opnd(ir) = convertIR(UNA_opnd(ir), lchange, rc);
+    if (lchange) {
+        change = true;
+        ir->setParentPointer(false);
+    }
+    return ir;
+}
+
+
 IR * InsertCvt::convertReturn(IR * ir, bool & change, InsertCvtCtx & rc)
 {
     if (RET_exp(ir) == nullptr) { return ir; }
@@ -340,6 +353,9 @@ IR * InsertCvt::convertIR(IR * ir, bool & change, InsertCvtCtx & rc)
         break;
     case IR_NEG:
         ir = convertNeg(ir, tmpc, rc);
+        break;
+    case IR_ALLOCA:
+        ir = convertUnaryOp(ir, tmpc, rc);
         break;
     SWITCH_CASE_COMPARE: {
         //According input setting to do convertment.
@@ -693,13 +709,12 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
     SWITCH_CASE_CFS_OP:
     SWITCH_CASE_BRANCH_OP:
     SWITCH_CASE_SHIFT:
+    SWITCH_CASE_UNA_REST:
     case IR_STPR:
     case IR_LDA:
-    case IR_NEG:
     case IR_LABEL:
     case IR_CASE:
     case IR_ARRAY:
-    case IR_CVT:
     case IR_RETURN:
     case IR_SELECT: {
         Type const* tgt_ty = parent->getType();

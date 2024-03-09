@@ -155,8 +155,7 @@ bool IRSimp::isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const
     SWITCH_CASE_BITWISE:
     SWITCH_CASE_COMPARE:
     SWITCH_CASE_SHIFT:
-    case IR_NEG:
-    case IR_CVT:
+    SWITCH_CASE_UNA_REST:
         return isLowest(ir);
     case IR_SELECT:
         return isLowestHeightSelect(ir);
@@ -1470,8 +1469,7 @@ IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
     SWITCH_CASE_SHIFT:
     SWITCH_CASE_BITWISE:
     SWITCH_CASE_INDIRECT_MEM_EXP:
-    case IR_NEG: //negative
-    case IR_CVT: //data type convertion
+    SWITCH_CASE_UNA_REST:
         return simplifyBinAndUniExpression(ir, ctx);
     case IR_SELECT: return simplifySelect(ir, ctx);
     default: return simplifyExtExp(ir, ctx);

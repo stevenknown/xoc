@@ -84,7 +84,11 @@ endif
 
 OPT_DEP_OBJS+=\
 $(OPT_DIR)/data_type.o\
-$(OPT_DIR)/logmgr.o
+$(OPT_DIR)/logmgr.o\
+$(OPT_DIR)/symtab.o\
+$(OPT_DIR)/util.o\
+$(OPT_DIR)/option.o
+
 
 CFLAGS+=\
   -D$(TARG) \

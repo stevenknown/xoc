@@ -271,7 +271,7 @@ public:
         ASSERTN(ir->is_bor(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertXOR(IR const* ir, OUT RecycMIList & mis,
+    virtual void convertXor(IR const* ir, OUT RecycMIList & mis,
                             MOD IMCtx * cont)
     {
         ASSERTN(ir->is_xor(), ("illegal ir"));

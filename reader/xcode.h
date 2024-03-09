@@ -68,6 +68,7 @@ typedef enum {
     X_BNOT,
     X_LNOT,
     X_NEG,
+    X_ALLOCA,
     X_CVT,
     X_GOTO,
     X_IGOTO,

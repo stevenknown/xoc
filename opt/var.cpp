@@ -601,4 +601,74 @@ bool VarMgr::verifyAllVar() const
 }
 //END VarMgr
 
+
+//
+//START VarLabelRelationMgr.
+//
+VarLabelRelationMgr::~VarLabelRelationMgr()
+{
+    if (m_var_label_refill.get_elem_count() != 0) {
+        for (LabelRefill * lr = m_var_label_refill.get_head(); lr != nullptr;
+             lr = m_var_label_refill.get_next()) {
+            delete lr;
+        }
+    }
+
+    if (m_var_label_reloc.get_elem_count() != 0) {
+        for (LabelReloc * lr = m_var_label_reloc.get_head(); lr != nullptr;
+             lr = m_var_label_reloc.get_next()) {
+            delete lr;
+        }
+    }
+}
+
+
+LabelRefill * VarLabelRelationMgr::allocLabelRefill()
+{
+    return new LabelRefill();
+}
+
+
+LabelReloc * VarLabelRelationMgr::allocLabelReloc()
+{
+    return new LabelReloc();
+}
+
+
+void VarLabelRelationMgr::addVarLabelRefill(Var const* var, UINT offset,
+    Type const* tp, Sym const* function, LabelInfo const* label0,
+    LabelInfo const* label1)
+{
+    ASSERT0(var && tp && tp->is_scalar() && function && label0 && label1);
+
+    LabelRefill * lr = allocLabelRefill();
+    lr->setVar(var);
+    lr->setOffset(offset);
+    lr->setType(tp);
+    lr->setFunction(function);
+    lr->setLabel0(label0);
+    lr->setLabel1(label1);
+
+    m_var_label_refill.append_tail(lr);
+}
+
+
+void VarLabelRelationMgr::addVarLabelRelocation(
+    Sym const* current, Sym const* other, UINT offset, LabelInfo const* li)
+{
+    ASSERT0(current && other && li);
+
+    LabelReloc * lr = allocLabelReloc();
+    lr->setCurrent(current);
+    lr->setOther(other);
+    lr->setOffset(offset);
+    lr->setLabel(li);
+
+    m_var_label_reloc.append_tail(lr);
+}
+
+
+LabelReloc * allocLabelReloc();
+//END VarLabelRelationMgr.
+
 } //namespace xoc

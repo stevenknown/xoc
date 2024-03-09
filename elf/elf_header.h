@@ -635,6 +635,39 @@ public:
 //Section to be placed at the end of like-named sections by static link.
 #define SF_END 0x02000000
 
+//Defined the entry for ELFSHdr that should be ignored in collecting ELF info.
+#define SWITCH_CASE_NOT_HANDLE     \
+    case S_HASH:                   \
+    case S_NOTE:                   \
+    case S_REL:                    \
+    case S_SHLIB:                  \
+    case S_LOOS:                   \
+    case S_OS:                     \
+    case S_IMPORTS:                \
+    case S_EXPORTS:                \
+    case S_RES:                    \
+    case S_PROGFRAGS:              \
+    case S_IDMDLL:                 \
+    case S_DEFLIB:                 \
+    case S_LOPROC:                 \
+    case S_HIPROC:                 \
+    case S_LOUSER:                 \
+    case S_HIUSER:                 \
+    case S_VERSYM:                 \
+    case S_VERNEED:                \
+    case S_OS_O:                   \
+    case S_IMPORTS_O:              \
+    case S_EXPORTS_O:              \
+    case S_RES_O
+
+#define SWITCH_CASE_NONEED_COLLECT \
+    SWITCH_CASE_NOT_HANDLE:        \
+    case S_PROGBITS:               \
+    case S_STRTAB:                 \
+    case S_NOBITS:                 \
+    case S_DYNSYM:                 \
+    case S_DYNAMIC
+
 //==============================================================================
 //SECTION TYPES
 #define S_UNDEF 0 //inactive, unknown section
@@ -649,6 +682,7 @@ public:
 #define S_REL 9 //as RELA but no explicit addends
 #define S_SHLIB 10 //reserved but evil
 #define S_DYNSYM 11 //dynamic link symbol table
+#define S_LOOS 0x60000000 //Start OS-specific
 #define S_OS 0x60000001 //info to identify target OS
 #define S_IMPORTS 0x60000002 //info on refs to external symbols
 #define S_EXPORTS 0x60000003 //info on symbols exported by ordinal
@@ -1119,7 +1153,33 @@ public:
     //Type "Word32" for elf64 and type "Word32:8" for elf32.
     static UINT getTypeSize(ELFMgr const* mgr);
 
+    //Set ELFRela info via 'buf'. The type of the value in 'buf'
+    //will be cast according to the type of ELFRela(e.g.: elf32, elf64).
     void insert(BYTE const* buf, ELFMgr const* mgr);
+
+    //Set the r_addend field of 'buf' with 'v'.
+    //'buf': A buffer to record ELFRela info, it's space allocated
+    //       according to the type of ELFRela(e.g.: elf32, elf64).
+    //'v': Type will be cast.(e.g.: 'SWord32' for elf32, 'SWord' for elf64).
+    static void setAddend(BYTE const* buf, SWord v, ELFMgr const* mgr);
+
+    //Set the r_offset field of 'buf' with 'v'.
+    //'buf': A buffer to record ELFRela info, it's space allocated
+    //       according to the type of ELFRela(e.g.: elf32, elf64).
+    //'v': Type will be cast.(e.g.: 'Addr32' for elf32, 'Addr' for elf64).
+    static void setOffset(BYTE const* buf, Addr v, ELFMgr const* mgr);
+
+    //Set the r_sym field of 'buf' with 'v'.
+    //'buf': A buffer to record ELFRela info, it's space allocated
+    //       according to the type of ELFRela(e.g.: elf32, elf64).
+    //'v': Type will be cast.(e.g.: 'Word' for elf32, 'Word32' for elf64).
+    static void setSym(BYTE const* buf, Word v, ELFMgr const* mgr);
+
+    //Set the value of r_type field with 'buf'.
+    //'buf': A buffer to record ELFRela info, it's space allocated
+    //       according to the type of ELFRela(e.g.: elf32, elf64).
+    //'v': Type will be cast.(e.g.: 'Word' for elf32, 'Word32' for elf64).
+    static void setType(BYTE const* buf, Word v, ELFMgr const* mgr);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

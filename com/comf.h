@@ -47,9 +47,7 @@ template <class T> class Vector;
 //Note ValueType should be unsigned integer type.
 template <class ValueType>
 inline ValueType computeUnsignedMaxValue(UINT bitwidth)
-{
-    return ((((ValueType)1) << bitwidth) - 1);
-}
+{ return ((((ValueType)1) << bitwidth) - 1); }
 
 //Arrangement
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
@@ -134,8 +132,8 @@ ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end);
 //e.g: given value is 7 and bitwidth is 2, return 3 as result.
 //Note ValueType should be unsigned integer type.
 template <class ValueType>
-inline ValueType extractValidValueViaBitWidth(ValueType value,
-                                              UINT bitwidth)
+inline ValueType extractValidValueViaBitWidth(
+    ValueType value, UINT bitwidth)
 {
     return (value & computeUnsignedMaxValue<ValueType>(bitwidth));
 }
@@ -299,8 +297,7 @@ bool isExceedBitWidth(ULONGLONG val, UINT bitwidth);
 //  ---------------------------------------------------------------
 //
 //  The special character "À" is expressed in UTF-8 form as: "0xC3 0x80".
-inline bool xisextchar(CHAR c)
-{ return (c & 0x80) != 0; }
+inline bool xisextchar(CHAR c) { return (c & 0x80) != 0; }
 
 //Judge if 'f' is integer conform to IEEE754 spec.
 bool isIntegerF(float f);
@@ -317,7 +314,7 @@ bool isFiniteD(double f);
 bool isFiniteF(float f);
 
 //inline is necessary to avoid multiple define.
-inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }
+inline bool isPowerOf2(ULONGLONG x) { return (x != 0) & ((x & (x-1)) == 0); }
 bool isPowerOf5(double f);
 
 //Prime Factorization.
@@ -342,12 +339,12 @@ CHAR * rotateString(MOD CHAR * str, UINT n);
 //Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
 inline CHAR upper(CHAR n)
-{ return (n >= 'a' && n <= 'z') ? (CHAR)(n - 32) : n; }
+{ return ((n >= 'a') & (n <= 'z')) ? (CHAR)(n - 32) : n; }
 
 //Replace letters in 'n' to lowercase letter.
 CHAR * lower(CHAR * n);
 inline CHAR lower(CHAR n)
-{ return (n >= 'A' && n <= 'Z') ? (CHAR)(n + 32) : n; }
+{ return ((n >= 'A') & (n <= 'Z')) ? (CHAR)(n + 32) : n; }
 
 //Replace the suffix of the file name(or path name) using given suffix name.
 //For example:
@@ -441,10 +438,10 @@ UINT xsplit(CHAR const* str, CHAR const* sep, OUT StrBufVec & ret);
 CHAR const* xstrcpy(CHAR const* src, size_t bytesize, OUT StrBuf & tgt);
 
 //Return true if 'c' is blank space or TAB character.
-inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
+inline bool xisspace(CHAR c) { return (c == ' ') | (c == '\t'); }
 
 //Return true if char 'c' is decimal.
-inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
+inline bool xisdigit(CHAR c) { return (c >= '0') & (c <= '9'); }
 
 //Return true if string 'str' is decimal.
 inline bool xisdigit(CHAR const* str)
@@ -458,15 +455,18 @@ inline bool xisdigit(CHAR const* str)
 }
 
 //Return true if 'c' is hex decimal.
+inline bool xisdigitbin(CHAR c) { return (c == '0') | (c == '1'); }
+
+//Return true if 'c' is hex decimal.
 inline bool xisdigithex(CHAR c)
 {
     if (xisdigit(c)) { return true; }
-    else if (upper(c) >= 'A' && upper(c) <= 'F') { return true; }
+    if ((upper(c) >= 'A') & (upper(c) <= 'F')) { return true; }
     return false;
 }
 
 //Return true if 'c' is letter.
-inline bool xisalpha(CHAR c) { return upper(c) >= 'A' && upper(c) <= 'Z'; }
+inline bool xisalpha(CHAR c) { return (upper(c) >= 'A') & (upper(c) <= 'Z'); }
 
 //Return abs value of 'a'.
 inline LONGLONG xabs(LONGLONG a) { return a >= LONGLONG(0) ? a : -a; }
