@@ -353,7 +353,7 @@ public:
     //base: base of array operation, it is either LDA or pointer.
     //sublist: subscript expression list.
     //type: result type of array operator.
-    //    Note that type may NOT be equal to elem_tyid, accroding to
+    //    Note that type may NOT be equal to elem_tyid, according to
     //    ARR_ofst(). If ARR_ofst() is not zero, that means array
     //    elem is MC, or VECTOR, and type should be type of member
     //    to MC/VECTOR.
@@ -395,7 +395,7 @@ public:
     //base: base of array operation, it is either LDA or pointer.
     //sublist: subscript expression list.
     //type: result type of array operator.
-    //    Note that type may NOT be equal to elem_tyid, accroding to
+    //    Note that type may NOT be equal to elem_tyid, according to
     //    ARR_ofst(). If ARR_ofst() is not zero, that means array
     //    elem is MC, or VECTOR, and type should be type of member
     //    to MC/VECTOR.

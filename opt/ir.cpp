@@ -741,7 +741,7 @@ IR * IR::getOpndMem(MD const* md) const
 }
 
 
-//Get the Stmt accroding to given prno.
+//Get the Stmt according to given prno.
 //The stmt must write to PR as a result.
 //This function can not be const because it will return itself.
 IR * IR::getResultPR(PRNO prno)
@@ -765,7 +765,7 @@ IR * IR::getResultPR(PRNO prno)
 }
 
 
-//Copy MD that ir referenced accroding to 'mds'.
+//Copy MD that ir referenced according to 'mds'.
 void IR::setRefMD(MD const* md, Region * rg)
 {
     DU * du = getDU();
@@ -780,7 +780,7 @@ void IR::setRefMD(MD const* md, Region * rg)
 }
 
 
-//Copy the set of MD that ir referenced accroding to 'mds'.
+//Copy the set of MD that ir referenced according to 'mds'.
 void IR::setRefMDSet(MDSet const* mds, Region * rg)
 {
     ASSERT0(!is_region());
@@ -1700,7 +1700,7 @@ UINT IR::getAlign() const
     case IR_STARRAY: return STARR_align(this);
     case IR_ILD: return ILD_align(this);
     case IR_IST: return IST_align(this);
-    default: ASSERT0(0); //TODO
+    default: UNREACHABLE(); //TODO
     }
     return false;
 }
@@ -1715,7 +1715,7 @@ void IR::setAlign(UINT align_bytenum)
     case IR_STARRAY: STARR_align(this) = align_bytenum; return;
     case IR_ILD: ILD_align(this) = align_bytenum; return;
     case IR_IST: IST_align(this) = align_bytenum; return;
-    default: ASSERT0(0); //TODO
+    default: UNREACHABLE(); //TODO
     }
 }
 
@@ -1783,7 +1783,7 @@ IR_CODE IR::invertIRCode(IR_CODE src)
 }
 
 
-//This function invert the operation accroding to it semantics.
+//This function invert the operation according to it semantics.
 IR * IR::invertIRCode(IR * ir, Region * rg)
 {
     switch (ir->getCode()) {

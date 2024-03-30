@@ -1045,7 +1045,7 @@ void BackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
     switch (mode) {
     case INSERT_MODE_HEAD: insertFakeUseAtBBEntry(bb, prno, bbpos); break;
     case INSERT_MODE_TAIL: insertFakeUseAtBBExit(bb, prno, bbpos); break;
-    default: ASSERT0(0); break;
+    default: UNREACHABLE(); break;
     }
 }
 
@@ -2985,6 +2985,7 @@ bool LinearScanRA::perform(OptCtx & oc)
 
     //Enable the dump-buffer.
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     UpdatePos up(*this);
     collectDedicatedPR(m_bb_list, m_dedicated_mgr);
     getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);

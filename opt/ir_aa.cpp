@@ -1939,7 +1939,7 @@ MD const* AliasAnalysis::reviseMDSize(IR const* ir, MD const* md)
 }
 
 
-//Recompute the data type byte-size accroding to stmt type.
+//Recompute the data type byte-size according to stmt type.
 //Note we only revise data type if LDA on the RHS expression, and if
 //LDA appeared on RHS, its MD will be put in 'mds' if comp_pts is true.
 //For those MDs in 'hashed_mds' when 'mds' is empty, we just keep them
@@ -2043,7 +2043,7 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
 }
 
 
-//Caculate pointer info accroding to rules for individiual ir, and
+//Caculate pointer info according to rules for individiual ir, and
 //constructing the mapping table that maps MD to an unique Var.
 //e.g For given four point-to pairs {p->a,p->b,q->c,q->d}.
 //    store can be shown as
@@ -2194,7 +2194,7 @@ bool AliasAnalysis::isPointToDedicatedVar(MD const* md, MD2MDSet const& mx)
 }
 
 
-//This function update LHS's POINT-TO set accroding to RHS.
+//This function update LHS's POINT-TO set according to RHS.
 //is_lhs_pointer: true if transit rhs's POINT-TO set to lhs.
 //rhs: RHS expression of stmt, which are IR_ST, IR_IST, IR_STARRAY.
 //rhsrefmds: record memory descriptor of 'rhs' if AC_comp_pts() is false, or
@@ -2832,13 +2832,11 @@ void AliasAnalysis::inferExpression(IR * expr, MOD MDSet & mds,
     SWITCH_CASE_COMPARE:
     SWITCH_CASE_LOGIC:
     SWITCH_CASE_BITWISE:
+    SWITCH_CASE_ARITH_NONLINEAR:
     case IR_SELECT:
+    SWITCH_CASE_UNA_TRIGONOMETRIC:
     case IR_NEG:
-    case IR_ALLOCA:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD: {
+    case IR_ALLOCA: {
         AACtx tic(*ic);
         AC_comp_pts(&tic) = false;
         for (UINT i = 0; i < IR_MAX_KID_NUM(expr); i++) {

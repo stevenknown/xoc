@@ -434,7 +434,7 @@ public:
         //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
+        //MD2 to according IR's MDSet, which can keep global variables
         //and MD2 dependence.
         //e.g:
         //  #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
@@ -513,7 +513,7 @@ public:
         //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
+        //MD2 to according IR's MDSet, which can keep global variables
         //and MD2 dependence.
         //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable
         //           #that represented in Program Region.
@@ -830,7 +830,7 @@ public:
         m_free_md_list.append_head(md);
     }
 
-    //Register MD accroding to specific m. And return the generated MD.
+    //Register MD according to specific m. And return the generated MD.
     MD const* registerMD(MD const& m);
 
     //Register an effectively unbound MD that base is 'var'.

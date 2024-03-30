@@ -420,7 +420,7 @@ VN const* InferEVN::inferStmt(IR const* ir, InferCtx & ctx)
     SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:
     case IR_RETURN:
     case IR_REGION:
-        ASSERT0(0);
+        UNREACHABLE();
         return nullptr;
     default: inferExtStmt(ir, ctx);
     }

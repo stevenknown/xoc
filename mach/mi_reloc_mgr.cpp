@@ -137,7 +137,8 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
         }
 
         if (hasLocalVar(mi)) {
-            setValueViaMICode(mi, m_var2offset->computeVarOffset(MI_var(mi)));
+            setValueViaMICode(mi,
+                (TMWORD)m_var2offset->computeVarOffset(MI_var(mi)));
         }
 
         offset = (TMWORD)xcom::ceil_align(offset, getCodeAlign());

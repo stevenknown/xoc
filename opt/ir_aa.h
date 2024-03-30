@@ -728,7 +728,7 @@ public:
     MD2MDSet * mapBBToMD2MDSet(UINT bbid) const
     { return m_md2mds_vec.get(bbid); }
 
-    //This function update LHS's POINT-TO set accroding to RHS.
+    //This function update LHS's POINT-TO set according to RHS.
     //is_lhs_pointer: true if transit rhs's POINT-TO set to lhs.
     //rhs: RHS expression of stmt, which are IR_ST, IR_IST, IR_STARRAY.
     //rhsrefmds: record memory descriptor of 'rhs' if AC_comp_pts() is false, or

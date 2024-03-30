@@ -124,7 +124,7 @@ public:
 //  compilation of region unit include following phases:
 //    * Prescan IR list to specify which variable is taken address.
 //    * High level process to perform miscellaneous high
-//      level IR transformations accroding to syntactics analysis.
+//      level IR transformations according to syntactics analysis.
 //      This process is also responsible to simpify high level IR
 //      down to low level, and construct basic blocks.
 //    * Both high level and middle level will perform these passes,
@@ -608,7 +608,7 @@ public:
         return li;
     }
 
-    //Allocate a LabelInfo accroding to given 'labid'.
+    //Allocate a LabelInfo according to given 'labid'.
     LabelInfo * genILabel(UINT labid)
     {
         ASSERT0(labid <= RM_label_count(getRegionMgr()));
@@ -730,7 +730,7 @@ public:
     bool isLogMgrInit() const { return getRegionMgr()->isLogMgrInit(); }
 
     //Perform middle level IR optimizations which are implemented
-    //accroding to control flow info and data flow info.
+    //according to control flow info and data flow info.
     //Return true if processing finish successful, otherwise return false.
     virtual bool MiddleProcess(OptCtx & oc);
 

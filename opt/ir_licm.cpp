@@ -43,8 +43,9 @@ static bool isImmRHS(IR const* exp, IR const* stmt)
 }
 
 
-static void updateDomTreeByPreheader(LI<IRBB> const* li, IRBB const* preheader,
-                                     DomTree & domtree, ActMgr & actmgr)
+static void updateDomTreeByPreheader(
+    LI<IRBB> const* li, IRBB const* preheader, DomTree & domtree,
+    ActMgr & actmgr)
 {
     ASSERT0(preheader);
     //Only insert preheader into domtree.
@@ -54,9 +55,9 @@ static void updateDomTreeByPreheader(LI<IRBB> const* li, IRBB const* preheader,
 }
 
 
-static void updateDomTreeByGuardRegion(LI<IRBB> const* li,
-                                       InsertGuardHelper const& help,
-                                       DomTree & domtree, ActMgr & actmgr)
+static void updateDomTreeByGuardRegion(
+    LI<IRBB> const* li, InsertGuardHelper const& help,
+    DomTree & domtree, ActMgr & actmgr)
 {
     ASSERT0(help.getGuardEnd());
     domtree.insertParent(li->getLoopHead()->id(), help.getGuardEnd()->id());
@@ -74,25 +75,227 @@ static void updateDomTreeByGuardRegion(LI<IRBB> const* li,
 }
 
 
-static bool isJudgeHoistCand(IR const* ir)
+//
+//START MoveStmtBetweenBB
+//
+class MoveStmtBetweenBB {
+    COPY_CONSTRUCTOR(MoveStmtBetweenBB);
+protected:
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
+    Region const* m_rg;
+    OptCtx const* m_oc;
+    ConstIRTab m_stmttab;
+protected:
+    void dumpMovedIR(IR const* ir) const;
+
+    //Return true if any stmt that is related to 'exp' that is moved to 'tgtbb'.
+    bool moveDefByDUChain(IR const* exp, IRBB * srcbb, IRBB * tgtbb) const;
+
+    //Return true if any stmt that is related to 'exp' is moved to 'tgtbb'.
+    bool moveDefByPRSSA(IR const* exp, IRBB * srcbb, IRBB * tgtbb) const;
+
+    //Return true if any stmt that is related to 'exp' is moved to 'tgtbb'.
+    bool moveDefByClassicDU(IR const* exp, IRBB * srcbb, IRBB * tgtbb) const;
+
+    //Return true if any stmt that is related to 'exp' is moved to 'tgtbb'.
+    bool moveDefByMDSSA(IR const* exp, IRBB * srcbb, IRBB * tgtbb) const;
+    void moveStmtToTgtBB(
+        BBIRListIter irit, MOD IRBB * srcbb, MOD IRBB * tgtbb) const;
+    void moveStmtToTgtBB(
+        IR * ir, MOD IRBB * srcbb, MOD IRBB * tgtbb) const;
+    bool moveDependentStmtInBB(IR * ir, IRBB * srcbb, IRBB * tgtbb) const;
+
+    bool needToMove(IR const* ir) const
+    {
+        if (ir->is_phi()) { return false; }
+        return m_stmttab.find(ir);
+    }
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+public:
+    MoveStmtBetweenBB(Region const* rg, OptCtx const* oc, IRBB * srcbb)
+    {
+        m_rg = rg;
+        m_oc = oc;
+        m_mdssamgr = m_rg->getMDSSAMgr();
+        m_prssamgr = m_rg->getPRSSAMgr();
+        for (IR const* ir = srcbb->getIRList().get_head();
+             ir != nullptr; ir = srcbb->getIRList().get_next()) {
+            m_stmttab.append(ir);
+        }
+    }
+    void moveStmtListToTgtBB(
+        xcom::List<BBIRListIter> const& itlst, MOD IRBB * srcbb,
+        MOD IRBB * tgtbb) const;
+};
+
+
+//Return true if any stmt that is related to 'exp' is moved to 'tgtbb'.
+bool MoveStmtBetweenBB::moveDefByMDSSA(
+    IR const* exp, IRBB * srcbb, IRBB * tgtbb) const
 {
-    ASSERT0(ir->is_judge());
-    switch (ir->getKidNum()) {
-    case 1: {
-        IR const* op = UNA_opnd(ir);
-        return !(op->isReadPR() || op->is_const());
-    }
-    case 2: {
-        IR const* op0 = BIN_opnd0(ir);
-        IR const* op1 = BIN_opnd1(ir);
-        bool op0_simp = op0->isReadPR() || op0->is_const();
-        bool op1_simp = op1->isReadPR() || op1->is_const();
-        return !(op0_simp && op1_simp);
-    }
-    default: ASSERTN(0, ("TODO"));
+    ASSERT0(exp->isMemRefNonPR());
+    MDSSAInfo * info = m_mdssamgr->getMDSSAInfoIfAny(exp);
+    ASSERTN(info, ("def stmt even not in MDSSA system"));
+    VOpndSetIter it = nullptr;
+    VOpndSet const& vset = info->readVOpndSet();
+    UseDefMgr const* udmgr = m_mdssamgr->getUseDefMgr();
+    BSIdx nexti;
+    for (BSIdx i = vset.get_first(&it); i != BS_UNDEF; i = nexti) {
+        nexti = vset.get_next(i, &it);
+        VMD const* vmd = (VMD*)udmgr->getVOpnd(i);
+        if (vmd == nullptr) {
+            //CASE:licm_mdssa2.c
+            //current i may have been removed by moveStmtToTgtBB() at last
+            //round of the iteration.
+            continue;
+        }
+        ASSERT0(vmd->is_md());
+        MDDef const* def = vmd->getDef();
+        if (def == nullptr) {
+            //Region livein PR.
+            continue;
+        }
+        ASSERT0(def->getBB());
+        if (def->getBB() != srcbb) {
+            //Outside src BB def.
+            continue;
+        }
+        if (def->is_phi()) {
+            //PHI is used to merge ocntrol-flow-dependence, can not be moved.
+            continue;
+        }
+        IR * defocc = def->getOcc();
+        if (!needToMove(defocc)) { continue; }
+        moveStmtToTgtBB(defocc, srcbb, tgtbb);
+        moveDependentStmtInBB(defocc, srcbb, tgtbb);
+
+        //Note after stmt moved, vset may be changed.
+        if (!vset.is_contain(nexti)) {
+            //CASE:rp3.c
+            i = vset.get_first(&it);
+        }
     }
     return false;
 }
+
+
+bool MoveStmtBetweenBB::moveDefByPRSSA(
+    IR const* exp, IRBB * srcbb, IRBB * tgtbb) const
+{
+    ASSERT0(exp->isPROp());
+    SSAInfo * info = exp->getSSAInfo();
+    ASSERTN(info, ("miss PRSSAInfo"));
+    //Check if SSA def is loop invariant.
+    IR * def = SSA_def(info);
+    if (def == nullptr) { return false; }
+    if (!needToMove(def)) { return false; }
+    moveDependentStmtInBB(def, srcbb, tgtbb);
+    moveStmtToTgtBB(def, srcbb, tgtbb);
+    return true;
+}
+
+
+bool MoveStmtBetweenBB::moveDefByClassicDU(
+    IR const* exp, IRBB * srcbb, IRBB * tgtbb) const
+{
+    ASSERTN(m_rg->getDUMgr(), ("valid DUChain need DUMgr"));
+    DUSet const* defset = exp->readDUSet();
+    if (defset == nullptr) { return true; }
+    DUSetIter di = nullptr;
+    BSIdx nexti;
+    IRBB const* expbb = exp->getStmt()->getBB();
+    ASSERT0(expbb);
+    for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = nexti) {
+        nexti = defset->get_next(i, &di);
+        IR * def = m_rg->getIR(i);
+        ASSERT0(def);
+        if (!needToMove(def)) { continue; }
+        moveDependentStmtInBB(def, srcbb, tgtbb);
+        moveStmtToTgtBB(def, srcbb, tgtbb);
+    }
+    return true;
+}
+
+//Return true if any stmt that is related to 'exp' that is moved to 'tgtbb'.
+bool MoveStmtBetweenBB::moveDefByDUChain(
+    IR const* exp, IRBB * srcbb, IRBB * tgtbb) const
+{
+    ASSERT0(exp->is_exp() && exp->isMemOpnd());
+    if (exp->isPROp() && usePRSSADU()) {
+        return moveDefByPRSSA(exp, srcbb, tgtbb);
+    }
+    if (exp->isMemRefNonPR() && useMDSSADU()) {
+      return moveDefByMDSSA(exp, srcbb, tgtbb);
+    }
+    ASSERT0(m_oc);
+    if (m_oc->is_pr_du_chain_valid() || m_oc->is_nonpr_du_chain_valid()) {
+      return moveDefByClassicDU(exp, srcbb, tgtbb);
+    }
+    return false;
+}
+
+
+bool MoveStmtBetweenBB::moveDependentStmtInBB(
+    IR * ir, IRBB * srcbb, IRBB * tgtbb) const
+{
+    bool changed = false;
+    ConstIRIter iriter;
+    for (IR const* x = iterExpInitC(ir, iriter);
+         x != nullptr; x = iterExpNextC(iriter, true)) {
+        if (!x->isMemOpnd()) { continue; }
+        changed |= moveDefByDUChain(x, srcbb, tgtbb);
+    }
+    return changed;
+}
+
+
+void MoveStmtBetweenBB::dumpMovedIR(IR const* ir) const
+{
+    if (ir == nullptr || !m_rg->isLogMgrInit()) { return; }
+    note(m_rg, "\n-- MOVED IR: --");
+    m_rg->getLogMgr()->incIndent(2);
+    dumpIR(ir, m_rg, nullptr, IR_DUMP_DEF);
+    m_rg->getLogMgr()->decIndent(2);
+}
+
+
+void MoveStmtBetweenBB::moveStmtToTgtBB(
+    IR * ir, MOD IRBB * srcbb, MOD IRBB * tgtbb) const
+{
+    srcbb->getIRList().remove(ir);
+    tgtbb->getIRList().append_tail_ex(ir);
+    dumpMovedIR(ir);
+}
+
+
+void MoveStmtBetweenBB::moveStmtToTgtBB(
+    BBIRListIter irit, MOD IRBB * srcbb, MOD IRBB * tgtbb) const
+{
+    IR * ir = irit->val();
+    srcbb->getIRList().remove(irit);
+    tgtbb->getIRList().append_tail_ex(ir);
+    dumpMovedIR(ir);
+}
+
+
+void MoveStmtBetweenBB::moveStmtListToTgtBB(
+    xcom::List<BBIRListIter> const& itlst, MOD IRBB * srcbb,
+    MOD IRBB * tgtbb) const
+{
+    xcom::List<BBIRListIter>::Iter lit;
+    for (BBIRListIter irit = itlst.get_head(&lit);
+         irit != nullptr; irit = itlst.get_next(&lit)) {
+        IR * ir = irit->val();
+        moveDependentStmtInBB(ir, srcbb, tgtbb);
+        moveStmtToTgtBB(irit, srcbb, tgtbb);
+    }
+}
+//END MoveStmtBetweenBB
 
 
 //
@@ -100,6 +303,18 @@ static bool isJudgeHoistCand(IR const* ir)
 //
 void LICMAnaCtx::dump(Region const* rg) const
 {
+}
+
+
+bool LICMAnaCtx::verifyInvStmt(IR const* ir) const
+{
+    ConstIRIter it;
+    for (IR const* x = iterExpInitC(ir, it);
+         x != nullptr; x = iterExpNextC(it)) {
+        if (x->isConstExp()) { continue; }
+        ASSERT0(isInvExp(x));
+    }
+    return true;
 }
 
 
@@ -279,8 +494,11 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
     if (m_gdhelp.hasInsertedGuard()) {
         //Remove the preheader and guard just inserted.
         CfgOptCtx coctx(*m_oc);
+        ASSERT0(m_preheader == m_gdhelp.getGuardedBB());
+        VexIdx preheadervid = m_preheader->id();
         m_gdhelp.removeGuardRegion(*ctx.domtree);
-        ASSERT0(!m_cfg->isVertex(m_preheader->id()));
+        m_preheader = nullptr; //gdhelper will delete the preheader BB.
+        ASSERT0(!m_cfg->isVertex(preheadervid));
 
         //Useless preheader has been removed.
         ctx.cleanAfterLoop();
@@ -347,25 +565,24 @@ void InsertPreheaderMgr::updateMDSSADUForExpInPreHeader()
 }
 
 
-static bool refHoistedPR(IRBB const* loophead, IR const* ir)
+static void collectAllPRInLoopHead(
+    IRBB const* loophead, xcom::TTab<PRNO> & prnotab)
 {
-    ASSERT0(ir->is_stpr());
     BBIRListIter it;
     ConstIRIter tit;
-    PRNO irprno = ir->getPrno();
     for (IR const* t = const_cast<IRBB*>(loophead)->getIRList().get_head(&it);
          t != nullptr;
          t = const_cast<IRBB*>(loophead)->getIRList().get_next(&it)) {
         if (t->is_phi()) {
             //Do not consider PHI because it is not real USE of PR. PHI is
-            //only used to converge PR value from diferent predecessors.
+            //only used to converge PR value from different predecessors.
             //e.g:licm3.c
-            //                 GUAARD_START:
+            //                 GUARD_START:
             //                 stpr $33 = ...
             //      ___________| |
             //     V             |
             //GUARDED:           |
-            //stpr $34 = ... S1  |
+            //stpr $34 = ... #S1 |
             // |                 |
             // |____             |
             //      |            |
@@ -374,19 +591,18 @@ static bool refHoistedPR(IRBB const* loophead, IR const* ir)
             //      LOOPHEAD:
             //      phi $32 = $33, $34
             //      falsebr $9 != 0
-            //Even if $34 is referenced by phi, the stmt S1 should not be move
+            //Even if $34 is referenced by phi, the stmt #S1 should not be move
             //to GUARD_START BB.
             continue;
         }
         tit.clean();
-        for (IR const* k = xoc::iterInitC(t, tit, true);
-             k != nullptr; k = xoc::iterNextC(tit, true)) {
-            if (k->is_pr() && k->getPrno() == irprno) {
-                return true;
+        for (IR const* k = xoc::iterExpInitC(t, tit);
+             k != nullptr; k = xoc::iterExpNextC(tit, true)) {
+            if (k->is_pr()) {
+                prnotab.append(k->getPrno());
             }
         }
     }
-    return false;
 }
 
 
@@ -396,27 +612,56 @@ void InsertPreheaderMgr::reviseStmtExecAtLeastOnce()
     IRBB * loophead = m_li->getLoopHead();
     ASSERT0(loophead);
     BBIRListIter it;
-    BBIRListIter nextit;
-    xcom::StrBuf tmp(8);
     IRBB * guarded_bb = m_gdhelp.getGuardedBB();
     IRBB * guard_start = m_gdhelp.getGuardStart();
     ASSERT0(guarded_bb && guard_start);
-    for (guarded_bb->getIRList().get_head(&it);
-         it != nullptr; it = nextit) {
-        IR * ir = it->val();
-        nextit = it;
-        guarded_bb->getIRList().get_next(&nextit);
-        if (!ir->isPROp()) { continue; }
-        if (!refHoistedPR(loophead, ir)) { continue; }
 
+    //Record the IR that should be moved to GUARD_START_BB. These IRs have
+    //already been placed in GUARDED_BB.
+    //e.g:compile/licm_guard.c
+    //     -----------------------------------
+    //    | GUARD_START_BB:                   |
+    //    | falsebr BB_LOOPHEAD gt ld pp, 0x0 |
+    //     -----------------------------------
+    //        |                  |
+    //        V                  |
+    //  -----------------------  |
+    // | GUARDED_BB:           | |
+    // | st q=ld xx         #S1| |
+    // | stpr $3=ld q       #S2| |
+    // | stpr $4=gt $3 0x0, #S3| |
+    //  -----------------------  |
+    //        |                  |
+    //        V                  V
+    //       --------------------------
+    //      | LOOPHEAD:                |
+    //      | falsebr L2 ne $4 0x0, #S4|
+    //       --------------------------
+    // #S4 uses $4 which defined by #S3. Meanwhile, #S3 uses $3 which defined
+    // by #S2, and #S2 uses 'q' which defined by #S1. Thus #S1, #S2, #S3 all
+    // three need to be moved to GUARD_START_BB, where 'xx' is invariant.
+    xcom::List<BBIRListIter> shouldbemoved;
+    xcom::TTab<PRNO> prnotab;
+    collectAllPRInLoopHead(loophead, prnotab);
+    for (guarded_bb->getIRList().get_tail(&it);
+         it != nullptr; guarded_bb->getIRList().get_prev(&it)) {
+        IR * ir = it->val();
+        if (!ir->isPROp()) { continue; }
+        if (!prnotab.find(ir->getPrno())) { continue; }
+
+        //loophead references ir.
         //The result PR will be referenced at least the first access of
         //loophead.
-        m_licm->getActMgr().dump(
-            "%s executes at least once, thus it is moved from BB%u to BB%u",
-            dumpIRName(ir, tmp), guarded_bb->id(), guard_start->id());
-        guarded_bb->getIRList().remove(it);
-        guard_start->getIRList().append_tail_ex(ir);
+        if (g_dump_opt.isDumpLICM()) {
+            xcom::StrBuf tmp(8);
+            m_licm->getActMgr().dump(
+                "%s executes at least once, thus it is moved from BB%u to BB%u",
+                dumpIRName(ir, tmp), guarded_bb->id(), guard_start->id());
+        }
+        shouldbemoved.append_tail(it);
     }
+    MoveStmtBetweenBB mv2bb(m_rg, m_oc, guarded_bb);
+    mv2bb.moveStmtListToTgtBB(shouldbemoved, guarded_bb, guard_start);
 }
 
 
@@ -457,8 +702,8 @@ void InsertPreheaderMgr::reviseSSADU(HoistCtx const& ctx)
 void InsertPreheaderMgr::updateDomTree(DomTree & domtree)
 {
     if (m_gdhelp.hasInsertedGuard()) {
-        updateDomTreeByGuardRegion(m_li, m_gdhelp, domtree,
-                                   m_licm->getActMgr());
+        updateDomTreeByGuardRegion(
+            m_li, m_gdhelp, domtree, m_licm->getActMgr());
         return;
     }
     if (m_preheader == nullptr) { return; }
@@ -470,8 +715,8 @@ bool InsertPreheaderMgr::perform(IRTab const& irtab,MOD HoistCtx & ctx)
 {
     //Always insert a preheader to facilitate the insertion of guard-BB.
     m_preheader = nullptr;
-    bool insert_prehead = xoc::insertPreheader(m_li, m_rg, &m_preheader, m_oc,
-                                               true);
+    bool insert_prehead = xoc::insertPreheader(
+        m_li, m_rg, &m_preheader, m_oc, true);
     ctx.cfg_changed |= insert_prehead;
     if (insert_prehead) {
         m_licm->getActMgr().dump("insert preheader BB%u of LOOP%u",
@@ -620,12 +865,36 @@ bool LICM::chooseCallStmt(LI<IRBB> const* li, IR * ir, IRIter & irit,
         //stmt can NOT be loop invariant because some exp is not invariant.
         return find;
     }
+    if (ir->hasIdinfo() && !isWorthHoist(ir->getIdinfo())) {
+        return find;
+    }
     if (!anactx.isInvStmt(ir)) {
         //Push stmt into list that to be analyzed.
         //Stmt is invariant only if both base and RHS are invariant.
         ASSERT0(!anactx.getAnaStmtList().find(ir));
         anactx.getAnaStmtList().append_tail(ir);
         anactx.addHoistCand(ir);
+    }
+    return false;
+}
+
+
+bool LICM::isJudgeHoistCand(IR const* ir) const
+{
+    ASSERT0(ir->is_judge());
+    switch (ir->getKidNum()) {
+    case 1: {
+        IR const* op = UNA_opnd(ir);
+        return !(op->isReadPR() || op->is_const());
+    }
+    case 2: {
+        IR const* op0 = BIN_opnd0(ir);
+        IR const* op1 = BIN_opnd1(ir);
+        bool op0_simp = op0->isReadPR() || op0->is_const();
+        bool op1_simp = op1->isReadPR() || op1->is_const();
+        return !(op0_simp && op1_simp);
+    }
+    default: ASSERTN(0, ("not judgement"));
     }
     return false;
 }
@@ -647,6 +916,7 @@ bool LICM::chooseBranch(LI<IRBB> const* li, IR * ir, IRIter & irit,
     } else {
         anactx.addHoistCand(*invlist);
     }
+    ASSERT0(!ir->hasIdinfo());
     m_irs_mgr.free(invlist);
     //TODO:hoist branch if it is loop invariant.
     return find;
@@ -663,6 +933,7 @@ bool LICM::chooseSwitch(LI<IRBB> const* li, IR * ir, IRIter & irit,
     bool find = chooseExp(li, SWITCH_vexp(ir), irit, &exp_invariant,
                           invlist, anactx);
     anactx.addHoistCand(*invlist);
+    ASSERT0(!ir->hasIdinfo());
     m_irs_mgr.free(invlist);
     //TODO:hoist branch if it is loop invariant.
     return find;
@@ -702,11 +973,7 @@ bool LICM::chooseBin(LI<IRBB> const* li, IR * ir, IRIter & irit,
                      OUT bool * all_exp_invariant, OUT IRList * invlist,
                      OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     bool find = false;
     bool op0_all_inv = false;
     IRList * invlist0 = m_irs_mgr.alloc();
@@ -735,11 +1002,7 @@ bool LICM::chooseUna(LI<IRBB> const* li, IR * ir, IRIter & irit,
                      OUT bool * all_exp_invariant, OUT IRList * invlist,
                      OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     bool op0_all_inv = false;
     IRList * invlist0 = m_irs_mgr.alloc();
     bool find = chooseExp(li, UNA_opnd(ir), irit, &op0_all_inv,
@@ -761,11 +1024,7 @@ bool LICM::chooseArray(LI<IRBB> const* li, IR * ir, IRIter & irit,
                        OUT bool * all_exp_invariant, OUT IRList * invlist,
                        OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     List<IRList*> tmp;
     bool find = false;
     bool base_inv = false;
@@ -808,11 +1067,7 @@ bool LICM::chooseILD(LI<IRBB> const* li, IR * ir, IRIter & irit,
                      OUT bool * all_exp_invariant, OUT IRList * invlist,
                      OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     bool base_inv = false;
     IRList * invlist0 = m_irs_mgr.alloc();
     bool find = chooseExp(li, ir->getBase(), irit, &base_inv,
@@ -833,10 +1088,7 @@ bool LICM::chooseILD(LI<IRBB> const* li, IR * ir, IRIter & irit,
 bool LICM::chooseConst(IR * ir, OUT bool * all_exp_invariant,
                        OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = true;
-    if (anactx.isInvExp(ir)) {
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     anactx.addInvExp(ir);
 
     //ConstExp and LDA should not be regarded as loop hoist candidate,
@@ -853,11 +1105,7 @@ bool LICM::choosePR(LI<IRBB> const* li, IR * ir, IRIter & irit,
                     OUT bool * all_exp_invariant, OUT IRList * invlist,
                     OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     if (xoc::isLoopInvariant(ir, li, m_rg, &anactx.getInvStmtList(), true)) {
         *all_exp_invariant = true;
         anactx.addInvExp(ir);
@@ -879,9 +1127,10 @@ bool LICM::chooseLD(LI<IRBB> const* li, IR * ir, IRIter & irit,
                     OUT bool * all_exp_invariant, OUT IRList * invlist,
                     OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
+    ASSERT0(!anactx.isInvExp(ir));
+    ASSERT0(ir->hasIdinfo());
+    if (!isWorthHoist(ir->getIdinfo())) {
+        *all_exp_invariant = false;
         return false;
     }
     if (xoc::isLoopInvariant(ir, li, m_rg, &anactx.getInvStmtList(), true)) {
@@ -898,11 +1147,7 @@ bool LICM::chooseSELECT(LI<IRBB> const* li, IR * ir, IRIter & irit,
                         OUT bool * all_exp_invariant, OUT IRList * invlist,
                         OUT LICMAnaCtx & anactx)
 {
-    *all_exp_invariant = false;
-    if (anactx.isInvExp(ir)) {
-        *all_exp_invariant = true;
-        return false;
-    }
+    ASSERT0(!anactx.isInvExp(ir));
     bool find = false;
     //Trueexp
     bool op0_all_inv = false;
@@ -951,6 +1196,16 @@ bool LICM::chooseExp(LI<IRBB> const* li, IR * ir, IRIter & irit,
 {
     ASSERT0(invlist);
     ASSERT0(ir->is_exp());
+    *all_exp_invariant = false;
+    if (anactx.isInvExp(ir)) {
+        *all_exp_invariant = true;
+        return false;
+    }
+    if (!isWorthHoist(ir)) {
+        //CASE:compile/licm_volatile.c
+        *all_exp_invariant = false;
+        return false;
+    }
     switch (ir->getCode()) {
     SWITCH_CASE_BIN:
         return chooseBin(li, ir, irit, all_exp_invariant, invlist, anactx);
@@ -984,6 +1239,11 @@ bool LICM::chooseStmt(LI<IRBB> const* li, IR * ir, IRIter & irit,
                       OUT LICMAnaCtx & anactx)
 {
     ASSERT0(ir->is_stmt());
+    if (anactx.isInvStmt(ir)) {
+        ASSERT0(anactx.verifyInvStmt(ir));
+        //Not find new INV.
+        return false;
+    }
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
@@ -991,6 +1251,9 @@ bool LICM::chooseStmt(LI<IRBB> const* li, IR * ir, IRIter & irit,
     case IR_STPR: { //Usually other PR operations is unrewarding to hoist.
         bool all_kid_invariant = true;
         bool find = chooseKid(li, ir, all_kid_invariant, irit, anactx);
+        if (ir->hasIdinfo() && !isWorthHoist(ir->getIdinfo())) {
+            return find;
+        }
         if (all_kid_invariant) {
             anactx.addHoistCand(ir);
         }
@@ -1367,14 +1630,14 @@ bool LICM::hoistDefByDUChain(LICMAnaCtx const& anactx, IR const* exp,
 }
 
 
-void LICM::moveStmtToPreheader(MOD IR * stmt, MOD IRBB * prehead,
-                               OUT HoistCtx & ctx) const
+void LICM::moveStmtToPreheader(
+    MOD IR * stmt, MOD IRBB * tgtbb, OUT HoistCtx & ctx) const
 {
-    ASSERT0(prehead);
+    ASSERT0(tgtbb);
     if (stmt->getBB() != nullptr) {
         //Some new generated stmt does not have set BB yet.
         //The stmt is used to hold the value of hoisted-expression.
-        ASSERT0(prehead != stmt->getBB());
+        ASSERT0(tgtbb != stmt->getBB());
         stmt->getBB()->getIRList().remove(stmt);
         ctx.stmt_changed = true;
     }
@@ -1384,8 +1647,8 @@ void LICM::moveStmtToPreheader(MOD IR * stmt, MOD IRBB * prehead,
     //may be readonly CALL stmt, it is also the invariant stmt. e.g:licm.gr
     //Post process the preheader BB into two fallthrough BBs and put the
     //CALL into the first BB, its sebsequent stmts into second BB.
-    //prehead->getIRList().append_tail_ex(stmt);
-    prehead->getIRList().append_tail(stmt);
+    //tgtbb->getIRList().append_tail_ex(stmt);
+    tgtbb->getIRList().append_tail(stmt);
 }
 
 
@@ -1438,8 +1701,8 @@ bool LICM::tryHoistDependentStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
 }
 
 
-void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt,
-                                          HoistCtx const& ctx) const
+void LICM::updateMDSSADUForStmtInLoopBody(
+    MOD IR * stmt, HoistCtx const& ctx) const
 {
     if (!useMDSSADU()) { return; }
     ASSERT0(ctx.oc->is_dom_valid());
@@ -1451,8 +1714,8 @@ void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt,
     for (IR * x = xoc::iterExpInit(stmt, it);
          x != nullptr; x = xoc::iterExpNext(it, true)) {
         if (MDSSAMgr::hasMDSSAInfo(x)) {
-            m_mdssamgr->findAndSetLiveInDef(x, startir, stmt->getBB(),
-                                            *ctx.oc);
+            m_mdssamgr->findAndSetLiveInDef(
+                x, startir, stmt->getBB(), *ctx.oc);
         }
     }
 }
@@ -1502,9 +1765,9 @@ bool LICM::hasInsertedGuardBB(LI<IRBB> const* li) const
 
 
 //Return true if BB or STMT changed.
-bool LICM::hoistCandHelper(LICMAnaCtx const& anactx, OUT IR * cand_exp,
-                           OUT IRBB * prehead, OUT LI<IRBB> * li,
-                           OUT HoistCtx & ctx)
+bool LICM::hoistCandHelper(
+    LICMAnaCtx const& anactx, OUT IR * cand_exp, OUT IRBB * prehead,
+    OUT LI<IRBB> * li, OUT HoistCtx & ctx)
 {
     ASSERT0(cand_exp->is_exp());
     IR * cand_stmt = cand_exp->getStmt();
@@ -1545,8 +1808,8 @@ bool LICM::hoistCandHelper(LICMAnaCtx const& anactx, OUT IR * cand_exp,
     }
 
     //Make a hoisting stmt and put to preheader BB.
-    IR * stpr = m_rg->getIRMgr()->buildStorePR(PR_no(t), t->getType(),
-                                               cand_exp);
+    IR * stpr = m_rg->getIRMgr()->buildStorePR(
+        PR_no(t), t->getType(), cand_exp);
 
     //Revise MD info.
     MD const* tmd = m_rg->getMDMgr()->genMDForPR(t);
@@ -1913,6 +2176,7 @@ bool LICM::perform(OptCtx & oc)
         }
     }
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     xcom::DomTree domtree;
     HoistCtx ctx(&oc, &domtree, m_cfg);
     ctx.buildDomTree(m_cfg);

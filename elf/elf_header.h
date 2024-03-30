@@ -1193,6 +1193,112 @@ public:
 #define STACK_NAME "_stack"
 #define EXCEPTION_SECTION_NAME ".exception"
 
+
+//ELFAR format.
+//---------------------------------------------------------------
+// a. ARIdent. AR file flag.
+//
+//    !<arch>0x0A
+//
+// b. ARHdr. AR header info.
+//
+//    ar_name[16]  //Name of this member.
+//    ar_date[12]  //File modify time.
+//    ar_uid[6]    //Owner uid: printed as decimal.
+//    ar_gid[6]    //Owner gid: printed as decimal.
+//    ar_mode[8]   //File mode: printed as octal.
+//    ar_size[10]  //File size: printed as decimal.
+//    ar_fmag[2]   //Should contain ARFMAG.
+//
+// c. Padding 0 or not to make the size of ARHdr even number.
+//
+// d. Index info number. A number dedicated how many global symbol in this ar
+//    file. It's sizeof(ar_index_size: 4 or 8) is decided by ARHdr.ar_name.
+//
+// e. Index info array. (size = index_num * ar_index_size). Record the offset
+//    of ELF file of global symbol in this ar file. Each index array element
+//    is corresponded to a global symbol.
+//        ...
+//    m_index_array[0]   ELF 1 offset --> global symbol 1.
+//    m_index_array[1]   ELF 1 offset --> global symbol 2.
+//    m_index_array[2]   ELF 2 offset --> global symbol 3.
+//        ...
+//
+// f. Symbol content. There are Global symbols of all ELF files.
+//    There is corresponded index_array element of each global symbol.
+//
+//    str1\0str2\0str3\0...
+//
+// g. OBJ file. ELF file content.
+//
+//    ARHdr_1
+//    ELF_1 content
+//
+//    ARHdr_2
+//    ELF_2 content
+//
+//    ARHdr_3
+//    ELF_3 content
+//       ...
+//
+//----------------------------------------------------------------------
+
+//Length of magic string.
+#define AR_MAGIC_STR_LEN         8
+//Beginning string of ARHDR. It marks the size of index element is 4B.
+#define ARHDR_SYMBOL_START       "/               "
+//Beginning string of ARHDR. It marks the size of index element is 8B.
+#define ARHDR_SYMBOL_START_64    "/SYM64/         "
+//The size of each index element.
+#define ARHDR_INDEX_ELEM_SIZE_4B 4
+#define ARHDR_INDEX_ELEM_SIZE_8B 8
+
+//AR file identity.
+class ARIdent {
+    COPY_CONSTRUCTOR(ARIdent);
+
+    //Archive file magic string.
+    CHAR m_ar_magic[AR_MAGIC_STR_LEN];
+public:
+    ARIdent() {}
+
+    ~ARIdent() {}
+
+    bool isARFile() const;
+
+    void extract(BYTE const* buf)
+    {
+        ASSERT0(buf);
+        ARIdent * ident = (ARIdent*)buf;
+        ::memcpy(&m_ar_magic, &(ident->m_ar_magic), sizeof(m_ar_magic));
+    }
+};
+
+
+#define ARHDR_ar_name(e)  ((e)->m_ar_name)
+#define ARHDR_ar_size(e)  ((e)->m_ar_size)
+#define ARHDR_add_size(e) ((e) & 1)
+//A class descripts AR header info(ARHdr) in AR file. ARHdr contains the
+//basic info of AR file and each ELF file that recorded in AR file.
+class ARHdr {
+    COPY_CONSTRUCTOR(ARHdr);
+public:
+    //The data structures are referenced from '/usr/include/ar.h'.
+    CHAR m_ar_name[16];  //Name of this member.
+    CHAR m_ar_date[12];  //File modify time.
+    CHAR m_ar_uid[6];    //Owner uid: printed as decimal.
+    CHAR m_ar_gid[6];    //Owner gid: printed as decimal.
+    CHAR m_ar_mode[8];   //File mode: printed as octal.
+    CHAR m_ar_size[10];  //File size: printed as decimal.
+    CHAR m_ar_fmag[2];   //Should contain ARFMAG.
+public:
+    ARHdr() {}
+
+    ~ARHdr() {}
+
+    void extract(BYTE const* buf);
+};
+
 } //namespace
 
 #endif

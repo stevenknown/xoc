@@ -1048,7 +1048,7 @@ UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
             //So one simply method to get value of basic variable is
             //to set non-basic variable all be zero. Then the basic variables
             //could consequently be worked out.
-            //The following code would do that operation accroding
+            //The following code would do that operation according
             //to information in 'bvset'.
             //There are two possibilities, the first is that the optimal
             //solution is avaiable, the else indicates the solution is

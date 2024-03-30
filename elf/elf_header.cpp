@@ -568,4 +568,30 @@ void ELFRela::setSym(BYTE const* buf, Word v, ELFMgr const* mgr)
     ((ELFRela32*)buf)->r_sym = v;
 }
 
+
+//START ARFile
+static BYTE g_arfile_magic[AR_MAGIC_STR_LEN] =
+    { '!', '<', 'a', 'r', 'c', 'h', '>', 0x0A };
+
+
+bool ARIdent::isARFile() const
+{
+    return (::memcmp(g_arfile_magic, m_ar_magic, AR_MAGIC_STR_LEN) == 0);
+}
+
+
+void ARHdr::extract(BYTE const* buf)
+{
+    ASSERT0(buf);
+
+    ARHdr * arhdr = (ARHdr*)buf;
+    ::memcpy(&m_ar_name, &arhdr->m_ar_name, sizeof(m_ar_name));
+    ::memcpy(&m_ar_date, &arhdr->m_ar_date, sizeof(m_ar_date));
+    ::memcpy(&m_ar_uid, &arhdr->m_ar_uid, sizeof(m_ar_uid));
+    ::memcpy(&m_ar_gid, &arhdr->m_ar_gid, sizeof(m_ar_gid));
+    ::memcpy(&m_ar_mode, &arhdr->m_ar_mode, sizeof(m_ar_mode));
+    ::memcpy(&m_ar_size, &arhdr->m_ar_size, sizeof(m_ar_size));
+    ::memcpy(&m_ar_fmag, &arhdr->m_ar_fmag, sizeof(m_ar_fmag));
+}
+
 } //namespace elf

@@ -596,6 +596,7 @@ bool LFTR::perform(OptCtx & oc)
     bool insert_bb = false;
 
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
                              insert_bb, oc);
     if (!change) {

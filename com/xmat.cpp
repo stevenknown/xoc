@@ -1293,35 +1293,9 @@ static void flt_dumps(void const* pbasis)
 
 
 #ifdef USE_FAST_BUT_LOW_PRECISION_SQRT
-static float fast_sqrt_float(float n)
-{
-    float const f = 1.5f;
-    float x = n * 0.5f;
-    float y = n;
-
-    //WARNING: dereferencing type-punned pointer will break
-    //strict-aliasing rules [-Wstrict-aliasing]
-    float * py = &y;
-    UINT32 i = *(UINT32*)py;
-
-    i  = 0x5f3759df - (i >> 1);
-
-    //WARNING: dereferencing type-punned pointer will break
-    //strict-aliasing rules [-Wstrict-aliasing]
-    UINT32 * pi = &i;
-    y  = *(float*)pi;
-
-    //May be need more iters for higher precision?
-    y  = y * (f - ( x * y * y ));
-    y  = y * (f - ( x * y * y ));
-    y  = y * (f - ( x * y * y ));
-    return n * y;
-}
-
-
 static Float fast_sqrt(Float n)
 {
-    return Float(fast_sqrt_float((float)n.val()));
+    return Float(xsqrtNonIter((float)n.val()));
 }
 #endif
 
@@ -1339,15 +1313,14 @@ void FloatMat::setSigDigitDesc(UINT sd)
         set_hook(&i);
     }
     switch (sd) {
-    case 0:    g_sd_str = "%.0f"; break;
-    case 1:    g_sd_str = "%.1f"; break;
-    case 2:    g_sd_str = "%.2f"; break;
-    case 3:    g_sd_str = "%.3f"; break;
-    case 4:    g_sd_str = "%.4f"; break;
-    case 5:    g_sd_str = "%.5f"; break;
-    case 6:    g_sd_str = "%.6f"; break;
-    default:
-        ASSERTN(0, ("unsupport significant digit!"));
+    case 0: g_sd_str = "%.0f"; break;
+    case 1: g_sd_str = "%.1f"; break;
+    case 2: g_sd_str = "%.2f"; break;
+    case 3: g_sd_str = "%.3f"; break;
+    case 4: g_sd_str = "%.4f"; break;
+    case 5: g_sd_str = "%.5f"; break;
+    case 6: g_sd_str = "%.6f"; break;
+    default: ASSERTN(0, ("unsupport significant digit!"));
     }
 }
 

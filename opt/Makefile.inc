@@ -103,6 +103,7 @@ ifeq ($(FOR_IP), true)
   ir_dse.o\
   linear_scan.o\
   ir_vect.o\
+  derivative.o\
   prologue_epilogue_inserter.o\
   arg_passer.o\
   gp_adjustment.o\

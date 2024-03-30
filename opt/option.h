@@ -129,9 +129,11 @@ public:
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_insert_cvt; //Dump InsertCvt.
+    bool is_dump_calc_derivative; //Dump Derivative Cacluation.
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
     bool is_dump_lsra; //Dump LinearScanRA
+    bool is_dump_to_buffer; //Dump info to buffer
     bool is_dump_pelog; //Dump PrologueEpilogue
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
@@ -139,7 +141,7 @@ public:
     //compilation.
     bool is_dump_ir_id;
     bool is_dump_gp_adjustment; //Dump GlobalPointerAdjustment
-    bool is_dump_relaxation; //Dump ir after relaxation.
+    bool is_dump_br_opt; //Dump ir after BROpt.
 public:
     DumpOption();
     DumpOption const& operator = (DumpOption const&); //Disable operator =.
@@ -182,14 +184,16 @@ public:
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
     bool isDumpInsertCvt() const;
+    bool isDumpCalcDerivative() const;
     bool isDumpGSCC() const;
     bool isDumpCDG() const;
     bool isDumpLIS() const;
     bool isDumpIRID() const;
     bool isDumpLSRA() const;
+    bool isDumpToBuffer() const;
     bool isDumpPElog() const;
     bool isDumpGPAdjustment() const;
-    bool isDumpRelaxation() const;
+    bool isDumpBROpt() const;
 };
 
 class Option {
@@ -257,6 +261,7 @@ typedef enum _PASS_TYPE {
     PASS_MDSSALIVE_MGR,
     PASS_REFINE,
     PASS_INSERT_CVT,
+    PASS_CALC_DERIVATIVE,
     PASS_SCC,
     PASS_IRSIMP,
     PASS_LINEAR_SCAN_RA,
@@ -283,6 +288,9 @@ extern bool g_do_refine;
 
 //If true to insert IR_CVT if necessary.
 extern bool g_insert_cvt;
+
+//If true to calculate derivative.
+extern bool g_calc_derivative;
 
 //If true to hoist short type to integer type.
 //Hoist data type from less than INT to INT.
@@ -612,5 +620,20 @@ extern StrTabOption g_include_region;
 //Rocord a list of Region that should NOT participate in optimization.
 extern StrTabOption g_exclude_region;
 
+//Stack is located in SPM by default, which is set to false.
+//If it is located in HBM, it is set to true.
+extern bool g_stack_on_global;
+
+//Used to enable the debug mode for LSRA, and the g_debug_reg_num can be use
+//to control the number of physical register under debug mode.
+extern bool g_do_lsra_debug;
+extern UINT g_debug_reg_num;
+//Support alloca.
+extern bool g_support_alloca;
+
+//Enable fp as stack pointer.
+extern bool g_force_use_fp_as_sp;
+//Perform ir reloc.
+extern bool g_do_ir_reloc;
 } //namespace xoc
 #endif

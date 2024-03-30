@@ -41,7 +41,12 @@ static IR const* findLoopHeadPhi(LI<IRBB> const* li, IR const* ir)
 {
     ASSERT0(ir->is_stmt());
     for (; !ir->is_phi() && ir != nullptr;) {
-        if (!isCopyPropStmt(ir)) { return nullptr; }
+        if (!isCopyPropStmt(ir)) {
+            //TODO:Handle more complex cases.
+            //e.g:while((a+b) > 0) {...}
+            //CASE:compile/licm_guard2.c
+            return nullptr;
+        }
         SSAInfo const* ssainfo = ir->getRHS()->getSSAInfo();
         ASSERT0(ssainfo);
         ir = ssainfo->getDef();

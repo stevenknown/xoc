@@ -152,14 +152,6 @@ public:
         return IVVAL_fp(*this);
     }
 
-    //Return the binary content in memory of float-point
-    //if value indicates a float-point.
-    HOST_UINT getFPBin() const
-    {
-        ASSERT0(is_fp());
-        return *((HOST_UINT*)&IVVAL_fp(*this));
-    }
-
     //Return float-point if value indicates a float-point.
     ChainRec const* getCR() const
     {

@@ -75,7 +75,7 @@ public:
 
 //The maximum integer value that can described by bits of IR_CODE_BIT_SIZE
 //should larger than IR_CODE_NUM.
-#define IR_CODE_BIT_SIZE 7
+#define IR_CODE_BIT_SIZE 8
 
 //Each IR at same Region has it own unique id.
 #define IR_id(ir) ((ir)->uid)
@@ -384,7 +384,7 @@ public:
     //Return stmt if it writes PR as result. Otherwise return nullptr.
     IR * getResultPR();
 
-    //Get the stmt accroding to given prno if the stmt writes PR as a result.
+    //Get the stmt according to given prno if the stmt writes PR as a result.
     //Otherwise return nullptr.
     //This function can not be const because it will return itself.
     IR * getResultPR(PRNO prno);
@@ -710,10 +710,19 @@ public:
     //True if store to specified element of pseduo register.
     //The pseduo register must be D_MC or vector type.
     bool is_setelem() const { return getCode() == IR_SETELEM; }
-
     bool is_alloca() const { return getCode() == IR_ALLOCA; }
+    bool is_pow() const { return getCode() == IR_POW; }
+    bool is_nroot() const { return getCode() == IR_NROOT; }
+    bool is_log() const { return getCode() == IR_LOG; }
+    bool is_exponent() const { return getCode() == IR_EXPONENT; }
+    bool is_sin() const { return getCode() == IR_SIN; }
+    bool is_cos() const { return getCode() == IR_COS; }
+    bool is_tan() const { return getCode() == IR_TAN; }
+    bool is_asin() const { return getCode() == IR_ASIN; }
+    bool is_acos() const { return getCode() == IR_ACOS; }
+    bool is_atan() const { return getCode() == IR_ATAN; }
 
-    //Rreturn true if picking up specified element of givne PR and store the
+    //Return true if picking up specified element of givne PR and store the
     //value to a new PR. The base PR must be D_MC or vector type.
     //And the result PR must be element type of base PR.
     bool is_getelem() const { return getCode() == IR_GETELEM; }
@@ -797,6 +806,13 @@ public:
     bool isBranch() const
     { return isConditionalBr() || isMultiConditionalBr() ||
              isUnconditionalBr() || isIndirectBr(); }
+
+    //Return true if ir is trigonometric function.
+    bool isTrig() const
+    {
+        return is_sin() || is_cos() || is_tan() || is_asin() ||
+               is_acos() || is_atan();
+    }
 
     //Return true if ir is indirect memory operation.
     bool isIndirectMemOp() const
@@ -904,7 +920,7 @@ public:
     //indirect array accessing.
     bool isDirectArrayRef() const;
 
-    //This function invert the operation accroding to it semantics.
+    //This function invert the operation according to it semantics.
     static IR * invertIRCode(IR * ir, Region * rg);
     static IR_CODE invertIRCode(IR_CODE src);
 

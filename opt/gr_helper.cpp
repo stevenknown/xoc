@@ -723,7 +723,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
             case REGION_BLACKBOX: prt(m_lm, "blackbox "); break;
             case REGION_FUNC: prt(m_lm, "func "); break;
             case REGION_INNER: prt(m_lm, "inner "); break;
-            default: ASSERT0(0); //TODO
+            default: UNREACHABLE(); //TODO
             }
             if (REGION_ru(ir)->getRegionVar() != nullptr) {
                 prt(m_lm, "%s ",
@@ -791,7 +791,7 @@ void GRDump::dumpRegion(bool dump_inner_region) const
     case REGION_BLACKBOX: prt(m_rg, "blackbox "); break;
     case REGION_FUNC: prt(m_rg, "func "); break;
     case REGION_INNER: prt(m_rg, "inner "); break;
-    default: ASSERT0(0); //TODO
+    default: UNREACHABLE(); //TODO
     }
     if (m_rg->getRegionVar() != nullptr) {
         xcom::StrBuf buf(32);

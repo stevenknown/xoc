@@ -101,7 +101,16 @@ typedef enum {
 
     //Dynamically allocate stack memory.
     IR_ALLOCA,
-
+    IR_POW, //x^a, caculate the x to a power.
+    IR_NROOT, //x^(1/nth_root), caculate the nth-root of x.
+    IR_LOG, //log_a(x), caculate the logarithm of x to the base a.
+    IR_EXPONENT, //a^(x), caculate the power x of a.
+    IR_SIN, //trigonometric function:sin
+    IR_COS, //trigonometric function:cos
+    IR_TAN, //trigonometric function:tangent
+    IR_ASIN, //trigonometric function:arcsin
+    IR_ACOS, //trigonometric function:arccos
+    IR_ATAN, //trigonometric function:arctan
     IR_PHI, //Phi statement.
     IR_REGION, //Region statement.
     IR_LAST_UNDERLYING_CODE = IR_REGION,

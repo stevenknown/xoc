@@ -405,7 +405,7 @@ bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
 LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it);
 
 //Iterative access LoopInfo tree.
-//This function return the next LoopInfo accroding to 'it'.
+//This function return the next LoopInfo according to 'it'.
 //it: iterator.
 LI<IRBB> const* iterNextLoopInfoC(OUT CLoopInfoIter & it);
 
@@ -415,7 +415,7 @@ LI<IRBB> const* iterNextLoopInfoC(OUT CLoopInfoIter & it);
 LI<IRBB> * iterInitLoopInfo(LI<IRBB> * li, OUT LoopInfoIter & it);
 
 //Iterative access LoopInfo tree.
-//This function return the next LoopInfo accroding to 'it'.
+//This function return the next LoopInfo according to 'it'.
 //it: iterator.
 LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it);
 

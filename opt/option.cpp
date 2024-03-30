@@ -48,6 +48,7 @@ bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
 bool g_insert_cvt = false;
+bool g_calc_derivative = false;
 bool g_do_loop_ana = true;
 bool g_do_cfg_remove_redundant_label = true;
 bool g_do_cfg_remove_empty_bb = true;
@@ -122,6 +123,7 @@ UINT g_debug_reg_num = 0;
 bool g_force_use_fp_as_sp = false;
 bool g_support_alloca = true;
 bool g_do_ir_reloc = false;
+bool g_stack_on_global = false;
 
 
 StrTabOption g_include_region;
@@ -227,6 +229,7 @@ DumpOption::DumpOption()
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
     is_dump_ir_id = false; //Do not dump IR's id by default.
+    is_dump_to_buffer = false;
 }
 
 
@@ -462,6 +465,12 @@ bool DumpOption::isDumpInsertCvt() const
 }
 
 
+bool DumpOption::isDumpCalcDerivative() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_calc_derivative);
+}
+
+
 bool DumpOption::isDumpRefine() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine);
@@ -485,9 +494,15 @@ bool DumpOption::isDumpGPAdjustment() const
     return is_dump_all || (!is_dump_nothing && is_dump_gp_adjustment);
 }
 
-bool DumpOption::isDumpRelaxation() const
+bool DumpOption::isDumpBROpt() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_relaxation);
+    return is_dump_all || (!is_dump_nothing && is_dump_br_opt);
+}
+
+
+bool DumpOption::isDumpToBuffer() const
+{
+    return is_dump_to_buffer;
 }
 //END DumpOption
 

@@ -3821,7 +3821,7 @@ public:
     }
 
     //This function remove one element, and return the removed one.
-    //Note that 't' may be different with the return one accroding to
+    //Note that 't' may be different with the return one according to
     //the behavior of user's defined HF class.
     //
     //Do NOT change the order that elements in m_elem_vector and the
@@ -3919,7 +3919,7 @@ public:
         }
     }
 
-    //Find element accroding to specific 'val'.
+    //Find element according to specific 'val'.
     //You can implement your own find(), but do NOT
     //change the order that elements in m_elem_vector and the value of m_cur.
     //Because it will impact the effect of get_first(), get_next(),

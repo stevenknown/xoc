@@ -99,14 +99,22 @@ typedef UINT PRNO;
 #define SWITCH_CASE_LOGIC_UNA \
     case IR_LNOT
 
+#define SWITCH_CASE_ARITH_NONLINEAR \
+    case IR_MUL: \
+    case IR_DIV: \
+    case IR_REM: \
+    case IR_MOD: \
+    case IR_POW: \
+    case IR_NROOT: \
+    case IR_LOG: \
+    case IR_EXPONENT
+
 //Defined the entry for expression that is arithmetic operation.
 #define SWITCH_CASE_ARITH \
     case IR_ADD: \
     case IR_SUB: \
-    case IR_MUL: \
-    case IR_DIV: \
-    case IR_REM: \
-    case IR_MOD
+    SWITCH_CASE_ARITH_NONLINEAR
+
 
 //Defined the entry for shift expression.
 #define SWITCH_CASE_SHIFT \
@@ -123,7 +131,16 @@ typedef UINT PRNO;
     case IR_EQ: \
     case IR_NE
 
+#define SWITCH_CASE_UNA_TRIGONOMETRIC \
+    case IR_SIN: \
+    case IR_COS: \
+    case IR_TAN: \
+    case IR_ASIN: \
+    case IR_ACOS: \
+    case IR_ATAN
+
 #define SWITCH_CASE_UNA_REST \
+    SWITCH_CASE_UNA_TRIGONOMETRIC: \
     case IR_NEG: \
     case IR_CVT: \
     case IR_ALLOCA

@@ -191,7 +191,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 }
 
 
-//Create a CallNode accroding to caller.
+//Create a CallNode according to caller.
 //This CallNode will corresponding to an unqiue Region.
 //Ensure CallNode for Region is unique.
 //rg: the region that ir resident in.

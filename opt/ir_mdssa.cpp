@@ -4125,7 +4125,7 @@ void MDSSAMgr::copyMDSSAInfoForTree(IR * tgt, IR const* src)
 
 void MDSSAMgr::addStmtToMDSSAMgr(IR * ir, IR const* ref)
 {
-    ASSERT0(0);//TODO:
+    UNREACHABLE();//TODO:
 }
 
 
@@ -5060,7 +5060,7 @@ IR const* MDSSAMgr::iterUseInitC(IR const* def,
 
 //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
 //describes a memory expression.
-//This function return the next USE accroding to 'it'.
+//This function return the next USE according to 'it'.
 //it: iterator.
 //Readonly function.
 //Note this function may iterate same IR multiple times because it may
@@ -5130,7 +5130,7 @@ MDDef const* MDSSAMgr::iterDefInitC(MDDef const* def,
 
 
 //Iterative access MDDef chain.
-//This function return the next MDDef node accroding to 'it'.
+//This function return the next MDDef node according to 'it'.
 //it: iterator.
 //Readonly function.
 MDDef const* MDSSAMgr::iterDefNextC(MOD ConstMDDefIter & it) const
@@ -5160,7 +5160,7 @@ MDDef const* MDSSAMgr::iterDefInitCTillKillingDef(MDDef const* def,
 
 
 //Iterative access MDDef chain.
-//This function return the next MDDef node accroding to 'it'.
+//This function return the next MDDef node according to 'it'.
 //it: iterator.
 //use: indicate the USE expression of the 'def'.
 //Readonly function.

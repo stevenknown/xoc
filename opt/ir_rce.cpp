@@ -644,6 +644,7 @@ bool RCE::perform(OptCtx & oc)
         &oc, PASS_RPO, PASS_GVN, PASS_UNDEF);
     ASSERT0(m_gvn->is_valid());
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpInit(this);
     RCECtx ctx(&oc);
     bool change = performSimplyRCE(ctx);

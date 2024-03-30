@@ -461,6 +461,7 @@ bool InferType::perform(OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     START_TIMER(t, getPassName());
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpInit();
     bool changed = false;
     do {

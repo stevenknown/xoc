@@ -93,7 +93,7 @@ public:
     //'begin' and 'end' have to be within same INTERVAL.
     RPOVal tryFindUsableRPO(RPOVal begin, RPOVal end);
 
-    //Try to update RPO of newvex accroding to RPO of marker.
+    //Try to update RPO of newvex according to RPO of marker.
     //newvex_prior_marker: true if newvex's lexicographical order is prior to
     //marker. Return true if this function find a properly RPO for 'newvex',
     //otherwise return false.

@@ -35,23 +35,24 @@ author: Su Zhenyu
 
 namespace xcom {
 
-bool operator == (Float const& a, Float const& b)
+//Initialize global variable.
+PRECISION_TYPE Float::g_e = PRECISION_TYPE_E;
+
+bool Float::isApproEq(PRECISION_TYPE a, PRECISION_TYPE b)
 {
-    PRECISION_TYPE av = a.m_f;
-    PRECISION_TYPE bv = b.m_f;
-    if ((av > 0 && bv < 0) || (av < 0 && bv > 0)) {
+    if ((a > 0 && b < 0) || (a < 0 && b > 0)) {
         return false;
     }
-    if (av < 0) { av = -av; }
-    if (bv < 0) { bv = -bv; }
-    if((av == PRECISION_TYPE(0) && bv < INFINITESIMAL) ||
-       (bv == PRECISION_TYPE(0) && av < INFINITESIMAL)) {
+    if (a < 0) { a = -a; }
+    if (b < 0) { b = -b; }
+    if((a == PRECISION_TYPE(0) && b < INFINITESIMAL) ||
+       (b == PRECISION_TYPE(0) && a < INFINITESIMAL)) {
         return true;
     }
-    if (av > bv) {
-        return (av - bv) < INFINITESIMAL;
+    if (a > b) {
+        return (a - b) < INFINITESIMAL;
     }
-    return (bv - av) < INFINITESIMAL;
+    return (b - a) < INFINITESIMAL;
 }
 
 
@@ -103,7 +104,7 @@ CHAR const* Float::dump(StrBuf & buf) const
 }
 
 
-bool Float::is_int()
+bool Float::is_int() const
 {
     PRECISION_TYPE av = m_f;
     if (av < 0) {

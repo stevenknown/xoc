@@ -111,7 +111,7 @@ IR const* iterInitC(IR const* ir, OUT ConstIRIter & it,
                     bool iter_next = true);
 
 //Iterative access ir tree.
-//This function return the next IR node accroding to 'it'.
+//This function return the next IR node according to 'it'.
 //it: iterator.
 //iter_next: true to iterate the next IR of ir in current iteration.
 //Readonly function.
@@ -126,7 +126,7 @@ IR const* iterNextC(MOD ConstIRIter & it, bool iter_next = true);
 IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next = true);
 
 //Iterative access the ir tree.
-//This funtion return the next IR node accroding to 'it'.
+//This funtion return the next IR node according to 'it'.
 //it: iterator.
 //iter_next: true to iterate the next IR of ir in current iteration.
 //Note this function is NOT readonly, the returnd IR may be modified.
@@ -143,7 +143,7 @@ IR * iterNext(MOD IRIter & it, bool iter_next = true);
 IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it);
 
 //Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'it'.
+//This function return the next IR node according to 'it'.
 //it: iterator.
 //iter_next: true to iterate the next IR of ir in current iteration.
 //Readonly function.
@@ -161,7 +161,7 @@ inline IR const* iterExpNextC(MOD ConstIRIter & it, bool iter_next = true)
 IR * iterExpInit(IR const* ir, OUT IRIter & it);
 
 //Iterative access the right-hand-side expression of stmt.
-//The function return the next IR node accroding to 'it'.
+//The function return the next IR node according to 'it'.
 //it: iterator.
 //iter_next: true to iterate the next IR of ir in current iteration.
 //This is a readonly function.
@@ -180,7 +180,7 @@ inline IR * iterExpNext(MOD IRIter & it, bool iter_next = true)
 IR * iterExpOfStmtInit(IR * ir, OUT IRIter & it);
 
 //Iterative access the expressions that is consist of LHS of stmt itself.
-//This function return the next IR node accroding to 'it'.
+//This function return the next IR node according to 'it'.
 //'it': iterator.
 //Readonly function.
 //e.g: base expression consist of the access of IST, thus the iteration does

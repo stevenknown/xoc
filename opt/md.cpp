@@ -113,7 +113,7 @@ bool MD::is_overlap(MD const* m) const
     //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
-    //MD2 to accroding IR's MDSet, which can keep global variables
+    //MD2 to according IR's MDSet, which can keep global variables
     //and MD2 dependence.
     //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
     //           #represented in Program Region.
@@ -203,7 +203,7 @@ void MDSet::bunion(MDIdx mdid, DefMiscBitSetMgr & mbsmgr)
     //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
-    //MD2 to accroding IR's MDSet, which can keep global variables
+    //MD2 to according IR's MDSet, which can keep global variables
     //and MD2 dependence.
     //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
     //           #represented in Program Region.
@@ -290,7 +290,7 @@ bool MDSet::is_contain_inexact(MDSystem const* ms) const
         //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
+        //MD2 to according IR's MDSet, which can keep global variables
         //and MD2 dependence.
         //e.g: g=10,  #mustdef=MD10, maydef={MD2, MD10}, g is global
         //            #variable that represented in Program Region.
@@ -349,7 +349,7 @@ bool MDSet::is_contain_by_delegate(MD const* md, Region const* rg) const
     //TBD: Does it necessary to judge if either current
     //MDSet or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
-    //MD2 to accroding IR's MDSet, which can keep global variables
+    //MD2 to according IR's MDSet, which can keep global variables
     //and MD2 dependence.
     //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
     //           #represented in Program Region.
@@ -421,7 +421,7 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
     //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
-    //MD2 to accroding IR's MDSet, which can keep global variables
+    //MD2 to according IR's MDSet, which can keep global variables
     //and MD2 dependence.
     //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
     //           #represented in Program Region.
@@ -740,7 +740,7 @@ MD const* MDSystem::registerMD(MD const& m)
 {
     ASSERT0(MD_base(&m));
     if (MD_id(&m) > 0) {
-        //Find the entry in MDTab accroding to m.
+        //Find the entry in MDTab according to m.
         MDTab * mdtab = getMDTab(MD_base(&m));
         ASSERTN(mdtab != nullptr, ("md has not been registered"));
         MD const* entry = mdtab->find(&m);
@@ -764,7 +764,7 @@ MD const* MDSystem::registerMD(MD const& m)
         //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
+        //MD2 to according IR's MDSet, which can keep global variables
         //and MD2 dependence.
         //e.g:
         //  #mustdef=MD10, maydef={MD2, MD10}, g is global
@@ -788,7 +788,7 @@ MD const* MDSystem::registerMD(MD const& m)
         //}
     }
 
-    //Generate a new MD and record it in md-table accroding to its id.
+    //Generate a new MD and record it in md-table according to its id.
     MD * entry = allocMD();
     if (MD_id(entry) == MD_UNDEF) {
         MD_id(entry) = m_md_count++;
@@ -1174,7 +1174,7 @@ MD const* MDSystem::getDelegate(MDIdx mdid) const
     case MD_LOCAL_VAR: return m_local_mem;
     case MD_HEAP_MEM: return m_heap_mem;
     case MD_LOCAL_MAY_ALIAS: return m_local_may_alias;
-    default: ASSERT0(0);
+    default: UNREACHABLE();
     }
     return nullptr;
 }

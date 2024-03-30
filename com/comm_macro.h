@@ -76,6 +76,9 @@ namespace xcom {
 #undef GET_SIGN_LOW_16BIT
 #define GET_SIGN_LOW_16BIT(l) (((l&0xffff)^0x8000)-0x8000)
 
+#undef GET_HIGH_16BIT
+#define GET_HIGH_16BIT(l) (((l)>>16)&0xffff)
+
 #undef GET_SIGN_HIGH_16BIT
 #define GET_SIGN_HIGH_16BIT(l) (((l&0xffffffff)^0x80000000)-0x80000000)
 

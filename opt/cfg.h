@@ -220,7 +220,7 @@ public:
 
     virtual void addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set);
 
-    //Build the CFG accroding to BB list.
+    //Build the CFG according to BB list.
     void build(OptCtx & oc);
 
     //The function clones almost all contents about graph, loopinfo, and CFG
@@ -1656,7 +1656,7 @@ bool CFG<BB, XR>::verifyRPOUniqueness() const
     for (BB * bb = m_bb_list->get_head(&ct);
          bb != nullptr; bb = m_bb_list->get_next(&ct)) {
         if (bb->rpo() == RPO_UNDEF) {
-            ASSERT0(0);
+            UNREACHABLE();
             return false;
         }
         bool find = false;

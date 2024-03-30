@@ -687,7 +687,8 @@ public:
     //DU chain operation.
     //The function changes DEF of PRSSA DU chain from 'olddef' to 'newdef'.
     //Note the function only changes the DU chain for the USE in
-    //'partial_useset', the rest of IRs in use-set of 'olddef' will unchanged.
+    //'partial_useset', the rest of IRs in use-set of 'olddef' will be
+    //unchanged.
     //olddef: original stmt.
     //newdef: new stmt.
     //e.g: given 'olddef'->USE, the result is 'newdef'->USE.

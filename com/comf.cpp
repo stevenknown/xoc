@@ -544,18 +544,6 @@ static LONGLONG bintoll(CHAR const* nptr)
         res = 2 * res + c - '0';
         c = *++nptr;
     }
-    //LONGLONG res = 0;
-    //UCHAR c = *nptr;
-    //if (!xisdigitbin(c)) {
-    //    return 0; //Just return 0 to do error recovery.
-    //}
-    //LONGLONG powof2 = 1;
-    //res = c - '0';
-    //c = *++nptr;
-    //while (xisdigitbin(c)) {
-    //    res = powof2 * (c - '0') + res;
-    //    c = *++nptr;
-    //}
     return res;
 }
 
@@ -744,17 +732,6 @@ void prim(INT m, OUT INT * buf)
 }
 
 
-//Reverse a LONG type integer by lexicalgraph.
-//e.g: if 'd' is 0x12345678, return 0x78563412.
-LONG revlong(LONG d)
-{
-    CHAR * c = (CHAR*)&d, m;
-    m = c[0], c[0] = c[3], c[3] = m;
-    m = c[1], c[1] = c[2], c[2] = m;
-    return d;
-}
-
-
 //Convert floating point string into binary words.
 void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 {
@@ -803,18 +780,6 @@ UINT getLookupPopCount(ULONGLONG v)
            g_bit_count[p[2]] + g_bit_count[p[3]] +
            g_bit_count[p[4]] + g_bit_count[p[5]] +
            g_bit_count[p[6]] + g_bit_count[p[7]];
-}
-
-
-//Ceil rounding alignment.
-//e.g  v=17 , align=4 , the result is 20.
-LONGLONG ceil_align(LONGLONG v, LONGLONG align)
-{
-    if (align == 0 || align == 1) { return v; }
-    if ((v % align) != 0) {
-        v = (v / align + 1) * align;
-    }
-    return v;
 }
 
 
@@ -1682,24 +1647,6 @@ void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen)
 }
 
 
-INT getSign32BitLow16BitVal(INT32 val)
-{
-    return ((val & 0xffff) ^ 0x8000) - 0x8000;
-}
-
-
-INT getSign64BitLow16BitVal(INT64 val)
-{
-    return ((val & 0xffff) ^ 0x8000) - 0x8000;
-}
-
-
-INT getSign64BitLow32BitVal(INT64 val)
-{
-    return ((val & 0xffffffff) ^ 0x80000000) - 0x80000000;
-}
-
-
 void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
                                OUT INT & part3, OUT INT & part4)
 {
@@ -1725,17 +1672,6 @@ void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
     //Get 47~63 bits number.
     part4 = getSign64BitLow32BitVal(val);
     part4 >>= 16;
-}
-
-
-UINT getSignBit(UINT bitsize)
-{
-    //Note that bitsize should be greater than or equal to 8 and be a
-    //multiple of 8.
-    ASSERTN(bitsize >= 8, ("Type bitsize is too small.\n"));
-    ASSERTN(bitsize % 8 == 0, ("Type bitsize must be multiple of 8.\n"));
-
-    return bitsize - 1;
 }
 
 
@@ -1778,6 +1714,32 @@ float xsqrt(float num)
 }
 
 
+float xsqrtNonIter(float n)
+{
+    ASSERT0(sizeof(float) == sizeof(UINT32));
+    float const f = 1.5f;
+    float x = n * 0.5f;
+    float y = n;
+
+    //WARNING: dereferencing type-punned pointer will break
+    //strict-aliasing rules [-Wstrict-aliasing]
+    float * py = &y;
+    UINT32 i = *reinterpret_cast<UINT32*>(py);
+    i  = 0x5f3759df - (i >> 1);
+
+    //WARNING: dereferencing type-punned pointer will break
+    //strict-aliasing rules [-Wstrict-aliasing]
+    UINT32 * pi = &i;
+    y  = *reinterpret_cast<float*>(pi);
+
+    //May be need more iters for higher precision?
+    y  = y * (f - ( x * y * y ));
+    y  = y * (f - ( x * y * y ));
+    y  = y * (f - ( x * y * y ));
+    return n * y;
+}
+
+
 double xsqrt(double num)
 {
     double x = num;
@@ -1788,6 +1750,32 @@ double xsqrt(double num)
         y = (x + num / x) / double(2.0);
     }
     return y;
+}
+
+
+double xlog(double x, double y)
+{
+    return ::log(y) / ::log(x);
+}
+
+
+bool xnroot(Float const& num, UINT nroot, OUT Float & res)
+{
+    PRECISION_TYPE numval = num.val();
+    if (numval < 0 && nroot % 2 == 0) {
+        //The even root of negative number is undefined in the range of
+        //real num.
+        res = Float(NAN);
+        return false;
+    }
+    PRECISION_TYPE guess = numval / nroot; //The first guess value.
+    PRECISION_TYPE epsilon = Float::getEpsilon(); //Required precison.
+    while (::fabs(::pow(guess, nroot) - numval) > epsilon) {
+        guess = ((nroot - 1) * pow(guess, nroot) + numval) /
+                (nroot * pow(guess, nroot - 1));
+    }
+    res = Float(guess);
+    return true;
 }
 
 } //namespace xcom

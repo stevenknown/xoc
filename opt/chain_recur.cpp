@@ -186,7 +186,7 @@ static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     IR * op0 = buildMemRef(v0, mgr);
     IR * op1 = nullptr;
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         op1 = buildMemRef(v1, mgr);
         break;
@@ -232,7 +232,7 @@ static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     IR * op0 = rg->dupIRTree(v0.getExp());
     IR * op1 = nullptr;
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         op1 = buildMemRef(v1, mgr);
         break;
@@ -332,7 +332,7 @@ static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     IR * op0 = nullptr;
     IR * op1 = nullptr;
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_INT:
         if (code == IR_SUB) {
             res.setToInt(v0.getInt() - v1.getInt(), v0.getDType());
@@ -358,7 +358,7 @@ static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
             res.setToCR(rescr, v0.getDType());
             return mgr.doSub(v0, *v1.getCR(), *rescr);
         } else {
-            ASSERT0(0); //TODO
+            UNREACHABLE(); //TODO
         }
         return true;
     default: UNREACHABLE();
@@ -388,7 +388,7 @@ static bool doSubCR2Any(IVVal const& v0, IVVal const& v1,
     ASSERT0(v0.is_cr());
     ChainRec * rescr = mgr.allocChainRec();
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_INT:
     case IVVal::VAL_IS_FP:
     case IVVal::VAL_IS_VAR:
@@ -437,7 +437,7 @@ static bool doAddOrMulInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     ASSERT0(v0.is_int());
     switch (v1.getKind()) {
     case IVVal::VAL_UNDEF:
-        ASSERT0(0);
+        UNREACHABLE();
         return false;
     case IVVal::VAL_IS_INT:
         if (code == IR_ADD) {
@@ -481,7 +481,7 @@ static bool doSubOrDivFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     IR * op0 = nullptr;
     IR * op1 = nullptr;
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_INT:
         return doBinOpFP2Int(code, v0, v1, res, mgr);
     case IVVal::VAL_IS_FP:
@@ -527,7 +527,7 @@ static bool doAddOrMulFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     ASSERT0(code == IR_ADD || code == IR_MUL);
     ASSERT0(v0.is_fp());
     switch (v1.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_FP: {
         if (code == IR_ADD) {
             res.setToFP(v0.getFP() + v1.getFP(), v0.getDType());
@@ -563,7 +563,7 @@ bool IVVal::doMul(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
                   MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         return doBinOpVar2Any(IR_MUL, v0, v1, res, mgr);
     case IVVal::VAL_IS_INT:
@@ -585,7 +585,7 @@ bool IVVal::doAdd(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
                   MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         return doBinOpVar2Any(IR_ADD, v0, v1, res, mgr);
     case IVVal::VAL_IS_INT:
@@ -607,7 +607,7 @@ bool IVVal::doDiv(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
                   MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         return doBinOpVar2Any(IR_DIV, v0, v1, res, mgr);
     case IVVal::VAL_IS_INT:
@@ -626,7 +626,7 @@ bool IVVal::doSub(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
                   MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return false;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
         return doBinOpVar2Any(IR_SUB, v0, v1, res, mgr);
     case IVVal::VAL_IS_INT:
@@ -646,7 +646,7 @@ bool IVVal::doSub(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
 void IVVal::copyExclusive(IVVal const& src, MOD ChainRecMgr & mgr)
 {
     switch (src.getKind()) {
-    case IVVal::VAL_UNDEF: ASSERT0(0); return;
+    case IVVal::VAL_UNDEF: UNREACHABLE(); return;
     case IVVal::VAL_IS_VAR:
     case IVVal::VAL_IS_INT:
     case IVVal::VAL_IS_FP:
@@ -1138,7 +1138,7 @@ static bool doMulByCodeAdd(ChainRec const& cr0, ChainRec const& cr1,
 static bool doMulByCodeMul(ChainRec const& cr0, ChainRec const& cr1,
                            OUT ChainRec & res, MOD ChainRecMgr & mgr)
 {
-    ASSERT0(0); //TODO
+    UNREACHABLE(); //TODO
     mgr.refine(res);
     return true;
 }

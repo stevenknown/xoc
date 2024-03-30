@@ -2693,6 +2693,7 @@ bool RegPromot::perform(OptCtx & oc)
     if (!m_gvn->is_valid()) { return false; }
 
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpBeforePass();
     reset();
     List<LI<IRBB> const*> worklst;

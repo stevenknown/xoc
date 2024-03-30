@@ -185,8 +185,8 @@ static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
 }
 
 
-static RPOVal compRPOIfMarkerPriorVex(Vertex const* newvex, Vertex const* marker,
-                                      RPOMgr * rpomgr)
+static RPOVal compRPOIfMarkerPriorVex(
+    Vertex const* newvex, Vertex const* marker, RPOMgr * rpomgr)
 {
     ASSERT0(newvex && marker);
     //newvex is after marker.
@@ -223,8 +223,9 @@ static RPOVal compRPOIfMarkerPriorVex(Vertex const* newvex, Vertex const* marker
 }
 
 
-//Try to update RPO of newvex accroding to RPO of marker.
-//newvex_prior_marker: true if newvex's lexicographical order is prior to marker.
+//Try to update RPO of newvex according to RPO of marker.
+//newvex_prior_marker: true if newvex's lexicographical order is prior
+//to marker.
 //Return true if this function find a properly RPO for 'newvex', otherwise
 //return false.
 bool RPOMgr::tryUpdateRPO(MOD Vertex * newvex, Vertex const* marker,

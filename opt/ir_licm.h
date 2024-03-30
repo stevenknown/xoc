@@ -174,6 +174,9 @@ public:
 
     //Return true if ir is the unqiue DEF stmt of MustRef in the loop.
     bool isUniqueDef(IR const* ir) const { return m_md2defcnt.isUniqueDef(ir); }
+
+    //Return true if all kids of 'ir' are inv-exp.
+    bool verifyInvStmt(IR const* ir) const;
 };
 
 
@@ -330,19 +333,26 @@ protected:
     bool isHoistStmt() const { return m_is_hoist_stmt; }
 
     //Consider whether ir is worth hoisting.
-    inline bool isWorthHoist(IR const* ir) const
+    bool isWorthHoist(IR const* ir) const
     {
         //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
         //but still can be moved.
         return !ir->isNoMove(true) && !ir->is_volatile();
     }
 
+    //Consider whether variable is worth hoisting.
+    bool isWorthHoist(Var const* var) const { return !var->is_volatile(); }
+
     //Return true if LICM will perform aggressive strategy with RCE.
     //The aggressive strategy will take longer compilation time.
     bool is_aggressive() const { return m_is_aggressive; }
 
-    void moveStmtToPreheader(MOD IR * stmt, MOD IRBB * prehead,
-                             OUT HoistCtx & ctx) const;
+    //Return true if judgement operation 'ir' can be hoisted.
+    bool isJudgeHoistCand(IR const* ir) const;
+
+    void moveStmtToPreheader(
+        MOD IR * stmt, MOD IRBB * tgtbb, OUT HoistCtx & ctx) const;
+
     //Process a loop.
     //Return true if code motion happened.
     //The funtion will maintain LoopInfo.

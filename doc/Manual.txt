@@ -108,7 +108,7 @@ Programming Guides
       compilation of region unit include following phases:
         * Prescan IR list to specify which variable is taken address.
         * High level process to perform miscellaneous higher
-          level IR transformations accroding to syntactics analysis.
+          level IR transformations according to syntactics analysis.
           This process is also responsible to simpify higher level IR
           down to lower level, and construct basic blocks.
         * Both high level and middle level could perform these passes,
@@ -593,7 +593,8 @@ Programming Guides
   ¡ñ  IR_SWITCH
       This operation represents multiple target branch.
       Usage:
-      switch vexp, default label, [end label], [val1:label1, val2:label2, ...], [body].
+      switch vexp, default label, [end label], [val1:label1, val2:label2, ...],
+          [body].
 
       The operation is a multiple conditional direct which jumping to one
       of the label that indicated in case list.
@@ -607,7 +608,7 @@ Programming Guides
           switch ($pr1) //unconditional jump to pr1.
 
       e.g: demostrate how to use IR_SWITCH.
-          In this example, switch operation jump to label accroding to the
+          In this example, switch operation jump to label according to the
           value of a.
           switch (ld:i32 a) (deflab, L3) (0, L1), (1, L2)
           ...
@@ -736,11 +737,11 @@ Programming Guides
           IR_GE   great or equal than
           IR_EQ   equal
           IR_NE   not equal£¬ compute the boolean value of its two operands.
-          IR_ASR  perform arithmetical shift-right for BIN_opnd0 accroding
+          IR_ASR  perform arithmetical shift-right for BIN_opnd0 according
                   to value of BIN_opnd1, and return the shifted value as result.
-          IR_LSR  perform logical shift-right for BIN_opnd0 accroding to
+          IR_LSR  perform logical shift-right for BIN_opnd0 according to
                   value of BIN_opnd1, and return the shifted value as result.
-          IR_LSL  perform logical shift-left for BIN_opnd0 accroding to
+          IR_LSL  perform logical shift-left for BIN_opnd0 according to
                   value of BIN_opnd1, and return the shifted value as result.
 
       Operands:
@@ -928,7 +929,7 @@ Programming Guides
 
   ¡ñ IR_SELECT
       This operation represents conditional execute operation. It computes
-      the value accroding to the result of predicator expression, if the
+      the value according to the result of predicator expression, if the
       result value is true, return CONDEXE_trueexp, otherwise return
       CONDEXE_falseexp.
 
@@ -1215,7 +1216,8 @@ Programming Guides
     e.g: gcc -D_DEBUG_ ir_opt.cpp -S -O2
 
   ¡ñ How to build XOC project under Visual Studio 2010(VS2010)
-    Add to command line: /D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_"
+    Add to command line:
+      /D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_"
 
   ¡ñ How to build XOC project under Windows
     Add predefined macro to command line: -D_ON_WINDOWS_
@@ -1231,7 +1233,7 @@ Programming Guides
         RegionMgr rm;
         rm.init_var_mgr();
 
-        //Generate IR list, Var and Region accroding to user input.
+        //Generate IR list, Var and Region according to user input.
         generateIRList(&rm);
         generateVarTab(&rm);
 

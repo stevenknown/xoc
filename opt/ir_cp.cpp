@@ -543,7 +543,7 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
                 //CASE: $1:f64 = cvt:fp64 ($2:fp32)
                 //      ... = $1:64 #USE
                 //Where $2:f32 can NOT be propagated to $1 because of type.
-                ASSERT0(0);
+                UNREACHABLE();
             }
             return ir;
         default:
@@ -991,6 +991,7 @@ bool CopyProp::perform(OptCtx & oc)
     }
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     bool changed = doPropBBInDomTreeOrder();
     END_TIMER(t, getPassName());
     if (!changed) {

@@ -462,6 +462,7 @@ bool LoopDepAna::perform(OptCtx & oc)
         return false;
     }
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopDepAna()) {
         dump();
     }

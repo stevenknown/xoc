@@ -502,7 +502,7 @@ public:
     bool checkIfCanBeSplitCand(LifeTime const* lt, Pos split_pos,
                                OUT Pos & reload_pos, OUT Occ & reload_occ);
 
-    //Split lt into two lifetime accroding to the information given in 'ctx'.
+    //Split lt into two lifetime according to the information given in 'ctx'.
     //Note after splitting the second half of 'lt' will be renamed to a newlt.
     //Return the newlt.
     LifeTime * splitAt(LifeTime * lt, SplitCtx const& ctx);

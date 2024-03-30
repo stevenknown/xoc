@@ -850,7 +850,7 @@ public:
     Type const* getString() const { return m_str; }
     Type const* getAny() const { return m_any; }
 
-    //Generate and return type accroding to given DATA_TYPE.
+    //Generate and return type according to given DATA_TYPE.
     Type const* getSimplexType(DATA_TYPE dt)
     {
         ASSERT0(IS_SIMPLEX(dt));
@@ -859,7 +859,7 @@ public:
         return registerType(&d);
     }
 
-    //Return existing type accroding to given DATA_TYPE.
+    //Return existing type according to given DATA_TYPE.
     inline Type const* getSimplexTypeEx(DATA_TYPE dt) const
     {
         switch (dt) {
@@ -930,7 +930,7 @@ public:
         return TC_type(registerStream(&d));
     }
 
-    //Register and return pointer type accroding to pt_base_size.
+    //Register and return pointer type according to pt_base_size.
     //pt_base_sz: byte size of pointer's base type.
     Type const* getPointerType(UINT pt_base_sz)
     {
@@ -945,7 +945,7 @@ public:
         return TC_type(registerPointer(&d));
     }
 
-    //Return memory chunk tyid accroding to chunk size and vector element tyid.
+    //Return memory chunk tyid according to chunk size and vector element tyid.
     //mc_bytesize: the byte size of memory chunk.
     Type const* getMCType(UINT mc_bytesize)
     {

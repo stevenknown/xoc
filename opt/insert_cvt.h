@@ -35,7 +35,7 @@ namespace xoc {
 
 class Region;
 
-//Refining context variable.
+//Insertion context variable.
 //Set the following options true or false to enable or disable the convertion.
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 #define RC_optctx(r) ((r).m_oc)
@@ -86,9 +86,13 @@ class InsertCvt : public Pass {
         UINT tgt_size = parent->getTypeSize(m_tm);
         UINT src_size = kid->getTypeSize(m_tm);
         //Do not do hoisting for vector type.
-        ASSERTN(tgt_size >= src_size, ("size is overflowed"));
+        ASSERTN_DUMMYUSE(tgt_size >= src_size, ("size is overflowed"));
         return kid;
     }
+
+    //The function only iteratively perform CVT insertion for kids of given ir.
+    //It does not perform CVT insertion between 'ir' and its kids.
+    IR * convertAllKids(IR * ir, bool & change, InsertCvtCtx & rc);
 
     //Try to convert constant expression.
     //Return updated ir if type converted.
@@ -138,11 +142,6 @@ public:
     explicit InsertCvt(Region * rg);
     virtual ~InsertCvt() {}
 
-    virtual bool dump() const;
-
-    virtual CHAR const* getPassName() const { return "InsertCvt"; }
-    virtual PASS_TYPE getPassType() const { return PASS_INSERT_CVT; }
-
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.
     IR * convertIRlist(IR * ir_list, bool & change, MOD InsertCvtCtx & rc);
@@ -160,6 +159,11 @@ public:
     //BB list will be updated if optimization performed.
     //Return true if BB list changed.
     bool convertBBlist(MOD BBList * ir_bb_list, MOD InsertCvtCtx & rc);
+
+    virtual bool dump() const;
+
+    virtual CHAR const* getPassName() const { return "InsertCvt"; }
+    virtual PASS_TYPE getPassType() const { return PASS_INSERT_CVT; }
 
     bool perform(OptCtx & oc, MOD InsertCvtCtx & rc);
     virtual bool perform(OptCtx & oc);

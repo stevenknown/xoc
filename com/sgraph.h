@@ -176,7 +176,7 @@ public:
     UINT get_hash_value(Edge * e, UINT bs) const
     {
         //Note this function does not guarantee hash-value is unique.
-        //This might cause much hash conflict accroding to hash
+        //This might cause much hash conflict according to hash
         //element value.
         ASSERT0(isPowerOf2(bs));
         return hash32bit((UINT32)MAKE_VALUE(e->from()->id(), e->to()->id()))

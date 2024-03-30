@@ -264,94 +264,19 @@ public:
     Var();
     virtual ~Var() {}
 
-    UINT id() const { return VAR_id(this); }
-    bool is_local() const { return varflag.have(VAR_LOCAL); }
-    bool is_global() const { return varflag.have(VAR_GLOBAL); }
-    bool is_fake() const { return varflag.have(VAR_FAKE); }
-    bool is_label() const { return varflag.have(VAR_IS_LABEL); }
-    bool is_unallocable() const { return varflag.have(VAR_IS_UNALLOCABLE); }
-    bool is_decl() const { return varflag.have(VAR_IS_DECL); }
-    bool is_array() const { return varflag.have(VAR_IS_ARRAY); }
-    bool is_formal_param() const { return varflag.have(VAR_IS_FORMAL_PARAM); }
-    bool is_private() const { return varflag.have(VAR_PRIVATE); }
-    bool is_readonly() const { return varflag.have(VAR_READONLY); }
-    bool is_func() const { return varflag.have(VAR_IS_FUNC); }
-    bool is_volatile() const { return varflag.have(VAR_VOLATILE); }
-    bool is_spill() const { return varflag.have(VAR_IS_SPILL); }
-    bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
-    bool is_pr() const { return varflag.have(VAR_IS_PR); }
-    bool is_region() const { return varflag.have(VAR_IS_REGION); }
-    bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
-    bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
-    bool is_weak() const { return var_link_attr.have(VAR_LINK_ATTR_WEAK); }
-    bool is_extern() const { return var_link_attr.have(VAR_LINK_ATTR_EXTERN); }
-    bool is_visible() const {
-        return var_link_attr.have(VAR_LINK_ATTR_VISIBLE);
-    }
-    bool is_any() const
-    {
-        ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_any();
-    }
+    //The interface to dump declaration information when current
+    //variable dumpped. This is target dependent code.
+    virtual CHAR const* dumpVARDecl(OUT StrBuf &, VarMgr const*) const
+    { return nullptr; }
+    virtual void dump(VarMgr const* vm) const;
 
-    //Return true if variable is pointer data type.
-    bool is_pointer() const
-    {
-        ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_pointer();
-    }
-
-    //Return true if variable is regarded as a pointer.
-    bool isPointer() const { return is_any() || is_pointer(); }
-
-    //Return true if variable type is memory chunk data type.
-    bool is_mc() const
-    {
-        ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_mc();
-    }
-
-    //Return true if variable type is string data type.
-    bool is_string() const
-    {
-        ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_string();
-    }
-
-    //Return true if variable type is vector data type.
-    bool is_vector() const
-    {
-        ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_vector();
-    }
-
-    //Return true if variable has flags to output to GR.
-    bool hasGRFlag() const
-    {
-        return (is_unallocable() ||
-                is_func() ||
-                is_decl() ||
-                is_private() ||
-                is_readonly() ||
-                is_volatile() ||
-                is_restrict() ||
-                is_fake() ||
-                is_label() ||
-                is_array() ||
-                (is_string() && getString() != nullptr) ||
-                (hasInitVal() && getByteValue() != nullptr));
-    }
-
-    //Return true if variable has initial byte value that stored in ByteBuf.
-    bool hasInitVal() const { return VAR_flag(this).have(VAR_HAS_INIT_VAL); }
-
-    //Return true if variable has initial string value that stored
-    //in VAR_string.
-    //Note if the variable is string type and it has initial string value, then
-    //the initial string value should be recorded in VAR_string, not in
-    //VAR_byte_val.
-    bool hasInitString() const
-    { return hasInitVal() && is_string() && getString() != nullptr; }
+    //You must make sure this function will not change any field of Var.
+    //The information will be dumpped into 'buf'.
+    virtual CHAR const* dump(OUT StrBuf & buf, VarMgr const* vm) const;
+    void dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const;
+    void dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const;
+    void dumpProp(OUT StrBuf & buf, bool grmode) const;
+    CHAR const* dumpGR(OUT StrBuf & buf, TypeMgr * dm) const;
 
     //Get byte alignment.
     UINT get_align() const { return VAR_align(this); }
@@ -392,7 +317,7 @@ public:
     //Get the storage space.
     StorageSpace getStorageSpace() const { return VAR_storage_space(this); }
 
-    //Return the byte size of variable accroding type.
+    //Return the byte size of variable according type.
     UINT getByteSize(TypeMgr const* dm) const
     {
         //Length of string var should include '\0'.
@@ -400,19 +325,93 @@ public:
             getStringLength() + 1 : dm->getByteSize(VAR_type(this));
     }
 
-    //The interface to dump declaration information when current
-    //variable dumpped. This is target dependent code.
-    virtual CHAR const* dumpVARDecl(OUT StrBuf &, VarMgr const*) const
-    { return nullptr; }
-    virtual void dump(VarMgr const* vm) const;
+    //Return true if variable has flags to output to GR.
+    bool hasGRFlag() const
+    {
+        return (is_unallocable() ||
+                is_func() ||
+                is_decl() ||
+                is_private() ||
+                is_readonly() ||
+                is_volatile() ||
+                is_restrict() ||
+                is_fake() ||
+                is_label() ||
+                is_array() ||
+                (is_string() && getString() != nullptr) ||
+                (hasInitVal() && getByteValue() != nullptr));
+    }
 
-    //You must make sure this function will not change any field of Var.
-    //The information will be dumpped into 'buf'.
-    virtual CHAR const* dump(OUT StrBuf & buf, VarMgr const* vm) const;
-    void dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const;
-    void dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const;
-    void dumpProp(OUT StrBuf & buf, bool grmode) const;
-    CHAR const* dumpGR(OUT StrBuf & buf, TypeMgr * dm) const;
+    //Return true if variable has initial byte value that stored in ByteBuf.
+    bool hasInitVal() const { return VAR_flag(this).have(VAR_HAS_INIT_VAL); }
+
+    //Return true if variable has initial string value that stored
+    //in VAR_string.
+    //Note if the variable is string type and it has initial string value, then
+    //the initial string value should be recorded in VAR_string, not in
+    //VAR_byte_val.
+    bool hasInitString() const
+    { return hasInitVal() && is_string() && getString() != nullptr; }
+
+    UINT id() const { return VAR_id(this); }
+    bool is_local() const { return varflag.have(VAR_LOCAL); }
+    bool is_global() const { return varflag.have(VAR_GLOBAL); }
+    bool is_fake() const { return varflag.have(VAR_FAKE); }
+    bool is_label() const { return varflag.have(VAR_IS_LABEL); }
+    bool is_unallocable() const { return varflag.have(VAR_IS_UNALLOCABLE); }
+    bool is_decl() const { return varflag.have(VAR_IS_DECL); }
+    bool is_array() const { return varflag.have(VAR_IS_ARRAY); }
+    bool is_formal_param() const { return varflag.have(VAR_IS_FORMAL_PARAM); }
+    bool is_private() const { return varflag.have(VAR_PRIVATE); }
+    bool is_readonly() const { return varflag.have(VAR_READONLY); }
+    bool is_func() const { return varflag.have(VAR_IS_FUNC); }
+    bool is_volatile() const { return varflag.have(VAR_VOLATILE); }
+    bool is_spill() const { return varflag.have(VAR_IS_SPILL); }
+    bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
+    bool is_pr() const { return varflag.have(VAR_IS_PR); }
+    bool is_region() const { return varflag.have(VAR_IS_REGION); }
+    bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
+    bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
+    bool is_weak() const { return var_link_attr.have(VAR_LINK_ATTR_WEAK); }
+    bool is_extern() const { return var_link_attr.have(VAR_LINK_ATTR_EXTERN); }
+    bool is_visible() const
+    { return var_link_attr.have(VAR_LINK_ATTR_VISIBLE); }
+    bool is_any() const
+    {
+        ASSERT0(VAR_type(this));
+        return VAR_type(this)->is_any();
+    }
+
+    //Return true if variable is pointer data type.
+    bool is_pointer() const
+    {
+        ASSERT0(VAR_type(this));
+        return VAR_type(this)->is_pointer();
+    }
+
+    //Return true if variable is regarded as a pointer.
+    bool isPointer() const { return is_any() || is_pointer(); }
+
+    //Return true if variable type is memory chunk data type.
+    bool is_mc() const
+    {
+        ASSERT0(VAR_type(this));
+        return VAR_type(this)->is_mc();
+    }
+
+    //Return true if variable type is string data type.
+    bool is_string() const
+    {
+        ASSERT0(VAR_type(this));
+        return VAR_type(this)->is_string();
+    }
+
+    //Return true if variable type is vector data type.
+    bool is_vector() const
+    {
+        ASSERT0(VAR_type(this));
+        return VAR_type(this)->is_vector();
+    }
 
     //Set variable is global scope.
     //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
@@ -537,7 +536,7 @@ public:
 //    u32 var0 = func.label0;
 //    u64 var1 = { 1, func.label1 };
 //
-//Since the PC values ​​represented by "label0" and "label1" can only be
+//Since the PC values represented by "label0" and "label1" can only be
 //obtained at linking time, we first add the relocation of the variables to
 //point to the location of the code segment represented by label.
 //

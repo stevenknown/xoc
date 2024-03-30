@@ -1089,7 +1089,7 @@ bool IRCFG::tryUpdateRPOBeforeCFGChanged(IRBB * newbb, IRBB const* marker,
 }
 
 
-//Try to update RPO of newbb accroding to RPO of marker.
+//Try to update RPO of newbb according to RPO of marker.
 //newbb_prior_marker: true if newbb's lexicographical order is prior to marker.
 //Return true if this function find a properly RPO for 'newbb', otherwise
 //return false.

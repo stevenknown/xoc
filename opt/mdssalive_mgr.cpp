@@ -68,7 +68,7 @@ void MDSSALiveMgr::clean()
 //Get livein VMD of 'mdid' in given 'bb'.
 VMD * MDSSALiveMgr::getLiveinVMD(MDIdx mdid, IRBB const* bb) const
 {
-    ASSERT0(0);
+    UNREACHABLE();
     return nullptr;
 }
 

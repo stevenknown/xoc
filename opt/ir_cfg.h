@@ -428,7 +428,7 @@ public:
     //pred2opnd: a map between predecessor to operand, used to retrieve info.
     void sortPhiOpnd(IR * phi, Pred2Opnd const& pred2opnd);
 
-    //Try to update RPO of newbb accroding to RPO of marker.
+    //Try to update RPO of newbb according to RPO of marker.
     //newbb_prior_marker: true if newbb's lexicographical order is prior to
     //marker.
     //Return true if the function find a properly RPO for 'newbb', otherwise

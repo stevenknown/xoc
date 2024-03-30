@@ -83,9 +83,9 @@ void DCECtx::dump(Region const* rg) const
 //
 //START DeadCodeElim
 //
-void DeadCodeElim::setEffectStmt(IR const* stmt, bool set_bb_effect,
-                                 MOD List<IR const*> * act_ir_lst,
-                                 DCECtx & dcectx)
+void DeadCodeElim::setEffectStmt(
+    IR const* stmt, bool set_bb_effect, MOD List<IR const*> * act_ir_lst,
+    DCECtx & dcectx)
 {
     ASSERT0(stmt && stmt->is_stmt());
     act_ir_lst->append_tail(stmt);
@@ -956,6 +956,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
+    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
         dumpBeforePass();
     }

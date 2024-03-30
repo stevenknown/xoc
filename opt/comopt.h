@@ -57,6 +57,7 @@ author: Su Zhenyu
 
 #ifdef FOR_IP
 #include "ir_vect.h"
+#include "derivative.h"
 #include "ir_dse.h"
 #include "scop.h"
 #include "ir_poly.h"

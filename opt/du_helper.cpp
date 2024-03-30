@@ -58,7 +58,7 @@ void changeDefForPartialUseSet(IR * olddef, IR * newdef,
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         olddef->isMemRefNonPR()) {
         //mdssamgr->changeDefForPartialUseSet(olddef, newdef, partial_useset);
-        ASSERT0(0);//hack TODO
+        ASSERTN(0, ("TODO"));
         mdssa_changed = true;
     }
 
@@ -75,7 +75,7 @@ void changeDefForPartialUseSet(IR * olddef, IR * newdef,
         DUSet * oldduse = olddef->getDUSet();
         if (oldduse != nullptr) {
             //dumgr->changeDefForPartialUseSet(newdef, olddef, partial_useset);
-            ASSERT0(0);//hack TODO
+            ASSERTN(0, ("TODO"));
         }
         classic_du_changed = true;
     }
@@ -1321,7 +1321,7 @@ bool hasLoopReduceDep(
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr && ir->getDUSet() != nullptr) {
-        ASSERT0(0); //TODO:
+        UNREACHABLE(); //TODO:
     }
 
     if (ir->isPROp()) {

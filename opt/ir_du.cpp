@@ -2765,7 +2765,7 @@ bool DUMgr::buildDUChain(IR * def, IR * use, OptCtx const& oc)
 }
 
 
-//Check and build DU chain to IR Expression accroding to MustUse MD.
+//Check and build DU chain to IR Expression according to MustUse MD.
 void DUMgr::checkMustMDAndBuildDUChainForPotentialDefList(IR const* exp,
                                                           MD const* expmd,
                                                           DUSet * expdu)
@@ -2781,7 +2781,7 @@ void DUMgr::checkMustMDAndBuildDUChainForPotentialDefList(IR const* exp,
 }
 
 
-//Check and build DU chain to IR Expression accroding to MDSet.
+//Check and build DU chain to IR Expression according to MDSet.
 void DUMgr::checkMDSetAndBuildDUChain(IR const* exp, MD const* expmd,
                                       MDSet const& expmds, DUSet * expdu)
 {
@@ -3026,8 +3026,14 @@ bool DUMgr::verifyMDRefForExtIR(IR const* ir, ConstIRIter & cii)
 {
     if (ir->isDirectMemOp()) {
         if (ir->is_stmt()) {
-            ASSERT0(ir->getMustRef() &&
-                    !ir->getMustRef()->get_base()->is_readonly());
+            ASSERT0(ir->getMustRef());
+            //CASE:In C lang, function local const variable
+            //initialization is dependent on store operation to stack
+            //memory to inialize the variable. Thus disable the verify
+            //of readonly attribute here to facilitate user's IR
+            //generation.
+            //e.g:compile/local_const_init.c
+            //ASSERT0(!ir->getMustRef()->get_base()->is_readonly());
         } else {
             ASSERT0(ir->is_exp());
         }
@@ -3059,7 +3065,12 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
             break;
         SWITCH_CASE_DIRECT_MEM_STMT:
             ASSERT0(t->getMustRef());
-            ASSERT0(!t->getMustRef()->get_base()->is_readonly());
+            //CASE:In C lang, function local const variable initialization is
+            //dependent on store operation to stack memory to inialize the
+            //variable. Thus disable the verify of readonly attribute here to
+            //facilitate user's IR generation.
+            //e.g:compile/local_const_init.c
+            //ASSERT0(!t->getMustRef()->get_base()->is_readonly());
             verifyDirectMemOpImpl(t, m_rg);
             break;
         SWITCH_CASE_READ_PR:
@@ -3089,7 +3100,13 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
             if (must != nullptr) {
                 //PR can not be accessed by indirect operation.
                 ASSERT0(!must->is_pr());
-                ASSERT0(!must->get_base()->is_readonly());
+
+                //CASE:In C lang, function local const variable initialization
+                //is dependent on store operation to stack memory to inialize
+                //the variable. Thus disable the verify of readonly attribute
+                //here to facilitate user's IR generation.
+                //e.g:compile/local_const_init.c
+                //ASSERT0(!must->get_base()->is_readonly());
             }
             if (may != nullptr) {
                 //PR can not be accessed by indirect operation.
@@ -3099,7 +3116,13 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
                     MD const* x = m_rg->getMDSystem()->getMD(i);
                     DUMMYUSE(x);
                     ASSERT0(x && !x->is_pr());
-                    ASSERT0(!x->get_base()->is_readonly());
+                    //CASE:In C lang, function local const variable
+                    //initialization is dependent on store operation to stack
+                    //memory to inialize the variable. Thus disable the verify
+                    //of readonly attribute here to facilitate user's IR
+                    //generation.
+                    //e.g:compile/local_const_init.c
+                    //ASSERT0(!x->get_base()->is_readonly());
                 }
                 ASSERT0(m_rg->getMDSetHash()->find(*may));
             }

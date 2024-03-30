@@ -38,6 +38,7 @@ namespace xcom {
 
 class StrBuf;
 class StrBufVec;
+class Float;
 
 //Forward Declaration
 template <class T> class Vector;
@@ -69,7 +70,14 @@ UINT combin(UINT n, UINT m); //Combination
 
 //Ceil rounding alignment.
 //e.g  v=17 , align=4 , the result is 20.
-LONGLONG ceil_align(LONGLONG v, LONGLONG align);
+inline LONGLONG ceil_align(LONGLONG v, LONGLONG align)
+{
+    if (align == 0 || align == 1) { return v; }
+    if ((v % align) != 0) {
+        v = (v / align + 1) * align;
+    }
+    return v;
+}
 
 //Compute the number of bits which biger enough to represent given value.
 //value: the input value that to be check.
@@ -236,9 +244,17 @@ INT getFirstOneAtRightSide(INT m);
 //                        |<-  11 ->| |<-     52       ->|
 //128bit floating point:0 0000...0000 0000000...0000000000
 //                        |<-  15 ->| |<-     112      ->|
-UINT getSignBit(UINT bitsize);
+inline UINT getSignBit(UINT bitsize)
+{
+    //Note that bitsize should be greater than or equal to 8 and be a
+    //multiple of 8.
+    ASSERTN(bitsize >= 8, ("Type bitsize is too small.\n"));
+    ASSERTN(bitsize % 8 == 0, ("Type bitsize must be multiple of 8.\n"));
+    return bitsize - 1;
+}
 
-//Get low 16-bit value of signal 32-bit value.
+//Get low 16-bit value of signed 32-bit value.
+//Note the function will extend sign-bit of the low 16-bit to 32-bit value.
 //For example:
 //val:     0b 0100010......1000 0111 0101 1011
 //                         &
@@ -253,15 +269,40 @@ UINT getSignBit(UINT bitsize);
 //0x8000:  0b 0000000......1000 0000 0000 0000
 //                         =
 //         0b 1111111......1000 0111 0101 1011
-INT getSign32BitLow16BitVal(INT32 val);
+inline INT32 getSign32BitLow16BitVal(INT32 val)
+{ return ((val & 0xffff) ^ 0x8000) - 0x8000; }
 
-//Get low 16-bit value of signal 64-bit value.
+//Get low 16-bit value of signed 64-bit value.
+//Note the function will extend sign-bit of the low 16-bit to 32-bit value.
 //The principle is similar to getSign32BitLow16BitVal().
-INT getSign64BitLow16BitVal(INT64 val);
+inline INT64 getSign64BitLow16BitVal(INT64 val)
+{ return ((val & 0xffff) ^ 0x8000) - 0x8000; }
 
-//Get low 32-bit value of signal 64-bit value.
+//Get low 32-bit value of signed 64-bit value.
+//Note the function will extend sign-bit of the low 16-bit to 32-bit value.
 //The principle is similar to getSign32BitLow16BitVal().
-INT getSign64BitLow32BitVal(INT64 val);
+inline INT64 getSign64BitLow32BitVal(INT64 val)
+{ return ((val & 0xffffffff) ^ 0x80000000) - 0x80000000; }
+
+//Get low n-bit value of 32bit value.
+//For example:
+//a.given val: 0x12345678 and bitnum: 4, it will return 0x8.
+//b.given val: 0x12345678 and bitnum: 8, it will return 0x78.
+inline UINT32 get32BitValueLowNBit(UINT32 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 32));
+    return (val & (0xffffFFFF >> (32 - bitnum)));
+}
+
+//Get low n-bit value of 64bit value.
+//For example:
+//a.given val: 0x1122334455667788 and bitnum: 8, it will return 0x88.
+//b.given val: 0x1122334455667788 and bitnum: 16, it will return 0x7788.
+inline UINT64 get64BitValueLowNBit(UINT64 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 64));
+    return (val & (0xffffffffFFFFFFFF >> (64 - bitnum)));
+}
 
 //Calculate an integer hash value according to 'n'.
 inline UINT32 hash32bit(UINT32 n)
@@ -323,7 +364,13 @@ void prim(INT m, OUT INT * buf);
 
 //Reverse a LONG type integer by lexicalgraph.
 //e.g: if 'd' is 0x12345678, return 0x78563412.
-LONG revlong(LONG d);
+inline LONG revlong(LONG d)
+{
+    CHAR * c = (CHAR*)&d, m;
+    m = c[0], c[0] = c[3], c[3] = m;
+    m = c[1], c[1] = c[2], c[2] = m;
+    return d;
+}
 
 //Reverse the string.
 CHAR * reverseString(CHAR * v);
@@ -476,6 +523,26 @@ inline double xfabs(double a) { return (a < double(0.0)) ? -a : a; }
 //Return sqrt value of 'num'.
 float xsqrt(float num);
 double xsqrt(double num);
+
+//The function utilizes a very fast algorithm that does not calculate
+//iteratively to converge to the square root of 'n'.
+//Note the algorithm's precision is a little bit low.
+float xsqrtNonIter(float n);
+
+//Return true if the nth-root of 'num' is in the range of real-number.
+//num: the input real-number.
+//nroot: the nth root.
+//res: record the result if nth-root of 'num' is valid.
+//e.g: given num is 8, root is 3, the function will calculate 8^(1/3).
+//     and return 2.
+//e.g2:given num is -4, root is 2, the function will return false.
+//     Because the even root of negative number is undefined in the range of
+//     real num.
+bool xnroot(Float const& num, UINT nroot, OUT Float & res);
+
+//Compute the logarithm of 'y' to the base of 'x': log_x(y).
+//e.g: given x is 3, y is 27, the function return 3.0.
+double xlog(double x, double y);
 
 //Return true if the imm is valid for the limited bitsize.
 bool isValidImmForBitsize(UINT bitsize, UINT64 imm);

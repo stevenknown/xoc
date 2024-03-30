@@ -257,8 +257,8 @@ public:
         if (!lm->is_init()) { return; }
         lm->startBuffer();
     }
-    ~DumpBufferSwitch() { flush(); }
-    void flush()
+    ~DumpBufferSwitch() { close(); }
+    void close()
     {
         if (m_is_buffer_enabled_before) { return; }
         m_lm->endBuffer();

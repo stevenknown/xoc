@@ -595,7 +595,7 @@ public:
 };
 
 
-//Binary Operation, includes ADD, SUB, MUL, DIV, REM, MOD,
+//Binary Operation, includes ADD, SUB, MUL, DIV, REM, MOD, POW, NROOT,
 //LAND, LOR, BAND, BOR, XOR, LT, LE, GT, GE, EQ, NE, ASR, LSR, LSL.
 #define BIN_opnd0(ir) BIN_kid(ir, 0)
 #define BIN_opnd1(ir) BIN_kid(ir, 1)
@@ -1243,7 +1243,7 @@ public:
 //    if (a > b) res = 10;
 //    else res = 20;
 //  where a > b is predicator expression.
-//This operation compute the value accroding to the result of
+//This operation compute the value according to the result of
 //predicator expression, if the result value is true, return
 //SELECT_trueexp, otherwise return SELECT_falseexp.
 

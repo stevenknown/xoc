@@ -448,6 +448,16 @@ Pass * PassMgr::allocInsertCvt()
 }
 
 
+Pass * PassMgr::allocCalcDerivative()
+{
+    #ifdef FOR_IP
+    return new CalcDerivative(m_rg);
+    #else
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::registerPass(PASS_TYPE passty)
 {
     ASSERT0(passty != PASS_UNDEF);
@@ -561,6 +571,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_INSERT_CVT:
         pass = allocInsertCvt();
+        break;
+    case PASS_CALC_DERIVATIVE:
+        pass = allocCalcDerivative();
         break;
     case PASS_MDSSALIVE_MGR:
         pass = allocMDSSALiveMgr();

@@ -844,7 +844,12 @@ IR * IRMgr::buildStore(Var * lhs, Type const* type, IR * rhs)
 {
     ASSERT0(type);
     ASSERT0(lhs && rhs && rhs->is_exp());
-    ASSERTN(!lhs->is_readonly(), ("can not write readonly variable"));
+    //CASE:In C lang, function local const variable initialization is
+    //dependent on store operation to stack memory to inialize the variable.
+    //Thus disable the verify of readonly attribute here to facilitate user's
+    //IR generation.
+    //e.g:compile/local_const_init.c
+    //ASSERTN(!lhs->is_readonly(), ("can not write readonly variable"));
     IR * ir = allocIR(IR_ST);
     ST_idinfo(ir) = lhs;
     ST_rhs(ir) = rhs;
@@ -902,7 +907,7 @@ IR * IRMgr::buildIStore(IR * base, IR * rhs, Type const* type)
 //base: base of array operation, it is either LDA or pointer.
 //sublist: subscript expression list.
 //type: result type of array operator.
-//    Note that type may NOT be equal to elem_tyid, accroding to
+//    Note that type may NOT be equal to elem_tyid, according to
 //    ARR_ofst(). If ARR_ofst() is not zero, that means array
 //    elem is MC, or VECTOR, and type should be type of member
 //    to MC/VECTOR.
@@ -967,7 +972,7 @@ IR * IRMgr::buildArray(IR * base, IR * sublist, Type const* type,
 //base: base of array operation, it is either LDA or pointer.
 //sublist: subscript expression list.
 //type: result type of array operator.
-//    Note that type may NOT be equal to elem_tyid, accroding to
+//    Note that type may NOT be equal to elem_tyid, according to
 //    ARR_ofst(). If ARR_ofst() is not zero, that means array
 //    elem is MC, or VECTOR, and type should be type of member
 //    to MC/VECTOR.
@@ -1012,8 +1017,13 @@ IR * IRMgr::buildStoreArray(IR * base, IR * sublist, Type const* type,
     IR_dt(ir) = type;
     ARR_base(ir) = base;
     if (base->is_lda()) {
-        ASSERTN(!LDA_idinfo(base)->is_readonly(),
-                ("can not write readonly variable"));
+        //CASE:In C lang, function local const variable initialization is
+        //dependent on store operation to stack memory to inialize the variable.
+        //Thus disable the verify of readonly attribute here to facilitate user's
+        //IR generation.
+        //e.g:compile/local_const_init.c
+        //ASSERTN(!LDA_idinfo(base)->is_readonly(),
+        //        ("can not write readonly variable"));
     }
     IR_parent(base) = ir;
     ARR_sub_list(ir) = sublist;

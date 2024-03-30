@@ -127,7 +127,7 @@ private:
     //Read map between Symbol and CallNode for current region if exist.
     SYM2CN * getSym2CallNode(Region * rg) const { return m_ru2sym2cn.get(rg); }
 
-    //Create a CallNode accroding to caller.
+    //Create a CallNode according to caller.
     //This CallNode will corresponding to an unqiue Region.
     //Ensure CallNode for Region is unique.
     //rg: the region that ir resident in.

@@ -37,13 +37,7 @@ author: Su Zhenyu
 namespace xcom {
 
 #define PRECISION_TYPE double
-
-//The precision of 'double' is too high to
-//some operation of those value that approaching infinitesimal.
-//e.g: when the value is 0.00000000000000066613381477509392,
-//it should approximately equal to 0 in actually.
-//#define INFINITESIMAL 0.00000000000000001
-#define INFINITESIMAL 0.000001
+#define PRECISION_TYPE_E 2.718281828459045
 
 class Float {
     friend Float zerolinz(Float const& a);
@@ -61,38 +55,70 @@ class Float {
 protected:
     PRECISION_TYPE m_f;
 public:
+    static PRECISION_TYPE g_e;
+public:
     Float() { m_f = PRECISION_TYPE(0); }
+    Float(PRECISION_TYPE f) { m_f = f; }
     Float(Float const& f)
     {
         //Sometimes, r does not require to initialize always.
         //ASSERTN(r.m_den != 0, ("denominator is 0!"));
         m_f = f.m_f;
     }
-    Float(PRECISION_TYPE f) { m_f = f; }
 
     CHAR const* dump(StrBuf & buf) const;
     void dump() const;
 
-    bool is_int();
+    //Return the base of natural logarithm: e.
+    static inline PRECISION_TYPE getE() { return Float::g_e; }
 
-    Float & operator = (Float const& a)
+    //The function return the unique address of 'e'.
+    //Since the float-number is an approximate representation of real-number,
+    //thus there is a margin of error. In order to avoid the error, user can
+    //compare the unique address of static member 'e' instead of comparing
+    //the appoximate value.
+    static inline PRECISION_TYPE const* getEAddr() { return &g_e; }
+    static inline PRECISION_TYPE getEpsilon()
     {
-        m_f = a.m_f;
-        return *this;
+        //The precision of 'double' is too high to
+        //some operation of those value that approaching infinitesimal.
+        //e.g: when the value is 0.00000000000000066613381477509392,
+        //it should approximately equal to 0 in actually.
+        //#define INFINITESIMAL 0.00000000000000001
+        #define INFINITESIMAL 0.000001
+        return INFINITESIMAL;
     }
+
+    //The function attempt to find the nearest integer of given float number.
+    //e.g:given 1.000001, return 1.000000.
+    //    given 1.999999, return 2.000000.
+    static PRECISION_TYPE integralize(PRECISION_TYPE const& a);
+    bool is_int() const;
+
+    //Return true if given float-number 'a' is approximately equal to current
+    //float-number.
+    bool isApproEq(Float const& a) const
+    { return Float::isApproEq(m_f, a.m_f); }
+
+    //Return true if given float-number 'a' is approximately equal to 'b'.
+    static bool isApproEq(PRECISION_TYPE a, PRECISION_TYPE b);
+
+    Float & operator = (Float const& a) { m_f = a.m_f; return *this; }
 
     void reduce() {}
 
     //Calculate the floor boundary.
-    INT typecast2int() { return (INT)m_f; }
+    INT typecast2int() const { return (INT)m_f; }
 
     PRECISION_TYPE val() const { return m_f; }
     PRECISION_TYPE & val() { return m_f; }
+
+    static Float zerolinz(Float const& a);
 };
 
-
 //Exported Functions
-bool operator == (Float const& a, Float const& b);
+inline bool operator == (Float const& a, Float const& b)
+{ return Float::isApproEq(a.m_f, b.m_f); }
 bool operator != (Float const& a, Float const& b);
 inline bool operator != (Float const& a, Float const& b) { return !(a == b); }
 inline bool operator < (Float const& a, Float const& b)
@@ -132,8 +158,6 @@ inline Float operator - (Float a)
     a.m_f = -(a.m_f);
     return a;
 }
-PRECISION_TYPE integralize(PRECISION_TYPE const& a);
-Float zerolinz(Float const& a);
 
 } //namespace xcom
 #endif

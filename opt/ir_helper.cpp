@@ -123,7 +123,7 @@ IR const* iterInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
 
 
 //Iterative access ir tree.
-//This function return the next IR node accroding to 'it'.
+//This function return the next IR node according to 'it'.
 //it: iterator.
 //iter_next: true if the function expect iterate the sibling IR.
 //Readonly function.

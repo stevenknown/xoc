@@ -135,6 +135,7 @@ class Refine : public Pass {
     COPY_CONSTRUCTOR(Refine);
 protected:
     TypeMgr * m_tm;
+    IRMgr * m_irmgr;
 protected:
     //The function try to choose proper data-type for judgement operation.
     //The data type is used to fold-const with specific judge operations.
@@ -169,6 +170,10 @@ protected:
     IR * refineNe(IR * ir, bool & change, RefineCtx & rc);
     IR * refineEq(IR * ir, bool & change, RefineCtx & rc);
     IR * refineMod(IR * ir, bool & change, RefineCtx & rc);
+    IR * refinePow(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineNRoot(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineLog(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineExponent(IR * ir, bool & change, RefineCtx & rc);
     IR * refineCall(IR * ir, bool & change, RefineCtx & rc);
     IR * refineICall(IR * ir, bool & change, RefineCtx & rc);
     IR * refineSwitch(IR * ir, bool & change, RefineCtx & rc);
@@ -196,7 +201,11 @@ protected:
     IR * refineIStore1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
     bool refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc);
+
+    //The function only iteratively perform refinement for kids of given ir.
+    //It does not perform refinement between 'ir' and its kids.
     IR * refineAllKids(IR * ir, bool & change, RefineCtx & rc);
+    IR * reassociationCase1(IR * ir, bool & change);
     IR * reassociation(IR * ir, bool & change);
     virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc);
 

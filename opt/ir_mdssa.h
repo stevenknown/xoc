@@ -1177,7 +1177,7 @@ public:
     MDDef const* iterDefInitC(MDDef const* def, OUT ConstMDDefIter & it) const;
 
     //Iterative access MDDef chain.
-    //The function return the next MDDef node accroding to 'it'.
+    //The function return the next MDDef node according to 'it'.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
     //it: iterator.
@@ -1203,7 +1203,7 @@ public:
 
     //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
     //describes a memory expression.
-    //The function return the next USE accroding to 'it'.
+    //The function return the next USE according to 'it'.
     //it: iterator.
     //Readonly function.
     //Note the function may iterate same IR multiple times because it may
@@ -1229,7 +1229,7 @@ public:
                                             OUT ConstMDDefIter & it) const;
 
     //Iterative access MDDef chain.
-    //The function return the next MDDef node accroding to 'it'.
+    //The function return the next MDDef node according to 'it'.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
     //it: iterator.

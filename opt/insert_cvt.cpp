@@ -231,6 +231,20 @@ IR * InsertCvt::convertNot(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
+IR * InsertCvt::convertAllKids(IR * ir, bool & change, InsertCvtCtx & rc)
+{
+    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        IR * new_kid = convertIR(kid, change, rc);
+        if (new_kid != kid) {
+            ir->setKid(i, new_kid);
+        }
+    }
+    return ir;
+}
+
+
 //InsertCvt binary operations.
 IR * InsertCvt::convertBinaryOp(IR * ir, bool & change, InsertCvtCtx & rc)
 {
@@ -356,6 +370,9 @@ IR * InsertCvt::convertIR(IR * ir, bool & change, InsertCvtCtx & rc)
         break;
     case IR_ALLOCA:
         ir = convertUnaryOp(ir, tmpc, rc);
+        break;
+    SWITCH_CASE_UNA_TRIGONOMETRIC:
+        ir = convertAllKids(ir, tmpc, rc);
         break;
     SWITCH_CASE_COMPARE: {
         //According input setting to do convertment.
@@ -804,19 +821,14 @@ IR * InsertCvt::convertConstIntBinary(IR * ir, bool & change)
 
 IR * InsertCvt::convertConstExp(IR * ir, bool & change, InsertCvtCtx const& rc)
 {
-    bool doit = false;
-    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            IR * new_kid = convertConstExp(kid, change, rc);
-            if (new_kid != kid) {
-                doit = true;
-                ir->setKid(i, new_kid);
-            }
+        if (kid == nullptr) { continue; }
+        IR * new_kid = convertConstExp(kid, change, rc);
+        ASSERT0(new_kid);
+        if (new_kid != kid) {
+            ir->setKid(i, new_kid);
         }
-    }
-    if (doit) {
-        ir->setParentPointer();
     }
     switch (ir->getCode()) {
     SWITCH_CASE_BIN: {

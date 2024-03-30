@@ -90,6 +90,7 @@ protected:
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocRefine();
     virtual Pass * allocInsertCvt();
+    virtual Pass * allocCalcDerivative();
     virtual Pass * allocGSCC();
     virtual Pass * allocIRSimp();
     virtual Pass * allocIRMgr();
