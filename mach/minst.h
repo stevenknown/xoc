@@ -96,7 +96,11 @@ public:
 public:
     MInst() : m_flag(0) {}
 
-    void copyDbx(Dbx const& dbx) { MI_dbx(this).copy(dbx); }
+    void copyDbx(IR const* ir, DbxMgr * dbx_mgr);
+    void copyDbx(Dbx const& dbx, DbxMgr * dbx_mgr)
+    {
+        MI_dbx(this).copy(dbx, dbx_mgr);
+    }
 
     void dump(OUT xcom::StrBuf & buf, MInstMgr const& mgr) const;
     void dump(FileObj & fo, MInstMgr const& mgr) const;

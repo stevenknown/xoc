@@ -44,7 +44,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     #ifdef _DEBUG_
     m_num_allocated = 0;
     #endif
-    m_ru_count = REGION_ID_UNDEF + 1;
+    m_rg_count = REGION_ID_UNDEF + 1;
     m_label_count = LABEL_ID_UNDEF + 1;
     m_var_mgr = nullptr;
     m_var_label_relation_mgr = nullptr;
@@ -55,8 +55,11 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_str_md = nullptr;
     m_targinfo = nullptr;
     m_program = nullptr;
+    m_dm = nullptr;
     m_pool = smpoolCreate(64, MEM_COMM);
     m_logmgr = new LogMgr();
+    m_targinfo_mgr = nullptr;
+    initIRDescFlagSet();
 }
 
 
@@ -90,6 +93,35 @@ RegionMgr::~RegionMgr()
     m_pool = nullptr;
     delete m_logmgr;
     m_logmgr = nullptr;
+    if(m_dm != nullptr) {
+        delete m_dm;
+        m_dm = nullptr;
+    }
+
+    if (m_targinfo != nullptr) {
+        delete m_targinfo;
+        m_targinfo = nullptr;
+    }
+
+    if (m_targinfo_mgr != nullptr) {
+        //Note if user enable and reference TargInfoMgr, the macro
+        //REF_TARGMACH_INFO has to be opend. And TargInfoMgr will reference
+        //xgen's data structure.
+        delete m_targinfo_mgr;
+        m_targinfo_mgr = nullptr;
+    }
+}
+
+
+void RegionMgr::initIRDescFlagSet()
+{
+    //NOTE: If new IR flag value is greater than the bit range that
+    //IRDescFlagSeg can express, user should extend the
+    //IR_DESC_FLAG_BYTE_SIZE value and set the big flag value here,
+    //then invoke the function right after RegionMgr created.
+    //e.g: Assume we are going to add a new flag IRC_NEW_FEAT which value
+    //is 117 to IR_VST, the code is:
+    //IRDES_attr(g_ir_desc[IR_VST]).set(IRC_NEW_FEAT);
 }
 
 
@@ -181,6 +213,12 @@ VarMgr * RegionMgr::allocVarMgr()
 }
 
 
+MCDwarfMgr * RegionMgr::allocDwarfMgr()
+{
+    return new xoc::MCDwarfMgr();
+}
+
+
 VarLabelRelationMgr * RegionMgr::allocVarLabelRelationMgr()
 {
     return new VarLabelRelationMgr();
@@ -188,6 +226,12 @@ VarLabelRelationMgr * RegionMgr::allocVarLabelRelationMgr()
 
 
 TargInfo * RegionMgr::allocTargInfo()
+{
+    return nullptr;
+}
+
+
+TargInfoMgr * RegionMgr::allocTargInfoMgr()
 {
     return nullptr;
 }
@@ -206,9 +250,9 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
     #endif
 
     Region * rg = allocRegion(rt);
-    UINT free_id = m_free_ru_id.remove_head();
+    UINT free_id = m_free_rg_id.remove_head();
     if (free_id == REGION_ID_UNDEF) {
-        REGION_id(rg) = m_ru_count++;
+        REGION_id(rg) = m_rg_count++;
     } else {
         REGION_id(rg) = free_id;
     }
@@ -221,7 +265,7 @@ void RegionMgr::addToRegionTab(Region * rg)
 {
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
     ASSERT0(getRegion(rg->id()) == nullptr);
-    ASSERT0(rg->id() < m_ru_count);
+    ASSERT0(rg->id() < m_rg_count);
     UINT pad = xcom::getNearestPowerOf2(rg->id());
     if (m_id2rg.get_elem_count() < pad) {
         m_id2rg.set(pad, nullptr);
@@ -367,7 +411,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
 
     if (collect_id && id != REGION_ID_UNDEF) {
         m_id2rg.set(id, nullptr);
-        m_free_ru_id.append_head(id);
+        m_free_rg_id.append_head(id);
     }
 
     #ifdef _DEBUG_

@@ -37,7 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 #define VAR_ID_UNDEF 0
-#define VAR_ID_MAX 5000000
+#define VAR_ID_MAX 10000000
 
 class RegionMgr;
 class VarMgr;
@@ -127,6 +127,9 @@ enum VAR_FLAG {
 
     //Variable is entry function.
     VAR_IS_ENTRY = 0x40000,
+
+    //Variable is section.
+    VAR_IS_SECTION = 0x80000,
 };
 
 class VarFlag : public UFlag {
@@ -284,6 +287,7 @@ public:
     Type const* getType() const { return VAR_type(this); }
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
     UINT getFormalParamPos() const { return VAR_formal_param_pos(this); }
+    VarFlag const& getFlag() const { return VAR_flag(this); }
 
     //Get byte length if variable records string contents.
     UINT getStringLength() const
@@ -370,6 +374,7 @@ public:
     bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
     bool is_pr() const { return varflag.have(VAR_IS_PR); }
     bool is_region() const { return varflag.have(VAR_IS_REGION); }
+    bool is_section() const { return varflag.have(VAR_IS_SECTION); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
     bool is_weak() const { return var_link_attr.have(VAR_LINK_ATTR_WEAK); }
@@ -597,7 +602,7 @@ protected:
     LabelReloc * allocLabelReloc();
 public:
     VarLabelRelationMgr() {}
-    ~VarLabelRelationMgr();
+    virtual ~VarLabelRelationMgr();
 
     //This function will add an entry of using label difference to initialize
     //a global variable(scalar) or a location of a global variable(vector).

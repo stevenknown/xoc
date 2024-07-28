@@ -49,6 +49,7 @@ static void generate_region(RegionMgr * rm)
     Region * func = rm->allocRegion(REGION_FUNC);
     func->initPassMgr();
     func->initIRMgr();
+    func->initDbxMgr();
     func->initIRBBMgr();
     func->setRegionVar(rm->getVarMgr()->registerVar(
         ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
@@ -142,7 +143,6 @@ static void dumpGR(Region * rg)
 
 int main(int argc, char * argv[])
 {
-    g_dbx_mgr = new DbxMgr();
     RegionMgr * rm = new RegionMgr();
     rm->getLogMgr()->init("ex.tmp", true);
     rm->initVarMgr();
@@ -166,8 +166,6 @@ int main(int argc, char * argv[])
     dumpGR(rm->getRegion(1));
 
     delete rm;
-    delete g_dbx_mgr;
-    g_dbx_mgr = NULL;
     printf("\nFINISH\n");
 
     return 0;

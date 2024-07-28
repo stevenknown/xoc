@@ -35,6 +35,8 @@ namespace xoc {
 
 //Defined the entry for extended expression ir code.
 #define SWITCH_CASE_EXT_EXP \
+    SWITCH_CASE_EXT_UNA: \
+    SWITCH_CASE_EXT_BIN: \
     case IR_BROADCAST
 
 //Defined the entry for extended virtual stmt ir code.
@@ -59,10 +61,20 @@ namespace xoc {
     case IR_VST
 
 //Defined the entry for extended UNA ir code.
-#define SWITCH_CASE_EXT_UNA PLACEHOLDER_LABEL1
+//The IR_EXT_UNA_PLACEHOLDER entry is just a placeholder the SWITCH-CASE.
+//User should redefine the macro to apply target dependent IR code.
+#define SWITCH_CASE_EXT_UNA \
+    case IR_EXT_UNA_PLACEHOLDER
 
-//No extended BIN for now.
-#define SWITCH_CASE_EXT_BIN PLACEHOLDER_LABEL2
+//Defined the entry for extended BIN ir code.
+//The IR_EXT_BIN_PLACEHOLDER entry is just a placeholder the SWITCH-CASE.
+//User should redefine the macro to apply target dependent IR code.
+#define SWITCH_CASE_EXT_BIN \
+    case IR_EXT_BIN_PLACEHOLDER
+
+#define SWITCH_CASE_EXT_PLACEHOLDER \
+    case IR_EXT_UNA_PLACEHOLDER: \
+    case IR_EXT_BIN_PLACEHOLDER
 
 //In order to conform the compatibility of origin IR code, user can undef
 //original SWITCH_CASE_<NAME>, then redefine the same MACRO with new IR code

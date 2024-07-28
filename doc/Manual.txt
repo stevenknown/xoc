@@ -82,19 +82,19 @@ Programming Guides
     list, local Var table, and many kinds of analysis and transformation
     modules.
 
-    The kind of region can be blackbox, subregion, exception handling,
+    The kind of region can be blackbox, inner region, exception handling,
     function unit, and program unit.
     * blackbox
       The region is a black box that attached customized data.
       Black box is a single entry, single exit region.
 
-    * subregion
-      This kind of region serves as a unit of compilation. Subregion
+    * inner region
+      This kind of region serves as a unit of compilation. Inner region
       can be nested one inside another, which contains a list of IR.
-      Subregion is single entry, multiple exits region. The different
-      between subregion and function unit is subregion has neither
+      Inner region is single entry, multiple exits region. The different
+      between inner region and function unit is inner region has neither
       epilog and prolog part of function, nor the landing part of
-      exception handling. In general, subregions should be compiled
+      exception handling. In general, inner regions should be compiled
       inside-out. An additional use of this node is to specify a region
       to be parallelized.
 
@@ -265,10 +265,19 @@ Programming Guides
   used to describe multiple primitive data are operated in parallel. The
   vector-elem-type may be all first class type.
   e.g:
-  D_MC, mc-size is 64, vector elem type is i16, then the vector is <4 ¡Á i16>
-  D_MC, mc-size is 64, vector elem type is f32, then the vector is <2 ¡Á f32>
+  D_MC, mc-size is 64, vector elem type is i16, then the vector is <i16 ¡Á4>
+  D_MC, mc-size is 64, vector elem type is f32, then the vector is <f32 ¡Á2>
   If the type is vector, make sure the MC size is the multiple of
   vector-elem-type.
+
+  ¡ñ Tensor type
+  Tensor type is used to describe multiple dimensional tensor data. Each
+  dimension is a constant immediate.
+  e.g:
+  Given tensor <i16 ¡Á4 ¡Á3 ¡Á2 ¡Á1>, the tensor has three dimensions, the
+  degree of the first dimension is 4, the degree of second dimension is 3, the
+  remaining dimensions are similar like them. The type of element in the tensor
+  is i16.
 
   ¡ñ Any type
   Variables of this type refer to the data of unspecified type, so in this
@@ -558,17 +567,17 @@ Programming Guides
   ¡ñ IR_REGION
       Region semantics is a key feature of XOC, and the concept allows IR
       to be customized in powerful ways.
-      The kind of region can be blackbox, subregion, exception handling,
+      The kind of region can be blackbox, inner region, exception handling,
       function unit, and program unit.
         * blackbox
           The region is a black box that attached customized data.
           Black box is a single entry, single exit region, and without
           any IR.
 
-        * subregion
-          It is a region which contains a list of IR, subregion is
+        * inner region
+          It is a region which contains a list of IR, inner region is
           single entry, multiple exits region.
-          The different between subregion and function unit is subregion
+          The different between inner region and function unit is inner region
           has neither epilog and prolog part of function, nor the landing
           part of exception handling.
 
@@ -788,10 +797,10 @@ Programming Guides
       from an array element.
 
       Operands:
-      * IR_dt       indicate the result type.
-      * ARR_base    indicate the target label.
-      * ARR_sub     indicate the subscript expression.
-      * ARR_elem_ty indicate the array element type.
+      * IR_dt        indicate the result type.
+      * ARR_base     indicate the target label.
+      * ARR_sub_list indicate the subscript expression.
+      * ARR_elemtype indicate the array element type.
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of
@@ -820,12 +829,12 @@ Programming Guides
       The most operations and properties are same as IR_ARRAY.
 
       Operands:
-      * IR_dt        indicate the result type.
-      * ARR_base     indicate the target label.
-      * ARR_sub      indicate the subscript expression.
-      * ARR_elem_ty  indicate the array element type.
-      * STARR_rhs    indicate the Right Hand Side expression that computing
-                     a value to be stored to array element.
+      * IR_dt         indicate the result type.
+      * ARR_base      indicate the target label.
+      * ARR_sub_list  indicate the subscript expression.
+      * ARR_elemtype  indicate the array element type.
+      * STARR_rhs     indicate the Right Hand Side expression that computing
+                      a value to be stored to array element.
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of

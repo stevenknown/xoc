@@ -116,6 +116,25 @@ typedef enum {
     //   For this example, by giving POS 17, the range of lifetime <2-17> is
     //   shrunk from 2 to 17.
     POS_ATTR_LT_SHRINK_BEFORE   = 0x4,
+
+
+    //Indicate the lifetime of PR should be extended to the end of BB from the
+    //POS where POS_ATTR_LT_EXTEND_BB_END is set.
+    //e.g: This attribute is set at POS 53, and the end of BB is at POS 67.
+    //   Original lifetime: <2-17><34-53>
+    //    | ----------------                --------------------
+    //    |                u                d      u           u
+    //                                                         ^
+    //                                                         |
+    //                                                     POS = 53
+    //
+    //   Modified lifetime: <2-17><34-67>
+    //    | ----------------                ----------------------------------
+    //    |                u                d      u           u             u
+    //
+    //   For this example, by giving POS 53, the range of lifetime <34-53> is
+    //   extended to the end of BB 67.
+    POS_ATTR_LT_EXTEND_BB_END   = 0x8,
 } POS_ATTR_FLAG;
 
 //This enum is used to describe the lexical sequence of BB for the fake-use IRs
@@ -277,9 +296,6 @@ public:
 typedef xcom::TMap<BBPos, PosAttr const*, BBPosCmp> BBPos2Attr;
 typedef xcom::TMapIter<BBPos, PosAttr const*> BBPos2AttrIter;
 
-//ID for topological order.
-typedef UINT TOPOID;
-
 //Map from prno to the Occurence.
 typedef xcom::TMap<PRNO, Occurence const*> Prno2OccMap;
 typedef xcom::TMapIter<PRNO, Occurence const*> Prno2OccMapIter;
@@ -316,13 +332,11 @@ class BackwardJumpAnalysis {
     BBPos2Attr * m_pos2attr;
     IRMgr * m_irmgr;
     BBList * m_bb_list;
-    Vector<TOPOID> m_bb_topoid;
     LivenessMgr * m_live_mgr;
     BackwardEdgeList m_backward_edges;
     Vector<Pos> m_bb_entry_pos;
     Vector<Pos> m_bb_exit_pos;
     Prno2OccMap m_prno2occ;
-    PRLiveSetList m_pr_live_set_list;
     FakeVarMgr * m_fake_var_mgr;
     LinearScanRA * m_lsra;
     BackwardJumpAnalysisResMgr * m_resource_mgr;
@@ -353,13 +367,6 @@ protected:
         m_backward_edges.append_tail(e);
     }
 
-    //Take the prno of live in for src_bbid and the live out for dst_bbid,
-    //and put into m_pr_live_set_list.
-    void addToPRLiveSetList(UINT src_bbid, UINT dst_bbid);
-
-    //Give each BB a topological sequence ID.
-    void assignTopoIdForBB();
-
     //Check the condition for fake-use first, and then do the insertion.
     void checkAndInsertFakeUse();
 
@@ -380,15 +387,6 @@ protected:
     //This func records the start/entry position of the input BB.
     Pos getBBStartPos(UINT bbid) const { return m_bb_entry_pos.get(bbid); }
 
-    //Determine an edge is backward jump or not.
-    bool isBackwardJump(UINT src_bbid, UINT dst_bbid) const
-    { return m_bb_topoid[dst_bbid] <= m_bb_topoid[src_bbid]; }
-
-    //Determine the prno is really need to be processed or not. During
-    //the analysis, the prno in live-in or live-out of backward edge related
-    //BBs are helpful, and the other prnos will be ignored.
-    bool isPrInRelatedLiveSet(PRNO pr);
-
     //This func inserts the fake-use IR at the head or tail of input BB.
     void insertFakeUse(IRBB const* bb, PRNO prno, INSERT_MODE mode);
 
@@ -399,7 +397,7 @@ protected:
     void insertFakeUseAtBBExit(IRBB const* bb, PRNO prno, BBPos const& pos);
 
     //This func records the occurence of the input prno at the specified pos.
-    void recordOccurenceForPr(PRNO prno, Pos pos);
+    void recordOccurenceForPR(PRNO prno, Pos pos);
 };
 //END BackwardJumpAnalysis
 
@@ -444,603 +442,6 @@ typedef union {
         UINT16 chk;
     } state;
 } PRState;
-
-typedef UINT BBID;
-typedef List<PRNO> PRNOList;
-
-//
-//START PRInfo
-//
-//This class is used to record the pr information during the data flow analysis
-//for the branch hole finder. There are two parts of data need to be recorded:
-// 1. The state of PR.
-// 2. The BBID where the DEF and USE state changed from.
-class PRInfo {
-    COPY_CONSTRUCTOR(PRInfo);
-
-    //Record the state of PR started from the m_bbid.
-    PRState m_state;
-
-    //The BBID where the PR is DEF or USE.
-    BBID m_bbid;
-
-    //Point to an IR if the PR is defined in this IR, if current PR is a USE,
-    //m_def_ir should be set to null. Normally the fake-use IR is inserted
-    //before this IR.
-    IR const* m_def_ir;
-public:
-    PRInfo()
-    {
-        m_state.value = 0;
-        m_bbid = BBID_UNDEF;
-        m_def_ir = nullptr;
-    }
-
-    void copyFrom(PRInfo const* other)
-    {
-        m_state.value = other->m_state.value;
-        m_bbid = other->m_bbid;
-        m_def_ir = other->m_def_ir;
-    }
-
-    void dump(Region * rg) const;
-
-    UINT getBBID() const { return m_bbid; }
-
-    PR_CHK_STATE getChkState() const
-    { return (PR_CHK_STATE)m_state.state.chk; }
-
-    PR_DU_STATE getDUState() const
-    { return (PR_DU_STATE)m_state.state.du; }
-
-    IR const* getDefIR() const { return m_def_ir; }
-
-    UINT getState() const { return m_state.value; }
-
-    void setBBID(BBID bbid) { m_bbid = bbid; }
-
-    void setDefIR(IR const* ir) { m_def_ir = ir; }
-
-    void updateChkState(PR_CHK_STATE chk_state)
-    { m_state.state.chk = chk_state; }
-
-    //This func updates the DU state per the input du_state.
-    //du_state: the new DU state.
-    //bbid: the bbid where the DU state comes from.
-    void updateDUState(PR_DU_STATE du_state, BBID bbid = BBID_UNDEF);
-};
-//END PRInfo
-
-//The data type mapping from the prno to the pr infor.
-typedef TMap<PRNO, PRInfo*> PR2Info;
-typedef TMapIter<PRNO, PRInfo*> PR2InfoIter;
-
-//The data type mapping the branch start BB to PR2Info.
-//Key: BBID of a branch start BB.
-//value: PR2Info.
-typedef TMap<BBID, PR2Info*> BB2PRHolder;
-typedef TMapIter<BBID, PR2Info*> BB2PRHolderIter;
-
-
-//
-//START IRDUData
-//
-//This class is designed to record the DEF and USE info for each IR in all BBs,
-//which is used in the preProcess function of BrHoleFinder to collect the DEF
-//and USE info for the live-in and live-out PRs.
-class IRDUData {
-    COPY_CONSTRUCTOR(IRDUData);
-
-    //Record the DEF PRs.
-    PRNOList m_def_list;
-
-    //Record the USE PRs.
-    PRNOList m_use_list;
-public:
-    IRDUData() { init(); }
-    ~IRDUData()
-    {
-        m_def_list.destroy();
-        m_use_list.destroy();
-    }
-
-    void addDef(PRNO prno) { m_def_list.append_tail(prno); }
-    void addUse(PRNO prno) { m_use_list.append_tail(prno); }
-
-    void dump(Region * rg);
-
-    PRNOList & getDefList() { return m_def_list; }
-    PRNOList & getUseList() { return m_use_list; }
-
-    void init()
-    {
-        m_def_list.init();
-        m_use_list.init();
-    }
-};
-//END IRDUData
-
-
-//This structure describes the branch lifetime hole info that need to be
-//processed by inserting the fake-use IR.
-#define HOLEINFO_prno(h) ((h)->prno)
-#define HOLEINFO_bbid(h) ((h)->bbid)
-#define HOLEINFO_ir(h) ((h)->ir)
-typedef struct {
-    //The prno may have branch lifetime hole.
-    PRNO prno;
-
-    //The bbid for the hole resides in. Normally the DEF of the prno is in
-    //this bbid.
-    BBID bbid;
-
-    //The IR for this DEF PR.
-    IR const* ir;
-} HoleInfo;
-
-
-//
-//START FinderResMgr
-//
-//This class is used to manage the resources used by BrHoleFinder.
-class FinderResMgr {
-    COPY_CONSTRUCTOR(FinderResMgr);
-    typedef List<PR2Info*> PR2InfoList;
-    typedef List<BB2PRHolder*> BB2PRHolderList;
-    BB2PRHolderList m_bb_holder_list;
-    PR2InfoList m_pr2info_list;
-    SMemPool * m_pool;
-public:
-    FinderResMgr()
-    {
-        m_pool = nullptr;
-        init();
-    }
-    ~FinderResMgr() { destroy(); }
-
-    BB2PRHolder * allocBB2PRHolder();
-    IRDUData * allocIRDUData();
-    PR2Info * allocPR2Info();
-
-    PRInfo * allocPRInfo()
-    { return (PRInfo*)xmalloc(sizeof(PRInfo)); }
-
-    PRState * allocStateResult()
-    { return (PRState*)xmalloc(sizeof(PRState)); }
-
-    void destroy();
-
-    HoleInfo * genHoleInfo(PRNO prno, BBID bbid, IR const* ir);
-    PosAttr * genPosAttr(UINT v, IRBB const* bb, IR const* ir);
-
-    void init();
-    void * xmalloc(size_t size);
-};
-//END FinderResMgr
-
-
-//
-//START BrHoleFinder
-//
-//This class shall find the potential branch lifetime holes for LSRA introduced
-//by the branch of CFG, and then fix all the branch lifetime holes.
-//
-//Basically, the lifetime hole of a PR is generated by a DEF next to a USE.
-//For the below example, the lifetime hole is: [18-33]
-//  lifetime original: <2-17><34-51>
-//   | ----------------                --------------------
-//   |                u                d      u           u
-//
-//During the LSRA, there is no need to insert the spill and reload IR if the
-//PR is split in the lifetime hole. However, it would lead to the incorrect
-//result when lifetime hole is generated by the branches of CFG. Please see
-//the following CFG example:
-//
-//                          BB1:
-//                          $p <-- ... #S1
-//                          |
-//                          v
-//                        BB2:
-//                        $p < n #S2
-//                       |     |
-//                  _____|     |_____
-//                  |               |
-//                  v               v
-//                BB3:              BB4:
-//                ...               ...
-//                ... <-- $p #S3    $p <-- ... #S5
-//                $q <-- ... #S4    ...
-//                ...               |
-//                 |                |
-//                 |________  ______|
-//                         |  |
-//                         v  v
-//                         BB5:
-//                         ...
-//                         ... <-- $p #S6
-//                         ...
-//The linear order of BBs is: BB1 -> BB2 -> BB3 -> BB4 -> BB5
-//The branch lifetime hole of '$p' looks like:
-//    | BB1 -> BB2 -> BB3 -> BB4 -> BB5
-//    | -----------------      ---------
-//    |   d     u       u      d       u
-//                          ^
-//                          |
-//                   branch lifetime hole
-//    This hole is generated by the two parallel branches. If $p is split
-//    after the USE of $p (#S3) in BB3, and the control flow goes through only
-//    one of the two paths on CFG, the value of $p may be overwrote by other
-//    PRs, so the user would not get the expected value.
-//
-//    For example, R1 is a physical register, and it is assigned to $p (#S3) in
-//    BB3. There is a DEF of $q (#S4) in BB3 after the split position (in the
-//    hole), so if there is no other available physical register resource, the
-//    linear scan register allocator may assign R1 to $q without the insertion
-//    of spill and reload. When the control flow goes through the left path on
-//    CFG, we will get the value of $q if we use the $p (#S6) in BB5, this is
-//    not correct, because the value in R1 was overwrote by $q (#S4).
-//
-//The algorithm will be implemented by three steps:
-//  A. preProcess
-//     This step will go through all the IRs in BB list to record the
-//     DEF and USE info for all PRs, and here only the live-in or live-out
-//     PRs will be cared.
-//
-//  B. check
-//     This step will find all the branch lifetime holes based on the DEF
-//     and USE info generated in step A. The finding process is performed
-//     by the form of forward data flow analysis.
-//
-//  B.1. Data Flow Equation.
-//
-//     To implement the equation, a map holder is used as the data structure to
-//     flow the data from top to down on the CFG, and each BB stores an IN map
-//     holder and an OUT map holder.
-//     Map holder:
-//       key: BBID, stands for a branch start BB, and the out degree is greater
-//                  than 1. In above CFG, only BB2 is a branch start BB.
-//       value: Map, records the PR and its related information.
-//              Key: PR number
-//              value:           |-- PRState: State of PR.
-//                      PRInfo---|-- DEF IR: Set only if the PR is a DEF in IR.
-//                               |-- BBID: Where the PR is defined or used.
-
-//     The data flow equation can be formulated as below:
-//       1. BB[IN] = BB[OUT 1] U BB[OUT 2] U ... U BB[OUT N]
-//       2. BB[OUT] = BB[IN] U GEN
-//          where N is the number of predecessors.
-//          BB[OUT N] is the OUT map holder of the Nth predecessor of
-//                    current BB.
-//          BB[IN] is the IN map holder of current BB.
-//          BB[OUT] is the OUT map holder of current BB.
-//
-//     B.1.1. GEN
-//         GEN map holder:
-//         If a BB is in a branch, just set the BBID of branch start BB as the
-//         key, and then go through all the IRs in the BB to generate PR2Info.
-//         If a PR is used or defined in an IR, set the PR number as the key,
-//         and then generate the PRInfo.
-//
-//         GEN PRInfo:
-//          1. If the check state of PR is PR_CHK_CONFLICT, do nothing.
-//          2. If current IR is the first occurence of the PR in current BB
-//             after the branch start BB, set the DU state to PR_DU_DEFINED
-//             if the occurence is a DEF, and to PR_DU_USED if the occurence
-//             is a USE, also set the check state to PR_CHK_GOOD.
-//
-//         [NOTE1]: Only the first occurence of PR after the branch start BB is
-//                  recorded. Because when all BBs of multiple siblings are
-//                  ordered linearly, the type (DEF/USE) of the first occurence
-//                  for a PR can determine whether there will be a lifetime
-//                  hole cross the branch. For example, on above CFG, there is
-//                  a branch lifetime hole for $p, however, if the type of #S5
-//                  is changed from DEF to USE (""... <-- $p"), the first
-//                  occurence of $p in two siblings BB3 and BB4 are both USE,
-//                  there will be no lifetime hole no matter what the linear
-//                  order (BB3->BB4 or BB4->bb3) is.
-//
-//        GEN example on BBID 4 in above CFG:
-//          For the key BBID 2, which is a branch start BB, IR "$p <-- ..." #S5
-//          is the first DEF occurence of $p in BBID 4.
-//          so the GEN result will be updated as:
-//          key: BBID 2 (branch start BB)
-//          value: Key: $p
-//                 value:          |-- PRState: PR_DU_DEFINED, PR_CHK_GOOD
-//                        PRInfo---|-- DEF IR: '$p <-- ...' #S5
-//                                 |-- BBID: 4
-//
-//     B.1.2. UNION Definition
-//         Based on the above map holder data structure, when multiple edges
-//         join at a BB on CFG, the union opertaion is used to merge all the
-//         OUT map holders of all predecessors as the IN map holder for the BB,
-//         it can be defined as below:
-//         1. If the key of branch start BBID is different, copy and use
-//            directly, that means the elements of the map will include more
-//            branch start BBs.
-//
-//         2. If the key of branch start BBID is same, that means that they are
-//            from the same branch start BB, we need to do the union operation
-//            on the value PR2Info:
-//            2.1. If the key of PR number is different, copy and use directly,
-//                 that means the elements of map will include more PRs appeared
-//                 in the same branch start BB.
-//
-//            2.1. If the key of PR number is same, that means the same PR are
-//                 appeared in two different predecessors with the same branch
-//                 start BB (the same ancestor), we need to do the further
-//                 merge operation on the PRInfo of two predecessors, and the
-//                 merged check state will be updated per the TABLE1 below:
-//                ________________________________________________________
-//                | rules  | predecessor_A | predecessor_B |    merged   |
-//                |        |  check state  |  check state  | check state |
-//                |------------------------------------------------------|
-//                | rule 1 |  conflict     |  conflict     |  conflict   |
-//                | rule 2 |  conflict     |  undef        |  conflict   |
-//                | rule 3 |  conflict     |  good         |  conflict   |
-//                | rule 4 |  good         |  conflict     |  conflict   |
-//                | rule 5 |  undef        |  good         |  good       |
-//                | rule 6 |  good         |  good         |  TABLE2     |
-//                ________________________________________________________
-//                                       TABLE1
-//
-//                For the rule 6 in TABLE1, the merged check state should be
-//                updated per the TABLE2 below:
-//                ___________________________________________________________
-//                |    rules  | predecessor_A | predecessor_B |   merged    |
-//                |           |   DU state    |    DU state   | check state |
-//                |---------------------------------------------------------|
-//                |  rule 6.1 |      DEF      |     USE       |  conflict   |
-//                |  rule 6.2 |      USE      |     DEF       |  conflict   |
-//                |  rule 6.3 |      USE      |     USE       |  good       |
-//                |  rule 6.4 |      DEF      |     DEF       |  good       |
-//                ___________________________________________________________
-//                                       TABLE2
-//
-//            [NOTE2]: When the merged check state is conflicted, the defined
-//                     BBID will be recorded as a marker to indicate where the
-//                     fake-use IR need to be inserted.
-//            The detailed union example can refer to B.2.5 in the next section.
-//
-//  B.2. Data flow process example on above CFG.
-//     B.2.1. Process BB1
-//         IN BB1:
-//           NONE, because it is not in any branch.
-//         OUT BB1:
-//           NONE, because it is not in any branch.
-//     B.2.2. Process BB2
-//         IN BB2:
-//           NONE, because it is not in any branch.
-//         OUT BB2:
-//           NONE, because it is not in any branch.
-//     B.2.3. Process BB3
-//         IN BB3: flowed down from BB2, same as OUT BB2.
-//         OUT BB3:
-//           key: BBID 2 (branch start BB)
-//           value: Key: $p
-//                  value:           |-- PRState: PR_DU_USED, PR_CHK_GOOD
-//                          PRInfo---|-- DEF IR: null
-//                                   |-- BBID: 3
-//                  Key: $q
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_GOOD
-//                          PRInfo---|-- DEF IR: '$q <-- ...' #S4
-//                                   |-- BBID: 3
-//     B.2.4. Process BB4
-//         IN BB4: flowed down from BB2, same as OUT BB2.
-//         OUT BB4:
-//           key: BBID 2 (branch start BB)
-//           value: Key: $p
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_GOOD
-//                          PRInfo---|-- DEF IR: '$p <-- ...' #S5
-//                                   |-- BBID: 4
-//     B.2.5. Process BB5
-//         The union operation is needed to do for the two precedecssors
-//          (BB3 and BB4):
-//         For the key start BBID 2:
-//
-//         For the key $p, both contained in BB3 and BB4, the PRInfo is not
-//         same, and the check states are both PR_CHK_GOOD, so we need to
-//         check further per rule 6 in above TABLE2. Because the two DU states
-//         are not same, one is PR_DU_DEFINED (precedecssor BBID 4), and the
-//         other one is PR_DU_USED (precedecssor BBID 3), so the result is
-//         PR_CHK_CONFLICT according to the rule 6.1 or 6.2 in TABLE2 above.
-//
-//         For the key $q, only contained in BB3, so just copy it into the
-//         final map directly.
-//
-//         The final union result will be updated as:
-//         IN BB5:
-//           key: BBID 2 (branch start BB)
-//           value: Key: $p
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_CONFLICT
-//                          PRInfo---|-- DEF IR: '$p <-- ...' #S5
-//                                   |-- BBID: 4, see the [NOTE2] above.
-//                  Key: $q
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_GOOD
-//                          PRInfo---|-- DEF IR: '$q <-- ...' #S4
-//                                   |-- BBID: 3
-//         OUT BB5:
-//           key: BBID 2 (branch start BB)
-//           value: Key: $p
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_CONFLICT
-//                          PRInfo---|-- DEF IR: '$p <-- ...' #S5
-//                                   |-- BBID: 4
-//                  Key: $q
-//                  value:           |-- PRState: PR_DU_DEFINED, PR_CHK_GOOD
-//                          PRInfo---|-- DEF IR: '$q <-- ...' #S4
-//                                   |-- BBID: 3
-//
-//  C. postProcess
-//     Definition for the fake-use IR: A statement that stores a PR to a fake
-//     memory var, the format is: fake_var <-- $p
-//
-//     This step will fix the branch lifetime holes found in step B. The
-//     fake-use IR for the specified PR can be inserted before the IR where
-//     the PR is defined to eliminate the branch lifetime hole when do the
-//     LSRA. The fake-use IR is set an attribute POS_ATTR_NO_CODE_GEN, which
-//     means this IR is not involved in the final machine instruction
-//     generation, and will be removed eventually during the attribute
-//     processing phase.
-//
-//     In this CFG example, the conflicted PR $p is defined in #S5 of BB4,
-//     so the fake-use IR #S7 will be inserted before #S5 in BB4.
-//
-//     After this step, the final CFG is as below:
-//
-//                          BB1:
-//                          $p <-- ... #S1
-//                          |
-//                          v
-//                        BB2:
-//                        $p < n $S2
-//                       |     |
-//                  _____|     |______
-//                  |                |
-//                  |                v
-//                  v               BB4:
-//                BB3:              ...
-//                ...               fake_var <-- $p #S7
-//                ... <-- $p #S3    $p <-- ...      #S5
-//                $q <-- ... #S4    ...
-//                ...                |
-//                 |                 |
-//                 |________  ______|
-//                         |  |
-//                         v  v
-//                         BB5:
-//                         ...
-//                         ... <-- $p #S6
-//                         ...
-//     The DU state of PR $p in BB3 and BB4 are changed to both PR_DU_USED
-//     in the final CFG, and there is no chance to introduce a lifetime
-//     hole when do the linear scan register allocation, this will ensure the
-//     correctness of the register allocation result.
-//
-class BrHoleFinder {
-    COPY_CONSTRUCTOR(BrHoleFinder);
-    typedef TMap<IR const*, IRDUData const*> IR2DUData;
-    typedef TMapIter<IR const*, IRDUData const*> IR2DUDataIter;
-
-    Region * m_rg;
-    BBList * m_bb_list;
-    LivenessMgr * m_live_mgr;
-    LinearScanRA * m_lsra;
-    FinderResMgr m_resmgr;
-    BBPos2Attr * m_pos2attr;
-    FakeVarMgr * m_fake_var_mgr;
-    IRMgr * m_irmgr;
-
-    //The DU info for every IR generated in the preprocess.
-    IR2DUData m_ir2du;
-
-    //The data in for each BB during the data flow analysis.
-    Vector<BB2PRHolder*> m_bb_state_in;
-
-    //The data out for each BB during the data flow analysis.
-    Vector<BB2PRHolder*> m_bb_state_out;
-
-    //The hole info list used for future fix.
-    List<HoleInfo const*> m_hole_list;
-public:
-    BrHoleFinder(Region * rg, BBPos2Attr * pos2attr,
-                 FakeVarMgr * fake_var_mgr, LinearScanRA * lsra);
-    ~BrHoleFinder() { destroy(); }
-
-    void destroy();
-
-    void dump() const;
-
-    //Init the resources for the analysis.
-    void init();
-
-    void reset();
-
-    void run();
-protected:
-    //Calculate the PR info in holder of specified BB.
-    void calcHolderForBB(IRBB const* bb);
-
-    //Calculate the PR info in holder of IR in specified BB.
-    void calcHolderForIR(IR const* ir, MOD BB2PRHolder * holder,BBID cur_bbid);
-
-    //Calculate the PR info in PR2Info in map holder of specified BB.
-    void calcPR2Info(MOD PR2Info * pr2state, IRDUData const* ana,
-                     BBID cur_bbid, IR const* ir);
-
-    //Calculate the DEF PR info in PR2Info in map holder of specified BB.
-    void calcPRDefState(MOD PR2Info * pr2state, IRDUData const* ana,
-                        BBID cur_bbid, IR const* ir);
-
-    //Calculate the USE PR info in PR2Info in map holder of specified BB.
-    void calcPRUseState(MOD PR2Info * pr2state, IRDUData const* ana,
-                        BBID cur_bbid);
-
-    //This function finds the branch lifetime holes introduced by the branch.
-    bool check();
-
-    //Copy the data of BB2PRHolder from h2 to h1.
-    void copyBBPrHolder(MOD BB2PRHolder * h1, BB2PRHolder const* h2);
-
-    //Copy the data of PR2Info from src to dst.
-    void copyPR2Info(MOD PR2Info * dst, PR2Info const* src);
-
-    void dumpDataFlow() const;
-    void dumpIRDUInfo() const;
-    void dumpHolderState(BB2PRHolder const* holder) const;
-    void dumpPR2Info(PR2Info const* pr2state) const;
-
-    IRDUData const* getIRDUInfo(IR const* ir) const { return m_ir2du.get(ir); }
-
-    BB2PRHolder * genBBPrHolderIn(BBID bbid);
-    BB2PRHolder * genBBPrHolderOut(BBID bbid);
-
-    BB2PRHolder * getBBPrHolderIn(BBID bbid) const
-    { return m_bb_state_in.get(bbid); }
-    BB2PRHolder * getBBPrHolderOut(BBID bbid) const
-    { return m_bb_state_out.get(bbid); }
-
-    PR2Info * genPr2InfoInHolder(MOD BB2PRHolder * h, BBID bbid);
-
-    void genDefForIR(IR const* ir, MOD IRDUData * du_info);
-    void genDUForIR(IR const* ir, MOD ConstIRIter & irit);
-    void genUseForIR(IR const* ir, MOD IRDUData * du_info,
-                     MOD ConstIRIter & irit);
-
-    //Insert a fake-use IR for the prno per the pos and marker during the
-    //branch lifetime hole fix phase.
-    //bb: The BB to insert the fake-use IR
-    //prno: the USE prno in fake-use IR.
-    //pos: the combined position info for fake-use IR.
-    //marker: fake-use IR should be inserted before this marker.
-    void insertFakeUse(IRBB const* bb, PRNO prno, BBPos const& pos,
-                       IR const* marker);
-
-    //Merge the two PRInfo.
-    void mergePrInfo(MOD PRInfo * pr_info1, PRInfo const* pr_info2, PRNO prno);
-
-    //Fix the branch lifetime hole after check.
-    void postProcess();
-
-    //Do some analysis for IR before the check.
-    bool preProcess();
-
-    //Record the pr hole info for the future fix.
-    void recordPrHoleInfo(HoleInfo const* hole)
-    { m_hole_list.append_tail(hole); }
-
-    void setIRDUInfo(IR const* ir, IRDUData const* du_info)
-    { m_ir2du.set(ir, du_info); }
-    void setBBPrHolderIn(BBID bbid, BB2PRHolder * h)
-    { m_bb_state_in.set(bbid, h); }
-    void setBBPrHolderOut(BBID bbid, BB2PRHolder * h)
-    { m_bb_state_out.set(bbid, h); }
-
-    //Do the union operation between two BB2PRHolder.
-    void unionBBPrHolder(MOD BB2PRHolder * h1, BB2PRHolder const* h2);
-
-    //Do the union operation between two PR2Info.
-    void unionPr2State(MOD PR2Info * pr2state1, PR2Info const* pr2state2);
-};
-//END BrHoleFinder
 
 
 //
@@ -1146,6 +547,14 @@ public:
     //Free register from all return value alias register set.
     virtual void freeRegisterFromReturnValueAliasSet(Reg r);
 
+    //Get allocable regsets.
+    RegSet const& getAvailAllocable() const { return m_avail_allocable; }
+
+    TargInfoMgr & getTIMgr() const;
+
+    //Get the total register numbers on the target.
+    UINT const getTotalRegNum() const { return getTIMgr().getNumOfRegister(); }
+
     //Init all register sets.
     //Note the function invoked by constructor can not be virtual.
     void initRegSet();
@@ -1169,11 +578,6 @@ public:
     //Special registers represent registers used by dedicate
     //that do not exist in any regset.
     bool isSpecialReg(Reg r) const;
-
-    TargInfoMgr & getTIMgr() const;
-
-    //Get allocable regsets.
-    RegSet const& getAvailAllocable() const { return m_avail_allocable; }
 
     //Get used caller regiser regset.
     RegSet getUsedCaller() const { return m_used_caller; }
@@ -1219,7 +623,6 @@ protected:
     //Used to control the FP can be allocable or not based on the user's input.
     bool m_is_fp_allocable_allowed;
     LifeTimeMgr * m_lt_mgr;
-    TargInfoMgr * m_ti_mgr;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
     BBList * m_bb_list;
@@ -1236,8 +639,14 @@ protected:
     DedicatedMgr m_dedicated_mgr;
     PRNO2Var m_prno2var;
     ActMgr m_act_mgr;
+    Vector<UINT> m_bb_seqid;
+    xcom::TTab<PRNO> m_prno_with_2d_hole;
 protected:
+    LifeTimeMgr * allocLifeTimeMgr(Region * rg)
+    { ASSERT0(rg); return new LifeTimeMgr(rg); }
+
     virtual RegSetImpl * allocRegSetImpl() { return new RegSetImpl(*this); }
+
 public:
     explicit LinearScanRA(Region * rg);
     virtual ~LinearScanRA();
@@ -1246,6 +655,7 @@ public:
     void addActive(LifeTime * lt);
     void addInActive(LifeTime * lt);
     void addHandled(LifeTime * lt);
+    void assignTopoIdForBB();
 
     virtual IR * buildRemat(PRNO prno, RematCtx const& rematctx,
                             Type const* ty);
@@ -1259,6 +669,21 @@ public:
     PRNO buildPrnoDedicated(Type const* type, Reg reg);
     //Should be called after register allocation.
     PRNO buildPrno(Type const* type, Reg reg);
+
+    //This func is used to get the prno assigned to special register can be
+    //avoid to be spilled to improve the performance on specific target.
+    //Normally, if a prno is spilled into memory, that means the value in the
+    //register assigned to the prno will be used again after the split
+    //position, we have to reload the value from the memory before the USE
+    //position. However, on some specific architecture, the value of the
+    //register is automatically kept by the hardware, it can be used as a
+    //special dedicated register.
+    //For example: There is a ZERO register on some architecture, the value in
+    //this register is always zero, it cannot be changed.
+    virtual bool canSpillAvoid(PRNO prno) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    void addPrnoWith2dLTHole(PRNO prno) { m_prno_with_2d_hole.append(prno); }
 
     //The function check whether 'lt' value is simple enough to rematerialize.
     //And return the information through rematctx.
@@ -1274,6 +699,10 @@ public:
 
     void freeReg(Reg reg);
     void freeReg(LifeTime const* lt);
+
+    //This func is used to find the ancestor prno if an original prno is split
+    //more than one time and is renamed many times.
+    PRNO getAnctPrno(PRNO prno) const;
 
     //Construct a name for Var that will lived in Region.
     CHAR const* genFuncLevelNewVarName(OUT xcom::StrBuf & name);
@@ -1297,7 +726,8 @@ public:
     IRTab & getMoveTab() { return m_move_tab; }
     BBList * getBBList() const { return m_bb_list; }
     IRCFG * getCFG() const { return m_cfg; }
-    TargInfoMgr & getTIMgr() { return *m_ti_mgr; }
+    TargInfoMgr & getTIMgr() const
+    { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LifeTimeMgr & getLTMgr() { return *m_lt_mgr; }
     Reg getDedicatedReg(LifeTime const* lt) const
     { return getDedicatedReg(lt->getPrno()); }
@@ -1312,39 +742,63 @@ public:
     //not the data type of lt.
     Type const* getRegType(PRNO prno) const;
 
-    virtual ArgPasser * getArgPasser() const {
-        ASSERTN(0, ("Target Dependent Code"));
-        return nullptr;
-    }
-
     //Get target physical registers.
-    virtual Reg getFP() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getBP() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getRA() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getSP() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getGP() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getTA() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    //Get base pointer register.
+    Reg getBP() const { return getTIMgr().getBP(); }
+
+    //Get end caller saved scalar register.
+    Reg getCallerScalarEnd() const { return getTIMgr().getCallerScalarEnd(); }
+
+    //Get start caller saved scalar register.
+    Reg getCallerScalarStart() const
+    { return getTIMgr().getCallerScalarStart(); }
+
+    //Get frame pointer register.
+    Reg getFP() const { return getTIMgr().getFP(); }
+
+    //Get global pointer register.
+    Reg getGP() const { return getTIMgr().getGP(); }
+
+    //Get start parameter scalar register.
+    xgen::Reg getParamScalarStart() const
+    { return getTIMgr().getParamScalarStart(); }
+
+    //Get program counter register.
+    Reg getPC() const { return getTIMgr().getPC(); }
+
+    //Get returned address register.
+    Reg getRA() const { return getTIMgr().getRA(); }
+
+    //Get stack pointer register.
+    Reg getSP() const { return getTIMgr().getSP(); }
+
+    //Get target address register.
+    Reg getTA() const { return getTIMgr().getTA(); }
+
+    //Get program counter register.
+    virtual xgen::Reg getTargetPC() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Used to get the special dedicated prno per the specific arch.
+    virtual PRNO getSpecialDedicatedPrno(Type const* type, Reg reg) const
+    { ASSERTN(0, ("Target Dependent Code")); return PRNO_UNDEF; }
+
     //The temporary register is a reserved register that used to save a
     //temporary value, which is usually used after the register allocation
     //and does not be assigned in the register allocation.
-    virtual Reg getTMP() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getRegisterZero() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual Reg getScalarArgRegStart() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    Reg getTemp() const { return getTIMgr().getTemp(); }
+
+    //Get zero register.
+    Reg getZero() const { return getTIMgr().getZero(); }
 
     bool hasReg(PRNO prno) const;
     bool hasReg(LifeTime const* lt) const;
 
     //Return true if register r1 alias to r2.
     virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
+    //Determine an edge is backward jump or not.
+    bool isBackwardJump(UINT src_bbid, UINT dst_bbid) const
+    { return m_bb_seqid[dst_bbid] <= m_bb_seqid[src_bbid]; }
     virtual bool isCalleePermitted(LifeTime const* lt) const;
     bool isDedicated(PRNO prno) const
     { return m_dedicated_mgr.is_dedicated(prno); }
@@ -1368,9 +822,27 @@ public:
     bool isRematOp(IR const* ir) const;
     bool isSpillOp(IR const* ir) const;
 
+    //This func is used to check the TMP register is available or not for the
+    //input type.
+    virtual bool isTmpRegAvailable(Type const* ty) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    bool isUnsplitable(PRNO prno) const
+    {
+        //Currently the prnos with 2D lifetime holes are not allowed to
+        //split during the LSRA, because it will lead to incorrect spill/reload
+        //operation.
+        return m_prno_with_2d_hole.find(prno);
+    }
+
 
     virtual bool perform(OptCtx & oc);
     virtual bool performLsraImpl(OptCtx & oc);
+
+    //Used to record the special dedicated prno per the specific arch.
+    virtual void recordSpecialDedicatedPrno(Type const* type, Reg reg,
+                                            PRNO prno)
+    { ASSERTN(0, ("Target Dependent Code")); return; }
 
     //Reset all resource before allocation.
     void reset();

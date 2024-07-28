@@ -263,6 +263,46 @@ typedef SWord64 SWord; //signed largest word
 #define ED_LITTLE 1
 #define ED_BIG 2
 
+//Define some e_flags.
+
+//Undefined e_flag.
+#define EF_UNDEF 0x0
+
+//These macros are used to define specific flags for the RISC-V ELF (Executable
+//and Linkable Format) headers. These flags provide information about the
+//binary’s code generation and ABI (Application Binary Interface) options:
+//
+//This flag indicates that the binary contains RISC-V compressed instructions.
+#define EF_RISCV_RVC 0x0001
+
+//This is a mask for the floating-point ABI. It indicates which floating-point
+//ABI the binary uses.
+#define EF_RISCV_FLOAT_ABI 0x0006
+
+//This flag indicates that the binary uses the soft-float ABI, meaning it does
+//not use hardware floating-point instructions.
+#define EF_RISCV_FLOAT_ABI_SOFT 0x0000
+
+//This flag indicates that the binary uses the single-precision floating-point
+//ABI.
+#define EF_RISCV_FLOAT_ABI_SINGLE 0x0002
+
+//This flag indicates that the binary uses the double-precision floating-point
+//ABI.
+#define EF_RISCV_FLOAT_ABI_DOUBLE 0x0004
+
+//This flag indicates that the binary uses the quad-precision floating-point
+//ABI.
+#define EF_RISCV_FLOAT_ABI_QUAD 0x0006
+
+//This flag indicates that the binary is using the RISC-V embedded ABI, which
+//is a reduced version of the standard ABI designed for embedded systems.
+#define EF_RISCV_RVE 0x0008
+
+//This flag indicates that the binary assumes Total Store Order memory
+//consistency.
+#define EF_RISCV_TSO 0x0010
+
 #pragma pack(1)
 //Preload ident info that is used to determine file class.
 typedef struct {

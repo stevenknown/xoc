@@ -53,6 +53,15 @@ protected:
     void computeCodeOffset(MOD MIList & milst,
                            OUT Label2Offset & lab2off);
 
+    //Compute distance between target label and current jump instruction.
+    TMWORD computeJumpOff(MInstMgr * mimgr, Label2Offset const& lab2off,
+                          MInst const* mi);
+
+    //Whether the distance between target label and current jump instruction
+    //need to be subtracted by 1.
+    virtual bool const isDistanceNeedSubOne() const
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+
 public:
     MIRelocMgr(Region * rg, MInstMgr * imgr, TMWORD align);
     virtual ~MIRelocMgr();
@@ -65,13 +74,17 @@ public:
 
     MInstMgr * getMIMgr() const { return m_mimgr; }
 
-    virtual UINT getMInstRelocType(MI_CODE c) = 0;
+    //Get the relocation type of given machine instruction code.
+    virtual UINT getMInstRelocType(MI_CODE c)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //Set the data or code byte offset according to relocation type.
-    virtual void setValueViaRelocType(OUT MInst * mi, TMWORD offset) = 0;
+    virtual void setValueViaRelocType(OUT MInst * mi, TMWORD offset)
+    { ASSERTN(0, ("Target Dependent Code")); }
 
     //Set the data or code byte offset according to mi code.
-    virtual void setValueViaMICode(OUT MInst * mi, TMWORD offset) = 0;
+    virtual void setValueViaMICode(OUT MInst * mi, TMWORD offset)
+    { ASSERTN(0, ("Target Dependent Code")); }
 
     //Set the code alignment.
     //The byte offset of each Machine Instruction will aligned in 'align'.

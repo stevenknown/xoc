@@ -115,7 +115,6 @@ typedef UINT PRNO;
     case IR_SUB: \
     SWITCH_CASE_ARITH_NONLINEAR
 
-
 //Defined the entry for shift expression.
 #define SWITCH_CASE_SHIFT \
     case IR_ASR: \
@@ -158,6 +157,7 @@ typedef UINT PRNO;
     SWITCH_CASE_WRITE_ARRAY: \
     SWITCH_CASE_CALL: \
     SWITCH_CASE_BRANCH_OP: \
+    SWITCH_CASE_DEBUG: \
     case IR_REGION: \
     case IR_RETURN
 
@@ -312,9 +312,13 @@ typedef UINT PRNO;
     SWITCH_CASE_BRANCH_OP: \
     SWITCH_CASE_CFS_OP: \
     SWITCH_CASE_LOOP_ITER_CFS_OP: \
+    SWITCH_CASE_DEBUG: \
     case IR_RETURN: \
     case IR_LABEL: \
     case IR_REGION
+    //The EXT_STMT entries has been inserted into DIRECT_MEM_STMT and
+    //INDIRET_MEM_STMT respectively, thus there is no need to append them here.
+    //SWITCH_CASE_EXT_STMT
 
 //Defined the entry for all expression operations.
 #define SWITCH_CASE_EXP \
@@ -324,12 +328,21 @@ typedef UINT PRNO;
     SWITCH_CASE_READ_PR: \
     SWITCH_CASE_BIN: \
     SWITCH_CASE_UNA: \
+    case IR_DUMMYUSE: \
     case IR_CASE: \
     case IR_SELECT: \
     case IR_LDA: \
     case IR_ID: \
     case IR_CONST: \
     SWITCH_CASE_EXT_EXP
+
+//Defined debug info.
+#define SWITCH_CASE_DEBUG \
+    case IR_CFI_DEF_CFA: \
+    case IR_CFI_SAME_VALUE: \
+    case IR_CFI_OFFSET: \
+    case IR_CFI_RESTORE: \
+    case IR_CFI_DEF_CFA_OFFSET
 
 } //namespace xoc
 

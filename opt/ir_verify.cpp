@@ -48,6 +48,9 @@ static bool verifyKidMap(IR const* ir)
 
 bool verifyGeneral(IR const* ir, Region const* rg)
 {
+    if (ir->getParent() != nullptr) {
+        ASSERT0(ir->getParent()->isImmKid(ir));
+    }
     verifyKidMap(ir);
     TypeMgr const* tm = rg->getTypeMgr();
     ASSERT0(tm);
@@ -85,6 +88,7 @@ bool verifyConst(IR const* ir, Region const* rg)
         !ir->is_fp() &&
         !ir->is_bool() &&
         !ir->is_mc() &&
+        !ir->is_tensor() &&
         !ir->is_any() &&
         !ir->is_ptr() && //immediate can be pointer, e.g: int * p = 0;
         !ir->is_str()) {
@@ -114,7 +118,7 @@ bool verifyLD(IR const* ir, Region const* rg)
 }
 
 
-bool verifyST(IR const* ir, Region const* rg)
+bool verifySt(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -142,7 +146,7 @@ bool verifyST(IR const* ir, Region const* rg)
 }
 
 
-bool verifySTPR(IR const* ir, Region const* rg)
+bool verifyStpr(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -160,7 +164,7 @@ bool verifySTPR(IR const* ir, Region const* rg)
 }
 
 
-bool verifyILD(IR const* ir, Region const* rg)
+bool verifyILd(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -183,7 +187,7 @@ bool verifyILD(IR const* ir, Region const* rg)
 }
 
 
-bool verifyIST(IR const* ir, Region const* rg)
+bool verifyISt(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -204,7 +208,7 @@ bool verifyIST(IR const* ir, Region const* rg)
 }
 
 
-bool verifySETELEM(IR const* ir, Region const* rg)
+bool verifySetElem(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -232,7 +236,7 @@ bool verifySETELEM(IR const* ir, Region const* rg)
 }
 
 
-bool verifyGETELEM(IR const* ir, Region const* rg)
+bool verifyGetElem(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -272,7 +276,7 @@ bool verifyLDA(IR const* ir, Region const* rg)
 }
 
 
-bool verifyCALL(IR const* ir, Region const* rg)
+bool verifyCall(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -298,7 +302,7 @@ bool verifyCALL(IR const* ir, Region const* rg)
 }
 
 
-bool verifyICALL(IR const* ir, Region const* rg)
+bool verifyICall(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -381,6 +385,24 @@ bool verifyCompare(IR const* ir, Region const* rg)
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
     ASSERT0(((CBin*)ir)->getOpnd0()->is_single());
     ASSERT0(((CBin*)ir)->getOpnd1()->is_single());
+    return true;
+}
+
+
+bool verifyTer(IR const* ir, Region const* rg)
+{
+    verifyGeneral(ir, rg);
+    TypeMgr const* tm = rg->getTypeMgr();
+    ASSERT0_DUMMYUSE(tm);
+    Type const* d = ir->getType();
+    ASSERT0_DUMMYUSE(d);
+    ASSERT0(d->getDType() != D_UNDEF);
+    ASSERT0(TER_opnd0(ir) && TER_opnd0(ir)->is_exp() &&
+            TER_opnd1(ir) && TER_opnd1(ir)->is_exp() &&
+            TER_opnd2(ir) && TER_opnd2(ir)->is_exp());
+    ASSERT0(TER_opnd0(ir)->is_single());
+    ASSERT0(TER_opnd1(ir)->is_single());
+    ASSERT0(TER_opnd2(ir)->is_single());
     return true;
 }
 
@@ -508,7 +530,7 @@ bool verifySWITCH(IR const* ir, Region const* rg)
 }
 
 
-bool verifyCASE(IR const* ir, Region const* rg)
+bool verifyCase(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -593,7 +615,7 @@ bool verifyBranch(IR const* ir, Region const* rg)
 }
 
 
-bool verifyRETURN(IR const* ir, Region const* rg)
+bool verifyReturn(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -607,7 +629,7 @@ bool verifyRETURN(IR const* ir, Region const* rg)
 }
 
 
-bool verifySELECT(IR const* ir, Region const* rg)
+bool verifySelect(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();
@@ -631,7 +653,7 @@ bool verifySELECT(IR const* ir, Region const* rg)
 }
 
 
-bool verifyPHI(IR const* ir, Region const* rg)
+bool verifyPhi(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();

@@ -26,8 +26,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
+
+//The file defines extended APIs and interfaces to access IR's miscellaneous
+//attributes and operands.
 bool is_vst() const { return getCode() == IR_VST; }
 bool is_vstpr() const { return getCode() == IR_VSTPR; }
 bool is_vist() const { return getCode() == IR_VIST; }
 bool is_broadcast() const { return getCode() == IR_BROADCAST; }
-bool isVirtualOp() const { return is_vst() || is_vstpr() || is_vist(); }
+bool isVirtualOp() const
+{
+    switch (getCode()) {
+    SWITCH_CASE_EXT_VSTMT: return true;
+    default:; //Nothing to do.
+    }
+    return false;
+}

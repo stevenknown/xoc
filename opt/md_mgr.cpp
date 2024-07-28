@@ -34,7 +34,9 @@ MDMgr::MDMgr(Region * rg) :
     m_rg(rg), m_rm(rg->getRegionMgr()), m_mdsys(rg->getMDSystem()),
     m_tm(rg->getTypeMgr()), m_vm(rg->getVarMgr())
 {
-    ASSERT0(m_rg && m_rm && m_mdsys && m_tm);
+    ASSERT0(m_rg && m_rm && m_tm);
+    ASSERTN(m_mdsys, ("MD system is necessary, "
+                      "initialize VarMgr and MDSystem first"));
 }
 
 

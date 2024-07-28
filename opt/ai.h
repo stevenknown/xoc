@@ -61,6 +61,7 @@ typedef enum _AI_TYPE {
     AI_EH_LABEL,  //Record a list of Labels.
     AI_USER_DEF,  //User Defined
     AI_MD_SSA,    //MD SSA info
+    AI_TENSOR,    //Tensor Data Info
     AI_LAST,      //The number of ai type.
 } AI_TYPE;
 
@@ -70,12 +71,11 @@ class BaseAttachInfo {
     COPY_CONSTRUCTOR(BaseAttachInfo);
 protected:
     AI_TYPE m_type;
-
 public:
     explicit BaseAttachInfo(AI_TYPE t) { init(t); }
     ~BaseAttachInfo() {}
-    void init(AI_TYPE t) { m_type = t; }
     AI_TYPE getType() const { return m_type; }
+    void init(AI_TYPE t) { m_type = t; }
 };
 
 
@@ -164,12 +164,12 @@ public:
 class DbxAttachInfo : public BaseAttachInfo {
     COPY_CONSTRUCTOR(DbxAttachInfo);
 public:
-    Dbx dbx; //record debug info.
-    DbxAttachInfo() : BaseAttachInfo(AI_DBX) { init(); }
-    void init()
+    Dbx dbx; //Record debug info for mapping .xxx  to assembly.
+    DbxAttachInfo(DbxMgr * dbg_mg) : BaseAttachInfo(AI_DBX) { init(dbg_mg); }
+    void init(DbxMgr * dbx_mgr)
     {
         BaseAttachInfo::init(AI_DBX);
-        dbx.clean();
+        dbx.init(dbx_mgr);
     }
 };
 
@@ -204,6 +204,13 @@ class MDSSAInfoAttachInfo : public BaseAttachInfo {
     COPY_CONSTRUCTOR(MDSSAInfoAttachInfo);
 public:
     MDSSAInfoAttachInfo() : BaseAttachInfo(AI_MD_SSA) {}
+};
+
+
+class TensorInfoAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(TensorInfoAttachInfo);
+public:
+    TensorInfoAttachInfo() : BaseAttachInfo(AI_TENSOR) {}
 };
 
 } //namespace xoc

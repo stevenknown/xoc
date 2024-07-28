@@ -38,6 +38,7 @@ namespace xoc {
 
 class IRBB;
 class IRBBMgr;
+class IRMgr;
 template <class IRBB, class IR> class CFG;
 typedef List<LabelInfo const*> LabelInfoList;
 typedef LabelInfoList::Iter LabelInfoListIter;
@@ -71,6 +72,7 @@ public:
     {
         if (ir == nullptr) { return nullptr; }
         ASSERT0(m_bb != nullptr);
+        ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_head(ir);
     }
@@ -79,6 +81,7 @@ public:
     {
         if (ir == nullptr) { return nullptr; }
         ASSERT0(m_bb != nullptr);
+        ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_tail(ir);
     }
@@ -160,6 +163,7 @@ public:
         if (ir == nullptr) { return nullptr; }
         ASSERT0(marker != nullptr);
         ASSERT0(m_bb != nullptr);
+        ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
@@ -170,6 +174,7 @@ public:
         if (ir == nullptr) { return nullptr; }
         ASSERT0(marker != nullptr);
         ASSERT0(m_bb != nullptr);
+        ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_after(
             ir, const_cast<IR*>(marker));
@@ -181,6 +186,7 @@ public:
         if (ir == nullptr) { return nullptr; }
         ASSERT0(marker != nullptr);
         ASSERT0(m_bb != nullptr);
+        ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
@@ -346,6 +352,9 @@ public:
     void dumpIRList(Region const* rg, bool dump_inner_region) const;
     void dump(Region const* rg, bool dump_inner_region) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
+
+    //The function frees all IR in IRList back into IRMgr.
+    void freeIRList(Region * rg);
 
     Vertex * getVex() const { return BB_vex(this); }
     LabelInfoList & getLabelList() { return lab_list; }
@@ -528,10 +537,15 @@ public:
     {
         ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
                 ir1->getBB() == this && ir2->getBB() == this);
-        if (is_strict && ir1 == ir2) {
-            return false;
+        if (is_strict) {
+            if (ir1 == ir2) {
+                return false;
+            }
+        } else {
+            if (ir1 == ir2) {
+                return true;
+            }
         }
-
         IRListIter ctir;
         for (BB_irlist(this).get_head(&ctir);
              ctir != BB_irlist(this).end();
@@ -586,10 +600,11 @@ class IRBBMgr {
     COPY_CONSTRUCTOR(IRBBMgr);
 protected:
     UINT m_bb_count; //counter of IRBB.
+    Region * m_rg;
     BBVec m_bb_vec;
     BBList m_free_list;
 public:
-    IRBBMgr() { m_bb_count = BBID_UNDEF + 1; }
+    IRBBMgr(Region * rg) { m_rg = rg; m_bb_count = BBID_UNDEF + 1; }
     ~IRBBMgr();
 
     IRBB * allocBB();

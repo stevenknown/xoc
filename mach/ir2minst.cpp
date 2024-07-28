@@ -122,6 +122,24 @@ void IR2MInst::convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
 }
 
 
+void IR2MInst::processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont)
+{
+    xoc::MCDwarfMgr * dm = m_rg->getRegionMgr()->getDwarfMgr();
+    ASSERT0(dm);
+    xcom::Vector<LabelInfo const*> * hint_ir_v =
+        MCDWARFMGR_ret_after_hint_map_region(dm).get(m_rg);
+    ASSERT0(hint_ir_v);
+    for (UINT i = 0; i < hint_ir_v->get_elem_count(); i++) {
+        MInst * mi = m_mimgr->buildLabel();
+        LabelInfo const* li = (*hint_ir_v)[i];
+        ASSERT0(mi && li);
+        MI_lab(mi) = li;
+        mis.append_tail(mi);
+        IMCTX_label_num(cont)++;
+    }
+}
+
+
 void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->verify(m_rg));
@@ -161,6 +179,21 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
         break;
     case IR_IGOTO:
         convertIgoto(ir, mis, cont);
+        break;
+    case IR_CFI_DEF_CFA:
+        convertCFIDefCfa(ir, mis, cont);
+        break;
+    case IR_CFI_SAME_VALUE:
+        convertCFISameValue(ir, mis, cont);
+        break;
+    case IR_CFI_OFFSET:
+        convertCFIOffset(ir, mis, cont);
+        break;
+    case IR_CFI_RESTORE:
+        convertCFIRestore(ir, mis, cont);
+        break;
+    case IR_CFI_DEF_CFA_OFFSET:
+        convertCFICfaOffset(ir, mis, cont);
         break;
     case IR_LABEL: break;
     default: convertExtStmt(ir, mis, cont);
@@ -205,6 +238,11 @@ void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
             convert(irit->val(), milst, cont);
         }
     }
+
+    //Insert some hints for the final milst.
+    if (xoc::g_debug) {
+        processHintOfAfterRet(milst, cont);
+    }
 }
 
 
@@ -224,4 +262,105 @@ void IR2MInst::convertToMIList(OUT RecycMIList & milst, MOD IMCtx * cont)
     END_TIMER(t, "Convert IR to MInst");
 }
 
+
+void IR2MInst::convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
+                                MOD IMCtx * cont)
+{
+    ASSERT0(ir->is_cfi_def_cfa());
+    ASSERT0(xoc::g_debug);
+    IR const* rhs0 = CFI_CFA_KID(ir, 0);
+    ASSERT0(rhs0->getCode() == IR_CONST);
+    UINT reg_num = (UINT)((CConst*)rhs0)->getInt();
+
+    IR const* rhs1 = CFI_CFA_KID(ir, 1);
+    ASSERT0(rhs1->getCode() == IR_CONST);
+    INT cfa_offset = (INT)((CConst*)rhs1)->getInt();
+
+    MInst * mi = getMIMgr()->buildCFIDefCfa();
+    ASSERT0(mi);
+    MI_cfi_def_cfa_offset(mi) = cfa_offset;
+    MI_cfi_def_cfa_register(mi) = reg_num;
+    mis.append_tail(mi);
+    mis.copyDbx(ir, getDbxMgr());
+    IMCTX_cfi_num(cont)++;
+}
+
+
+void IR2MInst::convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
+                                   MOD IMCtx * cont)
+{
+    ASSERT0(ir->is_cfi_same_value());
+    ASSERT0(xoc::g_debug);
+    IR const* rhs0 = CFI_SAME_VALUE_kid(ir, 0);
+    ASSERT0(rhs0->getCode() == IR_CONST);
+    UINT reg_num = (UINT)((CConst*)rhs0)->getInt();
+    MInst * mi = getMIMgr()->buildCFISameValue();
+    ASSERT0(mi);
+    MI_cfi_samevalue_register(mi) = reg_num;
+
+    mis.append_tail(mi);
+    mis.copyDbx(ir, getDbxMgr());
+    IMCTX_cfi_num(cont)++;
+}
+
+
+void IR2MInst::convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
+                                MOD IMCtx * cont)
+{
+    ASSERT0(ir->is_cfi_offset());
+    ASSERT0(xoc::g_debug);
+    IR const* rhs0 = CFI_OFFSET_kid(ir, 0);
+    ASSERT0(rhs0->getCode() == IR_CONST);
+    UINT reg_num = (UINT)((CConst*)rhs0)->getInt();
+
+    IR const* rhs1 = CFI_OFFSET_kid(ir, 1);
+    ASSERT0(rhs1->getCode() == IR_CONST);
+    INT offset = (INT)((CConst*)rhs1)->getInt();
+    MInst * mi = getMIMgr()->buildCFIOffset();
+    ASSERT0(mi);
+
+    MI_cfi_offset_offset(mi) = offset;
+    MI_cfi_offset_register(mi)  = reg_num;
+    mis.append_tail(mi);
+    mis.copyDbx(ir, getDbxMgr());
+    IMCTX_cfi_num(cont)++;
+}
+
+
+void IR2MInst::convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
+                                 MOD IMCtx * cont)
+{
+    ASSERT0(ir->is_cfi_restore());
+    ASSERT0(xoc::g_debug);
+    IR const* rhs0 = CFI_RESTORE_kid(ir, 0);
+    ASSERT0(rhs0->getCode() == IR_CONST);
+    UINT reg_num = (UINT)((CConst*)rhs0)->getInt();
+
+    MInst * mi = getMIMgr()->buildCFIRestore();
+    ASSERT0(mi);
+    MI_cfi_restore_register(mi) = reg_num;
+
+    mis.append_tail(mi);
+    mis.copyDbx(ir, getDbxMgr());
+    IMCTX_cfi_num(cont)++;
+}
+
+
+void IR2MInst::convertCFICfaOffset(IR const* ir, OUT RecycMIList & mis,
+                                   MOD IMCtx * cont)
+{
+    ASSERT0(ir->is_cfi_def_cfa_offset());
+    ASSERT0(xoc::g_debug);
+    IR const* rhs0 = CFI_DEF_CFA_OFFSET_KID(ir, 0);
+    ASSERT0(rhs0->getCode() == IR_CONST);
+    INT cfa_offset = (INT)((CConst*)rhs0)->getInt();
+
+    MInst * mi = getMIMgr()->buildCFIDefCfaOffset();
+    ASSERT0(mi);
+    MI_cfi_def_cfa_offset_offset(mi) = cfa_offset;
+
+    mis.append_tail(mi);
+    mis.copyDbx(ir, getDbxMgr());
+    IMCTX_cfi_num(cont)++;
+}
 } //namespace

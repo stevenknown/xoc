@@ -5,6 +5,7 @@
 //#define VARIADIC_PARAMETER_ACCESS
 
 //libxcom
+#include <math.h>
 #include "ltype.h"
 #include "diagnostic.h"
 #include "comm_macro.h"
@@ -33,6 +34,9 @@ using namespace xcom;
 #include "matt.h"
 #include "birmat.h"
 #include "xmat.h"
+#include "tensor.h"
+#include "tensor2d.h"
+#include "xtensor.h"
 #include "agraph.h"
 #include "linsys.h"
 #include "lpsol.h"

@@ -39,7 +39,7 @@ namespace xoc {
 class IterSideEffect : public VisitIRTree {
     bool m_has_sideeffect;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
             ir->isNoMove(false)) {
@@ -142,7 +142,7 @@ void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
 
 void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
 {
-    ASSERT0(use_stmt->is_kids(use));
+    ASSERT0(use_stmt->isKids(use));
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //gen_pr hold the CSE value come from gen-stmt.
@@ -171,7 +171,7 @@ void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
 
 void GCSE::elimCseOfBranch(IR * use, IR * use_stmt, IN IR * gen)
 {
-    ASSERT0(use_stmt->is_kids(use));
+    ASSERT0(use_stmt->isKids(use));
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //gen_pr hold the CSE value come from gen-stmt.
@@ -485,6 +485,10 @@ bool GCSE::doPropVN(IRBB * bb)
         case IR_STPR: {
             if (hasSideEffect(ir)) { break; }
             IR * rhs = ir->getRHS();
+            if (rhs == nullptr) {
+                //Virtual OP may not have RHS.
+                break;
+            }
             //Find CSE and replace it with properly PR.
             if (isCseCandidate(rhs)) {
                 change |= handleCandidate(rhs, bb);
@@ -536,18 +540,20 @@ bool GCSE::doPropStmt(IR * ir, List<IR*> & livexp)
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
-    case IR_STPR:
+    case IR_STPR: {
+        IR * rhs = ir->getRHS();
         //Find cse and replace it with properly pr.
-        if (isCseCandidate(ir->getRHS())) {
-            if (processCse(ir->getRHS(), livexp)) {
+        if (rhs != nullptr && isCseCandidate(rhs)) {
+            if (processCse(rhs, livexp)) {
                 //Has found cse and replaced cse with pr.
                 change = true;
             } else {
                 //Generate new cse.
-                livexp.append_tail(ir->getRHS());
+                livexp.append_tail(rhs);
             }
         }
         break;
+    }
     SWITCH_CASE_CALL: {
         IR * param = CALL_param_list(ir);
         IR * next = nullptr;

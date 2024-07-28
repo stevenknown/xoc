@@ -55,7 +55,7 @@ UINT MInstDesc::getFieldSizeByFT(FIELD_TYPE ft) const
 {
     ASSERTN(isContainField(ft),
             ("minst does not contain field '%s'", m_inst_mgr.getFieldName(ft)));
-    return m_inst_mgr.getFieldMgr().getFieldSize(ft);
+    return m_inst_mgr.getFieldMgr()->getFieldSize(ft);
 }
 
 

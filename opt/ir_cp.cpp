@@ -223,7 +223,8 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
     copyVN(cand_exp, newir);
     m_rg->freeIRTree(exp);
 
-    //Fixup DUChain.
+    //Fixup PRSSA|MDSSA DUChain.
+    //NOTE classic DU chain does not need to find the live-in DEF.
     IR * stmt = newir->getStmt();
     IRBB * stmtbb = stmt->getBB();
     xoc::findAndSetLiveInDef(newir, stmtbb->getPrevIR(stmt), stmtbb,
@@ -628,7 +629,8 @@ void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
          "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
          DumpIRName().dump(prop_value));
     m_rg->getLogMgr()->incIndent(4);
-    dumpIR(def_stmt, m_rg, nullptr, IR_DUMP_KID|IR_DUMP_VAR_DECL);
+    xoc::dumpIR(def_stmt, m_rg, nullptr,
+                DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
     m_rg->getLogMgr()->decIndent(4);
     note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
          DumpIRName().dump(use));
@@ -642,7 +644,8 @@ void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
         ID_phi(use)->dump(m_rg, m_mdssamgr->getUseDefMgr());
     } else {
         ASSERT0(use->getStmt());
-        dumpIR(use->getStmt(), m_rg, nullptr, IR_DUMP_KID|IR_DUMP_VAR_DECL);
+        xoc::dumpIR(use->getStmt(), m_rg, nullptr,
+                    DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
     }
     m_rg->getLogMgr()->decIndent(4);
 }
@@ -889,7 +892,7 @@ bool CopyProp::doPropStmt(IR * cpop, MOD IRSet & useset,
         return false;
     }
     IR const* prop_value = getPropagatedValue(cpop);
-    if (!canBeCandidate(prop_value)) {
+    if (prop_value == nullptr || !canBeCandidate(prop_value)) {
         return false;
     }
     bool prssadu;

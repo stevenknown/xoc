@@ -26,6 +26,7 @@ domtree.o\
 lca.o\
 assemblebin.o\
 fileobj.o\
+xtensor.o\
 diagnostic.o
 
 COM_OUTPUT=libxcom.a

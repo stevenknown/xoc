@@ -223,8 +223,11 @@ IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
 //To find the killing-def, the function prefer use SSA info.
 IR * findUniqueMustDef(IR const* use, Region const* rg);
 
+//The function will be looking for the correct DEF for each exp of 'root' in
+//SSA mode. And the classic DU chain does NOT need to find the live-in DEF.
+//And the looking process will start from 'startir'.
 //Note DOM info must be available.
-//exp: the expression that expected to set livein.
+//root: the IR expression tree root that expected to set livein.
 //startir: the start position in 'startbb', it can be NULL.
 //         If it is NULL, the function first finding the Phi list of
 //         'startbb', then keep finding its predecessors until meet CFG entry.
@@ -337,6 +340,8 @@ bool isDependent(IR const* ir, MDPhi const* phi);
 //                 element in MayDef/MayUse, which will iterate elements
 //                 in MDSet, and is costly.
 //li: loop info.
+//NOTE: Before invoking the function, user should rule out cases that ir1
+//and ir2 are independent.
 bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
                        LI<IRBB> const* li, Region const* rg, GVN const* gvn);
 

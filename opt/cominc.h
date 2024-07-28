@@ -36,7 +36,6 @@ author: Su Zhenyu
 #include "commoninc.h"
 #include "literal.h"
 #include "region_deps.h"
-#include "ir_refine.h"
 #include "ir_simp.h"
 #include "ir_high_opt.h"
 #include "ir_middle_opt.h"
@@ -56,6 +55,7 @@ author: Su Zhenyu
 #include "du_helper.h"
 #include "debug_util.h" //only for compiler internal debugging.
 #include "gscc.h"
+#include "dwarf.h"
 
 using namespace xoc;
 #endif

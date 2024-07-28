@@ -133,6 +133,7 @@ protected:
     void getLinearRepOfIV(LFAnaCtx const& ctx, IR const* lf_exp,
                           IV const** iv, IR const** coeff);
     OptCtx * getOptCtx() const { return m_oc; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Insert PHI at head BB of loop for given reduction operation.
     //init: initial value stmt.

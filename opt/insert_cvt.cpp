@@ -734,6 +734,7 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
     case IR_ARRAY:
     case IR_RETURN:
     case IR_SELECT: {
+        ASSERT0(parent && kid);
         Type const* tgt_ty = parent->getType();
         if (tgt_ty->is_any() || kid->getType()->is_any()) {
             //Nothing need to do if converting to ANY.

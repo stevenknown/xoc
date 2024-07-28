@@ -41,17 +41,16 @@ namespace xoc {
 //Note that this function does NOT free ir's kids and siblings.
 void Region::freeIR(IR * ir)
 {
-    ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
+    ASSERTN(ir && !ir->is_undef(), ("ir has been freed"));
+    ASSERTN(ir->is_single(), ("chain list should be cut off"));
     if (getDUMgr() != nullptr) {
         ir->freeDUset(getDUMgr());
     }
-
     AIContainer * res_ai = IR_ai(ir);
     if (res_ai != nullptr) {
         //AICont will be reinitialized till next setting.
         res_ai->destroy();
     }
-
     DU * du = ir->cleanDU();
     if (du != nullptr) {
         DU_md(du) = nullptr;
@@ -68,15 +67,16 @@ void Region::freeIR(IR * ir)
 //Free ir and all its kids, except its sibling node.
 //We can only utilizing the function to free the
 //IR which allocated by 'allocIR'.
-void Region::freeIRTree(IR * ir)
+void Region::freeIRTree(IR * ir, bool is_check_undef)
 {
     if (ir == nullptr) { return; }
+    if (!is_check_undef && ir->is_undef()) { return; }
     ASSERTN(!ir->is_undef(), ("ir has been freed"));
     ASSERTN(ir->is_single(), ("chain list should be cut off"));
-    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid != nullptr) {
-            freeIRTreeList(kid);
+            freeIRTreeList(kid, is_check_undef);
         }
     }
     freeIR(ir);
@@ -84,9 +84,9 @@ void Region::freeIRTree(IR * ir)
 
 
 //Free ir, and all its kids.
-//We can only utilizing the function to free
-//the IR which allocated by 'allocIR'.
-void Region::freeIRTreeList(IRList & irs)
+//We can only utilizing the function to free the IR which allocated
+//by 'allocIR'.
+void Region::freeIRTreeList(IRList & irs, bool is_check_undef)
 {
     IRListIter next;
     IRListIter ct;
@@ -96,7 +96,7 @@ void Region::freeIRTreeList(IRList & irs)
         ASSERTN(ir->is_single(),
                 ("do not allow sibling node, need to simplify"));
         irs.remove(ir);
-        freeIRTree(ir);
+        freeIRTree(ir, is_check_undef);
     }
 }
 
@@ -106,14 +106,14 @@ void Region::freeIRTreeList(IRList & irs)
 //which allocated by 'allocIR'.
 //NOTICE: If ir's sibling is not nullptr, that means the IR is
 //a high level type. IRBB consists of only middle/low level IR.
-void Region::freeIRTreeList(IR * ir)
+void Region::freeIRTreeList(IR * ir, bool is_check_undef)
 {
     if (ir == nullptr) { return; }
     IR * head = ir, * next = nullptr;
     while (ir != nullptr) {
         next = ir->get_next();
         xcom::remove(&head, ir);
-        freeIRTree(ir);
+        freeIRTree(ir, is_check_undef);
         ir = next;
     }
 }

@@ -37,7 +37,17 @@ namespace xoc {
 //
 void TargInfoMgr::init()
 {
-    m_link = REG_RETURN_ADDRESS_REGISTER;
+    m_link = getRA();
+    initCalleeScalar();
+    initCalleeVector();
+    initCallerScalar();
+    initCallerVector();
+    initParamScalar();
+    initParamVector();
+    initRetvalScalar();
+    initRetvalVector();
+    initAllocableScalar();
+    initAllocableVector();
 }
 
 
@@ -49,65 +59,70 @@ void TargInfoMgr::destroy()
 void TargInfoMgr::reset()
 {
     destroy();
-    init();
 }
 
 
-RegSet const* TargInfoMgr::getAllocable() const
+RegSet const* TargInfoMgr::getAllocableScalarRegSet() const
 {
     return xgen::tmGetRegSetAllocable();
 }
 
 
-RegSet const* TargInfoMgr::getReturnValue() const
+UINT const TargInfoMgr::getNumOfRegister() const
+{
+    return xgen::tmGetRegNum();
+}
+
+
+RegSet const* TargInfoMgr::getRetvalScalarRegSet() const
 {
     return xgen::tmGetRegSetOfReturnValue();
 }
 
 
-RegSet const* TargInfoMgr::getParam() const
+RegSet const* TargInfoMgr::getParamScalarRegSet() const
 {
     return xgen::tmGetRegSetOfArgument();
 }
 
 
-RegSet const* TargInfoMgr::getCaller() const
+RegSet const* TargInfoMgr::getCallerScalarRegSet() const
 {
     return xgen::tmGetRegSetOfCallerSaved();
 }
 
 
-RegSet const* TargInfoMgr::getCallee() const
+RegSet const* TargInfoMgr::getCalleeScalarRegSet() const
 {
     return xgen::tmGetRegSetOfCalleeSaved();
 }
 
 
-RegSet const* TargInfoMgr::getVectorAllocable() const
+RegSet const* TargInfoMgr::getAllocableVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetAllocable();
 }
 
 
-RegSet const* TargInfoMgr::getVectorReturnValue() const
+RegSet const* TargInfoMgr::getRetvalVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetOfReturnValue();
 }
 
 
-RegSet const* TargInfoMgr::getVectorParam() const
+RegSet const* TargInfoMgr::getParamVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetOfArgument();
 }
 
 
-RegSet const* TargInfoMgr::getVectorCaller() const
+RegSet const* TargInfoMgr::getCallerVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetOfCallerSaved();
 }
 
 
-RegSet const* TargInfoMgr::getVectorCallee() const
+RegSet const* TargInfoMgr::getCalleeVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetOfCalleeSaved();
 }
@@ -119,32 +134,32 @@ void TargInfoMgr::dump(Region const* rg) const
     TargInfoMgr * pthis = const_cast<TargInfoMgr*>(this);
     rg->getLogMgr()->incIndent(2);
     xcom::StrBuf buf(32);
-    if (pthis->getAllocable() != nullptr) {
-        pthis->getAllocable()->dump(buf);
+    if (pthis->getAllocableScalarRegSet() != nullptr) {
+        pthis->getAllocableScalarRegSet()->dump(buf);
     }
     note(rg, "\nALLOCABLE:%s", buf.buf);
 
     buf.clean();
-    if (pthis->getCaller() != nullptr) {
-        pthis->getCaller()->dump(buf);
+    if (pthis->getCallerScalarRegSet() != nullptr) {
+        pthis->getCallerScalarRegSet()->dump(buf);
     }
     note(rg, "\nCALLER:%s", buf.buf);
 
     buf.clean();
-    if (pthis->getCallee() != nullptr) {
-        pthis->getCallee()->dump(buf);
+    if (pthis->getCalleeScalarRegSet() != nullptr) {
+        pthis->getCalleeScalarRegSet()->dump(buf);
     }
     note(rg, "\nCALLEE:%s", buf.buf);
 
     buf.clean();
-    if (pthis->getParam() != nullptr) {
-        pthis->getParam()->dump(buf);
+    if (pthis->getParamScalarRegSet() != nullptr) {
+        pthis->getParamScalarRegSet()->dump(buf);
     }
     note(rg, "\nPARAM:%s", buf.buf);
 
     buf.clean();
-    if (pthis->getReturnValue() != nullptr) {
-        pthis->getReturnValue()->dump(buf);
+    if (pthis->getRetvalScalarRegSet() != nullptr) {
+        pthis->getRetvalScalarRegSet()->dump(buf);
     }
     note(rg, "\nRETURN_VALUE:%s", buf.buf);
 

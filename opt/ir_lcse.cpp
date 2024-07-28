@@ -335,7 +335,7 @@ bool LCSE::processRHS(IN IRBB * bb, IN IR * ir,
     ASSERT0(ir->hasRHS());
     bool change = false;
     IR * rhs = ir->getRHS();
-    if (!canBeCandidate(rhs)) {
+    if (rhs == nullptr || !canBeCandidate(rhs)) {
         return false;
     }
     ExprRep * ie = m_expr_tab->mapIR2ExprRep(rhs);

@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class Region;
+class ActMgr;
 
 //Refining context variable.
 //Set the following options true or false to enable or disable the refinement.
@@ -49,6 +50,7 @@ class Region;
 #define RC_maintain_du(r) ((r).u1.s1.maintain_du)
 #define RC_optctx(r) ((r).m_oc)
 class RefineCtx {
+    //The class allows copy-constructor.
 public:
     typedef UINT BitUnion;
     union {
@@ -87,6 +89,7 @@ public:
         BitUnion i1;
     } u1;
     OptCtx * m_oc; //some operations may change flags in OptCtx.
+    ActMgr * m_act_mgr;
 public:
     RefineCtx(OptCtx * oc)
     {
@@ -98,14 +101,20 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = true;
         m_oc = oc;
+        m_act_mgr = nullptr;
     }
+    ~RefineCtx() { m_act_mgr = nullptr; }
     RefineCtx const& operator = (RefineCtx const&);
 
     //Clean the actions which propagated bottom up during refinement.
     void cleanBottomUpFlag() { RC_stmt_removed(*this) = false; }
 
+    void dump() const;
+
     //Return the OptCtx.
     OptCtx * getOptCtx() const { return RC_optctx(*this); }
+    Region * getRegion() const { return getOptCtx()->getRegion(); }
+    ActMgr * getActMgr() const { return m_act_mgr; }
 
     bool fold_const() const { return RC_do_fold_const(*this); }
 
@@ -125,6 +134,8 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
+    void setActMgr(ActMgr * am) { m_act_mgr = am; }
+
     //Return true if refinement need to maintain DefUse chain.
     bool maintainDU() const { return RC_maintain_du(*this); }
 };
@@ -146,12 +157,24 @@ protected:
 
     //The function prefer to compute ir's const value by float point type.
     IR * foldConstFloatBinary(IR * ir, bool & change);
+    IR * foldConstFloatBinaryForPow(IR * ir, bool & change);
 
     //The function prefer to compute ir's const value by integer point type.
     IR * foldConstIntUnary(IR * ir, bool & change);
+    IR * foldConstAllKids(IR * ir, bool & change, RefineCtx & rc);
 
     //The function prefer to compute ir's const value by integer point type.
-    IR * foldConstIntBinary(IR * ir, bool & change);
+    IR * foldConstIntBinary(IR * ir, bool & change, RefineCtx & rc);
+    IR * foldConstCompareAndShift(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * foldConstExtExp(IR * ir, bool & change, RefineCtx & rc)
+    {
+        //Target Dependent Code.
+        return ir;
+    }
+    virtual IR * foldConstUnary(IR * ir, bool & change, RefineCtx &);
+    virtual IR * foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc);
+
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Peephole optimizations.
     IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
@@ -180,14 +203,14 @@ protected:
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
     IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineBranch(IR * ir);
+    IR * refineBranch(IR * ir, bool & change);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAsr(IR * ir, bool & change);
     IR * refineLsl(IR * ir, bool & change);
     IR * refineLsr(IR * ir, bool & change);
-    IR * refineComparisonAndLogic(IR * ir, bool & change, RefineCtx const& rc);
+    virtual IR * refineTrigonometric(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);
@@ -200,6 +223,10 @@ protected:
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIgoto(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIf(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineDoLoop(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineNormalLoop(IR * ir, bool & change, RefineCtx & rc);
     bool refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc);
 
     //The function only iteratively perform refinement for kids of given ir.
@@ -207,7 +234,19 @@ protected:
     IR * refineAllKids(IR * ir, bool & change, RefineCtx & rc);
     IR * reassociationCase1(IR * ir, bool & change);
     IR * reassociation(IR * ir, bool & change);
-    virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineCompare(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc)
+    {
+        switch (ir->getCode()) {
+        SWITCH_CASE_EXT_STMT:
+        SWITCH_CASE_EXT_EXP:
+            //Target Dependent Code.
+            return ir;
+        default: UNREACHABLE();
+        }
+        return nullptr;
+    }
+    IR * refineIRImpl(IR * ir, bool & change, MOD RefineCtx & rc);
 
     IR * StrengthReduce(MOD IR * ir, MOD bool & change, RefineCtx & rc);
 
@@ -232,7 +271,7 @@ public:
 
     //Perform const-folding.
     //Return updated ir if optimization performed.
-    IR * foldConst(IR * ir, bool & change, RefineCtx const& rc);
+    IR * foldConst(IR * ir, bool & change, RefineCtx & rc);
 
     virtual CHAR const* getPassName() const { return "IR Refinement"; }
     virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
@@ -248,7 +287,7 @@ public:
 
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.
-    IR * refineIRlist(IR * ir_list, bool & change, MOD RefineCtx & rc);
+    IR * refineIRList(IR * ir_list, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to ir.
     //Return updated ir if optimization performed.
@@ -268,7 +307,7 @@ public:
     virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
 
     bool perform(OptCtx & oc, MOD RefineCtx & rc);
-    virtual bool perform(OptCtx & oc);
+    virtual bool perform(OptCtx & oc) override;
 };
 
 } //namespace xoc

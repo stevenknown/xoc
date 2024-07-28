@@ -136,6 +136,7 @@ protected:
     PRSSAMgr * m_prssamgr;
     OptCtx * m_oc;
     EffectMDDef m_is_mddef_effect;
+    ActMgr m_act_mgr;
 protected:
     //Return true if ir is effect.
     bool checkEffectStmt(IR const* ir);
@@ -167,6 +168,7 @@ protected:
     bool find_effect_kid_uncondbr(IR const* ir, MOD DCECtx & dcectx) const;
     bool find_effect_kid(IR const* ir, MOD DCECtx & dcectx) const;
 
+    bool initSSAMgr(OptCtx const& oc);
     bool is_effect_write(Var * v) const
     { return v->is_global() || v->is_volatile(); }
     bool is_effect_read(Var * v) const { return v->is_volatile(); }
@@ -200,7 +202,7 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    explicit DeadCodeElim(Region * rg) : Pass(rg)
+    explicit DeadCodeElim(Region * rg) : Pass(rg), m_act_mgr(rg)
     {
         ASSERT0(rg != nullptr);
         m_tm = rg->getTypeMgr();
@@ -224,8 +226,10 @@ public:
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
-    bool dump(DCECtx const& dcectx) const;
+    void dump(DCECtx const& dcectx) const;
+    void dumpBBListAndDU() const;
 
+    ActMgr & getActMgr() { return m_act_mgr; }
     OptCtx * getOptCtx() const { return m_oc; }
     IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const

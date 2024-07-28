@@ -101,6 +101,16 @@ void TensorType::setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr)
 }
 
 
+bool TensorType::is_homo(TensorType const& src) const
+{
+    if (getDim() != src.getDim()) { return false; }
+    for (UINT i = 0; i < getDim(); i++) {
+        if (getDegreeOfDim(i) != src.getDegreeOfDim(i)) { return false; }
+    }
+    return true;
+}
+
+
 void TensorType::copy(TensorType const& src, TypeMgr * mgr)
 {
     Type::copy(src);

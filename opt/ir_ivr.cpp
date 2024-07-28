@@ -44,7 +44,7 @@ class FindUniqueIVRef : public VisitIRTree {
     IV const* m_iv;
     LI<IRBB> const* m_li;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         IV const* iv = nullptr;
         if (!m_ivr->isIV(m_li, ir, &iv)) { return true; }
@@ -79,7 +79,7 @@ class CoeffIsInv : public VisitIRTree {
     LI<IRBB> const* m_li;
     InvStmtList const* m_invstmtlst;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         if (ir == m_ivref || !ir->isMemRef()) { return true; }
         if (!xoc::isLoopInvariant(ir, m_li, m_rg, m_invstmtlst, false)) {
@@ -501,7 +501,8 @@ bool FindBIVByChainRec::computeCR(IR const* ivocc, IR const* ir,
         }
         ti.setRedStmt(def);
     }
-    if (!def->hasRHS()) {
+    if (!def->hasRHS() || def->getRHS() == nullptr) {
+        //Virtual OP may not have RHS.
         //Unknown DefUse path.
         return false;
     }
@@ -697,10 +698,22 @@ protected:
     //linrep: record and output linear-representation if exist.
     bool isLinearRepOfMD(LI<IRBB> const* li, IR const* ir,
                          MD const* selfmd, OUT IVLinearRep * linrep) const;
+
+    //Return true if ir indicates a memory reference that corresponds to
+    //one of operands of 'phi', whereas ir is located in the BB which is
+    //predecessor of BB of phi.
     bool isRelateToMDPhiOpnd(IR const* ir, MDPhi const* phi) const;
+
+    //Return true if ir indicates a memory reference that corresponds to
+    //one of operands of 'phi', whereas ir is located in the BB which is
+    //predecessor of BB of phi.
     bool isRelateToPhiOpnd(IR const* ir, IR const* phi) const;
+
+    //Return true if ir is reduction OP in MDSSA mode.
     bool isReductionOpByMDSSA(IR const* ir, LI<IRBB> const* li,
                               OUT IVLinearRep * lr) const;
+
+    //Return true if ir is reduction OP in PRSSA mode.
     bool isReductionOpByPRSSA(IR const* ir, LI<IRBB> const* li,
                               OUT IVLinearRep * lr) const;
 
@@ -869,7 +882,9 @@ bool FindBIVByRedOp::isReductionOpByMDSSA(IR const* ir, LI<IRBB> const* li,
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(useMDSSADU());
     IR const* rhs = ir->getRHS();
+    if (rhs == nullptr) { return false; }
     if (!m_ivr->isReductionOpCode(rhs->getCode())) { return false; }
+    ASSERTN(rhs->isBinaryOp(), ("TODO"));
     IR const* op0 = BIN_opnd0(rhs);
     IR const* op1 = BIN_opnd1(rhs);
     IRBB const* head = li->getLoopHead();
@@ -1042,6 +1057,7 @@ bool FindBIVByRedOp::isReductionOpByPRSSA(IR const* ir, LI<IRBB> const* li,
     ASSERT0(ir->is_stpr());
     ASSERT0(usePRSSADU());
     IR const* rhs = ir->getRHS();
+    if (rhs == nullptr) { return false; }
     if (!m_ivr->isReductionOpCode(rhs->getCode())) { return false; }
     IR const* op0 = BIN_opnd0(rhs);
     IR const* op1 = BIN_opnd1(rhs);
@@ -1088,7 +1104,10 @@ bool FindBIVByRedOp::isReductionOp(IR const* ir, LI<IRBB> const* li,
     }
 
     //Extract linear-representation of variable.
-    ASSERT0(ir->getRHS());
+    if (ir->getRHS() == nullptr) {
+        //Virtual OP may not have RHS.
+        return false;
+    }
     IVLinearRep linrep;
     if (ir->isPROp() && usePRSSADU()) {
         //Prefer judgement by SSA info.
@@ -1243,7 +1262,7 @@ public:
 
 bool FindDIV::findByCRRecur(IR const* ir, OUT ChainRec & cr)
 {
-    ASSERT0(ir->is_exp());
+    ASSERT0(ir && ir->is_exp());
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_EXP:
     SWITCH_CASE_INDIRECT_MEM_EXP:
@@ -1267,7 +1286,10 @@ bool FindDIV::findByCRRecur(IR const* ir, OUT ChainRec & cr)
             }
             return false;
         }
-        ASSERT0(def->getRHS());
+        if (def->getRHS() == nullptr) {
+            //Virtual OP may not have RHS.
+            return false;
+        }
         return findByCRRecur(def->getRHS(), cr);
     }
     case IR_ADD:
@@ -1301,6 +1323,7 @@ bool FindDIV::findByCRRecur(IR const* ir, OUT ChainRec & cr)
 
 bool FindDIV::findByCR(IR const* ir)
 {
+    ASSERT0(ir);
     ChainRec cr;
     xcom::StrBuf tmp(8);
     if (!findByCRRecur(ir, cr)) {
@@ -1344,7 +1367,7 @@ void FindDIV::computeCRByLinRep(IVLinearRep const& lr, OUT ChainRec & rescr,
 
 bool FindDIV::findByLinRep(IR const* ir)
 {
-    ASSERT0(ir->is_exp());
+    ASSERT0(ir && ir->is_exp());
     IVLinearRep lr;
     xcom::StrBuf tmp(8);
     if (!m_ivr->isLinearRepOfIV(m_li, ir, &lr)) {
@@ -1381,12 +1404,13 @@ void FindDIV::findByStmt(IR * ir, ComputeMD2DefCnt const& md2defcnt,
                 dumpIRName(ir, tmp), m_li->id());
             return;
         }
-        if (findByLinRep(ir->getRHS())) {
+        IR * rhs = ir->getRHS();
+        if (rhs == nullptr) {
+            //Virtual OP may not have RHS.
             return;
         }
-        if (findByCR(ir->getRHS())) {
-            return;
-        }
+        if (findByLinRep(rhs)) { return; }
+        if (findByCR(rhs)) { return; }
         return;
     }
     default:;
@@ -1522,7 +1546,8 @@ void BIV::dump(Region const* rg) const
     note(rg, "\nREDUCTION-STMT:");
     ASSERT0(iv->getRedStmt());
     rg->getLogMgr()->incIndent(2);
-    dumpIR(iv->getRedStmt(), rg, nullptr, IR_DUMP_KID);
+    xoc::dumpIR(iv->getRedStmt(), rg, nullptr,
+                DumpFlag::combineIRID(IR_DUMP_KID));
     rg->getLogMgr()->decIndent(2);
 
     //Dump BIV's occ-exp.
@@ -1531,7 +1556,8 @@ void BIV::dump(Region const* rg) const
     //ASSERT0(iv->getRedExp());
     if (iv->getRedExp() != nullptr) {
         rg->getLogMgr()->incIndent(2);
-        dumpIR(iv->getRedExp(), rg, nullptr, IR_DUMP_KID);
+        xoc::dumpIR(iv->getRedExp(), rg, nullptr,
+                    DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(2);
     } else {
         prt(rg, "--");
@@ -1541,7 +1567,8 @@ void BIV::dump(Region const* rg) const
     if (iv->getInitStmt() != nullptr) {
         note(rg, "\nINIT-STMT:");
         rg->getLogMgr()->incIndent(2);
-        dumpIR(iv->getInitStmt(), rg, nullptr, IR_DUMP_KID);
+        xoc::dumpIR(iv->getInitStmt(), rg, nullptr,
+                    DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(2);
     }
     rg->getLogMgr()->decIndent(2);
@@ -1580,7 +1607,8 @@ void DIV::dump(Region const* rg) const
 
     note(rg, "\nREDUCTION-STMT:");
     rg->getLogMgr()->incIndent(2);
-    dumpIR(iv->getRedStmt(), rg, nullptr, IR_DUMP_KID);
+    xoc::dumpIR(iv->getRedStmt(), rg, nullptr,
+                DumpFlag::combineIRID(IR_DUMP_KID));
     rg->getLogMgr()->decIndent(2);
 
     //Dump linear-representation by other BIV or DIV.
@@ -1773,7 +1801,12 @@ bool IVR::computeInitVal(IR const* ir, OUT IVVal & val) const
         v = ir;
     } else if (ir->hasRHS()) {
         v = ir->getRHS();
+        if (v == nullptr) {
+            //Virtual OP may not have RHS.
+            return false;
+        }
     } else { return false; }
+    ASSERT0(v);
     if (v->is_cvt()) {
         v = ((CCvt*)v)->getLeafExp();
     }
@@ -2281,7 +2314,7 @@ bool IVR::computeConstInitValOfBIV(BIV const* biv, OUT HOST_INT & val) const
     if (biv->isInitVar() && useGVN()) {
         ASSERT0(m_gvn);
         IR const* initval = biv->getInitStmt();
-        ASSERT0(initval && initval->hasRHS());
+        ASSERT0(initval && initval->hasRHS() && initval->getRHS());
         VN const* vn = m_gvn->getVN(initval->getRHS());
         if (vn == nullptr) {
             //We know nothing about initial value of IV.

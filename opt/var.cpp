@@ -56,6 +56,7 @@ VarFlagDesc const g_varflag_desc[] = {
     { VAR_IS_DECL, "decl", }, //idx17
     { VAR_IS_REGION, "region", }, //idx18
     { VAR_IS_ENTRY, "entry", }, //idx19
+    { VAR_IS_SECTION, "section", }, //idx20
 };
 static UINT g_varflag_num = sizeof(g_varflag_desc) / sizeof(g_varflag_desc[0]);
 

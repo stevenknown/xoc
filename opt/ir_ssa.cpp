@@ -1033,7 +1033,8 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
         }
         if (detail) {
             //TODO: implement dump_ir_buf();
-            dumpIR(def, m_rg, nullptr, IR_DUMP_KID);
+            dumpIR(def, m_rg, nullptr,
+                   DumpFlag::combineIRID(IR_DUMP_KID));
         }
         fprintf(h, "\"}");
     }
@@ -1479,7 +1480,7 @@ IR * PRSSAMgr::insertPhi(PRNO prno, MOD IRBB * bb, OUT ConstructCtx & cstctx)
 
     //Here each operand and result of phi set to same type.
     //They will be revised to correct type during renaming.
-    IR * phi = m_rg->getIRMgr()->buildPhi(prno, prtype, num_opnd);
+    IR * phi = getIRMgr()->buildPhi(prno, prtype, num_opnd);
     m_rg->getMDMgr()->allocRef(phi);
     for (IR * opnd = PHI_opnd_list(phi);
          opnd != nullptr; opnd = opnd->get_next()) {
@@ -1548,7 +1549,7 @@ void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
         //into serveral isolated parts. Thus there is no livein path from entry
         //to current bb.
         //ASSERTN(col.getOptCtx()->is_dom_valid(), ("invalid dominfo"));
-        IR * newopnd = m_rg->getIRMgr()->buildPR(ir->getType());
+        IR * newopnd = getIRMgr()->buildPR(ir->getType());
         m_rg->getMDMgr()->allocRef(newopnd);
         genInitVersionSSAInfoForExp(newopnd);
         ((CPhi*)ir)->insertOpndAt(pos, newopnd);
@@ -2041,8 +2042,8 @@ void PRSSAMgr::handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset,
         IR * defres = SSA_def(topv)->getResultPR(topv->orgprno());
         ASSERT0(defres);
 
-        IR * new_opnd = m_rg->getIRMgr()->buildPRdedicated(defres->getPrno(),
-                                               defres->getType());
+        IR * new_opnd = getIRMgr()->buildPRdedicated(
+            defres->getPrno(), defres->getType());
         new_opnd->copyRef(defres, m_rg);
         xcom::replace(&PHI_opnd_list(ir), opnd, new_opnd);
         IR_parent(new_opnd) = ir;
@@ -2374,10 +2375,9 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
     xcom::Vertex const* vex = bb->getVex();
     ASSERT0(vex);
     //Temprarory RP to hold the result of PHI.
-    IR * phicopy = m_rg->getIRMgr()->buildPR(phi->getType());
-    phicopy->setMustRef(m_rg->getMDMgr()->genMDForPR(PR_no(phicopy),
-                                                     phicopy->getType()),
-                        m_rg);
+    IR * phicopy = getIRMgr()->buildPR(phi->getType());
+    phicopy->setMustRef(m_rg->getMDMgr()->genMDForPR(
+        PR_no(phicopy), phicopy->getType()), m_rg);
     phicopy->cleanMayRef();
     IR * opnd = PHI_opnd_list(phi);
 
@@ -2399,9 +2399,8 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
         }
 
         //The copy will be inserted into related predecessor.
-        IR * store_to_phicopy = m_rg->getIRMgr()->buildStorePR(PR_no(phicopy),
-                                                   phicopy->getType(),
-                                                   opndcopy);
+        IR * store_to_phicopy = getIRMgr()->buildStorePR(
+            PR_no(phicopy), phicopy->getType(), opndcopy);
         store_to_phicopy->copyRef(phicopy, m_rg);
         insertCopy(m_cfg->getBB(pred), store_to_phicopy);
         //Remove the SSA DU chain between opnd and its DEF stmt.
@@ -2416,7 +2415,7 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
         }
     }
 
-    IR * substitue_phi = m_rg->getIRMgr()->buildStorePR(
+    IR * substitue_phi = getIRMgr()->buildStorePR(
         PHI_prno(phi), phi->getType(), phicopy);
     substitue_phi->copyRef(phi, m_rg);
     BB_irlist(bb).insert_before(substitue_phi, phict);
@@ -2427,6 +2426,10 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
 void PRSSAMgr::removePhiList()
 {
     BBList * bblst = m_rg->getBBList();
+    if (bblst == nullptr) {
+        //Region's BBList has been destroied.
+        return;
+    }
     BBListIter bbit = nullptr;
     for (bblst->get_head(&bbit); bbit != nullptr;
          bbit = bblst->get_next(bbit)) {
@@ -3151,7 +3154,7 @@ void PRSSAMgr::stripSpecificVPR(VPR * vpr)
             ("orgprno does not have VPR and version"));
     ASSERTN(def->getResultPR(orgprno), ("stmt result must be PR%d", orgprno));
     Type const* newprty = def->getResultPR(orgprno)->getType();
-    PRNO newprno = m_rg->getIRMgr()->buildPrno(newprty);
+    PRNO newprno = getIRMgr()->buildPrno(newprty);
     IR * replaced_one = replaceResultPR(def, orgprno, newprno, newprty);
     ASSERT0(replaced_one);
 
@@ -3449,7 +3452,7 @@ static void iterPhiToGenLab(IRBB const* bb, IRCFG const* cfg,
 }
 
 
-bool PRSSAMgr::hasPhiWithAllSameOperand(IRBB const* bb)
+bool PRSSAMgr::hasPhiWithAllSameOperand(IRBB const* bb) const
 {
     BBIRListIter it;
     bool hasphi = false;
@@ -3460,7 +3463,7 @@ bool PRSSAMgr::hasPhiWithAllSameOperand(IRBB const* bb)
         IR const* first_opnd = PHI_opnd_list(ir);
         for (IR const* opnd = first_opnd->get_next();
              opnd != nullptr; opnd = opnd->get_next()) {
-            if (first_opnd->isIREqual(opnd, false)) { continue; }
+            if (first_opnd->isIREqual(opnd, getIRMgr(), false)) { continue; }
             return false;
         }
     }

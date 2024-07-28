@@ -52,7 +52,12 @@ public:
     //is_del: true to delete the file with same name.
     FileObj(CHAR const* filename, bool is_del = false,
             bool is_readonly = false, OUT FO_STATUS * st = nullptr)
-    { init(filename, is_del, is_readonly, st); }
+    {
+        m_file_handler = nullptr;
+        m_is_opened = false;
+        m_file_name = nullptr;
+        init(filename, is_del, is_readonly, st);
+    }
     FileObj(FILE * h);
     FileObj();
     ~FileObj() { destroy(); }

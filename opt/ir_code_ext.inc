@@ -38,4 +38,8 @@ IR_VIST,
 //Represent broadcast operation.
 IR_BROADCAST,
 
+//Placeholder IR code for corresponding SWITCH-CASE entry.
+IR_EXT_UNA_PLACEHOLDER,
+IR_EXT_BIN_PLACEHOLDER,
+
 #include "targ_code_ext.inc"

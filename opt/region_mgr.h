@@ -66,7 +66,8 @@ typedef enum {
 class Region;
 class IPA;
 class TargInfo;
-
+class TargInfoMgr;
+class MCDwarfMgr;
 //
 //START RegionMgr
 //
@@ -83,15 +84,18 @@ protected:
 #ifdef _DEBUG_
     UINT m_num_allocated;
 #endif
-    UINT m_ru_count;
-    UINT m_label_count;
+    UINT m_rg_count; //record the number of region that has been allocated.
+    UINT m_label_count; //record the number of label that has been allocated.
     VarMgr * m_var_mgr;
     VarLabelRelationMgr * m_var_label_relation_mgr;
     MD const* m_str_md;
     MDSystem * m_md_sys;
     TargInfo * m_targinfo;
+    TargInfoMgr * m_targinfo_mgr;
     xcom::SMemPool * m_pool;
     LogMgr * m_logmgr;
+    //For debug the context management of Dwarf.
+    MCDwarfMgr * m_dm;
     Region * m_program;
     RegionTab m_id2rg;
     SymTab m_sym_tab;
@@ -99,7 +103,12 @@ protected:
     xcom::Vector<OptCtx*> m_id2optctx;
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
-    xcom::List<UINT> m_free_ru_id;
+
+    //ID is an important resource that should be recycled.
+    //The region ID will be recycled if a region destroy.
+    //The data structure records the ID of region that can be
+    //reused to assign to a new region.
+    xcom::List<UINT> m_free_rg_id;
 protected:
     void estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
                     bool scan_call, bool scan_inner_region);
@@ -120,11 +129,17 @@ public:
     //Allocate VarMgr.
     virtual VarMgr * allocVarMgr();
 
+    //Allocate DwarfMgr.
+    virtual MCDwarfMgr * allocDwarfMgr();
+
     //Allocate VarLabelRelationMgr.
     virtual VarLabelRelationMgr * allocVarLabelRelationMgr();
 
     //Allocate TargInfo.
     virtual TargInfo * allocTargInfo();
+
+    //Allocate TargInfoMgr.
+    virtual TargInfoMgr * allocTargInfoMgr();
 
     //Allocate IPA module.
     IPA * allocIPA(Region * program);
@@ -164,6 +179,7 @@ public:
     VarLabelRelationMgr * getVarLabelRelationMgr() const
     { return m_var_label_relation_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
+    TargInfoMgr * getTargInfoMgr() const { return m_targinfo_mgr; }
     LogMgr * getLogMgr() const { return m_logmgr; }
     OptCtx * getAndGenOptCtx(Region * rg);
     virtual Region * getProgramRegion() const { return m_program; }
@@ -173,6 +189,9 @@ public:
     //process all regions. Because that will assign smaller MD id to global
     //variable.
     void registerGlobalMD();
+
+    //Initialize the flags of specific IR.
+    virtual void initIRDescFlagSet();
 
     //Initialize VarMgr structure and MD system.
     //It is the first thing you should do after you declared a RegionMgr.
@@ -186,6 +205,16 @@ public:
         m_md_sys = new MDSystem(m_var_mgr);
         ASSERT0(m_md_sys);
     }
+
+    //Initialize DwarfMgr structure
+    //It is the first thing you should do after you declared a RegionMgr.
+    void initDwarfMgr()
+    {
+        ASSERTN(m_dm == nullptr, ("VarMgr already initialized"));
+        m_dm = allocDwarfMgr();
+        ASSERT0(m_dm);
+    }
+
 
     //Initialize VarLabelRelationMgr structure.
     //You should do after you declared a RegionMgr if variable and label need
@@ -207,6 +236,16 @@ public:
         ASSERT0(m_targinfo);
         ASSERT0(verifyPreDefinedInfo());
     }
+
+    //Initialize TargInfoMgr.
+    void initTargInfoMgr()
+    {
+        ASSERTN(m_targinfo_mgr == nullptr,
+                ("TargInfoMgr already initialized"));
+        m_targinfo_mgr = allocTargInfoMgr();
+        ASSERT0(m_targinfo_mgr);
+    }
+
     bool isLogMgrInit() const
     { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }
 
@@ -222,15 +261,6 @@ public:
     { return m_is_regard_str_as_same_md; }
 
     Region * newRegion(REGION_TYPE rt);
-
-    //Note m_targinfo will be destructed when RegionMgr is destructed.
-    //m_targinfo should be set to nullptr if given TargInfo object is not
-    //allocated by allocTargInfo() of current RegionMgr.
-    void setTargInfo(TargInfo * ti)
-    {
-        ASSERTN(m_targinfo == nullptr, ("TargInfo has already been set"));
-        m_targinfo = ti;
-    }
 
     //Process region in the form of function type.
     virtual bool processFuncRegion(IN Region * func, OptCtx * oc);
@@ -253,6 +283,8 @@ public:
     { m_is_regard_str_as_same_md = doit; }
 
     bool verifyPreDefinedInfo();
+
+    xoc::MCDwarfMgr * getDwarfMgr() { return m_dm; }
 };
 //END RegionMgr
 

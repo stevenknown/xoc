@@ -39,57 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-static inline PR2Info * getPrStateInHolder(BB2PRHolder const* h, BBID bbid)
-{
-    return h->get(bbid);
-}
-
-
-//Check the equilvalent of content pointed by two PRInfo pointers.
-static bool isEqual(PRInfo const* pr_info1, PRInfo const* pr_info2)
-{
-    ASSERT0(pr_info1 && pr_info2);
-    return pr_info1->getState() == pr_info2->getState();
-}
-
-
-//Check the equilvalent of content pointed by two PR2Info pointers.
-static bool isEqual(PR2Info const* s1, PR2Info const* s2)
-{
-    ASSERT0(s1 && s2);
-    if (s1->get_elem_count() != s2->get_elem_count()) { return false; }
-
-    PR2InfoIter it;
-    PRInfo * pr_info2 = nullptr;
-    for (PRNO prno = s2->get_first(it, &pr_info2); !it.end();
-         prno = s2->get_next(it, &pr_info2)) {
-        bool find = false;
-        PRInfo * pr_info1 = s1->get(prno, &find);
-        if (!find) { return false; }
-        if (!isEqual(pr_info1, pr_info2)) { return false; }
-    }
-    return true;
-}
-
-
-//Check the equilvalent of content pointed by two BB2PRHolder pointers.
-static bool isEqual(BB2PRHolder const* h1, BB2PRHolder const* h2)
-{
-    ASSERT0(h1 && h2);
-    if (h1->get_elem_count() != h2->get_elem_count()) { return false; }
-
-    BB2PRHolderIter it;
-    PR2Info * state2 = nullptr;
-    for (BBID bbid = h2->get_first(it, &state2); !it.end();
-         bbid = h2->get_next(it, &state2)) {
-        PR2Info * state1 = getPrStateInHolder(h1, bbid);
-        if (state1 == nullptr) { return false; }
-        if (!isEqual(state1, state2)) { return false; }
-    }
-    return true;
-}
-
-
 static void dumpFakeUse(LinearScanRA * lsra, IR const* fake_ir,
                         IR const* marker, PRNO prno,
                         UINT bbid, bool head, CHAR const* context)
@@ -294,6 +243,7 @@ protected:
 
     bool processAttrLTNoTerminatedAfter(BBPos const& pos, PosAttr const* attr);
     bool processAttrLTShrinkedBefore(BBPos const& pos, PosAttr const* attr);
+    bool processAttrLTExtendBBEnd(BBPos const& pos, PosAttr const* attr);
 
     //Record the position info for attribute POS_ATTR_LT_SHRINK_BEFORE.
     void recordPosInfo(OUT PRNO2Pos & prno2pos, PRNO prno, Pos pos,
@@ -470,6 +420,7 @@ bool PosAttrLifeTimeProc::processAttr(BBPos const& pos, PosAttr const* attr)
     ASSERT0(attr);
     if (!processAttrLTNoTerminatedAfter(pos, attr)) { return false; }
     if (!processAttrLTShrinkedBefore(pos, attr)) { return false; }
+    if (!processAttrLTExtendBBEnd(pos, attr)) { return false; }
     return true;
 }
 
@@ -478,7 +429,8 @@ bool PosAttrLifeTimeProc::checkRelatedAttrs(PosAttr const* attr) const
 {
     ASSERT0(attr);
     return attr->have(POS_ATTR_LT_NO_TERM_AFTER) ||
-        attr->have(POS_ATTR_LT_SHRINK_BEFORE);
+        attr->have(POS_ATTR_LT_SHRINK_BEFORE) ||
+        attr->have(POS_ATTR_LT_EXTEND_BB_END);
 }
 
 
@@ -586,11 +538,12 @@ bool PosAttrLifeTimeProc::processAttrLTShrinkedBefore(BBPos const& pos,
     //    |                    u         u        u            d             u
     if (attr->getSequence() != BB_SEQ_FIRST) { return true; }
 
-    //Terminated the current lifetime before the BBPos through the steps below:
-    // 1. Find the accurate start pos of BB from lifetime manager.
-    // 2. Get the first live range in the lifetime, the lifetime is extend from
-    //    the entry of function due to the fake-use PR.
-    // 3. Update the start of the live range as the accurate occurence position.
+    //Terminate the current lifetime before the BBPos through the steps below:
+    // 1. Find the accurate position of BB entry from lifetime manager.
+    // 2. Get the first live range in the lifetime, the lifetime is extended
+    //    from the entry of function due to the fake-use PR.
+    // 3. Update the start of the live range to the position of BB entry.
+    //
     // e.g:
     //   lifetime original: <2-17><34-67>
     //               bb_start_pos = 16
@@ -602,22 +555,46 @@ bool PosAttrLifeTimeProc::processAttrLTShrinkedBefore(BBPos const& pos,
     //                     |
     //                   occ_pos = 17
     //
-    //   lifetime modified: <17><34-67>
-    //    |                -                ----------------------------------
+    //   lifetime modified: <16-17><34-67>
+    //    |               --                ----------------------------------
     //    |                u                d      u           u             u
     LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
     Pos cur_bb_entry_pos = m_lsra->getLTMgr().getBBStartPos(bb->id());
     Range r = lt->getFirstRange();
-    OccListIter it;
-    bool succ = lt->findOccAfter(cur_bb_entry_pos, it);
-    ASSERT0(succ);
-    Pos occ_pos = it->val().pos();
 
-    //Terminated the current life range from the current occurence.
+    //Shrink the current live range to the position of BB entry.
     if (r.is_contain(cur_bb_entry_pos)) {
-        RG_start(r) = occ_pos;
+        RG_start(r) = cur_bb_entry_pos;
         lt->setRange(0, r);
     }
+    return true;
+}
+
+
+bool PosAttrLifeTimeProc::processAttrLTExtendBBEnd(BBPos const& pos,
+                                                   PosAttr const* attr)
+{
+    ASSERT0(attr);
+    if (!attr->have(POS_ATTR_LT_EXTEND_BB_END)) { return true; }
+    IR * tmp_ir = const_cast<IR*>(attr->getIR());
+    IRBB const* bb = attr->getBB();
+    ASSERT0(bb && BBPOS_bbid(pos) == bb->id());
+
+    //Normally this position should be at the tail of BB.
+    ASSERT0(BBPOS_flag(pos) == INSERT_MODE_TAIL);
+
+    //Extend the last live range to the end of BB by following steps:
+    //1. Get the last live range.
+    //2. If the end position of last range is after the BB end, then do nothing.
+    //3. Update the the end position of last range to the BB end position.
+    Pos bb_end_pos = m_lsra->getLTMgr().getBBEndPos(bb->id());
+    IR * rhs = tmp_ir->getRHS();
+    ASSERT0(rhs && rhs->is_pr() && (rhs->getPrno() == BBPOS_prno(pos)));
+    LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
+    Range r = lt->getLastRange();
+    if (RG_end(r) >= bb_end_pos) { return true; }
+    RG_end(r) = bb_end_pos;
+    lt->setLastRange(r);
     return true;
 }
 //END PosAttrLifeTimeProc
@@ -631,11 +608,10 @@ class OccRecorder : public VisitIRTree {
     BackwardJumpAnalysis * m_ana;
     Pos m_pos;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         if (ir->is_pr() || (ir->is_stpr())) {
-            if (!m_ana->isPrInRelatedLiveSet(ir->getPrno())) { return true; }
-            m_ana->recordOccurenceForPr(ir->getPrno(), m_pos);
+            m_ana->recordOccurenceForPR(ir->getPrno(), m_pos);
         }
         return true;
     }
@@ -761,7 +737,6 @@ void BackwardJumpAnalysis::reset()
 
 void BackwardJumpAnalysis::init()
 {
-    m_pr_live_set_list.init();
     m_pos2attr->init();
     m_prno2occ.init();
     m_backward_edges.init();
@@ -773,11 +748,9 @@ void BackwardJumpAnalysis::init()
 
 void BackwardJumpAnalysis::destroy()
 {
-    m_pr_live_set_list.destroy();
     m_pos2attr->destroy();
     m_backward_edges.destroy();
     m_prno2occ.clean();
-    m_bb_topoid.clean();
     m_bb_entry_pos.clean();
     m_bb_exit_pos.clean();
     if (m_resource_mgr != nullptr) {
@@ -787,7 +760,7 @@ void BackwardJumpAnalysis::destroy()
 }
 
 
-void BackwardJumpAnalysis::recordOccurenceForPr(PRNO prno, Pos pos)
+void BackwardJumpAnalysis::recordOccurenceForPR(PRNO prno, Pos pos)
 {
     //The occurence information of each prno contains the first position
     //and the last position only in the IRBB List. The last position need to be
@@ -816,28 +789,6 @@ void BackwardJumpAnalysis::recordOccurenceForPr(PRNO prno, Pos pos)
 }
 
 
-void BackwardJumpAnalysis::addToPRLiveSetList(UINT src_bbid, UINT dst_bbid)
-{
-    PRLiveSet const* live_out = m_live_mgr->get_liveout(src_bbid);
-    PRLiveSet const* live_in = m_live_mgr->get_livein(dst_bbid);
-    ASSERT0(live_out && live_in);
-
-    m_pr_live_set_list.append_tail(live_out);
-    m_pr_live_set_list.append_tail(live_in);
-}
-
-
-bool BackwardJumpAnalysis::isPrInRelatedLiveSet(PRNO pr)
-{
-    ASSERT0(pr != PRNO_UNDEF);
-    for (PRLiveSet const* set = m_pr_live_set_list.get_head(); set != nullptr;
-         set = m_pr_live_set_list.get_next()) {
-        if (set->is_contain(pr)) { return true; }
-    }
-    return false;
-}
-
-
 void BackwardJumpAnalysis::collectBackwardJumps()
 {
     BBListIter bbit;
@@ -846,22 +797,9 @@ void BackwardJumpAnalysis::collectBackwardJumps()
         AdjVertexIter ito;
         for (Vertex const* o = Graph::get_first_out_vertex(bb->getVex(), ito);
              o != nullptr; o = Graph::get_next_out_vertex(ito)) {
-            if (!isBackwardJump(bb->id(), o->id())) { continue; }
+            if (!m_lsra->isBackwardJump(bb->id(), o->id())) { continue; }
             addBackwardJump(bb, m_rg->getBB(o->id()));
-            addToPRLiveSetList(bb->id(), o->id());
         }
-    }
-}
-
-
-void BackwardJumpAnalysis::assignTopoIdForBB()
-{
-    //Iterate BB list.
-    BBListIter bbit;
-    TOPOID id = 0;
-    for (IRBB * bb = m_bb_list->get_head(&bbit); bb != nullptr;
-         bb = m_bb_list->get_next(&bbit)) {
-        m_bb_topoid.set(bb->id(), id++);
     }
 }
 
@@ -896,39 +834,36 @@ void BackwardJumpAnalysis::generateOccurence()
 
 bool BackwardJumpAnalysis::analyze()
 {
-    START_TIMER_FMT(t, ("DUMP %s", "backward jump analysis"));
+    START_TIMER_FMT(t, ("Backward Jump Analysis"));
     m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
     m_bb_list = m_rg->getBBList();
     if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
-        END_TIMER_FMT(t, ("DUMP %s", "backward jump analysis"));
+        END_TIMER_FMT(t, ("Backward Jump Analysis"));
         return true;
     }
 
-    //Step1: Assign each BB a topologic sequence ID.
-    assignTopoIdForBB();
-
-    //Step2: Collect the backward jump info in the CFG.
+    //Step1: Collect the backward jump info in the CFG.
     collectBackwardJumps();
 
     //If there is no backward jump, nothing need to do.
     if (m_backward_edges.get_elem_count() == 0) {
-        END_TIMER_FMT(t, ("DUMP %s", "backward jump analysis"));
+        END_TIMER_FMT(t, ("Backward Jump Analysis"));
         return true;
     }
 
-    //Step3: Generate the simple occurence info for the relative live PRs.
+    //Step2: Generate the simple occurence info for the relative live PRs.
     generateOccurence();
 
-    //Step4: Insert the fake-use IR for the related PRs after checked.
+    //Step3: Insert the fake-use IR for the related PRs after checked.
     checkAndInsertFakeUse();
-    END_TIMER_FMT(t, ("DUMP %s", "backward jump analysis"));
+    END_TIMER_FMT(t, ("Backward Jump Analysis"));
     return true;
 }
 
 
 void BackwardJumpAnalysis::dump()
 {
-    note(m_rg, "\n==-- DUMP %s --==", "BackwardJumpAnalysis");
+    note(m_rg, "\n==-- DUMP BackwardJumpAnalysis --==");
 
     Prno2OccMapIter it;
     Occurence const* occ = nullptr;
@@ -979,6 +914,7 @@ void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
     Type const* ty = m_lsra->getRegType(prno);
     IR * pr_ir = m_irmgr->buildPRdedicated(prno, ty);
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
+    st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().append_head(st);
 
     //POS_ATTR_LT_SHRINK_BEFORE is used to avoid the lifetime of PR is from the
@@ -1018,8 +954,14 @@ void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
     Type const* ty = m_lsra->getRegType(prno);
     IR * pr_ir = m_irmgr->buildPRdedicated(prno, ty);
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
+    st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().insert_before(st, tail);
-    PosAttr * attr = m_resource_mgr->genPosAttr(POS_ATTR_NO_CODE_GEN, bb, st);
+
+    //Attribute POS_ATTR_LT_EXTEND_BB_END is set, because the multiple fake-use
+    //IRs are inserted at the tail part of the same BB, which would lead to
+    //this lifetime cannot live to the real ending position of BB.
+    PosAttr * attr = m_resource_mgr->genPosAttr(
+        POS_ATTR_NO_CODE_GEN | POS_ATTR_LT_EXTEND_BB_END, bb, st);
     setPosAttr(pos, attr, m_pos2attr);
     dumpFakeUse(m_lsra, st, nullptr, prno, bb->id(), false,
                 "backward jump analysis");
@@ -1056,7 +998,7 @@ void BackwardJumpAnalysis::checkAndInsertFakeUse()
          e != nullptr; e = m_backward_edges.get_next()) {
         IRBB const* src_bb = BKEDGE_srcbb(e);
         IRBB const* dst_bb = BKEDGE_dstbb(e);
-        ASSERT0(src_bb && src_bb);
+        ASSERT0(src_bb && dst_bb);
 
         //For the source BB of the backward jump edge, prno of the live out
         //need to be processed. If the last occurence of the pr is before the
@@ -1085,6 +1027,10 @@ void BackwardJumpAnalysis::checkAndInsertFakeUse()
         PRLiveSetIter * iter = nullptr;
         for (PRNO pr = (PRNO)live_out->get_first(&iter);
              pr != BS_UNDEF; pr = (PRNO)live_out->get_next(pr, &iter)) {
+            if (m_lsra->isDedicated(pr) &&
+                m_lsra->getDedicatedReg(pr) == m_lsra->getZero()) {
+                continue;
+            }
             Occurence const* occ = m_prno2occ.get(pr);
             ASSERT0(occ);
             if (OCC_last(occ) < m_bb_exit_pos[src_bb->id()]) {
@@ -1139,724 +1085,6 @@ void BackwardJumpAnalysis::checkAndInsertFakeUse()
     }
 }
 //END BackwardJumpAnalysis
-
-
-//
-//START PRInfo
-//
-void PRInfo::updateDUState(PR_DU_STATE du_state, BBID bbid)
-{
-    if (PR_CHK_CONFLICT == m_state.state.chk) { return; }
-    if (PR_DU_UNDEF == m_state.state.du) {
-        m_state.state.du = du_state;
-        m_state.state.chk = PR_CHK_GOOD;
-        if (bbid == BBID_UNDEF) { return; }
-        setBBID(bbid);
-    }
-}
-
-
-void PRInfo::dump(Region * rg) const
-{
-    CHAR const* du_state_str[] = {"undef", "defined", "used"};
-    CHAR const* chk_state_str[] = {"undef", "good", "conflict"};
-
-    note(rg, "PRInfo value: [%s, %s] in bbid %u\n",
-         du_state_str[getDUState()], chk_state_str[getChkState()], getBBID());
-}
-//END PRInfo
-
-//
-//START IRDUData
-//
-void IRDUData::dump(Region * rg)
-{
-    note(rg, "DEF list: [");
-    UINT i = 0;
-    for (PRNO prno = m_def_list.get_head(); i < m_def_list.get_elem_count();
-         i++, prno = m_def_list.get_next()) {
-        note(rg, "%u, ", prno);
-    }
-    note(rg, "]\nUSE list: [");
-    i = 0;
-    for (PRNO prno = m_use_list.get_head(); i < m_use_list.get_elem_count();
-         i++, prno = m_use_list.get_next()) {
-        note(rg, "%u, ", prno);
-    }
-    note(rg, "]\n");
-}
-//END IRDUData
-
-//
-//START FinderResMgr
-//
-void FinderResMgr::destroy()
-{
-    if (m_pool != nullptr) {
-        smpoolDelete(m_pool);
-        m_pool = nullptr;
-    }
-
-    for (PR2Info * r = m_pr2info_list.get_head();
-         r != nullptr; r = m_pr2info_list.get_next()) {
-        delete r;
-    }
-    m_pr2info_list.destroy();
-
-    for (BB2PRHolder * h = m_bb_holder_list.get_head();
-         h != nullptr; h = m_bb_holder_list.get_next()) {
-        delete h;
-    }
-    m_bb_holder_list.destroy();
-}
-
-
-void FinderResMgr::init()
-{
-    if (m_pool == nullptr) {
-        m_pool = smpoolCreate(64, MEM_COMM);
-    }
-    ASSERT0(m_pool);
-    m_bb_holder_list.init();
-    m_pr2info_list.init();
-}
-
-
-void * FinderResMgr::xmalloc(size_t size)
-{
-    ASSERTN(m_pool != nullptr, ("pool does not initialized"));
-    void * p = smpoolMalloc(size, m_pool);
-    ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
-    return p;
-}
-
-
-IRDUData * FinderResMgr::allocIRDUData()
-{
-    IRDUData * du_info = (IRDUData*)xmalloc(sizeof(IRDUData));
-    du_info->init();
-    return du_info;
-}
-
-
-BB2PRHolder * FinderResMgr::allocBB2PRHolder()
-{
-    BB2PRHolder * h = new BB2PRHolder();
-    m_bb_holder_list.append_tail(h);
-    return h;
-}
-
-
-PR2Info * FinderResMgr::allocPR2Info()
-{
-    PR2Info * r = new PR2Info();
-    m_pr2info_list.append_tail(r);
-    return r;
-}
-
-
-HoleInfo * FinderResMgr::genHoleInfo(PRNO prno, BBID bbid, IR const* ir)
-{
-    ASSERT0(ir);
-    HoleInfo * hole = (HoleInfo*)xmalloc(sizeof(HoleInfo));
-    HOLEINFO_prno(hole) = prno;
-    HOLEINFO_bbid(hole) = bbid;
-    HOLEINFO_ir(hole) = ir;
-    return hole;
-}
-
-
-PosAttr * FinderResMgr::genPosAttr(UINT v, IRBB const* bb, IR const* ir)
-{
-    ASSERT0(bb && ir);
-    PosAttr * pos_attr = (PosAttr*)xmalloc(sizeof(PosAttr));
-    pos_attr->init(v, bb, ir);
-    return pos_attr;
-}
-//END FinderResMgr
-
-//
-//START BrHoleFinder
-//
-void BrHoleFinder::init()
-{
-    m_hole_list.init();
-    m_resmgr.init();
-    m_ir2du.init();
-}
-
-
-void BrHoleFinder::destroy()
-{
-    m_resmgr.destroy();
-    m_hole_list.destroy();
-    m_bb_state_in.clean();
-    m_bb_state_out.clean();
-    m_ir2du.destroy();
-}
-
-
-BrHoleFinder::BrHoleFinder(Region * rg, BBPos2Attr * pos2attr,
-                           FakeVarMgr * fake_var_mgr, LinearScanRA * lsra)
-{
-    m_lsra = lsra;
-    m_rg = rg;
-    m_pos2attr = pos2attr;
-    m_fake_var_mgr = fake_var_mgr;
-    m_irmgr = rg->getIRMgr();
-    init();
-}
-
-
-void BrHoleFinder::reset()
-{
-    destroy();
-    init();
-}
-
-
-BB2PRHolder * BrHoleFinder::genBBPrHolderIn(BBID bbid)
-{
-    BB2PRHolder * h = m_bb_state_in.get(bbid);
-    if (h != nullptr) { return h; }
-    h = m_resmgr.allocBB2PRHolder();
-    m_bb_state_in.set(bbid, h);
-    return h;
-}
-
-
-BB2PRHolder * BrHoleFinder::genBBPrHolderOut(BBID bbid)
-{
-    BB2PRHolder * h = m_bb_state_out.get(bbid);
-    if (h != nullptr) { return h; }
-    h = m_resmgr.allocBB2PRHolder();
-    m_bb_state_out.set(bbid, h);
-    return h;
-}
-
-
-PR2Info * BrHoleFinder::genPr2InfoInHolder(MOD BB2PRHolder * h, BBID bbid)
-{
-    ASSERT0(h);
-    PR2Info * pr2info = h->get(bbid);
-    if (pr2info == nullptr) {
-        pr2info = m_resmgr.allocPR2Info();
-        h->set(bbid, pr2info);
-    }
-    return pr2info;
-}
-
-
-void BrHoleFinder::genDefForIR(IR const* ir, MOD IRDUData * du_info)
-{
-    ASSERT0(ir && du_info);
-    IRBB * bb = ir->getBB();
-    PRLiveSet const* live_out = m_live_mgr->get_liveout(bb->id());
-    PRLiveSet const* live_in = m_live_mgr->get_livein(bb->id());
-
-    if (ir->isWritePR() || ir->isCallStmt() || ir->is_region()) {
-        IR * result = const_cast<IR*>(ir)->getResultPR();
-        if (result == nullptr) { return; }
-        PRNO prno = result->getPrno();
-        if (!live_out->is_contain(prno) && !live_in->is_contain(prno)) {
-            //Ignore the irrelated PRs which are not live-in and live-out.
-            return;
-        }
-        du_info->addDef(result->getPrno());
-    }
-}
-
-
-void BrHoleFinder::genUseForIR(IR const* ir, MOD IRDUData * du_info,
-                               MOD ConstIRIter & irit)
-{
-    ASSERT0(ir && du_info);
-    irit.clean();
-    IRBB * bb = ir->getBB();
-    PRLiveSet const* live_out = m_live_mgr->get_liveout(bb->id());
-    PRLiveSet const* live_in = m_live_mgr->get_livein(bb->id());
-
-    for (IR const* k = iterExpInitC(ir, irit); k != nullptr;
-         k = iterExpNextC(irit)) {
-        ASSERT0(k->is_exp());
-        if (!k->isReadPR()) { continue; }
-        PRNO prno = k->getPrno();
-        if (!live_out->is_contain(prno) && !live_in->is_contain(prno)) {
-            //Ignore the irrelated PRs which are not live-in and live-out.
-            continue;
-        }
-        du_info->addUse(k->getPrno());
-    }
-}
-
-
-void BrHoleFinder::genDUForIR(IR const* ir, MOD ConstIRIter & irit)
-{
-    ASSERT0(ir && ir->is_stmt());
-    IRDUData * du_info = m_resmgr.allocIRDUData();
-    genDefForIR(ir, du_info);
-    genUseForIR(ir, du_info, irit);
-    setIRDUInfo(ir, du_info);
-}
-
-
-//This function implements the step A of the algorithm.
-bool BrHoleFinder::preProcess()
-{
-    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
-    ASSERT0(m_live_mgr && m_live_mgr->is_valid());
-    BBList * bb_list = m_rg->getBBList();
-    BBListIter bbit;
-    ConstIRIter irit;
-    //Go through each BB list to get the PR info
-    for (IRBB const* bb = bb_list->get_head(&bbit); bb != nullptr;
-         bb = bb_list->get_next(&bbit)) {
-        BBIRListIter bbirit;
-        BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
-        for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
-             ir = irlst.get_next(&bbirit)) {
-            genDUForIR(ir, irit);
-        }
-    }
-    return true;
-}
-
-
-void BrHoleFinder::copyPR2Info(MOD PR2Info * dst, PR2Info const* src)
-{
-    ASSERT0(dst && src);
-    dst->clean();
-    PR2InfoIter it;
-    PRInfo * pr_info = nullptr;
-    for (PRNO prno = src->get_first(it, &pr_info); !it.end();
-         prno = src->get_next(it, &pr_info)) {
-        PRInfo * pr_info_new = m_resmgr.allocPRInfo();
-        pr_info_new->copyFrom(pr_info);
-        dst->set(prno, pr_info_new);
-    }
-}
-
-
-void BrHoleFinder::copyBBPrHolder(MOD BB2PRHolder * h1, BB2PRHolder const* h2)
-{
-    ASSERT0(h1);
-    if (h2 == nullptr) { return; }
-    BB2PRHolderIter it;
-    PR2Info * pr2state2 = nullptr;
-    for (BBID bbid = h2->get_first(it, &pr2state2); !it.end();
-         bbid = h2->get_next(it, &pr2state2)) {
-        PR2Info * pr2state1 = genPr2InfoInHolder(h1, bbid);
-        copyPR2Info(pr2state1, pr2state2);
-    }
-}
-
-
-void BrHoleFinder::mergePrInfo(MOD PRInfo * pr_info1, PRInfo const* pr_info2,
-                               PRNO prno)
-{
-    ASSERT0(pr_info1 && pr_info2);
-    PR_CHK_STATE const& chk_state1 = pr_info1->getChkState();
-    PR_CHK_STATE const& chk_state2 = pr_info2->getChkState();
-    PR_DU_STATE const& du_state1 = pr_info1->getDUState();
-    PR_DU_STATE const& du_state2 = pr_info2->getDUState();
-
-    //The merge operation should follow the rules in TABLE1 below:
-    //    ________________________________________________________
-    //    | rules  | predecessor_A | predecessor_B |    merged   |
-    //    |        |  check state  |  check state  | check state |
-    //    |------------------------------------------------------|
-    //    | rule 1 |  conflict     |  conflict     |  conflict   |
-    //    | rule 2 |  conflict     |  undef        |  conflict   |
-    //    | rule 3 |  conflict     |  good         |  conflict   |
-    //    | rule 4 |  good         |  conflict     |  conflict   |
-    //    | rule 5 |  undef        |  good         |  good       |
-    //    | rule 6 |  good         |  good         |  TABLE2     |
-    //    ________________________________________________________
-    //                           TABLE1
-    //    For the rule 6 in TABLE1, the merged check state should be
-    //    updated per the TABLE2 below:
-    //    ___________________________________________________________
-    //    |    rules  | predecessor_A | predecessor_B |   merged    |
-    //    |           |   DU state    |    DU state   | check state |
-    //    |---------------------------------------------------------|
-    //    |  rule 6.1 |      DEF      |     USE       |  conflict   |
-    //    |  rule 6.2 |      USE      |     DEF       |  conflict   |
-    //    |  rule 6.3 |      USE      |     USE       |  good       |
-    //    |  rule 6.4 |      DEF      |     DEF       |  good       |
-    //    ___________________________________________________________
-    //                           TABLE2
-
-    //The logical below implements the rule 1 in TABLE1.
-    if (PR_CHK_CONFLICT == chk_state1 && chk_state1 == chk_state2) { return; }
-
-    //The logical below implements the rule 3 in TABLE1.
-    if (PR_CHK_CONFLICT == chk_state1 && PR_CHK_GOOD == chk_state2) {
-        if (PR_DU_DEFINED != du_state2) { return; }
-
-        //Record if pr_info2 is a DEF.
-        ASSERT0(pr_info2->getDefIR());
-        HoleInfo * hole = m_resmgr.genHoleInfo(prno, pr_info2->getBBID(),
-                                               pr_info2->getDefIR());
-        return recordPrHoleInfo(hole);
-    }
-
-    //The logical below implements the rule 4 in TABLE1.
-    if (PR_CHK_GOOD == chk_state1 && PR_CHK_CONFLICT == chk_state2) {
-        pr_info1->updateChkState(PR_CHK_CONFLICT);
-        if (PR_DU_DEFINED != du_state1) { return; }
-
-        //Record if pr_info1 is a DEF.
-        ASSERT0(pr_info1->getDefIR());
-        HoleInfo * hole = m_resmgr.genHoleInfo(prno, pr_info1->getBBID(),
-                                               pr_info1->getDefIR());
-        return recordPrHoleInfo(hole);
-    }
-
-    ASSERT0(PR_CHK_GOOD == chk_state1 && PR_CHK_GOOD == chk_state2);
-
-    //The logical below implements the rule 5 in TABLE1.
-    if (PR_DU_UNDEF == du_state1) {
-        return pr_info1->copyFrom(pr_info2);
-    }
-
-    //The logical below implements the rule 6.1 in TABLE2.
-    if (PR_DU_USED == du_state1 && PR_DU_DEFINED == du_state2) {
-        pr_info1->updateChkState(PR_CHK_CONFLICT);
-        ASSERT0(pr_info2->getDefIR());
-        HoleInfo * hole = m_resmgr.genHoleInfo(prno, pr_info2->getBBID(),
-                                               pr_info2->getDefIR());
-        return recordPrHoleInfo(hole);
-    }
-
-    //The logical below implements the rule 6.2 in TABLE2.
-    if (PR_DU_DEFINED == du_state1 && PR_DU_USED == du_state2) {
-        pr_info1->updateChkState(PR_CHK_CONFLICT);
-        ASSERT0(pr_info1->getDefIR());
-        HoleInfo * hole = m_resmgr.genHoleInfo(prno, pr_info1->getBBID(),
-                                               pr_info1->getDefIR());
-        recordPrHoleInfo(hole);
-    }
-
-    //For the rules not mentioned in above tables, no changes required to do.
-}
-
-
-void BrHoleFinder::unionPr2State(MOD PR2Info * pr2info1,
-                                 PR2Info const* pr2info2)
-{
-    ASSERT0(pr2info1 && pr2info2);
-    PR2InfoIter it;
-    PRInfo * info2 = nullptr;
-    //Go through map PR2Info.
-    for (PRNO prno = pr2info2->get_first(it, &info2); !it.end();
-         prno = pr2info2->get_next(it, &info2)) {
-        bool find = false;
-        PRInfo * info1 = pr2info1->get(prno, &find);
-        if (!find) {
-            //Copy and use if there is no same key.
-            info1 = m_resmgr.allocPRInfo();
-            info1->copyFrom(info2);
-            pr2info1->set(prno, info1);
-            continue;
-        }
-        if (isEqual(info1, info2)) { continue; }
-
-        //Call the merge operation on two PRInfos.
-        mergePrInfo(info1, info2, prno);
-    }
-}
-
-//This function implements the union operation during the data flow analysis.
-void BrHoleFinder::unionBBPrHolder(MOD BB2PRHolder * h1, BB2PRHolder const* h2)
-{
-    ASSERT0(h1 && h2);
-    BB2PRHolderIter it;
-    PR2Info * pr2info2 = nullptr;
-    //Go through the first level of map.
-    for (BBID bbid = h2->get_first(it, &pr2info2); !it.end();
-         bbid = h2->get_next(it, &pr2info2)) {
-        PR2Info * pr2info1 = genPr2InfoInHolder(h1, bbid);
-        //Call Union operation on map PR2Info.
-        unionPr2State(pr2info1, pr2info2);
-    }
-}
-
-
-void BrHoleFinder::calcPRUseState(MOD PR2Info * pr2info,
-                                  IRDUData const* du, BBID cur_bbid)
-{
-    ASSERT0(pr2info && du);
-    PRNOList & use_list = const_cast<IRDUData*>(du)->getUseList();
-    UINT i = 0;
-    for (PRNO prno_use = use_list.get_head(); i < use_list.get_elem_count();
-         i++, prno_use = use_list.get_next()) {
-        bool find = false;
-        PRInfo * info = pr2info->get(prno_use, &find);
-        if (find) {
-            info->updateDUState(PR_DU_USED, cur_bbid);
-            continue;
-        }
-        info = m_resmgr.allocPRInfo();
-        info->updateDUState(PR_DU_USED, cur_bbid);
-        pr2info->set(prno_use, info);
-    }
-}
-
-
-void BrHoleFinder::calcPRDefState(MOD PR2Info * pr2info, IRDUData const* du,
-                                  BBID cur_bbid, IR const* ir)
-{
-    ASSERT0(pr2info && du && ir);
-    PRNOList & def_list = const_cast<IRDUData*>(du)->getDefList();
-    UINT i = 0;
-    for (PRNO prno_def = def_list.get_head(); i < def_list.get_elem_count();
-         i++, prno_def = def_list.get_next()) {
-        bool find = false;
-        PRInfo * info = pr2info->get(prno_def, &find);
-        if (find) {
-            info->updateDUState(PR_DU_DEFINED, cur_bbid);
-            continue;
-        }
-        info = m_resmgr.allocPRInfo();
-        info->updateDUState(PR_DU_DEFINED, cur_bbid);
-        info->setDefIR(ir);
-        pr2info->set(prno_def, info);
-    }
-}
-
-
-void BrHoleFinder::calcPR2Info(MOD PR2Info * pr2info, IRDUData const* du,
-                               BBID cur_bbid, IR const* ir)
-{
-    ASSERT0(pr2info && du && ir);
-    calcPRDefState(pr2info, du, cur_bbid, ir);
-    calcPRUseState(pr2info, du, cur_bbid);
-}
-
-
-void BrHoleFinder::calcHolderForIR(IR const* ir, MOD BB2PRHolder * holder,
-                                   BBID cur_bbid)
-{
-    ASSERT0(ir && holder);
-    IRDUData const* du = getIRDUInfo(ir);
-    BB2PRHolderIter it;
-    PR2Info * pr2info = nullptr;
-    for (BBID bbid = holder->get_first(it, &pr2info); !it.end();
-         bbid = holder->get_next(it, &pr2info)) {
-        PR2Info * state = getPrStateInHolder(holder, bbid);
-        ASSERT0(state);
-        calcPR2Info(state, du, cur_bbid, ir);
-    }
-}
-
-
-void BrHoleFinder::calcHolderForBB(IRBB const* bb)
-{
-    ASSERT0(bb);
-    BBID const bbid = bb->id();
-    BB2PRHolder * holder_in = getBBPrHolderIn(bbid);
-    BB2PRHolder * holder_out = genBBPrHolderOut(bbid);
-    copyBBPrHolder(holder_out, holder_in);
-
-    BBIRListIter bbirit;
-    BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
-    for (IR const* ir = irlst.get_head(&bbirit); ir != nullptr;
-         ir = irlst.get_next(&bbirit)) {
-        calcHolderForIR(ir, holder_out, bbid);
-    }
-}
-
-//This function implements the step B of the algorithm.
-bool BrHoleFinder::check()
-{
-    IRCFG const* cfg = m_rg->getCFG();
-    ASSERT0(cfg->getEntry() && BB_is_entry(cfg->getEntry()));
-    //RPO should be available.
-    RPOVexList const* vlst = const_cast<IRCFG*>(cfg)->getRPOVexList();
-    ASSERT0(vlst);
-    ASSERT0(vlst->get_elem_count() == cfg->getBBList()->get_elem_count());
-
-    RPOVexListIter ct;
-    UINT branch_out_degree_threshold = 1;
-    UINT count = 0;
-    UINT thres = 30;
-    bool change = true;
-    BB2PRHolder * holder_new = m_resmgr.allocBB2PRHolder();
-    do {
-        change = false;
-        for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
-            IRBB const* bb = cfg->getBB(ct->val()->id());
-            ASSERT0(bb);
-            AdjVertexIter ito;
-            Vertex const* in = Graph::get_first_in_vertex(bb->getVex(), ito);
-            //If there is no predecessor, ignore directly.
-            if (in == nullptr) { continue; }
-            holder_new->clean();
-            if (cfg->isOutDegreeMoreThan(in, branch_out_degree_threshold)) {
-                //If the ancestor BB has multiple kids, that is to say it is a
-                //start point of a branch, then generate a holder for the new
-                //branch.
-                genPr2InfoInHolder(holder_new, in->id());
-            }
-
-            //Flow the data per the first edge, normally most BBs have only
-            //one predecessor.
-            BB2PRHolder * holder_pre = getBBPrHolderOut(in->id());
-            if (holder_pre != nullptr) {
-                copyBBPrHolder(holder_new, holder_pre);
-            }
-            in = Graph::get_next_in_vertex(ito);
-            for (; in != nullptr; in = Graph::get_next_in_vertex(ito)) {
-                //Do the union operation if there are multiple predecessors.
-                holder_pre = getBBPrHolderOut(in->id());
-                if (holder_pre == nullptr) { continue; }
-                unionBBPrHolder(holder_new, holder_pre);
-            }
-
-            //Check whether the data is changed or not, and set the flag.
-            BB2PRHolder * holder_cur = getBBPrHolderIn(bb->id());
-            if ((holder_cur == nullptr) || !isEqual(holder_new, holder_cur)) {
-                change = true;
-                setBBPrHolderIn(bb->id(), holder_new);
-            }
-            //Compute the OUT based on IN.
-            calcHolderForBB(bb);
-        }
-        count++;
-    } while (change && count < thres);
-    ASSERTN(!change, ("result of BrHoleFinder equation is convergent slowly"));
-    return true;
-}
-
-
-void BrHoleFinder::insertFakeUse(IRBB const* bb, PRNO prno, BBPos const& pos,
-                                 IR const* marker)
-{
-    ASSERT0(bb);
-    ASSERT0(prno != PRNO_UNDEF);
-    ASSERT0(BBPOS_flag(pos) == INSERT_MODE_MID);
-    if (m_pos2attr->find(pos)) { return; }
-
-    //Insert a fake-use IR using the prno to eliminate the branch lifetime hole.
-    Type const* ty = m_lsra->getRegType(prno);
-    IR * pr_ir = m_irmgr->buildPRdedicated(prno, ty);
-    IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
-    const_cast<IRBB*>(bb)->getIRList().insert_before(st, marker);
-
-    //Attribute POS_ATTR_NO_CODE_GEN will indicate to remove this fake-use IR
-    //for code generation.
-    PosAttr * attr = m_resmgr.genPosAttr(POS_ATTR_NO_CODE_GEN, bb, st);
-    setPosAttr(pos, attr, m_pos2attr);
-    BBID bbid = BBPOS_bbid(pos);
-    dumpFakeUse(m_lsra, st, marker, prno, bbid, true,
-                "branch lifetime hole finder");
-}
-
-
-//This function implements the step C of the algorithm.
-void BrHoleFinder::postProcess()
-{
-    if (m_hole_list.get_elem_count() == 0) { return; }
-    IRCFG const* cfg = m_rg->getCFG();
-
-    for (HoleInfo const* h = m_hole_list.get_head();
-         h != nullptr; h = m_hole_list.get_next()) {
-        PRNO prno = HOLEINFO_prno(h);
-        BBID bbid = HOLEINFO_bbid(h);
-        IR const* ir = HOLEINFO_ir(h);
-        ASSERT0(ir);
-        BBPos bbpos(prno, bbid, INSERT_MODE_MID);
-        insertFakeUse(cfg->getBB(bbid), prno, bbpos, ir);
-    }
-}
-
-//The entry function of BrHoleFinder, which will drive the whole processes to
-//find and fix the branch lifetime holes.
-void BrHoleFinder::run()
-{
-    //Analyze the DU info for related PRNOs.
-    preProcess();
-
-    //Check the branch lifetime holes in the CFG.
-    check();
-
-    //Fix the branch lifetime holes found in the previous check.
-    postProcess();
-}
-
-
-void BrHoleFinder::dump() const
-{
-    dumpIRDUInfo();
-    dumpDataFlow();
-}
-
-
-void BrHoleFinder::dumpDataFlow() const
-{
-    note(m_rg, "\n==-- DUMP %s --==", "BrHoleFinder::BB2PRHolder");
-    UINT ind = 2;
-    m_rg->getLogMgr()->incIndent(ind);
-    for (VecIdx i = 0; i < (VecIdx)m_bb_state_in.get_elem_count(); i++) {
-        BB2PRHolder * h_in = m_bb_state_in.get(i);
-        if (h_in != nullptr) {
-            note(m_rg, "\nbbid [%u]:", i);
-            note(m_rg, "\nIn:\n");
-            dumpHolderState(h_in);
-        }
-        BB2PRHolder * h_out = m_bb_state_out.get(i);
-        if (h_out != nullptr) {
-            note(m_rg, "\nOut:\n");
-            dumpHolderState(h_out);
-        }
-    }
-    m_rg->getLogMgr()->decIndent(ind);
-}
-
-
-void BrHoleFinder::dumpIRDUInfo() const
-{
-    note(m_rg, "\n==-- DUMP %s --==", "BrHoleFinder::IRDefUseInfo");
-    IR2DUDataIter iter;
-    IRDUData const* du = nullptr;
-    for (IR const* ir = m_ir2du.get_first(iter, &du); !iter.end();
-         ir = m_ir2du.get_next(iter, &du)) {
-        note(m_rg, "DEF-USE map for ir %u: \n", ir->id());
-        const_cast<IRDUData*>(du)->dump(m_rg);
-    }
-}
-
-
-void BrHoleFinder::dumpHolderState(BB2PRHolder const* holder) const
-{
-    BB2PRHolderIter iter;
-    PR2Info * pr2info = nullptr;
-    for (BBID bbid = holder->get_first(iter, &pr2info); !iter.end();
-         bbid = holder->get_next(iter, &pr2info)) {
-        note(m_rg, "dump Key BBID [%u]:\n", bbid);
-        dumpPR2Info(pr2info);
-    }
-}
-
-
-void BrHoleFinder::dumpPR2Info(PR2Info const* pr2info) const
-{
-    ASSERT0(pr2info);
-    UINT ind = 2;
-    m_rg->getLogMgr()->incIndent(ind);
-    note(m_rg, "PR2Info:\n");
-    PR2InfoIter it;
-    PRInfo * pr_info = nullptr;
-    for (PRNO prno = pr2info->get_first(it, &pr_info); !it.end();
-         prno = pr2info->get_next(it, &pr_info)) {
-        note(m_rg, " Key prno [%u] --->", prno);
-        pr_info->dump(m_rg);
-    }
-    m_rg->getLogMgr()->decIndent(ind);
-}
-//END BrHoleFinder
-
 
 //
 //START RegSetImpl
@@ -1941,16 +1169,16 @@ void RegSetImpl::initRegSet()
     if (g_do_lsra_debug) {
         initDebugRegSet();
     } else {
-        m_target_callee_scalar = getTIMgr().getCallee();
-        m_target_caller_scalar = getTIMgr().getCaller();
-        m_target_param_scalar = getTIMgr().getParam();
-        m_target_return_value_scalar = getTIMgr().getReturnValue();
-        m_target_allocable_scalar = getTIMgr().getAllocable();
-        m_target_callee_vector = getTIMgr().getVectorCallee();
-        m_target_caller_vector = getTIMgr().getVectorCaller();
-        m_target_param_vector = getTIMgr().getVectorParam();
-        m_target_return_value_vector = getTIMgr().getVectorReturnValue();
-        m_target_allocable_vector = getTIMgr().getVectorAllocable();
+        m_target_callee_scalar = getTIMgr().getCalleeScalarRegSet();
+        m_target_caller_scalar = getTIMgr().getCallerScalarRegSet();
+        m_target_param_scalar = getTIMgr().getParamScalarRegSet();
+        m_target_return_value_scalar = getTIMgr().getRetvalScalarRegSet();
+        m_target_allocable_scalar = getTIMgr().getAllocableScalarRegSet();
+        m_target_callee_vector = getTIMgr().getCalleeVectorRegSet();
+        m_target_caller_vector = getTIMgr().getCallerVectorRegSet();
+        m_target_param_vector = getTIMgr().getParamVectorRegSet();
+        m_target_return_value_vector = getTIMgr().getRetvalVectorRegSet();
+        m_target_allocable_vector = getTIMgr().getAllocableVectorRegSet();
     }
     initAvailRegSet();
 }
@@ -2100,7 +1328,7 @@ bool RegSetImpl::isSpecialReg(Reg r) const
 {
     return r == m_ra.getFP() || r == m_ra.getBP() || r == m_ra.getRA() ||
            r == m_ra.getSP() || r == m_ra.getGP() || r == m_ra.getTA() ||
-           r == m_ra.getRegisterZero();
+           r == m_ra.getZero();
 }
 
 
@@ -2215,7 +1443,7 @@ void RegSetImpl::freeReg(LifeTime const* lt)
 
 void RegSetImpl::dumpAvailRegSet() const
 {
-    note(m_ra.getRegion(), "\n==-- DUMP %s --==", "AvaiableRegisterSet");
+    note(m_ra.getRegion(), "\n==-- DUMP AvaiableRegisterSet  --==");
     StrBuf buf(32);
     m_avail_caller_scalar.dump(buf);
     note(m_ra.getRegion(), "\nAVAIL_CALLER:%s", buf.buf);
@@ -2249,7 +1477,6 @@ LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
     m_bb_list = nullptr;
     m_irmgr = rg->getIRMgr();
     m_lt_mgr = new LifeTimeMgr(rg);
-    m_ti_mgr = new TargInfoMgr();
     m_func_level_var_count = 0;
     m_is_apply_to_region = false;
     m_is_fp_allocable_allowed = true;
@@ -2259,7 +1486,6 @@ LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
 LinearScanRA::~LinearScanRA()
 {
     delete m_lt_mgr;
-    delete m_ti_mgr;
 }
 
 
@@ -2291,17 +1517,35 @@ void LinearScanRA::reset()
     m_move_tab.clean();
     m_prno2var.clean();
     m_act_mgr.clean();
+    m_bb_seqid.clean();
+    m_prno_with_2d_hole.clean();
+}
+
+
+void LinearScanRA::assignTopoIdForBB()
+{
+    //Iterate BB list.
+    BBListIter bbit;
+    UINT id = 0;
+    for (IRBB * bb = m_bb_list->get_head(&bbit); bb != nullptr;
+         bb = m_bb_list->get_next(&bbit)) {
+        m_bb_seqid.set(bb->id(), id++);
+    }
 }
 
 
 Var * LinearScanRA::getSpillLoc(PRNO prno)
 {
+    prno = getAnctPrno(prno);
+    ASSERT0(prno != PRNO_UNDEF);
     return m_prno2var.get(prno);
 }
 
 
 Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 {
+    prno = getAnctPrno(prno);
+    ASSERT0(prno != PRNO_UNDEF);
     Var * v = getSpillLoc(prno);
     if (v == nullptr) {
         //The alignment of vector register is greater than STACK_ALIGNMENT.
@@ -2318,8 +1562,12 @@ PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
 {
     ASSERT0(type);
     ASSERT0(reg != REG_UNDEF);
-    PRNO prno = m_irmgr->buildPrno(type);
+    PRNO prno = getSpecialDedicatedPrno(type, reg);
+    if (prno != PRNO_UNDEF) { return prno; }
+
+    prno = m_irmgr->buildPrno(type);
     setDedicatedReg(prno, reg);
+    recordSpecialDedicatedPrno(type, reg, prno);
     return prno;
 }
 
@@ -2328,8 +1576,12 @@ PRNO LinearScanRA::buildPrno(Type const* type, Reg reg)
 {
     ASSERT0(type);
     ASSERT0(reg != REG_UNDEF);
-    PRNO prno = m_irmgr->buildPrno(type);
+    PRNO prno = getSpecialDedicatedPrno(type, reg);
+    if (prno != PRNO_UNDEF) { return prno; }
+
+    prno = m_irmgr->buildPrno(type);
     setReg(prno, reg);
+    recordSpecialDedicatedPrno(type, reg, prno);
     return prno;
 }
 
@@ -2418,7 +1670,7 @@ Type const* LinearScanRA::getRegType(PRNO prno) const
     Var * var = m_rg->mapPR2Var(prno);
     ASSERT0(var);
     TypeMgr * tm = m_rg->getTypeMgr();
-    if (!VAR_type(var)->is_vector()) {
+    if (!VAR_type(var)->is_vector() && !VAR_type(var)->is_any()) {
         ASSERT0(var->getByteSize(tm) <=
                 tm->getByteSize(tm->getTargMachRegisterType()));
     }
@@ -2525,7 +1777,7 @@ bool LinearScanRA::verifyAfterRA() const
 
 void LinearScanRA::dump4List() const
 {
-    note(m_rg, "\n==-- DUMP %s --==", "4LIST");
+    note(m_rg, "\n==-- DUMP 4LIST --==");
     note(m_rg, "\nUNHANDLED:");
     UINT ind = 1;
     m_rg->getLogMgr()->incIndent(ind);
@@ -2593,7 +1845,7 @@ void LinearScanRA::dumpPR2Reg(PRNO p) const
 
 void LinearScanRA::dumpPR2Reg() const
 {
-    note(m_rg, "\n==-- DUMP %s --==", "PR2Reg");
+    note(m_rg, "\n==-- DUMP PR2Reg --==");
     m_rg->getLogMgr()->incIndent(2);
     for (PRNO p = PRNO_UNDEF + 1; p < m_prno2reg.get_elem_count(); p++) {
         dumpPR2Reg(p);
@@ -2750,7 +2002,7 @@ public:
     {
         m_rg = rg;
         m_org_bbmgr = bbmgr;
-        m_new_bbmgr = new IRBBMgr();
+        m_new_bbmgr = new IRBBMgr(rg);
         m_rg->setBBMgr(m_new_bbmgr);
     }
     ~UseNewIRBBMgr()
@@ -2911,6 +2163,15 @@ public:
 };
 
 
+PRNO LinearScanRA::getAnctPrno(PRNO prno) const
+{
+    ASSERT0(prno != PRNO_UNDEF);
+    LifeTime const* lt = m_lt_mgr->getLifeTime(prno);
+    if (lt == nullptr ) { return prno; }
+    return lt->getAnctPrno();
+}
+
+
 bool LinearScanRA::isPrnoAlias(PRNO prno1, PRNO prno2) const
 {
     if (prno1 == prno2) { return true; }
@@ -2922,10 +2183,17 @@ bool LinearScanRA::isPrnoAlias(PRNO prno1, PRNO prno2) const
     PRNO big = MAX(prno1, prno2);
     PRNO small = MIN(prno1, prno2);
     LifeTime const* lt = m_lt_mgr->getLifeTime(big);
-    ASSERT0(lt);
-    while (lt->getAncestor() != nullptr) {
-        ASSERT0(lt->getPrno() > lt->getAncestor()->getPrno());
-        lt = lt->getAncestor();
+    //This assert is commented due to the below if statement.
+    //ASSERT0(lt);
+    if (lt == nullptr) {
+        //If there is no lifetime related to the prno, which means this prno is
+        //not participated the register allocation, it is assigned to dediacted
+        //register, so it is not alias with any other register.
+        return false;
+    }
+    while (lt->getParent() != nullptr) {
+        ASSERT0(lt->getPrno() > lt->getParent()->getPrno());
+        lt = lt->getParent();
         if (lt->getPrno() == small) { return true; }
     }
     return false;
@@ -2971,21 +2239,17 @@ bool LinearScanRA::perform(OptCtx & oc)
         ASSERT0(m_cfg->verify());
     }
 
+    //Assign each BB a topologic sequence ID.
+    assignTopoIdForBB();
+
     //Do the backward jump analysis based on the CFG and liveness information.
     BBPos2Attr pos2attr;
     FakeVarMgr fake_var_mgr(m_rg);
     BackwardJumpAnalysis back_jump_ana(m_rg, &pos2attr, &fake_var_mgr, this);
     back_jump_ana.analyze();
 
-    //The finder will find the potential lifetime hole caused by the branches
-    //of CFG, and fix the branch lifetime hole before the register allocation
-    //begins.
-    BrHoleFinder finder(m_rg, &pos2attr, &fake_var_mgr, this);
-    finder.run();
-
     //Enable the dump-buffer.
     DumpBufferSwitch buff(m_rg->getLogMgr());
-    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     UpdatePos up(*this);
     collectDedicatedPR(m_bb_list, m_dedicated_mgr);
     getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);

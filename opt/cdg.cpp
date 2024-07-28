@@ -59,7 +59,10 @@ void CDG::dumpVCG(CHAR const* name) const
 
 bool CDG::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCDG()) {
+        return  true;
+    }
+    START_TIMER(t, "Build CDG:dump");
     note(getRegion(), "\n==---- DUMP Control Dependence '%s' ----==",
          m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);
@@ -80,6 +83,7 @@ bool CDG::dump() const
     }
     note(getRegion(), "\n");
     getRegion()->getLogMgr()->decIndent(2);
+    END_TIMER(t, "Build CDG:dump");
     return true;
 }
 
@@ -173,8 +177,8 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     }
 
     Vector<Vertex*> top_order;
-    bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
-    ASSERT0_DUMMYUSE(!has_cyc);
+    bool succ = pdom_tree.sortInTopologOrder(top_order);
+    ASSERT0_DUMMYUSE(succ);
 
     xcom::DefMiscBitSetMgr bs_mgr;
 
@@ -232,18 +236,13 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     }
     set_valid(true);
     END_TIMER(t, "Build CDG");
-
     for (VecIdx i = 0; i <= cd_set.get_last_idx(); i++) {
         xcom::DefSBitSet * sbs = cd_set.get(i);
         if (sbs != nullptr) {
             sbs->clean();
         }
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCDG()) {
-        START_TIMER(t3, "Build CDG:dump");
-        dump();
-        END_TIMER(t3, "Build CDG:dump");
-    }
+    dump();
 }
 
 

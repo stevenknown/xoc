@@ -51,8 +51,6 @@ public:
     virtual bool hasMultiRes(IR * stmt) const;
 
     virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
-
-    virtual void setAlterResDescList(IR * stmt, IR * lst) const;
 };
 
 } //namespace xoc

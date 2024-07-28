@@ -36,10 +36,26 @@ author: Su Zhenyu
 
 namespace xoc {
 
+static void dumpRemovedIneffectIR(
+    IR const* ir, IRBB const* bb, DeadCodeElim const* dce)
+{
+    ASSERT0(dce);
+    if (ir == nullptr || !dce->getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpDCE()) { return; }
+    xcom::StrBuf buf(32);
+    dce->getRegion()->getLogMgr()->incIndent(2);
+    xoc::dumpIRToBuf(ir, dce->getRegion(), buf,
+                     DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_KID));
+    dce->getRegion()->getLogMgr()->decIndent(2);
+    ActMgr & am = const_cast<DeadCodeElim*>(dce)->getActMgr();
+    am.dump("removed ineffect IR:%s", buf.getBuf());
+}
+
+
 class IterSideEffect : public VisitIRTree {
     bool m_has_sideeffect;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
             ir->isNoMove(false)) {
@@ -117,14 +133,8 @@ bool DeadCodeElim::dumpBeforePass() const
 }
 
 
-bool DeadCodeElim::dump(DCECtx const& dcectx) const
+void DeadCodeElim::dumpBBListAndDU() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
-    START_TIMER_FMT(t, ("DUMP %s", getPassName()));
-    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
-         getPassName(), m_rg->getRegionName());
-    m_rg->getLogMgr()->incIndent(2);
-    dcectx.dump(m_rg);
     dumpBBList(m_rg->getBBList(), m_rg);
     if (usePRSSADU()) {
         m_prssamgr->dumpBrief();
@@ -132,10 +142,22 @@ bool DeadCodeElim::dump(DCECtx const& dcectx) const
     if (useMDSSADU()) {
         m_mdssamgr->dump();
     }
+}
+
+
+void DeadCodeElim::dump(DCECtx const& dcectx) const
+{
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpDCE()) { return; }
+    START_TIMER_FMT(t, ("DUMP %s", getPassName()));
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
+    const_cast<DeadCodeElim*>(this)->getActMgr().dump();
+    dcectx.dump(m_rg);
+    //dumpBBListAndDU();
     Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
-    return true;
 }
 
 
@@ -143,8 +165,8 @@ bool DeadCodeElim::dump(DCECtx const& dcectx) const
 void DeadCodeElim::checkValidAndRecomputeCDG()
 {
     if (m_is_elim_cfs) {
-        m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_PDOM, PASS_CDG,
-                                                   PASS_RPO, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(
+            m_oc, PASS_PDOM, PASS_CDG, PASS_RPO, PASS_UNDEF);
         m_cdg = (CDG*)m_rg->getPassMgr()->queryPass(PASS_CDG);
         ASSERT0(m_cdg && m_cdg->is_valid());
         return;
@@ -751,6 +773,7 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
         //Could not just remove the SSA def, you should consider
         //the SSA_uses and make sure they are all removable.
         //Use SSA related API.
+        dumpRemovedIneffectIR(stmt, bb, dce);
         xoc::removeStmt(stmt, rg, *dcectx.getOptCtx());
         if (stmt->isConditionalBr() ||
             stmt->isUnconditionalBr() ||
@@ -934,13 +957,8 @@ bool DeadCodeElim::elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
 }
 
 
-//An aggressive algo will be used if CDG is avaliable.
-bool DeadCodeElim::perform(OptCtx & oc)
+bool DeadCodeElim::initSSAMgr(OptCtx const& oc)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-    if (!oc.is_ref_valid()) { return false; }
-    m_oc = &oc;
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
@@ -953,7 +971,19 @@ bool DeadCodeElim::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
+    return true;
+}
+
+
+//An aggressive algo will be used if CDG is avaliable.
+bool DeadCodeElim::perform(OptCtx & oc)
+{
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
+    m_oc = &oc;
     START_TIMER(t, getPassName());
+    if (!initSSAMgr(oc)) { return false; }
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
@@ -968,13 +998,10 @@ bool DeadCodeElim::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDCE()) {
-        dump(dcectx);
-    }
+    dump(dcectx);
 
     //DU chain and DU reference should be maintained.
     ASSERT0(m_dumgr->verifyMDRef());
-
     if (remove_branch_stmt) {
         //Branch stmt will effect control-flow-data-structure.
         oc.setInvalidIfCFGChanged();

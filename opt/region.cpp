@@ -65,10 +65,13 @@ void Region::destroy()
 {
     if (m_pool == nullptr) { return; }
     if (!is_blackbox()) {
+        //NOTE IRBBMgr has to be destroied before IRMgr, becasuse it will
+        //free all IR back into the IRMgr.
+        destroyIRBBMgr();
         destroyPassMgr();
         destroyAttachInfoMgr();
-        destroyIRBBMgr();
         if (getAnalysisInstrument() != nullptr) {
+            //AnalysisInstrument does not dependent on other Mgr.
             delete REGION_analysis_instrument(this);
         }
     }
@@ -399,6 +402,18 @@ bool Region::reconstructBBList(OptCtx & oc)
 }
 
 
+void Region::genEntryBB()
+{
+    //Note we always create entry BB because original CFG may only
+    //contain cyclic graph.
+    IRBB * entry = allocBB();
+    BB_is_entry(entry) = true;
+
+    //Always place entry-BB at the first lexicographical position in list.
+    getBBList()->append_head(entry);
+}
+
+
 //Construct IR list from IRBB list.
 //clean_ir_list: clean bb's ir list if it is true.
 IR * Region::constructIRlist(bool clean_ir_list)
@@ -441,6 +456,7 @@ void Region::constructBBList()
 {
     if (getIRList() == nullptr) { return; }
     START_TIMER(t, "Construct IRBB list");
+    ASSERTN(getBBList()->get_elem_count() == 0, ("BB list is not empty"));
     IRBB * cur_bb = nullptr;
     IR * pointer = getIRList();
     while (pointer != nullptr) {
@@ -510,8 +526,7 @@ void Region::constructBBList()
     //All IRs have been moved to each IRBB.
     setIRList(nullptr);
 
-    //cur_bb is the last bb, it is also the exit bb.
-    //IR_BB_is_func_exit(cur_bb) = true;
+    genEntryBB();
     END_TIMER(t, "Construct IRBB list");
 }
 
@@ -800,6 +815,14 @@ AttachInfoMgr * Region::allocAttachInfoMgr()
 PassMgr * Region::allocPassMgr()
 {
     return new PassMgr(this);
+}
+
+
+DbxMgr * Region::allocDbxMgr()
+{
+    DbxMgr * dbx_mgr = new DbxMgr();
+    ASSERT0(dbx_mgr);
+    return dbx_mgr;
 }
 
 
@@ -1238,9 +1261,9 @@ void Region::dump(bool dump_inner_region) const
     IR * irlst = getIRList();
     if (irlst != nullptr) {
         note(this, "\n==---- IR List ----==");
-        xoc::dumpIRList(irlst, this, nullptr,
-            IR_DUMP_KID | IR_DUMP_SRC_LINE |
-            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+        DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_SRC_LINE);
+        f.set(dump_inner_region ? IR_DUMP_INNER_REGION : 0);
+        xoc::dumpIRList(irlst, this, nullptr, f);
         return;
     }
     dumpBBList(dump_inner_region);
@@ -1297,6 +1320,18 @@ void Region::dumpGR(bool dump_inner_region) const
 }
 
 
+IRMgr * Region::reInitIRMgr()
+{
+    PassMgr * passmgr = getPassMgr();
+    ASSERTN(passmgr, ("need PassMgr"));
+    if (getAnalysisInstrument()->getIRMgr() != nullptr) {
+        passmgr->destroyRegisteredPass(PASS_IRMGR);
+        setIRMgr(nullptr);
+    }
+    return initIRMgr();
+}
+
+
 IRMgr * Region::initIRMgr()
 {
     ASSERTN(getAnalysisInstrument(), ("need AnalysisInstrument"));
@@ -1306,7 +1341,9 @@ IRMgr * Region::initIRMgr()
     PassMgr * passmgr = getPassMgr();
     ASSERTN(passmgr, ("need PassMgr"));
     setIRMgr((IRMgr*)passmgr->registerPass(PASS_IRMGR));
-    return getIRMgr();
+    IRMgr * irmgr = getIRMgr();
+    irmgr->set_valid(true);
+    return irmgr;
 }
 
 
@@ -1316,7 +1353,8 @@ IRBBMgr * Region::initIRBBMgr()
     if (getAnalysisInstrument()->getIRBBMgr() != nullptr) {
         return getAnalysisInstrument()->getIRBBMgr();
     }
-    setBBMgr(new IRBBMgr());
+    setBBMgr(new IRBBMgr(this));
+    ASSERT0(getBBList()->get_elem_count() == 0);
     return getBBMgr();
 }
 
@@ -1329,6 +1367,20 @@ PassMgr * Region::initPassMgr()
     }
     ANA_INS_pass_mgr(getAnalysisInstrument()) = allocPassMgr();
     return getAnalysisInstrument()->getPassMgr();
+}
+
+
+DbxMgr * Region::initDbxMgr()
+{
+    ASSERTN(getAnalysisInstrument(), ("need AnalysisInstrument"));
+    if (getAnalysisInstrument()->getDbxMgr() != nullptr) {
+        return getAnalysisInstrument()->getDbxMgr();
+    }
+    ANA_INS_dbx_mgr(getAnalysisInstrument()) = allocDbxMgr();
+
+    //Start ranking the various debugging languages for the frontend.
+    ANA_INS_dbx_mgr(getAnalysisInstrument())->setLangInfo();
+    return getAnalysisInstrument()->getDbxMgr();
 }
 
 
@@ -1362,6 +1414,7 @@ void Region::destroyIRBBMgr()
     }
     delete ANA_INS_ir_bb_mgr(getAnalysisInstrument());
     ANA_INS_ir_bb_mgr(getAnalysisInstrument()) = nullptr;
+    getBBList()->clean();
 }
 
 
@@ -1863,6 +1916,7 @@ bool Region::process(OptCtx * oc)
         return true;
     }
     initPassMgr();
+    initDbxMgr();
     initAttachInfoMgr();
     initIRMgr();
     initIRBBMgr();

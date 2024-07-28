@@ -715,7 +715,6 @@ void MDPhi::dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
     }
     default: UNREACHABLE();
     }
-
     if (pred == nullptr) {
         //Predecessor is not match with PHI, error occurred.
         prt(rg, " BB??");
@@ -909,7 +908,7 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
 
 void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 {
-    ASSERT0(ir && mdssainfo && m_mdssa_mgr->hasMDSSAInfo(ir));
+    ASSERT0(ir && mdssainfo && MDSSAMgr::hasMDSSAInfo(ir));
     if (ir->getAI() == nullptr) {
         IR_ai(ir) = m_rg->allocAIContainer();
     }
@@ -920,7 +919,7 @@ void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 void UseDefMgr::cleanMDSSAInfo(IR * ir)
 {
     ASSERT0(ir);
-    ASSERTN(m_mdssa_mgr->hasMDSSAInfo(ir), ("make decision early"));
+    ASSERTN(MDSSAMgr::hasMDSSAInfo(ir), ("make decision early"));
     if (ir->getAI() == nullptr) { return; }
     IR_ai(ir)->clean(AI_MD_SSA);
 }
@@ -929,7 +928,7 @@ void UseDefMgr::cleanMDSSAInfo(IR * ir)
 
 MDSSAInfo * UseDefMgr::genMDSSAInfo(MOD IR * ir)
 {
-    ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
+    ASSERT0(ir && MDSSAMgr::hasMDSSAInfo(ir));
     if (ir->getAI() == nullptr) {
         IR_ai(ir) = m_rg->allocAIContainer();
     }
@@ -946,16 +945,8 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(MOD IR * ir)
 MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir)
 {
     ASSERT0(ir && MDSSAMgr::hasMDSSAInfo(ir));
-    if (ir->getAI() == nullptr) {
-        return nullptr;
-    }
-
-    MDSSAInfo * mdssainfo = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
-    if (mdssainfo == nullptr) {
-        return nullptr;
-    }
-
-    return mdssainfo;
+    if (ir->getAI() == nullptr) { return nullptr; }
+    return (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
 }
 
 

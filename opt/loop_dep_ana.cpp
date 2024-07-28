@@ -71,29 +71,56 @@ CHAR const* LoopDepInfo::dumpTgt(OUT xcom::StrBuf & buf) const
 
 
 //
-//START LDAInfoSet
+//START LoopDepInfoSet
 //
-void LDAInfoSet::dump(Region const* rg) const
+void LoopDepInfoSet::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
-    LDAInfoSetIter lit;
+    LoopDepInfoSetIter lit;
     xcom::StrBuf tmp(16);
-    for (LoopDepInfo * info = get_head(&lit);
-         info != nullptr; info = get_next(&lit)) {
-        ASSERT0(info->verify());
+    for (LoopDepInfo const* ldi = get_first(lit);
+        !lit.end(); ldi = get_next(lit)) {
+        ASSERT0(ldi);
+        ASSERT0(ldi->verify());
         note(rg, "\nLOOP_DEP:%s:%s<->",
-             LoopDepInfoDesc::getDepName(LDI_kind(info)),
-             DumpIRName().dump(LDI_src(info)));
-        if (info->isTgtIR()) {
-            prt(rg, "%s", DumpIRName().dump(LDI_tgt_ir(info)));
+             LoopDepInfoDesc::getDepName(LDI_kind(ldi)),
+             DumpIRName().dump(LDI_src(ldi)));
+        if (ldi->isTgtIR()) {
+            prt(rg, "%s", DumpIRName().dump(LDI_tgt_ir(ldi)));
         } else {
             tmp.clean();
-            ASSERT0(info->isTgtMDDef());
-            prt(rg, "%s", info->dumpTgt(tmp));
+            ASSERT0(ldi->isTgtMDDef());
+            prt(rg, "%s", ldi->dumpTgt(tmp));
         }
     }
 }
-//END LDAInfoSet
+
+
+bool LoopDepInfoSet::isOnlyContainLoopIndep(IR const* src, IR const* tgt) const
+{
+    ASSERT0(src && tgt);
+    if (get_elem_count() != 1) { return false; }
+    LoopDepInfo const* ldi = get_first();
+    return ldi->getSrc() == src && ldi->getTgtIR() == tgt &&
+           ldi->isLoopIndep();
+}
+
+
+bool LoopDepInfoSet::isAtMostContainLoopIndep(
+    IR const* src, IR const* tgt) const
+{
+    ASSERT0(src && tgt);
+    if (get_elem_count() == 0) { return true; }
+    LoopDepInfoSetIter it;
+    for (LoopDepInfo const* ldi = get_first(it);
+         !it.end(); ldi = get_next(it)) {
+        if (ldi->getSrc() == src && ldi->getTgtIR() == tgt) {
+            return ldi->isLoopIndep();
+        }
+    }
+    return true; //No dependence between src and tgt.
+}
+//END LoopDepInfoSet
 
 
 //
@@ -152,14 +179,109 @@ void LDAActMgr::dumpLinRepAct(IVLinearRep const& linrep,
 
 
 //
+//START LDACtx
+//
+LoopDepInfo * LDACtx::allocLoopDepInfo()
+{
+    LoopDepInfo * p = (LoopDepInfo*)smpoolMalloc(sizeof(LoopDepInfo), m_pool);
+    ASSERT0(p);
+    ::memset((void*)p, 0, sizeof(LoopDepInfo));
+    return p;
+}
+
+
+LDACtx::FirstTab * LDACtx::allocFirstTab()
+{
+    FirstTab * p = (FirstTab*)smpoolMalloc(sizeof(FirstTab), m_pool);
+    ASSERT0(p);
+    ::memset((void*)p, 0, sizeof(FirstTab));
+    p->init(m_firtab_pool);
+    return p;
+}
+
+
+LDACtx::SecondTab * LDACtx::allocSecondTab()
+{
+    SecondTab * p = (SecondTab*)smpoolMalloc(sizeof(SecondTab), m_pool);
+    ASSERT0(p);
+    ::memset((void*)p, 0, sizeof(SecondTab));
+    return p;
+}
+
+
+LDACtx::IR2LDITab * LDACtx::allocIR2LDI()
+{
+    IR2LDITab * p = (IR2LDITab*)smpoolMalloc(sizeof(IR2LDITab), m_pool);
+    ASSERT0(p);
+    ::memset((void*)p, 0, sizeof(IR2LDITab));
+    p->init(m_ir2ldi_pool);
+    return p;
+}
+
+
+LDACtx::MDDef2LDITab * LDACtx::allocMDDef2LDI()
+{
+    MDDef2LDITab * p = (MDDef2LDITab*)smpoolMalloc(
+        sizeof(MDDef2LDITab), m_pool);
+    ASSERT0(p);
+    ::memset((void*)p, 0, sizeof(MDDef2LDITab));
+    p->init(m_mddef2ldi_pool);
+    return p;
+}
+
+
+LoopDepInfo const* LDACtx::appendLoopDepInfo(LoopDepInfo const& ldi)
+{
+    IR const* src = ldi.getSrc();
+    ASSERT0(src);
+    FirstTab * ft = m_ir2firsttab.get(src);
+    if (ft == nullptr) {
+        ft = allocFirstTab();
+        m_ir2firsttab.set(src, ft);
+    }
+    ASSERT0(ldi.getKind() != LOOP_DEP_UNDEF);
+    SecondTab * st = ft->get(ldi.getKind());
+    if (st == nullptr) {
+        st = allocSecondTab();
+        ft->set(ldi.getKind(), st);
+    }
+    if (ldi.isTgtIR()) {
+        if (st->ir2ldi == nullptr) {
+            st->ir2ldi = allocIR2LDI();
+        }
+        IR const* tgtir = ldi.getTgtIR();
+        ASSERT0(tgtir && !tgtir->is_undef());
+        LoopDepInfo const* hashed = st->ir2ldi->get(tgtir);
+        if (hashed == nullptr) {
+            LoopDepInfo * t = allocLoopDepInfo();
+            t->copy(ldi);
+            st->ir2ldi->set(tgtir, t);
+            hashed = t;
+        }
+        return hashed;
+    }
+    if (st->mddef2ldi == nullptr) {
+        st->mddef2ldi = allocMDDef2LDI();
+    }
+    ASSERT0(ldi.isTgtMDDef());
+    ASSERT0(ldi.getTgtMDDef());
+    MDDef const* mddef = ldi.getTgtMDDef();
+    ASSERT0(mddef && mddef->is_valid());
+    LoopDepInfo const* hashed = st->mddef2ldi->get(mddef);
+    if (hashed == nullptr) {
+        LoopDepInfo * t = allocLoopDepInfo();
+        t->copy(ldi);
+        st->mddef2ldi->set(mddef, t);
+        hashed = t;
+    }
+    return hashed;
+}
+//END LDACtx
+
+
+//
 //START LoopDepAna
 //
-//Return true if given two IRs in 'info' are indicates same memory location.
-//The funtion uses Equal VN to determine whether these two IRs reference same
-//memory base address.
-//e.g: ist x VS ild y, return true if x's EVN is equal to y's EVN.
-//Return true if these two IRs are reference identical memory location,
-//otherwise tell caller 'I KNOW NOTHING ABOUT THAT' by returning false.
 bool LoopDepAna::isSameMemLocViaEVN(LoopDepInfo const& info)
 {
     ASSERT0(info.verify());
@@ -260,119 +382,166 @@ void LoopDepAna::init(GVN * gvn)
 }
 
 
-LoopDepInfo * LoopDepAna::allocLoopDepInfo()
+bool LoopDepAna::containLoopRedDep(LoopDepInfoSet const& set)
 {
-    LoopDepInfo * p = (LoopDepInfo*)smpoolMalloc(sizeof(LoopDepInfo), m_pool);
-    ASSERT0(p);
-    ::memset((void*)p, 0, sizeof(LoopDepInfo));
-    return p;
-}
-
-
-bool LoopDepAna::containLoopRedDep(LDAInfoSet const& set)
-{
-    LDAInfoSetIter it;
-    for (LoopDepInfo const* info = set.get_head(&it);
-         info != nullptr; info = set.get_next(&it)) {
-        if (info->isLoopRed()) { return true; }
+    LoopDepInfoSetIter it;
+    for (LoopDepInfo const* ldi = set.get_first(it);
+         !it.end(); ldi = set.get_next(it)) {
+        ASSERT0(ldi);
+        if (ldi->isLoopRed()) { return true; }
     }
     return false;
 }
 
 
-bool LoopDepAna::containLoopCarrDep(LDAInfoSet const& set)
+bool LoopDepAna::containLoopCarrDep(LoopDepInfoSet const& set)
 {
-    LDAInfoSetIter it;
-    for (LoopDepInfo const* info = set.get_head(&it);
-         info != nullptr; info = set.get_next(&it)) {
-        if (info->isLoopCarr()) { return true; }
+    LoopDepInfoSetIter it;
+    for (LoopDepInfo const* ldi = set.get_first(it);
+         !it.end(); ldi = set.get_next(it)) {
+        ASSERT0(ldi);
+        if (ldi->isLoopCarr()) { return true; }
     }
     return false;
 }
 
 
 void LoopDepAna::analyzeLinearDep(
-    IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+{
+    ASSERT0(ir && ctx.getLI());
+    ASSERT0(tgt->is_exp() || tgt->is_stmt());
+    if (tgt == ir) { return; }
+    if (!xoc::isDependent(ir, tgt, is_aggressive(), m_rg)) { return; }
+    if (xoc::isLoopIndependent(ir, tgt, is_aggressive(), ctx.getLI(),
+                               m_rg, m_gvn)) {
+        LoopDepInfo tmp;
+        LDI_kind(&tmp) = LOOP_DEP_INDEPENDENT;
+        LDI_src(&tmp) = ir;
+        tmp.setTgtIR(tgt);
+        LoopDepInfo const* ldi = ctx.appendLoopDepInfo(tmp);
+        set.append(ldi);
+        return;
+    }
+    LoopDepInfo tmp;
+    LDI_kind(&tmp) = LOOP_DEP_CARRIED;
+    LDI_src(&tmp) = ir;
+    tmp.setTgtIR(tgt);
+    LoopDepInfo const* ldi = ctx.appendLoopDepInfo(tmp);
+    set.append(ldi);
+}
+
+
+void LoopDepAna::analyzeLinearDep(
+    IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
     MOD LDACtx & ctx)
 {
-    bool is_aggressive = true;
     ASSERT0(ir && ctx.getLI());
     xcom::List<IR*>::Iter it;
     for (IR * tgt = lst.get_head(&it);
          tgt != nullptr; tgt = lst.get_next(&it)) {
         ASSERT0(tgt->is_exp() || tgt->is_stmt());
-        if (tgt == ir) { continue; }
-        if (!xoc::isDependent(ir, tgt, is_aggressive, m_rg)) {
-            continue;
-        }
-        if (xoc::isLoopIndependent(ir, tgt, is_aggressive, ctx.getLI(),
-                                   m_rg, m_gvn)) {
-            LoopDepInfo * ldainfo = allocLoopDepInfo();
-            LDI_kind(ldainfo) = LOOP_DEP_INDEPENDENT;
-            LDI_src(ldainfo) = ir;
-            ldainfo->setTgtIR(tgt);
-            continue;
-        }
-        LoopDepInfo * ldainfo = allocLoopDepInfo();
-        LDI_kind(ldainfo) = LOOP_DEP_CARRIED;
-        LDI_src(ldainfo) = ir;
-        ldainfo->setTgtIR(tgt);
-        set.append_tail(ldainfo);
+        analyzeLinearDep(ir, tgt, set, ctx);
     }
 }
 
 
-void LoopDepAna::analyzeRedDep(
-    IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+void LoopDepAna::analyzeRedDep(IR const* ir, OUT LoopDepInfoSet & set,
     MOD LDACtx & ctx)
 {
     if (!ir->is_exp()) { return; }
     if (!ir->isDirectMemOp() && !ir->isReadPR()) { return; }
     LoopDepInfo tmp;
     if (!xoc::hasLoopReduceDep(ir, m_rg, ctx.getLI(), tmp)) { return; }
-    LoopDepInfo * ldainfo = allocLoopDepInfo();
-    ldainfo->copy(tmp);
-    set.append_tail(ldainfo);
+    LoopDepInfo const* ldainfo = ctx.appendLoopDepInfo(tmp);
+    set.append(ldainfo);
 }
 
 
 void LoopDepAna::analyzeDep(
-    IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+    IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
     MOD LDACtx & ctx)
 {
-    ctx.add(ir); //set ir that has analyzed.
+    ctx.add(ir); //setting ir that is already analyzed.
     analyzeLinearDep(ir, lst, set, ctx);
-    analyzeRedDep(ir, lst, set, ctx);
+    analyzeRedDep(ir, set, ctx);
+}
+
+
+void LoopDepAna::analyzeDep(
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+{
+    ctx.add(ir); //setting ir that is already analyzed.
+    analyzeLinearDep(ir, tgt, set, ctx);
+    analyzeRedDep(ir, set, ctx);
 }
 
 
 bool LoopDepAna::transLoopCarrToLoopIndep(
-    IR const* ir, LDAInfoSet const& set)
+    IR const* ir, MOD LoopDepInfoSet & set, MOD LDACtx & ctx)
 {
     bool changed = false;
-    LDAInfoSetIter lit;
-    for (LoopDepInfo * info = set.get_head(&lit);
-         info != nullptr; info = set.get_next(&lit)) {
-        if (!info->isLoopCarr()) { continue; }
-        if (!isSameMemLocViaEVN(*info)) { continue; }
+    LoopDepInfoSetIter it;
+    List<LoopDepInfo const*> remove;
+    List<LoopDepInfo const*> add;
+    for (LoopDepInfo const* ldi = set.get_first(it);
+         !it.end(); ldi = set.get_next(it)) {
+        ASSERT0(ldi);
+        if (!ldi->isLoopCarr()) { continue; }
+        if (!isSameMemLocViaEVN(*ldi)) { continue; }
 
         //Revise loop-carried to loop-independent to make loop dependence
         //more precise.
-        ASSERT0(info->isTgtIR());
+        ASSERT0(ldi->isTgtIR());
         getActMgr().dumpAct(ir,
             "%s and %s access same memory location, thus they have "
             "loop-independent dependence",
-            DumpIRName().dump(info->getSrc()),
-            DumpIRName().dump(info->getTgtIR()));
-        LDI_kind(info) = LOOP_DEP_INDEPENDENT;
+            DumpIRName().dump(ldi->getSrc()),
+            DumpIRName().dump(ldi->getTgtIR()));
+        LoopDepInfo t(*ldi);
+        LDI_kind(&t) = LOOP_DEP_INDEPENDENT;
+        LoopDepInfo const* newldi = ctx.appendLoopDepInfo(t);
         changed = true;
+        remove.append_tail(ldi);
+        add.append_tail(newldi);
+    }
+    for (LoopDepInfo const* l = remove.get_head();
+         l != nullptr; l = remove.get_next()) {
+        set.remove(l);
+    }
+    for (LoopDepInfo const* l = add.get_head();
+         l != nullptr; l = add.get_next()) {
+        set.append(l);
     }
     return changed;
 }
 
 
 void LoopDepAna::analyzeDepForIRTree(
-    IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+{
+    ASSERT0(ir->is_exp() || ir->is_stmt());
+    ASSERT0(tgt->is_exp() || tgt->is_stmt());
+    ConstIRIter it;
+    for (IR const* x = xoc::iterInitC(ir, it, false);
+         x != nullptr; x = xoc::iterNextC(it, true)) {
+        if (!x->isMemRefNonPR()) { continue; }
+        analyzeDep(x, tgt, set, ctx);
+    }
+    transLoopCarrToLoopIndep(ir, set, ctx);
+}
+
+
+void LoopDepAna::analyzeDepAndRefineDep(
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+{
+    analyzeDep(ir, tgt, set, ctx);
+    transLoopCarrToLoopIndep(ir, set, ctx);
+}
+
+
+void LoopDepAna::analyzeDepForIRTree(
+    IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
     LDACtx & ctx)
 {
     ASSERT0(ir->is_exp() || ir->is_stmt());
@@ -382,7 +551,7 @@ void LoopDepAna::analyzeDepForIRTree(
         if (!x->isMemRefNonPR()) { continue; }
         analyzeDep(x, lst, set, ctx);
     }
-    transLoopCarrToLoopIndep(ir, set);
+    transLoopCarrToLoopIndep(ir, set, ctx);
 }
 
 

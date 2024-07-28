@@ -46,6 +46,7 @@ namespace mach {
 #define IMCTX_mem_byte_size(cont) ((cont)->u1.mem_byte_size)
 #define IMCTX_int_imm(cont) ((cont)->u1.int_imm)
 #define IMCTX_label_num(cont) ((cont)->m_label_num)
+#define IMCTX_cfi_num(cont) ((cont)->m_cfi_num)
 class IMCtx {
 public:
     //Propagate info bottom up.
@@ -80,6 +81,9 @@ public:
     //offset by addRelocation() interface since MI_label instructions will not
     //be added in the final assemble instructions.
     UINT m_label_num;
+
+    //Record the number of CFI instructions in the debug_frame section.
+    UINT m_cfi_num;
 public:
     IMCtx()
     {
@@ -87,6 +91,7 @@ public:
         ::memset((void*)&u2, 0, sizeof(u2));;
         micode = MI_UNDEF;
         m_label_num = 0;
+        m_cfi_num = 0;
     }
     IMCtx(IMCtx const& src) { clean(); copy_topdown(src); }
     IMCtx const& operator = (IMCtx const&);
@@ -168,11 +173,14 @@ public:
     virtual void convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
                                 MOD IMCtx * cont);
     virtual void convertStorePR(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont) = 0;
+                                MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertStoreVar(IR const* ir, OUT RecycMIList & mis,
-                                 MOD IMCtx * cont) = 0;
+                                 MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertIStoreVar(IR const* ir, OUT RecycMIList & mis,
-                                  MOD IMCtx * cont) = 0;
+                                  MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertUnaryOp(IR const* ir, OUT RecycMIList & mis,
                                 MOD IMCtx * cont);
     virtual void convertBinaryOp(IR const* ir, OUT RecycMIList & mis,
@@ -184,11 +192,14 @@ public:
     virtual void convertRelationOp(IR const* ir, OUT RecycMIList & mis,
                                    MOD IMCtx * cont);
     virtual void convertGoto(IR const* ir, OUT RecycMIList & mis,
-                             MOD IMCtx * cont) = 0;
+                             MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertIgoto(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont) = 0;
+                              MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertTruebr(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont) = 0;
+                               MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
     virtual void convertFalsebr(IR const* ir, OUT RecycMIList & mis,
                                 MOD IMCtx * cont);
     virtual void convertReturn(IR const* ir, OUT RecycMIList & mis,
@@ -355,10 +366,36 @@ public:
     {
         ASSERTN(0, ("Target Dependent Code"));
     }
-    void copyDbx(MInst * mi, IR const* ir)
+
+    //The following are operations for converting
+    //DWARF-related instructions to MI.
+
+    //The basic format for both IR and MI is .cfi_def_cfa $reg,offset,
+    //with the difference being the need to obtain
+    //the PC at the MI layer, requiring knowledge of the current CFI's PC.
+    virtual void convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
+                                  MOD IMCtx * cont);
+
+    //Similar to the above, its format is .cfi_same_value $reg.
+    virtual void convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
+                                     MOD IMCtx * cont);
+
+    //Similar to the above, its format is .cfi_offset $reg ,offset.
+    virtual void convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
+                                  MOD IMCtx * cont);
+
+    //Similar to the above, its format is .cfi_restore $reg.
+    virtual void convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
+                                   MOD IMCtx * cont);
+
+    //Similar to the above, its format is .cfi_def_cfa_offset num.
+    virtual void convertCFICfaOffset(IR const* ir, OUT RecycMIList & mis,
+                                     MOD IMCtx * cont);
+
+    void copyDbx(MInst * mi, IR const* ir, DbxMgr * dbx_mgr)
     {
         Dbx * d = ::getDbx(ir);
-        if (d != nullptr) { MI_dbx(mi).copy(*d); }
+        if (d != nullptr) { MI_dbx(mi).copy(*d, dbx_mgr); }
     }
 
     //Translate IR in IRBB to a list of MInst.
@@ -369,6 +406,13 @@ public:
     MInstMgr * getMIMgr() const { return m_mimgr; }
     TypeMgr const* getTypeMgr() const { return m_tm; }
     RecycMIListMgr * getRecycMIListMgr() { return &m_recyc_orlist_mgr; }
+    Region * getRegion() { return m_rg; }
+    DbxMgr * getDbxMgr()
+    {
+        DbxMgr * dbx_mgr = getRegion()->getDbxMgr();
+        ASSERT0(dbx_mgr);
+        return dbx_mgr;
+    }
 
     //Extract the constant value from 'val' that the size is conform to given
     //field type.
@@ -384,6 +428,9 @@ public:
 
     void processRealParams(IR const* ir, OUT RecycMIList & mis,
                            MOD IMCtx * cont);
+
+    //Process hint of after ret.
+    void processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont);
 };
 
 } //namespace

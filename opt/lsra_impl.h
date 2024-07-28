@@ -65,11 +65,16 @@ typedef enum {
 typedef struct tagVexPair {
     VexIdx fromid;
     VexIdx toid;
+    tagVexPair(VexIdx t) { fromid = t; toid = t; }
+    tagVexPair() { fromid = VERTEX_UNDEF; toid = VERTEX_UNDEF; }
 } VexPair;
 class CompareVexPair {
 public:
     bool is_less(VexPair t1, VexPair t2) const
-    { return t1.fromid < t2.fromid || t1.toid < t2.toid; }
+    {
+        return (t1.fromid < t2.fromid) ||
+               (t1.fromid == t2.fromid && t1.toid < t2.toid);
+    }
     bool is_equ(VexPair t1, VexPair t2) const
     { return t1.fromid == t2.fromid && t1.toid == t2.toid; }
     VexPair createKey(VexPair t) { return t; }
@@ -167,8 +172,14 @@ public:
         //The PR is spilled and reloaded in the current BB.
         PR_STATUS_SPILLED_AND_RELOAD = 3,
 
-        //The PR is already in memory for the current BB.
+        //The PR is already in memory in the current BB.
         PR_STATUS_IN_MEMORY = 4,
+
+        //The PR is already reloaded in to the new register in the current BB.
+        PR_STATUS_IN_OLD_REG = 5,
+
+        //The PR is in the original register in the current BB.
+        PR_STATUS_IN_NEW_REG = 6,
     } PR_STATUS;
 protected:
     COPY_CONSTRUCTOR(LTConsistencyMgr);
@@ -179,12 +190,18 @@ protected:
     LSRAImpl & m_impl;
     bool m_is_insert_bb;
     typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
+    typedef TMapIter<VexPair, IRBB*> LatchMapIter;
     typedef TMapIter<LifeTime const*, CONSIST_STATUS> LT2STIter;
     typedef TMap<LifeTime const*, CONSIST_STATUS> LT2ST;
-    typedef TMap<Var const*, PR_STATUS> Var2PRST;
+    typedef TMap<PRNO, PR_STATUS> PR2ST;
     Vector<LT2ST*> m_lt2st_in_vec;
     Vector<LT2ST*> m_lt2st_out_vec;
-    Vector<Var2PRST*> m_var2prst_vec;
+    Vector<PR2ST*> m_pr2st_vec;
+    //This m_inconsist_lt is a sub set of the whole split lifetime list getting
+    //from LSRA, it is used to reduce the time consumed by the inconsistency
+    //check process.
+    List<LifeTime const*> m_inconsist_lt;
+    LivenessMgr * m_live_mgr;
 protected:
     void addInStatus(LifeTime const* lt, CONSIST_STATUS st, UINT bbid)
     { genInTab(bbid)->setAlways(lt, st); }
@@ -198,8 +215,8 @@ protected:
     //   splitting.
     //st: the status of the PR in current BB.
     //bbid: the bbid of current BB.
-    void addPRStatus(Var const* v, PR_STATUS st, UINT bbid)
-    { genPRTab(bbid)->setAlways(v, st); }
+    void addPRStatus(PRNO prno, PR_STATUS st, UINT bbid)
+    { genPRTab(bbid)->setAlways(prno, st); }
 
     //This function shall add the status of PR for current BB per the spill and
     //reload bbid information.
@@ -233,6 +250,10 @@ protected:
     //bbid: current bbid.
     void addConsistStatus(LifeTime const* lt, Pos start, Pos end, UINT bbid);
 
+    //This function is used to exclude the edges which are not necessary to
+    //be invlolved in the inconsistency check.
+    bool canIgnoreEdge(xcom::Edge * e);
+
     void computeLTConsistency();
     void computeEdgeConsistency(OUT InConsistPairList & inconsist_lst);
     void computeEdgeConsistencyImpl(xcom::Edge const* e,
@@ -244,13 +265,10 @@ protected:
     //newlt: the new lifetime of the PR after splited.
     //from: the source BBID of the edge in CFG.
     //to: the destination BBID of the edge in CFG.
+    //spill_loc: the memory location for the spilling operation.
     //inconsist_lst: the list to record the inconsistency information.
-    //Returen value: return true if there is no inconsistency problem for
-    //  anct and newlt; return false if it is uncertain that there is no
-    //  inconsistency problem althrough current check passed, but the further
-    //  check is still required.
-    bool computeForwardConsistencyImpl(LifeTime const* anct,
-        LifeTime const* newlt, UINT from, UINT to,
+    void computeForwardConsistencyImpl(LifeTime const* anct,
+        LifeTime const* newlt, UINT from, UINT to, Var const* spill_loc,
         OUT InConsistPairList & inconsist_lst);
 
     //This function implements the inconsistency check based on backward
@@ -259,10 +277,13 @@ protected:
     //newlt: the new lifetime of the PR after splited.
     //from: the source BBID of the edge in CFG.
     //to: the destination BBID of the edge in CFG.
+    //spill_loc: the memory location for the spilling operation.
     //inconsist_lst: the list to record the inconsistency information.
     void computeBackwardConsistencyImpl(LifeTime const* anct,
-        LifeTime const* newlt, UINT from, UINT to,
+        LifeTime const* newlt, UINT from, UINT to, Var const* spill_loc,
         OUT InConsistPairList & inconsist_lst);
+
+    void dumpBBAfterReorder(IRBB const* bb) const;
 
     LT2ST * genInTab(UINT bbid)
     {
@@ -273,6 +294,11 @@ protected:
         }
         return tab;
     }
+
+    //This func is used to generate the lifetimes which are really need to do
+    //the inconsistency revise.
+    void genInconsistLTList();
+
     //This function generates and inserts a latch BB to hold the IRs for
     //inconsistency recovery.
     //The latch BB is a BB that need to be inserted on an edge in CFG.
@@ -290,12 +316,12 @@ protected:
     //       ...
     //
     IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const& pair);
-    Var2PRST * genPRTab(UINT bbid)
+    PR2ST * genPRTab(UINT bbid)
     {
-        Var2PRST * tab = m_var2prst_vec.get(bbid);
+        PR2ST * tab = m_pr2st_vec.get(bbid);
         if (tab == nullptr) {
-            tab = new Var2PRST();
-            m_var2prst_vec.set(bbid, tab);
+            tab = new PR2ST();
+            m_pr2st_vec.set(bbid, tab);
         }
         return tab;
     }
@@ -308,10 +334,12 @@ protected:
         }
         return tab;
     }
+    List<LifeTime const*> const& getInconsistLTList() const
+    { return m_inconsist_lt; }
     LT2ST * getInTab(UINT bbid) const
     { return m_lt2st_in_vec.get(bbid); }
-    Var2PRST * getPRTab(UINT bbid) const
-    { return m_var2prst_vec.get(bbid); }
+    PR2ST * getPRTab(UINT bbid) const
+    { return m_pr2st_vec.get(bbid); }
     LT2ST * getOutTab(UINT bbid) const
     { return m_lt2st_out_vec.get(bbid); }
     CONSIST_STATUS getInSt(LifeTime const* lt, UINT bbid) const
@@ -320,9 +348,10 @@ protected:
         ASSERT0(tab);
         return tab->get(lt);
     }
-    PR_STATUS getPRSt(Var const* v, UINT bbid) const
+
+    PR_STATUS getPRSt(PRNO v, UINT bbid) const
     {
-        Var2PRST * tab = getPRTab(bbid);
+        PR2ST * tab = getPRTab(bbid);
         ASSERT0(tab);
         return tab->get(v);
     }
@@ -344,10 +373,50 @@ protected:
 
     IRBB * insertLatch(IRBB const* from, MOD IRBB * to);
 
+    //This func will check the reorder for the MOV IRs is required or not in
+    //the specified BB, and also collect some infomations used in the coming
+    //reorder phase.
+    //bb: the specified latch BB.
+    //reg_use_cnt: the register use count for the registers involved in MOV IRs.
+    //move_info: contains the source and destination registers for the MOV IRs.
+    //def_irs: contains the original MOV IR responding to the defined register.
+    //marker: the marker IR indicates where the adjusted IR should be inserted.
+    //return value: true if it is needed to do the reorder; false means don't
+    //              need to do reorder.
+    //For example:
+    //  The group of MOV IRs are in the order below:
+    //    $10 <- MOV $8    #S1
+    //    $7  <- MOV $10   #S2
+    //
+    //  Because $10 is used in #S2, but before it is used, it will be
+    //  overwrote by $8 in #S1, so this two MOV IRs need to be reordered,
+    //  The expected sequence should be:
+    //    $7  <- MOV $10   #S2
+    //    $10 <- MOV $8    #S1
+    //
+    bool isReorderRequired(MOD IRBB * bb, OUT UINT *& reg_use_cnt,
+                           OUT UINT *& move_info, OUT IR **& def_irs,
+                           OUT IR *& marker);
+
+    //This func will reorder the Move IRs inserted at the all latch BBs.
+    void reorderMoveIRInLatchBB(MOD LatchMap & latch_map);
+
+    //This func will do the reorder for the MOV IRs in the latch BB.
+    //bb: the specified latch BB.
+    //reg_use_cnt: the register use count for the registers involved in MOV IRs.
+    //move_info: contains the source and destination registers for the MOV IRs.
+    //def_irs: contains the original MOV IR responding to the defined register.
+    //marker: the marker IR indicates where the adjusted IR should be inserted.
+    void reorderMoveIRForBB(MOD IRBB * bb, MOD UINT *& reg_use_cnt,
+        MOD UINT *& move_info, IN IR ** def_irs, IR const* marker);
+
     void reviseEdgeConsistency(InConsistPairList const& inconsist_lst);
     void reviseTypeMEM2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
     void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const& pair);
     void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
+
+    //This function will verify the reorder result.
+    bool verifyReorderResult(UINT const* move_info, UINT max_reg_num) const;
 public:
     LTConsistencyMgr(LSRAImpl & impl);
     ~LTConsistencyMgr()
@@ -357,7 +426,7 @@ public:
             if (in != nullptr) { delete in; }
             LT2ST * out = m_lt2st_out_vec.get(i);
             if (out != nullptr) { delete out; }
-            Var2PRST * prtbl = m_var2prst_vec.get(i);
+            PR2ST * prtbl = m_pr2st_vec.get(i);
             if (prtbl != nullptr) { delete prtbl; }
         }
     }
@@ -408,7 +477,6 @@ public:
 };
 //END SplitCtx
 
-
 //
 //START SplitMgr
 //
@@ -446,6 +514,8 @@ private:
 
     //Return true if 'stmt' defined the PR that lt represented.
     bool isDefLT(IR const* stmt, LifeTime const* lt) const;
+
+    bool isUsedBySuccessors(PRNO prno, SplitCtx const& ctx);
 
     //The function shrinks lifetime to properly position.
     void shrinkLTToSplitPos(LifeTime * lt, Pos split_pos,
@@ -505,7 +575,7 @@ public:
     //Split lt into two lifetime according to the information given in 'ctx'.
     //Note after splitting the second half of 'lt' will be renamed to a newlt.
     //Return the newlt.
-    LifeTime * splitAt(LifeTime * lt, SplitCtx const& ctx);
+    LifeTime * splitAt(LifeTime * lt, MOD SplitCtx & ctx);
 
     //If there is no available register to assign to 'lt', the function try
     //to find alternative lifetime or 'lt' itself to split.
@@ -541,7 +611,7 @@ public:
     };
     typedef xcom::TMap<LifeTime const*, REG_PREFER> LT2Prefer;
     typedef xcom::TMapIter<LifeTime const*, REG_PREFER> LT2PreferIter;
-    typedef xcom::TMap<Var const*, UINT64> Var2Split;
+    typedef xcom::TMap<PRNO, UINT64> PR2Split;
 private:
     COPY_CONSTRUCTOR(LSRAImpl);
 protected:
@@ -558,7 +628,11 @@ protected:
     OptCtx * m_oc;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
-    Var2Split m_var2split;
+    PR2Split m_pr2split;
+    //This temp var is used as a temp space for vector type.
+    Var * m_temp_vec_var;
+    //This temp var is used as a temp space for scalar type.
+    Var * m_temp_var;
 protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
@@ -588,6 +662,8 @@ public:
         m_bb_list = m_ra.getBBList();
         m_live_mgr = nullptr;
         m_oc = nullptr;
+        m_temp_vec_var = nullptr;
+        m_temp_var = nullptr;
     }
     ~LSRAImpl() {}
     void computeRAPrefer();
@@ -600,7 +676,8 @@ public:
 
     static Var * findSpillLoc(IR const* ir);
 
-    TargInfoMgr & getTIMgr() const { return m_ra.getTIMgr(); }
+    TargInfoMgr & getTIMgr() const
+    { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LivenessMgr * getLiveMgr() const { return m_live_mgr; }
     LinearScanRA & getRA() const { return m_ra; }
     OptCtx * getOptCtx() const { return m_oc; }
@@ -615,12 +692,15 @@ public:
     RegSetImpl & getRegSetImpl() const { return m_rsimpl; }
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
-    PRSplitBB getPrSplitBB(Var const* v) const
+
+    PRSplitBB getPrSplitBB(PRNO v) const
     {
         PRSplitBB splitbb;
-        splitbb.value = m_var2split.get(v);
+        splitbb.value = m_pr2split.get(v);
         return splitbb;
     }
+    //Get a temp memory location for temp use.
+    Var * getTempVar(Type const* ty);
 
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
@@ -638,21 +718,36 @@ public:
     IR * insertSpillAfter(PRNO prno, Type const* ty, IR const* marker);
     void insertSpillBefore(IR * spill, IR const* marker);
     IR * insertSpillBefore(PRNO prno, Type const* ty, IR const* marker);
-    IR * insertSpillBefore(Reg r, IR const* marker);
     IR * insertReload(PRNO to, Var * v, Type const* ty, IRBB * bb);
     void insertReloadBefore(IR * reload, IR const* marker);
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
+
+    //This func shall generate the IRs to swap the data in two registers, if
+    //there is a TMP register reserved on the specific architecture, the
+    //register will be used as the temp space to finish the swap, or else,
+    //memory location on stack willbe adopted to help to complete the data
+    //exchange.
+    //prno1: the first prno for swap data.
+    //prno2: the second prno to swap data.
+    //ty: the data tyupe of prno.
+    //marker: the marker IR used to indicate where to insert the generated IRs.
+    //bb: the BB where IRs will be inserted.
+    //retun value: this func will return the last IR in the new generated IRs,
+    //             it can be used as a new marker if user wants to get the tail
+    //             of new IRs.
+    IR * insertSwapPR(PRNO prno1, PRNO prno2, Type const* ty, IR const* marker,
+                      MOD IRBB * bb);
     bool perform(OptCtx & oc);
 
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
-    void recordVar2Split(Var const* v, UINT spill_bbid, UINT reload_bbid)
+    void recordPR2Split(PRNO prno, UINT spill_bbid, UINT reload_bbid)
     {
         PRSplitBB splitbb;
         splitbb.bb.spill_bbid = spill_bbid;
         splitbb.bb.reload_bbid = reload_bbid;
-        m_var2split.set(v, splitbb.value);
+        m_pr2split.set(prno, splitbb.value);
     }
 
     //The function check each CFG edge to fixup the lifetime conflict while the

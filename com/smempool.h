@@ -109,6 +109,10 @@ size_t smpoolGetPoolSize(SMemPool const* handle);
 //the initialization is dispensable.
 void smpoolInitPool(); //Initializing pool utilities
 
+//The function is used to check whether given elem_size can satified given
+//pool's constraints.
+bool smpoolIsValidConstPool(size_t elem_size, SMemPool const* handler);
+
 //This function perform finialization works
 //if smpoolInitPool() has been invoked.
 void smpoolFiniPool(); //Finializing pool

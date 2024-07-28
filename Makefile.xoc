@@ -5,7 +5,7 @@ ifeq ($(TARG),)
 endif
 
 ifeq ($(TARG_DIR),)
-  $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
+  $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
 endif
 
 ifeq ($(THREAD_NUM),)

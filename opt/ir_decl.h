@@ -31,21 +31,37 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class TenVal {};
+class AnonyVal {};
+
 //Record float point.
-#define CONST_fp_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_const_value)
+#define CONST_fp_val(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_const_value)
 
 //Record the number of mantissa of float-point number.
-#define CONST_fp_mant(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_mantissa)
+#define CONST_fp_mant(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_mantissa)
 
-//Record integer.
-#define CONST_int_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.int_const_value)
+//Record *signed* integer.
+#define CONST_int_val(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.int_const_value)
+
+//Record *unsigned* integer.
+#define CONST_uint_val(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.uint_const_value)
 
 //Record string.
-#define CONST_str_val(ir) (((CConst*)CK_IRC(ir, IR_CONST))->u1.str_value)
+#define CONST_str_val(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.str_value)
 
 //Record anonymous value.
 #define CONST_anony_val(ir) \
     (((CConst*)CK_IRC(ir, IR_CONST))->u1.anonymous_value)
+
+//Record tensor data that is given by user.
+#define CONST_tensor_val(ir) \
+    (((CConst*)CK_IRC(ir, IR_CONST))->u1.tensor_value)
+
 class CConst : public IR {
     COPY_CONSTRUCTOR(CConst);
 public:
@@ -53,8 +69,11 @@ public:
         //record string-const if current ir is string type.
         Sym const* str_value;
 
-        //record integer value using a length of HOST_INT memory.
+        //record *signed* integer value using a length of HOST_INT memory.
         HOST_INT int_const_value;
+
+        //record *unsigned* integer value using a length of HOST_UINT memory.
+        HOST_UINT uint_const_value;
 
         //record float point value if current ir is float type.
         struct {
@@ -65,7 +84,10 @@ public:
         } s1;
 
         //record customized value.
-        void * anonymous_value;
+        AnonyVal * anonymous_value;
+
+        //record tensor value.
+        TenVal * tensor_value;
     } u1;
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0x0;
@@ -74,7 +96,9 @@ public:
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getInt() const { return CONST_int_val(this); }
     Sym const* getStr() const { return CONST_str_val(this); }
-    void * getAnonymousVal() const { return CONST_anony_val(this); }
+    AnonyVal * getAnonymousVal() const { return CONST_anony_val(this); }
+    TenVal * getTensor() const
+    { ASSERT0(is_tensor()); return CONST_tensor_val(this); }
 };
 
 //Record Var property.
@@ -595,6 +619,27 @@ public:
 };
 
 
+//Ternary Operation, includes some target-dependent operations.
+#define TER_opnd0(ir) TER_kid(ir, 0)
+#define TER_opnd1(ir) TER_kid(ir, 1)
+#define TER_opnd2(ir) TER_kid(ir, 2)
+#define TER_kid(ir, idx) (((CTer*)ir)->opnd[CK_KID_TER(ir, idx)])
+class CTer : public IR {
+    COPY_CONSTRUCTOR(CTer);
+public:
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx) { return TER_kid(ir, idx); }
+
+    IR * getKid(UINT idx) const { return TER_kid(this, idx); }
+    IR * getOpnd0() const { return TER_opnd0(this); }
+    IR * getOpnd1() const { return TER_opnd1(this); }
+    IR * getOpnd2() const { return TER_opnd2(this); }
+};
+
+
 //Binary Operation, includes ADD, SUB, MUL, DIV, REM, MOD, POW, NROOT,
 //LAND, LOR, BAND, BOR, XOR, LT, LE, GT, GE, EQ, NE, ASR, LSR, LSL.
 #define BIN_opnd0(ir) BIN_kid(ir, 0)
@@ -883,6 +928,24 @@ public:
 };
 
 
+//The class represents a list expressions that represent dummy-use.
+//e.g: given a call to foo(x), user can build a dummyuse to represent global
+//variables that foo(x) referenced, such as call foo(x, dummyuse(ld g, ld m)).
+#define DUMMYUSE_use_list(ir) DUMMYUSE_kid(ir, 0)
+#define DUMMYUSE_kid(ir, idx) \
+    (((CDummyUse*)ir)->opnd[CK_KID_IRC(ir, IR_DUMMYUSE, idx)])
+class CDummyUse : public IR {
+    COPY_CONSTRUCTOR(CDummyUse);
+public:
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 1;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return DUMMYUSE_kid(ir, idx); }
+};
+
+
 //This class represents the case value expression and its jump target label.
 //NOTE: this class is used only by SWITCH and IGOTO.
 #define CASE_lab(ir) (((CCase*)CK_IRC(ir, IR_CASE))->jump_target_label)
@@ -1047,7 +1110,7 @@ public:
     {
         for (IR const* s = ARR_sub_list(this);
              s != nullptr; s = s->get_next()) {
-            if (s == exp || s->is_kids(exp)) { return true; }
+            if (s == exp || s->isKids(exp)) { return true; }
         }
         return false;
     }
@@ -1413,6 +1476,94 @@ public:
 
 bool checkIRCodeBitSize();
 bool checkMaxIRCode();
+
+
+#define CCFIDEFCFA_bb(ir) (((CCFIDefCfa*)CK_IRC(ir, IR_CFI_DEF_CFA))->bb)
+#define CFI_CFA_KID(ir, idx) \
+    (((CCFIDefCfa*)ir)->opnd[CK_KID_IRC(ir, IR_CFI_DEF_CFA, idx)])
+class CCFIDefCfa : public IR, public StmtProp{
+    COPY_CONSTRUCTOR(CCFIDefCfa);
+public:
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return CFI_CFA_KID(ir, idx); }
+    static inline IRBB *& accBB(IR * ir) { return CCFIDEFCFA_bb(ir); }
+    IR * getKid(UINT idx) const { return CFI_CFA_KID(this, idx); }
+
+};
+
+#define CCFISAMEVALUE_bb(ir) \
+    (((CCFISameValue*)CK_IRC(ir, IR_CFI_SAME_VALUE))->bb)
+#define CFI_SAME_VALUE_kid(ir, idx) \
+    (((CCFISameValue*)ir)->opnd[CK_KID_IRC(ir, IR_CFI_SAME_VALUE, idx)])
+class CCFISameValue : public IR, public StmtProp{
+    COPY_CONSTRUCTOR(CCFISameValue);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return CFI_SAME_VALUE_kid(ir, idx); }
+    static inline IRBB *& accBB(IR * ir) { return CCFISAMEVALUE_bb(ir); }
+    IR * getKid(UINT idx) const { return CFI_SAME_VALUE_kid(this, idx); }
+
+};
+
+#define CCFIOFFSET_bb(ir) (((CCFIOffset*)CK_IRC(ir, IR_CFI_OFFSET))->bb)
+#define CFI_OFFSET_kid(ir, idx) \
+    (((CCFIOffset*)ir)->opnd[CK_KID_IRC(ir, IR_CFI_OFFSET, idx)])
+class CCFIOffset : public IR, public StmtProp{
+    COPY_CONSTRUCTOR(CCFIOffset);
+public:
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return CFI_OFFSET_kid(ir, idx); }
+    static inline IRBB *& accBB(IR * ir) { return CCFIOFFSET_bb(ir); }
+    IR * getKid(UINT idx) const { return CFI_OFFSET_kid(this, idx); }
+
+};
+
+#define CCFIRESTORE_bb(ir) (((CCFIRestore*)CK_IRC(ir, IR_CFI_RESTORE))->bb)
+#define CFI_RESTORE_kid(ir, idx) \
+    (((CCFIRestore*)ir)->opnd[CK_KID_IRC(ir, IR_CFI_RESTORE, idx)])
+class CCFIRestore : public IR, public StmtProp{
+    COPY_CONSTRUCTOR(CCFIRestore);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return CFI_RESTORE_kid(ir, idx); }
+    static inline IRBB *& accBB(IR * ir) { return CCFIRESTORE_bb(ir); }
+    IR * getKid(UINT idx) const { return CFI_RESTORE_kid(this, idx); }
+
+};
+
+#define CCFIDEFCFAOFFSET_bb(ir) \
+    (((CCFIDefCfaOffset*)CK_IRC(ir, IR_CFI_DEF_CFA_OFFSET))->bb)
+#define CFI_DEF_CFA_OFFSET_KID(ir, idx) \
+    (((CCFIDefCfaOffset*)ir)->opnd[CK_KID_IRC(ir, IR_CFI_DEF_CFA_OFFSET, idx)])
+class CCFIDefCfaOffset : public IR, public StmtProp{
+    COPY_CONSTRUCTOR(CCFIDefCfaOffset);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return CFI_DEF_CFA_OFFSET_KID(ir, idx); }
+    static inline IRBB *& accBB(IR * ir) { return CCFIDEFCFAOFFSET_bb(ir); }
+    IR * getKid(UINT idx) const { return CFI_DEF_CFA_OFFSET_KID(this, idx); }
+
+};
 
 } //namespace xoc
 

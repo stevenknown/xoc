@@ -55,6 +55,7 @@ CHAR const* AIContainer::getAIName(AI_TYPE type) const
     case AI_EH_LABEL: return "EH";
     case AI_USER_DEF: return "UserDef";
     case AI_MD_SSA: return "MDSSA";
+    case AI_TENSOR: return "TENSOR";
     case AI_LAST:;
     default: UNREACHABLE();
     }

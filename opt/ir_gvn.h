@@ -606,18 +606,21 @@ public:
 };
 
 
-//The class inferences Equal VN via walk through DefUse chain.
-//Equal VN describes a kind of VN comparasion strategy when determining whether
-//two given IR exps's value are equal. The passes can reason out that
-//that two IR expressions have same runtime value if their Equal VN are the
-//same one.
-//ONE KEY NOTE: the Equal VN is different to normal VN as GVN computed. If
-//given two IR expressions's Equal VN is different, we can NOT exactly say the
-//IR expressions have different runtime value. On the contrary, VN could
-//exactly say the IR expressions have different runtime value.
-//e.g: given two IR expressions ld x and $y, if InferVN reasoned out that
-//ld x has EVN1, and $y has EVN2, we just tell optimizer that we have
-//no knowledge about ld x and $y's value.
+//The class inferences Equivalent-VN via walk through DefUse chain.
+//Equivalent-VN describes a kind of VN comparasion strategy when determining
+//whether two given IR exps's value are equal.
+//The passes can reason out that two IR expressions have same runtime value
+//if their Equivalent-VN are the same one.
+//ONE KEY NOTE: the Equivalent-VN is different to the normal VN that GVN
+//computed in usually.
+//If given two IR expressions's Equivalent-VN is different, we can NOT
+//exactly conclude the IR expressions have different runtime value.
+//On the contrary, GVN's VN comparison strategy could exactly say the IR
+//expressions have different runtime value.
+//e.g: given two IR expressions ld x and $y, if InferEVN reasoned out that
+//ld x has EVN1, and $y has EVN2, we just tell user that we have no knowledge
+//about ld x and $y's value.
+//NOTE: the EVN's inference may utilize GVN's VN if exist to infer EVN.
 class InferEVN {
     COPY_CONSTRUCTOR(InferEVN);
 protected:
@@ -673,6 +676,8 @@ protected:
     void setVN(IR const* ir, VN const* vn)
     {
         ASSERT0(!vn->is_unknown());
+        //NOTE: each IR can be set only once, user has to check VN before
+        //inoke the function.
         m_irid2vn.set(ir->id(), vn);
     }
     void setVN(MDDef const* mddef, VN const* vn)
@@ -725,6 +730,7 @@ protected:
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
+    IRMgr * m_irmgr;
     Refine * m_refine;
     VN * m_zero_vn;
     VN * m_mc_zero_vn;
@@ -797,6 +803,7 @@ protected:
     void destroyLocalUsed();
 
     OptCtx const* getOptCtx() const { return m_oc; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.

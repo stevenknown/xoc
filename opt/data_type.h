@@ -48,6 +48,7 @@ class RegionMgr;
 
 #define IS_INT(t) ((t) >= D_I8 && (t) <= D_U128)
 #define IS_SINT(t) ((t) >= D_I8 && (t) <= D_I128)
+#define IS_UINT(t) ((t) >= D_U8 && (t) <= D_U128)
 #define IS_FP(t) ((t) >= D_BF16 && (t) <= D_F128)
 #define IS_BOOL(t) ((t) == D_B)
 #define IS_MC(t) ((t) == D_MC)
@@ -90,6 +91,19 @@ class RegionMgr;
     case D_STR: \
     case D_ANY
 
+#define SWITCH_CASE_SMALL_INT_DTYPE \
+    case D_B: \
+    case D_I8: \
+    case D_U8: \
+    case D_I16: \
+    case D_U16: \
+    case D_I32: \
+    case D_U32
+
+#define SWITCH_CASE_LONG_INT_DTYPE \
+    case D_I64: \
+    case D_U64
+
 //Data Type, represented with bit length.
 //
 //Is unsigned type indispensible?
@@ -121,7 +135,7 @@ typedef enum _DATA_TYPE {
     D_F16, //Float point 16 bit
     D_F32, //Float point 32 bit
     D_F64, //Float point 64 bit
-    D_F80, //Float point 96 bit
+    D_F80, //Float point 80 bit
     D_F128, //Float point 128 bit
     //NOTE ALL ABOVE TYPES ARE SCALAR.
 
@@ -289,6 +303,13 @@ public:
     bool is_int() const
     { return TY_dtype(this) >= D_B && TY_dtype(this) <= D_U128; }
 
+    //Return true if data type is subword integer.
+    bool is_subword_int() const
+    {
+        return (TY_dtype(this) >= D_B && TY_dtype(this) <= D_I16) ||
+               (TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U16);
+    }
+
     //Return true if data type is float.
     bool is_fp() const
     { return TY_dtype(this) >= D_BF16 && TY_dtype(this) <= D_F128; }
@@ -397,10 +418,18 @@ class TensorType : public Type {
     COPY_CONSTRUCTOR(TensorType);
 public:
     friend class TypeMgr;
+
+    //Note the default grow size should be 1 because, SimpleVector does not
+    //have 'lastidx' indicator, thus it just regards the maximum size of
+    //vector as the number of elements.
+    static UINT const g_default_grow_size = 1;
+    static UINT const g_default_max_tensor_dim = 64;
+
     //Record the degree of each dimension.
     //e.g: <3x2x7x1>, the degree of dimension 0 is 3,
     //degree of dimension 1 is 2, degree of dimension 2 is 7, etc.
-    xcom::SimpleVector<UINT, 3, 64> degree_of_dimension;
+    xcom::SimpleVector<UINT, g_default_grow_size, g_default_max_tensor_dim>
+        degree_of_dimension;
 
     //Record data type of element in tensor.
     DATA_TYPE tensor_elem_type;
@@ -413,18 +442,47 @@ public:
 
     void copy(TensorType const& src, TypeMgr * mgr);
 
-    void init() { degree_of_dimension.init(); }
     void destroy() { degree_of_dimension.destroy(); }
 
     //Get data type of element in tensor.
     DATA_TYPE getElemDataType() const { return tensor_elem_type; }
+
+    //Get type of element in tensor.
+    inline Type const* getElemType(TypeMgr const* tm) const;
+
     //Return the degree of given dimension in tensor.
     UINT getDegreeOfDim(UINT dim) const
     { return degree_of_dimension.get(dim); }
+
     //Return the number of dimensions of tensor.
     UINT getDim() const { return degree_of_dimension.get_capacity(); }
+
     //Return byte size of total tensor.
     UINT getByteSize(TypeMgr const* mgr) const;
+
+    void init() { degree_of_dimension.init(); }
+
+    //Return true if data type is signed integer.
+    bool is_sint() const { return IS_SINT(tensor_elem_type); }
+
+    //Return true if data type is unsgined integer.
+    bool is_uint() const { return IS_UINT(tensor_elem_type); }
+
+    //Return true if data type is integer.
+    //The function treats BOOL as integer.
+    bool is_int() const
+    { return tensor_elem_type >= D_B && tensor_elem_type <= D_U128; }
+
+    //Return true if data type is float.
+    bool is_fp() const { return IS_FP(tensor_elem_type); }
+
+    //Return true if curent tensor type's dimension and the dergree of each
+    //dimensions are equal to 'src'.
+    //NOTE the function does NOT check the element type.
+    //e.g: If current tensor is <i32x3x3x6>, src is <f64x3x3x6>, the function
+    //return true. If current tensor is <f64x3x3>, src is <f64x3x4>, the
+    //function return false.
+    bool is_homo(TensorType const& src) const;
 
     //Set degree to given dimension.
     void setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr);
@@ -604,6 +662,7 @@ public:
 
 
 extern TypeDesc const g_type_desc[];
+
 class TypeMgr {
     COPY_CONSTRUCTOR(TypeMgr);
     friend class TensorType;
@@ -1069,6 +1128,16 @@ UINT Type::getVectorElemNum(TypeMgr const* tm) const
     return TY_vec_size(this) / tm->getDTypeByteSize(TY_vec_ety(this));
 }
 //END Type
+
+
+//
+//START TensorType
+//
+Type const* TensorType::getElemType(TypeMgr const* tm) const
+{
+    return tm->getSimplexTypeEx(tensor_elem_type);
+}
+//END TensorType
 
 } //namespace xoc
 #endif

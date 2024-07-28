@@ -468,7 +468,7 @@ void AliasAnalysis::processCvt(IR const* ir, MOD MDSet & mds,
                                OUT AACtx * ic, OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_cvt());
-    inferExpression(CVT_exp(ir), mds, ic, mx);
+    inferExp(CVT_exp(ir), mds, ic, mx);
     if (!ic->is_mds_mod()) { return; }
 
     MDSetIter iter;
@@ -677,10 +677,10 @@ void AliasAnalysis::inferArrayExpBase(IR * ir, IR * array_base,
     tic.copyTopDownFlag(*ic);
 
     //Compute point-to set at this function scope rather than demand
-    //inferExpression for 'array_base', we can do more evaluation.
+    //inferExp for 'array_base', we can do more evaluation.
     AC_comp_pts(&tic) = false;
 
-    inferExpression(array_base, tmp, &tic, mx);
+    inferExp(array_base, tmp, &tic, mx);
 
     //Acquire TBAA to determine MD reference.
     MD const* typed_md = queryTBAA(array_base);
@@ -916,7 +916,7 @@ void AliasAnalysis::processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
         AACtx tic;
         tic.copyTopDownFlag(*ic);
         AC_comp_pts(&tic) = false;
-        inferExpression(s, mds, &tic, mx);
+        inferExp(s, mds, &tic, mx);
     }
     IR * array_base = ARR_base(ir);
 
@@ -1376,7 +1376,7 @@ void AliasAnalysis::inferPointerArith(IR const* ir, OUT MDSet & mds,
     opnd1_tic.cleanBottomUpFlag();
     AC_comp_pts(&opnd1_tic) = false; //PointToSet of addon is useless.
     IR * opnd1 = BIN_opnd1(ir);
-    inferExpression(opnd1, mds, &opnd1_tic, mx);
+    inferExp(opnd1, mds, &opnd1_tic, mx);
 
     //Bottom-up flag of opnd1, say mds, is useless to its parent.
     mds.clean(*getSBSMgr());
@@ -1458,14 +1458,14 @@ void AliasAnalysis::processAddSub(IR * ir, MOD MDSet & mds,
     AACtx tic(*ic);
     AC_comp_pts(&tic) = false; //Just compute the mdset of opnd0.
     tic.cleanBottomUpFlag();
-    inferExpression(opnd0, mds, &tic, mx);
+    inferExp(opnd0, mds, &tic, mx);
     mds.clean(*getSBSMgr()); //Do not remove this code.
 
     //Scan and generate MD of opnd1.
     AACtx tic2(*ic);
     AC_comp_pts(&tic2) = false; //Just compute the mdset of opnd1.
     tic2.cleanBottomUpFlag();
-    inferExpression(opnd1, mds, &tic2, mx);
+    inferExp(opnd1, mds, &tic2, mx);
     mds.clean(*getSBSMgr()); //Do not remove this code.
 
     //Have to union the ctx info bottom up to caller.
@@ -1492,7 +1492,7 @@ void AliasAnalysis::processPointerArith(IR * ir, MOD MDSet & mds,
     MDSet opnd0_mds;
     AACtx opnd0_tic(*ic);
     opnd0_tic.cleanBottomUpFlag();
-    inferExpression(opnd0, opnd0_mds, &opnd0_tic, mx);
+    inferExp(opnd0, opnd0_mds, &opnd0_tic, mx);
     ASSERT0_DUMMYUSE(is_legal_set(opnd0_mds, &opnd0_tic));
     if (ir->is_add()) {
         //If opnd1 is pointer. e.g: x+&q, it means the arih regard the
@@ -1791,7 +1791,7 @@ void AliasAnalysis::processILoad(IR * ir, MOD MDSet & mds,
     AC_comp_pts(&tic) = true;
 
     //Compute the memory address that ILD described.
-    inferExpression(ILD_base(ir), mds, &tic, mx);
+    inferExp(ILD_base(ir), mds, &tic, mx);
 
     ASSERT0_DUMMYUSE(is_legal_set(mds, &tic));
     if (mds.is_empty()) {
@@ -1975,10 +1975,11 @@ void AliasAnalysis::recomputeDataType(IR const* ir, AACtx const& ic,
 //rhs: RHS expression of ir. It's refdu might be updated by this function.
 //lhs_md: MD of LHS of 'ir'.
 //ic: analysis context.
-void AliasAnalysis::inferStoreValue(IR const* ir, IR * rhs, MD const* mustref,
+void AliasAnalysis::inferStoreValue(IR const* ir, IR * rhs,
                                     AACtx const* ic, MOD MD2MDSet * mx)
 {
     ASSERT0(ir->isWritePR() || ir->isDirectMemOp());
+    ASSERT0(rhs->is_single());
 
     //Considering the STORE operation, there
     //are three situations should be processed:
@@ -1987,8 +1988,9 @@ void AliasAnalysis::inferStoreValue(IR const* ir, IR * rhs, MD const* mustref,
     //        e.g: p=ILD(q), if q->a->w, then p->w.
     //    3. Propagate the MDSet that RHS pointed to.
     //        e.g: p=q, if q->a, then p->a.
+    MD const* mustref = ir->getMustRef();
     ASSERT0(mustref);
-    if (!g_is_support_dynamic_type) {
+    if (!g_is_support_dynamic_type && !ir->is_any()) {
         //lhs of IR_ST may be inexact because IR_ST may be ANY.
         ASSERT0(mustref->is_exact());
     }
@@ -1999,11 +2001,9 @@ void AliasAnalysis::inferStoreValue(IR const* ir, IR * rhs, MD const* mustref,
 //The function will infer POINT-TO of ir and update the POINT-TO information of
 //mustref and mayref.
 //rhs: RHS of ir, ir should be stmt. It's reference MD will be computed.
-void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
-                                         MD const* mustref,
-                                         MDSet const* mayref,
-                                         AACtx const* ic,
-                                         MOD MD2MDSet * mx)
+void AliasAnalysis::inferRHSAndUpdateLHS(
+    IR const* ir, IR * rhs, MD const* mustref, MDSet const* mayref,
+    AACtx const* ic, MOD MD2MDSet * mx)
 {
     ASSERT0_DUMMYUSE(is_legal_ref(ir));
     //Considering the indirect operation, there are three
@@ -2025,10 +2025,9 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
         //of 'rhs' expression.
         AC_comp_pts(&rhsic) = true;
     }
-
     MDSet rhsrefmds;
     if (rhs != nullptr) {
-        inferExpression(rhs, rhsrefmds, &rhsic, mx);
+        inferExp(rhs, rhsrefmds, &rhsic, mx);
     }
     if (rhsic.is_comp_pts()) {
         ASSERT0_DUMMYUSE(is_legal_set(rhsrefmds, &rhsic));
@@ -2053,10 +2052,12 @@ void AliasAnalysis::inferRHSAndUpdateLHS(IR const* ir, IR * rhs,
 //    MDSet(p) = MDSet(q)
 void AliasAnalysis::processDirectMemOp(IR const* ir, MOD MD2MDSet * mx)
 {
-    MD const* t = ir->getMustRef();
-    ASSERT0(t);
+    if (ir->getRHS() == nullptr) {
+        //Virtual OP may not have RHS.
+        return;
+    }
     AACtx ic;
-    inferStoreValue(ir, ir->getRHS(), t, &ic, mx);
+    inferStoreValue(ir, ir->getRHS(), &ic, mx);
 }
 
 
@@ -2064,18 +2065,16 @@ void AliasAnalysis::processDirectMemOp(IR const* ir, MOD MD2MDSet * mx)
 void AliasAnalysis::processSetElem(IR * ir, MOD MD2MDSet * mx)
 {
     ASSERT0(ir->is_setelem());
-    MD const* t = ir->getMustRef();
-    ASSERT0(t);
     AACtx ic;
-    inferStoreValue(ir, SETELEM_val(ir), t, &ic, mx);
+    inferStoreValue(ir, SETELEM_val(ir), &ic, mx);
 
     MDSet tmp;
     ic.clean();
-    inferExpression(SETELEM_base(ir), tmp, &ic, mx);
+    inferExp(SETELEM_base(ir), tmp, &ic, mx);
     if (!SETELEM_ofst(ir)->is_const()) {
         ic.clean();
         tmp.clean(*getSBSMgr());
-        inferExpression(SETELEM_ofst(ir), tmp, &ic, mx);
+        inferExp(SETELEM_ofst(ir), tmp, &ic, mx);
     }
     tmp.clean(*getSBSMgr());
 }
@@ -2088,11 +2087,11 @@ void AliasAnalysis::processGetElem(IR * ir, MOD MD2MDSet * mx)
     //Process base field, it must refer to memory object.
     AACtx ic;
     MDSet tmp;
-    inferExpression(GETELEM_base(ir), tmp, &ic, mx);
+    inferExp(GETELEM_base(ir), tmp, &ic, mx);
 
     //Process byte offset to base field.
     ic.clean();
-    inferExpression(GETELEM_ofst(ir), tmp, &ic, mx);
+    inferExp(GETELEM_ofst(ir), tmp, &ic, mx);
     tmp.clean(*getSBSMgr());
 }
 
@@ -2109,7 +2108,7 @@ void AliasAnalysis::processPhiOpndPTS(IR const* ir, bool phi_pts_is_worst,
          opnd != nullptr; opnd = opnd->get_next()) {
         AACtx tic;
         AC_comp_pts(&tic) = true;
-        inferExpression(opnd, tmp, &tic, mx);
+        inferExp(opnd, tmp, &tic, mx);
         if (phi_pts_is_worst) {
             tmp.clean(*getSBSMgr());
             continue;
@@ -2170,7 +2169,7 @@ void AliasAnalysis::processPhi(IR const* ir, MOD MD2MDSet * mx)
     for (IR * opnd = PHI_opnd_list(ir);
          opnd != nullptr; opnd = opnd->get_next()) {
         AACtx tic(ic);
-        inferExpression(opnd, tmp, &tic, mx);
+        inferExp(opnd, tmp, &tic, mx);
         tmp.clean(*getSBSMgr());
     }
     tmp.clean(*getSBSMgr());
@@ -2204,14 +2203,10 @@ bool AliasAnalysis::isPointToDedicatedVar(MD const* md, MD2MDSet const& mx)
 //hashed_mds: record the POINT-TO set of 'rhs' if AC_comp_pts() is true.
 //              Note if AC_comp_pts() is true, the returned POINT-TO set may be
 //              recorded in 'rhsrefmds' or AC_hashed_mds.
-void AliasAnalysis::updateLHSPointToSet(bool is_lhs_pointer,
-                                        bool rhs_taken_address,
-                                        MD const* lhs_mustref,
-                                        MDSet const* lhs_mayref,
-                                        IR const* rhs,
-                                        MDSet & rhsrefmds,
-                                        MDSet const* hashed_mds,
-                                        MD2MDSet * mx)
+void AliasAnalysis::updateLHSPointToSet(
+    bool is_lhs_pointer, bool rhs_taken_address, MD const* lhs_mustref,
+    MDSet const* lhs_mayref, IR const* rhs, MDSet & rhsrefmds,
+    MDSet const* hashed_mds, MD2MDSet * mx)
 {
     if (rhs_taken_address || is_lhs_pointer) {
         if (lhs_mustref != nullptr && lhs_mustref->is_restrict()) {
@@ -2418,7 +2413,7 @@ void AliasAnalysis::processIndirectMemOp(MOD IR * ir, IN MD2MDSet * mx)
     AC_comp_pts(&ic) = true;
 
     //Compute where base may point to.
-    inferExpression(base, base_maypts, &ic, mx);
+    inferExp(base, base_maypts, &ic, mx);
     ASSERT0_DUMMYUSE(is_legal_set(base_maypts, &ic));
 
     //In fact, The POINT-TO set of base-expression indicates what IST
@@ -2543,7 +2538,7 @@ void AliasAnalysis::processReturn(IR const* ir, IN MD2MDSet * mx)
         AACtx tic;
         ASSERT0(RET_exp(ir) == nullptr || RET_exp(ir)->is_single());
         ASSERT0(RET_exp(ir)->is_single());
-        inferExpression(RET_exp(ir), tmp, &tic, mx);
+        inferExp(RET_exp(ir), tmp, &tic, mx);
         tmp.clean(*getSBSMgr());
     }
 }
@@ -2668,7 +2663,7 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
     MDSet tmp;
     if (ir->is_icall()) {
         AACtx tic;
-        inferExpression(ICALL_callee(ir), tmp, &tic, mx);
+        inferExp(ICALL_callee(ir), tmp, &tic, mx);
     }
 
     //Analyze the point-to of each parameters.
@@ -2678,7 +2673,7 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
         if (p->isPtr()) {
             AC_comp_pts(&tic) = true;
         }
-        inferExpression(p, tmp, &tic, mx);
+        inferExp(p, tmp, &tic, mx);
 
         if (ir->isReadOnly()) { continue; }
         if (!tic.is_comp_pts() && !tic.is_taken_addr()) { continue; }
@@ -2695,7 +2690,7 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
     //Infer the MD reference of each parameters.
     for (IR * p = CALL_dummyuse(ir); p != nullptr; p = p->get_next()) {
         AACtx tic;
-        inferExpression(p, tmp, &tic, mx);
+        inferExp(p, tmp, &tic, mx);
     }
 
     setMayDefSetForCall(ir, this);
@@ -2746,35 +2741,41 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
 }
 
 
-void AliasAnalysis::inferExtExpression(IR * ir, MOD MDSet & mds,
-                                       MOD AACtx * ic, MOD MD2MDSet * mx)
+void AliasAnalysis::inferExpGeneralAndSetWorstCase(
+    IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx)
+{
+    AACtx tic(*ic);
+    AC_comp_pts(&tic) = false;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        tic.cleanBottomUpFlag();
+        inferExp(kid, mds, &tic, mx);
+    }
+    //CASE: if (p && q)
+    //GR: land (ld p:*<2>, ld q:*<2>)
+    //ASSERTN(!BIN_opnd0(expr)->is_ptr(),
+    //    ("illegal, left operand can not be pointer type"));
+    //These expressions does not descripte
+    //an accurate memory-address. So, for the
+    //conservative purpose, we claim that can
+    //not find any MD.
+    if (ic->is_comp_pts()) {
+        mds.clean(*getSBSMgr());
+        AC_hashed_mds(ic) = getWorstCase();
+        return;
+    }
+    mds.clean(*getSBSMgr());
+}
+
+
+void AliasAnalysis::inferExtExp(IR * ir, MOD MDSet & mds,
+                                MOD AACtx * ic, MOD MD2MDSet * mx)
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
     SWITCH_CASE_EXT_EXP: {
-        AACtx tic(*ic);
-        AC_comp_pts(&tic) = false;
-        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-            IR * kid = ir->getKid(i);
-            if (kid != nullptr) {
-                tic.cleanBottomUpFlag();
-                inferExpression(kid, mds, &tic, mx);
-            }
-        }
-        //CASE: if (p && q)
-        //GR: land (ld p:*<2>, ld q:*<2>)
-        //ASSERTN(!BIN_opnd0(expr)->is_ptr(),
-        //    ("illegal, left operand can not be pointer type"));
-        //These expressions does not descripte
-        //an accurate memory-address. So, for the
-        //conservative purpose, we claim that can
-        //not find any MD.
-        if (ic->is_comp_pts()) {
-            mds.clean(*getSBSMgr());
-            AC_hashed_mds(ic) = getWorstCase();
-        } else {
-            mds.clean(*getSBSMgr());
-        }
+        inferExpGeneralAndSetWorstCase(ir, mds, ic, mx);
         return;
     }
     default: UNREACHABLE();
@@ -2788,8 +2789,8 @@ void AliasAnalysis::inferExtExpression(IR * ir, MOD MDSet & mds,
 //mds: record output memory descriptors which 'expr' might express that
 //     generated by this function.
 //ic: context of analysis.
-void AliasAnalysis::inferExpression(IR * expr, MOD MDSet & mds,
-                                    MOD AACtx * ic, MOD MD2MDSet * mx)
+void AliasAnalysis::inferExp(IR * expr, MOD MDSet & mds,
+                             MOD AACtx * ic, MOD MD2MDSet * mx)
 {
     ASSERT0(expr);
     switch (expr->getCode()) {
@@ -2843,7 +2844,7 @@ void AliasAnalysis::inferExpression(IR * expr, MOD MDSet & mds,
             IR * kid = expr->getKid(i);
             if (kid != nullptr) {
                 tic.cleanBottomUpFlag();
-                inferExpression(kid, mds, &tic, mx);
+                inferExp(kid, mds, &tic, mx);
             }
         }
         //CASE: if (p && q)
@@ -2862,9 +2863,14 @@ void AliasAnalysis::inferExpression(IR * expr, MOD MDSet & mds,
         }
         return;
     }
-    case IR_LABEL:
+    case IR_DUMMYUSE:
+        inferExpGeneralAndSetWorstCase(expr, mds, ic, mx);
         return;
-    default: inferExtExpression(expr, mds, ic, mx);
+    case IR_CASE:
+    case IR_LABEL:
+        //Above IR's behaviors do not affect the pointer analysis.
+        return;
+    default: inferExtExp(expr, mds, ic, mx);
     }
 }
 
@@ -3336,7 +3342,8 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         note(getRegion(), "\n---------------------------------");
-        dumpIRList(ir, m_rg, nullptr, IR_DUMP_KID | IR_DUMP_SRC_LINE);
+        dumpIRList(ir, m_rg, nullptr,
+                   DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_SRC_LINE));
         note(getRegion(), "\n");
         dumpIRPointToForIR(ir, dump_kid, mx);
     }
@@ -3571,7 +3578,7 @@ void AliasAnalysis::computeStmt(MOD IR * ir, MOD MD2MDSet * mx)
         ASSERT0(ir == ir->getBB()->getLastIR());
         MDSet tmp;
         AACtx ic;
-        inferExpression(ir->getValExp(), tmp, &ic, mx);
+        inferExp(ir->getValExp(), tmp, &ic, mx);
         tmp.clean(*getSBSMgr());
         break;
     }
@@ -3585,7 +3592,7 @@ void AliasAnalysis::computeStmt(MOD IR * ir, MOD MD2MDSet * mx)
         ASSERT0(ir == ir->getBB()->getLastIR());
         MDSet tmp;
         AACtx ic;
-        inferExpression(ir->getJudgeDet(), tmp, &ic, mx);
+        inferExp(ir->getJudgeDet(), tmp, &ic, mx);
         tmp.clean(*getSBSMgr());;
         break;
     }
@@ -3597,7 +3604,7 @@ void AliasAnalysis::computeStmt(MOD IR * ir, MOD MD2MDSet * mx)
         ASSERT0(ir == ir->getBB()->getLastIR());
         MDSet tmp;
         AACtx ic;
-        inferExpression(ir->getValExp(), tmp, &ic, mx);
+        inferExp(ir->getValExp(), tmp, &ic, mx);
         tmp.clean(*getSBSMgr());
         break;
     }

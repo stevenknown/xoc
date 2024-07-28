@@ -5102,7 +5102,7 @@ INT RA::tryExtend(LTG const* ltg, BitSet const& occupied,
 //operand will be freed.
 IR * RA::insertMoveBefore(IR * stmt, IR * src)
 {
-    ASSERT0(stmt->is_kids(src));
+    ASSERT0(stmt->isKids(src));
     IR * newkid = m_rg->getIRMgr()->buildPR(IR_dt(src));
     IR * mv = m_rg->getIRMgr()->buildStorePR(PR_no(newkid), IR_dt(newkid),
                                              m_rg->dupIR(src));

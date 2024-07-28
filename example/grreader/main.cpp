@@ -40,6 +40,7 @@ static bool readGR(CHAR * gr_file_name)
     ASSERT0(gr_file_name);
     xoc::RegionMgr * rm = new xoc::RegionMgr();
     rm->initVarMgr();
+    rm->initIRDescFlagSet();
     rm->getLogMgr()->init("tmp.log", true);
     bool succ = xoc::readGRAndConstructRegion(rm, gr_file_name);
     if (!succ) {

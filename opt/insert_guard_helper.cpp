@@ -47,6 +47,7 @@ static IR const* findLoopHeadPhi(LI<IRBB> const* li, IR const* ir)
             //CASE:compile/licm_guard2.c
             return nullptr;
         }
+        ASSERT0(ir->getRHS());
         SSAInfo const* ssainfo = ir->getRHS()->getSSAInfo();
         ASSERT0(ssainfo);
         ir = ssainfo->getDef();
@@ -59,7 +60,7 @@ static IR const* findLoopHeadPhi(LI<IRBB> const* li, IR const* ir)
 
 
 //
-//START xxx
+//START MDID2PhiMap
 //
 MDID2PhiMap::MDID2PhiMap(IRBB const* bb, InsertGuardHelper const& helper)
 {
@@ -75,7 +76,7 @@ MDID2PhiMap::MDID2PhiMap(IRBB const* bb, InsertGuardHelper const& helper)
         set(res->mdid(), phi);
     }
 }
-//END xxx
+//END MDID2PhiMap
 
 
 //
@@ -83,8 +84,8 @@ MDID2PhiMap::MDID2PhiMap(IRBB const* bb, InsertGuardHelper const& helper)
 //
 //Return true if the determinate-expression of loop and related DU chain are too
 //complicated to analysz and recompute.
-bool InsertGuardHelper::hasComplicatedDefForPR(LI<IRBB> const* li,
-                                               IR const* ir) const
+bool InsertGuardHelper::hasComplicatedDefForPR(
+    LI<IRBB> const* li, IR const* ir) const
 {
     ASSERT0(ir->isPROp());
     if (!usePRSSADU()) { return true; }
@@ -531,7 +532,7 @@ void InsertGuardHelper::reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
             //Only need to fix PRSSA.
             continue;
         }
-        ASSERT0(x->isIREqual(y, false));
+        ASSERT0(x->isIREqual(y, getIRMgr(), false));
         SSAInfo const* info = x->getSSAInfo();
         ASSERT0(info);
         IR * def = info->getDef();

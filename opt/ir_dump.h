@@ -45,13 +45,21 @@ enum IR_DUMP_FLAG {
     IR_DUMP_VAR_DECL = 0x10, //dump variable declaration if exist that given
                              //by user.
     IR_DUMP_NO_NEWLINE = 0x20, //Do NOT dump newline
-    IR_DUMP_COMBINE = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL,
+    IR_DUMP_IRID = 0x40, //dump IR's id.
+    IR_DUMP_DWARF = 0x80, //dump all DWARF debug information.
+    IR_DUMP_COMBINE =
+        IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL|IR_DUMP_IRID,
 };
 
 class DumpFlag : public UFlag {
 public:
     DumpFlag() : UFlag(0) {}
     DumpFlag(UINT v) : UFlag(v) {}
+
+    //Return the new flag with combining with IRID if g_dump_option
+    //enabled the IRID flag.
+    static DumpFlag combineIRID(UINT v)
+    { return v | (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0); }
 };
 
 void dumpConstContent(IR const* ir, Region const* rg);
@@ -70,13 +78,16 @@ void dumpIRCombine(IR const* ir, Region const* rg);
 //The function dumps IR's name and id into the given buffer.
 //Return the buffer address.
 CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf);
+void dumpIRName(IR const* ir, Region const* rg);
 
 //The function dump IR info into given buffer.
-void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
+CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
+                        DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
+void dumpIRListH(IR const* ir_list, Region const* rg,
+                 CHAR const* attr = nullptr,
                  DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
-void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
-                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
-void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
+void dumpIRList(IR const* ir_list, Region const* rg,
+                CHAR const* attr = nullptr,
                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 void dumpIRList(IRList const& ir_list, Region const* rg);
 void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
@@ -97,31 +108,42 @@ public:
     CHAR const* dump(IR const* ir) { return xoc::dumpIRName(ir, m_buf); }
 };
 
-void dumpUNDEF(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpAllKids(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag);
+void dumpVarDecl(IR const* ir, Region const* rg);
+void dumpIdinfo(IR const* ir, Region const* rg);
+void dumpStorageSpace(IR const* ir, Region const* rg);
+void dumpOffset(IR const* ir, Region const* rg);
+void dumpUndef(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpMemRefGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpVarGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpSTARRAY(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpBranch(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpGeneralNoType(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpIF(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpDOWHILE(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpWHILEDO(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpDOLOOP(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpLABEL(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpSELECT(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpPHI(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpIf(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpCASE(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpARRAY(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpREGION(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCase(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpArray(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpConst(IR const* ir, Region const* rg, IRDumpCtx & ctx);
-void dumpRETURN(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpReturn(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpLda(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 
 } //namespace xoc
 #endif

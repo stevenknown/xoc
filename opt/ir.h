@@ -44,6 +44,7 @@ class SSAInfo;
 class MDSSAInfo;
 class MDPhi;
 class IRCFG;
+class IRMgr;
 
 #include "ir_code.h"
 #include "ir_desc.h"
@@ -73,14 +74,38 @@ public:
     IsomoFlag(UINT v) : UFlag(v) {}
 };
 
-//The maximum integer value that can described by bits of IR_CODE_BIT_SIZE
+class ReplaceKidCompareFunc {
+public:
+    bool m_is_replace_whole_ir_tree;
+public:
+    ReplaceKidCompareFunc(bool replace_whole_ir_tree = true)
+    { m_is_replace_whole_ir_tree = replace_whole_ir_tree; }
+    virtual ~ReplaceKidCompareFunc() {}
+
+    //Return true if oldir has to be replaced by 'newir'.
+    virtual bool is_replace(IR const* oldir, IR const* newir) const
+    { return oldir == newir; }
+
+    //Return true if oldir has to be replaced, and record the anticepated
+    //replacer in 'newir'.
+    //newir: return as a result that recorded the anticipated IR to replace.
+    virtual bool is_replace(IR const* oldir, OUT IR ** newir) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Return true if the replacement will scan whole IR tree, otherwise the
+    //scanning will stopped right after the first replacing happened.
+    virtual bool isReplaceWholeIRTree() const
+    { return m_is_replace_whole_ir_tree; }
+};
+
+//The maximum integer value that can be described by bits of IR_CODE_BIT_SIZE
 //should larger than IR_CODE_NUM.
-#define IR_CODE_BIT_SIZE 8
+#define IR_CODE_BIT_SIZE 9
 
 //Each IR at same Region has it own unique id.
 #define IR_id(ir) ((ir)->uid)
 
-//Record result data type.
+//Record IR's result data type.
 #define IR_dt(ir) ((ir)->result_data_type)
 
 //Record if ir might throw exception. If ir throw exception, destructor of
@@ -94,12 +119,9 @@ public:
 //  occurred, then destructor executed.
 #define IR_may_throw(ir) ((ir)->may_throw_exception)
 
-//Indicate IR will terminate current control flow.
+//Indicates IR will terminate current control flow in the region.
 //If this flag is true, the code that followed subsequently is unreachable.
 #define IR_is_terminate(ir) ((ir)->is_terminate_control_flow)
-
-//Indicate whether IR is a real operation, e.g: the dummyuse of CallStmt.
-#define IR_is_dummy(ir) ((ir)->is_dummy_operation)
 
 //Record IR code.
 #define IR_code(ir) ((ir)->code)
@@ -116,47 +138,48 @@ public:
 //Record attached info container.
 #define IR_ai(ir) ((ir)->attach_info_container)
 
-//This flag describe concurrency semantics.
-//True if current operation is atomic. If ir is atomic load, atomic write or
-//atomic read-modify-write.
+//This flag describes concurrency semantics.
+//It is true if current operation is atomic.
+//IR can be atomic load, atomic write or atomic read-modify-write.
 //Read barrier: such as ID/LD/ILD/PR/ARRAY may be regarded as read
 //barrier if the flag is true.
 //Analogously, ST/STPR/IST/STARRAY/CALL may be regarded as write barrier.
-//NOTE: do NOT replace replace an atomic operation with a non-atomic operation.
+//NOTE: do NOT replace an atomic operation with a non-atomic operation.
 #define IR_is_atomic(ir) ((ir)->is_atomic_op)
 
-//This flag describe concurrency semantics.
-//True if current operation is atomic read-modify-write.
-//For given variable, RMW operation read the old value, then compare
-//with new value, then write the new value to the variable, finally return
-//old value.
+//This flag describes concurrency semantics.
+//Set to true if current operation is atomic read-modify-write.
+//For given variable, Read-Modify-Write(RMW) operation read the old value,
+//then compare with new value, then write the new value to the variable,
+//finally return old value.
 //NOTE: The write operation may be failed.
 //
-//If the variable is volatile, one should
-//not change the order of this operation with other memory operations.
+//If the variable is volatile, one should not change the order of this
+//operation with other memory operations.
 //The flag can be used to represent safepoint in code generation, and
 //if it is, the IR modified/invalided each pointers previous defined,
 //and this cuts off the Def-Use chain of those pointers immediately
 //after the IR.
 //By default, RMW could be simulated by IR_CALL with 3 arguments,
-//e.g: call Opcode:i32, OldValueMemory:<valuetype>, NewValue:valuetype;
-//where Opcode defined the RMW operations, OldValueMemory indicates
+//e.g: $x = call Opcode:i32, OldValueMemory:<valuetype>, NewValue:valuetype;
+//where Opcode defined the RMW operations, and OldValueMemory indicates
 //the memory location with valuetype that hold old-value, and NewValue
 //is the value to be set.
 #define IR_is_read_mod_write(ir) ((ir)->is_read_mod_write)
 
-//True if ir has sideeffect. This flag often be used to prevent user
-//perform incorrect optimization.
-//If ir has sideeffect, that means ir can not be removed,
-//but it still can be moved.
+//Set to true if IR has sideeffect. This flag often be used to prevent
+//the user from performing incorrect optimization.
+//If IR has sideeffect, that means IR can not be removed, but it still
+//can be moved.
 #define IR_has_sideeffect(ir) ((ir)->has_sideeffect)
 
-//True if ir can not be moved. This flag often be used to prevent user
-//perform incorrect optimization, e.g: LICM.
-//If ir is immovable, it also can not be removed
+//Set to true if ir can not be moved.
+//This flag often be used to prevent the user from performing incorrect
+//optimization, e.g: LICM.
+//If IR is immovable, it also can not be removed
 #define IR_no_move(ir) ((ir)->no_move)
 
-//Define this marco if we try to do fast searching ir in
+//Define the marco if we try to do fast searching IR in
 //free_ir_tab while invoking IRMgr::allocIR(). But by default, it is disabled.
 //#define CONST_IRC_SZ
 
@@ -164,31 +187,36 @@ public:
 #define IR_irc_size(ir) ((ir)->irc_size)
 #endif
 
-//IR, the intermediate language for the XOC compiler, serves as the common
-//interface among almost all the components. IR is defined to be capable of
-//representing any level of semantics except the level that corresponds to
-//the machine instructions. Two different levels of IR are defined, and each
-//optimization phase is defined to work at a specific level of IR. The
-//front-ends may generate the highest level of IR. Optimization proceeds
+//The class represents IR, the intermediate language for the XOC compiler,
+//serves as the common interface among almost all the components.
+//IR is defined to be capable of representing any level of semantics except
+//the level that corresponds to the machine instructions.
+//Two different levels of IR are defined, and each optimization phase is
+//defined to work at a specific level of IR.
+//
+//The front-ends may generate the highest level of IR. Optimization proceeds
 //together with the process of continuous simplification, in which a
 //simplification of IR is called to translate IR from the current level to
 //the next lower level.
 //
-//High level IR preserve the high level control flow constructs, such as
+//High level IR preserves the high level control flow constructs, such as
 //DO_LOOP, DO_WHILE, WHILE_DO, SWITCH, IF, BREAK and CONTINUE.
 //Operations can be divided into two categories: statements, and expressions.
 //Statement implies which variable is defined, or control flow transfering.
 //Expression implies which variable is used, or operation without sideeffect,
-//and expression does not transfer control flow. Both statement and expression
-//node have NEXT and PREV pointers which link them together.
+//and expression does not transfer control flow.
+//Both statement and expression node have NEXT and PREV pointers which
+//link them together.
+//
 //Statment can not be kid of other statement except control flow structure IR,
 //and expression can be kid of both expression and statement.
+//
 //In a simple word, statements have side effects, and can be reordered only
 //if dependencies preserved. Expressions do not have side effect, expression
 //trees hung from statement, and they contain only uses and can be
 //aggressively optimized.
 //
-//Note IR should not have virtual table because all operations are
+//Note IR should NOT have virtual table because all operations are
 //distinguished by IR_CODE. An IR object might represent differet operation
 //in specific scene when it is continually freed and allocated. Diverse
 //description should be placed in attach-info.
@@ -213,9 +241,6 @@ public:
 
     //True if IR may terminate the control flow, such as throwing an excetion.
     USHORT is_terminate_control_flow:1;
-
-    //True if IR is not real operation, e.g:the dummyuse of CallStmt.
-    USHORT is_dummy_operation:1;
 
     //True if IR may have side effect.
     USHORT has_sideeffect:1;
@@ -242,7 +267,7 @@ public:
     //This field should be nullptr if IR is the top level of stmt.
     IR * parent;
 
-    //IR may have an unique attach info container.
+    //IR may have an unique attach-info container.
     AIContainer * attach_info_container;
 public:
     //Calculate the accumulated offset value from the base of array.
@@ -289,7 +314,7 @@ public:
     //Count memory usage for current IR.
     size_t count_mem() const;
 
-    //Copy memory reference only for current ir node.
+    //Copy memory reference only for current IR.
     //src: copy MD reference from 'src', it may be different to current ir.
     void copyRef(IR const* src, Region * rg);
 
@@ -300,8 +325,8 @@ public:
     void copyType(IR const* src) { setType(src->getType()); }
 
     //Copy each memory reference for whole ir tree.
-    //'src': copy MD reference from 'src', it must be equal to current ir tree.
-    //'copy_kid_ref': copy MD reference for kid recursively.
+    //src: copy MD reference from 'src', it must be equal to current ir tree.
+    //copy_kid_ref: copy MD reference for kid recursively.
     void copyRefForTree(IR const* src, Region * rg);
 
     //The function collects the LabelInfo for each branch-target.
@@ -324,9 +349,15 @@ public:
     IRBB * getBB() const;
     DU * getDU() const;
 
+    //Return rest part of multip-result list if exist.
+    //e.g:some IR may have multiple-results, e.g: broadcast. the result IR
+    //list is stpr $1, stpr $2, stpr $3, the function will return stpr $2 and
+    //stpr $3, whereas stpr $1 will be the result IR of broadcast's parent stmt.
+    IR * getResList() const;
+
     //Return STMT if current ir is expression.
-    //e.g:  st(i32 a)
-    //         ld(i32 b)
+    //e.g: st(i32 a)
+    //       ld(i32 b)
     //If given expression is ld, this function return st stmt.
     //Note if there are high level stmts, such as:
     //    if (det)
@@ -395,7 +426,7 @@ public:
 
     //Find the first PR related to 'prno'.
     //This function iterate IR tree nonrecursively.
-    //'it': iterator.
+    //it: iterator.
     IR * getOpndPR(PRNO prno, IRIter & it) const; //Nonrecursively.
 
     //This function recursively iterate the IR tree to
@@ -474,7 +505,10 @@ public:
     }
 
     //Return true if ir has RHS. The ir always be store operation.
-    bool hasRHS() const { return IRDES_has_rhs(g_ir_desc[getCode()]); }
+    bool hasRHS() const { return IRDES_has_rhs(getCode()); }
+
+    //Return true if ir has Multi-Result-List.
+    bool hasResList() const { return IRDES_has_res_list(getCode()); }
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR has side effect.
@@ -482,31 +516,31 @@ public:
     bool hasSideEffect(bool recur) const;
 
     //Return true if ir compute produce a result.
-    bool hasResult() const { return IRDES_has_result(g_ir_desc[getCode()]); }
+    bool hasResult() const { return IRDES_has_result(getCode()); }
 
     //Return true if ir has constant offset.
-    bool hasOffset() const { return IRDES_has_offset(g_ir_desc[getCode()]); }
+    bool hasOffset() const { return IRDES_has_offset(getCode()); }
 
     //Return true if ir has address-alignment property.
     bool hasAlign() const;
 
     //Return true if ir has idinfo.
-    bool hasIdinfo() const { return IRDES_has_idinfo(g_ir_desc[getCode()]); }
+    bool hasIdinfo() const { return IRDES_has_idinfo(getCode()); }
 
     //Return true if ir has stroage space.
     bool hasStorageSpace() const
-    { return IRDES_has_storage_space(g_ir_desc[getCode()]); }
+    { return IRDES_has_storage_space(getCode()); }
 
     //Return true if ir has DU Info.
-    bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
+    bool hasDU() const { return IRDES_has_du(getCode()); }
 
     //Return true if stmt has judge determinate expression.
     bool hasJudgeDet() const
-    { return IRDES_has_judge_target(g_ir_desc[getCode()]); }
+    { return IRDES_has_judge_target(getCode()); }
 
     //Return true if stmt has CASE list as kid.
     bool hasCaseList() const
-    { return IRDES_has_case_list(g_ir_desc[getCode()]); }
+    { return IRDES_has_case_list(getCode()); }
 
     //Return true if ir is call and does have a return value.
     bool hasReturnValue() const;
@@ -571,6 +605,9 @@ public:
     //Return true if ir's data type can be regarded as integer.
     bool isInt() const { return is_int() || is_bool() || is_ptr(); }
 
+    //Return true if ir's data type can be regarded as unsigned integer.
+    bool isUInt() const { return is_uint() || is_bool() || is_ptr(); }
+
     //Return true if ir's data type is string.
     bool is_str() const { return IR_dt(this)->is_string(); }
 
@@ -602,6 +639,9 @@ public:
     //Return true if ir data type is boolean.
     bool is_bool() const { return IR_dt(this)->is_bool(); }
 
+    //Return true if ir data type is tensor.
+    bool is_tensor() const { return IR_dt(this)->is_tensor(); }
+
     //Return true if ir is label.
     bool is_lab() const { return getCode() == IR_LABEL; }
 
@@ -609,7 +649,8 @@ public:
     //src: root of IR tree.
     //is_cmp_kid: it is true if comparing kids as well.
     //Note the function does not compare the siblings of 'src'.
-    bool isIREqual(IR const* src, bool is_cmp_kid = true) const;
+    bool isIREqual(IR const* src, IRMgr const* mgr,
+                   bool is_cmp_kid = true) const;
 
     //Return true if current ir tree is isomorphic to src.
     //src: root of IR tree.
@@ -617,7 +658,7 @@ public:
     //Note the function does not compare the siblings of 'src'.
     //e.g:ist (ld base) is isomorphic to ild (ld base)
     //    ist (ld base) is NOT isomorphic to ild ($base)
-    bool isIsomoTo(IR const* src, bool is_cmp_kid = true,
+    bool isIsomoTo(IR const* src, IRMgr const* mgr, bool is_cmp_kid = true,
                    IsomoFlag const& flag = IsomoFlag(ISOMO_UNDEF)) const;
 
     //Return true if current ir is PR and equal to src.
@@ -628,11 +669,12 @@ public:
     }
 
     //Return true if ir-list are equivalent.
-    bool isIRListEqual(IR const* irs, bool is_cmp_kid = true) const;
+    bool isIRListEqual(IR const* irs, IRMgr const* mgr,
+                       bool is_cmp_kid = true) const;
 
     //Return true if IR tree is exactly congruent, or
     //they are parity memory reference.
-    bool isMemRefEqual(IR const* src) const;
+    bool isMemRefEqual(IR const* src, IRMgr const* mgr) const;
 
     //Return true if ir does not have any sibling.
     bool is_single() const
@@ -647,12 +689,12 @@ public:
 
     //Return true if current ir is stmt.
     //Only statement can be chained.
-    bool is_stmt() const { return IRDES_is_stmt(g_ir_desc[getCode()]); }
+    bool is_stmt() const { return IRDES_is_stmt(getCode()); }
 
     //Return true if current ir is expression.
     bool is_exp() const { ASSERT0(!is_undef()); return !is_stmt(); }
 
-    //Return true if k is kid node of right-hand-side of current ir.
+    //Return true if k is kid of right-hand-side of current ir.
     bool is_rhs(IR const* k) const { return !is_lhs(k) && k != this; }
 
     //Return true if k is the lhs of current ir.
@@ -662,8 +704,8 @@ public:
     bool is_terminate() const { return IR_is_terminate(this); }
 
     //Return true if ir is dummy operation.
-    bool is_dummy() const { return IR_is_dummy(this); }
-    bool isDummyOp() const;
+    //The dummy operation includes both stmt and expression.
+    bool isDummyOp() const { return isVirtualOp() || is_dummyuse(); }
 
     //Return true if ir is volatile.
     bool is_volatile() const;
@@ -679,13 +721,17 @@ public:
     //Record if ir might throw exception.
     bool isMayThrow(bool recur) const;
 
+    //Return true if current ir is ternary operation.
+    bool isTernaryOp() const { return IRDES_is_ter(getCode()); }
+    static bool isTernaryOp(IR_CODE c) { return IRDES_is_ter(c); }
+
     //Return true if current ir is binary operation.
-    bool isBinaryOp() const { return IRDES_is_bin(g_ir_desc[getCode()]); }
-    static bool isBinaryOp(IR_CODE c) { return IRDES_is_bin(g_ir_desc[c]); }
+    bool isBinaryOp() const { return IRDES_is_bin(getCode()); }
+    static bool isBinaryOp(IR_CODE c) { return IRDES_is_bin(c); }
 
     //Return true if current ir is unary operation.
-    bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[getCode()]); }
-    static bool isUnaryOp(IR_CODE c) { return IRDES_is_una(g_ir_desc[c]); }
+    bool isUnaryOp() const { return IRDES_is_una(getCode()); }
+    static bool isUnaryOp(IR_CODE c) { return IRDES_is_una(c); }
 
     //Return true if ir is constant expression.
     bool isConstExp() const;
@@ -733,6 +779,7 @@ public:
     bool is_if() const { return getCode() == IR_IF; }
     bool is_label() const { return getCode() == IR_LABEL; }
     bool is_case() const { return getCode() == IR_CASE; }
+    bool is_dummyuse() const { return getCode() == IR_DUMMYUSE; }
     bool is_id() const { return getCode() == IR_ID; }
     bool is_break() const { return getCode() == IR_BREAK; }
     bool is_continue() const { return getCode() == IR_CONTINUE; }
@@ -781,13 +828,26 @@ public:
     bool is_neg() const { return getCode() == IR_NEG; }
     bool is_pr() const { return getCode() == IR_PR; }
     bool is_stpr() const { return getCode() == IR_STPR; }
+    bool is_cfi_def_cfa() const { return getCode() == IR_CFI_DEF_CFA; }
+    bool is_cfi_same_value() const { return getCode() == IR_CFI_SAME_VALUE; }
+    bool is_cfi_offset() const { return getCode() == IR_CFI_OFFSET; }
+    bool is_cfi_restore() const { return getCode() == IR_CFI_RESTORE; }
+    bool is_cfi_def_cfa_offset() const {
+        return getCode() == IR_CFI_DEF_CFA_OFFSET;
+    }
+
+    bool isDwarf() const {
+        return is_cfi_def_cfa() || is_cfi_same_value() ||
+               is_cfi_offset() || is_cfi_restore() ||
+               is_cfi_def_cfa_offset();
+    }
 
     //Return true if ir indicate conditional branch to a label.
     bool isConditionalBr() const
-    { return IRDES_is_conditional_br(g_ir_desc[getCode()]); }
+    { return IRDES_is_conditional_br(getCode()); }
 
     //Return true if ir is operation that read or write to an array element.
-    bool isArrayOp() const { return IRDES_is_array_op(g_ir_desc[getCode()]); }
+    bool isArrayOp() const { return IRDES_is_array_op(getCode()); }
 
     //Return true if ir is base expression of array operation.
     bool isArrayBase(IR const* ir) const;
@@ -797,7 +857,7 @@ public:
 
     //Return true if ir is unconditional branch.
     bool isUnconditionalBr() const
-    { return IRDES_is_unconditional_br(g_ir_desc[getCode()]); }
+    { return IRDES_is_unconditional_br(getCode()); }
 
     //Return true if ir is indirect jump to multiple targets.
     bool isIndirectBr() const { return is_igoto(); }
@@ -816,11 +876,11 @@ public:
 
     //Return true if ir is indirect memory operation.
     bool isIndirectMemOp() const
-    { return IRDES_is_indirect_mem_op(g_ir_desc[getCode()]); }
+    { return IRDES_is_indirect_mem_op(getCode()); }
 
     //Return true if ir is direct memory operation.
     bool isDirectMemOp() const
-    { return IRDES_is_direct_mem_op(g_ir_desc[getCode()]); }
+    { return IRDES_is_direct_mem_op(getCode()); }
 
     bool isCallStmt() const { return is_call() || is_icall(); }
 
@@ -835,13 +895,13 @@ public:
 
     //Return true if stmt modify PR.
     //CALL/ICALL may modify PR if it has a return value.
-    bool isWritePR() const { return IRDES_is_write_pr(g_ir_desc[getCode()]); }
+    bool isWritePR() const { return IRDES_is_write_pr(getCode()); }
 
     //Return true if current stmt exactly modifies a PR.
     //CALL/ICALL may modify PR if it has a return value.
     //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole IR.
     bool isWriteWholePR() const
-    { return IRDES_is_write_whole_pr(g_ir_desc[getCode()]); }
+    { return IRDES_is_write_whole_pr(getCode()); }
 
     //Return true if current expression read value from PR.
     bool isReadPR() const { return is_pr(); }
@@ -853,13 +913,13 @@ public:
     //Return true if current operation references memory.
     //These kinds of operation always define or use MD, thus include both PR
     //and NonPR operations.
-    bool isMemRef() const { return IRDES_is_mem_ref(g_ir_desc[getCode()]); }
+    bool isMemRef() const { return IRDES_is_mem_ref(getCode()); }
 
     //Return true if current operation references memory, and
     //it is the rhs of stmt.
     //These kinds of operation always use MD.
     bool isMemOpnd() const
-    { return IRDES_is_mem_opnd(g_ir_desc[getCode()]); }
+    { return IRDES_is_mem_opnd(getCode()); }
 
     //Return true if current ir is integer constant, and the number
     //is equal to 'value'.
@@ -871,7 +931,7 @@ public:
 
     //Return true if current operation references memory except the PR memory.
     bool isMemRefNonPR() const
-    { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
+    { return IRDES_is_non_pr_memref(getCode()); }
 
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
@@ -886,32 +946,38 @@ public:
     static bool is_judge(IR_CODE c) { return is_relation(c) || is_logical(c); }
 
     //True if ir is logical operation.
-    bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
+    bool is_logical() const { return IRDES_is_logical(getCode()); }
 
     //True if ir code is logical operation.
-    static bool is_logical(IR_CODE c) { return IRDES_is_logical(g_ir_desc[c]); }
+    static bool is_logical(IR_CODE c) { return IRDES_is_logical(c); }
 
     //True if ir is relation operation.
-    bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
+    bool is_relation() const { return IRDES_is_relation(getCode()); }
 
     //True if ir code is relation operation.
     static bool is_relation(IR_CODE c)
-    { return IRDES_is_relation(g_ir_desc[c]); }
+    { return IRDES_is_relation(c); }
 
     //IR meet commutative, e.g: a+b = b+a
     bool is_commutative() const
-    { return IRDES_is_commutative(g_ir_desc[getCode()]); }
+    { return IRDES_is_commutative(getCode()); }
 
     //IR meet associative, e.g: (a+b)+c = a+(b+c)
     bool is_associative() const
-    { return IRDES_is_associative(g_ir_desc[getCode()]); }
+    { return IRDES_is_associative(getCode()); }
 
     //Return true if current ir is leaf node at IR tree.
     //Leaf node must be expression node and it does not have any kids.
-    bool is_leaf() const { return IRDES_is_leaf(g_ir_desc[getCode()]); }
+    bool is_leaf() const { return IRDES_is_leaf(getCode()); }
 
-    //Return true if 'exp' is kid node of current ir tree.
-    bool is_kids(IR const* exp) const;
+    //Return true if 'k' is kid of current IR tree.
+    //Check if 'k' is child or grandchildren of current IR.
+    //The function only compares the equality of two IR pointer
+    //to determine and apply the DFS searching in whole IR tree.
+    bool isKids(IR const* k) const;
+
+    //Return true if 'k' is the immeidate kid of current IR.
+    bool isImmKid(IR const* k) const;
 
     //Return true if array base is IR_LDA. This exactly clerifies which array
     //we are accessing. In contrast to direct array reference,
@@ -940,9 +1006,10 @@ public:
     //Return true if RHS of current stmt reference PR with given 'prno'.
     bool isRHSUsePR(PRNO prno) const { return getOpndPR(prno) != nullptr; }
 
-    //Return true if RHS of current stmt reference expression that is isomorphic
-    //to 'exp'.
-    bool isRHSUseIsomoExp(IR const* exp) const;
+    //Return true if IR or its kid expression is isomorphic to 'exp'.
+    //e.g: if given exp is ld 'x', current ir is (add ld 'x', ld 'y')
+    //the function returns true.
+    bool isUseIsomoExp(IR const* exp, IRMgr const* mgr) const;
 
     //Return true if ir's data type must be bool.
     bool mustBeBoolType() const { return is_judge(); }
@@ -967,6 +1034,7 @@ public:
     void setIdinfo(Var * idinfo);
     void setLabel(LabelInfo const* li);
     void setBB(IRBB * bb);
+    void setResList(IR * reslist);
     void setSSAInfo(SSAInfo * ssa);
     void setDU(DU * du);
     void setValExp(IR * exp);
@@ -984,7 +1052,7 @@ public:
     //Set current ir to be parent of 'kid'.
     void setParent(IR * kid)
     {
-        ASSERT0(kid && is_kids(kid));
+        ASSERT0(kid);
         for (IR * k = kid; k != nullptr; k = IR_next(k)) {
             IR_parent(k) = this;
         }
@@ -1013,6 +1081,7 @@ public:
         ASSERT0(md);
         setRefMD(md, rg);
     }
+
     //mds: record MayMDSet that have to be hashed.
     void setMayRef(MDSet const* mds, Region * rg)
     {
@@ -1031,9 +1100,29 @@ public:
 
     //Find and substitute 'newk' for 'oldk'.
     //Return true if replaced the 'oldk'.
-    //'recur': set to true if function recusively perform
+    //recur: set to true if function recusively perform
     //replacement for 'oldk'.
     bool replaceKid(IR * oldk, IR * newk, bool recur);
+
+    //Find and substitute 'newk' by the strategy that defined in compare
+    //function 'cmp'.
+    //Return true if substitution happened.
+    //newk: since newk may satisifed 'cmp' multiple times, the function will
+    //      duplicate newk when replacing happened.
+    //recur: set to true if function recusively perform the replacement for
+    //cmp: a strategy comparison function that determined which IR should be
+    //     replaced by 'newk'.
+    bool replaceKid(IR const* newk, bool recur,
+                    ReplaceKidCompareFunc const& cmp, MOD Region * rg);
+
+    //Find and substitute the related IR by the strategy that defined in compare
+    //function 'cmp'.
+    //Return true if substitution happened.
+    //recur: set to true if function recusively perform the replacement for
+    //cmp: a strategy comparison function that determined which IR should be
+    //     replaced by new IR. Note the new IR is also given by 'cmp' function.
+    bool replaceKid(bool recur, ReplaceKidCompareFunc const& cmp,
+                    MOD Region * rg);
 
     //Get the MD DefUse Set. This function is readonly.
     DUSet const* readDUSet() const { return getDUSet(); }
@@ -1045,7 +1134,25 @@ public:
     void removeSSAUse();
 
     bool verify(Region const* rg) const;
+
+    //The file includes the extended APIs and interfaces that defined by user
+    //to access IR's miscellaneous attributes and operands.
     #include "ir_ext.inc"
+};
+
+class CompareIRFunc {
+public:
+    bool is_less(IR * t1, IR * t2) const { return t1->id() < t2->id(); }
+    bool is_equ(IR * t1, IR * t2) const { return t1 == t2; }
+    IR * createKey(IR * t) { return t; }
+};
+
+class CompareConstIRFunc {
+public:
+    bool is_less(IR const* t1, IR const* t2) const
+    { return t1->id() < t2->id(); }
+    bool is_equ(IR const* t1, IR const* t2) const { return t1 == t2; }
+    IR const* createKey(IR const* t) { return t; }
 };
 
 } //namespace xoc

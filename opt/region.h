@@ -165,14 +165,18 @@ protected:
     //Allocate PassMgr
     virtual PassMgr * allocPassMgr();
 
+    //Allocate dbxMgr
+    virtual DbxMgr * allocDbxMgr();
+
     //Allocate AttachInfoMgr
     virtual AttachInfoMgr * allocAttachInfoMgr();
 
     void doBasicAnalysis(OptCtx & oc);
 
+    void genEntryBB();
     AnalysisInstrument * getAnalysisInstrument() const
     {
-        ASSERT0(is_function() || is_program() || is_inner() || is_eh());
+        ASSERT0(hasAnaInstrument());
         return REGION_analysis_instrument(this);
     }
 
@@ -359,19 +363,25 @@ public:
     //Free ir and all its kids, except its sibling node.
     //We can only utilizing the function to free the
     //IR which allocated by 'allocIR'.
-    void freeIRTree(IR * ir);
+    //is_check_undef: If it is true, the function will assert when meeting
+    //                an IR_UNDEF, that means some IRs has been freed already.
+    void freeIRTree(IR * ir, bool is_check_undef = true);
 
     //Free ir, ir's sibling, and all its kids.
     //We can only utilizing the function to free the IR
     //which allocated by 'allocIR'.
     //NOTICE: If ir's sibling is not nullptr, that means the IR is
     //a high level type. IRBB consists of only middle/low level IR.
-    void freeIRTreeList(IR * ir);
+    //is_check_undef: If it is true, the function will assert when meeting
+    //                an IR_UNDEF, that means some IRs has been freed already.
+    void freeIRTreeList(IR * ir, bool is_check_undef = true);
 
     //Free ir, and all its kids.
-    //We can only utilizing the function to free
-    //the IR which allocated by 'allocIR'.
-    void freeIRTreeList(IRList & irs);
+    //We can only utilizing the function to free the IR which allocated
+    //by 'allocIR'.
+    //is_check_undef: If it is true, the function will assert when meeting
+    //                an IR_UNDEF, that means some IRs has been freed already.
+    void freeIRTreeList(IRList & irs, bool is_check_undef = true);
 
     //Free IRBB list.
     //We can only utilizing the function to free the IRBB
@@ -475,6 +485,10 @@ public:
     //Return PassMgr.
     PassMgr * getPassMgr() const
     { return ANA_INS_pass_mgr(getAnalysisInstrument()); }
+
+    //Return DbxMgr.
+    DbxMgr * getDbxMgr() const
+    { return ANA_INS_dbx_mgr(getAnalysisInstrument()); }
 
     //Return AttachInfoMgr.
     AttachInfoMgr * getAttachInfoMgr() const
@@ -659,6 +673,10 @@ public:
     //Return true if processing finish successful, otherwise return false.
     virtual bool HighProcess(OptCtx & oc);
 
+    //Return true if current region has Analysis Instrument.
+    bool hasAnaInstrument() const
+    { return is_function() || is_program() || is_inner() || is_eh(); }
+
     UINT id() const { return REGION_id(this); }
 
     //Initialze Region.
@@ -675,6 +693,9 @@ public:
 
     //Allocate and initialize pass manager.
     PassMgr * initPassMgr();
+
+    //Allocate and initialize dbx manager.
+    DbxMgr * initDbxMgr();
 
     //Allocate and initialize IR manager.
     IRMgr * initIRMgr();
@@ -744,6 +765,15 @@ public:
     //Register global variable located in program region.
     void registerGlobalVAR();
 
+    //Reinitialize current region.
+    void reinit()
+    {
+        REGION_TYPE rt = getRegionType();
+        RegionMgr * rm = getRegionMgr();
+        destroy();
+        init(rt, rm);
+    }
+
     //Split IR list into list of basic blocks.
     //irs: a list of ir.
     //bbl: a list of bb.
@@ -800,6 +830,17 @@ public:
     //This function is the entry to process inner region.
     //Return true if the processing is successful.
     virtual bool processInnerRegion(OptCtx * oc);
+
+    //The funtion will re-construct IRBBMgr and re-initialize the related
+    //BB list information.
+    void reInitIRBBMgr()
+    {
+        destroyIRBBMgr();
+        initIRBBMgr();
+    }
+
+    //The funtion will re-construct IRMgr.
+    IRMgr * reInitIRMgr();
 
     //The function collect information that IPA may used.
     //Check and rescan call-list of region if something changed.

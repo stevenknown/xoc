@@ -33,6 +33,13 @@ namespace xoc {
 
 #define PRED_PR_IDX 0
 
+//This class represents properties of stmt that may have multiple results.
+class MultiResProp {
+    COPY_CONSTRUCTOR(MultiResProp);
+public:
+    IR * res_list;
+};
+
 #define VSTPR_bb(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->bb)
 #define VSTPR_no(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->prno)
 #define VSTPR_ssainfo(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->ssainfo)
@@ -114,22 +121,27 @@ public:
 //This class represents broadcast operation that is used to dispatch value in
 //'src' to multiple results in 'res_list'.
 #define BROADCAST_src(ir) BROADCAST_kid(ir, 0)
-#define BROADCAST_alter_res_desc_list(ir) BROADCAST_kid(ir, 1)
+#define BROADCAST_res_list(ir) BROADCAST_kid(ir, 1)
+#define VIST_ofst(ir) (((CVirISt*)CK_IRC(ir, IR_VIST))->field_offset)
 #define BROADCAST_kid(ir, idx) \
     (((CBroadCast*)ir)->opnd[CK_KID_IRC(ir, IR_BROADCAST, idx)])
-class CBroadCast : public IR {
+class CBroadCast : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CBroadCast);
 public:
-    static BYTE const kid_map = 0x3;
+    static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 2;
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return BROADCAST_kid(ir, idx); }
+    static inline IR *& accResList(IR * ir)
+    { return BROADCAST_res_list(ir); }
 };
 
 } //namespace xoc
 
+//Do NOT place extended declarations header files within xoc namespace.
+//User should guarantee extended IR are declared within xoc namespace.
 #include "targ_decl_ext.h"
 
 #endif

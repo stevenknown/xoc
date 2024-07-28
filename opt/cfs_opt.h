@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class Refine;
+
 class CfsOpt : public Pass {
     COPY_CONSTRUCTOR(CfsOpt);
     TypeMgr * m_tm;

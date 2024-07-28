@@ -48,6 +48,22 @@ bool OptCtx::isPassValid(PASS_TYPE pt) const
 }
 
 
+void OptCtx::setInvalidAllFlags()
+{
+    u1.int1 = 0;
+    ASSERT0(m_rg);
+    PassMgr * pm = m_rg->getPassMgr();
+    if (pm == nullptr) { return; }
+    PassTab const& passtab = pm->getPassTab();
+    PassTabIter tabiter;
+    Pass * p;
+    for (passtab.get_first(tabiter, &p);
+         p != nullptr; passtab.get_next(tabiter, &p)) {
+        p->set_valid(false);
+    }
+}
+
+
 void OptCtx::dumpPass() const
 {
     PassTab const& passtab = m_rg->getPassMgr()->getPassTab();
@@ -100,8 +116,8 @@ void OptCtx::dump() const
 }
 
 
-static void setInvalidIfCFGChangedExceptImpl(OptCtx * oc,
-                                             PassTypeList & optlist)
+static void setInvalidIfCFGChangedExceptImpl(
+    OptCtx * oc, PassTypeList & optlist)
 {
     ASSERTN(optlist.get_elem_count() < 1000,
             ("too many pass queried or miss ending placeholder"));

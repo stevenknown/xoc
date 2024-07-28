@@ -48,7 +48,14 @@ public:
 
     T & getFlagSet() { return m_flagset; }
     UINT getFlagSetSize() const { return sizeof(m_flagset); }
+
+    //Get the hex value of the No.idx flag in current flag-set.
+    //e.g: flag-set includes two flag 0b100 and 0b1, the two flags combined in
+    //hex form: 0x5. If given idx is 2, the function return 0b100, namely 0x4.
     T get_value(UINT idx) const { return T(1<<idx); }
+
+    //The function is used to iterate flagset.
+    //The function returns the first flag in flagset.
     T get_first_flag(Iter & it) const
     {
         BYTE const* ptr = (BYTE*)&m_flagset;
@@ -57,6 +64,9 @@ public:
         if (it.idx == BS_UNDEF) { return T(0); }
         return get_value(it.idx);
     }
+
+    //The function is used to iterate flagset.
+    //The function returns the next flag by iterate 'it'.
     T get_next_flag(Iter & it) const
     {
         BYTE const* ptr = (BYTE*)&m_flagset;
@@ -66,11 +76,22 @@ public:
         return get_value(it.idx);
     }
 
+    //The function is used to iterate flagset.
+    //Return true if the iteration should terminate.
     bool end(Iter & it) const { return it.idx == BS_UNDEF; }
 
+    //Return true if current flagset includes 'v', which 'v' may contain
+    //combined flags.
+    //e.g: if v is 0x5, it indicates v is combined with 0b100 and 0b1.
     bool have(T v) const { return HAVE_FLAG(m_flagset, v); }
+
+    //Return true if current flagset only includes 'v'.
     bool only_have(T v) const { return ONLY_HAVE_FLAG(m_flagset, v); }
+
+    //The function removes flag out of flagset.
     void remove(T v) { REMOVE_FLAG(m_flagset, v); }
+
+    //The function adds new flag into flagset.
     void set(T v) { SET_FLAG(m_flagset, v); }
 };
 

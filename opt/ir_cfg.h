@@ -48,7 +48,6 @@ class IRCFG : public Pass, public OptimizedCFG<IRBB, IR> {
 protected:
     Lab2BB m_lab2bb;
     TypeMgr * m_tm;
-    CFG_SHAPE m_cs;
 protected:
     UINT afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
                                  List<UINT> const& newpreds,
@@ -64,7 +63,7 @@ protected:
     void dumpGraph(FILE * h) const;
     void dumpForTest(UINT flag) const;
 
-    void initEntryAndExit(CFG_SHAPE cs);
+    void initEntryAndExit();
 
     virtual void preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx);
 
@@ -127,8 +126,7 @@ public:
         DUMP_COMBINE = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA,
     };
 public:
-    IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
-          UINT vertex_hash_size = 16);
+    IRCFG(BBList * bbl, Region * rg, UINT vertex_hash_size = 16);
     IRCFG(IRCFG const& src, BBList * bbl,
           bool clone_edge_info, bool clone_vex_info);
     virtual ~IRCFG() {}
@@ -265,8 +263,6 @@ public:
     void insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
                          OUT CfgOptCtx & ctx);
 
-    CFG_SHAPE getCfgShape() const { return m_cs; }
-
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
     {
@@ -402,6 +398,8 @@ public:
     }
     virtual void setVertex(IRBB * from, IRBB * to, Edge * e)
     { BB_vex(from) = e->from(); BB_vex(to) = e->to(); }
+
+    void setLabAndBBMap();
 
     //Split BB into two BBs.
     //bb: BB to be splited.

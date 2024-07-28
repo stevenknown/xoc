@@ -350,6 +350,17 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
 }
 
 
+//The function is used to check whether given elem_size can satified given
+//pool's constraints.
+bool smpoolIsValidConstPool(size_t elem_size, SMemPool const* handler)
+{
+    ASSERT0(handler);
+    return MEMPOOL_type(handler) == MEM_CONST_SIZE &&
+           MEMPOOL_pool_size(handler) >= elem_size &&
+           (MEMPOOL_pool_size(handler) % elem_size) == 0;
+}
+
+
 //Allocate one element from const size pool.
 //User must ensure each element in const size pool are same size.
 //elem_size: the byte size of each element.

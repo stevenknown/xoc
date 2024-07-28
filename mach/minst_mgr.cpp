@@ -125,6 +125,18 @@ void * MInstMgr::xmalloc(UINT size)
     ::memset((void*)p, 0, size);
     return p;
 }
+
+
+bool MInstMgr::isCFIInstruction(MInst const* mi)
+{
+    ASSERT0(mi);
+    MI_CODE code = mi->getCode();
+    return code == MI_cfi_def_cfa ||
+           code == MI_cfi_same_value ||
+           code == MI_cfi_offset ||
+           code == MI_cfi_restore ||
+           code == MI_cfi_def_cfa_offset;
+}
 //END MInstMgr
 
 } //namespace

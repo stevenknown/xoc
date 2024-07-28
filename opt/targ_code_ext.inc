@@ -29,6 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #if defined(FOR_JS)
 #include "../js/js_code_ext.inc"
 
+#elif defined(FOR_TECO)
+#include "../teco/teco_code_ext.inc"
+
+#elif defined(FOR_ARM)
+#include "../arm/arm_code_ext.inc"
+
 #else
 //No target extented code
 #endif

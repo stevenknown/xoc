@@ -83,6 +83,12 @@ typedef enum {
 
     //Switch clause, include determinant expression, a list of case, and body.
     IR_SWITCH,
+
+    //Represent a list expressions that represent dummy-use.
+    //e.g: given a call to foo(x), user can build a dummyuse to represent
+    //global variables that foo(x) referenced, such as:
+    //call foo(x, dummyuse(ld g, ld m)).
+    IR_DUMMYUSE,
     IR_CASE, //CASE VALUE, this is used only within SWITCH clause.
     IR_TRUEBR, //Branch if determinant express is true.
     IR_FALSEBR, //Branch if determinant express is false.
@@ -113,7 +119,15 @@ typedef enum {
     IR_ATAN, //trigonometric function:arctan
     IR_PHI, //Phi statement.
     IR_REGION, //Region statement.
-    IR_LAST_UNDERLYING_CODE = IR_REGION,
+
+    //dwarf
+    IR_CFI_DEF_CFA,
+    IR_CFI_SAME_VALUE,
+    IR_CFI_OFFSET,
+    IR_CFI_RESTORE,
+    IR_CFI_DEF_CFA_OFFSET,
+
+    IR_LAST_UNDERLYING_CODE = IR_CFI_DEF_CFA_OFFSET,
 
     #include "ir_code_ext.inc"
 

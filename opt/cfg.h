@@ -47,19 +47,11 @@ typedef enum {
 } SEQ_TYPE;
 
 
-//CFG Shape
-typedef enum {
-    C_UNDEF = 0,
-    C_SESE, //single entry, single exit
-    C_SEME, //single entry, multi exit
-} CFG_SHAPE;
-
-
 //CFG xcom::Edge Info.
 #define CFGEI_is_eh(ei) ((ei)->m_is_eh)
 class CFGEdgeInfo {
 public:
-    BYTE m_is_eh:1; //true if edge describes exception-handling edge.
+    bool m_is_eh; //true if edge describes exception-handling edge.
 public:
     bool is_eh() const { return CFGEI_is_eh(this); }
 };
@@ -289,8 +281,9 @@ public:
         return count;
     }
 
-    void dumpLoopTree(LI<BB> const* looplist, UINT indent, Region * rg) const;
-    virtual void dumpLoopInfo(Region * rg) const
+    void dumpLoopTree(LI<BB> const* looplist, UINT indent,
+                      Region const* rg) const;
+    virtual void dumpLoopInfo(Region const* rg) const
     {
         if (!rg->isLogMgrInit()) { return; }
         prt(rg, "\n==---- DUMP Natural Loop Info ----==");
@@ -471,11 +464,10 @@ public:
     //
     //Assuming the reordered bblist is bb1=>bb3=>bb4=>bb2, the
     //associated control flow edges are: bb1->bb3->bb4, bb2->bb3.
-    //
-    //It is obviously that converting bb1->bb3 to be fallthrough,
-    //and converting bb1->bb2 to be conditional branch, converting
-    //bb2->bb3 to be unconditional branch.
-    void revise_fallthrough(List<BB*> & new_bbl)
+    //It is obviously that bb1->bb3 should be converted to be fallthrough,
+    //and bb1->bb2 to be conditional branch, bb2->bb3 to be unconditional
+    //branch.
+    virtual void reviseFallthrough(List<BB*> & new_bbl)
     { ASSERTN(0, ("Target Dependent Code")); }
 
     //Remove xr that in bb.
@@ -534,7 +526,7 @@ public:
 
 template <class BB, class XR>
 void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
-                               Region * rg) const
+                               Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
     while (looplist != nullptr) {
@@ -675,7 +667,7 @@ void CFG<BB, XR>::sortByDFS()
         ASSERTN(visited.get(bbc->id()), ("unreachable BB"));
     }
     #endif
-    revise_fallthrough(new_bbl);
+    reviseFallthrough(new_bbl);
     m_bb_list->copy(new_bbl);
     m_bb_sort_type = SEQ_DFS;
 }
@@ -724,7 +716,7 @@ void CFG<BB, XR>::sortByBFS()
         ASSERTN(visited.get(bbc->id()), ("unreachable BB"));
     }
     #endif
-    revise_fallthrough(new_bbl);
+    reviseFallthrough(new_bbl);
     m_bb_list->copy(new_bbl);
     m_bb_sort_type = SEQ_BFS;
 }
@@ -748,7 +740,7 @@ void CFG<BB, XR>::sortByTopological()
         ASSERT0(v);
         m_bb_list->append_tail(getBB(v->id()));
     }
-    revise_fallthrough(*m_bb_list);
+    reviseFallthrough(*m_bb_list);
     m_bb_sort_type = SEQ_TOPOL;
 }
 
@@ -854,7 +846,6 @@ void CFG<BB, XR>::build(OptCtx & oc)
         if (next_ct != m_bb_list->end()) {
             next = next_ct->val();
         }
-
         XR * last = get_last_xr(bb);
         if (last == nullptr) {
             //Remove empty bb after CFG done.
@@ -870,12 +861,10 @@ void CFG<BB, XR>::build(OptCtx & oc)
             }
             continue;
         }
-
-        //Check bb boundary
         if (last->is_terminate()) {
-            continue; //Do nothing.
+            //Meet region boundary.
+            continue;
         }
-
         if (last->is_call()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
@@ -885,7 +874,6 @@ void CFG<BB, XR>::build(OptCtx & oc)
             }
             continue;
         }
-
         if (last->isConditionalBr()) {
             //Add fall-through edge.
             //The last bb may not be terminated by 'return' stmt.
@@ -900,9 +888,8 @@ void CFG<BB, XR>::build(OptCtx & oc)
             setVertex(bb, target_bb, e);
             continue;
         }
-
         if (last->isMultiConditionalBr()) {
-            //Add fall-through edge
+            //Add fall-through edge.
             //The last bb may not be terminated by 'return' stmt.
             if (next != nullptr && !next->is_terminate()) {
                 Edge * e = DGraph::addEdge(bb->id(), next->id());
@@ -922,9 +909,9 @@ void CFG<BB, XR>::build(OptCtx & oc)
             }
             continue;
         }
-
         if (last->isUnconditionalBr()) {
             if (last->isIndirectBr()) {
+                //Add edge to every target of current BB.
                 tgt_bbs.clean();
                 findTargetBBOfIndirectBranch(last, tgt_bbs);
                 xcom::C<BB*> * ct2;
@@ -934,16 +921,15 @@ void CFG<BB, XR>::build(OptCtx & oc)
                     Edge * e = DGraph::addEdge(bb->id(), t->id());
                     setVertex(bb, t, e);
                 }
-            } else {
-                //Add edge between source BB and target BB.
-                BB * target_bb = findBBbyLabel(last->getLabel());
-                ASSERTN(target_bb != nullptr, ("target cannot be nullptr"));
-                Edge * e = DGraph::addEdge(bb->id(), target_bb->id());
-                setVertex(bb, target_bb, e);
+                continue;
             }
+            //Add edge between source BB and target BB.
+            BB * target_bb = findBBbyLabel(last->getLabel());
+            ASSERTN(target_bb != nullptr, ("target cannot be nullptr"));
+            Edge * e = DGraph::addEdge(bb->id(), target_bb->id());
+            setVertex(bb, target_bb, e);
             continue;
         }
-
         if (!last->is_return()) {
             //Add fall-through edge.
             //The last bb may not end by 'return' stmt.
@@ -953,7 +939,6 @@ void CFG<BB, XR>::build(OptCtx & oc)
             }
             continue;
         }
-
         Vertex * v = addVertex(bb->id());
         setVertex(bb, v);
     }

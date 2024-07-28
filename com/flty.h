@@ -40,8 +40,13 @@ namespace xcom {
 #define PRECISION_TYPE_E 2.718281828459045
 
 class Float {
+public:
+    typedef PRECISION_TYPE PType;
+public:
     friend Float zerolinz(Float const& a);
     friend bool operator == (Float const& a, Float const& b);
+    friend bool operator == (Float const& a, Float::PType b);
+    friend bool operator == (Float::PType a, Float const& b);
     friend bool operator != (Float const& a, Float const& b);
     friend bool operator < (Float const& a, Float const& b);
     friend bool operator <= (Float const& a, Float const& b);
@@ -105,6 +110,11 @@ public:
 
     Float & operator = (Float const& a) { m_f = a.m_f; return *this; }
 
+    //Define the implict type converting operation.
+    //e.g:convert Float to double.
+    //    Float a(1.1); double b = (double)a;
+    operator PRECISION_TYPE() const { return m_f; }
+
     void reduce() {}
 
     //Calculate the floor boundary.
@@ -119,6 +129,10 @@ public:
 //Exported Functions
 inline bool operator == (Float const& a, Float const& b)
 { return Float::isApproEq(a.m_f, b.m_f); }
+inline bool operator == (Float const& a, Float::PType b)
+{ return Float::isApproEq(a.m_f, b); }
+inline bool operator == (Float::PType a, Float const& b)
+{ return Float::isApproEq(b.m_f, a); }
 bool operator != (Float const& a, Float const& b);
 inline bool operator != (Float const& a, Float const& b) { return !(a == b); }
 inline bool operator < (Float const& a, Float const& b)

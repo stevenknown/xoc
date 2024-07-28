@@ -783,14 +783,6 @@ void BitSet::copy(BitSet const& src)
 }
 
 
-//Support concatenation assignment such as: a=b=c
-BitSet const& BitSet::operator = (BitSet const& src)
-{
-    copy(src);
-    return *this;
-}
-
-
 void BitSet::dump(CHAR const* name, bool is_del, UFlag flag,
                   BSIdx last_pos) const
 {
@@ -854,7 +846,7 @@ void BitSet::dump(FileObj & fo, UFlag flag, BSIdx last_pos) const
     if (flag.have(BS_DUMP_POS)) {
         fo.prt("\npos(start at 0):");
         for (BSIdx j = get_first(); j != BS_UNDEF; j = get_next(j)) {
-            fo.prt("%u ", elem);
+            fo.prt("%u ", j);
         }
     }
 }

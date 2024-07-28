@@ -360,10 +360,11 @@ public:
         setSimpToLowestHeight();
     }
 
-    void dump(Region * rg) {
+    void dump(Region * rg)
+    {
         ASSERT0(rg);
         note(rg, "\n==---- DUMP SimpCtx IR List ----==");
-        dumpIRList(ir_stmt_list, rg);
+        dumpIRList(ir_stmt_list, rg, nullptr);
     }
 };
 
@@ -401,7 +402,12 @@ protected:
     //it as a whole node. e.g: a[1][2] + b is the lowest height.
     bool isLowestHeight(IR const* ir, SimpCtx const* ctx) const;
     virtual bool isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const;
-
+    virtual bool isLowestHeightExtExp(IR const* ir) const
+    {
+        //Target Dependent Code.
+        ASSERT0(ir->is_exp());
+        return isLowest(ir);
+    }
     //At lowest mode, the predicator, trueexp, falseexp must be leaf.
     //Note the lowest height means tree height is more than 2.
     //e.g: ... = add ld a, ld b; ADD is the lowest height.
@@ -446,12 +452,14 @@ protected:
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
     bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
                                SimpCtx * ctx);
+    IR * simplifyAllKidsExpression(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx *)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
     virtual IR * simplifySpecialRegCall(IR * ir, SimpCtx * ctx)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
+    IR * simplifyDummyUse(IR * ir, SimpCtx *) { return ir; }
 
     bool useMDSSADU() const;
     bool usePRSSADU() const;
@@ -481,6 +489,8 @@ public:
     virtual IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
     virtual void simplifySelectKids(IR * ir, SimpCtx * cont);
     virtual IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyIndirectStmt(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyIndirectExp(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
     virtual void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
@@ -502,8 +512,11 @@ public:
     virtual IR * simplifyIgoto(IR * ir, SimpCtx * cont);
     virtual IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
     virtual IR * simplifyArray(IR * ir, SimpCtx * cont);
+    IR * simplifyExpressionList(IR * irlst, SimpCtx * cont);
+
+    //Return new generated expression's value.
+    //ir: ir may be in parameter list if its prev or next is not empty.
     virtual IR * simplifyExpression(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyStmt(IR * ir, SimpCtx * cont);
     virtual IR * simplifyStmtList(IR * ir, SimpCtx * cont);
     virtual void simplifyBB(IRBB * bb, SimpCtx * cont);

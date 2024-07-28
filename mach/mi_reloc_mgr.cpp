@@ -81,8 +81,8 @@ static bool isMIAlignedByWordLength(TMWORD offset, UINT length)
 //target label and current instruction. The formula is as follows:
 //   offset = (PC_target_label - PC_jump_instruction) / SIZE_instruction;
 //Note that, PC values must be aligned by size of instructions.
-static TMWORD computeJumpOff(MInstMgr * mimgr, Label2Offset const& lab2off,
-                             MInst const* mi)
+TMWORD MIRelocMgr::computeJumpOff(MInstMgr * mimgr,
+    Label2Offset const& lab2off, MInst const* mi)
 {
     TMWORD label_pc = lab2off.get(MI_lab(mi));
     TMWORD inst_pc = MI_pc(mi);
@@ -93,8 +93,12 @@ static TMWORD computeJumpOff(MInstMgr * mimgr, Label2Offset const& lab2off,
     ASSERT0(isMIAlignedByWordLength(label_pc - inst_pc, (UINT)inst_size));
 
     //Label is a custom label.
+    //Note that, For some architectures, it is inconsistent whether the
+    //distance between the target label and the current jump instruction needs
+    //to be subtracted by 1.
     if (lab2off.find(MI_lab(mi))) {
-        return (label_pc - inst_pc) / inst_size - 1;
+        return (TMWORD)((label_pc - inst_pc) / inst_size) -
+               (TMWORD)isDistanceNeedSubOne();
     }
 
     //Label is a internal used for relaxation.
@@ -121,9 +125,28 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
     MIListIter it;
     TMWORD offset = 0;
 
+    xoc::MCDwarfMgr * dm = nullptr;
+    if (xoc::g_debug) {
+        dm = m_rg->getRegionMgr()->getDwarfMgr();
+        ASSERT0(dm);
+    }
+
     for (MInst * mi = milst.get_head(&it);
          mi != nullptr; mi = milst.get_next(&it)) {
         if (m_mimgr->isLabel(mi)) {
+            if (xoc::g_debug) {
+                //We need to update the pc of the MCSymbol for the function.
+                Sym const* sym = LABELINFO_pragma(MI_lab(mi));
+                ASSERT0(sym);
+                dm->setFuncLabelOff(offset, sym);
+            }
+            continue;
+        }
+
+        //The CFI instruction "pc" maintains the pc of the previous
+        //chip instruction.
+        if (xoc::g_debug && MInstMgr::isCFIInstruction(mi)) {
+            MI_pc(mi) = offset;
             continue;
         }
 
@@ -137,8 +160,9 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
         }
 
         if (hasLocalVar(mi)) {
-            setValueViaMICode(mi,
-                (TMWORD)m_var2offset->computeVarOffset(MI_var(mi)));
+            TMWORD var_offset = (TMWORD)m_var2offset->
+                computeVarOffset(MI_var(mi));
+            setValueViaMICode(mi, var_offset);
         }
 
         offset = (TMWORD)xcom::ceil_align(offset, getCodeAlign());

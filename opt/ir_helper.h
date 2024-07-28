@@ -64,11 +64,14 @@ public:
 class VisitIRTree {
     COPY_CONSTRUCTOR(VisitIRTree);
 protected:
+    //Internal variable. No user attention required.
     bool m_is_terminate;
 protected:
+    //Internal function. No user attention required.
     template<class T> void iter(T ir)
     {
         if (!visitIR(ir)) { return; }
+        if (is_terminate()) { return; }
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             T tmplst = ir->getKid(i);
             if (tmplst == nullptr) { continue; }
@@ -78,25 +81,98 @@ protected:
             }
         }
     }
+
+    //Internal function. No user attention required.
+    template<class T> void iterWithSibling(T ir)
+    {
+        for (T t = ir; t != nullptr; t = t->get_next()) {
+            if (!visitIR(t)) { return; }
+            if (is_terminate()) { return; }
+            for (UINT i = 0; i < IR_MAX_KID_NUM(t); i++) {
+                T tmplst = t->getKid(i);
+                if (tmplst == nullptr) { continue; }
+                for (T tmp = tmplst; tmp != nullptr; tmp = tmp->get_next()) {
+                    if (is_terminate()) { return; }
+                    iter(tmp);
+                }
+            }
+        }
+    }
+
+    //Internal function. No user attention required.
     bool is_terminate() const { return m_is_terminate; }
-    void setTerminate() { m_is_terminate = true; }
-protected:
-    //Return true to process the kid IR on tree.
-    virtual bool visitIR(IR *)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
-    virtual bool visitIR(IR const*)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
 public:
     VisitIRTree() : m_is_terminate(false) {}
     virtual ~VisitIRTree() {}
 
+    //API that can be invoked by user.
+    //User can invoke the function when user expect to terminate the visiting
+    //immediately.
+    void setTerminate() { m_is_terminate = true; }
+
+    //API that can be invoked by user.
     //The function will iterate the IR tree that rooted by 'ir'.
     //Note the function does NOT access the sibling IR of 'ir'.
     void visit(IR * ir) { iter<IR*>(ir); }
 
+    //API that can be invoked by user.
     //The function will iterate the IR tree that rooted by 'ir'.
     //Note the function does NOT access the sibling IR of 'ir'.
     void visit(IR const* ir) { iter<IR const*>(ir); }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function will access the sibling IR of 'ir'.
+    void visitWithSibling(IR * ir) { iterWithSibling<IR*>(ir); }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function will access the sibling IR of 'ir'.
+    void visitWithSibling(IR const* ir) { iterWithSibling<IR const*>(ir); }
+
+    //Inferface that can be overrided by user.
+    //The function will be invoked by current class object when visiting each
+    //IR. User can set visiting status to control whether the IR tree visiting
+    //keep going or terminate.
+    //Return true to process the kid IR on tree.
+    //e.g: we are going to find LDA operation in IR tree.
+    //  class MyVisit : public VisitIRTree {
+    //  public:
+    //    IR * lda;
+    //    virtual bool visitIR(IR * ir) {
+    //      if (ir->is_lda()) {
+    //        lda = ir;
+    //        setTerminate();
+    //      }
+    //      //Note it is OK to return true of false here, because the
+    //      //visiting will terminated immedately.
+    //      return true;
+    //    }
+    //  };
+    virtual bool visitIR(IR *)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+
+    //Inferface that can be overrided by user.
+    //The function will be invoked by current class object when visiting each
+    //IR. User can set visiting status to control whether the IR tree visiting
+    //keep going or terminate.
+    //Return true to process the kid IR on tree.
+    //e.g: we are going to find LDA operation in IR tree.
+    //  class MyVisit : public VisitIRTree {
+    //  public:
+    //    IR * lda;
+    //    virtual bool visitIR(IR * ir) {
+    //      if (ir->is_lda()) {
+    //        lda = ir;
+    //        setTerminate();
+    //      }
+    //      //Note it is OK to return true of false here, because the
+    //      //visiting will terminated immedately.
+    //      return true;
+    //    }
+    //  };
+    virtual bool visitIR(IR const*)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
 };
 
 //The function clean the IR_parent for each elements in 'irlst'.
@@ -196,20 +272,31 @@ bool allBeStmt(IR * irlst);
 UINT getArithPrecedence(IR_CODE ty);
 
 inline bool isCommutative(IR_CODE irt)
-{ return IRDES_is_commutative(g_ir_desc[irt]); }
+{ return IRDES_is_commutative(irt); }
+
+inline bool isTernaryOp(IR_CODE irt)
+{ return IRDES_is_ter(irt); }
 
 inline bool isBinaryOp(IR_CODE irt)
-{ return IRDES_is_bin(g_ir_desc[irt]); }
+{ return IRDES_is_bin(irt); }
 
 inline bool isUnaryOp(IR_CODE irt)
-{ return IRDES_is_una(g_ir_desc[irt]); }
+{ return IRDES_is_una(irt); }
 
 //CASE:_$L9 is non-identifier char because of '$'.
 bool isContainNonIdentifierChar(CHAR const* name);
 
 void setParentPointerForIRList(IR * ir_list);
 
-bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
+//The function is used to verify given IR list sanity and uniqueness.
+//irh: an IR set that is used only inside the function.
+//     used to guarrantee the uniquess of IR.
+bool verifyIRList(IR const* ir, BitSet * irh, Region const* rg);
+
+//The function is used to verify given IR list sanity and uniqueness.
+bool verifyIRList(IR const* ir, Region const* rg);
+
+//The function is used to verify IR sanity after IR simplified.
 bool verifySimp(IR * ir, SimpCtx & simp);
 
 } //namespace xoc

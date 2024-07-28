@@ -42,6 +42,7 @@ class DUMgr;
 typedef xcom::TMap<PASS_TYPE, Pass*> PassTab;
 typedef xcom::TMapIter<PASS_TYPE, Pass*> PassTabIter;
 typedef xcom::List<PASS_TYPE> PassTypeList;
+typedef xcom::List<PASS_TYPE>::Iter PassTypeListIter;
 
 class PassMgr {
     COPY_CONSTRUCTOR(PassMgr);
@@ -56,61 +57,69 @@ protected:
     xcom::TTab<Pass*> m_allocated_pass;
     PassTab m_registered_pass;
 protected:
+    virtual Pass * allocAA();
+    virtual Pass * allocArgPasser();
+    virtual Pass * allocBROpt();
+    virtual Pass * allocCalcDerivative();
+    virtual Pass * allocCallGraph();
+    virtual Pass * allocCCP();
     virtual Pass * allocCDG();
     virtual Pass * allocCFG();
-    virtual Pass * allocAA();
-    virtual Pass * allocDUMgr();
-    virtual Pass * allocCopyProp();
-    virtual Pass * allocGCSE();
-    virtual Pass * allocLCSE();
-    virtual Pass * allocRP();
-    virtual Pass * allocPRE();
-    virtual Pass * allocIVR();
-    virtual Pass * allocLICM();
-    virtual Pass * allocDCE();
-    virtual Pass * allocLFTR();
-    virtual Pass * allocInferType();
-    virtual Pass * allocInvertBrTgt();
-    virtual Pass * allocVRP();
-    virtual Pass * allocDSE();
-    virtual Pass * allocRCE();
-    virtual Pass * allocGVN();
-    virtual Pass * allocLoopCvt();
-    virtual Pass * allocPRSSAMgr();
-    virtual Pass * allocMDSSAMgr();
-    virtual Pass * allocCCP();
-    virtual Pass * allocExprTab();
     virtual Pass * allocCfsMgr();
-    virtual Pass * allocIPA();
-    virtual Pass * allocInliner();
-    virtual Pass * allocRefineDUChain();
-    virtual Pass * allocScalarOpt();
-    virtual Pass * allocMDLivenessMgr();
-    virtual Pass * allocLivenessMgr();
-    virtual Pass * allocMDSSALiveMgr();
-    virtual Pass * allocRefine();
-    virtual Pass * allocInsertCvt();
-    virtual Pass * allocCalcDerivative();
-    virtual Pass * allocGSCC();
-    virtual Pass * allocIRSimp();
-    virtual Pass * allocIRMgr();
-    virtual Pass * allocLinearScanRA();
-    virtual Pass * allocCallGraph();
-    virtual Pass * allocVectorization();
-    virtual Pass * allocLoopDepAna();
-    virtual Pass * allocPrologueEpilogue();
-    virtual Pass * allocGPAdjustment();
-    virtual Pass * allocBROpt();
-    virtual Pass * allocWorkaround();
+    virtual Pass * allocCopyProp();
+
+    virtual Pass * allocDCE();
+    virtual Pass * allocDUMgr();
     virtual Pass * allocDynamicStack();
+    virtual Pass * allocDSE();
+    virtual Pass * allocExprTab();
+    virtual Pass * allocGCSE();
+    virtual Pass * allocGPAdjustment();
+    virtual Pass * allocGSCC();
+    virtual Pass * allocGVN();
+    virtual Pass * allocIGotoOpt();
+    virtual Pass * allocInferType();
+    virtual Pass * allocInliner();
+    virtual Pass * allocInsertCvt();
+    virtual Pass * allocInvertBrTgt();
+    virtual Pass * allocIPA();
+    virtual Pass * allocIRMgr();
     virtual Pass * allocIRReloc();
+    virtual Pass * allocIRSimp();
+    virtual Pass * allocIVR();
+    virtual Pass * allocLCSE();
+    virtual Pass * allocLICM();
+    virtual Pass * allocLFTR();
+    virtual Pass * allocLinearScanRA();
+    virtual Pass * allocLivenessMgr();
+    virtual Pass * allocLoopCvt();
+    virtual Pass * allocLoopDepAna();
+    virtual Pass * allocMDLivenessMgr();
+    virtual Pass * allocMDSSALiveMgr();
+    virtual Pass * allocMDSSAMgr();
+    virtual Pass * allocPRE();
+    virtual Pass * allocPRSSAMgr();
+    virtual Pass * allocPrologueEpilogue();
+    virtual Pass * allocRefine();
+    virtual Pass * allocRefineDUChain();
+    virtual Pass * allocRCE();
+    virtual Pass * allocRP();
+    virtual Pass * allocScalarOpt();
+    virtual Pass * allocVectorization();
+    virtual Pass * allocMultiResConvert();
+    virtual Pass * allocVRP();
+    virtual Pass * allocWorkaround();
 protected:
-    void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
-                                  BitSet const& opts);
-    void checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
-                                  AliasAnalysis *& aa,
-                                  DUMgr *& dumgr,
-                                  BitSet const& opts);
+    void checkAndRecomputeDUChain(
+        OptCtx * oc, DUMgr * dumgr, BitSet const& opts);
+    void checkAndRecomputeAAandDU(
+        OptCtx * oc, IRCFG * cfg, AliasAnalysis *& aa, DUMgr *& dumgr,
+        BitSet const& opts);
+    void checkValidAndRecomputePass(
+        PASS_TYPE pt, MOD OptCtx * oc, PassTypeList const& optlist,
+        IRCFG *& cfg, AliasAnalysis *& aa, DUMgr *& dumgr, BitSet const& opts);
+    void checkValidAndRecomputeImpl(
+        MOD OptCtx * oc, PassTypeList const& optlist, BitSet const& opts);
 public:
     PassMgr(Region * rg);
     virtual ~PassMgr() { destroyAllPass(); }
@@ -124,7 +133,7 @@ public:
     //recomputation if it is invalid.
     //...: the options/passes that anticipated to recompute.
     void checkValidAndRecompute(OptCtx * oc, ...);
-    void checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist);
+    void checkValidAndRecompute(OptCtx * oc, PassTypeList const& optlist);
 
     void destroyAllPass();
 
@@ -141,6 +150,14 @@ public:
     PassTab const& getPassTab() const { return m_registered_pass; }
 
     virtual Pass * registerPass(PASS_TYPE passty);
+
+    //The function will re-construct given pass object and do registration
+    //for the pass again.
+    Pass * reRegisterPass(PASS_TYPE passty)
+    {
+        destroyRegisteredPass(passty);
+        return registerPass(passty);
+    }
 
     virtual Pass * queryPass(PASS_TYPE passty)
     { return m_registered_pass.get(passty); }

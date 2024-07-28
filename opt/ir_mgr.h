@@ -105,6 +105,13 @@ public:
     //Build IR_BREAK operation.
     IR * buildBreak();
 
+    //Build IR_DUMMYUSE operation.
+    //A dummyuse operation indicates that IR is a real operation.
+    //e.g: the dummyuse of a CallStmt represents the variables that may be
+    //referenced by the call.
+    //for example: call fopen(h, dummyuse(errno));
+    IR * buildDummyUse(IR * use_list);
+
     //Build IR_CASE operation.
     IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
 
@@ -169,7 +176,7 @@ public:
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
 
     //Build Identifier.
-    IR * buildId(Var * var_info);
+    IR * buildId(Var * var);
 
     //Build internal label operation.
     IR * buildIlabel();
@@ -204,6 +211,10 @@ public:
     //generate det-expression if it is not relational/logical.
     IR * buildJudge(IR * exp);
 
+    //Build ternary operation.
+    IR * buildTernaryOp(IR_CODE irt, Type const* type, IN IR * opnd0,
+                        IN IR * opnd1, IN IR * opnd2);
+
     //Build binary operation without considering pointer arithmetic.
     IR * buildBinaryOpSimp(IR_CODE irt, Type const* type, IR * lchild,
                            IR * rchild);
@@ -234,6 +245,10 @@ public:
     //v: value of integer.
     //type: integer type.
     IR * buildImmInt(HOST_INT v, Type const* type);
+
+    //Build IR_CONST operation.
+    //The expression indicates a tensor value.
+    IR * buildImmTensor(TenVal * tensor_val, Type const* type);
 
     //Build IR_CONST operation.
     //The expression indicates an integer.
@@ -329,6 +344,12 @@ public:
     //type: data type of targe pr.
     //rhs: value expected to store.
     IR * buildStorePR(Type const* type, IR * rhs);
+
+    //Build store operation to store 'rhs' to new pr, the store operation
+    //will reference type of 'rhs'.
+    //rhs: value expected to store.
+    IR * buildStorePR(IR * rhs)
+    { return buildStorePR(rhs->getType(), rhs); }
 
     //Build store operation to store 'rhs' to new pr with type.
     //dt: the simplex data type of targe pr.
@@ -478,6 +499,33 @@ public:
     //Build a STPR IR to save const value of given IR.
     IR * buildStprFromConst(IR * ir, Type const* tp);
 
+    //The command to establish the CFA (Caller Frame Address)
+    //sets a base value starting from a specific base on the stack.
+    //e.g: .cfi_def_cfa $30, 32.
+    //Representing that the CFA is currently
+    //at the location of register $30 plus an offset of 32.
+    IR *  buildDwarfCFIDefCfa(Type const* tp, IR * reg_num, IR * offset);
+
+    //Indicating that the value of this register
+    //has remained unchanged throughout.
+    //e.g: .cfi_same_value $26.
+    IR *  buildDwarfCFISameValue(Type const* tp, IR * reg_num);
+
+    //Representing the current location of the CFA (Caller Frame Address).
+    //e.g: .cfi_offset $15, -16.
+    //This indicates that the current position of the CFA is
+    //at the location of register 15 minus an offset of 16.
+    IR *  buildDwarfCFIOffset(Type const* tp, IR * reg_num, IR * offset);
+
+    //This indicates that the register has been restored to its original state.
+    //e.g: .cfi_restore $26.
+    IR *  buildDwarfCFIRestore(Type const* tp, IR * reg_num);
+
+    //This represents that the current CFA is at an offset
+    //from the stack pointer.
+    //e.g: .cfi_def_cfa_offset 99.
+    IR *  buildDwarfCFICfaOffset(Type const* tp, IR * offset);
+
     size_t count_mem() const;
 
     void dumpFreeTab() const;
@@ -504,6 +552,24 @@ public:
     //Generate a variable to inform compiler that this is a placeholder.
     Var * genInitPlaceHolderVar();
     Var * getInitPlaceHolderVar() const { return m_init_placeholder_var; }
+
+    //Return true if ir tree is isomorphic to src.
+    //ir, src: root of IR tree.
+    //is_cmp_kid: it is true if comparing kids as well.
+    //flag: record the checking condition while compare two given ir expression
+    //      or stmt.
+    //      e.g: If ISOMO_CK_CODE is set, the comparison of IST and ILD will
+    //      return false.
+    bool isIRIsomorphic(IR const* ir, IR const* src,
+                        bool is_cmp_kid, IsomoFlag const& flag) const;
+    bool isArrayIsomorphic(IR const* ir, IR const* src,
+                           bool is_cmp_kid, IsomoFlag const& flag) const;
+    bool isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
+                            bool is_cmp_kid, IsomoFlag const& flag) const;
+    virtual bool isIRIsomorphicExtOp(
+        IR const* ir, IR const* src, bool is_cmp_kid,
+        IsomoFlag const& flag) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     //Note if the ir-count changed, the new generated IR id will start from the
     //new ir-count.

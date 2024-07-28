@@ -1329,7 +1329,6 @@ void MDSystem::removeMDforVAR(Var const* v, ConstMDIter & iter)
             MD * freeone = getMD(MD_id(x));
             freeMD(freeone);
         }
-
         OffsetTab * ofstab = mdtab->get_ofst_tab();
         ASSERT0(ofstab);
         if (ofstab->get_elem_count() > 0) {

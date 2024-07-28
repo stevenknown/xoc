@@ -75,7 +75,6 @@ public:
         init();
         copy(bs);
     }
-    BitSet const& operator = (BitSet const& src);
     ~BitSet() { destroy(); }
 
     //Initialize bit buffer.
@@ -170,6 +169,9 @@ public:
     //Get byte size the bitset allocated.
     UINT get_byte_size() const { return m_size; }
 
+    //Get bit size the bitset allocated.
+    UINT get_bit_size() const { return get_byte_size() * BITS_PER_BYTE; }
+
     //Get buffer pointer.
     BYTE const* get_byte_vec() const { return m_ptr; }
 
@@ -209,6 +211,13 @@ public:
     //Return true if there is no element ONE in bitset.
     bool is_empty() const;
 
+    //Support concatenation assignment such as: a=b=c
+    BitSet const& operator = (BitSet const& src)
+    {
+        copy(src);
+        return *this;
+    }
+
     //Set each byte in BitSet to 'val'.
     void set(BYTE val) { ::memset((void*)m_ptr, val, m_size); }
 
@@ -219,32 +228,99 @@ public:
 };
 
 
-//Read Only BitSet.
-class ROBitSet : public BitSet {
-    COPY_CONSTRUCTOR(ROBitSet);
+//Fixed Size BitSet.
+class FixedSizeBitSet : public BitSet {
 public:
-    ROBitSet(BYTE const* vec, UINT veclen) : BitSet(0) { init(vec, veclen); }
-    ~ROBitSet() { m_ptr = nullptr; m_size = 0; }
+    FixedSizeBitSet(BYTE * vec, UINT veclen) : BitSet(0)
+    { init(vec, veclen); }
+    FixedSizeBitSet(FixedSizeBitSet const& src) { copy(src); }
+    ~FixedSizeBitSet() { m_ptr = nullptr; m_size = 0; }
+
+    void bunion(FixedSizeBitSet const& src)
+    {
+        ASSERT0(src.get_bit_size() <= get_bit_size());
+        BitSet::bunion(src);
+    }
+    void bunion(BSIdx v)
+    {
+        ASSERT0(v <= get_bit_size());
+        BitSet::bunion(v);
+    }
 
     //Count memory usage for current object.
     size_t count_mem() const { return get_byte_size(); }
+    void copy(FixedSizeBitSet const& src)
+    {
+        ASSERT0(src.get_bit_size() <= get_bit_size());
+        ASSERTN(this != &src, ("copy self"));
+        BitSet::copy(src);
+    }
+    void complement(FixedSizeBitSet const& univers)
+    {
+        ASSERT0(univers.get_bit_size() == get_bit_size());
+        BitSet::complement(univers);
+    }
 
     //Dump bit value and position.
     void dump(CHAR const* name = nullptr, bool is_del = false,
               UFlag f = UFlag(BS_DUMP_BITSET|BS_DUMP_POS),
               BSIdx last_pos = BS_UNDEF) const
     { BitSet::dump(name, is_del, f, last_pos); }
+
     //Dump bit value and position.
     void dump(FILE * h, UFlag flag, BSIdx last_pos) const
     { BitSet::dump(h, flag, last_pos); }
+
     //Dump bit value and position.
     void dump(FILE * h) const { BitSet::dump(h); }
+    void diff(BSIdx v)
+    {
+        ASSERT0(v <= get_bit_size());
+        BitSet::diff(v);
+    }
+    void diff(BitSet const& src)
+    {
+        ASSERT0(src.get_bit_size() <= get_bit_size());
+        BitSet::diff(src);
+    }
 
-    void init(BYTE const* vec, UINT veclen)
+    void init(BYTE * vec, UINT veclen)
     {
         m_size = veclen;
-        m_ptr = const_cast<BYTE*>(vec);
+        m_ptr = vec;
     }
+    void intersect(FixedSizeBitSet const& src)
+    {
+        ASSERT0(src.get_bit_size() <= get_bit_size());
+        BitSet::intersect(src);
+    }
+
+    //Support concatenation assignment such as: a=b=c
+    FixedSizeBitSet const& operator = (FixedSizeBitSet const& src)
+    {
+        copy(src);
+        return *this;
+    }
+
+    void rev(BSIdx v)
+    {
+        ASSERT0(v <= get_bit_size());
+        BitSet::rev(v);
+    }
+    ////////////////////////////////////////////////////////////
+    //NOTE: THE FOLLOWING INTERFACES ARE PROHIBITED TO BE USED//
+    ////////////////////////////////////////////////////////////
+    void alloc(UINT) { UNREACHABLE(); }
+};
+
+
+//Read Only BitSet.
+class ROBitSet : public FixedSizeBitSet {
+    COPY_CONSTRUCTOR(ROBitSet);
+public:
+    ROBitSet(BYTE const* vec, UINT veclen) :
+        FixedSizeBitSet(const_cast<BYTE*>(vec), veclen) {}
+    ~ROBitSet() {}
 
     ////////////////////////////////////////////////////////////
     //NOTE: THE FOLLOWING INTERFACES ARE PROHIBITED TO BE USED//

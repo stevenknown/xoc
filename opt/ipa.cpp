@@ -140,6 +140,7 @@ void IPA::computeCallRefForAllRegion()
             continue;
         }
         rg->initPassMgr();
+        rg->initDbxMgr();
         rg->initIRMgr();
         rg->initIRBBMgr();
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
@@ -188,6 +189,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     }
     if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
+        rg->initDbxMgr();
         rg->initIRMgr();
         rg->initIRBBMgr();
     }

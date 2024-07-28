@@ -144,17 +144,22 @@ bool InferType::inferStmtMemAcc(IR * ir)
     ASSERT0(ir->isMemRef() && ir->is_stmt());
     ASSERT0(ir->getRHS());
     bool changed = false;
-    if (ir->getRHS()->is_any()) {
-        if (ir->is_any()) { return false; }
-        IR_dt(ir->getRHS()) = ir->getType();
-        addDump(ir->getRHS());
-        addChanged(ir->getRHS());
-        changed = true;
-    } else if (ir->is_any()) {
-        IR_dt(ir) = ir->getRHS()->getType();
-        changed = true;
-        addDump(ir);
-        addChanged(ir);
+    IR * rhs = ir->getRHS();
+    if (rhs != nullptr) {
+        if (ir->getRHS()->is_any()) {
+            if (ir->is_any()) { return false; }
+            IR_dt(ir->getRHS()) = ir->getType();
+            addDump(ir->getRHS());
+            addChanged(ir->getRHS());
+            changed = true;
+        } else if (ir->is_any()) {
+            IR_dt(ir) = ir->getRHS()->getType();
+            changed = true;
+            addDump(ir);
+            addChanged(ir);
+        }
+    } else {
+        //Virtual OP may not have RHS.
     }
     changed |= inferVarTypeByIRCode(ir);
     return true;

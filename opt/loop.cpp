@@ -108,7 +108,8 @@ void InsertPhiHelper::dumpPhi() const
     List<IR*>::Iter it;
     for (IR * ir = m_prssa_phis.get_head(&it); ir != nullptr;
          ir = m_prssa_phis.get_next(&it)) {
-        dumpIR(ir, m_rg, nullptr, IR_DUMP_KID);
+        dumpIR(ir, m_rg, nullptr,
+               DumpFlag::combineIRID(IR_DUMP_KID));
     }
 
     note(getRegion(), "\n");
@@ -1268,6 +1269,335 @@ bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt)
     IRBB const* tbb = cfg->findBBbyLabel(lab);
     ASSERT0(tbb);
     return !li->isInsideLoop(tbb->id());
+}
+
+
+//
+//START FindRedOp
+//
+class FindRedOp {
+    friend class IterIRTreeForMemRef;
+    COPY_CONSTRUCTOR(FindRedOp);
+protected:
+    MDSSAMgr const* m_mdssamgr;
+    PRSSAMgr const* m_prssamgr;
+    UseDefMgr const* m_udmgr;
+    MD const* m_ref;
+    LI<IRBB> const* m_li;
+    IR const* m_op;
+    Region const* m_rg;
+    IRBB const* m_loophead;
+    FindRedOpResult m_res;
+    xcom::TTab<UINT> m_mddeftab;
+    xcom::TTab<UINT> m_irtab;
+protected:
+    void checkOpRHS();
+
+    void findInPRSSA();
+    void findInMDSSA();
+    void find();
+
+    bool isVisited(MDDef const* mddef) const
+    { return m_mddeftab.find(mddef->id()); }
+    bool isVisited(IR const* ir) const
+    { return m_irtab.find(ir->id()); }
+
+    void setVisited(MDDef const* mddef) { m_mddeftab.append(mddef->id()); }
+    void setVisited(IR const* ir) { m_irtab.append(ir->id()); }
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+public:
+    FindRedOp(LI<IRBB> const* li, IR const* op, Region const* rg) :
+        m_li(li), m_op(op), m_rg(rg)
+    {
+        ASSERT0(op && op->is_stmt());
+        m_prssamgr = m_rg->getPRSSAMgr();
+        m_mdssamgr = m_rg->getMDSSAMgr();
+        if (m_mdssamgr != nullptr) {
+            m_udmgr = const_cast<MDSSAMgr*>(m_mdssamgr)->getUseDefMgr();
+        }
+        m_loophead = li->getLoopHead();
+        m_res = OP_UNDEF;
+        if (!useMDSSADU() || !usePRSSADU()) {
+            m_res = OP_UNKNOWN;
+            return;
+        }
+        find();
+    }
+    void checkExp(IR const* exp);
+    void checkExpInPRSSA(IR const* exp);
+    void checkExpInMDSSA(IR const* exp);
+    void checkDefInPRSSA(IR const* def);
+    void checkMDDefInMDSSA(MDDef const* mddef);
+
+    FindRedOpResult getResult() const { return m_res; }
+
+    void iterIRTreeList(IR const* exp_list);
+};
+
+
+void FindRedOp::find()
+{
+    ASSERT0(m_op && m_op->is_stmt() && m_op->isMemRef());
+    m_res = OP_UNDEF;
+
+    //Get the MustDef MD.
+    m_ref = m_op->getMustRef();
+    if (!m_ref->is_exact() && !m_ref->is_range()) {
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    if (m_op->isCallStmt()) {
+        if (m_op->isReadOnly()) {
+            //If Call is readonly, it is impossible for DefUse chain to
+            //form a cycle.
+            m_res = OP_IS_NOT_RED;
+            return;
+        }
+        //For the sake of complexity of call-stmt, we can not easy determine
+        //the reduction behaviors of a call, expect more aggressive analysis.
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    checkOpRHS();
+}
+
+
+void FindRedOp::checkExp(IR const* exp)
+{
+    if (exp->isPROp()) {
+        checkExpInPRSSA(exp);
+        return;
+    }
+    if (exp->isMemRefNonPR()) {
+        checkExpInMDSSA(exp);
+        return;
+    }
+    UNREACHABLE();
+}
+
+
+void FindRedOp::checkDefInPRSSA(IR const* def)
+{
+    ASSERT0(def && def->is_stmt());
+    if (def->is_phi()) {
+        if (def->getBB() != m_loophead) {
+            //If exp's DEF is a PHI, for now, we just check whether the phi
+            //is located in loophead BB. If it is not the case, we can not
+            //determine if 'exp' is in the cycle of reduction op.
+            m_res = OP_UNKNOWN;
+            return;
+        }
+        if (isVisited(def)) {
+            //Found a cycle in DefUse chain that formed by
+            //phi1 -> $3 id:11 -> $3 id:37 -> phi2 -> $1 id:9 -> phi1
+            //  $1 phi1 = $0, $3 id:11
+            //  ...
+            //  $3 phi2 = $1 id:9, $6
+            //  ...
+            //  st x = $3 id:37
+            ASSERT0(m_res == OP_UNDEF);
+            m_res = OP_HAS_CYCLE;
+            return;
+        }
+        setVisited(def);
+        iterIRTreeList(((CPhi const*)def)->getOpndList());
+        return;
+    }
+    if (def == m_op) {
+        //CASE:rp0_2.c
+        //     BB_LOOPHEAD:<-----------
+        //     phi $17 = $18, $19; #S1 |
+        //  ---falsebr                 |
+        // |     |                     |
+        // |     V                     |
+        // |   BODY:                   |
+        // |   stpr $18 = $17;         |
+        // |   stpr $19 = $18;         |
+        // |   goto BB_LOOPHEAD;-------
+        // |
+        //  -->BB_END:
+        //     ist = ... $17; #S2
+        //In the case, #S1 and #S2 construct a reduce operation pair,
+        //which reduce-variable is $19.
+        ASSERT0(m_res == OP_UNDEF);
+        m_res = OP_HAS_CYCLE;
+        return;
+    }
+}
+
+
+void FindRedOp::checkExpInPRSSA(IR const* exp)
+{
+    ASSERT0(exp && exp->is_exp());
+    ASSERT0(exp->isPROp());
+    SSAInfo const* prssainfo = exp->getSSAInfo();
+    ASSERT0(prssainfo);
+    IR const* def = prssainfo->getDef();
+    if (def == nullptr) {
+        //Region live-in PR can not form reduction operation.
+        ASSERT0(m_res == OP_UNDEF);
+        m_res = OP_IS_NOT_RED;
+        return;
+    }
+    if (!m_li->isInsideLoop(def->getBB()->id())) {
+        //Outside loop stmt can not form reduction operation.
+        ASSERT0(m_res == OP_UNDEF);
+        m_res = OP_IS_NOT_RED;
+        return;
+    }
+    checkDefInPRSSA(def);
+}
+
+
+void FindRedOp::checkMDDefInMDSSA(MDDef const* mddef)
+{
+    ASSERT0(mddef);
+    if (mddef->is_phi()) {
+        if (mddef->getBB() != m_loophead) {
+            //If exp's DEF is a PHI, for now, we just check whether the phi
+            //is located in loophead BB. If it is not the case, we can not
+            //determine if 'exp' is in the cycle of reduction op.
+            m_res = OP_UNKNOWN;
+            return;
+        }
+        if (isVisited(mddef)) {
+            //Found a cycle in DefUse chain that formed by
+            //MDPhi5 -> LD id:39 -> ID id:74 -> MDPhi5.
+            //CASE:compile/ir_refine.c,
+            //    BB2:<------------------------------------------
+            //  --MDPhi5: MD18V1 <- (MD18V0 BB8), (id:74 MD18V1) |
+            // |   |                                             |
+            // |   V                                             |
+            // |  BB3:                                           |
+            // |  st:f32 'f00' id:21                             |
+            // |    ld:f32 'gf' id:39 -USE:MD18V1                |
+            // |  goto BB2;--------------------------------------
+            // |
+            //  ->BB4:
+            //    return
+            ASSERT0(m_res == OP_UNDEF);
+            m_res = OP_HAS_CYCLE;
+            return;
+        }
+        setVisited(mddef);
+        iterIRTreeList(((MDPhi const*)mddef)->getOpndList());
+        return;
+    }
+    IR const* defocc = mddef->getOcc();
+    ASSERT0(defocc);
+    if (!m_li->isInsideLoop(defocc->getBB()->id())) {
+        //No need to consider the outside DefUse relation. It must not
+        //be able to form reduction operation. However, since MDSSA
+        //represents May-Dependence, we have to keep analysing remain
+        //VMD.
+        return;
+    }
+    bool const is_aggressive = true;
+    if (xoc::isDependent(defocc, m_op, is_aggressive, m_rg)) {
+        //Since MDSSA represents May-Dependence, we just record that
+        //the function has found a DefUse chain which form a dependence
+        //cycle in the loop.
+        ASSERT0(m_res == OP_UNDEF);
+        m_res = OP_HAS_CYCLE;
+        return;
+    }
+    if (defocc->hasRHS()) {
+        //Note RHS may be NULL if defocc is Virtual OP.
+        iterIRTreeList(defocc->getRHS());
+        return;
+    }
+    ASSERTN(0, ("TODO"));
+}
+
+
+void FindRedOp::checkExpInMDSSA(IR const* exp)
+{
+    ASSERT0(exp && exp->is_exp());
+    ASSERT0(exp->isMemRefNonPR());
+    MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
+    ASSERT0(mdssainfo);
+    //WORKAROUND: ASSERT0(mdssainfo && !mdssainfo->isEmptyVOpndSet());
+    if (mdssainfo->isEmptyVOpndSet()) {
+        //WORKAROUND:
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    VOpndSetIter it;
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&it);
+         i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &it)) {
+        VMD * vmd = (VMD*)m_udmgr->getVOpnd(i);
+        ASSERT0(vmd && vmd->is_md());
+        if (!vmd->hasDef()) { continue; }
+        MDDef const* mddef = vmd->getDef();
+        checkMDDefInMDSSA(mddef);
+        if (m_res != OP_UNDEF) {
+            //Result has been ready.
+            return;
+        }
+    }
+}
+
+
+void FindRedOp::checkOpRHS()
+{
+    ASSERT0(m_op && m_op->is_stmt());
+    ASSERT0(m_op->hasRHS());
+    IR const* rhs = m_op->getRHS();
+    if (rhs == nullptr) {
+        //Virtual OP may not have RHS.
+        //If OP does not have RHS, it is impossible for DefUse chain to
+        //form a cycle.
+        m_res = OP_IS_NOT_RED;
+        return;
+    }
+    iterIRTreeList(rhs);
+}
+
+
+class IterIRTreeForMemRef : public VisitIRTree {
+    FindRedOp & m_findredop;
+protected:
+    virtual bool visitIR(IR const* ir) override
+    {
+        ASSERT0(ir->is_exp());
+        if (!ir->isMemRef()) {
+            //Return true to keep visiting kid of 'ir'.
+            return true;
+        }
+        m_findredop.checkExp(ir);
+        if (m_findredop.getResult() == OP_UNDEF) {
+            //Return true to keep processing the next kid.
+            return true;
+        }
+        //The finding result has already been generated, terminate the
+        //finding process immediately.
+        setTerminate();
+        return false;
+    }
+public:
+    IterIRTreeForMemRef(IR const* ir, FindRedOp & findredop) :
+        m_findredop(findredop) { visitWithSibling(ir); }
+};
+
+
+void FindRedOp::iterIRTreeList(IR const* exp_list)
+{
+    ASSERT0(exp_list && exp_list->is_exp());
+    IterIRTreeForMemRef iterirtree(exp_list, *this);
+}
+//END FindRedOp
+
+
+FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
+                                Region const* rg)
+{
+    ASSERT0(stmt && stmt->is_stmt());
+    FindRedOp findredop(li, stmt, rg);
+    return findredop.getResult();
 }
 
 

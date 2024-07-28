@@ -881,11 +881,6 @@ bool Graph::is_livein_from(Vertex const* v, Vertex const* pred,
 }
 
 
-//Sort graph vertices in topological order.
-//vex_vec: record vertics in topological order.
-//Return true if sorting success, otherwise there exist cycles in graph.
-//Note you should NOT retrieve vertex in 'vex_vec' via vertex's index because
-//they are stored in dense manner.
 bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
 {
     ASSERTN(m_ec_pool != nullptr, ("Graph still not yet initialize."));
@@ -927,7 +922,7 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
             }
         }
     }
-    return pos == getVertexNum() - 1;
+    return pos == getVertexNum();
 }
 
 
@@ -959,60 +954,64 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 
 
 //Remove transitive edge.
+//Return false if the function failed to remove transitive edge.
+//Note the function handle only acyclic graph.
 //e.g: Given edges of G, there are v0->v1->v2->v3, v0->v3, then v0->v3 named
 //transitive edge.
 //ALGO:
-//    INPUT: Graph with N vertices.
-//    1. Sort vertices in topological order.
-//    2. Associate each edges with indicator respective,
-//       and recording them in one matrix(N*N)
-//       e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
-//              0   1    2
-//            0 --  e3   e1
-//            1 --  --   e2
-//            2 --  --   --
-//
-//    3. Scan vertices according to toplogical order,
-//       remove all edges which the target-node has been
-//       marked at else rows.
-//       e.g: There are dependence edges: v0->v1, v0->v2.
-//       If v1->v2 has been marked, we said v0->v2 is removable,
-//       and the same goes for the rest of edges.
-//e.g: E->D, A->D are transitive edges.
-//           E   A
-//         __|   |_
-//        |   \ /  |
-//        |    V   |
-//        |    B   |
-//        |    |   |
-//        |    |   |
-//        |    V   |
-//        |    C   |
-//        |___ | __|
-//            \|/
-//             V
-//             D
-void Graph::removeTransitiveEdge()
+//  INPUT: Graph with N vertices.
+//  1. Sort vertices in topological order.
+//  2. Associate each edges with indicator respective,
+//     and recording them in one matrix(N*N)
+//     e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
+//            0   1    2
+//          0 --  e3   e1
+//          1 --  --   e2
+//          2 --  --   --
+//  3. Scan vertices according to toplogical order,
+//     remove all edges which the target-node has been
+//     marked at else rows.
+//     e.g: There are dependence edges: v0->v1, v0->v2.
+//     If v1->v2 has been marked, we said v0->v2 is removable,
+//     and the same goes for the rest of edges.
+//     e.g: E->D, A->D are transitive edges.
+//         E   A
+//       __|   |_
+//      |   \ /  |
+//      |    V   |
+//      |    B   |
+//      |    |   |
+//      |    |   |
+//      |    V   |
+//      |    C   |
+//      |___ | __|
+//          \|/
+//           V
+//           D
+bool Graph::removeTransitiveEdge()
 {
     Vector<Vertex*> vex_vec;
-    sortInTopologOrder(vex_vec);
+    bool succ = sortInTopologOrder(vex_vec);
+    if (!succ) { return false; }
     DefMiscBitSetMgr bs_mgr;
     Vector<DefSBitSetCore*> reachset_vec;
     TMap<VexIdx, DefSBitSetCore*> reachset_map;
     BitSet is_visited;
+
     //Scanning vertices in topological order.
     for (VecIdx i = 0; i <= vex_vec.get_last_idx(); i++) {
         Vertex const* fromvex = vex_vec.get(i);
+        //Note the vertices have sorted and stored in dense mode in vector.
+        //Thus there is no node can be skipped.
         ASSERT0(fromvex);
         if (is_dense()) {
-            removeTransitiveEdgeHelper(fromvex, &reachset_vec,
-                                       is_visited, bs_mgr);
-        } else {
-            removeTransitiveEdgeHelper(fromvex,
-                (Vector<DefSBitSetCore*>*)&reachset_map, is_visited, bs_mgr);
+            removeTransitiveEdgeHelper(
+                fromvex, &reachset_vec, is_visited, bs_mgr);
+            continue;
         }
+        removeTransitiveEdgeHelper(fromvex,
+            (Vector<DefSBitSetCore*>*)&reachset_map, is_visited, bs_mgr);
     }
-
     if (is_dense()) {
         for (VecIdx i = 0; i <= reachset_vec.get_last_idx(); i++) {
             DefSBitSetCore * bs = reachset_vec.get(i);
@@ -1020,22 +1019,21 @@ void Graph::removeTransitiveEdge()
                 bs->clean(bs_mgr);
             }
         }
-        return;
+        return true;
     }
-
     TMapIter<VexIdx, DefSBitSetCore*> iter;
     DefSBitSetCore * bs = nullptr;
     for (reachset_map.get_first(iter, &bs);
          bs != nullptr; reachset_map.get_next(iter, &bs)) {
         bs->clean(bs_mgr);
     }
+    return true;
 }
 
 
-void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
-                                       Vector<DefSBitSetCore*> * reachset,
-                                       BitSet & is_visited,
-                                       DefMiscBitSetMgr & bs_mgr)
+void Graph::removeTransitiveEdgeHelper(
+    Vertex const* fromvex, Vector<DefSBitSetCore*> * reachset,
+    BitSet & is_visited, DefMiscBitSetMgr & bs_mgr)
 {
     ASSERT0(reachset);
     if (is_visited.is_contain((BSIdx)fromvex->id())) { return; }

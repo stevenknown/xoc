@@ -56,15 +56,14 @@ void Lab2BB::dump(Region * rg) const
 
 
 //IRCFG
-IRCFG::IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
-             UINT vertex_hash_size)
+IRCFG::IRCFG(BBList * bbl, Region * rg, UINT vertex_hash_size)
     : Pass(rg), OptimizedCFG<IRBB, IR>(bbl, vertex_hash_size)
 {
     m_tm = rg->getTypeMgr();
     ASSERT0(rg->getBBMgr());
-    m_cs = cs;
     setBitSetMgr(rg->getBitSetMgr());
-    initEntryAndExit(m_cs);
+    ASSERT0(getEntry() == nullptr);
+    initEntryAndExit();
 }
 
 
@@ -458,18 +457,8 @@ UINT IRCFG::replacePredWith(IRBB const* bb, IRBB const* succ,
 }
 
 
-void IRCFG::initEntryAndExit(CFG_SHAPE cs)
+void IRCFG::setLabAndBBMap()
 {
-    //This function may be called multiple times.
-    m_exit_list.clean();
-    m_lab2bb.clean();
-    if (m_bb_list != nullptr && m_bb_list->get_elem_count() == 0) {
-        m_entry = nullptr;
-        m_exit_list.clean();
-        return;
-    }
-
-    //Add BB into graph.
     for (IRBB * bb = m_bb_list->get_tail();
          bb != nullptr; bb = m_bb_list->get_prev()) {
         for (LabelInfo const* li = bb->getLabelList().get_head();
@@ -485,41 +474,31 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
             }
         }
     }
-    if (m_entry != nullptr) {
-        //Already have entry and exit BB.
+}
+
+
+void IRCFG::initEntryAndExit()
+{
+    m_lab2bb.clean();
+
+    //This function may be called multiple times.
+    //Entry BB will be generated and recorded during the first call of
+    //build(). In order to avoid generating entry-BB at each call of
+    //initEntryAndExit, we prefer to reuse the first generated entry BB.
+    //Thus do NOT clean m_entry before calling initEntryAndExit.
+    //If you expect to reconstruct whole CFG, please destroy the PASS_CFG
+    //first and then register the CFG pass again.
+    m_entry = nullptr;
+    m_exit_list.clean();
+    if (m_bb_list != nullptr && m_bb_list->get_elem_count() == 0) {
         return;
     }
-    switch (cs) {
-    case C_SESE: {
-        //Make sure the region has the unique entry.
-        //Note we always create entry BB because original CFG may only
-        //contain cyclic graph.
-        m_entry = m_rg->allocBB();
-        addBB(m_entry);
-        m_bb_list->append_head(m_entry);
-        BB_is_entry(m_entry) = true;
-
-        //Create logical exit BB.
-        //NOTICE: In actually, the logical exit BB is ONLY
-        //used to solve diverse dataflow equations, whereas
-        //considering the requirement of ENTRY BB, EXIT BB.
-        IRBB * exit = m_rg->allocBB();
-        addBB(exit);
-        m_bb_list->append_tail(exit);
-        m_exit_list.append_tail(exit);
-        break;
-    }
-    case C_SEME: {
-        //Note we always create entry BB because original CFG may only
-        //contain cyclic graph.
-        m_entry = m_rg->allocBB();
-        addBB(m_entry);
-        m_bb_list->append_head(m_entry);
-        BB_is_entry(m_entry) = true;
-        break;
-    }
-    default: ASSERTN(0, ("strang shape of CFG"));
-    }
+    //Region's BB related API guarantees the first BB in BBList is already
+    //the entry of current Region.
+    m_entry = m_bb_list->get_head();
+    ASSERT0(BB_is_entry(m_entry));
+    addBB(m_entry);
+    setLabAndBBMap();
 }
 
 
@@ -667,7 +646,7 @@ void IRCFG::removeBB(C<IRBB*> * bbct, OUT CfgOptCtx & ctx)
     ASSERT0(!bb->is_entry());
     //The mapping between Labels and BB has been maintained by caller's code.
     //removeMapBetweenLabelAndBB(bb);
-    m_rg->getBBMgr()->destroyBB(bb);
+    m_rg->getBBMgr()->freeBB(bb);
 }
 
 
@@ -768,11 +747,10 @@ bool IRCFG::refineCFG(MOD CfgOptCtx & optctx)
 }
 
 
-//Note if cfg rebuild, SSAInfo and MDSSAInfo should be recomputed.
+//Note if CFG rebuild, SSAInfo and MDSSAInfo should be recomputed.
 void IRCFG::rebuild(OptCtx & oc)
 {
-    ASSERT0(m_cs != C_UNDEF);
-    initEntryAndExit(m_cs);
+    initEntryAndExit();
     SortPredByBBId sortpred(this);
     sortpred.collectPhiOpnd2PredBB();
     CFG<IRBB, IR>::rebuild(oc);
@@ -1033,8 +1011,8 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point, OptCtx & oc)
     IRBB * newbb = m_rg->allocBB();
 
     //Move rest IRs from bb to newbb.
-    bb->getIRList().extractRestIRIntoList(split_point, false,
-                                          newbb->getIRList());
+    bb->getIRList().extractRestIRIntoList(
+        split_point, false, newbb->getIRList());
     insertFallThroughBBAfter(bb, newbb, &oc);
     return newbb;
 }
@@ -1401,6 +1379,7 @@ void IRCFG::removeAllStmt(IRBB * bb, CfgOptCtx const& ctx)
         xoc::removeStmt(ir, getRegion(), ctx.oc);
         getRegion()->freeIRTree(ir);
     }
+    bb->getIRList().clean();
 }
 
 
@@ -2112,9 +2091,10 @@ static void dumpVertex(Vertex const* v, UINT flag, IRCFG const* cfg,
 
         //TODO: implement dump_ir_buf();
         if (dump_mdssa) {
-            mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
+            mdssamgr->dumpIRWithMDSSA(ir, DumpFlag::combineIRID(IR_DUMP_KID));
         } else {
-            dumpIR(ir, cfg->getRegion(), nullptr, IR_DUMP_KID);
+            dumpIR(ir, cfg->getRegion(), nullptr,
+                   DumpFlag::combineIRID(IR_DUMP_KID));
         }
     }
 
@@ -2283,9 +2263,10 @@ static void dumpVCGNodeWithDetail(CHAR const* shape, CHAR const* font,
 
         //TODO: implement dump_ir_buf();
         if (dump_mdssa) {
-            mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
+            mdssamgr->dumpIRWithMDSSA(ir, DumpFlag::combineIRID(IR_DUMP_KID));
         } else {
-            dumpIR(ir, cfg->getRegion(), nullptr, IR_DUMP_KID);
+            dumpIR(ir, cfg->getRegion(), nullptr,
+                   DumpFlag::combineIRID(IR_DUMP_KID));
         }
     }
 
@@ -2513,6 +2494,7 @@ bool IRCFG::dump() const
     m_lab2bb.dump(m_rg);
     m_rg->getLogMgr()->decIndent(2);
     if (g_dump_opt.isDumpDOM()) {
+        note(m_rg, "\n==-- DUMP DOM&IDOM PDOM&IPDOM IN IRCFG --==");
         dumpDomSet();
     }
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
@@ -2571,7 +2553,6 @@ void IRCFG::clone(IRCFG const& src, bool clone_edge_info, bool clone_vex_info)
 {
     CFG<IRBB, IR>::clone(src, clone_edge_info, clone_vex_info);
     m_tm = src.getRegion()->getTypeMgr();
-    m_cs = src.getCfgShape();
     setBitSetMgr(src.getBitSetMgr());
     cloneLab2BB(src.m_lab2bb);
 }
@@ -2602,10 +2583,6 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
-        note(m_rg, "\n==---- DUMP DOM&IDOM IN IRCFG ----==");
-        dumpDomSet();
-    }
 }
 
 
@@ -2661,10 +2638,6 @@ void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_pdom_valid(oc) = true;
     END_TIMER(t, "Compute PDom,IPDom");
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
-        note(m_rg, "\n==---- DUMP PDOM&IPDOM IN IRCFG ----==");
-        dumpDomSet();
-    }
 }
 
 

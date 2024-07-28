@@ -846,6 +846,21 @@ public:
 
 typedef TMapIter<MDIdx, MDSet const*> MD2MDSetIter;
 
+class CompareMDFunc {
+public:
+    bool is_less(MD * t1, MD * t2) const { return t1->id() < t2->id(); }
+    bool is_equ(MD * t1, MD * t2) const { return t1 == t2; }
+    MD * createKey(MD * t) { return t; }
+};
+
+class CompareConstMDFunc {
+public:
+    bool is_less(MD const* t1, MD const* t2) const
+    { return t1->id() < t2->id(); }
+    bool is_equ(MD const* t1, MD const* t2) const { return t1 == t2; }
+    MD const* createKey(MD const* t) { return t; }
+};
+
 //MD2MD_SET_MAP
 //Record MD->MDS relations.
 //Note MD may mapped to nullptr, means the MD does not point to anything.

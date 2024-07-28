@@ -73,6 +73,7 @@ protected:
     SMemPool * m_pool;
     SMemPool * m_sc_pool;
     MDSetMgr * m_md_set_mgr; //alloca MS_SET.
+    IRMgr * m_irmgr;
     ExprRepVec m_ir_expr_vec;
     //Record allocated object. used by destructor.
     SList<ExprRep*> m_ir_expr_lst;
@@ -83,14 +84,24 @@ protected:
     ExprRep * allocExprRep();
     void cleanHashTab();
     HOST_UINT compute_hash_key(IR const* ir) const;
+
+    //Note m_iter may changed.
     HOST_UINT compute_hash_key_for_tree(IR const* ir);
+
+    void encodeAllKids(IR const* ir);
     ExprRep * encodeBaseOfIST(IR * ir)
     {
         ASSERT0(ir->getParent()->is_ist());
         if (ir->is_array()) { return nullptr; }
         return encodeExp(ir);
     }
+    virtual ExprRep * encodeExtExp(IR * ir);
+    virtual void encodeExtStmt(IR const* ir);
+
+    IRMgr * getIRMgr() const { return m_irmgr; }
+
     void reset();
+
     void * xmalloc(INT size);
 public:
     explicit ExprTab(Region * rg);

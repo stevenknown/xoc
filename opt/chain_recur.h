@@ -170,8 +170,8 @@ public:
     //Return true if value is equal to v.
     bool isEqual(HOST_INT v) const;
     bool isEqual(HOST_FP v) const;
-    bool isEqual(IVVal const& v) const;
-    bool isEqual(IR const* v) const;
+    bool isEqual(IVVal const& v, IRMgr const* mgr) const;
+    bool isEqual(IR const* v, IRMgr const* mgr) const;
 
     //Set current value to be integer.
     void setToInt(HOST_INT val, Type const* ty)
@@ -271,14 +271,14 @@ public:
     UINT id() const { return m_id; }
 
     //Return true if current chain-rec is equal to src.
-    bool isEqual(ChainRec const& src) const;
+    bool isEqual(ChainRec const& src, IRMgr const* mgr) const;
 
     //Return true if current chain-rec form is equal to given IV value list.
     //e.g: given CR is {1,+,3}, function call of
     //     isEqual(2, &IVVal(HOST_INT(1)), &IVVal(HOST_INT(3)));
     //     will return true.
-    bool isEqual(UINT num, ...) const;
-    bool isEqual(ConstIVValList const& lst) const;
+    bool isEqual(IRMgr const* mgr, UINT num, ...) const;
+    bool isEqual(ConstIVValList const& lst, IRMgr const* mgr) const;
 
     //Return true if chainrec is either linear increasing or linear decreasing.
     bool isLinear() const { return getCode() == IR_ADD || getCode() == IR_SUB; }

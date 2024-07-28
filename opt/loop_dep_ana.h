@@ -49,6 +49,7 @@ typedef enum tagLOOP_DEP_KIND {
 #define LDI_tgt_mddef(l) ((l)->u1.m_tgt_mddef)
 #define LDI_tgt_is_ir(l) ((l)->m_tgt_is_ir)
 class LoopDepInfo {
+    //The class permits copy-constructor.
 public:
     bool m_tgt_is_ir;
     LOOP_DEP_KIND m_kind;
@@ -70,6 +71,7 @@ public:
 
     CHAR const* dumpTgt(OUT xcom::StrBuf & buf) const;
 
+    LOOP_DEP_KIND getKind() const { return m_kind; }
     CHAR const* getDepName() const;
     IR const* getSrc() const { return LDI_src(this); }
     IR const* getTgtIR() const
@@ -140,19 +142,78 @@ public:
 class LDACtx {
     COPY_CONSTRUCTOR(LDACtx);
 protected:
-    ConstIRTab m_analyzed_irs; //record all IRs that has analyzed.
-public:
+    class IR2LDITab : public xcom::TMap<
+        IR const*, LoopDepInfo const*, CompareConstIRFunc> {
+    public:
+        static UINT getTNodeSize()
+        {
+            return xcom::TMap<IR const*, LoopDepInfo const*>::
+                getTNodeSize<IR const*, LoopDepInfo const*>();
+        }
+    };
+    class MDDef2LDITab : public xcom::TMap<
+        MDDef const*, LoopDepInfo const*, CompareConstMDDefFunc> {
+    public:
+        static UINT getTNodeSize()
+        {
+            return xcom::TMap<MDDef const*, LoopDepInfo const*>::
+                getTNodeSize<MDDef const*, LoopDepInfo const*>();
+        }
+    };
+    class SecondTab {
+    public:
+        IR2LDITab * ir2ldi;
+        MDDef2LDITab * mddef2ldi;
+    };
+    class FirstTab : public xcom::TMap<LOOP_DEP_KIND, SecondTab*> {
+    public:
+        static UINT getTNodeSize()
+        {
+            return xcom::TMap<LOOP_DEP_KIND, SecondTab*>::
+                getTNodeSize<LOOP_DEP_KIND, SecondTab*>();
+        }
+    };
+    typedef xcom::TMap<IR const*, FirstTab*, CompareConstIRFunc> IR2FirstTab;
+protected:
+    SMemPool * m_pool;
+    SMemPool * m_firtab_pool;
+    SMemPool * m_ir2ldi_pool;
+    SMemPool * m_mddef2ldi_pool;
     LI<IRBB> const* m_li;
+    ConstIRTab m_analyzed_irs; //record all IRs that has analyzed.
+    IR2FirstTab m_ir2firsttab;
+protected:
+    LoopDepInfo * allocLoopDepInfo();
+    FirstTab * allocFirstTab();
+    SecondTab * allocSecondTab();
+    MDDef2LDITab * allocMDDef2LDI();
+    IR2LDITab * allocIR2LDI();
 public:
     LDACtx(LI<IRBB> const* li)
     {
         ASSERT0(li);
         m_li = li;
+        m_pool = smpoolCreate(sizeof(LoopDepInfo) * 4, MEM_COMM);
+        m_firtab_pool = smpoolCreate(FirstTab::getTNodeSize() * 2,
+                                     MEM_CONST_SIZE);
+        m_ir2ldi_pool = smpoolCreate(IR2LDITab::getTNodeSize() * 2,
+                                     MEM_CONST_SIZE);
+        m_mddef2ldi_pool = smpoolCreate(MDDef2LDITab::getTNodeSize() * 2,
+                                        MEM_CONST_SIZE);
     }
-    ~LDACtx() {}
+    ~LDACtx()
+    {
+        smpoolDelete(m_pool);
+        smpoolDelete(m_firtab_pool);
+        smpoolDelete(m_ir2ldi_pool);
+        smpoolDelete(m_mddef2ldi_pool);
+    }
 
     //Record 'ir' as the IR that has participated the analysis.
     void add(IR const* ir) { m_analyzed_irs.append(ir); }
+
+    //The function generates an unqiue LoopDepInfo according to 'ldi'.
+    LoopDepInfo const* appendLoopDepInfo(LoopDepInfo const& ldi);
 
     LI<IRBB> const* getLI() const { return m_li; }
 
@@ -161,17 +222,30 @@ public:
 };
 
 
-class LDAInfoSet : public xcom::List<LoopDepInfo*> {
+//The class records loop depdendence information for each individual IR.
+//Note each IR in the set only have one kind of loop dependence.
+typedef xcom::TTabIter<LoopDepInfo const*> LoopDepInfoSetIter;
+class LoopDepInfoSet : public xcom::TTab<LoopDepInfo const*> {
 public:
-    LDAInfoSet() {}
+    LoopDepInfoSet() {}
     void dump(Region const* rg) const;
-};
 
-typedef xcom::List<LoopDepInfo*>::Iter LDAInfoSetIter;
+    //Return true if there is at most loop-independent dependence of src
+    //and tgt in the set.
+    bool isAtMostContainLoopIndep(IR const* src, IR const* tgt) const;
+
+    //Return true if there is only one loop-independent dependence of src
+    //and tgt in the set.
+    //Note the function return false if there is no any dependence between
+    //src and tgt.
+    bool isOnlyContainLoopIndep(IR const* src, IR const* tgt) const;
+};
 
 //This class represents loop dependence analysis.
 class LoopDepAna : public Pass {
     COPY_CONSTRUCTOR(LoopDepAna);
+protected:
+    bool m_is_aggressive;
     SMemPool * m_pool;
     IVR * m_ivr;
     GVN * m_gvn;
@@ -184,13 +258,14 @@ class LoopDepAna : public Pass {
     InferEVN * m_infer_evn;
     LDAActMgr m_act_mgr;
 protected:
-    LoopDepInfo * allocLoopDepInfo();
     void analyzeLinearDep(
-        IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+        IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
+        MOD LDACtx & ctx);
+    void analyzeLinearDep(
+        IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
         MOD LDACtx & ctx);
     void analyzeRedDep(
-        IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
-        MOD LDACtx & ctx);
+        IR const* ir, OUT LoopDepInfoSet & set, MOD LDACtx & ctx);
 
     void destroy();
 
@@ -198,11 +273,10 @@ protected:
 
     void init(GVN * gvn);
 
-    //Return true if given two IRs in 'info' are indicates same memory
-    //location.
-    //The funtion uses Equal VN to determine whether these two IRs reference
-    //same memory base address.
-    //e.g: ist x VS ild y, return true if x's EVN is equal to y's EVN.
+    //Return true if given two IRs in 'info' are indicates same memory location.
+    //The funtion uses Equivalent-VN to determine whether these two IRs
+    //reference same memory base address.
+    //e.g: ist x VS. ild y, return true if x's EVN is equal to y's EVN.
     //Return true if these two IRs are reference identical memory location,
     //otherwise tell caller 'I KNOW NOTHING ABOUT THAT' by returning false.
     bool isSameMemLocViaEVN(LoopDepInfo const& info);
@@ -211,7 +285,10 @@ protected:
 
     void reset();
 
-    bool transLoopCarrToLoopIndep(IR const* ir, LDAInfoSet const& set);
+    //The function try to revise loop-carried to loop-independent to make
+    //loop dependence info more precise.
+    bool transLoopCarrToLoopIndep(
+        IR const* ir, MOD LoopDepInfoSet & set, MOD LDACtx & ctx);
 
     bool useLICM() const;
     bool useMDSSADU() const
@@ -224,18 +301,27 @@ public:
     explicit LoopDepAna(Region * rg, GVN * gvn) : Pass(rg), m_act_mgr(rg)
     {
         m_pool = nullptr;
+        m_is_aggressive = true;
         init(gvn);
     }
     virtual ~LoopDepAna() { destroy(); }
 
     void analyzeDepForIRTree(
-        IR const* ir, xcom::List<IR*> const& lst, OUT LDAInfoSet & set,
+        IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
+        MOD LDACtx & ctx);
+    void analyzeDepForIRTree(
+        IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
         MOD LDACtx & ctx);
     void analyzeDep(IR const* ir, xcom::List<IR*> const& lst,
-                    OUT LDAInfoSet & set, MOD LDACtx & ctx);
+                    OUT LoopDepInfoSet & set, MOD LDACtx & ctx);
+    void analyzeDep(IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
+                    MOD LDACtx & ctx);
+    void analyzeDepAndRefineDep(
+        IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
+        MOD LDACtx & ctx);
 
-    bool containLoopRedDep(LDAInfoSet const& set);
-    bool containLoopCarrDep(LDAInfoSet const& set);
+    bool containLoopRedDep(LoopDepInfoSet const& set);
+    bool containLoopCarrDep(LoopDepInfoSet const& set);
 
     virtual bool dump() const;
     void dumpInferEVN() const;
@@ -246,7 +332,15 @@ public:
     LDAActMgr & getActMgr() { return m_act_mgr; }
     InferEVN & getInferEVN() const { return *m_infer_evn; }
 
+    //Return true if user ask to perform aggressive optimization that without
+    //consideration of compilation time and memory.
+    bool is_aggressive() const { return m_is_aggressive; }
+
     virtual bool perform(OptCtx & oc);
+
+    //Set to true if user ask to perform aggressive optimization that without
+    //consideration of compilation time and memory.
+    void setAggressive(bool doit) { m_is_aggressive = doit; }
 };
 
 } //namespace xoc

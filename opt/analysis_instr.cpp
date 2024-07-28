@@ -97,7 +97,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_attachinfo_mgr = nullptr;
     m_ir_mgr = nullptr;
     m_ir_bb_mgr = nullptr;
-
+    m_dbx_mgr = nullptr;
     //Counter of IR_PR, and do not use '0' as prno.
     m_pr_count = PRNO_UNDEF + 1;
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
@@ -127,8 +127,19 @@ AnalysisInstrument::~AnalysisInstrument()
         m_attachinfo_mgr = nullptr;
     }
 
-    //Free local Var id and related MD id, and destroy the memory.
-    destroyVARandMD(m_rg);
+    if (m_dbx_mgr != nullptr) {
+        delete m_dbx_mgr;
+        m_dbx_mgr = nullptr;
+    }
+
+    //Free local Var id and related MD id back to VarMgr and MDSystem if the
+    //option is set. This is quite time-consuming if the numbers of Regions
+    //and Vars are large.
+    if (g_recycle_local_id) {
+        destroyVARandMD(m_rg);
+    } else {
+        m_rg->getVarTab()->clean();
+    }
 
     //Destroy reference info.
     RefInfo * refinfo = REGION_refinfo(m_rg);
@@ -170,11 +181,12 @@ AnalysisInstrument::~AnalysisInstrument()
     smpoolDelete(m_sc_labelinfo_pool);
     m_sc_labelinfo_pool = nullptr;
 
-    //Just set to NULL because these objects are not managed by 'this'.
+    //Destroy the BBList that allocated by 'this'.
+    delete m_ir_bb_list;
+
+    //Just set to NULL because these members are not managed by 'this'.
     m_ir_list = nullptr;
     m_ir_mgr = nullptr;
-
-    delete m_ir_bb_list;
     m_ir_bb_mgr = nullptr;
 }
 

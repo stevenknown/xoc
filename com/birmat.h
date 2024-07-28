@@ -30,7 +30,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-class INTMat;
+class IMat;
 class BIRMat;
 class RMat;
 
@@ -43,16 +43,13 @@ class BIRMat : public Matrix<BIRational> {
     friend BIRMat operator * (BIRMat const& a, BIRMat const& b);
     friend BIRMat operator + (BIRMat const& a, BIRMat const& b);
     friend BIRMat operator - (BIRMat const& a, BIRMat const& b);
-    friend class INTMat;
+    friend class IMat;
     friend class RMat;
-    BYTE m_is_init:1; //To make sure functions are idempotent.
-
-    void _init_hook();
 public:
     BIRMat();
     BIRMat(BigInt const& v); //used by template call of T(0) in Vector<Mat>
     BIRMat(BIRMat const& m);
-    BIRMat(INTMat const& m);
+    BIRMat(IMat const& m);
     BIRMat(RMat const& m);
     BIRMat(UINT row, UINT col);
     ~BIRMat();
@@ -60,21 +57,20 @@ public:
     void init(UINT row, UINT col);
     void init(BIRMat const& m);
     void init(RMat const& m);
-    void init(INTMat const& m);
+    void init(IMat const& m);
     void destroy();
-    bool is_init() const { return m_is_init; }
     bool is_imat(UINT * row = nullptr, UINT * col = nullptr);
     void sete(UINT num, ...);
     void setr(UINT row, UINT col, BigInt const& numer, BigInt const& denom = 1);
     void setr(UINT row, UINT col, BIRational const& rat);
     //Set value to numerator and denomiator.
-    void setr(UINT row, UINT col, FRAC_TYPE numer, FRAC_TYPE denom);
+    void setr(UINT row, UINT col, Rational::FType numer,
+              Rational::FType denom);
     void getr(UINT row, UINT col, BigInt * numer, BigInt * denom);
     BIRational getr(UINT row, UINT col);
-    bool inv(BIRMat & e);
     void ds(BIRMat const& c);
     void copy(BIRMat const& r);
-    void copy(INTMat const& r);
+    void copy(IMat const& r);
     void copy(RMat const& m);
     UINT comden(UINT row, UINT col); //Common denominator
     void substit(BIRMat const& exp,
@@ -85,6 +81,15 @@ public:
     BIRMat & operator = (BIRMat const& m);
     BIRational reduce(UINT row, UINT col);
     void reduce();
+};
+
+
+class BIRMatMgr : public MatMgr<BIRational> {
+public:
+    virtual Matrix<BIRational> * allocMat() override
+    { return new BIRMat(); }
+    virtual Matrix<BIRational> * allocMat(UINT row, UINT col) override
+    { return new BIRMat(row, col); }
 };
 
 } //namespace xcom

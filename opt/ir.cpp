@@ -87,6 +87,17 @@ INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
 }
 
 
+INT checkKidNumValidTernary(IR const* ir, UINT n, CHAR const* filename,
+                            INT line)
+{
+    UINT x = IR_MAX_KID_NUM(ir);
+    ASSERTL(n < x, filename, line,
+            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERT0(ir->isTernaryOp());
+    return n;
+}
+
+
 INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
                            INT line)
 {
@@ -210,7 +221,7 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 //
 bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
 {
-    return HAVE_FLAG(IRDES_kid_map(g_ir_desc[irc]), 1 << kididx);
+    return HAVE_FLAG(IRDES_kid_map(irc), 1 << kididx);
 }
 //END IRDesc
 
@@ -251,7 +262,7 @@ size_t IR::count_mem() const
 //Check that IR cannot take a UNDEF type.
 bool IR::verify(Region const* rg) const
 {
-    IRVerifyFuncType verifyfunc = IRDES_verifyfunc(g_ir_desc[getCode()]);
+    IRVerifyFuncType verifyfunc = IRDES_verifyfunc(getCode());
     ASSERT0(verifyfunc);
     (*verifyfunc)(this, rg);
     return true;
@@ -307,12 +318,12 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
 
 //Return true if ir-list are equivalent.
 //is_cmp_kid: it is true if comparing kids as well.
-bool IR::isIRListEqual(IR const* irs, bool is_cmp_kid) const
+bool IR::isIRListEqual(IR const* irs, IRMgr const* mgr, bool is_cmp_kid) const
 {
     if (this == irs) { return true; }
     IR const* pthis = this;
     while (irs != nullptr && pthis != nullptr) {
-        if (!pthis->isIREqual(irs, is_cmp_kid)) {
+        if (!pthis->isIREqual(irs, mgr, is_cmp_kid)) {
             return false;
         }
         irs = irs->get_next();
@@ -353,10 +364,10 @@ bool IR::isSameArrayStruct(IR const* ir) const
 
 //Return true if IR tree is exactly congruent, or
 //they are parity memory reference.
-bool IR::isMemRefEqual(IR const* src) const
+bool IR::isMemRefEqual(IR const* src, IRMgr const* mgr) const
 {
     ASSERTN(isMemRef() && src->isMemRef(), ("Not memory expression"));
-    if (isIREqual(src, true)) { return true; }
+    if (isIREqual(src, mgr, true)) { return true; }
     switch (getCode()) {
     SWITCH_CASE_DIRECT_MEM_OP:
         if (src->isDirectMemOp() &&
@@ -368,7 +379,7 @@ bool IR::isMemRefEqual(IR const* src) const
         return false;
     SWITCH_CASE_INDIRECT_MEM_OP:
         if (src->isIndirectMemOp() &&
-            getBase()->isIREqual(src->getBase(), true) &&
+            getBase()->isIREqual(src->getBase(), mgr, true) &&
             getOffset() == src->getOffset() &&
             getType() == src->getType()) {
             return true;
@@ -376,7 +387,7 @@ bool IR::isMemRefEqual(IR const* src) const
         return false;
     SWITCH_CASE_ARRAY_OP:
         if (src->isArrayOp() &&
-            ARR_base(src)->isIREqual(ARR_base(this), true) &&
+            ARR_base(src)->isIREqual(ARR_base(this), mgr, true) &&
             ARR_ofst(src) == ARR_ofst(this) &&
             ARR_elemtype(src) == ARR_elemtype(this) &&
             getType() == src->getType()) {
@@ -385,7 +396,7 @@ bool IR::isMemRefEqual(IR const* src) const
                 return false;
             }
             if (ARR_sub_list(src) != nullptr &&
-                !ARR_sub_list(src)->isIRListEqual(ARR_sub_list(this))) {
+                !ARR_sub_list(src)->isIRListEqual(ARR_sub_list(this), mgr)) {
                 return false;
             }
             if ((ARR_elem_num_buf(src) != nullptr) ^
@@ -417,207 +428,14 @@ bool IR::isMemRefEqual(IR const* src) const
 }
 
 
-static bool isIRIsomorphic(IR const* ir, IR const* src,
-                           bool is_cmp_kid, IsomoFlag const& flag);
-
-static bool isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
-                               bool is_cmp_kid, IsomoFlag const& flag)
-{
-    IR const* ir1 = ir1lst;
-    IR const* ir2 = ir2lst;
-    for (; ir1 != nullptr && ir2 != nullptr;
-         ir1 = ir1->get_next(), ir2 = ir2->get_next()) {
-        if (!isIRIsomorphic(ir1, ir2, is_cmp_kid, flag)) {
-            return false;
-        }
-    }
-    if ((ir1 != nullptr) ^ (ir2 != nullptr)) {
-        return false;
-    }
-    return true;
-}
-
-
-static bool isArrayIsomorphic(IR const* ir, IR const* src,
-                              bool is_cmp_kid, IsomoFlag const& flag)
-{
-    if (!ir->isArrayOp()) { return false; }
-    if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
-        //Not diff exp or stmt.
-        return false;
-    }
-    if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-        return false;
-    }
-    if (ir->getOffset() != src->getOffset()) {
-        return false;
-    }
-    if (ARR_elem_num_buf(src) == nullptr || ARR_elem_num_buf(ir) == nullptr) {
-        //We have no knowledge about the array.
-        return false;
-    }
-    TMWORD dimnum = ((CArray*)ir)->getDimNum();
-    if (((CArray*)src)->getDimNum() != dimnum) { return false; }
-    for (UINT i = 0; i < dimnum; i++) {
-        if (((CArray*)ir)->getElementNumOfDim(i) !=
-            ((CArray*)src)->getElementNumOfDim(i)) {
-            return false;
-        }
-    }
-    IR const* cursub = ARR_sub_list(ir);
-    IR const* srcsub = ARR_sub_list(src);
-    for (; cursub != nullptr; cursub = cursub->get_next(),
-         srcsub = srcsub->get_next()) {
-        ASSERT0(srcsub);
-        if (!isIRIsomorphic(cursub, srcsub, is_cmp_kid, flag)) {
-            return false;
-        }
-    }
-    ASSERT0(ir->getBase() && src->getBase());
-    return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
-}
-
-
-//flag: record the checking condition while compare two given ir expression
-//      or stmt.
-//      e.g: If ISOMO_CK_CODE is set, the comparison of IST and ILD will
-//      return false.
-static bool isIRIsomorphic(IR const* ir, IR const* src,
-                           bool is_cmp_kid, IsomoFlag const& flag)
-{
-    if (ir == src) { return true; }
-    switch (src->getCode()) {
-    case IR_CONST: //Constant value: include integer, float, string.
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (flag.have(ISOMO_CK_CONST_VAL) &&
-            CONST_int_val(ir) != CONST_int_val(src)) {
-            return false;
-        }
-        break;
-    case IR_ID:
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (ID_info(ir) != ID_info(src)) { return false; }
-        break;
-    SWITCH_CASE_DIRECT_MEM_OP:
-        if (!ir->isDirectMemOp()) { return false; }
-        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
-            return false;
-        }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        if (flag.have(ISOMO_CK_IDINFO) &&
-            ir->getIdinfo() != src->getIdinfo()) {
-            return false;
-        }
-        if (ir->getOffset() != src->getOffset()) {
-            return false;
-        }
-        break;
-    SWITCH_CASE_INDIRECT_MEM_OP:
-        if (!ir->isIndirectMemOp()) { return false; }
-        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
-            return false;
-        }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        if (ir->getOffset() != src->getOffset()) {
-            return false;
-        }
-        ASSERT0(ir->getBase() && src->getBase());
-        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
-    SWITCH_CASE_PR_OP:
-        if (!ir->isPROp()) { return false; }
-        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
-            return false;
-        }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        if (flag.have(ISOMO_CK_PRNO) && ir->getPrno() != src->getPrno()) {
-            return false;
-        }
-        break;
-    SWITCH_CASE_ARRAY_OP:
-        if (!isArrayIsomorphic(ir, src, is_cmp_kid, flag)) { return false; }
-        break;
-    case IR_LDA:
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        if (LDA_idinfo(ir) != LDA_idinfo(src) ||
-            LDA_ofst(ir) != LDA_ofst(src)) {
-            return false;
-        }
-        break;
-    case IR_CALL:
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (CALL_idinfo(ir) != CALL_idinfo(src)) { return false; }
-        break;
-    case IR_ICALL:
-        break;
-    SWITCH_CASE_BIN:
-    SWITCH_CASE_UNA:
-        if (ir->getCode() != src->getCode()) { return false; }
-        break;
-    case IR_LABEL:
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (LAB_lab(ir) != LAB_lab(src)) { return false; }
-        break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-    case IR_SELECT:
-        if (ir->getCode() != src->getCode()) { return false; }
-        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
-            return false;
-        }
-        break;
-    case IR_REGION:
-        //One should implement comparation function for your own region.
-        return false;
-    case IR_GOTO:
-    case IR_IGOTO:
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_SWITCH:
-    case IR_CASE:
-    case IR_RETURN:
-    case IR_BREAK:
-    case IR_CONTINUE:
-        break;
-    default: UNREACHABLE();
-    }
-    if (!is_cmp_kid) { return true; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
-        IR const* kid1 = ir->getKid(i);
-        IR const* kid2 = src->getKid(i);
-        if (src->isCallStmt() &&
-            (kid1 == CALL_dummyuse(ir) ||
-             kid2 == CALL_dummyuse(src))) {
-            //Do NOT check the equality of dummyuses.
-            continue;
-        }
-        if (!isIRListIsomorphic(kid1, kid2, is_cmp_kid, flag)) {
-            return false;
-        }
-    }
-    //Note there is no need to ask the number of ir and src must be same.
-    //ASSERT0(i == IR_MAX_KID_NUM(ir) && i == IR_MAX_KID_NUM(src));
-    return true;
-}
-
-
 //Return true if current ir tree is isomorphic to src.
 //src: root of IR tree.
 //is_cmp_kid: it is true if comparing kids as well.
 //Note the function does not compare the siblings of 'src'.
-bool IR::isIsomoTo(IR const* src, bool is_cmp_kid, IsomoFlag const& flag) const
+bool IR::isIsomoTo(IR const* src, IRMgr const* mgr,
+                   bool is_cmp_kid, IsomoFlag const& flag) const
 {
-    return isIRIsomorphic(this, src, is_cmp_kid, flag);
+    return mgr->isIRIsomorphic(this, src, is_cmp_kid, flag);
 }
 
 
@@ -625,26 +443,22 @@ bool IR::isIsomoTo(IR const* src, bool is_cmp_kid, IsomoFlag const& flag) const
 //src: root of IR tree.
 //is_cmp_kid: it is true if comparing kids as well.
 //Note the function does not compare the siblings of 'src'.
-bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
+bool IR::isIREqual(IR const* src, IRMgr const* mgr, bool is_cmp_kid) const
 {
-    return isIRIsomorphic(this, src, is_cmp_kid, IsomoFlag(ISOMO_CK_ALL));
+    return mgr->isIRIsomorphic(this, src, is_cmp_kid, IsomoFlag(ISOMO_CK_ALL));
 }
 
 
 //Contructing IR forest.
-//'recur': true to iterate kids.
+//recur: true to iterate kids.
 void IR::setParentPointer(bool recur)
 {
     for (INT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        IR * kid = getKid(i);
-        if (kid != nullptr) {
-            while (kid != nullptr) {
-                IR_parent(kid) = this;
-                if (recur) {
-                    kid->setParentPointer(recur);
-                }
-                kid = kid->get_next();
-            }
+        IR * k = getKid(i);
+        while (k != nullptr) {
+            IR_parent(k) = this;
+            if (recur) { k->setParentPointer(recur); }
+            k = k->get_next();
         }
     }
 }
@@ -684,15 +498,15 @@ IR * IR::getOpndPR(PRNO prno, IRIter & it) const
 }
 
 
-bool IR::isRHSUseIsomoExp(IR const* exp) const
+bool IR::isUseIsomoExp(IR const* exp, IRMgr const* mgr) const
 {
     ASSERT0(exp);
-    if (is_exp() && isIsomoTo(exp)) {
+    if (is_exp() && isIsomoTo(exp, mgr, false, ISOMO_CK_MEMREF_NAME)) {
         return true;
     }
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR * kid = getKid(i);
-        if (kid != nullptr && kid->isRHSUseIsomoExp(exp)) {
+        if (kid != nullptr && kid->isUseIsomoExp(exp, mgr)) {
             return true;
         }
     }
@@ -1094,7 +908,7 @@ void IR::setPrnoAndUpdateSSAInfo(PRNO prno)
 
 void IR::copyRefForTree(IR const* src, Region * rg)
 {
-    ASSERT0(src && isIREqual(src, true) && rg);
+    ASSERT0(src && isIREqual(src, rg->getIRMgr(), true) && rg);
     ASSERT0(src != this);
     if (isMemRef()) {
         setRefMD(src->getRefMD(), rg);
@@ -1118,21 +932,11 @@ void IR::copyRefForTree(IR const* src, Region * rg)
 void IR::setRHS(IR * rhs)
 {
     ASSERT0(hasRHS());
-    ASSERT0(IRDES_accrhsfunc(g_ir_desc[getCode()]));
-    (*IRDES_accrhsfunc(g_ir_desc[getCode()]))(this) = rhs;
+    ASSERT0(IRDES_accrhsfunc(getCode()));
+    (*IRDES_accrhsfunc(getCode()))(this) = rhs;
     if (rhs != nullptr) {
         IR_parent(rhs) = this;
     }
-}
-
-
-bool IR::isDummyOp() const
-{
-    switch (getCode()) {
-    SWITCH_CASE_EXT_VSTMT: return true;
-    default: return is_dummy();
-    }
-    return false;
 }
 
 
@@ -1189,25 +993,38 @@ bool IR::isNoMove(bool recur) const
 }
 
 
-//Check if 'exp' is child or grandchildren of current ir.
-//Here we only compare equality of two IR pointer to determine and apply
-//the DFS searching in tree.
-bool IR::is_kids(IR const* exp) const
+bool IR::isImmKid(IR const* k) const
 {
-    if (exp == nullptr) { return false; }
-    IR * tmp;
+    if (k == nullptr) { return false; }
+    //k may be stmt if current IR is high level IR, e.g:IR_IF.
+    ASSERT0(k->is_stmt() || k->is_exp());
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        tmp = getKid(i);
-        while (tmp != nullptr) {
-            if (exp == tmp) {
+        for (IR * tmp = getKid(i); tmp != nullptr; tmp = tmp->get_next()) {
+            if (k == tmp) {
                 return true;
             }
-            if (tmp->is_kids(exp)) {
+        }
+    }
+    return false;
+
+}
+
+
+bool IR::isKids(IR const* k) const
+{
+    if (k == nullptr) { return false; }
+    //k may be stmt if current IR is high level IR, e.g:IR_IF.
+    ASSERT0(k->is_stmt() || k->is_exp());
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        for (IR * tmp = getKid(i); tmp != nullptr; tmp = tmp->get_next()) {
+            if (k == tmp) {
                 return true;
             }
-            tmp = IR_next(tmp);
-        } //end while
-    } //end for
+            if (tmp->isKids(k)) {
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -1284,6 +1101,9 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 //replacement for 'oldk'.
 bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
 {
+    //Note for the sake of accessing speed, and the function is frequently
+    //used, thus the function does NOT reuse the replaceKid() with
+    //compare-function implementation.
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR * kid = getKid(i);
         if (kid == nullptr) { continue; }
@@ -1304,6 +1124,81 @@ bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
         }
     }
     return false;
+}
+
+
+bool IR::replaceKid(bool recur, ReplaceKidCompareFunc const& cmp,
+                    MOD Region * rg)
+{
+    bool replaced = false;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid == nullptr) { continue; }
+        for (IR * x = kid; x != nullptr; x = x->get_next()) {
+            IR * anti_ir = nullptr;
+            if (cmp.is_replace(x, &anti_ir)) {
+                ASSERT0(anti_ir);
+                IR * dupnewk = rg->dupIRTree(anti_ir);
+                xcom::replace(&kid, x, dupnewk);
+                if (IR_prev(dupnewk) == nullptr) {
+                    //oldk is the header, and update the kid i.
+                    setKid(i, kid);
+                } else {
+                    IR_parent(dupnewk) = IR_parent(x);
+                }
+                ASSERT0(x->is_single());
+                rg->freeIRTree(x);
+                replaced = true;
+                if (!cmp.isReplaceWholeIRTree()) {
+                    return replaced;
+                }
+            }
+            if (recur && x->replaceKid(true, cmp, rg)) {
+                replaced = true;
+                if (!cmp.isReplaceWholeIRTree()) {
+                    return replaced;
+                }
+            }
+        }
+    }
+    return replaced;
+}
+
+
+bool IR::replaceKid(
+    IR const* newk, bool recur, ReplaceKidCompareFunc const& cmp,
+    MOD Region * rg)
+{
+    bool replaced = false;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid == nullptr) { continue; }
+        for (IR * x = kid; x != nullptr; x = x->get_next()) {
+            if (cmp.is_replace(x, newk)) {
+                IR * dupnewk = rg->dupIRTree(newk);
+                xcom::replace(&kid, x, dupnewk);
+                if (IR_prev(dupnewk) == nullptr) {
+                    //oldk is the header, and update the kid i.
+                    setKid(i, kid);
+                } else {
+                    IR_parent(dupnewk) = IR_parent(x);
+                }
+                ASSERT0(x->is_single());
+                rg->freeIRTree(x);
+                replaced = true;
+                if (!cmp.isReplaceWholeIRTree()) {
+                    return replaced;
+                }
+            }
+            if (recur && x->replaceKid(newk, true, cmp, rg)) {
+                replaced = true;
+                if (!cmp.isReplaceWholeIRTree()) {
+                    return replaced;
+                }
+            }
+        }
+    }
+    return replaced;
 }
 
 
@@ -1364,8 +1259,8 @@ bool IR::is_volatile() const
 IR * IR::getRHS() const
 {
     ASSERT0(hasRHS());
-    ASSERT0(IRDES_accrhsfunc(g_ir_desc[getCode()]));
-    return (*IRDES_accrhsfunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accrhsfunc(getCode()));
+    return (*IRDES_accrhsfunc(getCode()))(const_cast<IR*>(this));
 }
 
 
@@ -1380,14 +1275,14 @@ bool IR::isArrayBase(IR const* ir) const
 PRNO IR::getPrno() const
 {
     ASSERT0(isPROp());
-    ASSERT0(IRDES_accprnofunc(g_ir_desc[getCode()]));
-    return (*IRDES_accprnofunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accprnofunc(getCode()));
+    return (*IRDES_accprnofunc(getCode()))(const_cast<IR*>(this));
 }
 
 
 void IR::cleanSSAInfo()
 {
-    if (IRDES_accssainfofunc(g_ir_desc[getCode()]) != nullptr) {
+    if (IRDES_accssainfofunc(getCode()) != nullptr) {
         //DO NOT ASSERT even if current IR has no related field for
         //conveninent purpose.
         setSSAInfo(nullptr);
@@ -1397,45 +1292,52 @@ void IR::cleanSSAInfo()
 
 SSAInfo * IR::getSSAInfo() const
 {
-    ASSERT0(IRDES_accssainfofunc(g_ir_desc[getCode()]));
-    return (*IRDES_accssainfofunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accssainfofunc(getCode()));
+    return (*IRDES_accssainfofunc(getCode()))(const_cast<IR*>(this));
 }
 
 
 IR * IR::getKid(UINT idx) const
 {
-    ASSERT0(IRDES_acckidfunc(g_ir_desc[getCode()]));
-    return (*IRDES_acckidfunc(g_ir_desc[getCode()]))(
+    ASSERT0(IRDES_acckidfunc(getCode()));
+    return (*IRDES_acckidfunc(getCode()))(
         const_cast<IR*>(this), idx);
 }
 
 
 IRBB * IR::getBB() const
 {
-    ASSERT0(IRDES_accbbfunc(g_ir_desc[getCode()]));
-    return (*IRDES_accbbfunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accbbfunc(getCode()));
+    return (*IRDES_accbbfunc(getCode()))(const_cast<IR*>(this));
+}
+
+
+IR * IR::getResList() const
+{
+    ASSERT0(IRDES_accreslistfunc(getCode()));
+    return (*IRDES_accreslistfunc(getCode()))(const_cast<IR*>(this));
 }
 
 
 Var * IR::getIdinfo() const
 {
     ASSERT0(hasIdinfo());
-    ASSERT0(IRDES_accidinfofunc(g_ir_desc[getCode()]));
-    return (*IRDES_accidinfofunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accidinfofunc(getCode()));
+    return (*IRDES_accidinfofunc(getCode()))(const_cast<IR*>(this));
 }
 
 
 void IR::setIdinfo(Var * idinfo)
 {
     ASSERT0(hasIdinfo());
-    ASSERT0(IRDES_accidinfofunc(g_ir_desc[getCode()]));
-    (*IRDES_accidinfofunc(g_ir_desc[getCode()]))(this) = idinfo;
+    ASSERT0(IRDES_accidinfofunc(getCode()));
+    (*IRDES_accidinfofunc(getCode()))(this) = idinfo;
 }
 
 
 TMWORD IR::getOffset() const
 {
-    IRAccOfstFuncType func = IRDES_accofstfunc(g_ir_desc[getCode()]);
+    IRAccOfstFuncType func = IRDES_accofstfunc(getCode());
     //DO NOT ASSERT even if current IR has no offset for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : 0;
@@ -1444,7 +1346,7 @@ TMWORD IR::getOffset() const
 
 IR * IR::getBase() const
 {
-    IRAccBaseFuncType func = IRDES_accbasefunc(g_ir_desc[getCode()]);
+    IRAccBaseFuncType func = IRDES_accbasefunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : nullptr;
@@ -1454,7 +1356,7 @@ IR * IR::getBase() const
 void IR::setBase(IR * exp)
 {
     ASSERT0(exp && exp->is_exp());
-    IRAccBaseFuncType func = IRDES_accbasefunc(g_ir_desc[getCode()]);
+    IRAccBaseFuncType func = IRDES_accbasefunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     if (func != nullptr) {
@@ -1467,7 +1369,7 @@ void IR::setBase(IR * exp)
 //Return label info if exist.
 LabelInfo const* IR::getLabel() const
 {
-    IRAccLabFuncType func = IRDES_acclabfunc(g_ir_desc[getCode()]);
+    IRAccLabFuncType func = IRDES_acclabfunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : nullptr;
@@ -1497,61 +1399,68 @@ bool IR::isDirectArrayRef() const
 
 void IR::setBB(IRBB * bb)
 {
-    ASSERT0(IRDES_accbbfunc(g_ir_desc[getCode()]));
-    (*IRDES_accbbfunc(g_ir_desc[getCode()]))(this) = bb;
+    ASSERT0(IRDES_accbbfunc(getCode()));
+    (*IRDES_accbbfunc(getCode()))(this) = bb;
+}
+
+
+void IR::setResList(IR * reslist)
+{
+    ASSERT0(IRDES_accreslistfunc(getCode()));
+    (*IRDES_accreslistfunc(getCode()))(this) = reslist;
 }
 
 
 void IR::setOffset(TMWORD ofst)
 {
     ASSERT0(hasOffset());
-    ASSERT0(IRDES_accofstfunc(g_ir_desc[getCode()]));
-    (*IRDES_accofstfunc(g_ir_desc[getCode()]))(this) = ofst;
+    ASSERT0(IRDES_accofstfunc(getCode()));
+    (*IRDES_accofstfunc(getCode()))(this) = ofst;
 }
 
 
 void IR::setSSAInfo(SSAInfo * ssa)
 {
-    ASSERT0(IRDES_accssainfofunc(g_ir_desc[getCode()]));
-    (*IRDES_accssainfofunc(g_ir_desc[getCode()]))(this) = ssa;
+    ASSERT0(IRDES_accssainfofunc(getCode()));
+    (*IRDES_accssainfofunc(getCode()))(this) = ssa;
 }
 
 
 void IR::setPrno(PRNO prno)
 {
     ASSERT0(isPROp());
-    ASSERT0(IRDES_accprnofunc(g_ir_desc[getCode()]));
-    (*IRDES_accprnofunc(g_ir_desc[getCode()]))(this) = prno;
+    ASSERT0(IRDES_accprnofunc(getCode()));
+    (*IRDES_accprnofunc(getCode()))(this) = prno;
 }
 
 
 void IR::setStorageSpace(StorageSpace ss)
 {
-    ASSERT0(IRDES_accssfunc(g_ir_desc[getCode()]));
-    (*IRDES_accssfunc(g_ir_desc[getCode()]))(this) = ss;
+    ASSERT0(IRDES_accssfunc(getCode()));
+    (*IRDES_accssfunc(getCode()))(this) = ss;
 }
 
 
 StorageSpace IR::getStorageSpace() const
 {
-    ASSERT0(IRDES_accssfunc(g_ir_desc[getCode()]));
-    return (*IRDES_accssfunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accssfunc(getCode()));
+    return (*IRDES_accssfunc(getCode()))(const_cast<IR*>(this));
 }
 
 
 //Return label or nullptr.
 void IR::setLabel(LabelInfo const* li)
 {
-    ASSERT0(IRDES_acclabfunc(g_ir_desc[getCode()]));
-    (*IRDES_acclabfunc(g_ir_desc[getCode()]))(this) = li;
+    ASSERT0(IRDES_acclabfunc(getCode()));
+    (*IRDES_acclabfunc(getCode()))(this) = li;
 }
 
 
 //Set the No.idx child to be 'kid', and update the IR_parent of kid.
 void IR::setKid(UINT idx, IR * kid)
 {
-    ASSERT0(IRDES_acckidfunc(g_ir_desc[getCode()]));
-    (*IRDES_acckidfunc(g_ir_desc[getCode()]))(this, idx) = kid;
+    ASSERT0(IRDES_acckidfunc(getCode()));
+    (*IRDES_acckidfunc(getCode()))(this, idx) = kid;
     for (IR * k = kid; k != nullptr; k = IR_next(k)) {
         IR_parent(k) = this;
     }
@@ -1571,7 +1480,7 @@ bool IR::is_lhs(IR const* k) const
 bool IR::isStmtInBB() const
 {
     if (is_switch() && SWITCH_body(this) != nullptr) { return false; }
-    return IRDES_is_stmt_in_bb(g_ir_desc[getCode()]);
+    return IRDES_is_stmt_in_bb(getCode());
 }
 
 
@@ -1595,7 +1504,7 @@ DU * IR::cleanDU()
 IR * IR::getResultPR()
 {
     ASSERT0(is_stmt());
-    IRAccResultPRFuncType func = IRDES_accresultprfunc(g_ir_desc[getCode()]);
+    IRAccResultPRFuncType func = IRDES_accresultprfunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     return func != nullptr ? (*func)(this) : nullptr;
@@ -1753,8 +1662,8 @@ void IR::setAligned(bool is_aligned)
 IR * IR::getJudgeDet() const
 {
     ASSERT0(hasJudgeDet());
-    ASSERT0(IRDES_accdetfunc(g_ir_desc[getCode()]));
-    return (*IRDES_accdetfunc(g_ir_desc[getCode()]))(const_cast<IR*>(this));
+    ASSERT0(IRDES_accdetfunc(getCode()));
+    return (*IRDES_accdetfunc(getCode()))(const_cast<IR*>(this));
 }
 
 
@@ -1762,8 +1671,8 @@ void IR::setJudgeDet(IR * det)
 {
     ASSERT0(det && det->is_exp());
     ASSERT0(hasJudgeDet());
-    ASSERT0(IRDES_accdetfunc(g_ir_desc[getCode()]));
-    (*IRDES_accdetfunc(g_ir_desc[getCode()]))(this) = det;
+    ASSERT0(IRDES_accdetfunc(getCode()));
+    (*IRDES_accdetfunc(getCode()))(this) = det;
     IR_parent(det) = this;
 }
 

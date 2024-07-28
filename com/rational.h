@@ -40,9 +40,10 @@ namespace xcom {
 #define INT_MAX 0x7fffFFFF
 #endif
 
-typedef INT FRAC_TYPE;
-
 class Rational {
+public:
+    typedef INT FType; //Define the fraction type of numerator and denominator.
+public:
     friend bool operator != (Rational const& a, Rational const& b);
     friend bool operator == (Rational const& a, Rational const& b);
     friend bool operator < (Rational const& a, Rational const& b);
@@ -55,10 +56,10 @@ class Rational {
     friend Rational operator - (Rational const& a, Rational const& b);
     friend Rational operator - (Rational const& a);
 protected:
-    FRAC_TYPE m_num;
-    FRAC_TYPE m_den;
+    FType m_num;
+    FType m_den;
 protected:
-    FRAC_TYPE _gcd(FRAC_TYPE x, FRAC_TYPE y);
+    Rational::FType _gcd(FType x, FType y);
 public:
     Rational();
     Rational(Rational const& r);
@@ -68,10 +69,10 @@ public:
     bool is_int() { return m_den == 1; }
     void reduce();
     Rational abs();
-    FRAC_TYPE num() const { return m_num; }
-    FRAC_TYPE & num() { return m_num; }
-    FRAC_TYPE den() const { return m_den; }
-    FRAC_TYPE & den() { return m_den; }
+    FType num() const { return m_num; }
+    FType & num() { return m_num; }
+    FType den() const { return m_den; }
+    FType & den() { return m_den; }
     CHAR const* dump(StrBuf & buf) const;
     void dump() const;
 };
@@ -82,8 +83,6 @@ inline bool operator == (Rational const& a, Rational const& b)
 { return (a.m_num == b.m_num && a.m_den == b.m_den); }
 inline bool operator != (Rational const& a, Rational const& b)
 { return (a.m_num != b.m_num || a.m_den != b.m_den); }
-bool operator == (Rational const& a, Rational const& b);
-bool operator != (Rational const& a, Rational const& b);
 bool operator < (Rational const& a, Rational const& b);
 bool operator <= (Rational const& a, Rational const& b);
 bool operator > (Rational const& a, Rational const& b);
@@ -91,8 +90,7 @@ bool operator >= (Rational const& a, Rational const& b);
 Rational operator * (Rational const& a, Rational const& b);
 Rational operator / (Rational const& a, Rational const& b);
 Rational operator + (Rational const& a, Rational const& b);
-Rational operator - (Rational const& a, Rational const& b);
-Rational operator - (Rational const& a);
+
 //Subtraction operation
 inline Rational operator - (Rational const& a, Rational const& b)
 { return a + (-b); }

@@ -557,7 +557,7 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
     if (to == from) { return; }
 
     ASSERT0(to->is_exp() && from->is_exp());
-    ASSERT0(to->isIREqual(from, true));
+    ASSERT0(to->isIREqual(from, rg->getIRMgr(), true));
 
     //Priority of DU chain: PRSSA > MDSSA > Classic DU.
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
@@ -573,7 +573,7 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
     ASSERT0(cit.get_elem_count() == it.get_elem_count());
     for (; to_ir != nullptr;
          to_ir = xoc::iterNext(it, true), from_ir = xoc::iterNextC(cit, true)) {
-        ASSERT0(to_ir->isIREqual(from_ir, true));
+        ASSERT0(to_ir->isIREqual(from_ir, rg->getIRMgr(), true));
         if (!to_ir->isMemRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes require it, e.g. GVN.
             continue;
@@ -659,7 +659,7 @@ bool hasSameUniqueMustDefForTree(IR const* ir1, IR const* ir2,
         }
         return false;
     }
-    if (!ir1->isIREqual(ir2, false)) { return false; }
+    if (!ir1->isIREqual(ir2, rg->getIRMgr(), false)) { return false; }
     if (IR_MAX_KID_NUM(ir1) != IR_MAX_KID_NUM(ir2)) { return false; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir1); i++) {
         IR const* kid1 = ir1->getKid(i);
@@ -911,6 +911,7 @@ static bool isCoverExcludeCallStmt(IR const* ir1, IR const* ir2, GVN const* gvn)
 bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 {
     ASSERT0(def && use);
+    ASSERT0(def->is_stmt() && use->is_exp());
     ASSERTN(def->isMemRef() && use->isMemRef(), ("should not query its DU"));
     if (def->isCallStmt() && def->getMayRef() != nullptr &&
         !def->getMayRef()->is_empty()) {
@@ -927,6 +928,7 @@ bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 //    relation between 'ir1' and 'ir2' through gvn info.
 bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn)
 {
+    if (ir1 == ir2) { return true; }
     if (ir1->is_stmt() && ir2->is_exp()) {
         return isKillingDef(ir1, ir2, gvn);
     }
@@ -1165,7 +1167,7 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
     //determine their equality by retrieving its value.
     //e.g: ild(x) is non-isomo to ist(y), but they may describe the same
     //memory if x's value is equal to y.
-    ASSERT0(ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_UNDEF)));
+    ASSERT0(ir1->isIsomoTo(ir2, rg->getIRMgr(), true, IsomoFlag(ISOMO_UNDEF)));
     switch (ir1->getCode()) {
     SWITCH_CASE_INDIRECT_MEM_OP:
         ASSERT0(ir2->isIndirectMemOp());
@@ -1283,10 +1285,10 @@ static bool hasLoopReduceDepInMDSSA(
     ASSERT0(def->getBB());
     if (!li->isInsideLoop(def->getBB()->id())) {  return false; }
     if (def->is_phi()) {
-        //TODO:phi may not be in loopheader. If phi is place in loop body,
-        //it may not be loop-carried.
-        //e.g:It may exist loop carried dependence if there is a MayDef between
-        //ir and its Def in the DefDef Chain.
+        //TODO:Handle the case that phi is not in loopheader, because that
+        //if phi is placed in loop body, it may not be loop-carried.
+        //e.g:there may exist loop carried dependence if there is a MayDef
+        //between ir and its Def in the DefDef Chain.
         LDI_kind(&info) = LOOP_DEP_REDUCE;
         LDI_src(&info) = ir;
         info.setTgtMDDef(def);
@@ -1312,23 +1314,24 @@ bool hasLoopReduceDep(
     IR const* ir, Region const* rg, LI<IRBB> const* li, OUT LoopDepInfo & info)
 {
     ASSERT0(ir->is_exp() && ir->isMemRef());
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
-        ir->isMemRefNonPR()) {
-        ASSERT0(mdssamgr->hasMDSSAInfo(ir));
-        return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr, info);
+    if (ir->isMemRefNonPR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            ASSERT0(mdssamgr->hasMDSSAInfo(ir));
+            return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr, info);
+        }
     }
-
-    DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != nullptr && ir->getDUSet() != nullptr) {
-        UNREACHABLE(); //TODO:
-    }
-
     if (ir->isPROp()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
+            ASSERT0(ir->getSSAInfo());
             return hasLoopReduceDepInPRSSA(ir, rg, li, prssamgr, info);
         }
+    }
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr) {
+        ASSERT0(ir->getDUSet());
+        UNREACHABLE(); //TODO:
     }
     return true;
 }
@@ -1431,7 +1434,10 @@ bool isLoopCarried(
     xcom::List<IR*>::Iter it;
     for (IR * cand = lst.get_head(&it);
          cand != nullptr; cand = lst.get_next(&it)) {
-        if (cand == ir) { continue; }
+        if (cand == ir) {
+            //If 'cand' is equal to 'ir', this is loop-independent dependence.
+            continue;
+        }
         if (cand == irstmt && !include_itselfstmt) { continue; }
         if (xoc::isLoopCarried(ir, cand, is_aggressive, li, rg, gvn, info)) {
             return true;
@@ -1444,8 +1450,10 @@ bool isLoopCarried(
 bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
                        LI<IRBB> const* li, Region const* rg, GVN const* gvn)
 {
+    if (ir1 == ir2) { return true; }
     if (!ir1->isMemRef() || !ir2->isMemRef()) { return false; }
-    if (!xoc::isDependent(ir1, ir2, costly_analysis, rg)) { return true; }
+    ASSERTN(xoc::isDependent(ir1, ir2, costly_analysis, rg),
+            ("user should rule out cases that ir1 and ir2 are independent"));
     IRBB const* ir1bb = ir1->is_stmt() ? ir1->getBB() : ir1->getStmt()->getBB();
     IRBB const* ir2bb = ir2->is_stmt() ? ir2->getBB() : ir2->getStmt()->getBB();
     ASSERT0(ir1bb && ir2bb);
@@ -1455,13 +1463,16 @@ bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
     MD const* ir1ref = ir1->getExactRef();
     MD const* ir2ref = ir2->getExactRef();
     if (ir1ref && ir2ref && ir1ref == ir2ref) { return true; }
-    if (ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_CK_MEMREF_NAME))) {
+    if (ir1->isIsomoTo(ir2, rg->getIRMgr(), true,
+                       IsomoFlag(ISOMO_CK_MEMREF_NAME))) {
         return true;
     }
     if (gvn != nullptr && gvn->is_valid() && gvn->isSameMemLoc(ir1, ir2)) {
         return true;
     }
-    if (!ir1->isIsomoTo(ir2, true, IsomoFlag(ISOMO_UNDEF))) { return false; }
+    if (!ir1->isIsomoTo(ir2, rg->getIRMgr(), true, IsomoFlag(ISOMO_UNDEF))) {
+        return false;
+    }
     //TODO:handle the comparison between ILD/IST and ARRAY.
     return hasSameUniqueMustDefForIsomoKidTree(ir1, ir2, rg);
 }
@@ -1544,6 +1555,7 @@ bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
                  Region const* rg)
 {
     ASSERT0(!ir1->is_undef() && !ir2->is_undef());
+    if (ir1 == ir2) { return true; }
     if (ir1->isCallStmt()) {
        return isDependentForCallStmt(ir1, ir2, costly_analysis, rg);
     }
@@ -1587,6 +1599,7 @@ bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
 bool isDependentForTree(IR const* ir1, IR const* ir2, bool costly_analysis,
                         Region const* rg)
 {
+    if (ir1 == ir2) { return true; }
     ConstIRIter it;
     //Only iterate the IR tree that root is ir2.
     for (IR const* x = iterInitC(ir2, it, false);
@@ -1611,11 +1624,16 @@ void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
     IRIter it;
     for (IR * x = iterInit(root, it, true);
          x != nullptr; x = iterNext(it, true)) {
+        if (!x->isMemRef()) { continue; }
         if (use_mdssa && x->isMemRefNonPR()) {
             mdssamgr->findAndSetLiveInDef(x, startir, startbb, oc);
-        } else if (use_prssa && x->isReadPR()) {
-            prssamgr->findAndSetLiveinDef(x);
+            continue;
         }
+        if (use_prssa && x->isReadPR()) {
+            prssamgr->findAndSetLiveinDef(x);
+            continue;
+        }
+        //NOTE classic DU chain does not need to find the live-in DEF.
     }
 }
 

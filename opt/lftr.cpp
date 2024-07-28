@@ -270,7 +270,7 @@ void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list,
         IR const* equal_exp = nullptr;
         for (IR const* e = init_val_list.get_head();
              e != nullptr; e = init_val_list.get_next()) {
-            if (cand->isIREqual(e, true)) {
+            if (cand->isIREqual(e, getIRMgr(), true)) {
                 equal_exp = e;
                 break;
             }
@@ -294,7 +294,7 @@ void LFTR::addDUChainForRHSOfInitDef(IR * newrhs, IR const* oldrhs,
                                      LI<IRBB> const* li)
 {
     if (!useMDSSADU()) { return; }
-    ASSERT0(newrhs->isIREqual(oldrhs, true));
+    ASSERT0(newrhs->isIREqual(oldrhs, getIRMgr(), true));
     IRIter itnew;
     ConstIRIter itold;
     IR * x;

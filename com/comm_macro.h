@@ -67,33 +67,6 @@ namespace xcom {
 //Offset of field 'f' of struct type 'st'.
 #define OFFSET_OF(st, f) ((size_t)&((st*)0)->f)
 
-#undef GET_LOW_12BIT
-#define GET_LOW_12BIT(l) ((l)&(0xfff))
-
-#undef GET_LOW_16BIT
-#define GET_LOW_16BIT(l) ((l)&(0xffff))
-
-#undef GET_SIGN_LOW_16BIT
-#define GET_SIGN_LOW_16BIT(l) (((l&0xffff)^0x8000)-0x8000)
-
-#undef GET_HIGH_16BIT
-#define GET_HIGH_16BIT(l) (((l)>>16)&0xffff)
-
-#undef GET_SIGN_HIGH_16BIT
-#define GET_SIGN_HIGH_16BIT(l) (((l&0xffffffff)^0x80000000)-0x80000000)
-
-#undef GET_LOW_18BIT
-#define GET_LOW_18BIT(l) ((l)&(0x3ffff))
-
-#undef GET_LOW_22BIT
-#define GET_LOW_22BIT(l) ((l)&(0x3fffff))
-
-#undef GET_LOW_32BIT
-#define GET_LOW_32BIT(l) ((l)&0xffffFFFF)
-
-#undef GET_HIGH_32BIT
-#define GET_HIGH_32BIT(l) (((l)>>32)&0xffffFFFF)
-
 //True if type is unsigned.
 #define IS_UNSIGN_TY(type) ((type)(((type)0) - 1) > 0)
 
@@ -113,6 +86,9 @@ namespace xcom {
 
 #define COPY_CONSTRUCTOR_ASSIGN(class_name) \
     class_name const& operator = (class_name const&)
+
+#define COPY_CONSTRUCTOR_CTOR(class_name) \
+    class_name(class_name const&)
 
 #define BITS_PER_BYTE 8  //Bit number of Byte.
 

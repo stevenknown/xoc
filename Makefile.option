@@ -8,9 +8,11 @@ ifeq ($(DEBUG), true)
   #Add predefined macro if build host is Windows.
   CFLAGS+=-D_DEBUG_
   CFLAGS+=-O0 -g2
+  CFLAGS+=-std=c++11
   CFLAGS+=-MMD #Ask compiler generate dependent files information.
 else
   CFLAGS+=-O2
+  CFLAGS+=-std=c++11
   CFLAGS+=-MMD #Ask compiler generate dependent files information.
 endif
 

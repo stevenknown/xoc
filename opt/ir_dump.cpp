@@ -33,7 +33,7 @@ namespace xoc {
 
 //Dump IR list with a logging header-notation.
 //Dump both its kids and siblings.
-void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
+void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
                  DumpFlag dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -43,7 +43,7 @@ void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr,
+void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
                 DumpFlag dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -53,9 +53,9 @@ void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr,
         if (first_one) {
             first_one = false;
             dumpIR(ir_list, rg, attr, dumpflag);
-        } else {
-            dumpIR(ir_list, rg, attr, dumpflag);
+            continue;
         }
+        dumpIR(ir_list, rg, attr, dumpflag);
     }
 }
 
@@ -74,7 +74,16 @@ void dumpIRList(IRList const& ir_list, Region const* rg)
 }
 
 
-static void dumpOffset(IR const* ir, Region const* rg)
+void dumpStorageSpace(IR const* ir, Region const* rg)
+{
+    if (ir->hasStorageSpace() && ir->getStorageSpace() != SS_UNDEF) {
+        prt(rg, ":storage_space(%s)",
+            StorageSpaceDesc::getName(ir->getStorageSpace()));
+    }
+}
+
+
+void dumpOffset(IR const* ir, Region const* rg)
 {
     if (ir->getOffset() != 0) {
         prt(rg, ":offset(%d)", ir->getOffset());
@@ -82,7 +91,7 @@ static void dumpOffset(IR const* ir, Region const* rg)
 }
 
 
-static void dumpIdinfo(IR const* ir, Region const* rg)
+void dumpIdinfo(IR const* ir, Region const* rg)
 {
     if (!ir->hasIdinfo()) { return; }
     CHAR tt[40];
@@ -106,8 +115,7 @@ static void dumpAbstractIdinfo(IR const* ir, Region const* rg)
 }
 
 
-static void dumpAllKids(IR const* ir, Region const* rg, UINT dn,
-                        DumpFlag dumpflag)
+void dumpAllKids(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag)
 {
     LogMgr * lm = rg->getLogMgr();
     lm->incIndent(dn);
@@ -120,7 +128,7 @@ static void dumpAllKids(IR const* ir, Region const* rg, UINT dn,
 }
 
 
-static void dumpVarDecl(IR const* ir, Region const* rg)
+void dumpVarDecl(IR const* ir, Region const* rg)
 {
     if (!ir->hasIdinfo()) { return; }
     ASSERT0(ir->getIdinfo());
@@ -262,9 +270,9 @@ void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
 }
 
 
-static void dumpAttr(OUT xcom::StrBuf & buf, IR const* ir)
+static void dumpAttr(OUT xcom::StrBuf & buf, IR const* ir, DumpFlag dumpflag)
 {
-    if (g_dump_opt.isDumpIRID()) {
+    if (g_dump_opt.isDumpIRID() && dumpflag.have(IR_DUMP_IRID)) {
         buf.strcat(" id:%d", ir->id());
     }
     if (ir->isMayThrow(false)) {
@@ -294,29 +302,60 @@ static void dumpAttr(OUT xcom::StrBuf & buf, IR const* ir)
 }
 
 
-static void dumpAttachInfo(OUT xcom::StrBuf & buf, IR const* ir)
+static void dumpDbx(OUT xcom::StrBuf & buf, Region const* rg,
+                    BaseAttachInfo const* ac)
 {
-    ASSERT0(ir);
+    ASSERT0(rg);
+    DbxMgr * dbx_mgr = rg->getDbxMgr();
+    ASSERT0(dbx_mgr);
+    DbxAttachInfo const* dbx_info = (DbxAttachInfo const*)ac;
+    bool is_has_dbg_info = dbx_info->
+        dbx.getLine(LangInfo::LANG_CPP, dbx_mgr) != DBX_UNDEF;
+    if(!is_has_dbg_info) { return; }
+    buf.strcat(" file: ");
+    buf.strcat("%d", dbx_info->dbx.
+        getFileIndex(LangInfo::LANG_CPP, dbx_mgr));
+    buf.strcat(" row: ");
+    buf.strcat("%d", dbx_info->dbx.
+        getLine(LangInfo::LANG_CPP, dbx_mgr));
+    buf.strcat(" col: ");
+    buf.strcat("%d", dbx_info->dbx.
+        getColOffset(LangInfo::LANG_CPP, dbx_mgr));
+    buf.strcat(" flag: ");
+    buf.strcat("%d", dbx_info->dbx.
+        getFlag(LangInfo::LANG_CPP, dbx_mgr));
+}
+
+
+static void dumpAttachInfo(OUT xcom::StrBuf & buf, IR const* ir,
+                           Region const* rg, DumpFlag dumpflag)
+{
+    ASSERT0(ir && rg);
+    bool is_dump_all_dwarf_info = dumpflag.have(IR_DUMP_DWARF) &&
+                                  rg->getDbxMgr() != nullptr;
     AIContainer const* ai = ir->getAI();
     if (ai == nullptr) { return; }
     AICont const* cont = ai->getContainer();
     if (!cont->is_init()) { return; }
-    buf.strcat(" attachinfo:");
-    bool not_first = false;
+    bool first = true;
     for (UINT i = 0; i < cont->get_capacity(); i++) {
         BaseAttachInfo const* ac = cont->get(i);
         if (ac == nullptr) { continue; }
-        if (!not_first) {
-            not_first = true;
+        if (first) {
+            buf.strcat(" attachinfo:");
+            first = false;
         } else {
             buf.strcat(",");
         }
         buf.strcat("%s", ai->getAIName(ac->getType()));
+        if (is_dump_all_dwarf_info && ac->getType() == AI_DBX) {
+            dumpDbx(buf, rg, ac);
+        }
     }
 }
 
 
-void dumpREGION(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_inner_region = ctx.dumpflag.have(IR_DUMP_INNER_REGION);
@@ -345,7 +384,7 @@ void dumpREGION(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpARRAY(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -400,7 +439,7 @@ void dumpARRAY(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCASE(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCase(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     LogMgr * lm = rg->getLogMgr();
@@ -454,7 +493,7 @@ void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpPHI(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -480,7 +519,7 @@ void dumpPHI(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpSELECT(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -508,7 +547,7 @@ void dumpSELECT(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpLABEL(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     LabelInfo const* li = LAB_lab(ir);
@@ -554,7 +593,7 @@ void dumpLABEL(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpDOLOOP(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -594,7 +633,7 @@ void dumpDOLOOP(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpWHILEDO(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -620,7 +659,7 @@ void dumpWHILEDO(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpDOWHILE(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -645,7 +684,7 @@ void dumpDOWHILE(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpIF(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpIf(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -720,6 +759,7 @@ void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
     dumpOffset(ir, rg);
+    dumpStorageSpace(ir, rg);
     dumpIdinfo(ir, rg);
     if (dump_var_decl) {
         dumpVarDecl(ir, rg);
@@ -768,7 +808,7 @@ void dumpBranch(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpUNDEF(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpUndef(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     note(rg, "%s!", IRNAME(ir));
@@ -778,7 +818,7 @@ void dumpUNDEF(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpSTARRAY(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -911,7 +951,31 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpRETURN(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpLda(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    dumpOffset(ir, rg);
+    dumpStorageSpace(ir, rg);
+    dumpIdinfo(ir, rg);
+    if (dump_var_decl) {
+        dumpVarDecl(ir, rg);
+    }
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+    }
+}
+
+
+void dumpReturn(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -1004,6 +1068,15 @@ CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf)
 }
 
 
+void dumpIRName(IR const* ir, Region const* rg)
+{
+    prt(rg, "%s", IRNAME(ir));
+    if (g_dump_opt.isDumpIRID()) {
+        prt(rg, "(id:%u)", ir->id());
+    }
+}
+
+
 void dumpIRCombine(IR const* ir, Region const* rg)
 {
     dumpIR(ir, rg, nullptr, DumpFlag(IR_DUMP_COMBINE));
@@ -1023,20 +1096,20 @@ void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
     if (attr != nullptr) {
         lattr.strcat(attr);
     }
-    dumpAttr(lattr, ir);
-    dumpAttachInfo(lattr, ir);
+    dumpAttr(lattr, ir, dumpflag);
+    dumpAttachInfo(lattr, ir, rg, dumpflag);
 
     //Record type info and var decl.
-    if (g_dbx_mgr != nullptr && dump_src_line) {
-        DbxMgr::PrtCtx prtctx;
+    if (rg->getDbxMgr() != nullptr && dump_src_line) {
+        DbxMgr::PrtCtx prtctx(LangInfo::LANG_CPP);
         prtctx.logmgr = lm;
-        g_dbx_mgr->printSrcLine(ir, &prtctx);
+        rg->getDbxMgr()->printSrcLine(ir, &prtctx);
     }
     if (dump_newline) {
         //Dump newline before root ir.
         prt(rg, "\n");
     }
-    IRDumpFuncType dumpfunc = IRDES_dumpfunc(g_ir_desc[ir->getCode()]);
+    IRDumpFuncType dumpfunc = IRDES_dumpfunc(ir->getCode());
     ASSERT0(dumpfunc);
     IRDumpCtx ctx;
     ctx.dn = dn;
@@ -1046,8 +1119,8 @@ void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
 }
 
 
-void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
-                 DumpFlag dumpflag)
+CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
+                        DumpFlag dumpflag)
 {
     ASSERT0(rg && ir);
     LogCtx tctx; //Define a tmp logctx.
@@ -1077,6 +1150,114 @@ void dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
 
     //Pop the tmp ctx and restore original LogCtx.
     rg->getLogMgr()->pop();
+    return outbuf.getBuf();
+}
+
+
+void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        LogMgr * lm = rg->getLogMgr();
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_CFA_KID(ir, 0), rg, (CHAR*)" reg", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_CFA_KID(ir, 1), rg, (CHAR*)" num", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+    }
+}
+
+
+void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        LogMgr * lm = rg->getLogMgr();
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_SAME_VALUE_kid(ir, 0), rg, (CHAR*)" num", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+    }
+}
+
+
+void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        LogMgr * lm = rg->getLogMgr();
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_OFFSET_kid(ir, 0), rg, (CHAR*)" reg", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_OFFSET_kid(ir, 1), rg, (CHAR*)" num", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+    }
+}
+
+
+void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        LogMgr * lm = rg->getLogMgr();
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_RESTORE_kid(ir, 0), rg, (CHAR*)" num", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+    }
+}
+
+
+void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        LogMgr * lm = rg->getLogMgr();
+        lm->incIndent(ctx.dn);
+        dumpIRList(CFI_DEF_CFA_OFFSET_KID(ir, 0),
+                   rg, (CHAR*)" num", ctx.dumpflag);
+        lm->decIndent(ctx.dn);
+    }
 }
 
 } //namespace xoc

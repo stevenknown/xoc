@@ -148,29 +148,43 @@ public:
             ASSERTN(idx > 0, ("head value start from 1"));
             return m_data->get(idx - 1);
         }
+        UINT get_elem_count() const { return m_data->get_elem_count(); }
 
         void set(UINT idx, U val)
         {
             ASSERTN(idx > 0, ("head value start from 1"));
             return m_data->set(idx - 1, val);
         }
-
-        UINT get_elem_count() const { return m_data->get_elem_count(); }
     };
 private:
+    //Reorder value in 'data' to build min-heap.
+    void build_max_heap(MOD Vector<T> & data)
+    {
+        HeapValVector<T> hdata(data);
+        for (UINT i = last_parent(hdata.get_end_idx());
+             i >= hdata.get_begin_idx(); i--) {
+            max_heapify(hdata, i, hdata.get_end_idx());
+        }
+    }
+
+    //Reorder value in 'data' to build min-heap.
+    void build_min_heap(MOD Vector<T> & data)
+    {
+        HeapValVector<T> hdata(data);
+        for (UINT i = last_parent(hdata.get_end_idx());
+             i >= hdata.get_begin_idx(); i--) {
+            min_heapify(hdata, i, hdata.get_end_idx());
+        }
+    }
+
     //The floor of integer division.
     UINT parent(UINT i) { return i / 2; }
     UINT lchild(UINT i) { return i * 2; }
     UINT rchild(UINT i) { return i * 2 + 1; }
+
     //The last (len/2)+1 nodes are kid.
     //The floor of integer division.
     UINT last_parent(UINT len) { return len / 2; }
-    void swap(MOD HeapValVector<T> & data, UINT i, UINT j)
-    {
-        INT tmpval = data.get(i);
-        data.set(i, data.get(j));
-        data.set(j, tmpval);
-    }
 
     void min_heapify(MOD HeapValVector<T> & data, UINT start, UINT end)
     {
@@ -209,24 +223,11 @@ private:
         max_heapify(data, major, end);
     }
 
-    //Reorder value in 'data' to build min-heap.
-    void build_min_heap(MOD Vector<T> & data)
+    void swap(MOD HeapValVector<T> & data, UINT i, UINT j)
     {
-        HeapValVector<T> hdata(data);
-        for (UINT i = last_parent(hdata.get_end_idx());
-             i >= hdata.get_begin_idx(); i--) {
-            min_heapify(hdata, i, hdata.get_end_idx());
-        }
-    }
-
-    //Reorder value in 'data' to build min-heap.
-    void build_max_heap(MOD Vector<T> & data)
-    {
-        HeapValVector<T> hdata(data);
-        for (UINT i = last_parent(hdata.get_end_idx());
-             i >= hdata.get_begin_idx(); i--) {
-            max_heapify(hdata, i, hdata.get_end_idx());
-        }
+        INT tmpval = data.get(i);
+        data.set(i, data.get(j));
+        data.set(j, tmpval);
     }
 protected:
     virtual bool GreatThan(T a, T b) const { return a > b; }
@@ -235,6 +236,7 @@ protected:
     virtual bool LessEqualThan(T a, T b) const { return a <= b; }
 public:
     virtual ~HeapSort() {}
+
     //Sort value in 'data' incrementally.
     void sort(MOD Vector<T> & data)
     {
@@ -339,9 +341,7 @@ template <class T> class MergeSort {
     void _merge_sort(Vector<T> const& data, VecIdx start_idx, VecIdx end_idx,
                      OUT Vector<T> & output)
     {
-        if (start_idx > end_idx) {
-            return;
-        }
+        if (start_idx > end_idx) { return; }
         if (start_idx == end_idx) {
             output.set(0, data.get(start_idx));
             return;
@@ -350,10 +350,10 @@ template <class T> class MergeSort {
             if (LessEqualThan(data.get(start_idx), data.get(end_idx))) {
                 output.set(0, data.get(start_idx));
                 output.set(1, data.get(end_idx));
-            } else {
-                output.set(0, data.get(end_idx));
-                output.set(1, data.get(start_idx));
+                return;
             }
+            output.set(0, data.get(end_idx));
+            output.set(1, data.get(start_idx));
             return;
         }
         VecIdx mid_idx = (start_idx + end_idx + 1) / 2;
@@ -367,34 +367,31 @@ template <class T> class MergeSort {
             if (LessEqualThan(left_output.get(lidx), right_output.get(ridx))) {
                 output.set(i, left_output.get(lidx));
                 lidx++;
-                if (lidx >= llen) {
-                    i++;
-                    for (VecIdx j = ridx; j <= right_output.get_last_idx();
-                         j++) {
-                        output.set(i, right_output.get(j));
-                        i++;
-                    }
-                    break;
-                }
-                continue;
-            }
-
-            output.set(i, right_output.get(ridx));
-            ridx++;
-            if (ridx >= rlen) {
+                if (lidx < llen) { continue; }
                 i++;
-                for (VecIdx j = lidx; j <= left_output.get_last_idx(); j++) {
-                    output.set(i, left_output.get(j));
+                for (VecIdx j = ridx; j <= right_output.get_last_idx();
+                     j++) {
+                    output.set(i, right_output.get(j));
                     i++;
                 }
                 break;
             }
+            output.set(i, right_output.get(ridx));
+            ridx++;
+            if (ridx < rlen) { continue; }
+            i++;
+            for (VecIdx j = lidx; j <= left_output.get_last_idx(); j++) {
+                output.set(i, left_output.get(j));
+                i++;
+            }
+            break;
         }
     }
 protected:
     virtual bool LessEqualThan(T a, T b) const { return a <= b; }
 public:
     virtual ~MergeSort() {}
+
     //Merge Sort.
     //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
@@ -499,9 +496,9 @@ template <class T> class ShellSort {
             }
             if (ct == nullptr) {
                 list.append_tail(d);
-            } else {
-                list.insert_before(d, ct);
+                continue;
             }
+            list.insert_before(d, ct);
         }
 
         //Reflush 'data'
@@ -518,9 +515,7 @@ public:
     void sort(MOD Vector<T> & data)
     {
         VecIdx n = data.get_elem_count();
-        if (n <= 1) {
-            return;
-        }
+        if (n <= 1) { return; }
         UINT gap = 2;
         UINT rem = 0;
         for (UINT group = n / gap; group >= 1;
@@ -529,10 +524,7 @@ public:
             for (UINT i = 0; i < group + rem; i++) {
                 _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));
             }
-
-            if (group == 1) {
-                break;
-            }
+            if (group == 1) { break; }
         }
         if (rem != 0) {
             _insert_sort(data, 0, n - 1);

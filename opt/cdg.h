@@ -53,7 +53,7 @@ public:
 
     void dumpDOT(CHAR const* name = nullptr) const;
     void dumpVCG(CHAR const* name = nullptr) const;
-    virtual bool dump() const;
+    virtual bool dump() const override;
 
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);

@@ -37,7 +37,6 @@ void AttachInfoMgr::copyAI(OUT IR * tgtir, IR const* srcir)
     AIContainer * tgt = IR_ai(tgtir);
     AIContainer const* src = srcir->getAI();
     ASSERT0(tgt && src && tgt != src);
-
     UINT sz = src->getContainer()->get_capacity();
     if (sz > 0 && !tgt->getContainer()->is_init()) {
         tgt->init(sz, m_rg->getAttachInfoMgr()->get_pool());
@@ -45,13 +44,17 @@ void AttachInfoMgr::copyAI(OUT IR * tgtir, IR const* srcir)
     for (UINT i = 0; i < sz; i++) {
         BaseAttachInfo * srcac = src->getContainer()->get(i);
         if (srcac == nullptr) { continue; }
-
         switch (srcac->getType()) {
         case AI_DBX:
         case AI_PROF:
         case AI_TBAA:
         case AI_EH_LABEL:
         case AI_USER_DEF:
+            tgt->set(srcac, m_rg);
+            break;
+        case AI_TENSOR:
+            //Each kind of IR should correspond to individual tensor.
+            ASSERT0(tgtir->getCode() == srcir->getCode());
             tgt->set(srcac, m_rg);
             break;
         case AI_MD_SSA: {

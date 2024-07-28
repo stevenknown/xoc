@@ -218,6 +218,7 @@ DUMgr::DUMgr(Region * rg) : Pass(rg), m_solve_set_mgr(rg)
     m_aa = rg->getAA();
     m_vm = rg->getVarMgr();
     m_cfg = rg->getCFG();
+    m_irmgr = rg->getIRMgr();
     m_mds_mgr = rg->getMDSetMgr();
     m_mds_hash = rg->getMDSetHash();
     m_pool = smpoolCreate(sizeof(DUSet) * 2, MEM_COMM);
@@ -750,6 +751,8 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
     case IR_SELECT:
+    case IR_DUMMYUSE:
+    case IR_CASE:
         inferAllKidMDRef(ir, ret_mds, compflag, duflag);
         ASSERT0(ir->getDU() == nullptr);
         return;
@@ -1160,7 +1163,7 @@ void DUMgr::addUseForTree(IR * to, IR const* from)
             continue;
         }
         //The memory reference structure must be idendical.
-        ASSERT0(to_ir->isIREqual(from_ir, false));
+        ASSERT0(to_ir->isIREqual(from_ir, getIRMgr(), false));
         DUSet const* from_du = from_ir->readDUSet();
         if (from_du == nullptr || from_du->is_empty()) { continue; }
 
@@ -1553,7 +1556,6 @@ void DUMgr::inferExtStmt(IR * ir, DUOptFlag duflag)
 void DUMgr::inferDirectMemStmt(IR * ir, DUOptFlag duflag)
 {
     ASSERT0(ir->isDirectMemOp() && ir->getRefMD());
-
     //if (duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
         //Find ovelapped MD.
         //e.g: struct {int a;} s;
@@ -1566,7 +1568,6 @@ void DUMgr::inferDirectMemStmt(IR * ir, DUOptFlag duflag)
         //only ReachDef of PR is required by user.
         computeOverlapMDSet(ir, false);
     //}
-
     computeExpression(ir->getRHS(), nullptr, COMP_EXP_RECOMPUTE, duflag);
 }
 
@@ -3080,7 +3081,7 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
                 ASSERTN(t->getMustRef(), ("type is at least effect"));
                 ASSERTN(t->getMustRef()->is_pr(),
                         ("MD must present a PR."));
-            } else {
+            } else if (!t->is_any()) {
                 ASSERTN(t->getExactRef(), ("type must be exact"));
                 ASSERTN(t->getExactRef()->is_pr(),
                         ("MD must present a PR."));
@@ -3137,7 +3138,7 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
                 ASSERTN(t->getMustRef(), ("type is at least effect"));
                 ASSERTN(t->getMustRef()->is_pr(),
                         ("MD must present a PR."));
-            } else {
+            } else if (!t->is_any()) {
                 MD const* md = t->getMustRef();
                 ASSERT0(md);
                 if (!md->is_exact()) {
@@ -3148,14 +3149,12 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
             ASSERT0(t->getRefMDSet() == nullptr);
             break;
         SWITCH_CASE_CALL: {
-            if (t->getRefMDSet() != nullptr) {
-                ASSERT0(m_rg->getMDSetHash()->find(*t->getRefMDSet()));
-            }
-            MD const* ref = t->getRefMD();
+            MD const* ref = t->getMustRef();
             ASSERT0_DUMMYUSE(ref == nullptr || ref->is_pr());
-
-            MDSet const* may = t->getRefMDSet();
+            MDSet const* may = t->getMayRef();
             if (may != nullptr) {
+                ASSERT0(m_rg->getMDSetHash()->find(*may));
+
                 //MayRef of call should not contain PR.
                 MDSetIter iter;
                 for (BSIdx i = may->get_first(&iter);
@@ -3180,7 +3179,8 @@ bool DUMgr::verifyMDRefForIR(IR const* ir, ConstIRIter & cii)
         case IR_CASE:
         case IR_RETURN:
         case IR_REGION:
-            ASSERT0(t->getRefMD() == nullptr && t->getRefMDSet() == nullptr);
+        case IR_DUMMYUSE:
+            ASSERT0(t->getMustRef() == nullptr && t->getMayRef() == nullptr);
             break;
         default: return verifyMDRefForExtIR(t, cii);
         }
@@ -3405,8 +3405,9 @@ IR * DUMgr::findNearestDomDef(IR const* exp, DUSet const* defset) const
             const_cast<IR*>(exp)->getMustRef());
     IR * last = nullptr;
     IR const* exp_stmt = exp->getStmt();
-    INT stmt_rpo = exp_stmt->getBB()->rpo();
-    ASSERT0(stmt_rpo != RPO_UNDEF);
+    IRBB const* exp_bb = exp_stmt->getBB();
+    INT exp_rpo = exp_bb->rpo();
+    ASSERT0(exp_rpo != RPO_UNDEF);
     INT lastrpo = RPO_UNDEF;
     DUSetIter di = nullptr;
     for (BSIdx i = defset->get_first(&di);
@@ -3414,7 +3415,6 @@ IR * DUMgr::findNearestDomDef(IR const* exp, DUSet const* defset) const
         IR * d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
         if (!const_cast<DUMgr*>(this)->isMayDef(d, exp, false)) { continue; }
-        if (d == exp_stmt) { continue; }
         if (last == nullptr) {
             last = d;
             lastrpo = d->getBB()->rpo();
@@ -3424,21 +3424,65 @@ IR * DUMgr::findNearestDomDef(IR const* exp, DUSet const* defset) const
         IRBB * dbb = d->getBB();
         ASSERT0(dbb);
         ASSERT0(dbb->rpo() != RPO_UNDEF);
-        if (dbb->rpo() < stmt_rpo && dbb->rpo() > lastrpo) {
+        if (dbb->rpo() < exp_rpo && dbb->rpo() > lastrpo) {
+            //CASE:
+            // BB1: dbb
+            // BB2: last_bb
+            // BB3: exp_bb
             last = d;
             lastrpo = dbb->rpo();
             continue;
         }
         if (dbb == last->getBB() && dbb->is_dom(last, d, true)) {
+            //CASE:
+            // BB1:
+            //  last stmt #S1
+            //  d stmt    #S2
+            // BB3: exp_bb
             last = d;
             lastrpo = dbb->rpo();
+            continue;
+        }
+        if (dbb->rpo() > exp_rpo) {
+            //CASE:
+            // BB1: last_bb
+            // BB2: exp_bb
+            // BB3: dbb
+            //In this case, d is topologically after 'exp_stmt', thus 'exp'
+            //does not have dominate-def stmt.
+            return nullptr;
+        }
+        if (dbb == exp_bb &&
+            (exp_stmt == d || dbb->is_dom(exp_stmt, d, true))) {
+            //CASE:current def 'd' is located in same BB with 'exp',
+            //moreover, d is lexicographically after 'exp_stmt'. In this
+            //case, 'exp' does not have dominate-def stmt.
+            //e.g:ivr_init.c
+            //    BB1:
+            //    i = 0;  #S1
+            //      |
+            //      V
+            //    BB2:<----------------
+            //  --false i < 100, BB4   |
+            // |    |                  |
+            // |    V                  |
+            // |  BB3:                 |
+            // |  x = i + n; #S2       |
+            // |  i = y;     #S3       |
+            // |  goto BB2;------------
+            // |
+            //  ->BB4:
+            //    return;
+            //In the case, i in #S2 has a DEF #S3 that is after #S2, thus
+            //'i' in #S2 does have two DEFs, #S1 and #S3, but does not have any
+            //dominate-def.
+            return nullptr;
         }
     }
     if (last == nullptr) { return nullptr; }
 
-    //Check whether the last stmt is dominate exp_stmt.
+    //Finally check whether the last stmt is dominate exp_stmt.
     IRBB const* last_bb = last->getBB();
-    IRBB const* exp_bb = exp_stmt->getBB();
     if (exp_bb == last_bb) {
         if (!exp_bb->is_dom(last, exp_stmt, true)) {
             //e.g: *p = *p + 1

@@ -321,7 +321,8 @@ VN const* InferEVN::inferVNViaBase(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir);
     ASSERT0(ir->isIndirectMemOp() || ir->isArrayOp());
-    ASSERTN(getVN(ir) == nullptr, ("no need to infer VN"));
+    ASSERTN(getVN(ir) == nullptr,
+            ("has to check VN before invoke the function"));
     IR const* base = ir->getBase();
     ASSERT0(base);
     VN const* basevn = inferExp(base, ctx);
@@ -395,13 +396,10 @@ VN const* InferEVN::inferStmt(IR const* ir, InferCtx & ctx)
     switch (ir->getCode()) {
     case IR_STPR:
     SWITCH_CASE_DIRECT_MEM_STMT: {
-        VN const* vn = inferExp(ir->getRHS(), ctx);
+        VN const* vn = getVN(ir);
+        if (vn != nullptr) { return vn; }
+        vn = inferExp(ir->getRHS(), ctx);
         if (vn == nullptr) { return nullptr; }
-        //VN const* newvn = m_vnhashtab.registerIntList(
-        //    ir->getCode(), 2, (VNHashInt)vn->id(),
-        //    (VNHashInt)ir->getOffset());
-        //setVN(ir, newvn);
-        //return newvn;
         setVN(ir, vn);
         return vn;
     }
@@ -471,6 +469,7 @@ VN const* InferEVN::inferDirectExpViaMDSSA(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir && ir->is_exp());
     ASSERT0(ir->isDirectMemOp() || ir->isReadPR() || ir->is_id());
+    ASSERTN(getVN(ir) == nullptr, ("caller should avoid this case"));
     if (!useMDSSADU()) { return nullptr; }
     MDDef const* mdssadef = m_mdssamgr->findNearestDef(ir);
     if (mdssadef == nullptr) {
@@ -660,7 +659,8 @@ VN const* InferEVN::inferVNByIterKid(IR const* ir, InferCtx & ctx)
 
 VN const* InferEVN::inferExp(IR const* ir, InferCtx & ctx)
 {
-    ASSERT0(ir && ir->is_exp());
+    if (ir == nullptr) { return nullptr; }
+    ASSERT0(ir->is_exp());
     VN const* vn = getVN(ir);
     if (vn != nullptr) { return vn; }
     switch (ir->getCode()) {
@@ -2139,7 +2139,7 @@ bool GVN::hasConstVN(IR const* ir) const
 
 bool GVN::hasSameValueBySSA(IR const* ir1, IR const* ir2) const
 {
-    if (!ir1->isIsomoTo(ir2, true,
+    if (!ir1->isIsomoTo(ir2, getIRMgr(), true,
                         IsomoFlag(ISOMO_UNDEF|ISOMO_CK_CONST_VAL))) {
         //Only check the IR tree structure and type.
         return false;
@@ -2298,7 +2298,10 @@ void GVN::processDirectMemOp(IR * ir, bool & change)
 {
     ASSERT0(ir->is_stmt() && ir->hasRHS());
     IR * rhs = ir->getRHS();
-    if (rhs == nullptr) { return; }
+    if (rhs == nullptr) {
+        //Virtual OP may not have RHS.
+        return;
+    }
     VN const* x = computeVN(rhs, change);
     if (x == nullptr) {
         //CASE:Any VN indicates the unique value, thus do NOT assign VN to an
@@ -2509,11 +2512,15 @@ void GVN::assignRHSVN()
              ir != nullptr; ir = bb->getIRList().get_next(&irit)) {
             if (!ir->hasRHS()) { continue; }
             VN const* resvn = getVN(ir);
-            if (resvn == nullptr) {
-                ASSERT0(getVN(ir->getRHS()) == nullptr);
+            IR const* rhs = ir->getRHS();
+            if (rhs == nullptr) {
+                //Virtual OP may not have RHS.
                 continue;
             }
-            IR const* rhs = ir->getRHS();
+            if (resvn == nullptr) {
+                ASSERT0(getVN(rhs) == nullptr);
+                continue;
+            }
             ASSERT0(getVN(rhs) == nullptr || getVN(rhs) == resvn);
             setVN(rhs, resvn);
         }

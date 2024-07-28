@@ -95,6 +95,12 @@ public:
     OptCtx(Region * rg) { init(rg); }
 
     void copy(OptCtx const& src) { *this = src; }
+    void clean()
+    {
+        setInvalidAllFlags();
+        //Expect label always can be merged.
+        OC_do_merge_label(*this) = true;
+    }
 
     bool do_merge_label() const { return OC_do_merge_label(*this); }
     void dump() const;
@@ -103,10 +109,11 @@ public:
 
     void init(Region * rg)
     {
-        setInvalidAllFlags();
-        OC_do_merge_label(*this) = true;
         ASSERT0(rg);
         m_rg = rg;
+        u1.int1 = 0;
+        //Expect label always can be merged.
+        OC_do_merge_label(*this) = true;
     }
     bool is_ref_valid() const { return OC_is_ref_valid(*this); }
 
@@ -188,7 +195,7 @@ public:
     }
 
     //The function make all flag invalid.
-    void setInvalidAllFlags() { u1.int1 = 0; }
+    void setInvalidAllFlags();
     void setInvalidDom() { OC_is_dom_valid(*this) = false; }
     void setInvalidPDom() { OC_is_pdom_valid(*this) = false; }
     void setInvalidPRDU() { OC_is_pr_du_chain_valid(*this) = false; }

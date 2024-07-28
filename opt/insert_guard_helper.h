@@ -49,6 +49,7 @@ class InsertGuardHelper {
     Region * m_rg;
     IRCFG * m_cfg;
     OptCtx * m_oc;
+    IRMgr * m_irmgr;
     IRBB * m_guard_start;
     IRBB * m_guard_end;
     IRBB * m_guarded_bb;
@@ -120,6 +121,7 @@ public:
     InsertGuardHelper(Region * rg, OptCtx * oc) : m_rg(rg), m_oc(oc)
     {
         m_cfg = m_rg->getCFG();
+        m_irmgr = m_rg->getIRMgr();
         m_mdssa = m_rg->getMDSSAMgr();
         m_prssa = m_rg->getPRSSAMgr();
         m_du = m_rg->getDUMgr();
@@ -130,6 +132,7 @@ public:
         m_guarded_bb = nullptr;
     }
 
+    IRMgr * getIRMgr() const { return m_irmgr; }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssa; }
     OptCtx * getOptCtx() const { return m_oc; }
     IRBB * getGuardEnd() const { return m_guard_end; }

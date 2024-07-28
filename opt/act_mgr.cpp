@@ -44,6 +44,7 @@ void ActMgr::clean()
 
 ActHandler ActMgr::dump_args(CHAR const* format, va_list args)
 {
+    if (!m_rg->isLogMgrInit()) { return ActHandler(); }
     xcom::StrBuf * buf = new xcom::StrBuf(64);
     buf->strcat("ACT%u:", m_cnt);
     m_cnt++;

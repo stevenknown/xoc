@@ -74,7 +74,8 @@ void LinearRep::dump(Region const* rg) const
     if (coeff != nullptr) {
         note(rg, "\nCOEFF:");
         rg->getLogMgr()->incIndent(ind);
-        dumpIR(coeff, rg, nullptr, IR_DUMP_KID);
+        dumpIR(coeff, rg, nullptr,
+               DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(ind);
     } else { note(rg, "\nNOCOEFF"); }
 
@@ -83,7 +84,8 @@ void LinearRep::dump(Region const* rg) const
         note(rg, "\n");
         prt(rg, "VAR:");
         rg->getLogMgr()->incIndent(ind);
-        dumpIR(var_exp, rg, nullptr, IR_DUMP_KID);
+        dumpIR(var_exp, rg, nullptr,
+               DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(ind);
     } else { note(rg, "\nNOVAR"); }
 
@@ -92,7 +94,8 @@ void LinearRep::dump(Region const* rg) const
         ASSERT0(addend_sign != ADDEND_SIGN_UNDEF);
         note(rg, "\n%s ADDEND:", addend_sign == ADDEND_SIGN_POS ? "+" : "-");
         rg->getLogMgr()->incIndent(ind);
-        dumpIR(addend, rg, nullptr, IR_DUMP_KID);
+        dumpIR(addend, rg, nullptr,
+               DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(ind);
     } else { note(rg, "\nNOADDEND"); }
 }
@@ -103,7 +106,7 @@ class FindUniqueRef : public VisitIRTree {
     UINT m_ref_cnt;
     IR const* m_ref;
 protected:
-    virtual bool visitIR(IR const* ir)
+    virtual bool visitIR(IR const* ir) override
     {
         if (ir == m_ref) {
             m_ref_cnt++;

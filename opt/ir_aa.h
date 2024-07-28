@@ -426,7 +426,7 @@ protected:
     void inferRHSAndUpdateLHS(IR const* ir, IR * rhs, MD const* mustref,
                               MDSet const* mayref, AACtx const* ic,
                               MOD MD2MDSet * mx);
-    void inferStoreValue(IR const* ir, IR * rhs, MD const* lhs_md,
+    void inferStoreValue(IR const* ir, IR * rhs,
                          AACtx const* ic, IN MD2MDSet * mx);
 
     //The function compute may memory address or point-to set for
@@ -442,10 +442,11 @@ protected:
                             MDSet const& in, OUT MDSet & out);
     MD const* inferArrayLdabase(MOD IR * ir, IR * array_base, bool is_ofst_pred,
                                 UINT ofst, MOD AACtx * ic);
-    virtual void inferExtExpression(IR * ir, MOD MDSet & mds,
-                                    MOD AACtx * ic, MOD MD2MDSet * mx);
-    void inferExpression(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
-                         MOD MD2MDSet * mx);
+    virtual void inferExtExp(IR * ir, MOD MDSet & mds,
+                             MOD AACtx * ic, MOD MD2MDSet * mx);
+    void inferExpGeneralAndSetWorstCase(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void inferExp(IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     void inferArrayExpBase(IR * ir, IR * array_base, bool is_ofst_predicable,
                            UINT ofst, OUT MDSet & mds,
                            MOD AACtx * ic, MOD MD2MDSet * mx);

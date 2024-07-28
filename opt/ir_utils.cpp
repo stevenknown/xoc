@@ -41,12 +41,19 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
 {
     for (UINT i = IR_UNDEF + 1; i < IR_CODE_NUM; i++) {
         switch ((IR_CODE)i) {
+        SWITCH_CASE_EXT_PLACEHOLDER:
+            //Placeholder IRs do not participate any concrete IR operations,
+            //there is no need to check them.
+            continue;
+        default:; //Nothing to do.
+        }
+        switch ((IR_CODE)i) {
         SWITCH_CASE_STMT:
         SWITCH_CASE_EXP:
             break;
         default: checkIRSwitchCaseInterface((IR_CODE)i);
         }
-        if (IRDES_is_stmt(g_ir_desc[i])) {
+        if (IRDES_is_stmt(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_STMT:
                 break;
@@ -59,50 +66,49 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_direct_mem_op(g_ir_desc[i])) {
+        if (IRDES_is_direct_mem_op(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_DIRECT_MEM_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_indirect_mem_op(g_ir_desc[i])) {
+        if (IRDES_is_indirect_mem_op(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_INDIRECT_MEM_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_write_pr(g_ir_desc[i])) {
+        if (IRDES_is_write_pr(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_WRITE_PR:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_array_op(g_ir_desc[i])) {
+        if (IRDES_is_array_op(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_ARRAY_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_conditional_br(g_ir_desc[i])) {
+        if (IRDES_is_conditional_br(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_CONDITIONAL_BRANCH_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_unconditional_br(g_ir_desc[i])) {
+        if (IRDES_is_unconditional_br(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_bin(g_ir_desc[i])) {
-            DUMMYUSE_LABEL(SWITCH_CASE_EXT_BIN);
+        if (IRDES_is_bin(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_BIN:
             SWITCH_CASE_EXT_BIN:
@@ -110,8 +116,7 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_una(g_ir_desc[i])) {
-            DUMMYUSE_LABEL(SWITCH_CASE_EXT_UNA);
+        if (IRDES_is_una(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_UNA:
             SWITCH_CASE_EXT_UNA:
@@ -119,21 +124,21 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_stmt_in_bb(g_ir_desc[i])) {
+        if (IRDES_is_stmt_in_bb(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_STMT_IN_BB:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_is_non_pr_memref(g_ir_desc[i])) {
+        if (IRDES_is_non_pr_memref(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_MEM_NONPR_OP:
                 break;
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_has_du(g_ir_desc[i])) {
+        if (IRDES_has_du(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_HAS_DU:
                 break;

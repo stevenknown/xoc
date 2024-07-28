@@ -47,6 +47,19 @@ typedef xcom::EList<IR*, IR2Holder>::Iter InvStmtListIter;
 typedef xcom::List<LI<IRBB>*> LoopInfoIter;
 typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
 
+typedef enum tagFindRedOpResult {
+    OP_UNDEF = 0, //Undef status.
+    OP_IS_RED, //OP is reduction operation.
+    OP_IS_NOT_RED, //OP is definitely not reduction operation.
+
+    //OP may be reduction operation because there exists at least one cycle
+    //in DefUse chain. However, since the May-Dependence information is not
+    //exact enough, we can not guarrantee there exist definitely a reduction
+    //operation in the loop.
+    OP_HAS_CYCLE,
+    OP_UNKNOWN, //I don't know whether OP is reduction operation.
+} FindRedOpResult;
+
 //
 //START LI<BB>
 //
@@ -364,6 +377,16 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 //BB2 is the loop header fallthrough bb.
 bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG const* cfg,
                                     UINT * succ1, UINT * succ2);
+
+//The function try to answer whether there may exist a cyclic reference
+//that start from 'start' stmt.
+//e.g: there exist a cyclic reference of
+//MD10v3->MD10v1->MD10v1->MD13->MD10v3.
+//  MD10v1 <- PHI(MD10v2, MD10v3)
+//  MD13   <- MD10v1
+//  MD10v3 <- MD13 #start
+FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
+                                Region const* rg);
 
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR

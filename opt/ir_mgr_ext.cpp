@@ -33,11 +33,12 @@ namespace xoc {
 
 IRMgrExt::IRMgrExt(Region * rg) : IRMgr(rg)
 {
+    ASSERT0(m_rg->getPassMgr());
 }
 
 
 IR * IRMgrExt::buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
-                          Type const* ty)
+                            Type const* ty)
 {
     ASSERT0(ty && base);
     IR * ir = allocIR(IR_VIST);
@@ -47,11 +48,13 @@ IR * IRMgrExt::buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
     IR_dt(ir) = ty;
     IR_parent(base) = ir;
     if (rhs != nullptr) {
+        ASSERT0(rhs->is_single());
         IR_parent(rhs) = ir;
     }
     VIST_dummyuse(ir) = dummyuse;
     if (dummyuse != nullptr) {
-        IR_is_dummy(dummyuse) = true;
+        ASSERT0(dummyuse->is_dummyuse());
+        ASSERT0(dummyuse->is_single());
         IR_parent(dummyuse) = ir;
     }
     return ir;
@@ -68,11 +71,13 @@ IR * IRMgrExt::buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
     VST_rhs(ir) = rhs;
     IR_dt(ir) = ty;
     if (rhs != nullptr) {
+        ASSERT0(rhs->is_single());
         IR_parent(rhs) = ir;
     }
     VST_dummyuse(ir) = dummyuse;
     if (dummyuse != nullptr) {
-        IR_is_dummy(dummyuse) = true;
+        ASSERT0(dummyuse->is_dummyuse());
+        ASSERT0(dummyuse->is_single());
         IR_parent(dummyuse) = ir;
     }
     return ir;
@@ -80,7 +85,7 @@ IR * IRMgrExt::buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
 
 
 IR * IRMgrExt::buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse,
-                           Type const* ty)
+                             Type const* ty)
 {
     ASSERT0(resprno != PRNO_UNDEF);
     IR * ir = allocIR(IR_VSTPR);
@@ -88,11 +93,13 @@ IR * IRMgrExt::buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse,
     IR_dt(ir) = ty;
     VSTPR_rhs(ir) = rhs;
     if (rhs != nullptr) {
+        ASSERT0(rhs->is_single());
         IR_parent(VSTPR_rhs(ir)) = ir;
     }
     VSTPR_dummyuse(ir) = dummyuse;
     if (dummyuse != nullptr) {
-        IR_is_dummy(dummyuse) = true;
+        ASSERT0(dummyuse->is_dummyuse());
+        ASSERT0(dummyuse->is_single());
         IR_parent(dummyuse) = ir;
     }
     return ir;
@@ -105,7 +112,7 @@ IR * IRMgrExt::buildBroadCast(IR * src, IR * res_list, Type const* ty)
     IR * ir = allocIR(IR_BROADCAST);
     BROADCAST_src(ir) = src;
     IR_parent(src) = ir;
-    BROADCAST_alter_res_desc_list(ir) = res_list;
+    BROADCAST_res_list(ir) = res_list;
     for (IR * res = res_list; res != nullptr; res = res->get_next()) {
         IR_parent(res) = ir;
     }
@@ -128,21 +135,10 @@ IR * IRMgrExt::getAlterResDescList(IR * stmt) const
 {
     switch (stmt->getCode()) {
     case IR_BROADCAST:
-        return BROADCAST_alter_res_desc_list(stmt);
+        return BROADCAST_res_list(stmt);
     default: UNREACHABLE();
     }
     return nullptr;
-}
-
-
-void IRMgrExt::setAlterResDescList(IR * stmt, IR * lst) const
-{
-    switch (stmt->getCode()) {
-    case IR_BROADCAST:
-        BROADCAST_alter_res_desc_list(stmt) = lst;
-        return;
-    default: UNREACHABLE();
-    }
 }
 
 } //namespace xoc

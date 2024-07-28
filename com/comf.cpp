@@ -412,43 +412,73 @@ UINT fact(UINT n)
 
 
 //float:
-//x    xxxxxxxx xxxxxxxxxxxxxxxxxxx
 //sign exponent    mantissa
 //31   30 ~ 23     22 ~ 0
+//x    11111111    xxxxxxxxxxxxxxxxxxxxxxx - special numbers (+/-Inf, NaN)
+//x    1xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers
+//x    0xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers
+//x    00000000    xxxxxxxxxxxxxxxxxxxxxxx - subnormal numbers
+//
 //ESP64:
+//sign exponent    mantissa with 29 trailing zeros
+//63   62 ~ 52     51 ~ 0
+//x    11111111111 xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
 //x    1000xxxxxxx xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
 //x    0111xxxxxxx xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
+//x    00000000000 xxxxxxxxxxxxxxxxxxxxxxx00000000000000000000000000000
 UINT64 float2ESP64(UINT64 val)
 {
     if (val == 0) { return 0; }
-    //sign
-    UINT64 esp64_val = (val & 0x80000000) << 32;
-    //exponent
-    esp64_val |= ((val & 0x40000000) > 0) ?
-        (UINT64)0x4000000000000000ULL : (UINT64)0x3800000000000000ULL;
-    //mantissa
-    esp64_val |= (val & 0x3FFFFFFF) << 29;
+    //Copy mantissa and exponent bits.
+    UINT64 esp64_val = (val & 0x3fffffff) << 29;
+    //Fix exponent bits.
+    UINT64 orig_exp = val & 0x7f800000;
+    if (orig_exp == 0x7f800000) {
+        //Special numbers (+/-Inf, NaN).
+        esp64_val |= (UINT64)0x7ff0000000000000ULL;
+    } else if (orig_exp != 0) {
+        //Normal numbers.
+        esp64_val |= ((val & 0x40000000) != 0) ?
+            (UINT64)0x4000000000000000ULL : (UINT64)0x3800000000000000ULL;
+    }
+    //Copy the sign bit.
+    esp64_val |= (val & 0x80000000) << 32;
     return esp64_val;
 }
 
 
 //half:
-//x    xxxxx       xxxxxxxxxx
 //sign exponent    mantissa
 //15   14 ~ 10     9 ~ 0
+//x    11111       xxxxxxxxxx - special numbers (+/-Inf, NaN)
+//x    1xxxx       xxxxxxxxxx - normal numbers
+//x    0xxxx       xxxxxxxxxx - normal numbers
+//x    00000       xxxxxxxxxx - subnormal numbers
+//
 //EHP64:
+//sign exponent    mantissa with 42 trailing zeros
+//63   62 ~ 52     51 ~ 0
+//x    11111111111 xxxxxxxxxx000000000000000000000000000000000000000000
 //x    1000000xxxx xxxxxxxxxx000000000000000000000000000000000000000000
 //x    0111111xxxx xxxxxxxxxx000000000000000000000000000000000000000000
+//x    00000000000 xxxxxxxxxx000000000000000000000000000000000000000000
 UINT64 half2EHP64(UINT64 val)
 {
     if (val == 0) { return 0; }
-    //sign
-    UINT64 ehp64_val = (val & 0x8000) << 48;
-    //exponent
-    ehp64_val |= ((val & 0x4000) > 0) ?
-        (UINT64)0x4000000000000000ULL : (UINT64)0x3F00000000000000ULL;
-    //mantissa
-    ehp64_val |= (val & 0x3FFF) << 42;
+    //Copy mantissa and exponent bits.
+    UINT64 ehp64_val = (val & 0x3fff) << 42;
+    //Fix exponent bits.
+    UINT64 orig_exp = val & 0x7c00;
+    if (orig_exp == 0x7c00) {
+        //Special numbers (+/-Inf, NaN).
+        ehp64_val |= (UINT64)0x7ff0000000000000ULL;
+    } else if (orig_exp != 0) {
+        //Normal numbers.
+        ehp64_val |= ((val & 0x4000) != 0) ?
+            (UINT64)0x4000000000000000ULL : (UINT64)0x3f00000000000000ULL;
+    }
+    //Copy the sign bit.
+    ehp64_val |= (val & 0x8000) << 48;
     return ehp64_val;
 }
 
@@ -1001,9 +1031,24 @@ INT getFirstOneAtRightSide(INT m)
 }
 
 
+//Signed value "val" exceeds bit width "n" if and only if
+//  val < -(2^(n-1))  OR  val > 2^(n-1) - 1
+bool isExceedBitWidth(LONGLONG val, UINT bitwidth)
+{
+    ASSERTN(bitwidth <= sizeof(LONGLONG) * BITS_PER_BYTE,
+            ("bit width is too large"));
+    if (bitwidth == sizeof(LONGLONG) * BITS_PER_BYTE) { return true; }
+    return val < ((LONGLONG)-1 << (bitwidth - 1)) ||
+           val > (((LONGLONG)1 << (bitwidth - 1)) - 1);
+}
+
+
+//Unsigned value "val" exceeds bit width "n" if and only if
+//  val > 2^n - 1
 bool isExceedBitWidth(ULONGLONG val, UINT bitwidth)
 {
-    ASSERTN(bitwidth <= sizeof(ULONGLONG) * BITS_PER_BYTE, ("TODO"));
+    ASSERTN(bitwidth <= sizeof(ULONGLONG) * BITS_PER_BYTE,
+            ("bit width is too large"));
     if (bitwidth == sizeof(ULONGLONG) * BITS_PER_BYTE) { return true; }
     return val > ((((ULONGLONG)1) << bitwidth) - 1);
 }
@@ -1647,31 +1692,104 @@ void charToByteHex(CHAR const* string, OUT BYTE * buf, UINT buflen)
 }
 
 
-void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
-                               OUT INT & part3, OUT INT & part4)
+void splitMbitToNGroup(UINT64 val, UINT m,
+                       UINT const* bit_group_desc, UINT bit_group_desc_len,
+                       OUT UINT64 * bit_group_val, UINT bit_group_val_len)
 {
-    //Get 0~15 bits number.
-    part1 = getSign64BitLow16BitVal(val);
+    UINT const bits_uint64 = sizeof(UINT64) * BITS_PER_BYTE;
+    ASSERT0(m <= bits_uint64);
 
-    val -= part1;
+    ASSERT0(bit_group_desc_len == bit_group_val_len);
 
-    //Get 0~31 bits number.
-    part2 = getSign64BitLow32BitVal(val);
+    UINT64 const maxmask = ((UINT64)0x1) << (bits_uint64 - 1);
 
-    //Get 32~63 bits number.
-    val = (val - part2) >> 32;
+    UINT64 const help_val_0 = (maxmask >> (bits_uint64 - 1 - m)) - 1;
 
-    //Get 15~31 bits number.
-    part2 >>= 16;
+    UINT total_bit_num = 0;
+    INT64 value = val;
 
-    //Get 32~47 bits number.
-    part3 = getSign64BitLow16BitVal(val);
+    //Clear the exceess bits.
+    if (m != bits_uint64) { value &= help_val_0; }
 
-    val -= part3;
+    for (UINT i = 0; i < bit_group_desc_len; i++) {
 
-    //Get 47~63 bits number.
-    part4 = getSign64BitLow32BitVal(val);
-    part4 >>= 16;
+        UINT j = bit_group_desc_len - i - 1;
+
+        ASSERT0(bit_group_desc[j] <= m && total_bit_num < m);
+
+        total_bit_num += bit_group_desc[j];
+
+        UINT64 const help_val_1 =
+            (maxmask >> (bits_uint64 - bit_group_desc[j] - 1)) - 1;
+        bit_group_val[j] = value & help_val_1;
+
+        value >>= bit_group_desc[j];
+    }
+
+    ASSERT0(total_bit_num == m);
+}
+
+
+void splitMbitToNGroup(UINT64 val, UINT m, Vector<UINT> & bit_group_desc,
+                       OUT Vector<UINT64> & bit_group_val)
+{
+    ASSERT0(bit_group_val.get_capacity() == bit_group_desc.get_capacity());
+
+    splitMbitToNGroup(val, m,
+                      bit_group_desc.get_vec(), bit_group_desc.get_capacity(),
+                      bit_group_val.get_vec(), bit_group_val.get_capacity());
+}
+
+
+void splitMbitToNGroup(UINT64 val, UINT m,
+                       UINT const* bit_group_desc, UINT bit_group_desc_len,
+                       OUT INT64 * bit_group_val, UINT bit_group_val_len)
+{
+    UINT const bits_uint64 = sizeof(UINT64) * BITS_PER_BYTE;
+    ASSERT0(m <= bits_uint64);
+
+    ASSERT0(bit_group_desc_len == bit_group_val_len);
+
+    UINT64 const maxmask = ((UINT64)0x1) << (bits_uint64 - 1);
+
+    UINT64 const help_val_0 = (maxmask >> (bits_uint64 - 1 - m)) - 1;
+
+    UINT total_bit_num = 0;
+    INT64 value = val;
+
+    //Clear the exceess bits.
+    if (m != bits_uint64) { value &= help_val_0; }
+
+    for (UINT i = 0; i < bit_group_desc_len; i++) {
+
+        UINT j = bit_group_desc_len - i - 1;
+
+        ASSERT0(bit_group_desc[j] <= m && total_bit_num < m);
+
+        total_bit_num += bit_group_desc[j];
+
+        UINT64 const help_val_1 = maxmask >> (bits_uint64 - bit_group_desc[j]);
+        UINT64 const help_val_2 =
+            (maxmask >> (bits_uint64 - bit_group_desc[j] - 1)) - 1;
+        bit_group_val[j] = ((value & help_val_2) ^ help_val_1) - help_val_1;
+
+        value -= bit_group_val[j];
+        value >>= bit_group_desc[j];
+    }
+
+    ASSERT0(total_bit_num == m);
+
+}
+
+
+void splitMbitToNGroup(UINT64 val, UINT m, Vector<UINT> & bit_group_desc,
+                       OUT Vector<INT64> & bit_group_val)
+{
+    ASSERT0(bit_group_val.get_capacity() == bit_group_desc.get_capacity());
+
+    splitMbitToNGroup(val, m,
+                      bit_group_desc.get_vec(), bit_group_desc.get_capacity(),
+                      bit_group_val.get_vec(), bit_group_val.get_capacity());
 }
 
 
@@ -1778,4 +1896,61 @@ bool xnroot(Float const& num, UINT nroot, OUT Float & res)
     return true;
 }
 
+
+UINT32 encodeULEB128(UINT64 value, OUT Vector<CHAR> & os, UINT32 pad_to)
+{
+    UINT32 count = 0;
+    do {
+        UINT8 byte = (UINT8)get64BitValueLowNBit(value, 7);
+        value >>= 7;
+        count++;
+        if (value != 0 || count < pad_to) {
+            byte |= 0x80; //Mark this byte to show that more bytes will follow.
+        }
+        os.append(CHAR(byte));
+    } while (value != 0);
+
+    //Pad with 0x80 and emit a null byte at the end.
+    if (count < pad_to) {
+        for (; count < pad_to - 1; ++count) {
+            os.append('\x80');
+        }
+        os.append('\x00');
+        count++;
+    }
+    return count;
+}
+
+
+UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os, UINT32 pad_to)
+{
+    bool more;
+    UINT32 count = 0;
+    do {
+        UINT8 byte = (UINT8)get64BitValueLowNBit(UINT64(value), 7);
+
+        //NOTE: this assumes that this signed shift is
+        //an arithmetic right shift.
+        value >>= 7;
+        more = !((((value == 0 ) && ((byte & 0x40) == 0)) ||
+                    ((value == -1) && ((byte & 0x40) != 0))));
+        count++;
+        if (more || count < pad_to) {
+            //Mark this byte to show that more bytes will follow.
+            byte |= 0x80;
+        }
+        os.append(CHAR(byte));
+    } while (more);
+
+    //Pad with 0x80 and emit a terminating byte at the end.
+    if (count < pad_to) {
+        UINT8 pad_value = value < 0 ? 0x7f : 0x00;
+        for (; count < pad_to - 1; ++count) {
+            os.append(CHAR(pad_value | 0x80));
+        }
+        os.append(CHAR(pad_value));
+        count++;
+    }
+    return count;
+}
 } //namespace xcom

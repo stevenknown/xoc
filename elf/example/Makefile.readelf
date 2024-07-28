@@ -87,8 +87,9 @@ $(OPT_DIR)/data_type.o\
 $(OPT_DIR)/logmgr.o\
 $(OPT_DIR)/symtab.o\
 $(OPT_DIR)/util.o\
-$(OPT_DIR)/option.o
-
+$(OPT_DIR)/option.o \
+$(OPT_DIR)/dwarf.o \
+$(OPT_DIR)/label.o
 
 CFLAGS+=\
   -D$(TARG) \

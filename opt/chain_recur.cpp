@@ -52,7 +52,8 @@ void IVVal::dump(Region const* rg) const
         return;
     case VAL_IS_EXP: {
         xcom::StrBuf tbuf(32);
-        xoc::dumpIRToBuf(getExp(), rg, tbuf, DumpFlag(IR_DUMP_DEF|IR_DUMP_KID));
+        xoc::dumpIRToBuf(getExp(), rg, tbuf,
+                         DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_KID));
         prt(rg, "EXP:%s", tbuf.getBuf());
         return;
     }
@@ -703,10 +704,10 @@ void IVVal::setToCR(ChainRecMgr & mgr, Type const* ty)
 }
 
 
-bool IVVal::isEqual(IR const* v) const
+bool IVVal::isEqual(IR const* v, IRMgr const* mgr) const
 {
     if (!is_exp()) { return false; }
-    return getExp()->isIRListEqual(v, true);
+    return getExp()->isIRListEqual(v, mgr, true);
 }
 
 
@@ -734,7 +735,7 @@ bool IVVal::isEqual(HOST_FP v) const
 }
 
 
-bool IVVal::isEqual(IVVal const& v) const
+bool IVVal::isEqual(IVVal const& v, IRMgr const* mgr) const
 {
     if (getKind() != v.getKind()) { return false; }
     switch (v.getKind()) {
@@ -745,9 +746,9 @@ bool IVVal::isEqual(IVVal const& v) const
     case IVVal::VAL_IS_FP:
         return TypeMgr::isEqual(getFP(), v.getFP());
     case IVVal::VAL_IS_EXP:
-        return getExp()->isIREqual(v.getExp(), true);
+        return getExp()->isIREqual(v.getExp(), mgr, true);
     case IVVal::VAL_IS_CR: {
-        return getCR()->isEqual(*v.getCR());
+        return getCR()->isEqual(*v.getCR(), mgr);
     }
     default: UNREACHABLE();
     }
@@ -896,16 +897,16 @@ void ChainRec::dumpComputedValue(MOD ChainRecMgr & mgr) const
 }
 
 
-bool ChainRec::isEqual(ChainRec const& src) const
+bool ChainRec::isEqual(ChainRec const& src, IRMgr const* mgr) const
 {
     if (getCode() != src.getCode()) { return false; }
-    if (!getInit().isEqual(src.getInit())) { return false; }
-    if (!getStep().isEqual(src.getStep())) { return false; }
+    if (!getInit().isEqual(src.getInit(), mgr)) { return false; }
+    if (!getStep().isEqual(src.getStep(), mgr)) { return false; }
     return true;
 }
 
 
-bool ChainRec::isEqual(ConstIVValList const& lst) const
+bool ChainRec::isEqual(ConstIVValList const& lst, IRMgr const* mgr) const
 {
     ConstIVValListIter it;
     ChainRec const* s = this;
@@ -913,7 +914,7 @@ bool ChainRec::isEqual(ConstIVValList const& lst) const
     for (lst.get_head(&it); i < lst.get_elem_count();
          it = lst.get_next(it), i++) {
         ASSERT0(it->val());
-        if (!s->getInit().isEqual(*it->val())) { return false; }
+        if (!s->getInit().isEqual(*it->val(), mgr)) { return false; }
         if (!s->getStep().is_cr()) {
             break; //meet the last level CR.
         }
@@ -923,11 +924,11 @@ bool ChainRec::isEqual(ConstIVValList const& lst) const
     it = lst.get_next(it);
     ASSERT0(it != lst.end());
     ASSERT0(it->val());
-    return s->getStep().isEqual(*it->val());
+    return s->getStep().isEqual(*it->val(), mgr);
 }
 
 
-bool ChainRec::isEqual(UINT valnum, ...) const
+bool ChainRec::isEqual(IRMgr const* mgr, UINT valnum, ...) const
 {
     va_list ptr;
     va_start(ptr, valnum);
@@ -937,7 +938,7 @@ bool ChainRec::isEqual(UINT valnum, ...) const
         vlst.append_tail(val);
     }
     va_end(ptr);
-    return isEqual(vlst);
+    return isEqual(vlst, mgr);
 }
 
 

@@ -79,23 +79,19 @@ bool IRSimp::isLowest(IR const* ir) const
         //tree height is more than 2.
         return false;
     }
-
     if (parent->isCallStmt()) {
         //If parent is CALL/ICALL, we always intend to reduce the
         //height for parameter/callee even if its height is not more than 2.
         return false;
     }
-
     if (parent->is_ist() && ir == IST_base(parent)) {
         //At lowest mode, IST's base expression must be leaf.
         return false;
     }
-
     if (parent->is_starray() && ir == ARR_base(parent)) {
         //At lowest mode, STARRAY's base and sublist must be leaf.
         return false;
     }
-
     return true;
 }
 
@@ -139,7 +135,6 @@ bool IRSimp::isLowestHeightArrayOp(IR const* ir) const
 bool IRSimp::isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const
 {
     if (ir->is_leaf()) { return true; }
-
     ASSERT0(ctx);
     switch (ir->getCode()) {
     case IR_LAND:
@@ -159,6 +154,8 @@ bool IRSimp::isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const
         return isLowest(ir);
     case IR_SELECT:
         return isLowestHeightSelect(ir);
+    SWITCH_CASE_EXT_EXP:
+        return isLowestHeightExtExp(ir);
     default: UNREACHABLE();
     }
 
@@ -917,7 +914,8 @@ IR * IRSimp::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
         SIMP_changed(ctx) = true;
         SIMP_need_recon_bblist(ctx) = true;
         return ret_list;
-    } else if (BR_det(ir)->is_land()) {
+    }
+    if (BR_det(ir)->is_land()) {
         if (ir->is_truebr()) {
             ret_list = simplifyLogicalAndAtTruebr(BR_det(ir), BR_lab(ir));
             BR_det(ir) = nullptr;
@@ -934,7 +932,8 @@ IR * IRSimp::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
         SIMP_changed(ctx) = true;
         SIMP_need_recon_bblist(ctx) = true;
         return ret_list;
-    } else if (BR_det(ir)->is_lnot()) {
+    }
+    if (BR_det(ir)->is_lnot()) {
         if (ir->is_truebr()) {
             IR_code(ir) = IR_FALSEBR;
         } else {
@@ -963,7 +962,6 @@ void IRSimp::simplifySelectKids(IR * ir, SimpCtx * ctx)
         IR * kid = ir->getKid(i);
         if (kid == nullptr) { continue; }
         IR * new_kid = simplifyExpression(kid, ctx);
-
         if (SIMP_to_lowest_height(ctx)) {
             if (!new_kid->is_leaf()) {
                 //Lower new_kid to PR.
@@ -971,7 +969,6 @@ void IRSimp::simplifySelectKids(IR * ir, SimpCtx * ctx)
                 continue;
             }
         }
-
         ir->setKid(i, new_kid);
     }
 }
@@ -1361,25 +1358,21 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 }
 
 
-IR * IRSimp::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
+IR * IRSimp::simplifyAllKidsExpression(IR * ir, SimpCtx * ctx)
 {
-    ASSERT0(ir && (ir->isBinaryOp() || ir->isUnaryOp() || ir->is_ild()));
-
+    ASSERT0(ir);
     if (ir->is_ild() && !SIMP_ild_ist(ctx)) { return ir; }
-
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid != nullptr) {
-            IR * x = simplifyExpression(kid, ctx);
-            ir->setKid(i, x);
+            ASSERT0(kid->is_exp());
+            ir->setKid(i, simplifyExpressionList(kid, ctx));
         }
     }
-
     if (!SIMP_to_lowest_height(ctx) || isLowestHeightExp(ir, ctx)) {
         return ir;
     }
-
-    //Do lowering.
+    //Lower to lowest height.
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
         if (k == nullptr) { continue; }
@@ -1394,7 +1387,8 @@ IR * IRSimp::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
             ir->setKid(i, simplifyToPR(k, ctx));
         }
     }
-
+    //ir's parent is not the lowest tree, thus ir should be in the PR mode to
+    //guarrantee its parent could be the lowest tree.
     return simplifyToPR(ir, ctx);
 }
 
@@ -1438,8 +1432,25 @@ IR * IRSimp::simplifyRHSInPRMode(IR * ir, SimpCtx * ctx)
 }
 
 
-//Return new generated expression's value.
-//'ir': ir may be in parameter list if its prev or next is not empty.
+IR * IRSimp::simplifyExpressionList(IR * irlst, SimpCtx * ctx)
+{
+    if (irlst == nullptr) { return nullptr; }
+    IR * newirlst = nullptr;
+    IR * newplast = nullptr;
+    IR * last = xcom::get_last(SIMP_stmtlist(ctx));
+    for (; irlst != nullptr;) {
+        SimpCtx tcont(*ctx);
+        IR * p = xcom::removehead(&irlst);
+        ASSERTN(p->is_exp(), ("expect non-statement node"));
+        p = simplifyExpression(p, &tcont);
+        xcom::add_next(&newirlst, &newplast, p);
+        ctx->unionBottomUpInfo(tcont);
+        xcom::add_next(&SIMP_stmtlist(ctx), &last, SIMP_stmtlist(&tcont));
+    }
+    return newirlst;
+}
+
+
 IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
 {
     if (ir == nullptr) { return nullptr; }
@@ -1448,14 +1459,16 @@ IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
     //ir can not in list, or it may incur illegal result.
     ASSERT0(ir->is_single());
     switch (ir->getCode()) {
-    case IR_CONST: return ir;
-    case IR_ID: return ir;
+    case IR_CONST:
+    case IR_ID:
+    case IR_CASE: return ir;
     SWITCH_CASE_DIRECT_MEM_EXP:
         if (SIMP_to_pr_mode(ctx)) {
             return simplifyToPR(ir, ctx);
         }
         return ir;
     SWITCH_CASE_READ_PR: return ir;
+    SWITCH_CASE_DEBUG: return ir;
     SWITCH_CASE_READ_ARRAY: return simplifyArray(ir, ctx);
     case IR_LDA: //&sym, get address of 'sym'
         if (SIMP_to_pr_mode(ctx)) {
@@ -1468,10 +1481,12 @@ IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
     SWITCH_CASE_ARITH:
     SWITCH_CASE_SHIFT:
     SWITCH_CASE_BITWISE:
-    SWITCH_CASE_INDIRECT_MEM_EXP:
     SWITCH_CASE_UNA_REST:
-        return simplifyBinAndUniExpression(ir, ctx);
+        return simplifyAllKidsExpression(ir, ctx);
+    SWITCH_CASE_INDIRECT_MEM_EXP:
+        return simplifyIndirectMemOp(ir, ctx);
     case IR_SELECT: return simplifySelect(ir, ctx);
+    case IR_DUMMYUSE: return simplifyDummyUse(ir, ctx);
     default: return simplifyExtExp(ir, ctx);
     }
     return nullptr;
@@ -1513,7 +1528,6 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
                 }
             }
         }
-
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
             ir = simplifyToPR(ir, ctx);
         }
@@ -1542,7 +1556,6 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
                 }
             }
         }
-
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
             ir = simplifyToPR(ir, ctx);
         }
@@ -1560,14 +1573,13 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
                 ir->setKid(i, simplifyExpression(kid, ctx));
             }
         }
-
         if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
             ir = simplifyToPR(ir, ctx);
         }
         return ir;
     }
     default: UNREACHABLE();
-    } //end switch
+    }
     return nullptr;
 }
 
@@ -1600,7 +1612,6 @@ IR * IRSimp::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
         SimpCtx subctx(*ctx);
         SIMP_ret_array_val(&subctx) = true;
         IR * news = simplifyExpression(s, &subctx);
-
         if (SIMP_to_lowest_height(ctx) && !news->is_leaf()) {
             news = simplifyToPR(news, &subctx);
         }
@@ -2001,8 +2012,18 @@ IR * IRSimp::simplifyGetelem(IR * ir, SimpCtx * ctx)
 }
 
 
-IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
+IR * IRSimp::simplifyIndirectExp(IR * ir, SimpCtx * ctx)
 {
+    ASSERT0(ir->is_exp());
+    //For now, there is nothing to do for IR_ILD itself.
+    return simplifyAllKidsExpression(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->is_stmt());
+    //Do simplification to stmt itself at first.
     IR * ret_list = nullptr;
     IR * last = nullptr;
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
@@ -2032,7 +2053,7 @@ IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
         SIMP_changed(ctx) = true;
     }
 
-    //Simplify RHS.
+    //Then, simplify its RHS.
     SimpCtx rhsctx(*ctx);
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&rhsctx) = true;
@@ -2047,9 +2068,16 @@ IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, &last, retlst2);
     }
 
-    //Add original ir as the last new IR.
+    //Add original stmt IR as the last new IR at the result-list.
     xcom::add_next(&ret_list, &last, ir);
     return ret_list;
+}
+
+
+IR * IRSimp::simplifyIndirectMemOp(IR * ir, SimpCtx * ctx)
+{
+    if (ir->is_stmt()) { return simplifyIndirectStmt(ir, ctx); }
+    return simplifyIndirectExp(ir, ctx);
 }
 
 
@@ -2057,6 +2085,10 @@ IR * IRSimp::simplifyDirectMemOp(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->hasRHS());
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    if (ir->getRHS() == nullptr) {
+        //Virtual OP may not have RHS.
+        return ir;
+    }
     IR * ret_list = nullptr;
     IR * last = nullptr;
     SimpCtx tcont(*ctx);
@@ -2298,10 +2330,11 @@ IR * IRSimp::simplifySwitch(IR * ir, SimpCtx * ctx)
 
 IR * IRSimp::simplifyExtExp(IR * ir, SimpCtx * ctx)
 {
+    //Target Dependent Code.
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
     SWITCH_CASE_EXT_EXP:
-        return ir;
+        return simplifyAllKidsExpression(ir, ctx);
     default: UNREACHABLE();
     }
     return nullptr;
@@ -2310,6 +2343,7 @@ IR * IRSimp::simplifyExtExp(IR * ir, SimpCtx * ctx)
 
 IR * IRSimp::simplifyExtStmt(IR * ir, SimpCtx * ctx)
 {
+    //Target Dependent Code.
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     SWITCH_CASE_EXT_STMT:
@@ -2416,10 +2450,15 @@ IR * IRSimp::simplifyStmt(IR * ir, SimpCtx * ctx)
         break;
     case IR_REGION:
     case IR_PHI:
+    SWITCH_CASE_DEBUG:
         return ir;
     default:
         ret_list = simplifyExtStmt(ir, ctx);
     }
+    if (g_debug) {
+        copyDbx(ret_list, ir, m_rg);
+    }
+
     setParentPointerForIRList(ret_list);
     if (has_side_effect || is_no_move) {
         for (IR * t = ret_list; t != nullptr; t = t->get_next()) {

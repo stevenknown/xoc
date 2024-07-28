@@ -55,6 +55,9 @@ namespace xoc {
 //Record Data structure for IR analysis and transformation.
 #define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
 #define ANA_INS_ai_mgr(a) ((a)->m_attachinfo_mgr)
+
+//dbg manager.
+#define ANA_INS_dbx_mgr(a) ((a)->m_dbx_mgr)
 class AnalysisInstrument {
     friend class Region;
     friend class IRMgr;
@@ -86,10 +89,12 @@ protected:
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;
     xcom::List<DU*> m_free_du_list;
+    DbxMgr * m_dbx_mgr; //dbg manager.
 protected:
     //Count memory usage for current object.
     size_t count_mem() const;
     PassMgr * getPassMgr() const { return ANA_INS_pass_mgr(this); }
+    DbxMgr * getDbxMgr() const { return ANA_INS_dbx_mgr(this); }
     IRMgr * getIRMgr() const { return ANA_INS_ir_mgr(this); }
     IRBBMgr * getIRBBMgr() const { return ANA_INS_ir_bb_mgr(this); }
     AttachInfoMgr * getAttachInfoMgr() const { return ANA_INS_ai_mgr(this); }

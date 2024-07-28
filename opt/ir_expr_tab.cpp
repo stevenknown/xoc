@@ -182,6 +182,30 @@ HOST_UINT ExprTab::compute_hash_key(IR const* ir) const
 }
 
 
+ExprRep * ExprTab::encodeExtExp(IR * ir)
+{
+    ASSERT0(ir->is_exp());
+    switch (ir->getCode()) {
+    SWITCH_CASE_EXT_EXP:
+        return nullptr;
+    default:UNREACHABLE();
+    }
+    return nullptr;
+}
+
+
+void ExprTab::encodeExtStmt(IR const* ir)
+{
+    ASSERT0(ir->is_stmt());
+    switch (ir->getCode()) {
+    SWITCH_CASE_EXT_STMT:
+        encodeAllKids(ir);
+        break;
+    default:UNREACHABLE();
+    }
+}
+
+
 HOST_UINT ExprTab::compute_hash_key_for_tree(IR const* ir)
 {
     HOST_UINT hval = 0;
@@ -249,7 +273,7 @@ ExprRep * ExprTab::appendExp(IR * ir)
     //Scanning in ExprRep list in level2 hash tab.
     ExprRep * last = nullptr;
     while (ie != nullptr) {
-        if (ir->isIREqual(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
             return ie;
         }
         last = ie;
@@ -294,14 +318,14 @@ void ExprTab::removeOccs(IR * ir)
     case IR_STPR:
     SWITCH_CASE_DIRECT_MEM_STMT: {
         IR * stv = ir->getRHS();
-        if (stv->is_const()) { return; }
+        if (stv != nullptr && stv->is_const()) { return; }
         removeOcc(stv);
         break;
     }
     SWITCH_CASE_WRITE_ARRAY:
     SWITCH_CASE_INDIRECT_MEM_STMT: {
         IR * stv = ir->getRHS();
-        if (!stv->is_const()) {
+        if (stv != nullptr && !stv->is_const()) {
             removeOcc(stv);
         }
         IR * m = ir->getBase();
@@ -365,7 +389,7 @@ ExprRep * ExprTab::removeExp(IR * ir)
 
     //Scanning in ExprRep list in level2 hash tab.
     while (ie != nullptr) {
-        if (ir->isIREqual(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
             xcom::remove(&level2_hash_tab[level2_hashv], ie);
             m_ir_expr_vec.remove(EXPR_id(ie), nullptr);
             return ie;
@@ -397,7 +421,7 @@ ExprRep * ExprTab::findExp(IR * ir)
 
     //Scanning in ExprRep list in level2 hash tab.
     while (ie != nullptr) {
-        if (ir->isIREqual(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
             return ie;
         }
         ie = EXPR_next(ie);
@@ -416,6 +440,7 @@ ExprRep * ExprTab::encodeExp(IR * ir)
     case IR_ILD:
     case IR_LDA:
     case IR_CONST:
+    case IR_DUMMYUSE:
     SWITCH_CASE_READ_PR:
         return nullptr;
     SWITCH_CASE_BIN:
@@ -427,7 +452,7 @@ ExprRep * ExprTab::encodeExp(IR * ir)
         EXPR_occ_list(ie).append_tail(ir);
         return ie;
     }
-    default: UNREACHABLE();
+    default: return encodeExtExp(ir);
     }
     return nullptr;
 }
@@ -550,7 +575,19 @@ void ExprTab::encodeStmt(IR const* ir)
         }
         break;
     }
-    default: UNREACHABLE();
+    default: encodeExtStmt(ir);
+    }
+}
+
+
+void ExprTab::encodeAllKids(IR const* ir)
+{
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        ExprRep * ie = encodeExp(kid);
+        if (ie == nullptr) { continue; }
+        setMapIR2ExprRep(kid, ie);
     }
 }
 

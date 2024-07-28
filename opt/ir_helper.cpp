@@ -31,11 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-static void verifyIR(IR * ir, BitSet * irh, Region const* rg)
+static void verifyIR(IR const* ir, MOD BitSet * irh, Region const* rg)
 {
     ASSERT0(irh != nullptr);
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * k = ir->getKid(i);
+        IR const* k = ir->getKid(i);
         if (k != nullptr) {
             ASSERTN(k->getParent() == ir, ("ir must be k's parent"));
             verifyIRList(k, irh, rg);
@@ -50,7 +50,6 @@ static void verifyIR(IR * ir, BitSet * irh, Region const* rg)
 }
 
 
-//Function to verify stmt info after IR simplified.
 bool verifySimp(IR * ir_list, SimpCtx & simp)
 {
     if (simp.isSimpCFG()) {
@@ -63,8 +62,15 @@ bool verifySimp(IR * ir_list, SimpCtx & simp)
 }
 
 
-//Check for IR sanity and uniqueness.
-bool verifyIRList(IR * ir, BitSet * irh, Region const* rg)
+bool verifyIRList(IR const* ir, Region const* rg)
+{
+    BitSet irset;
+    return verifyIRList(ir, &irset, rg);
+}
+
+
+//irh: used to guarrantee the uniquess of IR.
+bool verifyIRList(IR const* ir, BitSet * irh, Region const* rg)
 {
     BitSet * loc = nullptr;
     if (irh == nullptr) {

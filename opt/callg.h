@@ -38,7 +38,7 @@ namespace xoc {
 
 //CALL NODE
 #define CN_id(c) ((c)->nid)
-#define CN_sym(c) ((c)->ru_name)
+#define CN_sym(c) ((c)->rg_name)
 #define CN_ru(c) ((c)->rg)
 #define CN_is_used(c) ((c)->u1.s1.is_used)
 #define CN_unknown_callee(c) ((c)->u1.s1.has_unknown_callee)
@@ -46,7 +46,7 @@ class CallNode {
     COPY_CONSTRUCTOR(CallNode);
 public:
     UINT nid;
-    Sym const* ru_name; //record the Region name.
+    Sym const* rg_name; //record the Region name.
     Region * rg; //record the Region that callnode corresponds to.
     union {
         struct {
@@ -60,7 +60,6 @@ public:
         } s1;
         BYTE u1b1;
     } u1;
-
 public:
     CallNode() { ::memset((void*)this, 0, sizeof(CallNode)); }
 
@@ -181,7 +180,7 @@ public:
     //name: file name if you want to dump VCG to specified file.
     //flag: default is 0xFFFFffff(-1) means doing dumping
     //        with completely information.
-    void dumpVCG(CHAR const* name = nullptr, INT flag = -1);
+    void dumpVCG(CHAR const* name = nullptr, INT flag = -1) const;
 
     //Clean entire call-graph.
     void erase()

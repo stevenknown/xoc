@@ -72,7 +72,7 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
 //name: file name if you want to dump VCG to specified file.
 //flag: default is 0xFFFFffff(-1) means doing dumping
 //      with completely information.
-void CallGraph::dumpVCG(CHAR const* name, INT flag)
+void CallGraph::dumpVCG(CHAR const* name, INT flag) const
 {
     if (name == nullptr) {
         name = "graph_call_graph.vcg";
@@ -132,16 +132,18 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     getRegionMgr()->getLogMgr()->push(h, name);
     VertexIter itv = VERTEX_UNDEF;
     List<Var const*> formalparamlst;
+    DumpFlag f = DumpFlag::combineIRID(
+        IR_DUMP_KID|(dump_src_line ? IR_DUMP_SRC_LINE : 0)|
+                    (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     for (xcom::Vertex * v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
-        INT id = v->id();
+        VexIdx id = v->id();
         CallNode * cn = m_cnid2cn.get(id);
         ASSERT0(cn != nullptr);
         fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
                    "fontname:\"courB\" label:\"", id);
-
-        CHAR const* cnname = CN_sym(cn) != nullptr ?
-                             SYM_name(CN_sym(cn)) : "IndirectCall";
+        CHAR const* cnname = cn->name() != nullptr ?
+                             cn->name()->getStr() : "IndirectCall";
         if (cn->region() != nullptr) {
             fprintf(h, "CN(%d):Region(%d):%s\n",
                     cn->id(), cn->region()->id(), cnname);
@@ -158,15 +160,12 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                  param = formalparamlst.get_next()) {
                 param->dump(getVarMgr());
             }
-
             IR * irs = cn->region()->getIRList();
             if (irs != nullptr) {
                 for (; irs != nullptr; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
-                    dumpIR(irs, cn->region(), nullptr, IR_DUMP_KID|
-                           (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
-                           (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+                    dumpIR(irs, cn->region(), nullptr, f);
                 }
             } else {
                 dumpBBList(cn->region()->getBBList(),

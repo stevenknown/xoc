@@ -333,14 +333,15 @@ class Graph {
     friend class CompareEdgeFunc;
     friend class VertexHash;
 protected:
-    //it is true if the number of edges between any two
-    //vertices are not more than one.
-    BYTE m_is_unique:1;
-    BYTE m_is_direction:1; //true if graph is direction.
+    //It is true if the number of edges between any two vertices are
+    //not more than one.
+    bool m_is_unique;
+    bool m_is_direction; //true if graph is direction.
     UINT m_vex_hash_size;
     UINT m_dense_vex_num; //record the number of vertex in dense mode.
-    //record vertex if vertex id is densen distribution.
-    //map vertex id to vertex.
+
+    //Record vertex if vertex id is densen distribution.
+    //Map vertex id to vertex.
     Vector<Vertex*> * m_dense_vertex;
     VertexHash * m_sparse_vertex; //record all vertices.
     SMemPool * m_vertex_pool;
@@ -350,7 +351,6 @@ protected:
     FreeList<Edge> m_e_free_list; //record freed Edge for reuse.
     FreeList<EdgeC> m_el_free_list; //record freed EdgeC for reuse.
     FreeList<Vertex> m_v_free_list; //record freed Vertex for reuse.
-
 protected:
     //Add 'e' into out-edges of 'vex'
     inline EdgeC * addOutList(Vertex * vex, Edge * e)
@@ -442,10 +442,10 @@ protected:
         return el;
     }
 
-    void removeTransitiveEdgeHelper(Vertex const* fromvex,
-                                    Vector<DefSBitSetCore*> * reachset_vec,
-                                    BitSet & is_visited,
-                                    DefMiscBitSetMgr & bs_mgr);
+    void removeTransitiveEdgeHelper(
+        Vertex const* fromvex, Vector<DefSBitSetCore*> * reachset_vec,
+        BitSet & is_visited, DefMiscBitSetMgr & bs_mgr);
+
     Graph * self() { return this; }
 public:
     Graph(UINT vex_hash_size = 64);
@@ -686,7 +686,7 @@ public:
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return removeVertex(getVertex(vid));
     }
-    void removeTransitiveEdge();
+    bool removeTransitiveEdge();
 
     //Replace orginal in-vertex with a list of new vertex.
     //Return the position of 'from' that is in the in-vertex list of 'to'.
@@ -697,7 +697,8 @@ public:
 
     //Sort graph vertices in topological order.
     //vex_vec: record vertics in topological order.
-    //Return true if sorting success, otherwise there exist cycles in graph.
+    //Return true if sorting success, otherwise return false which means there
+    //exist cycles in current graph.
     //Note you should NOT retrieve vertex in 'vex_vec' via vertex's index
     //because they are stored in dense manner.
     bool sortInTopologOrder(OUT Vector<Vertex*> & vex_vec);

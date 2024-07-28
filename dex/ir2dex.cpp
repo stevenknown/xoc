@@ -464,7 +464,7 @@ UINT IR2Dex::findFieldId(IR * ir, IR * objptr)
             ILD (r:I32:4 ofst:0) store_value id:20
                 PR1 (r:PTR:4 ptbase:1) mem_addr id:19
     */
-    ASSERT0(ir->is_stmt() && objptr->is_exp() && ir->is_kids(objptr));
+    ASSERT0(ir->is_stmt() && objptr->is_exp() && ir->isKids(objptr));
     DUMgr * du_mgr = m_rg->getDUMgr();
     ASSERT0(du_mgr);
     IR const* def = du_mgr->getExactAndUniqueDef(objptr);

@@ -42,13 +42,12 @@ void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
     DUMPADDR(ir);
     prt(rg, "%s", ctx.attr);
-    if (dump_kid) {
-        lm->incIndent(ctx.dn);
-        dumpIRList(BROADCAST_src(ir), rg, (CHAR*)" src", ctx.dumpflag);
-        dumpIRList(BROADCAST_alter_res_desc_list(ir), rg, nullptr,
-                   ctx.dumpflag);
-        lm->decIndent(ctx.dn);
-    }
+    if (!dump_kid) { return; }
+    lm->incIndent(ctx.dn);
+    dumpIRList(BROADCAST_src(ir), rg, (CHAR*)" src", ctx.dumpflag);
+    dumpIRList(BROADCAST_res_list(ir), rg, (CHAR*)" multi-res",
+               ctx.dumpflag);
+    lm->decIndent(ctx.dn);
 }
 
 

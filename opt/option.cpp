@@ -47,6 +47,7 @@ bool g_enable_local_var_delegate = false;
 bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
+bool g_do_refine_with_host_api = false;
 bool g_insert_cvt = false;
 bool g_calc_derivative = false;
 bool g_do_loop_ana = true;
@@ -92,6 +93,7 @@ bool g_do_gvn = true;
 bool g_do_pre = false;
 bool g_do_rce = false;
 bool g_do_vect = false;
+bool g_do_multi_res_convert = true;
 bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
@@ -124,7 +126,19 @@ bool g_force_use_fp_as_sp = false;
 bool g_support_alloca = true;
 bool g_do_ir_reloc = false;
 bool g_stack_on_global = false;
+bool g_use_accurate_2d_lifetime_hole_algo = true;
+bool g_do_arg_passer = true;
+bool g_recycle_local_id = false;
+bool g_debug = false;
+bool g_debug_cpp = true;
+bool g_debug_pcx = false;
+bool g_debug_pyhton = false;
 
+//Special options for different using of specific architectures.
+#ifdef FOR_TECO_IP
+bool g_do_relaxation2uncondbr = false;
+bool g_do_relaxation2jmp = false;
+#endif
 
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
@@ -214,6 +228,7 @@ DumpOption::DumpOption()
     is_dump_vrp = false;
     is_dump_lftr = false;
     is_dump_vectorization = false;
+    is_dump_multi_res_convert = false;
     is_dump_loop_dep_ana = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
@@ -354,6 +369,12 @@ bool DumpOption::isDumpLFTR() const
 bool DumpOption::isDumpVectorization() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_vectorization);
+}
+
+
+bool DumpOption::isDumpMultiResConvert() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_multi_res_convert);
 }
 
 
@@ -504,6 +525,25 @@ bool DumpOption::isDumpToBuffer() const
 {
     return is_dump_to_buffer;
 }
+
+
+bool DumpOption::isDumpLSRAReorderMovInLatchBB() const
+{
+    return is_dump_all ||
+        (!is_dump_nothing && is_dump_lsra_reorder_mov_in_latch_BB);
+}
+
+
+bool DumpOption::isDumpArgPasser() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_argpasser);
+}
+
+
+bool DumpOption::isDumpIRReloc() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_irreloc);
+}
 //END DumpOption
 
 
@@ -531,6 +571,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_cfg = %s", g_do_cfg ? "true":"false");
     note(lm, "\ng_do_rpo = %s", g_do_rpo ? "true":"false");
     note(lm, "\ng_do_refine = %s", g_do_refine ? "true":"false");
+    note(lm, "\ng_do_refine_with_host_api = %s",
+         g_do_refine_with_host_api ? "true":"false");
     note(lm, "\ng_insert_cvt = %s",
          g_insert_cvt ? "true":"false");
     note(lm, "\ng_do_loop_ana = %s", g_do_loop_ana ? "true":"false");
@@ -590,6 +632,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_pre = %s", g_do_pre ? "true":"false");
     note(lm, "\ng_do_rce = %s", g_do_rce ? "true":"false");
     note(lm, "\ng_do_vect = %s", g_do_vect ? "true":"false");
+    note(lm, "\ng_do_multi_res_convert = %s",
+         g_do_multi_res_convert ? "true":"false");
     note(lm, "\ng_do_loop_dep_ana = %s", g_do_loop_dep_ana ? "true":"false");
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
@@ -629,10 +673,15 @@ void Option::dump(MOD LogMgr * lm)
     g_exclude_region.dump(lm);
     note(lm, "\ng_do_lsra_debug = %s", g_do_lsra_debug ? "true":"false");
     note(lm, "\ng_debug_reg_num = %u", g_debug_reg_num);
-    note(lm, "\ng_force_use_fp_as_stack_pointer = %u",
+    note(lm, "\ng_force_use_fp_as_stack_pointer = %s",
          g_force_use_fp_as_sp ? "true":"false");
-    note(lm, "\ng_support_alloca = %u", g_support_alloca ? "true":"false");
-    note(lm, "\ng_do_ir_reloc = %u", g_do_ir_reloc);
+    note(lm, "\ng_support_alloca = %s", g_support_alloca ? "true":"false");
+    note(lm, "\ng_do_ir_reloc = %s", g_do_ir_reloc ? "true":"false");
+    note(lm, "\ng_stack_on_global = %s", g_stack_on_global ? "true":"false");
+    note(lm, "\ng_do_arg_passer = %s", g_do_arg_passer ? "true":"false");
+    note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
+    note(lm, "\ng_use_accurate_2d_lifetime_hole_algo = %s",
+         g_use_accurate_2d_lifetime_hole_algo ? "true":"false");
     lm->decIndent(2);
 }
 

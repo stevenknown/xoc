@@ -35,6 +35,8 @@ INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
                            INT line);
+INT checkKidNumValidTernary(IR const* ir, UINT n, CHAR const* filename,
+                            INT line);
 INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
                            INT line);
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename, INT line);
@@ -58,6 +60,7 @@ UINT checkArrayDimension(IR const* ir, UINT n);
     (checkKidNumIRCode(ir, n, irc, f, l))
 #define CK_KID_NUM_UNA(ir, n, f, l) (checkKidNumValidUnary(ir, n, f, l))
 #define CK_KID_NUM_BIN(ir, n, f, l) (checkKidNumValidBinary(ir, n, f, l))
+#define CK_KID_NUM_TER(ir, n, f, l) (checkKidNumValidTernary(ir, n, f, l))
 #define CK_KID_NUM_BR(ir, n, f, l) (checkKidNumValidBranch(ir, n, f, l))
 #define CK_KID_NUM_LOOP(ir, n, f, l) (checkKidNumValidLoop(ir, n, f, l))
 #define CK_KID_NUM_CALL(ir, n, f, l) (checkKidNumValidCall(ir, n, f, l))
@@ -74,6 +77,7 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 #define CK_KID_NUM_IRC(ir, n, irc, f, l) (n)
 #define CK_KID_NUM_UNA(ir, n, f, l) (n)
 #define CK_KID_NUM_BIN(ir, n, f, l) (n)
+#define CK_KID_NUM_TER(ir, n, f, l) (n)
 #define CK_KID_NUM_BR(ir, n, f, l) (n)
 #define CK_KID_NUM_LOOP(ir, n, f, l) (n)
 #define CK_KID_NUM_CALL(ir, n, f, l) (n)
@@ -92,6 +96,7 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 #define CK_KID_LOOP(ir, n) CK_KID_NUM_LOOP(ir, n, __FILE__, __LINE__)
 #define CK_KID_UNA(ir, n) CK_KID_NUM_UNA(ir, n, __FILE__, __LINE__)
 #define CK_KID_BIN(ir, n) CK_KID_NUM_BIN(ir, n, __FILE__, __LINE__)
+#define CK_KID_TER(ir, n) CK_KID_NUM_TER(ir, n, __FILE__, __LINE__)
 #define CK_KID_CALL(ir, n) CK_KID_NUM_CALL(ir, n, __FILE__, __LINE__)
 #define CK_KID_ARR(ir, n) CK_KID_NUM_ARR(ir, n, __FILE__, __LINE__)
 

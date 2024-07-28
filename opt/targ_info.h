@@ -58,19 +58,19 @@ public:
     //Return byte size of instruction cache line.
     virtual UINT getICacheLineSize() const = 0;
 
-    // Return the number of return-value integer register.
+    //Return the number of return-value integer register.
     virtual UINT getNumOfReturnValueRegister() const = 0;
 
-    // Return the number of allocable integer register.
+    //Return the number of allocable integer register.
     virtual UINT getNumOfAllocableIntegerRegister() const = 0;
 
-    // Return the number of allocable float register.
+    //Return the number of allocable float register.
     virtual UINT getNumOfAllocableFloatRegister() const = 0;
 
-    // Return the number of group.
+    //Return the number of group.
     virtual UINT getNumOfGroup() const = 0;
 
-    // Return the number of thread.
+    //Return the number of thread.
     virtual UINT getNumOfThread() const = 0;
 
     //Return the alignment parameter for matrix.

@@ -152,6 +152,7 @@ class DUMgr : public Pass {
 protected:
     TypeMgr * m_tm;
     VarMgr * m_vm;
+    IRMgr * m_irmgr;
     AliasAnalysis * m_aa;
     IRCFG * m_cfg;
     MDSystem * m_md_sys;
@@ -516,6 +517,7 @@ public:
 
     virtual CHAR const* getPassName() const { return "DU Manager"; }
     virtual PASS_TYPE getPassType() const { return PASS_DU_MGR; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Try allocate DUSet for memory reference.
     DUSet * genDUSet(IR * ir);

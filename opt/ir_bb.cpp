@@ -43,7 +43,7 @@ namespace xoc {
 IRListIter BBIRList::append_head_ex(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
-
+    ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
     IRListIter ct;
     for (List<IR*>::get_head(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_next(ct)) {
@@ -51,7 +51,6 @@ IRListIter BBIRList::append_head_ex(IR * ir)
             break;
         }
     }
-
     ASSERT0(m_bb);
     ir->setBB(m_bb);
     if (ct == nullptr) {
@@ -67,6 +66,7 @@ IRListIter BBIRList::append_head_ex(IR * ir)
 IRListIter BBIRList::append_tail_ex_without_set_bb(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
+    ASSERTN(!(xcom::EList<IR*, IR2Holder>::find(ir)), ("already in list"));
     IRListIter ct;
     List<IR*>::get_tail(&ct);
     if (ct != List<IR*>::end() && IRBB::isLowerBoundary(ct->val())) {
@@ -92,8 +92,8 @@ IRListIter BBIRList::append_tail_ex(IR * ir)
 }
 
 
-IR * BBIRList::extractRestIRIntoList(MOD BBIRListIter marker,
-                                     bool include_marker)
+IR * BBIRList::extractRestIRIntoList(
+    MOD BBIRListIter marker, bool include_marker)
 {
     IR * restirs = nullptr;
     IR * last = nullptr;
@@ -113,9 +113,8 @@ IR * BBIRList::extractRestIRIntoList(MOD BBIRListIter marker,
 }
 
 
-void BBIRList::extractRestIRIntoList(MOD BBIRListIter marker,
-                                     bool include_marker,
-                                     OUT BBIRList & newlst)
+void BBIRList::extractRestIRIntoList(
+    MOD BBIRListIter marker, bool include_marker, OUT BBIRList & newlst)
 {
     ASSERT0(marker);
     BBIRListIter curlstit;
@@ -326,11 +325,13 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region) const
     note(rg, "\nSTMT NUM:%d", getNumOfIR());
     rg->getLogMgr()->incIndent(3);
     IRBB * pthis = const_cast<IRBB*>(this);
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_SRC_LINE|
+        (dump_inner_region ? IR_DUMP_INNER_REGION : 0)|
+        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() || ir->is_undef());
-        dumpIR(ir, rg, nullptr, IR_DUMP_KID | IR_DUMP_SRC_LINE |
-               (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+        dumpIR(ir, rg, nullptr, f);
     }
     rg->getLogMgr()->decIndent(3);
     note(rg, "\n");
@@ -504,9 +505,18 @@ bool IRBB::hasPRPhi() const
 
 bool IRBB::hasPhiWithAllSameOperand(CFG<IRBB, IR> const* cfg) const
 {
-    if (!PRSSAMgr::hasPhiWithAllSameOperand(this)) { return false; }
-    MDSSAMgr * mgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
-    return mgr->hasPhiWithAllSameOperand(this);
+    PRSSAMgr * prssamgr = ((IRCFG*)cfg)->getRegion()->getPRSSAMgr();
+    if (prssamgr == nullptr || !prssamgr->is_valid()) {
+        //The region is not in SSA mode.
+        return false;
+    }
+    if (!prssamgr->hasPhiWithAllSameOperand(this)) { return false; }
+    MDSSAMgr * mdssamgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
+    if (mdssamgr == nullptr || !mdssamgr->is_valid()) {
+        //The region is not in MDSSA mode.
+        return false;
+    }
+    return mdssamgr->hasPhiWithAllSameOperand(this);
 }
 
 
@@ -621,6 +631,17 @@ void IRBB::copy(IRBB const& src, Region * rg)
     copyLabelInfoList(src, rg->getCommPool());
     copyIRList(src, rg);
 }
+
+
+void IRBB::freeIRList(MOD Region * rg)
+{
+    BBIRListIter irit;
+    for (IR * ir = BB_irlist(this).get_head(&irit);
+         ir != nullptr; ir = BB_irlist(this).get_next(&irit)) {
+        rg->freeIRTreeList(ir);
+    }
+    BB_irlist(this).clean();
+}
 //END IRBB
 
 
@@ -629,12 +650,14 @@ void IRBB::copy(IRBB const& src, Region * rg)
 //
 IRBBMgr::~IRBBMgr()
 {
+    //BBs which are in free list are also recorded in m_bb_vec,
+    //thus no need to delete BB in m_free_list.
     for (VecIdx i = 0; i < (VecIdx)m_bb_vec.get_elem_count(); i++) {
-        IRBB const* bb = m_bb_vec.get(i);
+        IRBB * bb = m_bb_vec.get(i);
         if (bb == nullptr) { continue; }
+        bb->freeIRList(m_rg);
         delete bb;
     }
-    //BB in free list will also be recorded in m_bb_tab.
 }
 
 
@@ -667,7 +690,9 @@ void IRBBMgr::destroyBB(IRBB * bb)
 {
     ASSERT0(bb && bb->id() != BBID_UNDEF);
     m_bb_vec.set(bb->id(), nullptr);
-    ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb), ("double destroy"));
+    ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb),
+            ("BB has been put in freelist"));
+    bb->freeIRList(m_rg);
     bb->clean();
     delete bb;
 }
@@ -677,6 +702,7 @@ void IRBBMgr::freeBB(IRBB * bb)
 {
     ASSERT0(bb);
     ASSERTN(!((xcom::List<IRBB*>&)m_free_list).find(bb), ("double free"));
+    bb->freeIRList(m_rg);
     bb->clean();
     m_free_list.append_head(bb);
 }

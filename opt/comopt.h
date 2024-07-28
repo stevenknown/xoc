@@ -41,6 +41,7 @@ author: Su Zhenyu
 #include "act_mgr.h"
 #include "cfs_opt.h"
 #include "goto_opt.h"
+#include "ir_refine.h"
 #include "if_opt.h"
 #include "linear_rep.h"
 #include "chain_recur.h"
@@ -54,6 +55,7 @@ author: Su Zhenyu
 #include "insert_guard_helper.h"
 #include "cfg_lifting.h"
 #include "loop_dep_ana.h"
+#include "multi_res_convert.h"
 
 #ifdef FOR_IP
 #include "ir_vect.h"
@@ -83,6 +85,7 @@ author: Su Zhenyu
 #include "dynamic_stack.h"
 #include "var2offset.h"
 #include "ir_reloc_mgr.h"
+#include "igoto_opt.h"
 #endif
 
 #include "ir_cp.h"

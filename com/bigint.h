@@ -127,11 +127,8 @@ class BigInt : public xcom::Vector<BigIntElemType> {
     friend BigInt& biSub(BigInt const& a, BigInt const& b, MOD BigInt & res);
     friend BigInt& bisMul(BigInt const& a, BigInt const& b, MOD BigInt & res);
     friend BigInt& biuMul(BigInt const& a, BigInt const& b, MOD BigInt & res);
-
-
 private:
     INT m_sig_pos; //Record significant position.
-
 public:
     BigInt() { m_sig_pos = -1; }
     BigInt(BigInt const& bi) { copy(bi); }

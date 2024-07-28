@@ -55,7 +55,7 @@ public:
     //nearless: optional, record position of the nearest value that is
     //          less-than 'val' if not found 'val' in data.
     //neargreat: optional, record position of the nearest value that is
-    //           great-than 'va' if not found 'val' in data.
+    //           great-than 'val' if not found 'val' in data.
     bool search(Vector<T> const& data, T val, OUT VecIdx * valpos = nullptr,
                 OUT VecIdx * nearless = nullptr,
                 OUT VecIdx * neargreat = nullptr);
@@ -88,14 +88,16 @@ bool BinarySearch<T, Compare>::search(Vector<T> const& data, T val,
             hi = pos - 1;
             posless = hi;
             posgreat = pos;
-        } else if (m_comp.is_great(val, data.get(pos))) {
+            continue;
+        }
+        if (m_comp.is_great(val, data.get(pos))) {
             lo = pos + 1;
             posless = pos;
             posgreat = lo;
-        } else {
-            if (valpos != nullptr) { *valpos = pos; }
-            return true;
+            continue;
         }
+        if (valpos != nullptr) { *valpos = pos; }
+        return true;
     }
     if (nearless != nullptr) { *nearless = posless; }
     if (neargreat != nullptr) {

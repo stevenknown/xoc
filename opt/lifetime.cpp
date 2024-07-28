@@ -211,17 +211,15 @@ void Range::dump(Region const* rg) const
 //
 //START OccList
 //
-void OccList::append_tail(Occ occ, LifeTimeMgr & mgr)
+void OccList::append_tail(Occ occ)
 {
-    OccListCt * ct = mgr.allocOccListCt();
-    SC_val(ct) = occ;
-    SListCoreEx<Occ>::append_tail(ct);
+   xcom::List<Occ>::append_tail(occ);
 }
 
 
-void OccList::remove(OccListIter prev, OccListIter it, LifeTimeMgr & mgr)
+void OccList::remove(OccListIter it)
 {
-    xcom::SListCoreEx<Occ>::remove(prev, it, mgr.getFreeCtListHeader());
+    xcom::List<Occ>::remove(it);
 }
 //END OccList
 
@@ -311,77 +309,58 @@ void LifeTime::moveRangeVecFrom(LifeTime * src, Pos pos)
 }
 
 
-void LifeTime::moveCrossedCallInfoFrom(LifeTime * src, Pos pos)
+void LifeTime::removeOccFrom(OccListIter it)
 {
-    if (src->getCallCrossedNum() == 0) { return; }
-
-    //Since the cross call pos vector is incremental, so the binary search
-    //can be used to find the proper vector index.
-    VecIdx remove_start = VEC_UNDEF;
-    VecIdx great = VEC_UNDEF;
-    Vector<Pos> const& lt_call_pos_vec = src->getCallPosVec();
-    xcom::BinarySearch<Pos> bs;
-    if (!bs.search(lt_call_pos_vec, pos, &remove_start, nullptr, &great)) {
-        //If the specified pos is not in the cross call pos vector, use the vec
-        //index right greater than the specified pos as the start position for
-        //removal.
-        remove_start = great;
-    }
-
-    //If the POS is after any call position, do nothing.
-    if (remove_start == VEC_UNDEF) { return; }
-
-    if (remove_start < (VecIdx)src->getCallPosVec().get_elem_count()) {
-        src->removeCallPosVecFrom(remove_start);
-    }
-}
-
-
-void LifeTime::removeOccFrom(OccListIter prev, OccListIter it,
-                             MOD LifeTimeMgr & mgr)
-{
-    for (OccListIter nit = nullptr; it != getOccList().end(); it = nit) {
+    for (OccListIter nit = it; it != getOccList().end(); it = nit) {
         nit = getOccList().get_next(it);
-        getOccList().remove(prev, it, mgr);
+        getOccList().remove(it);
     }
 }
 
 
-void LifeTime::moveOccListFrom(LifeTime * src, Pos pos, LifeTimeMgr & mgr)
+void LifeTime::moveOccListFrom(LifeTime * src, Pos pos)
 {
     LifeTime * psrc = const_cast<LifeTime*>(src);
     OccListIter it = nullptr;
-    OccListIter prev = nullptr;
     OccListIter remove_point = nullptr;
-    for (it = psrc->getOccList().get_head();
-         it != psrc->getOccList().end(); it = psrc->getOccList().get_next(it)) {
-        Occ occ = it->val();
+    for (Occ occ = psrc->getOccList().get_head(&it);
+         it != psrc->getOccList().end();
+        occ = psrc->getOccList().get_next(&it)) {
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
         if (occ.pos() >= pos) {
-            addOcc(occ, mgr);
+            addOcc(occ);
             remove_point = it;
             break;
         }
-        prev = it;
     }
     if (it == psrc->getOccList().end()) { return; }
-    for (it = psrc->getOccList().get_next(it);
+    for (Occ occ = psrc->getOccList().get_next(&it);
          it != psrc->getOccList().end();
-         it = psrc->getOccList().get_next(it)) {
-        Occ occ = it->val();
+         occ = psrc->getOccList().get_next(&it)) {
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
         ASSERT0(occ.pos() >= pos);
-        addOcc(occ, mgr);
+        addOcc(occ);
     }
-    src->removeOccFrom(prev, remove_point, mgr);
+    src->removeOccFrom(remove_point);
 }
 
 
-void LifeTime::moveFrom(LifeTime * src, Pos pos, LifeTimeMgr & mgr)
+void LifeTime::shrinkForwardToLastOccPos()
+{
+    Occ occ = getOccList().get_tail();
+    Range temp = getLastRange();
+    temp.m_end = occ.pos();
+    setLastRange(temp);
+}
+
+
+void LifeTime::moveFrom(LifeTime * src, Pos pos)
 {
     moveRangeVecFrom(src, pos);
-    moveOccListFrom(src, pos, mgr);
-    moveCrossedCallInfoFrom(src, pos);
+    moveOccListFrom(src, pos);
+    //m_call_crossed_num is just an rough esimation number, so use the number
+    //from source lifetime directly.
+    m_call_crossed_num = src->getCallCrossedNum();
 }
 
 
@@ -403,8 +382,7 @@ bool LifeTime::findRange(Pos pos, OUT Range & r, OUT VecIdx & ridx,
 bool LifeTime::findOcc(Pos pos, OUT OccListIter & it) const
 {
     OccList & ol = const_cast<LifeTime*>(this)->getOccList();
-    for (it = ol.get_head(); it != ol.end(); it = ol.get_next(it)) {
-        Occ occ = it->val();
+    for (Occ occ = ol.get_head(&it); it != ol.end(); occ = ol.get_next(&it)) {
         if (occ.pos() == pos) {
             return true;
         }
@@ -416,8 +394,7 @@ bool LifeTime::findOcc(Pos pos, OUT OccListIter & it) const
 bool LifeTime::findOccAfter(Pos pos, OUT OccListIter & it) const
 {
     OccList & ol = const_cast<LifeTime*>(this)->getOccList();
-    for (it = ol.get_head(); it != ol.end(); it = ol.get_next(it)) {
-        Occ occ = it->val();
+    for (Occ occ = ol.get_head(&it); it != ol.end(); occ = ol.get_next(&it)) {
         if (occ.pos() > pos) {
             return true;
         }
@@ -426,10 +403,10 @@ bool LifeTime::findOccAfter(Pos pos, OUT OccListIter & it) const
 }
 
 
-void LifeTime::addOcc(Occ occ, LifeTimeMgr & mgr)
+void LifeTime::addOcc(Occ occ)
 {
     ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
-    m_occ_list.append_tail(occ, mgr);
+    m_occ_list.append_tail(occ);
 }
 
 
@@ -502,8 +479,8 @@ bool LifeTime::is_intersect(LifeTime const* lt) const
 static void dumpOccList(OccList const& ol, Region const* rg)
 {
     ASSERT0(rg);
-    for (OccListIter it = ol.get_head(); it != ol.end(); it = ol.get_next(it)) {
-        Occ occ = it->val();
+    OccListIter it;
+    for (Occ occ = ol.get_head(&it); it != ol.end(); occ = ol.get_next(&it)) {
         if (occ.is_def()) {
             prt(rg, "d");
         } else {
@@ -518,8 +495,8 @@ static void dumpOccListG(OccList const& ol, Region const* rg)
 {
     ASSERT0(rg);
     Pos p = POS_INIT_VAL;
-    for (OccListIter it = ol.get_head(); it != ol.end(); it = ol.get_next(it)) {
-        Occ occ = it->val();
+    OccListIter it = nullptr;
+    for (Occ occ = ol.get_head(&it); it != ol.end(); occ = ol.get_next(&it)) {
         for (; p < occ.pos(); p++) {
             prt(rg, " ");
         }
@@ -557,7 +534,7 @@ void LifeTime::dump(Region const* rg) const
 {
     note(rg, "\nLT:$%u,prio:%0.2f,", getPrno(), getPriority());
     if (getCallCrossedNum() != 0) {
-        prt(rg, "cross_call_num:%u,", getCallCrossedNum());
+        prt(rg, "call_crossed_num:%u,", getCallCrossedNum());
     }
     prt(rg, "range:");
     dumpRangeVec(m_range_vec, rg);
@@ -575,9 +552,9 @@ static bool verifyOccList(LifeTime const* lt)
 {
     Pos prev_pos = POS_INIT_VAL;
     LifeTime * plt = const_cast<LifeTime*>(lt);
-    for (OccListIter it = plt->getOccList().get_head();
-         it != plt->getOccList().end(); it = plt->getOccList().get_next(it)) {
-        Occ occ = it->val();
+    OccListIter it = nullptr;
+    for (Occ occ = plt->getOccList().get_head(&it);
+         it != plt->getOccList().end(); occ = plt->getOccList().get_next(&it)) {
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
         ASSERTN_DUMMYUSE(prev_pos <= occ.pos(),
                          ("pos should be incremental order"));
@@ -644,17 +621,6 @@ void * LifeTimeMgr::xmalloc(size_t size)
 }
 
 
-OccListCt * LifeTimeMgr::allocOccListCt()
-{
-    OccListCt * ct = xcom::removehead_single_list(&m_freect_list);
-    if (ct == nullptr) {
-        ct = (OccListCt*)xmalloc(sizeof(OccListCt));
-    }
-    ct->init();
-    return ct;
-}
-
-
 LifeTime * LifeTimeMgr::genLifeTime(PRNO prno)
 {
     ASSERT0(prno != PRNO_UNDEF);
@@ -672,7 +638,6 @@ void LifeTimeMgr::init(Region * rg)
     if (m_pool != nullptr) { return; }
     m_pool = smpoolCreate(64, MEM_COMM);
     m_rg = rg;
-    m_freect_list = nullptr;
     m_lt_list.init();
     m_prno2lt.init();
     #ifdef _DEBUG_
@@ -694,13 +659,13 @@ void LifeTimeMgr::destroy()
     m_ir2pos.destroy();
     #endif
     smpoolDelete(m_pool);
-    m_freect_list = nullptr; //freect's memory is allocated in pool.
     m_pool = nullptr;
 }
 
 
 static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
-                       DedicatedMgr const& dedmgr)
+                       DedicatedMgr const& dedmgr,
+                       MOD CrossedCallCounter & cross_call_counter)
 {
     ASSERT0(ir && ir->is_stmt());
     IR const* res = const_cast<IR*>(ir)->getResultPR();
@@ -710,13 +675,15 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
     lt->set_dedicated(dedmgr.is_dedicated(prno));
     ASSERT0(lt);
     lt->addRange(pos);
-    lt->addOcc(Occ(true, pos, ir), mgr);
+    lt->addOcc(Occ(true, pos, ir));
     mgr.recordPos(ir, pos);
+    cross_call_counter.updateForDef(lt);
 }
 
 
 static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
-                       DedicatedMgr const& dedmgr)
+                       DedicatedMgr const& dedmgr,
+                       MOD CrossedCallCounter & cross_call_counter)
 {
     ASSERT0(ir && ir->isPROp());
     PRNO prno = ir->getPrno();
@@ -732,23 +699,85 @@ static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
         RG_end(r) = pos;
     }
     lt->setLastRange(r);
-    lt->addOcc(Occ(false, pos, ir), mgr);
+    lt->addOcc(Occ(false, pos, ir));
     mgr.recordPos(ir, pos);
+    cross_call_counter.updateForUse(lt, r.start());
 }
 
 
 static void computeRHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
                        Pos livein_def, IRIter & irit,
-                       DedicatedMgr const& dedmgr)
+                       DedicatedMgr const& dedmgr,
+                       MOD CrossedCallCounter & cross_call_counter)
 {
     ASSERT0(ir && ir->is_stmt());
     irit.clean();
     for (IR * e = xoc::iterExpInit(ir, irit); e != nullptr;
          e = xoc::iterExpNext(irit)) {
         if (e->isReadPR()) {
-            computeUSE(e, mgr, pos, livein_def, dedmgr);
+            computeUSE(e, mgr, pos, livein_def, dedmgr, cross_call_counter);
         }
     }
+}
+
+
+void CrossedCallCounter::updateForUse(LifeTime * lt, Pos def_pos)
+{
+    ASSERT0(lt);
+    ASSERT0(def_pos != POS_UNDEF);
+    if (m_call2pos.get_elem_count() == 0 ||
+        lt->getCallCrossedNum() >= CROSS_CALL_NUM_THRESHOLD) {
+        //Implement the 2.1 of the algorithm.
+        //Don't update the call_crossed_num if there is no call or the
+        //call_crossed_num is greater than the CROSS_CALL_NUM_THRESHOLD.
+        return;
+    }
+
+    PRNO prno = lt->getPrno();
+    VecIdx current_call_id = m_call2pos.get_last_idx();
+
+    //If the position of current_call_id is less than the start of a range
+    //(DEF position), that means this call is in the hole of the lifetime,
+    //so it will not impact the call_crossed_num.
+    if (m_call2pos[current_call_id] < def_pos) {
+        //Implement the 2.2 of the algorithm.
+        return;
+    }
+
+    //If the prno cannot find in the map m_prno2callid, that means the
+    //baseline_call_id is not recorded, it needs to be recorded first.
+    bool find = false;
+    VecIdx baseline_call_id = m_prno2callid.get(prno, &find);
+    if (!find) {
+        //Implement the 2.3.1 of the algorithm.
+        lt->incCallCrossedNum(current_call_id + 1);
+        m_prno2callid.set(prno, current_call_id);
+        return;
+    }
+
+    if (baseline_call_id < current_call_id) {
+        //Implement the 2.3.2 of the algorithm.
+        //Add the call_crossed_num with the number of calls not counted.
+        lt->incCallCrossedNum(current_call_id - baseline_call_id);
+        m_prno2callid.setAlways(prno, current_call_id);
+    }
+}
+
+
+void CrossedCallCounter::updateForDef(LifeTime * lt)
+{
+    ASSERT0(lt);
+    if (m_call2pos.get_elem_count() == 0 ||
+        lt->getCallCrossedNum() >= CROSS_CALL_NUM_THRESHOLD) {
+        //Implement the 3.1 of the algorithm.
+        //Don't update the call_crossed_num if there is no call or the
+        //call_crossed_num is greater than the CROSS_CALL_NUM_THRESHOLD.
+        return;
+    }
+    //Implement the 3.2 of the algorithm.
+    //Record the baseline_call_id to current_call_id at the DEF postion,
+    //because this DEF position will start a new range of lifetime.
+    m_prno2callid.setAlways(lt->getPrno(), m_call2pos.get_last_idx());
 }
 
 
@@ -786,28 +815,10 @@ bool LifeTimeMgr::verifyPos(IR const* ir, Pos pos) const
 }
 
 
-void LifeTimeMgr::genCallCrossedInfo(BBList const* bblst,
-                                     Call2PosMap const& call2pos)
-{
-    if (call2pos.get_elem_count() == 0) { return; }
-
-    for (VecIdx i = 0; i <= m_prno2lt.get_last_idx(); i++) {
-        if (m_prno2lt[i] == nullptr) { continue; }
-        Call2PosMapIter it;
-        Pos pos = POS_UNDEF;
-        for (call2pos.get_first(it, &pos); pos != POS_UNDEF;
-            call2pos.get_next(it, &pos)) {
-            if (!m_prno2lt[i]->is_contain(pos)) { continue; }
-            m_prno2lt[i]->updateCallCrossedInfo(pos);
-        }
-    }
-}
-
-
 void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                                     DedicatedMgr const& dedmgr,
                                     Pos livein_def, IRIter & irit,
-                                    OUT Call2PosMap & call2pos)
+                                    MOD CrossedCallCounter & cross_call_counter)
 {
     Pos dpos_bb_start = 0, upos_bb_start = 0;
     up.updateAtBBEntry(dpos_bb_start, upos_bb_start);
@@ -820,12 +831,13 @@ void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
         if (!up.updateAtIR(ir, dpos, upos)) {
             continue;
         }
-        computeRHS(ir, *this, upos, livein_def, irit, dedmgr);
-        computeLHS(ir, *this, dpos, dedmgr);
         //Record the call IR and the position info.
         if (ir->isCallStmt() && !CALL_is_intrinsic(ir)) {
-            call2pos.set(ir, dpos);
+            cross_call_counter.addNewCall(dpos);
         }
+        computeRHS(ir, *this, upos, livein_def, irit, dedmgr,
+                   cross_call_counter);
+        computeLHS(ir, *this, dpos, dedmgr, cross_call_counter);
     }
     Pos dpos_bb_end = 0, upos_bb_end = 0;
     up.updateAtBBExit(dpos_bb_end, upos_bb_end);
@@ -840,15 +852,14 @@ void LifeTimeMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
     Pos dpos_start, upos_start;
     bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
     ASSERT0_DUMMYUSE(valid);
-    Call2PosMap call2pos;
+    CrossedCallCounter cross_call_counter;
     Pos livein_def = dpos_start;
     BBListIter bbit;
     IRIter irit;
     for (IRBB * bb = bblst->get_head(&bbit);
          bb != nullptr; bb = bblst->get_next(&bbit)) {
-        computeLifeTimeBB(up, bb, dedmgr, livein_def, irit, call2pos);
+        computeLifeTimeBB(up, bb, dedmgr, livein_def, irit, cross_call_counter);
     }
-    genCallCrossedInfo(bblst, call2pos);
     Pos dpos_end, upos_end;
     bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
     ASSERT0_DUMMYUSE(valid2);
@@ -1015,9 +1026,9 @@ void LifeTimeMgr::renameLifeTimeOcc(LifeTime const* lt, PRNO newprno)
 {
     ASSERT0(newprno != PRNO_UNDEF);
     LifeTime * plt = const_cast<LifeTime*>(lt);
-    for (OccListIter it = plt->getOccList().get_head();
-         it != plt->getOccList().end(); it = plt->getOccList().get_next(it)) {
-        Occ occ = it->val();
+    OccListIter it = nullptr;
+    for (Occ occ = plt->getOccList().get_head(&it);
+         it != plt->getOccList().end(); occ = plt->getOccList().get_next(&it)) {
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
         IR * ir = occ.getIR();
         ASSERT0(ir->isPROp());

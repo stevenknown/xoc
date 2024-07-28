@@ -113,6 +113,7 @@ public:
     bool is_dump_invert_brtgt; //Dump Invert Branch Target.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_vectorization; //Dump IR Vectorization.
+    bool is_dump_multi_res_convert; //Dump Multiple Result Convert.
     bool is_dump_loop_dep_ana; //Dump Loop Dependence Analysis.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
@@ -142,6 +143,13 @@ public:
     bool is_dump_ir_id;
     bool is_dump_gp_adjustment; //Dump GlobalPointerAdjustment
     bool is_dump_br_opt; //Dump ir after BROpt.
+
+    //Used to dump the reorder functionality result in the LSRA PASS to verify
+    //the reorder result for the multiple MOV IRs if the reorder is required
+    //due to the USE dependencies problem.
+    bool is_dump_lsra_reorder_mov_in_latch_BB;
+    bool is_dump_argpasser; //Dump ArgPasser.
+    bool is_dump_irreloc; //Dump IRReloc.
 public:
     DumpOption();
     DumpOption const& operator = (DumpOption const&); //Disable operator =.
@@ -166,6 +174,7 @@ public:
     bool isDumpInvertBrTgt() const;
     bool isDumpLFTR() const;
     bool isDumpVectorization() const;
+    bool isDumpMultiResConvert() const;
     bool isDumpLoopDepAna() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
@@ -194,6 +203,9 @@ public:
     bool isDumpPElog() const;
     bool isDumpGPAdjustment() const;
     bool isDumpBROpt() const;
+    bool isDumpLSRAReorderMovInLatchBB() const;
+    bool isDumpArgPasser() const;
+    bool isDumpIRReloc() const;
 };
 
 class Option {
@@ -268,6 +280,7 @@ typedef enum _PASS_TYPE {
     PASS_IRMGR,
     PASS_CALL_GRAPH,
     PASS_VECT,
+    PASS_MULTI_RES_CVT,
     PASS_LOOP_DEP_ANA,
     PASS_PROLOGUE_EPILOGUE,
     PASS_GP_ADJUSTMENT,
@@ -275,6 +288,8 @@ typedef enum _PASS_TYPE {
     PASS_WORKAROUND,
     PASS_DYNAMIC_STACK,
     PASS_IRRELOC,
+    PASS_ARGPASSER,
+    PASS_IGOTO_OPT,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -285,6 +300,10 @@ extern INT g_opt_level;
 
 //Perform peephole optimizations.
 extern bool g_do_refine;
+
+//Perform more aggressive peephole optimizations.
+//e.g: cos:f64 5.0:f64 will be refined to 0.9961947:f64 directly.
+extern bool g_do_refine_with_host_api;
 
 //If true to insert IR_CVT if necessary.
 extern bool g_insert_cvt;
@@ -483,6 +502,9 @@ extern bool g_do_rce;
 //Perform auto vectorization.
 extern bool g_do_vect;
 
+//Perform multiple result convert.
+extern bool g_do_multi_res_convert;
+
 //Perform loop dependence analysis.
 extern bool g_do_loop_dep_ana;
 
@@ -624,16 +646,43 @@ extern StrTabOption g_exclude_region;
 //If it is located in HBM, it is set to true.
 extern bool g_stack_on_global;
 
+#ifdef FOR_TECO_IP
+//Forced relaxation of cond-br to uncond-br.
+extern bool g_do_relaxation2uncondbr;
+
+//Forced relaxation of cond-br or uncond-br to jmp.
+extern bool g_do_relaxation2jmp;
+
+#endif
 //Used to enable the debug mode for LSRA, and the g_debug_reg_num can be use
 //to control the number of physical register under debug mode.
 extern bool g_do_lsra_debug;
 extern UINT g_debug_reg_num;
 //Support alloca.
 extern bool g_support_alloca;
-
 //Enable fp as stack pointer.
 extern bool g_force_use_fp_as_sp;
 //Perform ir reloc.
 extern bool g_do_ir_reloc;
+//Enable arg passer.
+extern bool g_do_arg_passer;
+//Recycle local Var id and related MD id when destorying regions.
+extern bool g_recycle_local_id;
+
+//Enable debug.
+extern bool g_debug;
+
+//The front end is in debug_cpp mode.
+extern bool g_debug_cpp;
+
+//The front end is in debug_pcx mode.
+extern bool g_debug_pcx;
+
+//The front end is in debug_python mode.
+extern bool g_debug_pyhton;
+
+//Use the accurate algorithm to find the PRs with 2d lifetime hole, which is
+//time-consuming but with higher performance of LSRA result.
+extern bool g_use_accurate_2d_lifetime_hole_algo;
 } //namespace xoc
 #endif

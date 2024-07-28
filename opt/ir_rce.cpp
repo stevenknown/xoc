@@ -257,13 +257,13 @@ static void dumpFini(RCE const* pass)
 }
 
 
-static void dumpRemovedIR(IR const* ir, RCE const* pass)
+static void dumpRemovedIR(IR const* ir, RCE const* rce)
 {
     if (!g_dump_opt.isDumpRCE()) { return; }
-    Region * rg = pass->getRegion();
+    Region * rg = rce->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\nREMOVE IR:");
-    dumpIR(ir, rg, IR_DUMP_KID);
+    xoc::dumpIR(ir, rg, DumpFlag::combineIRID(IR_DUMP_KID));
 }
 
 
@@ -284,10 +284,10 @@ static void dumpChangedIR(IR const* oldir, IR const* newir, RCE const* pass)
     note(rg, "\nCHANGE:");
     rg->getLogMgr()->incIndent(2);
     note(rg, "\nOLD:");
-    dumpIR(oldir, rg, IR_DUMP_KID);
+    xoc::dumpIR(oldir, rg, DumpFlag::combineIRID(IR_DUMP_KID));
     note(rg, "\nNEW:");
     if (newir != nullptr) {
-        dumpIR(newir, rg, IR_DUMP_KID);
+        xoc::dumpIR(newir, rg, DumpFlag::combineIRID(IR_DUMP_KID));
     } else {
         note(rg, "\nNULL");
     }

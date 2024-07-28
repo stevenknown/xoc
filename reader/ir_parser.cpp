@@ -306,7 +306,7 @@ void ParseCtx::addIR(IR * stmt)
     //Set lineno for debug info.
     ASSERT0(current_region);
     xoc::setLineNum(stmt, parser->getLexer()->getCurrentLineNum(),
-                    current_region);
+                    current_region, LangInfo::LANG_CPP);
 }
 
 
@@ -744,12 +744,15 @@ bool IRParser::checkPhiOpndLabel(IR const* ir,
     ParseCtx const& ctx)
 {
     ASSERT0(ir->is_phi());
+    ASSERT0(ctx.current_region);
+    DbxMgr * dbx_mgr = ctx.current_region->getDbxMgr();
+    ASSERT0(dbx_mgr);
     for (IR * opnd = PHI_opnd_list(ir);
          opnd != nullptr; opnd = opnd->get_next()) {
         LabelInfo const* li = const_cast<ParseCtx&>(ctx).
             getIR2Label().get(opnd);
         if (li == nullptr) {
-            error(xoc::getLineNum(opnd),
+            error(xoc::getLineNum(opnd, LangInfo::LANG_CPP, dbx_mgr),
                   "no label corresponding to phi operand");
             return false;
         }
@@ -759,8 +762,8 @@ bool IRParser::checkPhiOpndLabel(IR const* ir,
         if (find) { continue; }
 
         StrBuf buf(32);
-        error(xoc::getLineNum(ir), "use undefined label %s",
-              li->getName(buf));
+        error(xoc::getLineNum(ir, LangInfo::LANG_CPP, dbx_mgr),
+              "use undefined label %s", li->getName(buf));
         return false;
 
     }
@@ -775,6 +778,10 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
     ConstIRIter it;
     xcom::TMap<LabelInfo const*, IR const*> labtab;
     bool error_occur = false;
+    if (irlist == nullptr) { return true; }
+    ASSERT0(ctx.current_region);
+    ASSERT0(ctx.current_region->hasAnaInstrument());
+    DbxMgr * dbx_mgr = ctx.current_region->getDbxMgr();
     for (IR const* ir = iterInitC(irlist, it, true);
          ir != nullptr; ir = iterNextC(it, true)) {
         if (!ir->is_label()) { continue; }
@@ -785,15 +792,14 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
         if (find) {
             ASSERT0(mapped);
             StrBuf buf(32);
-            error(xoc::getLineNum(ir),
+            error(xoc::getLineNum(ir, LangInfo::LANG_CPP, dbx_mgr),
                   "duplicated label %s, and has been defined at line:%d",
-                  lab->getName(buf), xoc::getLineNum(mapped));
+                  lab->getName(buf),
+                  xoc::getLineNum(mapped, LangInfo::LANG_CPP, dbx_mgr));
             error_occur = true;
         }
-
         labtab.set(lab, ir);
     }
-
     for (IR const* ir = iterInitC(irlist, it, true);
          ir != nullptr; ir = iterNextC(it, true)) {
         if (ir->is_label()) { continue; }
@@ -803,7 +809,6 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
             }
             continue;
         }
-
         LabelInfo const* lab = ir->getLabel();
         if (lab == nullptr) { continue; }
 
@@ -816,11 +821,10 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
         if (ir->is_stmt()) { stmt = ir; }
         else { stmt = ir->getStmt(); }
         ASSERT0(stmt && stmt->is_stmt());
-        error(xoc::getLineNum(stmt), "use undefined label %s",
-              lab->getName(buf));
+        error(xoc::getLineNum(stmt, LangInfo::LANG_CPP, dbx_mgr),
+              "use undefined label %s", lab->getName(buf));
         error_occur = true;
     }
-
     return error_occur ? false : true;
 }
 
@@ -857,6 +861,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
     case X_FUNC:
         *region = m_rm->newRegion(REGION_FUNC);
         (*region)->initPassMgr();
+        (*region)->initDbxMgr();
         (*region)->initIRMgr();
         (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
@@ -865,6 +870,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
     case X_PROGRAM:
         *region = m_rm->newRegion(REGION_PROGRAM);
         (*region)->initPassMgr();
+        (*region)->initDbxMgr();
         (*region)->initIRMgr();
         (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
@@ -873,6 +879,7 @@ bool IRParser::parseRegionType(Region ** region, UFlag & flag, ParseCtx * ctx)
     case X_INNER:
         *region = m_rm->newRegion(REGION_INNER);
         (*region)->initPassMgr();
+        (*region)->initDbxMgr();
         (*region)->initIRMgr();
         (*region)->initIRBBMgr();
         (*region)->initAttachInfoMgr();
@@ -919,6 +926,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region);
     ASSERT0(oc);
     rg->initPassMgr();
+    rg->initDbxMgr();
     rg->initIRMgr();
     rg->initIRBBMgr();
     PassMgr * pm = rg->getPassMgr();

@@ -30,160 +30,222 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-class INTMat;
+class IMat;
+class IMatMgr;
 class RMat;
+class RMatMgr;
 class BIRMat;
-class FloatMat;
+class FMat;
+class FMatMgr;
 
 ///Rational
-RMat operator * (RMat const& a, RMat const& b);
-RMat operator + (RMat const& a, RMat const& b);
-RMat operator - (RMat const& a, RMat const& b);
+typedef MatWrap<Rational> RMatWrap;
 
 class RMat : public Matrix<Rational> {
 protected:
-    friend RMat operator * (RMat const& a, RMat const& b);
-    friend RMat operator + (RMat const& a, RMat const& b);
-    friend RMat operator - (RMat const& a, RMat const& b);
-    friend class INTMat;
+    friend class IMat;
     friend class BIRMat;
-    BYTE m_is_init:1; //To make sure functions are idempotent.
 protected:
-    void _init_hook();
+    virtual void copyTBuf(Rational * dst, Rational const* src,
+                          UINT elemnum) override
+    { ::memcpy(dst, src, elemnum * sizeof(Rational)); }
 public:
-    RMat();
-    RMat(FRAC_TYPE v); //used by template call of T(0) in Vector<Mat>
-    RMat(RMat const& m);
-    RMat(INTMat const& m);
-    RMat(UINT row, UINT col);
-    ~RMat();
+    RMat() {}
+    RMat(UINT) {} //Used by template call of T(0) in Vector<Mat>
+    RMat(RMat const& m) { copy(m); }
+
+    //DO NOT explicitly initialize the base-class copy-constructor.
+    RMat(IMat const& m) { init(m); }
+    RMat(UINT row, UINT col) : Matrix<Rational>(row, col) {}
+    ~RMat() { destroy(); }
+
+    void adjust() override {}
+
+    void copy(RMat const& r);
+    void copy(IMat const& r);
+    void clean() { zero(); }
+    UINT comden(UINT row, UINT col); //Common denominator
+
+    void destroy();
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const override;
+    void dumps() const override;
+    void dumpfh(FILE * h) const;
+    void ds(RMat const& c);
+
+    void getr(UINT row, UINT col, Rational::FType * numer,
+              Rational::FType * denom);
+    Rational getr(UINT row, UINT col);
+
     void init();
     void init(UINT row, UINT col);
     void init(RMat const& m);
-    void init(INTMat const& m);
-    void destroy();
-    bool is_init() const { return m_is_init; }
+    void init(IMat const& m);
     bool is_imat(UINT * row = nullptr, UINT * col = nullptr);
-    void sete(UINT num,...);
-    void setr(UINT row, UINT col, FRAC_TYPE numer, FRAC_TYPE denom = 1);
-    void setr(UINT row, UINT col, Rational rat);
-    void getr(UINT row, UINT col, FRAC_TYPE * numer, FRAC_TYPE * denom);
-    Rational getr(UINT row, UINT col);
-    bool inv(RMat & e) const;
-    void ds(RMat const& c);
-    void copy(RMat const& r);
-    void copy(INTMat const& r);
-    void clean() { zero(); }
-    UINT comden(UINT row, UINT col); //Common denominator
-    void substit(RMat const& exp,
-                 UINT v,
-                 bool is_eq = true,
-                 INT cst_col = CST_COL_UNDEF);
     void intlize(INT row = -1); //Converting rational element to integer.
+
     RMat & operator = (RMat const& m);
+
     Rational reduce(UINT row, UINT col);
     void reduce();
+
+    void sete(UINT num, ...);
+    void setr(UINT row, UINT col, Rational::FType numer,
+              Rational::FType denom = 1);
+    void setr(UINT row, UINT col, Rational rat);
+    void substit(RMat const& exp, UINT v, bool is_eq = true,
+                 INT cst_col = CST_COL_UNDEF);
+};
+
+
+class RMatMgr : public MatMgr<Rational> {
+public:
+    virtual Matrix<Rational> * allocMat() override
+    { ASSERT0(incMatCnt()); return new RMat(); }
+    virtual Matrix<Rational> * allocMat(UINT row, UINT col) override
+    { ASSERT0(incMatCnt()); return new RMat(row, col); }
 };
 
 
 ///Integer
-INTMat operator * (INTMat const& a, INTMat const& b);
-INTMat operator + (INTMat const& a, INTMat const& b);
-INTMat operator - (INTMat const& a, INTMat const& b);
+typedef MatWrap<INT> IMatWrap;
 
-class INTMat : public Matrix<INT> {
+class IMat : public Matrix<INT> {
     friend class RMat;
     friend class BIRMat;
-    BYTE m_is_init:1; //To make sure functions are idempotent.
-    void _verify_hnf(INTMat &h) const;
-    friend INTMat operator * (INTMat const& a, INTMat const& b);
-    friend INTMat operator + (INTMat const& a, INTMat const& b);
-    friend INTMat operator - (INTMat const& a, INTMat const& b);
+    void _verify_hnf(IMat &h) const;
+protected:
+    virtual void copyTBuf(INT * dst, INT const* src, UINT elemnum) override
+    { ::memcpy(dst, src, elemnum * sizeof(INT)); }
 public:
-    INTMat();
+    IMat() {}
+    IMat(INT) {} //Used by template call of T(0) in Vector<Mat>.
+    IMat(UINT row, UINT col) : Matrix<INT>(row, col) {}
+    ~IMat() {}
 
-    //Used by template call of T(0) in Vector<Mat>.
-    INTMat(INT v);
-    INTMat(UINT row, UINT col);
-    ~INTMat();
+    void adjust() override {}
+
     //Find convex hull of a set of points.
-    void cvexhull(OUT INTMat &hull);
-    INTMat & operator = (INTMat const& m);
+    void cvexhull(OUT IMat &hull);
     void copy(RMat const& r);
     void clean() { fzero(); }
 
-    //Invering of Integer Matrix will be transformed
-    //to Rational Matrix, and one exception will be thrown
-    //if there are some element's denomiator is not '1'.
-    bool inv(OUT INTMat &e) const;
-    void init();
-    bool is_init() const { return m_is_init; }
-
-    void destroy();
-    INT det() const;
-
-    //Set entry value one by one, 'num' indicate entry number.
-    void sete(UINT num,...);
+    void dumps() const override;
+    INT det(MOD RMatMgr & mgr) const;
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const override;
 
     //Generate unimodular matrix to eliminate element.
-    void genElimMat(UINT row, UINT col, OUT INTMat &elim);
-
-    //Hermite Normal Form decomposition.
-    void hnf(OUT INTMat &h, OUT INTMat &u) const;
+    void genElimMat(UINT row, UINT col, OUT IMat &elim);
 
     //Reduce matrix by GCD operation.
     void gcd();
 
-    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
-               bool is_del = false) const;
-    void dumps() const;
+    //Hermite Normal Form decomposition.
+    void hnf(OUT IMat &h, OUT IMat &u, MOD IMatMgr & mgr) const;
+
+    //Invering of Integer Matrix will be transformed
+    //to Rational Matrix, and one exception will be thrown
+    //if there are some element's denomiator is not '1'.
+    bool inv(OUT IMat &e, RMatMgr & mgr) const;
+
+    IMat & operator = (IMat const& m);
+};
+
+
+class IMatMgr : public MatMgr<INT> {
+public:
+    virtual Matrix<INT> * allocMat() override
+    { ASSERT0(incMatCnt()); return new IMat(); }
+    virtual Matrix<INT> * allocMat(UINT row, UINT col) override
+    { ASSERT0(incMatCnt()); return new IMat(row, col); }
 };
 
 
 ///Float
 #define DEFAULT_SD            6
 #define USE_FAST_BUT_LOW_PRECISION_SQRT
-FloatMat operator * (FloatMat const& a, FloatMat const& b);
-FloatMat operator - (FloatMat const& a, FloatMat const& b);
-class FloatMat : public Matrix<Float> {
-    BYTE m_is_init:1; //To make sure functions are idempotent.
+
+typedef MatWrap<Float> FMatWrap;
+
+class FMat : public Matrix<Float> {
+protected:
+    virtual void copyTBuf(Float * dst, Float const* src, UINT elemnum) override
+    { ::memcpy(dst, src, elemnum * sizeof(Float)); }
 public:
-    FloatMat();
-    FloatMat(INT v); //used by template call of T(0) in Vector<Mat>
-    FloatMat(UINT row, UINT col);
-    ~FloatMat();
-    void init();
-    void destroy();
-    bool is_init() const { return m_is_init; }
-    void sete(UINT num,...);
-    void setie(UINT num, ...);
-    FloatMat& operator = (FloatMat const& m);
-    void setSigDigitDesc(UINT sd); //Redefine the significant digit.
-    void substit(IN FloatMat const& exp, UINT v, bool is_eq, INT cst_col);
-    bool is_imat(UINT * row, UINT * col);
+    FMat() {}
+    FMat(INT) {} //Used by template call of T(0) in Vector<Mat>
+    FMat(UINT row, UINT col) : Matrix<Float>(row, col) {}
+    ~FMat() {}
+
+    void adjust() override;
+
+    void dumps() const override;
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const override;
+    void dumpfh(FILE * h) const;
 
     //Get the significant digit description string.
     CHAR const* getSigDigitDesc() const;
-    Float reduce(UINT row, UINT col) { return get(row, col); }
+
+    bool is_imat(UINT * row, UINT * col);
+
+    FMat& operator = (FMat const& m);
+
     void reduce() {}
+    Float reduce(UINT row, UINT col) { return get(row, col); }
+
+    Float sqrtElem(Float a) override;
+    void sete(UINT num, ...);
+    void setie(UINT num, ...);
+    void setSigDigitDesc(UINT sd); //Redefine the significant digit.
+    void substit(IN FMat const& exp, UINT v, bool is_eq, INT cst_col);
+};
+
+
+class FMatMgr : public MatMgr<Float> {
+public:
+    virtual Matrix<Float> * allocMat() override
+    { ASSERT0(incMatCnt()); return new FMat(); }
+    virtual Matrix<Float> * allocMat(UINT row, UINT col) override
+    { ASSERT0(incMatCnt()); return new FMat(row, col); }
 };
 
 
 ///Boolean
+
+typedef MatWrap<bool> BMatWrap;
+
 class BMat : public Matrix<bool> {
-    BYTE m_is_init:1; //To make sure functions are idempotent.
+protected:
+    virtual void copyTBuf(bool * dst, bool const* src, UINT elemnum) override
+    { ::memcpy(dst, src, elemnum * sizeof(bool)); }
 public:
-    BMat();
-    BMat(INT v); //used by template call of T(0) in Vector<Mat>
-    BMat(UINT row, UINT col);
-    ~BMat();
-    void init();
-    void destroy();
-    bool is_init() const { return m_is_init; }
+    BMat() {}
+    BMat(INT) {} //Used by template call of T(0) in Vector<Mat>
+    BMat(UINT row, UINT col) : Matrix<bool>(row, col) {}
+    ~BMat() {}
+
+    void adjust() override {}
+
+    void dumps() const override;
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const override;
+    void dumpfh(FILE * h) const;
 
     //Set entry value one by one, 'num' indicate entry number.
     void sete(UINT num, ...);
+
     BMat & operator = (BMat const& m);
+};
+
+
+class BMatMgr : public MatMgr<bool> {
+public:
+    virtual Matrix<bool> * allocMat() override
+    { ASSERT0(incMatCnt()); return new BMat(); }
+    virtual Matrix<bool> * allocMat(UINT row, UINT col) override
+    { ASSERT0(incMatCnt()); return new BMat(row, col); }
 };
 
 } //namespace xcom

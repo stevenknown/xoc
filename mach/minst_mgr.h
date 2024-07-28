@@ -44,21 +44,25 @@ public:
     //Move elements in 'ors' to tail of current list.
     void move_tail(MOD MIList & ors);
 
-    void copyDbx(IR const* ir)
+    void copyDbx(IR const* ir, DbxMgr * dbx_mgr)
     {
         ASSERT0(ir);
         if (IR_ai(ir) == nullptr) { return; }
         DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
         if (da == nullptr) { return; }
-        for (MInst * mi = get_head(); mi != nullptr; mi = get_next()) {
-            MI_dbx(mi).copy(da->dbx);
-        }
+
+        //We only need to copy the tail part.
+        MInst * mi = get_tail();
+        ASSERT0(mi);
+        MI_dbx(mi).copy(da->dbx, dbx_mgr);
     }
-    void copyDbx(Dbx const* dbx)
+
+
+    void copyDbx(Dbx const* dbx, DbxMgr * dbx_mgr)
     {
         if (dbx == nullptr) { return; }
         for (MInst * mi = get_head(); mi != nullptr; mi = get_next()) {
-            MI_dbx(mi).copy(*dbx);
+            MI_dbx(mi).copy(*dbx, dbx_mgr);
         }
     }
 
@@ -88,8 +92,17 @@ public:
     void move_tail(MIList & ors) { m_entity->move_tail(ors); }
     void move_tail(RecycMIList & ors) { m_entity->move_tail(ors.getList()); }
 
-    void copyDbx(IR const* ir) { m_entity->copyDbx(ir); }
-    void copyDbx(Dbx const* dbx) { m_entity->copyDbx(dbx); }
+    void copyDbx(IR const* ir, DbxMgr * dbx_mgr)
+    {
+        m_entity->copyDbx(ir, dbx_mgr);
+    }
+
+
+    void copyDbx(Dbx const* dbx, DbxMgr * dbx_mgr)
+    {
+        m_entity->copyDbx(dbx, dbx_mgr);
+    }
+
     void clean() { m_entity->clean(); }
 
     void dump(LogMgr * lm, MInstMgr const& mgr) { m_entity->dump(lm, mgr); }
@@ -112,10 +125,12 @@ public:
 
 class MInstMgr {
     COPY_CONSTRUCTOR(MInstMgr);
-    MFieldMgr const& m_field_mgr;
+    SMemPool * m_pool;
+    Region * m_rg;
+    MFieldMgr * m_field_mgr;
     LabelInstDesc m_label_instdesc;
     MemAccInstDesc m_memacc_instdesc;
-    SMemPool * m_pool;
+    DwarfCFIInstDesc m_dwarf_cfi_instdesc;
 protected:
     template<class T>
     MInst * allocMInst(UINT fieldnum)
@@ -131,13 +146,15 @@ protected:
 
     LabelInstDesc & getLabelInstDesc() { return m_label_instdesc; }
     MemAccInstDesc & getMemAccInstDesc() { return m_memacc_instdesc; }
+    DwarfCFIInstDesc & getCFIInstDesc() { return m_dwarf_cfi_instdesc; }
 
     void * xmalloc(UINT size);
     MInstMgr * self() { return this; }
 public:
-    MInstMgr(MFieldMgr const& fm) : m_field_mgr(fm),
+    MInstMgr(Region * rg, MFieldMgr * fm) : m_rg(rg), m_field_mgr(fm),
         m_label_instdesc(*self()),
-        m_memacc_instdesc(*self())
+        m_memacc_instdesc(*self()),
+        m_dwarf_cfi_instdesc(*self())
     { m_pool = smpoolCreate(64, MEM_COMM); }
     virtual ~MInstMgr() { smpoolDelete(m_pool); }
 
@@ -151,7 +168,13 @@ public:
         MInst * mi = allocMInst<T>(d->getFieldNum());
         MI_code(mi) = c;
         MI_desc(mi) = d;
-        MI_wordbuflen(mi) = getMInstWordLength();
+        MI_wordbuflen(mi) = isCFIInstruction(mi)? 0 : getMInstWordLength();
+
+        //This is the memory allocation for the various attributes of dbx,
+        //which is dbx's own memory allocator.
+        DbxMgr * dbx_mgr = m_rg->getDbxMgr();
+        ASSERT0(dbx_mgr);
+        MI_dbx(mi).init(dbx_mgr);
         return mi;
     }
 
@@ -161,7 +184,7 @@ public:
         MInst * mi = buildMInst<LabelMInst>(MI_label, &m_label_instdesc);
         mi->setFlag(MI_FLAG_HAS_LABEL);
         return mi;
-     }
+    }
 
     //Build a dummy machine instruction that indicates a memory access.
     virtual MInst * buildMemAcc(MI_CODE c)
@@ -171,23 +194,57 @@ public:
         return mi;
     }
 
+    virtual MInst * buildCFIDefCfa()
+    {
+        return buildMInst<MCCCFIDefCfaIns>(MI_cfi_def_cfa,
+            &m_dwarf_cfi_instdesc);
+    }
+
+
+    virtual MInst * buildCFISameValue()
+    {
+        return buildMInst<MCCCFISameValueIns>(MI_cfi_same_value,
+            &m_dwarf_cfi_instdesc);
+    }
+
+
+    virtual MInst * buildCFIOffset()
+    {
+        return buildMInst<MCCFICOffsetIns>(MI_cfi_offset,
+            &m_dwarf_cfi_instdesc);
+    }
+
+
+    virtual MInst * buildCFIRestore()
+    {
+        return buildMInst<MCCCFIRestoreInst>(MI_cfi_restore,
+            &m_dwarf_cfi_instdesc);
+    }
+
+
+    virtual MInst * buildCFIDefCfaOffset()
+    {
+        return buildMInst<MCCFIDefCfaOffsetInst>(MI_cfi_def_cfa_offset,
+            &m_dwarf_cfi_instdesc);
+    }
+
     //Return the name of given field type.
     CHAR const* getFieldName(FIELD_TYPE ft) const
-    { return m_field_mgr.getFieldName(ft); }
+    { return getFieldMgr()->getFieldName(ft); }
 
     //Return the bit width of given field type.
     UINT getFieldSize(FIELD_TYPE ft) const
-    { return getFieldMgr().getFieldSize(ft); }
+    { return getFieldMgr()->getFieldSize(ft); }
 
     //Return the start bit position of given field type.
     UINT getFieldStart(FIELD_TYPE ft) const
-    { return getFieldMgr().getFieldStart(ft); }
+    { return getFieldMgr()->getFieldStart(ft); }
 
     //Return the end bit position of given field type.
     UINT getFieldEnd(FIELD_TYPE ft) const
-    { return getFieldMgr().getFieldEnd(ft); }
+    { return getFieldMgr()->getFieldEnd(ft); }
 
-    MFieldMgr const& getFieldMgr() const { return m_field_mgr; }
+    MFieldMgr * getFieldMgr() const { return m_field_mgr; }
 
     //Return the name of machine instruction.
     //Target Dependent Code.
@@ -198,16 +255,21 @@ public:
     //Target Dependent Code.
     virtual UINT getMInstWordLength() const { return 0; }
 
+    Region * getRegion() const { return m_rg; }
+
     //Whether the mi is function call.
     virtual bool isCall(MInst const* mi) const
     { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     //Whether the mi is label.
-    bool isLabel(MInst const* mi) const { return mi->getCode() == MI_label; }
+    bool isLabel(MInst const* mi) const
+    { return mi->getCode() == MI_label; }
 
     //Whether the mi is unconditional br.
     virtual bool isUncondBr(MInst const* mi) const
     { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    static bool isCFIInstruction(MInst const * mi);
 };
 
 } //namespace

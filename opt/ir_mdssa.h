@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class ActMgr;
+
 typedef xcom::TMap<UINT, VMD*> MD2VMD;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
@@ -322,7 +324,6 @@ public:
             liveset->getSet().copy(src, m_sbsmgr);
         }
         return liveset;
-
     }
     LiveSet * genAndCopy(UINT bbid, VMD const* vmd)
     {
@@ -360,7 +361,10 @@ class RenameDef {
     DomTree const& m_domtree;
     LiveSet * m_liveset;
     MDSSAMgr * m_mgr;
+    UseDefMgr * m_udmgr;
     IRCFG * m_cfg;
+    ActMgr * m_am;
+    Region * m_rg;
     Vertex2LiveSet m_vex2liveset;
 private:
     void connect(Vertex const* defvex, LiveSet * defliveset,
@@ -379,6 +383,12 @@ private:
         IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
     void connectDefInterBBTillPrevDef(
         Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb);
+
+    void dumpRenameBB(IRBB const* bb);
+    void dumpRenameVMD(IR const* ir, VMD const* vmd);
+    void dumpInsertDDChain(IR const* ir, VMD const* vmd);
+    void dumpInsertDDChain(MDPhi const* phi, VMD const* vmd);
+    void dumpRenamePhi(MDPhi const* phi, UINT opnd_pos);
 
     Vertex2LiveSet & getVex2LiveSet() { return m_vex2liveset; }
 
@@ -399,13 +409,15 @@ private:
 
     //stmtbb: the BB of inserted stmt
     //newinfo: MDSSAInfo that intent to be swap-in.
-    bool renameVMDForDesignatedPhiOpnd(MDPhi * phi, UINT opnd_pos,
-                                       LiveSet & liveset);
+    bool renameVMDForDesignatedPhiOpnd(
+        MDPhi * phi, UINT opnd_pos, LiveSet & liveset);
+
     //vmd: intent to be swap-in.
     //irtree: may be stmt or exp.
     //irit: for local used.
-    void renameVMDForIRTree(IR * irtree, VMD * vmd, MOD IRIter & irit,
-                            bool & no_exp_has_ssainfo);
+    void renameVMDForIRTree(
+        IR * irtree, VMD * vmd, MOD IRIter & irit, bool & no_exp_has_ssainfo);
+
     //ir: may be stmt or exp
     //irit: for local used.
     void renameLivedVMDForIRTree(
@@ -449,6 +461,7 @@ public:
               MDSSAMgr * mgr);
 
     MDSSAMgr * getMgr() const { return m_mgr; }
+    ActMgr * getActMgr() const { return m_am; }
 
     void perform();
 };
@@ -547,6 +560,7 @@ protected:
     xcom::Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
+    ActMgr * m_am;
 protected:
     //Add an USE to given mdssainfo.
     //use: occurence to be added.
@@ -590,16 +604,12 @@ protected:
     void dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
                                VMD const* vopnd) const;
     void dumpExpDUChainIter(
-        IR const* ir, List<IR*> & lst, List<IR*> & opnd_lst,
-        OUT bool * parting_line) const;
+        IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const;
     void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
-    void dumpDUChainForStmt(
-        IR const* ir, xcom::List<IR*> & lst, xcom::List<IR*> & opnd_lst) const;
+    void dumpDUChainForStmt(IR const* ir, ConstIRIter & it) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
-    void dumpIRWithMDSSAForStmt(
-        IR const* ir, UINT flag, bool & parting_line) const;
-    void dumpIRWithMDSSAForExp(
-        IR const* ir, UINT flag, bool & parting_line) const;
+    void dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const;
+    void dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
@@ -609,8 +619,18 @@ protected:
     //olddef: old DEF of id.
     void findNewDefForID(
         IR * id, MDSSAInfo * ssainfo, MDDef * olddef, OptCtx const& oc);
+
+    //Find live-in VMD through given start IR at start BB.
+    //Note DOM info must be available.
+    //mdid: find the live-in VMD for the MD.
+    //bb: the work BB, namely, the function will do searching job in this BB.
+    //startir: the start position in 'startbb', it can be NULL.
+    //         If it is NULL, the function first finding the Phi list of
+    //         'startbb', then keep finding its predecessors until meet the
+    //         CFG entry.
+    //startbb: the BB that begin to do searching.
     VMD * findLiveInDefFrom(
-        IRBB const* bb, MDIdx mdid, IR const* startir, IRBB const* startbb,
+        MDIdx mdid, IRBB const* bb, IR const* startir, IRBB const* startbb,
         VMDVec const* vmdvec) const;
     void freeBBPhiList(IRBB * bb);
     void freePhiList();
@@ -743,29 +763,12 @@ protected:
     bool verifyRefedVMD() const;
     bool verifyAllVMD() const;
 public:
-    explicit MDSSAMgr(Region * rg) :
-        Pass(rg),
-        m_sbs_mgr(rg->getMiscBitSetMgr()),
-        m_seg_mgr(rg->getMiscBitSetMgr()->getSegMgr()),
-        m_usedef_mgr(rg, this)
-    {
-        cleanInConstructor();
-        ASSERT0(rg);
-        m_tm = rg->getTypeMgr();
-        m_irmgr = rg->getIRMgr();
-        ASSERT0(m_tm);
-        ASSERT0(rg->getMiscBitSetMgr());
-        ASSERT0(m_seg_mgr);
-        m_cfg = rg->getCFG();
-        ASSERTN(m_cfg, ("cfg is not available."));
-        m_md_sys = rg->getMDSystem();
-    }
+    explicit MDSSAMgr(Region * rg);
     ~MDSSAMgr()
     {
         //CAUTION: If you do not finish out-of-SSA prior to destory(),
         //the reference to IR's MDSSA info will lead to undefined behaviors.
         //ASSERTN(!is_valid(), ("should be destructed"));
-
         destroy();
     }
 
@@ -892,6 +895,13 @@ public:
     //exp: expression.
     bool isOverConservativeDUChain(MDDef const* def, IR const* exp) const;
 
+    //Return true if there is at least one USE 'vmd' has been placed in given
+    //IRBB 'bbid'.
+    //vmd: the function will iterate all its USE occurrences.
+    //it: for tmp used.
+    bool isUseWithinBB(VMD const* vmd, MOD VMD::UseSetIter & it,
+                       UINT bbid) const;
+
     //Initial VMD stack for each MD in 'bb2defmds'.
     void initVMDStack(BB2DefMDSet const& bb2defmds,
                       OUT MD2VMDStack & md2verstk);
@@ -930,7 +940,7 @@ public:
     //Dump IR tree and MDSSAInfo if any.
     //ir: can be stmt or expression.
     //flag: the flag to dump IR.
-    void dumpIRWithMDSSA(IR const* ir, UINT flag = IR_DUMP_COMBINE) const;
+    void dumpIRWithMDSSA(IR const* ir, DumpFlag flag = IR_DUMP_COMBINE) const;
 
     //Duplicate Phi operand that is at the given position, and insert after
     //given position sequently.
@@ -990,8 +1000,9 @@ public:
     MDDef const* findUniqueOutsideLoopDef(MDDef const* phi,
                                           LI<IRBB> const* li) const;
 
-    //Find livein def-stmt through given start IR at start BB.
+    //Find live-in def-stmt through given start IR at start BB.
     //Note DOM info must be available.
+    //mdid: find the live-in DEF for the MD.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
@@ -1006,7 +1017,7 @@ public:
                                      OptCtx const& oc) const;
 
     //Note DOM info must be available.
-    //exp: the expression that expected to set livein.
+    //exp: the expression that expected to set live-in.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
@@ -1022,7 +1033,7 @@ public:
     }
 
     //Note DOM info must be available.
-    //exp: the expression that expected to set livein.
+    //exp: the expression that expected to set live-in.
     //startir: the start position in 'startbb', it can be NULL.
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
@@ -1044,6 +1055,8 @@ public:
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
     IRCFG * getCFG() const { return m_cfg; }
     IRMgr * getIRMgr() const { return m_irmgr; }
+    MDSystem const* getMDSystem() const { return m_md_sys; }
+    ActMgr * getActMgr() { return m_am; }
 
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
@@ -1074,8 +1087,7 @@ public:
     //The function will generate MDSSAInfo for 'exp' according to the refinfo.
     //that defined inside li. The new info for 'exp' will be VMD that defined
     //outside of li or the initial version of VMD.
-    void genMDSSAInfoToOutsideLoopDef(IR * exp,
-                                      MDSSAInfo const* refinfo,
+    void genMDSSAInfoToOutsideLoopDef(IR * exp, MDSSAInfo const* refinfo,
                                       LI<IRBB> const* li);
 
     //Generate MDSSAInfo and generate VOpnd for referrenced MD that both include

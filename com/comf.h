@@ -50,6 +50,17 @@ template <class ValueType>
 inline ValueType computeUnsignedMaxValue(UINT bitwidth)
 { return ((((ValueType)1) << bitwidth) - 1); }
 
+//Compute the maximum unsigned integer value
+//based on the byte width of the type.
+//e.g, given bytewidth is 1 (byte),
+//return 255 as result for an 8-bit unsigned integer.
+//Note: ValueType should be an unsigned integer type.
+template <class ValueType>
+inline ValueType computeMaxValueFromByteWidth(UINT bytewidth)
+{
+    return computeUnsignedMaxValue<ValueType>(bytewidth * BITS_PER_BYTE);
+}
+
 //Arrangement
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
 UINT arra(UINT n, UINT m); //Arrangement
@@ -145,6 +156,52 @@ inline ValueType extractValidValueViaBitWidth(
 {
     return (value & computeUnsignedMaxValue<ValueType>(bitwidth));
 }
+
+//Utility function to encode a ULEB128 value to an output stream. Returns
+//the length in bytes of the encoded value.
+//We can set a padding, for example,
+//if we calculate that the number of bytes is two,
+//we can supplement it to the number of bytes we set.
+//ULEB128 (Unsigned Little Endian Base 128)
+//and SLEB128 (Signed Little Endian Base 128) are
+//variable-length encoding methods commonly used
+//for encoding integers to save space.They are frequently used in DWARF.
+//ULEB128 (Unsigned Little Endian Base 128) is used for variable-length
+//encoding of non-negative integers.
+//It encodes integers into one or more bytes,
+//with each byte providing 7 bits to represent a portion of the value,
+//and the highest 8th bit serves as a "continuation bit"
+//indicating whether there are more bytes to follow.
+//For example, if we have the number 1016, The encoding rules are as follows:
+//1 The binary representation of 1016 is 001111111000.
+//splitting the binary representation 0000_0011_1111_1000 into two groups of 7,
+//we get 111_1000 and 000_0111.
+//2 For the first group, 111_1000, we add its highest bit.
+//Since there is more data following it,
+//we set the highest bit to 1, making it 1111_1000.
+//For the second group,
+//000_0111, since there is no more data following it,
+//we add a highest bit of 0, resulting in 0000_0111.
+//3 Finally, we concatenate 1111_1000 and 0000_0111 to get 1111_1000_0000_0111.
+
+//Here's the explanation for the parameters:
+//value: This is the value that we want to encode,
+//which serves as the input to the encoding process.
+//os(output stream): This represents the encoded value,
+//which is the output of the encoding process.
+//After encoding, the result is stored in this variable.
+//pad_to: This parameter specifies padding,
+//meaning that even if the encoded value requires only
+//a certain number of bytes (e.g., 2 bytes),
+//we can forcefully pad it to a certain number of bytes.
+//This ensures that the encoded value conforms to a specific byte length,
+//regardless of the actual encoding size.
+UINT32 encodeULEB128(UINT64 value, OUT Vector<CHAR> & os,
+                     UINT32 pad_to = 0);
+
+//Similar to the encodeULEB128 function.
+UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os,
+                     UINT32 pad_to = 0);
 
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
@@ -253,7 +310,46 @@ inline UINT getSignBit(UINT bitsize)
     return bitsize - 1;
 }
 
-//Get low 16-bit value of signed 32-bit value.
+//Get the signal bit of given value of bit-num. Note that the returned value
+//is a binary value.
+//For example:                              |
+//                                          V
+//(1) given 20-bit value: 0b 0000 0000 0000 1000 1001 0001 0010 0000
+//(2) 1 shift 19-bit:     0b 0000 0000 0000 1000 0000 0000 0000 0000
+//(3) & and shift:        0b 0000 0000 0000 0000 0000 0000 0000 0001
+//
+//Another example:                               |
+//                                               V
+//(1) given 16-bit value: 0b 0000 0000 0000 0000 0101 0010 0010 0010
+//(2) 1 shift 15-bit:     0b 0000 0000 0000 0000 1000 0000 0000 0000
+//(3) & and shift:        0b 0000 0000 0000 0000 0000 0000 0000 0000
+inline UINT getSignBitOfNBitNum(UINT val, UINT bit_num)
+{ return (val & (1 << (bit_num - 1))) >> (bit_num - 1); }
+
+
+//Get unsigned hign n-bit value of unsigned 32bit value.
+inline UINT32 get32BitValueHighNBit(UINT32 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 32));
+    UINT64 mask = (0x1 << bitnum) - 1;
+    return (val >> bitnum) & mask;
+}
+
+
+//Get unsigned low n-bit value of unsigned 32bit value.
+//For example:
+//a.given val: 0x12345678 and bitnum: 4, it will return 0x8.
+//b.given val: 0x12345678 and bitnum: 8, it will return 0x78.
+inline UINT32 get32BitValueLowNBit(UINT32 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 32));
+    return (val & (0xffffFFFF >> (32 - bitnum)));
+}
+
+//Get signed low n-bit value of signal 32bit value.
+//Note the function will signal extend the low-bit value.
+//
+//For example: get low 16-bit value of signed 32-bit value.
 //Note the function will extend sign-bit of the low 16-bit to 32-bit value.
 //For example:
 //val:     0b 0100010......1000 0111 0101 1011
@@ -269,32 +365,23 @@ inline UINT getSignBit(UINT bitsize)
 //0x8000:  0b 0000000......1000 0000 0000 0000
 //                         =
 //         0b 1111111......1000 0111 0101 1011
-inline INT32 getSign32BitLow16BitVal(INT32 val)
-{ return ((val & 0xffff) ^ 0x8000) - 0x8000; }
-
-//Get low 16-bit value of signed 64-bit value.
-//Note the function will extend sign-bit of the low 16-bit to 32-bit value.
-//The principle is similar to getSign32BitLow16BitVal().
-inline INT64 getSign64BitLow16BitVal(INT64 val)
-{ return ((val & 0xffff) ^ 0x8000) - 0x8000; }
-
-//Get low 32-bit value of signed 64-bit value.
-//Note the function will extend sign-bit of the low 16-bit to 32-bit value.
-//The principle is similar to getSign32BitLow16BitVal().
-inline INT64 getSign64BitLow32BitVal(INT64 val)
-{ return ((val & 0xffffffff) ^ 0x80000000) - 0x80000000; }
-
-//Get low n-bit value of 32bit value.
-//For example:
-//a.given val: 0x12345678 and bitnum: 4, it will return 0x8.
-//b.given val: 0x12345678 and bitnum: 8, it will return 0x78.
-inline UINT32 get32BitValueLowNBit(UINT32 val, UINT bitnum)
+inline INT32 get32BitValueLowNBit(INT32 val, UINT bitnum)
 {
     ASSERT0((bitnum >= 0) && (bitnum < 32));
-    return (val & (0xffffFFFF >> (32 - bitnum)));
+    UINT64 const mask_0 = ((UINT64)(0x1) << bitnum) - 1;
+    UINT64 const mask_1 = (UINT64)(0x1) << (bitnum - 1);
+    return (INT32)(((val & mask_0) ^ mask_1) - mask_1);
 }
 
-//Get low n-bit value of 64bit value.
+//Get unsigned hign n-bit value of unsigned 64bit value.
+inline UINT64 get64BitValueHighNBit(UINT64 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 64));
+    UINT64 mask = (0x1 << bitnum) - 1;
+    return (val >> bitnum) & mask;
+}
+
+//Get unsigned low n-bit value of unsigned 64bit value.
 //For example:
 //a.given val: 0x1122334455667788 and bitnum: 8, it will return 0x88.
 //b.given val: 0x1122334455667788 and bitnum: 16, it will return 0x7788.
@@ -302,6 +389,18 @@ inline UINT64 get64BitValueLowNBit(UINT64 val, UINT bitnum)
 {
     ASSERT0((bitnum >= 0) && (bitnum < 64));
     return (val & (0xffffffffFFFFFFFF >> (64 - bitnum)));
+}
+
+//Get signal low n-bit value of signal 64bit value.
+//Note the function will signal extend the low-bit value.
+//The principle is similar to
+//"INT32 get32BitValueLowNBit(INT32 val, UINT bitnum)".
+inline INT64 get64BitValueLowNBit(INT64 val, UINT bitnum)
+{
+    ASSERT0((bitnum >= 0) && (bitnum < 64));
+    UINT64 const mask_0 = ((UINT64)(0x1) << bitnum) - 1;
+    UINT64 const mask_1 = (UINT64)(0x1) << (bitnum - 1);
+    return (INT64)(((val & mask_0) ^ mask_1) - mask_1);
 }
 
 //Calculate an integer hash value according to 'n'.
@@ -319,7 +418,10 @@ inline UINT32 hash32bit(UINT32 n)
 //convert half to EHP64(64-bit extended half-precision) format.
 UINT64 half2EHP64(UINT64 val);
 
-//Return true if val exceed the range that can be described with 'bitsize'.
+//Return true if *signed* val exceeds the range described by 'bitsize'.
+bool isExceedBitWidth(LONGLONG val, UINT bitwidth);
+
+//Return true if *unsigned* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(ULONGLONG val, UINT bitwidth);
 
 //Return true if 'c' is an extended character.
@@ -407,12 +509,57 @@ INT sgcd(INT x, INT y);
 //Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y);
 
-//Get 0~15(part1), 16~31(part2), 32~47(part3), 48~63(part4) bits value of
-//signal 64-bit value.
-//This function uses getSign64BitLow16BitVal(), getSign64BitLow32BitVal(),
-//and shift operation to iteratively fetch each value.
-void splitSign64BitToFourParts(INT64 val, OUT INT & part1, OUT INT & part2,
-                               OUT INT & part3, OUT INT & part4);
+//According to the values in "bit_group_desc", split the m-bit value "val" into
+//several parts and write the result to "bit_group_val".
+//
+// val:            the given m-bit value
+// m:              the bit width of "val"
+// bit_group_desc: the bit width of each part
+// bit_group_val:  the result of UINT64 type
+//
+//For example:
+//
+// val:            0x123456
+// m:              22        Given value is 0b 01 0010 0011 0100 0101 0110
+// bit_group_desc: { 4, 5, 6, 7 }
+// bit_group_val:  { 0x4, 0x11, 0x28, 0x56 }
+//                 { 0b0100, 0b10001, 0b101000, 0b1010110 }
+void splitMbitToNGroup(UINT64 val, UINT m, Vector<UINT> & bit_group_desc,
+                       OUT Vector<UINT64> & bit_group_val);
+
+//The function of this function is the same as
+//
+//    void splitMbitToNGroup(UINT64 val, UINT m,
+//                           Vector<UINT> const& bit_group_desc,
+//                           OUT Vector<UINT64> & bit_group_val).
+//
+//The difference is that the parameters passed in are pointers and lengths,
+//not Vector references. It will be called by the function above.
+void splitMbitToNGroup(UINT64 val, UINT m,
+                       UINT const* bit_group_desc, UINT bit_group_desc_len,
+                       OUT UINT64 * bit_group_val, UINT bit_group_val_len);
+
+//According to the values in "bit_group_desc", split the m-bit value "val" into
+//several parts and write the result to "bit_group_val".
+//
+//This function has similar functions to another function with the same name,
+//except that the fourth parameter type is different. This function returns a
+//Vector containing INT64 type, and the element value needs to be signal
+//extended.
+void splitMbitToNGroup(UINT64 val, UINT m, Vector<UINT> & bit_group_desc,
+                       OUT Vector<INT64> & bit_group_val);
+
+//The function of this function is the same as
+//
+//    void splitMbitToNGroup(UINT64 val, UINT m,
+//                           Vector<UINT> const& bit_group_desc,
+//                           OUT Vector<INT64> & bit_group_val).
+//
+//The difference is that the parameters passed in are pointers and lengths,
+//not Vector references. It will be called by the function above.
+void splitMbitToNGroup(UINT64 val, UINT m,
+                       UINT const* bit_group_desc, UINT bit_group_desc_len,
+                       OUT INT64 * bit_group_val, UINT bit_group_val_len);
 
 //Shift a string to right side or left side.
 //ofst: great than zero means shifting string to right side,

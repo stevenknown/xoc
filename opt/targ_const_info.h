@@ -49,6 +49,9 @@ author: Su Zhenyu
 #elif defined(FOR_JS)
 #include "../js/js_const_info.h"
 
+#elif defined(FOR_TECO)
+#include "../teco/teco_const_info.h"
+
 #else
 #error "No target info"
 #endif

@@ -66,6 +66,9 @@ public:
     //Dump all actions.
     void dump() const;
 
+    //Return the number of actions.
+    UINT getActNum() const { return m_act_list.get_elem_count(); }
+
     Region const* getRegion() const { return m_rg; }
 };
 

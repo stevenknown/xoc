@@ -75,6 +75,7 @@ ir_verify_ext.o\
 ir_decl.o\
 ir_desc.o\
 ir_utils.o\
+multi_res_convert.o\
 cfg_lifting.o\
 revise_cfg.o\
 bytebuf.o\
@@ -83,10 +84,15 @@ storage_space.o\
 literal.o\
 chain_recur.o\
 insert_cvt.o\
-act_mgr.o
+act_mgr.o\
+dwarf.o
 
 ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
+endif
+
+ifeq ($(TARG_DIR),)
+  $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
 endif
 
 ifeq ($(FOR_IP), true)
@@ -111,7 +117,8 @@ ifeq ($(FOR_IP), true)
   workaround.o\
   dynamic_stack.o\
   var2offset.o\
-  ir_reloc_mgr.o
+  ir_reloc_mgr.o\
+  igoto_opt.o
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
   OPT_OBJS+=\
@@ -130,7 +137,8 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   workaround.o\
   dynamic_stack.o\
   var2offset.o\
-  ir_reloc_mgr.o
+  ir_reloc_mgr.o\
+  igoto_opt.o
 else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
   OPT_OBJS+=\
@@ -149,7 +157,8 @@ else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   workaround.o\
   dynamic_stack.o\
   var2offset.o\
-  ir_reloc_mgr.o
+  ir_reloc_mgr.o\
+  igoto_opt.o
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

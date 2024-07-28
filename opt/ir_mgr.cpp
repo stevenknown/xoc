@@ -98,6 +98,47 @@ static bool checkLogicalOp(IR_CODE irc, Type const* type, TypeMgr * tm)
 }
 #endif
 
+
+bool IRMgr::isArrayIsomorphic(IR const* ir, IR const* src,
+                              bool is_cmp_kid, IsomoFlag const& flag) const
+{
+    if (!ir->isArrayOp()) { return false; }
+    if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+        //Not diff exp or stmt.
+        return false;
+    }
+    if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+        return false;
+    }
+    if (ir->getOffset() != src->getOffset()) {
+        return false;
+    }
+    if (ARR_elem_num_buf(src) == nullptr || ARR_elem_num_buf(ir) == nullptr) {
+        //We have no knowledge about the array.
+        return false;
+    }
+    TMWORD dimnum = ((CArray*)ir)->getDimNum();
+    if (((CArray*)src)->getDimNum() != dimnum) { return false; }
+    for (UINT i = 0; i < dimnum; i++) {
+        if (((CArray*)ir)->getElementNumOfDim(i) !=
+            ((CArray*)src)->getElementNumOfDim(i)) {
+            return false;
+        }
+    }
+    IR const* cursub = ARR_sub_list(ir);
+    IR const* srcsub = ARR_sub_list(src);
+    for (; cursub != nullptr; cursub = cursub->get_next(),
+         srcsub = srcsub->get_next()) {
+        ASSERT0(srcsub);
+        if (!isIRIsomorphic(cursub, srcsub, is_cmp_kid, flag)) {
+            return false;
+        }
+    }
+    ASSERT0(ir->getBase() && src->getBase());
+    return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
+}
+
+
 IRMgr::IRMgr(Region * rg) : Pass(rg)
 {
     m_ir_count = IRID_UNDEF + 1;
@@ -114,6 +155,164 @@ IRMgr::~IRMgr()
 {
     xcom::smpoolDelete(m_ir_pool);
     m_ir_pool = nullptr;
+}
+
+
+bool IRMgr::isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
+                               bool is_cmp_kid, IsomoFlag const& flag) const
+{
+    IR const* ir1 = ir1lst;
+    IR const* ir2 = ir2lst;
+    for (; ir1 != nullptr && ir2 != nullptr;
+         ir1 = ir1->get_next(), ir2 = ir2->get_next()) {
+        if (!isIRIsomorphic(ir1, ir2, is_cmp_kid, flag)) {
+            return false;
+        }
+    }
+    if ((ir1 != nullptr) ^ (ir2 != nullptr)) {
+        return false;
+    }
+    return true;
+}
+
+
+//Return true if ir tree is isomorphic to src.
+//ir, src: root of IR tree.
+//is_cmp_kid: it is true if comparing kids as well.
+//flag: record the checking condition while compare two given ir expression
+//      or stmt.
+//      e.g: If ISOMO_CK_CODE is set, the comparison of IST and ILD will
+//      return false.
+bool IRMgr::isIRIsomorphic(IR const* ir, IR const* src,
+                           bool is_cmp_kid, IsomoFlag const& flag) const
+{
+    if (ir == src) { return true; }
+    ASSERT0(src);
+    switch (src->getCode()) {
+    case IR_CONST: //Constant value: include integer, float, string.
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (flag.have(ISOMO_CK_CONST_VAL) &&
+            CONST_int_val(ir) != CONST_int_val(src)) {
+            return false;
+        }
+        break;
+    case IR_ID:
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (ID_info(ir) != ID_info(src)) { return false; }
+        break;
+    SWITCH_CASE_DIRECT_MEM_OP:
+        if (!ir->isDirectMemOp()) { return false; }
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_IDINFO) &&
+            ir->getIdinfo() != src->getIdinfo()) {
+            return false;
+        }
+        if (ir->getOffset() != src->getOffset()) {
+            return false;
+        }
+        break;
+    SWITCH_CASE_INDIRECT_MEM_OP:
+        if (!ir->isIndirectMemOp()) { return false; }
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (ir->getOffset() != src->getOffset()) {
+            return false;
+        }
+        ASSERT0(ir->getBase() && src->getBase());
+        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
+    SWITCH_CASE_PR_OP:
+        if (!ir->isPROp()) { return false; }
+        if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (flag.have(ISOMO_CK_PRNO) && ir->getPrno() != src->getPrno()) {
+            return false;
+        }
+        break;
+    SWITCH_CASE_ARRAY_OP:
+        if (!isArrayIsomorphic(ir, src, is_cmp_kid, flag)) {
+            return false;
+        }
+        break;
+    case IR_LDA:
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        if (LDA_idinfo(ir) != LDA_idinfo(src) ||
+            LDA_ofst(ir) != LDA_ofst(src)) {
+            return false;
+        }
+        break;
+    case IR_CALL:
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (CALL_idinfo(ir) != CALL_idinfo(src)) { return false; }
+        break;
+    case IR_ICALL:
+        break;
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
+        if (ir->getCode() != src->getCode()) { return false; }
+        break;
+    case IR_LABEL:
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (LAB_lab(ir) != LAB_lab(src)) { return false; }
+        break;
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SELECT:
+        if (ir->getCode() != src->getCode()) { return false; }
+        if (flag.have(ISOMO_CK_TYPE) && ir->getType() != src->getType()) {
+            return false;
+        }
+        break;
+    case IR_REGION:
+        //One should implement comparation function for your own region.
+        return false;
+    case IR_GOTO:
+    case IR_IGOTO:
+    case IR_DO_WHILE:
+    case IR_WHILE_DO:
+    case IR_DO_LOOP:
+    case IR_IF:
+    case IR_SWITCH:
+    case IR_CASE:
+    case IR_RETURN:
+    case IR_BREAK:
+    case IR_CONTINUE:
+        break;
+    default:
+        return isIRIsomorphicExtOp(ir, src, is_cmp_kid,  flag);
+    }
+    if (!is_cmp_kid) { return true; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
+        IR const* kid1 = ir->getKid(i);
+        IR const* kid2 = src->getKid(i);
+        if (src->isCallStmt() &&
+            (kid1 == CALL_dummyuse(ir) ||
+             kid2 == CALL_dummyuse(src))) {
+            //Do NOT check the equality of dummyuses.
+            continue;
+        }
+        if (!isIRListIsomorphic(kid1, kid2, is_cmp_kid, flag)) {
+            return false;
+        }
+    }
+    //Note there is no need to ask the number of ir and src must be same.
+    //ASSERT0(i == IR_MAX_KID_NUM(ir) && i == IR_MAX_KID_NUM(src));
+    return true;
 }
 
 
@@ -216,6 +415,7 @@ bool IRMgr::dump() const
 void IRMgr::freeIR(IR * ir)
 {
     ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
+    ASSERTN(!ir->is_undef(), ("ir has been freed"));
     #ifdef _DEBUG_
     ASSERT0(!m_has_been_freed_irs.is_contain(ir->id()));
     m_has_been_freed_irs.bunion(ir->id());
@@ -1019,8 +1219,8 @@ IR * IRMgr::buildStoreArray(IR * base, IR * sublist, Type const* type,
     if (base->is_lda()) {
         //CASE:In C lang, function local const variable initialization is
         //dependent on store operation to stack memory to inialize the variable.
-        //Thus disable the verify of readonly attribute here to facilitate user's
-        //IR generation.
+        //Thus disable the verify of readonly attribute here to facilitate
+        //user's IR generation.
         //e.g:compile/local_const_init.c
         //ASSERTN(!LDA_idinfo(base)->is_readonly(),
         //        ("can not write readonly variable"));
@@ -1077,6 +1277,21 @@ IR * IRMgr::buildContinue()
 IR * IRMgr::buildBreak()
 {
     IR * ir = allocIR(IR_BREAK);
+    IR_dt(ir) = m_tm->getAny();
+    return ir;
+}
+
+
+IR * IRMgr::buildDummyUse(IR * use_list)
+{
+    //NOTE:use_list may be NULL.
+    IR * ir = allocIR(IR_DUMMYUSE);
+    DUMMYUSE_use_list(ir) = use_list;
+    if (use_list != nullptr) {
+        for (IR * u = use_list; u != nullptr; u = u->get_next()) {
+            IR_parent(u) = ir;
+        }
+    }
     IR_dt(ir) = m_tm->getAny();
     return ir;
 }
@@ -1269,6 +1484,19 @@ IR * IRMgr::buildBranch(bool is_true_br, IR * det, LabelInfo const* lab)
     BR_lab(ir) = lab;
     IR_parent(det) = ir;
     return ir;
+}
+
+
+//Build IR_CONST operation.
+//The expression indicates a tensor value.
+IR * IRMgr::buildImmTensor(TenVal * tensor_val, Type const* type)
+{
+    ASSERT0(type && tensor_val);
+    IR * imm = allocIR(IR_CONST);
+    ASSERT0(type->is_tensor());
+    CONST_tensor_val(imm) = tensor_val;
+    IR_dt(imm) = type;
+    return imm;
 }
 
 
@@ -1628,6 +1856,26 @@ IR * IRMgr::buildBinaryOp(IR_CODE irc, Type const* type, IR * lchild,
 }
 
 
+IR * IRMgr::buildTernaryOp(IR_CODE irc, Type const* type, IN IR * opnd0,
+                           IN IR * opnd1, IN IR * opnd2)
+{
+    ASSERT0(type);
+    ASSERT0(isTernaryOp(irc));
+    ASSERT0(opnd0 && opnd0->is_exp() &&
+            opnd1 && opnd1->is_exp() &&
+            opnd2 && opnd2->is_exp());
+    IR * ir = allocIR(irc);
+    TER_opnd0(ir) = opnd0;
+    TER_opnd1(ir) = opnd1;
+    TER_opnd2(ir) = opnd2;
+    IR_parent(opnd0) = ir;
+    IR_parent(opnd1) = ir;
+    IR_parent(opnd2) = ir;
+    IR_dt(ir) = type;
+    return ir;
+}
+
+
 IR * IRMgr::buildStprFromConst(IR * ir, Type const* tp)
 {
     ASSERT0(ir && ir->is_const() && tp);
@@ -1643,6 +1891,95 @@ IR * IRMgr::buildAlloca(IR * size)
     ALLOCA_size(ir) = size;
     IR_parent(size) = ir;
     IR_dt(ir) = m_tm->getPointerType(1);
+    return ir;
+}
+
+
+IR * IRMgr::buildDwarfCFIDefCfa(Type const* tp, IR * reg_num, IR * offset)
+{
+    ASSERT0(tp && reg_num && offset && reg_num->is_exp());
+    IR * ir = allocIR(IR_CFI_DEF_CFA);
+    CCFIDefCfa::accKid(ir, 0) = reg_num;
+    CCFIDefCfa::accKid(ir, 1) = offset;
+    IR_dt(ir) = tp;
+    IR_parent(reg_num) = ir;
+    IR_parent(offset) = ir;
+
+    //Set the side effect flag for cfi_def_cfa to true.
+    //This is necessary because CFI instructions and
+    //machine instructions have no dependencies,
+    //and we want to avoid the CFI instruction being optimized away.
+    IR_has_sideeffect(ir) = true;
+    return ir;
+}
+
+
+IR * IRMgr::buildDwarfCFISameValue(Type const* tp, IR * reg_num)
+{
+    ASSERT0(tp && reg_num && reg_num->is_exp());
+    IR * ir = allocIR(IR_CFI_SAME_VALUE);
+    CCFISameValue::accKid(ir, 0) = reg_num;
+    IR_dt(ir) = tp;
+    IR_parent(reg_num) = ir;
+
+    //Set the side effect flag for cfi_same_value to true.
+    //This is necessary because CFI instructions and
+    //machine instructions have no dependencies,
+    //and we want to avoid the CFI instruction being optimized away.
+    IR_has_sideeffect(ir) = true;
+    return ir;
+}
+
+
+IR * IRMgr::buildDwarfCFIOffset(Type const* tp, IR * reg_num, IR * offset)
+{
+    ASSERT0(tp && reg_num && offset && reg_num->is_exp());
+    IR * ir = allocIR(IR_CFI_OFFSET);
+    CCFIOffset::accKid(ir, 0) = reg_num;
+    CCFIOffset::accKid(ir, 1) = offset;
+    IR_dt(ir) = tp;
+    IR_parent(reg_num) = ir;
+    IR_parent(offset) = ir;
+
+    //Set the side effect flag for cfi_offset to true.
+    //This is necessary because CFI instructions and
+    //machine instructions have no dependencies,
+    //and we want to avoid the CFI instruction being optimized away.
+    IR_has_sideeffect(ir) = true;
+    return ir;
+}
+
+
+IR * IRMgr::buildDwarfCFIRestore(Type const* tp, IR * reg_num)
+{
+    ASSERT0(tp && reg_num && reg_num->is_exp());
+    IR * ir = allocIR(IR_CFI_RESTORE);
+    CCFIRestore::accKid(ir, 0) = reg_num;
+    IR_dt(ir) = tp;
+    IR_parent(reg_num) = ir;
+
+    //Set the side effect flag for cfi_res_store to true.
+    //This is necessary because CFI instructions and
+    //machine instructions have no dependencies,
+    //and we want to avoid the CFI instruction being optimized away.
+    IR_has_sideeffect(ir) = true;
+    return ir;
+}
+
+
+IR * IRMgr::buildDwarfCFICfaOffset(Type const* tp, IR * reg_num)
+{
+    ASSERT0(tp && reg_num && reg_num->is_exp());
+    IR * ir = allocIR(IR_CFI_DEF_CFA_OFFSET);
+    CCFIDefCfaOffset::accKid(ir, 0) = reg_num;
+    IR_dt(ir) = tp;
+    IR_parent(reg_num) = ir;
+
+    //Set the side effect flag for def_cfa_offset to true.
+    //This is necessary because CFI instructions and
+    //machine instructions have no dependencies,
+    //and we want to avoid the CFI instruction being optimized away.
+    IR_has_sideeffect(ir) = true;
     return ir;
 }
 

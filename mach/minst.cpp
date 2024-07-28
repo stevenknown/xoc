@@ -93,11 +93,32 @@ MI_FLAG MIFlagDesc::getFlag(UINT idx)
 //
 //START MInst
 //
+void MInst::copyDbx(IR const* ir, DbxMgr * dbx_mgr)
+{
+    ASSERT0(ir);
+    if (IR_ai(ir) == nullptr) { return; }
+    DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
+    if (da == nullptr) { return; }
+    MI_dbx(this).copy(da->dbx, dbx_mgr);
+}
+
+
 void MInst::dump(OUT xcom::StrBuf & buf, MInstMgr const& mgr) const
 {
     ASSERT0(m_inst_desc);
     buf.strcat("\nMI_CODE:%s, PC:0x%x", mgr.getMInstName(this),
                 (UINT)MI_pc(this));
+    Dbx const* temp = &m_dbx;
+    DbxMgr * dbx_mgr = mgr.getRegion()->getDbxMgr();
+    ASSERT0(dbx_mgr);
+    ASSERT0(temp);
+    if (temp->getLine(LangInfo::LANG_CPP, dbx_mgr) != DBX_UNDEF) {
+        buf.strcat(" file_index:%d, row: %d, col: %d, flag: %d",
+            temp->getFileIndex(LangInfo::LANG_CPP, dbx_mgr),
+            temp->getLine(LangInfo::LANG_CPP, dbx_mgr),
+            temp->getColOffset(LangInfo::LANG_CPP, dbx_mgr),
+            temp->getFlag(LangInfo::LANG_CPP, dbx_mgr));
+    }
     for (UINT i = 0; i < m_inst_desc->getFieldNum(); i++) {
         buf.strcat("\n%s:0x%llx", m_inst_desc->getFieldName(i),
                    (ULONGLONG)getFieldValue(i));
@@ -138,7 +159,7 @@ void MInst::setFieldValue(FIELD_TYPE ft, TMWORD val)
 {
     ASSERT0(m_inst_desc);
     ASSERTN_DUMMYUSE(!xcom::isExceedBitWidth(
-                        val, m_inst_desc->getFieldSizeByFT(ft)),
+                        (ULONGLONG)val, m_inst_desc->getFieldSizeByFT(ft)),
                      ("val %u exceed bitwidth %u",
                       val, m_inst_desc->getFieldSizeByFT(ft)));
     UINT idx = m_inst_desc->getFieldIdx(ft);

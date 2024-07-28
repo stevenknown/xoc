@@ -43,78 +43,165 @@ namespace xoc {
 //target machine. It is an wrapper of interfaces under target/precompile.
 class TargInfoMgr {
     COPY_CONSTRUCTOR(TargInfoMgr);
-private:
+protected:
     Reg m_link;
+
+protected:
+    virtual void initAllocableScalar()
+    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initAllocableVector()
+    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initCalleeScalar() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initCalleeVector() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initCallerScalar() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initCallerVector() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initParamScalar() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initParamVector() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initRetvalScalar() { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void initRetvalVector() { ASSERTN(0, ("Target Dependent Code")); }
+
 public:
-    TargInfoMgr() { init(); }
+    TargInfoMgr() {}
     virtual ~TargInfoMgr() { destroy(); }
 
     void dump(Region const* rg) const;
     void destroy();
 
     REGFILE getRegFile(Reg r) const;
-    RegSet const* getAllocable() const;
-    RegSet const* getCallee() const;
-    RegSet const* getCaller() const;
-    RegSet const* getReturnValue() const;
-    RegSet const* getParam() const;
-    RegSet const* getVectorAllocable() const;
-    RegSet const* getVectorReturnValue() const;
-    RegSet const* getVectorParam() const;
-    RegSet const* getVectorCaller() const;
-    RegSet const* getVectorCallee() const;
+
+    //Get scalar allocable register set of different architectures.
+    virtual xgen::RegSet const* getAllocableScalarRegSet() const;
+
+    //Get vector allocable register set of different architectures.
+    virtual xgen::RegSet const* getAllocableVectorRegSet() const;
+
+    //Get base pointer register of different architectures.
+    virtual xgen::Reg getBP() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get scalar callee saved register set of different architectures.
+    virtual xgen::RegSet const* getCalleeScalarRegSet() const;
+
+    //Get vector callee saved register set of different architectures.
+    virtual xgen::RegSet const* getCalleeVectorRegSet() const;
+
+    //Get end scalar caller saved register of different architectures.
+    virtual xgen::Reg getCallerScalarEnd() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get scalar caller saved register set of different architectures.
+    virtual xgen::RegSet const* getCallerScalarRegSet() const;
+
+    //Get start scalar caller saved register of different architectures.
+    virtual xgen::Reg getCallerScalarStart() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get vector caller saved register set of different architectures.
+    virtual xgen::RegSet const* getCallerVectorRegSet() const;
+
+    //Get frame pointer register of different architectures.
+    virtual xgen::Reg getFP() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get global pointer register of different architectures.
+    virtual xgen::Reg getGP() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get number of registers of different architectures.
+    virtual UINT const getNumOfRegister() const;
+
+    //Get scalar parame register set of different architectures.
+    virtual xgen::RegSet const* getParamScalarRegSet() const;
+
+    //Get start scalar parameter register of different architectures.
+    virtual xgen::Reg getParamScalarStart() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get vector parameter register set of different architectures.
+    virtual xgen::RegSet const* getParamVectorRegSet() const;
+
+    //Get program counter register of different architectures.
+    virtual xgen::Reg getPC() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get return address of different architectures.
+    virtual xgen::Reg getRA() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get scalar allocable register set of different architectures.
+    virtual xgen::RegSet const* getRetvalScalarRegSet() const;
+
+    //Get vector returned value register set of different architectures.
+    virtual xgen::RegSet const* getRetvalVectorRegSet() const;
+
+    //Get stack pointer register of different architectures.
+    virtual xgen::Reg getSP() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get target address register of different architectures.
+    virtual xgen::Reg getTA() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get temporary register of different architectures.
+    virtual xgen::Reg getTemp() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get zero register of different architectures.
+    virtual xgen::Reg getZero() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
     Reg getLink() const { return m_link; }
     virtual CHAR const* getRegName(Reg r) const;
     virtual CHAR const* getRegFileName(REGFILE rf) const;
 
     bool isAllocable(Reg r) const
     {
-        RegSet const* s = getAllocable();
+        RegSet const* s = getAllocableScalarRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isCallee(Reg r) const
     {
-        RegSet const* s = getCallee();
+        RegSet const* s = getCalleeScalarRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isCaller(Reg r) const
     {
-        RegSet const* s = getCaller();
+        RegSet const* s = getCallerScalarRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isReturnValue(Reg r) const
     {
-        RegSet const* s = getReturnValue();
+        RegSet const* s = getRetvalScalarRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isParam(Reg r) const
     {
-        RegSet const* s = getParam();
+        RegSet const* s = getParamScalarRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isVectorAllocable(Reg r) const
     {
-        RegSet const* s = getVectorAllocable();
+        RegSet const* s = getAllocableVectorRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isVectorCallee(Reg r) const
     {
-        RegSet const* s = getVectorCallee();
+        RegSet const* s = getCalleeVectorRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isVectorCaller(Reg r) const
     {
-        RegSet const* s = getVectorCaller();
+        RegSet const* s = getCallerVectorRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isVectorReturnValue(Reg r) const
     {
-        RegSet const* s = getVectorReturnValue();
+        RegSet const* s = getRetvalVectorRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isVectorParam(Reg r) const
     {
-        RegSet const* s = getVectorParam();
+        RegSet const* s = getParamVectorRegSet();
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isLink(Reg r) const { return getLink() == r; }

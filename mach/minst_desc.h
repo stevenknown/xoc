@@ -118,6 +118,11 @@ public:
     MemAccInstDesc(mach::MInstMgr const& im) : MInstDesc(im) {}
 };
 
+class DwarfCFIInstDesc : public mach::MInstDesc {
+public:
+    DwarfCFIInstDesc(mach::MInstMgr const& im) : MInstDesc(im) {}
+};
+
 } //namespace
 
 #endif

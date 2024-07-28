@@ -39,7 +39,7 @@ namespace xcom {
 //    lattice L = {i,j|2i+1, 3j+5|i,j¡ÊZ}
 class ZPoly {
     RMat m_domain;
-    INTMat m_lattice; //an affine, invertible matrix.
+    IMat m_lattice; //an affine, invertible matrix.
 public:
 
 };
@@ -56,6 +56,7 @@ public:
 #define CST_EQ 4 //equal to
 
 class Lineq {
+protected:
     BYTE m_is_init:1; //To make sure functions are idempotent.
     BYTE m_is_dump:1;
 
@@ -64,116 +65,92 @@ class Lineq {
     //If 'cst_col' does not equal to 'm_col_size - 1', it means,
     //each column from 'cst_col + 1' to 'm_col_size -1' represent one
     //constant symbol.
-    //e.g: x+y <= 10 + M + N, where M, N represent constant symbols respectively.
+    //e.g: x+y <= 10 + M + N, where M, N represent constant symbols
+    //respectively.
     //Default value is -1, indicate last column is constant vector.
     INT m_cst_col;
 
     //Record coeff of inequality: Ax <= b+C(x), where C(x) is function of
     //symbolic constant.
     RMat * m_coeff;
-
-    INT compareConstIterm(RMat const& m,
-                          UINT cst_col,
-                          INT idx_of_eqt1,
+    RMatMgr m_rmmgr;
+    IMatMgr m_immgr;
+protected:
+    INT compareConstIterm(RMat const& m, UINT cst_col, INT idx_of_eqt1,
                           Rational v);
-    INT compareConstIterm(RMat const& m,
-                          UINT cst_col,
-                          INT idx_of_eqt1,
+    INT compareConstIterm(RMat const& m, UINT cst_col, INT idx_of_eqt1,
                           INT idx_of_eqt2);
-    INT selectLeadingColumn(INTMat const& coeff,
-                            Vector<bool> const& is_noneg,
+    void combine(OUT IMat & res, IMat const& coeff,
+                 UINT nc, UINT pc, UINT lc, UINT pos);
+    void combineRays(OUT IMat & res, MOD IMat & coeff,
+                     UINT r1, UINT r2, UINT lc, UINT pos);
+
+    RMatMgr & getRMatMgr() { return m_rmmgr; }
+    IMatMgr & getIMatMgr() { return m_immgr; }
+
+    bool omit(IMat const& coeff, UINT ncv, UINT pcv, UINT rhs_part,
+              Vector<UINT> const& combined, Vector<UINT> const& noneg);
+
+    void removeRedRow(MOD IMat & cs, IMat const& org_cone, UINT rhs_part);
+
+    INT selectLeadingColumn(IMat const& coeff, Vector<bool> const& is_noneg,
                             UINT rhs_part);
-    void combine(OUT INTMat & res,
-                 INTMat const& coeff,
-                 UINT nc,
-                 UINT pc,
-                 UINT lc,
-                 UINT pos);
-    void combineRays(OUT INTMat & res,
-                     MOD INTMat & coeff,
-                     UINT r1,
-                     UINT r2,
-                     UINT lc,
-                     UINT pos);
-    bool omit(INTMat const& coeff,
-              UINT ncv,
-              UINT pcv,
-              UINT rhs_part,
-              Vector<UINT> const& combined,
-              Vector<UINT> const& noneg);
-    void removeRedRow(MOD INTMat & cs,
-                      INTMat const& org_cone,
-                      UINT rhs_part);
 public:
     Lineq(RMat * m, INT cst_col = CST_COL_UNDEF);
     ~Lineq();
-    void init(RMat * m, INT cst_col = CST_COL_UNDEF);
-    void destroy();
 
     void appendEquation(RMat const& eq);
+
+    bool convertRay2Constraint(
+        IMat const& gmat, OUT IMat & cs, UINT cslimit = 100);
+    bool convertConstraint2Ray(
+        OUT IMat & gmat, IMat const& cs, UINT cst_col,
+        UINT raylimit = 1000);
+    bool calcBound(MOD List<RMat*> & limits);
+    void ConvexHullUnionAndIntersect(
+        OUT RMat & res, IN List<RMat*> & chulls, UINT cst_col,
+        bool is_intersect);
 
     //Dumps variable, forms as
     //  ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
     //           a(k+1)x(k+1) + ... + anxn.
     void dumps_var_bound(UINT u);
+    void destroy();
 
-    //Set index of const column and coeff matrix.
-    void setParam(RMat * m, INT cst_col = CST_COL_UNDEF);
-    void set_dump(bool is_dump) { m_is_dump = is_dump; }
-    bool reduce(MOD RMat & m, UINT cst_col, bool is_intersect);
-    void ConvexHullUnionAndIntersect(OUT RMat & res,
-                                     IN List<RMat*> & chulls,
-                                     UINT cst_col,
-                                     bool is_intersect);
+    void EhartPoly(OUT RMat & res, IN RMat & a, UINT cst_col);
 
-    //Fourier-Motzkin elimination
-    bool fme(UINT const u, OUT RMat & res, bool const darkshadow = false);
-    bool is_consistent();
-    bool has_solution(RMat const& leq,
-                      RMat const& eq,
-                      RMat const& vc,
-                      UINT cst_col,
-                      bool is_int_sol,
-                      bool is_unique_sol);
-    void initVarConstraint(Vector<INT> const& sign,
-                           MOD RMat & vc,
-                           UINT cst_col);
-    void substituteAndExpand(MOD RMat & coeff,
-                             UINT cst_col,
-                             RMat const& p,
-                             UINT sub_var);
     //Represent variable, forms as
     //    ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
     //             a(k+1)x(k+1) + ... + anxn.
     void formatBound(UINT u, OUT RMat & ineqt_of_u);
-    bool calcBound(MOD List<RMat*> & limits);
 
-    void move2cstsym(IN RMat & ieq,
-                     UINT cst_col,
-                     UINT first_var,
-                     UINT last_var,
-                     OUT UINT * first_sym_idx,
-                     OUT UINT * last_sym_idx);
-    void move2var(IN RMat & ieq,
-                  UINT cst_col,
-                  UINT first_sym,
-                  UINT last_sym,
-                  OUT UINT * first_var_idx,
-                  OUT UINT * last_var_idx);
-    void removeIdenRow(MOD RMat & m);
+    //Fourier-Motzkin elimination
+    bool fme(UINT const u, OUT RMat & res, bool const darkshadow = false);
+
+    bool is_consistent();
+    void init(RMat * m, INT cst_col = CST_COL_UNDEF);
+    void initVarConstraint(Vector<INT> const& sign, MOD RMat & vc,
+                           UINT cst_col);
+
+    bool has_solution(RMat const& leq, RMat const& eq, RMat const& vc,
+                      UINT cst_col, bool is_int_sol, bool is_unique_sol);
+    void move2cstsym(IN RMat & ieq, UINT cst_col, UINT first_var, UINT last_var,
+                     OUT UINT * first_sym_idx, OUT UINT * last_sym_idx);
+    void move2var(IN RMat & ieq, UINT cst_col, UINT first_sym, UINT last_sym,
+                  OUT UINT * first_var_idx, OUT UINT * last_var_idx);
 
     //Polyhedra operation
-    bool convertConstraint2Ray(OUT INTMat & gmat,
-                               INTMat const& cs,
-                               UINT cst_col,
-                               UINT raylimit = 1000);
-    bool convertRay2Constraint(INTMat const& gmat,
-                               OUT INTMat & cs,
-                               UINT cslimit = 100);
     void PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT cst_col);
     void PolyImage(OUT RMat & res, IN RMat & a, UINT cst_col);
-    void EhartPoly(OUT RMat & res, IN RMat & a, UINT cst_col);
 
+    bool reduce(MOD RMat & m, UINT cst_col, bool is_intersect);
+    void removeIdenRow(MOD RMat & m);
+
+    //Set index of const column and coeff matrix.
+    void setParam(RMat * m, INT cst_col = CST_COL_UNDEF);
+    void set_dump(bool is_dump) { m_is_dump = is_dump; }
+    void substituteAndExpand(MOD RMat & coeff, UINT cst_col, RMat const& p,
+                             UINT sub_var);
 };
 
 } //namespace xcom

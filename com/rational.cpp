@@ -37,26 +37,21 @@ namespace xcom {
 
 #define REDUCE
 
-Rational::Rational()
-{
-    m_num = 0;
-    m_den = 1;
-}
+Rational::Rational() : m_num(0), m_den(1)
+{}
 
 
-Rational::Rational(Rational const& r)
+Rational::Rational(Rational const& r) : m_num(r.m_num), m_den(r.m_den)
 {
     //Sometimes, r need not to initialize always.
     //ASSERTN(r.m_den != 0, ("denominator is 0!"));
-    m_num = r.m_num;
-    m_den = r.m_den;
 }
 
 
 Rational::Rational(INT num, INT den)
 {
     ASSERTN(den != 0, ("denominator is 0!"));
-    m_num = num,  m_den = den;
+    m_num = num, m_den = den;
 }
 
 
@@ -75,7 +70,7 @@ void Rational::reduce()
         m_den = 1;
         return;
     }
-    FRAC_TYPE gcd = _gcd(m_num, m_den);
+    FType gcd = _gcd(m_num, m_den);
     if (gcd == 1) {
         if (m_den < 0) {
             m_den = -m_den;
@@ -107,9 +102,9 @@ Rational Rational::abs()
 }
 
 
-FRAC_TYPE Rational::_gcd(FRAC_TYPE x, FRAC_TYPE y)
+Rational::FType Rational::_gcd(FType x, FType y)
 {
-    FRAC_TYPE t;
+    FType t;
     if (x < 0) { x = -x; }
     if (y < 0) { y = -y; }
     if ( x > y ) {
@@ -303,18 +298,18 @@ Rational operator * (Rational const& a, Rational const& b)
 
     //Enforce conversion from 'int64' to 'int32',
     //even if it possible loss of data.
-    rat.m_num = (FRAC_TYPE)(rnum < 0 ? -trnum : trnum);
-    rat.m_den = (FRAC_TYPE)rden;
+    rat.m_num = (Rational::FType)(rnum < 0 ? -trnum : trnum);
+    rat.m_den = (Rational::FType)rden;
     return rat;
 }
 
 
 Rational operator / (Rational const& a, Rational const& b)
 {
-    FRAC_TYPE anum = a.m_num;
-    FRAC_TYPE aden = a.m_den;
-    FRAC_TYPE bnum = b.m_num;
-    FRAC_TYPE bden = b.m_den;
+    Rational::FType anum = a.m_num;
+    Rational::FType aden = a.m_den;
+    Rational::FType bnum = b.m_num;
+    Rational::FType bden = b.m_den;
 
     ASSERTN(aden != 0 && bden != 0, ("denominator is 0"));
     ASSERTN(bnum != 0, ("'a' divided by 0"));
@@ -354,8 +349,8 @@ Rational operator / (Rational const& a, Rational const& b)
                     (ratden < (LONGLONG)(INT_MAX)));
         }
     }
-    rat.m_num = (FRAC_TYPE)(ratnum < 0 ? -trnum : trnum);
-    rat.m_den = (FRAC_TYPE)ratden;
+    rat.m_num = (Rational::FType)(ratnum < 0 ? -trnum : trnum);
+    rat.m_den = (Rational::FType)ratden;
     return rat;
 }
 
@@ -391,8 +386,8 @@ Rational operator + (Rational const& a, Rational const& b)
                     (rden < (LONGLONG)(INT_MAX)));
         }
     }
-    rat.m_num = (FRAC_TYPE)(rnum < 0 ? -trnum : trnum);
-    rat.m_den = (FRAC_TYPE)rden;
+    rat.m_num = (Rational::FType)(rnum < 0 ? -trnum : trnum);
+    rat.m_den = (Rational::FType)rden;
     return rat;
 }
 

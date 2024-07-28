@@ -46,10 +46,10 @@ double LTPriorityMgr::computePriority(LifeTime const* lt) const
     double prio = 0.0;
     OccList const& occlst = const_cast<LifeTime*>(lt)->getOccList();
     UINT count = 0;
-    for (it = occlst.get_head(); it != occlst.end(); it = occlst.get_next(it)) {
+    for (Occ occ  = occlst.get_head(&it); it != occlst.end();
+         occ = occlst.get_next(&it)) {
         count++;
         double tprio = 1.0;
-        Occ occ = it->val();
         ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
         IRBB const* occbb = occ.getBB();
         ASSERT0(occbb);

@@ -94,6 +94,8 @@ void PassMgr::destroyAllPass()
          p != nullptr; p = irmgr_pass_lst.get_next()) {
         delete p;
     }
+    m_allocated_pass.clean();
+    m_registered_pass.clean();
 }
 
 
@@ -272,6 +274,12 @@ Pass * PassMgr::allocVectorization()
 }
 
 
+Pass * PassMgr::allocMultiResConvert()
+{
+    return new MultiResConvert(m_rg);
+}
+
+
 Pass * PassMgr::allocLoopDepAna()
 {
     return new LoopDepAna(m_rg, (GVN*)registerPass(PASS_GVN));
@@ -355,6 +363,17 @@ Pass * PassMgr::allocIRReloc()
 }
 
 
+Pass * PassMgr::allocArgPasser()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new ArgPasser(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocCCP()
 {
     //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PRSSA_MGR));
@@ -402,7 +421,7 @@ Pass * PassMgr::allocCFG()
 {
     BBList * bbl = m_rg->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
-    return new IRCFG(C_SEME, bbl, m_rg, n);
+    return new IRCFG(bbl, m_rg, n);
 }
 
 
@@ -453,6 +472,17 @@ Pass * PassMgr::allocCalcDerivative()
     #ifdef FOR_IP
     return new CalcDerivative(m_rg);
     #else
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocIGotoOpt()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new IGotoOpt(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }
@@ -596,6 +626,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_VECT:
         pass = allocVectorization();
         break;
+    case PASS_MULTI_RES_CVT:
+        pass = allocMultiResConvert();
+        break;
     case PASS_LOOP_DEP_ANA:
         pass = allocLoopDepAna();
         break;
@@ -616,6 +649,12 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_IRRELOC:
         pass = allocIRReloc();
+        break;
+    case PASS_ARGPASSER:
+        pass = allocArgPasser();
+        break;
+    case PASS_IGOTO_OPT:
+        pass = allocIGotoOpt();
         break;
     default: ASSERTN(0, ("Unsupport Pass."));
     }
@@ -641,13 +680,13 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
         num++;
         passty = (PASS_TYPE)va_arg(ptr, UINT);
     }
-    va_end(ptr);
     checkValidAndRecompute(oc, optlist);
+    va_end(ptr);
 }
 
 
-void PassMgr::checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
-                                       BitSet const& opts)
+void PassMgr::checkAndRecomputeDUChain(
+    OptCtx * oc, DUMgr * dumgr, BitSet const& opts)
 {
     if (oc->is_pr_du_chain_valid() && oc->is_nonpr_du_chain_valid()) {
         return;
@@ -768,14 +807,130 @@ void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
 }
 
 
-void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
+void PassMgr::checkValidAndRecomputePass(
+    PASS_TYPE pt, MOD OptCtx * oc, PassTypeList const& optlist,
+    IRCFG *& cfg, AliasAnalysis *& aa, DUMgr *& dumgr, BitSet const& opts)
+{
+    switch (pt) {
+    case PASS_CFG:
+        if (!oc->is_cfg_valid()) {
+            if (cfg == nullptr) {
+                //CFG is not constructed.
+                cfg = (IRCFG*)registerPass(PASS_CFG);
+                cfg->initCFG(*oc);
+            } else {
+                //CAUTION: validation of CFG should maintained by user.
+                //Note rebuild CFG will not erase Entry BB information, so
+                //if you expect to reconstruct whole CFG, please destroy
+                //the PASS_CFG first, by destroyRegisteredPass(PASS_CFG), and
+                //register the CFG pass, by registerPass(PASS_CFG), again.
+                cfg->rebuild(*oc);
+            }
+        }
+        break;
+    case PASS_CDG: {
+        CDG * cdg = (CDG*)registerPass(PASS_CDG);
+        ASSERT0(cdg); //cdg is not enable.
+        if (!cdg->is_valid()) {
+            ASSERTN(cfg && oc->is_cfg_valid(),
+                    ("You should make CFG available first."));
+            cdg->perform(*oc);
+        } else {
+            ASSERT0(cdg->verify());
+        }
+        break;
+    }
+    case PASS_DOM:
+    case PASS_PDOM:
+        if (!oc->is_dom_valid()) {
+            ASSERTN(cfg && oc->is_cfg_valid(),
+                    ("You should make CFG available first."));
+            cfg->computeDomAndIdom(*oc);
+        }
+        if (!oc->is_pdom_valid()) {
+            ASSERTN(cfg && oc->is_cfg_valid(),
+                    ("You should make CFG available first."));
+            cfg->computePdomAndIpdom(*oc);
+        }
+        break;
+    case PASS_EXPR_TAB:
+        if (!oc->isPassValid(PASS_EXPR_TAB) &&
+            m_rg->getBBList() != nullptr &&
+            m_rg->getBBList()->get_elem_count() != 0) {
+            ExprTab * exprtab = (ExprTab*)registerPass(PASS_EXPR_TAB);
+            ASSERT0(exprtab);
+            exprtab->perform(*oc);
+        }
+        break;
+    case PASS_LOOP_INFO:
+        if (!oc->is_loopinfo_valid()) {
+            ASSERTN(cfg && oc->is_cfg_valid(),
+                    ("You should make CFG available first."));
+            cfg->LoopAnalysis(*oc);
+        } else {
+            cfg->verifyLoopInfo(*oc);
+        }
+        break;
+    case PASS_RPO:
+        ASSERTN(cfg && oc->is_cfg_valid(),
+                ("You should make CFG available first."));
+        if (!oc->is_rpo_valid() || cfg->getRPOVexList() == nullptr) {
+            cfg->computeRPO(*oc);
+        } else {
+            ASSERT0(cfg->verifyRPO(*oc));
+        }
+        break;
+    case PASS_SCC:
+        if (!oc->is_scc_valid()) {
+            ASSERTN(cfg && oc->is_cfg_valid(),
+                    ("You should make CFG available first."));
+            GSCC * gscc = (GSCC*)registerPass(PASS_SCC);
+            ASSERT0(gscc); //scc is not enable.
+            gscc->perform(*oc);
+        }
+        break;
+    case PASS_AA:
+    case PASS_DU_REF:
+    case PASS_LIVE_EXPR:
+    case PASS_REACH_DEF:
+    case PASS_AVAIL_REACH_DEF:
+        checkAndRecomputeAAandDU(oc, cfg, aa, dumgr, opts);
+        break;
+    case PASS_DU_CHAIN:
+        checkAndRecomputeDUChain(oc, dumgr, opts);
+        break;
+    default: {
+        Pass * pass = registerPass(pt);
+        if (pass != nullptr || !pass->is_valid()) {
+            pass->perform(*oc);
+        }
+    }
+    }
+}
+
+
+void PassMgr::checkValidAndRecomputeImpl(
+    MOD OptCtx * oc, PassTypeList const& optlist, BitSet const& opts)
+{
+    IRCFG * cfg = (IRCFG*)queryPass(PASS_CFG);
+    AliasAnalysis * aa = nullptr;
+    DUMgr * dumgr = nullptr;
+    PassTypeListIter it;
+    for (optlist.get_head(&it); it != optlist.end();
+         it = optlist.get_next(it)) {
+        PASS_TYPE pt = it->val();
+        checkValidAndRecomputePass(pt, oc, optlist, cfg, aa, dumgr, opts);
+    }
+}
+
+
+void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList const& optlist)
 {
     ASSERTN(optlist.get_elem_count() < 1000,
             ("too many pass queried or miss ending placeholder"));
     if (optlist.get_elem_count() == 0) { return; }
-
     BitSet opts;
-    C<PASS_TYPE> * it;
+    PassTypeListIter it;
     for (optlist.get_head(&it); it != nullptr; optlist.get_next(&it)) {
         PASS_TYPE passty = it->val();
         if (passty == PASS_UNDEF) { continue; }
@@ -788,106 +943,7 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
         opts.bunion(PASS_DOM);
         opts.bunion(PASS_PDOM);
     }
-
-    IRCFG * cfg = (IRCFG*)queryPass(PASS_CFG);
-    AliasAnalysis * aa = nullptr;
-    DUMgr * dumgr = nullptr;
-
-    for (optlist.get_head(&it); it != optlist.end();
-         it = optlist.get_next(it)) {
-        PASS_TYPE pt = it->val();
-        switch (pt) {
-        case PASS_CFG:
-            if (!oc->is_cfg_valid()) {
-                if (cfg == nullptr) {
-                    //CFG is not constructed.
-                    cfg = (IRCFG*)registerPass(PASS_CFG);
-                    cfg->initCFG(*oc);
-                } else {
-                    //CAUTION: validation of CFG should maintained by user.
-                    cfg->rebuild(*oc);
-                }
-            }
-            break;
-        case PASS_CDG: {
-            CDG * cdg = (CDG*)registerPass(PASS_CDG);
-            ASSERT0(cdg); //cdg is not enable.
-            if (!cdg->is_valid()) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                cdg->perform(*oc);
-            } else {
-                ASSERT0(cdg->verify());
-            }
-            break;
-        }
-        case PASS_DOM:
-        case PASS_PDOM:
-            if (!oc->is_dom_valid()) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                cfg->computeDomAndIdom(*oc);
-            }
-            if (!oc->is_pdom_valid()) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                cfg->computePdomAndIpdom(*oc);
-            }
-            break;
-        case PASS_EXPR_TAB:
-            if (!oc->isPassValid(PASS_EXPR_TAB) &&
-                m_rg->getBBList() != nullptr &&
-                m_rg->getBBList()->get_elem_count() != 0) {
-                ExprTab * exprtab = (ExprTab*)registerPass(PASS_EXPR_TAB);
-                ASSERT0(exprtab);
-                exprtab->perform(*oc);
-            }
-            break;
-        case PASS_LOOP_INFO:
-            if (!oc->is_loopinfo_valid()) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                cfg->LoopAnalysis(*oc);
-            } else {
-                cfg->verifyLoopInfo(*oc);
-            }
-            break;
-        case PASS_RPO:
-            ASSERTN(cfg && oc->is_cfg_valid(),
-                    ("You should make CFG available first."));
-            if (!oc->is_rpo_valid() || cfg->getRPOVexList() == nullptr) {
-                cfg->computeRPO(*oc);
-            } else {
-                ASSERT0(cfg->verifyRPO(*oc));
-            }
-            break;
-        case PASS_SCC:
-            if (!oc->is_scc_valid()) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                GSCC * gscc = (GSCC*)registerPass(PASS_SCC);
-                ASSERT0(gscc); //scc is not enable.
-                gscc->perform(*oc);
-            }
-            break;
-        case PASS_AA:
-        case PASS_DU_REF:
-        case PASS_LIVE_EXPR:
-        case PASS_REACH_DEF:
-        case PASS_AVAIL_REACH_DEF:
-            checkAndRecomputeAAandDU(oc, cfg, aa, dumgr, opts);
-            break;
-        case PASS_DU_CHAIN:
-            checkAndRecomputeDUChain(oc, dumgr, opts);
-            break;
-        default: {
-            Pass * pass = registerPass(pt);
-            if (pass != nullptr || !pass->is_valid()) {
-                pass->perform(*oc);
-            }
-        }
-        } //end switch
-    } //end for
+    checkValidAndRecomputeImpl(oc, optlist, opts);
 }
 
 } //namespace xoc

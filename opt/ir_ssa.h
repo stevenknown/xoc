@@ -398,6 +398,7 @@ class PRSSAMgr : public Pass {
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
+    IRMgr * m_irmgr;
     DefSegMgr * m_seg_mgr;
     LivenessMgr * m_livemgr;
     //Record OptCtx in used. It is always updated in perform().
@@ -601,6 +602,7 @@ public:
         clean();
         ASSERT0(rg);
         m_tm = rg->getTypeMgr();
+        m_irmgr = rg->getIRMgr();
         ASSERT0(m_tm);
         ASSERT0(rg->getMiscBitSetMgr());
         m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
@@ -765,6 +767,7 @@ public:
     virtual CHAR const* getPassName() const { return "PRSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_PRSSA_MGR; }
     IRCFG * getCFG() const { return m_cfg; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.
@@ -781,7 +784,7 @@ public:
     //e.g: phi $1 = ($2, $2, $2), return true.
     //     phi $1 = (0x3, $2, $2), return false.
     //Note if 'bb' does NOT have any PHI, the function will return true.
-    static bool hasPhiWithAllSameOperand(IRBB const* bb);
+    bool hasPhiWithAllSameOperand(IRBB const* bb) const;
 
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.

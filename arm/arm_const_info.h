@@ -150,6 +150,17 @@ author: Su Zhenyu
 //This is an expirical value.
 #define THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY 70000
 
+//HACK CODE TO BE REMOVED
+//Element number of vector type.
+//For type intv16, uintv16, floatv16, float16v16.
+//Also used for type vec<bool*16> in IR.
+#define ELEM_NUM_OF_16_ELEM_VECTOR_TYPE 16
+
+//HACK CODE TO BE REMOVED
+//For type shortv32, ushortv32.
+//Also used for type vec<bool*32> in IR.
+#define ELEM_NUM_OF_32_ELEM_VECTOR_TYPE 32
+
 //Defined macros to skip some special argument registers when passing
 //arguments.
 #define TO_BE_COMPATIBLE_WITH_ARM_LINUX_GNUEABI

@@ -188,7 +188,7 @@ public:
         void dump(Region const* rg) const;
     };
     typedef xcom::TTabIter<UINT> UseSetIter;
-
+public:
     UINT m_version; //unique version of MD.
     UINT m_mdid; //id of current virtual MD.
     MDDef * m_def_stmt; //each versioned MD has an unique Definition.
@@ -338,6 +338,8 @@ public:
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
     VOpnd * getVOpndForMD(UINT mdid, MDSSAMgr const* mgr) const;
 
+    //If MDSSAInfo is allocated in mempool, the function needs to be invoked
+    //to initialize base class object.
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
 
     //Return true if all definition of vopnds can reach 'exp'.
@@ -618,12 +620,10 @@ protected:
     xcom::Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
     MDDefVec m_def_vec;
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
-
 protected:
     void buildMDPhiOpnd(MDPhi * phi, UINT mdid, UINT num_operands);
     void cleanOrDestroy(bool is_reinit);
     void destroyMD2VMDVec();
-
 public:
     UseDefMgr(Region * rg, MDSSAMgr * mgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
@@ -695,6 +695,14 @@ public:
 
     //Set 'mdssainfo' to ir.
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);
+};
+
+class CompareConstMDDefFunc {
+public:
+    bool is_less(MDDef const* t1, MDDef const* t2) const
+    { return t1->id() < t2->id(); }
+    bool is_equ(MDDef const* t1, MDDef const* t2) const { return t1 == t2; }
+    MDDef const* createKey(MDDef const* t) { return t; }
 };
 
 } //namespace xoc
