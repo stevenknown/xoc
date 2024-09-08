@@ -43,6 +43,11 @@ ifeq ($(TARG),)
   TARG=FOR_DEX
 endif
 
+ifeq ($(TARG_DIR),)
+  #SET DEFAULT TARG_DIR. TARG INFORM IS USELESS TO READELF.EXE
+  TARG_DIR=../dex
+endif
+
 include $(ELF_DIR)/Makefile.inc
 include $(COM_DIR)/Makefile.inc
 include $(ROOT_DIR)/Makefile.option
@@ -140,8 +145,8 @@ $(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) \
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
-      CFLAGS="$(CFLAGS)"
+	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) TARG_DIR="$(TARG_DIR)" \
+      DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
 
 %.o:%.cpp
 	@echo "BUILD $<"

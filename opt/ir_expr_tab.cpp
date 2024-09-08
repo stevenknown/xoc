@@ -143,12 +143,14 @@ bool ExprTab::dump() const
     if (!m_rg->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    getRegion()->getLogMgr()->incIndent(2);
     for (UINT i = 0; i < m_ir_expr_vec.get_elem_count(); i++) {
         ExprRep const* ie = m_ir_expr_vec.get(i);
         if (ie == nullptr) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
         ie->dump(m_rg);
     }
+    getRegion()->getLogMgr()->decIndent(2);
     return true;
 }
 

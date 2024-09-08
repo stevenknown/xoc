@@ -613,6 +613,7 @@ public:
     void recordUsedCaller(Reg r);
 };
 
+typedef xcom::TMap<Type const*, Var *> Ty2Var;
 
 //The class represents the basic structure and interface of linear-scan register
 //allocation.
@@ -636,11 +637,13 @@ protected:
     IRTab m_reload_tab;
     IRTab m_remat_tab;
     IRTab m_move_tab;
+    IRTab m_fake_use_tab;
     DedicatedMgr m_dedicated_mgr;
     PRNO2Var m_prno2var;
     ActMgr m_act_mgr;
     Vector<UINT> m_bb_seqid;
     xcom::TTab<PRNO> m_prno_with_2d_hole;
+    Ty2Var m_ty2var;
 protected:
     LifeTimeMgr * allocLifeTimeMgr(Region * rg)
     { ASSERT0(rg); return new LifeTimeMgr(rg); }
@@ -681,7 +684,10 @@ public:
     //For example: There is a ZERO register on some architecture, the value in
     //this register is always zero, it cannot be changed.
     virtual bool canSpillAvoid(PRNO prno) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
+    {
+        ASSERT0(prno != PRNO_UNDEF);
+        return !getLT(prno)->isOccHasDef();
+    }
 
     void addPrnoWith2dLTHole(PRNO prno) { m_prno_with_2d_hole.append(prno); }
 
@@ -706,6 +712,7 @@ public:
 
     //Construct a name for Var that will lived in Region.
     CHAR const* genFuncLevelNewVarName(OUT xcom::StrBuf & name);
+    Var * getSpillLoc(Type const* ty);
     Var * getSpillLoc(PRNO prno);
     Var * genSpillLoc(PRNO prno, Type const* ty);
     Var * genFuncLevelVar(Type const* type, UINT align);
@@ -814,13 +821,31 @@ public:
                pthis->getMoveTab().get_elem_count() != 0;
     }
 
-    bool isMoveOp(IR const* ir) const;
+    bool isMoveOp(IR const* ir) const
+    { return m_move_tab.find(const_cast<IR*>(ir)); }
+
     bool isPrnoAlias(PRNO prno, PRNO alias) const;
+
     //Return true if ir is rematerializing operation.
-    virtual bool isRematLikeOp(IR const* ir) const;
-    bool isReloadOp(IR const* ir) const;
-    bool isRematOp(IR const* ir) const;
-    bool isSpillOp(IR const* ir) const;
+    virtual bool isRematLikeOp(IR const* ir) const
+    {
+        if (!ir->is_stpr()) { return false; }
+        if (!ir->getRHS()->is_lda() || !ir->getRHS()->is_const()) {
+            return false;
+        }
+        return true;
+    }
+    bool isReloadOp(IR const* ir) const
+    { return m_reload_tab.find(const_cast<IR*>(ir)); }
+
+    bool isRematOp(IR const* ir) const
+    { return m_remat_tab.find(const_cast<IR*>(ir)); }
+
+    bool isSpillOp(IR const* ir) const
+    { return m_spill_tab.find(const_cast<IR*>(ir)); }
+
+    bool isFakeUseOp(IR const* ir) const
+    { return m_fake_use_tab.find(const_cast<IR*>(ir)); }
 
     //This func is used to check the TMP register is available or not for the
     //input type.
@@ -858,6 +883,7 @@ public:
     //the regular registers.
     void setFPAllocableAllowed(bool allowed)
     { m_is_fp_allocable_allowed = allowed; }
+    void setFakeUse(IR * ir) { m_fake_use_tab.append(ir); }
     void setMove(IR * ir) { m_move_tab.append(ir); }
     void setReg(PRNO prno, Reg reg);
     void setReload(IR * ir) { m_reload_tab.append(ir); }

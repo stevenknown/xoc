@@ -46,23 +46,19 @@ namespace xoc {
 //For each version of each prno, VPR is unique.
 typedef IRSetIter SSAUseIter;
 
-#define SSA_id(ssainfo) ((ssainfo)->uid)
-#define SSA_def(ssainfo) ((ssainfo)->def_stmt)
-#define SSA_uses(ssainfo) ((ssainfo)->use_exp_set)
+#define SSA_id(ssainfo) ((ssainfo)->m_uid)
+#define SSA_def(ssainfo) ((ssainfo)->m_def_stmt)
+#define SSA_uses(ssainfo) ((ssainfo)->m_use_exp_set)
 class SSAInfo {
     COPY_CONSTRUCTOR(SSAInfo);
 protected:
-    void cleanMember()
-    {
-        uid = 0;
-        def_stmt = nullptr;
-    }
+    void cleanMember() { m_uid = 0; m_def_stmt = nullptr; }
 public:
-    UINT uid;
-    IR * def_stmt;
-    IRSet use_exp_set;
+    UINT m_uid;
+    IR * m_def_stmt;
+    IRSet m_use_exp_set;
 public:
-    SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
+    SSAInfo(DefSegMgr * sm) : m_use_exp_set(sm) { cleanMember(); }
 
     //Add an USE reference.
     //This function build DU chain between DEF and 'use'.
@@ -96,7 +92,7 @@ public:
     void copyUseSet(SSAInfo const& src) { SSA_uses(this).copy(src.getUses()); }
 
     //Get SSAInfo id.
-    UINT id() const { return uid; }
+    UINT id() const { return m_uid; }
     void init(DefSegMgr * sm)
     {
         cleanMember();
@@ -116,6 +112,7 @@ public:
 
     //Get the DEF stmt.
     IR * getDef() const { return SSA_def(this); }
+
     //Get the USE set of expressions.
     IRSet const& getUses() const { return SSA_uses(this); }
 
@@ -132,7 +129,31 @@ public:
 };
 
 
-//Version PR.
+//The class represents Versioned PR.
+//A PR will be versioned during SSA transformation. When one PR is versisoned,
+//its PRNO will be changed to a new PRNO. The 'orgprno' records the original
+//PRNO before versioned, and 'newprno' records the new PRNO that assigned to
+//current PR operation. Usually, we call the versioned process SSA renaming.
+//e.g: the versioned process might generate following VPR:
+//  VPR1:$1v0--: DEF:--
+//  VPR2:$1v1$2: DEF:stpr($2,id:20) USE:--
+//  VPR3:$3v1$3: DEF:stpr($3,id:33) USE:id:32
+//  VPR7:$7v0--: DEF:--
+//  VPR8:$7v1$9: DEF:stpr($9,id:49) USE:id:58
+//  VPR9:$7v2$8: DEF:phi($8,id:55) USE:id:50,id:51
+//where VPR1 does not have DEF, it is the region live-in PR, note $1's version
+//is INIT_VERSION, VPR2 is renamed from $1 to $2 by the DEF stmt
+//'stpr($2 id:20)'.
+//VPR3 described a DEF stmt 'stpr($3,id:33)' to $3 that make the first
+//occurrence of $3 is a DEF, in other words VPR3 tell us that $3 is NOT region
+//live-in PR, and its first DEF result is $3, thus we call that $3->v1->$3,
+//note its version is not INIT_VERSION any more, whereas $3 has an USE, which
+//id is 32.
+//VPR7 also described a region live-in PR occurrence, there is no DEF stmt.
+//vPR8 and VPR9 described that $7 has been defined twice. The first DEF renamed
+//$7 to $9, the second DEF renamed $7 to $8. If you dump CFG graph at the
+//point, you will see the definitions of $7 have been changed to $9 and $8.
+
 //Record original PRNO before SSA construction.
 #define VPR_orgprno(v) (((VPR*)v)->m_orgprno)
 
@@ -181,6 +202,7 @@ public:
 };
 
 
+//The class represents a list of VPR.
 class VPRVec : public Vector<VPR*> {
     COPY_CONSTRUCTOR(VPRVec);
 public:

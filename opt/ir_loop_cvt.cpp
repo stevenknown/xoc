@@ -219,18 +219,16 @@ bool LoopCvt::perform(OptCtx & oc)
                  getPassName(), m_rg->getRegionName());
             dumpBBList(m_rg->getBBList(), m_rg);
         }
-
-        //DU reference and du chain has maintained.
+        //DU reference and classic DU chain has maintained.
         ASSERT0(m_dumgr->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg, oc));
 
-        //All these changed.
-        OC_is_reach_def_valid(oc) = false;
-        OC_is_avail_reach_def_valid(oc) = false;
-        OC_is_live_expr_valid(oc) = false;
-
+        //All these have been changed.
+        oc.setInvalidPass(PASS_REACH_DEF);
+        oc.setInvalidPass(PASS_AVAIL_REACH_DEF);
+        oc.setInvalidPass(PASS_LIVE_EXPR);
         oc.setInvalidIfCFGChanged();
-        //TODO: make rpo, dom valid.
+        //TODO:maintain RPO, DOM incrementally.
     }
 
     END_TIMER(t, getPassName());

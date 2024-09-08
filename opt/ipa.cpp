@@ -170,10 +170,9 @@ void IPA::createCallDummyuse(OptCtx & oc)
         }
     }
     if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
-        OC_is_pr_du_chain_valid(oc) = true;
-        OC_is_nonpr_du_chain_valid(oc) = true;
+        oc.setValidPass(PASS_CLASSIC_DU_CHAIN);
         if (m_is_keep_reachdef) {
-            OC_is_reach_def_valid(oc) = true;
+            oc.setValidPass(PASS_REACH_DEF);
         }
     }
 }
@@ -225,30 +224,26 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         xoc::removeClassicDUChain(rg, rmprdu, rmnonprdu);
         return;
     }
-
-    //Build classic du chain.
+    //Build classic DU chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
-            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_REACH_DEF,
-                                                     PASS_DU_REF, PASS_CFG,
-                                                     PASS_DU_CHAIN,
-                                                     PASS_UNDEF);
-        } else {
-            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
-                                                     PASS_CFG, PASS_DU_CHAIN,
-                                                     PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(
+                &oc, PASS_REACH_DEF, PASS_DU_REF, PASS_CFG,
+                PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
+            return;
         }
-    } else {
-        if (m_is_keep_reachdef) {
-            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_REACH_DEF,
-                                                     PASS_CFG, PASS_DU_CHAIN,
-                                                     PASS_UNDEF);
-        } else {
-            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG,
-                                                     PASS_DU_CHAIN,
-                                                     PASS_UNDEF);
-        }
+        rg->getPassMgr()->checkValidAndRecompute(
+            &oc, PASS_DU_REF, PASS_CFG, PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
+        return;
     }
+    if (m_is_keep_reachdef) {
+        rg->getPassMgr()->checkValidAndRecompute(
+            &oc, PASS_REACH_DEF, PASS_CFG, PASS_CLASSIC_DU_CHAIN,
+            PASS_UNDEF);
+        return;
+    }
+    rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_CFG, PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
 }
 
 

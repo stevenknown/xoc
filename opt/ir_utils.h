@@ -140,6 +140,7 @@ typedef UINT PRNO;
 
 #define SWITCH_CASE_UNA_REST \
     SWITCH_CASE_UNA_TRIGONOMETRIC: \
+    case IR_ABS: \
     case IR_NEG: \
     case IR_CVT: \
     case IR_ALLOCA

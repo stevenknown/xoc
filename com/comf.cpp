@@ -985,10 +985,14 @@ UINT xstrlen(CHAR const* p)
 }
 
 
-bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n)
+bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n,
+             OUT UINT * pos)
 {
+    ASSERTN(n > 0 && p1 && p2, ("string length is zero."));
     //Note it does not have to judge whether current char is terminate char.
+    UINT len = n - 1;
     while (n-- > 0 && *p1++ == *p2++) {}
+    if (pos != nullptr) { *pos = len - n; }
     return n < 0;
 }
 

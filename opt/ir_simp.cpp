@@ -36,6 +36,16 @@ author: Su Zhenyu
 
 namespace xoc {
 
+void IRSimp::copyDbxFromParent(IR * ir)
+{
+    ASSERT0(m_rg && ir && ir->is_exp());
+    if (xoc::getDbx(ir) != nullptr || ir->getParent() == nullptr) { return; }
+    Dbx * pdbx = xoc::getDbx(ir->getParent());
+    if (pdbx == nullptr) { return; }
+    xoc::setDbx(ir, pdbx, m_rg);
+}
+
+
 bool IRSimp::needMaintainDUChain(SimpCtx const& ctx)
 {
     Region const* rg = ctx.getOptCtx()->getRegion();
@@ -283,6 +293,9 @@ IR * IRSimp::simplifyIfSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, elsebody);
     xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
 }
@@ -322,7 +335,12 @@ IR * IRSimp::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     copyDbx(falsebr, ir, m_rg);
     xcom::add_next(&det, falsebr);
 
+    //Prepare the break-target-label for IR_BREAK which belong to body of
+    //current CFS.
     SIMP_break_label(&local) = BR_lab(falsebr);
+
+    //Prepare the continue-target-label for IR_CONTINUE which belong to body of
+    //current CFS.
     SIMP_continue_label(&local) = startl;
 
     //loop body
@@ -348,6 +366,9 @@ IR * IRSimp::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildLabel(BR_lab(falsebr)));
     xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
 }
@@ -361,18 +382,17 @@ IR * IRSimp::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
 //  TRUEBR start
 IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == nullptr) return nullptr;
+    if (ir == nullptr) { return nullptr; }
     SimpCtx local(ctx->getOptCtx());
     local.copyTopDownFlag(*ctx);
     IR * ret_list = nullptr;
     ASSERTN(ir->is_dowhile(), ("expect IR_DO_WHILE node"));
-
     LabelInfo * startl = m_rg->genILabel();
     LabelInfo * endl = m_rg->genILabel();
     LabelInfo * det_startl = m_rg->genILabel();
 
-    //det exp
-    //When we first lowering CFS, det-expression should not be TRUEBR/FASLEBR.
+    //Handle det-exp.
+    //When we first lowering CFS, det-exp should not be TRUEBR/FASLEBR.
     ASSERT0(LOOP_det(ir)->is_judge());
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
@@ -383,16 +403,19 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
         //det-expression should be judgement.
         last = m_irmgr->buildJudge(last);
     }
-
     IR * truebr = m_irmgr->buildBranch(true, last, startl);
     copyDbx(truebr, ir, m_rg);
     xcom::add_next(&det, truebr);
 
+    //Prepare the break-target-label for IR_BREAK which belong to body of
+    //current CFS.
     SIMP_break_label(&local) = endl;
-    SIMP_continue_label(&local) = det_startl;
 
+    //Prepare the continue-target-label for IR_CONTINUE which belong to body of
+    //current CFS.
+    SIMP_continue_label(&local) = det_startl;
     IR * body = simplifyStmtList(LOOP_body(ir), &local);
-    insertbefore_one(&body, body, m_irmgr->buildLabel(startl));
+    xcom::insertbefore_one(&body, body, m_irmgr->buildLabel(startl));
 
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
@@ -414,6 +437,9 @@ IR * IRSimp::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, &last, m_irmgr->buildLabel(endl));
     xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
 }
@@ -442,14 +468,15 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     IR * iv = simplifyExpression(LOOP_iv(ir), &local);
     ASSERT0(iv->is_id() || iv->is_pr());
 
-    //det exp
-    //When we first lowering CFS, det-expression should not be TRUEBR/FASLEBR.
+    //Handle det-exp
+    //When we first lowering CFS, det-exp should not be TRUEBR/FASLEBR.
     ASSERT0(LOOP_det(ir)->is_judge());
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
     IR * upperbound = simplifyDet(LOOP_det(ir), &tcont);
     IR * last = xcom::removetail(&upperbound);
     ASSERTN(last->is_exp(), ("invalide det exp"));
+
     //det-expression should be judgement.
     //last = m_irmgr->buildCmp(IR_LE, iv->is_id() ?
     //    m_irmgr->buildLoad(ID_info(iv)) : iv, last);
@@ -458,7 +485,12 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 
     LabelInfo * stepl = m_rg->genILabel();
 
+    //Prepare the break-target-label for IR_BREAK which belong to body of
+    //current CFS.
     SIMP_break_label(&local) = BR_lab(falsebr);
+
+    //Prepare the continue-target-label for IR_CONTINUE which belong to body of
+    //current CFS.
     SIMP_continue_label(&local) = stepl;
 
     IR * init = simplifyExpression(LOOP_init(ir), &local);
@@ -503,6 +535,9 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildLabel(BR_lab(falsebr)));
     xoc::cleanParentForIRList(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
     return ret_list;
 }
@@ -511,15 +546,13 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 //Simplify determination of Control Flow Structure.
 IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
 {
-    if (ir == nullptr) return nullptr;
+    if (ir == nullptr) { return nullptr; }
     IR * ret_exp_list = nullptr;
-    IR * next;
     while (ir != nullptr) {
-        next = ir->get_next();
-        IR_next(ir) = IR_prev(ir) = nullptr;
-        if (ir->is_stmt()) {
+        IR * head = xcom::removehead(&ir);
+        if (head->is_stmt()) {
             SimpCtx tcont(*ctx);
-            IR * new_stmt_list = simplifyStmt(ir, &tcont);
+            IR * new_stmt_list = simplifyStmt(head, &tcont);
             ctx->unionBottomUpInfo(tcont);
 
             #ifdef _DEBUG_
@@ -530,9 +563,9 @@ IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
             }
             #endif
             ctx->appendStmt(new_stmt_list);
-        } else if (ir->is_exp()) {
+        } else if (head->is_exp()) {
             SimpCtx tcont(*ctx);
-            IR * new_exp = simplifyJudgeDet(ir, &tcont);
+            IR * new_exp = simplifyJudgeDet(head, &tcont);
             ASSERT0(new_exp->is_exp());
             xcom::add_next(&ret_exp_list, new_exp);
             ctx->appendStmt(tcont);
@@ -540,7 +573,6 @@ IR * IRSimp::simplifyDet(IR * ir, SimpCtx * ctx)
         } else {
             ASSERTN(0, ("unknonw IR code"));
         }
-        ir = next;
     }
     xoc::cleanParentForIRList(ret_exp_list);
     return ret_exp_list;
@@ -607,8 +639,13 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     ctx->appendStmt(ret_list);
     m_rg->freeIRTree(ir);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
-    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
+
+    //Use the option to inform PRSSA rebuild when function returned.
+    SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return pr;
 }
 
@@ -654,11 +691,16 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label2));
     ctx->appendStmt(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
+
     //Note the function generated more than two STPR to write to same PR.
     //If PRSSA is constructed, a PHI need to be inserted to make SSA form
     //legal. Thus the function ask to rebuild PRSSA later.
-    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
+    //Use the option to inform PRSSA rebuild when function returned.
+    SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return pr;
 }
 
@@ -883,8 +925,13 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, m_irmgr->buildLabel(label2));
     ctx->appendStmt(ret_list);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
-    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
+
+    //Use the option to inform PRSSA rebuild when function returned.
+    SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return pr;
 }
 
@@ -964,7 +1011,7 @@ void IRSimp::simplifySelectKids(IR * ir, SimpCtx * ctx)
         IR * new_kid = simplifyExpression(kid, ctx);
         if (SIMP_to_lowest_height(ctx)) {
             if (!new_kid->is_leaf()) {
-                //Lower new_kid to PR.
+                //Lowering new_kid to PR.
                 ir->setKid(i, simplifyToPR(new_kid, ctx));
                 continue;
             }
@@ -984,8 +1031,7 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
         if (!SIMP_to_lowest_height(ctx) || isLowestHeightExp(ir, ctx)) {
             return ir;
         }
-
-        //Lower SELECT as a leaf node.
+        //Lowering SELECT to be a leaf node.
         return simplifyToPR(ir, ctx);
     }
 
@@ -1067,7 +1113,8 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
         SIMP_cfs_mgr(ctx)->recordStmt(true_exp, *CFS_INFO_true_body(ci));
         SIMP_cfs_mgr(ctx)->recordStmt(else_exp, *CFS_INFO_false_body(ci));
     }
-    SIMP_need_rebuild_pr_du_chain(ctx) = true; //inform PRSSA rebuild.
+    //Use the option to inform PRSSA rebuild when function returned.
+    SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return res;
 }
 
@@ -1086,7 +1133,6 @@ IR * IRSimp::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_switch(), ("expect switch node"));
-
     IR * vexp_stmt = nullptr;
     IR * swt_val = SWITCH_vexp(ir);
     if (!swt_val->is_pr()) {
@@ -1148,12 +1194,18 @@ IR * IRSimp::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
         }
 
         SimpCtx tctx(*ctx);
+
+        //Prepare the break-target-label for IR_BREAK which belong to body of
+        //current CFS.
         SIMP_break_label(&tctx) = switch_endlab;
         prev_ir_tree = simplifyStmtList(prev_ir_tree, &tctx);
     }
 
     xoc::cleanParentForIRList(prev_ir_tree);
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
 
     IR * ret_list = prev_ir_tree;
@@ -1163,6 +1215,74 @@ IR * IRSimp::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
     }
     m_rg->freeIRTree(ir);
     return ret_list;
+}
+
+
+static IR * simplifySubExp(
+    OUT UINT & elemnum, IR * ofst_exp, UINT dim, Type const* indexty,
+    IR * ir, IRSimp * simp, IRMgr * irmgr, Region * rg,
+    TMWORD const* elemnumbuf, SimpCtx * ctx)
+{
+    SimpCtx tcont(*ctx);
+    SIMP_ret_array_val(&tcont) = true;
+    IR * newsub = simp->simplifyExpression(ir, &tcont);
+    Dbx * dbx = xoc::getDbx(ir);
+    ctx->appendStmt(tcont);
+    ctx->unionBottomUpInfo(tcont);
+
+    //'ir' is exact array.
+    //CASE1: elem-type v[n]
+    //    can simply to: &v + n*sizeof(BASETYPE)
+    //CASE2: a = (*p)[n]
+    //can simply to: (*p) + n*sizeof(BASETYPE)
+    //
+    //CASE3: struct S {int a, b;} s[10];
+    //  the elem_ty is struct S.
+    //  s[1].b has ARR_ofst(ir)==4
+    //  can simply to: &s + 1*sizeof(struct S) + offset(4)
+    if (newsub->is_const() && newsub->is_int()) {
+        //Subexp is const.
+        if (elemnum != 0) {
+            IR * t = irmgr->buildImmInt(
+                ((HOST_INT)elemnum) * CONST_int_val(newsub), indexty);
+            rg->freeIRTree(newsub);
+            newsub = t;
+        }
+    } else {
+        if (elemnum != 0) {
+            newsub = irmgr->buildBinaryOp(IR_MUL, indexty, newsub,
+                irmgr->buildImmInt(elemnum, indexty));
+            if (dbx != nullptr) {
+                xoc::copyDbxForList(newsub, ir, rg);
+            }
+        }
+    }
+    if (ofst_exp == nullptr) {
+        ofst_exp = newsub;
+    } else {
+        ofst_exp = irmgr->buildBinaryOpSimp(
+            IR_ADD, indexty, ofst_exp, newsub);
+        if (dbx != nullptr) {
+            xoc::copyDbxForList(ofst_exp, ir, rg);
+        }
+    }
+    if (elemnumbuf == nullptr) { return ofst_exp; }
+
+    if (dim == 0) {
+        //The element-size of dim0 may be zero.
+        //e.g: User can define an array with zero size.
+        //     In C-language: struct { int buf[]; };
+        elemnum = (UINT)elemnumbuf[dim];
+        return ofst_exp;
+    }
+
+    //The higher dimesion size should not be zero, otherwise
+    //we could not generate the address computation expression to
+    //linearize the array, because it needs to know how many total
+    //elements in dimension 0 to dimension dim-1.
+    ASSERTN(elemnumbuf[dim - 1] != 0, ("Incomplete array dimension"));
+    elemnum *= (UINT)elemnumbuf[dim];
+    return ofst_exp;
 }
 
 
@@ -1177,72 +1297,13 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
     UINT elemnum = 0;
     UINT dim = 0;
     TMWORD const* elemnumbuf = ARR_elem_num_buf(ir);
-    Type const* indextyid = rg->getTargetMachineArrayIndexType();
+    Type const* indexty = rg->getTargetMachineArrayIndexType();
     IR * ofst_exp = nullptr;
     for (IR * s = xcom::removehead(&ARR_sub_list(ir));
          s != nullptr; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
-        SimpCtx tcont(*ctx);
-        SIMP_ret_array_val(&tcont) = true;
-        IR * newsub = simp->simplifyExpression(s, &tcont);
-        Dbx * dbx = xoc::getDbx(s);
-        ctx->appendStmt(tcont);
-        ctx->unionBottomUpInfo(tcont);
-
-        //'ir' is exact array.
-        //CASE1: elem-type v[n]
-        //    can simply to: &v + n*sizeof(BASETYPE)
-        //CASE2: a = (*p)[n]
-        //can simply to: (*p) + n*sizeof(BASETYPE)
-        //
-        //CASE3: struct S {int a, b;} s[10];
-        //  the elem_ty is struct S.
-        //  s[1].b has ARR_ofst(ir)==4
-        //  can simply to: &s + 1*sizeof(struct S) + offset(4)
-        if (newsub->is_const() && newsub->is_int()) {
-            //Subexp is const.
-            if (elemnum != 0) {
-                IR * t = irmgr->buildImmInt(((HOST_INT)elemnum) *
-                                            CONST_int_val(newsub), indextyid);
-                rg->freeIRTree(newsub);
-                newsub = t;
-            }
-        } else {
-            if (elemnum != 0) {
-                newsub = irmgr->buildBinaryOp(IR_MUL, indextyid, newsub,
-                    irmgr->buildImmInt(elemnum, indextyid));
-
-                if (dbx != nullptr) {
-                    xoc::copyDbxForList(newsub, s, rg);
-                }
-            }
-        }
-
-        if (ofst_exp == nullptr) {
-            ofst_exp = newsub;
-        } else {
-            ofst_exp = irmgr->buildBinaryOpSimp(IR_ADD, indextyid,
-                                                ofst_exp, newsub);
-            if (dbx != nullptr) {
-                xoc::copyDbxForList(ofst_exp, s, rg);
-            }
-        }
-
-        if (elemnumbuf == nullptr) { continue; }
-
-        if (dim == 0) {
-            //The element-size of dim0 may be zero.
-            //e.g: User can define an array with zero size.
-            //     In C-language: struct { int buf[]; };
-            elemnum = (UINT)elemnumbuf[dim];
-            continue;
-        }
-
-        //The higher dimesion size should not be zero, otherwise
-        //we could not generate the address computation expression to
-        //linearize the array, because it needs to know how many total
-        //elements in dimension 0 to dimension dim-1.
-        ASSERTN(elemnumbuf[dim - 1] != 0, ("Incomplete array dimension"));
-        elemnum *= (UINT)elemnumbuf[dim];
+        ofst_exp = simplifySubExp(
+            elemnum, ofst_exp, dim, indexty, s, simp, irmgr, rg,
+            elemnumbuf, ctx);
     }
     return ofst_exp;
 }
@@ -1250,28 +1311,27 @@ static IR * simplifySubExpList(IR * ir, IRSimp * simp, SimpCtx * ctx)
 
 //Simplify array operator IR_ARRAY to a list of address computing expressions.
 //ir: the IR_ARRAY/IR_STARRAY that to be simplified.
-//Note m_rg function does not free ir becase ir's Reference info and
+//Note the function does not free ir becase ir's Reference info and
 //DUSet is still useful.
 //
-//In C language, the ARRAY operator is also avaiable for
-//dereference of pointer,
+//In C language, the ARRAY operator is also available for dereference
+//of pointer,
 //e.g: char * p; p[x] = 10; the operator is actually invoke an ILD operator,
-//    namely, its behavor is *(p + x) = 10, and the will generate:
-//        t1 = [p]
-//        t2 = t1 + x
-//        [t2] = 10
-//    In the contrast, char q[]; q[x] = 10, will generate:
-//        t1 = &q
-//        t2 = t1 + x
-//        [t2] = 10
+//  namely, its behavor is *(p + x) = 10, and the will generate:
+//      t1 = [p]
+//      t2 = t1 + x
+//      [t2] = 10
+//  In the contrast, char q[]; q[x] = 10, will generate:
+//      t1 = &q
+//      t2 = t1 + x
+//      [t2] = 10
 //For the sake of correctness, p[] already be converted to *p
-//via replacing IR_ARRAY/IR_STARRAY with IR_ILD before
-//coming into m_rg function.
+//via replacing IR_ARRAY/IR_STARRAY with IR_ILD before coming into
+//current function.
 IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir && SIMP_array(ctx) && ir->isArrayOp());
     ASSERT0(ARR_sub_list(ir));
-
     TypeMgr * dm = m_tm; //may generate new pointer type.
     ASSERT0(ir->getTypeSize(dm) > 0);
     IR * ofst_exp = simplifySubExpList(ir, this, ctx);
@@ -1294,10 +1354,10 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         //the elem_ty is struct S.
         //s[1].b has ARR_ofst(ir)==4
         //can simply to: 1*sizeof(struct S) + offset(4) + LDA(s).
-        IR * imm = m_irmgr->buildImmInt((HOST_INT)(ARR_ofst(ir)),
-                                        indextyid);
-        ofst_exp = m_irmgr->buildBinaryOpSimp(IR_ADD, indextyid,
-                                              ofst_exp, imm);
+        IR * imm = m_irmgr->buildImmInt(
+            (HOST_INT)(ARR_ofst(ir)), indextyid);
+        ofst_exp = m_irmgr->buildBinaryOpSimp(
+            IR_ADD, indextyid, ofst_exp, imm);
         if (subexpdbx != nullptr) {
             xoc::setDbx(ofst_exp, subexpdbx, m_rg);
         }
@@ -1314,12 +1374,11 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     ASSERT0(newbase && (newbase->is_ptr() || newbase->is_any()));
     ARR_base(ir) = nullptr;
 
-    //'array_addr' is address of an ARRAY, and it is pointer type.
+    //'array_addr' is address of ARRAY, and it has to be pointer type.
     //Given 'array_addr + n', the result-type of '+' must
     //be pointer type as well.
-    //Note do not call buildBinaryOp(IR_ADD...) to generate ir.
-    //Because that when 'sub' is pointer, the extra IR_MUL
-    //operation will be generated.
+    //Note do NOT call buildBinaryOp(IR_ADD...) to generate ir, because while
+    //'sub' is pointer, the extra IR_MUL operation will be generated.
     IR * array_addr = m_irmgr->buildBinaryOpSimp(IR_ADD,
         dm->getPointerType(ir->getTypeSize(dm)), newbase, ofst_exp);
     if (subexpdbx != nullptr) {
@@ -1334,22 +1393,14 @@ IR * IRSimp::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         ctx->appendStmt(ttcont);
         ctx->unionBottomUpInfo(ttcont);
     }
-
     if (SIMP_to_lowest_height(ctx)) {
-       //CASE: If IR_parent is nullptr, the situation is
-       //caller attempt to enforce simplification to array expression
-       //whenever possible.
-       SimpCtx ttcont(*ctx);
-       SIMP_ret_array_val(&ttcont) = true;
-       array_addr = simplifyExpression(array_addr, &ttcont);
-       ctx->appendStmt(ttcont);
-       ctx->unionBottomUpInfo(ttcont);
-
-       //IR * t = buildPR(array_addr->getType());
-       //IR * mv = m_rg->dupIsomoStmt(t, array_addr);
-       //copyDbx(mv, array_addr, m_rg);
-       //ctx->appendStmt(mv);
-       //array_addr = t;
+       //CASE: If IR_parent is NULL, the situation might be user is going to
+       //enforce simplification to array expression whenever possible.
+       SimpCtx tctx(*ctx);
+       SIMP_ret_array_val(&tctx) = true;
+       array_addr = simplifyExpression(array_addr, &tctx);
+       ctx->appendStmt(tctx);
+       ctx->unionBottomUpInfo(tctx);
     }
 
     //freeIRTree(ir); //Should free ir in caller's function.
@@ -1388,13 +1439,19 @@ IR * IRSimp::simplifyAllKidsExpression(IR * ir, SimpCtx * ctx)
         }
     }
     //ir's parent is not the lowest tree, thus ir should be in the PR mode to
-    //guarrantee its parent could be the lowest tree.
+    //guarantee its parent could be the lowest tree.
     return simplifyToPR(ir, ctx);
 }
 
 
 IR * IRSimp::simplifyToPR(IR * ir, SimpCtx * ctx)
 {
+    //Note ir might not have parent since ir may be the intermediate products
+    //during simplification.
+    //ASSERT0(ir->getParent());
+    ASSERT0(ir->is_exp());
+    //WORKAROUND: ir's Dbx should be available before inoking the function.
+    copyDbxFromParent(ir); //Keep dbg info from parent.
     IR * pr = m_irmgr->buildPR(ir->getType());
     m_rg->getMDMgr()->allocRef(pr);
     copyDbx(pr, ir, m_rg); //keep dbg info for new EXP.
@@ -1493,6 +1550,88 @@ IR * IRSimp::simplifyExpression(IR * ir, SimpCtx * ctx)
 }
 
 
+IR * IRSimp::simplifyLogicalNotInDet(IR * ir, SimpCtx * ctx)
+{
+    if (SIMP_lnot(ctx)) {
+        SimpCtx tcont(*ctx);
+        SIMP_ret_array_val(&tcont) = true;
+        IR * newir = simplifyLogicalNot(ir, &tcont);
+        ASSERT0(newir->is_exp());
+        IR * lst = SIMP_stmtlist(&tcont);
+        ASSERTN(newir->is_pr(),
+               ("For now, newir will fairly be IR_PR. But it is not "
+                "certain in the future."));
+        SimpCtx t_tcont(tcont);
+        lst = simplifyStmtList(lst, &t_tcont);
+        ctx->appendStmt(lst);
+        ir = newir;
+        ctx->unionBottomUpInfo(tcont);
+    } else {
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * kid = ir->getKid(i);
+            if (kid != nullptr) {
+                ir->setKid(i, simplifyExpression(kid, ctx));
+            }
+        }
+    }
+    if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
+        ir = simplifyToPR(ir, ctx);
+    }
+    return ir;
+}
+
+
+IR * IRSimp::simplifyLogicalAndOrInDet(IR * ir, SimpCtx * ctx)
+{
+    if (SIMP_lor_land(ctx)) {
+        SimpCtx tcont(*ctx);
+        SIMP_ret_array_val(&tcont) = true;
+        IR * newir = nullptr;
+        if (ir->is_lor()) {
+            newir = simplifyLogicalOr(ir, &tcont);
+        } else {
+            newir = simplifyLogicalAnd(ir, &tcont);
+        }
+        ctx->unionBottomUpInfo(tcont);
+
+        ASSERT0(newir->is_exp());
+        IR * lst = SIMP_stmtlist(&tcont);
+        ASSERT0(newir != ir);
+        SimpCtx t_tcont(tcont);
+        lst = simplifyStmtList(lst, &t_tcont);
+        ctx->appendStmt(lst);
+        ir = newir;
+    } else {
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * kid = ir->getKid(i);
+            if (kid != nullptr) {
+                ir->setKid(i, simplifyExpression(kid, ctx));
+            }
+        }
+    }
+    if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
+        ir = simplifyToPR(ir, ctx);
+    }
+    return ir;
+}
+
+
+IR * IRSimp::simplifyRelationInDet(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->getParent());
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            ir->setKid(i, simplifyExpression(kid, ctx));
+        }
+    }
+    if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
+        ir = simplifyToPR(ir, ctx);
+    }
+    return ir;
+}
+
+
 //Return new generated expression's value.
 IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
 {
@@ -1501,83 +1640,17 @@ IR * IRSimp::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
     ASSERT0(ir->is_single());
     switch (ir->getCode()) {
     case IR_LAND: //logical and &&
-    case IR_LOR: { //logical or ||
-        if (SIMP_lor_land(ctx)) {
-            SimpCtx tcont(*ctx);
-            SIMP_ret_array_val(&tcont) = true;
-            IR * newir = nullptr;
-            if (ir->is_lor()) {
-                newir = simplifyLogicalOr(ir, &tcont);
-            } else {
-                newir = simplifyLogicalAnd(ir, &tcont);
-            }
-            ctx->unionBottomUpInfo(tcont);
-
-            ASSERT0(newir->is_exp());
-            IR * lst = SIMP_stmtlist(&tcont);
-            ASSERT0(newir != ir);
-            SimpCtx t_tcont(tcont);
-            lst = simplifyStmtList(lst, &t_tcont);
-            ctx->appendStmt(lst);
-            ir = newir;
-        } else {
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * kid = ir->getKid(i);
-                if (kid != nullptr) {
-                    ir->setKid(i, simplifyExpression(kid, ctx));
-                }
-            }
-        }
-        if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simplifyToPR(ir, ctx);
-        }
-        return ir;
-    }
+    case IR_LOR: //logical or ||
+        return simplifyLogicalAndOrInDet(ir, ctx);
     case IR_LNOT: //logical not
-        if (SIMP_lnot(ctx)) {
-            SimpCtx tcont(*ctx);
-            SIMP_ret_array_val(&tcont) = true;
-            IR * newir = simplifyLogicalNot(ir, &tcont);
-            ASSERT0(newir->is_exp());
-            IR * lst = SIMP_stmtlist(&tcont);
-            ASSERTN(newir->is_pr(),
-                   ("For now, newir will fairly be IR_PR. But it is not "
-                    "certain in the future."));
-            SimpCtx t_tcont(tcont);
-            lst = simplifyStmtList(lst, &t_tcont);
-            ctx->appendStmt(lst);
-            ir = newir;
-            ctx->unionBottomUpInfo(tcont);
-        } else {
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * kid = ir->getKid(i);
-                if (kid != nullptr) {
-                    ir->setKid(i, simplifyExpression(kid, ctx));
-                }
-            }
-        }
-        if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simplifyToPR(ir, ctx);
-        }
-        return ir;
+        return simplifyLogicalNotInDet(ir, ctx);
     case IR_EQ:
     case IR_NE:
     case IR_LT:
     case IR_GT:
     case IR_GE:
-    case IR_LE: {
-        ASSERT0(IR_parent(ir));
-        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-            IR * kid = ir->getKid(i);
-            if (kid != nullptr) {
-                ir->setKid(i, simplifyExpression(kid, ctx));
-            }
-        }
-        if (SIMP_to_lowest_height(ctx) && !isLowest(ir)) {
-            ir = simplifyToPR(ir, ctx);
-        }
-        return ir;
-    }
+    case IR_LE:
+        return simplifyRelationInDet(ir, ctx);
     default: UNREACHABLE();
     }
     return nullptr;
@@ -1717,8 +1790,9 @@ IR * IRSimp::simplifyStoreArray(IR * ir, SimpCtx * ctx)
 IR * IRSimp::simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
-    IR * ld = m_irmgr->buildLoad(ID_info(array_addr),
-                                          array_addr->getType());
+    ASSERT0(ir->getBase() != array_addr);
+    IR * ld = m_irmgr->buildLoad(ID_info(array_addr), array_addr->getType());
+
     //Load variable which is an array.
     ld->copyRef(ir, m_rg);
     ld->copyAI(ir, m_rg);
@@ -1734,6 +1808,7 @@ IR * IRSimp::simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx)
 IR * IRSimp::simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
+    ASSERT0(ir->getBase() != array_addr);
     if (!array_addr->is_pr()) {
         array_addr = simplifyToPR(array_addr, ctx);
     }
@@ -1764,6 +1839,7 @@ IR * IRSimp::simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx)
 IR * IRSimp::simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
+    ASSERT0(ir->getBase() != array_addr);
     if (!array_addr->is_leaf()) {
         array_addr = simplifyToPR(array_addr, ctx);
     }
@@ -1794,6 +1870,8 @@ IR * IRSimp::simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx)
 IR * IRSimp::simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() && array_addr);
+    ASSERT0(ir->getBase() != array_addr);
+
     //Load array element value.
     IR * elem_val = m_irmgr->buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, m_rg);
@@ -1817,11 +1895,12 @@ IR * IRSimp::simplifyArray(IR * ir, SimpCtx * ctx)
         }
         return ir;
     }
-
     IR * array_addr = simplifyArrayAddrExp(ir, ctx);
-    //Need to free ir in current function.
-    ASSERTN(!ir->is_undef(), ("ir has been freed"));
 
+    //Do NOT free ir and all its kids in other function, whole IR tree of 'ir'
+    //should only be freed in current function.
+    ASSERTN(!ir->is_undef(), ("ir has been freed"));
+    ASSERT0(ir->getBase() != array_addr);
     SIMP_changed(ctx) = true;
     if (!SIMP_ret_array_val(ctx)) {
         return array_addr;
@@ -1831,15 +1910,12 @@ IR * IRSimp::simplifyArray(IR * ir, SimpCtx * ctx)
     if (array_addr->is_id()) {
         return simplifyArrayAddrID(ir, array_addr, ctx);
     }
-
     if (SIMP_to_pr_mode(ctx)) {
         return simplifyArrayPRMode(ir, array_addr, ctx);
     }
-
     if (SIMP_to_lowest_height(ctx)) {
         return simplifyArrayLowestHeight(ir, array_addr, ctx);
     }
-
     return simplifyArraySelf(ir, array_addr, ctx);
 }
 
@@ -2323,6 +2399,9 @@ IR * IRSimp::simplifySwitch(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ir, body);
 
     SIMP_changed(ctx) = true;
+
+    //Use the option to inform the Region that BB list has to be rebuild
+    //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
     return ir;
 }

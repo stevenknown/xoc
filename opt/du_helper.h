@@ -223,6 +223,11 @@ IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
 //To find the killing-def, the function prefer use SSA info.
 IR * findUniqueMustDef(IR const* use, Region const* rg);
 
+//The function find a DEF for 'use'.
+//Note the DEF may not be must-def, may not be killing-def.
+//If 'use' does not have any DEF, the function return NULL.
+IR * findDef(IR const* use, Region const* rg);
+
 //The function will be looking for the correct DEF for each exp of 'root' in
 //SSA mode. And the classic DU chain does NOT need to find the live-in DEF.
 //And the looking process will start from 'startir'.

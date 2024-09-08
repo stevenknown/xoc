@@ -117,6 +117,7 @@ protected:
     GVN * m_gvn;
     OptCtx * m_oc;
     UFlag m_prop_kind;
+    ActMgr m_am;
 protected:
     //Return true if CP allows propagating memory object with inexact MD.
     bool allowInexactMD() const
@@ -253,9 +254,12 @@ public:
     //Check if ir is appropriate for propagation.
     virtual bool canBeCandidate(IR const* ir) const;
 
+    virtual bool dump() const override;
+
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;
+    ActMgr & getActMgr() { return m_am; }
 
     bool is_aggressive() const
     { return m_prop_kind.have(CP_PROP_NONPR) || allowInexactMD(); }

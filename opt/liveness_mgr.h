@@ -146,6 +146,28 @@ public:
     //Keep local-set information.
     void set_keep_local(bool keep) { m_keep_local = (BYTE)keep; }
 
+    void set_livein(UINT bbid, PRLiveSet const* live_set)
+    {
+        ASSERT0(live_set);
+        ASSERT0(bbid != BBID_UNDEF);
+        PRLiveSet * livein = gen_livein(bbid);
+        livein->copy(*live_set, m_sbs_mgr);
+    }
+
+    void set_liveout(UINT bbid, PRLiveSet const* live_set)
+    {
+        ASSERT0(live_set);
+        ASSERT0(bbid != BBID_UNDEF);
+        PRLiveSet * liveout = gen_liveout(bbid);
+        liveout->copy(*live_set, m_sbs_mgr);
+    }
+
+    //Set the liveness info for an empty BB.
+    //empty_bb: the empty BB.
+    //from: the predecessor BB of the empty_BB.
+    void setLivenessForEmptyBB(IRBB const* empty_bb, IRBB const* from);
+
+
     //Set map structure which used during the processing of maydef and mayuse.
     void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }
 

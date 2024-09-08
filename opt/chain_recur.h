@@ -85,7 +85,7 @@ public:
     void clean() { ::memset((void*)this, 0, sizeof(IVVal)); }
     void clean(MOD ChainRecMgr & mgr);
 
-    //The function guarrantees whole object (include subfield objects)
+    //The function guarantees whole object (include subfield objects)
     //are exclusive.
     //e.g: if src is CR, the function will allocate a new CR object and copy
     //data structure recursively from src's CR object.
@@ -326,6 +326,9 @@ public:
 
     ChainRec * allocChainRec();
 
+    //The function build IR_LD or IR_PR according to given Var in 'v'.
+    IR * buildVarRef(IVVal const& v) const;
+
     //The function compute the first 'num' value that represented by 'cr'.
     //Return true if the computation is successful, otherwise false which
     //meaning 'cr' can not be computed.
@@ -348,7 +351,7 @@ public:
     //Add given two chain-recs, store result in 'res'.
     //The function adds a loop invariant symbol 'ir' and cr1, and store the
     //result chain-rec to 'res'.
-    //ir: user have to guarrantee it is a loop invariant variable.
+    //ir: user have to guarantee it is a loop invariant variable.
     //e.g:x*{a,+,b} ==> {x*a,+,b}
     //Note the function supports in-place operation, 'res' can be identical
     //to cr0 or cr1.
@@ -389,7 +392,7 @@ public:
     //Substract given two chain-recs, store result in 'res'.
     //The function substracts a loop invariant symbol 'ir' and cr1, and
     //store the result chain-rec to 'res'.
-    //ir: user have to guarrantee it is a loop invariant variable.
+    //ir: user have to guarantee it is a loop invariant variable.
     //e.g:x*{a,-,b} ==> {x*a,-,b}
     //Note the function supports in-place operation, 'res' can be identical
     //to cr0 or cr1.
@@ -449,7 +452,7 @@ public:
     //Multiple given two chain-recs, store result in 'res'.
     //The function multiple a loop invariant symbol 'ir' and cr1, and store
     //the result chain-rec to 'res'.
-    //ir: user have to guarrantee it is a loop invariant variable.
+    //ir: user have to guarantee it is a loop invariant variable.
     //e.g:x*{a,+,b} ==> {x*a,+,x*b}
     //    x*{a,-,b} ==> {x*a,-,x*b}
     //Note the function supports in-place operation, 'res' can be identical

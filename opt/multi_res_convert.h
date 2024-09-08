@@ -34,24 +34,32 @@ namespace xoc {
 #define MAX_MULTI_RES_DESC_NUM 50
 
 //This class converts multiple-result operation to normal IR list.
+//Note the class represents two methods to convert multiple-result operation,
+//one is to split origin results into multiple operations, another is to
+//extract multiple-result from a fake-result object.
 class MultiResConvert : public Pass {
     COPY_CONSTRUCTOR(MultiResConvert);
 protected:
-    ActMgr m_act_mgr;
+    bool m_is_enable_post_vdef;
     IRMgrExt * m_irmgr;
+    TypeMgr const* m_tm;
+    ActMgr m_act_mgr;
 protected:
     IR * genPreDefStmt(
         IR * stmt, IR * res_isomo_list, IR ** predeflst);
     IR * genPostDefStmt(IR * stmt, IR * res_isomo_list);
+    IR * genExtractStmtList(IR * stmt, IR * res_isomo_list);
 
     //The function returns the maximum number of multiple-result
     //descriptions allowed.
     UINT getMaxMultiResDescNum() const { return MAX_MULTI_RES_DESC_NUM; }
 public:
-    explicit MultiResConvert(Region * rg) : Pass(rg), m_act_mgr(rg)
+    explicit MultiResConvert(Region * rg) :
+        Pass(rg), m_is_enable_post_vdef(false), m_act_mgr(rg)
     {
         ASSERT0(rg != nullptr);
         m_irmgr = (IRMgrExt*)rg->getIRMgr();
+        m_tm = rg->getTypeMgr();
         ASSERT0(m_irmgr);
     }
     virtual ~MultiResConvert() {}
@@ -88,12 +96,45 @@ public:
     //beside the #S4.
     //Finally, the generated three stmts (#S1,#S2,#S3) and one existing
     //stmt (#S4) together express the multiple result of broadcast operation.
-    IR * buildStorePRWithMultiResAndConvert(
+    IR * buildStorePRWithMultiResAndConvertBySplit(
         PRNO prno, Type const* type, IR * rhs);
-    IR * buildStorePRWithMultiResAndConvert(Type const* type, IR * rhs);
-    IR * buildStoreWithMultiResAndConvert(Var * lhs, IR * rhs);
-    IR * buildStoreWithMultiResAndConvert(
+    IR * buildStorePRWithMultiResAndConvertBySplit(Type const* type, IR * rhs);
+    IR * buildStoreWithMultiResAndConvertBySplit(Var * lhs, IR * rhs);
+    IR * buildStoreWithMultiResAndConvertBySplit(
         Var * lhs, Type const* type, IR * rhs);
+
+    //Build a store with a RHS expression which generate multiple results and
+    //convert the store to a group stmts by inserting virtual-def.
+    //e.g: given RHS expression is: broadcast src, $res1, $res2, res3, res4
+    //which spreads 'ld src' to multiple result $res1, $res2, res3 and res4.
+    //The generated single store is:
+    //  st 'fake-res'
+    //    broadcast:u8
+    //      ld:u32 'src'
+    //      $res1:u8 multi-res
+    //      $res2:u8 multi-res
+    //      ld:u32 'res3' multi-res
+    //      ld:u32 'res4' multi-res
+    //After converting to multiple-result stmts by inserting vdef, the code
+    //will be:
+    //  st 'fake-res'                                      #S1
+    //    broadcast:u8
+    //      ld:u32 'src'
+    //      $res1:u8 multi-res
+    //      $res2:u8 multi-res
+    //      ld:u32 'res3' multi-res
+    //      ld:u32 'res4' multi-res
+    //  vstpr $res1:u8 = dummyuse:any(ld 'fake-res', #0))  #S2
+    //  vstpr $res2:u8 = dummyuse:any(ld 'fake-res', #1))  #S3
+    //  vst:u32 'res3' = dummyuse:any(ld 'fake-res', #2))  #S4
+    //  vst:u32 'res4' = dummyuse:any(ld 'fake-res', #3))  #S5
+    //Note original single store is unchanged. The convertion from
+    //normal-form-single-store to multiple-result-form-store will check
+    //and make sure that each STMT has an individual result. After the
+    //convertion, the generated four stmts (#S1,#S2,#S3,#S4) together
+    //express multiple-result of broadcast operation.
+    IR * buildStoreWithMultiResAndConvertByExtract(
+        Var * lhs, IR * rhs);
 
     IR * convertMultiResMemMem(IR * stmt, IR * res1);
     IR * convertMultiResRegMem(IR * stmt, IR * res1);
@@ -116,23 +157,24 @@ public:
     //  vstpr $res2:u8 = broadcast:u8(ld 'src')  #S2
     //  vst:u32 'res3' = broadcast:u8(ld 'src')  #S3
     //  st:u32 'res4'                            #S4
-    //      broadcast:u8
-    //        ld:u32 'src'
-    //        $res1:u8 multi-res
-    //        $res2:u8 multi-res
-    //        ld:u32 'res3' multi-res
+    //    broadcast:u8
+    //      ld:u32 'src'
+    //      $res1:u8 multi-res
+    //      $res2:u8 multi-res
+    //      ld:u32 'res3' multi-res
     //where #S1, #S2 and #S3 are Virtual OPs, and #S4 is original stmt.
     //genpostde: true to generate post virtual-def OP right after real-def stmt
     //  to prevent subsequent stmts from moving over.
     //  e.g: given res1, res2 = src,
     //  after convertion:
-    //       vst res1 = src;
-    //       st res2 = src, res1(dummyuse); #S5
-    //       vst res1 = res1; #S6 (post virtual-def OP)
-    //       ...
-    //       st res1 = 10;    #S7
+    //    vst res1 = src;
+    //    st res2 = src, res1(dummyuse); #S5
+    //    vst res1 = res1; #S6 (post virtual-def OP)
+    //    ...
+    //    st res1 = 10;    #S7
     //  #S6 prevents #S7 from scheduling over before #S6.
-    IR * convertMultiRes(IR * stmt, bool genpostdef);
+    IR * convertMultiResBySplitRes(IR * stmt, bool genpostdef);
+    IR * convertMultiResByExtractRes(IR * stmt);
 
     virtual bool dump() const override;
 

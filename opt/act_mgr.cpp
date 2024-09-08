@@ -31,6 +31,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#ifdef _DEBUG_
+//NOTE: the variable is only used in DEBUG mode to facilitate user
+//to debug and trace all reported actions.
+//The variable is NOT thread-safe.
+static UINT g_global_cnt = ACT_HANDLER_ID_UNDEF + 1;
+#endif
+
+//
+//START ActHandler
+//
+ActHandler::ActHandler(UINT id, xcom::StrBuf * buf)
+    : m_id(id), info(buf)
+{
+    ASSERT0(m_id != ACT_HANDLER_ID_UNDEF && buf != nullptr);
+    #ifdef _DEBUG_
+    m_gid = g_global_cnt;
+    #endif
+}
+//END ActHandler
+
+
+//
+//START ActMgr
+//
 void ActMgr::clean()
 {
     for (xcom::StrBuf * buf = m_act_list.get_head();
@@ -45,13 +69,24 @@ void ActMgr::clean()
 ActHandler ActMgr::dump_args(CHAR const* format, va_list args)
 {
     if (!m_rg->isLogMgrInit()) { return ActHandler(); }
-    xcom::StrBuf * buf = new xcom::StrBuf(64);
+    xcom::StrBuf * buf = allocStrBuf();
+
+    //Dump action id.
     buf->strcat("ACT%u:", m_cnt);
+    #ifdef _DEBUG_
+    buf->strcat("GID%u:", g_global_cnt);
+    #endif
+
+    //Update action id.
     m_cnt++;
+    #ifdef _DEBUG_
+    g_global_cnt++;
+    #endif
+
+    //Append into action list.
     va_list targs;
     va_copy(targs, args);
     buf->vstrcat(format, targs);
-    m_act_list.append_tail(buf);
     va_end(targs);
     return ActHandler(m_cnt, buf);
 }
@@ -80,5 +115,6 @@ void ActMgr::dump() const
     }
     m_rg->getLogMgr()->decIndent(2);
 }
+//END ActMgr
 
 } //namespace xoc

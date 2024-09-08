@@ -526,6 +526,14 @@ public:
     SolveSetMgr * getSolveSetMgr() { return &m_solve_set_mgr; }
     IR const* getExactAndUniqueDef(IR const* exp) const;
 
+    //Return true if exist USE to 'ir'.
+    //ir: must be stmt.
+    bool hasUse(IR const* ir) const;
+
+    //Return true if exist DEF to 'ir'.
+    //ir: must be exp.
+    bool hasDef(IR const* ir) const;
+
     //Return true if 'def' may or must modify MDSet that 'use' referenced.
     //'def': STPR stmt.
     //'use': must be expression.

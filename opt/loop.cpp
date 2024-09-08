@@ -336,8 +336,8 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
         ASSERT0(oldopnd && oldopnd->isPROp() && oldopnd->getSSAInfo());
         PRSSAMgr::removePRSSAOcc(oldopnd);
 
-        IR * newopnd = m_irmgr->buildPRdedicated(ir_pre->getPrno(),
-                                                 ir_pre->getType());
+        IR * newopnd = m_irmgr->buildPRdedicated(
+            ir_pre->getPrno(), ir_pre->getType());
         m_rg->getMDMgr()->allocRef(newopnd);
         m_prssamgr->buildDUChain(ir_pre, newopnd);
 
@@ -416,9 +416,8 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 
 //Fixup edge that come from loop-inside BB when preheader inserted.
 //pred: predecessor of head which is inside loop body.
-static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
-                                                      Region * rg,
-                                                      IRBB * pred)
+static void fixupInnerLoopEdgeBetweenHeadAndPreheader(
+    LI<IRBB> const* li, Region * rg, IRBB * pred)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -472,12 +471,10 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
 
 //Return true if inserted a new BB.
 //insert_preheader: true if preheader has been inserted, otherwise do insertion.
-static void insertAndUpdateOutterLoopEdge(LI<IRBB> const* li, Region * rg,
-                                          IRBB * pred, BBListIter head_it,
-                                          IRBB * preheader,
-                                          MOD LabelInfo const** preheader_lab,
-                                          OUT bool & insert_preheader,
-                                          OptCtx * oc)
+static void insertAndUpdateOutterLoopEdge(
+    LI<IRBB> const* li, Region * rg, IRBB * pred, BBListIter head_it,
+    IRBB * preheader, MOD LabelInfo const** preheader_lab,
+    OUT bool & insert_preheader, OptCtx * oc)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -560,9 +557,9 @@ static void insertAndUpdateOutterLoopEdge(LI<IRBB> const* li, Region * rg,
 //heads and preheader.
 //Return true if inserted a new preheader, otherwise there is no loop-outside
 //BB.
-static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
-                                BBListIter head_it, IRBB * preheader,
-                                OptCtx * oc)
+static bool insertAndUpdateEdge(
+    LI<IRBB> const* li, Region * rg, BBListIter head_it, IRBB * preheader,
+    OptCtx * oc)
 {
     IRCFG * cfg = rg->getCFG();
     List<IRBB*> preds;
@@ -593,8 +590,8 @@ static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
 
 //Move LabelInfos from head to preheader except LabelInfos that
 //are the target of IR that belongs to loop body.
-static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li, IRCFG * cfg,
-                                            IRBB * preheader)
+static void tryMoveLabelFromHeadToPreheader(
+    LI<IRBB> const* li, IRCFG * cfg, IRBB * preheader)
 {
     IRBB * head = li->getLoopHead();
     LabelInfoList & lablst = head->getLabelList();
@@ -776,7 +773,8 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 
     IRBB * preheader = rg->allocBB();
     cfg->addBB(preheader);
-    //Guarrantee preheader is fallthrough to head.
+
+    //Guarantee preheader is fallthrough to head.
     bblst->insert_before(preheader, head_it);
     insert_bb |= insertAndUpdateEdge(li, rg, head_it, preheader, oc);
     ASSERT0(cfg->getBBList()->find(preheader));
@@ -817,9 +815,9 @@ static bool isRealMDDef(MDDef const* mddef, IR const* use,
 }
 
 
-static bool isRealMDDefInvariant(MDDef const* mddef, LI<IRBB> const* li,
-                                 InvStmtList const* invariant_stmt,
-                                 MDSSAMgr const* mdssamgr)
+static bool isRealMDDefInvariant(
+    MDDef const* mddef, LI<IRBB> const* li, InvStmtList const* invariant_stmt,
+    MDSSAMgr const* mdssamgr)
 {
     ASSERT0(mddef && !mddef->is_phi());
     IR const* def = mddef->getOcc();
@@ -839,10 +837,9 @@ static bool isRealMDDefInvariant(MDDef const* mddef, LI<IRBB> const* li,
 //Return true if 'use' is loop invariant.
 //Note if use's DEF is a PHI, we will not simply just check whether
 //the DEF's BB is inside the loop, because PHI is not real DEF.
-static bool isMDPhiInvariant(MDDef const* start, IR const* use,
-                             LI<IRBB> const* li,
-                             InvStmtList const* invariant_stmt,
-                             MDSSAMgr const* mdssamgr)
+static bool isMDPhiInvariant(
+    MDDef const* start, IR const* use, LI<IRBB> const* li,
+    InvStmtList const* invariant_stmt, MDSSAMgr const* mdssamgr)
 {
     ASSERT0(start && start->is_phi() && mdssamgr);
     ConstMDDefIter ii;
@@ -863,9 +860,9 @@ static bool isMDPhiInvariant(MDDef const* start, IR const* use,
 }
 
 
-static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
-                                   InvStmtList const* invariant_stmt,
-                                   MDSSAMgr const* mdssamgr)
+static bool isLoopInvariantInMDSSA(
+    IR const* ir, LI<IRBB> const* li, InvStmtList const* invariant_stmt,
+    MDSSAMgr const* mdssamgr)
 {
     ASSERT0(ir->isMemRefNonPR());
     MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
@@ -900,10 +897,9 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
 }
 
 
-static bool isLoopInvariantInDUMgr(IR const* ir,
-                                   LI<IRBB> const* li,
-                                   InvStmtList const* invariant_stmt,
-                                   Region const* rg)
+static bool isLoopInvariantInDUMgr(
+    IR const* ir, LI<IRBB> const* li, InvStmtList const* invariant_stmt,
+    Region const* rg)
 {
     DUSet const* duset = ir->readDUSet();
     if (duset == nullptr) { return true; }
@@ -924,6 +920,31 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
              !invariant_stmt->find(const_cast<IR*>(def)))) {
             return false;
         }
+    }
+    return true;
+}
+
+
+bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg)
+{
+    ASSERT0(phi && phi->is_phi());
+    SSAInfo const* prssainfo = phi->getSSAInfo();
+    ASSERT0(prssainfo);
+    ASSERT0(prssainfo->getDef() == phi);
+    IRSet const& useset = prssainfo->getUses();
+    SSAUseIter it = nullptr;
+    for (BSIdx i = useset.get_first(&it);
+         it != nullptr; i = useset.get_next(i, &it)) {
+        IR * use = rg->getIR(i);
+        ASSERT0(use->isReadPR());
+        if (!li->isInsideLoop(use->getStmt()->getBB()->id())) {
+            continue;
+        }
+        if (xcom::in_list(PHI_opnd_list(phi), use)) {
+            continue;
+        }
+        //There is at least one USE occurrence in loop.
+        return false;
     }
     return true;
 }
@@ -1231,10 +1252,9 @@ static bool verifyLoopInfo(LI<IRBB> const* li, OptCtx const& oc)
     ASSERT0(li->getLoopHead()->id() <=
             oc.getRegion()->getBBMgr()->getBBCount());
     bool try_failed = false;
-    ASSERTN_DUMMYUSE(Graph::isReachIn(li->getLoopHead()->getVex(),
-                                      li->getLoopHead()->getVex(),
-                                      (UINT)-1, try_failed),
-                                      ("loophead is not in cycle"));
+    ASSERTN_DUMMYUSE(Graph::isReachIn(
+        li->getLoopHead()->getVex(), li->getLoopHead()->getVex(),
+        (UINT)-1, try_failed), ("loophead is not in cycle"));
     IRCFG const* cfg = oc.getRegion()->getCFG();
     BitSet const* body = li->getBodyBBSet();
     for (BSIdx i = body->get_first(); i != BS_UNDEF; i = body->get_next(i)) {
@@ -1292,6 +1312,8 @@ protected:
     xcom::TTab<UINT> m_irtab;
 protected:
     void checkOpRHS();
+    void checkCall();
+    void checkAssign();
 
     void findInPRSSA();
     void findInMDSSA();
@@ -1342,27 +1364,11 @@ public:
 void FindRedOp::find()
 {
     ASSERT0(m_op && m_op->is_stmt() && m_op->isMemRef());
-    m_res = OP_UNDEF;
-
-    //Get the MustDef MD.
-    m_ref = m_op->getMustRef();
-    if (!m_ref->is_exact() && !m_ref->is_range()) {
-        m_res = OP_UNKNOWN;
-        return;
-    }
     if (m_op->isCallStmt()) {
-        if (m_op->isReadOnly()) {
-            //If Call is readonly, it is impossible for DefUse chain to
-            //form a cycle.
-            m_res = OP_IS_NOT_RED;
-            return;
-        }
-        //For the sake of complexity of call-stmt, we can not easy determine
-        //the reduction behaviors of a call, expect more aggressive analysis.
-        m_res = OP_UNKNOWN;
+        checkCall();
         return;
     }
-    checkOpRHS();
+    checkAssign();
 }
 
 
@@ -1539,6 +1545,51 @@ void FindRedOp::checkExpInMDSSA(IR const* exp)
             return;
         }
     }
+}
+
+
+void FindRedOp::checkAssign()
+{
+    m_res = OP_UNDEF;
+
+    //Get the MustDef MD.
+    m_ref = m_op->getMustRef();
+    if (m_ref == nullptr) {
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    if (!m_ref->is_exact() && !m_ref->is_range()) {
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    checkOpRHS();
+}
+
+
+void FindRedOp::checkCall()
+{
+    ASSERT0(m_op && m_op->is_stmt() && m_op->isMemRef());
+    m_res = OP_UNDEF;
+
+    //Get the MustDef MD.
+    m_ref = m_op->getMustRef();
+    if (m_ref == nullptr) {
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    if (!m_ref->is_exact() && !m_ref->is_range()) {
+        m_res = OP_UNKNOWN;
+        return;
+    }
+    if (m_op->isReadOnly()) {
+        //If Call is readonly, it is impossible for DefUse chain to
+        //form a cycle.
+        m_res = OP_IS_NOT_RED;
+        return;
+    }
+    //For the sake of complexity of call-stmt, we can not easy determine
+    //the reduction behaviors of a call, expect more aggressive analysis.
+    m_res = OP_UNKNOWN;
 }
 
 

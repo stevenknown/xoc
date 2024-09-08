@@ -589,7 +589,7 @@ bool Region::isRegionIR(IR const* ir) const
 Var * Region::genVarForPR(PRNO prno, Type const* type)
 {
     ASSERT0(type);
-    Var * pr_var = mapPR2Var(prno);
+    Var * pr_var = getVarByPRNO(prno);
     if (pr_var != nullptr) { return pr_var; }
 
     //Create a new PR Var.
@@ -597,7 +597,7 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
     ::sprintf(name, "%s%u", VarFlagDesc::getName(VAR_IS_PR), prno);
     ASSERT0(::strlen(name) < sizeof(name));
     pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL|VAR_IS_PR);
-    setMapPR2Var(prno, pr_var);
+    setMapPRNO2Var(prno, pr_var);
     VAR_prno(pr_var) = prno;
 
     //Set the pr-var to be unallocable, means do NOT add

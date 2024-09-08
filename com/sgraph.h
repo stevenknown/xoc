@@ -303,15 +303,15 @@ public:
 typedef EdgeTabIter EdgeIter;
 typedef VecIdx VertexIter;
 
-typedef TTabIter<Vertex const*> VexTabIter;
-class VexTab : public TTab<Vertex const*> {
+typedef TTabIter<VexIdx> VexTabIter;
+class VexTab : public TTab<VexIdx> {
 public:
-    void add(Vertex const* v) { append(v); }
+    void add(Vertex const* v) { append(v->id()); }
     void add(VexTab const& src)
     {
         VexTabIter it;
-        for (Vertex const* t = src.get_first(it);
-             t != nullptr; t = src.get_next(it)) {
+        for (VexIdx t = src.get_first(it);
+             t != VERTEX_UNDEF; t = src.get_next(it)) {
             append(t);
         }
     }
@@ -498,11 +498,15 @@ public:
     size_t count_mem() const;
 
     void dumpHeight(FILE * h) const;
+    CHAR const* dumpAllVertices(OUT StrBuf & buf) const;
     void dumpAllVertices(FILE * h) const;
+    CHAR const* dumpAllEdges(OUT StrBuf & buf) const;
     void dumpAllEdges(FILE * h) const;
-    virtual void dumpVertexAux(FILE * h, Vertex const* v) const;
+    virtual void dumpVertexAux(Vertex const* v, OUT StrBuf & buf) const;
     virtual void dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const;
+    CHAR const* dumpVertex(Vertex const* v, OUT StrBuf & buf) const;
     virtual void dumpVertex(FILE * h, Vertex const* v) const;
+    CHAR const* dumpEdge(Edge const* e, OUT StrBuf & buf) const;
     virtual void dumpEdge(FILE * h, Edge const* e) const;
     void dumpDOT(CHAR const* name = nullptr) const;
     void dumpVCG(CHAR const* name = nullptr) const;
@@ -787,11 +791,22 @@ public:
     //update the related info for 'vex'.
     //vex: a marker vertex.
     //newsucc: the vertex that must be immediate successor of 'vex'.
+    //e.g: given edge vex->oldsucc, after insert newsucc, the graph will be:
+    //     vex->newsucc->oldsucc, where there is only ONE predecessor to
+    //     newsucc.
+    void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
+                                   Vertex const* oldsucc);
+
+    //The function adds Dom and IDom information for newsucc, whereas
+    //update the related info for 'oldsucc'. The newsucc is a new insert BB,
+    //and has one input edge and one output edge.
+    //vex: a marker vertex.
+    //newsucc: the vertex that must be immediate successor of 'vex'.
     //e.g: vex->oldsucc, after insert newsucc, the graph will be:
     //     vex->newsucc->oldsucc, where there is only ONE edge between
     //     vex->newsucc, and newsucc->oldsucc.
-    void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
-                                   Vertex const* oldsucc);
+    void addDomToNewSingleInOutBB(Vertex const* vex, Vertex const* newsucc,
+                                  Vertex const* oldsucc);
 
     //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
     //update the related info for 'vex'.
@@ -900,10 +915,14 @@ public:
     //  succ's dom become pred. vex is neither DOM nor PDOM.
     bool changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ);
 
+    //Dump dom set, pdom set, idom, ipdom.
+    //dump_dom_tree: set to be true to dump dominate
+    //               tree, and post dominate Tree.
     void dumpDom(FILE * h, bool dump_dom_tree = true,
                  bool dump_pdom_tree = true) const;
     void dumpDom(CHAR const* name = nullptr, bool dump_dom_tree = true,
                  bool dump_pdom_tree = true) const;
+    CHAR const* dumpDom(OUT StrBuf & buf) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.

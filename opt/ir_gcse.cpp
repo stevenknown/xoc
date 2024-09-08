@@ -68,8 +68,8 @@ public:
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> &)
+    virtual void visitWhenAllKidHaveBeenVisited(
+        Vertex const* v, Stack<Vertex const*> &)
     {}
     virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
@@ -97,8 +97,8 @@ public:
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> &)
+    virtual void visitWhenAllKidHaveBeenVisited(
+        Vertex const* v, Stack<Vertex const*> &)
     {}
     virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
@@ -135,7 +135,7 @@ void GCSE::copyVN(IR const* newir, IR const* oldir)
 void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
 {
     if (!getRegion()->isLogMgrInit()) { return; }
-    m_actmgr.dump("%s is CSE and will be replaced by %s",
+    m_am.dump("%s is CSE and will be replaced by %s",
         DumpIRName().dump(oldexp), DumpIRName().dump(newexp));
 }
 
@@ -435,12 +435,10 @@ bool GCSE::shouldBeCse(IR * det)
     if (!IR_parent(det)->is_truebr() && !IR_parent(det)->is_falsebr()) {
         return true;
     }
-
     if (!det->is_relation()) {
         //det is complex operation.
         return true;
     }
-
     IR const* op0 = BIN_opnd0(det);
     IR const* op1 = BIN_opnd1(det);
     if (!op0->is_pr() && !op0->is_const()) {
@@ -532,116 +530,153 @@ bool GCSE::doPropVN(IRBB * bb)
 }
 
 
+bool GCSE::doPropReturn(IR * ir, MOD List<IR*> & livexp)
+{
+    ASSERT0(ir->is_return());
+    if (RET_exp(ir) != nullptr && isCseCandidate(RET_exp(ir)) &&
+        shouldBeCse(RET_exp(ir))) {
+        if (processCse(RET_exp(ir), livexp)) {
+            //Found CSE and replaced CSE with PR successfully.
+            return true;
+        }
+        //Generate new CSE.
+        livexp.append_tail(RET_exp(ir));
+    }
+    return false;
+}
+
+
+bool GCSE::doPropBranch(IR * ir, MOD List<IR*> & livexp)
+{
+    ASSERT0(ir->isBranch());
+    if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
+        if (processCse(BR_det(ir), livexp)) {
+            //Replaced CSE with PR successfully.
+            return true;
+        }
+        //Generate new CSE.
+        livexp.append_tail(BR_det(ir));
+    }
+    return false;
+}
+
+
+bool GCSE::doPropCall(IR * ir, MOD List<IR*> & livexp)
+{
+    bool change = false;
+    IR * param = CALL_param_list(ir);
+    IR * next = nullptr;
+    while (param != nullptr) {
+        next = param->get_next();
+        if (isCseCandidate(param)) {
+            if (processCse(param, livexp)) {
+                //Has found cse and replaced cse with pr.
+                change = true;
+            } else {
+                //Generate new cse.
+                livexp.append_tail(param);
+            }
+        }
+        param = next;
+    }
+    return change;
+}
+
+
+bool GCSE::doPropAssign(IR * ir, MOD List<IR*> & livexp)
+{
+    ASSERT0(ir->is_stmt());
+    ASSERT0(ir->is_stmt());
+    ASSERT0(ir->isDirectMemOp() || ir->isIndirectMemOp() ||
+            ir->is_stpr() || ir->isCallStmt());
+    IR * rhs = ir->getRHS();
+    //Find CSE and replace it with properly PR.
+    if (rhs != nullptr && isCseCandidate(rhs)) {
+        if (processCse(rhs, livexp)) {
+            //Replaced CSE with PR successfully.
+            return true;
+        }
+        //Generate new CSE.
+        livexp.append_tail(rhs);
+    }
+    return false; //unchange
+}
+
+
+void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
+{
+    ASSERT0(ir->is_stmt());
+    ASSERT0(ir->isDirectMemOp() || ir->isIndirectMemOp() ||
+            ir->is_stpr() || ir->isCallStmt());
+    MDSet tmp;
+    MDSet const* maydef = ir->getMayRef();
+    if (maydef != nullptr && !maydef->is_empty()) {
+        IRListIter ct2;
+        IRListIter next;
+        for (livexp.get_head(&ct2), next = ct2;
+             ct2 != nullptr; ct2 = next) {
+            livexp.get_next(&next);
+            IR * x2 = ct2->val();
+            tmp.clean(m_misc_bs_mgr);
+            DUMgr::collectMayUseRecursive(
+                x2, m_rg, true, m_misc_bs_mgr, tmp);
+            if (maydef->is_intersect(tmp)) {
+                livexp.remove(ct2);
+            }
+        }
+    }
+    MD const* mustdef = ir->getMustRef();
+    if (mustdef != nullptr) {
+        IRListIter ct2;
+        IRListIter next;
+        for (livexp.get_head(&ct2), next = ct2;
+             ct2 != nullptr; ct2 = next) {
+            livexp.get_next(&next);
+            IR * x2 = ct2->val();
+            tmp.clean(m_misc_bs_mgr);
+            DUMgr::collectMayUseRecursive(x2, m_rg, true,
+                                          m_misc_bs_mgr, tmp);
+            if (tmp.is_overlap(mustdef, m_rg)) {
+                livexp.remove(ct2);
+            }
+        }
+    }
+    tmp.clean(m_misc_bs_mgr);
+}
+
+
 bool GCSE::doPropStmt(IR * ir, List<IR*> & livexp)
 {
-    MDSet tmp;
     bool change = false;
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
-    case IR_STPR: {
-        IR * rhs = ir->getRHS();
-        //Find cse and replace it with properly pr.
-        if (rhs != nullptr && isCseCandidate(rhs)) {
-            if (processCse(rhs, livexp)) {
-                //Has found cse and replaced cse with pr.
-                change = true;
-            } else {
-                //Generate new cse.
-                livexp.append_tail(rhs);
-            }
-        }
+    case IR_STPR:
+        change |= doPropAssign(ir, livexp);
         break;
-    }
-    SWITCH_CASE_CALL: {
-        IR * param = CALL_param_list(ir);
-        IR * next = nullptr;
-        while (param != nullptr) {
-            next = param->get_next();
-            if (isCseCandidate(param)) {
-                if (processCse(param, livexp)) {
-                    //Has found cse and replaced cse with pr.
-                    change = true;
-                } else {
-                    //Generate new cse.
-                    livexp.append_tail(param);
-                }
-            }
-            param = next;
-        }
+    SWITCH_CASE_CALL:
+        change |= doPropCall(ir, livexp);
         break;
-    }
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
-        if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
-            if (processCse(BR_det(ir), livexp)) {
-                //Has found cse and replaced cse with pr.
-                change = true;
-            } else {
-                //Generate new cse.
-                livexp.append_tail(BR_det(ir));
-            }
-        }
+        change |= doPropBranch(ir, livexp);
         break;
     case IR_RETURN:
-        if (RET_exp(ir) != nullptr &&
-            isCseCandidate(RET_exp(ir)) &&
-            shouldBeCse(RET_exp(ir))) {
-            if (processCse(RET_exp(ir), livexp)) {
-                //Has found cse and replaced cse with pr.
-                change = true;
-            } else {
-                //Generate new cse.
-                livexp.append_tail(RET_exp(ir));
-            }
-        }
+        change |= doPropReturn(ir, livexp);
         break;
     default: break;
     }
-
     //Remove may-killed live-expr.
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
     SWITCH_CASE_CALL:
     case IR_STPR: {
-        MDSet const* maydef = ir->getMayRef();
-        if (maydef != nullptr && !maydef->is_empty()) {
-            IRListIter ct2;
-            IRListIter next;
-            for (livexp.get_head(&ct2), next = ct2;
-                 ct2 != nullptr; ct2 = next) {
-                livexp.get_next(&next);
-                IR * x2 = ct2->val();
-                tmp.clean(m_misc_bs_mgr);
-                DUMgr::collectMayUseRecursive(x2, m_rg, true,
-                                              m_misc_bs_mgr, tmp);
-                if (maydef->is_intersect(tmp)) {
-                    livexp.remove(ct2);
-                }
-            }
-        }
-        MD const* mustdef = ir->getMustRef();
-        if (mustdef != nullptr) {
-            IRListIter ct2;
-            IRListIter next;
-            for (livexp.get_head(&ct2), next = ct2;
-                 ct2 != nullptr; ct2 = next) {
-                livexp.get_next(&next);
-                IR * x2 = ct2->val();
-                tmp.clean(m_misc_bs_mgr);
-                DUMgr::collectMayUseRecursive(x2, m_rg, true,
-                                              m_misc_bs_mgr, tmp);
-                if (tmp.is_overlap(mustdef, m_rg)) {
-                    livexp.remove(ct2);
-                }
-            }
-        }
+        removeMayKill(ir, livexp);
         break;
     }
-    default: ;
+    default:;
     }
-    tmp.clean(m_misc_bs_mgr);
     return change;
 }
 
@@ -673,10 +708,17 @@ bool GCSE::doPropExp(IRBB * bb, List<IR*> & livexp)
 
 bool GCSE::dump() const
 {
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGCSE()) {
+        return true;
+    }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
-    m_actmgr.dump();
-    return Pass::dump();
+    getRegion()->getLogMgr()->incIndent(2);
+    m_am.dump();
+    bool succ = Pass::dump();
+    getRegion()->getLogMgr()->decIndent(2);
+    return succ;
 }
 
 
@@ -742,9 +784,7 @@ bool GCSE::perform(OptCtx & oc)
         change = doPropExpInDomTreeOrder(domtree);
     }
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGCSE()) {
-        dump();
-    }
+    dump();
     if (change) {
         //no new expr generated, only new pr.
         oc.setInvalidIfDUMgrLiveChanged();

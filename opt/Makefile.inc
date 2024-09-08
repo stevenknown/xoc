@@ -24,6 +24,7 @@ cdg.o\
 ir_refine.o\
 ir_rp.o\
 ir_aa.o\
+ssaregion.o\
 ir_ssa.o\
 ir_mdssa.o\
 mdssainfo.o\
@@ -96,69 +97,11 @@ ifeq ($(TARG_DIR),)
 endif
 
 ifeq ($(FOR_IP), true)
-  $(info "CONDBR:opt/Makefile.inc:FOR_IP=$(FOR_IP)")
-  OPT_OBJS+=\
-  lsra_impl.o\
-  lsra_scan_in_pos.o\
-  lsra_scan_in_prio.o\
-  lt_interf_graph.o\
-  lt_prio_mgr.o\
-  lifetime.o\
-  targinfo_mgr.o\
-  ir_vrp.o\
-  ir_dse.o\
-  linear_scan.o\
-  ir_vect.o\
-  derivative.o\
-  prologue_epilogue_inserter.o\
-  arg_passer.o\
-  gp_adjustment.o\
-  br_opt.o\
-  workaround.o\
-  dynamic_stack.o\
-  var2offset.o\
-  ir_reloc_mgr.o\
-  igoto_opt.o
+  include $(OPT_DIR)/Makefile.ip.inc
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
-  $(info "CONDBR:opt/Makefile.inc:REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)")
-  OPT_OBJS+=\
-  lsra_impl.o\
-  lsra_scan_in_pos.o\
-  lsra_scan_in_prio.o\
-  lt_interf_graph.o\
-  lt_prio_mgr.o\
-  lifetime.o\
-  targinfo_mgr.o\
-  linear_scan.o\
-  prologue_epilogue_inserter.o\
-  arg_passer.o\
-  gp_adjustment.o\
-  br_opt.o\
-  workaround.o\
-  dynamic_stack.o\
-  var2offset.o\
-  ir_reloc_mgr.o\
-  igoto_opt.o
+  include $(OPT_DIR)/Makefile.ref_targmach_info.inc
 else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
-  $(info "CONDBR:opt/Makefile.inc:TARG=$(TARG)")
-  OPT_OBJS+=\
-  lsra_impl.o\
-  lsra_scan_in_pos.o\
-  lsra_scan_in_prio.o\
-  lt_interf_graph.o\
-  lt_prio_mgr.o\
-  lifetime.o\
-  targinfo_mgr.o\
-  linear_scan.o\
-  prologue_epilogue_inserter.o\
-  arg_passer.o\
-  gp_adjustment.o\
-  br_opt.o\
-  workaround.o\
-  dynamic_stack.o\
-  var2offset.o\
-  ir_reloc_mgr.o\
-  igoto_opt.o
+  include $(TARG_DIR)/Makefile.opt.ext.inc
 endif
 
 CFLAGS+=-Wno-unknown-pragmas

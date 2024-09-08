@@ -33,6 +33,7 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 #include "prssainfo.h"
+#include "ssaregion.h"
 #include "ir_ssa.h"
 
 namespace xoc {

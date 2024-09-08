@@ -46,11 +46,14 @@ typedef struct {
 } TabCol;
 
 
-static SectionNameDesc const g_section_name_desc[] = {
+static SectionDesc const g_section_desc[] = {
     //Name(enum), Sect type,  Program header,
     //Flags,      Addr align, Entry size,     Name(str)
     { SH_TYPE_UNDEF, S_UNDEF, PH_TYPE_UNDEF,
       ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".sh_name_undef" },
+
+    { SH_TYPE_EMPTY, S_UNDEF, PH_TYPE_UNDEF,
+      ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".sh_name_empty" },
 
     { SH_TYPE_SHSTR, S_STRTAB,  PH_TYPE_UNDEF,
       ELF_VAL_UNDEF, SHDR_1B_ALIGN, ELF_VAL_UNDEF, ".shdr_strtab" },
@@ -145,15 +148,37 @@ static SectionNameDesc const g_section_name_desc[] = {
     { SH_TYPE_EH_FRAME, S_PROGBITS, PH_TYPE_DATA,
       SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".eh_frame" },
 
-    { SH_TYPE_COMMENT, S_PROGBITS, PH_TYPE_UNDEF,
-      SF_MERGE|SF_STRINGS, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".comment" },
+    #include "sect_desc_ext.impl"
 
-    { SH_TYPE_NOTE, S_PROGBITS, PH_TYPE_UNDEF,
-      ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".note" },
- };
+    { SH_TYPE_MAX_NUM, S_UNDEF, PH_TYPE_UNDEF,
+      ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".sh_max_num" }
+};
 
-static UINT const g_section_name_num =
-    sizeof(g_section_name_desc) / sizeof(g_section_name_desc[0]);
+
+//Record Sym of section name.
+static Sym const* g_section_name_sym[SH_TYPE_MAX_NUM] = {0};
+
+
+void ELFMgr::initSectionInfo()
+{
+    for (UINT i = 0;  i < SH_TYPE_MAX_NUM; i++) {
+        g_section_name_sym[i] = addToSymTab(g_section_desc[i].m_desc_name_str);
+        m_sect_name_type_map.set(g_section_name_sym[i], (SECTION_TYPE)i);
+    }
+}
+
+
+//The function only invoked at debug mode.
+bool checkSectDesc()
+{
+    for (UINT i = SH_TYPE_UNDEF; i < SH_TYPE_MAX_NUM; i++) {
+        ASSERT0(i == (UINT)SECTDESC_code(i));
+    }
+    UINT num = sizeof(g_section_desc) / sizeof(g_section_desc[0]);
+    ASSERTN_DUMMYUSE(num - 1 == SH_TYPE_MAX_NUM,
+        ("miss section desc declaration"));
+    return true;
+}
 
 
 static SECTION_TYPE const g_dynamic_section_desc[] = {
@@ -3371,28 +3396,24 @@ void ELFMgr::addSymRelocInfo(MOD SymbolInfo * symbol_info,
 }
 
 
+bool ELFMgr::verifyPreDefinedInfo()
+{
+    ASSERT0(checkSectDesc());
+    return true;
+}
+
+
 Sym const* ELFMgr::getSectionName(SECTION_TYPE sect_type)
 {
-    SectionNameDesc const* desc;
-    SectNameDescIter iter;
-    for (m_sect_desc_info.get_first(iter, &desc); !iter.end();
-         m_sect_desc_info.get_next(iter, &desc)) {
-        ASSERT0(desc);
-        if (sect_type == SECTDESC_type(desc)) {
-            return addToSymTab(SECTDESC_name(desc));
-        }
-    }
-    ASSERTN(0, ("get section name failed!"));
-    return nullptr;
+    ASSERT0(sect_type < SH_TYPE_MAX_NUM);
+    return g_section_name_sym[sect_type];
 }
 
 
 SECTION_TYPE ELFMgr::getSectionType(Sym const* sect_name)
 {
-    ASSERT0(sect_name && m_sect_desc_info.find(sect_name));
-    SectionNameDesc const* desc = m_sect_desc_info.get(sect_name);
-    ASSERT0(desc);
-    return SECTDESC_type(desc);
+    ASSERT0(sect_name && m_sect_name_type_map.find(sect_name));
+    return m_sect_name_type_map.get(sect_name);
 }
 
 
@@ -3422,14 +3443,8 @@ SECTION_TYPE ELFMgr::getSectionTypeWithSplit(Sym const* sect_name)
     ASSERT0(name);
     //The format of name is ".xxx\0".
     ::sprintf(name, ".%s%c", substr_vec.getStrBuf(1)->getBuf(), '\0');
-    Sym const* sym_name = addToSymTab(name);
     //3.Get section type according to 'name'.
-    if (m_sect_desc_info.find(sym_name)) {
-        SectionNameDesc const* desc = m_sect_desc_info.get(sym_name);
-        ASSERT0(desc);
-        return SECTDESC_type(desc);
-    }
-    return SH_TYPE_UNDEF;
+    return getSectionType(addToSymTab(name));
 }
 
 
@@ -3485,17 +3500,6 @@ UINT ELFMgr::getDynSymItemNum() const
         if (RELADYNINFO_is_dynsym(m_reladyn_info_vec[i])) { num++; }
     }
     return num;
-}
-
-
-SectionNameDesc ELFMgr::getSectionDesc(SECTION_TYPE sect_type) const
-{
-    SectionNameDesc const* desc = getSectionNameDesc();
-    for (UINT i = 0; i < getSectionNum(); i++) {
-        if (sect_type == SECTDESC_type(&desc[i])) { return desc[i]; }
-    }
-    UNREACHABLE();
-    return desc[0];
 }
 
 
@@ -3652,7 +3656,8 @@ Sym const* ELFMgr::getShdrType(CHAR const* shdr_name)
     //      3.the function will return '.rodata1'.
     switch (num) {
     case 2:
-        ASSERT0(m_sect_desc_info.find(addToSymTab(shdr_name)));
+        ASSERTN(getSectionType(addToSymTab(shdr_name)) < SH_TYPE_MAX_NUM,
+            ("Invalid sect_type."));
         return addToSymTab(shdr_name);
     case 3:
     case 4:
@@ -3660,7 +3665,8 @@ Sym const* ELFMgr::getShdrType(CHAR const* shdr_name)
         //'1' represents the index of substr after splited.
         CHAR const* name = getSubStrWithDelimViaIdxAfterSplited(
             shdr_name, ".", FIRST_INDEX_OF_SUBSTR);
-        ASSERT0(m_sect_desc_info.find(addToSymTab(name)));
+        ASSERTN(getSectionType(addToSymTab(name)) < SH_TYPE_MAX_NUM,
+            ("Invalid sect_type."));
         return addToSymTab(name);
     }
     default:
@@ -3714,9 +3720,10 @@ void ELFMgr::setELFType(UINT type)
 }
 
 
-SectionNameDesc const* ELFMgr::getSectionNameDesc() const
+SectionDesc const& ELFMgr::getSectionDescElem(SECTION_TYPE sect_type)
 {
-    return g_section_name_desc;
+    ASSERTN(sect_type < SH_TYPE_MAX_NUM, ("Invalid sect_type."));
+    return g_section_desc[sect_type];
 }
 
 
@@ -3726,24 +3733,13 @@ SECTION_TYPE const* ELFMgr::getDynamicSectionDesc() const
 }
 
 
-void ELFMgr::initSectionDescInfo()
-{
-    SectionNameDesc const* desc = ELFMgr::getSectionNameDesc();
-    ASSERT0(desc);
-
-    for (UINT i = 0; i < g_section_name_num; i++) {
-        m_sect_desc_info.set(addToSymTab(SECTDESC_name(&desc[i])), &desc[i]);
-    }
-}
-
-
 void ELFMgr::initELFMgrInfo(MOD SymTab * sym_tab, CHAR const* file_path,
                             bool is_elf_format)
 {
     ASSERT0(sym_tab);
 
     setSymTab(sym_tab);
-    initSectionDescInfo();
+    initSectionInfo();
 
     m_have_elf_format = is_elf_format;
     m_file_name = (file_path == nullptr) ? nullptr : processELFName(file_path);
@@ -4457,8 +4453,7 @@ void ELFMgr::setSection(SECTION_TYPE sect_type)
     ASSERT0(si);
     if (find) { return; }
 
-    SectionNameDesc const* sect_desc = m_sect_desc_info.get(sym_name);
-    ASSERT0(sect_desc);
+    ASSERT0(sect_type < SH_TYPE_MAX_NUM);
     setSectionImpl(si, sect_type);
 }
 
@@ -4476,18 +4471,16 @@ void ELFMgr::setSection(SECTION_TYPE sect_type,
     ASSERT0(si);
     if (find) { return; }
 
-    SectionNameDesc const* sect_desc =
-        m_sect_desc_info.get(getSectionName(sect_type));
-    ASSERT0(sect_desc);
+    SectionDesc const& sect_desc = getSectionDescElem(sect_type);
 
     //Re-set info.
     SECTINFO_type(si) = sect_type;
     SECTINFO_name(si) = sym_name;
-    SECTINFO_ph_type(si) = SECTDESC_ph_type(sect_desc);
-    SECTINFO_shdr_type(si) = SECTDESC_shdr_type(sect_desc);
-    SECTINFO_flag(si) = setSectionFlags(sect_desc);
-    SECTINFO_align(si) = SECTDESC_align(sect_desc);
-    SECTINFO_entry_size(si) = SECTDESC_entry_sz(sect_desc);
+    SECTINFO_ph_type(si) = SECTDESC_ph_type(&sect_desc);
+    SECTINFO_shdr_type(si) = SECTDESC_shdr_type(&sect_desc);
+    SECTINFO_flag(si) = getSectionFlags(&sect_desc);
+    SECTINFO_align(si) = SECTDESC_align(&sect_desc);
+    SECTINFO_entry_size(si) = SECTDESC_entry_sz(&sect_desc);
     SECTINFO_index(si) = sect_index;
 }
 
@@ -4496,17 +4489,15 @@ void ELFMgr::setSectionImpl(MOD SectionInfo * si, SECTION_TYPE sect_type)
 {
     ASSERT0(si);
 
-    SectionNameDesc const* sect_desc =
-        m_sect_desc_info.get(getSectionName(sect_type));
-    ASSERT0(sect_desc);
+    SectionDesc const& sect_desc = getSectionDescElem(sect_type);
 
     SECTINFO_type(si) = sect_type;
     SECTINFO_name(si) = getSectionName(sect_type);
-    SECTINFO_ph_type(si) = SECTDESC_ph_type(sect_desc);
-    SECTINFO_shdr_type(si) = SECTDESC_shdr_type(sect_desc);
-    SECTINFO_flag(si) = setSectionFlags(sect_desc);
-    SECTINFO_align(si) = SECTDESC_align(sect_desc);
-    SECTINFO_entry_size(si) = SECTDESC_entry_sz(sect_desc);
+    SECTINFO_ph_type(si) = SECTDESC_ph_type(&sect_desc);
+    SECTINFO_shdr_type(si) = SECTDESC_shdr_type(&sect_desc);
+    SECTINFO_flag(si) = getSectionFlags(&sect_desc);
+    SECTINFO_align(si) = SECTDESC_align(&sect_desc);
+    SECTINFO_entry_size(si) = SECTDESC_entry_sz(&sect_desc);
     SECTINFO_index(si) = 0;
 }
 
@@ -4941,7 +4932,7 @@ void ELFMgr::constructELFSection()
         }
         //Process s_type. e.g.: S_PROGBITS;
         shdr->s_type = SECTINFO_shdr_type(sect_info);
-        //Process s_flags. Value from config table(g_section_name_desc).
+        //Process s_flags. Value from config table(g_section_desc).
         SET_FLAG(shdr->s_flags, SECTINFO_flag(sect_info));
         //Process s_addr.
         shdr->s_addr = getSectionAddr(SECTINFO_name(sect_info));
@@ -6181,7 +6172,7 @@ void LinkerMgr::setOutputName(CHAR const* output_name)
 
 
 bool LinkerMgr::hasSameSymbol(ELFMgr const* target_elf_mgr,
-    SymbolInfo const* target_symbol_info, bool is_elf_mgr_from_var_info)
+    SymbolInfo const* target_symbol_info, bool is_special_elf_mgr)
 {
     ASSERT0(target_symbol_info);
 
@@ -6204,7 +6195,7 @@ bool LinkerMgr::hasSameSymbol(ELFMgr const* target_elf_mgr,
         if (SYMINFO_is_extern(symbol_info)) { continue; }
 
         //Symbol with STB_GLOBAL/STB_WEAK attribute doesn't need to be renamed.
-        if (!is_elf_mgr_from_var_info &&
+        if (!is_special_elf_mgr &&
             (SYMINFO_sym(symbol_info).st_bind == STB_GLOBAL ||
              SYMINFO_sym(symbol_info).st_bind == STB_WEAK)) {
             continue;
@@ -6269,7 +6260,7 @@ void LinkerMgr::renameSymbolName(MOD ELFMgr * elf_mgr,
 
 
 void LinkerMgr::handleSameNameInDiffFile(MOD ELFMgr * elf_mgr,
-                                         bool is_elf_mgr_from_var_info)
+                                         bool is_special_elf_mgr)
 {
     ASSERT0(elf_mgr);
 
@@ -6284,7 +6275,7 @@ void LinkerMgr::handleSameNameInDiffFile(MOD ELFMgr * elf_mgr,
         ASSERT0(symbol_info);
 
         if (elf_mgr->isNullSymbol(symbol_info, i)) { continue; }
-        if (!hasSameSymbol(elf_mgr, symbol_info, is_elf_mgr_from_var_info)) {
+        if (!hasSameSymbol(elf_mgr, symbol_info, is_special_elf_mgr)) {
             continue;
         }
 

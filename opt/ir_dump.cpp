@@ -60,6 +60,12 @@ void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
 }
 
 
+void dumpIRList(ConstIRList const& ir_list, Region const* rg)
+{
+    dumpIRList((IRList const&)ir_list, rg);
+}
+
+
 void dumpIRList(IRList const& ir_list, Region const* rg)
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -1094,7 +1100,7 @@ void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
     if (!rg->isLogMgrInit() || ir == nullptr) { return; }
     xcom::StrBuf lattr(32);
     if (attr != nullptr) {
-        lattr.strcat(attr);
+        lattr.strcat("%s", attr);
     }
     dumpAttr(lattr, ir, dumpflag);
     dumpAttachInfo(lattr, ir, rg, dumpflag);
@@ -1123,33 +1129,19 @@ CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
                         DumpFlag dumpflag)
 {
     ASSERT0(rg && ir);
-    LogCtx tctx; //Define a tmp logctx.
-
-    //Copy current LogCtx info except the dump buffer, because the tmp ctx
-    //will open a new dump buffer to redirect the dumping.
-    tctx.copyWithOutBuffer(rg->getLogMgr()->getCurrentCtx());
-
-    //Push current LogCtx and enable tmp ctx as the present one.
-    rg->getLogMgr()->push(tctx);
-
-    //Open a new buffer for the tmp ctx.
-    rg->getLogMgr()->startBuffer();
-
-    //Dump IR info to dump buffer of the tmp ctx.
-    dumpIR(ir, rg, nullptr, dumpflag);
-
-    //Get the dump buffer.
-    xcom::StrBuf const* tmplogbuf = rg->getLogMgr()->getBuffer();
-    ASSERT0(tmplogbuf);
-
-    //Append the string in dump buffer into 'outbuf'.
-    outbuf.strcat(tmplogbuf->getBuf());
-
-    //Close the dump buffer.
-    rg->getLogMgr()->endBuffer(false);
-
-    //Pop the tmp ctx and restore original LogCtx.
-    rg->getLogMgr()->pop();
+    class Dump : public xoc::DumpToBuf {
+    public:
+        IR const* ir;
+        DumpFlag const& dumpflag;
+        Dump(Region const* rg, DumpFlag const& df, xcom::StrBuf & buf) :
+            DumpToBuf(rg, buf), dumpflag(df) {}
+        virtual void dumpUserInfo() const override
+        { xoc::dumpIR(ir, getRegion(), nullptr, dumpflag); }
+    };
+    if (!rg->isLogMgrInit()) { return nullptr; }
+    Dump d(rg, dumpflag, outbuf);
+    d.ir = ir;
+    d.dump();
     return outbuf.getBuf();
 }
 
@@ -1259,5 +1251,53 @@ void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx & ctx)
         lm->decIndent(ctx.dn);
     }
 }
+
+//
+//START DumpToBuf
+//
+DumpToBuf::DumpToBuf(Region const* rg, xcom::StrBuf & outbuf, UINT indent) :
+    m_indent(indent), m_rg(rg), m_outbuf(outbuf)
+{
+    ASSERT0(rg);
+    m_lm = rg->getLogMgr();
+    ASSERT0(m_lm);
+}
+
+
+CHAR const* DumpToBuf::dump() const
+{
+    if (!m_rg->isLogMgrInit()) { return nullptr; }
+    LogCtx tctx; //Define a tmp logctx.
+
+    //Copy current LogCtx info except the dump buffer, because the tmp ctx
+    //will open a new dump buffer to redirect the dumping.
+    tctx.copyWithOutBuffer(m_lm->getCurrentCtx());
+
+    //Push current LogCtx and enable tmp ctx as the present one.
+    m_lm->push(tctx);
+
+    //Open a new buffer for the tmp ctx.
+    m_lm->startBuffer();
+
+    //Invoke user's interface to dump info to dump-buffer of the tmp ctx.
+    m_lm->incIndent(m_indent);
+    dumpUserInfo();
+    m_lm->decIndent(m_indent);
+
+    //Get the dump buffer.
+    xcom::StrBuf const* tmplogbuf = m_lm->getBuffer();
+    ASSERT0(tmplogbuf);
+
+    //Append the string in dump buffer into 'm_outbuf'.
+    m_outbuf.strcat("%s", tmplogbuf->getBuf());
+
+    //Close the dump buffer.
+    m_lm->endBuffer(false);
+
+    //Pop the tmp ctx and restore original LogCtx.
+    m_lm->pop();
+    return m_outbuf.getBuf();
+}
+//END DumpToBuf
 
 } //namespace xoc

@@ -213,12 +213,12 @@ protected:
                              MOD TermInfo & ti, OUT ChainRec & cr);
     bool combineStepByBinOp(IR_CODE code, ChainRec const& cr0,
                             ChainRec const& cr1, OUT ChainRec & rescr);
-    bool combineTermInfoByBinOp(IR_CODE code, TermInfo const& ti0,
-                                TermInfo const& ti1,
-                                OUT TermInfo & resti) const;
+    bool combineTermInfoByBinOp(
+        IR_CODE code, TermInfo const& ti0, TermInfo const& ti1,
+        OUT TermInfo & resti) const;
 
-    bool extractRedOpOpnd(MDPhi const* phi,
-                          OUT IR const** init, OUT IR const** step);
+    bool extractRedOpOpnd(MDPhi const* phi, OUT IR const** init,
+                          OUT IR const** step);
     bool extractRedOpOpnd(IR const* ir,
                           OUT IR const** init, OUT IR const** step);
 
@@ -381,9 +381,9 @@ bool FindBIVByChainRec::combineTermInfoByBinOp(IR_CODE code,
 }
 
 
-bool FindBIVByChainRec::combineStepByBinOp(IR_CODE code, ChainRec const& cr0,
-                                           ChainRec const& cr1,
-                                           OUT ChainRec & rescr)
+bool FindBIVByChainRec::combineStepByBinOp(
+    IR_CODE code, ChainRec const& cr0, ChainRec const& cr1,
+    OUT ChainRec & rescr)
 {
     switch (code) {
     case IR_ADD:
@@ -398,9 +398,8 @@ bool FindBIVByChainRec::combineStepByBinOp(IR_CODE code, ChainRec const& cr0,
 }
 
 
-bool FindBIVByChainRec::computeStepByIRTree(IR const* ivocc, IR const* ir,
-                                            MOD TermInfo & ti,
-                                            OUT ChainRec & cr)
+bool FindBIVByChainRec::computeStepByIRTree(
+    IR const* ivocc, IR const* ir, MOD TermInfo & ti, OUT ChainRec & cr)
 {
     switch (ir->getCode()) {
     case IR_CVT:
@@ -510,9 +509,9 @@ bool FindBIVByChainRec::computeCR(IR const* ivocc, IR const* ir,
 }
 
 
-bool FindBIVByChainRec::findBIVImpl(IR const* init, IR const* step,
-                                    MOD TermInfo & ti, OUT ChainRec & cr,
-                                    OUT IR const** initstmt)
+bool FindBIVByChainRec::findBIVImpl(
+    IR const* init, IR const* step, MOD TermInfo & ti, OUT ChainRec & cr,
+    OUT IR const** initstmt)
 {
     ASSERT0(init && step);
     IVVal val;
@@ -661,27 +660,25 @@ protected:
     //Extract BIV info from linear-representation.
     //Return true if the function extracted correct BIV information, and
     //record the BIV into 'biv', otherwise return false.
-    bool extractBIV(IR const* def, IVLinearRep const& lr,
-                    LI<IRBB> const* li, OUT BIV ** biv,
-                    IVRCtx const& ctx);
+    bool extractBIV(IR const* def, IVLinearRep const& lr, LI<IRBB> const* li,
+                    OUT BIV ** biv, IVRCtx const& ctx);
 
     //Find initial value of IV through reduction-operation, if found the
     //value return true, otherwise return false.
     //ir: the reduce-exp.
     //val: used to record the initial value.
     //initstmt: record the initializing stmt.
-    bool findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
-                            OUT IVVal & val, OUT IR const** initstmt,
-                            IVRCtx const& ctx) const;
-    bool findInitValByRedOp(LI<IRBB> const* li, OUT BIV * iv,
-                            IVRCtx const& ctx) const;
-    IR const* findInitStmtByPRSSA(IR const* redexp,
-                                  LI<IRBB> const* li) const;
-    IR const* findInitStmtByMDSSA(IR const* redexp,
-                                  LI<IRBB> const* li) const;
-    IR const* findInitStmtByClassicDU(IR const* redexp,
-                                      LI<IRBB> const* li,
-                                      MD const* ivoccmd) const;
+    bool findInitValByRedOp(
+        IR const* ir, LI<IRBB> const* li, OUT IVVal & val,
+        OUT IR const** initstmt, IVRCtx const& ctx) const;
+    bool findInitValByRedOp(
+        LI<IRBB> const* li, OUT BIV * iv, IVRCtx const& ctx) const;
+    IR const* findInitStmtByPRSSA(
+        IR const* redexp, LI<IRBB> const* li) const;
+    IR const* findInitStmtByMDSSA(
+        IR const* redexp, LI<IRBB> const* li) const;
+    IR const* findInitStmtByClassicDU(
+        IR const* redexp, LI<IRBB> const* li, MD const* ivoccmd) const;
 
     static bool isMDEqual(MD const* md, IR const* ir)
     { return md == ir->getRefMD(); }
@@ -750,8 +747,8 @@ public:
 };
 
 
-IR const* FindBIVByRedOp::findInitStmtByMDSSA(IR const* redexp,
-                                              LI<IRBB> const* li) const
+IR const* FindBIVByRedOp::findInitStmtByMDSSA(
+    IR const* redexp, LI<IRBB> const* li) const
 {
     ASSERT0(redexp->isMemRefNonPR());
     MDDef const* def = m_mdssamgr->findMustMDDef(redexp);
@@ -777,9 +774,8 @@ IR const* FindBIVByRedOp::findInitStmtByMDSSA(IR const* redexp,
 }
 
 
-IR const* FindBIVByRedOp::findInitStmtByClassicDU(IR const* redexp,
-                                                  LI<IRBB> const* li,
-                                                  MD const* ivoccmd) const
+IR const* FindBIVByRedOp::findInitStmtByClassicDU(
+    IR const* redexp, LI<IRBB> const* li, MD const* ivoccmd) const
 {
     //For tmp used, it must be clean before return.
     //IRSet defset(const_cast<IVR*>(m_ivr)->getSegMgr());
@@ -805,8 +801,8 @@ IR const* FindBIVByRedOp::findInitStmtByClassicDU(IR const* redexp,
 }
 
 
-IR const* FindBIVByRedOp::findInitStmtByPRSSA(IR const* redexp,
-                                              LI<IRBB> const* li) const
+IR const* FindBIVByRedOp::findInitStmtByPRSSA(
+    IR const* redexp, LI<IRBB> const* li) const
 {
     ASSERT0(redexp->isPROp());
     ASSERTN(redexp->getSSAInfo(), ("miss SSAInfo"));
@@ -832,8 +828,8 @@ IR const* FindBIVByRedOp::findInitStmtByPRSSA(IR const* redexp,
 }
 
 
-bool FindBIVByRedOp::findInitValByRedOp(LI<IRBB> const* li, OUT BIV * iv,
-                                        IVRCtx const& ctx) const
+bool FindBIVByRedOp::findInitValByRedOp(
+    LI<IRBB> const* li, OUT BIV * iv, IVRCtx const& ctx) const
 {
     IR const* redexp = iv->getRedExp();
     ASSERT0(redexp);
@@ -848,10 +844,9 @@ bool FindBIVByRedOp::findInitValByRedOp(LI<IRBB> const* li, OUT BIV * iv,
 //return false.
 //iv: used to record the initial value.
 //initstmt: record the initializing stmt.
-bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
-                                        OUT IVVal & val,
-                                        OUT IR const** initstmt,
-                                        IVRCtx const& ctx) const
+bool FindBIVByRedOp::findInitValByRedOp(
+    IR const* ir, LI<IRBB> const* li, OUT IVVal & val, OUT IR const** initstmt,
+    IVRCtx const& ctx) const
 {
     IR const* def = nullptr;
     ASSERT0(ir->isMemRef());
@@ -876,8 +871,8 @@ bool FindBIVByRedOp::findInitValByRedOp(IR const* ir, LI<IRBB> const* li,
 }
 
 
-bool FindBIVByRedOp::isReductionOpByMDSSA(IR const* ir, LI<IRBB> const* li,
-                                          OUT IVLinearRep * lr) const
+bool FindBIVByRedOp::isReductionOpByMDSSA(
+    IR const* ir, LI<IRBB> const* li, OUT IVLinearRep * lr) const
 {
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(useMDSSADU());
@@ -919,9 +914,9 @@ bool FindBIVByRedOp::isReductionOpByMDSSA(IR const* ir, LI<IRBB> const* li,
 }
 
 
-bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
-                                LI<IRBB> const* li, OUT BIV ** biv,
-                                IVRCtx const& ctx)
+bool FindBIVByRedOp::extractBIV(
+    IR const* def, IVLinearRep const& lr, LI<IRBB> const* li, OUT BIV ** biv,
+    IVRCtx const& ctx)
 {
     ASSERT0(def->is_stmt());
     if (!lr.isValidAddendSign()) { return false; }
@@ -959,9 +954,9 @@ bool FindBIVByRedOp::extractBIV(IR const* def, IVLinearRep const& lr,
 }
 
 
-bool FindBIVByRedOp::isMultipleOfMD(LI<IRBB> const* li, IR const* ir,
-                                    MD const* selfmd,
-                                    OUT IVLinearRep * linrep) const
+bool FindBIVByRedOp::isMultipleOfMD(
+    LI<IRBB> const* li, IR const* ir, MD const* selfmd,
+    OUT IVLinearRep * linrep) const
 {
     if (ir->is_mul()) {
         //IVLinearRep of IV:a*i.
@@ -993,9 +988,9 @@ bool FindBIVByRedOp::isMultipleOfMD(LI<IRBB> const* li, IR const* ir,
 }
 
 
-bool FindBIVByRedOp::isLinearRepOfMD(LI<IRBB> const* li, IR const* ir,
-                                     MD const* selfmd,
-                                     OUT IVLinearRep * linrep) const
+bool FindBIVByRedOp::isLinearRepOfMD(
+    LI<IRBB> const* li, IR const* ir, MD const* selfmd,
+    OUT IVLinearRep * linrep) const
 {
     ASSERT0(ir->is_exp());
     if (!ir->is_add() && !ir->is_sub()) {
@@ -1051,8 +1046,8 @@ bool FindBIVByRedOp::isRelateToPhiOpnd(IR const* ir, IR const* phi) const
 }
 
 
-bool FindBIVByRedOp::isReductionOpByPRSSA(IR const* ir, LI<IRBB> const* li,
-                                          OUT IVLinearRep * lr) const
+bool FindBIVByRedOp::isReductionOpByPRSSA(
+    IR const* ir, LI<IRBB> const* li, OUT IVLinearRep * lr) const
 {
     ASSERT0(ir->is_stpr());
     ASSERT0(usePRSSADU());
@@ -1093,8 +1088,8 @@ bool FindBIVByRedOp::isReductionOpByPRSSA(IR const* ir, LI<IRBB> const* li,
 }
 
 
-bool FindBIVByRedOp::isReductionOp(IR const* ir, LI<IRBB> const* li,
-                                   OUT IVLinearRep * lr) const
+bool FindBIVByRedOp::isReductionOp(
+    IR const* ir, LI<IRBB> const* li, OUT IVLinearRep * lr) const
 {
     ASSERT0(ir->isMemRef());
     MD const* mustref = ir->getRefMD();
@@ -1444,11 +1439,59 @@ void FindDIV::find()
 //
 void IVRCtx::dumpAct(CHAR const* format, ...) const
 {
-    if (m_act_mgr == nullptr) { return; }
+    if (m_am == nullptr) { return; }
     va_list args;
     va_start(args, format);
-    m_act_mgr->dump_args(format, args);
+    m_am->dump_args(format, args);
     va_end(args);
+}
+
+
+void IVRCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+    ASSERT0(m_am);
+    ASSERT0(ir);
+    xcom::StrBuf tmpbuf(64);
+    if (format != nullptr) {
+        va_list args;
+        va_start(args, format);
+        tmpbuf.vstrcat(format, args);
+        va_end(args);
+    }
+    ActHandler acth = m_am->dump("IVR:");
+    if (format != nullptr) {
+        acth.info->strcat("%s", tmpbuf.getBuf());
+    }
+    getRegion()->getLogMgr()->incIndent(4);
+    xcom::StrBuf irbuf(64);
+    dumpIRToBuf(ir, getRegion(), irbuf);
+    getRegion()->getLogMgr()->decIndent(4);
+    acth.info->strcat(irbuf);
+}
+
+
+void IVRCtx::dumpAct(BIV const* biv, CHAR const* format, ...) const
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+    ASSERT0(m_am);
+    ASSERT0(biv);
+    xcom::StrBuf tmpbuf(64);
+    if (format != nullptr) {
+        va_list args;
+        va_start(args, format);
+        tmpbuf.vstrcat(format, args);
+        va_end(args);
+    }
+    ActHandler acth = m_am->dump("IVR:");
+    if (format != nullptr) {
+        acth.info->strcat("%s", tmpbuf.getBuf());
+    }
+    getRegion()->getLogMgr()->incIndent(2);
+    xcom::StrBuf buf(64);
+    biv->dumpBuf(getRegion(), buf);
+    getRegion()->getLogMgr()->decIndent(2);
+    acth.info->strcat(buf);
 }
 //END IVRCtx
 
@@ -1467,6 +1510,9 @@ IR * BIV::genInitExp(IRMgr * irmgr) const
     case IVVal::VAL_IS_VAR:
         ASSERT0(getInitValMD() != nullptr);
         return irmgr->buildLoad(getInitValMD()->get_base(), getInitValType());
+    case IVVal::VAL_IS_EXP:
+        ASSERT0(getInitExp() != nullptr);
+        return irmgr->getRegion()->dupIRTree(getInitExp());
     default:
         ASSERTN(0, ("need to generate IR if needed"));
         return nullptr;
@@ -1478,10 +1524,33 @@ IR * BIV::genInitExp(IRMgr * irmgr) const
 IR * BIV::genStepExp(IRMgr * irmgr) const
 {
     ASSERT0(getInitValType());
+    switch (getStepVal().getKind()) {
+    case IVVal::VAL_IS_INT:
+        return irmgr->buildImmInt(getStepValInt(), getInitValType());
+    case IVVal::VAL_IS_FP:
+        return irmgr->buildImmFP(getStepValFP(), getInitValType());
+    case IVVal::VAL_IS_VAR:
+        ASSERT0(getStepValMD() != nullptr);
+        return irmgr->buildLoad(getStepValMD()->get_base(), getInitValType());
+    case IVVal::VAL_IS_EXP:
+        ASSERT0(getStepValExp() != nullptr);
+        return irmgr->getRegion()->dupIRTree(getStepValExp());
+    default:
+        ASSERTN(0, ("need to generate IR if needed"));
+        return nullptr;
+    }
+    return nullptr;
+}
+
+
+IR * BIV::genStepReduceExp(IRMgr * irmgr) const
+{
+    ASSERT0(getInitValType());
     Type const* ty = getInitValType();
     ASSERT0(isInc() || isDec());
     IR_CODE irc = isInc() ? IR_ADD : IR_SUB;
-    return irmgr->buildBinaryOp(irc, ty,
+    ASSERT0(isStepValInt());
+    return irmgr->buildBinaryOpSimp(irc, ty,
         irmgr->buildLoad(getExpOccMD()->get_base(), ty),
         irmgr->buildImmInt(getStepValInt(), ty));
 }
@@ -1511,8 +1580,26 @@ IR * BIV::genBoundExp(IVBoundInfo const& boundinfo, IVR const* ivr,
 }
 
 
+CHAR const* BIV::dumpBuf(Region const* rg, OUT StrBuf & outbuf) const
+{
+    class Dump : public xoc::DumpToBuf {
+    public:
+        BIV const* biv;
+        Dump(Region const* rg, xcom::StrBuf & buf) : DumpToBuf(rg, buf) {}
+        virtual void dumpUserInfo() const override
+        { biv->dump(getRegion()); }
+    };
+    if (!rg->isLogMgrInit()) { return nullptr; }
+    Dump d(rg, outbuf);
+    d.biv = this;
+    d.dump();
+    return outbuf.getBuf();
+}
+
+
 void BIV::dump(Region const* rg) const
 {
+    if (!rg->isLogMgrInit()) { return; }
     BIV * iv = const_cast<BIV*>(this);
     ASSERT0(iv->getRedStmt());
     note(rg, "\nBIV(STMTOCC:MD%d,'%s')",
@@ -1675,43 +1762,64 @@ void IVLinearRep::dump(Region const* rg) const
 //
 //START IVBoundInfo
 //
+void IVBoundInfo::dumpBuf(Region const* rg, OUT xcom::StrBuf & buf) const
+{
+    class Dump : public xoc::DumpToBuf {
+    public:
+        IVBoundInfo const* ibinfo;
+        Dump(Region const* rg, xcom::StrBuf & buf) : DumpToBuf(rg, buf) {}
+        virtual void dumpUserInfo() const override
+        { ibinfo->dump(getRegion()); }
+    };
+    Dump d(rg, buf);
+    d.ibinfo = this;
+    d.dump();
+}
+
+
+static void dumpTC(Region const* rg, IVBoundInfo const* ib)
+{
+    if (IVBI_is_tc_imm(*ib)) {
+        xcom::StrBuf lbuf(32);
+        xoc::dumpHostInt(IVBI_tc_imm(*ib), false, false, lbuf);
+        note(rg, "\nTRIPCOUNT IS IMM:%s", lbuf.getBuf());
+
+        lbuf.clean();
+        xoc::dumpHostInt(IVBI_tc_init_val_imm(*ib), false, false, lbuf);
+        note(rg, "\nINIT_VAL IS IMM:%s", lbuf.getBuf());
+
+        lbuf.clean();
+        xoc::dumpHostInt(IVBI_tc_end_val_imm(*ib), false, false, lbuf);
+        note(rg, "\nEND_VAL IS IMM:%s", lbuf.getBuf());
+        return;
+    }
+    IR const* exp = IVBI_tc_exp(*ib);
+    ASSERT0(exp && exp->is_exp());
+    note(rg, "\nTRIPCOUNT IS EXP:");
+    rg->getLogMgr()->incIndent(2);
+    xoc::dumpIR(exp, rg);
+    rg->getLogMgr()->decIndent(2);
+}
+
+
 void IVBoundInfo::dump(Region const* rg) const
 {
     ASSERT0(rg);
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP IVBoundInfo --==");
     rg->getLogMgr()->incIndent(2);
-    BIV const* iv = IVBI_iv(*this);
+
+    BIV const* iv = getBIV();
+    ASSERT0(iv);
     iv->dump(rg);
-    xcom::StrBuf lbuf(32);
-    xcom::StrBuf buf(32);
-    if (IVBI_is_tc_imm(*this)) {
-        xoc::dumpHostInt(IVBI_tc_imm(*this), false, false, lbuf);
-        buf.strcat("\nTRIPCOUNT IS IMM:%s", lbuf.buf);
+    dumpTC(rg, this);
 
-        lbuf.clean();
-        xoc::dumpHostInt(IVBI_tc_init_val_imm(*this), false, false, lbuf);
-        buf.strcat("\nINIT_VAL IS IMM:%s", lbuf.buf);
+    //In particularly dump step value.
+    note(rg, "\nSTEP IS:");
+    rg->getLogMgr()->incIndent(2);
+    iv->getStepVal().dump(rg);
+    rg->getLogMgr()->decIndent(2);
 
-        lbuf.clean();
-        xoc::dumpHostInt(IVBI_tc_end_val_imm(*this), false, false, lbuf);
-        buf.strcat("\nEND_VAL IS IMM:%s", lbuf.buf);
-    } else {
-        IR const* exp = IVBI_tc_exp(*this);
-        ASSERT0(exp && exp->is_exp());
-        buf.strcat("\nTRIPCOUNT IS EXP:");
-        {
-            DumpBufferSwitch buff(rg->getLogMgr());
-            xoc::dumpIR(exp, rg);
-            ASSERT0(rg->getLogMgr()->getBuffer());
-            buf.strcat(rg->getLogMgr()->getBuffer()->getBuf());
-            rg->getLogMgr()->cleanBuffer();
-        }
-    }
-    lbuf.clean();
-    xoc::dumpHostInt((HOST_INT)iv->getStepValInt(), false, false, lbuf);
-    buf.strcat("\nSTEP IS IMM:%s", lbuf.buf);
-    note(rg, buf.buf);
     rg->getLogMgr()->decIndent(2);
 }
 //END IVBoundInfo
@@ -1734,6 +1842,34 @@ bool IV::isRefIV(IR const* ir) const
     if (irref == nullptr) { return false; }
     ASSERT0(getStmtOccMD() && getExpOccMD());
     return isRefIV(irref);
+}
+
+
+bool IV::isIRTreeRefIV(IR const* ir, OUT IR const** refiv) const
+{
+    class IterTree : public VisitIRTree {
+    public:
+        IV const* iv;
+        IR const* refiv;
+        IterTree() { refiv = nullptr; iv = nullptr; }
+        virtual bool visitIR(IR const* ir) override
+        {
+            if (iv->isRefIV(ir)) {
+                refiv = ir;
+                setTerminate();
+                return false;
+            }
+            return true;
+        }
+    };
+    IterTree it;
+    it.iv = this;
+    it.visit(ir);
+    ASSERT0(refiv);
+    *refiv = nullptr;
+    if (it.refiv == nullptr) { return false; }
+    *refiv = it.refiv;
+    return true;
 }
 
 
@@ -1918,6 +2054,103 @@ bool IVR::isDIV(LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const
 }
 
 
+IR * IVR::tryBuildInitStmtByIVVal(IR const* resref, IVVal const& initv) const
+{
+    IVR * pthis = const_cast<IVR*>(this);
+    IR * rhs = nullptr;
+    switch (initv.getKind()) {
+    case IVVal::VAL_IS_VAR:
+        rhs = pthis->getChainRecMgr().buildVarRef(initv);
+        break;
+    case IVVal::VAL_IS_INT:
+        rhs = m_rg->getIRMgr()->buildImmInt(initv.getInt(), initv.getDType());
+        break;
+    case IVVal::VAL_IS_FP:
+        rhs = m_rg->getIRMgr()->buildImmFP(initv.getFP(), initv.getDType());
+        break;
+    case IVVal::VAL_IS_EXP:
+        rhs = m_rg->dupIRTree(initv.getExp());
+        break;
+    case IVVal::VAL_IS_CR: {
+        IVVal const& tinitv = initv.getCR()->getInit();
+        rhs = tryBuildInitStmtByIVVal(resref, tinitv);
+        break;
+    }
+    default: UNREACHABLE();
+    }
+    if (rhs == nullptr) { return nullptr; }
+    if (resref->is_phi() || resref->isCallStmt()) {
+        return m_irmgr->buildStorePR(resref->getPrno(), resref->getType(), rhs);
+    }
+    return m_rg->dupIsomoStmt(resref, rhs);
+}
+
+
+IR * IVR::buildLoadIV(IV const* iv, Type const* ty) const
+{
+    ASSERT0(iv && ty);
+    Var * ivvar = iv->getExpOccMD()->get_base();
+    if (ivvar->is_pr()) {
+        return m_irmgr->buildPRdedicated(ivvar->getPrno(), ty);
+    }
+    return m_irmgr->buildId(ivvar);
+}
+
+
+IR * IVR::buildLoadIV(IV const* iv) const
+{
+    Var * ivvar = iv->getExpOccMD()->get_base();
+    ASSERT0(ivvar);
+    return buildLoadIV(iv, ivvar->getType());
+}
+
+
+IR * IVR::tryBuildReduceExpOfIV(
+    IV const* iv, HOST_UINT step, OUT IR ** loadiv) const
+{
+    if (!iv->isInc() && !iv->isDec()) { return nullptr; }
+    Type const* ty = iv->getIVType();
+    ASSERT0(ty);
+    IR_CODE irc = iv->isInc() ? IR_ADD : IR_SUB;
+    *loadiv = buildLoadIV(iv, ty);
+    IR * exp = m_irmgr->buildBinaryOpSimp(irc, ty,
+        *loadiv, m_irmgr->buildImmInt(step, ty));
+    return exp;
+}
+
+
+IR * IVR::tryBuildReduceStmtOfIV(IV const* iv, HOST_UINT step) const
+{
+    IR * loadiv = nullptr;
+    IR * rhs = tryBuildReduceExpOfIV(iv, step, &loadiv);
+    if (rhs == nullptr) { return nullptr; }
+    ASSERT0(loadiv);
+    return m_rg->dupIsomoStmt(loadiv, rhs);
+}
+
+
+IR * IVR::tryBuildReduceStmtOfIV(
+    IR const* resref, IV const* iv, HOST_UINT step) const
+{
+    IR * loadiv = nullptr;
+    IR * rhs = tryBuildReduceExpOfIV(iv, step, &loadiv);
+    if (rhs == nullptr) { return nullptr; }
+    if (resref->is_phi() || resref->isCallStmt()) {
+        return m_irmgr->buildStorePR(resref->getPrno(), resref->getType(), rhs);
+    }
+    return m_rg->dupIsomoStmt(resref, rhs);
+}
+
+
+IR * IVR::tryBuildInitStmtOfIV(IR const* resref, IV const* iv) const
+{
+    ASSERT0(iv);
+    if (!iv->hasInitVal()) { return nullptr; }
+    IVVal const& initv = iv->getInitVal();
+    return tryBuildInitStmtByIVVal(resref, initv);
+}
+
+
 bool IVR::isIV(LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const
 {
     if (isBIV(li, ir, iv)) { return true; }
@@ -1949,23 +2182,22 @@ bool IVR::canBeAddend(LI<IRBB> const* li, IR const* ir) const
 }
 
 
-bool IVR::isRelaxLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
-                               InvStmtList const* invstmtlst, OptCtx const* oc,
-                               OUT IVLinearRep * linrep,
-                               MOD LinearRepMgr & lrmgr) const
+bool IVR::isRelaxLinearRepOfDIV(
+    LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+    OptCtx const* oc, OUT IVLinearRep * linrep, MOD LinearRepMgr & lrmgr) const
 {
-    BIVList const* bivlst = getBIVList(li);
-    if (bivlst == nullptr) { return false; }
-    for (BIVListIter it = bivlst->get_head();
-         it != bivlst->end(); it = bivlst->get_next(it)) {
-        BIV const* tiv = it->val();
+    DIVList const* divlst = getDIVList(li);
+    if (divlst == nullptr) { return false; }
+    for (DIVListIter it = divlst->get_head();
+         it != divlst->end(); it = divlst->get_next(it)) {
+        DIV const* tiv = it->val();
         ASSERT0(tiv);
         LRInferCtx ctx;
-        ctx.is_transitive = true;
-        ctx.li = li;
-        ASSERTN(tiv->getInitIVVar(), ("miss IV var"));
-        if (lrmgr.inferAndConstructLinearRep(ir, tiv->getInitIVVar(),
-                                             *linrep, ctx)) {
+        LRCTX_is_transitive(ctx) = true;
+        LRCTX_li(ctx) = li;
+        Var const* iv = tiv->getInitIVVar();
+        if (iv == nullptr) { return false; }
+        if (lrmgr.inferAndConstructLinearRep(ir, iv, *linrep, ctx)) {
             IVLR_iv(linrep) = tiv;
             return true;
         }
@@ -1974,8 +2206,43 @@ bool IVR::isRelaxLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
 }
 
 
-bool IVR::isMultipleOfIV(LI<IRBB> const* li, IR const* ir,
-                         OUT IVLinearRep * linrep) const
+bool IVR::isRelaxLinearRepOfBIV(
+    LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+    OptCtx const* oc, OUT IVLinearRep * linrep, MOD LinearRepMgr & lrmgr) const
+{
+    BIVList const* bivlst = getBIVList(li);
+    if (bivlst == nullptr) { return false; }
+    for (BIVListIter it = bivlst->get_head();
+         it != bivlst->end(); it = bivlst->get_next(it)) {
+        BIV const* tiv = it->val();
+        ASSERT0(tiv);
+        LRInferCtx ctx;
+        LRCTX_is_transitive(ctx) = true;
+        LRCTX_li(ctx) = li;
+        Var const* iv = tiv->getInitIVVar();
+        ASSERTN(iv, ("miss IV var"));
+        if (lrmgr.inferAndConstructLinearRep(ir, iv, *linrep, ctx)) {
+            IVLR_iv(linrep) = tiv;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool IVR::isRelaxLinearRepOfIV(
+    LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+    OptCtx const* oc, OUT IVLinearRep * linrep, MOD LinearRepMgr & lrmgr) const
+{
+    if (isRelaxLinearRepOfBIV(li, ir, invstmtlst, oc, linrep, lrmgr)) {
+        return true;
+    }
+    return isRelaxLinearRepOfDIV(li, ir, invstmtlst, oc, linrep, lrmgr);
+}
+
+
+bool IVR::isMultipleOfIV(
+    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const
 {
     ASSERT0(ir->is_exp());
     IV const* iv = nullptr;
@@ -2012,8 +2279,8 @@ bool IVR::isMultipleOfIV(LI<IRBB> const* li, IR const* ir,
 }
 
 
-bool IVR::isLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
-                          OUT IVLinearRep * linrep) const
+bool IVR::isLinearRepOfIV(
+    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const
 {
     ASSERT0(ir->is_exp());
     if (!ir->is_add() && !ir->is_sub()) {
@@ -2091,8 +2358,12 @@ bool IVR::dump() const
     if (!m_rg->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
     dump_recur(m_cfg->getLoopInfo(), 0);
-    return Pass::dump();
+    getActMgr()->dump();
+    bool succ = Pass::dump();
+    m_rg->getLogMgr()->decIndent(2);
+    return succ;
 }
 
 
@@ -2127,7 +2398,7 @@ IR const* IVR::findBIVBoundStmt(LI<IRBB> const* li, OUT BIV const** biv,
     xcom::List<UINT> endlst;
     li->findAllLoopEndBB(m_cfg, endlst);
     if (endlst.get_elem_count() > 1) {
-        ivrctx.dumpAct("there are multiple exit BBs in LoopInfo %u", li->id());
+        ivrctx.dumpAct("there are multiple exit BBs in LOOP%u", li->id());
         //Multiple exit BB.
         return nullptr;
     }
@@ -2154,10 +2425,9 @@ IR const* IVR::findBIVBoundStmt(LI<IRBB> const* li, OUT BIV const** biv,
 }
 
 
-bool IVR::extractIVBoundExpFromStmt(IV const* iv, IR const* stmt,
-                                    OUT IR const** ivref,
-                                    OUT IR const** bexp,
-                                    OUT bool * is_closed_range) const
+bool IVR::extractIVBoundExpFromStmt(
+    IV const* iv, IR const* stmt, OUT IR const** ivref, OUT IR const** bexp,
+    OUT bool * is_closed_range) const
 {
     ASSERT0(iv && stmt && stmt->is_stmt());
     if (!stmt->isConditionalBr()) { return false; }
@@ -2179,9 +2449,9 @@ bool IVR::extractIVBoundExpFromStmt(IV const* iv, IR const* stmt,
 }
 
 
-bool IVR::extractIVBoundExp(IV const* iv, IR const* compare_exp,
-                            OUT IR const** ivref,
-                            OUT IR const** bexp) const
+bool IVR::extractIVBoundExp(
+    IV const* iv, IR const* compare_exp, OUT IR const** ivref,
+    OUT IR const** bexp) const
 {
     ASSERT0(compare_exp && compare_exp->is_relation());
     IR const* opnd0 = BIN_opnd0(compare_exp);
@@ -2350,35 +2620,41 @@ bool IVR::computeIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
 }
 
 
-IR * IVR::genTripCountExp(BIV const* biv, IR const* initexp,
-                          IR const* boundexp, HOST_INT step,
-                          MOD IVRCtx & ivrctx) const
+IR * IVR::genTripCountExp(
+    BIV const* biv, IR const* initexp, IR const* boundexp,
+    IR const* stepexp, MOD IVRCtx & ivrctx) const
 {
-    IR const* iv_initval = nullptr;
-    IR const* iv_endval = nullptr;
+    IR * triplen = nullptr;
+    Type const* ty = initexp->getType();
     if (biv->isInc()) {
-        iv_initval = initexp;
-        iv_endval = boundexp;
+        IR const* initval = initexp;
+        IR const* endval = boundexp;
+        triplen = m_irmgr->buildBinaryOpSimp(
+            IR_SUB, ty, m_rg->dupIRTree(endval), m_rg->dupIRTree(initval));
+    } else if (biv->isDec()) {
+        IR const* initval = boundexp;
+        IR const* endval = initexp;
+        triplen = m_irmgr->buildBinaryOpSimp(
+            IR_SUB, ty, m_rg->dupIRTree(endval), m_rg->dupIRTree(initval));
     } else {
-        ASSERT0(biv->isDec());
-        iv_initval = boundexp;
-        iv_endval = initexp;
+        //We have no knowledge about IV reduce-direction.
+        IR const* initval = boundexp;
+        IR const* endval = initexp;
+        triplen = m_irmgr->buildUnaryOp(
+            IR_ABS, ty, m_irmgr->buildBinaryOpSimp(
+                IR_SUB, ty, m_rg->dupIRTree(endval), m_rg->dupIRTree(initval)));
     }
-    DUMMYUSE(iv_initval);
-    Type const* ty = iv_endval->getType();
-    IR * tripcount_exp = m_irmgr->buildBinaryOp(IR_DIV, ty,
-        m_irmgr->buildBinaryOp(IR_SUB, ty,
-                               m_rg->dupIRTree(boundexp),
-                               m_rg->dupIRTree(initexp)),
-        m_irmgr->buildImmInt(step, ty));
+    DUMMYUSE(triplen);
+    IR * tripcount_exp = m_irmgr->buildBinaryOpSimp(
+        IR_DIV, ty, triplen, m_rg->dupIRTree(stepexp));
     Refine * refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
     if (refine != nullptr) {
         //Perform peephole optimization to ir.
         //Return updated ir if optimization performed.
         RefineCtx rc(ivrctx.getOptCtx());
         bool change;
-        tripcount_exp = refine->refineIRUntilUnchange(tripcount_exp,
-                                                      change, rc);
+        tripcount_exp = refine->refineIRUntilUnchange(
+            tripcount_exp, change, rc);
     }
     return tripcount_exp;
 }
@@ -2394,15 +2670,15 @@ bool IVR::computeExpIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
         //out in a high probability.
         return false;
     }
-    ASSERT0(ubstmt->is_stmt());
-    ASSERT0(biv);
-    HOST_INT step = (HOST_INT)biv->getStepValInt();
-    if (step == 0) {
-        //Step is 0, may cause infinit loop.
-        return false;
-    }
     ASSERT0(biv);
     if (!biv->hasInitVal()) { return false; }
+    ASSERT0(ubstmt->is_stmt());
+
+    //Compute the initial value of IV.
+    //Note the initial value of IV is NOT constant.
+    IR const* initexp = biv->isInitExp() ?
+        biv->getInitExp() : biv->genInitExp(m_irmgr);
+    ASSERT0(initexp);
 
     //Compute the finish value of IV.
     IR const* ivref = nullptr;
@@ -2410,11 +2686,21 @@ bool IVR::computeExpIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
     bool is_closed_range = false;
     extractIVBoundExpFromStmt(biv, ubstmt, &ivref, &bexp, &is_closed_range);
     ASSERT0(ivref && bexp);
-    IR const* initexp = biv->isInitExp() ?
-        biv->getInitExp() : biv->genInitExp(m_irmgr);
-    ASSERT0(initexp);
-    IR * tripcount_exp = genTripCountExp(biv, initexp, bexp, step, ivrctx);
+
+    //Compute the step value of IV.
+    if (biv->isStepValInt() && biv->getStepValInt() == 0) {
+        //Step is 0, may cause infinit loop.
+        return false;
+    }
+    IR * stepexp = biv->genStepExp(m_irmgr);
+    ASSERT0(stepexp);
+
+    //Compute the trip-count.
+    IR * tripcount_exp = genTripCountExp(biv, initexp, bexp, stepexp, ivrctx);
     ASSERT0(tripcount_exp);
+    m_rg->freeIRTree(stepexp); //used for local.
+
+    //Fill bound-info with misc info.
     IVBI_is_tc_imm(bi) = false;
     IVBI_tc_exp(bi) = tripcount_exp;
     IVBI_iv(bi) = biv;
@@ -2436,6 +2722,7 @@ bool IVR::computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
     }
     ASSERT0(biv);
     if (!biv->hasInitVal()) { return false; }
+    ASSERT0(ubstmt->is_stmt());
 
     //Compute the initial value of IV.
     HOST_INT iv_initval = 0;
@@ -2447,14 +2734,26 @@ bool IVR::computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
     bool is_closed_range = false;
     extractIVBoundExpFromStmt(biv, ubstmt, &ivref, &bexp, &is_closed_range);
     ASSERT0(ivref && bexp);
-    HOST_INT iv_endval = 0;
+
     //Whether the end bound is constant value.
+    HOST_INT iv_endval = 0;
     if (!computeConstValOfExp(bexp, iv_endval)) { return false; }
+    if (!biv->isStepValInt()) {
+        ivrctx.dumpAct(biv,
+            "can not compute IV bound because BIV of LOOP%u does "
+            "not have integer step value", li->id());
+        return false;
+    }
+
+    //Compute the step value of IV.
     HOST_INT step = (HOST_INT)biv->getStepValInt();
     if (step == 0) {
         //Step is 0, may cause infinit loop.
+        ivrctx.dumpAct("The step BIV of LOOP%u is %d", step);
         return false;
     }
+
+    //Compute the trip-count.
     HOST_INT trip_count;
     if (biv->isInc()) {
         trip_count = (iv_endval - iv_initval) / step;
@@ -2463,6 +2762,8 @@ bool IVR::computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
         trip_count = (iv_initval - iv_endval) / step;
     }
     if (trip_count < 0) { return false; }
+
+    //Fill bound-info with misc info.
     IVBI_is_tc_imm(bi) = true;
     IVBI_tc_imm(bi) = trip_count;
     IVBI_iv(bi) = biv;
@@ -2511,7 +2812,7 @@ bool IVR::perform(OptCtx & oc)
         return false;
     }
     CLoopInfoIter it;
-    IVRCtx ctx(&oc, getActMgr());
+    IVRCtx ctx(getRegion(), &oc, getActMgr());
     for (LI<IRBB> const* tli = iterInitLoopInfoC(li, it);
          tli != nullptr; tli = iterNextLoopInfoC(it)) {
         bool try_classic_prdu = true;
@@ -2534,7 +2835,6 @@ bool IVR::perform(OptCtx & oc)
         fdiv.find();
     }
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIVR()) {
-        getActMgr()->dump();
         dump();
     }
     set_valid(true);

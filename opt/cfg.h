@@ -150,6 +150,24 @@ protected:
     SMemPool * m_pool;
     List<BB*> m_exit_list; //CFG Graph ENTRY list
 protected:
+    LI<BB> * allocLoopInfo()
+    {
+        LI<BB> * li = (LI<BB>*)xmalloc(sizeof(LI<BB>));
+        LI_id(li) = m_li_count++;
+        return li;
+    }
+
+    //Build a loopinfo.
+    //bbset: record all BBs inside the loop, include the head.
+    LI<BB> * buildLoopInfo(xcom::BitSet * bbset, BB * head)
+    {
+        ASSERT0(bbset && head);
+        LI<BB> * li = allocLoopInfo();
+        LI_bb_set(li) = bbset;
+        LI_loop_head(li) = head;
+        return li;
+    }
+
     //Collect loop info e.g: loop has call, loop has goto.
     void collectLoopInfo() { collectLoopInfoRecur(m_loop_info); }
     void cloneRPOVexList(CFG<BB, XR> const& src);
@@ -286,7 +304,7 @@ public:
     virtual void dumpLoopInfo(Region const* rg) const
     {
         if (!rg->isLogMgrInit()) { return; }
-        prt(rg, "\n==---- DUMP Natural Loop Info ----==");
+        note(rg, "\n==---- DUMP Natural Loop Info ----==");
         dumpLoopTree(m_loop_info, 0, rg);
     }
     virtual void dumpVCG(CHAR const* name = nullptr) const;
@@ -296,7 +314,9 @@ public:
     {
         //Do not dump if LogMr is not initialized.
         if (!rg->isLogMgrInit()) { return; }
-        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(), false, false);
+        xcom::StrBuf buf(32);
+        xcom::DGraph::dumpDom(buf);
+        note(rg, "%s", buf.getBuf());
     }
 
     //Dump Dom Info to dump file and dump dom-tree graph into file.
@@ -487,6 +507,7 @@ public:
         erase();
         UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
         resize(newsz);
+        cleanBBVertex();
         build(oc);
         //NOTE:one should invoke removeEmptyBB() immediately after this
         //function return, because the rebuilding of CFG may generate
@@ -530,7 +551,7 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
 {
     if (!rg->isLogMgrInit()) { return; }
     while (looplist != nullptr) {
-        prt(rg, "\n");
+        note(rg, "\n");
         for (UINT i = 0; i < indent; i++) { prt(rg, " "); }
         ASSERT0(LI_loop_head(looplist));
         prt(rg, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
@@ -942,7 +963,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
         Vertex * v = addVertex(bb->id());
         setVertex(bb, v);
     }
-    OC_is_cfg_valid(oc) = true;
+    oc.setValidPass(PASS_CFG);
 }
 
 
@@ -1200,11 +1221,7 @@ bool CFG<BB, XR>::findLoop()
                 reinsertLoopTree(&m_loop_info, li);
                 continue;
             }
-
-            li = (LI<BB>*)xmalloc(sizeof(LI<BB>));
-            LI_id(li) = m_li_count++;
-            LI_bb_set(li) = loop;
-            LI_loop_head(li) = succ;
+            li = buildLoopInfo(loop, succ);
             insertLoopTree(&m_loop_info, li);
             head2li.set(succ, li);
         }
@@ -1396,7 +1413,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     #else
     getRPOMgr().computeRPO(*this, m_entry->getVex(), *m_rpo_vexlst);
     #endif
-    OC_is_rpo_valid(oc) = true;
+    oc.setValidPass(PASS_RPO);
     END_TIMER(t, "Compute RPO");
 }
 

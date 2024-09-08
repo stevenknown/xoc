@@ -407,6 +407,7 @@ void LifeTime::addOcc(Occ occ)
 {
     ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
     m_occ_list.append_tail(occ);
+    if (isDefOcc(occ.getIR())) { setOccHasDef(); }
 }
 
 
@@ -672,8 +673,8 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
     if (res == nullptr) { return; }
     PRNO prno = res->getPrno();
     LifeTime * lt = mgr.genLifeTime(prno);
-    lt->set_dedicated(dedmgr.is_dedicated(prno));
     ASSERT0(lt);
+    if (dedmgr.is_dedicated(prno)) { lt->setDedicated(); }
     lt->addRange(pos);
     lt->addOcc(Occ(true, pos, ir));
     mgr.recordPos(ir, pos);
@@ -688,8 +689,8 @@ static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
     ASSERT0(ir && ir->isPROp());
     PRNO prno = ir->getPrno();
     LifeTime * lt = mgr.genLifeTime(prno);
-    lt->set_dedicated(dedmgr.is_dedicated(prno));
     ASSERT0(lt);
+    if (dedmgr.is_dedicated(prno)) { lt->setDedicated(); }
     Range r = lt->getLastRange();
     if (r.start() == POS_UNDEF) {
         //PR is region livein.

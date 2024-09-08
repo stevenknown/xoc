@@ -121,7 +121,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     }
     if (g_do_dce || g_do_dce_aggressive) {
         DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
-        dce->set_elim_cfs(g_do_dce_aggressive);
+        dce->setElimCFS(g_do_dce_aggressive);
         passlist.append_tail(dce);
     }
     if (g_do_dse) {

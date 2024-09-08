@@ -150,63 +150,88 @@ public:
     bool is_dump_lsra_reorder_mov_in_latch_BB;
     bool is_dump_argpasser; //Dump ArgPasser.
     bool is_dump_irreloc; //Dump IRReloc.
+
+    bool is_dump_kernel_adjustment; //Dump ir after KernelAdjustment.
 public:
     DumpOption();
     DumpOption const& operator = (DumpOption const&); //Disable operator =.
 
-    bool isDumpAll() const;
-    bool isDumpNothing() const;
-    bool isDumpBeforePass() const;
-    bool isDumpAfterPass() const;
     bool isDumpAA() const;
-    bool isDumpDUMgr() const;
-    bool isDumpMDSetHash() const;
+    bool isDumpAfterPass() const;
+    bool isDumpAll() const;
+    bool isDumpArgPasser() const;
+    bool isDumpBeforePass() const;
+    bool isDumpBROpt() const;
+    bool isDumpCalcDerivative() const;
+    bool isDumpCDG() const;
     bool isDumpCFG() const;
     bool isDumpCFGOpt() const;
-    bool isDumpDOM() const;
-    bool isDumpRPO() const;
-    bool isDumpCP() const;
-    bool isDumpRP() const;
-    bool isDumpRCE() const;
-    bool isDumpDCE() const;
-    bool isDumpVRP() const;
-    bool isDumpInferType() const;
-    bool isDumpInvertBrTgt() const;
-    bool isDumpLFTR() const;
-    bool isDumpVectorization() const;
-    bool isDumpMultiResConvert() const;
-    bool isDumpLoopDepAna() const;
-    bool isDumpGVN() const;
-    bool isDumpGCSE() const;
-    bool isDumpIVR() const;
-    bool isDumpLICM() const;
-    bool isDumpExprTab() const;
-    bool isDumpLoopCVT() const;
-    bool isDumpSimp() const;
-    bool isDumpPRSSAMgr() const;
-    bool isDumpMDSSAMgr() const;
     bool isDumpCG() const;
-    bool isDumpRA() const;
-    bool isDumpMemUsage() const;
-    bool isDumpLivenessMgr() const;
-    bool isDumpIRParser() const;
-    bool isDumpRefineDUChain() const;
-    bool isDumpRefine() const;
-    bool isDumpInsertCvt() const;
-    bool isDumpCalcDerivative() const;
-    bool isDumpGSCC() const;
-    bool isDumpCDG() const;
-    bool isDumpLIS() const;
-    bool isDumpIRID() const;
-    bool isDumpLSRA() const;
-    bool isDumpToBuffer() const;
-    bool isDumpPElog() const;
+    bool isDumpCP() const;
+    bool isDumpDCE() const;
+    bool isDumpDOM() const;
+    bool isDumpDUMgr() const;
+    bool isDumpExprTab() const;
+    bool isDumpGCSE() const;
     bool isDumpGPAdjustment() const;
-    bool isDumpBROpt() const;
-    bool isDumpLSRAReorderMovInLatchBB() const;
-    bool isDumpArgPasser() const;
+    bool isDumpGSCC() const;
+    bool isDumpGVN() const;
+    bool isDumpInferType() const;
+    bool isDumpInsertCvt() const;
+    bool isDumpInvertBrTgt() const;
+    bool isDumpIRID() const;
+    bool isDumpIRParser() const;
     bool isDumpIRReloc() const;
+    bool isDumpIVR() const;
+    bool isDumpKernelAdjustment() const;
+    bool isDumpLICM() const;
+    bool isDumpLIS() const;
+    bool isDumpLivenessMgr() const;
+    bool isDumpLFTR() const;
+    bool isDumpLoopCVT() const;
+    bool isDumpLoopDepAna() const;
+    bool isDumpLSRA() const;
+    bool isDumpLSRAReorderMovInLatchBB() const;
+    bool isDumpMDSetHash() const;
+    bool isDumpMDSSAMgr() const;
+    bool isDumpMemUsage() const;
+    bool isDumpMultiResConvert() const;
+    bool isDumpNothing() const;
+    bool isDumpPElog() const;
+    bool isDumpPRSSAMgr() const;
+    bool isDumpRA() const;
+    bool isDumpRCE() const;
+    bool isDumpRefine() const;
+    bool isDumpRefineDUChain() const;
+    bool isDumpRP() const;
+    bool isDumpRPO() const;
+    bool isDumpSimp() const;
+    bool isDumpToBuffer() const;
+    bool isDumpVectorization() const;
+    bool isDumpVRP() const;
+
 };
+
+
+class ArchOption {
+public:
+    //Architecture T1.
+    bool is_arch_t1;
+
+    //Architecture T2.
+    bool is_arch_t2;
+
+public:
+    ArchOption();
+    ArchOption const& operator = (ArchOption const&); //Disable operator =.
+
+    bool isArchSpecified() const { return is_arch_t1 || is_arch_t2; }
+
+    bool isArchT1() const { return is_arch_t1; }
+
+    bool isArchT2() const { return is_arch_t2; }
+};
+
 
 class Option {
 public:
@@ -251,7 +276,7 @@ typedef enum _PASS_TYPE {
     PASS_LIVE_EXPR,
     PASS_AVAIL_REACH_DEF,
     PASS_REACH_DEF,
-    PASS_DU_CHAIN,
+    PASS_CLASSIC_DU_CHAIN,
     PASS_EXPR_TAB,
     PASS_LOOP_INFO,
     PASS_CDG,
@@ -273,13 +298,12 @@ typedef enum _PASS_TYPE {
     PASS_MDSSALIVE_MGR,
     PASS_REFINE,
     PASS_INSERT_CVT,
-    PASS_CALC_DERIVATIVE,
+    PASS_VECT,
     PASS_SCC,
     PASS_IRSIMP,
     PASS_LINEAR_SCAN_RA,
     PASS_IRMGR,
     PASS_CALL_GRAPH,
-    PASS_VECT,
     PASS_MULTI_RES_CVT,
     PASS_LOOP_DEP_ANA,
     PASS_PROLOGUE_EPILOGUE,
@@ -290,6 +314,9 @@ typedef enum _PASS_TYPE {
     PASS_IRRELOC,
     PASS_ARGPASSER,
     PASS_IGOTO_OPT,
+    PASS_MEMCHECK,
+    PASS_KERNEL_ADJUSTMENT,
+    #include "pass_type_ext.inc"
     PASS_NUM,
 } PASS_TYPE;
 
@@ -334,7 +361,7 @@ extern UINT g_inline_threshold;
 extern bool g_is_opt_float;
 
 //Lower IR to PR mode.
-//The simplification will guarrantee that all value in computation will be
+//The simplification will guarantee that all value in computation will be
 //stored in PR. The behavior is just like a RISC machine.
 //e.g: given st a = add ld b, ld c; will be simplied to
 //  stpr $1 = ld a;
@@ -583,6 +610,12 @@ extern bool g_do_gp_adjustment;
 //Perform relaxation.
 extern bool g_do_relaxation;
 
+//Perform memory check.
+extern bool g_do_memcheck;
+
+//Adjust kernel.
+extern bool g_adjust_kernel;
+
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;
 
@@ -625,6 +658,9 @@ extern bool g_generate_var_for_pr;
 
 //Record dump options for each Pass.
 extern DumpOption g_dump_opt;
+
+//Record architecture.
+extern ArchOption g_arch;
 
 //Redirect output information to stdout to dump file if exist.
 extern bool g_redirect_stdout_to_dump_file;

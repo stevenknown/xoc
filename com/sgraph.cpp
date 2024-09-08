@@ -47,11 +47,11 @@ void VexTab::dump(FILE * h) const
     fprintf(h, "VexTab:");
     VexTabIter it;
     bool first = true;
-    for (Vertex const* t = get_first(it);
-         t != nullptr; t = get_next(it)) {
+    for (VexIdx t = get_first(it);
+         t != VERTEX_UNDEF; t = get_next(it)) {
         if (!first) { fprintf(h, ","); }
         first = false;
-        fprintf(h, "V%u", t->id());
+        fprintf(h, "V%u", t);
     }
     if (first) { fprintf(h, "--"); }
     fflush(h);
@@ -1125,7 +1125,7 @@ void Graph::dumpHeight(FILE * h) const
 }
 
 
-void Graph::dumpVertexAux(FILE * h, Vertex const* v) const
+void Graph::dumpVertexAux(Vertex const* v, OUT StrBuf & buf) const
 {
     //NOTE:DOT file use '\l' as newline charactor.
     //Target Dependent Code.
@@ -1143,57 +1143,90 @@ void Graph::dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const
 }
 
 
+CHAR const* Graph::dumpVertex(Vertex const* v, OUT StrBuf & buf) const
+{
+    buf.strcat("\nnode%d [shape = Mrecord, label=\"", v->id());
+    StrBuf tbuf(16);
+    dumpVertexDesc(v, tbuf);
+    buf.strcat("%s", tbuf.getBuf());
+    dumpVertexAux(v, buf);
+
+    //The end char of properties.
+    buf.strcat("\"];");
+    return buf.getBuf();
+}
+
+
 void Graph::dumpVertex(FILE * h, Vertex const* v) const
 {
-    fprintf(h, "\nnode%d [shape = Mrecord, label=\"", v->id());
-    StrBuf buf(16);
-    dumpVertexDesc(v, buf);
-    fprintf(h, "%s", buf.buf);
-    dumpVertexAux(h, v);
-    //The end char of properties.
-    fprintf(h, "\"];");
+    StrBuf buf(32);
+    fprintf(h, "%s", dumpVertex(v, buf));
+}
+
+
+CHAR const* Graph::dumpEdge(Edge const* e, OUT StrBuf & buf) const
+{
+    buf.strcat("\nnode%d->node%d", e->from()->id(), e->to()->id());
+    buf.strcat("[");
+    bool prt_comma = false;
+    if (!is_direction()) {
+        if (prt_comma) { buf.strcat(","); }
+        buf.strcat("dir=none");
+        prt_comma = true;
+    }
+    {
+        //Print label.
+        if (prt_comma) { buf.strcat(","); }
+        buf.strcat("label=\"%s\"", "");
+        prt_comma = true;
+    }
+    buf.strcat("]");
+    return buf.getBuf();
 }
 
 
 void Graph::dumpEdge(FILE * h, Edge const* e) const
 {
-    fprintf(h, "\nnode%d->node%d", e->from()->id(), e->to()->id());
-    fprintf(h, "[");
-    bool prt_comma = false;
-    if (!is_direction()) {
-        if (prt_comma) { fprintf(h, ","); }
-        fprintf(h, "dir=none");
-        prt_comma = true;
-    }
-    {
-        //Print label.
-        if (prt_comma) { fprintf(h, ","); }
-        fprintf(h, "label=\"%s\"", "");
-        prt_comma = true;
-    }
-    fprintf(h, "]");
+    StrBuf buf(32);
+    fprintf(h, "%s", dumpEdge(e, buf));
 }
 
 
 //Print node
-void Graph::dumpAllVertices(FILE * h) const
+CHAR const* Graph::dumpAllVertices(OUT StrBuf & buf) const
 {
     VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
-        dumpVertex(h, v);
+        dumpVertex(v, buf);
     }
+    return buf.getBuf();
+}
+
+
+void Graph::dumpAllVertices(FILE * h) const
+{
+    StrBuf buf(32);
+    fprintf(h, "%s", dumpAllVertices(buf));
 }
 
 
 //Print edge
-void Graph::dumpAllEdges(FILE * h) const
+CHAR const* Graph::dumpAllEdges(OUT StrBuf & buf) const
 {
     EdgeIter ite;
     for (Edge const* e = get_first_edge(ite);
          e != nullptr; e = get_next_edge(ite)) {
-        dumpEdge(h, e);
+        dumpEdge(e, buf);
     }
+    return buf.getBuf();
+}
+
+
+void Graph::dumpAllEdges(FILE * h) const
+{
+    StrBuf buf(32);
+    fprintf(h, "%s", dumpAllEdges(buf));
 }
 
 
@@ -2492,52 +2525,11 @@ void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree,
 }
 
 
-//Dump dom set, pdom set, idom, ipdom.
-//'dump_dom_tree': set to be true to dump dominate
-//  tree, and post dominate Tree.
 void DGraph::dumpDom(FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
 {
     if (h == nullptr) { return; }
-    fprintf(h, "\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
-    VertexIter c = VERTEX_UNDEF;
-    for (Vertex * v = get_first_vertex(c);
-         v != nullptr; v = get_next_vertex(c)) {
-        VexIdx vid = VERTEX_id(v);
-        BitSet * bs;
-        fprintf(h, "\nVERTEX(%d)", vid);
-        fprintf(h, "\n  domset:");
-        if ((bs = m_dom_set.get(vid)) != nullptr) {
-            for (BSIdx id = bs->get_first();
-                 id != BS_UNDEF ; id = bs->get_next((VexIdx)id)) {
-                if ((VexIdx)id != vid) {
-                    fprintf(h, "%u ", id);
-                }
-            }
-        }
-
-        fprintf(h, "\n  pdomset:");
-        if ((bs = m_pdom_set.get(vid)) != nullptr) {
-            for (BSIdx id = bs->get_first();
-                 id != BS_UNDEF; id = bs->get_next((VexIdx)id)) {
-                if ((VexIdx)id != vid) {
-                    fprintf(h, "%u ", id);
-                }
-            }
-        }
-
-        if (m_idom_set.get(vid) != VERTEX_UNDEF) {
-            fprintf(h, "\n  idom:%u", m_idom_set.get(vid));
-        } else {
-            fprintf(h, "\n");
-        }
-
-        if (m_ipdom_set.get(vid) != VERTEX_UNDEF) {
-            fprintf(h, "\n  ipdom:%u", m_ipdom_set.get(vid));
-        } else {
-            fprintf(h, "\n");
-        }
-    }
-    fprintf(h, "\n");
+    StrBuf buf(32);
+    fprintf(h, "%s\n", dumpDom(buf));
     fflush(h);
     if (dump_dom_tree) {
         DomTree dom;
@@ -2549,6 +2541,49 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
         genPDomTree(dom);
         dom.dumpDOT("graph_pdom_tree.dot");
     }
+}
+
+
+//Dump dom set, pdom set, idom, ipdom.
+CHAR const* DGraph::dumpDom(OUT StrBuf & buf) const
+{
+    buf.strcat("\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
+    VertexIter c = VERTEX_UNDEF;
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
+        VexIdx vid = VERTEX_id(v);
+        BitSet * bs;
+        buf.strcat("\nVERTEX(%d)", vid);
+        buf.strcat("\n  domset:");
+        if ((bs = m_dom_set.get(vid)) != nullptr) {
+            for (BSIdx id = bs->get_first();
+                 id != BS_UNDEF ; id = bs->get_next((VexIdx)id)) {
+                if ((VexIdx)id != vid) {
+                    buf.strcat("%u ", id);
+                }
+            }
+        }
+        buf.strcat("\n  pdomset:");
+        if ((bs = m_pdom_set.get(vid)) != nullptr) {
+            for (BSIdx id = bs->get_first();
+                 id != BS_UNDEF; id = bs->get_next((VexIdx)id)) {
+                if ((VexIdx)id != vid) {
+                    buf.strcat("%u ", id);
+                }
+            }
+        }
+        if (m_idom_set.get(vid) != VERTEX_UNDEF) {
+            buf.strcat("\n  idom:%u", m_idom_set.get(vid));
+        } else {
+            buf.strcat("\n");
+        }
+        if (m_ipdom_set.get(vid) != VERTEX_UNDEF) {
+            buf.strcat("\n  ipdom:%u", m_ipdom_set.get(vid));
+        } else {
+            buf.strcat("\n");
+        }
+    }
+    return buf.getBuf();
 }
 
 
@@ -2908,15 +2943,14 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, VexIdx newid,
 }
 
 
-bool DGraph::recomputeDomInfoForSubGraph(Vertex const* root,
-                                         OUT VexTab * modset,
-                                         OUT UINT & iter_times)
+bool DGraph::recomputeDomInfoForSubGraph(
+    Vertex const* root, OUT VexTab * modset, OUT UINT & iter_times)
 {
     ASSERT0(root);
     RPOVexList affectlst;
     TMap<Vertex const*, VexIdx> vex2idom;
-    collectDomTreeCoveredReachableVertex(root, *this, modset, affectlst,
-                                         vex2idom, iter_times);
+    collectDomTreeCoveredReachableVertex(
+        root, *this, modset, affectlst, vex2idom, iter_times);
     computeIdomForSubGraph(root, affectlst);
     if (modset != nullptr) {
         RPOVexListIter it;
@@ -2929,12 +2963,12 @@ bool DGraph::recomputeDomInfoForSubGraph(Vertex const* root,
                 //CASE:if idom of graph entry changed, that means the entry is
                 //not original entry of graph, it become an entry just
                 //because the in-edge is removed.
-                modset->append(v);
+                modset->add(v);
                 continue;
             }
             Vertex const* idomv = getVertex(newidom);
             ASSERT0(idomv);
-            modset->append(idomv);
+            modset->add(idomv);
         }
     }
     bool f = computeDom2(affectlst);
@@ -2943,11 +2977,9 @@ bool DGraph::recomputeDomInfoForSubGraph(Vertex const* root,
 }
 
 
-void DGraph::reviseDomInfoAfterAddOrRemoveEdge(Vertex const* from,
-                                               Vertex const* to,
-                                               OUT VexTab * modset,
-                                               OUT Vertex const*& root,
-                                               OUT UINT & iter_times)
+void DGraph::reviseDomInfoAfterAddOrRemoveEdge(
+    Vertex const* from, Vertex const* to, OUT VexTab * modset,
+    OUT Vertex const*& root, OUT UINT & iter_times)
 
 {
     VexIdx idom;
@@ -2973,13 +3005,6 @@ void DGraph::reviseDomInfoAfterAddOrRemoveEdge(Vertex const* from,
 }
 
 
-//The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
-//update the related info for 'vex'.
-//vex: a marker vertex.
-//newsucc: the vertex that must be immediate successor of 'vex'.
-//e.g: vex->oldsucc, after insert newsucc, the graph will be:
-//     vex->newsucc->oldsucc, where there is only ONE edge between vex->newsucc,
-//     and newsucc->oldsucc.
 void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
                                        Vertex const* oldsucc)
 {
@@ -2988,7 +3013,9 @@ void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
             get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
     ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
 
-    //TBD:Do we have to restrict the in-degree of oldsucc? User has guarrantee
+    //CONFIRMED: No need to care about the in-degree of oldsucc, because once
+    //user guaranteed vex is idom of oldsucc, there is only one CASE to handle.
+    //TBD:Do we have to restrict the in-degree of oldsucc? User has guaranteed
     //that vex is the idom of oldsucc, and there is only ONE path from vex to
     //oldsucc.
     //e.g:licm.gr, LICM insert BB11 between BB10->BB2, BB11 is the fallthrough
@@ -3026,6 +3053,55 @@ void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
     }
     //Set domset, pdomset.
     addVexToDomAndPdomSet(this, oldsucc, newsucc->id(), true);
+}
+
+
+void DGraph::addDomToNewSingleInOutBB(Vertex const* vex,
+    Vertex const* newsucc, Vertex const* oldsucc)
+{
+    ASSERT0(vex && newsucc && oldsucc);
+    ASSERTN(get_idom(newsucc->id()) == VERTEX_UNDEF &&
+            get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
+
+    //Set idom info.
+    set_idom(newsucc->id(), vex->id());
+    if (oldsucc->getInDegree() == 1 &&
+        get_idom(oldsucc->id()) == vex->id()) {
+        set_idom(oldsucc->id(), newsucc->id());
+    }
+
+    if (get_dom_set(newsucc->id()) == nullptr) {
+        //Copy Dom info from vex to newsucc.
+        DomSet const* ds = get_dom_set(vex->id());
+        ASSERT0(ds);
+        if (ds != nullptr) {
+            gen_dom_set(newsucc->id())->bunion(*ds);
+        }
+        gen_dom_set(newsucc->id())->bunion(vex->id());
+    }
+
+    //Update the Dom info of oldsucc.
+    if (oldsucc->getInDegree() == 1) {
+        if (get_dom_set(oldsucc->id()) == nullptr) {
+            gen_dom_set(oldsucc->id())->bunion(newsucc->id());
+            return;
+        }
+        const_cast<DomSet*>(get_dom_set(oldsucc->id()))->bunion(newsucc->id());
+        return;
+    }
+
+    //Sometimes, extra BBs are generated to connect with oldsucc.
+    AdjVertexIter it = nullptr;
+    for (Vertex const* in = Graph::get_first_in_vertex(oldsucc, it);
+         in != nullptr; in = Graph::get_next_out_vertex(it)) {
+        if (in->getInDegree() != 1 || in->getOutDegree() != 1) { continue; }
+
+        if (get_dom_set(in->id()) != nullptr) { continue; }
+        AdjVertexIter it2 = nullptr;
+        Vertex const* parent = Graph::get_first_in_vertex(in, it2);
+        set_idom(in->id(), parent->id());
+    }
 }
 
 

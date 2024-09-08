@@ -188,25 +188,23 @@ public:
 
     //The function will invalidate flags which affected while DU chain
     //changed.
-    void setInvalidClassicDUChain()
-    {
-        setInvalidPRDU();
-        setInvalidNonPRDU();
-    }
-
-    //The function make all flag invalid.
-    void setInvalidAllFlags();
-    void setInvalidDom() { OC_is_dom_valid(*this) = false; }
-    void setInvalidPDom() { OC_is_pdom_valid(*this) = false; }
+    void setInvalidClassicDUChain() { setInvalidPass(PASS_CLASSIC_DU_CHAIN); }
+    void setInvalidDom() { setInvalidPass(PASS_DOM); }
+    void setInvalidPDom() { setInvalidPass(PASS_PDOM); }
     void setInvalidPRDU() { OC_is_pr_du_chain_valid(*this) = false; }
     void setInvalidNonPRDU() { OC_is_nonpr_du_chain_valid(*this) = false; }
-    void setInvalidRPO() { OC_is_rpo_valid(*this) = false; }
-    void setInvalidLoopInfo() { OC_is_loopinfo_valid(*this) = false; }
+    void setInvalidRPO() { setInvalidPass(PASS_RPO); }
+    void setInvalidLoopInfo() { setInvalidPass(PASS_LOOP_INFO); }
     void setInvalidCDG() { setInvalidPass(PASS_CDG); }
     void setInvalidSCC() { setInvalidPass(PASS_SCC); }
     void setInvalidMDSSA() { setInvalidPass(PASS_MDSSA_MGR); }
     void setInvalidPRSSA() { setInvalidPass(PASS_PRSSA_MGR); }
-    void setInvalidPass(PASS_TYPE pass);
+    void setInvalidLiveness() { setInvalidPass(PASS_LIVENESS_MGR); }
+    void setInvalidPass(PASS_TYPE pt);
+
+    //The function make all flag invalid.
+    void setInvalidAllFlags();
+    void setValidPass(PASS_TYPE pt);
 };
 
 } //namespace xoc

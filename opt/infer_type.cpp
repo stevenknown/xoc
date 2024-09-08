@@ -89,7 +89,7 @@ bool InferType::inferVarTypeByIRCode(IR const* ir) const
             var = ref->get_base();
             break;
         }
-        var = m_rg->mapPR2Var(ir->getPrno());
+        var = m_rg->getVarByPRNO(ir->getPrno());
         break;
     }
     SWITCH_CASE_DIRECT_MEM_OP:
@@ -179,7 +179,7 @@ bool InferType::inferLeafExpMemAcc(IR * ir)
         }
         Var const* v;
         if (ir->is_pr() &&
-            (v = m_rg->mapPR2Var(PR_no(ir))) != nullptr &&
+            (v = m_rg->getVarByPRNO(PR_no(ir))) != nullptr &&
             !v->is_any()) {
             IR_dt(ir) = v->getType();
             addDump(ir);

@@ -82,8 +82,6 @@ bool DexRegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 
     //Function region has been handled. And call list should be available.
     buildCallGraph(*oc, false, false);
-    ASSERT0(OC_is_callg_valid(*oc));
-
-
+    ASSERT0(oc->is_callgraph_valid());
     return true;
 }

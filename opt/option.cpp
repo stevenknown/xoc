@@ -92,7 +92,7 @@ bool g_do_licm_no_guard = false;
 bool g_do_gvn = true;
 bool g_do_pre = false;
 bool g_do_rce = false;
-bool g_do_vect = false;
+bool g_do_vect = true;
 bool g_do_multi_res_convert = true;
 bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
@@ -110,6 +110,7 @@ bool g_do_pelog = false;
 bool g_do_scalar_opt = true;
 bool g_do_gp_adjustment = true;
 bool g_do_relaxation = false;
+bool g_do_memcheck = false;
 bool g_retain_pass_mgr_for_region = true;
 UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
@@ -117,6 +118,7 @@ bool g_is_simplify_array_ingredient = true;
 bool g_is_search_and_copy_dbx = true;
 bool g_generate_var_for_pr = true;
 DumpOption g_dump_opt;
+ArchOption g_arch;
 bool g_redirect_stdout_to_dump_file = false;
 FILE * g_unique_dumpfile = nullptr;
 CHAR const* g_unique_dumpfile_name = nullptr;
@@ -133,6 +135,7 @@ bool g_debug = false;
 bool g_debug_cpp = true;
 bool g_debug_pcx = false;
 bool g_debug_pyhton = false;
+bool g_adjust_kernel = true;
 
 //Special options for different using of specific architectures.
 #ifdef FOR_TECO_IP
@@ -544,7 +547,20 @@ bool DumpOption::isDumpIRReloc() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irreloc);
 }
+
+
+bool DumpOption::isDumpKernelAdjustment() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_kernel_adjustment);
+}
 //END DumpOption
+
+
+ArchOption::ArchOption()
+{
+    is_arch_t1 = false;
+    is_arch_t2 = false;
+}
 
 
 //
@@ -651,6 +667,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_scalar_opt = %s", g_do_scalar_opt ? "true":"false");
     note(lm, "\ng_do_gp_adjustment = %s", g_do_gp_adjustment ? "true":"false");
     note(lm, "\ng_do_relaxation = %s", g_do_relaxation ? "true":"false");
+    note(lm, "\ng_do_memcheck = %s", g_do_memcheck ? "true":"false");
     note(lm, "\ng_retain_pass_mgr_for_region = %s",
          g_retain_pass_mgr_for_region ? "true":"false");
     note(lm, "\ng_verify_level = %s", Option::getOptLevelName(g_verify_level));
@@ -682,6 +699,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
     note(lm, "\ng_use_accurate_2d_lifetime_hole_algo = %s",
          g_use_accurate_2d_lifetime_hole_algo ? "true":"false");
+    note(lm, "\ng_adjust_kernel = %s", g_adjust_kernel ? "true":"false");
     lm->decIndent(2);
 }
 

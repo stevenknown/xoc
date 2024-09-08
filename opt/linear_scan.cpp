@@ -561,9 +561,10 @@ bool PosAttrLifeTimeProc::processAttrLTShrinkedBefore(BBPos const& pos,
     LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
     Pos cur_bb_entry_pos = m_lsra->getLTMgr().getBBStartPos(bb->id());
     Range r = lt->getFirstRange();
+    Pos const region_start = REGION_START_POS;
 
     //Shrink the current live range to the position of BB entry.
-    if (r.is_contain(cur_bb_entry_pos)) {
+    if (RG_start(r) == region_start && r.is_contain(cur_bb_entry_pos)) {
         RG_start(r) = cur_bb_entry_pos;
         lt->setRange(0, r);
     }
@@ -916,6 +917,7 @@ void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
     st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().append_head(st);
+    m_lsra->setFakeUse(st);
 
     //POS_ATTR_LT_SHRINK_BEFORE is used to avoid the lifetime of PR is from the
     //entry of region because the first occurence of this PR is a USE.
@@ -956,6 +958,7 @@ void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
     st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().insert_before(st, tail);
+    m_lsra->setFakeUse(st);
 
     //Attribute POS_ATTR_LT_EXTEND_BB_END is set, because the multiple fake-use
     //IRs are inserted at the tail part of the same BB, which would lead to
@@ -1558,6 +1561,21 @@ Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 }
 
 
+Var * LinearScanRA::getSpillLoc(Type const* ty)
+{
+    ASSERT0(ty);
+    bool find = false;
+    Var * v = m_ty2var.get(ty, &find);
+    if (find) { return v; }
+    //The alignment of vector register is greater than STACK_ALIGNMENT.
+    v = genFuncLevelVar(ty, MAX(
+        m_rg->getTypeMgr()->getByteSize(ty), STACK_ALIGNMENT));
+    VAR_storage_space(v) = SS_STACK;
+    m_ty2var.set(ty, v);
+    return v;
+}
+
+
 PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
 {
     ASSERT0(type);
@@ -1667,7 +1685,7 @@ bool LinearScanRA::hasReg(PRNO prno) const
 
 Type const* LinearScanRA::getRegType(PRNO prno) const
 {
-    Var * var = m_rg->mapPR2Var(prno);
+    Var * var = m_rg->getVarByPRNO(prno);
     ASSERT0(var);
     TypeMgr * tm = m_rg->getTypeMgr();
     if (!VAR_type(var)->is_vector() && !VAR_type(var)->is_any()) {
@@ -1771,6 +1789,27 @@ bool LinearScanRA::verifyAfterRA() const
     ASSERT0(m_unhandled.get_elem_count() == 0);
     ASSERT0(m_active.get_elem_count() == 0);
     ASSERT0(m_inactive.get_elem_count() == 0);
+    BBListIter bbit;
+    TypeMgr * tm = m_rg->getTypeMgr();
+    for (IRBB const* bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+        BBIRListIter bbirit;
+        BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
+        for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
+            ir = irlst.get_next(&bbirit)) {
+            if (!isSpillOp(ir) && !isReloadOp(ir)) { continue; }
+
+            //Check the reload and spill only.
+            ASSERT0(ir->getRHS());
+            Type const* lhs_ty = ir->getType();
+            Type const* rhs_ty = ir->getRHS()->getType();
+            ASSERT0(lhs_ty && rhs_ty);
+            UINT lhs_size = tm->getDTypeByteSize(lhs_ty->getDType());
+            UINT rhs_size = tm->getDTypeByteSize(rhs_ty->getDType());
+            ASSERT0(lhs_size >= rhs_size);
+            if (lhs_size < rhs_size) { return false; }
+        }
+    }
     return true;
 }
 
@@ -1914,38 +1953,6 @@ Var * LinearScanRA::genFuncLevelVar(Type const* type, UINT align)
     Var * v = m_rg->getVarMgr()->registerVar(
         genFuncLevelNewVarName(name), type, align, VAR_LOCAL);
     return v;
-}
-
-
-bool LinearScanRA::isSpillOp(IR const* ir) const
-{
-    return m_spill_tab.find(const_cast<IR*>(ir));
-}
-
-
-bool LinearScanRA::isRematOp(IR const* ir) const
-{
-    return m_remat_tab.find(const_cast<IR*>(ir));
-}
-
-
-bool LinearScanRA::isReloadOp(IR const* ir) const
-{
-    return m_reload_tab.find(const_cast<IR*>(ir));
-}
-
-
-bool LinearScanRA::isMoveOp(IR const* ir) const
-{
-    return m_move_tab.find(const_cast<IR*>(ir));
-}
-
-
-bool LinearScanRA::isRematLikeOp(IR const* ir) const
-{
-    if (!ir->is_stpr()) { return false; }
-    if (!ir->getRHS()->is_lda() || !ir->getRHS()->is_const()) { return false; }
-    return true;
 }
 
 

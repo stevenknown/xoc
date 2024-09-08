@@ -372,8 +372,9 @@ void ParseCtx::dump() const
 {
     ASSERT0(current_region);
     Region * rg = current_region;
+    if (!rg->isLogMgrInit()) { return; }
     LogMgr * lm = rg->getLogMgr();
-    if (lm == nullptr || !lm->is_init()) { return; }
+    ASSERT0(lm);
     note(rg, "\n==-- DUMP ParseCtx:%u --==", id);
     note(rg, "\ncurrent_region:%s", current_region->getRegionName());
     note(rg, "\nreturned_exp:");

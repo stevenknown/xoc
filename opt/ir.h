@@ -761,6 +761,7 @@ public:
     bool is_nroot() const { return getCode() == IR_NROOT; }
     bool is_log() const { return getCode() == IR_LOG; }
     bool is_exponent() const { return getCode() == IR_EXPONENT; }
+    bool is_abs() const { return getCode() == IR_ABS; }
     bool is_sin() const { return getCode() == IR_SIN; }
     bool is_cos() const { return getCode() == IR_COS; }
     bool is_tan() const { return getCode() == IR_TAN; }

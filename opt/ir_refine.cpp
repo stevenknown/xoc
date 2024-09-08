@@ -1042,6 +1042,24 @@ IR * Refine::refineAllKids(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
+IR * Refine::refineAbs(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_abs());
+    bool lchange = false;
+    ir = foldConst(ir, lchange, rc);
+    change |= lchange;
+    if (!lchange && UNA_opnd(ir)->is_unsigned()) {
+        //abs(unsigned x) => x
+        IR * tmp = UNA_opnd(UNA_opnd(ir));
+        UNA_opnd(UNA_opnd(ir)) = nullptr;
+        m_rg->freeIRTree(ir);
+        change = true;
+        return tmp;
+    }
+    return ir;
+}
+
+
 IR * Refine::refineNeg(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_neg());
@@ -1418,6 +1436,16 @@ IR * Refine::refineTrigonometric(IR * ir, bool & change, RefineCtx & rc)
     if (!ir->isInt() && !ir->is_fp()) { return ir; }
     Type const* ty = ir->getType();
     switch (ir->getCode()) {
+    case IR_ABS: {
+        HOST_FP v;
+        if (op->isInt()) { v = ::fabs(HOST_FP(CONST_int_val(op))); }
+        else { v = ::fabs(CONST_fp_val(op)); }
+        m_rg->freeIRTree(ir);
+        if (ty->is_int()) {
+            return m_irmgr->buildImmInt(HOST_INT(v), ty);
+        }
+        return m_irmgr->buildImmFP(HOST_FP(v), ty);
+    }
     case IR_SIN: {
         HOST_FP v;
         if (op->isInt()) { v = ::sin(HOST_FP(CONST_int_val(op))); }
@@ -2705,9 +2733,12 @@ IR * Refine::refineIRImpl(IR * ir, bool & change, RefineCtx & rc)
     SWITCH_CASE_BITWISE_BIN:
         ir = refineBinaryOp(ir, tmpc, rc);
         break;
-    case IR_BNOT:
-    case IR_LNOT:
+    SWITCH_CASE_BITWISE_UNA:
+    SWITCH_CASE_LOGIC_UNA:
         ir = refineNot(ir, tmpc, rc);
+        break;
+    case IR_ABS:
+        ir = refineAbs(ir, tmpc, rc);
         break;
     case IR_NEG:
         ir = refineNeg(ir, tmpc, rc);
@@ -2897,8 +2928,7 @@ bool Refine::refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc)
         ASSERT0(verifyIRandBB(ir_bb_list, m_rg));
     }
     rc.getOptCtx()->setInvalidPass(PASS_EXPR_TAB);
-    OC_is_live_expr_valid(*rc.getOptCtx()) = false;
-    OC_is_reach_def_valid(*rc.getOptCtx()) = false;
+    rc.getOptCtx()->setInvalidPass(PASS_REACH_DEF);
     return true;
 }
 
@@ -2912,6 +2942,7 @@ IR * Refine::foldConstIntUnary(IR * ir, bool & change)
     HOST_INT v0 = CONST_int_val(opnd);
     Type const* resty = ir->getType();
     if (ir->is_neg()) {
+        //NEG(1) => INT(-1)
         IR * ret = ir;
         if (resty->is_fp()) {
             ret = m_irmgr->buildImmFP((HOST_FP)-v0, resty);
@@ -2941,6 +2972,19 @@ IR * Refine::foldConstIntUnary(IR * ir, bool & change)
             ret = m_irmgr->buildImmFP((HOST_FP)~v0, resty);
         } else if (resty->is_int()) {
             ret = m_irmgr->buildImmInt((HOST_INT)~v0, resty);
+        } else { return ir; }
+        copyDbx(ret, ir, m_rg);
+        m_rg->freeIRTree(ir);
+        change = true;
+        return ret;
+    }
+    if (ir->is_abs()) {
+        //abs(x)
+        IR * ret = ir;
+        if (resty->is_fp()) {
+            ret = m_irmgr->buildImmFP(::fabs((HOST_FP)v0), resty);
+        } else if (resty->is_int()) {
+            ret = m_irmgr->buildImmInt(::abs((HOST_INT)v0), resty);
         } else { return ir; }
         copyDbx(ret, ir, m_rg);
         m_rg->freeIRTree(ir);
@@ -3020,6 +3064,7 @@ IR * Refine::foldConstFloatUnary(IR * ir, bool & change)
     ASSERT0(UNA_opnd(ir)->is_fp());
     ASSERT0(UNA_opnd(ir)->is_const());
     if (ir->is_neg()) {
+        //NEG(1.0) => FP(-1.0)
         IR * oldir = ir;
         ir = m_irmgr->buildImmFP(-CONST_fp_val(UNA_opnd(ir)), ir->getType());
         copyDbx(ir, oldir, m_rg);
@@ -3132,7 +3177,6 @@ IR * Refine::foldConstFloatBinary(IR * ir, bool & change)
 IR * Refine::foldConstUnary(IR * ir, bool & change, RefineCtx &)
 {
     ASSERT0(ir->isUnaryOp());
-    //NEG(1.0) => INT(-1.0)
     IR * t = UNA_opnd(ir);
     ASSERT0(t);
     if (t->is_const() && t->is_fp() && g_is_opt_float) {
@@ -3187,8 +3231,9 @@ IR * Refine::foldConst(IR * ir, bool & change, RefineCtx & rc)
     SWITCH_CASE_BIN:
         ir = foldConstBinary(ir, change, rc);
         break;
-    case IR_BNOT:
-    case IR_LNOT: //Boolean logical not e.g LNOT(0x0001) = 0x0000
+    SWITCH_CASE_BITWISE_UNA:
+    SWITCH_CASE_LOGIC_UNA: //Boolean logical not e.g LNOT(0x0001) = 0x0000
+    case IR_ABS:
     case IR_NEG:
         ir = foldConstUnary(ir, change, rc);
         break;

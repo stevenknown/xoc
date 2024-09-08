@@ -1,7 +1,9 @@
 /*@
-Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
+XOC Release License
 
-All rights reserved.
+Copyright (c) 2013-2014, Alibaba Group, All rights reserved.
+
+    compiler@aliexpress.com
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -15,17 +17,21 @@ modification, are permitted provided that the following conditions are met:
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED "AS IS" AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+author: Su Zhenyu
 @*/
+
 #ifndef _MC_DWARF_H_
 #define _MC_DWARF_H_
 
@@ -185,7 +191,6 @@ class DwarfResMgr;
 //This is the offset size of the variable type
 //mcsymbol on the stack. We fix it to be 8 bytes.
 #define MCSYMBOL_VAR_STACK_OFF_SIZE 8
-
 #define DWARF2_LINE_DEFAULT_IS_STMT 1
 #define DWARF2_FLAG_IS_STMT (1 << 0)
 #define DWARF2_FLAG_BASIC_BLOCK (1 << 1)
@@ -280,11 +285,11 @@ public:
     }
 };
 
+typedef TMap<Region const*, MCSymbol*> Region2MCSymbol;
 typedef xcom::Vector<BYTE> BYTEVec;
-typedef xcom::TMap<Sym const*, MCSymbol*> MAPSYMBOL;
-typedef xcom::TMap<Sym const*, TMap<Region const*, MCSymbol*>*> MAPSYMBOLVAR;
-typedef xcom::TMapIter<Region const*, MCSymbol*> REGION2MCSYMBOLITER;
-typedef Vector<MCSymbol*> MCSYMBOLVECTOR;
+typedef xcom::TMap<Sym const*, MCSymbol*> Sym2MCSymbol;
+typedef xcom::TMap<Sym const*, Region2MCSymbol*> Sym2Region2MCSymbol;
+typedef xcom::TMapIter<Region const*, MCSymbol*> Region2MCSymbolIter;
 
 //The base class for symbol expressions,
 //which fixups will use, currently only
@@ -334,7 +339,7 @@ public:
 };
 
 
-//This is an operation between two references within a section
+//This is an operation between two references within a section.
 #define MCBINARYEXPR_lhs(e)     ((e)->m_lhs)
 #define MCBINARYEXPR_rhs(e)     ((e)->m_rhs)
 #define MCBINARYEXPR_opcode(e)  ((e)->m_opcode_type)
@@ -411,7 +416,7 @@ public:
 };
 
 
-typedef xcom::Vector<MCFixup*> FIXUPS;
+typedef xcom::Vector<MCFixup*> FixupVec;
 
 //For debug line
 //MCDwarfFile is a data structure related to the debug_line section,
@@ -422,32 +427,43 @@ public:
     StrBuf const* m_name;
 
     //The index into the list of directory names for this file name.
-    UINT m_dir_index = 0;
+    UINT m_dir_index;
+public:
+    MCDwarfFile() : m_name(nullptr), m_dir_index(0) {}
 };
 
 
 //For debug line
+#define DWARF_LINE_OPCODE_BASE 13
+#define DWARF_LINE_BASE -5
+#define DWARF_LINE_RANGE 14
+
 struct MCDwarfLineTableParams {
 public:
     //First special line opcode - leave room for the standard opcodes.
     //Note: If you want to change this, you'll have to update the
     //"StandardOpcodeLengths" table that is emitted in
-    //Emit(), 13 is a fixed value for line_op_base.
-    UINT8 m_dwarf2_line_opcode_base = 13;
+    //Emit(), DWARF_LINE_OPCODE_BASE is a fixed value for line_op_base.
+    UINT8 m_dwarf2_line_opcode_base;
 
-    //Minimum line offset in a special line info. opcode.  The value
-    //-5 was chosen to give a reasonable range of values.
-    INT8 m_dwarf2_line_base = -5;
+    //Minimum line offset in a special line info. opcode.
+    //DWARF_LINE_BASE was chosen to give a reasonable range of values.
+    INT8 m_dwarf2_line_base;
 
     //Range of line offsets in a special line info. opcode.
-    //14 is a fixed value for line_range.
-    UINT8 m_dwarf2_line_range = 14;
+    //DWARF_LINE_RANGE is a fixed value for line_range.
+    UINT8 m_dwarf2_line_range;
+public:
+    MCDwarfLineTableParams() :
+        m_dwarf2_line_opcode_base(DWARF_LINE_OPCODE_BASE),
+        m_dwarf2_line_base(DWARF_LINE_BASE),
+        m_dwarf2_line_range(DWARF_LINE_RANGE) {}
 };
 
 
 //This is to record debug_line-related location information,
 //which is the frontend user's location information,
-//for example, 1.c, 1.cpp
+//for example, 1.c, 1.cpp.
 #define MCDWARFLOC_file_index(e)  ((e)->m_file_index)
 #define MCDWARFLOC_line(e)        ((e)->m_line)
 #define MCDWARFLOC_column(e)      ((e)->m_column)
@@ -545,18 +561,18 @@ public:
 
     OpType m_operation;
     MCSymbol const* m_label;
-    UINT32 m_register;
+    UINT m_register;
     union {
-        INT32 m_offset;
-        UINT32 m_register2;
+        INT m_offset;
+        UINT m_register2;
     };
 public:
-    MCCFIInstruction(OpType op, MCSymbol const* l, UINT32 r, INT32 o):
+    MCCFIInstruction(OpType op, MCSymbol const* l, UINT r, INT o):
         m_operation(op), m_label(l), m_register(r), m_offset(o) {
         ASSERT0(op != OPREGISTER);
     }
 
-    MCCFIInstruction(OpType op, MCSymbol const* l, UINT32 r1, UINT32 r2):
+    MCCFIInstruction(OpType op, MCSymbol const* l, UINT r1, UINT r2):
         m_operation(op), m_label(l), m_register(r1), m_register2(r2) {
         ASSERT0(op == OPREGISTER);
     }
@@ -573,7 +589,7 @@ public:
         return m_register;
     }
 
-    INT32 getOffset() const {
+    INT getOffset() const {
         ASSERT0(m_operation == OPDEFCFA || m_operation == OPOFFSET ||
                 m_operation == OPRELOFFSET ||
                 m_operation == OPDEFCFAOFFSET ||
@@ -583,6 +599,7 @@ public:
     }
 };
 
+typedef Vector<MCCFIInstruction*> MCCFIInstructionVec;
 
 //This contains various CFI (Call Frame Information)
 //information corresponding to each function.
@@ -594,7 +611,7 @@ struct MCDwarfFrameRegionInfo {
 public:
     MCSymbol const* m_begin;
     MCSymbol const* m_end;
-    Vector<MCCFIInstruction*> * m_instructions;
+    MCCFIInstructionVec * m_instructions;
     UINT m_ra_reg;
     UINT m_fp_reg;
     UINT m_sp_reg;
@@ -602,17 +619,19 @@ public:
     //Constructor with parameters for initialization.
     MCDwarfFrameRegionInfo(MCSymbol const* begin = nullptr,
         MCSymbol const* end = nullptr,
-        Vector<MCCFIInstruction*> * instructions = nullptr, UINT ra_reg = 0,
+        MCCFIInstructionVec * instructions = nullptr, UINT ra_reg = 0,
         UINT fp_reg = 0, UINT sp_reg = 0) :
         m_begin(begin), m_end(end), m_instructions(instructions),
         m_ra_reg(ra_reg), m_fp_reg(fp_reg), m_sp_reg(sp_reg) {}
 };
 
-
-typedef xcom::TMap<Region*, xcom::Vector<MCDwarfLineEntry*>*>
-    MCLINEDIVISIONMAP;
-typedef xcom::TMap<Region const* , MCDwarfFrameRegionInfo*>
-    MCFRAMEDIVISIONMAP;
+typedef xcom::Vector<MCDwarfLineEntry*> MCDwarfLineEntryVec;
+typedef xcom::TMap<Region*, MCDwarfLineEntryVec*> Region2MCDwarfLineEntryVec;
+typedef xcom::TMapIter<Region*, MCDwarfLineEntryVec*>
+    Region2MCDwarfLineEntryVecIter;
+typedef xcom::TMap<Region const*, MCDwarfFrameRegionInfo*>
+    Region2MCDwarfFrameRegionInfo;
+typedef TMap<Region*, Vector<LabelInfo const*>*> Region2LabelInfoVec;
 
 //START DwarfResMgr
 //Responsible for managing resources related to DWARF.
@@ -621,11 +640,11 @@ class DwarfResMgr {
     SMemPool * m_pool;
 public:
     List<StrBuf*> m_str_mgr;
-    List<TMap<Region const*, MCSymbol*>*> m_map_region_mc_symbol_mgr;
+    List<Region2MCSymbol*> m_map_region_mc_symbol_mgr;
     List<MCDwarfFrameRegionInfo*> m_region_frame_info_mgr;
-    List<Vector<MCCFIInstruction*>*> m_cfi_info_vector_mgr;
-    List<Vector<MCDwarfLineEntry*>*> m_line_entry_mgr;
-    List<xcom::Vector<LabelInfo const*>*> m_ret_hint_map_region_info_mgr;
+    List<MCCFIInstructionVec*> m_cfi_info_vector_mgr;
+    List<MCDwarfLineEntryVec*> m_line_entry_mgr;
+    List<Vector<LabelInfo const*>*> m_ret_hint_map_region_info_mgr;
 public:
     DwarfResMgr() { m_pool = nullptr; init(); }
     ~DwarfResMgr() { destroy(); }
@@ -641,27 +660,27 @@ public:
     //Allocate memory for CFI (Call Frame Information).
     //.cfi_def_cfa defines a rule for computing CFA as: take address from
     //Register and add Offset to it.
-    MCCFIInstruction * allocCFIDefCfa(MCSymbol const* l, UINT32 r,
-                                      INT32 offset);
+    MCCFIInstruction * allocCFIDefCfa(MCSymbol const* l, UINT r,
+                                      INT offset);
 
     //.cfi_same_value Current value of Register is the same as in the
     //previous frame. I.e., no restoration is needed.
-    MCCFIInstruction * allocSameValue(MCSymbol const* l, UINT32 r);
+    MCCFIInstruction * allocSameValue(MCSymbol const* l, UINT r);
 
     //.cfi_offset Previous value of Register is saved at offset from CFA.
-    MCCFIInstruction * allocOffset(MCSymbol const* l, UINT32 r, INT32 o);
+    MCCFIInstruction * allocOffset(MCSymbol const* l, UINT r, INT o);
 
     //.cfi_restore says that the rule for Register is now the same as it
     //was at the beginning of the function,
     //after all initial instructions added
     //by .cfi_startproc were executed.
-    MCCFIInstruction * allocRestore(MCSymbol const* l, UINT32 r);
+    MCCFIInstruction * allocRestore(MCSymbol const* l, UINT r);
 
     //.cfi_def_cfa_offset modifies a rule for computing CFA. Register
     //remains the same, but offset is new.
     //Note that it is the absolute offset
     //that will be added to a defined register to the compute CFA address.
-    MCCFIInstruction * allocDefCfaOffset(MCSymbol const* l, INT32 o);
+    MCCFIInstruction * allocDefCfaOffset(MCSymbol const* l, INT o);
 
     //Allocate memory for each line_entry in debug_line.
     MCDwarfLineEntry * allocLineEntry(MCSymbol const* l);
@@ -670,16 +689,16 @@ public:
     xcom::StrBuf * allocStr(UINT init_size);
 
     //Allocate var vector.
-    TMap<Region const*, MCSymbol*> * allocMapRegionVar();
+    Region2MCSymbol * allocMapRegionVar();
 
     //Allocate cfi info vector.
-    Vector<MCCFIInstruction*> * allocCFIInfoVector();
+    MCCFIInstructionVec * allocCFIInfoVector();
 
     //Allocate frame region info.
     MCDwarfFrameRegionInfo * allocFrameRegionInfo();
 
     //Allocate line entry vector.
-    Vector<MCDwarfLineEntry*> * allocLineEntryVector();
+    MCDwarfLineEntryVec * allocLineEntryVector();
 
     //Allocate label vector.
     Vector<LabelInfo const*> * allocLabelVector();
@@ -712,9 +731,14 @@ public:
     ((e)->m_ret_hint_map_region)
 class MCDwarfMgr {
 protected:
-    //For var relocation
+    //For var relocation.
     UINT m_cur_cfa;
     INT m_cur_cfa_offset;
+
+    //The minimum alignment size of stack slots for callee-saved
+    //registers in bytes.When generating the .debug_frame,
+    //it is calculated differently based on the architecture.
+    INT m_stack_slot_alignment;
 
     //Temporary buffer for encoding data with CHAR elements.
     //Used to mitigate the overhead of constantly using temporary variables.
@@ -731,10 +755,10 @@ public:
 
     //Future MCSymbol records for types FUNC_LABEL
     //and SECTION_LABEL will be stored here.
-    MAPSYMBOL m_map_symbol;
+    Sym2MCSymbol m_map_symbol;
 
     //Future MCSymbol records for types FUNC_VAR will be stored here.
-    MAPSYMBOLVAR m_map_symbol_var;
+    Sym2Region2MCSymbol m_map_symbol_var;
 
     //debug_abbrev
     BYTEVec m_debug_abbrev_code;
@@ -742,11 +766,11 @@ public:
     //debug_info
     BYTEVec m_debug_info_code;
 
-    FIXUPS m_debug_info_fixups;
+    FixupVec m_debug_info_fixups;
 
     //debug_ranges
     BYTEVec m_debug_ranges_code;
-    FIXUPS m_debug_rangse_fixups;
+    FixupVec m_debug_rangse_fixups;
 
     //debug_str
     BYTEVec m_debug_str_code;
@@ -756,15 +780,15 @@ public:
 
     //debug_frame
     //The code for all regions in the current scope.
-    xcom::Vector<UINT8> m_debug_frame_code;
-    MCFRAMEDIVISIONMAP m_region_frame_info;
-    FIXUPS m_debug_frame_fixups;
+    BYTEVec m_debug_frame_code;
+    Region2MCDwarfFrameRegionInfo m_region_frame_info;
+    FixupVec m_debug_frame_fixups;
 
     //debug_line
     //The code for all regions in the current scope.
-    MCLINEDIVISIONMAP m_region_line_info;
+    Region2MCDwarfLineEntryVec m_region_line_info;
     BYTEVec m_debug_line_code;
-    FIXUPS m_debug_line_fixups;
+    FixupVec m_debug_line_fixups;
 
     //Allocate memory for some objects of the Dwarf class,
     //keeping in mind that it has no copy constructor.
@@ -785,7 +809,7 @@ public:
     //these two hints may be optimized away.
     //Since we need to use them, we will record them during lexical parsing,
     //and then add them back in the Machine Instruction (MI) layer.
-    TMap<Region*, Vector<LabelInfo const*>*> m_ret_hint_map_region;
+    Region2LabelInfoVec m_ret_hint_map_region;
 public:
     MCDwarfMgr();
     virtual ~MCDwarfMgr();
@@ -793,6 +817,7 @@ public:
 
     //Encode the value according to its name
     //and place it into the encoding container for the corresponding section.
+    //This interface only handles debug sections that will be relocated.
     //The encoding follows little-endian rules.
     //Parameter Explanation:
     //value: The value we want to encode.
@@ -944,10 +969,12 @@ public:
     //os: The binary code returned by the encoding.
     //addr_delta: The difference inPC values
     //corresponding to two CFI instructions.
-    void encodeAdvanceLoc(OUT Vector<UINT8> & os, UINT64 addr_delta);
+    void encodeAdvanceLoc(OUT Vector<BYTE> & os, UINT64 addr_delta);
 
-    //Get region of mcsymbol.
-    Region const* getVarRegion(Sym const* name, xoc::RegionMgr * region_mgr);
+    //Retrieves the region object corresponding to
+    //the specified symbol name from the region manager.
+    Region const* findRegionByName(Sym const* name,
+                                   xoc::RegionMgr * region_mgr);
 
     //Get the MCSymbol for this region from the vector in the map.
     MCSymbol * getVarSymbolInRegion(Sym const* name,
@@ -958,6 +985,11 @@ public:
 
     //Get the ending MCSymbol for this function.
     MCSymbol const* getMCSymbolRegionEnd(Region const* region) const;
+
+    //This is to obtain the offset multiplier factor from the
+    //CFI instruction's offset. This value will be passed to DWARF
+    //for future use.
+    INT getCFIInstOffsetOffByFactor(const MCCFIInstruction * ins) const;
 
     //Generate code for debug_frame.
     //The process mainly consists of the following two steps:
@@ -1101,7 +1133,7 @@ public:
     //[0x0000028c]  Advance PC by 128 to 0x80
     //[0x0000028f]  Special opcode 6: advance Address by 0
     //to 0x80 and Line by 1 to 30
-    void genDwarfLineTable(Vector<MCDwarfLineEntry*> * line_entry_v);
+    void genDwarfLineTable(MCDwarfLineEntryVec * line_entry_v);
 
     //This is for encoding the line table
     //(mapping between line numbers and assembly PC) in the debug_line section.
@@ -1127,20 +1159,18 @@ public:
     //Label: The MCSymbol corresponding to the current location.
     //pointer_size: The size of the pointer.
     void genDwarfAdvanceLineAddr(INT64 line_delta, MCSymbol const* last_label,
-                                 MCSymbol const* label, UINT32 pointer_size);
+                                 MCSymbol const* label, UINT pointer_size);
 
     //This is for encoding the first line of the line table,
     //such as the first line of the func_line_table above.
     void genDwarfSetLineAddr(INT64 line_delta, MCSymbol const* label,
-                             UINT32 pointer_size);
+                             UINT pointer_size);
 
     //Return the size of various types of fixups.
     //Currently, only sizes 1, 2, 4, and 8 are supported.
     inline static UINT getSizeForFixupKind(MCFixupKind kind)
     {
         switch (kind) {
-        case FK_NONE:
-            return 0;
         case FK_DATA_1:
             return 1;
         case FK_DATA_2:
@@ -1149,14 +1179,14 @@ public:
             return 4;
         case FK_DATA_8:
             return 8;
-        default:
-            UNREACHABLE();
+        default: UNREACHABLE(); return 1;
         }
-        return 0;
     }
 
-    //Return the region based on the name.
-    static Region const* getSectionRegion(RegionMgr * rm, CHAR const* name);
+    //Returns the region object that corresponds to the specified
+    //name from the region manager. If no region with the given name exists,
+    //the function may return nullptr.
+    static Region const* getRegionByName(RegionMgr * rm, CHAR const* name);
 
     //Please refer to the detailed explanation
     //in the function createSingleRefRel().
@@ -1191,7 +1221,7 @@ public:
     //The following are functions related to debugging lines.
     //Record the filename and file number passed from the frontend
     //e.g: frontend .file 3 "/usr/include/stdlib.h"
-    //then the number 3 and the path "/usr/include/stdlib.h" are separated
+    //then the number 3 and the path "/usr/include/stdlib.h" are separated.
     void recordFileInfo(UINT32 file_num, xoc::Sym const* all_file_name);
 
     //This symbol of a certain variable type must exist,
@@ -1210,12 +1240,7 @@ public:
     //regardless of whether the same symbol exists in different regions.
     bool isVarSymbolPresent(Sym const* name);
 
-    //Has this MCSymbol been registered?
-    //Being registered means that all hardware-related
-    //information associated with it has been prepared.
-    bool isSymbolRegister(Sym const* name);
-
-    //For find symbol only for FUNC_LABEL,SECTION_LABEL,FUNC_VAR
+    //For find symbol only for FUNC_LABEL,SECTION_LABEL,FUNC_VAR.
     inline bool isSymbolfind(Sym const* name)
     {
         return m_map_symbol.find(name);
@@ -1251,6 +1276,11 @@ public:
     //Set a special starting tag for the label of function.
     //Such as the starting label and ending label of the region.
     void setSpecialTagLabel(LabelInfo * label, MCSymbol * mc_symbol_ptr);
+
+    //The minimum alignment size of stack slots for callee-saved
+    //registers in bytes.When generating the .debug_frame,
+    //it is calculated differently based on the architecture.
+    void setStackSlotAlignment(Region const* region);
 
     //Update the current CFA position to track changes in the current stack.
     //it is related to the debug_frame.

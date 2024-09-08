@@ -52,23 +52,6 @@ static void dumpRemovedIneffectIR(
 }
 
 
-class IterSideEffect : public VisitIRTree {
-    bool m_has_sideeffect;
-protected:
-    virtual bool visitIR(IR const* ir) override
-    {
-        if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
-            ir->isNoMove(false)) {
-            m_has_sideeffect = true;
-            return false;
-        }
-        return true;
-    }
-public:
-    IterSideEffect(IR const* ir) : m_has_sideeffect(false) { visit(ir); }
-    bool hasSideEffect() const { return m_has_sideeffect; }
-};
-
 //
 //START DCECtx
 //
@@ -77,16 +60,28 @@ void DCECtx::dump(Region const* rg) const
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP DCECtx --==");
     note(rg, "\nEFFECT BB:");
-    for (BSIdx i = m_effect_bb.get_first();
-         i != BS_UNDEF; i = m_effect_bb.get_next(i)) {
+    StmtSetIter it;
+    for (BSIdx i = m_effect_bb.get_first(&it);
+         i != BS_UNDEF; i = m_effect_bb.get_next(i, &it)) {
         IRBB const* bb = rg->getBBMgr()->getBB(i);
         ASSERT0(bb);
         prt(rg, "%u ", bb->id());
     }
     note(rg, "\nEFFECT STMT:");
     rg->getLogMgr()->incIndent(2);
-    for (BSIdx i = m_effect_stmt.get_first();
-         i != BS_UNDEF; i = m_effect_stmt.get_next(i)) {
+    StmtSetIter it2;
+    for (BSIdx i = m_effect_stmt.get_first(&it2);
+         i != BS_UNDEF; i = m_effect_stmt.get_next(i, &it2)) {
+        IR const* ir = rg->getIR(i);
+        ASSERT0(ir);
+        note(rg, "\n%s ", DumpIRName().dump(ir));
+    }
+    rg->getLogMgr()->decIndent(2);
+    note(rg, "\nEXCLUDE STMT:");
+    rg->getLogMgr()->incIndent(2);
+    StmtSetIter it3;
+    for (BSIdx i = m_exclude_stmt.get_first(&it3);
+         i != BS_UNDEF; i = m_exclude_stmt.get_next(i, &it3)) {
         IR const* ir = rg->getIR(i);
         ASSERT0(ir);
         note(rg, "\n%s ", DumpIRName().dump(ir));
@@ -100,9 +95,10 @@ void DCECtx::dump(Region const* rg) const
 //START DeadCodeElim
 //
 void DeadCodeElim::setEffectStmt(
-    IR const* stmt, bool set_bb_effect, MOD List<IR const*> * act_ir_lst,
+    IR const* stmt, bool set_bb_effect, MOD ConstIRList * act_ir_lst,
     DCECtx & dcectx)
 {
+    ASSERT0(!dcectx.isExcluded(stmt));
     ASSERT0(stmt && stmt->is_stmt());
     act_ir_lst->append_tail(stmt);
     dcectx.addEffectStmt(stmt);
@@ -177,64 +173,110 @@ void DeadCodeElim::checkValidAndRecomputeCDG()
 
 bool DeadCodeElim::checkEffectStmt(IR const* ir)
 {
-    IterSideEffect it(ir);
-    if (it.hasSideEffect()) {
-        //TBD:For now, DCE permits remove redundant dummy operation.
-        return true;
-    }
-    if (!m_is_use_md_du && ir->isMemRefNonPR()) {
-        return true;
-    }
-    MD const* mustdef = ir->getRefMD();
-    if (mustdef != nullptr) {
-        if (is_effect_write(mustdef->get_base())) {
-            return true;
-        }
-    } else {
-        MDSet const* maydefs = ir->getRefMDSet();
-        if (maydefs != nullptr) {
+    ASSERT0(ir->is_stmt());
+    class IterTree : public VisitIRTree {
+    protected:
+        bool checkStmt(IR const* ir)
+        {
+            ASSERT0(ir->is_stmt());
+            ASSERT0(ir->isMemRef());
+            MD const* mustref = ir->getMustRef();
+            if (mustref != nullptr) {
+                if (dce->is_effect_write(mustref->get_base())) {
+                    setTerminate();
+                    is_effect = true;
+                    return false;
+                }
+                //No need to check MayRef if MustRef is not NULL.
+                //Keep walking trough the IR tree.
+                return true;
+            }
+            MDSet const* mayref = ir->getMayRef();
+            if (mayref == nullptr) { return true; }
             MDSetIter iter;
-            for (BSIdx i = maydefs->get_first(&iter);
-                 i != BS_UNDEF; i = maydefs->get_next(i, &iter)) {
-                MD * md = m_md_sys->getMD(i);
+            for (BSIdx i = mayref->get_first(&iter);
+                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+                MD * md = mdsys->getMD(i);
                 ASSERT0(md);
-                if (is_effect_write(md->get_base())) {
-                    return true;
+                if (dce->is_effect_write(md->get_base())) {
+                    setTerminate();
+                    is_effect = true;
+                    return false;
                 }
             }
-        }
-    }
-    ConstIRIter citer;
-    for (IR const* x = iterExpInitC(ir, citer);
-         x != nullptr; x = iterExpNextC(citer)) {
-        if (!m_is_use_md_du && x->isMemRefNonPR()) {
+            //Keep walking trough the IR tree.
             return true;
         }
-        if (!x->isMemRef()) { continue; }
-
-        //Check if using volatile variable.
-        //e.g: volatile int g = 0;
-        //    while(g); # The stmt has effect.
-        MD const* md = x->getRefMD();
-        if (md != nullptr) {
-            if (is_effect_read(md->get_base())) {
+        bool checkExp(IR const* ir)
+        {
+            ASSERT0(ir->is_exp());
+            ASSERT0(ir->isMemRef());
+            //Check if expression using volatile variable.
+            //e.g: volatile int g = 0;
+            //    while(g); # The stmt has effect.
+            MD const* mustref = ir->getMustRef();
+            if (mustref != nullptr) {
+                if (dce->is_effect_read(mustref->get_base())) {
+                    setTerminate();
+                    is_effect = true;
+                    return false;
+                }
+                //No need to check MayRef if MustRef is not NULL.
+                //Keep walking trough the IR tree.
                 return true;
             }
-            continue;
+            MDSet const* mayref = ir->getMayRef();
+            if (mayref == nullptr) { return true; }
+            MDSetIter iter;
+            for (BSIdx i = mayref->get_first(&iter);
+                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+                MD * md = mdsys->getMD(i);
+                ASSERT0(md != nullptr);
+                if (dce->is_effect_read(md->get_base())) {
+                    setTerminate();
+                    is_effect = true;
+                    return false;
+                }
+            }
+            //Keep walking trough the IR tree.
+            return true;
         }
-        MDSet const* mds = x->getRefMDSet();
-        if (mds == nullptr) { continue; }
-        MDSetIter iter;
-        for (BSIdx i = mds->get_first(&iter);
-             i != BS_UNDEF; i = mds->get_next(i, &iter)) {
-            MD * md2 = m_md_sys->getMD(i);
-            ASSERT0(md2 != nullptr);
-            if (is_effect_read(md2->get_base())) {
+        virtual bool visitIR(IR const* ir) override
+        {
+            if (dce->hasSideEffect(ir)) {
+                setTerminate();
+                is_effect = true;
+                return false;
+            }
+            if (!ir->isMemRef()) {
+                //Keep walking trough the IR tree.
                 return true;
             }
+            if (!ir->isMemRefNonPR()) {
+                //Keep walking trough the IR tree.
+                return true;
+            }
+            if (!dce->isCheckMDRef()) {
+                //NonPR operation will always be treated as effect.
+                setTerminate();
+                is_effect = true;
+                return false;
+            }
+            if (ir->is_stmt()) { return checkStmt(ir); }
+            return checkExp(ir);
         }
-    }
-    return false;
+    public:
+        bool is_effect;
+        MDSystem const* mdsys;
+        DeadCodeElim const* dce;
+    public:
+        IterTree() { is_effect = false; dce = nullptr; mdsys = nullptr; }
+    };
+    IterTree it;
+    it.dce = this;
+    it.mdsys = getMDSystem();
+    it.visit(ir);
+    return it.is_effect;
 }
 
 
@@ -246,48 +288,101 @@ bool DeadCodeElim::checkCall(IR const* ir) const
 }
 
 
+void DeadCodeElim::markEffectIRForRegion(
+    IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    ASSERT0(ir->is_region());
+    ASSERT0(!dcectx.isExcluded(ir));
+    //The redundant of Region should be processed in IPA
+    //rather than DCE, thus regard Region always effect.
+    setEffectStmt(ir, true, &work_list, dcectx);
+}
+
+
+void DeadCodeElim::markEffectIRForReturn(
+    IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    ASSERT0(ir->is_return());
+    ASSERT0(!dcectx.isExcluded(ir));
+    //Do NOT set exit-bb to be effect.
+    //That will generate redundant control-flow dependence.
+    //CASE:
+    //    IF (...)
+    //        ...
+    //    ENDIF
+    //    RETURN //EXIT BB
+    //IF clause stmt is redundant code.
+    setEffectStmt(ir, true, &work_list, dcectx);
+}
+
+
+void DeadCodeElim::markEffectIRForCall(
+    IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    ASSERT0(ir->isCallStmt());
+    ASSERT0(!dcectx.isExcluded(ir));
+    if (checkCall(ir)) {
+        setEffectStmt(ir, true, &work_list, dcectx);
+    }
+}
+
+
+void DeadCodeElim::markEffectIRForBranch(
+    IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    ASSERT0(ir->isBranch());
+    ASSERT0(!dcectx.isExcluded(ir));
+    if (!m_is_elim_cfs) {
+        setEffectStmt(ir, true, &work_list, dcectx);
+    }
+}
+
+
+void DeadCodeElim::markEffectIRForStmt(
+    IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    if (dcectx.isExcluded(ir)) { return; }
+    switch (ir->getCode()) {
+    case IR_REGION:
+        markEffectIRForRegion(ir, work_list, dcectx);
+        return;
+    case IR_RETURN:
+        markEffectIRForReturn(ir, work_list, dcectx);
+        return;
+    SWITCH_CASE_CALL:
+        markEffectIRForCall(ir, work_list, dcectx);
+        return;
+    SWITCH_CASE_BRANCH_OP:
+        markEffectIRForBranch(ir, work_list, dcectx);
+        return;
+    default:
+        if (!checkEffectStmt(ir)) { return; }
+        setEffectStmt(ir, true, &work_list, dcectx);
+    }
+}
+
+
+void DeadCodeElim::markEffectIRForBBIRList(
+    IRBB const* bb, MOD ConstIRList & work_list, MOD DCECtx & dcectx)
+{
+    BBIRListIter irit;
+    IRBB * pbb = const_cast<IRBB*>(bb);
+    for (IR const* ir = pbb->getIRList().get_head(&irit);
+         ir != nullptr; ir = pbb->getIRList().get_next(&irit)) {
+        markEffectIRForStmt(ir, work_list, dcectx);
+    }
+}
+
+
 //Mark effect IRs.
-void DeadCodeElim::mark_effect_ir(MOD List<IR const*> & work_list,
-                                  MOD DCECtx & dcectx)
+void DeadCodeElim::markEffectIR(MOD ConstIRList & work_list,
+                                MOD DCECtx & dcectx)
 {
     List<IRBB*> * bbl = m_rg->getBBList();
     BBListIter ct;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != nullptr; bb = bbl->get_next(&ct)) {
-        BBIRListIter irit;
-        for (IR const* ir = bb->getIRList().get_head(&irit);
-             ir != nullptr; ir = bb->getIRList().get_next(&irit)) {
-            switch (ir->getCode()) {
-            case IR_REGION:
-                //The redundant of Region should be processed in IPA
-                //rather than DCE, thus regard Region always effect.
-            case IR_RETURN:
-                //Do NOT set exit-bb to be effect.
-                //That will generate redundant control-flow dependence.
-                //CASE:
-                //    IF (...)
-                //        ...
-                //    ENDIF
-                //    RETURN //EXIT BB
-                //IF clause stmt is redundant code.
-                setEffectStmt(ir, true, &work_list, dcectx);
-                break;
-            SWITCH_CASE_CALL:
-                if (checkCall(ir)) {
-                    setEffectStmt(ir, true, &work_list, dcectx);
-                }
-                break;
-            SWITCH_CASE_BRANCH_OP:
-                if (!m_is_elim_cfs) {
-                    setEffectStmt(ir, true, &work_list, dcectx);
-                }
-                break;
-            default:
-                if (checkEffectStmt(ir)) {
-                    setEffectStmt(ir, true, &work_list, dcectx);
-                }
-            }
-        }
+        markEffectIRForBBIRList(bb, work_list, dcectx);
     }
 }
 
@@ -412,9 +507,8 @@ bool DeadCodeElim::find_effect_kid(IR const* ir, MOD DCECtx & dcectx) const
 }
 
 
-bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
-                                          OUT List<IR const*> & act_ir_lst,
-                                          MOD DCECtx & dcectx)
+bool DeadCodeElim::markControlPredAndStmt(
+    IRBB const* bb, OUT ConstIRList & act_ir_lst, MOD DCECtx & dcectx)
 {
     ASSERT0(m_cdg);
     UINT bbid = bb->id();
@@ -454,6 +548,9 @@ bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
             //  }
             continue;
         }
+        if (dcectx.isExcluded(last_ir)) {
+            continue;
+        }
         if (!dcectx.isEffectStmt(last_ir)) {
             setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
             change = true;
@@ -486,15 +583,15 @@ bool DeadCodeElim::markCFGPred(IRBB const* bb, MOD DCECtx & dcectx)
 }
 
 
-bool DeadCodeElim::tryMarkUnconditionalBranch(IRBB const* bb,
-                                              MOD List<IR const*> & act_ir_lst,
-                                              MOD DCECtx & dcectx)
+bool DeadCodeElim::tryMarkUnconditionalBranch(
+    IRBB const* bb, MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx)
 {
     IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
-    if (last_ir != nullptr &&
-        last_ir->isUnconditionalBr() &&
-        !dcectx.isEffectStmt(last_ir) &&
-        find_effect_kid(last_ir, dcectx)) {
+    if (last_ir == nullptr) { return false; }
+    if (!last_ir->isUnconditionalBr()) { return false; }
+    if (dcectx.isExcluded(last_ir)) { return false; }
+    if (dcectx.isEffectStmt(last_ir)) { return false; }
+    if (find_effect_kid(last_ir, dcectx)) {
         //TBD: Does effect_kid of last_ir have to be considered?
         setEffectStmt(last_ir, true, &act_ir_lst, dcectx);
         return true;
@@ -503,26 +600,26 @@ bool DeadCodeElim::tryMarkUnconditionalBranch(IRBB const* bb,
 }
 
 
-bool DeadCodeElim::tryMarkBranch(IRBB const* bb,
-                                 OUT List<IR const*> & act_ir_lst,
-                                 MOD DCECtx & dcectx)
+bool DeadCodeElim::tryMarkBranch(
+    IRBB const* bb, OUT ConstIRList & act_ir_lst, MOD DCECtx & dcectx)
 {
     //If last ir of effect BB is branch operation, try to mark effect stmts
     //that controlled by current bb.
     IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
-    if (last_ir != nullptr && last_ir->isBranch() &&
-        !dcectx.isEffectStmt(last_ir)) {
-        if (find_effect_kid(last_ir, dcectx)) {
-            //IR_SWTICH might have multiple successors BB.
-            setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
-            return true;
-        }
-        if (!getCFG()->isValidToKeepSSAIfRemoveBB(bb)) {
-            //Branch stmt and BB can NOT be removed becasue that will make SSA
-            //structure invalid.
-            setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
-            return true;
-        }
+    if (last_ir == nullptr) { return false; }
+    if (!last_ir->isBranch()) { return false; }
+    if (dcectx.isExcluded(last_ir)) { return false; }
+    if (dcectx.isEffectStmt(last_ir)) { return false; }
+    if (find_effect_kid(last_ir, dcectx)) {
+        //IR_SWTICH might have multiple successors BB.
+        setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
+        return true;
+    }
+    if (!getCFG()->isValidToKeepSSAIfRemoveBB(bb)) {
+        //Branch stmt and BB can NOT be removed becasue that will make SSA
+        //structure invalid.
+        setEffectStmt(last_ir, false, &act_ir_lst, dcectx);
+        return true;
     }
     return false;
 }
@@ -531,9 +628,8 @@ bool DeadCodeElim::tryMarkBranch(IRBB const* bb,
 //Try to set controlling BB of 'bb' to be effective.
 //bb: given effect BB.
 //act_ir_lst: collect stmts that become effect marked by this function.
-bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
-                                             OUT List<IR const*> & act_ir_lst,
-                                             MOD DCECtx & dcectx)
+bool DeadCodeElim::setControlDepBBToBeEffect(
+    IRBB const* bb, OUT ConstIRList & act_ir_lst, MOD DCECtx & dcectx)
 {
     bool change = markControlPredAndStmt(bb, act_ir_lst, dcectx);
     change |= markCFGPred(bb, dcectx);
@@ -545,8 +641,8 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
 }
 
 
-bool DeadCodeElim::preserve_cd(MOD List<IR const*> & act_ir_lst,
-                               MOD DCECtx & dcectx)
+bool DeadCodeElim::preserveControlDep(
+    MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx)
 {
     ASSERT0(m_cfg);
     bool change = false;
@@ -570,7 +666,7 @@ bool DeadCodeElim::preserve_cd(MOD List<IR const*> & act_ir_lst,
 }
 
 
-bool DeadCodeElim::collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2,
+bool DeadCodeElim::collectByPRSSA(IR const* x, MOD ConstIRList * pwlst2,
                                   MOD DCECtx & dcectx)
 {
     ASSERT0(x->isReadPR() && PR_ssainfo(x) && usePRSSADU());
@@ -578,6 +674,7 @@ bool DeadCodeElim::collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2,
     if (d == nullptr) { return false; }
     ASSERT0(d->is_stmt());
     ASSERT0(d->isWritePR() || d->isCallHasRetVal());
+    if (dcectx.isExcluded(d)) { return false; }
     if (dcectx.isEffectStmt(d)) { return false; }
     setEffectStmt(d, true, pwlst2, dcectx);
     return true;
@@ -585,7 +682,7 @@ bool DeadCodeElim::collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2,
 
 
 bool DeadCodeElim::collectAllDefThroughDefChain(
-    MDDef const* tdef, IR const* use, OUT xcom::List<IR const*> * pwlst2,
+    MDDef const* tdef, IR const* use, OUT ConstIRList * pwlst2,
     MOD DCECtx & dcectx)
 {
     bool change = false;
@@ -606,7 +703,9 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
         //mark almost all DEF to be effect. This may lead to
         //traverse the same DEF many times. Apply DP like algo to reduce
         //the traversal time.
-
+        if (dcectx.isExcluded(stmt)) {
+            continue;
+        }
         if (dcectx.isEffectStmt(stmt)) {
             continue; //Check all previous DEF in debug mode.
         }
@@ -617,7 +716,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 }
 
 
-bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
+bool DeadCodeElim::collectByMDSSA(IR const* x, MOD ConstIRList * pwlst2,
                                   MOD DCECtx & dcectx)
 {
     ASSERT0(x->isMemRefNonPR() && useMDSSADU());
@@ -662,6 +761,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
             mustuse->is_exact() &&
             mustdef->is_exact()) {
             if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
+                if (dcectx.isExcluded(defstmt)) { continue; }
                 if (dcectx.isEffectStmt(defstmt)) { continue; }
                 setEffectStmt(defstmt, true, pwlst2, dcectx);
                 change = true;
@@ -696,7 +796,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2,
 }
 
 
-bool DeadCodeElim::collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2,
+bool DeadCodeElim::collectByDUSet(IR const* x, MOD ConstIRList * pwlst2,
                                   MOD DCECtx & dcectx)
 {
     ASSERT0(x->is_exp());
@@ -708,39 +808,29 @@ bool DeadCodeElim::collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2,
          i != BS_UNDEF; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
-        if (!dcectx.isEffectStmt(d)) {
-            change = true;
-            setEffectStmt(d, true, pwlst2, dcectx);
-        }
+        if (dcectx.isExcluded(d)) { continue; }
+        if (dcectx.isEffectStmt(d)) { continue; }
+        change = true;
+        setEffectStmt(d, true, pwlst2, dcectx);
     }
     return change;
 }
 
 
-//Try to revise DomInfo before removing 'stmt'.
-static void tryReviseDomInfoForUncondBr(IR const* stmt, DeadCodeElim const* dce,
-                                        DCECtx const& dcectx)
-{
-    ASSERTN(stmt->is_goto(), ("TODO"));
-    dcectx.getOptCtx()->setInvalidIfCFGChanged();
-    dcectx.getOptCtx()->setInvalidMDSSA();
-}
-
-
 //Try to revise DomInfo, SSA, etc before removing 'stmt'.
-static void tryReviseAnalysisInfo(IR const* stmt, DeadCodeElim const* dce,
-                                  DCECtx const& dcectx)
+//Return true if CFG, Dom and SSA are all maintained.
+static bool tryReviseAnaInfo(IR const* stmt, DeadCodeElim const* dce,
+                             DCECtx const& dcectx)
 {
     switch (stmt->getCode()) {
-    case IR_GOTO:
-        tryReviseDomInfoForUncondBr(stmt, dce, dcectx);
-        return;
-    case IR_FALSEBR:
-    case IR_TRUEBR:
-    default: break;
+    SWITCH_CASE_BRANCH_OP:
+        //TODO:In some cases, such as reducable graph, Dom info and SSA info
+        //may be maintained incrementally.
+        break;
+    default: UNREACHABLE();
     }
-    //We can not revise the DomInfo because the controlflow modification is
-    //too compilcate.
+    //For now, we can not revise the DomInfo because the controlflow
+    //modification is too compilcate to maintain.
     //e.g:BB1->BB2->BB3
     //     |         ^
     //     \________/
@@ -751,12 +841,13 @@ static void tryReviseAnalysisInfo(IR const* stmt, DeadCodeElim const* dce,
     //dramatically the compilation time.
     dcectx.getOptCtx()->setInvalidIfCFGChanged();
     dcectx.getOptCtx()->setInvalidMDSSA();
+    return false;
 }
 
 
-static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
-                                 IRBB * bb, BBListIter const& bbit,
-                                 OUT bool & remove_branch_stmt)
+static bool removeIneffectIRImpl(
+    DeadCodeElim const* dce, DCECtx const& dcectx,
+    IRBB * bb, BBListIter const& bbit, OUT bool & remove_branch_stmt)
 {
     IRListIter ctir = nullptr;
     IRListIter next = nullptr;
@@ -769,19 +860,20 @@ static bool removeIneffectIRImpl(DeadCodeElim const* dce, DCECtx const& dcectx,
         BB_irlist(bb).get_next(&next);
         if (dcectx.isEffectStmt(stmt)) { continue; }
 
-        //Revise DU chains.
-        //Could not just remove the SSA def, you should consider
-        //the SSA_uses and make sure they are all removable.
-        //Use SSA related API.
+        //Revise DU chains before removing IR stmt.
+        //Note in SSA mode, user should not just remove the SSA def,
+        //while user has to consider the SSA_uses and make sure they are
+        //all removable. Utilizing SSA related API to maintain DU chain.
         dumpRemovedIneffectIR(stmt, bb, dce);
         xoc::removeStmt(stmt, rg, *dcectx.getOptCtx());
         if (stmt->isConditionalBr() ||
             stmt->isUnconditionalBr() ||
             stmt->isMultiConditionalBr()) {
             remove_branch_stmt = true;
-            tryReviseAnalysisInfo(stmt, dce, dcectx);
-            //No need verify PHI here, because SSA will be rebuilt
-            //after this function.
+            if (!tryReviseAnaInfo(stmt, dce, dcectx)) {
+                //No need to verify PHI here, because SSA mode will be rebuilt
+                //after this function if revising analysis info failed.
+            }
             CfgOptCtx ctx(*dcectx.getOptCtx());
             cfg->changeToBeFallthroughBB(bb, bbit, ctx);
         }
@@ -811,11 +903,11 @@ bool DeadCodeElim::removeIneffectIR(
             continue;
         }
         if (m_is_reserve_phi) {
-            //TBD:Do we need to remove MDPHI which witout any USE?
-            //I think keeping PHI there could maintain Def-Chain, e.g:
-            //md1v1, md1v2, md1v3, md1v4 are in different BBs. Here PHI
-            //is acted as a disjoint dominator point to diverge data flow
-            //to md1v3 and md1v4.
+            //TBD:Do we need to remove MDPhi which witout any USE?
+            //I think keeping PHI there could maintain DefDef-Chain, e.g:
+            //md1v1, md1v2, md1v3, md1v4 are in different BBs. In the case
+            //MDPhi is acted as a disjoint dominator that point to diverge
+            //data flow to md1v3 and md1v4.
             //e.g:md1v1<-...
             //      |
             //      V
@@ -825,16 +917,14 @@ bool DeadCodeElim::removeIneffectIR(
             // md1v3<-...  md1v4<-...
             continue;
         }
-        if (m_mdssamgr->removeRedundantPhi(bb, *dcectx.getOptCtx())) {
-            change = true;
-        }
+        change |= m_mdssamgr->removeRedundantPhi(bb, *dcectx.getOptCtx());
     }
     return change;
 }
 
 
 bool DeadCodeElim::collectByDU(
-    IR const* x, MOD List<IR const*> * pwlst2, MOD DCECtx & dcectx,
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
     bool usemdssa, bool useprssa)
 {
     ASSERT0(x->is_exp());
@@ -850,12 +940,11 @@ bool DeadCodeElim::collectByDU(
 
 //Iterative record effect IRs, according to DU chain,
 //and preserving the control flow dependence.
-void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list,
-                                MOD DCECtx & dcectx)
+void DeadCodeElim::iterCollect(MOD ConstIRList & efflist, MOD DCECtx & dcectx)
 {
-    List<IR const*> work_list2;
-    List<IR const*> * pwlst1 = &work_list;
-    List<IR const*> * pwlst2 = &work_list2;
+    ConstIRList efflist2;
+    ConstIRList * pwlst1 = &efflist;
+    ConstIRList * pwlst2 = &efflist2;
     bool change = true;
     bool usemdssa = useMDSSADU();
     bool useprssa = usePRSSADU();
@@ -875,7 +964,7 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list,
            }
         }
         if (m_is_elim_cfs) {
-            change |= preserve_cd(*pwlst2, dcectx);
+            change |= preserveControlDep(*pwlst2, dcectx);
         }
         pwlst1->clean();
         xcom::swap(pwlst1, pwlst2);
@@ -902,54 +991,84 @@ bool DeadCodeElim::removeRedundantPhi(MOD OptCtx & oc)
 }
 
 
+void DeadCodeElim::addEffectIRAndBB(
+    ConstIRList const& efflist, OUT DCECtx & dcectx) const
+{
+    ConstIRListIter it;
+    for (IR const* ir = efflist.get_head(&it);
+         ir != nullptr; ir = efflist.get_next(&it)) {
+        ASSERT0(ir->is_stmt());
+        ASSERTN(!dcectx.isExcluded(ir), ("effect ir should not be in list"));
+        dcectx.addEffectStmt(ir);
+        dcectx.addEffectBB(ir->getBB());
+    }
+}
+
+
+bool DeadCodeElim::performByEffectIRList(
+    ConstIRList & efflist, OUT DCECtx & dcectx, OUT bool remove_branch_stmt)
+{
+    addEffectIRAndBB(efflist, dcectx);
+    return iterCollectAndElim(efflist, dcectx, remove_branch_stmt);
+}
+
+
+bool DeadCodeElim::iterCollectAndElim(
+    ConstIRList & efflist, OUT DCECtx & dcectx, OUT bool & remove_branch_stmt)
+{
+    checkValidAndRecomputeCDG();
+    iterCollect(efflist, dcectx);
+
+    //Remove ineffect IRs.
+    //dcectx.setRemoveCFS(false);
+    bool removed = removeIneffectIR(dcectx, remove_branch_stmt);
+
+    //Remove dissociated vertex.
+    OptCtx * oc = dcectx.getOptCtx();
+    CfgOptCtx coctx(*oc);
+    if (useMDSSADU()) {
+        //CFG opt will attempt to maintain MDSSA information and update DOM
+        //info as much as possible.
+        CFGOPTCTX_need_update_dominfo(&coctx) = true;
+    }
+    if (m_cfg->performMiscOpt(coctx)) {
+        //Note DOM info will changed without maintaining.
+        //CFG has been changed, thus remove empty BB to produce more
+        //optimization opportunities.
+        //TODO: DO not recompute whole SSA/MDSSA. Instead, update
+        //SSA|MDSSA info especially PHI operands incrementally.
+        removed = true;
+    }
+    if (!oc->is_dom_valid()) {
+        //If DomInfo is invalid, MDSSA info is also not maintained.
+        oc->setInvalidMDSSA();
+        m_rg->getPassMgr()->checkValidAndRecompute(oc, PASS_MDSSA_MGR,
+            PASS_DOM, PASS_LOOP_INFO, PASS_CDG, PASS_UNDEF);
+    }
+    removed |= removeRedundantPhi(*oc);
+    ASSERT0(m_dumgr->verifyMDRef());
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, *oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *oc));
+    return removed;
+}
+
+
 bool DeadCodeElim::elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
                             OUT bool & remove_branch_stmt)
 {
     bool change = false;
     bool removed = false;
     UINT count = 0;
-    List<IR const*> work_list;
+    ConstIRList effstmtlist;
     UINT const max_iter = 0xFFFF;
     remove_branch_stmt = false;
     do {
-        dcectx.reinit(m_rg);
-        checkValidAndRecomputeCDG();
+        dcectx.reinit();
         removed = false;
         count++;
-        //Mark effect IRs.
-        work_list.clean();
-        mark_effect_ir(work_list, dcectx);
-        iter_collect(work_list, dcectx);
-
-        //Remove ineffect IRs.
-        //dcectx.setRemoveCFS(false);
-        removed = removeIneffectIR(dcectx, remove_branch_stmt);
-
-        //Remove dissociated vertex.
-        CfgOptCtx coctx(oc);
-        if (useMDSSADU()) {
-            //CFG opt will attempt to maintain MDSSA information and update DOM
-            //info as much as possible.
-            CFGOPTCTX_need_update_dominfo(&coctx) = true;
-        }
-        if (m_cfg->performMiscOpt(coctx)) {
-            //Note DOM info will changed without maintaining.
-            //CFG has been changed, thus remove empty BB to produce more
-            //optimization opportunities.
-            //TODO: DO not recompute whole SSA/MDSSA. Instead, update
-            //SSA|MDSSA info especially PHI operands incrementally.
-            removed = true;
-        }
-        if (!oc.is_dom_valid()) {
-            //If DomInfo is invalid, MDSSA info is also not maintained.
-            oc.setInvalidMDSSA();
-            m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_MDSSA_MGR,
-                PASS_DOM, PASS_LOOP_INFO, PASS_CDG, PASS_UNDEF);
-        }
-        removed |= removeRedundantPhi(oc);
-        ASSERT0(m_dumgr->verifyMDRef());
-        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+        effstmtlist.clean();
+        markEffectIR(effstmtlist, dcectx);
+        removed = iterCollectAndElim(effstmtlist, dcectx, remove_branch_stmt);
         change |= removed;
     } while (removed && count < max_iter);
     ASSERT0(!removed);
@@ -991,7 +1110,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         dumpBeforePass();
     }
     bool remove_branch_stmt = false;
-    DCECtx dcectx(&oc);
+    DCECtx dcectx(&oc, *getSBSMgr().getSegMgr());
     bool change = elimImpl(oc, dcectx, remove_branch_stmt);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();

@@ -1612,17 +1612,10 @@ IR * IRMgr::buildPointerOp(IR_CODE irc, IR * lchild, IR * rchild)
 {
     ASSERT0(lchild && rchild);
     if (!lchild->is_ptr() && rchild->is_ptr()) {
-        ASSERTN(irc == IR_ADD ||
-                irc == IR_MUL ||
-                irc == IR_XOR ||
-                irc == IR_BAND ||
-                irc == IR_BOR ||
-                irc == IR_LT ||
-                irc == IR_GT ||
-                irc == IR_LE ||
-                irc == IR_GE ||
-                irc == IR_EQ ||
-                irc == IR_NE, ("illegal pointer operation"));
+        ASSERTN(irc == IR_ADD || irc == IR_MUL || irc == IR_XOR ||
+                irc == IR_BAND || irc == IR_BOR || irc == IR_LT ||
+                irc == IR_GT || irc == IR_LE || irc == IR_GE ||
+                irc == IR_EQ || irc == IR_NE, ("illegal pointer operation"));
         ASSERTN(lchild->is_int() || lchild->is_mc() || lchild->is_any(),
                 ("illegal pointer addend"));
         return buildPointerOp(irc, rchild, lchild);

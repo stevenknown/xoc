@@ -250,7 +250,7 @@ public:
     //Return true if md is volatile memory.
     bool is_volatile() const { return MD_base(this)->is_volatile(); }
 
-    //Return true if user hint guarranteed that the MD does not overlap
+    //Return true if user hint guaranteed that the MD does not overlap
     //with other MDs.
     bool is_restrict() const { return MD_base(this)->is_restrict(); }
 

@@ -74,7 +74,10 @@ public:
     virtual UINT getNumOfThread() const = 0;
 
     //Return the alignment parameter for matrix.
-    virtual UINT getMemAlginOfMatrix() const = 0;
+    virtual UINT getMemAlignOfMatrix() const = 0;
+
+    //Returns the minimum alignment for instructions in the debug section.
+    virtual UINT getMinDebugInstAlign() const = 0;
 
     //Return byte size of TLB if any.
     virtual UINT getTLBSize() const = 0;

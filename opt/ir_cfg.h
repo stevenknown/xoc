@@ -61,6 +61,7 @@ protected:
                                  UINT newpredstartpos);
 
     void dumpGraph(FILE * h) const;
+    void dumpGraph() const;
     void dumpForTest(UINT flag) const;
 
     void initEntryAndExit();
@@ -96,11 +97,11 @@ protected:
     bool removeTrampolinBranch(OUT CfgOptCtx & ctx);
 
     //The function remove all stmt in 'bb'.
-    //Note caller should guarrantee stmt is useless and removable.
+    //Note caller should guarantee stmt is useless and removable.
     void removeAllStmt(IRBB * bb, CfgOptCtx const& ctx);
 
     //The function remove all MDPhis in 'bb'.
-    //Note caller should guarrantee phi is useless and removable.
+    //Note caller should guarantee phi is useless and removable.
     void removeAllMDPhi(IRBB * bb, CfgOptCtx const& ctx);
     void removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
                                      CfgOptCtx const& ctx);
@@ -205,7 +206,7 @@ public:
     void dumpDOTNoSSA() const
     { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
     void dumpDOT(FILE * h, UINT flag) const;
-    void dumpDomSet() const { CFG<IRBB, IR>::dumpDomSet(m_rg); }
+    void dumpDomSet() const;
     void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg, true, false); }
     void dumpPDomTree() const
     { CFG<IRBB, IR>::dumpDomTree(m_rg, false, true); }
@@ -365,6 +366,10 @@ public:
     //Note if CFG rebuild, SSAInfo and MDSSAInfo should be recomputed.
     void rebuild(OptCtx & oc);
 
+    //Rebuild CFG and adjust CFG structure if PRSSA enabled.
+    //sortpred: optional, it is NULL if PRSSA is unavailable.
+    void rebuild(OptCtx & oc, SortPredByBBId const* sortpred);
+
     //Cut off the mapping relation between Labels and BB.
     virtual void removeMapBetweenLabelAndBB(IRBB * bb);
 
@@ -377,6 +382,14 @@ public:
     //and transform, otherwise perform operations follow the 'ctx' mandate.
     void removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx);
 
+    //The function replaces the label in BB 'from' which pointed to BB 'to'
+    //with new label li.
+    //from: the BB contains the label to be replaced.
+    //to: the target BB which ponited by the label in BB 'from'.
+    //li: the new label.
+    void replaceBranchLabel(IRBB const* from, IRBB const* to,
+                            LabelInfo const* li);
+
     //The function replaces original predecessor with a list of
     //new predecessors.
     //bb: the predecessor will be replaced.
@@ -388,7 +401,8 @@ public:
                                  OUT CfgOptCtx & ctx);
 
     //The function will update the MDSSA version for stmt and phi.
-    void reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root);
+    void reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root,
+                     MOD CfgOptCtx & ctx);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
     virtual void setVertex(IRBB * bb, Vertex * v)

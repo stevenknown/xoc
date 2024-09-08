@@ -36,12 +36,16 @@ namespace xoc {
 class ActHandler {
     //The class permits copy-constructor.
     UINT m_id;
+    #ifdef _DEBUG_
+    //NOTE: the variable is only used in DEBUG mode to facilitate user
+    //to debug and trace all reported actions.
+    UINT m_gid;
+    #endif
 public:
     xcom::StrBuf * info;
 public:
     ActHandler() : m_id(ACT_HANDLER_ID_UNDEF), info(nullptr) {}
-    ActHandler(UINT id, xcom::StrBuf * buf) : m_id(id), info(buf)
-    { ASSERT0(m_id != ACT_HANDLER_ID_UNDEF && buf != nullptr); }
+    ActHandler(UINT id, xcom::StrBuf * buf);
 
     UINT id() const { return m_id; }
 };
@@ -51,9 +55,17 @@ public:
 //It is often used to inform user what behaviours have optimizations done,
 //and why are some optimizations not performed.
 class ActMgr {
+protected:
+    UINT m_cnt;
     Region const* m_rg;
     xcom::List<xcom::StrBuf*> m_act_list;
-    UINT m_cnt;
+protected:
+    xcom::StrBuf * allocStrBuf()
+    {
+        xcom::StrBuf * buf = new xcom::StrBuf(64);
+        m_act_list.append_tail(buf);
+        return buf;
+    }
 public:
     ActMgr(Region const* rg) : m_rg(rg) { m_cnt = ACT_HANDLER_ID_UNDEF + 1; }
     ~ActMgr() { clean(); }

@@ -155,7 +155,7 @@ public:
 
 //The class represent a vector that record a set of StrBuf.
 //Note the class maintains the memory of each StrBuf in the vector, and
-//guarrantees all allocated memory will be freed during destruction.
+//guarantees all allocated memory will be freed during destruction.
 class StrBufVec {
     COPY_CONSTRUCTOR(StrBufVec);
 protected:

@@ -42,7 +42,6 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
     }
-
     if (g_do_prssa) {
         //Note if this flag enable,
         //AA may generate imprecise result.
@@ -51,24 +50,19 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
         simp.setSimpLnot();
         simp.setSimpCFS();
     }
-
     //Simplify IR tree if it is needed.
     getIRSimp()->simplifyBBlist(getBBList(), &simp);
-
     if (SIMP_need_recon_bblist(&simp)) {
         //New BB boundary IR generated, rebuilding CFG.
         if (reconstructBBList(oc)) {
             getCFG()->rebuild(oc);
         }
     }
-
-    if (SIMP_changed(&simp)) {
-        OC_is_aa_valid(oc) = false;
-        OC_is_pr_du_chain_valid(oc) = false;
-        OC_is_nonpr_du_chain_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
-        OC_is_avail_reach_def_valid(oc) = false;
-    }
+    if (!SIMP_changed(&simp)) { return; }
+    oc.setInvalidPass(PASS_AA);
+    oc.setInvalidPass(PASS_CLASSIC_DU_CHAIN);
+    oc.setInvalidPass(PASS_REACH_DEF);
+    oc.setInvalidPass(PASS_AVAIL_REACH_DEF);
 }
 
 
@@ -83,7 +77,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
                 getDUMgr()->verifyMDRef());
         return;
     }
-    OC_is_cfg_valid(oc) = false;
+    oc.setInvalidPass(PASS_CFG);
     oc.setInvalidIfCFGChanged();
 
     //Simplification may generate new memory operations.
@@ -91,7 +85,6 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
         //O0 does not build DU ref.
         ASSERT0(getDUMgr() && getDUMgr()->verifyMDRef());
     }
-
     bool need_rebuild_mdssa = false;
     bool need_rebuild_prssa = false;
     MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
@@ -100,7 +93,6 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
         need_rebuild_mdssa = true;
         mdssamgr->destruction(oc);
     }
-
     PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
         PASS_PRSSA_MGR);
     if (prssamgr != nullptr && prssamgr->is_valid()) {
@@ -116,6 +108,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     ASSERT0(getCFG()->verify());
     if (need_rebuild_mdssa) {
         mdssamgr->construction(oc);
+
         //CASE:Since MDSSA does not affect the real IR stmt and exp.
         //Here we prefer to do not invalid classic NonPRDU.
         //oc.setInvalidNonPRDU();
@@ -123,6 +116,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     }
     if (need_rebuild_prssa) {
         prssamgr->construction(oc);
+
         //If SSA is enabled, disable classic DU Chain.
         //Since we do not maintain both them as some passes.
         //e.g:In RCE, remove PHI's operand will not update the

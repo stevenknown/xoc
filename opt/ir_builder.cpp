@@ -178,10 +178,9 @@ IR * Region::dupIsomoStmt(IR const* ir, IR * rhs)
         //Prepare base and subscript expression list.
         IR * newbase = dupIRTree(ir->getBase());
         IR * newsublist = dupIRTreeList(ARR_sub_list(ir));
-        stmt = getIRMgr()->buildStoreArray(newbase, newsublist, ir->getType(),
-                                           ARR_elemtype(ir),
-                                           ((CArray*)ir)->getDimNum(),
-                                           ARR_elem_num_buf(ir), rhs);
+        stmt = getIRMgr()->buildStoreArray(
+            newbase, newsublist, ir->getType(), ARR_elemtype(ir),
+            ((CArray*)ir)->getDimNum(), ARR_elem_num_buf(ir), rhs);
         stmt->setOffset(ir->getOffset());
         stmt->copyRef(ir, this);
         return stmt;

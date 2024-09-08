@@ -594,6 +594,7 @@ typedef VNHashTab::IntType VNHashInt;
 class InferCtx {
 protected:
     xcom::TTab<UINT> m_mdphi_tab;
+    xcom::TTab<UINT> m_irtab;
 public:
     InferCtx() {}
 
@@ -601,8 +602,11 @@ public:
 
     bool isVisited(MDPhi const* phi) const
     { return m_mdphi_tab.find(phi->id()); }
+    bool isVisited(IR const* ir) const
+    { return m_irtab.find(ir->id()); }
 
-    void setVisitMDPhi(MDPhi const* phi) { m_mdphi_tab.append(phi->id()); }
+    void setVisited(MDPhi const* phi) { m_mdphi_tab.append(phi->id()); }
+    void setVisited(IR const* ir) { m_irtab.append(ir->id()); }
 };
 
 
@@ -652,6 +656,7 @@ protected:
     Region * getRegion() const { return m_rg; }
 
     virtual VN const* inferExtStmt(IR const* ir, InferCtx & ctx);
+    VN const* inferDirectStmt(IR const* ir, InferCtx & ctx);
     VN const* inferIndirectStmt(IR const* ir, InferCtx & ctx);
     VN const* inferLiveinPR(IR const* ir, InferCtx & ctx);
     VN const* inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx);
@@ -673,11 +678,31 @@ protected:
     //a MDDef and a set of integers.
     IR_CODE mapMDDef2IRCode(MDDef const* mddef) const;
 
+    //IR may be set an initial VN through DU chain, then the IR's vn
+    //will be re-updated when the recursive processing of its kid IR finished.
+    //e.g:
+    //  BB2:
+    //  phi $10 = $11, $12;
+    //  falsebr BB3;
+    //  BB3:
+    //  stpr $12 = add $10, 1; #S1
+    //  goto BB2;
+    //At first, the VN of phi is set to VN6(OP) because it is kill-def
+    //of $10 in #S1, then updated to VN8(OP) when all its two operands $11 and
+    //$12's VN are set.
+    void setVNAlways(IR const* ir, VN const* vn)
+    {
+        ASSERT0(!vn->is_unknown());
+        //NOTE: each IR can be set only once, user has to check VN before
+        //inoke the function.
+        m_irid2vn.setAlways(ir->id(), vn);
+    }
     void setVN(IR const* ir, VN const* vn)
     {
         ASSERT0(!vn->is_unknown());
         //NOTE: each IR can be set only once, user has to check VN before
         //inoke the function.
+        ASSERT0(getVN(ir) == nullptr || getVN(ir) == vn);
         m_irid2vn.set(ir->id(), vn);
     }
     void setVN(MDDef const* mddef, VN const* vn)

@@ -650,6 +650,10 @@ public:
     //Allocate Var for PR.
     Var * genVarForPR(PRNO prno, Type const* type);
 
+    //Map from prno to related Var.
+    Var * getVarByPRNO(PRNO prno) const
+    { return ANA_INS_prno2var(getAnalysisInstrument()).get((VecIdx)prno); }
+
     //Return the type for array index, the default is WORD length of target
     //machine.
     inline Type const* getTargetMachineArrayIndexType()
@@ -755,10 +759,6 @@ public:
     //Return true if processing finish successful, otherwise return false.
     virtual bool MiddleProcess(OptCtx & oc);
 
-    //Map from prno to related Var.
-    Var * mapPR2Var(PRNO prno) const
-    { return ANA_INS_prno2var(getAnalysisInstrument()).get((VecIdx)prno); }
-
     //Construct BB list by destructing CFG.
     bool reconstructBBList(OptCtx & oc);
 
@@ -783,7 +783,7 @@ public:
                                  BBListIter ctbb, OptCtx const& oc);
 
     //Assign variable to given PR.
-    void setMapPR2Var(PRNO prno, Var * pr_var)
+    void setMapPRNO2Var(PRNO prno, Var * pr_var)
     { ANA_INS_prno2var(getAnalysisInstrument()).set((VecIdx)prno, pr_var); }
 
     //Set the counter of PR.

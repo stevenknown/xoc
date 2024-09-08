@@ -31,8 +31,54 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+void OptCtx::setValidPass(PASS_TYPE pt)
+{
+    switch (pt) {
+    case PASS_DOM: OC_is_dom_valid(*this) = true; break;
+    case PASS_PDOM: OC_is_pdom_valid(*this) = true; break;
+    case PASS_RPO: OC_is_rpo_valid(*this) = true; break;
+    case PASS_LOOP_INFO: OC_is_loopinfo_valid(*this) = true; break;
+    case PASS_LIVE_EXPR: OC_is_live_expr_valid(*this) = true; break;
+    case PASS_REACH_DEF: OC_is_reach_def_valid(*this) = true; break;
+    case PASS_AVAIL_REACH_DEF:
+        OC_is_avail_reach_def_valid(*this) = true;
+        break;
+    case PASS_CLASSIC_DU_CHAIN:
+        OC_is_pr_du_chain_valid(*this) = true;
+        OC_is_nonpr_du_chain_valid(*this) = true;
+        break;
+    case PASS_DU_REF: OC_is_ref_valid(*this) = true; break;
+    case PASS_CFG: OC_is_cfg_valid(*this) = true; break;
+    case PASS_AA: OC_is_aa_valid(*this) = true; break;
+    default: break; //to invalid pass object.
+    }
+    Pass * pass = m_rg->getPassMgr()->queryPass(pt);
+    if (pass == nullptr) { return; }
+    pass->set_valid(true);
+}
+
+
 void OptCtx::setInvalidPass(PASS_TYPE pt)
 {
+    switch (pt) {
+    case PASS_DOM: OC_is_dom_valid(*this) = false; break;
+    case PASS_PDOM: OC_is_pdom_valid(*this) = false; break;
+    case PASS_RPO: OC_is_rpo_valid(*this) = false; break;
+    case PASS_LOOP_INFO: OC_is_loopinfo_valid(*this) = false; break;
+    case PASS_LIVE_EXPR: OC_is_live_expr_valid(*this) = false; break;
+    case PASS_REACH_DEF: OC_is_reach_def_valid(*this) = false; break;
+    case PASS_AVAIL_REACH_DEF:
+        OC_is_avail_reach_def_valid(*this) = false;
+        break;
+    case PASS_CLASSIC_DU_CHAIN:
+        OC_is_pr_du_chain_valid(*this) = false;
+        OC_is_nonpr_du_chain_valid(*this) = false;
+        break;
+    case PASS_DU_REF: OC_is_ref_valid(*this) = false; break;
+    case PASS_CFG: OC_is_cfg_valid(*this) = false; break;
+    case PASS_AA: OC_is_aa_valid(*this) = false; break;
+    default: break; //to invalid pass object.
+    }
     Pass * pass = m_rg->getPassMgr()->queryPass(pt);
     if (pass == nullptr) { return; }
     pass->set_valid(false);
@@ -43,8 +89,24 @@ void OptCtx::setInvalidPass(PASS_TYPE pt)
 bool OptCtx::isPassValid(PASS_TYPE pt) const
 {
     Pass * pass = m_rg->getPassMgr()->queryPass(pt);
-    if (pass == nullptr) { return false; }
-    return pass->is_valid();
+    if (pass != nullptr && pass->is_valid()) { return true; }
+    switch (pt) {
+    case PASS_DOM: return OC_is_dom_valid(*this);
+    case PASS_PDOM: return OC_is_pdom_valid(*this);
+    case PASS_RPO: return OC_is_rpo_valid(*this);
+    case PASS_LOOP_INFO: return OC_is_loopinfo_valid(*this);
+    case PASS_LIVE_EXPR: return OC_is_live_expr_valid(*this);
+    case PASS_REACH_DEF: return OC_is_reach_def_valid(*this);
+    case PASS_AVAIL_REACH_DEF: return OC_is_avail_reach_def_valid(*this);
+    case PASS_CLASSIC_DU_CHAIN:
+        return OC_is_pr_du_chain_valid(*this) ||
+               OC_is_nonpr_du_chain_valid(*this);
+    case PASS_DU_REF: return OC_is_ref_valid(*this);
+    case PASS_CFG: return OC_is_cfg_valid(*this);
+    case PASS_AA: return OC_is_aa_valid(*this);
+    default: break;
+    }
+    return false;
 }
 
 

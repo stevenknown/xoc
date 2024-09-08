@@ -163,8 +163,8 @@ void LinearRepMgr::clean()
 }
 
 
-IR const* LinearRepMgr::buildConstBinOp(IR_CODE code, IR const* op0,
-                                        IR const* op1)
+IR const* LinearRepMgr::buildConstBinOp(
+    IR_CODE code, IR const* op0, IR const* op1)
 {
     ASSERT0(op0->is_const() && op1->is_const());
     ASSERT0(op0->is_int() || op0->is_fp());
@@ -212,9 +212,8 @@ IR const* LinearRepMgr::buildConstBinOp(IR_CODE code, IR const* op0,
 }
 
 
-IR const* LinearRepMgr::constructAddendByMul(LinearRep const& lr0,
-                                             LinearRep const& lr1,
-                                             OUT LRInferCtx & ctx)
+IR const* LinearRepMgr::constructAddendByMul(
+    LinearRep const& lr0, LinearRep const& lr1, OUT LRInferCtx & ctx)
 {
     if (!lr0.hasAddend() || !lr1.hasAddend()) { return nullptr; }
     IR const* a0 = lr0.getAddend();
@@ -223,14 +222,14 @@ IR const* LinearRepMgr::constructAddendByMul(LinearRep const& lr0,
     IR const* addend = buildBinOp(IR_MUL, a0, a1);
     ASSERT0(addend);
     if (isImmEqualTo(addend, 0)) { return nullptr; }
-    ctx.is_constructed = true;
+    LRCTX_is_constructed(ctx) = true;
     return addend;
 }
 
 
-IR const* LinearRepMgr::constructAddend(IR_CODE code, LinearRep const& lr0,
-                                        LinearRep const& lr1,
-                                        OUT LRInferCtx & ctx)
+IR const* LinearRepMgr::constructAddend(
+    IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+    OUT LRInferCtx & ctx)
 {
     if (code == IR_MUL) {
         return constructAddendByMul(lr0, lr1, ctx);
@@ -245,14 +244,13 @@ IR const* LinearRepMgr::constructAddend(IR_CODE code, LinearRep const& lr0,
     IR const* addend = buildBinOp(code, a0, a1);
     ASSERT0(addend);
     if (isImmEqualTo(addend, 0)) { return nullptr; }
-    ctx.is_constructed = true;
+    LRCTX_is_constructed(ctx) = true;
     return addend;
 }
 
 
-IR const* LinearRepMgr::constructCoeffByMul(LinearRep const& lr0,
-                                            LinearRep const& lr1,
-                                            OUT LRInferCtx & ctx)
+IR const* LinearRepMgr::constructCoeffByMul(
+    LinearRep const& lr0, LinearRep const& lr1, OUT LRInferCtx & ctx)
 {
     if (lr0.hasVar() && lr1.hasVar()) {
         ASSERT0(lr0.getVar(m_rg) == lr1.getVar(m_rg));
@@ -275,7 +273,7 @@ IR const* LinearRepMgr::constructCoeffByMul(LinearRep const& lr0,
     }
     IR const* coeff = buildBinOp(IR_MUL, coeff0, addend1);
     ASSERT0(coeff);
-    ctx.is_constructed = true;
+    LRCTX_is_constructed(ctx) = true;
     return coeff;
 }
 
@@ -306,9 +304,9 @@ IR const* LinearRepMgr::buildBinOp(IR_CODE code, IR const* c0, IR const* c1)
 }
 
 
-IR const* LinearRepMgr::constructCoeff(IR_CODE code, LinearRep const& lr0,
-                                       LinearRep const& lr1,
-                                       OUT LRInferCtx & ctx)
+IR const* LinearRepMgr::constructCoeff(
+    IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+    OUT LRInferCtx & ctx)
 {
     if (code == IR_MUL) {
         return constructCoeffByMul(lr0, lr1, ctx);
@@ -323,15 +321,14 @@ IR const* LinearRepMgr::constructCoeff(IR_CODE code, LinearRep const& lr0,
     IR const* c1 = lr1.getCoeff();
     IR const* coeff = buildBinOp(code, c0, c1);
     ASSERT0(coeff);
-    ctx.is_constructed = true;
+    LRCTX_is_constructed(ctx) = true;
     return coeff;
 }
 
 
-bool LinearRepMgr::combinLinearRep(IR_CODE code, LinearRep const& lr0,
-                                   LinearRep const& lr1,
-                                   OUT LinearRep & reslr,
-                                   OUT LRInferCtx & ctx)
+bool LinearRepMgr::combinLinearRep(
+    IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+    OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
     if (lr0.hasVar() && lr1.hasVar() &&
         lr0.getVar(m_rg) != lr1.getVar(m_rg)) {
@@ -399,9 +396,10 @@ bool LinearRepMgr::combinLinearRep(IR_CODE code, LinearRep const& lr0,
 }
 
 
-bool LinearRepMgr::inferConst(IR const* ir, OUT LinearRep & reslr,
-                              OUT LRInferCtx & ctx)
+bool LinearRepMgr::inferConst(
+    IR const* ir, OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
+    ASSERT0(ir->is_const());
     if (reslr.addend == nullptr) {
         //Regard the IR as invariant if it is not Var.
         reslr.addend = ir;
@@ -412,15 +410,16 @@ bool LinearRepMgr::inferConst(IR const* ir, OUT LinearRep & reslr,
 }
 
 
-bool LinearRepMgr::inferLinearRepByDUChain(IR const* ir, Var const* var,
-                                           OUT LinearRep & reslr,
-                                           OUT LRInferCtx & ctx)
+bool LinearRepMgr::inferLinearRepByDUChain(
+    IR const* ir, Var const* var, OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
     ASSERT0(ir->is_exp());
     IR * def = xoc::findKillingDef(ir, m_rg);
     if (def == nullptr) { return false; }
-    if (ctx.li != nullptr && !ctx.li->isInsideLoop(def->getBB()->id())) {
-        //ir's def is out of scope.
+    if (ctx.getLI() != nullptr &&
+        !ctx.getLI()->isInsideLoop(def->getBB()->id())) {
+        //ir's is a loop invariant, thus there is no more information can be
+        //used to deduce var's linear-rep.
         return false;
     }
     ASSERT0(def->hasRHS());
@@ -428,40 +427,49 @@ bool LinearRepMgr::inferLinearRepByDUChain(IR const* ir, Var const* var,
 }
 
 
-bool LinearRepMgr::inferPR(IR const* ir, Var const* var, OUT LinearRep & reslr,
-                           OUT LRInferCtx & ctx)
+bool LinearRepMgr::inferPR(
+    IR const* ir, Var const* var, OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
-    ASSERT0(var);
+    ASSERT0(var && ir->is_pr());
     MD const* ref = ir->getMustRef();
     ASSERTN(ref, ("miss MD"));
     if (ref->get_base() == var) {
+        //Found var of linear-rep.
         ASSERT0(reslr.var_exp == nullptr);
         reslr.var_exp = ir;
         return true;
     }
-    if (ctx.is_transitive && inferLinearRepByDUChain(ir, var, reslr, ctx)) {
-        return true;
+    if (ctx.is_transitive()) {
+        if (inferLinearRepByDUChain(ir, var, reslr, ctx)) {
+            //Found linear-rep by walking through DU chain.
+            return true;
+        }
+        //We have no knowledge about the relation of ir and var.
+        return false;
     }
+    //Not in transitive mode.
     if (reslr.addend == nullptr) {
-        //Regard the IR as invariant if it is not Var.
+        //Regard the 'ir' as an invariant if it is not Var.
         reslr.addend = ir;
         reslr.addend_sign = ADDEND_SIGN_POS;
         return true;
     }
+    //We have no knowledge about the relation of ir and var.
     return false;
 }
 
 
-bool LinearRepMgr::inferLD(IR const* ir, Var const* var, OUT LinearRep & reslr,
-                           OUT LRInferCtx & ctx)
+bool LinearRepMgr::inferLD(
+    IR const* ir, Var const* var, OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
-    ASSERT0(var);
+    ASSERT0(var && ir->is_ld());
     if (ir->getIdinfo() == var) {
         ASSERT0(reslr.var_exp == nullptr);
         reslr.var_exp = ir;
         return true;
     }
-    if (ctx.is_transitive && inferLinearRepByDUChain(ir, var, reslr, ctx)) {
+    if (ctx.is_transitive() &&
+        inferLinearRepByDUChain(ir, var, reslr, ctx)) {
         return true;
     }
     if (reslr.addend == nullptr) {
@@ -474,9 +482,8 @@ bool LinearRepMgr::inferLD(IR const* ir, Var const* var, OUT LinearRep & reslr,
 }
 
 
-bool LinearRepMgr::inferAndConstructLinearRep(IR const* ir, Var const* var,
-                                              OUT LinearRep & lr,
-                                              OUT LRInferCtx & ctx)
+bool LinearRepMgr::inferAndConstructLinearRep(
+    IR const* ir, Var const* var, OUT LinearRep & lr, OUT LRInferCtx & ctx)
 {
     switch (ir->getCode()) {
     case IR_ADD:
@@ -489,12 +496,9 @@ bool LinearRepMgr::inferAndConstructLinearRep(IR const* ir, Var const* var,
         LinearRep reslr;
         return combinLinearRep(ir->getCode(), op0lr, op1lr, lr, ctx);
     }
-    case IR_PR:
-        return inferPR(ir, var, lr, ctx);
-    case IR_LD:
-        return inferLD(ir, var, lr, ctx);
-    case IR_CONST:
-         return inferConst(ir, lr, ctx);
+    case IR_PR: return inferPR(ir, var, lr, ctx);
+    case IR_LD: return inferLD(ir, var, lr, ctx);
+    case IR_CONST: return inferConst(ir, lr, ctx);
     default: return false;
     }
 }

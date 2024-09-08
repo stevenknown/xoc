@@ -748,7 +748,7 @@ public:
     //The function verify that the given variable information is sane.
     bool verifyVar(Var const* v) const;
 
-    //The function verify all variables generated to guarrantee they are sane.
+    //The function verify all variables generated to guarantee they are sane.
     bool verifyAllVar() const;
 };
 

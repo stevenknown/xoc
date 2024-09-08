@@ -169,7 +169,8 @@ public:
     IR2MInst(Region * rg, MInstMgr * mgr);
     virtual ~IR2MInst() {}
 
-    virtual void convertLabel(IR const* ir, OUT RecycMIList & mis);
+    virtual void convertLabel(IR const* ir, OUT RecycMIList & mis,
+                              MOD IMCtx * cont);
     virtual void convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
                                 MOD IMCtx * cont);
     virtual void convertStorePR(IR const* ir, OUT RecycMIList & mis,

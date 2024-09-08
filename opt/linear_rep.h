@@ -32,22 +32,28 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 //The context to infer linear-represetation.
+#define LRCTX_is_constructed(l) ((l).m_is_constructed)
+#define LRCTX_is_transitive(l) ((l).m_is_transitive)
+#define LRCTX_li(l) ((l).m_li)
 class LRInferCtx {
 public:
     //True if the linear-rep is a new generated.
     //It means newe IR expression is allocated, e.g:coeff expression.
     //Propagate info bottom up.
-    bool is_constructed;
+    bool m_is_constructed;
 
     //True if the inference of variable will cross DU chain.
     //Propagate info top down.
-    bool is_transitive;
+    bool m_is_transitive;
 
     //Record the linear-rep inference scope, it is a LoopInfo.
     //Propagate info top down.
-    LI<IRBB> const* li;
+    LI<IRBB> const* m_li;
 public:
     LRInferCtx() { ::memset((void*)this, 0, sizeof(LRInferCtx)); }
+    LI<IRBB> const* getLI() const { return LRCTX_li(*this); }
+    bool is_transitive() const { return LRCTX_is_transitive(*this); }
+    bool is_constructed() const { return LRCTX_is_constructed(*this); }
 };
 
 typedef enum tagAddendSign {
@@ -81,7 +87,7 @@ public:
         ASSERT0(hasVar());
         if (var_exp->hasIdinfo()) { return var_exp->getIdinfo(); }
         ASSERT0(getVarExp()->is_pr());
-        return rg->mapPR2Var(getVarExp()->getPrno());
+        return rg->getVarByPRNO(getVarExp()->getPrno());
     }
 
     //Return the variable expression of linear expression.
@@ -154,31 +160,48 @@ protected:
     IR const* buildBinOp(IR_CODE code, IR const* c0, IR const* c1);
 
     void clean();
-    IR const* constructCoeffByMul(LinearRep const& lr0,
-                                  LinearRep const& lr1,
-                                  OUT LRInferCtx & ctx);
-    IR const* constructAddendByMul(LinearRep const& lr0,
-                                   LinearRep const& lr1,
-                                   OUT LRInferCtx & ctx);
-    IR const* constructAddend(IR_CODE code, LinearRep const& lr0,
-                              LinearRep const& lr1, OUT LRInferCtx & ctx);
-    IR const* constructCoeff(IR_CODE code, LinearRep const& lr0,
-                             LinearRep const& lr1, OUT LRInferCtx & ctx);
+    IR const* constructCoeffByMul(
+        LinearRep const& lr0, LinearRep const& lr1, OUT LRInferCtx & ctx);
+    IR const* constructAddendByMul(
+        LinearRep const& lr0, LinearRep const& lr1, OUT LRInferCtx & ctx);
+    IR const* constructAddend(
+        IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+         OUT LRInferCtx & ctx);
+    IR const* constructCoeff(
+        IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+        OUT LRInferCtx & ctx);
 
     //Combine given two linear-rep that formed as a*x+b and c*x+d.
-    bool combinLinearRep(IR_CODE code, LinearRep const& lr0,
-                         LinearRep const& lr1,
-                         OUT LinearRep & reslr,
-                         OUT LRInferCtx & ctx);
+    bool combinLinearRep(
+        IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
+        OUT LinearRep & reslr, OUT LRInferCtx & ctx);
 
-    //Return true if operation of two linear-rep is linear.
+    //Return true if the operation of two linear-rep still be linear-rep.
+    //e.g:given two linear-rep: a*x+b, c*x+d, the ADD operation of them is
+    //(a+c)*x+(b+d) which still be linear-rep.
     bool isLinearCombine(IR_CODE code) const
     { return code == IR_ADD && code == IR_SUB; }
+
+    //Return true if found linear-representation from given ir, otherwise
+    //return false indicates we have no knowledge about the relation of ir
+    //and var.
     bool inferConst(IR const* ir, OUT LinearRep & reslr, OUT LRInferCtx & ctx);
+
+    //Return true if found linear-representation from given ir, otherwise
+    //return false indicates we have no knowledge about the relation of ir
+    //and var.
     bool inferPR(IR const* ir, Var const* var, OUT LinearRep & reslr,
                  OUT LRInferCtx & ctx);
+
+    //Return true if found linear-representation from given ir, otherwise
+    //return false indicates we have no knowledge about the relation of ir
+    //and var.
     bool inferLD(IR const* ir, Var const* var, OUT LinearRep & reslr,
                  OUT LRInferCtx & ctx);
+
+    //Return true if found linear-representation from given ir, otherwise
+    //return false indicates we have no knowledge about the relation of ir
+    //and var.
     bool inferLinearRepByDUChain(IR const* ir, Var const* var,
                                  OUT LinearRep & reslr, OUT LRInferCtx & ctx);
 
@@ -193,13 +216,14 @@ public:
     LinearRepMgr(Region * rg, OptCtx const& oc);
     ~LinearRepMgr() { clean(); }
 
+    //The function attempts to deduce linear-representation from given IR.
     //ir: IR expression that to be analyzed.
     //var: the variable of linear-representation.
     //lr: record and output linear-representation if exist.
     //Return true if find the linear-representation of 'var'.
-    bool inferAndConstructLinearRep(IR const* ir, Var const* var,
-                                    OUT LinearRep & lr,
-                                    OUT LRInferCtx & ctx);
+    bool inferAndConstructLinearRep(
+        IR const* ir, Var const* var, OUT LinearRep & lr,
+        OUT LRInferCtx & ctx);
 };
 
 } //namespace xoc

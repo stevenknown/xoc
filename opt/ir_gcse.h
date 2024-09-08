@@ -94,10 +94,14 @@ private:
     TMap<IR*, IR*> m_exp2pr;
     TMap<VN const*, IR*> m_vn2exp;
     List<IR*> m_newst_lst;
-    ActMgr m_actmgr;
+    ActMgr m_am;
 protected:
     void copyVN(IR const* newir, IR const* oldir);
 
+    bool doPropBranch(IR * ir, MOD List<IR*> & livexp);
+    bool doPropCall(IR * ir, MOD List<IR*> & livexp);
+    bool doPropAssign(IR * ir, MOD List<IR*> & livexp);
+    bool doPropReturn(IR * ir, MOD List<IR*> & livexp);
     virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
     bool doPropExp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb);
@@ -142,12 +146,14 @@ protected:
 
     virtual bool shouldBeCse(IR * det);
 
+    void removeMayKill(IR * ir, MOD List<IR*> & livexp);
+
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    GCSE(Region * rg, GVN * gvn) : Pass(rg), m_actmgr(rg)
+    GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
     {
         ASSERT0(rg);
         m_cfg = rg->getCFG();

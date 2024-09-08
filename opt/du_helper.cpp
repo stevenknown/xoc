@@ -288,7 +288,6 @@ void buildDUChain(IR * def, IR * use, Region * rg, OptCtx const& oc)
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             ASSERT0(use->isMemRefNonPR());
-dumpIR(def,rg);//hac
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
             mdssamgr->copyAndAddMDSSAOcc(use, info);
@@ -747,6 +746,35 @@ static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
 }
 
 
+bool hasDef(IR const* exp, Region const* rg)
+{
+    ASSERT0(exp->is_exp());
+    ASSERTN(exp->isMemOpnd(), ("should not query its DU"));
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            return prssamgr->hasDef(exp);
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemRefNonPR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
+                    ("exp does not have MDSSAInfo"));
+            return mdssamgr->hasDef(exp);
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    return rg->getDUMgr()->hasDef(exp);
+}
+
+
 IR * findUniqueMustDef(IR const* exp, Region const* rg)
 {
     ASSERT0(exp->is_exp());
@@ -1162,6 +1190,8 @@ bool hasSameUniqueMustDefForIsomoKidTree(IR const* ir1, IR const* ir2,
                                          Region const* rg)
 {
     if (ir1 == ir2) { return true; }
+    ASSERTN(!ir1->is_leaf() && !ir2->is_leaf(),
+            ("the function only handle IR with kid"));
 
     //No need to ask memory ref have to be same name, the function will
     //determine their equality by retrieving its value.
@@ -1320,8 +1350,7 @@ bool hasLoopReduceDep(
             ASSERT0(mdssamgr->hasMDSSAInfo(ir));
             return hasLoopReduceDepInMDSSA(ir, rg, li, mdssamgr, info);
         }
-    }
-    if (ir->isPROp()) {
+    } else if (ir->isPROp()) {
         PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             ASSERT0(ir->getSSAInfo());
@@ -1463,13 +1492,26 @@ bool isLoopIndependent(IR const* ir1, IR const* ir2, bool costly_analysis,
     MD const* ir1ref = ir1->getExactRef();
     MD const* ir2ref = ir2->getExactRef();
     if (ir1ref && ir2ref && ir1ref == ir2ref) { return true; }
-    if (ir1->isIsomoTo(ir2, rg->getIRMgr(), true,
-                       IsomoFlag(ISOMO_CK_MEMREF_NAME))) {
+    if (ir1->isIsomoTo(ir2, rg->getIRMgr(), true, IsomoFlag(ISOMO_CK_ALL))) {
+        //CASE:All kind of isomophism checking need to perform.
+        //e.g: given two references of 'x',
+        //  st:u32 'x' = ...
+        //  ...        = ld:any 'x'
+        //The two references of x are NOT isomophic because their type are
+        //differents.
         return true;
     }
     if (gvn != nullptr && gvn->is_valid() && gvn->isSameMemLoc(ir1, ir2)) {
+        //GVN tell us that ir1 and ir2 are reference the same memory address
+        //except the memory size.
         return true;
     }
+    if (ir1->is_leaf() || ir2->is_leaf()) {
+        //There is no method to determine direct-memory-op dependence.
+        return false;
+    }
+    //For now, we attempt to judge ir1 and ir2 value equivalence via killing
+    //DEF. And do isomophic-check before quering MustDef comparison.
     if (!ir1->isIsomoTo(ir2, rg->getIRMgr(), true, IsomoFlag(ISOMO_UNDEF))) {
         return false;
     }
@@ -1754,7 +1796,7 @@ void destructInvalidClassicDUChain(Region * rg, OptCtx const& oc)
 //
 void ComputeMD2DefCnt::dump() const
 {
-    if (!m_rg->getLogMgr()->is_init()) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     MD2UINTPtrIter it;
     UINT * cnt;
     note(m_rg, "\n==-- MD2DefCnt --==");

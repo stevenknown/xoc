@@ -446,8 +446,8 @@ void LoopDepAna::analyzeLinearDep(
 }
 
 
-void LoopDepAna::analyzeRedDep(IR const* ir, OUT LoopDepInfoSet & set,
-    MOD LDACtx & ctx)
+void LoopDepAna::analyzeRedDep(
+    IR const* ir, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
 {
     if (!ir->is_exp()) { return; }
     if (!ir->isDirectMemOp() && !ir->isReadPR()) { return; }

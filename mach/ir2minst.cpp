@@ -46,11 +46,14 @@ TMWORD IR2MInst::mapReg2TMCode(xgen::Reg r)
 }
 
 
-void IR2MInst::convertLabel(IR const* ir, OUT RecycMIList & mis)
+void IR2MInst::convertLabel(IR const* ir, OUT RecycMIList & mis,
+                            MOD IMCtx * cont)
 {
     MInst * mi = m_mimgr->buildLabel();
-    MI_lab(mi) = LAB_lab(ir);
+    ASSERT0(ir->getLabel());
+    MI_lab(mi) = ir->getLabel();
     mis.append_tail(mi);
+    IMCTX_label_num(cont)++;
 }
 
 
@@ -195,7 +198,9 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     case IR_CFI_DEF_CFA_OFFSET:
         convertCFICfaOffset(ir, mis, cont);
         break;
-    case IR_LABEL: break;
+    case IR_LABEL:
+        convertLabel(ir, mis, cont);
+        break;
     default: convertExtStmt(ir, mis, cont);
     }
 }

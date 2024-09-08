@@ -350,7 +350,7 @@ public:
     void dumpLabelList(Region const* rg) const;
     void dumpAttr(Region const* rg) const;
     void dumpIRList(Region const* rg, bool dump_inner_region) const;
-    void dump(Region const* rg, bool dump_inner_region) const;
+    void dump(Region const* rg, bool dump_inner_region = false) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     //The function frees all IR in IRList back into IRMgr.

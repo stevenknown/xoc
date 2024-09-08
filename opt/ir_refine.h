@@ -205,6 +205,7 @@ protected:
     IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBranch(IR * ir, bool & change);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineAbs(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAsr(IR * ir, bool & change);

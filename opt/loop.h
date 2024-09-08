@@ -54,7 +54,7 @@ typedef enum tagFindRedOpResult {
 
     //OP may be reduction operation because there exists at least one cycle
     //in DefUse chain. However, since the May-Dependence information is not
-    //exact enough, we can not guarrantee there exist definitely a reduction
+    //exact enough, we can not guarantee there exist definitely a reduction
     //operation in the loop.
     OP_HAS_CYCLE,
     OP_UNKNOWN, //I don't know whether OP is reduction operation.
@@ -183,7 +183,7 @@ public:
         LI_prev(this) = nullptr;
     }
 
-    void dump(Region * rg) const
+    void dump(Region const* rg) const
     {
         note(rg, "\nLOOP%u HEAD:BB%u, BODY:", id(), getLoopHead()->id());
         if (getBodyBBSet() != nullptr) {
@@ -402,6 +402,19 @@ FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
 //Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
                      InvStmtList const* invariant_stmt, bool check_tree);
+
+//Return true if Phi does NOT have any USE in loop, except itself operand
+//list.
+//e.g: phi can be treated as loop invariant.
+//  BB2:
+//  phi $40 = $41, $42;
+//  false br BB4;
+//  BB3:
+//  NO USE OF $40;
+//  BB4:
+//  ... = $40;
+//The loop body does not have USE of PHI result.
+bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg);
 
 //Return true if the target BB of branch-stmt 'stmt' is outside the given
 //loop 'li'.

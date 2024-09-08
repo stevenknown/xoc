@@ -34,6 +34,7 @@ author: Su Zhenyu
 //Optimizations
 #include "liveness_mgr.h"
 #include "mdliveness_mgr.h"
+#include "ssaregion.h"
 #include "ir_ssa.h"
 #include "ir_mdssa.h"
 #include "mdssalive_mgr.h"
@@ -86,6 +87,7 @@ author: Su Zhenyu
 #include "var2offset.h"
 #include "ir_reloc_mgr.h"
 #include "igoto_opt.h"
+#include "kernel_adjustment.h"
 #endif
 
 #include "ir_cp.h"

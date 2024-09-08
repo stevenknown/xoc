@@ -101,34 +101,6 @@ protected:
 
     //Internal function. No user attention required.
     bool is_terminate() const { return m_is_terminate; }
-public:
-    VisitIRTree() : m_is_terminate(false) {}
-    virtual ~VisitIRTree() {}
-
-    //API that can be invoked by user.
-    //User can invoke the function when user expect to terminate the visiting
-    //immediately.
-    void setTerminate() { m_is_terminate = true; }
-
-    //API that can be invoked by user.
-    //The function will iterate the IR tree that rooted by 'ir'.
-    //Note the function does NOT access the sibling IR of 'ir'.
-    void visit(IR * ir) { iter<IR*>(ir); }
-
-    //API that can be invoked by user.
-    //The function will iterate the IR tree that rooted by 'ir'.
-    //Note the function does NOT access the sibling IR of 'ir'.
-    void visit(IR const* ir) { iter<IR const*>(ir); }
-
-    //API that can be invoked by user.
-    //The function will iterate the IR tree that rooted by 'ir'.
-    //Note the function will access the sibling IR of 'ir'.
-    void visitWithSibling(IR * ir) { iterWithSibling<IR*>(ir); }
-
-    //API that can be invoked by user.
-    //The function will iterate the IR tree that rooted by 'ir'.
-    //Note the function will access the sibling IR of 'ir'.
-    void visitWithSibling(IR const* ir) { iterWithSibling<IR const*>(ir); }
 
     //Inferface that can be overrided by user.
     //The function will be invoked by current class object when visiting each
@@ -173,6 +145,34 @@ public:
     //  };
     virtual bool visitIR(IR const*)
     { ASSERTN(0, ("Target Dependent Code")); return true; }
+public:
+    VisitIRTree() : m_is_terminate(false) {}
+    virtual ~VisitIRTree() {}
+
+    //API that can be invoked by user.
+    //User can invoke the function when user expect to terminate the visiting
+    //immediately.
+    void setTerminate() { m_is_terminate = true; }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function does NOT access the sibling IR of 'ir'.
+    void visit(IR * ir) { iter<IR*>(ir); }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function does NOT access the sibling IR of 'ir'.
+    void visit(IR const* ir) { iter<IR const*>(ir); }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function will access the sibling IR of 'ir'.
+    void visitWithSibling(IR * ir) { iterWithSibling<IR*>(ir); }
+
+    //API that can be invoked by user.
+    //The function will iterate the IR tree that rooted by 'ir'.
+    //Note the function will access the sibling IR of 'ir'.
+    void visitWithSibling(IR const* ir) { iterWithSibling<IR const*>(ir); }
 };
 
 //The function clean the IR_parent for each elements in 'irlst'.
@@ -290,7 +290,7 @@ void setParentPointerForIRList(IR * ir_list);
 
 //The function is used to verify given IR list sanity and uniqueness.
 //irh: an IR set that is used only inside the function.
-//     used to guarrantee the uniquess of IR.
+//     used to guarantee the uniquess of IR.
 bool verifyIRList(IR const* ir, BitSet * irh, Region const* rg);
 
 //The function is used to verify given IR list sanity and uniqueness.

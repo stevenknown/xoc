@@ -158,6 +158,8 @@ class FunctionInfo;
 #define DEBUG_RELA_FRAME_SH_NAME   ".rela.debug_frame"
 #define DEBUG_LOC_SH_NAME          ".debug_loc"
 
+#define SECTDESC_code(c) (g_section_desc[c].m_desc_sect_type)
+
 typedef xcom::Vector<CHAR> CHARVec;
 typedef xcom::Vector<Off> OffVec;
 typedef xcom::Vector<CHAR const*> StringVec;
@@ -250,12 +252,9 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_SUBTEXT,
     SH_TYPE_RELA,
     SH_TYPE_CONST,
-    SH_TYPE_SPM,
     SH_TYPE_GOT,
     SH_TYPE_RELA_DYN,
     SH_TYPE_DYNSYM,
-    SH_TYPE_TEXT1,
-    SH_TYPE_AITEXT,
     SH_TYPE_FINI,
     SH_TYPE_PREINIT_ARRAY,
     SH_TYPE_DYNAMIC,
@@ -264,7 +263,6 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_RODATA,
     SH_TYPE_RODATA1,
     SH_TYPE_LDM,
-    SH_TYPE_COMPILER_VERSION,
     SH_TYPE_DEBUG_INFO,
     SH_TYPE_DEBUG_LINE,
     SH_TYPE_DEBUG_ABBREV,
@@ -274,9 +272,13 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_DEBUG_FRAME,
     SH_TYPE_DEBUG_LOC,
     SH_TYPE_EH_FRAME,
-    SH_TYPE_COMMENT,
-    SH_TYPE_NOTE, //'.note.GNU-stack'
-    SH_TYPE_MAX_NUM,
+
+    #include "sect_type_ext.inc"
+
+    ///////////////////////////////////////////////////////////////////////////
+    //DO NOT ADD NEW SH_TYPE AFTER SH_TYPE_MAX_NUM.                          //
+    ///////////////////////////////////////////////////////////////////////////
+    SH_TYPE_MAX_NUM //The last SH_TYPE code, the number of SH_TYPE code.
 } SECTION_TYPE;
 
 
@@ -419,7 +421,7 @@ struct ELFSymbolOff {
 //attribute of all ELF sections, it will provide a configure table to
 //describe these attribute. Then 'm_sect_desc_info' will be initialized
 //according to the table infomation. These info are referenced from 'ELFHdr'.
-struct SectionNameDesc {
+struct SectionDesc {
     //Record section type(e.g. SH_TYPE_TEXT).
     SECTION_TYPE m_desc_sect_type;
 
@@ -582,8 +584,8 @@ public:
 #define SECTINFO_bytevec(v)    (((v)->m_vec).bytevec)
 #define SECTINFO_charvec(v)    (((v)->m_vec).charvec)
 //Describe section infomation which usd to construct ELF. These section info
-//are generted according to the section configure table 'SectionNameDesc' if
-//it need to create section. Then the map'm_sect_map' is used to manage all
+//are generted according to the section configure table 'SectionDesc' if it
+//need to create section. Then the map'm_sect_map' is used to manage all
 //section of output ELF.
 class SectionInfo {
     COPY_CONSTRUCTOR(SectionInfo);
@@ -716,7 +718,6 @@ public:
             UNREACHABLE();
             break;
         }
-
         m_list.append_tail(si);
         return si;
     }
@@ -1298,14 +1299,13 @@ typedef xcom::Vector<SymbolInfo*> SymbolInfoVec;
 typedef xcom::Vector<SymbolInfoVec*> SymtabInfoVec;
 typedef xcom::TMap<Sym const*, SymbolInfo*> SymbolInfoMap;
 typedef xcom::TMapIter<Sym const*, SymbolInfo*> SymbolInfoMapIter;
-//SectNameDescMap.
-typedef xcom::TMap<Sym const*, SectionNameDesc const*> SectionNameDescMap;
-typedef xcom::TMapIter<Sym const*, SectionNameDesc const*> SectNameDescIter;
 //SectionInfoMap.
 typedef xcom::TMapIter<Sym const*, SectionInfo*> SectionInfoMapIter;
 //AliasSymbolMap.
 typedef xcom::TMap<Sym const*, Sym const*> AliasSymbolMap;
 typedef xcom::TMapIter<Sym const*, Sym const*> AliasSymbolMapIter;
+//The map of section name and section type.
+typedef xcom::TMap<Sym const*, SECTION_TYPE> SectionNameAndTypeMap;
 //
 //Start ELFMgr.
 //
@@ -2058,9 +2058,6 @@ protected:
     //Record reladyn info.
     xcom::Vector<RelaDynInfo*> m_reladyn_info_vec;
 
-    //Record section name description info.
-    SectionNameDescMap m_sect_desc_info;
-
     //SymbolInfo Mgr. Create and free SymbolInfo resources.
     SymbolInfoMgr m_sym_mgr;
 
@@ -2151,6 +2148,9 @@ public:
     //to resolve other RelocInfo.
     //Record alias symbol and it's corresponded aliasee symbol.
     AliasSymbolMap m_alias_symbol_map;
+
+    //Record the map of section name and section type.
+    SectionNameAndTypeMap m_sect_name_type_map;
 
     //Add 's' into 'm_sym_tab'.
     Sym const* addToSymTab(CHAR const* s)
@@ -2354,9 +2354,8 @@ public:
     SectionInfo * getSectionWithGenIfNotExist(SECTION_TYPE sect_type)
     { return getSectionWithGenIfNotExist(getSectionName(sect_type)); }
 
-    //Get section name description.
-    //Different architecture may own different section description.
-    virtual SectionNameDesc const* getSectionNameDesc() const;
+    //Get element from section description table.
+    SectionDesc const& getSectionDescElem(SECTION_TYPE sect_type);
 
     //Get dynamic section description.
     SECTION_TYPE const* getDynamicSectionDesc() const;
@@ -2386,9 +2385,6 @@ public:
     //type that needs to be handled according to different architecture.
     //e.g.: given '.bss' and return 'SH_TYPE_BSS'.
     virtual SECTION_TYPE getSectionType(Sym const* sect_name);
-
-    //Get section description info.
-    SectionNameDesc getSectionDesc(SECTION_TYPE sect_type) const;
 
     //Get section BYTEVec content via 'sect_sym_name'.
     BYTEVec * getSectionContent(Sym const* sect_sym_name) const;
@@ -2448,10 +2444,6 @@ public:
 
     //Get the number of program header.
     UINT getProgramHeaderNum() const { return PHDR_NUMBER; }
-
-    //Get the number of section according to different architecture.
-    virtual UINT getSectionNum() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //Get function name from 'text_shdr_name'.
     //e.g.: 1.given ".text1" and return ".text1".
@@ -2525,6 +2517,10 @@ public:
     //Get the size of .dynamic section content.
     UINT getDynamicSectionSize();
 
+    //Get flags. There may be specific section flags for different architecture.
+    virtual Addr getSectionFlags(SectionDesc const* sect_desc)
+    { ASSERT0(sect_desc); return SECTDESC_flags(sect_desc); }
+
     //Check whether there is specific section.
     bool hasSection(SECTION_TYPE sect_type)
     { return hasSection(getSectionName(sect_type)); }
@@ -2560,9 +2556,8 @@ public:
     //Initialize the value of p_offset/p_vaddr/p_paddr of program header.
     void initProgramHeader();
 
-    //Initialize section description info according to the DescInfo that
-    //provided by different architecture.
-    virtual void initSectionDescInfo();
+    //Initialize section info according to the section description table.
+    void initSectionInfo();
 
     //Check whether it is S_UNDEF symbol.
     bool isNullSymbol(SymbolInfo const* symbol_info, UINT symbol_idx);
@@ -2759,10 +2754,6 @@ public:
     //Set SectionInfo.
     void setSectionImpl(MOD SectionInfo * si, SECTION_TYPE sect_type);
 
-    //Set flags. There may be specific section flags for different architecture.
-    virtual Addr setSectionFlags(SectionNameDesc const* sect_desc)
-    { ASSERT0(sect_desc); return SECTDESC_flags(sect_desc); }
-
     //Set the section order after all sections have been created.
     void setSectionOrder();
 
@@ -2789,6 +2780,9 @@ public:
     //Update st_value of ELFSym after the base address
     //of .symtab/.dynsym section have been set.
     void updateSymOffset(SECTION_TYPE sect_type);
+
+    //Verify predefined infomation.
+    bool verifyPreDefinedInfo();
 
     //Write 'buf' info into the 'addr' of section content.
     //'addr': relative offset in corresponded section.
@@ -3471,11 +3465,12 @@ public:
     //e.g.: given three SymbolInfo with the same name 'str'. The new name of
     //      these SymbolInfo are 'str', 'str.R_1', and 'str.R_2'.
     //'elf_mgr': ELFMgr currently being operated on.
-    //'is_elf_mgr_from_var_info': There is special handling if ELFMgr comes
-    //from Var info that directly generated by upper compiler. SymbolInfo
-    //to which belong this ELFMgr needs to be renamed later.
+    //'is_special_elf_mgr': There is special handling for specific ELFMgr
+    //formed by symbol, relocation and other standard format info of ELF that
+    //directly generated by upper compiler. SymbolInfo to which belong this
+    //ELFMgr needs to be renamed later.
     void handleSameNameInDiffFile(MOD ELFMgr * elf_mgr,
-                                  bool is_elf_mgr_from_var_info);
+                                  bool is_special_elf_mgr);
 
     //Check whether there is still unresolved RelocInfo.
     //'is_notype_as_resolved': SymbolInfo with STT_NOTYPE attribute also
@@ -3488,11 +3483,12 @@ public:
 
     //Check whether there is another SymbolInfo in ELFMgr that recorded
     //in 'm_elf_mgr_list' with the same name as 'symbol_info' in 'elf_mgr'.
-    //'is_elf_mgr_from_var_info': There is special handling if ELFMgr comes
-    //from Var info that directly generated by upper compiler. SymbolInfo
-    //to which belong this ELFMgr needs to be renamed later.
+    //'is_special_elf_mgr': There is special handling for specific ELFMgr
+    //formed by symbol, relocation and other standard format info of ELF that
+    //directly generated by upper compiler. SymbolInfo to which belong this
+    //ELFMgr needs to be renamed later.
     bool hasSameSymbol(ELFMgr const* elf_mgr, SymbolInfo const* symbol_info,
-                       bool is_elf_mgr_from_var_info);
+                       bool is_special_elf_mgr);
 
     //Initial 'm_unresolved_reloc_idx_map'.
     void initUnResolveSymbol();

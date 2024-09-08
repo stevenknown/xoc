@@ -111,6 +111,7 @@ typedef enum {
     IR_NROOT, //x^(1/nth_root), caculate the nth-root of x.
     IR_LOG, //log_a(x), caculate the logarithm of x to the base a.
     IR_EXPONENT, //a^(x), caculate the power x of a.
+    IR_ABS, //calculate the absolute value.
     IR_SIN, //trigonometric function:sin
     IR_COS, //trigonometric function:cos
     IR_TAN, //trigonometric function:tangent

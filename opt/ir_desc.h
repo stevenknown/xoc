@@ -67,121 +67,124 @@ typedef IR *& (*IRAccDetFuncType)(IR * ir);
 typedef StorageSpace & (*IRAccStorageSpaceFuncType)(IR * ir);
 typedef IR *& (*IRAccResListFuncType)(IR * ir);
 
-//Describe miscellaneous information for IR.
-#define IRC_IS_STMT_SHIFT 0
-#define IRC_IS_STMT 1ULL<<IRC_IS_STMT_SHIFT //statement.
+typedef enum tagIRC_ATTR {
+    //Describe miscellaneous information for IR.
+    IRC_IS_STMT_POS = 0,
+    IRC_IS_STMT = 1ULL<<IRC_IS_STMT_POS, //statement.
 
-#define IRC_IS_TER_SHIFT 1
-#define IRC_IS_TER 1ULL<<IRC_IS_TER_SHIFT //ternary operation.
+    IRC_IS_TER_POS = 1,
+    IRC_IS_TER = 1ULL<<IRC_IS_TER_POS, //ternary operation.
 
-#define IRC_IS_BIN_SHIFT 2
-#define IRC_IS_BIN 1ULL<<IRC_IS_BIN_SHIFT //binary operation.
+    IRC_IS_BIN_POS = 2,
+    IRC_IS_BIN = 1ULL<<IRC_IS_BIN_POS, //binary operation.
 
-#define IRC_IS_UNA_SHIFT 3
-#define IRC_IS_UNA 1ULL<<IRC_IS_UNA_SHIFT //unary operation.
+    IRC_IS_UNA_POS = 3,
+    IRC_IS_UNA = 1ULL<<IRC_IS_UNA_POS, //unary operation.
 
-//Memory reference operation. Memory reference indicates all
-//operations which write or load memory object.
-#define IRC_IS_MEM_REF_SHIFT 4
-#define IRC_IS_MEM_REF 1ULL<<IRC_IS_MEM_REF_SHIFT
+    //Memory reference operation. Memory reference indicates all
+    //operations which write or load memory object.
+    IRC_IS_MEM_REF_POS = 4,
+    IRC_IS_MEM_REF = 1ULL<<IRC_IS_MEM_REF_POS,
 
-//Memory operand indicates all operations which only load memory object.
-#define IRC_IS_MEM_OPND_SHIFT 5
-#define IRC_IS_MEM_OPND 1ULL<<IRC_IS_MEM_OPND_SHIFT
+    //Memory operand indicates all operations which only load memory object.
+    IRC_IS_MEM_OPND_POS = 5,
+    IRC_IS_MEM_OPND = 1ULL<<IRC_IS_MEM_OPND_POS,
 
-//Indicates the operation satifies arithmetic associative.
-#define IRC_IS_ASSOCIATIVE_SHIFT 6
-#define IRC_IS_ASSOCIATIVE 1ULL<<IRC_IS_ASSOCIATIVE_SHIFT
+    //Indicates the operation satifies arithmetic associative.
+    IRC_IS_ASSOCIATIVE_POS = 6,
+    IRC_IS_ASSOCIATIVE = 1ULL<<IRC_IS_ASSOCIATIVE_POS,
 
-//Indicates the operation satifies arithmetic commutative.
-#define IRC_IS_COMMUTATIVE_SHIFT 7
-#define IRC_IS_COMMUTATIVE 1ULL<<IRC_IS_COMMUTATIVE_SHIFT
+    //Indicates the operation satifies arithmetic commutative.
+    IRC_IS_COMMUTATIVE_POS = 7,
+    IRC_IS_COMMUTATIVE = 1ULL<<IRC_IS_COMMUTATIVE_POS,
 
-//Indicates the operation is relation operation.
-#define IRC_IS_RELATION_SHIFT 8
-#define IRC_IS_RELATION 1ULL<<IRC_IS_RELATION_SHIFT
+    //Indicates the operation is relation operation.
+    IRC_IS_RELATION_POS = 8,
+    IRC_IS_RELATION = 1ULL<<IRC_IS_RELATION_POS,
 
-//Indicates the operation is logical operation.
-#define IRC_IS_LOGICAL_SHIFT 9
-#define IRC_IS_LOGICAL 1ULL<<IRC_IS_LOGICAL_SHIFT
+    //Indicates the operation is logical operation.
+    IRC_IS_LOGICAL_POS = 9,
+    IRC_IS_LOGICAL = 1ULL<<IRC_IS_LOGICAL_POS,
 
-//Indicates the operation does not have any kid.
-#define IRC_IS_LEAF_SHIFT 10
-#define IRC_IS_LEAF 1ULL<<IRC_IS_LEAF_SHIFT
+    //Indicates the operation does not have any kid.
+    IRC_IS_LEAF_POS = 10,
+    IRC_IS_LEAF = 1ULL<<IRC_IS_LEAF_POS,
 
-//Indicates the operation generates output result.
-#define IRC_HAS_RESULT_SHIFT 11
-#define IRC_HAS_RESULT 1ULL<<IRC_HAS_RESULT_SHIFT
+    //Indicates the operation generates output result.
+    IRC_HAS_RESULT_POS = 11,
+    IRC_HAS_RESULT = 1ULL<<IRC_HAS_RESULT_POS,
 
-//Indicates the operation can be placed into Basic Block.
-#define IRC_IS_STMT_IN_BB_SHIFT 12
-#define IRC_IS_STMT_IN_BB 1ULL<<IRC_IS_STMT_IN_BB_SHIFT
+    //Indicates the operation can be placed into Basic Block.
+    IRC_IS_STMT_IN_BB_POS = 12,
+    IRC_IS_STMT_IN_BB = 1ULL<<IRC_IS_STMT_IN_BB_POS,
 
-//Indicates the operation is nonpr memory operation.
-#define IRC_IS_NON_PR_MEMREF_SHIFT 13
-#define IRC_IS_NON_PR_MEMREF 1ULL<<IRC_IS_NON_PR_MEMREF_SHIFT
+    //Indicates the operation is nonpr memory operation.
+    IRC_IS_NON_PR_MEMREF_POS = 13,
+    IRC_IS_NON_PR_MEMREF = 1ULL<<IRC_IS_NON_PR_MEMREF_POS,
 
-//Indicates the operation has mustref and mayref.
-#define IRC_HAS_DU_SHIFT 14
-#define IRC_HAS_DU 1ULL<<IRC_HAS_DU_SHIFT
+    //Indicates the operation has mustref and mayref.
+    IRC_HAS_DU_POS = 14,
+    IRC_HAS_DU = 1ULL<<IRC_HAS_DU_POS,
 
-//Indicates the operation is write-pr operation.
-#define IRC_IS_WRITE_PR_SHIFT 15
-#define IRC_IS_WRITE_PR 1ULL<<IRC_IS_WRITE_PR_SHIFT
+    //Indicates the operation is write-pr operation.
+    IRC_IS_WRITE_PR_POS = 15,
+    IRC_IS_WRITE_PR = 1ULL<<IRC_IS_WRITE_PR_POS,
 
-//Indicates the operation is write-pr operation and its result will
-//modifying whole PR.
-#define IRC_IS_WRITE_WHOLE_PR_SHIFT 16
-#define IRC_IS_WRITE_WHOLE_PR 1ULL<<IRC_IS_WRITE_WHOLE_PR_SHIFT
+    //Indicates the operation is write-pr operation and its result will
+    //modifying whole PR.
+    IRC_IS_WRITE_WHOLE_PR_POS = 16,
+    IRC_IS_WRITE_WHOLE_PR = 1ULL<<IRC_IS_WRITE_WHOLE_PR_POS,
 
-//Indicates the operation is memory operation and has offset.
-#define IRC_HAS_OFFSET_SHIFT 17
-#define IRC_HAS_OFFSET 1ULL<<IRC_HAS_OFFSET_SHIFT
+    //Indicates the operation is memory operation and has offset.
+    IRC_HAS_OFFSET_POS = 17,
+    IRC_HAS_OFFSET = 1ULL<<IRC_HAS_OFFSET_POS,
 
-//Indicates the operation has identifier information.
-#define IRC_HAS_IDINFO_SHIFT 18
-#define IRC_HAS_IDINFO 1ULL<<IRC_HAS_IDINFO_SHIFT
+    //Indicates the operation has identifier information.
+    IRC_HAS_IDINFO_POS = 18,
+    IRC_HAS_IDINFO = 1ULL<<IRC_HAS_IDINFO_POS,
 
-//Indicates the operation is directly accesssing memory through idinfo.
-#define IRC_IS_DIRECT_MEM_OP_SHIFT 19
-#define IRC_IS_DIRECT_MEM_OP 1ULL<<IRC_IS_DIRECT_MEM_OP_SHIFT
+    //Indicates the operation is directly accesssing memory through idinfo.
+    IRC_IS_DIRECT_MEM_OP_POS = 19,
+    IRC_IS_DIRECT_MEM_OP = 1ULL<<IRC_IS_DIRECT_MEM_OP_POS,
 
-//Indicates the operation is indirectly accesssing memory through base.
-#define IRC_IS_INDIRECT_MEM_OP_SHIFT 20
-#define IRC_IS_INDIRECT_MEM_OP 1ULL<<IRC_IS_INDIRECT_MEM_OP_SHIFT
+    //Indicates the operation is indirectly accesssing memory through base.
+    IRC_IS_INDIRECT_MEM_OP_POS = 20,
+    IRC_IS_INDIRECT_MEM_OP = 1ULL<<IRC_IS_INDIRECT_MEM_OP_POS,
 
-//Indicates the operation is conditional branch operation.
-#define IRC_IS_CONDITIONAL_BR_SHIFT 21
-#define IRC_IS_CONDITIONAL_BR 1ULL<<IRC_IS_CONDITIONAL_BR_SHIFT
+    //Indicates the operation is conditional branch operation.
+    IRC_IS_CONDITIONAL_BR_POS = 21,
+    IRC_IS_CONDITIONAL_BR = 1ULL<<IRC_IS_CONDITIONAL_BR_POS,
 
-//Indicates the operation is unconditional branch operation.
-#define IRC_IS_UNCONDITIONAL_BR_SHIFT 22
-#define IRC_IS_UNCONDITIONAL_BR 1ULL<<IRC_IS_UNCONDITIONAL_BR_SHIFT
+    //Indicates the operation is unconditional branch operation.
+    IRC_IS_UNCONDITIONAL_BR_POS = 22,
+    IRC_IS_UNCONDITIONAL_BR = 1ULL<<IRC_IS_UNCONDITIONAL_BR_POS,
 
-//Indicates the operation is memory operation that accessing through
-//array style.
-#define IRC_IS_ARRAY_OP_SHIFT 23
-#define IRC_IS_ARRAY_OP 1ULL<<IRC_IS_ARRAY_OP_SHIFT
+    //Indicates the operation is memory operation that accessing through
+    //array style.
+    IRC_IS_ARRAY_OP_POS = 23,
+    IRC_IS_ARRAY_OP = 1ULL<<IRC_IS_ARRAY_OP_POS,
 
-//Indicates the operation is memory operation and it has a RHS expression.
-#define IRC_HAS_RHS_SHIFT 24
-#define IRC_HAS_RHS 1ULL<<IRC_HAS_RHS_SHIFT
+    //Indicates the operation is memory operation and it has a RHS expression.
+    IRC_HAS_RHS_POS = 24,
+    IRC_HAS_RHS = 1ULL<<IRC_HAS_RHS_POS,
 
-//Indicates the operation has determinate expression
-#define IRC_HAS_JUDGE_TARGET_SHIFT 25
-#define IRC_HAS_JUDGE_TARGET 1ULL<<IRC_HAS_JUDGE_TARGET_SHIFT
+    //Indicates the operation has determinate expression
+    IRC_HAS_JUDGE_TARGET_POS = 25,
+    IRC_HAS_JUDGE_TARGET = 1ULL<<IRC_HAS_JUDGE_TARGET_POS,
 
-//Indicates the operation has a case list.
-#define IRC_HAS_CASE_LIST_SHIFT 26
-#define IRC_HAS_CASE_LIST 1ULL<<IRC_HAS_CASE_LIST_SHIFT
+    //Indicates the operation has a case list.
+    IRC_HAS_CASE_LIST_POS = 26,
+    IRC_HAS_CASE_LIST = 1ULL<<IRC_HAS_CASE_LIST_POS,
 
-//Indicates the operation has storage space information.
-#define IRC_HAS_STORAGE_SPACE_SHIFT 27
-#define IRC_HAS_STORAGE_SPACE 1ULL<<IRC_HAS_STORAGE_SPACE_SHIFT
+    //Indicates the operation has storage space information.
+    IRC_HAS_STORAGE_SPACE_POS = 27,
+    IRC_HAS_STORAGE_SPACE = 1ULL<<IRC_HAS_STORAGE_SPACE_POS,
 
-//Indicates the operation has multiple-result list.
-#define IRC_HAS_RES_LIST_SHIFT 28
-#define IRC_HAS_RES_LIST 1ULL<<IRC_HAS_RES_LIST_SHIFT
+    //Indicates the operation has multiple-result list.
+    IRC_HAS_RES_LIST_POS = 28,
+    IRC_HAS_RES_LIST = 1ULL<<IRC_HAS_RES_LIST_POS,
+    #include "irc_attr_ext.inc"
+} IRC_ATTR;
 
 ////////////////////////////////////////////////////////////////////////////////
 //NOTE: If new IR flag value is greater than the bit range that IRDescFlagSeg //
@@ -222,44 +225,44 @@ public:
 #define IRDES_kid_map(c) (g_ir_desc[c].kid_map)
 #define IRDES_kid_num(c) (g_ir_desc[c].kid_num)
 #define IRDES_attr(c) (g_ir_desc[c].attr)
-#define IRDES_is_stmt(c) (IRDES_attr(c).have(IRC_IS_STMT_SHIFT))
-#define IRDES_is_ter(c) (IRDES_attr(c).have(IRC_IS_TER_SHIFT))
-#define IRDES_is_bin(c) (IRDES_attr(c).have(IRC_IS_BIN_SHIFT))
-#define IRDES_is_una(c) (IRDES_attr(c).have(IRC_IS_UNA_SHIFT))
-#define IRDES_is_mem_ref(c) (IRDES_attr(c).have(IRC_IS_MEM_REF_SHIFT))
-#define IRDES_is_mem_opnd(c) (IRDES_attr(c).have(IRC_IS_MEM_OPND_SHIFT))
-#define IRDES_is_associative(c) (IRDES_attr(c).have(IRC_IS_ASSOCIATIVE_SHIFT))
-#define IRDES_is_commutative(c) (IRDES_attr(c).have(IRC_IS_COMMUTATIVE_SHIFT))
-#define IRDES_is_relation(c) (IRDES_attr(c).have(IRC_IS_RELATION_SHIFT))
-#define IRDES_is_logical(c) (IRDES_attr(c).have(IRC_IS_LOGICAL_SHIFT))
-#define IRDES_is_leaf(c) (IRDES_attr(c).have(IRC_IS_LEAF_SHIFT))
-#define IRDES_is_stmt_in_bb(c) (IRDES_attr(c).have(IRC_IS_STMT_IN_BB_SHIFT))
+#define IRDES_is_stmt(c) (IRDES_attr(c).have(IRC_IS_STMT_POS))
+#define IRDES_is_ter(c) (IRDES_attr(c).have(IRC_IS_TER_POS))
+#define IRDES_is_bin(c) (IRDES_attr(c).have(IRC_IS_BIN_POS))
+#define IRDES_is_una(c) (IRDES_attr(c).have(IRC_IS_UNA_POS))
+#define IRDES_is_mem_ref(c) (IRDES_attr(c).have(IRC_IS_MEM_REF_POS))
+#define IRDES_is_mem_opnd(c) (IRDES_attr(c).have(IRC_IS_MEM_OPND_POS))
+#define IRDES_is_associative(c) (IRDES_attr(c).have(IRC_IS_ASSOCIATIVE_POS))
+#define IRDES_is_commutative(c) (IRDES_attr(c).have(IRC_IS_COMMUTATIVE_POS))
+#define IRDES_is_relation(c) (IRDES_attr(c).have(IRC_IS_RELATION_POS))
+#define IRDES_is_logical(c) (IRDES_attr(c).have(IRC_IS_LOGICAL_POS))
+#define IRDES_is_leaf(c) (IRDES_attr(c).have(IRC_IS_LEAF_POS))
+#define IRDES_is_stmt_in_bb(c) (IRDES_attr(c).have(IRC_IS_STMT_IN_BB_POS))
 #define IRDES_is_non_pr_memref(c) \
-    (IRDES_attr(c).have(IRC_IS_NON_PR_MEMREF_SHIFT))
-#define IRDES_has_result(c) (IRDES_attr(c).have(IRC_HAS_RESULT_SHIFT))
-#define IRDES_has_offset(c) (IRDES_attr(c).have(IRC_HAS_OFFSET_SHIFT))
-#define IRDES_has_idinfo(c) (IRDES_attr(c).have(IRC_HAS_IDINFO_SHIFT))
-#define IRDES_has_du(c) (IRDES_attr(c).have(IRC_HAS_DU_SHIFT))
-#define IRDES_has_rhs(c) (IRDES_attr(c).have(IRC_HAS_RHS_SHIFT))
-#define IRDES_has_res_list(c) (IRDES_attr(c).have(IRC_HAS_RES_LIST_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_NON_PR_MEMREF_POS))
+#define IRDES_has_result(c) (IRDES_attr(c).have(IRC_HAS_RESULT_POS))
+#define IRDES_has_offset(c) (IRDES_attr(c).have(IRC_HAS_OFFSET_POS))
+#define IRDES_has_idinfo(c) (IRDES_attr(c).have(IRC_HAS_IDINFO_POS))
+#define IRDES_has_du(c) (IRDES_attr(c).have(IRC_HAS_DU_POS))
+#define IRDES_has_rhs(c) (IRDES_attr(c).have(IRC_HAS_RHS_POS))
+#define IRDES_has_res_list(c) (IRDES_attr(c).have(IRC_HAS_RES_LIST_POS))
 #define IRDES_has_judge_target(c) \
-    (IRDES_attr(c).have(IRC_HAS_JUDGE_TARGET_SHIFT))
+    (IRDES_attr(c).have(IRC_HAS_JUDGE_TARGET_POS))
 #define IRDES_has_storage_space(c) \
-    (IRDES_attr(c).have(IRC_HAS_STORAGE_SPACE_SHIFT))
-#define IRDES_has_case_list(c) (IRDES_attr(c).have(IRC_HAS_CASE_LIST_SHIFT))
-#define IRDES_is_write_pr(c) (IRDES_attr(c).have(IRC_IS_WRITE_PR_SHIFT))
+    (IRDES_attr(c).have(IRC_HAS_STORAGE_SPACE_POS))
+#define IRDES_has_case_list(c) (IRDES_attr(c).have(IRC_HAS_CASE_LIST_POS))
+#define IRDES_is_write_pr(c) (IRDES_attr(c).have(IRC_IS_WRITE_PR_POS))
 #define IRDES_is_write_whole_pr(c) \
-    (IRDES_attr(c).have(IRC_IS_WRITE_WHOLE_PR_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_WRITE_WHOLE_PR_POS))
 #define IRDES_is_conditional_br(c) \
-    (IRDES_attr(c).have(IRC_IS_CONDITIONAL_BR_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_CONDITIONAL_BR_POS))
 #define IRDES_is_unconditional_br(c) \
-    (IRDES_attr(c).have(IRC_IS_UNCONDITIONAL_BR_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_UNCONDITIONAL_BR_POS))
 #define IRDES_is_array_op(c) \
-    (IRDES_attr(c).have(IRC_IS_ARRAY_OP_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_ARRAY_OP_POS))
 #define IRDES_is_direct_mem_op(c) \
-    (IRDES_attr(c).have(IRC_IS_DIRECT_MEM_OP_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_DIRECT_MEM_OP_POS))
 #define IRDES_is_indirect_mem_op(c) \
-    (IRDES_attr(c).have(IRC_IS_INDIRECT_MEM_OP_SHIFT))
+    (IRDES_attr(c).have(IRC_IS_INDIRECT_MEM_OP_POS))
 #define IRDES_size(c) (g_ir_desc[c].size)
 #define IRDES_dumpfunc(c) (g_ir_desc[c].dumpfunc)
 #define IRDES_verifyfunc(c) (g_ir_desc[c].verifyfunc)

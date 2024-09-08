@@ -342,6 +342,37 @@ public:
 
 
 //
+//SATRT RenameExp
+//
+//The class performs renaming for each NonPR Memory expression.
+class RenameExp {
+    COPY_CONSTRUCTOR(RenameExp);
+protected:
+    IR * m_root;
+    IR const* m_startir;
+    IRBB const* m_startbb;
+    MDSSAMgr * m_mgr;
+    ActMgr * m_am;
+    Region * m_rg;
+    OptCtx * m_oc;
+public:
+    //root: the root IR that expected to start to set live-in.
+    //      Note root can be stmt or expression.
+    //startir: the start position in 'startbb', it can be NULL.
+    //         If it is NULL, the function first finding the Phi list of
+    //         'startbb', then keep finding its predecessors until meet the
+    //         CFG entry.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
+    RenameExp(MOD IR * root, IR const* startir, IRBB const* startbb,
+              MDSSAMgr * mgr, OptCtx * oc);
+    MDSSAMgr * getMgr() const { return m_mgr; }
+    ActMgr * getActMgr() const { return m_am; }
+    void perform();
+};
+//END RenameExp
+
+
+//
 //START RenameDef
 //
 //The class generates VMD for new Stmt or new MDPhi, then inserts VMD into
@@ -470,12 +501,13 @@ public:
 
 //The class reconstruct MDSSA info for given region in DomTree order.
 //The region recorded in 'm_vextab'
-class ReconstructMDSSA : public VisitTree {
+class ReconstructMDSSA : public xcom::VisitTree {
     COPY_CONSTRUCTOR(ReconstructMDSSA);
     //Record the vertex on CFG that need to revise.
     xcom::VexTab const& m_vextab;
-    MDSSAMgr * m_mdssamgr;
     xcom::Graph const* m_cfg;
+    MDSSAMgr * m_mdssamgr;
+    OptCtx * m_oc;
     Region const* m_rg;
 protected:
     void renameBBIRList(IRBB const* bb) const;
@@ -483,7 +515,7 @@ protected:
 public:
     ReconstructMDSSA(xcom::Vertex const* root, xcom::VexTab const& vextab,
                      xcom::DomTree const& domtree, xcom::Graph const* cfg,
-                     MDSSAMgr * mgr);
+                     MDSSAMgr * mgr, OptCtx * oc);
 
     //The interface of VisitTree to access each Vertex.
     //v: the vertex on DomTree.
@@ -491,7 +523,7 @@ public:
     {
         Vertex const* cfgv = m_cfg->getVertex(v->id());
         ASSERT0(cfgv);
-        if (!m_vextab.find(cfgv)) { return true; }
+        if (!m_vextab.find(cfgv->id())) { return true; }
         IRBB * bb = m_rg->getBB(cfgv->id());
         ASSERT0(bb);
         renameBBPhiList(bb);
@@ -628,7 +660,7 @@ protected:
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
-    //startbb: the BB that begin to do searching.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
     VMD * findLiveInDefFrom(
         MDIdx mdid, IRBB const* bb, IR const* startir, IRBB const* startbb,
         VMDVec const* vmdvec) const;
@@ -884,34 +916,15 @@ public:
     void collectUseSet(IR const* def, LI<IRBB> const* li,
                        CollectFlag f, OUT IRSet * useset);
 
-    //Return true if VMDs of stmt cross version when moving stmt
-    //outside of loop.
-    bool isCrossLoopHeadPhi(IR const* stmt, LI<IRBB> const* li,
-                            OUT bool & cross_nonphi_def) const;
-
-    //Return true if the DU chain between 'def' and 'use' can be ignored during
-    //DU chain manipulation.
-    //def: one of DEF of exp.
-    //exp: expression.
-    bool isOverConservativeDUChain(MDDef const* def, IR const* exp) const;
-
-    //Return true if there is at least one USE 'vmd' has been placed in given
-    //IRBB 'bbid'.
-    //vmd: the function will iterate all its USE occurrences.
-    //it: for tmp used.
-    bool isUseWithinBB(VMD const* vmd, MOD VMD::UseSetIter & it,
-                       UINT bbid) const;
-
-    //Initial VMD stack for each MD in 'bb2defmds'.
-    void initVMDStack(BB2DefMDSet const& bb2defmds,
-                      OUT MD2VMDStack & md2verstk);
-
-    //Return true if the DU chain between 'def' and 'use' can be ignored during
-    //DU chain manipulation.
-    //ir1: related DEF or USE to same VMD, can be stmt/exp.
-    //ir2: related DEF or USE to same VMD, can be stmt/exp.
-    static bool isOverConservativeDUChain(IR const* ir1, IR const* ir2,
-                                          Region const* rg);
+    //The function constructs SSA mode for all NonPR operations that recorded
+    //in 'ssarg'.
+    //The IR list and related BBs should have been recorded in SSA-region.
+    //ssarg: a SSA-region that records a list of BB that describes the region.
+    //NOTE:
+    // 1. the SSA-region is independent to Region.
+    // 2. The function will transform all NonPR operations that belong to
+    //    the SSA-region.
+    bool constructDesignatedRegion(MOD SSARegion & ssarg);
 
     //Destroy all objects in MDSSAMgr.
     void destroy();
@@ -1007,7 +1020,7 @@ public:
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
-    //startbb: the BB that begin to do searching.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
     VMD * findDomLiveInDefFrom(MDIdx mdid, IR const* startir,
                                IRBB const* startbb, OptCtx const& oc) const;
 
@@ -1022,7 +1035,7 @@ public:
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
-    //startbb: the BB that begin to do searching.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
     void findAndSetLiveInDefForTree(IR * exp, IR const* startir,
                                     IRBB const* startbb, OptCtx const& oc);
     void findAndSetLiveInDefForTree(IR * exp, IRBB const* startbb,
@@ -1038,7 +1051,7 @@ public:
     //         If it is NULL, the function first finding the Phi list of
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
-    //startbb: the BB that begin to do searching.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
     void findAndSetLiveInDef(MOD IR * exp, IR const* startir,
                              IRBB const* startbb, OptCtx const& oc);
     void findAndSetLiveInDef(MOD IR * exp, IRBB const* startbb,
@@ -1142,8 +1155,14 @@ public:
     //Return true if exist USE to 'ir'.
     //The is a helper function to provid simple query, an example to
     //show how to retrieval VOpnd and USE occurences as well.
-    //ir: stmt
+    //ir: must be stmt.
     bool hasUse(IR const* ir) const;
+
+    //Return true if exist DEF to 'ir'.
+    //The is a helper function to provid simple query, an example to
+    //show how to retrieval VOpnd and DEF occurences as well.
+    //ir: must be exp.
+    bool hasDef(IR const* ir) const;
 
     //Return true if bb has PHI.
     bool hasPhi(UINT bbid) const
@@ -1162,6 +1181,35 @@ public:
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);
+
+    //Return true if VMDs of stmt cross version when moving stmt
+    //outside of loop.
+    bool isCrossLoopHeadPhi(IR const* stmt, LI<IRBB> const* li,
+                            OUT bool & cross_nonphi_def) const;
+
+    //Return true if the DU chain between 'def' and 'use' can be ignored during
+    //DU chain manipulation.
+    //def: one of DEF of exp.
+    //exp: expression.
+    bool isOverConservativeDUChain(MDDef const* def, IR const* exp) const;
+
+    //Return true if there is at least one USE 'vmd' has been placed in given
+    //IRBB 'bbid'.
+    //vmd: the function will iterate all its USE occurrences.
+    //it: for tmp used.
+    bool isUseWithinBB(VMD const* vmd, MOD VMD::UseSetIter & it,
+                       UINT bbid) const;
+
+    //Initial VMD stack for each MD in 'bb2defmds'.
+    void initVMDStack(BB2DefMDSet const& bb2defmds,
+                      OUT MD2VMDStack & md2verstk);
+
+    //Return true if the DU chain between 'def' and 'use' can be ignored during
+    //DU chain manipulation.
+    //ir1: related DEF or USE to same VMD, can be stmt/exp.
+    //ir2: related DEF or USE to same VMD, can be stmt/exp.
+    static bool isOverConservativeDUChain(IR const* ir1, IR const* ir2,
+                                          Region const* rg);
 
     //Insert a new PHI into bb according to given MDIdx.
     //Note the operand and PHI's result will be initialized in initial-version.
@@ -1324,7 +1372,7 @@ public:
                                MDSSAUpdateCtx const& ctx);
 
     //The function remove all MDPhis in 'bb'.
-    //Note caller should guarrantee phi is useless and removable.
+    //Note caller should guarantee phi is useless and removable.
     void removePhiList(IRBB * bb, MDSSAUpdateCtx const& ctx);
 
     //Remove MDDef from DefDef chain.

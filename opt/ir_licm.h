@@ -150,7 +150,7 @@ public:
     void addHoistCand(IR * ir);
 
     //The function dumps the invariant stmt and invariant expression.
-    void dumpInvariantExpStmt() const;
+    void dump() const;
 
     LI<IRBB> const* getLI() const { return m_li; }
     Region const* getRegion() const { return m_rg; }
@@ -237,7 +237,7 @@ protected:
     SMemPool * m_pool;
     xcom::TTab<LI<IRBB> const*> m_insert_guard_bb;
     IRListMgr m_irs_mgr;
-    ActMgr m_act_mgr;
+    ActMgr m_am;
 protected:
     void clean();
     bool chooseConst(IR * ir, OUT bool * all_exp_invariant,
@@ -469,7 +469,7 @@ protected:
         return p;
     }
 public:
-    explicit LICM(Region * rg) : Pass(rg), m_act_mgr(rg)
+    explicit LICM(Region * rg) : Pass(rg), m_am(rg)
     {
         ASSERT0(rg != nullptr);
         m_dumgr = rg->getDUMgr();
@@ -496,7 +496,7 @@ public:
 
     virtual bool dump() const;
 
-    ActMgr & getActMgr() { return m_act_mgr; }
+    ActMgr & getActMgr() { return m_am; }
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }

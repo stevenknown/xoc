@@ -68,18 +68,17 @@ void IVVal::dump(Region const* rg) const
 CHAR const* IVVal::dump(Region const* rg, UINT indent,
                         OUT xcom::StrBuf & buf) const
 {
-    LogCtx tmplogctx;
-    tmplogctx.copyWithOutBuffer(rg->getLogMgr()->getCurrentCtx());
-    rg->getLogMgr()->push(tmplogctx);
-    {
-    DumpBufferSwitch tmpbuff(rg->getLogMgr());
-    rg->getLogMgr()->incIndent(indent);
-    dump(rg);
-    rg->getLogMgr()->decIndent(indent);
-    buf.copy(*rg->getLogMgr()->getBuffer());
-    rg->getLogMgr()->cleanBuffer();
-    }
-    rg->getLogMgr()->pop();
+    class Dump : public xoc::DumpToBuf {
+    public:
+        Dump(Region const* rg, xcom::StrBuf & buf, UINT ind) :
+            DumpToBuf(rg, buf, ind) {}
+        IVVal const* ivval;
+        virtual void dumpUserInfo() const override
+        { ivval->dump(getRegion()); }
+    };
+    Dump d(rg, buf, indent);
+    d.ivval = this;
+    d.dump();
     return buf.getBuf();
 }
 
@@ -136,15 +135,14 @@ bool IVVal::extractFrom(IR const* ir)
 
 
 //The function build IR_LD or IR_PR according to given Var in 'v'.
-static IR * buildMemRef(IVVal const& v, MOD ChainRecMgr & mgr)
+IR * ChainRecMgr::buildVarRef(IVVal const& v) const
 {
     ASSERT0(v.is_var());
     if (v.getVar()->is_pr()) {
-        return mgr.getIRMgr()->buildPRdedicated(v.getVar()->getPrno(),
-                                                v.getDType());
+        return getIRMgr()->buildPRdedicated(
+            v.getVar()->getPrno(), v.getDType());
     }
-    return mgr.getIRMgr()->buildLoad(const_cast<Var*>(v.getVar()),
-                                     v.getDType());
+    return getIRMgr()->buildLoad(const_cast<Var*>(v.getVar()), v.getDType());
 }
 
 
@@ -184,12 +182,12 @@ static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 {
     ASSERT0(v0.is_var());
     Region * rg = mgr.getRegion();
-    IR * op0 = buildMemRef(v0, mgr);
+    IR * op0 = mgr.buildVarRef(v0);
     IR * op1 = nullptr;
     switch (v1.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
-        op1 = buildMemRef(v1, mgr);
+        op1 = mgr.buildVarRef(v1);
         break;
     case IVVal::VAL_IS_INT:
         op1 = rg->getIRMgr()->buildImmInt(v1.getInt(), v1.getDType());
@@ -235,7 +233,7 @@ static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     switch (v1.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
     case IVVal::VAL_IS_VAR:
-        op1 = buildMemRef(v1, mgr);
+        op1 = mgr.buildVarRef(v1);
         break;
     case IVVal::VAL_IS_INT:
         op1 = rg->getIRMgr()->buildImmInt(v1.getInt(), v1.getDType());
@@ -346,7 +344,7 @@ static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
         return doBinOpInt2FP(code, v0, v1, res, mgr);
     case IVVal::VAL_IS_VAR:
         op0 = rg->getIRMgr()->buildImmInt(v0.getInt(), v0.getDType());
-        op1 = buildMemRef(v1, mgr);
+        op1 = mgr.buildVarRef(v1);
         break;
     case IVVal::VAL_IS_EXP:
         op0 = rg->getIRMgr()->buildImmInt(v0.getInt(), v0.getDType());
@@ -495,7 +493,7 @@ static bool doSubOrDivFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
         return true;
     case IVVal::VAL_IS_VAR:
         op0 = rg->getIRMgr()->buildImmFP(v0.getFP(), v0.getDType());
-        op1 = buildMemRef(v1, mgr);
+        op1 = mgr.buildVarRef(v1);
         break;
     case IVVal::VAL_IS_EXP:
         op0 = rg->getIRMgr()->buildImmFP(v0.getFP(), v0.getDType());

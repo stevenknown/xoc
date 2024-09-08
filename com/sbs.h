@@ -398,8 +398,8 @@ public:
 
 
 //Sparse BitSet
-//This class encapsulates operations of SBitSetCore, and
-//simply the usage of them.
+//This class encapsulates operations of SBitSetCore, and simply the usage
+//of them.
 //e.g1: No need to call clean().
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> x(mbsm.getSegMgr());

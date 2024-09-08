@@ -67,7 +67,6 @@ protected:
     virtual Pass * allocCFG();
     virtual Pass * allocCfsMgr();
     virtual Pass * allocCopyProp();
-
     virtual Pass * allocDCE();
     virtual Pass * allocDUMgr();
     virtual Pass * allocDynamicStack();
@@ -87,6 +86,7 @@ protected:
     virtual Pass * allocIRReloc();
     virtual Pass * allocIRSimp();
     virtual Pass * allocIVR();
+    virtual Pass * allocKernelAdjustment();
     virtual Pass * allocLCSE();
     virtual Pass * allocLICM();
     virtual Pass * allocLFTR();
@@ -94,6 +94,7 @@ protected:
     virtual Pass * allocLivenessMgr();
     virtual Pass * allocLoopCvt();
     virtual Pass * allocLoopDepAna();
+    virtual Pass * allocMemCheck();
     virtual Pass * allocMDLivenessMgr();
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocMDSSAMgr();
@@ -109,6 +110,11 @@ protected:
     virtual Pass * allocMultiResConvert();
     virtual Pass * allocVRP();
     virtual Pass * allocWorkaround();
+    virtual Pass * allocExtPass(PASS_TYPE passty)
+    {
+        ASSERTN(0, ("Target Dependent Code."));
+        return nullptr;
+    }
 protected:
     void checkAndRecomputeDUChain(
         OptCtx * oc, DUMgr * dumgr, BitSet const& opts);

@@ -69,7 +69,7 @@ bool verifyIRList(IR const* ir, Region const* rg)
 }
 
 
-//irh: used to guarrantee the uniquess of IR.
+//irh: used to guarantee the uniquess of IR.
 bool verifyIRList(IR const* ir, BitSet * irh, Region const* rg)
 {
     BitSet * loc = nullptr;

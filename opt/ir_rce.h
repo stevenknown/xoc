@@ -36,19 +36,18 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class RCECtx {
+public:
+    bool cfg_changed;
+    OptCtx & oc;
+public:
+    RCECtx(OptCtx & t) : cfg_changed(false), oc(t) {}
+    ~RCECtx() {}
+};
+
 //Perform Redundant Code Elimination.
 class RCE : public Pass {
     COPY_CONSTRUCTOR(RCE);
-public:
-    class RCECtx {
-    public:
-        bool cfg_mod;
-        bool retry_bblist;
-        OptCtx * oc;
-    public:
-        RCECtx(OptCtx * t) : cfg_mod(false), retry_bblist(false), oc(t) {}
-        ~RCECtx() {}
-    };
 protected:
     IRCFG * m_cfg;
     GVN * m_gvn;

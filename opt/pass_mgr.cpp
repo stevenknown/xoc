@@ -374,6 +374,24 @@ Pass * PassMgr::allocArgPasser()
 }
 
 
+Pass * PassMgr::allocMemCheck()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocKernelAdjustment()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new KernelAdjustment(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocCCP()
 {
     //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PRSSA_MGR));
@@ -602,9 +620,6 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_INSERT_CVT:
         pass = allocInsertCvt();
         break;
-    case PASS_CALC_DERIVATIVE:
-        pass = allocCalcDerivative();
-        break;
     case PASS_MDSSALIVE_MGR:
         pass = allocMDSSALiveMgr();
         break;
@@ -656,8 +671,17 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_IGOTO_OPT:
         pass = allocIGotoOpt();
         break;
-    default: ASSERTN(0, ("Unsupport Pass."));
+    case PASS_MEMCHECK:
+        pass = allocMemCheck();
+        break;
+    case PASS_KERNEL_ADJUSTMENT:
+        pass = allocKernelAdjustment();
+        break;
+    default:
+        pass = allocExtPass(passty);
+        break;
     }
+    ASSERT0(pass);
     m_allocated_pass.append(pass);
     return pass;
 }
@@ -760,7 +784,7 @@ void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
     if (opts.is_contain(PASS_REACH_DEF) && !oc->is_reach_def_valid()) {
         f.set(DUOPT_SOL_REACH_DEF);
     }
-    if (opts.is_contain(PASS_DU_CHAIN) &&
+    if (opts.is_contain(PASS_CLASSIC_DU_CHAIN) &&
         (!oc->is_pr_du_chain_valid() || !oc->is_nonpr_du_chain_valid()) &&
         !oc->is_reach_def_valid()) {
         f.set(DUOPT_SOL_REACH_DEF);
@@ -896,7 +920,7 @@ void PassMgr::checkValidAndRecomputePass(
     case PASS_AVAIL_REACH_DEF:
         checkAndRecomputeAAandDU(oc, cfg, aa, dumgr, opts);
         break;
-    case PASS_DU_CHAIN:
+    case PASS_CLASSIC_DU_CHAIN:
         checkAndRecomputeDUChain(oc, dumgr, opts);
         break;
     default: {

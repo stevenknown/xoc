@@ -92,6 +92,10 @@ public:
     //Get scalar caller saved register set of different architectures.
     virtual xgen::RegSet const* getCallerScalarRegSet() const;
 
+    //Get the callee-saved register stack slot size in bytes
+    //of different architectures.
+    virtual UINT getCalleeSaveStackSlotSize() const = 0;
+
     //Get start scalar caller saved register of different architectures.
     virtual xgen::Reg getCallerScalarStart() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
@@ -205,6 +209,11 @@ public:
         return s == nullptr ? false : s->is_contain(r);
     }
     bool isLink(Reg r) const { return getLink() == r; }
+
+    //Return true if the stack grows upward, false if it grows downward,
+    //reflecting the behavior across different architectures.
+    virtual bool isStackGrowthDownward() const = 0;
+
     void init();
 
     void reset();

@@ -37,7 +37,7 @@ static IR * dupIsomoVDef(
     IRMgrExt * irmgrext = (IRMgrExt*)rg->getIRMgr();
     ASSERT0(ir);
     Type const* ty = ir->getType();
-    if (realuse != nullptr) {
+    if (realuse != nullptr && !realuse->is_dummyuse()) {
         realuse = irmgrext->buildDummyUse(realuse);
     }
     if (dummyuse != nullptr) {
@@ -138,6 +138,24 @@ IR * MultiResConvert::genPreDefStmt(
 }
 
 
+IR * MultiResConvert::genExtractStmtList(IR * stmt, IR * res_isomo_list)
+{
+    ASSERT0(stmt && stmt->is_stmt());
+    IR * last = nullptr;
+    IR * postdeflst = nullptr;
+    UINT i = 0;
+    Type const* u32 = m_tm->getU32();
+    for (IR * res = res_isomo_list; res != nullptr;
+         res = res->get_next(), i++) {
+        IR * dummyrhs = m_rg->dupIsomoExpTree(stmt);
+        xcom::add_next(&dummyrhs, m_irmgr->buildImmInt(i, u32));
+        IR * vdef = dupIsomoVDef(res, dummyrhs, nullptr, m_rg);
+        xcom::add_next(&postdeflst, &last, vdef);
+    }
+    return postdeflst;
+}
+
+
 IR * MultiResConvert::genPostDefStmt(IR * stmt, IR * res_isomo_list)
 {
     ASSERT0(stmt && stmt->is_stmt());
@@ -149,7 +167,7 @@ IR * MultiResConvert::genPostDefStmt(IR * stmt, IR * res_isomo_list)
         if (res->isIsomoTo(stmt, m_irmgr, false, ISOMO_CK_MEMREF_NAME)) {
             continue;
         }
-        IR * dummyuse = m_rg->dupIsomoExpTree(prev_res);        
+        IR * dummyuse = m_rg->dupIsomoExpTree(prev_res);
         IR * vdef = dupIsomoVDef(res, nullptr, dummyuse, m_rg);
         xcom::add_next(&postdeflst, &last, vdef);
         prev_res = res;
@@ -158,9 +176,23 @@ IR * MultiResConvert::genPostDefStmt(IR * stmt, IR * res_isomo_list)
 }
 
 
-IR * MultiResConvert::convertMultiRes(IR * stmt, bool genpostdef)
+IR * MultiResConvert::convertMultiResByExtractRes(IR * stmt)
 {
     ASSERT0(stmt && stmt->is_stmt() && stmt->hasRHS());
+    ASSERT0(stmt->getRHS()->hasResList());
+    IR * res_list = stmt->getRHS()->getResList();
+    if (res_list == nullptr) { return stmt; }
+    ASSERT0(xcom::cnt_list(res_list) <= getMaxMultiResDescNum());
+    IR * postdeflst = genExtractStmtList(stmt, res_list);
+    xcom::add_next(&stmt, postdeflst);
+    return stmt;
+}
+
+
+IR * MultiResConvert::convertMultiResBySplitRes(IR * stmt, bool genpostdef)
+{
+    ASSERT0(stmt && stmt->is_stmt() && stmt->hasRHS());
+    ASSERT0(stmt->getRHS()->hasResList());
     IR * res_list = stmt->getRHS()->getResList();
     if (res_list == nullptr) { return stmt; }
     stmt->getRHS()->setResList(nullptr);
@@ -261,38 +293,48 @@ IR * MultiResConvert::convertMultiResRegReg(IR * stmt, IR * res1)
 }
 
 
-IR * MultiResConvert::buildStorePRWithMultiResAndConvert(
+IR * MultiResConvert::buildStorePRWithMultiResAndConvertBySplit(
     PRNO prno, Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStorePR(prno, type, rhs);
     ASSERT0(rhs->getResList());
-    return convertMultiRes(stmt, false);
+    return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
 
-IR * MultiResConvert::buildStorePRWithMultiResAndConvert(
+IR * MultiResConvert::buildStorePRWithMultiResAndConvertBySplit(
     Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStorePR(type, rhs);
     ASSERT0(rhs->getResList());
-    return convertMultiRes(stmt, false);
+    return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
 
-IR * MultiResConvert::buildStoreWithMultiResAndConvert(Var * lhs, IR * rhs)
+IR * MultiResConvert::buildStoreWithMultiResAndConvertBySplit(
+    Var * lhs, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStore(lhs, rhs);
     ASSERT0(rhs->getResList());
-    return convertMultiRes(stmt, false);
+    return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
 
-IR * MultiResConvert::buildStoreWithMultiResAndConvert(
+IR * MultiResConvert::buildStoreWithMultiResAndConvertByExtract(
+    Var * lhs, IR * rhs)
+{
+    IR * stmt = m_irmgr->buildStore(lhs, rhs);
+    ASSERT0(rhs->getResList());
+    return convertMultiResByExtractRes(stmt);
+}
+
+
+IR * MultiResConvert::buildStoreWithMultiResAndConvertBySplit(
     Var * lhs, Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStore(lhs, type, rhs);
     ASSERT0(rhs->getResList());
-    return convertMultiRes(stmt, false);
+    return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
 

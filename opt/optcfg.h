@@ -35,7 +35,7 @@ class RemoveUnreachBBCtx {
     //Record the vertexs that in/out edge changed.
     xcom::VexTab m_changed_vextab;
 public:
-    void add(Vertex const* v) { m_changed_vextab.append(v); }
+    void add(Vertex const* v) { m_changed_vextab.add(v); }
     xcom::VexTab & getVexTab() { return m_changed_vextab; }
 };
 

@@ -351,7 +351,7 @@ VN const* InferEVN::inferMDPhi(MDPhi const* phi, InferCtx & ctx)
     if (ctx.isVisited(phi)) {
         return allocVNForMDDef(phi, ctx);
     }
-    ctx.setVisitMDPhi(phi);
+    ctx.setVisited(phi);
     VNHashTab::VNList lst;
     for (IR const* id = phi->getOpndList();
          id != nullptr; id = id->get_next()) {
@@ -379,6 +379,8 @@ VN const* InferEVN::inferMDPhi(MDPhi const* phi, InferCtx & ctx)
 VN const* InferEVN::inferIndirectStmt(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir->isIndirectMemOp());
+    if (ctx.isVisited(ir)) { return nullptr; }
+    ctx.setVisited(ir);
     VN const* vn1 = inferExp(ir->getRHS(), ctx);
     if (vn1 == nullptr) { return nullptr; }
     VN const* vn2 = inferExp(ir->getBase(), ctx);
@@ -390,19 +392,26 @@ VN const* InferEVN::inferIndirectStmt(IR const* ir, InferCtx & ctx)
 }
 
 
+VN const* InferEVN::inferDirectStmt(IR const* ir, InferCtx & ctx)
+{
+    if (ctx.isVisited(ir)) { return nullptr; }
+    ctx.setVisited(ir);
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+    vn = inferExp(ir->getRHS(), ctx);
+    if (vn == nullptr) { return nullptr; }
+    setVNAlways(ir, vn);
+    return vn;
+}
+
+
 VN const* InferEVN::inferStmt(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir && ir->is_stmt());
     switch (ir->getCode()) {
     case IR_STPR:
-    SWITCH_CASE_DIRECT_MEM_STMT: {
-        VN const* vn = getVN(ir);
-        if (vn != nullptr) { return vn; }
-        vn = inferExp(ir->getRHS(), ctx);
-        if (vn == nullptr) { return nullptr; }
-        setVN(ir, vn);
-        return vn;
-    }
+    SWITCH_CASE_DIRECT_MEM_STMT:
+        return inferDirectStmt(ir, ctx);
     SWITCH_CASE_INDIRECT_MEM_STMT:
         return inferIndirectStmt(ir, ctx);
     case IR_GETELEM:
@@ -562,6 +571,8 @@ VN const* InferEVN::inferArrayKidOp(IR const* ir, InferCtx & ctx)
 VN const* InferEVN::inferWriteArray(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir && ir->is_stmt());
+    if (ctx.isVisited(ir)) { return nullptr; }
+    ctx.setVisited(ir);
     VN const* kidvn = inferArrayKidOp(ir, ctx);
     if (kidvn == nullptr) { return nullptr; }
     VN const* rhsvn = inferExp(ir->getRHS(), ctx);
@@ -569,7 +580,7 @@ VN const* InferEVN::inferWriteArray(IR const* ir, InferCtx & ctx)
     VN const* vn = m_vnhashtab.registerIntList(
             ir->getCode(), 3, (VNHashInt)kidvn->id(),
             (VNHashInt)rhsvn->id(), (VNHashInt)ir->getOffset());
-    setVN(ir, vn);
+    setVNAlways(ir, vn);
     return vn;
 }
 
@@ -636,6 +647,10 @@ VN const* InferEVN::inferVNByIterKid(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir);
     ASSERT0(ir->is_stmt() || ir->is_exp());
+    if (ir->is_stmt()) {
+        if (ctx.isVisited(ir)) { return nullptr; }
+        ctx.setVisited(ir);
+    }
     VN const* vn = getVN(ir);
     if (vn != nullptr) { return nullptr; }
     VNHashTab::VNList lst;
@@ -652,7 +667,7 @@ VN const* InferEVN::inferVNByIterKid(IR const* ir, InferCtx & ctx)
         }
     }
     vn = m_vnhashtab.registerVN(ir->getCode(), lst);
-    setVN(ir, vn);
+    setVNAlways(ir, vn);
     return vn;
 }
 

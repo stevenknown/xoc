@@ -67,8 +67,7 @@ void SSAInfo::dump(Region const* rg) const
     PRNO defprno = PRNO_UNDEF;
     DUMMYUSE(defprno);
     if (def != nullptr) {
-        ASSERT0(def->is_stmt());
-        prt(rg, "DEF:%s", IRNAME(def));
+        prt(rg, "DEF:%s", IRNAME(def)); //def may be IR_UNDEF.
         if (def->isWritePR()) {
             defprno = def->getPrno();
             prt(rg, "(%s%d,id:%d)", PR_TYPE_CHAR, def->getPrno(), def->id());
@@ -80,6 +79,19 @@ void SSAInfo::dump(Region const* rg) const
             } else {
                 prt(rg, "NoRetVal??");
             }
+        } else if (vpr->version() == PRSSA_INIT_VERSION) {
+            //CASE: Zero verison VPR might be generated in constructing SSA
+            //region, the zero version VPR will be renamed to another
+            //non-zero version VPR. However, both the two VPRs reference same
+            //PRNO, and both of them record the same DEF stmt. Thus when one
+            //of VPR(SSAInfo) are updated during DU modification, the DEF stmt
+            //is freed, the PRSSAMgr does not update the another DEF meanwhile.
+            //e.g: $9 is renamed to $18, and immediately VPR8 is obsoleted.
+            //Howevern both VPR8 and VPR15 have recorded the DEF stmt which
+            //pointed to (stpr id:49), when the DEF in VPR15 freed in DCE,
+            //the DEF of VPR15 is NULL, but the DEF of VPR8 became to IR_UNDEF.
+            //VPR8:$9v0$9: DEF:stpr($18,id:49) USE:--
+            //VPR15:$9v1$18: DEF:stpr($18, id:49) USE : --
         } else {
             ASSERTN(0, ("not def stmt of PR"));
         }

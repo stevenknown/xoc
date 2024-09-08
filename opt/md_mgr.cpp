@@ -144,7 +144,7 @@ MD const* MDMgr::allocSetElemMD(IR * ir)
 MD const* MDMgr::genMDForPR(PRNO prno, Type const* type)
 {
     ASSERT0(type);
-    Var * pr_var = m_rg->mapPR2Var(prno);
+    Var * pr_var = m_rg->getVarByPRNO(prno);
     if (pr_var == nullptr) {
         pr_var = m_rg->genVarForPR(prno, type);
     }

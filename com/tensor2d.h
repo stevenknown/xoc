@@ -117,6 +117,11 @@ public:
     virtual void setElem(UINT dim, UINT degree, T t) override
     { this->set(dim, degree, t); }
 
+    //Calculate Absolute Value.
+    //Note the function supports in-place operation.
+    //Record the result in 'res' Ten2D.
+    static Ten2D<T> & abs(MOD Ten2D<T> & input, OUT Ten2D<T> & res);
+
     //Trigonometric Function.
     //Note the function supports in-place operation.
     //Record the result in 'res' Ten2D.
@@ -175,6 +180,22 @@ Ten2D<T> & Ten2D<T>::cos(MOD Ten2D<T> & input, OUT Ten2D<T> & res)
     for (UINT i = 0; i < input.getRowSize(); i++) {
         for (UINT j = 0; j < input.getColSize(); j++) {
             PRECISION_TYPE t = ::cos((PRECISION_TYPE)input.get(i, j));
+            res.set(i, j, T(t));
+        }
+    }
+    return res;
+}
+
+
+template <class T>
+Ten2D<T> & Ten2D<T>::abs(MOD Ten2D<T> & input, OUT Ten2D<T> & res)
+{
+    ASSERTN(input.is_init(), ("not yet initialize."));
+    ASSERTN(input.getSize() > 0, ("invalid Ten2D"));
+    res.reinit(input.getRowSize(), input.getColSize());
+    for (UINT i = 0; i < input.getRowSize(); i++) {
+        for (UINT j = 0; j < input.getColSize(); j++) {
+            PRECISION_TYPE t = ::fabs((PRECISION_TYPE)input.get(i, j));
             res.set(i, j, T(t));
         }
     }

@@ -42,8 +42,6 @@ typedef xcom::TMap<PRNO, VPR*> PRNO2VPR;
 typedef xcom::TMap<UINT, VPR const*> VertexID2VPR;
 typedef xcom::DefSBitSet PRSet;
 typedef xcom::DefSBitSetIter PRSetIter;
-typedef xcom::DefSBitSet BBSet;
-typedef xcom::DefSBitSetIter BBSetIter;
 typedef xcom::Vector<Type const*> PRNO2Type;
 
 //Mapping from PRNO to vector of VPR.
@@ -63,98 +61,6 @@ public:
     PRSet * genPRSet(UINT bbid);
     void genPRSet(BBSet const& bbset);
 };
-
-
-//
-//START PRSSARegion
-//
-//The class represents a region that is consist of BB in bbset, which
-//is expected to perform SSA construction for the region.
-class PRSSARegion {
-    COPY_CONSTRUCTOR(PRSSARegion);
-public:
-    Region const* m_rg;
-    IRBB * m_root;
-    OptCtx * m_oc;
-    IRCFG const* m_cfg;
-    DomTree const& m_domtree;
-    TTab<UINT> m_idtab;
-    IRList m_irlist;
-    BBSet m_bbset;
-public:
-    PRSSARegion(xcom::DefMiscBitSetMgr * sbs, DomTree const& dt,
-                Region const* rg, OptCtx * oc) :
-        m_rg(rg), m_root(nullptr), m_oc(oc), m_domtree(dt),
-        m_bbset(sbs->getSegMgr()) { m_cfg = m_rg->getCFG(); }
-
-    //The function will find PR that assigned 'prno' into current
-    //SSA construction region.
-    //start: stmt or expression start to find.
-    void add(PRNO prno, IR * start);
-
-    //Add ir to current SSA construction region that expected to transform
-    //to SSA mode.
-    //Note ir must be PR op.
-    void add(IR * ir);
-
-    //Add BB into current SSA construction region.
-    //Note even if there is no occurrence of PR operation in 'bb', the BB that
-    //belong to the SSARegion also should be add into bbset.
-    void add(IRBB const* bb) { ASSERT0(bb); getBBSet().bunion(bb->id()); }
-
-    //Add a set of BB into current SSA construction region.
-    //The construction will not exceed these BBs.
-    void add(BitSet const& bbset) { getBBSet().bunion(bbset); }
-
-    //Walk through each predecessors from 'start' to guarrantee all vertexs in
-    //path from root to start have been added.
-    void addPredBBTillRoot(IRBB const* start);
-
-    //Walk through DomTree start from root and add BB into SSARegion.
-    //Note root must be set first.
-    void addAllBBUnderRootInDomTree();
-
-    //Return true if bb can be regarded as the root of SSA region.
-    bool canBeRoot(IRBB const* bb) const;
-
-    void dump() const;
-
-    //The function attempt to find properly root BB of SSA region.
-    //A properly root BB either does not have any PHI operation, or all
-    //predecessors of root BBs are located within current SSA region.
-    IRBB * findRootBB(IRBB * start);
-
-    //Get the bbset of region.
-    BBSet & getBBSet() { return m_bbset; }
-
-    //Get the irlist of current SSA construction region.
-    IRList & getIRList() { return m_irlist; }
-
-    //Get the root BB of current SSA construction region.
-    IRBB * getRootBB() const { return m_root; }
-    OptCtx * getOptCtx() const { return m_oc; }
-    DomTree const& getDomTree() const { return m_domtree; }
-
-    //Return true if BB id is in the SSA region.
-    //id: the BB id.
-    bool isInRegion(UINT id) const { return m_bbset.is_contain(id); }
-
-    //Return true if all predecessors of 'bb' are located in SSA region.
-    bool isAllPredInRegion(IRBB const* bb) const;
-
-    //Infer and add those BBs that should be also handled in PRSSA construction.
-    void inferAndAddRelatedBB();
-
-    //Set the root BB of current SSA construction region.
-    //root: root BB for CFG region that is consisted of BB which is
-    //in SSA construction region.
-    void setRootBB(IRBB * root) { add(root); m_root = root; }
-
-    //Verify whether the SSA region is legal enough to construct.
-    bool verify() const;
-};
-//END PRSSARegion
-
 
 class BB2VPRMap : public xcom::Vector<PRNO2VPR*> {
     COPY_CONSTRUCTOR(BB2VPRMap);
@@ -317,6 +223,8 @@ public:
     void cleanPRNO2Type();
     size_t count_mem() const;
 
+    void dump(Region const* rg) const;
+
     Type const* getPRNOType(PRNO prno) const
     { return m_prno2type.get((VecIdx)prno); }
     UINT getMaxVersion(PRNO prno) const
@@ -394,23 +302,26 @@ class PRSSAMgr : public Pass {
     COPY_CONSTRUCTOR(PRSSAMgr);
     BYTE m_is_semi_pruned:1;
     BYTE m_is_pruned:1;
-    UINT m_vp_count;
+    UINT m_vpr_count;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
+    VarMgr * m_vm;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
     DefSegMgr * m_seg_mgr;
     LivenessMgr * m_livemgr;
-    //Record OptCtx in used. It is always updated in perform().
-    IRIter m_iter; //for tmp use.
 
-    //Record virtual PR for each PR.
+    //Record OptCtx in used. It is always updated in perform().
+    IRIter m_iter; //for tmp local use.
+    ConstIRIter m_citer; //for tmp local use.
+
+    //Record VPR-Vector that indexed by PRNO.
     PRNO2VPRVec m_prno2vprvec;
 
-    //Record virtual PR that indexed by VPR id.
+    //Record VPR that indexed by VPR id.
     VPRVec m_vpr_vec;
 
-    //Record virtual PR that indexed by PRNO.
+    //Record VPR that indexed by PRNO.
     VPRVec m_prno2vpr;
 private:
     VPR * allocVPR()
@@ -434,7 +345,7 @@ private:
         m_tm = nullptr;
         m_seg_mgr = nullptr;
         m_cfg = nullptr;
-        m_vp_count = 1;
+        m_vpr_count = 1;
 
         //Set to true if PR ssa is constructed.
         //This flag will direct the behavior of optimizations.
@@ -449,20 +360,20 @@ private:
     //Clean VPR info for IR in 'lst'.
     //The function always used in initialization in partial computation to
     //SSAInfo of given IR.
-    void cleanPRNO2VPRForIRList(IRList const& lst);
+    void cleanVPRForSSARegion(SSARegion const& ssarg);
 
     //Set SSAInfo of IR to be nullptr to inform optimizer that IR is
     //not in SSA form.
     void cleanPRSSAInfo();
+    void cleanVPR(PRNO prno) { setVPRByPRNO(prno, nullptr); }
 
     //definedprs: record PRs which defined in 'bb'.
     void collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & mustdef_pr,
                                   OUT ConstructCtx & cstctx);
-    void collectPRAndInitVPRForIRList(IRList const& irlist, BBSet const& bbset,
-                                      MOD DefMiscBitSetMgr & sm,
-                                      OUT BB2PRSet & bb2definedprs,
-                                      OUT PRSet & prset,
-                                      MOD ConstructCtx & cstctx);
+    void collectPRAndInitVPRForIRList(
+        IRList const& irlist, BBSet const& bbset, MOD DefMiscBitSetMgr & sm,
+        OUT BB2PRSet & bb2definedprs, OUT PRSet & prset,
+        MOD ConstructCtx & cstctx);
     void constructMDDUChainForPR();
 
     void destructBBSSAInfo(IRBB * bb, OptCtx const& oc);
@@ -471,27 +382,22 @@ private:
 
     //The function retrieves VPR by its id.
     VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
+
+    //The function retrieves VPR by prno and its version.
     VPR * getVPR(PRNO prno, UINT version) const
     {
         VPRVec const* vprvec = getVPRVecByPRNO(prno);
+        //Note the elements in VPRVec are indexed by version.
         return vprvec != nullptr ? vprvec->get(version) : nullptr;
     }
 
     //The function retrieves VPRVec by given prno.
-    //Map PRNO to VPRVec that recorded all VPR during SSA.
+    //Map PRNO to VPRVec and record all VPRs allocated during SSA processing.
     VPRVec const* getVPRVecByPRNO(PRNO prno) const
     { return m_prno2vprvec.get((VecIdx)prno); }
 
     //The function generates VPRVec by given prno.
-    VPRVec * genVPRVecByPRNO(PRNO prno)
-    {
-        VPRVec * vec = m_prno2vprvec.get((VecIdx)prno);
-        if (vec == nullptr) {
-            vec = new VPRVec();
-            m_prno2vprvec.set((VecIdx)prno, vec);
-        }
-        return vec;
-    }
+    VPRVec * genVPRVecByPRNO(PRNO prno);
     SSAInfo * genInitVersionSSAInfoForExp(IR * exp);
     VPRVec const * getVPRVec() const { return &m_vpr_vec; }
 
@@ -501,9 +407,8 @@ private:
 
     //The function rename PR in BB.
     //defined_prs: record the PR set that defined in 'bb' if exist.
-    void handleBBRename(PRSet const* defined_prs,
-                        BBSet const* bbset, PRSet const* prset,
-                        MOD ConstructCtx & cstctx,
+    void handleBBRename(PRSet const* defined_prs, BBSet const* bbset,
+                        PRSet const* prset, MOD ConstructCtx & cstctx,
                         MOD IRBB * bb, MOD BB2VPRMap & bb2vpr);
     void handleSuccOfBB(IRBB * bb, BBSet const* bbset, PRSet const* prset,
                         ConstructCtx const& cstctx);
@@ -514,7 +419,7 @@ private:
     inline void init()
     {
         if (m_vp_pool != nullptr) { return; }
-        m_vp_count = 1;
+        m_vpr_count = 1;
         m_is_valid = false;
         m_prno2vprvec.set(m_rg->getPRCount(), nullptr);
         m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
@@ -529,9 +434,9 @@ private:
     bool isLiveOut(PRNO prno, UINT bbid);
 
     //Return true if stmt dominate use's stmt, otherwise return false.
-    bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
-                                LI<IRBB> const* li,
-                                OptCtx const& oc) const;
+    bool isStmtDomUseInsideLoop(
+        IR const* stmt, IR const* use, LI<IRBB> const* li,
+        OptCtx const& oc) const;
 
     //Rename opnd, except PHI.
     //Walk through RHS expression of 'ir' to rename PR's VPR.
@@ -540,26 +445,33 @@ private:
     //ir: may be Phi.
     void renameLHS(MOD IR * ir, PRSet const* prset,
                    MOD ConstructCtx & cstctx);
-    bool refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
-                       MOD List<IRBB*> & wl, MOD BitSet & in_list,
-                       IRListIter irct, OptCtx const& oc);
-    void rename(OUT ConstructCtx & cstctx, PRSet const& effect_prs,
-                BB2PRSet const& bb2definedprs,
-                xcom::DomTree const& domtree);
+    bool refinePhiImpl(
+        MOD IRBB * bb, MOD IR * ir, MOD List<IRBB*> & wl, MOD BitSet & in_list,
+        IRListIter irct, OptCtx const& oc);
+    void renameEntireCFG(
+        OUT ConstructCtx & cstctx, PRSet const& effect_prs,
+        BB2PRSet const& bb2definedprs, xcom::DomTree const& domtree);
+    void renameSSARegion(
+        OUT ConstructCtx & cstctx, PRSet const& prset,
+        BB2PRSet const& bb2definedprs, SSARegion const& ssarg);
     void renameBB(IRBB const* bb, PRSet const* prset,
                   MOD ConstructCtx & cstctx);
 
     //Linear renaming algorithm.
-    //bb2definedprs: for each BB, indicate PRs which has been defined.
-    //bbset: if not null, indicates perform the renaming inside designated
-    //       BB set.
-    void renameInDomTreeOrder(MOD IRBB * root, xcom::DomTree const& domtree,
-                              BB2PRSet const& bb2definedprs,
-                              BBSet const* bbset, PRSet const* prset,
-                              MOD ConstructCtx & cstctx);
+    //bb2definedprs: for each BB, describes PRs which have been defined.
+    //bbset: if not NULL, indicates the caller ask to perform the renaming
+    //       inside designated BB set.
+    //prset: if not NULL, indicates the caller ask to perform the renaming
+    //       inside designated PR set.
+    void renameInDomTreeOrder(
+        MOD IRBB * root, xcom::DomTree const& domtree,
+        BB2PRSet const& bb2definedprs, BBSet const* bbset, PRSet const* prset,
+        MOD ConstructCtx & cstctx);
     void removePhiList();
+    void reinitVPRForIR(PRSet const& prset, MOD IR * ir,
+                        OUT ConstructCtx & cstctx);
 
-    //The function record VPR object by given prno.
+    //The function records the corresponding VPR for given prno.
     void setVPRByPRNO(PRNO prno, VPR * vpr);
     void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
     void stripVersionForBBList(BBList const& bblst);
@@ -570,18 +482,17 @@ private:
 
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
-    void placePhiHelper(OUT ConstructCtx & cstctx,
-                        DfMgr const& dfm, PRSet const& prset,
-                        BBSet const* bbset, PR2DefBBSet const& pr2defbbset,
-                        BB2PRSet const& bb2definedprs);
+    void placePhiHelper(
+        OUT ConstructCtx & cstctx, DfMgr const& dfm, PRSet const& prset,
+        BBSet const* bbset, PR2DefBBSet const& pr2defbbset,
+        BB2PRSet const& bb2definedprs);
 
     //Insert phi for PR.
     //defbbs: record a list of BB that defined given PR identified by 'prno'.
-    void placePhiForPR(PRNO prno, OUT ConstructCtx & cstctx,
-                       List<IRBB*> const* defbbs,
-                       DfMgr const& dfm, xcom::BitSet & visited,
-                       List<IRBB*> & wl, BB2PRSet const& bb2definedprs,
-                       BBSet const* bbset);
+    void placePhiForPR(
+        PRNO prno, OUT ConstructCtx & cstctx, List<IRBB*> const* defbbs,
+        DfMgr const& dfm, xcom::BitSet & visited, List<IRBB*> & wl,
+        BB2PRSet const& bb2definedprs, BBSet const* bbset);
 
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
@@ -596,12 +507,14 @@ private:
                          bool is_vpinfo_avail, bool before_strip_version) const;
     bool verifyPrnoOfVPR() const; //Only used in PRSSAMgr.
     bool verifyVPR() const; //Only used in PRSSAMgr.
+    bool verifyMapBetweenPRNOAndVPR() const; //Only used in PRSSAMgr.
 public:
     explicit PRSSAMgr(Region * rg) : Pass(rg)
     {
         clean();
         ASSERT0(rg);
         m_tm = rg->getTypeMgr();
+        m_vm = rg->getVarMgr();
         m_irmgr = rg->getIRMgr();
         ASSERT0(m_tm);
         ASSERT0(rg->getMiscBitSetMgr());
@@ -618,8 +531,8 @@ public:
 
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
-    void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
-                                       PRSSAInfoCollect const& col);
+    void addSuccessorDesignatedPhiOpnd(
+        IRBB * bb, IRBB * succ, PRSSAInfoCollect const& col);
 
     //Allocate SSAInfo for expression and ensure it is unique according to prno.
     //Note the function generates initial-version SSAInfo for prno if prno is
@@ -647,7 +560,7 @@ public:
     static void addUseForTree(IR * to, IR const* from);
 
     //The function add 'exp' to be the USE of 'prno'.
-    void addUseToDedicatedPRNO(IR * exp)
+    void addUseToDedicatedPRNO(MOD IR * exp) const
     {
         ASSERT0(exp && exp->is_pr() && exp->getPrno() != PRNO_UNDEF);
         SSAInfo * ssainfo = getSSAInfoByPRNO(exp->getPrno());
@@ -665,13 +578,18 @@ public:
     //operate on PR.
     void buildDUChain(MOD IR * def, MOD IR * use);
 
-    //The function construct SSA for IR in given region.
-    //The IR list and related BB set are represented in region.
-    //ssarg: a region that records a list of PR that expect to transform to
-    //       SSA mode. It specified a set of BB that is used to describing
-    //       the region.
-    bool constructDesignatedRegion(PRSSARegion & ssarg,
-                                   xcom::DomTree const& domtree);
+    //The function constructs SSA mode for all PR operations that recorded
+    //in 'ssarg'.
+    //The IR list and related BBs should have been recorded in SSA-region.
+    //ssarg: a SSA-region that records a list of PR operations that are
+    //       expected to transform to SSA mode. It specified a set of BBs
+    //       that is used to describe the region.
+    //NOTE:
+    // 1. the SSA-region is independent to Region.
+    // 2. The function might recompute the liveness if necessary.
+    // 3. The function does NOT transform PR operations that are NOT recorded
+    //    in the SSA-region.
+    bool constructDesignatedRegion(SSARegion & ssarg);
 
     //Note: Non-SSA DU Chains of read/write PR will be clean and
     //unusable after SSA construction.
@@ -720,6 +638,9 @@ public:
     //This function dumps VPR structure and SSA DU info.
     //have_renamed: set true if PRs have been renamed in construction.
     void dumpAllVPR() const;
+    void dumpPRNO2VPR() const;
+    void dumpVPRRef() const;
+    void dumpVPRRefDetail() const;
     void dumpSSAGraph(CHAR const* name = nullptr) const;
 
     //Duplicate Phi operand that is at the given position, and insert after
@@ -780,6 +701,14 @@ public:
         return ir != nullptr && ir->is_phi();
     }
 
+    //Return true if exist USE to 'ir'.
+    //ir: must be stmt.
+    bool hasUse(IR const* ir) const;
+
+    //Return true if exist DEF to 'ir'.
+    //ir: must be exp.
+    bool hasDef(IR const* ir) const;
+
     //Return true if current bb has Phi with all same operand.
     //e.g: phi $1 = ($2, $2, $2), return true.
     //     phi $1 = (0x3, $2, $2), return false.
@@ -790,11 +719,12 @@ public:
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);
 
-    //Initialize VPR and Type for each PR.
+    //Initialize VPR and Type for each PR in the IR tree that rooted by 'ir'.
     //ir can be stmt or expression.
     //Note the function record the type that first met as the initial type of
     //specific Prno.
-    void initVPR(MOD IR * ir, PRSet const* prset, OUT ConstructCtx & cstctx);
+    void initVPRForIRTree(MOD IR * ir, OUT ConstructCtx & cstctx);
+    void initVPRForIR(MOD IR * ir, OUT ConstructCtx & cstctx);
 
     //Insert operand at given position.
     //pos: position of operand, start at 0.

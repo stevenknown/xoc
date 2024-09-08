@@ -36,6 +36,36 @@ author: Su Zhenyu
 
 namespace xoc {
 
+static void dumpTab(Region const* rg, LI<IRBB> const* li,
+                    ExactAccTab & etab, InexactAccTab & inetab)
+{
+    if (rg->isLogMgrInit()) { return; }
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
+        rg->getLogMgr()->incIndent(2);
+        note(rg, "\n==-- DUMP LoopInfo --==");
+        rg->getLogMgr()->incIndent(2);
+        li->dump(rg);
+        rg->getLogMgr()->decIndent(2);
+        etab.dump(rg);
+        inetab.dump(rg);
+        rg->getLogMgr()->decIndent(2);
+    }
+}
+
+
+static void dumpDeleMgr(DelegateMgr const& delemgr)
+{
+    if (delemgr.getRegion()->isLogMgrInit()) { return; }
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
+        //Note some members of delemgr will be free after a while.
+        //Dump info before that happened.
+        delemgr.getRegion()->getLogMgr()->incIndent(2);
+        delemgr.dump();
+        delemgr.getRegion()->getLogMgr()->decIndent(2);
+    }
+}
+
+
 static inline IR * genDirectMemAccess(IR const* ir, Region * rg, bool is_load,
                                       IR * rhs)
 {
@@ -430,7 +460,7 @@ void ExactAccTab::remove(MD const* md)
 //
 //START InexactAccTab
 //
-void InexactAccTab::dump(Region * rg) const
+void InexactAccTab::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP InexactAccessTab --==");
@@ -993,6 +1023,15 @@ bool RegPromot::checkIfExistOverlappedExactAcc(
     IR * ir, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
     MOD RPCtx & ctx)
 {
+    if (ir->is_any()) {
+        //CASE: given two references of 'x',
+        //  st:u32 'x' = ...
+        //  ...        = ld:any 'x'
+        //The two references of x may overlap because the
+        //inexact ANY type of LD.
+        return true;
+    }
+
     //Determine wherther current ir is overlapped with other elements
     //in memory reference tab.
     ExactAccTabIter it;
@@ -1001,6 +1040,14 @@ bool RegPromot::checkIfExistOverlappedExactAcc(
          !it.end(); exact_tab.get_next(it, &ref)) {
         if (!xoc::isDependent(ir, ref, is_aggressive(), m_rg)) {
             continue;
+        }
+        if (ref->is_any()) {
+            //CASE: given two references of 'x',
+            //  st:u32 'x' = ...
+            //  ...        = ld:any 'x'
+            //The two references of x may overlap because the
+            //inexact ANY type of LD.
+            return true;
         }
         if (ir->isArrayOp()) {
             UINT st = analyzeArrayStatus(ir, ref);
@@ -1560,8 +1607,9 @@ void RegPromot::handleEpilog(RestoreTab & restore2mem,
     RestoreTabIter ti;
     for (IR const* dele = restore2mem.get_first(ti);
          dele != nullptr; dele = restore2mem.get_next(ti)) {
-        IR * pr = m_rg->dupIRTree(delemgr.getPR(dele));
-        IR * restore = delemgr.genRestoreStmt(dele, pr);
+        IR const* promoted = delemgr.getPR(dele);
+        ASSERT0(promoted);
+        IR * restore = delemgr.genRestoreStmt(dele, m_rg->dupIRTree(promoted));
         restore2mem.setRestore(const_cast<IR*>(dele), restore);
         IR const* ir  = BB_irlist(exit_bb).get_head();
         if (ir != nullptr) {
@@ -1707,11 +1755,7 @@ void RegPromot::promoteExactAccess(
         exact_tab.collectOutsideLoopDU(md, dele, li, delemgr);
         ASSERT0(!((md == nullptr) ^ (dele == nullptr)));
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        //Note some members of delemgr will be free after a while.
-        //Dump info before that happened.
-        delemgr.dump();
-    }
+    dumpDeleMgr(delemgr);
     mi.clean();
     IR * de = nullptr;
     for (exact_tab.get_first(mi, &de);
@@ -1719,8 +1763,8 @@ void RegPromot::promoteExactAccess(
         //CASE:If whole IR tree is regards as delegate, the kids in the tree
         //should not be added into exact_tab.
         //if (d->is_undef()) { continue; }
-        promoteExactAccessDelegate(de, delemgr, li, ii, preheader,
-                                   exit_bb, exact_tab, ctx);
+        promoteExactAccessDelegate(
+            de, delemgr, li, ii, preheader, exit_bb, exact_tab, ctx);
     }
 }
 
@@ -1885,8 +1929,8 @@ void RegPromot::handleStmtInBody(
     occ->setRHS(nullptr); //Do NOT remove the DU chain of RHS of occ.
     xoc::removeStmt(occ, m_rg, *ctx.oc);
     //Substitute STPR for writing memory.
-    IR * stpr = getIRMgr()->buildStorePR(PR_no(delegate_pr),
-                                         delegate_pr->getType(), occrhs);
+    IR * stpr = getIRMgr()->buildStorePR(
+        PR_no(delegate_pr), delegate_pr->getType(), occrhs);
     m_rg->getMDMgr()->allocRef(stpr);
     stpr->copyAI(occ, m_rg);
     m_gvn->copyVN(stpr, occ);
@@ -1899,7 +1943,7 @@ void RegPromot::handleStmtInBody(
     BB_irlist(refbb).insert_after(stpr, ct);
     BB_irlist(refbb).remove(ct);
     occ2newocc.set(occ, stpr);
-    //Do not free occ here since it will be freed later.
+    //Note do NOT free occ here since it will be freed later.
 }
 
 
@@ -2007,17 +2051,17 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
     IRBB * preheader, MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    PRSSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
+    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
 
-    //Add all BB of loop to PRSSARegion.
+    //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
 
-    //Set root of PRSSARegion.
+    //Set root of SSARegion.
     ASSERT0(ctx.domtree);
     ssarg.setRootBB(ssarg.findRootBB(preheader));
 
     //Add STPR/PR which has prno 'deleprno' in init-stmt and restore-stmt
-    //to PRSSARegion.
+    //to SSARegion.
     DeleTab const& deletab = const_cast<DelegateMgr&>(delemgr).getDeleTab();
     DeleTabIter it;
     for (IR const* dele = deletab.get_first(it);
@@ -2038,7 +2082,7 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
         }
     }
 
-    //Add all newocc IRs into PRSSARegion.
+    //Add all newocc IRs into SSARegion.
     Occ2OccIter occit;
     IR * newocc = nullptr;
     for (IR * occ = occ2newocc.get_first(occit, &newocc);
@@ -2054,10 +2098,11 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
         m_rg->getPassMgr()->checkValidAndRecompute(
             ctx.oc, PASS_DOM, PASS_UNDEF);
     }
+    ctx.oc->setInvalidLiveness();
 
     //Infer and add those BBs that should be also handled in PRSSA construction.
     ssarg.inferAndAddRelatedBB();
-    m_prssamgr->constructDesignatedRegion(ssarg, *ctx.domtree);
+    m_prssamgr->constructDesignatedRegion(ssarg);
     OC_is_pr_du_chain_valid(*ctx.oc) = false;
     return true;
 }
@@ -2071,9 +2116,9 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
     MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    PRSSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
+    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
 
-    //Add all BB of loop to PRSSARegion.
+    //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
 
     IR const* pr = delemgr.getPR(dele);
@@ -2081,13 +2126,13 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
     PRNO deleprno = pr->getPrno();
     IR * init = delemgr.getInitStmt(dele);
     ASSERT0(init);
-    //Set root of PRSSARegion.
+    //Set root of SSARegion.
     ssarg.setRootBB(ssarg.findRootBB(init->getBB()));
 
-    //Add STPR/PR which has prno 'deleprno' in init IR tree to PRSSARegion.
+    //Add STPR/PR which has prno 'deleprno' in init IR tree to SSARegion.
     ssarg.add(deleprno, init);
 
-    //Add STPR/PR which has prno 'deleprno' in rest IR tree to PRSSARegion.
+    //Add STPR/PR which has prno 'deleprno' in rest IR tree to SSARegion.
     IR * restore = restore2mem.getRestore(dele);
     if (restore != nullptr) {
         ASSERT0(restore->getRHS());
@@ -2095,7 +2140,7 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
         ssarg.add(deleprno, restore);
     }
 
-    //Add all newocc IRs into PRSSARegion.
+    //Add all newocc IRs into SSARegion.
     Occ2OccIter it;
     IR * newocc = nullptr;
     for (IR * occ = occ2newocc.get_first(it, &newocc);
@@ -2111,7 +2156,8 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
             ("dominfo of preheader must have been maintained"));
     ASSERT0(ctx.domtree);
     ASSERT0(m_prssamgr);
-    m_prssamgr->constructDesignatedRegion(ssarg, *ctx.domtree);
+    ctx.oc->setInvalidLiveness();
+    m_prssamgr->constructDesignatedRegion(ssarg);
     OC_is_pr_du_chain_valid(*ctx.oc) = false;
     return true;
 }
@@ -2504,9 +2550,7 @@ void RegPromot::promoteInexactAccess(
         ASSERT0(dele);
         delemgr.collectOutsideLoopDefUse(occ, dele, li);
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        delemgr.dump();
-    }
+    dumpDeleMgr(delemgr);
     promoteInexactAccessDelegate(delemgr, li, preheader, exit_bb,
                                  inexact_tab, ii, ctx);
     //Note the delegate is one of references in 'inexact_tab'.
@@ -2611,14 +2655,7 @@ bool RegPromot::tryPromoteLoop(
         //to promote.
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        note(m_rg, "\n==-- DUMP LoopInfo --==");
-        m_rg->getLogMgr()->incIndent(2);
-        li->dump(m_rg);
-        m_rg->getLogMgr()->decIndent(2);
-        exact_tab.dump(m_rg);
-        inexact_tab.dump(m_rg);
-    }
+    dumpTab(m_rg, li, exact_tab, inexact_tab);
     exit_bb = tryInsertStubExitBB(exit_bb, exitedge, ctx);
     ASSERT0(exit_bb);
 
@@ -2728,8 +2765,8 @@ bool RegPromot::dumpBeforePass() const
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     dumpBBList(m_rg->getBBList(), m_rg);
-    m_rg->getLogMgr()->decIndent(2);
     Pass::dumpBeforePass();
+    m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
     return true;
 }
@@ -2784,8 +2821,8 @@ bool RegPromot::initSSAMgr(OptCtx const& oc)
 
 bool RegPromot::initLoopInfo(OptCtx & oc)
 {
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
-                                               PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_LOOP_INFO, PASS_UNDEF);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     return li != nullptr;
 }
@@ -2797,7 +2834,9 @@ bool RegPromot::initLoopDepAna(OptCtx & oc)
         PASS_LOOP_DEP_ANA));
     ASSERT0(m_loop_dep_ana);
     if (!m_loop_dep_ana->is_valid()) {
+        m_rg->getLogMgr()->tryIncIndent(2);
         m_loop_dep_ana->perform(oc);
+        m_rg->getLogMgr()->tryDecIndent(2);
     }
     return true;
 }

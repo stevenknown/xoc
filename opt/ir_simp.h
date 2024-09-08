@@ -396,6 +396,10 @@ private:
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
 protected:
+    //Some PRs do not carry dbx information, and this information needs to be
+    //copied from the parent.
+    void copyDbxFromParent(IR * ir);
+
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
     //Note that if ARRAY or ILD still not be lowered at the moment, regarding
@@ -487,53 +491,56 @@ public:
     virtual IR * simplifyWhileDoSelf(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
     virtual IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
-    virtual void simplifySelectKids(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyDirectMemOp(IR * ir, SimpCtx * cont);
+    virtual void simplifySelectKids(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDirectMemOp(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyIndirectStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyIndirectExp(IR * ir, SimpCtx * ctx);
-    virtual IR * simplifyIndirectMemOp(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyIndirectMemOp(IR * ir, SimpCtx * ctx);
     virtual void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
     virtual IR * simplifySetelem(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    virtual IR * simplifyCall(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyIf(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyWhileDo(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyDoWhile (IR * ir, SimpCtx * cont);
-    virtual IR * simplifyDoLoop(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyDet(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyJudgeDet(IR * ir, SimpCtx * cont);
-    virtual IR * simplifySelect(IR * ir, SimpCtx * cont);
-    virtual IR * simplifySwitch (IR * ir, SimpCtx * cont);
+    virtual IR * simplifyCall(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyIf(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyWhileDo(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDoWhile (IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDoLoop(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyDet(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyJudgeDet(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySelect(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySwitch (IR * ir, SimpCtx * ctx);
     virtual IR * simplifyReturn(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyCase(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyGoto(IR * ir, SimpCtx * ctx);
-    virtual IR * simplifyIgoto(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyArray(IR * ir, SimpCtx * cont);
-    IR * simplifyExpressionList(IR * irlst, SimpCtx * cont);
+    virtual IR * simplifyIgoto(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyArrayAddrExp(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyArray(IR * ir, SimpCtx * ctx);
+    IR * simplifyExpressionList(IR * irlst, SimpCtx * ctx);
 
     //Return new generated expression's value.
     //ir: ir may be in parameter list if its prev or next is not empty.
-    virtual IR * simplifyExpression(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyStmt(IR * ir, SimpCtx * cont);
-    virtual IR * simplifyStmtList(IR * ir, SimpCtx * cont);
-    virtual void simplifyBB(IRBB * bb, SimpCtx * cont);
-    virtual void simplifyBBlist(BBList * bbl, SimpCtx * cont);
-    virtual void simplifyIRList(SimpCtx * cont);
-    virtual IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
+    virtual IR * simplifyExpression(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyStmt(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyStmtList(IR * ir, SimpCtx * ctx);
+    virtual void simplifyBB(IRBB * bb, SimpCtx * ctx);
+    virtual void simplifyBBlist(BBList * bbl, SimpCtx * ctx);
+    virtual void simplifyIRList(SimpCtx * ctx);
+    virtual IR * simplifyLogicalNot(IN IR * ir, SimpCtx * ctx);
     virtual IR * simplifyLogicalOrAtFalsebr(IN IR * ir,
                                             LabelInfo const* tgt_label);
     virtual IR * simplifyLogicalOrAtTruebr(IN IR * ir,
                                            LabelInfo const* tgt_label);
-    virtual IR * simplifyLogicalOr(IN IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLogicalOr(IN IR * ir, SimpCtx * ctx);
     virtual IR * simplifyLogicalAndAtTruebr(IN IR * ir,
                                             LabelInfo const* tgt_label);
     virtual IR * simplifyLogicalAndAtFalsebr(IN IR * ir,
                                              LabelInfo const* tgt_label);
-    virtual IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * cont);
-    virtual IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
+    virtual IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx);
+    IR * simplifyLogicalAndOrInDet(IN IR * ir, SimpCtx * ctx);
+    IR * simplifyLogicalNotInDet(IN IR * ir, SimpCtx * ctx);
+    IR * simplifyRelationInDet(IN IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyLogicalDet(IR * ir, SimpCtx * ctx);
 
     //Simplify ir to PR mode.
     virtual IR * simplifyToPR(IR * ir, SimpCtx * ctx);

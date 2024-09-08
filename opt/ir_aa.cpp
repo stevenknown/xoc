@@ -32,9 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
+#include "comopt.h"
 
 //#define USE_LOOPINFO
 #define PARTIAL_UPDATE
@@ -2592,7 +2590,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
 
     MD md;
     MD_base(&md) = tv;
-    //Use UNBOUND to guarrantee the abstract heap object will not be
+    //Use UNBOUND to guarantee the abstract heap object will not be
     //regared as must-exact object that will confuse killing computation.
     MD_ty(&md) = MD_UNBOUND;
     MD const* entry = m_md_sys->registerMD(md);
@@ -4187,8 +4185,8 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         initEntryPTS(ppsetmgr);
         computeFlowInsensitive();
         END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
-    }
-    OC_is_aa_valid(oc) = true;
+    }    
+    oc.setValidPass(PASS_AA);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAA()) {
         dump();
     }

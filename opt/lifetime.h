@@ -34,6 +34,7 @@ namespace xoc {
 #define POS_UNDEF 0
 #define POS_INIT_VAL 1
 #define CROSS_CALL_NUM_THRESHOLD 2
+#define REGION_START_POS 2
 
 class LifeTime;
 class LifeTimeMgr;
@@ -202,14 +203,47 @@ public:
 };
 
 
+typedef enum {
+    LT_FLAG_UNDEF = 0,
+
+    //Used to indicate the current lifetime has a DEF occurence or not in
+    //the responding occ list, usually a lifetime has more one DEF occurence.
+    //But if a lifetime does not has a DEF occurence, that means the IRs using
+    //this lifetime do not care the content of the register, so this lifetime
+    //doesn't need to be spilled to memory to store the original value
+    LT_FLAG_HAS_DEF = 0x1,
+
+    //Used to indicate this lifetime is dedicated or not.
+    LT_FLAG_IS_DEDICATED = 0x2,
+
+    //Used to indicate the current lifetime is forced to spill or not.
+    //Usually, this flag is set only if there is no occurence after the split
+    //position.
+    LT_FLAG_SPILL_FORCED = 0x4,
+
+    //Used to indicate the current lifetime is forced to reload or not.
+    //Usually, this flag is set only if it is started with a fake-use IR
+    //inserted by the backward analysis.
+    LT_FLAG_RELOAD_FORCED = 0x8,
+} LT_ATTR_FLAG;
+
+
+class LTAttrFlag : public UFlag {
+public:
+    LTAttrFlag(UINT v) : UFlag(v) {}
+};
+
 class LifeTime {
     COPY_CONSTRUCTOR(LifeTime);
-    bool m_is_dedicated;
 
     //Used to record the number of calls intersected with the whole lifetime
     //except holes, this is not an accurate number, if this number is greater
     //than the CROSS_CALL_NUM_THRESHOLD, it will not be updated.
     BYTE m_call_crossed_num;
+
+    //Used to store the attributes of current lifetime.
+    LTAttrFlag m_flag;
+
     PRNO m_prno;
 
     //Here we use m_parent and m_ancestor to record the new lifetimes that
@@ -254,17 +288,23 @@ class LifeTime {
     // POS: 2   5          17               34 37  41          53            67
     LifeTime const* m_parent;
     LifeTime const* m_ancestor;
+
     double m_priority;
     double m_spill_cost;
     RangeVec m_range_vec;
     OccList m_occ_list;
+
+    //Used to store the descendant lifetime created during split.
+    LTList m_child;
 public:
-    LifeTime(PRNO prno) : m_is_dedicated(false), m_call_crossed_num(0),
-        m_prno(prno), m_parent(nullptr)
+    LifeTime(PRNO prno) : m_call_crossed_num(0), m_flag(0), m_prno(prno),
+        m_parent(nullptr)
     { m_ancestor = this; }
     Range addRange(Pos start, Pos end);
     Range addRange(Pos start) { return addRange(start, start); }
     void addOcc(Occ occ);
+    void addChild(LifeTime * lt) { m_child.append_tail(lt); }
+    LTList const& getChild() { return m_child; }
 
     //Clean the position from 'pos'(include pos).
     //e.g:lifetime range is <1-10><15-30>, given position is 16, the
@@ -297,6 +337,7 @@ public:
 
     LifeTime const* getAncestor() const { return m_ancestor; }
     PRNO getAnctPrno() const { return m_ancestor->getPrno(); }
+    LTAttrFlag getAttrFlag() const { return m_flag; }
     BYTE getCallCrossedNum() const { return m_call_crossed_num; }
     UINT getRangeNum() const
     { return const_cast<LifeTime*>(this)->getRangeVec().get_elem_count(); }
@@ -338,6 +379,9 @@ public:
 
     void incCallCrossedNum(UINT num) { m_call_crossed_num += num; }
 
+    void inheritAttrFlag(LifeTime * lt)
+    { m_flag.set(lt->getAttrFlag().getFlagSet()); }
+
     bool isAncestor() const { return this == m_ancestor; }
 
     //Return true if current lifetime contains the position.
@@ -376,8 +420,17 @@ public:
     //      lt:        |---|         |--|
     bool is_intersect(LifeTime const* lt) const;
 
+    //Return true if the occ has a DEF.
+    bool isOccHasDef() const { return m_flag.have(LT_FLAG_HAS_DEF); }
+
     //Return true if current lifetime is dedicated.
-    bool is_dedicated() const { return m_is_dedicated; }
+    bool is_dedicated() const { return m_flag.have(LT_FLAG_IS_DEDICATED); }
+
+    //Return true if current lifetime is forced to spill.
+    bool isReloadForced() const { return m_flag.have(LT_FLAG_RELOAD_FORCED); }
+
+    //Return true if current lifetime is forced to spill.
+    bool isSpillForced() const { return m_flag.have(LT_FLAG_SPILL_FORCED); }
 
     //Return true if 'ir' is an DEF occurrence of current lt.
     bool isDefOcc(IR const* ir) const
@@ -400,7 +453,10 @@ public:
 
     //Set current lifetime to be deidcated, that means the lifetime must
     //assign dedicated register.
-    void set_dedicated(bool is) { m_is_dedicated = is; }
+    void setDedicated() { m_flag.set(LT_FLAG_IS_DEDICATED); }
+
+    void setOccHasDef() { m_flag.set(LT_FLAG_HAS_DEF); }
+
     void setRange(VecIdx idx, Range r);
     void setLastRange(Range r)
     {
@@ -411,6 +467,8 @@ public:
     void setParent(LifeTime const* parent) { m_parent = parent; }
     void setPriority(double pri) { m_priority = pri; }
     void setSpillCost(double cost) { m_spill_cost = cost; }
+    void setSpillForced() { m_flag.set(LT_FLAG_SPILL_FORCED); }
+    void setReloadForced() { m_flag.set(LT_FLAG_RELOAD_FORCED); }
 
     //Shrink the lifetime forward to the last occ position.
     void shrinkForwardToLastOccPos();

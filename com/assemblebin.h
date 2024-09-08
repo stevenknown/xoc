@@ -55,7 +55,7 @@ public:
 
     //bs: bit size of given binary value.
     //buf: a buffer that hold the binary value. Note user should have to
-    //     guarrantee that 'bs' and 'buf' match each other.
+    //     guarantee that 'bs' and 'buf' match each other.
     //e.g:if we describe binary value 0xAAAABBBBCCCCDDDDEE in 'buf',
     //then bs should be 72.
     //Note if the binary bit size is less than BIN_WORD_SIZE, the constructor

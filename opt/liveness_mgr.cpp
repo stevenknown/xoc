@@ -433,6 +433,24 @@ void LivenessMgr::initSet(BBList const& bblst)
 }
 
 
+void LivenessMgr::setLivenessForEmptyBB(IRBB const* empty_bb, IRBB const* from)
+{
+    ASSERT0(empty_bb && from);
+    ASSERT0(empty_bb->is_empty());
+    ASSERT0(m_rg->getCFG()->is_pred(empty_bb->getVex(), from->getVex()));
+    ASSERT0(empty_bb->getVex()->getInDegree() == 1);
+    ASSERT0(empty_bb->getVex()->getOutDegree() == 1);
+    PRLiveSet const* live_set = get_liveout(from->id());
+    ASSERT0(live_set);
+
+    //Here we use the liveout of the predecessor BB as the liveset to be set
+    //for the empty latch BB, because this liveset is the subset of the livein
+    //of the successor BB, and this liveset is more accurate.
+    set_liveout(empty_bb->id(), live_set);
+    set_livein(empty_bb->id(), live_set);
+}
+
+
 //Note this function still not consider PHI effect properly.
 //e.g:  BB1:          BB2:
 //      st $4 = 0     st $3 = 1

@@ -90,6 +90,7 @@ void dumpIRList(IR const* ir_list, Region const* rg,
                 CHAR const* attr = nullptr,
                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
 void dumpIRList(IRList const& ir_list, Region const* rg);
+void dumpIRList(ConstIRList const& ir_list, Region const* rg);
 void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 
@@ -144,6 +145,40 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx & ctx);
 void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+
+//The class provides an approach to redirect the result of normal dump
+//functions to user's buffer.
+//USAGE: To redirect user's dump behaviors to a given buffer, user only need
+//to define a new Dump class and public from the 'DumpToBuf'. Then override
+//the interface 'dump()' by implementing user's actual dump behaviors. User
+//can search for the example in ir_dump.cpp.
+class DumpToBuf {
+protected:
+    UINT m_indent; //the indent to user's dump information.
+    Region const* m_rg;
+    LogMgr * m_lm;
+    xcom::StrBuf & m_outbuf; //records the user's dump-buffer.
+
+    //The indent of user's dump information is set to 0 by default.
+    static UINT const g_default_indent = 0;
+protected:
+    //The function is an interface to encapsulate the user's dump behaviors.
+    //User should rewrite the function with normal dump functions without
+    //considering how to put info into the buffer 'outbuf'.
+    virtual void dumpUserInfo() const
+    {
+        //Target Dependent Code
+        ASSERT0(0);
+    }
+    Region const* getRegion() const { return m_rg; }
+public:
+    DumpToBuf(Region const* rg, xcom::StrBuf & outbuf,
+              UINT indent = g_default_indent);
+    //The function dump user designated information to given buffer.
+    //Return the buffer pointer to facilate the scenarios that the returned
+    //buffer is used in parameter of a call.
+    CHAR const* dump() const;
+};
 
 } //namespace xoc
 #endif

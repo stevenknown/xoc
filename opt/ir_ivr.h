@@ -117,6 +117,13 @@ public:
     LI<IRBB> const* getLI() const { return IV_li(this); }
 
     //Get the MD of IR stmt that represents the IV in reduction operation.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction operation, and $10 in #S1 is the stmt-occ in
+    //  reduction operation.
+    //  The function will return the Must-Ref MD of $10.
     MD const* getStmtOccMD() const
     {
         ASSERT0(getRedStmt());
@@ -124,6 +131,13 @@ public:
     }
 
     //Get the Var of IR stmt that represents the IV in reduction operation.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction operation, and $10 in #S1 is the stmt-occ in
+    //  reduction operation.
+    //  The function will return the Var of $10.
     Var const* getStmtOccVar() const
     {
         ASSERT0(getStmtOccMD());
@@ -131,28 +145,41 @@ public:
     }
 
     //Get the MD of IR expression that represents the IV in reduction operation.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction operation, and $8 in #S1 is the exp-occ in
+    //  reduction operation.
     MD const* getExpOccMD() const
     {
         //Reduction exp may be NULL if current IV is DIV.
         return getRedExp() != nullptr ? getRedExp()->getRefMD() : nullptr;
     }
 
-    //Get the Var of IR expression that represents the IV in
-    //reduction operation.
+    //Get the Var of IR expression that represents the IV in reduction
+    //operation.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction operation, and $8 in #S1 is the exp-occ in
+    //  reduction operation.
+    //  The function will return the Var of $8.
     Var const* getExpOccVar() const
     {
         ASSERT0(getExpOccMD());
         return getExpOccMD()->get_base();
     }
 
-    //Return the string name of stmt IV variable.
+    //Return the string name of variable of stmt-occ of IV.
     CHAR const* getStmtOccVarName() const
     {
         ASSERT0(getStmtOccMD());
         return getStmtOccMD()->get_base()->get_name()->getStr();
     }
 
-    //Return the string name of expression IV variable.
+    //Return the string name of variable of exp-occ of IV.
     CHAR const* getExpOccVarName() const
     {
         ASSERT0(getExpOccMD());
@@ -162,22 +189,75 @@ public:
     //Return the reduction stmt of IV. Note reduction stmt indicates the
     //occrrence of IV in loop body.
     //Reduction is the unique stmt that defined IV in loop body.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction stmt operation, and both $10 and $8 in #S1
+    //  are the IV variables.
+    //  The function will return stpr $10.
     IR const* getRedStmt() const { return IV_reduction_stmt(this); }
 
     //Return the computation expression of reduction operation.
     //Note the reduce-exp may be not the RHS of reduce-stmt.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction stmt operation, and both $10 and $8 in #S1
+    //  are the IV variables.
+    //  The function will return pr $8.
     IR const* getRedExp() const { return IV_reduction_exp(this); }
     IVVal const& getInitVal() const { return IV_initv(this); }
     IVVal const& getStepVal() const { return IV_stepv(this); }
+
+    //Return the type of exp-occ of reduction operation.
+    //Note the reduce-exp may be not the RHS of reduce-stmt.
+    //In SSA mode, the Def and Use of IV may not be same variable.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 1 #S1
+    //  where #S1 is the reduction stmt operation, and both $10 and $8 in #S1
+    //  are the IV variables.
+    //  The function will return the type of $8.
+    Type const* getIVType() const
+    { ASSERT0(getRedExp()); return getRedExp()->getType(); }
 
     //Get the IV step integer value.
     //Note the float-point type step value should able to be converted to
     //integer, otherwise, step computation, such as: i+=1.5f, is not
     //supported by IVR.
+    //e.g: phi $8 = $9, $10
+    //     ....
+    //     $10 = add $8, 4 #S1
+    //  where #S1 is the reduction stmt operation, and both $10 and $8 in #S1
+    //  are the IV variables, 4 is the step value.
+    //  The function will return 4.
     HOST_INT getStepValInt() const
     {
         ASSERT0(isStepValInt());
         return getStepVal().getInt();
+    }
+
+    //Get the float-point step value if IV is float-point type.
+    HOST_FP getStepValFP() const
+    {
+        ASSERT0(isStepValFP());
+        return getStepVal().getFP();
+    }
+
+    //Get the step memory descriptor if IV is variable.
+    MD const* getStepValMD() const
+    {
+        ASSERT0(isStepValVar());
+        return getStepVal().getMD();
+    }
+
+    //Get the step memory descriptor if IV is variable.
+    IR const* getStepValExp() const
+    {
+        ASSERT0(isStepValExp());
+        return getStepVal().getExp();
     }
 
     //Return true if IV found initial-value.
@@ -186,16 +266,29 @@ public:
     //Return true if IV found step-value.
     bool hasStepVal() const { return !IV_stepv(this).is_undef(); }
 
+    //Return true if IV is increasing positive.
+    //Otherwise the function know nothing about the direction.
+    inline bool isInc() const;
+
+    //Return true if IV is increasing negative.
+    //Otherwise the function know nothing about the direction.
+    inline bool isDec() const;
+
     //Return true if current IV is basic IV.
     bool is_biv() const { return m_is_biv; }
 
     //Return true if current IV is derived IV.
     bool is_div() const { return !is_biv(); }
 
-    //Return true if 'ir' represent the reference of current IV.
+    //Return true if 'ir' represents the reference of current IV.
     bool isRefIV(IR const* ir) const;
 
-    //Return true if 'ref' represent the reference of current IV.
+    //Return true if IR tree that rooted by 'ir' represents the reference
+    //of current IV.
+    //refiv: record the IR that referenced the IV.
+    bool isIRTreeRefIV(IR const* ir, OUT IR const** refiv) const;
+
+    //Return true if 'ref' represents the reference of current IV.
     bool isRefIV(MD const* ref) const;
 
     //Return true if step value is integer.
@@ -220,6 +313,7 @@ public:
     BIV() { ::memset((void*)this, 0, sizeof(BIV)); }
 
     void dump(Region const* rg) const;
+    CHAR const* dumpBuf(Region const* rg, OUT StrBuf & outbuf) const;
 
     //Return true if initial value is const.
     bool isInitConst() const { return isInitConstInt() || isInitConstFP(); }
@@ -314,6 +408,9 @@ public:
     //Generate the IR expression of step value of BIV.
     IR * genStepExp(IRMgr * irmgr) const;
 
+    //Generate the IR expression of reduce operation to step value of BIV.
+    IR * genStepReduceExp(IRMgr * irmgr) const;
+
     //Generate the IR expression to compare the BIV and end bound.
     IR * genBoundExp(IVBoundInfo const& boundinfo, IVR const* ivr,
                      IRMgr * irmgr, Region * rg) const;
@@ -340,6 +437,16 @@ public:
     IV::INCDIR getIncDir() const;
 
     ChainRec const* getChainRec() const { return DIV_chain_rec(this); }
+
+    //Get the IV variable that derived from BIV.
+    Var const* getInitIVVar() const
+    {
+        ChainRec const* cr = getChainRec();
+        IVVal const& crinit = cr->getInit();
+        if (!crinit.is_var()) { return nullptr; }
+        ASSERT0(crinit.getVar());
+        return crinit.getVar();
+    }
 
     //Return true if ir represents a reference to current DIV.
     bool isRefDIV(IR const* ir) const { return isRefIV(ir); }
@@ -396,7 +503,10 @@ public:
     IR const* m_biv_end_bound_stmt;
 public:
     IVBoundInfo() { ::memset((void*)this, 0, sizeof(IVBoundInfo)); }
+
     void dump(Region const* rg) const;
+    void dumpBuf(Region const* rg, xcom::StrBuf & buf) const;
+
     IR const* getBound() const { return IVBI_iv_end_bound_stmt(*this); }
     HOST_INT getTCImm() const
     {
@@ -420,14 +530,19 @@ class IVRCtx {
     COPY_CONSTRUCTOR(IVRCtx);
 public:
     OptCtx * m_oc;
-    ActMgr * m_act_mgr;
+    ActMgr * m_am;
+    Region const* m_rg;
 public:
-    IVRCtx(OptCtx * oc, ActMgr * am = nullptr) { m_oc = oc; m_act_mgr = am; }
+    IVRCtx(Region const* rg, OptCtx * oc, ActMgr * am = nullptr)
+    { m_rg = rg; m_oc = oc; m_am = am; }
 
     void dumpAct(CHAR const* format, ...) const;
+    void dumpAct(IR const* ir, CHAR const* format, ...) const;
+    void dumpAct(BIV const* biv, CHAR const* format, ...) const;
 
+    Region const* getRegion() const { return m_rg; }
     OptCtx * getOptCtx() const { return m_oc; }
-    ActMgr * getActMgr() const { return m_act_mgr; }
+    ActMgr * getActMgr() const { return m_am; }
 };
 
 
@@ -549,6 +664,9 @@ public:
         delete m_sbs_mgr;
     }
 
+    IR * buildLoadIV(IV const* iv, Type const* ty) const;
+    IR * buildLoadIV(IV const* biv) const;
+
     void clean();
 
     //The function try to evaluate the constant trip-count for given 'li'.
@@ -580,18 +698,25 @@ public:
     //  maximum/minimum value of 'bexp'.
     //  e.g:i <= N, is_closed_range is true.
     //      i <  N, is_closed_range is false.
-    bool extractIVBoundExpFromStmt(IV const* iv, IR const* stmt,
-                                   OUT IR const** ivref,
-                                   OUT IR const** bexp,
-                                   OUT bool * is_closed_range) const;
+    bool extractIVBoundExpFromStmt(
+        IV const* iv, IR const* stmt, OUT IR const** ivref, OUT IR const** bexp,
+        OUT bool * is_closed_range) const;
 
     //Given loop id, return the BIV list.
     BIVList const* getBIVList(UINT loopid) const
     { return m_li2bivlst.get(loopid); }
 
+    //Given loop id, return the DIV list.
+    DIVList const* getDIVList(UINT loopid) const
+    { return m_li2divlst.get(loopid); }
+
     //Given loop 'li', return the BIV list.
     BIVList const* getBIVList(LI<IRBB> const* li) const
     { return getBIVList(li->id()); }
+
+    //Given loop 'li', return the DIV list.
+    DIVList const* getDIVList(LI<IRBB> const* li) const
+    { return getDIVList(li->id()); }
 
     virtual CHAR const* getPassName() const
     { return "Induction Variable Recogization"; }
@@ -599,9 +724,9 @@ public:
     ActMgr * getActMgr() const { return m_act_mgr; }
 
     //Generate the expression that represents 'biv' trip-count.
-    IR * genTripCountExp(BIV const* biv, IR const* initexp,
-                         IR const* boundexp, HOST_INT step,
-                         MOD IVRCtx & ivrctx) const;
+    IR * genTripCountExp(
+        BIV const* biv, IR const* initexp, IR const* boundexp,
+        IR const* stepexp, MOD IVRCtx & ivrctx) const;
 
     //Return true if ir is expression that represent the multiple of IV.
     //e.g: iv or n*iv
@@ -615,15 +740,24 @@ public:
     //Return true if ir is relaxed linear-representation about IV.
     //The function try to find the standard linear-expression such as: a*i+b,
     //moreover it permits extra loop invariant factor in the expression,
-    //such as (i + c)*8 + a - 7, where c, a are loop invariant expression.
+    //such as (i + c)*8 + a - 7, where c and a are loop invariant expressions,
+    //we call the expression relax-linear-representation of IV 'i'.
     //invstmtlst: optional, record the analysis result of LICM that indicates
     //            whether a stmt is invariant stmt.
     //linrep: record the linear-representation that found.
     //lrmgr: used to allocate IR expression for linear-representation.
-    bool isRelaxLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
-                              InvStmtList const* invstmtlst, OptCtx const* oc,
-                              OUT IVLinearRep * linrep,
-                              MOD LinearRepMgr & lrmgr) const;
+    bool isRelaxLinearRepOfBIV(
+        LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+        OptCtx const* oc, OUT IVLinearRep * linrep,
+        MOD LinearRepMgr & lrmgr) const;
+    bool isRelaxLinearRepOfDIV(
+        LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+        OptCtx const* oc, OUT IVLinearRep * linrep,
+        MOD LinearRepMgr & lrmgr) const;
+    bool isRelaxLinearRepOfIV(
+        LI<IRBB> const* li, IR const* ir, InvStmtList const* invstmtlst,
+        OptCtx const* oc, OUT IVLinearRep * linrep,
+        MOD LinearRepMgr & lrmgr) const;
 
     //Return true if ir is linear-representation about IV.
     //The function find the expression such as: a*i+b, where a is at least 1,
@@ -652,13 +786,56 @@ public:
 
     bool is_aggressive() const { return m_is_aggressive; }
 
+    virtual bool perform(OptCtx & oc);
+
     void setOnlyHandleExactMD(bool doit) { m_is_only_handle_exact_md = doit; }
 
     //Inform the pass to perform optimization aggressively.
     void setAggressive(bool doit);
 
-    virtual bool perform(OptCtx & oc);
+    //The function try to build a stmt by given IV that initialize the IV.
+    //Return the stmt if successful, otherwise return NULL.
+    IR * tryBuildInitStmtOfIV(IR const* resref, IV const* iv) const;
+
+    //The function try to build a stmt by given IV that perform the reduction
+    //operation of the IV.
+    //Return the stmt if successful, otherwise return NULL.
+    //Note if iv could NOT tell the direction of IV, namely increment or
+    //decrement, the function return NULL.
+    IR * tryBuildReduceStmtOfIV(
+        IR const* resref, IV const* iv, HOST_UINT step) const;
+    IR * tryBuildReduceStmtOfIV(IV const* iv, HOST_UINT step) const;
+
+    //The function try to build reduce-operation according to IV info of 'iv'.
+    //step: the step value that IV reduced.
+    //      e.g: k = i + X, where i and k belongs are IV, X is the step value.
+    //loadiv: record the memory-load-operation of IV.
+    //        e.g: k = i + X, loadiv records the load of 'i'.
+    //Note if iv could NOT tell the direction of IV, namely increment or
+    //decrement, the function return NULL.
+    IR * tryBuildReduceExpOfIV(
+        IV const* iv, HOST_UINT step, OUT IR ** loadiv) const;
+
+    //The function try to build a stmt by given IVVal that initialize the IV.
+    //Return the stmt if successful, otherwise return NULL.
+    IR * tryBuildInitStmtByIVVal(IR const* resref, IVVal const& initv) const;
 };
+
+
+//
+//START IV
+//
+inline bool IV::isInc() const
+{
+    return is_biv() ? ((BIV*)this)->isInc() : ((DIV*)this)->isInc();
+}
+
+
+inline bool IV::isDec() const
+{
+    return is_biv() ? ((BIV*)this)->isDec() : ((DIV*)this)->isDec();
+}
+//END IV
 
 } //namespace xoc
 #endif

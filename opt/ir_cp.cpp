@@ -36,6 +36,61 @@ author: Su Zhenyu
 
 namespace xoc {
 
+static void dumpAct(
+    CopyProp * cp, IR const* def_stmt, IR const* prop_value,
+    IR const* use)
+{
+    Region const* rg = cp->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    class Dump : public xoc::DumpToBuf {
+    public:
+        CopyProp const* cp;
+        IR const* def_stmt;
+        IR const* prop_value;
+        IR const* use;
+        MDSSAMgr * mdssamgr;
+        Dump(Region const* rg, xcom::StrBuf & buf) : DumpToBuf(rg, buf, 2)
+        { mdssamgr = rg->getMDSSAMgr(); }
+        virtual void dumpUserInfo() const override
+        {
+            Region const* rg = getRegion();
+            note(getRegion(),
+                 "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
+                 DumpIRName().dump(prop_value));
+            rg->getLogMgr()->incIndent(2);
+            xoc::dumpIR(def_stmt, rg, nullptr,
+                        DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
+            rg->getLogMgr()->decIndent(2);
+ 
+            note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
+                 DumpIRName().dump(use));
+            rg->getLogMgr()->incIndent(2);
+            if (use->is_id()) {
+                ASSERT0(mdssamgr);
+                MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->
+                    getMDSSAInfo(use);
+                ASSERT0_DUMMYUSE(mdssainfo);
+                ASSERT0(ID_phi(use));
+                note(getRegion(), "\n");
+                ID_phi(use)->dump(rg, mdssamgr->getUseDefMgr());
+            } else {
+                ASSERT0(use->getStmt());
+                xoc::dumpIR(use->getStmt(), rg, nullptr,
+                    DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
+            }
+            rg->getLogMgr()->decIndent(2);
+        }
+    };
+    xcom::StrBuf buf(32);
+    Dump d(rg, buf);
+    d.cp = cp;
+    d.def_stmt = def_stmt;
+    d.prop_value = prop_value;
+    d.use = use;
+    cp->getActMgr().dump("%s", d.dump());
+}
+
+
 //
 //START PropVisit
 //
@@ -53,8 +108,8 @@ public:
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> &)
+    virtual void visitWhenAllKidHaveBeenVisited(
+        Vertex const* v, Stack<Vertex const*> &)
     {}
     virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
@@ -68,7 +123,8 @@ public:
 //
 //START CopyProp
 //
-CopyProp::CopyProp(Region * rg) : Pass(rg), m_prop_kind(CP_PROP_UNDEF)
+CopyProp::CopyProp(Region * rg) :
+    Pass(rg), m_prop_kind(CP_PROP_UNDEF), m_am(rg)
 {
     m_md_sys = rg->getMDSystem();
     m_dumgr = rg->getDUMgr();
@@ -176,19 +232,18 @@ void CopyProp::copyVN(IR const* from, IR const* to) const
 //depends on later Redundancy Elimination to reverse back.
 //exp: expression that will be replaced.
 //cand_exp: substitute cand_exp for exp.
-//    e.g: cand_exp is *p, cand_exp_md is MD3
-//        *p(MD3) = 10 //p point to MD3
-//        ...
-//        g = *q(MD3) //q point to MD3
+//  e.g: cand_exp is *p, cand_exp_md is MD3
+//      *p(MD3) = 10 //p point to MD3
+//      ...
+//      g = *q(MD3) //q point to MD3
 void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_exp);
     ASSERT0(exp->getExactRef() || allowInexactMD() ||
             exp->is_id() || //exp is operand of MD PHI
             exp->is_pr());  //exp is operand of PR PHI
-    if (!checkTypeConsistency(exp, cand_exp)) {
-        return;
-    }
+    if (!checkTypeConsistency(exp, cand_exp)) { return; }
+
     //The memory that 'exp' pointed to is same to 'cand_exp' because
     //cand_exp has been garanteed that will not change in propagation
     //interval.
@@ -266,8 +321,8 @@ bool CopyProp::isCopyOP(IR * ir) const
 }
 
 
-bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
-                                 IRBB const* meetup) const
+bool CopyProp::existMayDefTillBB(
+    IR const* exp, IRBB const* start, IRBB const* meetup) const
 {
     xcom::GraphIterIn iterin(*m_cfg, start->getVex());
     for (Vertex const* t = iterin.get_first();
@@ -290,9 +345,8 @@ bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
 //def_stmt: the stmt of 'prop_value'.
 //prop_value: the expression to be propagated.
 //nextit: the iter of the next IR of 'def_stmt'.
-bool CopyProp::existMayDefTillEndOfCurBB(IR const* def_stmt,
-                                         IR const* prop_value,
-                                         IRListIter const& curit) const
+bool CopyProp::existMayDefTillEndOfCurBB(
+    IR const* def_stmt, IR const* prop_value, IRListIter const& curit) const
 {
     ASSERT0(curit);
     ASSERT0(curit->val());
@@ -311,9 +365,9 @@ bool CopyProp::existMayDefTillEndOfCurBB(IR const* def_stmt,
 
 //Both def_stmt and use_stmt are in same BB.
 //curit: the IR list iter of 'def_stmt'.
-bool CopyProp::isAvailableInSameBB(IR const* def_stmt, IR const* use_stmt,
-                                   IR const* prop_value,
-                                   IRListIter const& curit) const
+bool CopyProp::isAvailableInSameBB(
+    IR const* def_stmt, IR const* use_stmt, IR const* prop_value,
+    IRListIter const& curit) const
 {
     IRBB * defbb = def_stmt->getBB();
     IR * ir = curit->val();
@@ -443,8 +497,7 @@ bool CopyProp::isLowCostCVT(IR const* ir) const
         SWITCH_CASE_READ_PR:
         case IR_LDA:
             return true;
-        default:
-            return false;
+        default: return false;
         }
     }
     UNREACHABLE();
@@ -514,8 +567,7 @@ bool CopyProp::isSimpCVT(IR const* ir) const
                 return false;
             }
             return true;
-        default:
-            return false;
+        default: return false;
         }
     }
     UNREACHABLE();
@@ -547,8 +599,7 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
                 UNREACHABLE();
             }
             return ir;
-        default:
-            return nullptr;
+        default: return nullptr;
         }
     }
     UNREACHABLE();
@@ -577,9 +628,9 @@ bool CopyProp::doPropForMDPhi(IR const* prop_value, MOD IR * use)
 }
 
 
-bool CopyProp::doPropForNormalStmt(IRListIter curit, IRListIter * nextit,
-                                   IR const* prop_value, MOD IR * use,
-                                   IRBB * def_bb)
+bool CopyProp::doPropForNormalStmt(
+    IRListIter curit, IRListIter * nextit, IR const* prop_value, MOD IR * use,
+    IRBB * def_bb)
 {
     IR * use_stmt = use->getStmt();
     ASSERT0(use_stmt && use_stmt->is_stmt() && use_stmt->getBB());
@@ -619,42 +670,9 @@ bool CopyProp::doPropForNormalStmt(IRListIter curit, IRListIter * nextit,
 }
 
 
-void CopyProp::dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
-                                  IR const* use)
-{
-    if (!getRegion()->isLogMgrInit()) { return; }
-    note(getRegion(), "\n==-- DUMP %s '%s' --==",
-         getPassName(), m_rg->getRegionName());
-    note(getRegion(),
-         "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
-         DumpIRName().dump(prop_value));
-    m_rg->getLogMgr()->incIndent(4);
-    xoc::dumpIR(def_stmt, m_rg, nullptr,
-                DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
-    m_rg->getLogMgr()->decIndent(4);
-    note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
-         DumpIRName().dump(use));
-    m_rg->getLogMgr()->incIndent(4);
-    if (use->is_id()) {
-        ASSERT0(m_mdssamgr);
-        MDSSAInfo * mdssainfo = m_mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
-        ASSERT0_DUMMYUSE(mdssainfo);
-        ASSERT0(ID_phi(use));
-        note(getRegion(), "\n");
-        ID_phi(use)->dump(m_rg, m_mdssamgr->getUseDefMgr());
-    } else {
-        ASSERT0(use->getStmt());
-        xoc::dumpIR(use->getStmt(), m_rg, nullptr,
-                    DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
-    }
-    m_rg->getLogMgr()->decIndent(4);
-}
-
-
-IR const* CopyProp::pickUpCandExp(IR const* prop_value, IR const* repexp,
-                                  IR const* def_stmt,
-                                  IRListIter const& curit,
-                                  bool prssadu, bool mdssadu) const
+IR const* CopyProp::pickUpCandExp(
+    IR const* prop_value, IR const* repexp, IR const* def_stmt,
+    IRListIter const& curit, bool prssadu, bool mdssadu) const
 {
     if (repexp->is_id()) {
         if (!prop_value->is_const()) {
@@ -801,7 +819,7 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
             prssadu = true;
             return true;
         }
-        goto CLASSIC_DU;
+        goto TRY_CLASSIC_DU;
     }
     ASSERT0(def_stmt->isMemRefNonPR());
     if (useMDSSADU()) {
@@ -815,7 +833,7 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
         mdssadu = true;
         return true;
     }
-CLASSIC_DU:
+TRY_CLASSIC_DU:
     DUSet const* duset = def_stmt->readDUSet();
     if (duset != nullptr && !duset->is_empty()) {
         if (def_stmt->getExactRef() == nullptr && !allowInexactMD()) {
@@ -834,10 +852,9 @@ CLASSIC_DU:
 
 //curit: the iter to current IR.
 //nextit: the iter to next IR in 'bb'. It may be changed.
-bool CopyProp::doPropUseSet(IRSet const& useset, IR const* def_stmt,
-                            IR const* prop_value, IRListIter curit,
-                            IRListIter * nextit,
-                            bool prssadu, bool mdssadu)
+bool CopyProp::doPropUseSet(
+    IRSet const& useset, IR const* def_stmt, IR const* prop_value,
+    IRListIter curit, IRListIter * nextit, bool prssadu, bool mdssadu)
 {
     bool change = false;
     IRSetIter it;
@@ -850,13 +867,13 @@ bool CopyProp::doPropUseSet(IRSet const& useset, IR const* def_stmt,
             //Whole IR tree has been replaced.
             continue;
         }
-        IR const* new_prop_value = pickUpCandExp(prop_value, use, def_stmt,
-                                                 curit, prssadu, mdssadu);
+        IR const* new_prop_value = pickUpCandExp(
+            prop_value, use, def_stmt, curit, prssadu, mdssadu);
         if (new_prop_value == nullptr) { continue; }
         IR const* nearest_def = xoc::findNearestDomDef(use, m_rg);
         if (nearest_def != def_stmt) { continue; }
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
-            dumpCopyPropAction(def_stmt, new_prop_value, use);
+            dumpAct(this, def_stmt, new_prop_value, use);
         }
         if (!allowPropConstToPhiOpnd() && use->getStmt()->is_phi() &&
             prop_value->isConstExp()) {
@@ -956,6 +973,22 @@ bool CopyProp::doPropBBInDomTreeOrder()
 }
 
 
+bool CopyProp::dump() const
+{
+    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRP()) {
+        return true;
+    }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
+    const_cast<CopyProp*>(this)->getActMgr().dump();
+    bool succ = Pass::dump();
+    m_rg->getLogMgr()->decIndent(2);
+    return succ;
+}
+
+
 bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
@@ -1001,9 +1034,10 @@ bool CopyProp::perform(OptCtx & oc)
         m_rg->getLogMgr()->cleanBuffer();
         return false;
     }
+    dump();
     oc.setInvalidPass(PASS_EXPR_TAB);
-    OC_is_aa_valid(oc) = false;
-    OC_is_ref_valid(oc) = true; //already update.
+    oc.setInvalidPass(PASS_AA);
+    oc.setValidPass(PASS_DU_REF);
     ASSERT0(m_dumgr->verifyMDRef());
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

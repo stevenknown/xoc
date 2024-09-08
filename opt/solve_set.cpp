@@ -1759,13 +1759,13 @@ bool SolveSetMgr::perform(MOD OptCtx & oc, UFlag flag)
 
     //Set opt-context variables.
     if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
-        OC_is_avail_reach_def_valid(oc) = true;
+        oc.setValidPass(PASS_AVAIL_REACH_DEF);
     }
     if (flag.have(DUOPT_SOL_REACH_DEF)) {
-        OC_is_reach_def_valid(oc) = true;
+        oc.setValidPass(PASS_REACH_DEF);
     }
     if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
-        OC_is_live_expr_valid(oc) = true;
+        oc.setValidPass(PASS_LIVE_EXPR);
     }
     return false;
 }

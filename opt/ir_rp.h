@@ -247,7 +247,7 @@ public:
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     GVN * getGVN() const { return m_gvn; }
     RegPromot * getRegPromot() const { return m_rp; }
-
+    Region const* getRegion() const { return m_rg; }
     DUSet const* getOutsideUseSet(IR const* dele) const
     { return m_dele2outsideuseset.get(const_cast<IR*>(dele)); }
 
@@ -338,7 +338,7 @@ public:
 typedef TTabIter<IR*> InexactAccTabIter;
 
 //The table records the IR with inexact MD accessing or even without a must MD.
-//Note the IR added to table should be guarranteed that they are either
+//Note the IR added to table should be guaranteed that they are either
 //not overlap with any other IR occ or completely identical to one of IR occ
 //in the table.
 class InexactAccTab : public xcom::TTab<IR*> {
@@ -346,7 +346,7 @@ class InexactAccTab : public xcom::TTab<IR*> {
 public:
     InexactAccTab() {}
     void addOcc(IR * ir) { append_and_retrieve(ir); }
-    void dump(Region * rg) const;
+    void dump(Region const* rg) const;
 };
 
 class RPActMgr : public ActMgr {

@@ -92,30 +92,12 @@ TMWORD MIRelocMgr::computeJumpOff(MInstMgr * mimgr,
     ASSERT0(isMIAlignedByWordLength(inst_pc, (UINT)inst_size));
     ASSERT0(isMIAlignedByWordLength(label_pc - inst_pc, (UINT)inst_size));
 
-    //Label is a custom label.
     //Note that, For some architectures, it is inconsistent whether the
     //distance between the target label and the current jump instruction needs
     //to be subtracted by 1.
-    if (lab2off.find(MI_lab(mi))) {
-        return (TMWORD)((label_pc - inst_pc) / inst_size) -
-               (TMWORD)isDistanceNeedSubOne();
-    }
-
-    //Label is a internal used for relaxation.
-    //If relaxation is performed, uncond-br "br" is only used to save current
-    //PC value and cond-br such as "bne" is used to skip uncond-br.
-    //For example:
-    //    br   $31, label_0                   beq $1, label_1
-    //    ......                              ......
-    //          |                                    |
-    //          V                                    V
-    //    br   $28, 0      <--- This is 0.    bne $1, 1        <--- This is 1.
-    //    ldih $63, 0($31)                    br  $31, label_1
-    //    ......                              ......
-    //    addl $63, $28, $28
-    //    jmp  $31, $28, 0x1
-    //    ......
-    return mimgr->isUncondBr(mi) ? 0 : 1;
+    ASSERT0(lab2off.find(MI_lab(mi)));
+    return (TMWORD)((label_pc - inst_pc) / inst_size) -
+        (TMWORD)isDistanceNeedSubOne();
 }
 
 

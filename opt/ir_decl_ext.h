@@ -40,12 +40,12 @@ public:
     IR * res_list;
 };
 
-#define VSTPR_bb(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->bb)
-#define VSTPR_no(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->prno)
-#define VSTPR_ssainfo(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->ssainfo)
-#define VSTPR_du(ir) (((CVirStpr*)CK_IRC(ir, IR_VSTPR))->du)
+#define VSTPR_bb(ir) (((CVStpr*)CK_IRC(ir, IR_VSTPR))->bb)
+#define VSTPR_no(ir) (((CVStpr*)CK_IRC(ir, IR_VSTPR))->prno)
+#define VSTPR_ssainfo(ir) (((CVStpr*)CK_IRC(ir, IR_VSTPR))->ssainfo)
+#define VSTPR_du(ir) (((CVStpr*)CK_IRC(ir, IR_VSTPR))->du)
 #define VSTPR_kid(ir, idx) \
-    (((CVirStpr*)ir)->opnd[CK_KID_IRC(ir, IR_VSTPR, idx)])
+    (((CVStpr*)ir)->opnd[CK_KID_IRC(ir, IR_VSTPR, idx)])
 //Represents the RHS of defined PR, thus it must be PR, which indicates that
 //RHS defined LHS. If LHS and RHS's physical registers are different, it will
 //certainly be converted to MOVE operation, e.g:stpr<-pr.
@@ -53,8 +53,8 @@ public:
 
 //Represents a dummy USE of PR that is used to maintain DU chain.
 #define VSTPR_dummyuse(ir) VSTPR_kid(ir, 1)
-class CVirStpr : public DuProp, public StmtProp {
-    COPY_CONSTRUCTOR(CVirStpr);
+class CVStpr : public DuProp, public StmtProp {
+    COPY_CONSTRUCTOR(CVStpr);
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
@@ -71,15 +71,15 @@ public:
 };
 
 
-#define VST_bb(ir) (((CVirSt*)CK_IRC(ir, IR_VST))->bb)
-#define VST_idinfo(ir) (((CVirSt*)CK_IRC(ir, IR_VST))->id_info)
-#define VST_ofst(ir) (((CVirSt*)CK_IRC(ir, IR_VST))->field_offset)
-#define VST_du(ir) (((CVirSt*)CK_IRC(ir, IR_VST))->du)
+#define VST_bb(ir) (((CVSt*)CK_IRC(ir, IR_VST))->bb)
+#define VST_idinfo(ir) (((CVSt*)CK_IRC(ir, IR_VST))->id_info)
+#define VST_ofst(ir) (((CVSt*)CK_IRC(ir, IR_VST))->field_offset)
+#define VST_du(ir) (((CVSt*)CK_IRC(ir, IR_VST))->du)
 #define VST_rhs(ir) VST_kid(ir, 0)
 #define VST_dummyuse(ir) VST_kid(ir, 1)
-#define VST_kid(ir, idx) (((CVirSt*)ir)->opnd[CK_KID_IRC(ir, IR_VST, idx)])
-class CVirSt : public CLd, public StmtProp {
-    COPY_CONSTRUCTOR(CVirSt);
+#define VST_kid(ir, idx) (((CVSt*)ir)->opnd[CK_KID_IRC(ir, IR_VST, idx)])
+class CVSt : public CLd, public StmtProp {
+    COPY_CONSTRUCTOR(CVSt);
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
@@ -96,15 +96,15 @@ public:
 //This class represents an indirect memory operation that is used to describe
 //multiple memory locations. Some target machine instruction will write
 //multiple memory simultaneously, e.g:picture compress operation.
-#define VIST_bb(ir) (((CVirISt*)CK_IRC(ir, IR_VIST))->bb)
-#define VIST_ofst(ir) (((CVirISt*)CK_IRC(ir, IR_VIST))->field_offset)
-#define VIST_du(ir) (((CVirISt*)CK_IRC(ir, IR_VIST))->du)
+#define VIST_bb(ir) (((CVISt*)CK_IRC(ir, IR_VIST))->bb)
+#define VIST_ofst(ir) (((CVISt*)CK_IRC(ir, IR_VIST))->field_offset)
+#define VIST_du(ir) (((CVISt*)CK_IRC(ir, IR_VIST))->du)
 #define VIST_base(ir) VIST_kid(ir, 0)
 #define VIST_rhs(ir) VIST_kid(ir, 1)
 #define VIST_dummyuse(ir) VIST_kid(ir, 2)
-#define VIST_kid(ir, idx) (((CVirISt*)ir)->opnd[CK_KID_IRC(ir, IR_VIST, idx)])
-class CVirISt : public DuProp, public OffsetProp, public StmtProp {
-    COPY_CONSTRUCTOR(CVirISt);
+#define VIST_kid(ir, idx) (((CVISt*)ir)->opnd[CK_KID_IRC(ir, IR_VIST, idx)])
+class CVISt : public DuProp, public OffsetProp, public StmtProp {
+    COPY_CONSTRUCTOR(CVISt);
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 3;
@@ -121,16 +121,17 @@ public:
 //This class represents broadcast operation that is used to dispatch value in
 //'src' to multiple results in 'res_list'.
 #define BROADCAST_src(ir) BROADCAST_kid(ir, 0)
-#define BROADCAST_res_list(ir) BROADCAST_kid(ir, 1)
-#define VIST_ofst(ir) (((CVirISt*)CK_IRC(ir, IR_VIST))->field_offset)
+#define BROADCAST_res_list(ir) \
+    (((CBroadCast*)CK_IRC(ir, IR_BROADCAST))->res_list)
 #define BROADCAST_kid(ir, idx) \
     (((CBroadCast*)ir)->opnd[CK_KID_IRC(ir, IR_BROADCAST, idx)])
 class CBroadCast : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CBroadCast);
 public:
     static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 2;
+    static BYTE const kid_num = 1;
     IR * opnd[kid_num];
+    IR * res_list;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return BROADCAST_kid(ir, idx); }

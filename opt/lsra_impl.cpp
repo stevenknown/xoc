@@ -193,17 +193,59 @@ static LifeTime * pickFromSet(PRNO prno, MOD LTSet & set)
 
 
 static void genInconsistPair(OUT InConsistPair & pair, UINT from, UINT to,
-                             LifeTime const* anct, LifeTime const* newlt,
-                             Var const* v, INCONSIST_TYPE type)
+                             LifeTime const* from_lt, LifeTime const* to_lt,
+                             Var const* spill_loc, INCONSIST_TYPE type)
 {
     ASSERT0(from != BBID_UNDEF && to != BBID_UNDEF);
     ASSERT0(type != INCONSIST_UNDEF);
     pair.from_vex_id = from;
     pair.to_vex_id = to;
-    pair.from_lt = anct;
-    pair.to_lt = newlt;
-    pair.mem_var = v;
+    pair.from_lt = from_lt;
+    pair.to_lt = to_lt;
+    pair.mem_var = spill_loc;
     pair.type = type;
+}
+
+
+static void computeInconsistency(OUT InConsistPairList & inconsist_lst,
+    UINT from, UINT to, LifeTime const* from_lt, LifeTime const* to_lt,
+    Var const* spill_loc, LinearScanRA const& lsra)
+{
+    ASSERT0(from != BBID_UNDEF && to != BBID_UNDEF);
+    if (from_lt != nullptr && to_lt != nullptr) {
+        //If the from_lt and to_lt both exist, consider to revise the type
+        //INCONSIST_PR2PR.
+        if (lsra.getReg(from_lt->getPrno()) == lsra.getReg(to_lt->getPrno()))
+        { return; }
+        InConsistPair pair;
+        genInconsistPair(pair, from, to, from_lt, to_lt, nullptr,
+            INCONSIST_PR2PR);
+        inconsist_lst.append_tail(pair);
+        return;
+    }
+
+    //If there is no spill memory used during the split, return directly.
+    if (spill_loc == nullptr) { return; }
+
+    //If the spill memory is used during the split, then consider
+    //the inconsistency type for INCONSIST_MEM2PR or INCONSIST_PR2MEM.
+    if (from_lt == nullptr) {
+        //If the 'from' lifetime exists and 'to' lifetime does not
+        //exist, then should do the revise type INCONSIST_MEM2PR.
+        InConsistPair pair;
+        genInconsistPair(pair, from, to, nullptr, to_lt, spill_loc,
+                         INCONSIST_MEM2PR);
+        inconsist_lst.append_tail(pair);
+        return;
+    }
+    if (to_lt == nullptr) {
+        //If the 'from' lifetime does not exist and 'from' lifetime
+        //exists, then should do the revise type INCONSIST_PR2MEM.
+        InConsistPair pair;
+        genInconsistPair(pair, from, to, from_lt, nullptr, spill_loc,
+                        INCONSIST_PR2MEM);
+        inconsist_lst.append_tail(pair);
+    }
 }
 
 
@@ -234,28 +276,34 @@ void LTConsistencyMgr::dump() const
          bb = bblst->get_next(&cb)) {
         UINT bbid = bb->id();
         note(rg, "\n\n-- BB%d --", bbid);
-        LT2ST const* intab = getInTab(bbid);
-        LT2STIter it;
-        CONSIST_STATUS st;
-        note(rg, "\nLT2ST-IN:");
+        PR2LT const* intab = getInPR2Lt(bbid);
+        PR2LTIter it;
+        LifeTime const* lt = nullptr;
+        note(rg, "\nPR2Lt-IN:");
         if (intab != nullptr) {
             rg->getLogMgr()->incIndent(ind);
-            for (LifeTime const* lt = intab->get_first(it, &st);
-                 lt != nullptr; lt = intab->get_next(it, &st)) {
-                ASSERT0(st != CONSIST_UNDEF);
-                note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+            for (PRNO prno = intab->get_first(it, &lt);
+                 prno != PRNO_UNDEF; prno = intab->get_next(it, &lt)) {
+                if (lt == nullptr) {
+                    note(rg, "\n$%u: null", prno);
+                    continue;
+                }
+                note(rg, "\n$%u:%u", prno, lt->getPrno());
             }
             rg->getLogMgr()->decIndent(ind);
         }
 
-        LT2ST const* outtab = getOutTab(bbid);
-        note(rg, "\nLT2ST-OUT:");
+        PR2LT const* outtab = getInPR2Lt(bbid);
+        note(rg, "\nPR2Lt-OUT:");
         if (outtab != nullptr) {
             rg->getLogMgr()->incIndent(ind);
-            for (LifeTime const* lt = outtab->get_first(it, &st);
-                 lt != nullptr; lt = outtab->get_next(it, &st)) {
-                ASSERT0(st != CONSIST_UNDEF);
-                note(rg, "\n$%u:%s", lt->getPrno(), getStName(st));
+            for (PRNO prno = outtab->get_first(it, &lt);
+                 prno != PRNO_UNDEF; prno = outtab->get_next(it, &lt)) {
+                if (lt == nullptr) {
+                    note(rg, "\n$%u: null", prno);
+                    continue;
+                }
+                note(rg, "\n$%u:%u", prno, lt->getPrno());
             }
             rg->getLogMgr()->decIndent(ind);
         }
@@ -264,885 +312,157 @@ void LTConsistencyMgr::dump() const
 }
 
 
-void LTConsistencyMgr::addConsistStatus(LifeTime const* lt, Pos start, Pos end,
-                                        UINT bbid)
+LifeTime const* LTConsistencyMgr::getLifetimeChild(LTList const& lt_list,
+                                                    Pos pos)
 {
-    ASSERT0(lt);
-    ASSERT0(start != POS_UNDEF && end != POS_UNDEF);
-    if (lt->is_cover(start)) {
-        addInStatus(lt, LTConsistencyMgr::CONSIST_VALID, bbid);
+    LTListIter it;
+    for (LifeTime const* lt = lt_list.get_head(&it);
+         lt != nullptr; lt = lt_list.get_next(&it)) {
+        if (lt->is_cover(pos)) { return lt; }
+    }
+    return nullptr;
+}
+
+
+LifeTime const* LTConsistencyMgr::selectPossibleLifetime(LifeTime * anct,
+                                                         Pos pos)
+{
+    ASSERT0(anct);
+    ASSERT0(pos != POS_UNDEF);
+    LTList const& lt_list = anct->getChild();
+
+    //This function is used to select a responding lifetime at various position,
+    //because there are multiple child lifetimes are generated during split.
+    //
+    //e.g:
+    // Original lifetime $1: <5-17><34-37>
+    //    |     ------------                ----
+    //    |     u          u                d  u
+    // POS: 2   5          17               34 37
+
+    //Lifetimes after split:
+    // Anct Lifetime $1: <5-17>
+    //    |     ------------
+    //    |     u          u
+    // POS: 2   5          17
+    //
+    // Child Lifetime $10: <34-37>
+    //    |                                 ----
+    //    |                                 d  u
+    // POS:                                 34 37
+    //
+    //For the above lifetimes generated during split, there are some standards
+    //used to slelect a proper lifetime:
+    //  1. If the spill memory is used:
+    //     1.0 If the pos is between [0, 5):
+    //         1.0.1 If the anct is reload forced, nullptr will be selected.
+    //     1.1 If the pos is between [0, 17], anct will be selected.
+    //     1.2 If the pos is between [34, 37], child will be selected.
+    //     1.3 If the pos is between (17, 34), nullptr will be selected.
+    //     1.4 If the pos > 34:
+    //         1.4.1 If the last child is forced to be spilled, nullptr will
+    //               be selected.
+    //         1.4.2 If the last child is not forced to be spilled, last child
+    //               will be selected.
+    //
+    //  2. If the spill memory is not used:
+    //     2.1 If the pos is between [0, 17], anct will be selected
+    //     2.2 If the pos is between [34, 37], child will be selected.
+    //     2.3 If the pos is between (17, 34), anct will be selected.
+    //     2.4 If the pos > 34, child will be used.
+
+    //  [Note:] nullptr will be used to indicate that the data of this
+    //          lifetime is in the memory.
+
+    if (pos < anct->getFirstRange().start() && anct->isReloadForced()) {
+        //Implemented 1.0 above.
+        return nullptr;
+    }
+
+    //Since anct indicates the original lifetime, if the pos is before the
+    //end position of this lifetime, anct should be selected as the correct
+    //lifetime.
+    if (pos <= anct->getLastRange().end()) {
+        //Implemented 1.1 and 2.1 above.
+        return anct;
+    }
+
+    //Since child_last indicates the last child generated during split,
+    //if the pos is after the end position of this lifetime, child_last
+    //should be selected as the correct lifetime unless it is forced to spill.
+    LifeTime * child_last = lt_list.get_elem_count() == 0 ?
+        anct : const_cast<LTList&>(lt_list).get_tail();
+    if (pos > child_last->getLastRange().end()) {
+        //Implemented 1.4 and 2.4 above.
+        return child_last->isSpillForced() ? nullptr : child_last;
+    }
+
+    //Traverse the child list to find the correct lifetime.
+    LifeTime const* parent_lt = anct;
+    LTListIter it = nullptr;
+    Var const* spill_loc = m_impl.getRA().getSpillLoc(anct->getPrno());
+    for (LifeTime * child = lt_list.get_head(&it);
+         child != nullptr; child = lt_list.get_next(&it)) {
+        //Since the child lifetimes are generated by the split of ancestor
+        //lifetime, and there is no overlap between any two child lifetimes, so
+        //for a specified postion, if it is covered by a child lifetime, which
+        //indicates that the child lifetime is used at the position.
+        if (child->is_cover(pos)) {
+            //Implemented 1.2 and 2.2 above.
+            return child;
+        }
+
+        if (spill_loc == nullptr && pos < child->getFirstRange().start()) {
+            //If there is no memory used for the lifetime duirng split, then
+            //select the parent lifetime which the current child lifetime
+            //derived from.
+            //Implemented 2.3 above.
+            return parent_lt;
+        }
+        parent_lt = child;
+    }
+    //Implemented 1.3 above.
+    return nullptr;
+}
+
+
+void LTConsistencyMgr::computePR2LtInfoForBB(UINT bbid, bool is_input)
+{
+    ASSERT0(bbid != BBID_UNDEF);
+    Pos boundary_pos = POS_UNDEF;
+    PRLiveSet const* live_set = nullptr;
+    PRLiveSetIter * iter = nullptr;
+
+    if (is_input) {
+        boundary_pos = m_impl.getLTMgr().getBBStartPos(bbid);
+        live_set = m_live_mgr->get_livein(bbid);
     } else {
-        addInStatus(lt, LTConsistencyMgr::CONSIST_INVALID, bbid);
+        boundary_pos = m_impl.getLTMgr().getBBEndPos(bbid);
+        live_set = m_live_mgr->get_liveout(bbid);
     }
 
-    if (lt->is_cover(end)) {
-        addOutStatus(lt, LTConsistencyMgr::CONSIST_VALID, bbid);
-    } else {
-        addOutStatus(lt, LTConsistencyMgr::CONSIST_INVALID, bbid);
-    }
-}
-
-
-void LTConsistencyMgr::addPRStatus(LifeTime const* anct, LifeTime const* newlt,
-                                   UINT cur_bbid)
-{
-    ASSERT0(anct && newlt);
-    ASSERT0(cur_bbid != BBID_UNDEF);
-    PRNO anct_prno = anct->getPrno();
-    Var const* v =  m_impl.getRA().getSpillLoc(anct_prno);;
-
-    PRSplitBB splitbb = m_impl.getPrSplitBB(anct_prno);
-    UINT spill_bbid = splitbb.bb.spill_bbid;
-    UINT reload_bbid = splitbb.bb.reload_bbid;
-
-    if (reload_bbid == cur_bbid && spill_bbid == cur_bbid) {
-        //This means the split of this lifetime is localized inside a single
-        //BB, so the status of PR in cur_bbid is irrelevant to the
-        //inconsistency revise.
-        addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_UNDEF, cur_bbid);
-        return;
-    }
-
-    if (spill_bbid == cur_bbid) {
-        addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_SPILLED, cur_bbid);
-        return;
-    }
-
-    if (reload_bbid == cur_bbid) {
-        addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_RELOADED, cur_bbid);
-        return;
-    }
-
-    //If the start position and the end position of cur_bbid are included in
-    //the range from the end of anct lifetime to the start of new lifetime,
-    //that means the PR status of cur_bbid must be PR_STATUS_IN_MEMORY, because
-    //the PR has already been spilled into memory in this range.
-    Pos anct_last = anct->getLastPos();
-    Pos new_first = newlt->getFirstPos();
-    Pos startpos = m_impl.getLTMgr().getBBStartPos(cur_bbid);
-    Pos endpos = m_impl.getLTMgr().getBBEndPos(cur_bbid);
-
-    Range bb_range(startpos, endpos);
-    Range anct_range(anct->getFirstPos(), anct->getLastPos());
-    Range new_range(newlt->getFirstPos(), newlt->getLastPos());
-    if (startpos > anct_last && endpos < new_first) {
-        PR_STATUS pr_st = (v == nullptr) ? LTConsistencyMgr::PR_STATUS_UNDEF:
-                          LTConsistencyMgr::PR_STATUS_IN_MEMORY;
-        addPRStatus(anct_prno, pr_st, cur_bbid);
-        return;
-    }
-    if (bb_range.is_intersect(new_range)) {
-        addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_IN_NEW_REG,
-                    cur_bbid);
-        return;
-    }
-    if (bb_range.is_intersect(anct_range)) {
-        addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_IN_OLD_REG,
-                    cur_bbid);
-        return;
-    }
-    //when goes to here, that means current bbid is not related to the spilling
-    //or reloading, just set to inital status.
-    addPRStatus(anct_prno, LTConsistencyMgr::PR_STATUS_UNDEF, cur_bbid);
-}
-
-
-void LTConsistencyMgr::computeLTConsistency()
-{
-    BBListIter bbit;
-    List<LifeTime const*> const& inconsist_lt = getInconsistLTList();
-    for (IRBB * bb = m_bb_list->get_head(&bbit);
-         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
-        xcom::List<LifeTime const*>::Iter ltit;
-        Pos startpos = m_impl.getLTMgr().getBBStartPos(bb->id());
-        Pos endpos = m_impl.getLTMgr().getBBEndPos(bb->id());
-        for (LifeTime const* newlt = inconsist_lt.get_head(&ltit);
-             newlt != nullptr; newlt = inconsist_lt.get_next(&ltit)) {
-            LifeTime const* anct = newlt->getParent();
-            ASSERT0(anct);
-            addConsistStatus(newlt, startpos, endpos, bb->id());
-            addConsistStatus(anct, startpos, endpos, bb->id());
-            addPRStatus(anct, newlt, bb->id());
-        }
-    }
-}
-
-
-//This function implements the inconsistency check based on forward analysis.
-//The PR $anct is split, that means it will be spilled to [mem], and then
-//the data of PR is reloaded into $new from [mem].
-//There are five scenarios need to be processed:
-//
-// Scenario 1:
-//    $anct crosses the OUT boundary of FROM BB, however it does NOT cross the
-//    IN boundary of TO BB.
-//    $new is reloaded from [mem] in TO BB, so it does NOT cross the IN
-//    boundary of TO BB.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add spilling operation '[mem] <-- $anct' in the latch BB.
-//    e.g:
-//      Original CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         ...
-//            |
-//            V
-//         BB: TO
-//         $new <-- [mem]
-//         ... <-- $new
-//         ...
-//
-//      Modified CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         ...
-//            |
-//            V
-//         BB: LATCH
-//         [new_mem] <-- $anct
-//            |
-//            V
-//         BB: TO
-//         $new <-- [mem]
-//         ... <-- $new
-//         ...
-//
-// Scenario 2:
-//    $anct is used in the FROM BB, and it crosses the OUT boundary of FROM BB.
-//    $new is a local register in BB SUCCESSOR.
-//    The PR #anct is used in BB FROM (#S1) and $new is reloaded in
-//    BB SUCCESSOR (#S3), the status of PR from the BB TO to the #S2 of
-//    BB SUCCESSOR is PR_STATUS_IN_MEMORY.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add spilling operation '[mem] <-- $anct' in the latch BB.
-//
-//    e.g:
-//      Original CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct        #S1
-//         ...
-//            |
-//            V
-//         BB: TO
-//         ...
-//            |
-//            V
-//         ...
-//            |
-//            V
-//         BB: SUCCESSOR
-//         ...                  #S2
-//         $new <-- [mem]       #S3
-//         ... <-- $new         #S4
-//         ...
-//
-//      Modified CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct        #S1
-//         ...
-//            |
-//            V
-//         BB: LATCH
-//         [mem] <-- $anct
-//            |
-//            V
-//         BB: TO
-//         ...
-//            |
-//            V
-//         ...
-//            |
-//            V
-//         BB: SUCCESSOR
-//         ...                  #S2
-//         $new <-- [mem]       #S3
-//         ... <-- $new         #S4
-//         ...
-//
-// Scenario 3:
-//    $anct is split in the FROM BB, so it does NOT cross the OUT boundary
-//    of FROM BB.
-//    $new crosses the IN boundary of TO BB, however it does NOT cross the OUT
-//    boundary of FROM BB.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add reloading operation '$new <-- [mem]' in the latch BB.
-//
-//    e.g:
-//      Original CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         [mem] <-- $anct
-//         ...
-//            |
-//            V
-//         BB: TO
-//         ...
-//         ... <-- $new
-//         ...
-//
-//      Modified CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         [mem] <-- $anct
-//         ...
-//            |
-//            V
-//         BB: LATCH
-//         $new <-- [mem]
-//            |
-//            V
-//         BB: TO
-//         ...
-//         ... <-- $new
-//         ...
-//
-// Scenario 4:
-//    $anct is split in the BB PREDECESSOR, so it does NOT cross the OUT
-//    boundary of FROM BB.
-//    $new crosses the IN boundary of TO BB.
-//    The PR $anct is spilled in BB PREDECESSOR (#S2) and $new is used in BB
-//    SUCCESSOR (#S5), the status of PR from the #S3 of BB PREDECESSOR to the
-//    end of BB FROM is PR_STATUS_IN_MEMORY.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add reloading operation '$new <-- [mem]' in the latch BB.
-//
-//    e.g:
-//      Original CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct        #S1
-//         [mem] <-- $anct      #S2
-//         ...                  #S3
-//            |
-//            V
-//         ...
-//            |
-//            V
-//         BB: FROM
-//         ...
-//            |
-//            V
-//         BB: TO
-//         ...                  #S4
-//         ... <-- $new         #S5
-//         ...
-//
-//      Modified CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct        #S1
-//         [mem] <-- $anct      #S2
-//         ...                  #S3
-//            |
-//            V
-//         ...
-//            |
-//            V
-//         BB: FROM
-//         ...
-//            |
-//            V
-//         BB: LATCH
-//         $new <-- [mem]
-//            |
-//            V
-//         BB: TO
-//         ...                  #S4
-//         ... <-- $new         #S5
-//         ...
-//
-// Scenario 5:
-//    $anct crosses the OUT boundary of FROM BB, however it does NOT cross the
-//    IN boundary of TO BB.
-//    $new crosses the IN boundary of TO BB, however it does NOT cross the OUT
-//    boundary of FROM BB.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add moving operation '$new <-- $anct' in the latch BB.
-//    e.g:
-//      Original CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         ...
-//            |
-//            V
-//         BB: TO
-//         ...
-//         ... <-- $new
-//         ...
-//
-//      Modified CFG:
-//         BB: FROM
-//         ...
-//         ... <-- $anct
-//         ...
-//            |
-//            V
-//         BB: LATCH
-//         $new <-- $anct
-//            |
-//            V
-//         BB: TO
-//         ...
-//         ... <-- $new
-//         ...
-//
-void LTConsistencyMgr::computeForwardConsistencyImpl(LifeTime const* anct,
-    LifeTime const* newlt, UINT from, UINT to, Var const* spill_loc,
-    OUT InConsistPairList & inconsist_lst)
-{
-    ASSERT0(anct && newlt);
-    ASSERT0(from != BBID_UNDEF && to != BBID_UNDEF);
-    CONSIST_STATUS const fromst = getOutSt(newlt, from);
-    CONSIST_STATUS const tost = getInSt(newlt, to);
-    PRNO anct_prno = anct->getPrno();
-    PRNO new_prno = newlt->getPrno();
-    PR_STATUS const prst_from = getPRSt(anct_prno, from);
-    PR_STATUS const prst_to = getPRSt(newlt->getParent()->getPrno(), to);
-    LinearScanRA & lsra = m_impl.getRA();
-
-    ASSERT0(anct_prno != PRNO_UNDEF && new_prno != PRNO_UNDEF);
-
-    if (tost != CONSIST_VALID && fromst != CONSIST_VALID) {
-        if (getOutSt(anct, from) != CONSIST_VALID) {
-            //CASE:
-            //$anct is not live-out from 'from' BB, it may be
-            //localized in 'from' BB. $new is not live-in to 'to' BB, there will
-            //be no data flow between BB 'from' and BB 'to' for this PR, so
-            //there is no inconsistency problem for current check.
-            return;
-        }
-        if (PR_STATUS_RELOADED != prst_to && PR_STATUS_IN_MEMORY != prst_to) {
-            //CASE:
-            //$anct is live-out from 'from' BB. $new is not live-in to 'to'
-            //BB, this PR is PR_STATUS_SPILLED/PR_STATUS_SPILLED_AND_RELOAD/
-            //PR_STATUS_UNDEF in 'to' BB, the data flow between BB 'from' and
-            //BB 'to' works well, there is no inconsistency problem.
-            return;
-        }
-
-        //When goes here, that means the spilling operation will be added
-        //before the control flow goes into BB TO, because we should ensure the
-        //content of $anct is in the memory.
-
-        //Implemented scenario 1, add spilling operation '[mem] <-- $anct'
-        //if prst_to is PR_STATUS_RELOADED.
-        //Implemented scenario 2, add spilling operation '[mem] <-- $anct'
-        //if prst_to is PR_STATUS_IN_MEMORY.
-        if (spill_loc != nullptr) {
-            InConsistPair pair;
-            genInconsistPair(pair, from, to, anct, nullptr, spill_loc,
-                             INCONSIST_PR2MEM);
-            inconsist_lst.append_tail(pair);
-            return;
-        }
-    }
-
-    if (tost == CONSIST_VALID && fromst != CONSIST_VALID) {
-        if ((prst_from == PR_STATUS_IN_OLD_REG ||
-            (prst_from == PR_STATUS_SPILLED && spill_loc == nullptr)) &&
-            prst_to == PR_STATUS_IN_NEW_REG) {
-            //Implemented scenario 5, add moving operation '$new <-- $anct'.
-            if (lsra.getReg(anct_prno) == lsra.getReg(new_prno)) { return; }
-            InConsistPair pair;
-            genInconsistPair(pair, from, to, anct, newlt, nullptr,
-                             INCONSIST_PR2PR);
-            inconsist_lst.append_tail(pair);
-            return;
-        }
-
-        if (getOutSt(anct, from) != CONSIST_VALID) {
-            if (prst_from != PR_STATUS_SPILLED &&
-                prst_from != PR_STATUS_IN_MEMORY) {
-                //CASE:lsra_fix_inconsist.gr
-                //$anct is not live-out from 'from' BB, it may be localized
-                //in 'from' BB. Thus there is dispensable to insert
-                //the copy operation.
-                return;
-            }
-
-            //When goes here, that means the reloading operation will be added
-            //before the control flow goes into BB TO, because we should ensure
-            //the content of $anct (already in memory) is in $new.
-
-            //Implemented scenario 3, add reloading operation
-            //'$new <-- [mem]' if prst_from is PR_STATUS_SPILLED.
-            //Implemented scenario 4, add reloading operation
-            //'$new <-- [mem]' if prst_from is PR_STATUS_IN_MEMORY.
-            ASSERT0(spill_loc);
-            InConsistPair pair;
-            genInconsistPair(pair, from, to, nullptr, newlt, spill_loc,
-                             INCONSIST_MEM2PR);
-            inconsist_lst.append_tail(pair);
-            return;
-        }
-    }
-}
-
-
-//This function implements the inconsistency check based on backward analysis.
-//The PR $anct is split, that means it will be spilled to [mem], and then
-//the data of PR is reloaded into $new from [mem].
-//There are four scenarios need to be processed:
-//
-// Scenario 1:
-//    $anct crosses the OUT boundary of TO BB, however, it dees NOT cross the IN
-//    boundary of FROM BB.
-//    $new crosses the OUT boundary of FROM BB, however, it does NOT cross the
-//    IN boundary of TO BB.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add moving operation '$anct <-- $new' in the latch BB.
-//    e.g:
-//      Original CFG:
-//            __________________________
-//            |                        |
-//            V                        |
-//         BB: TO                      |
-//         ...                         |
-//         ... <-- $anct               |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//         ... <-- $new                |
-//         ...                         |
-//            |________________________|
-//
-//      Modified CFG:
-//            __________________________
-//            |                        |
-//            V                        |
-//         BB: TO                      |
-//         ...                         |
-//         ... <-- $anct               |
-//         ...                         |
-//            |                        |
-//            V                     BB: LATCH
-//         ...                      $anct <-- $new
-//            |                        ^
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//         ... <-- $new                |
-//         ...                         |
-//            |________________________|
-//
-// Scenario 2:
-//    $anct does NOT cross the OUT boundary of FROM BB and the IN boundary
-//    of TO BB.
-//    $new crosses the IN boundary of FROM BB, and it is reloaded from memory
-//    in TO BB.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add moving operation '[mem] <-- $new' in the latch BB.
-//    e.g:
-//      Original CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct
-//         [mem] <-- $anct
-//         ...
-//            |
-//            V
-//         ...
-//          |  _________________________
-//          |  |                       |
-//          V  V                       |
-//         BB: TO                      |
-//         ...                         |
-//         $new <-- [mem]              |
-//         ... <-- $new                |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//            |________________________|
-//
-//      Modified CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct
-//         [mem] <-- $anct
-//         ...
-//            |
-//            V
-//         ...
-//          |  _________________________
-//          |  |                       |
-//          V  V                       |
-//         BB: TO                      |
-//         ...                         |
-//         $new <-- [mem]              |
-//         ... <-- $new                |
-//         ...                         |
-//            |                        |
-//            V                     BB: LATCH
-//         ...                      [mem] <-- $new
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//            |________________________|
-//
-// Scenario 3:
-//    $anct does NOT cross the OUT boundary of FROM BB and the IN boundary
-//    of TO BB.
-//    $new is a local register in BB SUCCESSOR.
-//    The PR $anct is spilled in BB PREDECESSOR (#S2) and reloaded in BB
-//    SUCCESSOR (#S5), the status of PR from the #S3 of BB PREDECESSOR to the
-//    #S4 of BB SUCCESSOR is PR_STATUS_IN_MEMORY.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add moving operation '[mem] <-- $new' in the latch BB.
-//    e.g:
-//      Original CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct        #S1
-//         [mem] <-- $anct      #S2
-//         ...                  #S3
-//            |
-//            V
-//         ...
-//          |  _________________________
-//          |  |                       |
-//          V  V                       |
-//         BB: TO                      |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: SUCCESSOR               |
-//         ...                  #S4    |
-//         $new <-- [mem]       #S5    |
-//         ... <-- $new         #S6    |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//            |________________________|
-//
-//      Modified CFG:
-//         BB: PREDECESSOR
-//         ...
-//         ... <-- $anct        #S1
-//         [mem] <-- $anct      #S2
-//         ...                  #S3
-//            |
-//            V
-//         ...
-//          |  _________________________
-//          |  |                       |
-//          V  V                       |
-//         BB: TO                      |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: SUCCESSOR               |
-//         ...                  #S4    |
-//         $new <-- [mem]       #S5    |
-//         ... <-- $new         #S6    |
-//         ...                         |
-//            |                        |
-//            V                     BB: LATCH
-//         ...                      [mem] <-- $new
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//            |________________________|
-//
-// Scenario 4:
-//    $anct crosses the IN boundary of TO BB and does NOT cross the OUT
-//    boundary of FROM BB.
-//    $NEW does NOT cross the IN and OUT boundary of TO BB.
-//    $new is a local register in BB SUCCESSOR.
-//    The PR $anct is spilled in BB TO (#S2) and reloaded in BB
-//    SUCCESSOR (#S4), the status of PR in BB FROM is PR_STATUS_IN_MEMORY.
-//
-//    Solution:
-//         1. Generate and insert a latch BB between BB FROM and BB TO.
-//         2. Add reloading operation '$anct <-- [mem]' in the latch BB.
-//    e.g:
-//      Original CFG:
-//             _________________________
-//             |                       |
-//             V                       |
-//         BB: TO                      |
-//         ...                         |
-//         ... <-- $anct        #S1    |
-//         [mem] <-- $anct #S2         |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         ...                         |
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//          | |________________________|
-//          |
-//          V
-//         BB: SUCCESSOR
-//         ...                  #S3
-//         $new <-- [mem]       #S4
-//         ... <-- $new         #S5
-//         ...
-//
-//      Modified CFG:
-//             _________________________
-//             |                       |
-//             V                       |
-//         BB: TO                      |
-//         ...                         |
-//         ... <-- $anct        #S1    |
-//         [mem] <-- $anct      #S2    |
-//         ...                         |
-//            |                        |
-//            V                      BB: LATCH
-//         ...                       $anct <-- [mem]
-//            |                        |
-//            V                        |
-//         BB: FROM                    |
-//         ...                         |
-//          | |________________________|
-//          |
-//          V
-//         BB: SUCCESSOR
-//         ...                  #S3
-//         $new <-- [mem]   #S4
-//         ... <-- $new         #S5
-//         ...
-//
-void LTConsistencyMgr::computeBackwardConsistencyImpl(LifeTime const* anct,
-    LifeTime const* newlt, UINT from, UINT to, Var const* spill_loc,
-    OUT InConsistPairList & inconsist_lst)
-{
-    ASSERT0(anct && newlt);
-    ASSERT0(from != BBID_UNDEF && to != BBID_UNDEF);
-    CONSIST_STATUS fromst = getOutSt(anct, from);
-    CONSIST_STATUS tost = getInSt(anct, to);
-    PRNO anct_prno = anct->getPrno();
-    PRNO new_prno = newlt->getPrno();
-    ASSERT0(anct_prno != PRNO_UNDEF && new_prno != PRNO_UNDEF);
-
-    LinearScanRA & lsra = m_impl.getRA();
-    if (tost == CONSIST_VALID && fromst != CONSIST_VALID) {
-        PRNO new_st_prno = newlt->getParent()->getPrno();
-        if (getOutSt(newlt, from) != CONSIST_VALID) {
-            if (getPRSt(new_st_prno, from) == PR_STATUS_IN_MEMORY) {
-                //Implemented scenario 4, add reloading operation
-                //'$anct <-- [mem]' if PR state is_PR_STATUS_IN_MEMORY.
-                ASSERT0(spill_loc);
-                InConsistPair pair;
-                genInconsistPair(pair, from, to, nullptr, anct, spill_loc,
-                                 INCONSIST_MEM2PR);
-                inconsist_lst.append_tail(pair);
-                return;
-            }
-            if (getPRSt(new_st_prno, from) != PR_STATUS_RELOADED &&
-                getPRSt(new_st_prno, from) != PR_STATUS_IN_NEW_REG) {
-                //CASE: If 'newlt' doesn't cross the OUT boundary of 'from' BB,
-                //and is not reloaded in the 'from' BB, that means it is never
-                //used in the 'from' BB, so return directly.
-                return;
-            }
-        }
-
-        //If the ancestor and new are assigned to the same register, it is
-        //not necessary to do the moving operation.
-        if (lsra.getReg(anct_prno) == lsra.getReg(new_prno)) { return; }
-
-        //Implemented scenario 1, add moving operation '$anct <-- $new'.
-        InConsistPair pair;
-        genInconsistPair(pair, from, to, newlt, anct, nullptr, INCONSIST_PR2PR);
-        inconsist_lst.append_tail(pair);
-        return;
-    }
-
-    if (tost != CONSIST_VALID && fromst != CONSIST_VALID) {
-        if (getInSt(newlt, from) != CONSIST_VALID &&
-            getOutSt(newlt, from) != CONSIST_VALID) {
-            //'newlt' is not live-in of 'from' BB and not live-out of 'from'
-            //BB, there is no necessary to check the inconsistency.
-            return;
-        }
-        PR_STATUS const prst_to = getPRSt(anct_prno, to);
-        if (spill_loc == nullptr ||
-            (prst_to != PR_STATUS_RELOADED && prst_to != PR_STATUS_IN_MEMORY)) {
-            //If the PR is not spilled into memory, or the status is not
-            //PR_STATUS_RELOADED and PR_STATUS_IN_MEMORY, there is no
-            //inconsistency problem between memory and PR.
-            return;
-        }
-
-        //When goes here, that means the spilling operation will be added
-        //before the control flow goes into BB TO, because we should ensure the
-        //content of $new is in the memory.
-
-        //Implemented scenario 2, add spilling operation '[mem] <-- $new' if
-        //prst_to is PR_STATUS_RELOADED.
-        //Implemented scenario 3, add spilling operation '[mem] <-- $new' if
-        //prst_to is PR_STATUS_IN_MEMORY.
-        InConsistPair pair;
-        ASSERT0(spill_loc);
-        genInconsistPair(pair, from, to, newlt, nullptr, spill_loc,
-                         INCONSIST_PR2MEM);
-        inconsist_lst.append_tail(pair);
-    }
-}
-
-
-void LTConsistencyMgr::genInconsistLTList()
-{
-    LinearScanRA & lsra = m_impl.getRA();
-    List<LifeTime const*>::Iter ltit;
-    List<LifeTime const*> const& splitlst = m_impl.getSplittedLTList();
-    for (LifeTime const* newlt = splitlst.get_head(&ltit);
-         newlt != nullptr; newlt = splitlst.get_next(&ltit)) {
-        ASSERT0(newlt->getParent());
-        LifeTime const* anct = newlt->getParent();
-        PRNO new_prno = newlt->getPrno();
-        ASSERT0(anct->getPrno() != PRNO_UNDEF);
-        ASSERT0(new_prno != PRNO_UNDEF);
-        ASSERT0(lsra.getReg(anct->getPrno()) != REG_UNDEF);
-        ASSERT0(lsra.getReg(new_prno) != REG_UNDEF);
-        Var const* spill_loc =  lsra.getSpillLoc(anct->getPrno());;
-        //If the prno is not spilled into memory, and the new renamed prno
-        //after split is assigned to the same physical register, that means
-        //this prno is no inconsistency issue even if the split of current
-        //prno breaks the edge of CFG.
-        //
-        //For example: Assume $p and $p2 are assigned to the same physical,
-        //register, below is a CFG after register allocation, and $p is
-        //split after #S2 in BB2 and renamed to $p2 at #S4, #S5 and #S7. $p is
-        //not spilled into memory, this split breaks the two branches started
-        //from BB2 on the CFG, however, there is no inconsistency issue due to
-        //the $p and $p2 are assigned to the same physical register when the
-        //control flow goes to any branch on the CFG.
-        //                     BB1:
-        //                     $p <-- ... #S1
-        //                     ...
-        //                     |
-        //                     v
-        //                   BB2:
-        //                   $p < n #S2
-        //                   ...
-        //                    |    |
-        //          __________|    |___________
-        //          |                         |
-        //          v                         v
-        //        BB3:                      BB6:
-        //        ...                       ...
-        //          |                         |
-        //          v                         v
-        //        BB4:                      BB7:
-        //        ...                       ...
-        //        $p2 <-- ... #S4           $p2 <-- ... #S5
-        //        ...                       ...
-        //          |                         |
-        //          V                         V
-        //        BB5:                      BB8:
-        //        ...                       ...
-        //          |                         |
-        //          |___________   ___________|
-        //                     |   |
-        //                     v   v
-        //                      BB9:
-        //                      ...
-        //                      ... <-- $p2 #S7
-        //                      ...
-        if (spill_loc == nullptr &&
-            anct->getParent() == nullptr &&
-            m_impl.getPrSplitBB(new_prno).value == 0 &&
-            lsra.getReg(anct->getPrno()) == lsra.getReg(new_prno))
-        { continue; }
-        //'newlt' might potentially have inconsistencies with ancestor.
-        m_inconsist_lt.append_tail(newlt);
-    }
-}
-
-
-void LTConsistencyMgr::computeEdgeConsistencyImpl(
-    xcom::Edge const* e, OUT InConsistPairList & inconsist_lst)
-{
-    ASSERT0(e);
-    xcom::VexIdx from = e->from()->id();
-    xcom::VexIdx to = e->to()->id();
-    LinearScanRA & lsra = m_impl.getRA();
-    PRLiveSet const* live_in_to = m_live_mgr->get_livein(to);
-    PRLiveSet const* live_out_to = m_live_mgr->get_liveout(to);
-    PRLiveSet const* live_in_from = m_live_mgr->get_livein(from);
-    PRLiveSet const* live_out_from = m_live_mgr->get_liveout(from);
-    ASSERT0(live_in_to && live_out_from);
-    ASSERT0(live_out_to && live_in_from);
-    bool is_backward = lsra.isBackwardJump(from, to);
-
-    List<LifeTime const*> const& inconsist_lt = getInconsistLTList();
-    List<LifeTime const*>::Iter ltit;
-    for (LifeTime const* newlt = inconsist_lt.get_head(&ltit);
-         newlt != nullptr; newlt = inconsist_lt.get_next(&ltit)) {
-        ASSERT0(newlt->getParent());
-        LifeTime const* anct = newlt->getParent();
-        PRNO root_prno = lsra.getAnctPrno(anct->getPrno());
-
-        if ((!live_out_from->is_contain(root_prno) &&
-            !live_in_from->is_contain(root_prno)) &&
-            (!live_in_to->is_contain(root_prno) &&
-            !live_out_to->is_contain(root_prno))) {
-            //If the prno is not the live-in and live-out of 'from' BB, and
-            //not the live-in and live-out of 'to' BB, which means this prno
-            //is not occurenced in 'from' and 'to' BB, so it is not necessary
-            //to do the further the inconsist analysis.
+    for (PRNO pr = (PRNO)live_set->get_first(&iter);
+         pr != BS_UNDEF; pr = (PRNO)live_set->get_next(pr, &iter)) {
+        LifeTime * lt = m_impl.getRA().getLTMgr().getLifeTime(pr);
+        LTList const& lt_list = lt->getChild();
+        Var const* spill_loc = m_impl.getRA().getSpillLoc(lt->getPrno());
+        if (lt_list.get_elem_count() == 0 && spill_loc == nullptr) {
             continue;
         }
-        Var const* spill_loc = lsra.getSpillLoc(anct->getPrno());
-        for (; anct != nullptr; anct = anct->getParent()) {
-            if (!is_backward) {
-                computeForwardConsistencyImpl(anct, newlt, from, to,
-                    spill_loc, inconsist_lst);
-                continue;
-            }
-            computeBackwardConsistencyImpl(anct, newlt, from, to,
-                spill_loc, inconsist_lst);
-        }
+        LifeTime const* child = selectPossibleLifetime(lt, boundary_pos);
+        if (is_input) { addInPR2Lt(pr, child, bbid); continue; }
+        addOutPR2Lt(pr, child, bbid);
+    }
+}
+
+
+void LTConsistencyMgr::computePR2LtInfo()
+{
+    BBListIter bbit;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+        bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+        computePR2LtInfoForBB(bb->id(), true);
+        computePR2LtInfoForBB(bb->id(), false);
     }
 }
 
@@ -1154,6 +474,47 @@ void LTConsistencyMgr::computeEdgeConsistency(
     for (xcom::Edge * e = m_cfg->get_first_edge(it); e != nullptr;
          e = m_cfg->get_next_edge(it)) {
         computeEdgeConsistencyImpl(e, inconsist_lst);
+    }
+}
+
+
+void LTConsistencyMgr::computeEdgeConsistencyImpl(xcom::Edge const* e,
+    OUT InConsistPairList & inconsist_lst)
+{
+    ASSERT0(e);
+    xcom::VexIdx from = e->from()->id();
+    xcom::VexIdx to = e->to()->id();
+    LinearScanRA & lsra = m_impl.getRA();
+    PRLiveSet const* live_in_to = m_live_mgr->get_livein(to);
+    PRLiveSet const* live_out_from = m_live_mgr->get_liveout(from);
+    ASSERT0(live_in_to && live_out_from);
+
+    PRLiveSetIter * iter = nullptr;
+    for (PRNO pr = (PRNO)live_in_to->get_first(&iter);
+         pr != BS_UNDEF; pr = (PRNO)live_in_to->get_next(pr, &iter)) {
+        if (!live_out_from->is_contain(pr)) { continue; }
+
+        LifeTime * lt = m_impl.getRA().getLTMgr().getLifeTime(pr);
+
+        //If this lifetime is never defined, don't consider the inconsistency.
+        if (!lt->isOccHasDef()) { continue; }
+
+        //If the lifetime is not split or spilled, don't consider the
+        //inconsistency.
+        LTList const& lt_list = lt->getChild();
+        Var const* spill_loc = lsra.getSpillLoc(lt->getPrno());
+        if (lt_list.get_elem_count() == 0 && spill_loc == nullptr) {
+            continue;
+        }
+
+        LifeTime const* from_lt = getOutLt(pr, from);
+        LifeTime const* to_lt = getInLt(pr, to);
+        if (from_lt == to_lt) { continue; }
+
+        //Compute the inconsistency between from_lt and to_lt on the current
+        //edge.
+        computeInconsistency(inconsist_lst, from, to, from_lt, to_lt,
+                             spill_loc, lsra);
     }
 }
 
@@ -1198,8 +559,8 @@ IRBB * LTConsistencyMgr::insertLatch(IRBB const* from, MOD IRBB * to)
         m_impl.tryUpdateRPO(newbb, tramp, from, false);
     }
 
-    m_impl.tryUpdateDom(newbb, to);
-    m_impl.tryUpdateLiveness(newbb, to);
+    m_impl.tryUpdateDom(from, newbb, to);
+    m_impl.addLivenessForEmptyLatchBB(newbb, from);
     dumpInsertBB(m_impl, from, to, newbb, "fix lifetime consistency");
     m_is_insert_bb = true;
     return newbb;
@@ -1325,125 +686,13 @@ void LTConsistencyMgr::reviseEdgeConsistency(
 
 void LTConsistencyMgr::perform()
 {
-    genInconsistLTList();
-
-    //If the inconsist lifetime list is null, return directly.
-    if (getInconsistLTList().get_elem_count() == 0) { return; }
-
-    computeLTConsistency();
+    computePR2LtInfo();
     InConsistPairList inconsist_lst;
     computeEdgeConsistency(inconsist_lst);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         inconsist_lst.dump(m_rg);
     }
     reviseEdgeConsistency(inconsist_lst);
-}
-
-
-bool LTConsistencyMgr::canIgnoreEdge(xcom::Edge * e)
-{
-    ASSERT0(e);
-
-    Vertex * from = e->from();
-    Vertex * to = e->to();
-    ASSERT0(from && to);
-
-    //The edge is not required to do the inconsistency check only if the out
-    //degree of 'from' BB is 1 and the in degree of 'to' BB is 1. If the above
-    //condition is not met, this edge still need to do the inconsistency check.
-    //
-    //For example:
-    //  The CFG after the register allocation is as below, the $p is
-    //  spilled (#S6) in BB7, and relaoded into $p2 (#S3) in BB4. The split of
-    //  $p breaks the original edges in CFG.
-    //  When do the inconsistency check analysis, the LATCH BB should be
-    //  inserted between the edge from BB2 and BB3, and the edge from BB8 and
-    //  BB9. The out degreee of 'from' BB (BB2) and the in degree of 'to' BB
-    //  (BB9) are great than one, which means they are the start of the branch
-    //  or the join of branch. The detail analysis can refer to the function
-    //  computeBackwardConsistencyImpl or computeForwardConsistencyImpl.
-    //
-    //  The CFG before inconsistency revise:
-    //                     BB1:
-    //                     $p <-- ... #S1
-    //                     ...
-    //                     |
-    //                     v
-    //                   BB2:
-    //                   $p < n #S2
-    //                   ...
-    //                    |    |
-    //          __________|    |___________
-    //          |                         |
-    //          v                         v
-    //        BB3:                      BB6:
-    //        ...                       ...
-    //          |                         |
-    //          v                         v
-    //        BB4:                      BB7:
-    //        ...                       ... <-- $p         #S5
-    //        $p2 <-- reload [mem] #S3  [mem] <-- spill $p #S6
-    //        ... <-- $p2          #S4  ...
-    //          |                         |
-    //          V                         V
-    //        BB5:                      BB8:
-    //        ...                       ...
-    //          |                         |
-    //          |___________   ___________|
-    //                     |   |
-    //                     v   v
-    //                      BB9:
-    //                      ...
-    //                      ... <-- $p2 #S7
-    //                      ...
-    //
-    //  The CFG after inconsistency revise:
-    //                     BB1:
-    //                     $p <-- ... #S1
-    //                     ...
-    //                     |
-    //                     v
-    //                   BB2:
-    //                   $p < n #S2
-    //                   ...
-    //                    |    |
-    //          __________|    |___________
-    //          |                         |
-    //          v                         v
-    //        BB_LATCH1:                  |
-    //        [mem] <-- spill $p #S10     |
-    //          |                         |
-    //          v                         v
-    //        BB3:                      BB6:
-    //        ...                       ...
-    //          |                         |
-    //          v                         v
-    //        BB4:                      BB7:
-    //        ...                       ... <-- $p         #S5
-    //        $p2 <-- reload [mem] #S3  [mem] <-- spill $p #S6
-    //        ... <-- $p2          #S4  ...
-    //          |                         |
-    //          V                         V
-    //        BB5:                      BB8:
-    //        ...                       ...
-    //          |                         |
-    //          |                         v
-    //          |                       BB_LATCH2:
-    //          |                       $p2 <-- reload [mem] #S11
-    //          |                         |
-    //          |___________   ___________|
-    //                     |   |
-    //                     v   v
-    //                      BB9:
-    //                      ...
-    //                      ... <-- $p2 #S7
-    //                      ...
-    //   Note: BB_LATCH1 and BB_LATCH2 are inserted for inconsistency revise.
-
-    if (m_cfg->isOutDegreeMoreThan(from, 1)) { return false; }
-
-    if (m_cfg->isInDegreeMoreThan(to, 1)) { return false; }
-    return true;
 }
 
 
@@ -1566,14 +815,18 @@ void LTConsistencyMgr::reorderMoveIRForBB(MOD IRBB * bb,
         if (old_r == r) { ++r; continue; }
         ASSERT0(reg_use_cnt[old_r] == 1);
 
-        //Exchange old_r and r2; after that old_r is a fixed point
+        //Exchange old_r and r2; after that old_r is a fixed point.
         Reg r2 = move_info[old_r];
+        ASSERT0(def_irs[old_r]);
+        ASSERT0(def_irs[r2]);
 
         //Do the data exchange.
         PRNO old_r_prno = def_irs[old_r]->getPrno();
+        Type const* ty1 = def_irs[old_r]->getType();
         PRNO r2_prno = def_irs[r2]->getPrno();
-        Type const* ty = def_irs[old_r]->getType();
-        marker = m_impl.insertSwapPR(old_r_prno, r2_prno, ty, marker, bb);
+        Type const* ty2 = def_irs[r2]->getType();
+        marker = m_impl.insertIRToSwap(old_r_prno, r2_prno, ty1, ty2, marker,
+                                       bb);
 
         //Value of register r2 is now in the correct register old_r.
         move_info[old_r] = old_r;
@@ -1687,7 +940,6 @@ void LTConsistencyMgr::reorderMoveIRInLatchBB(MOD LatchMap & latch_map)
         ::memset(reg_use_cnt, 0, max_reg_num * sizeof(UINT));
         ::memset(def_irs, 0, sizeof(IR*) * max_reg_num);
         for (UINT i = 0; i < max_reg_num; i++) { move_info[i] = i; }
-
         //Check the reorder is necessary to be performed or not.
         IR * marker = nullptr;
         if (!isReorderRequired(bb, reg_use_cnt, move_info, def_irs,
@@ -2035,10 +1287,14 @@ IR * SplitMgr::insertSpillAroundSplitPos(LifeTime * lt, SplitCtx const& ctx)
 bool SplitMgr::isUsedBySuccessors(PRNO prno, SplitCtx const& ctx)
 {
     ASSERT0(ctx.split_pos_ir);
-    ASSERT0(ctx.reload_pos != POS_UNDEF);
+
+    //CASE: The reload position can be POS_UNDEF if there is no occ
+    //after current split position.
+    //ASSERT0(ctx.reload_pos != POS_UNDEF);
 
     //If the reload position is a USE point, return true directly.
-    if (UpdatePos::isUse(ctx.reload_pos)) { return true; }
+    if (ctx.reload_pos != POS_UNDEF && UpdatePos::isUse(ctx.reload_pos))
+    { return true; }
     IRBB * bb =
         ctx.split_pos_ir->is_stmt() ? ctx.split_pos_ir->getBB() :
         ctx.split_pos_ir->getStmt()->getBB();
@@ -2121,6 +1377,13 @@ LifeTime * SplitMgr::splitAt(LifeTime * lt, MOD SplitCtx & ctx)
 }
 
 
+void SplitMgr::spillForced(LifeTime * lt, MOD SplitCtx & ctx)
+{
+    insertSpillAroundSplitPos(lt, ctx);
+    lt->setSpillForced();
+}
+
+
 LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
 {
     ASSERT0(ctx.reload_occ.getIR());
@@ -2130,6 +1393,7 @@ LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
     LifeTime * newlt = m_impl.getLTMgr().genLifeTime(newprno);
     newlt->setParent(lt);
     newlt->setAncestor(lt->getAncestor());
+    const_cast<LifeTime*>(lt->getAncestor())->addChild(newlt);
     newlt->moveFrom(lt, ctx.reload_pos);
 
     //Shrink the original lifetime forward to the last occ position. Because
@@ -2157,7 +1421,7 @@ LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
     //    |                u
     // POS: 2              17
     lt->shrinkForwardToLastOccPos();
-    newlt->set_dedicated(lt->is_dedicated());
+    newlt->inheritAttrFlag(lt);
     m_ra.setReg(newlt->getPrno(), REG_UNDEF);
     if (newlt->is_dedicated()) {
         Reg antireg = m_ra.getDedicatedReg(lt->getPrno());
@@ -2493,8 +1757,10 @@ void LSRAImpl::transferActive(Pos curpos)
 //linearization allocation flattening the CFG.
 void LSRAImpl::reviseLTConsistency()
 {
+    START_TIMER(t, "reviseLTConsistency");
     LTConsistencyMgr mgr(*this);
     mgr.perform();
+    END_TIMER(t, "reviseLTConsistency");
 }
 
 
@@ -2560,58 +1826,31 @@ void LSRAImpl::insertReloadAtExit(Reg r, Var * spill_loc)
 }
 
 
-Var * LSRAImpl::getTempVar(Type const* ty)
+IR * LSRAImpl::doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
+                           Type const* ty2, IR const* marker, MOD IRBB * bb)
 {
-    ASSERT0(ty);
-    //This function may not be fully covered, because the temp scalar var or
-    //temp vector var would be used only if there is no the temp scalar
-    //register or temp vector register on the target.
-    if (ty->is_vector()) {
-        if (m_temp_vec_var == nullptr) {
-            PRNO tmpprno = m_irmgr->buildPrno(ty);
-            m_temp_vec_var = m_ra.genSpillLoc(tmpprno, ty);
-        }
-        return m_temp_vec_var;
-    }
-
-    if (ty->is_scalar()) {
-        //Process the scalar type.
-        if (m_temp_var == nullptr) {
-            PRNO tmpprno = m_irmgr->buildPrno(ty);
-            m_temp_var = m_ra.genSpillLoc(tmpprno, ty);
-        }
-        return m_temp_var;
-    }
-    return nullptr;
-}
-
-
-IR * LSRAImpl::insertSwapPR(PRNO prno1, PRNO prno2, Type const* ty,
-                            IR const* marker, MOD IRBB * bb)
-{
-    ASSERT0(bb && ty);
+    ASSERT0(bb && ty1 && ty2);
     ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
     ASSERT0(prno1 != prno2);
 
-    //If there is a TMP register on the target, the register will be used as a
-    //temp space to finish the swap, or else, a memory location on stack will
-    //be adopted to help to complete the data exchange.
-    bool const isTempRegAvail = m_ra.isTmpRegAvailable(ty);
-    PRNO tmpprno = isTempRegAvail ?
-        m_ra.buildPrno(ty, m_ra.getTemp()) : PRNO_UNDEF;
-    IR * stpr1 = isTempRegAvail ?
-        m_irmgr->buildStorePR(tmpprno, ty,
-                              m_irmgr->buildPRdedicated(prno1, ty)) :
-        m_ra.buildSpillByLoc(prno1, getTempVar(ty), ty);
+    UINT const elem_num = ELEM_NUM_OF_16_ELEM_VECTOR_TYPE;
+    Type const* ty_tmp = ty1->is_vector() ?
+        m_tm->getVectorType(elem_num, D_U32) : m_tm->getTargMachRegisterType();
 
-    //This data move is always between two registers.
-    IR * stpr2 = m_irmgr->buildStorePR(prno1, ty,
-        m_irmgr->buildPRdedicated(prno2, ty));
+    //Move the data from the reg of prno1 to the reg of temp.
+    PRNO tmpprno = m_ra.buildPrno(ty_tmp, m_ra.getTemp());
+    IR * stpr1 = m_irmgr->buildStorePR(tmpprno, ty_tmp,
+        m_irmgr->buildPRdedicated(prno1, ty1));
 
-    IR * stpr3 = isTempRegAvail ?
-        m_irmgr->buildStorePR(prno2, ty,
-                              m_irmgr->buildPRdedicated(tmpprno, ty)) :
-        m_ra.buildReload(prno2, getTempVar(ty), ty);
+    //Move the data from the reg of prno2 to the reg of prno1.
+    PRNO tmp_prno_2 = m_ra.buildPrno(ty2, m_ra.getReg(prno1));
+    IR * stpr2 = m_irmgr->buildStorePR(tmp_prno_2, ty2,
+        m_irmgr->buildPRdedicated(prno2, ty2));
+
+    //Move the data from the reg of tmp to the reg of prno2.
+    PRNO tmp_prno_3 = m_ra.buildPrno(ty_tmp, m_ra.getReg(prno2));
+    IR * stpr3 = m_irmgr->buildStorePR(tmp_prno_3, ty_tmp,
+        m_irmgr->buildPRdedicated(tmpprno, ty_tmp));
 
     if (marker) {
         IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
@@ -2622,10 +1861,71 @@ IR * LSRAImpl::insertSwapPR(PRNO prno1, PRNO prno2, Type const* ty,
 
     bb->getIRList().insert_after(stpr2, stpr1);
     bb->getIRList().insert_after(stpr3, stpr2);
-    m_ra.setMove(stpr1);
+
     m_ra.setMove(stpr2);
+    m_ra.setMove(stpr1);
     m_ra.setMove(stpr3);
     return stpr3;
+}
+
+
+IR * LSRAImpl::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
+                           Type const* ty2, IR const* marker, MOD IRBB * bb)
+{
+    ASSERT0(bb && ty1 && ty2);
+    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
+    ASSERT0(prno1 != prno2);
+
+    UINT const elem_num = ELEM_NUM_OF_16_ELEM_VECTOR_TYPE;
+    Type const* ty_tmp = ty1->is_vector() ?
+        m_tm->getVectorType(elem_num, D_U32) : m_tm->getTargMachRegisterType();
+    Var * spill_loc = getTempVar(ty_tmp);
+    ASSERT0(spill_loc);
+
+    //Build the spill IR.
+    PRNO tmpprno = m_ra.buildPrno(ty_tmp, m_ra.getReg(prno1));
+    IR * spill = m_ra.buildSpillByLoc(tmpprno, spill_loc, ty_tmp);
+    if (marker) {
+        IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
+        bb->getIRList().insert_after(spill, stmt);
+    } else {
+        bb->getIRList().append_head(spill);
+    }
+    //This data move is always between two registers.
+    tmpprno = m_ra.buildPrno(ty2, m_ra.getReg(prno1));
+    IR * stpr = m_irmgr->buildStorePR(tmpprno, ty2,
+        m_irmgr->buildPRdedicated(prno2, ty2));
+
+    //Build the reload IR.
+    tmpprno = m_ra.buildPrno(ty_tmp, m_ra.getReg(prno2));
+    IR * reload = m_ra.buildReload(tmpprno, spill_loc, ty_tmp);
+
+    bb->getIRList().insert_after(stpr, spill);
+    bb->getIRList().insert_after(reload, stpr);
+    m_ra.setSpill(spill);
+    m_ra.setMove(stpr);
+    m_ra.setReload(reload);
+    return reload;
+}
+
+
+IR * LSRAImpl::insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
+                              Type const* ty2, IR const* marker, MOD IRBB * bb)
+{
+    ASSERT0(bb && ty1 && ty2);
+    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
+    ASSERT0(prno1 != prno2);
+    ASSERT0(m_ra.getReg(prno1) != m_ra.getReg(prno2));
+
+    if (m_ra.isTmpRegAvailable(ty1)) {
+        return doSwapByReg(prno1, prno2, ty1, ty2, marker, bb);
+    }
+
+    if (m_ra.isTmpRegAvailable(ty2)) {
+        return doSwapByReg(prno2, prno1, ty2, ty1, marker, bb);
+    }
+
+    return doSwapByMem(prno1, prno2, ty1, ty2, marker, bb);
 }
 
 
@@ -2700,21 +2000,25 @@ void LSRAImpl::recordSplittedNewLT(LifeTime const* newlt)
 }
 
 
-void LSRAImpl::tryUpdateDom(IRBB const* newbb, IRBB const* marker)
+void LSRAImpl::tryUpdateDom(IRBB const* from, IRBB const* newbb,
+                            IRBB const* to)
 {
-    //TODO:update DomInfo incrementally.
-    m_oc->setInvalidDom();
-    m_oc->setInvalidPDom();
-    m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_DOM, PASS_UNDEF);
+    //Update DomInfo incrementally.
+    m_rg->getCFG()->addDomToNewSingleInOutBB(from->getVex(),
+        newbb->getVex(), to->getVex());
+    setDomInfoValid(false);
 }
 
 
-void LSRAImpl::tryUpdateLiveness(IRBB const* newbb, IRBB const* marker)
+void LSRAImpl::addLivenessForEmptyLatchBB(IRBB const* new_bb, IRBB const* from)
 {
-    //TODO:update liveness incrementally.
-    m_live_mgr->set_valid(false);
-    m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_LIVENESS_MGR,
-                                               PASS_UNDEF);
+    ASSERT0(new_bb && from);
+    ASSERT0(new_bb->is_empty());
+    ASSERT0(m_cfg->is_pred(new_bb->getVex(), from->getVex()));
+    ASSERT0(new_bb->getVex()->getInDegree() == 1);
+    ASSERT0(new_bb->getVex()->getOutDegree() == 1);
+
+    m_live_mgr->setLivenessForEmptyBB(new_bb, from);
 }
 
 
@@ -2786,8 +2090,19 @@ IR * LSRAImpl::insertSpillAtBBEnd(PRNO prno, Var * var, Type const* ty,
 
 IRListIter LSRAImpl::insertSpillAtBBEnd(IR * spill, IRBB * bb)
 {
-    ASSERT0(isSpillLikeOp(spill) && bb);
+    ASSERT0(spill && isSpillLikeOp(spill) && bb && m_rg &&
+            m_rg->getRegionVar());
     m_ra.setSpill(spill);
+
+    ArgPasser * ap = (ArgPasser*)m_rg->getPassMgr()->queryPass(PASS_ARGPASSER);
+    ASSERT0(ap);
+
+    IR * marker = ap->getEntryParam();
+    if (m_rg->getRegionVar()->is_entry() && bb->is_entry() &&
+        marker != nullptr) {
+        return bb->getIRList().insert_before(spill, ap->getEntryParam());
+    }
+
     return bb->getIRList().append_tail_ex(spill);
 }
 
@@ -2813,6 +2128,30 @@ void LSRAImpl::insertSpillBefore(IR * spill, IR const* marker)
     BBIRListIter it = nullptr;
     irlst.find(const_cast<IR*>(stmt), &it);
     ASSERT0(it);
+
+    //Find the proper position to place the spill IR.
+    bool is_after_reload = false;
+    for (; it->get_prev() != nullptr; it = irlst.get_prev(it)) {
+        IR * ir = it->get_prev()->val();
+        if (!m_ra.isReloadOp(ir) && !m_ra.isSpillOp(ir)) {
+            break;
+        }
+
+        if (m_ra.isReloadOp(ir)) {
+            PRNO def_prno = ir->getPrno();
+            PRNO use_prno = spill->getRHS()->getPrno();
+
+            //CASE: If a prno is already reloaded before this marker, and
+            //the same prno is also needed to be spilled before this marker,
+            //the sequence of this reload IR should be keeped to before the
+            //spill IR to ensure the correctness of the spilled data.
+            if (def_prno == use_prno) { is_after_reload = true; break; }
+        }
+    }
+    if (is_after_reload) {
+        irlst.insert_after(spill, it->get_prev());
+        return;
+    }
     irlst.insert_before(spill, it);
 }
 
@@ -2837,6 +2176,42 @@ IR * LSRAImpl::insertReload(PRNO to, Var * v, Type const* ty, IRBB * bb)
 }
 
 
+void LSRAImpl::checkAndDoReloadForced(LifeTime * lt, Pos curpos,
+                                      IR const* curir, LifeTime const* cand)
+{
+    ASSERT0(lt && cand && curir);
+    ASSERT0(curpos != POS_UNDEF);
+
+    OccList & lt_occ_list = lt->getOccList();
+    OccList & cand_occ_list = const_cast<LifeTime*>(cand)->getOccList();
+    IR * lt_first = lt_occ_list.get_head().getIR();
+    IR * cand_first = cand_occ_list.get_head().getIR();
+    ASSERT0(lt_first && cand_first);
+
+    IR * lt_stmt = lt_first->is_stmt() ? lt_first : lt_first->getStmt();
+    IR * cand_stmt = cand_first->is_stmt() ? cand_first : cand_first->getStmt();
+
+    //If the statement of the first occ of lt and cand are not fake-use IR,
+    //it is not required to do the reload forced.
+    if (!getRA().isFakeUseOp(lt_stmt) || !getRA().isFakeUseOp(cand_stmt)) {
+        return;
+    }
+
+    //Insert Reload before current IR.
+    Type const* ty = lt_first->getType();
+    Var * spill = m_ra.genSpillLoc(lt->getPrno(), ty);
+    insertReloadBefore(lt->getPrno(), spill, ty, lt_stmt);
+
+    //Shrink the liftime to curpos.
+    Range r = lt->getFirstRange();
+    RG_start(r) = curpos;
+    lt->setRange(0, r);
+
+    //Set reload forced flag.
+    lt->setReloadForced();
+}
+
+
 void LSRAImpl::solveConflict(LifeTime * lt, Pos curpos, IR const* curir)
 {
     ASSERT0(m_ra.getLTMgr().verifyPos(curir, curpos));
@@ -2847,18 +2222,38 @@ void LSRAImpl::solveConflict(LifeTime * lt, Pos curpos, IR const* curir)
     do {
         SplitCtx ctx(curpos, curir, lt);
         LifeTime * cand = spltmgr.selectSplitCand(lt, tryself, ctx);
-        ASSERTN(cand, ("no enough resource to remedy splitting"));
+        //CASE: The candidate cannot be found under if all the lifetimes
+        //in the active list do not have the occurence after the split
+        //position.
+        // ASSERTN(cand, ("no enough resource to remedy splitting"));
         if (cand == lt) {
             //Only try itself once.
             tryself = false;
         }
+       if (cand == nullptr || ctx.reload_pos == POS_UNDEF) {
+            LTSetIter it;
+            LTSet & set = m_ra.getActive();
 
-        //If the candidate does not have a reload_pos, splitAt() can NOT
-        //cutoff lifetime into two.
-        ASSERT0(ctx.reload_pos != POS_UNDEF);
+            //Pick the first lifetime from the active list.
+            set.get_head(&it);
+            ASSERT0(it);
+            cand = it->val();
+            ASSERT0(cand && m_ra.hasReg(cand));
+            set.remove(cand);
 
-        LifeTime * newlt = spltmgr.splitAt(cand, ctx);
-        m_ra.addUnhandled(newlt);
+            //Since there is no occurence after current split position,
+            //here only need to spill the candidate to the memory, and the
+            //reload operation will be added by the inconsistency revise
+            //algorithm.
+            spltmgr.spillForced(cand, ctx);
+        } else {
+            //If the candidate does not have a reload_pos, splitAt() can NOT
+            //cutoff lifetime into two.
+            ASSERT0(ctx.reload_pos != POS_UNDEF);
+            LifeTime * newlt = spltmgr.splitAt(cand, ctx);
+            m_ra.addUnhandled(newlt);
+            computeLTPrefer(newlt);
+        }
         //CASE:lsra_split.gr, cand may not have reload-occ.
         //ASSERT0(ctx.reload_pos != POS_UNDEF);
         if (m_ra.hasReg(cand)) {
@@ -2874,8 +2269,10 @@ void LSRAImpl::solveConflict(LifeTime * lt, Pos curpos, IR const* curir)
             //Update the lifetime prefer only if it is not handled.
             computeLTPrefer(cand);
         }
-        computeLTPrefer(newlt);
         succ = tryAssignRegister(curir, lt);
+
+        //Check and do the reload forced if necessary.
+        if (succ) { checkAndDoReloadForced(lt, curpos, curir, cand); }
         count++;
     } while (!succ && count < 20);
     ASSERT0(succ);
@@ -2932,6 +2329,13 @@ bool LSRAImpl::perform(OptCtx & oc)
     scan.perform();
     reviseLTConsistency();
     saveCallee();
+
+    if (!isDomInfoValid()) {
+        //Recompute the DOM/PDOM if necessary.
+        m_oc->setInvalidPDom();
+        m_oc->setInvalidDom();
+        m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_DOM, PASS_UNDEF);
+    }
     if (m_is_insert_bb) {
         m_live_mgr->set_valid(false);
     }

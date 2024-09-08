@@ -456,6 +456,7 @@ RenameDef::RenameDef(MOD IR * stmt, DomTree const& dt, bool build_ddchain,
 {
     ASSERT0(stmt);
     m_newstmt = stmt;
+    ASSERT0(MDSSAMgr::hasMDSSAInfo(m_newstmt));
     m_newphi = nullptr;
     m_liveset = nullptr;
     m_mgr = mgr;
@@ -964,7 +965,7 @@ void RenameDef::processPhi()
 
 void RenameDef::processStmt()
 {
-    ASSERT0(m_newstmt);
+    ASSERT0(m_newstmt && MDSSAMgr::hasMDSSAInfo(m_newstmt));
     IRBB const* bb = m_newstmt->getBB();
     MDSSAInfo const* info = m_mgr->getMDSSAInfoIfAny(m_newstmt);
     if (info == nullptr || info->isEmptyVOpndSet()) {
@@ -992,6 +993,7 @@ void RenameDef::processStmt()
 void RenameDef::perform()
 {
     if (m_newstmt != nullptr) {
+        ASSERT0(MDSSAMgr::hasMDSSAInfo(m_newstmt));
         processStmt();
         return;
     }
@@ -1001,15 +1003,68 @@ void RenameDef::perform()
 
 
 //
+//SATRT RenameExp
+//
+RenameExp::RenameExp(MOD IR * root, IR const* startir, IRBB const* startbb,
+                     MDSSAMgr * mgr, OptCtx * oc)
+{
+    ASSERT0(root && (root->is_stmt() || root->is_exp()));
+    ASSERT0(startir == nullptr ||
+            (startir->is_stmt() && startir->getBB() == startbb));
+    m_root = root;
+    m_startir = startir;
+    m_startbb = startbb;
+    m_mgr = mgr;
+    m_am = mgr->getActMgr();
+    m_rg = mgr->getRegion();
+    m_oc = oc;
+}
+
+
+void RenameExp::perform()
+{
+    class IterTree : public VisitIRTree {
+    protected:
+        virtual bool visitIR(IR * ir) override
+        {
+            if (!ir->is_exp() || !ir->isMemRefNonPR()) { return true; }
+            m_mdssamgr->findAndSetLiveInDef(ir, m_startir, m_startbb, *m_oc);
+            return true;
+        }
+    public:
+        IR const* m_startir;
+        IRBB const* m_startbb;
+        MDSSAMgr * m_mdssamgr;
+        OptCtx * m_oc;
+    public:
+        //startir: the start position in 'startbb', it can be NULL.
+        //         If it is NULL, the function first finding the Phi list of
+        //         'startbb', then keep finding its predecessors until meet the
+        //         CFG entry.
+        //startbb: the BB that begin to do searching. It can NOT be NULL.
+        IterTree(IR const* startir, IRBB const* startbb,
+                 MDSSAMgr * mgr, OptCtx * oc) :
+            m_startir(startir), m_startbb(startbb), m_mdssamgr(mgr), m_oc(oc)
+        {
+            ASSERT0(startir == nullptr ||
+                    (startir->is_stmt() && startir->getBB() == startbb));
+        }
+    };
+    IterTree it(m_startir, m_startbb, m_mgr, m_oc);
+    it.visit(m_root);
+}
+//END RenameExp
+
+
+//
 //START ReconstructMDSSA
 //
-ReconstructMDSSA::ReconstructMDSSA(xcom::Vertex const* root,
-                                   xcom::VexTab const& vextab,
-                                   xcom::DomTree const& domtree,
-                                   xcom::Graph const* cfg,
-                                   MDSSAMgr * mgr) :
-    VisitTree(domtree, root->id()), m_vextab(vextab), m_mdssamgr(mgr),
-    m_cfg(cfg)
+ReconstructMDSSA::ReconstructMDSSA(
+    xcom::Vertex const* root, xcom::VexTab const& vextab,
+    xcom::DomTree const& domtree, xcom::Graph const* cfg, MDSSAMgr * mgr,
+    OptCtx * oc) :
+    xcom::VisitTree(domtree, root->id()), m_vextab(vextab), m_cfg(cfg),
+    m_mdssamgr(mgr), m_oc(oc)
 {
     ASSERT0(m_mdssamgr);
     m_rg = m_mdssamgr->getRegion();
@@ -1034,11 +1089,16 @@ void ReconstructMDSSA::renameBBIRList(IRBB const* bb) const
 {
     BBIRList & irlst = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter irit;
+    IR * prev = nullptr;
     for (IR * ir = irlst.get_head(&irit);
-         ir != nullptr; ir = irlst.get_next(&irit)) {
-        if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
-        RenameDef rn(ir, (DomTree const&)getTree(), false, m_mdssamgr);
-        rn.perform();
+         ir != nullptr; prev = ir, ir = irlst.get_next(&irit)) {
+        ASSERT0(ir->is_stmt());
+        if (MDSSAMgr::hasMDSSAInfo(ir)) {
+            RenameDef rnd(ir, (DomTree const&)getTree(), false, m_mdssamgr);
+            rnd.perform();
+        }
+        RenameExp rne(ir, prev, bb, m_mdssamgr, m_oc);
+        rne.perform();
     }
 }
 //END ReconstructMDSSA
@@ -1470,9 +1530,8 @@ VMD * MDSSAMgr::findLiveInDefFrom(
 //         'startbb', then keep finding its predecessors until meet the
 //         CFG entry.
 //startbb: the BB that begin to do searching.
-VMD * MDSSAMgr::findDomLiveInDefFrom(MDIdx mdid, IR const* startir,
-                                     IRBB const* startbb,
-                                     OptCtx const& oc) const
+VMD * MDSSAMgr::findDomLiveInDefFrom(
+    MDIdx mdid, IR const* startir, IRBB const* startbb, OptCtx const& oc) const
 {
     ASSERT0(startbb);
 
@@ -1714,6 +1773,23 @@ MDDef * MDSSAMgr::findMustMDDef(IR const* ir) const
         }
     }
     return nullptr;
+}
+
+
+bool MDSSAMgr::hasDef(IR const* ir) const
+{
+    ASSERT0(ir->is_exp());
+    MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
+    ASSERTN(mdssainfo, ("miss MDSSAInfo"));
+    VOpndSetIter iter = nullptr;
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
+         i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
+        VMD * t = (VMD*)m_usedef_mgr.getVOpnd(i);
+        ASSERT0(t && t->is_md());
+        MDDef * tdef = t->getDef();
+        if (tdef != nullptr) { return true; }
+    }
+    return false;
 }
 
 
@@ -1968,6 +2044,29 @@ bool MDSSAMgr::hasUse(IR const* ir) const
         }
     }
     return false;
+}
+
+
+bool MDSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
+{
+    START_TIMER(t, "MDSSA: Construct Designated Region");
+    ASSERT0(ssarg.verify());
+    xcom::Vertex const* rootv = m_cfg->getVertex(ssarg.getRootBB()->id());
+    ASSERT0(rootv);
+    xcom::VexTab vextab;
+    vextab.add(rootv);
+    BBSet const& bbset = ssarg.getBBSet();
+    BBSetIter it;
+    for (BSIdx i = bbset.get_first(&it);
+         i != BS_UNDEF; i = bbset.get_next(i, &it)) {
+        vextab.append(i);
+    }
+    ReconstructMDSSA recon(rootv, vextab, ssarg.getDomTree(), m_cfg,
+                           this, ssarg.getOptCtx());
+    recon.perform();
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *ssarg.getOptCtx()));
+    END_TIMER(t, "MDSSA: Construct Designated Region");
+    return true;
 }
 
 
@@ -3413,7 +3512,7 @@ static bool verifyVersionImpl(DomTree const& domtree, MDSSAMgr const* mgr)
     MD2VMDStack md2verstk;
 
     //The initial-version of each MDs has been created already.
-    //The call-site here can guarrantee that no new initial-version of MD
+    //The call-site here can guarantee that no new initial-version of MD
     //generated.
     //CASE:To speedup verify, there is no need to push init-version of each MD
     //into stack. The init-version of IR is corresponding to a empty slot in
@@ -3999,8 +4098,9 @@ void MDSSAMgr::findAndSetLiveInDefForTree(
 void MDSSAMgr::findAndSetLiveInDef(
     MOD IR * exp, IR const* startir, IRBB const* startbb, OptCtx const& oc)
 {
-    ASSERT0(startir == nullptr || startir->getBB() == startbb);
-    ASSERT0(exp->is_exp() && exp->isMemRefNonPR());
+    ASSERT0(startir == nullptr ||
+            (startir->is_stmt() && startir->getBB() == startbb));
+    ASSERT0(exp && exp->is_exp() && exp->isMemRefNonPR());
     MDSSAInfo * info = genMDSSAInfo(exp);
     ASSERT0(info);
     List<VMD*> newvmds;
@@ -5304,12 +5404,11 @@ bool MDSSAMgr::verifyMDSSAInfo(Region const* rg, OptCtx const& oc)
 {
     MDSSAMgr * ssamgr = (MDSSAMgr*)(rg->getPassMgr()->
         queryPass(PASS_MDSSA_MGR));
-    if (ssamgr != nullptr && ssamgr->is_valid()) {
-        ASSERT0(ssamgr->verify());
-        ASSERT0(ssamgr->verifyPhi());
-        if (oc.is_dom_valid()) {
-            ASSERT0(ssamgr->verifyVersion(oc));
-        }
+    if (ssamgr == nullptr || !ssamgr->is_valid()) { return true; }
+    ASSERT0(ssamgr->verify());
+    ASSERT0(ssamgr->verifyPhi());
+    if (oc.is_dom_valid()) {
+        ASSERT0(ssamgr->verifyVersion(oc));
     }
     return true;
 }

@@ -44,9 +44,7 @@ static bool verifyDirectMemOpImpl(IR const* ir, Region const* rg)
 {
     ASSERT0(ir->getMustRef());
     if (g_is_support_dynamic_type) {
-        ASSERTN(ir->getMustRef(), ("type is at least effect"));
-        ASSERTN(!ir->getMustRef()->is_pr(),
-                ("MD can not present a PR."));
+        ASSERTN(!ir->getMustRef()->is_pr(), ("MD can not present a PR."));
     } else {
         ASSERTN(ir->getExactRef(), ("type must be exact"));
         ASSERTN(!ir->getExactRef()->is_pr(),
@@ -420,6 +418,26 @@ IR const* DUMgr::getExactAndUniqueDef(IR const* exp) const
         return d1ir;
     }
     return nullptr;
+}
+
+
+//Return true if exist USE to 'ir'.
+//ir: must be stmt.
+bool DUMgr::hasUse(IR const* ir) const
+{
+    ASSERT0(ir->is_stmt() && ir->hasDU());
+    DUSet const* set = ir->readDUSet();
+    return set != nullptr && !set->is_empty();
+}
+
+
+//Return true if exist DEF to 'ir'.
+//ir: must be exp.
+bool DUMgr::hasDef(IR const* ir) const
+{
+    ASSERT0(ir->is_exp() && ir->hasDU());
+    DUSet const* set = ir->readDUSet();
+    return set != nullptr && !set->is_empty();
 }
 
 
@@ -2105,7 +2123,7 @@ void DUMgr::computeMDRef(MOD OptCtx & oc, DUOptFlag duflag)
     delete m_is_cached_mdset;
     m_is_cached_mdset = nullptr;
 
-    OC_is_ref_valid(oc) = true;
+    oc.setValidPass(PASS_DU_REF);
     ASSERT0(verifyMDRef());
     END_TIMER(t1, "Build DU ref");
 }
@@ -2602,8 +2620,7 @@ void DUMgr::checkAndBuildChainForAllKid(IR * ir, IRBB * bb, IRListIter ct,
 UINT DUMgr::checkIsNonLocalKillingDef(IR const* stmt, IR const* exp)
 {
     ASSERT0(m_oc);
-    if (!OC_is_live_expr_valid(*m_oc)) { return CK_UNKNOWN; }
-
+    if (!m_oc->is_live_expr_valid()) { return CK_UNKNOWN; }
     if (!exp->is_ild() || !stmt->is_ist()) { return CK_UNKNOWN; }
 
     IR const* t = ILD_base(exp);
@@ -3623,7 +3640,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         END_TIMER(t, "Build DU chain");
         //Only reach-def-in is useful for computing DU chain.
         m_solve_set_mgr.resetGlobalSet();
-        OC_is_reach_def_valid(oc) = false;
+        oc.setInvalidPass(PASS_REACH_DEF);
         return;
     }
 
@@ -3647,7 +3664,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         //Reach def info will be cleaned.
         //Only reach-def-in is useful for computing DU chain.
         m_solve_set_mgr.resetGlobalSet();
-        OC_is_reach_def_valid(oc) = false;
+        oc.setInvalidPass(PASS_REACH_DEF);
     }
     if (duflag.have(DUOPT_COMPUTE_PR_DU)) {
         OC_is_pr_du_chain_valid(oc) = true;

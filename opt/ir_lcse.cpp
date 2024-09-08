@@ -649,10 +649,9 @@ bool LCSE::perform(OptCtx & oc)
     if (change) {
         //Found CSE and processed them.
         oc.setInvalidPass(PASS_EXPR_TAB);
-        OC_is_aa_valid(oc) = false;
-        OC_is_pr_du_chain_valid(oc) = false;
-        OC_is_nonpr_du_chain_valid(oc) = false;
-        OC_is_ref_valid(oc) = false;
+        oc.setInvalidPass(PASS_AA);
+        oc.setInvalidPass(PASS_CLASSIC_DU_CHAIN);
+        oc.setInvalidPass(PASS_DU_REF);
     }
     END_TIMER(t, getPassName());
     return change;

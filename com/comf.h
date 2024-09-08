@@ -477,11 +477,10 @@ inline LONG revlong(LONG d)
 //Reverse the string.
 CHAR * reverseString(CHAR * v);
 
-//The function rotates string in buf.
+//The function rotates string in buffer.
 //e.g: given string "xyzmn", n is 2, after rotation,
-//the buf will be "zmnxy".
-//buf: record the string.
-//buflen: byte length of buf.
+//the 'str' will be "zmnxy".
+//str: record the string.
 //n: rotate times.
 CHAR * rotateString(MOD CHAR * str, UINT n);
 
@@ -580,8 +579,12 @@ UINT xstrlen(CHAR const* p);
 
 //Compare the first 'n' characters of two string.
 //Return true if equal.
-//e.g: return true if p1 is "aaa", p2 is "aaab".
-bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n);
+//n: byte length to compare.
+//pos: it is optional and can be NULL. If it is not NULL then record the byte
+//     position if the function return false.
+//e.g: return true if p1 is "aaa", p2 is "aaab", which n is 3.
+bool xstrcmp(CHAR const*RESTRICT p1, CHAR const*RESTRICT p2, INT n,
+             OUT UINT * pos = nullptr);
 
 //Format string and record in buf.
 //'buf': output buffer record string.
