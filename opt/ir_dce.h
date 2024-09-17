@@ -136,7 +136,6 @@ protected:
     DUMgr * m_dumgr;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
-    OptCtx * m_oc;
     EffectMDDef m_is_mddef_effect;
     ActMgr m_act_mgr;
     DefMiscBitSetMgr m_sbs_mgr;
@@ -149,7 +148,7 @@ protected:
 
     //Return true if ir is effect.
     bool checkCall(IR const* ir) const;
-    void checkValidAndRecomputeCDG();
+    void checkValidAndRecomputeCDG(DCECtx const& dcectx);
     bool collectByDU(IR const* x, MOD ConstIRList * pwlst2,
                      MOD DCECtx & dcectx, bool usemdssa, bool useprssa);
     bool collectByPRSSA(IR const* x, MOD ConstIRList * pwlst2,
@@ -244,6 +243,7 @@ public:
         m_is_elim_cfs = true;
         m_is_reserve_phi = false;
         m_check_md_ref = true;
+        m_cdg = nullptr;
     }
     virtual ~DeadCodeElim() {}
 
@@ -256,11 +256,9 @@ public:
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
     void dump(DCECtx const& dcectx) const;
-    void dumpBBListAndDU() const;
 
     MDSystem * getMDSystem() const { return m_md_sys; }
     ActMgr & getActMgr() { return m_act_mgr; }
-    OptCtx * getOptCtx() const { return m_oc; }
     IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }

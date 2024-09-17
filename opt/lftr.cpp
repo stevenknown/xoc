@@ -70,7 +70,7 @@ LFRInfo * LFAnaCtx::genLFRInfo(IR const* lf_exp)
 
 void LFAnaCtx::dump(Region * rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLFTR()) { return; }
     note(rg, "\n==-- LINEAR FUNC CAND LIST of LI%d --==", m_li->id());
     IRListIter it;
     for (IR const* x = getCandList().get_head(&it); x != nullptr;
@@ -157,26 +157,21 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
         LFAnaCtx ctx(tli);
         analysis(tli, ctx);
         if (ctx.getCandList().get_elem_count() == 0) { continue; }
-
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLFTR()) {
+        if (g_dump_opt.isDumpAfterPass()) {
             dump(tli, ctx);
         }
-
         IRBB * preheader = nullptr;
         if (xoc::insertPreheader(tli, m_rg, &preheader, &oc, false)) {
-            m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM,
-                                                       PASS_LOOP_INFO,
-                                                       PASS_UNDEF);
+            m_rg->getPassMgr()->checkValidAndRecompute(
+                &oc, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
             insert_bb = true;
         }
-
         bool li_insert_bb = false;
         bool replaced = doReplacement(preheader, tli, li_insert_bb, ctx);
         if (!replaced && !li_insert_bb) {
             //Nothing changed.
             continue;
         }
-
         du_set_info_changed |= replaced;
         changed |= du_set_info_changed;
         insert_bb |= li_insert_bb;
@@ -556,7 +551,9 @@ bool LFTR::doReplacement(OUT IRBB * preheader, OUT LI<IRBB> * li,
 
 bool LFTR::dump(LI<IRBB> const* li, LFAnaCtx const& ctx) const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpLFTR()) {
+        return true;
+    }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     ctx.dump(getRegion());
@@ -568,7 +565,6 @@ bool LFTR::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();

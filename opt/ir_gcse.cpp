@@ -36,75 +36,93 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IterSideEffect : public VisitIRTree {
-    bool m_has_sideeffect;
-protected:
-    virtual bool visitIR(IR const* ir) override
+class VF {
+public:
+    bool has_sideeffect;
+public:
+    VF() : has_sideeffect(false) {}
+    bool visitIR(IR const* ir, OUT bool & is_terminate)
     {
         if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
             ir->isNoMove(false)) {
-            m_has_sideeffect = true;
+            has_sideeffect = true;
             return false;
         }
         return true;
     }
-public:
-    IterSideEffect(IR const* ir) : m_has_sideeffect(false) { visit(ir); }
-    bool hasSideEffect() const { return m_has_sideeffect; }
 };
 
-//
-//START PropVNVisit
-//
-class PropVNVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(PropVNVisit);
+
+class IterSideEffect : public VisitIRTree<VF> {
+public:
+    IterSideEffect(IR const* ir, VF & vf) : VisitIRTree(vf) { visit(ir); }
+};
+
+
+class PropVNVisitFunc : public xcom::VisitTreeFuncBase {
+    COPY_CONSTRUCTOR(PropVNVisitFunc);
     bool m_is_changed;
     IRCFG * m_cfg;
     GCSE * m_gcse;
 public:
-    PropVNVisit(IRBB * root, DomTree const& domtree, IRCFG * cfg, GCSE * gcse) :
-        VisitTree(domtree, root->id()), m_cfg(cfg), m_gcse(gcse)
+    PropVNVisitFunc(IRCFG * cfg, GCSE * gcse) : m_cfg(cfg), m_gcse(gcse)
     { m_is_changed = false; }
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(
+    void visitWhenAllKidHaveBeenVisited(
         Vertex const* v, Stack<Vertex const*> &)
     {}
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         m_is_changed |= m_gcse->doPropVN(m_cfg->getBB(v->id()));
         return true;
     }
 };
+
+
+//
+//START PropVNVisit
+//
+class PropVNVisit : public xcom::VisitTree<PropVNVisitFunc> {
+    COPY_CONSTRUCTOR(PropVNVisit);
+public:
+    PropVNVisit(IRBB * root, DomTree const& domtree, PropVNVisitFunc & vf)
+        : VisitTree(domtree, root->id(), vf) {}
+};
 //END PropVNVisit
 
 
-//
-//START PropExpVisit
-//
-class PropExpVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(PropExpVisit);
+class PropExpVisitFunc : public xcom::VisitTreeFuncBase {
+    COPY_CONSTRUCTOR(PropExpVisitFunc);
     bool m_is_changed;
     IRCFG * m_cfg;
     GCSE * m_gcse;
     List<IR*> m_livexp;
 public:
-    PropExpVisit(IRBB * root, DomTree const& domtree,
-                 IRCFG * cfg, GCSE * gcse) :
-        VisitTree(domtree, root->id()), m_cfg(cfg), m_gcse(gcse)
+    PropExpVisitFunc(IRCFG * cfg, GCSE * gcse) : m_cfg(cfg), m_gcse(gcse)
     { m_is_changed = false; }
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(
-        Vertex const* v, Stack<Vertex const*> &)
+    void visitWhenAllKidHaveBeenVisited(Vertex const*, Stack<Vertex const*> &)
     {}
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         m_is_changed |= m_gcse->doPropExp(m_cfg->getBB(v->id()), m_livexp);
         return true;
     }
+};
+
+
+//
+//START PropExpVisit
+//
+class PropExpVisit : public xcom::VisitTree<PropExpVisitFunc> {
+    COPY_CONSTRUCTOR(PropExpVisit);
+public:
+    PropExpVisit(IRBB * root, DomTree const& domtree, PropExpVisitFunc & vf)
+        : VisitTree(domtree, root->id(), vf) {}
 };
 //END PropExpVisit
 
@@ -116,9 +134,10 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::DomTree const& domtree)
 {
     IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
-    PropVNVisit visit(entry, domtree, m_cfg, this);
-    visit.perform();
-    return visit.isChanged();
+    PropVNVisitFunc vf(m_cfg, this);
+    PropVNVisit prop(entry, domtree, vf);
+    prop.visit();
+    return vf.isChanged();
 }
 
 
@@ -134,9 +153,9 @@ void GCSE::copyVN(IR const* newir, IR const* oldir)
 
 void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) { return; }
     m_am.dump("%s is CSE and will be replaced by %s",
-        DumpIRName().dump(oldexp), DumpIRName().dump(newexp));
+              DumpIRName().dump(oldexp), DumpIRName().dump(newexp));
 }
 
 
@@ -457,16 +476,18 @@ bool GCSE::doPropExpInDomTreeOrder(xcom::DomTree const& domtree)
 {
     IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
-    PropExpVisit visit(entry, domtree, m_cfg, this);
-    visit.perform();
-    return visit.isChanged();
+    PropExpVisitFunc vf(m_cfg, this);
+    PropExpVisit prop(entry, domtree, vf);
+    prop.visit();
+    return vf.isChanged();
 }
 
 
 bool GCSE::hasSideEffect(IR const* ir) const
 {
-    IterSideEffect it(ir);
-    return it.hasSideEffect();
+    VF vf;
+    IterSideEffect it(ir, vf);
+    return vf.has_sideeffect;
 }
 
 
@@ -708,10 +729,10 @@ bool GCSE::doPropExp(IRBB * bb, List<IR*> & livexp)
 
 bool GCSE::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return true; }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGCSE()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) {
         return true;
     }
+    if (!g_dump_opt.isDumpAfterPass()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);

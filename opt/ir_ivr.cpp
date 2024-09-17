@@ -36,76 +36,6 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Find the unique IV at IR tree.
-class FindUniqueIVRef : public VisitIRTree {
-    UINT m_ivref_cnt;
-    IR const* m_last_ivref;
-    IVR const* m_ivr;
-    IV const* m_iv;
-    LI<IRBB> const* m_li;
-protected:
-    virtual bool visitIR(IR const* ir) override
-    {
-        IV const* iv = nullptr;
-        if (!m_ivr->isIV(m_li, ir, &iv)) { return true; }
-        m_ivref_cnt++;
-        m_last_ivref = ir;
-        m_iv = iv;
-        return true;
-    }
-public:
-    FindUniqueIVRef(IR const* ir, IVR const* ivr, LI<IRBB> const* li)
-    {
-        ASSERT0(ivr);
-        m_ivref_cnt = 0;
-        m_last_ivref = nullptr;
-        m_iv = nullptr;
-        m_ivr = ivr;
-        m_li = li;
-        visit(ir);
-    }
-    IV const* getIV() const { return m_iv; }
-    IR const* getUniqueIVRef() const
-    { return m_ivref_cnt == 1 ? m_last_ivref : nullptr; }
-};
-
-
-//Return true if the IR tree only contain loop invariant except IV.
-class CoeffIsInv : public VisitIRTree {
-    bool m_is_inv;
-    IR const* m_ivref;
-    IVR const* m_ivr;
-    Region const* m_rg;
-    LI<IRBB> const* m_li;
-    InvStmtList const* m_invstmtlst;
-protected:
-    virtual bool visitIR(IR const* ir) override
-    {
-        if (ir == m_ivref || !ir->isMemRef()) { return true; }
-        if (!xoc::isLoopInvariant(ir, m_li, m_rg, m_invstmtlst, false)) {
-            setTerminate();
-            m_is_inv = false;
-            return false;
-        }
-        return true;
-    }
-public:
-    CoeffIsInv(IR const* root, IR const* ivref, IVR const* ivr,
-               LI<IRBB> const* li, InvStmtList const* invstmtlst)
-    {
-        ASSERT0(ivref && ivr && li);
-        m_ivref = ivref;
-        m_ivr = ivr;
-        m_li = li;
-        m_rg = ivr->getRegion();
-        m_is_inv = true;
-        m_invstmtlst = invstmtlst;
-        visit(root);
-    }
-    bool isInv() const { return m_is_inv; }
-};
-
-
 //
 //START FindBIVByChainRec
 //
@@ -1449,7 +1379,7 @@ void IVRCtx::dumpAct(CHAR const* format, ...) const
 
 void IVRCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
     ASSERT0(m_am);
     ASSERT0(ir);
     xcom::StrBuf tmpbuf(64);
@@ -1473,7 +1403,7 @@ void IVRCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
 
 void IVRCtx::dumpAct(BIV const* biv, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
     ASSERT0(m_am);
     ASSERT0(biv);
     xcom::StrBuf tmpbuf(64);
@@ -1847,28 +1777,33 @@ bool IV::isRefIV(IR const* ir) const
 
 bool IV::isIRTreeRefIV(IR const* ir, OUT IR const** refiv) const
 {
-    class IterTree : public VisitIRTree {
+    class VF {
     public:
         IV const* iv;
         IR const* refiv;
-        IterTree() { refiv = nullptr; iv = nullptr; }
-        virtual bool visitIR(IR const* ir) override
+        VF() { refiv = nullptr; iv = nullptr; }
+        bool visitIR(IR const* ir, OUT bool & is_term)
         {
             if (iv->isRefIV(ir)) {
                 refiv = ir;
-                setTerminate();
+                is_term = true;
                 return false;
             }
             return true;
         }
     };
-    IterTree it;
-    it.iv = this;
+    class IterTree : public VisitIRTree<VF> {
+    public:
+        IterTree(VF & vf) : VisitIRTree(vf) {}
+    };
+    VF vf;
+    vf.iv = this;
+    IterTree it(vf);
     it.visit(ir);
     ASSERT0(refiv);
     *refiv = nullptr;
-    if (it.refiv == nullptr) { return false; }
-    *refiv = it.refiv;
+    if (vf.refiv == nullptr) { return false; }
+    *refiv = vf.refiv;
     return true;
 }
 
@@ -2355,7 +2290,7 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
 //Dump IVR info for loop.
 bool IVR::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);

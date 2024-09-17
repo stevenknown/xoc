@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class ActMgr;
+
 typedef xcom::DefSBitSet BBSet;
 typedef xcom::DefSBitSetIter BBSetIter;
 
@@ -48,14 +50,15 @@ public:
     IRBB * m_root;
     OptCtx * m_oc;
     IRCFG const* m_cfg;
+    ActMgr * m_am;
     DomTree const& m_domtree;
     xcom::TTab<UINT> m_iridtab; //for local used.
     IRList m_irlist;
     BBSet m_bbset;
 public:
     SSARegion(xcom::DefMiscBitSetMgr * sbs, DomTree const& dt,
-              Region const* rg, OptCtx * oc) :
-        m_rg(rg), m_root(nullptr), m_oc(oc), m_domtree(dt),
+              Region const* rg, OptCtx * oc, ActMgr * am) :
+        m_rg(rg), m_root(nullptr), m_oc(oc), m_am(am), m_domtree(dt),
         m_bbset(sbs->getSegMgr()) { m_cfg = m_rg->getCFG(); }
 
     //The function will find PR that assigned 'prno' into current
@@ -107,6 +110,7 @@ public:
     IRBB * getRootBB() const { return m_root; }
     OptCtx * getOptCtx() const { return m_oc; }
     DomTree const& getDomTree() const { return m_domtree; }
+    ActMgr * getActMgr() const { return m_am; }
 
     //Return true if BB id is in the SSA region.
     //id: the BB id.

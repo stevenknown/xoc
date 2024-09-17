@@ -385,11 +385,9 @@ UINT IRCFG::afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
 }
 
 
-UINT IRCFG::afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
-                                    List<UINT> const& newpreds,
-                                    OUT CfgOptCtx & ctx,
-                                    UINT orgpos, UINT orgnum,
-                                    UINT newpredstartpos)
+UINT IRCFG::afterReplacePredInCase1(
+    IRBB const* bb, IRBB const* succ, List<UINT> const& newpreds,
+    OUT CfgOptCtx & ctx, UINT orgpos, UINT orgnum, UINT newpredstartpos)
 {
     ASSERT0(newpreds.get_elem_count() <= 1);
     PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
@@ -438,9 +436,9 @@ UINT IRCFG::afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
 //succ: the target BB.
 //newpreds: list of new predecessors.
 //Return the new position of 'bb' that is in the predecessor list of 'succ'.
-UINT IRCFG::replacePredWith(IRBB const* bb, IRBB const* succ,
-                            List<UINT> const& newpreds,
-                            OUT CfgOptCtx & ctx)
+UINT IRCFG::replacePredWith(
+    IRBB const* bb, IRBB const* succ, List<UINT> const& newpreds,
+    OUT CfgOptCtx & ctx)
 {
     bool is_pred;
     UINT orgpos = WhichPred(bb, succ, is_pred);
@@ -509,8 +507,8 @@ void IRCFG::build(OptCtx & oc)
 }
 
 
-static LabelInfo const* useFirstAvailLabel(IR * ir, LabelInfo const* li,
-                                           IRCFG const* cfg)
+static LabelInfo const* useFirstAvailLabel(
+    IR * ir, LabelInfo const* li, IRCFG const* cfg)
 {
     if (li->hasSideEffect()) { return li; }
     IRBB * tgt = cfg->findBBbyLabel(li);
@@ -546,25 +544,27 @@ void IRCFG::removeDomInfo(C<IRBB*> * bbct, MOD CfgOptCtx & ctx)
 }
 
 
-void IRCFG::removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li, MOD OptCtx * oc)
+void IRCFG::removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li, MOD OptCtx & oc)
 {
     ASSERT0(li);
     li->getBodyBBSet()->diff(bb->id());
     if (li->getLoopHead() == bb) {
         //LoopInfo need to be recompute.
         LI_loop_head(li) = nullptr;
-        oc->setInvalidLoopInfo();
+        oc.setInvalidLoopInfo();
     }
 }
 
 
 void IRCFG::removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx)
 {
-    if (!ctx.oc.is_loopinfo_valid()) { return; }
+    if (!const_cast<CfgOptCtx&>(ctx).getOptCtx().is_loopinfo_valid()) {
+        return;
+    }
     LoopInfoIter it;
     for (LI<IRBB> * li = xoc::iterInitLoopInfo(getLoopInfo(), it);
          li != nullptr; li = xoc::iterNextLoopInfo(it)) {
-        removeLoopInfo(bb, li, &ctx.oc);
+        removeLoopInfo(bb, li, const_cast<CfgOptCtx&>(ctx).getOptCtx());
     }
 }
 
@@ -821,8 +821,8 @@ void IRCFG::initCFG(OptCtx & oc)
 }
 
 
-void IRCFG::findTargetBBOfMulticondBranch(IR const* ir,
-                                          OUT List<IRBB*> & tgt_bbs)
+void IRCFG::findTargetBBOfMulticondBranch(
+    IR const* ir, OUT List<IRBB*> & tgt_bbs)
 {
     ASSERT0(ir->isMultiConditionalBr());
     tgt_bbs.clean();
@@ -850,9 +850,9 @@ void IRCFG::findTargetBBOfMulticondBranch(IR const* ir,
 //    control flow.
 //ehbbs: record all BB of the exception handler region.
 //Note: this function does not clean ehbbs. Caller is responsible for that.
-void IRCFG::findEHRegion(IRBB const* catch_start,
-                         xcom::BitSet const& mainstreambbs,
-                         OUT xcom::BitSet & ehbbs)
+void IRCFG::findEHRegion(
+    IRBB const* catch_start, xcom::BitSet const& mainstreambbs,
+    OUT xcom::BitSet & ehbbs)
 {
     ASSERT0(catch_start && catch_start->isExceptionHandler());
     List<xcom::Vertex const*> list;
@@ -943,8 +943,8 @@ void IRCFG::findTryRegion(IRBB const* try_start, OUT xcom::BitSet & trybbs)
 
 
 //Find a list bb that referred labels which is the target of ir.
-void IRCFG::findTargetBBOfIndirectBranch(IR const* ir,
-                                         OUT List<IRBB*> & tgtlst)
+void IRCFG::findTargetBBOfIndirectBranch(
+    IR const* ir, OUT List<IRBB*> & tgtlst)
 {
     ASSERT0(ir->isIndirectBr());
     for (IR * c = IGOTO_case_list(ir); c != nullptr; c = c->get_next()) {
@@ -1057,9 +1057,8 @@ bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc)
 }
 
 
-bool IRCFG::tryUpdateRPOBeforeCFGChanged(IRBB * newbb, IRBB const* marker,
-                                         bool newbb_prior_marker,
-                                         MOD OptCtx * oc)
+bool IRCFG::tryUpdateRPOBeforeCFGChanged(
+    IRBB * newbb, IRBB const* marker, bool newbb_prior_marker, MOD OptCtx * oc)
 {
     if (!oc->is_rpo_valid()) {
         oc->setInvalidRPO();
@@ -1164,11 +1163,12 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc)
 //make prev no longer fallthrough to bb.
 //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
 //next: the next BB in BBList.
-IRBB * IRCFG::changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
-                                          OptCtx * oc)
+IRBB * IRCFG::changeFallthroughBBToJumpBB(
+    IRBB * prev, MOD IRBB * next, OptCtx * oc)
 {
     ASSERT0(prev && next);
     ASSERT0(prev->is_fallthrough());
+
     //Given 'to' has a fallthrough in-edge. Insert a tmp BB
     //e.g:Given following edges,
     //    from->bb1->bb2->to, where all edges are fallthrough edges;
@@ -1281,9 +1281,9 @@ void IRCFG::replaceBranchLabel(IRBB const* from, IRBB const* to,
 //The function insert newbb bewteen 'from' and 'to'. As a result, the
 //function may break up fallthrough edge of 'to' if necessary.
 //Return trampoline BB if the function inserted it before 'to'.
-IRBB *  IRCFG::insertBBBetween(IN IRBB const* from, IN BBListIter from_it,
-                               MOD IRBB * to, IN BBListIter to_it,
-                               IN IRBB * newbb, MOD OptCtx * oc)
+IRBB *  IRCFG::insertBBBetween(
+    IRBB const* from, IN BBListIter from_it, MOD IRBB * to,
+    IN BBListIter to_it, IN IRBB * newbb, MOD OptCtx * oc)
 {
     ASSERT0(from_it->val() == from && to_it->val() == to);
     //Revise BB list, note that 'from' is either fall-through to 'to',
@@ -1355,8 +1355,8 @@ void IRCFG::moveLabels(IRBB * src, IRBB * tgt)
 }
 
 
-void IRCFG::removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
-                                        CfgOptCtx const& ctx)
+void IRCFG::removeSuccDesignatedPhiOpnd(
+    IRBB const* succ, UINT pos, CfgOptCtx const& ctx)
 {
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB 'succ' has PHI.
@@ -1407,9 +1407,10 @@ void IRCFG::removeMapBetweenLabelAndBB(IRBB * bb)
 void IRCFG::removeAllStmt(IRBB * bb, CfgOptCtx const& ctx)
 {
     BBIRListIter it;
+    CfgOptCtx & pctx = const_cast<CfgOptCtx&>(ctx);
     for (IR * ir = bb->getIRList().get_head(&it); ir != nullptr;
          ir = bb->getIRList().get_next(&it)) {
-        xoc::removeStmt(ir, getRegion(), ctx.oc);
+        xoc::removeStmt(ir, getRegion(), pctx.getOptCtx());
         getRegion()->freeIRTree(ir);
     }
     bb->getIRList().clean();
@@ -1435,11 +1436,14 @@ void IRCFG::reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root,
                         MOD CfgOptCtx & ctx)
 {
     if (!useMDSSADU()) { return; }
-    DomTree domtree;
+    START_TIMER_FMT(t, ("IRCFG::Revise MDSSA"));
+    xcom::DomTree domtree;
     genDomTree(domtree);
-    ReconstructMDSSA recon(root, vextab, domtree, this,
-                           m_rg->getMDSSAMgr(), &ctx.getOptCtx());
-    recon.perform();
+    ReconstructMDSSAVF vf(vextab, domtree, this, m_rg->getMDSSAMgr(),
+                          &ctx.getOptCtx(), ctx.getActMgr());
+    ReconstructMDSSA recon(domtree, root, vf);
+    recon.reconstruct();
+    END_TIMER_FMT(t, ("IRCFG::Revise MDSSA"));
 }
 
 
@@ -1675,9 +1679,9 @@ bool IRCFG::removeTrampolinBB(OUT CfgOptCtx & ctx)
 
 
 
-static bool removeTrampolinEdgeCase2_1(IRCFG * cfg, IR * last_xr, IRBB * bb,
-                                       IRBB * pred, IRBB * succ,
-                                       OUT CfgOptCtx & ctx)
+static bool removeTrampolinEdgeCase2_1(
+    IRCFG * cfg, IR * last_xr, IRBB * bb, IRBB * pred, IRBB * succ,
+    OUT CfgOptCtx & ctx)
 {
     //CASE: pred->bb, pred fall-through to bb.
     //  pred is:
@@ -1699,10 +1703,9 @@ static bool removeTrampolinEdgeCase2_1(IRCFG * cfg, IR * last_xr, IRBB * bb,
 }
 
 
-static bool removeTrampolinEdgeCase2_2(IRCFG * cfg, IR * last_xr,
-                                       IR * last_xr_of_pred,
-                                       IRBB * bb, IRBB * pred, IRBB * succ,
-                                       OUT CfgOptCtx & ctx)
+static bool removeTrampolinEdgeCase2_2(
+    IRCFG * cfg, IR * last_xr, IR * last_xr_of_pred, IRBB * bb, IRBB * pred,
+    IRBB * succ, OUT CfgOptCtx & ctx)
 {
     LabelInfo const* tgt_li = last_xr->getLabel();
     //CASE: pred->bb, pred fall-through to bb.
@@ -1740,11 +1743,9 @@ static bool removeTrampolinEdgeCase2_2(IRCFG * cfg, IR * last_xr,
 }
 
 
-static bool removeTrampolinEdgeCase2_3(IRCFG * cfg, IR * last_xr,
-                                       IR * last_xr_of_pred,
-                                       IRBB * bb, IRBB * pred, IRBB * succ,
-                                       BBListIter bbct,
-                                       OUT CfgOptCtx & ctx)
+static bool removeTrampolinEdgeCase2_3(
+    IRCFG * cfg, IR * last_xr, IR * last_xr_of_pred, IRBB * bb, IRBB * pred,
+    IRBB * succ, BBListIter bbct, OUT CfgOptCtx & ctx)
 {
     LabelInfo const* tgt_li = last_xr->getLabel();
     // CASE: pred->f, pred->bb, and pred fall-throught to f.
@@ -1799,8 +1800,8 @@ static bool removeTrampolinEdgeCase2_3(IRCFG * cfg, IR * last_xr,
 //Remove bb and revise CFG.
 //ct: container in m_bb_list of CFG.
 //    It will be updated if related BB removed.
-static bool removeTrampolinEdgeCase2(IRCFG * cfg, BBListIter bbct,
-                                     OUT CfgOptCtx & ctx)
+static bool removeTrampolinEdgeCase2(
+    IRCFG * cfg, BBListIter bbct, OUT CfgOptCtx & ctx)
 {
     ASSERT0(bbct);
     IRBB * bb = bbct->val();
@@ -1865,8 +1866,8 @@ static bool removeTrampolinEdgeCase2(IRCFG * cfg, BBListIter bbct,
 //Remove bb and revise CFG.
 //ct: container in m_bb_list of CFG.
 //    It will be updated if related BB removed.
-static bool removeTrampolinEdgeCase1(IRCFG * cfg, BBListIter bbct,
-                                     CfgOptCtx const& ctx)
+static bool removeTrampolinEdgeCase1(
+    IRCFG * cfg, BBListIter bbct, CfgOptCtx const& ctx)
 {
     ASSERT0(bbct);
     IRBB * bb = bbct->val();
@@ -1968,7 +1969,7 @@ bool IRCFG::removeRedundantBranch(OUT CfgOptCtx & ctx)
             LabelInfo const* tgt_li = last_xr->getLabel();
             ASSERT0(tgt_li != nullptr);
             BB_irlist(bb).remove_tail();
-            xoc::removeStmt(last_xr, m_rg, ctx.oc);
+            xoc::removeStmt(last_xr, m_rg, ctx.getOptCtx());
             m_rg->freeIRTree(last_xr);
 
             IR * uncond_br = m_rg->getIRMgr()->buildGoto(tgt_li);
@@ -1992,7 +1993,7 @@ bool IRCFG::removeRedundantBranch(OUT CfgOptCtx & ctx)
         if ((last_xr->is_truebr() && always_false) ||
             (last_xr->is_falsebr() && always_true)) {
             IR * r = BB_irlist(bb).remove_tail();
-            xoc::removeStmt(r, m_rg, ctx.oc);
+            xoc::removeStmt(r, m_rg, ctx.getOptCtx());
             m_rg->freeIRTree(r);
 
             //Remove branch edge, leave fallthrough edge.
@@ -2052,7 +2053,7 @@ bool IRCFG::verifyRPO(OptCtx const& oc) const
 
 void IRCFG::dumpDomSet() const
 {
-    if (!m_rg->isLogMgrInit()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpCFG()) { return; }
     note(m_rg, "\n==-- DUMP DOM&IDOM PDOM&IPDOM IN IRCFG --==");
     m_rg->getLogMgr()->incIndent(2);
     CFG<IRBB, IR>::dumpDomSet(m_rg);
@@ -2063,7 +2064,7 @@ void IRCFG::dumpDomSet() const
 void IRCFG::dumpDOT(CHAR const* name, UINT flag) const
 {
     //Do not dump if LogMr is not initialized.
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCFG()) { return; }
 
     //Note this function does not use LogMgr as output.
     //So it is dispensable to check LogMgr.
@@ -2077,9 +2078,9 @@ void IRCFG::dumpDOT(CHAR const* name, UINT flag) const
 }
 
 
-static void dumpVertex(Vertex const* v, UINT flag, IRCFG const* cfg,
-                       bool dump_detail, bool dump_mdssa,
-                       MDSSAMgr const* mdssamgr, FILE * h)
+static void dumpVertex(
+    Vertex const* v, UINT flag, IRCFG const* cfg, bool dump_detail,
+    bool dump_mdssa, MDSSAMgr const* mdssamgr, FILE * h)
 {
     //Set dot-node properties.
     CHAR const* shape = "box";
@@ -2232,7 +2233,10 @@ static void dumpDotEdge(FILE * h, UINT flag, IRCFG const* cfg)
 
 void IRCFG::dumpDOT(FILE * h, UINT flag) const
 {
-    if (!getRegion()->isLogMgrInit() || h == nullptr) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCFG() ||
+        h == nullptr) {
+        return;
+    }
     getRegion()->getLogMgr()->push(h, "");
 
     bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
@@ -2269,13 +2273,9 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
 }
 
 
-static void dumpVCGNodeWithDetail(CHAR const* shape, CHAR const* font,
-                                  CHAR const* color,
-                                  UINT vertical_order,
-                                  INT scale,
-                                  UINT flag,
-                                  IRBB const* bb,
-                                  IRCFG const* cfg)
+static void dumpVCGNodeWithDetail(
+    CHAR const* shape, CHAR const* font, CHAR const* color,
+    UINT vertical_order, INT scale, UINT flag, IRBB const* bb, IRCFG const* cfg)
 {
     bool dump_mdssa = HAVE_FLAG(flag, IRCFG::DUMP_MDSSA);
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)cfg->getRegion()->getMDSSAMgr();
@@ -2703,7 +2703,7 @@ void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 void IRCFG::remove_xr(IRBB * bb, IR * ir, CfgOptCtx const& ctx)
 {
     ASSERT0(ir->is_stmt());
-    xoc::removeStmt(ir, m_rg, ctx.oc);
+    xoc::removeStmt(ir, m_rg, const_cast<CfgOptCtx&>(ctx).getOptCtx());
     ir = BB_irlist(bb).remove(ir);
     m_rg->freeIRTree(ir);
 }
@@ -2860,7 +2860,7 @@ bool IRCFG::removeTrampolinBranchForBB(BBListIter & it, OUT CfgOptCtx & ctx)
     }
     //Begin replacement.
     reviseTrampolinBranchEdge(bb, next, nextnext, next_tgt, this, ctx);
-    if (ctx.oc.is_dom_valid()) {
+    if (ctx.getOptCtx().is_dom_valid()) {
         //Maintain DOM info.
         //e.g: bb is BB26
         //  --BB26
@@ -3020,6 +3020,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
     bool change = false;
     bool lchange = false;
     UINT count = 0;
+    OptCtx & oc = ctx.getOptCtx();
     do {
         lchange = false;
         if (g_do_cfg_remove_unreach_bb) {
@@ -3027,8 +3028,8 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             lchange |= res;
             if (res) {
                 //TODO:maintain them on the fly.
-                ctx.oc.setInvalidCDG();
-                ctx.oc.setInvalidSCC();
+                oc.setInvalidCDG();
+                oc.setInvalidSCC();
             }
         }
         if (g_do_cfg_remove_redundant_label) {
@@ -3043,7 +3044,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             if (res) {
                 //removeEmptyBB only maintained these frequently used CFG info.
                 OptCtx::setInvalidIfCFGChangedExcept(
-                    &ctx.oc, PASS_RPO, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
+                    &oc, PASS_RPO, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
             }
         }
         if (g_do_cfg_remove_redundant_branch) {
@@ -3052,7 +3053,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             if (res) {
                 //TBD:If ctx has set need_update_dominfo is true, is it
                 //necessary invalid CFG status.
-                ctx.oc.setInvalidIfCFGChanged();
+                oc.setInvalidIfCFGChanged();
             }
         }
         if (g_do_cfg_remove_trampolin_bb) {
@@ -3061,7 +3062,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             if (res) {
                 //TBD:If ctx has set need_update_dominfo is true, is it
                 //necessary invalid CFG status.
-                ctx.oc.setInvalidIfCFGChanged();
+                oc.setInvalidIfCFGChanged();
             }
         }
         if (g_do_cfg_remove_trampolin_branch) {
@@ -3070,7 +3071,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             if (res) {
                 //TBD:If ctx has set need_update_dominfo is true, is it
                 //necessary invalid CFG status.
-                ctx.oc.setInvalidIfCFGChanged();
+                oc.setInvalidIfCFGChanged();
             }
         }
         change |= lchange;

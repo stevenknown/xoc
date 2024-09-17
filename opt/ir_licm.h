@@ -323,13 +323,13 @@ protected:
     //Note some DEF that has been hoisted by this function is recorded in 'ctx'
     //even not all of DEF hoisted totally.
     bool hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
-                         OUT IRBB * prehead, MOD HoistCtx & ctx) const;
+                         OUT IRBB * prehead, MOD HoistCtx & ctx);
     bool hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
-                             OUT IRBB * prehead, MOD HoistCtx & ctx) const;
+                             OUT IRBB * prehead, MOD HoistCtx & ctx);
     bool hoistDefByPRSSA(LICMAnaCtx const& anactx, IR const* exp,
-                         OUT IRBB * prehead, MOD HoistCtx & ctx) const;
+                         OUT IRBB * prehead, MOD HoistCtx & ctx);
     bool hoistDefByDUChain(LICMAnaCtx const& anactcx, IR const* exp,
-                           OUT IRBB * prehead, MOD HoistCtx & ctx) const;
+                           OUT IRBB * prehead, MOD HoistCtx & ctx);
 
     //Hoist candidate IR to preheader BB.
     bool hoistCand(MOD LICMAnaCtx & anactcx, OUT IRBB * prehead,
@@ -438,22 +438,21 @@ protected:
 
     //Return true if any stmt is moved outside from loop.
     bool tryHoistDefStmt(LICMAnaCtx const& anactx, MOD IR * def,
-                         MOD IRBB * prehead, MOD HoistCtx & ctx) const;
+                         MOD IRBB * prehead, MOD HoistCtx & ctx);
 
     //Try hoisting the dependent stmt to 'stmt' firstly.
     //Return true if all dependent stmts have been hoisted outside of loop.
     bool tryHoistDependentStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
-                               MOD IRBB * prehead, OUT HoistCtx & ctx) const;
+                               MOD IRBB * prehead, OUT HoistCtx & ctx);
 
     //Return true if any stmt is moved outside from loop.
     bool tryHoistStmt(LICMAnaCtx const& anactx, IR * stmt,
-                      OUT IRBB * prehead, OUT HoistCtx & ctx) const;
+                      OUT IRBB * prehead, OUT HoistCtx & ctx);
 
     //The function will scan and update each IR exp in given 'stmt'.
     //NOTE:1. the funtion should be invoked after stmt hoisted.
     //     2. DomInfo must be avaliable.
-    void updateMDSSADUForStmtInLoopBody(
-        MOD IR * stmt, HoistCtx const& ctx) const;
+    void updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }

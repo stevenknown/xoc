@@ -92,6 +92,7 @@ inline UINT cnt_list(T const* t)
 
 
 //Return true if p is in current list.
+//Note the function returns true if 'p' is NULL.
 template <class T>
 bool in_list(T const* head, T const* p)
 {

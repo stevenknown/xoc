@@ -41,6 +41,8 @@ public:
     //Return the maximum height of the tree.
     VexIdx computeHeight();
 
+    void dumpBuf(OUT StrBuf & buf) const;
+
     //The function get the parent Vertex of tree node.
     Vertex * getParent(Vertex const* v) const
     {
@@ -114,6 +116,38 @@ public:
 };
 
 
+class VisitTreeFuncBase {
+public:
+    //The function is a callback interface.
+    //The function will be invoked when all kid of v have been accessed.
+    //v: the vertex on Tree.
+    //stk: the visiting stack of vertex. Usually, user does not need to
+    //     manipulate the element in stk.
+    void visitWhenAllKidHaveBeenVisited(
+        Vertex const* v, MOD Stack<Vertex const*> & stk)
+    {
+        DUMMYUSE(v); //Avoid compiler warning.
+        DUMMYUSE(stk); //Avoid compiler warning.
+        ASSERTN(0, ("Target Dependent Code"));
+    }
+
+    //The function is a callback interface.
+    //The function will be invoked when first accessing the vertex v.
+    //Return true to process the kid vertex on tree.
+    //v: the vertex on Tree.
+    //stk: the visiting stack of vertex. Usually, user does not need to
+    //     manipulate the element in stk.
+    bool visitWhenFirstMeet(Vertex const* v, MOD Stack<Vertex const*> & stk)
+    {
+        DUMMYUSE(v); //Avoid compiler warning.
+        DUMMYUSE(stk); //Avoid compiler warning.
+        ASSERTN(0, ("Target Dependent Code"));
+        return true;
+    }
+};
+
+
+template <class VF = VisitTreeFuncBase>
 class VisitTree {
     COPY_CONSTRUCTOR(VisitTree);
 public:
@@ -122,6 +156,7 @@ public:
 protected:
     bool m_is_terminate;
     Tree const& m_tree;
+    VF & m_vf;
 
     //Record the root vertex on Tree.
     Vertex const* m_root;
@@ -145,7 +180,8 @@ protected:
     //Inform visitor to stop visiting.
     void setTerminate() { m_is_terminate = true; }
 public:
-    VisitTree(Tree const& dt, VexIdx root) : m_is_terminate(false), m_tree(dt)
+    VisitTree(Tree const& dt, VexIdx root, VF & vf)
+        : m_is_terminate(false), m_tree(dt), m_vf(vf)
     {
         m_root = dt.getVertex(root);
         ASSERT0(m_root);
@@ -157,7 +193,7 @@ public:
             m_visitedset = nullptr;
         }
     }
-    virtual ~VisitTree()
+    ~VisitTree()
     {
         if (m_visitedtab != nullptr) { delete m_visitedtab; }
         if (m_visitedset != nullptr) { delete m_visitedset; }
@@ -169,36 +205,44 @@ public:
     //Return the root of tree.
     Vertex const* getRoot() const { return m_root; }
 
-    //The function is a callback interface.
-    //The function will be invoked when all kid of v have been accessed.
-    //v: the vertex on Tree.
-    //stk: the visiting stack of vertex. Usually, user does not need to
-    //     manipulate the element in stk.
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> & stk)
-    {
-        DUMMYUSE(v);
-        DUMMYUSE(stk);
-        ASSERTN(0, ("Target Dependent Code"));
-    }
+    //The function will visit the tree beginning at the given 'start' vertex.
+    //NOTE: start should belong to the tree that rooted by 'm_root'.
+    void visit(Vertex const* start);
 
-    //The function is a callback interface.
-    //The function will be invoked when first accessing the vertex v.
-    //Return true to process the kid vertex on tree.
-    //v: the vertex on Tree.
-    //stk: the visiting stack of vertex. Usually, user does not need to
-    //     manipulate the element in stk.
-    virtual bool visitWhenFirstMeet(Vertex const* v,
-                                    Stack<Vertex const*> & stk)
-    {
-        DUMMYUSE(v);
-        DUMMYUSE(stk);
-        ASSERTN(0, ("Target Dependent Code"));
-        return true;
-    }
-
-    void perform();
+    //The function will visit the tree beginning at the root vertex.
+    void visit() { visit(getRoot()); }
 };
+
+template <class VF>
+void VisitTree<VF>::visit(Vertex const* start)
+{
+    ASSERT0(start);
+    xcom::Stack<Vertex const*> stk;
+    Vertex const* v;
+    stk.push(start);
+    while ((v = stk.get_top()) != nullptr && !is_terminate()) {
+        if (!isVisited(v->id())) {
+            setVisited(v->id());
+            if (!m_vf.visitWhenFirstMeet(v, stk)) { continue; }
+        }
+        bool all_visited = true;
+        AdjVertexIter oit;
+        for (Vertex const* kid = Graph::get_first_out_vertex(v, oit);
+             kid != nullptr; kid = Graph::get_next_out_vertex(oit)) {
+            if (kid == v) { continue; }
+            if (!isVisited(kid->id())) {
+                all_visited = false;
+                stk.push(kid);
+                break;
+            }
+        }
+        if (all_visited) {
+            stk.pop();
+            //Do post-processing while all kids of vertex has been processed.
+            m_vf.visitWhenAllKidHaveBeenVisited(v, stk);
+        }
+    }
+}
 
 } //namespace xcom
 #endif

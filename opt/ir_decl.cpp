@@ -63,8 +63,8 @@ IR * CPr::dupIRTreeByRef(IR const* src, Region * rg)
 IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
 {
     ASSERT0(src->is_ist());
-    IR * ild = rg->getIRMgr()->buildILoad(rg->dupIRTree(IST_base(src)),
-                                          IST_ofst(src), src->getType());
+    IR * ild = rg->getIRMgr()->buildILoad(
+        rg->dupIRTree(IST_base(src)), IST_ofst(src), src->getType());
     ild->copyRef(src, rg);
     ILD_base(ild)->copyRefForTree(IST_base(src), rg);
     return ild;
@@ -78,11 +78,10 @@ IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
 IR * CArray::dupIRTreeByStmt(IR const* src, Region * rg)
 {
     ASSERT0(src->is_starray());
-    IR * arr = rg->getIRMgr()->buildArray(rg->dupIRTree(ARR_base(src)),
-                                          rg->dupIRTreeList(ARR_sub_list(src)),
-                                          src->getType(), ARR_elemtype(src),
-                                          ((CStArray*)src)->getDimNum(),
-                                          ARR_elem_num_buf(src));
+    IR * arr = rg->getIRMgr()->buildArray(
+        rg->dupIRTree(ARR_base(src)), rg->dupIRTreeList(ARR_sub_list(src)),
+        src->getType(), ARR_elemtype(src), ((CStArray*)src)->getDimNum(),
+        ARR_elem_num_buf(src));
     arr->setOffset(src->getOffset());
     arr->copyRef(src, rg);
     ARR_base(arr)->copyRefForTree(ARR_base(src), rg);
@@ -120,9 +119,10 @@ bool CArray::isIsomoArrayStructTo(IR const* src) const
 IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 {
     ASSERT0(src->is_array());
-    IR * starr = rg->getIRMgr()->buildStoreArray(rg->dupIRTree(ARR_base(src)),
-        rg->dupIRTreeList(ARR_sub_list(src)), src->getType(), ARR_elemtype(src),
-        ((CStArray*)src)->getDimNum(), ARR_elem_num_buf(src), rhs);
+    IR * starr = rg->getIRMgr()->buildStoreArray(
+        rg->dupIRTree(ARR_base(src)), rg->dupIRTreeList(ARR_sub_list(src)),
+        src->getType(), ARR_elemtype(src), ((CStArray*)src)->getDimNum(),
+        ARR_elem_num_buf(src), rhs);
     starr->setOffset(src->getOffset());
     starr->copyRef(src, rg);
     ARR_base(starr)->copyRefForTree(ARR_base(src), rg);
@@ -138,8 +138,8 @@ IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 {
     ASSERT0(src->is_ild());
-    IR * ist = rg->getIRMgr()->buildIStore(rg->dupIRTree(ILD_base(src)), rhs,
-                                           src->getOffset(), src->getType());
+    IR * ist = rg->getIRMgr()->buildIStore(
+        rg->dupIRTree(ILD_base(src)), rhs, src->getOffset(), src->getType());
     ist->copyRef(src, rg);
     IST_base(ist)->copyRefForTree(ILD_base(src), rg);
     return ist;
@@ -153,8 +153,8 @@ IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 {
     ASSERT0(src->is_ld());
-    IR * st = rg->getIRMgr()->buildStore(LD_idinfo(src), src->getType(),
-                                         src->getOffset(), rhs);
+    IR * st = rg->getIRMgr()->buildStore(
+        LD_idinfo(src), src->getType(), src->getOffset(), rhs);
     st->copyRef(src, rg);
     return st;
 }
@@ -326,8 +326,8 @@ IR * CPhi::dupIRTreeByRef(IR const* src, Region * rg)
 {
     ASSERT0(src->isPROp());
     //Type cast if host compiler does NOT support C11.
-    IR * phi = rg->getIRMgr()->buildPhi(src->getPrno(), src->getType(),
-                                        (IR*)nullptr);
+    IR * phi = rg->getIRMgr()->buildPhi(
+        src->getPrno(), src->getType(), (IR*)nullptr);
     phi->copyRef(src, rg);
     return phi;
 }

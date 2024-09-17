@@ -113,7 +113,7 @@ protected:
     //Remove bb from LoopInfo tree.
     void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
     static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
-                               MOD OptCtx * oc);
+                               MOD OptCtx & oc);
     bool useMDSSADU() const;
     bool usePRSSADU() const;
 public:

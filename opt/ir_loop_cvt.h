@@ -88,7 +88,7 @@ public:
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
-    virtual bool dump() const { return Pass::dump(); }
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const { return "Loop Convertion"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_CVT; }

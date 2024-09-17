@@ -3307,7 +3307,9 @@ void Refine::invertCondition(IR ** cond, Region * rg)
 
 bool Refine::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRefine()) {
+        return false;
+    }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
@@ -3330,7 +3332,7 @@ bool Refine::perform(OptCtx & oc, MOD RefineCtx & rc)
         IR * irs = refineIRList(m_rg->getIRList(), change, rc);
         ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
         m_rg->setIRList(irs);
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefine()) {
+        if (g_dump_opt.isDumpAfterPass()) {
             dump();
         }
         END_TIMER(t, "Do Primitive Refinement");
@@ -3340,7 +3342,7 @@ bool Refine::perform(OptCtx & oc, MOD RefineCtx & rc)
     //Do primitive refinement.
     START_TIMER(t, "Do Primitive Refinement");
     change = refineBBlist(m_rg->getBBList(), rc);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefine()) {
+    if (g_dump_opt.isDumpAfterPass()) {
         dump();
     }
     END_TIMER(t, "Do Primitive Refinement");

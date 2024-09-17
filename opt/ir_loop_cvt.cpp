@@ -197,40 +197,43 @@ bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst, OptCtx & oc)
 }
 
 
+bool LoopCvt::dump() const
+{
+    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpLoopCVT()) {
+        return true;
+    }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    dumpBBList(m_rg->getBBList(), m_rg);
+    return Pass::dump();
+}
+
+
 bool LoopCvt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO,
-                                               PASS_UNDEF);
-
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
     LI<IRBB> * li = m_cfg->getLoopInfo();
     if (li == nullptr) { return false; }
-
     List<LI<IRBB>*> worklst;
     while (li != nullptr) {
         worklst.append_tail(li);
         li = LI_next(li);
     }
-
     bool change = find_and_convert(worklst, oc);
     if (change) {
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopCVT()) {
-            note(getRegion(), "\n==---- DUMP %s '%s' ----==",
-                 getPassName(), m_rg->getRegionName());
-            dumpBBList(m_rg->getBBList(), m_rg);
-        }
+        dump();
+
         //DU reference and classic DU chain has maintained.
         ASSERT0(m_dumgr->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg, oc));
 
         //All these have been changed.
-        oc.setInvalidPass(PASS_REACH_DEF);
-        oc.setInvalidPass(PASS_AVAIL_REACH_DEF);
-        oc.setInvalidPass(PASS_LIVE_EXPR);
+        oc.setInvalidIfDUMgrLiveChanged();
         oc.setInvalidIfCFGChanged();
         //TODO:maintain RPO, DOM incrementally.
     }
-
     END_TIMER(t, getPassName());
     return change;
 }

@@ -60,26 +60,29 @@ typedef EdgeC const* AdjEdgeIter;
 
 #define EDGE_next(e) ((e)->next)
 #define EDGE_prev(e) ((e)->prev)
-#define EDGE_from(e) ((e)->_from)
-#define EDGE_to(e) ((e)->_to)
-#define EDGE_info(e) ((e)->_info)
+#define EDGE_from(e) ((e)->m_from)
+#define EDGE_to(e) ((e)->m_to)
+#define EDGE_info(e) ((e)->m_info)
 class Edge {
 public:
     Edge * prev; //used by FreeList
     Edge * next; //used by FreeList
-    Vertex * _from;
-    Vertex * _to;
-    void * _info;
+    Vertex * m_from;
+    Vertex * m_to;
+    void * m_info;
 public:
     void copyEdgeInfo(Edge const* src) { EDGE_info(this) = src->info(); }
+
+    Edge * get_next() const { return EDGE_next(this); }
+    Edge * get_prev() const { return EDGE_prev(this); }
 
     void init()
     {
         prev = nullptr;
         next = nullptr;
-        _from = nullptr;
-        _to = nullptr;
-        _info = nullptr;
+        m_from = nullptr;
+        m_to = nullptr;
+        m_info = nullptr;
     }
     void * info() const { return EDGE_info(this); }
 
@@ -88,6 +91,7 @@ public:
 };
 
 typedef UINT VexIdx;
+typedef EdgeC const* VexIter;
 
 #define VERTEX_next(v) ((v)->next)
 #define VERTEX_prev(v) ((v)->prev)
@@ -129,10 +133,14 @@ public:
     VexIdx id() const { return VERTEX_id(this); }
     void * info() const { return VERTEX_info(this); }
 
-    UINT getInDegree() const;
-    UINT getOutDegree() const;
+    UINT getInDegree() const { return xcom::cnt_list(VERTEX_in_list(this)); }
+    UINT getOutDegree() const { return xcom::cnt_list(VERTEX_out_list(this)); }
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
     EdgeC * getInList() const { return VERTEX_in_list(this); }
+    Vertex * getFirstToVex(OUT VexIter * it) const;
+    Vertex * getFirstFromVex(OUT VexIter * it) const;
+    Vertex * getNextToVex(OUT VexIter * it) const;
+    Vertex * getNextFromVex(OUT VexIter * it) const;
 
     //Return the vertex that is the source-vertex of Nth in-edge.
     Vertex * getNthInVertex(UINT n) const;

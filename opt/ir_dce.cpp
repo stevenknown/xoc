@@ -57,7 +57,9 @@ static void dumpRemovedIneffectIR(
 //
 void DCECtx::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpDCE()) {
+        return;
+    }
     note(rg, "\n==-- DUMP DCECtx --==");
     note(rg, "\nEFFECT BB:");
     StmtSetIter it;
@@ -111,7 +113,9 @@ void DeadCodeElim::setEffectStmt(
 
 bool DeadCodeElim::dumpBeforePass() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpDCE()) {
+        return false;
+    }
     START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
     note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
@@ -129,18 +133,6 @@ bool DeadCodeElim::dumpBeforePass() const
 }
 
 
-void DeadCodeElim::dumpBBListAndDU() const
-{
-    dumpBBList(m_rg->getBBList(), m_rg);
-    if (usePRSSADU()) {
-        m_prssamgr->dumpBrief();
-    }
-    if (useMDSSADU()) {
-        m_mdssamgr->dump();
-    }
-}
-
-
 void DeadCodeElim::dump(DCECtx const& dcectx) const
 {
     if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpDCE()) { return; }
@@ -150,7 +142,6 @@ void DeadCodeElim::dump(DCECtx const& dcectx) const
     m_rg->getLogMgr()->incIndent(2);
     const_cast<DeadCodeElim*>(this)->getActMgr().dump();
     dcectx.dump(m_rg);
-    //dumpBBListAndDU();
     Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
@@ -158,11 +149,12 @@ void DeadCodeElim::dump(DCECtx const& dcectx) const
 
 
 //CFG optimization may invalid CDG.
-void DeadCodeElim::checkValidAndRecomputeCDG()
+void DeadCodeElim::checkValidAndRecomputeCDG(DCECtx const& dcectx)
 {
     if (m_is_elim_cfs) {
+        ASSERT0(dcectx.getOptCtx());
         m_rg->getPassMgr()->checkValidAndRecompute(
-            m_oc, PASS_PDOM, PASS_CDG, PASS_RPO, PASS_UNDEF);
+            dcectx.getOptCtx(), PASS_PDOM, PASS_CDG, PASS_RPO, PASS_UNDEF);
         m_cdg = (CDG*)m_rg->getPassMgr()->queryPass(PASS_CDG);
         ASSERT0(m_cdg && m_cdg->is_valid());
         return;
@@ -174,16 +166,16 @@ void DeadCodeElim::checkValidAndRecomputeCDG()
 bool DeadCodeElim::checkEffectStmt(IR const* ir)
 {
     ASSERT0(ir->is_stmt());
-    class IterTree : public VisitIRTree {
-    protected:
-        bool checkStmt(IR const* ir)
+    class VF {
+    public:
+        bool checkStmt(IR const* ir, OUT bool & is_terminate)
         {
             ASSERT0(ir->is_stmt());
             ASSERT0(ir->isMemRef());
             MD const* mustref = ir->getMustRef();
             if (mustref != nullptr) {
                 if (dce->is_effect_write(mustref->get_base())) {
-                    setTerminate();
+                    is_terminate = true;
                     is_effect = true;
                     return false;
                 }
@@ -199,7 +191,7 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
                 MD * md = mdsys->getMD(i);
                 ASSERT0(md);
                 if (dce->is_effect_write(md->get_base())) {
-                    setTerminate();
+                    is_terminate = true;
                     is_effect = true;
                     return false;
                 }
@@ -207,7 +199,7 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
             //Keep walking trough the IR tree.
             return true;
         }
-        bool checkExp(IR const* ir)
+        bool checkExp(IR const* ir, OUT bool & is_terminate)
         {
             ASSERT0(ir->is_exp());
             ASSERT0(ir->isMemRef());
@@ -217,7 +209,7 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
             MD const* mustref = ir->getMustRef();
             if (mustref != nullptr) {
                 if (dce->is_effect_read(mustref->get_base())) {
-                    setTerminate();
+                    is_terminate = true;
                     is_effect = true;
                     return false;
                 }
@@ -233,7 +225,7 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
                 MD * md = mdsys->getMD(i);
                 ASSERT0(md != nullptr);
                 if (dce->is_effect_read(md->get_base())) {
-                    setTerminate();
+                    is_terminate = true;
                     is_effect = true;
                     return false;
                 }
@@ -241,10 +233,10 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
             //Keep walking trough the IR tree.
             return true;
         }
-        virtual bool visitIR(IR const* ir) override
+        bool visitIR(IR const* ir, OUT bool & is_terminate)
         {
             if (dce->hasSideEffect(ir)) {
-                setTerminate();
+                is_terminate = true;
                 is_effect = true;
                 return false;
             }
@@ -258,25 +250,29 @@ bool DeadCodeElim::checkEffectStmt(IR const* ir)
             }
             if (!dce->isCheckMDRef()) {
                 //NonPR operation will always be treated as effect.
-                setTerminate();
+                is_terminate = true;
                 is_effect = true;
                 return false;
             }
-            if (ir->is_stmt()) { return checkStmt(ir); }
-            return checkExp(ir);
+            if (ir->is_stmt()) { return checkStmt(ir, is_terminate); }
+            return checkExp(ir, is_terminate);
         }
     public:
         bool is_effect;
         MDSystem const* mdsys;
         DeadCodeElim const* dce;
     public:
-        IterTree() { is_effect = false; dce = nullptr; mdsys = nullptr; }
+        VF() { is_effect = false; dce = nullptr; mdsys = nullptr; }
     };
-    IterTree it;
-    it.dce = this;
-    it.mdsys = getMDSystem();
+    class IterTree : public VisitIRTree<VF> {
+    public: IterTree(VF & vf) : VisitIRTree<VF>(vf) {}
+    };
+    VF vf;
+    vf.dce = this;
+    vf.mdsys = getMDSystem();
+    IterTree it(vf);
     it.visit(ir);
-    return it.is_effect;
+    return vf.is_effect;
 }
 
 
@@ -1016,7 +1012,7 @@ bool DeadCodeElim::performByEffectIRList(
 bool DeadCodeElim::iterCollectAndElim(
     ConstIRList & efflist, OUT DCECtx & dcectx, OUT bool & remove_branch_stmt)
 {
-    checkValidAndRecomputeCDG();
+    checkValidAndRecomputeCDG(dcectx);
     iterCollect(efflist, dcectx);
 
     //Remove ineffect IRs.
@@ -1100,13 +1096,12 @@ bool DeadCodeElim::perform(OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_ref_valid()) { return false; }
-    m_oc = &oc;
     START_TIMER(t, getPassName());
     if (!initSSAMgr(oc)) { return false; }
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
-    if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
+    if (g_dump_opt.isDumpBeforePass()) {
         dumpBeforePass();
     }
     bool remove_branch_stmt = false;

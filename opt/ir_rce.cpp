@@ -139,7 +139,7 @@ static void postProcessReached(Vertex const* from, Vertex const* to,
         recordOutVex(from, modset);
     }
     recordDomVexForEachElem(rce->getCFG(), modset);
-    CfgOptCtx cfgoptctx(rcectx.oc);
+    CfgOptCtx cfgoptctx(rcectx.oc, &rce->getActMgr());
     rce->getCFG()->reviseMDSSA(modset, root, cfgoptctx);
 
     //RPO is unchanged if only removing branch-edge.
@@ -150,8 +150,8 @@ static void postProcessReached(Vertex const* from, Vertex const* to,
     //   ----BB2----->BB4
     // If removing BB3->BB4, idom of BB4 changed.
     // DOM has been maintained by removeEdge().
-    OptCtx::setInvalidIfCFGChangedExcept(&rcectx.oc, PASS_RPO, PASS_DOM,
-                                         PASS_UNDEF);
+    OptCtx::setInvalidIfCFGChangedExcept(
+        &rcectx.oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
     rcectx.cfg_changed = true;
     ASSERT0(rce->getCFG()->verifyDomAndPdom(rcectx.oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(rce->getRegion(), rcectx.oc));
@@ -206,7 +206,7 @@ static void postProcessUnreached(Vertex const* from, Vertex const* to,
     recordDomVexForEachElem(rce->getCFG(), modset);
 
     //Fixup SSA info according DOM.
-    CfgOptCtx cfgoptctx(rcectx.oc);
+    CfgOptCtx cfgoptctx(rcectx.oc, &rce->getActMgr());
     rce->getCFG()->reviseMDSSA(modset, root, cfgoptctx);
 
     //Update status of CFG of RCECtx.
@@ -362,9 +362,9 @@ static bool regardAsMustFalse(IR const* ir)
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
 //Return the changed ir.
-IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
-                          OUT bool & must_false, OUT bool & changed,
-                          MOD OptCtx & oc)
+IR * RCE::calcCondMustVal(
+    MOD IR * ir, OUT bool & must_true, OUT bool & must_false,
+    OUT bool & changed, MOD OptCtx & oc)
 {
     must_true = false;
     must_false = false;
@@ -382,30 +382,29 @@ IR * RCE::calcCondMustVal(MOD IR * ir, OUT bool & must_true,
             }
             return ir;
         }
-        if (m_gvn != nullptr && m_gvn->is_valid()) {
-            if (changed) {
-                bool vn_changed = false;
-                m_gvn->computeVN(ir, vn_changed);
-            }
-            bool succ = m_gvn->calcCondMustVal(ir, must_true, must_false);
-            if (succ) {
-                changed = true;
-                if (must_true) {
-                    ASSERT0(!must_false);
-                    Type const* type = ir->getType();
-                    xoc::removeUseForTree(ir, m_rg, oc);
-                    m_rg->freeIRTree(ir);
-                    return m_irmgr->buildImmInt(1, type);
-                } else {
-                    ASSERT0(must_false);
-                    Type const* type = ir->getType();
-                    xoc::removeUseForTree(ir, m_rg, oc);
-                    m_rg->freeIRTree(ir);
-                    return m_irmgr->buildImmInt(0, type);
-                }
-            }
+        if (m_gvn == nullptr || !m_gvn->is_valid()) {
+            //GVN is inavailable.
+            return ir;
         }
-        break;
+        if (changed) {
+            bool vn_changed = false;
+            m_gvn->computeVN(ir, vn_changed);
+        }
+        bool succ = m_gvn->calcCondMustVal(ir, must_true, must_false);
+        if (!succ) { return ir; }
+        changed = true;
+        if (must_true) {
+            ASSERT0(!must_false);
+            Type const* type = ir->getType();
+            xoc::removeUseForTree(ir, m_rg, oc);
+            m_rg->freeIRTree(ir);
+            return m_irmgr->buildImmInt(1, type);
+        }
+        ASSERT0(must_false);
+        Type const* type = ir->getType();
+        xoc::removeUseForTree(ir, m_rg, oc);
+        m_rg->freeIRTree(ir);
+        return m_irmgr->buildImmInt(0, type);
     }
     default: UNREACHABLE();
     }
@@ -650,7 +649,6 @@ bool RCE::perform(OptCtx & oc)
     dumpInit(this);
     RCECtx ctx(oc);
     bool change = performSimplyRCE(ctx);
-m_rg->dumpBBList("2.log");
     if (ctx.cfg_changed) {
         ASSERT0(change);
         //CASE:rce_cfgopt.c

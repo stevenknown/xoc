@@ -86,7 +86,7 @@ public:
     bool needUpdateDomInfo() const
     { return removeTooManyTimes() &&
              cfgoptctx_org.needUpdateDomInfo() &&
-             cfgoptctx_org.oc.is_dom_valid(); }
+             cfgoptctx_org.getOptCtx().is_dom_valid(); }
 
     bool removeTooManyTimes() const
     {
@@ -306,7 +306,7 @@ bool OptimizedCFG<BB, XR>::removeEmptyBBHelper(
     }
     //Only apply restricted removing if CFG is invalid.
     //Especially BB list is ready, whereas CFG is not.
-    if (!rmctx.chooseCtx().oc.is_cfg_valid()) { return false; }
+    if (!rmctx.chooseCtx().getOptCtx().is_cfg_valid()) { return false; }
     if (!rmctx.chooseCtx().do_merge_label() && bb->hasLabel()) {
         return false;
     }
@@ -363,7 +363,7 @@ bool OptimizedCFG<BB, XR>::removeSingleEmptyBB(
     if (doit) {
         if (ctx.needUpdateDomInfo()) {
             START_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
-            recomputeDomInfo(ctx.chooseCtx().oc);
+            recomputeDomInfo(ctx.chooseCtx().getOptCtx());
             END_TIMER(u, "Remove Single Empty BB::Recompute DomInfo");
         }
     }
@@ -414,7 +414,7 @@ bool OptimizedCFG<BB, XR>::removeEmptyBB(OUT RemoveEmptyBBCtx & rmctx)
     }
     if (rmctx.needUpdateDomInfo()) {
         START_TIMER(u, "Remove Empty BB::Recompute DomInfo");
-        recomputeDomInfo(rmctx.chooseCtx().oc);
+        recomputeDomInfo(rmctx.chooseCtx().getOptCtx());
         END_TIMER(u, "Remove Empty BB::Recompute DomInfo");
     }
     END_TIMER(t, "Remove Empty BB");
@@ -552,7 +552,7 @@ void OptimizedCFG<BB, XR>::removeUnreachSingleBB(
     }
     //Unreachable-code will confuse the DomInfo updation.
     CfgOptCtx tctx(ctx);
-    OptCtx toc(ctx.oc);
+    OptCtx toc(ctx.getOptCtx());
     //Invalid DomInfo to inform CFG related API to stop updation.
     toc.setInvalidDom();
     tctx.setOptCtx(toc);

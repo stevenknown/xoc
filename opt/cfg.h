@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class CDG;
+class ActMgr;
 
 //Sort Sequence
 typedef enum {
@@ -90,7 +91,8 @@ public:
     UINT m_vertex_iter_time;
 
     //Record current OptCtx.
-    OptCtx & oc;
+    OptCtx & m_oc;
+    ActMgr * m_am;
     union {
         BYTE m_flags; //union set of optimization flags.
         struct {
@@ -106,24 +108,26 @@ public:
         } s1;
     } common_info;
 public:
-    CfgOptCtx(OptCtx & toc) : oc(toc) { reinit(); }
-    CfgOptCtx(CfgOptCtx const& src) : oc(src.oc)
+    CfgOptCtx(OptCtx & toc, ActMgr * am = nullptr)
+        : m_oc(toc), m_am(am) { reinit(); }
+    CfgOptCtx(CfgOptCtx const& src) : m_oc(src.m_oc)
     { reinit(); copyTopDownInfo(src); }
 
     void copyTopDownInfo(CfgOptCtx const& src)
-    { common_info = src.common_info; }
+    { common_info = src.common_info; m_am = src.m_am; }
 
     //If it is true, CFG optimizer will attempt to merge label to
     //next BB if current BB is empty. Default is true.
     bool do_merge_label() const { return CFGOPTCTX_do_merge_label(this); }
 
-    OptCtx & getOptCtx() { return oc; }
+    OptCtx & getOptCtx() { return m_oc; }
+    ActMgr * getActMgr() const { return m_am; }
 
     //Return true if caller asks CFG optimizer to maintain DomInfo on the fly.
     bool needUpdateDomInfo() const
-    { return CFGOPTCTX_need_update_dominfo(this) && oc.is_dom_valid(); }
+    { return CFGOPTCTX_need_update_dominfo(this) && m_oc.is_dom_valid(); }
 
-    void setOptCtx(OptCtx const& loc) { oc.copy(loc); }
+    void setOptCtx(OptCtx const& loc) { m_oc.copy(loc); }
 
     //The function unify ctx information that collected by 'src'.
     void unionBottomUpInfo(CfgOptCtx const& src)

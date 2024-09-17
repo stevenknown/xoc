@@ -242,10 +242,49 @@ public:
 };
 
 
+class ReconstructSSA {
+    COPY_CONSTRUCTOR(ReconstructSSA);
+protected:
+    IRBB * m_root;
+    IRList const& m_irlist;
+    BBSet const& m_bbset;
+    OptCtx const& m_oc;
+    DomTree const& m_domtree;
+    PRSSAMgr * m_mgr;
+    Region const* m_rg;
+    ActMgr * m_am;
+    IRCFG * m_cfg;
+protected:
+    void collectPRAndInitVPRForIRList(
+        IRList const& irlist, BBSet const& bbset, MOD DefMiscBitSetMgr & sm,
+        OUT BB2PRSet & bb2definedprs, OUT PRSet & prset,
+        OUT ConstructCtx & cstctx);
+
+    void renameSSARegion(
+        OUT ConstructCtx & cstctx, PRSet const& prset,
+        BB2PRSet const& bb2definedprs);
+    void reinitVPRForIR(PRSet const& prset, MOD IR * ir,
+                        OUT ConstructCtx & cstctx);
+
+    //The function revises PHI data type, and remove redundant PHI.
+    void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
+public:
+    ReconstructSSA(IRBB * root, IRList const& irlst, BBSet const& bbset,
+                   OptCtx const& oc, DomTree const& dm, PRSSAMgr * mgr,
+                   ActMgr * am);
+
+    ActMgr * getActMgr() const { return m_am; }
+    OptCtx const& getOptCtx() const { return m_oc; }
+
+    bool reconstruct();
+};
+
+
 //Perform SSA based optimizations.
 class PRSSAMgr : public Pass {
     friend class SSAGraph;
-    friend class PRSSAConstructRenameVisit;
+    friend class PRSSAConstructRenameVisitFunc;
+    friend class ReconstructSSA;
     class PR2DefBBSet {
         COPY_CONSTRUCTOR(PR2DefBBSet);
         //All objects allocated and recorded in pr2defbb are used
@@ -370,10 +409,6 @@ private:
     //definedprs: record PRs which defined in 'bb'.
     void collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & mustdef_pr,
                                   OUT ConstructCtx & cstctx);
-    void collectPRAndInitVPRForIRList(
-        IRList const& irlist, BBSet const& bbset, MOD DefMiscBitSetMgr & sm,
-        OUT BB2PRSet & bb2definedprs, OUT PRSet & prset,
-        MOD ConstructCtx & cstctx);
     void constructMDDUChainForPR();
 
     void destructBBSSAInfo(IRBB * bb, OptCtx const& oc);
@@ -451,9 +486,6 @@ private:
     void renameEntireCFG(
         OUT ConstructCtx & cstctx, PRSet const& effect_prs,
         BB2PRSet const& bb2definedprs, xcom::DomTree const& domtree);
-    void renameSSARegion(
-        OUT ConstructCtx & cstctx, PRSet const& prset,
-        BB2PRSet const& bb2definedprs, SSARegion const& ssarg);
     void renameBB(IRBB const* bb, PRSet const* prset,
                   MOD ConstructCtx & cstctx);
 
@@ -468,12 +500,9 @@ private:
         BB2PRSet const& bb2definedprs, BBSet const* bbset, PRSet const* prset,
         MOD ConstructCtx & cstctx);
     void removePhiList();
-    void reinitVPRForIR(PRSet const& prset, MOD IR * ir,
-                        OUT ConstructCtx & cstctx);
 
     //The function records the corresponding VPR for given prno.
     void setVPRByPRNO(PRNO prno, VPR * vpr);
-    void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
     void stripVersionForBBList(BBList const& bblst);
     void stripPhi(IR * phi, IRListIter phict, OptCtx const& oc);
     void stripSpecificVPR(VPR * vpr);
@@ -689,6 +718,7 @@ public:
     PASS_TYPE getPassType() const { return PASS_PRSSA_MGR; }
     IRCFG * getCFG() const { return m_cfg; }
     IRMgr * getIRMgr() const { return m_irmgr; }
+    UINT getVPRCount() const { return m_vpr_count; }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.

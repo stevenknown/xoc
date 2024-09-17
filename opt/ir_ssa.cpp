@@ -100,11 +100,8 @@ static void genSSAInfoForStmtInBBList(BBList * bblst, PRSSAMgr * mgr)
 }
 
 
-//
-//START PRSSAConstructRenameVisit
-//
-class PRSSAConstructRenameVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(PRSSAConstructRenameVisit);
+class PRSSAConstructRenameVisitFunc : public xcom::VisitTreeFuncBase {
+    COPY_CONSTRUCTOR(PRSSAConstructRenameVisitFunc);
     BBSet const* m_bbset;
     PRSet const* m_prset;
     PRSSAMgr * m_mgr;
@@ -113,19 +110,17 @@ class PRSSAConstructRenameVisit : public xcom::VisitTree {
     BB2VPRMap & m_bb2vprmap;
     ConstructCtx & m_cstctx;
 public:
-    PRSSAConstructRenameVisit(
-        BBSet const* bbset, PRSet const* prset, IRBB * root,
-        DomTree const& domtree, BB2PRSet const& bb2definedprs,
-        ConstructCtx & cstctx, BB2VPRMap & bb2vprmap, PRSSAMgr * mgr) :
-        VisitTree(domtree, root->id()), m_bbset(bbset), m_prset(prset),
-        m_mgr(mgr), m_bb2defprs(bb2definedprs), m_bb2vprmap(bb2vprmap),
-        m_cstctx(cstctx)
+    PRSSAConstructRenameVisitFunc(
+        BBSet const* bbset, PRSet const* prset, BB2PRSet const& bb2definedprs,
+        ConstructCtx & cstctx, BB2VPRMap & bb2vprmap, PRSSAMgr * mgr)
+        : m_bbset(bbset), m_prset(prset), m_mgr(mgr),
+          m_bb2defprs(bb2definedprs), m_bb2vprmap(bb2vprmap), m_cstctx(cstctx)
     {
         ASSERT0((bbset == nullptr && prset == nullptr) ||
                 (bbset != nullptr && prset != nullptr));
         m_rg = m_mgr->getRegion();
     }
-    virtual void visitWhenAllKidHaveBeenVisited(
+    void visitWhenAllKidHaveBeenVisited(
         Vertex const* v, Stack<Vertex const*> &)
     {
         //Do post-processing while all kids of BB has been processed.
@@ -148,7 +143,7 @@ public:
         //vprmap is useless from now on.
         m_bb2vprmap.destoryPRNO2VPR(v->id());
     }
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         IRBB * bb = m_rg->getBB(v->id());
         m_mgr->handleBBRename(m_bb2defprs.get(v->id()), m_bbset,
@@ -158,6 +153,19 @@ public:
         }
         return true;
     }
+};
+
+
+//
+//START PRSSAConstructRenameVisit
+//
+class PRSSAConstructRenameVisit
+    : public xcom::VisitTree<PRSSAConstructRenameVisitFunc> {
+    COPY_CONSTRUCTOR(PRSSAConstructRenameVisit);
+public:
+    PRSSAConstructRenameVisit(
+        IRBB * root, DomTree const& domtree, PRSSAConstructRenameVisitFunc & vf)
+        : VisitTree(domtree, root->id(), vf) {}
 };
 //END PRSSAConstructRenameVisit
 
@@ -905,6 +913,190 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
 
 
 //
+//START ReconstructSSA
+//
+ReconstructSSA::ReconstructSSA(
+    IRBB * root, IRList const& irlst, BBSet const& bbset,
+    OptCtx const& oc, DomTree const& dm, PRSSAMgr * mgr, ActMgr * am)
+    : m_root(root), m_irlist(irlst), m_bbset(bbset), m_oc(oc), m_domtree(dm),
+      m_mgr(mgr), m_am(am)
+{
+    ASSERT0(m_mgr);
+    ASSERT0(m_root);
+    m_rg = m_mgr->getRegion();
+    m_cfg = m_rg->getCFG();
+}
+
+
+//The function revises PHI data type, and remove redundant PHI.
+void ReconstructSSA::stripVersionForBBSet(
+    BBSet const& bbset, PRSet const* prset)
+{
+    START_TIMER(t, "ReconstructSSA: Strip PR version for BBSet");
+    xcom::BitSet visited;
+
+    //Ensure the first allocation of bitset could
+    //accommodata the last vpr id.
+    visited.alloc(m_mgr->getVPRCount() / BITS_PER_BYTE + 1);
+
+    //Why not strip all VPR at once by iterating m_vpr_vec?
+    //Just like:
+    //  for (UINT i = PRNO_UNDEF + 1; i < m_vpr_vec.get_elem_count(); i++) {
+    //      VPR * v = m_vpr_vec.get(i);
+    //      ASSERT0(v != nullptr);
+    //      stripSpecificVPR(v);
+    //  }
+    //Because the information of VPR during striping will not be maintained
+    //and the relationship between VPR_orgprno and the concrete occurrence PR
+    //may be invalid and that making the process assert.
+
+    BBSetIter it = nullptr;
+    for (BSIdx i = bbset.get_first(&it);
+         i != BS_UNDEF; i = bbset.get_next(i, &it)) {
+        IRBB * bb = m_cfg->getBB(i);
+        ASSERT0(bb);
+        IRListIter irct = nullptr;
+        IRListIter nextirct = nullptr;
+        for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
+             irct != BB_irlist(bb).end(); irct = nextirct) {
+            nextirct = BB_irlist(bb).get_next(nextirct);
+            m_mgr->stripStmtVersion(irct->val(), prset, visited);
+        }
+    }
+    END_TIMER(t, "ReconstructSSA: Strip PR version for BBSet");
+}
+
+
+void ReconstructSSA::renameSSARegion(
+    OUT ConstructCtx & cstctx, PRSet const& prset,
+    BB2PRSet const& bb2definedprs)
+{
+    START_TIMER(t, "PRSSA: Rename SSA Region");
+    //Initialize VPR stack for all given PRNOs.
+    m_mgr->initVPRStack(prset, cstctx);
+    ASSERT0(m_cfg->getEntry());
+    m_mgr->renameInDomTreeOrder(m_root, m_domtree, bb2definedprs,
+                                &m_bbset, &prset, cstctx);
+    END_TIMER(t, "PRSSA: Rename SSA Region");
+}
+
+
+void ReconstructSSA::collectPRAndInitVPRForIRList(
+    IRList const& irlist, BBSet const& bbset, MOD DefMiscBitSetMgr & sm,
+    OUT BB2PRSet & bb2definedprs, OUT PRSet & prset, OUT ConstructCtx & cstctx)
+{
+    ASSERT0(prset.is_empty());
+    IRListIter it;
+    for (IR * ir = irlist.get_head(&it);
+         ir != nullptr; ir = irlist.get_next(&it)) {
+        ASSERT0(ir->isPROp());
+        reinitVPRForIR(prset, ir, cstctx);
+        PRNO prno = ir->getPrno();
+        prset.bunion((BSIdx)prno);
+        if (ir->is_exp()) {
+            //Only initialize VPR for DEF.
+            ASSERTN(bbset.is_contain(ir->getStmt()->getBB()->id()),
+                    ("ir does not belong to bbset"));
+            continue;
+        }
+        ASSERT0(ir->is_stmt() && ir->getBB());
+        UINT bbid = ir->getBB()->id();
+        ASSERTN(bbset.is_contain(bbid), ("ir does not belong to bbset"));
+        bb2definedprs.addDefBB(prno, bbid);
+    }
+
+    //Allocate PRSet for given BBs, because placePhi() will need it later.
+    //placePhi may add new PHI into PRSet.
+    bb2definedprs.genPRSet(bbset);
+}
+
+
+//The function does some initializations to version information for
+//renaming in SSA construction.
+static void rebaseOrgPrnoOfVPR(MOD VPR * vpr)
+{
+    ASSERT0(vpr);
+    if (vpr->newprno() == PRNO_UNDEF) {
+        //vpr has not been renamed.
+        ASSERT0(vpr->version() == PRSSA_INIT_VERSION);
+        return;
+    }
+    if (vpr->orgprno() == vpr->newprno()) {
+        //Note if vpr is allocated by allocNewVersionSSAInfo(), its version
+        //is not initial-version, that means 'vpr' is only generated to
+        //maintain SSA DU chain incrementally, and the VPR information will
+        //not be used to participate SSA-Region or fully CFG SSA mode
+        //construction.
+        //In summary, the verion of 'vpr' has to be either initial-version
+        //when vpr is in SSA mode construction or initial-version+1 when vpr
+        //is in incremental DU chain maintaining.
+        ASSERT0(vpr->version() == PRSSA_INIT_VERSION + 1);
+    }
+    //In the current situation, vpr is in SSA mode construction, and its
+    //version has to be initial-version.
+    VPR_version(vpr) = PRSSA_INIT_VERSION;
+    VPR_orgprno(vpr) = VPR_newprno(vpr);
+}
+
+
+void ReconstructSSA::reinitVPRForIR(PRSet const& prset, MOD IR * ir,
+                                    OUT ConstructCtx & cstctx)
+{
+    ASSERT0(ir->isPROp());
+    PRNO prno = ir->getPrno();
+    VPR * vpr = m_mgr->getVPRByPRNO(prno);
+    if (vpr != nullptr) {
+        if (!prset.is_contain(prno)) {
+            //Only handle the first visiting of VRP of prno.
+            rebaseOrgPrnoOfVPR(vpr);
+        }
+    } else {
+        vpr = m_mgr->allocVPR(prno, PRSSA_INIT_VERSION, ir->getType());
+    }
+    ir->setSSAInfo(vpr);
+    if (cstctx.getPRNOType(prno) != nullptr) { return; }
+
+    //Always record the type as the type of PRNO when meeting
+    //the PR at the first time. May be inaccurate if other
+    //occurrence's type is not identical.
+    cstctx.setPRNOType(prno, ir->getType());
+}
+
+
+bool ReconstructSSA::reconstruct()
+{
+    //Do necessary initialization for PRSet renaming.
+    ConstructCtx cstctx(m_rg);
+
+    START_TIMER(t2, "PRSSA: Build Dominance Frontier");
+    ASSERTN(getOptCtx().is_dom_valid(), ("DfMgr need domset info"));
+    DfMgr dfm;
+    dfm.build((xcom::DGraph&)*m_cfg);
+    END_TIMER(t2, "PRSSA: Build Dominance Frontier");
+    if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
+        return false;
+    }
+    DefMiscBitSetMgr sm;
+    PRSet prset(sm.getSegMgr());
+    BB2PRSet bb2definedprs(&sm);
+    collectPRAndInitVPRForIRList(m_irlist, m_bbset, sm, bb2definedprs,
+                                 prset, cstctx);
+    m_mgr->placePhi(cstctx, dfm, prset, m_bbset, bb2definedprs);
+    renameSSARegion(cstctx, prset, bb2definedprs);
+
+    //Clean version stack after renaming.
+    cstctx.cleanPRNO2VPRStack();
+
+    //Clean the mapping after renaming, and recompute the map if ssa needs
+    //reconstruct.
+    cstctx.cleanPRNO2Type();
+    stripVersionForBBSet(m_bbset, &prset);
+    return true;
+}
+//END ReconstructSSA
+
+
+//
 //START ConstructCtx
 //
 void ConstructCtx::dump(Region const* rg) const
@@ -1336,58 +1528,6 @@ bool PRSSAMgr::dump() const
     dumpVPRRefDetail();
     m_rg->getLogMgr()->decIndent(2);
     return true;
-}
-
-
-//The function does some initializations to version information for
-//renaming in SSA construction.
-static void rebaseOrgPrnoOfVPR(MOD VPR * vpr)
-{
-    ASSERT0(vpr);
-    if (vpr->newprno() == PRNO_UNDEF) {
-        //vpr has not been renamed.
-        ASSERT0(vpr->version() == PRSSA_INIT_VERSION);
-        return;
-    }
-    if (vpr->orgprno() == vpr->newprno()) {
-        //Note if vpr is allocated by allocNewVersionSSAInfo(), its version
-        //is not initial-version, that means 'vpr' is only generated to
-        //maintain SSA DU chain incrementally, and the VPR information will
-        //not be used to participate SSA-Region or fully CFG SSA mode
-        //construction.
-        //In summary, the verion of 'vpr' has to be either initial-version
-        //when vpr is in SSA mode construction or initial-version+1 when vpr
-        //is in incremental DU chain maintaining.
-        ASSERT0(vpr->version() == PRSSA_INIT_VERSION + 1);
-    }
-    //In the current situation, vpr is in SSA mode construction, and its
-    //version has to be initial-version.
-    VPR_version(vpr) = PRSSA_INIT_VERSION;
-    VPR_orgprno(vpr) = VPR_newprno(vpr);
-}
-
-
-void PRSSAMgr::reinitVPRForIR(PRSet const& prset, MOD IR * ir,
-                              OUT ConstructCtx & cstctx)
-{
-    ASSERT0(ir->isPROp());
-    PRNO prno = ir->getPrno();
-    VPR * vpr = getVPRByPRNO(prno);
-    if (vpr != nullptr) {
-        if (!prset.is_contain(prno)) {
-            //Only handle the first visiting of VRP of prno.
-            rebaseOrgPrnoOfVPR(vpr);
-        }
-    } else {
-        vpr = allocVPR(prno, PRSSA_INIT_VERSION, ir->getType());
-    }
-    ir->setSSAInfo(vpr);
-    if (cstctx.getPRNOType(prno) != nullptr) { return; }
-
-    //Always record the type as the type of PRNO when meeting
-    //the PR at the first time. May be inaccurate if other
-    //occurrence's type is not identical.
-    cstctx.setPRNOType(prno, ir->getType());
 }
 
 
@@ -2135,59 +2275,18 @@ void PRSSAMgr::renameInDomTreeOrder(
     ASSERT0(m_cfg->getEntry());
     ASSERT0(bbset == nullptr || bbset->is_contain(root->id()));
     BB2VPRMap bb2vprmap(m_rg->getBBList()->get_elem_count());
-    PRSSAConstructRenameVisit visit(
-        bbset, prset, root, domtree, bb2definedprs, cstctx, bb2vprmap, this);
-    visit.perform();
+    PRSSAConstructRenameVisitFunc vf(
+        bbset, prset, bb2definedprs, cstctx, bb2vprmap, this);
+    PRSSAConstructRenameVisit rn(root, domtree, vf);
+    rn.visit();
     ASSERT0(bb2vprmap.verify());
-}
-
-
-void PRSSAMgr::collectPRAndInitVPRForIRList(
-    IRList const& irlist, BBSet const& bbset, MOD DefMiscBitSetMgr & sm,
-    OUT BB2PRSet & bb2definedprs, OUT PRSet & prset, OUT ConstructCtx & cstctx)
-{
-    ASSERT0(prset.is_empty());
-    IRListIter it;
-    for (IR * ir = irlist.get_head(&it);
-         ir != nullptr; ir = irlist.get_next(&it)) {
-        ASSERT0(ir->isPROp());
-        reinitVPRForIR(prset, ir, cstctx);
-        PRNO prno = ir->getPrno();
-        prset.bunion((BSIdx)prno);
-        if (ir->is_exp()) {
-            //Only initialize VPR for DEF.
-            ASSERTN(bbset.is_contain(ir->getStmt()->getBB()->id()),
-                    ("ir does not belong to bbset"));
-            continue;
-        }
-        ASSERT0(ir->is_stmt() && ir->getBB());
-        UINT bbid = ir->getBB()->id();
-        ASSERTN(bbset.is_contain(bbid), ("ir does not belong to bbset"));
-        bb2definedprs.addDefBB(prno, bbid);
-    }
-
-    //Allocate PRSet for given BBs, because placePhi() will need it later.
-    //placePhi may add new PHI into PRSet.
-    bb2definedprs.genPRSet(bbset);
 }
 
 
 bool PRSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
 {
-    START_TIMER(t, "PRSSA: Rename Designated PRSet");
+    START_TIMER(t, "PRSSA: Construct Designated SSA Region");
     ASSERT0(ssarg.verify());
-    //Do necessary initialization for PRSet renaming.
-    ConstructCtx cstctx(m_rg);
-    IRList & irlist = ssarg.getIRList();
-
-    START_TIMER(t2, "PRSSA: Build dominance frontier");
-    ASSERTN(ssarg.getOptCtx()->is_dom_valid(), ("DfMgr need domset info"));
-    DfMgr dfm;
-    dfm.build((xcom::DGraph&)*m_cfg);
-    END_TIMER(t2, "PRSSA: Build dominance frontier");
-    if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
-        return false;
-    }
     if (m_is_pruned) {
         m_rg->getPassMgr()->checkValidAndRecompute(
             ssarg.getOptCtx(), PASS_LIVENESS_MGR, PASS_UNDEF);
@@ -2197,26 +2296,14 @@ bool PRSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
     } else {
         m_livemgr = nullptr;
     }
-    BBSet & bbset = ssarg.getBBSet();
-    DefMiscBitSetMgr sm;
-    PRSet prset(sm.getSegMgr());
-    BB2PRSet bb2definedprs(&sm);
-    collectPRAndInitVPRForIRList(irlist, bbset, sm, bb2definedprs,
-                                 prset, cstctx);
-    placePhi(cstctx, dfm, prset, bbset, bb2definedprs);
-    renameSSARegion(cstctx, prset, bb2definedprs, ssarg);
-
-    //Clean version stack after renaming.
-    cstctx.cleanPRNO2VPRStack();
-
-    //Clean the mapping after renaming, and recompute the map if ssa needs
-    //reconstruct.
-    cstctx.cleanPRNO2Type();
-    stripVersionForBBSet(bbset, &prset);
+    ReconstructSSA recon(ssarg.getRootBB(), ssarg.getIRList(),
+                         ssarg.getBBSet(), *ssarg.getOptCtx(),
+                         ssarg.getDomTree(), this, ssarg.getActMgr());
+    recon.reconstruct();
     if (m_livemgr != nullptr) {
         m_livemgr->clean();
     }
-    END_TIMER(t, "PRSSA: Rename Designated PRSet");
+    END_TIMER(t, "PRSSA: Construct Designated SSA Region");
     return true;
 }
 
@@ -2229,21 +2316,6 @@ void PRSSAMgr::initVPRStack(PRSet const& prset, OUT ConstructCtx & cstctx)
         VPR * vpr = allocVPR((PRNO)prno, PRSSA_INIT_VERSION, m_tm->getAny());
         cstctx.genVPRStack(prno)->push(vpr);
     }
-}
-
-
-void PRSSAMgr::renameSSARegion(
-    OUT ConstructCtx & cstctx, PRSet const& prset,
-    BB2PRSet const& bb2definedprs, SSARegion const& ssarg)
-{
-    START_TIMER(t, "PRSSA: Rename SSA Region");
-    //Initialize VPR stack for all given PRNOs.
-    initVPRStack(prset, cstctx);
-    ASSERT0(m_cfg->getEntry());
-    BBSet & bbset = const_cast<SSARegion&>(ssarg).getBBSet();
-    renameInDomTreeOrder(ssarg.getRootBB(), ssarg.getDomTree(), bb2definedprs,
-                         &bbset, &prset, cstctx);
-    END_TIMER(t, "PRSSA: Rename SSA Region");
 }
 
 
@@ -3073,45 +3145,6 @@ void PRSSAMgr::removeSuccessorDesignatedPhiOpnd(IRBB const* succ, UINT pos)
         ((CPhi*)ir)->removeOpnd(opnd);
         m_rg->freeIRTree(opnd);
     }
-}
-
-
-//This function revise phi data type, and remove redundant phi.
-void PRSSAMgr::stripVersionForBBSet(BBSet const& bbset, PRSet const* prset)
-{
-    START_TIMER(t, "PRSSA: Strip PR version for BBSet");
-    xcom::BitSet visited;
-
-    //Ensure the first allocation of bitset could
-    //accommodata the last vpr id.
-    visited.alloc(m_vpr_count / BITS_PER_BYTE + 1);
-
-    //Why not strip all VPR at once by iterating m_vpr_vec?
-    //Just like:
-    //  for (UINT i = PRNO_UNDEF + 1; i < m_vpr_vec.get_elem_count(); i++) {
-    //      VPR * v = m_vpr_vec.get(i);
-    //      ASSERT0(v != nullptr);
-    //      stripSpecificVPR(v);
-    //  }
-    //Because the information of VPR during striping will not be maintained
-    //and the relationship between VPR_orgprno and the concrete occurrence PR
-    //may be invalid and that making the process assert.
-
-    BBSetIter it = nullptr;
-    for (BSIdx i = bbset.get_first(&it);
-         i != BS_UNDEF; i = bbset.get_next(i, &it)) {
-        IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb);
-        IRListIter irct = nullptr;
-        IRListIter nextirct = nullptr;
-        for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
-             irct != BB_irlist(bb).end(); irct = nextirct) {
-            nextirct = BB_irlist(bb).get_next(nextirct);
-            stripStmtVersion(irct->val(), prset, visited);
-        }
-    }
-
-    END_TIMER(t, "PRSSA: Strip PR version for BBSet");
 }
 
 

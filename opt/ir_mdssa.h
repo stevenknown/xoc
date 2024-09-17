@@ -258,85 +258,84 @@ public:
 };
 
 
-class LiveSet {
+typedef VOpndSetIter LiveSetIter;
+class LiveSet : public VOpndSet {
     COPY_CONSTRUCTOR(LiveSet);
     xcom::DefMiscBitSetMgr * m_sbsmgr;
-    VOpndSet m_set;
 public:
     LiveSet(VMD const* vmd, xcom::DefMiscBitSetMgr * sbsmgr)
     {
-        m_set.bunion(vmd->id(), *sbsmgr);
+        bunion(vmd->id(), *sbsmgr);
         m_sbsmgr = sbsmgr;
     }
     LiveSet(VOpndSet const& set, xcom::DefMiscBitSetMgr * sbsmgr)
     {
-        m_set.copy(set, *sbsmgr);
+        VOpndSet::copy(set, *sbsmgr);
         m_sbsmgr = sbsmgr;
     }
     ~LiveSet()
     {
         //Should call clean() before destruction,
         //otherwise it will incur SegMgr assertion.
-        m_set.clean(*m_sbsmgr);
+        clean();
     }
 
-    bool all_killed() const { return m_set.is_empty(); }
+    bool all_killed() const { return is_empty(); }
 
-    void copy(LiveSet const& src) { copy(src.m_set); }
-    void copy(VOpndSet const& vopndset) { m_set.copy(vopndset, *m_sbsmgr); }
+    void copy(LiveSet const& src)
+    { VOpndSet::copy((VOpndSet const&)src, *m_sbsmgr); }
+    void copy(VOpndSet const& vopndset) { VOpndSet::copy(vopndset, *m_sbsmgr); }
+    void clean() { VOpndSet::clean(*m_sbsmgr); }
 
     void dump(MDSSAMgr const* mgr) const;
 
-    VOpndSet & getSet() { return m_set; }
+    bool is_live(UINT id) const { return is_contain(id); }
 
-    bool is_live(UINT id) const { return m_set.is_contain(id); }
-
-    void set_killed(UINT id) { m_set.diff(id, *m_sbsmgr); }
+    void set_killed(UINT id) { diff(id, *m_sbsmgr); }
 };
 
 
-class Vertex2LiveSet {
-    COPY_CONSTRUCTOR(Vertex2LiveSet);
-    xcom::TMap<UINT, LiveSet*> m_bbid2set;
+typedef xcom::TMapIter<UINT, LiveSet*> BBID2LiveSetIter;
+class BBID2LiveSet : public xcom::TMap<UINT, LiveSet*> {
+    COPY_CONSTRUCTOR(BBID2LiveSet);
     xcom::DefMiscBitSetMgr m_sbsmgr;
 public:
-    Vertex2LiveSet() {}
-    ~Vertex2LiveSet()
+    BBID2LiveSet() {}
+    ~BBID2LiveSet()
     {
-        TMapIter<UINT, LiveSet*> it;
+        BBID2LiveSetIter it;
         LiveSet * set;
-        for (m_bbid2set.get_first(it, &set); set != nullptr;
-             m_bbid2set.get_next(it, &set)) {
+        for (get_first(it, &set); set != nullptr; get_next(it, &set)) {
             delete set;
         }
     }
     void dump(Region const* rg) const;
 
+    void free(UINT bbid)
+    {
+        LiveSet * set = remove(bbid);
+        if (set != nullptr) { delete set; }
+    }
+
     LiveSet * genAndCopy(UINT bbid, LiveSet const& src)
-    { return genAndCopy(bbid, const_cast<LiveSet&>(src).getSet()); }
+    { return genAndCopy(bbid, (VOpndSet const&)src); }
     LiveSet * genAndCopy(UINT bbid, VOpndSet const& src)
     {
-        LiveSet * liveset = m_bbid2set.get(bbid);
+        LiveSet * liveset = get(bbid);
         if (liveset == nullptr) {
             liveset = new LiveSet(src, &m_sbsmgr);
-            m_bbid2set.set(bbid, liveset);
+            set(bbid, liveset);
         } else {
-            liveset->getSet().copy(src, m_sbsmgr);
+            liveset->copy(src);
         }
         return liveset;
     }
     LiveSet * genAndCopy(UINT bbid, VMD const* vmd)
     {
         LiveSet * liveset = new LiveSet(vmd, &m_sbsmgr);
-        ASSERT0(m_bbid2set.get(bbid) == nullptr);
-        m_bbid2set.set(bbid, liveset);
+        ASSERT0(get(bbid) == nullptr);
+        set(bbid, liveset);
         return liveset;
-    }
-    LiveSet * get(UINT bbid) const { return m_bbid2set.get(bbid); }
-    void free(UINT bbid)
-    {
-        LiveSet * set = m_bbid2set.remove(bbid);
-        if (set != nullptr) { delete set; }
     }
 };
 
@@ -348,14 +347,16 @@ public:
 class RenameExp {
     COPY_CONSTRUCTOR(RenameExp);
 protected:
-    IR * m_root;
-    IR const* m_startir;
-    IRBB const* m_startbb;
     MDSSAMgr * m_mgr;
     ActMgr * m_am;
     Region * m_rg;
     OptCtx * m_oc;
 public:
+    RenameExp(MDSSAMgr * mgr, OptCtx * oc, ActMgr * am);
+
+    MDSSAMgr * getMgr() const { return m_mgr; }
+    ActMgr * getActMgr() const { return m_am; }
+
     //root: the root IR that expected to start to set live-in.
     //      Note root can be stmt or expression.
     //startir: the start position in 'startbb', it can be NULL.
@@ -363,11 +364,7 @@ public:
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
-    RenameExp(MOD IR * root, IR const* startir, IRBB const* startbb,
-              MDSSAMgr * mgr, OptCtx * oc);
-    MDSSAMgr * getMgr() const { return m_mgr; }
-    ActMgr * getActMgr() const { return m_am; }
-    void perform();
+    void rename(MOD IR * root, IR const* startir, IRBB const* startbb);
 };
 //END RenameExp
 
@@ -377,26 +374,21 @@ public:
 //
 //The class generates VMD for new Stmt or new MDPhi, then inserts VMD into
 //DefDef chain and renames all immediate USEs of the original DEF meanwhile.
-//Note after renaming, if the class find a memory reference that references
-//same version MD with new Stmt or new MDPhi, the class will build a DefUse
-//chain between the memory reference and the new Stmt or new MDPhi.
+//Note after renaming, if the class find a memory reference X that references
+//a version MD that is same to new Stmt or new MDPhi, the class will build
+//a DefUse chain between the memory reference X and the new Stmt or new MDPhi.
 class RenameDef {
-    friend class RenameDefVisit;
+    friend class RenameDefVisitFunc;
     COPY_CONSTRUCTOR(RenameDef);
-    bool m_is_build_ddchain; //true to build DefDef chain with DomTree.
-
-    //Record the stmt that inserted.
-    //The class will generate MDSSAInfo if it does not have one.
-    IR * m_newstmt;
-    MDPhi const* m_newphi; //record the phi that inserted
+    bool m_is_build_ddchain; //Set to true to build DefDef chain by DomTree.
     DomTree const& m_domtree;
     LiveSet * m_liveset;
     MDSSAMgr * m_mgr;
     UseDefMgr * m_udmgr;
     IRCFG * m_cfg;
-    ActMgr * m_am;
     Region * m_rg;
-    Vertex2LiveSet m_vex2liveset;
+    ActMgr * m_am;
+    BBID2LiveSet m_bbid2liveset;
 private:
     void connect(Vertex const* defvex, LiveSet * defliveset,
                  IRBB const* start_bb, IR const* start_ir);
@@ -421,7 +413,7 @@ private:
     void dumpInsertDDChain(MDPhi const* phi, VMD const* vmd);
     void dumpRenamePhi(MDPhi const* phi, UINT opnd_pos);
 
-    Vertex2LiveSet & getVex2LiveSet() { return m_vex2liveset; }
+    BBID2LiveSet & getBBID2LiveSet() { return m_bbid2liveset; }
 
     void iterBBPhiListToKillLivedVMD(IRBB const* bb, LiveSet & liveset);
     void iterSuccBBPhiListToRename(
@@ -433,8 +425,8 @@ private:
 
     void killLivedVMD(MDPhi const* phi, MOD LiveSet & liveset);
 
-    void processStmt();
-    void processPhi();
+    void processStmt(MOD IR * newstmt);
+    void processPhi(MDPhi const* newphi);
 
     void renamePhiOpnd(MDPhi const* phi, UINT opnd_idx, MOD VMD * vmd);
 
@@ -486,40 +478,87 @@ private:
     bool tryInsertDDChainForStmt(IR * ir, bool before, MOD LiveSet & liveset);
     bool tryInsertDDChainForPhi(MDPhi * phi, MOD LiveSet & liveset);
 public:
-    RenameDef(MOD IR * stmt, DomTree const& dt, bool build_ddchain,
-              MDSSAMgr * mgr);
-    RenameDef(MDPhi const* phi, DomTree const& dt, bool build_ddchain,
-              MDSSAMgr * mgr);
+    RenameDef(DomTree const& dt, bool build_ddchain, MDSSAMgr * mgr,
+              ActMgr * am);
+
+    void clean();
 
     MDSSAMgr * getMgr() const { return m_mgr; }
     ActMgr * getActMgr() const { return m_am; }
 
-    void perform();
+    //The function will generate MDSSAInfo if it does not have one.
+    //newstmt: record the stmt that inserted.
+    void rename(MOD IR * newstmt);
+
+    //The function will generate MDSSAInfo if it does not have one.
+    //newphi: record the phi that inserted.
+    void rename(MDPhi const* newphi);
 };
 //END RenameDef
 
 
-//The class reconstruct MDSSA info for given region in DomTree order.
-//The region recorded in 'm_vextab'
-class ReconstructMDSSA : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(ReconstructMDSSA);
+//
+//START RecomputeDefDefAndDefUseChain
+//
+class RecomputeDefDefAndDefUseChain {
+    COPY_CONSTRUCTOR(RecomputeDefDefAndDefUseChain);
+    xcom::DomTree const& m_domtree;
+    MDSSAMgr * m_mgr;
+    OptCtx const& m_oc;
+    ActMgr * m_am;
+    Region * m_rg;
+    IRCFG * m_cfg;
+public:
+    RecomputeDefDefAndDefUseChain(
+        xcom::DomTree const& domtree, MDSSAMgr * mgr,
+        OptCtx const& oc, ActMgr * am);
+
+    ActMgr * getActMgr() const { return m_am; }
+    DomTree const& getDomTree() const { return m_domtree; }
+
+    //These functions compute the DefDef chain and the DefUse chain for
+    //given Stmt|MDPhi.
+    //Note these functions are often invoked when new Stmt or new MDPhi
+    //generated.
+    //These functions will insert given Stmt|MDPhi into DefDef chain of each
+    //VMD and iterate all memory references which are related to the VMD that
+    //given Stmt|MDPhi carried from the start BB (Stmt|MDPhi's BB) to the next
+    //versioned VMD DEF. During the iteration of VMD, these functions also
+    //build DefUse chain to ensure the correctness of dependence of the new
+    //Stmt|MDPhi.
+    void recompute(MOD IR * ir);
+    void recompute(xcom::List<IR*> const& irlist);
+    void recompute(MDPhiList const* philist);
+    void recompute(MDPhi const* phi);
+    void recomputeDefForPhiOpnd(MDPhi const* phi);
+    void recomputeDefForPhiOpnd(MDPhiList const* philist);
+    void recomputeDefForRHS(MOD IR * stmt);
+};
+//END RecomputeDefDefAndDefUseChain
+
+
+class ReconstructMDSSAVF : public xcom::VisitTreeFuncBase {
     //Record the vertex on CFG that need to revise.
     xcom::VexTab const& m_vextab;
     xcom::Graph const* m_cfg;
     MDSSAMgr * m_mdssamgr;
     OptCtx * m_oc;
     Region const* m_rg;
+    ActMgr * m_am;
+    DomTree const& m_dt;
 protected:
     void renameBBIRList(IRBB const* bb) const;
     void renameBBPhiList(IRBB const* bb) const;
 public:
-    ReconstructMDSSA(xcom::Vertex const* root, xcom::VexTab const& vextab,
-                     xcom::DomTree const& domtree, xcom::Graph const* cfg,
-                     MDSSAMgr * mgr, OptCtx * oc);
+    ReconstructMDSSAVF(xcom::VexTab const& vextab, DomTree const& dt,
+                       xcom::Graph const* cfg, MDSSAMgr * mgr, OptCtx * oc,
+                       ActMgr * am);
+
+    ActMgr * getActMgr() const { return m_am; }
 
     //The interface of VisitTree to access each Vertex.
     //v: the vertex on DomTree.
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         Vertex const* cfgv = m_cfg->getVertex(v->id());
         ASSERT0(cfgv);
@@ -530,8 +569,19 @@ public:
         renameBBIRList(bb);
         return true;
     }
-    virtual void visitWhenAllKidHaveBeenVisited(
+    void visitWhenAllKidHaveBeenVisited(
         Vertex const*, Stack<Vertex const*> &) {}
+};
+
+
+//The class reconstruct MDSSA info for given region in DomTree order.
+//The region recorded in 'm_vextab'
+class ReconstructMDSSA : public xcom::VisitTree<ReconstructMDSSAVF> {
+public:
+    ReconstructMDSSA(xcom::DomTree const& dt, xcom::Vertex const* root,
+                     ReconstructMDSSAVF & vf)
+        : VisitTree((Tree const&)dt, root->id(), vf) {}
+    void reconstruct() { visit(getRoot()); }
 };
 
 
@@ -573,7 +623,7 @@ public:
 //IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
     friend class MDPhi;
-    friend class MDSSAConstructRenameVisit;
+    friend class MDSSAConstructRenameVisitVF;
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     BYTE m_is_semi_pruned:1;
@@ -1413,31 +1463,6 @@ public:
     //e.g:u1, u2 are its USE expressions.
     //The function will cut off the DU chain between phi->u1 and phi->u2.
     void removeDefFromUseSet(MDPhi const* phi, MDSSAUpdateCtx const& ctx);
-
-    //These functions compute the DefDef chain and the DefUse chain for
-    //given Stmt|MDPhi.
-    //Note these functions are often invoked when new Stmt or new MDPhi
-    //generated.
-    //These functions will insert given Stmt|MDPhi into DefDef chain of each
-    //VMD and iterate all memory references which are related to the VMD that
-    //given Stmt|MDPhi carried from the start BB (Stmt|MDPhi's BB) to the next
-    //versioned VMD DEF. During the iteration of VMD, these functions also
-    //build DefUse chain to ensure the correctness of dependence of the new
-    //Stmt|MDPhi.
-    void recomputeDefDefAndDefUseChain(
-        MDPhi const* phi, xcom::DomTree const& domtree);
-    void recomputeDefDefAndDefUseChain(
-        MDPhiList const* philist, xcom::DomTree const& domtree);
-    void recomputeDefDefAndDefUseChain(
-        MOD IR * stmt, xcom::DomTree const& domtree, OptCtx const& oc);
-    void recomputeDefDefAndDefUseChain(
-        xcom::List<IR*> const& irlist, xcom::DomTree const& domtree,
-        OptCtx const& oc);
-    void recomputeDefForOpnd(MDPhi const* phi, OptCtx const& oc);
-    void recomputeDefForOpnd(MDPhiList const* philist, OptCtx const& oc);
-
-    //irit: for local used.
-    void recomputeDefForRHS(IR const* stmt, IRIter & it, OptCtx const& oc);
 
     //The function will attempt to remove the USE that located in outside loop.
     //Note the function will NOT cross MDPHI.

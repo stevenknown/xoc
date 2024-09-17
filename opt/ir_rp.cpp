@@ -39,30 +39,30 @@ namespace xoc {
 static void dumpTab(Region const* rg, LI<IRBB> const* li,
                     ExactAccTab & etab, InexactAccTab & inetab)
 {
-    if (rg->isLogMgrInit()) { return; }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        rg->getLogMgr()->incIndent(2);
-        note(rg, "\n==-- DUMP LoopInfo --==");
-        rg->getLogMgr()->incIndent(2);
-        li->dump(rg);
-        rg->getLogMgr()->decIndent(2);
-        etab.dump(rg);
-        inetab.dump(rg);
-        rg->getLogMgr()->decIndent(2);
-    }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
+    if (!g_dump_opt.isDumpAfterPass()) { return; }
+    rg->getLogMgr()->incIndent(2);
+    note(rg, "\n==-- DUMP LoopInfo --==");
+    rg->getLogMgr()->incIndent(2);
+    li->dump(rg);
+    rg->getLogMgr()->decIndent(2);
+    etab.dump(rg);
+    inetab.dump(rg);
+    rg->getLogMgr()->decIndent(2);
 }
 
 
 static void dumpDeleMgr(DelegateMgr const& delemgr)
 {
-    if (delemgr.getRegion()->isLogMgrInit()) { return; }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        //Note some members of delemgr will be free after a while.
-        //Dump info before that happened.
-        delemgr.getRegion()->getLogMgr()->incIndent(2);
-        delemgr.dump();
-        delemgr.getRegion()->getLogMgr()->decIndent(2);
+    if (!delemgr.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
+        return;
     }
+    if (!g_dump_opt.isDumpAfterPass()) { return; }
+    //Note some members of delemgr will be free after a while.
+    //Dump info before that happened.
+    delemgr.getRegion()->getLogMgr()->incIndent(2);
+    delemgr.dump();
+    delemgr.getRegion()->getLogMgr()->decIndent(2);
 }
 
 
@@ -207,7 +207,9 @@ void RPCtx::dumpSweepOut(IR const* ir1, IR const* ir2,
                          CHAR const* format, ...)
 {
     if (m_act_mgr == nullptr) { return; }
-    if (!m_act_mgr->getRegion()->isLogMgrInit()) { return; }
+    if (!m_act_mgr->getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
+        return;
+    }
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
         va_list args;
@@ -228,7 +230,9 @@ void RPCtx::dumpClobber(IR const* ir1, IR const* ir2,
                         CHAR const* format, ...)
 {
     if (m_act_mgr == nullptr) { return; }
-    if (!m_act_mgr->getRegion()->isLogMgrInit()) { return; }
+    if (!m_act_mgr->getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
+        return;
+    }
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
         va_list args;
@@ -265,7 +269,7 @@ bool DontPromoteTab::is_overlap(IR const* ir, MOD RPCtx & ctx) const
 
 bool DontPromoteTab::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
     note(m_rg, "\n==-- DUMP Dont Promotion Table --==");
     m_rg->getLogMgr()->incIndent(2);
     xcom::TTabIter<IR const*> it;
@@ -286,7 +290,7 @@ bool DontPromoteTab::dump() const
 void Ref2DeleTab::dump(Region const* rg) const
 {
     ASSERT0(rg);
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
     note(rg, "\n==---- DUMP REF TO DELEGATE TABLE ----==");
     Ref2DeleTabIter it;
     IR * dele = nullptr;
@@ -336,7 +340,7 @@ void ExactAccTab::collectOutsideLoopDU(MD const* md, IR const* dele,
 
 void ExactAccTab::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
     note(rg, "\n==-- DUMP ExactAccessTab --==");
     rg->getLogMgr()->incIndent(2);
     ExactAccTabIter it;
@@ -462,7 +466,7 @@ void ExactAccTab::remove(MD const* md)
 //
 void InexactAccTab::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
     note(rg, "\n==-- DUMP InexactAccessTab --==");
     rg->getLogMgr()->incIndent(2);
     InexactAccTabIter it;
@@ -750,7 +754,7 @@ void DelegateMgr::clean()
 
 bool DelegateMgr::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
     note(m_rg, "\n==-- DUMP DelegateMgr '%s' --==",
          m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
@@ -1604,6 +1608,9 @@ void RegPromot::handleEpilog(RestoreTab & restore2mem,
                              DelegateMgr & delemgr, IRBB * exit_bb,
                              MOD RPCtx & ctx)
 {
+
+    RecomputeDefDefAndDefUseChain recomp(
+        *ctx.domtree, m_mdssamgr, *ctx.oc, &getActMgr());
     RestoreTabIter ti;
     for (IR const* dele = restore2mem.get_first(ti);
          dele != nullptr; dele = restore2mem.get_next(ti)) {
@@ -1622,8 +1629,7 @@ void RegPromot::handleEpilog(RestoreTab & restore2mem,
             //Generate MDSSAInfo and insert new stmt 'restore' into the
             //DefDef chain. The function also add Def-Use chain from 'restore'
             //to original USEs of 'dele' that located outside of the loop.
-            m_mdssamgr->recomputeDefDefAndDefUseChain(
-                restore, *ctx.domtree, *ctx.oc);
+            recomp.recompute(restore);
 
             //Inform caller that the DUChain of restore has been built, no need
             //to worry about DU sanity.
@@ -2051,7 +2057,7 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
     IRBB * preheader, MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
+    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc, &getActMgr());
 
     //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
@@ -2116,7 +2122,7 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
     MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc);
+    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc, &getActMgr());
 
     //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
@@ -2756,10 +2762,10 @@ bool RegPromot::EvaluableScalarReplacement(
 
 bool RegPromot::dumpBeforePass() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
-    if (!g_dump_opt.isDumpBeforePass() || !g_dump_opt.isDumpRP()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
         return false;
     }
+    if (!g_dump_opt.isDumpBeforePass()) { return false; }
     START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
     note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
@@ -2774,10 +2780,8 @@ bool RegPromot::dumpBeforePass() const
 
 bool RegPromot::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
-    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRP()) {
-        return true;
-    }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
+    if (!g_dump_opt.isDumpAfterPass()) { return true; }
     m_rg->getLogMgr()->pauseBuffer();
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());

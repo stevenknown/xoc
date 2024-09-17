@@ -53,6 +53,7 @@ class InsertGuardHelper {
     IRBB * m_guard_start;
     IRBB * m_guard_end;
     IRBB * m_guarded_bb;
+    ActMgr * m_am;
 private:
     LabelInfo const* addJumpEdge(IRBB * guard_start, IRBB * guard_end);
 
@@ -118,7 +119,8 @@ private:
     bool useMDSSADU() const { return m_usemdssa; }
     bool usePRSSADU() const { return m_useprssa; }
 public:
-    InsertGuardHelper(Region * rg, OptCtx * oc) : m_rg(rg), m_oc(oc)
+    InsertGuardHelper(Region * rg, OptCtx * oc, ActMgr * am)
+        : m_rg(rg), m_oc(oc), m_am(am)
     {
         m_cfg = m_rg->getCFG();
         m_irmgr = m_rg->getIRMgr();
@@ -138,6 +140,7 @@ public:
     IRBB * getGuardEnd() const { return m_guard_end; }
     IRBB * getGuardStart() const { return m_guard_start; }
     IRBB * getGuardedBB() const { return m_guarded_bb; }
+    ActMgr * getActMgr() const { return m_am; }
 
     //Return true if guard helper has inserted guard BB.
     bool hasInsertedGuard() const { return m_guarded_bb != nullptr; }

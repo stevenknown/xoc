@@ -70,6 +70,50 @@ void Tree::insertKid(VexIdx v, VexIdx kid)
 }
 
 
+//Dump instruction char.
+static void dumpInst(UINT ind, OUT StrBuf & buf)
+{
+    buf.strcat("|");
+    for (UINT i = 1; i < ind; i++) { buf.strcat("-"); }
+}
+
+
+static void dumpPreInd(UINT ind, OUT StrBuf & buf)
+{
+    buf.strcat("\n");
+    for (UINT i = 0; i < ind + 1; i++) { buf.strcat(" "); }
+}
+
+
+static void dumpBufRecur(
+    Vertex const* v, UINT preind, UINT inst, OUT StrBuf & buf)
+{
+    dumpPreInd(preind, buf);
+    dumpInst(inst, buf);
+    buf.strcat("%u", v->id());
+    VexIter it;
+    for (Vertex const* k = v->getFirstToVex(&it);
+         k != nullptr; k = v->getNextToVex(&it)) {
+        dumpBufRecur(k, preind + inst, inst, buf);
+    }
+}
+
+
+void Tree::dumpBuf(OUT StrBuf & buf) const
+{
+    Vertex const* root = getRoot();
+    if (root == nullptr) { return; }
+    buf.strcat("%u", root->id());
+    UINT preind = 0;
+    UINT inst = 3;
+    VexIter it;
+    for (Vertex const* k = root->getFirstToVex(&it);
+         k != nullptr; k = root->getNextToVex(&it)) {
+        dumpBufRecur(k, 0, inst, buf);
+    }
+}
+
+
 VexIdx Tree::computeHeight()
 {
     ASSERT0(m_root);
@@ -103,40 +147,5 @@ Vertex * BFSTreeIter::get_next(Vertex const* t)
     return v;
 }
 //END DFSTreeIter
-
-
-//
-//START VisitTree
-//
-void VisitTree::perform()
-{
-    ASSERT0(m_root);
-    xcom::Stack<Vertex const*> stk;
-    Vertex const* v;
-    stk.push(m_root);
-    while ((v = stk.get_top()) != nullptr && !is_terminate()) {
-        if (!isVisited(v->id())) {
-            setVisited(v->id());
-            if (!visitWhenFirstMeet(v, stk)) { continue; }
-        }
-        bool all_visited = true;
-        AdjVertexIter oit;
-        for (Vertex const* kid = Graph::get_first_out_vertex(v, oit);
-             kid != nullptr; kid = Graph::get_next_out_vertex(oit)) {
-            if (kid == v) { continue; }
-            if (!isVisited(kid->id())) {
-                all_visited = false;
-                stk.push(kid);
-                break;
-            }
-        }
-        if (all_visited) {
-            stk.pop();
-            //Do post-processing while all kids of vertex has been processed.
-            visitWhenAllKidHaveBeenVisited(v, stk);
-        }
-    }
-}
-//END VisitTree
 
 } //namespace xcom

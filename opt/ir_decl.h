@@ -316,6 +316,15 @@ public:
 //  The code stores $1 that is part of $3 to be second element
 //  of $2. In this case, the second element's offset in $2 is 4 bytes.
 //
+//NOTE: The base can be NULL if user only set 'value'.
+//usage: stpr $ofst = 4;
+//       setelem $2:vec<4*i32> = NULL, $1:i32, $ofst.
+//  Note there is no base in the operation.
+//  The result PR is $2. $1 is the input value, and $ofst record the byte
+//  offset.
+//  The code stores $1 to be second element of $2.
+//  In this case, the second element's offset in $2 is 4 bytes.
+//
 //This operation will store value to the memory which offset to the
 //memory chunk or vector's base address.
 #define SETELEM_bb(ir) (((CSetElem*)CK_IRC(ir, IR_SETELEM))->bb)
@@ -330,7 +339,7 @@ public:
 class CSetElem : public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CSetElem);
 public:
-    static BYTE const kid_map = 0x7;
+    static BYTE const kid_map = 0x6;
     static BYTE const kid_num = 3;
     PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.

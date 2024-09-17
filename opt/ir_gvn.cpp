@@ -914,7 +914,7 @@ void GVN::dumpAllVN() const
 
 void GVN::dumpMiscMap() const
 {
-    if (!m_rg->isLogMgrInit()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpGVN()) { return; }
     note(getRegion(), "\n==-- DUMP IR2VN --==");
     {
         m_rg->getLogMgr()->incIndent(2);
@@ -2629,7 +2629,7 @@ void GVN::dumpBB(UINT bbid) const
 
 bool GVN::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpGVN()) { return false; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
@@ -2969,7 +2969,7 @@ bool GVN::perform(OptCtx & oc)
     assignRHSVN();
     destroyLocalUsed();
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGVN()) {
+    if (g_dump_opt.isDumpAfterPass()) {
        dump();
     }
     set_valid(true);

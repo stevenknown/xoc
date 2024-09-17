@@ -61,16 +61,66 @@ public:
     }
 };
 
+
+class VisitIRFuncBase {
+public:
+    //Inferface that can be overrided by user.
+    //The function will be invoked by current class object when visiting each
+    //IR. User can set visiting status to control whether the IR tree visiting
+    //keep going or terminate.
+    //Return true to process the kid IR on tree.
+    //e.g: we are going to find LDA operation in IR tree.
+    //  class MyVisit : public VisitIRTree {
+    //  public:
+    //    IR * lda;
+    //    virtual bool visitIR(IR * ir) {
+    //      if (ir->is_lda()) {
+    //        lda = ir;
+    //        setTerminate();
+    //      }
+    //      //Note it is OK to return true of false here, because the
+    //      //visiting will terminated immedately.
+    //      return true;
+    //    }
+    //  };
+    bool visitIR(IR const*, OUT bool & is_terminate)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+
+    //Inferface that can be overrided by user.
+    //The function will be invoked by current class object when visiting each
+    //IR. User can set visiting status to control whether the IR tree visiting
+    //keep going or terminate.
+    //Return true to process the kid IR on tree.
+    //e.g: we are going to find LDA operation in IR tree.
+    //  class MyVisit : public VisitIRTree {
+    //  public:
+    //    IR * lda;
+    //    virtual bool visitIR(IR * ir) {
+    //      if (ir->is_lda()) {
+    //        lda = ir;
+    //        setTerminate();
+    //      }
+    //      //Note it is OK to return true of false here, because the
+    //      //visiting will terminated immedately.
+    //      return true;
+    //    }
+    //  };
+    bool visitIR(IR *, OUT bool & is_terminate)
+    { ASSERTN(0, ("Target Dependent Code")); return true; }
+};
+
+template <class VF = VisitIRFuncBase>
 class VisitIRTree {
     COPY_CONSTRUCTOR(VisitIRTree);
 protected:
     //Internal variable. No user attention required.
     bool m_is_terminate;
+    VF & m_vf;
 protected:
     //Internal function. No user attention required.
     template<class T> void iter(T ir)
     {
-        if (!visitIR(ir)) { return; }
+        if (!m_vf.visitIR(ir, m_is_terminate)) { return; }
         if (is_terminate()) { return; }
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             T tmplst = ir->getKid(i);
@@ -86,7 +136,7 @@ protected:
     template<class T> void iterWithSibling(T ir)
     {
         for (T t = ir; t != nullptr; t = t->get_next()) {
-            if (!visitIR(t)) { return; }
+            if (!m_vf.visitIR(t, m_is_terminate)) { return; }
             if (is_terminate()) { return; }
             for (UINT i = 0; i < IR_MAX_KID_NUM(t); i++) {
                 T tmplst = t->getKid(i);
@@ -101,53 +151,9 @@ protected:
 
     //Internal function. No user attention required.
     bool is_terminate() const { return m_is_terminate; }
-
-    //Inferface that can be overrided by user.
-    //The function will be invoked by current class object when visiting each
-    //IR. User can set visiting status to control whether the IR tree visiting
-    //keep going or terminate.
-    //Return true to process the kid IR on tree.
-    //e.g: we are going to find LDA operation in IR tree.
-    //  class MyVisit : public VisitIRTree {
-    //  public:
-    //    IR * lda;
-    //    virtual bool visitIR(IR * ir) {
-    //      if (ir->is_lda()) {
-    //        lda = ir;
-    //        setTerminate();
-    //      }
-    //      //Note it is OK to return true of false here, because the
-    //      //visiting will terminated immedately.
-    //      return true;
-    //    }
-    //  };
-    virtual bool visitIR(IR *)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
-
-    //Inferface that can be overrided by user.
-    //The function will be invoked by current class object when visiting each
-    //IR. User can set visiting status to control whether the IR tree visiting
-    //keep going or terminate.
-    //Return true to process the kid IR on tree.
-    //e.g: we are going to find LDA operation in IR tree.
-    //  class MyVisit : public VisitIRTree {
-    //  public:
-    //    IR * lda;
-    //    virtual bool visitIR(IR * ir) {
-    //      if (ir->is_lda()) {
-    //        lda = ir;
-    //        setTerminate();
-    //      }
-    //      //Note it is OK to return true of false here, because the
-    //      //visiting will terminated immedately.
-    //      return true;
-    //    }
-    //  };
-    virtual bool visitIR(IR const*)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
 public:
-    VisitIRTree() : m_is_terminate(false) {}
-    virtual ~VisitIRTree() {}
+    VisitIRTree(VF & vf) : m_is_terminate(false), m_vf(vf) {}
+    ~VisitIRTree() {}
 
     //API that can be invoked by user.
     //User can invoke the function when user expect to terminate the visiting
@@ -174,6 +180,7 @@ public:
     //Note the function will access the sibling IR of 'ir'.
     void visitWithSibling(IR const* ir) { iterWithSibling<IR const*>(ir); }
 };
+
 
 //The function clean the IR_parent for each elements in 'irlst'.
 void cleanParentForIRList(IR * irlst);

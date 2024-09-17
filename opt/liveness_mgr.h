@@ -45,6 +45,7 @@ typedef SEGIter PRLiveSetIter;
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);
+protected:
     BYTE m_handle_may:1; //true if consider maydef/mayuse info.
     BYTE m_keep_local:1; //true to retain local-set info when perform() ends.
     MDSystem * m_md_sys;
@@ -57,11 +58,9 @@ class LivenessMgr : public Pass {
 protected:
     void cleanLocal();
     void cleanGlobal();
-    void computeExp(IR const* stmt, ConstIRIter & it,
-                    MOD PRLiveSet * use,
+    void computeExp(IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use,
                     MOD PRLiveSet * gen);
-    void computeStmt(IR const* stmt, ConstIRIter & it,
-                     MOD PRLiveSet * use,
+    void computeStmt(IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use,
                      MOD PRLiveSet * gen);
 
     PRLiveSet * gen_liveout(UINT bbid);
@@ -69,28 +68,23 @@ protected:
     PRLiveSet * gen_def(UINT bbid);
     PRLiveSet * gen_use(UINT bbid);
 
-    void processPHI(IR const* x, ConstIRIter & it,
-                    MOD PRLiveSet * use,
+    void processPHI(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
                     MOD PRLiveSet * gen);
-    void processSTPR(IR const* x, ConstIRIter & it,
-                     MOD PRLiveSet * use,
+    void processSTPR(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
                      MOD PRLiveSet * gen);
-    void processSETELEM(IR const* x, ConstIRIter & it,
-                        MOD PRLiveSet * use,
+    void processSETELEM(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
                         MOD PRLiveSet * gen);
-    void processGETELEM(IR const* x, ConstIRIter & it,
-                        MOD PRLiveSet * use,
+    void processGETELEM(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
                         MOD PRLiveSet * gen);
-    void processCallStmt(IR const* x, ConstIRIter & it,
-                         MOD PRLiveSet * use,
+    void processCallStmt(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
                          MOD PRLiveSet * gen);
-    inline void processOpnd(IR const* exp, ConstIRIter & it,
-                            MOD PRLiveSet * use, MOD PRLiveSet * gen);
-    inline void processMayDef(PRNO prno, MOD PRLiveSet * gen,
-                              MOD PRLiveSet * use);
-    inline void processMay(IR const* pr, MOD PRLiveSet * gen,
-                           MOD PRLiveSet * use, bool is_lhs);
-    inline void processMayUse(PRNO prno, MOD PRLiveSet * use);
+    void processOpnd(IR const* exp, ConstIRIter & it,
+                     MOD PRLiveSet * use, MOD PRLiveSet * gen);
+    void processMayDef(PRNO prno, MOD PRLiveSet * gen,
+                       MOD PRLiveSet * use);
+    void processMay(IR const* pr, MOD PRLiveSet * gen,
+                    MOD PRLiveSet * use, bool is_lhs);
+    void processMayUse(PRNO prno, MOD PRLiveSet * use);
 public:
     LivenessMgr(Region * rg) : Pass(rg)
     {
@@ -123,8 +117,7 @@ public:
     PRLiveSet * get_def(UINT bbid) const { return m_def.get(bbid); }
     PRLiveSet * get_use(UINT bbid) const { return m_use.get(bbid); }
     PRLiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
-    PRLiveSet * get_liveout(UINT bbid) const
-    { return m_liveout.get(bbid); }
+    PRLiveSet * get_liveout(UINT bbid) const { return m_liveout.get(bbid); }
 
     //By default, local set is initialized by computeLocal().
     void initSet(BBList const& bblst);

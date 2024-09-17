@@ -327,7 +327,7 @@ typedef List<BackwardEdge const*> BackwardEdgeList;
 //    BB4
 class BackwardJumpAnalysis {
     COPY_CONSTRUCTOR(BackwardJumpAnalysis);
-    friend class OccRecorder;
+    friend class OccRecorderVF;
     Region * m_rg;
     BBPos2Attr * m_pos2attr;
     IRMgr * m_irmgr;

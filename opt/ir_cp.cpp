@@ -41,7 +41,7 @@ static void dumpAct(
     IR const* use)
 {
     Region const* rg = cp->getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return; }
     class Dump : public xoc::DumpToBuf {
     public:
         CopyProp const* cp;
@@ -91,31 +91,37 @@ static void dumpAct(
 }
 
 
-//
-//START PropVisit
-//
-class PropVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(PropVisit);
+class PropVisitFunc : public xcom::VisitTreeFuncBase {
+    COPY_CONSTRUCTOR(PropVisitFunc);
     bool m_is_changed;
     IRCFG * m_cfg;
     CopyProp * m_cp;
     IRSet m_useset; //for local used
 public:
-    PropVisit(IRBB * root, DomTree const& domtree, IRCFG * cfg, CopyProp * cp,
-              DefSegMgr * segmgr) :
-        VisitTree(domtree, root->id()), m_cfg(cfg), m_cp(cp), m_useset(segmgr)
+    PropVisitFunc(IRCFG * cfg, CopyProp * cp, DefSegMgr * segmgr)
+        : m_cfg(cfg), m_cp(cp), m_useset(segmgr)
     { m_is_changed = false; }
 
     bool isChanged() const { return m_is_changed; }
 
-    virtual void visitWhenAllKidHaveBeenVisited(
-        Vertex const* v, Stack<Vertex const*> &)
+    void visitWhenAllKidHaveBeenVisited(Vertex const*, Stack<Vertex const*> &)
     {}
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
         m_is_changed |= m_cp->doPropBB(m_cfg->getBB(v->id()), m_useset);
         return true;
     }
+};
+
+
+//
+//START PropVisit
+//
+class PropVisit : public xcom::VisitTree<PropVisitFunc> {
+    COPY_CONSTRUCTOR(PropVisit);
+public:
+    PropVisit(IRBB * root, DomTree const& domtree, PropVisitFunc & vf)
+        : VisitTree(domtree, root->id(), vf) {}
 };
 //END PropVisit
 
@@ -958,9 +964,10 @@ bool CopyProp::doPropBBInDomTreeOrder()
     xcom::DomTree domtree;
     m_cfg->genDomTree(domtree);
     do {
-        PropVisit visit(entry, domtree, m_cfg, this, getSegMgr());
-        visit.perform();
-        if (!visit.isChanged()) { break; }
+        PropVisitFunc vf(m_cfg, this, getSegMgr());
+        PropVisit visit(entry, domtree, vf);
+        visit.visit();
+        if (!vf.isChanged()) { break; }
         changed = true;
         refinement(m_rg, *getOptCtx());
         ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *getOptCtx()));
@@ -975,7 +982,7 @@ bool CopyProp::doPropBBInDomTreeOrder()
 
 bool CopyProp::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return false; }
     if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRP()) {
         return true;
     }

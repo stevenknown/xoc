@@ -1609,10 +1609,11 @@ void FindRedOp::checkOpRHS()
 }
 
 
-class IterIRTreeForMemRef : public VisitIRTree {
+class MemRefVisitFunc {
+public:
     FindRedOp & m_findredop;
-protected:
-    virtual bool visitIR(IR const* ir) override
+public:
+    bool visitIR(IR const* ir, OUT bool & is_terminate)
     {
         ASSERT0(ir->is_exp());
         if (!ir->isMemRef()) {
@@ -1626,19 +1627,26 @@ protected:
         }
         //The finding result has already been generated, terminate the
         //finding process immediately.
-        setTerminate();
+        is_terminate = true;
         return false;
     }
+    MemRefVisitFunc(FindRedOp & findredop) : m_findredop(findredop) {}
+};
+
+
+class IterIRTreeForMemRef : public VisitIRTree<MemRefVisitFunc> {
 public:
-    IterIRTreeForMemRef(IR const* ir, FindRedOp & findredop) :
-        m_findredop(findredop) { visitWithSibling(ir); }
+    IterIRTreeForMemRef(IR const* ir, MemRefVisitFunc & vf)
+        : VisitIRTree<MemRefVisitFunc>(vf)
+    { visitWithSibling(ir);}
 };
 
 
 void FindRedOp::iterIRTreeList(IR const* exp_list)
 {
     ASSERT0(exp_list && exp_list->is_exp());
-    IterIRTreeForMemRef iterirtree(exp_list, *this);
+    MemRefVisitFunc vf(*this);
+    IterIRTreeForMemRef iterirtree(exp_list, vf);
 }
 //END FindRedOp
 

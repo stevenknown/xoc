@@ -140,7 +140,7 @@ void ExprTab::reset()
 //Dump all IR expressions of region and its used MDs.
 bool ExprTab::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpExprTab()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);
@@ -619,7 +619,7 @@ bool ExprTab::perform(MOD OptCtx & oc)
         encodeBB(bb);
     }
     set_valid(true);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpExprTab()) {
+    if (g_dump_opt.isDumpAfterPass()) {
         dump();
     }
     return false;

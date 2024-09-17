@@ -104,7 +104,7 @@ public:
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
-    friend class PropVisit;
+    friend class PropVisitFunc;
     COPY_CONSTRUCTOR(CopyProp);
 protected:
     MDSystem * m_md_sys;

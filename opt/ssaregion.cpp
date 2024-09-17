@@ -65,9 +65,18 @@ void SSARegion::dump() const
     note(m_rg, "\n==---- DUMP SSARegion ----==");
     ASSERT0(getRootBB());
     note(m_rg, "\nROOT:BB%d", getRootBB()->id());
+
     note(m_rg, "\nBBSET:");
     SSARegion * pthis = const_cast<SSARegion*>(this);
     pthis->getBBSet().dump(m_rg->getLogMgr()->getFileHandler());
+
+    note(m_rg, "\nDomTree:");
+    m_rg->getLogMgr()->incIndent(2);
+    xcom::StrBuf buf(32);
+    getDomTree().dumpBuf(buf);
+    note(m_rg, "\n%s", buf.getBuf());
+    m_rg->getLogMgr()->decIndent(2);
+
     note(m_rg, "\nIRLIST:");
     m_rg->getLogMgr()->incIndent(2);
     for (IR const* ir = pthis->getIRList().get_head(); ir != nullptr;
@@ -76,6 +85,11 @@ void SSARegion::dump() const
                DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_SRC_LINE));
     }
     m_rg->getLogMgr()->decIndent(2);
+
+    note(m_rg, "\nActMgr:");
+    if (getActMgr() != nullptr) {
+        getActMgr()->dump();
+    }
 }
 
 
@@ -125,7 +139,8 @@ void SSARegion::addAllBBUnderRoot()
 {
     IRBB const* root = getRootBB();
     ASSERT0(root && root->getVex());
-    xcom::GraphIterOut iterout(m_domtree, m_domtree.getVertex(root->id()));
+    DomTree const& dt = getDomTree();
+    xcom::GraphIterOut iterout(dt, dt.getVertex(root->id()));
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
         add(t->id());

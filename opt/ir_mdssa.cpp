@@ -306,28 +306,27 @@ void CollectDef::collectDefThroughDefChain(
 
 
 //
-//START Vertex2LiveSet
+//START BBID2LiveSet
 //
-void Vertex2LiveSet::dump(Region const* rg) const
+void BBID2LiveSet::dump(Region const* rg) const
 {
     ASSERT0(rg);
-    note(rg, "\n==-- DUMP Vertex2LiveSet --==");
+    note(rg, "\n==-- DUMP BBID2LiveSet --==");
     MDSSAMgr * mgr = rg->getMDSSAMgr();
     ASSERT0(mgr);
     LiveSet * liveset;
     xcom::TMapIter<UINT, LiveSet*> it;
-    for (UINT bbid = m_bbid2set.get_first(it, &liveset);
-         bbid != BBID_UNDEF; bbid = m_bbid2set.get_next(it, &liveset)) {
+    for (UINT bbid = get_first(it, &liveset);
+         bbid != BBID_UNDEF; bbid = get_next(it, &liveset)) {
         note(rg, "\nBB%u:", bbid);
         if (liveset == nullptr) {
             prt(rg, "--");
             continue;
         }
-        VOpndSet & set = liveset->getSet();
-        VOpndSetIter its;
+        LiveSetIter its;
         bool first = true;
-        for (BSIdx i = set.get_first(&its);
-             i != BS_UNDEF; i = set.get_next(i, &its)) {
+        for (BSIdx i = liveset->get_first(&its);
+             i != BS_UNDEF; i = liveset->get_next(i, &its)) {
             VMD * t = (VMD*)mgr->getUseDefMgr()->getVOpnd(i);
             ASSERT0(t && t->is_md());
             if (!first) { note(rg, ","); }
@@ -336,14 +335,13 @@ void Vertex2LiveSet::dump(Region const* rg) const
         }
     }
 }
-//END Vertex2LiveSet
+//END BBID2LiveSet
 
 
 //
 //START MDSSAConstructRenameVisit
 //
-class MDSSAConstructRenameVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(MDSSAConstructRenameVisit);
+class MDSSAConstructRenameVisitVF : public xcom::VisitTreeFuncBase {
     DefMDSet const& m_effect_mds;
     BB2DefMDSet & m_defed_mds_vec;
     MD2VMDStack & m_md2vmdstk;
@@ -351,21 +349,17 @@ class MDSSAConstructRenameVisit : public xcom::VisitTree {
     IRCFG * m_cfg;
     BB2VMDMap m_bb2vmdmap;
 public:
-    MDSSAConstructRenameVisit(DefMDSet const& effect_mds,
-                              IRBB * root,
-                              DomTree const& domtree,
-                              BB2DefMDSet & defed_mds_vec,
-                              MD2VMDStack & md2vmdstk,
-                              MDSSAMgr * mgr) :
-        VisitTree(domtree, root->id()),
-        m_effect_mds(effect_mds), m_defed_mds_vec(defed_mds_vec),
-        m_md2vmdstk(md2vmdstk), m_mgr(mgr)
+    MDSSAConstructRenameVisitVF(
+        DefMDSet const& effect_mds, BB2DefMDSet & defed_mds_vec,
+        MD2VMDStack & md2vmdstk, MDSSAMgr * mgr)
+            : m_effect_mds(effect_mds), m_defed_mds_vec(defed_mds_vec),
+              m_md2vmdstk(md2vmdstk), m_mgr(mgr)
     {
         m_cfg = mgr->getCFG();
         m_bb2vmdmap.setElemNum(m_cfg->getBBList()->get_elem_count());
     }
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> &)
+    void visitWhenAllKidHaveBeenVisited(
+        xcom::Vertex const* v, xcom::Stack<Vertex const*> &)
     {
         //Do post-processing while all kids of BB has been processed.
         MD2VMD * mdid2vmd = m_bb2vmdmap.get(v->id());
@@ -386,7 +380,7 @@ public:
         //vmdmap is useless from now on.
         m_bb2vmdmap.erase(v->id());
     }
-    virtual bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
+    bool visitWhenFirstMeet(xcom::Vertex const* v, xcom::Stack<Vertex const*> &)
     {
         DefMDSet const* defed_mds = m_defed_mds_vec.get(v->id());
         ASSERT0(defed_mds);
@@ -396,41 +390,47 @@ public:
         return true;
     }
 };
+
+
+class MDSSAConstructRenameVisit
+    : public xcom::VisitTree<MDSSAConstructRenameVisitVF> {
+    COPY_CONSTRUCTOR(MDSSAConstructRenameVisit);
+public:
+    MDSSAConstructRenameVisit(DomTree const& domtree, IRBB * root,
+                              MDSSAConstructRenameVisitVF & vf)
+        : VisitTree(domtree, root->id(), vf) {}
+};
 //END MDSSAConstructRenameVisit
 
 
 //
-//START RenameDef
+//START RenameDefVisit
 //
-class RenameDefVisit : public xcom::VisitTree {
-    COPY_CONSTRUCTOR(RenameDefVisit);
+class RenameDefVisitFunc : public xcom::VisitTreeFuncBase {
     RenameDef & m_rndef;
     IRCFG * m_cfg;
+    DomTree const& m_dt;
 public:
-    RenameDefVisit(RenameDef & rndef, IRCFG * cfg, VexIdx rootid,
-                   DomTree const& domtree) :
-        VisitTree(domtree, rootid), m_rndef(rndef), m_cfg(cfg)
-    {
-        //Skip the root vertex on DomTree.
-        setVisited(rootid);
-    }
-    virtual void visitWhenAllKidHaveBeenVisited(Vertex const* v,
-                                                Stack<Vertex const*> &)
-    { m_rndef.getVex2LiveSet().free(v->id()); }
-    virtual bool visitWhenFirstMeet(Vertex const* v,
-                                    Stack<Vertex const*> & stk)
+    RenameDefVisitFunc(RenameDef & rndef, IRCFG * cfg, DomTree const& dt)
+        : m_rndef(rndef), m_cfg(cfg), m_dt(dt) {}
+
+    void visitWhenAllKidHaveBeenVisited(
+        xcom::Vertex const* v, MOD xcom::Stack<Vertex const*> &)
+    { m_rndef.getBBID2LiveSet().free(v->id()); }
+    bool visitWhenFirstMeet(
+        xcom::Vertex const* v, MOD xcom::Stack<Vertex const*> & stk)
     {
         //Init liveset for given vertex.
-        LiveSet * tliveset = m_rndef.getVex2LiveSet().get(v->id());
+        LiveSet * tliveset = m_rndef.getBBID2LiveSet().get(v->id());
         if (tliveset == nullptr) {
-            Vertex const* parent = getTree().getParent(v);
+            Vertex const* parent = m_dt.getParent(v);
             ASSERT0(parent);
-            LiveSet const* pset = m_rndef.getVex2LiveSet().get(parent->id());
+            LiveSet const* pset = m_rndef.getBBID2LiveSet().get(parent->id());
             ASSERT0(pset);
-            tliveset = m_rndef.getVex2LiveSet().genAndCopy(v->id(), *pset);
+            tliveset = m_rndef.getBBID2LiveSet().genAndCopy(v->id(), *pset);
         } else if (tliveset->all_killed()) {
             stk.pop(); //no need to perform rename-def anymore.
-            m_rndef.getVex2LiveSet().free(v->id());
+            m_rndef.getBBID2LiveSet().free(v->id());
             //All VMDs processed, no need to go to kid vertex.
             return false;
         }
@@ -441,7 +441,7 @@ public:
         m_rndef.renameUseInBBTillNextDef(v, vbb, true, irlistit, *tliveset);
         if (tliveset->all_killed()) {
             stk.pop(); //no need to perform rename-def anymore.
-            m_rndef.getVex2LiveSet().free(v->id());
+            m_rndef.getBBID2LiveSet().free(v->id());
             //All VMDs processed, no need to go to kid vertex.
             return false;
         }
@@ -450,41 +450,51 @@ public:
 };
 
 
-RenameDef::RenameDef(MOD IR * stmt, DomTree const& dt, bool build_ddchain,
-                     MDSSAMgr * mgr)
-    : m_domtree(dt)
+class RenameDefVisit : public xcom::VisitTree<RenameDefVisitFunc> {
+public:
+    RenameDefVisit(VexIdx rootid, DomTree const& domtree,
+                   RenameDefVisitFunc & vf) : VisitTree(domtree, rootid, vf)
+    {
+        //Skip the root vertex on DomTree.
+        setVisited(rootid);
+    }
+};
+//END RenameDefVisit
+
+
+
+//
+//START RenameDef
+//
+RenameDef::RenameDef(DomTree const& dt, bool build_ddchain,
+                     MDSSAMgr * mgr, ActMgr * am)
+    : m_domtree(dt), m_am(am)
 {
-    ASSERT0(stmt);
-    m_newstmt = stmt;
-    ASSERT0(MDSSAMgr::hasMDSSAInfo(m_newstmt));
-    m_newphi = nullptr;
     m_liveset = nullptr;
     m_mgr = mgr;
     m_cfg = m_mgr->getCFG();
     m_is_build_ddchain = build_ddchain;
-    m_am = m_mgr->getActMgr();
     m_udmgr = m_mgr->getUseDefMgr();
     m_rg = mgr->getRegion();
 }
 
 
-RenameDef::RenameDef(MDPhi const* phi, DomTree const& dt, bool build_ddchain,
-                     MDSSAMgr * mgr)
-    : m_domtree(dt)
+void RenameDef::clean()
 {
-    ASSERT0(phi);
-    m_newstmt = nullptr;
-    m_newphi = phi;
-    m_liveset = nullptr;
-    m_mgr = mgr;
-    m_cfg = m_mgr->getCFG();
-    m_is_build_ddchain = build_ddchain;
-    m_am = mgr->getActMgr();
+    BBID2LiveSet & ls = getBBID2LiveSet();
+    LiveSet * liveset = nullptr;
+    BBID2LiveSetIter it;
+    for (UINT bbid = ls.get_first(it, &liveset);
+         bbid != BBID_UNDEF; bbid = ls.get_next(it, &liveset)) {
+        if (liveset == nullptr) { continue; }
+        liveset->clean();
+    }
 }
 
 
 void RenameDef::dumpRenameBB(IRBB const* bb)
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     am->dump("RenameDef:renaming BB%u", bb->id());
@@ -493,6 +503,7 @@ void RenameDef::dumpRenameBB(IRBB const* bb)
 
 void RenameDef::dumpRenameVMD(IR const* ir, VMD const* vmd)
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     xcom::StrBuf buf(16);
@@ -503,6 +514,7 @@ void RenameDef::dumpRenameVMD(IR const* ir, VMD const* vmd)
 
 void RenameDef::dumpInsertDDChain(IR const* ir, VMD const* vmd)
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     xcom::StrBuf buf(16);
@@ -513,6 +525,7 @@ void RenameDef::dumpInsertDDChain(IR const* ir, VMD const* vmd)
 
 void RenameDef::dumpInsertDDChain(MDPhi const* phi, VMD const* vmd)
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     xcom::StrBuf buf(16);
@@ -523,6 +536,7 @@ void RenameDef::dumpInsertDDChain(MDPhi const* phi, VMD const* vmd)
 
 void RenameDef::dumpRenamePhi(MDPhi const* phi, UINT opnd_pos)
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     xcom::StrBuf buf(16);
@@ -554,10 +568,9 @@ bool RenameDef::renameVMDForDesignatedPhiOpnd(
     dumpRenamePhi(phi, opnd_pos);
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
     MDIdx phimdid = phi->getResult()->mdid();
-    VOpndSet const& set = const_cast<LiveSet&>(liveset).getSet();
-    VOpndSetIter it = nullptr;
-    for (BSIdx i = set.get_first(&it); i != BS_UNDEF;
-         i = set.get_next(i, &it)) {
+    LiveSetIter it = nullptr;
+    for (BSIdx i = liveset.get_first(&it); i != BS_UNDEF;
+         i = liveset.get_next(i, &it)) {
         VMD * t = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
         if (t->mdid() == phimdid) {
@@ -596,10 +609,9 @@ void RenameDef::renameLivedVMDForIRTree(
 {
     VOpndSetIter it = nullptr;
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
-    VOpndSet const& set = const_cast<LiveSet&>(liveset).getSet();
     bool no_exp_has_ssainfo = true;
-    for (BSIdx i = set.get_first(&it); i != BS_UNDEF;
-         i = set.get_next(i, &it)) {
+    for (BSIdx i = liveset.get_first(&it); i != BS_UNDEF;
+         i = liveset.get_next(i, &it)) {
         VMD * t = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
         dumpRenameVMD(ir, t);
@@ -669,15 +681,13 @@ bool RenameDef::tryInsertDDChainForPhi(MDPhi * phi, MOD LiveSet & liveset)
     VOpndSetIter it = nullptr;
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
     bool inserted = false;
-    VOpndSet const& vmdset = liveset.getSet();
     BSIdx nexti;
-    for (BSIdx i = vmdset.get_first(&it); i != BS_UNDEF; i = nexti) {
-        nexti = vmdset.get_next(i, &it); //i may be removed.
+    for (BSIdx i = liveset.get_first(&it); i != BS_UNDEF; i = nexti) {
+        nexti = liveset.get_next(i, &it); //i may be removed.
         VMD * t = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
-        if (liveset.is_live(i)) {
-            inserted |= tryInsertDDChainForDesigatedVMD(phi, t, liveset);
-        }
+        if (!liveset.is_live(i)) { continue; }
+        inserted |= tryInsertDDChainForDesigatedVMD(phi, t, liveset);
     }
     return inserted;
 }
@@ -690,15 +700,13 @@ bool RenameDef::tryInsertDDChainForStmt(
     VOpndSetIter it = nullptr;
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
     bool inserted = false;
-    VOpndSet const& vmdset = liveset.getSet();
     BSIdx nexti;
-    for (BSIdx i = vmdset.get_first(&it); i != BS_UNDEF; i = nexti) {
-        nexti = vmdset.get_next(i, &it); //i may be removed.
+    for (BSIdx i = liveset.get_first(&it); i != BS_UNDEF; i = nexti) {
+        nexti = liveset.get_next(i, &it); //i may be removed.
         VMD * t = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
-        if (liveset.is_live(i)) {
-            inserted |= tryInsertDDChainForDesigatedVMD(ir, t, before, liveset);
-        }
+        if (!liveset.is_live(i)) { continue; }
+        inserted |= tryInsertDDChainForDesigatedVMD(ir, t, before, liveset);
     }
     return inserted;
 }
@@ -708,11 +716,10 @@ void RenameDef::killLivedVMD(MDPhi const* phi, MOD LiveSet & liveset)
 {
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
     MDIdx phimdid = phi->getResult()->mdid();
-    VOpndSet const& vmdset = liveset.getSet();
     VOpndSetIter it = nullptr;
     BSIdx nexti = BS_UNDEF;
-    for (BSIdx i = vmdset.get_first(&it); i != BS_UNDEF; i = nexti) {
-        nexti = vmdset.get_next(i, &it);
+    for (BSIdx i = liveset.get_first(&it); i != BS_UNDEF; i = nexti) {
+        nexti = liveset.get_next(i, &it);
         VMD * t = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
         if (t->mdid() == phimdid) {
@@ -917,8 +924,9 @@ void RenameDef::connectDefInterBBTillPrevDef(
 void RenameDef::renameFollowUseInterBBTillNextDef(
     Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb)
 {
-    RenameDefVisit visit(*this, m_cfg, defvex->id(), m_domtree);
-    visit.perform();
+    RenameDefVisitFunc vf(*this, m_cfg, m_domtree);
+    RenameDefVisit rn(defvex->id(), m_domtree, vf);
+    rn.visit();
 }
 
 
@@ -928,7 +936,7 @@ void RenameDef::rename(Vertex const* defvex, LiveSet * defliveset,
 {
     renameFollowUseIntraBBTillNextDef(defvex, *defliveset, start_bb, start_ir);
     if (defliveset->all_killed()) {
-        m_vex2liveset.free(start_bb->id());
+        m_bbid2liveset.free(start_bb->id());
         return;
     }
     renameFollowUseInterBBTillNextDef(defvex, *defliveset, start_bb);
@@ -950,82 +958,207 @@ void RenameDef::connect(Vertex const* defvex, LiveSet * defliveset,
 }
 
 
-void RenameDef::processPhi()
+void RenameDef::processPhi(MDPhi const* newphi)
 {
-    ASSERT0(m_newphi);
-    IRBB const* bb = m_newphi->getBB();
+    ASSERT0(newphi);
+    IRBB const* bb = newphi->getBB();
     Vertex const* defvex = m_domtree.getVertex(bb->id());
-    ASSERT0(m_vex2liveset.get(bb->id()) == nullptr);
-    LiveSet * defliveset = m_vex2liveset.genAndCopy(
-        bb->id(), m_newphi->getResult());
+    ASSERT0(m_bbid2liveset.get(bb->id()) == nullptr);
+    LiveSet * defliveset = m_bbid2liveset.genAndCopy(
+        bb->id(), newphi->getResult());
     rename(defvex, defliveset, bb, nullptr);
     //Phi does not have previous-def.
 }
 
 
-void RenameDef::processStmt()
+void RenameDef::processStmt(IR * newstmt)
 {
-    ASSERT0(m_newstmt && MDSSAMgr::hasMDSSAInfo(m_newstmt));
-    IRBB const* bb = m_newstmt->getBB();
-    MDSSAInfo const* info = m_mgr->getMDSSAInfoIfAny(m_newstmt);
+    ASSERT0(newstmt && MDSSAMgr::hasMDSSAInfo(newstmt));
+    IRBB const* bb = newstmt->getBB();
+    MDSSAInfo const* info = m_mgr->getMDSSAInfoIfAny(newstmt);
     if (info == nullptr || info->isEmptyVOpndSet()) {
-        info = m_mgr->genMDSSAInfoAndNewVesionVMD(m_newstmt);
+        info = m_mgr->genMDSSAInfoAndNewVesionVMD(newstmt);
     }
     if (info->readVOpndSet().get_elem_count() == 0) {
         //MDSSAInfo may be empty if CALL does not have MustRef and MayRef.
         return;
     }
-    ASSERT0(m_vex2liveset.get(bb->id()) == nullptr);
-    LiveSet * defliveset = m_vex2liveset.genAndCopy(
+    ASSERT0(m_bbid2liveset.get(bb->id()) == nullptr ||
+            m_bbid2liveset.get(bb->id())->is_empty());
+    LiveSet * defliveset = m_bbid2liveset.genAndCopy(
         bb->id(), info->readVOpndSet());
     Vertex const* defvex = m_domtree.getVertex(bb->id());
     ASSERTN(defvex, ("miss vertex on domtree"));
-    rename(defvex, defliveset, bb, m_newstmt);
-    if (m_is_build_ddchain) {
-        //Previous defliveset may has been freed.
-        LiveSet * newdefliveset = m_vex2liveset.genAndCopy(
-            bb->id(), info->readVOpndSet());
-        connect(defvex, newdefliveset, bb, m_newstmt);
-    }
+    rename(defvex, defliveset, bb, newstmt);
+    if (!m_is_build_ddchain) { return; }
+
+    //Previous defliveset may has been freed.
+    LiveSet * newdefliveset = m_bbid2liveset.genAndCopy(
+        bb->id(), info->readVOpndSet());
+    connect(defvex, newdefliveset, bb, newstmt);
 }
 
 
-void RenameDef::perform()
+void RenameDef::rename(IR * newstmt)
 {
-    if (m_newstmt != nullptr) {
-        ASSERT0(MDSSAMgr::hasMDSSAInfo(m_newstmt));
-        processStmt();
-        return;
-    }
-    processPhi();
+    processStmt(newstmt);
+}
+
+
+void RenameDef::rename(MDPhi const* newphi)
+{
+    processPhi(newphi);
 }
 //END RenameDef
 
 
 //
-//SATRT RenameExp
+//START RecomputeDefDefAndDefUseChain
 //
-RenameExp::RenameExp(MOD IR * root, IR const* startir, IRBB const* startbb,
-                     MDSSAMgr * mgr, OptCtx * oc)
+RecomputeDefDefAndDefUseChain::RecomputeDefDefAndDefUseChain(
+    xcom::DomTree const& domtree, MDSSAMgr * mgr,
+    OptCtx const& oc, ActMgr * am)
+    : m_domtree(domtree), m_mgr(mgr), m_oc(oc), m_am(am)
 {
-    ASSERT0(root && (root->is_stmt() || root->is_exp()));
-    ASSERT0(startir == nullptr ||
-            (startir->is_stmt() && startir->getBB() == startbb));
-    m_root = root;
-    m_startir = startir;
-    m_startbb = startbb;
-    m_mgr = mgr;
-    m_am = mgr->getActMgr();
-    m_rg = mgr->getRegion();
-    m_oc = oc;
+    m_rg = m_mgr->getRegion();
+    m_cfg = m_rg->getCFG();
 }
 
 
-void RenameExp::perform()
+void RecomputeDefDefAndDefUseChain::recompute(MOD IR * stmt)
 {
-    class IterTree : public VisitIRTree {
-    protected:
-        virtual bool visitIR(IR * ir) override
+    ASSERT0(stmt && stmt->is_stmt() && MDSSAMgr::hasMDSSAInfo(stmt));
+    MDSSAUpdateCtx ssactx(m_oc);
+    if (MDSSAMgr::getMDSSAInfoIfAny(stmt) != nullptr) {
+        //There is no MDSSAInfo if 'stmt' is just generated.
+        //Remove old MDSSAInfo, cutoff DefDef chain and DefUse chain before
+        //recomputation.
+        m_mgr->removeStmtMDSSAInfo(stmt, ssactx);
+    }
+    //Generate new MDSSAInfo according to stmt's memory reference.
+    MDSSAInfo const* info = m_mgr->genMDSSAInfoAndNewVesionVMD(stmt);
+    ASSERT0_DUMMYUSE(info);
+
+    //MDSSAInfo may be empty if CALL does not have any MustRef and MayRef.
+    //ASSERT0(info->readVOpndSet().get_elem_count() > 0);
+    //Perform renaming according to the new versioned VMD.
+    //Note the original USE of origin VMD may not be reached by this renaming
+    //because 'stmt' may have been moved a BB that does not dominate origin
+    //USE any more. And the origin USE's DefUse chain will be revised during
+    //InsertPreheaderMgr::reviseSSADU().
+    RenameDef rn(getDomTree(), true, m_mgr, getActMgr());
+    rn.rename(stmt);
+}
+
+
+void RecomputeDefDefAndDefUseChain::recompute(xcom::List<IR*> const& irlist)
+{
+    xcom::List<IR*>::Iter it;
+    for (IR * stmt = irlist.get_head(&it);
+         stmt != nullptr; stmt = irlist.get_next(&it)) {
+        ASSERT0(MDSSAMgr::getMDSSAInfoIfAny(stmt));
+        recompute(stmt);
+    }
+}
+
+
+void RecomputeDefDefAndDefUseChain::recompute(MDPhi const* phi)
+{
+    ASSERT0(phi);
+    RenameDef rn(getDomTree(), true, m_mgr, getActMgr());
+    rn.rename(phi);
+}
+
+
+//irit: for local used.
+void RecomputeDefDefAndDefUseChain::recomputeDefForRHS(MOD IR * stmt)
+{
+    class VF {
+        IR const* m_prev_stmt;
+        IRBB const* m_start_bb;
+        MDSSAMgr * m_mgr;
+        OptCtx const& m_oc;
+    public:
+        VF(IR const* prev, IRBB const* s, MDSSAMgr * m, OptCtx const& oc)
+            : m_prev_stmt(prev), m_start_bb(s), m_mgr(m), m_oc(oc) {}
+        bool visitIR(MOD IR * ir, OUT bool & is_term)
+        {
+            if (!ir->is_exp() || !MDSSAMgr::hasMDSSAInfo(ir)) { return true; }
+            m_mgr->findAndSetLiveInDef(ir, m_prev_stmt, m_start_bb, m_oc);
+            return true;
+        }
+    };
+    class IterTree : public VisitIRTree<VF> {
+    public:
+        IterTree(VF & vf) : VisitIRTree(vf) {}
+    };
+    ASSERT0(stmt && stmt->is_stmt() && stmt->getBB());
+    IRBB * start_bb = stmt->getBB();
+    IR * prev_stmt = start_bb->getPrevIR(stmt);
+    VF vf(prev_stmt, start_bb, m_mgr, m_oc);
+    IterTree it(vf);
+    it.visit(stmt);
+}
+
+
+void RecomputeDefDefAndDefUseChain::recomputeDefForPhiOpnd(MDPhi const* phi)
+{
+    UINT idx = 0;
+    ASSERT0(phi->getBB());
+    Vertex const* vex = phi->getBB()->getVex();
+    ASSERT0(vex);
+    AdjVertexIter itv;
+    ASSERT0(m_oc.is_dom_valid());
+    for (xcom::Vertex const* in = Graph::get_first_in_vertex(vex, itv);
+         in != nullptr; in = Graph::get_next_in_vertex(itv), idx++) {
+        IR * opnd = phi->getOpnd(idx);
+        ASSERT0(opnd->is_leaf());
+        m_mgr->findAndSetLiveInDef(opnd, m_cfg->getBB(in->id()), m_oc);
+    }
+}
+
+
+void RecomputeDefDefAndDefUseChain::recomputeDefForPhiOpnd(
+    MDPhiList const* philist)
+{
+    ASSERT0(philist);
+    ASSERT0(m_oc.is_dom_valid());
+    for (MDPhiListIter it = philist->get_head();
+         it != philist->end(); it = philist->get_next(it)) {
+        MDPhi * phi = it->val();
+        ASSERT0(phi && phi->is_phi());
+        recomputeDefForPhiOpnd(phi);
+    }
+}
+
+
+void RecomputeDefDefAndDefUseChain::recompute(MDPhiList const* philist)
+{
+    for (MDPhiListIter it = philist->get_head();
+         it != philist->end(); it = philist->get_next(it)) {
+        MDPhi * phi = it->val();
+        ASSERT0(phi && phi->is_phi());
+        recompute(phi);
+   }
+}
+//END RecomputeDefDefAndDefUseChain
+
+
+//
+//SATRT RenameExp
+//
+RenameExp::RenameExp(MDSSAMgr * mgr, OptCtx * oc, ActMgr * am) :
+    m_mgr(mgr), m_am(am), m_oc(oc)
+{
+    m_rg = mgr->getRegion();
+}
+
+
+void RenameExp::rename(MOD IR * root, IR const* startir, IRBB const* startbb)
+{
+    class VF {
+    public:
+        bool visitIR(IR * ir, OUT bool & is_term)
         {
             if (!ir->is_exp() || !ir->isMemRefNonPR()) { return true; }
             m_mdssamgr->findAndSetLiveInDef(ir, m_startir, m_startbb, *m_oc);
@@ -1042,16 +1175,23 @@ void RenameExp::perform()
         //         'startbb', then keep finding its predecessors until meet the
         //         CFG entry.
         //startbb: the BB that begin to do searching. It can NOT be NULL.
-        IterTree(IR const* startir, IRBB const* startbb,
-                 MDSSAMgr * mgr, OptCtx * oc) :
-            m_startir(startir), m_startbb(startbb), m_mdssamgr(mgr), m_oc(oc)
+        VF(IR const* startir, IRBB const* startbb, MDSSAMgr * mgr, OptCtx * oc)
+            : m_startir(startir), m_startbb(startbb), m_mdssamgr(mgr), m_oc(oc)
         {
             ASSERT0(startir == nullptr ||
                     (startir->is_stmt() && startir->getBB() == startbb));
         }
     };
-    IterTree it(m_startir, m_startbb, m_mgr, m_oc);
-    it.visit(m_root);
+    class IterTree : public VisitIRTree<VF> {
+    public:
+        IterTree(VF & vf) : VisitIRTree(vf) {}
+    };
+    ASSERT0(root && (root->is_stmt() || root->is_exp()));
+    ASSERT0(startir == nullptr ||
+            (startir->is_stmt() && startir->getBB() == startbb));
+    VF vf(startir, startbb, m_mgr, m_oc);
+    IterTree it(vf);
+    it.visit(root);
 }
 //END RenameExp
 
@@ -1059,46 +1199,53 @@ void RenameExp::perform()
 //
 //START ReconstructMDSSA
 //
-ReconstructMDSSA::ReconstructMDSSA(
-    xcom::Vertex const* root, xcom::VexTab const& vextab,
-    xcom::DomTree const& domtree, xcom::Graph const* cfg, MDSSAMgr * mgr,
-    OptCtx * oc) :
-    xcom::VisitTree(domtree, root->id()), m_vextab(vextab), m_cfg(cfg),
-    m_mdssamgr(mgr), m_oc(oc)
+ReconstructMDSSAVF::ReconstructMDSSAVF(
+    xcom::VexTab const& vextab, DomTree const& dt, xcom::Graph const* cfg,
+    MDSSAMgr * mgr, OptCtx * oc, ActMgr * am)
+        : m_vextab(vextab), m_cfg(cfg), m_mdssamgr(mgr), m_oc(oc), m_am(am),
+          m_dt(dt)
 {
     ASSERT0(m_mdssamgr);
     m_rg = m_mdssamgr->getRegion();
 }
 
 
-void ReconstructMDSSA::renameBBPhiList(IRBB const* bb) const
+void ReconstructMDSSAVF::renameBBPhiList(IRBB const* bb) const
 {
     MDPhiList const* philist = m_mdssamgr->getPhiList(bb);
     if (philist == nullptr) { return; }
+    RenameDef rn(m_dt, false, m_mdssamgr, getActMgr());
     for (MDPhiListIter it = philist->get_head();
          it != philist->end(); it = philist->get_next(it)) {
         MDPhi const* phi = it->val();
         ASSERT0(phi && phi->is_phi());
-        RenameDef rn(phi, (DomTree const&)getTree(), false, m_mdssamgr);
-        rn.perform();
+        rn.clean();
+        rn.rename(phi);
     }
 }
 
 
-void ReconstructMDSSA::renameBBIRList(IRBB const* bb) const
+void ReconstructMDSSAVF::renameBBIRList(IRBB const* bb) const
 {
     BBIRList & irlst = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter irit;
     IR * prev = nullptr;
+    RenameExp rne(m_mdssamgr, m_oc, getActMgr());
+
+    //CASE:DefDef chain is necessary after new stmt generated.
+    //e.g:compile/vect18_5_2.c, compile.gr/vect18_5.low.gr
+    //The new generated stmt should connect DefDef chain with the previous
+    //stmt when it has been inserted into a BB.
+    bool need_build_dd_chain = true;
+    RenameDef rnd(m_dt, need_build_dd_chain, m_mdssamgr, getActMgr());
     for (IR * ir = irlst.get_head(&irit);
          ir != nullptr; prev = ir, ir = irlst.get_next(&irit)) {
         ASSERT0(ir->is_stmt());
         if (MDSSAMgr::hasMDSSAInfo(ir)) {
-            RenameDef rnd(ir, (DomTree const&)getTree(), false, m_mdssamgr);
-            rnd.perform();
+            rnd.clean();
+            rnd.rename(ir);
         }
-        RenameExp rne(ir, prev, bb, m_mdssamgr, m_oc);
-        rne.perform();
+        rne.rename(ir, prev, bb);
     }
 }
 //END ReconstructMDSSA
@@ -1112,8 +1259,8 @@ void LiveSet::dump(MDSSAMgr const* mgr) const
     note(mgr->getRegion(), "\nLiveSet:");
     bool first = true;
     VOpndSetIter it;
-    for (BSIdx i = m_set.get_first(&it);
-         i != BS_UNDEF; i = m_set.get_next(i, &it)) {
+    for (BSIdx i = get_first(&it);
+         i != BS_UNDEF; i = get_next(i, &it)) {
         VMD * t = (VMD*)const_cast<MDSSAMgr*>(mgr)->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
         if (!first) { prt(mgr->getRegion(), ","); }
@@ -1134,7 +1281,7 @@ void LiveSet::dump(MDSSAMgr const* mgr) const
 //
 void VMD::UseSet::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     VMD::UseSetIter it;
     note(rg, "\nVMD::UseSet:");
     xcom::StrBuf tmp(8);
@@ -1152,7 +1299,7 @@ void VMD::UseSet::dump(Region const* rg) const
 //
 void BB2DefMDSet::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     note(rg, "\n==-- DUMP BB2DefMDSet --==");
     BBList * bbl = rg->getBBList();
     for (IRBB const* bb = bbl->get_head();
@@ -1171,7 +1318,7 @@ void BB2DefMDSet::dump(Region const* rg) const
 //
 void MD2VMDStack::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     note(rg, "\n==-- DUMP MD2VMDStack --==");
     for (VecIdx i = MD_UNDEF + 1; i <= get_last_idx(); i++) {
         VMDStack * s = get(i);
@@ -1315,7 +1462,7 @@ void MDSSAMgr::cleanLocalUsedData()
 //This function dumps VMD structure and SSA DU info.
 void MDSSAMgr::dumpAllVMD() const
 {
-    if (!m_rg->isLogMgrInit()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     note(getRegion(), "\n\n==---- DUMP MDSSAMgr: ALL VMD '%s'----==",
          m_rg->getRegionName());
     VOpndVec * vec = const_cast<MDSSAMgr*>(this)->getUseDefMgr()->
@@ -1680,7 +1827,7 @@ void MDSSAMgr::dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const
 //flag: the flag to dump IR.
 void MDSSAMgr::dumpIRWithMDSSA(IR const* ir, DumpFlag flag) const
 {
-    if (!m_rg->isLogMgrInit()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ASSERT0(ir);
     dumpIR(ir, m_rg, nullptr, flag);
 
@@ -1702,7 +1849,7 @@ void MDSSAMgr::dumpBBList() const
 void MDSSAMgr::dumpVOpndRef() const
 {
     Region * rg = getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     note(rg, "\n==-- DUMP MDSSAMgr VOpndRef '%s' --==\n", rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
@@ -1718,7 +1865,7 @@ void MDSSAMgr::dumpVOpndRef() const
 
 bool MDSSAMgr::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return false; }
     START_TIMER(t, "MDSSA: Dump After Pass");
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
@@ -2061,9 +2208,10 @@ bool MDSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
          i != BS_UNDEF; i = bbset.get_next(i, &it)) {
         vextab.append(i);
     }
-    ReconstructMDSSA recon(rootv, vextab, ssarg.getDomTree(), m_cfg,
-                           this, ssarg.getOptCtx());
-    recon.perform();
+    ReconstructMDSSAVF vf(vextab, ssarg.getDomTree(), m_cfg,
+                          this, ssarg.getOptCtx(), ssarg.getActMgr());
+    ReconstructMDSSA recon(ssarg.getDomTree(), rootv, vf);
+    recon.reconstruct();
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *ssarg.getOptCtx()));
     END_TIMER(t, "MDSSA: Construct Designated Region");
     return true;
@@ -2196,7 +2344,7 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
 void MDSSAMgr::dumpDUChain() const
 {
     Region * rg = getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     note(rg, "\n==-- DUMP MDSSAMgr DU CHAIN '%s' --==\n", rg->getRegionName());
     BBList * bbl = rg->getBBList();
     ConstIRIter it;
@@ -3092,9 +3240,9 @@ void MDSSAMgr::rename(DefMDSet const& effect_mds, BB2DefMDSet & bb2defmds,
     if (bblst->get_elem_count() == 0) { return; }
     initVMDStack(effect_mds, md2vmdstk);
     ASSERT0(m_cfg->getEntry());
-    MDSSAConstructRenameVisit visit(effect_mds, m_cfg->getEntry(),
-                                    domtree, bb2defmds, md2vmdstk, this);
-    visit.perform();
+    MDSSAConstructRenameVisitVF vf(effect_mds, bb2defmds, md2vmdstk, this);
+    MDSSAConstructRenameVisit rn(domtree, m_cfg->getEntry(), vf);
+    rn.visit();
     END_TIMER(t, "MDSSA: Rename");
 }
 
@@ -5548,111 +5696,7 @@ bool MDSSAMgr::hasSameValue(IR const* ir1, IR const* ir2)
 }
 
 
-void MDSSAMgr::recomputeDefDefAndDefUseChain(
-    MDPhi const* phi, DomTree const& domtree)
-{
-    ASSERT0(phi);
-    RenameDef rn(phi, domtree, true, this);
-    rn.perform();
-}
 
-
-//irit: for local used.
-void MDSSAMgr::recomputeDefForRHS(IR const* stmt, IRIter & it, OptCtx const& oc)
-{
-    it.clean();
-    ASSERT0(stmt && stmt->is_stmt() && stmt->getBB());
-    IRBB * start_bb = stmt->getBB();
-    IR * prev_stmt = start_bb->getPrevIR(stmt);
-    for (IR * e = iterExpInit(stmt, it);
-         e != nullptr; e = iterExpNext(it, true)) {
-        if (MDSSAMgr::hasMDSSAInfo(e)) {
-            findAndSetLiveInDef(e, prev_stmt, start_bb, oc);
-        }
-    }
-}
-
-
-void MDSSAMgr::recomputeDefForOpnd(MDPhi const* phi, OptCtx const& oc)
-{
-    UINT idx = 0;
-    ASSERT0(phi->getBB());
-    Vertex const* vex = phi->getBB()->getVex();
-    ASSERT0(vex);
-    AdjVertexIter itv;
-    ASSERT0(oc.is_dom_valid());
-    for (xcom::Vertex const* in = Graph::get_first_in_vertex(vex, itv);
-         in != nullptr; in = Graph::get_next_in_vertex(itv), idx++) {
-        IR * opnd = phi->getOpnd(idx);
-        ASSERT0(opnd->is_leaf());
-        findAndSetLiveInDef(opnd, m_cfg->getBB(in->id()), oc);
-    }
-}
-
-
-void MDSSAMgr::recomputeDefForOpnd(MDPhiList const* philist, OptCtx const& oc)
-{
-    ASSERT0(philist);
-    ASSERT0(oc.is_dom_valid());
-    for (MDPhiListIter it = philist->get_head();
-         it != philist->end(); it = philist->get_next(it)) {
-        MDPhi * phi = it->val();
-        ASSERT0(phi && phi->is_phi());
-        recomputeDefForOpnd(phi, oc);
-    }
-}
-
-
-void MDSSAMgr::recomputeDefDefAndDefUseChain(
-    MDPhiList const* philist, xcom::DomTree const& domtree)
-{
-    for (MDPhiListIter it = philist->get_head();
-         it != philist->end(); it = philist->get_next(it)) {
-        MDPhi * phi = it->val();
-        ASSERT0(phi && phi->is_phi());
-        recomputeDefDefAndDefUseChain(phi, domtree);
-   }
-}
-
-
-void MDSSAMgr::recomputeDefDefAndDefUseChain(
-    xcom::List<IR*> const& irlist, xcom::DomTree const& domtree,
-    OptCtx const& oc)
-{
-    xcom::List<IR*>::Iter it;
-    for (IR * stmt = irlist.get_head(&it);
-         stmt != nullptr; stmt = irlist.get_next(&it)) {
-        ASSERT0(getMDSSAInfoIfAny(stmt));
-        recomputeDefDefAndDefUseChain(stmt, domtree, oc);
-    }
-}
-
-
-void MDSSAMgr::recomputeDefDefAndDefUseChain(
-    MOD IR * stmt, xcom::DomTree const& domtree, OptCtx const& oc)
-{
-    ASSERT0(stmt && stmt->is_stmt() && hasMDSSAInfo(stmt));
-    MDSSAUpdateCtx ssactx(oc);
-    if (getMDSSAInfoIfAny(stmt) != nullptr) {
-        //There is no MDSSAInfo if 'stmt' is just generated.
-        //Remove old MDSSAInfo, cutoff DefDef chain and DefUse chain before
-        //recomputation.
-        removeStmtMDSSAInfo(stmt, ssactx);
-    }
-    //Generate new MDSSAInfo according to stmt's memory reference.
-    MDSSAInfo const* info = genMDSSAInfoAndNewVesionVMD(stmt);
-    ASSERT0_DUMMYUSE(info);
-
-    //MDSSAInfo may be empty if CALL does not have any MustRef and MayRef.
-    //ASSERT0(info->readVOpndSet().get_elem_count() > 0);
-    //Perform renaming according to the new versioned VMD.
-    //Note the original USE of origin VMD may not be reached by this renaming
-    //because 'stmt' may have been moved a BB that does not dominate origin
-    //USE any more. And the origin USE's DefUse chain will be revised during
-    //InsertPreheaderMgr::reviseSSADU().
-    RenameDef rn(stmt, domtree, true, this);
-    rn.perform();
-}
 
 
 //Return true if there is at least one USE 'vmd' has been placed in given

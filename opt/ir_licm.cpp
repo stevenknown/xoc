@@ -39,7 +39,7 @@ namespace xoc {
 static void dumpAnaCtx(LICM * licm, LICMAnaCtx const& ctx)
 {
     Region const* rg = licm->getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return; }
     class Dump : public xoc::DumpToBuf {
     public:
         LICMAnaCtx const* ctx;
@@ -302,7 +302,9 @@ bool MoveStmtBetweenBB::moveDependentStmtInBB(
 void MoveStmtBetweenBB::dumpMovedIR(IR const* ir, IRBB const* from,
                                     IRBB const* to) const
 {
-    if (ir == nullptr || !m_rg->isLogMgrInit()) { return; }
+    if (ir == nullptr || !m_rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) {
+        return;
+    }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     xcom::StrBuf buf(32);
@@ -449,6 +451,7 @@ class InsertPreheaderMgr {
     IRCFG * m_cfg;
     LICM * m_licm;
     RCE const* m_rce;
+    ActMgr * m_am;
     LICMAnaCtx const& m_anactx;
     InsertGuardHelper m_gdhelp;
 private:
@@ -478,9 +481,9 @@ private:
     void updateDomTree(DomTree & domtree);
 public:
     InsertPreheaderMgr(Region * rg, OptCtx * oc, LICM * licm, RCE const* rce,
-                       LICMAnaCtx const& anactx) :
+                       LICMAnaCtx const& anactx, ActMgr * am) :
         m_rg(rg), m_oc(oc), m_preheader(nullptr), m_licm(licm),
-        m_rce(rce), m_anactx(anactx), m_gdhelp(rg, oc)
+        m_rce(rce), m_am(am), m_anactx(anactx), m_gdhelp(rg, oc, am)
     {
         m_mdssamgr = m_rg->getMDSSAMgr();
         m_cfg = m_rg->getCFG();
@@ -490,6 +493,7 @@ public:
     LICM * getLICM() const { return m_licm; }
     IRBB * getPreheader() const { return m_preheader; }
     InsertGuardHelper const& getInsertGuardHelper() const { return m_gdhelp; }
+    ActMgr * getActMgr() const { return m_am; }
 
     bool needComplicatedGuard() const
     { return m_gdhelp.needComplicatedGuard(m_li); }
@@ -637,10 +641,10 @@ void InsertPreheaderMgr::updateMDSSADUForExpInBB(IRBB const* bb)
     BBIRListIter it;
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
     IR * prev = nullptr;
+    RenameExp rne(m_mdssamgr, m_oc, nullptr);
     for (IR * ir = irlst.get_head(&it); ir != nullptr;
          prev = ir, ir = irlst.get_next(&it)) {
-        RenameExp rne(ir, prev, bb, m_mdssamgr, m_oc);
-        rne.perform();
+        rne.rename(ir, prev, bb);
     }
 }
 
@@ -808,8 +812,10 @@ void InsertPreheaderMgr::updateMDSSADUForLoopHeadPhi(HoistCtx const& ctx)
     IRBB * loophead = m_li->getLoopHead();
     MDPhiList const* philist = m_mdssamgr->getPhiList(loophead);
     if (philist == nullptr) { return; }
-    m_mdssamgr->recomputeDefDefAndDefUseChain(philist, *ctx.domtree);
-    m_mdssamgr->recomputeDefForOpnd(philist, *m_oc);
+    RecomputeDefDefAndDefUseChain recomp(
+        *ctx.domtree, m_mdssamgr, *m_oc, getActMgr());
+    recomp.recompute(philist);
+    recomp.recomputeDefForPhiOpnd(philist);
 }
 
 
@@ -1596,7 +1602,7 @@ bool LICM::analysisInvariantOp(OUT LICMAnaCtx & anactx)
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
 bool LICM::hoistDefByPRSSA(LICMAnaCtx const& anactx, IR const* exp,
-                           OUT IRBB * prehead, MOD HoistCtx & ctx) const
+                           OUT IRBB * prehead, MOD HoistCtx & ctx)
 {
     SSAInfo * info = exp->getSSAInfo();
     ASSERTN(info, ("miss PRSSAInfo"));
@@ -1620,7 +1626,7 @@ bool LICM::hoistDefByPRSSA(LICMAnaCtx const& anactx, IR const* exp,
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
 bool LICM::hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
-                               OUT IRBB * prehead, MOD HoistCtx & ctx) const
+                               OUT IRBB * prehead, MOD HoistCtx & ctx)
 {
     ASSERTN(m_rg->getDUMgr(), ("valid DUChain need DUMgr"));
     DUSet const* defset = exp->readDUSet();
@@ -1660,7 +1666,7 @@ bool LICM::hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
 //Note some DEF that has been hoisted by this function is recorded in 'ctx'
 //even not all of DEF hoisted totally.
 bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
-                           OUT IRBB * prehead, MOD HoistCtx & ctx) const
+                           OUT IRBB * prehead, MOD HoistCtx & ctx)
 {
     MDSSAInfo * info = m_mdssamgr->getMDSSAInfoIfAny(exp);
     ASSERTN(info, ("def stmt even not in MDSSA system"));
@@ -1722,7 +1728,7 @@ bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
 bool LICM::hoistDefByDUChain(LICMAnaCtx const& anactx, IR const* exp,
-                             OUT IRBB * prehead, MOD HoistCtx & ctx) const
+                             OUT IRBB * prehead, MOD HoistCtx & ctx)
 {
     ASSERT0(exp->is_exp());
     if (!exp->isMemOpnd()) { return true; }
@@ -1765,7 +1771,7 @@ void LICM::moveStmtToPreheader(
 //Return true if all dependent stmts have been hoisted outside of loop.
 bool LICM::tryHoistDependentStmt(
     LICMAnaCtx const& anactx, MOD IR * stmt, MOD IRBB * prehead,
-    OUT HoistCtx & ctx) const
+    OUT HoistCtx & ctx)
 {
     //cand is store-value and the result memory object is ID|PR.
     //NOTE: If we hoist entire stmt out from loop,
@@ -1810,15 +1816,16 @@ bool LICM::tryHoistDependentStmt(
 }
 
 
-void LICM::updateMDSSADUForStmtInLoopBody(
-    MOD IR * stmt, HoistCtx const& ctx) const
+void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx)
 {
     if (!useMDSSADU()) { return; }
     ASSERT0(ctx.oc->is_dom_valid());
     if (MDSSAMgr::hasMDSSAInfo(stmt)) {
         //Firstly, right after stmt has been moved, update the stmt's MDSSAInfo
         //which include DefDef chain and DefUse chain.
-        m_mdssamgr->recomputeDefDefAndDefUseChain(stmt, *ctx.domtree, *ctx.oc);
+        RecomputeDefDefAndDefUseChain recomp(
+            *ctx.domtree, m_mdssamgr, *ctx.oc, &getActMgr());
+        recomp.recompute(stmt);
     }
     //Sencondly, update the DefUse chain of each expressions of stmt.
     //Note the updation will be looking for the correct DEF for each exp of
@@ -1838,7 +1845,7 @@ void LICM::updateMDSSADUForStmtInLoopBody(
 
 //Return true if stmt is successfully moved outside of loop.
 bool LICM::tryHoistStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
-                        MOD IRBB * prehead, OUT HoistCtx & ctx) const
+                        MOD IRBB * prehead, OUT HoistCtx & ctx)
 {
     if (!tryHoistDependentStmt(anactx, stmt, prehead, ctx)) {
         return false;
@@ -1857,7 +1864,7 @@ bool LICM::tryHoistStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
 
 //Return true if any stmt is moved outside from loop.
 bool LICM::tryHoistDefStmt(LICMAnaCtx const& anactx, MOD IR * def,
-                           MOD IRBB * prehead, MOD HoistCtx & ctx) const
+                           MOD IRBB * prehead, MOD HoistCtx & ctx)
 {
     ASSERT0(def->is_stmt());
     if (!anactx.getLI()->isInsideLoop(def->getBB()->id())) {
@@ -2163,7 +2170,8 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
         //hoist candidate.
         return false;
     }
-    InsertPreheaderMgr insertmgr(m_rg, ctx.oc, this, m_rce, anactx);
+    InsertPreheaderMgr insertmgr(m_rg, ctx.oc, this, m_rce,
+                                 anactx, &getActMgr());
     if (insertmgr.needComplicatedGuard()) { return false; }
 
     ASSERT0(ctx.verifyDomTree());

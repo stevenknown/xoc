@@ -167,9 +167,9 @@ public:
     void setInvalidIfDUMgrLiveChanged()
     {
         setInvalidPass(PASS_EXPR_TAB);
-        OC_is_live_expr_valid(*this) = false;
-        OC_is_reach_def_valid(*this) = false;
-        OC_is_avail_reach_def_valid(*this) = false;
+        setInvalidPass(PASS_LIVE_EXPR);
+        setInvalidPass(PASS_REACH_DEF);
+        setInvalidPass(PASS_AVAIL_REACH_DEF);
     }
 
     //The function will invalidate flags which may be affected when control

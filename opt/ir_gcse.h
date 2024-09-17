@@ -75,8 +75,8 @@ public:
 
 
 class GCSE : public Pass {
-    friend class PropVNVisit;
-    friend class PropExpVisit;
+    friend class PropVNVisitFunc;
+    friend class PropExpVisitFunc;
 private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.

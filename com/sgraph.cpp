@@ -62,30 +62,48 @@ void VexTab::dump(FILE * h) const
 //
 //START Vertex
 //
-UINT Vertex::getInDegree() const
-{
-    return xcom::cnt_list(VERTEX_in_list(this));
-}
-
-
-UINT Vertex::getOutDegree() const
-{
-    return xcom::cnt_list(VERTEX_out_list(this));
-}
-
-
 //Return the vertex that is the from-vertex of Nth in-edge.
 //n: the index of vertex, start from 0.
 Vertex * Vertex::getNthInVertex(UINT n) const
 {
     UINT i = 0;
     EdgeC const* ec = getInList();
-    for (; i < n && ec != nullptr; ec = ec->get_next(), i++) {
-    }
-    if (ec != nullptr) {
-        return ec->getFrom();
-    }
-    return nullptr;
+    for (; i < n && ec != nullptr; ec = ec->get_next(), i++) {}
+    return ec != nullptr ? ec->getFrom() : nullptr;
+}
+
+
+Vertex * Vertex::getNextFromVex(VexIter * it) const
+{
+    ASSERT0(it && xcom::in_list(getInList(), *it));
+    if (*it == nullptr) { return nullptr; }
+    *it = (*it)->get_next();
+    return (*it) != nullptr ? (*it)->getFrom() : nullptr;
+}
+
+
+Vertex * Vertex::getFirstToVex(OUT VexIter * it) const
+{
+    ASSERT0(it);
+    *it = getOutList();
+    return (*it) != nullptr ? (*it)->getTo() : nullptr;
+}
+
+
+Vertex * Vertex::getFirstFromVex(OUT VexIter * it) const
+{
+    ASSERT0(it);
+    *it = getInList();
+    return (*it) != nullptr ? (*it)->getFrom() : nullptr;
+}
+
+
+Vertex * Vertex::getNextToVex(OUT VexIter * it) const
+{
+    ASSERT0(it && xcom::in_list(getOutList(), *it));
+    if (*it == nullptr) { return nullptr; }
+    *it = (*it)->get_next();
+    return (*it) != nullptr ? (*it)->getTo() : nullptr;
 }
 
 
@@ -95,12 +113,8 @@ Vertex * Vertex::getNthOutVertex(UINT n) const
 {
     UINT i = 0;
     EdgeC const* ec = getOutList();
-    for (; i < n && ec != nullptr; ec = ec->get_next(), i++) {
-    }
-    if (ec != nullptr) {
-        return ec->getTo();
-    }
-    return nullptr;
+    for (; i < n && ec != nullptr; ec = ec->get_next(), i++) {}
+    return ec != nullptr ? ec->getTo() : nullptr;
 }
 //END Vertex
 

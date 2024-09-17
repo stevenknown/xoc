@@ -49,6 +49,9 @@ public:
 class RCE : public Pass {
     COPY_CONSTRUCTOR(RCE);
 protected:
+    //Use GVN info to determine if code is redundant.
+    //Note that compute GVN is expensive.
+    bool m_use_gvn;
     IRCFG * m_cfg;
     GVN * m_gvn;
     DUMgr * m_du;
@@ -56,9 +59,7 @@ protected:
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     Refine * m_refine;
-    //Use GVN info to determine if code is redundant.
-    //Note that compute GVN is expensive.
-    bool m_use_gvn;
+    ActMgr m_am;
 private:
     IR * processTruebr(IR * ir, IR * new_det, bool must_true,
                        bool must_false, bool changed, MOD RCECtx & ctx);
@@ -75,7 +76,7 @@ private:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    RCE(Region * rg, GVN * gvn) : Pass(rg)
+    RCE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
     {
         ASSERT0(rg != nullptr);
         m_gvn = gvn;
@@ -100,9 +101,9 @@ public:
     //If 'ir' is always true, set 'must_true', or if it is
     //always false, set 'must_false'.
     //Return the changed ir.
-    IR * calcCondMustVal(MOD IR * ir, OUT bool & must_true,
-                         OUT bool & must_false, OUT bool & changed,
-                         MOD OptCtx & oc);
+    IR * calcCondMustVal(
+        MOD IR * ir, OUT bool & must_true, OUT bool & must_false,
+        OUT bool & changed, MOD OptCtx & oc);
 
     virtual bool dump() const { return true; }
 
@@ -111,6 +112,7 @@ public:
     PASS_TYPE getPassType() const { return PASS_RCE; }
     GVN * getGVN() const { return m_gvn; }
     IRCFG * getCFG() const { return m_cfg; }
+    ActMgr & getActMgr() { return m_am; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 

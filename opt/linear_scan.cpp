@@ -601,30 +601,36 @@ bool PosAttrLifeTimeProc::processAttrLTExtendBBEnd(BBPos const& pos,
 //END PosAttrLifeTimeProc
 
 
-//
-//START OccRecorder
-//
-class OccRecorder : public VisitIRTree {
-    COPY_CONSTRUCTOR(OccRecorder);
+class OccRecorderVF {
     BackwardJumpAnalysis * m_ana;
-    Pos m_pos;
-protected:
-    virtual bool visitIR(IR const* ir) override
+public:
+    Pos pos;
+public:
+    OccRecorderVF(BackwardJumpAnalysis * ana) : m_ana(ana) {}
+    bool visitIR(IR const* ir, OUT bool & is_term)
     {
-        if (ir->is_pr() || (ir->is_stpr())) {
-            m_ana->recordOccurenceForPR(ir->getPrno(), m_pos);
+        if (ir->is_pr() || ir->is_stpr()) {
+            m_ana->recordOccurenceForPR(ir->getPrno(), pos);
         }
         return true;
     }
+};
+
+
+//
+//START OccRecorder
+//
+class OccRecorder : public VisitIRTree<OccRecorderVF> {
+    COPY_CONSTRUCTOR(OccRecorder);
 public:
-    OccRecorder(IR const* ir, Pos pos, BackwardJumpAnalysis * ana) :
-        m_ana(ana), m_pos(pos)
+    OccRecorder(IR const* ir, OccRecorderVF & vf) : VisitIRTree(vf)
     {
         ASSERT0(ir);
         visit(ir);
     }
 };
 //END OccRecorder
+
 
 //
 //START BackwardJumpAnalysisResMgr
@@ -814,9 +820,11 @@ void BackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb, MOD Pos & pos)
     if (irlst.is_empty()) { return; }
     BBIRListIter bbirit;
     m_bb_entry_pos.set(bb->id(), pos + 1);
+    OccRecorderVF vf(this); 
     for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
          ir = irlst.get_next(&bbirit)) {
-        OccRecorder occurence_recorder(ir, ++pos, this);
+        vf.pos = ++pos;
+        OccRecorder occurence_recorder(ir, vf);
     }
     m_bb_exit_pos.set(bb->id(), pos);
 }

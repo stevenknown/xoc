@@ -255,9 +255,8 @@ void LivenessMgr::processMay(IR const* pr, MOD PRLiveSet * gen,
 }
 
 
-void LivenessMgr::processOpnd(IR const* ir, ConstIRIter & it,
-                              MOD PRLiveSet * use,
-                              MOD PRLiveSet * gen)
+void LivenessMgr::processOpnd(
+    IR const* ir, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     for (IR const* k = iterInitC(ir, it); k != nullptr; k = iterNextC(it)) {
         if (k->isReadPR()) {
@@ -268,9 +267,8 @@ void LivenessMgr::processOpnd(IR const* ir, ConstIRIter & it,
 }
 
 
-void LivenessMgr::processPHI(IR const* x, ConstIRIter & it,
-                             MOD PRLiveSet * use,
-                             MOD PRLiveSet * gen)
+void LivenessMgr::processPHI(
+    IR const* x, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)PHI_prno(x), m_sbs_mgr);
     use->diff((BSIdx)PHI_prno(x), m_sbs_mgr);
@@ -281,9 +279,8 @@ void LivenessMgr::processPHI(IR const* x, ConstIRIter & it,
 }
 
 
-void LivenessMgr::processSTPR(IR const* x, ConstIRIter & it,
-                              MOD PRLiveSet * use,
-                              MOD PRLiveSet * gen)
+void LivenessMgr::processSTPR(
+    IR const* x, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)STPR_no(x), m_sbs_mgr);
     use->diff((BSIdx)STPR_no(x), m_sbs_mgr);
@@ -294,9 +291,8 @@ void LivenessMgr::processSTPR(IR const* x, ConstIRIter & it,
 }
 
 
-void LivenessMgr::processSETELEM(IR const* x, ConstIRIter & it,
-                                 MOD PRLiveSet * use,
-                                 MOD PRLiveSet * gen)
+void LivenessMgr::processSETELEM(
+    IR const* x, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)GETELEM_prno(x), m_sbs_mgr);
     use->diff((BSIdx)GETELEM_prno(x), m_sbs_mgr);
@@ -310,9 +306,8 @@ void LivenessMgr::processSETELEM(IR const* x, ConstIRIter & it,
 }
 
 
-void LivenessMgr::processGETELEM(IR const* x, ConstIRIter & it,
-                                 MOD PRLiveSet * use,
-                                 MOD PRLiveSet * gen)
+void LivenessMgr::processGETELEM(
+    IR const* x, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     gen->bunion((BSIdx)SETELEM_prno(x), m_sbs_mgr);
     use->diff((BSIdx)SETELEM_prno(x), m_sbs_mgr);
@@ -329,9 +324,8 @@ void LivenessMgr::processGETELEM(IR const* x, ConstIRIter & it,
 }
 
 
-void LivenessMgr::processCallStmt(IR const* x, ConstIRIter & it,
-                                  MOD PRLiveSet * use,
-                                  MOD PRLiveSet * gen)
+void LivenessMgr::processCallStmt(
+    IR const* x, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     if (x->hasReturnValue()) {
         gen->bunion((BSIdx)CALL_prno(x), m_sbs_mgr);
@@ -349,9 +343,8 @@ void LivenessMgr::processCallStmt(IR const* x, ConstIRIter & it,
 }
 
 
-void LivenessMgr::computeExp(IR const* stmt, ConstIRIter & it,
-                             MOD PRLiveSet * use,
-                             MOD PRLiveSet * gen)
+void LivenessMgr::computeExp(
+    IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     ASSERT0(stmt->is_stmt());
     it.clean();
@@ -365,9 +358,8 @@ void LivenessMgr::computeExp(IR const* stmt, ConstIRIter & it,
 }
 
 
-void LivenessMgr::computeStmt(IR const* stmt, ConstIRIter & it,
-                              MOD PRLiveSet * use,
-                              MOD PRLiveSet * gen)
+void LivenessMgr::computeStmt(
+    IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use, MOD PRLiveSet * gen)
 {
     ASSERT0(stmt->is_stmt());
     if (stmt->isWritePR() || stmt->isCallStmt() || stmt->is_region()) {

@@ -319,8 +319,8 @@ void InsertGuardHelper::updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,
 
 
 //Note DOM info must be valid.
-void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(IR * ir,
-                                                     DomTree const& domtree)
+void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(
+    IR * ir, DomTree const& domtree)
 {
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(m_guard_end && m_guard_start && m_guarded_bb);
@@ -333,17 +333,19 @@ void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(IR * ir,
     UINT numpred = m_guard_end->getNumOfPred();
     VOpndSetIter it = nullptr;
     MDID2PhiMap mdid2phi(m_guard_end, *this);
+    RecomputeDefDefAndDefUseChain recomp(
+        domtree, m_mdssa, *m_oc, getActMgr());
     for (BSIdx i = mdssainfo->readVOpndSet().get_first(&it);
         i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &it)) {
         VMD * vmd = m_mdssa->getVMD(i);
         ASSERT0(vmd && vmd->is_md());
         MDPhi * phi = mdid2phi.get(vmd->mdid());
         if (phi == nullptr) {
-            phi = m_mdssa->insertPhiWithNewVersion(vmd->mdid(),
-                                                   m_guard_end, numpred);
+            phi = m_mdssa->insertPhiWithNewVersion(
+                vmd->mdid(), m_guard_end, numpred);
         }
-        m_mdssa->recomputeDefDefAndDefUseChain(phi, domtree);
-        m_mdssa->recomputeDefForOpnd(phi, *getOptCtx());
+        recomp.recompute(phi);
+        recomp.recomputeDefForPhiOpnd(phi);
     }
 }
 

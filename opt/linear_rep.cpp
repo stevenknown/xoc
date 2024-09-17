@@ -102,32 +102,6 @@ void LinearRep::dump(Region const* rg) const
 //END LinearRep
 
 
-class FindUniqueRef : public VisitIRTree {
-    UINT m_ref_cnt;
-    IR const* m_ref;
-protected:
-    virtual bool visitIR(IR const* ir) override
-    {
-        if (ir == m_ref) {
-            m_ref_cnt++;
-        }
-        if (m_ref_cnt > 1) {
-            setTerminate();
-            return false;
-        }
-        return true;
-    }
-public:
-    FindUniqueRef(IR const* ir, IR const* ref)
-    {
-        m_ref_cnt = 0;
-        m_ref = ref;
-        visit(ir);
-    }
-    UINT getRefCount() const { return m_ref_cnt; }
-};
-
-
 //
 //START LinearRepMgr
 //
