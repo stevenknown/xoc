@@ -62,19 +62,25 @@ protected:
     Rational::FType _gcd(FType x, FType y);
 public:
     Rational();
-    Rational(Rational const& r);
     Rational(INT num, INT den = 1);
-    Rational & operator = (Rational const& a);
-    INT typecast2int() { return m_num / m_den; }
-    bool is_int() { return m_den == 1; }
-    void reduce();
+
     Rational abs();
-    FType num() const { return m_num; }
-    FType & num() { return m_num; }
+
     FType den() const { return m_den; }
     FType & den() { return m_den; }
     CHAR const* dump(StrBuf & buf) const;
     void dump() const;
+
+    FType num() const { return m_num; }
+    FType & num() { return m_num; }
+
+    bool is_int() { return m_den == 1; }
+
+    void reduce();
+
+    INT typecast2int() { return m_num / m_den; }
+
+    bool verify() const;
 };
 
 

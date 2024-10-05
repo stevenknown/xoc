@@ -33,7 +33,8 @@ typedef UINT64 IRDescFlagSeg;
 class IR;
 class IRBB;
 class DumpFlag;
-class IRDumpCtx;
+class IRDumpAttrBaseFunc;
+template <class DF = IRDumpAttrBaseFunc> class IRDumpCtx;
 
 #define NO_DUMP_FUNC nullptr
 #define NO_VERIFY_FUNC nullptr
@@ -51,7 +52,8 @@ class IRDumpCtx;
 #define NO_ACC_SS_FUNC nullptr
 #define NO_ACC_RESLIST_FUNC nullptr
 
-typedef void(*IRDumpFuncType)(IR const* ir, Region const* rg, IRDumpCtx & ctx);
+typedef void(*IRDumpFuncType)(IR const* ir, Region const* rg,
+                              IRDumpCtx<> & ctx);
 typedef bool(*IRVerifyFuncType)(IR const* ir, Region const* rg);
 typedef IR *& (*IRAccRHSFuncType)(IR * t);
 typedef Var *& (*IRAccIdinfoFuncType)(IR * ir);

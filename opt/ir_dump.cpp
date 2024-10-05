@@ -43,6 +43,17 @@ void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
 
 
 //Dump IR, and both its kids and siblings.
+void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx)
+{
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "");
+    for (; ir_list != nullptr; ir_list = ir_list->get_next()) {
+        dumpIR(ir_list, rg, ctx);
+    }
+}
+
+
+//Dump IR, and both its kids and siblings.
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
                 DumpFlag dumpflag)
 {
@@ -121,14 +132,17 @@ static void dumpAbstractIdinfo(IR const* ir, Region const* rg)
 }
 
 
-void dumpAllKids(IR const* ir, Region const* rg, UINT dn, DumpFlag dumpflag)
+void dumpAllKids(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     LogMgr * lm = rg->getLogMgr();
+    UINT dn = ctx.dn;
     lm->incIndent(dn);
+    IRDumpCtx<> lctx(ctx);
+    lctx.attr = nullptr;
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
         if (k == nullptr) { continue; }
-        dumpIRList(k, rg, nullptr, dumpflag);
+        dumpIRList(k, rg, lctx);
     }
     lm->decIndent(dn);
 }
@@ -361,7 +375,7 @@ static void dumpAttachInfo(OUT xcom::StrBuf & buf, IR const* ir,
 }
 
 
-void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_inner_region = ctx.dumpflag.have(IR_DUMP_INNER_REGION);
@@ -390,7 +404,7 @@ void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -445,7 +459,7 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCase(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCase(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     LogMgr * lm = rg->getLogMgr();
@@ -465,7 +479,7 @@ void dumpCase(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -499,7 +513,7 @@ void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -525,7 +539,7 @@ void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -553,7 +567,7 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     LabelInfo const* li = LAB_lab(ir);
@@ -599,7 +613,7 @@ void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -639,7 +653,7 @@ void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -665,7 +679,7 @@ void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -690,7 +704,7 @@ void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpIf(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpIf(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -722,7 +736,7 @@ void dumpIf(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -737,12 +751,12 @@ void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     StrBuf buf(64);
@@ -755,7 +769,7 @@ void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -774,12 +788,12 @@ void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpGeneralNoType(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpGeneralNoType(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -794,11 +808,11 @@ void dumpGeneralNoType(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
-void dumpBranch(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpBranch(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -809,12 +823,12 @@ void dumpBranch(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpUndef(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpUndef(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     note(rg, "%s!", IRNAME(ir));
@@ -824,7 +838,7 @@ void dumpUndef(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -878,7 +892,7 @@ void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -891,12 +905,12 @@ void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -957,7 +971,7 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpLda(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpLda(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -976,12 +990,12 @@ void dumpLda(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpReturn(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpReturn(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -990,12 +1004,12 @@ void dumpReturn(IR const* ir, Region const* rg, IRDumpCtx & ctx)
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
     if (dump_kid) {
-        dumpAllKids(ir, rg, ctx.dn, ctx.dumpflag);
+        dumpAllKids(ir, rg, ctx);
     }
 }
 
 
-void dumpConst(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpConst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     note(rg, "");
@@ -1089,21 +1103,31 @@ void dumpIRCombine(IR const* ir, Region const* rg)
 }
 
 
-//Dump IR and all of its kids.
-//'attr': miscellaneous string which following 'ir'.
 void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
 {
-    bool dump_src_line = dumpflag.have(IR_DUMP_SRC_LINE);
-    bool dump_newline = !dumpflag.have(IR_DUMP_NO_NEWLINE);
+    UINT dn = 4; //default indent number.
+    IRDumpCtx<> ctx(dn, dumpflag, attr);
+    dumpIR(ir, rg, ctx);
+}
+
+
+//Dump IR and all of its kids.
+//'attr': miscellaneous string which following 'ir'.
+void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
+{
+    bool dump_src_line = ctx.dumpflag.have(IR_DUMP_SRC_LINE);
+    bool dump_newline = !ctx.dumpflag.have(IR_DUMP_NO_NEWLINE);
     LogMgr * lm = rg->getLogMgr();
-    UINT dn = 4;
     if (!rg->isLogMgrInit() || ir == nullptr) { return; }
-    xcom::StrBuf lattr(32);
-    if (attr != nullptr) {
-        lattr.strcat("%s", attr);
+    xcom::StrBuf lattr(10);
+    if (ctx.attr != nullptr) {
+        lattr.strcat("%s", ctx.attr);
     }
-    dumpAttr(lattr, ir, dumpflag);
-    dumpAttachInfo(lattr, ir, rg, dumpflag);
+    dumpAttr(lattr, ir, ctx.dumpflag);
+    if (ctx.dump_attr_func != nullptr) {
+        ctx.dump_attr_func->dumpAttr(lattr, rg, ir, ctx.dumpflag);
+    }
+    dumpAttachInfo(lattr, ir, rg, ctx.dumpflag);
 
     //Record type info and var decl.
     if (rg->getDbxMgr() != nullptr && dump_src_line) {
@@ -1117,11 +1141,9 @@ void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
     }
     IRDumpFuncType dumpfunc = IRDES_dumpfunc(ir->getCode());
     ASSERT0(dumpfunc);
-    IRDumpCtx ctx;
-    ctx.dn = dn;
-    ctx.dumpflag = dumpflag;
-    ctx.attr = lattr.getBuf();
-    (*dumpfunc)(ir, rg, ctx);
+    IRDumpCtx<> lctx(ctx);
+    lctx.attr = lattr.getBuf();
+    (*dumpfunc)(ir, rg, lctx);
 }
 
 
@@ -1146,7 +1168,7 @@ CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
 }
 
 
-void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -1169,7 +1191,7 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -1189,7 +1211,7 @@ void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -1212,7 +1234,7 @@ void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -1232,7 +1254,7 @@ void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);

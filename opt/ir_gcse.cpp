@@ -36,11 +36,11 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class VF {
+class VFSideEff {
 public:
     bool has_sideeffect;
 public:
-    VF() : has_sideeffect(false) {}
+    VFSideEff() : has_sideeffect(false) {}
     bool visitIR(IR const* ir, OUT bool & is_terminate)
     {
         if (ir->isMayThrow(false) || ir->hasSideEffect(false) ||
@@ -53,9 +53,10 @@ public:
 };
 
 
-class IterSideEffect : public VisitIRTree<VF> {
+class IterSideEffect : public VisitIRTree<VFSideEff> {
 public:
-    IterSideEffect(IR const* ir, VF & vf) : VisitIRTree(vf) { visit(ir); }
+    IterSideEffect(IR const* ir, VFSideEff & vf)
+        : VisitIRTree(vf) { visit(ir); }
 };
 
 
@@ -485,7 +486,7 @@ bool GCSE::doPropExpInDomTreeOrder(xcom::DomTree const& domtree)
 
 bool GCSE::hasSideEffect(IR const* ir) const
 {
-    VF vf;
+    VFSideEff vf;
     IterSideEffect it(ir, vf);
     return vf.has_sideeffect;
 }

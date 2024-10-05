@@ -182,15 +182,16 @@ void MCDwarfMgr::setSpecialTagLabel(LabelInfo * label, MCSymbol * mc_symbol_ptr)
 void MCDwarfMgr::setStackSlotAlignment(Region const* region)
 {
     ASSERT0(region);
-    TargInfoMgr * targ_info_mgr = region->getRegionMgr()->getTargInfoMgr();
-    ASSERT0(targ_info_mgr);
+    TargInfo * targ_info = region->getTargInfo();
+    ASSERT0(targ_info);
+    UINT slotbytesize = targ_info->getCalleeSaveStackSlotSize();
 
     //Some architectural stacks are rising,
     //and currently, the coverage ignores the current line.
     m_stack_slot_alignment =
-        targ_info_mgr->isStackGrowthDownward() ? //GCOVR_EXCL_LINE
-        targ_info_mgr->getCalleeSaveStackSlotSize() : //GCOVR_EXCL_LINE
-        -(INT)targ_info_mgr->getCalleeSaveStackSlotSize();
+        targ_info->isStackGrowthDownward() ? //GCOVR_EXCL_LINE
+        slotbytesize : //GCOVR_EXCL_LINE
+        -(INT)slotbytesize;
 }
 
 

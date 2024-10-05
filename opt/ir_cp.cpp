@@ -61,7 +61,7 @@ static void dumpAct(
             xoc::dumpIR(def_stmt, rg, nullptr,
                         DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_VAR_DECL));
             rg->getLogMgr()->decIndent(2);
- 
+
             note(getRegion(), "\nWILL REPLACE %s THAT LOCATED IN STMT:",
                  DumpIRName().dump(use));
             rg->getLogMgr()->incIndent(2);

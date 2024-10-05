@@ -30,12 +30,13 @@ ifeq ($(OPEN_COVERAGE),true)
 endif
 
 CFLAGS+=-Wall
-ROOT_DIR=../..
+ROOT_DIR=$(CURDIR)/../..
 COM_DIR=../../com
 OPT_DIR=../../opt
 ELF_DIR=..
 READELF_DIR=.
 READELF_OUTPUT=readelf.exe
+CURFILE=$(CURDIR)/Makefile.readelf
 
 #NOTE SET $TARG BEFORE INCLUDE OTHER MODULES.
 ifeq ($(TARG),)
@@ -48,9 +49,16 @@ ifeq ($(TARG_DIR),)
   TARG_DIR=../dex
 endif
 
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(ELF_DIR)/Makefile.inc")
 include $(ELF_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(COM_DIR)/Makefile.inc")
 include $(COM_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(ROOT_DIR)/Makefile.option")
 include $(ROOT_DIR)/Makefile.option
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(OPT_DIR)/Makefile.inc")
 include $(OPT_DIR)/Makefile.inc
 
 MISC_TARG_MACH_ELF_OBJS+=\
@@ -122,6 +130,10 @@ READELF_OBJS+=\
 readelf.o\
 
 #Display internal variables.
+$(info "TARG:$(TARG)")
+$(info "TARG_DIR:$(TARG_DIR)")
+$(info "CURDIR:$(CURDIR)")
+$(info "ROOT_DIR:$(ROOT_DIR)")
 $(info "CC:$(CC)")
 $(info "INC:$(INC)")
 $(info "CFLAGS:$(CFLAGS)")
@@ -145,7 +157,7 @@ $(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) \
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	cd $(COM_DIR) && make -f Makefile TARG=$(TARG) TARG_DIR="$(TARG_DIR)" \
+	make -C $(COM_DIR) -f Makefile TARG=$(TARG) TARG_DIR="$(TARG_DIR)" \
       DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
 
 %.o:%.cpp

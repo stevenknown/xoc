@@ -721,8 +721,8 @@ public:
     //This function is helper function to faciltate user identify Region.
     bool isRegionName(CHAR const* n) const
     {
-        ASSERTN(getRegionName(), ("Region does not have name"));
-        return strcmp(getRegionName(), n) == 0;
+        ASSERT0(n);
+        return getRegionName() != nullptr && ::strcmp(getRegionName(), n) == 0;
     }
 
     //Return true if Region type is undefined.

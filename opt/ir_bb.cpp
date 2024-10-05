@@ -320,7 +320,8 @@ void IRBB::dumpAttr(Region const* rg) const
 }
 
 
-void IRBB::dumpIRList(Region const* rg, bool dump_inner_region) const
+void IRBB::dumpIRList(Region const* rg, bool dump_inner_region,
+                      MOD IRDumpCtx<> * ctx) const
 {
     note(rg, "\nSTMT NUM:%d", getNumOfIR());
     rg->getLogMgr()->incIndent(3);
@@ -331,6 +332,10 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region) const
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() || ir->is_undef());
+        if (ctx != nullptr) {
+            dumpIR(ir, rg, *ctx);
+            continue;
+        }
         dumpIR(ir, rg, nullptr, f);
     }
     rg->getLogMgr()->decIndent(3);
@@ -357,11 +362,12 @@ void IRBB::dumpDigest(Region const* rg) const
 }
 
 
-void IRBB::dump(Region const* rg, bool dump_inner_region) const
+void IRBB::dump(Region const* rg, bool dump_inner_region,
+                IRDumpCtx<> * ctx) const
 {
     if (!rg->isLogMgrInit()) { return; }
     dumpDigest(rg);
-    dumpIRList(rg, dump_inner_region);
+    dumpIRList(rg, dump_inner_region, ctx);
 }
 
 
@@ -782,7 +788,7 @@ void dumpBBLabel(LabelInfoList & lablist, Region const* rg)
 
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
-                bool dump_inner_region)
+                bool dump_inner_region, IRDumpCtx<> * ctx)
 {
     ASSERT0(filename);
     FileObj fo(filename, true, false);
@@ -793,16 +799,16 @@ void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
 }
 
 
-void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region)
+void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region,
+                IRDumpCtx<> * ctx)
 {
     ASSERT0(rg && bbl);
     if (!rg->isLogMgrInit() || bbl->get_elem_count() == 0) { return; }
-
     note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
     xcom::C<IRBB*> * ct = nullptr;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != nullptr; bb = bbl->get_next(&ct)) {
-        bb->dump(rg, dump_inner_region);
+        bb->dump(rg, dump_inner_region, ctx);
     }
 }
 

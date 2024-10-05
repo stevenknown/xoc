@@ -255,12 +255,14 @@ protected:
     LifeTime const* getInLt(PRNO prno, UINT bbid) const
     {
         PR2LT * tab = getInPR2Lt(bbid);
+        if (tab == nullptr) { return nullptr; }
         ASSERT0(tab);
         return tab->get(prno);
     }
     LifeTime const* getOutLt(PRNO prno, UINT bbid) const
     {
         PR2LT * tab = getOutPR2Lt(bbid);
+        if (tab == nullptr) { return nullptr; }
         ASSERT0(tab);
         return tab->get(prno);
     }
@@ -309,12 +311,22 @@ protected:
     void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const& pair);
     void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
 
-    //Select a possible lifetime derived from an ancester lifetime at a
+    //Select the correct lifetime derived from an ancestor lifetime at a
     //specified position.
-    LifeTime const* selectPossibleLifetime(LifeTime * anct, Pos pos);
+    //antc: the ancestor lifetime.
+    //pos: the specified position used to determine which descendant lifetime
+    //     will be used.
+    //lt: the output lifetime choosed.
+    //return: true if a lifetime is choosed; false if the lifetime is in the
+    //        memory.
+    bool selectLifetimeAtPos(LifeTime * anct, Pos pos, OUT LifeTime const*& lt);
 
     //This function will verify the reorder result.
     bool verifyReorderResult(UINT const* move_info, UINT max_reg_num) const;
+
+    //This function will verify the swap condition.
+    bool verifySwapCondition(PRNO prno1, PRNO prno2, Type const* ty1,
+                             Type const* ty2) const;
 public:
     LTConsistencyMgr(LSRAImpl & impl);
     ~LTConsistencyMgr()
@@ -534,21 +546,15 @@ protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
 
-    //Implement the swap by memory as the temp location.
-    IR * doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
-                     Type const* ty2, IR const* marker, MOD IRBB * bb);
-
-    //Implement the swap by register as the temp location.
-    IR * doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
-                     Type const* ty2, IR const* marker, MOD IRBB * bb);
     //The function assigns lt focibly with given reg.
     void forceAssignRegister(LifeTime const* lt, Reg reg);
 
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
 
-    IR * insertSpillAtEntry(Reg r);
-    void insertReloadAtExit(Reg r, Var * spill_loc);
+    IR * insertSpillAtEntry(PRNO prno, Type const* ty, IRBB * bb);
+    IR * insertSpillCalleeAtEntry(Reg r);
+    void insertReloadCalleeAtExit(Reg r, Var * spill_loc);
     IRListIter insertSpillAtBBEnd(IR * spill, IRBB * bb);
     IRListIter insertReloadAtBB(IR * reload, IRBB * bb, bool start);
     IR * insertReloadAtBB(PRNO prno, Var * spill_loc, Type const* ty,
@@ -577,17 +583,17 @@ public:
     void computeRAPrefer();
     void computeLTPrefer(LifeTime const* lt);
 
-    //This func will check the reload forced is necessary or not first, and
+    //This func will check the force-reload is necessary or not first, and
     //then insert the reload IR for lt before the curir. Normally, it is
     //need to do the force reload operation when the lt and cand are both
-    //livein to the entry of the dstination BB of backward edge.
+    //livein to the entry of the destination BB of backward edge.
     //lt: the lifetime need to be checked and inserted with the reload IR.
     //curpos: the position of current IR using the lt.
     //curir: the IR using the lt.
     //cand: the candidate lifetime that selected by the process of
     //      solveConflict when assigned the register for lt.
-    void checkAndDoReloadForced(LifeTime * lt, Pos curpos, IR const* curir,
-                                LifeTime const* cand);
+    void checkAndDoForceReload(LifeTime * lt, Pos curpos, IR const* curir,
+                               LifeTime const* cand);
 
     void dumpBBList() const;
     void dump() const;
@@ -619,9 +625,6 @@ public:
         splitbb.value = m_pr2split.get(v);
         return splitbb;
     }
-    //Get a temp memory location for temp use.
-    Var * getTempVar(Type const* ty)
-    { ASSERT0(ty);  return m_ra.getSpillLoc(ty); }
 
     void insertRematBefore(IR * remat, IR const* marker);
     void insertRematBefore(PRNO newres, RematCtx const& rematctx,
@@ -640,27 +643,47 @@ public:
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
 
-    //This func shall generate the IRs to swap the data in two registers, if
-    //there is a TMP register reserved on the specific architecture, the
-    //register will be used as the temp space to finish the swap, or else,
-    //memory location on stack willbe adopted to help to complete the data
-    //exchange.
-    //prno1: the first prno for swap data.
-    //prno2: the second prno to swap data.
-    //ty1: the data tyupe of prno1.
-    //ty2: the data tyupe of prno2.
-    //marker: the marker IR used to indicate where to insert the generated IRs.
-    //bb: the BB where IRs will be inserted.
-    //retun value: this func will return the last IR in the new generated IRs,
-    //             it can be used as a new marker if user wants to get the tail
-    //             of new IRs.
-    IR * insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
-                        Type const* ty2, IR const* marker, MOD IRBB * bb);
-
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
     static bool isReloadLikeOp(IR const* ir);
     bool isDomInfoValid() const { return m_is_dominfo_valid; }
+    bool isLTUsedInFakeOp(LifeTime const* lt) const
+    {
+        ASSERT0(lt);
+        OccList & lt_occ_list = const_cast<LifeTime*>(lt)->getOccList();
+        IR * lt_first = lt_occ_list.get_head().getIR();
+        ASSERT0(lt_first);
+        IR * lt_stmt = lt_first->is_stmt() ? lt_first : lt_first->getStmt();
+        ASSERT0(lt_stmt);
+        return getRA().isFakeUseAtLexFirstBBInLoop(lt_stmt);
+    }
+
+    //Return true if the split position of the specified lifetime is before
+    //the fake-use IR at the last BB of loop by lexicographical order.
+    //lt: the lifetime will be split.
+    //split_pos: the split position
+    //e.g: The #S4 is a fake-use IR of $1, it is located at the last BB of
+    //     loop by lexicographical order. The split position is right before
+    //     this fake-use IR #S4 and after the normal IR #S2.
+    //       ----->BB1
+    //      |      $1<-x               #S1
+    //      |      |
+    //      |      V
+    //      |      BB2
+    //      |      |
+    //      |      V
+    //      |      BB3
+    //      |      $4<-mov $1          #S2
+    //      |      |
+    //      |      V
+    //      |      BB4
+    //      |      $6<-$3              #S3     <-- split_pos
+    //      |      [mem]<-fake_use $1  #S4
+    //      |      |
+    //       ------|
+    //             V
+    bool isLtSplitBeforeFakeUseAtLexLastBBInLoop(LifeTime const* lt,
+                                                 Pos split_pos) const;
 
     bool perform(OptCtx & oc);
 
@@ -711,6 +734,14 @@ public:
     //The function split all lifetimes that assigned link register
     //before call-stmt.
     void splitLinkLT(Pos curpos, IR const* ir);
+
+    //This func will select a strategy for the lifetime based on the split
+    //position. If the split position of the specified lifetime is before
+    //the fake-use IR at the last BB of loop by lexicographical order, the
+    //lifetime will be forced to spill, or else it will be split into two
+    //lifetimes.
+    void splitOrSpillLT(LifeTime * t, Pos split_pos, MOD SplitCtx & ctx,
+                        SplitMgr & spltmgr);
 
     void transferActive(Pos curpos);
     void transferInActive(Pos curpos);

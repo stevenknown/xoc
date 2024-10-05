@@ -58,6 +58,17 @@ author: Su Zhenyu
 #include "loop_dep_ana.h"
 #include "multi_res_convert.h"
 
+#ifdef REF_TARGMACH_INFO
+#include "targinfo_mgr.h"
+#include "lifetime.h"
+#include "lt_interf_graph.h"
+#include "linear_scan.h"
+#include "lsra_impl.h"
+#include "lsra_scan_in_pos.h"
+#include "lt_prio_mgr.h"
+#include "lsra_scan_in_prio.h"
+#endif
+
 #ifdef FOR_IP
 #include "ir_vect.h"
 #include "derivative.h"
@@ -67,18 +78,7 @@ author: Su Zhenyu
 #include "ir_vrp.h"
 #include "ir_ccp.h"
 #include "ir_pre.h"
-#endif
-
-#ifdef REF_TARGMACH_INFO
-#include "targinfo_mgr.h"
-#include "lifetime.h"
-#include "lt_interf_graph.h"
 #include "arg_passer.h"
-#include "linear_scan.h"
-#include "lsra_impl.h"
-#include "lsra_scan_in_pos.h"
-#include "lt_prio_mgr.h"
-#include "lsra_scan_in_prio.h"
 #include "gp_adjustment.h"
 #include "prologue_epilogue_inserter.h"
 #include "br_opt.h"
@@ -87,6 +87,7 @@ author: Su Zhenyu
 #include "var2offset.h"
 #include "ir_reloc_mgr.h"
 #include "igoto_opt.h"
+#include "memcheck.h"
 #include "kernel_adjustment.h"
 #endif
 
@@ -101,3 +102,4 @@ author: Su Zhenyu
 #include "infer_type.h"
 #include "insert_cvt.h"
 #include "invert_brtgt.h"
+#include "targ_opt.inc"

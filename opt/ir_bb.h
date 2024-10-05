@@ -349,8 +349,10 @@ public:
     void dumpDigest(Region const* rg) const;
     void dumpLabelList(Region const* rg) const;
     void dumpAttr(Region const* rg) const;
-    void dumpIRList(Region const* rg, bool dump_inner_region) const;
-    void dump(Region const* rg, bool dump_inner_region = false) const;
+    void dumpIRList(Region const* rg, bool dump_inner_region,
+                    MOD IRDumpCtx<> * ctx) const;
+    void dump(Region const* rg, bool dump_inner_region = false,
+              IRDumpCtx<> * ctx = nullptr) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     //The function frees all IR in IRList back into IRMgr.
@@ -632,10 +634,11 @@ public:
 //Exported Functions
 void dumpBBLabel(LabelInfoList & lablist, Region const* rg);
 void dumpBBList(BBList const* bbl, Region const* rg,
-                bool dump_inner_region = true);
+                bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
+
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
-                bool dump_inner_region = true);
+                bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
 
 bool verifyIRandBB(BBList * bbl, Region const* rg);
 

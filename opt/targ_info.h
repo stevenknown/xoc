@@ -81,6 +81,14 @@ public:
 
     //Return byte size of TLB if any.
     virtual UINT getTLBSize() const = 0;
+
+    //Get the callee-saved register stack slot size in bytes
+    //of different architectures.
+    virtual UINT getCalleeSaveStackSlotSize() const = 0;
+
+    //Return true if the stack grows upward, false if it grows downward,
+    //reflecting the behavior across different architectures.
+    virtual bool isStackGrowthDownward() const = 0;
 };
 
 } //namespace xoc

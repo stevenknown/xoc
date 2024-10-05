@@ -36,6 +36,7 @@ author: Su Zhenyu
 #include "../xgen/reg.h"
 #include "../xgen/regfile.h"
 #include "../xgen/targ_interface.h"
+#include "migen.h"
 #include "minst_field.h"
 #include "minst.h"
 #include "minst_desc.h"

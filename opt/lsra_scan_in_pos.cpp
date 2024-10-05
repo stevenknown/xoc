@@ -111,7 +111,7 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     //Verify dedicated PR.
     LifeTime * lt = m_ra.getLT(prno);
     ASSERT0(lt);
-    if (lt->is_dedicated()) {
+    if (lt->isDedicated()) {
         Reg antireg = m_ra.getDedicatedReg(prno);
         ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
         ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
@@ -139,7 +139,7 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         //Verify dedicated PR.
         LifeTime * lt = m_ra.getLT(prno);
         ASSERT0(lt);
-        if (lt->is_dedicated()) {
+        if (lt->isDedicated()) {
             Reg antireg = m_ra.getDedicatedReg(prno);
             ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
             ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));

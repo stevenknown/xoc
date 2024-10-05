@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -51,7 +51,7 @@ void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx & ctx)
 }
 
 
-void dumpVSTPR(IR const* ir, Region const* rg, IRDumpCtx & ctx)
+void dumpVSTPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);

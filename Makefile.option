@@ -4,20 +4,33 @@ ifeq ($(DEBUG),)
   DEBUG=true
 endif
 
+CFLAGS+=-Wno-bool-compare
+
 ifeq ($(DEBUG), true)
   #Add predefined macro if build host is Windows.
   CFLAGS+=-D_DEBUG_
   CFLAGS+=-O0 -g2
-  CFLAGS+=-std=c++11
   CFLAGS+=-MMD #Ask compiler generate dependent files information.
 else
   CFLAGS+=-O2
-  CFLAGS+=-std=c++11
   CFLAGS+=-MMD #Ask compiler generate dependent files information.
 endif
 
 ifeq ($(REF_TARGMACH_INFO),true)
   CFLAGS+=-DREF_TARGMACH_INFO #LSRA use targmach info
+endif
+
+#The code attemps to compile an empty C++ file with the option, and
+#return YES if compilation is successful, otherwise return NO. The return info
+#is record in a makefile variable.
+CC_SUPPORTS_C11 := $(shell echo "" | \
+  $(CC) -std=c++11 -c -x c++ \
+  - > /dev/null 2>&1 && echo YES || echo NO)
+ifeq ($(CC_SUPPORTS_C11),YES)
+  $(info "NOTE:$(CC) SUPPORT C++11")
+  CFLAGS+=-std=c++11
+else
+  $(info "NOTE:$(CC) DOES NOT SUPPORT C++11")
 endif
 
 #The code attemps to compile an empty C++ file with the warning option, and

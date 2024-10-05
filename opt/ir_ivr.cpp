@@ -1775,28 +1775,33 @@ bool IV::isRefIV(IR const* ir) const
 }
 
 
+//In C++, local declared class should NOT be used in template parameters of a
+//template class. Because the template class may be instanced outside the
+//function and the local type in function is invisible.
+class VFRefIR {
+public:
+    IV const* iv;
+    IR const* refiv;
+    VFRefIR() { refiv = nullptr; iv = nullptr; }
+    bool visitIR(IR const* ir, OUT bool & is_term)
+    {
+        if (iv->isRefIV(ir)) {
+            refiv = ir;
+            is_term = true;
+            return false;
+        }
+        return true;
+    }
+};
+
+
 bool IV::isIRTreeRefIV(IR const* ir, OUT IR const** refiv) const
 {
-    class VF {
+    class IterTree : public VisitIRTree<VFRefIR> {
     public:
-        IV const* iv;
-        IR const* refiv;
-        VF() { refiv = nullptr; iv = nullptr; }
-        bool visitIR(IR const* ir, OUT bool & is_term)
-        {
-            if (iv->isRefIV(ir)) {
-                refiv = ir;
-                is_term = true;
-                return false;
-            }
-            return true;
-        }
+        IterTree(VFRefIR & vf) : VisitIRTree(vf) {}
     };
-    class IterTree : public VisitIRTree<VF> {
-    public:
-        IterTree(VF & vf) : VisitIRTree(vf) {}
-    };
-    VF vf;
+    VFRefIR vf;
     vf.iv = this;
     IterTree it(vf);
     it.visit(ir);

@@ -175,17 +175,7 @@ protected:
 
     DefMiscBitSetMgr & getSBSMgr() { return m_sbs_mgr; }
 
-    bool hasSideEffect(IR const* ir) const
-    {
-        ASSERT0(ir);
-        return ir->isMayThrow(false) || ir->hasSideEffect(false) ||
-               ir->isNoMove(false);
-    }
-
     bool initSSAMgr(OptCtx const& oc);
-    bool is_effect_write(Var * v) const
-    { return v->is_global() || v->is_volatile(); }
-    bool is_effect_read(Var * v) const { return v->is_volatile(); }
     void iterCollect(MOD ConstIRList & efflist, MOD DCECtx & dcectx);
     bool iterCollectAndElim(ConstIRList & efflist, OUT DCECtx & dcectx,
                             OUT bool & remove_branch_stmt);
@@ -264,8 +254,18 @@ public:
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
+    bool hasSideEffect(IR const* ir) const
+    {
+        ASSERT0(ir);
+        return ir->isMayThrow(false) || ir->hasSideEffect(false) ||
+               ir->isNoMove(false);
+    }
+
     bool isAggressive() const { return m_is_elim_cfs; }
     bool isCheckMDRef() const { return m_check_md_ref; }
+    bool is_effect_write(Var * v) const
+    { return v->is_global() || v->is_volatile(); }
+    bool is_effect_read(Var * v) const { return v->is_volatile(); }
 
     void setReservePhi(bool reserve) { m_is_reserve_phi = reserve; }
     void setElimCFS(bool doit) { m_is_elim_cfs = doit; }

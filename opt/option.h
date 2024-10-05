@@ -613,6 +613,9 @@ extern bool g_do_relaxation;
 //Perform memory check.
 extern bool g_do_memcheck;
 
+//Perform static memory check.
+extern bool g_do_memcheck_static;
+
 //Adjust kernel.
 extern bool g_adjust_kernel;
 

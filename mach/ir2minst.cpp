@@ -31,12 +31,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace mach {
 
-IR2MInst::IR2MInst(Region * rg, MInstMgr * mgr)
+IR2MInst::IR2MInst(Region * rg, MInstMgr * mgr, elf::ELFMgr * em)
 {
     ASSERT0(rg && mgr);
     m_rg = rg;
     m_mimgr = mgr;
     m_tm = m_rg->getTypeMgr();
+    m_em = em;
 }
 
 

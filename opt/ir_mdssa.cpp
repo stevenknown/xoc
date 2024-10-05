@@ -506,9 +506,10 @@ void RenameDef::dumpRenameVMD(IR const* ir, VMD const* vmd)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf(16);
+    xcom::StrBuf buf1(16);
+    xcom::StrBuf buf2(16);
     am->dump("RenameDef:renaming %s with %s",
-             xoc::dumpIRName(ir, buf), vmd->dump(buf));
+             xoc::dumpIRName(ir, buf1), vmd->dump(buf2));
 }
 
 
@@ -517,9 +518,10 @@ void RenameDef::dumpInsertDDChain(IR const* ir, VMD const* vmd)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf(16);
+    xcom::StrBuf buf1(16);
+    xcom::StrBuf buf2(16);
     am->dump("RenameDef:insert %s into DDChain by access MDSSAInfo of %s",
-             vmd->dump(buf), xoc::dumpIRName(ir, buf));
+             vmd->dump(buf1), xoc::dumpIRName(ir, buf2));
 }
 
 
@@ -539,7 +541,6 @@ void RenameDef::dumpRenamePhi(MDPhi const* phi, UINT opnd_pos)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf(16);
     am->dump("RenameDef:rename MDPhi%u with No.%u operand",
              phi->id(), opnd_pos);
 }
@@ -1070,32 +1071,37 @@ void RecomputeDefDefAndDefUseChain::recompute(MDPhi const* phi)
 }
 
 
+//In C++, local declared class should NOT be used in template parameters of a
+//template class. Because the template class may be instanced outside the
+//function and the local type in function is invisible.
+class VFToRecomp {
+    IR const* m_prev_stmt;
+    IRBB const* m_start_bb;
+    MDSSAMgr * m_mgr;
+    OptCtx const& m_oc;
+public:
+    VFToRecomp(IR const* prev, IRBB const* s, MDSSAMgr * m, OptCtx const& oc)
+        : m_prev_stmt(prev), m_start_bb(s), m_mgr(m), m_oc(oc) {}
+    bool visitIR(MOD IR * ir, OUT bool & is_term)
+    {
+        if (!ir->is_exp() || !MDSSAMgr::hasMDSSAInfo(ir)) { return true; }
+        m_mgr->findAndSetLiveInDef(ir, m_prev_stmt, m_start_bb, m_oc);
+        return true;
+    }
+};
+
+
 //irit: for local used.
 void RecomputeDefDefAndDefUseChain::recomputeDefForRHS(MOD IR * stmt)
 {
-    class VF {
-        IR const* m_prev_stmt;
-        IRBB const* m_start_bb;
-        MDSSAMgr * m_mgr;
-        OptCtx const& m_oc;
+    class IterTree : public VisitIRTree<VFToRecomp> {
     public:
-        VF(IR const* prev, IRBB const* s, MDSSAMgr * m, OptCtx const& oc)
-            : m_prev_stmt(prev), m_start_bb(s), m_mgr(m), m_oc(oc) {}
-        bool visitIR(MOD IR * ir, OUT bool & is_term)
-        {
-            if (!ir->is_exp() || !MDSSAMgr::hasMDSSAInfo(ir)) { return true; }
-            m_mgr->findAndSetLiveInDef(ir, m_prev_stmt, m_start_bb, m_oc);
-            return true;
-        }
-    };
-    class IterTree : public VisitIRTree<VF> {
-    public:
-        IterTree(VF & vf) : VisitIRTree(vf) {}
+        IterTree(VFToRecomp & vf) : VisitIRTree(vf) {}
     };
     ASSERT0(stmt && stmt->is_stmt() && stmt->getBB());
     IRBB * start_bb = stmt->getBB();
     IR * prev_stmt = start_bb->getPrevIR(stmt);
-    VF vf(prev_stmt, start_bb, m_mgr, m_oc);
+    VFToRecomp vf(prev_stmt, start_bb, m_mgr, m_oc);
     IterTree it(vf);
     it.visit(stmt);
 }
@@ -1154,42 +1160,48 @@ RenameExp::RenameExp(MDSSAMgr * mgr, OptCtx * oc, ActMgr * am) :
 }
 
 
+//In C++, local declared class should NOT be used in template parameters of a
+//template class. Because the template class may be instanced outside the
+//function and the local type in function is invisible.
+class VFToRename {
+public:
+    bool visitIR(IR * ir, OUT bool & is_term)
+    {
+        if (!ir->is_exp() || !ir->isMemRefNonPR()) { return true; }
+        m_mdssamgr->findAndSetLiveInDef(ir, m_startir, m_startbb, *m_oc);
+        return true;
+    }
+public:
+    IR const* m_startir;
+    IRBB const* m_startbb;
+    MDSSAMgr * m_mdssamgr;
+    OptCtx * m_oc;
+public:
+    //startir: the start position in 'startbb', it can be NULL.
+    //         If it is NULL, the function first finding the Phi list of
+    //         'startbb', then keep finding its predecessors until meet the
+    //         CFG entry.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
+    VFToRename(IR const* startir, IRBB const* startbb, MDSSAMgr * mgr,
+               OptCtx * oc)
+        : m_startir(startir), m_startbb(startbb), m_mdssamgr(mgr), m_oc(oc)
+    {
+        ASSERT0(startir == nullptr ||
+                (startir->is_stmt() && startir->getBB() == startbb));
+    }
+};
+
+
 void RenameExp::rename(MOD IR * root, IR const* startir, IRBB const* startbb)
 {
-    class VF {
+    class IterTree : public VisitIRTree<VFToRename> {
     public:
-        bool visitIR(IR * ir, OUT bool & is_term)
-        {
-            if (!ir->is_exp() || !ir->isMemRefNonPR()) { return true; }
-            m_mdssamgr->findAndSetLiveInDef(ir, m_startir, m_startbb, *m_oc);
-            return true;
-        }
-    public:
-        IR const* m_startir;
-        IRBB const* m_startbb;
-        MDSSAMgr * m_mdssamgr;
-        OptCtx * m_oc;
-    public:
-        //startir: the start position in 'startbb', it can be NULL.
-        //         If it is NULL, the function first finding the Phi list of
-        //         'startbb', then keep finding its predecessors until meet the
-        //         CFG entry.
-        //startbb: the BB that begin to do searching. It can NOT be NULL.
-        VF(IR const* startir, IRBB const* startbb, MDSSAMgr * mgr, OptCtx * oc)
-            : m_startir(startir), m_startbb(startbb), m_mdssamgr(mgr), m_oc(oc)
-        {
-            ASSERT0(startir == nullptr ||
-                    (startir->is_stmt() && startir->getBB() == startbb));
-        }
-    };
-    class IterTree : public VisitIRTree<VF> {
-    public:
-        IterTree(VF & vf) : VisitIRTree(vf) {}
+        IterTree(VFToRename & vf) : VisitIRTree(vf) {}
     };
     ASSERT0(root && (root->is_stmt() || root->is_exp()));
     ASSERT0(startir == nullptr ||
             (startir->is_stmt() && startir->getBB() == startbb));
-    VF vf(startir, startbb, m_mgr, m_oc);
+    VFToRename vf(startir, startbb, m_mgr, m_oc);
     IterTree it(vf);
     it.visit(root);
 }
@@ -1265,7 +1277,6 @@ void LiveSet::dump(MDSSAMgr const* mgr) const
         ASSERT0(t && t->is_md());
         if (!first) { prt(mgr->getRegion(), ","); }
         first = false;
-        //t->dump(mgr->getRegion(), const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
         t->dump(mgr->getRegion());
     }
     if (first) {

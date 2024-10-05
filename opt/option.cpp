@@ -111,6 +111,7 @@ bool g_do_scalar_opt = true;
 bool g_do_gp_adjustment = true;
 bool g_do_relaxation = false;
 bool g_do_memcheck = false;
+bool g_do_memcheck_static = false;
 bool g_retain_pass_mgr_for_region = true;
 UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
@@ -668,6 +669,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_gp_adjustment = %s", g_do_gp_adjustment ? "true":"false");
     note(lm, "\ng_do_relaxation = %s", g_do_relaxation ? "true":"false");
     note(lm, "\ng_do_memcheck = %s", g_do_memcheck ? "true":"false");
+    note(lm, "\ng_do_memcheck_static = %s",
+         g_do_memcheck_static ? "true":"false");
     note(lm, "\ng_retain_pass_mgr_for_region = %s",
          g_retain_pass_mgr_for_region ? "true":"false");
     note(lm, "\ng_verify_level = %s", Option::getOptLevelName(g_verify_level));

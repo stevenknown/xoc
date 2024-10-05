@@ -41,13 +41,6 @@ Rational::Rational() : m_num(0), m_den(1)
 {}
 
 
-Rational::Rational(Rational const& r) : m_num(r.m_num), m_den(r.m_den)
-{
-    //Sometimes, r need not to initialize always.
-    //ASSERTN(r.m_den != 0, ("denominator is 0!"));
-}
-
-
 Rational::Rational(INT num, INT den)
 {
     ASSERTN(den != 0, ("denominator is 0!"));
@@ -55,12 +48,10 @@ Rational::Rational(INT num, INT den)
 }
 
 
-Rational & Rational::operator = (Rational const& a)
+bool Rational::verify() const
 {
-    ASSERTN(a.m_den != 0, ("denominator is 0!"));
-    m_num = a.m_num;
-    m_den = a.m_den;
-    return *this;
+    ASSERTN(m_den != 0, ("denominator is 0!"));
+    return true;
 }
 
 

@@ -31,6 +31,10 @@ author: Su Zhenyu
 #ifndef _IR2MINST_H_
 #define _IR2MINST_H_
 
+namespace elf {
+class ELFMgr;
+}
+
 namespace mach {
 
 //
@@ -131,6 +135,7 @@ protected:
     Region * m_rg; //Current region.
     TypeMgr * m_tm; //Data manager.
     MInstMgr * m_mimgr;
+    elf::ELFMgr * m_em;
     RecycMIListMgr m_recyc_orlist_mgr;
 protected:
     void convertIRListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
@@ -166,7 +171,7 @@ protected:
     void tryExtendLoadValByMemSize(bool is_signed, Dbx const* dbx,
                                    OUT RecycMIList & mis, MOD IMCtx * cont);
 public:
-    IR2MInst(Region * rg, MInstMgr * mgr);
+    IR2MInst(Region * rg, MInstMgr * mgr, elf::ELFMgr * em);
     virtual ~IR2MInst() {}
 
     virtual void convertLabel(IR const* ir, OUT RecycMIList & mis,
@@ -432,6 +437,9 @@ public:
 
     //Process hint of after ret.
     void processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont);
+
+    //Set ELFMgr object.
+    void setELFMgr(elf::ELFMgr * em) { m_em = em; }
 };
 
 } //namespace

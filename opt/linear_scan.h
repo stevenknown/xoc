@@ -245,6 +245,14 @@ public:
 };
 //END BBPosCmp
 
+#define FAKEUSE_bb(r) ((r)->bb)
+#define FAKEUSE_pos(r) ((r)->pos)
+class FakeUse {
+public:
+    IRBB const* bb;
+    Pos pos;
+};
+
 //
 //START BackwardJumpAnalysisResMgr
 //
@@ -264,7 +272,11 @@ public:
     BackwardEdge * genBackwardEdge(IRBB const* srcbb, IRBB const* dstbb);
 
     //Generate a Occurence object and append the pointer in the m_occ_list.
-    Occurence * genOccurence();
+    Occurence * genOccurence()
+    { return (Occurence*)xmalloc(sizeof(Occurence)); }
+
+    FakeUse * genFakeUse()
+    { return (FakeUse*)xmalloc(sizeof(FakeUse)); }
 
     void * xmalloc(size_t size);
 };
@@ -299,6 +311,10 @@ typedef xcom::TMapIter<BBPos, PosAttr const*> BBPos2AttrIter;
 //Map from prno to the Occurence.
 typedef xcom::TMap<PRNO, Occurence const*> Prno2OccMap;
 typedef xcom::TMapIter<PRNO, Occurence const*> Prno2OccMapIter;
+
+//Map from prno to the fake-use info.
+typedef xcom::TMap<PRNO, FakeUse*> Prno2FakeUse;
+typedef xcom::TMapIter<PRNO, FakeUse*> Prno2FakeUseIter;
 
 //Used to store the PRLiveSet related to the backward jump BBs.
 typedef List<PRLiveSet const*> PRLiveSetList;
@@ -339,8 +355,9 @@ class BackwardJumpAnalysis {
     Prno2OccMap m_prno2occ;
     FakeVarMgr * m_fake_var_mgr;
     LinearScanRA * m_lsra;
+    Prno2FakeUse m_pr2fakeuse_head;
+    Prno2FakeUse m_pr2fakeuse_tail;
     BackwardJumpAnalysisResMgr * m_resource_mgr;
-
 public:
     BackwardJumpAnalysis(Region * rg, BBPos2Attr * pos2attr,
                          FakeVarMgr * fake_var_mgr, LinearScanRA * lsra);
@@ -359,6 +376,7 @@ public:
 
     //Reset the resources for the analysis.
     void reset();
+
 protected:
     //Add the backward jump to the set m_backward_edges.
     void addBackwardJump(IRBB const* srcbb, IRBB const* dstbb)
@@ -367,11 +385,10 @@ protected:
         m_backward_edges.append_tail(e);
     }
 
-    //Check the condition for fake-use first, and then do the insertion.
-    void checkAndInsertFakeUse();
-
     //Collect all the backward jumps in the control flow graph.
     void collectBackwardJumps();
+
+    void generateFakeUse();
 
     //Generate the occurence for pr in m_pr_live_set_list. The occurence is a
     //simple line/IR sequence ID.
@@ -387,6 +404,8 @@ protected:
     //This func records the start/entry position of the input BB.
     Pos getBBStartPos(UINT bbid) const { return m_bb_entry_pos.get(bbid); }
 
+    void insertFakeUse();
+
     //This func inserts the fake-use IR at the head or tail of input BB.
     void insertFakeUse(IRBB const* bb, PRNO prno, INSERT_MODE mode);
 
@@ -395,6 +414,9 @@ protected:
 
     //This func inserts the fake-use IR at the tail of input BB.
     void insertFakeUseAtBBExit(IRBB const* bb, PRNO prno, BBPos const& pos);
+
+    //Record the fake-use information.
+    void recordFakeUse(PRNO prno, IRBB const* bb, INSERT_MODE mode);
 
     //This func records the occurence of the input prno at the specified pos.
     void recordOccurenceForPR(PRNO prno, Pos pos);
@@ -564,16 +586,58 @@ public:
     { return m_avail_allocable.is_contain(r); }
 
     //True if input reg is callee register.
-    bool isCallee(Reg r) const;
+    bool isCallee(Reg r) const
+    { return isCalleeScalar(r) || isCalleeVector(r); }
 
     //True if input reg is caller register.
-    bool isCaller(Reg r) const;
+    bool isCaller(Reg r) const
+    {
+        return (m_target_caller_scalar != nullptr &&
+            m_target_caller_scalar->is_contain(r)) ||
+            (m_target_caller_vector != nullptr &&
+            m_target_caller_vector->is_contain(r));
+    }
+
+    //True if reg is a vector register.
+    bool isVector(Reg r) const
+    { return isCalleeVector(r) || isCallerVector(r); }
+
+    //True if reg is a caller vector register.
+    bool isCallerVector(Reg r) const
+    {
+        return m_target_caller_vector != nullptr &&
+            m_target_caller_vector->is_contain(r);
+    }
+
+    bool isCalleeVector(Reg r) const
+    {
+        return m_target_callee_vector != nullptr &&
+            m_target_callee_vector->is_contain(r);
+    }
+
+    bool isCalleeScalar(Reg r) const
+    {
+        return m_target_callee_scalar != nullptr &&
+            m_target_callee_scalar->is_contain(r);
+    }
 
     //True if input reg is param register.
-    bool isParam(Reg r) const;
+    bool isParam(Reg r) const
+    {
+       return (m_target_param_scalar != nullptr &&
+           m_target_param_scalar->is_contain(r)) ||
+           (m_target_param_vector != nullptr &&
+           m_target_param_vector->is_contain(r));
+    }
 
     //True if input reg is return value register.
-    bool isReturnValue(Reg r) const;
+    bool isReturnValue(Reg r) const
+    {
+        return (m_target_return_value_scalar != nullptr &&
+            m_target_return_value_scalar->is_contain(r)) ||
+            (m_target_return_value_vector != nullptr &&
+            m_target_return_value_vector->is_contain(r));
+    }
 
     //Special registers represent registers used by dedicate
     //that do not exist in any regset.
@@ -637,7 +701,8 @@ protected:
     IRTab m_reload_tab;
     IRTab m_remat_tab;
     IRTab m_move_tab;
-    IRTab m_fake_use_tab;
+    ConstIRTab m_fake_use_head_tab;
+    ConstIRTab m_fake_use_tail_tab;
     DedicatedMgr m_dedicated_mgr;
     PRNO2Var m_prno2var;
     ActMgr m_act_mgr;
@@ -686,7 +751,7 @@ public:
     virtual bool canSpillAvoid(PRNO prno) const
     {
         ASSERT0(prno != PRNO_UNDEF);
-        return !getLT(prno)->isOccHasDef();
+        return !getLT(prno)->isOccHasDef() || getReg(prno) == getSP();
     }
 
     void addPrnoWith2dLTHole(PRNO prno) { m_prno_with_2d_hole.append(prno); }
@@ -697,6 +762,16 @@ public:
                                             OUT RematCtx & rematctx);
     virtual void collectDedicatedPR(BBList const* bblst,
                                     OUT DedicatedMgr & mgr);
+
+    void dumpBBListWithReg() const;
+
+    //Implement the swap by memory as the temp location.
+    IR * doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
+                     Type const* ty2, IR const* marker, MOD IRBB * bb);
+
+    //Implement the swap by register as the temp location.
+    IR * doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
+                     Type const* ty2, IR const* marker, MOD IRBB * bb);
 
     void dumpPR2Reg(PRNO prno) const;
     void dumpPR2Reg() const;
@@ -745,9 +820,23 @@ public:
     { return "Linear Scan Register Allocation"; }
     PASS_TYPE getPassType() const { return PASS_LINEAR_SCAN_RA; }
 
-    //This function mainly prepares the correct register type for spill,
+    //This function mainly prepares the correct register type for a prno,
     //not the data type of lt.
     Type const* getRegType(PRNO prno) const;
+
+    //This function returns the type when do the spill operation for a prno.
+    //This function can be overidden by the derived class if the required
+    //spill type is not the original type of the prno.
+    //Prno: the input prno.
+    virtual Type const* getSpillType(PRNO prno) const
+    { return getRegType(prno); }
+
+    //This function returns the actual type for the input type.
+    //This function can be overidden by the derived class if the required
+    //spill type is not the same as the original input type.
+    //ty: the input type.
+    virtual Type const* getSpillType(Type const* ty) const
+    { ASSERT0(ty); return ty; }
 
     //Get target physical registers.
     //Get base pointer register.
@@ -793,13 +882,36 @@ public:
     //The temporary register is a reserved register that used to save a
     //temporary value, which is usually used after the register allocation
     //and does not be assigned in the register allocation.
-    Reg getTemp() const { return getTIMgr().getTemp(); }
+    Reg getTempScalar() const { return getTIMgr().getTempScalar(); }
+    Reg getTempVector() const { return getTIMgr().getTempVector(); }
+
+    //Get a temp memory location per the specified type.
+    //ty: the input type.
+    Var * getTempVar(Type const* ty)
+    { ASSERT0(ty);  return getSpillLoc(ty); }
 
     //Get zero register.
     Reg getZero() const { return getTIMgr().getZero(); }
 
     bool hasReg(PRNO prno) const;
     bool hasReg(LifeTime const* lt) const;
+
+    //This func shall generate the IRs to swap the data in two registers, if
+    //there is a TMP register reserved on the specific architecture, the
+    //register will be used as the temp space to finish the swap, or else,
+    //memory location on stack willbe adopted to help to complete the data
+    //exchange.
+    //prno1: the first prno for swap data.
+    //prno2: the second prno to swap data.
+    //ty1: the data tyupe of prno1.
+    //ty2: the data tyupe of prno2.
+    //marker: the marker IR used to indicate where to insert the generated IRs.
+    //bb: the BB where IRs will be inserted.
+    //retun value: this func will return the last IR in the new generated IRs,
+    //             it can be used as a new marker if user wants to get the tail
+    //             of new IRs.
+    virtual IR * insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
+        Type const* ty2, IR const* marker, MOD IRBB * bb);
 
     //Return true if register r1 alias to r2.
     virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
@@ -808,10 +920,54 @@ public:
     { return m_bb_seqid[dst_bbid] <= m_bb_seqid[src_bbid]; }
     virtual bool isCalleePermitted(LifeTime const* lt) const;
     bool isDedicated(PRNO prno) const
-    { return m_dedicated_mgr.is_dedicated(prno); }
+    { return m_dedicated_mgr.isDedicated(prno); }
 
     //Check the Frame Pointer Register can be allocable or not.
     bool isFPAllocableAllowed() const { return m_is_fp_allocable_allowed; }
+
+    //Return true if a fake-use IR at the first BB of loop by lexicographical
+    //order.
+    //e.g: "[mem]<-fake_use $1" is a fake-use IR at the first BB of loop by
+    //      lexicographical order.
+    //       ----->BB1
+    //      |      [mem]<-fake_use $1
+    //      |      ...
+    //      |      |
+    //      |      V
+    //      |      BB2
+    //      |      |
+    //      |      V
+    //      |      BB3
+    //      |      |
+    //      |      V
+    //      |      BB4
+    //      |      |
+    //      '------|
+    //             V
+    bool isFakeUseAtLexFirstBBInLoop(IR const* ir) const
+    { return m_fake_use_head_tab.find(ir); }
+
+    //Return true if a fake-use IR at the last BB of loop by lexicographical
+    //order.
+    //e.g: "[mem]<-fake_use $1" is a fake-use IR at the last BB of loop by
+    //      lexicographical order.
+    //       ----->BB1
+    //      |      |
+    //      |      V
+    //      |      BB2
+    //      |      |
+    //      |      V
+    //      |      BB3
+    //      |      |
+    //      |      V
+    //      |      BB4
+    //      |      ...
+    //      |      [mem]<-fake_use $1
+    //      |      |
+    //       ------|
+    //             V
+    bool isFakeUseAtLexLastBBInLoop(IR const* ir) const
+    { return m_fake_use_tail_tab.find(ir); }
 
     bool isInsertOp() const
     {
@@ -844,8 +1000,11 @@ public:
     bool isSpillOp(IR const* ir) const
     { return m_spill_tab.find(const_cast<IR*>(ir)); }
 
-    bool isFakeUseOp(IR const* ir) const
-    { return m_fake_use_tab.find(const_cast<IR*>(ir)); }
+    //This function returns true if the full width of the register will be
+    //spilled into memory. Or else, returns false if the partial of register
+    //will be spilled into memory. It can be overidden by the derived class
+    //on the specific architecture.
+    virtual bool isSpillFullReg() const { return false; }
 
     //This func is used to check the TMP register is available or not for the
     //input type.
@@ -883,7 +1042,10 @@ public:
     //the regular registers.
     void setFPAllocableAllowed(bool allowed)
     { m_is_fp_allocable_allowed = allowed; }
-    void setFakeUse(IR * ir) { m_fake_use_tab.append(ir); }
+    void setFakeUseAtLexFirstBBInLoop(IR * ir)
+    { m_fake_use_head_tab.append(ir); }
+    void setFakeUseAtLexLastBBInLoop(IR * ir)
+    { m_fake_use_tail_tab.append(ir); }
     void setMove(IR * ir) { m_move_tab.append(ir); }
     void setReg(PRNO prno, Reg reg);
     void setReload(IR * ir) { m_reload_tab.append(ir); }

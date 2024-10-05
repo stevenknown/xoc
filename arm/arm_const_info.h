@@ -47,6 +47,10 @@ author: Su Zhenyu
 //Define target machine general register byte size.
 #define GENERAL_REGISTER_SIZE BYTE_PER_POINTER
 
+//Size of the stack slot reserved for callee-saved registers, in bytes.
+//it is same as pointer size.
+#define CALLEE_SAVE_STACK_SLOT_SIZE BYTE_PER_POINTER
+
 //Define the max bit length of HOST_INT that indicates the max integer
 //that compiler can represent.
 //Note HOST_INT must be signed, and HOST_UINT must be unsigned.
@@ -298,13 +302,19 @@ typedef enum _REGFILE {
 #define REG_R3 4
 #define REG_R4 5
 #define REG_R5 6
+#define REG_R8 9
+#define REG_R9 10
 #define REG_R11 12
+#define REG_R14 15
 #define REG_R15 16
+#define REG_PC REG_R15
+#define REG_RA REG_R14
 #define REG_FP 8 //R7
 #define REG_TMP 13 //R12, Scratch Register, the synonym is IP register.
 #define REG_ZERO REG_R0
 #define REG_SP 14
 #define REG_D0 17
+#define REG_D1 18
 #define REG_D31 48
 #define REG_Q0 49
 #define REG_Q15 64
@@ -361,6 +371,14 @@ typedef enum _REGFILE {
 //Define allocable registers.
 #define ALLOCABLE_REG_START REG_R4
 #define ALLOCABLE_REG_END REG_R11
+
+//Define allocable vector registers.
+#define ALLOCABLE_VEC_REG_D_START REG_D0
+#define ALLOCABLE_VEC_REG_D_END REG_D31
+#define ALLOCABLE_VEC_REG_Q_START REG_Q0
+#define ALLOCABLE_VEC_REG_Q_END REG_Q15
+#define ALLOCABLE_VEC_REG_S_START REG_S0
+#define ALLOCABLE_VEC_REG_S_END REG_S31
 
 typedef enum _BUILTIN_TYPE {
     BUILTIN_UNDEF = 0,

@@ -33,6 +33,7 @@ endif
 $(info "WIN=$(WIN),WSL=$(WSL)")
 $(info "TARG:$(TARG)")
 $(info "TARG_DIR:$(TARG_DIR)")
+$(info "CURDIR:$(CURDIR)")
 $(info "CC:$(CC)")
 $(info "INC:$(INC)")
 $(info "CFLAGS:$(CFLAGS)")

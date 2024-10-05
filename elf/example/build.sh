@@ -14,4 +14,4 @@ done
 
 make readelf.exe -f Makefile.readelf DEBUG=$IS_DEBUG FOR_ARM=false FOR_X86=false \
   FOR_X64=false FOR_SCORE=false FOR_DEX=false FOR_JS=false FOR_TECO=true \
-  TARG=FOR_TECO OPEN_COVERAGE=$OPEN_COVERAGE
+  TARG=FOR_TECO TARG_DIR=../../teco OPEN_COVERAGE=$OPEN_COVERAGE

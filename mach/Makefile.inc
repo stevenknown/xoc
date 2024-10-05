@@ -1,6 +1,7 @@
 MACH_OBJS+=\
 ir2minst.o\
 machoption.o\
+migen.o\
 minst.o\
 minst_desc.o\
 minst_field.o\

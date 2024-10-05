@@ -736,7 +736,7 @@ protected:
     INT m_cur_cfa_offset;
 
     //The minimum alignment size of stack slots for callee-saved
-    //registers in bytes.When generating the .debug_frame,
+    //registers in bytes. When generating the .debug_frame,
     //it is calculated differently based on the architecture.
     INT m_stack_slot_alignment;
 

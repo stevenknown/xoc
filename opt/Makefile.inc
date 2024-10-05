@@ -96,12 +96,31 @@ ifeq ($(TARG_DIR),)
   $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
 endif
 
+CURFILE=$(CURDIR)/Makefile.inc
+
 ifeq ($(FOR_IP), true)
-  include $(OPT_DIR)/Makefile.ip.inc
+  $(info "INCLUDE: IN $(CURFILE), INCLUDE $(OPT_DIR)/Makefile.ip.inc, \
+          CURDIR=$(CURDIR)")
+  include $(CURDIR)/$(OPT_DIR)/Makefile.ip.inc
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
-  include $(OPT_DIR)/Makefile.ref_targmach_info.inc
-else ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
-  include $(TARG_DIR)/Makefile.opt.ext.inc
+  $(info "INCLUDE: IN $(CURFILE), INCLUDE \
+          $(OPT_DIR)/Makefile.ref_targmach_info.inc")
+  include $(CURDIR)/$(OPT_DIR)/Makefile.ref_targmach_info.inc
 endif
+
+ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
+  ifeq ($(ROOT_DIR),)
+    $(error "NEED ROOT_DIR:e.g:make ROOT_DIR=/usr/xoc")
+  endif
+  TARG_DIR_NAME  := $(notdir $(TARG_DIR))
+  opt_ext_file = $(ROOT_DIR)/$(TARG_DIR_NAME)/Makefile.opt.ext.inc
+  ifneq ($(wildcard $(opt_ext_file)),$(opt_ext_file))
+    $(error "OPT_EXT_FILE $(opt_ext_file) DOES NOT EXIST.")
+  endif
+  $(info "INCLUDE: IN $(CURFILE), INCLUDE $(opt_ext_file)")
+  include $(opt_ext_file)
+endif
+
+$(info "INCLUDE: IN $(CURFILE), AFTER INCLUDE OPT_OBJS=$(OPT_OBJS) --==")
 
 CFLAGS+=-Wno-unknown-pragmas

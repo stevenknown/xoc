@@ -674,7 +674,7 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
     PRNO prno = res->getPrno();
     LifeTime * lt = mgr.genLifeTime(prno);
     ASSERT0(lt);
-    if (dedmgr.is_dedicated(prno)) { lt->setDedicated(); }
+    if (dedmgr.isDedicated(prno)) { lt->setDedicated(); }
     lt->addRange(pos);
     lt->addOcc(Occ(true, pos, ir));
     mgr.recordPos(ir, pos);
@@ -690,7 +690,7 @@ static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
     PRNO prno = ir->getPrno();
     LifeTime * lt = mgr.genLifeTime(prno);
     ASSERT0(lt);
-    if (dedmgr.is_dedicated(prno)) { lt->setDedicated(); }
+    if (dedmgr.isDedicated(prno)) { lt->setDedicated(); }
     Range r = lt->getLastRange();
     if (r.start() == POS_UNDEF) {
         //PR is region livein.

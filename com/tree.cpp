@@ -104,7 +104,6 @@ void Tree::dumpBuf(OUT StrBuf & buf) const
     Vertex const* root = getRoot();
     if (root == nullptr) { return; }
     buf.strcat("%u", root->id());
-    UINT preind = 0;
     UINT inst = 3;
     VexIter it;
     for (Vertex const* k = root->getFirstToVex(&it);

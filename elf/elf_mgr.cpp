@@ -2783,7 +2783,7 @@ void ELFMgr::extractSymbolExceptUserDefFunc()
         //Set symbol size.
         SYMINFO_size(sym_info) = ((var->is_string() && !var->hasInitString()) ||
             var->is_func()) ? 0 : (var->is_string() && var->hasInitString()) ?
-            ::strlen(VAR_string(var)->getStr()) : var->getByteSize(m_tm);
+            ::strlen(VAR_string(var)->getStr()) + 1 : var->getByteSize(m_tm);
 
         if (SYMINFO_is_global(sym_info) ||
             SYMINFO_sect_type(sym_info) == SH_TYPE_UNDEF) {

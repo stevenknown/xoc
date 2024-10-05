@@ -163,111 +163,116 @@ void DeadCodeElim::checkValidAndRecomputeCDG(DCECtx const& dcectx)
 }
 
 
+//In C++, local declared class should NOT be used in template parameters of a
+//template class. Because the template class may be instanced outside the
+//function and the local type in function is invisible.
+class VFEffStmt {
+public:
+    bool checkStmt(IR const* ir, OUT bool & is_terminate)
+    {
+        ASSERT0(ir->is_stmt());
+        ASSERT0(ir->isMemRef());
+        MD const* mustref = ir->getMustRef();
+        if (mustref != nullptr) {
+            if (dce->is_effect_write(mustref->get_base())) {
+                is_terminate = true;
+                is_effect = true;
+                return false;
+            }
+            //No need to check MayRef if MustRef is not NULL.
+            //Keep walking trough the IR tree.
+            return true;
+        }
+        MDSet const* mayref = ir->getMayRef();
+        if (mayref == nullptr) { return true; }
+        MDSetIter iter;
+        for (BSIdx i = mayref->get_first(&iter);
+             i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+            MD * md = mdsys->getMD(i);
+            ASSERT0(md);
+            if (dce->is_effect_write(md->get_base())) {
+                is_terminate = true;
+                is_effect = true;
+                return false;
+            }
+        }
+        //Keep walking trough the IR tree.
+        return true;
+    }
+    bool checkExp(IR const* ir, OUT bool & is_terminate)
+    {
+        ASSERT0(ir->is_exp());
+        ASSERT0(ir->isMemRef());
+        //Check if expression using volatile variable.
+        //e.g: volatile int g = 0;
+        //    while(g); # The stmt has effect.
+        MD const* mustref = ir->getMustRef();
+        if (mustref != nullptr) {
+            if (dce->is_effect_read(mustref->get_base())) {
+                is_terminate = true;
+                is_effect = true;
+                return false;
+            }
+            //No need to check MayRef if MustRef is not NULL.
+            //Keep walking trough the IR tree.
+            return true;
+        }
+        MDSet const* mayref = ir->getMayRef();
+        if (mayref == nullptr) { return true; }
+        MDSetIter iter;
+        for (BSIdx i = mayref->get_first(&iter);
+             i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+            MD * md = mdsys->getMD(i);
+            ASSERT0(md != nullptr);
+            if (dce->is_effect_read(md->get_base())) {
+                is_terminate = true;
+                is_effect = true;
+                return false;
+            }
+        }
+        //Keep walking trough the IR tree.
+        return true;
+    }
+    bool visitIR(IR const* ir, OUT bool & is_terminate)
+    {
+        if (dce->hasSideEffect(ir)) {
+            is_terminate = true;
+            is_effect = true;
+            return false;
+        }
+        if (!ir->isMemRef()) {
+            //Keep walking trough the IR tree.
+            return true;
+        }
+        if (!ir->isMemRefNonPR()) {
+            //Keep walking trough the IR tree.
+            return true;
+        }
+        if (!dce->isCheckMDRef()) {
+            //NonPR operation will always be treated as effect.
+            is_terminate = true;
+            is_effect = true;
+            return false;
+        }
+        if (ir->is_stmt()) { return checkStmt(ir, is_terminate); }
+        return checkExp(ir, is_terminate);
+    }
+public:
+    bool is_effect;
+    MDSystem const* mdsys;
+    DeadCodeElim const* dce;
+public:
+    VFEffStmt() { is_effect = false; dce = nullptr; mdsys = nullptr; }
+};
+
+
 bool DeadCodeElim::checkEffectStmt(IR const* ir)
 {
     ASSERT0(ir->is_stmt());
-    class VF {
-    public:
-        bool checkStmt(IR const* ir, OUT bool & is_terminate)
-        {
-            ASSERT0(ir->is_stmt());
-            ASSERT0(ir->isMemRef());
-            MD const* mustref = ir->getMustRef();
-            if (mustref != nullptr) {
-                if (dce->is_effect_write(mustref->get_base())) {
-                    is_terminate = true;
-                    is_effect = true;
-                    return false;
-                }
-                //No need to check MayRef if MustRef is not NULL.
-                //Keep walking trough the IR tree.
-                return true;
-            }
-            MDSet const* mayref = ir->getMayRef();
-            if (mayref == nullptr) { return true; }
-            MDSetIter iter;
-            for (BSIdx i = mayref->get_first(&iter);
-                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
-                MD * md = mdsys->getMD(i);
-                ASSERT0(md);
-                if (dce->is_effect_write(md->get_base())) {
-                    is_terminate = true;
-                    is_effect = true;
-                    return false;
-                }
-            }
-            //Keep walking trough the IR tree.
-            return true;
-        }
-        bool checkExp(IR const* ir, OUT bool & is_terminate)
-        {
-            ASSERT0(ir->is_exp());
-            ASSERT0(ir->isMemRef());
-            //Check if expression using volatile variable.
-            //e.g: volatile int g = 0;
-            //    while(g); # The stmt has effect.
-            MD const* mustref = ir->getMustRef();
-            if (mustref != nullptr) {
-                if (dce->is_effect_read(mustref->get_base())) {
-                    is_terminate = true;
-                    is_effect = true;
-                    return false;
-                }
-                //No need to check MayRef if MustRef is not NULL.
-                //Keep walking trough the IR tree.
-                return true;
-            }
-            MDSet const* mayref = ir->getMayRef();
-            if (mayref == nullptr) { return true; }
-            MDSetIter iter;
-            for (BSIdx i = mayref->get_first(&iter);
-                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
-                MD * md = mdsys->getMD(i);
-                ASSERT0(md != nullptr);
-                if (dce->is_effect_read(md->get_base())) {
-                    is_terminate = true;
-                    is_effect = true;
-                    return false;
-                }
-            }
-            //Keep walking trough the IR tree.
-            return true;
-        }
-        bool visitIR(IR const* ir, OUT bool & is_terminate)
-        {
-            if (dce->hasSideEffect(ir)) {
-                is_terminate = true;
-                is_effect = true;
-                return false;
-            }
-            if (!ir->isMemRef()) {
-                //Keep walking trough the IR tree.
-                return true;
-            }
-            if (!ir->isMemRefNonPR()) {
-                //Keep walking trough the IR tree.
-                return true;
-            }
-            if (!dce->isCheckMDRef()) {
-                //NonPR operation will always be treated as effect.
-                is_terminate = true;
-                is_effect = true;
-                return false;
-            }
-            if (ir->is_stmt()) { return checkStmt(ir, is_terminate); }
-            return checkExp(ir, is_terminate);
-        }
-    public:
-        bool is_effect;
-        MDSystem const* mdsys;
-        DeadCodeElim const* dce;
-    public:
-        VF() { is_effect = false; dce = nullptr; mdsys = nullptr; }
+    class IterTree : public VisitIRTree<VFEffStmt> {
+    public: IterTree(VFEffStmt & vf) : VisitIRTree<VFEffStmt>(vf) {}
     };
-    class IterTree : public VisitIRTree<VF> {
-    public: IterTree(VF & vf) : VisitIRTree<VF>(vf) {}
-    };
-    VF vf;
+    VFEffStmt vf;
     vf.dce = this;
     vf.mdsys = getMDSystem();
     IterTree it(vf);

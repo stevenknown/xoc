@@ -154,9 +154,8 @@ bool PosAttrNoCodeGenProc::processAttrNoCodeGen(BBPos const& pos,
 
     //Check the fake-use IR responding at the pos.
     ASSERT0(tmp_ir && tmp_ir->is_st());
-    IR * rhs = tmp_ir->getRHS();
-    ASSERT0(rhs && rhs->is_pr());
-    ASSERT0(m_lsra->isPrnoAlias(rhs->getPrno(), BBPOS_prno(pos)));
+    ASSERT0(tmp_ir->getRHS() && tmp_ir->getRHS()->is_pr());
+    ASSERT0(m_lsra->isPrnoAlias(tmp_ir->getRHS()->getPrno(), BBPOS_prno(pos)));
     IRBB const* bb = attr->getBB();
     ASSERT0(bb && BBPOS_bbid(pos) == bb->id());
     tmp_ir = BB_irlist(const_cast<IRBB*>(bb)).remove(tmp_ir);
@@ -606,7 +605,7 @@ class OccRecorderVF {
 public:
     Pos pos;
 public:
-    OccRecorderVF(BackwardJumpAnalysis * ana) : m_ana(ana) {}
+    OccRecorderVF(BackwardJumpAnalysis * ana) : m_ana(ana), pos(POS_UNDEF) {}
     bool visitIR(IR const* ir, OUT bool & is_term)
     {
         if (ir->is_pr() || ir->is_stpr()) {
@@ -669,12 +668,6 @@ PosAttr * BackwardJumpAnalysisResMgr::genPosAttr(UINT v, IRBB const* bb,
     PosAttr * pos_attr = (PosAttr*)xmalloc(sizeof(PosAttr));
     pos_attr->init(v, bb, ir);
     return pos_attr;
-}
-
-
-Occurence * BackwardJumpAnalysisResMgr::genOccurence()
-{
-    return (Occurence*)xmalloc(sizeof(Occurence));
 }
 
 
@@ -746,6 +739,8 @@ void BackwardJumpAnalysis::init()
 {
     m_pos2attr->init();
     m_prno2occ.init();
+    m_pr2fakeuse_head.init();
+    m_pr2fakeuse_tail.init();
     m_backward_edges.init();
     if (m_resource_mgr == nullptr) {
         m_resource_mgr = new BackwardJumpAnalysisResMgr();
@@ -760,6 +755,8 @@ void BackwardJumpAnalysis::destroy()
     m_prno2occ.clean();
     m_bb_entry_pos.clean();
     m_bb_exit_pos.clean();
+    m_pr2fakeuse_head.clean();
+    m_pr2fakeuse_tail.clean();
     if (m_resource_mgr != nullptr) {
         delete m_resource_mgr;
         m_resource_mgr = nullptr;
@@ -820,7 +817,7 @@ void BackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb, MOD Pos & pos)
     if (irlst.is_empty()) { return; }
     BBIRListIter bbirit;
     m_bb_entry_pos.set(bb->id(), pos + 1);
-    OccRecorderVF vf(this); 
+    OccRecorderVF vf(this);
     for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
          ir = irlst.get_next(&bbirit)) {
         vf.pos = ++pos;
@@ -863,8 +860,11 @@ bool BackwardJumpAnalysis::analyze()
     //Step2: Generate the simple occurence info for the relative live PRs.
     generateOccurence();
 
-    //Step3: Insert the fake-use IR for the related PRs after checked.
-    checkAndInsertFakeUse();
+    //Step3: Generate the fake-use IR info.
+    generateFakeUse();
+
+    //Step4: Insert the fake-use IR.
+    insertFakeUse();
     END_TIMER_FMT(t, ("Backward Jump Analysis"));
     return true;
 }
@@ -925,7 +925,7 @@ void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
     st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().append_head(st);
-    m_lsra->setFakeUse(st);
+    m_lsra->setFakeUseAtLexFirstBBInLoop(st);
 
     //POS_ATTR_LT_SHRINK_BEFORE is used to avoid the lifetime of PR is from the
     //entry of region because the first occurence of this PR is a USE.
@@ -966,7 +966,12 @@ void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
     st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().insert_before(st, tail);
-    m_lsra->setFakeUse(st);
+
+    //Store the fake-use IR in the table, because the fake-use IR at the
+    //last BB of loop by lexicographical order will not particaipated into
+    //the register allocation, and this table will be used to identify such
+    //kind of fake-use IR.
+    m_lsra->setFakeUseAtLexLastBBInLoop(st);
 
     //Attribute POS_ATTR_LT_EXTEND_BB_END is set, because the multiple fake-use
     //IRs are inserted at the tail part of the same BB, which would lead to
@@ -1003,7 +1008,50 @@ void BackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
 }
 
 
-void BackwardJumpAnalysis::checkAndInsertFakeUse()
+void BackwardJumpAnalysis::recordFakeUse(PRNO prno, IRBB const* bb,
+                                         INSERT_MODE mode)
+{
+    ASSERT0(bb);
+    ASSERT0(prno != PRNO_UNDEF);
+    UINT bbid = bb->id();
+    ASSERT0(bbid != BBID_UNDEF);
+
+    if (mode == INSERT_MODE_HEAD) {
+        bool find = false;
+        FakeUse * fakeuse = m_pr2fakeuse_head.get(prno, &find);
+        if (!find) {
+            fakeuse = m_resource_mgr->genFakeUse();
+            FAKEUSE_bb(fakeuse) = bb;
+            FAKEUSE_pos(fakeuse) = m_bb_entry_pos[bbid];
+            m_pr2fakeuse_head.set(prno, fakeuse);
+            return;
+        }
+        if (m_bb_entry_pos[bbid] >= FAKEUSE_pos(fakeuse)) { return; }
+        FAKEUSE_bb(fakeuse) = bb;
+        FAKEUSE_pos(fakeuse) = m_bb_exit_pos[bbid];
+        return;
+    }
+
+    if (mode == INSERT_MODE_TAIL) {
+        bool find = false;
+        FakeUse * fakeuse = m_pr2fakeuse_tail.get(prno, &find);
+        if (!find) {
+            fakeuse = m_resource_mgr->genFakeUse();
+            FAKEUSE_bb(fakeuse) = bb;
+            FAKEUSE_pos(fakeuse) = m_bb_exit_pos[bbid];
+            m_pr2fakeuse_tail.set(prno, fakeuse);
+            return;
+        }
+        if (m_bb_exit_pos[bbid] <= FAKEUSE_pos(fakeuse)) { return; }
+        FAKEUSE_bb(fakeuse) = bb;
+        FAKEUSE_pos(fakeuse) = m_bb_exit_pos[bbid];
+        return;
+    }
+    UNREACHABLE();
+}
+
+
+void BackwardJumpAnalysis::generateFakeUse()
 {
     for (BackwardEdge const* e = m_backward_edges.get_head();
          e != nullptr; e = m_backward_edges.get_next()) {
@@ -1044,8 +1092,10 @@ void BackwardJumpAnalysis::checkAndInsertFakeUse()
             }
             Occurence const* occ = m_prno2occ.get(pr);
             ASSERT0(occ);
+            //Since some new fake-use IRs will be inserted at the end of the
+            //src BB, so the exit boundary of src BB should be included.
             if (OCC_last(occ) < m_bb_exit_pos[src_bb->id()]) {
-                insertFakeUse(src_bb, pr, INSERT_MODE_TAIL);
+                recordFakeUse(pr, src_bb, INSERT_MODE_TAIL);
             }
         }
 
@@ -1082,17 +1132,35 @@ void BackwardJumpAnalysis::checkAndInsertFakeUse()
              pr != BS_UNDEF; pr = (PRNO)live_in->get_next(pr, &iter)) {
             Occurence const* occ = m_prno2occ.get(pr);
             ASSERT0(occ);
-            if (m_lsra->getDedicatedMgr().is_dedicated(pr)) { continue; }
+            if (m_lsra->getDedicatedMgr().isDedicated(pr)) { continue; }
             if (OCC_first(occ) > m_bb_exit_pos[src_bb->id()]) {
                 //Ignore the PR if the first occ of PR is after the jump/loop,
                 //which means this PR is not involved in the scope of current
                 //jump/loop.
                 continue;
             }
-            if (OCC_first(occ) > m_bb_entry_pos[dst_bb->id()]) {
-                insertFakeUse(dst_bb, pr, INSERT_MODE_HEAD);
+            //Since some new fake-use IRs will be inserted at the start of the
+            //dst BB, so the entry boundary of the dst BB should be included.
+            if (OCC_first(occ) >= m_bb_entry_pos[dst_bb->id()]) {
+                recordFakeUse(pr, dst_bb, INSERT_MODE_HEAD);
             }
         }
+    }
+}
+
+
+void BackwardJumpAnalysis::insertFakeUse()
+{
+    Prno2FakeUseIter it;
+    FakeUse * fake = nullptr;
+    for (PRNO pr = m_pr2fakeuse_head.get_first(it, &fake); fake != nullptr;
+         pr = m_pr2fakeuse_head.get_next(it, &fake)) {
+        insertFakeUse(FAKEUSE_bb(fake), pr, INSERT_MODE_HEAD);
+    }
+
+    for (PRNO pr = m_pr2fakeuse_tail.get_first(it, &fake); fake != nullptr;
+         pr = m_pr2fakeuse_tail.get_next(it, &fake)) {
+        insertFakeUse(FAKEUSE_bb(fake), pr, INSERT_MODE_TAIL);
     }
 }
 //END BackwardJumpAnalysis
@@ -1359,36 +1427,6 @@ void RegSetImpl::freeRegisterFromAliasSet(Reg r)
         return freeRegisterFromReturnValueAliasSet(r);
     }
     ASSERT0(isSpecialReg(r));
-}
-
-
-bool RegSetImpl::isCallee(Reg r) const
-{
-    return (m_target_callee_scalar && m_target_callee_scalar->is_contain(r)) ||
-        (m_target_callee_vector && m_target_callee_vector->is_contain(r));
-}
-
-
-bool RegSetImpl::isCaller(Reg r) const
-{
-    return (m_target_caller_scalar && m_target_caller_scalar->is_contain(r)) ||
-        (m_target_caller_vector && m_target_caller_vector->is_contain(r));
-}
-
-
-bool RegSetImpl::isParam(Reg r) const
-{
-    return (m_target_param_scalar && m_target_param_scalar->is_contain(r)) ||
-        (m_target_param_vector && m_target_param_vector->is_contain(r));
-}
-
-
-bool RegSetImpl::isReturnValue(Reg r) const
-{
-    return (m_target_return_value_scalar &&
-        m_target_return_value_scalar->is_contain(r)) ||
-        (m_target_return_value_vector &&
-        m_target_return_value_vector->is_contain(r));
 }
 
 
@@ -1870,6 +1908,32 @@ void LinearScanRA::dump4List() const
 }
 
 
+void LinearScanRA::dumpBBListWithReg() const
+{
+    class DumpPRWithReg : public IRDumpAttrBaseFunc {
+    public:
+        LinearScanRA const* lsra;
+    public:
+        virtual void dumpAttr(
+            OUT xcom::StrBuf & buf, Region const* rg, IR const* ir,
+            DumpFlag dumpflag) const override
+        {
+            if (!ir->isPROp()) { return; }
+            Reg r = lsra->getReg(ir->getPrno());
+            if (r == REG_UNDEF) { return; }
+            buf.strcat(" (%s)", lsra->getRegName(r));
+        }
+    };
+    DumpPRWithReg df;
+    df.lsra = this;
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
+        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
+    IRDumpCtx<> ctx(4, f, nullptr, &df);
+    ASSERT0(m_rg->getBBList());
+    xoc::dumpBBList(m_rg->getBBList(), m_rg, false, &ctx);
+}
+
+
 void LinearScanRA::dumpPR2Reg(PRNO p) const
 {
     Reg r = getReg(p);
@@ -1915,6 +1979,7 @@ bool LinearScanRA::dump(bool dumpir) const
     UpdatePos up(*this);
     pthis->getLTMgr().dumpAllLT(up, m_bb_list, dumpir);
     dumpPR2Reg();
+    dumpBBListWithReg();
     dump4List();
     m_act_mgr.dump();
     //---------
@@ -2178,6 +2243,135 @@ public:
 };
 
 
+//This function implements the swap operation of two prnos through the temp
+//register after the register allocation.
+//  There are three steps used to complete the swap operation:
+//  1. $temp  <-- mov $prno1
+//  2. $prno1 <-- mov $prno2
+//  3. $prno2 <-- mov $temp
+IR * LinearScanRA::doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
+    Type const* ty2, IR const* marker, MOD IRBB * bb)
+{
+    ASSERT0(bb && ty1 && ty2);
+    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
+    ASSERT0(prno1 != prno2);
+
+    Type const* ty1_tmp = getSpillType(ty1);
+    Type const* ty2_tmp = getSpillType(ty2);
+    ASSERT0(ty1_tmp && ty2_tmp);
+
+    //Move the data from the reg of prno1 to the reg of temp.
+    PRNO tmpprno = buildPrno(ty1_tmp, ty1_tmp->is_vector() ?
+        getTempVector() : getTempScalar());
+    IR * stpr1 = m_irmgr->buildStorePR(tmpprno, ty1_tmp,
+        m_irmgr->buildPRdedicated(prno1, ty1_tmp));
+
+    //Move the data from the reg of prno2 to the reg of prno1.
+    PRNO tmp_prno_2 = buildPrno(ty2_tmp, getReg(prno1));
+    IR * stpr2 = m_irmgr->buildStorePR(tmp_prno_2, ty2_tmp,
+        m_irmgr->buildPRdedicated(prno2, ty2_tmp));
+
+    //Move the data from the reg of tmp to the reg of prno2.
+    PRNO tmp_prno_3 = buildPrno(ty1_tmp, getReg(prno2));
+    IR * stpr3 = m_irmgr->buildStorePR(tmp_prno_3, ty1_tmp,
+        m_irmgr->buildPRdedicated(tmpprno, ty1_tmp));
+
+    if (marker) {
+        IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
+        bb->getIRList().insert_after(stpr1, stmt);
+    } else {
+        bb->getIRList().append_head(stpr1);
+    }
+
+    bb->getIRList().insert_after(stpr2, stpr1);
+    bb->getIRList().insert_after(stpr3, stpr2);
+
+    setMove(stpr2);
+    setMove(stpr1);
+    setMove(stpr3);
+    return stpr3;
+}
+
+
+//This function implements the swap operation of two prnos through the memory
+//allocation after the register allocation.
+//  There are three steps used to complete the swap operation:
+//  1. [mem]  <-- spill $prno1
+//  2. $prno1 <-- mov $prno2
+//  3. $prno2 <-- reload [mem]
+IR * LinearScanRA::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
+    Type const* ty2, IR const* marker, MOD IRBB * bb)
+{
+    ASSERT0(bb && ty1 && ty2);
+    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
+    ASSERT0(prno1 != prno2);
+
+    Type const* ty1_tmp = getSpillType(ty1);
+    Type const* ty2_tmp = getSpillType(ty2);
+    ASSERT0(ty1_tmp && ty2_tmp);
+
+    Var * spill_loc = getTempVar(ty1_tmp);
+    ASSERT0(spill_loc);
+
+    //Build the spill IR.
+    PRNO tmpprno = buildPrno(ty1_tmp, getReg(prno1));
+    IR * spill = buildSpillByLoc(tmpprno, spill_loc, ty1_tmp);
+    if (marker) {
+        IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
+        bb->getIRList().insert_after(spill, stmt);
+    } else {
+        bb->getIRList().append_head(spill);
+    }
+    //This data move is always between two registers.
+    tmpprno = buildPrno(ty2_tmp, getReg(prno1));
+    IR * stpr = m_irmgr->buildStorePR(tmpprno, ty2_tmp,
+        m_irmgr->buildPRdedicated(prno2, ty2_tmp));
+
+    //Build the reload IR.
+    tmpprno = buildPrno(ty1_tmp, getReg(prno2));
+    IR * reload = buildReload(tmpprno, spill_loc, ty1_tmp);
+
+    bb->getIRList().insert_after(stpr, spill);
+    bb->getIRList().insert_after(reload, stpr);
+    setSpill(spill);
+    setMove(stpr);
+    setReload(reload);
+    return reload;
+}
+
+
+//This function implements the swap operation of two prnos after the register
+//allocation.
+//  There are two ways to finish this operation:
+//     1. Temp register.
+//     2. Temp memory location.
+//  The principles of the swap operation are listed as below:
+//     1. If the temp register for prno1 is available, do the swap operation
+//        by the temp register.
+//     2. If the temp register for prno2 is available, do the swap operation
+//        by the temp register.
+//     3. If the temp register for prno1 and prno2 are not available, do
+//        swap operation by the temp memory location.
+IR * LinearScanRA::insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
+    Type const* ty2, IR const* marker, MOD IRBB * bb)
+{
+    ASSERT0(bb && ty1 && ty2);
+    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
+    ASSERT0(prno1 != prno2);
+    ASSERT0(getReg(prno1) != getReg(prno2));
+
+    if (isTmpRegAvailable(ty1)) {
+        return doSwapByReg(prno1, prno2, ty1, ty2, marker, bb);
+    }
+
+    if (isTmpRegAvailable(ty2)) {
+        return doSwapByReg(prno2, prno1, ty2, ty1, marker, bb);
+    }
+
+    return doSwapByMem(prno1, prno2, ty1, ty2, marker, bb);
+}
+
+
 PRNO LinearScanRA::getAnctPrno(PRNO prno) const
 {
     ASSERT0(prno != PRNO_UNDEF);
@@ -2264,7 +2458,7 @@ bool LinearScanRA::perform(OptCtx & oc)
     back_jump_ana.analyze();
 
     //Enable the dump-buffer.
-    DumpBufferSwitch buff(m_rg->getLogMgr());
+    //DumpBufferSwitch buff(m_rg->getLogMgr());
     UpdatePos up(*this);
     collectDedicatedPR(m_bb_list, m_dedicated_mgr);
     getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);
@@ -2306,3 +2500,4 @@ bool LinearScanRA::perform(OptCtx & oc)
 //END LinearScanRA
 
 } //namespace xoc
+

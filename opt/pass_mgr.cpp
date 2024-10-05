@@ -299,78 +299,43 @@ Pass * PassMgr::allocLinearScanRA()
 
 Pass * PassMgr::allocPrologueEpilogue()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new PrologueEpilogueInserter(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
 Pass * PassMgr::allocGPAdjustment()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new GlobalPointerAdjustment(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
 Pass * PassMgr::allocBROpt()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new BROpt(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
-}
-
-
-Pass * PassMgr::allocWorkaround()
-{
-    #ifdef REF_TARGMACH_INFO
-    return new Workaround(m_rg);
-    #else
-    ASSERTN(0, ("Target Dependent Code"));
-    return nullptr;
-    #endif
 }
 
 
 Pass * PassMgr::allocDynamicStack()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new DynamicStack(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
 Pass * PassMgr::allocIRReloc()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new IRRelocMgr(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
 Pass * PassMgr::allocArgPasser()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new ArgPasser(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
@@ -383,12 +348,8 @@ Pass * PassMgr::allocMemCheck()
 
 Pass * PassMgr::allocKernelAdjustment()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new KernelAdjustment(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
@@ -497,12 +458,8 @@ Pass * PassMgr::allocCalcDerivative()
 
 Pass * PassMgr::allocIGotoOpt()
 {
-    #ifdef REF_TARGMACH_INFO
-    return new IGotoOpt(m_rg);
-    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
-    #endif
 }
 
 
@@ -655,9 +612,6 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_BR_OPT:
         pass = allocBROpt();
-        break;
-    case PASS_WORKAROUND:
-        pass = allocWorkaround();
         break;
     case PASS_DYNAMIC_STACK:
         pass = allocDynamicStack();

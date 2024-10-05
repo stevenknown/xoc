@@ -56,7 +56,7 @@ public:
     //antireg: the target-machine register that 'prno' anticipated.
     void add(PRNO prno, Reg antireg) { set(prno, antireg); }
     void dump(Region const* rg, TargInfoMgr const& timgr) const;
-    bool is_dedicated(PRNO prno) const { return find(prno); }
+    bool isDedicated(PRNO prno) const { return find(prno); }
 };
 
 class UpdatePos {
@@ -379,7 +379,7 @@ public:
 
     void incCallCrossedNum(UINT num) { m_call_crossed_num += num; }
 
-    void inheritAttrFlag(LifeTime * lt)
+    void inheritAttrFlag(LifeTime const* lt)
     { m_flag.set(lt->getAttrFlag().getFlagSet()); }
 
     bool isAncestor() const { return this == m_ancestor; }
@@ -420,13 +420,13 @@ public:
     //      lt:        |---|         |--|
     bool is_intersect(LifeTime const* lt) const;
 
-    //Return true if the occ has a DEF.
+    //Return true if the occ has a DEF at least.
     bool isOccHasDef() const { return m_flag.have(LT_FLAG_HAS_DEF); }
 
     //Return true if current lifetime is dedicated.
-    bool is_dedicated() const { return m_flag.have(LT_FLAG_IS_DEDICATED); }
+    bool isDedicated() const { return m_flag.have(LT_FLAG_IS_DEDICATED); }
 
-    //Return true if current lifetime is forced to spill.
+    //Return true if current lifetime is forced to reload.
     bool isReloadForced() const { return m_flag.have(LT_FLAG_RELOAD_FORCED); }
 
     //Return true if current lifetime is forced to spill.

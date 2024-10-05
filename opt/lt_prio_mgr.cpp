@@ -62,7 +62,7 @@ double LTPriorityMgr::computePriority(LifeTime const* lt) const
         prio += tprio;
     }
     ASSERTN(prio != 0.0, ("empty lt, consider split it in entry and exit"));
-    if (lt->is_dedicated()) {
+    if (lt->isDedicated()) {
         prio += count * 10;
     }
     return prio;

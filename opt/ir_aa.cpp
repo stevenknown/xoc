@@ -4185,7 +4185,7 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         initEntryPTS(ppsetmgr);
         computeFlowInsensitive();
         END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
-    }    
+    }
     oc.setValidPass(PASS_AA);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAA()) {
         dump();

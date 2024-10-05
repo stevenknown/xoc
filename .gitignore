@@ -3,4 +3,13 @@
 *.a
 *.exe
 *.log
-test
+mi.test.elf
+
+*.gcno
+*.gcda
+*.gcov
+
+report
+tools/incre_report
+tools/gcovr.log
+tools/gcovr_incre.log

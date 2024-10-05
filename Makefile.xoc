@@ -1,11 +1,11 @@
 $(info "====---- START Makefile.xoc ----====")
 
 ifeq ($(TARG),)
-  $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
+  $(error "NEED TARG INFO:e.g:make TARG=FOR_ARM TARG_DIR=arm")
 endif
 
 ifeq ($(TARG_DIR),)
-  $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_ARM TARG_DIR=../arm")
+  $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_ARM TARG_DIR=arm")
 endif
 
 ifeq ($(THREAD_NUM),)
@@ -17,28 +17,40 @@ OPT_DIR=opt
 COM_DIR=com
 READER_DIR=reader
 MACH_DIR=mach
+CURFILE=$(CURDIR)/Makefile.xoc
 
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(READER_DIR)/Makefile.inc")
 include $(READER_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(COM_DIR)/Makefile.inc")
 include $(COM_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(OPT_DIR)/Makefile.inc")
 include $(OPT_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE $(MACH_DIR)/Makefile.inc")
 include $(MACH_DIR)/Makefile.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE Makefile.xoc.inc")
 include Makefile.xoc.inc
+
+$(info "INCLUDE: IN $(CURFILE), INCLUDE Makefile.option")
 include Makefile.option
 
 #SET DEFAULT CFLAGS.
 CFLAGS+=\
- -D$(TARG) \
- -D_SUPPORT_C11_ \
- -Wno-unknown-pragmas \
- -Wno-write-strings \
- -Wsign-promo \
- -Wparentheses \
- -Wformat \
- -Wsign-compare \
- -Wpointer-arith \
- -Wno-multichar \
- -Winit-self \
- -Wswitch
+  -D$(TARG) \
+  -D_SUPPORT_C11_ \
+  -Wno-unknown-pragmas \
+  -Wno-write-strings \
+  -Wsign-promo \
+  -Wparentheses \
+  -Wformat \
+  -Wsign-compare \
+  -Wpointer-arith \
+  -Wno-multichar \
+  -Winit-self \
+  -Wswitch
 
 #Disable -Wconversion to avoid too much complaints.
 
@@ -63,6 +75,8 @@ $(info "COMBINED READER OBJS:$(TMP_READER_OBJS)")
 $(info "COMBINED MACH OBJS:$(TMP_MACH_OBJS)")
 $(info "TARG:$(TARG)")
 $(info "TARG_DIR:$(TARG_DIR)")
+$(info "CURDIR:$(CURDIR)")
+$(info "ROOT_DIR:$(ROOT_DIR)")
 $(info "CC:$(CC)")
 $(info "INC:$(INC)")
 $(info "CFLAGS:$(CFLAGS)")

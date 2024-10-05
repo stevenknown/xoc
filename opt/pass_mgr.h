@@ -109,7 +109,6 @@ protected:
     virtual Pass * allocVectorization();
     virtual Pass * allocMultiResConvert();
     virtual Pass * allocVRP();
-    virtual Pass * allocWorkaround();
     virtual Pass * allocExtPass(PASS_TYPE passty)
     {
         ASSERTN(0, ("Target Dependent Code."));

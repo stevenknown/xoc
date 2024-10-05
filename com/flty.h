@@ -64,12 +64,6 @@ public:
 public:
     Float() { m_f = PRECISION_TYPE(0); }
     Float(PRECISION_TYPE f) { m_f = f; }
-    Float(Float const& f)
-    {
-        //Sometimes, r does not require to initialize always.
-        //ASSERTN(r.m_den != 0, ("denominator is 0!"));
-        m_f = f.m_f;
-    }
 
     CHAR const* dump(StrBuf & buf) const;
     void dump() const;
