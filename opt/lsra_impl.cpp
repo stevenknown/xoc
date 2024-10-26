@@ -1916,27 +1916,9 @@ IR * LSRAImpl::insertSpillCalleeAtEntry(Reg r)
         m_tm->getVectorType(ELEM_NUM_OF_16_ELEM_VECTOR_TYPE, D_U32);
     PRNO prno = m_irmgr->buildPrno(ty);
     m_ra.setReg(prno, r);
-    IR * spill = insertSpillAtEntry(prno, ty, bb);
+    IR * spill = insertSpillAtBBEnd(prno, ty, bb);
     dumpSpill(*this, spill, r, bb, "spill callee-saved at entry");
     return spill;
-}
-
-
-IR * LSRAImpl::insertSpillAtEntry(PRNO prno, Type const* ty, IRBB * bb)
-{
-    ASSERT0(prno != PRNO_UNDEF && ty && bb);
-    ASSERT0(bb->is_entry());
-    IR * spill = m_ra.buildSpill(prno, ty);
-    ASSERT0(spill && isSpillLikeOp(spill) && m_rg->getRegionVar());
-    ASSERT0(m_rg->getRegionVar()->is_entry());
-    m_ra.setSpill(spill);
-    ArgPasser * ap = (ArgPasser*)m_rg->getPassMgr()->queryPass(PASS_ARGPASSER);
-    ASSERT0(ap);
-    IR * marker = ap->getEntryParam();
-    if (marker != nullptr) {
-        return bb->getIRList().insert_before(spill, marker);
-    }
-    return bb->getIRList().append_tail_ex(spill);
 }
 
 
@@ -2122,6 +2104,16 @@ IRListIter LSRAImpl::insertSpillAtBBEnd(IR * spill, IRBB * bb)
     ASSERT0(spill && isSpillLikeOp(spill) && bb && m_rg &&
             m_rg->getRegionVar());
     m_ra.setSpill(spill);
+
+    ArgPasser * ap = (ArgPasser*)m_rg->getPassMgr()->queryPass(PASS_ARGPASSER);
+    ASSERT0(ap);
+
+    IR * marker = ap->getEntryParam();
+    if (m_rg->getRegionVar()->is_entry() && bb->is_entry() &&
+        marker != nullptr) {
+        return bb->getIRList().insert_before(spill, ap->getEntryParam());
+    }
+
     return bb->getIRList().append_tail_ex(spill);
 }
 

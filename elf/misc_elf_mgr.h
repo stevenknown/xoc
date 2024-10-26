@@ -53,7 +53,7 @@ protected:
     void genSymTabContent(OUT BYTEVec & bytevec, OffVec const& offvec)
     { ASSERTN(0, ("TODO")); }
 public:
-    MiscELFMgr() {}
+    MiscELFMgr() : ELFMgr() {}
     virtual ~MiscELFMgr() {}
 };
 

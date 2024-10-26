@@ -714,9 +714,6 @@ extern bool g_debug;
 //The front end is in debug_cpp mode.
 extern bool g_debug_cpp;
 
-//The front end is in debug_pcx mode.
-extern bool g_debug_pcx;
-
 //The front end is in debug_python mode.
 extern bool g_debug_pyhton;
 

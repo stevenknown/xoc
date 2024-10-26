@@ -67,6 +67,7 @@ author: Su Zhenyu
 #include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
+#include "arg_passer.h"
 #endif
 
 #ifdef FOR_IP
@@ -78,7 +79,6 @@ author: Su Zhenyu
 #include "ir_vrp.h"
 #include "ir_ccp.h"
 #include "ir_pre.h"
-#include "arg_passer.h"
 #include "gp_adjustment.h"
 #include "prologue_epilogue_inserter.h"
 #include "br_opt.h"

@@ -251,6 +251,8 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_SYMTAB,
     SH_TYPE_SUBTEXT,
     SH_TYPE_RELA,
+    SH_TYPE_RELA_DATA,
+    SH_TYPE_RELA_SDATA,
     SH_TYPE_CONST,
     SH_TYPE_GOT,
     SH_TYPE_RELA_DYN,
@@ -264,12 +266,16 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_RODATA1,
     SH_TYPE_LDM,
     SH_TYPE_DEBUG_INFO,
+    SH_TYPE_RELA_DEBUG_INFO,
     SH_TYPE_DEBUG_LINE,
+    SH_TYPE_RELA_DEBUG_LINE,
     SH_TYPE_DEBUG_ABBREV,
     SH_TYPE_DEBUG_ARANGES,
     SH_TYPE_DEBUG_RANGES,
+    SH_TYPE_RELA_DEBUG_RANGES,
     SH_TYPE_DEBUG_STR,
     SH_TYPE_DEBUG_FRAME,
+    SH_TYPE_RELA_DEBUG_FRAME,
     SH_TYPE_DEBUG_LOC,
     SH_TYPE_EH_FRAME,
 
@@ -303,21 +309,19 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_SUBTEXT:          \
     case SH_TYPE_RELA:             \
     case SH_TYPE_CONST:            \
-    case SH_TYPE_SPM:              \
     case SH_TYPE_GOT:              \
     case SH_TYPE_RELA_DYN:         \
     case SH_TYPE_DYNSYM:           \
-    case SH_TYPE_TEXT1:            \
-    case SH_TYPE_AITEXT:           \
     case SH_TYPE_FINI:             \
     case SH_TYPE_DYNAMIC:          \
     case SH_TYPE_DL_TDATA:         \
     case SH_TYPE_RODATA:           \
     case SH_TYPE_RODATA1:          \
     case SH_TYPE_LDM:              \
-    case SH_TYPE_COMPILER_VERSION: \
     case SH_TYPE_COMMENT:          \
-    case SH_TYPE_NOTE
+    case SH_TYPE_NOTE:             \
+    case SH_TYPE_RELA_DATA:        \
+    case SH_TYPE_RELA_SDATA
 
 
 #define SWITCH_CASE_COMMON_SECT_CONSTRUCT \
@@ -332,12 +336,8 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_BSS:                     \
     case SH_TYPE_DATA:                    \
     case SH_TYPE_SUBTEXT:                 \
-    case SH_TYPE_RELA:                    \
     case SH_TYPE_CONST:                   \
-    case SH_TYPE_SPM:                     \
     case SH_TYPE_GOT:                     \
-    case SH_TYPE_TEXT1:                   \
-    case SH_TYPE_AITEXT:                  \
     case SH_TYPE_FINI:                    \
     case SH_TYPE_PREINIT_ARRAY:           \
     case SH_TYPE_INTERP:                  \
@@ -345,9 +345,17 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_RODATA:                  \
     case SH_TYPE_RODATA1:                 \
     case SH_TYPE_LDM:                     \
-    case SH_TYPE_COMPILER_VERSION:        \
     case SH_TYPE_COMMENT:                 \
     case SH_TYPE_NOTE
+
+
+#define SWITCH_CASE_COMMON_RELA_SECT_CONSTRUCT \
+    case SH_TYPE_RELA_DATA:                    \
+    case SH_TYPE_RELA_SDATA:                   \
+    case SH_TYPE_RELA_DEBUG_INFO:              \
+    case SH_TYPE_RELA_DEBUG_LINE:              \
+    case SH_TYPE_RELA_DEBUG_FRAME:             \
+    case SH_TYPE_RELA_DEBUG_RANGES
 
 
 #define SWITCH_CASE_COMMON_SECT_OFST \
@@ -362,19 +370,24 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_INTERP
 
 
-#define SWITCH_CASE_SECT_BYTE_TYPE \
-    SWITCH_CASE_COMMON_SECT:       \
-    case SH_TYPE_UNDEF:            \
-    case SH_TYPE_SYMTAB:           \
-    case SH_TYPE_INTERP:           \
-    case SH_TYPE_PREINIT_ARRAY:    \
-    case SH_TYPE_DEBUG_INFO:       \
-    case SH_TYPE_DEBUG_LINE:       \
-    case SH_TYPE_DEBUG_ABBREV:     \
-    case SH_TYPE_DEBUG_ARANGES:    \
-    case SH_TYPE_DEBUG_RANGES:     \
-    case SH_TYPE_DEBUG_FRAME:      \
-    case SH_TYPE_DEBUG_LOC
+#define SWITCH_CASE_SECT_BYTE_TYPE  \
+    SWITCH_CASE_COMMON_SECT:        \
+    case SH_TYPE_UNDEF:             \
+    case SH_TYPE_SYMTAB:            \
+    case SH_TYPE_INTERP:            \
+    case SH_TYPE_PREINIT_ARRAY:     \
+    case SH_TYPE_DEBUG_INFO:        \
+    case SH_TYPE_DEBUG_LINE:        \
+    case SH_TYPE_DEBUG_ABBREV:      \
+    case SH_TYPE_DEBUG_ARANGES:     \
+    case SH_TYPE_DEBUG_RANGES:      \
+    case SH_TYPE_DEBUG_FRAME:       \
+    case SH_TYPE_DEBUG_LOC:         \
+    case SH_TYPE_RELA_DEBUG_FRAME:  \
+    case SH_TYPE_RELA_DEBUG_LINE:   \
+    case SH_TYPE_RELA_DEBUG_RANGES: \
+    case SH_TYPE_RELA_DEBUG_INFO
+
 
 typedef enum _PROGRAM_HEADER {
     PH_TYPE_UNDEF = 0,
@@ -442,128 +455,6 @@ struct SectionDesc {
 
     //Record section name.
     CHAR const* m_desc_name_str;
-};
-
-
-//
-//Start ELFSectionInfo.
-//
-//Record section info when generating elf.
-class ELFSectionInfo {
-    COPY_CONSTRUCTOR(ELFSectionInfo);
-private:
-    //Record whether section exists.
-    bool m_has_sbss;         //Save whether .sbss exists.
-    bool m_has_sdata;        //Save whether .sdata exists.
-    bool m_has_bss;          //Save whether .bss exists.
-    bool m_has_data;         //Save whether .data exists.
-    bool m_has_spm;          //Save whether .spm exists.
-    bool m_has_const;        //Save whether .const exists.
-    bool m_has_rela_sdata;   //Save whether .rela.sdata exists.
-    bool m_has_rela_data;    //Save whether .rela.data exists.
-    bool m_has_debug_abbrev; //Save whether .debug_abbrev exists.
-    bool m_has_debug_info;   //Save whether .debug_info exists.
-    bool m_has_debug_ranges; //Save whether .debug_ranges exists.
-    bool m_has_debug_str;    //Save whether .debug_str exists.
-    bool m_has_debug_line;   //Save whether .debug_line exists.
-    bool m_has_debug_frame;  //Save whether .debug_frame exists.
-
-
-    //Record section align.
-    UINT m_sbss_align;       //Save align value of .sbss.
-    UINT m_sdata_align;      //Save align value of .sdata.
-    UINT m_bss_align;        //Save align value of .bss.
-    UINT m_data_align;       //Save align value of .data.
-    UINT m_spm_align;        //Save align value of .spm.
-    UINT m_const_align;      //Save align value of .const.
-    UINT m_rela_sdata_align; //Save align value of .rela.sdata.
-    UINT m_rela_data_align;  //Save align value of .rela.data.
-    UINT m_shdr_num;         //Save section numbers of elf file.
-
-    UINT m_debug_abbrev_align;  //Save align value of .debug_abbrev.
-    UINT m_debug_info_align;    //Save align value of .debug_info.
-    UINT m_debug_ranges_align;  //Save align value of .debug_ranges.
-    UINT m_debug_str_align;     //Save align value of .debug_str.
-    UINT m_debug_line_align;    //Save align value of .debug_line.
-    UINT m_debug_frame_align;   //Save align value of .debug_frame.
-
-public:
-    ELFSectionInfo();
-    virtual ~ELFSectionInfo() {}
-
-    UINT getBssAlign() const { return m_bss_align; }
-    UINT getConstAlign() const { return m_const_align; }
-    UINT getDataAlign() const { return m_data_align; }
-    UINT getSbssAlign() const { return m_sbss_align; }
-    UINT getSdataAlign() const { return m_sdata_align; }
-    //Judge section type of given section.
-    UINT getSectionAlign(SECTION_TYPE sect);
-    UINT getShdrNum() const { return m_shdr_num; }
-    UINT getSpmAlign() const { return m_spm_align; }
-
-    UINT getDebugAbbrevAlign() const { return m_debug_abbrev_align; }
-    UINT getDebugInfoAlign() const { return m_debug_info_align; }
-    UINT getDebugRangesAlign() const { return m_debug_ranges_align; }
-    UINT getDebugStrAlign() const { return m_debug_str_align; }
-    UINT getDebugLineAlign() const { return m_debug_line_align; }
-    UINT getDebugFrameAlign() const { return m_debug_frame_align; }
-
-    bool hasBss() const { return m_has_bss; }
-    bool hasConst() const { return m_has_const; }
-    bool hasData() const { return m_has_data; }
-    bool hasRelaData() const { return m_has_rela_data; }
-    bool hasRelaSdata() const { return m_has_rela_sdata; }
-    bool hasSbss() const { return m_has_sbss; }
-    bool hasSdata() const { return m_has_sdata; }
-    bool hasSpm() const { return m_has_spm; }
-
-    bool hasDebugAbbrev() const { return m_has_debug_abbrev; }
-    bool hasDebugInfo() const { return m_has_debug_info; }
-    bool hasDebugRanges() const { return m_has_debug_ranges; }
-    bool hasDebugStr() const { return m_has_debug_str; }
-    bool hasDebugLine() const { return m_has_debug_line; }
-    bool hasDebugFrame() const { return m_has_debug_frame; }
-
-    void setBss(bool v) { m_has_bss = v; }
-    void setBssAlign(UINT v) { m_bss_align = v; }
-
-    void setConst(bool v) { m_has_const = v; }
-    void setConstAlign(UINT v) { m_const_align = v; }
-
-    void setData(bool v) { m_has_data = v; }
-    void setDataAlign(UINT v) { m_data_align = v; }
-
-    void setRelaData(bool v) { m_has_rela_data = v; }
-    void setRelaSdata(bool v) { m_has_rela_sdata = v; }
-
-    void setSbss(bool v) { m_has_sbss = v; }
-    void setSbssAlign(UINT v) { m_sbss_align = v; }
-
-    void setSdata(bool v) { m_has_sdata = v; }
-    void setSdataAlign(UINT v) { m_sdata_align = v; }
-
-    void setShdrNum(UINT v) { m_shdr_num = v; }
-
-    void setSpm(bool v) { m_has_spm = v; }
-    void setSpmAlign(UINT v) { m_spm_align = v; }
-
-    void setDebugAbb(bool v) { m_has_debug_abbrev = v; }
-    void setDebugAbbAlign(UINT v) { m_debug_abbrev_align = v; }
-
-    void setDebugInfo(bool v) { m_has_debug_info = v; }
-    void setDebugInfoAlign(UINT v) { m_debug_info_align = v; }
-
-    void setDebugRanges(bool v) { m_has_debug_ranges = v; }
-    void setDebugRangesAlign(UINT v) { m_debug_ranges_align = v; }
-
-    void setDebugStr(bool v) { m_has_debug_str = v; }
-    void setDebugStrAlign(UINT v) { m_debug_str_align = v; }
-
-    void setDebugLine(bool v) { m_has_debug_line = v; }
-    void setDebugLineAlign(UINT v) { m_debug_line_align = v; }
-
-    void setDebugFrame(bool v) { m_has_debug_frame = v; }
-    void setDebugFrameAlign(UINT v) { m_debug_frame_align = v; }
 };
 
 
@@ -676,7 +567,7 @@ public:
         m_charvec_list.init();
     }
 
-    ~SectionInfoMgr()
+    virtual ~SectionInfoMgr()
     {
         for (SectionInfo * si = m_list.get_head();
              si != nullptr; si = m_list.get_next()) {
@@ -698,29 +589,35 @@ public:
         m_charvec_list.clean();
     }
 
-    SectionInfo * allocSectionInfo(SECTION_TYPE sect_type)
+    CHARVec * allocCharVec()
     {
-        SectionInfo * si = new SectionInfo();
-        ASSERT0(si);
-        //Allocate charvec or bytevec according to the section name.
-        switch (sect_type) {
-        case SH_TYPE_SYMSTR:
-        case SH_TYPE_SHSTR:
-        case SH_TYPE_DEBUG_STR:
-            SECTINFO_charvec(si) = new CHARVec();
-            m_charvec_list.append_tail(SECTINFO_charvec(si));
-            break;
-        SWITCH_CASE_SECT_BYTE_TYPE:
-            SECTINFO_bytevec(si) = new BYTEVec();
-            m_bytevec_list.append_tail(SECTINFO_bytevec(si));
-            break;
-        default:
-            UNREACHABLE();
-            break;
-        }
-        m_list.append_tail(si);
-        return si;
+        CHARVec * c = new CHARVec();
+        ASSERT0(c);
+        m_charvec_list.append_tail(c);
+        return c;
     }
+
+    BYTEVec * allocByteVec()
+    {
+        BYTEVec * b = new BYTEVec();
+        ASSERT0(b);
+        m_bytevec_list.append_tail(b);
+        return b;
+    }
+
+    SectionInfo * allocSectionInfo()
+    {
+        SectionInfo * s = new SectionInfo();
+        ASSERT0(s);
+        m_list.append_tail(s);
+        return s;
+    }
+
+    void initSectionInfo(MOD SectionInfo * si, SECTION_TYPE sect_type);
+
+    virtual void initExtSectionInfo(MOD SectionInfo * si,
+                                    SECTION_TYPE sect_type)
+    { ASSERTN(0, ("Target Dependent Code")); }
 };
 
 
@@ -840,6 +737,7 @@ class RelocInfo;
 #define SYMINFO_is_init(v)       ((v)->m_sym_is_init)
 #define SYMINFO_is_global(v)     ((v)->m_sym_is_global)
 #define SYMINFO_is_dynsym(v)     ((v)->m_sym_is_dynsym)
+#define SYMINFO_is_label(v)      ((v)->m_sym_is_label)
 #define SYMINFO_is_debug(v)      ((v)->m_sym_is_debug)
 #define SYMINFO_file_name(v)     ((v)->m_sym_file_name)
 #define SYMINFO_ofst(v)          ((v)->m_sym_offset)
@@ -881,6 +779,9 @@ public:
 
     //Record whether it is debug symbol.
     bool m_sym_is_debug;
+
+    //Record whether it is label symbol.
+    bool m_sym_is_label;
 
     //Record the index of related section.
     UINT m_sect_index;
@@ -944,6 +845,7 @@ public:
         m_sym_is_visible = false;
         m_sym_is_init = false;
         m_sym_is_global = false;
+        m_sym_is_label = false;
         m_sect_type = SH_TYPE_UNDEF;
         m_sect_index = 0;
         m_sym_align = 0;
@@ -1306,6 +1208,8 @@ typedef xcom::TMap<Sym const*, Sym const*> AliasSymbolMap;
 typedef xcom::TMapIter<Sym const*, Sym const*> AliasSymbolMapIter;
 //The map of section name and section type.
 typedef xcom::TMap<Sym const*, SECTION_TYPE> SectionNameAndTypeMap;
+//Record the map of section and it's index in output ELF.
+typedef xcom::TMap<SECTION_TYPE, UINT> SectionIndexMap;
 //
 //Start ELFMgr.
 //
@@ -1402,9 +1306,6 @@ protected:
     //Record all sections that indicate writable data.
     List<ELFSHdr*> m_bss_sect_list;
 
-    //Record section info for generating elf.
-    ELFSectionInfo * m_sect_info;
-
     //Record all symbol names in the order of local symbols first and global
     //symbols last.
     xcom::List<Sym const*> m_symbol_name;
@@ -1413,7 +1314,6 @@ public:
     CHAR const* m_output_file_name;
 protected:
     virtual void allocTargInfo() { ASSERTN(0, ("Target Dependent Code")); }
-    void assignDebugSectionIndex(UINT & debug_section_ind);
     EM_STATUS append(BYTE const* buf, size_t size);
 
     EM_STATUS closeELF();
@@ -1558,115 +1458,8 @@ public:
     void assemblePadZeroToContent(OUT AssembleBinDescVec & content_desc_vec,
                                   UINT pad_size);
 
-    //Collect following info:
-    //(1) Names(string) of all symbols.
-    //(2) Section info.
-    void collectELFFactor(OUT StringList & sym_name);
-
-    //Construct .xxx.attributes section.
-    void constructELFAttributeSection(MOD ELFSHdr * attr_shdr,
-                                      BYTEVec & attr_content, Addr attr_size,
-                                      Word32 attr_type, CHAR const* attr_name);
-
-    //Construct .bss section.
-    void constructELFBssSection(MOD ELFSHdr * bss_shdr, BYTEVec & bss,
-                                UINT bss_align);
-
-    //Construct .const section.
-    void constructELFConstSection(MOD ELFSHdr * const_shdr,
-                                  BYTEVec & const_data,
-                                  UINT const_align);
-
-    //Construct .data section.
-    void constructELFDataSection(MOD ELFSHdr * data_shdr, BYTEVec & data,
-                                 UINT data_align);
-
-    //Construct .text.xxx section.
-    void constructELFFuncSection(MOD ELFSHdr * func_shdr, BYTEVec & code,
-                                 CHAR const* name, MOD BYTE * text_space,
-                                 SymbolInfo const* sym_info);
-
     //Construct ELF header based on the section header number.
     void constructELFHeader(UINT sthr_num);
-
-    //Construct null section header. It always be first section in all
-    //sections and its values are all zero.
-    void constructELFNullSection(MOD ELFSHdr * null_shdr);
-
-    //Construct .rela.data section.
-    void constructELFRelaDataSection(MOD ELFSHdr * rela_data_shdr,
-                                     BYTEVec & rela_data_data,
-                                     ELFSHdr const* sym_shdr,
-                                     ELFSHdr const* data_shdr);
-
-    //Construct .rela.sdata section.
-    void constructELFRelaSdataSection(MOD ELFSHdr * rela_sdata_shdr,
-                                      BYTEVec & rela_sdata_data,
-                                      ELFSHdr const* sym_shdr,
-                                      ELFSHdr const* sdata_shdr);
-
-
-    //Construct .rel.text.xxx section.
-    void constructELFRelSection(MOD ELFSHdr * rel_shdr,
-                                ELFSHdr const* sym_shdr,
-                                ELFSHdr const* func_shdr, BYTEVec & rel,
-                                CHAR const* name, MOD BYTE * rel_space);
-
-    //Construct .sbss section.
-    void constructELFSbssSection(MOD ELFSHdr * sbss_shdr, BYTEVec & sbss,
-                                 UINT sbss_align);
-
-    //Construct .sdata section.
-    void constructELFSdataSection(MOD ELFSHdr * sdata_shdr, BYTEVec & sdata,
-                                  UINT sdata_align);
-
-    //Construct section header indexs.
-    void constructELFShIndex(OUT CHARVec & charvec, OUT OffVec & offvec);
-
-    //Construct .shdr_strtab section.
-    void constructELFShStrSection(MOD ELFSHdr * shstr_shdr);
-
-    //Construct .spm section.
-    void constructELFSpmSection(MOD ELFSHdr * spm_shdr, BYTEVec & spm,
-                                UINT spm_align);
-
-    //Construct .symstr section.
-    void constructELFStrTabSection(MOD ELFSHdr * symstr_shdr,
-                                   CHARVec & sym_str);
-
-    //Construct .symtab section.
-    void constructELFSymTabSection(MOD ELFSHdr * symtab_shdr,
-                                   ELFSHdr const* symstr_shdr,
-                                   ELFSHdr const* text_shdr, BYTEVec & sym);
-
-    //Construct .text section.
-    void constructELFTextSection(MOD ELFSHdr * text_shdr);
-
-    //Construct .debug_abb section.
-    void constructELFDebugAbbrevSection(MOD ELFSHdr * debug_abb_shdr,
-                                        UINT debug_abb_align);
-
-    //Construct .debug_str section.
-    void constructELFDebugStrSection(MOD ELFSHdr * debug_str_shdr,
-                                     UINT debug_str_align);
-
-    //Construct .debug and rela section.
-    //Fxiups is used for generating relocation of relevant
-    //debug sections. Currently,
-    //only debug_ranges, debug_info, debug_line,
-    //and debug_frame need relocation.
-    void constructELFDebugAndRelaSection(MOD ELFSHdr * symtab_shdr,
-                                         MOD ELFSHdr * debug_shdr,
-                                         UINT debug_info_align,
-                                         OUT UINT & si,
-                                         CHAR const* debug_section_name,
-                                         CHAR const* debug_rela_section_name,
-                                         Vector<MCFixup*> const& fxiups,
-                                         BYTEVec & debug_code);
-
-    //Construct null symbol. It always be the first symbol in all symbols and
-    //its values are all zero.
-    void constructSymbolNull(OUT BYTEVec & bytevec);
 
     void dump() const;
     void dumpStrTabContent(CHAR const* strtab, Addr size) const;
@@ -1691,17 +1484,6 @@ public:
     virtual Word32 getAttributeSectionType()
     { ASSERTN(0, ("Target Dependent Code")); return ELF_VAL_UNDEF; }
 
-    //Generate contents for .symtab, .sbss, .bss, .sdata, .data, .const
-    //and SPM sections.
-    void genCommonSectionContent(OUT BYTEVec & symtab_content,
-                                 OUT BYTEVec & sbss_content,
-                                 OUT BYTEVec & sdata_content,
-                                 OUT BYTEVec & bss_content,
-                                 OUT BYTEVec & data_content,
-                                 OUT BYTEVec & const_content,
-                                 OUT BYTEVec & spm_content,
-                                 OffVec const& sym_str_off);
-
     //Generate relocation entries for a debug section,
     //not all fixups will generate relocation entries.
     //e.g: for a var, once its position is determined,
@@ -1714,30 +1496,6 @@ public:
     //Generate relocation entries for MCExpr of type SymbolRef.
     void genSymbolRefReloc(MCExpr const* value, SymbolInfo const* elf_sym_info,
                            MCFixup * fixup_entry, BYTEVec & debug_code);
-
-    //Generate contents for .rel.text.xxx section.
-    //bytevec: binary code of relocation info of function.
-    //reloc:   saved all relocation entries for current symbol.
-    void genRelocContent(OUT BYTEVec & bytevec,
-                         xcom::Vector<RelocInfo*> const& reloc);
-
-    //Generate contents for .rel.sdata and .rel.data sections.
-    void genRelocSdataAndDataContent(OUT BYTEVec & sdata_content,
-                                     OUT BYTEVec & data_content);
-
-    //Extract all section headers' string name and make up a string-table.
-    //charvec: the generated string table.
-    //offvec: record the byte offset to each string name.
-    void genSectHeaderNameStrTabContent(OUT CHARVec & charvec,
-                                        OUT OffVec & offvec);
-
-    //The function generate the content of string table by given string list.
-    //It will compose string in 'strlst' into a char-vector, and record the
-    //byte offset into 'offvec' for each string in 'charvec'.
-    //charvec: record a char buffer.
-    //offvec: record the byte offset.
-    void genStrTabContent(OUT CHARVec & charvec, OUT OffVec & offvec,
-                          StringList const& strlst);
 
     //Returns binary codes of given symbol.
     BYTEVec & getSymbolCode(Sym const* sym)
@@ -1878,11 +1636,16 @@ public:
     //Initialize the symbol information and save it to m_symbol_info by modules
     //outside the ELFMgr module.
     void initSymbol(xoc::Var const* var, Sym const* func_name = nullptr,
-        SECTION_TYPE sect_type = SH_TYPE_UNDEF, UINT sect_ofst = 0);
+        SECTION_TYPE sect_type = SH_TYPE_UNDEF, UINT sect_ofst = 0,
+        UCHAR symbol_type = STT_NOTYPE);
 
     //Initialize the section's symbol information based on
     //the section var passed from the frontend, such as debug_line.
     void initSymSection(xoc::Var const* var);
+
+    //Initialize the info of ELFMgr.
+    void initELFMgr();
+
     bool is64bit() const { return m_elf_hdr.is64bit(); }
     bool is32bit() const { return m_elf_hdr.is32bit(); }
 
@@ -1895,9 +1658,6 @@ public:
     //whether the value is less than or equal to BIN_WORD_SIZE;
     bool isSizeValid(UINT sz) { return sz <= BIN_WORD_SIZE; }
 
-    //Whether current variable is user-defined variable.
-    bool isUserDefinedFunction(xoc::Var const* var);
-
     //Whether info of var should be wrote into ELF file.
     bool isVarAvailable(xoc::Var const* var)
     {
@@ -1905,14 +1665,12 @@ public:
             !var->is_fake() && !var->is_unallocable();
     }
 
-    //Judge section type of symbols.
-    SECTION_TYPE judgeSymbolSection(xoc::Var const* var);
+    //Judge section type of 'var' according to different architecture.
+    virtual SECTION_TYPE judgeSectWhichVarBelongTo(xoc::Var const* var);
 
-    //Generate contents for .text.xxx and .rel.text.xxx and construct them
-    //using generated data.
-    //symtab_shdr: .symtab section header
-    //si: index of current section header in all section headers.
-    void processELFTextRelSection(ELFSHdr const* symtab_shdr, OUT UINT & si);
+    //Judge section type of 'function var' for output ELF with ET_REL type.
+    virtual SECTION_TYPE judgeSectWhichFuncBelongTo(xoc::Var const* var)
+    { ASSERTN(0, ("Target Dependent Code")); return SH_TYPE_UNDEF; }
 
     EM_STATUS readAllSectContent();
     //Read the ELF information.
@@ -1940,9 +1698,6 @@ public:
     //Set dwarf mgr.
     void setDwarfMgr(MCDwarfMgr * dm) { ASSERT0(dm); m_dm = dm; }
 
-    //Set section info based symbol information.
-    void setSectionInfo(SymbolInfo const* sym_info);
-
     //Set name of generated binary file.
     void setOutputFileName(CHAR const* name)
     {
@@ -1950,9 +1705,9 @@ public:
         ::memcpy((void*)m_output_file_name, name, ::strlen(name) + 1);
     }
 
-    //Set section header content offset.
+    CHAR const* getOutputFileName() const { return m_output_file_name; }
+
     //Note section content size should be ready.
-    void setSectContentOffset();
     void setSectHeaderNameOffset(OffVec const& offvec);
     void setSectHeaderNameStrTab(ELFSHdr * shdr)
     {
@@ -1973,10 +1728,6 @@ public:
     EM_STATUS writeSectContent();
     EM_STATUS writeSectHeaderTab();
 
-    //An common used ELF generation process for different architectures,
-    //different architectures only need to implement the info collection
-    //functions.
-    void write2ELF();
 protected:
     //Record whether the ELFMgr is with ELF format. 'true' if the ELFMgr
     //info collected from ELF file. 'false' if the ELFMgr info collected
@@ -2049,6 +1800,9 @@ protected:
     //Record string name for decreasing lookup time.
     SymTab * m_sym_tab;
 
+    //SectionInfo Mgr. Create and free SectionInfo resources.
+    SectionInfoMgr * m_sect_mgr;
+
     //Record section with order. The order info come from getSectionIndex().
     xcom::Vector<Sym const*> m_sect_layout;
 
@@ -2058,14 +1812,14 @@ protected:
     //Record reladyn info.
     xcom::Vector<RelaDynInfo*> m_reladyn_info_vec;
 
+    //Record the map of section and it's index.
+    SectionIndexMap m_section_index_map;
+
     //SymbolInfo Mgr. Create and free SymbolInfo resources.
     SymbolInfoMgr m_sym_mgr;
 
     //FunctionInfo Mgr. Create and free FunctionInfo resources.
     FunctionInfoMgr m_func_mgr;
-
-    //SectionInfo Mgr. Create and free SectionInfo resources.
-    SectionInfoMgr m_sect_mgr;
 
     //RelocInfo Mgr. Create and free RelocInfo resources.
     RelocInfoMgr m_reloc_mgr;
@@ -2083,7 +1837,12 @@ protected:
     //      .sdata_off:     0,      8,        40
     //     ----------------------------------------
     ELFSymbolOff m_symbol_off;
+
 public:
+    //Record the index of text section in output ELF with ET_REL type.
+    //Since there may be more than one '.function_name.text' section.
+    UINT m_text_index;
+
     //Record the file name of ELFMgr.
     CHAR const* m_file_name;
 
@@ -2103,7 +1862,7 @@ public:
     SymtabInfoVec m_symtab_info_vec;
 
     //Record ELF SectionInfo.
-    SectionInfoMap m_sect_map;
+    SectionInfoMap * m_sect_map;
 
     //Alias is a second name of the aliasee symbol. These two symbols are point
     //to the same content and can be used interchangeably. Alias is an important
@@ -2156,6 +1915,10 @@ public:
     Sym const* addToSymTab(CHAR const* s)
     { ASSERT0(s && m_sym_tab); return m_sym_tab->add(s); }
 
+    //Allocate SectionInfoMgr object according to different architecture.
+    virtual SectionInfoMgr * allocSectionInfoMgr()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
     //Allocate program header according to the given 'phnum'.
     void allocProgramHeader(UINT phnum);
 
@@ -2202,15 +1965,22 @@ public:
 
     //Construct null symbol of '.symtab' and '.dynsym'.
     //It is the first symbol in symtab and it's values are all zero.
-    void constructSymbolNull(OUT BYTEVec * symtab_bytevec,
-                             OUT BYTEVec * dynsym_bytevec);
+    void constructSymbolNull(OUT BYTEVec * bytevec);
 
     //A helper function of construct ELF section.
     void constructELFSectionHelper();
 
     void constructELFSection();
 
+    //Construct extend ELF section according to different architecture.
+    virtual void constructExtELFSection(MOD SectionInfo * sect_info,
+        SECTION_TYPE sect_type, MOD ELFSHdr * shdr)
+    { ASSERTN(0, ("Target Dependent Code")); }
+
     void countStrSizeAndSymbolNum();
+
+    //Count the number of section according to the section type.
+    virtual UINT countSectNumViaSectType(SECTION_TYPE sect_type);
 
     //Create the element of dynamic section. The element is ELFDyn type.
     //tag: value of d_tag field of ELFDyn.
@@ -2219,9 +1989,24 @@ public:
     void createDynamicElement(OUT AssembleBinDescVec & desc_vec,
                               SWord tag, Addr val, UINT idx);
 
+    //Create '.text' section according to the FunctionInfo.
+    void createTextSect(MOD FunctionInfo * fi);
+
+    //Create '.rela.text' section according to SymbolInfo.
+    void createRelaTextSect(MOD SymbolInfo * symbol_info);
+
+    //Create '.rela.debug.xx' section according to SymbolInfo.
+    void createRelaDebugSect(SymbolInfo const* symbol_info);
+
+    //Create '.rela.data' section according to SymbolInfo.
+    void createRelaDataSect(SymbolInfo const* symbol_info);
+
+    //A helper function of create foundamental sections
+    //according to different architecture.
+    virtual void createFundamentalSection();
+
     //Construct symbol of '.symtab' and '.dynsym'.
-    void constructSymbolUnull(OUT BYTEVec * sym_bytevec,
-                              OUT BYTEVec * dynsym_bytevec);
+    void constructSymbolUnull();
 
     //A helper function to extract info from 'abdv' and save it into
     //section content buffer 'bytevec'.
@@ -2235,6 +2020,9 @@ public:
     bool findSymbolWithNoSectionType(SymbolInfo const* original_symbol,
                                      OUT SymbolInfo ** target_symbol);
 
+    //Find SymbolInfo according to the 'symbol_name'.
+    SymbolInfo * findSymbol(Sym const* symbol_name);
+
     //Generate section content helper function.
     void genSectionContentHelper();
 
@@ -2245,11 +2033,10 @@ public:
                           StringList const& strlst);
 
     //The function generate the content of string table by m_symbol_info.
-    void genStrTabContent(OUT CHARVec * charvec);
+    void genStrTabContent();
 
-    //Generate contents for .symtab section.
-    //bytevec: binary code of .symtab section content.
-    void genSymTabContent(OUT BYTEVec * bytevec, OUT BYTEVec * dynsym_bytevec);
+    //Generate contents for .symtab and .dynsym section.
+    void genSymTabContent();
 
     //Extract all section headers' string name and make up a string-table.
     //offvec: record the byte offset to each string name.
@@ -2272,6 +2059,31 @@ public:
     //      The number of 'x' in 'str.x' is decided by 'name_num'.
     CHAR const* genSymbolNameWithIntSuffix(
         MOD SymbolInfo * symbol_info, UINT name_num);
+
+    //Generate contents for .rel.text.xxx section.
+    //bytevec: binary code of relocation info of function.
+    //reloc:   saved all relocation entries for current symbol.
+    void genRelocContent(OUT BYTEVec * bytevec,
+        xcom::Vector<RelocInfo*> const& reloc_vec);
+
+    //The helper function of generated section content.
+    void genCommonSectionContentHelper();
+
+    //Generate '.text' and '.rela.text' section content.
+    void genRelaTextSectionContent(MOD SymbolInfo * symbol_info);
+
+    //Generate '.rela.xxx' section content.
+    void genRelaSectionContent(MOD SymbolInfo * symbol_info);
+
+    //Get rela text section type.
+    virtual SECTION_TYPE getRelaTextSectType(MOD SymbolInfo * symbol_info)
+    { ASSERT0(symbol_info && SYMINFO_func(symbol_info)); return SH_TYPE_RELA; }
+
+    //Get sub-name of rela text section. e.g. '.rela.text.' of rela text
+    //section '.rela.text.func_name' and other '.rela.xxx.' sub name of
+    //rela text section in different architecture.
+    virtual CHAR const* getSubNameOfRelaTextSect(MOD SymbolInfo * symbol_info)
+    { ASSERT0(symbol_info && SYMINFO_func(symbol_info)); return RELA_SH_NAME; }
 
     //Get SymbolInfo from 'm_symbol_info_map'.
     SymbolInfo * getSymbolInfo(Sym const* symbol_name);
@@ -2402,21 +2214,21 @@ public:
 
     //Get section order index. Differnet architecture may have different section
     //layout(order). This function must be called after all sections have been
-    //created by processSectionInfo() or processCode().
-    virtual UINT getSectionIndex(SECTION_TYPE sect_type)
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    //created by createFundamentalSection() or processCode().
+    UINT getSectionIndex(SECTION_TYPE sect_type)
+    { return m_section_index_map.get(sect_type); }
 
     //Get section index via 'symbol_info'.
     virtual UINT getSectionIndexViaSymbolInfo(SymbolInfo const* symbol_info)
     {
         ASSERT0(symbol_info);
-        SectionInfo * si = m_sect_map.get(SYMINFO_sect_name(symbol_info));
+        SectionInfo * si = m_sect_map->get(SYMINFO_sect_name(symbol_info));
         ASSERT0(si);
         return (UINT)SECTINFO_index(si);
     }
 
     UINT getShdrNum() const
-    { return m_sect_map.get_elem_count(); }
+    { return m_sect_map->get_elem_count(); }
 
     //Get section name by 'index'.
     Sym const* getSectionNameByIndex(UINT index)
@@ -2424,8 +2236,8 @@ public:
 
     UINT getSectionAlign(Sym const* sect_name) const
     {
-        ASSERT0(m_sect_map.find(sect_name));
-        SectionInfo * si = m_sect_map.get(sect_name);
+        ASSERT0(m_sect_map->find(sect_name));
+        SectionInfo * si = m_sect_map->get(sect_name);
         ASSERT0(si);
         return (UINT)SECTINFO_align(si);
     }
@@ -2461,6 +2273,12 @@ public:
     //Get rela section header type.
     //e.g.: given ".rela.text.func_name" and return ".text"
     CHAR const* getRelaShdrType(CHAR const* shdr_name);
+
+    //Get corresponded section type of 'rela_sect_type'.
+    SECTION_TYPE getCorrespondedSectType(SECTION_TYPE rela_sect_type);
+
+    //Get corresponded rela section type of 'sect_type'.
+    SECTION_TYPE getCorrespondedRelaSectType(SECTION_TYPE sect_type);
 
     //Get substr from 'str' via the 'index' of
     //substr after splited by 'delimiter'.
@@ -2517,9 +2335,32 @@ public:
     //Get the size of .dynamic section content.
     UINT getDynamicSectionSize();
 
+    //Get the index of .text section.
+    UINT getTextIndex() const { return m_text_index; }
+
+    //Get the number of .text section.
+    UINT getTextNum() const { return getTextIndex(); }
+
     //Get flags. There may be specific section flags for different architecture.
     virtual Addr getSectionFlags(SectionDesc const* sect_desc)
     { ASSERT0(sect_desc); return SECTDESC_flags(sect_desc); }
+
+    //Get the size of 'section index table'.
+    virtual UINT getSectionIndexTableNum() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get 'section index table'.
+    virtual SECTION_TYPE const* getSectionIndexTable() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get secton table info from 'section index table'.
+    SECTION_TYPE getSectionFromIndexTable(UINT index)
+    {
+        ASSERT0(index < getSectionIndexTableNum());
+        return getSectionIndexTable()[index];
+    }
+
+    UINT getELFType();
 
     //Check whether there is specific section.
     bool hasSection(SECTION_TYPE sect_type)
@@ -2527,7 +2368,7 @@ public:
 
     //Check whether there is specific section.
     bool hasSection(Sym const* sect_sym_name) const
-    { ASSERT0(sect_sym_name); return m_sect_map.find(sect_sym_name); }
+    { ASSERT0(sect_sym_name); return m_sect_map->find(sect_sym_name); }
 
     //Whether the corresponded reladyn info of 'reloc_info' has been recorded.
     bool hasBeenRecordedRelaDynInfoItem(RelocInfo const* reloc_info,
@@ -2551,7 +2392,7 @@ public:
     //'file_path': used for 'm_file_name' variable.
     //'is_elf_format': used for 'm_have_elf_format' variable.
     void initELFMgrInfo(MOD SymTab * sym_tab, CHAR const* file_path,
-                        bool is_elf_format);
+        UINT elf_type, bool is_elf_format);
 
     //Initialize the value of p_offset/p_vaddr/p_paddr of program header.
     void initProgramHeader();
@@ -2580,27 +2421,32 @@ public:
     virtual bool isUndefFuncationalVar(SymbolInfo * symbol_info, UCHAR bind)
     { ASSERT0(symbol_info); return false; }
 
+    //Whethe it is mult-section which more than one sections with same
+    //section type. e.g.: Both .text.func_name_1 and .text.func_name_2
+    //have SH_TYPE_SUBTEXT type.
+    virtual bool isMultiSection(SECTION_TYPE sect_type)
+    { return SH_TYPE_RELA == sect_type; }
+
+    bool isRelType() { return getELFType() == ET_REL; }
+
+    bool isDynType() { return getELFType() == ET_DYN; }
+
     //Whether SymbolInfo is with local attribute.
-    bool isSymbolWithLocalAttr(SymbolInfo const* s) const
-    {
-        ASSERT0(s);
-        return ((SYMINFO_sym(s).st_bind == STB_LOCAL) ||
-                (GET_SYM_OTHER_VALUE(SYMINFO_sym(s).st_other) == STV_HIDDEN));
-    }
+    bool isSymbolWithLocalAttr(SymbolInfo const* s);
 
     bool isStandardELFFormat() { return m_have_elf_format; }
 
-    bool isDebugSection(SECTION_TYPE sect_name)
+    bool isDebugSection(SECTION_TYPE sect_type)
     {
-        return (sect_name == SH_TYPE_EH_FRAME ||
-                sect_name == SH_TYPE_DEBUG_INFO ||
-                sect_name == SH_TYPE_DEBUG_LINE ||
-                sect_name == SH_TYPE_DEBUG_ABBREV ||
-                sect_name == SH_TYPE_DEBUG_RANGES ||
-                sect_name == SH_TYPE_DEBUG_FRAME ||
-                sect_name == SH_TYPE_DEBUG_LOC ||
-                sect_name == SH_TYPE_DEBUG_STR ||
-                sect_name == SH_TYPE_DEBUG_ARANGES);
+        return (sect_type == SH_TYPE_EH_FRAME ||
+                sect_type == SH_TYPE_DEBUG_INFO ||
+                sect_type == SH_TYPE_DEBUG_LINE ||
+                sect_type == SH_TYPE_DEBUG_ABBREV ||
+                sect_type == SH_TYPE_DEBUG_RANGES ||
+                sect_type == SH_TYPE_DEBUG_FRAME ||
+                sect_type == SH_TYPE_DEBUG_LOC ||
+                sect_type == SH_TYPE_DEBUG_STR ||
+                sect_type == SH_TYPE_DEBUG_ARANGES);
     }
 
     //Merge BSS SymbolInfo into the corresponded section of output ELF.
@@ -2628,10 +2474,6 @@ public:
     //the Phdr info of each shdr.
     void processProgramHeader();
 
-    //A helper function of create foundamental sections
-    //according to different architecture.
-    virtual void processSectionInfo();
-
     //A function to generate .dynamic section content. There is a dynamic
     //section configure table to control the item info of .dynamic section.
     //The function will iterate over the configure table and create ELFDyn
@@ -2643,9 +2485,19 @@ public:
     //of section. s_offset field dedicated the section offset in ELF file.
     void processSectionOffset();
 
+    //Process extend section offset according to different architecture.
+    virtual void processExtSectionOffset(MOD SectionInfo * sect_info,
+        SECTION_TYPE sect_type, Off section_base, UINT sect_index)
+    { ASSERTN(0, ("Target Dependent Code")); }
+
     //Process the s_addr field of ELFSHdr type after setting the base addr
     //of section. s_addr field is the address of section.
     void processSectionAddr();
+
+    //Process extend section address according to different architecture.
+    virtual void processExtSectionAddr(MOD SectionInfo * sect_info,
+        SECTION_TYPE sect_type, Addr & current_addr, UINT sect_index)
+    { ASSERTN(0, ("Target Dependent Code")); }
 
     //Process ELF name. The 'fn' may be a file path.
     //e.g.: 1.given "elf.name" and return "elf.name".
@@ -2713,7 +2565,7 @@ public:
     //Set section align.
     void setSectionAlign(SECTION_TYPE sect_type, UINT v)
     {
-        ASSERT0(m_sect_map.find(getSectionName(sect_type)));
+        ASSERT0(m_sect_map->find(getSectionName(sect_type)));
         SectionInfo * si = getSection(sect_type);
         ASSERT0(si);
         si->m_sect_addr_align = v;
@@ -2740,6 +2592,10 @@ public:
     void setStrSize(UINT v) { m_symbol_str_len = v; }
 
     void setSymTab(MOD SymTab * v) { m_sym_tab = v; }
+
+    void setSectionIndex();
+
+    void setTextIndex(UINT v) { m_text_index = v; }
 
     //Record SymbolInfo into 'm_symbol_info_map' and 'm_symbol_info_vec'.
     void setSymbolInfo(MOD SymbolInfo * sym_info);
@@ -2777,6 +2633,15 @@ public:
     void setRelaDynInfo(MOD RelocInfo * reloc_info, Off & got_ofst,
                         UINT & dynsym_idx);
 
+    //Set the index of multi-section which more than one sections with
+    //same section type.
+    void setMultiSectionIndex();
+
+    //Set the index of extend multi-section which more than one sections
+    //with same section type.
+    virtual void setExtMultiSectionIndex(SECTION_TYPE sect_type)
+    { ASSERTN(0, ("Target Dependent Code")); return; }
+
     //Update st_value of ELFSym after the base address
     //of .symtab/.dynsym section have been set.
     void updateSymOffset(SECTION_TYPE sect_type);
@@ -2799,25 +2664,25 @@ class ELFOpt {
 public:
     //-elf-device option: Output relocatable file (ET_REL type) that need
     //to be relocated with other device file.
-    bool is_device_elf;
+    bool m_is_device_elf;
     //-elf-fatbin option: Output shared object file (ET_DYN type) that direct
     //execute on device. It will linked multi-file and other external .so file.
-    bool is_fatbin_elf;
+    bool m_is_fatbin_elf;
     //-elf-dumplink option: Dump info during link process.
-    bool is_dump_link_info;
+    bool m_is_dump_link_info;
 public:
     ELFOpt()
     {
         //FIXME: Now default ELF output format is 'is_device_elf = true'.
         //Removed it after modified testcases CMakefile.
-        is_device_elf = true;
-        is_fatbin_elf = false;
-        is_dump_link_info = false;
+        m_is_device_elf = true;
+        m_is_fatbin_elf = false;
+        m_is_dump_link_info = false;
     }
 
-    bool isDeviceELF() const { return is_device_elf; }
-    bool isFatbinELF() const { return is_fatbin_elf; }
-    bool isDumpLink() const { return is_dump_link_info; }
+    bool isDeviceELF() const { return m_is_device_elf; }
+    bool isFatbinELF() const { return m_is_fatbin_elf; }
+    bool isDumpLink() const { return m_is_dump_link_info; }
 };
 
 extern ELFOpt g_elf_opt;
@@ -3260,9 +3125,6 @@ typedef xcom::TMap<Sym const*, UINT, CompareKeyBase<Sym const*>,
 class LinkerMgr {
     COPY_CONSTRUCTOR(LinkerMgr);
 
-    //Record ELFMgr object that generated by LinkerMgr. Some ELFMgr objects
-    //that generated in other module don't be recorded in this List.
-    xcom::List<ELFMgr*> m_elf_mgr_meta_list;
 protected:
     //File name of output ELF.
     CHAR const* m_output_file_name;
@@ -3289,6 +3151,10 @@ protected:
     //be used in LinkerMgr. It includes the element in 'm_elf_mgr_meta_list'
     //and ELFMgr objects that generated by other module.
     xcom::List<ELFMgr*> m_elf_mgr_list;
+
+    //Record ELFMgr object that generated by LinkerMgr. Some ELFMgr objects
+    //that generated in other module don't be recorded in this List.
+    xcom::List<ELFMgr*> m_elf_mgr_meta_list;
 
     //Record relocated symbol.
     xcom::Vector<RelocInfo*> m_reloc_symbol_vec;
@@ -3320,11 +3186,8 @@ public:
     virtual ~LinkerMgr();
 
     //Allocate ELFMgr during linker.
-    ELFMgr * allocELFMgr();
-
-    //Allocate output ELFMgr object.
-    virtual void allocOutputELFMgr()
-    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual ELFMgr * allocELFMgr()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     //Allocate vector to record the unresolved RelocInfo.
     //'reloc_info': unresolved RelocInfo.
@@ -3428,18 +3291,8 @@ public:
     virtual void doRelocate(MOD ELFMgr * elf_mgr)
     { ASSERTN(0, ("Target Dependent Code")); return; }
 
-    //Free Output ELFMgr object.
-    void freeOutputELFMgr()
-    {
-        if (m_output_elf_mgr != nullptr) {
-            delete m_output_elf_mgr;
-            m_output_elf_mgr = nullptr;
-        }
-    }
-
     //Generate ELFMgr object.
-    virtual ELFMgr * genELFMgr()
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+    ELFMgr * genELFMgr();
 
     //Get target ELF info from AR file via 'index'.
     //And collect SymbolInfo and RelocInfo from this target ELF.
@@ -3551,8 +3404,17 @@ public:
     virtual void mergedShdrWithProgBitsType(
         ELFSHdr const* shdr, Sym const* shdr_subname);
 
-    //Merge code in 'symbol_info' into .text section of output ELFMgr.
-    virtual void mergeCode(MOD SymbolInfo * symbol_info);
+    //The helper section of merged code in 'symbol_info'
+    //into .text section of output ELFMgr.
+    void mergeCodeHelper(MOD SymbolInfo * symbol_info);
+
+    //Merge code in 'symbol_info' into .text
+    //Section of ET_DYN type output ELFMgr.
+    virtual void mergeDynTypeCodeImpl(MOD SymbolInfo * symbol_info);
+
+    //Merge code in 'symbol_info' into .text
+    //Section of ET_REL type output ELFMgr.
+    virtual void mergeRelTypeCodeImpl(MOD SymbolInfo * symbol_info);
 
     //Merge data in 'symbol_info' into .data section of output ELFMgr.
     virtual void mergeData(MOD SymbolInfo * symbol_info);
@@ -3570,6 +3432,9 @@ public:
     //It will be called if the command option is '-elf-fatbin'.
     //'elf_mgr_list': List that recorded all ELFMgr.
     void outputSharedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list);
+
+    //It is entry function of output relocated object ELF file.
+    void outputRelocatedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list);
 
     //It is entry function of generating output executed ELF.
     void processOutputExeELF();
@@ -3716,7 +3581,8 @@ public:
 
     //The name of output ELFMgr can be set by 'output_name' that
     //provided by outside user or the default value will be used.
-    void setOutputName(CHAR const* output_name);
+    void setOutputInfo(CHAR const* output_name,
+                       MOD ELFMgr * elf_mgr, UINT elf_type);
 
     //Target resolved SymbolInfo exists in 'elf_mgr'. RelocInfo will be
     //resolved by the SymbolInfo.

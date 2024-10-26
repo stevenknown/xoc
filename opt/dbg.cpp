@@ -403,9 +403,6 @@ void DbxMgr::setLangInfo()
     if (g_debug_cpp) {
         m_lang_info.setLangIndex(LangInfo::LANG_CPP, index_lang_num++);
     }
-    if (g_debug_pcx) {
-        m_lang_info.setLangIndex(LangInfo::LANG_PCX, index_lang_num++);
-    }
     if (g_debug_pyhton) {
         m_lang_info.setLangIndex(LangInfo::LANG_PYTHON, index_lang_num++);
     }

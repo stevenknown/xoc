@@ -111,6 +111,15 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
+    //There is problem that entry_bb will be attached redundant LiveIn and
+    //LiveOut info after completed liveness computing via the function of
+    //'computeGlobal'. The main reason for this phenomenon is that there is
+    //loop edge in the CFG. LiveIn and LiveOut info will be flowed back into
+    //entry_bb along with the loop edge. Thus it needs to remove redudant
+    //LiveIn and LiveOut info from entry_bb and it's successor node until
+    //reached a node with more than one degree.
+    void eliminateRedundantLivenessInEntryBB(IRCFG const* cfg);
+
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }

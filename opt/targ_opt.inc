@@ -36,5 +36,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../arm/arm_opt.inc"
 
 #else
-//No target extented code
+//No target extented opt
 #endif

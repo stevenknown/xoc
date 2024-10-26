@@ -86,7 +86,7 @@ public:
     //of different architectures.
     virtual UINT getCalleeSaveStackSlotSize() const = 0;
 
-    //Return true if the stack grows upward, false if it grows downward,
+    //Return true if the stack grows downward, false means growing upward,
     //reflecting the behavior across different architectures.
     virtual bool isStackGrowthDownward() const = 0;
 };

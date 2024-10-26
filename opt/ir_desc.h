@@ -185,6 +185,8 @@ typedef enum tagIRC_ATTR {
     //Indicates the operation has multiple-result list.
     IRC_HAS_RES_LIST_POS = 28,
     IRC_HAS_RES_LIST = 1ULL<<IRC_HAS_RES_LIST_POS,
+
+    IRC_MAIN_ATTR_LAST_POS = IRC_HAS_RES_LIST_POS,
     #include "irc_attr_ext.inc"
 } IRC_ATTR;
 

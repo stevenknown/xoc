@@ -64,10 +64,10 @@ public:
     TargInfoMgr() {}
     virtual ~TargInfoMgr() { destroy(); }
 
-    void dump(Region const* rg) const;
+    virtual void dump(Region const* rg) const;
     void destroy();
 
-    REGFILE getRegFile(Reg r) const;
+    virtual REGFILE getRegFile(Reg r) const;
 
     //Get scalar allocable register set of different architectures.
     virtual xgen::RegSet const* getAllocableScalarRegSet() const;
@@ -126,6 +126,14 @@ public:
 
     //Get return address of different architectures.
     virtual xgen::Reg getRA() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get the rflag register for different architectures.
+    virtual xgen::Reg getRflagRegIsTer() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+
+    //Get the last physical register for different architectures.
+    virtual xgen::Reg getRegLast() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
     //Get scalar allocable register set of different architectures.
@@ -208,7 +216,7 @@ public:
     }
     bool isLink(Reg r) const { return getLink() == r; }
 
-    void init();
+    virtual void init();
 
     void reset();
 };

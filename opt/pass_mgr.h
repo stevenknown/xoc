@@ -76,7 +76,6 @@ protected:
     virtual Pass * allocGPAdjustment();
     virtual Pass * allocGSCC();
     virtual Pass * allocGVN();
-    virtual Pass * allocIGotoOpt();
     virtual Pass * allocInferType();
     virtual Pass * allocInliner();
     virtual Pass * allocInsertCvt();

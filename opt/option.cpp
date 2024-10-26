@@ -134,7 +134,6 @@ bool g_do_arg_passer = true;
 bool g_recycle_local_id = false;
 bool g_debug = false;
 bool g_debug_cpp = true;
-bool g_debug_pcx = false;
 bool g_debug_pyhton = false;
 bool g_adjust_kernel = true;
 

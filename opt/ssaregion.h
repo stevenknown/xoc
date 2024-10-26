@@ -119,7 +119,8 @@ public:
     //Return true if all predecessors of 'bb' are located in SSA region.
     bool isAllPredInRegion(IRBB const* bb) const;
 
-    //Infer and add those BBs that should be also handled in PRSSA construction.
+    //Infer and add those BBs that should be also handled in PRSSA
+    //construction.
     void inferAndAddRelatedBB();
 
     //Set the root BB of current SSA construction region.

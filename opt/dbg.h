@@ -49,7 +49,6 @@ public:
         LANG_UNDEF = 0,
         LANG_CPP,     //C++
         LANG_PYTHON,  //Python
-        LANG_PCX,     //PCX
         LANG_NUM
     } LANG;
     typedef xcom::TMap<LANG, UINT8> LANG2INDEX;

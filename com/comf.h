@@ -324,15 +324,18 @@ inline UINT getSignBit(UINT bitsize)
 //(2) 1 shift 15-bit:     0b 0000 0000 0000 0000 1000 0000 0000 0000
 //(3) & and shift:        0b 0000 0000 0000 0000 0000 0000 0000 0000
 inline UINT getSignBitOfNBitNum(UINT val, UINT bit_num)
-{ return (val & (1 << (bit_num - 1))) >> (bit_num - 1); }
+{
+    UINT s = 1;
+    return (val & (s << (bit_num - s))) >> (bit_num - s);
+}
 
 
 //Get unsigned hign n-bit value of unsigned 32bit value.
 inline UINT32 get32BitValueHighNBit(UINT32 val, UINT bitnum)
 {
-    ASSERT0((bitnum >= 0) && (bitnum < 32));
-    UINT64 mask = (0x1 << bitnum) - 1;
-    return (val >> bitnum) & mask;
+    ASSERT0((bitnum >= 1) && (bitnum <= 32));
+    UINT32 shift = 32 - bitnum;
+    return val >> shift;
 }
 
 
@@ -342,8 +345,9 @@ inline UINT32 get32BitValueHighNBit(UINT32 val, UINT bitnum)
 //b.given val: 0x12345678 and bitnum: 8, it will return 0x78.
 inline UINT32 get32BitValueLowNBit(UINT32 val, UINT bitnum)
 {
-    ASSERT0((bitnum >= 0) && (bitnum < 32));
-    return (val & (0xffffFFFF >> (32 - bitnum)));
+    ASSERT0((bitnum >= 1) && (bitnum <= 32));
+    UINT32 shift = 32 - bitnum;
+    return (val << shift) >> shift;
 }
 
 //Get signed low n-bit value of signal 32bit value.
@@ -374,11 +378,13 @@ inline INT32 get32BitValueLowNBit(INT32 val, UINT bitnum)
 }
 
 //Get unsigned hign n-bit value of unsigned 64bit value.
+//a.given val: 0x12345678 and bitnum: 4, it will return 0x1.
+//b.given val: 0x12345678 and bitnum: 8, it will return 0x12.
 inline UINT64 get64BitValueHighNBit(UINT64 val, UINT bitnum)
 {
-    ASSERT0((bitnum >= 0) && (bitnum < 64));
-    UINT64 mask = (0x1 << bitnum) - 1;
-    return (val >> bitnum) & mask;
+    ASSERT0((bitnum >= 1) && (bitnum <= 64));
+    UINT shift = 64 - bitnum;
+    return val >> shift;
 }
 
 //Get unsigned low n-bit value of unsigned 64bit value.
@@ -387,8 +393,9 @@ inline UINT64 get64BitValueHighNBit(UINT64 val, UINT bitnum)
 //b.given val: 0x1122334455667788 and bitnum: 16, it will return 0x7788.
 inline UINT64 get64BitValueLowNBit(UINT64 val, UINT bitnum)
 {
-    ASSERT0((bitnum >= 0) && (bitnum < 64));
-    return (val & (0xffffffffFFFFFFFF >> (64 - bitnum)));
+    ASSERT0((bitnum >= 1) && (bitnum <= 64));
+    UINT shift = 64 - bitnum;
+    return (val << shift) >> shift;
 }
 
 //Get signal low n-bit value of signal 64bit value.

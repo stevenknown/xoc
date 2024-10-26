@@ -427,7 +427,7 @@ public:
 
     //Return target-machine-word for given register.
     //The tmword is always used in assembly or machine code generation.
-    TMWORD mapReg2TMCode(xgen::Reg r);
+    virtual TMWORD mapReg2TMCode(xgen::Reg r);
 
     //Register local variable that will be allocated in memory.
     Var * registerLocalVar(IR const* pr);
@@ -437,9 +437,6 @@ public:
 
     //Process hint of after ret.
     void processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont);
-
-    //Set ELFMgr object.
-    void setELFMgr(elf::ELFMgr * em) { m_em = em; }
 };
 
 } //namespace

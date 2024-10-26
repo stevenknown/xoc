@@ -552,7 +552,6 @@ protected:
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
 
-    IR * insertSpillAtEntry(PRNO prno, Type const* ty, IRBB * bb);
     IR * insertSpillCalleeAtEntry(Reg r);
     void insertReloadCalleeAtExit(Reg r, Var * spill_loc);
     IRListIter insertSpillAtBBEnd(IR * spill, IRBB * bb);

@@ -334,8 +334,12 @@ Pass * PassMgr::allocIRReloc()
 
 Pass * PassMgr::allocArgPasser()
 {
+    #ifdef REF_TARGMACH_INFO
+    return new ArgPasser(m_rg);
+    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
+    #endif
 }
 
 
@@ -453,13 +457,6 @@ Pass * PassMgr::allocCalcDerivative()
     #else
     return nullptr;
     #endif
-}
-
-
-Pass * PassMgr::allocIGotoOpt()
-{
-    ASSERTN(0, ("Target Dependent Code"));
-    return nullptr;
 }
 
 
@@ -621,9 +618,6 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_ARGPASSER:
         pass = allocArgPasser();
-        break;
-    case PASS_IGOTO_OPT:
-        pass = allocIGotoOpt();
         break;
     case PASS_MEMCHECK:
         pass = allocMemCheck();
