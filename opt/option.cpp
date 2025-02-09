@@ -137,12 +137,6 @@ bool g_debug_cpp = true;
 bool g_debug_pyhton = false;
 bool g_adjust_kernel = true;
 
-//Special options for different using of specific architectures.
-#ifdef FOR_TECO_IP
-bool g_do_relaxation2uncondbr = false;
-bool g_do_relaxation2jmp = false;
-#endif
-
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
 

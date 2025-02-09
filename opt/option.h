@@ -685,14 +685,6 @@ extern StrTabOption g_exclude_region;
 //If it is located in HBM, it is set to true.
 extern bool g_stack_on_global;
 
-#ifdef FOR_TECO_IP
-//Forced relaxation of cond-br to uncond-br.
-extern bool g_do_relaxation2uncondbr;
-
-//Forced relaxation of cond-br or uncond-br to jmp.
-extern bool g_do_relaxation2jmp;
-
-#endif
 //Used to enable the debug mode for LSRA, and the g_debug_reg_num can be use
 //to control the number of physical register under debug mode.
 extern bool g_do_lsra_debug;
