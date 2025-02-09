@@ -56,117 +56,6 @@ void DedicatedMgr::dump(Region const* rg, TargInfoMgr const& timgr) const
 
 
 //
-//START UpdatePos
-//
-static inline bool is_even(Pos pos)
-{
-    return (pos & 0x1) == 0;
-}
-
-
-static inline bool is_odd(Pos pos)
-{
-    return (pos & 0x1) == 1;
-}
-
-
-void UpdatePos::decToLastUse(MOD Pos & pos)
-{
-    if (isDef(pos)) {
-        dec(pos);
-        return;
-    }
-}
-
-
-void UpdatePos::incToNextDef(MOD Pos & pos)
-{
-    if (isUse(pos)) {
-        inc(pos);
-        return;
-    }
-}
-
-
-void UpdatePos::decToLastDef(MOD Pos & pos)
-{
-    if (isDef(pos)) {
-        dec(pos);
-        dec(pos);
-        return;
-    }
-    dec(pos);
-}
-
-
-//Return true if pos indicates LHS.
-bool UpdatePos::isDef(Pos pos)
-{
-    return pos != POS_UNDEF && is_even(pos);
-}
-
-
-//Return true if pos indicates RHS.
-bool UpdatePos::isUse(Pos pos)
-{
-    return pos != POS_UNDEF && is_odd(pos);
-}
-
-
-bool UpdatePos::updateAtRegionEntry(OUT Pos & dpos, OUT Pos & upos)
-{
-    update(dpos, upos);
-    return true;
-}
-
-
-bool UpdatePos::updateAtRegionExit(OUT Pos & dpos, OUT Pos & upos)
-{
-    update(dpos, upos);
-    return true;
-}
-
-
-bool UpdatePos::updateAtBBEntry(OUT Pos & dpos, OUT Pos & upos)
-{
-    if (useExpose()) {
-        //BB start position
-        update(dpos, upos);
-        return true;
-    }
-    return false;
-}
-
-
-bool UpdatePos::updateAtBBExit(OUT Pos & dpos, OUT Pos & upos)
-{
-    if (useExpose()) {
-        //BB end position
-        update(dpos, upos);
-        return true;
-    }
-    return false;
-}
-
-
-//Return true if ir will be encoded at current position, otherwise false that
-//indicates ir is not belong to any lifetime.
-bool UpdatePos::updateAtIR(IR const* ir, OUT Pos & dpos, OUT Pos & upos)
-{
-    if (m_ra.isSpillOp(ir) || m_ra.isReloadOp(ir) ||
-        m_ra.isRematOp(ir) || m_ra.isMoveOp(ir)) {
-        //No need to handle spill/reload/remat/move.
-        //Their occ did not encoded with a position and therefore not
-        //resided in any lifetime.
-        return false;
-    }
-    update(dpos, upos);
-    return true;
-}
-//END UpdatePos
-
-
-//
 //START Range
 //
 void Range::dumpG(Pos init_pos, Region const* rg) const
@@ -599,6 +488,18 @@ bool LifeTime::verify() const
     verifyRangeVec(this);
     return true;
 }
+
+
+void LifeTime::updateLTConstraintsForSplit(LifeTime const* old_lt)
+{
+    ASSERT0(old_lt);
+    if (old_lt->getLTConstraints() == nullptr) { return; }
+    this->setLTConstraints(old_lt->getLTConstraints());
+    PRNO cur_pr = this->getPrno();
+    PRNO old_pr = old_lt->getPrno();
+    ASSERT0(cur_pr != PRNO_UNDEF && old_pr != PRNO_UNDEF);
+    this->getLTConstraints()->updateConflictPR(cur_pr, old_pr);
+}
 //END LifeTime
 
 
@@ -958,7 +859,7 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
              ir != nullptr; ir = irlst.get_next(&bbirit)) {
             Pos upos, dpos;
             bool in_lt = up.updateAtIR(ir, dpos, upos);
-            dumpStmtUsage(ir, rg, in_lt, dpos, upos, up.getRA(), irit);
+            dumpStmtUsage(ir, rg, in_lt, dpos, upos, *up.getRA(), irit);
             if (dumpir) {
                 rg->getLogMgr()->incIndent(4);
                 xoc::dumpIR(ir, rg);
@@ -981,6 +882,7 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
 
 //
 //START LTList
+//
 void LTList::dump(Region const* rg) const
 {
     note(rg, "\n==-- DUMP %s --==", "LTList");

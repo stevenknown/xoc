@@ -419,7 +419,10 @@ CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
     }
 
     buf.strcat(",decl:'");
-    dumpVARDecl(buf, vm);
+    DefFixedStrBuf tbuf;
+    tbuf.bind(&buf);
+    dumpVARDecl(tbuf, vm);
+    tbuf.unbind();
     buf.strcat("'");
     ASSERT0(VAR_flag(this).verify());
     ASSERT0(VAR_link_attr(this).verify());

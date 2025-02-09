@@ -624,6 +624,17 @@ public:
     //unusable after SSA construction.
     void construction(OptCtx & oc);
     bool construction(xcom::DomTree & domtree, OptCtx & oc);
+
+    //The old PR may carry dedicated register information, and the new PR needs
+    //to retain this information to ensure the correct operation of subsequent
+    //related passes (e.g. register allocation).
+    void copyDedicatedRegForAllVPR();
+    void copyDedicatedRegForEachVPR(VPR const* vpr);
+
+    //Since a new PR will be built, in some cases the attributes of the old PR
+    //need to be copied to support subsequent optimization.
+    virtual void copyPRAttr();
+
     size_t count_mem() const;
 
     //DU chain operation.
@@ -654,7 +665,7 @@ public:
     void destruction(xcom::DomTree & domtree, OptCtx const& oc);
 
     //This function perform SSA destruction via scanning BB in sequential order.
-    //Note PRSSA will change PR no during PRSSA destruction. If classic DU chain
+    //Note PRSSA will change PRNO during PRSSA destruction. If classic DU chain
     //is valid meanwhile, it might be disrupted as well. A better way is user
     //maintain the classic DU chain, alternatively a conservative way to
     //avoid subsequent verification complaining is set the prdu invalid.
@@ -839,6 +850,8 @@ public:
     //Note the function does NOT check the consistency of Prno if def or use
     //operate on PR.
     static void removeDUChain(IR * def, IR * use);
+
+    bool useLSRA() const;
 
     bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const;
 

@@ -35,9 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #elif defined(FOR_ARM)
 #include "../arm/arm_utils_ext.h"
 
-#elif defined(FOR_TECO)
-#include "../teco/teco_utils_ext.h"
-
 #else
 //No target ir utils.
 #endif

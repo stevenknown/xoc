@@ -175,6 +175,9 @@ public:
 #define VMD_version(v) (((VMD*)v)->m_version)
 #define VMD_def(v) (((VMD*)v)->m_def_stmt)
 #define VMD_occs(v) (((VMD*)v)->m_occs)
+
+typedef xcom::FixedStrBuf<32> VMDFixedStrBuf;
+
 class VMD : public VOpnd {
     COPY_CONSTRUCTOR(VMD);
 public:
@@ -209,7 +212,7 @@ public:
     void destroy() { VMD_occs(this).destroy(); }
     void dump(Region const* rg) const; //Concisely dump
     void dump(Region const* rg, UseDefMgr const* udmgr) const;
-    CHAR const* dump(OUT xcom::StrBuf & buf) const;
+    CHAR const* dump(OUT VMDFixedStrBuf & buf) const;
 
     //Return true 'exp' is in the UseSet.
     //exp: IR expression to be found.
@@ -379,7 +382,7 @@ public:
 };
 
 
-//This class represent MD Definition.
+//This class represents MD Definition.
 //A SSA definition of MD must be placed in BB. It could be either IR stmt
 //or MDPhi.
 #define MDDEF_id(m) (((MDDef*)m)->m_id)
@@ -417,6 +420,8 @@ public:
     }
     void cleanNextSet(UseDefMgr * mgr);
 
+    void dump(Region const* rg) const;
+
     IRBB * getBB() const;
     IR * getOcc() const;
     VMD * getResult() const { return MDDEF_result(this); }
@@ -448,6 +453,7 @@ public:
     }
     bool is_phi() const { return MDDEF_is_phi(this); }
     bool is_valid() const { return id() != MDDEF_UNDEF; }
+
     //Return true if MDDef's result referenced given 'mdid'.
     bool isRefMD(MDIdx mdid) const { return getResult()->mdid() == mdid; }
     bool isRefSameMDWith(IR const* ir) const;
@@ -531,8 +537,7 @@ public:
     {
         IR * o = getOpndList();
         UINT i;
-        for (i = 0; i < n && o != nullptr;
-             i++, o = o->get_next()) {}
+        for (i = 0; i < n && o != nullptr; i++, o = o->get_next()) {}
         return i == n;
     }
 
@@ -554,7 +559,6 @@ public:
     //Note Phi should not have previous def.
     bool isDefRealStmt() const
     { return getNextSet() != nullptr && !getNextSet()->is_empty(); }
-
     void insertOpndAfter(IR * marker, IR * opnd)
     {
         ASSERT0(marker && opnd && opnd->is_id());
@@ -564,6 +568,7 @@ public:
         xcom::insertafter(&marker, opnd);
         ID_phi(opnd) = this; //Record ID's host PHI.
     }
+
     //Insert operand at given position.
     IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
                       OptCtx const& oc);
@@ -591,7 +596,6 @@ public:
 
 typedef xcom::Vector<MDDef*> MDDefVec;
 typedef xcom::Vector<VOpnd*> VOpndVec;
-
 
 //This class manages MDSSAInfo object allocation and destroy.
 class UseDefMgr {

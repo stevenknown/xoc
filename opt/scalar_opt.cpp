@@ -40,7 +40,7 @@ bool ScalarOpt::isParticipateInOpt() const
 
 
 bool ScalarOpt::worthToDo(Pass const* pass, UINT cp_count,
-                          UINT licm_count, UINT rp_count)
+                          UINT licm_count, UINT rp_count, UINT gcse_count)
 {
     if (pass->getPassType() == PASS_LICM && licm_count > 1 && cp_count > 1) {
         //LICM has performed at least once.
@@ -63,16 +63,26 @@ bool ScalarOpt::worthToDo(Pass const* pass, UINT cp_count,
         //more than once, says twice, it is not worthy to do any more.
         return false;
     }
+    if (pass->getPassType() == PASS_CP && gcse_count > 1 && cp_count > 1) {
+        //CP has performed at least once.
+        //Sometime, GCSE doing the counter-effect to CP.
+        //We make the simplest choose that if both GCSE and CP have performed
+        //more than once, says twice, it is not worthy to do any more.
+        //CASE:compile/cp_gcse_counter_effect.c
+        return false;
+    }
     return true;
 }
 
 
 void ScalarOpt::updateCounter(Pass const* pass, UINT & cp_count,
-                              UINT & licm_count, UINT & rp_count)
+                              UINT & licm_count, UINT & rp_count,
+                              UINT & gcse_count)
 {
     licm_count += pass->getPassType() == PASS_LICM ? 1 : 0;
     rp_count += pass->getPassType() == PASS_RP ? 1 : 0;
     cp_count += pass->getPassType() == PASS_CP ? 1 : 0;
+    gcse_count += pass->getPassType() == PASS_GCSE ? 1 : 0;
 }
 
 
@@ -159,6 +169,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     UINT cp_count = 0;
     UINT licm_count = 0;
     UINT rp_count = 0;
+    UINT gcse_count = 0;
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
@@ -167,12 +178,12 @@ bool ScalarOpt::perform(OptCtx & oc)
             CHAR const* passname = pass->getPassName();
             DUMMYUSE(passname);
             bool doit = false;
-            if (worthToDo(pass, cp_count, licm_count, rp_count)) {
+            if (worthToDo(pass, cp_count, licm_count, rp_count, gcse_count)) {
                 doit = pass->perform(oc);
             }
             if (doit) {
                 change = true;
-                updateCounter(pass, cp_count, licm_count, rp_count);
+                updateCounter(pass, cp_count, licm_count, rp_count, gcse_count);
             }
             res |= doit;
             ASSERT0(m_dumgr->verifyMDRef());

@@ -35,6 +35,7 @@ class LifeTime;
 class LifeTimeMgr;
 class TargInfoMgr;
 class ArgPasser;
+class ApplyToRegion;
 
 //
 //START BackwardEdge
@@ -477,6 +478,24 @@ public:
 //END RematCtx
 
 
+//
+//START PRNOConstraintsTab
+//
+//This class is specifically used to store some PRs,
+//which have certain relationships with each other.
+class PRNOConstraintsTab : public xcom::TTab<PRNO> {
+public:
+    //Checks if the current object (this) and src_tab share two or
+    //more common elements.
+    //e.g: if `this` contains {1, 2, 3} and `src_tab` contains {2, 3, 4},
+    //the function will return true because they share two elements (2 and 3).
+    //TODO: Use this function with caution; it has low efficiency and is
+    //recommended only for ASSERT checks.
+    bool hasTwoOrMoreCommonElements(PRNOConstraintsTab const& src_tab) const;
+};
+//END PRNOConstraintsTab
+
+
 typedef List<LifeTime*>::Iter LTSetIter;
 typedef xcom::TMap<LifeTime*, xcom::C<LifeTime*>*> LT2Holder;
 class LTSet : public xcom::EList<LifeTime*, LT2Holder> {
@@ -572,10 +591,32 @@ public:
     //Get allocable regsets.
     RegSet const& getAvailAllocable() const { return m_avail_allocable; }
 
+    //Get the type of callee-save register. This function ensures the
+    //correct register type is used when saving callee-saved registers.
+    virtual Type const* getCalleeRegisterType(Reg r, TypeMgr * tm) const
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
     TargInfoMgr & getTIMgr() const;
 
     //Get the total register numbers on the target.
     UINT const getTotalRegNum() const { return getTIMgr().getNumOfRegister(); }
+
+    //Handles the case where both conflict and consistency sets are present.
+    Reg handleConflictsAndConsistency(OUT RegSet & set,
+                                      PRNOConstraintsTab const& conflict_prs,
+                                      PRNOConstraintsTab const& consist_prs);
+
+    //Handles the case where only conflict set is present.
+    Reg handleOnlyConflicts(OUT RegSet & set,
+                            PRNOConstraintsTab const& conflict_prs);
+
+    //Handles the case where only consistency set is present.
+    //TODO:
+    //  Currently, the constraints of the consistency set are not
+    //  considered during the register splitting process.
+    //  Future implementation needs to support this.
+    Reg handleOnlyConsistency(OUT RegSet & set,
+                              PRNOConstraintsTab const& consist_prs);
 
     //Init all register sets.
     //Note the function invoked by constructor can not be virtual.
@@ -589,18 +630,30 @@ public:
     bool isCallee(Reg r) const
     { return isCalleeScalar(r) || isCalleeVector(r); }
 
-    //True if input reg is caller register.
-    bool isCaller(Reg r) const
+    //True if input reg is callee scalar register.
+    virtual bool isCalleeScalar(Reg r) const
     {
-        return (m_target_caller_scalar != nullptr &&
-            m_target_caller_scalar->is_contain(r)) ||
-            (m_target_caller_vector != nullptr &&
-            m_target_caller_vector->is_contain(r));
+        return m_target_callee_scalar != nullptr &&
+            m_target_callee_scalar->is_contain(r);
     }
 
-    //True if reg is a vector register.
-    bool isVector(Reg r) const
-    { return isCalleeVector(r) || isCallerVector(r); }
+    //True if input reg is callee vector register.
+    bool isCalleeVector(Reg r) const
+    {
+        return m_target_callee_vector != nullptr &&
+            m_target_callee_vector->is_contain(r);
+    }
+
+    //True if input reg is caller register.
+    bool isCaller(Reg r) const
+    { return isCallerScalar(r) || isCallerVector(r); }
+
+    //True if reg is a caller scalar register.
+    virtual bool isCallerScalar(Reg r) const
+    {
+        return m_target_caller_scalar != nullptr &&
+            m_target_caller_scalar->is_contain(r);
+    }
 
     //True if reg is a caller vector register.
     bool isCallerVector(Reg r) const
@@ -609,54 +662,81 @@ public:
             m_target_caller_vector->is_contain(r);
     }
 
-    bool isCalleeVector(Reg r) const
-    {
-        return m_target_callee_vector != nullptr &&
-            m_target_callee_vector->is_contain(r);
-    }
-
-    bool isCalleeScalar(Reg r) const
-    {
-        return m_target_callee_scalar != nullptr &&
-            m_target_callee_scalar->is_contain(r);
-    }
-
     //True if input reg is param register.
     bool isParam(Reg r) const
+    { return isParamScalar(r) || isParamVector(r); }
+
+    //True if input reg is scalar param register.
+    virtual bool isParamScalar(Reg r) const
     {
-       return (m_target_param_scalar != nullptr &&
-           m_target_param_scalar->is_contain(r)) ||
-           (m_target_param_vector != nullptr &&
-           m_target_param_vector->is_contain(r));
+        return m_target_param_scalar != nullptr &&
+            m_target_param_scalar->is_contain(r);
+    }
+
+    //True if input reg is vector param register.
+    bool isParamVector(Reg r) const
+    {
+        return m_target_param_vector != nullptr &&
+            m_target_param_vector->is_contain(r);
     }
 
     //True if input reg is return value register.
     bool isReturnValue(Reg r) const
+    { return isReturnValueScalar(r) || isReturnValueVector(r); }
+
+    //True if input reg is scalar return value register.
+    virtual bool isReturnValueScalar(Reg r) const
     {
-        return (m_target_return_value_scalar != nullptr &&
-            m_target_return_value_scalar->is_contain(r)) ||
-            (m_target_return_value_vector != nullptr &&
-            m_target_return_value_vector->is_contain(r));
+        return m_target_return_value_scalar != nullptr &&
+            m_target_return_value_scalar->is_contain(r);
+    }
+
+    //True if input reg is vector return value register.
+    bool isReturnValueVector(Reg r) const
+    {
+        return m_target_return_value_vector != nullptr &&
+            m_target_return_value_vector->is_contain(r);
     }
 
     //Special registers represent registers used by dedicate
     //that do not exist in any regset.
     bool isSpecialReg(Reg r) const;
 
+    //True if reg is a vector register.
+    bool isVector(Reg r) const
+    { return isCalleeVector(r) || isCallerVector(r); }
+
     //Get used caller regiser regset.
     RegSet getUsedCaller() const { return m_used_caller; }
+
     //Get used callee regiser regset.
     RegSet getUsedCallee() const { return m_used_callee; }
-    //Pick callee register.
-    virtual Reg pickCallee(IR const* ir);
-    //Pick caller register.
-    virtual Reg pickCaller(IR const* ir);
+
+    //Pick a callee register, considering lifetime constraints.
+    virtual Reg pickCallee(IR const* ir, LTConstraints const* lt_constraints);
+
+    //Pick a caller register, considering lifetime constraints.
+    virtual Reg pickCaller(IR const* ir, LTConstraints const* lt_constraints);
 
     //Pick reg in a given regset and return it.
     static Reg pickReg(RegSet & set);
 
     //Pick reg in a given regset.
     static void pickReg(RegSet & set, Reg r);
+
+    //Select the registers that meet the conditions
+    //based on the current set of lifetime constraints.
+    //Currently, the restrictions are divided into two sets; in other words,
+    //it picks a register while considering various
+    //constraints related to conflicts and consistency.
+    //The function's selection process involves three main steps:
+    //If both conflict and consistency sets are present,
+    //it uses `handleConflictsAndConsistency()`.
+    //If only the conflict set is present, it calls `handleOnlyConflicts()`.
+    //If only the consistency set is present,
+    //it calls `handleOnlyConsistency()`.
+    Reg pickRegWithConstraints(OUT RegSet & set,
+                               LTConstraints const* lt_constraints);
 
     virtual void pickRegisterFromAliasSet(Reg r);
     //Pick reg from all caller alias register sets.
@@ -675,7 +755,131 @@ public:
     void recordUsedCallee(Reg r);
     //Record the allocation of caller.
     void recordUsedCaller(Reg r);
+
+    //This function checks the registers listed in conflict_prs to see
+    //if they have been allocated physical registers. If so, it removes
+    //those registers from the provided set and stores the removed
+    //registers in removed_regs_wrap.
+    void removeConflictingReg(OUT RegSet & set,
+                              PRNOConstraintsTab const& conflict_prs,
+                              OUT RegSetWrap & removed_regs_wrap);
 };
+
+
+//
+//START LTConstraintsStrategy
+//
+//This class represents a strategy for imposing constraints on lifetime.
+//This is a base class that different architectural strategies
+//may need to inherit from, as the requirements vary.
+class LTConstraintsStrategy {
+    COPY_CONSTRUCTOR(LTConstraintsStrategy);
+protected:
+    LinearScanRA & m_ra;
+public:
+    LTConstraintsStrategy(LinearScanRA & ra) : m_ra(ra) {}
+    virtual ~LTConstraintsStrategy() {}
+
+    //Set the constraints for the current IR's lifetime.
+    //Note that the constraints for each IR vary depending on the architecture.
+    virtual void applyConstraints(IR * ir)
+    { ASSERTN(0, ("Target Dependent Code")); }
+};
+//END LTConstraintsStrategy
+
+
+//
+//START LTConstraints
+//
+//This class represents a virtual register that requires additional constraints
+//during allocation, with the specific restrictions being dependent
+//on the hardware architecture.
+//The class maintains two key sets of constraints:
+//1. m_conflicting_prs: This table contains PRs that
+//    cannot be allocated simultaneously with the current PR. If a PR is
+//    listed in this set, it indicates a conflict that must be avoided to
+//    maintain correct operation of the program.
+//
+//2. m_consistent_prs: This table includes PRs that must always be allocated
+//    to the same physical register as the current PR across all uses. This
+//    ensures that the same register is used consistently in all relevant
+//    scenarios, preventing errors due to inconsistent allocations.
+//
+//If there is a need to introduce additional or more complex constraints,
+//this class can be inherited to create specialized constraint management
+//for specific architectures or use cases. The LTConstraints class
+//represents the manifestation of lifetime constraints. The specific
+//implementation of how these constraints are generated will require
+//extending the LTConstraintsStrategy class, which is also a base
+//class that should be inherited and expanded according to the needs
+//of different architectures.
+typedef xcom::TTabIter<PRNO> PRNOConstraintsTabIter;
+class LTConstraints {
+    COPY_CONSTRUCTOR(LTConstraints);
+public:
+    LTConstraints() {}
+    ~LTConstraints() {}
+
+    //Add the PR to the conflict table.
+    void addConflictPR(PRNO pr) { m_conflicting_prs.append(pr); }
+
+    //Add the PR to the consist table.
+    void addConsistPR(PRNO pr) { m_consistent_prs.append(pr); }
+
+    PRNOConstraintsTab const& getConflictTab() const
+    { return m_conflicting_prs; }
+    PRNOConstraintsTab const& getConsistTab() const { return m_consistent_prs; }
+
+    bool isConflictPR(PRNO pr) const { return m_conflicting_prs.find(pr); }
+    bool isConsistPR(PRNO pr) const { return m_consistent_prs.find(pr); }
+
+    //In the process of register allocation, a PR may be split,
+    //which results in changes to the PR.
+    //It is necessary to update the conflicting
+    //registers promptly to maintain the integrity of the allocation.
+    //This function updates the set of conflicting registers
+    //by replacing the old PR with the newly renamed PR,
+    //ensuring that all references to the old PR are updated.
+    void updateConflictPR(PRNO renamed_pr, PRNO old_pr);
+protected:
+    //The current PR can NOT be the same as the physical registers
+    //with PRs in the conflict PR tab.
+    PRNOConstraintsTab m_conflicting_prs;
+
+    //The current PR can be the same as the physical registers
+    //with PRs in the consistent PR tab.
+    PRNOConstraintsTab m_consistent_prs;
+};
+//END LTConstraints
+
+
+typedef List<LTConstraints*> LTConstraintsList;
+typedef List<LTConstraints*>::Iter LTConstraintsListIter;
+//
+//START LTConstraintsMgr
+//
+//This class serves as a base class for managing lifetime constraints.
+//It is designed to be overridden for different architectures,
+//allowing users to implement their own architecture-specific
+//LTConstraintsMgr by inheriting from this class.
+class LTConstraintsMgr {
+    COPY_CONSTRUCTOR(LTConstraintsMgr);
+protected:
+    LTConstraintsList m_ltc_list;
+protected:
+    void destroy();
+    void init();
+public:
+    LTConstraintsMgr() { init(); }
+    ~LTConstraintsMgr() { destroy(); }
+
+    virtual LTConstraints * allocLTConstraints();
+
+    //Clean the lifetime constraints info before computation.
+    void reset() { destroy(); init(); }
+};
+//END LTConstraintsMgr
+
 
 typedef xcom::TMap<Type const*, Var *> Ty2Var;
 
@@ -709,12 +913,25 @@ protected:
     Vector<UINT> m_bb_seqid;
     xcom::TTab<PRNO> m_prno_with_2d_hole;
     Ty2Var m_ty2var;
+    LTConstraintsMgr * m_lt_constraints_mgr;
+    LTConstraintsStrategy * m_lt_constraints_strategy;
 protected:
     LifeTimeMgr * allocLifeTimeMgr(Region * rg)
     { ASSERT0(rg); return new LifeTimeMgr(rg); }
 
     virtual RegSetImpl * allocRegSetImpl() { return new RegSetImpl(*this); }
 
+    //Allocates an instance of the lifetime constraints strategy.
+    //Derived classes can override this virtual function to provide
+    //their own implementation of the allocation process.
+    virtual LTConstraintsStrategy * allocLTConstraintsStrategy()
+    { return new LTConstraintsStrategy(*this); }
+
+    //Allocates an instance of the lifetime constraints manager.
+    //Derived classes can override this virtual function to provide
+    //their own implementation of the allocation process.
+    virtual LTConstraintsMgr * allocLTConstraintsMgr()
+    { return new LTConstraintsMgr(); }
 public:
     explicit LinearScanRA(Region * rg);
     virtual ~LinearScanRA();
@@ -752,6 +969,28 @@ public:
     {
         ASSERT0(prno != PRNO_UNDEF);
         return !getLT(prno)->isOccHasDef() || getReg(prno) == getSP();
+    }
+    //The function checks whether the register-allocation result should be
+    //applied to current region or just an estimiation of register pressure.
+    //NOTE: If the register-allocation behaviors applied to current region,
+    //the spilling, reloading operations and latch-BB that generated by LSRA
+    //will be inserted into region's BB list and CFG.
+    void checkAndApplyToRegion(MOD ApplyToRegion & apply);
+
+    //Determine whether the PASS apply all modifications of CFG and BB to
+    //current region. User may invoke LSRA as performance estimating tools
+    //to conduct optimizations, such as RP, GCSE, UNROLLING which may increase
+    //register pressure.
+    void checkAndPrepareApplyToRegion(OUT ApplyToRegion & apply);
+
+    //This func is used to color the stack slot and reuse the stack slot then.
+    void colorStackSlot()
+    {
+        //Do the stack slot reuse for the scalar var.
+        reuseStackSlot(false);
+
+        //Do the stack slot reuse for the vector var.
+        reuseStackSlot(true);
     }
 
     void addPrnoWith2dLTHole(PRNO prno) { m_prno_with_2d_hole.append(prno); }
@@ -811,6 +1050,8 @@ public:
     TargInfoMgr & getTIMgr() const
     { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LifeTimeMgr & getLTMgr() { return *m_lt_mgr; }
+    LTConstraintsMgr * getLTConstraintsMgr()
+    { return m_lt_constraints_mgr; }
     Reg getDedicatedReg(LifeTime const* lt) const
     { return getDedicatedReg(lt->getPrno()); }
     Reg getDedicatedReg(PRNO prno) const { return m_dedicated_mgr.get(prno); }
@@ -822,14 +1063,14 @@ public:
 
     //This function mainly prepares the correct register type for a prno,
     //not the data type of lt.
-    Type const* getRegType(PRNO prno) const;
+    Type const* getVarTypeOfPRNO(PRNO prno) const;
 
     //This function returns the type when do the spill operation for a prno.
     //This function can be overidden by the derived class if the required
     //spill type is not the original type of the prno.
     //Prno: the input prno.
     virtual Type const* getSpillType(PRNO prno) const
-    { return getRegType(prno); }
+    { return getVarTypeOfPRNO(prno); }
 
     //This function returns the actual type for the input type.
     //This function can be overidden by the derived class if the required
@@ -925,6 +1166,10 @@ public:
     //Check the Frame Pointer Register can be allocable or not.
     bool isFPAllocableAllowed() const { return m_is_fp_allocable_allowed; }
 
+    //Return true if the register-allocation result should be applied to
+    //current region's BB list and CFG.
+    bool isApplyToRegion() const { return m_is_apply_to_region; }
+
     //Return true if a fake-use IR at the first BB of loop by lexicographical
     //order.
     //e.g: "[mem]<-fake_use $1" is a fake-use IR at the first BB of loop by
@@ -1019,6 +1264,21 @@ public:
         return m_prno_with_2d_hole.find(prno);
     }
 
+    //Initialize the allocation strategy for the lifetime constraint set.
+    //Note that different architectures have varying strategies.
+    void initConstraintsStrategy()
+    {
+        if (m_lt_constraints_strategy != nullptr) { return; }
+        m_lt_constraints_strategy = allocLTConstraintsStrategy();
+    }
+
+    //Initializes the lifetime constraint management unit.
+    //Note that different architectures have different constraints.
+    void initLTConstraintsMgr()
+    {
+        if (m_lt_constraints_mgr != nullptr) { return; }
+        m_lt_constraints_mgr = allocLTConstraintsMgr();
+    }
 
     virtual bool perform(OptCtx & oc);
     virtual bool performLsraImpl(OptCtx & oc);
@@ -1030,6 +1290,13 @@ public:
 
     //Reset all resource before allocation.
     void reset();
+
+    //Do the stack slot resue per the input var type to save the stack
+    //space after the LSRA.
+    //is_vector: the type of the stack slot. True means do the stack slot
+    //           reuse for vector var; false means do the stack slot
+    //           reuse for the scalar var.
+    void reuseStackSlot(bool is_vector);
 
     void setApplyToRegion(bool doit) { m_is_apply_to_region = doit; }
     void setDedicatedReg(PRNO prno, Reg r) { m_dedicated_mgr.add(prno, r); }
@@ -1052,6 +1319,12 @@ public:
     void setRemat(IR * ir) { m_remat_tab.append(ir); }
     void setSpill(IR * ir) { m_spill_tab.append(ir); }
 
+    //Set the constraint set for each IR.
+    void scanIRAndSetConstraints();
+
+    //After the lifetime calculation is completed, begin setting constraint
+    //sets for each lifetime.
+    void tryComputeConstraints();
     void updateSSA(OptCtx & oc) const;
 
     bool verify4List() const;

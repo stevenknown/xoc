@@ -269,8 +269,19 @@ public:
 
     //The interface to dump declaration information when current
     //variable dumpped. This is target dependent code.
-    virtual CHAR const* dumpVARDecl(OUT StrBuf &, VarMgr const*) const
+    virtual CHAR const* dumpVARDecl(
+        OUT xcom::DefFixedStrBuf &, VarMgr const*) const
     { return nullptr; }
+
+    virtual CHAR const* dumpVARDecl(
+        OUT xcom::StrBuf & strbuf, VarMgr const* vm) const
+    {
+        xcom::DefFixedStrBuf fixstrbuf;
+        fixstrbuf.bind(&strbuf);
+        dumpVARDecl(fixstrbuf, vm);
+        fixstrbuf.unbind();
+        return strbuf.getBuf();
+    }
     virtual void dump(VarMgr const* vm) const;
 
     //You must make sure this function will not change any field of Var.

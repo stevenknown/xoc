@@ -778,9 +778,7 @@ void ArgPasser::processIRUsedFormalParam(OptCtx & oc)
     ASSERT0(bblist);
     BBListIter bbit;
 
-    if (isNeedPreprocessFormalParam()) {
-        preProcessFormalParam(oc);
-    }
+    preProcessFormalParam(oc);
 
     //Process formal parameter.
     for (IRBB * bb = bblist->get_head(&bbit); bb != nullptr;

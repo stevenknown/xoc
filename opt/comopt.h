@@ -57,6 +57,7 @@ author: Su Zhenyu
 #include "cfg_lifting.h"
 #include "loop_dep_ana.h"
 #include "multi_res_convert.h"
+#include "update_pos.h"
 
 #ifdef REF_TARGMACH_INFO
 #include "targinfo_mgr.h"

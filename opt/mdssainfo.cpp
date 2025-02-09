@@ -156,6 +156,18 @@ IRBB * MDDef::getBB() const
                         MDDEFSTMT_occ(this)->is_stmt()));
     return is_phi() ? MDPHI_bb(this) : MDDEFSTMT_occ(this)->getBB();
 }
+
+
+void MDDef::dump(Region const* rg) const
+{
+    ASSERT0(rg);
+    if (is_phi()) {
+        prt(rg, "MDPhi");
+    } else {
+        prt(rg, "MDDef");
+    }
+    prt(rg, "%u:MD%uV%u", id(), getResult()->mdid(), getResult()->version());
+}
 //END MDDef
 
 
@@ -482,10 +494,10 @@ void VMD::dump(Region const* rg) const
 }
 
 
-CHAR const* VMD::dump(OUT xcom::StrBuf & buf) const
+CHAR const* VMD::dump(OUT VMDFixedStrBuf & buf) const
 {
     buf.strcat("MD%dV%d", mdid(), version());
-    return buf.buf;
+    return buf.getBuf();
 }
 
 

@@ -506,8 +506,8 @@ void RenameDef::dumpRenameVMD(IR const* ir, VMD const* vmd)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf1(16);
-    xcom::StrBuf buf2(16);
+    VMDFixedStrBuf buf1;
+    VMDFixedStrBuf buf2;
     am->dump("RenameDef:renaming %s with %s",
              xoc::dumpIRName(ir, buf1), vmd->dump(buf2));
 }
@@ -518,8 +518,8 @@ void RenameDef::dumpInsertDDChain(IR const* ir, VMD const* vmd)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf1(16);
-    xcom::StrBuf buf2(16);
+    VMDFixedStrBuf buf1;
+    VMDFixedStrBuf buf2;
     am->dump("RenameDef:insert %s into DDChain by access MDSSAInfo of %s",
              vmd->dump(buf1), xoc::dumpIRName(ir, buf2));
 }
@@ -530,7 +530,7 @@ void RenameDef::dumpInsertDDChain(MDPhi const* phi, VMD const* vmd)
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    xcom::StrBuf buf(16);
+    VMDFixedStrBuf buf;
     am->dump("RenameDef:insert %s into DDChain by access MDPhi%u",
              vmd->dump(buf), phi->id());
 }

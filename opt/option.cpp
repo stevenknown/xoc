@@ -129,7 +129,7 @@ bool g_force_use_fp_as_sp = false;
 bool g_support_alloca = true;
 bool g_do_ir_reloc = false;
 bool g_stack_on_global = false;
-bool g_use_accurate_2d_lifetime_hole_algo = true;
+bool g_interference_graph_stack_slot_color = false;
 bool g_do_arg_passer = true;
 bool g_recycle_local_id = false;
 bool g_debug = false;
@@ -699,8 +699,8 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_stack_on_global = %s", g_stack_on_global ? "true":"false");
     note(lm, "\ng_do_arg_passer = %s", g_do_arg_passer ? "true":"false");
     note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
-    note(lm, "\ng_use_accurate_2d_lifetime_hole_algo = %s",
-         g_use_accurate_2d_lifetime_hole_algo ? "true":"false");
+    note(lm, "\ng_interference_graph_stack_slot_color = %s",
+         g_interference_graph_stack_slot_color ? "true":"false");
     note(lm, "\ng_adjust_kernel = %s", g_adjust_kernel ? "true":"false");
     lm->decIndent(2);
 }

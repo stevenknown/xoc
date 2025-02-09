@@ -209,7 +209,7 @@ void ScanInPosOrder::scanBBList(BBList * bblst)
 {
     ASSERT0(bblst);
     //Create entry position.
-    UpdatePos up(m_ra);
+    UpdatePos up(&m_ra);
     Pos dpos_start, upos_start;
     bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
     ASSERT0_DUMMYUSE(valid);

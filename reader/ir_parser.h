@@ -84,6 +84,10 @@ public:
     IR * stmt_list;
 
     //Bottom up propagate information.
+    //Record the last IR at generated IR stmt list.
+    IR * stmt_list_last;
+
+    //Bottom up propagate information.
     //Record whether the current region contained IR_PHI.
     bool has_phi;
 

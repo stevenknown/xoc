@@ -137,8 +137,8 @@ static void freeExactOccs(IRList & occs, Region * rg, GVN * gvn)
             //that stmt/exp has been freed.
             continue;
         }
+        gvn->cleanVNIRTree(occ);
 
-        gvn->cleanIRTreeVN(occ);
         //Note the delegate is one of references in Occs List.
         rg->freeIRTree(occ);
     }
@@ -157,8 +157,8 @@ static void freeInexactOccs(InexactAccTab & tab, Region * rg, GVN * gvn)
             //that stmt/exp has been freed.
             continue;
         }
+        gvn->cleanVNIRTree(occ);
 
-        gvn->cleanIRTreeVN(occ);
         //Note the delegate is one of elements in 'tab'.
         rg->freeIRTree(occ);
     }

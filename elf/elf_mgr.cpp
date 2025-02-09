@@ -3564,8 +3564,10 @@ void ELFMgr::setSectionIndex()
     UINT section_index_table_num = getSectionIndexTableNum();
 
     //Initialize the section array.
-    UINT * has_section_tab = (UINT*)ALLOCA(
-        section_index_table_num * sizeof(UINT));
+    UINT bsz = section_index_table_num * sizeof(UINT);
+    //Use ALLOCA instead of dyn-array since some cc does not support dyn-array.
+    UINT * has_section_tab = (UINT*)ALLOCA(bsz);
+    ::memset(has_section_tab, 0, bsz);
     SECTION_TYPE const* sect_table = getSectionIndexTable();
 
     //Iterate over 'm_sect_map' to get section that
@@ -5179,8 +5181,31 @@ LinkerMgr::~LinkerMgr()
         if (elf_mgr != nullptr) { delete elf_mgr; }
     }
 
+    if (m_output_elf_mgr != nullptr) {
+        delete m_output_elf_mgr;
+        m_output_elf_mgr = nullptr;
+    }
+
     //Free m_dump.
     if (g_elf_opt.isDumpLink()) { closeDump(); }
+}
+
+
+void LinkerMgr::initLinkerMgr(CHAR const* output_name, UINT elf_type)
+{
+    //'output_name' may comes from the command option '-o'.
+    //Defaut value is: 'mi.test.elf'.
+    m_output_file_name = (output_name == nullptr) ?
+        LINKERMGR_OUTPUT_FILE_NAME : output_name;
+
+    //Allocate and init output ELFMgr info.
+    m_output_elf_mgr = allocOutputELFMgr();
+    ASSERT0(m_output_elf_mgr);
+    m_output_elf_mgr->initELFMgr();
+
+    //Initialize the info of ELFMgr that required by LinkerMgr.
+    m_output_elf_mgr->initELFMgrInfo(
+        &m_sym_tab, m_output_file_name, elf_type, false);
 }
 
 
@@ -5241,23 +5266,6 @@ void LinkerMgr::processLibPathList(xcom::List<CHAR const*> * lib_path_list)
     m_armgr.initARFileStack();
 
     if (g_elf_opt.isDumpLink()) { dumpLibPathList(lib_path_list); }
-}
-
-
-void LinkerMgr::setOutputInfo(CHAR const* output_name,
-    ELFMgr * elf_mgr, UINT elf_type)
-{
-    //'output_name' comes from the command option '-o'.
-    //Defaut value is: 'mi.test.elf'.
-    m_output_file_name = (output_name == nullptr) ?
-        LINKERMGR_OUTPUT_FILE_NAME : output_name;
-
-    //Set and init output ELFMgr info.
-    ASSERT0(elf_mgr);
-
-    m_output_elf_mgr = elf_mgr;
-    m_output_elf_mgr->initELFMgrInfo(
-        &m_sym_tab, m_output_file_name, elf_type, false);
 }
 
 

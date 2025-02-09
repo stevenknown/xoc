@@ -1211,6 +1211,62 @@ void PRSSAMgr::setVPRByPRNO(PRNO prno, VPR * vpr)
 }
 
 
+bool PRSSAMgr::useLSRA() const
+{
+    #ifdef REF_TARGMACH_INFO
+    ASSERT0(m_rg && m_rg->getPassMgr());
+    LinearScanRA * lsra = (LinearScanRA*)m_rg->getPassMgr()->queryPass(
+        PASS_LINEAR_SCAN_RA);
+    return lsra != nullptr;
+    #endif
+    return false;
+}
+
+
+void PRSSAMgr::copyDedicatedRegForEachVPR(VPR const* vpr)
+{
+    ASSERT0(vpr != nullptr);
+    PRNO orgprno = VPR_orgprno(vpr);
+    PRNO newprno = VPR_newprno(vpr);
+    if (orgprno == PRNO_UNDEF || newprno == PRNO_UNDEF ||
+        orgprno == newprno) {
+        return;
+    }
+
+    #ifdef REF_TARGMACH_INFO
+    ASSERT0(m_rg && m_rg->getPassMgr());
+    LinearScanRA * lsra = (LinearScanRA*)m_rg->getPassMgr()->queryPass(
+        PASS_LINEAR_SCAN_RA);
+    if (lsra == nullptr) { return; }
+    //If the original prno is a dedicated prno, the newly created prno also
+    //needs to be bound to this register.
+    if (lsra->isDedicated(orgprno)) {
+        ASSERT0(!lsra->isDedicated(newprno));
+        lsra->setDedicatedReg(newprno, lsra->getDedicatedReg(orgprno));
+    }
+    #endif
+}
+
+
+void PRSSAMgr::copyDedicatedRegForAllVPR()
+{
+    VPRVec const* vpr_vec = getVPRVec();
+    ASSERT0(vpr_vec != nullptr);
+    for (VecIdx i = PRNO_UNDEF + 1; i <= vpr_vec->get_last_idx(); i++) {
+        VPR const* vpr = vpr_vec->get(i);
+        ASSERT0(vpr != nullptr);
+        copyDedicatedRegForEachVPR(vpr);
+    }
+}
+
+
+void PRSSAMgr::copyPRAttr()
+{
+    //Copy dedicated register information.
+    if (useLSRA()) { copyDedicatedRegForAllVPR(); }
+}
+
+
 //Dump ssa du stmt graph.
 void PRSSAMgr::dumpSSAGraph(CHAR const* name) const
 {
@@ -2704,7 +2760,7 @@ bool PRSSAMgr::verifyVPR() const
             if (opndprno == PRNO_UNDEF) {
                 opndprno = PR_no(use);
             } else {
-                //All USE should have same PR no.
+                //All USE should have same PRNO.
                 ASSERT0(opndprno == PR_no(use));
             }
 
@@ -2777,7 +2833,7 @@ static void verify_use(IR * ir, SSAInfo * ssainfo, Region * rg,
         if (opndprno == PRNO_UNDEF) {
             opndprno = PR_no(use);
         } else {
-            //All opnd should have same PR no.
+            //All opnd should have same PRNO.
             ASSERT0(opndprno == PR_no(use));
         }
         //Each USE of current SSAInfo must be defined by same stmt.
@@ -2823,7 +2879,7 @@ static void verify_ssainfo_helper(IR * ir, xcom::BitSet & defset, Region * rg)
     PRNO opndprno = PRNO_UNDEF;
     verify_use(ir, ssainfo, rg, opndprno);
     if (opndprno != PRNO_UNDEF && defprno != PRNO_UNDEF) {
-        //Def should have same PR no with USE.
+        //Def should have same PRNO with USE.
         ASSERT0(opndprno == defprno);
     }
 }
@@ -2858,7 +2914,7 @@ bool PRSSAMgr::verifySSAInfo() const
 
 
 //This function perform SSA destruction via scanning BB in sequential order.
-//Note PRSSA will change PR no during PRSSA destruction. If classic DU chain
+//Note PRSSA will change PRNO during PRSSA destruction. If classic DU chain
 //is valid meanwhile, it might be disrupted as well. A better way is user
 //maintain the classic DU chain, alternatively a conservative way to
 //avoid subsequent verification complaining is set the prdu invalid.
@@ -3706,6 +3762,10 @@ bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
     cstctx.cleanPRNO2Type();
 
     stripVersionForBBList(*m_rg->getBBList());
+
+    //Copy the attributes of the old PR to the new PR.
+    copyPRAttr();
+
     refinePhi(oc);
     if (m_livemgr != nullptr) {
         m_livemgr->clean();

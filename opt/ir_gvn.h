@@ -34,6 +34,8 @@ author: Su Zhenyu
 #ifndef _IR_GVN_H_
 #define _IR_GVN_H_
 
+#define VNID_UNDEF 0
+
 namespace xoc {
 class VN;
 
@@ -105,12 +107,13 @@ public:
 
     void clean()
     {
-        m_id = 0;
+        m_id = VNID_UNDEF;
         m_vn_type = VN_UNKNOWN;
         u1.iv = 0;
     }
 
     void dump(Region const* rg) const;
+    void dump(Region const* rg, OUT xcom::StrBuf & buf) const;
 
     UINT id() const { return VN_id(this); }
 
@@ -189,6 +192,13 @@ public:
     IR2VN() {}
 };
 
+typedef TMapIter<PRNO, VN const*> PRNO2VNIter;
+class PRNO2VN : public xcom::TMap<PRNO, VN const*> {
+    COPY_CONSTRUCTOR(PRNO2VN);
+public:
+    PRNO2VN() {}
+};
+
 typedef TMapIter<UINT, VN const*> MDPhi2VNIter;
 class MDPhi2VN : public xcom::TMap<UINT, VN const*> {
     COPY_CONSTRUCTOR(MDPhi2VN);
@@ -251,7 +261,7 @@ public:
     void copy(VNE_ILD & ve) { *this = ve; }
     void clean()
     {
-        base_vn_id = 0;
+        base_vn_id = VNID_UNDEF;
         ofst = 0;
         sz = 0;
     }
@@ -274,7 +284,7 @@ public:
     void clean()
     {
         VNE_ILD::clean();
-        ofst_vn_id = 0;
+        ofst_vn_id = VNID_UNDEF;
     }
 };
 
@@ -565,7 +575,12 @@ public:
 };
 
 
-class VNHashTab {
+//The class generates an unique VN by registering a leading IR code and
+//a list VN id followed.
+//NOTE the first integer must be IR_CODE, and the following integer must be
+//VN id.
+//e.g: given IR_ADD, VN1, VN2, the class will generate VN3.
+class IRCAndVNHash {
 public:
     typedef HOST_UINT IntType;
     typedef xcom::List<IntType> IntList;
@@ -575,21 +590,22 @@ public:
 protected:
     GVN * m_gvn;
     IntSet2VN<IntType> m_intset2vn;
-    IntList m_tmp_ilst; //just used for temporary purpose.
 protected:
     VN * registerVN(IntList const& ilst);
 public:
-    VNHashTab(GVN * gvn) : m_gvn(gvn) {}
-    ~VNHashTab();
-
+    IRCAndVNHash(GVN * gvn) : m_gvn(gvn) {}
+    ~IRCAndVNHash();
+    void clean();
     void dump(Region const* rg, UINT indent) const;
 
+    //The function register VN by given a list of VN id.
+    //irt: the operation code.
+    //vnnum: the number of VN id.
+    //...: A variable number of VN id, each VN id's type should be VNHashInt.
     VN const* registerVN(IR_CODE irt, UINT vnnum, ...);
-    VN const* registerVN(IR_CODE irt, VNList const& ilst);
-    VN const* registerIntList(IR_CODE irt, UINT num, ...);
+    VN const* registerVN(IR_CODE irt, MOD IntList & ilst);
 };
-
-typedef VNHashTab::IntType VNHashInt;
+typedef IRCAndVNHash::IntType VNHashInt;
 
 class InferCtx {
 protected:
@@ -633,9 +649,10 @@ protected:
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
     IR2VN m_irid2vn;
+    PRNO2VN m_prno2vn;
     VMD2VN m_vmd2vn;
     MDPhi2VN m_mdphi2vn;
-    VNHashTab m_vnhashtab;
+    IRCAndVNHash m_ircvnhash;
 protected:
     //Return true if the inference will try to infer Phi's EVN via inferring
     //each operands of Phi respectively.
@@ -645,20 +662,23 @@ protected:
     VN const* allocVNForStmt(IR const* ir, InferCtx & ctx);
     VN const* allocVNForMDDef(MDDef const* mddef, InferCtx & ctx);
     VN const* allocVNForVMD(VMD const* vmd, InferCtx & ctx);
+    VN const* allocVNForPRNO(PRNO prno);
 
     //The function allocates a VN given extended stmt.
     virtual VN const* allocVNForExtStmt(IR const* ir, InferCtx & ctx);
 
     VN const* getVN(IR const* ir) { return m_irid2vn.get(ir->id()); }
+    VN const* getVN(PRNO prno) { return m_prno2vn.get(prno); }
     VN const* getVN(MDDef const* mddef)
     { return m_mdphi2vn.get(mddef->id()); }
     VN const* getVN(VMD const* vmd) { return m_vmd2vn.get(vmd->id()); }
     Region * getRegion() const { return m_rg; }
 
+    VN const* inferIntConst(HOST_INT val);
+    VN const* inferConst(IR const* ir, InferCtx & ctx);
     virtual VN const* inferExtStmt(IR const* ir, InferCtx & ctx);
     VN const* inferDirectStmt(IR const* ir, InferCtx & ctx);
     VN const* inferIndirectStmt(IR const* ir, InferCtx & ctx);
-    VN const* inferLiveinPR(IR const* ir, InferCtx & ctx);
     VN const* inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx);
     VN const* inferVNByIterKid(IR const* ir, InferCtx & ctx);
     VN const* inferArrayKidOp(IR const* ir, InferCtx & ctx);
@@ -672,6 +692,14 @@ protected:
     VN const* inferDirectExpViaMDSSA(IR const* ir, InferCtx & ctx);
     VN const* inferDirectExpViaPRSSA(IR const* ir, InferCtx & ctx);
     VN const* inferDirectExpViaSSA(IR const* ir, InferCtx & ctx);
+
+    //The function try to infer VN for given killdef, which is
+    //killing-definition of 'exp'. If there is not an available VN, the
+    //function generates a dedicated VN for 'killdef'.
+    //NOTE: User has to guarantee that 'killdef' must be the killing-def
+    //of 'exp'.
+    VN const* inferAndGenVNForKillingDef(
+        IR const* exp, IR const* killdef, InferCtx & ctx);
 
     //The function maps given mddef information into an unique IR_CODE.
     //The mapped ir-code is used to conform the hashing-rules when registers
@@ -692,23 +720,46 @@ protected:
     //$12's VN are set.
     void setVNAlways(IR const* ir, VN const* vn)
     {
-        ASSERT0(!vn->is_unknown());
+        ASSERT0(vn == nullptr || !vn->is_unknown());
+
         //NOTE: each IR can be set only once, user has to check VN before
         //inoke the function.
         m_irid2vn.setAlways(ir->id(), vn);
     }
-    void setVN(IR const* ir, VN const* vn)
+    void setVN(PRNO prno, VN const* vn)
     {
-        ASSERT0(!vn->is_unknown());
+        ASSERT0(vn == nullptr || !vn->is_unknown());
         //NOTE: each IR can be set only once, user has to check VN before
         //inoke the function.
+        ASSERT0(getVN(prno) == nullptr || getVN(prno) == vn);
+        m_prno2vn.set(prno, vn);
+    }
+
+    //NOTE ir's VN could be set multiple times but should be unique.
+    void setVN(IR const* ir, VN const* vn)
+    {
+        ASSERT0(vn && !vn->is_unknown());
+        //NOTE: each IR can be set only unique VN, user has to check VN before
+        //inoking the function.
         ASSERT0(getVN(ir) == nullptr || getVN(ir) == vn);
-        m_irid2vn.set(ir->id(), vn);
+        m_irid2vn.setAlways(ir->id(), vn);
     }
     void setVN(MDDef const* mddef, VN const* vn)
-    { m_mdphi2vn.set(mddef->id(), vn); }
+    {
+        ASSERT0(!vn->is_unknown());
+        //NOTE: each MDDef can be set only unique VN, user has to check VN
+        //before inoking the function.
+        ASSERT0(getVN(mddef) == nullptr || getVN(mddef) == vn);
+        m_mdphi2vn.setAlways(mddef->id(), vn);
+    }
     void setVN(VMD const* vmd, VN const* vn)
-    { m_vmd2vn.set(vmd->id(), vn); }
+    {
+        ASSERT0(!vn->is_unknown());
+        //NOTE: each MDDef can be set only unique VN, user has to check VN
+        //before inoking the function.
+        ASSERT0(getVN(vmd) == nullptr || getVN(vmd) == vn);
+        m_vmd2vn.setAlways(vmd->id(), vn);
+    }
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -717,7 +768,14 @@ protected:
 public:
     InferEVN(GVN * gvn);
     virtual ~InferEVN() {}
+
+    //Clean ir related VN info.
+    void cleanVN(IR const* ir) { setVNAlways(ir, nullptr); }
+    void cleanVNIRTree(IR const* ir);
+    void clean();
+
     void dump() const;
+    void dumpBBListWithEVN() const;
     VN const* inferExp(IR const* ir, InferCtx & ctx);
 };
 
@@ -794,7 +852,6 @@ protected:
     bool calcCondMustValBin(IR const* ir, bool & must_true,
                             bool & must_false) const;
     void cleanIR2VN();
-    void clean();
     VN const* computeIntConst(HOST_INT val);
     VN const* computeSelect(IR const* exp, bool & change);
     VN const* computeBin(IR const* exp, bool & change);
@@ -823,7 +880,6 @@ protected:
     VN const* computePhiPROpnd(IR const* exp, bool & change);
     VN const* computePhiOpnd(IR const* exp, bool & change);
 
-    void dumpBB(UINT bbid) const;
     void dumpIR2VN() const;
     void destroyLocalUsed();
 
@@ -863,14 +919,7 @@ protected:
     virtual bool isTriple(IR_CODE irt) const;
     virtual bool isQuad(IR_CODE irt) const;
 
-    void * xmalloc(UINT size)
-    {
-        void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p);
-        ::memset((void*)p, 0, size);
-        return p;
-    }
-
+    void reset();
     VN * registerQuadVN(IR_CODE irt, VN const* v0, VN const* v1,
                         VN const* v2, VN const* v3);
     VN * registerTripleVN(IR_CODE irt, VN const* v0, VN const* v1,
@@ -907,17 +956,26 @@ protected:
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+
+    void * xmalloc(UINT size)
+    {
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        ::memset((void*)p, 0, size);
+        return p;
+    }
 public:
     explicit GVN(Region * rg);
     virtual ~GVN();
 
     VN * allocVN();
+    virtual InferEVN * allocInferEVN() { return new InferEVN(this); }
 
     //Return true if GVN is able to determine the result of 'ir', otherwise
     //return false that GVN know nothing about ir.
     bool calcCondMustVal(IR const* ir, bool & must_true,
                          bool & must_false) const;
-    void cleanIRTreeVN(IR const* ir);
+    void cleanVNIRTree(IR const* ir);
     void copyVN(IR const* from, IR const* to);
 
     //Compute VN to given exp.
@@ -942,6 +1000,7 @@ public:
     virtual bool dump() const;
     void dumpAllVN() const;
     void dumpMiscMap() const;
+    void dumpBBListWithVN() const;
     void destroy();
 
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }

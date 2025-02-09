@@ -102,7 +102,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/D "_ON_WINDOWS_" /D "_DEBUG_" /D "FOR_DEX" /D "_CRT_SECURE_NO_WARNINGS" /DFOR_ARM /DFOR_X86 /DFOR_X64 /DFOR_SCORE /DFOR_TECO %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D "_ON_WINDOWS_" /D "_DEBUG_" /D "FOR_DEX" /D "_CRT_SECURE_NO_WARNINGS" /DFOR_ARM /DFOR_X86 /DFOR_X64 /DFOR_SCORE %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -155,7 +155,6 @@
     <ClCompile Include="..\..\..\com\smempool.cpp" />
     <ClCompile Include="..\..\..\com\strbuf.cpp" />
     <ClCompile Include="..\..\..\score\score_elf_targinfo.cpp" />
-    <ClCompile Include="..\..\..\teco\teco_elf_targinfo.cpp" />
     <ClCompile Include="..\..\..\x64\x64_elf_targinfo.cpp" />
     <ClCompile Include="..\..\..\x86\x86_elf_targinfo.cpp" />
     <ClCompile Include="..\..\elf_header.cpp" />
@@ -173,7 +172,6 @@
     <ClInclude Include="..\..\..\com\smempool.h" />
     <ClInclude Include="..\..\..\com\strbuf.h" />
     <ClInclude Include="..\..\..\score\score_elf_targinfo.h" />
-    <ClInclude Include="..\..\..\teco\teco_elf_targinfo.h" />
     <ClInclude Include="..\..\..\x64\x64_elf_targinfo.h" />
     <ClInclude Include="..\..\..\x86\x86_elf_targinfo.h" />
     <ClInclude Include="..\..\elf32.h" />

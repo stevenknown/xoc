@@ -560,7 +560,7 @@ IR * IRMgr::buildPR(Type const* type)
 
 //Generate a PR number by specified prno and type id.
 //This operation will allocate new PR number.
-//Note the function does NOT generate Var for generated PR no.
+//Note the function does NOT generate Var for generated PRNO.
 UINT IRMgr::buildPrno(Type const* type)
 {
     ASSERT0(type);

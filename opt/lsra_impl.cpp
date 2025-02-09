@@ -492,7 +492,6 @@ void LTConsistencyMgr::computePR2LtInfoForBB(UINT bbid, bool is_input)
     Pos boundary_pos = POS_UNDEF;
     PRLiveSet const* live_set = nullptr;
     PRLiveSetIter * iter = nullptr;
-
     if (is_input) {
         boundary_pos = m_impl.getLTMgr().getBBStartPos(bbid);
         live_set = m_live_mgr->get_livein(bbid);
@@ -500,7 +499,8 @@ void LTConsistencyMgr::computePR2LtInfoForBB(UINT bbid, bool is_input)
         boundary_pos = m_impl.getLTMgr().getBBEndPos(bbid);
         live_set = m_live_mgr->get_liveout(bbid);
     }
-
+    ASSERT0(boundary_pos != POS_UNDEF);
+    ASSERT0(live_set);
     for (PRNO pr = (PRNO)live_set->get_first(&iter);
          pr != BS_UNDEF; pr = (PRNO)live_set->get_next(pr, &iter)) {
         LifeTime * lt = m_impl.getRA().getLTMgr().getLifeTime(pr);
@@ -557,6 +557,7 @@ void LTConsistencyMgr::computeEdgeConsistencyImpl(xcom::Edge const* e,
         if (!live_out_from->is_contain(pr)) { continue; }
 
         LifeTime * lt = m_impl.getRA().getLTMgr().getLifeTime(pr);
+        ASSERT0(lt);
 
         //If this lifetime is never defined, don't consider the inconsistency.
         if (!lt->isOccHasDef()) { continue; }
@@ -578,6 +579,12 @@ void LTConsistencyMgr::computeEdgeConsistencyImpl(xcom::Edge const* e,
         computeInconsistency(inconsist_lst, from, to, from_lt, to_lt,
                              spill_loc, lsra);
     }
+}
+
+
+LinearScanRA & LTConsistencyMgr::getRA() const
+{
+    return m_impl.getRA();
 }
 
 
@@ -1066,34 +1073,37 @@ SplitMgr::SplitMgr(LSRAImpl & impl) : m_impl(impl), m_ra(impl.getRA())
 }
 
 
-LifeTime * SplitMgr::selectLTByFurthestNextOcc(LTSet const& lst, Pos pos,
-                                               Vector<SplitCtx> const& ctxvec,
-                                               OUT Occ & reload_occ)
+LifeTime * SplitMgr::selectLTByPrioAndNextOcc(LTSet const& lst, Pos pos,
+                                              Vector<SplitCtx> const& ctxvec,
+                                              OUT Occ & reload_occ)
 {
     VecIdx cnt = 0;
     ASSERT0(ctxvec.get_elem_count() == lst.get_elem_count());
-    Occ furthest_occ;
-    LifeTime * furthest_lt = nullptr;
+    Occ next_occ;
+    LifeTime * selected_lt = nullptr;
     LTSetIter it;
     for (LifeTime * t = lst.get_head(&it);
          t != nullptr; t = lst.get_next(&it), cnt++) {
         SplitCtx l = ctxvec.get(cnt);
-        if (furthest_lt == nullptr) {
-            furthest_occ = l.reload_occ;
-            furthest_lt = t;
+        if (selected_lt == nullptr) {
+            next_occ = l.reload_occ;
+            selected_lt = t;
             continue;
         }
-        if (furthest_occ.pos() > l.reload_pos) {
+        if (t->getPriority() > selected_lt->getPriority()) {
             continue;
         }
-        furthest_occ = l.reload_occ;
-        furthest_lt = t;
+        if (next_occ.pos() > l.reload_pos) {
+            continue;
+        }
+        next_occ = l.reload_occ;
+        selected_lt = t;
     }
-    if (furthest_lt == nullptr) { return nullptr; }
-    reload_occ = furthest_occ;
-    dumpSelectSplitCand(m_impl, furthest_lt, pos, true,
-                        "$%u has furthest reload-occ", furthest_lt->getPrno());
-    return furthest_lt;
+    if (selected_lt == nullptr) { return nullptr; }
+    reload_occ = next_occ;
+    dumpSelectSplitCand(m_impl, selected_lt, pos, true,
+                        "$%u has furthest reload-occ", selected_lt->getPrno());
+    return selected_lt;
 }
 
 
@@ -1159,7 +1169,11 @@ void SplitMgr::selectSplitCandFromSet(LTSet const& set, SplitCtx const& ctx,
         ASSERTN(m_ra.hasReg(t), ("it should not be in InActiveSet"));
         if (m_ra.isUnsplitable(t->getPrno())) { continue; }
 
-        Type const* target_ty = m_impl.getRA().getRegType(
+        //If the current lifetime's PR exists in the constraint set of the PR
+        //to be allocated, it is ignored.
+        if (isConflictedWithTargetLT(t, ctx.split_lt->getPrno())) { continue; }
+
+        Type const* target_ty = m_impl.getRA().getVarTypeOfPRNO(
             m_ra.getAnctPrno(ctx.split_lt->getPrno()));
         ASSERT0(target_ty);
         Reg r = m_ra.getReg(t->getPrno());
@@ -1171,10 +1185,9 @@ void SplitMgr::selectSplitCandFromSet(LTSet const& set, SplitCtx const& ctx,
         SplitCtx lctx(ctx);
         bool canbe = checkIfCanBeSplitCand(t, ctx.split_pos, lctx.reload_pos,
                                            lctx.reload_occ);
-        if (canbe) {
-            candlst.append_tail(t);
-            candctxvec.append(lctx);
-        }
+        if (!canbe) { continue; }
+        candlst.append_tail(t);
+        candctxvec.append(lctx);
     }
 }
 
@@ -1212,12 +1225,10 @@ LifeTime * SplitMgr::selectSplitCandImpl(LTSet & set, LifeTime * lt,
     if (candlst.get_elem_count() == 0) {
         return nullptr;
     }
-    //Attempt to select a lifetime with the biggest hole to contain the entire
-    //given 'lt'.
-    LifeTime * cand = selectLTByFurthestNextOcc(candlst, ctx.split_pos,
-                                                candctxvec, ctx.reload_occ);
-    //LifeTime * cand = selectLTByFurthestNextRange(candlst, ctx.split_pos,
-    //                                              ctx.reload_occ);
+    //Attempt to select a lifetime with least priority and the biggest hole to
+    //contain the entire given 'lt'.
+    LifeTime * cand = selectLTByPrioAndNextOcc(candlst, ctx.split_pos,
+                                               candctxvec, ctx.reload_occ);
     ASSERT0(cand);
     ctx.reload_pos = ctx.reload_occ.pos();
     //candidate may not have reload_pos.
@@ -1255,6 +1266,13 @@ LifeTime * SplitMgr::selectSplitCand(LifeTime * lt, bool tryself,
         return t;
     }
     return selectSplitCandFromActive(lt, tryself, ctx);
+}
+
+
+bool SplitMgr::isConflictedWithTargetLT(LifeTime const* target_lt, PRNO cur_pr)
+{
+    return target_lt->getLTConstraints() != nullptr &&
+           target_lt->getLTConstraints()->isConflictPR(cur_pr);
 }
 
 
@@ -1307,7 +1325,14 @@ void SplitMgr::shrinkLTToSplitPos(LifeTime * lt, Pos split_pos,
         //  lt's lifetime will be terminated at split_pos.
         UpdatePos::incToNextDef(split_pos);
     }
+
+    if (split_pos == lt->getFirstRange().start()) {
+        //This would avoid the lifetime may be updated to start from zero
+        //after shrinked.
+        UpdatePos::inc(split_pos);
+    }
     lt->cleanRangeFrom(split_pos);
+    ASSERT0(lt->getFirstRange().start() > POS_UNDEF);
 }
 
 
@@ -1578,7 +1603,7 @@ bool LSRAImpl::tryAssignCallee(IR const* ir, LifeTime const* lt)
 {
     if (!m_ra.isCalleePermitted(lt)) { return false; }
 
-    Reg r = m_rsimpl.pickCallee(ir);
+    Reg r = m_rsimpl.pickCallee(ir, lt->getLTConstraints());
     if (r != REG_UNDEF) {
         ASSERT0(m_rsimpl.isAvailAllocable(r));
         m_rsimpl.pickRegisterFromCalleeAliasSet(r);
@@ -1594,7 +1619,7 @@ bool LSRAImpl::tryAssignCallee(IR const* ir, LifeTime const* lt)
 
 bool LSRAImpl::tryAssignCaller(IR const* ir, LifeTime const* lt)
 {
-    Reg r = m_rsimpl.pickCaller(ir);
+    Reg r = m_rsimpl.pickCaller(ir, lt->getLTConstraints());
     if (r != REG_UNDEF) {
         ASSERT0(m_rsimpl.isAvailAllocable(r));
         ASSERT0(m_rsimpl.isCaller(r));
@@ -1743,7 +1768,7 @@ void LSRAImpl::splitCallerSavedLT(Pos curpos, IR const* ir)
 {
     ASSERT0(ir->isCallStmt());
     if (ir->isIntrinsicOp()) { return; }
-    RegSet used = m_rsimpl.getUsedCaller();
+    RegSet const& used = m_rsimpl.getUsedCaller();
     for (BSIdx i = used.get_first(); i != BS_UNDEF; i = used.get_next(i)) {
         ASSERT0(i != REG_UNDEF);
         splitAllLTWithReg(curpos, ir, (Reg)i, m_ra.getActive());
@@ -1754,7 +1779,7 @@ void LSRAImpl::splitCallerSavedLT(Pos curpos, IR const* ir)
 
 void LSRAImpl::saveCallee()
 {
-    RegSet used_callee = m_rsimpl.getUsedCallee();
+    RegSet const& used_callee = m_rsimpl.getUsedCallee();
     for (BSIdx i = used_callee.get_first();
          i != BS_UNDEF; i = used_callee.get_next(i)) {
         ASSERT0(m_rsimpl.isCallee(i));
@@ -1911,9 +1936,7 @@ IR * LSRAImpl::insertSpillCalleeAtEntry(Reg r)
     ASSERT0(r != REG_UNDEF);
     ASSERT0(m_rsimpl.isCallee(r));
     IRBB * bb = m_cfg->getEntry();
-    Type const* ty = m_rsimpl.isCalleeScalar(r) ?
-        m_tm->getTargMachRegisterType() :
-        m_tm->getVectorType(ELEM_NUM_OF_16_ELEM_VECTOR_TYPE, D_U32);
+    Type const* ty = m_rsimpl.getCalleeRegisterType(r, m_tm);
     PRNO prno = m_irmgr->buildPrno(ty);
     m_ra.setReg(prno, r);
     IR * spill = insertSpillAtBBEnd(prno, ty, bb);
@@ -1927,9 +1950,7 @@ void LSRAImpl::insertReloadCalleeAtExit(Reg r, Var * spill_loc)
     ASSERT0(r != REG_UNDEF && spill_loc);
     ASSERT0(m_rsimpl.isCallee(r));
     List<IRBB*>::Iter it;
-    Type const* ty = m_rsimpl.isCalleeScalar(r) ?
-        m_tm->getTargMachRegisterType() :
-        m_tm->getVectorType(ELEM_NUM_OF_16_ELEM_VECTOR_TYPE, D_U32);
+    Type const* ty = m_rsimpl.getCalleeRegisterType(r, m_tm);
     PRNO prno = m_irmgr->buildPrno(ty);
     m_ra.setReg(prno, r);
     for (IRBB * bb = m_cfg->getExitList()->get_head(&it);
@@ -1954,9 +1975,12 @@ void LSRAImpl::insertSpillAfter(IR * spill, IR const* marker)
     IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
     ASSERT0(stmt->is_stmt());
     if (stmt->isCallStmt()) {
-        IRBB * followed_bb = m_cfg->insertFallThroughBBAfter(stmt->getBB(),
-                                                             m_oc);
+        IRBB * followed_bb = m_cfg->insertFallThroughBBAfter(
+            stmt->getBB(), m_oc);
         ASSERT0(followed_bb);
+
+        //Increamentally maintain new BB's liveness via marker's BB.
+        addLivenessForEmptyLatchBB(followed_bb, stmt->getBB());
         insertSpillAtHead(spill, followed_bb);
         return;
     }
@@ -2021,15 +2045,15 @@ void LSRAImpl::tryUpdateDom(IRBB const* from, IRBB const* newbb,
 }
 
 
-void LSRAImpl::addLivenessForEmptyLatchBB(IRBB const* new_bb, IRBB const* from)
+void LSRAImpl::addLivenessForEmptyLatchBB(
+    IRBB const* latch_bb, IRBB const* from)
 {
-    ASSERT0(new_bb && from);
-    ASSERT0(new_bb->is_empty());
-    ASSERT0(m_cfg->is_pred(new_bb->getVex(), from->getVex()));
-    ASSERT0(new_bb->getVex()->getInDegree() == 1);
-    ASSERT0(new_bb->getVex()->getOutDegree() == 1);
-
-    m_live_mgr->setLivenessForEmptyBB(new_bb, from);
+    ASSERT0(latch_bb && from);
+    ASSERT0(latch_bb->is_empty());
+    ASSERT0(m_cfg->is_pred(latch_bb->getVex(), from->getVex()));
+    ASSERT0(latch_bb->getVex()->getInDegree() == 1);
+    ASSERT0(latch_bb->getVex()->getOutDegree() == 1);
+    m_live_mgr->setLivenessForEmptyBB(latch_bb, from);
 }
 
 
@@ -2099,15 +2123,22 @@ IR * LSRAImpl::insertSpillAtBBEnd(PRNO prno, Var * var, Type const* ty,
 }
 
 
+ArgPasser * LSRAImpl::getArgPasser()
+{
+    if (m_argpasser != nullptr) { return m_argpasser; }
+    m_argpasser = (ArgPasser*)m_rg->getPassMgr()->registerPass(
+        PASS_ARGPASSER);
+    return m_argpasser;
+}
+
+
 IRListIter LSRAImpl::insertSpillAtBBEnd(IR * spill, IRBB * bb)
 {
     ASSERT0(spill && isSpillLikeOp(spill) && bb && m_rg &&
             m_rg->getRegionVar());
     m_ra.setSpill(spill);
-
-    ArgPasser * ap = (ArgPasser*)m_rg->getPassMgr()->queryPass(PASS_ARGPASSER);
+    ArgPasser * ap = getArgPasser();
     ASSERT0(ap);
-
     IR * marker = ap->getEntryParam();
     if (m_rg->getRegionVar()->is_entry() && bb->is_entry() &&
         marker != nullptr) {
@@ -2361,7 +2392,6 @@ bool LSRAImpl::perform(OptCtx & oc)
 
     //Compute the lifetime prefer for Register Allocation.
     computeRAPrefer();
-
     ScanInPosOrder scan(*this);
     scan.perform();
     reviseLTConsistency();

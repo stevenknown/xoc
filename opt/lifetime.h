@@ -31,16 +31,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-#define POS_UNDEF 0
-#define POS_INIT_VAL 1
 #define CROSS_CALL_NUM_THRESHOLD 2
 #define REGION_START_POS 2
 
 class LifeTime;
 class LifeTimeMgr;
 class LinearScanRA;
+class LTConstraints;
 
-typedef UINT32 Pos;
 typedef xcom::TMapIter<PRNO, Reg> PRNO2RegIter;
 typedef xcom::TMap<PRNO, Reg> PRNO2Reg;
 
@@ -58,67 +56,6 @@ public:
     void dump(Region const* rg, TargInfoMgr const& timgr) const;
     bool isDedicated(PRNO prno) const { return find(prno); }
 };
-
-class UpdatePos {
-    bool m_use_expose;
-    Pos m_pos;
-    LinearScanRA const& m_ra;
-private:
-    //Increase update position while building lifetime.
-    void update(OUT Pos & defpos, OUT Pos & usepos)
-    {
-        usepos = m_pos++;
-        defpos = m_pos++;
-    }
-public:
-    UpdatePos(LinearScanRA const& ra) : m_ra(ra)
-    { m_use_expose = true; m_pos = POS_INIT_VAL; }
-    Pos getPos() const { return m_pos; }
-    LinearScanRA const& getRA() const { return m_ra; }
-
-    //Decrease position in step.
-    static void dec(MOD Pos & pos) { pos--; }
-
-    //Decrease position to lastest DEF.
-    //e.g:given pos is 15 or 16, the output pos is 14.
-    //  [14] <= [13]
-    //  [16] <= [15]
-    static void decToLastDef(MOD Pos & pos);
-
-    //Decrease position to lastest DEF.
-    //e.g:given pos is 16, the output pos is 15.
-    //  [14] <= [13]
-    //  [16] <= [15]
-    static void decToLastUse(MOD Pos & pos);
-
-    //Increase position to next DEF.
-    //e.g:given pos is 16, the output pos is 16.
-    //  [16] <= [15]
-    //e.g2:given pos is 15, the output pos is 16.
-    //  [16] <= [15]
-    static void incToNextDef(MOD Pos & pos);
-
-    //Increase position in step.
-    static void inc(MOD Pos & pos) { pos++; }
-
-    //Return true if pos indicates LHS.
-    static bool isDef(Pos pos);
-
-    //Return true if pos indicates RHS.
-    static bool isUse(Pos pos);
-
-    //Return true if user expect to generate Def/Use position at exposed-use
-    //and exposed-def.
-    bool useExpose() const { return m_use_expose; }
-    bool updateAtRegionEntry(OUT Pos & dpos, OUT Pos & upos);
-    bool updateAtRegionExit(OUT Pos & dpos, OUT Pos & upos);
-    bool updateAtBBEntry(OUT Pos & dpos, OUT Pos & upos);
-    bool updateAtBBExit(OUT Pos & dpos, OUT Pos & upos);
-    bool updateAtIR(IR const* ir, OUT Pos & dpos, OUT Pos & upos);
-
-    void setUseExpose(bool use_exp) { m_use_expose = use_exp; }
-};
-
 
 #define RG_start(r) ((r).m_start)
 #define RG_end(r) ((r).m_end)
@@ -288,6 +225,7 @@ class LifeTime {
     // POS: 2   5          17               34 37  41          53            67
     LifeTime const* m_parent;
     LifeTime const* m_ancestor;
+    LTConstraints * m_lt_constraints;
 
     double m_priority;
     double m_spill_cost;
@@ -298,7 +236,7 @@ class LifeTime {
     LTList m_child;
 public:
     LifeTime(PRNO prno) : m_call_crossed_num(0), m_flag(0), m_prno(prno),
-        m_parent(nullptr)
+        m_parent(nullptr), m_lt_constraints(nullptr)
     { m_ancestor = this; }
     Range addRange(Pos start, Pos end);
     Range addRange(Pos start) { return addRange(start, start); }
@@ -368,6 +306,7 @@ public:
     }
     double getPriority() const { return m_priority; }
     double getSpillCost() const { return m_spill_cost; }
+    LTConstraints * getLTConstraints() const { return m_lt_constraints; }
 
     //Return the length of lifetime, which describes the number of program
     //points of lifetime.
@@ -380,7 +319,10 @@ public:
     void incCallCrossedNum(UINT num) { m_call_crossed_num += num; }
 
     void inheritAttrFlag(LifeTime const* lt)
-    { m_flag.set(lt->getAttrFlag().getFlagSet()); }
+    {
+        m_flag.set(lt->getAttrFlag().getFlagSet());
+        updateLTConstraintsForSplit(lt);
+    }
 
     bool isAncestor() const { return this == m_ancestor; }
 
@@ -472,7 +414,17 @@ public:
 
     //Shrink the lifetime forward to the last occ position.
     void shrinkForwardToLastOccPos();
+    void setLTConstraints(LTConstraints * lt_constraints)
+    {
+        ASSERT0(lt_constraints);
+        m_lt_constraints = lt_constraints;
+    }
 
+    //This function handles the propagation and update of register allocation
+    //constraints when a lifetime is split into two. The new
+    //lifetime should inherit the original constraints, and the conflict
+    //PRs need to be updated accordingly.
+    void updateLTConstraintsForSplit(LifeTime const* old_lt);
     bool verify() const;
 };
 

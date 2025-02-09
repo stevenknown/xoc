@@ -762,6 +762,14 @@ void prim(INT m, OUT INT * buf)
 }
 
 
+//Solve the integer power of 2.
+//e.g: if 'x' is 2, return 4.
+int powerXOf2(int x)
+{
+    return (int)::pow((double)2, (double)x);
+}
+
+
 //Convert floating point string into binary words.
 void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 {

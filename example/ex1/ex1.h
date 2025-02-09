@@ -36,7 +36,8 @@ author: Su Zhenyu
 
 class CVAR : public Var {
 public:
-    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf, VarMgr const* vm) const
+    virtual CHAR const* dumpVARDecl(
+        OUT xcom::DefFixedStrBuf & buf, VarMgr const* vm) const override
     { return nullptr; }
 };
 

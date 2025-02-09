@@ -190,8 +190,8 @@ void MCDwarfMgr::setStackSlotAlignment(Region const* region)
     //and currently, the coverage ignores the current line.
     m_stack_slot_alignment =
         targ_info->isStackGrowthDownward() ? //GCOVR_EXCL_LINE
-        slotbytesize : //GCOVR_EXCL_LINE
-        -(INT)slotbytesize;
+        -(INT)slotbytesize :
+        slotbytesize; //GCOVR_EXCL_LINE
 }
 
 

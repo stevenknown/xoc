@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
+#include "var_liveness_mgr.h"
 
 namespace xoc {
 
@@ -920,10 +921,9 @@ void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
-    Type const* ty = m_lsra->getRegType(prno);
+    Type const* ty = m_lsra->getVarTypeOfPRNO(prno);
     IR * pr_ir = m_irmgr->buildPRdedicated(prno, ty);
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
-    st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().append_head(st);
     m_lsra->setFakeUseAtLexFirstBBInLoop(st);
 
@@ -961,10 +961,9 @@ void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
     if (!tail->isBranch()) { return; }
 
     //Insert before the branch.
-    Type const* ty = m_lsra->getRegType(prno);
+    Type const* ty = m_lsra->getVarTypeOfPRNO(prno);
     IR * pr_ir = m_irmgr->buildPRdedicated(prno, ty);
     IR * st = m_irmgr->buildStore(m_fake_var_mgr->genFakeVar(ty), ty, pr_ir);
-    st->setBB(const_cast<IRBB*>(bb));
     const_cast<IRBB*>(bb)->getIRList().insert_before(st, tail);
 
     //Store the fake-use IR in the table, because the fake-use IR at the
@@ -1165,6 +1164,26 @@ void BackwardJumpAnalysis::insertFakeUse()
 }
 //END BackwardJumpAnalysis
 
+
+//
+//START PRNOConstraintsTab
+//
+bool PRNOConstraintsTab::hasTwoOrMoreCommonElements(
+    PRNOConstraintsTab const& src_tab) const
+{
+    PRNOConstraintsTabIter it;
+    UINT common_count = 0;
+    for (PRNO pr = src_tab.get_first(it); pr != PRNO_UNDEF;
+         pr = src_tab.get_next(it)) {
+        if (!find(pr)) { continue; }
+        common_count++;
+        if (common_count >= 2) { return true; }
+    }
+    return false;
+}
+//END PRNOConstraintsTab
+
+
 //
 //START RegSetImpl
 //
@@ -1317,6 +1336,156 @@ void RegSetImpl::pickReg(RegSet & set, Reg r)
 }
 
 
+Reg RegSetImpl::handleOnlyConsistency(OUT RegSet & set,
+                                      PRNOConstraintsTab const& consist_prs)
+{
+    PRNOConstraintsTabIter it;
+
+    //Check in consist_prs whether a register has already been allocated.
+    //If a register has been allocated, return it directly.
+    for (PRNO pr = consist_prs.get_first(it); pr != PRNO_UNDEF;
+         pr = consist_prs.get_next(it)) {
+        Reg r = m_ra.getReg(pr);
+        if (r != REG_UNDEF) {
+            return r;
+        }
+    }
+
+    //Attempt to find an available register from the set.
+    BSIdx available_reg = set.get_first();
+    if (available_reg != BS_UNDEF) {
+        set.diff(available_reg);
+        return (Reg)available_reg;
+    }
+    return REG_UNDEF;
+}
+
+
+void RegSetImpl::removeConflictingReg(OUT RegSet & set,
+                                      PRNOConstraintsTab const& conflict_prs,
+                                      OUT RegSetWrap & removed_regs_wrap)
+{
+
+    PRNOConstraintsTabIter it;
+    PRNO pr = conflict_prs.get_first(it);
+    if (pr != PRNO_UNDEF) {
+        removed_regs_wrap.alloc();
+    }
+
+    //Traverse conflict_prs and delete its registers from the set.
+    //`set` represents the available (free) register set. It contains
+    //registers that can be allocated. Suppose the conflicting PRs are
+    //$2 and $3. This may lead to the following cases:
+    //Case 1: If `set = {R2, R3, R4, R5, R6}`, and $2 is assigned to
+    //register R2, and R2 is still in the free set. When allocating
+    //a register for $3, we must remove R2 from the free set and select
+    //one from the remaining set {R3, R4, R5, R6}. Additionally, we
+    //record the removal of R2.
+    //
+    //Case 2: If $2 is assigned to register R2, but the free set is
+    //`{R3, R4, R5, R6}` (meaning R2 is no longer in the free set), we
+    //can freely select a register from the set without needing to record
+    //any information.
+    for (; pr != PRNO_UNDEF; pr = conflict_prs.get_next(it)) {
+        Reg r = m_ra.getReg(pr);
+
+        //The current PR has already been assigned a register,
+        //and the assigned register is in the free set.
+        if (r != REG_UNDEF && set.is_contain(r)) {
+            set.diff(r);
+            ASSERT0(removed_regs_wrap.getRegSet());
+            removed_regs_wrap.getRegSet()->bunion(r);
+        }
+    }
+}
+
+
+Reg RegSetImpl::handleOnlyConflicts(OUT RegSet & set,
+                                    PRNOConstraintsTab const& conflict_prs)
+{
+    RegSetWrap removed_regs_wrap;
+
+    //Remove conflicting registers.
+    removeConflictingReg(set, conflict_prs, removed_regs_wrap);
+
+    //Attempt to find an available register from the set after
+    //removing conflict set.
+    BSIdx available_reg = set.get_first();
+    if (available_reg != BS_UNDEF) {
+        set.diff(available_reg);
+
+        //Restore previously removed conflicting registers back into the set.
+        RegSet const* rs = removed_regs_wrap.getRegSet();
+        if (rs != nullptr) {
+            set.bunion(*rs);
+        }
+        return (Reg)available_reg;
+    }
+    return REG_UNDEF;
+}
+
+
+Reg RegSetImpl::handleConflictsAndConsistency(
+    OUT RegSet & set, PRNOConstraintsTab const& conflict_prs,
+    PRNOConstraintsTab const& consist_prs)
+{
+    //Check for conflicts between conflict_prs and consist_prs.
+    //conflict_prs contains elements like {pr0, pr1, pr2},
+    //indicating that these registers cannot be allocated
+    //to the same physical register in the future.
+    //consist_prs contains elements like {pr1, pr2},
+    //indicating that pr1 and pr2 must be allocated to the
+    //same physical register. If there are common elements
+    //between these two sets,
+    //it represents a conflict and violates the intended semantics.
+    ASSERT0(!conflict_prs.hasTwoOrMoreCommonElements(consist_prs));
+    PRNOConstraintsTabIter it;
+
+    //Check if any register has already been allocated in consist_prs
+    //Return the allocated register directly.
+    for (PRNO pr = consist_prs.get_first(it); pr != PRNO_UNDEF;
+         pr = consist_prs.get_next(it)) {
+        Reg r = m_ra.getReg(pr);
+        if (r != REG_UNDEF) {
+            return r;
+        }
+    }
+
+    //If no registers were allocated in consist_prs, handle conflict set.
+    return handleOnlyConflicts(set, conflict_prs);
+}
+
+
+Reg RegSetImpl::pickRegWithConstraints(OUT RegSet & set,
+                                       LTConstraints const* lt_constraints)
+{
+    ASSERT0(lt_constraints);
+
+    PRNOConstraintsTab const& conflict_prs = lt_constraints->getConflictTab();
+    PRNOConstraintsTab const& consist_prs = lt_constraints->getConsistTab();
+
+    //Check different conditions based on the state of
+    //conflict_prs and consist_prs.
+    //1. If both conflict_prs and consist_prs are not empty, handle that case.
+    //2. If only conflict_prs is not empty, handle that case.
+    //3. If only consist_prs is not empty, handle that case.
+    //4. If both are empty, assert an error (indicating an unexpected state).
+    if (!conflict_prs.is_empty() && !consist_prs.is_empty()) {
+        return handleConflictsAndConsistency(set, conflict_prs, consist_prs);
+    }
+
+    if (!conflict_prs.is_empty()) {
+        return handleOnlyConflicts(set, conflict_prs);
+    }
+
+    if (!consist_prs.is_empty()) {
+        return handleOnlyConsistency(set, consist_prs);
+    }
+
+    ASSERT0(0); return REG_UNDEF;
+}
+
+
 void RegSetImpl::pickRegFromAllocable(Reg reg)
 {
     ASSERT0(isAvailAllocable(reg));
@@ -1340,19 +1509,25 @@ void RegSetImpl::recordUsedCaller(Reg reg)
 }
 
 
-Reg RegSetImpl::pickCallee(IR const* ir)
+Reg RegSetImpl::pickCallee(IR const* ir, LTConstraints const* lt_constraints)
 {
-    Reg r = ir->is_vec() ? pickReg(m_avail_callee_vector)
-        : pickReg(m_avail_callee_scalar);
-    return r;
+    RegSet & set = ir->is_vec() ? m_avail_callee_vector :
+                                  m_avail_callee_scalar;
+    if (lt_constraints != nullptr) {
+        return pickRegWithConstraints(set, lt_constraints);
+    }
+    return pickReg(set);
 }
 
 
-Reg RegSetImpl::pickCaller(IR const* ir)
+Reg RegSetImpl::pickCaller(IR const* ir, LTConstraints const* lt_constraints)
 {
-    Reg r = ir->is_vec() ? pickReg(m_avail_caller_vector)
-        : pickReg(m_avail_caller_scalar);
-    return r;
+    RegSet & set = ir->is_vec() ? m_avail_caller_vector :
+                                  m_avail_caller_scalar;
+    if (lt_constraints != nullptr) {
+        return pickRegWithConstraints(set, lt_constraints);
+    }
+    return pickReg(set);
 }
 
 
@@ -1516,6 +1691,45 @@ void RegSetImpl::dumpAvailRegSet() const
 //END RegSetImpl
 
 
+//START LTConstraintsMgr
+void LTConstraintsMgr::init()
+{
+    m_ltc_list.init();
+}
+
+
+LTConstraints * LTConstraintsMgr::allocLTConstraints()
+{
+    LTConstraints * lt_constraints = new LTConstraints();
+    ASSERT0(lt_constraints);
+    m_ltc_list.append_tail(lt_constraints);
+    return lt_constraints;
+}
+
+
+void LTConstraintsMgr::destroy()
+{
+    for (LTConstraints * ltc = m_ltc_list.get_head(); ltc!= nullptr;
+         ltc = m_ltc_list.get_next()) {
+        delete ltc;
+    }
+    m_ltc_list.destroy();
+}
+//END LTConstraintsMgr
+
+
+//
+//START LTConstraints
+//
+void LTConstraints::updateConflictPR(PRNO renamed_pr, PRNO old_pr)
+{
+    ASSERT0(m_conflicting_prs.find(old_pr));
+    m_conflicting_prs.remove(old_pr);
+    m_conflicting_prs.append(renamed_pr);
+}
+//END LTConstraints
+
+
 //
 //START LinearScanRA
 //
@@ -1529,12 +1743,22 @@ LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
     m_func_level_var_count = 0;
     m_is_apply_to_region = false;
     m_is_fp_allocable_allowed = true;
+    m_lt_constraints_strategy = nullptr;
+    m_lt_constraints_mgr = nullptr;
 }
 
 
 LinearScanRA::~LinearScanRA()
 {
     delete m_lt_mgr;
+    if (m_lt_constraints_mgr != nullptr) {
+        delete m_lt_constraints_mgr;
+        m_lt_constraints_mgr = nullptr;
+    }
+    if (m_lt_constraints_strategy != nullptr) {
+        delete m_lt_constraints_strategy;
+        m_lt_constraints_strategy = nullptr;
+    }
 }
 
 
@@ -1567,6 +1791,9 @@ void LinearScanRA::reset()
     m_prno2var.clean();
     m_act_mgr.clean();
     m_bb_seqid.clean();
+    if (getLTConstraintsMgr() != nullptr) {
+        getLTConstraintsMgr()->reset();
+    }
     m_prno_with_2d_hole.clean();
 }
 
@@ -1628,7 +1855,7 @@ PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
     ASSERT0(reg != REG_UNDEF);
     PRNO prno = getSpecialDedicatedPrno(type, reg);
     if (prno != PRNO_UNDEF) { return prno; }
-
+    ASSERT0(m_irmgr);
     prno = m_irmgr->buildPrno(type);
     setDedicatedReg(prno, reg);
     recordSpecialDedicatedPrno(type, reg, prno);
@@ -1729,18 +1956,19 @@ bool LinearScanRA::hasReg(PRNO prno) const
 }
 
 
-Type const* LinearScanRA::getRegType(PRNO prno) const
+Type const* LinearScanRA::getVarTypeOfPRNO(PRNO prno) const
 {
     Var * var = m_rg->getVarByPRNO(prno);
     ASSERT0(var);
     TypeMgr * tm = m_rg->getTypeMgr();
-    if (!VAR_type(var)->is_vector() && !VAR_type(var)->is_any()) {
-        ASSERT0(var->getByteSize(tm) <=
-                tm->getByteSize(tm->getTargMachRegisterType()));
-    }
-
-    return VAR_type(var)->is_vector() ? VAR_type(var)
-        : tm->getTargMachRegisterType();
+    Type const* varty = var->getType();
+    Type const* tm_word_ty = tm->getTargMachRegisterType();
+    UINT var_sz = var->getByteSize(tm);
+    UINT tm_word_sz = tm->getByteSize(tm_word_ty);
+    if (varty->is_vector() || varty->is_fp()) { return varty; }
+    ASSERT0(varty->isInt());
+    if (var_sz <= tm_word_sz) { return tm_word_ty; }
+    return varty; //varty might be ANY.
 }
 
 
@@ -1915,7 +2143,7 @@ void LinearScanRA::dumpBBListWithReg() const
         LinearScanRA const* lsra;
     public:
         virtual void dumpAttr(
-            OUT xcom::StrBuf & buf, Region const* rg, IR const* ir,
+            OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
             if (!ir->isPROp()) { return; }
@@ -1976,7 +2204,7 @@ bool LinearScanRA::dump(bool dumpir) const
     LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
     pthis->getTIMgr().dump(m_rg);
     m_dedicated_mgr.dump(m_rg, pthis->getTIMgr());
-    UpdatePos up(*this);
+    UpdatePos up(this);
     pthis->getLTMgr().dumpAllLT(up, m_bb_list, dumpir);
     dumpPR2Reg();
     dumpBBListWithReg();
@@ -2127,28 +2355,28 @@ public:
 class UseNewBBList {
     BBList * m_org_bblst;
     BBList * m_new_bblst;
-    IRBBMgr * m_org_bbmgr;
+    IRBBMgr * m_new_bbmgr; //record user generated new IRBBMgr.
     Region * m_rg;
 public:
-    UseNewBBList(Region * rg, BBList * bblst, MOD IRBBMgr * bbmgr)
+    UseNewBBList(Region * rg, BBList * bblst, MOD IRBBMgr * newbbmgr)
     {
-        ASSERT0(bbmgr);
+        ASSERT0(newbbmgr);
         m_rg = rg;
         m_org_bblst = bblst;
-        m_org_bbmgr = bbmgr;
+        m_new_bbmgr = newbbmgr;
         m_new_bblst = new BBList();
-        m_new_bblst->clone(*bblst, bbmgr, rg);
+        m_new_bblst->clone(*bblst, m_new_bbmgr, rg);
         m_rg->setBBList(m_new_bblst);
     }
     ~UseNewBBList()
     {
-        m_rg->setBBList(m_org_bblst);
         BBListIter it;
         for (IRBB * bb = m_new_bblst->get_head(&it);
              bb != nullptr; bb = m_new_bblst->get_next(&it)) {
-            m_org_bbmgr->destroyBB(bb);
+            m_new_bbmgr->destroyBB(bb);
         }
         delete m_new_bblst;
+        m_rg->setBBList(m_org_bblst);
     }
     BBList * getNewBBList() const { return m_new_bblst; }
     BBList * getOrgBBList() const { return m_org_bblst; }
@@ -2161,13 +2389,14 @@ class UseNewCFG {
     IRCFG * m_new_cfg;
     Region * m_rg;
 public:
-    UseNewCFG(Region * rg, IRCFG * cfg, BBList * bblst)
+    UseNewCFG(Region * rg, IRCFG * cfg, BBList * newbblst)
     {
+        ASSERT0(newbblst);
         m_rg = rg;
         m_org_cfg = cfg;
         ASSERT0(m_rg->getPassMgr());
         //m_new_cfg = (IRCFG*)m_rg->getPassMgr()->allocPass(PASS_CFG);
-        m_new_cfg = new IRCFG(*cfg, bblst, false, false);
+        m_new_cfg = new IRCFG(*cfg, newbblst, false, false);
         m_new_cfg->setBBVertex();
         m_rg->setCFG(m_new_cfg);
     }
@@ -2183,6 +2412,9 @@ public:
 };
 
 
+//
+//START ApplyToRegion
+//
 class ApplyToRegion {
     COPY_CONSTRUCTOR(ApplyToRegion);
     xcom::Stack<UseNewIRMgr*> m_irmgr_stack;
@@ -2209,21 +2441,25 @@ public:
     {
         //Push current IRMgr of region and adopt a new.
         UseNewIRMgr * usenewirmgr = new UseNewIRMgr(m_rg, m_rg->getIRMgr());
+        ASSERT0(usenewirmgr->getNewIRMgr() == m_rg->getIRMgr());
         m_irmgr_stack.push(usenewirmgr);
 
         //Push current IRBBMgr of region and adopt a new.
         UseNewIRBBMgr * usenewbbmgr = new UseNewIRBBMgr(
             m_rg, m_rg->getBBMgr());
+        ASSERT0(usenewbbmgr->getNewIRBBMgr() == m_rg->getBBMgr());
         m_bbmgr_stack.push(usenewbbmgr);
 
         //Push current BBList of region and adopt a new.
         UseNewBBList * usenewbblst = new UseNewBBList(
-            m_rg, m_rg->getBBList(), m_rg->getBBMgr());
+            m_rg, m_rg->getBBList(), usenewbbmgr->getNewIRBBMgr());
+        ASSERT0(usenewbblst->getNewBBList() == m_rg->getBBList());
         m_bblist_stack.push(usenewbblst);
 
         //Push current CFG of region and adopt a new.
         UseNewCFG * usenewcfg = new UseNewCFG(
-            m_rg, m_rg->getCFG(), m_rg->getBBList());
+            m_rg, m_rg->getCFG(), usenewbblst->getNewBBList());
+        ASSERT0(usenewcfg->getNewCFG() == m_rg->getCFG());
         m_cfg_stack.push(usenewcfg);
     }
     void pop()
@@ -2241,6 +2477,7 @@ public:
         if (useirmgr != nullptr) { delete useirmgr; }
     }
 };
+//END ApplyToRegion
 
 
 //This function implements the swap operation of two prnos through the temp
@@ -2422,30 +2659,120 @@ bool LinearScanRA::performLsraImpl(OptCtx & oc)
 }
 
 
+void LinearScanRA::reuseStackSlot(bool is_vector)
+{
+    VarCheck::setVarCheckCondition(is_vector);
+    VarLivenessMgr var_liveness_mgr(m_rg, *this);
+    var_liveness_mgr.perform();
+
+    VarLifeTimeMgr var_ltmgr(m_rg, &var_liveness_mgr);
+    var_ltmgr.computeLifeTime();
+    var_ltmgr.computeAccuLifeTime();
+
+    VarInterfGraph interf(m_rg, var_ltmgr);
+    if (xoc::g_interference_graph_stack_slot_color) {
+        interf.color();
+    } else {
+        interf.colorFast();
+    }
+    interf.rewrite();
+}
+
+
+void LinearScanRA::scanIRAndSetConstraints()
+{
+    if (m_lt_constraints_strategy == nullptr) {
+        ASSERT0(m_lt_constraints_mgr == nullptr);
+        return;
+    }
+
+    BBList * bb_list = this->getBBList();
+    ASSERT0(bb_list);
+    BBListIter bb_it;
+    for (IRBB * bb = bb_list->get_head(&bb_it);
+         bb != nullptr; bb = bb_list->get_next(&bb_it)) {
+        BBIRList & ir_lst = bb->getIRList();
+        BBIRListIter bb_ir_it;
+        for (IR * ir = ir_lst.get_head(&bb_ir_it);
+             ir != nullptr; ir = ir_lst.get_next(&bb_ir_it)) {
+            //Note that different architectures have different strategy
+            //implementations. For example, this architecture's addition
+            //instruction requires that the source and destination registers
+            //have different lifetime allocations,
+            //while other architectures may not have this requirement.
+            m_lt_constraints_strategy->applyConstraints(ir);
+        }
+    }
+}
+
+
+void LinearScanRA::tryComputeConstraints()
+{
+    //Before calculating the lifetime constraints, we need to
+    //initialize both the lifetime constraint management unit
+    //and the constraints strategy. After initialization, we can
+    //proceed to set the constraint collection.
+    //Note: initLTConstraintsMgr() and initConstraintsStrategy()
+    //have different implementations depending on the architecture.
+    //initLTConstraintsMgr() allocates memory for the lifetime
+    //constraint specific to the architecture, while the
+    //ConstraintsStrategy generates various constraint results
+    //according to the architecture-specific strategies.
+    //For example, the base class is LTConstraints. ARM may need
+    //to create its own constraint collection, which can be done
+    //with a class like ARMLTConstraints that inherits from
+    //LTConstraints. Similarly, ARM can have its own
+    //ARMLTConstraintsMgr, such as class ARMLTConstraintsMgr
+    //that inherits from LTConstraintsMgr, with similar strategies
+    //for method implementation.
+    initLTConstraintsMgr();
+    initConstraintsStrategy();
+    scanIRAndSetConstraints();
+}
+
+
+void LinearScanRA::checkAndApplyToRegion(MOD ApplyToRegion & apply)
+{
+    if (isApplyToRegion()) { return; }
+    //Stash pop current region information.
+    apply.pop();
+    m_cfg = m_rg->getCFG();
+    m_bb_list = m_rg->getBBList();
+    m_irmgr = m_rg->getIRMgr();
+}
+
+
+void LinearScanRA::checkAndPrepareApplyToRegion(OUT ApplyToRegion & apply)
+{
+    m_cfg = m_rg->getCFG();
+    m_bb_list = m_rg->getBBList();
+    m_irmgr = m_rg->getIRMgr();
+    if (isApplyToRegion()) { return; }
+    //Stash push current region information.
+    apply.push();
+    m_cfg = m_rg->getCFG();
+    m_bb_list = m_rg->getBBList();
+    m_irmgr = m_rg->getIRMgr();
+    ASSERT0(m_cfg->verify());
+}
+
+
 //TODO: rematerialization and spill-store-elimination
 bool LinearScanRA::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
-                                               PASS_LIVENESS_MGR, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_RPO, PASS_DOM, PASS_LIVENESS_MGR, PASS_UNDEF);
     reset();
-    m_cfg = m_rg->getCFG();
-    m_bb_list = m_rg->getBBList();
-    if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
-        return false;
-    }
 
     //Determine whether the PASS apply all modifications of CFG and BB to
     //current region. User may invoke LSRA as performance estimating tools
     //to conduct optimizations, such as RP, GCSE, UNROLLING which may increase
     //register pressure.
     ApplyToRegion apply(m_rg);
-    if (!m_is_apply_to_region) {
-        //Stash current region information.
-        apply.push();
-        m_cfg = m_rg->getCFG();
-        m_bb_list = m_rg->getBBList();
-        ASSERT0(m_cfg->verify());
+    checkAndPrepareApplyToRegion(apply);
+    if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
+        return false;
     }
 
     //Assign each BB a topologic sequence ID.
@@ -2457,11 +2784,13 @@ bool LinearScanRA::perform(OptCtx & oc)
     BackwardJumpAnalysis back_jump_ana(m_rg, &pos2attr, &fake_var_mgr, this);
     back_jump_ana.analyze();
 
-    //Enable the dump-buffer.
-    //DumpBufferSwitch buff(m_rg->getLogMgr());
-    UpdatePos up(*this);
+    UpdatePos up(this);
     collectDedicatedPR(m_bb_list, m_dedicated_mgr);
     getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);
+
+    //After the lifetime calculation is completed, begin setting constraint
+    //sets for each lifetime.
+    tryComputeConstraints();
 
     //Process the lifetime related attributes before register assignment.
     PosAttrLifeTimeProc lt_proc(m_rg, pos2attr, this);
@@ -2475,19 +2804,19 @@ bool LinearScanRA::perform(OptCtx & oc)
     //assignment.
     PosAttrNoCodeGenProc no_code_gen_proc(m_rg, pos2attr, this);
     no_code_gen_proc.process();
+
+    //Color the stack slot and reuse the stack slot.
+    colorStackSlot();
+
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         dump(false);
     }
-    if (!m_is_apply_to_region) {
-        apply.pop();
-        m_cfg = nullptr;
-        m_bb_list = nullptr;
-    }
+    checkAndApplyToRegion(apply);
     ASSERTN(getRegion()->getCFG()->verifyRPO(oc),
             ("make sure original RPO is legal"));
     ASSERTN(getRegion()->getCFG()->verifyDomAndPdom(oc),
             ("make sure original DOM/PDOM is legal"));
-    if (!changed || !m_is_apply_to_region) {
+    if (!changed || !isApplyToRegion()) {
         ASSERT0(m_rg->getBBMgr()->verify());
         END_TIMER(t, getPassName());
         return false;

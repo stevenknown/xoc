@@ -86,7 +86,9 @@ literal.o\
 chain_recur.o\
 insert_cvt.o\
 act_mgr.o\
-dwarf.o
+dwarf.o\
+var_liveness_mgr.o\
+update_pos.o
 
 ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
@@ -96,23 +98,24 @@ ifeq ($(TARG_DIR),)
   $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
 endif
 
-CURFILE=$(CURDIR)/Makefile.inc
+ifeq ($(ROOT_DIR),)
+  $(error "NEED ROOT_DIR:e.g:make ROOT_DIR=~/xoc")
+endif
+
+CURFILE=$(ROOT_DIR)/opt/Makefile.inc
+$(info "CURFILE: $(CURFILE)")
 
 ifeq ($(FOR_IP), true)
-  $(info "INCLUDE: IN $(CURFILE), INCLUDE $(OPT_DIR)/Makefile.ip.inc, \
-          CURDIR=$(CURDIR)")
-  include $(CURDIR)/$(OPT_DIR)/Makefile.ip.inc
+  $(info "INCLUDE: IN $(CURFILE), INCLUDE $(ROOT_DIR)/opt/Makefile.ip.inc")
+  include $(ROOT_DIR)/opt/Makefile.ip.inc
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE \
-          $(OPT_DIR)/Makefile.ref_targmach_info.inc")
-  include $(CURDIR)/$(OPT_DIR)/Makefile.ref_targmach_info.inc
+          $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")
+  include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
 endif
 
 ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
-  ifeq ($(ROOT_DIR),)
-    $(error "NEED ROOT_DIR:e.g:make ROOT_DIR=/usr/xoc")
-  endif
-  TARG_DIR_NAME  := $(notdir $(TARG_DIR))
+  TARG_DIR_NAME := $(notdir $(TARG_DIR))
   opt_ext_file = $(ROOT_DIR)/$(TARG_DIR_NAME)/Makefile.opt.ext.inc
   ifneq ($(wildcard $(opt_ext_file)),$(opt_ext_file))
     $(error "OPT_EXT_FILE $(opt_ext_file) DOES NOT EXIST.")
@@ -120,7 +123,5 @@ ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE $(opt_ext_file)")
   include $(opt_ext_file)
 endif
-
-$(info "INCLUDE: IN $(CURFILE), AFTER INCLUDE OPT_OBJS=$(OPT_OBJS) --==")
 
 CFLAGS+=-Wno-unknown-pragmas

@@ -78,7 +78,15 @@ void dumpIRCombine(IR const* ir, Region const* rg);
 
 //The function dumps IR's name and id into the given buffer.
 //Return the buffer address.
-CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf);
+template <class StrBufType>
+CHAR const* dumpIRName(IR const* ir, MOD StrBufType & buf)
+{
+    buf.sprint("%s", IRNAME(ir));
+    if (g_dump_opt.isDumpIRID()) {
+        buf.strcat("(id:%u)", ir->id());
+    }
+    return buf.getBuf();
+}
 void dumpIRName(IR const* ir, Region const* rg);
 
 //The function dump IR info into given buffer.
@@ -98,7 +106,7 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 
 class IRDumpAttrBaseFunc {
 public:
-    virtual void dumpAttr(OUT xcom::StrBuf &, Region const*,
+    virtual void dumpAttr(OUT xcom::DefFixedStrBuf &, Region const*,
                           IR const*, DumpFlag dumpflag) const
     {
         DUMMYUSE(dumpflag);

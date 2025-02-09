@@ -1117,6 +1117,7 @@ bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
                 } else {
                     IR_parent(newk) = IR_parent(oldk);
                 }
+                IR_parent(oldk) = nullptr;
                 return true;
             }
             if (recur && x->replaceKid(oldk, newk, true)) {
@@ -1147,6 +1148,7 @@ bool IR::replaceKid(bool recur, ReplaceKidCompareFunc const& cmp,
                 } else {
                     IR_parent(dupnewk) = IR_parent(x);
                 }
+                IR_parent(x) = nullptr;
                 ASSERT0(x->is_single());
                 rg->freeIRTree(x);
                 replaced = true;
@@ -1184,6 +1186,7 @@ bool IR::replaceKid(
                 } else {
                     IR_parent(dupnewk) = IR_parent(x);
                 }
+                IR_parent(x) = nullptr;
                 ASSERT0(x->is_single());
                 rg->freeIRTree(x);
                 replaced = true;

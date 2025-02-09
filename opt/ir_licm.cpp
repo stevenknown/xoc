@@ -2348,8 +2348,8 @@ bool LICM::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     if (!initSSAMgr(oc)) { return false; }
     if (!initDepPass(oc)) { return false; }
-    DumpBufferSwitch buff(m_rg->getLogMgr());
-    if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
+    //DumpBufferSwitch buff(m_rg->getLogMgr());
+    //if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     xcom::DomTree domtree;
     HoistCtx ctx(&oc, &domtree, m_cfg);
     ctx.buildDomTree(m_cfg);

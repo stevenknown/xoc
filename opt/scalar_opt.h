@@ -43,9 +43,9 @@ protected:
     virtual bool isParticipateInOpt() const;
 
     void updateCounter(Pass const* pass, UINT & cp_count,
-                       UINT & licm_count, UINT & rp_count);
+                       UINT & licm_count, UINT & rp_count, UINT & gcse_count);
     bool worthToDo(Pass const* pass, UINT cp_count,
-                   UINT licm_count, UINT rp_count);
+                   UINT licm_count, UINT rp_count, UINT gcse_count);
 public:
     explicit ScalarOpt(Region * rg) : Pass(rg)
     {

@@ -17,10 +17,6 @@ ifndef FOR_SCORE
 FOR_SCORE=true
 endif
 
-ifndef FOR_TECO
-FOR_TECO=true
-endif
-
 ifeq ($(DEBUG),)
   DEBUG=true
 endif
@@ -31,12 +27,12 @@ endif
 
 CFLAGS+=-Wall
 ROOT_DIR=$(CURDIR)/../..
-COM_DIR=../../com
-OPT_DIR=../../opt
-ELF_DIR=..
-READELF_DIR=.
+COM_DIR=$(ROOT_DIR)/com
+OPT_DIR=$(ROOT_DIR)/opt
+ELF_DIR=$(ROOT_DIR)/elf
+READELF_DIR=$(ROOT_DIR)/elf/example
 READELF_OUTPUT=readelf.exe
-CURFILE=$(CURDIR)/Makefile.readelf
+CURFILE=$(READELF_DIR)/Makefile.readelf
 
 #NOTE SET $TARG BEFORE INCLUDE OTHER MODULES.
 ifeq ($(TARG),)
@@ -46,7 +42,7 @@ endif
 
 ifeq ($(TARG_DIR),)
   #SET DEFAULT TARG_DIR. TARG INFORM IS USELESS TO READELF.EXE
-  TARG_DIR=../dex
+  TARG_DIR=$(ROOT_DIR)/dex
 endif
 
 $(info "INCLUDE: IN $(CURFILE), INCLUDE $(ELF_DIR)/Makefile.inc")
@@ -87,12 +83,6 @@ ifeq ($(FOR_SCORE),true)
   TARG_SCORE_DIR=../../score
   MISC_TARG_MACH_ELF_OBJS+=$(TARG_SCORE_DIR)/*_elf_targinfo.o
   -include $(TARG_SCORE_DIR)/*_elf_targinfo.d
-endif
-
-ifeq ($(FOR_TECO),true)
-  TARG_TECO_DIR=../../teco
-  MISC_TARG_MACH_ELF_OBJS+=$(TARG_TECO_DIR)/*_elf_targinfo.o
-  -include $(TARG_TECO_DIR)/*_elf_targinfo.d
 endif
 
 OPT_DEP_OBJS+=\
@@ -157,8 +147,12 @@ $(READELF_OUTPUT): tmp_elf_objs misc_targ_mach_elf_objs $(COM_OUTPUT) \
 $(COM_OUTPUT):
 	@echo "BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	make -C $(COM_DIR) -f Makefile TARG=$(TARG) TARG_DIR="$(TARG_DIR)" \
-      DEBUG=$(DEBUG) CFLAGS="$(CFLAGS)"
+	make -C $(COM_DIR) -f Makefile \
+      TARG=$(TARG) \
+      TARG_DIR="$(TARG_DIR)" \
+      ROOT_DIR=$(ROOT_DIR) \
+      DEBUG=$(DEBUG) \
+      CFLAGS="$(CFLAGS)"
 
 %.o:%.cpp
 	@echo "BUILD $<"

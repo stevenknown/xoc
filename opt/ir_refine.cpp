@@ -238,8 +238,13 @@ HOST_UINT Refine::calcBinUIntVal(IR_CODE code, Type const* ty,
     if (code == IR_ASR) {
         return calcASRUIntValImpl(m_tm, v0, v1);
     }
-    //Use properly signed type according to target machine.
-    switch (sizeof(TMWORD) * BIT_PER_BYTE) {
+    //Use properly unsigned type according to target machine.
+    //CASE:Should use HOST UnSigned Integer type to calculate the value,
+    //otherwise the value will be truncated and incur incorrect optimizations.
+    //e.g:exec/shift3.c, x is 0x12345678ABC, then x<<3 is 0x91a2b3c4d5e0,
+    //however the target is 32bit machine. Here we should use HOST integer type
+    //to evaluate the immediate value.
+    switch (sizeof(HOST_UINT) * BIT_PER_BYTE) {
     case 32: return (HOST_UINT)calcBinIntValImpl(code, (UINT32)v0, (UINT32)v1);
     case 64: return (HOST_UINT)calcBinIntValImpl(code, (UINT64)v0, (UINT64)v1);
     default: ASSERTN(0, ("Target Dependent Code"));

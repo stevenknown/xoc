@@ -64,8 +64,11 @@ CHAR const* LoopDepInfo::dumpTgt(OUT xcom::StrBuf & buf) const
     ASSERT0(isTgtMDDef());
     ASSERT0(getTgtMDDef() && getTgtMDDef()->getResult());
     buf.strcat("mddef%u,", getTgtMDDef()->id());
-    getTgtMDDef()->getResult()->dump(buf);
-    return buf.buf;
+    VMDFixedStrBuf fbuf;
+    fbuf.bind(&buf);
+    getTgtMDDef()->getResult()->dump(fbuf);
+    fbuf.unbind();
+    return buf.getBuf();
 }
 //END LoopDepInfo
 
@@ -378,7 +381,7 @@ void LoopDepAna::init(GVN * gvn)
     m_gvn = gvn;
     m_prssamgr = nullptr;
     m_mdssamgr = nullptr;
-    m_infer_evn = new InferEVN(gvn);
+    m_infer_evn = gvn->allocInferEVN();
 }
 
 

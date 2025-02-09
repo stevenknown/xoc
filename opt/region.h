@@ -423,7 +423,7 @@ public:
     SMemPool * getSCPool() const
     { return ANA_INS_sc_labelinfo_pool(getAnalysisInstrument()); }
 
-    //Get the maximum PR no.
+    //Get the maximum PRNO.
     UINT getPRCount() const
     { return ANA_INS_pr_count(getAnalysisInstrument()); }
 

@@ -717,8 +717,8 @@ extern bool g_debug_cpp;
 //The front end is in debug_python mode.
 extern bool g_debug_pyhton;
 
-//Use the accurate algorithm to find the PRs with 2d lifetime hole, which is
-//time-consuming but with higher performance of LSRA result.
-extern bool g_use_accurate_2d_lifetime_hole_algo;
+//Use the interference graph algorithm to clor the stack slot generated in LSRA,
+//which can reduce the final stack space.
+extern bool g_interference_graph_stack_slot_color;
 } //namespace xoc
 #endif

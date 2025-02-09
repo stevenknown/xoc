@@ -38,14 +38,19 @@ namespace xoc {
 void TargInfoMgr::init()
 {
     m_link = getRA();
-    initCalleeScalar();
-    initCalleeVector();
-    initCallerScalar();
-    initCallerVector();
+
+    //Must keep the regsets related to param and return value before the caller
+    //regsets and callee regsets.
     initParamScalar();
     initParamVector();
     initRetvalScalar();
     initRetvalVector();
+
+    initCalleeScalar();
+    initCalleeVector();
+    initCallerScalar();
+    initCallerVector();
+
     initAllocableScalar();
     initAllocableVector();
 }

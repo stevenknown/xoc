@@ -108,6 +108,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     ASSERT0(getCFG()->verify());
     if (need_rebuild_mdssa) {
         mdssamgr->construction(oc);
+        oc.setInvalidIfMDSSAReconstructed();
 
         //CASE:Since MDSSA does not affect the real IR stmt and exp.
         //Here we prefer to do not invalid classic NonPRDU.
@@ -116,6 +117,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
     }
     if (need_rebuild_prssa) {
         prssamgr->construction(oc);
+        oc.setInvalidIfPRSSAReconstructed();
 
         //If SSA is enabled, disable classic DU Chain.
         //Since we do not maintain both them as some passes.
@@ -161,6 +163,7 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
             if (mdssamgr != nullptr) {
                 mdssamgr->destruction(oc);
                 mdssamgr->construction(oc);
+                oc.setInvalidIfMDSSAReconstructed();
                 oc.setInvalidNonPRDU();
                 rmnonprdu = true;
             }
@@ -171,6 +174,7 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
             if (prssamgr != nullptr) {
                 prssamgr->destruction(oc);
                 prssamgr->construction(oc);
+                oc.setInvalidIfPRSSAReconstructed();
                 oc.setInvalidPRDU();
                 rmprdu = true;
             }
@@ -234,11 +238,10 @@ void Region::doBasicAnalysis(OptCtx & oc)
             getMDMgr()->assignMD(true, true);
         }
         if (!oc.is_aa_valid()) {
-            getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
-                                                 PASS_AA, PASS_UNDEF);
+            getPassMgr()->checkValidAndRecompute(
+                &oc, PASS_DOM, PASS_LOOP_INFO, PASS_AA, PASS_UNDEF);
         }
     }
-
     if (g_do_md_du_analysis) {
         ASSERT0(g_cst_bb_list && oc.is_cfg_valid() && oc.is_aa_valid());
         ASSERT0(getPassMgr());
@@ -269,6 +272,7 @@ void Region::doBasicAnalysis(OptCtx & oc)
             ASSERT0(prssamgr);
             if (!prssamgr->is_valid()) {
                 prssamgr->construction(oc);
+                oc.setInvalidIfPRSSAReconstructed();
             }
             //If SSA is enabled, disable classic DU Chain.
             //Since we do not maintain both them as some passes.
@@ -284,6 +288,7 @@ void Region::doBasicAnalysis(OptCtx & oc)
             ASSERT0(mdssamgr);
             if (!mdssamgr->is_valid()) {
                 mdssamgr->construction(oc);
+                oc.setInvalidIfMDSSAReconstructed();
             }
             //If SSA is enabled, disable classic DU Chain.
             //Since we do not maintain both them as some passes.

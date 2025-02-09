@@ -2667,7 +2667,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
                     PRNO prno = ir->getPrno();
                     if (prno == LT_prno(l)) {
                         if (*newpr == nullptr) {
-                            //Generate new PR no.
+                            //Generate new PRNO.
                             *newpr = m_rg->getIRMgr()->buildPR(IR_dt(ir));
                         }
                         ir->setPrno(PR_no(*newpr));

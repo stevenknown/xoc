@@ -202,7 +202,8 @@ public:
     IRBB * changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc);
 
     void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
-    void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
+    void dumpDOT() const { dumpDOT((CHAR const*)nullptr, DUMP_COMBINE); }
+    void dumpDOT(CHAR const* name, UINT flag) const;
     void dumpDOTNoSSA() const
     { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
     void dumpDOT(FILE * h, UINT flag) const;

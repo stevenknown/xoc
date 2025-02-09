@@ -403,7 +403,7 @@ public:
     //such as IR_ST, IR_STPR and IR_IST.
     IR * getRHS() const;
 
-    //Return the PR no if exist.
+    //Return the PRNO if exist.
     PRNO getPrno() const;
 
     //Return the storage space if exist.

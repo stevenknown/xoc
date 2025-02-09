@@ -314,7 +314,6 @@ public:
     void setSimpArray() { SIMP_array(this) = true; }
 
     //Simplify IR tree and reduce the tree height of IST/ILD to be lowest.
-    //
     void setSimpILdISt() { SIMP_ild_ist(this) = true; }
 
     //Simplify IR_SELECT to IR_TRUBR/IR_FALSEBR operation.
@@ -430,6 +429,15 @@ protected:
     {
         //Target Dependent Code
         return false;
+    }
+
+    //Return true if we need to simplify given ist-ild pair like:
+    //  IST(ILD(...), ...)
+    //Parameter 'ir' should be an IST.
+    virtual bool isSimplifyIstIldNeeded(IR const* ir, SimpCtx const* ctx) const
+    {
+        ASSERT0(ir->is_ist());
+        return SIMP_ild_ist(ctx);
     }
 
     //Return true if current simplification should maintain the DU chain as

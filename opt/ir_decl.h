@@ -198,6 +198,7 @@ public:
 #define ILD_storage_space(ir) (((CILd*)CK_IRC(ir, IR_ILD))->storage_space)
 #define ILD_align(ir) (((CILd*)CK_IRC(ir, IR_ILD))->alignment)
 #define ILD_is_aligned(ir) (((CILd*)CK_IRC(ir, IR_ILD))->is_aligned)
+#define ILD_is_trivial(ir) (((CILd*)CK_IRC(ir, IR_ILD))->isTrivial())
 class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
@@ -218,6 +219,11 @@ public:
 
     IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
     IR * getBase() const { return ILD_base(this); }
+    //An ILD ir is regarded as trivial if it
+    //  1) has load base in PR
+    //  2) has zero load offset
+    bool isTrivial() const
+    { return ILD_base(this)->is_pr() && ILD_ofst(this) == 0; }
 };
 
 

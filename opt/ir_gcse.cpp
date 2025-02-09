@@ -52,13 +52,11 @@ public:
     }
 };
 
-
 class IterSideEffect : public VisitIRTree<VFSideEff> {
 public:
     IterSideEffect(IR const* ir, VFSideEff & vf)
         : VisitIRTree(vf) { visit(ir); }
 };
-
 
 class PropVNVisitFunc : public xcom::VisitTreeFuncBase {
     COPY_CONSTRUCTOR(PropVNVisitFunc);
@@ -131,6 +129,34 @@ public:
 //
 //START GCSE
 //
+GCSE::GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
+{
+    ASSERT0(rg);
+    m_cfg = rg->getCFG();
+    m_dumgr = rg->getDUMgr();
+    m_aa = rg->getAA();
+    ASSERT0(m_dumgr && m_aa && m_cfg);
+    m_expr_tab = nullptr;
+    m_tm = rg->getTypeMgr();
+    m_gvn = gvn;
+    m_tg = nullptr;
+    m_oc = nullptr;
+    m_is_in_ssa_form = false;
+    m_prssamgr = nullptr;
+    m_mdssamgr = nullptr;
+    m_infer_evn = gvn->allocInferEVN();
+    ASSERT0(m_infer_evn);
+}
+
+
+GCSE::~GCSE()
+{
+    ASSERT0(m_infer_evn);
+    delete m_infer_evn;
+    m_infer_evn = nullptr;
+}
+
+
 bool GCSE::doPropVNInDomTreeOrder(xcom::DomTree const& domtree)
 {
     IRBB * entry = m_cfg->getEntry();
@@ -160,8 +186,9 @@ void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
 }
 
 
-void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
+void GCSE::elimCse(IR * use, IR * use_stmt, IR const* gen)
 {
+    ASSERT0(use != gen);
     ASSERT0(use_stmt->isKids(use));
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
@@ -185,7 +212,17 @@ void GCSE::elimCse(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(gen_stmt->isPREqual(gen_pr));
     xoc::buildDUChain(gen_stmt, new_pr, m_rg, *getOptCtx());
     xoc::removeUseForTree(use, m_rg, *m_oc);
+    cleanVNForIRTree(use);
     m_rg->freeIRTree(use);
+}
+
+
+void GCSE::cleanVNForIRTree(IR const* ir)
+{
+    ASSERT0(m_infer_evn);
+    ASSERT0(m_gvn);
+    m_infer_evn->cleanVNIRTree(ir);
+    m_gvn->cleanVNIRTree(ir);
 }
 
 
@@ -234,13 +271,7 @@ void GCSE::elimCseOfAssignment(IR * use, IR * use_stmt, IR * gen)
 }
 
 
-//Process the expression in CSE generation.
-//This function do replacement via gvn info.
-//e.g: ...=a+b <--generate CSE
-//     ...
-//     ...=a+b <--use CSE
-//gen: generated cse.
-void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
+void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
 {
     ASSERT0(gen->is_exp() && gen_stmt->is_stmt());
     //Move STORE_VAL to temp PR.
@@ -259,8 +290,22 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     }
     m_exp2pr.set(gen, tmp_pr);
     m_rg->getMDMgr()->allocMDForPROp(tmp_pr);
-    IR * new_stpr = m_rg->getIRMgr()->buildStorePR(PR_no(tmp_pr),
-                                                   IR_dt(tmp_pr), gen);
+
+    //Relpace GEN with DelegatePR in original gen-stmt.
+    IR * newkid = tmp_pr;
+    if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
+        //Det of branch stmt have to be judgement expression.
+        newkid = m_rg->getIRMgr()->buildJudge(tmp_pr);
+        copyDbx(newkid, tmp_pr, m_rg);
+    }
+    bool v = gen_stmt->replaceKid(gen, newkid, false);
+    ASSERT0_DUMMYUSE(v);
+
+    //Generate PR operation to load GEN to a temporary PR.
+    //For now, GEN is dangling IR exp.
+    ASSERT0(gen->getParent() == nullptr && gen->is_single());
+    IR * new_stpr = m_rg->getIRMgr()->buildStorePR(
+        tmp_pr->getPrno(), tmp_pr->getType(), gen);
     m_rg->getMDMgr()->allocMDForPROp(new_stpr);
     copyVN(new_stpr, gen);
     copyDbx(new_stpr, gen_stmt, m_rg);
@@ -271,16 +316,6 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     ASSERT0_DUMMYUSE(f);
     ASSERT0_DUMMYUSE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
-
-    IR * newkid = tmp_pr;
-    if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
-        //Det of branch stmt have to be judgement expression.
-        newkid = m_rg->getIRMgr()->buildJudge(tmp_pr);
-        copyDbx(newkid, tmp_pr, m_rg);
-    }
-
-    bool v = gen_stmt->replaceKid(gen, newkid, false);
-    ASSERT0_DUMMYUSE(v);
 
     //Keep original DU unchange, add DU chain for new stmt.
     ASSERT0(tmp_pr->is_pr());
@@ -372,9 +407,7 @@ bool GCSE::findAndElim(IR * exp, IR * gen)
 }
 
 
-//If find 'exp' is CSE, replace it with related pr.
-//NOTE: exp should be freed.
-bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
+bool GCSE::processCse(MOD IR * exp, IN List<IR*> & livexp)
 {
     IR * expstmt = exp->getStmt();
     ExprRep * irie = m_expr_tab->mapIR2ExprRep(exp);
@@ -433,10 +466,29 @@ bool GCSE::handleCandidateByExprRep(IR * exp)
 
 bool GCSE::handleCandidate(IR * exp, IRBB * bb)
 {
+    InferCtx ictx;
+    VN const* evn = m_infer_evn->inferExp(exp, ictx);
+    if (evn != nullptr) {
+        IR * gen = m_evn2exp.get(evn);
+        if (gen != nullptr) {
+            //Clean exp info out of VN2IR tab.
+            VN const* vn = m_gvn->getVN(exp);
+            if (vn != nullptr) {
+                m_vn2exp.clean(vn);
+            }
+
+            //Found CSE and replaced it with pr.
+            return findAndElim(exp, gen);
+        }
+        m_evn2exp.set(evn, exp);
+    }
     VN const* vn = m_gvn->getVN(exp);
     if (vn != nullptr) {
         IR * gen = m_vn2exp.get(vn);
         if (gen != nullptr) {
+            //Clean exp info out of VN2IR tab.
+            m_evn2exp.clean(evn);
+
             //Found CSE and replaced it with pr.
             return findAndElim(exp, gen);
         }
@@ -492,61 +544,114 @@ bool GCSE::hasSideEffect(IR const* ir) const
 }
 
 
+bool GCSE::doPropVNDirectStmt(IR * ir)
+{
+    if (hasSideEffect(ir)) { return false; }
+    IR * rhs = ir->getRHS();
+    if (rhs == nullptr) {
+        //Virtual OP may not have RHS.
+        return false;
+    }
+    //Find CSE and replace it with properly PR.
+    if (isCseCandidate(rhs)) {
+        return handleCandidate(rhs, ir->getBB());
+    }
+    return false;
+}
+
+
+bool GCSE::doPropVNIndirectStmt(IR * ir)
+{
+    if (hasSideEffect(ir)) { return false; }
+    IR * rhs = ir->getRHS();
+    if (rhs == nullptr) {
+        //Virtual OP may not have RHS.
+        return false;
+    }
+    bool change = false;
+    //Find CSE and replace it with properly PR.
+    IR * base = ir->getBase();
+    if (isCseCandidate(base)) {
+        change |= handleCandidate(base, ir->getBB());
+    }
+    if (isCseCandidate(rhs)) {
+        change |= handleCandidate(rhs, ir->getBB());
+    }
+    return change;
+}
+
+
+bool GCSE::doPropVNCallStmt(IR * ir)
+{
+    if (hasSideEffect(ir)) { return false; }
+    IR * p = CALL_param_list(ir);
+    IR * next = nullptr;
+    bool lchange = false;
+    m_newst_lst.clean();
+    bool change = false;
+    IRBB * bb = ir->getBB();
+    while (p != nullptr) {
+        next = p->get_next();
+        if (isCseCandidate(p)) {
+            change |= handleCandidate(p, bb);
+        }
+        p = next;
+    }
+    return change;
+}
+
+
+bool GCSE::doPropVNBrStmt(IR * ir)
+{
+    if (hasSideEffect(ir)) { return false; }
+
+    //Find CSE and replace it with properly pr.
+    ASSERT0(BR_det(ir));
+    if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
+        return handleCandidate(BR_det(ir), ir->getBB());
+    }
+    return false;
+}
+
+
+bool GCSE::doPropVNRetStmt(IR * ir)
+{
+    if (hasSideEffect(ir)) { return false; }
+    if (RET_exp(ir) != nullptr && isCseCandidate(RET_exp(ir))) {
+        return handleCandidate(RET_exp(ir), ir->getBB());
+    }
+    return false;
+}
+
+
+bool GCSE::doPropVNStmt(IR * ir)
+{
+    switch (ir->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_STMT:
+    case IR_STPR:
+        return doPropVNDirectStmt(ir);
+    SWITCH_CASE_INDIRECT_MEM_STMT:
+        return doPropVNIndirectStmt(ir);
+    SWITCH_CASE_CALL:
+        return doPropVNCallStmt(ir);
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
+        return doPropVNBrStmt(ir);
+    case IR_RETURN:
+        return doPropVNRetStmt(ir);
+    default: break;
+    }
+    return false;
+}
+
+
 //Do propagation according to value numbering.
 bool GCSE::doPropVN(IRBB * bb)
 {
     bool change = false;
-    IRListIter ct;
-    for (IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
-        switch (ir->getCode()) {
-        SWITCH_CASE_DIRECT_MEM_STMT:
-        SWITCH_CASE_INDIRECT_MEM_STMT:
-        case IR_STPR: {
-            if (hasSideEffect(ir)) { break; }
-            IR * rhs = ir->getRHS();
-            if (rhs == nullptr) {
-                //Virtual OP may not have RHS.
-                break;
-            }
-            //Find CSE and replace it with properly PR.
-            if (isCseCandidate(rhs)) {
-                change |= handleCandidate(rhs, bb);
-            }
-            break;
-        }
-        SWITCH_CASE_CALL: {
-            if (hasSideEffect(ir)) { break; }
-            IR * p = CALL_param_list(ir);
-            IR * next = nullptr;
-            bool lchange = false;
-            m_newst_lst.clean();
-            while (p != nullptr) {
-                next = p->get_next();
-                if (isCseCandidate(p)) {
-                    change |= handleCandidate(p, bb);
-                }
-                p = next;
-            }
-            change |= lchange;
-            break;
-        }
-        SWITCH_CASE_CONDITIONAL_BRANCH_OP:
-            if (hasSideEffect(ir)) { break; }
-            //Find CSE and replace it with properly pr.
-            ASSERT0(BR_det(ir));
-            if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
-                change |= handleCandidate(BR_det(ir), bb);
-            }
-            break;
-        case IR_RETURN:
-            if (hasSideEffect(ir)) { break; }
-            if (RET_exp(ir) != nullptr && isCseCandidate(RET_exp(ir))) {
-                change |= handleCandidate(RET_exp(ir), bb);
-            }
-            break;
-        default: break;
-        }
+    IRListIter it;
+    BBIRList & lst = bb->getIRList();
+    for (IR * ir = lst.get_head(&it); ir != nullptr; ir = lst.get_next(&it)) {
+        change |= doPropVNStmt(ir);
     }
     return change;
 }
@@ -728,6 +833,14 @@ bool GCSE::doPropExp(IRBB * bb, List<IR*> & livexp)
 }
 
 
+void GCSE::dumpEVN() const
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+    ASSERT0(m_infer_evn);
+    m_infer_evn->dumpBBListWithEVN();
+}
+
+
 bool GCSE::dump() const
 {
     if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) {
@@ -747,7 +860,11 @@ bool GCSE::dump() const
 void GCSE::reset()
 {
     m_vn2exp.clean();
+    m_evn2exp.clean();
     m_exp2pr.clean();
+    ASSERT0(m_infer_evn);
+    m_infer_evn->clean();
+    m_am.clean();
 }
 
 
@@ -773,15 +890,15 @@ bool GCSE::perform(OptCtx & oc)
     m_oc = &oc;
     START_TIMER(t, getPassName());
     if (m_gvn != nullptr) {
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-                                                   PASS_GVN, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(
+            &oc, PASS_DOM, PASS_PDOM, PASS_GVN, PASS_UNDEF);
         ASSERT0(m_gvn->is_valid());
         //GVN provide more accurate result of value flow analysis than
         //expression analysis.
     }
     oc.setInvalidPass(PASS_EXPR_TAB);
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-                                               PASS_EXPR_TAB, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->queryPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab && m_expr_tab->is_valid());
     reset();
@@ -818,6 +935,7 @@ bool GCSE::perform(OptCtx & oc)
         ASSERT0(m_cfg->verifyDomAndPdom(oc));
         ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
         ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+
         //For now, gvn has updated correctly.
         oc.setInvalidPass(PASS_EXPR_TAB);
     }

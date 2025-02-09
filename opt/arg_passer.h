@@ -82,7 +82,7 @@ protected:
         PRNO start_address_prno, OUT UINT & offset, Var const* v);
 
     //Get the start address of parameters in kernel function.
-    void appendIRToGetStartAddressOfParamsInEntryFunc(OUT PRNO & prno);
+    virtual void appendIRToGetStartAddressOfParamsInEntryFunc(OUT PRNO & prno);
 
     //Use external function call to copy src_var to dst_var.
     //src_var: source varlable.
@@ -439,11 +439,6 @@ public:
     //the parameter space. If the actual number of copies is greater than this
     //value, the parameter is moved by function call.
     virtual UINT getMaxCopyNum() const { return 8; }
-
-    //Different architectures need to overwrite this interface to indicate
-    //whether preprocessing parameters are required.
-    virtual bool isNeedPreprocessFormalParam() const //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     virtual bool perform(OptCtx & oc);
 };

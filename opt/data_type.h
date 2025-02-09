@@ -663,6 +663,9 @@ public:
 
 extern TypeDesc const g_type_desc[];
 
+//
+//START TypeMgr
+//
 class TypeMgr {
     COPY_CONSTRUCTOR(TypeMgr);
     friend class TensorType;
@@ -734,7 +737,8 @@ public:
     TypeMgr(RegionMgr * rm);
     virtual ~TypeMgr();
 
-    CHAR const* dump_type(Type const* ty, OUT StrBuf & buf) const;
+    template<class StrBufType>
+    CHAR const* dump_type(Type const* ty, OUT StrBufType & buf) const;
     void dump_type(Type const* ty) const;
     void dump_type(UINT tyid) const;
     void dump_type_tab() const;
@@ -1088,6 +1092,57 @@ public:
     //Return data type that registered in m_type_tab.
     Type * registerType(Type const* ty);
 };
+
+
+template<class StrBufType>
+CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBufType & buf) const
+{
+    ASSERT0(type);
+    DATA_TYPE dt = TY_dtype(type);
+    switch (dt) {
+    SWITCH_CASE_INT_DTYPE:
+    SWITCH_CASE_FP_DTYPE:
+    case D_B:
+    case D_STR:
+        buf.strcat("%s", DTNAME(dt));
+        break;
+    case D_MC:
+        buf.strcat("%s<%d>", DTNAME(dt), getByteSize(type));
+        break;
+    case D_PTR:
+        buf.strcat("%s<%d>", DTNAME(dt), TY_ptr_base_size(type));
+        break;
+    case D_VEC: {
+        UINT elem_byte_size = getDTypeByteSize(TY_vec_ety(type));
+        ASSERT0(elem_byte_size != 0);
+        ASSERT0(getByteSize(type) % elem_byte_size == 0);
+        UINT elemnum = getByteSize(type) / elem_byte_size;
+        buf.strcat("%s<%s*%u>", DTNAME(dt), DTNAME(TY_vec_ety(type)), elemnum);
+        break;
+    }
+    case D_TENSOR: {
+        //Check byte size of element.
+        ASSERT0(getDTypeByteSize(TY_tensor_ety(type)) != 0);
+        ASSERT0(getByteSize(type) % getDTypeByteSize(TY_tensor_ety(type)) == 0);
+        buf.strcat("%s:%s<", DTNAME(dt), DTNAME(TY_tensor_ety(type)));
+        UINT dim = ((TensorType const*)type)->getDim();
+        for (UINT i = 0; i < dim; i++) {
+            if (i != 0) {
+                buf.strcat("x");
+            }
+            buf.strcat("%d", ((TensorType const*)type)->getDegreeOfDim(i));
+        }
+        buf.strcat(">");
+        break;
+    }
+    case D_ANY:
+        buf.strcat("%s", DTNAME(dt));
+        break;
+    default: UNREACHABLE();
+    }
+    return buf.getBuf();
+}
+//END TypeMgr
 
 
 //

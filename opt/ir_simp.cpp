@@ -2105,7 +2105,7 @@ IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SimpCtx basectx(*ctx);
     SIMP_ret_array_val(&basectx) = true;
-    if (SIMP_ild_ist(ctx)) {
+    if (isSimplifyIstIldNeeded(ir, ctx)) {
         //Reduce the tree height.
         ir->setBase(simplifyExpression(ir->getBase(), &basectx));
         ctx->unionBottomUpInfo(basectx);
@@ -2116,7 +2116,7 @@ IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
     }
 
     if (SIMP_to_lowest_height(ctx) && ir->getBase()->is_ild() &&
-        SIMP_ild_ist(ctx)) {
+        isSimplifyIstIldNeeded(ir, ctx)) {
         //Handle a special case, the following tree is obscure,
         //transform it to be more understandable.
         //  IST(ILD(PR1), ...)

@@ -365,6 +365,7 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_SYMSTR:             \
     case SH_TYPE_SYMTAB
 
+
 #define SWITCH_CASE_COMMON_SECT_ADDR \
     SWITCH_CASE_COMMON_SECT:         \
     case SH_TYPE_INTERP
@@ -1576,6 +1577,8 @@ public:
     //Get spm section name.
     virtual CHAR const* getSpmSHName() const { return SPM_SH_NAME; }
 
+    CHAR const* getOutputFileName() const { return m_output_file_name; }
+
     //Get flag of stack in HBM.
     //This flag will be used to set the flags for the function section
     //in the future (note that only the entry function needs to be set).
@@ -1704,8 +1707,6 @@ public:
         m_output_file_name = (CHAR*)xmalloc(::strlen(name) + 1);
         ::memcpy((void*)m_output_file_name, name, ::strlen(name) + 1);
     }
-
-    CHAR const* getOutputFileName() const { return m_output_file_name; }
 
     //Note section content size should be ready.
     void setSectHeaderNameOffset(OffVec const& offvec);
@@ -3189,6 +3190,10 @@ public:
     virtual ELFMgr * allocELFMgr()
     { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
+    //Allocate output ELFMgr.
+    virtual ELFMgr * allocOutputELFMgr()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
     //Allocate vector to record the unresolved RelocInfo.
     //'reloc_info': unresolved RelocInfo.
     //'idx': the index of 'reloc_info' in 'm_reloc_sym_vec'.
@@ -3343,7 +3348,12 @@ public:
     bool hasSameSymbol(ELFMgr const* elf_mgr, SymbolInfo const* symbol_info,
                        bool is_special_elf_mgr);
 
-    //Initial 'm_unresolved_reloc_idx_map'.
+    //Initialize the info of LinkerMgr. The name of output ELFMgr
+    //can be set by 'output_name' that provided by outside user or
+    //the default value will be used.
+    void initLinkerMgr(CHAR const* output_name, UINT elf_type);
+
+    //Initialize 'm_unresolved_reloc_idx_map'.
     void initUnResolveSymbol();
 
     //Initialize dump file info.
@@ -3578,11 +3588,6 @@ public:
         ASSERT0(symbol_info);
         m_same_name_num_map.setIfFind(SYMINFO_name(symbol_info), v);;
     }
-
-    //The name of output ELFMgr can be set by 'output_name' that
-    //provided by outside user or the default value will be used.
-    void setOutputInfo(CHAR const* output_name,
-                       MOD ELFMgr * elf_mgr, UINT elf_type);
 
     //Target resolved SymbolInfo exists in 'elf_mgr'. RelocInfo will be
     //resolved by the SymbolInfo.

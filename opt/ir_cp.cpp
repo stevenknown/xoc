@@ -982,10 +982,8 @@ bool CopyProp::doPropBBInDomTreeOrder()
 
 bool CopyProp::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return false; }
-    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRP()) {
-        return true;
-    }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpCP()) { return false; }
+    if (!g_dump_opt.isDumpAfterPass()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);

@@ -57,7 +57,7 @@ double LTPriorityMgr::computePriority(LifeTime const* lt) const
         if (liroot != nullptr &&
             liroot->isInsideLoopTree(occbb->id(), nestlevel, true)) {
             ASSERT0(nestlevel > 0);
-            tprio *= 10 * nestlevel;
+            tprio *= ::pow(10, nestlevel);
         }
         prio += tprio;
     }

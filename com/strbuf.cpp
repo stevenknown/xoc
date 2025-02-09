@@ -52,13 +52,9 @@ void StrBuf::strcat(UINT bytesize, CHAR const* format, va_list args)
 }
 
 
-//Find sub-string in 'source', return the index if sub-string found,
-//otherwise return -1.
-//source: input string.
-//substring: partial string.
-LONG StrBuf::findSubStr(CHAR const* source, CHAR const* substring)
+LONG StrBuf::findSubStr(CHAR const* substring)
 {
-    return xstrstr(source, substring);
+    return xstrstr(getBuf(), substring);
 }
 
 

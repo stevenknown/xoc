@@ -301,7 +301,7 @@ ParseCtx::~ParseCtx()
 void ParseCtx::addIR(IR * stmt)
 {
     ASSERT0(stmt->is_stmt());
-    xcom::add_next(&stmt_list, stmt);
+    xcom::add_next(&stmt_list, &stmt_list_last, stmt);
 
     //Set lineno for debug info.
     ASSERT0(current_region);
@@ -345,6 +345,7 @@ void ParseCtx::clean()
     current_region = nullptr;
     returned_exp = nullptr;
     stmt_list = nullptr;
+    stmt_list_last = nullptr;
     previous_ctx = nullptr;
     has_phi = false;
     has_scf = false;
@@ -2735,7 +2736,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
         return false;
     }
 
-    //PR no
+    //PRNO
     PRNO prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
@@ -3418,6 +3419,7 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
         parseStmtList(&tmpctx);
         body = tmpctx.stmt_list;
         tmpctx.stmt_list = nullptr;
+        tmpctx.stmt_list_last = nullptr;
     }
 
     tok = m_lexer->getCurrentToken();
@@ -3564,6 +3566,7 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
         parseStmtList(&tmpctx);
         body = tmpctx.stmt_list;
         tmpctx.stmt_list = nullptr;
+        tmpctx.stmt_list_last = nullptr;
     }
     tok = m_lexer->getCurrentToken();
     if (tok != T_RLPAREN) {

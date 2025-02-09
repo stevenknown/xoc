@@ -2087,6 +2087,7 @@ static void dumpVertex(
     CHAR const* font = "courB";
     CHAR const* color = "black";
     CHAR const* style = "bold";
+    bool is_mdssa_valid = mdssamgr != nullptr && mdssamgr->is_valid();
     UINT fontsize = 12;
     IRBB * bb = cfg->getBB(v->id());
     ASSERT0(bb);
@@ -2122,7 +2123,8 @@ static void dumpVertex(
     fprintf(h, "rpo:%d ", bb->rpo());
 
     //Dump MDSSA Phi List.
-    if (dump_mdssa) {
+    if (dump_mdssa && is_mdssa_valid) {
+        ASSERT0(mdssamgr);
         MDPhiList const* philist = mdssamgr->getPhiList(bb);
         if (philist != nullptr) {
             mdssamgr->dumpPhiList(philist);
@@ -2136,7 +2138,8 @@ static void dumpVertex(
         fprintf(h, "\\l");
 
         //TODO: implement dump_ir_buf();
-        if (dump_mdssa) {
+        if (dump_mdssa && is_mdssa_valid) {
+            ASSERT0(mdssamgr);
             mdssamgr->dumpIRWithMDSSA(ir, DumpFlag::combineIRID(IR_DUMP_KID));
         } else {
             dumpIR(ir, cfg->getRegion(), nullptr,
@@ -2295,6 +2298,7 @@ static void dumpVCGNodeWithDetail(
 
     //Dump MDSSA Phi List.
     if (dump_mdssa) {
+        ASSERT0(mdssamgr);
         MDPhiList const* philist = mdssamgr->getPhiList(bb);
         if (philist != nullptr) {
             mdssamgr->dumpPhiList(philist);
@@ -2308,13 +2312,13 @@ static void dumpVCGNodeWithDetail(
 
         //TODO: implement dump_ir_buf();
         if (dump_mdssa) {
+            ASSERT0(mdssamgr);
             mdssamgr->dumpIRWithMDSSA(ir, DumpFlag::combineIRID(IR_DUMP_KID));
         } else {
             dumpIR(ir, cfg->getRegion(), nullptr,
                    DumpFlag::combineIRID(IR_DUMP_KID));
         }
     }
-
     fprintf(h, "\"}");
     fflush(h);
 }

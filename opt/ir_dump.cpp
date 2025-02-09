@@ -152,9 +152,9 @@ void dumpVarDecl(IR const* ir, Region const* rg)
 {
     if (!ir->hasIdinfo()) { return; }
     ASSERT0(ir->getIdinfo());
-    StrBuf buf(64);
+    xcom::DefFixedStrBuf buf;
     if (ir->getIdinfo()->dumpVARDecl(buf, rg->getVarMgr()) != nullptr) {
-        prt(rg, " decl:%s", buf.buf);
+        prt(rg, " decl:%s", buf.getBuf());
     }
 }
 
@@ -179,9 +179,9 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
     if (li->is_ilabel()) {
         bool non_id = false;
         if (for_gr) {
-            StrBuf buf(8);
+            FixedStrBuf<8> buf;
             buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(li));
-            if (isContainNonIdentifierChar(buf.buf)) {
+            if (isContainNonIdentifierChar(buf.getBuf())) {
                 //Some non-identifier character will be recognized as individual
                 //token.
                 //prt(rm, "\"" ILABEL_STR_FORMAT "\"", ILABEL_CONT(li));
@@ -204,9 +204,9 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
     if (li->is_clabel()) {
         bool non_id = false;
         if (for_gr) {
-            StrBuf buf(8);
+            FixedStrBuf<8> buf;
             buf.strcat(CLABEL_STR_FORMAT, CLABEL_CONT(li));
-            if (isContainNonIdentifierChar(buf.buf)) {
+            if (isContainNonIdentifierChar(buf.getBuf())) {
                 //Some non-identifier character will be recognized as individual
                 //token.
                 //prt(rm, "\"" ILABEL_STR_FORMAT "\"", ILABEL_CONT(li));
@@ -227,7 +227,7 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
         ASSERT0(li->getPragma());
         bool non_id = false;
         if (for_gr) {
-            StrBuf buf(8);
+            FixedStrBuf<8> buf;
             if (isContainNonIdentifierChar(li->getPragma()->getStr())) {
                 //Some non-identifier character will be recognized as individual
                 //token.
@@ -290,7 +290,8 @@ void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
 }
 
 
-static void dumpAttr(OUT xcom::StrBuf & buf, IR const* ir, DumpFlag dumpflag)
+template <class StrBufType>
+static void dumpAttr(OUT StrBufType & buf, IR const* ir, DumpFlag dumpflag)
 {
     if (g_dump_opt.isDumpIRID() && dumpflag.have(IR_DUMP_IRID)) {
         buf.strcat(" id:%d", ir->id());
@@ -322,7 +323,8 @@ static void dumpAttr(OUT xcom::StrBuf & buf, IR const* ir, DumpFlag dumpflag)
 }
 
 
-static void dumpDbx(OUT xcom::StrBuf & buf, Region const* rg,
+template <class StrBufType>
+static void dumpDbx(OUT StrBufType & buf, Region const* rg,
                     BaseAttachInfo const* ac)
 {
     ASSERT0(rg);
@@ -347,7 +349,8 @@ static void dumpDbx(OUT xcom::StrBuf & buf, Region const* rg,
 }
 
 
-static void dumpAttachInfo(OUT xcom::StrBuf & buf, IR const* ir,
+template <class StrBufType>
+static void dumpAttachInfo(OUT StrBufType & buf, IR const* ir,
                            Region const* rg, DumpFlag dumpflag)
 {
     ASSERT0(ir && rg);
@@ -408,7 +411,7 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -517,7 +520,7 @@ void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -543,7 +546,7 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -740,7 +743,7 @@ void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -759,7 +762,7 @@ void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s%d:%s", PR_TYPE_CHAR, ir->getPrno(), xtm->dump_type(d, buf));
@@ -774,7 +777,7 @@ void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -842,7 +845,7 @@ void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -896,7 +899,7 @@ void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s %s%d:%s", IRNAME(ir), PR_TYPE_CHAR, ir->getPrno(),
@@ -915,7 +918,7 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -976,7 +979,7 @@ void dumpLda(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1022,7 +1025,7 @@ void dumpConst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 
 void dumpConstContent(IR const* ir, Region const* rg)
 {
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     if (ir->is_sint() || ir->is_uint()) {
@@ -1030,8 +1033,9 @@ void dumpConstContent(IR const* ir, Region const* rg)
         return;
     }
     if (ir->is_fp()) {
-        CHAR fpformat[128];
-        ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", CONST_fp_mant(ir));
+        CHAR fpformat[64];
+        ::snprintf(fpformat, sizeof(fpformat) - 1,
+                   "fpconst:%%s %%.%df", CONST_fp_mant(ir));
         prt(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
         return;
     }
@@ -1063,9 +1067,9 @@ void dumpConstContent(IR const* ir, Region const* rg)
         //Imm may be MC type.
         CHAR const* intfmt = getHostUIntFormat(false);
         CHAR const* hexintfmt = getHostUIntFormat(true);
-        StrBuf fmt(16);
+        FixedStrBuf<16> fmt;
         fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
-        prt(rg, fmt.buf, xtm->dump_type(d, buf),
+        prt(rg, fmt.getBuf(), xtm->dump_type(d, buf),
             CONST_int_val(ir), CONST_int_val(ir));
         return;
     }
@@ -1075,16 +1079,6 @@ void dumpConstContent(IR const* ir, Region const* rg)
     //Note the dump format may extend or truncate the real value.
     prt(rg, "intconst:%s %d|0x%x", xtm->dump_type(d, buf),
         CONST_int_val(ir),  CONST_int_val(ir));
-}
-
-
-CHAR const* dumpIRName(IR const* ir, MOD StrBuf & buf)
-{
-    buf.sprint("%s", IRNAME(ir));
-    if (g_dump_opt.isDumpIRID()) {
-        buf.strcat("(id:%u)", ir->id());
-    }
-    return buf.getBuf();
 }
 
 
@@ -1119,7 +1113,7 @@ void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
     bool dump_newline = !ctx.dumpflag.have(IR_DUMP_NO_NEWLINE);
     LogMgr * lm = rg->getLogMgr();
     if (!rg->isLogMgrInit() || ir == nullptr) { return; }
-    xcom::StrBuf lattr(10);
+    xcom::DefFixedStrBuf lattr;
     if (ctx.attr != nullptr) {
         lattr.strcat("%s", ctx.attr);
     }
@@ -1172,7 +1166,7 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1195,7 +1189,7 @@ void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1215,7 +1209,7 @@ void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1238,7 +1232,7 @@ void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1258,7 +1252,7 @@ void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    StrBuf buf(64);
+    FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));

@@ -74,7 +74,23 @@ public:
 };
 
 
+//The class map a VN to its IR expression that generated the VN.
+typedef xcom::TMap<VN const*, IR*> VN2IRTabIter;
+class VN2IRTab : public xcom::TMap<VN const*, IR*> {
+public:
+    void clean(VN const* vn) { setAlways(vn, nullptr); }
+    void clean() { xcom::TMap<VN const*, IR*>::clean(); }
+    void set(VN const* vn, IR * ir) { setAlways(vn, ir); }
+};
+
+
+//The class map a CSE to its delegate PR.
+class CSE2DeleTab : public xcom::TMap<IR const*, IR*> {
+};
+
+
 class GCSE : public Pass {
+    COPY_CONSTRUCTOR(GCSE);
     friend class PropVNVisitFunc;
     friend class PropExpVisitFunc;
 private:
@@ -90,14 +106,23 @@ private:
     GVN * m_gvn;
     TG * m_tg;
     OptCtx const* m_oc;
+    InferEVN * m_infer_evn;
     DefMiscBitSetMgr m_misc_bs_mgr;
-    TMap<IR*, IR*> m_exp2pr;
-    TMap<VN const*, IR*> m_vn2exp;
+    CSE2DeleTab m_exp2pr;
+    VN2IRTab m_vn2exp;
+    VN2IRTab m_evn2exp;
     List<IR*> m_newst_lst;
     ActMgr m_am;
 protected:
+    void cleanVNForIRTree(IR const* ir);
     void copyVN(IR const* newir, IR const* oldir);
 
+    bool doPropVNDirectStmt(IR * ir);
+    bool doPropVNIndirectStmt(IR * ir);
+    bool doPropVNCallStmt(IR * ir);
+    bool doPropVNBrStmt(IR * ir);
+    bool doPropVNRetStmt(IR * ir);
+    bool doPropVNStmt(IR * ir);
     bool doPropBranch(IR * ir, MOD List<IR*> & livexp);
     bool doPropCall(IR * ir, MOD List<IR*> & livexp);
     bool doPropAssign(IR * ir, MOD List<IR*> & livexp);
@@ -134,15 +159,24 @@ protected:
     //gen: the referrence of cse.
     //NOTE: 'use' should be freed.
     //      'use' must be rhs of 'use_stmt'.
-    void elimCse(IR * use, IR * use_stmt, IR * gen);
+    void elimCse(IR * use, IR * use_stmt, IR const* gen);
     void elimCseOfBranch(IR * use, IR * use_stmt, IR * gen);
     void elimCseOfAssignment(IR * use, IR * use_stmt, IR * gen);
 
     //Reset local used data.
     void reset();
 
-    void processCseGen(IR * cse, IR * cse_stmt, bool & change);
-    bool processCse(IR * ir, List<IR*> & livexp);
+    //Process the expression in CSE generation.
+    //This function do replacement via gvn info.
+    //e.g: ...=a+b <--generate CSE
+    //     ...
+    //     ...=a+b <--use CSE
+    //gen: generated cse.
+    void processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change);
+
+    //If find 'exp' is CSE, replace it with related pr.
+    //NOTE: exp should be freed.
+    bool processCse(MOD IR * ir, List<IR*> & livexp);
 
     virtual bool shouldBeCse(IR * det);
 
@@ -153,24 +187,8 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
-    {
-        ASSERT0(rg);
-        m_cfg = rg->getCFG();
-        m_dumgr = rg->getDUMgr();
-        m_aa = rg->getAA();
-        ASSERT0(m_dumgr && m_aa && m_cfg);
-        m_expr_tab = nullptr;
-        m_tm = rg->getTypeMgr();
-        m_gvn = gvn;
-        m_tg = nullptr;
-        m_oc = nullptr;
-        m_is_in_ssa_form = false;
-        m_prssamgr = nullptr;
-        m_mdssamgr = nullptr;
-    }
-    COPY_CONSTRUCTOR(GCSE);
-    virtual ~GCSE() {}
+    GCSE(Region * rg, GVN * gvn);
+    virtual ~GCSE();
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -181,10 +199,12 @@ public:
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
+    void dumpEVN() const;
 
     virtual CHAR const* getPassName() const
     { return "Global Command Subexpression Elimination"; }
     PASS_TYPE getPassType() const { return PASS_GCSE; }
+    ActMgr const& getActMgr() const { return m_am; }
 
     bool perform(OptCtx & oc);
 };

@@ -74,6 +74,10 @@ public:
 
     MInstMgr * getMIMgr() const { return m_mimgr; }
 
+    //Get the alignment value required by the machine instruction.
+    virtual UINT getMInstAlign(MI_CODE c) const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
     //Get the relocation type of given machine instruction code.
     virtual UINT getMInstRelocType(MI_CODE c)
     { ASSERTN(0, ("Target Dependent Code")); return 0; }

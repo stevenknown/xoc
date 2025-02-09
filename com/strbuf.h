@@ -28,6 +28,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _STRBUF_H_
 #define _STRBUF_H_
 
+#define MAX_INIT_SIZE 4096
+
 namespace xcom {
 
 class StrBuf {
@@ -43,17 +45,13 @@ public:
     //Note the buffer may be longer than a string needed.
     StrBuf(UINT initsize)
     {
-        ASSERT0(initsize > 0);
+        ASSERT0(initsize > 0 && initsize < MAX_INIT_SIZE);
         buflen = initsize;
         buf = (CHAR*)::malloc(initsize);
         buf[0] = 0;
     }
-    ~StrBuf()
-    {
-        if (buf != nullptr) {
-            ::free(buf);
-        }
-    }
+    ~StrBuf() { if (buf != nullptr) { ::free(buf); } }
+
     void clean()
     {
         ASSERT0(buf);
@@ -72,11 +70,10 @@ public:
         ::memcpy(buf, src.buf, buflen);
     }
 
-    //Find sub-string in 'source', return the index if sub-string found,
-    //otherwise return -1.
-    //source: input string.
+    //Find sub-string in current string buffer, return the index if
+    //sub-string found, otherwise return -1.
     //substring: partial string.
-    LONG findSubStr(CHAR const* source, CHAR const* substring);
+    LONG findSubStr(CHAR const* substring);
 
     //Return the string buffer byte length.
     UINT getBufLen() const { return buflen; }
@@ -188,6 +185,176 @@ public:
     }
     UINT getStrBufNum() const { return m_strbufvec.get_elem_count(); }
 };
+
+
+//
+//START FixedStrBuf
+//
+template <UINT ByteSize>
+class FixedStrBuf {
+    COPY_CONSTRUCTOR(FixedStrBuf);
+protected:
+    CHAR m_fixbuf[ByteSize];
+    StrBuf * m_strbuf;
+protected:
+    void allocStrBuf(UINT sz)
+    {
+        if (m_strbuf != nullptr) { return; }
+        m_strbuf = new StrBuf(sz);
+    }
+
+    //The function move the string content from fixed-buffer to StrBuf.
+    //sz: the byte size that needed to move from fixed-buffer to StrBuf.
+    void moveToStrBuf(size_t sz)
+    {
+        ASSERT0(m_strbuf);
+        ASSERT0(m_strbuf->getBufLen() >= ByteSize);
+        ASSERT0(sz < ByteSize);
+        ::memcpy(m_strbuf->buf, m_fixbuf, sz);
+        m_strbuf->buf[sz] = 0;
+    }
+
+    UINT strlen() const
+    {
+        if (m_strbuf == nullptr) { return ::strlen(m_fixbuf); }
+        return m_strbuf->strlen();
+    }
+public:
+    FixedStrBuf()
+    {
+        ASSERT0(ByteSize > 0);
+        m_fixbuf[0] = 0;
+        m_strbuf = nullptr;
+    }
+    ~FixedStrBuf() { destroy(); }
+
+    //The function binds a given StrBuf object as the internal StrBuf of
+    //current FixedStrBuf. Then all string operations will apply on the given
+    //StrBuf object.
+    //NOTE: the binded StrBuf object should be unbinded before destroying
+    //current FixedStrBuf, otherwise it might be double freed.
+    void bind(MOD StrBuf * src);
+
+    void clean()
+    {
+        if (m_strbuf != nullptr) { m_strbuf->clean(); }
+        else { m_fixbuf[0] = 0; }
+    }
+    void copy(FixedStrBuf const& src);
+
+    void destroy()
+    { if (m_strbuf != nullptr) { delete m_strbuf; m_strbuf = nullptr; } }
+
+    //Find sub-string in current string buffer, return the index if
+    //sub-string found, otherwise return -1.
+    //substring: partial string.
+    LONG findSubStr(CHAR const* substring);
+
+    CHAR const* getBuf() const
+    { return m_strbuf != nullptr ? m_strbuf->getBuf() : m_fixbuf; }
+    CHAR const* getBufLen() const
+    { return m_strbuf != nullptr ? m_strbuf->getBufLen() : ByteSize; }
+
+    //Composes a string that formed by 'format'.
+    void sprint(CHAR const* format, ...);
+    void strcat(UINT bytesize, CHAR const* format, va_list args);
+    void strcat(CHAR const* format, ...);
+
+    //The function unbinds StrBuf if exist, and return the unbinded StrBuf
+    //object.
+    //NOTE: The function regards StrBuf as an external object that input by
+    //user.
+    StrBuf * unbind();
+};
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::bind(MOD StrBuf * src)
+{
+    ASSERT0(src);
+    destroy();
+    m_strbuf = src;
+}
+
+
+template <UINT ByteSize>
+StrBuf * FixedStrBuf<ByteSize>::unbind()
+{
+    StrBuf * strbuf = m_strbuf;
+    m_strbuf = nullptr;
+    return strbuf;
+}
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::sprint(CHAR const* format, ...)
+{
+    clean();
+    va_list args;
+    va_start(args, format);
+    va_list org_args;
+    va_copy(org_args, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
+    strcat(l, format, org_args);
+    va_end(args);
+    va_end(org_args);
+}
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::copy(FixedStrBuf const& src)
+{
+    if (src.m_strbuf != nullptr) {
+        allocStrBuf(src.m_strbuf->getBufLen());
+        m_strbuf->copy(*src.m_strbuf);
+        return;
+    }
+    ::memcpy(m_fixbuf, src.m_fixbuf, ByteSize);
+}
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::strcat(UINT bytesize, CHAR const* format,
+                                   va_list args)
+{
+    if (m_strbuf != nullptr) {
+        return m_strbuf->strcat(bytesize, format, args);
+    }
+    size_t sl = ::strlen(m_fixbuf);
+    if (ByteSize - sl <= bytesize) {
+        allocStrBuf(ByteSize + bytesize);
+        moveToStrBuf(sl);
+        return m_strbuf->strcat(bytesize, format, args);
+    }
+    UINT k = VSNPRINTF(&m_fixbuf[sl], bytesize + 1, format, args);
+    ASSERT0(k == bytesize);
+    DUMMYUSE(k);
+}
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::strcat(CHAR const* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    va_list org_args;
+    va_copy(org_args, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
+    strcat(l, format, org_args);
+    va_end(args);
+    va_end(org_args);
+}
+
+
+template <UINT ByteSize>
+LONG FixedStrBuf<ByteSize>::findSubStr(CHAR const* substring)
+{
+    return m_strbuf != nullptr ? xstrstr(m_strbuf->getBuf(), substring) :
+                                 xstrstr(m_fixbuf, substring);
+}
+//END FixedStrBuf
+
+typedef FixedStrBuf<64> DefFixedStrBuf;
 
 } //namespace xcom
 #endif

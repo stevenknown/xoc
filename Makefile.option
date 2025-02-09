@@ -34,27 +34,27 @@ else
 endif
 
 #Try to disable the warning.
-WARN=class-memaccess
-CC_SUPPORTS_WNO-$(WARN) := $(shell echo "" | \
-  $(CC) -Wno-$(WARN) -c -x c++ \
+WARN1=class-memaccess
+CC_SUPPORTS_WNO-$(WARN1) := $(shell echo "" | \
+  $(CC) -Wno-$(WARN1) -c -x c++ \
   - > /dev/null 2>&1 && echo YES || echo NO)
-ifeq ($(CC_SUPPORTS_WNO-$(WARN)),YES)
-  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN)")
-  CFLAGS+=-Wno-$(WARN)
+ifeq ($(CC_SUPPORTS_WNO-$(WARN1)),YES)
+  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN1)")
+  CFLAGS+=-Wno-$(WARN1)
 else
-  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN)")
+  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN1)")
 endif
 
 #Try to disable the warning.
-WARN=delete-incomplete
-CC_SUPPORTS_WNO-$(WARN) := $(shell echo "" | \
-  $(CC) -Wno-$(WARN) -c -x c++ \
+WARN2=delete-incomplete
+CC_SUPPORTS_WNO-$(WARN2) := $(shell echo "" | \
+  $(CC) -Wno-$(WARN2) -c -x c++ \
   - > /dev/null 2>&1 && echo YES || echo NO)
-ifeq ($(CC_SUPPORTS_WNO-$(WARN)),YES)
-  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN)")
-  CFLAGS+=-Wno-$(WARN)
+ifeq ($(CC_SUPPORTS_WNO-$(WARN2)),YES)
+  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN2)")
+  CFLAGS+=-Wno-$(WARN2)
 else
-  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN)")
+  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN2)")
 endif
 
 #Try to disable the warning.
@@ -63,15 +63,15 @@ endif
 #is record in a makefile variable.
 #The warning is NOT effect without optimization, thus code must be
 #compiled with the -O2 option in order for GCC to find the bug.
-WARN=mismatched-new-delete
-CC_SUPPORTS_WNO-$(WARN) := $(shell echo "" | \
-  $(CC) -Wno-$(WARN) -c -x c++ \
+WARN3:=mismatched-new-delete
+CC_SUPPORTS_WNO-$(WARN3) := $(shell echo "" | \
+  $(CC) -Wno-$(WARN3) -c -x c++ \
   - > /dev/null 2>&1 && echo YES || echo NO)
-ifeq ($(CC_SUPPORTS_WNO-$(WARN)),YES)
-  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN)")
-  CFLAGS+=-Wno-$(WARN)
+ifeq ($(CC_SUPPORTS_WNO-$(WARN3)),YES)
+  $(info "NOTE:$(CC) SUPPORT -Wno-$(WARN3)")
+  CFLAGS+=-Wno-$(WARN3)
 else
-  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN)")
+  $(info "NOTE:$(CC) DOES NOT SUPPORT -Wno-$(WARN3)")
 endif
 
 #To conveninently use DUMMYUSE, some compiler will complain for comma

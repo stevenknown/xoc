@@ -145,22 +145,21 @@ public:
 //START LTConsistencyMgr
 //
 class LTConsistencyMgr {
-private:
     COPY_CONSTRUCTOR(LTConsistencyMgr);
-    Region * m_rg;
-    BBList * m_bb_list;
-    IRCFG * m_cfg;
-    OptCtx * m_oc;
-    LSRAImpl & m_impl;
-    bool m_is_insert_bb;
+protected:
     typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
     typedef TMapIter<VexPair, IRBB*> LatchMapIter;
     typedef TMap<PRNO, LifeTime const*> PR2LT;
     typedef TMapIter<PRNO, LifeTime const*> PR2LTIter;
+    bool m_is_insert_bb;
+    Region * m_rg;
+    BBList * m_bb_list;
+    IRCFG * m_cfg;
+    OptCtx * m_oc;
+    LivenessMgr * m_live_mgr;
+    LSRAImpl & m_impl;
     Vector<PR2LT*> m_pr2lt_in_vec;
     Vector<PR2LT*> m_pr2lt_out_vec;
-    LivenessMgr * m_live_mgr;
-
 protected:
     PR2LT * genInPR2LT(UINT bbid)
     {
@@ -246,7 +245,7 @@ protected:
     //       ...
     //
     IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const& pair);
-
+    LinearScanRA & getRA() const;
     PR2LT * getInPR2Lt(UINT bbid) const
     { return m_pr2lt_in_vec.get(bbid); }
     PR2LT * getOutPR2Lt(UINT bbid) const
@@ -452,16 +451,16 @@ private:
     LifeTime * selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
                                            OUT Occ & reload_occ);
 
-    //The function select a lifetime from 'lst' which the next-occ from
-    //given position is the furthest.
-    //e.g:given pos is 10, and there are two lifetime in 'lst'.
+    //The function selects a lifetime from 'lst' which has the least priority
+    //and the next-occ from given position is the furthest.
+    //e.g: given pos is 10, and two lifetimes with the same priority in 'lst'.
     //    lt1:  <5-40>, next-occ is in 20
     //    lt2:  <5-25>, next-occ is in 25
     // the function return lt2.
     //Return nullptr if there is no lifetime has next-occ.
-    LifeTime * selectLTByFurthestNextOcc(LTSet const& lst, Pos pos,
-                                         Vector<SplitCtx> const& ctxvec,
-                                         OUT Occ & reload_occ);
+    LifeTime * selectLTByPrioAndNextOcc(LTSet const& lst, Pos pos,
+                                        Vector<SplitCtx> const& ctxvec,
+                                        OUT Occ & reload_occ);
 
     //The function splits 'lt' into two lifetimes, lt and newlt, at ctx's
     //reload_pos. The original 'lt' will be termiated at the reload_pos.
@@ -479,6 +478,10 @@ public:
     //be split at 'split_pos' or there is no properly reload position.
     bool checkIfCanBeSplitCand(LifeTime const* lt, Pos split_pos,
                                OUT Pos & reload_pos, OUT Occ & reload_occ);
+
+    //Checks if the lifetime of the current PR conflicts
+    //with the target lifetime.
+    bool isConflictedWithTargetLT(LifeTime const* target_lt, PRNO cur_pr);
 
     //Spill the lifetime only if there is no occurence after the split
     //position.
@@ -539,6 +542,7 @@ protected:
     BBList * m_bb_list;
     IRCFG * m_cfg;
     OptCtx * m_oc;
+    ArgPasser * m_argpasser;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
     PR2Split m_pr2split;
@@ -551,6 +555,7 @@ protected:
 
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
+    ArgPasser * getArgPasser();
 
     IR * insertSpillCalleeAtEntry(Reg r);
     void insertReloadCalleeAtExit(Reg r, Var * spill_loc);
@@ -571,6 +576,7 @@ public:
         m_bb_list = m_ra.getBBList();
         m_live_mgr = nullptr;
         m_oc = nullptr;
+        m_argpasser = nullptr;
     }
     ~LSRAImpl() {}
 

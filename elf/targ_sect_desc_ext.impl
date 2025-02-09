@@ -32,8 +32,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 
-#if defined(FOR_TECO)
-#include "../teco/teco_sect_desc_ext.impl"
+#if defined(FOR_X86)
+#include "../x86/x86_sect_desc_ext.impl"
 
 #else
 //No sect desc.

@@ -1520,7 +1520,7 @@ IR * Dex2IR::genMappedPR(UINT vid, Type const* ty)
 }
 
 
-//Map Vreg to PR, then return the PR no.
+//Map Vreg to PR, then return the PRNO.
 //vid: Vreg id.
 UINT Dex2IR::genMappedPrno(UINT vid, Type const* ty)
 {

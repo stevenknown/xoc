@@ -471,6 +471,10 @@ bool isPowerOf5(double f);
 //e.g: 435234 = 251 * 17 * 17 * 3 * 2.
 void prim(INT m, OUT INT * buf);
 
+//Solve the integer power of 2.
+//e.g: if 'x' is 2, return 4.
+int powerXOf2(int x);
+
 //Reverse a LONG type integer by lexicalgraph.
 //e.g: if 'd' is 0x12345678, return 0x78563412.
 inline LONG revlong(LONG d)

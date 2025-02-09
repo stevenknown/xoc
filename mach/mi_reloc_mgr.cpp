@@ -144,6 +144,11 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
         if (hasLocalVar(mi)) {
             TMWORD var_offset = (TMWORD)m_var2offset->
                 computeVarOffset(MI_var(mi));
+
+            //[BUG_FIX] The offset of the memory access instruction needs to be
+            //aligned upward according to the instruction type.
+            var_offset = xcom::ceil_align(var_offset,
+                                          getMInstAlign(mi->getCode()));
             setValueViaMICode(mi, var_offset);
         }
 

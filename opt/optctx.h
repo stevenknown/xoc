@@ -162,6 +162,19 @@ public:
     //Return true if given pass is valid.
     bool isPassValid(PASS_TYPE pt) const;
 
+    //The function will invalidate flags which may be affected when MDSSA
+    //reconstructed.
+    void setInvalidIfMDSSAReconstructed()
+    {
+        //GVN or InferEVN might record VMD object if as VN_TYPE is VN_VMD.
+        //These objects will be invalid after MDSSA reconstructed.
+        setInvalidPass(PASS_GVN);
+    }
+
+    //The function will invalidate flags which may be affected when PRSSA
+    //reconstructed.
+    void setInvalidIfPRSSAReconstructed() {}
+
     //The function will invalidate flags which may be affected when data-flow
     //changed.
     void setInvalidIfDUMgrLiveChanged()
@@ -170,6 +183,7 @@ public:
         setInvalidPass(PASS_LIVE_EXPR);
         setInvalidPass(PASS_REACH_DEF);
         setInvalidPass(PASS_AVAIL_REACH_DEF);
+        setInvalidPass(PASS_LINEAR_SCAN_RA);
     }
 
     //The function will invalidate flags which may be affected when control
