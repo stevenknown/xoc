@@ -48,6 +48,7 @@ class ChainRec;
 //formulated as: a*iv+b, where a is coeff, iv is variable, b is addend.
 #define IVLR_iv(lr) ((lr)->m_iv)
 class IVLinearRep : public LinearRep {
+    //This class premits copy-constructing.
 public:
     IV const* m_iv; //record BIV|DIV info
 public:
@@ -85,6 +86,7 @@ public:
 #define IV_initv(d) ((d)->m_init_val)
 #define IV_stepv(d) ((d)->m_step_val)
 class IV {
+    //This class premits copy-constructing.
 public:
     //The data type defined the increasing direction of current IV.
     typedef enum tagINCDIR {
@@ -691,6 +693,14 @@ public:
     //Extract IV reference and Bound expression from mono-bound expression.
     bool extractIVBoundExp(IV const* biv, IR const* compare_exp,
                            OUT IR const** ivref, OUT IR const** bexp) const;
+
+    //The function tries to extract IVVal from given 'ir'.
+    //Return true if the function extracts value successfully.
+    bool extractIVValFrom(MOD IVVal * val, IR const* ir) const;
+
+    //The function tries to extract IVVal from given 'ir' which is MC type.
+    //Return true if the function extracts value successfully.
+    bool extractIVValFromMC(MOD IVVal * val, IR const* ir) const;
 
     //Extract IV reference and Bound expression from mono-bound expression.
     //is_closed_range:

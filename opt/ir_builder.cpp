@@ -39,7 +39,7 @@ namespace xoc {
 //If DU info exist, this function will retrieve it back
 //to region for next allocation.
 //Note that this function does NOT free ir's kids and siblings.
-void Region::freeIR(IR * ir)
+void Region::freeIR(IR * ir) const
 {
     ASSERTN(ir && !ir->is_undef(), ("ir has been freed"));
     ASSERTN(ir->is_single(), ("chain list should be cut off"));
@@ -67,7 +67,7 @@ void Region::freeIR(IR * ir)
 //Free ir and all its kids, except its sibling node.
 //We can only utilizing the function to free the
 //IR which allocated by 'allocIR'.
-void Region::freeIRTree(IR * ir, bool is_check_undef)
+void Region::freeIRTree(IR * ir, bool is_check_undef) const
 {
     if (ir == nullptr) { return; }
     if (!is_check_undef && ir->is_undef()) { return; }
@@ -86,7 +86,7 @@ void Region::freeIRTree(IR * ir, bool is_check_undef)
 //Free ir, and all its kids.
 //We can only utilizing the function to free the IR which allocated
 //by 'allocIR'.
-void Region::freeIRTreeList(IRList & irs, bool is_check_undef)
+void Region::freeIRTreeList(IRList & irs, bool is_check_undef) const
 {
     IRListIter next;
     IRListIter ct;
@@ -106,7 +106,7 @@ void Region::freeIRTreeList(IRList & irs, bool is_check_undef)
 //which allocated by 'allocIR'.
 //NOTICE: If ir's sibling is not nullptr, that means the IR is
 //a high level type. IRBB consists of only middle/low level IR.
-void Region::freeIRTreeList(IR * ir, bool is_check_undef)
+void Region::freeIRTreeList(IR * ir, bool is_check_undef) const
 {
     if (ir == nullptr) { return; }
     IR * head = ir, * next = nullptr;
@@ -121,13 +121,12 @@ void Region::freeIRTreeList(IR * ir, bool is_check_undef)
 
 //Duplication all contents of 'src', includes AttachInfo, except DU info,
 //SSA info, kids and siblings IR.
-IR * Region::dupIR(IR const* src)
+IR * Region::dupIR(IR const* src) const
 {
     if (src == nullptr) { return nullptr; }
     IR_CODE irc = src->getCode();
     IR * res = getIRMgr()->allocIR(irc);
     ASSERTN(res != nullptr && src != nullptr, ("res/src is nullptr"));
-
     UINT res_id = IR_id(res);
     AIContainer * res_ai = IR_ai(res);
     UINT res_irc_sz = IR::getIRCodeSize(res);
@@ -221,7 +220,7 @@ IR * Region::dupIsomoStmt(IR const* ir, IR * rhs)
 
 //Duplicate 'ir' and its kids, but without ir's sibiling node.
 //The duplication includes AI, except DU info, SSA info.
-IR * Region::dupIRTree(IR const* ir)
+IR * Region::dupIRTree(IR const* ir) const
 {
     if (ir == nullptr) { return nullptr; }
     IR * newir = dupIR(ir);
@@ -239,7 +238,7 @@ IR * Region::dupIRTree(IR const* ir)
 //Duplication 'ir' and kids, and its sibling, return list of new ir.
 //Duplicate irs start from 'ir' to the end of list.
 //The duplication includes AI, except DU info, SSA info.
-IR * Region::dupIRTreeList(IR const* ir)
+IR * Region::dupIRTreeList(IR const* ir) const
 {
     IR * new_list = nullptr;
     while (ir != nullptr) {

@@ -34,6 +34,9 @@ author: Su Zhenyu
 #ifndef __IR_H__
 #define __IR_H__
 
+//For the compilation of XOC in limited memory space device, e.g: mobile phone.
+//#define LIMITED_MEMORY_SPACE true
+
 namespace xoc {
 
 class SimpCtx;
@@ -223,11 +226,8 @@ public:
 class IR {
     COPY_CONSTRUCTOR(IR);
 public:
-    #ifdef _DEBUG_
-    IR_CODE code;
-    #else
+    #ifdef LIMITED_MEMORY_SPACE
     USHORT code:IR_CODE_BIT_SIZE;
-    #endif
 
     //True if IR may throw excetion.
     USHORT may_throw_exception:1;
@@ -247,6 +247,27 @@ public:
 
     //True if IR can not be moved.
     USHORT no_move:1;
+    #else
+    //True if IR may throw excetion.
+    bool may_throw_exception;
+
+    //True if IR is atomic operation.
+    bool is_atomic_op;
+
+    //True if IR behaved as if it is an atomic operation consist of
+    //sequential read, modify, and write.
+    bool is_read_mod_write;
+
+    //True if IR may terminate the control flow, such as throwing an excetion.
+    bool is_terminate_control_flow;
+
+    //True if IR may have side effect.
+    bool has_sideeffect;
+
+    //True if IR can not be moved.
+    bool no_move;
+    IR_CODE code;
+    #endif
 
     #ifdef CONST_IRC_SZ
     //Record the specific IR byte size.
@@ -316,10 +337,10 @@ public:
 
     //Copy memory reference only for current IR.
     //src: copy MD reference from 'src', it may be different to current ir.
-    void copyRef(IR const* src, Region * rg);
+    void copyRef(IR const* src, Region const* rg);
 
     //Copy AttachInfo from 'src' to current ir, not include kid and sibling.
-    void copyAI(IR const* src, Region * rg);
+    void copyAI(IR const* src, Region const* rg);
 
     //Copy data-type from 'src' to current ir, not include kid and sibling.
     void copyType(IR const* src) { setType(src->getType()); }
@@ -327,7 +348,7 @@ public:
     //Copy each memory reference for whole ir tree.
     //src: copy MD reference from 'src', it must be equal to current ir tree.
     //copy_kid_ref: copy MD reference for kid recursively.
-    void copyRefForTree(IR const* src, Region * rg);
+    void copyRefForTree(IR const* src, Region const* rg);
 
     //The function collects the LabelInfo for each branch-target.
     void collectLabel(OUT List<LabelInfo const*> & lst) const;
@@ -605,6 +626,9 @@ public:
     //Return true if ir's data type can be regarded as integer.
     bool isInt() const { return is_int() || is_bool() || is_ptr(); }
 
+    //Return true if ir's data type can be regarded as float.
+    bool isFP() const { return IR_dt(this)->isFP(); }
+
     //Return true if ir's data type can be regarded as unsigned integer.
     bool isUInt() const { return is_uint() || is_bool() || is_ptr(); }
 
@@ -844,8 +868,7 @@ public:
     }
 
     //Return true if ir indicate conditional branch to a label.
-    bool isConditionalBr() const
-    { return IRDES_is_conditional_br(getCode()); }
+    bool isConditionalBr() const { return IRDES_is_conditional_br(getCode()); }
 
     //Return true if ir is operation that read or write to an array element.
     bool isArrayOp() const { return IRDES_is_array_op(getCode()); }
@@ -880,9 +903,9 @@ public:
     { return IRDES_is_indirect_mem_op(getCode()); }
 
     //Return true if ir is direct memory operation.
-    bool isDirectMemOp() const
-    { return IRDES_is_direct_mem_op(getCode()); }
+    bool isDirectMemOp() const { return IRDES_is_direct_mem_op(getCode()); }
 
+    //Return true if ir is direct-call or indirect-call operation.
     bool isCallStmt() const { return is_call() || is_icall(); }
 
     //Return true if ir is a readonly call stmt.
@@ -901,8 +924,12 @@ public:
     //Return true if current stmt exactly modifies a PR.
     //CALL/ICALL may modify PR if it has a return value.
     //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole IR.
-    bool isWriteWholePR() const
-    { return IRDES_is_write_whole_pr(getCode()); }
+    bool isWriteWholePR() const { return IRDES_is_write_whole_pr(getCode()); }
+
+    //Return true if current stmt may modifies a PR.
+    //Note CALL/ICALL may modify PR if it has a return value.
+    //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole IR.
+    bool isMayWritePR() const { return isWritePR() || isCallStmt(); }
 
     //Return true if current expression read value from PR.
     bool isReadPR() const { return is_pr(); }
@@ -910,6 +937,11 @@ public:
     //Return true if current stmt/expression operates PR.
     bool isPROp() const
     { return isReadPR() || isWritePR() || isCallHasRetVal(); }
+
+    //Return true if ir might be control-flow-structure.
+    bool isCFS() const
+    { return is_switch() || is_if() || is_dowhile() || is_whiledo() ||
+             is_doloop(); }
 
     //Return true if current operation references memory.
     //These kinds of operation always define or use MD, thus include both PR
@@ -919,8 +951,7 @@ public:
     //Return true if current operation references memory, and
     //it is the rhs of stmt.
     //These kinds of operation always use MD.
-    bool isMemOpnd() const
-    { return IRDES_is_mem_opnd(getCode()); }
+    bool isMemOpnd() const { return IRDES_is_mem_opnd(getCode()); }
 
     //Return true if current ir is integer constant, and the number
     //is equal to 'value'.
@@ -987,6 +1018,12 @@ public:
     //indirect array accessing.
     bool isDirectArrayRef() const;
 
+    //Return true if current ir is extended IR operation.
+    bool isExtOp() const;
+
+    //Return true if given IR_CODE is extended IR operation.
+    static bool isExtOp(IR_CODE code);
+
     //This function invert the operation according to it semantics.
     static IR * invertIRCode(IR * ir, Region * rg);
     static IR_CODE invertIRCode(IR_CODE src);
@@ -997,6 +1034,7 @@ public:
     //Return true if current ir operates on memory object with alignged address
     //or has the attribute of aligned.
     bool isAligned() const { return getAlign() != 0 || hasAlignedAttr(); }
+
     //Return true if current ir has the attribute of aligned.
     bool hasAlignedAttr() const;
 
@@ -1075,15 +1113,16 @@ public:
         ASSERT0(!mustBeBoolType() || ty->is_bool());
         IR_dt(this) = ty;
     }
-    void setRefMD(MD const* md, Region * rg);
-    void setRefMDSet(MDSet const* mds, Region * rg);
+    void setRefMD(MD const* md, Region const* rg);
+    void setRefMDSet(MDSet const* mds, Region const* rg);
     void setMustRef(MD const* md, Region * rg)
     {
         ASSERT0(md);
         setRefMD(md, rg);
     }
 
-    //mds: record MayMDSet that have to be hashed.
+    //The function record the May-Reference MDSet of ir.
+    //mds: record MayMDSet that has been hashed.
     void setMayRef(MDSet const* mds, Region * rg)
     {
         ASSERT0(mds && !mds->is_empty());

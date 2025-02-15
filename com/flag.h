@@ -30,6 +30,9 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+//
+//START Flag
+//
 //The class represents flag operations.
 //Note the class regards integer 0 as the default UNDEF flag.
 template <class T>
@@ -94,6 +97,7 @@ public:
     //The function adds new flag into flagset.
     void set(T v) { SET_FLAG(m_flagset, v); }
 };
+//END Flag
 
 class UFlag : public Flag<UINT> {
 public:
@@ -101,4 +105,5 @@ public:
 };
 
 } //namespace xcom
+
 #endif //END __FLAG_H__

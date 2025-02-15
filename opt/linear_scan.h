@@ -38,16 +38,17 @@ class ArgPasser;
 class ApplyToRegion;
 
 //
-//START BackwardEdge
+//START LexBackwardJump
 //
-#define BKEDGE_srcbb(b) ((b)->srcbb)
-#define BKEDGE_dstbb(b) ((b)->dstbb)
-class BackwardEdge {
+#define BKJUMP_srcbb(b) ((b)->srcbb)
+#define BKJUMP_dstbb(b) ((b)->dstbb)
+class LexBackwardJump {
 public:
     IRBB const* srcbb;
     IRBB const* dstbb;
 
-    BackwardEdge(IRBB const* src, IRBB const* dst) : srcbb(src), dstbb(dst) {}
+    LexBackwardJump(IRBB const* src, IRBB const* dst) : srcbb(src), dstbb(dst)
+    { }
     void init(IRBB const* src, IRBB const* dst)
     {
         ASSERT0(src && dst);
@@ -55,7 +56,7 @@ public:
         dstbb = dst;
     }
 };
-//END BackwardEdge
+//END LexBackwardJump
 
 //
 //START Occurence
@@ -270,7 +271,7 @@ public:
     PosAttr * genPosAttr(UINT v, IRBB const* bb, IR const* ir);
 
     //Generate a Occurence object and append the pointer in the m_occ_list.
-    BackwardEdge * genBackwardEdge(IRBB const* srcbb, IRBB const* dstbb);
+    LexBackwardJump * genLexBackwardJump(IRBB const* srcbb, IRBB const* dstbb);
 
     //Generate a Occurence object and append the pointer in the m_occ_list.
     Occurence * genOccurence()
@@ -321,12 +322,12 @@ typedef xcom::TMapIter<PRNO, FakeUse*> Prno2FakeUseIter;
 typedef List<PRLiveSet const*> PRLiveSetList;
 
 //Used to store the backward jump edges.
-typedef List<BackwardEdge const*> BackwardEdgeList;
+typedef List<LexBackwardJump const*> BackwardEdgeList;
 
 //
-//START BackwardJumpAnalysis
+//START LexBackwardJumpAnalysis
 //
-//BackwardJumpAnalysis is used to check the CFG whether have the backward
+//LexBackwardJumpAnalysis is used to check the CFG whether have the backward
 //jump, and insert some fake-use IRs for some prno after analysis.
 //eg. BB3-->BB2 is a backward jump:
 //    BB1
@@ -342,8 +343,8 @@ typedef List<BackwardEdge const*> BackwardEdgeList;
 //     |
 //     V
 //    BB4
-class BackwardJumpAnalysis {
-    COPY_CONSTRUCTOR(BackwardJumpAnalysis);
+class LexBackwardJumpAnalysis {
+    COPY_CONSTRUCTOR(LexBackwardJumpAnalysis);
     friend class OccRecorderVF;
     Region * m_rg;
     BBPos2Attr * m_pos2attr;
@@ -360,9 +361,9 @@ class BackwardJumpAnalysis {
     Prno2FakeUse m_pr2fakeuse_tail;
     BackwardJumpAnalysisResMgr * m_resource_mgr;
 public:
-    BackwardJumpAnalysis(Region * rg, BBPos2Attr * pos2attr,
-                         FakeVarMgr * fake_var_mgr, LinearScanRA * lsra);
-    virtual ~BackwardJumpAnalysis();
+    LexBackwardJumpAnalysis(Region * rg, BBPos2Attr * pos2attr,
+                            FakeVarMgr * fake_var_mgr, LinearScanRA * lsra);
+    virtual ~LexBackwardJumpAnalysis();
 
     //The main function controls the analysis flow.
     bool analyze();
@@ -377,12 +378,12 @@ public:
 
     //Reset the resources for the analysis.
     void reset();
-
 protected:
     //Add the backward jump to the set m_backward_edges.
     void addBackwardJump(IRBB const* srcbb, IRBB const* dstbb)
     {
-        BackwardEdge const* e = m_resource_mgr->genBackwardEdge(srcbb, dstbb);
+        LexBackwardJump const* e = m_resource_mgr->genLexBackwardJump(srcbb,
+                                                                      dstbb);
         m_backward_edges.append_tail(e);
     }
 
@@ -422,7 +423,7 @@ protected:
     //This func records the occurence of the input prno at the specified pos.
     void recordOccurenceForPR(PRNO prno, Pos pos);
 };
-//END BackwardJumpAnalysis
+//END LexBackwardJumpAnalysis
 
 
 //This enum is used to indicate the PR is DEF or USE in an IR.
@@ -511,6 +512,10 @@ class LTTab : public xcom::TTab<LifeTime*> {
 typedef TMap<PRNO, Var*> PRNO2Var;
 typedef TMapIter<PRNO, Var*> PRNO2VarIter;
 
+
+//
+//START RegSetImpl
+//
 //This class represents the main manipulating interfaces to target dependent
 //RegSet information.
 class RegSetImpl {
@@ -553,6 +558,31 @@ protected:
     //Allocable register.
     RegSet m_avail_allocable;
 protected:
+    //Some other modules will occupy additional registers, making these
+    //registers unable to participate in normal register allocation. This
+    //interface checks these modules and collects available registers.
+    //Note that special handling can be done based on the architecture.
+    virtual void collectOtherAvailableRegister()
+    {
+        //Collect FP register.
+        //If the frame pointer register can be allocated and the dynamic stack
+        //function and prologue&epilogue inserter function have not used this
+        //register during the current compilation process, it can be used to
+        //participate in scalar callee saved register allocation.
+        //In addition, if debug mode is turned on, the frame pointer register
+        //has a special role and cannot participate in allocation. Also, it can
+        //not be used if debugging linear scan register allocation.
+        if (isFPAllocable()) {
+            Reg reg = getTIMgr().getFP();
+            m_avail_callee_scalar.bunion(reg);
+            m_avail_allocable.bunion(reg);
+        }
+    }
+
+    void destroyDebugRegSet();
+    void destroyRegSet();
+    void initAvailRegSet();
+
     //Init the register set for debug purpose.
     //The function is always used by pass writer to manipulate the number and
     //the content of specific register set.
@@ -563,10 +593,6 @@ protected:
     //overwrite the allocable-register-set through this inteface to
     //cut down the number of alloable-register-set.
     virtual void initDebugRegSet() { ASSERTN(0, ("Target Depedent Code")); }
-    void initAvailRegSet();
-
-    void destroyRegSet();
-    void destroyDebugRegSet();
 public:
     RegSetImpl(LinearScanRA & ra);
     virtual ~RegSetImpl() { destroyRegSet(); }
@@ -630,11 +656,18 @@ public:
     bool isCallee(Reg r) const
     { return isCalleeScalar(r) || isCalleeVector(r); }
 
-    //True if input reg is callee scalar register.
+    //True if input register is callee saved scalar register. Note that the
+    //frame pointer register can be used as callee saved register if this
+    //register can be allocated and the dynamic stack function has not used it.
+    //Note that special handling can be done based on the architecture.
     virtual bool isCalleeScalar(Reg r) const
     {
-        return m_target_callee_scalar != nullptr &&
+        bool is_callee_scalar = m_target_callee_scalar != nullptr &&
             m_target_callee_scalar->is_contain(r);
+        //GCOVR_EXCL_START
+        bool use_fp_as_callee_scalar = isFP(r) && isFPAllocable();
+        //GCOVR_EXCL_STOP
+        return is_callee_scalar || use_fp_as_callee_scalar;
     }
 
     //True if input reg is callee vector register.
@@ -662,6 +695,14 @@ public:
             m_target_caller_vector->is_contain(r);
     }
 
+    //Whether current register "r" is frame pointer register.
+    bool isFP(Reg r) const { return r == getTIMgr().getFP(); }
+
+    //Whether the frame pointer register is allocable. If the debug mode is not
+    //turned on, and dynamic stack, prologue/epilogue inserter function not use
+    //this register, it can be used for other purposes.
+    bool isFPAllocable() const;
+
     //True if input reg is param register.
     bool isParam(Reg r) const
     { return isParamScalar(r) || isParamVector(r); }
@@ -679,6 +720,12 @@ public:
         return m_target_param_vector != nullptr &&
             m_target_param_vector->is_contain(r);
     }
+
+    //GCOVR_EXCL_START
+    //Return true if Type matches the register type.
+    virtual bool isRegTypeMatch(Type const* ty, Reg r) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+    //GCOVR_EXCL_STOP
 
     //True if input reg is return value register.
     bool isReturnValue(Reg r) const
@@ -719,10 +766,14 @@ public:
     virtual Reg pickCaller(IR const* ir, LTConstraints const* lt_constraints);
 
     //Pick reg in a given regset and return it.
-    static Reg pickReg(RegSet & set);
+    virtual Reg pickReg(RegSet & set);
 
     //Pick reg in a given regset.
     static void pickReg(RegSet & set, Reg r);
+
+    //Pick reg by the incramental order in a given regset, usually the
+    //arg passer and epilog/prolog pick the reg by this order.
+    static Reg pickRegByIncrementalOrder(RegSet & set);
 
     //Select the registers that meet the conditions
     //based on the current set of lifetime constraints.
@@ -764,6 +815,28 @@ public:
                               PRNOConstraintsTab const& conflict_prs,
                               OUT RegSetWrap & removed_regs_wrap);
 };
+//END RegSetImpl
+
+
+//
+//START RoundRobinRegSetImpl
+//
+class RoundRobinRegSetImpl : public RegSetImpl {
+    COPY_CONSTRUCTOR(RoundRobinRegSetImpl);
+    BSIdx m_bsidx_marker;
+public:
+    RoundRobinRegSetImpl(LinearScanRA & ra) : RegSetImpl(ra)
+    { m_bsidx_marker = BS_UNDEF; }
+    virtual ~RoundRobinRegSetImpl() {}
+
+    //Pick up a physical register from allocable register set by the roundrobin
+    //way.
+    Reg pickRegRoundRobin(RegSet & set);
+
+    //Pick reg in a given regset and return it.
+    virtual Reg pickReg(RegSet & set) override;
+};
+//END RoundRobinRegSetImpl
 
 
 //
@@ -871,7 +944,7 @@ protected:
     void init();
 public:
     LTConstraintsMgr() { init(); }
-    ~LTConstraintsMgr() { destroy(); }
+    virtual ~LTConstraintsMgr() { destroy(); }
 
     virtual LTConstraints * allocLTConstraints();
 
@@ -891,6 +964,10 @@ protected:
     bool m_is_apply_to_region;
     //Used to control the FP can be allocable or not based on the user's input.
     bool m_is_fp_allocable_allowed;
+    bool m_has_alloca; //Whether alloca opeartion exists.
+
+    //True to indicate that the stack space may need to be realigned.
+    bool m_may_need_to_realign_stack;
     LifeTimeMgr * m_lt_mgr;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
@@ -911,7 +988,6 @@ protected:
     PRNO2Var m_prno2var;
     ActMgr m_act_mgr;
     Vector<UINT> m_bb_seqid;
-    xcom::TTab<PRNO> m_prno_with_2d_hole;
     Ty2Var m_ty2var;
     LTConstraintsMgr * m_lt_constraints_mgr;
     LTConstraintsStrategy * m_lt_constraints_strategy;
@@ -940,19 +1016,28 @@ public:
     void addActive(LifeTime * lt);
     void addInActive(LifeTime * lt);
     void addHandled(LifeTime * lt);
-    void assignTopoIdForBB();
+    void assignLexSeqIdForBB();
 
     virtual IR * buildRemat(PRNO prno, RematCtx const& rematctx,
                             Type const* ty);
-    virtual IR * buildMove(PRNO from, PRNO to, Type const* fromty,
-                           Type const* toty);
     virtual IR * buildSpill(PRNO prno, Type const* ty);
     virtual IR * buildSpillByLoc(PRNO prno, Var * spill_loc, Type const* ty);
     virtual IR * buildReload(PRNO prno, Var * spill_loc, Type const* ty);
 
-    //Should be called before register allocation.
+    //The function builds PRNO with given 'type', and records the relation
+    //between PRNO and 'reg' in current pass. Unlike buildPrno(), the function
+    //records the generated PRNO as a dedicated PRNO which binds a dedicated
+    //physical register 'reg'.
+    //When TargInfo enabled, some PR operations might correspond to dedicated
+    //physical register. In order to preserve this information, passes such
+    //as IR simplification, calls this function.
     PRNO buildPrnoDedicated(Type const* type, Reg reg);
-    //Should be called after register allocation.
+
+    //The function builds PRNO with given 'type', and records the relation
+    //between PRNO and 'reg' in current pass.
+    //When TargInfo enabled, some PR operations might correspond to dedicated
+    //physical register. In order to preserve this information, passes such
+    //as IR simplification, calls this function.
     PRNO buildPrno(Type const* type, Reg reg);
 
     //This func is used to get the prno assigned to special register can be
@@ -986,31 +1071,68 @@ public:
     //This func is used to color the stack slot and reuse the stack slot then.
     void colorStackSlot()
     {
+        START_TIMER(t, "colorStackSlot");
         //Do the stack slot reuse for the scalar var.
         reuseStackSlot(false);
 
         //Do the stack slot reuse for the vector var.
         reuseStackSlot(true);
+        END_TIMER(t, "colorStackSlot");
     }
-
-    void addPrnoWith2dLTHole(PRNO prno) { m_prno_with_2d_hole.append(prno); }
 
     //The function check whether 'lt' value is simple enough to rematerialize.
     //And return the information through rematctx.
-    virtual bool checkLTCanBeRematerialized(LifeTime const* lt,
+    virtual bool checkLTCanBeRematerialized(MOD LifeTime * lt,
                                             OUT RematCtx & rematctx);
     virtual void collectDedicatedPR(BBList const* bblst,
                                     OUT DedicatedMgr & mgr);
 
     void dumpBBListWithReg() const;
 
-    //Implement the swap by memory as the temp location.
-    IR * doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
-                     Type const* ty2, IR const* marker, MOD IRBB * bb);
+    //This func shall generate the IRs to swap the data in two registers,
+    //and implement the swap by memory as the temp memory location.
+    //src_prno_with_r2: the src prno responding to the second register.
+    //dst_prno_with_r1: the dst prno responding to the first register.
+    //src_prno_with_r1: the src prno responding to the first register.
+    //dst_prno_with_r2: the dst prno responding to the second register.
+    //ty1: the data type of dst_prno_with_r1.
+    //ty2: the data type of dst_prno_with_r2.
+    //marker: the marker IR used to indicate where to insert the generated IRs.
+    //bb: the BB where IRs will be inserted.
+    //retun value: this func will return the last IR in the new generated IRs,
+    //             it can be used as a new marker if user wants to get the tail
+    //             of new IRs.
+    //
+    //There are three steps used to complete the swap operation:
+    //  1. [mem]  <-- spill $src_prno_with_r1
+    //  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
+    //  3. $dst_prno_with_r2 <-- reload [mem]
+    IR * doSwapByMem(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+       PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
+       Type const* ty2, IR const* marker, MOD IRBB * bb);
 
-    //Implement the swap by register as the temp location.
-    IR * doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
-                     Type const* ty2, IR const* marker, MOD IRBB * bb);
+    //This func shall generate the IRs to swap the data in two registers,
+    //and implement the swap by memory as the temp registers.
+    //src_prno_with_r2: the src prno responding to the second register.
+    //dst_prno_with_r1: the dst prno responding to the first register.
+    //src_prno_with_r1: the src prno responding to the first register.
+    //dst_prno_with_r2: the dst prno responding to the second register.
+    //ty1: the data type of dst_prno_with_r1.
+    //ty2: the data type of dst_prno_with_r2.
+    //marker: the marker IR used to indicate where to insert the generated IRs.
+    //bb: the BB where IRs will be inserted.
+    //retun value: this func will return the last IR in the new generated IRs,
+    //             it can be used as a new marker if user wants to get the tail
+    //             of new IRs.
+    //
+    //There are three steps used to complete the swap operation:
+    //  1. $temp  <-- mov $src_prno_with_r1
+    //  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
+    //  3. $dst_prno_with_r2 <-- mov $temp
+
+    IR * doSwapByReg(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+       PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
+       Type const* ty2, IR const* marker, MOD IRBB * bb);
 
     void dumpPR2Reg(PRNO prno) const;
     void dumpPR2Reg() const;
@@ -1020,9 +1142,18 @@ public:
     void freeReg(Reg reg);
     void freeReg(LifeTime const* lt);
 
+    //Generate the remat information by traversing the lifetime list.
+    void genRematInfo();
+    void genRematForLT(MOD LifeTime * lt) const;
+
     //This func is used to find the ancestor prno if an original prno is split
     //more than one time and is renamed many times.
     PRNO getAnctPrno(PRNO prno) const;
+
+    //Get the BB that will used to insert the spill IR of callee registers.
+    //Normally, it is the entry BB of the CFG.
+    virtual IRBB * getCalleeSpilledBB() const
+    { return m_rg->getCFG()->getEntry(); }
 
     //Construct a name for Var that will lived in Region.
     CHAR const* genFuncLevelNewVarName(OUT xcom::StrBuf & name);
@@ -1123,7 +1254,10 @@ public:
     //The temporary register is a reserved register that used to save a
     //temporary value, which is usually used after the register allocation
     //and does not be assigned in the register allocation.
-    Reg getTempScalar() const { return getTIMgr().getTempScalar(); }
+    Reg getTempReg(Type const* ty) const
+    { return ty->is_vector() ? getTempVector() : getTempScalar(ty); }
+    Reg getTempScalar(Type const* ty) const
+    { return getTIMgr().getTempScalar(ty); }
     Reg getTempVector() const { return getTIMgr().getTempVector(); }
 
     //Get a temp memory location per the specified type.
@@ -1140,18 +1274,45 @@ public:
     //This func shall generate the IRs to swap the data in two registers, if
     //there is a TMP register reserved on the specific architecture, the
     //register will be used as the temp space to finish the swap, or else,
-    //memory location on stack willbe adopted to help to complete the data
+    //memory location on stack will be adopted to help to complete the data
     //exchange.
-    //prno1: the first prno for swap data.
-    //prno2: the second prno to swap data.
-    //ty1: the data tyupe of prno1.
-    //ty2: the data tyupe of prno2.
+    //src_prno_with_r2: the src prno responding to the second register.
+    //dst_prno_with_r1: the dst prno responding to the first register.
+    //src_prno_with_r1: the src prno responding to the first register.
+    //dst_prno_with_r2: the dst prno responding to the second register.
+    //ty1: the data type of dst_prno_with_r1.
+    //ty2: the data type of dst_prno_with_r2.
     //marker: the marker IR used to indicate where to insert the generated IRs.
     //bb: the BB where IRs will be inserted.
     //retun value: this func will return the last IR in the new generated IRs,
     //             it can be used as a new marker if user wants to get the tail
     //             of new IRs.
-    virtual IR * insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
+    //e.g:
+    //Original IRs with cyclic MOVs:
+    //    $1(R0) <- $10(R1)
+    //    $2(R1) <- $20(R2)
+    //    $3(R2) <- $30(R0)
+    //
+    //These three IRs are abstracted with the concrete prnos with variable
+    //names:
+    //    $dst_prno_with_r0 <- $src_prno_with_r1
+    //    $dst_prno_with_r1 <- $src_prno_with_r2
+    //    $dst_prno_with_r2 <- $src_prno_with_r0
+    //
+    //There will be two groups of swap per this algorithm:
+    //    Group 1: r = R0, r1 = R1, r2 = R2, and do swap for R1 and R2.
+    //        temp <- $src_prno_with_r1               |  temp <- $10(R1)
+    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $2(R1) <- $20(R2)
+    //        $dst_prno_with_r2 <- temp               |  $3(R2) <- temp
+    //    After the first group swap, R1 contains the final correct data,
+    //    R2 contains the data of R1.
+    //
+    //    Group 2: r = R0, swap r1 = R2, r2 = R0, and do swap for R2 and R0.
+    //        temp <- $src_prno_with_r2               |  temp <- $3(R2)
+    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $3(R2) <- $30(R0)
+    //        $dst_prno_with_r2 <- temp               |  $1(R0) <- temp
+    virtual IR * insertIRToSwap(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+        PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
         Type const* ty2, IR const* marker, MOD IRBB * bb);
 
     //Return true if register r1 alias to r2.
@@ -1226,7 +1387,6 @@ public:
     { return m_move_tab.find(const_cast<IR*>(ir)); }
 
     bool isPrnoAlias(PRNO prno, PRNO alias) const;
-
     //Return true if ir is rematerializing operation.
     virtual bool isRematLikeOp(IR const* ir) const
     {
@@ -1256,14 +1416,6 @@ public:
     virtual bool isTmpRegAvailable(Type const* ty) const
     { ASSERTN(0, ("Target Dependent Code")); return false; }
 
-    bool isUnsplitable(PRNO prno) const
-    {
-        //Currently the prnos with 2D lifetime holes are not allowed to
-        //split during the LSRA, because it will lead to incorrect spill/reload
-        //operation.
-        return m_prno_with_2d_hole.find(prno);
-    }
-
     //Initialize the allocation strategy for the lifetime constraint set.
     //Note that different architectures have varying strategies.
     void initConstraintsStrategy()
@@ -1280,6 +1432,13 @@ public:
         m_lt_constraints_mgr = allocLTConstraintsMgr();
     }
 
+    //Whether the stack space does not need to be realigned.
+    bool noNeedToAlignStack() const { return !m_may_need_to_realign_stack; }
+
+    //Whether the dynamic stack function has been performed and used frame
+    //pointer register before.
+    bool notHaveAlloca() const { return !m_has_alloca; }
+
     virtual bool perform(OptCtx & oc);
     virtual bool performLsraImpl(OptCtx & oc);
 
@@ -1288,9 +1447,10 @@ public:
                                             PRNO prno)
     { ASSERTN(0, ("Target Dependent Code")); return; }
 
+    void recalculateSSA(OptCtx & oc) const;
+
     //Reset all resource before allocation.
     void reset();
-
     //Do the stack slot resue per the input var type to save the stack
     //space after the LSRA.
     //is_vector: the type of the stack slot. True means do the stack slot
@@ -1299,6 +1459,9 @@ public:
     void reuseStackSlot(bool is_vector);
 
     void setApplyToRegion(bool doit) { m_is_apply_to_region = doit; }
+
+    //Set attributes obtained from other passes.
+    void setAttr();
     void setDedicatedReg(PRNO prno, Reg r) { m_dedicated_mgr.add(prno, r); }
 
     //Normally m_is_fp_allocable_allowed can be set to false only, because the
@@ -1325,7 +1488,6 @@ public:
     //After the lifetime calculation is completed, begin setting constraint
     //sets for each lifetime.
     void tryComputeConstraints();
-    void updateSSA(OptCtx & oc) const;
 
     bool verify4List() const;
     bool verifyAfterRA() const;

@@ -27,9 +27,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 
-typedef UINT64 IRDescFlagSeg;
-#define IR_DESC_FLAG_BYTE_SIZE (sizeof(IRDescFlagSeg) * 1)
-
 class IR;
 class IRBB;
 class DumpFlag;
@@ -192,38 +189,29 @@ typedef enum tagIRC_ATTR {
 
 ////////////////////////////////////////////////////////////////////////////////
 //NOTE: If new IR flag value is greater than the bit range that IRDescFlagSeg //
-//can express, user should extend the IR_DESC_FLAG_BYTE_SIZE value and set the//
+//can express, user should extend the IRDescFlagSegNum value and set the      //
 //big flag value at RegionMgr::initIRDescFlagSet(), then invoke the function  //
 //right after RegionMgr created.                                              //
 ////////////////////////////////////////////////////////////////////////////////
 
-class IRDescFlag : public xcom::FixedSizeBitSet {
-protected:
-    BYTE m_flagbuf[IR_DESC_FLAG_BYTE_SIZE];
+//
+//START IRDescFlag
+//
+typedef UINT64 IRDescFlagSeg;
+#define IRDescFlagSegNum 1
+
+class IRDescFlag : public xcom::FlagSet<IRDescFlagSeg, IRDescFlagSegNum> {
 public:
-    IRDescFlag() : FixedSizeBitSet(m_flagbuf, IR_DESC_FLAG_BYTE_SIZE) {}
-    IRDescFlag(IRDescFlagSeg v) :
-        FixedSizeBitSet(m_flagbuf, IR_DESC_FLAG_BYTE_SIZE)
-    {
-        ASSERT0(IR_DESC_FLAG_BYTE_SIZE >= sizeof(v));
-        ::memcpy(m_flagbuf, &v, sizeof(v));
-    }
-
-    //Return true if current flagset includes 'v', which 'v' may contain
-    //combined flags.
-    //e.g: if v is 0x5, it indicates v is combined with 0b100 and 0b1.
-    bool have(BSIdx v) const { return is_contain(v); }
-
-    //Return true if current flagset only includes 'v'.
-    bool only_have(BSIdx v) const { return have(v) && get_elem_count() == 1; }
-
-    //The function removes flag out of flagset.
-    void remove(BSIdx v) { diff(v); }
-
-    //The function adds new flag into flagset.
-    void set(BSIdx v) { bunion(v); }
+    IRDescFlag() {}
+    IRDescFlag(IRDescFlagSeg v)
+        : FlagSet<IRDescFlagSeg, IRDescFlagSegNum>(v) {}
 };
+//END IRDescFlag
 
+
+//
+//START IRDesc
+//
 #define IRDES_code(c) (g_ir_desc[c].code)
 #define IRDES_name(c) (g_ir_desc[c].name)
 #define IRDES_kid_map(c) (g_ir_desc[c].kid_map)
@@ -334,6 +322,7 @@ public:
     //Return true if the No.kididx kid of operation 'irc' can not be NULL.
     static bool mustExist(IR_CODE irc, UINT kididx);
 };
+//END IRDesc
 
 
 //Defined rounding type that CVT operation used.

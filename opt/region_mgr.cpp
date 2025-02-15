@@ -102,7 +102,7 @@ RegionMgr::~RegionMgr()
         delete m_targinfo;
         m_targinfo = nullptr;
     }
-
+    #ifdef REF_TARGMACH_INFO
     if (m_targinfo_mgr != nullptr) {
         //Note if user enable and reference TargInfoMgr, the macro
         //REF_TARGMACH_INFO has to be opend. And TargInfoMgr will reference
@@ -110,6 +110,7 @@ RegionMgr::~RegionMgr()
         delete m_targinfo_mgr;
         m_targinfo_mgr = nullptr;
     }
+    #endif
 }
 
 
@@ -117,7 +118,7 @@ void RegionMgr::initIRDescFlagSet()
 {
     //NOTE: If new IR flag value is greater than the bit range that
     //IRDescFlagSeg can express, user should extend the
-    //IR_DESC_FLAG_BYTE_SIZE value and set the big flag value here,
+    //IRDescFlagSeg and IRDescFlagSegNum value and set the big flag value here,
     //then invoke the function right after RegionMgr created.
     //e.g: Assume we are going to add a new flag IRC_NEW_FEAT which value
     //is 117 to IR_VST, the code is:
@@ -135,11 +136,17 @@ void * RegionMgr::xmalloc(UINT size)
 }
 
 
+OptCtx * RegionMgr::allocOptCtx()
+{
+    return (OptCtx*)xmalloc(sizeof(OptCtx));
+}
+
+
 OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 {
     OptCtx * oc = m_id2optctx.get(rg->id());
     if (oc == nullptr) {
-        oc = (OptCtx*)xmalloc(sizeof(OptCtx));
+        oc = allocOptCtx();
         oc->init(rg);
         m_id2optctx.set(rg->id(), oc);
     }
@@ -240,6 +247,18 @@ TargInfoMgr * RegionMgr::allocTargInfoMgr()
 Region * RegionMgr::allocRegion(REGION_TYPE rt)
 {
     return new Region(rt, this);
+}
+
+
+void RegionMgr::initTargInfoMgr()
+{
+    ASSERTN(m_targinfo_mgr == nullptr,
+            ("TargInfoMgr already initialized"));
+    #ifdef REF_TARGMACH_INFO
+    m_targinfo_mgr = allocTargInfoMgr();
+    ASSERT0(m_targinfo_mgr);
+    m_targinfo_mgr->init();
+    #endif
 }
 
 

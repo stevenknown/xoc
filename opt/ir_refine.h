@@ -90,8 +90,10 @@ public:
     } u1;
     OptCtx * m_oc; //some operations may change flags in OptCtx.
     ActMgr * m_act_mgr;
+    PRSSAMgr const* m_prssamgr;
+    MDSSAMgr const* m_mdssamgr;
 public:
-    RefineCtx(OptCtx * oc)
+    RefineCtx(MOD OptCtx * oc)
     {
         RC_refine_div_const(*this) = true;
         RC_refine_mul_const(*this) = false;
@@ -102,6 +104,9 @@ public:
         RC_hoist_to_lnot(*this) = true;
         m_oc = oc;
         m_act_mgr = nullptr;
+        ASSERT0(m_oc->getRegion());
+        m_prssamgr = m_oc->getRegion()->getPRSSAMgr();
+        m_mdssamgr = m_oc->getRegion()->getMDSSAMgr();
     }
     ~RefineCtx() { m_act_mgr = nullptr; }
     RefineCtx const& operator = (RefineCtx const&);
@@ -112,6 +117,7 @@ public:
     void dump() const;
 
     //Return the OptCtx.
+    //Note some operations may change flags in OptCtx.
     OptCtx * getOptCtx() const { return RC_optctx(*this); }
     Region * getRegion() const { return getOptCtx()->getRegion(); }
     ActMgr * getActMgr() const { return m_act_mgr; }
@@ -138,6 +144,11 @@ public:
 
     //Return true if refinement need to maintain DefUse chain.
     bool maintainDU() const { return RC_maintain_du(*this); }
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 };
 
 
@@ -181,7 +192,7 @@ protected:
     IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBand(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBor(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineCvt(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineCvt(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLand(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLor(IR * ir, bool & change, RefineCtx & rc);
     IR * refineXor(IR * ir, bool & change, RefineCtx & rc);
@@ -218,7 +229,7 @@ protected:
     IR * refineILoad2(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad3(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineDetViaSSADU(IR * ir, bool & change);
+    IR * refineDetViaSSADU(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
     IR * refineDirectStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);

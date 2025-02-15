@@ -381,7 +381,7 @@ CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 //You must make sure this function will not change any field of Var.
 CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
 {
-    CHAR * lname = SYM_name(VAR_name(this));
+    CHAR const* lname = VAR_name(this)->getStr();
     CHAR tt[43];
     if (xcom::xstrlen(lname) > 43) {
         ::memcpy(tt, lname, 43);

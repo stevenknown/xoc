@@ -66,10 +66,10 @@ public:
 
     //Top-down and bottom-up propagate information.
     IRCFG const* cfg;
+    MDSSAMgr * mdssamgr;
+    PRSSAMgr * prssamgr;
 public:
-    HoistCtx(OptCtx * t, DomTree * dt, IRCFG * g) :
-        inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
-        stmt_changed(false), domtree(dt), oc(t), cfg(g) {}
+    HoistCtx(OptCtx * t, DomTree * dt, IRCFG * g);
     HoistCtx(HoistCtx const& src) :
         inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
         stmt_changed(false)
@@ -90,6 +90,8 @@ public:
         domtree = src.domtree;
         oc = src.oc;
         cfg = src.cfg;
+        mdssamgr = src.mdssamgr;
+        prssamgr = src.prssamgr;
     }
 
     void unionBottomUpInfo(HoistCtx const& src)
@@ -99,6 +101,10 @@ public:
         duset_changed |= src.duset_changed;
         stmt_changed |= src.stmt_changed;
     }
+    bool useMDSSADU() const
+    { return mdssamgr != nullptr && mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return prssamgr != nullptr && prssamgr->is_valid(); }
 
     bool verifyDomTree() const
     {
@@ -230,8 +236,6 @@ protected:
     IRCFG * m_cfg;
     //LICM use RCE to determine whether a branch must-execute.
     RCE * m_rce;
-    MDSSAMgr * m_mdssamgr;
-    PRSSAMgr * m_prssamgr;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
@@ -339,8 +343,8 @@ protected:
     bool hoistCandHelper(LICMAnaCtx const& anactx, OUT IR * cand_exp,
                          OUT IRBB * prehead, OUT HoistCtx & ctx);
 
-    bool initSSAMgr(OptCtx const& oc);
-    bool initDepPass(MOD OptCtx & oc);
+    bool initSSAMgr(HoistCtx const& ctx);
+    bool initDepPass(MOD HoistCtx & ctx);
 
     //Return true if the pass will try to hoist stmt out of loop.
     bool isHoistStmt() const { return m_is_hoist_stmt; }
@@ -454,11 +458,6 @@ protected:
     //     2. DomInfo must be avaliable.
     void updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx);
 
-    bool useMDSSADU() const
-    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
-    bool usePRSSADU() const
-    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
-
     void * xmalloc(UINT size)
     {
         ASSERT0(m_pool != nullptr);
@@ -477,8 +476,6 @@ public:
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
-        m_mdssamgr = nullptr;
-        m_prssamgr = nullptr;
         m_rce = nullptr;
         m_is_hoist_stmt = true;
         m_is_aggressive = true;

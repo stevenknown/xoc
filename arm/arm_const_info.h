@@ -117,6 +117,14 @@ author: Su Zhenyu
 //The alignment should not less than STACK_ALIGNMENT.
 #define SPADJUST_ALIGNMENT 8
 
+//Define the base address of the integer part in vaargs relative
+//to the $fp.
+#define VAARG_INT_BASE 48
+
+//Define the base address of the floating-point number in vaargs
+//relative to the $fp.
+#define VAARG_FP_BASE 96
+
 //Define default float mantissa in output file, such as GR file.
 #define DEFAULT_MANTISSA_NUM 6
 
@@ -187,6 +195,23 @@ typedef enum _SLOT {
     SLOT_NUM = 1,
 } SLOT;
 #define SLOT_NAME_MAX_LEN 10
+
+//Teco spm section name.
+#define TECO_SPM_SH_NAME ".dl_ldm"
+
+//Allocate the stack on global.
+#define  TECO_SF_STACK_ON_GLOBAL 0x8
+
+//Machine instruction word length in BYTE of TECO architecture.
+#define MI_WORD_LEN_BYTE 4
+
+#define TECO_GOT_SECTION_ELEM_BYTE_SIZE 8
+
+//The section index of SymbolInfo from xoc::Var is undefine before section
+//is constructed in ELF, but the index can't be used 'SHN_UNDEF' to assign.
+//Since 'SHN_UNDEF' means that the SymbolInfo is with external attribute.
+//Thus it use a processor-specific value to assign.
+#define TECO_SHN_UNDEF  0xfffe
 
 //Machine function units for all clusters.
 //Note that function unit and issue slot do not have to be one to one mapped.
@@ -302,11 +327,64 @@ typedef enum _REGFILE {
 #define REG_R3 4
 #define REG_R4 5
 #define REG_R5 6
+#define REG_R6 7
+#define REG_R7 8
 #define REG_R8 9
 #define REG_R9 10
+#define REG_R10 11
 #define REG_R11 12
+#define REG_R12 13
+#define REG_R13 14
 #define REG_R14 15
 #define REG_R15 16
+#define REG_R16 17
+#define REG_R17 18
+#define REG_R18 19
+#define REG_R19 20
+#define REG_R20 21
+#define REG_R21 22
+#define REG_R22 23
+#define REG_R23 24
+#define REG_R24 25
+#define REG_R25 26
+#define REG_R26 27
+#define REG_R27 28
+#define REG_R28 29
+#define REG_R29 30
+#define REG_R30 31
+#define REG_R31 32
+#define REG_R32 33
+#define REG_R33 34
+#define REG_R34 35
+#define REG_R35 36
+#define REG_R36 37
+#define REG_R37 38
+#define REG_R38 39
+#define REG_R39 40
+#define REG_R40 41
+#define REG_R41 42
+#define REG_R42 43
+#define REG_R43 44
+#define REG_R44 45
+#define REG_R45 46
+#define REG_R46 47
+#define REG_R47 48
+#define REG_R48 49
+#define REG_R49 50
+#define REG_R50 51
+#define REG_R51 52
+#define REG_R52 53
+#define REG_R53 54
+#define REG_R54 55
+#define REG_R55 56
+#define REG_R56 57
+#define REG_R57 58
+#define REG_R58 59
+#define REG_R59 60
+#define REG_R60 61
+#define REG_R61 62
+#define REG_R62 63
+#define REG_R63 64
 #define REG_PC REG_R15
 #define REG_RA REG_R14
 #define REG_FP 8 //R7
@@ -379,6 +457,83 @@ typedef enum _REGFILE {
 #define ALLOCABLE_VEC_REG_Q_END REG_Q15
 #define ALLOCABLE_VEC_REG_S_START REG_S0
 #define ALLOCABLE_VEC_REG_S_END REG_S31
+
+//Define the minimum target machine global memory operations alignment.
+#define GLOBAL_MEMORY_ALIGNMENT 4
+
+//Target.
+typedef enum _TARG {
+    TARG_UNDEF = 0,
+    TARG_ARM,
+    TARG_THUMB,
+} TARG;
+
+typedef enum {
+    //There are actual special internal physical registers,
+    //and the ID is 0.This is the thread id,
+    //and the value read in the future will be 0 to 31.
+    SREG_TID = 0,
+
+    //There are actual special internal physical registers, and the ID is 3.
+    //This is the group id, and the value read in the future will be 0 to 3.
+    SREG_GID = 3,
+
+    //There are actual special internal physical registers, and the ID is 4.
+    //This is how many clocks the current hardware is running,
+    //a total of 56 bits.
+    SREG_CLOCK = 4,
+
+    //No actual special register, using immediate value 80 instead.
+    //The total number of threads, which is 32.
+    SREG_NTHREAD = 80,
+
+    //No actual special register, using immediate value 81 instead.
+    //The total number of groups is 4.
+    SREG_NGROUP = 81,
+
+    //No actual special register, using immediate value 82 instead.
+    //The total number of spe array columns is 8.
+    SREG_COL_SIZE = 82,
+
+    //No actual special register, using immediate value 82 instead.
+    //The total number of spe array rows is 4.
+    SREG_ROW_SIZE = 83,
+
+    //No actual special register, using immediate value 84 instead.
+    //This is the value of the spm and global memory alignment,
+    //which is 4 bytes.
+    SREG_ALIGN_MEM = 84,
+
+    //No actual special register, using immediate value 85 instead.
+    //This is the value of the matrix alignment, which is 64 byte.
+    SREG_ALIGN_MATRIX = 85,
+
+    //No actual special register, using immediate value 86 instead.
+    //This is the value of the return address, which is 64 byte.
+    SREG_RTN_ADDR = 86,
+
+    //No actual special register, using immediate value 87 instead.
+    //This is the value of the frame pointer address, which is 64 byte.
+    SREG_FRAME_ADDR = 87,
+
+    //No actual special register, using immediate value 88 instead.
+    //Indicates the first address of the vaarg.
+    SREG_VAARG = 88,
+
+    //No actual special register, using immediate value 0xC22 instead.
+    //Indicates the vector length.
+    SREG_VLEN = 0xC22,
+
+    //These two special registers belong to the TRF register and use temporary
+    //values as replacements.
+    //Specifically, the TRF register with value 31 represents exception status,
+    //and the TRF register with value 0 register represents the parameter
+    //address.
+    SREG_EXCEPTION = 0xFFE,
+    SREG_PARAM_ADDR = 0xFFF,
+
+    SREG_NUM,
+} SREG_INDEX;
 
 typedef enum _BUILTIN_TYPE {
     BUILTIN_UNDEF = 0,
@@ -602,4 +757,121 @@ typedef enum _OR_CODE {
 #define OR_NUM OR_LAST
 
 #include "arm_mach_def.h"
+
+#define SREG_TID_STR "tid"
+#define SREG_GID_STR "gid"
+#define SREG_CLOCK_STR "clock"
+#define SREG_NTHREAD_STR "nthread"
+#define SREG_COL_SIZE_STR "col_size"
+#define SREG_ROW_SIZE_STR "row_size"
+#define SREG_NGROUP_STR "ngroup"
+#define SREG_ALIGN_MEM_STR "memory_align"
+#define SREG_ALIGN_MATRIX_STR "matrix_align"
+#define SREG_RTN_ADDR_STR "rtn_addr"
+#define SREG_FRAME_ADDR_STR "frame_addr"
+#define SREG_VAARG_STR "vaarg"
+#define SREG_VLEN_STR "vlen"
+
+typedef enum _EXTERNAL_CALL_TYPE {
+    EXTERNAL_CALL_UNDEF = 0,
+    EXTERNAL_ABS,
+    EXTERNAL_LABS,
+    EXTERNAL_FABSF,
+    EXTERNAL_FABS,
+    EXTERNAL_FMAX,
+    EXTERNAL_FMIN,
+    EXTERNAL_MEMCPY,
+    EXTERNAL_MATMUL_ZYX,
+    EXTERNAL_DIVW,
+    EXTERNAL_DIVWU,
+    EXTERNAL_DIVL,
+    EXTERNAL_DIVLU,
+    EXTERNAL_REMW,
+    EXTERNAL_REMWU,
+    EXTERNAL_REML,
+    EXTERNAL_REMLU,
+    EXTERNAL_SIN,
+    EXTERNAL_SINF,
+    EXTERNAL_COS,
+    EXTERNAL_COSF,
+    EXTERNAL_POW,
+    EXTERNAL_POWF,
+    EXTERNAL_TAN,
+    EXTERNAL_TANF,
+    EXTERNAL_TANH,
+    EXTERNAL_TANHF,
+    EXTERNAL_ATAN,
+    EXTERNAL_ATANF,
+    EXTERNAL_LOG,
+    EXTERNAL_LOGF,
+    EXTERNAL_LOG2,
+    EXTERNAL_EXP,
+    EXTERNAL_EXPF,
+    EXTERNAL_EXP2,
+    EXTERNAL_ERF,
+    EXTERNAL_ERFF,
+    EXTERNAL_SIGMOID,
+    EXTERNAL_SIGMOIDF,
+    EXTERNAL_VTANH,
+    EXTERNAL_VTANH128,
+    EXTERNAL_VATAN,
+    EXTERNAL_VATAN128,
+    EXTERNAL_VLOG,
+    EXTERNAL_VLOG128,
+    EXTERNAL_VEXP,
+    EXTERNAL_VEXP128,
+    EXTERNAL_VERF,
+    EXTERNAL_VERF128,
+    EXTERNAL_VSIGMOID,
+    EXTERNAL_VSIGMOID128,
+    EXTERNAL_VSQRT,
+    EXTERNAL_VSQRT128,
+    EXTERNAL_VINV,
+    EXTERNAL_MALLOC,
+    EXTERNAL_FREE,
+    EXTERNAL_PERF_START,
+    EXTERNAL_PERF_STOP,
+    EXTERNAL_MALLOC_T2,
+    EXTERNAL_FREE_T2,
+    EXTERNAL_LOG_T2,
+    EXTERNAL_LOGF_T2,
+    EXTERNAL_EXP_T2,
+    EXTERNAL_EXPF_T2,
+    EXTERNAL_SIGMOID_T2,
+    EXTERNAL_SIGMOIDF_T2,
+    EXTERNAL_ATAN_T2,
+    EXTERNAL_ATANF_T2,
+    EXTERNAL_ERF_T2,
+    EXTERNAL_ERFF_T2,
+    EXTERNAL_MEMCPY_T2,
+    EXTERNAL_COS_T2,
+    EXTERNAL_COSF_T2,
+    EXTERNAL_SIN_T2,
+    EXTERNAL_SINF_T2,
+    EXTERNAL_TAN_T2,
+    EXTERNAL_TANF_T2,
+    //EXTERNAL_POW_T2,
+    //EXTERNAL_POWF_T2,
+} EXTERNAL_CALL_TYPE;
+
+//These macros represent various bit size
+//that are used during processing bit width.
+#define VALID_BIT_SIZE_11 11
+#define VALID_BIT_SIZE_12 12
+#define VALID_BIT_SIZE_15 15
+#define VALID_BIT_SIZE_16 16
+
+//These macros represent various valid number
+//that are used during processing bit width.
+#define VALID_NUM_1 1
+#define VALID_NUM_2 2
+#define VALID_NUM_3 3
+#define SHAMT_5     5
+#define SHAMT_6     6
+
+//T2 control and status register (CSR) address map
+#define T2_CSR_ADDR_FFLAGS  0x1 //Floating-point accrued exceptions.
+#define T2_CSR_ADDR_FRM     0x2 //Floating-point dynamic rounding mode.
+#define T2_CSR_ADDR_FCSR    0x3 //fflags (0x1) + frm (0x2).
+
 #endif

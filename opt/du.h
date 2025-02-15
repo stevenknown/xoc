@@ -40,7 +40,7 @@ class MD;
 class MDSet;
 class DUMgr;
 
-typedef SEGIter * DUSetIter;
+typedef DefSEGIter * DUSetIter;
 
 class DUSet : public DefSBitSetCore {
     COPY_CONSTRUCTOR(DUSet);

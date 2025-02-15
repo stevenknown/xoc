@@ -29,6 +29,62 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+//
+//START RPOVexList
+//
+bool RPOVexList::isEqual(RPOVexList const& src) const
+{
+    if (get_elem_count() != src.get_elem_count()) { return false; }
+    RPOVexListIter srcit;
+    Vertex const* srcv = src.get_head(&srcit);
+    RPOVexListIter it;
+    Vertex const* v = get_head(&it);
+    for (; v != nullptr && srcv != nullptr;
+         v = get_next(&it), srcv = get_next(&srcit)) {
+        if (v != srcv) {
+            return false;
+        }
+    }
+    return v == srcv;
+}
+//END RPOVexList
+
+
+class VertexQuickSort : public QuickSort<Vertex const*> {
+protected:
+    virtual Vertex const* _max(Vertex const* a, Vertex const* b) const
+    { return a->rpo() > b->rpo() ? a : b; }
+
+    virtual Vertex const* _min(Vertex const* a, Vertex const* b) const
+    { return a->rpo() < b->rpo() ? a : b; }
+
+    virtual bool GreatThan(Vertex const* a, Vertex const* b) const
+    { return a->rpo() > b->rpo(); }
+
+    virtual bool LessThan(Vertex const* a, Vertex const* b) const
+    { return a->rpo() < b->rpo(); }
+};
+
+void RPOMgr::collectRPOVexList(Graph const& g, OUT RPOVexList & vlst)
+{
+    Vector<Vertex const*> vec(g.getVertexNum());
+    VertexIter it;
+    for (Vertex const* v = g.get_first_vertex(it);
+         v != nullptr; v = g.get_next_vertex(it)) {
+        ASSERT0(v->rpo() != RPO_UNDEF);
+        vec.append(v);
+    }
+    VertexQuickSort qs;
+    qs.sort(vec);
+    vlst.clean();
+    for (VecIdx i = 0; i < (VecIdx)vec.get_elem_count(); i++) {
+        Vertex const* v = vec.get(i);
+        ASSERT0(v);
+        vlst.append_tail(v);
+    }
+}
+
+
 //Sort vertice by RPO order, and update rpo of vertex.
 //Record sorted vertex into vlst in incremental order of RPO.
 //NOTE: rpo start at RPO_INIT_VAL.
@@ -135,24 +191,38 @@ bool RPOMgr::tryFindLessRPO(Vertex * v, Vertex const* ref)
 }
 
 
-static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
-                                      Vertex const* marker,
-                                      RPOMgr * rpomgr)
+//Note newvex should be the previous vertex to marker.
+static RPOVal compRPOIfVexPriorMarker(
+    Vertex const* newvex, Vertex const* marker, RPOMgr * rpomgr)
 {
     ASSERT0(newvex && marker && marker->rpo() != RPO_UNDEF);
-    //newvex is prior to marker.
+    //'newvex' is prior to 'marker'.
     //Collect the maxmimum RPO of predecessors of marker.
     RPOVal maxpredrpo = MIN_HOST_INT_VALUE;
     xcom::AdjVertexIter it;
     for (xcom::Vertex const* pred = Graph::get_first_in_vertex(marker, it);
          pred != nullptr; pred = Graph::get_next_in_vertex(it)) {
         if (pred->id() == marker->id()) { continue; }
-        if (pred->id() == newvex->id()) { continue; }
+        if (pred->id() == newvex->id()) {
+            //CAUTION: If newvex has already be predecessor of marker, that
+            //means user is going to compute RPO after graph has been changed.
+            //Thus the function may be unable to find a correct RPO for
+            //'newvex'.
+            return RPO_UNDEF;
+        }
         if (pred->rpo() == RPO_UNDEF) {
             //Exist invalid rpo, recompute them first.
             return RPO_UNDEF;
         }
-        if (pred->rpo() >= marker->rpo()) { continue; }
+        if (pred->rpo() >= marker->rpo()) {
+            //Do NOT ignore the backward predecessor vertex.
+            //TBD: Should we ignore the backward vertex to participate in the
+            //computation of maxpredrpo?
+            //If newvex is acutally lexicograical after marker, such as the
+            //from-vertex in backedge of a natural loop, we can not infer
+            //an usable RPO for 'newvex' easily.
+            //continue;
+        }
         maxpredrpo = MAX(pred->rpo(), maxpredrpo);
     }
     RPOVal rpo = RPO_UNDEF;
@@ -170,13 +240,13 @@ static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
         //Can not find usable RPO.
         //CASE:compile.gr/guard.gr
         // newvex is V14, marker is V2
-        // VEX13 rpo:19
+        // V13 rpo:19
         //  |
-        //  v v．．．．．．．．．．
-        // VEX2 rpo:20    |
-        //  |             |
-        //  v             |
-        // VEX4 rpo:30----
+        //  v v````````
+        // V2 rpo:20   |
+        //  |          |
+        //  v          |
+        // V4 rpo:30---
         return RPO_UNDEF;
     }
     rpo = rpomgr->tryFindUsableRPO(begin, end);
@@ -185,6 +255,7 @@ static RPOVal compRPOIfVexPriorMarker(Vertex const* newvex,
 }
 
 
+//Note newvex should be the next vertex to marker.
 static RPOVal compRPOIfMarkerPriorVex(
     Vertex const* newvex, Vertex const* marker, RPOMgr * rpomgr)
 {
@@ -196,12 +267,27 @@ static RPOVal compRPOIfMarkerPriorVex(
     for (xcom::Vertex const* succ = Graph::get_first_out_vertex(marker, it);
          succ != nullptr; succ = Graph::get_next_out_vertex(it)) {
         if (succ->id() != marker->id()) {
-            if (succ->id() == newvex->id()) { continue; }
+            if (succ->id() == newvex->id()) {
+                //CAUTION: If newvex has already be successor of marker, that
+                //means user is going to compute RPO after graph has been
+                //changed.
+                //Thus the function may be unable to find a correct RPO for
+                //'newvex'.
+                return RPO_UNDEF;
+            }
             if (succ->rpo() == RPO_UNDEF) {
                 //Exist invalid rpo, recompute them first.
                 return RPO_UNDEF;
             }
-            if (succ->rpo() <= marker->rpo()) { continue; }
+            if (succ->rpo() <= marker->rpo()) {
+                //Do NOT ignore the backward predecessor vertex.
+                //TBD: Should we ignore the backward vertex to participate
+                //in the computation of minpredrpo?
+                //If newvex is acutally lexicograical before marker, such as
+                //the from-vertex in backedge of a natural loop, we can not
+                //infer an usable RPO for 'newvex' easily.
+                //continue;
+            }
             minsuccrpo = MIN(succ->rpo(), minsuccrpo);
         }
     }
@@ -216,20 +302,114 @@ static RPOVal compRPOIfMarkerPriorVex(
     RPOVal end = minsuccrpo == MAX_HOST_INT_VALUE ?
         RPOMgr::computeNearestLessUnUsableRPO(marker->rpo()) + RPO_INTERVAL :
         minsuccrpo - 1;
-    if (begin > end) { return RPO_UNDEF; }
+    if (begin > end) {
+        //Can not find usable RPO.
+        //CASE:compile.gr/guard.gr
+        // newvex is V14, marker is V2
+        // V13 rpo:19
+        //  |
+        //  v v````````
+        // V2 rpo:20   |
+        //  |          |
+        //  v          |
+        // V4 rpo:30---
+        return RPO_UNDEF;
+    }
     rpo = rpomgr->tryFindUsableRPO(begin, end);
     #endif
     return rpo;
 }
 
 
-//Try to update RPO of newvex according to RPO of marker.
-//newvex_prior_marker: true if newvex's lexicographical order is prior
-//to marker.
-//Return true if this function find a properly RPO for 'newvex', otherwise
-//return false.
+static void prtIndent(FILE * h, UINT indent)
+{
+    ASSERT0(h);
+    for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
+}
+
+
+//Ensure the RPO in CFG conforms to the expected RPO result.
+//Collect RPO from current CFG into a orgrpovexlst.
+bool RPOMgr::verifyRPOVexList(Graph const& g, Vertex const* root,
+                              RPOVexList const& vlst)
+{
+    //CASE:alias.loop.c
+    //The RPO is strongly dependent on the visiting-order of kids of
+    //each vertex.
+    //e.g:in given example, g is:
+    //        _______
+    //       |       v
+    //  v12->v1->v7->v6
+    //            ^__|
+    //v7 can be previous_vex of v6, vice-verse, v6 can be previous_vex of
+    //v7 too. It depends on which kids of v1 is visited first.
+    //However the verify method can not enumerate all possible cases.
+    //Thus we would not use the method to verify RPOVexList in usual.
+    return true;
+
+    //Collect RPO from current CFG into a orgrpovexlst.
+    RPOVexList tvlst;
+    Graph tg;
+    tg.clone(g, false, false);
+    Vertex * troot = tg.getVertex(root->id());
+    ASSERT0(troot);
+    RPOMgr mgr;
+    mgr.computeRPO(tg, troot, tvlst);
+    ASSERT0(vlst.get_elem_count() == tvlst.get_elem_count());
+    TMap<VexIdx, DefSBitSet*> v2bs;
+    DefMiscBitSetMgr bsmgr;
+    BitSet previous_vex;
+    RPOVexListIter rpovit;
+    for (Vertex const* tv = tvlst.get_head(&rpovit);
+         tv != nullptr; tv = tvlst.get_next(&rpovit)) {
+        DefSBitSet * pbs = v2bs.get(tv->id());
+        if (pbs == nullptr) {
+            pbs = bsmgr.allocSBitSet();
+            v2bs.set(tv->id(), pbs);
+        }
+        AdjVertexIter ait;
+        for (Vertex const* in = tg.get_first_in_vertex(tv, ait);
+             in != nullptr; in = tg.get_next_in_vertex(ait)) {
+            if (!previous_vex.is_contain((BSIdx)in->id())) {
+                continue;
+            }
+            //Only collect the predecessors that placed previous to 'tv'.
+            pbs->bunion(in->id());
+        }
+        previous_vex.bunion(tv->id());
+    }
+    previous_vex.clean();
+    for (Vertex const* v = vlst.get_head(&rpovit);
+         v != nullptr; v = vlst.get_next(&rpovit)) {
+        DefSBitSet const* pbs = v2bs.get(v->id());
+        ASSERT0(pbs);
+        DefSBitSetIter it;
+        for (BSIdx i = pbs->get_first(&it);
+             i != BS_UNDEF; i = pbs->get_next(i, &it)) {
+            ASSERT0(previous_vex.is_contain(i));
+        }
+        previous_vex.bunion(v->id());
+    }
+    return true;
+}
+
+
+void RPOMgr::dumpRPOVexList(FILE * h, RPOVexList const& vlst, UINT indent)
+{
+    ASSERT0(h);
+    RPOVexListIter it;
+    for (xcom::Vertex const* v = vlst.get_head(&it);
+         v != nullptr; v = vlst.get_next(&it)) {
+        fprintf(h, "\n");
+        prtIndent(h, indent);
+        fprintf(h, "v%u(rpo:%d)", v->id(), v->rpo());
+    }
+    fflush(h);
+}
+
+
 bool RPOMgr::tryUpdateRPO(MOD Vertex * newvex, Vertex const* marker,
-                          bool newvex_prior_marker)
+                          MOD RPOVexList * rpovexlst, bool newvex_prior_marker)
 {
     ASSERT0(newvex != marker);
     ASSERT0(newvex->rpo() == RPO_UNDEF && marker->rpo() != RPO_UNDEF);
@@ -245,6 +425,14 @@ bool RPOMgr::tryUpdateRPO(MOD Vertex * newvex, Vertex const* marker,
         return false;
     }
     VERTEX_rpo(newvex) = rpo;
+    if (rpovexlst == nullptr) { return true; }
+
+    //Meanwhile update vertex list that ordered in RPO.
+    if (newvex_prior_marker) {
+        rpovexlst->insert_before(newvex, marker);
+    } else {
+        rpovexlst->insert_after(newvex, marker);
+    }
     return true;
 }
 

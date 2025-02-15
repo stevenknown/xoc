@@ -347,23 +347,32 @@ template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::dump(FILE * h) const
 {
     ASSERT0(h);
+    StrBuf buf(128);
+    dump(buf);
+    fprintf(h, "%s", buf.getBuf());
+    fflush(h);
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::dump(OUT StrBuf & buf) const
+{
     for (TSEGIter * st = segs.get_head();
          st != segs.end(); st = segs.get_next(st)) {
         SEG<BitsPerSeg> * s = st->val();
         ASSERT0(s);
 
-        fprintf(h, " [");
+        buf.strcat(" [");
         BSIdx n;
         for (BSIdx i = s->bs.get_first(); i != BS_UNDEF; i = n) {
             n = s->bs.get_next(i);
-            fprintf(h, "%u", i + s->get_start());
+            buf.strcat("%u", i + s->get_start());
             if (n != BS_UNDEF) {
-                fprintf(h, ",");
+                buf.strcat(",");
             }
         }
-        fprintf(h, "]");
+        buf.strcat("]");
     }
-    fflush(h);
 }
 
 

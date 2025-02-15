@@ -121,6 +121,20 @@ static void dumpMovedIRExecOnce(IR const* ir, IRBB const* from,
 
 
 //
+//START HoistCtx
+//
+HoistCtx::HoistCtx(OptCtx * t, DomTree * dt, IRCFG * g) :
+    inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
+    stmt_changed(false), domtree(dt), oc(t), cfg(g)
+{
+    ASSERT0(oc->getRegion());
+    prssamgr = oc->getRegion()->getPRSSAMgr();
+    mdssamgr = oc->getRegion()->getMDSSAMgr();
+}
+//END HoistCtx
+
+
+//
 //START MoveStmtBetweenBB
 //
 class MoveStmtBetweenBB {
@@ -362,7 +376,7 @@ void LICMAnaCtx::dump() const
     note(rg, "\n-- DUMP LICM Analysis Result:LOOP%u:'%s' --",
          li->id(), rg->getRegionName());
     rg->getLogMgr()->incIndent(2);
-    rg->getCFG()->dumpLoopInfo(rg);
+    rg->getCFG()->dumpLoopInfo();
 
     note(rg, "\n");
     if (getInvExpTab().get_elem_count() > 0) {
@@ -462,6 +476,11 @@ private:
     //the judgement stmt in loophead BB.
     //e.g:Return true for while-do loop, and false for do-while loop.
     bool isLoopExecConditional() const;
+
+    //The function will remove the MDPhi that inserted by
+    //insertPreheader().
+    //NOTE: The preheader can only contain Phi at most.
+    void removeInsertedMDPhi();
 
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
@@ -594,6 +613,19 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
 }
 
 
+//The function will remove the MDPhi that inserted by
+//insertPreheader().
+//NOTE: The preheader can only contain Phi at most.
+void InsertPreheaderMgr::removeInsertedMDPhi()
+{
+    if (m_preheader == nullptr) { return; }
+    MDPhiList const* philist = m_mdssamgr->getPhiList(m_preheader);
+    if (philist == nullptr) { return; }
+    MDSSAUpdateCtx ctx(*m_oc);
+    m_mdssamgr->removePhiList(m_preheader, ctx);
+}
+
+
 void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
 {
     if (m_gdhelp.hasInsertedGuard()) {
@@ -610,7 +642,17 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
         ASSERT0(ctx.verifyDomTree());
         return;
     }
-    if (m_preheader != nullptr) {
+    if (m_preheader != nullptr && m_cfg->isEmptyBB(m_preheader)) {
+        ASSERT0(m_preheader->getNumOfIR() == 0);
+
+        //CASE:compiler/licm_undo2.c
+        //Do NOT remove the inserted MDPhi here because the Phi might describe
+        //a merge operation of multiple DEFs, and it is getting a little
+        //complicated to undo the merge operation, moreover leaving the PHI
+        //and the empty preheader BB will not much affect the subsequent
+        //optimizations.
+        //removeInsertedMDPhi();
+
         //Update DomTree before BB structure removed, because its id is freed.
         ctx.domtree->remove(m_preheader->id());
 
@@ -622,8 +664,8 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
         ASSERT0_DUMMYUSE(res);
 
         //removeEmptyBB only maintained these frequently used CFG info.
-        OptCtx::setInvalidIfCFGChangedExcept(m_oc, PASS_RPO, PASS_DOM,
-                                             PASS_LOOP_INFO, PASS_UNDEF);
+        OptCtx::setInvalidIfCFGChangedExcept(
+            m_oc, PASS_RPO, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
     }
     ASSERT0(ctx.verifyDomTree());
     ctx.cleanAfterLoop();
@@ -1006,10 +1048,10 @@ bool LICM::chooseCallStmt(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
     //Hoisting CALL out of loop should generate a guard as well to
     //guarantee CALL will not be exectued if the loop
     //will never execute.
-    bool all_param_invariant = true;
-    bool find = chooseExpList(CALL_param_list(ir), all_param_invariant,
+    bool all_arg_invariant = true;
+    bool find = chooseExpList(CALL_arg_list(ir), all_arg_invariant,
                               irit, anactx);
-    if (!all_param_invariant || !ir->isReadOnly()) {
+    if (!all_arg_invariant || !ir->isReadOnly()) {
         //stmt can NOT be loop invariant because some exp is not invariant.
         return find;
     }
@@ -1522,7 +1564,7 @@ bool LICM::scanInDirectStmt(IR * stmt, OUT LICMAnaCtx & anactx)
 
 bool LICM::scanCallStmt(IR * stmt, OUT LICMAnaCtx & anactx)
 {
-    ASSERT0(canBeRegardAsInvExpList(CALL_param_list(stmt), anactx));
+    ASSERT0(canBeRegardAsInvExpList(CALL_arg_list(stmt), anactx));
     if (anactx.isInvStmt(stmt)) { return false; }
     if ((!stmt->hasReturnValue() || anactx.isUniqueDef(stmt)) &&
         stmt->isReadOnly()) {
@@ -1668,11 +1710,12 @@ bool LICM::hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
 bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
                            OUT IRBB * prehead, MOD HoistCtx & ctx)
 {
-    MDSSAInfo * info = m_mdssamgr->getMDSSAInfoIfAny(exp);
+    ASSERT0(ctx.useMDSSADU());
+    MDSSAInfo * info = ctx.mdssamgr->getMDSSAInfoIfAny(exp);
     ASSERTN(info, ("def stmt even not in MDSSA system"));
     VOpndSetIter it = nullptr;
     VOpndSet const& vopndset = info->readVOpndSet();
-    UseDefMgr const* udmgr = m_mdssamgr->getUseDefMgr();
+    UseDefMgr const* udmgr = ctx.mdssamgr->getUseDefMgr();
     BSIdx nexti;
     for (BSIdx i = vopndset.get_first(&it); i != BS_UNDEF; i = nexti) {
         nexti = vopndset.get_next(i, &it);
@@ -1703,7 +1746,7 @@ bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
             //relation between 'exp' and other potential STMT.
             //However, even if 'exp' can not be hoisted because of DU, its kid
             //expressions have the opportunity to hoist.
-            if (m_mdssamgr->isOverConservativeDUChain(def, exp)) {
+            if (ctx.mdssamgr->isOverConservativeDUChain(def, exp)) {
                 continue;
             }
             return false;
@@ -1732,10 +1775,10 @@ bool LICM::hoistDefByDUChain(LICMAnaCtx const& anactx, IR const* exp,
 {
     ASSERT0(exp->is_exp());
     if (!exp->isMemOpnd()) { return true; }
-    if (exp->isPROp() && usePRSSADU()) {
+    if (exp->isPROp() && ctx.usePRSSADU()) {
         return hoistDefByPRSSA(anactx, exp, prehead, ctx);
     }
-    if (exp->isMemRefNonPR() && useMDSSADU()) {
+    if (exp->isMemRefNonPR() && ctx.useMDSSADU()) {
         return hoistDefByMDSSA(anactx, exp, prehead, ctx);
     }
     if (ctx.oc->is_pr_du_chain_valid() || ctx.oc->is_nonpr_du_chain_valid()) {
@@ -1799,9 +1842,9 @@ bool LICM::tryHoistDependentStmt(
             return false;
         }
     }
-    if (!useMDSSADU()) { return true; }
+    if (!ctx.useMDSSADU()) { return true; }
     bool cross_nonphi_def = false;
-    m_mdssamgr->isCrossLoopHeadPhi(stmt, anactx.getLI(), cross_nonphi_def);
+    ctx.mdssamgr->isCrossLoopHeadPhi(stmt, anactx.getLI(), cross_nonphi_def);
     if (cross_nonphi_def) {
         //Illegal hoisting that violate prev-def.
         return false;
@@ -1818,28 +1861,30 @@ bool LICM::tryHoistDependentStmt(
 
 void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx)
 {
-    if (!useMDSSADU()) { return; }
+    if (!ctx.useMDSSADU()) { return; }
     ASSERT0(ctx.oc->is_dom_valid());
     if (MDSSAMgr::hasMDSSAInfo(stmt)) {
         //Firstly, right after stmt has been moved, update the stmt's MDSSAInfo
         //which include DefDef chain and DefUse chain.
         RecomputeDefDefAndDefUseChain recomp(
-            *ctx.domtree, m_mdssamgr, *ctx.oc, &getActMgr());
+            *ctx.domtree, ctx.mdssamgr, *ctx.oc, &getActMgr());
         recomp.recompute(stmt);
     }
     //Sencondly, update the DefUse chain of each expressions of stmt.
-    //Note the updation will be looking for the correct DEF for each exp of
+    //Note the update will be looking for the correct DEF for each exp of
     //stmt. And the looking process should start from the previous IR of
     //'stmt'.
     IR * startir = stmt->getBB()->getPrevIR(stmt);
     //If startir is NULL, that means 'stmt' is the first IR of BB.
     IRIter it;
+    MDSSAStatus st;
     for (IR * x = xoc::iterExpInit(stmt, it);
          x != nullptr; x = xoc::iterExpNext(it, true)) {
         if (!MDSSAMgr::hasMDSSAInfo(x)) { continue; }
-        m_mdssamgr->findAndSetLiveInDef(
-            x, startir, stmt->getBB(), *ctx.oc);
+        ctx.mdssamgr->findAndSetLiveInDef(
+            x, startir, stmt->getBB(), *ctx.oc, st);
     }
+    ASSERT0(st.is_succ());
 }
 
 
@@ -2239,24 +2284,22 @@ bool LICM::dump() const
 }
 
 
-void LICM::postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc)
+void LICM::postProcessIfChanged(HoistCtx const& ctx, OptCtx & oc)
 {
-    if (hoistctx.cfg_changed) {
-        //CASE:compile/rp13.c, can not update RPO for some new BB.
-        //ASSERT0(oc.is_rpo_valid());
-        ASSERT0(m_cfg->verifyRPO(oc));
-
+    //CASE:compile/rp13.c, can not update RPO for some new BB.
+    //ASSERT0(oc.is_rpo_valid());
+    ASSERT0(m_cfg->verifyRPO(oc));
+    if (ctx.cfg_changed) {
         //For conservative purpose, we hope to recompute RPO BB list
         //when it is needed.
-        m_cfg->freeRPOVexList();
+        m_cfg->cleanRPOVexList();
 
         //LOOP, DOM are maintained, but CDG is not.
         ASSERT0(oc.is_dom_valid());
     }
-    ASSERT0(m_cfg->verifyRPO(oc));
     ASSERT0(m_cfg->verifyLoopInfo(oc));
     oc.setInvalidPass(PASS_EXPR_TAB);
-    if (hoistctx.duset_changed) {
+    if (ctx.duset_changed) {
         oc.setInvalidPass(PASS_LIVE_EXPR);
         oc.setInvalidPass(PASS_AVAIL_REACH_DEF);
         oc.setInvalidPass(PASS_REACH_DEF);
@@ -2273,8 +2316,8 @@ void LICM::postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc)
     ASSERT0(verifyMDDUChain(m_rg, oc));
     ASSERT0(m_cfg->verifyRPO(oc));
     ASSERT0(m_cfg->verifyDomAndPdom(oc));
-    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0(!ctx.usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0(!ctx.useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
 }
 
 
@@ -2297,17 +2340,15 @@ void LICM::postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc)
 }
 
 
-bool LICM::initSSAMgr(OptCtx const& oc)
+bool LICM::initSSAMgr(HoistCtx const& ctx)
 {
-    m_mdssamgr = m_rg->getMDSSAMgr();
-    m_prssamgr = m_rg->getPRSSAMgr();
-    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
+    if (!ctx.oc->is_pr_du_chain_valid() && !ctx.usePRSSADU()) {
         //The pass use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         set_valid(false);
         return false;
     }
-    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
+    if (!ctx.oc->is_nonpr_du_chain_valid() && !ctx.useMDSSADU()) {
         //The pass use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         set_valid(false);
@@ -2317,8 +2358,9 @@ bool LICM::initSSAMgr(OptCtx const& oc)
 }
 
 
-bool LICM::initDepPass(MOD OptCtx & oc)
+bool LICM::initDepPass(MOD HoistCtx & ctx)
 {
+    if (!initSSAMgr(ctx)) { return false; }
     PassTypeList optlist;
     optlist.append_tail(PASS_DOM);
     optlist.append_tail(PASS_LOOP_INFO);
@@ -2326,12 +2368,12 @@ bool LICM::initDepPass(MOD OptCtx & oc)
         if (g_do_gvn) { optlist.append_tail(PASS_GVN); }
         if (g_do_rce) { optlist.append_tail(PASS_DOM); }
     }
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, optlist);
+    m_rg->getPassMgr()->checkValidAndRecompute(ctx.oc, optlist);
     m_rce = (RCE*)m_rg->getPassMgr()->queryPass(PASS_RCE);
     if (m_rce != nullptr && m_rce->is_use_gvn()) {
         GVN * gvn = (GVN*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (!gvn->is_valid()) {
-            gvn->perform(oc);
+            gvn->perform(*ctx.oc);
         }
     }
     return true;
@@ -2346,12 +2388,11 @@ bool LICM::perform(OptCtx & oc)
     }
     if (!oc.is_ref_valid()) { return false; }
     START_TIMER(t, getPassName());
-    if (!initSSAMgr(oc)) { return false; }
-    if (!initDepPass(oc)) { return false; }
     //DumpBufferSwitch buff(m_rg->getLogMgr());
     //if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     xcom::DomTree domtree;
     HoistCtx ctx(&oc, &domtree, m_cfg);
+    if (!initDepPass(ctx)) { END_TIMER(t, getPassName()); return false; }
     ctx.buildDomTree(m_cfg);
     bool change = doLoopTree(m_cfg->getLoopInfo(), ctx);
     postProcess(ctx, change, oc);

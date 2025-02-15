@@ -33,3 +33,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "elf_mgr.h"
 #include "misc_elf_mgr.h"
 #include "../opt/dwarf.h"
+
+using namespace elf;

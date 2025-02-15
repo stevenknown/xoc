@@ -27,7 +27,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 //Represents a virtual store to PR.
-IR_VSTPR = IR_LAST_UNDERLYING_CODE + 1,
+IR_VSTPR = IR_LAST_COMMON_CODE + 1,
 
 //Represents a virtual store to Var.
 IR_VST,
@@ -37,6 +37,12 @@ IR_VIST,
 
 //Represent broadcast operation.
 IR_BROADCAST,
+
+//Represent atomic inc operation of fetch and add on memory.
+IR_ATOMINC,
+
+//Represent atomic cas operation of compare and swap on memory.
+IR_ATOMCAS,
 
 //Placeholder IR code for corresponding SWITCH-CASE entry.
 IR_EXT_UNA_PLACEHOLDER,

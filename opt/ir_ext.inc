@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //The file defines extended APIs and interfaces to access IR's miscellaneous
 //attributes and operands.
+bool is_atomcas() const { return getCode() == IR_ATOMCAS; }
+bool is_atominc() const { return getCode() == IR_ATOMINC; }
 bool is_vst() const { return getCode() == IR_VST; }
 bool is_vstpr() const { return getCode() == IR_VSTPR; }
 bool is_vist() const { return getCode() == IR_VIST; }

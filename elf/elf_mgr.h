@@ -62,23 +62,16 @@ class FunctionInfo;
 #define SYMTAB_SH_NAME          ".symtab"
 #define TEXT_SH_NAME            ".text"
 
-//For program header.
-#define PHDR_CODE_ALIGN         0x10000
-#define PHDR_DATA_ALIGN         0x10000
-#define PHDR_DYNAMIC_ALIGN      0x8
-#define PHDR_NUMBER             3
-
 //For section header.
-#define SHDR_OFFSET_ALIGN       0x10000
-#define SHDR_VIRTUAL_ADDR_ALIGN 0x10000
 #define SHDR_DYNAMIC_ALIGN      0x8
 #define SHDR_GOT_ALIGN          0x10
-#define SHDR_ALIGN_1B           1
 #define SHDR_TEXT_CODE_ALIGN    1
 #define SHDR_SYM_BYTE           24
 #define SHDR_SYM_ALIGN          8
-#define SHDR_1B_ALIGN           1
-#define SHDR_8B_ALIGN           8
+
+#define ELF_ALIGN_1B            1
+#define ELF_ALIGN_8B            8
+#define ELF_ALIGN_16B           16
 
 //Common used zero.
 #define ELF_VAL_UNDEF           0
@@ -143,8 +136,22 @@ class FunctionInfo;
 //The item number of STR in .dynamic section.
 #define ELF_STR_ITEM_NUM_IN_ELFDYN        2
 
+//The item number of PLT in .dynamic section.
+#define ELF_PLT_ITEM_NUM_IN_ELFDYN        4
+
 //The size of blank symbols in the symbol table.
 #define ELF_NULL_SYMBOL_SIZE              1
+
+//The first element size of .got section which be used for
+//set .dynamic section address.
+#define ELF_FIRST_ELEMENT_SIZE_OF_GOT_SECT 8
+
+//The first element of .got section is used to store the
+//begin address of .dynamic section.
+#define ELF_BEGIN_INDEX_OF_GOT_ITEM        1
+
+//The begin offset of relaplt item in .got section.
+#define ELF_OFFSET_OF_RELA_PLT_IN_GOT_SECT 16
 
 #define DEBUG_ABBREV_SH_NAME       ".debug_abbrev"
 #define DEBUG_INFO_SH_NAME         ".debug_info"
@@ -277,7 +284,11 @@ typedef enum _SECTION_TYPE {
     SH_TYPE_DEBUG_FRAME,
     SH_TYPE_RELA_DEBUG_FRAME,
     SH_TYPE_DEBUG_LOC,
+    SH_TYPE_RELA_DEBUG_LOC,
     SH_TYPE_EH_FRAME,
+    SH_TYPE_PLT,
+    SH_TYPE_RELA_PLT,
+    SH_TYPE_SRODATA,
 
     #include "sect_type_ext.inc"
 
@@ -355,7 +366,8 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_RELA_DEBUG_INFO:              \
     case SH_TYPE_RELA_DEBUG_LINE:              \
     case SH_TYPE_RELA_DEBUG_FRAME:             \
-    case SH_TYPE_RELA_DEBUG_RANGES
+    case SH_TYPE_RELA_DEBUG_RANGES:            \
+    case SH_TYPE_RELA_DEBUG_LOC                \
 
 
 #define SWITCH_CASE_COMMON_SECT_OFST \
@@ -387,14 +399,18 @@ typedef enum _SECTION_TYPE {
     case SH_TYPE_RELA_DEBUG_FRAME:  \
     case SH_TYPE_RELA_DEBUG_LINE:   \
     case SH_TYPE_RELA_DEBUG_RANGES: \
-    case SH_TYPE_RELA_DEBUG_INFO
-
+    case SH_TYPE_RELA_DEBUG_INFO:   \
+    case SH_TYPE_RELA_DEBUG_LOC     \
 
 typedef enum _PROGRAM_HEADER {
     PH_TYPE_UNDEF = 0,
     PH_TYPE_CODE,
     PH_TYPE_DATA,
     PH_TYPE_DYNAMIC,
+    PH_TYPE_RELA_PLT,
+    PH_TYPE_RISCV_ATTR,
+    PH_TYPE_INTERP,
+    PH_TYPE_NUMBER,
 } PROGRAM_HEADER;
 
 
@@ -1044,6 +1060,7 @@ public:
 #define RELADYNINFO_is_got(v)     ((v)->m_is_got_item)
 #define RELADYNINFO_is_dynsym(v)  ((v)->m_is_dynsym_item)
 #define RELADYNINFO_reloc_info(v) ((v)->m_reloc_info)
+#define RELADYNINFO_got_ofst(v)   ((v)->m_got_ofst)
 #define RELADYNINFO_addend(v)     (RELOCINFO_addend(((v)->m_reloc_info)))
 #define RELADYNINFO_type(v)       (RELOCINFO_type((v)->m_reloc_info))
 #define RELADYNINFO_ofst(v)       (RELOCINFO_called_loc((v)->m_reloc_info))
@@ -1122,6 +1139,101 @@ public:
 };
 
 
+#define PLTINFO_addr(p)          ((p)->m_plt_addr)
+#define PLTINFO_reloc(p)         ((p)->m_plt_reloc_info)
+#define PLTINFO_is_local(p)      ((p)->m_plt_is_local)
+#define PLTINFO_got_ofst(p)      ((p)->m_plt_got_offset)
+#define PLTINFO_loc_ofst(p)      ((p)->m_plt_loc_offset)
+#define PLTINFO_is_plt_addr(p)   ((p)->m_plt_is_plt_addr)
+#define PLTINFO_is_first_elem(p) ((p)->m_plt_is_first_elem)
+//The class describes the info of both '.plt' and '.relaplt' section.
+class PltInfo {
+    COPY_CONSTRUCTOR(PltInfo);
+public:
+    //Whether it is the first element of '.plt' section. The first element
+    //in '.plt' section is the content of runtime resolved function.
+    bool m_plt_is_first_elem;
+
+    //Record the type of PltInfo. 'true' represents that this PltInfo doesn't
+    //need to be created corresponded plt element in '.plt' section.
+    bool m_plt_is_local;
+
+    //Whether 'm_plt_addr' record the address of PltInfo in '.plt' section.
+    //e.g.: '0x1d0' is the address of PltInfo.
+    //      00001d0 <func@plt>:
+    //       1d0: xxxx
+    //       1d4: xxxx
+    //       ...   ...
+    bool m_plt_is_plt_addr;
+
+    //Record target address that need to be refilled in PltInfo. This address
+    //is pointed to the item of '.got' section that recoreded the physical
+    //function address and will be refilled in runtime.
+    Off m_plt_loc_offset;
+
+    //Record the offset of PltInfo that need to be refilled in '.got' section.
+    //e.g.: '150' of 'Offset' is the offset of '.got' section.
+    //      Offset  Info          Type        Sym. Value   Sym.  Name + Addend
+    //       150   00020005  R_RISCV_JUMP_SLOT     00464     set_begin + 0
+    Off m_plt_got_offset;
+
+    //Record the address of PltInfo in '.plt' section.
+    //e.g.: '0x1d0' is the address of PltInfo.
+    //      00001d0 <func@plt>:
+    //       1d0: xxxx
+    //       1d4: xxxx
+    //       ...   ...
+    //Or record the offset of PltInfo in target section.
+    Addr m_plt_addr;
+
+    //Record the corresponded RelocInfo.
+    RelocInfo * m_plt_reloc_info;
+public:
+    PltInfo()
+    {
+        m_plt_is_first_elem = false;
+        m_plt_is_local = false;
+        m_plt_is_plt_addr = false;
+        m_plt_loc_offset = 0;
+        m_plt_got_offset = 0;
+        m_plt_addr = 0;
+        m_plt_reloc_info = nullptr;
+    }
+
+    ~PltInfo() {}
+};
+
+
+//The class manages PltInfo object resources. It creates PltInfo object
+//and uses xoc::List 'm_list' to record. These resources would be freed
+//when the destructor is called.
+class PltInfoMgr {
+    COPY_CONSTRUCTOR(PltInfoMgr);
+protected:
+    //Record PltInfo object.
+    xcom::List<PltInfo*> m_list;
+public:
+    PltInfoMgr() { m_list.init(); }
+
+    ~PltInfoMgr()
+    {
+        for (PltInfo * pi = m_list.get_head();
+             pi != nullptr; pi = m_list.get_next()) {
+            if (pi != nullptr) { delete pi; }
+        }
+        m_list.clean();
+    }
+
+    PltInfo * allocPltInfo()
+    {
+        PltInfo * pi = new PltInfo();
+        ASSERT0(pi);
+        m_list.append_tail(pi);
+        return pi;
+    }
+};
+
+
 //The class describes generated mapped of SymMap.
 class GenMappedOfSymMap {
     COPY_CONSTRUCTOR(GenMappedOfSymMap);
@@ -1194,7 +1306,6 @@ public:
     ~SectionInfoMap() {}
 };
 
-
 class ELFARMgr;
 
 //SymbolInfo.
@@ -1202,6 +1313,8 @@ typedef xcom::Vector<SymbolInfo*> SymbolInfoVec;
 typedef xcom::Vector<SymbolInfoVec*> SymtabInfoVec;
 typedef xcom::TMap<Sym const*, SymbolInfo*> SymbolInfoMap;
 typedef xcom::TMapIter<Sym const*, SymbolInfo*> SymbolInfoMapIter;
+//RelocInfo.
+typedef xcom::Vector<RelocInfo*> RelocInfoVec;
 //SectionInfoMap.
 typedef xcom::TMapIter<Sym const*, SectionInfo*> SectionInfoMapIter;
 //AliasSymbolMap.
@@ -1211,6 +1324,14 @@ typedef xcom::TMapIter<Sym const*, Sym const*> AliasSymbolMapIter;
 typedef xcom::TMap<Sym const*, SECTION_TYPE> SectionNameAndTypeMap;
 //Record the map of section and it's index in output ELF.
 typedef xcom::TMap<SECTION_TYPE, UINT> SectionIndexMap;
+//Program header vector.
+typedef xcom::Vector<ELFPHdr*> PhdrVec;
+//The map of PltInfo.
+typedef xcom::TMap<Sym const*, PltInfo*> PltInfoMap;
+//The vector of RelapltInfo.
+typedef xcom::Vector<RelaDynInfo*> RelaPltInfoVec;
+//The vector of PltInfo.
+typedef xcom::Vector<PltInfo*> PltInfoVec;
 //
 //Start ELFMgr.
 //
@@ -1497,6 +1618,9 @@ public:
     //Generate relocation entries for MCExpr of type SymbolRef.
     void genSymbolRefReloc(MCExpr const* value, SymbolInfo const* elf_sym_info,
                            MCFixup * fixup_entry, BYTEVec & debug_code);
+
+    //Generate phdr content according to 'm_phdr_vec' info.
+    void genPhdrContent();
 
     //Returns binary codes of given symbol.
     BYTEVec & getSymbolCode(Sym const* sym)
@@ -1828,6 +1952,9 @@ protected:
     //RelaDynInfo Mgr. Create and free ReladynInfo resources.
     RelaDynInfoMgr m_reladyn_mgr;
 
+    //PltInfo Mgr. Create and free PltInfo resources.
+    PltInfoMgr m_plt_info_mgr;
+
     //Record symbol offset in corresponded section.
     //e.g. ----------------------------------------
     //     .sbss sect:    var_4B, var_8B,  var_32B
@@ -1840,9 +1967,19 @@ protected:
     ELFSymbolOff m_symbol_off;
 
 public:
+    //Whether this ELFMgr has been recorded in LinkerMgr.
+    bool m_has_recorded_in_linkermgr;
+
     //Record the index of text section in output ELF with ET_REL type.
     //Since there may be more than one '.function_name.text' section.
     UINT m_text_index;
+
+    //Record the offset in '.got' section. Since the info of '.rela.plt'
+    //and 'rela.rela' will be generated element in '.got' section.
+    Off m_got_offset;
+
+    //Record the index of dynsym element in '.dynsym' section.
+    UINT m_dynsym_idx;
 
     //Record the file name of ELFMgr.
     CHAR const* m_file_name;
@@ -1857,10 +1994,22 @@ public:
     SymbolInfoVec m_symbol_info_vec;
 
     //Record RelocInfo.
-    xcom::Vector<RelocInfo*> m_reloc_info;
+    RelocInfoVec m_reloc_info;
 
     //Record all 'm_symbol_info_vec'.
     SymtabInfoVec m_symtab_info_vec;
+
+    //Record phdr.
+    PhdrVec m_phdr_vec;
+
+    //Record relaplt info.
+    RelaPltInfoVec m_relaplt_info_vec;
+
+    //Record PltInfo.
+    PltInfoVec m_plt_info_vec;
+
+    //Record PltInfo.
+    PltInfoMap m_plt_info_map;
 
     //Record ELF SectionInfo.
     SectionInfoMap * m_sect_map;
@@ -1964,6 +2113,11 @@ public:
     //Collect SymtabInfo from 'hdr'.
     void collectSymtabInfo(ELFHdr & hdr, ELFSHdr const* sym_shdr);
 
+    //TODO:
+    //Collect GroupInfo from 'hdr'.
+    void collectGroupInfo(ELFHdr & hdr, ELFSHdr const* group_shdr)
+    { ASSERT0(group_shdr); return; }
+
     //Construct null symbol of '.symtab' and '.dynsym'.
     //It is the first symbol in symtab and it's values are all zero.
     void constructSymbolNull(OUT BYTEVec * bytevec);
@@ -2064,8 +2218,7 @@ public:
     //Generate contents for .rel.text.xxx section.
     //bytevec: binary code of relocation info of function.
     //reloc:   saved all relocation entries for current symbol.
-    void genRelocContent(OUT BYTEVec * bytevec,
-        xcom::Vector<RelocInfo*> const& reloc_vec);
+    void genRelocContent(OUT BYTEVec * bytevec, RelocInfoVec const& reloc_vec);
 
     //The helper function of generated section content.
     void genCommonSectionContentHelper();
@@ -2075,6 +2228,10 @@ public:
 
     //Generate '.rela.xxx' section content.
     void genRelaSectionContent(MOD SymbolInfo * symbol_info);
+
+    //Generate and initialize phdr info.
+    ELFPHdr * genAndInitPhdr(PROGRAM_HEADER phdr_type,
+                             SectionInfo const* sect_info);
 
     //Get rela text section type.
     virtual SECTION_TYPE getRelaTextSectType(MOD SymbolInfo * symbol_info)
@@ -2171,7 +2328,11 @@ public:
     SectionDesc const& getSectionDescElem(SECTION_TYPE sect_type);
 
     //Get dynamic section description.
-    SECTION_TYPE const* getDynamicSectionDesc() const;
+    virtual SECTION_TYPE const* getDynamicSectionDesc() const;
+
+    //Get the number of dynamic section description
+    //element according to different architecture.
+    virtual UINT getDynamicSectionDescNum();
 
     //Get section name via section type.
     //e.g.: given 'SH_TYPE_BSS' and return '.bss'
@@ -2256,7 +2417,8 @@ public:
     UINT getProgramHeaderIdxInPHdr(UINT ph_type);
 
     //Get the number of program header.
-    UINT getProgramHeaderNum() const { return PHDR_NUMBER; }
+    virtual UINT getProgramHeaderNum() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //Get function name from 'text_shdr_name'.
     //e.g.: 1.given ".text1" and return ".text1".
@@ -2361,24 +2523,128 @@ public:
         return getSectionIndexTable()[index];
     }
 
+    //Get the type of ELF object file. e.g.: ET_REL, ET_EXEC.
+    //Refer to the file 'elf_header.h' for more detailed about ELF type.
     UINT getELFType();
 
-    //Check whether there is specific section.
+    //Get the index of program header according to the 'ph_type'.
+    virtual size_t getPhdrIndex(PROGRAM_HEADER ph_type);
+
+    //Get program header index table according to different architecture.
+    virtual PROGRAM_HEADER const* getPhdrIndexTable() const
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
+    //Get the align of Phdr with PH_TYPE_CODE type.
+    virtual Word32 getPhdrCodeAlign() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the align of Phdr with PH_TYPE_DATA type.
+    virtual Word32 getPhdrDataAlign() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the align of Phdr with PH_TYPE_DYNAMIC type.
+    virtual Word32 getPhdrDynamicAlign() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the align of 'shdr offset' according to different architecture.
+    //'shdr offset' is the field of 'Offset' in section header in ELF.
+    virtual Off getShdrOffsetAlign() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the align of 'shdr address' according to different architecture.
+    //'shdr address' is the field of 'Address' in section header in ELF.
+    virtual Off getShdrAddrAlign() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //The content of 'runtime resolved function' which used for implemented
+    //lazy binding is the first element in '.plt' section. And it's offset
+    //in this element is pointed to an item in '.got' section which will be
+    //refilled by the physical address of 'runtime resolved function' in
+    //runtime. This offset maybe not the same in different architectures.
+    virtual Off getRuntimeResolvedFuncOfstInPlt() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //The first element of '.plt' section is used for 'runtime resolved
+    //function'. This function will return the size of this element.
+    virtual UINT getFirstElemSizeOfPlt()
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //The first element of '.plt' section is used for 'runtime resolved
+    //function'. This function will return the content of this element
+    //according to different architectures.
+    virtual UINT const* getFirstElemContentOfPlt()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
+    //The first element of '.plt' section is used for 'runction resolved
+    //function'. It is helper function of getting the first element content
+    //of '.plt' section. It will allocate and return space to store the
+    //content of first element.
+    CHAR const* getFirstElemContentOfPltHelper();
+
+    //Get the size of common element of '.plt' section
+    //according to different architectures.
+    virtual UINT getCommonElemSizeOfPlt()
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //This function return the content of common element of
+    //'.plt' section according to different architectures.
+    virtual UINT const* getCommonElemContentOfPlt()
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
+    //Helper function of getting the common element of '.plt' section.
+    //It will allocate space to store the content of comment element.
+    CHAR const* getCommonElemContentOfPltHelper();
+
+    //The offset of PltInfo is pointed to an item in '.got' section that
+    //will be refilled by the address of target function in runtime. This
+    //offset will be depended on different architecture.
+    //e.g.: a common element of '.plt' section
+    //      0x0  load a0,  address   <---- offset
+    //      0x4  jump a0             <---- jump to target function
+    virtual Off getPltOfst() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the element index of '.dynsym' section.
+    UINT getDynsymIdx() const { return m_dynsym_idx; }
+
+    //Both '.rela.dyn' and '.rela.plt' section will require to create items in
+    //'.got' section. Thus a 'm_got_offset' variable introduced to record
+    //current element offset in '.got' section.
+    Off getGotOffset() const { return m_got_offset; }
+
+    //There are two type of RelapltInfo: local and global type. This function
+    //will count and return the number of RelaPltInfo with global type.
+    UINT getGlobalRelaPltElemNum();
+
+    //Check whether there is specific section in ELFMgr.
     bool hasSection(SECTION_TYPE sect_type)
     { return hasSection(getSectionName(sect_type)); }
 
-    //Check whether there is specific section.
+    //Check whether there is specific section in ELFMgr.
     bool hasSection(Sym const* sect_sym_name) const
     { ASSERT0(sect_sym_name); return m_sect_map->find(sect_sym_name); }
 
     //Whether the corresponded reladyn info of 'reloc_info' has been recorded.
+    //Since there maybe with the same reladyn for more than one 'reloc_info'.
     bool hasBeenRecordedRelaDynInfoItem(RelocInfo const* reloc_info,
-        OUT RelocInfo ** out_reloc_info);
+                                        OUT RelocInfo ** out_reloc_info);
+
+    //Whether the corresponded relaplt info of 'reloc_info' has been recorded.
+    //Since there maybe with the same relaplt for more than one 'reloc_info'.
+    bool hasBeenRecordedRelaPltInfoItem(RelocInfo const* reloc_info,
+                                        OUT RelocInfo ** out_reloc_info);
 
     //Whether 'reloc_info' needs to be generated a GOT item. The judgement
     //method depend on relocated type according to different architecture.
     virtual bool hasGotItem(RelocInfo const* reloc_info)
     { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Return true if there is at least one PltInfo in current ELFMgr .
+    virtual bool hasPltInfo() const { return false; }
+
+    //Whether current ELFMgr has been recorded in LinkerMgr.
+    bool hasBeenRecordedCurrentELFMgr() const
+    { return m_has_recorded_in_linkermgr; }
 
     //Initialization of debug-related operations.
     //Currently, two operations have been performed:
@@ -2395,9 +2661,6 @@ public:
     void initELFMgrInfo(MOD SymTab * sym_tab, CHAR const* file_path,
         UINT elf_type, bool is_elf_format);
 
-    //Initialize the value of p_offset/p_vaddr/p_paddr of program header.
-    void initProgramHeader();
-
     //Initialize section info according to the section description table.
     void initSectionInfo();
 
@@ -2406,12 +2669,17 @@ public:
 
     //The function describes whether a GOT item needs to be created based on
     //the type of 'reloc_info' during the generation of '.reladyn' content.
-    virtual bool isNeededToCreateGotItem(RelocInfo * reloc_info)
+    virtual bool isNeededToCreateGotItem(RelocInfo const* reloc_info)
     { ASSERT0(reloc_info); return false; }
 
     //Whether current SymbolInfo is .rela.dyn symbol. There may be
-    //different jugement methods in different architecture.
-    virtual bool isRelaDynSymbol(Sym const* name, UINT reloc_type)
+    //different judgement methods in different architectures.
+    virtual bool isRelaDynSymbol(RelocInfo const* reloc_ifno)
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Whether current SymbolInfo is .rela.plt symbol. There may be
+    //different judgement methods in different architectures.
+    virtual bool isRelaPltSymbol(RelocInfo const* reloc_info)
     { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     //Whether it is kernel function.
@@ -2450,6 +2718,16 @@ public:
                 sect_type == SH_TYPE_DEBUG_ARANGES);
     }
 
+    //FIXME(SWS-6097): Handle some specific function when generated rela.plt.
+    virtual bool isSpecificFuncForRelaPlt(RelocInfo const* reloc_info)
+    { ASSERT0(reloc_info); return false; }
+
+    //Whether there are two phdrs with the same type.
+    bool isSamePhdrType(ELFPHdr const* phdr, SectionInfo const* sect_info,
+        PROGRAM_HEADER phdr_type, PROGRAM_HEADER pre_phdr_type) const;
+
+    void increaseDynsymIdx() { m_dynsym_idx++; }
+
     //Merge BSS SymbolInfo into the corresponded section of output ELF.
     //The BSS SymbolInfo needs to be allocated memory space and assigned
     //0 in corresponded section content.
@@ -2459,21 +2737,35 @@ public:
     //data of SymbolInfo will be copied to corresponded section content.
     void mergeUnullData(MOD SymbolInfo * symbol_info);
 
+    //Post process specific info after setting
+    //all section info for different architecture.
+    virtual void postProcessAfterSettingSectionInfo() { return; }
+
+    //Process element offset after section address has been set.
+    void postProcessAfterSetSectAddr();
+
+    //Generate the first element of '.plt' section content.
+    void preProcessFirstElemOfPlt();
+
+    //Generate the common element of '.plt' section content.
+    void preProcessCommonElemOfPlt();
+
     //Since the address of section will be used to generate the item content of
     //.dynamic section, the function will just calculate the size of .dynamic
     //section and allocate section memory. The content of the section will be
     //generated after the address of section have been set later.
     void preProcessDynamicSection();
 
-    //Post process specific info after setting
-    //all section info for different architecture.
-    virtual void postProcessAfterSettingSectionInfo() { return; }
-
     //Generate ELFPHdr info of ELFMgr. The Phdr info of each shdr has been
     //written into the configure table of description of section. The function
     //will allocate ELFPHdr memory and iterate over the 'm_sect_map' to collect
     //the Phdr info of each shdr.
     void processProgramHeader();
+
+    //Process extended program header according to different architecture.
+    virtual void processExtProgramHeader(
+        SectionInfo const* sect_info, MOD ELFPHdr * ph)
+    { ASSERTN(0, ("Target Dependent Code")); return; }
 
     //A function to generate .dynamic section content. There is a dynamic
     //section configure table to control the item info of .dynamic section.
@@ -2526,11 +2818,16 @@ public:
     //these address will be created and set to .reladyn section content.
     virtual void processRelaDynSectAfterSetSectAddr();
 
+    //After all sections address have been set, relaplt item that depend on
+    //these address will be created and set to .relaplt section content.
+    virtual void processRelaPltSectAfterSetSectAddr();
+
     //Process SymbolInfo according to different st_shndx value of ELFSym.
     bool processSpecialShndx(ELFHdr & hdr, MOD SymbolInfo * symbol_info);
 
-    //Process element offset after section address has been set.
-    void postProcessAfterSetSectAddr();
+    //Process '.plt' section after set section address. There are location
+    //that need to be refilled in the '.plt' section content.
+    void processPltSectAfterSetSectAddr();
 
     //Read ELFSym from .symtab section('shdr') via 'idx'.
     void readSymFromSymtabSect(ELFSHdr const* shdr,
@@ -2540,8 +2837,32 @@ public:
     void readRelaFromRelaTextSect(ELFSHdr const* shdr,
                                   OUT ELFRela & rela, size_t idx);
 
-    //Read a byte from section content via 'sect_name' and 'addr'.
-    BYTE readByteFromSectionContent(Sym const* sect_name, Addr addr);
+    //Read a byte value from section content via 'sect_name' and 'addr'.
+    BYTE readByteFromSectionContent(Sym const* sect_name, Addr addr)
+    { return readValueFromSectionContent<BYTE>(sect_name, addr); }
+
+    //Read value from section content via 'sect_name' and 'addr'.
+    template <class ValueType>
+    ValueType readValueFromSectionContent(Sym const* sect_name, Addr addr)
+    {
+        ASSERT0(sect_name && hasSection(sect_name));
+        BYTEVec * bytevec = getSectionContent(sect_name);
+        ASSERT0(bytevec);
+        return *(ValueType*)(bytevec->get_vec() + addr);
+    }
+
+    //Refill the element info of '.plt'. There is position that needs to be
+    //refilled by the address of corresponded '.got' item. For first element
+    //in '.plt', it's '.got' address will be relocated by the physical address
+    //of runtime resolved function in runtime. For comment element in '.plt',
+    //it's '.got' address will be relocated by the physical address of target
+    //function in runtime.
+    virtual void refillElemInfoOfPlt()
+    { ASSERTN(0, ("Target Dependent Code")); return; }
+
+    //Refill the address of '.plt' section to the corresponded '.got' item.
+    virtual void refillPltSectAddr()
+    { ASSERTN(0, ("Target Dependent Code")); return; }
 
     void resetFileObj() { m_file = nullptr; }
 
@@ -2594,12 +2915,18 @@ public:
 
     void setSymTab(MOD SymTab * v) { m_sym_tab = v; }
 
+    void setDynsymIdx(UINT v) { m_dynsym_idx = v; }
+
+    //Set the section index after all sections have been created.
     void setSectionIndex();
 
     void setTextIndex(UINT v) { m_text_index = v; }
 
+    void setRecordedInfoOfCurrentELFMgr(bool v)
+    { m_has_recorded_in_linkermgr = v; }
+
     //Record SymbolInfo into 'm_symbol_info_map' and 'm_symbol_info_vec'.
-    void setSymbolInfo(MOD SymbolInfo * sym_info);
+    virtual void setSymbolInfo(MOD SymbolInfo * sym_info);
 
     //Create SectionInfo.
     void setSection(SECTION_TYPE sect_type);
@@ -2631,8 +2958,7 @@ public:
         MOD BYTEVec * dynsym_vec, UINT local_idx, UINT global_idx);
 
     //Record reladyn info into 'm_reladyn_info_vec'.
-    void setRelaDynInfo(MOD RelocInfo * reloc_info, Off & got_ofst,
-                        UINT & dynsym_idx);
+    void setRelaDynInfo(MOD RelocInfo * reloc_info);
 
     //Set the index of multi-section which more than one sections with
     //same section type.
@@ -2642,6 +2968,9 @@ public:
     //with same section type.
     virtual void setExtMultiSectionIndex(SECTION_TYPE sect_type)
     { ASSERTN(0, ("Target Dependent Code")); return; }
+
+    //Record '.relaplt' info into 'm_relaplt_info_vec'.
+    void setRelaPltInfo(MOD RelocInfo * reloc_info);
 
     //Update st_value of ELFSym after the base address
     //of .symtab/.dynsym section have been set.
@@ -2655,6 +2984,16 @@ public:
     //'buflen': length of 'buf'.
     void writeSectionContent(Sym const* sect_name, Addr addr,
                              BYTE const* buf, Word buflen);
+
+    //Since both '.relaplt' and '.reladyn' section would create item in
+    //'.got' section, it needs to record the offset of '.got' section.
+    void updateGotOffset(UINT offset = 0)
+    { m_got_offset += ((offset == 0) ? getElemByteSizeInGotSect() : offset); }
+
+    //Record some useful info according to the RelocInfo.
+    virtual void updateUsefulInfoAccordingToRelocInfo(
+        RelocInfo const* reloc_info)
+    { ASSERTN(0, ("Target Dependent Code")); return; }
 };
 
 
@@ -2683,6 +3022,9 @@ public:
 
     bool isDeviceELF() const { return m_is_device_elf; }
     bool isFatbinELF() const { return m_is_fatbin_elf; }
+    //Use '-elf-dumplink' option to dump linker info.
+    //The default log file is 'dump.log'.
+    //e.g.: pcxac.exe xxx.pcx -O0 -elf-fatbin -elf-dumplink
     bool isDumpLink() const { return m_is_dump_link_info; }
 };
 
@@ -2845,8 +3187,9 @@ public:
 
     //Allocate FileObj via 'filename' and record to 'm_file_obj_list'.
     //is_del: 'true' to delete the file with same name.
+    //is_readonly: whether open 'filename' with readonly attribute.
     //return: FileObj.
-    FileObj * allocFileObj(CHAR const* filename, bool is_del);
+    FileObj * allocFileObj(CHAR const* filename, bool is_del, bool is_readonly);
 
     //Allocate ELFARInfoVec object and record to 'm_elfar_info_vec_list'.
     ELFARInfoVec * allocVectorOfELFARInfo();
@@ -3019,7 +3362,7 @@ public:
 //    in the order they were read in. Thus if there is more than one target
 //    SymbolInfo of unresolved RelocInfo in different AR file, the SymbolInfo
 //    that found from the first AR file will be used to resolve RelocInfo. And
-//    other SymbolInfo are useless.
+//    other SymbolInfo are not in use.
 //More detailed steps can be found in the description of 'doResolve()' function.
 //
 //Process output ELF. NOTE: Now LinkerMgr can only output ET_DYN ELF(shared
@@ -3158,7 +3501,7 @@ protected:
     xcom::List<ELFMgr*> m_elf_mgr_meta_list;
 
     //Record relocated symbol.
-    xcom::Vector<RelocInfo*> m_reloc_symbol_vec;
+    RelocInfoVec m_reloc_symbol_vec;
 
     //Record the index of unresolved relocated symbol in 'm_reloc_symbol_vec'.
     //            key                     value
@@ -3228,7 +3571,7 @@ public:
     //sorted in the order they were read in. Thus if there are more than one
     //target SymbolInfo of unresolved RelocInfo in different AR file, the
     //SymbolInfo that found from the first AR file will be used to resolve
-    //RelocInfo. And other target SymbolInfo are useless.
+    //RelocInfo. And other target SymbolInfo are not in use.
     //  a.In the beginning, RelocInfo that collected from xoc::Var have been
     //recorded into 'm_reloc_symbol_vec'. 'm_reloc_symbol_vec' record all
     //RelocInfo that need to be resolved. But it will be constantly updated
@@ -3446,6 +3789,10 @@ public:
     //It is entry function of output relocated object ELF file.
     void outputRelocatedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list);
 
+    //Count the number of element of '.plt' section and
+    //generate '.plt' section content.
+    void preProcessPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
+
     //It is entry function of generating output executed ELF.
     void processOutputExeELF();
 
@@ -3470,11 +3817,19 @@ public:
 
     //Create reladyn item of .reladyn section. Since the address of all
     //sections have not been set, the value of r_offset filed of ELFRela
-    //can't be determined. Now it just allocate memory space and record
+    //can't be determined. Now it just allocates memory space and records
     //the number of reladyn item. After setting the address of sections,
     //the value of r_offset will be refilled.
     //'elf_mgr': output ELFMgr.
     void preProcessRelaDynSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
+
+    //Create relaplt item of .relaplt section. Since the address of all
+    //sections have not been set, the value of r_offset filed of ELFRela
+    //can't be determined. Now it just allocates memory space and records
+    //the number of reladyn item. After setting the address of sections,
+    //the value of r_offset will be refilled.
+    //'elf_mgr': output ELFMgr.
+    void preProcessRelaPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
 
     //There is post-processing operation after ELFMgr that collected from
     //xoc::Var has been merged according to different architecture.

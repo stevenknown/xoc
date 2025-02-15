@@ -322,8 +322,7 @@ public:
     void set(Vector<IntType> const& iset, MappedObj mapped)
     {
         MappedObj old = setAlways(iset, mapped);
-        ASSERT0(old == mapped || old == MappedObj(0));
-        bool already_set;
+        ASSERT0_DUMMYUSE(old == mapped || old == MappedObj(0));
     }
     MappedObj setAlways(Vector<IntType> const& iset, MappedObj mapped)
     {

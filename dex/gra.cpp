@@ -142,7 +142,7 @@ public:
 UINT GLT::computeNumOfOcc(GltMgr & gltm)
 {
     if (livebbs == nullptr) { return 0; }
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     UINT n = 0;
     for (BSIdx i = livebbs->get_first(&cur);
          i != BS_UNDEF; i = livebbs->get_next(i, &cur)) {
@@ -160,7 +160,7 @@ UINT GLT::computeNumOfOcc(GltMgr & gltm)
 //Set usable for local part.
 void GLT::set_local_usable(GltMgr & gltm)
 {
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     for (BSIdx j = livebbs->get_first(&sc);
          j != BS_UNDEF; j = livebbs->get_next(j, &sc)) {
         LTMgr * ltm = gltm.get_ltm(j);
@@ -176,7 +176,7 @@ void GLT::set_local_usable(GltMgr & gltm)
 void GLT::set_local(GltMgr & gltm)
 {
     if (livebbs == nullptr) { return; }
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     for (BSIdx i = livebbs->get_first(&cur);
          i != BS_UNDEF; i = livebbs->get_next(i, &cur)) {
         LTMgr * ltm = gltm.get_ltm(i);
@@ -445,17 +445,17 @@ void RSC::comp_call_fmt(IR const* ir)
             m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_THROW:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_CHECK_CAST:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case BLTIN_FILLED_NEW_ARRAY:
             {
             //first parameter is invoke-kind.
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             ASSERT0(p->is_const());
 
             //second one is class-id.
@@ -470,28 +470,28 @@ void RSC::comp_call_fmt(IR const* ir)
             return;
             }
         case BLTIN_FILL_ARRAY_DATA:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FAABBBBBBBBv);
             return;
         case BLTIN_CONST_CLASS:
             m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case BLTIN_ARRAY_LENGTH:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FAB);
             return;
         case BLTIN_MONITOR_ENTER:
         case BLTIN_MONITOR_EXIT:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_INSTANCE_OF:
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_pr());
             m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
         case BLTIN_CMP_BIAS:
             {
-                IR const* p = CALL_param_list(ir);
+                IR const* p = CALL_arg_list(ir);
                 ASSERT0(p && p->is_const());
                 p = p->get_next();
                 ASSERT0(p && p->is_pr() && p->get_next() && p->get_next()->is_pr());
@@ -502,7 +502,7 @@ void RSC::comp_call_fmt(IR const* ir)
         }
     }
 
-    IR const* p = CALL_param_list(ir);
+    IR const* p = CALL_arg_list(ir);
     ASSERT0(p && p->is_const());
     INVOKE_KIND ik = (INVOKE_KIND)CONST_int_val(p);
     p = p->get_next();
@@ -930,7 +930,7 @@ void GltMgr::localize(GLT * g)
     ASSERT0(!GLT_is_param(g));
     DefDBitSetCore * bbs = GLT_bbs(g);
     ASSERTN(bbs, ("should not localize an empty glt"));
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     PRNO prno = GLT_prno(g);
     for (BSIdx j = bbs->get_first(&sc);
          j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
@@ -984,7 +984,7 @@ GLT * GltMgr::buildGltLike(IR * pr, GLT * cand)
     if (bbs != nullptr) {
         GLT_bbs(newglt) = m_sbs_mgr.allocDBitSetCore();
         GLT_bbs(newglt)->copy(*bbs, m_sbs_mgr);
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         PRNO candprno = GLT_prno(cand);
         PRNO prno = GLT_prno(newglt);
         for (BSIdx j = bbs->get_first(&sc);
@@ -1009,7 +1009,7 @@ bool GltMgr::verify()
     for (VecIdx i = 1; i <= m_gltid2glt_map.get_last_idx(); i++) {
         GLT * g = m_gltid2glt_map.get(i);
         if (g == nullptr || GLT_bbs(g) == nullptr) { continue; }
-        SEGIter * cur = nullptr;
+        DefSEGIter * cur = nullptr;
         for (BSIdx j = GLT_bbs(g)->get_first(&cur);
              j != BS_UNDEF; j = GLT_bbs(g)->get_next(j, &cur)) {
             LTMgr * ltm = m_bb2ltmgr.get(j);
@@ -1122,7 +1122,7 @@ void GltMgr::dumpg()
         DefDBitSetCore * livebbs = GLT_bbs(g);
         if (livebbs == nullptr || livebbs->is_empty()) { continue; }
         BSIdx start = 0;
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         for (BSIdx u = livebbs->get_first(&sc);
              u != BS_UNDEF; u = livebbs->get_next(u, &sc)) {
             for (BSIdx j = start; j < u; j++) {
@@ -1195,7 +1195,7 @@ GLT * GltMgr::new_glt(PRNO prno)
 void GltMgr::renameGLT(GLT * g)
 {
     IR * newpr = nullptr;
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     if (GLT_bbs(g) == nullptr) { return; }
     for (BSIdx i = GLT_bbs(g)->get_first(&cur);
          i != BS_UNDEF; i = GLT_bbs(g)->get_next(i, &cur)) {
@@ -1270,7 +1270,7 @@ void GltMgr::build(bool build_group_part)
         DefSBitSetCore * livein = m_liveness_mgr->get_livein(bb->id());
         DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(bb->id());
         if (livein != nullptr) {
-            SEGIter * cur = nullptr;
+            DefSEGIter * cur = nullptr;
             for (BSIdx i = livein->get_first(&cur);
                  i != BS_UNDEF; i = livein->get_next(i, &cur)) {
                 GLT * glt = map_pr2glt(i);
@@ -1285,7 +1285,7 @@ void GltMgr::build(bool build_group_part)
         }
 
         if (liveout != nullptr) {
-            SEGIter * cur = nullptr;
+            DefSEGIter * cur = nullptr;
             for (BSIdx i = liveout->get_first(&cur);
                  i != BS_UNDEF; i = liveout->get_next(i, &cur)) {
                 GLT * glt = map_pr2glt(i);
@@ -1399,7 +1399,7 @@ bool GIG::is_interf_with_neighbour(GLT * g, DefSBitSet & nis, UINT phy)
     ASSERT0(g && phy < 65000);
     nis.clean();
     getNeighborSet(nis, GLT_id(g));
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     for (BSIdx ltid = nis.get_first(&cur);
          ltid != BS_UNDEF; ltid = nis.get_next(ltid, &cur)) {
         GLT * g2 = m_gltm->get_glt(ltid);
@@ -1429,7 +1429,7 @@ bool GIG::is_interf(IN GLT * glt1, IN GLT * glt2)
     DefDBitSetCore * bs2 = GLT_bbs(glt2);
     PRNO pr1 = GLT_prno(glt1);
     PRNO pr2 = GLT_prno(glt2);
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     for (BSIdx i = bs1->get_first(&sc);
          i != BS_UNDEF; i = bs1->get_next(i, &sc)) {
         if (!bs2->is_contain(i)) { continue; }
@@ -1975,7 +1975,7 @@ static bool is_range_call(IR const* ir)
 {
     if (!ir->is_call()) { return false; }
     //The first parameter is used to record invoke-kind.
-    IR const* p = CALL_param_list(ir);
+    IR const* p = CALL_arg_list(ir);
     if (p == nullptr || !p->is_const() || !p->is_uint()) {
         return false;
     }
@@ -2012,7 +2012,7 @@ void LTMgr::genRangeCallGroup(IR const* ir)
 {
     ASSERT0(is_range_call(ir));
     IR * p;
-    for (p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    for (p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         if (!p->is_pr()) { continue; }
         break;
     }
@@ -2293,7 +2293,7 @@ void LTMgr::processLivein(OUT BitSet & lived_lt, UINT pos,
                           bool always_consider_glt)
 {
     DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     for (BSIdx i = livein->get_first(&cur);
          i != BS_UNDEF; i = livein->get_next(i, &cur)) {
         GLT * glt = m_gltm->map_pr2glt(i);
@@ -2329,7 +2329,7 @@ void LTMgr::processLiveout(MOD BitSet & lived_lt, UINT pos,
                            bool always_consider_glt)
 {
     DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     for (BSIdx i = liveout->get_first(&cur);
          i != BS_UNDEF; i = liveout->get_next(i, &cur)) {
         GLT * glt = m_gltm->map_pr2glt(i);
@@ -2548,7 +2548,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
     case IR_CALL:
         {
             IR * next;
-            for (IR * p = CALL_param_list(ir); p != nullptr; p = next) {
+            for (IR * p = CALL_arg_list(ir); p != nullptr; p = next) {
                 next = p->get_next();
                 if (p->is_pr()) {
                     if (PR_no(p) == LT_prno(l)) {
@@ -2557,7 +2557,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                         }
                         IR * newp = m_rg->dupIR(*newpr);
                         IR_dt(newp) = IR_dt(p);
-                        replace(&CALL_param_list(ir), p, newp);
+                        replace(&CALL_arg_list(ir), p, newp);
                         IR_parent(newp) = ir;
                         m_rg->freeIR(p);
                     } else if (gr != nullptr && gr->is_member(PR_no(p))) {
@@ -3036,7 +3036,7 @@ void LTMgr::dump()
     //Print live-in PR.
     note(getRegion(), "\nlivein:");
     DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
     for (BSIdx i = livein->get_first(&cur);
          i != BS_UNDEF; i = livein->get_next(i, &cur)) {
         prt(getRegion(), "pr%d, ", i);
@@ -4146,7 +4146,7 @@ float RA::computePrio(GLT * g)
     //Check to see if glt has branch occ.
     UINT cross_branch = 0;
     DefDBitSetCore * bbs = GLT_bbs(g);
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     for (BSIdx j = bbs->get_first(&sc);
          j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = m_gltm.get_ltm(j);
@@ -4218,7 +4218,7 @@ void RA::diffLocalNeighbourUsed(GLT * g, List<UINT> & nis, BitSet * unusable)
 {
     DefDBitSetCore * bbs = GLT_bbs(g);
     if (bbs == nullptr) { return; }
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     for (BSIdx j = bbs->get_first(&sc);
          j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = m_gltm.get_ltm(j);
@@ -4683,7 +4683,7 @@ void RA::reviseParam()
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
 
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         UINT gphy = GLT_phy(g);
         for (BSIdx j = bbs->get_first(&sc);
              j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
@@ -4754,7 +4754,7 @@ IR * RA::split(GLT * g)
     ASSERT0(!GLT_is_param(g));
     DefDBitSetCore * bbs = GLT_bbs(g);
     ASSERTN(bbs, ("should not select an empty candidate to split"));
-    SEGIter * sc = nullptr;
+    DefSEGIter * sc = nullptr;
     IR * spill_loc = nullptr;
     for (BSIdx j = bbs->get_first(&sc);
          j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
@@ -4845,7 +4845,7 @@ bool RA::verify_glt(bool check_alloc)
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
 
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         for (BSIdx j = bbs->get_first(&sc);
              j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             LTMgr * ltm = m_gltm.get_ltm(j);
@@ -5130,7 +5130,7 @@ void RA::remedyLTG(
         BitSet & visited,
         UINT rangestart)
 {
-    IR * param = CALL_param_list(ir);
+    IR * param = CALL_arg_list(ir);
     ASSERT0(param);
     while (param != nullptr && !param->is_pr()) { param = IR_next(param); }
     ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
@@ -5162,7 +5162,7 @@ void RA::remedyLTG(
     ASSERT0(param == nullptr);
 
     rangestart = org_rangestart;
-    param = CALL_param_list(ir);
+    param = CALL_arg_list(ir);
     while (param != nullptr && !param->is_pr()) { param = IR_next(param); }
     ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
@@ -5346,7 +5346,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
 
     //Compute unusable set.
     BitSet occupied; //occupied vreg by other lt which is not member in group.
-    SEGIter * cur = nullptr;
+    DefSEGIter * cur = nullptr;
 
     //Compute the phy occupied by local neighbours.
     for (BSIdx ltid = nis.get_first(&cur);
@@ -5384,7 +5384,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
         GLT * g = m_gltm.map_pr2glt(LT_prno(l));
         ASSERT0(g);
         PRNO prno = GLT_prno(g);
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
 
@@ -5401,7 +5401,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
             nig->getNeighborSet(nis, LT_uid(gl));
 
             //Compute the phy occupied by local part.
-            SEGIter * cur2 = nullptr;
+            DefSEGIter * cur2 = nullptr;
             for (BSIdx ltid = nis.get_first(&cur2);
                  ltid != BS_UNDEF; ltid = nis.get_next(ltid, &cur2)) {
                 LT * l2 = nltm->getLifeTime(ltid);
@@ -5593,7 +5593,7 @@ bool RA::verify_lt_occ()
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
 
-        SEGIter * sc = nullptr;
+        DefSEGIter * sc = nullptr;
         PRNO prno = GLT_prno(g);
         DUMMYUSE(prno);
         for (BSIdx j = bbs->get_first(&sc);
@@ -5743,7 +5743,7 @@ bool RA::verify_ltg()
         ASSERT0(ir && is_range_call(ir) && ltg);
 
         IR * arg = nullptr;
-        for (arg = CALL_param_list(ir); arg != nullptr; arg = IR_next(arg)) {
+        for (arg = CALL_arg_list(ir); arg != nullptr; arg = IR_next(arg)) {
             if (arg->is_pr()) { break; }
         }
 

@@ -129,24 +129,24 @@ protected:
     }
 
     //dump_helper for SBitSetCore.
-    void dump_helper_set(FILE * h, SBitSetCore<BitsPerSeg> const* set,
+    void dump_helper_set(StrBuf & buf, SBitSetCore<BitsPerSeg> const* set,
                          UINT indent, VecIdx id) const
     {
-        fprintf(h, "\n");
+        buf.strcat("\n");
         UINT i = 0;
-        while (i < indent) { fprintf(h, " "); i++; }
-        fprintf(h, "%u", id);
+        while (i < indent) { buf.strcat(" "); i++; }
+        buf.strcat("%u", id);
         if (set == nullptr) { return; }
-        fprintf(h, " {");
-        SEGIter * iter = nullptr;
+        buf.strcat(" {");
+        DefSEGIter * iter = nullptr;
         for (BSIdx j = set->get_first(&iter); j != BS_UNDEF;) {
-            fprintf(h, "%d", j);
+            buf.strcat("%d", j);
             j = set->get_next(j, &iter);
             if (j != BS_UNDEF) {
-                fprintf(h, ",");
+                buf.strcat(",");
             }
         }
-        fprintf(h, "}");
+        buf.strcat("}");
     }
 
     #ifdef _BIT2NODE_IN_HASH_
@@ -156,14 +156,14 @@ protected:
         VecIdx pos;
         for (B2NType * nextmn = mn->next.get_first_elem(pos);
              nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
-            dump_helper_set(h, nextmn->set, indent, pos);
+            dump_helper_set(buf, nextmn->set, indent, pos);
             ASSERT0(nextmn);
             dump_helper(h, nextmn, indent + 2);
         }
     }
     #else
     //dump_helper for Bit2NodeT.
-    void dump_helper(FILE * h, B2NType * mn, UINT indent) const
+    void dump_helper(StrBuf & buf, B2NType * mn, UINT indent) const
     {
         ASSERT0(mn);
         class B2NType::NextSetIter ti;
@@ -179,7 +179,7 @@ protected:
             UINT ind = indent_stack.pop();
             UINT id = id_stack.pop();
             ti.clean();
-            dump_helper_set(h, mn2->set, ind, id);
+            dump_helper_set(buf, mn2->set, ind, id);
 
             B2NType * nextmn = nullptr;
             for (BSIdx id2 = mn2->next.get_first(ti, &nextmn);
@@ -234,7 +234,7 @@ public:
     {
         //Destroy the Bit2Node structure, here you do
         //NOT need invoke SBitSetCore's destroy() because they were
-        //allocated from set-allocator and will be destroied by
+        //allocated from set-allocator and will be destroyed by
         //the allocator.
         List<B2NType*> wl;
         wl.append_tail(get_root());
@@ -260,7 +260,7 @@ public:
 
         //Destroy the Bit2Node structure, here you do
         //NOT need invoke SBitSetCore's destroy() because they were
-        //allocated from set-allocator and will be destroied by
+        //allocated from set-allocator and will be destroyed by
         //the allocator.
 
         //The iteration is very slow if there are too many Bit2NodeTs.
@@ -325,7 +325,7 @@ public:
 
     SBitSetCore<BitsPerSeg> const* append(SBitSetCore<BitsPerSeg> const& set)
     {
-        SEGIter * iter = nullptr;
+        DefSEGIter * iter = nullptr;
         BSIdx id = set.get_first(&iter);
         if (id == BS_UNDEF) { return nullptr; }
 
@@ -375,24 +375,40 @@ public:
     void dump(FILE * h) const
     {
         if (h == nullptr) { return; }
-        fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");
+        StrBuf buf(128);
+        dump(buf);
+        fprintf(h, "%s", buf.getBuf());
+        fflush(h);
+    }
+
+    //Dump hash tab as tree style.
+    void dump(OUT StrBuf & buf) const
+    {
+        buf.strcat("\n==-- DUMP SBitSetCoreHashHash --==");
 
         #ifdef _DEBUG_
-        fprintf(h, "\n---- NumOfNode:%d ----",
-                //The first node is m_bit2node
-                m_num_node + 1);
+        buf.strcat("\n-- NumOfNode:%d --",
+                   //The first node is m_bit2node
+                   m_num_node + 1);
         #endif
 
-        dump_helper(h, get_root(), 1);
-        fflush(h);
+        dump_helper(buf, get_root(), 1);
     }
 
     //Dump bitset that hashed.
     void dump_hashed_set(FILE * h) const
     {
         if (h == nullptr) { return; }
-        fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");
+        StrBuf buf(128);
+        dump_hashed_set(buf);
+        fprintf(h, "%s", buf.getBuf());
+        fflush(h);
+    }
 
+    //Dump bitset that hashed.
+    void dump_hashed_set(OUT StrBuf & buf) const
+    {
+        buf.strcat("\n==-- DUMP SBitSetCoreHashHash --==");
         List<B2NType*> wl;
 
         #ifdef _BIT2NODE_IN_HASH_
@@ -405,7 +421,6 @@ public:
         while (wl.get_elem_count() != 0) {
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
-
             B2NType * nextmn = nullptr;
 
             #ifdef _BIT2NODE_IN_HASH_
@@ -424,12 +439,10 @@ public:
             #endif
 
             if (mn->set != nullptr) {
-                fprintf(h, "\n");
-                mn->set->dump(h);
+                buf.strcat("\n");
+                mn->set->dump(buf);
             }
         }
-
-        fflush(h);
     }
 
     Allocator * get_allocator() const { return m_allocator; }
@@ -478,7 +491,7 @@ public:
     //Return true if SBitSetCore pointer has been record in the hash.
     bool find(SBitSetCore<BitsPerSeg> const& set) const
     {
-        SEGIter * iter = nullptr;
+        DefSEGIter * iter = nullptr;
         BSIdx id = set.get_first(&iter);
         if (id == BS_UNDEF) { return false; }
 

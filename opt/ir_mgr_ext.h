@@ -37,12 +37,29 @@ public:
     explicit IRMgrExt(Region * rg);
     virtual ~IRMgrExt() {}
 
+    //Build atomic cas operation of compare and swap on memory.
+    //memory: Opearated memory.
+    //oldval: Value to be compared with the value in memory.
+    //newval: If "oldval" equals to the value in memory, "newval" will be set
+    //        to the memory.
+    //reslst: Multiple results will be modified.
+    IR * buildAtomCas(Type const* type, IR * memory, IR * oldval, IR * newval,
+                      IR * reslst);
+
+    //Build atomic inc operation of fetch and add on memory.
+    //memory: Opearated memory.
+    //reslst: Multiple results will be modified.
+    //addend: (optional) Number to be added to memory, absent on T1.
+    IR * buildAtomInc(Type const* type, IR * memory, IR * reslst,
+                      IR * addend = nullptr);
+
+    IR * buildBroadCast(IR * src, IR * res_list, Type const* ty);
+
     IR * buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
                       Type const* ty);
     IR * buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
                      Type const* ty);
     IR * buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse, Type const* ty);
-    IR * buildBroadCast(IR * src, IR * res_list, Type const* ty);
 
     //Return expression list that describe multiple isomorphic result.
     virtual IR * getAlterResDescList(IR * stmt) const;

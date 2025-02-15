@@ -28,15 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
-#include "targinfo_mgr.h"
-#include "lifetime.h"
-#include "lt_interf_graph.h"
-#include "linear_scan.h"
-#include "lsra_impl.h"
-#include "lsra_scan_in_pos.h"
-#include "lt_prio_mgr.h"
-#include "lsra_scan_in_prio.h"
-#include "var_liveness_mgr.h"
 
 namespace xoc {
 
@@ -602,11 +593,11 @@ bool PosAttrLifeTimeProc::processAttrLTExtendBBEnd(BBPos const& pos,
 
 
 class OccRecorderVF {
-    BackwardJumpAnalysis * m_ana;
+    LexBackwardJumpAnalysis * m_ana;
 public:
     Pos pos;
 public:
-    OccRecorderVF(BackwardJumpAnalysis * ana) : m_ana(ana), pos(POS_UNDEF) {}
+    OccRecorderVF(LexBackwardJumpAnalysis * ana) : m_ana(ana), pos(POS_UNDEF) {}
     bool visitIR(IR const* ir, OUT bool & is_term)
     {
         if (ir->is_pr() || ir->is_stpr()) {
@@ -672,11 +663,11 @@ PosAttr * BackwardJumpAnalysisResMgr::genPosAttr(UINT v, IRBB const* bb,
 }
 
 
-BackwardEdge * BackwardJumpAnalysisResMgr::genBackwardEdge(IRBB const* srcbb,
-                                                           IRBB const* dstbb)
+LexBackwardJump * BackwardJumpAnalysisResMgr::genLexBackwardJump(
+    IRBB const* srcbb, IRBB const* dstbb)
 {
     ASSERT0(srcbb && dstbb);
-    BackwardEdge * e = (BackwardEdge*)xmalloc(sizeof(BackwardEdge));
+    LexBackwardJump * e = (LexBackwardJump*)xmalloc(sizeof(LexBackwardJump));
     e->init(srcbb, dstbb);
     return e;
 }
@@ -704,11 +695,10 @@ Var * FakeVarMgr::genFakeVar(Type const* ty)
 //END FakeVarMgr
 
 //
-//START BackwardJumpAnalysis
+//START LexBackwardJumpAnalysis
 //
-BackwardJumpAnalysis::BackwardJumpAnalysis(Region * rg, BBPos2Attr * pos2attr,
-                                           FakeVarMgr * fake_var_mgr,
-                                           LinearScanRA * lsra)
+LexBackwardJumpAnalysis::LexBackwardJumpAnalysis(Region * rg,
+    BBPos2Attr * pos2attr, FakeVarMgr * fake_var_mgr, LinearScanRA * lsra)
 {
     ASSERT0(rg && pos2attr && fake_var_mgr && lsra);
     m_rg = rg;
@@ -723,20 +713,20 @@ BackwardJumpAnalysis::BackwardJumpAnalysis(Region * rg, BBPos2Attr * pos2attr,
 }
 
 
-BackwardJumpAnalysis::~BackwardJumpAnalysis()
+LexBackwardJumpAnalysis::~LexBackwardJumpAnalysis()
 {
     destroy();
 }
 
 
-void BackwardJumpAnalysis::reset()
+void LexBackwardJumpAnalysis::reset()
 {
     destroy();
     init();
 }
 
 
-void BackwardJumpAnalysis::init()
+void LexBackwardJumpAnalysis::init()
 {
     m_pos2attr->init();
     m_prno2occ.init();
@@ -749,7 +739,7 @@ void BackwardJumpAnalysis::init()
 }
 
 
-void BackwardJumpAnalysis::destroy()
+void LexBackwardJumpAnalysis::destroy()
 {
     m_pos2attr->destroy();
     m_backward_edges.destroy();
@@ -765,7 +755,7 @@ void BackwardJumpAnalysis::destroy()
 }
 
 
-void BackwardJumpAnalysis::recordOccurenceForPR(PRNO prno, Pos pos)
+void LexBackwardJumpAnalysis::recordOccurenceForPR(PRNO prno, Pos pos)
 {
     //The occurence information of each prno contains the first position
     //and the last position only in the IRBB List. The last position need to be
@@ -794,7 +784,7 @@ void BackwardJumpAnalysis::recordOccurenceForPR(PRNO prno, Pos pos)
 }
 
 
-void BackwardJumpAnalysis::collectBackwardJumps()
+void LexBackwardJumpAnalysis::collectBackwardJumps()
 {
     BBListIter bbit;
     for (IRBB const* bb = m_bb_list->get_head(&bbit);
@@ -809,7 +799,8 @@ void BackwardJumpAnalysis::collectBackwardJumps()
 }
 
 
-void BackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb, MOD Pos & pos)
+void LexBackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb,
+                                                     MOD Pos & pos)
 {
     ASSERT0(bb);
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
@@ -828,7 +819,7 @@ void BackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb, MOD Pos & pos)
 }
 
 
-void BackwardJumpAnalysis::generateOccurence()
+void LexBackwardJumpAnalysis::generateOccurence()
 {
     BBListIter bbit;
     Pos pos = POS_UNDEF;
@@ -839,7 +830,7 @@ void BackwardJumpAnalysis::generateOccurence()
 }
 
 
-bool BackwardJumpAnalysis::analyze()
+bool LexBackwardJumpAnalysis::analyze()
 {
     START_TIMER_FMT(t, ("Backward Jump Analysis"));
     m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
@@ -871,9 +862,9 @@ bool BackwardJumpAnalysis::analyze()
 }
 
 
-void BackwardJumpAnalysis::dump()
+void LexBackwardJumpAnalysis::dump()
 {
-    note(m_rg, "\n==-- DUMP BackwardJumpAnalysis --==");
+    note(m_rg, "\n==-- DUMP LexBackwardJumpAnalysis --==");
 
     Prno2OccMapIter it;
     Occurence const* occ = nullptr;
@@ -885,10 +876,10 @@ void BackwardJumpAnalysis::dump()
     }
 
     note(m_rg, "\nBackward jump BB interval:\n");
-    for (BackwardEdge const* e = m_backward_edges.get_head();
+    for (LexBackwardJump const* e = m_backward_edges.get_head();
          e != nullptr; e = m_backward_edges.get_next()) {
-        UINT src_bb = BKEDGE_srcbb(e)->id();
-        UINT dst_bb = BKEDGE_dstbb(e)->id();
+        UINT src_bb = BKJUMP_srcbb(e)->id();
+        UINT dst_bb = BKJUMP_dstbb(e)->id();
         note(m_rg, "SRC bb: %u [%u, %u] ----> DST bb: %u [%u, %u]\n",
              src_bb, m_bb_entry_pos[src_bb], m_bb_exit_pos[src_bb],
              dst_bb, m_bb_entry_pos[dst_bb], m_bb_exit_pos[dst_bb]);
@@ -916,8 +907,8 @@ void BackwardJumpAnalysis::dump()
 //        --- POS_ATTR_NO_CODE_GEN
 //        --- POS_ATTR_LT_NO_TERM_AFTER
 //        --- POS_ATTR_LT_SHRINK_BEFORE
-void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
-                                                  BBPos const& pos)
+void LexBackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
+                                                     BBPos const& pos)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -951,8 +942,8 @@ void BackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
 //  1. Build a fake-use IR by write the pr into a fake var.
 //  2. Insert the fake-use IR at the tail of BB, but before the branch IR.
 //  3. Map the pos and the new fake-use IR with attribute POS_ATTR_NO_CODE_GEN.
-void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
-                                                 BBPos const& pos)
+void LexBackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
+                                                    BBPos const& pos)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -983,8 +974,8 @@ void BackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
 }
 
 
-void BackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
-                                         INSERT_MODE mode)
+void LexBackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
+                                            INSERT_MODE mode)
 {
     ASSERT0(bb);
     ASSERT0(mode != INSERT_MODE_UNDEF);
@@ -1007,8 +998,8 @@ void BackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
 }
 
 
-void BackwardJumpAnalysis::recordFakeUse(PRNO prno, IRBB const* bb,
-                                         INSERT_MODE mode)
+void LexBackwardJumpAnalysis::recordFakeUse(PRNO prno, IRBB const* bb,
+                                            INSERT_MODE mode)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -1050,12 +1041,12 @@ void BackwardJumpAnalysis::recordFakeUse(PRNO prno, IRBB const* bb,
 }
 
 
-void BackwardJumpAnalysis::generateFakeUse()
+void LexBackwardJumpAnalysis::generateFakeUse()
 {
-    for (BackwardEdge const* e = m_backward_edges.get_head();
+    for (LexBackwardJump const* e = m_backward_edges.get_head();
          e != nullptr; e = m_backward_edges.get_next()) {
-        IRBB const* src_bb = BKEDGE_srcbb(e);
-        IRBB const* dst_bb = BKEDGE_dstbb(e);
+        IRBB const* src_bb = BKJUMP_srcbb(e);
+        IRBB const* dst_bb = BKJUMP_dstbb(e);
         ASSERT0(src_bb && dst_bb);
 
         //For the source BB of the backward jump edge, prno of the live out
@@ -1132,12 +1123,6 @@ void BackwardJumpAnalysis::generateFakeUse()
             Occurence const* occ = m_prno2occ.get(pr);
             ASSERT0(occ);
             if (m_lsra->getDedicatedMgr().isDedicated(pr)) { continue; }
-            if (OCC_first(occ) > m_bb_exit_pos[src_bb->id()]) {
-                //Ignore the PR if the first occ of PR is after the jump/loop,
-                //which means this PR is not involved in the scope of current
-                //jump/loop.
-                continue;
-            }
             //Since some new fake-use IRs will be inserted at the start of the
             //dst BB, so the entry boundary of the dst BB should be included.
             if (OCC_first(occ) >= m_bb_entry_pos[dst_bb->id()]) {
@@ -1148,7 +1133,7 @@ void BackwardJumpAnalysis::generateFakeUse()
 }
 
 
-void BackwardJumpAnalysis::insertFakeUse()
+void LexBackwardJumpAnalysis::insertFakeUse()
 {
     Prno2FakeUseIter it;
     FakeUse * fake = nullptr;
@@ -1162,7 +1147,7 @@ void BackwardJumpAnalysis::insertFakeUse()
         insertFakeUse(FAKEUSE_bb(fake), pr, INSERT_MODE_TAIL);
     }
 }
-//END BackwardJumpAnalysis
+//END LexBackwardJumpAnalysis
 
 
 //
@@ -1314,10 +1299,15 @@ void RegSetImpl::initAvailRegSet()
     if (m_target_allocable_vector != nullptr) {
         m_avail_allocable.bunion(*m_target_allocable_vector);
     }
+
+    //Try to collect available registers occupied by other modules.
+    collectOtherAvailableRegister();
 }
 
-//Pick up a physical register from allocable register set.
-Reg RegSetImpl::pickReg(RegSet & set)
+
+//Pick up a physical register from allocable register set by the incremental
+//order.
+Reg RegSetImpl::pickRegByIncrementalOrder(RegSet & set)
 {
     BSIdx i = set.get_first();
     if (i == BS_UNDEF) {
@@ -1325,6 +1315,13 @@ Reg RegSetImpl::pickReg(RegSet & set)
     }
     set.diff(i);
     return (Reg)i;
+}
+
+
+//Pick up a physical register from allocable register set.
+Reg RegSetImpl::pickReg(RegSet & set)
+{
+    return pickRegByIncrementalOrder(set);
 }
 
 
@@ -1405,20 +1402,23 @@ Reg RegSetImpl::handleOnlyConflicts(OUT RegSet & set,
 {
     RegSetWrap removed_regs_wrap;
 
-    //Remove conflicting registers.
+    //Remove conflicting registers from the set to avoid conflicts.
+    //Example 1: set = {r2, r3, r4}, removed_regs_wrap = {r2}.
+    //Example 2: set = {r2}, removed_regs_wrap = {r2}.
     removeConflictingReg(set, conflict_prs, removed_regs_wrap);
 
     //Attempt to find an available register from the set after
     //removing conflict set.
     BSIdx available_reg = set.get_first();
+
+    //Immediately restore previously removed conflicting registers
+    //to ensure the set remains complete after conflict resolution.
+    //In Example 1 and Example 2, r2 will be restored back to set.
+    RegSet const* rs = removed_regs_wrap.getRegSet();
+    if (rs != nullptr) { set.bunion(*rs); }
+
     if (available_reg != BS_UNDEF) {
         set.diff(available_reg);
-
-        //Restore previously removed conflicting registers back into the set.
-        RegSet const* rs = removed_regs_wrap.getRegSet();
-        if (rs != nullptr) {
-            set.bunion(*rs);
-        }
         return (Reg)available_reg;
     }
     return REG_UNDEF;
@@ -1446,9 +1446,7 @@ Reg RegSetImpl::handleConflictsAndConsistency(
     for (PRNO pr = consist_prs.get_first(it); pr != PRNO_UNDEF;
          pr = consist_prs.get_next(it)) {
         Reg r = m_ra.getReg(pr);
-        if (r != REG_UNDEF) {
-            return r;
-        }
+        if (r != REG_UNDEF) { return r; }
     }
 
     //If no registers were allocated in consist_prs, handle conflict set.
@@ -1688,7 +1686,43 @@ void RegSetImpl::dumpAvailRegSet() const
     m_avail_allocable.dump(buf);
     note(m_ra.getRegion(), "\nAVAIL_ALLOCABLE:%s", buf.buf);
 }
+
+
+bool RegSetImpl::isFPAllocable() const
+{
+    return !g_force_use_fp_as_sp && !xoc::g_debug && m_ra.notHaveAlloca() &&
+        m_ra.noNeedToAlignStack() && m_ra.isFPAllocableAllowed();
+}
 //END RegSetImpl
+
+
+//
+//START RoundRobinRegSetImpl
+//
+//Pick up a physical register from allocable register set by the roundrobin
+//way.
+Reg RoundRobinRegSetImpl::pickRegRoundRobin(RegSet & set)
+{
+    BSIdx i = BS_UNDEF;
+    if (m_bsidx_marker == BS_UNDEF) {
+        i = m_bsidx_marker = set.get_first();
+    } else if (m_bsidx_marker != BS_UNDEF) {
+        i = set.get_next(m_bsidx_marker);
+        if (i == BS_UNDEF || i > set.get_last()) { i = set.get_first(); }
+        m_bsidx_marker = i;
+    }
+
+    if (i == BS_UNDEF) { return REG_UNDEF; }
+    set.diff(i);
+    return (Reg)i;
+}
+
+
+Reg RoundRobinRegSetImpl::pickReg(RegSet & set)
+{
+    return pickRegRoundRobin(set);
+}
+//END RoundRobinRegSetImpl
 
 
 //START LTConstraintsMgr
@@ -1794,11 +1828,10 @@ void LinearScanRA::reset()
     if (getLTConstraintsMgr() != nullptr) {
         getLTConstraintsMgr()->reset();
     }
-    m_prno_with_2d_hole.clean();
 }
 
 
-void LinearScanRA::assignTopoIdForBB()
+void LinearScanRA::assignLexSeqIdForBB()
 {
     //Iterate BB list.
     BBListIter bbit;
@@ -1917,21 +1950,11 @@ IR * LinearScanRA::buildReload(PRNO prno, Var * spill_loc, Type const* ty)
 IR * LinearScanRA::buildRemat(PRNO prno, RematCtx const& rematctx,
                               Type const* ty)
 {
-    ASSERT0(rematctx.material_exp);
+    ASSERT0(rematctx.material_exp && ty);
+    ASSERT0(prno != PRNO_UNDEF);
     IR * e = m_rg->dupIRTree(rematctx.material_exp);
     m_rg->getMDMgr()->allocRefForIRTree(e, true);
     IR * stmt = m_irmgr->buildStorePR(prno, ty, e);
-    m_rg->getMDMgr()->allocRef(stmt);
-    return stmt;
-}
-
-
-IR * LinearScanRA::buildMove(PRNO from, PRNO to, Type const* fromty,
-                             Type const* toty)
-{
-    IR * pr = m_irmgr->buildPRdedicated(from, fromty);
-    m_rg->getMDMgr()->allocRef(pr);
-    IR * stmt = m_irmgr->buildStorePR(to, toty, pr);
     m_rg->getMDMgr()->allocRef(stmt);
     return stmt;
 }
@@ -1962,10 +1985,13 @@ Type const* LinearScanRA::getVarTypeOfPRNO(PRNO prno) const
     ASSERT0(var);
     TypeMgr * tm = m_rg->getTypeMgr();
     Type const* varty = var->getType();
+    //[BUG FIX] If the type of var is ANY, size cannot be obtainer.
+    if (varty->is_vector() || varty->is_fp() || varty->is_any()) {
+        return varty;
+    }
     Type const* tm_word_ty = tm->getTargMachRegisterType();
     UINT var_sz = var->getByteSize(tm);
     UINT tm_word_sz = tm->getByteSize(tm_word_ty);
-    if (varty->is_vector() || varty->is_fp()) { return varty; }
     ASSERT0(varty->isInt());
     if (var_sz <= tm_word_sz) { return tm_word_ty; }
     return varty; //varty might be ANY.
@@ -2050,11 +2076,16 @@ bool LinearScanRA::verify4List() const
 
 //The function check whether 'lt' value is simple enough to rematerialize.
 //And return the information through rematctx.
-bool LinearScanRA::checkLTCanBeRematerialized(LifeTime const* lt,
+bool LinearScanRA::checkLTCanBeRematerialized(MOD LifeTime * lt,
                                               OUT RematCtx & rematctx)
 {
     //Target Dependent Code.
-    return false;
+    ASSERT0(lt);
+    if (!lt->canBeRemat()) { return false; }
+    ASSERT0(lt->getRematExp());
+    rematctx.material_exp = lt->getRematExp();
+    lt->setRematerialized();
+    return true;
 }
 
 
@@ -2154,8 +2185,7 @@ void LinearScanRA::dumpBBListWithReg() const
     };
     DumpPRWithReg df;
     df.lsra = this;
-    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
-        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
     IRDumpCtx<> ctx(4, f, nullptr, &df);
     ASSERT0(m_rg->getBBList());
     xoc::dumpBBList(m_rg->getBBList(), m_rg, false, &ctx);
@@ -2264,7 +2294,7 @@ CHAR const* LinearScanRA::genFuncLevelNewVarName(OUT xcom::StrBuf & name)
 }
 
 
-void LinearScanRA::updateSSA(OptCtx & oc) const
+void LinearScanRA::recalculateSSA(OptCtx & oc) const
 {
     bool rmprdu = false;
     bool rmnonprdu = false;
@@ -2300,218 +2330,38 @@ void LinearScanRA::collectDedicatedPR(BBList const* bblst,
 }
 
 
-//The class switch IRBBMgr of given region.
-class UseNewIRBBMgr {
-    IRBBMgr * m_org_bbmgr;
-    IRBBMgr * m_new_bbmgr;
-    Region * m_rg;
-public:
-    UseNewIRBBMgr(Region * rg, IRBBMgr * bbmgr)
-    {
-        m_rg = rg;
-        m_org_bbmgr = bbmgr;
-        m_new_bbmgr = new IRBBMgr(rg);
-        m_rg->setBBMgr(m_new_bbmgr);
-    }
-    ~UseNewIRBBMgr()
-    {
-        ASSERT0(m_org_bbmgr && m_new_bbmgr);
-        m_rg->setBBMgr(m_org_bbmgr);
-        delete m_new_bbmgr;
-    }
-    IRBBMgr * getNewIRBBMgr() const { return m_new_bbmgr; }
-    IRBBMgr * getOrgIRBBMgr() const { return m_org_bbmgr; }
-};
-
-
-//The class switch IRMgr of given region.
-class UseNewIRMgr {
-    IRMgr * m_org_mgr;
-    IRMgr * m_new_mgr;
-    Region * m_rg;
-public:
-    UseNewIRMgr(Region * rg, IRMgr * irmgr)
-    {
-        m_rg = rg;
-        m_org_mgr = irmgr;
-        ASSERT0(m_rg->getPassMgr());
-        m_new_mgr = (IRMgr*)m_rg->getPassMgr()->allocPass(PASS_IRMGR);
-        m_new_mgr->setIRCount(m_org_mgr->getIRCount());
-        m_rg->setIRMgr(m_new_mgr);
-    }
-    ~UseNewIRMgr()
-    {
-        ASSERT0(m_org_mgr && m_new_mgr);
-        m_rg->setIRMgr(m_org_mgr);
-        m_rg->getPassMgr()->destroyPass(m_new_mgr);
-    }
-    IRMgr * getNewIRMgr() const { return m_new_mgr; }
-    IRMgr * getOrgIRMgr() const { return m_org_mgr; }
-};
-
-
-//The class switch BBList of given region.
-//Note the class will clone new BB via given IRBBMgr.
-class UseNewBBList {
-    BBList * m_org_bblst;
-    BBList * m_new_bblst;
-    IRBBMgr * m_new_bbmgr; //record user generated new IRBBMgr.
-    Region * m_rg;
-public:
-    UseNewBBList(Region * rg, BBList * bblst, MOD IRBBMgr * newbbmgr)
-    {
-        ASSERT0(newbbmgr);
-        m_rg = rg;
-        m_org_bblst = bblst;
-        m_new_bbmgr = newbbmgr;
-        m_new_bblst = new BBList();
-        m_new_bblst->clone(*bblst, m_new_bbmgr, rg);
-        m_rg->setBBList(m_new_bblst);
-    }
-    ~UseNewBBList()
-    {
-        BBListIter it;
-        for (IRBB * bb = m_new_bblst->get_head(&it);
-             bb != nullptr; bb = m_new_bblst->get_next(&it)) {
-            m_new_bbmgr->destroyBB(bb);
-        }
-        delete m_new_bblst;
-        m_rg->setBBList(m_org_bblst);
-    }
-    BBList * getNewBBList() const { return m_new_bblst; }
-    BBList * getOrgBBList() const { return m_org_bblst; }
-};
-
-
-//The class switch IRCFG of given region.
-class UseNewCFG {
-    IRCFG * m_org_cfg;
-    IRCFG * m_new_cfg;
-    Region * m_rg;
-public:
-    UseNewCFG(Region * rg, IRCFG * cfg, BBList * newbblst)
-    {
-        ASSERT0(newbblst);
-        m_rg = rg;
-        m_org_cfg = cfg;
-        ASSERT0(m_rg->getPassMgr());
-        //m_new_cfg = (IRCFG*)m_rg->getPassMgr()->allocPass(PASS_CFG);
-        m_new_cfg = new IRCFG(*cfg, newbblst, false, false);
-        m_new_cfg->setBBVertex();
-        m_rg->setCFG(m_new_cfg);
-    }
-    ~UseNewCFG()
-    {
-        ASSERT0(m_org_cfg && m_new_cfg);
-        m_rg->setCFG(m_org_cfg);
-        m_new_cfg->setBBList(nullptr);
-        delete m_new_cfg;
-    }
-    IRCFG * getNewCFG() const { return m_new_cfg; }
-    IRCFG * getOrgCFG() const { return m_org_cfg; }
-};
-
-
-//
-//START ApplyToRegion
-//
-class ApplyToRegion {
-    COPY_CONSTRUCTOR(ApplyToRegion);
-    xcom::Stack<UseNewIRMgr*> m_irmgr_stack;
-    xcom::Stack<UseNewIRBBMgr*> m_bbmgr_stack;
-    xcom::Stack<UseNewBBList*> m_bblist_stack;
-    xcom::Stack<UseNewCFG*> m_cfg_stack;
-    Region * m_rg;
-public:
-    ApplyToRegion(Region * rg) { m_rg = rg; }
-    ~ApplyToRegion()
-    {
-        for (; m_irmgr_stack.get_top() != nullptr;) {
-            m_irmgr_stack.pop();
-            m_bbmgr_stack.pop();
-            m_bblist_stack.pop();
-            m_cfg_stack.pop();
-        }
-        ASSERT0(m_irmgr_stack.get_top() == nullptr);
-        ASSERT0(m_bbmgr_stack.get_top() == nullptr);
-        ASSERT0(m_bblist_stack.get_top() == nullptr);
-        ASSERT0(m_cfg_stack.get_top() == nullptr);
-    }
-    void push()
-    {
-        //Push current IRMgr of region and adopt a new.
-        UseNewIRMgr * usenewirmgr = new UseNewIRMgr(m_rg, m_rg->getIRMgr());
-        ASSERT0(usenewirmgr->getNewIRMgr() == m_rg->getIRMgr());
-        m_irmgr_stack.push(usenewirmgr);
-
-        //Push current IRBBMgr of region and adopt a new.
-        UseNewIRBBMgr * usenewbbmgr = new UseNewIRBBMgr(
-            m_rg, m_rg->getBBMgr());
-        ASSERT0(usenewbbmgr->getNewIRBBMgr() == m_rg->getBBMgr());
-        m_bbmgr_stack.push(usenewbbmgr);
-
-        //Push current BBList of region and adopt a new.
-        UseNewBBList * usenewbblst = new UseNewBBList(
-            m_rg, m_rg->getBBList(), usenewbbmgr->getNewIRBBMgr());
-        ASSERT0(usenewbblst->getNewBBList() == m_rg->getBBList());
-        m_bblist_stack.push(usenewbblst);
-
-        //Push current CFG of region and adopt a new.
-        UseNewCFG * usenewcfg = new UseNewCFG(
-            m_rg, m_rg->getCFG(), usenewbblst->getNewBBList());
-        ASSERT0(usenewcfg->getNewCFG() == m_rg->getCFG());
-        m_cfg_stack.push(usenewcfg);
-    }
-    void pop()
-    {
-        UseNewCFG * usecfg = m_cfg_stack.pop();
-        if (usecfg != nullptr) { delete usecfg; }
-
-        UseNewBBList * usebblst = m_bblist_stack.pop();
-        if (usebblst != nullptr) { delete usebblst; }
-
-        UseNewIRBBMgr * usebbmgr = m_bbmgr_stack.pop();
-        if (usebbmgr != nullptr) { delete usebbmgr; }
-
-        UseNewIRMgr * useirmgr = m_irmgr_stack.pop();
-        if (useirmgr != nullptr) { delete useirmgr; }
-    }
-};
-//END ApplyToRegion
-
-
 //This function implements the swap operation of two prnos through the temp
 //register after the register allocation.
 //  There are three steps used to complete the swap operation:
-//  1. $temp  <-- mov $prno1
-//  2. $prno1 <-- mov $prno2
-//  3. $prno2 <-- mov $temp
-IR * LinearScanRA::doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
+//  1. $temp  <-- mov $src_prno_with_r1
+//  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
+//  3. $dst_prno_with_r2 <-- mov $temp
+IR * LinearScanRA::doSwapByReg(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
     Type const* ty2, IR const* marker, MOD IRBB * bb)
 {
     ASSERT0(bb && ty1 && ty2);
-    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
-    ASSERT0(prno1 != prno2);
+    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(src_prno_with_r2 != src_prno_with_r1);
+    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
+    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
 
     Type const* ty1_tmp = getSpillType(ty1);
     Type const* ty2_tmp = getSpillType(ty2);
     ASSERT0(ty1_tmp && ty2_tmp);
 
-    //Move the data from the reg of prno1 to the reg of temp.
-    PRNO tmpprno = buildPrno(ty1_tmp, ty1_tmp->is_vector() ?
-        getTempVector() : getTempScalar());
-    IR * stpr1 = m_irmgr->buildStorePR(tmpprno, ty1_tmp,
-        m_irmgr->buildPRdedicated(prno1, ty1_tmp));
+    //Move the data from the reg of src_prno_with_r1 to the reg of temp.
+    PRNO tmpprno = buildPrno(ty1_tmp, getTempReg(ty1_tmp));
+    IR * stpr1 = m_irmgr->buildMove(tmpprno, src_prno_with_r1, ty1_tmp);
 
-    //Move the data from the reg of prno2 to the reg of prno1.
-    PRNO tmp_prno_2 = buildPrno(ty2_tmp, getReg(prno1));
-    IR * stpr2 = m_irmgr->buildStorePR(tmp_prno_2, ty2_tmp,
-        m_irmgr->buildPRdedicated(prno2, ty2_tmp));
+    //Move the data from the reg of src_prno_with_r2 to the reg of
+    //dst_prno_with_r1.
+    IR * stpr2 = m_irmgr->buildMove(dst_prno_with_r1, src_prno_with_r2,
+                                    ty2_tmp);
 
-    //Move the data from the reg of tmp to the reg of prno2.
-    PRNO tmp_prno_3 = buildPrno(ty1_tmp, getReg(prno2));
-    IR * stpr3 = m_irmgr->buildStorePR(tmp_prno_3, ty1_tmp,
-        m_irmgr->buildPRdedicated(tmpprno, ty1_tmp));
+    //Move the data from the reg of tmp to the reg of dst_prno_with_r2.
+    IR * stpr3 = m_irmgr->buildMove(dst_prno_with_r2, tmpprno, ty1_tmp);
 
     if (marker) {
         IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
@@ -2533,15 +2383,19 @@ IR * LinearScanRA::doSwapByReg(PRNO prno1, PRNO prno2, Type const* ty1,
 //This function implements the swap operation of two prnos through the memory
 //allocation after the register allocation.
 //  There are three steps used to complete the swap operation:
-//  1. [mem]  <-- spill $prno1
-//  2. $prno1 <-- mov $prno2
-//  3. $prno2 <-- reload [mem]
-IR * LinearScanRA::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
+//  1. [mem]  <-- spill $src_prno_with_r1
+//  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
+//  3. $dst_prno_with_r2 <-- reload [mem]
+IR * LinearScanRA::doSwapByMem(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
     Type const* ty2, IR const* marker, MOD IRBB * bb)
 {
     ASSERT0(bb && ty1 && ty2);
-    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
-    ASSERT0(prno1 != prno2);
+    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(src_prno_with_r2 != src_prno_with_r1);
+    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
+    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
 
     Type const* ty1_tmp = getSpillType(ty1);
     Type const* ty2_tmp = getSpillType(ty2);
@@ -2551,8 +2405,7 @@ IR * LinearScanRA::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
     ASSERT0(spill_loc);
 
     //Build the spill IR.
-    PRNO tmpprno = buildPrno(ty1_tmp, getReg(prno1));
-    IR * spill = buildSpillByLoc(tmpprno, spill_loc, ty1_tmp);
+    IR * spill = buildSpillByLoc(src_prno_with_r1, spill_loc, ty1_tmp);
     if (marker) {
         IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
         bb->getIRList().insert_after(spill, stmt);
@@ -2560,13 +2413,10 @@ IR * LinearScanRA::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
         bb->getIRList().append_head(spill);
     }
     //This data move is always between two registers.
-    tmpprno = buildPrno(ty2_tmp, getReg(prno1));
-    IR * stpr = m_irmgr->buildStorePR(tmpprno, ty2_tmp,
-        m_irmgr->buildPRdedicated(prno2, ty2_tmp));
+    IR * stpr = m_irmgr->buildMove(dst_prno_with_r1, src_prno_with_r2, ty2_tmp);
 
     //Build the reload IR.
-    tmpprno = buildPrno(ty1_tmp, getReg(prno2));
-    IR * reload = buildReload(tmpprno, spill_loc, ty1_tmp);
+    IR * reload = buildReload(dst_prno_with_r2, spill_loc, ty1_tmp);
 
     bb->getIRList().insert_after(stpr, spill);
     bb->getIRList().insert_after(reload, stpr);
@@ -2583,29 +2433,35 @@ IR * LinearScanRA::doSwapByMem(PRNO prno1, PRNO prno2, Type const* ty1,
 //     1. Temp register.
 //     2. Temp memory location.
 //  The principles of the swap operation are listed as below:
-//     1. If the temp register for prno1 is available, do the swap operation
-//        by the temp register.
-//     2. If the temp register for prno2 is available, do the swap operation
-//        by the temp register.
-//     3. If the temp register for prno1 and prno2 are not available, do
-//        swap operation by the temp memory location.
-IR * LinearScanRA::insertIRToSwap(PRNO prno1, PRNO prno2, Type const* ty1,
+//     1. If the temp register for dst_prno_with_r1 is available, do the swap
+//        operation by the temp register.
+//     2. If the temp register for dst_prno_with_r2 is available, do the swap
+//        operation by the temp register.
+//     3. If the temp register for dst_prno_with_r1 and dst_prno_with_r2 are
+//        not available, do swap operation by the temp memory location.
+IR * LinearScanRA::insertIRToSwap(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
+    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
     Type const* ty2, IR const* marker, MOD IRBB * bb)
 {
     ASSERT0(bb && ty1 && ty2);
-    ASSERT0(prno1 != PRNO_UNDEF && prno2 != PRNO_UNDEF);
-    ASSERT0(prno1 != prno2);
-    ASSERT0(getReg(prno1) != getReg(prno2));
+    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
+    ASSERT0(src_prno_with_r1 != src_prno_with_r2);
+    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
+    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
 
     if (isTmpRegAvailable(ty1)) {
-        return doSwapByReg(prno1, prno2, ty1, ty2, marker, bb);
+        return doSwapByReg(src_prno_with_r2, dst_prno_with_r1,
+            src_prno_with_r1, src_prno_with_r1, ty1, ty2, marker, bb);
     }
 
     if (isTmpRegAvailable(ty2)) {
-        return doSwapByReg(prno2, prno1, ty2, ty1, marker, bb);
+        return doSwapByReg(src_prno_with_r1, dst_prno_with_r2,
+            src_prno_with_r2, dst_prno_with_r1, ty2, ty1, marker, bb);
     }
 
-    return doSwapByMem(prno1, prno2, ty1, ty2, marker, bb);
+    return doSwapByMem(src_prno_with_r2, dst_prno_with_r1,
+        src_prno_with_r1, dst_prno_with_r2, ty1, ty2, marker, bb);
 }
 
 
@@ -2662,10 +2518,10 @@ bool LinearScanRA::performLsraImpl(OptCtx & oc)
 void LinearScanRA::reuseStackSlot(bool is_vector)
 {
     VarCheck::setVarCheckCondition(is_vector);
-    VarLivenessMgr var_liveness_mgr(m_rg, *this);
+    LSRAVarLivenessMgr var_liveness_mgr(m_rg, *this);
     var_liveness_mgr.perform();
 
-    VarLifeTimeMgr var_ltmgr(m_rg, &var_liveness_mgr);
+    VarLifeTimeMgr var_ltmgr(m_rg, *this, &var_liveness_mgr);
     var_ltmgr.computeLifeTime();
     var_ltmgr.computeAccuLifeTime();
 
@@ -2757,6 +2613,64 @@ void LinearScanRA::checkAndPrepareApplyToRegion(OUT ApplyToRegion & apply)
 }
 
 
+void LinearScanRA::genRematForLT(MOD LifeTime * lt) const
+{
+    ASSERT0(lt);
+    bool lt_has_only_one_def = lt->isOneDefOnly();
+    OccList & occ_lst = const_cast<LifeTime*>(lt)->getOccList();
+    OccListIter it = nullptr;
+    for (Occ occ = occ_lst.get_head(&it); it != occ_lst.end();
+         occ = occ_lst.get_next(&it)) {
+        ASSERT0(occ.getIR());
+        IR * occ_ir = occ.getIR();
+
+        //Process the def occ only.
+        if (!occ.is_def()) { continue; }
+
+        //If there is a def IR which is not a remat-like Op, that means this
+        //lifetime cannot be rematerialized.
+        if (!isRematLikeOp(occ_ir)) {
+            lt->setRematExp(nullptr);
+            break;
+        }
+        if (lt->getRematExp() == nullptr) {
+            lt->setRematExp(occ_ir->getRHS());
+        }
+
+        //If this lifetime has only one def, then exit the loop.
+        if (lt_has_only_one_def) { break; }
+
+        //If the two remat-like IRs are not same, clear the remat info stored
+        //before.
+        if (!lt->getRematExp()->isIREqual(occ_ir->getRHS(), m_rg->getIRMgr())) {
+            lt->setRematExp(nullptr);
+            break;
+        }
+    }
+}
+
+
+void LinearScanRA::genRematInfo()
+{
+    LTList const& ltlst = getLTMgr().getLTList();
+    LTListIter it;
+    for (LifeTime * lt = ltlst.get_head(&it); lt != nullptr;
+         lt = ltlst.get_next(&it)) {
+        genRematForLT(lt);
+    }
+}
+
+
+void LinearScanRA::setAttr()
+{
+    DynamicStack * dynamic_stack = (DynamicStack*)m_rg->getPassMgr()->
+        queryPass(PASS_DYNAMIC_STACK);
+    ASSERT0(dynamic_stack);
+    m_has_alloca = dynamic_stack->hasAlloca();
+    m_may_need_to_realign_stack = dynamic_stack->mayRealignStack();
+}
+
+
 //TODO: rematerialization and spill-store-elimination
 bool LinearScanRA::perform(OptCtx & oc)
 {
@@ -2774,14 +2688,15 @@ bool LinearScanRA::perform(OptCtx & oc)
     if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
         return false;
     }
+    setAttr();
 
-    //Assign each BB a topologic sequence ID.
-    assignTopoIdForBB();
+    //Assign each BB a lexical sequence ID.
+    assignLexSeqIdForBB();
 
     //Do the backward jump analysis based on the CFG and liveness information.
     BBPos2Attr pos2attr;
     FakeVarMgr fake_var_mgr(m_rg);
-    BackwardJumpAnalysis back_jump_ana(m_rg, &pos2attr, &fake_var_mgr, this);
+    LexBackwardJumpAnalysis back_jump_ana(m_rg, &pos2attr, &fake_var_mgr, this);
     back_jump_ana.analyze();
 
     UpdatePos up(this);
@@ -2792,6 +2707,10 @@ bool LinearScanRA::perform(OptCtx & oc)
     //sets for each lifetime.
     tryComputeConstraints();
 
+    //The remat info must be generated before the priority of the lifetime is
+    //computed.
+    genRematInfo();
+
     //Process the lifetime related attributes before register assignment.
     PosAttrLifeTimeProc lt_proc(m_rg, pos2attr, this);
     lt_proc.process();
@@ -2799,7 +2718,6 @@ bool LinearScanRA::perform(OptCtx & oc)
     LTPriorityMgr priomgr(m_cfg, getTIMgr());
     priomgr.computePriority(getLTMgr());
     bool changed = performLsraImpl(oc);
-
     //Remove the fake-use IR with no code gen attribute after register
     //assignment.
     PosAttrNoCodeGenProc no_code_gen_proc(m_rg, pos2attr, this);
@@ -2811,6 +2729,7 @@ bool LinearScanRA::perform(OptCtx & oc)
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         dump(false);
     }
+
     checkAndApplyToRegion(apply);
     ASSERTN(getRegion()->getCFG()->verifyRPO(oc),
             ("make sure original RPO is legal"));
@@ -2821,7 +2740,7 @@ bool LinearScanRA::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    updateSSA(oc);
+    recalculateSSA(oc);
     ASSERT0(m_rg->getBBMgr()->verify());
     END_TIMER(t, getPassName());
     return false;

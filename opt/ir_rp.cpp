@@ -1560,7 +1560,7 @@ bool RegPromot::collectStmt(IR * ir, LI<IRBB> const* li,
         return true;
     case IR_CALL:
         //Do NOT iterate DUMMY expression-list.
-        return scanIRTreeList(CALL_param_list(ir), li, exact_tab,
+        return scanIRTreeList(CALL_arg_list(ir), li, exact_tab,
                               inexact_tab, ctx);
     case IR_ICALL:
         //Do NOT iterate DUMMY expression-list.
@@ -1568,7 +1568,7 @@ bool RegPromot::collectStmt(IR * ir, LI<IRBB> const* li,
                             inexact_tab, ctx)) {
             return false;
         }
-        return scanIRTreeList(CALL_param_list(ir), li, exact_tab,
+        return scanIRTreeList(CALL_arg_list(ir), li, exact_tab,
                               inexact_tab, ctx);
     case IR_REGION:
         return true;
@@ -1822,7 +1822,7 @@ void RegPromot::removeMDPhiForInexactAcc(
     Ref2DeleTab & ref2dele = const_cast<DelegateMgr&>(delemgr).
         getRef2DeleTab();
     InexactAccTabIter ti;
-    TTab<IR*> visited;
+    xcom::TTab<IR*> visited;
     for (IR * occ = inexact_tab.get_first(ti); occ != nullptr;
          occ = inexact_tab.get_next(ti)) {
         //Get the unique delegate.
@@ -2109,7 +2109,7 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
     //Infer and add those BBs that should be also handled in PRSSA construction.
     ssarg.inferAndAddRelatedBB();
     m_prssamgr->constructDesignatedRegion(ssarg);
-    OC_is_pr_du_chain_valid(*ctx.oc) = false;
+    ctx.oc->setInvalidPRDU();
     return true;
 }
 
@@ -2164,7 +2164,7 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
     ASSERT0(m_prssamgr);
     ctx.oc->setInvalidLiveness();
     m_prssamgr->constructDesignatedRegion(ssarg);
-    OC_is_pr_du_chain_valid(*ctx.oc) = false;
+    ctx.oc->setInvalidPRDU();
     return true;
 }
 
@@ -2213,18 +2213,19 @@ void RegPromot::addDUChainForInexactAccDele(
 }
 
 
-void RegPromot::addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb,
-                                     RPCtx const& ctx)
+void RegPromot::addDUChainForExpTree(
+    IR * root, IR * startir, IRBB * startbb, RPCtx const& ctx)
 {
     ASSERT0(root->is_exp());
     bool use_prssa = usePRSSADU();
     bool use_mdssa = useMDSSADU();
     if (!use_prssa && !use_mdssa) { return; }
     IRIter it;
+    MDSSAStatus st;
     for (IR * x = iterInit(root, it);
          x != nullptr; x = iterNext(it)) {
         if (use_mdssa && x->isMemRefNonPR()) {
-            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc);
+            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc, st);
         } else if (use_prssa && x->isReadPR()) {
             m_prssamgr->findAndSetLiveinDef(x);
         }
@@ -2261,10 +2262,11 @@ void RegPromot::addSSADUChainForExpOfRestoreLHS(
     IRIter it;
     IR * startir = restore->getBB()->getPrevIR(restore);
     IRBB * startbb = restore->getBB();
-    for (IR * x = iterExpOfStmtInit(restore, it);
-         x != nullptr; x = iterExpOfStmtNext(it)) {
+    MDSSAStatus st;
+    for (IR * x = xoc::iterExpOfStmtInit(restore, it);
+         x != nullptr; x = xoc::iterExpOfStmtNext(it)) {
         if (use_mdssa && x->isMemRefNonPR()) {
-            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc);
+            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc, st);
         } else if (use_prssa && x->isReadPR()) {
             m_prssamgr->findAndSetLiveinDef(x);
         }
@@ -2670,10 +2672,14 @@ bool RegPromot::tryPromoteLoop(
     bool change_cfg = xoc::insertPreheader(li, m_rg, &preheader, ctx.oc, false);
     if ((change_cfg || ctx.domtree == nullptr || ctx.need_rebuild_domtree) &&
         (useMDSSADU() || usePRSSADU())) {
+        //DomTree needs DomInfo to be available.
+        m_rg->getPassMgr()->checkValidAndRecompute(
+            ctx.oc, PASS_DOM, PASS_UNDEF);
         ctx.buildDomTree(m_cfg);
     }
-    bool change_ir = promote(li, exit_bb, preheader, ii,
-                             exact_tab, inexact_tab, ctx);
+    bool change_ir = promote(
+        li, exit_bb, preheader, ii, exact_tab, inexact_tab, ctx);
+
     //promote() should maintaind PRSSA and MDSSA.
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *ctx.oc));
     ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *ctx.oc));
@@ -2701,19 +2707,36 @@ IRBB * RegPromot::tryInsertStubExitBB(
 
     //CASE:compile/update_rpo.c
     //In this case, we have to amend PRO before change CFG, that is to say,
-    //inserting BB56 between BB43 and BB35. Because tryUpdateRPO() collect
-    //and compute new RPO by walking through the predecessors of 'exit_bb'.
+    //inserting BB56 between BB43 and BB35. Because tryUpdateRPO() collects
+    //and computes new RPO by walking through the predecessors of 'exit_bb'.
     IRBB * stub = m_rg->allocBB();
     m_cfg->addBB(stub);
+
+    //Update RPO before inserting BB since the update need original CFG info.
     m_cfg->tryUpdateRPOBeforeCFGChanged(stub, exit_bb, true, ctx.oc);
+
+    //Insert stub-BB.
     m_cfg->insertBBBetween(pred, pred_it, exit_bb, exit_bb_it, stub, ctx.oc);
-    //TODO:revise dom-info incrementally.
-    ctx.oc->setInvalidDom();
-    ctx.oc->setInvalidPDom();
-    ctx.oc->setInvalidCDG();
-    ctx.need_rebuild_domtree = true;
+
+    //Revise LoopInfo for stub-BB.
+    //Note stub-BB should NOT belong to current loop body.
+    ctx.getLI()->addBBToAllOuterLoop(stub->id());
+
+    //Since CDG is rarely used, such as DCE, we choose to recompute CDG
+    //if needed.
+    //TODO:Revise DomInfo incrementally.
+    OptCtx::setInvalidIfCFGChangedExcept(
+        ctx.oc, PASS_RPO, PASS_LOOP_INFO, PASS_UNDEF);
+
+    //The following processing procedure needs DomInfo, thus we ensure DomInfo
+    //to be valid after inserting stub-BB.
     m_cfg->getRegion()->getPassMgr()->checkValidAndRecompute(
         ctx.oc, PASS_DOM, PASS_UNDEF);
+
+    //Inform RP to rebuild Dom Tree before invoke promote() because we
+    //recompute DomInfo.
+    ctx.need_rebuild_domtree = true;
+    ASSERT0(m_cfg->verifyLoopInfo(*ctx.oc));
     return stub;
 }
 
@@ -2864,6 +2887,28 @@ BAILOUT:
 }
 
 
+bool RegPromot::initDepPass(OptCtx & oc)
+{
+    if (!initSSAMgr(oc)) {
+        dump();
+        return false;
+    }
+    if (!initLoopInfo(oc)) {
+        dump();
+        return false;
+    }
+    if (!initGVN(oc)) {
+        dump();
+        return false;
+    }
+    if (!initLoopDepAna(oc)) {
+        dump();
+        return false;
+    }
+    return true;
+}
+
+
 //Perform scalar replacement of aggregates and array.
 bool RegPromot::perform(OptCtx & oc)
 {
@@ -2871,11 +2916,12 @@ bool RegPromot::perform(OptCtx & oc)
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_ref_valid()) { return false; }
     if (!oc.is_cfg_valid()) { return false; }
+
     START_TIMER(t, getPassName());
-    if (!initSSAMgr(oc)) { dump(); return false; }
-    if (!initLoopInfo(oc)) { dump(); return false; }
-    if (!initGVN(oc)) { dump(); return false; }
-    if (!initLoopDepAna(oc)) { dump(); return false; }
+    if (!initDepPass(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpBeforePass();

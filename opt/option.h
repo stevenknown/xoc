@@ -83,21 +83,25 @@ public:
 };
 
 
+//The class represents dump-options for miscellaneous dump behaviours.
 class DumpOption {
 public:
     //Dump all information.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_all;
+
     //Dump after pass.
     bool is_dump_after_pass;
+
     //Dump before pass.
     bool is_dump_before_pass;
+
     //Do not dump anything.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
     bool is_dump_aa; //Dump Alias Analysis information.
     bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.
-    bool is_dump_duref; //Dump MD Def-Use reference built both
+    bool is_dump_mdref; //Dump MD Def-Use reference built both
                         //by AA and DU Manager.
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.
     bool is_dump_cfg; //Dump CFG.
@@ -114,6 +118,8 @@ public:
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_vectorization; //Dump IR Vectorization.
     bool is_dump_multi_res_convert; //Dump Multiple Result Convert.
+    bool is_dump_targinfo_handler; //Dump Multiple Result Convert.
+    bool is_dump_alge_reasscociate; //Dump Alge Reasscociation.
     bool is_dump_loop_dep_ana; //Dump Loop Dependence Analysis.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
@@ -136,6 +142,7 @@ public:
     bool is_dump_lsra; //Dump LinearScanRA
     bool is_dump_to_buffer; //Dump info to buffer
     bool is_dump_pelog; //Dump PrologueEpilogue
+
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
     //basedump file in testsuite, because the id may be different in different
@@ -196,6 +203,8 @@ public:
     bool isDumpMDSSAMgr() const;
     bool isDumpMemUsage() const;
     bool isDumpMultiResConvert() const;
+    bool isDumpTargInfoHandler() const;
+    bool isDumpAlgeReasscociate() const;
     bool isDumpNothing() const;
     bool isDumpPElog() const;
     bool isDumpPRSSAMgr() const;
@@ -210,6 +219,37 @@ public:
     bool isDumpVectorization() const;
     bool isDumpVRP() const;
 
+    void setDumpNothing();
+    void setDumpAll();
+};
+
+
+//The class represents options to manipulate miscellaneous passes.
+class PassOption {
+protected:
+    void setPassInLevel1(bool enable);
+    void setPassInLevel2(bool enable);
+    void setPassInLevel3(bool enable);
+    void setPassInLevelSize(bool enable);
+public:
+    PassOption() {}
+
+    void disablePassInLevel1() { setPassInLevel2(false); }
+    void disablePassInLevel2() { setPassInLevel2(false); }
+    void disablePassInLevel3() { setPassInLevel3(false); }
+    void disablePassInLevelSize() { setPassInLevelSize(false); }
+    void disableAllPass()
+    {
+        disablePassInLevel1();
+        disablePassInLevel2();
+        disablePassInLevel3();
+        disablePassInLevelSize();
+    }
+
+    void enablePassInLevel1() { setPassInLevel2(true); }
+    void enablePassInLevel2() { setPassInLevel2(true); }
+    void enablePassInLevel3() { setPassInLevel3(true); }
+    void enablePassInLevelSize() { setPassInLevelSize(true); }
 };
 
 
@@ -272,7 +312,7 @@ typedef enum _PASS_TYPE {
     PASS_GVN,
     PASS_DOM,
     PASS_PDOM,
-    PASS_DU_REF,
+    PASS_MD_REF,
     PASS_LIVE_EXPR,
     PASS_AVAIL_REACH_DEF,
     PASS_REACH_DEF,
@@ -305,6 +345,8 @@ typedef enum _PASS_TYPE {
     PASS_IRMGR,
     PASS_CALL_GRAPH,
     PASS_MULTI_RES_CVT,
+    PASS_ALGE_REASSCOCIATE,
+    PASS_TARGINFO_HANDLER,
     PASS_LOOP_DEP_ANA,
     PASS_PROLOGUE_EPILOGUE,
     PASS_GP_ADJUSTMENT,
@@ -358,7 +400,7 @@ extern bool g_do_inline;
 extern UINT g_inline_threshold;
 
 //Optimize float point operation.
-extern bool g_is_opt_float;
+extern bool g_do_opt_float;
 
 //Lower IR to PR mode.
 //The simplification will guarantee that all value in computation will be
@@ -475,6 +517,9 @@ extern bool g_compute_available_exp;
 
 //Computem imported MD which are defined and used in region.
 extern bool g_compute_region_imported_defuse_md;
+
+//Computem PR-DU chain by PRSSA.
+extern bool g_compute_pr_du_chain_by_prssa;
 
 //Build expression table to record lexicographic equally IR expression.
 extern bool g_do_expr_tab;
@@ -595,6 +640,9 @@ extern bool g_do_poly_tran;
 //Refine DefUse Chain.
 extern bool g_do_refine_duchain;
 
+//Algebraic Reasscociation.
+extern bool g_do_alge_reasscociate;
+
 //Linear Scan Register Allocation.
 extern bool g_do_lsra;
 
@@ -621,10 +669,6 @@ extern bool g_adjust_kernel;
 
 //Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;
-
-//This variable show the verification level that compiler will perform.
-//More higher the level is, more verifications will be performed.
-extern UINT g_verify_level;
 
 //We always simplify parameters to lowest height to
 //facilitate the query of point-to set.
@@ -662,6 +706,9 @@ extern bool g_generate_var_for_pr;
 //Record dump options for each Pass.
 extern DumpOption g_dump_opt;
 
+//Record options for each Pass.
+extern PassOption g_pass_opt;
+
 //Record architecture.
 extern ArchOption g_arch;
 
@@ -693,10 +740,13 @@ extern UINT g_debug_reg_num;
 extern bool g_support_alloca;
 //Enable fp as stack pointer.
 extern bool g_force_use_fp_as_sp;
+
 //Perform ir reloc.
 extern bool g_do_ir_reloc;
+
 //Enable arg passer.
 extern bool g_do_arg_passer;
+
 //Recycle local Var id and related MD id when destorying regions.
 extern bool g_recycle_local_id;
 
@@ -712,5 +762,7 @@ extern bool g_debug_pyhton;
 //Use the interference graph algorithm to clor the stack slot generated in LSRA,
 //which can reduce the final stack space.
 extern bool g_interference_graph_stack_slot_color;
+
 } //namespace xoc
+
 #endif

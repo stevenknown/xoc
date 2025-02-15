@@ -237,7 +237,8 @@ protected:
 public:
     virtual ~HeapSort() {}
 
-    //Sort value in 'data' incrementally.
+    //HeapSort.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         build_max_heap(data);
@@ -313,19 +314,26 @@ template <class T> class QuickSort {
 protected:
     //The function is optional to sorting, usually used in calibrating
     //mid-value to avoid degrdating to the worst case.
-    //e.g:you can return a directly.
+    //e.g:you can return 'a' directly.
     virtual T _max(T a, T b) const { return MAX(a, b); }
 
     //The function is optional to sorting, usually used in calibrating
     //mid-value to avoid degrdating to the worst case.
-    //e.g:you can return a directly.
+    //e.g:you can return 'a' directly.
     virtual T _min(T a, T b) const { return MIN(a, b); }
+
+    //The function is necessary to sorting.
+    //Return true if 'a' > 'b'.
     virtual bool GreatThan(T a, T b) const { return a > b; }
+
+    //The function is necessary to sorting.
+    //Return true if 'a' < 'b'.
     virtual bool LessThan(T a, T b) const { return a < b; }
 public:
     virtual ~QuickSort() {}
+
     //Quick Sort.
-    //The output data will be ordered increment.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         if (data.get_last_idx() == VEC_UNDEF || data.get_last_idx() == 0) {
@@ -404,12 +412,15 @@ public:
 
 
 //Bubble Sort.
-//The output data will be ordered increment.
+//The output data will be ordered incrementally.
 template <class T> class BubbleSort {
 protected:
     virtual bool GreatThan(T a, T b) const { return a > b; }
 public:
     virtual ~BubbleSort() {}
+
+    //Bubble Sort.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         VecIdx n = data.get_last_idx();
@@ -429,6 +440,8 @@ public:
 
 template <class T> class CountingSort {
 public:
+    //Counting Sort.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         Vector<T> c; //for tmp use.
@@ -470,6 +483,8 @@ template <class T> class BucketSort {
         return true;
     }
 public:
+    //Bucket Sort.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         Bucket<T> bk(data.get_elem_count());
@@ -490,7 +505,7 @@ template <class T> class ShellSort {
             C<T> * ct = nullptr;
             T d = data[i];
             for (T v = list.get_head(&ct); ct; v = list.get_next(&ct)) {
-                if (LessThan(d, v)) { //in increment order
+                if (LessThan(d, v)) { //in incremental order
                     break;
                 }
             }
@@ -512,6 +527,9 @@ protected:
     virtual bool LessThan(T a, T b) const { return a < b; }
 public:
     virtual ~ShellSort() {}
+
+    //Shell Sort.
+    //The output data will be ordered incrementally.
     void sort(MOD Vector<T> & data)
     {
         VecIdx n = data.get_elem_count();

@@ -177,7 +177,8 @@ bool IRMgr::isIRListIsomorphic(IR const* ir1lst, IR const* ir2lst,
 
 
 //Return true if ir tree is isomorphic to src.
-//ir, src: root of IR tree.
+//ir: root of IR tree.
+//src: root of IR tree to be compared.
 //is_cmp_kid: it is true if comparing kids as well.
 //flag: record the checking condition while compare two given ir expression
 //      or stmt.
@@ -629,10 +630,11 @@ IR * IRMgr::buildLda(Var * var)
     IR * ir = allocIR(IR_LDA);
     LDA_idinfo(ir) = var;
     if (var->is_any()) {
+        //Regard the base byte size of a pointer with ANY type to one byte.
+        //NOTE: User should not dereference a pointer with ANY type.
         IR_dt(ir) = m_tm->getPointerType(1);
     } else {
-        IR_dt(ir) = m_tm->getPointerType(
-            var->getByteSize(m_tm));
+        IR_dt(ir) = m_tm->getPointerType(var->getByteSize(m_tm));
     }
     return ir;
 }
@@ -756,19 +758,19 @@ IR * IRMgr::buildPhi(PRNO prno, Type const* type, IR * opnd_list)
 //result_prno: indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
 //type: result PR data type.
-IR * IRMgr::buildCall(Var * callee, IR * param_list, UINT result_prno,
+IR * IRMgr::buildCall(Var * callee, IR * arg_list, UINT result_prno,
                       Type const* type)
 {
     ASSERT0(type);
     ASSERT0(callee);
     IR * ir = allocIR(IR_CALL);
-    CALL_param_list(ir) = param_list;
+    CALL_arg_list(ir) = arg_list;
     CALL_prno(ir) = result_prno;
     CALL_idinfo(ir) = callee;
     IR_dt(ir) = type;
-    while (param_list != nullptr) {
-        IR_parent(param_list) = ir;
-        param_list = IR_next(param_list);
+    while (arg_list != nullptr) {
+        IR_parent(arg_list) = ir;
+        arg_list = IR_next(arg_list);
     }
     return ir;
 }
@@ -790,22 +792,22 @@ IR * IRMgr::buildInitPlaceHolder(IR * exp)
 //    0 means the call does not have a return value.
 //type: result PR data type.
 //    0 means the call does not have a return value.
-IR * IRMgr::buildICall(IR * callee, IR * param_list, UINT result_prno,
+IR * IRMgr::buildICall(IR * callee, IR * arg_list, UINT result_prno,
                        Type const* type)
 {
     ASSERT0(type);
     ASSERT0(callee);
     IR * ir = allocIR(IR_ICALL);
     ASSERT0(!callee->is_id());
-    CALL_param_list(ir) = param_list;
+    CALL_arg_list(ir) = arg_list;
     CALL_prno(ir) = result_prno;
     ICALL_callee(ir) = callee;
     IR_dt(ir) = type;
 
     IR_parent(callee) = ir;
-    while (param_list != nullptr) {
-        IR_parent(param_list) = ir;
-        param_list = IR_next(param_list);
+    while (arg_list != nullptr) {
+        IR_parent(arg_list) = ir;
+        arg_list = IR_next(arg_list);
     }
     return ir;
 }
@@ -1587,9 +1589,11 @@ IR * IRMgr::buildImmInt(HOST_INT v, Type const* type)
             break;
         }
         case D_I128:
-        case D_U128:
-            ASSERTN(0, ("TODO:unsupport 128 bit integer"));
+        case D_U128: {
+            UINT128 uv(v);
+            ASSERTN(0, ("TODO:support 128bit integer in CConst"));
             break;
+        }
         case D_ANY:
             //If IR_CONST operation has ANY type, that indicates the constant
             //value with dynamic type.
@@ -1883,6 +1887,8 @@ IR * IRMgr::buildAlloca(IR * size)
     IR * ir = allocIR(IR_ALLOCA);
     ALLOCA_size(ir) = size;
     IR_parent(size) = ir;
+
+    //Regard the base byte of ALLOCA pointer to BYTE type.
     IR_dt(ir) = m_tm->getPointerType(1);
     return ir;
 }

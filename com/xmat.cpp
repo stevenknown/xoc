@@ -1023,7 +1023,7 @@ void BMat::sete(UINT num, ...)
     va_start(ptr, num);
     for (UINT i = 0; i < num; i++) {
         //Note 'bool' is promoted to 'int' when passed through '...'.
-        bool numer = va_arg(ptr, INT) == 0 ? false : true;
+        BOOL numer = va_arg(ptr, INT) == 0 ? false : true;
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;
@@ -1036,7 +1036,7 @@ void BMat::sete(UINT num, ...)
 
 BMat& BMat::operator = (BMat const& m)
 {
-    Matrix<bool>::copy(*((Matrix<bool>*)&m));
+    Matrix<BOOL>::copy(*((Matrix<BOOL>*)&m));
     return *this;
 }
 

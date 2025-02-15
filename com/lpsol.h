@@ -101,7 +101,7 @@ public:
     bool is_handle(INT nvidx, INT bvidx) const
     {
         ASSERT0(nvidx != bvidx);
-        return m_pair.get((UINT)nvidx, (UINT)bvidx);
+        return m_pair.get((UINT)nvidx, (UINT)bvidx) ? true : false;
     }
 
     //Rows indicate NV, cols indicate BV.

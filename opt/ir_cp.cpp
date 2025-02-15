@@ -1042,7 +1042,7 @@ bool CopyProp::perform(OptCtx & oc)
     dump();
     oc.setInvalidPass(PASS_EXPR_TAB);
     oc.setInvalidPass(PASS_AA);
-    oc.setValidPass(PASS_DU_REF);
+    oc.setValidPass(PASS_MD_REF);
     ASSERT0(m_dumgr->verifyMDRef());
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

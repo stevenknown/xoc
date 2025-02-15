@@ -49,13 +49,13 @@ public:
     explicit TG(Region * rg) { m_rg = rg; }
     COPY_CONSTRUCTOR(TG);
 
-    void pick_eh()
+    //Pick out exception-handling-vertex and related edge.
+    void pickEH()
     {
         List<IRBB*> * bbs = m_rg->getBBList();
         for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
-            if (bb->isExceptionHandler()) {
-                removeVertex(bb->id());
-            }
+            if (!bb->isExceptionHandler()) { continue; }
+            removeVertex(bb->id());
         }
     }
 
@@ -88,6 +88,25 @@ public:
 class CSE2DeleTab : public xcom::TMap<IR const*, IR*> {
 };
 
+
+//The class performs global common subexpression recognization and replacement.
+//Note the CSE recognization and replacement only apply to the entire RHS of
+//stmt. If user is going to handle sub-IR-tree operation, the corresponding
+//simplification should have been done.
+//e.g: ild:i32 ld:*<4> 'p1' is a CSE candidiate. However, the CSE in 'falserbr'
+//determinator expression could not be recognized because the RHS of it
+//starts from 'gt' operation, not 'ild'.
+//  stpr $3:i32 =
+//    ild:i32 ld:*<4> 'p1';
+//  falsebr _$L1
+//    gt:bool
+//      ild:i32 ld:*<4> 'p1', 10;
+//In order to trigger CSE optimization, user has to simplify 'falsebr' at
+//least to:
+//  stpr $4:i32 =
+//    ild:i32 ld:*<4> 'p1';
+//  falsebr _$L1
+//    gt:bool $4, 10
 
 class GCSE : public Pass {
     COPY_CONSTRUCTOR(GCSE);
@@ -132,7 +151,7 @@ protected:
     bool doPropVN(IRBB * bb);
     bool doPropVNInDomTreeOrder(xcom::DomTree const& domtree);
     bool doPropExpInDomTreeOrder(xcom::DomTree const& domtree);
-    void dumpAct(IR const* oldexp, IR const* newexp);
+    void dumpAct(IR const* oldexp, IR const* genexp, IR const* newexp);
 
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
 
@@ -146,7 +165,7 @@ protected:
     bool handleCandidateByExprRep(IR * exp);
     bool hasSideEffect(IR const* ir) const;
 
-    virtual bool isCseCandidate(IR * ir);
+    virtual bool isCseCandidate(IR const* ir) const;
     bool isDom(IR const* exp_stmt, IR const* gen_stmt) const;
 
     //Replace 'use' CSE with PR that related to 'gen' CSE.
@@ -154,9 +173,9 @@ protected:
     //     ...
     //     ...=a+b <--use CSE
     //This function do replacement via gvn info.
-    //use: the referrence of cse.
+    //use: the referrence of CSE.
     //use_stmt: the stmt contains use.
-    //gen: the referrence of cse.
+    //gen: the referrence of CSE.
     //NOTE: 'use' should be freed.
     //      'use' must be rhs of 'use_stmt'.
     void elimCse(IR * use, IR * use_stmt, IR const* gen);
@@ -171,14 +190,14 @@ protected:
     //e.g: ...=a+b <--generate CSE
     //     ...
     //     ...=a+b <--use CSE
-    //gen: generated cse.
+    //gen: generated CSE.
     void processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change);
 
     //If find 'exp' is CSE, replace it with related pr.
     //NOTE: exp should be freed.
     bool processCse(MOD IR * ir, List<IR*> & livexp);
 
-    virtual bool shouldBeCse(IR * det);
+    virtual bool shouldBeCse(IR const* det) const;
 
     void removeMayKill(IR * ir, MOD List<IR*> & livexp);
 

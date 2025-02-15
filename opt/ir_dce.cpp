@@ -390,8 +390,8 @@ void DeadCodeElim::markEffectIR(MOD ConstIRList & work_list,
 
 //Return true if there are effect BBs that controlled by ir's BB.
 //ir: stmt.
-bool DeadCodeElim::find_effect_kid_condbr(IR const* ir,
-                                          MOD DCECtx & dcectx) const
+bool DeadCodeElim::find_effect_kid_condbr(
+    IR const* ir, MOD DCECtx & dcectx) const
 {
     ASSERT0(m_cfg);
     IRBB const* bb = ir->getBB();
@@ -416,8 +416,8 @@ bool DeadCodeElim::find_effect_kid_condbr(IR const* ir,
 
 //Return true if there are effect BBs that controlled by ir's BB.
 //ir: stmt.
-bool DeadCodeElim::find_effect_kid_uncondbr(IR const* ir,
-                                            MOD DCECtx & dcectx) const
+bool DeadCodeElim::find_effect_kid_uncondbr(
+    IR const* ir, MOD DCECtx & dcectx) const
 {
     ASSERT0(m_cfg);
     IRBB const* bb = ir->getBB();
@@ -688,11 +688,9 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 {
     bool change = false;
     ASSERT0(tdef);
-    ConstMDDefIter ii;
-    for (MDDef const* def = m_mdssamgr->iterDefInitCTillKillingDef(
-             tdef, use, ii);
-         def != nullptr;
-         def = m_mdssamgr->iterDefNextCTillKillingDef(use, ii)) {
+    ConstMDDefIter ii(m_mdssamgr);
+    for (MDDef const* def = ii.get_first_untill_killing_def(tdef, use);
+         def != nullptr; def = ii.get_next_untill_killing_def(use)) {
         if (def->is_phi()) {
             //Merged DEF will be iterated.
             continue;

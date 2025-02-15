@@ -40,7 +40,8 @@ void TargInfoMgr::init()
     m_link = getRA();
 
     //Must keep the regsets related to param and return value before the caller
-    //regsets and callee regsets.
+    //regsets and callee regsets, because the init process of caller and callee
+    //regsets will use the param and return value regsets.
     initParamScalar();
     initParamVector();
     initRetvalScalar();

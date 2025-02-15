@@ -41,7 +41,41 @@ class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
 };
 
 typedef DefSBitSetCore PRLiveSet;
-typedef SEGIter PRLiveSetIter;
+typedef DefSEGIter PRLiveSetIter;
+typedef Vector<PRLiveSet*> LivenessVec;
+
+
+//Auxiliary livenessMgr that used to remove redundant liveness info.
+class AuxLivenessMgr {
+protected:
+    Region const* m_rg;
+    DefMiscBitSetMgr m_sbs_mgr;
+    LivenessVec m_new_livein_vec;
+    LivenessVec m_new_liveout_vec;
+protected:
+    //Free new liveness vector.
+    void destroy();
+
+    //Initialize new liveness vector.
+    void init();
+public:
+    AuxLivenessMgr(Region const* rg) : m_rg(rg) { init(); }
+
+    ~AuxLivenessMgr() { destroy(); }
+
+    PRLiveSet * genNewLiveIn(UINT bbid);
+
+    PRLiveSet * genNewLiveOut(UINT bbid);
+
+    PRLiveSet * getNewLiveOut(UINT bbid) const
+    { return m_new_liveout_vec.get(bbid); }
+
+    PRLiveSet * getNewLiveIn(UINT bbid) const
+    { return m_new_livein_vec.get(bbid); }
+
+    DefMiscBitSetMgr & getSBSMgr() { return m_sbs_mgr; }
+};
+
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);
@@ -116,9 +150,22 @@ public:
     //'computeGlobal'. The main reason for this phenomenon is that there is
     //loop edge in the CFG. LiveIn and LiveOut info will be flowed back into
     //entry_bb along with the loop edge. Thus it needs to remove redudant
-    //LiveIn and LiveOut info from entry_bb and it's successor node until
-    //reached a node with more than one degree.
-    void eliminateRedundantLivenessInEntryBB(IRCFG const* cfg);
+    //LiveIn and LiveOut info from liveness info in whole CFG.
+    void eliminateRedundantLiveness(IRCFG const* cfg);
+
+    //The implement function of computed new livein and liveout. Return 'false'
+    //if the livein and liveout are no more changed compared with last time.
+    //'auxmgr': auxiliary livenessMgr for removed redundant liveness info.
+    //'redundant_live': the full set of redundant liveness that come from
+    //                  the livein of entry vertex.
+    bool eliminateRedundantLivenessImpl(
+        IRCFG const* cfg, AuxLivenessMgr & auxmgr,
+        PRLiveSet const& redundant_live);
+
+    //Get a union set of new liveout info from all predecessors of 'v'.
+    //These new liveout info come from 'm_new_liveout_vec' in 'auxmgr'.
+    void getPreVertexNewLiveOut(OUT PRLiveSet & new_liveout, Vertex const* v,
+                                AuxLivenessMgr & auxmgr);
 
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
@@ -141,6 +188,12 @@ public:
         ASSERTN(get_liveout(bbid), ("miss liveness info"));
         return get_liveout(bbid)->is_contain(prno);
     }
+
+    //Reset 'm_livein' and 'm_liveout' with new livein and liveout that
+    //come from 'm_new_livein_vec' and 'm_new_liveout_vec' in 'auxmgr'.
+    //'auxmgr': auxiliary livenessMgr for removed redundant liveness info.
+    void resetLivenessAfterRemoveRedundantLiveness(
+        IRCFG const* cfg, AuxLivenessMgr & auxmgr);
 
     //Set true to handle maydef and mayuse MDSet.
     void set_handle_may(bool handle) { m_handle_may = (BYTE)handle; }
@@ -168,7 +221,6 @@ public:
     //empty_bb: the empty BB.
     //from: the predecessor BB of the empty_BB.
     void setLivenessForEmptyBB(IRBB const* empty_bb, IRBB const* from);
-
 
     //Set map structure which used during the processing of maydef and mayuse.
     void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }

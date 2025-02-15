@@ -139,6 +139,107 @@ public:
     { return BROADCAST_res_list(ir); }
 };
 
+
+//This class represents atomic inc operation of fetch and add on memory. IR:
+//
+//  stpr $res:i64
+//    atominc:i64
+//      ild:i64 memory
+//        $src:*<1>
+//      ild:i64 multi-res
+//        $src:*<1>
+//Or:
+//
+//  stpr $res:i64
+//    atominc:i64
+//      ld:i64:storage_space(global) 'global_var' memory
+//      ld:i64:storage_space(global) 'global_var' multi-res
+//
+//Note that this operation will change memory of "global_var" or pointed by
+//"$src", and "res" both.
+
+//Operated memory.
+#define ATOMINC_memory(ir) ATOMINC_kid(ir, 0)
+
+//The num to add (absent on T1 so it's initialized to nullptr).
+#define ATOMINC_addend(ir) ATOMINC_kid(ir, 1)
+
+//The multiple result list.
+#define ATOMINC_multires(ir) (((CAtomInc*)CK_IRC(ir, IR_ATOMINC))->res_list)
+
+#define ATOMINC_kid(ir, idx)\
+    (((CAtomInc*)ir)->opnd[CK_KID_IRC(ir, IR_ATOMINC, idx)])
+
+class CAtomInc : public IR, public MultiResProp {
+    COPY_CONSTRUCTOR(CAtomInc);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 2;
+    IR * opnd[kid_num];
+    IR * res_list;
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return ATOMINC_kid(ir, idx); }
+    static inline IR *& accResList(IR * ir)
+    { return ATOMINC_multires(ir); }
+};
+
+
+//This class represents atomic cas operation of compare and swap on memory. IR:
+//
+//  stpr $res:i32
+//    cas:i32
+//      ild:i32 memory
+//        $src:*<1>
+//      $oldval:i32 oldval
+//      $newval:i32 newval
+//      ild:i32 multi-res
+//        $src:*<1>
+//Or:
+//
+//  stpr $res:i64
+//    atomcas:i64
+//      ld:i64:storage_space(global) 'global_var' memory
+//      $oldval:i64 oldval
+//      $newval:i64 newval
+//      ld:i64:storage_space(global) 'global_var' multi-res
+//
+//Note that this operation will change memory of "global_var" or pointed by
+//"$src", and "res" both.
+//
+//Operated memory.
+#define ATOMCAS_memory(ir) ATOMCAS_kid(ir, 0)
+
+//Compared with the value of target operand.
+#define ATOMCAS_oldval(ir) ATOMCAS_kid(ir, 1)
+
+//Indicate the newval if changed success.
+#define ATOMCAS_newval(ir) ATOMCAS_kid(ir, 2)
+
+//Atomic compare and swap operation may occupy additional resources on
+//different architectures, such as registers, memory, etc. This attribute needs
+//to be explicitly specified to support other modules in allocating resources.
+#define ATOMCAS_occupy(ir) ATOMCAS_kid(ir, 3)
+
+//Multiple result modified by this operation.
+#define ATOMCAS_multires(ir) (((CAtomCas*)CK_IRC(ir, IR_ATOMCAS))->res_list)
+
+#define ATOMCAS_kid(ir, idx)\
+    (((CAtomCas*)ir)->opnd[CK_KID_IRC(ir, IR_ATOMCAS, idx)])
+class CAtomCas : public IR, public MultiResProp {
+    COPY_CONSTRUCTOR(CAtomCas);
+public:
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 4;
+    IR * opnd[kid_num];
+    IR * res_list;
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return ATOMCAS_kid(ir, idx); }
+    static inline IR *& accResList(IR * ir)
+    { return ATOMCAS_multires(ir); }
+};
+
 } //namespace xoc
 
 //Do NOT place extended declarations header files within xoc namespace.

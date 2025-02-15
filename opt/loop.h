@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+#define LOOPINFO_UNDEF 0
+
 class IRBB;
 class Region;
 class IRCFG;
@@ -101,21 +103,25 @@ typedef enum tagFindRedOpResult {
 template <class BB> class LI {
     COPY_CONSTRUCTOR(LI);
 public:
+    bool has_early_exit;
+    bool has_call;
     UINT uid;
     LI * next;
     LI * prev;
     LI * inner_list; //inner loop list
     LI * outer; //outer loop
-    UCHAR has_early_exit:1;
-    UCHAR has_call:1;
+
     //Loop head node, the only one header indicates a natural loop.
     BB * loop_head;
     xcom::BitSet * bb_set; //loop body elements
 public:
     LI() {}
 
-    //Add bbid to the body BB set of all outer loop.
+    //Add bbid to all outer loops except current loop.
     void addBBToAllOuterLoop(UINT bbid) const;
+
+    //Add bbid to the current loop and all outer loops.
+    void addBBToLoopAndAllOuterLoop(UINT bbid) const;
 
     //Return true if ir in bbid is at least execute once from loophead,
     //otherwise return false means unknown.
@@ -155,6 +161,9 @@ public:
 
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
+
+    //Return the number of loops that rooted by current loop.
+    UINT getLoopNum() const;
     BB * getLoopHead() const { return loop_head; }
     BitSet * getBodyBBSet() const { return bb_set; }
     LI<BB> * get_next() const { return next; }
@@ -168,10 +177,57 @@ public:
     bool isOuterMost() const { return getOuter() == nullptr; }
     bool isInnerMost() const { return getInnerList() == nullptr; }
 
-    //Return true if bb is belong to current loop.
-    //'bbid': id of BB.
+    //The function performs a complete comparison between current LoopInfo and
+    //'src'.
+    //Return true if current loop is complete equal to 'src'.
+    bool isEqual(LI<BB> const* src) const;
+
+    //The function compares current LoopInfo with given LoopInfo 'src' in
+    //term of Loop Structure.
+    //Return true if current loop is isomophic to 'src' in Loop Structure.
+    //e.g: current loop info is: loophead is BB2, loopbody is {2,3,5,6},
+    //     where src's loop info is: loophead is BB2, loopbody is {2,3,5},
+    //     the function return false because the loopbody is not equal.
+    bool isLoopStructEqual(LI<BB> const* src) const;
+
+    //The function compares two LoopInfo trees in term of Loop Structure.
+    //Return true if li1 and li2 are isomophic equal in Loop Structure.
+    //e.g: given two LoopInfo LI1 and LI2, they are isomophic equal even if
+    //the LI's id are not equal.
+    //  LI1:
+    //      LOOP1 HEAD:BB2, BODY:2,3,11,13,
+    //      LOOP2 HEAD:BB4, BODY:4,5,6,7,
+    //  LI2:
+    //      LOOP3 HEAD:BB2, BODY:2,3,11,13,
+    //      LOOP4 HEAD:BB4, BODY:4,5,6,7,
+    static bool isLoopInfoTreeEqual(LI<BB> const* li1, LI<BB> const* li2);
+
+    //The function compares two LoopInfo trees in term of Loop Structure.
+    //Return true if li1 and li2 are approximately equal in Loop Structure.
+    //NOTE: two LoopInfos are always approximately equal if they are
+    //isomophic equal, but the converse is not true.
+    //e.g: given two LoopInfos LI1 and LI2, they are approximately equal if
+    //there is a isomophic equal LoopInfo in the same loop-level for given
+    //two LoopInfos.
+    //  LI1:
+    //      LOOP1 HEAD:BB2, BODY:2,3,11,13,
+    //        LOOP1 HEAD:BB11, BODY:11,13,
+    //      LOOP2 HEAD:BB4, BODY:4,5,6,7,
+    //  LI2:
+    //      LOOP3 HEAD:BB4, BODY:4,5,6,7,
+    //      LOOP4 HEAD:BB2, BODY:2,3,11,13,
+    //        LOOP7 HEAD:BB11, BODY:11,13,
+    static bool isLoopInfoTreeApproEqual(LI<BB> const* li1, LI<BB> const* li2);
+
+    //Return true if bbid is belong to current loop.
+    //bbid: id of BB.
     bool isInsideLoop(UINT bbid) const
     { return LI_bb_set(this)->is_contain(bbid); }
+
+    //Return true if bbid is belong to the LoopInfo tree that rooted by
+    //current loop.
+    //bbid: id of BB.
+    //access_sibling: if true to compare the sibling LoopInfo as well.
     bool isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
                           bool access_sibling) const;
 
@@ -193,10 +249,110 @@ public:
             }
         }
     }
+
+    void dumpLoopTree(LI<BB> const* looplist, MOD LogMgr * lm,
+                      UINT indent) const
+    {
+        if (!lm->is_init()) { return; }
+        while (looplist != nullptr) {
+            note(lm, "\n");
+            for (UINT i = 0; i < indent; i++) { prt(lm, " "); }
+            ASSERT0(looplist->getLoopHead());
+            prt(lm, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
+                looplist->getLoopHead()->id());
+            if (looplist->getBodyBBSet() != nullptr) {
+                for (BSIdx i = looplist->getBodyBBSet()->get_first();
+                     i != BS_UNDEF;
+                     i = looplist->getBodyBBSet()->get_next((UINT)i)) {
+                    prt(lm, "%d,", i);
+                }
+            }
+            dumpLoopTree(looplist->getInnerList(), lm, indent + 2);
+            looplist = looplist->get_next();
+        }
+    }
+    void dumpLoopTree(MOD LogMgr * lm, UINT indent = 0) const
+    { dumpLoopTree(this, lm, indent); }
 };
 
 
-//Add bbid to the body BB set of all outer loop.
+template <class BB>
+bool LI<BB>::isLoopStructEqual(LI<BB> const* src) const
+{
+    ASSERT0(src);
+    return this == src ||
+           (getBodyBBSet()->is_equal(*src->getBodyBBSet()) &&
+            getLoopHead() == src->getLoopHead());
+}
+
+
+template <class BB>
+bool LI<BB>::isEqual(LI<BB> const* src) const
+{
+    ASSERT0(src);
+    return getBodyBBSet()->is_equal(*src->getBodyBBSet()) &&
+           getLoopHead() == src->getLoopHead() &&
+           has_early_exit == src->has_early_exit &&
+           has_call == src->has_call;
+}
+
+
+template <class BB>
+bool LI<BB>::isLoopInfoTreeApproEqual(LI<BB> const* li1, LI<BB> const* li2)
+{
+    if (li1 == li2) { return true; }
+    if ((li1 == nullptr) ^ (li2 == nullptr)) { return false; }
+    if (li1 == nullptr) { return true; }
+    UINT loopcnt1 = xcom::cnt_list(li1);
+    UINT loopcnt2 = xcom::cnt_list(li2);
+    if (loopcnt1 != loopcnt2) { return false; }
+    for (LI<BB> const* tli1 = li1; tli1 != nullptr; tli1 = tli1->get_next()) {
+        LI<BB> const* tli2 = li2;
+        for (; tli2 != nullptr; tli2 = tli2->get_next()) {
+            if (tli1->isLoopStructEqual(tli2)) { break; }
+        }
+        if (tli2 == nullptr) {
+            //Can not find a isomophic LoopStructure at current loop-level.
+            return false;
+        }
+        if (!isLoopInfoTreeApproEqual(tli1->getInnerList(),
+                                      tli2->getInnerList())) {
+            //The inner LoopInfos are not approximately equal in
+            //minor loop-level.
+            return false;
+        }
+    }
+    return true;
+}
+
+
+template <class BB>
+bool LI<BB>::isLoopInfoTreeEqual(LI<BB> const* li1, LI<BB> const* li2)
+{
+    if (li1 == li2) { return true; }
+    if ((li1 == nullptr) ^ (li2 == nullptr)) { return false; }
+    if (li1 == nullptr) { return true; }
+    LI<BB> const* tli1 = li1;
+    LI<BB> const* tli2 = li2;
+    for (; tli1 != nullptr && tli2 != nullptr;
+         tli1 = tli1->get_next(), tli2 = tli2->get_next()) {
+        if (!tli1->isLoopStructEqual(tli2)) { return false; }
+        if (!isLoopInfoTreeEqual(tli1->getInnerList(), tli2->getInnerList())) {
+            return false;
+        }
+    }
+    return tli1 == tli2;
+}
+
+
+template <class BB>
+void LI<BB>::addBBToLoopAndAllOuterLoop(UINT bbid) const
+{
+    addBBToAllOuterLoop(bbid);
+    getBodyBBSet()->bunion(bbid);
+}
+
+
 template <class BB>
 void LI<BB>::addBBToAllOuterLoop(UINT bbid) const
 {
@@ -338,6 +494,311 @@ public:
 };
 
 
+//
+//START LoopInfoMgr
+//
+template <class BB> class LoopInfoMgr {
+    COPY_CONSTRUCTOR(LoopInfoMgr);
+protected:
+    UINT m_li_count; //counter to loop.
+    xcom::SMemPool * m_pool;
+    BitSetMgr m_bs_mgr;
+protected:
+    LI<BB> * allocLoopInfo()
+    {
+        LI<BB> * li = (LI<BB>*)xmalloc(sizeof(LI<BB>));
+        LI_id(li) = m_li_count++;
+        return li;
+    }
+
+    void destroy()
+    {
+        if (m_pool == nullptr) { return; }
+        m_bs_mgr.destroy();
+        xcom::smpoolDelete(m_pool);
+        m_pool = nullptr;
+    }
+
+    void init()
+    {
+        if (m_pool != nullptr) { return; }
+        m_bs_mgr.init();
+        m_li_count = LOOPINFO_UNDEF + 1;
+        m_pool = xcom::smpoolCreate(sizeof(LI<BB>) * 4, MEM_COMM);
+    }
+
+    void * xmalloc(size_t size)
+    {
+        ASSERT0(m_pool);
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        ::memset((void*)p, 0, size);
+        return p;
+    }
+public:
+    LoopInfoMgr() { m_pool = nullptr; init(); }
+    ~LoopInfoMgr() { destroy(); }
+
+    //Clean loopinfo structure before recompute loop info.
+    void clean() { destroy(); init(); }
+    BitSet * createBitSet() { return m_bs_mgr.create(); }
+    LI<BB> * copyLoopTree(LI<BB> const* src);
+    LI<BB> * copyLoopInfo(LI<BB> const* src)
+    {
+        ASSERT0(src);
+        BitSet * bs = createBitSet();
+        ASSERT0(src->getBodyBBSet());
+        bs->copy(*src->getBodyBBSet());
+        LI<BB> * li = buildLoopInfo(bs, src->getLoopHead());
+        li->has_early_exit = src->has_early_exit;
+        li->has_call = src->has_call;
+        return li;
+    }
+
+    //Build a loopinfo.
+    //bbset: record all BBs inside the loop, include the head.
+    LI<BB> * buildLoopInfo(xcom::BitSet * bbset, BB * head)
+    {
+        ASSERT0(bbset && head);
+        LI<BB> * li = allocLoopInfo();
+        LI_bb_set(li) = bbset;
+        LI_loop_head(li) = head;
+        return li;
+    }
+
+    void freeBitSet(BitSet * bs) { ASSERT0(bs); m_bs_mgr.free(bs); }
+
+    UINT getLoopNum() const { return m_li_count - 1; }
+};
+
+
+template <class BB>
+LI<BB> * LoopInfoMgr<BB>::copyLoopTree(LI<BB> const* src)
+{
+    LI<BB> * new_looplist = nullptr;
+    LI<BB> * last = nullptr;
+    LI<BB> const* looplist = src;
+    while (looplist != nullptr) {
+        LI<BB> * newli = copyLoopInfo(looplist);
+        xcom::add_next(&new_looplist, &last, newli);
+        LI_inner_list(newli) = copyLoopTree(looplist->getInnerList());
+        looplist = looplist->get_next();
+    }
+    return new_looplist;
+}
+//END LoopInfoMgr
+
+
+//
+//START ConstructLoopTree
+//
+//The class constructs a LoopInfo Tree to describe all LoopNest in 'cfg'.
+//e.g: CFG includes three loops.
+//  Construct LoopTree by the IRBB and IRCFG:
+//    LoopInfoMgr<IRBB> limgr;
+//    ConstructLoopTree<IRBB, IR> lt(cfg, limgr);
+//    LI<IRBB> const* loopinfo_root = lt.construct();
+//    loopinfo_root->dumpLoopTree(getLogMgr());
+//  The dumped LoopTree info is:
+//    LOOP2 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,
+//      LOOP1 HEAD:BB5, BODY:5,6,7,
+//      LOOP3 HEAD:BB8, BODY:8,9,
+//  The BBSet of outer-most loop is {2,3,4,5,6,7,8,9}, its loop head is BB2.
+//  The inner two loops are {5,6,7) and {8,9}, which loophead are BB5 and BB8
+//  respectively.
+template <class BB, class XR> class ConstructLoopTree {
+    COPY_CONSTRUCTOR(ConstructLoopTree);
+protected:
+    CFG<BB, XR> const* m_cfg;
+    xcom::List<BB*> const* m_bb_list;
+    LoopInfoMgr<BB> & m_li_mgr;
+protected:
+    //Identifiy back edge.
+    //A back edge is: y dominate x, back-edge is : x->y
+    void identifyNaturalLoop(UINT x, UINT y, MOD xcom::BitSet & loop,
+                             List<UINT> & tmp);
+
+    //Insert 'loop' into loop forest that started from 'lilst'.
+    //Return true if 'loop' has been inserted into LoopInfo forest.
+    bool insertLoopTree(LI<BB> ** lilist, LI<BB> * loop);
+
+    bool reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop);
+    void removeLoopInfo(LI<BB> * loop);
+public:
+    ConstructLoopTree(CFG<BB, XR> const* cfg, LoopInfoMgr<BB> & limgr)
+        : m_cfg(cfg), m_bb_list(cfg->getBBList()), m_li_mgr(limgr)
+    {}
+    LI<BB> * construct(OptCtx const& oc);
+};
+
+
+//Remove 'loop' out of loop tree.
+template <class BB, class XR>
+void ConstructLoopTree<BB, XR>::removeLoopInfo(LI<BB> * loop)
+{
+    ASSERT0(loop != nullptr);
+    LI<BB> * head = xcom::get_head(loop);
+    ASSERT0(head);
+    xcom::remove(&head, loop);
+    if (loop->getOuter() != nullptr) {
+        //Update inner-list for outer-loop of 'loop'.
+        //Guarantee outer-loop has the correct inner-loop after
+        //removing 'loop'.
+        LI_inner_list(loop->getOuter()) = head;
+    }
+    loop->cleanAdjRelation();
+}
+
+
+template <class BB, class XR>
+LI<BB> * ConstructLoopTree<BB, XR>::construct(OptCtx const& oc)
+{
+    LI<BB> * loopinfo_root = nullptr;
+    typename xcom::List<UINT> tmp;
+    xcom::TMap<BB const*, LI<BB>*> head2li;
+    //typename xcom::List<BB*>::Iter ct;
+    RPOVexListIter ct;
+    ASSERT0_DUMMYUSE(oc.is_rpo_valid() && oc.is_dom_valid());
+    RPOVexList const* rpolst = m_cfg->getRPOVexList();
+    ASSERT0(rpolst);
+    for (xcom::Vertex const* vex = rpolst->get_head(&ct);
+         vex != nullptr; vex = rpolst->get_next(&ct)) {
+        ASSERT0(m_cfg->getBB(vex->id()) && m_cfg->isVertex(vex));
+
+        //Access each sussessor of vex.
+        for (xcom::EdgeC const* el = vex->getOutList();
+             el != nullptr; el = EC_next(el)) {
+            BB const* succ = m_cfg->getBB(el->getToId());
+            ASSERT0(succ);
+            xcom::BitSet const* dom = m_cfg->get_dom_set(vex->id());
+            ASSERTN(dom, ("should compute dominator first"));
+            if (!dom->is_contain(succ->id()) &&
+                vex->id() != succ->id()) { //vex's successor is itself.
+                continue;
+            }
+
+            //If 'succ' is one of the DOMINATOR of 'vex', then it usually
+            //indicates a back-edge.
+            //Edge vex->succ is a back-edge, and each back-edge descripts a
+            //natural loop.
+            xcom::BitSet * loopbody = m_li_mgr.createBitSet();
+            identifyNaturalLoop(vex->id(), succ->id(), *loopbody, tmp);
+
+            //TBD: Do we have to handle the special case here? Or the special
+            //BB does not affect the analysis of control flow optimizations?
+            //addBreakOutLoop(succ, *loopbody);
+
+            //Loop may have multiple backedges.
+            LI<BB> * li = head2li.get(succ);
+            if (li != nullptr) {
+                //Multiple natural loops have the same loop header.
+                li->getBodyBBSet()->bunion(*loopbody);
+                reinsertLoopTree(&loopinfo_root, li);
+                continue;
+            }
+            li = m_li_mgr.buildLoopInfo(loopbody, const_cast<BB*>(succ));
+            insertLoopTree(&loopinfo_root, li);
+            head2li.set(succ, li);
+        }
+    }
+    return loopinfo_root;
+}
+
+
+//Reinsert loop into loop tree.
+//NOTE 'loop' has been inserted into the loop-tree.
+template <class BB, class XR>
+bool ConstructLoopTree<BB, XR>::reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
+{
+    ASSERT0(lilist != nullptr && loop != nullptr);
+    removeLoopInfo(loop);
+    return insertLoopTree(lilist, loop);
+}
+
+
+template <class BB, class XR>
+bool ConstructLoopTree<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB> * loop)
+{
+    ASSERT0(lilist != nullptr && loop != nullptr);
+    if (*lilist == nullptr) {
+        *lilist = loop;
+        return true;
+    }
+    ASSERT0(loop->getOuter() == nullptr);
+
+    //Check and insert if loop belong to the inner-loops of li.
+    LI<BB> * li = *lilist, * cur = nullptr;
+    while (li != nullptr) {
+        //Iterate the sibling LoopInfo trees.
+        cur = li;
+        li = li->get_next();
+        if (cur == loop) {
+            //loop has already in LoopInfo list.
+            return true;
+        }
+        if (cur->getBodyBBSet()->is_contain(*loop->getBodyBBSet())) {
+            if (insertLoopTree(&LI_inner_list(cur), loop)) {
+                if (loop->getOuter() == nullptr) {
+                    //'loop' belongs to the immediate-inner-loop-list of 'cur'.
+                    LI_outer(loop) = cur;
+                }
+                return true;
+            }
+            continue;
+        }
+        if (loop->getBodyBBSet()->is_contain(*cur->getBodyBBSet())) {
+            //Loop body of 'loop' contained 'cur'.
+            //Adjust inclusive-relation between 'loop' and 'cur' to
+            //have 'loop' become loop-parent of 'cur'.
+            xcom::remove(lilist, cur);
+            LI_outer(cur) = nullptr;
+            insertLoopTree(&LI_inner_list(loop), cur);
+            if (cur->getOuter() == nullptr) {
+                //'cur' belongs to the immediate-inner-loop-list of 'loop'.
+                LI_outer(cur) = loop;
+            }
+            ASSERTN(LI_inner_list(loop), ("illegal loop tree"));
+        }
+    }
+    xcom::add_next(lilist, loop);
+    return true;
+}
+
+
+template <class BB, class XR>
+void ConstructLoopTree<BB, XR>::identifyNaturalLoop(
+    UINT x, UINT y, MOD xcom::BitSet & loop, xcom::List<UINT> & tmp)
+{
+    //Both x,y are node in loop.
+    loop.bunion(x);
+    loop.bunion(y);
+    if (x == y) { return; }
+    tmp.clean();
+    tmp.append_head(x);
+    while (tmp.get_elem_count() != 0) {
+        //Bottom-up scanning and starting with 'x'
+        //to handling each node till 'y'.
+        //All nodes in the path among from 'x' to 'y'
+        //are belong to natural loop.
+        UINT bb = tmp.remove_tail();
+        for (xcom::EdgeC const* ec = m_cfg->getVertex(bb)->getInList();
+             ec != nullptr; ec = ec->get_next()) {
+            VexIdx pred = ec->getFromId();
+            if (loop.is_contain(pred)) { continue; }
+
+            //If pred is not a member of loop,
+            //add it into list to handle.
+            loop.bunion(pred);
+            tmp.append_head(pred);
+        }
+    }
+}
+//END ConstructLoopTree
+
+//The function dump whole LoopInfo Forest that rooted by 'li'.
+//NOTE: the function also dump the sibling LoopInfos of 'li'.
+void dumpLoopTree(Region const* rg, LI<IRBB> const* li);
+
 //Find the bb that is the START of the unqiue backedge of loop.
 //  BB1: loop-start bb
 //  BB2: body
@@ -477,7 +938,32 @@ bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg,
 
 //Verify the sanity of LoopInfo structure.
 //Return true if LoopInfo tree is sane.
+//li: the root of LoopInfo tree.
 bool verifyLoopInfoTree(LI<IRBB> const* li, OptCtx const& oc);
+
+//Verify the sanity of LoopInfo structure.
+//Return true if LoopInfo tree is sane.
+//NOTE: the function perform the verification by reconstructing a duplication
+//LoopInfo tree for given 'cfg'.
+//li: the root of LoopInfo tree.
+bool verifyLoopInfoTreeByRecomp(
+    IRCFG const* cfg, LI<IRBB> const* li, OptCtx const& oc);
+
+//
+//START LI<BB>
+//
+template <class BB>
+UINT LI<BB>::getLoopNum() const
+{
+    UINT cnt = 0;
+    LoopInfoIter it;
+    for (LI<IRBB> * li = iterInitLoopInfo(this, it);
+         li != nullptr; li = iterNextLoopInfo(it)) {
+        cnt++;
+    }
+    return cnt;
+}
+//END LI<BB>
 
 } //namespace xoc
 #endif

@@ -36,16 +36,71 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class LogMgr;
+
 //Record a variety of symbols such as user defined variables,
 //compiler internal variables, LABEL, ID, TYPE_NAME etc.
 #define SYM_name(sym) ((sym)->s)
 class Sym {
     COPY_CONSTRUCTOR(Sym);
 public:
-    CHAR * s;
+    CHAR const* s;
 public:
-    Sym() {}
+    Sym() { init(); }
+
+    void clean() { SYM_name(this) = nullptr; }
+    void dump(MOD LogMgr * lm) const;
     CHAR const* getStr() const { return s; }
+    UINT getLen() const { return (UINT)::strlen(getStr()); }
+
+    //The function initializes current Sym by given constant string.
+    void initByString(CHAR const* s, UINT slen)
+    {
+        ASSERT0(s);
+        DUMMYUSE(slen);
+        SYM_name(this) = s;
+    }
+    void init() { s = nullptr; }
+};
+
+
+//The class represents extended symbol that records the byte length of string.
+//e.g: given "ab\0c", the ::strlen() of Sym's string return the byte length 2.
+//Instead, ESym's getLen() will return 4.
+#define CASTCONSTSYM(ptr) (const_cast<Sym*>(static_cast<Sym const*>(ptr)))
+#define ESYM_len(sym) ((sym)->slen)
+#define ESYM_name(sym) (SYM_name(CASTCONSTSYM(sym)))
+class ESym : public Sym {
+    COPY_CONSTRUCTOR(ESym);
+public:
+    UINT slen;
+public:
+    ESym() { init(); }
+
+    void clean() { ESYM_name(this) = nullptr; ESYM_len(this) = 0; }
+    void dump(MOD LogMgr * lm) const;
+    UINT getLen() const { return slen; }
+
+    //The function initializes current Sym by given constant string.
+    void initByString(CHAR const* s, UINT slen)
+    {
+        ASSERT0(s);
+        ESYM_name(this) = const_cast<CHAR*>(s);
+        ASSERT0(slen >= ::strlen(s));
+        ESYM_len(this) = slen;
+    }
+    void init() { s = nullptr; slen = 0; }
+
+    bool verify() const
+    {
+        if (::strlen(getStr()) != 0) {
+            ASSERT0(getLen() != 0);
+            //NOTE: ::strlen(getStr()) may not equal to getLen().
+            //e.g: string is "ab\0c", strlen() return 2, but getLen()
+            //return 4.
+        }
+        return true;
+    }
 };
 
 
@@ -146,7 +201,7 @@ public:
 
 
 //
-//START SymTab based on Hash
+//START SymTabBase based on Hash
 //
 class SymTabHash : public Hash<Sym const*, SymbolHashFunc> {
     COPY_CONSTRUCTOR(SymTabHash);
@@ -193,7 +248,7 @@ public:
 
 
 //
-//START SymTab based on Map
+//START SymTabBase based on Hash
 //
 class CompareFuncSymTab {
     COPY_CONSTRUCTOR(CompareFuncSymTab);
@@ -229,36 +284,172 @@ public:
     }
 };
 
-typedef xcom::TTabIter<Sym*> SymTabIter;
 
 //Note the symbol might be modified by CompareFuncSymTab::createKey(), thus the
-//'const' qualifier of 'Sym*' is unusable.
-class SymTab : public xcom::TTab<Sym*, CompareFuncSymTab> {
-    COPY_CONSTRUCTOR(SymTab);
+//'const' qualifier of 'SymType*' is unusable.
+template <class SymType>
+class SymTabBaseIter : public xcom::TTabIter<SymType*> {};
+
+template <class SymType, class CompareFuncType>
+class SymTabBase : public xcom::TTab<SymType*, CompareFuncType> {
+    COPY_CONSTRUCTOR(SymTabBase);
 protected:
-    Sym * m_free_one;
+    SymType * m_free_one;
     SMemPool * m_pool;
 public:
-    SymTab()
+    SymTabBase()
     {
         m_pool = smpoolCreate(64, MEM_COMM);
         m_free_one = nullptr;
-        xcom::TTab<Sym*, CompareFuncSymTab>::m_ck.m_pool = m_pool;
+        xcom::TTab<SymType*, CompareFuncType>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
     }
-    virtual ~SymTab() { smpoolDelete(m_pool); }
+    virtual ~SymTabBase() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.
-    Sym const* add(CHAR const* s);
+    SymType const* add(CHAR const* s);
+
+    //Add const string into symbol table.
+    //NOTE slen may be longer than the result of strlen(s).
+    //e.g: given s is "ab\0c", slen is 4.
+    SymType const* add(CHAR const* s, UINT slen);
 
     //Find const string in symbol table.
     //Return the Symbol if string existed.
-    Sym * find(CHAR const* s) const;
+    SymType * find(CHAR const* s) const;
 
     //Remove const string from symbol table.
     void remove(CHAR const* s);
 };
+
+//Add const string into symbol table.
+template <class SymType, class CompareFuncType>
+SymType const* SymTabBase<SymType, CompareFuncType>::add(CHAR const* s)
+{
+    return add(s, (UINT)::strlen(s));
+}
+
+
+//Add const string into symbol table.
+template <class SymType, class CompareFuncType>
+SymType const* SymTabBase<SymType, CompareFuncType>::add(
+    CHAR const* s, UINT slen)
+{
+    ASSERT0(s);
+    SymType * sym = m_free_one;
+    if (sym == nullptr) {
+        sym = (SymType*)smpoolMalloc(sizeof(SymType), m_pool);
+        sym->init();
+    }
+    sym->initByString(s, slen);
+    SymType const* appended_one =
+        xcom::TTab<SymType*, CompareFuncType>::append(sym);
+    ASSERT0(m_free_one == nullptr || m_free_one == sym);
+    if (appended_one != sym) {
+        //'s' has already been appended.
+        sym->clean();
+        m_free_one = sym;
+    } else {
+        //m_free_one has been inserted into table.
+        //'s' is a new string so far.
+        m_free_one = nullptr;
+    }
+    return appended_one;
+}
+
+
+//Find const string in symbol table.
+template <class SymType, class CompareFuncType>
+SymType * SymTabBase<SymType, CompareFuncType>::find(CHAR const* s) const
+{
+    ASSERT0(s);
+    SymType sym;
+    SYM_name(&sym) = const_cast<CHAR*>(s);
+    bool find = false;
+    return xcom::TTab<SymType*, CompareFuncType>::get(&sym, &find);
+}
+
+
+template <class SymType, class CompareFuncType>
+void SymTabBase<SymType, CompareFuncType>::remove(CHAR const* s)
+{
+    SymType * sym = find(s);
+    if (sym == nullptr) { return; }
+    xcom::TTab<SymType*, CompareFuncType>::remove(sym);
+}
+//END SymTabBase
+
+
+//
+//START SymTab
+//
+class SymTabIter : public SymTabBaseIter<Sym>  {};
+class SymTab : public SymTabBase<Sym, CompareFuncSymTab> {
+    COPY_CONSTRUCTOR(SymTab);
+public:
+    SymTab() {}
+    void dump(MOD LogMgr * lm) const;
+};
 //END SymTab
+
+
+//The class represents the comparison bewteen two ESym.
+class CompareFuncESymTab {
+    COPY_CONSTRUCTOR(CompareFuncESymTab);
+protected:
+    CHAR * xstrdup(CHAR const* s, UINT slen)
+    {
+        if (s == nullptr) { return nullptr; }
+        CHAR * ns = (CHAR*)smpoolMalloc(slen + 1, m_pool);
+        ::memcpy(ns, s, slen);
+        ns[slen] = 0;
+        return ns;
+    }
+public:
+    SMemPool * m_pool;
+public:
+    CompareFuncESymTab() {}
+
+    bool is_less(ESym const* t1, ESym const* t2) const
+    {
+        ASSERT0(t1 && t2);
+        ASSERT0(t1->verify() && t2->verify());
+        return t1->getLen() < t2->getLen() ||
+               (t1->getLen() == t2->getLen() &&
+                ::memcmp(ESYM_name(t1), ESYM_name(t2), t1->getLen()) < 0);
+    }
+
+    bool is_equ(ESym const* t1, ESym const* t2) const
+    {
+        ASSERT0(t1 && t2);
+        ASSERT0(t1->verify() && t2->verify());
+        return t1->getLen() == t2->getLen() &&
+               ::memcmp(ESYM_name(t1), ESYM_name(t2), t1->getLen()) == 0;
+    }
+
+    //Note the function createKey() will modify parameter's contents, thus the
+    //'const' qualifier is unusable.
+    ESym * createKey(ESym * t)
+    {
+        ASSERT0(t && t->verify());
+        ESYM_name(t) = xstrdup(t->getStr(), t->getLen());
+        ESYM_len(t) = t->getLen();
+        return t;
+    }
+};
+
+
+//
+//START ESymTab
+//
+class ESymTabIter : public SymTabBaseIter<ESym>  {};
+class ESymTab : public xoc::SymTabBase<ESym, CompareFuncESymTab> {
+    COPY_CONSTRUCTOR(ESymTab);
+public:
+    ESymTab() {}
+    void dump(MOD LogMgr * lm) const;
+};
+//END ESymTab
 
 } //namespace xoc
 #endif

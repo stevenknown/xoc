@@ -43,6 +43,7 @@ class UseDefMgr;
 class VMD;
 class MDDefSet;
 class MDSSAMgr;
+class MDSSAStatus;
 
 class VMDVec : public Vector<VMD*> {
     COPY_CONSTRUCTOR(VMDVec);
@@ -249,7 +250,7 @@ public:
     }
 };
 
-typedef xcom::SEGIter * VOpndSetIter;
+typedef xcom::DefSEGIter * VOpndSetIter;
 
 //Set of Virtual Operand.
 class VOpndSet : public DefSBitSetCore {
@@ -290,7 +291,7 @@ public:
     }
 };
 
-typedef xcom::SEGIter * VOpndSetIter;
+typedef xcom::DefSEGIter * VOpndSetIter;
 
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
@@ -359,7 +360,13 @@ public:
     bool isEmptyVOpndSet() const { return readVOpndSet().is_empty(); }
 
     //Return true if all VOpnds in current MDSSAInfo are live-in version.
+    //e.g:int g1, g2; //g, g2 is global variable.
+    //  foo() { g2 = 10; return g1; }
+    //  the MD reference of LD:'g1' is {MD7V0,MD2V3}
+    //  The function return false in the case because the MayRef includes
+    //  MD2V3 which is not livein.
     bool isLiveInVOpndSet(UseDefMgr const* mgr) const;
+    bool isLiveInVOpndSet(MDSSAMgr const* mgr) const;
 
     VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 
@@ -570,8 +577,13 @@ public:
     }
 
     //Insert operand at given position.
+    //pos: position of operand, start at 0.
+    //     Each operand correspond to in-edge on CFG.
+    //NOTE: the function will attempt to find the latest live-in version
+    //of the new operand MD of the PHI.
+    //st: record the status when the function can not find the Dom-LiveIn-Def.
     IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
-                      OptCtx const& oc);
+                      OptCtx const& oc, OUT MDSSAStatus & st);
 
     void replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd);
     void removeOpnd(IR * ir)

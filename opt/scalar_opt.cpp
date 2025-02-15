@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define MAX_DCE_COUNT 4
+
 bool ScalarOpt::isParticipateInOpt() const
 {
     if (g_exclude_region.find(m_rg->getRegionName())) { return false; }
@@ -39,8 +41,9 @@ bool ScalarOpt::isParticipateInOpt() const
 }
 
 
-bool ScalarOpt::worthToDo(Pass const* pass, UINT cp_count,
-                          UINT licm_count, UINT rp_count, UINT gcse_count)
+bool ScalarOpt::worthToDo(
+    Pass const* pass, UINT cp_count, UINT licm_count, UINT rp_count,
+    UINT gcse_count, UINT dce_count)
 {
     if (pass->getPassType() == PASS_LICM && licm_count > 1 && cp_count > 1) {
         //LICM has performed at least once.
@@ -71,18 +74,25 @@ bool ScalarOpt::worthToDo(Pass const* pass, UINT cp_count,
         //CASE:compile/cp_gcse_counter_effect.c
         return false;
     }
+    if (pass->getPassType() == PASS_DCE && dce_count > MAX_DCE_COUNT) {
+        //Some pass, such as LICM, might generate a trampolin BB over and
+        //over again. If it is the case, do not reperform DCE again.
+        //User could perform DCE after the loop.
+        return false;
+    }
     return true;
 }
 
 
-void ScalarOpt::updateCounter(Pass const* pass, UINT & cp_count,
-                              UINT & licm_count, UINT & rp_count,
-                              UINT & gcse_count)
+void ScalarOpt::updateCounter(
+    Pass const* pass, UINT & cp_count, UINT & licm_count, UINT & rp_count,
+    UINT & gcse_count, UINT & dce_count)
 {
     licm_count += pass->getPassType() == PASS_LICM ? 1 : 0;
     rp_count += pass->getPassType() == PASS_RP ? 1 : 0;
     cp_count += pass->getPassType() == PASS_CP ? 1 : 0;
     gcse_count += pass->getPassType() == PASS_GCSE ? 1 : 0;
+    dce_count += pass->getPassType() == PASS_DCE ? 1 : 0;
 }
 
 
@@ -129,8 +139,9 @@ bool ScalarOpt::perform(OptCtx & oc)
         ASSERT0(cp);
         passlist.append_tail(cp);
     }
+    DeadCodeElim * dce = nullptr;
     if (g_do_dce || g_do_dce_aggressive) {
-        DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
+        dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
         dce->setElimCFS(g_do_dce_aggressive);
         passlist.append_tail(dce);
     }
@@ -145,6 +156,9 @@ bool ScalarOpt::perform(OptCtx & oc)
             registerPass(PASS_VECT);
         if (g_opt_level >= OPT_LEVEL3) { pass->setAggressive(true); }
         passlist.append_tail(pass);
+    }
+    if (g_do_alge_reasscociate) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_ALGE_REASSCOCIATE));
     }
     #endif
     if (g_do_loop_convert) {
@@ -170,6 +184,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     UINT licm_count = 0;
     UINT rp_count = 0;
     UINT gcse_count = 0;
+    UINT dce_count = 0;
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
@@ -178,12 +193,14 @@ bool ScalarOpt::perform(OptCtx & oc)
             CHAR const* passname = pass->getPassName();
             DUMMYUSE(passname);
             bool doit = false;
-            if (worthToDo(pass, cp_count, licm_count, rp_count, gcse_count)) {
+            if (worthToDo(pass, cp_count, licm_count, rp_count, gcse_count,
+                          dce_count)) {
                 doit = pass->perform(oc);
             }
             if (doit) {
                 change = true;
-                updateCounter(pass, cp_count, licm_count, rp_count, gcse_count);
+                updateCounter(pass, cp_count, licm_count, rp_count, gcse_count,
+                              dce_count);
             }
             res |= doit;
             ASSERT0(m_dumgr->verifyMDRef());
@@ -200,6 +217,20 @@ bool ScalarOpt::perform(OptCtx & oc)
         count++;
     } while (change && count < 20);
     ASSERT0(!change);
+    if (dce != nullptr && dce_count > MAX_DCE_COUNT) {
+        //Only perform the last once.
+        res |= dce->perform(oc);
+        ASSERT0(m_dumgr->verifyMDRef());
+        ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+        ASSERT0(m_rg->getCFG()->verify());
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+        ASSERT0(m_cfg->verifyRPO(oc));
+        ASSERT0(m_cfg->verifyLoopInfo(oc));
+        ASSERT0(m_cfg->verifyDomAndPdom(oc));
+        ASSERT0(!m_rg->getLogMgr()->isEnableBuffer());
+    }
     return res;
 }
 

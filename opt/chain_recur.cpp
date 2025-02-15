@@ -104,7 +104,7 @@ void IVVal::clean(MOD ChainRecMgr & mgr)
 }
 
 
-bool IVVal::extractFrom(IR const* ir)
+bool IVVal::extractFrom(IR const* ir, IVR const* ivr)
 {
     ASSERT0(ir && !ir->is_undef());
     if (ir->is_const()) {
@@ -120,8 +120,8 @@ bool IVVal::extractFrom(IR const* ir)
             setToFP(CONST_fp_val(ir), ir->getType());
             return true;
         }
-        UNREACHABLE(); //TODO: support more kind of init-value.
-        return false;
+        ASSERT0(ivr);
+        return ivr->extractIVValFrom(this, ir);
     }
     MD const* md = ir->getExactRef();
     if (md != nullptr) {
@@ -675,14 +675,14 @@ void IVVal::computeByLinRep(IVVal const& src, LinearRep const& lr,
     clean();
     if (lr.hasCoeff()) {
         ASSERT0(lr.getCoeff());
-        bool succ = extractFrom(lr.getCoeff());
+        bool succ = extractFrom(lr.getCoeff(), mgr.getIVR());
         ASSERT0_DUMMYUSE(succ);
         IVVal::doMul(src, *this, *this, mgr);
     }
     if (!lr.hasAddend()) { return; }
     ASSERT0(lr.getAddend());
     IVVal addendval;
-    bool succ = addendval.extractFrom(lr.getAddend());
+    bool succ = addendval.extractFrom(lr.getAddend(), mgr.getIVR());
     ASSERT0_DUMMYUSE(succ);
     if (lr.isPosAddend()) {
         IVVal::doAdd(src, addendval, *this, mgr);
@@ -947,7 +947,7 @@ void ChainRec::computeByLinRep(LinearRep const& lr, ChainRec const& src,
     IVVal coeff;
     if (lr.hasCoeff()) {
         ASSERT0(lr.getCoeff());
-        bool succ = coeff.extractFrom(lr.getCoeff());
+        bool succ = coeff.extractFrom(lr.getCoeff(), mgr.getIVR());
         ASSERT0_DUMMYUSE(succ);
     } else {
         coeff.setToInt(1, src.getInit().getDType());
@@ -960,7 +960,7 @@ void ChainRec::computeByLinRep(LinearRep const& lr, ChainRec const& src,
     }
     ASSERT0(lr.getAddend());
     IVVal addendval;
-    bool succ2 = addendval.extractFrom(lr.getAddend());
+    bool succ2 = addendval.extractFrom(lr.getAddend(), mgr.getIVR());
     ASSERT0_DUMMYUSE(succ2);
     if (lr.isPosAddend()) {
         bool succ = mgr.doAdd(*this, addendval, *this);
@@ -982,8 +982,11 @@ void ChainRec::computeByLinRep(LinearRep const& lr, ChainRec const& src,
 //
 //START ChainRecMgr
 //
-ChainRecMgr::ChainRecMgr(Region * rg, OptCtx const* oc) : m_rg(rg), m_oc(oc)
+ChainRecMgr::ChainRecMgr(Region * rg, OptCtx const* oc, IVR const* ivr)
 {
+    m_rg = rg;
+    m_oc = oc;
+    m_ivr = ivr;
     m_pool = smpoolCreate(sizeof(ChainRec) * 4, MEM_COMM);
     m_tm = rg->getTypeMgr();
     m_irmgr = rg->getIRMgr();

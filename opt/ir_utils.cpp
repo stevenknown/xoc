@@ -149,4 +149,50 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
     return true;
 }
 
+
+//
+//START IRVec
+//
+bool IRVec::is_empty() const
+{
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
+        if (get(i) != nullptr) { return false; }
+    }
+    return true;
+}
+
+
+void IRVec::dump(Region const* rg) const
+{
+    note(rg, "\n-- DUMP IRVec --");
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
+        IR const* ir = get(i);
+        if (ir == nullptr) { continue; }
+        dumpIR(ir, rg);
+    }
+}
+
+
+void IRVec::copyContent(IRVec const& src, Region * rg)
+{
+    ASSERT0(is_empty());
+    for (VecIdx i = 0; i <= src.get_last_idx(); i++) {
+        IR const* ir = src.get(i);
+        if (ir == nullptr) { continue; }
+        set(i, rg->dupIRTree(ir));
+    }
+}
+
+
+void IRVec::freeContent(Region * rg)
+{
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
+        IR * ir = get(i);
+        if (ir == nullptr) { continue; }
+        rg->freeIRTree(ir);
+    }
+    clean();
+}
+//END IRVec
+
 } //namespace xoc

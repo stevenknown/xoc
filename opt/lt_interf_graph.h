@@ -42,7 +42,8 @@ class LTIG : public xcom::Graph {
     LifeTimeMgr & m_lt_mgr;
 private:
     LifeTimeMgr const& getLTMgr() const { return m_lt_mgr; }
-    virtual void dumpVertexDesc(Vertex const* v, StrBuf & buf) const;
+    virtual void dumpVertexDesc(
+        xcom::Vertex const* v, xcom::DefFixedStrBuf & buf) const override;
 public:
     LTIG(Region * rg, LifeTimeMgr & mgr) : m_rg(rg), m_lt_mgr(mgr)
     { set_direction(false); set_dense(true); }

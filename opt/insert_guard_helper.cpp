@@ -570,14 +570,15 @@ IRBB * InsertGuardHelper::insertGuardStart(IRBB * guarded_bb)
 {
     //Add vertex to graph before updating RPO.
     IRBB * guard_start = m_rg->allocBB();
-    m_cfg->insertBBBefore(guarded_bb, guard_start);
-    if (!m_cfg->tryUpdateRPO(guard_start, guarded_bb, true)) {
+    if (!m_cfg->tryUpdateRPOBeforeCFGChanged(
+            guard_start, guarded_bb, true, getOptCtx())) {
         //TODO: Try update RPO incrementally to avoid recompute
         //whole RPO-Vex list in CFG.
         //m_cfg->tryUpdateRPO(prehead, guard_start, true);
         //Just leave RPO-recomputation to next user for now.
         m_oc->setInvalidRPO();
     }
+    m_cfg->insertBBBefore(guarded_bb, guard_start);
     bool add_pdom_failed = false;
     m_cfg->addDomInfoToNewIDom(guarded_bb->id(), guard_start->id(),
                                add_pdom_failed);
@@ -600,14 +601,15 @@ IRBB * InsertGuardHelper::insertGuardEnd(IRBB * guarded_bb,
     BBListIter next_it;
     m_rg->getBBList()->find(next_to_guarded_bb, &next_it);
     ASSERT0(next_it);
-    m_cfg->insertBBBetween(guarded_bb, guarded_bb_it, next_to_guarded_bb,
-                           next_it, guard_end, m_oc);
-    if (!m_cfg->tryUpdateRPO(guard_end, guarded_bb, false)) {
+    if (!m_cfg->tryUpdateRPOBeforeCFGChanged(
+            guard_end, guarded_bb, false, getOptCtx())) {
         //TODO: Try update RPO incrementally to avoid recompute whole BB list.
         //m_cfg->tryUpdateRPO(prehead, guard_start, true);
         //Just leave RPO-recomputation to next user for now.
         m_oc->setInvalidRPO();
     }
+    m_cfg->insertBBBetween(guarded_bb, guarded_bb_it, next_to_guarded_bb,
+                           next_it, guard_end, m_oc);
     bool add_pdom_failed = false;
     m_cfg->addDomInfoToNewIDom(next_to_guarded_bb->id(), guard_end->id(),
                                add_pdom_failed);
@@ -651,6 +653,7 @@ IRBB * InsertGuardHelper::insertGuard(LI<IRBB> const* li, IRBB * prehead)
         //Recompute or maintain the DOM need RPO.
         m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_RPO, PASS_UNDEF);
     }
+    ASSERT0L3(m_cfg->verifyRPO(*m_oc));
 
     //Preheader does not have PDOM any more.
     LabelInfo const* guard_end_lab = addJumpEdge(guard_start, guard_end);

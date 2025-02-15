@@ -41,6 +41,9 @@ class DbxMgr;
 
 //This macro defines the maximum number of frontend languages.
 #define MAX_FRONTEND_LANGUAGES 4
+#define MAX_FILE_INDEX 65535
+typedef xcom::Vector<xoc::Sym const*> FileIdx2FileName;
+
 
 class LangInfo {
     COPY_CONSTRUCTOR(LangInfo);
@@ -57,11 +60,14 @@ public:
     LANG2INDEX m_frontend_lang_to_index;
 public:
     LangInfo() { m_frontend_lang_to_index.clean(); };
-    UINT8 getLangIndex(LangInfo::LANG lang);
-    UINT8 getLangNum();
+    UINT8 getLangIndex(LangInfo::LANG lang) const;
+    UINT8 getLangNum() const;
     void setLangIndex(LangInfo::LANG lang, UINT8 index);
 };
 
+typedef xcom::TMap<LangInfo::LANG, FileIdx2FileName*> Lang2FileIdx2FileName;
+typedef xcom::TMapIter<LangInfo::LANG, FileIdx2FileName*>
+    Lang2FileIdx2FileNameIter;
 
 //Describe debug information.
 //Note 0 indicates the line number info is invalid.
@@ -128,6 +134,7 @@ public:
 class DbxMgr {
     COPY_CONSTRUCTOR(DbxMgr);
     SMemPool * m_pool;
+    Lang2FileIdx2FileName m_lang2fi2fn;
 public:
     #define PRTCTX_lang(p)  ((p)->m_lang)
     class PrtCtx {
@@ -165,10 +172,16 @@ public:
     //Allocate memory for dbx.
     Dbx * allocDbx();
 
+    //Allocate memory for file vector.
+    FileIdx2FileName * allocFileVec();
+
     void destroy();
 
     //Do some prepare work before print source file.
     virtual void doPrepareWorkBeforePrint() {}
+
+    xoc::Sym const* getFileName(LangInfo::LANG lang, UINT fileidx) const;
+
     void init();
 
     //Print source code line in internal stream.
@@ -191,7 +204,9 @@ public:
         //Nothing to do.
     }
 
+    void setFileName(LangInfo::LANG lang, UINT fileidx, xoc::Sym const* s);
     void setLangInfo();
+
     void * xmalloc(size_t size);
 };
 

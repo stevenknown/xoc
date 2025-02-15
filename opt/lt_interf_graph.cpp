@@ -39,7 +39,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-void LTIG::dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const
+void LTIG::dumpVertexDesc(
+    xcom::Vertex const* v, OUT xcom::DefFixedStrBuf & buf) const
 {
     buf.sprint("$%u", v->id());
 }

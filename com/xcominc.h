@@ -21,6 +21,7 @@ using namespace xcom;
 #include "bs.h"
 #include "sbs.h"
 #include "sbs_hash.h"
+#include "flagset.h"
 #include "rpo.h"
 #include "sgraph.h"
 #include "tree.h"

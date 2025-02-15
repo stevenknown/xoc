@@ -202,6 +202,8 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     case IR_LABEL:
         convertLabel(ir, mis, cont);
         break;
+    //Following IRs do not need to be convert into machine instruction.
+    SWITCH_CASE_EXT_VSTMT: break;
     default: convertExtStmt(ir, mis, cont);
     }
 }

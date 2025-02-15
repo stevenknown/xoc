@@ -36,8 +36,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
+#define VPR_UNDEF 0
+
 class PRSSAMgr;
 class LivenessMgr;
+class TargInfoHandler;
+
 typedef xcom::TMap<PRNO, VPR*> PRNO2VPR;
 typedef xcom::TMap<UINT, VPR const*> VertexID2VPR;
 typedef xcom::DefSBitSet PRSet;
@@ -49,6 +53,11 @@ typedef Vector<VPRVec*> PRNO2VPRVec;
 
 //Mapping from PRNO to Stack of VPR.
 typedef xcom::Stack<VPR*> VPRStack;
+
+class PRSSAStatus : public Status {
+public:
+    bool is_succ() const { return get_status_num() == 0; }
+};
 
 class BB2PRSet : public xcom::Vector<PRSet*> {
     COPY_CONSTRUCTOR(BB2PRSet);
@@ -67,7 +76,7 @@ class BB2VPRMap : public xcom::Vector<PRNO2VPR*> {
 public:
     BB2VPRMap(UINT size) : xcom::Vector<PRNO2VPR*>(size) {}
 
-    //The allocated object will be destroied at destoryPRNO2VPR().
+    //The allocated object will be destroyed at destoryPRNO2VPR().
     PRNO2VPR * allocPRNO2VPR(UINT bbid);
     void destoryPRNO2VPR(UINT bbid);
     //Verify if vpmap of each BB has been deleted.
@@ -135,7 +144,7 @@ class PRSSAInfoCollect {
     IRCFG * m_cfg;
     OptCtx const* m_oc;
     TMap<IR const*, IR const*> m_phi2livein;
-private:
+protected:
     //Find livein BB through given 'pred'.
     //The function will iterate dom tree bottom up from 'pred' until the
     //anticipated BB is found.
@@ -339,8 +348,9 @@ class PRSSAMgr : public Pass {
         { return m_pr2defbblst.get((VecIdx)prno); }
     };
     COPY_CONSTRUCTOR(PRSSAMgr);
-    BYTE m_is_semi_pruned:1;
-    BYTE m_is_pruned:1;
+protected:
+    bool m_is_semi_pruned;
+    bool m_is_pruned;
     UINT m_vpr_count;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
@@ -349,6 +359,7 @@ class PRSSAMgr : public Pass {
     IRMgr * m_irmgr;
     DefSegMgr * m_seg_mgr;
     LivenessMgr * m_livemgr;
+    TargInfoHandler * m_ti_handler;
 
     //Record OptCtx in used. It is always updated in perform().
     IRIter m_iter; //for tmp local use.
@@ -362,7 +373,7 @@ class PRSSAMgr : public Pass {
 
     //Record VPR that indexed by PRNO.
     VPRVec m_prno2vpr;
-private:
+protected:
     VPR * allocVPR()
     {
         ASSERTN(m_vp_pool != nullptr, ("not init"));
@@ -379,23 +390,12 @@ private:
     VPR * allocVPR(PRNO orgprno, UINT version, Type const* orgtype);
     VPR * allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
                        Type const* orgtype, MOD VPRVec * vprvec);
-    void clean()
-    {
-        m_tm = nullptr;
-        m_seg_mgr = nullptr;
-        m_cfg = nullptr;
-        m_vpr_count = 1;
 
-        //Set to true if PR ssa is constructed.
-        //This flag will direct the behavior of optimizations.
-        //If SSA constructed, DU mananger should not compute information
-        //for PR any more.
-        m_is_valid = false;
-        m_is_semi_pruned = true;
-        m_is_pruned = true;
-        m_vp_pool = nullptr;
-        m_livemgr = nullptr;
-    }
+    //Return true if SSA construction is successful.
+    bool constructByDomTree(xcom::DomTree & domtree, OptCtx & oc);
+    bool constructVPRAndPhi(xcom::DomTree & domtree, OptCtx & oc);
+    void clean();
+
     //Clean VPR info for IR in 'lst'.
     //The function always used in initialization in partial computation to
     //SSAInfo of given IR.
@@ -411,7 +411,7 @@ private:
                                   OUT ConstructCtx & cstctx);
     void constructMDDUChainForPR();
 
-    void destructBBSSAInfo(IRBB * bb, OptCtx const& oc);
+    void destructBBSSAInfo(MOD IRBB * bb, OptCtx const& oc);
     void destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
                                    OptCtx const& oc);
 
@@ -434,7 +434,6 @@ private:
     //The function generates VPRVec by given prno.
     VPRVec * genVPRVecByPRNO(PRNO prno);
     SSAInfo * genInitVersionSSAInfoForExp(IR * exp);
-    VPRVec const * getVPRVec() const { return &m_vpr_vec; }
 
     //The function retrieves VPR by given prno.
     VPR * getVPRByPRNO(PRNO prno) const
@@ -451,14 +450,10 @@ private:
     void handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset,
                              ConstructCtx const& cstctx);
 
-    inline void init()
-    {
-        if (m_vp_pool != nullptr) { return; }
-        m_vpr_count = 1;
-        m_is_valid = false;
-        m_prno2vprvec.set(m_rg->getPRCount(), nullptr);
-        m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
-    }
+    //The function initialize the PRSSA dependent passes.
+    void initDepPass();
+    void initTargInfoHandler();
+    void init();
     void initMapInfo(DefMiscBitSetMgr & bs_mgr, OUT BB2PRSet & bb2definedprs,
                      OUT PRSet & prset, OUT ConstructCtx & cstctx);
     void initVPRStack(PRSet const& prset, OUT ConstructCtx & cstctx);
@@ -499,6 +494,7 @@ private:
         MOD IRBB * root, xcom::DomTree const& domtree,
         BB2PRSet const& bb2definedprs, BBSet const* bbset, PRSet const* prset,
         MOD ConstructCtx & cstctx);
+    void removePhiList(MOD IRBB * bb);
     void removePhiList();
 
     //The function records the corresponding VPR for given prno.
@@ -538,27 +534,10 @@ private:
     bool verifyVPR() const; //Only used in PRSSAMgr.
     bool verifyMapBetweenPRNOAndVPR() const; //Only used in PRSSAMgr.
 public:
-    explicit PRSSAMgr(Region * rg) : Pass(rg)
-    {
-        clean();
-        ASSERT0(rg);
-        m_tm = rg->getTypeMgr();
-        m_vm = rg->getVarMgr();
-        m_irmgr = rg->getIRMgr();
-        ASSERT0(m_tm);
-        ASSERT0(rg->getMiscBitSetMgr());
-        m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
-        ASSERT0(m_seg_mgr);
-        m_cfg = rg->getCFG();
-        ASSERTN(m_cfg, ("cfg is not available."));
-    }
-    ~PRSSAMgr()
-    {
-        ASSERTN(!is_valid(), ("should be destructed"));
-        destroy(false);
-    }
+    explicit PRSSAMgr(Region * rg);
+    virtual ~PRSSAMgr();
 
-    //After adding BB or change BB successor,
+    //After adding BB or changing BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatedPhiOpnd(
         IRBB * bb, IRBB * succ, PRSSAInfoCollect const& col);
@@ -621,20 +600,22 @@ public:
     bool constructDesignatedRegion(SSARegion & ssarg);
 
     //Note: Non-SSA DU Chains of read/write PR will be clean and
-    //unusable after SSA construction.
+    //unusable after PRSSA construction.
     void construction(OptCtx & oc);
-    bool construction(xcom::DomTree & domtree, OptCtx & oc);
+
+    //The function only constructs VPR and inserts PHI, but striping version.
+    void constructVPRAndPhi(OptCtx & oc);
 
     //The old PR may carry dedicated register information, and the new PR needs
     //to retain this information to ensure the correct operation of subsequent
     //related passes (e.g. register allocation).
+    void copyDedicatedReg(VPR const* vpr);
     void copyDedicatedRegForAllVPR();
-    void copyDedicatedRegForEachVPR(VPR const* vpr);
 
+    //Copy the attributes of the original PR to the new renamed PR.
     //Since a new PR will be built, in some cases the attributes of the old PR
     //need to be copied to support subsequent optimization.
-    virtual void copyPRAttr();
-
+    virtual void copyPRAttrForAllVPR();
     size_t count_mem() const;
 
     //DU chain operation.
@@ -655,8 +636,9 @@ public:
     void changeDefForPartialUseSet(IR * olddef, IR * newdef,
                                    IRSet const& partial_useset);
 
-    //is_reinit: this function is invoked in reinit().
-    void destroy(bool is_reinit);
+    //The function destroy all resources that allocated by current pass.
+    //The function is usually called when PRSSA info is not in use.
+    void destroy();
 
     //This function perform SSA destruction via scanning BB in preorder
     //traverse dominator tree.
@@ -670,6 +652,10 @@ public:
     //maintain the classic DU chain, alternatively a conservative way to
     //avoid subsequent verification complaining is set the prdu invalid.
     void destruction(MOD OptCtx & oc);
+
+    //The function destructs VPR and remove all PHIs.
+    //NOTE: the function does not perform striping of PHI version to out of SSA.
+    void destructVPRAndPhi();
 
     //The function dump PR info rather than specific IR stmt and exp details.
     bool dumpBrief() const;
@@ -730,6 +716,8 @@ public:
     IRCFG * getCFG() const { return m_cfg; }
     IRMgr * getIRMgr() const { return m_irmgr; }
     UINT getVPRCount() const { return m_vpr_count; }
+    TargInfoHandler * getTIHandler() const { return m_ti_handler; }
+    VPRVec const * getVPRVec() const { return &m_vpr_vec; }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.
@@ -798,7 +786,7 @@ public:
     //This function will clean all informations and recreate them.
     inline void reinit()
     {
-        destroy(true);
+        destroy();
         init();
     }
     //Before removing BB or change BB successor,
@@ -850,8 +838,12 @@ public:
     //Note the function does NOT check the consistency of Prno if def or use
     //operate on PR.
     static void removeDUChain(IR * def, IR * use);
-
-    bool useLSRA() const;
+    bool reconstruction(OptCtx & oc)
+    {
+        destruction(oc);
+        construction(oc);
+        return true;
+    }
 
     bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const;
 
@@ -863,6 +855,8 @@ public:
     bool verifyVersion(OptCtx const& oc) const;
     static bool verifyPRSSAInfo(Region const* rg, OptCtx const& oc);
 
+    //Note: Non-SSA DU Chains of read/write PR is unavaiable after
+    //PRSSA construction.
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
 

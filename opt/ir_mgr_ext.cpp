@@ -141,4 +141,42 @@ IR * IRMgrExt::getAlterResDescList(IR * stmt) const
     return nullptr;
 }
 
+
+IR * IRMgrExt::buildAtomCas(Type const* type, IR * memory, IR * oldval,
+                            IR * newval, IR * reslst)
+{
+    ASSERT0(memory && newval && oldval && reslst);
+    ASSERT0(type && (type->is_i32() || type->is_i64()));
+    IR * ir = allocIR(IR_ATOMCAS);
+    ATOMCAS_memory(ir) = memory;
+    ATOMCAS_newval(ir) = newval;
+    ATOMCAS_oldval(ir) = oldval;
+    ATOMCAS_multires(ir) = reslst;
+    IR_parent(memory) = ir;
+    IR_parent(newval) = ir;
+    IR_parent(oldval) = ir;
+    IR_parent(reslst) = ir;
+    IR_dt(ir) = type;
+    return ir;
+}
+
+
+IR * IRMgrExt::buildAtomInc(Type const* type, IR * memory, IR * reslst,
+                            IR * addend)
+{
+    ASSERT0(type && memory && reslst);
+    IR * ir = allocIR(IR_ATOMINC);
+    ATOMINC_memory(ir) = memory;
+    ATOMINC_multires(ir) = reslst;
+    IR_parent(memory) = ir;
+
+    //Some architectures require explicit specification, some do not.
+    if (addend != nullptr) {
+        ATOMINC_addend(ir) = addend;
+        IR_parent(addend) = ir;
+    }
+    IR_dt(ir) = type;
+    return ir;
+}
+
 } //namespace xoc

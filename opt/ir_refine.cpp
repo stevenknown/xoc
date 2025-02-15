@@ -760,17 +760,17 @@ IR * Refine::refineCall(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->isCallStmt());
     bool lchange = false;
-    if (CALL_param_list(ir) != nullptr) {
-        IR * param = xcom::removehead(&CALL_param_list(ir));
-        IR * newparamlst = nullptr;
+    if (CALL_arg_list(ir) != nullptr) {
+        IR * arg = xcom::removehead(&CALL_arg_list(ir));
+        IR * newarglst = nullptr;
         IR * last = nullptr;
-        while (param != nullptr) {
-            IR * newp = refineIR(param, lchange, rc);
-            xcom::add_next(&newparamlst, &last, newp);
+        while (arg != nullptr) {
+            IR * newp = refineIR(arg, lchange, rc);
+            xcom::add_next(&newarglst, &last, newp);
             last = newp;
-            param = xcom::removehead(&CALL_param_list(ir));
+            arg = xcom::removehead(&CALL_arg_list(ir));
         }
-        CALL_param_list(ir) = newparamlst;
+        CALL_arg_list(ir) = newarglst;
     }
     if (lchange) {
         change = true;
@@ -1126,7 +1126,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ir->is_div());
     IR * op1 = BIN_opnd1(ir);
     IR * op0 = BIN_opnd0(ir);
-    if (g_is_opt_float && op1->is_const() && op1->is_fp() && !op0->is_const()) {
+    if (g_do_opt_float && op1->is_const() && op1->is_fp() && !op0->is_const()) {
         HOST_FP fp_imm = CONST_fp_val(op1);
         if (fp_imm == 1.0) {
             //X/1.0 => X
@@ -1170,7 +1170,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
     if (op0->isIREqual(op1, getIRMgr(), true)) {
         //CASE: div inf, inf
         //The result of div is nan not 1.0f, which cannot be optimized.
-        if (ir->is_fp() && !g_is_opt_float) { return ir; }
+        if (ir->is_fp() && !g_do_opt_float) { return ir; }
 
         //X/X => 1.
         IR * tmp = ir;
@@ -1228,7 +1228,7 @@ AGAIN:
         change = true;
         return base;
     }
-    if ((pow->is_fp() && g_is_opt_float) &&
+    if ((pow->is_fp() && g_do_opt_float) &&
         pow->is_const() && CONST_fp_val(pow) == 1) {
         //pow X,1 => X
         BIN_opnd0(ir) = nullptr;
@@ -1269,7 +1269,7 @@ IR * Refine::refineNRoot(IR * ir, bool & change, RefineCtx & rc)
         }
         return ir;
     }
-    if (g_is_opt_float && nroot->is_fp()) {
+    if (g_do_opt_float && nroot->is_fp()) {
         if (nroot->is_const()) {
             if (xcom::Float::isApproEq(CONST_fp_val(nroot), HOST_FP(2.0))) {
                 //User would calculate the sqrt(base);
@@ -1307,7 +1307,7 @@ IR * Refine::refineExponent(IR * ir, bool & change, RefineCtx & rc)
         return imm;
     }
 NEXT:
-    if (!g_is_opt_float) { return ir; }
+    if (!g_do_opt_float) { return ir; }
     if (pow->is_int() && CONST_int_val(pow) == 1 && ir->is_fp()) {
         //a^(1) => a
         IR * ret = base;
@@ -1432,7 +1432,7 @@ IR * Refine::refineRem(IR * ir, bool & change, RefineCtx & rc)
 
 IR * Refine::refineTrigonometric(IR * ir, bool & change, RefineCtx & rc)
 {
-    if (!g_is_opt_float) { return ir; }
+    if (!g_do_opt_float) { return ir; }
     ir = refineAllKids(ir, change, rc);
     IR const* op = UNA_opnd(ir);
     if (!op->is_const()) { return ir; }
@@ -1697,7 +1697,7 @@ IR * Refine::refineAdd(IR * ir, bool & change, RefineCtx & rc)
         change = true;
         return op0; //No need to update DU.
     }
-    if (op1->is_const() && op1->is_fp() && g_is_opt_float &&
+    if (op1->is_const() && op1->is_fp() && g_do_opt_float &&
         CONST_fp_val(op1) == HOST_FP(0.0)) {
         //For conservative purpose, we do not optimize ADD of float-type.
         //e.g: add X,0.0 => X
@@ -1750,7 +1750,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
     ASSERT0(op0 != nullptr && op1 != nullptr);
-    if (g_is_opt_float && op1->is_const() && op1->is_fp()) {
+    if (g_do_opt_float && op1->is_const() && op1->is_fp()) {
         if (xcom::Float::isApproEq(CONST_fp_val(op1), HOST_FP(2.0))) {
             //mul.fp X,2.0 => add.fp X,X
             IR_code(ir) = IR_ADD;
@@ -1991,7 +1991,7 @@ IR * Refine::refineSub(IR * ir, bool & change, RefineCtx & rc)
     if (op0->isIRListEqual(op1, getIRMgr())) {
         //CASE: sub inf, inf
         //The result of sub is nan, not 0.0f, which cannot be optimized.
-        if (ir->is_fp() && !g_is_opt_float) { return ir; }
+        if (ir->is_fp() && !g_do_opt_float) { return ir; }
 
         //sub X,X => 0
         if (rc.maintainDU()) {
@@ -2042,7 +2042,7 @@ IR * Refine::refineSub(IR * ir, bool & change, RefineCtx & rc)
         change = true;
         return ir; //No need to update DU.
     }
-    if (op0->is_const() && op0->is_fp() && g_is_opt_float &&
+    if (op0->is_const() && op0->is_fp() && g_do_opt_float &&
         CONST_fp_val(op0) == HOST_FP(0)) {
         //For conservative purpose, we do not optimize SUB of float-type.
         //e.g: 0.0 - X => X
@@ -2340,7 +2340,7 @@ IR * Refine::refineCompare(IR * ir, bool & change, RefineCtx & rc)
     ir = refineBinaryOp(ir, lchange2, t);
     if (lchange2) { ir->setParentPointer(false); }
     if (!ir->is_const()) {
-        ir = refineDetViaSSADU(ir, lchange2);
+        ir = refineDetViaSSADU(ir, lchange2, rc);
     }
     change |= lchange2;
     return ir;
@@ -2622,7 +2622,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
             change = true;
             return tmp;
         }
-        if (g_is_opt_float && ir->is_fp() && CVT_exp(ir)->is_int()) {
+        if (g_do_opt_float && ir->is_fp() && CVT_exp(ir)->is_int()) {
             //cvt(f64, const(i64)) => const(f64)
             IR * tmp = m_irmgr->buildImmFP(
                 HOST_FP(CONST_int_val(CVT_exp(ir))), ir->getType());
@@ -2635,8 +2635,9 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
-IR * Refine::refineDetViaSSADU(IR * ir, bool & change)
+IR * Refine::refineDetViaSSADU(IR * ir, bool & change, RefineCtx const& rc)
 {
+    if (!rc.usePRSSADU()) { return ir; }
     ASSERT0(ir->is_judge());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
@@ -2802,7 +2803,9 @@ IR * Refine::refineIRImpl(IR * ir, bool & change, RefineCtx & rc)
     case IR_GOTO:
     case IR_REGION:
         break;
-    default: ir = refineExtOp(ir, tmpc, rc);
+    default:
+        ASSERT0(ir->isExtOp());
+        ir = refineExtOp(ir, tmpc, rc);
     }
     change |= tmpc;
     return ir;
@@ -3097,7 +3100,7 @@ IR * Refine::foldConstFloatUnary(IR * ir, bool & change)
 
 IR * Refine::foldConstFloatBinaryForPow(IR * ir, bool & change)
 {
-    if (!g_is_opt_float || !g_do_refine_with_host_api) { return ir; }
+    if (!g_do_opt_float || !g_do_refine_with_host_api) { return ir; }
     ASSERT0(ir->is_pow());
     IR const* op0 = BIN_opnd0(ir);
     IR const* op1 = BIN_opnd1(ir);
@@ -3184,7 +3187,7 @@ IR * Refine::foldConstUnary(IR * ir, bool & change, RefineCtx &)
     ASSERT0(ir->isUnaryOp());
     IR * t = UNA_opnd(ir);
     ASSERT0(t);
-    if (t->is_const() && t->is_fp() && g_is_opt_float) {
+    if (t->is_const() && t->is_fp() && g_do_opt_float) {
         return foldConstFloatUnary(ir, change);
     }
     if (t->is_const() && t->is_int()) {
@@ -3201,7 +3204,7 @@ IR * Refine::foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc)
     IR * t1 = BIN_opnd1(ir);
     ASSERTN(t0 && t1, ("binary op"));
     if (t0->is_const() && t1->is_const()) {
-        if (g_is_opt_float && t0->is_fp() && t1->is_fp()) {
+        if (g_do_opt_float && t0->is_fp() && t1->is_fp()) {
             return foldConstFloatBinary(ir, change);
         }
         if ((t0->is_fp() && t1->is_int()) ||

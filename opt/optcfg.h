@@ -40,18 +40,19 @@ public:
 };
 
 
+#define RMEMPTYBBCTX_vertex_iter_time(x) ((x).m_vertex_iter_time)
 class RemoveEmptyBBCtx {
     xcom::List<UINT> * m_removed_bbid_list;
 public:
     //If the flag is true, the optimizer will remove empty BB without too
     //much considerations.
     bool m_force_remove_empty_bb;
-    UINT vertex_iter_time;
+    UINT m_vertex_iter_time;
     CfgOptCtx & cfgoptctx_org;
     CfgOptCtx cfgoptctx_dup; //a duplication of original CfgOptCtx.
 public:
     RemoveEmptyBBCtx(CfgOptCtx & coctx) :
-        vertex_iter_time(0), cfgoptctx_org(coctx),
+        m_vertex_iter_time(0), cfgoptctx_org(coctx),
         cfgoptctx_dup(cfgoptctx_org)
     {
         m_removed_bbid_list = nullptr;
@@ -60,7 +61,7 @@ public:
     ~RemoveEmptyBBCtx()
     { if (m_removed_bbid_list != nullptr) { delete m_removed_bbid_list; } }
 
-    void add(UINT bbid)
+    void addRemovedBB(UINT bbid)
     {
         if (m_removed_bbid_list != nullptr) {
             m_removed_bbid_list->append_tail(bbid);
@@ -80,6 +81,7 @@ public:
     }
 
     List<UINT> * getRemovedList() { return m_removed_bbid_list; }
+    OptCtx & getOptCtx() { return chooseCtx().getOptCtx(); }
 
     bool isForceRemove() const { return m_force_remove_empty_bb; }
 
@@ -90,7 +92,7 @@ public:
 
     bool removeTooManyTimes() const
     {
-        return vertex_iter_time >
+        return m_vertex_iter_time >
                g_cfg_remove_empty_bb_maxtimes_to_update_dominfo;
     }
 
@@ -145,16 +147,24 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); }
 
     //Remove redundant branch and stmt.
-    bool removeRedundantBranchCase2(BB *RESTRICT bb, BB const*RESTRICT next_bb,
-                                    XR * xr, CfgOptCtx const& ctx);
+    //NOTE: the function will maintain DomInfo.
+    //Return true if changed.
+    bool removeRedundantBranchCase2(
+        BB *RESTRICT bb, BB const*RESTRICT next_bb, XR * xr,
+        CfgOptCtx const& ctx);
+
     //Remove redundant branch edge and stmt.
-    bool removeRedundantBranchCase1(BB *RESTRICT bb, BB const*RESTRICT next_bb,
-                                    XR * xr, CfgOptCtx const& ctx);
+    //NOTE: the function will maintain DomInfo.
+    //Return true if changed.
+    bool removeRedundantBranchCase1(
+        BB *RESTRICT bb, BB const*RESTRICT next_bb, XR * xr,
+        CfgOptCtx const& ctx);
 
     //Remove empty bb, and merger label info.
-    bool removeEmptyBBHelper(BB * bb, BB * next_bb,
-                             C<BB*> * bbct, C<BB*> * next_ct,
-                             MOD RemoveEmptyBBCtx & rmctx);
+    //Return true if changed.
+    bool removeEmptyBBHelper(
+        BB * bb, BB * next_bb, C<BB*> * bbct, C<BB*> * next_ct,
+        MOD RemoveEmptyBBCtx & rmctx);
 public:
     OptimizedCFG(List<BB*> * bb_list, UINT vertex_hash_size = 16)
         : CFG<BB, XR>(bb_list, vertex_hash_size)
@@ -172,6 +182,7 @@ public:
     //Remove empty BB, and merger label info.
     //Note removing BB does NOT affect RPO.
     //bblst: if it is not NULL, record the removed BB.
+    //Return true if there are BBs removed.
     bool removeEmptyBB(OUT RemoveEmptyBBCtx & rmbbctx);
 
     //Try to remove empty bb, and merger label info.
@@ -190,7 +201,9 @@ public:
                          OUT RemoveUnreachBBCtx * unrchctx);
 
     //Remove redundant branch edge.
-    bool removeRedundantBranch(CfgOptCtx const& ctx);
+    //NOTE: the function will maintain DomInfo.
+    //Return true if changed.
+    bool removeRedundantBranch(MOD CfgOptCtx & ctx);
 
     //The function replaces original predecessor bb with a list of
     //new predecessors.
@@ -295,11 +308,14 @@ bool OptimizedCFG<BB, XR>::removeEmptyBBHelper(
             CfgOptCtx & ctx = rmctx.chooseCtx();
             CFGOPTCTX_vertex_iter_time(&ctx) = 0;
             preprocessBeforeRemoveBB(bb, ctx);
-            rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+            RMEMPTYBBCTX_vertex_iter_time(rmctx) +=
+                CFGOPTCTX_vertex_iter_time(&ctx);
 
             CFGOPTCTX_vertex_iter_time(&ctx) = 0;
+            rmctx.addRemovedBB(bb->id());
             getCFG()->removeBB(bbct, ctx);
-            rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+            RMEMPTYBBCTX_vertex_iter_time(rmctx) +=
+                CFGOPTCTX_vertex_iter_time(&ctx);
             return true;
         }
         return false;
@@ -321,23 +337,19 @@ bool OptimizedCFG<BB, XR>::removeEmptyBBHelper(
     //The function have to be invoked before CFG change.
     CfgOptCtx & ctx = rmctx.chooseCtx();
 
-    //replacePredWith will revise the number of Phi operands.
-    //ctx.vertex_iter_time = 0;
-    //preprocessBeforeRemoveBB(bb, ctx);
-    //rmctx.vertex_iter_time += ctx.vertex_iter_time;
-
     //Tranform CFG.
     List<UINT> newpreds;
     getCFG()->get_preds(newpreds, bb);
     CFGOPTCTX_vertex_iter_time(&ctx) = 0;
     replacePredWith(bb, next_bb, newpreds, ctx);
-    rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+    RMEMPTYBBCTX_vertex_iter_time(rmctx) += CFGOPTCTX_vertex_iter_time(&ctx);
+    rmctx.addRemovedBB(bb->id());
 
     //Invoke interface to remove related BB and Vertex.
     //The map between bb and labels should have maintained in above code.
     CFGOPTCTX_vertex_iter_time(&ctx) = 0;
     getCFG()->removeBB(bbct, ctx);
-    rmctx.vertex_iter_time += CFGOPTCTX_vertex_iter_time(&ctx);
+    RMEMPTYBBCTX_vertex_iter_time(rmctx) += CFGOPTCTX_vertex_iter_time(&ctx);
     return true;
 }
 
@@ -350,6 +362,12 @@ bool OptimizedCFG<BB, XR>::removeSingleEmptyBB(
     if (!getCFG()->isEmptyBB(bb) || getCFG()->isRegionEntry(bb) ||
         bb->isExceptionHandler()) {
         return false;
+    }
+    if (ctx.chooseCtx().needUpdateDomInfo()) {
+        //Since RPO is necessary to compute DomInfo and recompute it is not
+        //very costly, thus we prefer to recompute RPO.
+        ctx.getOptCtx().getRegion()->getPassMgr()->checkValidAndRecompute(
+            &ctx.getOptCtx(), PASS_RPO, PASS_UNDEF);
     }
     xcom::C<BB*> * ct;
     getCFG()->getBBList()->find(bb, &ct);
@@ -376,18 +394,22 @@ template <class BB, class XR>
 bool OptimizedCFG<BB, XR>::removeEmptyBB(OUT RemoveEmptyBBCtx & rmctx)
 {
     START_TIMER(t, "Remove Empty BB");
+    if (rmctx.chooseCtx().needUpdateDomInfo()) {
+        //Since RPO is necessary to compute DomInfo and recompute it is not
+        //very costly, thus we prefer to recompute RPO.
+        rmctx.getOptCtx().getRegion()->getPassMgr()->checkValidAndRecompute(
+            &rmctx.getOptCtx(), PASS_RPO, PASS_UNDEF);
+    }
     xcom::C<BB*> * ct;
     xcom::C<BB*> * next_ct;
-    bool doit = false;
+    bool removed = false;
     for (getCFG()->getBBList()->get_head(&ct), next_ct = ct;
          ct != nullptr; ct = next_ct) {
         next_ct = getCFG()->getBBList()->get_next(next_ct);
         BB * bb = ct->val();
         ASSERT0(bb);
         BB * next_bb = nullptr;
-        if (next_ct != nullptr) {
-            next_bb = next_ct->val();
-        }
+        if (next_ct != nullptr) { next_bb = next_ct->val(); }
 
         //TODO: confirm if this is correct:
         //  isRegionExit() need to update if CFG changed or ir_bb_list
@@ -403,13 +425,7 @@ bool OptimizedCFG<BB, XR>::removeEmptyBB(OUT RemoveEmptyBBCtx & rmctx)
         //has to be updated as well.
         if (getCFG()->isEmptyBB(bb) &&
             !getCFG()->isRegionEntry(bb) && !bb->isExceptionHandler()) {
-            UINT bbid = bb->id();
-            bool removed = removeEmptyBBHelper(
-                bb, next_bb, ct, next_ct, rmctx);
-            if (removed) {
-                rmctx.add(bbid);
-            }
-            doit |= removed;
+            removed |= removeEmptyBBHelper(bb, next_bb, ct, next_ct, rmctx);
         }
     }
     if (rmctx.needUpdateDomInfo()) {
@@ -418,7 +434,7 @@ bool OptimizedCFG<BB, XR>::removeEmptyBB(OUT RemoveEmptyBBCtx & rmctx)
         END_TIMER(u, "Remove Empty BB::Recompute DomInfo");
     }
     END_TIMER(t, "Remove Empty BB");
-    return doit;
+    return removed;
 }
 
 
@@ -485,9 +501,15 @@ bool OptimizedCFG<BB, XR>::removeRedundantBranchCase1(
 
 
 template <class BB, class XR>
-bool OptimizedCFG<BB, XR>::removeRedundantBranch(CfgOptCtx const& ctx)
+bool OptimizedCFG<BB, XR>::removeRedundantBranch(MOD CfgOptCtx & ctx)
 {
     START_TIMER(t, "Remove Redundant Branch");
+    if (ctx.needUpdateDomInfo()) {
+        //Since RPO is necessary to compute DomInfo and recompute it is not
+        //very costly, thus we prefer to recompute RPO.
+        ctx.getOptCtx().getRegion()->getPassMgr()->checkValidAndRecompute(
+            &ctx.getOptCtx(), PASS_RPO, PASS_UNDEF);
+    }
     xcom::C<BB*> * ct, * next_ct;
     bool doit = false;
     for (getCFG()->getBBList()->get_head(&ct), next_ct = ct;
@@ -498,7 +520,6 @@ bool OptimizedCFG<BB, XR>::removeRedundantBranch(CfgOptCtx const& ctx)
         if (next_ct != nullptr) {
             next_bb = next_ct->val();
         }
-
         XR * xr = getCFG()->get_last_xr(bb);
         if (xr == nullptr) {
             //CASE1:Although bb is empty, it may have some labels attached,
@@ -550,10 +571,10 @@ void OptimizedCFG<BB, XR>::removeUnreachSingleBB(
     if (unrchctx != nullptr) {
         recordChangedVex(bb->getVex(), unrchctx);
     }
-    //Unreachable-code will confuse the DomInfo updation.
+    //Unreachable-code will confuse the DomInfo update.
     CfgOptCtx tctx(ctx);
     OptCtx toc(ctx.getOptCtx());
-    //Invalid DomInfo to inform CFG related API to stop updation.
+    //Invalid DomInfo to inform CFG related API to stop update.
     toc.setInvalidDom();
     tctx.setOptCtx(toc);
     CFGOPTCTX_need_update_dominfo(&tctx) = false;

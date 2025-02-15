@@ -700,11 +700,11 @@ protected:
     UINT m_elem_count;
     C<T> * m_head;
     C<T> * m_tail;
-    Allocator pool;
 
     //It is a marker that used internally by List. Some function will
     //update the variable, see comments.
     C<T> * m_cur;
+    Allocator pool;
 
     //Hold the freed containers for next request.
     FreeList<C<T> > m_free_list;
@@ -782,6 +782,7 @@ public:
     }
 
     //Append container to head of list.
+    //c: the container.
     inline void append_head(C<T> * c)
     {
         if (m_head == nullptr) {
@@ -899,6 +900,7 @@ public:
         m_head = m_tail = m_cur = nullptr;
     }
 
+    //holder: record the container.
     bool find(IN T t, OUT C<T> ** holder = nullptr) const
     {
         C<T> * tholder;
@@ -939,6 +941,7 @@ public:
     }
 
     //Return m_cur and related container, and it does not modify m_cur.
+    //holder: record the container.
     inline T get_cur(MOD C<T> ** holder) const
     {
         if (m_cur == nullptr) {
@@ -950,8 +953,9 @@ public:
         return m_cur->val();
     }
 
-    //Get tail of list, return the CONTAINER.
+    //Get tail of list, return the container.
     //The function does not modify m_cur.
+    //holder: record the container.
     inline T get_tail(OUT C<T> ** holder) const
     {
         ASSERT0(holder);
@@ -962,7 +966,7 @@ public:
         return T(0);
     }
 
-    //Get tail of list, return the CONTAINER.
+    //Get tail of list, return the container.
     //The function will modify m_cur.
     inline T get_tail()
     {
@@ -973,7 +977,7 @@ public:
         return T(0);
     }
 
-    //Get head of list, return the CONTAINER.
+    //Get head of list, return the container.
     //The function will modify m_cur.
     inline T get_head()
     {
@@ -984,8 +988,9 @@ public:
         return T(0);
     }
 
-    //Get head of list, return the CONTAINER.
+    //Get head of list, return the container.
     //The function does not modify m_cur.
+    //holder: record the container.
     inline T get_head(OUT C<T> ** holder) const
     {
         ASSERT0(holder);
@@ -1011,6 +1016,7 @@ public:
     //Return next list node container of 'holder'.
     //Caller could get the element via C_val or val().
     //The function does not modify m_cur.
+    //holder: the container.
     inline C<T> * get_next(IN C<T> * holder) const
     {
         ASSERT0(holder);
@@ -1019,6 +1025,7 @@ public:
 
     //Return list member and update holder to next member.
     //The function does not modify m_cur.
+    //holder: record the container.
     inline T get_next(MOD C<T> ** holder) const
     {
         ASSERT0(holder && *holder);
@@ -1043,6 +1050,7 @@ public:
 
     //Return list member and update holder to prev member.
     //The function does not modify m_cur.
+    //holder: record the container.
     inline T get_prev(MOD C<T> ** holder) const
     {
         ASSERT0(holder && *holder);
@@ -1056,6 +1064,7 @@ public:
     //Return prev list node container of 'holder'.
     //Caller could get the element via C_val or val().
     //The function does not modify m_cur.
+    //holder: the container.
     inline C<T> * get_prev(IN C<T> * holder) const
     {
         ASSERT0(holder);
@@ -1063,9 +1072,9 @@ public:
     }
 
     //Get element for nth at tail.
-    //'n': starting at 0.
+    //n: starting at 0.
     //The function will modify m_cur.
-    T get_tail_nth(UINT n, MOD C<T> ** holder = nullptr)
+    T get_tail_nth(UINT n)
     {
         ASSERTN(n < m_elem_count,("Access beyond list"));
         m_cur = nullptr;
@@ -1080,19 +1089,36 @@ public:
         } else {
             return get_head_nth(m_elem_count - n - 1);
         }
-
         m_cur = c;
+        return c->val();
+    }
 
-        if (holder != nullptr) {
-            *holder = c;
+    //Get element for nth at tail.
+    //n: starting at 0.
+    //holder: record the container.
+    T get_tail_nth(UINT n, MOD C<T> ** holder) const
+    {
+        ASSERTN(n < m_elem_count,("Access beyond list"));
+        if (m_elem_count == 0) { return T(0); }
+        C<T> * c;
+        if (n <= (m_elem_count >> 1)) { // n<floor(elem_count,2)
+            c = m_tail;
+            while (n > 0) {
+                c = C_prev(c);
+                n--;
+            }
+        } else {
+            return get_head_nth(m_elem_count - n - 1, holder);
         }
+        ASSERT0(holder);
+        *holder = c;
         return c->val();
     }
 
     //Get element for nth at head.
-    //'n': getting start with zero.
+    //n: getting start with zero.
     //The function will modify m_cur.
-    T get_head_nth(UINT n, MOD C<T> ** holder = nullptr)
+    T get_head_nth(UINT n)
     {
         ASSERTN(n < m_elem_count,("Access beyond list"));
         m_cur = nullptr;
@@ -1110,9 +1136,30 @@ public:
             return get_tail_nth(m_elem_count - n - 1);
         }
         m_cur = c;
-        if (holder != nullptr) {
-            *holder = c;
+        return c->val();
+    }
+
+    //Get element for nth at head.
+    //n: getting start with zero.
+    //holder: record the container.
+    T get_head_nth(UINT n, MOD C<T> ** holder) const
+    {
+        ASSERTN(n < m_elem_count,("Access beyond list"));
+        if (m_head == nullptr) {
+            return T(0);
         }
+        C<T> * c;
+        if (n <= (m_elem_count >> 1)) { // n<floor(elem_count,2)
+            c = m_head;
+            while (n > 0) {
+                c = C_next(c);
+                n--;
+            }
+        } else {
+            return get_tail_nth(m_elem_count - n - 1, holder);
+        }
+        ASSERT0(holder);
+        *holder = c;
         return c->val();
     }
 
@@ -1267,7 +1314,7 @@ public:
         insert_before(list, ct, list_head_ct, list_tail_ct);
     }
 
-    //Insert 'list' before 'marker', and return the CONTAINER
+    //Insert 'list' before 'marker', and return the container
     //of list head and list tail.
     void insert_and_copy_before(List<T> const& list, IN C<T> * marker,
                                 OUT C<T> ** list_head_ct = nullptr,
@@ -1370,7 +1417,7 @@ public:
         return c;
     }
 
-    //Insert 'src' after 'marker', and return the CONTAINER
+    //Insert 'src' after 'marker', and return the container
     //of src head and src tail.
     //The function move all element in 'src' into current list.
     void insert_after(MOD List<T> & src, IN C<T> * marker,
@@ -1410,7 +1457,7 @@ public:
         src.m_elem_count = 0;
     }
 
-    //Insert 'list' after 'marker', and return the CONTAINER
+    //Insert 'list' after 'marker', and return the container
     //of list head and list tail.
     inline void insert_and_copy_after(List<T> const& list, T marker,
                                       OUT C<T> ** list_head_ct = nullptr,
@@ -1421,7 +1468,7 @@ public:
         insert_after(list, ct, list_head_ct, list_tail_ct);
     }
 
-    //Insert 'list' after 'marker', and return the CONTAINER
+    //Insert 'list' after 'marker', and return the container
     //of head and tail of members in 'list'.
     void insert_and_copy_after(List<T> const& list, IN C<T> * marker,
                                OUT C<T> ** list_head_ct = nullptr,
@@ -1535,6 +1582,7 @@ public:
     }
 
     //Remove from list directly.
+    //holder: the container.
     T remove(C<T> * holder)
     {
         ASSERT0(holder);
@@ -1703,7 +1751,7 @@ protected:
         return t;
     }
 
-    //Find the last element, and return the CONTAINER.
+    //Find the last element, and return the container.
     //This is a costly operation. Use it carefully.
     inline SC<T> * get_tail() const
     {
@@ -1842,11 +1890,12 @@ public:
     //Return the end of the list.
     SC<T> const * end() const { return &m_head; }
 
-    //Get head of list, return the CONTAINER.
+    //Get head of list, return the container.
     //You could iterate the list via comparing the container with end().
     SC<T> * get_head() const { return m_head.next; }
 
     //Return the next container.
+    //holder: the container.
     SC<T> * get_next(IN SC<T> * holder) const
     {
         ASSERT0(holder);
@@ -1856,6 +1905,7 @@ public:
     //Find 't' in list, return the container in 'holder' if 't' existed.
     //The function is regular list search, and has O(n) complexity.
     //Note that this is costly operation. Use it carefully.
+    //holder: record the container.
     bool find(IN T t, OUT SC<T> ** holder = nullptr) const
     {
         SC<T> * c = m_head.next;
@@ -1896,7 +1946,8 @@ public:
     }
 
     //Return the element removed.
-    //'prev': the previous one element of 'holder'.
+    //prev: the previous one element of 'holder'.
+    //holder: the container.
     T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
     {
         ASSERT0(holder);
@@ -1964,8 +2015,8 @@ public:
 template <class T> class SListCoreEx {
     COPY_CONSTRUCTOR(SListCoreEx);
 protected:
-    SListCore<T> m_slcore;
     SC<T> * m_tail; //list tail.
+    SListCore<T> m_slcore;
 public:
     SListCoreEx() { init(); }
     ~SListCoreEx()
@@ -2004,11 +2055,12 @@ public:
     //Return the end of the list.
     SC<T> const * end() const { return m_slcore.end(); }
 
-    //Get head of list, return the CONTAINER.
+    //Get head of list, return the container.
     //You could iterate the list via comparing the container with end().
     SC<T> * get_head() const { return m_slcore.m_head.next; }
 
     //Return the next container.
+    //holder: the container.
     SC<T> * get_next(IN SC<T> * holder) const
     {
         ASSERT0(holder);
@@ -2026,7 +2078,8 @@ public:
     { return m_slcore.remove_head(free_list); }
 
     //Return the element removed.
-    //'prev': the previous one element of 'holder'.
+    //prev: the previous one element of 'holder'.
+    //holder: the container.
     T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
     { return m_slcore.remove(prev, holder, free_list); }
 };
@@ -2073,8 +2126,7 @@ template <class T> class SList : public SListCore<T> {
     COPY_CONSTRUCTOR(SList);
 protected:
     SMemPool * m_free_list_pool;
-    SC<T> * m_free_list; //Hold for available containers
-
+    SC<T> * m_free_list; //Used to record available containers
 public:
     SList(SMemPool * pool = nullptr)
     {
@@ -2143,8 +2195,9 @@ public:
     //Remove elemlent that contained in 'holder' from current single
     //linked list.
     //Return element removed.
-    //'prev': the holder of previous element of 'holder'.
+    //prev: the holder of previous element of 'holder'.
     //Note both holders must belong to current SList.
+    //holder: the container.
     T remove(SC<T> * prev, SC<T> * holder)
     {
         ASSERT0(m_free_list_pool);
@@ -2368,13 +2421,14 @@ public:
 
     UINT get_elem_count() const { return m_elem_count; }
 
-    //Get tail of list, return the CONTAINER.
+    //Get tail of list, return the container.
     SC<T> * get_tail() const { return m_tail; }
 
-    //Get head of list, return the CONTAINER.
+    //Get head of list, return the container.
     SC<T> * get_head() const { return m_head; }
 
     //Return the next container.
+    //holder: the container.
     SC<T> * get_next(IN SC<T> * holder) const
     {
         ASSERT0(holder);
@@ -2383,6 +2437,7 @@ public:
 
     //Find 't' in list, return the container in 'holder' if 't' existed.
     //The function is regular list search, and has O(n) complexity.
+    //holder: record the container.
     bool find(IN T t, OUT SC<T> ** holder = nullptr) const
     {
         SC<T> * c = m_head;
@@ -2428,6 +2483,7 @@ public:
 
     //Return the element removed.
     //'prev': the previous one element of 'holder'.
+    //holder: the container.
     T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
     {
         ASSERT0(holder);
@@ -2516,7 +2572,7 @@ public:
 template <class T, class MapTypename2Holder> class EList : public List<T> {
     COPY_CONSTRUCTOR(EList);
 protected:
-    MapTypename2Holder m_typename2holder; //map typename 'T' to its list holder.
+    MapTypename2Holder m_typename2holder; //map class 'T' to its list holder.
 public:
     typedef C<T>* Iter; //the iter to iterate element in list.
 public:
@@ -2611,6 +2667,7 @@ public:
     T get_cur() const //Do NOT update 'm_cur'
     { return List<T>::get_cur(); }
 
+    //holder: record the container.
     T get_cur(MOD C<T> ** holder) const //Do NOT update 'm_cur'
     { return List<T>::get_cur(holder); }
 
@@ -2620,15 +2677,19 @@ public:
     T get_prev() //Update 'm_cur'
     { return List<T>::get_prev(); }
 
+    //holder: record the container.
     T get_next(MOD C<T> ** holder) const //Do NOT update 'm_cur'
     { return List<T>::get_next(holder); }
 
+    //holder: the container.
     C<T> * get_next(IN C<T> * holder) const //Do NOT update 'm_cur'
     { return List<T>::get_next(holder); }
 
+    //holder: record the container.
     T get_prev(MOD C<T> ** holder) const //Do NOT update 'm_cur'
     { return List<T>::get_prev(holder); }
 
+    //holder: the container.
     C<T> * get_prev(IN C<T> * holder) const //Do NOT update 'm_cur'
     { return List<T>::get_prev(holder); }
 
@@ -2770,15 +2831,44 @@ public:
 template <class T> class Stack : public List<T> {
     COPY_CONSTRUCTOR(Stack);
 public:
+    typedef C<T>* Iter; //the iter to iterate element in stack.
+public:
     Stack() {}
 
     void push(T t) { List<T>::append_tail(t); }
     T pop() { return List<T>::remove_tail(); }
 
+    //Get element at bottom of stack.
     T get_bottom() { return List<T>::get_head(); }
+
+    //Get element at bottom of stack.
+    //it: record the container.
+    T get_bottom(OUT Iter * it) const { return List<T>::get_head(it); }
+
+    //Get element at top of stack.
     T get_top() { return List<T>::get_tail(); }
-    T get_top_nth(INT n) { return List<T>::get_tail_nth(n); }
+
+    //Get element at top of stack.
+    //it: record the container.
+    T get_top(OUT Iter * it) const { return List<T>::get_tail(it); }
+
+    //Get element for nth at top of stack.
+    //n: starting at 0.
+    T get_top_nth(UINT n) { return List<T>::get_tail_nth(n); }
+
+    //Get element for nth at top of stack.
+    //n: starting at 0.
+    //it: record the container.
+    T get_top_nth(INT n, OUT Iter * it) const
+    { return List<T>::get_tail_nth(n, it); }
+
     T get_bottom_nth(INT n) { return List<T>::get_head_nth(n); }
+
+    //Get element for nth at bottom of stack.
+    //n: starting at 0.
+    //it: record the container.
+    T get_bottom_nth(UINT n, OUT Iter * it) const
+    { return List<T>::get_head_nth(n, it); }
 };
 //END Stack
 
@@ -2951,7 +3041,7 @@ public:
     }
 
     //Return vector buffer that hold elements.
-    T * get_vec() { return m_vec; }
+    T * get_vec() const { return m_vec; }
 
     void init()
     {
@@ -3545,8 +3635,8 @@ template <class T> struct HC {
 #define HB_count(hm) (hm).hash_member_count
 class HashBucket {
 public:
-    void * hash_member; //hash member list.
     UINT hash_member_count; //the number of member in list.
+    void * hash_member; //hash member list.
 };
 
 
@@ -3635,13 +3725,13 @@ public:
 template <class T, class HF = HashFuncBase<T> > class Hash {
     COPY_CONSTRUCTOR(Hash);
 protected:
+    UINT m_elem_count;
     HF m_hf;
     SMemPool * m_free_list_pool;
+    HashBucket * m_bucket;
     FreeList<HC<T> > m_free_list; //Hold for available containers
     UINT m_bucket_size;
-    HashBucket * m_bucket;
     VectorWithFreeIndex<T, 8> m_elem_vector;
-    UINT m_elem_count;
 protected:
     virtual T create(OBJTY v)
     {
@@ -4400,7 +4490,7 @@ public:
     void destroy()
     {
         if (!is_init()) {
-            //RBT has been destroied.
+            //RBT has been destroyed.
             return;
         }
         if (!m_use_outside_pool) {
@@ -4828,7 +4918,7 @@ public:
         append(src);
     }
 
-    //The function should be invoked if TMap is destroied manually.
+    //The function should be invoked if TMap is destroyed manually.
     void destroy() { RBT<Tsrc, Ttgt, CompareKey>::destroy(); }
 
     //Get mapped element of 't'. Set find to true if t is already be mapped.
@@ -5047,7 +5137,7 @@ class HMap : public Hash<Tsrc, HF> {
     COPY_CONSTRUCTOR(HMap);
 protected:
     Vector<Ttgt> m_mapped_elem_table;
-
+protected:
     //Find hash container
     HC<Tsrc> * findhc(Tsrc t) const
     {
@@ -5291,7 +5381,6 @@ class DMapEx : public DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc> > {
 public:
     typedef TMap<Tsrc, Ttgt> Tsrc2Ttgt;
     typedef TMapIter<Tsrc, Ttgt> Tsrc2TtgtIter;
-
     typedef TMap<Ttgt, Tsrc> Ttgt2Tsrc;
     typedef TMapIter<Ttgt, Tsrc> Ttgt2TsrcIter;
 public:

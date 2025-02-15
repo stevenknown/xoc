@@ -690,7 +690,7 @@ bool compileFunc(
         program->addToIRList(program->buildRegion(func_ru));
         rm->addToRegionTab(func_ru);
         if (rulist != nullptr) {
-            //Caller must make sure func_ru will not be destroied before IPA.
+            //Caller must make sure func_ru will not be destroyed before IPA.
             rulist->append_tail(func_ru);
         }
     } else {

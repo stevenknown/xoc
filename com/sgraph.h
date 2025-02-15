@@ -96,25 +96,24 @@ typedef EdgeC const* VexIter;
 #define VERTEX_next(v) ((v)->next)
 #define VERTEX_prev(v) ((v)->prev)
 #define VERTEX_id(v) ((v)->m_id)
-#define VERTEX_rpo(v) ((v)->u1.m_rpo)
-#define VERTEX_height(v) ((v)->u1.m_height)
+#define VERTEX_rpo(v) ((v)->m_rpo)
+#define VERTEX_height(v) ((v)->m_height)
 #define VERTEX_in_list(v) ((v)->m_in_list)
 #define VERTEX_out_list(v) ((v)->m_out_list)
 #define VERTEX_info(v) ((v)->m_info)
 class Vertex {
 public:
-    Vertex * prev; //used by FreeList and HASH
-    Vertex * next; //used by FreeList and HASH
-    EdgeC * m_in_list; //incoming edge list
-    EdgeC * m_out_list;//outgoing edge list
-    VexIdx m_id;
-    union {
-        VexIdx m_height;
-        RPOVal m_rpo;
-    } u1;
-    void * m_info;
+    VexIdx m_id; //Vertex id must be unique.
+    VexIdx m_height; //Only useful if current vertex is a tree node.
+    RPOVal m_rpo;
+    Vertex * prev; //Only can be used by FreeList and HASH.
+    Vertex * next; //Only can be used by FreeList and HASH.
+    EdgeC * m_in_list; //Describes incoming edge list.
+    EdgeC * m_out_list; //Describes outgoing edge list.
+    void * m_info; //Records the auxiliary info that attached by user.
 public:
-    void clone(Vertex const* src) { u1 = src->u1; }
+    void clone(Vertex const* src)
+    { m_height = src->m_height; m_rpo = src->m_rpo; }
 
     void init()
     {
@@ -123,9 +122,6 @@ public:
         m_in_list = nullptr;
         m_out_list = nullptr;
         m_id = VERTEX_UNDEF;
-        //Rpo should have same initial value with height because they share
-        //same memory.
-        ASSERT0(RPO_UNDEF == (RPOVal)HEIGHT_UNDEF);
         VERTEX_rpo(this) = RPO_UNDEF;
         VERTEX_height(this) = HEIGHT_UNDEF;
         m_info = nullptr;
@@ -294,8 +290,8 @@ public:
 
     virtual Vertex * create(OBJTY v)
     {
-        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
-                                                      m_ec_pool);
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(
+            sizeof(Vertex), m_ec_pool);
         ASSERT0(vex);
         ::memset((void*)vex, 0, sizeof(Vertex));
         VERTEX_id(vex) = (VexIdx)(size_t)v;
@@ -371,7 +367,7 @@ protected:
             if (EC_edge(el) == e) { return el; }
         }
         ASSERT0(last == nullptr || EC_next(last) == nullptr);
-        EdgeC * ec = newEdgeC(e);
+        EdgeC * ec = allocEdgeC(e);
         xcom::add_next(&VERTEX_out_list(vex), &last, ec);
         return ec;
     }
@@ -387,39 +383,25 @@ protected:
             if (EC_edge(el) == e) { return el; }
         }
         ASSERT0(last == nullptr || EC_next(last) == nullptr);
-        EdgeC * ec = newEdgeC(e);
+        EdgeC * ec = allocEdgeC(e);
         xcom::add_next(&VERTEX_in_list(vex), &last, ec);
         return ec;
     }
 
-    virtual void * cloneEdgeInfo(Edge*)
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
-
-    virtual void * cloneVertexInfo(Vertex*)
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
-
-    inline Vertex * newVertex()
+    //Allocate a vertex and assign 'vid' to it.
+    //Note the vertex id must be unqiue.
+    Vertex * allocVertex(VexIdx vid);
+    Vertex * allocVertex()
     {
-        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
-                                                      m_vertex_pool);
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(
+            sizeof(Vertex), m_vertex_pool);
         ASSERT0(vex);
         ::memset((void*)vex, 0, sizeof(Vertex));
         vex->init();
         return vex;
     }
-
-    inline Edge * newEdge(VexIdx from, VexIdx to)
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        Vertex * fp = addVertex(from);
-        Vertex * tp = addVertex(to);
-        return newEdge(fp, tp);
-    }
-    Edge * newEdge(Vertex * from, Vertex * to);
-    Vertex * newVertex(VexIdx vid);
-
-    inline Edge * newEdgeImpl(Vertex * from, Vertex * to,
-                              OUT EdgeC ** inec, OUT EdgeC ** outec)
+    Edge * allocEdgeImpl(Vertex * from, Vertex * to,
+                          OUT EdgeC ** inec, OUT EdgeC ** outec)
     {
         Edge * e = m_e_free_list.get_free_elem();
         if (e == nullptr) {
@@ -434,8 +416,15 @@ protected:
         *outec = addOutList(from, e);
         return e;
     }
-
-    inline EdgeC * newEdgeC(Edge * e)
+    Edge * allocEdge(VexIdx from, VexIdx to)
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        Vertex * fp = addVertex(from);
+        Vertex * tp = addVertex(to);
+        return allocEdge(fp, tp);
+    }
+    Edge * allocEdge(Vertex * from, Vertex * to);
+    inline EdgeC * allocEdgeC(Edge * e)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         if (e == nullptr) { return nullptr; }
@@ -449,6 +438,12 @@ protected:
         EC_edge(el) = e;
         return el;
     }
+
+    virtual void * cloneEdgeInfo(Edge*)
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+
+    virtual void * cloneVertexInfo(Vertex*)
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     void removeTransitiveEdgeHelper(
         Vertex const* fromvex, Vector<DefSBitSetCore*> * reachset_vec,
@@ -466,12 +461,12 @@ public:
     inline Edge * addEdge(VexIdx from, VexIdx to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return newEdge(from, to);
+        return allocEdge(from, to);
     }
     inline Edge * addEdge(Vertex * from, Vertex * to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return newEdge(from, to);
+        return allocEdge(from, to);
     }
     //Add edge from->to, whereas 'from' is the nth predecessor of 'to'.
     //pos: the position of 'from' in predecessors of 'to', start at 0.
@@ -487,7 +482,7 @@ public:
             if (vex != nullptr) {
                 return vex;
             }
-            vex = newVertex(vid);
+            vex = allocVertex(vid);
             m_dense_vertex->set((VecIdx)vid, vex);
             m_dense_vex_num++;
             return vex;
@@ -497,7 +492,7 @@ public:
         if (vex != nullptr) {
             return vex;
         }
-        return m_sparse_vertex->append(newVertex(vid));
+        return m_sparse_vertex->append(allocVertex(vid));
     }
 
     void clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
@@ -505,20 +500,51 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
+    //Dump height for all vertices.
+    //NOTE: the graph must be regarded as a tree.
     void dumpHeight(FILE * h) const;
-    CHAR const* dumpAllVertices(OUT StrBuf & buf) const;
+
+    //Dump all vertices into given buffer.
+    CHAR const* dumpAllVertices(OUT DefFixedStrBuf & buf) const;
+
+    //Dump all vertices into given file handler.
     void dumpAllVertices(FILE * h) const;
-    CHAR const* dumpAllEdges(OUT StrBuf & buf) const;
+
+    //Dump all edges into given buffer.
+    CHAR const* dumpAllEdges(OUT DefFixedStrBuf & buf) const;
+
+    //Dump all edges into given file handler.
     void dumpAllEdges(FILE * h) const;
-    virtual void dumpVertexAux(Vertex const* v, OUT StrBuf & buf) const;
-    virtual void dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const;
-    CHAR const* dumpVertex(Vertex const* v, OUT StrBuf & buf) const;
-    virtual void dumpVertex(FILE * h, Vertex const* v) const;
-    CHAR const* dumpEdge(Edge const* e, OUT StrBuf & buf) const;
-    virtual void dumpEdge(FILE * h, Edge const* e) const;
-    void dumpDOT(CHAR const* name = nullptr) const;
-    void dumpVCG(CHAR const* name = nullptr) const;
+
+    //Dump vertex auxiliaries of vertex.
+    virtual void dumpVertexAux(Vertex const* v, OUT DefFixedStrBuf & buf) const;
+
+    //User interface.
+    //Dump the description of given vertex.
+    //e.g: a vertex's description could just be the vertex's id.
+    virtual void dumpVertexDesc(
+        Vertex const* v, OUT DefFixedStrBuf & buf) const;
+
+    //Dump vertex into buffer.
+    CHAR const* dumpVertex(Vertex const* v, OUT DefFixedStrBuf & buf) const;
+
+    //Dump a vector of vertex into file handler.
     void dumpVexVector(Vector<Vertex*> const& vec, FILE * h);
+
+    //Dump vertex into file handler.
+    virtual void dumpVertex(FILE * h, Vertex const* v) const;
+
+    //Dump edge into buffer.
+    CHAR const* dumpEdge(Edge const* e, OUT DefFixedStrBuf & buf) const;
+
+    //Dump edge into file handler.
+    virtual void dumpEdge(FILE * h, Edge const* e) const;
+
+    //Dump graph to PDF file scripts.
+    void dumpDOT(CHAR const* name = nullptr) const;
+
+    //Dump graph to VCG file scripts.
+    void dumpVCG(CHAR const* name = nullptr) const;
 
     //Return true if graph vertex id is dense.
     bool is_dense() const { return m_dense_vertex != nullptr; }
@@ -598,9 +624,13 @@ public:
     //Return true if v is the vertex that allocated in current graph.
     bool isVertex(Vertex const* v) const { return getVertex(v->id()) == v; }
 
-    //Return true if vid indicates the graph vertex.
+    //Return true if there is at least an edge that from 'from' to 'to'.
     bool isEdge(VexIdx from, VexIdx to) const
     { return getEdge(from, to) != nullptr; }
+
+    //Return true if there is at least an edge that from 'from' to 'to'.
+    bool isEdge(Vertex const* from, Vertex const* to) const
+    { return isEdge(from->id(), to->id()); }
 
     //The function try to answer whether 'reachin' can reach 'start' from one of
     //in-vertexs of 'start'. Return false if it is not or unknown.
@@ -756,8 +786,8 @@ public:
     //e.g: If pred_vex_id is the first predecessor, return 0.
     //pred_vex_id: vertex id of predecessor.
     //is_pred: set to true if pred_vex_id is one of predecessor of 'vex',
-    //         otherwise set false.
-    //Note 'pred_vex_id' must be one of predecessors of 'vex'.
+    //         otherwise set false. Note user may input a vertex id which is
+    //         not the predecessors of 'vex'.
     static UINT WhichPred(VexIdx pred_vex_id, Vertex const* vex,
                           OUT bool & is_pred);
 };
@@ -778,6 +808,7 @@ protected:
     RPOMgr m_rpomgr;
 protected:
     //The function will compute idom for subgraph that rooted by 'entry'.
+    //NOTE: the function needs RPO to compute DomInfo.
     //entry: the entry vertex of subgraph. Note there can be only ONE entry.
     //vlst: the Vertex list that belong to the subgraph.
     void computeIdomForSubGraph(Vertex const* entry,
@@ -1036,22 +1067,24 @@ public:
     { m_ipdom_set.set((VecIdx)vid, ipdom); }
 
     //The function revise DomInfo after graph changed.
+    //NOTE: the function needs RPO to compute DomInfo.
     //Note the RPO must be available.
     //modset: if it is not null, means user asked to collect vertex that idom
     //        changed by the function.
     //root: record the root vertex the of subgraph that affected by adding
     //      or removing edge.
-    void reviseDomInfoAfterAddOrRemoveEdge(Vertex const* from, Vertex const* to,
-                                           OUT VexTab * modset,
-                                           OUT Vertex const*& root,
-                                           OUT UINT & iter_time);
+    void reviseDomInfoAfterAddOrRemoveEdge(
+        Vertex const* from, Vertex const* to, OUT VexTab * modset,
+        OUT Vertex const*& root, OUT UINT & iter_time);
 
     //The function recompute DomInfo after subgraph changed.
+    //NOTE: the function needs RPO to compute DomInfo.
     //Return true if all vertex rooted by 'root' has idom.
     //Note the RPO must be available.
-    bool recomputeDomInfoForSubGraph(Vertex const* root,
-                                     OUT VexTab * modset,
-                                     OUT UINT & iter_time);
+    //modset: if it is not null, means user asked to collect vertex that idom
+    //        changed by the function.
+    bool recomputeDomInfoForSubGraph(
+        Vertex const* root, OUT VexTab * modset, OUT UINT & iter_time);
     bool removeUnreachNode(VexIdx entry_id);
     void revisePdomByIpdom();
 

@@ -78,6 +78,7 @@ protected:
     virtual void recomputeDomInfo(MOD OptCtx & ctx);
 
     //Remove trampoline branch.
+    //NOTE: the function needs RPO to compute DomInfo.
     //Note the pass is different from what removeTrampolinEdge() does.
     //e.g:L2:
     //    truebr L4 | false L4
@@ -93,6 +94,7 @@ protected:
     //    L4:
     //    st = ...
     //    L3:
+    //NOTE: The function may corrupt DomInfo.
     bool removeTrampolinBranchForBB(BBListIter & it, OUT CfgOptCtx & ctx);
     bool removeTrampolinBranch(OUT CfgOptCtx & ctx);
 
@@ -114,6 +116,17 @@ protected:
     void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
     static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
                                MOD OptCtx & oc);
+
+    //The function will maintain DomInfo.
+    bool removeRedundantBranchCase1(
+        IRBB * bb, IR * last_xr, bool always_true, bool always_false,
+        BBListIter const& ct, OUT CfgOptCtx & ctx, MOD List<IRBB*> & succs);
+
+    //The function will maintain DomInfo.
+    bool removeRedundantBranchCase2(
+        IRBB * bb, IR * last_xr, bool always_true, bool always_false,
+        BBListIter const& ct, OUT CfgOptCtx & ctx, MOD List<IRBB*> & succs);
+
     bool useMDSSADU() const;
     bool usePRSSADU() const;
 public:
@@ -141,6 +154,8 @@ public:
         m_lab2bb.setAlways(li, src);
     }
 
+    //The function will add given edge from->to while maintaining the
+    //DomInfo if 'ctx' asked.
     //Note if dominfo is not maintained, SSA update can not prove to be
     //correct.
     //ctx: CFG optimizer will perform operations follow the 'ctx' mandate.
@@ -201,16 +216,32 @@ public:
     //The function insert a tampolining BB bewteen bb and its next BB.
     IRBB * changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc);
 
+    void dumpRPOVexList(RPOVexList const& vlst) const;
+    void dumpRPO() const;
     void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
     void dumpDOT() const { dumpDOT((CHAR const*)nullptr, DUMP_COMBINE); }
     void dumpDOT(CHAR const* name, UINT flag) const;
     void dumpDOTNoSSA() const
     { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
     void dumpDOT(FILE * h, UINT flag) const;
+
+    //The function dump sub-graph that bbid described by 'subset'.
+    void dumpSubGraph(BBSet const& subset, FILE * h, UINT flag) const;
+    void dumpSubGraph(BBSet const& subset, CHAR const* name, UINT flag) const;
+    void dumpSubGraph(BBSet const& subset) const
+    { dumpSubGraph(subset, (CHAR const*)nullptr, DUMP_COMBINE); }
+    void dumpSubGraph(xcom::BitSet const& subset) const
+    {
+        DefMiscBitSetMgr bsmgr;
+        BBSet bs(bsmgr.getSegMgr());
+        bs.copy(subset);
+        dumpSubGraph(bs);
+    }
     void dumpDomSet() const;
     void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg, true, false); }
     void dumpPDomTree() const
     { CFG<IRBB, IR>::dumpDomTree(m_rg, false, true); }
+    void dumpLoopInfo() const { CFG<IRBB, IR>::dumpLoopInfo(m_rg); }
     virtual bool dump() const;
 
     void erase();
@@ -293,10 +324,9 @@ public:
     //Find which predecessor is pred to bb.
     //Return the position of 'bb', position start at 0.
     //e.g: If pred is the first predecessor, return 0.
-    //pred: BB id of predecessor.
-    //is_pred: set to true if pred_vex_id is one of predecessor of 'vex',
+    //pred: predecessor of bb.
+    //is_pred: set to true if 'pred' is one of predecessor of 'vex',
     //         otherwise set false.
-    //Note 'pred' must be one of predecessors of 'bb'.
     UINT WhichPred(IRBB const* pred, IRBB const* bb, OUT bool & is_pred) const
     { return Graph::WhichPred(pred->id(), bb->getVex(), is_pred); }
 
@@ -321,11 +351,12 @@ public:
     //DomInfo if 'ctx' asked.
     //Note if dominfo is not maintained, SSA update can not prove to be
     //correct.
-    //ctx: CFG optimizer will perform default updation
-    //and transform, otherwise perform operations follow the 'ctx' mandate.
+    //ctx: CFG optimizer will perform default update and transform, otherwise
+    //     perform operations follow the 'ctx' mandate.
     void removeEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx);
 
     //The function remove labels that no one referenced.
+    //NOTE: The function does not change CFG.
     bool removeRedundantLabel();
 
     //Remove trampoline edge.
@@ -335,10 +366,11 @@ public:
     //    some-code1;
     //    BB3:
     //    some-code2;
-    //  where BB1->BB2->BB3 are fallthrough path.
+    //where BB1->BB2->BB3 are fallthrough path.
     //stmt of BB2 is just 'goto bb3', then BB1->BB2 is tramp-edge.
     //And the resulting edges are BB1->BB3, BB2->BB3 respectively.
     //Return true if at least one tramp-edge removed.
+    //NOTE: The function does not change DomInfo.
     bool removeTrampolinEdge(OUT CfgOptCtx & ctx);
 
     //Remove trampoline BB.
@@ -361,6 +393,9 @@ public:
     //        add edge pred->BB's next.
     //    end for
     bool removeTrampolinBB(OUT CfgOptCtx & ctx);
+
+    //Return true if changed.
+    //NOTE: The function will maintain DomInfo.
     bool removeRedundantBranch(OUT CfgOptCtx & ctx);
 
     //Rebuild CFG.
@@ -379,7 +414,7 @@ public:
     //you need remove the related PHI operand if BB successor has PHI.
     //Note if dominfo is not maintained, SSA update can not prove to be
     //correct.
-    //ctx: if it is nullptr, CFG optimizer will perform default updation
+    //ctx: if it is nullptr, CFG optimizer will perform default update
     //and transform, otherwise perform operations follow the 'ctx' mandate.
     void removeSuccPhiOpnd(IRBB const* bb, CfgOptCtx const& ctx);
 
@@ -418,8 +453,8 @@ public:
 
     //Split BB into two BBs.
     //bb: BB to be splited.
-    //split_point: the ir in 'bb' used to mark the split point that followed
-    //             IRs will be moved to fallthrough newbb.
+    //split_point: the ir in 'bb' that is used to mark the split point that
+    //followed IRs will be moved to fallthrough newbb.
     //e.g:bb:
     //    ...
     //    split_point;
@@ -448,9 +483,16 @@ public:
     //return false.
     bool tryUpdateRPO(IRBB * newbb, IRBB const* marker,
                       bool newbb_prior_marker);
-    bool tryUpdateRPOBeforeCFGChanged(IRBB * newbb, IRBB const* marker,
-                                      bool newbb_prior_marker,
-                                      MOD OptCtx * oc);
+    bool tryUpdateRPOBeforeCFGChanged(
+        IRBB * newbb, IRBB const* marker, bool newbb_prior_marker,
+        MOD OptCtx * oc);
+
+    //NOTE: the function needs RPO to compute DomInfo.
+    void tryUpdateDomInfoAndMDSSA(
+        Vertex const* from, Vertex const* to, MOD CfgOptCtx & ctx);
+    void tryUpdateDomInfoAndMDSSA(
+        MOD xcom::VexTab & modset, Vertex const* from, Vertex const* to,
+        MOD CfgOptCtx & ctx);
 
     //Move all Labels which attached on src BB to tgt BB.
     virtual void moveLabels(IRBB * src, IRBB * tgt);
@@ -480,7 +522,6 @@ public:
     //Verification at building SSA mode by ir parser.
     bool verifyPhiEdge(IR2Lab const& ir2lab) const;
     bool verifyDomAndPdom(OptCtx const& oc) const;
-    bool verifyRPO(OptCtx const& oc) const;
     bool verifyLoopInfo(OptCtx const& oc) const;
     bool verify() const;
 };

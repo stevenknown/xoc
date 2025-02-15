@@ -109,6 +109,18 @@ public:
     void assignMD(IRBB * bb, bool assign_pr, bool assign_nonpr,
                   MOD IRIter & ii);
 
+    //Assign MD for PR operations and NonPR direct memory operations for
+    //both IRList and BBList.
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
+    void assignMD()
+    {
+        //Assign PR and NonPR Var and MD sperately to make MD id more
+        //grouped together.
+        assignMD(false, true);
+        assignMD(true, false);
+    }
+
     //Allocate MD for PR.
     MD const* genMDForPR(PRNO prno, Type const* type);
 

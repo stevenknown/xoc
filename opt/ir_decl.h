@@ -66,28 +66,32 @@ class CConst : public IR {
     COPY_CONSTRUCTOR(CConst);
 public:
     union {
-        //record string-const if current ir is string type.
-        Sym const* str_value;
-
-        //record *signed* integer value using a length of HOST_INT memory.
+        //Record *signed* integer value using a length of HOST_INT memory.
         HOST_INT int_const_value;
 
-        //record *unsigned* integer value using a length of HOST_UINT memory.
+        //Record *unsigned* integer value using a length of HOST_UINT memory.
         HOST_UINT uint_const_value;
 
-        //record float point value if current ir is float type.
+        //Record string-const if current ir is string type.
+        Sym const* str_value;
+
+        //Record customized value.
+        AnonyVal * anonymous_value;
+
+        //Record tensor value.
+        TenVal * tensor_value;
+
+        //Record float point value if current ir is float type.
         struct {
             HOST_FP fp_const_value;
 
-            //record the number of mantissa of float-point number.
+            //Record the number of mantissa of float-point number.
             BYTE fp_mantissa;
         } s1;
 
-        //record customized value.
-        AnonyVal * anonymous_value;
-
-        //record tensor value.
-        TenVal * tensor_value;
+        //TODO:Enable the data type of const value.
+        //Record Host 128bit Integer.
+        //UINT128 int_128_const_value;
     } u1;
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0x0;
@@ -174,13 +178,13 @@ class CLd : public DuProp, public VarProp, public OffsetProp {
 public:
     static BYTE const kid_map = 0;
     static BYTE const kid_num = 0;
-    UINT align;
     bool is_aligned;
+    UINT align;
 public:
     static inline Var *& accIdinfo(IR * ir) { return LD_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LD_ofst(ir); }
     static inline StorageSpace & accSS(IR * ir) { return LD_storage_space(ir); }
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
+    static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 };
 
 
@@ -204,8 +208,8 @@ class CILd : public DuProp, public OffsetProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    UINT alignment;
     bool is_aligned;
+    UINT alignment;
     StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
@@ -215,7 +219,7 @@ public:
     static inline StorageSpace & accSS(IR * ir)
     { return ILD_storage_space(ir); }
 
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
+    static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 
     IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
     IR * getBase() const { return ILD_base(this); }
@@ -259,8 +263,8 @@ class CSt : public CLd, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    UINT alignment;
     bool is_aligned;
+    UINT alignment;
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return ST_rhs(ir); }
@@ -270,7 +274,7 @@ public:
     static inline IR *& accKid(IR * ir, UINT idx) { return ST_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return ST_bb(ir); }
 
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 
     IR * getKid(UINT idx) const { return ST_kid(this, idx); }
     IR * getRHS() const { return ST_rhs(this); }
@@ -304,7 +308,7 @@ public:
 
     IR * getKid(UINT idx) const { return STPR_kid(this, idx); }
     IR * getRHS() const { return STPR_rhs(this); }
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 };
 
 
@@ -431,8 +435,8 @@ class CISt : public DuProp, public OffsetProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
-    UINT alignment;
     bool is_aligned;
+    UINT alignment;
     StorageSpace storage_space;
     IR * opnd[kid_num];
 public:
@@ -444,7 +448,7 @@ public:
     static inline StorageSpace & accSS(IR * ir)
     { return IST_storage_space(ir); }
 
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 
     IR * getKid(UINT idx) const { return IST_kid(this, idx); }
     IR * getRHS() const { return IST_rhs(this); }
@@ -516,8 +520,8 @@ public:
 //Record MD DU information.
 #define CALL_du(ir) CK_FLD_KIND(ir, CCall, CK_IRC_CALL, du)
 
-//Parameter list of call.
-#define CALL_param_list(ir) CALL_kid(ir, 0)
+//Arguments list of call.
+#define CALL_arg_list(ir) CALL_kid(ir, 0)
 
 //Record dummy referenced IR.
 #define CALL_dummyuse(ir) CALL_kid(ir, 1)
@@ -527,18 +531,19 @@ class CCall : public DuProp, public VarProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
+
     //True if current call is intrinsic call.
-    BYTE m_is_intrinsic:1;
+    bool m_is_intrinsic;
 
     //True if this call do allocate memory from heap. It always the function
     //like malloc or new.
-    BYTE m_is_alloc_heap:1;
+    bool m_is_alloc_heap;
 
     //True if this call does not necessarily to be basic block boundary.
     //By default, call stmt must be down boundary of basic block, but if
     //the flag is true, the call is always be defined by customer for
     //special purpose, e.g, intrinsic call or customized operation.
-    BYTE m_is_not_bb_bound:1;
+    bool m_is_not_bb_bound;
 
     //Record the intrinsic operation.
     UINT intrinsic_op;
@@ -555,7 +560,7 @@ public:
     //Build dummyuse expression to represent potential memory objects that
     //the Call referrenced.
     //Note dummyuse may be a list of IR.
-    void addDummyUse(Region * rg);
+    void addDummyUse(Region const* rg);
     static inline Var *& accIdinfo(IR * ir) { return CALL_idinfo(ir); }
     static inline SSAInfo *& accSSAInfo(IR * ir) { return CALL_ssainfo(ir); }
     static inline PRNO & accPrno(IR * ir) { return CALL_prno(ir); }
@@ -567,10 +572,11 @@ public:
     static inline IRBB *& accBB(IR * ir) { return CALL_bb(ir); }
 
     IR * getKid(UINT idx) const { return CALL_kid(this, idx); }
-    IR * getParamList() const { return CALL_param_list(this); }
+    IR * getArgList() const { return CALL_arg_list(this); }
     IR * getDummyUse() const { return CALL_dummyuse(this); }
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
+
     //Get the intrinsic operation code.
     UINT getIntrinsicOp()
     {
@@ -614,11 +620,15 @@ public:
     static BYTE const kid_map = 0x4; //callee must exist
     static BYTE const pad_kid_num = 1;
     static BYTE const kid_num = CCall::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member.
+
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd_pad' must be the first member.                              //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd_pad[pad_kid_num];
 
     //True if current call is readonly.
-    BYTE m_is_readonly:1;
+    //NOTE: Do NOT move the field before 'opnd_pad'.
+    bool m_is_readonly;
 public:
     static inline SSAInfo *& accSSAInfo(IR * ir) { return CALL_ssainfo(ir); }
     static inline PRNO & accPrno(IR * ir) { return CALL_prno(ir); }
@@ -638,6 +648,7 @@ public:
 #define TER_opnd0(ir) TER_kid(ir, 0)
 #define TER_opnd1(ir) TER_kid(ir, 1)
 #define TER_opnd2(ir) TER_kid(ir, 2)
+#define TER_opnd(ir, idx) TER_kid(ir, idx)
 #define TER_kid(ir, idx) (((CTer*)ir)->opnd[CK_KID_TER(ir, idx)])
 class CTer : public IR {
     COPY_CONSTRUCTOR(CTer);
@@ -652,6 +663,15 @@ public:
     IR * getOpnd0() const { return TER_opnd0(this); }
     IR * getOpnd1() const { return TER_opnd1(this); }
     IR * getOpnd2() const { return TER_opnd2(this); }
+
+    //Swap operands of TER operation.
+    //e.g: op x, y, z; swap the 0th operand and 2th operand, get op z, y, x;
+    void swapOpnd(UINT idx0, UINT idx1)
+    {
+        ASSERT0(idx0 < kid_num && idx1 < kid_num);
+        ASSERTN(idx0 != idx1, ("meaningless swap"));
+        xcom::swap(TER_opnd(this, idx0), TER_opnd(this, idx1));
+    }
 };
 
 
@@ -672,6 +692,10 @@ public:
     IR * getKid(UINT idx) const { return BIN_kid(this, idx); }
     IR * getOpnd0() const { return BIN_opnd0(this); }
     IR * getOpnd1() const { return BIN_opnd1(this); }
+
+    //Swap operands of BIN operation.
+    //e.g: add x, y; swap operand to add y, x;
+    void swapOpnd() { xcom::swap(BIN_opnd0(this), BIN_opnd1(this)); }
 };
 
 
@@ -755,6 +779,7 @@ class CWhileDo : public IR {
 public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const kid_num = 2;
+
     ////////////////////////////////////////////////////////////////////////////
     //NOTE: 'opnd' must be the last member of CWhileDo.                       //
     ////////////////////////////////////////////////////////////////////////////
@@ -826,7 +851,10 @@ public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const pad_kid_num = 3;
     static BYTE const kid_num = CWhileDo::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member of CDoLoop.
+
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd_pad' must be the first member of CDoLoop.                   //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd_pad[pad_kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1038,9 +1066,8 @@ class CArray : public DuProp, public OffsetProp {
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
-    UINT alignment;
-
     bool is_aligned;
+    UINT alignment;
 
     //Note that if ARR_ofst is not zero, the IR_dt may not equal to
     //ARR_elemtype. IR_dt describe the data-type of ARRAY operation + ARR_ofst.
@@ -1073,7 +1100,7 @@ public:
     static inline StorageSpace & accSS(IR * ir)
     { return ARR_storage_space(ir); }
 
-    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
+    static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 
     //Return the number of dimensions.
     UINT getDimNum() const
@@ -1170,7 +1197,10 @@ public:
     static BYTE const kid_map = 0x7;
     static BYTE const pad_kid_num = 1;
     static BYTE const kid_num = CArray::kid_num + pad_kid_num;
-    //NOTE: 'opnd_pad' must be the first member of CStArray.
+
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: 'opnd_pad' must be the first member of CStArray.                  //
+    ////////////////////////////////////////////////////////////////////////////
     IR * opnd_pad[pad_kid_num];
 
     //DO NOT PLACE MEMBER BEFORE opnd_pad
@@ -1184,7 +1214,7 @@ public:
     static inline StorageSpace & accSS(IR * ir)
     { return STARR_storage_space(ir); }
 
-    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 };
 
 
@@ -1243,7 +1273,7 @@ public:
     static inline PRNO & accPrno(IR * ir) { return PR_no(ir); }
 
     //src:can be stmt or expression.
-    static IR * dupIRTreeByRef(IR const* src, Region * rg);
+    static IR * dupIRTreeByRef(IR const* src, Region const* rg);
 };
 
 
@@ -1262,8 +1292,8 @@ class CTruebr : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
     LabelInfo const* jump_target_lab; //jump target label.
+    IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return BR_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return BR_bb(ir); }
@@ -1378,22 +1408,22 @@ public:
 
 
 //This class represents alloca operation.
-//e.g: alloca $ptr, size.
+//e.g: $ptr = alloca(size).
 #define ALLOCA_align(ir) (((CAlloca*)CK_IRC(ir, IR_ALLOCA))->align)
 #define ALLOCA_size(ir) ALLOCA_kid(ir, 0)
 #define ALLOCA_kid(ir, idx) \
     (((CAlloca*)ir)->opnd[CK_KID_IRC(ir, IR_ALLOCA, idx)])
-class CAlloca : public IR {
+class CAlloca : public CUna {
     COPY_CONSTRUCTOR(CAlloca);
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    IR * opnd[kid_num];
     UINT align;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return ALLOCA_kid(ir, idx); }
 
+    UINT getAlign() const { return ALLOCA_align(this); }
     IR * getKid(UINT idx) const { return ALLOCA_kid(this, idx); }
 };
 
@@ -1436,7 +1466,7 @@ public:
     }
 
     //src:can be stmt or expression.
-    static IR * dupIRTreeByRef(IR const* src, Region * rg);
+    static IR * dupIRTreeByRef(IR const* src, Region const* rg);
 
     IR * getKid(UINT idx) const { return PHI_kid(this, idx); }
     //Get the No.idx operand.

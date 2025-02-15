@@ -32,6 +32,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 //Optimizations
+#include "preana.h"
+#include "apply_to_region.h"
 #include "liveness_mgr.h"
 #include "mdliveness_mgr.h"
 #include "ssaregion.h"
@@ -46,6 +48,7 @@ author: Su Zhenyu
 #include "if_opt.h"
 #include "linear_rep.h"
 #include "chain_recur.h"
+#include "alge_reasscociate.h"
 #include "ir_gvn.h"
 #include "ir_ivr.h"
 #include "ir_lcse.h"
@@ -57,11 +60,19 @@ author: Su Zhenyu
 #include "cfg_lifting.h"
 #include "loop_dep_ana.h"
 #include "multi_res_convert.h"
-#include "update_pos.h"
+#include "targinfo_handler.h"
 
 #ifdef REF_TARGMACH_INFO
+//Header files in XGEN are referred to by the following passes since they
+//reference target machine informations, such as Reg, RegFile etc.
+//It looks like backward invoking functions that defined in XGEN.
+#include "../xgen/xgeninc.h"
+#include "update_pos.h"
 #include "targinfo_mgr.h"
 #include "lifetime.h"
+#include "var_liveness_mgr.h"
+#include "lsra_var_liveness_mgr.h"
+#include "var_lifetime.h"
 #include "lt_interf_graph.h"
 #include "linear_scan.h"
 #include "lsra_impl.h"
@@ -69,6 +80,10 @@ author: Su Zhenyu
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
 #include "arg_passer.h"
+#include "var2offset.h"
+#include "ir_reloc_mgr.h"
+#include "br_opt.h"
+#include "igoto_opt.h"
 #endif
 
 #ifdef FOR_IP
@@ -80,16 +95,7 @@ author: Su Zhenyu
 #include "ir_vrp.h"
 #include "ir_ccp.h"
 #include "ir_pre.h"
-#include "gp_adjustment.h"
-#include "prologue_epilogue_inserter.h"
-#include "br_opt.h"
 #include "workaround.h"
-#include "dynamic_stack.h"
-#include "var2offset.h"
-#include "ir_reloc_mgr.h"
-#include "igoto_opt.h"
-#include "memcheck.h"
-#include "kernel_adjustment.h"
 #endif
 
 #include "ir_cp.h"

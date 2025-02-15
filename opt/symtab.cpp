@@ -26,51 +26,65 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "../com/xcominc.h"
-#include "symtab.h"
+#include "errno.h"
+#include "commoninc.h"
+#include "region_deps.h"
 
 namespace xoc {
 
-//Add const string into symbol table.
-Sym const* SymTab::add(CHAR const* s)
+//
+//START Sym
+//
+void Sym::dump(MOD LogMgr * lm) const
 {
-    ASSERT0(s);
-    Sym * sym = m_free_one;
-    if (sym == nullptr) {
-        sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
+    ASSERT0(lm);
+    xoc::prt(lm, "%s", getStr());
+}
+//END Sym
+
+
+//
+//START ESym
+//
+void ESym::dump(MOD LogMgr * lm) const
+{
+    ASSERT0(lm);
+    CHAR const* str = getStr();
+    for (UINT i = 0; i < getLen(); i++) {
+        prt(lm, "%c", str[i]);
     }
-    SYM_name(sym) = const_cast<CHAR*>(s);
-    Sym const* appended_one = xcom::TTab<Sym*, CompareFuncSymTab>::append(sym);
-    ASSERT0(m_free_one == nullptr || m_free_one == sym);
-    if (appended_one != sym) {
-        //'s' has already been appended.
-        SYM_name(sym) = nullptr;
-        m_free_one = sym;
-    } else {
-        //m_free_one has been inserted into table.
-        //'s' is a new string so far.
-        m_free_one = nullptr;
+    prt(lm, " slen:%u", getLen());
+}
+//END ESym
+
+
+//
+//START SymTab
+//
+void SymTab::dump(MOD LogMgr * lm) const
+{
+    SymTabIter it;
+    for (Sym const* s = get_first(it); !it.end(); s = get_next(it)) {
+        note(lm, "\n");
+        s->dump(lm);
     }
-    return appended_one;
+    note(lm, "\n");
 }
+//END SymTab
 
 
-//Find const string in symbol table.
-Sym * SymTab::find(CHAR const* s) const
+//
+//START ESymTab
+//
+void ESymTab::dump(MOD LogMgr * lm) const
 {
-    ASSERT0(s);
-    Sym sym;
-    SYM_name(&sym) = const_cast<CHAR*>(s);
-    bool find = false;
-    return xcom::TTab<Sym*, CompareFuncSymTab>::get(&sym, &find);
+    ESymTabIter it;
+    for (ESym const* s = get_first(it); !it.end(); s = get_next(it)) {
+        note(lm, "\n");
+        s->dump(lm);
+    }
+    note(lm, "\n");
 }
-
-
-void SymTab::remove(CHAR const* s)
-{
-    Sym * sym = find(s);
-    if (sym == nullptr) { return; }
-    xcom::TTab<Sym*, CompareFuncSymTab>::remove(sym);
-}
+//END ESymTab
 
 } //namespace xoc

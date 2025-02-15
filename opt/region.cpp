@@ -36,6 +36,33 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//In C++, local declared class should NOT be used in template parameters of a
+//template class. Because the template class may be instanced outside the
+//function and the local type in function is invisible.
+class VFToIterIR {
+    Region * m_rg;
+public:
+    VFToIterIR(Region * rg) { m_rg = rg; }
+    bool visitIR(IR const* ir, OUT bool & is_terminate)
+    {
+        if (!ir->is_region()) {
+            if (ir->isCFS()) {
+                //Keep visiting kid IR, it may still be stmt.
+                return true;
+            }
+            //There is no need to process expression kid.
+            return false;
+        }
+        ASSERT0(m_rg);
+        if (!m_rg->processRegionIR(ir)) {
+            is_terminate = true;
+            return false;
+        }
+        return true;
+    }
+};
+
+
 //
 //START Region
 //
@@ -65,7 +92,7 @@ void Region::destroy()
 {
     if (m_pool == nullptr) { return; }
     if (!is_blackbox()) {
-        //NOTE IRBBMgr has to be destroied before IRMgr, becasuse it will
+        //NOTE IRBBMgr has to be destroyed before IRMgr, becasuse it will
         //free all IR back into the IRMgr.
         destroyIRBBMgr();
         destroyPassMgr();
@@ -75,7 +102,7 @@ void Region::destroy()
             delete REGION_analysis_instrument(this);
         }
     }
-    //MDSET destroied by MDSetMgr.
+    //MDSET destroyed by MDSetMgr.
     REGION_analysis_instrument(this) = nullptr;
     REGION_refinfo(this) = nullptr;
     REGION_id(this) = REGION_ID_UNDEF;
@@ -120,7 +147,7 @@ size_t Region::count_mem() const
 }
 
 
-void Region::setCFG(IRCFG * newcfg)
+void Region::setCFG(IRCFG * newcfg) const
 {
     ASSERT0(newcfg);
     PassMgr * passmgr = getPassMgr();
@@ -188,131 +215,6 @@ BBListIter Region::splitIRlistIntoBB(IN IR * irs, OUT BBList * bbl,
         BB_irlist(newbb).append_tail(ir);
     }
     return ctbb;
-}
-
-
-bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
-{
-    switch (ir->getCode()) {
-    case IR_CONST:
-        if (!ir->is_int()) { return false; }
-        *const_value = CONST_int_val(ir);
-        return true;
-    SWITCH_CASE_BIN: {
-        IR const* opnd0 = BIN_opnd0(ir);
-        IR const* opnd1 = BIN_opnd1(ir);
-
-        //TODO: Handle the case if opnd0's type is different with opnd1.
-        if (!opnd0->is_int() || !opnd1->is_int()) { return false; }
-        if (opnd0->is_uint() ^ opnd1->is_uint()) { return false; }
-
-        ULONGLONG lvalue = 0, rvalue = 0;
-        if (!evaluateConstInteger(BIN_opnd0(ir), &lvalue)) { return false; }
-        if (!evaluateConstInteger(BIN_opnd1(ir), &rvalue)) { return false; }
-
-        if (opnd0->is_uint()) {
-            switch (ir->getCode()) {
-            case IR_ADD: *const_value = lvalue + rvalue; break;
-            case IR_MUL: *const_value = lvalue * rvalue; break;
-            case IR_SUB: *const_value = lvalue - rvalue; break;
-            case IR_DIV: *const_value = lvalue / rvalue; break;
-            case IR_REM: *const_value = lvalue % rvalue; break;
-            case IR_MOD: *const_value = lvalue % rvalue; break;
-            case IR_LAND: *const_value = lvalue && rvalue; break;
-            case IR_LOR:  *const_value = lvalue || rvalue; break;
-            case IR_BAND: *const_value = lvalue & rvalue; break;
-            case IR_BOR:  *const_value = lvalue | rvalue; break;
-            case IR_XOR:  *const_value = lvalue ^ rvalue; break;
-            case IR_LT: *const_value= lvalue < rvalue; break;
-            case IR_LE: *const_value= lvalue <= rvalue; break;
-            case IR_GT: *const_value= lvalue > rvalue; break;
-            case IR_GE: *const_value= lvalue >= rvalue; break;
-            case IR_EQ: *const_value= lvalue == rvalue; break;
-            case IR_NE: *const_value= lvalue != rvalue; break;
-            case IR_ASR: *const_value = lvalue >> rvalue; break;
-            case IR_LSR: *const_value = lvalue >> rvalue; break;
-            case IR_LSL: *const_value = lvalue << rvalue; break;
-            default: return false;
-            }
-        } else {
-            LONGLONG lv = (LONGLONG)lvalue;
-            LONGLONG rv = (LONGLONG)rvalue;
-            LONGLONG res = 0;
-            switch (ir->getCode()) {
-            case IR_ADD:  res = lv + rv; break;
-            case IR_SUB:  res = lv - rv; break;
-            case IR_MUL:  res = lv * rv; break;
-            case IR_DIV:  res = lv / rv; break;
-            case IR_REM:  res = lv % rv; break;
-            case IR_MOD:  res = lv % rv; break;
-            case IR_LAND: res = lv && rv; break;
-            case IR_LOR:  res = lv || rv; break;
-            case IR_BAND: res = lv & rv; break;
-            case IR_BOR:  res = lv | rv; break;
-            case IR_XOR:  res = lv ^ rv; break;
-            case IR_LT: res = lv < rv; break;
-            case IR_LE: res = lv <= rv; break;
-            case IR_GT: res = lv > rv; break;
-            case IR_GE: res = lv >= rv; break;
-            case IR_EQ: res = lv == rv; break;
-            case IR_NE: res = lv != rv; break;
-            case IR_ASR: res = lv >> rv; break;
-            case IR_LSR: res = lv >> rv; break;
-            case IR_LSL: res = lv << rv; break;
-            default: return false;
-            }
-            *const_value = (ULONGLONG)res;
-        }
-        return true;
-    }
-    case IR_BNOT: //bitwise not
-    case IR_LNOT: //logical not
-    case IR_NEG: { //negative
-        if (!UNA_opnd(ir)->is_int()) { return false; }
-
-        ULONGLONG value = 0;
-        if (!evaluateConstInteger(UNA_opnd(ir), &value)) { return false; }
-
-        switch (ir->getCode()) {
-        case IR_BNOT: *const_value = ~value; break;
-        case IR_LNOT: *const_value = !value; break;
-        case IR_NEG:  *const_value = (ULONGLONG)(-(LONGLONG)value); break;
-        default: return false;
-        }
-        return true;
-    }
-    SWITCH_CASE_READ_PR: {
-        IR * defstmt = nullptr;
-        SSAInfo const* ssainfo = PR_ssainfo(ir);
-        if (ssainfo != nullptr) {
-            defstmt = SSA_def(ssainfo);
-            if (defstmt == nullptr || !defstmt->is_stpr()) {
-                return false;
-            }
-        } else {
-            DUSet const* defset = ir->readDUSet();
-            if (defset == nullptr || defset->get_elem_count() != 1) {
-                return false;
-            }
-
-            DUSetIter di = nullptr;
-            defstmt = getIR(defset->get_first(&di));
-            ASSERT0(defstmt && defstmt->is_stmt());
-
-            if (!defstmt->is_stpr()) { return false; }
-        }
-        ASSERT0(defstmt);
-        if (defstmt == ir->getStmt()) {
-            //CASE:PR is self-modified operation, e.g: $1=$1+0x2;
-            return false;
-        }
-        return evaluateConstInteger(STPR_rhs(defstmt), const_value);
-    }
-    case IR_CVT:
-        return evaluateConstInteger(CVT_exp(ir), const_value);
-    default:;
-    }
-    return false;
 }
 
 
@@ -638,10 +540,9 @@ CHAR const* Region::getRegionName() const
 HOST_INT Region::getIntegerInDataTypeValueRange(IR * ir) const
 {
     ASSERT0(ir->is_const() && ir->is_int());
-    UINT bitsz = getTypeMgr()->getDTypeBitSize(
-        TY_dtype(ir->getType()));
+    UINT bitsz = getTypeMgr()->getDTypeBitSize(TY_dtype(ir->getType()));
     ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
-        ("integer might be truncated"));
+            ("integer might be truncated"));
     switch (bitsz) {
     case 8: return (HOST_INT)(((UINT8)(INT8)CONST_int_val(ir)));
     case 16: return (HOST_INT)(((UINT16)(INT16)CONST_int_val(ir)));
@@ -649,7 +550,10 @@ HOST_INT Region::getIntegerInDataTypeValueRange(IR * ir) const
     case 64: return (HOST_INT)(((UINT64)(INT64)CONST_int_val(ir)));
     case 128:
         #ifdef INT128
+        //Host does NOT support INT128 and UINT128.
         return (HOST_INT)(((UINT128)(INT128)CONST_int_val(ir)));
+        #else
+        ASSERTN(0, ("HOST not support 128bit integer"));
         #endif
     default: ASSERTN(0, ("TODO:need to support"));
     }
@@ -670,6 +574,8 @@ HOST_INT Region::getMaxInteger(UINT bitsize, bool is_signed) const
         case 128:
             #ifdef INT128
             return (HOST_INT)(((UINT128)(INT128)-1) >> 1);
+            #else
+            ASSERTN(0, ("HOST not support 128bit integer"));
             #endif
         default: ASSERTN(0, ("TODO:need to support"));
         }
@@ -684,6 +590,8 @@ HOST_INT Region::getMaxInteger(UINT bitsize, bool is_signed) const
     case 128:
         #ifdef INT128
         return (HOST_INT)(((UINT128)(INT128)-1));
+        #else
+        ASSERTN(0, ("HOST not support 128bit integer"));
         #endif
     default: ASSERTN(0, ("TODO:need to support"));
     }
@@ -710,6 +618,8 @@ HOST_INT Region::getMinInteger(UINT bitsize, bool is_signed) const
         #ifdef INT128
         return (HOST_INT)
             ((UINT128)(~(UINT128)getMaxInteger(bitsize, is_signed)));
+        #else
+        ASSERTN(0, ("HOST not support 128bit integer"));
         #endif
     default: ASSERTN(0, ("TODO:need to support"));
     }
@@ -935,131 +845,6 @@ void Region::scanCallAndReturnList(OUT UINT & num_inner_region,
 }
 
 
-void Region::prescanBBList(BBList const* bblst)
-{
-    BBListIter bbit;
-    for (IRBB const* bb = bblst->get_head(&bbit);
-         bb != nullptr; bb = bblst->get_next(&bbit)) {
-        BBIRListIter irct;
-        for (IR const* ir = const_cast<IRBB*>(bb)->getIRList().
-                 get_head(&irct);
-             ir != nullptr;
-             ir = const_cast<IRBB*>(bb)->getIRList().get_next(&irct)) {
-            prescanIRList(ir);
-        }
-    }
-}
-
-
-//Prepare informations for analysis phase, such as record
-//which variables have been taken address for both
-//global and local variable.
-void Region::prescanIRList(IR const* ir)
-{
-    for (; ir != nullptr; ir = ir->get_next()) {
-        switch (ir->getCode()) {
-        SWITCH_CASE_DIRECT_MEM_STMT:
-            prescanIRList(ir->getRHS());
-            break;
-        SWITCH_CASE_CALL:
-            if (g_do_call_graph && !CALL_is_intrinsic(ir)) {
-                ConstIRList * cl = getCallList();
-                ASSERT0(cl);
-                cl->append_tail(ir);
-            }
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->getKid(i);
-                if (k != nullptr) {
-                    ASSERT0(IR_parent(k) == ir);
-                    prescanIRList(k);
-                }
-            }
-            break;
-        case IR_LDA: {
-            ASSERT0(LDA_idinfo(ir));
-            Var * v = LDA_idinfo(ir);
-            if (v->is_string()) {
-                if (getRegionMgr()->genDedicateStrMD() != nullptr) {
-                    //Treat all string variables as the same one.
-                    break;
-                }
-                Var * sv = getVarMgr()->registerStringVar(
-                    nullptr, VAR_string(v), MEMORY_ALIGNMENT);
-                ASSERT0(sv);
-                sv->setFlag(VAR_ADDR_TAKEN);
-            } else if (v->is_label()) {
-                ; //do nothing.
-            } else {
-                //General variable.
-                IR const* parent = ir->getParent();
-                ASSERT0(parent);
-                if (parent->isArrayOp() && parent->isArrayBase(ir)) {
-                    ; //nothing to do.
-                } else {
-                    //If LDA is the base of ARRAY, say (&a)[..], its
-                    //address does not need to mark as address taken.
-                    LDA_idinfo(ir)->setFlag(VAR_ADDR_TAKEN);
-                }
-
-                // ...=&x.a, address of 'x.a' is taken.
-                MD md;
-                MD_base(&md) = LDA_idinfo(ir); //correspond to Var
-                MD_ofst(&md) = LDA_ofst(ir);
-                MD_size(&md) = ir->getTypeSize(getTypeMgr());
-                MD_ty(&md) = MD_EXACT;
-                getMDSystem()->registerMD(md);
-            }
-            break;
-        }
-        case IR_ID:
-            //Array base must not be ID. It could be
-            //LDA or computational expressions.
-            //In C, array base address could be assgined to other variable.
-            //Its address should be marked as taken.
-            // And it's parent must be LDA.
-            //e.g: Address of 'a' is taken.
-            //    int a[10];
-            //    int * p;
-            //    p = a;
-            ASSERT0(ID_info(ir));
-            break;
-        SWITCH_CASE_LOOP_ITER_CFS_OP:
-        SWITCH_CASE_DIRECT_MEM_EXP:
-        case IR_CONST:
-        case IR_GOTO:
-        case IR_LABEL:
-        SWITCH_CASE_READ_PR:
-        case IR_PHI:
-        case IR_REGION:
-            break;
-        case IR_RETURN:
-            if (g_do_call_graph) {
-                ConstIRList * cl = getReturnList();
-                ASSERT0(cl);
-                cl->append_tail(ir);
-            }
-
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->getKid(i);
-                if (k != nullptr) {
-                    ASSERT0(IR_parent(k) == ir);
-                    prescanIRList(k);
-                }
-            }
-             break;
-        default:
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->getKid(i);
-                if (k != nullptr) {
-                    ASSERT0(IR_parent(k) == ir);
-                    prescanIRList(k);
-                }
-            }
-        }
-    }
-}
-
-
 //Dump IR and memory usage.
 void Region::dumpMemUsage() const
 {
@@ -1275,16 +1060,17 @@ void Region::dump(bool dump_inner_region) const
 void Region::dumpRef(UINT indent) const
 {
     if (!isLogMgrInit()) { return; }
-    note(this, "\n\n==---- DUMP IR MD REFERENCE '%s' ----==\n",
+    note(this, "\n\n==---- DUMP REGION MD REFERENCE '%s' ----==\n",
          getRegionName());
+    getLogMgr()->incIndent(2);
     BBList * bbs = getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
         getMDSystem()->dump(getVarMgr(), false);
     }
 
-    //Dump imported variables referenced.
-    note(this, "\n==----==");
+    //Dump region itself referenced MD, include the imported variables.
+    note(this, "\n==-- DUMP REGION MAY-REF MD --==");
     MDSet * ru_maydef = getMayDef();
     if (ru_maydef != nullptr) {
         note(this, "\nRegionMayDef(OuterRegion):");
@@ -1297,10 +1083,12 @@ void Region::dumpRef(UINT indent) const
         ru_mayuse->dump(getMDSystem(), getVarMgr(), true);
     }
 
+    note(this, "\n==-- DUMP BBLIST REFERENCED MD --==");
     for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
         note(this, "\n--- BB%d ---", bb->id());
         dumpBBRef(bb, indent);
     }
+    getLogMgr()->decIndent(2);
 }
 
 
@@ -1711,15 +1499,12 @@ bool Region::processBBList(OptCtx & oc)
     if (getBBList() == nullptr || getBBList()->get_elem_count() == 0) {
         return true;
     }
-
-    START_TIMER(t, "PreScan");
-    prescanBBList(getBBList());
-    END_TIMER(t, "PreScan");
+    PreAnaBeforeOpt preana(this);
+    preana.perform(oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IRBB LIST ----==");
         dumpBBList();
     }
-
     HighProcessImpl(oc);
     return MiddleProcess(oc);
 }
@@ -1749,9 +1534,8 @@ CallGraph * Region::getCallGraphPreferProgramRegion() const
 bool Region::processIRList(OptCtx & oc)
 {
     if (getIRList() == nullptr) { return true; }
-    START_TIMER(t, "PreScan");
-    prescanIRList(getIRList());
-    END_TIMER(t, "PreScan");
+    PreAnaBeforeOpt preana(this);
+    preana.perform(oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
         getLogMgr()->incIndent(2);
@@ -1838,7 +1622,7 @@ static void do_inline(Region * rg, OptCtx * oc)
 
 bool Region::processRegionIRInIRList(OptCtx & oc)
 {
-    return processRegionIRInIRList(getIRList());
+    return processRegionIRInIRList(oc, getIRList());
 }
 
 
@@ -1871,24 +1655,17 @@ bool Region::processRegionIRInBBList(OptCtx & oc)
 }
 
 
-bool Region::processRegionIRInIRList(IR const* ir)
+bool Region::processRegionIRInIRList(OptCtx & oc, IR const* ir)
 {
-    for (; ir != nullptr; ir = ir->get_next()) {
-        switch (ir->getCode()) {
-        case IR_REGION:
-            if (!processRegionIR(ir)) { return false; }
-            break;
-        default:
-            if (!ir->is_stmt()) { break; }
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->getKid(i);
-                if (k != nullptr) {
-                    ASSERT0(IR_parent(k) == ir);
-                    prescanIRList(k);
-                }
-            }
-        }
-    }
+    class IterTree : public VisitIRTree<VFToIterIR> {
+    public:
+        IterTree(VFToIterIR & vf) : VisitIRTree(vf) {}
+    };
+    PreAnaBeforeOpt preana(this);
+    preana.perform(oc);
+    VFToIterIR vf(this);
+    IterTree it(vf);
+    it.visit(ir);
     return true;
 }
 

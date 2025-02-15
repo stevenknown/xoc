@@ -126,7 +126,7 @@ Edge * CompareEdgeFunc::createKey(Edge const* ref)
 {
     ASSERT0(m_g);
     EdgeC * outec;
-    return m_g->newEdgeImpl(ref->from(), ref->to(), &m_inec, &outec);
+    return m_g->allocEdgeImpl(ref->from(), ref->to(), &m_inec, &outec);
 }
 //END CompareEdgeFunc
 
@@ -328,13 +328,13 @@ void Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
 
 
 //NOTE: Do NOT use 0 as vertex id.
-Vertex * Graph::newVertex(VexIdx vid)
+Vertex * Graph::allocVertex(VexIdx vid)
 {
     ASSERTN(m_vertex_pool, ("not yet initialized."));
     ASSERTN(vid != VERTEX_UNDEF, ("Use undefined vertex id"));
     Vertex * vex = m_v_free_list.get_free_elem();
     if (vex == nullptr) {
-        vex = newVertex();
+        vex = allocVertex();
     } else {
         vex->init();
     }
@@ -409,7 +409,7 @@ void Graph::addEdgeAtPos(List<VexIdx> const& fromlist, Vertex * to, UINT pos)
 }
 
 
-Edge * Graph::newEdge(Vertex * from, Vertex * to)
+Edge * Graph::allocEdge(Vertex * from, Vertex * to)
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (from == nullptr || to == nullptr) return nullptr;
@@ -436,7 +436,7 @@ Edge * Graph::newEdge(Vertex * from, Vertex * to)
     EdgeC * inec;
     EdgeC * outec;
     m_edgetab.getCompareKeyObject()->clean();
-    return m_edgetab.append(newEdgeImpl(from, to, &inec, &outec));
+    return m_edgetab.append(allocEdgeImpl(from, to, &inec, &outec));
 }
 
 
@@ -1139,28 +1139,31 @@ void Graph::dumpHeight(FILE * h) const
 }
 
 
-void Graph::dumpVertexAux(Vertex const* v, OUT StrBuf & buf) const
+void Graph::dumpVertexAux(Vertex const* v, OUT DefFixedStrBuf & buf) const
 {
     //NOTE:DOT file use '\l' as newline charactor.
     //Target Dependent Code.
 
     //If you dump in multiple-line, the last \l is very important to display
     //DOT file in a fine manner.
+    //Print carriage-return for DOT file, use \l instead of \n to
+    //avoid DOT complaint.
     //fprintf(h, "\\l");
 }
 
 
-void Graph::dumpVertexDesc(Vertex const* v, OUT StrBuf & buf) const
+void Graph::dumpVertexDesc(
+    xcom::Vertex const* v, OUT DefFixedStrBuf & buf) const
 {
-    //Just print the vertex index.
+    //Just dump the vertex index.
     buf.strcat("V%d", v->id());
 }
 
 
-CHAR const* Graph::dumpVertex(Vertex const* v, OUT StrBuf & buf) const
+CHAR const* Graph::dumpVertex(Vertex const* v, OUT DefFixedStrBuf & buf) const
 {
     buf.strcat("\nnode%d [shape = Mrecord, label=\"", v->id());
-    StrBuf tbuf(16);
+    DefFixedStrBuf tbuf;
     dumpVertexDesc(v, tbuf);
     buf.strcat("%s", tbuf.getBuf());
     dumpVertexAux(v, buf);
@@ -1173,12 +1176,12 @@ CHAR const* Graph::dumpVertex(Vertex const* v, OUT StrBuf & buf) const
 
 void Graph::dumpVertex(FILE * h, Vertex const* v) const
 {
-    StrBuf buf(32);
+    DefFixedStrBuf buf;
     fprintf(h, "%s", dumpVertex(v, buf));
 }
 
 
-CHAR const* Graph::dumpEdge(Edge const* e, OUT StrBuf & buf) const
+CHAR const* Graph::dumpEdge(Edge const* e, OUT DefFixedStrBuf & buf) const
 {
     buf.strcat("\nnode%d->node%d", e->from()->id(), e->to()->id());
     buf.strcat("[");
@@ -1201,13 +1204,13 @@ CHAR const* Graph::dumpEdge(Edge const* e, OUT StrBuf & buf) const
 
 void Graph::dumpEdge(FILE * h, Edge const* e) const
 {
-    StrBuf buf(32);
+    DefFixedStrBuf buf;
     fprintf(h, "%s", dumpEdge(e, buf));
 }
 
 
 //Print node
-CHAR const* Graph::dumpAllVertices(OUT StrBuf & buf) const
+CHAR const* Graph::dumpAllVertices(OUT DefFixedStrBuf & buf) const
 {
     VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
@@ -1220,13 +1223,13 @@ CHAR const* Graph::dumpAllVertices(OUT StrBuf & buf) const
 
 void Graph::dumpAllVertices(FILE * h) const
 {
-    StrBuf buf(32);
+    DefFixedStrBuf buf;
     fprintf(h, "%s", dumpAllVertices(buf));
 }
 
 
 //Print edge
-CHAR const* Graph::dumpAllEdges(OUT StrBuf & buf) const
+CHAR const* Graph::dumpAllEdges(OUT DefFixedStrBuf & buf) const
 {
     EdgeIter ite;
     for (Edge const* e = get_first_edge(ite);
@@ -1239,7 +1242,7 @@ CHAR const* Graph::dumpAllEdges(OUT StrBuf & buf) const
 
 void Graph::dumpAllEdges(FILE * h) const
 {
-    StrBuf buf(32);
+    DefFixedStrBuf buf;
     fprintf(h, "%s", dumpAllEdges(buf));
 }
 
@@ -1309,7 +1312,7 @@ void Graph::dumpVCG(CHAR const* name) const
          v != nullptr; v = get_next_vertex(itv)) {
         fprintf(h, "\nnode: { title:\"%d\" label:\"%d\" "
                 "shape:circle fontname:\"courB\" color:gold}",
-                VERTEX_id(v), VERTEX_id(v));
+                v->id(), v->id());
     }
 
     //Print edge
@@ -1317,9 +1320,8 @@ void Graph::dumpVCG(CHAR const* name) const
     for (Edge const* e = get_first_edge(ite);
          e != nullptr; e = get_next_edge(ite)) {
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
-                VERTEX_id(EDGE_from(e)),
-                VERTEX_id(EDGE_to(e)),
-                m_is_direction ? "" : "arrowstyle:none" );
+                e->from()->id(), e->to()->id(),
+                is_direction() ? "" : "arrowstyle:none" );
     }
     fprintf(h, "\n}\n");
 }
@@ -1401,7 +1403,10 @@ UINT Graph::WhichPred(VexIdx pred_vex_id, Vertex const* vex,
         }
         n++;
     }
-    //UNREACHABLE(); //pred_vex_id should be a predecessor of vex.
+    //CASE:User may require the function by a vertex which is not the
+    //predecessor of 'vex'. Thus set 'is_pred' to false to faciliate user
+    //usage.
+    //UNREACHABLE();
     return VERTEX_UNDEF;
 }
 
@@ -1833,13 +1838,12 @@ bool DGraph::computeDom2(List<Vertex const*> const& vlst)
 }
 
 
+//NOTE: the function needs RPO to compute DomInfo.
 //vextab: the vertex set of subgraph.
-static Vertex const* computeIdomViaOnePred(Vertex const* entry, Vertex const* v,
-                                           Vertex const* pred,
-                                           Vertex const* idom_cand,
-                                           DGraph const& g,
-                                           Vector<VexIdx> const& idomset,
-                                           TTab<VexIdx> const& vextab)
+static Vertex const* computeIdomViaOnePred(
+    Vertex const* entry, Vertex const* v, Vertex const* pred,
+    Vertex const* idom_cand, DGraph const& g, Vector<VexIdx> const& idomset,
+    TTab<VexIdx> const& vextab)
 {
     ASSERT0(pred && idom_cand);
     Vertex const* j = pred;
@@ -1907,13 +1911,13 @@ static Vertex const* computeIdomViaOnePred(Vertex const* entry, Vertex const* v,
 
 
 //The function compute the idom by retrive predecessor of 'v'.
-//Note the function will not compute idom outside the 'vextab'.
+//NOTE: the function will not compute idom outside the 'vextab'.
+//NOTE: the function needs RPO to compute DomInfo.
 //vextab: a set of vertex need to process.
 //        Note the vertex set may be subset of vertex of graph g.
-static Vertex const* computeIdomViaPred(Vertex const* entry, Vertex const* v,
-                                        DGraph const& g,
-                                        Vector<VexIdx> const& idomset,
-                                        TTab<VexIdx> const& vextab)
+static Vertex const* computeIdomViaPred(
+    Vertex const* entry, Vertex const* v, DGraph const& g,
+    Vector<VexIdx> const& idomset, TTab<VexIdx> const& vextab)
 {
     //Access each preds
     Vertex const* idom_cand = nullptr;
@@ -1939,9 +1943,8 @@ static Vertex const* computeIdomViaPred(Vertex const* entry, Vertex const* v,
             idom_cand = in;
             continue;
         }
-        Vertex const* next_idom_cand = computeIdomViaOnePred(entry, v, in,
-                                                             idom_cand, g,
-                                                             idomset, vextab);
+        Vertex const* next_idom_cand = computeIdomViaOnePred(
+            entry, v, in, idom_cand, g, idomset, vextab);
         if (next_idom_cand == nullptr) {
             //Thus skip current searching-path.
             continue;
@@ -1968,11 +1971,10 @@ static bool verifyAllVexHaveIDom(List<Vertex const*> const& vlst,
 }
 
 
-static bool computeIdomForVertexInSubGraph(Vertex const* entry,
-                                           List<Vertex const*> const& vlst,
-                                           DGraph const& g,
-                                           TTab<VexIdx> const& vextab,
-                                           OUT Vector<VexIdx> & idomset)
+//NOTE: the function needs RPO to compute DomInfo.
+static bool computeIdomForVertexInSubGraph(
+    Vertex const* entry, List<Vertex const*> const& vlst,
+    DGraph const& g, TTab<VexIdx> const& vextab, OUT Vector<VexIdx> & idomset)
 {
     bool changed = false;
     //Access vertex in RPO.
@@ -1987,8 +1989,8 @@ static bool computeIdomForVertexInSubGraph(Vertex const* entry,
             continue;
         }
         if (v == entry) { continue; }
-        Vertex const* idom = computeIdomViaPred(entry, v, g,
-                                                idomset, vextab);
+        Vertex const* idom = computeIdomViaPred(
+            entry, v, g, idomset, vextab);
         if (idom == nullptr) {
             if (idomset.get(v->id()) != VERTEX_UNDEF) {
                 idomset.set(v->id(), VERTEX_UNDEF);
@@ -2004,6 +2006,7 @@ static bool computeIdomForVertexInSubGraph(Vertex const* entry,
 }
 
 
+//NOTE: the function needs RPO to compute DomInfo.
 void DGraph::computeIdomForSubGraph(Vertex const* entry,
                                     List<Vertex const*> const& vlst)
 {
@@ -2022,8 +2025,8 @@ void DGraph::computeIdomForSubGraph(Vertex const* entry,
     bool changed = true;
     UINT count = 0;
     while (changed) {
-        changed = computeIdomForVertexInSubGraph(entry, vlst, *this,
-                                                 vextab, m_idom_set);
+        changed = computeIdomForVertexInSubGraph(
+            entry, vlst, *this, vextab, m_idom_set);
         count++;
     }
     if (is_graph_entry(entry)) {
@@ -2957,6 +2960,7 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, VexIdx newid,
 }
 
 
+//NOTE: the function needs RPO to compute DomInfo.
 bool DGraph::recomputeDomInfoForSubGraph(
     Vertex const* root, OUT VexTab * modset, OUT UINT & iter_times)
 {
@@ -2967,6 +2971,7 @@ bool DGraph::recomputeDomInfoForSubGraph(
         root, *this, modset, affectlst, vex2idom, iter_times);
     computeIdomForSubGraph(root, affectlst);
     if (modset != nullptr) {
+        //Record all vertices that dominator info changed.
         RPOVexListIter it;
         for (Vertex const* v = affectlst.get_head(&it);
              v != nullptr; v = affectlst.get_next(&it)) {
@@ -2991,6 +2996,7 @@ bool DGraph::recomputeDomInfoForSubGraph(
 }
 
 
+//NOTE: the function needs RPO to compute DomInfo.
 void DGraph::reviseDomInfoAfterAddOrRemoveEdge(
     Vertex const* from, Vertex const* to, OUT VexTab * modset,
     OUT Vertex const*& root, OUT UINT & iter_times)

@@ -42,7 +42,12 @@ class Vertex;
 typedef INT RPOVal;
 typedef UINT RPOUVal;
 typedef C<Vertex const*> * RPOVexListIter;
+
 class RPOVexList : public List<Vertex const*> {
+public:
+    //Return true if all elements in current list are equal to elements in
+    //'src'.
+    bool isEqual(RPOVexList const& src) const;
 };
 
 
@@ -56,6 +61,10 @@ public:
 
     static inline RPOVal computeNearestLessUnUsableRPO(RPOVal rpo)
     { ASSERT0(rpo > RPO_UNDEF); return rpo / RPO_INTERVAL * RPO_INTERVAL; }
+
+    //Find the nearest unusable RPO.
+    //A unusable RPO is the RPOVal that occupied and computed by computeRPO
+    //and separated by RPO_INTERVAL.
     static inline RPOVal computeNearestGreaterUnUsableRPO(RPOVal rpo)
     {
         ASSERT0(rpo > RPO_UNDEF);
@@ -67,6 +76,19 @@ public:
     //Record sorted vertex into vlst in incremental order of RPO.
     //NOTE: rpo start at RPO_INIT_VAL.
     void computeRPO(Graph const& g, MOD Vertex * root, OUT RPOVexList & vlst);
+
+    //The function only sorts vertice in RPO order and collects into 'vlst'.
+    //NOTE: the function does not recompute RPO of vertex.
+    void collectRPOVexList(Graph const& g, OUT RPOVexList & vlst);
+
+    static void dumpRPOVexList(FILE * h, RPOVexList const& vlst,
+                               UINT indent  = 0);
+    static void dumpRPOVexList(CHAR const* filename, RPOVexList const& vlst)
+    {
+        FileObj fo(filename);
+        ASSERT0(fo.getFileHandler());
+        dumpRPOVexList(fo.getFileHandler(), vlst, 0);
+    }
 
     //Free RPO for next allocation.
     void freeRPO(RPOVal rpo)
@@ -94,11 +116,18 @@ public:
     RPOVal tryFindUsableRPO(RPOVal begin, RPOVal end);
 
     //Try to update RPO of newvex according to RPO of marker.
-    //newvex_prior_marker: true if newvex's lexicographical order is prior to
-    //marker. Return true if this function find a properly RPO for 'newvex',
-    //otherwise return false.
+    //newvex_prior_marker: true if newvex's lexicographical
+    //                     order is prior to marker.
+    //rpovexlist: it is optional and can be NULL. If it is not NULL,
+    //    the function will insert 'newvex' into the 'rpovexlist' according
+    //    to RPO order.
+    //Return true if this function find a properly RPO for 'newvex', otherwise
+    //return false.
     bool tryUpdateRPO(MOD Vertex * newvex, Vertex const* marker,
-                      bool newvex_prior_marker);
+                      MOD RPOVexList * rpovexlst, bool newvex_prior_marker);
+
+    static bool verifyRPOVexList(Graph const& g, Vertex const* root,
+                                 RPOVexList const& vlst);
 };
 
 } //namespace xcom

@@ -36,7 +36,7 @@ author: Su Zhenyu
 namespace xoc {
 
 TypeDesc const g_type_desc[] = {
-    {D_UNDEF, "none",  0},
+    {D_UNDEF, "undef",  0},
     {D_B, "bool", 8}, //bool
     {D_I8, "i8", 8}, //signed integer 8 bits
     {D_I16, "i16", 16},
@@ -65,6 +65,11 @@ TypeDesc const g_type_desc[] = {
     //void type, default bitsize is as long as pointer type.
     {D_ANY, "any", BYTE_PER_POINTER * BIT_PER_BYTE},
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
+    {D_STREAM, "stream", 0}, //stream type, default bitsize is 0
+
+    //Add it to ensure that the length of g_type_desc is consistent with the
+    //length of the DATA_TYPE enumeration type to prevent out of bounds access.
+    {D_LAST, "none", 0},
 };
 
 
@@ -520,14 +525,10 @@ UINT TypeMgr::getByteSize(Type const* type) const
         //of ANY type, because ANY type always be represented by Object Pointer
         //in runtime system.
         return 0;
-    case D_PTR:
-        return getPointerByteSize();
-    case D_MC:
-        return TY_mc_size(type);
-    case D_VEC:
-        return TY_vec_size(type);
-    case D_TENSOR:
-        return ((TensorType const*)type)->getByteSize(this);
+    case D_PTR: return getPointerByteSize();
+    case D_MC: return ((MCType const*)type)->getByteSize();
+    case D_VEC: return ((VectorType const*)type)->getByteSize();
+    case D_TENSOR: return ((TensorType const*)type)->getByteSize(this);
     default: ASSERTN(0, ("unsupport"));
     }
     return 0;

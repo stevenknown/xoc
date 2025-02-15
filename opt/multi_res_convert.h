@@ -45,8 +45,7 @@ protected:
     TypeMgr const* m_tm;
     ActMgr m_act_mgr;
 protected:
-    IR * genPreDefStmt(
-        IR * stmt, IR * res_isomo_list, IR ** predeflst);
+    IR * genPreDefStmt(IR * stmt, IR * res_isomo_list, IR ** predeflst);
     IR * genPostDefStmt(IR * stmt, IR * res_isomo_list);
     IR * genExtractStmtList(IR * stmt, IR * res_isomo_list);
 
@@ -96,10 +95,15 @@ public:
     //beside the #S4.
     //Finally, the generated three stmts (#S1,#S2,#S3) and one existing
     //stmt (#S4) together express the multiple result of broadcast operation.
+    //prno: the result PRNO of IR_STPR.
+    //type: the result type of IR_STPR.
     IR * buildStorePRWithMultiResAndConvertBySplit(
         PRNO prno, Type const* type, IR * rhs);
     IR * buildStorePRWithMultiResAndConvertBySplit(Type const* type, IR * rhs);
     IR * buildStoreWithMultiResAndConvertBySplit(Var * lhs, IR * rhs);
+
+    //lhs: the Variable of result memory object.
+    //type: the result type of result memory object.
     IR * buildStoreWithMultiResAndConvertBySplit(
         Var * lhs, Type const* type, IR * rhs);
 

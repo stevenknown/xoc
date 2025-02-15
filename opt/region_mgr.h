@@ -39,6 +39,17 @@ namespace xoc {
 #define REGION_ID_UNDEF 0
 #define LABEL_ID_UNDEF 0
 
+//If user define the macro, RegionMgr and all generated Regions will use Extend
+//Symbol Table as default Symbol Table.
+//Check symtab.h to see details in between SymTab and ESymTab.
+#define ENABLE_ESYMTAB
+
+#ifdef ENABLE_ESYMTAB
+typedef ESymTab DefSymTab;
+#else
+typedef SymTab DefSymTab;
+#endif
+
 typedef enum {
     REGION_UNDEF = 0,
 
@@ -76,6 +87,7 @@ class MCDwarfMgr;
 class RegionMgr {
 public:
     typedef xcom::Vector<Region*> RegionTab;
+    typedef xcom::TMap<Var const*, Region*> Var2Region;
 private:
     COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
@@ -98,7 +110,8 @@ protected:
     MCDwarfMgr * m_dm;
     Region * m_program;
     RegionTab m_id2rg;
-    SymTab m_sym_tab;
+    Var2Region m_var2rg;
+    DefSymTab m_sym_tab;
     TypeMgr m_type_mgr;
     xcom::Vector<OptCtx*> m_id2optctx;
     xcom::BitSetMgr m_bs_mgr;
@@ -122,6 +135,9 @@ public:
 
     //This function will establish a map between region and its id.
     void addToRegionTab(Region * rg);
+
+    //Allocate OptCtx according to specific target machine.
+    OptCtx * allocOptCtx();
 
     //Allocate Region.
     virtual Region * allocRegion(REGION_TYPE rt);
@@ -159,8 +175,9 @@ public:
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
+    Region * getRegion(Var const* var) { return m_var2rg.get(var); }
     UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
-    RegionTab * getRegionTab() { return &m_id2rg; }
+    RegionTab & getRegionTab() { return m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
 
     //The function generates a dedicated MD to represent string md.
@@ -173,7 +190,7 @@ public:
     //as same unbounded MD.
     MD const* genDedicateStrMD();
     MDSystem * getMDSystem() { return m_md_sys; }
-    SymTab * getSymTab() { return &m_sym_tab; }
+    DefSymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
     VarMgr * getVarMgr() const { return m_var_mgr; }
     VarLabelRelationMgr * getVarLabelRelationMgr() const
@@ -238,14 +255,7 @@ public:
     }
 
     //Initialize TargInfoMgr.
-    void initTargInfoMgr()
-    {
-        ASSERTN(m_targinfo_mgr == nullptr,
-                ("TargInfoMgr already initialized"));
-        m_targinfo_mgr = allocTargInfoMgr();
-        ASSERT0(m_targinfo_mgr);
-    }
-
+    void initTargInfoMgr();
     bool isLogMgrInit() const
     { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }
 
@@ -281,6 +291,12 @@ public:
     //as same unbounded MD.
     void setRegardAllStringAsSameMD(bool doit)
     { m_is_regard_str_as_same_md = doit; }
+
+    void setVar2Region(Var const* var, Region * rg)
+    {
+        ASSERT0(var && rg);
+        m_var2rg.setAlways(var, rg);
+    }
 
     bool verifyPreDefinedInfo();
 

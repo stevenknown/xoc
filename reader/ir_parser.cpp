@@ -3184,11 +3184,11 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
 
     IR * ir = nullptr;
     if (is_call) {
-        ir = ctx->current_region->getIRMgr()->buildCall(callee_var, param_list,
-                                            return_prno, return_ty);
+        ir = ctx->current_region->getIRMgr()->buildCall(
+            callee_var, param_list, return_prno, return_ty);
     } else {
-        ir = ctx->current_region->getIRMgr()->buildICall(callee_exp, param_list,
-                                             return_prno, return_ty);
+        ir = ctx->current_region->getIRMgr()->buildICall(
+            callee_exp, param_list, return_prno, return_ty);
     }
     if (ps.ir_use_list != nullptr) {
         CALL_dummyuse(ir) = ps.ir_use_list;

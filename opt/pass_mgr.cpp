@@ -280,6 +280,12 @@ Pass * PassMgr::allocMultiResConvert()
 }
 
 
+Pass * PassMgr::allocAlgeReasscociate()
+{
+    return new AlgeReasscociate(m_rg);
+}
+
+
 Pass * PassMgr::allocLoopDepAna()
 {
     return new LoopDepAna(m_rg, (GVN*)registerPass(PASS_GVN));
@@ -354,6 +360,12 @@ Pass * PassMgr::allocKernelAdjustment()
 {
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
+}
+
+
+Pass * PassMgr::allocTargInfoHandler()
+{
+    return new TargInfoHandler(m_rg);
 }
 
 
@@ -598,6 +610,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_MULTI_RES_CVT:
         pass = allocMultiResConvert();
         break;
+    case PASS_ALGE_REASSCOCIATE:
+        pass = allocAlgeReasscociate();
+        break;
     case PASS_LOOP_DEP_ANA:
         pass = allocLoopDepAna();
         break;
@@ -624,6 +639,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_KERNEL_ADJUSTMENT:
         pass = allocKernelAdjustment();
+        break;
+    case PASS_TARGINFO_HANDLER:
+        pass = allocTargInfoHandler();
         break;
     default:
         pass = allocExtPass(passty);
@@ -673,12 +691,12 @@ void PassMgr::checkAndRecomputeDUChain(
     if (!oc->is_ref_valid()) {
         optlist.append_tail(PASS_RPO);
         optlist.append_tail(PASS_DOM);
-        optlist.append_tail(PASS_DU_REF);
+        optlist.append_tail(PASS_MD_REF);
     }
     if (!oc->is_reach_def_valid()) {
         optlist.append_tail(PASS_RPO);
         optlist.append_tail(PASS_DOM);
-        optlist.append_tail(PASS_DU_REF);
+        optlist.append_tail(PASS_MD_REF);
         optlist.append_tail(PASS_REACH_DEF);
     }
     if (optlist.get_elem_count() != 0) {
@@ -713,13 +731,43 @@ void PassMgr::checkAndRecomputeDUChain(
 }
 
 
-void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
-                                       AliasAnalysis *& aa, DUMgr *& dumgr,
-                                       BitSet const& opts)
+void PassMgr::checkAndRecomputeAA(
+    OptCtx * oc, IRCFG * cfg, AliasAnalysis *& aa, BitSet const& opts)
 {
+    if (!opts.is_contain(PASS_AA) || oc->is_aa_valid()) { return; }
     BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return; }
+    ASSERTN(cfg && oc->is_cfg_valid(),
+            ("You should make CFG available first."));
+    if (aa == nullptr) {
+        aa = (AliasAnalysis*)registerPass(PASS_AA);
+        if (!aa->is_init()) {
+            aa->initAliasAnalysis();
+        }
+    }
+    UINT numir = 0;
+    UINT max_numir_in_bb = 0;
+    for (IRBB * bb = bbl->get_head();
+        bb != nullptr; bb = bbl->get_next()) {
+        numir += bb->getNumOfIR();
+        max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
+    }
+    if (numir > g_thres_opt_ir_num ||
+        max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
+        aa->set_flow_sensitive(false);
+    }
+    //NOTE: assignMD(false) must be called before AA.
+    aa->perform(*oc);
+}
+
+
+void PassMgr::checkAndRecomputeAAandDU(
+    OptCtx * oc, IRCFG * cfg, AliasAnalysis *& aa, DUMgr *& dumgr,
+    BitSet const& opts)
+{
+    checkAndRecomputeAA(oc, cfg, aa, opts);
     DUOptFlag f(DUOPT_UNDEF);
-    if (opts.is_contain(PASS_DU_REF) && !oc->is_ref_valid()) {
+    if (opts.is_contain(PASS_MD_REF) && !oc->is_ref_valid()) {
         f.set(DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF);
     }
     if (opts.is_contain(PASS_LIVE_EXPR) && !oc->is_live_expr_valid()) {
@@ -737,44 +785,23 @@ void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
         !oc->is_reach_def_valid()) {
         f.set(DUOPT_SOL_REACH_DEF);
     }
-    if (opts.is_contain(PASS_AA) && !oc->is_aa_valid() &&
-        bbl != nullptr && bbl->get_elem_count() != 0) {
-        ASSERTN(cfg && oc->is_cfg_valid(),
-                ("You should make CFG available first."));
-        if (aa == nullptr) {
-            aa = (AliasAnalysis*)registerPass(PASS_AA);
-            if (!aa->is_init()) {
-                aa->initAliasAnalysis();
-            }
-        }
-        UINT numir = 0;
-        UINT max_numir_in_bb = 0;
-        for (IRBB * bb = bbl->get_head();
-            bb != nullptr; bb = bbl->get_next()) {
-            numir += bb->getNumOfIR();
-            max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
-        }
-        if (numir > g_thres_opt_ir_num ||
-            max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
-            aa->set_flow_sensitive(false);
-        }
-        //NOTE: assignMD(false) must be called before AA.
-        aa->perform(*oc);
+    if (f.do_nothing()) { return; }
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return; }
+    if (dumgr == nullptr) {
+        dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
     }
-    if (!f.do_nothing() && bbl != nullptr && bbl->get_elem_count() != 0) {
-        if (dumgr == nullptr) {
-            dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
-        }
-        if (opts.is_contain(PASS_DU_REF)) {
-            f.set(DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU);
-        }
-        dumgr->perform(*oc, f);
-        if (f.have(DUOPT_COMPUTE_PR_REF) || f.have(DUOPT_COMPUTE_NONPR_REF)) {
-            ASSERT0(dumgr->verifyMDRef());
-        }
-        if (f.have(DUOPT_SOL_AVAIL_EXPR)) {
-            ASSERT0(dumgr->verifyLiveinExp());
-        }
+    if (opts.is_contain(PASS_MD_REF)) {
+        f.set(DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU);
+    }
+    dumgr->perform(*oc, f);
+
+    //Do verifications.
+    if (f.have(DUOPT_COMPUTE_PR_REF) || f.have(DUOPT_COMPUTE_NONPR_REF)) {
+        ASSERT0(dumgr->verifyMDRef());
+    }
+    if (f.have(DUOPT_SOL_AVAIL_EXPR)) {
+        ASSERT0(dumgr->verifyLiveinExp());
     }
 }
 
@@ -839,18 +866,16 @@ void PassMgr::checkValidAndRecomputePass(
             ASSERTN(cfg && oc->is_cfg_valid(),
                     ("You should make CFG available first."));
             cfg->LoopAnalysis(*oc);
-        } else {
-            cfg->verifyLoopInfo(*oc);
         }
+        ASSERT0(cfg->verifyLoopInfo(*oc));
         break;
     case PASS_RPO:
         ASSERTN(cfg && oc->is_cfg_valid(),
                 ("You should make CFG available first."));
         if (!oc->is_rpo_valid() || cfg->getRPOVexList() == nullptr) {
             cfg->computeRPO(*oc);
-        } else {
-            ASSERT0(cfg->verifyRPO(*oc));
         }
+        ASSERT0(cfg->verifyRPO(*oc));
         break;
     case PASS_SCC:
         if (!oc->is_scc_valid()) {
@@ -862,7 +887,7 @@ void PassMgr::checkValidAndRecomputePass(
         }
         break;
     case PASS_AA:
-    case PASS_DU_REF:
+    case PASS_MD_REF:
     case PASS_LIVE_EXPR:
     case PASS_REACH_DEF:
     case PASS_AVAIL_REACH_DEF:

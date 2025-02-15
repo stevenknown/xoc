@@ -128,8 +128,12 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
             backedge_num++;
         }
     }
-    if (backedge_num > 1) { return false; }
+    if (backedge_num > 1) {
+        //The invertion to multiple backedges is compilcated.
+        return false;
+    }
 
+    ASSERTN(backedge_num != 0, ("a loop has at least one backedge"));
     ASSERT0(backedge_pred != VERTEX_UNDEF);
     IRBB * backedge_start = cfg->getBB(backedge_pred);
     ASSERT0(!backedge_start->isExceptionHandler());
@@ -194,12 +198,13 @@ bool InvertBrTgt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_oc = &oc;
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
-                                               PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_LOOP_INFO, PASS_UNDEF);
     if (!oc.is_loopinfo_valid()) { return false; }
+    ASSERT0L3(m_rg->getCFG()->verifyLoopInfo(oc));
     dumpInit();
-    bool changed = iterLoopTree(this, m_rg->getCFG(),
-                                m_rg->getCFG()->getLoopInfo());
+    bool changed = iterLoopTree(
+        this, m_rg->getCFG(), m_rg->getCFG()->getLoopInfo());
     if (!changed) {
         dumpFini();
         END_TIMER(t, getPassName());

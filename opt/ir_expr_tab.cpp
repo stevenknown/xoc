@@ -336,7 +336,7 @@ void ExprTab::removeOccs(IR * ir)
         break;
     }
     SWITCH_CASE_CALL:
-        for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             if (!p->is_const()) {
                 removeOcc(p);
             }
@@ -526,8 +526,7 @@ void ExprTab::encodeStmt(IR const* ir)
                 setMapIR2ExprRep(ICALL_callee(ir), ie);
             }
         }
-        for (IR * p = CALL_param_list(ir);
-             p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             ExprRep * ie = encodeExp(p);
             if (ie != nullptr) {
                 setMapIR2ExprRep(p, ie);

@@ -43,6 +43,7 @@ namespace xoc {
 #define DEBUG_STR_SH_NAME     ".debug_str"
 #define DEBUG_LINE_SH_NAME    ".debug_line"
 #define DEBUG_FRAME_SH_NAME   ".debug_frame"
+#define DEBUG_LOC_SH_NAME     ".debug_loc"
 
 
 INT64 MCExpr::evaluateAsAbsolute(MCExpr const* expr)
@@ -115,6 +116,10 @@ void MCDwarfMgr::appendBytes(UINT64 value, CHAR const* name, UINT count)
     }
     if (::strcmp(name, DEBUG_FRAME_SH_NAME) == 0) {
         appendBytesFromValue(MCDWARFMGR_debug_frame_code(this), value, count);
+        return;
+    }
+    if (::strcmp(name, DEBUG_LOC_SH_NAME) == 0) {
+        appendBytesFromValue(MCDWARFMGR_debug_loc_code(this), value, count);
         return;
     }
     UNREACHABLE();
@@ -287,6 +292,8 @@ void MCDwarfMgr::createMCSymbol(Region const* region, LabelInfo const* label,
         off = MCDWARFMGR_debug_str_code(this).get_elem_count();
     } else if (::strcmp(name, DEBUG_LINE_SH_NAME) == 0) {
         off = MCDWARFMGR_debug_line_code(this).get_elem_count();
+    } else if (::strcmp(name, DEBUG_LOC_SH_NAME) == 0) {
+        off = MCDWARFMGR_debug_loc_code(this).get_elem_count();
     } else { UNREACHABLE(); }
 
     Sym const* prag_sym = label->getPragma();
@@ -363,7 +370,7 @@ void MCDwarfMgr::handleGlobalVarSymSingleRefRel(Sym const* name,
 
 
 void MCDwarfMgr::handleFuncAndSectionLabelSingleRefRel(Sym const* name,
-        CHAR const* region_name, MCFixupKind kind)
+    CHAR const* region_name, MCFixupKind kind)
 {
     ASSERT0(name && region_name);
 
@@ -374,8 +381,11 @@ void MCDwarfMgr::handleFuncAndSectionLabelSingleRefRel(Sym const* name,
         src_section_off = MCDWARFMGR_debug_info_code(this).get_elem_count();
     } else if (::strcmp(region_name, DEBUG_RANGES_SH_NAME) == 0) {
         src_section_off = MCDWARFMGR_debug_ranges_code(this).get_elem_count();
+    } else if (::strcmp(region_name, DEBUG_LOC_SH_NAME) == 0) {
+        src_section_off = MCDWARFMGR_debug_loc_code(this).get_elem_count();
     } else {
-        //TODO: In the current context, consider only debug_info.
+        //TODO: In the current context, consider only debug_info,
+        //debug_ranges and debug_loc.
         UNREACHABLE();
     }
     MCSymbol const* mc_symbol = m_map_symbol.get(name);
@@ -388,8 +398,11 @@ void MCDwarfMgr::handleFuncAndSectionLabelSingleRefRel(Sym const* name,
         MCDWARFMGR_debug_info_fixups(this).append(fix);
     } else if (::strcmp(region_name, DEBUG_RANGES_SH_NAME) == 0) {
         MCDWARFMGR_debug_ranges_fixups(this).append(fix);
+    } else if (::strcmp(region_name, DEBUG_LOC_SH_NAME) == 0) {
+        MCDWARFMGR_debug_loc_fixups(this).append(fix);
     } else {
-        //TODO: In the current context, consider only debug_info.
+        //TODO: In the current context, consider only debug_info,
+        //debug_ranges and debug_loc.
         UNREACHABLE();
     }
     appendBytes(0, region_name, getSizeForFixupKind(kind));
@@ -408,7 +421,8 @@ void MCDwarfMgr::createSingleRefRel(Sym const* name, CHAR const* region_name,
     }
 
     if (::strcmp(region_name, DEBUG_INFO_SH_NAME) == 0 ||
-        ::strcmp(region_name, DEBUG_RANGES_SH_NAME) == 0) {
+        ::strcmp(region_name, DEBUG_RANGES_SH_NAME) == 0 ||
+        ::strcmp(region_name, DEBUG_LOC_SH_NAME) == 0) {
         handleFuncAndSectionLabelSingleRefRel(name, region_name, kind);
         return;
     }
@@ -444,7 +458,19 @@ void MCDwarfMgr::createBinaryExprRef(Sym const* name0, Sym const* name1,
         return;
     }
 
-    //TODO: In the current context, consider only debug_info.
+    if (::strcmp(region_name, DEBUG_LOC_SH_NAME) == 0) {
+        UINT src_section_off = MCDWARFMGR_debug_loc_code(this).
+            get_elem_count();
+        MCExpr const* binary_exp = MCDWARFMGR_dwarf_res_mgr(this).
+            allocMCBinaryExpr(op_type, ref_exp0, ref_exp1);
+        MCFixup * fix = MCDWARFMGR_dwarf_res_mgr(this).
+            allocFixup(src_section_off, binary_exp, kind);
+        MCDWARFMGR_debug_loc_fixups(this).append(fix);
+        appendBytes(0, region_name, getSizeForFixupKind(kind));
+        return;
+    }
+
+    //TODO: In the current context, consider only debug_info and debug_loc.
     UNREACHABLE();
 }
 
@@ -616,11 +642,11 @@ Region const* MCDwarfMgr::findRegionByName(Sym const* name,
                                            xoc::RegionMgr * region_mgr)
 {
     ASSERT0(name && region_mgr);
-    RegionMgr::RegionTab * region_tab = region_mgr->getRegionTab();
+    RegionMgr::RegionTab & region_tab = region_mgr->getRegionTab();
     SymbolHashFunc c;
     Region const* region_out = nullptr;
-    for (UINT i = 0; i < region_tab->get_elem_count(); i++) {
-        Region const* region_ptr = region_tab->get(i);
+    for (UINT i = 0; i < region_tab.get_elem_count(); i++) {
+        Region const* region_ptr = region_tab.get(i);
         if (region_ptr == nullptr) {
             continue;
         }
@@ -781,13 +807,13 @@ Region const* MCDwarfMgr::getRegionByName(RegionMgr * rm, CHAR const* name)
     ASSERT0(rm && name);
     Region const* region_out = nullptr;
     for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
-        Region * rg = (*(rm->getRegionTab()))[i];
+        Region * rg = rm->getRegionTab().get(i);
         if (rg == nullptr) { continue; }
-        Var * var = (*(rm->getRegionTab()))[i]->getRegionVar();
+        Var * var = rm->getRegionTab().get(i)->getRegionVar();
         if (var == nullptr) { continue; }
         CHAR const* region_name = var->get_name()->getStr();
         if (::strcmp(region_name, name) == 0) {
-            region_out = (*(rm->getRegionTab()))[i];
+            region_out = rm->getRegionTab().get(i);
         }
     }
     ASSERT0(region_out);
@@ -799,7 +825,6 @@ MCSymbol const* MCDwarfMgr::genFrameCIE(Region * region_ptr)
 {
     ASSERT0(region_ptr);
     UINT size_before = MCDWARFMGR_debug_frame_code(this).get_elem_count();
-    UINT32 const DW_CIE_ID = 0xffffffff;
 
     //Create start mcsymbol of cie.
     LabelInfo * label_start_cfi = region_ptr->genPragmaLabel("cfi_start");
@@ -851,6 +876,7 @@ MCSymbol const* MCDwarfMgr::genFrameCIE(Region * region_ptr)
 
     //Date Alignment Factor size: 1byte.
     Vector<CHAR> os_data_align;
+    ASSERT0(m_stack_slot_alignment != 0);
     xcom::encodeSLEB128(m_stack_slot_alignment, os_data_align);
     MCDWARFMGR_debug_frame_code(this).
         append((BYTE*)os_data_align.get_vec(), os_data_align.get_elem_count());
@@ -1128,14 +1154,14 @@ void MCDwarfMgr::genFrameBinary()
         if (first_cie) {
             first_cie = false;
 
-            //Return the position of the header of the debug_frame section
-            //provided for use by the header of each region.
-            cie_symbol = genFrameCIE((Region*)region_ptr);
-
             //Setting this m_stack_slot_alignment member variable,
             //for detailed explanations,
             //please refer to the variable declaration.
             setStackSlotAlignment(region_ptr);
+
+            //Return the position of the header of the debug_frame section
+            //provided for use by the header of each region.
+            cie_symbol = genFrameCIE((Region*)region_ptr);
         }
         ASSERT0(cie_symbol);
         genFrameFDE(cie_symbol, mc_dwarf_frame_info, (Region*)region_ptr);

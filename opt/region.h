@@ -122,7 +122,8 @@ public:
 //  Function unit may be multiple entries, and multiple exits.
 //  Most of optimizations apply on function unit. In general, the
 //  compilation of region unit include following phases:
-//    * Prescan IR list to specify which variable is taken address.
+//    * Preprocessing IR and BB list to specify which variable is taken
+//      address.
 //    * High level process to perform miscellaneous high
 //      level IR transformations according to syntactics analysis.
 //      This process is also responsible to simpify high level IR
@@ -155,12 +156,12 @@ protected:
         AnalysisInstrument * m_ana_ins; //Analysis instrument.
         void * m_blx_data; //Black box data.
     } m_u1;
+    SMemPool * m_pool;
 
     //Record vars defined in current region, include the subregion defined
     //variables. All LOCAL vars in the tab will be destroyed at region
     //destruction.
     VarTab m_rg_var_tab;
-    SMemPool * m_pool;
 protected:
     //Allocate PassMgr
     virtual PassMgr * allocPassMgr();
@@ -170,8 +171,6 @@ protected:
 
     //Allocate AttachInfoMgr
     virtual AttachInfoMgr * allocAttachInfoMgr();
-
-    void doBasicAnalysis(OptCtx & oc);
 
     void genEntryBB();
     AnalysisInstrument * getAnalysisInstrument() const
@@ -190,8 +189,6 @@ protected:
     virtual void postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
-    void prescanIRList(IR const* ir);
-    void prescanBBList(BBList const* bblst);
     bool partitionRegion();
     bool performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc);
 
@@ -205,10 +202,9 @@ protected:
     //Simplification will maintain CFG, PRSSA, MDSSA, and DU Ref information,
     //excepts the classic DU-Chain.
     bool performSimplify(OptCtx & oc);
-    bool processRegionIRInIRList(IR const* ir);
+    bool processRegionIRInIRList(OptCtx & oc, IR const* ir);
     bool processRegionIRInIRList(OptCtx & oc);
     bool processRegionIRInBBList(OptCtx & oc);
-    bool processRegionIR(IR const* ir);
 public:
     REGION_TYPE m_rg_type; //region type.
     UINT m_id; //region unique id.
@@ -245,11 +241,11 @@ public:
     { xcom::add_next(&ANA_INS_ir_list(getAnalysisInstrument()), irs); }
 
     //Allocate DU reference that describes memory reference to IR.
-    inline DU * allocDU()
+    inline DU * allocDU() const
     {
         DU * du = ANA_INS_free_du_list(getAnalysisInstrument()).remove_head();
         if (du == nullptr) {
-            du = (DU*)smpoolMallocConstSize(sizeof(DU),
+            du = (DU*)xcom::smpoolMallocConstSize(sizeof(DU),
                 ANA_INS_du_pool(getAnalysisInstrument()));
             ::memset((void*)du, 0, sizeof(DU));
         }
@@ -260,7 +256,7 @@ public:
     IRBB * allocBB() { return getBBMgr()->allocBB(); }
 
     //Allocate AIContainer that describes attach info to IR.
-    AIContainer * allocAIContainer()
+    AIContainer * allocAIContainer() const
     {
         ASSERT0(getAnalysisInstrument()->getAttachInfoMgr());
         return getAnalysisInstrument()->getAttachInfoMgr()->allocAIContainer();
@@ -295,18 +291,29 @@ public:
     void destroyAttachInfoMgr();
     void destroyIRBBMgr();
 
+    //The following funtions return true means IR status changed, caller
+    //should consider whether other optimizations should be reperform again.
+    //Otherwise return false.
+    bool doPRSSA(OptCtx & oc);
+    bool doMDSSA(OptCtx & oc);
+    bool doRefineDU(OptCtx & oc);
+    bool doDURefAndClassicDU(OptCtx & oc);
+    bool doDUAna(OptCtx & oc);
+    bool doAA(OptCtx & oc);
+    bool doBasicAnalysis(OptCtx & oc);
+
     //Duplication all contents of 'src', includes AttachInfo, except DU info,
     //SSA info, kids and siblings IR.
-    IR * dupIR(IR const* ir);
+    IR * dupIR(IR const* ir) const;
 
     //Duplicate 'ir' and its kids, but without ir's sibiling node.
     //The duplication includes AI, except DU info, SSA info.
-    IR * dupIRTree(IR const* ir);
+    IR * dupIRTree(IR const* ir) const;
 
     //Duplication 'ir' and kids, and its sibling, return list of new ir.
     //Duplicate irs start from 'ir' to the end of list.
     //The duplication includes AI, except DU info, SSA info.
-    IR * dupIRTreeList(IR const* ir);
+    IR * dupIRTreeList(IR const* ir) const;
 
     //Duplication 'ir' and kids, but without ir's sibling node.
     //The function will generate the isomophic IR expression if given ir is
@@ -350,22 +357,20 @@ public:
     void dumpBBRef(IN IRBB * bb, UINT indent) const;
     void dump(bool dump_inner_region) const;
 
-    bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
-
     //This function erases all informations of ir and
     //append it into free_list for next allocation.
     //If Attach Info exist, this function will erase it rather than deletion.
     //If DU info exist, this function will retrieve it back
     //to region for next allocation.
     //Note that this function does NOT free ir's kids and siblings.
-    void freeIR(IR * ir);
+    void freeIR(IR * ir) const;
 
     //Free ir and all its kids, except its sibling node.
     //We can only utilizing the function to free the
     //IR which allocated by 'allocIR'.
     //is_check_undef: If it is true, the function will assert when meeting
     //                an IR_UNDEF, that means some IRs has been freed already.
-    void freeIRTree(IR * ir, bool is_check_undef = true);
+    void freeIRTree(IR * ir, bool is_check_undef = true) const;
 
     //Free ir, ir's sibling, and all its kids.
     //We can only utilizing the function to free the IR
@@ -374,14 +379,14 @@ public:
     //a high level type. IRBB consists of only middle/low level IR.
     //is_check_undef: If it is true, the function will assert when meeting
     //                an IR_UNDEF, that means some IRs has been freed already.
-    void freeIRTreeList(IR * ir, bool is_check_undef = true);
+    void freeIRTreeList(IR * ir, bool is_check_undef = true) const;
 
     //Free ir, and all its kids.
     //We can only utilizing the function to free the IR which allocated
     //by 'allocIR'.
     //is_check_undef: If it is true, the function will assert when meeting
     //                an IR_UNDEF, that means some IRs has been freed already.
-    void freeIRTreeList(IRList & irs, bool is_check_undef = true);
+    void freeIRTreeList(IRList & irs, bool is_check_undef = true) const;
 
     //Free IRBB list.
     //We can only utilizing the function to free the IRBB
@@ -394,9 +399,15 @@ public:
     //in_decl_order: if it is true, this function will sort the formal
     //parameters in the Left to Right order according to their declaration.
     //e.g: foo(a, b, c), varlst will be {a, b, c}.
+    //NOTE: the function will iterate all Vars in the region. It is very
+    //costly and SHOULD BE USED CAREFULLY.
     void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
 
     //This function find the formal parameter variable by given position.
+    //NOTE: the function will iterate all Vars in the region. It is very
+    //costly and SHOULD BE USED CAREFULLY.
+    //Usually, user should retrieve and collect all parameter Vars of region in
+    //a temporary list by invoking findFormalParam(varlst).
     Var const* findFormalParam(UINT position) const;
 
     //This function find Var via iterating Var table of current region.
@@ -792,16 +803,17 @@ public:
     void setPRCount(UINT cnt)
     { ANA_INS_pr_count(getAnalysisInstrument()) = cnt; }
     void setRegionVar(Var * v) { m_var = v; }
-    void setIRList(IR * irs) { ANA_INS_ir_list(getAnalysisInstrument()) = irs; }
+    void setIRList(IR * irs) const
+    { ANA_INS_ir_list(getAnalysisInstrument()) = irs; }
     void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
     void setCommPool(SMemPool * pool) { m_pool = pool; }
-    void setIRMgr(IRMgr * mgr)
+    void setIRMgr(IRMgr * mgr) const
     { ANA_INS_ir_mgr(getAnalysisInstrument()) = mgr; }
-    void setBBMgr(IRBBMgr * mgr)
+    void setBBMgr(IRBBMgr * mgr) const
     { ANA_INS_ir_bb_mgr(getAnalysisInstrument()) = mgr; }
-    void setBBList(BBList * bblst)
+    void setBBList(BBList * bblst) const
     { ANA_INS_ir_bb_list(getAnalysisInstrument()) = bblst; }
-    void setCFG(IRCFG * newcfg);
+    void setCFG(IRCFG * newcfg) const;
 
     //Collect information of CALL and RETURN in current region.
     //num_inner_region: count the number of inner regions.
@@ -826,6 +838,7 @@ public:
     //This function is main entry to process current region.
     //Return true if the processing is successful.
     virtual bool process(OptCtx * oc);
+    bool processRegionIR(IR const* ir);
 
     //This function is the entry to process inner region.
     //Return true if the processing is successful.

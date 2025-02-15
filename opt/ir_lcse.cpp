@@ -102,7 +102,7 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExprRep * ie)
     }
     case IR_CALL:
     case IR_ICALL: {
-        IR * p = CALL_param_list(ir_pos);
+        IR * p = CALL_arg_list(ir_pos);
         IR * ret = nullptr; //return the pr that hold the cse value.
         IR * next_parm = nullptr;
         while (p != nullptr) {
@@ -113,10 +113,10 @@ IR * LCSE::hoistCse(IN IRBB * bb, IN IR * ir_pos, IN ExprRep * ie)
                 if (ret == nullptr) {
                     ret = m_rg->getIRMgr()->buildPR(IR_dt(p));
                     ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
-                    xcom::replace(&CALL_param_list(ir_pos), p, ret);
+                    xcom::replace(&CALL_arg_list(ir_pos), p, ret);
                     insert_st = true;
                 } else {
-                    xcom::replace(&CALL_param_list(ir_pos), p,
+                    xcom::replace(&CALL_arg_list(ir_pos), p,
                                   m_rg->dupIRTree(ret));
                     insert_st = false;
                 }
@@ -410,7 +410,7 @@ bool LCSE::processParamList(IN IRBB * bb, IN IR * ir,
     while (lchange) {
         //Iterative analyse cse, e.g:
         //  CALL(ADD(x,y), SUB(a,b), ADD(x,y), SUB(a,b))
-        IR * p = CALL_param_list(ir);
+        IR * p = CALL_arg_list(ir);
         lchange = false;
         while (p != nullptr) {
             if (canBeCandidate(p)) {
@@ -524,6 +524,7 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
                       MOD Vector<IR*> & map_expr2avail_pr,
                       IN MDSet & tmp)
 {
+    CollectMayUseRecur co(m_rg);
     bool change = false;
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
@@ -551,8 +552,7 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
                     continue;
                 }
                 tmp.clean(m_misc_bs_mgr);
-                DUMgr::collectMayUseRecursive(occ, m_rg, true,
-                                              m_misc_bs_mgr, tmp);
+                co.collect(occ, true, m_misc_bs_mgr, tmp);
                 if ((maydef != nullptr && maydef->is_intersect(tmp)) ||
                     (mustdef != nullptr && tmp.is_contain(mustdef, m_rg))) {
                     avail_ir_expr.diff(EXPR_id(ie));
@@ -651,7 +651,7 @@ bool LCSE::perform(OptCtx & oc)
         oc.setInvalidPass(PASS_EXPR_TAB);
         oc.setInvalidPass(PASS_AA);
         oc.setInvalidPass(PASS_CLASSIC_DU_CHAIN);
-        oc.setInvalidPass(PASS_DU_REF);
+        oc.setInvalidPass(PASS_MD_REF);
     }
     END_TIMER(t, getPassName());
     return change;

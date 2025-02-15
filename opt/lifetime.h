@@ -153,15 +153,49 @@ typedef enum {
     //Used to indicate this lifetime is dedicated or not.
     LT_FLAG_IS_DEDICATED = 0x2,
 
-    //Used to indicate the current lifetime is forced to spill or not.
+    //Used to indicate that the current lifetime generates spilling IR during
+    //splitting because of caller saved register assignment before the call
+    //statement.
+    LT_FLAG_SPILL_CALLER_SAVED = 0x4,
+
+    //Used to indicate the current lifetime is spill only or not.
     //Usually, this flag is set only if there is no occurence after the split
-    //position.
-    LT_FLAG_SPILL_FORCED = 0x4,
+    //position, it can only be set to the last child of a lifetime.
+    LT_FLAG_SPILL_ONLY = 0x8,
 
     //Used to indicate the current lifetime is forced to reload or not.
     //Usually, this flag is set only if it is started with a fake-use IR
     //inserted by the backward analysis.
-    LT_FLAG_RELOAD_FORCED = 0x8,
+    LT_FLAG_RELOAD_FORCED = 0x10,
+
+    //Used to indicate the current lifetime has one def or not in its full
+    //occurence list. This flag can be used to help to calculate the remat
+    //information of lifetime, also it can be used to optimize the spill/reload
+    //operation if a lifetime has only ONE def, redundant spill can be avoided
+    //if the spill is placed right after the definition.
+    //
+    //e.g:
+    // lifetime $1: <2-53>
+    //    | ----------------------------------------------------
+    //    | d              u                u  u               u
+    // POS: 2  5          17               34 37  41          53
+    //       ^              ^              ^    ^             ^
+    //       |              |              |    |             |
+    //    spill_1         split_1   reload_1  spill_2    reload_2
+    // The lifetime is split at POS 18, the spill IR "spill_1" is inserted at
+    // the POS 3 after the DEF at POS 2, a reload IR "reload_1" is inserted
+    // at POS 33 before the next USE at POS 34, if it is split again at POS
+    // 41, normally the spill IR "spill_2" should be inserted after POS 37,
+    // but since it is defined only once, the second spill IR "spill_2" can
+    // be saved, and reload directly with reload IR "reload_2" at POS 52
+    // before next the USE at POS 53 because the value in the spill memory
+    // is never changed.
+    LT_FLAG_ONE_DEF_ONLY = 0x20,
+
+    //Used to indicate the lifetime is rematerialized or not. If this flag
+    //is set, the spill operation of this lifetime can be avoided when it
+    //is split.
+    LT_FLAG_IS_REMAT = 0x40,
 } LT_ATTR_FLAG;
 
 
@@ -182,6 +216,9 @@ class LifeTime {
     LTAttrFlag m_flag;
 
     PRNO m_prno;
+
+    //Used to store the remat expression if lifetime can be rematerialized.
+    IR const* m_remat_exp;
 
     //Here we use m_parent and m_ancestor to record the new lifetimes that
     //are created during the lifetime split.
@@ -236,13 +273,15 @@ class LifeTime {
     LTList m_child;
 public:
     LifeTime(PRNO prno) : m_call_crossed_num(0), m_flag(0), m_prno(prno),
-        m_parent(nullptr), m_lt_constraints(nullptr)
+        m_remat_exp(nullptr), m_parent(nullptr), m_lt_constraints(nullptr)
     { m_ancestor = this; }
     Range addRange(Pos start, Pos end);
     Range addRange(Pos start) { return addRange(start, start); }
     void addOcc(Occ occ);
     void addChild(LifeTime * lt) { m_child.append_tail(lt); }
-    LTList const& getChild() { return m_child; }
+
+    //Return true if current lifetime canbe rematerialized.
+    bool canBeRemat() const { return getRematExp() != nullptr; }
 
     //Clean the position from 'pos'(include pos).
     //e.g:lifetime range is <1-10><15-30>, given position is 16, the
@@ -267,6 +306,7 @@ public:
     //Return true and occ if there is occ at given pos.
     bool findOcc(Pos pos, OUT OccListIter & it) const;
     bool findOccAfter(Pos pos, OUT OccListIter & it) const;
+    bool findOccBefore(Pos pos, OUT OccListIter & it) const;
 
     //Return true and range if there is range include the given pos.
     bool findRange(Pos pos, OUT Range & r, OUT VecIdx & ridx,
@@ -277,6 +317,7 @@ public:
     PRNO getAnctPrno() const { return m_ancestor->getPrno(); }
     LTAttrFlag getAttrFlag() const { return m_flag; }
     BYTE getCallCrossedNum() const { return m_call_crossed_num; }
+    LTList const& getChild() { return m_child; }
     UINT getRangeNum() const
     { return const_cast<LifeTime*>(this)->getRangeVec().get_elem_count(); }
     Pos getFirstPos() const { return getFirstRange().start(); }
@@ -298,6 +339,7 @@ public:
     Range const* getRangeVecBuf() const { return m_range_vec.get_vec(); }
     PRNO getPrno() const { return m_prno; }
     Range getRange(VecIdx idx) const { return m_range_vec.get(idx); }
+    IR const* getRematExp() const { return m_remat_exp; }
     LifeTime const* getParent() const { return m_parent; }
     Type const* getFirstOccType() const
     {
@@ -322,6 +364,11 @@ public:
     {
         m_flag.set(lt->getAttrFlag().getFlagSet());
         updateLTConstraintsForSplit(lt);
+
+        //If the lifetime is split, the new lifetime can be rematerialized
+        //too, so this remat expression should be inherited from the parent
+        //lifetime.
+        setRematExp(lt->getRematExp());
     }
 
     bool isAncestor() const { return this == m_ancestor; }
@@ -362,6 +409,14 @@ public:
     //      lt:        |---|         |--|
     bool is_intersect(LifeTime const* lt) const;
 
+    //Return true if 'ir' is an DEF occurrence of current lt.
+    bool isDefOcc(IR const* ir) const
+    {
+        if (!ir->is_stmt()) { return false; }
+        IR const* pr = const_cast<IR*>(ir)->getResultPR();
+        return pr != nullptr && pr->getPrno() == getPrno() ? true : false;
+    }
+
     //Return true if the occ has a DEF at least.
     bool isOccHasDef() const { return m_flag.have(LT_FLAG_HAS_DEF); }
 
@@ -371,16 +426,19 @@ public:
     //Return true if current lifetime is forced to reload.
     bool isReloadForced() const { return m_flag.have(LT_FLAG_RELOAD_FORCED); }
 
-    //Return true if current lifetime is forced to spill.
-    bool isSpillForced() const { return m_flag.have(LT_FLAG_SPILL_FORCED); }
+    //Return true if generating spilling IR because of caller saved register
+    //assignment before the call statement.
+    bool isSpillCallerSaved() const
+    { return m_flag.have(LT_FLAG_SPILL_CALLER_SAVED); }
 
-    //Return true if 'ir' is an DEF occurrence of current lt.
-    bool isDefOcc(IR const* ir) const
-    {
-        if (!ir->is_stmt()) { return false; }
-        IR const* pr = const_cast<IR*>(ir)->getResultPR();
-        return pr != nullptr && pr->getPrno() == getPrno() ? true : false;
-    }
+    //Return true if current lifetime is spill only or not.
+    bool isSpillOnly() const { return m_flag.have(LT_FLAG_SPILL_ONLY); }
+
+    //Return true if current lifetime has one define only.
+    bool isOneDefOnly() const { return m_flag.have(LT_FLAG_ONE_DEF_ONLY); }
+
+    //Return true if current lifetime is remateralized.
+    bool isRematerialized() const { return m_flag.have(LT_FLAG_IS_REMAT); }
 
     //Return true if 'ir' is an USE occurrence of current lt.
     bool isUseOcc(IR const* ir) const
@@ -389,6 +447,7 @@ public:
     }
 
     void removeOccFrom(OccListIter it);
+    void removeOneDefOnly() { m_flag.remove(LT_FLAG_ONE_DEF_ONLY); }
     void removeRangeFrom(VecIdx idx);
 
     void setAncestor(LifeTime const* anc) { m_ancestor = anc; }
@@ -408,9 +467,13 @@ public:
     }
     void setParent(LifeTime const* parent) { m_parent = parent; }
     void setPriority(double pri) { m_priority = pri; }
+    void setRematExp(IR const* exp) { m_remat_exp = exp; }
+    void setSpillCallerSaved() { m_flag.set(LT_FLAG_SPILL_CALLER_SAVED); }
     void setSpillCost(double cost) { m_spill_cost = cost; }
-    void setSpillForced() { m_flag.set(LT_FLAG_SPILL_FORCED); }
+    void setSpillOnly() { m_flag.set(LT_FLAG_SPILL_ONLY); }
     void setReloadForced() { m_flag.set(LT_FLAG_RELOAD_FORCED); }
+    void setRematerialized() { m_flag.set(LT_FLAG_IS_REMAT); }
+    void setOneDefOnly() { m_flag.set(LT_FLAG_ONE_DEF_ONLY); }
 
     //Shrink the lifetime forward to the last occ position.
     void shrinkForwardToLastOccPos();

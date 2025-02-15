@@ -31,6 +31,54 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+void dumpATOMINC(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", ctx.attr);
+    if (!dump_kid) { return; }
+    lm->incIndent(ctx.dn);
+    dumpIRList(ATOMINC_memory(ir), rg, (CHAR*)" memory", ctx.dumpflag);
+    if (ATOMINC_addend(ir) != nullptr) {
+        dumpIRList(ATOMINC_addend(ir), rg, (CHAR*)" addend", ctx.dumpflag);
+    }
+    dumpIRList(ATOMINC_multires(ir), rg, (CHAR*)" multi-res",
+               ctx.dumpflag);
+    lm->decIndent(ctx.dn);
+}
+
+
+void dumpATOMCAS(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", ctx.attr);
+    if (!dump_kid) { return; }
+    lm->incIndent(ctx.dn);
+    dumpIRList(ATOMCAS_memory(ir), rg, (CHAR*)" memory", ctx.dumpflag);
+    dumpIRList(ATOMCAS_oldval(ir), rg, (CHAR*)" oldval", ctx.dumpflag);
+    dumpIRList(ATOMCAS_newval(ir), rg, (CHAR*)" newval", ctx.dumpflag);
+    if (ATOMCAS_occupy(ir) != nullptr) {
+        dumpIRList(ATOMCAS_occupy(ir), rg, (CHAR*)" occupy", ctx.dumpflag);
+    }
+    dumpIRList(ATOMCAS_multires(ir), rg, (CHAR*)" multi-res",
+               ctx.dumpflag);
+    lm->decIndent(ctx.dn);
+}
+
+
 void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);

@@ -742,6 +742,7 @@ public:
 #define S_IMPORTS_O 13 //info on refs to external symbols
 #define S_EXPORTS_O 14 //info on symbols exported by ordinal
 #define S_RES_O 15 //read-only resource data.
+#define S_GROUP 17 //section group.
 
 class ELFSHdr {
 public:

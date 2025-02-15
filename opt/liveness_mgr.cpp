@@ -53,6 +53,69 @@ static void statistic_liveness(Region const* rg)
 
 
 //
+//START AuxLivenessMgr
+//
+PRLiveSet * AuxLivenessMgr::genNewLiveIn(UINT bbid)
+{
+    PRLiveSet * x = m_new_livein_vec.get(bbid);
+    if (x == nullptr) {
+        x = m_sbs_mgr.allocSBitSetCore();
+        m_new_livein_vec.set(bbid, x);
+    }
+    return x;
+}
+
+
+PRLiveSet * AuxLivenessMgr::genNewLiveOut(UINT bbid)
+{
+    PRLiveSet * x = m_new_liveout_vec.get(bbid);
+    if (x == nullptr) {
+        x = m_sbs_mgr.allocSBitSetCore();
+        m_new_liveout_vec.set(bbid, x);
+    }
+    return x;
+}
+
+
+void AuxLivenessMgr::init()
+{
+    BBListIter it;
+    BBList const* bblst = m_rg->getBBList();
+    ASSERT0(bblst);
+
+    for (bblst->get_head(&it); it != bblst->end(); it = bblst->get_next(it)) {
+        IRBB * bb = it->val();
+        ASSERT0(bb);
+
+        UINT bbid = bb->id();
+        genNewLiveIn(bbid)->clean(m_sbs_mgr);
+        genNewLiveOut(bbid)->clean(m_sbs_mgr);
+    }
+}
+
+
+void AuxLivenessMgr::destroy()
+{
+    for (VecIdx i = 0; i <= m_new_liveout_vec.get_last_idx(); i++) {
+        PRLiveSet * bs = m_new_liveout_vec.get((UINT)i);
+        if (bs != nullptr) {
+            m_sbs_mgr.freeSBitSetCore(bs);
+        }
+    }
+    m_new_liveout_vec.clean();
+
+    for (VecIdx i = 0; i <= m_new_livein_vec.get_last_idx(); i++) {
+        PRLiveSet * bs = m_new_livein_vec.get((UINT)i);
+        if (bs != nullptr) {
+            m_sbs_mgr.freeSBitSetCore(bs);
+        }
+    }
+    m_new_livein_vec.clean();
+}
+//END AuxLivenessMgr
+
+
+//
 //START LivenessMgr
 //
 void LivenessMgr::cleanGlobal()
@@ -334,7 +397,7 @@ void LivenessMgr::processCallStmt(
     }
 
     it.clean();
-    processOpnd(CALL_param_list(x), it, use, gen);
+    processOpnd(CALL_arg_list(x), it, use, gen);
 
     if (x->is_icall() && ICALL_callee(x)->is_pr()) {
         use->bunion((BSIdx)PR_no(ICALL_callee(x)), m_sbs_mgr);
@@ -511,8 +574,8 @@ void LivenessMgr::computeGlobal(IRCFG const* cfg)
     news.copy(*get_livein(cfg->getEntry()->id()), m_sbs_mgr);
     news.diff(*get_use(cfg->getEntry()->id()), m_sbs_mgr);
     if (!news.is_empty()) {
-        //Eliminate redundant liveness in entry bb.
-        eliminateRedundantLivenessInEntryBB(cfg);
+        //Eliminate redundant liveness.
+        eliminateRedundantLiveness(cfg);
     }
 
     ASSERTN(!change, ("result of equation is convergent slowly"));
@@ -521,7 +584,7 @@ void LivenessMgr::computeGlobal(IRCFG const* cfg)
 }
 
 
-void LivenessMgr::eliminateRedundantLivenessInEntryBB(IRCFG const* cfg)
+void LivenessMgr::eliminateRedundantLiveness(IRCFG const* cfg)
 {
     //There is a problem that entry_bb will be attached redundant livein and
     //liveout info after completed liveness computing via the function of
@@ -596,7 +659,6 @@ void LivenessMgr::eliminateRedundantLivenessInEntryBB(IRCFG const* cfg)
     //        or:
     //      liveout_new(pred) and use(cur)
     //
-    //
     //d.Exclude useful liveness info from the full set of useless liveness info
     //  or livein_old(entry) for current node.
     //
@@ -627,7 +689,6 @@ void LivenessMgr::eliminateRedundantLivenessInEntryBB(IRCFG const* cfg)
     //  livein_old(entry) for current node. Thus these useful liveness info need
     //  to be excluded from the full set of useless liveness info.
     //
-    //
     //    useless liveness info of current node is:
     //                           |
     //                           V
@@ -651,30 +712,113 @@ void LivenessMgr::eliminateRedundantLivenessInEntryBB(IRCFG const* cfg)
     //
     //e.Thus the formula of re-computed liveout is:
     //    liveout_old(cur) - { livein_old(entry) - liveout_new(pre) - gen(cur) }
+    //
+    //How to get useful liveout info from predecessor in 'c step' ?
+    //a.If there is loop edge in CFG, the predecessor maybe not visited when a
+    //  node is prepared to compute new liveness info. Thus two temporary vector
+    //  of 'new_livein' and 'new_liveout' are introduced. Firstly, these two
+    //  vector are initialized to empty. Then their will be constantly updated
+    //  after new liveness info of node have been computed. Empty value of these
+    //  new liveness info will be get if the node doesn't be visitd yet. In the
+    //  whole algorithm, new liveness info after computed will just be updated
+    //  into 'new_livein' and 'new_liout' vector instead of the original vector
+    //  'm_livein' and 'm_liveout'.
+    //b.The algorithm of computed new liveness info will be repeated utill the
+    //  new liveness info in 'new_livein' and 'new_liveout' of each node don't
+    //  be changed.
+    //  ba.As shown in the following figure, redundant liveness '$1' is passed
+    //     on to 'entry' and [N1] node from 'loop1' and '$2' is passed on to
+    //     'entry' and 'N[1:4]' node from 'loop2'. These redundant info need to
+    //     be removed by this algorithm.
+    //  bb.'$1' in entry and [N1] node will be removed in the first iteration.
+    //  bc.It is more complexly calculation for removed redundant liveness info
+    //     '$2' from 'loop1'. In the first iteration, '$1' generated from [N4]
+    //     and $2 generated from [N8] will be regarded as redundant livenss
+    //     info for [N2]. Since both [N4] and [N8] still don't be visited and
+    //     their new liveness vector of 'new_livein' and 'new_liveout' are
+    //     empty. Thus '$1' and '$2' can't be affected the new liveness info
+    //     computed of [N2]. '$1' and '$2' updated to new liveness info vector
+    //     untill [N4] and [N8] visited.
+    //  bd.In the second iteration, '$1' can't be regarded as redundant info
+    //     for [N2] and it will be updated to new liveness info of [N2] too,
+    //     because the new liveness of [N4] is no longer empty. But there is
+    //     no chances for '$2' to updated to the new liveness vector of [N2].
+    //  be.If the new liveness info computed of a node aren't equal to the
+    //     original liveness info that have been stored in 'new_livein' and
+    //     'new_liveout' by last iteration. The iteration will be continued.
+    //
+    //                     |-------$1------|               |------$2-------|
+    //   $1,$2             V      loop1    |               V     loop2     |
+    // [entry] -> [N1] -> [N2] -> [N3] -> [N4] -> [N5] -> [N6] -> [N7] -> [N8]
+    //                     |
+    //                     |---> [N9] -> [N10] -> [exit]
+    //
+    ASSERT0(cfg && cfg->getEntry() && BB_is_entry(cfg->getEntry()));
+    AuxLivenessMgr auxmgr(m_rg);
 
-    ASSERT0(cfg->getEntry() && BB_is_entry(cfg->getEntry()));
     //RPO should be available.
     RPOVexList const* vlst = const_cast<IRCFG*>(cfg)->getRPOVexList();
     ASSERT0(vlst);
     ASSERT0(vlst->get_elem_count() == cfg->getBBList()->get_elem_count());
 
-    AdjVertexIter ito;
-    PRLiveSet news, tmp_live, entry_livein;
-    xcom::List<Vertex const*> vertex_list;
+    UINT count = 0;
+    bool change = false;
     UINT entry_id = cfg->getEntry()->id();
+    PRLiveSet entry_use, entry_def, redundant_live;
 
-    //Save livein info of entry_bb.
-    entry_livein.copy(*get_livein(entry_id), m_sbs_mgr);
-    //Reset livein and liveout of entry_bb.
-    get_livein(entry_id)->copy(*get_use(entry_id), m_sbs_mgr);
-    get_liveout(entry_id)->copy(*get_def(entry_id), m_sbs_mgr);
+    //The livein of entry_id is the full set of redundant live.
+    redundant_live.copy(*get_livein(cfg->getEntry()->id()), auxmgr.getSBSMgr());
+
+    //Re-compute livein and liveout of entry_bb.
+    entry_use.copy(*get_use(entry_id), auxmgr.getSBSMgr());
+    entry_def.copy(*get_def(entry_id), auxmgr.getSBSMgr());
+
+    //livein(new) = livein(old) intersect 'use info'.
+    //e.g: [23] = [20, 23] intersect [23].
+    entry_use.intersect(*get_livein(entry_id), auxmgr.getSBSMgr());
+    //liveout(new) = liveout(old) intersect 'def info'.
+    //e.g: [25] = [20, 25] intersect [24, 25].
+    entry_def.intersect(*get_liveout(entry_id), auxmgr.getSBSMgr());
+
+    //Reset liveness info of entry bb.
+    get_livein(entry_id)->copy(entry_use, m_sbs_mgr);
+    get_liveout(entry_id)->copy(entry_def, m_sbs_mgr);
+
+    //Compute new livein and new liveout.
+    do {
+        change = eliminateRedundantLivenessImpl(cfg, auxmgr, redundant_live);
+        count++;
+    } while (change && count < 100);
+
+    //Copy 'm_new_livein/out' to 'm_livein/out' after
+    //redundant liveness have been removed.
+    resetLivenessAfterRemoveRedundantLiveness(cfg, auxmgr);
+
+    entry_use.clean(auxmgr.getSBSMgr());
+    entry_def.clean(auxmgr.getSBSMgr());
+    redundant_live.clean(auxmgr.getSBSMgr());
+}
+
+
+bool LivenessMgr::eliminateRedundantLivenessImpl(
+    IRCFG const* cfg, AuxLivenessMgr & auxmgr, PRLiveSet const& redundant_live)
+{
+    ASSERT0(cfg);
+
+    AdjVertexIter ito;
+    xcom::TTab<UINT> visit;
+    bool change = false;
+    UINT entry_id = cfg->getEntry()->id();
+    xcom::List<Vertex const*> vertex_list;
+    PRLiveSet news, tmp_live, pre_vertex_new_live_out;
+
+    //Identify entry vertex has been visited(re-computed).
+    visit.append(entry_id);
 
     //Iterate all successors node of current node.
-    Vertex const* entry_vertex = cfg->Graph::getVertex(entry_id);
-    ASSERT0(entry_vertex);
-    Vertex const* o = Graph::get_first_out_vertex(entry_vertex, ito);
+    Vertex const* o = Graph::get_first_out_vertex(
+        cfg->Graph::getVertex(entry_id), ito);
     for (; o != nullptr; o = Graph::get_next_out_vertex(ito)) {
-        if (o->getInDegree() > 1) { continue; }
         vertex_list.append_tail(o);
     }
 
@@ -683,49 +827,139 @@ void LivenessMgr::eliminateRedundantLivenessInEntryBB(IRCFG const* cfg)
         Vertex const* v = vertex_list.get_head();
         ASSERT0(v);
         vertex_list.remove_head();
-        //Get predecessor node of current node.
-        Vertex const* pre_vertex = Graph::get_first_in_vertex(v, ito);
-        ASSERT0(pre_vertex && pre_vertex->getInDegree() < 2);
+
+        //Whether 'v' has been visited.
+        if (visit.find(v->id())) { continue; }
+
+        //Identify 'v' has been visited(re-computed).
+        visit.append(v->id());
+
+        //Clean.
+        pre_vertex_new_live_out.clean(auxmgr.getSBSMgr());
+
+        //Get the liveout of predecessor node.
+        getPreVertexNewLiveOut(pre_vertex_new_live_out, v, auxmgr);
 
         //Re-computed livein.
         //a.Get the full set useless liveness info(livein_old(entry)).
-        tmp_live.copy(entry_livein, m_sbs_mgr);
+        tmp_live.copy(redundant_live, auxmgr.getSBSMgr());
+
         //b.Exclude useful liveness info(liveout_new(pre)) from full set.
-        tmp_live.diff(*get_liveout(pre_vertex->id()), m_sbs_mgr);
+        tmp_live.diff(pre_vertex_new_live_out, auxmgr.getSBSMgr());
+
         //c.Exclude useful liveness info(be used in current node) from full set.
-        tmp_live.diff(*get_use(v->id()), m_sbs_mgr);
+        tmp_live.diff(*get_use(v->id()), auxmgr.getSBSMgr());
+
         //d.Get livein_old(cur).
-        news.copy(*get_livein(v->id()), m_sbs_mgr);
+        news.copy(*get_livein(v->id()), auxmgr.getSBSMgr());
+
         //e.Exclude useless liveness info(tmp_live) from livein_old(cur).
-        news.diff(tmp_live, m_sbs_mgr);
-        //f.Reset.
-        get_livein(v->id())->copy(news, m_sbs_mgr);
+        news.diff(tmp_live, auxmgr.getSBSMgr());
+
+        //f.If the 'news' is different with the livein which has been recorded
+        //  in 'm_new_livein' by last time, it represents that the livein info
+        //  has been changed.
+        if (!(auxmgr.getNewLiveIn(v->id())->is_equal(news))) {
+            change = true;
+        }
+        //g.Update the livein in 'm_new_livein'.
+        auxmgr.getNewLiveIn(v->id())->copy(news, auxmgr.getSBSMgr());
 
         //Re-computed liveout.
         //a.Get the full set useless liveness info(livein_old(entry)).
-        tmp_live.copy(entry_livein, m_sbs_mgr);
+        tmp_live.copy(redundant_live, auxmgr.getSBSMgr());
+
         //b.Exclude useful liveness info(liveout_new(pre)) from full set.
-        tmp_live.diff(*get_liveout(pre_vertex->id()), m_sbs_mgr);
+        tmp_live.diff(pre_vertex_new_live_out, auxmgr.getSBSMgr());
+
         //c.Exclude useful liveness info(generated in current node).
-        tmp_live.diff(*get_def(v->id()), m_sbs_mgr);
+        tmp_live.diff(*get_def(v->id()), auxmgr.getSBSMgr());
+
         //d.Get liveout_old(cur).
-        news.copy(*get_liveout(v->id()), m_sbs_mgr);
+        news.copy(*get_liveout(v->id()), auxmgr.getSBSMgr());
+
         //e.Exclude useless liveness info(tmp_live) from liveout_old(cur).
-        news.diff(tmp_live, m_sbs_mgr);
-        //f.Reset.
-        get_liveout(v->id())->copy(news, m_sbs_mgr);
+        news.diff(tmp_live, auxmgr.getSBSMgr());
+
+        //f.If the 'news' is different with the liveout which has been recorded
+        //  in 'm_new_liveout' by last time, it represents that the liveout info
+        //  has been changed.
+        if (!(auxmgr.getNewLiveOut(v->id())->is_equal(news))) {
+            change = true;
+        }
+        //g.Update the liveout in 'm_new_liveout'.
+        auxmgr.getNewLiveOut(v->id())->copy(news, auxmgr.getSBSMgr());
 
         //Iterate all successor nodes of current node.
         Vertex const* o = Graph::get_first_out_vertex(v, ito);
         for (; o != nullptr; o = Graph::get_next_out_vertex(ito)) {
-            if (o->getInDegree() > 1) { continue; }
+            if (visit.find(o->id())) { continue; }
             vertex_list.append_tail(o);
         }
     }
 
-    news.clean(m_sbs_mgr);
-    tmp_live.clean(m_sbs_mgr);
-    entry_livein.clean(m_sbs_mgr);
+    news.clean(auxmgr.getSBSMgr());
+    tmp_live.clean(auxmgr.getSBSMgr());
+    pre_vertex_new_live_out.clean(auxmgr.getSBSMgr());
+
+    return change;
+}
+
+
+void LivenessMgr::resetLivenessAfterRemoveRedundantLiveness(
+    IRCFG const* cfg, AuxLivenessMgr & auxmgr)
+{
+    ASSERT0(cfg);
+
+    AdjVertexIter ito;
+    xcom::TTab<UINT> visit;
+    xcom::List<Vertex const*> vertex_list;
+    UINT entry_id = cfg->getEntry()->id();
+
+    //Identify entry vertex has been visited.
+    visit.append(entry_id);
+
+    Vertex const* o = Graph::get_first_out_vertex(
+        cfg->Graph::getVertex(entry_id), ito);
+    for (; o != nullptr; o = Graph::get_next_out_vertex(ito)) {
+        vertex_list.append_tail(o);
+    }
+
+    while (vertex_list.get_elem_count() != 0) {
+        Vertex const* v = vertex_list.get_head();
+        ASSERT0(v);
+
+        vertex_list.remove_head();
+        //Identify 'v' has been visited.
+        if (visit.find(v->id())) { continue; }
+        //Identify vertex has been visited.
+        visit.append(v->id());
+
+        //Copy 'm_new_liveout' to 'm_liveout'.
+        get_liveout(v->id())->copy(
+            *auxmgr.getNewLiveOut(v->id()), m_sbs_mgr);
+        //Copy 'm_new_livein' to 'm_livein'.
+        get_livein(v->id())->copy(
+            *auxmgr.getNewLiveIn(v->id()), m_sbs_mgr);
+
+        Vertex const* o = Graph::get_first_out_vertex(v, ito);
+        for (; o != nullptr; o = Graph::get_next_out_vertex(ito)) {
+            if (visit.find(o->id())) { continue; }
+            vertex_list.append_tail(o);
+        }
+    }
+}
+
+
+void LivenessMgr::getPreVertexNewLiveOut(
+    PRLiveSet & live_new_out, Vertex const* v, AuxLivenessMgr & auxmgr)
+{
+    ASSERT0(v);
+    xcom::VexIter iter;
+    for (xcom::Vertex * c = v->getFirstFromVex(&iter);
+         c != nullptr; c = v->getNextFromVex(&iter)) {
+        live_new_out.bunion(*auxmgr.getNewLiveOut(c->id()), auxmgr.getSBSMgr());
+    }
 }
 
 

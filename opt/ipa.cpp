@@ -199,8 +199,8 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (g_do_mdssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
-            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
-                                                     PASS_CFG, PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(
+                &oc, PASS_MD_REF, PASS_CFG, PASS_UNDEF);
         }
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
@@ -228,12 +228,12 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
             rg->getPassMgr()->checkValidAndRecompute(
-                &oc, PASS_REACH_DEF, PASS_DU_REF, PASS_CFG,
+                &oc, PASS_REACH_DEF, PASS_MD_REF, PASS_CFG,
                 PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
             return;
         }
         rg->getPassMgr()->checkValidAndRecompute(
-            &oc, PASS_DU_REF, PASS_CFG, PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
+            &oc, PASS_MD_REF, PASS_CFG, PASS_CLASSIC_DU_CHAIN, PASS_UNDEF);
         return;
     }
     if (m_is_keep_reachdef) {

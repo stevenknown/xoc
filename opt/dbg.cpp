@@ -333,14 +333,14 @@ void LangInfo::setLangIndex(LangInfo::LANG lang, UINT8 index)
 }
 
 
-UINT8 LangInfo::getLangIndex(LangInfo::LANG lang)
+UINT8 LangInfo::getLangIndex(LangInfo::LANG lang) const
 {
     ASSERT0(m_frontend_lang_to_index.find(lang));
     return m_frontend_lang_to_index.get(lang);
 }
 
 
-UINT8 LangInfo::getLangNum()
+UINT8 LangInfo::getLangNum() const
 {
     return m_frontend_lang_to_index.get_elem_count();
 }
@@ -362,6 +362,14 @@ void DbxMgr::destroy()
     if (m_pool != nullptr) {
         smpoolDelete(m_pool);
         m_pool = nullptr;
+    }
+
+    Lang2FileIdx2FileNameIter iter;
+    FileIdx2FileName * file_vec;
+    for (m_lang2fi2fn.get_first(iter, &file_vec); !iter.end();
+         m_lang2fi2fn.get_next(iter,&file_vec)) {
+        if (file_vec == nullptr) { continue; }
+        delete file_vec;
     }
 }
 
@@ -397,6 +405,12 @@ Dbx * DbxMgr::allocDbx()
 }
 
 
+FileIdx2FileName * DbxMgr::allocFileVec()
+{
+    return new FileIdx2FileName();
+}
+
+
 void DbxMgr::setLangInfo()
 {
     UINT8 index_lang_num = 0;
@@ -406,6 +420,36 @@ void DbxMgr::setLangInfo()
     if (g_debug_pyhton) {
         m_lang_info.setLangIndex(LangInfo::LANG_PYTHON, index_lang_num++);
     }
+}
+
+
+void DbxMgr::setFileName(LangInfo::LANG lang, UINT fileidx, xoc::Sym const* s)
+{
+    ASSERT0(s);
+    ASSERTN(fileidx < MAX_FILE_INDEX,
+            ("m_fi2fn may be better when using TMap compared to using"
+                " Vector if fileindex is sparse"));
+    ASSERTN(lang < MAX_FRONTEND_LANGUAGES,
+            ("The number of supported languages has been exceeded."));
+    FileIdx2FileName * file2_file_name = m_lang2fi2fn.get(lang);
+    if (file2_file_name == nullptr) {
+        file2_file_name = allocFileVec();
+        m_lang2fi2fn.set(lang, file2_file_name);
+    }
+    ASSERT0(file2_file_name);
+    file2_file_name->set(fileidx, s);
+}
+
+
+xoc::Sym const* DbxMgr::getFileName(LangInfo::LANG lang, UINT fileidx) const
+{
+    ASSERTN(m_lang_info.getLangNum() < MAX_FRONTEND_LANGUAGES,
+            ("The number of supported languages has been exceeded."));
+    ASSERTN(fileidx < MAX_FILE_INDEX,
+            ("m_fi2fn may be better when using TMap compared to using"
+                " Vector if fileindex is sparse"));
+    ASSERT0(m_lang2fi2fn.get(lang));
+    return m_lang2fi2fn.get(lang)->get(fileidx);
 }
 
 

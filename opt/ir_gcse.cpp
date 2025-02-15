@@ -178,11 +178,12 @@ void GCSE::copyVN(IR const* newir, IR const* oldir)
 }
 
 
-void GCSE::dumpAct(IR const* oldexp, IR const* newexp)
+void GCSE::dumpAct(IR const* oldexp, IR const* genexp, IR const* newexp)
 {
     if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) { return; }
-    m_am.dump("%s is CSE and will be replaced by %s",
-              DumpIRName().dump(oldexp), DumpIRName().dump(newexp));
+    m_am.dump("%s is CSE of %s and will be replaced by %s",
+              DumpIRName().dump(oldexp), DumpIRName().dump(genexp),
+              DumpIRName().dump(newexp));
 }
 
 
@@ -197,7 +198,7 @@ void GCSE::elimCse(IR * use, IR * use_stmt, IR const* gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr && gen_pr->is_pr());
     IR * new_pr = m_rg->dupIRTree(gen_pr);
-    dumpAct(use, new_pr);
+    dumpAct(use, gen, new_pr);
     bool f = use_stmt->replaceKid(use, new_pr, true);
     ASSERT0_DUMMYUSE(f);
 
@@ -236,7 +237,7 @@ void GCSE::elimCseOfBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr);
     IR * new_pr = m_rg->dupIRTree(gen_pr);
-    dumpAct(use, new_pr);
+    dumpAct(use, gen, new_pr);
 
     //Det of branch stmt have to be judgement operation.
     ASSERT0(use == BR_det(use_stmt));
@@ -281,7 +282,7 @@ void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
     IR * tmp_pr = m_exp2pr.get(gen);
     if (tmp_pr != nullptr) { return; }
 
-    //First process cse generation point.
+    //Generate delegate-PR of CSE at generation point.
     if (gen_stmt->is_truebr() || gen_stmt->is_falsebr()) {
         //Expect opnd1's type is same with opnd0.
         tmp_pr = m_rg->getIRMgr()->buildPR(BIN_opnd0(gen)->getType());
@@ -291,7 +292,7 @@ void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
     m_exp2pr.set(gen, tmp_pr);
     m_rg->getMDMgr()->allocMDForPROp(tmp_pr);
 
-    //Relpace GEN with DelegatePR in original gen-stmt.
+    //Relpace GEN that is in original gen-stmt with DelegatePR.
     IR * newkid = tmp_pr;
     if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
         //Det of branch stmt have to be judgement expression.
@@ -301,7 +302,7 @@ void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
     bool v = gen_stmt->replaceKid(gen, newkid, false);
     ASSERT0_DUMMYUSE(v);
 
-    //Generate PR operation to load GEN to a temporary PR.
+    //Generate STPR operation to store GEN to delegate-PR.
     //For now, GEN is dangling IR exp.
     ASSERT0(gen->getParent() == nullptr && gen->is_single());
     IR * new_stpr = m_rg->getIRMgr()->buildStorePR(
@@ -317,7 +318,7 @@ void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
     ASSERT0_DUMMYUSE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
 
-    //Keep original DU unchange, add DU chain for new stmt.
+    //Keep original DU chain unchanged, build DU chain for new stmt.
     ASSERT0(tmp_pr->is_pr());
     xoc::buildDUChain(new_stpr, tmp_pr, m_rg, *getOptCtx());
     IR_may_throw(gen_stmt) = false;
@@ -325,7 +326,7 @@ void GCSE::processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change)
 }
 
 
-bool GCSE::isCseCandidate(IR * ir)
+bool GCSE::isCseCandidate(IR const* ir) const
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
@@ -498,12 +499,12 @@ bool GCSE::handleCandidate(IR * exp, IRBB * bb)
 }
 
 
-//Determine if det-exp of truebr/falsebr ought to be cse.
-bool GCSE::shouldBeCse(IR * det)
+//Determine if det-exp of truebr/falsebr ought to be CSE.
+bool GCSE::shouldBeCse(IR const* det) const
 {
     ASSERT0(det->is_judge());
 
-    //If the det if simply enough, cse is dispensable.
+    //If the det if simply enough, CSE is dispensable.
     if (!IR_parent(det)->is_truebr() && !IR_parent(det)->is_falsebr()) {
         return true;
     }
@@ -552,6 +553,7 @@ bool GCSE::doPropVNDirectStmt(IR * ir)
         //Virtual OP may not have RHS.
         return false;
     }
+
     //Find CSE and replace it with properly PR.
     if (isCseCandidate(rhs)) {
         return handleCandidate(rhs, ir->getBB());
@@ -569,6 +571,7 @@ bool GCSE::doPropVNIndirectStmt(IR * ir)
         return false;
     }
     bool change = false;
+
     //Find CSE and replace it with properly PR.
     IR * base = ir->getBase();
     if (isCseCandidate(base)) {
@@ -584,9 +587,8 @@ bool GCSE::doPropVNIndirectStmt(IR * ir)
 bool GCSE::doPropVNCallStmt(IR * ir)
 {
     if (hasSideEffect(ir)) { return false; }
-    IR * p = CALL_param_list(ir);
+    IR * p = CALL_arg_list(ir);
     IR * next = nullptr;
-    bool lchange = false;
     m_newst_lst.clean();
     bool change = false;
     IRBB * bb = ir->getBB();
@@ -660,15 +662,16 @@ bool GCSE::doPropVN(IRBB * bb)
 bool GCSE::doPropReturn(IR * ir, MOD List<IR*> & livexp)
 {
     ASSERT0(ir->is_return());
-    if (RET_exp(ir) != nullptr && isCseCandidate(RET_exp(ir)) &&
-        shouldBeCse(RET_exp(ir))) {
-        if (processCse(RET_exp(ir), livexp)) {
-            //Found CSE and replaced CSE with PR successfully.
-            return true;
-        }
-        //Generate new CSE.
-        livexp.append_tail(RET_exp(ir));
+    IR * retexp = RET_exp(ir);
+    if (retexp == nullptr || !isCseCandidate(retexp) || !shouldBeCse(retexp)) {
+        return false;
     }
+    if (processCse(retexp, livexp)) {
+        //Found CSE and replaced CSE with PR successfully.
+        return true;
+    }
+    //Generate new CSE.
+    livexp.append_tail(retexp);
     return false;
 }
 
@@ -676,14 +679,15 @@ bool GCSE::doPropReturn(IR * ir, MOD List<IR*> & livexp)
 bool GCSE::doPropBranch(IR * ir, MOD List<IR*> & livexp)
 {
     ASSERT0(ir->isBranch());
-    if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
-        if (processCse(BR_det(ir), livexp)) {
-            //Replaced CSE with PR successfully.
-            return true;
-        }
-        //Generate new CSE.
-        livexp.append_tail(BR_det(ir));
+    if (!isCseCandidate(BR_det(ir)) || !shouldBeCse(BR_det(ir))) {
+        return false;
     }
+    if (processCse(BR_det(ir), livexp)) {
+        //Replaced CSE with PR successfully.
+        return true;
+    }
+    //Generate new CSE.
+    livexp.append_tail(BR_det(ir));
     return false;
 }
 
@@ -691,20 +695,20 @@ bool GCSE::doPropBranch(IR * ir, MOD List<IR*> & livexp)
 bool GCSE::doPropCall(IR * ir, MOD List<IR*> & livexp)
 {
     bool change = false;
-    IR * param = CALL_param_list(ir);
+    IR * arg = CALL_arg_list(ir);
     IR * next = nullptr;
-    while (param != nullptr) {
-        next = param->get_next();
-        if (isCseCandidate(param)) {
-            if (processCse(param, livexp)) {
-                //Has found cse and replaced cse with pr.
+    while (arg != nullptr) {
+        next = arg->get_next();
+        if (isCseCandidate(arg)) {
+            if (processCse(arg, livexp)) {
+                //Has found CSE and replaced CSE with pr.
                 change = true;
             } else {
-                //Generate new cse.
-                livexp.append_tail(param);
+                //Generate new CSE.
+                livexp.append_tail(arg);
             }
         }
-        param = next;
+        arg = next;
     }
     return change;
 }
@@ -737,6 +741,7 @@ void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
             ir->is_stpr() || ir->isCallStmt());
     MDSet tmp;
     MDSet const* maydef = ir->getMayRef();
+    CollectMayUseRecur co(m_rg);
     if (maydef != nullptr && !maydef->is_empty()) {
         IRListIter ct2;
         IRListIter next;
@@ -745,8 +750,7 @@ void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
             livexp.get_next(&next);
             IR * x2 = ct2->val();
             tmp.clean(m_misc_bs_mgr);
-            DUMgr::collectMayUseRecursive(
-                x2, m_rg, true, m_misc_bs_mgr, tmp);
+            co.collect(x2, true, m_misc_bs_mgr, tmp);
             if (maydef->is_intersect(tmp)) {
                 livexp.remove(ct2);
             }
@@ -761,8 +765,7 @@ void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
             livexp.get_next(&next);
             IR * x2 = ct2->val();
             tmp.clean(m_misc_bs_mgr);
-            DUMgr::collectMayUseRecursive(x2, m_rg, true,
-                                          m_misc_bs_mgr, tmp);
+            co.collect(x2, true, m_misc_bs_mgr, tmp);
             if (tmp.is_overlap(mustdef, m_rg)) {
                 livexp.remove(ct2);
             }
@@ -909,10 +912,10 @@ bool GCSE::perform(OptCtx & oc)
     m_cfg->genDomTree(domtree);
     xcom::Vertex * root = domtree.getVertex(entry->id());
     if (m_cfg->hasEHEdge()) {
-        //Initialize Temp CFG and pick out exception-edge.
+        //Initialize Temp CFG and pick out exception-handling-edge.
         m_tg = new TG(m_rg);
         m_tg->clone(*m_cfg, false, false);
-        m_tg->pick_eh();
+        m_tg->pickEH();
         m_tg->removeUnreachNode(entry->id());
         m_tg->computeDomAndIdom();
         m_tg->computePdomAndIpdom(root);

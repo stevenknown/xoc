@@ -1291,7 +1291,7 @@ IR * Dex2IR::convertFillArrayData(IN LIR * lir)
     //The second parameter points to filling data.
     add_next(&p, m_rg->buildImmInt((HOST_INT)pdata, m_tr->u32));
 
-    CALL_param_list(call) = p;
+    CALL_arg_list(call) = p;
     call->setParentPointer(false);
     IR_may_throw(call) = true;
     CALL_is_intrinsic(call) = true;

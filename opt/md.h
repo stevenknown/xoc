@@ -342,8 +342,8 @@ public:
 class MDTab {
     COPY_CONSTRUCTOR(MDTab);
 protected:
-    OffsetTab m_ofst_tab;
     MD const* m_invalid_ofst_md; //record MD with invalid ofst
+    OffsetTab m_ofst_tab;
 public:
     MDTab() { m_invalid_ofst_md = nullptr; }
 
@@ -401,7 +401,7 @@ public:
 };
 
 
-typedef xcom::SEGIter * MDSetIter;
+typedef xcom::DefSEGIter * MDSetIter;
 
 //Memory Descriptor Set.
 //Note: one must call clean() to reclamition before deletion or destruction.
@@ -496,6 +496,7 @@ public:
                        MDSystem const* mdsys) const;
     bool is_contain_inexact(MDSystem const* ms) const;
     bool is_contain_only_exact_and_str(MDSystem const* ms) const;
+
     //Return true current set is equivalent to mds, whereas every element
     //in set is exact.
     bool is_exact_equal(MDSet const& mds, MDSystem const* ms) const;
@@ -554,13 +555,12 @@ public:
 class MDSetMgr {
     COPY_CONSTRUCTOR(MDSetMgr);
 protected:
+    Region * m_rg;
     SMemPool * m_mds_pool;
     SMemPool * m_sc_mds_pool;
+    DefMiscBitSetMgr * m_misc_bs_mgr;
     SList<MDSet*> m_free_md_set;
     SList<MDSet*> m_md_set_list;
-    Region * m_rg;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
-
 public:
     MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
     ~MDSetMgr() { destroy(); }
@@ -599,7 +599,6 @@ public:
 class MDId2MD : public Vector<MD*> {
     COPY_CONSTRUCTOR(MDId2MD);
     UINT m_count;
-
 public:
     MDId2MD() { m_count = 0; }
 
@@ -662,7 +661,7 @@ protected:
     //Note the flag is always stand for all region local variables, it's flaw
     //is that if the flag appeared in overlapping MDSet of an IR, the DU chain
     //that built by DUMgr or SSAMgr will be conservative.
-    BYTE m_enable_local_var_delegate:1;
+    bool m_enable_local_var_delegate;
     SMemPool * m_pool;
     SMemPool * m_sc_mdptr_pool;
     TypeMgr * m_tm;

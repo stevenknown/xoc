@@ -33,9 +33,6 @@ namespace xoc {
 
 class ActMgr;
 
-typedef xcom::DefSBitSet BBSet;
-typedef xcom::DefSBitSetIter BBSetIter;
-
 //
 //START SSARegion
 //

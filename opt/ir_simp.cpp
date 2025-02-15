@@ -178,7 +178,7 @@ bool IRSimp::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
     ASSERT0(ir && ir->is_stmt() && ctx);
     switch (ir->getCode()) {
     SWITCH_CASE_CALL:
-        for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             if (!p->is_leaf()) {
                 return false;
             }
@@ -1920,8 +1920,8 @@ IR * IRSimp::simplifyArray(IR * ir, SimpCtx * ctx)
 }
 
 
-bool IRSimp::simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
-                                   SimpCtx * ctx)
+bool IRSimp::simplifyCallArgList(IR * ir, IR ** ret_list, IR ** last,
+                                 SimpCtx * ctx)
 {
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
@@ -1930,8 +1930,8 @@ bool IRSimp::simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
     ASSERT0(ir->isCallStmt());
     IR * newp = nullptr;
     IR * newplast = nullptr;
-    while (CALL_param_list(ir) != nullptr) {
-        IR * p = xcom::removehead(&CALL_param_list(ir));
+    while (CALL_arg_list(ir) != nullptr) {
+        IR * p = xcom::removehead(&CALL_arg_list(ir));
         if (g_is_simplify_parameter && !p->isMemOpnd() && !p->is_lda()) {
             //We always simplify parameters to the lowest height to
             //facilitate the query of point-to set.
@@ -1968,7 +1968,7 @@ bool IRSimp::simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
         SIMP_changed(&tcont) = false;
     }
 
-    CALL_param_list(ir) = newp;
+    CALL_arg_list(ir) = newp;
     if (newp != nullptr) {
         ir->setParent(newp);
     }
@@ -1995,7 +1995,7 @@ IR * IRSimp::simplifyCall(IR * ir, SimpCtx * ctx)
     }
     IR * ret_list = nullptr;
     IR * last = nullptr;
-    bool lchange = simplifyCallParamList(ir, &ret_list, &last, ctx);
+    bool lchange = simplifyCallArgList(ir, &ret_list, &last, ctx);
     if (ir->is_icall()) {
         //Simplify callee expression of ICALL
         SimpCtx tctx2(*ctx);
@@ -2345,10 +2345,8 @@ IR * IRSimp::simplifyDoWhile(IR * ir, SimpCtx * ctx)
     if (SIMP_dowhile(ctx)) {
         return simplifyDoWhileSelf(ir, ctx);
     }
-
     ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
-           ("Must simplify Loop-stmt if you want to simply Break/Continue."));
-
+            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
     return simplifyLoopIngredient(ir, ctx);
 }
 
@@ -2358,10 +2356,8 @@ IR * IRSimp::simplifyWhileDo(IR * ir, SimpCtx * ctx)
     if (SIMP_whiledo(ctx)) {
         return simplifyWhileDoSelf(ir, ctx);
     }
-
     ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
-           ("Must simplify Loop-stmt if you want to simply Break/Continue."));
-
+            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
     return simplifyLoopIngredient(ir, ctx);
 }
 
@@ -2371,10 +2367,8 @@ IR * IRSimp::simplifyDoLoop(IR * ir, SimpCtx * ctx)
     if (SIMP_doloop(ctx)) {
         return simplifyDoLoopSelf(ir, ctx);
     }
-
     ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
-           ("Must simplify Loop-stmt if you want to simply Break/Continue."));
-
+            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
     return simplifyLoopIngredient(ir, ctx);
 }
 
@@ -2384,24 +2378,23 @@ IR * IRSimp::simplifySwitch(IR * ir, SimpCtx * ctx)
     if (SIMP_switch(ctx)) {
         return simplifySwitchSelf(ir, ctx);
     }
-
+    //Keep IR_SWITCH stmt unchanged, only simplify its body.
     IR * body = SWITCH_body(ir);
     if (body == nullptr) { return ir; }
-
     ASSERTN(!SIMP_break(ctx),
-            ("Must simplify Swich-stmt if you want to simply Break."));
-
+            ("Must set flag to simplify IR_SWITCH stmt if you want to simply "
+             "IR_BREAK stmt."));
     SWITCH_body(ir) = nullptr;
     body = simplifyStmtList(body, ctx);
     if (ir->getParent() == nullptr) {
         xoc::cleanParentForIRList(body);
     }
     xcom::add_next(&ir, body);
-
     SIMP_changed(ctx) = true;
 
     //Use the option to inform the Region that BB list has to be rebuild
-    //when function returned.
+    //when function returned since simplifying IR_CASE, IR_BREAK and
+    //IR_CONTINUE will modify BB list.
     SIMP_need_recon_bblist(ctx) = true;
     return ir;
 }

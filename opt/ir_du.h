@@ -144,6 +144,29 @@ public:
     bool do_nothing() const { return only_have(DUOPT_UNDEF); }
 };
 
+class CollectMayUseRecur {
+    COPY_CONSTRUCTOR(CollectMayUseRecur);
+protected:
+    Region const* m_rg;
+protected:
+    void collectExtOp(IR const* ir, bool comp_pr, DefMiscBitSetMgr & bsmgr,
+                      OUT MDSet & mayuse)
+    { ASSERTN(0, ("Target Dependent Code")); }
+public:
+    CollectMayUseRecur(Region const* rg) : m_rg(rg) {}
+
+    //Collect must and may memory reference.
+    //Collect MD which ir may use, include overlapped MD.
+    void collect(IR const* ir, bool comp_pr, DefMiscBitSetMgr & bsmgr,
+                 OUT MDSet & mayuse);
+
+    //Collect MD which ir may use, include overlapped MD.
+    void collectIRList(
+        IR const* ir, bool comp_pr, DefMiscBitSetMgr & bsmgr,
+        OUT MDSet & mayuse);
+};
+
+
 //Def|Use information manager.
 class DUMgr : public Pass {
     COPY_CONSTRUCTOR(DUMgr);
@@ -318,7 +341,7 @@ public:
     //Build DU chain from stmt 'def' to expression 'use'.
     //Note the function does NOT check the consistency of Prno if def or use
     //operate on PR.
-    void buildDUChain(IR * def, IR * use)
+    void buildDUChain(MOD IR * def, MOD IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());
         ASSERT0(def->isMemRef() && use->isMemOpnd());
@@ -326,7 +349,7 @@ public:
         genDUSet(use)->addDef(def, *getSBSMgr());
     }
     //Return true if built DU chain.
-    bool buildDUChain(IR * def, IR * use, OptCtx const& oc);
+    bool buildDUChain(MOD IR * def, MOD IR * use, OptCtx const& oc);
 
     //Compute the MDSet that might overlap ones which 'ir' defined.
     //e.g: int A[100], there are two referrence of array A: A[i], A[j]
@@ -347,6 +370,7 @@ public:
     //The function check user command options and determine whether the
     //compiler should perform classic PR DUChain and NonPR DUChain.
     bool checkAndComputeClassicDUChain(MOD OptCtx & oc);
+    void computePRDUChainByPRSSA(MOD OptCtx & oc);
     void computeGenForBB(IN IRBB * bb, OUT SolveSet & expr_univers,
                          DefMiscBitSetMgr & bsmgr);
     void computeMDRefForBB(IRBB * bb, MOD OptCtx & oc, DUOptFlag duflag);
@@ -390,15 +414,6 @@ public:
                                 MDSet mds_arr_for_must[],
                                 MDSet mds_arr_for_may[],
                                 UINT elemnum);
-
-    //Collect must and may memory reference.
-    static void collectMayUseRecursive(IR const* ir, Region const* rg,
-                                       bool comp_pr, DefMiscBitSetMgr & bsmgr,
-                                       OUT MDSet & mayuse);
-    static void collectMayUseRecursiveIRList(IR const* ir, Region const* rg,
-                                             bool comp_pr,
-                                             DefMiscBitSetMgr & bsmgr,
-                                             OUT MDSet & mayuse);
 
     //Collect may memory reference.
     void collectMayUse(IR const* ir, MDSet & mayuse, bool comp_pr);
@@ -520,7 +535,7 @@ public:
     IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Try allocate DUSet for memory reference.
-    DUSet * genDUSet(IR * ir);
+    DUSet * genDUSet(MOD IR * ir);
     //Get sparse bitset mgr.
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     SolveSetMgr * getSolveSetMgr() { return &m_solve_set_mgr; }
@@ -723,11 +738,15 @@ public:
     //Verify if DU chain is correct between each Def and Use of MD.
     bool verifyMDDUChainForIR(IR const* ir, DUOptFlag duflag);
 
+    //Return true means IR status changed, caller should consider whether
+    //other optimizations should be reperform again. Otherwise return false.
     virtual bool perform(OptCtx &)
     {
         UNREACHABLE();
         return false;
     }
+    //Return true means IR status changed, caller should consider whether
+    //other optimizations should be reperform again. Otherwise return false.
     bool perform(MOD OptCtx & oc,
                  DUOptFlag f = DUOptFlag(DUOPT_SOL_AVAIL_REACH_DEF|
                     DUOPT_SOL_AVAIL_EXPR|
@@ -739,6 +758,7 @@ public:
 //Verify if DU chain is correct between each Def and Use of MD.
 bool verifyMDDUChain(Region * rg, DUOptFlag duflag);
 bool verifyMDDUChain(Region * rg, OptCtx const& oc);
+bool verifyMDRef(Region const* rg, OptCtx const& oc);
 
 } //namespace xoc
 #endif

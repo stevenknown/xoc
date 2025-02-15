@@ -578,9 +578,9 @@ public:
 template <class T> class BSVecMgr {
     COPY_CONSTRUCTOR(BSVecMgr);
 protected:
+    SMemPool * m_pool;
     SList<BSVec<T>*> m_bs_list;
     SList<BSVec<T>*> m_free_list;
-    SMemPool * m_pool;
 public:
     BSVecMgr() { m_pool = nullptr; init(); }
     ~BSVecMgr(){ destroy(); }

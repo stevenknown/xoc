@@ -62,6 +62,10 @@ protected:
     virtual bool const isDistanceNeedSubOne() const
     { ASSERTN(0, ("Target Dependent Code")); return true; }
 
+    //Whether current jump offset is valid for machine instruction.
+    virtual bool const jumpOffIsValid(INT64 val, MInst const* mi)
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
 public:
     MIRelocMgr(Region * rg, MInstMgr * imgr, TMWORD align);
     virtual ~MIRelocMgr();
@@ -77,6 +81,13 @@ public:
     //Get the alignment value required by the machine instruction.
     virtual UINT getMInstAlign(MI_CODE c) const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //GCOVR_EXCL_START
+    //Get the offset of the PC for the instruction.
+    virtual UINT getMInstPcOffset(MIList & milst, MIListIter it,
+                                  MInst * cur) const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    //GCOVR_EXCL_STOP
 
     //Get the relocation type of given machine instruction code.
     virtual UINT getMInstRelocType(MI_CODE c)

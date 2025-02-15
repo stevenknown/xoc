@@ -100,6 +100,14 @@ void dumpStorageSpace(IR const* ir, Region const* rg)
 }
 
 
+void dumpAlign(UINT align, Region const* rg)
+{
+    if (align != 0) {
+        prt(rg, ":align(%u)", align);
+    }
+}
+
+
 void dumpOffset(IR const* ir, Region const* rg)
 {
     if (ir->getOffset() != 0) {
@@ -462,14 +470,31 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
+void dumpAlloca(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    xcom::FixedStrBuf<64> buf;
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    dumpAlign(ALLOCA_align(ir), rg);
+    DUMPADDR(ir);
+    ASSERT0(ctx.attr);
+    prt(rg, "%s", ctx.attr);
+    if (dump_kid) {
+        dumpAllKids(ir, rg, ctx);
+    }
+}
+
+
 void dumpCase(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     LogMgr * lm = rg->getLogMgr();
-
     ASSERT0(CASE_vexp(ir));
     ASSERT0(CASE_lab(ir));
-    note(rg, "case");
+    note(rg, "%s", IRNAME(ir));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
@@ -951,10 +976,9 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     CHAR tmpbuf[30];
     UINT i = 0;
 
-    //Dump parameter list.
-    for (IR * p2 = CALL_param_list(ir);
-         p2 != nullptr; p2 = p2->get_next()) {
-        sprintf(tmpbuf, " param%d", i);
+    //Dump argument list.
+    for (IR * p2 = CALL_arg_list(ir); p2 != nullptr; p2 = p2->get_next()) {
+        sprintf(tmpbuf, " arg%d", i);
         lm->incIndent(ctx.dn);
         dumpIR(p2, rg, tmpbuf, ctx.dumpflag);
         lm->decIndent(ctx.dn);
@@ -1054,7 +1078,7 @@ void dumpConstContent(IR const* ir, Region const* rg)
             if (tbuf[i] == '\n') { tbuf[i] = ' '; }
         }
 
-        if (strlen(SYM_name(CONST_str_val(ir))) < tbuflen) {
+        if (CONST_str_val(ir)->getLen() < tbuflen) {
             prt(rg, "strconst:%s \\\"%s\\\"",
                 xtm->dump_type(d, buf), tbuf);
         } else {
@@ -1082,12 +1106,24 @@ void dumpConstContent(IR const* ir, Region const* rg)
 }
 
 
+void dumpIRCodeName(IR_CODE code, Region const* rg)
+{
+    prt(rg, "%s", IR::getIRCodeName(code));
+}
+
+
 void dumpIRName(IR const* ir, Region const* rg)
 {
     prt(rg, "%s", IRNAME(ir));
     if (g_dump_opt.isDumpIRID()) {
         prt(rg, "(id:%u)", ir->id());
     }
+}
+
+
+void dumpIRListCombine(IR const* ir, Region const* rg)
+{
+    dumpIRList(ir, rg, nullptr, DumpFlag(IR_DUMP_COMBINE));
 }
 
 

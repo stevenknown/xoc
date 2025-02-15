@@ -58,18 +58,63 @@ typedef enum {
     //destination BB, $p and the spilled memory of $p are inconsistent because
     //the $p is not spilled to that memory in source BB.
     INCONSIST_PR2MEM = 3,
+
+    //Inconsistent type for the PR is rematerialized.
+    //e.g: $p is split and renamed to $q. For an edge of CFG, $p is used
+    //in the source BB, and $p is rematerialized when split, $q is used in the
+    //destination BB, the rematerialization of $p and $q are inconsistent
+    //because the data of $p is not in $q in source BB, a remat IR need to be
+    //inserted to move the data of $p in $q through remat expression.
+    INCONSIST_REMAT = 4,
 } INCONSIST_TYPE;
 
 //CASE:Define local used type in global scope because some compiler
 //complained 'uses local type'.
-typedef struct tagVexPair {
+
+
+//
+//START PostProcessCtx
+//
+class PostProcessCtx {
+public:
+    //Record spilling IRs used to revise lifetime consistency.
+    IRTab m_revise_spill_tab;
+
+public:
+    IRTab const& getReviseSpillTab() const { return m_revise_spill_tab; }
+
+    PostProcessCtx() {}
+    ~PostProcessCtx() {}
+
+    void setReviseSpill(IR * ir) { m_revise_spill_tab.append(ir); }
+};
+//End PostProcessCtx
+
+
+//
+//START VexPair
+//
+class VexPair {
+public:
     VexIdx fromid;
     VexIdx toid;
-    tagVexPair(VexIdx t) { fromid = t; toid = t; }
-    tagVexPair() { fromid = VERTEX_UNDEF; toid = VERTEX_UNDEF; }
-} VexPair;
+public:
+    VexPair(VexIdx t) { fromid = t; toid = t; }
+    VexPair() { fromid = VERTEX_UNDEF; toid = VERTEX_UNDEF; }
+    VexPair(VexIdx from, VexIdx to) : fromid(from), toid(to) { }
+    //Overload the below operator because this class will be used as the key
+    //of xcom::TTab.
+    bool operator != (VexPair const& other) const
+    { return fromid != other.fromid || toid != other.toid; }
+};
+//END VexPair
+
+//
+//START CompareVexPair
+//
 class CompareVexPair {
 public:
+    VexPair createKey(VexPair t) { return t; }
     bool is_less(VexPair t1, VexPair t2) const
     {
         return (t1.fromid < t2.fromid) ||
@@ -77,22 +122,29 @@ public:
     }
     bool is_equ(VexPair t1, VexPair t2) const
     { return t1.fromid == t2.fromid && t1.toid == t2.toid; }
-    VexPair createKey(VexPair t) { return t; }
 };
+//END CompareVexPair
 
+//
+//START InConsistPair
+//
 class InConsistPair {
 public:
     VexIdx from_vex_id;
     VexIdx to_vex_id;
+    INCONSIST_TYPE type;
     LifeTime const* from_lt;
     LifeTime const* to_lt;
 
     //The spilled memory location var.
     Var const* mem_var;
-    INCONSIST_TYPE type;
+
+    //Record the remat expression when do the inconsist revise.
+    IR const* remat_exp;
 public:
-    InConsistPair() {}
-    InConsistPair(UINT id)
+    InConsistPair() { init(); }
+    InConsistPair(UINT id)  { init(); }
+    void init()
     {
         from_vex_id = VERTEX_UNDEF;
         to_vex_id = VERTEX_UNDEF;
@@ -100,46 +152,61 @@ public:
         to_lt = nullptr;
         mem_var = nullptr;
         type = INCONSIST_UNDEF;
+        remat_exp = nullptr;
     }
 };
+//END InConsistPair
 
-typedef List<InConsistPair>::Iter InConsistPairListIter;
-class InConsistPairList : public List<InConsistPair> {
+//
+//START InConsistPairList
+//
+typedef List<InConsistPair*>::Iter InConsistPairListIter;
+class InConsistPairList : public List<InConsistPair*> {
 public:
     void dump(Region const* rg) const
     {
         note(rg, "\n==-- DUMP %s --==", "InConsistPairList");
         InConsistPairListIter it;
         UINT i = 0;
-        for (InConsistPair pair = get_head(&it);
+        for (InConsistPair const* pair = get_head(&it);
              i < get_elem_count(); pair = get_next(&it), i++) {
-            switch (pair.type) {
+            switch (pair->type) {
             case INCONSIST_PR2PR:
-                ASSERT0(pair.from_lt && pair.to_lt);
+                ASSERT0(pair->from_lt && pair->to_lt);
                 note(rg,
                     "\nNEED insert bb between BB%u and BB%u, and move:$%u->$%u",
-                    pair.from_vex_id, pair.to_vex_id,
-                    pair.from_lt->getPrno(), pair.to_lt->getPrno());
+                    pair->from_vex_id, pair->to_vex_id,
+                    pair->from_lt->getPrno(), pair->to_lt->getPrno());
                 break;
             case INCONSIST_MEM2PR:
-                ASSERT0(pair.mem_var && pair.to_lt);
+                ASSERT0(pair->mem_var && pair->to_lt);
                 note(rg,
                     "\nNEED insert bb between BB%u and BB%u, and copy:$%s->$%u",
-                    pair.from_vex_id, pair.to_vex_id,
-                    pair.mem_var->get_name()->getStr(), pair.to_lt->getPrno());
+                    pair->from_vex_id, pair->to_vex_id,
+                    pair->mem_var->get_name()->getStr(),
+                    pair->to_lt->getPrno());
                 break;
             case INCONSIST_PR2MEM:
-                ASSERT0(pair.mem_var && pair.from_lt);
+                ASSERT0(pair->mem_var && pair->from_lt);
                 note(rg,
                     "\nNEED insert bb between BB%u and BB%u, and copy:$%u->$%s",
-                    pair.from_vex_id, pair.to_vex_id, pair.from_lt->getPrno(),
-                    pair.mem_var->get_name()->getStr());
+                    pair->from_vex_id, pair->to_vex_id,
+                    pair->from_lt->getPrno(),
+                    pair->mem_var->get_name()->getStr());
+                break;
+            case INCONSIST_REMAT:
+                ASSERT0(pair->remat_exp && pair->to_lt);
+                note(rg,
+                    "\nNEED insert bb between BB%u and BB%u, remat:id$%u->$%u",
+                    pair->from_vex_id, pair->to_vex_id, pair->remat_exp->id(),
+                    pair->to_lt->getPrno());
                 break;
             default: UNREACHABLE(); break;
             }
         }
     }
 };
+//END InConsistPairList
 
 //
 //START LTConsistencyMgr
@@ -149,6 +216,8 @@ class LTConsistencyMgr {
 protected:
     typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
     typedef TMapIter<VexPair, IRBB*> LatchMapIter;
+    typedef TTab<VexPair, CompareVexPair> InConsistVexPairTab;
+    typedef TTabIter<VexPair> InConsistVexPairTabIter;
     typedef TMap<PRNO, LifeTime const*> PR2LT;
     typedef TMapIter<PRNO, LifeTime const*> PR2LTIter;
     bool m_is_insert_bb;
@@ -157,10 +226,19 @@ protected:
     IRCFG * m_cfg;
     OptCtx * m_oc;
     LivenessMgr * m_live_mgr;
+    SMemPool * m_pool;
     LSRAImpl & m_impl;
+
+    //Used to store the info of inconsistent edge, which use the composition
+    //of bbid of 'from' BB and 'to' BB as the key of table.
+    InConsistVexPairTab m_inconsist_vexpair_tab;
     Vector<PR2LT*> m_pr2lt_in_vec;
     Vector<PR2LT*> m_pr2lt_out_vec;
 protected:
+    void addInconsitVexpairTab(VexPair const& pair)
+    { m_inconsist_vexpair_tab.append(pair); }
+    InConsistPair * allocInconsistPair()
+    { return (InConsistPair*)xmalloc(sizeof(InConsistPair)); }
     PR2LT * genInPR2LT(UINT bbid)
     {
         PR2LT * tab = m_pr2lt_in_vec.get(bbid);
@@ -186,6 +264,18 @@ protected:
 
     void addOutPR2Lt(PRNO prno, LifeTime const* lt, UINT bbid)
     { genOutPR2LT(bbid)->setAlways(prno, lt); }
+
+    //Return true if the lifetime do not need to do the inconsist check.
+    bool canIngoreInconsistCheck(LifeTime const* lt) const
+    {
+        ASSERT0(lt);
+        //If the lifetime is not split or spilled or not rematerialized,
+        //don't consider the inconsistency.
+        LTList const& lt_list = const_cast<LifeTime*>(lt)->getChild();
+        Var const* spill_loc = getRA().getSpillLoc(lt->getPrno());
+        return lt_list.get_elem_count() == 0 && spill_loc == nullptr &&
+               !lt->isRematerialized();
+    }
 
     void computePR2LtInfo();
 
@@ -226,6 +316,19 @@ protected:
         LifeTime const* newlt, UINT from, UINT to, Var const* spill_loc,
         OUT InConsistPairList & inconsist_lst);
 
+    //This function is used to compute the inconsisteny info for the lifetimes
+    //descendanted from the same ancestor liftime on a specified edge (
+    //indicated by a 'from' BB and a 'to' BB).
+    //inconsist_lst: the updated inconsistency list.
+    //from: the start BB id of 'from' BB.
+    //to: the start BB id of 'to' BB.
+    //from_lt: the lifetime covered the out boundary of 'from' BB.
+    //to_lt: the lifetime covered the in boundary of 'to' BB.
+    //spill_loc: the spill location of the lifetime.
+    void computeInconsistency(OUT InConsistPairList & inconsist_lst, UINT from,
+        UINT to, LifeTime const* from_lt, LifeTime const* to_lt,
+        Var const* spill_loc);
+
     void dumpBBAfterReorder(IRBB const* bb) const;
 
     //This function generates and inserts a latch BB to hold the IRs for
@@ -244,7 +347,7 @@ protected:
     //       BB: TO
     //       ...
     //
-    IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const& pair);
+    IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const* pair);
     LinearScanRA & getRA() const;
     PR2LT * getInPR2Lt(UINT bbid) const
     { return m_pr2lt_in_vec.get(bbid); }
@@ -266,7 +369,10 @@ protected:
         return tab->get(prno);
     }
 
-    IRBB * insertLatch(IRBB const* from, MOD IRBB * to);
+    IRBB * insertLatch(IRBB const* from, MOD IRBB * to,
+                       MOD LatchMap & latch_map);
+    bool isLatchBBRequired(VexPair const& pair) const
+    { return m_inconsist_vexpair_tab.find(pair); }
 
     //This func will check the reorder for the MOV IRs is required or not in
     //the specified BB, and also collect some infomations used in the coming
@@ -305,10 +411,13 @@ protected:
     void reorderMoveIRForBB(MOD IRBB * bb, MOD UINT *& reg_use_cnt,
         MOD UINT *& move_info, IN IR ** def_irs, IR const* marker);
 
-    void reviseEdgeConsistency(InConsistPairList const& inconsist_lst);
-    void reviseTypeMEM2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
-    void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const& pair);
-    void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const& pair);
+    void reviseEdgeConsistency(InConsistPairList const& inconsist_lst,
+                               MOD PostProcessCtx & ctx);
+    void reviseTypeMEM2PR(MOD LatchMap & latch_map, InConsistPair const* pair);
+    void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const* pair,
+                          MOD PostProcessCtx & ctx);
+    void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const* pair);
+    void reviseTypeRemat(MOD LatchMap & latch_map, InConsistPair const* pair);
 
     //Select the correct lifetime derived from an ancestor lifetime at a
     //specified position.
@@ -320,12 +429,71 @@ protected:
     //        memory.
     bool selectLifetimeAtPos(LifeTime * anct, Pos pos, OUT LifeTime const*& lt);
 
+    //Try to use the tramp BB as a latch BB if it is inconsistent of a
+    //lifetime between the precedessor BB and the successor BB of the
+    //tramp BB.
+    //tramp: the tramp BB.
+    //latch_map: the map recording the latch BB info.
+    //e.g:
+    //  CFG before the tramp BB generated:
+    //   BB1
+    //    |
+    //    V
+    //   BB2<---.
+    //    |     |
+    //    V     |
+    //   BB3    |
+    //    |_____|
+    //    |
+    //    V
+    //
+    //  CFG after the tramp BB generated:
+    //   BB1
+    //    |
+    //    V
+    //   BB_tramp
+    //    |
+    //    V
+    //   BB2<---.
+    //    |     |
+    //    V    BB_latch
+    //   BB3    |
+    //    |_____|
+    //    |
+    //    V
+    //  BB_tramp is generated during the insertion of latch BB BB_latch
+    //  between BB3 and BB2. The BB_tramp can be used as the latch BB if the
+    //  latch BB is really needed to be inserted between BB1 and BB2.
+    void tryUseTrampBBAsLatchBB(IRBB const* tramp, MOD LatchMap & latch_map);
+
+    //Verify the latch BB after the latch BB are generated.
+    bool verifyLatchBBs(LatchMap const& latch_map) const;
+
+    //Verify the latch BB by checking the following two parts:
+    //    1. The count of the physical registers used in the spill IRs.
+    //        If the count if more than 1, that means there is an error
+    //        in the previous lsra phase.
+    //    1. The count of the physical registers defined in the
+    //       reload/remat/move IRs. If the count if more than 1, that means
+    //       there is an error in the previous lsra phase.
+    bool verifyLatchBB(IRBB * bb, MOD Vector<BYTE> & use_reg_cnt,
+                       MOD Vector<BYTE> & def_reg_cnt) const;
+
     //This function will verify the reorder result.
     bool verifyReorderResult(UINT const* move_info, UINT max_reg_num) const;
 
     //This function will verify the swap condition.
     bool verifySwapCondition(PRNO prno1, PRNO prno2, Type const* ty1,
                              Type const* ty2) const;
+
+    void * xmalloc(size_t size)
+    {
+        ASSERTN(m_pool != nullptr, ("pool does not initialized"));
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p != nullptr);
+        ::memset(p, 0, size);
+        return p;
+    }
 public:
     LTConsistencyMgr(LSRAImpl & impl);
     ~LTConsistencyMgr()
@@ -336,11 +504,15 @@ public:
             lt2st = m_pr2lt_out_vec.get(i);
             if (lt2st != nullptr) { delete lt2st; }
         }
+        if (m_pool != nullptr) {
+            smpoolDelete(m_pool);
+            m_pool = nullptr;
+        }
     }
 
     void dump() const;
 
-    void perform();
+    void perform(MOD PostProcessCtx & ctx);
 };
 //END LTConsistencyMgr
 
@@ -462,6 +634,10 @@ private:
                                         Vector<SplitCtx> const& ctxvec,
                                         OUT Occ & reload_occ);
 
+    //This function shrinks the split position to the last occ of the lifetime
+    //if it is spill only.
+    void shrinkSplitPosForSpillOnly(LifeTime * lt, MOD SplitCtx & ctx);
+
     //The function splits 'lt' into two lifetimes, lt and newlt, at ctx's
     //reload_pos. The original 'lt' will be termiated at the reload_pos.
     //newlt will start at reload_pos and renamed to new PRNO.
@@ -485,7 +661,7 @@ public:
 
     //Spill the lifetime only if there is no occurence after the split
     //position.
-    void spillForced(LifeTime * lt, MOD SplitCtx & ctx);
+    void spillOnly(LifeTime * lt, MOD SplitCtx & ctx);
 
     //Split lt into two lifetime according to the information given in 'ctx'.
     //Note after splitting the second half of 'lt' will be renamed to a newlt.
@@ -545,7 +721,6 @@ protected:
     ArgPasser * m_argpasser;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
-    PR2Split m_pr2split;
 protected:
     //Dedicated register must be satefied in the highest priority.
     void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
@@ -605,6 +780,30 @@ public:
     static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
                            CHAR const* format, ...);
 
+    //Determine whether the current spilling IR can be eliminated based on the
+    //lifetime attributes and perform elimination.
+    bool eliminateSpill(IR * spill);
+
+    //For the lifetime with only one "def", we only need to spill after the
+    //"def" during splitting. For the subsequent "use", we only need to reload
+    //before the "use" without additional spilling.
+    //Refer to the "4.3 Spill Store Elimination" in "Optimized Interval
+    //Splitting in a Linear Scan Register Allocator".
+    //Note that if the current splitting is implemented based on the caller IR,
+    //spilling is necessary.
+    //Illustration:
+    //
+    //Before splitting: -----------------------------------------------------
+    //                  d                     u        call()               u
+    //
+    //After splitting:  -------  --------------  ------------  --------------
+    //No One-def opt:   d spill  spill reload u  spill call()  spill reload u
+    //
+    //After splitting:  -------  --------------  ------------  --------------
+    //With One-def opt: d spill        reload u  spill call()        reload u
+    //
+    bool eliminateSpillForOneDefLifeTime(IR * spill, LifeTime * lt);
+
     static Var * findSpillLoc(IR const* ir);
 
     TargInfoMgr & getTIMgr() const
@@ -624,15 +823,9 @@ public:
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
 
-    PRSplitBB getPrSplitBB(PRNO v) const
-    {
-        PRSplitBB splitbb;
-        splitbb.value = m_pr2split.get(v);
-        return splitbb;
-    }
-
+    IR * insertRemat(PRNO to, IR const* exp, Type const* ty, IRBB * bb);
     void insertRematBefore(IR * remat, IR const* marker);
-    void insertRematBefore(PRNO newres, RematCtx const& rematctx,
+    IR * insertRematBefore(PRNO newres, RematCtx const& rematctx,
                            Type const* loadvalty, IR const* marker);
     IR * insertMove(PRNO from, PRNO to, Type const* fromty, Type const* toty,
                     IRBB * bb);
@@ -692,22 +885,21 @@ public:
 
     bool perform(OptCtx & oc);
 
+    //Peform the following processing.
+    //1. Revise lifetime consistency.
+    //2. Save callee saved registers.
+    //3. Eliminate extra spilling IRs.
+    bool postProcess();
+
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
-    void recordPR2Split(PRNO prno, UINT spill_bbid, UINT reload_bbid)
-    {
-        PRSplitBB splitbb;
-        splitbb.bb.spill_bbid = spill_bbid;
-        splitbb.bb.reload_bbid = reload_bbid;
-        m_pr2split.set(prno, splitbb.value);
-    }
 
     //The function check each CFG edge to fixup the lifetime conflict while the
     //linearization allocation flattening the CFG.
     //The function check consistency for each newlt that generated by SplitMgr
     //and insert appropriately store/load/move to guarantee the lifetime
     //consistency.
-    void reviseLTConsistency();
+    void reviseLTConsistency(MOD PostProcessCtx & ctx);
 
     void saveCallee();
 
@@ -720,6 +912,11 @@ public:
     //curpos: the position that need a register.
     //curir: the stmt/exp that need a register.
     void solveConflict(LifeTime * lt, Pos curpos, IR const* curir);
+
+    //Eliminate extra spilling IRs. Traverse all spilling IRs, find the
+    //corresponding lifetime, and determine whether the current spilling IR
+    //can be eliminated based on the lifetime attributes.
+    bool spillElimination(PostProcessCtx const& ctx);
 
     //The function split all lifetimes in Active LifeTime Set that assigned
     //given register 'r' before 'ir'.
@@ -743,10 +940,10 @@ public:
     //This func will select a strategy for the lifetime based on the split
     //position. If the split position of the specified lifetime is before
     //the fake-use IR at the last BB of loop by lexicographical order, the
-    //lifetime will be forced to spill, or else it will be split into two
+    //lifetime will be spilled only, or else it will be split into two
     //lifetimes.
-    void splitOrSpillLT(LifeTime * t, Pos split_pos, MOD SplitCtx & ctx,
-                        SplitMgr & spltmgr);
+    void splitOrSpillOnly(LifeTime * t, Pos split_pos, MOD SplitCtx & ctx,
+                          SplitMgr & spltmgr);
 
     void transferActive(Pos curpos);
     void transferInActive(Pos curpos);
@@ -766,7 +963,7 @@ public:
     bool tryAssignRegisterDefault(IR const* ir, LifeTime const* lt);
     bool tryAssignRegisterByPrefer(IR const* ir, LifeTime const* lt);
 
-    void tryUpdateRPO(OUT IRBB * newbb, OUT IRBB * tramp, IRBB const* marker,
+    void tryUpdateRPO(OUT IRBB * newbb, IRBB const* marker,
                       bool newbb_prior_marker);
     void tryUpdateDom(IRBB const* from, IRBB const* newbb,
                       IRBB const* to);

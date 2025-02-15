@@ -539,6 +539,28 @@ protected:
         IR * ir, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
         OUT InexactAccTab & inexact_tab, MOD RPCtx & ctx);
 
+    //Find promotable memory references.
+    //Return true if current memory referense does not clobber other
+    //candidate in list. Or else return false means there are ambiguous
+    //memory reference.
+    //Return false if find unpromotable memory reference, this may
+    //prevent entire loop to be promoted.
+    bool collectStmt(IR * ir, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
+                     OUT InexactAccTab & inexact_tab, MOD RPCtx & ctx);
+
+    //Scan BB and find promotable memory reference.
+    //If this function will find out unpromotable accessing that with ambiguous
+    //memory reference. Those related promotable accesses will NOT be promoted.
+    //e.g:a[0] = ...
+    //    a[i] = ...
+    //    a[0] is promotable, but a[i] is not, then a[0] can not be promoted.
+    //If there exist memory accessing that we do not know where it access,
+    //whole loop is unpromotable.
+    //Return false if loop is unpromotable.
+    bool collectExactAndInexact(
+        IN IRBB * bb, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
+        OUT InexactAccTab & inexact_tab, MOD RPCtx & ctx);
+
     bool EvaluableScalarReplacement(
         List<LI<IRBB> const*> & worklst, MOD RPCtx & ctx);
 
@@ -667,6 +689,7 @@ protected:
     bool initLoopInfo(OptCtx & oc);
     bool initLoopDepAna(OptCtx & oc);
     bool initGVN(OptCtx & oc);
+    bool initDepPass(OptCtx & oc);
 
     //Return true if occ can be regarded as candidate to promoted to PR.
     bool isStmtCand(IR const* occ) const;
@@ -691,28 +714,6 @@ protected:
         }
         return false;
     }
-
-    //Find promotable memory references.
-    //Return true if current memory referense does not clobber other
-    //candidate in list. Or else return false means there are ambiguous
-    //memory reference.
-    //Return false if find unpromotable memory reference, this may
-    //prevent entire loop to be promoted.
-    bool collectStmt(IR * ir, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
-                     OUT InexactAccTab & inexact_tab, MOD RPCtx & ctx);
-
-    //Scan BB and find promotable memory reference.
-    //If this function will find out unpromotable accessing that with ambiguous
-    //memory reference. Those related promotable accesses will NOT be promoted.
-    //e.g:a[0] = ...
-    //    a[i] = ...
-    //    a[0] is promotable, but a[i] is not, then a[0] can not be promoted.
-    //If there exist memory accessing that we do not know where it access,
-    //whole loop is unpromotable.
-    //Return false if loop is unpromotable.
-    bool collectExactAndInexact(
-        IN IRBB * bb, LI<IRBB> const* li, OUT ExactAccTab & exact_tab,
-        OUT InexactAccTab & inexact_tab, MOD RPCtx & ctx);
 
     //The function promote IR.
     //dele: the delegate which indicates an exact-accessing reference.

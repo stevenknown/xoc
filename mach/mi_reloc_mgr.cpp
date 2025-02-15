@@ -96,8 +96,10 @@ TMWORD MIRelocMgr::computeJumpOff(MInstMgr * mimgr,
     //distance between the target label and the current jump instruction needs
     //to be subtracted by 1.
     ASSERT0(lab2off.find(MI_lab(mi)));
-    return (TMWORD)((label_pc - inst_pc) / inst_size) -
-        (TMWORD)isDistanceNeedSubOne();
+    INT64 val = (INT64)(label_pc - inst_pc) / (UINT)inst_size -
+        isDistanceNeedSubOne();
+    ASSERT0(jumpOffIsValid(val, mi));
+    return (TMWORD)val;
 }
 
 
@@ -174,7 +176,7 @@ void MIRelocMgr::computeCodeOffset(MOD MIList & milst,
         setCodeAlign(mi->getWordBufLen());
         offset = (TMWORD)xcom::ceil_align(offset, getCodeAlign());
         MI_pc(mi) = offset;
-        offset += mi->getWordBufLen();
+        offset += getMInstPcOffset(milst, it, mi);
     }
 }
 

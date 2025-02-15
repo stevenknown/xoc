@@ -56,6 +56,7 @@ author: Su Zhenyu
 #include "debug_util.h" //only for compiler internal debugging.
 #include "gscc.h"
 #include "dwarf.h"
+#include "eval.h"
 
 using namespace xoc;
 #endif

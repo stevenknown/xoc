@@ -33,10 +33,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define SWITCH_CASE_EXT_ATOM \
+    case IR_ATOMINC: \
+    case IR_ATOMCAS
+
 //Defined the entry for extended expression ir code.
 #define SWITCH_CASE_EXT_EXP \
     SWITCH_CASE_EXT_UNA: \
     SWITCH_CASE_EXT_BIN: \
+    SWITCH_CASE_EXT_ATOM: \
     case IR_BROADCAST
 
 //Defined the entry for extended virtual stmt ir code.
@@ -59,6 +64,9 @@ namespace xoc {
 
 #define SWITCH_CASE_EXT_DIRECT_MEM_VSTMT \
     case IR_VST
+
+#define SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT \
+    case IR_VIST
 
 //Defined the entry for extended UNA ir code.
 //The IR_EXT_UNA_PLACEHOLDER entry is just a placeholder the SWITCH-CASE.

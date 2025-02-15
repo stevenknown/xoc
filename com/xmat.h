@@ -38,7 +38,9 @@ class BIRMat;
 class FMat;
 class FMatMgr;
 
-///Rational
+//
+//STAR Rational Mat
+//
 typedef MatWrap<Rational> RMatWrap;
 
 class RMat : public Matrix<Rational> {
@@ -97,7 +99,6 @@ public:
                  INT cst_col = CST_COL_UNDEF);
 };
 
-
 class RMatMgr : public MatMgr<Rational> {
 public:
     virtual Matrix<Rational> * allocMat() override
@@ -105,9 +106,12 @@ public:
     virtual Matrix<Rational> * allocMat(UINT row, UINT col) override
     { ASSERT0(incMatCnt()); return new RMat(row, col); }
 };
+//END Rational Mat
 
 
-///Integer
+//
+//START Integer Mat
+//
 typedef MatWrap<INT> IMatWrap;
 
 class IMat : public Matrix<INT> {
@@ -152,7 +156,6 @@ public:
     IMat & operator = (IMat const& m);
 };
 
-
 class IMatMgr : public MatMgr<INT> {
 public:
     virtual Matrix<INT> * allocMat() override
@@ -160,9 +163,12 @@ public:
     virtual Matrix<INT> * allocMat(UINT row, UINT col) override
     { ASSERT0(incMatCnt()); return new IMat(row, col); }
 };
+//END Integer Mat
 
 
-///Float
+//
+//START Float Mat
+//
 #define DEFAULT_SD            6
 #define USE_FAST_BUT_LOW_PRECISION_SQRT
 
@@ -202,7 +208,6 @@ public:
     void substit(IN FMat const& exp, UINT v, bool is_eq, INT cst_col);
 };
 
-
 class FMatMgr : public MatMgr<Float> {
 public:
     virtual Matrix<Float> * allocMat() override
@@ -210,20 +215,23 @@ public:
     virtual Matrix<Float> * allocMat(UINT row, UINT col) override
     { ASSERT0(incMatCnt()); return new FMat(row, col); }
 };
+//END Float Mat
 
 
-///Boolean
+//
+//STAR Boolean Mat
+//
+typedef INT BOOL;
+typedef MatWrap<BOOL> BMatWrap;
 
-typedef MatWrap<bool> BMatWrap;
-
-class BMat : public Matrix<bool> {
+class BMat : public Matrix<BOOL> {
 protected:
-    virtual void copyTBuf(bool * dst, bool const* src, UINT elemnum) override
-    { ::memcpy(dst, src, elemnum * sizeof(bool)); }
+    virtual void copyTBuf(BOOL * dst, BOOL const* src, UINT elemnum)
+    { ::memcpy(dst, src, elemnum * sizeof(BOOL)); }
 public:
     BMat() {}
     BMat(INT) {} //Used by template call of T(0) in Vector<Mat>
-    BMat(UINT row, UINT col) : Matrix<bool>(row, col) {}
+    BMat(UINT row, UINT col) : Matrix<BOOL>(row, col) {}
     ~BMat() {}
 
     void adjust() override {}
@@ -239,14 +247,14 @@ public:
     BMat & operator = (BMat const& m);
 };
 
-
-class BMatMgr : public MatMgr<bool> {
+class BMatMgr : public MatMgr<BOOL> {
 public:
-    virtual Matrix<bool> * allocMat() override
+    virtual Matrix<BOOL> * allocMat()
     { ASSERT0(incMatCnt()); return new BMat(); }
-    virtual Matrix<bool> * allocMat(UINT row, UINT col) override
+    virtual Matrix<BOOL> * allocMat(UINT row, UINT col)
     { ASSERT0(incMatCnt()); return new BMat(row, col); }
 };
+//END Boolean Mat
 
 } //namespace xcom
 #endif

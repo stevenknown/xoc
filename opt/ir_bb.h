@@ -39,6 +39,8 @@ namespace xoc {
 class IRBB;
 class IRBBMgr;
 class IRMgr;
+typedef xcom::DefSBitSet BBSet;
+typedef xcom::DefSBitSetIter BBSetIter;
 template <class IRBB, class IR> class CFG;
 typedef List<LabelInfo const*> LabelInfoList;
 typedef LabelInfoList::Iter LabelInfoListIter;
@@ -225,10 +227,10 @@ public:
     //Note the function will allocate new BB according to 'src', and new
     //BB's id which is not same to src BB.
     //The function does NOT set mapping between new BB and Labels.
-    void copy(BBList const& src, Region * rg);
+    void copy(BBList const& src, Region const* rg);
 
     //The function clone all BB list info, also include the BB id.
-    void clone(BBList const& src, MOD IRBBMgr * bbmgr, Region * rg);
+    void clone(BBList const& src, MOD IRBBMgr * bbmgr, Region const* rg);
 
     //Find IRBB according to given id.
     static IRBB * find(BBList const& lst, UINT id);
@@ -267,7 +269,10 @@ public:
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 private:
-    void copyIRList(IRBB const& src, Region * rg);
+    //The function duplicates IR list from 'src'.
+    void copyIRList(IRBB const& src, Region const* rg);
+
+    //The function copies LabelInfo list from 'src'.
     void copyLabelInfoList(IRBB const& src, SMemPool * pool);
 
     bool verifyTerminate() const;
@@ -331,11 +336,11 @@ public:
     void cleanLabelInfoList() { getLabelList().clean(); }
 
     //The function copy attributes, labelinfo, IR stmts of 'src'.
-    void copy(IRBB const& src, Region * rg);
+    void copy(IRBB const& src, Region const* rg);
 
     //The function will copy not only attributes, labelinfo, IR stmts of 'src',
     //but also BBID and Vertex info.
-    void clone(IRBB const& src, Region * rg);
+    void clone(IRBB const& src, Region const* rg);
 
     void copyAttr(LabelInfo const* li)
     {
@@ -352,11 +357,11 @@ public:
     void dumpIRList(Region const* rg, bool dump_inner_region,
                     MOD IRDumpCtx<> * ctx) const;
     void dump(Region const* rg, bool dump_inner_region = false,
-              IRDumpCtx<> * ctx = nullptr) const;
+              MOD IRDumpCtx<> * ctx = nullptr) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     //The function frees all IR in IRList back into IRMgr.
-    void freeIRList(Region * rg);
+    void freeIRList(Region const* rg);
 
     Vertex * getVex() const { return BB_vex(this); }
     LabelInfoList & getLabelList() { return lab_list; }
@@ -602,11 +607,11 @@ class IRBBMgr {
     COPY_CONSTRUCTOR(IRBBMgr);
 protected:
     UINT m_bb_count; //counter of IRBB.
-    Region * m_rg;
+    Region const* m_rg;
     BBVec m_bb_vec;
     BBList m_free_list;
 public:
-    IRBBMgr(Region * rg) { m_rg = rg; m_bb_count = BBID_UNDEF + 1; }
+    IRBBMgr(Region const* rg) { m_rg = rg; m_bb_count = BBID_UNDEF + 1; }
     ~IRBBMgr();
 
     IRBB * allocBB();
@@ -617,7 +622,7 @@ public:
     //The function will copy not only attributes, labelinfo, IR stmts of 'src',
     //but also BBID and Vertex info. After the clone, bb counter update to
     //the maximum between current counter and src's id.
-    IRBB * cloneBB(IRBB const& src, Region * rg);
+    IRBB * cloneBB(IRBB const& src, Region const* rg);
 
     void destroyBB(IRBB * bb);
 
@@ -639,6 +644,9 @@ void dumpBBList(BBList const* bbl, Region const* rg,
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
                 bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
+
+void dumpBBSet(BBSet const& bbs, Region const* rg,
+               bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
 
 bool verifyIRandBB(BBList * bbl, Region const* rg);
 

@@ -59,6 +59,14 @@ typedef xcom::TTabIter<IR const*> ConstIRTabIter;
 //Type to describe the Prno of PR operation.
 typedef UINT PRNO;
 
+class IRVec : public xcom::Vector<IR*> {
+public:
+    void copyContent(IRVec const& src, Region * rg);
+    void dump(Region const* rg) const;
+    void freeContent(Region * rg);
+    bool is_empty() const;
+};
+
 //
 //These macros defined helper dispatch interface to related IR.
 //

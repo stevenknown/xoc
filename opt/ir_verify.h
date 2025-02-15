@@ -31,39 +31,41 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+bool verifyADD(IR const* ir, Region const* rg);
+bool verifyArrayOp(IR const* ir, Region const* rg);
+bool verifyAtomCas(IR const* ir, Region const* rg);
+bool verifyAtomInc(IR const* ir, Region const* rg);
+bool verifyBin(IR const* ir, Region const* rg);
+bool verifyBranch(IR const* ir, Region const* rg);
+bool verifyCall(IR const* ir, Region const* rg);
+bool verifyCase(IR const* ir, Region const* rg);
+bool verifyCompare(IR const* ir, Region const* rg);
 bool verifyConst(IR const* ir, Region const* rg);
+bool verifyCVT(IR const* ir, Region const* rg);
 bool verifyGeneral(IR const* ir, Region const* rg);
-bool verifyNothing(IR const* ir, Region const* rg);
-bool verifyLD(IR const* ir, Region const* rg);
-bool verifySt(IR const* ir, Region const* rg);
-bool verifyStpr(IR const* ir, Region const* rg);
+bool verifyGetElem(IR const* ir, Region const* rg);
+bool verifyGOTO(IR const* ir, Region const* rg);
+bool verifyICall(IR const* ir, Region const* rg);
+bool verifyIF(IR const* ir, Region const* rg);
+bool verifyIGOTO(IR const* ir, Region const* rg);
 bool verifyILd(IR const* ir, Region const* rg);
 bool verifyISt(IR const* ir, Region const* rg);
-bool verifySetElem(IR const* ir, Region const* rg);
-bool verifyGetElem(IR const* ir, Region const* rg);
+bool verifyLD(IR const* ir, Region const* rg);
 bool verifyLDA(IR const* ir, Region const* rg);
-bool verifyCall(IR const* ir, Region const* rg);
-bool verifyICall(IR const* ir, Region const* rg);
-bool verifyShift(IR const* ir, Region const* rg);
-bool verifyADD(IR const* ir, Region const* rg);
-bool verifyCompare(IR const* ir, Region const* rg);
-bool verifyTer(IR const* ir, Region const* rg);
-bool verifyBin(IR const* ir, Region const* rg);
 bool verifyLNOT(IR const* ir, Region const* rg);
-bool verifyUna(IR const* ir, Region const* rg);
-bool verifyGOTO(IR const* ir, Region const* rg);
-bool verifyIGOTO(IR const* ir, Region const* rg);
 bool verifyLoopCFS(IR const* ir, Region const* rg);
-bool verifyIF(IR const* ir, Region const* rg);
-bool verifySWITCH(IR const* ir, Region const* rg);
-bool verifyCase(IR const* ir, Region const* rg);
-bool verifyArrayOp(IR const* ir, Region const* rg);
-bool verifyCVT(IR const* ir, Region const* rg);
+bool verifyNothing(IR const* ir, Region const* rg);
+bool verifyPhi(IR const* ir, Region const* rg);
 bool verifyPR(IR const* ir, Region const* rg);
-bool verifyBranch(IR const* ir, Region const* rg);
 bool verifyReturn(IR const* ir, Region const* rg);
 bool verifySelect(IR const* ir, Region const* rg);
-bool verifyPhi(IR const* ir, Region const* rg);
+bool verifySetElem(IR const* ir, Region const* rg);
+bool verifyShift(IR const* ir, Region const* rg);
+bool verifySt(IR const* ir, Region const* rg);
+bool verifyStpr(IR const* ir, Region const* rg);
+bool verifySWITCH(IR const* ir, Region const* rg);
+bool verifyTer(IR const* ir, Region const* rg);
+bool verifyUna(IR const* ir, Region const* rg);
 
 } //namespace xoc
 #endif

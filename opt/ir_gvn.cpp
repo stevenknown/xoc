@@ -353,7 +353,7 @@ VN const* InferEVN::allocVNForStmt(IR const* ir, InferCtx & ctx)
 }
 
 
-VN const* InferEVN::inferVNViaBase(IR const* ir, InferCtx & ctx)
+VN const* InferEVN::inferVNViaBaseAndOfst(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir);
     ASSERT0(ir->isIndirectMemOp() || ir->isArrayOp());
@@ -687,6 +687,27 @@ VN const* InferEVN::inferConst(IR const* ir, InferCtx & ctx)
 }
 
 
+VN const* InferEVN::inferVNViaArrayKidAndOfst(IR const* ir, InferCtx & ctx)
+{
+    ASSERT0(ir);
+    ASSERT0(ir->isArrayOp());
+    ASSERTN(getVN(ir) == nullptr,
+            ("has to check VN before invoke the function"));
+    VN const* kidvn = inferArrayKidOp(ir, ctx);
+    if (kidvn == nullptr) { return nullptr; }
+
+    //Register VN by ir's kid and its offset.
+    VN const* ofstvn = inferIntConst(ir->getOffset());
+    ASSERT0(ofstvn);
+    VN const* newvn = m_ircvnhash.registerVN(
+        ir->getCode(), 2, (VNHashInt)kidvn->id(),
+        (VNHashInt)ofstvn->id());
+    ASSERT0(newvn);
+    setVN(ir, newvn);
+    return newvn;
+}
+
+
 VN const* InferEVN::inferArray(IR const* ir, InferCtx & ctx)
 {
     ASSERT0(ir);
@@ -695,18 +716,14 @@ VN const* InferEVN::inferArray(IR const* ir, InferCtx & ctx)
     if (vn != nullptr) { return vn; }
     IR * kdef = xoc::findKillingDef(ir, m_rg);
     if (kdef == nullptr) {
-        VN const* kidvn = inferArrayKidOp(ir, ctx);
-        if (kidvn == nullptr) { return nullptr; }
-
-        //Register VN by ir's kid and its offset.
-        VN const* ofstvn = inferIntConst(ir->getOffset());
-        ASSERT0(ofstvn);
-        VN const* newvn = m_ircvnhash.registerVN(
-            ir->getCode(), 2, (VNHashInt)kidvn->id(),
-            (VNHashInt)ofstvn->id());
-        ASSERT0(newvn);
-        setVN(ir, newvn);
-        return newvn;
+        //CASE:exec/evn.c
+        //...=arr($1,$x) #S1
+        //starr($2,$y)=...
+        //...=arr($1,$x) #S2
+        //VN of arr($1,$x) in #S1 can NOT be inferred through $1 and ARR code
+        //because starr($2,$y) may alias with arr($1,$x).
+        //return inferVNViaArrayKidAndOfst(ir, ctx);
+        return nullptr;
     }
     return inferAndGenVNForKillingDef(ir, kdef, ctx);
 }
@@ -720,7 +737,14 @@ VN const* InferEVN::inferIndirectMemExp(IR const* ir, InferCtx & ctx)
     if (vn != nullptr) { return vn; }
     IR * kdef = xoc::findKillingDef(ir, m_rg);
     if (kdef == nullptr) {
-        return inferVNViaBase(ir, ctx);
+        //CASE:exec/evn.c
+        //...=ild($1) #S1
+        //ist($2)=...
+        //...=ild($1) #S2
+        //VN of ild($1) in #S1 can NOT be inferred through $1 and ILD code
+        //because ist($2) may alias with ild($1).
+        //return inferVNViaBaseAndOfst(ir, ctx);
+        return nullptr;
     }
     return inferAndGenVNForKillingDef(ir, kdef, ctx);
 }
@@ -831,8 +855,7 @@ void InferEVN::dumpBBListWithEVN() const
     dumpwithevn.infer_evn = this;
 
     //Define IR dump flags.
-    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
-        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
 
     //Define dump context.
     IRDumpCtx<> ctx(4, f, nullptr, &dumpwithevn);
@@ -2199,7 +2222,7 @@ void GVN::processPhi(IR const* ir, bool & change)
 
 void GVN::processCall(IR const* ir, bool & change)
 {
-    for (IR const* p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    for (IR const* p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         computeVN(p, change);
     }
     //CASE:the VN of a call's result PR should be determined by its use.
@@ -2760,8 +2783,7 @@ void GVN::dumpBBListWithVN() const
     dumpwithvn.gvn = this;
 
     //Define IR dump flags.
-    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
-        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
 
     //Define dump context.
     IRDumpCtx<> ctx(4, f, nullptr, &dumpwithvn);

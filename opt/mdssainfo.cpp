@@ -441,6 +441,12 @@ void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 }
 
 
+bool MDSSAInfo::isLiveInVOpndSet(MDSSAMgr const* mgr) const
+{
+    return isLiveInVOpndSet(const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
+}
+
+
 bool MDSSAInfo::isLiveInVOpndSet(UseDefMgr const* mgr) const
 {
     VOpndSetIter it = nullptr;
@@ -594,11 +600,8 @@ void MDPhi::replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd)
 }
 
 
-//Insert operand at given position.
-//pos: position of operand, start at 0.
-//     Each operand correspond to in-edge on CFG.
 IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
-                         OptCtx const& oc)
+                         OptCtx const& oc, OUT MDSSAStatus & st)
 {
     Region * rg = mgr->getRegion();
     UINT i = 0;
@@ -618,16 +621,18 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
 
     //Find the latest live-in version of PHI's operand MD.
     VMD * livein_def = mgr->findDomLiveInDefFrom(res->id(),
-        const_cast<IRBB*>(pred)->getLastIR(), pred, oc);
+        const_cast<IRBB*>(pred)->getLastIR(), pred, oc, st);
     MDSSAInfo * mdssainfo = nullptr;
     if (livein_def != nullptr) {
         //Generate MDSSAInfo for new operand.
         mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, livein_def->version());
     } else {
+        //Still generate a MDSSAInfo to new operand of PHI even if there is no
+        //legal VMD. Because we expect to do error recovery and tolerate more
+        //following passes untill the MDSSA reconstruction.
         //Generate MDSSAInfo for new operand.
         mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, MDSSA_INIT_VERSION);
     }
-
     mgr->getUseDefMgr()->setMDSSAInfo(opnd, mdssainfo);
 
     //Add current ID into occurrence set of each VOpnd that recorded
@@ -642,6 +647,7 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
 
     //Append a new operand to list.
     ASSERT0(pos >= 0 && i == pos);
+
     //last' may be nullptr, because the operand list may be empty before
     //insertion. During several CFG edge removing and building,
     //there may appear single operand PHI.

@@ -214,11 +214,20 @@ public:
     //Return element data-type of element.
     inline DATA_TYPE getVectorElemDType() const;
 
+    //Return element data-type of element.
+    inline DATA_TYPE getTensorElemDType() const;
+
     //Return element type of element.
     inline Type const* getVectorElemType(TypeMgr const* tm) const;
 
+    //Return element type of element.
+    inline Type const* getTensorElemType(TypeMgr const* tm) const;
+
     //Return byte size of element.
     inline UINT getVectorElemSize(TypeMgr const* tm) const;
+
+    //Return byte size of element.
+    inline UINT getTensorElemSize(TypeMgr const* tm) const;
 
     //Return element type of element.
     inline DATA_TYPE getStreamElemType() const;
@@ -228,6 +237,10 @@ public:
 
     //Return true if data type is vector.
     bool is_vector() const { return TY_dtype(this) == D_VEC; }
+
+    //Return true if data type is vector and its element type is float.
+    bool is_vector_with_fp_elem_type() const
+    { return is_vector() && is_fp(getVectorElemDType()); }
 
     //Return true if data type is stream.
     bool is_stream() const { return TY_dtype(this) == D_STREAM; }
@@ -246,6 +259,10 @@ public:
 
     //Return true if data type is tensor.
     bool is_tensor() const { return TY_dtype(this) == D_TENSOR; }
+
+    //Return true if data type is tensor and its element type is float.
+    bool is_tensor_with_fp_elem_type() const
+    { return is_tensor() && is_fp(getTensorElemDType()); }
 
     //Return true if data type is boolean.
     bool is_bool() const { return TY_dtype(this) == D_B; }
@@ -311,8 +328,11 @@ public:
     }
 
     //Return true if data type is float.
-    bool is_fp() const
-    { return TY_dtype(this) >= D_BF16 && TY_dtype(this) <= D_F128; }
+    bool is_fp() const { return is_fp(TY_dtype(this)); }
+
+    //Return true if data type is float.
+    static bool is_fp(DATA_TYPE dtype)
+    { return dtype >= D_BF16 && dtype <= D_F128; }
 
     //Return true if data type can be regarded as integer.
     bool isInt() const { return is_int() || is_bool() || is_pointer(); }
@@ -326,10 +346,18 @@ public:
     //Return true if the type can be regarded as pointer.
     bool isPointer() const { return is_pointer() || is_any(); }
 
+    //Return true if the type can be regarded as float.
+    bool isFP() const
+    {
+        return is_fp() || is_vector_with_fp_elem_type() ||
+               is_tensor_with_fp_elem_type();
+    }
+
     bool verify(TypeMgr const* tm) const;
 };
 
 
+//The class represents Pointer Data Type.
 class PointerType : public Type {
     COPY_CONSTRUCTOR(PointerType);
 public:
@@ -349,6 +377,7 @@ public:
 };
 
 
+//The class represents Memory Chunk Data Type.
 class MCType : public Type {
     COPY_CONSTRUCTOR(MCType);
 public:
@@ -363,9 +392,13 @@ public:
         Type::copy(src);
         mc_size = src.mc_size;
     }
+
+    //Return the byte size of the memory chunk.
+    UINT getByteSize() const { return TY_mc_size(this); }
 };
 
 
+//The class represents Vector Data Type.
 class VectorType : public Type {
     COPY_CONSTRUCTOR(VectorType);
 public:
@@ -389,6 +422,9 @@ public:
         total_vector_size = src.total_vector_size;
         vector_elem_type = src.vector_elem_type;
     }
+
+    //Return the byte size of the vector.
+    UINT getByteSize() const { return TY_vec_size(this); }
 };
 
 
@@ -414,6 +450,7 @@ public:
 };
 
 
+//The class represents Tensor Data Type.
 class TensorType : public Type {
     COPY_CONSTRUCTOR(TensorType);
 public:
@@ -457,7 +494,7 @@ public:
     //Return the number of dimensions of tensor.
     UINT getDim() const { return degree_of_dimension.get_capacity(); }
 
-    //Return byte size of total tensor.
+    //Return the byte size of total tensor.
     UINT getByteSize(TypeMgr const* mgr) const;
 
     void init() { degree_of_dimension.init(); }
@@ -1154,15 +1191,33 @@ Type const* Type::getVectorElemType(TypeMgr const* tm) const
 }
 
 
+Type const* Type::getTensorElemType(TypeMgr const* tm) const
+{
+    return tm->getSimplexTypeEx(TY_tensor_ety(this));
+}
+
+
 UINT Type::getVectorElemSize(TypeMgr const* tm) const
 {
     return tm->getDTypeByteSize(TY_vec_ety(this));
 }
 
 
+UINT Type::getTensorElemSize(TypeMgr const* tm) const
+{
+    return tm->getDTypeByteSize(TY_tensor_ety(this));
+}
+
+
 DATA_TYPE Type::getVectorElemDType() const
 {
     return TY_vec_ety(this);
+}
+
+
+DATA_TYPE Type::getTensorElemDType() const
+{
+    return TY_tensor_ety(this);
 }
 
 

@@ -35,7 +35,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool g_is_opt_float = false;
+bool g_do_opt_float = false;
 bool g_is_lower_to_pr_mode = false;
 bool g_is_lower_to_lowest_height = true;
 bool g_is_support_dynamic_type = false;
@@ -69,6 +69,7 @@ bool g_compute_pr_du_chain = false;
 bool g_compute_nonpr_du_chain = false;
 bool g_compute_available_exp = false;
 bool g_compute_region_imported_defuse_md = false;
+bool g_compute_pr_du_chain_by_prssa = true;
 bool g_do_expr_tab = true;
 bool g_do_cp_aggressive = false;
 bool g_do_cp = false;
@@ -94,6 +95,8 @@ bool g_do_pre = false;
 bool g_do_rce = false;
 bool g_do_vect = true;
 bool g_do_multi_res_convert = true;
+bool g_do_targinfo_handler = true;
+bool g_do_alge_reasscociate = true;
 bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
@@ -113,12 +116,12 @@ bool g_do_relaxation = false;
 bool g_do_memcheck = false;
 bool g_do_memcheck_static = false;
 bool g_retain_pass_mgr_for_region = true;
-UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
 bool g_is_simplify_array_ingredient = true;
 bool g_is_search_and_copy_dbx = true;
 bool g_generate_var_for_pr = true;
 DumpOption g_dump_opt;
+PassOption g_pass_opt;
 ArchOption g_arch;
 bool g_redirect_stdout_to_dump_file = false;
 FILE * g_unique_dumpfile = nullptr;
@@ -126,7 +129,6 @@ CHAR const* g_unique_dumpfile_name = nullptr;
 bool g_do_lsra_debug = false;
 UINT g_debug_reg_num = 0;
 bool g_force_use_fp_as_sp = false;
-bool g_support_alloca = true;
 bool g_do_ir_reloc = false;
 bool g_stack_on_global = false;
 bool g_interference_graph_stack_slot_color = false;
@@ -208,13 +210,25 @@ void StrTabOption::dump(RegionMgr * rm) const
 //
 DumpOption::DumpOption()
 {
-    is_dump_all = false;
+    setDumpNothing();
+
+    //No dump-options are disabled by default.
     is_dump_nothing = false;
-    //In most cases, dump-after-pass is sufficient.
-    is_dump_before_pass = false;
+
+    //In most cases, dump-after-pass is sufficient, thus enable it by default.
     is_dump_after_pass = true;
+}
+
+
+void DumpOption::setDumpNothing()
+{
+    is_dump_nothing = true;
+    is_dump_all = false;
+    is_dump_before_pass = false;
+    is_dump_after_pass = false;
     is_dump_aa = false;
     is_dump_dumgr = false;
+    is_dump_mdref = false;
     is_dump_mdset_hash = false;
     is_dump_cfg = false;
     is_dump_dom = false;
@@ -226,6 +240,7 @@ DumpOption::DumpOption()
     is_dump_lftr = false;
     is_dump_vectorization = false;
     is_dump_multi_res_convert = false;
+    is_dump_targinfo_handler = false;
     is_dump_loop_dep_ana = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
@@ -242,6 +257,69 @@ DumpOption::DumpOption()
     is_dump_irparser = false;
     is_dump_ir_id = false; //Do not dump IR's id by default.
     is_dump_to_buffer = false;
+    is_dump_cfgopt = false;
+    is_dump_rce = false;
+    is_dump_infertype = false;
+    is_dump_invert_brtgt = false;
+    is_dump_alge_reasscociate = false;
+    is_dump_refine_duchain = false;
+    is_dump_refine = false;
+    is_dump_insert_cvt = false;
+    is_dump_calc_derivative = false;
+    is_dump_gscc = false;
+    is_dump_cdg = false;
+    is_dump_lsra = false;
+}
+
+
+void DumpOption::setDumpAll()
+{
+    is_dump_nothing = false;
+    is_dump_all = true;
+    is_dump_before_pass = true;
+    is_dump_after_pass = true;
+    is_dump_aa = true;
+    is_dump_dumgr = true;
+    is_dump_mdref = true;
+    is_dump_mdset_hash = true;
+    is_dump_cfg = true;
+    is_dump_dom = true;
+    is_dump_rpo = true;
+    is_dump_cp = true;
+    is_dump_rp = true;
+    is_dump_dce = true;
+    is_dump_vrp = true;
+    is_dump_lftr = true;
+    is_dump_vectorization = true;
+    is_dump_multi_res_convert = true;
+    is_dump_targinfo_handler = true;
+    is_dump_loop_dep_ana = true;
+    is_dump_gvn = true;
+    is_dump_gcse = true;
+    is_dump_ivr = true;
+    is_dump_licm = true;
+    is_dump_exprtab = true;
+    is_dump_gcse = true;
+    is_dump_loopcvt = true;
+    is_dump_simplification = true;
+    is_dump_prssamgr = true;
+    is_dump_mdssamgr = true;
+    is_dump_memusage = true;
+    is_dump_livenessmgr = true;
+    is_dump_irparser = true;
+    is_dump_ir_id = true;
+    is_dump_cfgopt = true;
+    is_dump_rce = true;
+    is_dump_infertype = true;
+    is_dump_invert_brtgt = true;
+    is_dump_alge_reasscociate = true;
+    is_dump_refine_duchain = true;
+    is_dump_refine = true;
+    is_dump_insert_cvt = true;
+    is_dump_calc_derivative = true;
+    is_dump_gscc = true;
+    is_dump_cdg = true;
+    is_dump_lsra = true;
 }
 
 
@@ -369,9 +447,21 @@ bool DumpOption::isDumpVectorization() const
 }
 
 
+bool DumpOption::isDumpTargInfoHandler() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_targinfo_handler);
+}
+
+
 bool DumpOption::isDumpMultiResConvert() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_multi_res_convert);
+}
+
+
+bool DumpOption::isDumpAlgeReasscociate() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_alge_reasscociate);
 }
 
 
@@ -550,11 +640,15 @@ bool DumpOption::isDumpKernelAdjustment() const
 //END DumpOption
 
 
+//
+//START ArchOption
+//
 ArchOption::ArchOption()
 {
     is_arch_t1 = false;
     is_arch_t2 = false;
 }
+//END ArchOption
 
 
 //
@@ -564,7 +658,7 @@ void Option::dump(MOD LogMgr * lm)
 {
     note(lm, "\n==---- DUMP All Options ----==");
     lm->incIndent(2);
-    note(lm, "\ng_is_opt_float = %s", g_is_opt_float ? "true":"false");
+    note(lm, "\ng_do_opt_float = %s", g_do_opt_float ? "true":"false");
     note(lm, "\ng_is_lower_to_pr_mode = %s",
          g_is_lower_to_pr_mode ? "true":"false");
     note(lm, "\ng_is_lower_to_lowest_height = %s",
@@ -616,6 +710,8 @@ void Option::dump(MOD LogMgr * lm)
          g_compute_available_exp ? "true":"false");
     note(lm, "\ng_compute_region_imported_defuse_md = %s",
          g_compute_region_imported_defuse_md ? "true":"false");
+    note(lm, "\ng_compute_pr_du_chain_by_prssa = %s",
+         g_compute_pr_du_chain_by_prssa ? "true":"false");
     note(lm, "\ng_do_expr_tab = %s", g_do_expr_tab ? "true":"false");
     note(lm, "\ng_do_cp_aggressive = %s", g_do_cp_aggressive ? "true":"false");
     note(lm, "\ng_do_cp = %s", g_do_cp ? "true":"false");
@@ -644,6 +740,10 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_vect = %s", g_do_vect ? "true":"false");
     note(lm, "\ng_do_multi_res_convert = %s",
          g_do_multi_res_convert ? "true":"false");
+    note(lm, "\ng_do_targinfo_handler = %s",
+         g_do_targinfo_handler ? "true":"false");
+    note(lm, "\ng_do_alge_reasscociate = %s",
+         g_do_alge_reasscociate ? "true":"false");
     note(lm, "\ng_do_loop_dep_ana = %s", g_do_loop_dep_ana ? "true":"false");
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
@@ -666,7 +766,6 @@ void Option::dump(MOD LogMgr * lm)
          g_do_memcheck_static ? "true":"false");
     note(lm, "\ng_retain_pass_mgr_for_region = %s",
          g_retain_pass_mgr_for_region ? "true":"false");
-    note(lm, "\ng_verify_level = %s", Option::getOptLevelName(g_verify_level));
     note(lm, "\ng_is_simplify_parameter = %s",
          g_is_simplify_parameter ? "true":"false");
     note(lm, "\ng_is_simplify_array_ingredient = %s",
@@ -688,7 +787,6 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_debug_reg_num = %u", g_debug_reg_num);
     note(lm, "\ng_force_use_fp_as_stack_pointer = %s",
          g_force_use_fp_as_sp ? "true":"false");
-    note(lm, "\ng_support_alloca = %s", g_support_alloca ? "true":"false");
     note(lm, "\ng_do_ir_reloc = %s", g_do_ir_reloc ? "true":"false");
     note(lm, "\ng_stack_on_global = %s", g_stack_on_global ? "true":"false");
     note(lm, "\ng_do_arg_passer = %s", g_do_arg_passer ? "true":"false");
@@ -731,5 +829,115 @@ CHAR const* Option::getVerifyLevelName(UINT verifylevel)
     return nullptr;
 }
 //END Option
+
+
+//
+//START PassOption
+//
+class PassSwitch {
+public:
+    bool * bool_switch;
+};
+
+//The Level1 pass only does refinement.
+static PassSwitch g_pass_in_level1[] {
+    { &xoc::g_do_prssa, },
+    { &xoc::g_do_mdssa, },
+    { &xoc::g_infer_type, },
+};
+static UINT g_pass_num_in_level1 =
+    sizeof(g_pass_in_level1) / sizeof(g_pass_in_level1[0]);
+
+
+static PassSwitch g_pass_in_level2[] {
+    { &xoc::g_do_cp, },
+    { &xoc::g_do_dce, },
+    { &xoc::g_do_licm, },
+    { &xoc::g_do_gcse, },
+    { &xoc::g_do_rce, },
+    { &xoc::g_do_rp, },
+    { &xoc::g_do_prssa, },
+    { &xoc::g_do_mdssa, },
+    { &xoc::g_infer_type, },
+};
+static UINT g_pass_num_in_level2 =
+    sizeof(g_pass_in_level2) / sizeof(g_pass_in_level2[0]);
+
+
+static PassSwitch g_pass_in_level3[] {
+    { &xoc::g_do_cp, },
+    { &xoc::g_do_cp_aggressive, },
+    { &xoc::g_do_dce, },
+    { &xoc::g_do_dce_aggressive, },
+    { &xoc::g_do_licm, },
+    { &xoc::g_do_gcse, },
+    { &xoc::g_do_rce, },
+    { &xoc::g_do_rp, },
+    { &xoc::g_do_lftr, },
+    { &xoc::g_do_prssa, },
+    { &xoc::g_do_mdssa, },
+    { &xoc::g_infer_type, },
+    { &xoc::g_do_vect, },
+    { &xoc::g_do_cfg_remove_empty_bb, },
+    { &xoc::g_do_cfg_remove_unreach_bb, },
+    { &xoc::g_do_cfg_remove_trampolin_bb, },
+    { &xoc::g_invert_branch_target, },
+    { &xoc::g_do_cfg_remove_redundant_branch, },
+    { &xoc::g_do_cfg_remove_trampolin_branch, },
+    { &xoc::g_do_cfg_remove_redundant_label, },
+};
+static UINT g_pass_num_in_level3 =
+    sizeof(g_pass_in_level3) / sizeof(g_pass_in_level3[0]);
+
+
+static PassSwitch g_pass_in_level_size[] {
+    { &xoc::g_do_dce, },
+    { &xoc::g_do_dce_aggressive, },
+    { &xoc::g_do_rce, },
+    { &xoc::g_do_prssa, },
+    { &xoc::g_do_mdssa, },
+    { &xoc::g_infer_type, },
+    { &xoc::g_do_cfg_remove_empty_bb, },
+    { &xoc::g_do_cfg_remove_unreach_bb, },
+    { &xoc::g_do_cfg_remove_trampolin_bb, },
+    { &xoc::g_do_cfg_remove_redundant_branch, },
+    { &xoc::g_do_cfg_remove_trampolin_branch, },
+    { &xoc::g_do_cfg_remove_redundant_label, },
+};
+static UINT g_pass_num_in_level_size =
+    sizeof(g_pass_in_level_size) / sizeof(g_pass_in_level_size[0]);
+
+
+void PassOption::setPassInLevel3(bool enable)
+{
+    for (UINT i = 0; i < g_pass_num_in_level3; i++) {
+        *g_pass_in_level3[i].bool_switch = enable;
+    }
+}
+
+
+void PassOption::setPassInLevel2(bool enable)
+{
+    for (UINT i = 0; i < g_pass_num_in_level2; i++) {
+        *g_pass_in_level2[i].bool_switch = enable;
+    }
+}
+
+
+void PassOption::setPassInLevel1(bool enable)
+{
+    for (UINT i = 0; i < g_pass_num_in_level1; i++) {
+        *g_pass_in_level1[i].bool_switch = enable;
+    }
+}
+
+
+void PassOption::setPassInLevelSize(bool enable)
+{
+    for (UINT i = 0; i < g_pass_num_in_level_size; i++) {
+        *g_pass_in_level_size[i].bool_switch = enable;
+    }
+}
+//END PassOption
 
 } //namespace xoc

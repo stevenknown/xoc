@@ -136,6 +136,10 @@ class InsertCvt : public Pass {
     //Insert CVT for float if necessary.
     virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOpByPtrType(IR * ir, bool & change);
+
+    //Whether cvt instruction is needed for stpr.
+    virtual bool isNeedInsertCvtForStpr(IR * parent, IR * kid) const
+    { return true; }
 protected:
     TypeMgr * m_tm;
 public:

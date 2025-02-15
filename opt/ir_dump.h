@@ -75,6 +75,7 @@ inline void dumpIR(IR const* ir, Region const* rg, DumpFlag dumpflag)
 
 //The function dumps all IR related info into LogCtx of current LogMgr.
 void dumpIRCombine(IR const* ir, Region const* rg);
+void dumpIRListCombine(IR const* ir, Region const* rg);
 
 //The function dumps IR's name and id into the given buffer.
 //Return the buffer address.
@@ -88,6 +89,18 @@ CHAR const* dumpIRName(IR const* ir, MOD StrBufType & buf)
     return buf.getBuf();
 }
 void dumpIRName(IR const* ir, Region const* rg);
+
+
+//The function dumps IR_CODE's name and id into the given buffer.
+//Return the buffer address.
+template <class StrBufType>
+CHAR const* dumpIRCodeName(IR_CODE code, MOD StrBufType & buf)
+{
+    buf.sprint("%s", IR::getIRCodeName(code));
+    return buf.getBuf();
+}
+void dumpIRCodeName(IR_CODE code, Region const* rg);
+
 
 //The function dump IR info into given buffer.
 CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
@@ -172,6 +185,7 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
+void dumpAlloca(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 
 //The class provides an approach to redirect the result of normal dump
 //functions to user's buffer.

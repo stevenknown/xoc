@@ -481,7 +481,7 @@ bool VersionVerification::verify() const
 //
 //START BB2VPRMap
 //
-//The allocated object will be destroied at destoryPRNO2VPR().
+//The allocated object will be destroyed at destoryPRNO2VPR().
 PRNO2VPR * BB2VPRMap::allocPRNO2VPR(UINT bbid)
 {
     PRNO2VPR * prno2vpr = new PRNO2VPR();
@@ -1192,6 +1192,79 @@ size_t ConstructCtx::count_mem() const
 //
 //START PRSSAMgr
 //
+PRSSAMgr::PRSSAMgr(Region * rg) : Pass(rg)
+{
+    clean();
+}
+
+
+PRSSAMgr::~PRSSAMgr()
+{
+    ASSERTN(!is_valid(), ("should be destructed"));
+    destroy();
+}
+
+
+void PRSSAMgr::initTargInfoHandler()
+{
+    #ifdef REF_TARGMACH_INFO
+    m_ti_handler = (TargInfoHandler*)m_rg->getPassMgr()->registerPass(
+        PASS_TARGINFO_HANDLER);
+    ASSERT0(m_ti_handler);
+    #else
+    m_ti_handler = nullptr;
+    #endif
+}
+
+
+void PRSSAMgr::initDepPass()
+{
+    m_tm = m_rg->getTypeMgr();
+    m_vm = m_rg->getVarMgr();
+    m_irmgr = m_rg->getIRMgr();
+    ASSERT0(m_tm && m_vm && m_irmgr);
+    ASSERT0(m_rg->getMiscBitSetMgr());
+    m_seg_mgr = m_rg->getMiscBitSetMgr()->getSegMgr();
+    ASSERT0(m_seg_mgr);
+    m_cfg = m_rg->getCFG();
+    ASSERTN(m_cfg, ("CFG is not available."));
+    initTargInfoHandler();
+}
+
+
+void PRSSAMgr::init()
+{
+    if (m_vp_pool != nullptr) { return; }
+    m_vpr_count = VPR_UNDEF + 1;
+    m_is_valid = false;
+    m_prno2vprvec.set(m_rg->getPRCount(), nullptr);
+    m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
+    initDepPass();
+}
+
+
+void PRSSAMgr::clean()
+{
+    m_tm = nullptr;
+    m_vm = nullptr;
+    m_irmgr = nullptr;
+    m_ti_handler = nullptr;
+    m_seg_mgr = nullptr;
+    m_cfg = nullptr;
+    m_vpr_count = VPR_UNDEF + 1;
+
+    //Set to true if PR ssa is constructed.
+    //This flag will direct the behavior of optimizations.
+    //If SSA constructed, DU mananger should not compute information
+    //for PR any more.
+    m_is_valid = false;
+    m_is_semi_pruned = true;
+    m_is_pruned = true;
+    m_vp_pool = nullptr;
+    m_livemgr = nullptr;
+}
+
+
 size_t PRSSAMgr::count_mem() const
 {
     size_t count = 0;
@@ -1211,19 +1284,7 @@ void PRSSAMgr::setVPRByPRNO(PRNO prno, VPR * vpr)
 }
 
 
-bool PRSSAMgr::useLSRA() const
-{
-    #ifdef REF_TARGMACH_INFO
-    ASSERT0(m_rg && m_rg->getPassMgr());
-    LinearScanRA * lsra = (LinearScanRA*)m_rg->getPassMgr()->queryPass(
-        PASS_LINEAR_SCAN_RA);
-    return lsra != nullptr;
-    #endif
-    return false;
-}
-
-
-void PRSSAMgr::copyDedicatedRegForEachVPR(VPR const* vpr)
+void PRSSAMgr::copyDedicatedReg(VPR const* vpr)
 {
     ASSERT0(vpr != nullptr);
     PRNO orgprno = VPR_orgprno(vpr);
@@ -1232,38 +1293,33 @@ void PRSSAMgr::copyDedicatedRegForEachVPR(VPR const* vpr)
         orgprno == newprno) {
         return;
     }
-
-    #ifdef REF_TARGMACH_INFO
-    ASSERT0(m_rg && m_rg->getPassMgr());
-    LinearScanRA * lsra = (LinearScanRA*)m_rg->getPassMgr()->queryPass(
-        PASS_LINEAR_SCAN_RA);
-    if (lsra == nullptr) { return; }
-    //If the original prno is a dedicated prno, the newly created prno also
-    //needs to be bound to this register.
-    if (lsra->isDedicated(orgprno)) {
-        ASSERT0(!lsra->isDedicated(newprno));
-        lsra->setDedicatedReg(newprno, lsra->getDedicatedReg(orgprno));
-    }
-    #endif
+    ASSERT0(getTIHandler());
+    getTIHandler()->tryCopyPhyRegIfAny(newprno, orgprno);
 }
 
 
+//Copy dedicated register information for all VPRs.
 void PRSSAMgr::copyDedicatedRegForAllVPR()
 {
+    if (getTIHandler() == nullptr) {
+        //There is no TargMach info avaiable.
+        return;
+    }
     VPRVec const* vpr_vec = getVPRVec();
     ASSERT0(vpr_vec != nullptr);
     for (VecIdx i = PRNO_UNDEF + 1; i <= vpr_vec->get_last_idx(); i++) {
         VPR const* vpr = vpr_vec->get(i);
         ASSERT0(vpr != nullptr);
-        copyDedicatedRegForEachVPR(vpr);
+        copyDedicatedReg(vpr);
     }
 }
 
 
-void PRSSAMgr::copyPRAttr()
+//Copy the attributes of the original PR to the new renamed PR.
+void PRSSAMgr::copyPRAttrForAllVPR()
 {
-    //Copy dedicated register information.
-    if (useLSRA()) { copyDedicatedRegForAllVPR(); }
+    copyDedicatedRegForAllVPR();
+    //Could handle other PR attributes here.
 }
 
 
@@ -1399,7 +1455,7 @@ void PRSSAMgr::buildDUChain(MOD IR * def, MOD IR * use)
 }
 
 
-void PRSSAMgr::destroy(bool is_reinit)
+void PRSSAMgr::destroy()
 {
     if (m_vp_pool == nullptr) { return; }
 
@@ -1414,16 +1470,11 @@ void PRSSAMgr::destroy(bool is_reinit)
     }
     for (UINT i = 0; i < m_vpr_vec.get_elem_count(); i++) {
         VPR * v = m_vpr_vec.get((UINT)i);
-        if (v != nullptr) {
-            v->destroy();
-        }
+        if (v != nullptr) { v->destroy(); }
     }
-    if (is_reinit) {
-        //Clean vector is dispensable if they are not be used any more.
-        m_prno2vprvec.clean();
-        m_vpr_vec.clean();
-        m_prno2vpr.clean();
-    }
+    m_prno2vprvec.clean();
+    m_vpr_vec.clean();
+    m_prno2vpr.clean();
     removePhiList();
     smpoolDelete(m_vp_pool);
     m_vp_pool = nullptr;
@@ -1692,17 +1743,16 @@ void PRSSAMgr::addUseForTree(IR * to, IR const* from)
 }
 
 
-//After adding BB or change BB successor,
-//you need add the related PHI operand if BB successor has PHI stmt.
-void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
-                                             PRSSAInfoCollect const& col)
+void PRSSAMgr::addSuccessorDesignatedPhiOpnd(
+    IRBB * bb, IRBB * succ, PRSSAInfoCollect const& col)
 {
     bool is_pred;
     UINT pos = m_cfg->WhichPred(bb, succ, is_pred);
     ASSERT0_DUMMYUSE(is_pred);
     IRListIter it;
-    for (IR * ir = BB_irlist(succ).get_head(&it);
-         ir != nullptr; ir = BB_irlist(succ).get_next(&it)) {
+    IRList const& succirlst = succ->getIRList();
+    for (IR * ir = succirlst.get_head(&it);
+         ir != nullptr; ir = succirlst.get_next(&it)) {
         if (!ir->is_phi()) { break; }
         IR const* ref = col.getLiveinRef(ir);
         if (ref != nullptr) {
@@ -2390,7 +2440,7 @@ void PRSSAMgr::renameEntireCFG(
 }
 
 
-void PRSSAMgr::destructBBSSAInfo(IRBB * bb, OptCtx const& oc)
+void PRSSAMgr::destructBBSSAInfo(MOD IRBB * bb, OptCtx const& oc)
 {
     IRListIter ct;
     IRListIter next_ct;
@@ -2400,7 +2450,6 @@ void PRSSAMgr::destructBBSSAInfo(IRBB * bb, OptCtx const& oc)
         next_ct = BB_irlist(bb).get_next(next_ct);
         IR * ir = ct->val();
         if (!ir->is_phi()) { break; }
-
         stripPhi(ir, ct, oc);
         BB_irlist(bb).remove(ct);
         m_rg->freeIRTree(ir);
@@ -2423,23 +2472,21 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
             destructBBSSAInfo(v, oc);
         }
 
-        xcom::Vertex * bbv = domtree.getVertex(v->id());
+        xcom::Vertex const* bbv = domtree.getVertex(v->id());
         ASSERTN(bbv, ("dom tree is invalid."));
-
-        xcom::EdgeC * c = bbv->getOutList();
+        xcom::EdgeC const* c = bbv->getOutList();
         bool all_visited = true;
         while (c != nullptr) {
-            xcom::Vertex * dom_succ = c->getTo();
+            xcom::Vertex const* dom_succ = c->getTo();
             if (dom_succ == bbv) { continue; }
-            if (!visited.is_contain(VERTEX_id(dom_succ))) {
-                ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
+            if (!visited.is_contain(dom_succ->id())) {
+                ASSERT0(m_cfg->getBB(dom_succ->id()));
                 all_visited = false;
-                stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
+                stk.push(m_cfg->getBB(dom_succ->id()));
                 break;
             }
-            c = EC_next(c);
+            c = c->get_next();
         }
-
         if (all_visited) {
             stk.pop();
             //Do post-processing while all kids of BB has been processed.
@@ -2560,30 +2607,37 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict, OptCtx const& oc)
 }
 
 
+void PRSSAMgr::removePhiList(MOD IRBB * bb)
+{
+    BBIRListIter irit = nullptr;
+    BBIRListIter next_irit = nullptr;
+    BBIRList & irlst = bb->getIRList();
+    for (irlst.get_head(&irit); irit != nullptr; irit = next_irit) {
+        next_irit = irlst.get_next(irit);
+        IR * ir = irit->val();
+        if (!ir->is_phi()) {
+            //There is no phi any more.
+            break;
+        }
+        PHI_ssainfo(ir) = nullptr;
+        irlst.remove(irit);
+        m_rg->freeIRTree(ir);
+    }
+}
+
+
 void PRSSAMgr::removePhiList()
 {
     BBList * bblst = m_rg->getBBList();
     if (bblst == nullptr) {
-        //Region's BBList has been destroied.
+        //Region's BBList has been destroyed.
         return;
     }
     BBListIter bbit = nullptr;
     for (bblst->get_head(&bbit); bbit != nullptr;
          bbit = bblst->get_next(bbit)) {
         IRBB * bb = bbit->val();
-        IRListIter irit = nullptr;
-        IRListIter next_irit = nullptr;
-        for (BB_irlist(bb).get_head(&irit); irit != nullptr; irit = next_irit) {
-            next_irit = BB_irlist(bb).get_next(irit);
-            IR * ir = irit->val();
-            if (!ir->is_phi()) {
-                //There is no phi any more.
-                break;
-            }
-            PHI_ssainfo(ir) = nullptr;
-            BB_irlist(bb).remove(irit);
-            m_rg->freeIRTree(ir);
-        }
+        removePhiList(bb);
     }
 }
 
@@ -2756,7 +2810,6 @@ bool PRSSAMgr::verifyVPR() const
             IR * use = m_rg->getIR(i2);
             ASSERT0(use->is_pr() || use->is_const());
             if (!use->is_pr()) { continue; }
-
             if (opndprno == PRNO_UNDEF) {
                 opndprno = PR_no(use);
             } else {
@@ -2920,7 +2973,6 @@ bool PRSSAMgr::verifySSAInfo() const
 //avoid subsequent verification complaining is set the prdu invalid.
 void PRSSAMgr::destruction(MOD OptCtx & oc)
 {
-    if (!is_valid()) { return; }
     BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     UINT bbcnt = bblst->get_elem_count();
@@ -3698,45 +3750,25 @@ void PRSSAMgr::changeDef(IR * olddef, IR * newdef)
 }
 
 
-void PRSSAMgr::construction(OptCtx & oc)
+void PRSSAMgr::destructVPRAndPhi()
 {
-    reinit();
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-
-    //Extract dominate tree of CFG.
-    START_TIMER(t, "PRSSA: Extract Dom Tree");
-    xcom::DomTree domtree;
-    m_cfg->genDomTree(domtree);
-    END_TIMER(t, "PRSSA: Extract Dom Tree");
-
-    if (!construction(domtree, oc)) {
-        return;
-    }
-    set_valid(true);
-    if (haveToMaintainClassicPRDU(oc)) {
-        //Revise classic PRDU if PRSSA constructed.
-        xoc::removeClassicDUChain(m_rg, true, false);
-    }
-    //The construction of PRSSA will destruct DUSet which built by DUMgr.
-    //If SSA is enabled, disable classic DU Chain.
-    //Since we do not maintain both them as some passes.
-    //e.g:In RCE, remove PHI's operand will not update the
-    //operand DEF's DUSet.
-    //CASE:compiler.gr/alias.loop.gr
-    oc.setInvalidPRDU();
+    destroy();
+    //Clean SSA info to avoid unnecessary abort or assert.
+    cleanPRSSAInfo();
 }
 
 
-//Note: Non-SSA DU Chains of read/write PR is unavaiable after SSA construction.
-bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
+bool PRSSAMgr::constructVPRAndPhi(xcom::DomTree & domtree, OptCtx & oc)
 {
+    bool succ = true;
     ASSERT0(m_rg);
     START_TIMER(t, "PRSSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((xcom::DGraph&)*m_cfg);
     END_TIMER(t, "PRSSA: Build dominance frontier");
     if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
-        return false;
+        succ = false;
+        return succ;
     }
     if (m_is_pruned) {
         m_livemgr = (LivenessMgr*)m_rg->getPassMgr()->
@@ -3760,20 +3792,22 @@ bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
 
     //Recompute the map if ssa needs reconstruct.
     cstctx.cleanPRNO2Type();
-
-    stripVersionForBBList(*m_rg->getBBList());
-
-    //Copy the attributes of the old PR to the new PR.
-    copyPRAttr();
-
-    refinePhi(oc);
     if (m_livemgr != nullptr) {
         m_livemgr->clean();
     }
+    return succ;
+}
+
+
+bool PRSSAMgr::constructByDomTree(xcom::DomTree & domtree, OptCtx & oc)
+{
+    bool succ = constructVPRAndPhi(domtree, oc);
+    stripVersionForBBList(*m_rg->getBBList());
+    copyPRAttrForAllVPR();
+    refinePhi(oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {
         START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
-        dfm.dump((xcom::DGraph&)*m_cfg, getRegion());
         END_TIMER(tdump, "PRSSA: Dump After Pass");
     }
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
@@ -3782,7 +3816,49 @@ bool PRSSAMgr::construction(xcom::DomTree & domtree, OptCtx & oc)
     ASSERT0(verifySSAInfo());
     ASSERT0(verifyMapBetweenPRNOAndVPR());
     set_valid(true);
-    return true;
+    return succ;
+}
+
+
+void PRSSAMgr::constructVPRAndPhi(OptCtx & oc)
+{
+    reinit();
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+
+    //Extract dominate tree of CFG.
+    START_TIMER(t, "PRSSA: Extract Dom Tree");
+    xcom::DomTree domtree;
+    m_cfg->genDomTree(domtree);
+    END_TIMER(t, "PRSSA: Extract Dom Tree");
+    constructVPRAndPhi(domtree, oc);
+}
+
+
+void PRSSAMgr::construction(OptCtx & oc)
+{
+    reinit();
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+
+    //Extract dominate tree of CFG.
+    START_TIMER(t, "PRSSA: Extract Dom Tree");
+    xcom::DomTree domtree;
+    m_cfg->genDomTree(domtree);
+    END_TIMER(t, "PRSSA: Extract Dom Tree");
+    if (!constructByDomTree(domtree, oc)) {
+        return;
+    }
+    set_valid(true);
+    if (haveToMaintainClassicPRDU(oc)) {
+        //Revise classic PRDU if PRSSA constructed.
+        xoc::removeClassicDUChain(m_rg, true, false);
+    }
+    //The construction of PRSSA will destruct DUSet which built by DUMgr.
+    //If SSA is enabled, disable classic DU Chain.
+    //Since we do not maintain both them as some passes.
+    //e.g:In RCE, remove PHI's operand will not update the
+    //operand DEF's DUSet.
+    //CASE:compiler.gr/alias.loop.gr
+    oc.setInvalidPRDU();
 }
 //END PRSSAMgr
 

@@ -47,7 +47,6 @@ typedef enum {
     SEQ_TOPOL, //topological sort
 } SEQ_TYPE;
 
-
 //CFG xcom::Edge Info.
 #define CFGEI_is_eh(ei) ((ei)->m_is_eh)
 class CFGEdgeInfo {
@@ -69,6 +68,12 @@ public:
 #define CFGOPTCTX_need_update_dominfo(x) ((x)->common_info.s1.m_update_dominfo)
 
 //The field transfers information bottom-up.
+//If it is true, there is at least one unreach-BB after CFG optimization.
+//Default is false.
+#define CFGOPTCTX_has_generate_unreach_bb(x) \
+    ((x)->common_info.s1.m_generate_unreach_bb)
+
+//The field transfers information bottom-up.
 //Record the number of time that iterate CFG vertex when updating DomInfo.
 //This is local used variable to collect information bottom-up from callee
 //to caller.
@@ -82,6 +87,7 @@ class CfgOptCtx {
         CFGOPTCTX_need_update_dominfo(this) = true;
         CFGOPTCTX_do_merge_label(this) = true;
         CFGOPTCTX_vertex_iter_time(this) = 0;
+        CFGOPTCTX_has_generate_unreach_bb(this) = false;
     }
 public:
     //The field transfers information bottom-up.
@@ -105,6 +111,12 @@ public:
             //If it is true, CFG optimizer will attempt to merge label to
             //next BB if current BB is empty. Default is true.
             BYTE m_do_merge_label:1;
+
+            //The field transfers information bottom-up.
+            //If it is true, there is at least one unreach-BB after CFG
+            //optimization.
+            //Default is false.
+            BYTE m_generate_unreach_bb:1;
         } s1;
     } common_info;
 public:
@@ -120,7 +132,12 @@ public:
     //next BB if current BB is empty. Default is true.
     bool do_merge_label() const { return CFGOPTCTX_do_merge_label(this); }
 
-    OptCtx & getOptCtx() { return m_oc; }
+    //If it is true, there is at least one unreach-BB after CFG /optimization.
+    //Default is false.
+    bool has_generate_unreach_bb() const
+    { return CFGOPTCTX_has_generate_unreach_bb(this); }
+
+    OptCtx & getOptCtx() const { return m_oc; }
     ActMgr * getActMgr() const { return m_am; }
 
     //Return true if caller asks CFG optimizer to maintain DomInfo on the fly.
@@ -131,7 +148,11 @@ public:
 
     //The function unify ctx information that collected by 'src'.
     void unionBottomUpInfo(CfgOptCtx const& src)
-    { CFGOPTCTX_vertex_iter_time(this) += CFGOPTCTX_vertex_iter_time(&src); }
+    {
+        CFGOPTCTX_vertex_iter_time(this) += CFGOPTCTX_vertex_iter_time(&src);
+        CFGOPTCTX_has_generate_unreach_bb(this) |=
+            CFGOPTCTX_has_generate_unreach_bb(&src);
+    }
 };
 
 
@@ -143,51 +164,35 @@ public:
 template <class BB, class XR> class CFG : public xcom::DGraph {
     COPY_CONSTRUCTOR(CFG);
 protected:
-    UINT m_has_eh_edge:1;
-    UINT m_li_count:31; //counter to loop.
+    bool m_has_eh_edge;
     SEQ_TYPE m_bb_sort_type;
-    LI<BB> * m_loop_info; //Loop information
-    List<BB*> * m_bb_list;
-    BB * m_entry; //CFG Graph entry.
-    RPOVexList * m_rpo_vexlst; //cache and record Vertex in reverse-post-order.
-    xcom::BitSetMgr * m_bs_mgr;
-    SMemPool * m_pool;
-    List<BB*> m_exit_list; //CFG Graph ENTRY list
-protected:
-    LI<BB> * allocLoopInfo()
-    {
-        LI<BB> * li = (LI<BB>*)xmalloc(sizeof(LI<BB>));
-        LI_id(li) = m_li_count++;
-        return li;
-    }
+    LI<BB> * m_loop_info; //The root of LoopInfo Tree
+    xcom::List<BB*> * m_bb_list;
+    BB * m_entry; //CFG Graph Entry.
 
-    //Build a loopinfo.
-    //bbset: record all BBs inside the loop, include the head.
-    LI<BB> * buildLoopInfo(xcom::BitSet * bbset, BB * head)
-    {
-        ASSERT0(bbset && head);
-        LI<BB> * li = allocLoopInfo();
-        LI_bb_set(li) = bbset;
-        LI_loop_head(li) = head;
-        return li;
-    }
+    //Cache and record Vertex in reverse-post-order.
+    xcom::RPOVexList * m_rpo_vexlst;
+    xcom::BitSetMgr * m_bs_mgr;
+    xcom::SMemPool * m_pool;
+    xcom::List<BB*> m_exit_list; //CFG Graph ENTRY list
+    LoopInfoMgr<BB> m_li_mgr;
+protected:
+    RPOVexList * allocRPOVexList() { return new RPOVexList(); }
 
     //Collect loop info e.g: loop has call, loop has goto.
     void collectLoopInfo() { collectLoopInfoRecur(m_loop_info); }
     void cloneRPOVexList(CFG<BB, XR> const& src);
     void cloneExitList(CFG<BB, XR> const& src);
     void cloneEntry(CFG<BB, XR> const& src);
-
-    //Clean loopinfo structure before recompute loop info.
-    void cleanLoopInfo();
+    void cloneLoopInfo(CFG<BB, XR> const& src);
     void computeRPOImpl(xcom::BitSet & is_visited, IN xcom::Vertex * v,
                         OUT INT & order);
     inline void collectLoopInfoRecur(LI<BB> * li);
 
-    inline bool isLoopHeadRecur(LI<BB> * li, BB * bb);
-    bool insertLoopTree(LI<BB> ** lilist, LI<BB> * loop);
-    void identifyNaturalLoop(UINT x, UINT y, MOD xcom::BitSet & loop,
-                             List<UINT> & tmp);
+    void genRPOVexList()
+    { if (m_rpo_vexlst == nullptr) { m_rpo_vexlst = allocRPOVexList(); } }
+
+    inline bool isLoopHeadRecur(LI<BB> const* li, BB const* bb) const;
 
     virtual void removeRPO(BB * bb)
     {
@@ -218,20 +223,33 @@ public:
         m_bb_list = bb_list;
         m_loop_info = nullptr;
         m_bs_mgr = nullptr;
-        m_li_count = 1;
         m_has_eh_edge = false;
         m_rpo_vexlst = nullptr;
         m_entry = nullptr; //entry will be computed during CFG::build().
-        m_pool = smpoolCreate(sizeof(CFGEdgeInfo) * 4, MEM_COMM);
+        m_pool = xcom::smpoolCreate(sizeof(CFGEdgeInfo) * 4, MEM_COMM);
         set_dense(true); //We think CFG is always dense graph.
     }
     virtual ~CFG()
     {
-        smpoolDelete(m_pool);
-        freeRPOVexList();
+        xcom::smpoolDelete(m_pool);
+        cleanRPOVexList();
         cleanBBVertex();
     }
 
+    //Add BB which is break-point of loop into loop.
+    //e.g:
+    //    for (i)
+    //        if (i < 10)
+    //            foo(A);
+    //        else
+    //            foo(B);
+    //            goto L1;
+    //        endif
+    //    endfor
+    //    ...
+    //    L1:
+    //  where foo(B) and goto L1 are in BBx, and BBx
+    //  should belong to loop body.
     virtual void addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set);
 
     //Build the CFG according to BB list.
@@ -246,7 +264,7 @@ public:
     bool computeDom(xcom::BitSet const* uni)
     {
         ASSERTN(m_entry, ("Not found entry"));
-        RPOVexList vlst;
+        xcom::RPOVexList vlst;
         computeRPO(m_entry->getVex(), vlst);
         return xcom::DGraph::computeDom(&vlst, uni);
     }
@@ -282,7 +300,7 @@ public:
     virtual void computeExitList()
     {
         m_exit_list.clean();
-        xcom::C<BB*> * ct;
+        typename xcom::List<BB*>::Iter ct;
         for (m_bb_list->get_head(&ct);
              ct != nullptr; ct = m_bb_list->get_next(ct)) {
             BB * bb = ct->val();
@@ -293,7 +311,16 @@ public:
         }
     }
     void cleanBBVertex();
+    void cleanRPOVexList()
+    {
+        if (m_rpo_vexlst != nullptr) {
+            delete m_rpo_vexlst;
+            m_rpo_vexlst = nullptr;
+        }
+    }
     void computeRPO(OptCtx & oc);
+    void collectRPOVexList(OptCtx const& oc);
+
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -303,15 +330,14 @@ public:
         return count;
     }
 
-    void dumpLoopTree(LI<BB> const* looplist, UINT indent,
-                      Region const* rg) const;
     virtual void dumpLoopInfo(Region const* rg) const
     {
         if (!rg->isLogMgrInit()) { return; }
         note(rg, "\n==---- DUMP Natural Loop Info ----==");
-        dumpLoopTree(m_loop_info, 0, rg);
+        m_loop_info->dumpLoopTree(rg->getLogMgr());
     }
     virtual void dumpVCG(CHAR const* name = nullptr) const;
+    void dumpRPOVexList(Region const* rg) const;
 
     //Dump Dom Info to dump file.
     void dumpDomSet(Region * rg) const
@@ -333,14 +359,15 @@ public:
                               dump_dom_tree, dump_pdom_tree);
     }
 
-    void freeRPOVexList()
+    //Find natural loops.
+    //NOTE: RPO and DOM info must be avaiable.
+    bool findLoop(OptCtx const& oc)
     {
-        if (m_rpo_vexlst != nullptr) {
-            delete m_rpo_vexlst;
-            m_rpo_vexlst = nullptr;
-        }
+        m_li_mgr.clean();
+        ConstructLoopTree<BB, XR> lt(this, m_li_mgr);
+        m_loop_info = lt.construct(oc);
+        return true;
     }
-    bool findLoop();
 
     //Find the single exit BB if exist for given loop.
     //li: represents a loop.
@@ -358,9 +385,9 @@ public:
     //2th parameter records a list of bb have found.
     virtual void findTargetBBOfIndirectBranch(XR const*, OUT List<BB*> &) = 0;
 
+    LoopInfoMgr<BB> & getLoopInfoMgr() { return m_li_mgr; }
     xcom::List<BB*> * getBBList() const { return m_bb_list; }
     xcom::BitSetMgr * getBitSetMgr() const { return m_bs_mgr; }
-    UINT getLoopNum() const { return m_li_count - 1; }
     void get_preds(MOD List<BB*> & preds, BB const* bb) const;
     void get_preds(MOD List<BB const*> & preds, BB const* bb) const;
     void get_preds(MOD List<UINT> & predid, BB const* bb) const;
@@ -396,10 +423,10 @@ public:
 
     //Get CFG exit BB list.
     List<BB*> * getExitList() { return &m_exit_list; }
-    RPOVexList * getRPOVexList() { return m_rpo_vexlst; }
+    RPOVexList * getRPOVexList() const { return m_rpo_vexlst; }
 
     //Return the fallthrough BB of 'bb'.
-    BB * getFallThroughBB(BB * bb);
+    BB * getFallThroughBB(BB const* bb) const;
 
     //Return the previous BB that fallthrough to 'bb'.
     BB * getFallThroughPrevBB(BB const* bb);
@@ -444,6 +471,13 @@ public:
     //True if current CFG has exception-handler edge.
     bool hasEHEdge() const { return m_has_eh_edge; }
 
+    //Return true if 'bb1' is fall-through to 'bb2' in BB list.
+    bool isFallThrough(BB const* bb1, BB const* bb2) const
+    {
+        ASSERT0(bb1 && bb2);
+        return getFallThroughBB(bb1) == bb2;
+    }
+
     bool isCFGEntry(BB * bb) const
     { return xcom::Graph::is_graph_entry(bb->getVex()); }
 
@@ -467,7 +501,7 @@ public:
     //In some case, BB is not region-exit even if it is the CFG exit.
     virtual bool isRegionExit(BB *) const = 0;
 
-    virtual bool isLoopHead(BB * bb)
+    virtual bool isLoopHead(BB const* bb) const
     { return isLoopHeadRecur(m_loop_info, bb); }
 
     //Return true if BB 'pred' control the execution of 'bb'.
@@ -477,9 +511,6 @@ public:
         return const_cast<CFG<BB, XR>*>(this)->get_ipdom(const_cast<BB*>(pred))
                != bb;
     }
-
-    void removeLoopInfo(LI<BB>* loop);
-    bool reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop);
 
     //Insert unconditional branch to revise fall through BB.
     //e.g: Given bblist is bb1=>bb2=>bb3=>bb4, where bb4 is exit-BB,
@@ -545,31 +576,11 @@ public:
     //Perform verification if BB has been removed.
     bool verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const;
     bool verifyRPOUniqueness() const;
+
+    //Verify RPO to given region.
+    bool verifyRPO(OptCtx const& oc) const;
     bool verify() const;
 };
-
-
-template <class BB, class XR>
-void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
-                               Region const* rg) const
-{
-    if (!rg->isLogMgrInit()) { return; }
-    while (looplist != nullptr) {
-        note(rg, "\n");
-        for (UINT i = 0; i < indent; i++) { prt(rg, " "); }
-        ASSERT0(LI_loop_head(looplist));
-        prt(rg, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
-            LI_loop_head(looplist)->id());
-        if (LI_bb_set(looplist) != nullptr) {
-            for (BSIdx i = LI_bb_set(looplist)->get_first();
-                 i != BS_UNDEF; i = LI_bb_set(looplist)->get_next((UINT)i)) {
-                prt(rg, "%d,", i);
-            }
-        }
-        dumpLoopTree(LI_inner_list(looplist), indent + 2, rg);
-        looplist = LI_next(looplist);
-    }
-}
 
 
 //Perform verification if BB has been removed.
@@ -577,7 +588,7 @@ template <class BB, class XR>
 bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
 {
     ASSERTN(cdg, ("DEBUG: verification requires cdg."));
-    xcom::C<BB*> * ct, * next_ct;
+    typename xcom::List<BB*>::Iter ct, next_ct;
     List<BB*> succs;
     bool is_cfg_valid = oc.is_cfg_valid();
     CFG<BB, XR> * pthis = const_cast<CFG<BB, XR>*>(this);
@@ -677,7 +688,7 @@ void CFG<BB, XR>::sortByDFS()
 {
     List<BB*> new_bbl;
     Vector<bool> visited;
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
         BB * bb = ct->val();
@@ -709,7 +720,7 @@ void CFG<BB, XR>::sortByBFS()
     List<BB*> new_bbl;
     List<BB*> succs;
     Vector<bool> visited;
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
         BB * bb = ct->val();
@@ -861,8 +872,8 @@ template <class BB, class XR>
 void CFG<BB, XR>::build(OptCtx & oc)
 {
     ASSERTN(m_bb_list, ("bb_list is emt"));
-    xcom::C<BB*> * ct = nullptr;
-    xcom::C<BB*> * next_ct;
+    typename xcom::List<BB*>::Iter ct = nullptr;
+    typename xcom::List<BB*>::Iter next_ct;
     List<BB*> tgt_bbs;
     for (m_bb_list->get_head(&ct); ct != m_bb_list->end(); ct = next_ct) {
         BB * bb = ct->val();
@@ -999,97 +1010,6 @@ void CFG<BB, XR>::collectLoopInfoRecur(LI<BB> * li)
 }
 
 
-//Remove 'loop' out of loop tree.
-template <class BB, class XR>
-void CFG<BB, XR>::removeLoopInfo(LI<BB>* loop)
-{
-    ASSERT0(loop != nullptr);
-    LI<BB> * head = xcom::get_head(loop);
-    ASSERT0(head);
-    xcom::remove(&head, loop);
-    if (LI_outer(loop) != nullptr) {
-        //Update inner-list header for outer-loop of 'loop'.
-        //Guarantee outer-loop have the correct inner-loop header.
-        LI_inner_list(LI_outer(loop)) = head;
-    }
-    loop->cleanAdjRelation();
-}
-
-
-//Reinsert loop into loop tree.
-//NOTE 'loop' has been inserted into the loop-tree.
-template <class BB, class XR>
-bool CFG<BB, XR>::reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
-{
-    ASSERT0(lilist != nullptr && loop != nullptr);
-    removeLoopInfo(loop);
-    return insertLoopTree(lilist, loop);
-}
-
-
-//Insert loop into loop tree.
-template <class BB, class XR>
-bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
-{
-    ASSERT0(lilist != nullptr && loop != nullptr);
-    if (*lilist == nullptr) {
-        *lilist = loop;
-        return true;
-    }
-
-    LI<BB> * li = *lilist, * cur = nullptr;
-    while (li != nullptr) {
-        cur = li;
-        li = LI_next(li);
-        if (cur == loop) {
-            //loop has already in LoopInfo list.
-            return true;
-        }
-        if (LI_bb_set(cur)->is_contain(*LI_bb_set(loop))) {
-            if (insertLoopTree(&LI_inner_list(cur), loop)) {
-                if (LI_outer(loop) == nullptr) {
-                    //Only record 'cur' as outermost loop when they
-                    //at are first meeting.
-                    LI_outer(loop) = cur;
-                }
-                return true;
-            }
-            continue;
-        }
-        if (LI_bb_set(loop)->is_contain(*LI_bb_set(cur))) {
-            //Loop body of 'loop' contained 'cur'.
-            //Adjust inclusive-relation between 'loop' and 'cur' to
-            //have 'loop' become loop-parent of 'cur'.
-            xcom::remove(lilist, cur);
-            insertLoopTree(&LI_inner_list(loop), cur);
-            if (LI_outer(cur) == nullptr) {
-                //Only record 'loop' as outermost loop when they
-                //at are first meeting.
-                LI_outer(cur) = loop;
-            }
-            ASSERTN(LI_inner_list(loop), ("illegal loop tree"));
-        }
-    }
-    xcom::add_next(lilist, loop);
-    return true;
-}
-
-
-//Add BB which is break-point of loop into loop.
-//e.g:
-//    for (i)
-//        if (i < 10)
-//            foo(A);
-//        else
-//            foo(B);
-//            goto L1;
-//        endif
-//    endfor
-//    ...
-//    L1:
-//
-//where foo(B) and goto L1 are in BBx, and BBx
-//should belong to loop body.
 template <class BB, class XR>
 void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
 {
@@ -1121,26 +1041,6 @@ void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
             out = EC_next(out);
         }
     }
-}
-
-
-template <class BB, class XR>
-void CFG<BB, XR>::cleanLoopInfo()
-{
-    LI<BB> * li = getLoopInfo();
-    if (li == nullptr) { return; }
-    List<LI<BB>*> worklst;
-    for (; li != nullptr; li = LI_next(li)) {
-        worklst.append_tail(li);
-    }
-    while (worklst.get_elem_count() > 0) {
-        LI<BB> * x = worklst.remove_head();
-        m_bs_mgr->free(LI_bb_set(x));
-        for (LI<BB> * y = LI_inner_list(x); y != nullptr; y = LI_next(y)) {
-            worklst.append_tail(y);
-        }
-    }
-    m_loop_info = nullptr;
 }
 
 
@@ -1179,99 +1079,11 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
 }
 
 
-//Find natural loops.
-//NOTICE: DOM set of BB must be avaiable.
 template <class BB, class XR>
-bool CFG<BB, XR>::findLoop()
-{
-    cleanLoopInfo();
-    List<UINT> tmp;
-    TMap<BB*, LI<BB>*> head2li;
-    xcom::C<BB*> * ct;
-    for (m_bb_list->get_head(&ct);
-         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
-        BB * bb = ct->val();
-
-        //Access each sussessor of bb.
-        xcom::Vertex * vex = bb->getVex();
-        ASSERT0(vex);
-        for (xcom::EdgeC * el = vex->getOutList();
-             el != nullptr; el = EC_next(el)) {
-            BB * succ = getBB(el->getToId());
-            ASSERT0(succ);
-
-            xcom::BitSet * dom = m_dom_set.get(bb->id());
-            ASSERTN(dom, ("should compute dominator first"));
-            if (!dom->is_contain(succ->id()) &&
-                bb->id() != succ->id()) { //bb's successor is itself.
-                continue;
-            }
-
-            //If the SUCC is one of the DOMINATOR of bb, then it
-            //indicates a back-edge.
-            //xcom::Edge:bb->succ is a back-edge, each back-edge descripts a
-            //natural loop.
-            xcom::BitSet * loop = m_bs_mgr->create();
-            identifyNaturalLoop(bb->id(), succ->id(), *loop, tmp);
-
-            //Handle some special cases.
-            //addBreakOutLoop(succ, *loop);
-
-            //Loop may have multiple back edges.
-            LI<BB> * li = head2li.get(succ);
-            if (li != nullptr) {
-                //Multiple natural loops have the same loop header.
-                li->getBodyBBSet()->bunion(*loop);
-                reinsertLoopTree(&m_loop_info, li);
-                continue;
-            }
-            li = buildLoopInfo(loop, succ);
-            insertLoopTree(&m_loop_info, li);
-            head2li.set(succ, li);
-        }
-    }
-    return true;
-}
-
-
-//Back edge: y dominate x, back-edge is : x->y
-template <class BB, class XR>
-void CFG<BB, XR>::identifyNaturalLoop(UINT x, UINT y, MOD xcom::BitSet & loop,
-                                      List<UINT> & tmp)
-{
-    //Both x,y are node in loop.
-    loop.bunion(x);
-    loop.bunion(y);
-    if (x == y) { return; }
-
-    tmp.clean();
-    tmp.append_head(x);
-    while (tmp.get_elem_count() != 0) {
-        //Bottom-up scanning and starting with 'x'
-        //to handling each node till 'y'.
-        //All nodes in the path among from 'x' to 'y'
-        //are belong to natural loop.
-        UINT bb = tmp.remove_tail();
-        xcom::EdgeC const* ec = VERTEX_in_list(getVertex(bb));
-        while (ec != nullptr) {
-            INT pred = ec->getFromId();
-            if (!loop.is_contain(pred)) {
-                //If pred is not a member of loop,
-                //add it into list to handle.
-                loop.bunion(pred);
-                tmp.append_head(pred);
-            }
-            ec = EC_next(ec);
-        }
-    }
-}
-
-
-template <class BB, class XR>
-bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
+bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> const* li, BB const* bb) const
 {
     if (li == nullptr) { return false; }
-    LI<BB> * t = li;
+    LI<BB> const* t = li;
     while (t != nullptr) {
         ASSERTN(LI_loop_head(t) != nullptr, ("loop info absent loophead bb"));
         if (LI_loop_head(t) == bb) {
@@ -1280,6 +1092,19 @@ bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
         t = LI_next(t);
     }
     return isLoopHeadRecur(LI_inner_list(li), bb);
+}
+
+
+template <class BB, class XR>
+void CFG<BB, XR>::dumpRPOVexList(Region const* rg) const
+{
+    if (getRPOVexList() == nullptr || !rg->isLogMgrInit()) { return; }
+    note(rg, "\n-- DUMP RPO VEX LIST, VEXNUM(%u) --",
+         getRPOVexList()->get_elem_count());
+    rg->getLogMgr()->incIndent(2);
+    xcom::RPOMgr::dumpRPOVexList(rg->getLogMgr()->getFileHandler(),
+        *getRPOVexList(), rg->getLogMgr()->getIndent());
+    rg->getLogMgr()->decIndent(2);
 }
 
 
@@ -1392,6 +1217,18 @@ void CFG<BB, XR>::computeRPOImpl(MOD xcom::BitSet & is_visited,
 
 //Compute rev-post-order.
 template <class BB, class XR>
+void CFG<BB, XR>::collectRPOVexList(OptCtx const& oc)
+{
+    ASSERT0_DUMMYUSE(oc.is_rpo_valid());
+    genRPOVexList();
+    ASSERT0(getRPOVexList());
+    getRPOVexList()->clean();
+    getRPOMgr().collectRPOVexList(*this, *getRPOVexList());
+}
+
+
+//Compute rev-post-order.
+template <class BB, class XR>
 void CFG<BB, XR>::computeRPO(OptCtx & oc)
 {
     if (m_bb_list->get_elem_count() == 0) { return; }
@@ -1408,8 +1245,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
 
     xcom::BitSet is_visited;
     ASSERTN(m_entry, ("Not find entry"));
-
-    if (m_rpo_vexlst == nullptr) { m_rpo_vexlst = new RPOVexList(); }
+    genRPOVexList();
 
     #ifdef RECURSIVE_ALGO
     INT order = RPO_INIT_VAL + m_bb_list->get_elem_count() * RPO_INTERVAL;
@@ -1425,7 +1261,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
 template <class BB, class XR>
 void CFG<BB, XR>::setBBVertex()
 {
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     if (m_bb_list == nullptr) { return; }
     for (m_bb_list->get_head(&ct);
          ct != nullptr; ct = m_bb_list->get_next(ct)) {
@@ -1438,6 +1274,13 @@ void CFG<BB, XR>::setBBVertex()
 
 
 template <class BB, class XR>
+void CFG<BB, XR>::cloneLoopInfo(CFG<BB, XR> const& src)
+{
+    m_loop_info = m_li_mgr.copyLoopTree(src.m_loop_info);
+}
+
+
+template <class BB, class XR>
 void CFG<BB, XR>::cloneEntry(CFG<BB, XR> const& src)
 {
     ASSERT0(this != &src);
@@ -1446,7 +1289,7 @@ void CFG<BB, XR>::cloneEntry(CFG<BB, XR> const& src)
         m_entry = src.m_entry;
         return;
     }
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     m_entry = nullptr;
     for (BB * bb = m_bb_list->get_head(&ct); bb != nullptr;
          bb = m_bb_list->get_next(&ct)) {
@@ -1468,11 +1311,11 @@ void CFG<BB, XR>::cloneExitList(CFG<BB, XR> const& src)
         m_exit_list.copy(src.m_exit_list);
         return;
     }
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     for (BB * s = src.m_exit_list.get_head(&ct); s != nullptr;
          s = src.m_exit_list.get_next(&ct)) {
         BB * t = nullptr;
-        xcom::C<BB*> * ct2;
+        typename xcom::List<BB*>::Iter ct2;
         for (t = m_bb_list->get_head(&ct2);
              t != nullptr; t = m_bb_list->get_next(&ct2)) {
             if (t->id() == s->id()) {
@@ -1490,7 +1333,7 @@ void CFG<BB, XR>::cloneRPOVexList(CFG<BB, XR> const& src)
 {
     ASSERT0(this != &src);
     if (src.m_rpo_vexlst == nullptr) {
-        freeRPOVexList();
+        cleanRPOVexList();
         return;
     }
     if (m_rpo_vexlst == nullptr) { m_rpo_vexlst = new RPOVexList(); }
@@ -1511,13 +1354,13 @@ void CFG<BB, XR>::clone(CFG<BB, XR> const& src, bool clone_edge_info,
     ASSERT0(this != &src);
     xcom::DGraph::clone(src, clone_edge_info, clone_vex_info);
     m_has_eh_edge = src.m_has_eh_edge;
-    m_li_count = src.m_li_count;
     m_bb_sort_type = src.m_bb_sort_type;
-    m_loop_info = src.m_loop_info;
+    cloneLoopInfo(src);
     cloneEntry(src);
     cloneExitList(src);
     cloneRPOVexList(src);
 }
+
 
 //Get the first successor of bb.
 template <class BB, class XR>
@@ -1588,7 +1431,7 @@ template <class BB, class XR>
 void CFG<BB, XR>::cleanBBVertex()
 {
     if (m_bb_list == nullptr) { return; }
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     for (m_bb_list->get_head(&ct);
          ct != nullptr; ct = m_bb_list->get_next(ct)) {
         BB * bb = ct->val();
@@ -1598,12 +1441,13 @@ void CFG<BB, XR>::cleanBBVertex()
 
 
 template <class BB, class XR>
-BB * CFG<BB, XR>::getFallThroughBB(BB * bb)
+BB * CFG<BB, XR>::getFallThroughBB(BB const* bb) const
 {
     ASSERT0(bb);
-    xcom::C<BB*> * ct;
-    ASSERT0(m_bb_list->find(bb, &ct));
-    m_bb_list->find(bb, &ct);
+    typename xcom::List<BB*>::Iter ct;
+    BB * pbb = const_cast<BB*>(bb);
+    ASSERT0(m_bb_list->find(pbb, &ct));
+    m_bb_list->find(pbb, &ct);
     return m_bb_list->get_next(&ct);
 }
 
@@ -1612,7 +1456,7 @@ template <class BB, class XR>
 BB * CFG<BB, XR>::getFallThroughPrevBB(BB const* bb)
 {
     ASSERT0(bb);
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     ASSERT0(m_bb_list->find(const_cast<BB*>(bb), &ct));
     m_bb_list->find(const_cast<BB*>(bb), &ct);
     return m_bb_list->get_prev(&ct);
@@ -1628,7 +1472,7 @@ bool CFG<BB, XR>::verify() const
     ASSERT0_DUMMYUSE(vex && vex->getInDegree() == 0);
 
     //The exit node can not have successors.
-    C<BB*> * it;
+    typename xcom::List<BB*>::Iter it;
     xcom::TTab<UINT> bbid;
     for (BB const* bb = m_exit_list.get_head(&it);
          bb != nullptr; bb = m_exit_list.get_next(&it)) {
@@ -1640,7 +1484,7 @@ bool CFG<BB, XR>::verify() const
 
     //Check the BB list.
     if (m_bb_list == nullptr) { return true; }
-    xcom::C<BB*> * ct;
+    typename xcom::List<BB*>::Iter ct;
     bbid.clean();
     for (BB * bb = m_bb_list->get_head(&ct); bb != nullptr;
          bb = m_bb_list->get_next(&ct)) {
@@ -1653,12 +1497,11 @@ bool CFG<BB, XR>::verify() const
 }
 
 
-//Verify RPO to given region.
 template <class BB, class XR>
 bool CFG<BB, XR>::verifyRPOUniqueness() const
 {
-    TMap<UINT, UINT> rpotab;
-    xcom::C<BB*> * ct;
+    xcom::TMap<UINT, UINT> rpotab;
+    typename xcom::List<BB*>::Iter ct;
     for (BB * bb = m_bb_list->get_head(&ct);
          bb != nullptr; bb = m_bb_list->get_next(&ct)) {
         if (bb->rpo() == RPO_UNDEF) {
@@ -1670,6 +1513,39 @@ bool CFG<BB, XR>::verifyRPOUniqueness() const
         ASSERTN(!find, ("duplicated RPO to %d", before_bbid));
         rpotab.set(bb->rpo(), bb->id());
     }
+    return true;
+}
+
+
+//Verify RPO to given region.
+template <class BB, class XR>
+bool CFG<BB, XR>::verifyRPO(OptCtx const& oc) const
+{
+    if (!oc.is_rpo_valid()) { return true; }
+    ASSERTN(verifyRPOUniqueness(),
+            ("Miss RPO info or set rpo invalid in OptCtx"));
+    BB const* entry = getEntry();
+    ASSERT0(entry && entry->getVex());
+    if (getRPOVexList() != nullptr) {
+        ASSERT0(getBBList());
+        ASSERTN(getRPOVexList()->get_elem_count() ==
+                getBBList()->get_elem_count(),
+                ("RPO info need to be fixed or set rpo invalid in OptCtx"));
+
+        //Ensure the RPO in CFG conforms to the expected RPO result.
+        //Collect RPO from current CFG into a orgrpovexlst.
+        ASSERT0(RPOMgr::verifyRPOVexList(*this, entry->getVex(),
+                                         *getRPOVexList()));
+        return true;
+    }
+    //Collect RPO from current CFG into a orgrpovexlst.
+    RPOVexList orgrpovexlst;
+    const_cast<CFG<BB, XR>*>(this)->getRPOMgr().collectRPOVexList(
+        *this, orgrpovexlst);
+
+    //Ensure the RPO in CFG conforms to the expected RPO result.
+    //Collect RPO from current CFG into a orgrpovexlst.
+    ASSERT0(RPOMgr::verifyRPOVexList(*this, entry->getVex(), orgrpovexlst));
     return true;
 }
 

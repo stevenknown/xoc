@@ -43,6 +43,21 @@ typedef xcom::DefSBitSet DefMDSet;
 typedef xcom::DefSBitSetIter DefMDSetIter;
 typedef xcom::Stack<VMD*> VMDStack;
 
+typedef enum tagMDSSA_STATUS {
+    //Describe miscellaneous information for IR.
+    MDSSA_STATUS_DOM_IS_INVALID_POS = 0,
+    MDSSA_STATUS_DOM_IS_INVALID = 1ULL<<MDSSA_STATUS_DOM_IS_INVALID_POS,
+} MDSSA_STATUS;
+
+class MDSSAStatus : public Status {
+public:
+    //Return true if current status indicates complete success.
+    bool is_succ() const { return get_status_num() == 0; }
+
+    //Return the name of status.
+    virtual CHAR const* getStatusName(FlagSetIdx s) const override;
+};
+
 enum COLLECT_FLAG {
     COLLECT_UNDEF = 0x0,
 
@@ -231,11 +246,12 @@ public:
     VMD::UseSetIter useset_iter;
     BSIdx current_pos_in_useset;
     VMD::UseSet const* current_useset;
+    MDSSAMgr const* m_mdssamgr;
+    UseDefMgr const* m_udmgr;
+    Region const* m_rg;
 public:
-    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr),
-        current_pos_in_vopndset(BS_UNDEF),
-        current_pos_in_useset(BS_UNDEF),
-        current_useset(nullptr) {}
+    ConstMDSSAUSEIRIter(MDSSAMgr const* mdssamgr);
+
     void clean()
     {
         vopndset_iter = nullptr;
@@ -244,16 +260,87 @@ public:
         current_pos_in_useset = BS_UNDEF;
         current_useset = nullptr;
     }
+
+    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+    //describes a memory expression.
+    //The funtion initialize the iterator.
+    //def: the MDDef of the chain.
+    //it: iterator. It should be clean already.
+    //Readonly function.
+    //Note the function may iterate same IR multiple times because it may
+    //belong different VOpnd.
+    //e.g: global int g; local int b;
+    //     g = b;
+    //The MDSSA info of ST is:
+    // st:i32 'g'
+    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
+    IR const* get_first(IR const* def);
+
+    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+    //describes a memory expression.
+    //The function return the next USE according to 'it'.
+    //it: iterator.
+    //Readonly function.
+    //Note the function may iterate same IR multiple times because it may
+    //belong different VOpnd.
+    //e.g: global int g; local int b;
+    //     g = b;
+    //The MDSSA info of ST is:
+    // st:i32 'g'
+    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
+    IR const* get_next();
 };
 
 
 class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);
+protected:
+    MDSSAMgr const* m_mdssamgr;
     xcom::TTab<UINT> m_is_visited;
 public:
-    ConstMDDefIter() {}
+    ConstMDDefIter(MDSSAMgr const* mdssamgr) : m_mdssamgr(mdssamgr) {}
+
     bool is_visited(MDDef const* def) const
     { return m_is_visited.find(def->id()); }
+
+    //Iterative access MDDef chain.
+    //The funtion initialize the iterator.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //def: the beginning MDDef of the chain.
+    //it: iterator. It should be clean already.
+    MDDef const* get_first(MDDef const* def);
+
+    //Iterative access MDDef chain.
+    //The function return the next MDDef node according to 'it'.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //it: iterator.
+    MDDef const* get_next();
+
+    //Iterative access MDDef chain.
+    //The funtion initialize the iterator.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //def: the beginning MDDef of the chain.
+    //use: indicate the USE expression of the 'def'.
+    //it: iterator. It should be clean already.
+    //Readonly function.
+    MDDef const* get_first_untill_killing_def(MDDef const* def, IR const* use);
+
+    //Iterative access MDDef chain.
+    //The function return the next MDDef node according to 'it'.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //it: iterator.
+    //use: indicate the USE expression of the 'def'.
+    //Readonly function.
+    MDDef const* get_next_untill_killing_def(IR const* use);
+
     void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
 };
 
@@ -574,8 +661,8 @@ public:
 };
 
 
-//The class reconstruct MDSSA info for given region in DomTree order.
-//The region recorded in 'm_vextab'
+//The class reconstructs MDSSA info for given region in DomTree order.
+//The region recorded in 'm_vextab' of ReconstructMDSSAVF.
 class ReconstructMDSSA : public xcom::VisitTree<ReconstructMDSSAVF> {
 public:
     ReconstructMDSSA(xcom::DomTree const& dt, xcom::Vertex const* root,
@@ -593,7 +680,7 @@ class MDSSAUpdateCtx {
 public:
     //Pass info top-down.
     //True to ask MDSSAMgr to maintain MDSSA DU chain by DomInfo.
-    BYTE m_update_duchain_by_dominfo:1;
+    bool m_update_duchain_by_dominfo;
     OptCtx const& m_oc;
 public:
     MDSSAUpdateCtx(OptCtx const& oc) : m_oc(oc)
@@ -700,7 +787,8 @@ protected:
     //ssainfo: MDSSAInfo of id.
     //olddef: old DEF of id.
     void findNewDefForID(
-        IR * id, MDSSAInfo * ssainfo, MDDef * olddef, OptCtx const& oc);
+        IR * id, MDSSAInfo * ssainfo, MDDef * olddef, OptCtx const& oc,
+        OUT MDSSAStatus & st);
 
     //Find live-in VMD through given start IR at start BB.
     //Note DOM info must be available.
@@ -862,8 +950,10 @@ public:
 
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
-    void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
-                                       OptCtx const& oc);
+    //NOTE: the function will attempt to find the latest live-in version
+    //of the new operand MD of PHI.
+    void addSuccessorDesignatedPhiOpnd(
+        IRBB * bb, IRBB * succ, OptCtx const& oc, OUT MDSSAStatus & st);
     void addStmtToMDSSAMgr(IR * ir, IR const* ref);
 
     //Build DU chain from 'def' to 'exp'.
@@ -1071,13 +1161,18 @@ public:
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
-    VMD * findDomLiveInDefFrom(MDIdx mdid, IR const* startir,
-                               IRBB const* startbb, OptCtx const& oc) const;
+    //reason: record the reason if the function can not find Dom-LiveIn-Def.
+    //Return nullptr if the funtion can not find a exist Dom-LiveIn-Def of
+    //'mdid'. It may be a Region-LiveIn-VMD.
+    VMD * findDomLiveInDefFrom(
+        MDIdx mdid, IR const* startir, IRBB const* startbb, OptCtx const& oc,
+        OUT MDSSAStatus & st) const;
 
     //The function do searching that begin at the IDom BB of marker.
     //Note DOM info must be available.
-    VMD * findDomLiveInDefFromIDomOf(IRBB const* marker, MDIdx mdid,
-                                     OptCtx const& oc) const;
+    VMD * findDomLiveInDefFromIDomOf(
+        IRBB const* marker, MDIdx mdid, OptCtx const& oc,
+        OUT MDSSAStatus & st) const;
 
     //Note DOM info must be available.
     //exp: the expression that expected to set live-in.
@@ -1086,13 +1181,14 @@ public:
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
-    void findAndSetLiveInDefForTree(IR * exp, IR const* startir,
-                                    IRBB const* startbb, OptCtx const& oc);
-    void findAndSetLiveInDefForTree(IR * exp, IRBB const* startbb,
-                                    OptCtx const& oc)
+    void findAndSetLiveInDefForTree(
+        IR * exp, IR const* startir, IRBB const* startbb,
+        OptCtx const& oc, OUT MDSSAStatus & st);
+    void findAndSetLiveInDefForTree(
+        IR * exp, IRBB const* startbb, OptCtx const& oc, OUT MDSSAStatus & st)
     {
         findAndSetLiveInDefForTree(exp, const_cast<IRBB*>(startbb)->getLastIR(),
-                                   startbb, oc);
+                                   startbb, oc, st);
     }
 
     //Note DOM info must be available.
@@ -1102,13 +1198,15 @@ public:
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
-    void findAndSetLiveInDef(MOD IR * exp, IR const* startir,
-                             IRBB const* startbb, OptCtx const& oc);
-    void findAndSetLiveInDef(MOD IR * exp, IRBB const* startbb,
-                             OptCtx const& oc)
+    void findAndSetLiveInDef(
+        MOD IR * exp, IR const* startir, IRBB const* startbb, OptCtx const& oc,
+        OUT MDSSAStatus & st);
+    void findAndSetLiveInDef(
+        MOD IR * exp, IRBB const* startbb, OptCtx const& oc,
+        OUT MDSSAStatus & st)
     {
         findAndSetLiveInDef(exp, const_cast<IRBB*>(startbb)->getLastIR(),
-                            startbb, oc);
+                            startbb, oc, st);
     }
 
     //Find the VOpnd if 'ir' must OR may referenced 'md'.
@@ -1276,78 +1374,6 @@ public:
     void insertDefBefore(VMD const* def1, VMD const* def2)
     { insertDefBefore(def1->getDef(), def2->getDef()); }
 
-    //Iterative access MDDef chain.
-    //The funtion initialize the iterator.
-    //When the iterator meets MDPhi, it will keep iterating the DEF of each
-    //operand of MDPhi.
-    //PHI.
-    //def: the beginning MDDef of the chain.
-    //it: iterator. It should be clean already.
-    //Readonly function.
-    MDDef const* iterDefInitC(MDDef const* def, OUT ConstMDDefIter & it) const;
-
-    //Iterative access MDDef chain.
-    //The function return the next MDDef node according to 'it'.
-    //When the iterator meets MDPhi, it will keep iterating the DEF of each
-    //operand of MDPhi.
-    //it: iterator.
-    //Readonly function.
-    MDDef const* iterDefNextC(MOD ConstMDDefIter & it) const;
-
-    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
-    //describes a memory expression.
-    //The funtion initialize the iterator.
-    //def: the MDDef of the chain.
-    //it: iterator. It should be clean already.
-    //Readonly function.
-    //Note the function may iterate same IR multiple times because it may
-    //belong different VOpnd.
-    //e.g: global int g; local int b;
-    //     g = b;
-    //The MDSSA info of ST is:
-    // st:i32 'g'
-    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
-    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
-    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
-    IR const* iterUseInitC(IR const* def, OUT ConstMDSSAUSEIRIter & it) const;
-
-    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
-    //describes a memory expression.
-    //The function return the next USE according to 'it'.
-    //it: iterator.
-    //Readonly function.
-    //Note the function may iterate same IR multiple times because it may
-    //belong different VOpnd.
-    //e.g: global int g; local int b;
-    //     g = b;
-    //The MDSSA info of ST is:
-    // st:i32 'g'
-    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
-    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
-    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
-    IR const* iterUseNextC(MOD ConstMDSSAUSEIRIter & it) const;
-
-    //Iterative access MDDef chain.
-    //The funtion initialize the iterator.
-    //When the iterator meets MDPhi, it will keep iterating the DEF of each
-    //operand of MDPhi.
-    //def: the beginning MDDef of the chain.
-    //use: indicate the USE expression of the 'def'.
-    //it: iterator. It should be clean already.
-    //Readonly function.
-    MDDef const* iterDefInitCTillKillingDef(MDDef const* def, IR const* use,
-                                            OUT ConstMDDefIter & it) const;
-
-    //Iterative access MDDef chain.
-    //The function return the next MDDef node according to 'it'.
-    //When the iterator meets MDPhi, it will keep iterating the DEF of each
-    //operand of MDPhi.
-    //it: iterator.
-    //use: indicate the USE expression of the 'def'.
-    //Readonly function.
-    MDDef const* iterDefNextCTillKillingDef(IR const* use,
-                                            MOD ConstMDDefIter & it) const;
-
     //Return true if ir dominates all its USE expressions which inside loop.
     //In ssa mode, stmt's USE may be placed in operand list of PHI.
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
@@ -1355,6 +1381,14 @@ public:
 
     //Return true if all vopnds of 'def' can reach 'exp'.
     bool isMustDef(IR const* def, IR const* exp) const;
+
+    //Return true if ir describes a region live-in MD reference.
+    //The function returns true if ir is region live-in in all paths that
+    //begins at the region entry to current ir.
+    //e.g: *p = 10; #S1 //The stmt does not have MustRef, its MayRef is MD2.
+    //     ... = g; #S2 //g's MustRef is MD7, MayRef is MD2.
+    //     the function will return false because #S1 may define MD2.
+    bool isRegionLiveIn(IR const* ir) const;
 
     //Move PHI from 'from' to 'to'.
     //The function often used in updating PHI when adding new dominater
@@ -1447,8 +1481,11 @@ public:
     //Return true if any PHI was removed.
     bool removeRedundantPhi(OptCtx const& oc);
 
-    //Before removing bb or change bb successor,
+    //Before removing bb or changing BB successor,
     //you need remove the related PHI operand if BB 'succ' has PHI stmt.
+    //ctx: pass the update-info top down.
+    //NOTE: the function is always successful in maintaining MDSSA info, thus
+    //      no need to require MDSSAStatus.
     void removeSuccessorDesignatedPhiOpnd(IRBB const* succ, UINT pos,
                                           MDSSAUpdateCtx const& ctx);
 

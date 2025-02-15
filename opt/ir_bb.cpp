@@ -169,7 +169,7 @@ bool BBList::isPrevBB(IRBB const* prev, BBListIter nextit) const
 }
 
 
-void BBList::clone(BBList const& src, MOD IRBBMgr * bbmgr, Region * rg)
+void BBList::clone(BBList const& src, MOD IRBBMgr * bbmgr, Region const* rg)
 {
     BBListIter srcit;
     for (IRBB const* srcbb = src.get_head(&srcit);
@@ -180,7 +180,7 @@ void BBList::clone(BBList const& src, MOD IRBBMgr * bbmgr, Region * rg)
 }
 
 
-void BBList::copy(BBList const& src, Region * rg)
+void BBList::copy(BBList const& src, Region const* rg)
 {
     IRBBMgr * mgr = rg->getBBMgr();
     BBListIter srcit;
@@ -327,8 +327,7 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region,
     rg->getLogMgr()->incIndent(3);
     IRBB * pthis = const_cast<IRBB*>(this);
     DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID|IR_DUMP_SRC_LINE|
-        (dump_inner_region ? IR_DUMP_INNER_REGION : 0)|
-        (g_dump_opt.isDumpIRID() ? IR_DUMP_IRID : 0));
+        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() || ir->is_undef());
@@ -363,7 +362,7 @@ void IRBB::dumpDigest(Region const* rg) const
 
 
 void IRBB::dump(Region const* rg, bool dump_inner_region,
-                IRDumpCtx<> * ctx) const
+                MOD IRDumpCtx<> * ctx) const
 {
     if (!rg->isLogMgrInit()) { return; }
     dumpDigest(rg);
@@ -378,12 +377,14 @@ bool IRBB::verify(Region const* rg) const
     IRListIter ct;
     BitSet irset;
     bool should_not_phi = false;
-    for (IR * ir = BB_irlist(this).get_head(&ct);
-         ir != nullptr; ir = BB_irlist(this).get_next(&ct)) {
+    BBIRList const& irlst = BB_irlist(this);
+    for (IR * ir = irlst.get_head(&ct);
+         ir != nullptr; ir = irlst.get_next(&ct)) {
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
         ASSERT0(ir->getParent() == nullptr);
         ASSERT0(ir->isStmtInBB());
+        ASSERTN(irlst.find(ir), ("element not in EList"));
         if (IRBB::isLowerBoundary(ir)) {
             ASSERTN(ir == const_cast<IRBB*>(this)->getLastIR(),
                     ("invalid BB down boundary."));
@@ -597,7 +598,7 @@ bool IRBB::verifyTryStart() const
 }
 
 
-void IRBB::copyIRList(IRBB const& src, Region * rg)
+void IRBB::copyIRList(IRBB const& src, Region const* rg)
 {
     BBIRList & tgtirlst = getIRList();
     ASSERT0(tgtirlst.get_elem_count() == 0);
@@ -620,18 +621,18 @@ void IRBB::copyLabelInfoList(IRBB const& src, SMemPool * pool)
 
 //The function will copy all contents of 'src', include BBID and Vertex info.
 //This is the difference that compare to IRBB::copy().
-void IRBB::clone(IRBB const& src, Region * rg)
+void IRBB::clone(IRBB const& src, Region const* rg)
 {
     m_id = src.m_id;
     copy(src, rg);
 }
 
 
-void IRBB::copy(IRBB const& src, Region * rg)
+void IRBB::copy(IRBB const& src, Region const* rg)
 {
-    ///////////////////////////////////////////////////////////////////////////
-    //DO NOT COPY BB'S ID, BB ID IS UNIQUE IN GIVEN REGION.                  //
-    ///////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    //DO NOT COPY BB'S ID, BB ID IS UNIQUE IN CURRENT REGION.                 //
+    ////////////////////////////////////////////////////////////////////////////
     u1 = src.u1;
     m_vertex = nullptr;
     copyLabelInfoList(src, rg->getCommPool());
@@ -639,7 +640,7 @@ void IRBB::copy(IRBB const& src, Region * rg)
 }
 
 
-void IRBB::freeIRList(MOD Region * rg)
+void IRBB::freeIRList(Region const* rg)
 {
     BBIRListIter irit;
     for (IR * ir = BB_irlist(this).get_head(&irit);
@@ -667,7 +668,7 @@ IRBBMgr::~IRBBMgr()
 }
 
 
-IRBB * IRBBMgr::cloneBB(IRBB const& src, Region * rg)
+IRBB * IRBBMgr::cloneBB(IRBB const& src, Region const* rg)
 {
     ASSERTN(m_bb_vec.get(src.id()) == nullptr,
             ("BB%d has been allocated", src.id()));
@@ -808,6 +809,22 @@ void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region,
     xcom::C<IRBB*> * ct = nullptr;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != nullptr; bb = bbl->get_next(&ct)) {
+        bb->dump(rg, dump_inner_region, ctx);
+    }
+}
+
+
+void dumpBBSet(BBSet const& bbs, Region const* rg, bool dump_inner_region,
+               IRDumpCtx<> * ctx)
+{
+    ASSERT0(rg);
+    if (!rg->isLogMgrInit() || bbs.get_elem_count() == 0) { return; }
+    note(rg, "\n==---- DUMP IRBBSet '%s' ----==", rg->getRegionName());
+    BBSetIter it;
+    for (BSIdx i = bbs.get_first(&it);
+         i != BS_UNDEF; i = bbs.get_next(i, &it)) {
+        IRBB const* bb = rg->getBB(i);
+        ASSERT0(bb);
         bb->dump(rg, dump_inner_region, ctx);
     }
 }

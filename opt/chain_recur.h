@@ -39,6 +39,7 @@ class DIV;
 class ChainRec;
 class ChainRecMgr;
 class IVVal;
+class IVR;
 
 typedef xcom::List<IVVal const*> ConstIVValList;
 typedef xcom::List<IVVal const*>::Iter ConstIVValListIter;
@@ -111,9 +112,9 @@ public:
     CHAR const* dump(Region const* rg, UINT indent,
                      OUT xcom::StrBuf & buf) const;
 
-    //The function extract value from given 'ir'.
-    //Return true if extract value successfully.
-    bool extractFrom(IR const* ir);
+    //The function tries to extract value from given 'ir'.
+    //Return true if the function extracts value successfully.
+    bool extractFrom(IR const* ir, IVR const* ivr);
 
     //Return kind of value.
     Kind getKind() const { return (Kind)IVVAL_kind(*this); }
@@ -306,6 +307,7 @@ protected:
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
     OptCtx const* m_oc;
+    IVR const* m_ivr;
     xcom::List<IR*> m_irlst;
 protected:
     bool computeStep(ChainRec const& cr, UINT num, OUT IVValVec & valvec);
@@ -321,7 +323,7 @@ protected:
     }
 public:
     //oc: optional, can be NULL.
-    ChainRecMgr(Region * rg, OptCtx const* oc);
+    ChainRecMgr(Region * rg, OptCtx const* oc, IVR const* ivr);
     ~ChainRecMgr();
 
     ChainRec * allocChainRec();
@@ -361,7 +363,7 @@ public:
     bool doAdd(ChainRec const& cr1, IR const* ir, OUT ChainRec & res)
     {
         IVVal cr2_init;
-        bool succ = cr2_init.extractFrom(ir);
+        bool succ = cr2_init.extractFrom(ir, getIVR());
         if (!succ) { return false; }
         return doAdd(cr1, cr2_init, res);
     }
@@ -399,7 +401,7 @@ public:
     bool doSub(ChainRec const& cr1, IR const* ir, OUT ChainRec & res)
     {
         IVVal cr2_init;
-        bool succ = cr2_init.extractFrom(ir);
+        bool succ = cr2_init.extractFrom(ir, getIVR());
         if (!succ) { return false; }
         return doSub(cr1, cr2_init, res);
     }
@@ -464,7 +466,7 @@ public:
     {
         if (cr1.getCode() != IR_ADD) { return false; }
         IVVal coeff;
-        bool succ = coeff.extractFrom(ir);
+        bool succ = coeff.extractFrom(ir, getIVR());
         if (!succ) { return false; }
         return doMul(cr1, coeff, res);
     }
@@ -484,6 +486,7 @@ public:
     OptCtx const& getOptCtx() const { ASSERT0(m_oc); return *m_oc; }
     Region * getRegion() const { return m_rg; }
     IRMgr * getIRMgr() const { return m_irmgr; }
+    IVR const* getIVR() const { return m_ivr; }
 
     //The function records all allocated ir through the mgr and free them
     //at the destruction.

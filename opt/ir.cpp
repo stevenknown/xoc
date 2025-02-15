@@ -60,8 +60,8 @@ bool allBeExp(IR * irlst)
 INT checkKidNumValid(IR const* ir, UINT n, CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     return n;
 }
 
@@ -70,8 +70,8 @@ INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
                           INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->isUnaryOp());
     return n;
 }
@@ -81,8 +81,8 @@ INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
                            INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->isBinaryOp());
     return n;
 }
@@ -92,8 +92,8 @@ INT checkKidNumValidTernary(IR const* ir, UINT n, CHAR const* filename,
                             INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->isTernaryOp());
     return n;
 }
@@ -103,8 +103,8 @@ INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
                            INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->is_truebr() || ir->is_falsebr());
     return n;
 }
@@ -113,8 +113,8 @@ INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
 INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->is_whiledo() || ir->is_dowhile() || ir->is_doloop());
     return n;
 }
@@ -123,8 +123,8 @@ INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line)
 INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->isCallStmt());
     return n;
 }
@@ -133,8 +133,8 @@ INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line)
 INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->isArrayOp());
     return n;
 }
@@ -144,8 +144,8 @@ INT checkKidNumIRCode(IR const* ir, UINT n, IR_CODE irc,
                       CHAR const* filename, INT line)
 {
     UINT x = IR_MAX_KID_NUM(ir);
-    ASSERTL(n < x, filename, line,
-            ("%d is beyond maximum IR kids num %d", n, x));
+    ASSERTLN(n < x, filename, line,
+             ("%d is beyond maximum IR kids num %d", n, x));
     ASSERT0(ir->getCode() == irc);
     return n;
 }
@@ -581,7 +581,7 @@ IR * IR::getResultPR(PRNO prno)
 
 
 //Copy MD that ir referenced according to 'mds'.
-void IR::setRefMD(MD const* md, Region * rg)
+void IR::setRefMD(MD const* md, Region const* rg)
 {
     DU * du = getDU();
     if (du == nullptr) {
@@ -596,7 +596,7 @@ void IR::setRefMD(MD const* md, Region * rg)
 
 
 //Copy the set of MD that ir referenced according to 'mds'.
-void IR::setRefMDSet(MDSet const* mds, Region * rg)
+void IR::setRefMDSet(MDSet const* mds, Region const* rg)
 {
     ASSERT0(!is_region());
     DU * du = getDU();
@@ -697,7 +697,7 @@ void IR::removeSSAUse()
 
 //Copy memory reference only for current ir node.
 //src: copy MD reference from 'src', it should be not same with current ir.
-void IR::copyRef(IR const* src, Region * rg)
+void IR::copyRef(IR const* src, Region const* rg)
 {
     ASSERT0(src && rg && this != src);
     ASSERTN(isMemRef() && src->isMemRef(), ("not memory reference"));
@@ -713,7 +713,7 @@ void IR::copyRef(IR const* src, Region * rg)
 
 
 //Copy AttachInfo from 'src' to current ir, not include kid and sibling.
-void IR::copyAI(IR const* src, Region * rg)
+void IR::copyAI(IR const* src, Region const* rg)
 {
     if (src->getAI() == nullptr) { return; }
     if (!src->getAI()->is_init()) {
@@ -732,13 +732,13 @@ void IR::copyAI(IR const* src, Region * rg)
 }
 
 
-//Dump IR tree's MD reference, where ir may be stmt or exp.
+//Dump IR Tree's MD references, where ir may be stmt or exp.
 //indent: the addend to current indent of LogMgr.
 void IR::dumpRef(Region * rg, UINT indent)
 {
     if (!rg->isLogMgrInit() || is_const()) { return; }
     rg->getLogMgr()->incIndent(indent);
-    dumpIR(this, rg, nullptr, false);
+    dumpIR(this, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF));
 
     //Dump mustref MD.
     MD const* md = getRefMD();
@@ -907,7 +907,7 @@ void IR::setPrnoAndUpdateSSAInfo(PRNO prno)
 }
 
 
-void IR::copyRefForTree(IR const* src, Region * rg)
+void IR::copyRefForTree(IR const* src, Region const* rg)
 {
     ASSERT0(src && isIREqual(src, rg->getIRMgr(), true) && rg);
     ASSERT0(src != this);
@@ -1485,6 +1485,18 @@ bool IR::isStmtInBB() const
 {
     if (is_switch() && SWITCH_body(this) != nullptr) { return false; }
     return IRDES_is_stmt_in_bb(getCode());
+}
+
+
+bool IR::isExtOp(IR_CODE code)
+{
+    return code > IR_LAST_COMMON_CODE && code < IR_CODE_NUM;
+}
+
+
+bool IR::isExtOp() const
+{
+    return IR::isExtOp(getCode());
 }
 
 

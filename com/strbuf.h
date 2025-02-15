@@ -35,11 +35,10 @@ namespace xcom {
 class StrBuf {
     COPY_CONSTRUCTOR(StrBuf);
 public:
-    CHAR * buf; //the buffer that holds the string.
-
     //The byte length of the buffer. Note the buffer may longer
     //than the string needed.
     UINT buflen;
+    CHAR * buf; //the buffer that holds the string.
 public:
     //initsize: the byte size that string buffer expected to be.
     //Note the buffer may be longer than a string needed.
@@ -95,6 +94,15 @@ public:
     //Return true if string s is only contain one character t.
     static bool is_equal(CHAR const* s, CHAR t) { return s[0] == t; }
 
+    //Return true if the first 'n' characters of string s are equal to
+    //string t.
+    static bool is_equal(CHAR const* s, CHAR const* t, UINT n)
+    { return ::strncmp(s, t, n) == 0; }
+
+    //Return true if string s is equal to string t.
+    static bool is_equal(CHAR const* s, CHAR const* t)
+    { return ::strcmp(s, t) == 0; }
+
     //Return true if string is empty.
     bool is_empty() const { return buf == nullptr || buf[0] == 0; }
 
@@ -110,12 +118,13 @@ public:
         buf[0] = 0;
     }
 
+    //The functions snprintf() and vsnprintf() do not write more than size
+    //bytes (including the terminating null byte ('\0')).
+    //bytesize: the maximum possible byte size of string.
+    void nstrcat(UINT bytesize, CHAR const* format, ...);
+
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
-
-    //This function print string according to 'format'.
-    //args: a list of argument store in stack.
-    void vsprint(CHAR const* format, va_list args);
 
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
@@ -137,16 +146,15 @@ public:
     //Note the size does NOT include the end-character '\0'.
     size_t strlen() const { return ::strlen(buf); }
 
-    //The functions snprintf() and vsnprintf() do not write more than size
-    //bytes (including the terminating null byte ('\0')).
-    //bytesize: the maximum possible byte size of string.
-    void nstrcat(UINT bytesize, CHAR const* format, ...);
-
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
     //the new string is consist of original string and the string formed
     //by 'args'.
     void vstrcat(CHAR const* format, va_list args);
+
+    //This function print string according to 'format'.
+    //args: a list of argument store in stack.
+    void vsprint(CHAR const* format, va_list args);
 };
 
 
@@ -194,8 +202,8 @@ template <UINT ByteSize>
 class FixedStrBuf {
     COPY_CONSTRUCTOR(FixedStrBuf);
 protected:
-    CHAR m_fixbuf[ByteSize];
     StrBuf * m_strbuf;
+    CHAR m_fixbuf[ByteSize];
 protected:
     void allocStrBuf(UINT sz)
     {
@@ -255,6 +263,23 @@ public:
     CHAR const* getBufLen() const
     { return m_strbuf != nullptr ? m_strbuf->getBufLen() : ByteSize; }
 
+    //Return true if string is empty.
+    bool is_empty() const
+    { return m_strbuf != nullptr ? m_strbuf->is_empty() : m_fixbuf[0] == 0; }
+
+    //String comparation.
+    //Return true if s equal to current string.
+    bool is_equal(CHAR const* s) const
+    {
+        return m_strbuf != nullptr ?
+            m_strbuf->is_equal(s) : ::strncmp(m_fixbuf, s, ByteSize) == 0;
+    }
+
+    //The functions snprintf() and vsnprintf() do not write more than size
+    //bytes (including the terminating null byte ('\0')).
+    //bytesize: the maximum possible byte size of string.
+    void nstrcat(UINT bytesize, CHAR const* format, ...);
+
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
     void strcat(UINT bytesize, CHAR const* format, va_list args);
@@ -265,6 +290,16 @@ public:
     //NOTE: The function regards StrBuf as an external object that input by
     //user.
     StrBuf * unbind();
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'args'.
+    void vstrcat(CHAR const* format, va_list args);
+
+    //This function print string according to 'format'.
+    //args: a list of argument store in stack.
+    void vsprint(CHAR const* format, va_list args);
 };
 
 
@@ -340,6 +375,45 @@ void FixedStrBuf<ByteSize>::strcat(CHAR const* format, ...)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
+    strcat(l, format, org_args);
+    va_end(args);
+    va_end(org_args);
+}
+
+
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::vstrcat(CHAR const* format, va_list args)
+{
+    va_list org_args;
+    va_copy(org_args, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
+    strcat(l, format, org_args);
+    va_end(org_args);
+}
+
+
+//This function print string according to 'format'.
+//args: a list of argument store in stack.
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::vsprint(CHAR const* format, va_list args)
+{
+    clean();
+    vstrcat(format, args);
+}
+
+
+//The functions snprintf() and vsnprintf() do not write more than size
+//bytes (including the terminating null byte ('\0')).
+//bytesize: the maximum possible byte size of string.
+template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::nstrcat(UINT bytesize, CHAR const* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    va_list org_args;
+    va_copy(org_args, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
+    if (l > bytesize) { l = bytesize; }
     strcat(l, format, org_args);
     va_end(args);
     va_end(org_args);

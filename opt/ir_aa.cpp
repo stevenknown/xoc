@@ -1127,7 +1127,8 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
     if (opnd1->is_const() && opnd1->is_int()) {
         const_offset = CONST_int_val(opnd1);
     } else if (opnd1->is_pr()) {
-        if (!m_rg->evaluateConstInteger(opnd1, (ULONGLONG*)&const_offset)) {
+        EvalConst eval(m_rg);
+        if (!eval.evaluateConstInteger(opnd1, (ULONGLONG*)&const_offset)) {
             return false;
         }
     } else {
@@ -2600,11 +2601,11 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
 }
 
 
-//Regard MDSet that parameters pointed-to as the MDSet that referrenced by call.
+//Regard MDSet that arguments pointed-to as the MDSet that referrenced by call.
 static void setMayDefSetForCall(IR * ir, AliasAnalysis * aa)
 {
 
-    for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         if (!p->isPtr()) { continue; }
 
         //Get POINT-TO that p pointed to.
@@ -2664,9 +2665,9 @@ void AliasAnalysis::processCall(MOD IR * ir, IN MD2MDSet * mx)
         inferExp(ICALL_callee(ir), tmp, &tic, mx);
     }
 
-    //Analyze the point-to of each parameters.
+    //Analyze the point-to of each arguments.
     MDSet by_addr_mds;
-    for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         AACtx tic;
         if (p->isPtr()) {
             AC_comp_pts(&tic) = true;
@@ -3199,8 +3200,7 @@ void AliasAnalysis::dumpIRPointToForIR(IR const* ir, bool dump_kid,
         }
 
         UINT i = 0;
-        for (IR * p = CALL_param_list(ir);
-             p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             note(getRegion(), "\nPARAM%u:", i++);
             dumpIRPointTo(p, false, mx);
         }
@@ -3212,12 +3212,12 @@ void AliasAnalysis::dumpIRPointToForIR(IR const* ir, bool dump_kid,
         }
 
         if (dump_kid) {
-            if (CALL_param_list(ir) != nullptr ||
+            if (CALL_arg_list(ir) != nullptr ||
                 CALL_dummyuse(ir) != nullptr) {
                 note(getRegion(), "\n>> MDSet DETAIL:\n");
             }
 
-            for (IR * p = CALL_param_list(ir);
+            for (IR * p = CALL_arg_list(ir);
                  p != nullptr; p = p->get_next()) {
                 dumpIRPointTo(p, true, mx);
             }
@@ -3237,9 +3237,9 @@ void AliasAnalysis::dumpIRPointToForIR(IR const* ir, bool dump_kid,
         ASSERT0(ICALL_callee(ir) != nullptr);
         prt(getRegion(), "CALLEE:");
         dumpIRPointTo(ICALL_callee(ir), false, mx);
-        if (dump_kid && CALL_param_list(ir) != nullptr) {
+        if (dump_kid && CALL_arg_list(ir) != nullptr) {
             note(getRegion(), "\n>> MDSet DETAIL:\n");
-            for (IR * p = CALL_param_list(ir); p ; p = p->get_next()) {
+            for (IR * p = CALL_arg_list(ir); p ; p = p->get_next()) {
                 dumpIRPointTo(p, true, mx);
             }
         }
@@ -3697,7 +3697,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
         if (ir->hasReturnValue()) {
             ASSERT0(ir->getMustRef());
         }
-        for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             verifyIR(p);
         }
         for (IR * p = CALL_dummyuse(ir); p != nullptr; p = p->get_next()) {

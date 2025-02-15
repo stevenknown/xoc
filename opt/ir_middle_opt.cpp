@@ -116,7 +116,7 @@ void Region::postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc)
         SIMP_need_rebuild_nonpr_du_chain(&simp) = false;
     }
     if (need_rebuild_prssa) {
-        prssamgr->construction(oc);
+        prssamgr->reconstruction(oc);
         oc.setInvalidIfPRSSAReconstructed();
 
         //If SSA is enabled, disable classic DU Chain.
@@ -172,8 +172,7 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
             PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
                 PASS_PRSSA_MGR);
             if (prssamgr != nullptr) {
-                prssamgr->destruction(oc);
-                prssamgr->construction(oc);
+                prssamgr->reconstruction(oc);
                 oc.setInvalidIfPRSSAReconstructed();
                 oc.setInvalidPRDU();
                 rmprdu = true;
@@ -181,9 +180,7 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
         }
         xoc::removeClassicDUChain(this, rmprdu, rmnonprdu);
     }
-    if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(verifyMDDUChain(this, oc));
-    }
+    ASSERT0L3(verifyMDDUChain(this, oc));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     return true;
@@ -224,92 +221,149 @@ bool Region::performSimplify(OptCtx & oc)
     bool change = performSimplifyImpl(simp, oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
+        getLogMgr()->incIndent(2);
         dumpBBList();
+        getLogMgr()->decIndent(2);
     }
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     return change;
 }
 
 
-void Region::doBasicAnalysis(OptCtx & oc)
+bool Region::doPRSSA(OptCtx & oc)
 {
-    if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && oc.is_cfg_valid());
-        if (!oc.is_ref_valid()) {
-            getMDMgr()->assignMD(true, true);
-        }
-        if (!oc.is_aa_valid()) {
-            getPassMgr()->checkValidAndRecompute(
-                &oc, PASS_DOM, PASS_LOOP_INFO, PASS_AA, PASS_UNDEF);
+    bool changed = false;
+    if (!g_do_prssa) { return changed; }
+    Region * rg = this;
+    PRSSAMgr * prssamgr = (PRSSAMgr*)rg->getPassMgr()->registerPass(
+        PASS_PRSSA_MGR);
+    ASSERT0(prssamgr);
+    if (!prssamgr->is_valid()) {
+        prssamgr->reconstruction(oc);
+        oc.setInvalidIfPRSSAReconstructed();
+    }
+    //If SSA is enabled, disable classic DU Chain.
+    //Since we do not maintain both them as some passes.
+    //e.g:In RCE, remove PHI's operand will not update the
+    //operand DEF's DUSet.
+    //CASE:compiler.gr/alias.loop.gr
+    oc.setInvalidPRDU();
+    changed = true;
+    return changed;
+}
+
+
+bool Region::doMDSSA(OptCtx & oc)
+{
+    bool changed = false;
+    if (!g_do_mdssa) { return changed; }
+    Region * rg = this;
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
+        PASS_MDSSA_MGR);
+    ASSERT0(mdssamgr);
+    if (!mdssamgr->is_valid()) {
+        mdssamgr->construction(oc);
+        oc.setInvalidIfMDSSAReconstructed();
+    }
+    //If SSA is enabled, disable classic DU Chain.
+    //Since we do not maintain both them as some passes.
+    //e.g:In RCE, remove PHI's operand will not update the
+    //operand DEF's DUSet.
+    //CASE:compiler.gr/alias.loop.gr
+    oc.setInvalidNonPRDU();
+    changed = true;
+    return changed;
+}
+
+
+bool Region::doRefineDU(OptCtx & oc)
+{
+    bool changed = false;
+    if (!g_do_refine_duchain) { return changed; }
+    Region * rg = oc.getRegion();
+    RefineDUChain * refinedu = (RefineDUChain*)rg->getPassMgr()->
+        registerPass(PASS_REFINE_DUCHAIN);
+    if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
+        refinedu->setUseGvn(true);
+        GVN * gvn = (GVN*)rg->getPassMgr()->registerPass(PASS_GVN);
+        gvn->perform(oc);
+    }
+    return refinedu->perform(oc);
+}
+
+
+bool Region::doAA(OptCtx & oc)
+{
+    if (!g_do_aa) { return false; }
+    ASSERT0(g_cst_bb_list && oc.is_cfg_valid());
+    Region * rg = oc.getRegion();
+    if (!oc.is_ref_valid()) {
+        getMDMgr()->assignMD();
+    }
+    if (oc.is_aa_valid()) { return true; }
+    rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_LOOP_INFO, PASS_AA, PASS_UNDEF);
+    return true;
+}
+
+
+bool Region::doDURefAndClassicDU(OptCtx & oc)
+{
+    Region * rg = this;
+    ASSERT0(rg->getPassMgr());
+    DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
+    ASSERT0(dumgr);
+    DUOptFlag f(DUOPT_COMPUTE_PR_REF | DUOPT_COMPUTE_NONPR_REF);
+    if (g_compute_region_imported_defuse_md) {
+        f.set(DUOPT_SOL_REGION_REF);
+    }
+    if (g_compute_pr_du_chain) {
+        if (g_compute_pr_du_chain_by_prssa) {
+            //No Need to compute REACH_DEF here because user ask computing PRDU
+            //chain through PRSSA. And the computation of REACH_DEF is costly.
+            //Thus call computePRDUChainByPRSSA() to computes PRDU chain in
+            //checkAndComputeClassicDUChain() after the function returning.
+            ;
+        } else {
+            //Compute REACH_DEF for PR.
+            f.set(DUOPT_COMPUTE_PR_DU | DUOPT_SOL_REACH_DEF);
         }
     }
-    if (g_do_md_du_analysis) {
-        ASSERT0(g_cst_bb_list && oc.is_cfg_valid() && oc.is_aa_valid());
-        ASSERT0(getPassMgr());
-        DUMgr * dumgr = (DUMgr*)getPassMgr()->registerPass(PASS_DU_MGR);
-        ASSERT0(dumgr);
-        UINT f = DUOPT_COMPUTE_PR_REF | DUOPT_COMPUTE_NONPR_REF;
-        if (g_compute_region_imported_defuse_md) {
-            f |= DUOPT_SOL_REGION_REF;
-        }
-        if (g_compute_pr_du_chain) {
-            f |= DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_PR_DU;
-        }
-        if (g_compute_nonpr_du_chain) {
-            f |= DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_NONPR_DU;
-        }
-        bool succ = dumgr->perform(oc, f);
-        ASSERT0(oc.is_ref_valid());
-        if (succ) {
-            //NOTE rebuild classic DU-Chain is costly.
-            //Especially compilation speed is considerable.
-            dumgr->checkAndComputeClassicDUChain(oc);
-        }
-        bool rmprdu = false;
-        bool rmnonprdu = false;
-        if (g_do_prssa) {
-            PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
-                PASS_PRSSA_MGR);
-            ASSERT0(prssamgr);
-            if (!prssamgr->is_valid()) {
-                prssamgr->construction(oc);
-                oc.setInvalidIfPRSSAReconstructed();
-            }
-            //If SSA is enabled, disable classic DU Chain.
-            //Since we do not maintain both them as some passes.
-            //e.g:In RCE, remove PHI's operand will not update the
-            //operand DEF's DUSet.
-            //CASE:compiler.gr/alias.loop.gr
-            oc.setInvalidPRDU();
-            rmprdu = true;
-        }
-        if (g_do_mdssa) {
-            MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->registerPass(
-                PASS_MDSSA_MGR);
-            ASSERT0(mdssamgr);
-            if (!mdssamgr->is_valid()) {
-                mdssamgr->construction(oc);
-                oc.setInvalidIfMDSSAReconstructed();
-            }
-            //If SSA is enabled, disable classic DU Chain.
-            //Since we do not maintain both them as some passes.
-            //e.g:In RCE, remove PHI's operand will not update the
-            //operand DEF's DUSet.
-            //CASE:compiler.gr/alias.loop.gr
-            oc.setInvalidNonPRDU();
-            rmnonprdu = true;
-        }
-        xoc::removeClassicDUChain(this, rmprdu, rmnonprdu);
-        if (g_do_refine_duchain) {
-            RefineDUChain * refdu = (RefineDUChain*)getPassMgr()->
-                registerPass(PASS_REFINE_DUCHAIN);
-            if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
-                refdu->setUseGvn(true);
-                GVN * gvn = (GVN*)getPassMgr()->registerPass(PASS_GVN);
-                gvn->perform(oc);
-            }
-            refdu->perform(oc);
-        }
+    if (g_compute_nonpr_du_chain) {
+        //Compute REACH_DEF for NonPR.
+        f.set(DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_NONPR_DU);
     }
+    bool changed = dumgr->perform(oc, f);
+    ASSERT0(oc.is_ref_valid());
+    ASSERT0(changed);
+
+    //NOTE rebuild classic DU-Chain is costly.
+    //Especially compilation speed is considerable.
+    dumgr->checkAndComputeClassicDUChain(oc);
+    return changed;
+}
+
+
+bool Region::doDUAna(OptCtx & oc)
+{
+    if (!g_do_md_du_analysis) { return false; }
+    ASSERT0(g_cst_bb_list && oc.is_cfg_valid() && oc.is_aa_valid());
+    doDURefAndClassicDU(oc);
+    bool changed_prssa = doPRSSA(oc);
+    bool changed_mdssa = doMDSSA(oc);
+    bool remove_prdu = changed_prssa ? true : false;
+    bool remove_nonprdu = changed_mdssa ? true : false;
+    xoc::removeClassicDUChain(oc.getRegion(), remove_prdu, remove_nonprdu);
+    return doRefineDU(oc);
+}
+
+
+bool Region::doBasicAnalysis(OptCtx & oc)
+{
+    bool changed = doAA(oc);
+    changed |= doDUAna(oc);
+    return changed;
 }
 
 
@@ -340,9 +394,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 {
     BBList * bbl = getBBList();
     if (bbl->get_elem_count() == 0) { return true; }
-    if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(verifyMDDUChain(this, oc));
-    }
+    ASSERT0L3(verifyMDDUChain(this, oc));
     if (g_opt_level > OPT_LEVEL0) {
         //Do analysis before simplification.
         doBasicAnalysis(oc);
@@ -358,16 +410,13 @@ bool Region::MiddleProcess(OptCtx & oc)
             getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
         }
     }
+dump(false);//hack
     ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf(&oc);
         Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
         if (refine->refineBBlist(bbl, rf)) {
-            if (g_verify_level >= VERIFY_LEVEL_3 &&
-                oc.is_pr_du_chain_valid() &&
-                oc.is_nonpr_du_chain_valid()) {
-                ASSERT0(verifyMDDUChain(this, oc));
-            }
+            ASSERT0L3(verifyMDDUChain(this, oc));
             return true;
         }
         return false;

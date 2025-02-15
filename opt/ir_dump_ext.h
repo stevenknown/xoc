@@ -31,8 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-void dumpVSTPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
+void dumpATOMCAS(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
+void dumpATOMINC(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
+void dumpVSTPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 
 } //namespace xoc
 #endif

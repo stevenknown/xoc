@@ -8,20 +8,30 @@ ifeq ($(TARG_DIR),)
   $(error "NEED TARG_DIR INFO:e.g:make TARG=FOR_ARM TARG_DIR=arm")
 endif
 
-ifeq ($(ROOT_DIR),)
-  $(error "NEED ROOT_DIR:e.g:make ROOT_DIR=~/xoc")
-endif
-
 ifeq ($(THREAD_NUM),)
-  THREAD_NUM=1
+  THREAD_NUM:=1
 endif
 
-CFLAGS+=-Wall
-OPT_DIR=$(ROOT_DIR)/opt
-COM_DIR=$(ROOT_DIR)/com
-READER_DIR=$(ROOT_DIR)/reader
-MACH_DIR=$(ROOT_DIR)/mach
-CURFILE=$(ROOT_DIR)/Makefile.xoc
+override ROOT_DIR:=$(CURDIR)
+
+COM_DIR:=$(ROOT_DIR)/com
+OPT_DIR:=$(ROOT_DIR)/opt
+READER_DIR:=$(ROOT_DIR)/reader
+MACH_DIR:=$(ROOT_DIR)/mach
+CURFILE:=$(ROOT_DIR)/Makefile.xoc
+
+#Check wether each directory is valid.
+ifeq ($(wildcard $(ROOT_DIR)),)
+  $(error "$(ROOT_DIR) SEEMS NOT VALID DIR.")
+else ifeq ($(wildcard $(COM_DIR)),)
+  $(error "$(COM_DIR) SEEMS NOT VALID DIR.")
+else ifeq ($(wildcard $(OPT_DIR)),)
+  $(error "$(OPT_DIR) SEEMS NOT VALID DIR.")
+else ifeq ($(wildcard $(READER_DIR)),)
+  $(error "$(READER_DIR) SEEMS NOT VALID DIR.")
+else ifeq ($(wildcard $(MACH_DIR)),)
+  $(error "$(MACH_DIR) SEEMS NOT VALID DIR.")
+endif
 
 $(info "INCLUDE: IN $(CURFILE), INCLUDE $(READER_DIR)/Makefile.inc")
 include $(READER_DIR)/Makefile.inc
@@ -41,7 +51,7 @@ include $(ROOT_DIR)/Makefile.xoc.inc
 $(info "INCLUDE: IN $(CURFILE), INCLUDE $(ROOT_DIR)/Makefile.option")
 include $(ROOT_DIR)/Makefile.option
 
-#SET DEFAULT CFLAGS.
+CFLAGS+=-Wall
 CFLAGS+=\
   -D$(TARG) \
   -D_SUPPORT_C11_ \
@@ -62,7 +72,7 @@ ifneq (,$(filter $(CC),g++ gcc))
   CFLAGS+=-Wno-strict-aliasing -finline-limit=10000000
 endif
 
-INC=-I .
+INC:=-I .
 
 #Combine path of objects.
 TMP_OPT_OBJS = $(foreach n,$(OPT_OBJS),$(OPT_DIR)/$(n))
@@ -86,54 +96,88 @@ $(info "INC:$(INC)")
 $(info "CFLAGS:$(CFLAGS)")
 $(info "DEBUG:$(DEBUG)")
 $(info "THREAD_NUM:$(THREAD_NUM)")
+$(info "REF_TARGMACH_INFO:$(REF_TARGMACH_INFO)")
 
-.PHONY: $(XOC_OUTPUT) $(COM_OUTPUT)
+.PHONY: build_tmp_opt_objs build_tmp_reader_objs build_tmp_mach_objs
 
-#Define rules.
-$(XOC_OUTPUT): $(COM_OUTPUT) tmp_opt_objs tmp_reader_objs tmp_mach_objs
-	@echo "START BUILD $(XOC_OUTPUT)"
-	@echo "EXEC:"
-	ar rcs $(XOC_OUTPUT) $(COM_DIR)/$(COM_OUTPUT) $(TMP_OPT_OBJS) \
-      $(TMP_READER_OBJS) $(TMP_MACH_OBJS)
-	@echo "END BUILD $(XOC_OUTPUT)"
-	@echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"
+$(XOC_OUTPUT): $(COM_OUTPUT) \
+               build_tmp_opt_objs \
+               build_tmp_reader_objs \
+               build_tmp_mach_objs
+	@echo "==-- IN Makefile.xoc: START BUILD $(XOC_OUTPUT) --=="
+	@if [ ! -f "$@" ] || [ "$<" -nt "$@" ]; then \
+       echo "EXEC:"; \
+       ar -rvscT $(XOC_OUTPUT) \
+         $(COM_DIR)/$(COM_OUTPUT) \
+         $(TMP_OPT_OBJS) \
+         $(TMP_READER_OBJS) \
+         $(TMP_MACH_OBJS); \
+       echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"; \
+     else \
+       echo "$(XOC_OUTPUT) ALREADY EXISTS!!"; \
+     fi
 
 %.o:%.cpp
 	@echo "BUILD $<"
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
 $(COM_OUTPUT):
-	@echo "CURDIR:$(CURDIR), BUILD $(COM_OUTPUT)"
+	@echo "IN Makefile.xoc: START BUILD $(COM_OUTPUT)"
 	@echo "EXEC:"
-	make -C $(COM_DIR) -j$(THREAD_NUM) -f Makefile \
+	make -C $(COM_DIR) \
+      -j$(THREAD_NUM) \
+      -f Makefile \
       TARG=$(TARG) \
       TARG_DIR=$(TARG_DIR) \
-	  DEBUG=$(DEBUG) \
-	  ROOT_DIR=$(ROOT_DIR) \
+      DEBUG=$(DEBUG) \
+      ROOT_DIR=$(ROOT_DIR) \
       CFLAGS="$(CFLAGS)" \
-      THREAD_NUM=$(THREAD_NUM)
+      THREAD_NUM=$(THREAD_NUM) \
+      REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)
+	@echo "IN Makefile.xoc: END BUILD $(COM_OUTPUT)"
 
-tmp_opt_objs: $(TMP_OPT_OBJS)
-	@echo "EXEC:tmp_opt_objs:$(TMP_OPT_OBJS)"
+build_tmp_opt_objs: pre_build_tmp_opt_objs $(TMP_OPT_OBJS)
+	@echo "SUCCESS TO GENERATE: $(TMP_OPT_OBJS)"
 
-tmp_reader_objs: $(TMP_READER_OBJS)
-	@echo "EXEC:tmp_reader_objs:$(TMP_READER_OBJS)"
+pre_build_tmp_opt_objs:
+	@echo "START BUILD: $(TMP_OPT_OBJS)"
 
-tmp_mach_objs: $(TMP_MACH_OBJS)
-	@echo "EXEC:tmp_mach_objs:$(TMP_MACH_OBJS)"
+build_tmp_reader_objs: pre_build_tmp_reader_objs $(TMP_READER_OBJS)
+	@echo "SUCCESS TO GENERATE: $(TMP_READER_OBJS)"
 
-opt_objs: $(OPT_OBJS)
-	@echo "EXEC:opt_objs:$(OPT_OBJS)"
+pre_build_tmp_reader_objs:
+	@echo "START BUILD: $(TMP_READER_OBJS)"
 
-reader_objs: $(READER_OBJS)
-	@echo "EXEC:reader_objs:$(READER_OBJS)"
+build_tmp_mach_objs: pre_build_tmp_mach_objs $(TMP_MACH_OBJS)
+	@echo "SUCCESS TO GENERATE: $(TMP_MACH_OBJS)"
 
-mach_objs: $(MACH_OBJS)
-	@echo "EXEC:mach_objs:$(MACH_OBJS)"
+pre_build_tmp_mach_objs:
+	@echo "START BUILD: $(TMP_MACH_OBJS)"
+
+bulid_opt_objs: pre_build_opt_objs $(OPT_OBJS)
+	@echo "SUCCESS TO GENERATE: $(OPT_OBJS)"
+
+pre_build_opt_objs:
+	@echo "START BUILD: $(OPT_OBJS)"
+
+build_reader_objs: pre_build_reader_objs $(READER_OBJS)
+	@echo "SUCCESS TO GENERATE: $(READER_OBJS)"
+
+pre_build_reader_objs:
+	@echo "START BUILD: $(READER_OBJS)"
+
+build_mach_objs: pre_build_mach_objs $(MACH_OBJS)
+	@echo "SUCCESS TO GENERATE: $(MACH_OBJS)"
+
+pre_build_mach_objs:
+	@echo "START BUILD: $(MACH_OBJS)"
 
 clean:
-	cd $(COM_DIR) && make clean -f Makefile TARG=$(TARG) DEBUG=$(DEBUG) \
-      CFLAGS="$(CFLAGS)"
+	make clean -C $(COM_DIR) -f Makefile \
+      TARG=$(TARG) \
+      DEBUG=$(DEBUG) \
+      CFLAGS="$(CFLAGS)" \
+      REF_TARGMACH_INFO=$(REF_TARGMACH_INFO)
 	@find ./ -name "*.gcda" | xargs rm -f
 	@find ./ -name "*.gcno" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f

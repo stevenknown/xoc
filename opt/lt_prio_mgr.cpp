@@ -44,6 +44,11 @@ double LTPriorityMgr::computePriority(LifeTime const* lt) const
     LI<IRBB> const* liroot = m_cfg->getLoopInfo();
     OccListIter it = nullptr;
     double prio = 0.0;
+    if (lt->canBeRemat()) {
+        //If the lifetime can do the rematerilization, the priority is
+        //the lowest.
+        return prio;
+    }
     OccList const& occlst = const_cast<LifeTime*>(lt)->getOccList();
     UINT count = 0;
     for (Occ occ  = occlst.get_head(&it); it != occlst.end();

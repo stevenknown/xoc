@@ -592,11 +592,9 @@ public:
 //
 //Start class VarLabelRelationMgr.
 //
-#define VarLabelRelationMgr_label_refill(vlrm) ((vlrm)->m_var_label_refill)
-#define VarLabelRelationMgr_label_reloc(vlrm)  ((vlrm)->m_var_label_reloc)
 class VarLabelRelationMgr {
     COPY_CONSTRUCTOR(VarLabelRelationMgr);
-public:
+protected:
     //Stored all entries that use the label difference to initialize global
     //variables.
     //Note that RegionMgr will save all information from program region and
@@ -668,6 +666,11 @@ public:
     //    current is "arr0", other is "foo", offset is 4(B), li is "label0".
     void addVarLabelRelocation(Sym const* current, Sym const* other,
         UINT offset, LabelInfo const* li);
+
+    xcom::List<LabelRefill*> * getVarLabelRefill()
+    { return &m_var_label_refill; }
+    xcom::List<LabelReloc*> * getVarLabelReloc()
+    { return &m_var_label_reloc; }
 };
 
 

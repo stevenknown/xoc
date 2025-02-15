@@ -145,6 +145,7 @@ class SolveSetMgr {
     IRCFG * m_cfg;
     BBList * m_bblst;
     MDSystem * m_md_sys;
+
     //Used by overall global functions in DUMgr. such as reach-in set.
     //The set might be queried by other passes.
     xcom::DefMiscBitSetMgr m_global_sbs_mgr;
@@ -189,6 +190,7 @@ class SolveSetMgr {
     //    The reach-def of BB3 is {S1, S2}
     //avail reach-in def of STMT
     Vector<SolveSet*> m_avail_reach_def_in;
+
     //avail reach-out def of STMT
     Vector<SolveSet*> m_avail_reach_def_out;
     Vector<SolveSet*> m_reach_def_in; //reach-in def of STMT
@@ -253,41 +255,35 @@ private:
     //maydefs: record may modified MD for each bb.
     //mayuse: record may used MD for each bb.
     //        collect mayuse (NOPR-DU) to compute Region referred MD.
-    void computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
-                                         OUT Vector<MDSet*> * maydefmds,
-                                         OUT MDSet * mayusemds,
-                                         UFlag flag);
-    void computeMustExactDef(IR const* ir, OUT MDSet * bb_mustdefmds,
-                             SolveSet * mustgen_stmt,
-                             ConstMDIter & mditer, DefMiscBitSetMgr & bsmgr,
-                             UFlag flag);
-    void computeMayDef(IR const* ir, MDSet * bb_maydefmds,
-                       SolveSet * maygen_stmt,
-                       DefMiscBitSetMgr & bsmgr, UFlag flag);
-    void computeKillSetByMayGenDef(UINT bbid, bool comp_must,
-                                   bool comp_may,
-                                   MDSet const* bb_mustdefmds,
-                                   MDSet const* bb_maydefmds,
-                                   DefMiscBitSetMgr & bsmgr,
-                                   OUT SolveSet & output);
+    void computeMustExactDefMayDefMayUse(
+        OUT Vector<MDSet*> * mustdefmds, OUT Vector<MDSet*> * maydefmds,
+        OUT MDSet * mayusemds, UFlag flag);
+    void computeMustExactDef(
+        IR const* ir, OUT MDSet * bb_mustdefmds, SolveSet * mustgen_stmt,
+        ConstMDIter & mditer, DefMiscBitSetMgr & bsmgr, UFlag flag);
+    void computeMayDef(
+        IR const* ir, MDSet * bb_maydefmds, SolveSet * maygen_stmt,
+        DefMiscBitSetMgr & bsmgr, UFlag flag);
+    void computeKillSetByMayGenDef(
+        UINT bbid, bool comp_must, bool comp_may, MDSet const* bb_mustdefmds,
+        MDSet const* bb_maydefmds, DefMiscBitSetMgr & bsmgr,
+        OUT SolveSet & output);
 
     //Compute must and may killed stmt.
     //NOTE: computation of maykill and mustkill both need may-gen-def.
-    void computeKillSetByLiveInBB(UINT bbid, bool comp_must,
-                                  bool comp_may,
-                                  MDSet const* bb_mustdefmds,
-                                  MDSet const* bb_maydefmds,
-                                  DefMiscBitSetMgr & bsmgr,
-                                  OUT SolveSet & output);
+    void computeKillSetByLiveInBB(
+        UINT bbid, bool comp_must, bool comp_may, MDSet const* bb_mustdefmds,
+        MDSet const* bb_maydefmds, DefMiscBitSetMgr & bsmgr,
+        OUT SolveSet & output);
 
     //Compute must and may killed stmt.
     //mustdefs: record must modified MD for each bb.
     //maydefs: record may modified MD for each bb.
     //NOTE: computation of maykill and mustkill both need may-gen-def.
-    void computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
-                        Vector<MDSet*> const* mustexactdefmds,
-                        Vector<MDSet*> const* maydefmds,
-                        DefMiscBitSetMgr & bsmgr);
+    void computeKillSet(
+        DefDBitSetCoreReserveTab & dbitsetchash,
+        Vector<MDSet*> const* mustexactdefmds, Vector<MDSet*> const* maydefmds,
+        DefMiscBitSetMgr & bsmgr);
 
     void computeGenExprForMayDef(IR const* ir, OUT SolveSet * gen_ir_expr,
                                  DefMiscBitSetMgr & bsmgr);
@@ -366,6 +362,7 @@ private:
                     MOD DefMiscBitSetMgr & bsmgr);
     void solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
                          MOD DefMiscBitSetMgr & bsmgr);
+
     //Solve reaching definitions problem for IR STMT and
     //computing LIVE IN and LIVE OUT IR expressions.
     //'expr_univers': the Universal SET for ExpRep.
@@ -379,6 +376,7 @@ public:
         m_bblst = m_cfg->getBBList();
         m_md_sys = rg->getMDSystem();
         setKeepReachDefIn(true);
+
         //Usually only reach-def-in is useful for computing DU chain.
         setKeepReachDefOut(false);
         setKeepAvailReachDefIn(false);
@@ -394,30 +392,41 @@ public:
         setKeepLiveInBB(false);
     }
     ~SolveSetMgr();
+
     //Represent reach-def IR stmt information. Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(ReachDefIn);
+
     //Represent reach-def IR stmt information. Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(ReachDefOut);
+
     //Represent available reach-def IR stmt information.
     //Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(AvailReachDefIn);
+
     //Represent available reach-def IR stmt information.
     //Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(AvailReachDefOut);
+
     //Represent generated IR expression. Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(GenIRExpr);
+
     //Represent available IR expression. Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(AvailExprIn);
+
     //Represent available IR expression. Each element in the set is IR id.
     DECLARE_SOLVESET_OPERATION(AvailExprOut);
     DECLARE_SOLVESET_OPERATION(MayGenDef);
     DECLARE_SOLVESET_OPERATION(MustGenDef);
+
     //Represent must-killed def of stmt.
     DECLARE_SOLVESET_OPERATION(MustKilledDef);
+
     //Represent may-killed def of stmt.
     DECLARE_SOLVESET_OPERATION(MayKilledDef);
+
     //Represent killed expression.
     DECLARE_SOLVESET_OPERATION(KilledIRExpr);
+
     //Represent live-in BB.
     DECLARE_SOLVESET_OPERATION(LiveInBB);
 

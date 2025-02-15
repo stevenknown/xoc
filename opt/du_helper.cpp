@@ -473,6 +473,7 @@ void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
         //Remove stmt and its RHS.
         MDSSAUpdateCtx ctx(oc);
         if (!oc.is_dom_valid()) {
+            //Info MDSSAMgr does not need to maintain DU chain.
             MDSSAUPDATECTX_update_duchain(&ctx) = false;
         }
         mdssamgr->removeMDSSAOccForTree(stmt, ctx);
@@ -996,6 +997,31 @@ bool isCover(MD const* md1, MD const* md2)
         (md1 == md2 || md1->is_exact_cover(md2))) {
         return true;
     }
+    return false;
+}
+
+
+bool isRegionLiveIn(IR const* ir, Region const* rg)
+{
+    ASSERT0(ir && ir->is_exp());
+    ASSERT0(ir->isMemRef());
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (ir->isPROp() && prssamgr != nullptr && prssamgr->is_valid()) {
+        SSAInfo const* prssainfo = ir->getSSAInfo();
+        ASSERTN(prssainfo, ("invalid PRSSA"));
+        return prssainfo->getDef() == nullptr;
+    }
+
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (ir->isMemRefNonPR() && mdssamgr != nullptr && mdssamgr->is_valid()) {
+        return mdssamgr->isRegionLiveIn(ir);
+    }
+
+    if (ir->readDUSet() != nullptr) {
+        return ir->readDUSet()->is_empty();
+    }
+
+    ASSERTN(0, ("DU Chain is not available"));
     return false;
 }
 
@@ -1664,11 +1690,12 @@ void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
     bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     if (!use_prssa && !use_mdssa) { return; }
     IRIter it;
+    MDSSAStatus st;
     for (IR * x = iterInit(root, it, true);
          x != nullptr; x = iterNext(it, true)) {
         if (!x->isMemRef()) { continue; }
         if (use_mdssa && x->isMemRefNonPR()) {
-            mdssamgr->findAndSetLiveInDef(x, startir, startbb, oc);
+            mdssamgr->findAndSetLiveInDef(x, startir, startbb, oc, st);
             continue;
         }
         if (use_prssa && x->isReadPR()) {

@@ -98,8 +98,8 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                 PARAM param0 id:3
                     INTCONST r:U32:4 (1 0x1) id:2
                 PR, retv0 */
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_const());
-            ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_const());
+            ASSERT0(IR_next(CALL_arg_list(ir)) == nullptr);
             ASSERT0(ir->hasReturnValue());
         }
         break;
@@ -116,7 +116,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                     INTCONST r:U32:4 (14 0xe) id:64
                 PR7 (r:PTR:4 ptbase:1) retv id:69 */
             //The first is a pr that record the number of array elements.
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             ASSERT0(p && p->is_pr());
             p = p->get_next();
 
@@ -137,7 +137,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
         {
             //The first is a pr that is the reference of
             //the exception object.
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             ASSERT0(p->is_pr());
             ASSERT0(p->get_next() == nullptr);
         }
@@ -153,7 +153,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                     INTCONST r:I32:4 (16 0x10) id:111
             */
             //The first is a pr that record the object-ptr
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             ASSERT0(p && p->is_pr());
             p = p->get_next();
 
@@ -177,7 +177,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                 PARAM param3 id:81
                     PR8 (r:I32:4) id:80
             */
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
 
             //The first record invoke flag.
             ASSERT0(p->is_const());
@@ -202,7 +202,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                 PARAM param1 id:77
                     INTCONST r:U32:4 (13 0xd) id:76
             */
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
 
             //The first record array obj-ptr.
             ASSERT0(p->is_pr());
@@ -224,25 +224,25 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                     INTCONST r:I32:4 (2 0x2) id:92
             */
             ASSERT0(ir->hasReturnValue());
-            ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_const());
-            ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
+            ASSERT0(CALL_arg_list(ir) && CALL_arg_list(ir)->is_const());
+            ASSERT0(IR_next(CALL_arg_list(ir)) == nullptr);
         }
         break;
     case BLTIN_ARRAY_LENGTH     :
         ASSERT0(ir->hasReturnValue());
-        ASSERT0(CALL_param_list(ir) &&
-                 CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
+        ASSERT0(CALL_arg_list(ir) &&
+                 CALL_arg_list(ir)->is_pr());
+        ASSERT0(IR_next(CALL_arg_list(ir)) == nullptr);
         break;
     case BLTIN_MONITOR_ENTER    :
-        ASSERT0(CALL_param_list(ir) &&
-                 CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
+        ASSERT0(CALL_arg_list(ir) &&
+                 CALL_arg_list(ir)->is_pr());
+        ASSERT0(IR_next(CALL_arg_list(ir)) == nullptr);
         break;
     case BLTIN_MONITOR_EXIT     :
-        ASSERT0(CALL_param_list(ir) &&
-                 CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
+        ASSERT0(CALL_arg_list(ir) &&
+                 CALL_arg_list(ir)->is_pr());
+        ASSERT0(IR_next(CALL_arg_list(ir)) == nullptr);
         break;
     case BLTIN_INSTANCE_OF      :
         {
@@ -256,7 +256,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                 PARAM param2 id:79
                     INTCONST
             */
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             //The first is object-ptr reg.
             ASSERT0(p && p->is_pr());
             p = p->get_next();
@@ -281,7 +281,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                     param2: vCC
                     res: vAA
             */
-            IR * p = CALL_param_list(ir);
+            IR * p = CALL_arg_list(ir);
             //The first is object-ptr reg.
             RegionMgr * trumgr =
                    const_cast<RegionMgr*>((RegionMgr const*)rumgr);

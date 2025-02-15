@@ -284,12 +284,12 @@ public:
 
 //Sparse BitSet Core
 //NOTE: User must invoke clean() to free resource before destruction.
-//e.g1:
+//e.g1: Must call clean() to free resource before destruction.
 //    MiscBitSetMgr<33> mbsm;
 //    SBitSetCore<33> * x = mbsm.allocSBitSetCore() ;
 //    x->bunion(100, mbsm);
 //    mbsm.freeSBitSetCore(x); //Very Important!
-//e.g2:
+//e.g2: Must call clean() to free resource before destruction.
 //    MiscBitSetMgr<33> mbsm;
 //    SBitSetCore<33> x;
 //    x.bunion(100, mbsm);
@@ -341,9 +341,28 @@ public:
         }
     }
 
+    //Copy entire bitset from 'src'.
     void copy(SBitSetCore<BitsPerSeg> const& src,
               MiscBitSetMgr<BitsPerSeg> & m)
     { copy(src, &m.sm, &m.scflst, m.ptr_pool); }
+
+    //Copy entire bitset from 'src'.
+    void copy(BitSet const& src, MiscBitSetMgr<BitsPerSeg> & m)
+    {
+        for (BSIdx i = src.get_first(); i != BS_UNDEF; i = src.get_next(i)) {
+            bunion(i, m);
+        }
+    }
+
+    //Copy entire bitset from 'src'.
+    void copy(BitSet const& src, SegMgr<BitsPerSeg> * sm,
+              TSEGIter ** free_list, SMemPool * pool)
+    {
+        for (BSIdx i = src.get_first(); i != BS_UNDEF; i = src.get_next(i)) {
+            bunion(i, sm, free_list, pool);
+        }
+    }
+
     //Count memory usage for current object.
     size_t count_mem() const;
 
@@ -376,6 +395,7 @@ public:
     { diff(src, &m.sm, &m.scflst); }
 
     void dump(FILE * h) const;
+    void dump(OUT StrBuf & buf) const;
 
     UINT get_elem_count() const;
     BSIdx get_first(TSEGIter ** cur) const;
@@ -406,8 +426,13 @@ public:
 //    x.bunion(100);
 //    //No need to explicit invoke x.clean() to free resource, destructor of x
 //    //will do it automatically.
-//
-//e.g2: Must call clean() to free resource before destruction.
+//e.g2: No need to call clean().
+//    MiscBitSetMgr<47> mbsm;
+//    SBitSet<47> * x = mbsm.allocSBitSet();
+//    x->bunion(100);
+//    //No need to explicit invoke x->clean() to free resource, destructor of x
+//    //will do it automatically.
+//e.g3: Must call clean() to free resource before destruction.
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);
@@ -451,7 +476,7 @@ public:
         }
 
         //Unnecessary call clean(), since free pool will free all
-        //SEGIter object.
+        //DefSEGIter object.
         //SBitSetCore::clean(m_sm, &m_flst);
         smpoolDelete(m_pool);
         m_pool = nullptr;
@@ -464,16 +489,25 @@ public:
     { SBitSetCore<BitsPerSeg>::bunion(elem, m_sm, &m_flst, m_pool); }
 
     void clean() { SBitSetCore<BitsPerSeg>::clean(m_sm, &m_flst); }
+
+    //Copy entire bitset from 'src'.
     void copy(SBitSet<BitsPerSeg> const& src)
     {
         //Do NOT change current m_sm.
         SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
     }
+
+    //Copy entire bitset from 'src'.
     void copy(SBitSetCore<BitsPerSeg> const& src)
     {
         //Do NOT change current m_sm.
         SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
     }
+
+    //Copy entire bitset from 'src'.
+    void copy(BitSet const& src)
+    { SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool); }
+
     //Count memory usage for current object.
     size_t count_mem() const;
 
@@ -797,7 +831,7 @@ public:
         }
 
         //Unnecessary call clean(), since free pool will free all
-        //SEGIter object.
+        //DefSEGIter object.
         //DBitSetCore::clean(m_sm, &m_flst);
         smpoolDelete(m_pool);
     }
@@ -893,10 +927,10 @@ public:
     //SEG manager.
     SegMgr<BitsPerSeg> sm;
 
-    //Free list of SEGIter container. It will be allocated in ptr_pool.
+    //Free list of DefSEGIter container. It will be allocated in ptr_pool.
     TSEGIter * scflst;
 
-    //Only used to allocate SEGIter.
+    //Only used to allocate DefSEGIter.
     SMemPool * ptr_pool;
 public:
     MiscBitSetMgr() : sm(self()) { ptr_pool = nullptr; init(); }
@@ -1066,11 +1100,12 @@ typedef MiscBitSetMgr<> DefMiscBitSetMgr;
 #include "sbs.impl"
 
 //If you want to use different size SEG, then declare the new iter.
-typedef SC<DefSEG*> SEGIter; //Default SEG iter.
+typedef SC<DefSEG*> DefSEGIter; //Default SEG iter.
 
 //Note the iterator of DefSBitSetCore, DBitSet, DBitSetCore are
 //same with DefSBitSet.
-typedef SEGIter * DefSBitSetIter; //Default size SBitSet iter.
+typedef DefSEGIter * DefSBitSetIter; //Default size SBitSet iter.
+typedef DefSEGIter * DefSBitSetCoreIter; //Default size SBitSetCore iter.
 } //namespace xcom
 
 #endif

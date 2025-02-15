@@ -128,7 +128,7 @@ typedef enum {
     IR_CFI_RESTORE,
     IR_CFI_DEF_CFA_OFFSET,
 
-    IR_LAST_UNDERLYING_CODE = IR_CFI_DEF_CFA_OFFSET,
+    IR_LAST_COMMON_CODE = IR_CFI_DEF_CFA_OFFSET,
 
     #include "ir_code_ext.inc"
 

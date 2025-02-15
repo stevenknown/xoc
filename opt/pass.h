@@ -42,7 +42,7 @@ class SimpCtx;
 class Pass {
     COPY_CONSTRUCTOR(Pass);
 protected:
-    BYTE m_is_valid:1; //True if current pass information is available.
+    bool m_is_valid; //True if current pass information is available.
     Region * m_rg;
 public:
     Pass() : m_is_valid(false), m_rg(nullptr) {}

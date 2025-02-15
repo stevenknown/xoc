@@ -33,7 +33,7 @@ namespace xoc {
 //
 //START CLd
 //
-IR * CLd::dupIRTreeByStmt(IR const* src, Region * rg)
+IR * CLd::dupIRTreeByStmt(IR const* src, Region const* rg)
 {
     ASSERT0(src->is_st());
     IR * ld = rg->getIRMgr()->buildLoad(ST_idinfo(src), src->getOffset(),
@@ -47,7 +47,7 @@ IR * CLd::dupIRTreeByStmt(IR const* src, Region * rg)
 //
 //START CPr
 //
-IR * CPr::dupIRTreeByRef(IR const* src, Region * rg)
+IR * CPr::dupIRTreeByRef(IR const* src, Region const* rg)
 {
     ASSERT0(src->isPROp());
     IR * pr = rg->getIRMgr()->buildPRdedicated(src->getPrno(), src->getType());
@@ -60,7 +60,7 @@ IR * CPr::dupIRTreeByRef(IR const* src, Region * rg)
 //
 //START CILd
 //
-IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
+IR * CILd::dupIRTreeByStmt(IR const* src, Region const* rg)
 {
     ASSERT0(src->is_ist());
     IR * ild = rg->getIRMgr()->buildILoad(
@@ -75,7 +75,7 @@ IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
 //
 //START CArray
 //
-IR * CArray::dupIRTreeByStmt(IR const* src, Region * rg)
+IR * CArray::dupIRTreeByStmt(IR const* src, Region const* rg)
 {
     ASSERT0(src->is_starray());
     IR * arr = rg->getIRMgr()->buildArray(
@@ -116,7 +116,7 @@ bool CArray::isIsomoArrayStructTo(IR const* src) const
 //
 //START CStArray
 //
-IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 {
     ASSERT0(src->is_array());
     IR * starr = rg->getIRMgr()->buildStoreArray(
@@ -135,7 +135,7 @@ IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 //
 //START CISt
 //
-IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 {
     ASSERT0(src->is_ild());
     IR * ist = rg->getIRMgr()->buildIStore(
@@ -150,7 +150,7 @@ IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 //
 //START CSt
 //
-IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 {
     ASSERT0(src->is_ld());
     IR * st = rg->getIRMgr()->buildStore(
@@ -164,7 +164,7 @@ IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 //
 //START CStpr
 //
-IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 {
     ASSERT0(src->is_pr());
     IR * stpr = rg->getIRMgr()->buildStorePR(PR_no(src), src->getType(), rhs);
@@ -175,12 +175,12 @@ IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
 
 
 //The function only invoked at debug mode.
-//Make sure IR_ICALL is the largest ir.
+//Make sure LARGEST_IR_CODE is the largest ir.
 bool checkMaxIRCode()
 {
-    //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
+    //Change MAX_OFFSET_AT_FREE_TABLE if LARGEST_IR_CODE is not the largest.
     for (UINT i = IR_UNDEF; i < IR_CODE_NUM; i++) {
-        ASSERT0(IRCSIZE(i) <= IRCSIZE(IR_ICALL));
+        ASSERT0(IRCSIZE(i) <= IRCSIZE(LARGEST_IR_CODE));
     }
     return true;
 }
@@ -300,7 +300,7 @@ void CIGoto::collectLabel(OUT List<LabelInfo const*> & lst) const
 //Build dummyuse expression to represent potential memory objects that
 //the Call referrenced.
 //Note dummyuse may be a list of IR.
-void CCall::addDummyUse(Region * rg)
+void CCall::addDummyUse(Region const* rg)
 {
     IR * newdummyuse = rg->getIRMgr()->buildILoad(
         rg->getIRMgr()->buildImmAny(0), rg->getTypeMgr()->getAny());
@@ -322,7 +322,7 @@ IR * CPhi::getOpnd(UINT idx) const
 }
 
 
-IR * CPhi::dupIRTreeByRef(IR const* src, Region * rg)
+IR * CPhi::dupIRTreeByRef(IR const* src, Region const* rg)
 {
     ASSERT0(src->isPROp());
     //Type cast if host compiler does NOT support C11.

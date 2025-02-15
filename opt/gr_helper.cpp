@@ -237,22 +237,24 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     }
 
     if (ir->is_str()) {
-        CHAR * tbuf = SYM_name(CONST_str_val(ir));
         //Remove \n to show string in one line.
         if (ctx != nullptr && ctx->dump_string_in_one_line) {
-            size_t len = ::strlen(SYM_name(CONST_str_val(ir)));
-            tbuf = (CHAR*)::malloc(len);
-            tbuf[0] = 0;
-            xstrcat(tbuf, len, "%s", SYM_name(CONST_str_val(ir)));
-            for (UINT i = 0; i < len && tbuf[i] != 0; i++) {
-                if (tbuf[i] == '\n') { tbuf[i] = ' '; }
+            size_t len = CONST_str_val(ir)->getLen();
+            CHAR * tbuf2 = (CHAR*)::malloc(len);
+            tbuf2[0] = 0;
+            xcom::xstrcat(tbuf2, len, "%s", CONST_str_val(ir)->getStr());
+            for (UINT i = 0; i < len && tbuf2[i] != 0; i++) {
+                if (tbuf2[i] == '\n') { tbuf2[i] = ' '; }
             }
+            m_lm->incIndent(dn);
+            prt(m_lm, "\"%s\"", tbuf2);
+            ::free(tbuf2);
+            m_lm->decIndent(dn);
+            return;
         }
+        CHAR const* tbuf = CONST_str_val(ir)->getStr();
         m_lm->incIndent(dn);
         prt(m_lm, "\"%s\"", tbuf);
-        if (tbuf != SYM_name(CONST_str_val(ir))) {
-            ::free(tbuf);
-        }
         m_lm->decIndent(dn);
         return;
     }
@@ -688,8 +690,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         }
         prt(m_lm, "(");
         m_lm->incIndent(dn);
-        for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
-            if (p != CALL_param_list(ir)) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
+            if (p != CALL_arg_list(ir)) {
                 prt(m_lm, ",");
             }
             dumpIR(p, ctx);

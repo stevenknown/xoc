@@ -156,6 +156,7 @@ protected:
                      OUT ChainRec & cr, OUT IR const** initstmt);
 
     void genBIV(TermInfo const& ti, ChainRec const& cr, IR const* init) const;
+    IVR * getIVR() const { return m_ivr; }
 
     //Return true if collected information is sanitary enough to
     //generate a BIV.
@@ -254,7 +255,7 @@ bool FindBIVByChainRec::computeStepByConst(IR const* ir, OUT ChainRec & cr)
         //Step has been assign value.
         return false;
     }
-    return CR_step(&cr).extractFrom(ir);
+    return CR_step(&cr).extractFrom(ir, getIVR());
 }
 
 
@@ -452,7 +453,7 @@ bool FindBIVByChainRec::findBIVImpl(
     } else {
         ASSERT0(init->isConstExp() || init->is_lda());
         *initstmt = nullptr;
-        val.extractFrom(init);
+        val.extractFrom(init, getIVR());
     }
     if (!step->isMemOpnd()) { return false; }
     CR_init(&cr) = val;
@@ -609,6 +610,8 @@ protected:
         IR const* redexp, LI<IRBB> const* li) const;
     IR const* findInitStmtByClassicDU(
         IR const* redexp, LI<IRBB> const* li, MD const* ivoccmd) const;
+
+    IVR * getIVR() const { return m_ivr; }
 
     static bool isMDEqual(MD const* md, IR const* ir)
     { return md == ir->getRefMD(); }
@@ -875,7 +878,7 @@ bool FindBIVByRedOp::extractBIV(
     IV_li(*biv) = m_li;
     IV_reduction_stmt(*biv) = const_cast<IR*>(def);
     IV_reduction_exp(*biv) = lr.getVarExp();
-    BIV_stepv(*biv).extractFrom(addend);
+    BIV_stepv(*biv).extractFrom(addend, getIVR());
     m_crmgr->refine(BIV_stepv(*biv));
 
     //Find and infer the initial value.
@@ -1849,7 +1852,7 @@ static bool isIVrecur(IVR const* ivr, LI<IRBB> const* li, IR const* ir,
 }
 
 
-IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr)
+IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr, this)
 {
     ASSERT0(rg != nullptr);
     m_mdsys = rg->getMDSystem();
@@ -1886,7 +1889,7 @@ bool IVR::computeInitVal(IR const* ir, OUT IVVal & val) const
     if (v->is_cvt()) {
         v = ((CCvt*)v)->getLeafExp();
     }
-    return val.extractFrom(v);
+    return val.extractFrom(v, this);
 }
 
 
@@ -2650,6 +2653,30 @@ bool IVR::computeExpIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
 }
 
 
+bool IVR::extractIVValFromMC(MOD IVVal * val, IR const* ir) const
+{
+    ASSERT0(ir->is_mc());
+    MCType const* ty = (MCType const*)ir->getType();
+    if (ty->getByteSize() <= sizeof(HOST_UINT)) {
+        //Regard MC typed value as integer value.
+        val->setToInt(CONST_int_val(ir), m_tm->getHostUIntType());
+        return true;
+    }
+    ASSERTN(0, ("Target Dependent Code"));
+    return false;
+}
+
+
+bool IVR::extractIVValFrom(MOD IVVal * val, IR const* ir) const
+{
+    if (ir->is_mc()) {
+        return extractIVValFromMC(val, ir);
+    }
+    ASSERTN(0, ("Target Dependent Code"));
+    return false;
+}
+
+
 bool IVR::computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
                               MOD IVRCtx & ivrctx) const
 {
@@ -2738,7 +2765,7 @@ bool IVR::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     clean();
     m_rg->getPassMgr()->checkValidAndRecompute(
-        &oc, PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
+        &oc, PASS_MD_REF, PASS_DOM, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
     if (is_aggressive() && !useGVN()) {
         m_gvn = (GVN*)m_rg->getPassMgr()->registerPass(PASS_GVN);

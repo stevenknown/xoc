@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "data_type.h"
+#include "extend_type.h"
 #include "const.h"
 
 //FOLLOWING FILES ARE MIDDLE LEVEL INCLUDED FILES
@@ -50,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pass.h"
 #include "ai.h"
 #include "du.h"
+#include "status.h"
 #include "ir.h"
 #include "ir_decl.h"
 #include "ir_decl_ext.h"

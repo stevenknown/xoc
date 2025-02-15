@@ -266,7 +266,7 @@ LIR * IR2Dex::buildThrow(IN IR ** ir)
     LIRAOp * lir = (LIRAOp*)ymalloc(sizeof(LIRAOp));
     lir->opcode = LOP_THROW;
     LIR_dt(lir) = LIR_JDT_unknown;
-    IR * p = CALL_param_list(*ir);
+    IR * p = CALL_arg_list(*ir);
     ASSERT0(p);
     lir->vA = get_vreg(p);
     ASSERT0(p->get_next() == nullptr);
@@ -282,7 +282,7 @@ LIR * IR2Dex::buildMonitorExit(IN IR ** ir)
     LIRAOp * lir = (LIRAOp*)ymalloc(sizeof(LIRAOp));
     lir->opcode = LOP_MONITOR_EXIT;
     LIR_dt(lir) = LIR_JDT_unknown;
-    IR * p = CALL_param_list(*ir);
+    IR * p = CALL_arg_list(*ir);
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
@@ -299,7 +299,7 @@ LIR * IR2Dex::buildMonitorEnter(IN IR ** ir)
     LIRAOp * lir = (LIRAOp*)ymalloc(sizeof(LIRAOp));
     lir->opcode = LOP_MONITOR_ENTER;
     LIR_dt(lir) = LIR_JDT_unknown;
-    IR * p = CALL_param_list(*ir);
+    IR * p = CALL_arg_list(*ir);
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
@@ -353,9 +353,9 @@ LIR * IR2Dex::buildArrayLength(IN IR ** ir)
     lir->vA = get_vreg(CALL_prno(tir));
 
     //vB
-    ASSERT0(CALL_param_list(tir));
-    lir->vB = get_vreg(CALL_param_list(tir));
-    ASSERT0(IR_next(CALL_param_list(tir)) == nullptr);
+    ASSERT0(CALL_arg_list(tir));
+    lir->vB = get_vreg(CALL_arg_list(tir));
+    ASSERT0(IR_next(CALL_arg_list(tir)) == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -368,7 +368,7 @@ LIR * IR2Dex::buildCheckCast(IN IR ** ir)
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_CHECK_CAST;
     IR * tir = *ir;
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
     ASSERT0(p);
 
     //object-ptr
@@ -471,7 +471,7 @@ UINT IR2Dex::findFieldId(IR * ir, IR * objptr)
     ASSERT0(def);
 
     ASSERT0(is_builtin(def, BLTIN_NEW, m_ru_mgr));
-    UINT field_id = CONST_int_val(CALL_param_list(def));
+    UINT field_id = CONST_int_val(CALL_arg_list(def));
     return field_id;
 }
 
@@ -803,7 +803,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
         //     $1:I32 param2 id:14
 
         //The first must be inoke-flag.
-        IR * p = CALL_param_list(tir);
+        IR * p = CALL_arg_list(tir);
         ASSERT0(p->is_const());
         UINT invoke_flags = CONST_int_val(p);
         p = p->get_next();
@@ -818,7 +818,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
     LIRInvokeOp * lir = (LIRInvokeOp*)ymalloc(sizeof(LIRInvokeOp));
     lir->opcode = LOP_INVOKE;
 
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
     ASSERT0(p);
 
     //Inoke-kind.
@@ -891,8 +891,8 @@ LIR * IR2Dex::buildNewInstance(IN IR ** ir)
     lir->opcode = LOP_NEW_INSTANCE;
     IR * tir = *ir;
     //class-id
-    ASSERT0(CALL_param_list(tir) && CALL_param_list(tir)->is_const());
-    lir->vB = CONST_int_val(CALL_param_list(tir));
+    ASSERT0(CALL_arg_list(tir) && CALL_arg_list(tir)->is_const());
+    lir->vB = CONST_int_val(CALL_arg_list(tir));
     LIR_dt(lir) = LIR_JDT_object;
 
     //Method idx.
@@ -918,7 +918,7 @@ LIR * IR2Dex::buildFillArrayData(IN IR ** ir)
     LIRSwitchOp * lir = (LIRSwitchOp*)ymalloc(sizeof(LIRSwitchOp));
     lir->opcode = LOP_FILL_ARRAY_DATA;
     IR * tir = *ir;
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
 
     //The first parameter is array obj-ptr.
     ASSERT0(p && p->is_pr());
@@ -959,7 +959,7 @@ LIR * IR2Dex::buildFilledNewArray(IN IR ** ir)
     LIRInvokeOp * lir = (LIRInvokeOp*)ymalloc(sizeof(LIRInvokeOp));
     lir->opcode = LOP_FILLED_NEW_ARRAY;
     IR * tir = *ir;
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
 
     //first parameter is invoke-kind.
     ASSERT0(p && p->is_uint());
@@ -1011,10 +1011,10 @@ LIR * IR2Dex::buildConstClass(IN IR ** ir)
     lir->vA = get_vreg(CALL_prno(tir));
 
     //Type id of array element.
-    ASSERT0(CALL_param_list(tir) &&
-            CALL_param_list(tir)->is_const());
-    lir->vB = CONST_int_val(CALL_param_list(tir));
-    ASSERT0(IR_next(CALL_param_list(tir)) == nullptr);
+    ASSERT0(CALL_arg_list(tir) &&
+            CALL_arg_list(tir)->is_const());
+    lir->vB = CONST_int_val(CALL_arg_list(tir));
+    ASSERT0(IR_next(CALL_arg_list(tir)) == nullptr);
 
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1031,7 +1031,7 @@ LIR * IR2Dex::buildNewArray(IN IR ** ir)
     lir->opcode = LOP_NEW_ARRAY;
     LIR_dt(lir) = LIR_JDT_unknown; //see dir2lir.c
 
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
     ASSERT0(p);
 
     //The number of array element.
@@ -1071,7 +1071,7 @@ LIR * IR2Dex::buildInstanceOf(IN IR ** ir)
     lir->vA = get_vreg(CALL_prno(tir));
 
     //Object-ptr register.
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
     ASSERT0(p->is_pr());
     lir->vB = get_vreg(p);
     p = p->get_next();
@@ -1103,7 +1103,7 @@ LIR * IR2Dex::buildCmpBias(IN IR ** ir)
     LIRABCOp * lir = (LIRABCOp*)ymalloc(sizeof(LIRABCOp));
 
     //cmp-kind
-    IR * p = CALL_param_list(tir);
+    IR * p = CALL_arg_list(tir);
     ASSERT0(p && p->is_int() && IR_dt(p) == m_tr->u32);
     CMP_KIND ck = (CMP_KIND)CONST_int_val(p);
     p = p->get_next();

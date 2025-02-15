@@ -920,7 +920,7 @@ public:
               bool is_unitarize = false) const;
 
     //The function will reinitialize the matrix by given row and col size.
-    //Note all origin elements will be destroied.
+    //Note all origin elements will be destroyed.
     void reinit(UINT row, UINT col)
     {
         if (m_row_size == row && m_col_size == col) { return; }

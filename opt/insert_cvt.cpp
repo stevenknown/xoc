@@ -116,17 +116,17 @@ IR * InsertCvt::convertGetelem(IR * ir, bool & change, InsertCvtCtx & rc)
 IR * InsertCvt::convertCall(IR * ir, bool & change, InsertCvtCtx & rc)
 {
     bool lchange = false;
-    if (CALL_param_list(ir) != nullptr) {
-        IR * param = xcom::removehead(&CALL_param_list(ir));
-        IR * newparamlst = nullptr;
+    if (CALL_arg_list(ir) != nullptr) {
+        IR * arg = xcom::removehead(&CALL_arg_list(ir));
+        IR * newarglst = nullptr;
         IR * last = nullptr;
-        while (param != nullptr) {
-            IR * newp = convertIR(param, lchange, rc);
-            xcom::add_next(&newparamlst, &last, newp);
+        while (arg != nullptr) {
+            IR * newp = convertIR(arg, lchange, rc);
+            xcom::add_next(&newarglst, &last, newp);
             last = newp;
-            param = xcom::removehead(&CALL_param_list(ir));
+            arg = xcom::removehead(&CALL_arg_list(ir));
         }
-        CALL_param_list(ir) = newparamlst;
+        CALL_arg_list(ir) = newarglst;
     }
     if (lchange) {
         change = true;
@@ -738,6 +738,9 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
         Type const* tgt_ty = parent->getType();
         if (tgt_ty->is_any() || kid->getType()->is_any()) {
             //Nothing need to do if converting to ANY.
+            return kid;
+        }
+        if (parent->is_stpr() && !isNeedInsertCvtForStpr(parent, kid)) {
             return kid;
         }
         UINT tgt_size = parent->getTypeSize(m_tm);

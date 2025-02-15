@@ -601,17 +601,14 @@ void SolveSetMgr::computeMustExactDefMayDefMayUse(
         flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
         ASSERT0(mustdefmds);
     }
-
     if (flag.have(DUOPT_SOL_REACH_DEF) ||
         flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
         flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         ASSERT0(maydefmds);
     }
-
     if (flag.have(DUOPT_SOL_REGION_REF)) {
         ASSERT0(mayusemds);
     }
-
     BBListIter ct;
     ConstMDIter mditer;
     xcom::DefMiscBitSetMgr * lsbsmgr = getLocalSBSMgr();
@@ -645,18 +642,14 @@ void SolveSetMgr::computeMustExactDefMayDefMayUse(
             mustgendef = genMustGenDef(bbid);
             cleanMustGenDef(mustgendef);
         }
-
         if (maydefmds != nullptr) {
             bb_maydefmds = maydefmds->get(bbid);
             maygendef = genMayGenDef(bbid);
             cleanMayGenDef(maygendef);
         }
-
-        computeMustExactDefMayDefMayUseForBB(bb, mditer,
-                                             mustdefmds, maydefmds,
-                                             mayusemds, bb_mustdefmds,
-                                             bb_maydefmds, mustgendef,
-                                             maygendef, flag, *lsbsmgr);
+        computeMustExactDefMayDefMayUseForBB(
+            bb, mditer, mustdefmds, maydefmds, mayusemds, bb_mustdefmds,
+            bb_maydefmds, mustgendef, maygendef, flag, *lsbsmgr);
     }
     END_TIMER_FMT(t3, ("Build MustDef, MayDef, MayUse: %s",
                        getSolveFlagName(flag)));
@@ -671,15 +664,14 @@ void SolveSetMgr::computeMustExactDefMayDefMayUseForBB(
     UFlag flag, DefMiscBitSetMgr & bsmgr)
 {
     //may_def_mds, must_def_mds should be already clean.
+    CollectMayUseRecur co(m_rg);
     IRListIter irct;
     for (BB_irlist(bb).get_head(&irct);
          irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
         IR const* ir = irct->val();
         ASSERT0(ir);
         if (mayusemds != nullptr) {
-            DUMgr::collectMayUseRecursive(ir, m_rg,
-                                          flag.have(DUOPT_COMPUTE_PR_DU),
-                                          bsmgr, *mayusemds);
+            co.collect(ir, flag.have(DUOPT_COMPUTE_PR_DU), bsmgr, *mayusemds);
             //collectMayUse(ir, *mayusemds, isComputePRDU());
         }
 
@@ -720,8 +712,8 @@ void SolveSetMgr::computeMustExactDefMayDefMayUseForBB(
 }
 
 
-void SolveSetMgr::collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
-                                  OUT MDSet * maydefmds) const
+void SolveSetMgr::collectNonPRMayDef(
+    IR const* ir, DefMiscBitSetMgr & bsmgr, OUT MDSet * maydefmds) const
 
 {
     if (ir->isWritePR()) {
@@ -742,9 +734,9 @@ void SolveSetMgr::collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
 }
 
 
-void SolveSetMgr::computeMayDef(IR const* ir, MDSet * bb_maydefmds,
-                                SolveSet * maygendef,
-                                DefMiscBitSetMgr & bsmgr, UFlag flag)
+void SolveSetMgr::computeMayDef(
+    IR const* ir, MDSet * bb_maydefmds, SolveSet * maygendef,
+    DefMiscBitSetMgr & bsmgr, UFlag flag)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
@@ -853,12 +845,9 @@ bool SolveSetMgr::isMustKill(IR const* def1, IR const* def2)
 }
 
 
-void SolveSetMgr::computeMustExactDef(IR const* ir,
-                                      OUT MDSet * bb_mustdefmds,
-                                      SolveSet * mustgendef,
-                                      ConstMDIter & mditer,
-                                      DefMiscBitSetMgr & bsmgr,
-                                      UFlag flag)
+void SolveSetMgr::computeMustExactDef(
+    IR const* ir, OUT MDSet * bb_mustdefmds, SolveSet * mustgendef,
+    ConstMDIter & mditer, DefMiscBitSetMgr & bsmgr, UFlag flag)
 {
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
@@ -943,12 +932,9 @@ void SolveSetMgr::computeLiveInBB(DefMiscBitSetMgr & bsmgr)
 }
 
 
-void SolveSetMgr::computeKillSetByMayGenDef(UINT bbid, bool comp_must,
-                                            bool comp_may,
-                                            MDSet const* bb_mustdefmds,
-                                            MDSet const* bb_maydefmds,
-                                            DefMiscBitSetMgr & bsmgr,
-                                            OUT SolveSet & output)
+void SolveSetMgr::computeKillSetByMayGenDef(
+    UINT bbid, bool comp_must, bool comp_may, MDSet const* bb_mustdefmds,
+    MDSet const* bb_maydefmds, DefMiscBitSetMgr & bsmgr, OUT SolveSet & output)
 {
     SolveSet const* maygendef = genMayGenDef(bbid);
     ASSERT0(maygendef);
@@ -986,12 +972,9 @@ void SolveSetMgr::computeKillSetByMayGenDef(UINT bbid, bool comp_must,
 
 //Compute must and may killed stmt.
 //NOTE: computation of maykill and mustkill both need may-gen-def.
-void SolveSetMgr::computeKillSetByLiveInBB(UINT bbid, bool comp_must,
-                                           bool comp_may,
-                                           MDSet const* bb_mustdefmds,
-                                           MDSet const* bb_maydefmds,
-                                           DefMiscBitSetMgr & bsmgr,
-                                           OUT SolveSet & output)
+void SolveSetMgr::computeKillSetByLiveInBB(
+    UINT bbid, bool comp_must, bool comp_may, MDSet const* bb_mustdefmds,
+    MDSet const* bb_maydefmds, DefMiscBitSetMgr & bsmgr, OUT SolveSet & output)
 {
     SolveSet const* liveinbbs = genLiveInBB(bbid);
     ASSERT0(liveinbbs);
@@ -1010,10 +993,10 @@ void SolveSetMgr::computeKillSetByLiveInBB(UINT bbid, bool comp_must,
 //mustdefs: record must modified MD for each bb.
 //maydefs: record may modified MD for each bb.
 //NOTE: computation of maykill and mustkill both need may-gen-def.
-void SolveSetMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
-                                 Vector<MDSet*> const* mustexactdefmds,
-                                 Vector<MDSet*> const* maydefmds,
-                                 DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::computeKillSet(
+    DefDBitSetCoreReserveTab & dbitsetchash,
+    Vector<MDSet*> const* mustexactdefmds, Vector<MDSet*> const* maydefmds,
+    DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t4, "Build KillSet");
     ASSERT0(mustexactdefmds || maydefmds);
@@ -1081,9 +1064,8 @@ static bool canBeLiveExprCand(IR const* ir)
 }
 
 
-void SolveSetMgr::computeGenExprForMayDef(IR const* ir,
-                                          OUT SolveSet * gen_ir_expr,
-                                          DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::computeGenExprForMayDef(
+    IR const* ir, OUT SolveSet * gen_ir_expr, DefMiscBitSetMgr & bsmgr)
 {
     ASSERT0(ir->is_stmt());
     //Compute lived IR expression after current statement executed.
@@ -1097,6 +1079,7 @@ void SolveSetMgr::computeGenExprForMayDef(IR const* ir,
     if (maydef == nullptr && mustdef == nullptr) { return; }
     DefSBitSetIter st = nullptr;
     MDSet tmp;
+    CollectMayUseRecur co(m_rg);
     for (BSIdx j = gen_ir_expr->get_first(&st), nj; j != BS_UNDEF; j = nj) {
         nj = gen_ir_expr->get_next(j, &st);
         IR * tir = m_rg->getIR(j);
@@ -1105,7 +1088,7 @@ void SolveSetMgr::computeGenExprForMayDef(IR const* ir,
             continue;
         }
         tmp.clean(bsmgr);
-        DUMgr::collectMayUseRecursive(tir, m_rg, true, bsmgr, tmp);
+        co.collect(tir, true, bsmgr, tmp);
         //collectMayUse(tir, tmp, true);
         if ((maydef != nullptr && maydef->is_intersect(tmp)) ||
             (mustdef != nullptr && tmp.is_contain(mustdef, m_rg))) {
@@ -1119,10 +1102,9 @@ void SolveSetMgr::computeGenExprForMayDef(IR const* ir,
 
 //The function collect the IR expression that being the GenExpr.
 //expr_univers: local set.
-void SolveSetMgr::computeGenExprForStmt(IR const* ir,
-                                        OUT SolveSet * gen_ir_expr,
-                                        OUT SolveSet & expr_univers,
-                                        DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::computeGenExprForStmt(
+    IR const* ir, OUT SolveSet * gen_ir_expr, OUT SolveSet & expr_univers,
+    DefMiscBitSetMgr & bsmgr)
 {
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
@@ -1171,8 +1153,7 @@ void SolveSetMgr::computeGenExprForStmt(IR const* ir,
                 expr_univers.bunion(IR_id(ICALL_callee(ir)), bsmgr);
             }
         }
-        for (IR * p = CALL_param_list(ir);
-             p != nullptr; p = p->get_next()) {
+        for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             if (canBeLiveExprCand(p)) {
                 bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(p));
                 expr_univers.bunion(IR_id(p), bsmgr);
@@ -1229,8 +1210,8 @@ void SolveSetMgr::computeGenExprForStmt(IR const* ir,
 
 //Compute generated-EXPR for BB.
 //expr_univers: local set.
-void SolveSetMgr::computeGenExprForBB(IRBB * bb, OUT SolveSet & expr_univers,
-                                      DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::computeGenExprForBB(
+    IRBB * bb, OUT SolveSet & expr_univers, DefMiscBitSetMgr & bsmgr)
 {
     SolveSet * gen_ir_expr = genGenIRExpr(bb->id());
     cleanGenIRExpr(gen_ir_expr);
@@ -1246,10 +1227,9 @@ void SolveSetMgr::computeGenExprForBB(IRBB * bb, OUT SolveSet & expr_univers,
 
 //Compute local-gen IR-EXPR set and killed IR-EXPR set.
 //'expr_universe': record the universal of all ir-expr of region.
-void SolveSetMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
-                                             OUT SolveSet * expr_universe,
-                                             Vector<MDSet*> const* maydefmds,
-                                             DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::computeAuxSetForExpression(
+    DefDBitSetCoreReserveTab & bshash, OUT SolveSet * expr_universe,
+    Vector<MDSet*> const* maydefmds, DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t5, "Build AvailableExp");
     ASSERT0(expr_universe && maydefmds);
@@ -1265,6 +1245,7 @@ void SolveSetMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
     //other exprs which used MDSet that modified by 'ir'.
     SolveSet tmp_killed_set(SOL_SET_IS_SPARSE);
     MDSet tmp;
+    CollectMayUseRecur co(m_rg);
     for (m_bblst->get_head(&ct);
          ct != m_bblst->end(); ct = m_bblst->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -1279,7 +1260,7 @@ void SolveSetMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
             if (ir->is_lda() || ir->is_const()) { continue; }
 
             tmp.clean(bsmgr);
-            DUMgr::collectMayUseRecursive(ir, m_rg, true, bsmgr, tmp);
+            co.collect(ir, true, bsmgr, tmp);
             //collectMayUse(ir, *tmp, true);
 
             if (bb_maydefmds->is_intersect(tmp)) {
@@ -1296,9 +1277,9 @@ void SolveSetMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
 
 
 //Compute maydef, mustdef, mayuse information for current region.
-void SolveSetMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
-                                    Vector<MDSet*> const* maydef_mds,
-                                    MDSet const* mayuse_mds)
+void SolveSetMgr::computeRegionMDDU(
+    Vector<MDSet*> const* mustexactdef_mds, Vector<MDSet*> const* maydef_mds,
+    MDSet const* mayuse_mds)
 {
     START_TIMER(t6, "Build Region DefUse MDSet");
     ASSERT0(mustexactdef_mds && maydef_mds && mayuse_mds);
@@ -1659,12 +1640,10 @@ static void finiSolveSetVec(BBList const* bblst,
 }
 
 
-static void initSolveSetVec(BBList const* bblst,
-                            MDSet *& mds_arr_for_must, MDSet *& mds_arr_for_may,
-                            MDSet *& mayuse_mds,
-                            Vector<MDSet*> *& mustexactdef_mds,
-                            Vector<MDSet*> *& maydef_mds,
-                            UFlag const& flag)
+static void initSolveSetVec(
+    BBList const* bblst, MDSet *& mds_arr_for_must, MDSet *& mds_arr_for_may,
+    MDSet *& mayuse_mds, Vector<MDSet*> *& mustexactdef_mds,
+    Vector<MDSet*> *& maydef_mds, UFlag const& flag)
 {
     ASSERT0(maydef_mds == nullptr &&
             mustexactdef_mds == nullptr &&

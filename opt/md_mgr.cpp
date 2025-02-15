@@ -177,7 +177,7 @@ MD const* MDMgr::allocStringMD(Sym const* string)
 
     MD md;
     MD_base(&md) = v;
-    MD_size(&md) = (UINT)::strlen(SYM_name(string)) + 1;
+    MD_size(&md) = string->getLen() + 1;
     MD_ofst(&md) = 0;
     MD_ty(&md) = MD_EXACT;
     ASSERT0(v->is_string());

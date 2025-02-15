@@ -42,10 +42,12 @@ protected:
     //optimizations.
     virtual bool isParticipateInOpt() const;
 
-    void updateCounter(Pass const* pass, UINT & cp_count,
-                       UINT & licm_count, UINT & rp_count, UINT & gcse_count);
-    bool worthToDo(Pass const* pass, UINT cp_count,
-                   UINT licm_count, UINT rp_count, UINT gcse_count);
+    void updateCounter(
+        Pass const* pass, UINT & cp_count, UINT & licm_count, UINT & rp_count,
+        UINT & gcse_count, UINT & dce_count);
+    bool worthToDo(
+        Pass const* pass, UINT cp_count, UINT licm_count, UINT rp_count,
+        UINT gcse_count, UINT dce_count);
 public:
     explicit ScalarOpt(Region * rg) : Pass(rg)
     {

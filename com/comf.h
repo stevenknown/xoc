@@ -46,9 +46,34 @@ template <class T> class Vector;
 //Compute the maximum unsigned integer value that type is ValueType.
 //e.g: given bitwidth is 3, return 7 as result.
 //Note ValueType should be unsigned integer type.
+//NOTE: The direct way to write it is
+//return ((((ValueType)1) << bitwidth) - 1);.
+//However, this approach may lead to incorrect results on different
+//architectures such as x86 and ARM.
+//The shift operation `1 << bitwidth` places the `1` in the `bitwidth`-th
+//position and then subtracting `1` gives us a number with all bits set to
+//`1` up to that position. However, behavior on different architectures
+//may vary:
+//- On **x86** (32-bit systems), shifting beyond 31 bits wraps around
+//(circular shift), which might lead to incorrect results if `bitwidth`
+//is larger than the number of bits in the type.
+//- On **ARM**, shifting beyond the number of available bits (e.g., 32
+//bits for uint32_t) will discard the extra bits, which is the expected
+//and correct behavior.
 template <class ValueType>
 inline ValueType computeUnsignedMaxValue(UINT bitwidth)
-{ return ((((ValueType)1) << bitwidth) - 1); }
+{
+    return (ValueType)(~((ValueType)0)) >>
+        (sizeof(ValueType) * BITS_PER_BYTE - bitwidth);
+}
+
+
+//Compute the maximum unsigned integer value that type is ValueType.
+//e.g: given ValueType is UINT32, return 0xFFFFffff as result.
+//Note ValueType should be unsigned integer type.
+template <class ValueType>
+inline ValueType computeUnsignedMaxValue()
+{ return ~((ValueType)0); }
 
 //Compute the maximum unsigned integer value
 //based on the byte width of the type.
@@ -203,6 +228,14 @@ UINT32 encodeULEB128(UINT64 value, OUT Vector<CHAR> & os,
 UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os,
                      UINT32 pad_to = 0);
 
+//Extract bits from 'v' according to the 'begin' index and 'end' index.
+//e.g.: Given v = '0x12345678', beign = 4 and end  = 7. it return 7.
+inline UINT64 extractBits(UINT64 v, UINT32 begin, UINT32 end)
+{
+    ASSERT0(begin < 64 && end < 64 && begin <= end);
+    return (v & computeMaxValueFromByteWidth<UINT64>(begin + 1)) >> end;
+}
+
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
 
@@ -277,6 +310,19 @@ float getclockend(LONG start);
 //Get the index of the first '1' start at most right side.
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
+
+//Get nbitnum consecutive bits starting at bit position mbitoffset from the val.
+//a.given val: 0x12345678, nbitnum: 4 and mbitoffset: 8, it will return 0x6.
+//b.given val: 0x12345678, nbitnum: 8 and mbitoffset: 8, it will return 0x56.
+inline UINT64 getNBitValueAtMBitOffset(UINT64 val, UINT nbitnum,
+                                       UINT mbitoffset)
+{
+    ASSERT0((nbitnum >= 1) && (nbitnum <= 64));
+    ASSERT0((mbitoffset >= 0) && (mbitoffset < 64));
+    ASSERT0((mbitoffset + nbitnum <= 64));
+    UINT64 mask = (nbitnum == 64) ? UINT64(-1) : ((UINT64(1) << nbitnum) - 1);
+    return (val >> mbitoffset) & mask;
+}
 
 //Get the sign bit of given bitsize.
 //                      |
@@ -376,6 +422,7 @@ inline INT32 get32BitValueLowNBit(INT32 val, UINT bitnum)
     UINT64 const mask_1 = (UINT64)(0x1) << (bitnum - 1);
     return (INT32)(((val & mask_0) ^ mask_1) - mask_1);
 }
+
 
 //Get unsigned hign n-bit value of unsigned 64bit value.
 //a.given val: 0x12345678 and bitnum: 4, it will return 0x1.
@@ -512,6 +559,24 @@ inline CHAR lower(CHAR n)
 //new_file_name: "xxx.o"
 void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
                            OUT StrBuf & new_file_name);
+
+//Set nbitnum consecutive bits starting at bit position mbitoffset
+//in orgval to bitval.
+//a.given orgval: 0x12345678, nbitnum: 4, mbitoffset: 8 and bitval: 0,
+//  The value of orgval will be set to 0x12345078.
+//b.given orgval: 0x12345678, nbitnum: 8, mbitoffset: 8 and bitval: 1,
+//  The value of orgval will be set to 0x12341178.
+inline void setNBitValueAtMBitOffset(OUT UINT64 * orgval, UINT nbitnum,
+                                     UINT mbitoffset, UINT64 bitval)
+{
+    ASSERT0((nbitnum >= 1) && (nbitnum <= 64));
+    ASSERT0((mbitoffset >= 0) && (mbitoffset < 64));
+    ASSERT0(mbitoffset + nbitnum <= 64);
+    ASSERT0(bitval == 0 || bitval == 1);
+    UINT64 mask = computeUnsignedMaxValue<UINT64>(nbitnum);
+    mask <<= mbitoffset;
+    *orgval = (*orgval & ~mask) | ((-(INT64)bitval) & mask);
+}
 
 //Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y);
@@ -662,18 +727,22 @@ inline bool xisdigit(CHAR const* str)
     return true;
 }
 
-//Return true if 'c' is hex decimal.
+//Return true if 'c' is binary decimal, 0 or 1.
 inline bool xisdigitbin(CHAR c) { return (c == '0') | (c == '1'); }
 
+//Return true if 'c' is hex decimal in the range a-f or A-F.
+inline bool xisdigithex_alpha(CHAR c)
+{ return (upper(c) >= 'A') & (upper(c) <= 'F'); }
+
+//Return true if 'c' is octal decimal in the range 0-7.
+inline bool xisdigithex_octal(CHAR c) { return (c >= '0') & (c <= '7'); }
+
 //Return true if 'c' is hex decimal.
-inline bool xisdigithex(CHAR c)
-{
-    if (xisdigit(c)) { return true; }
-    if ((upper(c) >= 'A') & (upper(c) <= 'F')) { return true; }
-    return false;
-}
+//The hex decimal is character in the range of 0-9, a-f, and A-F.
+inline bool xisdigithex(CHAR c) { return xisdigit(c) || xisdigithex_alpha(c); }
 
 //Return true if 'c' is letter.
+//The letter is character in the range of a-z and A-Z.
 inline bool xisalpha(CHAR c) { return (upper(c) >= 'A') & (upper(c) <= 'Z'); }
 
 //Return abs value of 'a'.

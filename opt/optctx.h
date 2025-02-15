@@ -40,7 +40,7 @@ typedef enum _PASS_TYPE PASS_TYPE; //forward declare PASS_TYPE
 //perform. When an optimization pass is run, it can change results of other
 //pass. Set the valid/invalid option to inform that results were preserved by
 //that optimization pass.es must be done explicitly.
-#define OC_is_ref_valid(o) ((o).u1.s1.is_du_ref_valid)
+#define OC_is_ref_valid(o) ((o).u1.s1.is_md_ref_valid)
 #define OC_is_pr_du_chain_valid(o) ((o).u1.s1.is_pr_du_chain_valid)
 #define OC_is_nonpr_du_chain_valid(o) ((o).u1.s1.is_nonpr_du_chain_valid)
 #define OC_is_live_expr_valid(o) ((o).u1.s1.is_live_expr_valid)
@@ -64,7 +64,7 @@ public:
         BitUnion int1;
         struct {
             //Record MUST-DEF, MAY-DEF, MAY-USE MDSet for each IR STMT/EXP.
-            BitUnion is_du_ref_valid:1;
+            BitUnion is_md_ref_valid:1;
 
             //Record DEF/USE IR stmt/exp for PR operation.
             BitUnion is_pr_du_chain_valid:1;
@@ -219,6 +219,8 @@ public:
     //The function make all flag invalid.
     void setInvalidAllFlags();
     void setValidPass(PASS_TYPE pt);
+    void setValidPRDU() { OC_is_pr_du_chain_valid(*this) = true; }
+    void setValidNonPRDU() { OC_is_nonpr_du_chain_valid(*this) = true; }
 };
 
 } //namespace xoc

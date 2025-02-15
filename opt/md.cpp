@@ -505,11 +505,15 @@ MD * MDSet::get_unique_md(MDSystem const* ms) const
 void MDSetHash::dump(Region * rg)
 {
     if (!rg->isLogMgrInit()) { return; }
-    note(rg, "\n==---- DUMP MDSet Hash ----==\n");
-    SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(
-        rg->getLogMgr()->getFileHandler());
-    SBitSetCoreHash<MDSetHashAllocator>::dump(
-        rg->getLogMgr()->getFileHandler());
+    note(rg, "\n==-- DUMP MDSet Hash --==\n");
+    rg->getLogMgr()->incIndent(2);
+    xcom::StrBuf buf(128);
+    SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(buf);
+    note(rg, "%s", buf.getBuf());
+    buf.clean();
+    SBitSetCoreHash<MDSetHashAllocator>::dump(buf);
+    note(rg, "%s", buf.getBuf());
+    rg->getLogMgr()->decIndent(2);
 }
 //END MDSetHash
 

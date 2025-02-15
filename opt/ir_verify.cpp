@@ -289,8 +289,8 @@ bool verifyCall(IR const* ir, Region const* rg)
     //The result type may be ANY.
     if (CALL_prno(ir) != PRNO_UNDEF) { ASSERT0_DUMMYUSE(d); }
 
-    //Parameters should be expression.
-    for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    //Arguments should be expression.
+    for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         ASSERT0(p->is_exp());
     }
 
@@ -315,7 +315,7 @@ bool verifyICall(IR const* ir, Region const* rg)
     ASSERT0(ICALL_callee(ir) && ICALL_callee(ir)->isPtr());
     ASSERT0(ICALL_callee(ir)->is_single());
 
-    for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
+    for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         ASSERT0(p->is_exp());
     }
     return true;
@@ -670,6 +670,92 @@ bool verifyPhi(IR const* ir, Region const* rg)
     //In order to convenient to cfg optimization, do not verify PHI here,
     //whereas more verifications to PHI should be placed to PRSSAMgr.
     //ASSERT0(verifyPhi(rg));
+    return true;
+}
+
+
+bool verifyAtomCas(IR const* ir, Region const* rg)
+{
+    verifyGeneral(ir, rg);
+    ASSERT0(ir->getType() &&
+            (ir->getType()->is_i32() || ir->getType()->is_i64()));
+    IR * memory = ATOMCAS_memory(ir);
+    IR * oldval = ATOMCAS_oldval(ir);
+    IR * newval = ATOMCAS_newval(ir);
+    IR * reslst = ATOMCAS_multires(ir);
+    ASSERT0(oldval && newval &&
+            (oldval->is_pr() || oldval->is_const()) &&
+            (newval->is_pr() || newval->is_const()));
+    ASSERT0(memory);
+    if (reslst != nullptr) { ASSERT0(reslst->get_next() == nullptr); }
+    if (memory->is_ld()) {
+        ASSERT0(LD_idinfo(memory) &&
+                LD_idinfo(memory)->getStorageSpace() == SS_GLOBAL);
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_ld() && LD_idinfo(reslst) &&
+                    LD_idinfo(memory) == LD_idinfo(reslst) &&
+                    LD_idinfo(memory)->getStorageSpace() == SS_GLOBAL);
+        }
+    } else if (memory->is_ild()) {
+        ASSERT0(ILD_base(memory) && ILD_base(memory)->is_pr());
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_ild() && ILD_base(reslst) &&
+                    ILD_base(reslst)->is_pr() &&
+                    ILD_base(memory)->getPrno() ==
+                    ILD_base(reslst)->getPrno());
+        }
+    } else {
+        ASSERT0(memory->is_pr());
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_pr());
+
+            //After PRSSA optimization, the prnos of the two operands will be
+            //inconsistent.
+            if (rg->getPRSSAMgr() == nullptr) {
+                ASSERT0(reslst->getPrno() == memory->getPrno());
+            }
+        }
+    }
+    return true;
+}
+
+
+bool verifyAtomInc(IR const* ir, Region const* rg)
+{
+    verifyGeneral(ir, rg);
+    ASSERT0(ir->getType() && ir->getType()->is_i64());
+    IR * memory = ATOMINC_memory(ir);
+    IR * reslst = ATOMINC_multires(ir);
+    ASSERT0(memory);
+    if (reslst != nullptr) { ASSERT0(reslst->get_next() == nullptr); }
+    if (memory->is_ld()) {
+        ASSERT0(LD_idinfo(memory) &&
+                LD_idinfo(memory)->getStorageSpace() == SS_GLOBAL);
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_ld() && LD_idinfo(reslst) &&
+                    LD_idinfo(memory) == LD_idinfo(reslst) &&
+                    LD_idinfo(memory)->getStorageSpace() == SS_GLOBAL);
+        }
+    } else if (memory->is_ild()) {
+        ASSERT0(ILD_base(memory) && ILD_base(memory)->is_pr());
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_ild() && ILD_base(reslst) &&
+                    ILD_base(reslst)->is_pr() &&
+                    ILD_base(memory)->getPrno() ==
+                    ILD_base(reslst)->getPrno());
+        }
+    } else {
+        ASSERT0(memory->is_pr());
+        if (reslst != nullptr) {
+            ASSERT0(reslst->is_pr());
+
+            //After PRSSA optimization, the prnos of the two operands will be
+            //inconsistent.
+            if (rg->getPRSSAMgr() == nullptr) {
+                ASSERT0(reslst->getPrno() == memory->getPrno());
+            }
+        }
+    }
     return true;
 }
 

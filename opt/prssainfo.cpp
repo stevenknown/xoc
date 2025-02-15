@@ -104,17 +104,17 @@ void SSAInfo::dump(Region const* rg) const
         return;
     }
     prt(rg, " USE:");
-    SSAUseIter vit = nullptr;
-    BSIdx nexti = 0;
-    for (BSIdx i2 = SSA_uses(this).get_first(&vit);
-         vit != nullptr; i2 = nexti) {
-        nexti = SSA_uses(this).get_next(i2, &vit);
-        IR * use = rg->getIR(i2);
-        ASSERT0(use->is_pr());
+    SSAUseIter it = nullptr;
+    BSIdx nextu = 0;
+    for (BSIdx u = SSA_uses(this).get_first(&it); it != nullptr; u = nextu) {
+        nextu = SSA_uses(this).get_next(u, &it);
+        IR * use = rg->getIR(u);
+        ASSERTN(use, ("'%s' does not have No.%u IR", u));
+        ASSERT0(use && use->is_pr());
         ASSERTN(defprno == PRNO_UNDEF || defprno == use->getPrno(),
                 ("unmatched PR"));
         prt(rg, "id:%d", use->id());
-        if (nexti != BS_UNDEF) {
+        if (nextu != BS_UNDEF) {
             prt(rg, ",");
         }
     }

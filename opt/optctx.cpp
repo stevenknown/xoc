@@ -44,10 +44,10 @@ void OptCtx::setValidPass(PASS_TYPE pt)
         OC_is_avail_reach_def_valid(*this) = true;
         break;
     case PASS_CLASSIC_DU_CHAIN:
-        OC_is_pr_du_chain_valid(*this) = true;
-        OC_is_nonpr_du_chain_valid(*this) = true;
+        setValidPRDU();
+        setValidNonPRDU();
         break;
-    case PASS_DU_REF: OC_is_ref_valid(*this) = true; break;
+    case PASS_MD_REF: OC_is_ref_valid(*this) = true; break;
     case PASS_CFG: OC_is_cfg_valid(*this) = true; break;
     case PASS_AA: OC_is_aa_valid(*this) = true; break;
     default: break; //to invalid pass object.
@@ -60,10 +60,19 @@ void OptCtx::setValidPass(PASS_TYPE pt)
 
 void OptCtx::setInvalidPass(PASS_TYPE pt)
 {
+    PassMgr * pm = m_rg->getPassMgr();
+    ASSERT0(pm);
     switch (pt) {
     case PASS_DOM: OC_is_dom_valid(*this) = false; break;
     case PASS_PDOM: OC_is_pdom_valid(*this) = false; break;
-    case PASS_RPO: OC_is_rpo_valid(*this) = false; break;
+    case PASS_RPO: {
+        OC_is_rpo_valid(*this) = false;
+        IRCFG * cfg = m_rg->getCFG();
+        if (cfg != nullptr) {
+            cfg->cleanRPOVexList();
+        }
+        break;
+    }
     case PASS_LOOP_INFO: OC_is_loopinfo_valid(*this) = false; break;
     case PASS_LIVE_EXPR: OC_is_live_expr_valid(*this) = false; break;
     case PASS_REACH_DEF: OC_is_reach_def_valid(*this) = false; break;
@@ -71,15 +80,15 @@ void OptCtx::setInvalidPass(PASS_TYPE pt)
         OC_is_avail_reach_def_valid(*this) = false;
         break;
     case PASS_CLASSIC_DU_CHAIN:
-        OC_is_pr_du_chain_valid(*this) = false;
-        OC_is_nonpr_du_chain_valid(*this) = false;
+        setInvalidPRDU();
+        setInvalidNonPRDU();
         break;
-    case PASS_DU_REF: OC_is_ref_valid(*this) = false; break;
+    case PASS_MD_REF: OC_is_ref_valid(*this) = false; break;
     case PASS_CFG: OC_is_cfg_valid(*this) = false; break;
     case PASS_AA: OC_is_aa_valid(*this) = false; break;
     default: break; //to invalid pass object.
     }
-    Pass * pass = m_rg->getPassMgr()->queryPass(pt);
+    Pass * pass = pm->queryPass(pt);
     if (pass == nullptr) { return; }
     pass->set_valid(false);
 }
@@ -91,19 +100,18 @@ bool OptCtx::isPassValid(PASS_TYPE pt) const
     Pass * pass = m_rg->getPassMgr()->queryPass(pt);
     if (pass != nullptr && pass->is_valid()) { return true; }
     switch (pt) {
-    case PASS_DOM: return OC_is_dom_valid(*this);
-    case PASS_PDOM: return OC_is_pdom_valid(*this);
-    case PASS_RPO: return OC_is_rpo_valid(*this);
-    case PASS_LOOP_INFO: return OC_is_loopinfo_valid(*this);
-    case PASS_LIVE_EXPR: return OC_is_live_expr_valid(*this);
-    case PASS_REACH_DEF: return OC_is_reach_def_valid(*this);
-    case PASS_AVAIL_REACH_DEF: return OC_is_avail_reach_def_valid(*this);
+    case PASS_DOM: return is_dom_valid();
+    case PASS_PDOM: return is_pdom_valid();
+    case PASS_RPO: return is_rpo_valid();
+    case PASS_LOOP_INFO: return is_loopinfo_valid();
+    case PASS_LIVE_EXPR: return is_live_expr_valid();
+    case PASS_REACH_DEF: return is_reach_def_valid();
+    case PASS_AVAIL_REACH_DEF: return is_avail_reach_def_valid();
     case PASS_CLASSIC_DU_CHAIN:
-        return OC_is_pr_du_chain_valid(*this) ||
-               OC_is_nonpr_du_chain_valid(*this);
-    case PASS_DU_REF: return OC_is_ref_valid(*this);
-    case PASS_CFG: return OC_is_cfg_valid(*this);
-    case PASS_AA: return OC_is_aa_valid(*this);
+        return is_pr_du_chain_valid() || is_nonpr_du_chain_valid();
+    case PASS_MD_REF: return is_ref_valid();
+    case PASS_CFG: return is_cfg_valid();
+    case PASS_AA: return is_aa_valid();
     default: break;
     }
     return false;

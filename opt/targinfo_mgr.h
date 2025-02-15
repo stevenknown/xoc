@@ -29,12 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _TARGINFO_MGR_H_
 #define _TARGINFO_MGR_H_
 
-//Header files in XGEN is referred by linear_scan.h.
-//It looks like backward invoking functions that defined in XGEN.
-#include "../xgen/reg.h"
-#include "../xgen/regfile.h"
-#include "../xgen/targ_interface.h"
-
 using namespace xgen;
 
 namespace xoc {
@@ -151,7 +145,7 @@ public:
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
     //Get temporary register of different architectures.
-    virtual xgen::Reg getTempScalar() const
+    virtual xgen::Reg getTempScalar(Type const* ty) const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
     virtual xgen::Reg getTempVector() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }

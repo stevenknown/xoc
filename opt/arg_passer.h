@@ -36,20 +36,184 @@ namespace xoc {
 
 typedef xcom::TMap<xoc::Var const*, Reg> ParamVar2Reg;
 typedef xcom::TMap<xoc::Var const*, PRNO> ParamVar2Prno;
+typedef xcom::TMapIter<IR const*, xcom::List<Var const*>*> CallIR2ArgListIter;
 
 class LinearScanRA;
 class Region;
 class IRMgr;
 class TypeMgr;
 class DynamicStack;
+class RegionMgr;
 
+typedef xcom::Vector<Var const*> PosParam;
+typedef xcom::TMap<Region*, PosParam*> RegionPosParam;
+typedef xcom::TMapIter<Region*, PosParam*> RegionPosParamIter;
+
+//
+//Start ArgPasserResMgr.
+//
+class ArgPasserResMgr {
+    COPY_CONSTRUCTOR(ArgPasserResMgr);
+protected:
+    xcom::List<xcom::List<Var const*>*> m_list_var_mgr;
+
+protected:
+    void deleteListVar();
+
+public:
+    ArgPasserResMgr() {}
+    ~ArgPasserResMgr();
+
+    xcom::List<Var const*> * allocListVar();
+};
+//End ArgPasserResMgr.
+
+
+//
+//Start GenListVarOfMap.
+//
+class GenListVarOfMap {
+    COPY_CONSTRUCTOR(GenListVarOfMap);
+
+public:
+    ArgPasserResMgr * m_arg_pass_res_mgr;
+
+public:
+    GenListVarOfMap() {}
+    ~GenListVarOfMap() {}
+
+    xcom::List<Var const*> * createMapped(IR const* call_ir)
+    {
+        ASSERT0(call_ir);
+        return m_arg_pass_res_mgr->allocListVar();
+    }
+};
+//End GenListVarOfMap.
+
+
+typedef xcom::TMap<IR const*, xcom::List<Var const*> *,
+    CompareKeyBase<IR const*>, GenListVarOfMap> CallIR2ArgListType;
+
+//This class provides a method for allocating 'xcom::List'
+//objects and manages the mapping between function calls (IR const*)
+//and their associated argument lists (xcom::List<Var const*>*).
+class CallIR2ArgListMap : public CallIR2ArgListType {
+    COPY_CONSTRUCTOR(CallIR2ArgListMap);
+
+public:
+    CallIR2ArgListMap(ArgPasserResMgr * arg_pass_res_mgr)
+    {
+        ASSERT0(arg_pass_res_mgr);
+        CallIR2ArgListType::m_gm.m_arg_pass_res_mgr = arg_pass_res_mgr;
+    }
+    ~CallIR2ArgListMap() {}
+
+    //Checks if the specified variable exists among the arguments pushed
+    //onto the stack from all function calls.
+    bool findVar(Var const* var) const
+    {
+        CallIR2ArgListIter iter;
+        xcom::List<Var const*> * callir_param_list = nullptr;
+        for (get_first(iter, &callir_param_list); !iter.end();
+             get_next(iter, &callir_param_list)) {
+            for (xoc::Var const* v = callir_param_list->get_head();
+                 v != nullptr; v = callir_param_list->get_next()) {
+                if (var != v) { continue; }
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+
+//The ParamList class efficiently stores and looks up function
+//parameters on the stack. It extends xcom::EList and uses a hash
+//map (Param2Holder) for optimized lookup and performance.
+typedef xcom::TMap<Var const*, xcom::C<Var const*>*> Param2Holder;
+class ParamList : public xcom::EList<Var const*, Param2Holder> {
+    COPY_CONSTRUCTOR(ParamList);
+public:
+    ParamList() {}
+};
+
+
+//
+//Start RegionParamMgr.
+//
+class RegionParamMgr {
+    COPY_CONSTRUCTOR(RegionParamMgr);
+
+protected:
+    RegionPosParam * m_rg_pos_param;
+
+protected:
+    void allocRegionPosParam()
+    {
+        ASSERT0(m_rg_pos_param == nullptr);
+        m_rg_pos_param = new RegionPosParam();
+    }
+
+    void deleteRegionPosParam()
+    {
+        ASSERT0(m_rg_pos_param);
+        RegionPosParamIter iter;
+        PosParam * pos_param = nullptr;
+        for (m_rg_pos_param->get_first(iter, &pos_param); !iter.end();
+             m_rg_pos_param->get_next(iter, &pos_param)) {
+            ASSERT0(pos_param);
+            delete pos_param;
+        }
+        delete m_rg_pos_param;
+        m_rg_pos_param = nullptr;
+    }
+
+public:
+    //According to the given region and parameter position, return the
+    //parameter variable corresponding to the region.
+    Var * getRegionParam(Region * rg, UINT pos)
+    {
+        ASSERT0(m_rg_pos_param && rg && m_rg_pos_param->get(rg));
+        return (Var*)m_rg_pos_param->get(rg)->get(pos);
+    }
+
+    bool haveCollected(Region * rg) const
+    { return m_rg_pos_param != nullptr && m_rg_pos_param->find(rg); }
+
+    RegionParamMgr() { m_rg_pos_param = nullptr; }
+    ~RegionParamMgr()
+    {
+        if (m_rg_pos_param != nullptr) { deleteRegionPosParam(); }
+    }
+
+    //Record the parameter variables corresponding to a certain region and
+    //a certain parameter position.
+    void setRegionParam(Region * rg, xcom::List<Var const*> & paramlst)
+    {
+        ASSERT0(rg);
+        if (paramlst.get_elem_count() == 0) { return; }
+        if (m_rg_pos_param == nullptr) { allocRegionPosParam(); }
+        if (m_rg_pos_param->find(rg)) { return; } //Already collected.
+        PosParam * pos_param = new PosParam();
+        pos_param->copy(paramlst);
+        m_rg_pos_param->set(rg, pos_param);
+    }
+};
+//End RegionParamMgr.
+
+
+//
+//Start ArgPasser.
+//
 class ArgPasser : public Pass {
     COPY_CONSTRUCTOR(ArgPasser);
 protected:
     LinearScanRA * m_lsra;
     IRMgr * m_irmgr;
+    RegionMgr * m_rm;
     TypeMgr * m_tm;
     DynamicStack * m_dystack_impl;
+    RegionParamMgr * m_rg_param_mgr;
 
     //Record the IR that obtains the entry function parameter address and use
     //it as a marker so that a spill can be inserted before the callee register
@@ -68,11 +232,29 @@ protected:
     //The maximum possible size of argument need to be passed on the stack.
     UINT m_max_argument_size;
 
-    //The list of arguments passed on the stack.
-    xcom::List<Var const*> m_arg_stack_list;
+    //Record argument maximum alignment. When adjusting the stack pointer, we
+    //need to ensure that the stack pointer is aligned according to the maximum
+    //alignment of the arguments.
+    UINT m_max_argument_align;
+
+    //Responsible for the resource management of the current PASS.
+    ArgPasserResMgr * m_arg_pass_res_mgr;
+
+    //Stores the variables passed through the stack for the corresponding
+    //call instruction. A `List` is used to record the variables in the
+    //order they are pushed onto the stack.
+    //e.g:
+    //call fuc(a,b,c,d,e,f,g)
+    //Suppose `e`, `f`, and `g` are passed through the stack, this call
+    //instruction will be recorded, and the variables `e -> f -> g` will
+    //be recorded in the same order they are passed on the stack.
+    CallIR2ArgListMap m_call_arg_list;
 
     //The list of formal parameters passed on the stack.
-    xcom::List<Var const*> m_param_stack_list;
+    ParamList m_param_stack_list;
+
+    //Record the the BBs that are inserted IRs after call statement.
+    xcom::List<IRBB*> m_mod_bblist;
 
     //Record the prno corresponding to the parameters for entry function.
     ParamVar2Prno m_var2prno;
@@ -81,16 +263,25 @@ protected:
     void appendIRToGetStartAddressOfMCInEntryFunc(MOD IRBB * irbb,
         PRNO start_address_prno, OUT UINT & offset, Var const* v);
 
+    void appendCallIRArgsToStack(IR const* call_ir, Var const* v);
+
     //Get the start address of parameters in kernel function.
     virtual void appendIRToGetStartAddressOfParamsInEntryFunc(OUT PRNO & prno);
 
-    //Use external function call to copy src_var to dst_var.
-    //src_var: source varlable.
-    //dst_var: target variable.
-    //size: byte size of the copy.
-    virtual void buildMemcpy(OUT xcom::List<IR*> & irlist, Var * src_var,
-                             Var * dst_var, UINT const size)
+    //GCOVR_EXCL_START
+    //This function is used for passing paramater which is a memory variable and
+    //is located in global or spm space. The variable will be loaded in the
+    //tgtprno.
+    void buildLoadForGlobalOrSpmVar(OUT IRList & irlist, PRNO tgtprno,
+                                    Var * var, Type const* type,
+                                    TMWORD ofst = 0);
+
+    //Use external function call to copy data with size from source to
+    //destination.
+    virtual void buildMemcpy(OUT IRList & irlst, IR const* source,
+                             Var * destination, UINT const size)
     { ASSERTN(0, ("Target Dependent Code")); }
+    //GCOVR_EXCL_STOP
 
     //Get the destination address of the IR_CALL/IR_ICALL and put it into the
     //REG_TARGET_ADDRESS_REGISTER.
@@ -118,48 +309,55 @@ protected:
     //----------------------------------------------------------------------
     void buildTargetAddressForCall(OUT IRList & irlist, IR * ir);
 
-    //When copying an argument to the parameter space, if the argument size is
-    //too large, many loads and stores will be generated, which will lead to
-    //a long compilation time. Therefore, when the load and store number is
-    //greater than the maximum number of copies defined by the architecture,
-    //the memcpy function will be called to copy the variable.
-    IR * copyMCWithMemcpy(OUT IRList & irlist, IR const* ir,
-                          OUT UINT & arg_size, MOD UINT & alignment);
-
     //When passing an argument of type MC by value, use this function to
-    //move the variable of type MC to the parameter space.
-    //e.g:
-    //.func entry()
-    //{
-    //    .stack.b<16> .align<8> stval;
-    //    call test(st);
-    //    ret;
-    //}
+    //move the variable of type MC to the parameter space. For example:
+    //
+    //    .func entry()
+    //    {
+    //        .stack.b<16> .align<8> stval;
+    //        call test(st);
+    //    }
+    //
     //In this case, stval is a stack variable and is passed to the function
-    //test as a value, so stval needs to be copyed to the parameter space,
-    //the way to move is:
+    //test as a value, so stval needs to be copyed to the parameter space. The
+    //way to move is:
+    //
     //    load.stack.u64 $0, [stval];
     //    store.param.u64 [param], $0;
     //    load.stack.u64 $0, [stval + 8];
     //    store.param.u64 [param + 8], $0;
     //
-    //arg_size: the sum of the parameter size passed through the stack for each
-    //          function call.
-    //alignment: The maximum alignment of all parameters passed through the
-    //           stack.
+    //Parameters:
+    //  irlst: Saves the IRs implemented this function.
+    //  ir:    Argument IR which will be modified.
+    //  size:  the sum of the parameter size passed through the stack for each
+    //         function call.
+    //  align: The maximum alignment of all parameters passed through the
+    //         stack.
+    //  param_var: Parameter variable in caller function.
+    //  formal_param_var: Formal parameter variable in callee function.
+    //
     //NOTE: The size of the data for each copy, calculated from the alignment
     //of the variables.
-    virtual IR * copyMCAndReturnAddress(OUT IRList & irlist, IR const* ir,
-        OUT UINT & arg_size, MOD UINT & alignment);
+    void copyMCWithLoadStore(OUT IRList & irlst, MOD IR *& ir, MOD UINT & size,
+                             MOD UINT & align, Var const* param_var,
+                             Var const* formal_param_var, IR const* call_ir);
 
-    //This function is used for passing paramater which is a memory variable and
-    //is located in global or spm space. The variable will be loaded in the
-    //tgtprno.
-    void buildLoadForGlobalOrSpmVar(OUT IRList & irlist, PRNO tgtprno,
-                                    Var * var, Type const* type,
-                                    TMWORD ofst = 0);
+    //When copying an argument to the parameter space, if the argument size is
+    //too large, many loads and stores will be generated, which will lead to
+    //a long compilation time. Therefore, when the load and store number is
+    //greater than the maximum number of copies defined by the architecture,
+    //the memcpy function will be called to copy the variable.
+    void copyMCWithMemcpy(OUT IRList & irlst, MOD IR *& ir, MOD UINT & size,
+                          MOD UINT & align, Var const* param_var,
+                          Var const* formal_param_var, IR const* call_ir);
 
     virtual bool dump() const;
+
+    //Return formal parameter variable on given position of callee function
+    //called by given ir.
+    //Now that we can only process IR_CALL.
+    Var * getCalleeFormalParamVar(IR const* ir, UINT position);
 
     //Return the data type of each copy when copying the argument of type MC to
     //the parameter space, and the size of the data copied each time is equal to
@@ -200,6 +398,9 @@ protected:
     //Whether the parameter passer generates LAD operations for function calls.
     virtual bool isArgPasserExternalCallNeedLda() //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    xgen::Reg pickReg(RegSet & set)
+    { return RegSetImpl::pickRegByIncrementalOrder(set); }
 
     //Pick reg according to var.
     virtual xgen::Reg pickParamReg(Var const* v) //GCOVR_EXCL_LINE
@@ -267,6 +468,22 @@ protected:
     //    }
     void preProcessFormalParam(OptCtx & oc);
 
+    //Collect all parameters of all callee functions. Specifically:
+    //
+    //                            ----> .func callee0(.param.u32 param0) {}
+    //                            |
+    //  .func caller()            | --> .func callee1(.param.u64 param0,
+    //  {                         | |                 .param.u64 param1)
+    //      call callee0($0);    -- |   {}
+    //      call callee1($1, $2);----
+    //  }
+    //
+    //After collection, the information in m_rg_pos_param:
+    //
+    // { callee0: { 0: param0 } }, { callee1: { 0: param0, 1: param1 } },
+    //
+    void preProcessFormalParamCallee();
+
     //Process irs that used formal parameters.
     //CASE1:
     //Replace load.param.u64 $0, [param0];
@@ -289,7 +506,7 @@ protected:
     // -> mov.u64 $dedidate_arg_reg $0;
     // -> call test($dedidate_arg_reg) -> $dedicate_ret_reg;
     // -> mov.u64 $1, $dedicate_ret_reg;
-    //PART2: dynamic adjust sp if argument size > 0 and hasAllocaIR() is true.
+    //PART2: dynamic adjust sp if argument size > 0 and hasAlloca() is true.
     //e.g: call test($0, $1, $2, $3, $4, $5, $6) -> $7;
     //Assume: 1.The number of argument registers is 6, $6 will be pass by stack.
     //        2.The register size of $6 is 8B.
@@ -361,10 +578,11 @@ protected:
     void passArgViaRegister(OUT IRList & irlist, OUT IR ** paramlist,
                             IR const* ir, xgen::Reg reg);
 
-    //Pass parameters more than the number fo parameter registers via stack.
+    //Pass parameters beyond the number of available parameter registers
+    //via the stack.
     void passArgViaStack(OUT IRList & irlist, OUT IR ** paramlist,
                          IR const* ir, MOD UINT & arg_size,
-                         MOD UINT & alignment);
+                         MOD UINT & alignment, IR const* call_ir);
 
     //Pass return values less than or equal to the number fo return value
     //registers via register.
@@ -375,37 +593,73 @@ protected:
     //stack.
     void passRetViaStack(IR const* ir);
 
-    //Process argument which size exceed the general register size.
+    //Process conditions with argument or parameter or returned value having
+    //type mc.
+    //
     //CASE1: Pass the address of this argument.
-    //e.g: call test() -> .param.B<N> retval;
-    //In this case, the address of the retval needs to be passed
-    //into the function test.
+    //
+    //  call callee() -> .param.b<N> retval;
+    //
+    //In this case, the address of the retval needs to be passed into the
+    //function "callee".
     //
     //CASE2: Pass the value of this augument.
-    //e.g: call test(.stack.B<N> stack0);
-    //In this case, the value of stack0 needs to be passed
-    //into the function test.
-    IR * processArgumentWithMCType(IR const* ir, IR * param,
-        OUT IRList & ir_list, MOD UINT & arg_size, MOD UINT & alignment);
+    //
+    //  .stack.b<N> stack0;
+    //  call callee(stack0);
+    //
+    //In this case, the value of "stack0" needs to be passed into the function
+    //"callee".
+    //
+    //CASE 3: The parameter in the function declaration is of type mc, but the
+    //        register is used at the call site.
+    //
+    //  .func callee(.param.b<N> param);
+    //
+    //  .func caller()
+    //  {
+    //      ......
+    //      call callee($0);
+    //      ......
+    //  }
+    //
+    //In this case, the value pointed to by "$0" needs to be passed into the
+    //function "callee".
+    //
+    void processArgOrParamWithMCType(MOD IR *& param, OUT IRList & irlst,
+                                     MOD UINT & size, MOD UINT & align,
+                                     Var const* param_var,
+                                     Var const* formal_param_var,
+                                     IR const* call_ir);
 
     IR * processFormalParamAddress(OUT IRList & irlist, IR * ir);
 
-    //Update total arg_size and max alignment for each function call.
-    void updateArgSizeAndAlignment(MOD UINT & arg_size, MOD UINT & alignment,
-                                   Var const* var) {
-        arg_size += m_tm->getByteSize(var->getType());
-        alignment = (UINT)xcom::ceil_align(MAX(var->get_align(),
-            alignment), STACK_ALIGNMENT);
-        arg_size = (UINT)xcom::ceil_align(arg_size, alignment);
+    //Update total argument size and max alignment value for each function
+    //call.
+    void updateArgSizeAndAlignment(MOD UINT & size, MOD UINT & align,
+                                   Var const* var)
+    {
+        ASSERT0(m_tm && var && var->getType());
+        size += m_tm->getByteSize(var->getType());
+        align = (UINT)xcom::ceil_align(MAX(var->get_align(), align),
+                                       STACK_ALIGNMENT);
+        size = (UINT)xcom::ceil_align(size, align);
     }
 
 public:
     ArgPasser(Region * rg);
-    virtual ~ArgPasser() {}
+    virtual ~ArgPasser();
 
     IR * getEntryParam() const { return m_entry_param; }
 
+    //GCOVR_EXCL_START
+    UINT getMaxArgAlign() const { return m_max_argument_align; }
+    //GCOVR_EXCL_STOP
     UINT getMaxArgSize() const { return m_max_argument_size; }
+
+    //Get the BB that needs to process the entry function.
+    virtual IRBB * getKernelAdjustBBForEntryFunc() const
+    { return m_rg->getCFG()->getEntry(); }
 
     //Different architectures need to overwrite this interface to bind
     //different registers for sclar parameters.
@@ -427,9 +681,14 @@ public:
     virtual xgen::RegSet const* getRetRegSetVector() const //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
-    xcom::List<Var const*> * getStackArgList() { return &m_arg_stack_list; }
+    //Get the arguments of the function call in the current region,
+    //and these arguments are passed on the stack.
+    CallIR2ArgListMap const* getStackArgMap() const
+    { return &m_call_arg_list; }
 
-    xcom::List<Var const*> * getStackParamList() { return &m_param_stack_list; }
+    //Get the list of parameters passed on the stack.
+    ParamList * getListOfParamOnStack()
+    { return &m_param_stack_list; }
 
     virtual CHAR const* getPassName() const { return "Arg Passer"; }
 
@@ -441,7 +700,11 @@ public:
     virtual UINT getMaxCopyNum() const { return 8; }
 
     virtual bool perform(OptCtx & oc);
+
+    //Split the BBs that are inserted with IRs after the call statement.
+    void splitBBIfNeeded(OptCtx & oc);
 };
+//End ArgPasser.
 
 }
 

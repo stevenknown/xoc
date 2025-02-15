@@ -209,6 +209,19 @@ IR * findNearestDomDef(IR const* exp, Region const* rg);
 
 //The function try to find the killing-def for 'use'.
 //To find the killing-def, the function prefer use SSA info.
+//e.g: stpr $1 = ...;
+//     ...     = $1; stpr is the killing-def of $1
+//e.g2 setelem $2:vec<4*i32> = $3:vec<4*i32>, $1:i32, 4;
+//     ... = $2;
+//     setelem is NOT the killing-def of $2 because it is a partial def $2.
+//e.g3: g is global variable, it is exact.
+//  x is a pointer that we do not know where it pointed to.
+//    #1. *x += 1; # *x may overlapped with g
+//    #2. g = 0; # exactly defined g
+//    #3. call foo(); # foo may overlapped with g
+//    #4. return g;
+//In the case, the last reference of g in #4 may be defined by
+//#1, #2, #3, thus there is no nearest killing def.
 IR * findKillingDef(IR const* use, Region const* rg);
 
 //Find the unique DEF of 'exp' that is inside given loop.
@@ -222,11 +235,6 @@ IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
 //killing-def.
 //To find the killing-def, the function prefer use SSA info.
 IR * findUniqueMustDef(IR const* use, Region const* rg);
-
-//The function find a DEF for 'use'.
-//Note the DEF may not be must-def, may not be killing-def.
-//If 'use' does not have any DEF, the function return NULL.
-IR * findDef(IR const* use, Region const* rg);
 
 //The function will be looking for the correct DEF for each exp of 'root' in
 //SSA mode. And the classic DU chain does NOT need to find the live-in DEF.
@@ -295,6 +303,13 @@ bool hasUniqueDefInLoopForMustRef(
 //        Note it may be equal to 0 if there is not any DEF in loop.
 bool hasMoreThanOneDefInLoopForMustRef(
     IR const* ir, Region const* rg, LI<IRBB> const* li, OUT UINT & defcnt);
+
+//Return true if ir is region-live-in expression.
+//A region-live-in expression does not have any DEF.
+//Usually, global variables and parameters variables loading might be
+//region-live-in.
+//ir: expression.
+bool isRegionLiveIn(IR const* ir, Region const* rg);
 
 //Return true if def is killing-def of use.
 //Note this function does not check if there is DU chain between def and use.

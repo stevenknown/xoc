@@ -73,7 +73,7 @@ void Region::HighProcessImpl(OptCtx & oc)
             PASS_PRSSA_MGR);
         ASSERT0(prssamgr);
         if (!prssamgr->is_valid()) {
-            prssamgr->construction(oc);
+            prssamgr->reconstruction(oc);
         }
         oc.setInvalidPRDU();
     }

@@ -292,11 +292,30 @@ bool LifeTime::findOccAfter(Pos pos, OUT OccListIter & it) const
 }
 
 
+bool LifeTime::findOccBefore(Pos pos, OUT OccListIter & it) const
+{
+    OccList & ol = const_cast<LifeTime*>(this)->getOccList();
+    OccListIter it2 = nullptr;
+    bool res = false;
+    for (Occ occ = ol.get_head(&it2); it2 != ol.end();
+         occ = ol.get_next(&it2)) {
+        ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
+        if (occ.pos() >= pos) { break; }
+        it = it2;
+        res = true;
+    }
+    return res;
+}
+
+
 void LifeTime::addOcc(Occ occ)
 {
     ASSERTN(occ.getIR() && !occ.getIR()->is_undef(), ("ilegal occ"));
     m_occ_list.append_tail(occ);
-    if (isDefOcc(occ.getIR())) { setOccHasDef(); }
+    if (!isDefOcc(occ.getIR())) { return; }
+    if (isOccHasDef()) { removeOneDefOnly(); return; }
+    setOccHasDef();
+    setOneDefOnly();
 }
 
 

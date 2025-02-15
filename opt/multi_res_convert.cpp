@@ -51,8 +51,9 @@ static IR * dupIsomoVDef(
             ir->getIdinfo(), ir->getOffset(), realuse, dummyuse, ty);
     }
     ASSERT0(ir->isIndirectMemOp());
-    return irmgrext->buildVIStore(
-        ir->getBase(), ir->getOffset(), realuse, dummyuse, ty);
+    //This base IR may be used in other operations.
+    return irmgrext->buildVIStore(rg->dupIRTree(ir->getBase()),
+        ir->getOffset(), realuse, dummyuse, ty);
 }
 
 

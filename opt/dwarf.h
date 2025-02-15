@@ -188,6 +188,12 @@ class DwarfResMgr;
 //This is the alignment value of debug section, aligned to 8.
 #define DEBUG_SECTION_ALIGN_EIGHT 8
 
+//Special ID value that distinguishes a CIE (Common Information Entry)
+//from an FDE (Frame Description Entry) in DWARF Call Frame Information (CFI).
+//This value is used to identify a CIE entry in the `.debug_frame` section.
+//Equivalent to UINT32_MAX.
+#define DW_CIE_ID 0xffffffffU
+
 //This is the offset size of the variable type
 //mcsymbol on the stack. We fix it to be 8 bytes.
 #define MCSYMBOL_VAR_STACK_OFF_SIZE 8
@@ -717,6 +723,7 @@ public:
 #define MCDWARFMGR_region_frame_info(e)    ((e)->m_region_frame_info)
 #define MCDWARFMGR_debug_frame_code(e)     ((e)->m_debug_frame_code)
 #define MCDWARFMGR_debug_loc_code(e)       ((e)->m_debug_loc_code)
+#define MCDWARFMGR_debug_loc_fixups(e)     ((e)->m_debug_loc_fixups)
 #define MCDWARFMGR_debug_frame_fixups(e) \
     ((e)->m_debug_frame_fixups)
 #define MCDWARFMGR_region_line_info(e)     ((e)->m_region_line_info)
@@ -777,6 +784,7 @@ public:
 
     //debug_loc
     BYTEVec m_debug_loc_code;
+    FixupVec m_debug_loc_fixups;
 
     //debug_frame
     //The code for all regions in the current scope.

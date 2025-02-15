@@ -36,7 +36,7 @@ namespace xoc {
 //An example function of dumping.
 //Usage: dump_rbt((RBT<Sym*, Sym*, xoc::CompareSymTab>&)map,
 //                "graph_rbt.vcg", 1000, dumpTN);
-inline CHAR * dumpTN(Sym* key, Sym* mapped)
+inline CHAR const* dumpTN(Sym* key, Sym* mapped)
 {
     DUMMYUSE(mapped);
     return SYM_name(key);

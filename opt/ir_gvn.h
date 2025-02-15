@@ -685,7 +685,8 @@ protected:
     VN const* inferWriteArray(IR const* ir, InferCtx & ctx);
     VN const* inferStmt(IR const* ir, InferCtx & ctx);
     VN const* inferMDPhi(MDPhi const* phi, InferCtx & ctx);
-    VN const* inferVNViaBase(IR const* ir, InferCtx & ctx);
+    VN const* inferVNViaBaseAndOfst(IR const* ir, InferCtx & ctx);
+    VN const* inferVNViaArrayKidAndOfst(IR const* ir, InferCtx & ctx);
     VN const* inferDirectExp(IR const* ir, InferCtx & ctx);
     VN const* inferArray(IR const* ir, InferCtx & ctx);
     VN const* inferIndirectMemExp(IR const* ir, InferCtx & ctx);

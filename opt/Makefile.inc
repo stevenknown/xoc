@@ -1,5 +1,7 @@
 OPT_OBJS+=\
+preana.o\
 cfs_opt.o\
+status.o\
 dbg.o\
 goto_opt.o\
 if_opt.o \
@@ -21,6 +23,7 @@ ir_middle_opt.o\
 ir_high_opt.o\
 ir_expr_tab.o\
 cdg.o\
+eval.o\
 ir_refine.o\
 ir_rp.o\
 ir_aa.o\
@@ -46,6 +49,7 @@ ir_loop_cvt.o\
 refine_duchain.o\
 prssainfo.o\
 scalar_opt.o\
+apply_to_region.o\
 liveness_mgr.o\
 mdliveness_mgr.o\
 du_helper.o\
@@ -59,6 +63,7 @@ md_mgr.o\
 solve_set.o\
 infer_type.o\
 attachinfo_mgr.o\
+alge_reasscociate.o\
 analysis_instr.o\
 invert_brtgt.o\
 ir_helper.o\
@@ -87,8 +92,7 @@ chain_recur.o\
 insert_cvt.o\
 act_mgr.o\
 dwarf.o\
-var_liveness_mgr.o\
-update_pos.o
+targinfo_handler.o
 
 ifeq ($(TARG),)
   $(error "NEED TARG INFO:e.g:make TARG=FOR_DEX TARG_DIR=../dex")
@@ -108,6 +112,9 @@ $(info "CURFILE: $(CURFILE)")
 ifeq ($(FOR_IP), true)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE $(ROOT_DIR)/opt/Makefile.ip.inc")
   include $(ROOT_DIR)/opt/Makefile.ip.inc
+  $(info "INCLUDE: IN $(CURFILE), INCLUDE \
+          $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")
+  include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
 else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE \
           $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")

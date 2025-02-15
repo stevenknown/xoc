@@ -188,7 +188,7 @@ static void postProcessUnreached(Vertex const* from, Vertex const* to,
     //e.g:rce_updatedom2.c
     rcectx.oc.setInvalidIfCFGChanged();
 
-    //DomInfo is necessary for subsequently SSA updation.
+    //DomInfo is necessary for subsequently SSA update.
     VexTab modset;
     UINT iter_times = 0;
     Vertex const* root = findMinimalRoot(rce);
@@ -337,7 +337,7 @@ static bool regardAsMustTrue(IR const* ir)
         return false;
     }
     if (ir->is_str() || ir->is_vec() || ir->is_mc()) { return true; }
-    if (g_is_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) > EPSILON) {
+    if (g_do_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) > EPSILON) {
         return true;
     }
     return false;
@@ -352,7 +352,7 @@ static bool regardAsMustFalse(IR const* ir)
         return false;
     }
     if (ir->is_str() || ir->is_vec() || ir->is_mc()) { return false; }
-    if (g_is_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) <= EPSILON) {
+    if (g_do_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) <= EPSILON) {
         return true;
     }
     return false;
@@ -642,7 +642,7 @@ bool RCE::perform(OptCtx & oc)
     }
     //Incremental update DOM need RPO.
     m_rg->getPassMgr()->checkValidAndRecompute(
-        &oc, PASS_RPO, PASS_GVN, PASS_UNDEF);
+        &oc, PASS_RPO, PASS_DOM, PASS_GVN, PASS_UNDEF);
     ASSERT0(m_gvn->is_valid());
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
@@ -666,7 +666,7 @@ bool RCE::perform(OptCtx & oc)
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
         //TBD:Sometimes, CFG is complicated, maintain Dom and SSA is costly.
-        //Thus you should apply a cost-model to drive the updation of Dom and
+        //Thus you should apply a cost-model to drive the update of Dom and
         //SSA. For now, we still choose to update Dom and SSA as much as
         //possible, whereas the compilation time can be unbearable.
         //CASE:Do NOT update Dom Info and SSA Info, because abnormal insane
