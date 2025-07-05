@@ -3094,7 +3094,7 @@ public:
     bool isGenerateFatbinELF() const { return m_is_gen_fatbin_elf; }
     //Use '-elf-dumplink' option to dump linker info.
     //The default log file is 'dump.log'.
-    //e.g.: pcxac.exe xxx.pcx -O0 -elf-fatbin -elf-dumplink
+    //e.g.: readelf a.asm -O0 -elf-fatbin -elf-dumplink
     bool isDumpLink() const { return m_is_dump_link_info; }
     bool isSymbolOrderFile() const { return m_is_symbol_ordering_file; }
 };

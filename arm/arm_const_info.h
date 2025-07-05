@@ -196,22 +196,10 @@ typedef enum _SLOT {
 } SLOT;
 #define SLOT_NAME_MAX_LEN 10
 
-//Teco spm section name.
-#define TECO_SPM_SH_NAME ".dl_ldm"
-
-//Allocate the stack on global.
-#define  TECO_SF_STACK_ON_GLOBAL 0x8
-
-//Machine instruction word length in BYTE of TECO architecture.
+//Machine instruction word length in BYTE of ARM architecture.
 #define MI_WORD_LEN_BYTE 4
 
-#define TECO_GOT_SECTION_ELEM_BYTE_SIZE 8
-
-//The section index of SymbolInfo from xoc::Var is undefine before section
-//is constructed in ELF, but the index can't be used 'SHN_UNDEF' to assign.
-//Since 'SHN_UNDEF' means that the SymbolInfo is with external attribute.
-//Thus it use a processor-specific value to assign.
-#define TECO_SHN_UNDEF  0xfffe
+#define ARM_GOT_SECTION_ELEM_BYTE_SIZE 8
 
 //Machine function units for all clusters.
 //Note that function unit and issue slot do not have to be one to one mapped.

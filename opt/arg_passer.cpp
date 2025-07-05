@@ -487,7 +487,7 @@ Var const* ArgPasser::getCalleeFormalParamVar(IR const* ir, UINT position)
     ASSERT0(ir && ir->isCallStmt());
 
     //[TODO] Currently, the function definition corresponding to ICALL cannot
-    //       be obtained, and we need to wait for the support of llvm-pcx or
+    //       be obtained, and we need to wait for the support of llvm or
     //       some other ways.
     if (ir->is_icall()) { return nullptr; }
 

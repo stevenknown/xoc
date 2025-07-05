@@ -45,11 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../x64/x64_elf_targinfo.h"
 #endif
 
-#ifdef FOR_TECO
-#include "../teco/teco_elf_targinfo.h"
-#include "../teco/t2_elf_targinfo.h"
-#endif
-
 namespace elf {
 
 void MiscELFMgr::allocTargInfo()

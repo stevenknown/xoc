@@ -33,9 +33,6 @@ author: Su Zhenyu
 @*/
 #if defined(FOR_JS)
 
-#elif defined(FOR_TECO)
-#include "../teco/teco_dbg_lang_ext.inc"
-
 #elif defined(FOR_ARM)
 
 #else

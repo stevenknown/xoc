@@ -29,9 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #if defined(FOR_JS)
 #include "../js/js_pass_type_ext.inc"
 
-#elif defined(FOR_TECO)
-#include "../teco/teco_pass_type_ext.inc"
-
 #elif defined(FOR_ARM)
 #include "../arm/arm_pass_type_ext.inc"
 

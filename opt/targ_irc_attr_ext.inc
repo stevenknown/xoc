@@ -29,9 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #if defined(FOR_JS)
 #include "../js/js_irc_attr_ext.inc"
 
-#elif defined(FOR_TECO)
-#include "../teco/teco_irc_attr_ext.inc"
-
 #elif defined(FOR_ARM)
 #include "../arm/arm_irc_attr_ext.inc"
 

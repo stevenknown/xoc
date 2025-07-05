@@ -28,9 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #if defined(FOR_JS)
 
-#elif defined(FOR_TECO)
-#include "../teco/teco_xcode_ext.inc"
-
 #elif defined(FOR_ARM)
 #include "../arm/arm_xcode_ext.inc"
 
