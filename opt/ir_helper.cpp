@@ -88,6 +88,62 @@ bool verifyIRList(IR const* ir, BitSet * irh, Region const* rg)
 }
 
 
+//The function verifies the consistency of PR operations and related MD
+//reference.
+//e.g: stpr $2:u64 id:1 = ... #S1
+//     ... = $2:u32 id:2 #S2
+//MD system will generate two different MDs to describe the $2 with different
+//size, that will confuse the solver of DUMgr when computing REACH_DEF. And
+//solver will give the wrong result, that is 'stpr $2 id:1' is NOT the DEF
+//of '$2:u32 id:2'.
+bool verifyPROpAndMDConsistency(Region const* rg)
+{
+    xcom::TMap<PRNO, MD const*> prno2md;
+    BBList const* bbl = rg->getBBList();
+    ConstIRIter cit;
+    BBListIter bbit;
+    DefFixedStrBuf buf;
+    for (IRBB * bb = bbl->get_head(&bbit);
+         bb != nullptr; bb = bbl->get_next(&bbit)) {
+        BBIRList const& irlst = bb->getIRList();
+        BBIRListIter irit;
+        for (IR const* ir = irlst.get_head(&irit);
+             ir != nullptr; ir = irlst.get_next(&irit)) {
+            cit.clean();
+            for (IR const* x = xoc::iterInitC(ir, cit, true);
+                 x != nullptr; x = xoc::iterNextC(cit, true)) {
+                if (!x->isPROp()) { continue; }
+                MD const* mustref = x->getMustRef();
+                ASSERT0(mustref);
+                MD const* mapped_md = prno2md.get(x->getPrno());
+                if (mapped_md == nullptr) {
+                    prno2md.set(x->getPrno(), mustref);
+                    continue;
+                }
+                ASSERTN(mapped_md == mustref,
+                        ("\n$%u id:%u(MD%u) is inconsistent to mapped MD%u\n",
+                         x->getPrno(), x->id(), mustref->id(),
+                         mapped_md->id()));
+            }
+        }
+    }
+    return true;
+}
+
+
+IR * onlyLeftLast(IR * lst, Region const* rg, OUT bool & change)
+{
+    ASSERT0(rg);
+    IR * t = xcom::removehead(&lst);
+    for (; t != nullptr && lst != nullptr;
+         t = xcom::removehead(&lst)) {
+        rg->freeIRTree(t);
+        change = true;
+    }
+    return t;
+}
+
+
 //CASE:_$L9 is non-identifier char because of '$'.
 bool isContainNonIdentifierChar(CHAR const* name)
 {

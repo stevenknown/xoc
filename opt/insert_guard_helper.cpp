@@ -188,7 +188,7 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
     ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guard_end));
 
     //Remove other remained emtpy BB.
-    CfgOptCtx coctx(*getOptCtx());
+    IRCfgOptCtx coctx(getOptCtx());
     m_cfg->removeEdge(m_guard_start, m_guard_end, coctx);
     RemoveEmptyBBCtx rmctx(coctx);
     rmctx.setRecordRemovedBB();
@@ -268,7 +268,7 @@ LabelInfo const* InsertGuardHelper::addJumpEdge(IRBB * guard_start,
         guard_end_lab = m_rg->genILabel();
         m_cfg->addLabel(guard_end, guard_end_lab);
     }
-    CfgOptCtx ctx(*m_oc);
+    IRCfgOptCtx ctx(m_oc);
     m_cfg->addEdge(guard_start, guard_end, ctx);
     return guard_end_lab;
 }
@@ -299,9 +299,8 @@ IR * InsertGuardHelper::insertGuardIR(IRBB * guard_start, IRBB * nextto_end,
 }
 
 
-void InsertGuardHelper::updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,
-                                           IRBB * guard_end,
-                                           IR * loophead_br)
+void InsertGuardHelper::updateGuardDUChain(
+    LI<IRBB> const* li, IR * guard_br, IRBB * guard_end, IR * loophead_br)
 {
     //Assign MD for all generated new IRs.
     m_rg->getMDMgr()->assignMD(guard_br, true, true);

@@ -52,6 +52,9 @@ class BitSet;
 class BitSetMgr;
 
 class BitSet {
+    //Disable the copy-constructor to avoid inefficient code by abusing it.
+    //e.g: BitSet t = foo();
+    COPY_CONSTRUCTOR(BitSet);
     friend BitSet * bs_union(BitSet const& set1, BitSet const& set2,
                              OUT BitSet & res);
     friend BitSet * bs_diff(BitSet const& set1, BitSet const& set2,
@@ -68,12 +71,6 @@ public:
     {
         m_ptr = 0;
         init(init_pool_size);
-    }
-    BitSet(BitSet const& bs)
-    {
-        m_ptr = 0;
-        init();
-        copy(bs);
     }
     ~BitSet() { destroy(); }
 
@@ -211,13 +208,6 @@ public:
     //Return true if there is no element ONE in bitset.
     bool is_empty() const;
 
-    //Support concatenation assignment such as: a=b=c
-    BitSet const& operator = (BitSet const& src)
-    {
-        copy(src);
-        return *this;
-    }
-
     //Set each byte in BitSet to 'val'.
     void set(BYTE val) { ::memset((void*)m_ptr, val, m_size); }
 
@@ -229,8 +219,13 @@ public:
 
 
 //Fixed Size BitSet.
+//The class represents a fixed byte size buffer.
+//NOTE: The class does not grow the buffer if the number of elements in BitSet
+//exceeds the 'veclen'.
 class FixedSizeBitSet : public BitSet {
 public:
+    //vec: the preallocated byte buffer.
+    //veclen: the byte size of 'vec'.
     FixedSizeBitSet(BYTE * vec, UINT veclen) : BitSet(0)
     { init(vec, veclen); }
     FixedSizeBitSet(FixedSizeBitSet const& src) { copy(src); }

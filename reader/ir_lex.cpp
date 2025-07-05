@@ -36,7 +36,7 @@ namespace xoc {
 //CAVEAT: The order of tokens must be consistent
 //with declarations order in lex.h.
 static TokenInfo g_token_info[] = {
-    { T_UNDEF, "", },
+    { T_UNDEF, "undef", },
     { T_IDENTIFIER, "identifier", },
     { T_IMM, "imm", },
     { T_IMML, "long imm", },
@@ -1376,35 +1376,44 @@ CHAR const* Lexer::getTokenName(TOKEN tok) const
 }
 
 
-//Dump token string.
-void Lexer::dump(CHAR const* input, FILE * output)
+void Lexer::dumpKeyWordTab(FILE * h) const
 {
-    ASSERT0(input && output);
-    FileObj fo(input, false, false);
-    FILE * h = fo.getFileHandler();
     if (h == nullptr) { return; }
-    setSrcFile(h);
-    TOKEN tok = getNextToken();
+    fprintf(h, "\n==---- LEXER KEYWORD TAB ----==");
+    Str2TokenIter it;
+    TOKEN tok;
+    for (CHAR const* tokname = m_str2token.get_first(it, &tok);
+         tokname != nullptr; tokname =  m_str2token.get_next(it, &tok)) {
+        fprintf(h, "\nTOK:%u:'%s'", tok, tokname);
+    }
+    fprintf(h, "\n");
+    fflush(h);
+}
+
+
+void Lexer::dump(FILE * h) const
+{
+    dumpKeyWordTab(h);
+    dumpAllTokens(h);
+}
+
+
+void Lexer::dumpAllTokens(FILE * output) const
+{
+    if (output == nullptr || getSrcFile() == nullptr) { return; }
+    fprintf(output, "\n==---- LEXER ALL TOKENS ----==");
+    fprintf(output, "\nFORMAT:[LINE]:TOKNAME 'STRING'");
+    Lexer * pthis = const_cast<Lexer*>(this);
+    TOKEN tok = pthis->getNextToken();
     while (tok != T_END) {
         UINT linenum = getCurrentLineNum();
         CHAR const* curtokstr = getCurrentTokenString();
-        if (tok == T_UNDEF) {
-            if (output != nullptr) {
-                fprintf(output, "ERROR(%d) Str:%s TokName:%s\n",
-                        linenum, curtokstr, g_token_info[tok].name);
-            }
-            break;
-        }
-        if (output != nullptr) {
-            fprintf(output, "Line(%u) Str:%s TokName:%s\n",
-                    linenum, curtokstr, g_token_info[tok].name);
-        }
-        tok = getNextToken();
+        fprintf(output, "\n[%u]:%s '%s'",
+                linenum, g_token_info[tok].name, curtokstr);
+        tok = pthis->getNextToken();
     }
-    if (output != nullptr) {
-        fprintf(output, "\n\n\n");
-        fflush(output);
-    }
+    fprintf(output, "\n");
+    fflush(output);
 }
 
 } //namespace xoc

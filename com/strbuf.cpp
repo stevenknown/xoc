@@ -36,8 +36,12 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-void StrBuf::strcat(UINT bytesize, CHAR const* format, va_list args)
+void StrBuf::vstrcat(UINT bytesize, CHAR const* format, va_list args)
 {
+    if (bytesize == 0) {
+        //'format' is emtpy string: "".
+        return;
+    }
     size_t sl = ::strlen(buf);
     if (buflen - sl <= bytesize) {
         CHAR * oldbuf = buf;
@@ -46,8 +50,20 @@ void StrBuf::strcat(UINT bytesize, CHAR const* format, va_list args)
         ::memcpy(buf, oldbuf, sl);
         ::free(oldbuf);
     }
-    UINT k = VSNPRINTF(buf + sl, bytesize + 1, format, args);
-    ASSERT0(k == bytesize);
+    //NOTE: the function will put number of 'bytesize' characters into buf,
+    //and append a '\0' at the end. Thus the buf+sl+bytesize+1 must less or
+    //equal then the buflen. Or else VSNPRINTF might return -1 in some C lib.
+    UINT k = VSNPRINTF(buf + sl, bytesize, format, args);
+
+    //NOTE:VSNPRINTF return the byte size of the formatted string.
+    //CASE:Some C library returns -1 if 'bytesize' less than the
+    //characters byte length of formatted string.
+    if (k >= bytesize || k == (UINT)-1) {
+        //If k is equal to bytesize, that means the buffer is smaller than
+        //formatted string, set the last charactor of buffer to '0'.
+        bytesize = bytesize - 1;
+    }
+    buf[sl + bytesize] = 0;
     DUMMYUSE(k);
 }
 
@@ -65,7 +81,8 @@ void StrBuf::strcat(CHAR const* format, ...)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
 }
@@ -82,7 +99,8 @@ void StrBuf::vstrcat(CHAR const* format, va_list args)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(org_args);
 }
 
@@ -95,7 +113,8 @@ void StrBuf::sprint(CHAR const* format, ...)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
 }
@@ -110,18 +129,29 @@ void StrBuf::vsprint(CHAR const* format, va_list args)
 }
 
 
-//The functions snprintf() and vsnprintf() do not write more than size
-//bytes (including the terminating null byte ('\0')).
-//bytesize: the maximum possible byte size of string.
-void StrBuf::nstrcat(UINT bytesize, CHAR const* format, ...)
+void StrBuf::sprint(UINT bytesize, CHAR const* format, ...)
 {
+    clean();
     va_list args;
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(nullptr, 0, format, args);
-    if (l > bytesize) { l = bytesize; }
-    strcat(l, format, org_args);
+    vstrcat(bytesize, format, org_args);
+    va_end(args);
+    va_end(org_args);
+}
+
+
+void StrBuf::strcat(UINT bytesize, CHAR const* format, ...)
+{
+    ASSERT0(bytesize > 0);
+    va_list args;
+    va_start(args, format);
+    va_list org_args;
+    va_copy(org_args, args);
+
+    //Should reserve one byte for storing the terminating null byte ('\0').
+    vstrcat(bytesize, format, org_args);
     va_end(args);
     va_end(org_args);
 }

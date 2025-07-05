@@ -546,6 +546,7 @@ ELFMgr::ELFMgr() : m_symbol_info(&m_sym_mgr)
     m_file_name = nullptr;
     m_sect_mgr = nullptr;
     m_sect_map = nullptr;
+    m_linker_mgr = nullptr;
     m_have_elf_format = false;
     m_shdr_num = 0;
     m_subtext_num = 0;
@@ -1946,14 +1947,18 @@ SymbolInfo * ELFMgr::findSymbol(Sym const* symbol_name)
 {
     ASSERT0(symbol_name);
 
-    for (UINT i = 0; i < m_symtab_info_vec.get_elem_count(); i++) {
-        SymbolInfoVec * symbol_info_vec = m_symtab_info_vec.get(i);
-        ASSERT0(symbol_info_vec);
-        for (UINT j = 0; j < symbol_info_vec->get_elem_count(); j++) {
-            if (SYMINFO_name(symbol_info_vec->get(j)) != symbol_name) {
-                continue;
-            }
-            return symbol_info_vec->get(j);
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
+
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo * symbol_info = symbol_info_list.get_head(&iter);
+             symbol_info != nullptr;
+             symbol_info = symbol_info_list.get_next(&iter)) {
+            if (SYMINFO_name(symbol_info) != symbol_name) { continue; }
+            return symbol_info;
         }
     }
     ASSERT0(0);
@@ -1963,7 +1968,7 @@ SymbolInfo * ELFMgr::findSymbol(Sym const* symbol_name)
 
 void ELFMgr::initSymbol(xoc::Var const* var, Sym const* func_name,
                         SECTION_TYPE sect_type, UINT sect_ofst,
-                        UCHAR symbol_type)
+                        UCHAR symbol_type, bool is_extern)
 {
     ASSERT0(var && var->get_name() &&
             !m_symbol_info.find(var->get_name()));
@@ -2006,6 +2011,9 @@ void ELFMgr::initSymbol(xoc::Var const* var, Sym const* func_name,
     //Set whether symbol is label.
     SYMINFO_is_label(sym_info) = var->is_label();
 
+    //Set whether symbol is external.
+    SYMINFO_is_extern(sym_info) = is_extern;
+
     //Set symbol section.
     SYMINFO_sect_type(sym_info) = sect_type != SH_TYPE_UNDEF ?
         sect_type : judgeSectWhichVarBelongTo(var);
@@ -2020,6 +2028,17 @@ void ELFMgr::initSymbol(xoc::Var const* var, Sym const* func_name,
     //symbols are in the back of the symbol table.
     if (var->is_global()) { m_symbol_name.append_tail(var->get_name()); }
     else { m_symbol_name.append_head(var->get_name()); }
+}
+
+
+void ELFMgr::initExternalSymbol(xoc::Var const* var)
+{
+    ASSERT0(var);
+
+    if (m_symbol_info.find(var->get_name())) { return; }
+
+    //'true' represents this var is with external attribute.
+    initSymbol(var, nullptr, SH_TYPE_UNDEF, 0, STT_NOTYPE, true);
 }
 
 
@@ -2143,6 +2162,8 @@ void ELFMgr::extractSymbolExceptUserDefFunc()
         SymbolInfo * sym_info = m_symbol_info.getAndGen(var->get_name(), &find);
         ASSERT0(sym_info);
         if (find && var->is_func()) {
+            //Record the user defined function for linker relaxation.
+            SYMINFO_is_user_def_func(sym_info) = true;
             if (isRelType()) {
                 SYMINFO_sect_type(sym_info) = judgeSectWhichFuncBelongTo(var);
             }
@@ -2210,24 +2231,6 @@ void ELFMgr::extractSymbolExceptUserDefFunc()
             src_addr, SYMINFO_size(sym_info));
         SYMINFO_is_byte(sym_info) = true;
     }
-}
-
-
-void ELFMgr::assembleInitValToContent(
-    OUT AssembleBinDescVec & content_desc_vec, SymbolInfo const* sym_info)
-{
-    ASSERT0(sym_info);
-    UINT sz = (UINT)SYMINFO_size(sym_info);
-    if (SYMINFO_is_byte(sym_info)) {
-        AssembleBinDesc asbd(sz * BITS_PER_BYTE, SYMINFO_data_byte(sym_info));
-        content_desc_vec.append(asbd);
-        return;
-    }
-
-    //Current symbol is located on SPM and it does not have init value.
-    ASSERT0(SYMINFO_sect_type(sym_info) == SH_TYPE_SPM &&
-            !SYMINFO_is_init(sym_info));
-    assemblePadZeroToContent(content_desc_vec, sz);
 }
 
 
@@ -2319,13 +2322,16 @@ void ELFMgr::genRelaSectionContent(MOD SymbolInfo * symbol_info)
 
 void ELFMgr::genCommonSectionContentHelper()
 {
-    for (UINT i = 0; i < m_symtab_info_vec.get_elem_count(); i++) {
-        SymbolInfoVec * symbol_info_vec = m_symtab_info_vec.get(i);
-        ASSERT0(symbol_info_vec);
-        for (UINT j = 0; j < symbol_info_vec->get_elem_count(); j++) {
-            SymbolInfo * symbol_info = symbol_info_vec->get(j);
-            ASSERT0(symbol_info);
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
 
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo * symbol_info = symbol_info_list.get_head(&iter);
+             symbol_info != nullptr;
+             symbol_info = symbol_info_list.get_next(&iter)) {
             if (SYMINFO_is_func(symbol_info) &&
                 !SYMINFO_is_extern(symbol_info) &&
                 SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
@@ -2361,7 +2367,9 @@ void ELFMgr::createTextSect(MOD FunctionInfo * fi)
     BYTEVec * bytevec = getSectionContent(addToSymTab(text_name_space));
     ASSERT0(bytevec);
 
-    bytevec->grow((UINT)FUNCINFO_size(fi));
+    if (bytevec->get_capacity() < ((UINT)FUNCINFO_size(fi))) {
+        bytevec->grow((UINT)FUNCINFO_size(fi));
+    }
     UCHAR * content = FUNCINFO_code(fi).get_vec();
     ASSERT0(content);
     bytevec->set((VecIdx)(FUNCINFO_size(fi) - 1), 0);
@@ -2434,7 +2442,7 @@ bool ELFMgr::isSymbolWithLocalAttr(SymbolInfo const* s)
 
 
 void ELFMgr::addSymRelocInfo(MOD SymbolInfo * symbol_info,
-    Sym const* other, UINT type, UINT offset, UINT addend)
+    Sym const* other, UINT type, TMWORD offset, UINT addend)
 {
     ASSERT0(symbol_info && other);
 
@@ -2448,6 +2456,21 @@ void ELFMgr::addSymRelocInfo(MOD SymbolInfo * symbol_info,
     RELOCINFO_addend(reloc_info) = addend;
 
     SYMINFO_reloc(symbol_info).append(reloc_info);
+}
+
+
+void ELFMgr::addRelaxBrInfo(Addr pc, Addr offset, FunctionInfo const* fi,
+                            IR const* ir)
+{
+    RelaxBrInfo * relax_br_info = m_relax_br_mgr.allocRelaxBrInfo();
+    ASSERT0(relax_br_info);
+
+    RELAXBRINFO_loc(relax_br_info) = pc;
+    RELAXBRINFO_disp(relax_br_info) = offset;
+    RELAXBRINFO_func(relax_br_info) = fi;
+    RELAXBRINFO_ir(relax_br_info) = ir;
+
+    m_relax_br_map.set(ir, relax_br_info);
 }
 
 
@@ -2604,6 +2627,62 @@ void ELFMgr::writeSectionContent(Sym const* sect_name, Addr addr,
     bytevec->set((VecIdx)(total_sz - 1), bytevec->get((VecIdx)(total_sz - 1)));
     //Copy data.
     ::memcpy(((void*)(bytevec->get_vec() + addr)), buf, buflen);
+}
+
+
+void ELFMgr::deleteFunctionContent(FunctionInfo const* fi, Addr rela_ofst,
+                                   Word length)
+{
+    ASSERT0(fi);
+
+    BYTEVec * bytevec = getSectionContent(FUNCINFO_sect_name(fi));
+    ASSERT0(bytevec);
+
+    //Because Some call or reference outside the section cannot get
+    //the new address if a function entry is changed,
+    //deal inside the function and make the function entry unchanged by now.
+    UINT total_sz = (UINT)FUNCINFO_size(fi);
+    ASSERT0(total_sz > (rela_ofst + length));
+    BYTE * begin = bytevec->get_vec() + FUNCINFO_code_ofst(fi);
+
+    //Delete inst.
+    //e.g:
+    //In function1, When rela_ofst is '0x10' and length is '1',
+    //delete inst1 which is at rela_ofst from function1 start address
+    //and move the following insts forward by 1.
+    // before:                     |    after:
+    // -----------------------------------------------------------
+    // 0x100 function1 start: ...  |    0x100 function1 start: ...
+    // ...                         |    ...
+    // 0x110    inst1              |    0x110    inst2
+    // 0x111    inst2              |    0x111    ...
+    // ...                         |    ...
+    // 0x1ff    ...                |    0x1ff    inst3
+    // 0x200 function1 end: inst3  |    0x200 function1 end: inst3
+    // -----------------------------------------------------------
+    // 0x201 function2 start: ...  |    0x201 function2 start: ...
+    // ...
+    //
+    ::memcpy((begin + rela_ofst), (begin + rela_ofst + length),
+             (total_sz - rela_ofst - length));
+
+    //Set the end to '0'.
+    //e.g:
+    //Set the inst at 'function1 end' to '0'.
+    // before:                     |    after:
+    // -----------------------------------------------------------
+    // 0x100 function1 start: ...  |    0x100    function1 start
+    // ...                         |    ...
+    // 0x110    inst2              |    0x110     inst2
+    // 0x111    ...                |    0x111     ...
+    // ...                         |    ...
+    // 0x1ff    inst3              |    0x1ff:    inst3
+    // 0x200 function1 end: inst3  |    0x200 function1 end: 0
+    // -----------------------------------------------------------
+    // 0x201 function2 start: ...  |    0x201 function2 start: ...
+    // ...
+    //
+    ::memset((begin + total_sz - length), 0, length);
 }
 
 
@@ -3082,7 +3161,7 @@ void ELFMgr::setSymbolInfo(MOD SymbolInfo * target_symbol_info)
     ASSERT0(!m_symbol_info_map.find(SYMINFO_name(target_symbol_info)));
     //Record symbol info into vector/map.
     m_symbol_info_map.set(SYMINFO_name(target_symbol_info), target_symbol_info);
-    m_symbol_info_vec.append(target_symbol_info);
+    m_symbol_info_list.append_tail(target_symbol_info);
 }
 
 
@@ -3169,8 +3248,6 @@ void ELFMgr::createFundamentalSection()
 
     //Create null section.
     setSection(SH_TYPE_UNDEF);
-    //Create .interp section.
-    setSection(SH_TYPE_INTERP);
     //Create .shdr_strtab section.
     setSection(SH_TYPE_SHSTR);
     //Create .strtab section.
@@ -3860,6 +3937,10 @@ void ELFMgr::processSectionOffset()
     for (UINT i = 0; i < getShdrNum(); i++) {
         SectionInfo * si = getSection(m_sect_layout.get(i));
         ASSERT0(si);
+        if (i == ELF_FIRST_VALID_SHDR_IN_ELF) {
+            //Set the offset align. The first UNDEF section will be skipped.
+            section_base = getShdrOffsetAlign();
+        }
 
         switch (SECTINFO_type(si)) {
         case SH_TYPE_UNDEF:
@@ -3867,7 +3948,8 @@ void ELFMgr::processSectionOffset()
             break;
         case SH_TYPE_INTERP:
             //.initerp as base section.
-            SECTINFO_ofst(si) = getShdrOffsetAlign();
+            SECTINFO_ofst(si) =
+                xcom::ceil_align(section_base, getShdrOffsetAlign());
             SECTINFO_size(si) = getSectionSize(m_sect_layout.get(i));
             break;
         case SH_TYPE_PREINIT_ARRAY:
@@ -4111,12 +4193,16 @@ void ELFMgr::constructSymbolUnull()
     BYTEVec space(sym_size);
     ASSERT0(space.get_vec());
 
-    for (UINT i = 0; i < m_symtab_info_vec.get_elem_count(); i++) {
-        SymbolInfoVec * symbol_info_vec = m_symtab_info_vec.get(i);
-        ASSERT0(symbol_info_vec);
-        for (UINT j = 0; j < symbol_info_vec->get_elem_count(); j++) {
-            SymbolInfo * symbol_info = symbol_info_vec->get(j);
-            ASSERT0(symbol_info);
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
+
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo * symbol_info = symbol_info_list.get_head(&iter);
+             symbol_info != nullptr;
+             symbol_info = symbol_info_list.get_next(&iter)) {
             ASSERT0(SYMINFO_sym(symbol_info).st_shndx != SHN_COMMON);
             SYMINFO_index(symbol_info) = ++index;
 
@@ -4449,13 +4535,17 @@ void ELFMgr::countStrSizeAndSymbolNum()
     //the first element to '\0' in 'charvec' manually.
     size_t sz = ELF_STR_ELEM_BEGIN_INDEX;
     UINT64 symbol_num = 0;
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
     //Estimitate content size.
-    for (UINT i = 0; i < m_symtab_info_vec.get_elem_count(); i++) {
-        SymbolInfoVec * symbol_info_vec = m_symtab_info_vec.get(i);
-        ASSERT0(symbol_info_vec);
-        for (UINT j = 0; j < symbol_info_vec->get_elem_count(); j++) {
-            SymbolInfo * si = symbol_info_vec->get(j);
-            ASSERT0(si);
+
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
+
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo const* si = symbol_info_list.get_head(&iter);
+             si != nullptr; si = symbol_info_list.get_next(&iter)) {
             sz += ::strlen(SYMINFO_name(si)->getStr()) + 1;
             symbol_num++;
         }
@@ -4475,13 +4565,16 @@ void ELFMgr::genStrTabContent()
     //Set the first element to '\0'.
     charvec->set(0, 0);
     size_t off = charvec->get_last_idx() + 1;
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
 
-    for (UINT i = 0; i < m_symtab_info_vec.get_elem_count(); i++) {
-        SymbolInfoVec * symbol_info_vec = m_symtab_info_vec.get(i);
-        ASSERT0(symbol_info_vec);
-        for (UINT j = 0; j < symbol_info_vec->get_elem_count(); j++) {
-            SymbolInfo * si = symbol_info_vec->get(j);
-            ASSERT0(si);
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
+
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo * si = symbol_info_list.get_head(&iter);
+             si != nullptr; si = symbol_info_list.get_next(&iter)) {
             size_t l = ::strlen(SYMINFO_name(si)->getStr());
             charvec->set((VecIdx)(off + l - 1), 0);
             ::memcpy((void*)(charvec->get_vec() + off),
@@ -4576,6 +4669,49 @@ bool ELFMgr::processSpecialShndx(ELFHdr & hdr, MOD SymbolInfo * symbol_info)
 }
 
 
+void ELFMgr::getSymbolInfoAttachInfo(MOD SymbolInfo * cur_symbol_info)
+{
+    //Multi-SymbolInfo with function type may be merged into a text section
+    //in ELF with relocatable file. And these functions may directly call or
+    //jump to other function in the same text section. Thus there is an order
+    //between these functions. When collected SymbolInfo, the AttachInfo is
+    //used to record these order relationship.
+    //e.g.:
+    //Symbol table '.symtab' contains x entryies:
+    //  Num:    Value    Size    Type    Bind    Vis    Ndx    Name
+    //    0:    000000    0      NOTYPE  LOCAL  DEFAULT UND
+    //    ...   ...
+    //    6:    000000   152     FUNC    GLOBAL DEFAULT  4    slave___divwu
+    //    7:    000098   92      FUNC    GLOBAL DEFAULT  4    slave___divw
+    //    ...   ...
+    //When merged or copied FunctionInfo, the relationship between function
+    //'slave___divwu' and 'slave___divw' should be keep. Since these two
+    //functions may jump to each other via offset that encode in instruction.
+    ASSERT0(cur_symbol_info);
+
+    //Iterate through the SymbolInfo vector in reverse order. The first
+    //SymbolInfo is UNDEF in '.symtab' in ELF, thus it can be skipped.
+    SymbolInfoListIter iter;
+    for (SymbolInfo * symbol_info = m_symbol_info_list.get_tail(&iter);
+         symbol_info != nullptr;
+         symbol_info = m_symbol_info_list.get_prev(&iter)) {
+        //Find the target SymbolInfo via 'st_shndx'.
+        if (!SYMINFO_is_func(symbol_info) ||
+            (SYMINFO_sym(symbol_info).st_shndx !=
+             SYMINFO_sym(cur_symbol_info).st_shndx) ||
+            (SYMINFO_name(symbol_info) == SYMINFO_name(cur_symbol_info))) {
+            continue;
+        }
+        ASSERT0(SYMINFO_func(symbol_info));
+
+        //These two SymbolInfo 'cur_symbol_info' and 'symbol_info'
+        //are mutually AttachInfo for each ohter.
+        SYMINFO_attach_list(symbol_info).append_tail(cur_symbol_info);
+        SYMINFO_attach_list(cur_symbol_info).append_head(symbol_info);
+    }
+}
+
+
 void ELFMgr::collectSymtabInfo(ELFHdr & hdr, ELFSHdr const* sym_shdr)
 {
     ASSERT0(sym_shdr);
@@ -4602,6 +4738,12 @@ void ELFMgr::collectSymtabInfo(ELFHdr & hdr, ELFSHdr const* sym_shdr)
         //corresponded FunctionInfo.
         if (SYMINFO_sym(symbol_info).st_type == STT_FUNC) {
             collectFuncInfoForSymbol(hdr, symbol_info);
+
+            //Collect symbol's attach symbol info.
+            SYMINFO_attach_list(symbol_info).append_tail(symbol_info);
+            if (SYMINFO_sym(symbol_info).st_value != 0) {
+                getSymbolInfoAttachInfo(symbol_info);
+            }
         }
 
         //There isn't RelocInfo to handle.
@@ -4620,6 +4762,12 @@ void ELFMgr::collectSymtabInfo(ELFHdr & hdr, ELFSHdr const* sym_shdr)
             }
 
             RELOCINFO_caller_sym(reloc_info) = symbol_info;
+
+            //Add RelocInfo to the symbol's m_sym_reloc_vec.
+            if (RELOCINFO_shdr_idx(reloc_info) ==
+                SYMINFO_sym(symbol_info).st_shndx) {
+                SYMINFO_reloc(symbol_info).append(reloc_info);
+            }
 
             if (RELOCINFO_sym_idx(reloc_info) == SYMINFO_index(symbol_info)) {
                 RELOCINFO_name(reloc_info) = SYMINFO_name(symbol_info);
@@ -4806,18 +4954,17 @@ bool ELFMgr::findSymbolWithNoSectionType(SymbolInfo const* origin_symbol,
     //If the type of 'origin_symbol' is 'STT_SECTION', the function
     //would try to find another same name symbol which the type isn't
     //'STT_SECTION' in the same ELFMgr.
-    for (UINT i = 0; i < m_symbol_info_vec.get_elem_count(); i++) {
-        SymbolInfo * symbol_info = m_symbol_info_vec[i];
-        ASSERT0(symbol_info);
+    UINT index = 0;
+    SymbolInfoListIter iter;
+    for (SymbolInfo * si = m_symbol_info_list.get_head(&iter);
+         si != nullptr; si = m_symbol_info_list.get_next(&iter)) {
+        if (isNullSymbol(si, index++)) { continue; }
 
-        if (isNullSymbol(symbol_info, i)) { continue; }
-        if (SYMINFO_sym(symbol_info).st_type != STT_SECTION &&
-            SYMINFO_sym(symbol_info).st_type != STT_NOTYPE &&
-            (SYMINFO_sym(origin_symbol).st_shndx ==
-             SYMINFO_sym(symbol_info).st_shndx) &&
-            (SYMINFO_sym(origin_symbol).st_value ==
-             SYMINFO_sym(symbol_info).st_value)) {
-            *target_symbol = symbol_info;
+        if (SYMINFO_sym(si).st_type != STT_SECTION &&
+            SYMINFO_sym(si).st_type != STT_NOTYPE &&
+            (SYMINFO_sym(origin_symbol).st_shndx == SYMINFO_sym(si).st_shndx) &&
+            (SYMINFO_sym(origin_symbol).st_value == SYMINFO_sym(si).st_value)) {
+            *target_symbol = si;
             return true;
         }
     }
@@ -4825,7 +4972,7 @@ bool ELFMgr::findSymbolWithNoSectionType(SymbolInfo const* origin_symbol,
 }
 
 
-UINT ELFMgr::getRelTypeFromDwarf(MCFixupKind kind)
+UINT ELFMgr::getRelTypeFromDwarf(MC_FIXUP_KIND kind)
 {
     UINT type = 0;
     switch (kind) {
@@ -4857,19 +5004,17 @@ void ELFMgr::addRelocForElfSymbol(MCFixup * fixup_entry,
 }
 
 
-void ELFMgr::genSymbolRefReloc(MCExpr const* value,
-                               SymbolInfo const* elf_sym_info,
-                               MCFixup * fixup_entry,
-                               Vector<BYTE> & debug_code)
+void ELFMgr::genSymbolRefReloc(
+    MCExpr const* value, SymbolInfo const* elf_sym_info, MCFixup * fixup_entry,
+    BYTEVec & debug_code)
 {
     ASSERT0(value && elf_sym_info && fixup_entry);
     MCSymbol const* mc_symbol = MCSYMBOLREFEXPR_mc_symbol(value);
     ASSERT0(mc_symbol);
-    MCSymbol::SymbolType type = MCSYMBOL_type(mc_symbol);
+    MCSYMBOL_TYPE type = MCSYMBOL_type(mc_symbol);
     Sym const* callee = nullptr;
 
-    if (type == MCSymbol::SECTION_LABEL ||
-        type == MCSymbol::FUNC_LABEL) {
+    if (type == ST_SECTION_LABEL || type == ST_FUNC_LABEL) {
         ASSERT0(MCSYMBOL_region(mc_symbol));
         callee = MCSYMBOL_region(mc_symbol)->getRegionVar()->get_name();
 
@@ -4878,7 +5023,7 @@ void ELFMgr::genSymbolRefReloc(MCExpr const* value,
         return;
     }
 
-    if (type == MCSymbol::FUNC_VAR) {
+    if (type == ST_FUNC_VAR) {
         //Generate the corresponding relocation entries.
         //for global var for HBM and SPM
         if (MCSYMBOL_var(mc_symbol)->is_global()) {
@@ -4912,7 +5057,7 @@ void ELFMgr::genSymbolRefReloc(MCExpr const* value,
 
 void ELFMgr::genDebugReloc(SymbolInfo const* elf_sym_info,
                            Vector<MCFixup*> const& fxiups,
-                           Vector<BYTE> & debug_code)
+                           BYTEVec & debug_code)
 {
     ASSERT0(elf_sym_info);
     xoc::MCDwarfMgr * dm = getDwarfMgr();
@@ -4921,12 +5066,12 @@ void ELFMgr::genDebugReloc(SymbolInfo const* elf_sym_info,
     for (UINT i = 0; i < num_fix; i++) {
         MCFixup * fixup_entry = fxiups[i];
         MCExpr const* value = MCFIXUP_value(fixup_entry) ;
-        MCExpr::ExprKind kind = MCEXPR_kind(value);
-        if (kind == MCExpr::SYMBOLREF) {
+        MCEXPR_KIND kind = MCEXPR_kind(value);
+        if (kind == EK_SYMBOLREF) {
             genSymbolRefReloc(value, elf_sym_info, fixup_entry, debug_code);
             continue;
         }
-        if (kind == MCExpr::BINARY) {
+        if (kind == EK_BINARY) {
             //Go fill in the fixup values.
             INT64 fix_value = MCExpr::evaluateAsAbsolute(value);
             UINT debug_frame_offset = MCFIXUP_offset(fixup_entry) ;
@@ -5225,22 +5370,22 @@ ELFARMgr::~ELFARMgr()
 {
     for (ELFAR * ar = m_ar_list.get_head();
          ar != nullptr; ar = m_ar_list.get_next()) {
-        if (ar != nullptr) { delete ar; }
+        delete ar;
     }
 
     for (ELFARInfo * ar_info = m_ar_info_meta_list.get_head();
          ar_info != nullptr; ar_info = m_ar_info_meta_list.get_next()) {
-        if (ar_info != nullptr) { delete ar_info; }
+        delete ar_info;
     }
 
     for (FileObj * fo = m_file_obj_list.get_head();
          fo != nullptr; fo = m_file_obj_list.get_next()) {
-        if (fo != nullptr) { delete fo; }
+        delete fo;
     }
 
     for (ELFARInfoVec * vec = m_elfar_info_vec_list.get_head();
          vec != nullptr; vec = m_elfar_info_vec_list.get_next()) {
-        if (vec != nullptr) { delete vec; }
+        delete vec;
     }
 }
 
@@ -5309,8 +5454,9 @@ void ELFARMgr::initARFileStack()
     //Thus a stack is used to record the ARFile name/path. The AR file is
     //read in first recorded in the top of the stack.
     m_ar_file_stack.clean();
-    for (CHAR const* file_path = m_ar_file_list->get_tail();
-         file_path != nullptr; file_path = m_ar_file_list->get_prev()) {
+    StringListIter iter;
+    for (CHAR const* file_path = m_ar_file_list->get_tail(&iter);
+         file_path != nullptr; file_path = m_ar_file_list->get_prev(&iter)) {
         m_ar_file_stack.push(file_path);
     }
 }
@@ -5395,20 +5541,6 @@ void ELFARMgr::saveSymbolARInfo(
 }
 
 
-size_t ELFMgr::getPhdrIndex(PROGRAM_HEADER ph_type)
-{
-    PROGRAM_HEADER const* phdr_table = getPhdrIndexTable();
-    ASSERT0(phdr_table);
-
-    for (UINT i = 0; i < getProgramHeaderNum(); i++) {
-        if (phdr_table[i] != ph_type) { continue; }
-        return phdr_table[i];
-    }
-    UNREACHABLE();
-    return 0; //GCOVR_EXCL_LINE
-}
-
-
 CHAR const* ELFMgr::getFirstElemContentOfPltHelper()
 {
     UINT size = getFirstElemSizeOfPlt();
@@ -5441,2121 +5573,50 @@ CHAR const* ELFMgr::getCommonElemContentOfPltHelper()
 }
 
 
-//
-// =========================== LinkerMgr Start ========================
-//
-LinkerMgr::LinkerMgr()
+void ELFMgr::reGrowRelocInfoVecCapacity(UINT additional_size)
 {
-    m_output_file_name = nullptr;
-    m_dump = nullptr;
-    m_output_elf_mgr = nullptr;
+    UINT original_size = m_reloc_info.get_elem_count();
+    UINT total_size = original_size + additional_size;
 
-    if (g_elf_opt.isDumpLink()) {
-        initDumpFile(LINKERMGR_DUMP_LOG_FILE_NAME);
+    if (m_reloc_info.get_capacity() < total_size) {
+        m_reloc_info.grow(total_size);
     }
 }
 
 
-LinkerMgr::~LinkerMgr()
+void SymbolInfo::copy(SymbolInfo const* src_symbol)
 {
-    for (ELFMgr * elf_mgr = m_elf_mgr_meta_list.get_head();
-         elf_mgr != nullptr; elf_mgr = m_elf_mgr_meta_list.get_next()) {
-        if (elf_mgr != nullptr) { delete elf_mgr; }
-    }
-
-    if (m_output_elf_mgr != nullptr) {
-        delete m_output_elf_mgr;
-        m_output_elf_mgr = nullptr;
-    }
-
-    //Free m_dump.
-    if (g_elf_opt.isDumpLink()) { closeDump(); }
-}
-
-
-void LinkerMgr::initLinkerMgr(CHAR const* output_name, UINT elf_type)
-{
-    //'output_name' may comes from the command option '-o'.
-    //Defaut value is: 'mi.test.elf'.
-    m_output_file_name = (output_name == nullptr) ?
-        LINKERMGR_OUTPUT_FILE_NAME : output_name;
-
-    //Allocate and init output ELFMgr info.
-    m_output_elf_mgr = allocOutputELFMgr();
-    ASSERT0(m_output_elf_mgr);
-    m_output_elf_mgr->initELFMgr();
-
-    //Initialize the info of ELFMgr that required by LinkerMgr.
-    m_output_elf_mgr->initELFMgrInfo(
-        &m_sym_tab, m_output_file_name, elf_type, false);
-}
-
-
-ELFMgr * LinkerMgr::genELFMgr()
-{
-    ELFMgr * elf_mgr = allocELFMgr();
-    ASSERT0(elf_mgr);
-
-    elf_mgr->initELFMgr();
-
-    return elf_mgr;
-}
-
-
-EM_STATUS LinkerMgr::initDumpFile(CHAR const* filename)
-{
-    ASSERT0(filename && m_dump == nullptr);
-
-    m_dump = new FileObj(filename, false);
-    ASSERT0(m_dump);
-
-    if (m_dump->getFileHandler() == nullptr) {
-        delete m_dump;
-        m_dump = nullptr;
-        return EM_OPEN_ERR;
-    }
-    //Initialize the indent of log file.
-    m_logmgr.setIndent(2);
-    return EM_SUCC;
-}
-
-
-void LinkerMgr::closeDump()
-{
-    if (m_dump != nullptr) { delete m_dump; m_dump = nullptr; }
-}
-
-
-void LinkerMgr::allocUnresolvedRelocSymbol(
-    RelocInfo const* reloc_info, UINT idx)
-{
-    ASSERT0(reloc_info);
-
-    UnresolvedRelocIdxVec * vec = m_infomgr.allocUnresolvedRelocIdxVec();
-    ASSERT0(vec);
-
-    vec->append(idx);
-    m_unresolved_reloc_idx_map.set(RELOCINFO_name(reloc_info), vec);
-}
-
-
-void LinkerMgr::processLibPathList(xcom::List<CHAR const*> * lib_path_list)
-{
-    ASSERT0(lib_path_list);
-
-    //Record 'lib_path_list' into 'm_armgr'.
-    m_armgr.setLibFileList(lib_path_list);
-    m_armgr.initARFileStack();
-
-    if (g_elf_opt.isDumpLink()) { dumpLibPathList(lib_path_list); }
-}
-
-
-bool LinkerMgr::hasSameSymbol(ELFMgr const* target_elf_mgr,
-    SymbolInfo const* target_symbol_info, bool is_special_elf_mgr)
-{
-    ASSERT0(target_symbol_info);
-
-    //If 'target_symbol_info' is with extern attribute,
-    //it doesn't need to be checked same name.
-    if (SYMINFO_is_extern(target_symbol_info)) { return false; }
-    Sym const* symbol_name = SYMINFO_name(target_symbol_info);
-    ASSERT0(symbol_name);
-
-    for (ELFMgr * elf_mgr = m_elf_mgr_list.get_head();
-         elf_mgr != nullptr; elf_mgr = m_elf_mgr_list.get_next()) {
-        if (target_elf_mgr == elf_mgr) { continue; }
-        if (!ELFMGR_symbol_map(elf_mgr).find(symbol_name)) { continue; }
-        //There is SymbolInfo with name of 'symbol_name' in 'elf_mgr'.
-        SymbolInfo * symbol_info = ELFMGR_symbol_map(elf_mgr).get(symbol_name);
-        ASSERT0(symbol_info);
-
-        //The SymbolInfo is with extern attribute,
-        //it doesn't need to be checked same name.
-        if (SYMINFO_is_extern(symbol_info)) { continue; }
-
-        //Symbol with STB_GLOBAL/STB_WEAK attribute doesn't need to be renamed.
-        if (!is_special_elf_mgr &&
-            (SYMINFO_sym(symbol_info).st_bind == STB_GLOBAL ||
-             SYMINFO_sym(symbol_info).st_bind == STB_WEAK)) {
-            continue;
-        }
-
-        ASSERT0(GET_SYM_OTHER_VALUE(
-                SYMINFO_sym(symbol_info).st_bind) == STV_HIDDEN ||
-                GET_SYM_OTHER_VALUE(
-                SYMINFO_sym(symbol_info).st_bind) == STV_DEFAULT ||
-                GET_SYM_OTHER_VALUE(
-                SYMINFO_sym(symbol_info).st_bind) == STV_INTERNAL);
-
-        //FIXME: It can check redefine symbol and print error msg there.
-        return true;
-    }
-    return false;
-}
-
-
-UINT LinkerMgr::getSameNameNum(SymbolInfo const* symbol_info)
-{
-    ASSERT0(symbol_info);
-
-    bool find = false;
-    return m_same_name_num_map.getAndGen(SYMINFO_name(symbol_info), &find);
-}
-
-
-void LinkerMgr::renameSymbolName(MOD ELFMgr * elf_mgr,
-    SymbolInfo const* target_symbol_info, CHAR const* name)
-{
-    ASSERT0(elf_mgr && target_symbol_info && name);
-
-    //Rename SymbolInfo and RelocInfo in 'elf_mgr'.
-    Sym const* origin_sym = SYMINFO_name(target_symbol_info);
-    ASSERT0(origin_sym);
-
-    //Rename SymbolInfo.
-    for (UINT i = 0; i < ELFMGR_symbol_vec(elf_mgr).get_elem_count(); i++) {
-        SymbolInfo * symbol_info = ELFMGR_symbol_vec(elf_mgr)[i];
-        ASSERT0(symbol_info);
-
-        if (elf_mgr->isNullSymbol(symbol_info, i) ||
-            (SYMINFO_name(symbol_info) != origin_sym)) { continue; }
-
-        ASSERT0(ELFMGR_symbol_map(elf_mgr).find(origin_sym));
-        ELFMGR_symbol_map(elf_mgr).remove(origin_sym);
-
-        SYMINFO_name(symbol_info) = elf_mgr->addToSymTab(name);
-        ELFMGR_symbol_map(elf_mgr).set(SYMINFO_name(symbol_info), symbol_info);
-    }
-
-    //Rename RelocInfo.
-    for (UINT i = 0; i < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-
-        if (RELOCINFO_name(reloc_info) != origin_sym) { continue; }
-        RELOCINFO_name(reloc_info) = elf_mgr->addToSymTab(name);
-    }
-}
-
-
-void LinkerMgr::mergeRelTypeCodeImpl(MOD SymbolInfo * symbol_info)
-{
-    ASSERT0(symbol_info);
-
-    if (SYMINFO_sect_index(symbol_info) == 0) {
-        UINT index = m_output_elf_mgr->getTextIndex();
-        SYMINFO_sect_index(symbol_info) = index;
-    }
-
-    FunctionInfo * fi = SYMINFO_func(symbol_info);
-    m_output_elf_mgr->createTextSect(fi);
-
-    if (SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
-        m_output_elf_mgr->createRelaTextSect(symbol_info);
-    }
-    UCHAR bind = SYMINFO_is_weak(symbol_info) ? STB_WEAK :
-        SYMINFO_is_global(symbol_info) ? STB_GLOBAL : STB_LOCAL;
-    UCHAR other = SYMINFO_is_visible(symbol_info) ? STV_DEFAULT : STV_HIDDEN;
-    m_output_elf_mgr->setSymbolValue(&(SYMINFO_sym(symbol_info)),
-        SYMINFO_sym(symbol_info).st_name, bind, SYMBOL_FUNC,
-        (m_output_elf_mgr->getSymOtherInfo() | other),
-        SYMINFO_sect_index(symbol_info), ELF_VAL_UNDEF,
-        SYMINFO_size(symbol_info));
-}
-
-
-void LinkerMgr::handleSameNameInDiffFile(MOD ELFMgr * elf_mgr,
-                                         bool is_special_elf_mgr)
-{
-    ASSERT0(elf_mgr);
-
-    //Process SymbolInfo with the same name in different ELFMgr. It will keep
-    //track of how many times it's the same name. And the number will be added
-    //to the original SymbolInfo name as a suffix. Thus the new name foramt is
-    //"original_name + number suffix".
-    //e.g.: given three same name 'str'.
-    //      the new name is 'str', 'str.R_1', and 'str.R_2'.
-    for (UINT i = 0; i < ELFMGR_symbol_vec(elf_mgr).get_elem_count(); i++) {
-        SymbolInfo * symbol_info = ELFMGR_symbol_vec(elf_mgr)[i];
-        ASSERT0(symbol_info);
-
-        if (elf_mgr->isNullSymbol(symbol_info, i)) { continue; }
-        if (!hasSameSymbol(elf_mgr, symbol_info, is_special_elf_mgr)) {
-            continue;
-        }
-
-        //Get how many SymbolInfo with the same name as 'symbol_info'.
-        UINT same_name_num = ELF_INCREASE_VALUE(getSameNameNum(symbol_info));
-        //Update the number.
-        setSameNameNum(symbol_info, same_name_num);
-        //Add the number to original SymbolInfo name
-        //as suffix to generate a new name.
-        CHAR const* symbol_new_name =
-            elf_mgr->genSymbolNameWithIntSuffix(symbol_info, same_name_num);
-        ASSERT0(symbol_new_name);
-
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "Change name: file %s, from %s to %s\n",
-                elf_mgr->m_file_name, SYMINFO_name(symbol_info)->getStr(),
-                symbol_new_name);
-        }
-        //Write new name.
-        renameSymbolName(elf_mgr, symbol_info, symbol_new_name);
-    }
-}
-
-
-void LinkerMgr::updateELFInfo(MOD ELFMgr * elf_mgr)
-{
-    ASSERT0(elf_mgr);
-
-    //Record SymbolInfo vec of 'elf_mgr' to 'm_symtab_vec'.
-    ELFMGR_symtab_vec(m_output_elf_mgr).append(&(ELFMGR_symbol_vec(elf_mgr)));
-
-    //Handle alias symbol.
-    for (UINT i = 0; i < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-
-        bool res = false;
-        Sym const* aliasee = ELFMGR_alias_map(m_output_elf_mgr).get(
-            RELOCINFO_name(reloc_info), &res);
-        if (!res) { continue; }
-
-        //The name of RelocInfo is alias symbol, it needs to be replaced
-        //with aliasee symbol according to the 'm_alias_symbol_map' info.
-        ASSERT0(aliasee);
-        RELOCINFO_name(reloc_info) = aliasee;
-    }
-
-    //Process SymbolInfo with the same name in different ELFMgrs.
-    //For SymbolInfo with same name, it needs to be generated a new name.
-    if (m_elf_mgr_list.get_elem_count() != 0) {
-        handleSameNameInDiffFile(elf_mgr, true);
-    }
-
-    //Resize 'm_reloc_symbol_vec' capacity.
-    UINT vec_sz = m_reloc_symbol_vec.get_elem_count();
-    UINT size = ELFMGR_reloc_vec(elf_mgr).get_elem_count();
-    UINT total_sz = vec_sz + size;
-    if (m_reloc_symbol_vec.get_capacity() < total_sz) {
-        m_reloc_symbol_vec.grow(total_sz);
-    }
-    //Update RelocInfo in 'elf_mgr' to 'm_reloc_symbol_vec'.
-    for (UINT i = 0; i < size; i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-        m_reloc_symbol_vec.set(vec_sz + i, reloc_info);
-    }
-
-    if (!elf_mgr->hasBeenRecordedCurrentELFMgr()) {
-        m_elf_mgr_list.append_tail(elf_mgr);
-        elf_mgr->setRecordedInfoOfCurrentELFMgr(true);
-    }
-}
-
-
-void LinkerMgr::resolveRelocInfoViaVar()
-{
-    //Found target SymbolInfo from ELFMgr that collected from xoc::Var. These
-    //ELFMgr mainly come from compile files that directly provided by user.
-    //These compile files have the highest priority during the processing of
-    //found target SymbolInfo. The function will iterate over all SymbolInfo
-    //in 'symbol_info_vec' in all xoc::Var ELFMgr, and check whether the name
-    //of SymbolInfo existed in 'm_unresolved_reloc_idx_map'. RelocInfo will be
-    //resolved if target SymbolInfo has been found.
-    for (ELFMgr * elf_mgr = m_elf_mgr_list.get_head();
-         elf_mgr != nullptr; elf_mgr = m_elf_mgr_list.get_next()) {
-        SymbolInfoVec & symbol_info_vec = ELFMGR_symbol_vec(elf_mgr);
-
-        for (UINT j = 0; j < symbol_info_vec.get_elem_count(); j++) {
-            SymbolInfo * symbol_info = symbol_info_vec[j];
-            ASSERT0(symbol_info);
-
-            if (elf_mgr->isNullSymbol(symbol_info, j) ||
-                SYMINFO_is_extern(symbol_info) ||
-                !m_unresolved_reloc_idx_map.find(SYMINFO_name(symbol_info))) {
-                continue;
-            }
-            //Resolve RelocInfo with SymbolInfo that comes from xoc::Var.
-            resolveRelocInfo(SYMINFO_name(symbol_info), symbol_info);
-        }
-    }
-
-    if (g_elf_opt.isDumpLink()) {
-        xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-            "\n\n======== Resolved Internal Done ======== \n\n");
-    }
-}
-
-
-void LinkerMgr::doResolve()
-{
-    initUnResolveSymbol();
-
-    if (g_elf_opt.isDumpLink()) {
-        xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-            "\n\n======== Do Resolved ========\n\n");
-    }
-
-    //Resolve RelocInfo with SymbolInfo that comes from xoc::Var.
-    resolveRelocInfoViaVar();
-
-    //Resolve RelocInfo with SymbolInfo that comes from library file.
-    resolveRelocInfoViaARFile();
-
-    if (!hasUnResolvedRelocSymbol(true)) { return; }
-    //There is unresolved RelocInfo.
-    if (g_elf_opt.isDumpLink()) { dumpLinkResolve(); }
-    ASSERTN(0, ("There is unresolved RelocInfo."));
-}
-
-
-ELFMgr * LinkerMgr::getELFMgrWhichSymbolBelongTo(ELFAR * ar, UINT64 index)
-{
-    ASSERT0(ar);
-
-    ELFMgr * elf_mgr = nullptr;
-    //'elf_mgr' has been recorded.
-    if (m_armgr.findELFMgr(ar, index, &elf_mgr)) {
-        ASSERT0(elf_mgr);
-        return elf_mgr;
-    }
-
-    //Get 'elf_mgr' from 'ar' via 'index'.
-    elf_mgr = getELFMgrFromARViaIdx(ar, index);
-    ASSERT0(elf_mgr);
-
-    //Addressing the problem that SymbolInfo with same name in different ELFMgr.
-    if (m_elf_mgr_list.get_elem_count() != 0) {
-        handleSameNameInDiffFile(elf_mgr, false);
-    }
-
-    //Save 'elf_mgr' info.
-    m_armgr.saveARInfo(ar, elf_mgr, index);
-    ELFMGR_symtab_vec(m_output_elf_mgr).append(&(ELFMGR_symbol_vec(elf_mgr)));
-
-    //Process RelocInfo of 'elf_mgr'.
-    processRelocInfo(ar, elf_mgr, index);
-    return elf_mgr;
-}
-
-
-void LinkerMgr::resolveRelocInfoViaARFile()
-{
-    //The function is used to find target SymbolInfo from ELFMgr that collected
-    //from AR file. AR file is packaged with numerous ELF. If target symbol has
-    //been found, a new ELFMgr will be created according to the ELF info to
-    //which this target symbol belong.
-    //1.Enter 'while' statement until all unresolved RelocInfo are resovlved or
-    //  all AR file have been found. In 'while' statement, AR file is popped
-    //  from 'm_ar_file_stack' and a 'for' statement is used to iterate over
-    //  global symtab in this AR file.
-    //2.'symbol' getting from global symtab will be used to find unresolved
-    //  RelocInfo from 'm_unresolved_reloc_idx_map'.
-    //3.Skipped if RelocInfo with the same name as 'symbol' has been resolved.
-    //  Thus if there are more than one target 'symbol' with the same name as
-    //  RelocInfo, only the first target 'symbol' will be used to resolve.
-    //4.If there isn't unresolved RelocInfo with the same name as 'symbol' in
-    //  'm_unresolved_reloc_idx_map', the 'symbol' still needs to be recorded.
-    //  Since RelocInfo in 'm_reloc_sym_vec' is constantly updated according to
-    //  the situation, there may be RelocInfo updated later needs this 'symbol'
-    //  to resolve. Thus ELFARInfo is used to record the relationship between
-    //  the name and index of 'symbol' and AR file, and the ELFARInfo object
-    //  will be recorded into 'm_symbol_ar_info_map'.
-    //5.If there is unresolved RelocInfo with the same name as 'symbol' in
-    //  'm_unresolved_reloc_idx_map', ELFMgr to which 'symbol' belong will be
-    //  got by 'findELFMgr' function or generated from AR file according to
-    //  ELFARInfo. If a new ELFMgr is generated, SymbolInfo and RelocInfo which
-    //  are belong to this ELFMgr need to be recorded into the LinkerMgr.
-    //6.RelocInfo will be resolved by this target 'symbol'.
-    while (hasUnResolvedRelocSymbol(false)) {
-        //Get AR file utill all AR file have been used.
-        ELFAR * ar = m_armgr.processARFile();
-        if (ar == nullptr) { break; }
-
-        UINT len = 0;
-        for (UINT i = 0; i < ELFAR_index_num(ar); i++) {
-            CHAR * sym_str = ELFAR_sym_tab(ar) + len;
-            ASSERT0(sym_str);
-            Sym const* global_sym = m_output_elf_mgr->addToSymTab(sym_str);
-            ASSERT0(global_sym);
-
-            UINT64 index = ELFAR_idx_array(ar)[i];
-            len += ELF_INCREASE_VALUE((UINT)::strnlen(
-                ELFAR_sym_tab(ar) + len, ELFAR_sym_tab_size(ar) - len));
-
-            if (checkHasBeenResolvedReloc(global_sym)) { continue; }
-            //Now no RelocInfo needs to be resolved by global_sym. But it may
-            //be needed by other RelocInfo that occurs in the funture.
-            if (!m_unresolved_reloc_idx_map.find(global_sym)) {
-                m_armgr.saveSymbolARInfo(ar, global_sym, index);
-                continue;
-            }
-            //There is unresolved RelocInfo that needs to be resolved
-            //by SymbolInfo with the name of 'global_sym'. And the
-            //'elf_mgr' to which 'global_sym' belong has been recorded.
-            ELFMgr * elf_mgr = getELFMgrWhichSymbolBelongTo(ar, index);
-            ASSERT0(elf_mgr);
-
-            resolveRelocInfoWithELFMgr(elf_mgr, global_sym);
-        }
-    }
-}
-
-
-void LinkerMgr::resolveRelocInfoWithELFMgr(
-    MOD ELFMgr * elf_mgr, Sym const* symbol_name)
-{
-    ASSERT0(elf_mgr && symbol_name);
-
-    //There is RelocInfo that needs to be resolved by the SymbolInfo with the
-    //name of 'symbol_name'. And the SymbolInfo will be got from 'elf_mgr'.
-    //Resolve RelocInfo with SymbolInfo that comes from 'elf_mgr'.
-    if (!m_unresolved_reloc_idx_map.find(symbol_name)) { return; }
-
-    //Get target SymbolInfo from 'elf_mgr'.
-    SymbolInfo * target_symbol_info = elf_mgr->getSymbolInfo(symbol_name);
-    ASSERT0(target_symbol_info);
-
-    if ((SYMINFO_sym(target_symbol_info).st_bind == STB_GLOBAL ||
-         SYMINFO_sym(target_symbol_info).st_bind == STB_WEAK) &&
-        SYMINFO_sym(target_symbol_info).st_type != STT_NOTYPE &&
-        SYMINFO_sym(target_symbol_info).st_shndx != SHN_UNDEF) {
-        //Resolved RelocInfo.
-        resolveRelocInfo(symbol_name, target_symbol_info);
-        return;
-    }
-    UNREACHABLE();
-}
-
-
-bool LinkerMgr::checkHasBeenResolvedReloc(Sym const* symbol_name)
-{
-    ASSERT0(symbol_name);
-
-    //The 'symbol_name' of SymbolInfo isn't used to resolve RelocInfo.
-    if (!m_resolved_reloc_idx_map.find(symbol_name)) { return false; }
-
-    //Get the vector of RelocInfo with the same name as 'symbol_name'
-    //that has been resolved by the SymbolInfo.
-    Vector<UINT> * reloc_symbol_idx =
-        m_resolved_reloc_idx_map.get(symbol_name);
-    ASSERT0(reloc_symbol_idx && (reloc_symbol_idx->get_elem_count() > 0));
-    //Get a RelocInfo from the vector.
-    RelocInfo * reloc_info = m_reloc_symbol_vec[reloc_symbol_idx->get(0)];
-    ASSERT0(reloc_info);
-    //Get target resolved SymbolInfo of RelocInfo.
-    SymbolInfo * symbol_info = RELOCINFO_sym(reloc_info);
-    ASSERT0(symbol_info);
-
-    //Previous target resolved SymbolInfo is with STT_NOTYPE attribute.
-    //Now there is another un-STT_NOTYPE SymbolInfo. It needs to use this
-    //SymbolInfo to resolve RelocInfo instead.
-    if (SYMINFO_sym(symbol_info).st_type == STT_NOTYPE) {
-        //Undo this resolved info.
-        for (UINT i = 0; i < reloc_symbol_idx->get_elem_count(); i++) {
-            UINT idx = reloc_symbol_idx->get(i);
-            RelocInfo * reloc_symbol_info = m_reloc_symbol_vec[idx];
-            ASSERT0(reloc_symbol_info);
-
-            RELOCINFO_is_resolved(reloc_symbol_info) = false;
-            RELOCINFO_resolved_notype(reloc_symbol_info) = false;
-            RELOCINFO_sym(reloc_symbol_info) = nullptr;
-        }
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "Undo notype %s\n", SYMINFO_name(symbol_info)->getStr());
-        }
-        m_resolved_reloc_idx_map.remove(symbol_name);
-        m_unresolved_reloc_idx_map.set(symbol_name, reloc_symbol_idx);
-        return false;
-    }
-
-    if (SYMINFO_sym(symbol_info).st_bind == STB_WEAK) {
-        //TODO: Process 'weak' and 'strong' attribute.
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "This is Weak symbol\n");
-        }
-    }
-    return true;
-}
-
-
-void LinkerMgr::resolveRelocInfo(Sym const* sym_name,
-    MOD SymbolInfo * symbol_info, bool is_notype)
-{
-    ASSERT0(sym_name && symbol_info);
-    ASSERT0(m_unresolved_reloc_idx_map.find(sym_name));
-
-    Vector<UINT> * reloc_idx_vec = m_unresolved_reloc_idx_map.get(sym_name);
-    ASSERT0(reloc_idx_vec);
-
-    for (UINT i = 0; i < reloc_idx_vec->get_elem_count(); i++) {
-        UINT idx = reloc_idx_vec->get(i);
-        RelocInfo * reloc_symbol_info = m_reloc_symbol_vec[idx];
-        ASSERT0(reloc_symbol_info);
-
-        RELOCINFO_is_resolved(reloc_symbol_info) = true;
-        RELOCINFO_sym(reloc_symbol_info) = symbol_info;
-        RELOCINFO_resolved_notype(reloc_symbol_info) = is_notype ? true : false;
-
-        if (g_elf_opt.isDumpLink()) {
-            if (is_notype) {
-                xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                    "\nresolved symbol(notype): %d %s\n",
-                    idx, sym_name->getStr());
-                continue;
-            }
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "\nresolved symbol: %d %s\n", idx, sym_name->getStr());
-            if (SYMINFO_file_name(symbol_info) != nullptr) {
-                xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                    "filename: %s\n", SYMINFO_file_name(symbol_info)->getStr());
-            }
-        }
-    }
-
-    //Update unresolved and resolved RelocInfo map.
-    m_unresolved_reloc_idx_map.remove(sym_name);
-    ASSERT0(!m_resolved_reloc_idx_map.find(sym_name));
-    m_resolved_reloc_idx_map.set(sym_name, reloc_idx_vec);
-}
-
-
-void LinkerMgr::resolveRelocInfoReplaceNoType(
-    Sym const* sym_name, MOD SymbolInfo * symbol_info)
-{
-    ASSERT0(sym_name && symbol_info);
-
-    //SymbolInfo with 'STT_NOTYPE' attribute can be used to resolve RelocInfo
-    //too. But it needs to be replaced if there is another same name SymbolInfo
-    //with no 'STT_NOTYPE' attribute later.
-    //e.g.: Given RelocInfo. Firstly it has been resolved by a SymbolInfo that
-    //      its type is STT_NOTYPE. If another SymbolInfo that its type is
-    //      STT_OBJECT has been found from other ELFMgr later, the RelocInfo
-    //      will be resolved by this STT_OBJECT SymbolInfo instead.
-    //      | STT_NOTYPE SymbolInfo replaced by STT_OBJECT SymbolInfo |
-    //      |---------------------------------------------------------|
-    //      |  Value    Size  Type    Bind     Vis    Ndx    Name     |
-    //      | 00000000   0   NOTYPE  GLOBAL  DEFAULT  UND  symbol_str |
-    //      | 00000020   8   OBJECT  GLOBAL  HIDDEN   5    symbol_str |
-    //      |---------------------------------------------------------|
-    Vector<UINT> * reloc_idx_vec = m_resolved_reloc_idx_map.get(sym_name);
-    ASSERT0(reloc_idx_vec);
-
-    for (UINT i = 0; i < reloc_idx_vec->get_elem_count(); i++) {
-        UINT idx = reloc_idx_vec->get(i);
-        RelocInfo * reloc_symbol_info = m_reloc_symbol_vec[idx];
-        ASSERT0(reloc_symbol_info &&
-            (RELOCINFO_is_resolved(reloc_symbol_info)) &&
-            (RELOCINFO_resolved_notype(reloc_symbol_info)));
-
-        RELOCINFO_resolved_notype(reloc_symbol_info) = false;
-        RELOCINFO_sym(reloc_symbol_info) = symbol_info;
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "resolved symbol(instead notype): %d %s \n",
-                idx, sym_name->getStr());
-        }
-    }
-}
-
-
-void LinkerMgr::updateRelocInfoVec(ELFMgr const* elf_mgr)
-{
-    ASSERT0(elf_mgr);
-
-    //Resize the capacity of 'm_reloc_symbol_vec'.
-    UINT vec_sz = m_reloc_symbol_vec.get_elem_count();
-    UINT total_sz = ELFMGR_reloc_vec(elf_mgr).get_elem_count() + vec_sz;
-    if (m_reloc_symbol_vec.get_capacity() < total_sz) {
-        m_reloc_symbol_vec.grow(total_sz);
-    }
-
-    //Append RelocInfo in 'elf_mgr' to 'm_reloc_info_vec'.
-    for (UINT i = 0; i < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-        m_reloc_symbol_vec.set(vec_sz + i, reloc_info);
-        //If there is related RelocInfo of 'reloc_info', it need to process.
-        //e.g.: The means of reloc_type of 'reloc_info' depended on
-        //      the reloc_type of related RelocInfo.
-        if (ELF_INCREASE_VALUE(i) >=
-            ELFMGR_reloc_vec(elf_mgr).get_elem_count()) { continue; }
-        processRelateRelocInfo(reloc_info, m_reloc_symbol_vec.get_last_idx());
-    }
-}
-
-
-bool LinkerMgr::checkCurrentRelocInfoHasBeenResolved(
-    MOD ELFMgr * elf_mgr, MOD RelocInfo * reloc_info, UINT reloc_index)
-{
-    ASSERT0(elf_mgr && reloc_info);
-
-    //Current 'reloc_info' doesn't be resolved.
-    if (!m_resolved_reloc_idx_map.find(RELOCINFO_name(reloc_info))) {
-        return false;
-    }
-
-    //RelocInfo with the same name as 'reloc_info' has been resolved.
-    //Thus 'reloc_info' can be resolved by the same target resolved
-    //symbol of RelocInfo.
-    relocInfoHasBeenResolved(reloc_info, reloc_index);
-
-    //Though the 'reloc_info' has been resolved, there may be another
-    //target resolved SymbolInfo with un-STT_NOTYPE attribute in 'elf_mgr'.
-    //If the SymbolInfo existed, it need to replace the original target
-    //resolved SymbolInfo of 'reloc_info'.
-    if (!ELFMGR_symbol_map(elf_mgr).find(RELOCINFO_name(reloc_info))) {
-        return true;
-    }
-
-    //Get the vector of RelocInfo with the same name.
-    Vector<UINT> * reloc_symbol_idx =
-        m_resolved_reloc_idx_map.get(RELOCINFO_name(reloc_info));
-    ASSERT0(reloc_symbol_idx && (reloc_symbol_idx->get_elem_count() > 0));
-
-    //Get RelocInfo from the vector.
-    RelocInfo * resolved_reloc_info =
-        m_reloc_symbol_vec[reloc_symbol_idx->get(0)];
-    ASSERT0(resolved_reloc_info);
-
-    //Get target resolved SymbolInfo from RelocInfo.
-    SymbolInfo * resolved_symbol_info = RELOCINFO_sym(resolved_reloc_info);
-    ASSERT0(resolved_symbol_info);
-
-    //Get target resolved SymbolInfo from 'elf_mgr'.
-    SymbolInfo * symbol_info =
-        ELFMGR_symbol_map(elf_mgr).get(RELOCINFO_name(reloc_info));
-    ASSERT0(symbol_info);
-
-    //Check.
-    if (SYMINFO_sym(symbol_info).st_type != STT_NOTYPE &&
-        SYMINFO_sym(resolved_symbol_info).st_type == STT_NOTYPE) {
-        resolveRelocInfoReplaceNoType(RELOCINFO_name(reloc_info), symbol_info);
-    }
-    return true;
-}
-
-
-void LinkerMgr::processRelocInfo(
-    ELFAR const* ar, MOD ELFMgr * elf_mgr, UINT64 idx)
-{
-    ASSERT0(ar && elf_mgr);
-
-    //Record the original size of 'm_reloc_symbol_vec'.
-    UINT reloc_index = ELF_INCREASE_VALUE(m_reloc_symbol_vec.get_last_idx());
-
-    //Record RelocInfo of 'elf_mgr' to 'm_reloc_info_vec'.
-    updateRelocInfoVec(elf_mgr);
-
-    //Process RelocInfo of 'elf_mgr'. The RelocInfo of 'elf_mgr' may has
-    //been resolved or there is reusable info of RelocInfo to help resolve.
-    for (UINT i = 0; i < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-
-        //There is SymbolInfo with same name as 'reloc_info' in 'elf_mgr'.
-        if (ELFMGR_symbol_map(elf_mgr).find(RELOCINFO_name(reloc_info))) {
-            SymbolInfo * symbol_info =
-                ELFMGR_symbol_map(elf_mgr).get(RELOCINFO_name(reloc_info));
-            ASSERT0(symbol_info);
-
-            //Check whether 'symbol_info' can be used as
-            //target SymbolInfo to resolve 'reloc_info'.
-            if (RELOCINFO_sym_idx(reloc_info) == SYMINFO_index(symbol_info) &&
-                SYMINFO_sym(symbol_info).st_bind == STB_LOCAL &&
-                SYMINFO_sym(symbol_info).st_type == STT_SECTION) {
-                //RelocInfo with same name as 'reloc_info' has been resolved.
-                //Thus 'reloc_info' will be resolved with info from RelocInfo.
-                if (checkCurrentRelocInfoHasBeenResolved(
-                    elf_mgr, reloc_info, reloc_index + i)) { continue; }
-
-                //'reloc_info' doesn't be resolved. It's info needs to be
-                //recorded to 'm_unresolved_reloc_idx_map' before resolved.
-                updateUnresolvedRelocInfo(elf_mgr, reloc_info, reloc_index + i);
-                //Use 'symbol_info' to resolve 'reloc_info'.
-                targetSymbolInfoFoundInCurrentELFMgr(elf_mgr, reloc_info);
-                continue;
-            }
-        }
-
-        //Check whether the RelocInfo has been resolved.
-        if (checkCurrentRelocInfoHasBeenResolved(
-            elf_mgr, reloc_info, reloc_index + i)) { continue; }
-
-        //Current reloc symbol isn't resolved, it needed to record the
-        //'reloc info' to 'm_unresolved_reloc_idx_map'.
-        updateUnresolvedRelocInfo(elf_mgr, reloc_info, reloc_index + i);
-
-        //Though reloc symbol isn't resolved, related reusable info
-        //(elf_mgr info) has been recorded. Just use the info to resolve.
-        if (m_armgr.findFromSymbolARInfoMap(RELOCINFO_name(reloc_info))) {
-            relocInfoHasBeenRecorded(ar, elf_mgr, reloc_info, idx);
-            continue;
-        }
-
-        //There is target resolved symbol of RelocInfo in current 'elf_mgr.
-        if (ELFMGR_symbol_map(elf_mgr).find(RELOCINFO_name(reloc_info))) {
-            targetSymbolInfoFoundInCurrentELFMgr(elf_mgr, reloc_info);
-        }
-    }
-}
-
-
-void LinkerMgr::targetSymbolInfoFoundInCurrentELFMgr(
-    MOD ELFMgr * elf_mgr, RelocInfo const* reloc_info)
-{
-    ASSERT0(elf_mgr && reloc_info);
-
-    Sym const* symbol_name = RELOCINFO_name(reloc_info);
-    ASSERT0(ELFMGR_symbol_map(elf_mgr).find(symbol_name));
-
-    SymbolInfo * symbol_info = elf_mgr->getSymbolInfo(symbol_name);
-    ASSERT0(symbol_info);
-
-    //Process SymbolInfo according to different attribute.
-    if (SYMINFO_sym(symbol_info).st_type != STT_NOTYPE &&
-        SYMINFO_sym(symbol_info).st_shndx != SHN_UNDEF) {
-        //If the 'symbol_info' is 'STT_SECTION' type, it will try to find
-        //a SymbolInfo with no 'STT_SECTION' as target resolved SymbolInfo.
-        SymbolInfo * sym = nullptr;
-        if ((SYMINFO_sym(symbol_info).st_type == STT_SECTION) &&
-            elf_mgr->findSymbolWithNoSectionType(symbol_info, &sym)) {
-            symbol_info = sym;
-        }
-        resolveRelocInfo(symbol_name, symbol_info);
-        return;
-    }
-
-    //The SymbolInfo with 'STT_NOTYPE' attribute also can be
-    //used to resolve RelocInfo. But it needed to set a flag.
-    resolveRelocInfo(symbol_name, symbol_info, true);
-}
-
-
-void LinkerMgr::updateUnresolvedRelocInfo(
-    MOD ELFMgr * elf_mgr, MOD RelocInfo * reloc_info, UINT index)
-{
-    ASSERT0(elf_mgr && reloc_info);
-
-    //'reloc_info' has been recorded into 'm_unresolved_reloc_idx_map'.
-    if (m_unresolved_reloc_idx_map.find(RELOCINFO_name(reloc_info))) {
-        //Note: m_symbol_info_vec don't contains the first null element.
-        ASSERT0(RELOCINFO_sym_idx(reloc_info) <
-                ELFMGR_symbol_vec(elf_mgr).get_elem_count());
-        SymbolInfo * symbol_info =
-            (ELFMGR_symbol_vec(elf_mgr)[
-                (VecIdx)RELOCINFO_sym_idx(reloc_info)]);
-        ASSERT0(symbol_info);
-
-        //Upate RelocInfo to 'm_unresolved_reloc_idx_map'.
-        Vector<UINT> * vec = m_unresolved_reloc_idx_map.get(
-            RELOCINFO_name(reloc_info));
-        ASSERT0(vec);
-        vec->append(index);
-        return;
-    }
-
-    //Allocate new item in 'm_unresolved_reloc_idx_map'.
-    allocUnresolvedRelocSymbol(reloc_info, index);
-}
-
-
-bool LinkerMgr::targetSymbolInTheSameELFMgr(ELFAR const* ar, UINT64 idx,
-    ELFARInfo const* ar_info, MOD ELFMgr * elf_mgr, RelocInfo const* reloc_info)
-{
-    ASSERT0(ar && ar_info && elf_mgr && reloc_info);
-
-    if (ELFARINFO_ar(ar_info) != ar || ELFARINFO_elf_mgr_idx(ar_info) != idx) {
-        return false;
-    }
-
-    SymbolInfo * symbol_info =
-        elf_mgr->getSymbolInfo(RELOCINFO_name(reloc_info));
-    ASSERT0(symbol_info);
-
-    if ((SYMINFO_sym(symbol_info).st_bind == STB_GLOBAL ||
-         SYMINFO_sym(symbol_info).st_bind == STB_WEAK) &&
-         SYMINFO_sym(symbol_info).st_type != STT_NOTYPE &&
-         SYMINFO_sym(symbol_info).st_shndx != 0) {
-        //If the symbol is 'STT_SECTION' type. Try to find no 'STT_SECTION'
-        //to resolve.
-        SymbolInfo * sym = nullptr;
-        if ((SYMINFO_sym(symbol_info).st_type == STT_SECTION) &&
-            (elf_mgr->findSymbolWithNoSectionType(symbol_info, &sym))) {
-            symbol_info = sym;
-        }
-        resolveRelocInfo(SYMINFO_name(symbol_info), symbol_info);
-        return true;
-    }
-    return false;
-}
-
-
-bool LinkerMgr::targetSymbolNoInTheSameELFMgr(
-    ELFARInfo const* ar_info, RelocInfo const* reloc_info)
-{
-    ASSERT0(ar_info && reloc_info);
-
-    //Try to find target resolved symbol of 'reloc_info' from other ELFMgr.
-    if (!m_armgr.findFromARInfoMap(ELFARINFO_ar(ar_info))) { return false; }
-
-    bool elf_mgr_has_been_recorded = false;
-    ELFARInfo * elf_mgr_elem = nullptr;
-    ELFARInfoVec * vec = m_armgr.getFromARInfoMap(ELFARINFO_ar(ar_info));
-    ASSERT0(vec);
-
-    //Find target ELFARInfo according to the idx'.
-    for (UINT i = 0; i < vec->get_elem_count(); i++) {
-        ELFARInfo * find_ar_info = vec->get(i);
-        ASSERT0(find_ar_info);
-
-        if (ELFARINFO_elf_mgr_idx(find_ar_info) ==
-            ELFARINFO_elf_mgr_idx(ar_info)) {
-            elf_mgr_has_been_recorded = true;
-            elf_mgr_elem = find_ar_info;
-            break;
-        }
-    }
-
-    if (!elf_mgr_has_been_recorded) { return false; }
-
-    ELFMgr * elf_mgr = ELFARINFO_elf_mgr(elf_mgr_elem);
-    ASSERT0(elf_mgr);
-    //Get target resolved symbol of 'reloc_info' from 'elf_mgr'.
-    SymbolInfo * target_symbol_info =
-        elf_mgr->getSymbolInfo(RELOCINFO_name(reloc_info));
-    ASSERT0(target_symbol_info);
-    resolveRelocInfo(SYMINFO_name(target_symbol_info), target_symbol_info);
-
-    return true;
-}
-
-
-void LinkerMgr::relocInfoHasBeenRecorded(ELFAR const* ar,
-     MOD ELFMgr * elf_mgr, RelocInfo const* reloc_info, UINT64 idx)
-{
-    ASSERT0(ar && elf_mgr && reloc_info && m_armgr.findFromSymbolARInfoMap(
-        RELOCINFO_name(reloc_info)));
-
-    ELFARInfo * ar_info =
-        m_armgr.getFromSymbolARInfoMap(RELOCINFO_name(reloc_info));
-    ASSERT0(ar_info);
-
-    //Both target resolved SymbolInfo and 'reloc_info' are in the same
-    //'elf_mgr'. The 'reloc_info' will be resolved by the SymbolInfo.
-    if (targetSymbolInTheSameELFMgr(ar, idx, ar_info, elf_mgr, reloc_info)) {
-        return;
-    }
-
-    //Target resolved SymbolInfo and 'reloc_info' are not in the same elf_mgr.
-    if (targetSymbolNoInTheSameELFMgr(ar_info, reloc_info)) { return; }
-
-    //Target resolved SymbolInfo comes from relocated elf_mgr.
-    ELFMgr * elf_mgr_inner = getELFMgrFromARViaIdx(
-        ELFARINFO_ar(ar_info), ELFARINFO_elf_mgr_idx(ar_info));
-    ASSERT0(elf_mgr_inner);
-
-    //Addressing the problem that SymbolInfo with same name in different ELFMgr.
-    if (m_elf_mgr_list.get_elem_count() != 0) {
-        handleSameNameInDiffFile(elf_mgr_inner, false);
-    }
-
-    //Update info.
-    ELFMGR_symtab_vec(m_output_elf_mgr).append(
-        &(ELFMGR_symbol_vec(elf_mgr_inner)));
-    m_armgr.saveARInfo(
-        ELFARINFO_ar(ar_info), elf_mgr_inner, ELFARINFO_elf_mgr_idx(ar_info));
-
-    //Get target resolved SymbolInfo and resolve RelocInfo.
-    SymbolInfo * target_symbol_info =
-        elf_mgr_inner->getSymbolInfo(RELOCINFO_name(reloc_info));
-    ASSERT0(target_symbol_info);
-    resolveRelocInfo(SYMINFO_name(target_symbol_info), target_symbol_info);
-
-    //Process RelocInfo in 'elf_mgr_inner'. It is recursive function.
-    processRelocInfo(ELFARINFO_ar(ar_info), elf_mgr_inner,
-        ELFARINFO_elf_mgr_idx(ar_info));
-}
-
-
-ELFMgr * LinkerMgr::getELFMgrFromARViaIdx(MOD ELFAR * ar, UINT64 index)
-{
-    ASSERT0(ar);
-
-    ELFMgr * elf_mgr = genELFMgr();
-    ASSERT0(elf_mgr);
-    elf_mgr->initELFMgrInfo(&m_sym_tab, ar->m_file_name, ET_NONE, true);
-
-    //Open AR file.
-    if (!ar->m_file->m_is_opened) { ar->open(ar->m_file_name, &m_armgr); }
-    //Get ELF info from AR file according to 'index'(offset in AR file).
-    if (ar->getArchiveELF(elf_mgr, index) != EM_SUCC) {
-        ASSERTN(0, ("Get ELF failed!"));
-    }
-    //Collect object info.
-    elf_mgr->collectObjELF();
-    return elf_mgr;
-}
-
-
-void LinkerMgr::relocInfoHasBeenResolved(
-    MOD RelocInfo * reloc_info, UINT index)
-{
-    ASSERT0(reloc_info && m_resolved_reloc_idx_map.find(
-        RELOCINFO_name(reloc_info)));
-
-    //Current RelocInfo has been resolved. Set resolved flag.
-    RELOCINFO_is_resolved(reloc_info) = true;
-
-    //Update index vec.
-    Vector<UINT> * reloc_symbol_index =
-        m_resolved_reloc_idx_map.get(RELOCINFO_name(reloc_info));
-    ASSERT0(reloc_symbol_index);
-    reloc_symbol_index->append(index);
-
-    //Get target resolved SymbolInfo of RelocInfo.
-    RelocInfo * other_same_reloc_info =
-        m_reloc_symbol_vec[reloc_symbol_index->get(0)];
-    ASSERT0(other_same_reloc_info);
-
-    //Set target resolved SymbolInfo to RelocInfo.
-    RELOCINFO_sym(reloc_info) = RELOCINFO_sym(other_same_reloc_info);
-    RELOCINFO_resolved_notype(reloc_info) =
-        RELOCINFO_resolved_notype(other_same_reloc_info);
-}
-
-
-bool LinkerMgr::hasUnResolvedRelocSymbol(bool is_notype_as_resolved) const
-{
-    //Check whether there is still unresolved RelocInfo.
-    //'is_notype_as_resolved': SymbolInfo with STT_NOTYPE attribute also
-    //can be used to resolve RelocInfo. The flag dedicated whether these
-    //RelocInfos need to be counted. 'true': RelocInfo that resoved by
-    //SymbolInfo with STT_NOTYPE doesn't need to be counted as unresolved
-    //RelocInfo. 'false': RelocInfo that resolved by SymbolInfo with
-    //STT_NOTYPE needs to be counted as unresolved RelocInfo.
-    for (UINT i = 0; i < m_reloc_symbol_vec.get_elem_count(); i++) {
-        RelocInfo * reloc_info = m_reloc_symbol_vec[i];
-        ASSERT0(reloc_info);
-
-        //Whehter the RelocInfo has been resolved.
-        if (RELOCINFO_is_resolved(reloc_info)) {
-            //Whether notype-resolved-symbol as resolved symbol.
-            if (RELOCINFO_resolved_notype(reloc_info) &&
-                !is_notype_as_resolved) { return true; }
-            continue;
-        }
-        return true;
-    }
-    return false;
-}
-
-
-void LinkerMgr::initUnResolveSymbol()
-{
-    for (UINT i = 0; i < m_reloc_symbol_vec.get_elem_count(); i++) {
-        RelocInfo * reloc_info = m_reloc_symbol_vec[i];
-        ASSERT0(reloc_info);
-
-        //Process related RelocInfo. The means of reloc_type of RelocInfo
-        //may be depended on the reloc_type of related RelocInfo.
-        if (ELF_INCREASE_VALUE(i) < m_reloc_symbol_vec.get_elem_count()) {
-            processRelateRelocInfo(reloc_info, i);
-        }
-
-        //Unresolve symbol vector has been created in Map.
-        //The index of 'reloc_info' just appended to it.
-        if (m_unresolved_reloc_idx_map.find(RELOCINFO_name(reloc_info))) {
-            Vector<UINT> * vec = m_unresolved_reloc_idx_map.get(
-                RELOCINFO_name(reloc_info));
-            ASSERT0(vec);
-            vec->append(i);
-            continue;
-        }
-
-        //Create new unresolved symbol vec.
-        allocUnresolvedRelocSymbol(reloc_info, i);
-    }
-}
-
-
-void LinkerMgr::processOBJFileList(MOD xcom::List<CHAR const*> * obj_file_list,
-                                   OUT xcom::List<ELFMgr*> * elf_mgr_list)
-{
-    ASSERT0(obj_file_list && elf_mgr_list);
-
-    //Collect info from xoc::Var.
-    for (ELFMgr * elf_mgr = elf_mgr_list->get_head();
-         elf_mgr != nullptr; elf_mgr = elf_mgr_list->get_next()) {
-        elf_mgr->initELFMgrInfo(&m_sym_tab, nullptr,
-            m_output_elf_mgr->getELFType(), false);
-        elf_mgr->collectELFInfoFromVar();
-    }
-
-    //Collect info from object file.
-    for (CHAR const* fn = obj_file_list->get_head();
-         fn != nullptr; fn = obj_file_list->get_next()) {
-        if (!xcom::FileObj::isFileExist(fn)) {
-            prt2C("\nerror: %s doesn't exist.", fn);
-            ASSERT0(0);
-        }
-        ELFMgr * elf_mgr = genELFMgr();
-        ASSERT0(elf_mgr);
-
-        //ELF read into memory.
-        if (elf_mgr->readELF(fn, true) != EM_SUCC) {
-            prt2C("\nerror: read objfile %s failed.", fn);
-            ASSERT0(0);
-        }
-
-        //Collect useful info to 'elf_mgr'.
-        elf_mgr->initELFMgrInfo(&m_sym_tab, fn, ET_NONE, true);
-        elf_mgr->collectObjELF();
-        if (!elf_mgr->hasBeenRecordedCurrentELFMgr()) {
-            elf_mgr_list->append_tail(elf_mgr);
-            elf_mgr->setRecordedInfoOfCurrentELFMgr(true);
-        }
-    }
-}
-
-
-void LinkerMgr::collectAliasInfo(MOD xcom::List<ELFMgr*> * elf_mgr_list)
-{
-    ASSERT0(elf_mgr_list);
-
-    //Collect alias info.
-    AliasSymbolMapIter iter;
-    for (ELFMgr * elf_mgr = elf_mgr_list->get_head();
-         elf_mgr != nullptr; elf_mgr = elf_mgr_list->get_next()) {
-        iter.clean();
-        Sym const* v;
-        //Add alias and it's aliasee name into the SymTab of 'm_output_elf_mgr'.
-        for (Sym const* k = ELFMGR_alias_map(elf_mgr).get_first(iter, &v);
-             !iter.end(); k = ELFMGR_alias_map(elf_mgr).get_next(iter, &v)) {
-            ASSERT0(k && v);
-            ELFMGR_alias_map(m_output_elf_mgr).set(
-                m_output_elf_mgr->addToSymTab(k->getStr()),
-                m_output_elf_mgr->addToSymTab(v->getStr()));
-        }
-    }
-}
-
-
-void LinkerMgr::outputSharedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list)
-{
-    ASSERT0(elf_mgr_list);
-
-    //Collect alias info from each ELFMgr in 'elf_mgr_list'.
-    collectAliasInfo(elf_mgr_list);
-
-    for (ELFMgr * elf_mgr = elf_mgr_list->get_head();
-         elf_mgr != nullptr; elf_mgr = elf_mgr_list->get_next()) {
-        //Merge all valid info in 'elf_mgr' into LinkerMgr.
-        updateELFInfo(elf_mgr);
-    }
-
-    //Resolve RelocInfo.
-    doResolve();
-
-    //Generate executed ELF.
-    processOutputExeELF();
-}
-
-
-void LinkerMgr::outputRelocatedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list)
-{
-    ASSERT0(elf_mgr_list);
-
-    m_output_elf_mgr->setELFType(ET_REL);
-
-    //FIXME: There may be only one elf_mgr.
-    for (ELFMgr * elf_mgr = elf_mgr_list->get_head();
-         elf_mgr != nullptr; elf_mgr = elf_mgr_list->get_next()) {
-        updateELFInfo(elf_mgr);
-    }
-
-    mergeELFMgrCollectedFromVar();
-
-    //create fundamental section.
-    m_output_elf_mgr->createFundamentalSection();
-
-    //set order for each section.
-    m_output_elf_mgr->setSectionOrder();
-
-    //Set ELF shdr_num.
-    //There isn't .text.xxx section when generated fatbin ELF.
-    m_output_elf_mgr->setSubTextNum(m_output_elf_mgr->getTextIndex());
-    m_output_elf_mgr->setShdrNum(m_output_elf_mgr->getShdrNum());
-
-    //Construct ELF header.
-    m_output_elf_mgr->constructELFHeader(m_output_elf_mgr->getShdrNum());
-
-    //Generate section content.
-    m_output_elf_mgr->genSectionContentHelper();
-
-    //Collect names of all symbols and compute some factors.
-    m_output_elf_mgr->genCommonSectionContentHelper();
-
-    //Construct section and set header info of output ELF.
-    m_output_elf_mgr->constructELFSectionHelper();
-
-    //Write data into ELF file.
-    m_output_elf_mgr->writeELF(m_output_file_name);
-}
-
-
-bool LinkerMgr::skipSpecificRelaDyn(
-    MOD ELFMgr * elf_mgr, MOD RelocInfo const* reloc_info) const
-{
-    ASSERT0(elf_mgr && reloc_info);
-
-    if (RELOCINFO_sect_name(reloc_info) == nullptr) { return false; }
-
-    SECTION_TYPE sect_type = elf_mgr->getSectionType(
-        RELOCINFO_sect_name(reloc_info));
-    return (sect_type == SH_TYPE_DEBUG_LOC ||
-            sect_type == SH_TYPE_DEBUG_STR ||
-            sect_type == SH_TYPE_DEBUG_LINE ||
-            sect_type == SH_TYPE_DEBUG_INFO ||
-            sect_type == SH_TYPE_DEBUG_FRAME ||
-            sect_type == SH_TYPE_DEBUG_ABBREV ||
-            sect_type == SH_TYPE_DEBUG_RANGES ||
-            sect_type == SH_TYPE_DEBUG_ARANGES);
-}
-
-
-UINT ELFMgr::getGlobalRelaPltElemNum()
-{
-    //There are two type of relaplt item: local and global. And this
-    //function count the number of relaplt item with global type.
-    UINT num = 0;
-    for (UINT i = 0; i < m_relaplt_info_vec.get_elem_count(); i++) {
-        RelaDynInfo * relaplt_info = m_relaplt_info_vec[i];
-        ASSERT0(relaplt_info);
-
-        RelocInfo * reloc_info = RELADYNINFO_reloc_info(relaplt_info);
-        ASSERT0(reloc_info);
-
-        if (SYMINFO_sym(RELOCINFO_sym(reloc_info)).st_bind == STB_LOCAL) {
-            continue;
-        }
-        num++;
-    }
-    return num;
-}
-
-
-void ELFMgr::preProcessFirstElemOfPlt()
-{
-    //Generate the first element content of '.plt' section.
-    BYTEVec * content = getSectionContent(SH_TYPE_PLT);
-    ASSERT0(content && content->get_elem_count() == 0);
-
-    //Get the size of the first element.
-    UINT first_elem_size = getFirstElemSizeOfPlt();
-    //Get the content of the first element.
-    CHAR const* first_elem_content = getFirstElemContentOfPltHelper();
-    ASSERT0(first_elem_content);
-
-    //Copy first element content info '.plt' section content.
-    ::memcpy((void*)(content->get_vec()),
-        (void*)(first_elem_content), first_elem_size);
-    content->set(first_elem_size - 1, 0);
-
-    //Record PltInfo.
-    PltInfo * pi = m_plt_info_mgr.allocPltInfo();
-    ASSERT0(pi);
-    m_plt_info_vec.append(pi);
-
-    //Record the offset in '.plt' section that need to be refilled by the first
-    //element address of '.got' section. It is the address of runtime resolved
-    //function that used by lazy loaded procedure.
-    PLTINFO_loc_ofst(pi) = content->get_elem_count() - first_elem_size +
-                           getRuntimeResolvedFuncOfstInPlt();
-    PLTINFO_is_first_elem(pi) = true;
-}
-
-
-void LinkerMgr::preProcessPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr)
-{
-    //There are two type of relaplt item: local and global. For relaplt with
-    //local type, it doesn't need to allocate space and generate plt element
-    //content in '.plt' section. Thus if there isn't relaplt with global type,
-    //the first element content for resolved function doesn't be generated in
-    //'.plt' section. And common element content for xxx@plt function doesn't
-    //generated in '.plt' section if the relaplt is with local type too. But
-    //the offset info of relaplt with local type still need to be updated.
-    ASSERT0(elf_mgr);
-
-    if (!elf_mgr->hasPltInfo()) { return; }
-
-    BYTEVec * content = elf_mgr->getSectionContent(SH_TYPE_PLT);
-    ASSERT0(content);
-
-    //Count the element size of '.plt' section.
-    UINT com_elem_size = elf_mgr->getCommonElemSizeOfPlt();
-    UINT first_elem_size = elf_mgr->getFirstElemSizeOfPlt();
-
-    //Re-allocate the capacity of '.plt' section. Just allocated memory for
-    //relaplt with global type.
-    UINT global_type_plt_elem_num = elf_mgr->getGlobalRelaPltElemNum();
-    UINT size = global_type_plt_elem_num * com_elem_size + first_elem_size;
-    if (content->get_capacity() < size) { content->grow(size); }
-
-    //Set the first element info of '.plt' if there is relaplt with global type.
-    if (global_type_plt_elem_num != 0) {
-        elf_mgr->preProcessFirstElemOfPlt();
-    }
-
-    //Set the common element info of '.plt' even if the relaplt is with local
-    //type. Thus except generated element content in '.plt' section, there are
-    //other offset info need to be upated for both relaplt type.
-    elf_mgr->preProcessCommonElemOfPlt();
-}
-
-
-void ELFMgr::preProcessCommonElemOfPlt()
-{
-    BYTEVec * content = getSectionContent(SH_TYPE_PLT);
-    ASSERT0(content);
-
-    CHAR const* common_elem_content = getCommonElemContentOfPltHelper();
-    ASSERT0(common_elem_content);
-
-    UINT com_elem_size = getCommonElemSizeOfPlt();
-    UINT plt_elem_num = m_relaplt_info_vec.get_elem_count();
-
-    for (UINT i = 0; i < plt_elem_num; i++) {
-        RelaDynInfo * relaplt_info = m_relaplt_info_vec[i];
-        ASSERT0(relaplt_info);
-
-        RelocInfo * reloc_info = RELADYNINFO_reloc_info(relaplt_info);
-        ASSERT0(reloc_info);
-
-        //Allocate PltInfo object.
-        PltInfo * pi = m_plt_info_mgr.allocPltInfo();
-        ASSERT0(pi);
-
-        m_plt_info_vec.append(pi);
-        //FIXME: Use 'set' ?
-        m_plt_info_map.setAlways(RELOCINFO_name(reloc_info), pi);
-
-        PLTINFO_is_local(pi) = true;
-        PLTINFO_is_plt_addr(pi) = false;
-        PLTINFO_reloc(pi) = reloc_info;
-        PLTINFO_addr(pi) = SYMINFO_ofst(RELOCINFO_sym(reloc_info));
-        PLTINFO_loc_ofst(pi) = PLTINFO_addr(pi) + getPltOfst();
-
-        if (!isSymbolWithLocalAttr(RELOCINFO_sym(reloc_info)) &&
-            !isSpecificFuncForRelaPlt(reloc_info)) {
-            //This PltInfo will be generated element in '.plt' section.
-            //Copy common element content into '.plt' section content.
-            ::memcpy((void*)(content->get_vec() + content->get_elem_count()),
-                     (void*)common_elem_content, com_elem_size);
-            content->set(content->get_elem_count() + com_elem_size - 1, 0);
-
-            //Update info.
-            PLTINFO_is_local(pi) = false;
-            PLTINFO_is_plt_addr(pi) = true;
-            PLTINFO_got_ofst(pi) = RELADYNINFO_got_ofst(relaplt_info);
-            PLTINFO_addr(pi) = content->get_elem_count() - com_elem_size;
-            PLTINFO_loc_ofst(pi) = PLTINFO_addr(pi) + getPltOfst();
-        }
-    }
-}
-
-
-void LinkerMgr::preProcessRelaPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr)
-{
-    ASSERT0(elf_mgr);
-
-    //Count the number of relaplt items. These info will be used to compute the
-    //size of '.plt' section content during setting section address. And some
-    //info in this '.plt' section need to be refilled after section address set.
-    if (!elf_mgr->hasPltInfo()) { return; }
-
-    //Record the element number of '.plt' section.
-    UINT relaplt_item_num = 0;
-
-    //FIXME: Is it corrected of ELF_OFFSET_OF_RELA_PLT_IN_GOT_SECT ?
-    //There is a corresponded got item in '.got' section for each
-    //relaplt item. Set the begin offset in '.got' section.
-    elf_mgr->updateGotOffset(ELF_OFFSET_OF_RELA_PLT_IN_GOT_SECT);
-
-    for (UINT i = 0; i < m_reloc_symbol_vec.get_elem_count(); i++) {
-        RelocInfo * reloc_info = m_reloc_symbol_vec[i];
-        ASSERT0(reloc_info);
-
-        //There isn't relaplt item.
-        if (RELOCINFO_resolved_notype(reloc_info) ||
-           !elf_mgr->isRelaPltSymbol(reloc_info)) {
-            continue;
-        }
-
-        //This relaplt has been recorded.
-        RelocInfo * recorded = nullptr;
-        if (elf_mgr->hasBeenRecordedRelaPltInfoItem(reloc_info, &recorded)) {
-            ASSERT0(recorded);
-            //Set the same info for two different RelocInfo.
-            RELOCINFO_sect_ofst(reloc_info) = RELOCINFO_sect_ofst(recorded);
-            continue;
-        }
-
-        elf_mgr->setRelaPltInfo(reloc_info);
-
-        //For SymbolInfo with 'stb_local' attribute, it doesn't
-        //need to be generated item in '.rela.plt' section.
-        if (elf_mgr->isSymbolWithLocalAttr(RELOCINFO_sym(reloc_info)) ||
-            elf_mgr->isSpecificFuncForRelaPlt(reloc_info)) {
-            continue;
-        }
-        relaplt_item_num++;
-    }
-
-    //There isn't relaplt item.
-    if (relaplt_item_num == 0) { return; }
-
-    BYTEVec * content = elf_mgr->getSectionContent(SH_TYPE_RELA_PLT);
-    ASSERT0(content);
-
-    //Compute the size of '.plt' section.
-    UINT content_sz = relaplt_item_num * ELFRela::getSize(elf_mgr);
-    if (content->get_capacity() < content_sz) { content->grow(content_sz); }
-    content->set(content_sz - 1, 0);
-    ::memset((void*)(content->get_vec()), 0, content_sz);
-
-    //Set element number of '.got' section.
-    elf_mgr->setGotElemNum(elf_mgr->getGotOffset() / BITS_PER_BYTE);
-}
-
-
-void LinkerMgr::preProcessRelaDynSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr)
-{
-    ASSERT0(elf_mgr);
-
-    UINT reladyn_item_num = 0;
-    //The first element of '.dynsym' is UNDEF and it's index is 0
-    //in ELF format. Thus the index of rest elements begin from 1.
-    elf_mgr->setDynsymIdx(ELF_DYNSYM_ELEM_BEGIN_INDEX);
-    elf_mgr->setRelaDynLocalItemNum(0);
-
-    for (UINT i = 0; i < m_reloc_symbol_vec.get_elem_count(); i++) {
-        RelocInfo * reloc_info = m_reloc_symbol_vec[i];
-        ASSERT0(reloc_info);
-
-        if (RELOCINFO_resolved_notype(reloc_info) ||
-            !elf_mgr->isRelaDynSymbol(reloc_info) ||
-            skipSpecificRelaDyn(elf_mgr, reloc_info)) { continue; }
-
-        RelocInfo * recorded = nullptr;
-        if (elf_mgr->isNeededToCreateGotItem(reloc_info) &&
-            elf_mgr->hasBeenRecordedRelaDynInfoItem(reloc_info, &recorded)) {
-            ASSERT0(recorded);
-            RELOCINFO_sect_ofst(reloc_info) = RELOCINFO_sect_ofst(recorded);
-            continue;
-        }
-
-        elf_mgr->setRelaDynInfo(reloc_info);
-        if (elf_mgr->isSymbolWithLocalAttr(RELOCINFO_sym(reloc_info))) {
-            UINT local_item_num = elf_mgr->getRelaDynLocalItemNum();
-            elf_mgr->setRelaDynLocalItemNum(ELF_INCREASE_VALUE(local_item_num));
-        }
-        reladyn_item_num++;
-    }
-
-    //In this function, the .rela_dyn section is just being calculated the
-    //number of rela_dyn items and the size of section content. The section
-    //content will be generated until all section address have been set.
-    //Since there is d_val field of ELFDyn needs to be set by the address of
-    //section. Thus the section content will be alligned 0 temporarily.
-    BYTEVec * content = elf_mgr->getSectionContent(SH_TYPE_RELA_DYN);
-    ASSERT0(content);
-    UINT content_sz = reladyn_item_num * ELFRela::getSize(elf_mgr);
-    if (content->get_capacity() < content_sz) { content->grow(content_sz); }
-    content->set(content_sz - 1, 0);
-    ::memset((void*)(content->get_vec()), 0, content_sz);
-
-    //Set GOT element number.
-    elf_mgr->setGotElemNum(elf_mgr->getGotOffset() / BITS_PER_BYTE);
-}
-
-
-void LinkerMgr::mergedShdrWithProgBitsType(
-    ELFSHdr const* shdr, Sym const* shdr_subname)
-{
-    ASSERT0(shdr && shdr_subname);
-
-    switch (m_output_elf_mgr->getSectionType(shdr_subname)) {
-    case SH_TYPE_TEXT:
-    case SH_TYPE_TEXT1:
-    case SH_TYPE_DATA:
-    case SH_TYPE_DL_TDATA:
-    case SH_TYPE_RODATA:
-    case SH_TYPE_RODATA1:
-    case SH_TYPE_LDM:
-    case SH_TYPE_EH_FRAME:
-    case SH_TYPE_DEBUG_INFO:
-    case SH_TYPE_DEBUG_LINE:
-    case SH_TYPE_DEBUG_ABBREV:
-    case SH_TYPE_DEBUG_ARANGES:
-    case SH_TYPE_DEBUG_RANGES:
-    case SH_TYPE_DEBUG_STR:
-    case SH_TYPE_DEBUG_FRAME:
-    case SH_TYPE_COMMENT:
-        //'false' represents the shdr isn't BSS section.
-        mergeShdrImpl(shdr, shdr_subname, false);
-        break;
-    case SH_TYPE_NOTE:
-        //TODO: Wait other part.
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-}
-
-void LinkerMgr::mergeShdrImpl(ELFSHdr const* shdr,
-    Sym const* shdr_name, bool is_bss_shdr)
-{
-    ASSERT0(shdr && shdr_name);
-
-    BYTEVec * content =
-        m_output_elf_mgr->getSectContentWithGenIfNotExist(shdr_name);
-    ASSERT0(content);
-
-    SectionInfo * sect_info = m_output_elf_mgr->getSection(shdr_name);
-    ASSERT0(sect_info);
-
-    //Update align/flag info.
-    SECTINFO_align(sect_info) =
-        MAX(SECTINFO_align(sect_info), shdr->s_addr_align);
-    SECTINFO_flag(sect_info) |= shdr->s_flags;
-
-    if (shdr->s_size == 0) { return; }
-
-    //Resize content capacity.
-    UINT base_ofst = (UINT)xcom::ceil_align(
-        content->get_elem_count(), shdr->s_addr_align);
-    UINT total_size = (UINT)(base_ofst + shdr->s_size);
-    if (content->get_capacity() < total_size) { content->grow(total_size); }
-    content->set((VecIdx)(total_size - 1), 0);
-
-    if (is_bss_shdr) {
-        //BSS section needs to be assigned 0.
-        ::memset((void*)(content->get_vec() + base_ofst), 0, shdr->s_size);
-        return;
-    }
-
-    //Copy shdr content to output ELFMgr section.
-    ::memcpy((void*)(content->get_vec() + base_ofst),
-             (void*)(shdr->s_content), shdr->s_size);
-}
-
-
-void LinkerMgr::mergeSymbolInfoWithCOMAttr(
-    MOD ELFMgr * elf_mgr, UINT shdr_idx, Sym const* shdr_subname)
-{
-    ASSERT0(elf_mgr && shdr_subname);
-
-    //SymbolInfo with SHN_COMMON attribute needs to be allocated memory
-    //space and assigned 0 in '.bss' section.
-    BYTEVec * content =
-        m_output_elf_mgr->getSectContentWithGenIfNotExist(shdr_subname);
-    ASSERT0(content);
-
-    SectionInfo * sect_info = m_output_elf_mgr->getSection(shdr_subname);
-    ASSERT0(sect_info);
-
-    for (UINT i = 0; i < ELFMGR_symbol_vec(elf_mgr).get_elem_count(); i++) {
-        SymbolInfo * symbol_info = ELFMGR_symbol_vec(elf_mgr)[i];
-        ASSERT0(symbol_info);
-
-        if (elf_mgr->isNullSymbol(symbol_info, i)) { continue; }
-        if (SYMINFO_sym(symbol_info).st_shndx != SHN_COMMON) { continue; }
-
-        //Assign 0 for this section content.
-        UINT base_ofst = (UINT)xcom::ceil_align(content->get_elem_count(),
-            SYMINFO_sym(symbol_info).st_value);
-        UINT sym_sz = (UINT)SYMINFO_sym(symbol_info).st_size;
-        UINT total_sz = base_ofst + sym_sz;
-        if (content->get_capacity() < total_sz) { content->grow(total_sz); }
-        content->set(total_sz - 1, 0);
-        ::memset((void*)(content->get_vec() + base_ofst), 0, sym_sz);
-
-        //Update info.
-        SECTINFO_align(sect_info) =
-             MAX(SECTINFO_align(sect_info), SYMINFO_sym(symbol_info).st_value);
-        //Reset the section name to 'SH_TYPE_BSS'.
-        SYMINFO_sect_type(symbol_info) = SH_TYPE_BSS;
-        SYMINFO_sym(symbol_info).st_shndx = shdr_idx;
-        SYMINFO_sect_name(symbol_info) = m_output_elf_mgr->addToSymTab(
-            elf_mgr->getSectionName(SH_TYPE_BSS)->getStr());
-    }
-}
-
-
-void LinkerMgr::mergedShdrWithNoBitsType(MOD ELFMgr * elf_mgr,
-    ELFSHdr const* shdr, UINT shdr_idx, Sym const* shdr_subname)
-{
-    ASSERT0(elf_mgr && shdr && shdr_subname);
-
-    switch (m_output_elf_mgr->getSectionType(shdr_subname)) {
-    case SH_TYPE_BSS:
-        //Merge .bss or .bss.xxx section. These sections need to be assigned 0.
-        //'true' represents the shdr is BSS section.
-        mergeShdrImpl(shdr, shdr_subname, true);
-        //For SymbolInfo with SHN_COMMON attribute. It needs to be allocated
-        //memory space in BSS section.
-        mergeSymbolInfoWithCOMAttr(elf_mgr, shdr_idx, shdr_subname);
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-}
-
-
-void LinkerMgr::updateRelaOfst(MOD ELFMgr * elf_mgr,
-    ELFSHdr const* shdr, CHAR const* shdr_name, UINT sh_idx)
-{
-    ASSERT0(elf_mgr && shdr && shdr_name);
-
-    //Update RelocInfo offset after corresponded SymbolInfo merged into section.
-    for (UINT i = 0; i < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); i++) {
-        RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[i];
-        ASSERT0(reloc_info);
-
-        //Find corresponded SymbolInfo according to 'shndx'.
-        if (RELOCINFO_shdr_idx(reloc_info) != sh_idx) { continue; }
-        //Process section name.
-        Sym const* shdr_subname = elf_mgr->getShdrType(shdr_name);
-        ASSERT0(shdr_subname);
-
-        SECTION_TYPE sect_type = elf_mgr->getSectionType(shdr_subname);
-        if (!m_output_elf_mgr->hasSection(shdr_subname) &&
-            m_output_elf_mgr->isDebugSection(sect_type)) {
-            //TODO: Wait other part.
-            ASSERT0(0);
-        }
-
-        //Update offset info.
-        UINT base_ofst =
-            (UINT)(m_output_elf_mgr->getSectionSize(shdr_subname) -
-                   shdr->s_size);
-        RELOCINFO_called_loc(reloc_info) += base_ofst;
-    }
-}
-
-
-void LinkerMgr::updateSymbolOfst(
-    MOD ELFMgr * elf_mgr, ELFSHdr const* shdr, UINT sh_idx)
-{
-    //TODO: Use Map to decrease found time.
-    ASSERT0(elf_mgr && shdr);
-
-    for (UINT i = 0; i < ELFMGR_symbol_vec(elf_mgr).get_elem_count(); i++) {
-        SymbolInfo * symbol_info = ELFMGR_symbol_vec(elf_mgr)[i];
-        ASSERT0(symbol_info);
-
-        if ((elf_mgr->isNullSymbol(symbol_info, i)) ||
-            (SYMINFO_sym(symbol_info).st_shndx != sh_idx) ||
-            (SYMINFO_sect_type(symbol_info) == SH_TYPE_UNDEF) ||
-            (SYMINFO_sect_name(symbol_info) == nullptr)) { continue; }
-
-        //Note: Don't need to process.
-        if (SYMINFO_sym(symbol_info).st_shndx == SHN_LORESERVE ||
-            SYMINFO_sym(symbol_info).st_shndx == SHN_LOPROC ||
-            SYMINFO_sym(symbol_info).st_shndx == SHN_HIPROC ||
-            SYMINFO_sym(symbol_info).st_shndx == SHN_HIRESERVE) {
-            UNREACHABLE();
-        }
-
-        SECTION_TYPE sect_type = elf_mgr->getSectionType(
-            SYMINFO_sect_name(symbol_info));
-
-        //TODO: Wait other part.
-        if (!m_output_elf_mgr->hasSection(SYMINFO_sect_name(symbol_info)) &&
-            (sect_type == SH_TYPE_COMMENT || sect_type == SH_TYPE_NOTE)) {
-            continue;
-        }
-
-        //Update SymbolInfo offset.
-        UINT base_ofst = m_output_elf_mgr->getSectionSize(
-            SYMINFO_sect_name(symbol_info)) - (UINT)shdr->s_size;
-        SYMINFO_ofst(symbol_info) =
-            base_ofst + SYMINFO_sym(symbol_info).st_value;
-        ASSERT0(SYMINFO_ofst(symbol_info) >= 0);
-
-        if (!SYMINFO_is_func(symbol_info)) { continue; }
-        //Process FunctionInfo offset.
-        FunctionInfo * func = SYMINFO_func(symbol_info);
-        ASSERT0(func);
-        FUNCINFO_code_ofst(func) =
-            base_ofst + SYMINFO_sym(symbol_info).st_value;
-        ASSERT0(FUNCINFO_code_ofst(func) >= 0);
-        ASSERT0(FUNCINFO_code_ofst(func) <= (base_ofst + shdr->s_size));
-    }
-}
-
-
-void LinkerMgr::mergeCodeHelper(MOD SymbolInfo * symbol_info)
-{
-    switch (m_output_elf_mgr->getELFType()) {
-    case ET_DYN:
-        mergeDynTypeCodeImpl(symbol_info);
-        break;
-    case ET_REL:
-        mergeRelTypeCodeImpl(symbol_info);
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-}
-
-
-void LinkerMgr::mergeDynTypeCodeImpl(MOD SymbolInfo * symbol_info)
-{
-    ASSERT0(symbol_info);
-
-    FunctionInfo * fi = SYMINFO_func(symbol_info);
-    ASSERT0(fi && (FUNCINFO_sect_type(fi) == SH_TYPE_TEXT ||
-            FUNCINFO_sect_type(fi) == SH_TYPE_TEXT1));
-
-    BYTEVec * content = m_output_elf_mgr->getSectContentWithGenIfNotExist(
-        FUNCINFO_sect_name(fi));
-    ASSERT0(content);
-
-    //Resize content capacity.
-    UINT base_ofst = (UINT)xcom::ceil_align(
-        content->get_elem_count(), FUNCINFO_align(fi));
-    UINT func_sz = (UINT)FUNCINFO_size(fi);
-
-    if (func_sz == 0) { return; }
-
-    UINT sz = base_ofst + func_sz;
-    if (content->get_capacity() < sz) { content->grow(sz); }
-    UCHAR * code = FUNCINFO_code(fi).get_vec();
-    ASSERT0(code);
-
-    //Copy code to section content.
-    content->set((VecIdx)(sz - 1), 0);
-    ::memcpy((void*)(content->get_vec() + base_ofst), (void*)code, func_sz);
-    //Update info.
-    FUNCINFO_code_ofst(fi) = base_ofst;
-    SYMINFO_ofst(symbol_info) = base_ofst;
-}
-
-
-void LinkerMgr::mergeData(MOD SymbolInfo * symbol_info)
-{
-    ASSERT0(symbol_info);
-
-    switch (SYMINFO_sect_type(symbol_info)) {
-    case SH_TYPE_BSS:
-        m_output_elf_mgr->mergeBssData(symbol_info);
-        break;
-    case SH_TYPE_DATA:
-    case SH_TYPE_RODATA:
-    case SH_TYPE_DL_TDATA:
-    case SH_TYPE_CONST:
-        m_output_elf_mgr->mergeUnullData(symbol_info);
-        break;
-    case SH_TYPE_EMPTY:
-    case SH_TYPE_UNDEF:
-        //For sbss/bss symbol with extern attribute.
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-}
-
-
-void LinkerMgr::mergeELFMgrCollectedFromVar()
-{
-    //Record code and data info in different ELFMgr into the corresponded
-    //section of output ELFMgr. The function mainly process ELFMgr that
-    //collected from xoc::Var.
-    for (ELFMgr * elf_mgr = m_elf_mgr_list.get_head();
-         elf_mgr != nullptr; elf_mgr = m_elf_mgr_list.get_next()) {
-        if (elf_mgr->isStandardELFFormat()) { continue; }
-        //Process SymbolInfo that collected from xoc::Var.
-        for (UINT j = 0; j < ELFMGR_symbol_vec(elf_mgr).get_elem_count(); j++) {
-            SymbolInfo * symbol_info = ELFMGR_symbol_vec(elf_mgr)[j];
-            ASSERT0(symbol_info);
-
-            if (elf_mgr->isNullSymbol(symbol_info, j)) { continue; }
-            //Merge code.
-            if (SYMINFO_is_func(symbol_info) &&
-                !SYMINFO_is_extern(symbol_info) &&
-                FUNCINFO_code(SYMINFO_func(symbol_info)).get_vec() != nullptr) {
-                //CASE: Both function with extern attribute and function without
-                //      definition don't be created .text section.
-                mergeCodeHelper(symbol_info);
-                continue;
-            }
-            //Process debug info.
-            if (SYMINFO_is_debug(symbol_info)) {
-                processDebugInfo(elf_mgr, symbol_info);
-                if (m_output_elf_mgr->isRelType() &&
-                    SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
-                    m_output_elf_mgr->createRelaDebugSect(symbol_info);
-                }
-                continue;
-            }
-            //Process data.
-            if (SYMINFO_sym(symbol_info).st_type == STT_OBJECT) {
-                if (!SYMINFO_is_extern(symbol_info)) {
-                    //There aren't data in SymbolInfo with external attribute.
-                    mergeData(symbol_info);
-                }
-
-                //Process rela.data in ET_REL Type.
-                if (m_output_elf_mgr->isRelType() &&
-                    SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
-                    m_output_elf_mgr->createRelaDataSect(symbol_info);
-                }
-                continue;
-            }
-        }
-
-        //Update RelocInfo offset after code and data info merged.
-        for (UINT j = 0; j < ELFMGR_reloc_vec(elf_mgr).get_elem_count(); j++) {
-            RelocInfo * reloc_info = ELFMGR_reloc_vec(elf_mgr)[j];
-            ASSERT0(reloc_info);
-
-            //Update useful info according to RelocInfo.
-            m_output_elf_mgr->updateUsefulInfoAccordingToRelocInfo(reloc_info);
-
-            updateRelaOfst(reloc_info);
-        }
-    }
-
-    //Post process after ELFMgr merged.
-    postMergeELFMgrCollectedFromVar();
-}
-
-
-void LinkerMgr::processDebugInfo(MOD ELFMgr * elf_mgr,
-                                 MOD SymbolInfo * symbol_info)
-{
-    //Record debug infomation into the corresponded section of output ELFMgr.
-    //These debug infomation mainly come from ELFMgr collected from xoc::Var.
-    ASSERT0(elf_mgr && symbol_info);
-
-    xoc::MCDwarfMgr * dm = elf_mgr->getDwarfMgr();
-    ASSERT0(dm);
-
-    SECTION_TYPE sect_type = SYMINFO_sect_type(symbol_info);
-
-    BYTEVec * content =
-        m_output_elf_mgr->getSectContentWithGenIfNotExist(sect_type);
-    ASSERT0(content);
-
-    //Get debug content according to different debug type.
-    BYTEVec * debug_content = nullptr;
-    switch (sect_type) {
-    case SH_TYPE_DEBUG_INFO:
-        debug_content = &(MCDWARFMGR_debug_info_code(dm));
-        break;
-    case SH_TYPE_DEBUG_LINE:
-        debug_content = &(MCDWARFMGR_debug_line_code(dm));
-        break;
-    case SH_TYPE_DEBUG_ABBREV:
-        debug_content = &(MCDWARFMGR_debug_abbrev_code(dm));
-        break;
-    case SH_TYPE_DEBUG_RANGES:
-        debug_content = &(MCDWARFMGR_debug_ranges_code(dm));
-        break;
-    case SH_TYPE_DEBUG_FRAME:
-        debug_content = &(MCDWARFMGR_debug_frame_code(dm));
-        break;
-    case SH_TYPE_DEBUG_STR:
-        debug_content = &(MCDWARFMGR_debug_str_code(dm));
-        break;
-    case SH_TYPE_DEBUG_LOC:
-        debug_content = &(MCDWARFMGR_debug_loc_code(dm));
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-    ASSERT0(debug_content);
-
-    //Copy debug info to the corresponded section of output ELFMgr.
-    UINT base_ofst = (UINT)xcom::ceil_align(
-        content->get_elem_count(), SYMINFO_align(symbol_info));
-    UINT debug_size = debug_content->get_elem_count();
-    UINT total_size = base_ofst + debug_size;
-    if (content->get_capacity() < total_size) { content->grow(total_size); }
-
-    //Copy section content.
-    if (debug_size != 0) {
-        content->set((VecIdx)(total_size - 1), 0);
-        ::memcpy(content->get_vec() + base_ofst,
-                 debug_content->get_vec(), debug_size);
-    }
-
-    //Update info.
-    SYMINFO_ofst(symbol_info) = base_ofst;
-    SectionInfo * sect_info = m_output_elf_mgr->getSection(sect_type);
-    ASSERT0(sect_info);
-    SECTINFO_align(sect_info) =
-        MAX(SECTINFO_align(sect_info), SYMINFO_align(symbol_info));
-}
-
-
-void LinkerMgr::updateRelaOfst(MOD RelocInfo * reloc_info)
-{
-    ASSERT0(reloc_info);
-
-    if (RELOCINFO_is_func(reloc_info)) {
-        RELOCINFO_called_loc(reloc_info) +=
-            FUNCINFO_code_ofst(RELOCINFO_caller_func(reloc_info));
-    }
-}
-
-
-void LinkerMgr::mergeELFMgrHelper()
-{
-    //Process ELFMgr that collected from xoc::Var.
-    mergeELFMgrCollectedFromVar();
-
-    //Process ELFMgr that collected from object file.
-    mergeELFMgr();
-}
-
-
-void LinkerMgr::mergeELFMgr()
-{
-    //Record code and data info from different ELFMgr into the corresponded
-    //section of output ELFMgr. The function mainly process ELFMgr that
-    //collected from object file.
-    for (ELFMgr * elf_mgr = m_elf_mgr_list.get_head();
-         elf_mgr != nullptr; elf_mgr = m_elf_mgr_list.get_next()) {
-        if (!elf_mgr->isStandardELFFormat()) { continue; }
-        ELFHdr & hdr = elf_mgr->getHdr();
-        ELFSHdr * shstrtab_shdr = elf_mgr->getSectHeader(hdr.e_shstrndx);
-        ASSERT0(shstrtab_shdr);
-
-        for (UINT j = 0; j < hdr.e_shnum; j++) {
-            ELFSHdr * shdr = elf_mgr->getSectHeader(j);
-            ASSERT0(shdr);
-            CHAR const* shdr_name =
-                elf_mgr->getStrFromStrTab(shstrtab_shdr, shdr->s_name);
-            ASSERT0(shdr_name);
-            //Process different shdr.
-            mergeELFMgrImpl(elf_mgr, shdr, shdr_name, j);
-            //Update SymbolInfo offset after section merged.
-            updateSymbolOfst(elf_mgr, shdr, j);
-            //Update RelocInfo offset after data and code info merged.
-            updateRelaOfst(elf_mgr, shdr, shdr_name, j);
-        }
-    }
-}
-
-
-void LinkerMgr::mergeELFMgrImpl(MOD ELFMgr * elf_mgr,
-    ELFSHdr const* shdr, CHAR const* shdr_name, UINT shdr_idx)
-{
-    ASSERT0(elf_mgr && shdr && shdr_name);
-
-    //Process shdr according to it's type.
-    switch (shdr->s_type) {
-    case S_UNDEF:
-        ASSERT0(shdr_idx == 0);
-        break;
-    case S_PROGBITS:
-        mergedShdrWithProgBitsType(shdr, elf_mgr->getShdrType(shdr_name));
-        break;
-    case S_NOBITS:
-        mergedShdrWithNoBitsType(elf_mgr, shdr,
-            shdr_idx, elf_mgr->getShdrType(shdr_name));
-        break;
-    case S_RELA:
-    case S_STRTAB:
-    case S_SYMTAB:
-    case S_DYNSYM:
-    case S_DYNAMIC:
-    SWITCH_CASE_NOT_HANDLE:
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "NOTE: The shdr don't be handled %ld %s.\n",
-                shdr->s_type, shdr_name);
-        }
-        break;
-    case S_GROUP:
-        //TODO: Support S_GROUP shdr.
-        if (g_elf_opt.isDumpLink()) {
-            xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-                "NOTE: The GROUP shdr doesn't be handled %ld %s.\n",
-                shdr->s_type, shdr_name);
-        }
-        break;
-    default:
-        UNREACHABLE();
-        break;
-    }
-}
-
-
-void LinkerMgr::processOutputExeELF()
-{
-    m_output_elf_mgr->setELFType(ET_DYN);
-    //Merge section in different ELFMgr.
-    mergeELFMgrHelper();
-
-    //Create fundamental section.
-    m_output_elf_mgr->createFundamentalSection();
-
-    //Set order for each section.
-    m_output_elf_mgr->setSectionOrder();
-
-    //Set ELF shdr_num.
-    //There isn't .text.xxx section when generated fatbin ELF.
-    m_output_elf_mgr->setSubTextNum(0);
-    m_output_elf_mgr->setShdrNum(m_output_elf_mgr->getShdrNum());
-
-    //Construct ELF header.
-    m_output_elf_mgr->constructELFHeader(m_output_elf_mgr->getShdrNum());
-
-    //Pre-construct .dynamic section.
-    m_output_elf_mgr->preProcessDynamicSection();
-
-    //Set ELF type.
-    m_output_elf_mgr->setELFType(ET_DYN);
-
-    //Generate rela_dyn section content.
-    preProcessRelaDynSectBeforeSetSectAddr(m_output_elf_mgr);
-
-    //Pre-process '.rela.plt' section info before section address set.
-    preProcessRelaPltSectBeforeSetSectAddr(m_output_elf_mgr);
-
-    //Pre-process '.plt' section info before section address set.
-    preProcessPltSectBeforeSetSectAddr(m_output_elf_mgr);
-
-    //Generate GOT section content.
-    m_output_elf_mgr->genGotContent();
-
-    //Generate section content.
-    m_output_elf_mgr->genSectionContentHelper();
-
-    //Process secton offset.
-    m_output_elf_mgr->processSectionOffset();
-
-    //Process section address.
-    m_output_elf_mgr->processSectionAddr();
-
-    //Process '.rela.dyn' section info after section address set.
-    m_output_elf_mgr->processRelaDynSectAfterSetSectAddr();
-
-    //Process '.rela.plt' section info after section address set.
-    m_output_elf_mgr->processRelaPltSectAfterSetSectAddr();
-
-    //Process '.plt' section info after section address set.
-    m_output_elf_mgr->processPltSectAfterSetSectAddr();
-
-    //Process element offset in '.dynsym' and '.symtab'.
-    m_output_elf_mgr->postProcessAfterSetSectAddr();
-
-    //Process .dynamic section.
-    m_output_elf_mgr->processDynamicSection();
-
-    //Process program header(segment).
-    m_output_elf_mgr->processProgramHeader();
-
-    //Relocate.
-    doRelocate(m_output_elf_mgr);
-
-    //Post process after all section info have been set.
-    m_output_elf_mgr->postProcessAfterSettingSectionInfo();
-
-    //Construct section and set header info of output ELF.
-    m_output_elf_mgr->constructELFSectionHelper();
-
-    //Write data into ELF file.
-    m_output_elf_mgr->writeELF(m_output_file_name);
-}
-
-
-void LinkerMgr::dumpLibPathList(xcom::List<CHAR const*> * lib_path_list) const
-{
-    ASSERT0(lib_path_list);
-
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\n\n======== AR File ======== \n\n");
-    for (CHAR const* str = lib_path_list->get_head();
-         str != nullptr; str = lib_path_list->get_next()) {
-        xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-            "LibPath: %s \n", str);
-    }
+    ASSERT0(src_symbol);
+    SYMINFO_name(this) = SYMINFO_name(src_symbol);
+    SYMINFO_func(this) = SYMINFO_func(src_symbol);
+    SYMINFO_sym(this) = SYMINFO_sym(src_symbol);
+    SYMINFO_ofst(this) = SYMINFO_ofst(src_symbol);
+    SYMINFO_index(this) = SYMINFO_index(src_symbol);
+    SYMINFO_align(this) = SYMINFO_align(src_symbol);
+    SYMINFO_reloc(this).copy(SYMINFO_reloc(src_symbol));
+    SYMINFO_is_func(this) = SYMINFO_is_func(src_symbol);
+    SYMINFO_func_name(this) = SYMINFO_func_name(src_symbol);
+    SYMINFO_is_extern(this) = SYMINFO_is_extern(src_symbol);
+    SYMINFO_is_dynsym(this) = SYMINFO_is_dynsym(src_symbol);
+    SYMINFO_file_name(this) = SYMINFO_file_name(src_symbol);
+    SYMINFO_sect_name(this) = SYMINFO_sect_name(src_symbol);
+    SYMINFO_sect_type(this) = SYMINFO_sect_type(src_symbol);
+    SYMINFO_dynsym_idx(this) = SYMINFO_dynsym_idx(src_symbol);
+    SYMINFO_sect_index(this) = SYMINFO_sect_index(src_symbol);
 }
 
 
-void LinkerMgr::dumpLinkResolve() const
+void FunctionInfo::copy(FunctionInfo const* src_func)
 {
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\n\n======== UnResolved Symbol ========\n\n");
-    for (UINT i = 0; i < m_reloc_symbol_vec.get_elem_count(); i++) {
-        RelocInfo * reloc_info = m_reloc_symbol_vec[i];
-        ASSERT0(reloc_info);
-        if (RELOCINFO_is_resolved(reloc_info)) { continue; }
-        xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-            "Error: Unresolved symbol idx: %d name: %s\n",
-            i, RELOCINFO_name(reloc_info)->getStr());
-    }
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\n\n======== UnResolved Symbol PRT Done ========\n\n");
+    ASSERT0(src_func);
+    FUNCINFO_size(this) = FUNCINFO_size(src_func);
+    FUNCINFO_name(this) = FUNCINFO_name(src_func);
+    FUNCINFO_align(this) = FUNCINFO_align(src_func);
+    FUNCINFO_is_entry(this) = FUNCINFO_is_entry(src_func);
+    FUNCINFO_file_name(this) = FUNCINFO_file_name(src_func);
+    FUNCINFO_code_ofst(this) = FUNCINFO_code_ofst(src_func);
+    FUNCINFO_sect_name(this) = FUNCINFO_sect_name(src_func);
+    FUNCINFO_sect_type(this) = FUNCINFO_sect_type(src_func);
 }
-
 
-void LinkerMgr::dumpLinkRelocate(RelocInfo const* reloc_info, UINT index) const
-{
-    ASSERT0(reloc_info);
-
-    //Dump RelocInfo.
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\n IDX:%d \n \
-        Resolved:%s  NAME:%s \n \
-        IS_OBJ:%s    IS_FUNC:%s    IS_NOTYPE:%s    Relate_reloc:%d \n \
-        LOC:0x%lx    TYPE:%d       ADDEND:%d\n",
-        index, (RELOCINFO_is_resolved(reloc_info) ? "TRUE" : "FALSE"),
-        RELOCINFO_name(reloc_info)->getStr(),
-        (RELOCINFO_is_object(reloc_info) ? "TRUE" : "FALSE"),
-        (RELOCINFO_is_func(reloc_info) ? "TRUE" : "FALSE"),
-        (RELOCINFO_resolved_notype(reloc_info) ? "TRUE" : "FALSE"),
-        RELOCINFO_next(reloc_info),
-        RELOCINFO_called_loc(reloc_info), RELOCINFO_type(reloc_info),
-        RELOCINFO_addend(reloc_info));
-    //Dump resolved SymbolInfo of RelocInfo.
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\nResolvedSymbolInfo:%s    IS_FUNC:%d \n \
-        st_type:%d    st_size:%d    st_bind:%d    st_shndx:%d\n",
-        SYMINFO_name(RELOCINFO_sym(reloc_info))->getStr(),
-        SYMINFO_is_func(RELOCINFO_sym(reloc_info)),
-        SYMINFO_sym(RELOCINFO_sym(reloc_info)).st_type,
-        SYMINFO_sym(RELOCINFO_sym(reloc_info)).st_size,
-        SYMINFO_sym(RELOCINFO_sym(reloc_info)).st_bind,
-        SYMINFO_sym(RELOCINFO_sym(reloc_info)).st_shndx);
-    //Dump caller FunctionInfo of RelocInfo.
-    if (!RELOCINFO_caller_func(reloc_info)) { return; }
-    xoc::note(m_dump->getFileHandler(), m_logmgr.getIndent(),
-        "\nCallerFuncInfo:%s      IS_ENTRY:%d \n \
-        SECT:%d    SECT_STR:%s    SIZE:%ld    OFST:0x%lx    ALIGN:%d\n",
-        FUNCINFO_name(RELOCINFO_caller_func(reloc_info))->getStr(),
-        FUNCINFO_is_entry(RELOCINFO_caller_func(reloc_info)),
-        FUNCINFO_sect_type(RELOCINFO_caller_func(reloc_info)),
-        FUNCINFO_sect_name(RELOCINFO_caller_func(reloc_info))->getStr(),
-        FUNCINFO_size(RELOCINFO_caller_func(reloc_info)),
-        FUNCINFO_code_ofst(RELOCINFO_caller_func(reloc_info)),
-            FUNCINFO_align(RELOCINFO_caller_func(reloc_info)));
 }
-
-} //namespace elf

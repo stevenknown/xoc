@@ -120,6 +120,9 @@ bool ScalarOpt::perform(OptCtx & oc)
         }
         passlist.append_tail(cp);
     }
+    if (g_do_bcp) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_BCP));
+    }
     if (g_do_rce) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_RCE));
     }
@@ -159,6 +162,14 @@ bool ScalarOpt::perform(OptCtx & oc)
     }
     if (g_do_alge_reasscociate) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_ALGE_REASSCOCIATE));
+        if (g_do_gcse) {
+            passlist.append_tail(m_pass_mgr->registerPass(PASS_GCSE));
+        }
+        if (g_do_dce || g_do_dce_aggressive) {
+            dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
+            dce->setElimCFS(g_do_dce_aggressive);
+            passlist.append_tail(dce);
+        }
     }
     #endif
     if (g_do_loop_convert) {
@@ -168,7 +179,7 @@ bool ScalarOpt::perform(OptCtx & oc)
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LFTR));
     }
     ASSERT0(m_dumgr->verifyMDRef());
-    ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+    ASSERT0(xoc::verifyClassicDUChain(m_rg, oc));
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(m_rg->getCFG()->verify());
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
@@ -204,11 +215,12 @@ bool ScalarOpt::perform(OptCtx & oc)
             }
             res |= doit;
             ASSERT0(m_dumgr->verifyMDRef());
-            ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+            ASSERT0(xoc::verifyClassicDUChain(m_rg, oc));
             ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
             ASSERT0(m_rg->getCFG()->verify());
             ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
             ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+            ASSERT0(xoc::verifyIVR(m_rg));
             ASSERT0(m_cfg->verifyRPO(oc));
             ASSERT0(m_cfg->verifyLoopInfo(oc));
             ASSERT0(m_cfg->verifyDomAndPdom(oc));
@@ -221,7 +233,8 @@ bool ScalarOpt::perform(OptCtx & oc)
         //Only perform the last once.
         res |= dce->perform(oc);
         ASSERT0(m_dumgr->verifyMDRef());
-        ASSERT0(xoc::verifyMDDUChain(m_rg, oc));
+        ASSERT0(IRMgr::verify(m_rg));
+        ASSERT0(xoc::verifyClassicDUChain(m_rg, oc));
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
         ASSERT0(m_rg->getCFG()->verify());
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

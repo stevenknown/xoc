@@ -48,8 +48,14 @@ public:
     }
     FlagSet(FlagDescSeg v) : FixedSizeBitSet(m_flagbuf, g_flagset_byte_size)
     {
-        ASSERT0(g_flagset_byte_size >= sizeof(v));
+        ASSERT0(sizeof(v) <= g_flagset_byte_size);
         ::memcpy(m_flagbuf, &v, sizeof(v));
+    }
+    FlagSet(BYTE const* vbuf, UINT vbuflen)
+        : FixedSizeBitSet(m_flagbuf, g_flagset_byte_size)
+    {
+        ASSERT0(vbuflen <= g_flagset_byte_size);
+        ::memcpy(m_flagbuf, vbuf, vbuflen);
     }
 
     //The function unifies all flags in 'st' into current flags buffer.

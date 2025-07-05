@@ -104,7 +104,6 @@ ArgPasser::ArgPasser(Region * rg) :
     m_irmgr = m_rg->getIRMgr();
     m_rm = m_rg->getRegionMgr();
     m_tm = m_rg->getTypeMgr();
-    m_rg_param_mgr = new RegionParamMgr();
     m_max_argument_size = 0;
     m_max_argument_align = STACK_ALIGNMENT;
     m_dystack_impl = nullptr;
@@ -115,9 +114,6 @@ ArgPasser::ArgPasser(Region * rg) :
 
 ArgPasser::~ArgPasser()
 {
-    ASSERT0(m_rg_param_mgr);
-    delete m_rg_param_mgr;
-    m_rg_param_mgr = nullptr;
     ASSERT0(m_arg_pass_res_mgr);
     delete m_arg_pass_res_mgr;
     m_arg_pass_res_mgr = nullptr;
@@ -137,14 +133,14 @@ void ArgPasser::passRetViaRegister(MOD IRBB * irbb, IR const* ir,
     //  .reg $1;
     //  call test($0) -> $1;
     //  mov.u32 $1, 1;
-    //If [m_lsra->getDedicatedMgr().add(ir->getPrno(), reg);]
+    //If [m_lsra->getPreAssignedMgr().add(ir->getPrno(), reg);]
     //  $2:u64 = call 'func'  id:8 attachinfo:Dbx
     //     $1:u64 param0 id:6
     //     $2:u64 param1 id:7
     //  stpr $2:u32 id:11 attachinfo:Dbx
     //     intconst:u32 1|0x1 id:10
     //The return value register is written by the 'mov'.
-    //If [m_lsra->getDedicatedMgr().add(temp, reg);]
+    //If [m_lsra->getPreAssignedMgr().add(temp, reg);]
     //  stpr $6:u64 id:19
     //     $2:u64 id:18
     //  $7:u64 = call 'func'  id:8 attachinfo:Dbx
@@ -155,9 +151,7 @@ void ArgPasser::passRetViaRegister(MOD IRBB * irbb, IR const* ir,
     //  stpr $2:u32 id:11 attachinfo:Dbx
     //     intconst:u32 1|0x1 id:10
     //The return value register is not written by the 'mov'.
-    xoc::PRNO tmpprno = m_irmgr->buildPrno(ty);
-    m_lsra->getDedicatedMgr().add(tmpprno, reg);
-
+    PRNO tmpprno = m_lsra->buildPrnoAndSetReg(ty, reg);
     IR * stpr = m_irmgr->buildMove(ir->getPrno(), tmpprno, ty);
     CALL_prno(ir) = tmpprno;
     stpr->setBB(irbb);
@@ -181,7 +175,6 @@ void ArgPasser::buildLoadForGlobalOrSpmVar(OUT IRList & irlist, PRNO tgtprno,
         //is no need to perform additional address loading operations, just use
         //the register corresponding to the formal parameter.
         ASSERT0(m_var2prno.find(var));
-        ASSERT0(m_lsra->getReg(m_var2prno.get(var)) != REG_UNDEF);
         src_prno = m_var2prno.get(var);
     } else {
         IR * load_address = m_irmgr->buildLoadAddrOfVar(var);
@@ -201,12 +194,10 @@ void ArgPasser::buildLoadForGlobalOrSpmVar(OUT IRList & irlist, PRNO tgtprno,
 void ArgPasser::passArgViaRegister(OUT IRList & irlist, OUT IR ** paramlist,
                                    IR const* param, xgen::Reg reg)
 {
-    xoc::PRNO tmpprno = m_irmgr->buildPrno(param->getType());
-    m_lsra->getDedicatedMgr().add(tmpprno, reg); // bind register to param
-
+    // bind register to param
+    xoc::PRNO tmpprno = m_lsra->buildPrnoAndSetReg(param->getType(), reg);
     Type const* src_tp = param->getType();
     Type const* dst_tp = param->getType();
-
     xoc::PRNO prno = PRNO_UNDEF;
     if (param->is_ld()) {
         //Pass stack var.
@@ -231,6 +222,12 @@ void ArgPasser::passArgViaRegister(OUT IRList & irlist, OUT IR ** paramlist,
         prno = m_irmgr->buildPrno(tp_reg);
         IR * ir = m_irmgr->buildLoadAddrOfVar(prno, param->getIdinfo());
         irlist.append_tail(ir);
+    } else if (param->is_const()) {
+        IR * save_const = m_irmgr->buildStprFromConst(
+            m_rg->dupIRTree(param), param->getType());
+        irlist.append_tail(save_const);
+        prno = save_const->getPrno();
+        dst_tp = getParamRegisterType(src_tp, reg);
     } else {
         //Pass reg.
         ASSERT0(param->is_pr());
@@ -271,13 +268,23 @@ void ArgPasser::passArgViaStack(OUT IRList & irlist,
         IR * newir = m_irmgr->buildLoadAddrOfVar(prno, ir->getIdinfo());
         irlist.append_tail(newir);
     } else {
-        ASSERT0(ir->is_pr());
+        PRNO prno_old = PRNO_UNDEF;
+        if (ir->is_const()) {
+            //GCOVR_EXCL_START
+            IR * save_const = m_irmgr->buildStprFromConst(
+                m_rg->dupIRTree(ir), ir->getType());
+            irlist.append_tail(save_const);
+            prno_old = save_const->getPrno();
+            //GCOVR_EXCL_STOP
+        } else {
+            prno_old = ir->getPrno();
+        }
         //Pass register.
         //A new prno should be built here bacause when a register is passed
         //as two params, prno and spill var correspond one-to-one.
         //e.g: call func ($0, $0);
         prno = m_irmgr->buildPrno(tp);
-        IR * newir = m_irmgr->buildMove(prno, ir->getPrno(), tp);
+        IR * newir = m_irmgr->buildMove(prno, prno_old, tp);
         irlist.append_tail(newir);
     }
 
@@ -475,22 +482,19 @@ void ArgPasser::processArgOrParamWithMCType(MOD IR *& param,
 }
 
 
-Var * ArgPasser::getCalleeFormalParamVar(IR const* ir, UINT position)
+Var const* ArgPasser::getCalleeFormalParamVar(IR const* ir, UINT position)
 {
-    ASSERT0(ir);
+    ASSERT0(ir && ir->isCallStmt());
 
     //[TODO] Currently, the function definition corresponding to ICALL cannot
     //       be obtained, and we need to wait for the support of llvm-pcx or
     //       some other ways.
-    Region * callee_region = !ir->is_call() ? nullptr :
-        m_rg->getRegionMgr()->getRegion(CALL_idinfo(ir));
+    if (ir->is_icall()) { return nullptr; }
 
-    if (callee_region == nullptr ||
-        !m_rg_param_mgr->haveCollected(callee_region)) {
-        return nullptr;
-    }
+    Region * callee_region = m_rg->getRegionMgr()->getRegion(CALL_idinfo(ir));
 
-    Var * var = m_rg_param_mgr->getRegionParam(callee_region, position);
+    if (callee_region == nullptr) { return nullptr; }
+    Var const* var = callee_region->findFormalParam(position);
     return var != nullptr && var->is_mc() ? var : nullptr;
 }
 
@@ -512,8 +516,8 @@ void ArgPasser::processArgument(MOD IRBB * irbb,
     UINT position = 0; //Arguments index.
     for (IR * arg = CALL_arg_list(ir); arg != nullptr; arg = arg->get_next()) {
         IR * curarg = arg;
-        Var * arg_var = nullptr;
-        Var * formal_parameter_var = nullptr;
+        Var const* arg_var = nullptr;
+        Var const* formal_parameter_var = nullptr;
 
         //Whether argument or formal parameter has type MC.
         if (arg->is_ld() || arg->is_lda()) {
@@ -644,8 +648,7 @@ void ArgPasser::processFormalReturnParam(OUT IRList & irlist, IR * ir)
     ASSERT0(ir->hasIdinfo());
 
     if (!ir->getIdinfo()->is_mc()) {
-        xoc::PRNO prno = m_irmgr->buildPrno(ir->getType());
-        m_lsra->getDedicatedMgr().add(prno, reg);
+        PRNO prno = m_lsra->buildPrnoAndSetReg(ir->getType(), reg);
         IR * newir = m_irmgr->buildStorePR(prno, ir->getType(), ir->getRHS());
         irlist.append_tail(newir);
         return;
@@ -742,7 +745,7 @@ void ArgPasser::appendIRToGetStartAddressOfParamsInEntryFunc(OUT PRNO & prno)
     IRBB * bb = m_rg->getCFG()->getEntry();
     Type const* tp = m_tm->getTargMachRegisterType();
 
-    PRNO prno_dedicated = m_lsra->buildPrnoDedicated(
+    PRNO prno_dedicated = m_lsra->buildPrnoAndSetReg(
         tp, m_lsra->getParamScalarStart());
     prno = m_irmgr->buildPrno(tp);
     IR * ir = m_irmgr->buildMove(prno, prno_dedicated, tp);
@@ -866,8 +869,37 @@ void ArgPasser::preProcessFormalParam(OptCtx & oc)
 {
     initRegBindInfo();
 
-    List<xoc::Var const*> param_list;
-    m_rg->findFormalParam(param_list, true);
+    ConstVarList param_list;
+
+    //If the function call has a return value and its type is not MC,
+    //no preprocessing is needed.
+    //e.g:
+    //
+    //CASE1: No return value.
+    //  C Syntax:
+    //      void foo(a);
+    //  Call IR:
+    //      call 'foo'  id:46     <- IR type is ANY.
+    //          $1:u64 arg0 id:21
+    //
+    //CASE1: Return type is simplex.
+    //  C Syntax:
+    //      int foo(a);
+    //  Call IR:
+    //      $29:u64 = call 'foo'  id:46
+    //          $1:u64 arg0 id:21
+    //
+    //CASE2: Return type is struct.
+    //  C Syntax:
+    //      struct S foo(a);
+    //  Call IR:
+    //      $15:mc<16> = call 'foo'  id:46
+    //          $1:u64 arg0 id:21
+    //          lda:*<16>:storage_space(stack) 'struct1' arg1
+    //
+    //When the return type is MC, the return value address needs to
+    //be passed using a parameter register.
+    findAndSetFormalParam(param_list);
 
     if (m_rg->getRegionVar() != nullptr &&
         m_rg->getRegionVar()->is_entry()) {
@@ -897,7 +929,7 @@ void ArgPasser::preProcessFormalParam(OptCtx & oc)
             m_tm->getPointerType(1) : v->getType();
 
         PRNO tgt_prno = m_irmgr->buildPrno(type);
-        PRNO src_prno = m_lsra->buildPrnoDedicated(type, reg);
+        PRNO src_prno = m_lsra->buildPrnoAndSetReg(type, reg);
 
         //NOTE: The generated IR needs to be inserted after the entry bb,
         //otherwise it will cause the register to be used incorrectly.
@@ -913,39 +945,6 @@ void ArgPasser::preProcessFormalParam(OptCtx & oc)
         new_bb->getIRList().append_tail(ir);
 
         m_var2prno.set(v, tgt_prno);
-        if (reg != REG_UNDEF) { m_lsra->setReg(tgt_prno, reg); }
-    }
-}
-
-
-void ArgPasser::preProcessFormalParamCallee()
-{
-    ASSERT0(m_rg->getBBList() && m_rg->getRegionMgr());
-    BBList * bblist = m_rg->getBBList();
-    BBListIter bbit;
-
-    //Process formal parameter of callee.
-    for (IRBB * bb = bblist->get_head(&bbit); bb != nullptr;
-         bb = bblist->get_next(&bbit)) {
-
-        for (IR * ir = bb->getIRList().get_head(); ir != nullptr;
-             ir = bb->getIRList().get_next()) {
-
-            //[TODO] Currently, only call operations will be collected. We will
-            //       need to wait until llvm-pcx supports icall operations.
-            if (!ir->is_call()) { continue; }
-
-            ASSERT0(CALL_idinfo(ir));
-            Region * callee_region =
-                m_rg->getRegionMgr()->getRegion(CALL_idinfo(ir));
-
-            //Already collected.
-            if (callee_region == nullptr) { continue; }
-
-            List<Var const*> param_lst;
-            callee_region->findFormalParam(param_lst, true);
-            m_rg_param_mgr->setRegionParam(callee_region, param_lst);
-        }
     }
 }
 
@@ -959,14 +958,12 @@ void ArgPasser::processIRUsedFormalParam(OptCtx & oc)
     BBListIter bbit;
 
     preProcessFormalParam(oc);
-    preProcessFormalParamCallee();
 
     //Process formal parameter.
+    IRList new_ir_list;
     for (IRBB * bb = bblist->get_head(&bbit); bb != nullptr;
          bb = bblist->get_next(&bbit)) {
-
-        List<IR*> new_ir_list;
-
+        new_ir_list.clean();
         for (IR * ir = bb->getIRList().get_head(); ir != nullptr;
              ir = bb->getIRList().get_next()) {
             //load.param.u32 $0, [param0];
@@ -993,19 +990,17 @@ void ArgPasser::processIRUsedFormalParam(OptCtx & oc)
 void ArgPasser::buildTargetAddressForCall(OUT IRList & irlist, IR * ir)
 {
     ASSERT0(ir->isCallStmt());
-
     Type const* tp = m_tm->getTargMachRegisterType();
-    PRNO call_prno = m_lsra->buildPrnoDedicated(tp, m_lsra->getTA());
-
     if (ir->is_call()) {
         if (!isArgPasserExternalCallNeedLda()) { return; }
+        PRNO call_prno = m_lsra->buildPrnoAndSetReg(tp, m_lsra->getTA());
         IR * call_addr = m_irmgr->buildLoadAddrOfVar(call_prno,
                                                      ir->getIdinfo());
         irlist.append_tail(call_addr);
         return;
     }
-
     ASSERT0(ir->is_icall() && ICALL_callee(ir)->getPrno() != PRNO_UNDEF);
+    PRNO call_prno = m_lsra->buildPrnoAndSetReg(tp, m_lsra->getTA());
     IR * stpr = m_irmgr->buildMove(call_prno, ICALL_callee(ir)->getPrno(), tp);
     irlist.append_tail(stpr);
 }
@@ -1017,12 +1012,12 @@ void ArgPasser::processCallStmt()
     //value of the call instruction to the register.
     BBList * bblist = m_rg->getBBList();
     BBListIter bbit;
-
+    IRList new_ir_list;
+    IRList ir_list_each_call;
     for (IRBB * bb = bblist->get_head(&bbit); bb != nullptr;
          bb = bblist->get_next(&bbit)) {
-
-        List<IR*> new_ir_list;
-        List<IR*> ir_list_each_call;
+        new_ir_list.clean();
+        ir_list_each_call.clean();
         for (IR * ir = bb->getIRList().get_head(); ir != nullptr;
              ir = bb->getIRList().get_next()) {
 
@@ -1076,6 +1071,31 @@ bool ArgPasser::dump() const
 }
 
 
+void ArgPasser::findAndSetFormalParam(OUT ConstVarList & paramlst)
+{
+    ConstVarList const* lst = m_rg->findAndRecordFormalParamList(true);
+    ASSERT0(lst != nullptr);
+
+    paramlst.copy(*const_cast<ConstVarList*>(lst));
+    if (paramlst.get_elem_count() == 0) { return; }
+
+    xcom::List<IRBB*> * bblist = m_rg->getCFG()->getExitList();
+    xcom::List<IRBB*>::Iter bbit;
+    for (IRBB * bb = bblist->get_tail(&bbit); bb != nullptr;
+         bb = bblist->get_prev(&bbit)) {
+        ASSERT0(bb->is_exit());
+        for (IR * ir = bb->getIRList().get_tail(); ir != nullptr;
+             ir = bb->getIRList().get_prev()) {
+            if (isStoreFormalParam(ir) && !ir->getIdinfo()->is_mc()) {
+                ASSERT0(ir->getIdinfo() == paramlst.get_tail());
+                paramlst.remove_tail();
+                return;
+            }
+        }
+    }
+}
+
+
 void ArgPasser::splitBBIfNeeded(OptCtx & oc)
 {
     //Split the BBs that are inserted with IRs after the call statement.
@@ -1088,6 +1108,7 @@ void ArgPasser::splitBBIfNeeded(OptCtx & oc)
 
 bool ArgPasser::perform(OptCtx & oc)
 {
+    START_TIMER(t, getPassName());
     m_lsra = (LinearScanRA*)m_rg->getPassMgr()->registerPass(
         PASS_LINEAR_SCAN_RA);
     ASSERT0(m_lsra);
@@ -1100,6 +1121,9 @@ bool ArgPasser::perform(OptCtx & oc)
     processCallStmt();
     splitBBIfNeeded(oc);
     oc.setInvalidDom(); //CFG has been modified.
+    oc.setInvalidLoopInfo();
+    set_valid(true);
+    END_TIMER(t, getPassName());
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpArgPasser()) {
         dump();
     }

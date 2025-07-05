@@ -37,6 +37,9 @@ author: Su Zhenyu
 namespace xoc {
 
 class CfsMgr;
+class IVR;
+class GVN;
+class ActMgr;
 
 #define MAX_SIMP_WORD_LEN  1
 
@@ -52,6 +55,7 @@ class CfsMgr;
 #define SIMP_lor_land(s) (s)->prop_top_down.s1.simp_logcial_or_and
 #define SIMP_lnot(s) (s)->prop_top_down.s1.simp_logcial_not
 #define SIMP_ild_ist(s) (s)->prop_top_down.s1.simp_ild_ist
+#define SIMP_atomic(s) (s)->prop_top_down.s1.simp_atomic
 #define SIMP_to_pr_mode(s) (s)->prop_top_down.s1.simp_to_pr_mode
 #define SIMP_array_to_pr_mode(s) (s)->prop_top_down.s1.simp_array_to_pr_mode
 #define SIMP_to_lowest_height(s) (s)->prop_top_down.s1.simp_to_lowest_height
@@ -61,7 +65,6 @@ class CfsMgr;
 #define SIMP_stmtlist(s) (s)->ir_stmt_list
 #define SIMP_break_label(s) (s)->break_label
 #define SIMP_continue_label(s) (s)->continue_label
-#define SIMP_optctx(s) (s)->optctx
 #define SIMP_changed(s) (s)->prop_bottom_up.s1.something_has_changed
 #define SIMP_need_recon_bblist(s) \
     (s)->prop_bottom_up.s1.need_to_reconstruct_bb_list
@@ -74,7 +77,8 @@ class CfsMgr;
 //The class represents the simplification behaviors.
 //Each behavior has an option corresponding to it.
 //Enable or disable options to control the related simplification.
-class SimpCtx {
+class SimpCtx : public PassCtx {
+    //THE CLASS ALLOWS COPY-CONSTRUCTOR.
 public:
     typedef UINT BitUnion;
     union {
@@ -93,6 +97,7 @@ public:
             BitUnion simp_logcial_or_and:1; //simplify LOR, LAND.
             BitUnion simp_logcial_not:1; //simplify LNOT.
             BitUnion simp_ild_ist:1; //simplify ILD and IST.
+            BitUnion simp_atomic:1; //simplify atomic operation.
 
             //Propagate info top down.
             //Simplify IR tree to the tree with lowest height,
@@ -189,16 +194,13 @@ public:
     //Record label info for context.
     LabelInfo const* break_label; //record the current LOOP/IF/SWITCH end label.
     LabelInfo const* continue_label; //record the current LOOP start label.
-    OptCtx const* optctx; //record current OptCtx for region.
 public:
-    SimpCtx(OptCtx const* oc) { init(); SIMP_optctx(this) = oc; }
-    SimpCtx(SimpCtx const& s)
+    SimpCtx(OptCtx * oc, ActMgr * am = nullptr);
+    SimpCtx(SimpCtx const& s) : PassCtx(s)
     {
         clean();
         copyTopDownFlag(s); //only copy topdown information.
     }
-
-    void init() { clean(); }
 
     //Append irs to current simplification context and
     //return back to up level.
@@ -216,7 +218,6 @@ public:
         prop_bottom_up.flag_value = 0;
         SIMP_stmtlist(this) = nullptr;
         SIMP_cfs_mgr(this) = nullptr;
-        SIMP_optctx(this) = nullptr;
         SIMP_break_label(this) = nullptr;
         SIMP_continue_label(this) = nullptr;
     }
@@ -230,8 +231,8 @@ public:
         SIMP_cfs_mgr(this) = SIMP_cfs_mgr(&c);
         SIMP_break_label(this) = SIMP_break_label(&c);
         SIMP_continue_label(this) = SIMP_continue_label(&c);
-        SIMP_optctx(this) = SIMP_optctx(&c);
         SIMP_stmtlist(this) = nullptr;
+        PassCtx::copy(c);
     }
 
     //Copy the actions which propagated bottom up
@@ -249,23 +250,12 @@ public:
         SIMP_need_rebuild_nonpr_du_chain(this) = false;
     }
 
+    void dump(Region const* rg) const;
+
     //Return the stmt list that recorded in the context.
     IR * getStmtList() { return SIMP_stmtlist(this); }
 
-    //Return the OptCtx that used in current region.
-    OptCtx const* getOptCtx() const { return SIMP_optctx(this); }
-
-    //Unify the actions which propagated bottom up
-    //during processing IR tree.
-    void unionBottomUpInfo(SimpCtx const& c)
-    {
-        SIMP_changed(this) |= SIMP_changed(&c);
-        SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
-        SIMP_need_rebuild_pr_du_chain(this) |=
-            SIMP_need_rebuild_pr_du_chain(&c);
-        SIMP_need_rebuild_nonpr_du_chain(this) |=
-            SIMP_need_rebuild_nonpr_du_chain(&c);
-    }
+    void init() { clean(); }
 
     //Return true if BB list need to be reconstructed.
     bool needReconstructBBList() const { return SIMP_need_recon_bblist(this); }
@@ -313,6 +303,9 @@ public:
     //Simplify IR_ARRAY to linear address computational stmt/expression.
     void setSimpArray() { SIMP_array(this) = true; }
 
+    //Simplify atomic operation.
+    void setSimpAtomic(bool flag) { SIMP_atomic(this) = flag; }
+
     //Simplify IR tree and reduce the tree height of IST/ILD to be lowest.
     void setSimpILdISt() { SIMP_ild_ist(this) = true; }
 
@@ -334,7 +327,7 @@ public:
     void setSimpToLowestHeight()
     {
         ASSERTN(SIMP_lor_land(this) && SIMP_lnot(this),
-               ("these operations should be lowered as well."));
+                ("these operations should be lowered as well."));
         SIMP_to_lowest_height(this) = true;
     }
 
@@ -359,13 +352,38 @@ public:
         setSimpToLowestHeight();
     }
 
-    void dump(Region * rg)
+    //Unify the actions which propagated bottom up
+    //during processing IR tree.
+    void unionBottomUpInfo(SimpCtx const& c)
     {
-        ASSERT0(rg);
-        note(rg, "\n==---- DUMP SimpCtx IR List ----==");
-        dumpIRList(ir_stmt_list, rg, nullptr);
+        SIMP_changed(this) |= SIMP_changed(&c);
+        SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
+        SIMP_need_rebuild_pr_du_chain(this) |=
+            SIMP_need_rebuild_pr_du_chain(&c);
+        SIMP_need_rebuild_nonpr_du_chain(this) |=
+            SIMP_need_rebuild_nonpr_du_chain(&c);
     }
 };
+
+
+//
+//START SimpCtxWrap
+//
+class SimpCtxWrap {
+protected:
+    SimpCtx * m_ctx;
+    IRSimp * m_simp;
+public:
+    SimpCtxWrap(OptCtx * oc, ActMgr * am, IRSimp * simp);
+    SimpCtxWrap(SimpCtxWrap const& src);
+    SimpCtxWrap(SimpCtx const& src, MOD IRSimp * simp);
+    ~SimpCtxWrap();
+
+    //Return the reference to SimpCtx.
+    SimpCtx & ctx() { return *m_ctx; }
+    SimpCtx & ctx() const { return *m_ctx; }
+};
+//END SimpCtxWrap
 
 
 //This pass is very important to multiple level IR compiler. It simplifies or
@@ -388,16 +406,42 @@ public:
 //     stpr $y = ld b
 //     stpr $1 = add ($x, $y)
 class IRSimp : public Pass {
+    friend class SimpCtxWrap;
     COPY_CONSTRUCTOR(IRSimp);
-private:
+protected:
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
+    MDMgr * m_mdmgr;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
 protected:
+    virtual SimpCtx * allocSimpCtx(OptCtx * oc, ActMgr * am = nullptr)
+    { return new SimpCtx(oc, am); }
+
+    virtual SimpCtx * copySimpCtx(SimpCtx const& src)
+    {
+        SimpCtx * newctx = allocSimpCtx(src.getOptCtx(), src.getActMgr());
+        newctx->copyTopDownFlag(src);
+        return newctx;
+    }
+
     //Some PRs do not carry dbx information, and this information needs to be
     //copied from the parent.
     void copyDbxFromParent(IR * ir);
+
+    //Free SimpCtx.
+    void freeSimpCtx(SimpCtx * ctx)
+    {
+        ASSERT0(ctx);
+        delete ctx;
+    }
+
+    //The function find and inserts a list of stmts before IR_CONTINUE.
+    //Return true if there are stmts inserted.
+    //stmtlist: a list of IR stmt that expected to insert before CONTINUE.
+    //irlist: a list of IR stmt that may contain some CONTINUE.
+    static bool insertStmtListBeforeContinue(
+        IR const* stmtlist, IR * irlist, Region * rg);
 
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
@@ -431,12 +475,11 @@ protected:
         return false;
     }
 
-    //Return true if we need to simplify given ist-ild pair like:
-    //  IST(ILD(...), ...)
-    //Parameter 'ir' should be an IST.
+    //Return true if IST/ILD need to be simplified.
+    //Parameter 'ir' should be an IST/ILD.
     virtual bool isSimplifyIstIldNeeded(IR const* ir, SimpCtx const* ctx) const
     {
-        ASSERT0(ir->is_ist());
+        ASSERT0(ir && (ir->is_ist() || ir->is_ild()));
         return SIMP_ild_ist(ctx);
     }
 
@@ -452,18 +495,33 @@ protected:
     //Note the function only handle ir's RHS, return NULL if there is no
     //stmt generated.
     virtual IR * simplifyRHSInPRMode(IR * ir, SimpCtx * ctx);
-    void simplifyStoreArrayRHS(IR * ir, OUT IR ** ret_list,
-                               OUT IR ** last, SimpCtx * ctx);
-    IR * simplifyStoreArrayAddr(IR * ir, OUT IR ** ret_list,
-                                OUT IR ** last, SimpCtx * ctx);
-    IR * simplifyStoreArrayLHS(IR * ir, OUT IR ** ret_list,
-                               OUT IR ** last, SimpCtx * ctx);
+    void simplifyStoreArrayRHS(
+        IR * ir, OUT IR ** ret_list, OUT IR ** last, SimpCtx * ctx);
+    IR * simplifyStoreArrayAddr(
+        IR * ir, OUT IR ** ret_list, OUT IR ** last, SimpCtx * ctx);
+    IR * simplifyStoreArrayLHS(
+        IR * ir, OUT IR ** ret_list, OUT IR ** last, SimpCtx * ctx);
     IR * simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
-    bool simplifyCallArgList(IR * ir, IR ** ret_list, IR ** last,
-                             SimpCtx * ctx);
+    bool simplifyCallArgList(
+        IR * ir, IR ** ret_list, IR ** last, SimpCtx * ctx);
+    IR * simplifyDoLoopSelfInit(IR * ir, IR * iv, SimpCtx * ctx);
+    IR * simplifyDoLoopSelfDet(IR * ir, LabelInfo const* endl, SimpCtx * ctx);
+    IR * simplifyDoLoopSelfBody(
+        IR * ir, IR * iv, IR * det, LabelInfo const* stepl,
+        LabelInfo const* startl, LabelInfo const* endl, SimpCtx * ctx);
+    IR * simplifyWhileDoSelfDet(
+        IR * ir, LabelInfo const* endl, SimpCtx * ctx);
+    IR * simplifyWhileDoSelfBody(
+        IR * ir, IR * det, LabelInfo const* startl, LabelInfo const* endl,
+        SimpCtx * ctx);
+    IR * simplifyDoWhileSelfDet(
+        IR * ir, LabelInfo const* startl, SimpCtx * ctx);
+    IR * simplifyDoWhileSelfBody(
+        IR * ir, IR * det, LabelInfo const* startl, LabelInfo const* endl,
+        LabelInfo const* det_startl, SimpCtx * ctx);
     IR * simplifyAllKidsExpression(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx *)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
@@ -480,6 +538,7 @@ public:
     {
         m_tm = rg->getTypeMgr();
         m_irmgr = rg->getIRMgr();
+        m_mdmgr = rg->getMDMgr();
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
     }
@@ -489,6 +548,7 @@ public:
     { return "IR Simplification"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRSIMP; }
     IRMgr * getIRMgr() const { return m_irmgr; }
+    MDMgr * getMDMgr() const { return m_mdmgr; }
 
     //Series of helper functions to simplify
     //ir according to given specification.
@@ -535,20 +595,23 @@ public:
     virtual void simplifyBBlist(BBList * bbl, SimpCtx * ctx);
     virtual void simplifyIRList(SimpCtx * ctx);
     virtual IR * simplifyLogicalNot(IN IR * ir, SimpCtx * ctx);
-    virtual IR * simplifyLogicalOrAtFalsebr(IN IR * ir,
-                                            LabelInfo const* tgt_label);
-    virtual IR * simplifyLogicalOrAtTruebr(IN IR * ir,
-                                           LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalOrAtFalsebr(
+        IN IR * ir, LabelInfo const* tgt_label, SimpCtx * ctx);
+    virtual IR * simplifyLogicalOrAtTruebr(
+        IN IR * ir, LabelInfo const* tgt_label, SimpCtx * ctx);
     virtual IR * simplifyLogicalOr(IN IR * ir, SimpCtx * ctx);
-    virtual IR * simplifyLogicalAndAtTruebr(IN IR * ir,
-                                            LabelInfo const* tgt_label);
-    virtual IR * simplifyLogicalAndAtFalsebr(IN IR * ir,
-                                             LabelInfo const* tgt_label);
+    virtual IR * simplifyLogicalAndAtTruebr(
+        IN IR * ir, LabelInfo const* tgt_label, SimpCtx * ctx);
+    virtual IR * simplifyLogicalAndAtFalsebr(
+        IN IR * ir, LabelInfo const* tgt_label, SimpCtx * ctx);
     virtual IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx);
     IR * simplifyLogicalAndOrInDet(IN IR * ir, SimpCtx * ctx);
     IR * simplifyLogicalNotInDet(IN IR * ir, SimpCtx * ctx);
     IR * simplifyRelationInDet(IN IR * ir, SimpCtx * ctx);
     virtual IR * simplifyLogicalDet(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySetelemBase(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifySetelemVal(IR * ir, SimpCtx * ctx);
+    IR * simplifySetelemOfset(IR * ir, SimpCtx * ctx);
 
     //Simplify ir to PR mode.
     virtual IR * simplifyToPR(IR * ir, SimpCtx * ctx);

@@ -286,8 +286,7 @@ template <class T> class QuickSort {
             T v = data.get(i);
             if (GreatThan(v, key_val)) {
                 //Swapping
-                data.set(key_idx, v);
-                data.set(i, key_val);
+                swap(data, key_idx, v, i, key_val);
                 key_idx = i;
                 left_start_idx = key_idx + 1;
                 goto FROM_RIGHT;
@@ -301,8 +300,7 @@ template <class T> class QuickSort {
             T v = data.get(j);
             if (LessThan(v, key_val)) {
                 //Swapping
-                data.set(key_idx, v);
-                data.set(j, key_val);
+                swap(data, key_idx, v, j, key_val);
                 key_idx = j;
                 right_start_idx = key_idx - 1;
                 goto FROM_LEFT;
@@ -329,6 +327,13 @@ protected:
     //The function is necessary to sorting.
     //Return true if 'a' < 'b'.
     virtual bool LessThan(T a, T b) const { return a < b; }
+
+    //Swap two elements in 'data'.
+    void swap(Vector<T> & data, UINT idx1, T v1, UINT idx2, T v2)
+    {
+        data.set(idx1, v1);
+        data.set(idx2, v2);
+    }
 public:
     virtual ~QuickSort() {}
 

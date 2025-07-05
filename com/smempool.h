@@ -97,6 +97,9 @@ INT smpoolDelete(SMemPool * handle);
 void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx,
                                 size_t grow_size = 0);
 void * smpoolMalloc(size_t size, SMemPool * handle, size_t grow_size = 0);
+
+//The function allocates constant size of memory according to the element size.
+//elem_size: the bytesize of element or a mutiple of the element size.
 void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler);
 
 //Get whole pool size with byte

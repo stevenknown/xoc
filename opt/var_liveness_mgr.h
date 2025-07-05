@@ -34,51 +34,17 @@ author: Su Zhenyu
 #ifndef __VAR_LIVENESS_MGR_H__
 #define __VAR_LIVENESS_MGR_H__
 
-#define LT_ID_UNDEF 0
-
 namespace xoc {
 
-typedef DefSBitSetCore VarLiveSet;
-typedef DefSEGIter VarLiveSetIter;
+typedef LiveSet VarLiveSet;
+typedef LiveSetIter VarLiveSetIter;
 
 //
 //START VarLivenessMgr
 //
-class VarLivenessMgr {
+class VarLivenessMgr : public LivenessMgr {
     COPY_CONSTRUCTOR(VarLivenessMgr);
 protected:
-    bool m_keep_local; //true to retain local-set info when perform() ends.
-    Region * m_rg;
-    Vector<VarLiveSet*> m_def;
-    Vector<VarLiveSet*> m_use;
-    Vector<VarLiveSet*> m_livein;
-    Vector<VarLiveSet*> m_liveout;
-    DefMiscBitSetMgr m_sbs_mgr;
-protected:
-    void cleanLocal();
-    void cleanGlobal();
-    void computeExp(IR const* stmt, MOD PRLiveSet * use, MOD PRLiveSet * gen);
-    void computeStmt(IR const* stmt, MOD VarLiveSet * use,
-                     MOD VarLiveSet * gen);
-
-    VarLiveSet * gen_liveout(UINT bbid);
-    VarLiveSet * gen_livein(UINT bbid);
-    VarLiveSet * gen_def(UINT bbid);
-    VarLiveSet * gen_use(UINT bbid);
-
-    void processSTPR(IR const* x, ConstIRIter & it,
-                     MOD VarLiveSet * use,
-                     MOD VarLiveSet * gen);
-public:
-    VarLivenessMgr(Region * rg) : m_rg(rg) { m_keep_local = false; }
-    ~VarLivenessMgr() { clean(); }
-
-    void add_liveout(IRBB const* bb, PRNO prno)
-    { gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
-    void add_livein(IRBB const* bb, PRNO prno)
-    { gen_livein(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
-
-    void clean() { cleanGlobal(); cleanLocal(); }
     virtual bool canBeStmtCand(IR const* stmt)
     {
         ASSERT0(stmt && stmt->is_stmt() && stmt->hasIdinfo());
@@ -91,71 +57,14 @@ public:
         ASSERT0(ir->hasIdinfo());
         return true;
     }
-
-    void computeLocal(IRBB const* bb);
-    void computeLocal(BBList const& bblst);
-    void computeGlobal(IRCFG const* cfg);
-
-    //The function dump pass relative information.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    bool dump() const;
-
-    //There is a problem that entry_bb will be attached redundant LiveIn and
-    //LiveOut info after completed liveness computing via the function of
-    //'computeGlobal'. The main reason for this phenomenon is that there is
-    //loop edge in the CFG. LiveIn and LiveOut info will be flowed back into
-    //entry_bb along with the loop edge. Thus it needs to remove redudant
-    //LiveIn and LiveOut info from entry_bb and it's successor node until
-    //reached a node with more than one degree.
-    void eliminateRedundantLivenessInEntryBB(IRCFG const* cfg);
-
+    virtual void computeExpImpl(
+        IR const* exp, MOD LiveSet * use, MOD LiveSet * gen) override;
+    virtual void computeStmtImpl(
+        IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen) override;
+public:
+    VarLivenessMgr(Region * rg) : LivenessMgr(rg) {}
+    ~VarLivenessMgr() { clean(); }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
-    VarLiveSet * get_def(UINT bbid) const { return m_def.get(bbid); }
-    VarLiveSet * get_use(UINT bbid) const { return m_use.get(bbid); }
-    VarLiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
-    VarLiveSet * get_liveout(UINT bbid) const
-    { return m_liveout.get(bbid); }
-    DefMiscBitSetMgr & getSBSMgr() { return m_sbs_mgr; }
-    Region * getRegion() const { return m_rg; }
-
-    //By default, local set is initialized by computeLocal().
-    void initSet(BBList const& bblst);
-    void init_livein(UINT bbid);
-    bool is_livein(UINT bbid, PRNO prno) const
-    {
-        ASSERTN(get_livein(bbid), ("miss liveness info"));
-        return get_livein(bbid)->is_contain(prno);
-    }
-    bool is_liveout(UINT bbid, PRNO prno) const
-    {
-        ASSERTN(get_liveout(bbid), ("miss liveness info"));
-        return get_liveout(bbid)->is_contain(prno);
-    }
-
-    //Keep local-set information.
-    void set_keep_local(bool keep) { m_keep_local = (BYTE)keep; }
-    void set_livein(UINT bbid, PRLiveSet const* live_set)
-    {
-        ASSERT0(live_set);
-        ASSERT0(bbid != BBID_UNDEF);
-        PRLiveSet * livein = gen_livein(bbid);
-        livein->copy(*live_set, m_sbs_mgr);
-    }
-    void set_liveout(UINT bbid, PRLiveSet const* live_set)
-    {
-        ASSERT0(live_set);
-        ASSERT0(bbid != BBID_UNDEF);
-        PRLiveSet * liveout = gen_liveout(bbid);
-        liveout->copy(*live_set, m_sbs_mgr);
-    }
-
-    //Set the liveness info for an empty BB.
-    //empty_bb: the empty BB.
-    //from: the predecessor BB of the empty_BB.
-    void setLivenessForEmptyBB(IRBB const* empty_bb, IRBB const* from);
-
-    bool perform();
 };
 //END VarLivenessMgr
 

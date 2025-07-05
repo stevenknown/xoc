@@ -51,11 +51,17 @@ namespace mach {
 #define IMCTX_int_imm(cont) ((cont)->u1.int_imm)
 #define IMCTX_label_num(cont) ((cont)->m_label_num)
 #define IMCTX_cfi_num(cont) ((cont)->m_cfi_num)
+#define IMCTX_is_build(cont) ((cont)->m_is_build)
 class IMCtx {
 public:
+    //Is used for instruction scheduling. If it is false, it only
+    //returns the MI code without actually building the MI.
+    bool m_is_build;
+
     //Propagate info bottom up.
     //Used as a result, and record MI_CODE of result if exist.
     MI_CODE micode;
+
     union {
         //Propagate info top down.
         //Used as input parameter, record total size of real
@@ -96,6 +102,7 @@ public:
         micode = MI_UNDEF;
         m_label_num = 0;
         m_cfi_num = 0;
+        m_is_build = true;
     }
     IMCtx(IMCtx const& src) { clean(); copy_topdown(src); }
     IMCtx const& operator = (IMCtx const&);
@@ -113,13 +120,8 @@ public:
         u2 = src.u2;
     }
     virtual void copy_bottomup(IMCtx const& src)
-    {
-        set_micode(src.get_micode());
-    }
-    void clean_bottomup()
-    {
-        set_micode(MI_UNDEF);
-    }
+    { set_micode(src.get_micode()); }
+    void clean_bottomup() { set_micode(MI_UNDEF); }
 
     UINT getMemByteSize() const { return IMCTX_mem_byte_size(this); }
     MI_CODE get_micode() const { return micode; }
@@ -136,160 +138,170 @@ protected:
     TypeMgr * m_tm; //Data manager.
     MInstMgr * m_mimgr;
     elf::ELFMgr * m_em;
-    RecycMIListMgr m_recyc_orlist_mgr;
+    RecycMIListMgr m_recyc_irlist_mgr;
 protected:
     void convertIRListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
     void convertIRBBListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
 
     //Load constant float value into register.
-    void convertLoadConstFP(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont);
+    void convertLoadConstFP(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Load constant integer value into register.
-    void convertLoadConstInt(HOST_INT constval, UINT constbytesize,
-                             bool is_signed, Dbx const* dbx,
-                             OUT RecycMIList & mis, MOD IMCtx * cont);
+    void convertLoadConstInt(
+        HOST_INT constval, UINT constbytesize, bool is_signed, Dbx const* dbx,
+        OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Load constant integer value into register.
-    void convertLoadConstInt(IR const* ir, OUT RecycMIList & mis,
-                             MOD IMCtx * cont);
+    void convertLoadConstInt(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Load constant boolean value into register.
-    void convertLoadConstBool(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont);
+    void convertLoadConstBool(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Load constant string address into register.
-    void convertLoadConstStr(IR const* ir, OUT RecycMIList & mis,
-                             MOD IMCtx * cont);
+    void convertLoadConstStr(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Load constant value into register.
-    void convertLoadConst(IR const* ir, OUT RecycMIList & mis,
-                          MOD IMCtx * cont);
+    void convertLoadConst(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //The function try extend loaded value to larger size when the loaded
     //value is passed through registers.
-    void tryExtendLoadValByMemSize(bool is_signed, Dbx const* dbx,
-                                   OUT RecycMIList & mis, MOD IMCtx * cont);
+    void tryExtendLoadValByMemSize(
+        bool is_signed, Dbx const* dbx, OUT RecycMIList & mis,
+        MOD IMCtx * cont);
 public:
     IR2MInst(Region * rg, MInstMgr * mgr, elf::ELFMgr * em);
     virtual ~IR2MInst() {}
 
-    virtual void convertLabel(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont);
-    virtual void convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
-                                MOD IMCtx * cont);
-    virtual void convertStorePR(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
+    virtual void convertLabel(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
+    virtual void convertBBLabel(
+        IRBB const* bb, OUT RecycMIList & mis, MOD IMCtx * cont);
+    virtual void convertStorePR(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertStoreVar(IR const* ir, OUT RecycMIList & mis,
-                                 MOD IMCtx * cont)
+    virtual void convertStoreVar(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertIStoreVar(IR const* ir, OUT RecycMIList & mis,
-                                  MOD IMCtx * cont)
+    virtual void convertIStoreVar(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertUnaryOp(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont);
-    virtual void convertBinaryOp(IR const* ir, OUT RecycMIList & mis,
-                                 MOD IMCtx * cont);
-    ///Generate compare operations and return the comparation result registers.
+    virtual void convertUnaryOp(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
+    virtual void convertBinaryOp(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
+
+    //Generate compare operations and return the comparation result registers.
     //The output registers in IMCtx are ResultSR,
     //TruePredicatedSR, FalsePredicatedSR.
     //The ResultSR record the boolean value of comparison of relation operation.
-    virtual void convertRelationOp(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont);
-    virtual void convertGoto(IR const* ir, OUT RecycMIList & mis,
-                             MOD IMCtx * cont)
+    //    e.g:
+    //        a - 1 > b + 2
+    //    =>
+    //        sr0 = a - 1
+    //        sr1 = b + 2
+    //        sr2 <- cmp.gt sr0, sr1
+    //        return sr2
+    //   e.g2:
+    //is_invert: true if generated inverted operation.
+    //  e.g: given a <= b, generate !(a > b)
+    virtual void convertRelationOp(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertIgoto(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+    virtual void convertGoto(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertTruebr(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont)
+    virtual void convertIgoto(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertFalsebr(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont);
-    virtual void convertReturn(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont)
+    virtual void convertTruebr(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertCall(IR const* ir, OUT RecycMIList & mis,
-                             MOD IMCtx * cont)
+    virtual void convertFalsebr(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
+    virtual void convertReturn(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertICall(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+    virtual void convertCall(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertExtract(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
+    virtual void convertICall(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     { ASSERTN(0, ("Target Dependent Code")); }
-    virtual void convertAdd(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertAdd(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_add(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertSub(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertSub(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_sub(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertDiv(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertDiv(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_div(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertMul(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertMul(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_mul(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertRem(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertRem(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_rem(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertMod(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertMod(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_mod(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
 
     //Logical AND
-    virtual void convertLogicalAnd(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont)
+    virtual void convertLogicalAnd(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_land(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
 
     //Logical OR
-    virtual void convertLogicalOr(IR const* ir, OUT RecycMIList & mis,
-                                  MOD IMCtx * cont)
+    virtual void convertLogicalOr(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_lor(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
 
     //Bitwise AND
-    virtual void convertBitAnd(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont)
+    virtual void convertBitAnd(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_band(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
 
     //Bitwise OR
-    virtual void convertBitOr(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+    virtual void convertBitOr(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_bor(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertXor(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertXor(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_xor(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
@@ -297,8 +309,8 @@ public:
 
     //Bitwise NOT.
     //e.g BNOT(0x0001) = 0xFFFE
-    virtual void convertBitNot(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont)
+    virtual void convertBitNot(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_bnot(), ("illegal ir"));
         convertUnaryOp(ir, mis, cont);
@@ -306,72 +318,65 @@ public:
 
     //Boolean logical not.
     //e.g LNOT(non-zero) = 0, LNOT(0) = 1
-    virtual void convertLogicalNot(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont)
+    virtual void convertLogicalNot(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_lnot(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertNeg(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+    virtual void convertNeg(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_neg(), ("illegal ir"));
         convertBinaryOp(ir, mis, cont);
     }
-    virtual void convertLT(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertLT(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_lt(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-    virtual void convertLE(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertLE(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_le(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-    virtual void convertGT(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertGT(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_gt(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-    virtual void convertGE(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertGE(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_ge(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-    virtual void convertEQ(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertEQ(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir->is_eq(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-
-    virtual void convertNE(IR const* ir, OUT RecycMIList & mis,
-                           MOD IMCtx * cont)
+    virtual void convertNE(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
         ASSERTN(ir && ir->is_ne(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
     //virtual void convertRegion(IR const* ir, OUT RecycMIList & mis,
     //                           MOD IMCtx * cont);
-    virtual void convertSetElem(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
-    {
-        ASSERTN(0, ("Target Dependent Code"));
-    }
-    virtual void convertGetElem(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
-    {
-        ASSERTN(0, ("Target Dependent Code"));
-    }
-    virtual void convertExtStmt(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
-    {
-        ASSERTN(0, ("Target Dependent Code"));
-    }
+    virtual void convertSetElem(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void convertGetElem(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void convertExtStmt(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
+    { ASSERTN(0, ("Target Dependent Code")); }
 
     //The following are operations for converting
     //DWARF-related instructions to MI.
@@ -379,24 +384,24 @@ public:
     //The basic format for both IR and MI is .cfi_def_cfa $reg,offset,
     //with the difference being the need to obtain
     //the PC at the MI layer, requiring knowledge of the current CFI's PC.
-    virtual void convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
-                                  MOD IMCtx * cont);
+    virtual void convertCFIDefCfa(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Similar to the above, its format is .cfi_same_value $reg.
-    virtual void convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
-                                     MOD IMCtx * cont);
+    virtual void convertCFISameValue(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Similar to the above, its format is .cfi_offset $reg ,offset.
-    virtual void convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
-                                  MOD IMCtx * cont);
+    virtual void convertCFIOffset(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Similar to the above, its format is .cfi_restore $reg.
-    virtual void convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont);
+    virtual void convertCFIRestore(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     //Similar to the above, its format is .cfi_def_cfa_offset num.
-    virtual void convertCFICfaOffset(IR const* ir, OUT RecycMIList & mis,
-                                     MOD IMCtx * cont);
+    virtual void convertCFICfaOffset(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
 
     void copyDbx(MInst * mi, IR const* ir, DbxMgr * dbx_mgr)
     {
@@ -411,7 +416,7 @@ public:
 
     MInstMgr * getMIMgr() const { return m_mimgr; }
     TypeMgr const* getTypeMgr() const { return m_tm; }
-    RecycMIListMgr * getRecycMIListMgr() { return &m_recyc_orlist_mgr; }
+    RecycMIListMgr & getRecycMIListMgr() { return m_recyc_irlist_mgr; }
     Region * getRegion() { return m_rg; }
     DbxMgr * getDbxMgr()
     {

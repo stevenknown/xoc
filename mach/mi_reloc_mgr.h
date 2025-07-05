@@ -37,6 +37,7 @@ namespace xoc { class Var2OffsetMgr; }
 namespace mach {
 
 typedef xcom::TMap<xoc::LabelInfo const*, TMWORD> Label2Offset;
+typedef xcom::TMap<MInst *, TMWORD> MI2JumpOffset;
 
 //This class is used to perform relocation for machine instructions.
 class MIRelocMgr {
@@ -48,6 +49,7 @@ protected:
     Var2OffsetMgr * m_var2offset;
     TMWORD m_code_align;
     TMWORD m_data_align;
+    MI2JumpOffset m_jump_offset_map;
     bool m_has_ir_reloc;
 protected:
     void computeCodeOffset(MOD MIList & milst,
@@ -73,6 +75,9 @@ public:
     void computeDataOffset(MOD MIList & milst,
                            Label2Offset const& lab2off);
 
+    //Get jump offset of br inst.
+    TMWORD getJumpOffset(MInst const* mi) const;
+
     TMWORD getCodeAlign() const { return m_code_align; }
     TMWORD getDataAlign() const { return m_data_align; }
 
@@ -88,14 +93,6 @@ public:
                                   MInst * cur) const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
     //GCOVR_EXCL_STOP
-
-    //Get the relocation type of given machine instruction code.
-    virtual UINT getMInstRelocType(MI_CODE c)
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-
-    //Set the data or code byte offset according to relocation type.
-    virtual void setValueViaRelocType(OUT MInst * mi, TMWORD offset)
-    { ASSERTN(0, ("Target Dependent Code")); }
 
     //Set the data or code byte offset according to mi code.
     virtual void setValueViaMICode(OUT MInst * mi, TMWORD offset)

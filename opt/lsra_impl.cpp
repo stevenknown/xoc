@@ -30,9 +30,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define MAX_PHY_REG_NUM 128
+
+//If this flag is true, the verify function of RegisterVerify will be executed.
+//Only used during the debugging phase.
+static bool g_enable_lsra_over_strict = false;
+
 static void dumpInsertMove(LSRAImpl & lsra, IRBB const* mvbb, IR const* mv,
                            CHAR const* format, ...)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     xcom::StrBuf buf(64);
     va_list args;
     va_start(args, format);
@@ -47,6 +54,7 @@ static void dumpInsertMove(LSRAImpl & lsra, IRBB const* mvbb, IR const* mv,
 static void dumpInsertBB(LSRAImpl & lsra, IRBB const* from, IRBB const* to,
                          IRBB const* newbb, CHAR const* format, ...)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     xcom::StrBuf buf(64);
     va_list args;
     va_start(args, format);
@@ -62,6 +70,7 @@ static void dumpSplitTwo(LSRAImpl & lsra, LifeTime const* lt,
                          LifeTime const* newlt,
                          Pos lt_end_pos, Pos newlt_start_pos)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     lsra.getActMgr().dump(
         "SPLIT:$%u into $%u and $%u, $%u end at pos:%u, $%u start from pos:%u",
         lt->getPrno(), lt->getPrno(), newlt->getPrno(),
@@ -94,6 +103,7 @@ static void dumpSpill(LSRAImpl & lsra, IR const* spill, Reg reg,
 static void dumpSpill(LSRAImpl & lsra, IR const* spill, LifeTime const* lt,
                       IR const* marker, bool before)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     lsra.getActMgr().dump(
         "SPILL:insert spill ir id:%u %s ir id:%u while splitting $%u",
         spill->id(), before ? "before" : "after",
@@ -125,6 +135,7 @@ static void dumpReload(LSRAImpl & lsra, IR const* reload, Reg reg,
 static void dumpReload(LSRAImpl & lsra, IR const* reload, LifeTime const* lt,
                        LifeTime const* newlt, IR const* marker)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     lsra.getActMgr().dump(
         "RELOAD:insert reload ir id:%u before ir id:%u "
         "while splitting $%u, $%u rename to $%u",
@@ -157,6 +168,7 @@ static void dumpRemat(LSRAImpl & lsra, IR const* remat, Reg reg,
 static void dumpRemat(LSRAImpl & lsra, IR const* remat, LifeTime const* lt,
                       LifeTime const* newlt, IR const* marker)
 {
+    if (!lsra.getRegion()->isLogMgrInit()) { return; }
     lsra.getActMgr().dump(
         "RELOAD:insert remat ir id:%u before ir id:%u "
         "while splitting $%u, $%u rename to $%u",
@@ -267,16 +279,522 @@ static void genInconsistPairRemat(OUT InConsistPair * pair, UINT from, UINT to,
 }
 
 
-static bool isContainDef(LifeTime * lt)
+//
+//START LatchBBReorder
+//
+//This class shall reorder the MOV IRs inserted in the latch BB due to
+//the USE dependencies. Normally, the data in the physical-register should
+//be used first before the data in physical-register is modified.
+//
+//There are two kinds of USE dependency problems:
+//1. Normal dependency problem.
+//2. Cyclic dependency problem.
+//
+//For example:
+//  The group of MOV IRs are in the order below:
+//  r10 <- mov r8    #S1
+//   r7 <- mov r10   #S2
+//   r3 <- mov r5    #S3
+//   r4 <- mov r3    #S4
+//   r5 <- mov r4    #S5
+//  1. r10 in #S1 and #S2 are normal dependency problem.
+//     r10 will be wrote to r7 in #S2, but before the original data is used,
+//     r10 is changed to the data of r8 in #S1, this is not what we expected,
+//     the correct order for #S1 and #S2 should ensure #S2 before #S1, which
+//     means the data of r10 is moved to r7 before it is wroten by r8.
+//
+//  2. r3, r4 and r5 in #S3, #S4 and #S5 are cyclic dependency problem.
+//     Firstly, we want to move r5 to r3 in #S3, but before change the r3, we
+//     have to move r3 to r4 in #S4, this is a basic rule, and then apply the
+//     same rule for r4, we find it needs to move r4 to r5 before #S4 is
+//     executed, so now, we can find these dependencies look like a "cycle",
+//     they dependents each other.
+//
+//This class will implement a reorder algorithm to resolve the two kinds
+//of USE dependency problem. First, distinguish the normal dependency MOV IRs
+//and reorder these MOV IRs. and then process the second cyclic dependency
+//problem for the remaining MOV IRs.
+//
+//The reorder algorithm should include two parts:
+//Part 1. Process normal dependency problem.
+//  we consider the USE count of destination registers, if the USE count
+//  is zero, that means this MOV IR has no dependency with other MOV IRs, we
+//  can reorder these MOV IRs at the beginning of the group of IRs. At the same
+//  time the USE count of the source registers should be decremented by 1.
+//  Algo steps:
+//   Go through all the dst-physical-register by the index, assume 'r' is the
+//   current index:
+//     1. If the USE count of dst-physical-register is more than 1, try the
+//        next dst-physical-register.
+//     2. If the USE count of dst-physical-register is zero:
+//        2.1. place the MOV IR which assigned to this dst-physical-register
+//             in the new IR list.
+//        2.2. Decrement the use count of src-physical-register by 1 placed in
+//             the step 2.1.
+//        2.3 If the idex of src-physical-register is less than 'r', and the
+//            use count of src-physical-register is zero, and we update 'r'
+//            to the index of src-physical-register, since the use count of
+//            src-physical-register is zero, there is no MOV IRs in the group
+//            are dependenct with it, so we have to go back to try to check
+//            the condition in step 1 for the possible new chance for other
+//            MOV IRs.
+//  e.g.:
+//  r1 <- mov r6                   r1 <- mov r6
+//  r6 <- mov r3   after reorder   r5 <- mov r2
+//  r5 <- mov r2   ------------->  r2 <- mov r7
+//  r2 <- mov r7                   r6 <- mov r3
+//  r7 <- mov r9                   r7 <- mov r9
+//
+//Part 2. Process cyclic dependency problem.
+//  After the processing of part 1, we only have the MOVs IR with
+//  "cycles" left, that means we have to resolve these permute MOV
+//  instructions.
+//  We can use the example mentioned above, there are three MOV IRs no handled
+//  at this point:
+//      r3 <- mov r5
+//      r4 <- mov r3
+//      r5 <- mov r4
+//    Assume the original data in the registers before the moving operations
+//    are as below:
+//        r3 = 'a'
+//        r4 = 'b'
+//        r5 = 'c'
+//    The expected final data in the registers after the moving operations
+//    are as below:
+//        r3 = 'c'
+//        r4 = 'a'
+//        r5 = 'b'
+//
+//  Algorithm for reordering a cyclic MOV group:
+//    1. Use any MOV IR in the cyclic MOV group, and let's assume register 'r'
+//       is occurened in the LHS, and 'r1' is  occurened in the RHS.
+//    2. Place a copy IR first, which would copy any register 'r1' used in
+//       the RHS of MOV IR to a temp location.
+//    3. Put the MOV IR which defined the register 'r1' right after the
+//       copy IR in step 2.
+//    4. Get the regsiter 'r2' occurenced in the RHS of the MOV IR in step 2,
+//       and place the MOV IR which defined the register 'r2' right after the
+//       MOV IR inserted in step 3.
+//    5. Repeat step 3 and step 4 until the 'r2' is equal to 'r'.
+//    6. Place a copy IR at last, which  which would copy the data from the
+//       temp location to the the register 'r'.
+//
+//    e.g.: For the three cyclic MOV IRs in the above example, there should
+//          be 4 steps to complete the reorder operation:
+//          Step 1: tmp <- mov r5 //tmp = 'c'
+//          Step 2: r5  <- mov r4 //r5  = 'b'
+//          Step 3: r4  <- mov r3 //r4  = 'a'
+//          Step 4: r3  <- tmp    //r3  = 'c'
+//    [Note]: tmp stands for the temp register reserved on some specific arch.
+//            If there is no temp register available on the arch, the memory
+//            slot on the stack need to be used to finish the swap operation.
+class LatchBBReorder {
+    COPY_CONSTRUCTOR(LatchBBReorder);
+
+    //The max number of physical register.
+    UINT m_max_reg_num;
+    Region * m_rg;
+    IRMgr * m_irmgr;
+
+    //Map the the dst-physical-register to src-physical-register for the MOV
+    //IRs. The index is the ID of dst-physcial-register, the responding value
+    //is the src-physcial-register.
+    //e.g.:
+    //  $3(r1) <- mov $5(r3)
+    //  $4(r5) <- mov $3(r1)
+    //  The data of m_phyreg_dst2src will be:
+    //  m_phyreg_dst2src[r1] = r3;
+    //  m_phyreg_dst2src[r5] = r1;
+    UINT * m_phyreg_dst2src;
+
+    //Map the src-physical-register to it's using count in MOV IRs. The
+    //index is the ID of src-physical-register.
+    //e.g.:
+    //  $3(r1) <- mov $5(r3)
+    //  $4(r5) <- mov $3(r1)
+    //  The data of m_srcreg_to_usecnt will be:
+    //  m_srcreg_to_usecnt[r1] = 1;
+    //  m_srcreg_to_usecnt[r3] = 1;
+    //  m_srcreg_to_usecnt[r5] = 0;
+    UINT * m_srcreg_to_usecnt;
+
+    //Map the physical-register to the result of a MOV IR that has been
+    //assigned to the physical-register, the index is the ID of
+    //physical-resgiter.
+    IR ** m_phyreg2defop;
+
+    //The marker IR which indicates where the IR will be inserted in BB.
+    IR * m_marker;
+
+    //The Map of latch BB.
+    LatchMap const& m_latch_map;
+    LSRAImpl & m_impl;
+
+    //Map the TMP register to a fixed prno.
+    Reg2PRNO m_reg2prno;
+public:
+    LatchBBReorder(LatchMap const& latch_map, LSRAImpl & impl) :
+        m_phyreg_dst2src(nullptr), m_srcreg_to_usecnt(nullptr),
+        m_phyreg2defop(nullptr), m_marker(nullptr), m_latch_map(latch_map),
+        m_impl(impl)
+    {
+        m_rg = m_impl.getRegion();
+        m_irmgr = m_rg->getIRMgr();
+        m_max_reg_num = m_impl.getRegSetImpl().getTotalRegNum();
+        ASSERTN(m_max_reg_num <= MAX_PHY_REG_NUM,
+            ("Physical register number too big"));
+    }
+
+    //Build a copy IR from prno to the temp location.
+    IR * buildCopyFromPRtoTmp(PRNO prno, Type const* ty);
+
+    //Build a copy IR from the temp location to prno.
+    IR * buildCopyFromTmptoPR(PRNO prno, Type const* ty);
+
+    //Implemented the Part 1 above for the normal MOV IRs in BB.
+    //bb: the specified latch BB.
+    void doNormalMoveReorder(MOD IRBB * bb);
+
+    //Implemented the Part 2 above for the cyclic MOV groups.
+    //bb: the specified latch BB.
+    void doCyclicMoveReorder(MOD IRBB * bb);
+
+    void dumpBBAfterReorder(IRBB const* bb) const;
+
+    //Get a fixed temp prno per the input data type.
+    PRNO getTmpPrno(Type const* ty);
+
+    //This function will check the reorder for the MOV IRs is required or not
+    //in the specified BB, and also collect some infomations used in the coming
+    //reorder phase.
+    //bb: the specified latch BB.
+    //reg_use_cnt: the register use count for the registers involved in MOV IRs.
+    //move_info: contains the source and destination registers for the MOV IRs.
+    //def_irs: contains the original MOV IR responding to the defined register.
+    //marker: the marker IR indicates where the adjusted IR should be inserted.
+    //return value: true if it is needed to do the reorder; false means don't
+    //              need to do reorder.
+    //For example:
+    //  The group of MOV IRs are in the order below:
+    //    r10 <- MOV r8    #S1
+    //    r7  <- MOV r10   #S2
+    //
+    //  Because r10 is used in #S2, but before it is used, it will be
+    //  overwrote by r8 in #S1, so this two MOV IRs need to be reordered,
+    //  The expected sequence should be:
+    //    r7  <- MOV r10   #S2
+    //    r10 <- MOV r8    #S1
+    bool isBBReorderRequired(MOD IRBB * bb);
+
+    //The entry function for the reorder.
+    void perform();
+
+    //This function will do the reorder for the MOV IRs in the latch BB.
+    //bb: the specified latch BB.
+    void reorderMoveIRForBB(MOD IRBB * bb);
+
+    //This function will verify the reorder result.
+    bool verifyReorderResult() const;
+};
+
+
+void LatchBBReorder::dumpBBAfterReorder(IRBB const* bb) const
 {
-    OccList & occlst = lt->getOccList();
-    OccListIter it = nullptr;
-    for (Occ occ = occlst.get_head(&it); it != occlst.end();
-         occ = occlst.get_next(&it)) {
-        if (occ.is_def()) { return true; }
+    note(m_rg, "\n-- DUMP After Reorder MOV IRs for Latch BB%u in LSRA --",
+         bb->id());
+    m_rg->getLogMgr()->incIndent(2);
+    bb->dump(m_rg, true);
+    m_rg->getLogMgr()->decIndent(2);
+}
+
+
+bool LatchBBReorder::verifyReorderResult() const
+{
+    ASSERT0(m_phyreg_dst2src);
+    for (Reg r = 0; r < m_max_reg_num; r++) {
+        ASSERT0(m_phyreg_dst2src[r] == r);
+    }
+    return true;
+}
+
+
+bool LatchBBReorder::isBBReorderRequired(MOD IRBB * bb)
+{
+    ASSERT0(bb && m_srcreg_to_usecnt && m_phyreg_dst2src && m_phyreg2defop);
+    BBIRList const& irlst = bb->getIRList();
+    BBIRListIter bbirit;
+    UINT move_cnt = 0;
+    UINT const MIN_PRCOESS_NUM = 2;
+    m_marker = nullptr;
+
+    //Collect the informations first.
+    for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
+         ir = irlst.get_next(&bbirit)) {
+        if (m_impl.getRA().isSpillOp(ir)) {
+            m_marker = ir;
+            continue;
+        }
+        //Since the MOV IRs are in the middle of latch BB, so we can exit the
+        //loop when a reload IR or a remat IR is encountered.
+        if (m_impl.getRA().isReloadOp(ir) || m_impl.getRA().isRematOp(ir))
+        { break; }
+
+        ASSERT0(m_impl.getRA().isMoveOp(ir));
+        ASSERT0(ir->isWritePR());
+        ASSERT0(ir->getRHS()->isReadPR());
+
+        PRNO use_prno = ir->getRHS()->getPrno();
+        PRNO def_prno = ir->getPrno();
+        ASSERT0(use_prno != PRNO_UNDEF);
+        ASSERT0(def_prno != PRNO_UNDEF);
+
+        Reg use_reg = m_impl.getRA().getReg(use_prno);
+        Reg def_reg = m_impl.getRA().getReg(def_prno);
+        ASSERT0(use_reg != REG_UNDEF);
+        ASSERT0(def_reg != REG_UNDEF);
+        m_phyreg_dst2src[def_reg] = use_reg;
+        m_phyreg2defop[def_reg] = ir;
+        m_srcreg_to_usecnt[use_reg]++;
+        move_cnt++;
+    }
+
+    //If the number of MOV IR is single or zero, just return false.
+    if (move_cnt < MIN_PRCOESS_NUM) { return false; }
+
+    //Check the USE count of the defined registers, if all the defined
+    //registers are not used in these MOV IRs, then return false.
+    for (UINT i = 0; i < m_max_reg_num; i++) {
+        if (m_srcreg_to_usecnt[i] > 0) { return true; }
     }
     return false;
 }
+
+
+PRNO LatchBBReorder::getTmpPrno(Type const* ty)
+{
+    ASSERT0(ty);
+    if (!m_impl.getRA().isTmpRegAvailable(ty)) { return PRNO_UNDEF; }
+    Reg tmp_rg = m_impl.getRA().getTempReg(ty);
+    bool find;
+    PRNO pr = m_reg2prno.get(tmp_rg, &find);
+    if (find) { return pr; }
+    pr = m_impl.getRA().buildPrnoAndSetReg(ty, tmp_rg);
+    m_reg2prno.set(tmp_rg, pr);
+    return pr;
+}
+
+
+IR * LatchBBReorder::buildCopyFromPRtoTmp(PRNO prno, Type const* ty)
+{
+    ASSERT0(ty);
+    ASSERT0(prno != PRNO_UNDEF);
+    PRNO tmpprno = getTmpPrno(ty);
+    IR * copy = nullptr;
+    if (tmpprno != PRNO_UNDEF) {
+        copy = m_irmgr->buildMove(tmpprno, prno, ty);
+        m_impl.getRA().setMove(copy);
+        return copy;
+    }
+    Var * spill_loc = m_impl.getRA().getTempVar(ty);
+    copy = m_impl.getRA().buildSpillByLoc(prno, spill_loc, ty);
+    m_impl.getRA().setSpill(copy);
+    return copy;
+}
+
+
+IR * LatchBBReorder::buildCopyFromTmptoPR(PRNO prno, Type const* ty)
+{
+    ASSERT0(ty);
+    ASSERT0(prno != PRNO_UNDEF);
+    PRNO tmpprno = getTmpPrno(ty);
+    IR * copy = nullptr;
+    if (tmpprno != PRNO_UNDEF) {
+        copy = m_irmgr->buildMove(prno, tmpprno, ty);
+        m_impl.getRA().setMove(copy);
+        return copy;
+    }
+    Var * spill_loc = m_impl.getRA().getTempVar(ty);
+    copy = m_impl.getRA().buildReload(prno, spill_loc, ty);
+    m_impl.getRA().setReload(copy);
+    return copy;
+}
+
+
+void LatchBBReorder::doNormalMoveReorder(MOD IRBB * bb)
+{
+    ASSERT0(bb && m_srcreg_to_usecnt && m_phyreg_dst2src && m_phyreg2defop);
+
+    //Implemented to Part 1 above.
+    for (Reg r = 0; r < m_max_reg_num;) {
+        UINT old_src = m_phyreg_dst2src[r];
+        if (old_src == r || m_srcreg_to_usecnt[r] > 0) {
+            //Since the data is already in the dst-pthysial-register, or it is
+            //used by other MOV IR, so we cannot put the MOV IR right now.
+            r++;
+            continue;
+        }
+        ASSERT0(m_phyreg2defop[r]);
+
+        //Remove the ir first.
+        bb->getIRList().remove(m_phyreg2defop[r]);
+        if (m_marker == nullptr) {
+            bb->getIRList().append_head(m_phyreg2defop[r]);
+        } else {
+            bb->getIRList().insert_after(m_phyreg2defop[r], m_marker);
+        }
+        m_marker = m_phyreg2defop[r];
+
+        //Se the flag that dst-pthysial-register has the correct data.
+        m_phyreg_dst2src[r] = r;
+        ASSERT0(m_srcreg_to_usecnt[old_src] > 0);
+
+        //Decrement the use count of src-pthysial-register.
+        m_srcreg_to_usecnt[old_src]--;
+
+        //If the idex of src-physical-register is less than 'r', and the
+        //use count of src-physical-register is zero, and we update 'r'
+        //to the index of src-physical-register, since the use count of
+        //src-physical-register is zero, there is no MOV IRs in the group
+        //are dependenct with it, so we have to go back to try to check
+        //the condition in step 1 for the possible new chance for other
+        //MOV IRs.
+        if (old_src < r && m_srcreg_to_usecnt[old_src] == 0) {
+            //CASE: When iter physical-register 'r2', the m_phyreg2defop['r2']
+            //      is #S2, but the m_srcreg_to_usecnt['r2'] > 0, so this
+            //      #S2 is ignored. But when iter the physical-register 'r5',
+            //      #S3 will be ordered after #S1, and m_srcreg_to_usecnt['r2']
+            //      is updated to 0, and at this time, the 'r' is updated to
+            //      old_src 'r2', so we will have a chance to iter
+            //      physical-register 'r2' again to order m_phyreg2defop['r2]
+            //      #S2.
+            //      r1 <- mov r6  #S1                  r1 <- mov r6  #S1
+            //      r2 <- mov r7  #S2  after reorder   r5 <- mov r2  #S3
+            //      r5 <- mov r2  #S3  ------------->  r2 <- mov r7  #S2
+            //      r7 <- mov r9  #S4                  r7 <- mov r9  #S4
+
+            r = old_src;
+            continue;
+        }
+        r++;
+    }
+}
+
+
+void LatchBBReorder::doCyclicMoveReorder(MOD IRBB * bb)
+{
+    ASSERT0(bb && m_srcreg_to_usecnt && m_phyreg_dst2src && m_phyreg2defop);
+    bool is_new_group = true;
+    for (Reg r = 0; r < m_max_reg_num;) {
+        UINT r1 = m_phyreg_dst2src[r];
+        if (r1 == r) { ++r; continue; }
+        ASSERT0(m_srcreg_to_usecnt[r1] == 1);
+
+        //Exchange 'r1' and 'r2', after that 'r1' is a fixed point, which means
+        //'r1' hold the correct final data.
+        Reg r2 = m_phyreg_dst2src[r1];
+        ASSERT0(m_phyreg2defop[r1]);
+        ASSERT0(m_phyreg2defop[r2]);
+        ASSERT0(m_impl.getRA().isMoveOp(m_phyreg2defop[r1]));
+        ASSERT0(m_impl.getRA().isMoveOp(m_phyreg2defop[r2]));
+        ASSERT0(m_impl.getRA().isMoveOp(m_phyreg2defop[r]));
+
+        if (is_new_group) {
+            //Process the start of new group, we have to move the data of 'r1'
+            //into temp location.
+            PRNO src_prno_with_r1 = m_phyreg2defop[r]->getRHS()->getPrno();
+            Type const* ty = m_phyreg2defop[r]->getType();
+
+            //Build the new copy IR, copy data from the register 'r1' to the
+            //temp location, insert after the marker, and update the marker
+            IR * copy = buildCopyFromPRtoTmp(src_prno_with_r1, ty);
+            if (m_marker != nullptr) {
+                bb->getIRList().insert_after(copy, m_marker);
+            } else {
+                bb->getIRList().append_head(copy);
+            }
+            m_marker = copy;
+            is_new_group = false;
+        }
+        //Insert the m_phyreg2defop[r1] after the marker
+        ASSERT0(m_marker && m_marker->is_stmt());
+        bb->getIRList().remove(m_phyreg2defop[r1]);
+        bb->getIRList().insert_after(m_phyreg2defop[r1], m_marker);
+        m_marker = m_phyreg2defop[r1];
+
+        //Process the last IR in the cyclic group.
+        if (r == r2) {
+            Type const* ty = m_phyreg2defop[r]->getType();
+            PRNO dst_prno_with_r = m_phyreg2defop[r]->getPrno();
+
+            //Build the copy IR, copy date form the temp location to the
+            //register r, and update the marker.
+            IR * copy = buildCopyFromTmptoPR(dst_prno_with_r, ty);
+            bb->getIRList().insert_after(copy, m_marker);
+            m_marker = copy;
+
+            //Remove the def IR of 'r'.
+            bb->getIRList().remove(m_phyreg2defop[r]);
+            m_impl.getRA().removeMoveOp(m_phyreg2defop[r]);
+
+            //Since the current group has been processed, so set the flag to
+            //indicate a new group will be started.
+            is_new_group = true;
+        }
+
+        //Value of register 'r2' is now in the correct register 'r1'.
+        m_phyreg_dst2src[r1] = r1;
+
+        //The source of 'r' changed to 'r2'.
+        m_phyreg_dst2src[r] = r2;
+    }
+}
+
+
+void LatchBBReorder::reorderMoveIRForBB(MOD IRBB * bb)
+{
+    ASSERT0(bb && m_srcreg_to_usecnt && m_phyreg_dst2src && m_phyreg2defop);
+
+    //Do the reorder for normal MOV IRs.
+    doNormalMoveReorder(bb);
+
+    //Do the reorder MOV IRs with cyclic.
+    doCyclicMoveReorder(bb);
+
+    //When comes here, all MOV IRs need to be handled, there must be some
+    //exception if there is any move unprocessed.
+    ASSERT0(verifyReorderResult());
+
+    if (g_dump_opt.isDumpLSRAReorderMovInLatchBB()) {
+        dumpBBAfterReorder(bb);
+    }
+}
+
+
+void LatchBBReorder::perform()
+{
+    UINT reg_array_size = m_max_reg_num * sizeof(UINT);
+    UINT ir_array_size = m_max_reg_num * sizeof(IR*);
+
+    m_srcreg_to_usecnt = (UINT*)ALLOCA(reg_array_size);
+    m_phyreg_dst2src = (UINT*)ALLOCA(reg_array_size);
+    m_phyreg2defop = (IR**)ALLOCA(ir_array_size);
+    LatchMapIter it;
+    IRBB * bb = nullptr;
+    for (m_latch_map.get_first(it, &bb); !it.end();
+         m_latch_map.get_next(it, &bb)) {
+        //Init the data structures.
+        ::memset(m_srcreg_to_usecnt, 0,  reg_array_size);
+        ::memset(m_phyreg2defop, 0, ir_array_size);
+        for (UINT i = 0; i < m_max_reg_num; i++) { m_phyreg_dst2src[i] = i; }
+
+        //Check the reorder is necessary to be performed or not.
+        if (!isBBReorderRequired(bb)) { continue; }
+
+        //Do the reorder for the MOV IRs in the latch BB.
+        reorderMoveIRForBB(bb);
+    }
+}
+//END LatchBBReorder
 
 
 //
@@ -289,7 +807,8 @@ LTConsistencyMgr::LTConsistencyMgr(LSRAImpl & impl) : m_impl(impl)
     m_cfg = impl.getCFG();
     m_oc = impl.getOptCtx();
     m_is_insert_bb = false;
-    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
+    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->
+        queryPass(PASS_PRLIVENESS_MGR);
     ASSERT0(m_live_mgr && m_live_mgr->is_valid());
     UINT const mem_pool_init_size = 64;
     m_pool = smpoolCreate(mem_pool_init_size, MEM_COMM);
@@ -357,6 +876,108 @@ LifeTime const* LTConsistencyMgr::getLifetimeChild(LTList const& lt_list,
 }
 
 
+Occ LTConsistencyMgr::getFirstRealOccOfFakeUseAtLexFirstBBInLoop(LifeTime * lt)
+{
+    //Since the first occ of lt is the fake-use IR, the first real occ of
+    //this lifetime is the occ right after the fake-use occ in Lexicographical
+    //order.
+    //e.g:
+    // lifetime $1: <5-17><34-67>
+    //    |     ------------                ----------------------------------
+    //    |     u          u                d  u               u             u
+    // POS:     5          17               34 37  41          53            67
+    //          ^          ^
+    //          |          |
+    //  fake-use occ first real-use occ
+    ASSERT0(lt);
+    LTList const& child_list = lt->getChild();
+    OccListIter it = nullptr;
+    OccList & ol = lt->getOccList();
+    Occ real_occ = ol.get_head(&it);
+
+    //If the occ list has more than 1 occ, the second occ must be the real occ.
+    if (ol.get_elem_count() > 1) {
+        ASSERT0(it != ol.end());
+        real_occ = ol.get_next(&it);
+        ASSERT0(real_occ.pos() != POS_UNDEF && real_occ.getIR() != nullptr);
+        return real_occ;
+    }
+
+    //Get the real occ from the split child.
+    LifeTime * first_child = const_cast<LTList&>(child_list).get_head();
+    ASSERT0(first_child);
+    it = nullptr;
+    real_occ = first_child->getOccList().get_head(&it);
+    ASSERT0(real_occ.pos() != POS_UNDEF && real_occ.getIR() != nullptr);
+    return real_occ;
+}
+
+
+//This function selects the proper lifetime inserted with fake-use IR at
+//the first BB of loop in lexicographical order when the input position is
+//between the fake-use IR and the real-use IR. If the ancestor lifetime
+//is split at the fake-use IR, the data of this lifetime is in the memory,
+//or else it is in the register.
+//
+//E.g.1:
+//   $1 is split into $1 and $5 at the fake-use IR.
+//      BB1          -----             BB1            -----
+//   [x]<-spill $1     ^            [x]<-spill $1       ^
+//      <-fake-use $1  |               <-fake-use $1  IN MEM
+//      |              |               ...              V
+//      V            IN MEM          $5<-reload [x]   -----
+//      BB2            |               <-real-use $5
+//      ...            V
+//    $5<-reload [x] -----
+//      <-real-use $5
+//           (a)                           (b)
+//  Note: 1. (a) shows the fake-use and real use are not in the the same BB.
+//        2. (b) shows the fake-use and real use are in the the same BB.
+//
+//E.g.2:
+//   $1 is not split at the fake-use IR.
+//      BB1          -----             BB1            -----
+//      <-fake-use $1  ^               <-fake-use $1  IN REG
+//      |              |               ...            -----
+//      V            IN REG            <-real-use $1
+//      BB2            |
+//      ...            V
+//      <-real-use $1
+//          (a)                            (b)
+//  Note: 1. (a) shows the fake-use and real use are not in the the same BB.
+//        2. (b) shows the fake-use and real use are in the the same BB.
+bool LTConsistencyMgr::selectLTAtPosForFakeUseAtLexFirstBBOfLoop(
+    LifeTime * anct, Pos pos, OUT LifeTime const*& lt)
+{
+    ASSERT0(anct);
+    ASSERT0(pos != POS_UNDEF);
+    Occ fake_occ = anct->getFirstOcc();
+    Occ real_occ = getFirstRealOccOfFakeUseAtLexFirstBBInLoop(anct);
+    ASSERT0(fake_occ.pos() < real_occ.pos());
+    ASSERT0(pos < real_occ.pos());
+    ASSERT0(pos >= anct->getFirstPos());
+
+    if (isLTSplitBetweenLeadingFakeUseAndRealUse(anct)) {
+        //If the anct prno is spilt due to the fake-use IR, we can know this
+        //through the number of occ in anct lifetime when it has only one occ
+        //in its occ list (the other occs are moved to the child lifetimes),
+        //the content of the anct lifetime should be in the memory, and the
+        //related spill IR will be removed afterwards in function
+        //LTConsistencyMgr::removeSpillIRForFakeUseAtLexFirstBBOfLoop().
+        LinearScanRA & lsra = m_impl.getRA();
+        PRNO anct_prno = anct->getPrno();
+        ASSERT0(anct_prno != PRNO_UNDEF);
+        lsra.genSpillLoc(anct_prno, lsra.getSpillType(anct_prno));
+        return false;
+    }
+
+    //if the anct prno is not spilled, that means the content of this anct
+    //lifetime can be kept in the registers, so the anct will be selected.
+    lt = anct;
+    return true;
+}
+
+
 bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
                                            OUT LifeTime const*& lt)
 {
@@ -386,42 +1007,58 @@ bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
     //
     //For the above lifetimes generated during split, there are some standards
     //used to slelect a proper lifetime:
-    //  1. If the spill memory is used:
-    //     1.0 If the pos is between [0, 5):
-    //         1.0.1 If the anct is force-reloaded, return false.
-    //     1.1 If the pos is between [0, 17], anct will be selected.
-    //     1.2 If the pos is between [34, 37], child will be selected.
-    //     1.3 If the pos is between (17, 34), return false.
-    //     1.4 If the pos > 34:
-    //         1.4.1 If the last child is spilled only, return false.
-    //         1.4.2 If the last child is not spilled only, last child
+    //  1. If the pos is between [0, 5), anct will be selected.
+    //
+    //  2. If the anct lifetime is used in the fake-use IR, and the pos is
+    //     less then first real occ of the lifetime, then refer to the select
+    //     logic in function selectLTAtPosForFakeUseAtLexFirstBBOfLoop.
+    //
+    //  3. If the spill memory is used:
+    //     3.1 If the pos is less then 17, anct will be selected.
+    //     3.2 If the pos is between [34, 37], child will be selected.
+    //     3.3 If the pos is between (17, 34), return false.
+    //     3.4 If the pos > 34:
+    //         3.4.1 If the last child is spilled only, return false.
+    //         3.4.2 If the last child is not spilled only, last child
     //               will be selected.
     //
-    //  2. If the spill memory is not used:
-    //     2.1 If the pos is between [0, 17], anct will be selected
-    //     2.2 If the pos is between [34, 37], child will be selected.
-    //     2.3 If the pos is between (17, 34), that means the position is
+    //  4. If the spill memory is not used:
+    //     4.1 If the pos is less then 17, anct will be selected.
+    //     4.2 If the pos is between [34, 37], child will be selected.
+    //     4.3 If the pos is between (17, 34), that means the position is
     //         located in the hole of lifetime:
-    //         2.3.1 If it is rematerialized, return false directly to
+    //         4.3.1 If it is rematerialized, return false directly to
     //               represent it is rematerialized althrough it is not in
     //               memory.
-    //         2.3.2 If the spill memory can be avoided, the parent lifetime
+    //         4.3.2 If the spill memory can be avoided, the parent lifetime
     //               will be selected.
-    //         2.3.3 If the spill memory cannot be avoided, that means the
+    //         4.3.3 If the spill memory cannot be avoided, that means the
     //               spill memory needs to be generated to solve the
     //               inconsistency, return false.
-    //     2.4 If the pos > 34, child will be used.
+    //     4.4 If the pos > 34, child will be used.
 
-    if (pos < anct->getFirstRange().start() && anct->isReloadForced()) {
-        //Implemented 1.0 above.
-        return false;
+    //Since anct indicates the original lifetime, if the pos is before the
+    //start position of this lifetime, anct should be selected as the correct
+    //lifetime.
+    if (pos < anct->getFirstPos()) {
+        //Implemented 1 above.
+        lt = anct;
+        return true;
+    }
+
+    if (m_impl.getRA().isLTWithFakeUseAtLexFirstBBInLoop(anct)) {
+         Occ real_occ = getFirstRealOccOfFakeUseAtLexFirstBBInLoop(anct);
+         if (pos < real_occ.pos()) {
+             //Implemented 2 above.
+             return selectLTAtPosForFakeUseAtLexFirstBBOfLoop(anct, pos, lt);
+         }
     }
 
     //Since anct indicates the original lifetime, if the pos is before the
     //end position of this lifetime, anct should be selected as the correct
     //lifetime.
-    if (pos <= anct->getLastRange().end()) {
-        //Implemented 1.1 and 2.1 above.
+    if (pos <= anct->getLastPos()) {
+        //Implemented 3.1 and 4.1 above.
         lt = anct;
         return true;
     }
@@ -431,15 +1068,14 @@ bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
     //should be selected as the correct lifetime unless it is spilled ony.
     LifeTime * child_last = lt_list.get_elem_count() == 0 ?
         anct : const_cast<LTList&>(lt_list).get_tail();
-    if (pos > child_last->getLastRange().end()) {
-        //Implemented 1.4 and 2.4 above.
+    if (pos > child_last->getLastPos()) {
+        //Implemented 3.4 and 4.4 above.
         if (child_last->isSpillOnly()) { return false; }
         lt = child_last;
         return true;
     }
 
     //Traverse the child list to find the correct lifetime.
-    LifeTime const* parent_lt = anct;
     LTListIter it = nullptr;
     LinearScanRA & lsra = m_impl.getRA();
     PRNO anct_prno = anct->getPrno();
@@ -452,14 +1088,14 @@ bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
         //for a specified postion, if it is covered by a child lifetime, which
         //indicates that the child lifetime is used at the position.
         if (child->is_cover(pos)) {
-            //Implemented 1.2 and 2.2 above.
+            //Implemented 3.2 and 4.2 above.
             lt = child;
             return true;
         }
 
-        if (spill_loc == nullptr && pos < child->getFirstRange().start()) {
+        if (spill_loc == nullptr && pos < child->getFirstPos()) {
             if (is_remat) {
-                //Implemented 2.3.1 above.
+                //Implemented 4.3.1 above.
                 //If the lifime is rematerialized, return false directly.
                 //Since this lifetime is rematerialized, the value of the
                 //the lifetime cannot responding to any descendant lifetime,
@@ -468,20 +1104,7 @@ bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
                 return false;
             }
 
-            //If there is no memory used for the lifetime duirng split, the
-            //position is located in the hole of lifetime, here means a
-            //spill memory is needed to solve the inconsistency.
-            //Implemented 2.3 above.
-            if (lsra.canSpillAvoid(anct_prno)) {
-                //Implemented 2.3.2 above.
-                //CASE:If the lifetime has been assigned with some register,
-                //it does not matter which lifetime is selected, because all
-                //lifetimes will be assigned to the same physical register
-                //after lifetime splitting.
-                lt = parent_lt;
-                return true;
-            }
-            //Implemented 2.3.3 above.
+            //Implemented 4.3.3 above.
             //CASE: The spill memory of 'anct' is not created so far, becasue
             //the split position of 'anct' is at an exit BB in a branch of
             //CFG, and the spill memory is not created after the calling of
@@ -522,13 +1145,11 @@ bool LTConsistencyMgr::selectLifetimeAtPos(LifeTime * anct, Pos pos,
             // [mem]<-$10   goto BB4
             //    |         |
             //     ---------
-            ASSERT0(!lsra.canSpillAvoid(anct_prno));
             lsra.genSpillLoc(anct_prno, lsra.getSpillType(anct_prno));
             return false;
         }
-        parent_lt = child;
     }
-    //Implemented 1.3 above.
+    //Implemented 3.3 above.
     return false;
 }
 
@@ -591,9 +1212,6 @@ void LTConsistencyMgr::computeInconsistency(
     if (from_lt != nullptr && to_lt != nullptr) {
         //If the from_lt and to_lt both exist, consider to revise the type
         //INCONSIST_PR2PR.
-        if (getRA().getReg(from_lt->getPrno()) ==
-            getRA().getReg(to_lt->getPrno()))
-        { return; }
         InConsistPair * pair = allocInconsistPair();
         genInconsistPairPR2PR(pair, from, to, from_lt, to_lt);
         inconsist_lst.append_tail(pair);
@@ -679,8 +1297,8 @@ LinearScanRA & LTConsistencyMgr::getRA() const
 }
 
 
-void LTConsistencyMgr::tryUseTrampBBAsLatchBB(IRBB const* tramp,
-                                              MOD LatchMap & latch_map)
+void LTConsistencyMgr::tryUseTrampBBAsLatchBB(
+    IRBB const* tramp, MOD LatchMap & latch_map)
 {
     ASSERT0(tramp);
     Vertex const* tramp_v = tramp->getVex();
@@ -791,9 +1409,9 @@ void LTConsistencyMgr::reviseTypeMEM2PR(MOD LatchMap & latch_map,
     ASSERT0(pair);
     ASSERT0(pair->mem_var && pair->mem_var->getType());
     IRBB * latch = genLatchBB(latch_map, pair);
-    IR * reload = m_impl.insertReload(pair->to_lt->getPrno(),
-                                      const_cast<Var*>(pair->mem_var),
-                                      pair->mem_var->getType(), latch);
+    IR * reload = m_impl.insertReload(
+        pair->to_lt->getPrno(), const_cast<Var*>(pair->mem_var),
+        pair->mem_var->getType(), latch);
     Reg r = m_impl.getRA().getReg(pair->to_lt->getPrno());
     ASSERT0(r != REG_UNDEF);
     dumpReload(m_impl, reload, r, latch,
@@ -819,23 +1437,23 @@ void LTConsistencyMgr::reviseTypeRemat(MOD LatchMap & latch_map,
 
 
 void LTConsistencyMgr::reviseTypePR2MEM(MOD LatchMap & latch_map,
-                                        InConsistPair const* pair,
-                                        MOD PostProcessCtx & ctx)
+                                        InConsistPair const* pair)
 {
     ASSERT0(pair);
     ASSERT0(pair->mem_var && pair->mem_var->getType());
     IRBB * latch = genLatchBB(latch_map, pair);
-    IR * spill = m_impl.insertSpillAtBBEnd(pair->from_lt->getPrno(),
-                                           const_cast<Var*>(pair->mem_var),
-                                           pair->mem_var->getType(), latch);
-    ctx.setReviseSpill(spill);
+    IR * spill = m_impl.insertSpillAtBBEnd(
+        pair->from_lt->getPrno(), const_cast<Var*>(pair->mem_var),
+        pair->mem_var->getType(), latch);
     Reg r = m_impl.getRA().getReg(pair->from_lt->getPrno());
     ASSERT0(r != REG_UNDEF);
     dumpSpill(m_impl, spill, r, latch,
               "fix lifetime consistency pr to memory $%u->%s",
               pair->from_lt->getPrno(), pair->mem_var->get_name()->getStr());
+    SplitCtx ctx(POS_UNDEF);
+    m_impl.getSpillReloadEliminateMgr().recordSpill(
+        pair->from_lt, spill, ctx, false);
 }
-
 
 
 bool LTConsistencyMgr::verifyLatchBB(IRBB * bb, MOD Vector<BYTE> & use_reg_cnt,
@@ -898,7 +1516,7 @@ bool LTConsistencyMgr::verifyLatchBBs(LatchMap const& latch_map) const
 
 
 void LTConsistencyMgr::reviseEdgeConsistency(
-    InConsistPairList const& inconsist_lst, MOD PostProcessCtx & ctx)
+    InConsistPairList const& inconsist_lst)
 {
     LatchMap inserted_latch;
     InConsistPairListIter it;
@@ -921,7 +1539,7 @@ void LTConsistencyMgr::reviseEdgeConsistency(
          i < inconsist_lst.get_elem_count();
          pair = inconsist_lst.get_next(&it), i++) {
         if (pair->type != INCONSIST_PR2MEM) { continue; }
-        reviseTypePR2MEM(inserted_latch, pair, ctx);
+        reviseTypePR2MEM(inserted_latch, pair);
     }
 
     //Step 2: Process the inconsist type PR2PR to ensure the MOV IRs are in
@@ -958,12 +1576,16 @@ void LTConsistencyMgr::reviseEdgeConsistency(
     }
     ASSERT0L1(verifyLatchBBs(inserted_latch));
 
-    //Reorder the mov IR after all IRs are inserted in the latch BB.
-    reorderMoveIRInLatchBB(inserted_latch);
+    //Reorder the MOV IR after all IRs are inserted in the latch BB.
+    LatchBBReorder reorder(inserted_latch, m_impl);
+    reorder.perform();
+
+    //Record latch BBs for subsequent optimization and analysis.
+    m_impl.getSpillReloadEliminateMgr().recordLatchBBTab(inserted_latch);
 }
 
 
-void LTConsistencyMgr::perform(MOD PostProcessCtx & ctx)
+void LTConsistencyMgr::perform()
 {
     computePR2LtInfo();
     InConsistPairList inconsist_lst;
@@ -971,345 +1593,144 @@ void LTConsistencyMgr::perform(MOD PostProcessCtx & ctx)
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         inconsist_lst.dump(m_rg);
     }
-    reviseEdgeConsistency(inconsist_lst, ctx);
-}
-
-
-//This function shall reorder the MOV IRs inserted in the latch BB due to
-//the USE dependencies. Normally, the data in the register should be used first
-//before the data in register is modified.
-//
-//There are two kinds of USE dependency problems:
-//1. Normal dependency problem.
-//2. Cyclic dependency problem.
-//
-//For example:
-//  The group of MOV IRs are in the order below:
-//  $10 <- MOV $8    #S1
-//  $7  <- MOV $10   #S2
-//  $3  <- mov $5    #S3
-//  $4  <- mov $3    #S4
-//  $5  <- mov $4    #S5
-//  1. $10 in #S1 and #S2 are normal dependency problem.
-//     $10 will be wrote to $7 in #S2, but before the original data is used,
-//     $10 is changed to the data of $8 in #S1, this is not what we expected,
-//     the correct order for #S1 and #S2 should ensure #S2 before #S1, which
-//     means the data of $10 is moved to $7 before it wrote by $8.
-//
-//  2. $3, $4 and $5 in #S3, #S4 and #S5 are cyclic dependency problem.
-//     Firstly, we want to move $5 to $3 in #S3, but before change the $3, we
-//     have to move $3 to $4 in #S4, this is a basic rule, and then apply the
-//     same rule for $4, we find it needs to move $4 to $5 before #S4 is
-//     executed, so now, we can find these dependencies look like a "cycle",
-//     they dependents each other.
-//
-//This function will implement a reorder algorithm to resolve the two kinds
-//of USE dependency problem. First, distinguish the normal dependency MOV IRs
-//and reorder these MOV IRs. and then process the second cyclic dependency
-//problem for the remaining MOV IRs.
-//
-//The reorder algorithm should include two parts:
-//Part 1. Process normal dependency problem.
-//  we consider the USE count of destination registers, if the USE count
-//  is zero, that means this MOV IR has no dependency with other MOV IRs, we
-//  can reorder these MOV IRs at the beginning of the group of IRs. At the same
-//  time the USE count of the source registers should be decremented by 1.
-//
-//Part 2. Process cyclic dependency problem.
-//  After the processing of part 1, we only have the MOVs IR with
-//  "cycles" left, that means we have to resolve these permute MOV
-//  instructions.
-//  We can use the example mentioned above, there are three MOV IRs no handled
-//  at this point:
-//      $3 <- mov $5
-//      $4 <- mov $3
-//      $5 <- mov $4
-//    Assume the original data in the registers before the moving operations
-//    are as below:
-//        $3 = 'a'
-//        $4 = 'b'
-//        $5 = 'c'
-//    The expected final data in the registers after the moving operations
-//    are as below:
-//        $3 = 'c'
-//        $4 = 'a'
-//        $5 = 'b'
-//
-//  Algorithm details:
-//    There should be 2 steps to finish the operations of three MOV IRs for the
-//    example mentioned above.
-//    Step 1: Swap the data in $4 and $5 by generating three swapping IRs:
-//      $tmp <- mov $4
-//      $4   <- mov $3
-//      $3   <- mov $tmp
-//      The data in registers after current swap is as below:
-//        $3 = 'a'
-//        $4 = 'c'
-//        $5 = 'b'
-//
-//    Step 2: Swap the data in $3 and $4 by generating three swapping IRs:
-//      $tmp <- mov $3
-//      $3   <- mov $4
-//      $4   <- mov $tmp
-//      The data in registers after current swap is as below:
-//        $3 = 'c'
-//        $4 = 'a'
-//        $5 = 'b'
-//    [Note]: $tmp stands for the temp register reserved on some specific arch.
-//            If there is no temp register available on the arch, the memory
-//            slot on the stack need to be used to finish the swap operation.
-void LTConsistencyMgr::reorderMoveIRForBB(MOD IRBB * bb,
-    MOD UINT *& reg_use_cnt, MOD UINT *& move_info,
-    IN IR ** def_irs, IR const* marker)
-{
-    ASSERT0(bb && reg_use_cnt && move_info && def_irs);
-    UINT const max_reg_num = m_impl.getRegSetImpl().getTotalRegNum();
-    //Remove the old IRs first from the BB.
-    for (Reg r = 0; r < max_reg_num; r++) {
-        if (move_info[r] == r) { continue; }
-        bb->getIRList().remove(def_irs[r]);
-    }
-
-    //Implemented to Part 1 above.
-    for (Reg r = 0; r < max_reg_num;) {
-        unsigned old_r = move_info[r];
-        if (old_r == r || reg_use_cnt[r] > 0) { ++r; continue; }
-        ASSERT0(def_irs[r]);
-        if (marker == nullptr) {
-            bb->getIRList().append_head(def_irs[r]);
-        } else {
-            bb->getIRList().insert_after(def_irs[r], marker);
-        }
-        marker = def_irs[r];
-        move_info[r] = r;
-        ASSERT0(reg_use_cnt[old_r] > 0);
-        reg_use_cnt[old_r]--;
-        //Advance or jump back.
-        r = (old_r < r && reg_use_cnt[old_r] == 0) ? old_r : r + 1;
-    }
-
-    //Implemented the Part 2 above.
-    //e.g:
-    //Original IRs with cyclic MOVs:
-    //    $1(R0) <- $10(R1)
-    //    $2(R1) <- $20(R2)
-    //    $3(R2) <- $30(R0)
-    //
-    //These three IRs are abstracted with the concrete prnos with variable
-    //names:
-    //    $dst_prno_with_r0 <- $src_prno_with_r1
-    //    $dst_prno_with_r1 <- $src_prno_with_r2
-    //    $dst_prno_with_r2 <- $src_prno_with_r0
-    //
-    //There will be two groups of swap per this algorithm:
-    //    Group 1: r = R0, r1 = R1, r2 = R2, and do swap for R1 and R2.
-    //        temp <- $src_prno_with_r1               |  temp <- $10(R1)
-    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $2(R1) <- $20(R2)
-    //        $dst_prno_with_r2 <- temp               |  $3(R2) <- temp
-    //    After the first group swap, R1 contains the final correct data,
-    //    R2 contains the data of R1.
-    //
-    //    Group 2: r = R0, swap r1 = R2, r2 = R0, and do swap for R2 and R0.
-    //        temp <- $src_prno_with_r2               |  temp <- $3(R2)
-    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $3(R2) <- $30(R0)
-    //        $dst_prno_with_r2 <- temp               |  $1(R0) <- temp
-    PRNO src_prno_with_r1 = PRNO_UNDEF;
-    for (Reg r = 0; r < max_reg_num;) {
-        unsigned r1 = move_info[r];
-        if (r1 == r) { ++r; continue; }
-        ASSERT0(reg_use_cnt[r1] == 1);
-
-        //Exchange r1 and r2; after that r1 is a fixed point.
-        Reg r2 = move_info[r1];
-        ASSERT0(def_irs[r1]);
-        ASSERT0(def_irs[r2]);
-        ASSERT0(m_impl.getRA().isMoveOp(def_irs[r1]));
-        ASSERT0(m_impl.getRA().isMoveOp(def_irs[r2]));
-        ASSERT0(m_impl.getRA().isMoveOp(def_irs[r]));
-
-        //Do the data exchange.
-        PRNO dst_prno_with_r1 = def_irs[r1]->getPrno();
-        PRNO src_prno_with_r2 = def_irs[r1]->getRHS()->getPrno();
-        Type const* ty1 = def_irs[r1]->getType();
-
-        PRNO dst_prno_with_r2 = def_irs[r2]->getPrno();
-        src_prno_with_r1 = (src_prno_with_r1 == PRNO_UNDEF) ?
-            def_irs[r]->getRHS()->getPrno() : dst_prno_with_r1;
-        Type const* ty2 = def_irs[r2]->getType();
-
-        ASSERT0(verifySwapCondition(dst_prno_with_r1, dst_prno_with_r2, ty1,
-                                    ty2));
-        marker = m_impl.getRA().insertIRToSwap(src_prno_with_r2,
-            dst_prno_with_r1, src_prno_with_r1, dst_prno_with_r2, ty1, ty2,
-            marker, bb);
-
-        //Value of register r2 is now in the correct register r1.
-        move_info[r1] = r1;
-        //The source of r changed to r2.
-        move_info[r] = r2;
-
-        //If the curent sub-group of cycle is done, clear the src_prno_with_r1
-        //for the next sub-group of cycle.
-        if (r == r2) { src_prno_with_r1 = PRNO_UNDEF; }
-    }
-
-    //When comes here, all MOVs need to be handled, there must be some
-    //exception if there is any move unprocessed.
-    ASSERT0(verifyReorderResult(move_info, max_reg_num));
-
-    if (g_dump_opt.isDumpLSRAReorderMovInLatchBB()) {
-        dumpBBAfterReorder(bb);
-    }
-}
-
-
-void LTConsistencyMgr::dumpBBAfterReorder(IRBB const* bb) const
-{
-    note(m_rg, "\n-- DUMP After Reorder MOV IRs for Latch BB%u in LSRA --",
-         bb->id());
-    m_rg->getLogMgr()->incIndent(2);
-    bb->dump(m_rg, true);
-    m_rg->getLogMgr()->decIndent(2);
-}
-
-
-//This function is used to determine the reorder for the MOV IRs is really
-//needed or not.
-//Thre are some check standards listed below:
-//  1. If there is only 1 MOV IR or less, it is no need to do the reorder.
-//  2. If the each source register in the MOV IRs are not used by other MOV
-//     IRs, that means this register has no dependency with any other
-//     registers, so the reorder is not required if the USE count of register
-//     is zero.
-//  3. Otherwise, the reorder need to be performed.
-//     For example:
-//       The group of MOV IRs are in the order below:
-//       $10 <- MOV $8    #S1
-//       $7  <- MOV $10   #S2
-//
-//       $10 is used in #S2, but before it is used, it will be overwrote by
-//       $8 in #S1, the USE count of $10 is 1, not zero.
-bool LTConsistencyMgr::isReorderRequired(MOD IRBB * bb,
-    OUT UINT *& reg_use_cnt, OUT UINT *& move_info,
-    OUT IR **& def_irs, OUT IR *& marker)
-{
-    ASSERT0(bb && reg_use_cnt && move_info && def_irs);
-    BBIRList const& irlst = bb->getIRList();
-    BBIRListIter bbirit;
-    UINT move_cnt = 0;
-    UINT const MIN_PRCOESS_NUM = 2;
-
-    //Collect the informations first.
-    for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
-         ir = irlst.get_next(&bbirit)) {
-        if (m_impl.getRA().isSpillOp(ir)) {
-            marker = ir;
-            continue;
-        }
-        //Since the MOV IRs are in the middle of latch BB, so we can exit the
-        //loop when a reload IR or a remat IR is encountered.
-        if (m_impl.getRA().isReloadOp(ir) || m_impl.getRA().isRematOp(ir))
-        { break; }
-
-        ASSERT0(m_impl.getRA().isMoveOp(ir));
-        ASSERT0(ir->isWritePR());
-        ASSERT0(ir->getRHS()->isReadPR());
-
-        PRNO use_prno = ir->getRHS()->getPrno();
-        PRNO def_prno = ir->getPrno();
-        ASSERT0(use_prno != PRNO_UNDEF);
-        ASSERT0(def_prno != PRNO_UNDEF);
-
-        Reg use_reg = m_impl.getRA().getReg(use_prno);
-        Reg def_reg = m_impl.getRA().getReg(def_prno);
-        ASSERT0(use_reg != REG_UNDEF);
-        ASSERT0(def_reg != REG_UNDEF);
-        if (move_info[def_reg] == use_reg) {
-            ASSERTN(0, ("MOV IRs in the latch should not be same"));
-        }
-        move_info[def_reg] = use_reg;
-        def_irs[def_reg] = ir;
-        reg_use_cnt[use_reg]++;
-        move_cnt++;
-    }
-
-    //If the number of MOV IR is single or zero, just return false.
-    if (move_cnt < MIN_PRCOESS_NUM) { return false; }
-
-    //Check the USE count of the defined registers, if all the defined
-    //registers are not used in these MOV IRs, then return false.
-    UINT const max_reg_num = m_impl.getRegSetImpl().getTotalRegNum();
-    for (UINT i = 0; i < max_reg_num; i++) {
-        if (reg_use_cnt[i] > 0) { return true; }
-    }
-    return false;
-}
-
-
-void LTConsistencyMgr::reorderMoveIRInLatchBB(MOD LatchMap & latch_map)
-{
-    UINT const max_reg_num = m_impl.getRegSetImpl().getTotalRegNum();
-    ASSERTN(max_reg_num <= 128, ("Physical register number too big"));
-    UINT * reg_use_cnt = (UINT*)ALLOCA(max_reg_num * sizeof(UINT));
-    UINT * move_info = (UINT*)ALLOCA(max_reg_num * sizeof(UINT));
-    IR ** def_irs = (IR**)ALLOCA(max_reg_num * sizeof(IR*));
-    LatchMapIter it;
-    IRBB * bb = nullptr;
-    for (latch_map.get_first(it, &bb); !it.end(); latch_map.get_next(it, &bb)) {
-        //Init the data structures.
-        ::memset(reg_use_cnt, 0, max_reg_num * sizeof(UINT));
-        ::memset(def_irs, 0, sizeof(IR*) * max_reg_num);
-        for (UINT i = 0; i < max_reg_num; i++) { move_info[i] = i; }
-        //Check the reorder is necessary to be performed or not.
-        IR * marker = nullptr;
-        if (!isReorderRequired(bb, reg_use_cnt, move_info, def_irs,
-                               marker)) {
-            continue;
-        }
-
-        //Do the reorder for the MOV IRs in the latch BB.
-        reorderMoveIRForBB(bb, reg_use_cnt, move_info, def_irs, marker);
-    }
-}
-
-
-bool LTConsistencyMgr::verifyReorderResult(UINT const* move_info,
-                                           UINT max_reg_num) const
-{
-    ASSERT0(move_info);
-    for (Reg r = 0; r < max_reg_num; r++) {
-        if (move_info[r] != r) { return false; }
-    }
-    return true;
-}
-
-
-bool LTConsistencyMgr::verifySwapCondition(PRNO prno1, PRNO prno2,
-    Type const* ty1,  Type const* ty2) const
-{
-    ASSERT0(ty1 && ty2);
-    ASSERT0(prno1 != PRNO_UNDEF);
-    ASSERT0(prno2 != PRNO_UNDEF);
-    Reg reg1 = m_impl.getRA().getReg(prno1);
-    Reg reg2 = m_impl.getRA().getReg(prno2);
-
-    ASSERT0(reg1 != REG_UNDEF);
-    ASSERT0(reg2 != REG_UNDEF);
-
-    if (ty1->is_vector() && !ty2->is_vector() &&
-        m_impl.getRegSetImpl().isVector(reg1) &&
-        !m_impl.getRegSetImpl().isVector(reg2)) {
-        return false;
-    }
-
-    if (ty2->is_vector() && !ty1->is_vector() &&
-        m_impl.getRegSetImpl().isVector(reg2) &&
-        !m_impl.getRegSetImpl().isVector(reg1)) {
-        return false;
-    }
-    return true;
+    reviseEdgeConsistency(inconsist_lst);
 }
 //END LTConsistencyMgr
+
+
+//
+//Start SpillReloadEliminateMgr
+//
+SpillReloadEliminateMgr::SpillReloadEliminateMgr(LSRAImpl & impl)
+    : m_impl(impl), m_ra(impl.getRA())
+{
+    m_lt2spill = nullptr;
+    m_spill_reload_pairs = nullptr;
+    m_rg = impl.getRegion();
+    ASSERT0(m_rg);
+}
+
+
+SpillReloadEliminateMgr::~SpillReloadEliminateMgr()
+{
+    freeRemovedIRs();
+    if (m_lt2spill != nullptr) {
+        LT2IRTabIter it;
+        IRTab * irtab = nullptr;
+        for (m_lt2spill->get_first(it, &irtab); !it.end();
+             m_lt2spill->get_next(it, &irtab)) {
+            ASSERT0(irtab);
+            delete irtab;
+        }
+        delete m_lt2spill;
+        m_lt2spill = nullptr;
+    }
+    if (m_spill_reload_pairs != nullptr) {
+        for (IRPair * pair = m_spill_reload_pairs->get_head();
+             pair != nullptr; pair = m_spill_reload_pairs->get_next()) {
+            delete pair;
+        }
+        delete m_spill_reload_pairs;
+        m_spill_reload_pairs = nullptr;
+    }
+}
+
+
+void SpillReloadEliminateMgr::freeRemovedIRs()
+{
+    RemovedIRTabIter it;
+    for (IR const* ir = m_removed_ir_tab.get_first(it); ir != nullptr;
+         ir = m_removed_ir_tab.get_next(it)) {
+        //Removed the IRs recorded before in LSRA.
+        m_ra.removeOpInPosGapRecord(ir);
+
+        //Free the resources of IRs.
+        m_rg->freeIRTree(const_cast<IR*>(ir));
+    }
+}
+
+
+void SpillReloadEliminateMgr::recordSpill(
+    LifeTime const* lt, IR * spill, SplitCtx const& ctx, bool is_def)
+{
+    ASSERT0(lt && spill);
+
+    //Record the spill for one-def lifetime.
+    recordInfoUsedByOneDefElim(lt, spill);
+
+    //Record the spill for the lifetime with fake-use IR.
+    recordInfoUsedByFakeUseSpillElim(lt, spill, ctx.split_pos_ir, is_def);
+}
+
+
+void SpillReloadEliminateMgr::recordLatchBBTab(LatchMap const& latch_map)
+{
+    LatchMapIter itt;
+    IRBB * bb = nullptr;
+    for (latch_map.get_first(itt, &bb); !itt.end();
+         latch_map.get_next(itt, &bb)) {
+        m_ra.setLatchBB(bb);
+    }
+}
+
+
+void SpillReloadEliminateMgr::recordInfoUsedByOneDefElim(
+    LifeTime const* lt, IR * spill)
+{
+    ASSERT0(lt && spill);
+    if (!lt->isOneDefOnly()) { return; }
+    ASSERT0(lt->getAncestor());
+    record(lt->getAncestor(), spill);
+}
+
+
+void SpillReloadEliminateMgr::recordInfoUsedByFakeUseSpillElim(
+    LifeTime const* lt, IR const* spill, IR const* split_pos_ir, bool is_def)
+{
+    if (split_pos_ir == nullptr) { return; }
+    ASSERT0(lt && spill);
+    //If the spill at a def IR, return directly since the fake-use
+    //IR is a use.
+    if (is_def) { return; }
+
+    //If the lifetime is not related to the fake-use IR, do nothing.
+    if (!m_ra.isLTWithFakeUseAtLexFirstBBInLoop(lt)) { return; }
+
+    //Check the split pos IR is the fake-use IR at the first BB of loop in
+    //lexicographical order or not.
+    IR const* split_stmt = split_pos_ir->is_stmt() ?
+        split_pos_ir : split_pos_ir->getStmt();
+    IR const* fake_use = const_cast<LifeTime*>(lt)->getFirstOccStmt();
+    if (fake_use != split_stmt) { return; }
+
+    recordSpillAtFirstFakeUse(lt->getPrno(), spill);
+}
+
+
+void SpillReloadEliminateMgr::record(LifeTime const* lt, IR * ir)
+{
+    ASSERT0(lt && ir);
+    if (m_lt2spill == nullptr) { m_lt2spill = allocLT2IRTab(); }
+    bool find = false;
+    IRTab * irtab = m_lt2spill->getAndGen(lt, &find);
+    ASSERT0(irtab);
+    irtab->getAndGen(ir, &find);
+}
+
+
+void SpillReloadEliminateMgr::record(IR * spill, IR * reload)
+{
+    if (spill == nullptr || reload == nullptr) { return; }
+    ASSERT0(spill->getBB() && reload->getBB());
+    if (spill->getBB() != reload->getBB()) { return; }
+    if (m_spill_reload_pairs == nullptr)
+    { m_spill_reload_pairs = allocIRPairLst(); }
+    IRPair * pair = allocIRPair();
+    pair->spill = spill;
+    pair->reload = reload;
+    m_spill_reload_pairs->append_tail(pair);
+}
+//End SpillReloadEliminateMgr
 
 
 //
@@ -1325,40 +1746,76 @@ SplitMgr::SplitMgr(LSRAImpl & impl) : m_impl(impl), m_ra(impl.getRA())
 }
 
 
-LifeTime * SplitMgr::selectLTByPrioAndNextOcc(LTSet const& lst, Pos pos,
-                                              Vector<SplitCtx> const& ctxvec,
-                                              OUT Occ & reload_occ)
+void SplitMgr::selectLTImpl(OUT Occ & next_occ, OUT LifeTime *& selected_lt,
+                            IN LifeTime *const cur_lt, SplitCtx const& ctx)
+{
+    if (selected_lt == nullptr) {
+        next_occ = ctx.reload_occ;
+        selected_lt = cur_lt;
+        return;
+    }
+
+    //Select the lifetime with lower loop nesting level.
+    if (cur_lt->getPriority() - selected_lt->getPriority() > EPSILON) {
+        return;
+    }
+
+    //Select the lifetime with the next occurance from given position is the
+    //furthest. For example, given pos is 10, and two lifetime lt1 and lt2:
+    //  lt1:  <5-40>, next-occ is in 20
+    //  lt2:  <5-25>, next-occ is in 25
+    //the lifetime lt2 will be selected.
+    if (next_occ.pos() > ctx.reload_pos) { return; }
+
+    //[PENDING] Experiments show that this is not a reasonable optimization
+    //          point and will not be adopted.
+    //Select the lifetime with higher length.
+    //if (cur_lt->getLength() < selected_lt->getLength()) { return; }
+
+    //Select the lifetime with lower activity level (i.e., with lower
+    //occurances).
+    if (cur_lt->getOccList().get_elem_count() >
+        selected_lt->getOccList().get_elem_count()) {
+        return;
+    }
+
+    //Consider the cost of spillage. Normally the spillage of vector
+    //operation is more larger than scalar operation. We will not select
+    //the lifetime with vector operation to be spilled.
+    ASSERT0(next_occ.getIR() && next_occ.getIR()->getType());
+    ASSERT0(ctx.reload_occ.getIR() && ctx.reload_occ.getIR()->getType());
+    if (!next_occ.getIR()->is_vec() && ctx.reload_occ.getIR()->is_vec()) {
+        return;
+    }
+
+    next_occ = ctx.reload_occ;
+    selected_lt = cur_lt;
+}
+
+
+LifeTime * SplitMgr::selectLTBaseMultiStrategies(LTSet const& lst,
+    Vector<SplitCtx> const& ctxvec, MOD SplitCtx & cur_ctx)
 {
     VecIdx cnt = 0;
     ASSERT0(ctxvec.get_elem_count() == lst.get_elem_count());
     Occ next_occ;
     LifeTime * selected_lt = nullptr;
     LTSetIter it;
-    for (LifeTime * t = lst.get_head(&it);
-         t != nullptr; t = lst.get_next(&it), cnt++) {
-        SplitCtx l = ctxvec.get(cnt);
-        if (selected_lt == nullptr) {
-            next_occ = l.reload_occ;
-            selected_lt = t;
-            continue;
-        }
-        if (t->getPriority() - selected_lt->getPriority() > EPSILON) {
-            continue;
-        }
-        if (next_occ.pos() > l.reload_pos) { continue; }
-        next_occ = l.reload_occ;
-        selected_lt = t;
+    for (LifeTime * cur_lt = lst.get_head(&it);
+         cur_lt != nullptr; cur_lt = lst.get_next(&it), cnt++) {
+        SplitCtx ctx = ctxvec.get(cnt);
+        selectLTImpl(next_occ, selected_lt, cur_lt, ctx);
     }
     if (selected_lt == nullptr) { return nullptr; }
-    reload_occ = next_occ;
-    dumpSelectSplitCand(m_impl, selected_lt, pos, true,
+    cur_ctx.reload_occ = next_occ;
+    dumpSelectSplitCand(m_impl, selected_lt, cur_ctx.split_pos, true,
                         "$%u has furthest reload-occ", selected_lt->getPrno());
     return selected_lt;
 }
 
 
-LifeTime * SplitMgr::selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
-                                                 OUT Occ & reload_occ)
+LifeTime * SplitMgr::selectLTByFurthestNextRange(
+    LTSet const& lst, Pos pos, OUT Occ & reload_occ)
 {
     LTSetIter it;
     Range furthest_range(POS_UNDEF);
@@ -1422,7 +1879,7 @@ void SplitMgr::selectSplitCandFromSet(LTSet const& set, SplitCtx const& ctx,
         //to be allocated, it is ignored.
         if (isConflictedWithTargetLT(t, ctx.split_lt->getPrno())) { continue; }
 
-        Type const* target_ty = m_impl.getRA().getVarTypeOfPRNO(
+        Type const* target_ty = m_ra.getVarTypeOfPRNO(
             m_ra.getAnctPrno(ctx.split_lt->getPrno()));
         ASSERT0(target_ty);
         Reg r = m_ra.getReg(t->getPrno());
@@ -1476,8 +1933,7 @@ LifeTime * SplitMgr::selectSplitCandImpl(LTSet & set, LifeTime * lt,
     }
     //Attempt to select a lifetime with least priority and the biggest hole to
     //contain the entire given 'lt'.
-    LifeTime * cand = selectLTByPrioAndNextOcc(candlst, ctx.split_pos,
-                                               candctxvec, ctx.reload_occ);
+    LifeTime * cand = selectLTBaseMultiStrategies(candlst, candctxvec, ctx);
     ASSERT0(cand);
     ctx.reload_pos = ctx.reload_occ.pos();
     //candidate may not have reload_pos.
@@ -1623,6 +2079,7 @@ IR * SplitMgr::doSpillAfterSplitPos(LifeTime * lt, SplitCtx const& ctx)
     spill = m_impl.insertSpillAfter(lt->getPrno(), reg_type, ctx.split_pos_ir);
     ASSERT0(spill);
     dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, false);
+    m_impl.getSpillReloadEliminateMgr().recordSpill(lt, spill, ctx, true);
     return spill;
 }
 
@@ -1638,6 +2095,7 @@ IR * SplitMgr::doSpillBeforeSplitPos(LifeTime * lt, SplitCtx const& ctx)
     spill = m_impl.insertSpillBefore(lt->getPrno(), reg_type, ctx.split_pos_ir);
     ASSERT0(spill);
     dumpSpill(m_impl, spill, lt, ctx.split_pos_ir, true);
+    m_impl.getSpillReloadEliminateMgr().recordSpill(lt, spill, ctx, false);
     return spill;
 }
 
@@ -1690,16 +2148,13 @@ void SplitMgr::insertSpillDuringSplitting(LifeTime * lt, SplitCtx const& ctx,
 {
     if (canberemat) { return; }
     if (!isUsedBySuccessors(lt->getPrno(), ctx)) { return; }
-    if (m_ra.canSpillAvoid(lt->getPrno())) { return; }
     spill = insertSpillAroundSplitPos(lt, ctx);
 }
 
 
 void SplitMgr::insertReloadDuringSplitting(LifeTime * lt, LifeTime * newlt,
-                                           SplitCtx const& ctx,
-                                           bool canberemat,
-                                           RematCtx const& rematctx,
-                                           IR * spill)
+    SplitCtx const& ctx, bool canberemat, RematCtx const& rematctx,
+    IR * spill, OUT IR*& reload)
 {
     if (!UpdatePos::isUse(ctx.reload_pos)) { return; }
     if (canberemat) {
@@ -1709,7 +2164,6 @@ void SplitMgr::insertReloadDuringSplitting(LifeTime * lt, LifeTime * newlt,
         dumpRemat(m_impl, remat, lt, newlt, ctx.reload_occ.getIR());
         return;
     }
-    if (m_ra.canSpillAvoid(lt->getPrno())) { return; }
 
     //There is no need to insert reload newlt's register in some cases:
     //1. reload_pos is already a DEF operation.
@@ -1717,9 +2171,8 @@ void SplitMgr::insertReloadDuringSplitting(LifeTime * lt, LifeTime * newlt,
     ASSERTN(spill, ("illegal splitting strategy"));
     Var * spill_loc = m_impl.findSpillLoc(spill);
     ASSERT0(spill_loc);
-    IR * reload = m_impl.insertReloadBefore(newlt->getPrno(), spill_loc,
-                                            spill_loc->getType(),
-                                            ctx.reload_occ.getIR());
+    reload = m_impl.insertReloadBefore(newlt->getPrno(), spill_loc,
+        spill_loc->getType(), ctx.reload_occ.getIR());
     dumpReload(m_impl, reload, lt, newlt, ctx.reload_occ.getIR());
 }
 
@@ -1738,9 +2191,12 @@ LifeTime * SplitMgr::splitAt(LifeTime * lt, MOD SplitCtx & ctx)
     RematCtx rematctx;
     bool canberemat = m_ra.checkLTCanBeRematerialized(lt, rematctx);
     IR * spill = nullptr;
+    IR * reload = nullptr;
     insertSpillDuringSplitting(lt, ctx, canberemat, rematctx, spill);
-    insertReloadDuringSplitting(lt, newlt, ctx, canberemat, rematctx, spill);
+    insertReloadDuringSplitting(lt, newlt, ctx, canberemat, rematctx, spill,
+                                reload);
     m_impl.recordSplittedNewLT(newlt);
+    m_impl.getSpillReloadEliminateMgr().record(spill, reload);
     return newlt;
 }
 
@@ -1759,6 +2215,55 @@ void SplitMgr::shrinkSplitPosForSpillOnly(LifeTime * lt, MOD SplitCtx & ctx)
 }
 
 
+void SplitMgr::shrinkLTForSpillOnly(LifeTime * lt, Pos split_pos,
+                                    IR const* split_pos_ir)
+{
+    //We need two steps to finish the lifetime shrink.
+    //  1. Shrink the lifetime forward to the split position.
+    //  2. Shrink the lifetime forward to the last occ if there are some gap
+    //     position between the last postion of lifetime and the last occ.
+    //E.g:
+    //
+    //Original lifetime:
+    // lifetime $1: <2-17><34-53>
+    //    | ----------------                --------------------
+    //    |                u                d  u               u
+    // POS: 2   5          17               34 37    41        53
+    //                                               ^
+    //                                               |
+    //                                           split_pos
+    //Modified lifetime after step 1:
+    // lifetime $1: <2-17><34-41>
+    //    | ----------------                ---------
+    //    |                u                d  u
+    // POS: 2   5          17               34 37    41
+    //                                               ^
+    //                                               |
+    //                                           split_pos
+    //Final lifetime after step 2:
+    // lifetime $1: <2-17><34-37>
+    //    | ----------------                ----
+    //    |                u                d  u
+    // POS: 2   5          17               34 37
+
+    ASSERT0(lt && split_pos_ir);
+    ASSERT0(split_pos != POS_UNDEF);
+    //Implemente the step 1.
+    shrinkLTToSplitPos(lt, split_pos, split_pos_ir);
+
+    //Implement the step 2, shrink the lifetime to the last pcc before the
+    //split position if possible.
+    OccListIter it = nullptr;
+    bool find = lt->findOccBefore(split_pos, it);
+    if (!find) { return; }
+    ASSERT0(find);
+    Occ occ = it->val();
+    Range r = lt->getLastRange();
+    RG_end(r) = occ.pos();
+    lt->setLastRange(r);
+}
+
+
 void SplitMgr::spillOnly(LifeTime * lt, MOD SplitCtx & ctx)
 {
     ASSERT0(lt);
@@ -1768,7 +2273,7 @@ void SplitMgr::spillOnly(LifeTime * lt, MOD SplitCtx & ctx)
         m_ra.getActMgr().dump("SPILL_ONLY: $%u is spilled only with ir:id%u",
             lt->getPrno(), spill->id());
     } else {
-        shrinkLTToSplitPos(lt, ctx.split_pos, ctx.split_pos_ir);
+        shrinkLTForSpillOnly(lt, ctx.split_pos, ctx.split_pos_ir);
         lt->setRematerialized();
         m_ra.getActMgr().dump("SPILL_ONLY: $%u is spilled only but can remat",
             lt->getPrno());
@@ -1816,11 +2321,11 @@ LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
     lt->shrinkForwardToLastOccPos();
     newlt->inheritAttrFlag(lt);
     m_ra.setReg(newlt->getPrno(), REG_UNDEF);
-    if (newlt->isDedicated()) {
-        Reg antireg = m_ra.getDedicatedReg(lt->getPrno());
+    if (newlt->isPreAssigned()) {
+        Reg antireg = m_ra.getPreAssignedReg(lt->getPrno());
         ASSERT0(antireg != REG_UNDEF);
-        //Both lt and newlt expect the same dedicated register.
-        m_ra.setDedicatedReg(newlt->getPrno(), antireg);
+        //Both lt and newlt expect the same pre-assigned register.
+        m_ra.setPreAssignedReg(newlt->getPrno(), antireg);
     }
     m_impl.getLTMgr().renameLifeTimeOcc(newlt, newprno);
     dumpSplitTwo(m_impl, lt, newlt, ctx.split_pos, ctx.reload_pos);
@@ -1829,8 +2334,34 @@ LifeTime * SplitMgr::splitIntoTwoLT(LifeTime * lt, SplitCtx const& ctx)
 //END SplitMgr
 
 
-void LSRAImpl::dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
-                          CHAR const* format, ...)
+//
+//Start LSRAImpl.
+//
+LSRAImpl::LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose)
+    : m_is_dominfo_valid(true), m_ra(ra), m_rsimpl(rsimpl),
+      //NOTE:m_rg has to be initialized before m_spill_reload_eliminate_mgr.
+      m_rg(ra.getRegion()),
+      m_spill_reload_eliminate_mgr(*this)
+{
+    m_is_insert_bb = false;
+    m_use_expose = use_expose;
+    m_rg = ra.getRegion();
+    m_tm = m_rg->getTypeMgr();
+    m_irmgr = m_rg->getIRMgr();
+    m_cfg = ra.getCFG();
+    m_bb_list = ra.getBBList();
+    m_live_mgr = nullptr;
+    m_oc = nullptr;
+    m_argpasser = nullptr;
+}
+
+
+LSRAImpl::~LSRAImpl()
+{}
+
+
+void LSRAImpl::dumpAssign(
+    LSRAImpl & lsra, LifeTime const* lt, CHAR const* format, ...)
 {
     Reg r = lsra.getReg(lt);
     if (format != nullptr) {
@@ -1864,7 +2395,7 @@ void LSRAImpl::forceAssignRegister(LifeTime const* lt, Reg reg)
         m_rsimpl.recordUsedCaller(reg);
     }
     m_ra.setReg(lt->getPrno(), reg);
-    dumpAssign(*this, lt, "assign dedicated register");
+    dumpAssign(*this, lt, "assign pre-assigned register");
 }
 
 
@@ -1904,7 +2435,7 @@ bool LSRAImpl::tryAssignCaller(IR const* ir, LifeTime const* lt)
 
 bool LSRAImpl::tryAssignRegisterByPrefer(IR const* ir, LifeTime const* lt)
 {
-    ASSERT0(!lt->isDedicated());
+    ASSERT0(!lt->isPreAssigned());
     ASSERT0(getLTPrefer(lt) != PREFER_UNDEF);
 
     if (getLTPrefer(lt) == PREFER_CALLEE) {
@@ -1924,20 +2455,17 @@ bool LSRAImpl::tryAssignRegisterByPrefer(IR const* ir, LifeTime const* lt)
 
 bool LSRAImpl::tryAssignRegisterDefault(IR const* ir, LifeTime const* lt)
 {
-    ASSERT0(!lt->isDedicated());
-
+    ASSERT0(!lt->isPreAssigned());
     if (tryAssignCaller(ir, lt)) { return true; }
     if (tryAssignCallee(ir, lt)) { return true; }
-
-    getActMgr().dump("ASSIGN:can NOT find register for $%u",
-                      lt->getPrno());
+    getActMgr().dump("ASSIGN:can NOT find register for $%u", lt->getPrno());
     return false;
 }
 
 
 bool LSRAImpl::tryAssignRegister(IR const* ir, LifeTime const* lt)
 {
-    ASSERT0(!lt->isDedicated());
+    ASSERT0(!lt->isPreAssigned());
     return (getLTPrefer(lt) == PREFER_UNDEF) ?
         tryAssignRegisterDefault(ir, lt) : tryAssignRegisterByPrefer(ir, lt);
 }
@@ -1951,8 +2479,8 @@ LifeTime * LSRAImpl::selectAssignDefCand(Pos curpos, IR const* curstmt)
 }
 
 
-LifeTime * LSRAImpl::selectAssignUseCand(Pos curpos, IR const* curstmt,
-                                         OUT IR const** curir)
+LifeTime * LSRAImpl::selectAssignUseCand(
+    Pos curpos, IR const* curstmt, OUT IR const** curir)
 {
     ASSERT0(curstmt && curir);
     if (m_ra.isFakeUseAtLexLastBBInLoop(curstmt)) {
@@ -1982,8 +2510,8 @@ LifeTime * LSRAImpl::selectAssignUseCand(Pos curpos, IR const* curstmt,
 
 
 //Spill LT that assigned referred register in given LTSet.
-void LSRAImpl::splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
-                                 MOD LTSet & set)
+void LSRAImpl::splitAllLTWithReg(
+    Pos curpos, IR const* ir, Reg r, MOD LTSet & set)
 {
     ASSERT0(r != REG_UNDEF);
     LTSetIter it;
@@ -1991,21 +2519,19 @@ void LSRAImpl::splitAllLTWithReg(Pos curpos, IR const* ir, Reg r,
     for (set.get_head(&it), nit = it; it != nullptr; it = nit) {
         set.get_next(&nit);
         LifeTime * t = it->val();
-        if (!m_ra.isAlias(getReg(t), r)) { continue; }
+        if (!m_rsimpl.isAlias(getReg(t), r)) { continue; }
         SplitMgr spltmgr(*this);
         SplitCtx ctx(curpos);
         ctx.split_pos = curpos;
         ctx.split_pos_ir = ir;
         ctx.split_lt = t;
-        bool canbe = spltmgr.checkIfCanBeSplitCand(t, ctx.split_pos,
-                                                   ctx.reload_pos,
-                                                   ctx.reload_occ);
+        bool canbe = spltmgr.checkIfCanBeSplitCand(
+            t, ctx.split_pos, ctx.reload_pos, ctx.reload_occ);
         ASSERT0_DUMMYUSE(canbe);
-        dumpSelectSplitCand(*this, t, curpos, true,
-                            "split $%u that assigned %s",
-                            t->getPrno(), m_ra.getRegName(r));
+        dumpSelectSplitCand(
+            *this, t, curpos, true, "split $%u that assigned %s",
+            t->getPrno(), m_ra.getRegName(r));
         splitOrSpillOnly(t, curpos, ctx, spltmgr);
-        if (ir->isCallStmt()) { t->setSpillCallerSaved(); }
         set.remove(it);
         m_ra.getHandled().append_tail(t);
         m_rsimpl.freeReg(t);
@@ -2041,8 +2567,11 @@ void LSRAImpl::splitCallerSavedLT(Pos curpos, IR const* ir)
     RegSet const& used = m_rsimpl.getUsedCaller();
     for (BSIdx i = used.get_first(); i != BS_UNDEF; i = used.get_next(i)) {
         ASSERT0(i != REG_UNDEF);
+        //Since the LifeTime is 2D, which includes live-in and live-out
+        //information, there is no need to split lifetimes that resided in
+        //a 2D hole, because these in-hole 2D lifetimes absolutely do not
+        //intersect with the lifetime of 'ir'.
         splitAllLTWithReg(curpos, ir, (Reg)i, m_ra.getActive());
-        splitAllLTWithReg(curpos, ir, (Reg)i, m_ra.getInActive());
     }
 }
 
@@ -2059,17 +2588,22 @@ void LSRAImpl::saveCallee()
 }
 
 
-//Dedicated register must be satefied in the highest priority.
-void LSRAImpl::assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt)
+//Pre-assigned register must be satefied in the highest priority.
+void LSRAImpl::assignPreAssignedLT(Pos curpos, IR const* ir, LifeTime * lt)
 {
-    ASSERT0(lt->isDedicated());
-    Reg antireg = m_ra.getDedicatedReg(lt);
+    ASSERT0(lt->isPreAssigned());
+    Reg antireg = m_ra.getPreAssignedReg(lt);
     ASSERT0(antireg != REG_UNDEF);
-    splitActiveLTWithReg(curpos, ir, antireg);
-    splitInActiveLTWithReg(curpos, ir, antireg);
+
+    //Dedicated prnos should not be involved in the lifetime splitting.
+    if (!m_ra.isDedicatedReg(antireg) ||
+        (antireg == m_ra.getFP() && m_ra.isFPAllocable())) {
+        splitActiveLTWithReg(curpos, ir, antireg);
+        splitInActiveLTWithReg(curpos, ir, antireg);
+        m_ra.addActive(lt);
+    }
     forceAssignRegister(lt, antireg);
     ASSERT0(getReg(lt) == antireg);
-    m_ra.addActive(lt);
     ASSERT0L3(m_ra.verify4List());
 }
 
@@ -2080,8 +2614,8 @@ void LSRAImpl::assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt)
 void LSRAImpl::tryAssignRegForIR(Pos pos, IR const* ir, LifeTime * lt)
 {
     ASSERT0(ir && (ir->is_stmt() || ir->is_exp()));
-    if (lt->isDedicated()) {
-        assignDedicatedLT(pos, ir, lt);
+    if (lt->isPreAssigned()) {
+        assignPreAssignedLT(pos, ir, lt);
         return;
     }
     //Normal lifetime.
@@ -2090,7 +2624,7 @@ void LSRAImpl::tryAssignRegForIR(Pos pos, IR const* ir, LifeTime * lt)
         ASSERT0(r != REG_UNDEF);
         splitInActiveLTWithReg(pos, ir, r);
         m_ra.addActive(lt);
-        ASSERT0(m_ra.verify4List());
+        ASSERT0L3(m_ra.verify4List());
         return;
     }
     ASSERT0(ir);
@@ -2158,11 +2692,11 @@ void LSRAImpl::transferActive(Pos curpos)
 
 //The function check each CFG edge to fixup the lifetime conflict while the
 //linearization allocation flattening the CFG.
-void LSRAImpl::reviseLTConsistency(MOD PostProcessCtx & ctx)
+void LSRAImpl::reviseLTConsistency()
 {
     START_TIMER(t, "reviseLTConsistency");
     LTConsistencyMgr mgr(*this);
-    mgr.perform(ctx);
+    mgr.perform();
     END_TIMER(t, "reviseLTConsistency");
 }
 
@@ -2493,52 +3027,6 @@ IR * LSRAImpl::insertRemat(PRNO to, IR const* exp, Type const* ty, IRBB * bb)
 }
 
 
-void LSRAImpl::checkAndDoForceReload(LifeTime * lt, Pos curpos,
-                                     IR const* curir, LifeTime const* cand)
-{
-    ASSERT0(lt && cand && curir);
-    ASSERT0(curpos != POS_UNDEF);
-
-    //If the lifetime can avoid to do do spill, so it is not necessary to
-    //do the reload.
-    if (m_ra.canSpillAvoid(lt->getPrno())) { return; }
-
-    OccList & lt_occ_list = lt->getOccList();
-    IR * lt_first = lt_occ_list.get_head().getIR();
-    ASSERT0(lt_first);
-
-    IR * lt_stmt = lt_first->is_stmt() ? lt_first : lt_first->getStmt();
-    IR const* cur_stmt = curir->is_stmt() ? curir : curir->getStmt();
-
-    PRLiveSet const* live_in = m_live_mgr->get_livein(cur_stmt->getBB()->id());
-    ASSERT0(live_in);
-
-    //Since the register assigned to the candidate will be assigned to the lt
-    //as well, so if the candidate lifetime is not the live-in of current BB,
-    //which means the candidate lifetime will be not used in current BB, so the
-    //the register will not be overwrote by the candidate, the reload for the
-    //lt is not necessary.
-    if (!live_in->is_contain(cand->getAnctPrno())) { return; }
-
-    //If the statement of the first occ of lt and cand are not fake-use IR,
-    //it is not required to do the force-reload.
-    if (!getRA().isFakeUseAtLexFirstBBInLoop(lt_stmt)) { return; }
-
-    //Insert Reload before current IR.
-    Type const* ty = m_ra.getSpillType(lt_first->getType());
-    Var * spill = m_ra.genSpillLoc(lt->getPrno(), ty);
-    insertReloadBefore(lt->getPrno(), spill, ty, lt_stmt);
-
-    //Shrink the liftime to curpos.
-    Range r = lt->getFirstRange();
-    RG_start(r) = curpos;
-    lt->setRange(0, r);
-
-    //Set force-reload flag.
-    lt->setReloadForced();
-}
-
-
 bool LSRAImpl::isLtSplitBeforeFakeUseAtLexLastBBInLoop(LifeTime const* lt,
                                                        Pos curpos) const
 {
@@ -2556,14 +3044,60 @@ bool LSRAImpl::isLtSplitBeforeFakeUseAtLexLastBBInLoop(LifeTime const* lt,
 }
 
 
+void LSRAImpl::splitPosOpt(LifeTime * lt, MOD SplitCtx & ctx)
+{
+    moveSplitPosOutsideLoop(lt, ctx);
+}
+
+
+void LSRAImpl::moveSplitPosOutsideLoop(LifeTime * lt, MOD SplitCtx & ctx) const
+{
+    LI<IRBB> const* liroot = m_cfg->getLoopInfo();
+    if (liroot == nullptr) { return; } //No loop info.
+
+    Occ final_occ; //Use as the final split position.
+    UINT min_nestlevel = 0xFFFFFFFF; //Maximum number of nest level in loop.
+
+    OccList const& occlst = lt->getOccList();
+    OccListIter it = nullptr;
+    for (Occ occ = occlst.get_tail(&it); it != nullptr;
+         occ = occlst.get_prev(&it)) {
+
+        //Don't care about the occurrences after the split position.
+        if (occ.pos() >= ctx.split_pos) { continue; }
+
+        //Spilling cannot cross the definition occurrence.
+        if (occ.is_def()) { break; }
+
+        //Whether the occurrence is within the loop.
+        ASSERT0(occ.getBB());
+        UINT nestlevel = 0;
+        liroot->isInsideLoopTree(occ.getBB()->id(), nestlevel, true);
+
+        //Select the occurrence with the smallest nest level. Note that we only
+        //select the occurrence that is closest to the original split position
+        //and has the smallest nesting level.
+        if (nestlevel >= min_nestlevel) { continue; }
+        min_nestlevel = nestlevel;
+        final_occ = occ;
+    }
+
+    //Move the split position out of loop.
+    ctx.split_pos = final_occ.pos();
+    ctx.split_pos_ir = final_occ.getIR();
+}
+
+
 void LSRAImpl::splitOrSpillOnly(LifeTime * lt, Pos split_pos,
                                 MOD SplitCtx & ctx, SplitMgr & spltmgr)
 {
     if (isLtSplitBeforeFakeUseAtLexLastBBInLoop(lt, split_pos)) {
-        if (m_ra.canSpillAvoid(lt->getPrno())) { return; }
         spltmgr.spillOnly(lt, ctx);
         return;
     }
+
+    //Lifetime split position optimization.
+    splitPosOpt(lt, ctx);
 
     LifeTime * newlt = spltmgr.splitAt(lt, ctx);
     m_ra.addUnhandled(newlt);
@@ -2619,16 +3153,13 @@ void LSRAImpl::solveConflict(LifeTime * lt, Pos curpos, IR const* curir)
             computeLTPrefer(cand);
         }
         succ = tryAssignRegister(curir, lt);
-
-        //Check and do the force-reload if necessary.
-        if (succ) { checkAndDoForceReload(lt, curpos, curir, cand); }
         count++;
     } while (!succ && count < 20);
     ASSERT0(succ);
     dumpAssign(*this, lt, nullptr);
     m_ra.addActive(lt);
     splitInActiveLTWithReg(curpos, curir, getReg(lt));
-    ASSERT0(m_ra.verify4List());
+    ASSERT0L3(m_ra.verify4List());
 }
 
 
@@ -2663,66 +3194,826 @@ void LSRAImpl::computeLTPrefer(LifeTime const* lt)
 }
 
 
-bool LSRAImpl::eliminateSpillForOneDefLifeTime(IR * spill, LifeTime * lt)
+bool LSRAImpl::eliminateSingleIR(IR const* ir)
 {
-    ASSERT0(spill && lt && lt->isOneDefOnly());
+    ASSERT0(ir);
 
-    //Spilling IR generated forced or due to caller saved register allocation
-    //before the call statement cannot be eliminated.
-    if (lt->isSpillOnly() || lt->isSpillCallerSaved()) { return false; }
+    //If the IR is already removed, return;
+    if (getSpillReloadEliminateMgr().isIRRemoved(ir)) { return false; }
 
-    //For one-def lifetime, we only need to eliminate the spilling IR in the
-    //lifetime of "use". The "def" lifetime cannot eliminate these IRs.
-    if (isContainDef(lt)) { return false; }
+    IRBB * bb = ir->getBB();
 
-    //Elimination.
-    IRBB * bb = spill->getBB();
-    ASSERT0(bb);
-    bb->getIRList().remove(spill);
+    //If the basic block of IR is nullptr, it means that this IR has already
+    //been eliminated by some optimizations.
+    //Note that we donot free this IR here. Since multiple optimizations may
+    //eliminate same IR, We record it instead of free it to prevent multiple
+    //free. The IR will be uniformly freed in the destructor's freeRemovedIRs()
+    //after all optimizations are completed.
+    if (bb != nullptr) { bb->getIRList().remove(const_cast<IR*>(ir)); }
+
+    //Record all the eliminated IRs.
+    getSpillReloadEliminateMgr().addToRemovedIRTab(ir);
     return true;
 }
 
 
-bool LSRAImpl::eliminateSpill(IR * spill)
+void LSRAImpl::removeSpillIRForFakeUseAtLexFirstBBOfLoop()
 {
-    ASSERT0(spill && spill->is_st() && spill->getRHS()->is_pr());
-    ASSERT0(spill->getRHS()->getPrno() != PRNO_UNDEF);
-    LifeTime * lt = m_ra.getLT(spill->getRHS()->getPrno());
+    PR2FakeUseSpill const& pr2fakeuse_spill =
+        getSpillReloadEliminateMgr().getPR2FakeUseSpill();
 
-    //Now we only eliminate spilling IRs for one-def lifetime.
-    if (lt == nullptr || !lt->isOneDefOnly()) { return false; }
-    return eliminateSpillForOneDefLifeTime(spill, lt);
+    PR2FakeUseSpillIter it;
+    IR const* spill = nullptr;
+    for(PRNO pr = pr2fakeuse_spill.get_first(it, &spill);
+        pr != PRNO_UNDEF; pr = pr2fakeuse_spill.get_next(it, &spill)) {
+       ASSERT0(getRA().isSpillOp(spill));
+       ASSERT0(pr == spill->getRHS()->getPrno());
+       eliminateSingleIR(spill);
+    }
 }
 
 
-bool LSRAImpl::spillElimination(PostProcessCtx const& ctx)
+bool LSRAImpl::eliminateIRsInTab(IRTab & irtab)
 {
+    if (irtab.get_elem_count() == 0) { return false; }
     bool changed = false;
-    IRTab const& spill_tab = m_ra.getSpillTab();
-    IRTab const& revise_spill_tab = ctx.getReviseSpillTab();
-    TTabIter<IR*> iter;
-    for (IR * spill = spill_tab.get_first(iter); spill != nullptr;
-         spill = spill_tab.get_next(iter)) {
-        if (revise_spill_tab.find(spill)) { continue; }
-        changed |= eliminateSpill(spill);
+    IRTabIter it;
+    for (IR * ir = irtab.get_first(it); ir != nullptr;
+         ir = irtab.get_next(it)) {
+        changed |= eliminateSingleIR(ir);
     }
     return changed;
 }
 
 
-bool LSRAImpl::postProcess()
+bool LSRAImpl::eliminateSpillOfOneDefLifeTime()
 {
     bool changed = false;
-    PostProcessCtx ctx;
 
-    //Revist lifetime consistency.
-    reviseLTConsistency(ctx);
+    LT2IRTab * lt2irtab = m_spill_reload_eliminate_mgr.getLT2Spill();
+    if (lt2irtab == nullptr) { return false; }
 
-    //Save callee saved registers.
-    saveCallee();
+    LTList const& ltlst = getLTMgr().getLTList();
+    LTListIter it;
+    for (LifeTime const* lt = ltlst.get_head(&it); lt != nullptr;
+         lt = ltlst.get_next(&it)) {
+        //We only process one-def lifetimes carried spilling IRs.
+        if (!lt->isOneDefOnly() || !lt2irtab->find(lt)) { continue; }
 
-    //Eliminate extra spilling IRs.
-    changed |= spillElimination(ctx);
+        //Eliminate all spilling IRs of current one-def lifetime.
+        eliminateIRsInTab(*(lt2irtab->get(lt)));
+
+        //Insert a new spilling IR after the definition of one-def lifetime.
+        ASSERT0(lt->getAncestor());
+        Occ def = lt->getAncestor()->getOnlyDefOcc();
+        ASSERT0(def.pos() != POS_UNDEF && def.getIR() != nullptr);
+        IR const* def_ir = def.getIR();
+        ASSERT0(def_ir->is_stmt() && def_ir->getPrno() != PRNO_UNDEF);
+        PRNO def_prno = def_ir->getPrno();
+        Type const* tp = getRA().getSpillType(def_prno);
+        insertSpillAfter(def_prno, tp, def_ir);
+
+        changed = true;
+    }
+    return changed;
+}
+
+
+bool LSRAImpl::eliminateRedundantMov()
+{
+    BBListIter bbit;
+    IRTab remove_tab;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+        BBIRList const& irlst = bb->getIRList();
+        BBIRListIter bbirit;
+        for (IR * ir = irlst.get_head(&bbirit);
+             ir != nullptr; ir = irlst.get_next(&bbirit)) {
+            //Process the mov Op only.
+            if (!m_ra.isMoveOp(ir)) { continue; }
+
+            PRNO dst_prno = ir->getPrno();
+            PRNO src_prno = ir->getRHS()->getPrno();
+            ASSERT0(dst_prno != PRNO_UNDEF);
+            ASSERT0(src_prno != PRNO_UNDEF);
+            ASSERT0(m_ra.getReg(dst_prno) != REG_UNDEF);
+            ASSERT0(m_ra.getReg(src_prno) != REG_UNDEF);
+
+            //Ignore the dst register and src register are not same.
+            if (m_ra.getReg(dst_prno) != m_ra.getReg(src_prno)) { continue; }
+
+            //Record redundant ir.
+            remove_tab.append(ir);
+        }
+    }
+
+    return eliminateIRsInTab(remove_tab);
+}
+
+
+bool LSRAImpl::eliminateSameSlotSpillAfterReload()
+{
+    BBListIter bbit;
+    IRTab remove_tab;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+        BBIRList const& irlst = bb->getIRList();
+        BBIRListIter bbirit;
+        IR * prev_ir = nullptr;
+
+        //Match and record redundant ir.
+        for (IR * cur_ir = irlst.get_head(&bbirit); cur_ir != nullptr;
+             prev_ir = cur_ir, cur_ir = irlst.get_next(&bbirit)) {
+
+            //Process only when current is spillOp and previous is reloadOp.
+            if (prev_ir == nullptr || !m_ra.isSpillOp(cur_ir) ||
+                !m_ra.isReloadOp(prev_ir)) {
+                continue;
+            }
+
+            PRNO ld_prno = prev_ir->getPrno();
+            PRNO st_prno = cur_ir->getRHS()->getPrno();
+            Var const* ld_var = LD_idinfo(prev_ir->getRHS());
+            Var const* st_var = ST_idinfo(cur_ir);
+            ASSERT0(ld_prno != PRNO_UNDEF && st_prno != PRNO_UNDEF);
+            ASSERT0(ld_var != nullptr && st_var != nullptr);
+
+            Reg ld_reg = m_ra.getReg(ld_prno);
+            Reg st_reg = m_ra.getReg(st_prno);
+            ASSERT0(ld_reg != REG_UNDEF && st_reg != REG_UNDEF);
+
+            //Ignore if registers or var IDs don't match.
+            if (ld_reg != st_reg || ld_var != st_var) { continue; }
+
+            //Record redundant ir.
+            remove_tab.append(cur_ir);
+        }
+    }
+
+    return eliminateIRsInTab(remove_tab);
+}
+
+
+bool LSRAImpl::optimizeCrossBBStoreLoadToMov()
+{
+    BBListIter bbit;
+    bool changed = false;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+
+        //Only handle latch BBs.
+        if (!getRA().isLatchBB(bb) ||
+            bb->getNumOfSucc() != 1) {
+            continue;
+        }
+
+        IRBB * succ_bb = m_cfg->get_first_succ(bb);
+        if (!isUniquePredSuccPair(bb, succ_bb)) { continue; }
+
+        //If the successor is a tramp BB, consider its successor instead.
+        if (isTrampBB(succ_bb)) {
+            IRBB * succ_succ_bb = m_cfg->get_first_succ(bb);
+            if (!isUniquePredSuccPair(succ_bb, succ_succ_bb)) { continue; }
+            succ_bb = succ_succ_bb;
+        }
+
+        if (bb->is_empty() || succ_bb->is_empty()) { continue; }
+
+        IR * lst_ir = bb->getLastIR();
+        IR * fst_ir = succ_bb->getFirstIR();
+        if (!m_ra.isSpillOp(lst_ir) || !m_ra.isReloadOp(fst_ir) ||
+            ST_idinfo(lst_ir) != LD_idinfo(fst_ir->getRHS())) {
+            continue;
+        }
+
+        PRNO st_prno = lst_ir->getRHS()->getPrno();
+        PRNO ld_prno = fst_ir->getPrno();
+        ASSERT0(st_prno != PRNO_UNDEF && ld_prno != PRNO_UNDEF);
+
+        //Convert to mov if assigned physical registers are different.
+        if (m_ra.getReg(ld_prno) != m_ra.getReg(st_prno)) {
+            IR * mv = m_irmgr->buildMove(ld_prno, st_prno,
+                fst_ir->getRHS()->getType(), lst_ir->getType());
+            m_ra.setMove(mv);
+            succ_bb->getIRList().append_head(mv);
+        }
+        changed |= eliminateSingleIR(fst_ir);
+    }
+    return changed;
+}
+
+
+bool LSRAImpl::isDifferentIROp(IR const* ir1, IR const* ir2) const
+{
+    if (ir1 == nullptr || ir2 == nullptr) { return true; }
+
+    if (m_ra.isRematOp(ir1) && m_ra.isRematOp(ir2)) {
+        //e.g.:
+        //    stpr $661:i32 (r42) attachinfo:Dbx
+        //        ldi:i32
+        //            $210:i32 (r13)
+        //            intconst:i32 255|0xff
+        PRNO ir1_prno = ir1->getPrno();
+        PRNO ir2_prno = ir2->getPrno();
+        ASSERT0(ir1_prno != PRNO_UNDEF && ir2_prno != PRNO_UNDEF);
+        if (ir1_prno == ir2_prno &&
+            m_ra.getReg(ir1_prno) == m_ra.getReg(ir2_prno) &&
+            m_irmgr->isIRIsomorphicExtOp(ir1->getRHS(), ir2->getRHS(),
+            true, IsomoFlag(ISOMO_CK_ALL))) {
+            return false;
+        }
+        return true;
+    }
+    if (m_ra.isReloadOp(ir1) && m_ra.isReloadOp(ir2)) {
+        //e.g.:
+        //    stpr $246:u64 (r8)
+        //        ld:u64:storage_space(stack) 'func_level_var_40'
+        PRNO ir1_prno = ir1->getPrno();
+        PRNO ir2_prno = ir2->getPrno();
+        ASSERT0(ir1_prno != PRNO_UNDEF && ir2_prno != PRNO_UNDEF);
+        if (ir1_prno == ir2_prno &&
+            m_ra.getReg(ir1_prno) == m_ra.getReg(ir2_prno) &&
+            LD_idinfo(ir1->getRHS()) == LD_idinfo(ir2->getRHS())) {
+            return false;
+        }
+        return true;
+    }
+    if (m_ra.isMoveOp(ir1) && m_ra.isMoveOp(ir2)) {
+        //e.g.:
+        //    stpr $6125:i32 (r6)
+        //        $6197:i32 (r4)
+        PRNO ir1_prno = ir1->getPrno();
+        PRNO ir2_prno = ir2->getPrno();
+        PRNO ir1_rhs_prno = ir1->getRHS()->getPrno();
+        PRNO ir2_rhs_prno = ir2->getRHS()->getPrno();
+        ASSERT0(ir1_prno != PRNO_UNDEF && ir2_prno != PRNO_UNDEF &&
+                ir1_rhs_prno != PRNO_UNDEF && ir2_rhs_prno != PRNO_UNDEF);
+        if (ir1_prno == ir2_prno && ir1_rhs_prno == ir2_rhs_prno &&
+            m_ra.getReg(ir1_prno) == m_ra.getReg(ir2_prno) &&
+            m_ra.getReg(ir1_rhs_prno) == m_ra.getReg(ir2_rhs_prno)) {
+            return false;
+        }
+        return true;
+    }
+    if (m_ra.isSpillOp(ir1) && m_ra.isSpillOp(ir2)) {
+        //e.g.:
+        //    st:u64:storage_space(stack) 'func_level_var_35'
+        //        $240:u64 (r8)
+        PRNO ir1_prno = ir1->getRHS()->getPrno();
+        PRNO ir2_prno = ir2->getRHS()->getPrno();
+        ASSERT0(ir1_prno != PRNO_UNDEF && ir2_prno != PRNO_UNDEF);
+        if (ir1_prno == ir2_prno && ST_idinfo(ir1) == ST_idinfo(ir2) &&
+            m_ra.getReg(ir1_prno) == m_ra.getReg(ir2_prno)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+bool LSRAImpl::mergeCommonIRAtBlockEnd(Vector<IRBB*> & latch_vec,
+                                       MOD IRBB * base_bb, UINT com_ir_num)
+{
+    ASSERT0(base_bb != nullptr);
+
+    bool changed = false;
+    UINT latchbb_nums = latch_vec.get_elem_count();
+
+    if (com_ir_num == 0 || latchbb_nums == 0) { return false; }
+
+    //1.Select the IR sequence to be merged.
+    //If any BB in the set fallthrough to 'base_bb', use its identical IRs as
+    //the merged IRs to avoid generating redundant branch instructions.
+    IRBB * ft_bb = m_cfg->getFallThroughPrevBB(base_bb);
+    IRBB * target_bb = latch_vec[latchbb_nums - 1];
+    ASSERT0(ft_bb != nullptr && target_bb != nullptr);
+
+    for (VecIdx i = 0; i < (VecIdx)latchbb_nums; i++) {
+        if (latch_vec[i] != ft_bb) { continue; }
+        target_bb = ft_bb;
+        break;
+    }
+
+    //2.Remove IRs to be merged from the other BBs.
+    for (VecIdx i = 0; i < (VecIdx)latchbb_nums; i++) {
+        if (latch_vec[i] == target_bb) { continue; }
+        BBIRList & irlst = latch_vec[i]->getIRList();
+        ASSERT0(irlst.get_elem_count() >= com_ir_num);
+
+        for (int j = com_ir_num; j > 0; --j) {
+            //Remove the IR and clear its record in LSRA.
+            IR * remove_ir = irlst.remove_tail();
+            changed |= eliminateSingleIR(remove_ir);
+        }
+    }
+
+    //3.Generate the merged BB.
+    IRBB * new_bb = nullptr;
+    BBIRListIter bbirit;
+    IRCfgOptCtx coctx(getOptCtx());
+
+    //Extract common IRs from the target BB and move them into a new BB.
+    if (target_bb->getIRList().get_elem_count() > com_ir_num) {
+        //Finding the Spill Point.
+        BBIRList & irlst = target_bb->getIRList();
+        UINT i = 0;
+        for (irlst.get_tail(&bbirit); i < com_ir_num;
+             ++i, irlst.get_prev(&bbirit)) {}
+
+        //Invalid DomInfo to inform CFG related API to stop update.
+        m_oc->setInvalidDom();
+        m_oc->setInvalidPDom();
+
+        new_bb = m_cfg->splitBB(target_bb, bbirit, *m_oc);
+    } else {
+        //If the target BB contains only common IRs, use the target
+        //BB as the merged BB.
+        new_bb = target_bb;
+    }
+
+    LabelInfo const* li = m_rg->genILabel();
+    m_cfg->addLabel(new_bb, li);
+
+    //4.Update the CFG to make latch BBs point to the newly merged BB.
+    List<IRBB*> preds;
+    for (VecIdx i = 0; i < (VecIdx)latchbb_nums; i++) {
+        if (latch_vec[i] == target_bb) { continue; }
+
+        IRBB * goto_bb = m_cfg->getFallThroughBB(latch_vec[i]);
+        ASSERT0(goto_bb != nullptr || isTrampBB(goto_bb));
+
+        if (latch_vec[i]->getIRList().get_elem_count() != 0) {
+            //Case1:If the BB is not empty after removing common IRs,
+            //update its goto BB to point to the new BB.
+            IR * goto_ir = goto_bb->getLastIR();
+            GOTO_lab(goto_ir) = li;
+            m_cfg->addEdge(goto_bb, new_bb, coctx);
+            m_cfg->removeEdge(goto_bb, base_bb, coctx);
+        } else {
+            //Case2:If the BB is empty after removing common IRs,
+            //update its predecessor BBs to point to the new BB,
+            //remove the current BB and its goto BB.
+            m_cfg->moveLabels(latch_vec[i], new_bb);
+
+            preds.clean();
+            m_cfg->get_preds(preds, latch_vec[i]);
+            for (IRBB * pred = preds.get_head();
+                 pred != nullptr; pred = preds.get_next()) {
+                //The case where there is a fallthrough predecessor BB
+                //is not considered.
+                ASSERT0(pred->getLastIR()->isBranch());
+                m_cfg->addEdge(pred, new_bb, coctx);
+                m_cfg->removeEdge(pred, latch_vec[i], coctx);
+            }
+
+            m_cfg->removeEdge(goto_bb, base_bb, coctx);
+            m_cfg->removeEdge(latch_vec[i], goto_bb, coctx);
+            m_cfg->removeBB(goto_bb, coctx);
+            m_cfg->removeBB(latch_vec[i], coctx);
+        }
+    }
+    return changed;
+}
+
+
+UINT LSRAImpl::getPredLatchBB(IRBB const* bb, MOD Vector<IRBB*> & latch_vec)
+{
+    ASSERT0(bb != nullptr);
+
+    latch_vec.clean();
+    for (UINT i = 0; i < bb->getNumOfPred(); ++i) {
+         IRBB * pred_bb = m_cfg->getNthPred(bb, i);
+
+        if (isTrampBB(pred_bb)) {
+            //If the predecessor BB is a tramp BB, the BB that fallthrough
+            //to the tramp BB is considered the actual latch BB.
+            pred_bb = m_cfg->getFallThroughPrevBB(pred_bb);
+        }
+
+        if (!getRA().isLatchBB(pred_bb)) { continue; }
+
+        latch_vec.append(pred_bb);
+    }
+    return latch_vec.get_elem_count();
+}
+
+
+UINT LSRAImpl::getCommonIRNumsSuffix(Vector<IRBB*> const& bbvec)
+{
+    UINT com_ir_cnt = 0;
+    UINT vec_nums = bbvec.get_elem_count();
+    Vector<BBIRList*> irlsts(vec_nums);
+    Vector<BBIRListIter> irits(vec_nums);
+
+    for (UINT i = 0; i < vec_nums; ++i) {
+        irlsts[i] = &bbvec[i]->getIRList();
+        irlsts[i]->get_tail(&irits[i]);
+    }
+
+    for (; irits[0] != nullptr; irits[0] = irlsts[0]->get_prev(irits[0])) {
+        IR * ir = irits[0]->val();
+        bool is_diff = false;
+
+        //Traverse all BBs and check whether the IR at the current
+        //position is identical.
+        for (UINT i = 1; i < vec_nums; i++) {
+            if (irits[i] == nullptr || irits[i]->val() == nullptr ||
+                isDifferentIROp(ir, irits[i]->val())) {
+                is_diff = true;
+                break;
+            }
+            irlsts[i]->get_prev(&irits[i]);
+        }
+
+        //Return immediately when the first different IR is encountered.
+        if (is_diff) { break; }
+        com_ir_cnt++;
+    }
+
+    return com_ir_cnt;
+}
+
+
+bool LSRAImpl::optimizeCommonIRAtLatchBBEnd()
+{
+    bool changed = false;
+    BBListIter bbit;
+    Vector<IRBB *> latch_vec;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+
+        //When predecessor is less than 2, optimization cannot be applied.
+        if (bb->getNumOfPred() < 2) { continue; }
+
+        //Find and record the predecessor latch BBs of the current BB.
+        //If there are fewer than 2 predecessor latch BBs,
+        //optimization cannot be applied.
+        if (getPredLatchBB(bb, latch_vec) < 2) { continue; }
+
+        //Calculate the number of identical IRs at the end of latch BBs.
+        UINT com_ir_cnt = getCommonIRNumsSuffix(latch_vec);
+
+        if (com_ir_cnt == 0) { continue; }
+
+        //Merge identical IRs at the end of BBs in the vector.
+        changed |= mergeCommonIRAtBlockEnd(latch_vec, bb, com_ir_cnt);
+    }
+    return changed;
+}
+
+
+bool LSRAImpl::optimizeCommonIRAtBlockBegin()
+{
+    bool changed = false;
+    BBListIter bbit;
+    for (IRBB * bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+
+        //Optimization applies only when the number of successors equals 2.
+        if (bb->getNumOfSucc() != 2) { continue; }
+
+        ASSERT0(bb->getLastIR()->isBranch());
+
+        IRBB * succ_bb1 = m_cfg->getNthSucc(bb, 0);
+        IRBB * succ_bb2 = m_cfg->getNthSucc(bb, 1);
+
+        if (!getRA().isLatchBB(succ_bb1) || !getRA().isLatchBB(succ_bb2) ||
+            succ_bb1->getNumOfPred() != 1 || succ_bb2->getNumOfPred() != 1) {
+            continue;
+        }
+
+        BBIRList & irlst1 = succ_bb1->getIRList();
+        BBIRList & irlst2 = succ_bb2->getIRList();
+        BBIRListIter bbirit1;
+        BBIRListIter bbirit2;
+        IR * ir1 = irlst1.get_head(&bbirit1);
+        IR * ir2 = irlst2.get_head(&bbirit2);
+        UINT com_ir_cnt = 0;
+
+        //Calculate the number of common IRs at the begin of BBs.
+        for (; ir1 != nullptr && ir2 != nullptr;
+             ir1 = irlst1.get_next(&bbirit1), ir2 = irlst2.get_next(&bbirit2)) {
+            if (isDifferentIROp(ir1, ir2)) { break; }
+            com_ir_cnt++;
+        }
+
+        while(com_ir_cnt--) {
+            //Move ir1 into the bb.
+            ir1 = irlst1.remove_head();
+            bb->getIRList().append_tail_ex(ir1);
+
+            //Delete ir2 from the irlist2.
+            ir2 = irlst2.remove_head();
+            changed |= eliminateSingleIR(ir2);
+        }
+    }
+    return changed;
+}
+
+
+bool LSRAImpl::optimizeCommonIRAtBBBoundaries()
+{
+    bool changed = false;
+
+    //Optimize common IRs in predecessor latch BBs.
+    changed |= optimizeCommonIRAtLatchBBEnd();
+
+    //Optimize common IRs in successor BBs.
+    changed |= optimizeCommonIRAtBlockBegin();
+
+    return changed;
+}
+
+
+bool LSRAImpl::replaceSpillAndReloadToMov()
+{
+    IRPairLst * pair_lst = m_spill_reload_eliminate_mgr.getSpillReloadPairs();
+    if (pair_lst == nullptr) { return false; }
+
+    //Try to get available register to replace spill and reload IRs into mov
+    //operations. Exit if it not exists.
+    Reg reg_replace = m_ra.getAvaiRegForLsraOpt();
+    if (reg_replace == REG_UNDEF) { return false; }
+
+    bool changed = false;
+    TypeMgr * tm = m_rg->getTypeMgr();
+    ASSERT0(tm);
+    xcom::List<IRBB*> bblst;
+    for (IRPair * pair = pair_lst->get_head(); pair != nullptr;
+         pair = pair_lst->get_next()) {
+        IR * spill = pair->spill;
+        IR * reload = pair->reload;
+        ASSERT0(spill && reload && spill->getType() && reload->getType());
+        ASSERT0(spill->getIdinfo() == reload->getRHS()->getIdinfo());
+        ASSERT0(spill->getType() == reload->getType());
+        ASSERT0(spill->getBB() && reload->getBB() &&
+                spill->getBB() == reload->getBB());
+        IRBB * bb = spill->getBB();
+        ASSERT0(bb);
+
+        //Current basic block has used this register and cannot use it again.
+        if (bblst.find(bb)) { continue; }
+        bblst.append_tail(bb);
+
+        Type const* tp = spill->getType();
+        ASSERT0(tp);
+        PRNO prno = m_ra.buildPrnoAndSetReg(tp, reg_replace);
+        IR * replace_spill = m_irmgr->buildStorePR(prno, tp,
+            m_rg->dupIRTree(spill->getRHS()));
+        IR * replace_reload = m_irmgr->buildStorePR(reload->getPrno(), tp,
+            m_irmgr->buildPRdedicated(prno, tp));
+        bb->getIRList().insert_before(replace_spill, spill);
+        bb->getIRList().insert_before(replace_reload, reload);
+        bb->getIRList().remove(spill);
+        bb->getIRList().remove(reload);
+        changed |= true;
+    }
+    return changed;
+}
+
+
+bool LSRAImpl::hasRegConflict(IR const* ir, Reg reg)
+{
+    ASSERT0(ir && reg != REG_UNDEF);
+    if (!ir->isWritePR()) { return false; }
+    PRNO prno = ir->getPrno();
+    ASSERT0(prno != PRNO_UNDEF);
+    Reg curreg = getRA().getReg(prno);
+    ASSERT0(curreg != REG_UNDEF);
+    return curreg == reg;
+}
+
+
+bool LSRAImpl::hasStackSlotConflict(IR const* ir, Var const* var,
+                                    MOD ConstIRIter & inneririt)
+{
+    ASSERT0(ir && var);
+    inneririt.clean();
+    for (IR const* inner_ir = iterInitC(ir, inneririt); inner_ir != nullptr;
+         inner_ir = iterNextC(inneririt)) {
+        if (!inner_ir->hasIdinfo()) { continue; }
+        Var const* curvar = inner_ir->getIdinfo();
+        ASSERT0(curvar);
+        if (curvar == var) { return true; }
+    }
+    return false;
+}
+
+
+bool LSRAImpl::hasRegOrStackSlotConflictOrCallInLoopBB(
+    IR const* ir, IRBB * bb, MOD ConstIRIter & inneririt)
+{
+    ASSERT0(bb && ir);
+    ASSERT0(getRA().isSpillOp(ir) || getRA().isReloadOp(ir));
+    IR const* rhs = ir->getRHS();
+    ASSERT0(rhs);
+    PRNO prno = getRA().isReloadOp(ir) ? ir->getPrno() : rhs->getPrno();
+    ASSERT0(prno != PRNO_UNDEF);
+    Reg reg = getRA().getReg(prno);
+    ASSERT0(reg != REG_UNDEF);
+    Var const* var = getRA().isReloadOp(ir) ? LD_idinfo(rhs) : ST_idinfo(ir);
+    ASSERT0(var);
+    IRListIter outeririt;
+    BBIRList & irlst = bb->getIRList();
+    for (IR * cur_ir = irlst.get_head(&outeririt); cur_ir != nullptr;
+         cur_ir = irlst.get_next(&outeririt)) {
+        if (cur_ir == ir) { continue; }
+
+        //Call stmt may change the register value.
+        if (cur_ir->isCallStmt() && m_rsimpl.isCaller(reg)) { return true; }
+
+        //There exists a register conflict in the loop.
+        if (hasRegConflict(cur_ir, reg)) { return true; }
+
+        //There exists a stack slot conflict in the loop.
+        if (hasStackSlotConflict(cur_ir, var, inneririt)) { return true; }
+    }
+    return false;
+}
+
+
+bool LSRAImpl::hasRegOrStackSlotConflictOrCallInLoop(
+    IR const* ir, LI<IRBB> const* li, MOD ConstIRIter & inneririt)
+{
+    ASSERT0(ir && li);
+    IRCFG * cfg = m_rg->getCFG();
+    ASSERT0(cfg);
+    xcom::BitSet * bbset = LI_bb_set(li);
+    ASSERT0(bbset);
+    for (BSIdx idx = bbset->get_first(); idx != BS_UNDEF;
+         idx = bbset->get_next(idx)) {
+        IRBB * bb = cfg->getBB(idx);
+        ASSERT0(bb);
+        if (hasRegOrStackSlotConflictOrCallInLoopBB(ir, bb, inneririt)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool LSRAImpl::canBeHoisted(
+    IR const* ir, LI<IRBB> const* li, MOD ConstIRIter & inneririt)
+{
+    ASSERT0(ir);
+    if (li == nullptr) { return false; }
+    IRBB * loophead = li->getLoopHead();
+    ASSERT0(loophead);
+    IRBB * curbb = ir->getBB();
+    ASSERT0(curbb);
+
+    //IRs in loop head should not be hoisted.
+    if (curbb == loophead) { return false; }
+    return !hasRegOrStackSlotConflictOrCallInLoop(ir, li, inneririt);
+}
+
+
+LI<IRBB> const* LSRAImpl::findHoistOuterMostLoop(
+    IR const* ir, LI<IRBB> const* liroot, MOD ConstIRIter & inneririt)
+{
+    ASSERT0(ir);
+    IRBB * bb = ir->getBB();
+    ASSERT0(bb);
+    LI<IRBB> const* li = liroot->getInnerMostLoopIncludeBB(bb->id());
+
+    //If there exists register conflict, stack slot conflict or call
+    //operation in the loop, do not hoist the IR outside the loop.
+    LI<IRBB> const* res = nullptr;
+    while (canBeHoisted(ir, li, inneririt)) {
+        res = li;
+        li = li->getOuter();
+    }
+    return res;
+}
+
+
+IRBB * LSRAImpl::genBBToHoistSpillReloadOutsideLoop(LI<IRBB> const* li,
+    MOD BB2BB & bb2insert, MOD OptCtx & oc)
+{
+    IRCFG * cfg = m_rg->getCFG();
+    ASSERT0(cfg);
+    IRBB * header_bb = li->getLoopHead();
+    ASSERT0(header_bb);
+    if (bb2insert.find(header_bb)) {
+        return bb2insert.get(header_bb);
+    }
+    IRBB * header_prev_bb = cfg->get_idom(header_bb);
+    ASSERT0(header_prev_bb);
+    IRBB * newbb = m_rg->allocBB();
+    BBListIter fromit;
+    BBListIter toit;
+    cfg->getBBList()->find(header_prev_bb, &fromit);
+    cfg->getBBList()->find(header_bb, &toit);
+    ASSERT0(fromit && toit);
+    BBListIter tmpit = fromit;
+    if (!cfg->tryUpdateRPOBeforeCFGChanged(newbb, header_bb, true, &oc)) {
+        oc.setInvalidRPO();
+    }
+    if (cfg->getBBList()->get_next(&tmpit) == header_bb) {
+        cfg->insertBBBetween(header_prev_bb, fromit, header_bb, toit, newbb,
+                             &oc);
+    } else {
+        cfg->insertBBBefore(header_bb, newbb);
+    }
+    bool add_pdom_failed = false;
+    cfg->addDomInfoToNewIDom(header_bb->id(), newbb->id(), add_pdom_failed);
+    if (add_pdom_failed) {
+        oc.setInvalidPDom();
+    }
+    bb2insert.set(header_bb, newbb);
+    getRA().setHoistBB(newbb);
+    return newbb;
+}
+
+
+bool LSRAImpl::hoistSpillReloadOutsideLoopImpl(OptCtx & oc, IRTab const& tab)
+{
+    bool changed = false;
+    LI<IRBB> const* liroot = m_cfg->getLoopInfo();
+    if (liroot == nullptr) { return changed; } //No loop info.
+    BB2BB bb2insert;
+    ConstIRIter inneririt;
+    IRTabIter irit;
+    for (IR const* ir = tab.get_first(irit); ir != nullptr;
+         ir = tab.get_next(irit)) {
+        IRBB * bb = ir->getBB();
+        if (bb == nullptr) { continue; }
+        LI<IRBB> const* li = findHoistOuterMostLoop(ir, liroot, inneririt);
+        if (li == nullptr) { continue; }
+
+        //Generate a new basic block for hoisting the spill and reload IRs
+        //outside the loop.
+        IRBB * new_bb = genBBToHoistSpillReloadOutsideLoop(li, bb2insert, oc);
+        bb->getIRList().remove(const_cast<IR*>(ir));
+        new_bb->getIRList().append_tail_ex(const_cast<IR*>(ir));
+        changed = true;
+    }
+
+    return changed;
+}
+
+
+bool LSRAImpl::removeRedundantPosGapIR(OptCtx & oc)
+{
+    PosGapIROpt pos_gap_opt(*this);
+    return pos_gap_opt.perform(oc);
+}
+
+
+bool LSRAImpl::hoistSpillReloadOutsideLoop(OptCtx & oc)
+{
+    ASSERT0L3(m_rg->getCFG()->verifyLoopInfo(oc));
+    ASSERT0(oc.is_loopinfo_valid());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
+                                               PASS_UNDEF);
+    bool changed = false;
+    changed |= hoistSpillReloadOutsideLoopImpl(oc, getRA().getSpillTab());
+    changed |= hoistSpillReloadOutsideLoopImpl(oc, getRA().getReloadTab());
+    if (changed) { oc.setInvalidLoopInfo(); }
+    return changed;
+}
+
+
+bool LSRAImpl::promoteSpillReload(OptCtx & oc)
+{
+    m_ra.generateRegLifeTime(oc);
+    return m_ra.promoteSpillReload(oc, m_rsimpl);
+}
+
+
+bool LSRAImpl::postProcess(OptCtx & oc)
+{
+    START_TIMER(t, "postProcess");
+    bool changed = false;
+
+    //Replace spill and reload IRs to mov operation using available register.
+    changed |= replaceSpillAndReloadToMov();
+
+    //Eliminate extra spilling IRs for one-def lifetimes.
+    changed |= eliminateSpillOfOneDefLifeTime();
+
+    //Eliminate the redundant spilling IRs.
+    changed |= eliminateSameSlotSpillAfterReload();
+
+    //Optimize common IR sequences at basic block boundaries.
+    changed |= optimizeCommonIRAtBBBoundaries();
+
+    //Remove the redundant pos gap IR.
+    changed |= removeRedundantPosGapIR(oc);
+
+    //Promote the spill/reload by the available registers.
+    changed |= promoteSpillReload(oc);
+
+    //Optimize load following a store across BBs into a mov instruction.
+    changed |= optimizeCrossBBStoreLoadToMov();
+
+    //Eliminate the redundant Mov IRs.
+    changed |= eliminateRedundantMov();
+
+    //Hoist spill and reload IRs outside the loop if possible.
+    // changed |= hoistSpillReloadOutsideLoop(oc);
+
+    END_TIMER(t, "postProcess");
     return changed;
 }
 
@@ -2731,18 +4022,44 @@ bool LSRAImpl::perform(OptCtx & oc)
 {
     bool changed = false;
     m_oc = &oc;
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LIVENESS_MGR,
-                                               PASS_UNDEF);
-    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_PRLIVENESS_MGR, PASS_UNDEF);
+    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->
+        queryPass(PASS_PRLIVENESS_MGR);
     ASSERT0(m_live_mgr && m_live_mgr->is_valid());
 
     //Compute the lifetime prefer for Register Allocation.
     computeRAPrefer();
+
     ScanInPosOrder scan(*this);
     scan.perform();
 
+    //Revise lifetime consistency.
+    reviseLTConsistency();
+
+    //Remove the unnecessary spill IR insterted due to the fake-use IR at
+    //the loop head.
+    removeSpillIRForFakeUseAtLexFirstBBOfLoop();
+
+    //Remove the fake-use IR with no code gen attribute after register
+    //allocation.
+    m_ra.removeFakeUseIR();
+
+    ASSERT0L3(m_ra.verifyLSRAByInterfGraph(oc));
+    ASSERT0L3(verifyLSRAOverStrict(oc));
+
+    //TODO: Investigate and fix incorrect dom information caused
+    //by pre-optimization.
+    m_oc->setInvalidPDom();
+    m_oc->setInvalidDom();
+    m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_DOM, PASS_UNDEF);
+
     //Post process after basic allocation.
-    changed |= postProcess();
+    bool removed = false;
+    removed |= postProcess(oc);
+
+    //Save callee saved registers.
+    saveCallee();
 
     if (!isDomInfoValid()) {
         //Recompute the DOM/PDOM if necessary.
@@ -2757,6 +4074,692 @@ bool LSRAImpl::perform(OptCtx & oc)
     changed |= m_ra.isInsertOp();
     return changed;
 }
-//END LSRAImpl
+
+
+bool LSRAImpl::verifyLSRAOverStrict(OptCtx & oc) const
+{
+    RegisterVerify register_verify(m_ra, m_rsimpl, m_rg, m_rg->getCFG());
+    ASSERT0(register_verify.verify());
+    return true;
+}
+//END LSRAImpl.
+
+
+//
+//START PosGapIROpt
+//
+void PosGapIROpt::genDUInfo(OptCtx & oc)
+{
+    ASSERT0(m_rg->getCFG()->verifyRPO(oc));
+    ASSERT0(m_rg->getCFG()->verifyDomAndPdom(oc));
+    ASSERT0(oc.is_rpo_valid());
+
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
+        PASS_UNDEF);
+
+    //FIXME START
+    //Need the previous PASS to revise the following PASS_LOOP_INFO, PASS_AA,
+    //PASS_MD_REF information.
+    bool do_aa = g_do_aa;
+    bool do_md_du_analysis = g_do_md_du_analysis;
+    bool compute_pr_du_chain = g_compute_pr_du_chain;
+    bool compute_nonpr_du_chain = g_compute_nonpr_du_chain;
+    bool compute_pr_du_chain_by_prssa = g_compute_pr_du_chain_by_prssa;
+
+    g_do_aa = true;
+    g_do_md_du_analysis = true;
+    g_compute_pr_du_chain = true;
+    g_compute_nonpr_du_chain = false;
+    g_compute_pr_du_chain_by_prssa = true;
+    oc.setInvalidPass(PASS_PRLIVENESS_MGR);
+    oc.setInvalidPass(PASS_LOOP_INFO);
+    oc.setInvalidPass(PASS_AA);
+    oc.setInvalidPass(PASS_MD_REF);
+    oc.setInvalidPRDU();
+    m_rg->doAA(oc);
+    m_rg->doMDRefAndClassicDU(oc);
+    g_do_aa = do_aa;
+    g_do_md_du_analysis = do_md_du_analysis;
+    g_compute_pr_du_chain = compute_pr_du_chain;
+    g_compute_nonpr_du_chain = compute_nonpr_du_chain;
+    g_compute_pr_du_chain_by_prssa = compute_pr_du_chain_by_prssa;
+    //FIXME END
+}
+
+
+static bool isSpillDefByReloadOnly(IR const* ir,
+    PosGapIROpt const* pos_gap_opt, MOD IR2BOOL & def_by_reload_only_map)
+{
+    ASSERT0(ir && ir->is_exp());
+
+    //Check this IR is defined by reload only from the cached map first. This
+    //cached map 'def_by_reload_only_map' is used to record the spill IRs if
+    //the data of the spilling register is defined by the reload IR only,
+    //which means this spilling operation is useless since the data in the
+    //spilling register never changed, and it is consistent with the data in
+    //the memory. This cached map can be used to avoid the traversing of the
+    //whole DU set everytime if it is cached before.
+    bool find = false;
+    bool rst = def_by_reload_only_map.get(ir, &find);
+    if (find) { return rst; }
+
+    //If it is not cached, do the check from the DU set of current IR.
+    DUSet const* set = ir->readDUSet();
+    ASSERT0(set);
+    Region * rg = pos_gap_opt->getRegion();
+    ASSERT0(rg);
+
+    DUSetIter di = nullptr;
+    rst = true;
+    for (BSIdx i = set->get_first(&di); i != BS_UNDEF;
+         i = set->get_next(i, &di)) {
+        ASSERT0(rg->getIR(i)->is_stmt());
+        if (!pos_gap_opt->getRA().isReloadOp(rg->getIR(i))) {
+            rst = false;
+            break;
+        }
+    }
+    def_by_reload_only_map.set(ir, rst);
+    return rst;
+}
+
+
+void PosGapIROpt::collectDeadSpillIR()
+{
+    //The cached map 'def_by_reload_only_map' is used to record the spill IRs
+    //if the data of the spilling register is defined by the reload IR only,
+    //which means this spilling operation is useless since the data in the
+    //spilling register never changed, and it is consistent with the data in
+    //the memory. This cached map can be used to avoid the traversing of the
+    //whole DU set everytime if it is cached before.
+    IR2BOOL def_by_reload_only_map;
+    for (IRBB * bb = m_bb_list->get_head(); bb != nullptr;
+         bb = m_bb_list->get_next()) {
+        for (IR * ir = BB_irlist(bb).get_head();
+             ir != nullptr; ir = BB_irlist(bb).get_next()) {
+            if (!m_impl.getRA().isReloadOp(ir)) { continue; }
+
+            //Check the use-set of the pr defined by this reload, if the USE
+            //IR is spill IR, and the pr this spill IR is defined by reload
+            //only, so this spill IR can be reconginzed as a dead spill IR.
+            DUSet const* set = ir->readDUSet();
+            if (set == nullptr) { continue; }
+            DUSetIter di = nullptr;
+            for (BSIdx i = set->get_first(&di); i != BS_UNDEF;
+                 i = set->get_next(i, &di)) {
+                ASSERT0(m_rg->getIR(i)->is_exp());
+                IR const* use_stmt = m_rg->getIR(i)->getStmt();
+                if (!m_impl.getRA().isSpillOp(use_stmt)) { continue; }
+                if (!isSpillDefByReloadOnly(m_rg->getIR(i), this,
+                    def_by_reload_only_map)) {
+                    continue;
+                }
+                addDeadSpillIR(use_stmt);
+            }
+        }
+    }
+}
+
+
+void PosGapIROpt::collectDeadMiscIR()
+{
+    LinearScanRA const& lsra = m_impl.getRA();
+    for (IRBB * bb = m_bb_list->get_head(); bb != nullptr;
+         bb = m_bb_list->get_next()) {
+        for (IR * ir = BB_irlist(bb).get_head();
+             ir != nullptr; ir = BB_irlist(bb).get_next()) {
+            if (!lsra.isMoveOp(ir) && !lsra.isRematOp(ir)
+                && !lsra.isReloadOp(ir)) { continue; }
+            DUSet const* set = ir->readDUSet();
+            if (set == nullptr || set->is_empty()) {
+                //If the use-set is empty, it is a dead reload/remat/move.
+                addDeadMiscIR(ir);
+                continue;
+            }
+            //Do the further check for the reload is dead or not.
+            if (!lsra.isReloadOp(ir)) { continue; }
+            bool is_dead_reload = true;
+            DUSetIter di = nullptr;
+            for (BSIdx i = set->get_first(&di); i != BS_UNDEF;
+                 i = set->get_next(i, &di)) {
+                ASSERT0(m_rg->getIR(i)->is_exp());
+                IR const* use_stmt = m_rg->getIR(i)->getStmt();
+                if (!lsra.isSpillOp(use_stmt)) {
+                    //If there is an use IR which is not spill, it is not
+                    //a dead reload.
+                    is_dead_reload = false;
+                    break;
+                }
+                if (!m_dead_spill_tab.find(use_stmt)) {
+                    //If the use IR is a spill IR, but it is not a dead spill
+                    //IR, so this reload IR is not dead either.
+                    is_dead_reload = false;
+                    break;
+                }
+            }
+            //Record the dead reload IR.
+            if (is_dead_reload) { addDeadMiscIR(ir); }
+         }
+    }
+}
+
+
+void PosGapIROpt::removeDeadIR()
+{
+    ConstIRTabIter it;
+    for (IR const* ir = m_dead_misc_tab.get_first(it);
+         ir != nullptr; ir = m_dead_misc_tab.get_next(it)) {
+        m_impl.eliminateSingleIR(ir);
+    }
+    for (IR const* ir = m_dead_spill_tab.get_first(it);
+         ir != nullptr; ir = m_dead_spill_tab.get_next(it)) {
+        m_impl.eliminateSingleIR(ir);
+    }
+}
+
+
+bool PosGapIROpt::perform(OptCtx & oc)
+{
+    //1.Generate the Def-Use information.
+    genDUInfo(oc);
+
+    //2.Collect the deal spill IRs.
+    collectDeadSpillIR();
+
+    //3.Collect the dead reload/remat/move IRs.
+    collectDeadMiscIR();
+
+    //4.Remove the recorded IRs in step 2 and step 3.
+    removeDeadIR();
+
+    ASSERT0L3(m_rg->getCFG()->verifyLoopInfo(oc));
+    ASSERT0(oc.is_loopinfo_valid());
+
+    return m_dead_misc_tab.get_elem_count() > 0 ||
+           m_dead_spill_tab.get_elem_count() > 0;
+}
+//END PosGapIROpt
+
+
+//
+//START RegisterVerify
+//
+bool RegisterVerify::checkState(PhyReg2VirReg const* input_state,
+    Reg reg, PRNO prno) const
+{
+    ASSERT0(reg != REG_UNDEF && prno != PRNO_UNDEF);
+    if (isPhysicalRegisterNotCheck(reg)) { return false; };
+    if (input_state->get(reg) == prno) { return false; }
+
+    //May be the virtual register prno has not been initialized.
+    if (input_state->get(reg) == PRNO_UNDEF) {
+        note(m_rg, "!! Warning in register allocation: prno(%u) has not"
+             " been initilized.\n", prno);
+        return false;
+    }
+
+    //The calculation of lastuse did not take into account the
+    //control flow, so in the comparison of input_state, the same
+    //physical register reg can be assigned to two pseudo registers
+    //prnos whose lifetimes do not conflict, but this is correct,
+    //so this situation needs to be addressed.
+    //For example:
+    //  After processing BB0 in the following figure, r1 is assigned to $a, and
+    //  when processing BB2, r1 is assigned to $c. This is correct because the
+    //  lifetimes of $a and $c do not conflict, but during verification,
+    //  it will be directly transferred from BB0 to BB2. At this time, the
+    //  state of BB0 is passed to BB2. When verifying the variable $c in BB2,
+    //  an error occurs, which is a false alarm and needs to be ignored.
+    //     $a $c          BB0
+    //     +     ----------$a<-1 assume assign physical register r1 to $a
+    //     |     |         |
+    //     |     |         |
+    //     |     |         |
+    //     |     |         V
+    //     |     |        BB1
+    //     -     |         store $a
+    //        +  |         $c<-2 assume assign physical register r1 to $c
+    //        |  |         |
+    //        |  |         |
+    //        |  |         |
+    //        |  |         V
+    //        |  |        BB2
+    //        -  +-------->$d<-$c * 2 assume assign physical register r1 to $c
+    //This code is not used because it may be inaccurate due to
+    //lifetime updates.
+    //LifeTime * old_lt = m_lsra.getLT(input_state->get(reg));
+    //LifeTime * now_lt = m_lsra.getLT(prno);
+    //ASSERT0(old_lt != nullptr && now_lt != nullptr);
+    //if (!old_lt->is_intersect(now_lt)) {
+    //    return false;
+    //}
+    note(m_rg, "!! Error in register allocation: The physical"
+         " register reg(%u) r1 cannot be assigned to two pseudo"
+         " registers prno(%u) and prno(%u) with conflicting"
+         " lifetimes simultaneously\n", reg, input_state->get(reg), prno);
+    return true;
+}
+
+
+void RegisterVerify::computeLastOcc()
+{
+    BBList const* bblst = m_cfg->getBBList();
+    BBListIter bbit;
+
+    //Calculate the last occurence position of a prno in lexical order.
+    for (IRBB const* bb = bblst->get_head(&bbit);
+         bb != nullptr; bb = bblst->get_next(&bbit)) {
+        BBIRList & irlst = const_cast<IRBB*>(bb)->getIRList();
+        BBIRListIter bbirit;
+        for (IR const* ir = irlst.get_head(&bbirit);
+             ir != nullptr; ir = irlst.get_next(&bbirit)) {
+            //No need to handle spill/reload/remat/move, the occ IR did not
+            //encoded with a position and therefore no resided in any lifetime.
+            if (m_lsra.isOpInPosGap(ir)) { continue; }
+            genLastOccRHS(ir);
+            genLastOccLHS(ir);
+        }
+    }
+}
+
+
+void RegisterVerify::dumpInitInfo() const
+{
+    note(m_rg, "\n\n==---- DUMP Register Verify Informations ----==");
+    note(m_rg, "\nOutput basic informations:");
+    note(m_rg, "\n==================================");
+    note(m_rg, "\nNote that both physical and virtual register numbers"
+         " start from 1, with 0 indicating undefined");
+    note(m_rg, "\nBasic block's num is %u", m_cfg->getNumOfBB());
+    note(m_rg, "\nphysical register's num is %u", m_physical_reg_num);
+    note(m_rg, "\n==================================");
+}
+
+
+void RegisterVerify::dumpPhyReg2VirReg(PhyReg2VirReg const* input_state) const
+{
+    note(m_rg, "\ninput_state is: [");
+
+    //The physical register number starts from 1.
+    for (UINT i = 1; i <= getPhysicalRegNum(); i++) {
+        note(m_rg, "{reg(%u) -> prno(%u)}", i, input_state->get(i));
+        if (i == getPhysicalRegNum()) {
+            note(m_rg, "]");
+        } else {
+            note(m_rg, ", ");
+        }
+    }
+}
+
+
+void RegisterVerify::genLastOccRHS(IR const* ir)
+{
+    ASSERT0(ir && ir->is_stmt());
+    IRIter irit;
+    for (IR const* e = xoc::iterExpInit(ir, irit); e != nullptr;
+         e = xoc::iterExpNext(irit)) {
+        if (e->isReadPR()) {
+            m_pr2lastocc.set(e->getPrno(), ir);
+        }
+    }
+}
+
+
+void RegisterVerify::genLastOccLHS(IR const* ir)
+{
+    ASSERT0(ir && ir->is_stmt());
+    IR const* res = const_cast<IR*>(ir)->getResultPR();
+    if (res == nullptr) { return; }
+    PRNO prno = res->getPrno();
+    m_pr2lastocc.set(prno, ir);
+}
+
+
+RegisterVerify::PhyReg2VirReg * RegisterVerify::getAndGenPhyReg2VirReg(
+    PhyReg2VirReg const* input_state)
+{
+    if (input_state == nullptr) { return nullptr; }
+    PhyReg2VirReg * new_state = allocPhyReg2VirReg();
+    new_state->copy(*input_state);
+    return new_state;
+}
+
+
+RegisterVerify::PhyReg2VirReg * RegisterVerify::createPhyReg2VirReg()
+{
+    //The physical register number 0 indicates undefined,
+    //therefore it is ignored. The array index starts from 1.
+    PhyReg2VirReg * new_state =
+        allocPhyReg2VirReg(getPhysicalRegNum() + 1);
+    for (UINT i = 0; i <= getPhysicalRegNum(); i++) {
+        new_state->set(i, PRNO_UNDEF);
+    }
+    return new_state;
+}
+
+
+void RegisterVerify::setPhyReg2VirReg(MOD PhyReg2VirReg * input_state,
+    Reg reg, PRNO prno) const
+{
+    ASSERT0(input_state != nullptr && reg != REG_UNDEF);
+    input_state->set(reg, prno);
+}
+
+
+void RegisterVerify::destroyPhyReg2VirReg(PhyReg2VirReg const* input_state)
+    const
+{
+    ASSERT0(input_state != nullptr);
+    delete input_state;
+}
+
+
+bool RegisterVerify::isLastOcc(IR const* ir, IR const* input) const
+{
+    ASSERT0(ir != nullptr && input != nullptr);
+    return m_pr2lastocc.get(input->getPrno()) == ir;
+}
+
+
+bool RegisterVerify::isPhysicalRegisterNotCheck(Reg reg) const
+{
+    ASSERT0(reg != REG_UNDEF);
+    if (m_lsra.getFP() == reg || m_lsra.getPC() == reg ||
+        m_lsra.getRA() == reg || m_lsra.getSP() == reg ||
+        m_lsra.getTA() == reg || m_lsra.getZeroScalar() == reg ||
+        m_lsra.getZeroVector() == reg) {
+        note(m_rg, "\nreg(%u) does not require verification.", reg);
+        return true;
+    }
+    return false;
+}
+
+
+void RegisterVerify::initPhysicalRegCaller()
+{
+    ASSERT0(m_physical_reg_num != 0);
+    for (UINT i = 0; i <= m_physical_reg_num; i++) {
+        if (m_reg_set.isCaller(i)) {
+            m_caller_regs.append(i);
+        }
+    }
+}
+
+
+void RegisterVerify::initPhysicalRegNum()
+{
+    m_physical_reg_num = m_reg_set.getTotalRegNum();
+}
+
+
+UINT RegisterVerify::getPhysicalRegNum() const
+{
+    return m_physical_reg_num;
+}
+
+
+void RegisterVerify::processBlock(IRBB const* bb)
+{
+    ASSERT0(bb != nullptr);
+
+    //Must copy state because it is modified.
+    PhyReg2VirReg * input_state = getAndGenPhyReg2VirReg(getPhyReg2VirReg(bb));
+    ASSERT0(input_state != nullptr);
+
+    note(m_rg, "\nprocess BB(%u), predecessors is: [", bb->id());
+    Vertex const* vex = bb->getVex();
+    AdjVertexIter in_iti;
+    for (Vertex const* in = Graph::get_first_in_vertex(vex, in_iti);
+         in != nullptr; in = Graph::get_next_in_vertex(in_iti)) {
+        note(m_rg, " %u ", in->id());
+    }
+    note(m_rg, "]");
+    dumpPhyReg2VirReg(input_state);
+
+    //Process all operations of the block.
+    processOperations(bb, input_state);
+
+    //Iterate bb's all successors.
+    AdjVertexIter out_iti;
+    for (Vertex const* out = Graph::get_first_out_vertex(vex, out_iti);
+         out != nullptr; out = Graph::get_next_out_vertex(out_iti)) {
+        processSuccessor(m_cfg->getBB(out->id()), input_state);
+    }
+}
+
+
+void RegisterVerify::processOperations(IRBB const* bb,
+    MOD PhyReg2VirReg * input_state)
+{
+    bool has_error = false;
+
+    //Visit all IRs of the block.
+    ASSERT0(bb != nullptr);
+    BBIRList const& irlist = const_cast<IRBB*>(bb)->getIRList();
+    BBIRListIter irit;
+    for (IR const* ir = irlist.get_head(&irit); ir != nullptr;
+         ir = irlist.get_next(&irit)) {
+        has_error |= processOperation(ir, input_state);
+    }
+    if(!has_error) {
+        note(m_rg, "\nRegister allocation check passed.");
+    }
+}
+
+
+bool RegisterVerify::processOperation(IR const* ir,
+    MOD PhyReg2VirReg * input_state)
+{
+    //Check if input operands are correct.
+    IRIter irit;
+    bool has_error = false;
+    for (IR * input = xoc::iterExpInit(ir, irit); input != nullptr;
+         input = xoc::iterExpNext(irit)) {
+        if (!input->isReadPR()) { continue; }
+        PRNO prno = input->getPrno();
+        ASSERT0(prno != PRNO_UNDEF);
+        Reg reg = m_lsra.getReg(prno);
+        ASSERT0(reg != REG_UNDEF);
+        if (m_lsra.getLT(prno) == nullptr) { continue; }
+        has_error |= checkState(input_state, reg, prno);
+        if (!m_lsra.getLT(prno)->isOccHasDef()) {
+            note(m_rg, "\nWARN IR:%u found prno $%u --> r%u due to no"
+                 " def", ir->id(), prno, reg);
+        }
+
+        ASSERTN(!has_error, ("\nIR:%u found prno $%u --> r%u error",
+                ir->id(), prno, reg));
+
+        //If it is the last use, set the status of the physical register
+        //to invalid. Because some variables are uninitialized,
+        //if this step is not taken, it will be judged as a register
+        //allocation failure. After completing this step,
+        //it can be determined whether the variable is uninitialized.
+        //For example:
+        //   (1) mov.u64 $0, 100;
+        //   (2) add.u64 $0, $0, 10;
+        //   (3) sub.u64 $2, $1, 8;
+        //In (3) input_state is {r6 -> $0}, assume r6 -> $1
+        //(There is no lift time conflict between $0 and $1,
+        //so the same physical register can be allocated), then
+        //  a.If the last use has not been calculated:
+        //    the lifetime of $0
+        //    will continue until the end of the basic block.
+        //    At this point, it is determined that $0 and
+        //    $1 have been allocated to the same physical register,
+        //    resulting in a misjudgment.
+        //  b.If the last use has been calculated:
+        //    input_state will be modified to {r6 -> PRNO_UNDEF},
+        //    and r6 -> $1, At this point,
+        //    it is believed that $1 is uninitialized.
+        if (!isLastOcc(ir, input)) { continue; }
+        note(m_rg, "\nprno(%u)[id(%u)] is last use.",
+             input->getPrno(), input->id());
+        setPhyReg2VirReg(input_state, reg, PRNO_UNDEF);
+    }
+
+    if (ir->isCallStmt()) {
+        //Invalidate all caller save registers at calls.
+        setAllCallerInvalid(input_state);
+    }
+
+    //Process output operands.
+    IR const* output = const_cast<IR*>(ir)->getResultPR();
+    if (output == nullptr || !output->isPROp()) { return has_error; }
+    PRNO prno = output->getPrno();
+    ASSERT0(prno != PRNO_UNDEF);
+    Reg reg = m_lsra.getReg(prno);
+    ASSERT0(reg != REG_UNDEF);
+    setPhyReg2VirReg(input_state, reg, prno);
+    if (isLastOcc(ir, output)) {
+        note(m_rg, "\nprno(%u)[id(%u)] is last def use.",
+             output->getPrno(), output->id());
+        setPhyReg2VirReg(input_state, reg, PRNO_UNDEF);
+    }
+
+    return has_error;
+}
+
+
+void RegisterVerify::processSuccessor(IRBB const* bb,
+    PhyReg2VirReg const* input_state)
+{
+    ASSERT0(bb != nullptr && input_state != nullptr);
+    PhyReg2VirReg * saved_state =
+        const_cast<PhyReg2VirReg*>(getPhyReg2VirReg(bb));
+
+    if (saved_state == nullptr) {
+        //The basic block corresponding to bbid has not been traversed,
+        //so set initial input_state.
+        setPhyReg2VirRegs(bb, getAndGenPhyReg2VirReg(input_state));
+        pushWorkList(bb);
+        return;
+    }
+
+    //The basic block corresponding to bbid has been traversed.
+    //Check if new input_state is consistent with saved_state.
+    bool saved_state_correct = true;
+    for (UINT i = 1; i <= getPhysicalRegNum(); i++) {
+        //Current input_state and previous saved_state assume a
+        //different interval in this register -> assume that
+        //this register is invalid.
+        if (saved_state->get(i) != input_state->get(i) &&
+            saved_state->get(i) != PRNO_UNDEF) {
+            saved_state->set(i, PRNO_UNDEF);
+            saved_state_correct = false;
+            note(m_rg, "\nprocess_successor B(%d):"
+                 " invalidating slot/reg(%d).", bb->id(), i);
+        }
+    }
+
+    if (saved_state_correct) {
+        //Already processed block with correct input_state.
+        note(m_rg, "\nprocess_successor B(%d): "
+             "previous visit already correct.", bb->id());
+        return;
+    }
+
+    //Must re-visit this block.
+    note(m_rg, "\nprocess_successor B(%d): must re-visit"
+         " because input state changed.", bb->id());
+    pushWorkList(bb);
+}
+
+
+void RegisterVerify::destroyPhyReg2VirRegs() const
+{
+    xcom::List<PhyReg2VirReg const*>::Iter irit;
+    PhyReg2VirReg const* pv = nullptr;
+    for (pv = m_input_states.get_head(&irit); pv != nullptr;
+         pv = m_input_states.get_next(&irit)) {
+        destroyPhyReg2VirReg(pv);
+    }
+}
+
+
+RegisterVerify::PhyReg2VirReg const* RegisterVerify::getPhyReg2VirReg(
+    IRBB const* bb) const
+{
+    ASSERT0(bb != nullptr);
+    return m_saved_states.get(bb);
+}
+
+
+void RegisterVerify::setAllCallerInvalid(MOD PhyReg2VirReg * input_state) const
+{
+    ASSERT0(input_state != nullptr);
+    //Invalidate all caller save registers at calls.
+    for (UINT i = 0; i < m_caller_regs.get_elem_count(); i++) {
+        setPhyReg2VirReg(input_state, m_caller_regs.get(i), PRNO_UNDEF);
+    }
+}
+
+
+void RegisterVerify::setPhyReg2VirRegs(IRBB const* bb,
+    IN PhyReg2VirReg * saved_state)
+{
+    ASSERT0(bb != nullptr);
+    m_saved_states.setAlways(bb, saved_state);
+}
+
+
+void RegisterVerify::setupInputStateForEntryBB(MOD PhyReg2VirReg * input_state)
+    const
+{
+    //Temporarily not verifying parameter registers.
+    //TODO: Setup input registers (method arguments) for first block.
+}
+
+
+void RegisterVerify::verify(IRBB const* start)
+{
+    ASSERT0(start != nullptr);
+    PhyReg2VirReg * input_state = createPhyReg2VirReg();
+    ASSERT0(input_state != nullptr);
+    computeLastOcc();
+
+    //Setup input registers (method arguments) for first block.
+    setupInputStateForEntryBB(input_state);
+    setPhyReg2VirRegs(start, input_state);
+    pushWorkList(start);
+
+    //Traverse CFG for verification.
+    do {
+        IRBB const* bb = popWorkList();
+        processBlock(bb);
+    } while (!isEmptyWorkList());
+}
+
+
+IRBB const* RegisterVerify::popWorkList()
+{
+    ASSERT0(m_work_list.get_elem_count() > 0);
+    return m_work_list.remove_head();
+}
+
+
+void RegisterVerify::pushWorkList(IRBB const* bb)
+{
+    ASSERT0(bb != nullptr);
+    if (!m_work_list.find(bb)) { m_work_list.append_tail(bb); }
+}
+
+
+bool RegisterVerify::isEmptyWorkList() const
+{
+    return m_work_list.get_elem_count() == 0;
+}
+
+
+bool RegisterVerify::verify()
+{
+    if (!g_enable_lsra_over_strict) { return true; }
+    dumpInitInfo();
+    IRBB const* start = m_cfg->getEntry();
+    ASSERT0(start != nullptr);
+    verify(start);
+    return true;
+}
+//End RegisterVerify
 
 } //namespace xoc

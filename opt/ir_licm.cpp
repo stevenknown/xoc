@@ -107,11 +107,13 @@ static void dumpHoistedIR(IR const* ir, IRBB const* bb, LICM const* licm)
 }
 
 
-static void dumpMovedIRExecOnce(IR const* ir, IRBB const* from,
-                                IRBB const* to, LICM const* licm)
+static void dumpMovedIRExecOnce(
+    IR const* ir, IRBB const* from, IRBB const* to, LICM const* licm)
 {
     if (ir == nullptr || !licm->getRegion()->isLogMgrInit() ||
-        !g_dump_opt.isDumpLICM()) { return; }
+        !g_dump_opt.isDumpLICM()) {
+        return;
+    }
     xcom::StrBuf buf(32);
     ActMgr & am = const_cast<LICM*>(licm)->getActMgr();
     am.dump("%s executes at least once, thus it "
@@ -313,8 +315,8 @@ bool MoveStmtBetweenBB::moveDependentStmtInBB(
 }
 
 
-void MoveStmtBetweenBB::dumpMovedIR(IR const* ir, IRBB const* from,
-                                    IRBB const* to) const
+void MoveStmtBetweenBB::dumpMovedIR(
+    IR const* ir, IRBB const* from, IRBB const* to) const
 {
     if (ir == nullptr || !m_rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) {
         return;
@@ -426,6 +428,10 @@ bool LICMAnaCtx::verifyInvStmt(IR const* ir) const
     for (IR const* x = iterExpInitC(ir, it);
          x != nullptr; x = iterExpNextC(it)) {
         if (x->isConstExp()) { continue; }
+
+        //NOTE:Since dummyuse of call is regarded as MayDef and MayUse of a
+        //call-stmt, thus if a call can be hoisted means its dummyuse also
+        //should be hoisted.
         ASSERT0(isInvExp(x));
     }
     return true;
@@ -485,8 +491,8 @@ private:
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
     //otherwise return false.
-    bool tryEvalLoopExecCondition(OUT bool & must_true, OUT bool & must_false,
-                                  HoistCtx const& ctx) const;
+    bool tryEvalLoopExecCondition(
+        OUT bool & must_true, OUT bool & must_false, HoistCtx const& ctx) const;
 
     //The funtion should be invoked after exp hoisted.
     void updateMDSSADUForExpInPreHeader();
@@ -566,7 +572,8 @@ bool InsertPreheaderMgr::tryEvalLoopExecCondition(
     ASSERT0(last && last->isConditionalBr());
 
     //Try to evaluate the value of judgement operation.
-    return m_rce->calcCondMustVal(BR_det(last), must_true, must_false, *m_oc);
+    RCECtx rcectx(*m_oc, m_am);
+    return m_rce->calcCondMustVal(BR_det(last), must_true, must_false, rcectx);
 }
 
 
@@ -598,6 +605,7 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
         }
         if (stmt->getBB() == m_li->getLoopHead()) { continue; }
         if (m_licm->hasInsertedGuardBB(m_li)) { continue; }
+
         //Guard BB is necessary.
         IRBB * guard = m_gdhelp.insertGuard(m_li, m_preheader);
         m_licm->getActMgr().dump("insert guard BB%u before preheader BB%u",
@@ -630,7 +638,7 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
 {
     if (m_gdhelp.hasInsertedGuard()) {
         //Remove the preheader and guard just inserted.
-        CfgOptCtx coctx(*m_oc);
+        IRCfgOptCtx coctx(m_oc);
         ASSERT0(m_preheader == m_gdhelp.getGuardedBB());
         VexIdx preheadervid = m_preheader->id();
         m_gdhelp.removeGuardRegion(*ctx.domtree);
@@ -657,7 +665,7 @@ void InsertPreheaderMgr::undoCFGChange(OUT HoistCtx & ctx)
         ctx.domtree->remove(m_preheader->id());
 
         //Remove the preheader just inserted.
-        CfgOptCtx coctx(*m_oc);
+        IRCfgOptCtx coctx(m_oc);
         RemoveEmptyBBCtx rmctx(coctx);
         rmctx.setForceRemove(true);
         bool res = m_cfg->removeSingleEmptyBB(m_preheader, rmctx);
@@ -1008,8 +1016,9 @@ bool LICM::chooseExpList(IR * ir, OUT bool & all_exp_invariant,
 
 
 //ir: may be exp or stmt.
-bool LICM::chooseKid(IR * ir, OUT bool & all_kid_invariant,
-                     IRIter & irit, OUT LICMAnaCtx & anactx)
+bool LICM::chooseKid(
+    IR * ir, OUT bool & all_kid_invariant, IRIter & irit,
+    OUT LICMAnaCtx & anactx)
 {
     bool find = false;
 
@@ -1049,8 +1058,8 @@ bool LICM::chooseCallStmt(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
     //guarantee CALL will not be exectued if the loop
     //will never execute.
     bool all_arg_invariant = true;
-    bool find = chooseExpList(CALL_arg_list(ir), all_arg_invariant,
-                              irit, anactx);
+    bool find = chooseExpList(
+        CALL_arg_list(ir), all_arg_invariant, irit, anactx);
     if (!all_arg_invariant || !ir->isReadOnly()) {
         //stmt can NOT be loop invariant because some exp is not invariant.
         return find;
@@ -1096,8 +1105,8 @@ bool LICM::chooseBranch(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
 {
     bool exp_invariant;
     IRList * invlist = m_irs_mgr.alloc();
-    bool find = chooseExp(BR_det(ir), irit, &exp_invariant,
-                          invlist, anactx);
+    bool find = chooseExp(
+        BR_det(ir), irit, &exp_invariant, invlist, anactx);
     if (exp_invariant && !isJudgeHoistCand(BR_det(ir))) {
         //Do not hoist the simplest format judgement expression.
         //There is no profit for such a code hoisting.
@@ -1118,8 +1127,8 @@ bool LICM::chooseSwitch(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
 {
     bool exp_invariant;
     IRList * invlist = m_irs_mgr.alloc();
-    bool find = chooseExp(SWITCH_vexp(ir), irit, &exp_invariant,
-                          invlist, anactx);
+    bool find = chooseExp(
+        SWITCH_vexp(ir), irit, &exp_invariant, invlist, anactx);
     anactx.addHoistCand(*invlist);
     ASSERT0(!ir->hasIdinfo());
     m_irs_mgr.free(invlist);
@@ -1194,8 +1203,8 @@ bool LICM::chooseUna(
     ASSERT0(!anactx.isInvExp(ir));
     bool op0_all_inv = false;
     IRList * invlist0 = m_irs_mgr.alloc();
-    bool find = chooseExp(UNA_opnd(ir), irit, &op0_all_inv,
-                          invlist0, anactx);
+    bool find = chooseExp(
+        UNA_opnd(ir), irit, &op0_all_inv, invlist0, anactx);
     if (op0_all_inv) {
         invlist->append_tail(ir);
         *all_exp_invariant = true;
@@ -1252,8 +1261,9 @@ bool LICM::chooseArray(
 }
 
 
-bool LICM::chooseILD(IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
-                     OUT IRList * invlist, OUT LICMAnaCtx & anactx)
+bool LICM::chooseILD(
+    IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
+    OUT IRList * invlist, OUT LICMAnaCtx & anactx)
 {
     ASSERT0(!anactx.isInvExp(ir));
     bool base_inv = false;
@@ -1272,8 +1282,8 @@ bool LICM::chooseILD(IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
 }
 
 
-bool LICM::chooseConst(IR * ir, OUT bool * all_exp_invariant,
-                       OUT LICMAnaCtx & anactx)
+bool LICM::chooseConst(
+    IR * ir, OUT bool * all_exp_invariant, OUT LICMAnaCtx & anactx)
 {
     ASSERT0(!anactx.isInvExp(ir));
     anactx.addInvExp(ir);
@@ -1288,8 +1298,9 @@ bool LICM::chooseConst(IR * ir, OUT bool * all_exp_invariant,
 }
 
 
-bool LICM::choosePR(IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
-                    OUT IRList * invlist, OUT LICMAnaCtx & anactx)
+bool LICM::choosePR(
+    IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
+    OUT IRList * invlist, OUT LICMAnaCtx & anactx)
 {
     ASSERT0(!anactx.isInvExp(ir));
     if (xoc::isLoopInvariant(ir, anactx.getLI(), m_rg,
@@ -1310,8 +1321,9 @@ bool LICM::choosePR(IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
 }
 
 
-bool LICM::chooseLD(IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
-                    OUT IRList * invlist, OUT LICMAnaCtx & anactx)
+bool LICM::chooseLD(
+    IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
+    OUT IRList * invlist, OUT LICMAnaCtx & anactx)
 {
     ASSERT0(!anactx.isInvExp(ir));
     ASSERT0(ir->hasIdinfo());
@@ -1358,20 +1370,20 @@ bool LICM::chooseSELECT(
     //Trueexp
     bool op0_all_inv = false;
     IRList * invlist0 = m_irs_mgr.alloc();
-    find |= chooseExp(SELECT_trueexp(ir), irit, &op0_all_inv,
-                      invlist0, anactx);
+    find |= chooseExp(
+        SELECT_trueexp(ir), irit, &op0_all_inv, invlist0, anactx);
 
     //Falseexp
     bool op1_all_inv = false;
     IRList * invlist1 = m_irs_mgr.alloc();
-    find |= chooseExp(SELECT_falseexp(ir), irit, &op1_all_inv,
-                      invlist1, anactx);
+    find |= chooseExp(
+        SELECT_falseexp(ir), irit, &op1_all_inv, invlist1, anactx);
 
     //Predexp
     bool op2_all_inv = false;
     IRList * invlist2 = m_irs_mgr.alloc();
-    find |= chooseExp(SELECT_det(ir), irit, &op2_all_inv,
-                      invlist2, anactx);
+    find |= chooseExp(
+        SELECT_det(ir), irit, &op2_all_inv, invlist2, anactx);
 
     if (op0_all_inv && op1_all_inv && op2_all_inv) {
         invlist->append_tail(ir);
@@ -1448,6 +1460,24 @@ bool LICM::chooseAssign(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
         anactx.addHoistCand(ir);
     }
     return find;
+}
+
+
+bool LICM::chooseExtStmt(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx)
+{
+    ASSERT0(ir->is_stmt() && ir->isExtOp());
+    switch (ir->getCode()) {
+    SWITCH_CASE_EXT_WRITE_PR:
+    SWITCH_CASE_EXT_DIRECT_MEM_VSTMT:
+    SWITCH_CASE_EXT_INDIRECT_MEM_VSTMT:
+        //Usually other PR operations is unrewarding to hoist.
+        return chooseAssign(ir, irit, anactx);
+    default:;
+    }
+    ASSERTN(0, ("Target Dependent Code"));
+    //NOTE: LICM expects user who defined extended stmt could handle the
+    //right behaviors when choosing canddidate to get the LICM benefits.
+    return false;
 }
 
 
@@ -1643,8 +1673,9 @@ bool LICM::analysisInvariantOp(OUT LICMAnaCtx & anactx)
 //Return true if any stmt that is related to invariant stmt
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
-bool LICM::hoistDefByPRSSA(LICMAnaCtx const& anactx, IR const* exp,
-                           OUT IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::hoistDefByPRSSA(
+    LICMAnaCtx const& anactx, IR const* exp, OUT IRBB * prehead,
+    MOD HoistCtx & ctx)
 {
     SSAInfo * info = exp->getSSAInfo();
     ASSERTN(info, ("miss PRSSAInfo"));
@@ -1667,8 +1698,9 @@ bool LICM::hoistDefByPRSSA(LICMAnaCtx const& anactx, IR const* exp,
 //Return true if any stmt that is related to invariant stmt
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
-bool LICM::hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
-                               OUT IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::hoistDefByClassicDU(
+    LICMAnaCtx const& anactx, IR const* exp, OUT IRBB * prehead,
+    MOD HoistCtx & ctx)
 {
     ASSERTN(m_rg->getDUMgr(), ("valid DUChain need DUMgr"));
     DUSet const* defset = exp->readDUSet();
@@ -1707,8 +1739,9 @@ bool LICM::hoistDefByClassicDU(LICMAnaCtx const& anactx, IR const* exp,
 //prevents 'exp' from being hoisted from the loop.
 //Note some DEF that has been hoisted by this function is recorded in 'ctx'
 //even not all of DEF hoisted totally.
-bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
-                           OUT IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::hoistDefByMDSSA(
+    LICMAnaCtx const& anactx, IR const* exp, OUT IRBB * prehead,
+    MOD HoistCtx & ctx)
 {
     ASSERT0(ctx.useMDSSADU());
     MDSSAInfo * info = ctx.mdssamgr->getMDSSAInfoIfAny(exp);
@@ -1770,8 +1803,9 @@ bool LICM::hoistDefByMDSSA(LICMAnaCtx const& anactx, IR const* exp,
 //Return true if any stmt that is related to invariant stmt
 //is moved outside from loop, return false if there is stmt that
 //prevents 'exp' from being hoisted from the loop.
-bool LICM::hoistDefByDUChain(LICMAnaCtx const& anactx, IR const* exp,
-                             OUT IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::hoistDefByDUChain(
+    LICMAnaCtx const& anactx, IR const* exp, OUT IRBB * prehead,
+    MOD HoistCtx & ctx)
 {
     ASSERT0(exp->is_exp());
     if (!exp->isMemOpnd()) { return true; }
@@ -1878,19 +1912,20 @@ void LICM::updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx)
     //If startir is NULL, that means 'stmt' is the first IR of BB.
     IRIter it;
     MDSSAStatus st;
+    FindAndSetLiveInDef fs(ctx.mdssamgr, *ctx.oc);
     for (IR * x = xoc::iterExpInit(stmt, it);
          x != nullptr; x = xoc::iterExpNext(it, true)) {
         if (!MDSSAMgr::hasMDSSAInfo(x)) { continue; }
-        ctx.mdssamgr->findAndSetLiveInDef(
-            x, startir, stmt->getBB(), *ctx.oc, st);
+        fs.findAndSet(x, startir, stmt->getBB(), st);
     }
     ASSERT0(st.is_succ());
 }
 
 
 //Return true if stmt is successfully moved outside of loop.
-bool LICM::tryHoistStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
-                        MOD IRBB * prehead, OUT HoistCtx & ctx)
+bool LICM::tryHoistStmt(
+    LICMAnaCtx const& anactx, MOD IR * stmt, MOD IRBB * prehead,
+    OUT HoistCtx & ctx)
 {
     if (!tryHoistDependentStmt(anactx, stmt, prehead, ctx)) {
         return false;
@@ -1908,8 +1943,9 @@ bool LICM::tryHoistStmt(LICMAnaCtx const& anactx, MOD IR * stmt,
 
 
 //Return true if any stmt is moved outside from loop.
-bool LICM::tryHoistDefStmt(LICMAnaCtx const& anactx, MOD IR * def,
-                           MOD IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::tryHoistDefStmt(
+    LICMAnaCtx const& anactx, MOD IR * def, MOD IRBB * prehead,
+    MOD HoistCtx & ctx)
 {
     ASSERT0(def->is_stmt());
     if (!anactx.getLI()->isInsideLoop(def->getBB()->id())) {
@@ -1945,8 +1981,8 @@ bool LICM::hoistCandHelper(
     if (cand_stmt->isStoreStmt() &&
         isImmRHS(cand_exp, cand_stmt) &&
         anactx.isInvStmt(cand_stmt) &&
-        xoc::isStmtDomAllUseInsideLoop(cand_stmt, anactx.getLI(),
-                                       m_rg, *ctx.oc)) {
+        xoc::isStmtDomAllUseInsideLoop(
+            cand_stmt, anactx.getLI(), m_rg, *ctx.oc)) {
         if (tryHoistStmt(anactx, cand_stmt, prehead, ctx)) {
             dumpHoistedIR(cand_stmt, prehead, this);
             return true;
@@ -1998,8 +2034,8 @@ bool LICM::hoistCandHelper(
 //Try to move and check that each definitions of candidate has been
 //already hoisted from loop.
 //Return true if all DEF stmt of 'c' has been hoisted.
-bool LICM::tryHoistAllDefStmt(LICMAnaCtx const& anactx, IR const* c,
-                              IRBB * prehead, MOD HoistCtx & ctx)
+bool LICM::tryHoistAllDefStmt(
+    LICMAnaCtx const& anactx, IR const* c, IRBB * prehead, MOD HoistCtx & ctx)
 {
     ConstIRIter irit;
     for (IR const* x = iterInitC(c, irit); x != nullptr; x = iterNextC(irit)) {
@@ -2014,8 +2050,7 @@ bool LICM::tryHoistAllDefStmt(LICMAnaCtx const& anactx, IR const* c,
 
 bool LICM::hoistStmtCandInCandTab(
     MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
-    OUT xcom::Vector<IR*> & removed,
-    IRTabIter & it, OUT HoistCtx & ctx)
+    OUT xcom::Vector<IR*> & removed, IRTabIter & it, OUT HoistCtx & ctx)
 {
     bool changed = false;
     it.clean();
@@ -2045,8 +2080,8 @@ bool LICM::hoistStmtCandInCandTab(
 
 
 //Return true if BB or STMT changed.
-bool LICM::hoistStmtCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
-                         OUT HoistCtx & ctx)
+bool LICM::hoistStmtCand(
+    MOD LICMAnaCtx & anactx, OUT IRBB * prehead, OUT HoistCtx & ctx)
 {
     xcom::Vector<IR*> removed;
     IRTabIter it;
@@ -2068,8 +2103,8 @@ bool LICM::hoistStmtCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
 }
 
 
-void LICM::tryPickKidInvExp(LICMAnaCtx const& anactx, IR * c,
-                            OUT xcom::Vector<IR*> & tryagain) const
+void LICM::tryPickKidInvExp(
+    LICMAnaCtx const& anactx, IR * c, OUT xcom::Vector<IR*> & tryagain) const
 {
     switch (c->getCode()) {
     SWITCH_CASE_INDIRECT_MEM_OP: {
@@ -2153,8 +2188,8 @@ bool LICM::hoistExpCandInCandTab(
 
 
 //Return true if BB or STMT changed.
-bool LICM::hoistExpCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
-                        OUT HoistCtx & ctx)
+bool LICM::hoistExpCand(
+    MOD LICMAnaCtx & anactx, OUT IRBB * prehead, OUT HoistCtx & ctx)
 {
     xcom::Vector<IR*> hoisted;
     xcom::Vector<IR*> tryagain;
@@ -2165,8 +2200,8 @@ bool LICM::hoistExpCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
 
         //Record the new generated cand to try to hoist.
         tryagain.clean();
-        changed |= hoistExpCandInCandTab(anactx, prehead, tryagain,
-                                         hoisted, it, ctx);
+        changed |= hoistExpCandInCandTab(
+            anactx, prehead, tryagain, hoisted, it, ctx);
         if (hoisted.get_elem_count() == 0) {
             //No candicate saftified the hoisting condition.
             return changed;
@@ -2193,8 +2228,8 @@ bool LICM::hoistExpCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
 //Hoist candidate IRs to preheader BB.
 //This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
-bool LICM::hoistCand(MOD LICMAnaCtx & anactx, OUT IRBB * prehead,
-                     OUT HoistCtx & ctx)
+bool LICM::hoistCand(
+    MOD LICMAnaCtx & anactx, OUT IRBB * prehead, OUT HoistCtx & ctx)
 {
     bool changed = hoistExpCand(anactx, prehead, ctx);
     changed |= hoistStmtCand(anactx, prehead, ctx);
@@ -2215,8 +2250,8 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
         //hoist candidate.
         return false;
     }
-    InsertPreheaderMgr insertmgr(m_rg, ctx.oc, this, m_rce,
-                                 anactx, &getActMgr());
+    InsertPreheaderMgr insertmgr(
+        m_rg, ctx.oc, this, m_rce, anactx, &getActMgr());
     if (insertmgr.needComplicatedGuard()) { return false; }
 
     ASSERT0(ctx.verifyDomTree());
@@ -2313,7 +2348,7 @@ void LICM::postProcessIfChanged(HoistCtx const& ctx, OptCtx & oc)
 
     //DU chain and DU ref is maintained.
     ASSERT0(m_dumgr->verifyMDRef());
-    ASSERT0(verifyMDDUChain(m_rg, oc));
+    ASSERT0(verifyClassicDUChain(m_rg, oc));
     ASSERT0(m_cfg->verifyRPO(oc));
     ASSERT0(m_cfg->verifyDomAndPdom(oc));
     ASSERT0(!ctx.usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
@@ -2382,14 +2417,10 @@ bool LICM::initDepPass(MOD HoistCtx & ctx)
 
 bool LICM::perform(OptCtx & oc)
 {
-    if (m_rg->getBBList() == nullptr ||
-        m_rg->getBBList()->get_elem_count() == 0) {
-        return false;
-    }
+    ASSERT0(m_rg->getBBList());
+    if (m_rg->getBBList()->is_empty()) { return false; }
     if (!oc.is_ref_valid()) { return false; }
     START_TIMER(t, getPassName());
-    //DumpBufferSwitch buff(m_rg->getLogMgr());
-    //if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     xcom::DomTree domtree;
     HoistCtx ctx(&oc, &domtree, m_cfg);
     if (!initDepPass(ctx)) { END_TIMER(t, getPassName()); return false; }

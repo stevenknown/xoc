@@ -45,12 +45,17 @@ public:
     void append(IR const* ir)
     {
         ASSERT0(ir && !ir->is_undef());
+        ASSERT0(is_unique(ir));
         xcom::Vector<IR const*>::append(ir);
     }
+
+    void clean() { m_code = IR_UNDEF; xcom::Vector<IR const*>::clean(); }
 
     void dump(ReassCtx const& ctx) const;
 
     IR_CODE getCode() const { return m_code; }
+
+    bool is_unique(IR const* ir) const;
 
     void setCode(IR_CODE c)
     {
@@ -69,17 +74,16 @@ public:
 
     //Dump misc action that related to given ir.
     //format: the reason.
-    void dumpAct(CHAR const* format, ...) const;
+    void dumpAct(CHAR const* format, ...);
 };
 
 
-class ReassCtx {
+class ReassCtx : public PassCtx {
     //THE CLASS ALLOWS COPY-CONSTRUCTOR.
 protected:
+    bool m_need_recomp_gvn; //True to indicate that GVN should be recomputed.
     UINT m_ir_rank_range_bitsize;
     RANK m_cur_rank;
-    OptCtx & m_oc;
-    Region const* m_rg;
     LinOpVec m_lin_opvec;
     xcom::TMap<UINT, RANK> m_ir2rank;
     xcom::TMap<UINT, RANK> m_bb2rank;
@@ -87,12 +91,7 @@ protected:
     void dumpBBListWithRankImpl(MOD IRDumpCtx<> & dumpctx) const;
     void dumpBBListWithRank() const;
 public:
-    ReassCtx(OptCtx & oc, Region const* rg)
-        : m_cur_rank(RANK_UNDEF), m_oc(oc), m_rg(rg)
-    {
-        m_ir_rank_range_bitsize = 0;
-        ASSERT0(m_rg);
-    }
+    ReassCtx(OptCtx & oc, Region const* rg);
 
     void cleanBottomUp();
 
@@ -103,15 +102,16 @@ public:
     RANK getCurRank() const { return m_cur_rank; }
     RANK getRank(IR const* ir) const { return m_ir2rank.get(ir->id()); }
     RANK getRank(IRBB const* bb) const { return m_bb2rank.get(bb->id()); }
-    Region const* getRegion() const { return m_rg; }
-    OptCtx & getOptCtx() const { return m_oc; }
     UINT getIRRankRangeBitSize() const { return m_ir_rank_range_bitsize; }
     UINT getBBRankRangeBitSize() const;
+
+    bool needRecompGVN() const { return m_need_recomp_gvn; }
 
     void setIRRankRangeBitSize(UINT bs) { m_ir_rank_range_bitsize = bs; }
     void setCurRank(RANK r) { m_cur_rank = r; }
     void setRank(IR const* ir, RANK rank) { m_ir2rank.set(ir->id(), rank); }
     void setRank(IRBB const* bb, RANK rank) { m_bb2rank.set(bb->id(), rank); }
+    void setRecompGVN(bool recomp) { m_need_recomp_gvn = recomp; }
 };
 
 
@@ -125,8 +125,10 @@ class AlgeReasscociate : public Pass {
     MDSSAMgr * m_mdssamgr;
     IRMgr * m_irmgr;
     Refine * m_refine;
+    IRSimp * m_simp;
     ReassActMgr m_am;
 protected:
+    //The function also generates MD reference for new IRs.
     void buildDUChainForReassExp(
         IRVec const& reassopvec, ReassCtx const& ctx) const;
 
@@ -145,7 +147,7 @@ protected:
 
     //The rank of operand can be used to determine the layout order of operand.
     //The operand with a higher rank will be processed preferentially.
-    bool doReass(MOD OptCtx & oc);
+    bool doReass(MOD ReassCtx & ctx);
 
     bool foldConstLastTwoOp(MOD ReassCtx & ctx) const;
 
@@ -158,13 +160,14 @@ protected:
         if (!g_do_opt_float && ir->isFP()) { return false; }
         return true;
     }
+    bool isOpCodeConsistent(IR const* ir, LinOpVec const& opvec) const;
 
     //Perform optimization to operations that recorded in the opvec.
     //Return true if operations in vector have been optimized.
     bool optimizeLinOpVec(MOD IR * ir, MOD ReassCtx & ctx) const;
 
     //Return true if given 'ir' has been rewrote.
-    bool replaceRHSWithReassExp(MOD IR * ir, ReassCtx const& ctx) const;
+    bool replaceRHSWithReassExp(MOD IR * ir, MOD ReassCtx & ctx) const;
     void reset();
 
     //It is not worth to reasscociate expressions.
@@ -186,16 +189,18 @@ public:
         m_prssamgr = nullptr;
         m_mdssamgr = nullptr;
         m_refine = nullptr;
+        m_simp = nullptr;
         m_is_aggressive = false;
     }
     virtual ~AlgeReasscociate() {}
 
-    void dumpAllAct() const { getActMgr().dump(); }
+    void dumpAllAct() const { m_am.dump(); }
     virtual bool dump() const;
 
     virtual CHAR const* getPassName() const { return "Alge Reasscociation"; }
-    ReassActMgr const& getActMgr() const { return m_am; }
+    ReassActMgr & getActMgr() { return m_am; }
     PASS_TYPE getPassType() const { return PASS_ALGE_REASSCOCIATE; }
+    IRSimp * getIRSimp() const { return m_simp; }
 
     //Return true if user ask to perform aggressive optimization that without
     //consideration of compilation time and memory.

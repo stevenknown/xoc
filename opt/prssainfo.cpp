@@ -34,28 +34,9 @@ namespace xoc {
 //
 //START SSAInfo
 //
-void SSAInfo::dump(Region const* rg) const
+static void dumpDefUseRef(VPR const* vpr, Region const* rg)
 {
-    //VPR info is only usful during SSA construction.
-    note(rg, "\nVPR%d:", id());
-
-    VPR * vpr = ((VPR*)this);
-    if (vpr->orgprno() != PRNO_UNDEF) {
-        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->orgprno());
-    } else {
-        prt(rg, "--");
-    }
-
-    prt(rg, "v%d", vpr->version());
-
-    if (vpr->newprno() != PRNO_UNDEF) {
-        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->newprno());
-    } else {
-        prt(rg, "--");
-    }
-    prt(rg, ": ");
-
-    IR * def = getDef();
+    IR * def = vpr->getDef();
     if (vpr->version() != PRSSA_INIT_VERSION) {
         //After renaming, version is meaningless, thus it is only visible
         //to VPR.
@@ -99,15 +80,15 @@ void SSAInfo::dump(Region const* rg) const
         prt(rg, "DEF:--");
     }
 
-    if (!hasUse()) {
+    if (!vpr->hasUse()) {
         prt(rg, " USE:--");
         return;
     }
     prt(rg, " USE:");
     SSAUseIter it = nullptr;
     BSIdx nextu = 0;
-    for (BSIdx u = SSA_uses(this).get_first(&it); it != nullptr; u = nextu) {
-        nextu = SSA_uses(this).get_next(u, &it);
+    for (BSIdx u = SSA_uses(vpr).get_first(&it); it != nullptr; u = nextu) {
+        nextu = SSA_uses(vpr).get_next(u, &it);
         IR * use = rg->getIR(u);
         ASSERTN(use, ("'%s' does not have No.%u IR", u));
         ASSERT0(use && use->is_pr());
@@ -118,6 +99,62 @@ void SSAInfo::dump(Region const* rg) const
             prt(rg, ",");
         }
     }
+}
+
+
+static void dumpDefChain(VPR const* vpr, Region const* rg)
+{
+    VPR const* prevdef = VPR_prev(vpr);
+    if (prevdef != nullptr) {
+        prt(rg, ",PrevDEF:VPR%u", prevdef->id());
+        IR const* prevdef_ir = prevdef->getDef();
+        if (prevdef_ir != nullptr) {
+            xcom::DefFixedStrBuf buf;
+            prt(rg, ":%s", xoc::dumpIRName(prevdef_ir, buf));
+        }
+    }
+    VPRSet const* nextset = VPR_nextset(vpr);
+    if (nextset == nullptr || nextset->is_empty()) { return; }
+    prt(rg, ",NextDEF:");
+    VPRSetIter nit = nullptr;
+    bool first = true;
+    for (BSIdx w = nextset->get_first(&nit);
+        w != BS_UNDEF; w = nextset->get_next(w, &nit)) {
+        if (first) {
+            first = false;
+        } else {
+            prt(rg, ",");
+        }
+        prt(rg, "VPR%u", w);
+    }
+}
+
+
+static void dumpVersion(VPR const* vpr, Region const* rg)
+{
+    if (vpr->orgprno() != PRNO_UNDEF) {
+        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->orgprno());
+    } else {
+        prt(rg, "--");
+    }
+    prt(rg, "v%d", vpr->version());
+    if (vpr->newprno() != PRNO_UNDEF) {
+        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->newprno());
+    } else {
+        prt(rg, "--");
+    }
+}
+
+
+void SSAInfo::dump(Region const* rg) const
+{
+    //VPR info is only usful during SSA construction.
+    note(rg, "\nVPR%d:", id());
+    VPR * vpr = ((VPR*)this);
+    dumpVersion(vpr, rg);
+    prt(rg, ": ");
+    dumpDefUseRef(vpr, rg);
+    dumpDefChain(vpr, rg);
 }
 //END SSAInfo
 
@@ -166,5 +203,72 @@ VPR * VPRVec::getInitVersion() const
     return get(PRSSA_INIT_VERSION);
 }
 //END VPRVec
+
+
+//
+//START VPRSet
+//
+void VPRSet::append(VPR const* v, MOD VPRSetMgr & mgr)
+{
+    xcom::DefSBitSetCore::bunion(v->id(), mgr.getSBSMgr());
+}
+
+
+void VPRSet::remove(VPR const* v, MOD VPRSetMgr & mgr)
+{
+    ASSERT0(v);
+    xcom::DefSBitSetCore::diff(v->id(), mgr.getSBSMgr());
+}
+//END VPRSet
+
+
+//
+//START VPRSetMgr
+//
+VPRSetMgr::VPRSetMgr()
+{
+    m_set_pool = nullptr;
+    init();
+}
+
+
+VPRSetMgr::~VPRSetMgr()
+{
+    destroy();
+}
+
+
+void VPRSetMgr::init()
+{
+    if (m_set_pool != nullptr) { return; }
+    m_set_pool = xcom::smpoolCreate(sizeof(VPRSet) * 2, MEM_CONST_SIZE);
+    m_sbs_mgr.init();
+}
+
+
+void VPRSetMgr::destroy()
+{
+    if (m_set_pool == nullptr) { return; }
+    for (VPRSet * set = m_set_list.get_head();
+         set != nullptr; set = m_set_list.get_next()) {
+        set->clean(getSBSMgr());
+    }
+    m_set_list.clean();
+    xcom::smpoolDelete(m_set_pool);
+    m_sbs_mgr.destroy();
+    m_set_pool = nullptr;
+}
+
+
+VPRSet * VPRSetMgr::allocVPRSet()
+{
+    ASSERT0(m_set_pool);
+    VPRSet * set = (VPRSet*)xcom::smpoolMallocConstSize(
+        sizeof(VPRSet), m_set_pool);
+    set->init();
+    m_set_list.append_tail(set);
+    return set;
+}
+//END VPRSetMgr
 
 } //namespace xoc

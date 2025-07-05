@@ -39,34 +39,40 @@ namespace xoc {
 class Region;
 class DbxMgr;
 
-//This macro defines the maximum number of frontend languages.
-#define MAX_FRONTEND_LANGUAGES 4
 #define MAX_FILE_INDEX 65535
 typedef xcom::Vector<xoc::Sym const*> FileIdx2FileName;
 
+enum LANG_TYPE {
+    LANG_UNDEF = 0,
+    LANG_CPP, //C++
+    LANG_PYTHON, //Python
+    LANG_GR, //GR
+    LANG_LAST_COMMON = LANG_GR,
+
+    #include "dbg_lang_ext.inc"
+
+    ///////////////////////////////////////////////////////////////////////////
+    //DO NOT ADD NEW LANG AFTER LANG_NUM.                                    //
+    ///////////////////////////////////////////////////////////////////////////
+    LANG_NUM //The number of LANG.
+};
 
 class LangInfo {
     COPY_CONSTRUCTOR(LangInfo);
 public:
-    typedef enum tagLANG {
-        LANG_UNDEF = 0,
-        LANG_CPP,     //C++
-        LANG_PYTHON,  //Python
-        LANG_NUM
-    } LANG;
-    typedef xcom::TMap<LANG, UINT8> LANG2INDEX;
+    typedef xcom::TMap<LANG_TYPE, UINT8> LANG2INDEX;
 public:
     //Record the index for each language.
     LANG2INDEX m_frontend_lang_to_index;
 public:
     LangInfo() { m_frontend_lang_to_index.clean(); };
-    UINT8 getLangIndex(LangInfo::LANG lang) const;
+    UINT8 getLangIndex(LANG_TYPE lang) const;
     UINT8 getLangNum() const;
-    void setLangIndex(LangInfo::LANG lang, UINT8 index);
+    void setLangIndex(LANG_TYPE lang, UINT8 index);
 };
 
-typedef xcom::TMap<LangInfo::LANG, FileIdx2FileName*> Lang2FileIdx2FileName;
-typedef xcom::TMapIter<LangInfo::LANG, FileIdx2FileName*>
+typedef xcom::TMap<LANG_TYPE, FileIdx2FileName*> Lang2FileIdx2FileName;
+typedef xcom::TMapIter<LANG_TYPE, FileIdx2FileName*>
     Lang2FileIdx2FileNameIter;
 
 //Describe debug information.
@@ -113,20 +119,20 @@ public:
     ~Dbx() {}
     void clean(DbxMgr * dbx_mgr);
     void copy(Dbx const& dbx, DbxMgr * dbx_mgr);
-    UINT32 getLine(LangInfo::LANG lang, DbxMgr * dbx_mgr) const;
-    UINT32 getColOffset(LangInfo::LANG lang, DbxMgr * dbx_mgr) const;
-    UINT32 getFileIndex(LangInfo::LANG lang, DbxMgr * dbx_mgr) const;
-    UINT8 getFlag(LangInfo::LANG lang, DbxMgr * dbx_mgr) const;
+    UINT32 getLine(LANG_TYPE lang, DbxMgr * dbx_mgr) const;
+    UINT32 getColOffset(LANG_TYPE lang, DbxMgr * dbx_mgr) const;
+    UINT32 getFileIndex(LANG_TYPE lang, DbxMgr * dbx_mgr) const;
+    UINT8 getFlag(LANG_TYPE lang, DbxMgr * dbx_mgr) const;
 
     //During initialization, we will allocate memory for the m_debug_infos.
     //Note that we use the pool of dbgMgr.
     void init(DbxMgr * dbx_mgr);
-    void setLine(LangInfo::LANG lang, UINT32 line, DbxMgr * dbx_mgr);
-    void setColOffset(LangInfo::LANG lang, UINT32 col_offset,
+    void setLine(LANG_TYPE lang, UINT32 line, DbxMgr * dbx_mgr);
+    void setColOffset(LANG_TYPE lang, UINT32 col_offset,
                       DbxMgr * dbx_mgr);
-    void setFileIndex(LangInfo::LANG lang, UINT32 file_index,
+    void setFileIndex(LANG_TYPE lang, UINT32 file_index,
                       DbxMgr * dbx_mgr);
-    void setFlag(LangInfo::LANG lang, UINT8 flag, DbxMgr * dbx_mgr);
+    void setFlag(LANG_TYPE lang, UINT8 flag, DbxMgr * dbx_mgr);
 };
 
 
@@ -146,9 +152,9 @@ public:
         LogMgr * logmgr;
 
         //Required language.
-        xoc::LangInfo::LANG m_lang;
+        xoc::LANG_TYPE m_lang;
     public:
-        PrtCtx(xoc::LangInfo::LANG lang)
+        PrtCtx(xoc::LANG_TYPE lang)
         {
             prefix = nullptr;
             logmgr = nullptr;
@@ -180,7 +186,7 @@ public:
     //Do some prepare work before print source file.
     virtual void doPrepareWorkBeforePrint() {}
 
-    xoc::Sym const* getFileName(LangInfo::LANG lang, UINT fileidx) const;
+    xoc::Sym const* getFileName(LANG_TYPE lang, UINT fileidx) const;
 
     void init();
 
@@ -204,8 +210,8 @@ public:
         //Nothing to do.
     }
 
-    void setFileName(LangInfo::LANG lang, UINT fileidx, xoc::Sym const* s);
-    void setLangInfo();
+    void setFileName(LANG_TYPE lang, UINT fileidx, xoc::Sym const* s);
+    virtual void setLangInfo();
 
     void * xmalloc(size_t size);
 };
@@ -214,25 +220,34 @@ public:
 //Copy Dbx information from 'src' to 'tgt'.
 void copyDbx(IR * tgt, IR const* src, Region * rg);
 
+//Copy Dbx information from 'dbx' to 'tgt'.
+void copyDbx(IR * tgt, Dbx const* dbx, Region * rg);
+
 //Copy dbx from 'src' to each element in 'tgt_list'.
 void copyDbxForList(IR * tgt_list, IR const* src, Region * rg);
 
+//Copy dbx from 'dbx' to each element in 'tgt_list'.
+void copyDbxForList(IR * tgt_list, Dbx const* dbx, Region * rg);
+
 //Get source file line number of 'ir'.
-UINT getLineNum(IR const* ir, LangInfo::LANG language, DbxMgr * dbx_mgr);
+UINT getLineNum(IR const* ir, LANG_TYPE language, DbxMgr * dbx_mgr);
 
 //Get source file line number in 'dbx'.
-UINT getLineNum(Dbx const* dbx, LangInfo::LANG language, DbxMgr * dbx_mgr);
+UINT getLineNum(Dbx const* dbx, LANG_TYPE language, DbxMgr * dbx_mgr);
+UINT getLineNumOfCPP(Dbx const* dbx, Region const* rg);
+UINT getLineNumOfPython(Dbx const* dbx, Region const* rg);
+UINT getLineNumOfGR(Dbx const* dbx, Region const* rg);
 
 //Return the dbx of 'ir'.
 Dbx * getDbx(IR const* ir);
 
 //Set source file line number to 'ir'.
 void setLineNum(IR * ir, UINT lineno, Region * rg,
-                LangInfo::LANG language = LangInfo::LANG_CPP);
+                LANG_TYPE language = LANG_CPP);
 
 //Set source file loc to 'ir'.
 void setLoc(IR * ir, Region * rg, UINT line, UINT col,
-            UINT file_index, LangInfo::LANG language);
+            UINT file_index, LANG_TYPE language);
 
 //Set dbx to 'ir'.
 void setDbx(IR * ir, Dbx * dbx, Region * rg);

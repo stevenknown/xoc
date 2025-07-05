@@ -36,14 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Map between Var and PRNO.
-class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
-};
-
-typedef DefSBitSetCore PRLiveSet;
-typedef DefSEGIter PRLiveSetIter;
-typedef Vector<PRLiveSet*> LivenessVec;
-
+typedef DefSBitSetCore LiveSet;
+typedef DefSEGIter LiveSetIter;
+typedef Vector<LiveSet*> LivenessVec;
 
 //Auxiliary livenessMgr that used to remove redundant liveness info.
 class AuxLivenessMgr {
@@ -63,14 +58,14 @@ public:
 
     ~AuxLivenessMgr() { destroy(); }
 
-    PRLiveSet * genNewLiveIn(UINT bbid);
+    LiveSet * genNewLiveIn(UINT bbid);
 
-    PRLiveSet * genNewLiveOut(UINT bbid);
+    LiveSet * genNewLiveOut(UINT bbid);
 
-    PRLiveSet * getNewLiveOut(UINT bbid) const
+    LiveSet * getNewLiveOut(UINT bbid) const
     { return m_new_liveout_vec.get(bbid); }
 
-    PRLiveSet * getNewLiveIn(UINT bbid) const
+    LiveSet * getNewLiveIn(UINT bbid) const
     { return m_new_livein_vec.get(bbid); }
 
     DefMiscBitSetMgr & getSBSMgr() { return m_sbs_mgr; }
@@ -79,52 +74,36 @@ public:
 
 class LivenessMgr : public Pass {
     COPY_CONSTRUCTOR(LivenessMgr);
+    friend class VFExp;
 protected:
-    BYTE m_handle_may:1; //true if consider maydef/mayuse info.
     BYTE m_keep_local:1; //true to retain local-set info when perform() ends.
     MDSystem * m_md_sys;
-    Var2PR * m_var2pr;
     DefMiscBitSetMgr m_sbs_mgr;
-    Vector<PRLiveSet*> m_def;
-    Vector<PRLiveSet*> m_use;
-    Vector<PRLiveSet*> m_livein;
-    Vector<PRLiveSet*> m_liveout;
+    Vector<LiveSet*> m_def;
+    Vector<LiveSet*> m_use;
+    Vector<LiveSet*> m_livein;
+    Vector<LiveSet*> m_liveout;
 protected:
     void cleanLocal();
     void cleanGlobal();
-    void computeExp(IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use,
-                    MOD PRLiveSet * gen);
-    void computeStmt(IR const* stmt, ConstIRIter & it, MOD PRLiveSet * use,
-                     MOD PRLiveSet * gen);
+    virtual void computeExpImpl(
+        IR const* exp, MOD LiveSet * use, MOD LiveSet * gen);
+    virtual void computeStmtImpl(
+        IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
+    void computeExp(IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
+    void computeStmt(IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
 
-    PRLiveSet * gen_liveout(UINT bbid);
-    PRLiveSet * gen_livein(UINT bbid);
-    PRLiveSet * gen_def(UINT bbid);
-    PRLiveSet * gen_use(UINT bbid);
-
-    void processPHI(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
-                    MOD PRLiveSet * gen);
-    void processSTPR(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
-                     MOD PRLiveSet * gen);
-    void processSETELEM(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
-                        MOD PRLiveSet * gen);
-    void processGETELEM(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
-                        MOD PRLiveSet * gen);
-    void processCallStmt(IR const* x, ConstIRIter & it, MOD PRLiveSet * use,
-                         MOD PRLiveSet * gen);
-    void processOpnd(IR const* exp, ConstIRIter & it,
-                     MOD PRLiveSet * use, MOD PRLiveSet * gen);
-    void processMayDef(PRNO prno, MOD PRLiveSet * gen,
-                       MOD PRLiveSet * use);
-    void processMay(IR const* pr, MOD PRLiveSet * gen,
-                    MOD PRLiveSet * use, bool is_lhs);
-    void processMayUse(PRNO prno, MOD PRLiveSet * use);
+    LiveSet * gen_liveout(UINT bbid);
+    LiveSet * gen_livein(UINT bbid);
+    LiveSet * gen_def(UINT bbid);
+    LiveSet * gen_use(UINT bbid);
+protected:
+    void updateSetByStmt(BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen);
+    void updateSetByExp(BSIdx idx, MOD LiveSet * use);
 public:
     LivenessMgr(Region * rg) : Pass(rg)
     {
         m_md_sys = rg->getMDSystem();
-        m_var2pr = nullptr;
-        m_handle_may = false;
         m_keep_local = false;
     }
     ~LivenessMgr() { clean(); }
@@ -134,7 +113,7 @@ public:
     void add_livein(IRBB const* bb, PRNO prno)
     { gen_livein(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
 
-    void computeLocal(IRBB const* bb, MOD ConstIRIter & it);
+    void computeLocal(IRBB const* bb);
     void computeLocal(BBList const& bblst);
     void computeGlobal(IRCFG const* cfg);
     size_t count_mem() const;
@@ -160,20 +139,20 @@ public:
     //                  the livein of entry vertex.
     bool eliminateRedundantLivenessImpl(
         IRCFG const* cfg, AuxLivenessMgr & auxmgr,
-        PRLiveSet const& redundant_live);
+        LiveSet const& redundant_live);
 
     //Get a union set of new liveout info from all predecessors of 'v'.
     //These new liveout info come from 'm_new_liveout_vec' in 'auxmgr'.
-    void getPreVertexNewLiveOut(OUT PRLiveSet & new_liveout, Vertex const* v,
+    void getPreVertexNewLiveOut(OUT LiveSet & new_liveout, Vertex const* v,
                                 AuxLivenessMgr & auxmgr);
 
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
-    PRLiveSet * get_def(UINT bbid) const { return m_def.get(bbid); }
-    PRLiveSet * get_use(UINT bbid) const { return m_use.get(bbid); }
-    PRLiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
-    PRLiveSet * get_liveout(UINT bbid) const { return m_liveout.get(bbid); }
+    LiveSet * get_def(UINT bbid) const { return m_def.get(bbid); }
+    LiveSet * get_use(UINT bbid) const { return m_use.get(bbid); }
+    LiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
+    LiveSet * get_liveout(UINT bbid) const { return m_liveout.get(bbid); }
 
     //By default, local set is initialized by computeLocal().
     void initSet(BBList const& bblst);
@@ -195,25 +174,22 @@ public:
     void resetLivenessAfterRemoveRedundantLiveness(
         IRCFG const* cfg, AuxLivenessMgr & auxmgr);
 
-    //Set true to handle maydef and mayuse MDSet.
-    void set_handle_may(bool handle) { m_handle_may = (BYTE)handle; }
-
     //Keep local-set information.
     void set_keep_local(bool keep) { m_keep_local = (BYTE)keep; }
 
-    void set_livein(UINT bbid, PRLiveSet const* live_set)
+    void set_livein(UINT bbid, LiveSet const* live_set)
     {
         ASSERT0(live_set);
         ASSERT0(bbid != BBID_UNDEF);
-        PRLiveSet * livein = gen_livein(bbid);
+        LiveSet * livein = gen_livein(bbid);
         livein->copy(*live_set, m_sbs_mgr);
     }
 
-    void set_liveout(UINT bbid, PRLiveSet const* live_set)
+    void set_liveout(UINT bbid, LiveSet const* live_set)
     {
         ASSERT0(live_set);
         ASSERT0(bbid != BBID_UNDEF);
-        PRLiveSet * liveout = gen_liveout(bbid);
+        LiveSet * liveout = gen_liveout(bbid);
         liveout->copy(*live_set, m_sbs_mgr);
     }
 
@@ -221,9 +197,6 @@ public:
     //empty_bb: the empty BB.
     //from: the predecessor BB of the empty_BB.
     void setLivenessForEmptyBB(IRBB const* empty_bb, IRBB const* from);
-
-    //Set map structure which used during the processing of maydef and mayuse.
-    void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }
 
     bool perform(BBList const* bblst, IRCFG const* cfg, OptCtx & oc);
     virtual bool perform(OptCtx & oc);

@@ -358,12 +358,10 @@ bool LoopDepAna::isSameMemLocIndirectOp(LoopDepInfo const& info)
 void LoopDepAna::destroy()
 {
     if (m_pool == nullptr) { return; }
-    ASSERT0(m_infer_evn);
-    delete m_infer_evn;
     m_infer_evn = nullptr;
     smpoolDelete(m_pool);
     m_pool = nullptr;
-    m_act_mgr.clean();
+    m_am.clean();
 }
 
 
@@ -381,7 +379,9 @@ void LoopDepAna::init(GVN * gvn)
     m_gvn = gvn;
     m_prssamgr = nullptr;
     m_mdssamgr = nullptr;
-    m_infer_evn = gvn->allocInferEVN();
+    ASSERT0(gvn);
+    m_infer_evn = gvn->getAndGenInferEVN();
+    m_infer_evn->clean();
 }
 
 
@@ -578,7 +578,7 @@ bool LoopDepAna::dump() const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    m_act_mgr.dump();
+    m_am.dump();
     dumpInferEVN();
     bool res = Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
@@ -616,8 +616,8 @@ bool LoopDepAna::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
-                                               PASS_IVR, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_LOOP_INFO, PASS_IVR, PASS_UNDEF);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
     ASSERT0(m_ivr && m_ivr->is_valid());
     m_licm = (LICM*)m_rg->getPassMgr()->registerPass(PASS_LICM);

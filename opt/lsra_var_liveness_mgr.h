@@ -35,30 +35,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 //
-//START VarCheck
-//
-class VarCheck {
-public:
-    static bool m_is_vec_only;
-public:
-    static void setVarCheckCondition(bool is_vec_only)
-    { m_is_vec_only = is_vec_only; }
-
-    static bool checkVarType(Var const* v)
-    {
-        if (m_is_vec_only && !v->is_vector()) {
-            return true;
-        }
-        if (!m_is_vec_only && v->is_vector()) {
-            return true;
-        }
-        return false;
-    }
-};
-//END VarCheck
-
-
-//
 //START LSRAVarLivenessMgr
 //
 class LSRAVarLivenessMgr : public VarLivenessMgr {
@@ -69,8 +45,8 @@ protected:
     virtual bool canBeStmtCand(IR const* stmt) override;
     virtual bool canBeExpCand(IR const* stmt, IR const* ir) override;
 public:
-    LSRAVarLivenessMgr(Region * rg, LinearScanRA & ra)
-        : VarLivenessMgr(rg), m_ra(ra) {}
+    LSRAVarLivenessMgr(Region * rg, LinearScanRA & ra) :
+        VarLivenessMgr(rg), m_ra(ra) {}
 };
 //END LSRAVarLivenessMgr
 

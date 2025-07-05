@@ -37,6 +37,71 @@ namespace xoc {
 //a BB can include.
 #define MAX_IR_BIT_RANGE_IN_BB 16
 
+static void dumpFoldConst(
+    IR const* ir1, IR const* ir2, IR const* res,
+    AlgeReasscociate const* reass)
+{
+    AlgeReasscociate * pthis = const_cast<AlgeReasscociate*>(reass);
+    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf s1(32);
+    xcom::StrBuf s2(32);
+    xcom::StrBuf s3(32);
+    pthis->getRegion()->getLogMgr()->incIndent(2);
+    xoc::dumpIRToBuf(ir1, pthis->getRegion(), s1);
+    xoc::dumpIRToBuf(ir2, pthis->getRegion(), s2);
+    xoc::dumpIRToBuf(res, pthis->getRegion(), s3);
+    pthis->getRegion()->getLogMgr()->decIndent(2);
+    pthis->getActMgr().dumpAct("fold %s,%s \n  into%s",
+       s1.getBuf(), s2.getBuf(), s3.getBuf());
+}
+
+
+static void dumpReplaceExp(
+    IR const* orgrhs, IR const* newrhs, AlgeReasscociate const* reass)
+{
+    AlgeReasscociate * pthis = const_cast<AlgeReasscociate*>(reass);
+    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf s1(32), s2(32);
+    pthis->getRegion()->getLogMgr()->incIndent(2);
+    xoc::dumpIRToBuf(orgrhs, pthis->getRegion(), s1);
+    xoc::dumpIRToBuf(newrhs, pthis->getRegion(), s2);
+    pthis->getRegion()->getLogMgr()->decIndent(2);
+    pthis->getActMgr().dumpAct(
+        "replace %s \n  with %s", s1.getBuf(), s2.getBuf());
+}
+
+
+static void dumpSimpStmt(IR const* ir, AlgeReasscociate const* reass)
+{
+    ASSERT0(ir->is_stmt());
+    AlgeReasscociate * pthis = const_cast<AlgeReasscociate*>(reass);
+    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    xcom::StrBuf s1(32);
+    pthis->getRegion()->getLogMgr()->incIndent(2);
+    xoc::dumpIRToBuf(ir, pthis->getRegion(), s1);
+    pthis->getRegion()->getLogMgr()->decIndent(2);
+    pthis->getActMgr().dumpAct(
+        "simplify %s \n  to lowest height.", s1.getBuf());
+}
+
+
+//
+//START ReassActMgr
+//
+void ReassActMgr::dumpAct(CHAR const* format, ...)
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    va_list args;
+    va_start(args, format);
+    xcom::DefFixedStrBuf buf;
+    buf.strcat("REASS:");
+    buf.vstrcat(format, args);
+    dump("%s", buf.getBuf());
+    va_end(args);
+}
+//END ReassActMgr
+
+
 class LinOpVecSort : public QuickSort<IR const*> {
     ReassCtx const& m_ctx;
 protected:
@@ -112,6 +177,16 @@ void LinOpVec::dump(ReassCtx const& ctx) const
 }
 
 
+bool LinOpVec::is_unique(IR const* ir) const
+{
+    for (VecIdx i = 0; i < (VecIdx)get_elem_count(); i++) {
+        IR const* t = get(i);
+        ASSERT0(t != ir);
+    }
+    return true;
+}
+
+
 bool LinOpVec::verify() const
 {
     IR_CODE code = IR_UNDEF;
@@ -137,6 +212,14 @@ bool LinOpVec::verify() const
 //START ReassCtx
 //
 //
+ReassCtx::ReassCtx(OptCtx & oc, Region const* rg)
+    : PassCtx(&oc, nullptr), m_cur_rank(RANK_UNDEF)
+{
+    m_ir_rank_range_bitsize = 0;
+    m_need_recomp_gvn = false;
+}
+
+
 void ReassCtx::dumpBBListWithRankImpl(MOD IRDumpCtx<> & dumpctx) const
 {
     ASSERT0(m_rg);
@@ -247,8 +330,10 @@ bool AlgeReasscociate::initDepPass(MOD OptCtx & oc)
     PassTypeList optlist;
     optlist.append_tail(PASS_RPO);
     if (g_do_refine) { optlist.append_tail(PASS_REFINE); }
+    optlist.append_tail(PASS_IRSIMP);
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, optlist);
     m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
+    m_simp = (IRSimp*)m_rg->getPassMgr()->queryPass(PASS_IRSIMP);
     return true;
 }
 
@@ -290,7 +375,9 @@ bool AlgeReasscociate::dump() const
 RANK AlgeReasscociate::computeConst(IR const* ir, MOD ReassCtx & ctx) const
 {
     RANK rank = getLowestRank();
-    ctx.setRank(ir, rank);
+    if (rank != RANK_UNDEF) {
+        ctx.setRank(ir, rank);
+    }
     ctx.getLinOpVec().append(ir);
     return rank;
 }
@@ -384,7 +471,7 @@ RANK AlgeReasscociate::computeRankForExp(MOD IR * ir, MOD ReassCtx & ctx) const
     case IR_DUMMYUSE:
     case IR_CASE:
     case IR_ID:
-        ASSERT0(0); //TODO
+        return RANK_UNDEF;
     default:
         ASSERT0(ir->isExtOp());
         return computeRankForExtOp(ir, ctx);
@@ -393,21 +480,31 @@ RANK AlgeReasscociate::computeRankForExp(MOD IR * ir, MOD ReassCtx & ctx) const
 }
 
 
+bool AlgeReasscociate::isOpCodeConsistent(
+    IR const* ir, LinOpVec const& opvec) const
+{
+    IR_CODE opcode = opvec.getCode();
+    return opcode == IR_UNDEF || ir->getCode() == opcode;
+}
+
+
 RANK AlgeReasscociate::computeStoreStmt(MOD IR * ir, MOD ReassCtx & ctx) const
 {
-    ASSERT0(ir->isStoreStmt());
+    ASSERT0(ir->isStoreStmt() || ir->isVirtualOp());
     if (!canBeCandStmt(ir)) { return RANK_UNDEF; }
     RANK rank = ctx.getRank(ir);
     if (rank != RANK_UNDEF) {
         return rank;
     }
     IR * rhs = ir->getRHS();
-    if (!rhs->isBinaryOp() || !canBeCandBinOp(rhs)) {
+    LinOpVec & opvec = ctx.getLinOpVec();
+    if (!rhs->isBinaryOp() || !canBeCandBinOp(rhs) ||
+        !isOpCodeConsistent(rhs, opvec)) {
         //Terminate the propagation of linearizing.
         ctx.getLinOpVec().append(rhs);
         return RANK_UNDEF;
     }
-    ctx.getLinOpVec().setCode(rhs->getCode());
+    opvec.setCode(rhs->getCode()); //Always set the consistent opcode.
     RANK rhs_rank = computeRankForExp(rhs, ctx);
     if (rhs_rank == RANK_UNDEF) { return RANK_UNDEF; }
     ASSERT0(ctx.getRank(rhs) == rhs_rank);
@@ -419,7 +516,6 @@ RANK AlgeReasscociate::computeStoreStmt(MOD IR * ir, MOD ReassCtx & ctx) const
 
 bool AlgeReasscociate::foldConstLastTwoOp(MOD ReassCtx & ctx) const
 {
-    bool changed = false;
     LinOpVec & linopvec = ctx.getLinOpVec();
     if (linopvec.get_elem_count() < 2) { return false; }
     VecIdx last1 = linopvec.get_last_idx();
@@ -431,15 +527,16 @@ bool AlgeReasscociate::foldConstLastTwoOp(MOD ReassCtx & ctx) const
     if (!last1_ir->is_const() || !last2_ir->is_const()) { return false; }
     IR_CODE binop = linopvec.getCode();
     ASSERT0(binop != IR_UNDEF);
-    Type const* binopty = last1_ir->getType();
-    ASSERT0(binopty == last2_ir->getType());
+    Type const* binopty = m_tm->hoistDTypeForBinOp(last1_ir, last2_ir);
+    ASSERT0(binopty);
     IR * newir = m_irmgr->buildBinaryOpSimp(binop,
        binopty, m_rg->dupIRTree(last1_ir), m_rg->dupIRTree(last2_ir));
     ASSERT0(m_refine);
-    RefineCtx rc(&ctx.getOptCtx());
+    RefineCtx rc(ctx.getOptCtx());
     bool change = false;
     newir = m_refine->foldConst(newir, change, rc);
     ASSERT0(newir->is_const() && change);
+    dumpFoldConst(last1_ir, last2_ir, newir, this);
 
     //Compute the rank for newir.
     computeConst(newir, ctx);
@@ -483,29 +580,71 @@ void AlgeReasscociate::buildDUChainForReassExp(
     LinOpVec const& linopvec = const_cast<ReassCtx&>(ctx).getLinOpVec();
     ASSERT0(linopvec.get_elem_count() == reassopvec.get_elem_count());
     for (VecIdx i = 0; i < (VecIdx)reassopvec.get_elem_count(); i++) {
-        IR const* orgop = linopvec.get(i);
-        ASSERT0(orgop);
-        if (!orgop->isMemOpnd()) { continue; }
+        //IR const* orgop = linopvec.get(i);
+        //ASSERT0(orgop);
+        //if (!orgop->isMemOpnd()) { continue; }
         IR * reassop = reassopvec.get(i);
-        ASSERT0(reassop && reassop->isMemOpnd());
-        xoc::addUse(reassop, orgop, m_rg);
+        if (!reassop->isMemOpnd()) {
+            //reassop may be const.
+            continue;
+        }
+        //xoc::addUse(reassop, orgop, m_rg);
+        IR * reassop_stmt = reassop->getStmt();
+        IRBB * startbb = reassop_stmt->getBB();
+        IR * startir = startbb->getPrevIR(reassop_stmt);
+        xoc::findAndSetLiveInDefForTree(
+            reassop, startir, startbb, m_rg, *ctx.getOptCtx());
+    }
+}
+
+
+static void simplifyStmtAndInsertToBB(
+    MOD IR * ir, Region const* rg, ReassCtx const& ctx,
+    AlgeReasscociate const* reass)
+{
+    ASSERT0(ir->is_stmt());
+    SimpCtx simpctx(ctx.getOptCtx());
+    simpctx.setSimpLandLor();
+    simpctx.setSimpLnot();
+    simpctx.setSimpToLowestHeight();
+    IRSimp * simppass = reass->getIRSimp();
+    ASSERT0(simppass);
+    dumpSimpStmt(ir, reass);
+    IR * newir = simppass->simplifyStmt(ir, &simpctx);
+    ASSERT0(newir);
+    ASSERT0(simpctx.getStmtList() == nullptr);
+    ASSERT0(!simpctx.needReconstructBBList());
+    IRListIter it;
+    IRBB * irbb = ir->getBB();
+    BBIRList & irlst = irbb->getIRList();
+    bool find = irlst.find(ir, &it);
+    ASSERT0_DUMMYUSE(find);
+    for (IR * x = xcom::removehead(&newir);
+         x != nullptr; x = xcom::removehead(&newir)) {
+        if (x == ir) { continue; }
+        ASSERT0(x->is_stmt());
+        irlst.insert_before(x, it);
     }
 }
 
 
 //Return true if given 'ir' has been rewrote.
 bool AlgeReasscociate::replaceRHSWithReassExp(
-    MOD IR * ir, ReassCtx const& ctx) const
+    MOD IR * ir, MOD ReassCtx & ctx) const
 {
     IRVec reassopvec;
     IR * reass = reasscociatedExp(reassopvec, ctx);
     if (reass == nullptr) { return false; }
     IR * orgrhs = ir->getRHS();
     //Maintain DU chain.
-    xoc::removeUseForTree(orgrhs, m_rg, ctx.getOptCtx());
-    buildDUChainForReassExp(reassopvec, ctx);
+    xoc::removeUseForTree(orgrhs, m_rg, *ctx.getOptCtx());
+    dumpReplaceExp(orgrhs, reass, this);
+    ctx.tryInvalidInfoBeforeFreeIR(orgrhs);
     m_rg->freeIRTree(orgrhs);
     ir->setRHS(reass);
+    buildDUChainForReassExp(reassopvec, ctx);
+    simplifyStmtAndInsertToBB(ir, m_rg, ctx, this);
+    ctx.setRecompGVN(true);
     return true;
 }
 
@@ -524,8 +663,7 @@ bool AlgeReasscociate::optimizeLinOpVec(MOD IR * ir, MOD ReassCtx & ctx) const
         changed |= lchanged;
     } while (lchanged);
     if (!changed) { return false; }
-    changed |= replaceRHSWithReassExp(ir, ctx);
-    return changed;
+    return replaceRHSWithReassExp(ir, ctx);
 }
 
 
@@ -533,6 +671,7 @@ RANK AlgeReasscociate::computePhi(MOD IR * ir, MOD ReassCtx & ctx) const
 {
     ASSERT0(ir->is_phi());
     RANK rank = ctx.getRank(ir->getBB());
+    if (rank != RANK_UNDEF) { return rank; }
     ctx.setRank(ir, rank);
     return rank;
 }
@@ -546,6 +685,7 @@ RANK AlgeReasscociate::computeRankForStmt(MOD IR * ir, MOD ReassCtx & ctx) const
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_WRITE_ARRAY:
     SWITCH_CASE_INDIRECT_MEM_STMT:
+    SWITCH_CASE_EXT_WRITE_PR:
         return computeStoreStmt(ir, ctx);
     case IR_SETELEM:
     case IR_GETELEM:
@@ -576,11 +716,12 @@ bool AlgeReasscociate::computeRankAndReassForBB(
     for (IR * ir = irlst.get_tail(&it);
          ir != nullptr; ir = irlst.get_prev(&it)) {
         ctx.cleanBottomUp();
+        if (ir->is_phi()) { continue; }
         RANK stmtrank = computeRankForStmt(ir, ctx);
         if (stmtrank == RANK_UNDEF) { continue; }
         changed |= optimizeLinOpVec(ir, ctx);
     }
-    return changed; 
+    return changed;
 }
 
 
@@ -597,11 +738,11 @@ static UINT computeMaxIRNumInBB(BBList const* bblst)
 
 
 static void computeBBRank(
-    Region const* rg, RPOVexList const* vexlst, UINT ir_rank_range_bitsize,
-    MOD ReassCtx & ctx)
+    Region const* rg, xcom::RPOVexList const* vexlst,
+    UINT ir_rank_range_bitsize, MOD ReassCtx & ctx)
 {
     ASSERT0(vexlst);
-    RPOVexListIter it;
+    xcom::RPOVexListIter it;
     RANK rank = ctx.getCurRank();
     for (vexlst->get_head(&it); it != vexlst->end();
          it = vexlst->get_next(it)) {
@@ -625,20 +766,19 @@ bool AlgeReasscociate::verifyRank(ReassCtx const& ctx) const
 }
 
 
-bool AlgeReasscociate::doReass(MOD OptCtx & oc)
+bool AlgeReasscociate::doReass(MOD ReassCtx & ctx)
 {
     bool changed = false;
-    ReassCtx ctx(oc, m_rg);
     UINT irnum = computeMaxIRNumInBB(m_rg->getBBList());
     UINT ir_rank_range_bitsize = xcom::computeMaxBitSizeForValue(
         (ULONGLONG)(irnum + 1));
     ASSERT0(ir_rank_range_bitsize < MAX_IR_BIT_RANGE_IN_BB);
     ctx.setIRRankRangeBitSize(ir_rank_range_bitsize);
     ASSERT0L3(verifyRank(ctx));
-    RPOVexList const* vexlst = m_cfg->getRPOVexList();
+    xcom::RPOVexList const* vexlst = m_cfg->getRPOVexList();
     ASSERT0(vexlst);
     computeBBRank(m_rg, vexlst, ir_rank_range_bitsize, ctx);
-    RPOVexListIter it;
+    xcom::RPOVexListIter it;
     for (vexlst->get_tail(&it); it != vexlst->end();
          it = vexlst->get_prev(it)) {
         IRBB const* bb = m_rg->getBB(it->val()->id());
@@ -653,19 +793,21 @@ bool AlgeReasscociate::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-    if (!oc.is_ref_valid()) { return false; }
+    if (!oc.isPassValid(PASS_MD_REF)) { return false; }
+
     //Initialize pass object since they might be destructed at any moment.
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     m_irmgr = m_rg->getIRMgr();
     if (!usePRSSADU() || !useMDSSADU()) {
-        //AlgeReass prefer using SSA instead of classic DU.
+        //AlgeReass prefers using SSA instead of classic DU.
         return false;
     }
     START_TIMER(t, getPassName());
     reset();
     initDepPass(oc);
-    bool change = doReass(oc);
+    ReassCtx ctx(oc, m_rg);
+    bool change = doReass(ctx);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAlgeReasscociate()) {
         dump();
     }
@@ -673,8 +815,11 @@ bool AlgeReasscociate::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
+    if (ctx.needRecompGVN()) {
+        oc.setInvalidPass(PASS_GVN);
+    }
     //DU chain and DU reference should be maintained.
-    ASSERT0(xoc::verifyMDRef(m_rg, oc) && xoc::verifyMDDUChain(m_rg, oc));
+    ASSERT0(xoc::verifyMDRef(m_rg, oc) && xoc::verifyClassicDUChain(m_rg, oc));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     END_TIMER(t, getPassName());

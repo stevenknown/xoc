@@ -74,6 +74,39 @@ IR * InsertCvt::convertDirectStore(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
+IR * InsertCvt::insertCvtForSetelemVal(IR * ir, IR * val)
+{
+    ASSERT0(val);
+    Type const* elemtype;
+    if (ir->is_vec()) {
+        elemtype = ir->getType()->getVectorElemType(m_tm);
+    } else {
+        elemtype = ir->getType();
+    }
+    if (val->getType() != elemtype &&
+        (elemtype->is_fp() || val->getType()->is_fp())) {
+        //Insert data type conversion.
+        //
+        //Convert:
+        //setelem:vec<tgt_type * n>
+        //    $0:<tgt_type * n>
+        //    $1:src_type
+        //    intconst:i32
+        //
+        //To:
+        //setelem:vec<tgt_type * n>
+        //    $0:<tgt_type * n>
+        //    cvt:tgt_type
+        //        $1:src_type
+        //    intconst:i32
+        IR * new_kid = m_rg->getIRMgr()->buildCvt(val, elemtype);
+        copyDbx(new_kid, val, m_rg);
+        return new_kid;
+    }
+    return val;
+}
+
+
 IR * InsertCvt::convertSetelem(IR * ir, bool & change, InsertCvtCtx & rc)
 {
     ASSERT0(ir->is_setelem());
@@ -83,6 +116,7 @@ IR * InsertCvt::convertSetelem(IR * ir, bool & change, InsertCvtCtx & rc)
         SETELEM_base(ir) = base;
     }
     IR * val = convertIR(SETELEM_val(ir), change, rc);
+    val = insertCvtForSetelemVal(ir, val);
     if (val != SETELEM_val(ir)) {
         ir->setParent(val);
         SETELEM_val(ir) = val;
@@ -494,12 +528,12 @@ bool InsertCvt::convertStmtList(MOD BBIRList & ir_list, MOD InsertCvtCtx & rc)
         IR * ir = ct->val();
         next_ct = ir_list.get_next(next_ct);
         bool lchange = false;
-        InsertCvtCtx lrc(rc);
-        IR * newir = convertIRUntilUnchange(ir, lchange, lrc);
+        InsertCvtCtx tmpctx(rc);
+        IR * newir = convertIRUntilUnchange(ir, lchange, tmpctx);
         change |= lchange;
         if (newir == ir) { continue; }
         change = true;
-        if (!RC_stmt_removed(lrc)) {
+        if (!tmpctx.isStmtRemoved()) {
             //If the old ir still not be removed by
             //callee, remove the old one here.
             //NOTE ir may be IR_UDNEF which has been freed.
@@ -531,7 +565,7 @@ bool InsertCvt::convertBBlist(MOD BBList * ir_bb_list, MOD InsertCvtCtx & rc)
     if (rc.getOptCtx()->is_ref_valid()) {
         ASSERT0(m_rg->getDUMgr() && m_rg->getDUMgr()->verifyMDRef());
         //DU chain is kept by convertment.
-        ASSERT0(verifyMDDUChain(m_rg, *rc.getOptCtx()));
+        ASSERT0(verifyClassicDUChain(m_rg, *rc.getOptCtx()));
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, *rc.getOptCtx()));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, *rc.getOptCtx()));
         ASSERT0(verifyIRandBB(ir_bb_list, m_rg));
@@ -570,6 +604,61 @@ void InsertCvt::insertCvtForBinaryOpByPtrType(IR * ir, bool & change)
 }
 
 
+void InsertCvt::insertCvtForOpnd0OfBinaryOp(
+    IR * ir, IR * op0, Type const* hoisted_type, bool & change)
+{
+    ASSERT0(ir->isBinaryOp() && op0 == BIN_opnd0(ir));
+    UINT hoisted_type_size = m_tm->getByteSize(hoisted_type);
+    if (op0->getTypeSize(m_tm) != hoisted_type_size) {
+        BIN_opnd0(ir) = m_rg->getIRMgr()->buildCvt(op0, hoisted_type);
+        copyDbx(BIN_opnd0(ir), op0, m_rg);
+        change = true;
+        ir->setParentPointer(false);
+        return;
+    }
+    if (hoisted_type->isFP() && !op0->isFP()) {
+        BIN_opnd0(ir) = m_rg->getIRMgr()->buildCvt(op0, hoisted_type);
+        copyDbx(BIN_opnd0(ir), op0, m_rg);
+        change = true;
+        ir->setParentPointer(false);
+        return;
+    }
+}
+
+
+void InsertCvt::insertCvtForOpnd1OfBinaryOp(
+    IR * ir, IR * op1, Type const* hoisted_type, bool & change)
+{
+    ASSERT0(ir->isBinaryOp() && op1 == BIN_opnd1(ir));
+    UINT hoisted_type_size = m_tm->getByteSize(hoisted_type);
+    if (op1->getTypeSize(m_tm) != hoisted_type_size) {
+        if (ir->is_asr() || ir->is_lsl() || ir->is_lsr()) {
+            //CASE:Second operand of Shift operantion need NOT to be converted.
+            //     Second operand indicates the bit that expected to be shifted.
+            //e.g: $2(u64) = $8(u64) >> j(u32);
+            //  stpr $2:u64 id:37 attachinfo:Dbx
+            //      lsr:u64 id:31 attachinfo:Dbx
+            //          $8:u64 id:59
+            //          ld:u32 'j' id:30 attachinfo:Dbx,MDSSA
+        } else {
+            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1, hoisted_type);
+            copyDbx(BIN_opnd1(ir), op1, m_rg);
+            change = true;
+            ir->setParentPointer(false);
+            return;
+        }
+        return;
+    }
+    if (hoisted_type->isFP() && !op1->isFP()) {
+        BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1, hoisted_type);
+        copyDbx(BIN_opnd1(ir), op1, m_rg);
+        change = true;
+        ir->setParentPointer(false);
+        return;
+    }
+}
+
+
 void InsertCvt::insertCvtForBinaryOp(IR * ir, bool & change)
 {
     ASSERT0(ir->isBinaryOp());
@@ -604,30 +693,9 @@ void InsertCvt::insertCvtForBinaryOp(IR * ir, bool & change)
     ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
 
     //Both op0 and op1 are NOT vector type.
-    Type const* type = m_tm->hoistDTypeForBinOp(op0, op1);
-    UINT dt_size = m_tm->getByteSize(type);
-    if (op0->getTypeSize(m_tm) != dt_size) {
-        BIN_opnd0(ir) = m_rg->getIRMgr()->buildCvt(op0, type);
-        copyDbx(BIN_opnd0(ir), op0, m_rg);
-        change = true;
-        ir->setParentPointer(false);
-    }
-    if (op1->getTypeSize(m_tm) != dt_size) {
-        if (ir->is_asr() || ir->is_lsl() || ir->is_lsr()) {
-            //CASE:Second operand of Shift operantion need NOT to be converted.
-            //     Second operand indicates the bit that expected to be shifted.
-            //e.g: $2(u64) = $8(u64) >> j(u32);
-            //  stpr $2:u64 id:37 attachinfo:Dbx
-            //      lsr:u64 id:31 attachinfo:Dbx
-            //          $8:u64 id:59
-            //          ld:u32 'j' id:30 attachinfo:Dbx,MDSSA
-        } else {
-            BIN_opnd1(ir) = m_rg->getIRMgr()->buildCvt(op1, type);
-            copyDbx(BIN_opnd1(ir), op1, m_rg);
-            change = true;
-            ir->setParentPointer(false);
-        }
-    }
+    Type const* hoisted_type = m_tm->hoistDTypeForBinOp(op0, op1);
+    insertCvtForOpnd0OfBinaryOp(ir, op0, hoisted_type, change);
+    insertCvtForOpnd1OfBinaryOp(ir, op1, hoisted_type, change);
 }
 
 

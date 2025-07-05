@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -78,12 +79,13 @@ void ExprRep::dump(Region const* rg) const
 //
 ExprTab::ExprTab(Region * rg) : Pass(rg)
 {
-    m_expr_count = 0;
+    m_expr_count = EXPR_UNDEF;
     m_tm = rg->getTypeMgr();
     ASSERT0(sizeof(m_level1_hash_tab) == LEVEL1_BYTE_SIZE);
     ::memset((void*)m_level1_hash_tab, 0, LEVEL1_BYTE_SIZE);
-    m_pool = smpoolCreate(sizeof(ExprRep*) * 128, MEM_COMM);
-    m_sc_pool = smpoolCreate(sizeof(xcom::SC<ExprRep*>) * 4, MEM_CONST_SIZE);
+    m_pool = xcom::smpoolCreate(sizeof(ExprRep*) * 128, MEM_COMM);
+    m_sc_pool = xcom::smpoolCreate(
+        sizeof(xcom::SC<ExprRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
     m_md_set_mgr = rg->getMDSetMgr();
     m_bs_mgr = rg->getBitSetMgr();
@@ -98,8 +100,8 @@ ExprTab::~ExprTab()
         ASSERT0(ie);
         delete ie;
     }
-    smpoolDelete(m_pool);
-    smpoolDelete(m_sc_pool);
+    xcom::smpoolDelete(m_pool);
+    xcom::smpoolDelete(m_sc_pool);
 }
 
 
@@ -110,16 +112,16 @@ size_t ExprTab::count_mem() const
     count += sizeof(m_rg);
     count += m_ir_expr_vec.count_mem();
     count += m_ir_expr_lst.count_mem();
-    count += smpoolGetPoolSize(m_pool);
+    count += xcom::smpoolGetPoolSize(m_pool);
     count += sizeof(m_level1_hash_tab);
     count += m_map_ir2exprep.count_mem();
     return count;
 }
 
 
-void * ExprTab::xmalloc(INT size)
+void * ExprTab::xmalloc(INT size) const
 {
-    void * p = smpoolMalloc(size, m_pool);
+    void * p = xcom::smpoolMalloc(size, m_pool);
     ASSERT0(p);
     ::memset((void*)p, 0, size);
     return p;
@@ -162,13 +164,13 @@ ExprRep * ExprTab::mapIR2ExprRep(IR const* ir) const
 }
 
 
-void ExprTab::setMapIR2ExprRep(IR const* ir, ExprRep * ie)
+void ExprTab::setMapIR2ExprRep(IR const* ir, MOD ExprRep * ie)
 {
     m_map_ir2exprep.set(ir->id(), ie);
 }
 
 
-HOST_UINT ExprTab::compute_hash_key(IR const* ir) const
+HOST_UINT ExprTab::computeHashKey(IR const* ir) const
 {
     ASSERT0(ir != nullptr);
     HOST_UINT hval = ir->getCode() + (ir->getOffset() + 1) +
@@ -184,7 +186,7 @@ HOST_UINT ExprTab::compute_hash_key(IR const* ir) const
 }
 
 
-ExprRep * ExprTab::encodeExtExp(IR * ir)
+ExprRep * ExprTab::encodeExtExp(IR const* ir, MOD ECCtx & ctx)
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
@@ -196,25 +198,26 @@ ExprRep * ExprTab::encodeExtExp(IR * ir)
 }
 
 
-void ExprTab::encodeExtStmt(IR const* ir)
+void ExprTab::encodeExtStmt(IR const* ir, MOD ECCtx & ctx)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     SWITCH_CASE_EXT_STMT:
-        encodeAllKids(ir);
+        encodeAllKids(ir, ctx);
         break;
     default:UNREACHABLE();
     }
 }
 
 
-HOST_UINT ExprTab::compute_hash_key_for_tree(IR const* ir)
+HOST_UINT ExprTab::computeHashKeyForTree(
+    IR const* ir, MOD ECCtx & ctx) const
 {
     HOST_UINT hval = 0;
-    m_iter.clean();
-    for (IR const* x = iterInitC(ir, m_iter);
-         x != nullptr; x = iterNextC(m_iter)) {
-        hval += compute_hash_key(x);
+    ctx.it.clean();
+    for (IR const* x = xoc::iterInitC(ir, ctx.it);
+         x != nullptr; x = xoc::iterNextC(ctx.it)) {
+        hval += computeHashKey(x);
     }
     return hval;
 }
@@ -232,10 +235,10 @@ void ExprTab::cleanHashTab()
 }
 
 
-ExprRep * ExprTab::appendExp(IR * ir)
+ExprRep * ExprTab::appendExp(IR const* ir, MOD ECCtx & ctx)
 {
     if (ir == nullptr) { return nullptr; }
-    HOST_UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = computeHashKeyForTree(ir, ctx);
 
     //First level hashing.
     HOST_UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
@@ -249,7 +252,7 @@ ExprRep * ExprTab::appendExp(IR * ir)
         ExprRep * ie = allocExprRep();
         EXPR_id(ie) = ++m_expr_count;
         EXPR_ir(ie) = m_rg->dupIRTree(ir);
-        m_ir_expr_vec.set(EXPR_id(ie), ie);
+        recordExprRep(ie);
 
         //Enter into 'ir'
         HOST_UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
@@ -265,7 +268,7 @@ ExprRep * ExprTab::appendExp(IR * ir)
         ie = allocExprRep();
         EXPR_id(ie) = ++m_expr_count;
         EXPR_ir(ie) = m_rg->dupIRTree(ir);
-        m_ir_expr_vec.set(EXPR_id(ie), ie);
+        recordExprRep(ie);
 
         //Enter into 'ir'
         level2_hash_tab[level2_hashv] = ie;
@@ -275,18 +278,18 @@ ExprRep * ExprTab::appendExp(IR * ir)
     //Scanning in ExprRep list in level2 hash tab.
     ExprRep * last = nullptr;
     while (ie != nullptr) {
-        if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
+        if (ir->isIREqual(ie->getIR(), getIRMgr())) {
             return ie;
         }
         last = ie;
-        ie = EXPR_next(ie);
+        ie = ie->get_next();
     }
 
     //Generate copy of 'ir'.
     ie = allocExprRep();
     EXPR_id(ie) = ++m_expr_count;
     EXPR_ir(ie) = m_rg->dupIRTree(ir);
-    m_ir_expr_vec.set(EXPR_id(ie), ie);
+    recordExprRep(ie);
 
     //Enter into 'ir'
     ASSERT0(level2_hash_tab[level2_hashv] != nullptr);
@@ -371,9 +374,9 @@ void ExprTab::removeOccs(IR * ir)
 }
 
 
-ExprRep * ExprTab::removeExp(IR * ir)
+ExprRep * ExprTab::removeExp(IR const* ir, MOD ECCtx & ctx)
 {
-    HOST_UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = computeHashKeyForTree(ir, ctx);
 
     //First level hashing.
     UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
@@ -393,19 +396,19 @@ ExprRep * ExprTab::removeExp(IR * ir)
     while (ie != nullptr) {
         if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
             xcom::remove(&level2_hash_tab[level2_hashv], ie);
-            m_ir_expr_vec.remove(EXPR_id(ie), nullptr);
+            cleanExprRep(ie);
             return ie;
         }
-        ie = EXPR_next(ie);
+        ie = ie->get_next();
     }
     return nullptr;
 }
 
 
-ExprRep * ExprTab::findExp(IR * ir)
+ExprRep * ExprTab::findExp(IR const* ir, MOD ECCtx & ctx) const
 {
     if (ir == nullptr) { return nullptr; }
-    HOST_UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = computeHashKeyForTree(ir, ctx);
 
     //First level hashing.
     UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
@@ -426,13 +429,13 @@ ExprRep * ExprTab::findExp(IR * ir)
         if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
             return ie;
         }
-        ie = EXPR_next(ie);
+        ie = ie->get_next();
     }
     return nullptr;
 }
 
 
-ExprRep * ExprTab::encodeExp(IR * ir)
+ExprRep * ExprTab::encodeExp(IR const* ir, MOD ECCtx & ctx)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_exp());
@@ -442,6 +445,7 @@ ExprRep * ExprTab::encodeExp(IR * ir)
     case IR_ILD:
     case IR_LDA:
     case IR_CONST:
+    case IR_CASE:
     case IR_DUMMYUSE:
     SWITCH_CASE_READ_PR:
         return nullptr;
@@ -449,34 +453,35 @@ ExprRep * ExprTab::encodeExp(IR * ir)
     SWITCH_CASE_UNA:
     case IR_ARRAY:
     case IR_SELECT: {
-        ExprRep * ie = appendExp(ir);
-        ASSERTN(!EXPR_occ_list(ie).find(ir), ("process same IR repeated."));
-        EXPR_occ_list(ie).append_tail(ir);
+        ExprRep * ie = appendExp(ir, ctx);
+        IR * pir = const_cast<IR*>(ir);
+        ASSERTN(!EXPR_occ_list(ie).find(pir), ("process same IR repeated."));
+        EXPR_occ_list(ie).append_tail(pir);
         return ie;
     }
-    default: return encodeExtExp(ir);
+    default: return encodeExtExp(ir, ctx);
     }
     return nullptr;
 }
 
 
-void ExprTab::encodeStmt(IR const* ir)
+void ExprTab::encodeStmt(IR const* ir, MOD ECCtx & ctx)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     case IR_SETELEM: {
-        ExprRep * ie = encodeExp(((CSetElem*)ir)->getBase());
+        ExprRep * ie = encodeExp(((CSetElem*)ir)->getBase(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(((CSetElem*)ir)->getBase(), ie);
         }
-        ExprRep * ie2 = encodeExp(((CSetElem*)ir)->getVal());
+        ExprRep * ie2 = encodeExp(((CSetElem*)ir)->getVal(), ctx);
         if (ie2 != nullptr) {
             setMapIR2ExprRep(((CSetElem*)ir)->getVal(), ie2);
         }
         break;
     }
     case IR_GETELEM: {
-        ExprRep * ie = encodeExp(((CGetElem*)ir)->getBase());
+        ExprRep * ie = encodeExp(((CGetElem*)ir)->getBase(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(((CGetElem*)ir)->getBase(), ie);
         }
@@ -484,36 +489,36 @@ void ExprTab::encodeStmt(IR const* ir)
     }
     SWITCH_CASE_DIRECT_MEM_STMT:
     case IR_STPR: {
-        ExprRep * ie = encodeExp(ir->getRHS());
+        ExprRep * ie = encodeExp(ir->getRHS(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(ir->getRHS(), ie);
         }
         break;
     }
     SWITCH_CASE_ARRAY_OP: {
-        ExprRep * ie = encodeExp(ir->getBase());
+        ExprRep * ie = encodeExp(ir->getBase(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(ir->getBase(), ie);
         }
         for (IR * sub = ARR_sub_list(ir);
              sub != nullptr; sub = sub->get_next()) {
-            ExprRep * ie2 = encodeExp(sub);
+            ExprRep * ie2 = encodeExp(sub, ctx);
             if (ie2 != nullptr) {
                 setMapIR2ExprRep(sub, ie2);
             }
         }
-        ie = encodeExp(ir->getRHS());
+        ie = encodeExp(ir->getRHS(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(ir->getRHS(), ie);
         }
         break;
     }
     SWITCH_CASE_INDIRECT_MEM_STMT: {
-        ExprRep * ie = encodeExp(ir->getRHS());
+        ExprRep * ie = encodeExp(ir->getRHS(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(ir->getRHS(), ie);
         }
-        ie = encodeBaseOfIST(ir->getBase());
+        ie = encodeBaseOfIST(ir->getBase(), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(ir->getBase(), ie);
         }
@@ -521,13 +526,13 @@ void ExprTab::encodeStmt(IR const* ir)
     }
     SWITCH_CASE_CALL: {
         if (ir->is_icall()) {
-            ExprRep * ie = encodeExp(ICALL_callee(ir));
+            ExprRep * ie = encodeExp(ICALL_callee(ir), ctx);
             if (ie != nullptr) {
                 setMapIR2ExprRep(ICALL_callee(ir), ie);
             }
         }
         for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
-            ExprRep * ie = encodeExp(p);
+            ExprRep * ie = encodeExp(p, ctx);
             if (ie != nullptr) {
                 setMapIR2ExprRep(p, ie);
             }
@@ -545,7 +550,7 @@ void ExprTab::encodeStmt(IR const* ir)
     case IR_REGION:
         break;
     SWITCH_CASE_CONDITIONAL_BRANCH_OP: {
-        ExprRep * ie = encodeExp(BR_det(ir));
+        ExprRep * ie = encodeExp(BR_det(ir), ctx);
         if (ie != nullptr) {
            setMapIR2ExprRep(BR_det(ir), ie);
         }
@@ -553,14 +558,14 @@ void ExprTab::encodeStmt(IR const* ir)
     }
     case IR_IGOTO:
     SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP: {
-        ExprRep * ie = encodeExp(ir->getValExp());
+        ExprRep * ie = encodeExp(ir->getValExp(), ctx);
         if (ie != nullptr) {
            setMapIR2ExprRep(ir->getValExp(), ie);
         }
         break;
     }
     case IR_RETURN: {
-        ExprRep * ie = encodeExp(RET_exp(ir));
+        ExprRep * ie = encodeExp(RET_exp(ir), ctx);
         if (ie != nullptr) {
             setMapIR2ExprRep(RET_exp(ir), ie);
         }
@@ -569,36 +574,47 @@ void ExprTab::encodeStmt(IR const* ir)
     case IR_PHI: {
         for (IR * opnd = PHI_opnd_list(ir);
              opnd != nullptr; opnd = opnd->get_next()) {
-            ExprRep * ie = encodeExp(opnd);
+            ExprRep * ie = encodeExp(opnd, ctx);
             if (ie != nullptr) {
                 setMapIR2ExprRep(opnd, ie);
             }
         }
         break;
     }
-    default: encodeExtStmt(ir);
+    default: encodeExtStmt(ir, ctx);
     }
 }
 
 
-void ExprTab::encodeAllKids(IR const* ir)
+void ExprTab::encodeAllKids(IR const* ir, MOD ECCtx & ctx)
 {
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
+        IR const* kid = ir->getKid(i);
         if (kid == nullptr) { continue; }
-        ExprRep * ie = encodeExp(kid);
+        ExprRep * ie = encodeExp(kid, ctx);
         if (ie == nullptr) { continue; }
         setMapIR2ExprRep(kid, ie);
     }
 }
 
 
-void ExprTab::encodeBB(IRBB const* bb)
+void ExprTab::encodeBB(IRBB const* bb, MOD ECCtx & ctx)
 {
     IRListIter ct = nullptr;
-    for (IR * ir = BB_irlist(bb).get_head(&ct);
+    for (IR const* ir = BB_irlist(bb).get_head(&ct);
          ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
-        encodeStmt(ir);
+        encodeStmt(ir, ctx);
+    }
+}
+
+
+static void encodeBBList(BBList const* bbl, MOD ExprTab * etab)
+{
+    BBListIter it;
+    ECCtx ctx;
+    for (IRBB const* bb = bbl->get_head(&it);
+         bb != nullptr; bb = bbl->get_next(&it)) {
+        etab->encodeBB(bb, ctx);
     }
 }
 
@@ -611,13 +627,11 @@ bool ExprTab::perform(MOD OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
+    START_TIMER(t, getPassName());
     reset();
-    BBListIter cb;
-    for (IRBB * bb = bbl->get_head(&cb);
-         bb != nullptr; bb = bbl->get_next(&cb)) {
-        encodeBB(bb);
-    }
+    encodeBBList(bbl, this);
     set_valid(true);
+    END_TIMER(t, getPassName());
     if (g_dump_opt.isDumpAfterPass()) {
         dump();
     }

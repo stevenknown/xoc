@@ -36,26 +36,35 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//Dump all propagation action candidates.
+//Note: If 'dump_actual' is true, only dump those in propagation action
+//candidates that will actually be performed.
 static void dumpAct(
-    CopyProp * cp, IR const* def_stmt, IR const* prop_value,
-    IR const* use)
+    CopyProp * cp, IR const* def_stmt, IR const* prop_value, IR const* use,
+    bool dump_actual)
 {
     Region const* rg = cp->getRegion();
     if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return; }
     class Dump : public xoc::DumpToBuf {
     public:
+        bool dump_actual;
         CopyProp const* cp;
         IR const* def_stmt;
         IR const* prop_value;
         IR const* use;
         MDSSAMgr * mdssamgr;
-        Dump(Region const* rg, xcom::StrBuf & buf) : DumpToBuf(rg, buf, 2)
-        { mdssamgr = rg->getMDSSAMgr(); }
+        Dump(Region const* rg, xcom::StrBuf & buf, bool flag) :
+            DumpToBuf(rg, buf, 2)
+        {
+            dump_actual = flag;
+            mdssamgr = rg->getMDSSAMgr();
+        }
         virtual void dumpUserInfo() const override
         {
             Region const* rg = getRegion();
             note(getRegion(),
                  "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
+                 dump_actual ? "ACTUAL" : "CANDIDATE",
                  DumpIRName().dump(prop_value));
             rg->getLogMgr()->incIndent(2);
             xoc::dumpIR(def_stmt, rg, nullptr,
@@ -82,7 +91,7 @@ static void dumpAct(
         }
     };
     xcom::StrBuf buf(32);
-    Dump d(rg, buf);
+    Dump d(rg, buf, dump_actual);
     d.cp = cp;
     d.def_stmt = def_stmt;
     d.prop_value = prop_value;
@@ -112,6 +121,27 @@ public:
         return true;
     }
 };
+
+
+//
+//START CPCtx
+//
+static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
+{
+    if (am == nullptr || !rg->isLogMgrInit()) { return; }
+    xcom::DefFixedStrBuf buf;
+    am->dump("'%s' will be removed, however it is IV, "
+             "so IVR will be invalided.",
+             xoc::dumpIRName(ir, buf));
+}
+
+
+CPCtx::CPCtx(OptCtx & oc, ActMgr * am) : PassCtx(&oc, am)
+{
+    change = false;
+    need_recompute_alias_info = false;
+}
+//END CPCtx
 
 
 //
@@ -242,13 +272,18 @@ void CopyProp::copyVN(IR const* from, IR const* to) const
 //      *p(MD3) = 10 //p point to MD3
 //      ...
 //      g = *q(MD3) //q point to MD3
-void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
+void CopyProp::replaceExp(
+    IR const* def_stmt, MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_exp);
     ASSERT0(exp->getExactRef() || allowInexactMD() ||
             exp->is_id() || //exp is operand of MD PHI
             exp->is_pr());  //exp is operand of PR PHI
+    if (!checkPropBenifit(exp, cand_exp)) { return; }
     if (!checkTypeConsistency(exp, cand_exp)) { return; }
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
+        dumpAct(this, def_stmt, cand_exp, exp, true);
+    }
 
     //The memory that 'exp' pointed to is same to 'cand_exp' because
     //cand_exp has been garanteed that will not change in propagation
@@ -282,14 +317,16 @@ void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
         DUMMYUSE(doit);
     }
     copyVN(cand_exp, newir);
+    dumpRemoveIR(ctx.getRegion(), ctx.getActMgr(), exp);
+    ctx.tryInvalidInfoBeforeFreeIR(exp);
     m_rg->freeIRTree(exp);
 
     //Fixup PRSSA|MDSSA DUChain.
     //NOTE classic DU chain does not need to find the live-in DEF.
     IR * stmt = newir->getStmt();
     IRBB * stmtbb = stmt->getBB();
-    xoc::findAndSetLiveInDef(newir, stmtbb->getPrevIR(stmt), stmtbb,
-                             m_rg, *getOptCtx());
+    xoc::findAndSetLiveInDefForTree(
+        newir, stmtbb->getPrevIR(stmt), stmtbb, m_rg, *getOptCtx());
 }
 
 
@@ -626,24 +663,25 @@ IR * CopyProp::getPropagatedValue(IR * stmt)
 }
 
 
-bool CopyProp::doPropForMDPhi(IR const* prop_value, MOD IR * use)
+bool CopyProp::doPropForMDPhi(
+    IR const* def_stmt, IR const* prop_value, MOD IR * use)
 {
-    CPCtx lchange;
-    replaceExp(use, prop_value, lchange);
+    CPCtx lchange(*getOptCtx(), &getActMgr());
+    replaceExp(def_stmt, use, prop_value, lchange);
     return CPC_change(lchange);
 }
 
 
 bool CopyProp::doPropForNormalStmt(
-    IRListIter curit, IRListIter * nextit, IR const* prop_value, MOD IR * use,
-    IRBB * def_bb)
+    IRListIter curit, IRListIter * nextit, IR const* def_stmt,
+    IR const* prop_value, MOD IR * use, IRBB * def_bb)
 {
     IR * use_stmt = use->getStmt();
     ASSERT0(use_stmt && use_stmt->is_stmt() && use_stmt->getBB());
     IRBB * use_bb = use_stmt->getBB();
-    CPCtx lchange;
+    CPCtx lchange(*getOptCtx(), &getActMgr());
     IR * old_use_stmt = use_stmt;
-    replaceExp(use, prop_value, lchange);
+    replaceExp(def_stmt, use, prop_value, lchange);
     ASSERTN(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
     if (!CPC_change(lchange)) { return false; }
 
@@ -879,8 +917,9 @@ bool CopyProp::doPropUseSet(
         IR const* nearest_def = xoc::findNearestDomDef(use, m_rg);
         if (nearest_def != def_stmt) { continue; }
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
-            dumpAct(this, def_stmt, new_prop_value, use);
+            dumpAct(this, def_stmt, new_prop_value, use, false);
         }
+        ASSERT0(use->getStmt());
         if (!allowPropConstToPhiOpnd() && use->getStmt()->is_phi() &&
             prop_value->isConstExp()) {
             continue;
@@ -889,10 +928,10 @@ bool CopyProp::doPropUseSet(
             continue;
         }
         if (use->is_id()) {
-            change |= doPropForMDPhi(new_prop_value, use);
+            change |= doPropForMDPhi(def_stmt, new_prop_value, use);
         } else {
-            change |= doPropForNormalStmt(curit, nextit, new_prop_value,
-                                          use, def_stmt->getBB());
+            change |= doPropForNormalStmt(curit, nextit, def_stmt,
+                new_prop_value, use, def_stmt->getBB());
         }
     } //end for each USE in SET
     return change;
@@ -945,10 +984,10 @@ bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet & useset)
 }
 
 
-static void refinement(Region * rg, OptCtx & oc)
+static void refinement(Region * rg, OptCtx & oc, ActMgr * am)
 {
     if (!g_do_refine) { return; }
-    RefineCtx rf(&oc);
+    RefineCtx rf(&oc, am);
     Refine * refine = (Refine*)rg->getPassMgr()->registerPass(PASS_REFINE);
     refine->refineBBlist(rg->getBBList(), rf);
 }
@@ -969,10 +1008,10 @@ bool CopyProp::doPropBBInDomTreeOrder()
         visit.visit();
         if (!vf.isChanged()) { break; }
         changed = true;
-        refinement(m_rg, *getOptCtx());
+        refinement(m_rg, *getOptCtx(), &getActMgr());
         ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *getOptCtx()));
         ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *getOptCtx()));
-        ASSERT0(verifyMDDUChain(m_rg, *getOptCtx()));
+        ASSERT0(verifyClassicDUChain(m_rg, *getOptCtx()));
         count++;
     } while (count < max_try);
     ASSERT0(count < max_try);
@@ -997,6 +1036,10 @@ bool CopyProp::dump() const
 bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
+    if (!initDepPass(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     ASSERTN(oc.is_cfg_valid(), ("CopyProp need CFG info"));
     bool is_org_pr_du_chain_valid = oc.is_pr_du_chain_valid();
     bool is_org_nonpr_du_chain_valid = oc.is_nonpr_du_chain_valid();

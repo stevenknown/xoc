@@ -155,7 +155,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     ASSERT0(last_cond_br);
     BB_irlist(gobackbb).remove(irct);
     m_rg->freeIR(lastir);
-    CfgOptCtx ctx(oc);
+    IRCfgOptCtx ctx(&oc);
     m_cfg->removeEdge(gobackbb, head, ctx); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
@@ -227,7 +227,7 @@ bool LoopCvt::perform(OptCtx & oc)
 
         //DU reference and classic DU chain has maintained.
         ASSERT0(m_dumgr->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg, oc));
+        ASSERT0(verifyClassicDUChain(m_rg, oc));
 
         //All these have been changed.
         oc.setInvalidIfDUMgrLiveChanged();

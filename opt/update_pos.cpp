@@ -137,8 +137,7 @@ bool UpdatePos::updateAtBBExit(OUT Pos & dpos, OUT Pos & upos)
 bool UpdatePos::updateAtIR(IR const* ir, OUT Pos & dpos, OUT Pos & upos)
 {
     ASSERT0(m_ra != nullptr);
-    if (m_ra->isSpillOp(ir) || m_ra->isReloadOp(ir) ||
-        m_ra->isRematOp(ir) || m_ra->isMoveOp(ir)) {
+    if (m_ra->isOpInPosGap(ir)) {
         //No need to handle spill/reload/remat/move.
         //Their occ did not encoded with a position and therefore not
         //resided in any lifetime.

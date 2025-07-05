@@ -59,16 +59,16 @@ typedef enum _ABS_TYPE {
 //     |-SCOP_NODE:BB
 //     |-...
 //   ...
-#define ABS_NODE_prev(sn)            ((sn)->prev)
-#define ABS_NODE_next(sn)            ((sn)->next)
-#define ABS_NODE_parent(sn)          ((sn)->parent)
-#define ABS_NODE_loop_body(sn)       ((sn)->u2.loop_body)
-#define ABS_NODE_true_body(sn)       ((sn)->u2.s1.true_body)
-#define ABS_NODE_false_body(sn)      ((sn)->u2.s1.false_body)
-#define ABS_NODE_type(sn)            ((sn)->ty)
-#define ABS_NODE_if_head(sn)         ((sn)->u1.if_head)
-#define ABS_NODE_loop_head(sn)       ((sn)->u1.loop_head)
-#define ABS_NODE_bb(sn)              ((sn)->u1.bb)
+#define ABS_NODE_prev(sn) ((sn)->prev)
+#define ABS_NODE_next(sn) ((sn)->next)
+#define ABS_NODE_parent(sn) ((sn)->parent)
+#define ABS_NODE_loop_body(sn) ((sn)->u2.loop_body)
+#define ABS_NODE_true_body(sn) ((sn)->u2.s1.true_body)
+#define ABS_NODE_false_body(sn) ((sn)->u2.s1.false_body)
+#define ABS_NODE_type(sn) ((sn)->ty)
+#define ABS_NODE_if_head(sn) ((sn)->u1.if_head)
+#define ABS_NODE_loop_head(sn) ((sn)->u1.loop_head)
+#define ABS_NODE_bb(sn) ((sn)->u1.bb)
 class AbsNode {
 public:
     AbsNode * prev;
@@ -94,12 +94,12 @@ public:
 //
 //CFS_INFO
 //
-#define CFS_INFO_cfs_type(ci)            ((ci)->cfs_type)
-#define CFS_INFO_ir(ci)                  ((ci)->u2.ir)
-#define CFS_INFO_head(ci)                ((ci)->u2.head)
-#define CFS_INFO_true_body(ci)           ((ci)->u1.if_info.true_body_ir_set)
-#define CFS_INFO_false_body(ci)          ((ci)->u1.if_info.false_body_ir_set)
-#define CFS_INFO_loop_body(ci)           ((ci)->u1.loop_info.loop_body_ir_set)
+#define CFS_INFO_cfs_type(ci) ((ci)->cfs_type)
+#define CFS_INFO_ir(ci) ((ci)->u2.ir)
+#define CFS_INFO_head(ci) ((ci)->u2.head)
+#define CFS_INFO_true_body(ci) ((ci)->u1.if_info.true_body_ir_set)
+#define CFS_INFO_false_body(ci) ((ci)->u1.if_info.false_body_ir_set)
+#define CFS_INFO_loop_body(ci) ((ci)->u1.loop_info.loop_body_ir_set)
 class CFS_INFO {
 public:
     IR_CODE cfs_type;
@@ -143,18 +143,16 @@ public:
     CfsMgr(Region * rg);
     ~CfsMgr() { smpoolDelete(m_pool); }
 
-    AbsNode * constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
-                               IN xcom::BitSet * cur_region,
-                               IN xcom::Graph & cur_graph,
-                               MOD xcom::BitSet & visited);
-    AbsNode * constructAbsIf(IN IRBB * entry, IN AbsNode * parent,
-                             IN xcom::Graph & cur_graph,
-                             MOD xcom::BitSet & visited);
+    AbsNode * constructAbsLoop(
+        IN IRBB * entry, IN AbsNode * parent, IN xcom::BitSet * cur_region,
+        IN xcom::Graph & cur_graph, MOD xcom::BitSet & visited);
+    AbsNode * constructAbsIf(
+        IN IRBB * entry, IN AbsNode * parent, IN xcom::Graph & cur_graph,
+        MOD xcom::BitSet & visited);
     AbsNode * constructAbsBB(IN IRBB * bb, IN AbsNode * parent);
-    AbsNode * constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
-                               IN xcom::BitSet * cur_region,
-                               IN xcom::Graph & cur_graph,
-                               MOD xcom::BitSet & visited);
+    AbsNode * constructAbsTree(
+        IN IRBB * entry, IN AbsNode * parent, IN xcom::BitSet * cur_region,
+        IN xcom::Graph & cur_graph, MOD xcom::BitSet & visited);
     AbsNode * constructAbstractControlFlowStruct();
 
     void dump_indent(UINT indent);

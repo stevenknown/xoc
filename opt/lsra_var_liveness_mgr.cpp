@@ -34,14 +34,10 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-bool VarCheck::m_is_vec_only = true;
-
 bool LSRAVarLivenessMgr::canBeStmtCand(IR const* stmt)
 {
     ASSERT0(stmt->is_stmt());
     if (!m_ra.isSpillOp(stmt)) { return false; }
-    Var * v = stmt->getIdinfo();
-    if (VarCheck::checkVarType(v)) { return false; }
     return true;
 }
 
@@ -52,8 +48,6 @@ bool LSRAVarLivenessMgr::canBeExpCand(IR const* stmt, IR const* ir)
     ASSERT0(ir->getStmt() == stmt);
     ASSERT0(ir->hasIdinfo());
     if (!m_ra.isReloadOp(stmt)) { return false; }
-    Var * v = ir->getIdinfo();
-    if (VarCheck::checkVarType(v)) { return false; }
     return true;
 }
 

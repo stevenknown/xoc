@@ -49,6 +49,51 @@ typedef ESymTab DefSymTab;
 #else
 typedef SymTab DefSymTab;
 #endif
+typedef xcom::Vector<Region*> RegionVec;
+typedef xcom::TTabIter<Region*> RegionTabIter;
+typedef xcom::TTab<Region*> RegionTab;
+typedef xcom::TMap<Var const*, Region*> Var2Region;
+
+class Sym2Regions;
+
+class GenRegionTab {
+    friend class Sym2Regions;
+    COPY_CONSTRUCTOR(GenRegionTab);
+protected:
+    Sym2Regions * m_sym2regions;
+public:
+    GenRegionTab() { m_sym2regions = nullptr; }
+    RegionTab * createMapped(Sym const*);
+};
+
+typedef xcom::TMapIter<Sym const*, RegionTab*> Sym2RegionTabIter;
+typedef xcom::TMap<
+    Sym const*, RegionTab*, CompareKeyBase<Sym const*>,
+    GenRegionTab> Sym2RegionTab;
+
+class Sym2Regions {
+    friend class GenRegionTab;
+    COPY_CONSTRUCTOR(Sym2Regions);
+protected:
+    xcom::List<RegionTab*> m_rgtab_list;
+    Sym2RegionTab m_sym2rgt;
+protected:
+    RegionTab * allocRegionTab()
+    {
+        RegionTab * rgtab = new RegionTab();
+        m_rgtab_list.append_tail(rgtab);
+        return rgtab;
+    }
+    Sym2Regions * self() { return this; }
+public:
+    Sym2Regions();
+    ~Sym2Regions();
+    void add(Region * rg);
+    void add(Sym const* sym, Region * rg);
+    RegionTab * getRegionTab(Sym const* sym) const;
+    Region * getUniqueRegion(Sym const* sym) const;
+    void set(Sym const* sym, Region * rg);
+};
 
 typedef enum {
     REGION_UNDEF = 0,
@@ -79,20 +124,27 @@ class IPA;
 class TargInfo;
 class TargInfoMgr;
 class MCDwarfMgr;
+class Sym;
+
 //
 //START RegionMgr
 //
 //Region Manager is the top level manager.
 #define RM_label_count(r) ((r)->m_label_count)
 class RegionMgr {
-public:
-    typedef xcom::Vector<Region*> RegionTab;
-    typedef xcom::TMap<Var const*, Region*> Var2Region;
 private:
     COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
 protected:
-    bool m_is_regard_str_as_same_md;
+    //Return true if all compilation process to regard all
+    //string variables as a same unbound MD.
+    //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+    //There is a function that allocates 3000+ string variable.
+    //Each string has been taken address.
+    //That will inflate may_point_to_set too much.
+    //In this situation, AA can be conservatively regard all string variables
+    //as same unbounded MD.
+    bool m_is_regard_all_string_as_same_md;
 #ifdef _DEBUG_
     UINT m_num_allocated;
 #endif
@@ -109,8 +161,8 @@ protected:
     //For debug the context management of Dwarf.
     MCDwarfMgr * m_dm;
     Region * m_program;
-    RegionTab m_id2rg;
-    Var2Region m_var2rg;
+    RegionVec m_id2rg;
+    Sym2Regions m_sym2rg;
     DefSymTab m_sym_tab;
     TypeMgr m_type_mgr;
     xcom::Vector<OptCtx*> m_id2optctx;
@@ -135,6 +187,12 @@ public:
 
     //This function will establish a map between region and its id.
     void addToRegionTab(Region * rg);
+
+    //The function establishs the mapping between Sym of Var to multiple region.
+    //e.g: given symbol:dyn_func, it may correspond to multiple region.
+    // dyn_func() { sub; }
+    // dyn_func() { add; }
+    void addVar2Region(Region * rg);
 
     //Allocate OptCtx according to specific target machine.
     OptCtx * allocOptCtx();
@@ -175,10 +233,14 @@ public:
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
-    Region * getRegion(Var const* var) { return m_var2rg.get(var); }
+    Region * getRegion(Var const* var)
+    { return m_sym2rg.getUniqueRegion(var->get_name()); }
+    Region * getRegion(CHAR const* name)
+    { return m_sym2rg.getUniqueRegion(addToSymbolTab(name)); }
     UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
-    RegionTab & getRegionTab() { return m_id2rg; }
+    RegionVec & getRegionVec() { return m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
+    MCDwarfMgr * getDwarfMgr() { return m_dm; }
 
     //The function generates a dedicated MD to represent string md.
     //Note the function regards all string variables as the same unbound MD.
@@ -188,7 +250,7 @@ public:
     //That will inflate may_point_to_set too much.
     //In this situation, AA can be conservatively regard all string variables
     //as same unbounded MD.
-    MD const* genDedicateStrMD();
+    MD const* getAndGenDedicateStrMD();
     MDSystem * getMDSystem() { return m_md_sys; }
     DefSymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
@@ -262,13 +324,13 @@ public:
     //Return true if all compilation process to regard all
     //string variables as a same unbound MD.
     //e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
-    //There is a function allocates 3000+ string variable.
+    //There is a function that allocates 3000+ string variable.
     //Each string has been taken address.
     //That will inflate may_point_to_set too much.
     //In this situation, AA can be conservatively regard all string variables
     //as same unbounded MD.
     bool isRegardAllStringAsSameMD() const
-    { return m_is_regard_str_as_same_md; }
+    { return m_is_regard_all_string_as_same_md; }
 
     Region * newRegion(REGION_TYPE rt);
 
@@ -290,17 +352,14 @@ public:
     //In this situation, AA can be conservatively regard all string variables
     //as same unbounded MD.
     void setRegardAllStringAsSameMD(bool doit)
-    { m_is_regard_str_as_same_md = doit; }
+    { m_is_regard_all_string_as_same_md = doit; }
 
-    void setVar2Region(Var const* var, Region * rg)
-    {
-        ASSERT0(var && rg);
-        m_var2rg.setAlways(var, rg);
-    }
+    //The function establish the unique mapping between Var to the region.
+    //NOTE: the function will erase the old mapping if the Sym of Var has
+    //already mapped.
+    void setVar2Region(Region * rg);
 
     bool verifyPreDefinedInfo();
-
-    xoc::MCDwarfMgr * getDwarfMgr() { return m_dm; }
 };
 //END RegionMgr
 

@@ -74,7 +74,7 @@ bool InvertBrTgt::dump() const
     }
     note(getRegion(), "\n==-- CHANGED CFG --==\n");
     m_rg->getCFG()->dumpDOT(m_rg->getLogMgr()->getFileHandler(),
-                            IRCFG::DUMP_DEF);
+                            IRCFG::DUMP_DEF, nullptr);
     note(getRegion(), "\n");
     return Pass::dump();
 }
@@ -100,7 +100,7 @@ bool InvertBrTgt::invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
     void * vi1 = cfg->getEdge(br->getBB()->id(), br_tgt->id())->info();
     void * vi2 = cfg->getEdge(jmp->getBB()->id(), jmp_tgt->id())->info();
 
-    CfgOptCtx ctx(*invt->getOptCtx());
+    IRCfgOptCtx ctx(invt->getOptCtx());
     cfg->removeEdge(br->getBB(), br_tgt, ctx);
     cfg->removeEdge(jmp->getBB(), jmp_tgt, ctx);
 

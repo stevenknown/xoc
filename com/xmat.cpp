@@ -78,6 +78,15 @@ void RMat::dumpfh(FILE * h) const
 }
 
 
+void RMat::initElem()
+{
+    Rational v(0);
+    for (UINT i = 0; i < getSize(); i++) {
+        m_mat[i] = v;
+    }
+}
+
+
 void RMat::dumpf(CHAR const* name, bool is_del) const
 {
     ASSERT0(name);

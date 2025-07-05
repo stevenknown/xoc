@@ -41,6 +41,9 @@ class LTConstraints;
 
 typedef xcom::TMapIter<PRNO, Reg> PRNO2RegIter;
 typedef xcom::TMap<PRNO, Reg> PRNO2Reg;
+typedef xcom::TMap<Reg, PRNO> Reg2PRNO;
+typedef xcom::DMap<PRNO, Reg, PRNO2Reg, Reg2PRNO> DualMapPRNO2Reg;
+typedef xcom::DMapIter<PRNO, Reg, PRNO2Reg, Reg2PRNO> DualMapPRNO2RegIter;
 
 typedef List<LifeTime*>::Iter LTListIter;
 class LTList : public List<LifeTime*> {
@@ -48,61 +51,24 @@ public:
     void dump(Region const* rg) const;
 };
 
-class DedicatedMgr : public PRNO2Reg {
+class PreAssignedMgr : public PRNO2Reg {
 public:
-    //prno: indicates the PR that is dedicated.
+    //prno: indicates the PR that is pre-assigned.
     //antireg: the target-machine register that 'prno' anticipated.
     void add(PRNO prno, Reg antireg) { set(prno, antireg); }
     void dump(Region const* rg, TargInfoMgr const& timgr) const;
+    bool isPreAssigned(PRNO prno) const { return find(prno); }
+};
+
+class DedicatedMgr : public DualMapPRNO2Reg {
+public:
+    //prno: indicates the PR that is dedicated.
+    //antireg: the target-machine register that 'prno' anticipated.
+    //Note that, the mapping between dedicated prnos and registers must be
+    //one-to-one.
+    void add(PRNO prno, Reg antireg) { set(prno, antireg); }
+    void dump(Region const* rg, TargInfoMgr const& timgr) const;
     bool isDedicated(PRNO prno) const { return find(prno); }
-};
-
-#define RG_start(r) ((r).m_start)
-#define RG_end(r) ((r).m_end)
-class Range {
-public:
-    Pos m_start;
-    Pos m_end;
-public:
-    //Range is point.
-    Range() : m_start(0), m_end(0) {}
-    Range(Pos p) : m_start(p), m_end(p) {}
-    Range(Pos s, Pos e) : m_start(s), m_end(e) {}
-
-    void dump(Region const* rg) const;
-    void dumpG(Pos start, Region const* rg) const;
-    bool is_less(Range const src) const { return end() < src.start(); }
-    bool is_great(Range const src) const { return start() > src.end(); }
-    bool is_contain(Pos pos) const { return start() <= pos && end() >= pos; }
-    //Return true if current range intersects with src.
-    //e.g:four cases of intersection:
-    // cur: |----|
-    // src:    |---|
-    //
-    // cur:   |----|
-    // src: |---------|
-    //
-    // cur:   |----|
-    // src: |----|
-    //
-    // cur: |----|
-    // src:  |--|
-    bool is_intersect(Range const src) const
-    {
-        return (src.end() >= end() && src.start() <= end()) ||
-               (src.end() <= end() && src.end() >= start());
-    }
-    Pos end() const { return m_end; }
-    Pos start() const { return m_start; }
-};
-
-
-class RangeVec : public Vector<Range> {
-    COPY_CONSTRUCTOR(RangeVec);
-public:
-    RangeVec() {}
-    Range const* get_vec() const
-    { return const_cast<RangeVec*>(this)->Vector<Range>::get_vec(); }
 };
 
 
@@ -150,23 +116,13 @@ typedef enum {
     //doesn't need to be spilled to memory to store the original value
     LT_FLAG_HAS_DEF = 0x1,
 
-    //Used to indicate this lifetime is dedicated or not.
-    LT_FLAG_IS_DEDICATED = 0x2,
-
-    //Used to indicate that the current lifetime generates spilling IR during
-    //splitting because of caller saved register assignment before the call
-    //statement.
-    LT_FLAG_SPILL_CALLER_SAVED = 0x4,
+    //Used to indicate this lifetime is pre-assigned or not.
+    LT_FLAG_IS_PREASSIGNED = 0x2,
 
     //Used to indicate the current lifetime is spill only or not.
     //Usually, this flag is set only if there is no occurence after the split
     //position, it can only be set to the last child of a lifetime.
-    LT_FLAG_SPILL_ONLY = 0x8,
-
-    //Used to indicate the current lifetime is forced to reload or not.
-    //Usually, this flag is set only if it is started with a fake-use IR
-    //inserted by the backward analysis.
-    LT_FLAG_RELOAD_FORCED = 0x10,
+    LT_FLAG_SPILL_ONLY = 0x4,
 
     //Used to indicate the current lifetime has one def or not in its full
     //occurence list. This flag can be used to help to calculate the remat
@@ -190,12 +146,12 @@ typedef enum {
     // be saved, and reload directly with reload IR "reload_2" at POS 52
     // before next the USE at POS 53 because the value in the spill memory
     // is never changed.
-    LT_FLAG_ONE_DEF_ONLY = 0x20,
+    LT_FLAG_ONE_DEF_ONLY = 0x8,
 
     //Used to indicate the lifetime is rematerialized or not. If this flag
     //is set, the spill operation of this lifetime can be avoided when it
     //is split.
-    LT_FLAG_IS_REMAT = 0x40,
+    LT_FLAG_IS_REMAT = 0x10,
 } LT_ATTR_FLAG;
 
 
@@ -267,6 +223,14 @@ class LifeTime {
     double m_priority;
     double m_spill_cost;
     RangeVec m_range_vec;
+
+    //The paper proves that 95% of the lifetimes in the program have only one
+    //definition, and this property can be leveraged to implement a variety of
+    //optimizations. It is worthwhile to add an m_only_def_occ variable to the
+    //lifetime class to record the only one definition.
+    //Note that the m_only_def_occ will be UNDEF-OCC if current lifetime is not
+    //one-def lifetime.
+    Occ m_only_def_occ;
     OccList m_occ_list;
 
     //Used to store the descendant lifetime created during split.
@@ -274,7 +238,10 @@ class LifeTime {
 public:
     LifeTime(PRNO prno) : m_call_crossed_num(0), m_flag(0), m_prno(prno),
         m_remat_exp(nullptr), m_parent(nullptr), m_lt_constraints(nullptr)
-    { m_ancestor = this; }
+    {
+        m_ancestor = this;
+        m_only_def_occ = Occ(POS_UNDEF);
+    }
     Range addRange(Pos start, Pos end);
     Range addRange(Pos start) { return addRange(start, start); }
     void addOcc(Occ occ);
@@ -302,6 +269,14 @@ public:
     void moveFrom(LifeTime * src, Pos pos);
 
     void dump(Region const* rg) const;
+
+    //Dump Reg2Lifetime info.
+    void dumpReg2LifeTime(
+        Region const* rg, LinearScanRA const* ra, Reg r) const;
+
+    //Dump Reg2LifeTime info with specific pos.
+    void dumpReg2LifeTimeWithPos(Region const* rg, LinearScanRA const* ra,
+        Reg r, Pos start, Pos end, bool open_range) const;
 
     //Return true and occ if there is occ at given pos.
     bool findOcc(Pos pos, OUT OccListIter & it) const;
@@ -335,6 +310,8 @@ public:
     }
     VecIdx getLastRangeIdx() const { return m_range_vec.get_last_idx(); }
     OccList & getOccList() { return m_occ_list; }
+    Occ getOnlyDefOcc() const
+    { ASSERT0(isOneDefOnly()); return m_only_def_occ; }
     RangeVec & getRangeVec() { return m_range_vec; }
     Range const* getRangeVecBuf() const { return m_range_vec.get_vec(); }
     PRNO getPrno() const { return m_prno; }
@@ -346,6 +323,19 @@ public:
         return const_cast<LifeTime*>(this)->getOccList().get_head().
                getIR()->getType();
     }
+
+    Occ getFirstOcc() const
+    { return const_cast<LifeTime*>(this)->getOccList().get_head(); }
+
+    IR * getFirstOccStmt() const
+    {
+        IR * ir = const_cast<LifeTime*>(this)->getFirstOcc().getIR();
+        ASSERT0(ir);
+        return ir->is_stmt() ? ir : ir->getStmt();
+    }
+    UINT getOccNum() const
+    { return const_cast<LifeTime*>(this)->getOccList().get_elem_count(); }
+
     double getPriority() const { return m_priority; }
     double getSpillCost() const { return m_spill_cost; }
     LTConstraints * getLTConstraints() const { return m_lt_constraints; }
@@ -408,6 +398,7 @@ public:
     // current: |-----|     |-------|
     //      lt:        |---|         |--|
     bool is_intersect(LifeTime const* lt) const;
+    bool is_intersect(RangeVec const& rv2) const;
 
     //Return true if 'ir' is an DEF occurrence of current lt.
     bool isDefOcc(IR const* ir) const
@@ -420,16 +411,8 @@ public:
     //Return true if the occ has a DEF at least.
     bool isOccHasDef() const { return m_flag.have(LT_FLAG_HAS_DEF); }
 
-    //Return true if current lifetime is dedicated.
-    bool isDedicated() const { return m_flag.have(LT_FLAG_IS_DEDICATED); }
-
-    //Return true if current lifetime is forced to reload.
-    bool isReloadForced() const { return m_flag.have(LT_FLAG_RELOAD_FORCED); }
-
-    //Return true if generating spilling IR because of caller saved register
-    //assignment before the call statement.
-    bool isSpillCallerSaved() const
-    { return m_flag.have(LT_FLAG_SPILL_CALLER_SAVED); }
+    //Return true if current lifetime is pre-assigned.
+    bool isPreAssigned() const { return m_flag.have(LT_FLAG_IS_PREASSIGNED); }
 
     //Return true if current lifetime is spill only or not.
     bool isSpillOnly() const { return m_flag.have(LT_FLAG_SPILL_ONLY); }
@@ -447,16 +430,21 @@ public:
     }
 
     void removeOccFrom(OccListIter it);
-    void removeOneDefOnly() { m_flag.remove(LT_FLAG_ONE_DEF_ONLY); }
+    void removeOneDefOnly()
+    {
+        m_flag.remove(LT_FLAG_ONE_DEF_ONLY);
+        m_only_def_occ = Occ(POS_UNDEF);
+    }
     void removeRangeFrom(VecIdx idx);
 
     void setAncestor(LifeTime const* anc) { m_ancestor = anc; }
 
-    //Set current lifetime to be deidcated, that means the lifetime must
-    //assign dedicated register.
-    void setDedicated() { m_flag.set(LT_FLAG_IS_DEDICATED); }
-
     void setOccHasDef() { m_flag.set(LT_FLAG_HAS_DEF); }
+    void setOnlyDefOcc(Occ occ) { m_only_def_occ = occ; }
+
+    //Set current lifetime to be pre-assigned, that means the lifetime must
+    //assign pre-assigned register.
+    void setPreAssigned() { m_flag.set(LT_FLAG_IS_PREASSIGNED); }
 
     void setRange(VecIdx idx, Range r);
     void setLastRange(Range r)
@@ -468,12 +456,15 @@ public:
     void setParent(LifeTime const* parent) { m_parent = parent; }
     void setPriority(double pri) { m_priority = pri; }
     void setRematExp(IR const* exp) { m_remat_exp = exp; }
-    void setSpillCallerSaved() { m_flag.set(LT_FLAG_SPILL_CALLER_SAVED); }
     void setSpillCost(double cost) { m_spill_cost = cost; }
     void setSpillOnly() { m_flag.set(LT_FLAG_SPILL_ONLY); }
-    void setReloadForced() { m_flag.set(LT_FLAG_RELOAD_FORCED); }
     void setRematerialized() { m_flag.set(LT_FLAG_IS_REMAT); }
-    void setOneDefOnly() { m_flag.set(LT_FLAG_ONE_DEF_ONLY); }
+    void setOneDefOnly(Occ occ)
+    {
+        m_flag.set(LT_FLAG_ONE_DEF_ONLY);
+        ASSERT0(this->getAncestor());
+        const_cast<LifeTime*>(this->getAncestor())->setOnlyDefOcc(occ);
+    }
 
     //Shrink the lifetime forward to the last occ position.
     void shrinkForwardToLastOccPos();
@@ -488,6 +479,15 @@ public:
     //lifetime should inherit the original constraints, and the conflict
     //PRs need to be updated accordingly.
     void updateLTConstraintsForSplit(LifeTime const* old_lt);
+
+    //This function updates the position at the tail of occ list.
+    void updateTailOccPos(Pos pos)
+    {
+        Occ occ_old = getOccList().get_tail();
+        occ_old.m_pos = pos;
+        getOccList().remove_tail();
+        addOcc(occ_old);
+    }
     bool verify() const;
 };
 
@@ -615,42 +615,90 @@ public:
 };
 
 typedef Vector<LifeTime*> PRNO2LT;
+
+
+class RegSetImpl;
+class RangeInfo;
+typedef xcom::Vector<LifeTime*> PRNO2LT;
+typedef xcom::Vector<RangeInfo*> RangeInfoVec;
+typedef xcom::TMap<IR const*, Pos> IR2POS;
+
+
+//
+//START LifeTimeMgr
+//
 class LifeTimeMgr {
     friend class OccList;
     COPY_CONSTRUCTOR(LifeTimeMgr);
+protected:
     bool m_use_expose; //true to compute exposed def/use for each BB.
     Region * m_rg;
     SMemPool * m_pool;
+
+    //Record the max position of the region when generate the lifetime, and
+    //the max position will be use tod calculte the distance between any
+    //position inside the region and the end of the region.
+    Pos m_max_pos;
+
+    //Record the Lifetime that allocated in LSRA pass.
     LTList m_lt_list;
+
+    //Record the Lifetime that used for Reg2LifeTime.
+    LTList m_reg2lt_list;
+
+    //Record the corresponded LifeTime info of PRNO.
     PRNO2LT m_prno2lt;
-    Vector<Pos> m_bb_entry_pos;
-    Vector<Pos> m_bb_exit_pos;
+
+    //Record the corresponded LifeTime info of physical register.
+    PRNO2LT m_reg2lt;
+
+    xcom::Vector<Pos> m_bb_entry_pos;
+    xcom::Vector<Pos> m_bb_exit_pos;
     #ifdef _DEBUG_
     xcom::TMap<IR const*, Pos> m_ir2pos;
     #endif
-private:
+protected:
+    //This func adds the position of caller register to the lifetime.
+    virtual void addCallerLTPos(Pos pos, IR const* ir) {}
+
     LifeTime * allocLifeTime(PRNO prno);
+
+    //Allocate the LifeTime for Reg2LifeTime.
+    LifeTime * allocReg2LifeTime(PRNO prno);
+
     void computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
-                           DedicatedMgr const& dedicated_mgr,
+                           PreAssignedMgr const& preassigned_mgr,
                            Pos livein_def, IRIter & irit,
                            MOD CrossedCallCounter & cross_call_counter);
     void destroy();
     void init(Region * rg);
+    void setMaxPos(Pos pos) { ASSERT0(pos != POS_UNDEF); m_max_pos = pos; }
     void * xmalloc(size_t size);
     bool useExpose() const { return m_use_expose; }
 public:
     LifeTimeMgr(Region * rg)
     { m_pool = nullptr; m_use_expose = false; init(rg); }
-    ~LifeTimeMgr() { destroy(); }
+    virtual ~LifeTimeMgr() { destroy(); }
 
     void computeCrossedCallNum(UpdatePos & up, BBList const* bblst);
     void computeCrossedCallNumBB(UpdatePos & up, IRBB const* bb,
         IRIter & irit, MOD CrossedCallCounter & cross_call_counter);
 
-    //dedicated_tab: record PRNO that is dedicated, a dedicated PRNO must be
-    //               assigned specific register.
-    void computeLifeTime(UpdatePos & up, BBList const* bblst,
-                         DedicatedMgr const& dedicated_mgr);
+    virtual void computeLifeTime(UpdatePos & up, BBList const* bblst,
+                                 PreAssignedMgr const& preassigned_mgr);
+
+    //If 'cur_range' is interected with the last range in the 'range_vec',
+    //these two ranges will be merged into a range and stored into 'range_vec'.
+    //'range_vec': RangeVec is used to contain Range.
+    //'last_idx': the last index of the 'range_vec'.
+    //'cur_range': range that will be stored into 'range_vec'.
+    //e.g.: 'cur_range.start() is_interect range_vec.get(last_idx)',
+    //      thus these two ranges can be merged into a range.
+    //range_vec:   | [S    E]    |
+    //cur_range:   |    [S    E] |
+    //after_merge: | [S       E] |
+    bool canMergeWithPreRange(RangeVec & range_vec,
+                              UINT last_idx, Range & cur_range);
 
     void dumpAllLT(UpdatePos & up, BBList const* bblst,
                    bool dumpir = true) const;
@@ -658,23 +706,96 @@ public:
 
     LifeTime * genLifeTime(PRNO prno);
     LifeTime * getLifeTime(PRNO prno) const { return m_prno2lt.get(prno); }
+    LifeTime * getRegLifeTime(Reg reg) const { return m_reg2lt.get(reg); }
     LTList const& getLTList() const { return m_lt_list; }
     Pos getBBStartPos(UINT bbid) const { return m_bb_entry_pos.get(bbid); }
     Pos getBBEndPos(UINT bbid) const { return m_bb_exit_pos.get(bbid); }
+    Pos getMaxPos() const { return m_max_pos; }
     PRNO2LT const& getPrno2LT() const { return m_prno2lt; }
+    PRNO2LT const& getReg2LT() const { return m_reg2lt; }
+
+    //Initialize Reg2LifeTimeInfo.
+    void initReg2LifeTimeInfo();
+
+    //Insert 'range_vec' into the lifetime of 'reg'.
+    void mergeRegLifetimeWIthRange(Reg reg, RangeVec const& range_vec);
+
+    //Merged two RangeVec 'rv_ori' and 'rv_new'.
+    //Then the new RangeVec will be stored into 'rv_ori'
+    void mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new);
+
+    //Merged the new lifetime 'lt_new' into the RangeVec of 'reg'.
+    void mergeReg2LifeTime(Reg reg, MOD LifeTime * lt_new);
 
     //Clean the lifetime info before computation.
     void reset();
     void recomputeLifeTime(UpdatePos & up, BBList const* bblst,
-                           DedicatedMgr const& dedicated_mgr);
+                           PreAssignedMgr const& preassigned_mgr);
     void recordPos(IR const* ir, Pos pos);
 
     //Rename each occurrences of 'lt' to 'newprno'.
     void renameLifeTimeOcc(LifeTime const* lt, PRNO newprno);
 
+    //Update the position at the BB entry.
+    void updateBBEntryPos(IRBB const* bb, MOD UpdatePos & up,
+                          MOD Pos & dpos_bb_start, MOD Pos & upos_bb_start);
+
+    //Update the postion at the BB exit.
+    void updateBBExitPos(IRBB const* bb, MOD UpdatePos & up,
+                         MOD Pos & dpos_bb_end, MOD Pos & upos_bb_end);
+
     bool verifyPos(IR const* ir, Pos pos) const;
     bool verify() const;
 };
+//END LifeTimeMgr
+
+//
+//START LifeTime2DMgr
+//
+typedef Vector<IR*> PRNO2IR;
+class LifeTime2DMgr : public LifeTimeMgr {
+    COPY_CONSTRUCTOR(LifeTime2DMgr);
+protected:
+    LivenessMgr * m_live_mgr;
+    LinearScanRA * m_lsra;
+
+    //Maps from the register of caller to the responding lifetime.
+    PRNO2LT m_caller2lt;
+protected:
+    //This function adds the position of caller register to the lifetime.
+    //Since the call statement can clober the caller registers, the position
+    //of call statement is added in the caller lifetime in order to indicate
+    //this reg is unavailable at this position.
+    //e.g:
+    //  A call at position 30 is added to the lifetime of REG_1.
+    //  LT:REG_1,range:<22-23><24-27><30><35-43>
+    //   |                     ------  -   ----------
+    //   |                     d    u  ^   d        u
+    //                                 |
+    //                                call
+    virtual void addCallerLTPos(Pos pos, IR const* ir) override;
+
+    LifeTime * getCallerLT(Reg r) const
+    { ASSERT0(r != REG_UNDEF); return m_caller2lt.get(r); }
+
+    //Merge the livein of BB info into the lifetime.
+    void mergeLiveIn(IRBB const* bb, UpdatePos & up,
+                     Pos dpos_bb_start);
+
+    void initCallerLifeTime();
+
+    //Merge the liveout of BB info into the lifetime.
+    void mergeLiveOut(IRBB const* bb, UpdatePos & up, Pos livein_def,
+                      Pos dpos_bb_end);
+
+public:
+    LifeTime2DMgr(Region * rg, LinearScanRA * ra) :
+        LifeTimeMgr(rg), m_lsra(ra) {}
+
+    virtual void computeLifeTime(UpdatePos & up, BBList const* bblst,
+        PreAssignedMgr const& preassigned_mgr) override;
+};
+//END LifeTime2DMgr
 
 } //namespace xoc
 #endif

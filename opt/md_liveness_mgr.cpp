@@ -27,9 +27,34 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
-#include "mdliveness_mgr.h"
+#include "md_liveness_mgr.h"
 
 namespace xoc {
+
+MDLivenessMgr::~MDLivenessMgr()
+{
+    for (VecIdx i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
+        MDSet * mds = m_livein_mds_vec.get(i);
+        if (mds == NULL) { continue; }
+        m_mds_mgr.free(mds);
+    }
+    for (VecIdx i = 0; i <= m_liveout_mds_vec.get_last_idx(); i++) {
+        MDSet * mds = m_liveout_mds_vec.get(i);
+        if (mds == NULL) { continue; }
+        m_mds_mgr.free(mds);
+    }
+    for (VecIdx i = 0; i <= m_def_mds_vec.get_last_idx(); i++) {
+        MDSet * mds = m_def_mds_vec.get(i);
+        if (mds == NULL) { continue; }
+        m_mds_mgr.free(mds);
+    }
+    for (VecIdx i = 0; i <= m_use_mds_vec.get_last_idx(); i++) {
+        MDSet * mds = m_use_mds_vec.get(i);
+        if (mds == NULL) { continue; }
+        m_mds_mgr.free(mds);
+    }
+}
+
 
 MDSet * MDLivenessMgr::getLiveInMDSet(IRBB * bb)
 {

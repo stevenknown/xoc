@@ -82,6 +82,7 @@ public:
 #define MI_wordbuf(mi) ((mi)->m_word_buf)
 #define MI_wordbuflen(mi) ((mi)->m_word_buf_len)
 #define MI_pc(mi) ((mi)->m_pc)
+#define MI_ir(mi) ((mi)->m_ir)
 class MInst {
     COPY_CONSTRUCTOR(MInst);
 public:
@@ -93,6 +94,7 @@ public:
     BYTE * m_word_buf;
     MField * m_field_vec;
     Dbx m_dbx;
+    IR const* m_ir;
 public:
     MInst() : m_flag(0) {}
 
@@ -116,6 +118,9 @@ public:
 
     //Return the abstract code descriptor.
     MI_CODE getCode() const { return m_code; }
+
+    //Return the corresponding IR.
+    IR const* getIR() const { return m_ir; }
 
     MInstDesc const* getInstDesc() const { return m_inst_desc; }
     BYTE * getWordBuf() const { return m_word_buf; }

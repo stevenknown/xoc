@@ -34,6 +34,16 @@ namespace xoc {
 //
 //START PreAnaBeforeOpt
 //
+PreAnaBeforeOpt::PreAnaBeforeOpt(Region * rg) : Pass(rg), m_rg(rg)
+{
+    ASSERT0(m_rg != nullptr);
+    m_rm = m_rg->getRegionMgr();
+    m_tm = m_rg->getTypeMgr();
+    m_mdsys = m_rg->getMDSystem();
+    m_vm = m_rg->getVarMgr();
+}
+
+
 bool PreAnaBeforeOpt::dump() const
 {
     return true;
@@ -76,13 +86,33 @@ bool PreAnaBeforeOpt::scanCallStmt(IR const* ir)
 }
 
 
+bool PreAnaBeforeOpt::scanCase(IR const* ir)
+{
+    ASSERT0(ir && ir->is_case());
+    IR const* stmt = ir->getStmt();
+    ASSERT0(stmt);
+    if (stmt->isBranch()) {
+        //Case-IRs used in Branch Stmt do not need to set label attributes.
+        return false;
+    }
+
+    //CASE: The label in Case-IR will be used as an address and should NOT
+    //be removed even if the label does not appeared in BB label list.
+    ASSERT0(stmt->isStoreStmt());
+    LabelInfo * li = const_cast<LabelInfo*>(CASE_lab(ir));
+    ASSERT0(li);
+    LABELINFO_is_refed_by_ir(li) = true;
+    return true;
+}
+
+
 bool PreAnaBeforeOpt::scanLDA(IR const* ir)
 {
     ASSERT0(ir->is_lda());
     ASSERT0(LDA_idinfo(ir));
     Var * v = LDA_idinfo(ir);
     if (v->is_string()) {
-        if (m_rm->genDedicateStrMD() != nullptr) {
+        if (m_rm->getAndGenDedicateStrMD() != nullptr) {
             //Treats all string variables as the same one.
             return false;
         }
@@ -209,6 +239,9 @@ bool PreAnaBeforeOpt::scanIRList(IR const* ir)
         case IR_RETURN:
             changed |= scanReturn(ir);
             break;
+        case IR_CASE:
+            changed |= scanCase(ir);
+            break;
         default:
             if (ir->isExtOp()) {
                 changed |= scanExtOp(ir);
@@ -221,10 +254,18 @@ bool PreAnaBeforeOpt::scanIRList(IR const* ir)
 }
 
 
+void PreAnaBeforeOpt::clean() const
+{
+    m_rg->getReturnList()->clean();
+    m_rg->getCallList()->clean();
+}
+
+
 bool PreAnaBeforeOpt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     bool changed = false;
+    clean();
     if (m_rg->getIRList() != nullptr) {
         changed |= scanIRList(m_rg->getIRList());
     } else {

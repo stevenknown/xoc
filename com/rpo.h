@@ -45,6 +45,9 @@ typedef C<Vertex const*> * RPOVexListIter;
 
 class RPOVexList : public List<Vertex const*> {
 public:
+    void dump(FILE * h, UINT indent = 0) const;
+    void dump(CHAR const* filename) const;
+
     //Return true if all elements in current list are equal to elements in
     //'src'.
     bool isEqual(RPOVexList const& src) const;
@@ -80,15 +83,6 @@ public:
     //The function only sorts vertice in RPO order and collects into 'vlst'.
     //NOTE: the function does not recompute RPO of vertex.
     void collectRPOVexList(Graph const& g, OUT RPOVexList & vlst);
-
-    static void dumpRPOVexList(FILE * h, RPOVexList const& vlst,
-                               UINT indent  = 0);
-    static void dumpRPOVexList(CHAR const* filename, RPOVexList const& vlst)
-    {
-        FileObj fo(filename);
-        ASSERT0(fo.getFileHandler());
-        dumpRPOVexList(fo.getFileHandler(), vlst, 0);
-    }
 
     //Free RPO for next allocation.
     void freeRPO(RPOVal rpo)

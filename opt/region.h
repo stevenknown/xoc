@@ -65,6 +65,19 @@ public:
     }
 };
 
+typedef xcom::List<xoc::Var const*> ConstVarList;
+typedef xcom::List<xoc::Var const*>::Iter ConstVarListIter;
+class ConstParamVarList : public ConstVarList {
+protected:
+    bool m_is_in_decl_order;
+public:
+    ConstParamVarList() { m_is_in_decl_order = false; }
+
+    bool isInDeclOrder() const { return m_is_in_decl_order; }
+
+    void setInDeclOrder(bool in_decl_order)
+    { m_is_in_decl_order = in_decl_order; }
+};
 
 //
 //START Region
@@ -172,6 +185,13 @@ protected:
     //Allocate AttachInfoMgr
     virtual AttachInfoMgr * allocAttachInfoMgr();
 
+    //Clear the formal parameter list.
+    void cleanFormalParamList()
+    {
+        delete m_formal_param_list;
+        m_formal_param_list = nullptr;
+    }
+
     void genEntryBB();
     AnalysisInstrument * getAnalysisInstrument() const
     {
@@ -201,7 +221,7 @@ protected:
     //array operations etc.
     //Simplification will maintain CFG, PRSSA, MDSSA, and DU Ref information,
     //excepts the classic DU-Chain.
-    bool performSimplify(OptCtx & oc);
+    virtual bool performSimplify(OptCtx & oc);
     bool processRegionIRInIRList(OptCtx & oc, IR const* ir);
     bool processRegionIRInIRList(OptCtx & oc);
     bool processRegionIRInBBList(OptCtx & oc);
@@ -212,6 +232,7 @@ public:
     Region * m_parent; //record parent region.
     RegionMgr * m_region_mgr; //Region manager.
     RefInfo * m_ref_info; //record USE/DEF MD info to current region.
+    ConstParamVarList * m_formal_param_list; //record formal parameter.
     union {
         struct {
             BYTE is_expect_inline:1; //see above macro declaration.
@@ -271,6 +292,14 @@ public:
         return buf;
     }
 
+    //The function assigns a DummyUse to each non-intrisinc call-stmt in BB
+    //or IR list.
+    //Note DummyUse is usually used to build explicit DefUse chain.
+    //e.g:given call foo(p); after assigning DummyUse, the function call will
+    //become call:(use(ld x, ld y), p), where ld x, ld y are MayRef of
+    //the function foo.
+    void assignDummyUseForCall();
+
     //Construct IR list from BB list.
     //clean_ir_list: clean bb's ir list if it is true.
     IR * constructIRlist(bool clean_ir_list);
@@ -291,15 +320,86 @@ public:
     void destroyAttachInfoMgr();
     void destroyIRBBMgr();
 
-    //The following funtions return true means IR status changed, caller
-    //should consider whether other optimizations should be reperform again.
-    //Otherwise return false.
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doPRSSA(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doMDSSA(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doRefineDU(OptCtx & oc);
-    bool doDURefAndClassicDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doMDRef(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doMDRefAndClassicDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doMDRefAndClassicPRDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doOnlyClassicNonPRDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doOnlyClassicPRDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doDUAna(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doAA(OptCtx & oc);
+
+    //The function assigns MD to each direct memory-ref operations that include
+    //PR operation and NonPR Direct-Mem-Ref operations.
+    void doAssignDirectRefMD(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doSimplyCPByClassicDU(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doAggressiveAA(OptCtx & oc);
+
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
     bool doBasicAnalysis(OptCtx & oc);
 
     //Duplication all contents of 'src', includes AttachInfo, except DU info,
@@ -327,9 +427,20 @@ public:
     //ir: root of IR tree.
     IR * dupIsomoStmt(IR const* ir, IR * rhs);
 
+    //Dump IRBB list into given file.
     //filename: dump BB list into given filename.
+    //dump_inner_region: true to dump inner-region.
     void dumpBBList(CHAR const* filename, bool dump_inner_region = true) const;
+
+    //Dump IRBB list into log file.
+    //dump_inner_region: true to dump inner-region.
     void dumpBBList(bool dump_inner_region = true) const;
+
+    //Dump IR list into given file.
+    //filename: dump IR list into given filename.
+    void dumpIRList(CHAR const* filename, bool dump_inner_region = true) const;
+
+    //Dump IR list into log file.
     void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
 
     //Dump all irs and ordering by IR_id.
@@ -337,6 +448,9 @@ public:
 
     //Dump each Var in current region's Var table.
     void dumpVARInRegion() const;
+
+    //Dump all MDs that referenced by current region.
+    void dumpRegionMayRef() const;
 
     //Dump all MD that related to Var.
     void dumpVarMD(Var * v, UINT indent) const;
@@ -349,6 +463,7 @@ public:
     void dumpVarTab() const;
 
     //Dump GR through LogMgr.
+    //dump_inner_region: true to dump inner-region.
     void dumpGR(bool dump_inner_region = true) const;
 
     //Dump Region's IR BB list.
@@ -394,6 +509,14 @@ public:
     //NOTICE: bb will not be destroyed, it is just recycled.
     void freeIRBBList(BBList & bbl);
 
+    //Find the formal parameter list. If it has already been recorded, return it
+    //directly. Otherwise, iterate the Var table of the current region to find
+    //all Vars that are formal parameters.
+    //in_decl_order: if it is true, this function sorts the formal parameters
+    //in left-to-right order based on their declaration.
+    //e.g: foo(a, b, c), varlst will be {a, b, c}.
+    ConstVarList const* findAndRecordFormalParamList(bool in_decl_order);
+
     //This function iterate Var table of current region to
     //find all Var which are formal parameter.
     //in_decl_order: if it is true, this function will sort the formal
@@ -403,12 +526,10 @@ public:
     //costly and SHOULD BE USED CAREFULLY.
     void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
 
-    //This function find the formal parameter variable by given position.
-    //NOTE: the function will iterate all Vars in the region. It is very
-    //costly and SHOULD BE USED CAREFULLY.
-    //Usually, user should retrieve and collect all parameter Vars of region in
-    //a temporary list by invoking findFormalParam(varlst).
-    Var const* findFormalParam(UINT position) const;
+    //This function find the formal parameter variable at the specified position
+    //from the parameter list. If the parameter list is nullptr, it first calls
+    //findAndRecordFormalParamList to initialize the list.
+    Var const* findFormalParam(UINT position);
 
     //This function find Var via iterating Var table of current region.
     Var * findVarViaSymbol(Sym const* sym) const;
@@ -429,6 +550,11 @@ public:
 
     //Get common memory pool of current region.
     SMemPool * getCommPool() const { return m_pool; }
+
+    //Get the formal parameter list.
+    //NOTICE: The formal parameter list may be nullptr.
+    ConstVarList const* getFormalParamList() const
+    { return m_formal_param_list; }
 
     //Get memory pool to allocate Single-List-Container.
     SMemPool * getSCPool() const
@@ -487,7 +613,7 @@ public:
     { return ANA_INS_ir_vec(getAnalysisInstrument()).get(irid); }
 
     //Return the vector that record all allocated IRs.
-    Vector<IR*> & getIRVec() const
+    xcom::Vector<IR*> & getIRVec() const
     { return ANA_INS_ir_vec(getAnalysisInstrument()); }
 
     //Return IRMgr.
@@ -655,7 +781,7 @@ public:
     LabelInfo * genCustomLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
-        return allocCustomerLabel(labsym, getCommPool());
+        return xoc::allocCustomerLabel(labsym, getCommPool());
     }
 
     //Allocate Var for PR.
@@ -773,8 +899,13 @@ public:
     //Construct BB list by destructing CFG.
     bool reconstructBBList(OptCtx & oc);
 
-    //Register global variable located in program region.
-    void registerGlobalVAR();
+    //This function iterates over the Var table of the current region to
+    //find all Vars that are formal parameters and records them in the formal
+    //parameter list.
+    //in_decl_order: if it is true, this function sorts the formal parameters
+    //in left-to-right order based on their declaration.
+    //e.g: foo(a, b, c), varlst will be {a, b, c}.
+    ConstVarList const* refindAndRecordFormalParamList(bool in_decl_order);
 
     //Reinitialize current region.
     void reinit()

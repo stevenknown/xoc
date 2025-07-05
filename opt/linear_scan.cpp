@@ -35,6 +35,7 @@ static void dumpFakeUse(LinearScanRA * lsra, IR const* fake_ir,
                         IR const* marker, PRNO prno,
                         UINT bbid, bool head, CHAR const* context)
 {
+    if (!lsra->getRegion()->isLogMgrInit()) { return; }
     CHAR const* preStr = "fake-use: insert fake-use IR id:";
     if (marker != nullptr) {
         lsra->getActMgr().dump(
@@ -58,6 +59,27 @@ static void setPosAttr(BBPos const& pos, PosAttr const* attr,
     if (pos2attr->find(pos)) { return; }
     pos2attr->set(pos, attr);
 }
+
+
+void dumpBBListWithReg(Region const* rg)
+{
+    ASSERT0(rg && rg->getPassMgr());
+    LinearScanRA const* lsra = (LinearScanRA const*)rg->getPassMgr()->
+        queryPass(PASS_LINEAR_SCAN_RA);
+    if (lsra == nullptr) { return; }
+    lsra->dumpBBListWithReg();
+}
+
+
+void dumpDOTWithReg(Region const* rg, CHAR const* name, UINT flag)
+{
+    ASSERT0(rg && rg->getPassMgr());
+    LinearScanRA const* lsra = (LinearScanRA const*)rg->getPassMgr()->
+        queryPass(PASS_LINEAR_SCAN_RA);
+    if (lsra == nullptr) { return; }
+    lsra->dumpDOTWithReg(name, flag);
+}
+
 
 //
 //START PosAttrProc
@@ -155,441 +177,6 @@ bool PosAttrNoCodeGenProc::processAttrNoCodeGen(BBPos const& pos,
     return true;
 }
 //END PosAttrNoCodeGenProc
-
-
-//
-//START PosAttrLifeTimeProc
-//
-//This class processes the attribute with POS_ATTR_LT_NO_TERM_AFTER
-//and POS_ATTR_LT_SHRINK_BEFORE.
-class PosAttrLifeTimeProc : public PosAttrProc {
-    COPY_CONSTRUCTOR(PosAttrLifeTimeProc);
-    SMemPool * m_pool;
-    //If there are multiple fake-use IRs related to the same PR, and these
-    //IRs are included in different BBs, structure PosInfo is used to record
-    //these infos about the position and the attribute.
-    // e.g:
-    //    In the below CFG, there are three fake-use IRs about $p.
-    //
-    //           BB1: ...
-    //                 |
-    //                 V
-    //           BB2: fake_var <-- $p  #S1 (BB Entry pos: 20)
-    //                ...
-    //                 |
-    //                 V
-    //           BB3: fake_var <-- $p  #S2 (BB Entry pos: 30)
-    //                ...
-    //                 |
-    //                 V
-    //           BB4: fake_var <-- $p  #S3 (BB Entry pos: 40)
-    //                ...
-    //                 |
-    //                 V
-    //           BB5: ...
-    //
-    //    For this case:
-    //        min_pos = 20
-    //        attr_first points to the attribute of #S1.
-    typedef struct {
-        //attr_first will record the attribute of the fake-use IR contained
-        //in the BB with the minimum BB entry position among these BBs inserted
-        //with the fake-use IRs related to the same PR in lexcical sequence.
-        PosAttr const* attr_first;
-
-        //min_pos will record the minimum entry position of a BB among these BBs
-        //inserted with the fake-use IRs related to the same PR in lexcical
-        //sequence.
-        Pos min_pos;
-    } PosInfo;
-    typedef xcom::TMap<PRNO, PosInfo*> PRNO2Pos;
-    typedef xcom::TMapIter<PRNO, PosInfo*> PRNO2PosIter;
-public:
-    PosAttrLifeTimeProc(Region * rg, BBPos2Attr const& ir2attr,
-                        LinearScanRA * lsra)
-        : PosAttrProc(rg, ir2attr, lsra)
-    {
-        m_pool = smpoolCreate(64, MEM_COMM);
-        ASSERT0(m_pool);
-    }
-
-    virtual ~PosAttrLifeTimeProc()
-    {
-        if (m_pool != nullptr) {
-            smpoolDelete(m_pool);
-            m_pool = nullptr;
-        }
-    }
-
-protected:
-    PosInfo * allocPosInfo()
-    {
-        PosInfo * info = (PosInfo*)xmalloc(sizeof(PosInfo));
-        return info;
-    }
-
-    virtual bool checkRelatedAttrs(PosAttr const* attr) const;
-    virtual void preProcess();
-    virtual bool processAttr(BBPos const& pos, PosAttr const* attr);
-
-    bool processAttrLTNoTerminatedAfter(BBPos const& pos, PosAttr const* attr);
-    bool processAttrLTShrinkedBefore(BBPos const& pos, PosAttr const* attr);
-    bool processAttrLTExtendBBEnd(BBPos const& pos, PosAttr const* attr);
-
-    //Record the position info for attribute POS_ATTR_LT_SHRINK_BEFORE.
-    void recordPosInfo(OUT PRNO2Pos & prno2pos, PRNO prno, Pos pos,
-                       PosAttr const* attr);
-    void * xmalloc(size_t size);
-};
-
-
-void * PosAttrLifeTimeProc::xmalloc(size_t size)
-{
-    ASSERTN(m_pool != nullptr, ("pool does not initialized"));
-    void * p = smpoolMalloc(size, m_pool);
-    ASSERT0(p != nullptr);
-    ::memset(p, 0, size);
-    return p;
-}
-
-
-void PosAttrLifeTimeProc::recordPosInfo(OUT PRNO2Pos & prno2pos, PRNO prno,
-                                        Pos pos, PosAttr const* attr)
-{
-    ASSERT0(attr && prno != PRNO_UNDEF && pos != POS_UNDEF);
-    bool find = false;
-    PosInfo * pos_info = nullptr;
-    pos_info = prno2pos.get(prno, &find);
-    if (!find) {
-        pos_info = allocPosInfo();
-        pos_info->attr_first = attr;
-        pos_info->min_pos = pos;
-        prno2pos.set(prno, pos_info);
-        return;
-    }
-    if (pos_info->min_pos > pos) {
-        pos_info->min_pos = pos;
-        pos_info->attr_first = attr;
-    }
-}
-
-
-//This function does the pre-process on the attribute POS_ATTR_LT_SHRINK_BEFORE.
-//This attribute means the beginning of lifetime will be shrunk from the entry
-//of region to the entry position of current BB, if the fake-use IRs related to
-//the same PR are inserted in multiple BBs, the modified lifetime may be
-//incorrect due to the improper processing order of these fake-use IRs.
-//
-//Because for each fake-use IR will do the shrinking process for each fake-use
-//IR, so the last fake-use IR of the same PR will determine the final start
-//position of lifetime of this PR. So it is no doubt that the final modified
-//lifetime will be correct only if the fake-use IR with the minimum BB Entry pos
-//is the last one to be processed, or else the modified lifetime cannot cover
-//the other fake-use IRs related to the same PR.
-//
-//So the fake-use IR in first BB in lexical sequence (has the minimum BB Entry
-//pos) need to be processed, while the otherfake-use IRs of the same PR in other
-//BBs need to be ignored.
-//
-// e.g:
-//   In the below CFG, there are three fake-use IRs about $p.
-//
-//          BB1: ...
-//                |
-//                V
-//          BB2: fake_var <-- $p  #S1 (BB Entry pos: 20)
-//               ...
-//                |
-//                V
-//          BB3: fake_var <-- $p  #S2 (BB Entry pos: 30)
-//               ...
-//                |
-//                V
-//          BB4: fake_var <-- $p  #S3 (BB Entry pos: 40)
-//               ...
-//                |
-//                V
-//          BB5: ...
-//               $p <-- ...       #S4 (pos: 50)
-//               ...
-//
-//       Original lifetime for $p: <2-49><50-67>
-//       | ------------------------------------------------------------------
-//       |                   u         u         u         d                u
-//                           ^         ^         ^         ^
-//                           |         |         |         |
-//                    pos_of_#S1  pos_of_#S2  pos_of_#S3  pos_of_#S4
-//
-//   Different processing orders of the three fake-use IRs will be showed in
-//   the following three cases:
-//
-//     CASE1 (incorrect):
-//       Processing order for these fake-use IRs:
-//             #S1 --> #S2 --> #S3
-//
-//       Modified lifetime for $p: <40-49><50-67>
-//       |                                       ----------------------------
-//       |                   u         u         u         d                u
-//                           ^         ^         ^         ^
-//                           |         |         |         |
-//                    pos_of_#S1  pos_of_#S2  pos_of_#S3  pos_of_#S4
-//
-//       The final start position of lifetime is 40, which doses not include the
-//       position of #S1 (20) and #S2 (30).
-//
-//
-//     CASE2 (incorrect):
-//       Processing order for these fake-use IRs:
-//             #S1 --> #S3 --> #S2
-//
-//       Modified lifetime for $p: <30-49><50-67>
-//       |                             --------------------------------------
-//       |                   u         u         u         d                u
-//                           ^         ^         ^         ^
-//                           |         |         |         |
-//                    pos_of_#S1  pos_of_#S2  pos_of_#S3  pos_of_#S4
-//
-//       The final start position of lifetime is 30, which doses not include the
-//       position of #S1 (20).
-//
-//
-//     CASE3 (correct):
-//       Processing order for these fake-use IRs:
-//             #S2 --> #S3 --> #S1
-//
-//       Modified lifetime for $p: <20-49><50-67>
-//       |                   ------------------------------------------------
-//       |                   u         u         u         d                u
-//                           ^         ^         ^         ^
-//                           |         |         |         |
-//                    pos_of_#S1  pos_of_#S2  pos_of_#S3  pos_of_#S4
-//
-//       The final start position of lifetime is 20, which can cover all the
-//       position of fake-use IRs related to $p.
-//
-//
-//   Conclusion: Only #S1 need to be processed, while #S2 and #S3 need to be
-//               ignored.
-//
-void PosAttrLifeTimeProc::preProcess()
-{
-    //Use a temp map to store the pos info for PRs.
-    PRNO2Pos prno2pos;
-
-    BBPos2AttrIter it;
-    PosAttr const* attr = nullptr;
-    for (BBPos pos = m_pos2attr.get_first(it, &attr); !it.end();
-         pos = m_pos2attr.get_next(it, &attr)) {
-        //Only process the attribute POS_ATTR_LT_SHRINK_BEFORE.
-        //For attribute POS_ATTR_LT_NO_TERM_AFTER is used to extend the first
-        //range of lifetime to the next definition, if the range was extended
-        //by any one of the fake-use IRs, the other fake-use IRs will make
-        //no changes for the range, that is as expected.
-        if (!attr->have(POS_ATTR_LT_SHRINK_BEFORE)) { continue; }
-        IR * rhs = const_cast<IR*>(attr->getIR())->getRHS();
-        ASSERT0(rhs && rhs->is_pr() && (rhs->getPrno() == BBPOS_prno(pos)));
-        PRNO prno = rhs->getPrno();
-        IRBB const* bb = attr->getBB();
-        ASSERT0(BBPOS_bbid(pos) == bb->id());
-        //Normally this position should be at the entry of BB.
-        ASSERT0(BBPOS_flag(pos) == INSERT_MODE_HEAD);
-        Pos bb_entry_pos = m_lsra->getLTMgr().getBBStartPos(bb->id());
-        recordPosInfo(prno2pos, prno, bb_entry_pos, attr);
-    }
-
-    PRNO2PosIter iter;
-    PosInfo * pos_info = nullptr;
-    for (BBPos pos = prno2pos.get_first(iter, &pos_info); !iter.end();
-         pos = prno2pos.get_next(iter, &pos_info)) {
-        const_cast<PosAttr*>(pos_info->attr_first)->setSequence(BB_SEQ_FIRST);
-    }
-}
-
-
-bool PosAttrLifeTimeProc::processAttr(BBPos const& pos, PosAttr const* attr)
-{
-    ASSERT0(attr);
-    if (!processAttrLTNoTerminatedAfter(pos, attr)) { return false; }
-    if (!processAttrLTShrinkedBefore(pos, attr)) { return false; }
-    if (!processAttrLTExtendBBEnd(pos, attr)) { return false; }
-    return true;
-}
-
-
-bool PosAttrLifeTimeProc::checkRelatedAttrs(PosAttr const* attr) const
-{
-    ASSERT0(attr);
-    return attr->have(POS_ATTR_LT_NO_TERM_AFTER) ||
-        attr->have(POS_ATTR_LT_SHRINK_BEFORE) ||
-        attr->have(POS_ATTR_LT_EXTEND_BB_END);
-}
-
-
-bool PosAttrLifeTimeProc::processAttrLTNoTerminatedAfter(BBPos const& pos,
-                                                         PosAttr const* attr)
-{
-    ASSERT0(attr);
-    if (!attr->have(POS_ATTR_LT_NO_TERM_AFTER)) { return true; }
-    IR * tmp_ir = const_cast<IR*>(attr->getIR());
-
-    //Check the fake-use IR responding at the BBPos.
-    ASSERT0(tmp_ir && tmp_ir->is_st());
-    IR * rhs = tmp_ir->getRHS();
-    ASSERT0(rhs && rhs->is_pr() && (rhs->getPrno() == BBPOS_prno(pos)));
-    IRBB const* bb = attr->getBB();
-    ASSERT0(bb && BBPOS_bbid(pos) == bb->id());
-    //Normally this position should be at the head of BB.
-    ASSERT0(BBPOS_flag(pos) == INSERT_MODE_HEAD);
-
-    //Extend the current lifetime through the steps below:
-    // 1. Find the accurate start pos of BB from lifetime manager.
-    // 2. Find the live range including the start pos of BB in lifetime, because
-    //    this pr is at the head of BB before the first real occurence, so the
-    //    live range must be the first one.
-    // 3. Find the next range, extend the current life range to the next DEF if
-    //    there is a hole.
-    // e.g:
-    //   lifetime original: <2-17><34-67>
-    //                bb_start_pos = 16
-    //                    |
-    //                    V
-    //    | ----------------                ----------------------------------
-    //    |                u                d      u           u             u
-    //   lifetime modified: <2-33><34-67>
-    //    | ------------------------------------------------------------------
-    //    |                u                d      u           u             u
-    LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
-    Pos cur_bb_entry_pos = m_lsra->getLTMgr().getBBStartPos(bb->id());
-    for (VecIdx i = 0; i <= lt->getRangeVec().get_last_idx(); i++) {
-        Range r = lt->getRange(i);
-        if (!r.is_contain(cur_bb_entry_pos)) { continue; }
-        //Normally this should be the first range in the lifetime.
-        ASSERT0(i == 0);
-        VecIdx next = i + 1;
-        if (next <= lt->getRangeVec().get_last_idx()) {
-            Range next_r = lt->getRange(next);
-            //There is a hole between current range and next range, extend
-            //the lifetime to the next definition.
-            if (next_r.start() > r.end() + 1) {
-                RG_end(r) = next_r.start() - 1;
-                lt->setRange(i, r);
-            }
-        }
-        break;
-    }
-    return true;
-}
-
-
-bool PosAttrLifeTimeProc::processAttrLTShrinkedBefore(BBPos const& pos,
-                                                      PosAttr const* attr)
-{
-    ASSERT0(attr);
-    if (!attr->have(POS_ATTR_LT_SHRINK_BEFORE)) { return true; }
-    IR * tmp_ir = const_cast<IR*>(attr->getIR());
-    IR * rhs = tmp_ir->getRHS();
-    ASSERT0(rhs && rhs->is_pr() && (rhs->getPrno() == BBPOS_prno(pos)));
-    IRBB const* bb = attr->getBB();
-    ASSERT0(BBPOS_bbid(pos) == bb->id());
-    //Normally this position should be at the head of BB.
-    ASSERT0(BBPOS_flag(pos) == INSERT_MODE_HEAD);
-
-    //Only process the fake-use IR related to the same PR with the flag
-    //BB_SEQ_FIRST.
-    // For example:
-    //    In the below CFG, there are three fake-use IRs about $p, #S1 is flaged
-    //    with BB_SEQ_FIRST, and it is the only fake-use IR need to be processed
-    //    for attribiute POS_ATTR_LT_SHRINK_BEFORE.
-    //
-    //           BB1: ...
-    //                 |
-    //                 V
-    //           BB2: fake_var <-- $p  #S1 (Entry pos: 20)
-    //                ...
-    //                 |
-    //                 V
-    //           BB3: fake_var <-- $p  #S2 (Entry pos: 30)
-    //                ...
-    //                 |
-    //                 V
-    //           BB4: fake_var <-- $p  #S3 (Entry pos: 40)
-    //                ...
-    //                 |
-    //                 V
-    //           BB5: ...
-    //
-    //    lifetime for $p original: <2-49><50-67>
-    //    | ------------------------------------------------------------------
-    //    |                    u         u        u            d             u
-    //
-    //    The first range of lifetime will be terminated at the entry of BB2.
-    //
-    //    lifetime for $p modified: <20-49><50-67>
-    //    |                    -----------------------------------------------
-    //    |                    u         u        u            d             u
-    if (attr->getSequence() != BB_SEQ_FIRST) { return true; }
-
-    //Terminate the current lifetime before the BBPos through the steps below:
-    // 1. Find the accurate position of BB entry from lifetime manager.
-    // 2. Get the first live range in the lifetime, the lifetime is extended
-    //    from the entry of function due to the fake-use PR.
-    // 3. Update the start of the live range to the position of BB entry.
-    //
-    // e.g:
-    //   lifetime original: <2-17><34-67>
-    //               bb_start_pos = 16
-    //                    |
-    //                    V
-    //    | ----------------                ----------------------------------
-    //    |                u                d      u           u             u
-    //                     ^
-    //                     |
-    //                   occ_pos = 17
-    //
-    //   lifetime modified: <16-17><34-67>
-    //    |               --                ----------------------------------
-    //    |                u                d      u           u             u
-    LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
-    Pos cur_bb_entry_pos = m_lsra->getLTMgr().getBBStartPos(bb->id());
-    Range r = lt->getFirstRange();
-    Pos const region_start = REGION_START_POS;
-
-    //Shrink the current live range to the position of BB entry.
-    if (RG_start(r) == region_start && r.is_contain(cur_bb_entry_pos)) {
-        RG_start(r) = cur_bb_entry_pos;
-        lt->setRange(0, r);
-    }
-    return true;
-}
-
-
-bool PosAttrLifeTimeProc::processAttrLTExtendBBEnd(BBPos const& pos,
-                                                   PosAttr const* attr)
-{
-    ASSERT0(attr);
-    if (!attr->have(POS_ATTR_LT_EXTEND_BB_END)) { return true; }
-    IR * tmp_ir = const_cast<IR*>(attr->getIR());
-    IRBB const* bb = attr->getBB();
-    ASSERT0(bb && BBPOS_bbid(pos) == bb->id());
-
-    //Normally this position should be at the tail of BB.
-    ASSERT0(BBPOS_flag(pos) == INSERT_MODE_TAIL);
-
-    //Extend the last live range to the end of BB by following steps:
-    //1. Get the last live range.
-    //2. If the end position of last range is after the BB end, then do nothing.
-    //3. Update the the end position of last range to the BB end position.
-    Pos bb_end_pos = m_lsra->getLTMgr().getBBEndPos(bb->id());
-    IR * rhs = tmp_ir->getRHS();
-    ASSERT0(rhs && rhs->is_pr() && (rhs->getPrno() == BBPOS_prno(pos)));
-    LifeTime * lt = m_lsra->getLTMgr().getLifeTime(rhs->getPrno());
-    Range r = lt->getLastRange();
-    if (RG_end(r) >= bb_end_pos) { return true; }
-    RG_end(r) = bb_end_pos;
-    lt->setLastRange(r);
-    return true;
-}
-//END PosAttrLifeTimeProc
 
 
 class OccRecorderVF {
@@ -784,7 +371,15 @@ void LexBackwardJumpAnalysis::recordOccurenceForPR(PRNO prno, Pos pos)
 }
 
 
-void LexBackwardJumpAnalysis::collectBackwardJumps()
+//Determine an edge is backward jump or not.
+static bool isBackwardJump(
+    Vector<UINT> const& bb_seqid, UINT src_bbid, UINT dst_bbid)
+{
+    return bb_seqid[dst_bbid] <= bb_seqid[src_bbid];
+}
+
+
+void LexBackwardJumpAnalysis::collectBackwardJumps(Vector<UINT> const& bb_seqid)
 {
     BBListIter bbit;
     for (IRBB const* bb = m_bb_list->get_head(&bbit);
@@ -792,15 +387,18 @@ void LexBackwardJumpAnalysis::collectBackwardJumps()
         AdjVertexIter ito;
         for (Vertex const* o = Graph::get_first_out_vertex(bb->getVex(), ito);
              o != nullptr; o = Graph::get_next_out_vertex(ito)) {
-            if (!m_lsra->isBackwardJump(bb->id(), o->id())) { continue; }
+            if (!isBackwardJump(bb_seqid, bb->id(), o->id())) {
+                //Edge bb->o is not lex-backward-jump.
+                continue;
+            }
             addBackwardJump(bb, m_rg->getBB(o->id()));
         }
     }
 }
 
 
-void LexBackwardJumpAnalysis::generateOccurenceForBB(IRBB const* bb,
-                                                     MOD Pos & pos)
+void LexBackwardJumpAnalysis::generateOccurenceForBB(
+    IRBB const* bb, MOD Pos & pos)
 {
     ASSERT0(bb);
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
@@ -830,18 +428,34 @@ void LexBackwardJumpAnalysis::generateOccurence()
 }
 
 
+void LexBackwardJumpAnalysis::assignLexSeqIdForBB(OUT Vector<UINT> & bb_seqid)
+{
+    //Iterate BB list.
+    BBListIter bbit;
+    bb_seqid.set(m_bb_list->get_elem_count(), 0);
+    UINT id = 0;
+    for (IRBB * bb = m_bb_list->get_head(&bbit); bb != nullptr;
+         bb = m_bb_list->get_next(&bbit)) {
+        bb_seqid.set(bb->id(), id++);
+    }
+}
+
+
 bool LexBackwardJumpAnalysis::analyze()
 {
     START_TIMER_FMT(t, ("Backward Jump Analysis"));
-    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(PASS_LIVENESS_MGR);
+    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->
+        queryPass(PASS_PRLIVENESS_MGR);
     m_bb_list = m_rg->getBBList();
     if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
         END_TIMER_FMT(t, ("Backward Jump Analysis"));
         return true;
     }
+    Vector<UINT> bb_seqid;
+    assignLexSeqIdForBB(bb_seqid);
 
     //Step1: Collect the backward jump info in the CFG.
-    collectBackwardJumps();
+    collectBackwardJumps(bb_seqid);
 
     //If there is no backward jump, nothing need to do.
     if (m_backward_edges.get_elem_count() == 0) {
@@ -907,8 +521,8 @@ void LexBackwardJumpAnalysis::dump()
 //        --- POS_ATTR_NO_CODE_GEN
 //        --- POS_ATTR_LT_NO_TERM_AFTER
 //        --- POS_ATTR_LT_SHRINK_BEFORE
-void LexBackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
-                                                     BBPos const& pos)
+void LexBackwardJumpAnalysis::insertFakeUseAtBBEntry(
+    IRBB const* bb, PRNO prno, BBPos const& pos)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -930,8 +544,7 @@ void LexBackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
     //   Modified lifetime: <17><34-67>
     //    |                -                ----------------------------------
     //    |                u                d      u           u             u
-    PosAttr * attr = m_resource_mgr->genPosAttr(POS_ATTR_NO_CODE_GEN |
-        POS_ATTR_LT_NO_TERM_AFTER | POS_ATTR_LT_SHRINK_BEFORE, bb, st);
+    PosAttr * attr = m_resource_mgr->genPosAttr(POS_ATTR_NO_CODE_GEN, bb, st);
     setPosAttr(pos, attr, m_pos2attr);
     dumpFakeUse(m_lsra, st, nullptr, prno, bb->id(), true,
                 "backward jump analysis");
@@ -942,8 +555,8 @@ void LexBackwardJumpAnalysis::insertFakeUseAtBBEntry(IRBB const* bb, PRNO prno,
 //  1. Build a fake-use IR by write the pr into a fake var.
 //  2. Insert the fake-use IR at the tail of BB, but before the branch IR.
 //  3. Map the pos and the new fake-use IR with attribute POS_ATTR_NO_CODE_GEN.
-void LexBackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
-                                                    BBPos const& pos)
+void LexBackwardJumpAnalysis::insertFakeUseAtBBExit(
+    IRBB const* bb, PRNO prno, BBPos const& pos)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -966,16 +579,15 @@ void LexBackwardJumpAnalysis::insertFakeUseAtBBExit(IRBB const* bb, PRNO prno,
     //Attribute POS_ATTR_LT_EXTEND_BB_END is set, because the multiple fake-use
     //IRs are inserted at the tail part of the same BB, which would lead to
     //this lifetime cannot live to the real ending position of BB.
-    PosAttr * attr = m_resource_mgr->genPosAttr(
-        POS_ATTR_NO_CODE_GEN | POS_ATTR_LT_EXTEND_BB_END, bb, st);
+    PosAttr * attr = m_resource_mgr->genPosAttr(POS_ATTR_NO_CODE_GEN, bb, st);
     setPosAttr(pos, attr, m_pos2attr);
     dumpFakeUse(m_lsra, st, nullptr, prno, bb->id(), false,
                 "backward jump analysis");
 }
 
 
-void LexBackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
-                                            INSERT_MODE mode)
+void LexBackwardJumpAnalysis::insertFakeUse(
+    IRBB const* bb, PRNO prno, INSERT_MODE mode)
 {
     ASSERT0(bb);
     ASSERT0(mode != INSERT_MODE_UNDEF);
@@ -998,8 +610,8 @@ void LexBackwardJumpAnalysis::insertFakeUse(IRBB const* bb, PRNO prno,
 }
 
 
-void LexBackwardJumpAnalysis::recordFakeUse(PRNO prno, IRBB const* bb,
-                                            INSERT_MODE mode)
+void LexBackwardJumpAnalysis::recordFakeUse(
+    PRNO prno, IRBB const* bb, INSERT_MODE mode)
 {
     ASSERT0(bb);
     ASSERT0(prno != PRNO_UNDEF);
@@ -1076,8 +688,9 @@ void LexBackwardJumpAnalysis::generateFakeUse()
         PRLiveSetIter * iter = nullptr;
         for (PRNO pr = (PRNO)live_out->get_first(&iter);
              pr != BS_UNDEF; pr = (PRNO)live_out->get_next(pr, &iter)) {
-            if (m_lsra->isDedicated(pr) &&
-                m_lsra->getDedicatedReg(pr) == m_lsra->getZero()) {
+            if (m_lsra->isPreAssigned(pr) &&
+                (m_lsra->getPreAssignedReg(pr) == m_lsra->getZeroScalar() ||
+                m_lsra->getPreAssignedReg(pr) == m_lsra->getZeroVector())) {
                 continue;
             }
             Occurence const* occ = m_prno2occ.get(pr);
@@ -1122,7 +735,7 @@ void LexBackwardJumpAnalysis::generateFakeUse()
              pr != BS_UNDEF; pr = (PRNO)live_in->get_next(pr, &iter)) {
             Occurence const* occ = m_prno2occ.get(pr);
             ASSERT0(occ);
-            if (m_lsra->getDedicatedMgr().isDedicated(pr)) { continue; }
+            if (m_lsra->getPreAssignedMgr().isPreAssigned(pr)) { continue; }
             //Since some new fake-use IRs will be inserted at the start of the
             //dst BB, so the entry boundary of the dst BB should be included.
             if (OCC_first(occ) >= m_bb_entry_pos[dst_bb->id()]) {
@@ -1305,6 +918,13 @@ void RegSetImpl::initAvailRegSet()
 }
 
 
+void RegSetImpl::pickOutAliasRegSet(Reg reg, OUT RegSet & alias_set)
+{
+    ASSERT0(reg != REG_UNDEF);
+    ASSERTN(0, ("Target Dependent Code"));
+}
+
+
 //Pick up a physical register from allocable register set by the incremental
 //order.
 Reg RegSetImpl::pickRegByIncrementalOrder(RegSet & set)
@@ -1333,8 +953,8 @@ void RegSetImpl::pickReg(RegSet & set, Reg r)
 }
 
 
-Reg RegSetImpl::handleOnlyConsistency(OUT RegSet & set,
-                                      PRNOConstraintsTab const& consist_prs)
+Reg RegSetImpl::handleOnlyConsistency(
+    OUT RegSet & set, PRNOConstraintsTab const& consist_prs)
 {
     PRNOConstraintsTabIter it;
 
@@ -1358,9 +978,9 @@ Reg RegSetImpl::handleOnlyConsistency(OUT RegSet & set,
 }
 
 
-void RegSetImpl::removeConflictingReg(OUT RegSet & set,
-                                      PRNOConstraintsTab const& conflict_prs,
-                                      OUT RegSetWrap & removed_regs_wrap)
+void RegSetImpl::removeConflictingReg(
+    OUT RegSet & set, PRNOConstraintsTab const& conflict_prs,
+    OUT RegSetWrap & removed_regs_wrap)
 {
 
     PRNOConstraintsTabIter it;
@@ -1397,8 +1017,8 @@ void RegSetImpl::removeConflictingReg(OUT RegSet & set,
 }
 
 
-Reg RegSetImpl::handleOnlyConflicts(OUT RegSet & set,
-                                    PRNOConstraintsTab const& conflict_prs)
+Reg RegSetImpl::handleOnlyConflicts(
+    OUT RegSet & set, PRNOConstraintsTab const& conflict_prs)
 {
     RegSetWrap removed_regs_wrap;
 
@@ -1454,8 +1074,8 @@ Reg RegSetImpl::handleConflictsAndConsistency(
 }
 
 
-Reg RegSetImpl::pickRegWithConstraints(OUT RegSet & set,
-                                       LTConstraints const* lt_constraints)
+Reg RegSetImpl::pickRegWithConstraints(
+    OUT RegSet & set, LTConstraints const* lt_constraints)
 {
     ASSERT0(lt_constraints);
 
@@ -1544,7 +1164,7 @@ void RegSetImpl::pickRegisterFromAliasSet(Reg r)
     if (isReturnValue(r)) {
         return pickRegisterFromReturnValueAliasSet(r);
     }
-    ASSERT0(isSpecialReg(r));
+    ASSERT0(m_ra.isPreAssignedReg(r));
 }
 
 
@@ -1576,14 +1196,6 @@ void RegSetImpl::pickRegisterFromCalleeAliasSet(Reg r)
 }
 
 
-bool RegSetImpl::isSpecialReg(Reg r) const
-{
-    return r == m_ra.getFP() || r == m_ra.getBP() || r == m_ra.getRA() ||
-           r == m_ra.getSP() || r == m_ra.getGP() || r == m_ra.getTA() ||
-           r == m_ra.getZero();
-}
-
-
 void RegSetImpl::freeRegisterFromAliasSet(Reg r)
 {
     ASSERT0(isAvailAllocable(r));
@@ -1599,7 +1211,7 @@ void RegSetImpl::freeRegisterFromAliasSet(Reg r)
     if (isReturnValue(r)) {
         return freeRegisterFromReturnValueAliasSet(r);
     }
-    ASSERT0(isSpecialReg(r));
+    ASSERT0(m_ra.isPreAssignedReg(r));
 }
 
 
@@ -1663,6 +1275,39 @@ void RegSetImpl::freeReg(LifeTime const* lt)
 }
 
 
+bool RegSetImpl::isCalleeScalar(Reg r) const
+{
+    //True if input register is callee saved scalar register. Note that the
+    //frame pointer register can be used as callee saved register if this
+    //register can be allocated and the dynamic stack function has not used it.
+    //Note that special handling can be done based on the architecture.
+    bool is_callee_scalar = m_target_callee_scalar != nullptr &&
+        m_target_callee_scalar->is_contain(r);
+    //GCOVR_EXCL_START
+    bool use_fp_as_callee_scalar = isFP(r) && m_ra.isFPAllocable();
+    //GCOVR_EXCL_STOP
+    return is_callee_scalar || use_fp_as_callee_scalar;
+}
+
+
+void RegSetImpl::collectOtherAvailableRegister()
+{
+    //Collect FP register.
+    //If the frame pointer register can be allocated and the dynamic stack
+    //function and prologue&epilogue inserter function have not used this
+    //register during the current compilation process, it can be used to
+    //participate in scalar callee saved register allocation.
+    //In addition, if debug mode is turned on, the frame pointer register
+    //has a special role and cannot participate in allocation. Also, it can
+    //not be used if debugging linear scan register allocation.
+    if (m_ra.isFPAllocable()) {
+        Reg reg = getTIMgr().getFP();
+        m_avail_callee_scalar.bunion(reg);
+        m_avail_allocable.bunion(reg);
+    }
+}
+
+
 void RegSetImpl::dumpAvailRegSet() const
 {
     note(m_ra.getRegion(), "\n==-- DUMP AvaiableRegisterSet  --==");
@@ -1685,13 +1330,6 @@ void RegSetImpl::dumpAvailRegSet() const
     buf.clean();
     m_avail_allocable.dump(buf);
     note(m_ra.getRegion(), "\nAVAIL_ALLOCABLE:%s", buf.buf);
-}
-
-
-bool RegSetImpl::isFPAllocable() const
-{
-    return !g_force_use_fp_as_sp && !xoc::g_debug && m_ra.notHaveAlloca() &&
-        m_ra.noNeedToAlignStack() && m_ra.isFPAllocableAllowed();
 }
 //END RegSetImpl
 
@@ -1765,6 +1403,1081 @@ void LTConstraints::updateConflictPR(PRNO renamed_pr, PRNO old_pr)
 
 
 //
+//START FakeIRMgr
+//
+void FakeIRMgr::removeFakeUseIR()
+{
+    //Remove the fake-use IR with no code gen attribute after register
+    //assignment.
+    PosAttrNoCodeGenProc no_code_gen_proc(m_rg, m_pos2attr, m_lsra);
+    no_code_gen_proc.process();
+}
+//END FakeIRMgr
+
+
+//
+//START LTInterfGraph
+//
+void LTInterfGraphLSRAChecker::build()
+{
+    erase();
+    LTListIter it1;
+    LTList const& ltlst = m_lt_mgr.getLTList();
+    for (LifeTime * lt1 = ltlst.get_head(&it1);
+         lt1 != nullptr; lt1 = ltlst.get_next(&it1)) {
+        addVertex(lt1->getPrno());
+        LTListIter it2;
+        for (LifeTime * lt2 = ltlst.get_head(&it2);
+             lt2 != nullptr; lt2 = ltlst.get_next(&it2)) {
+            if (lt1->getPrno() == lt2->getPrno()) { continue; }
+            if (lt1->is_intersect(lt2)) {
+                addEdge(lt1->getPrno(), lt2->getPrno());
+                continue;
+            }
+            addVertex(lt2->getPrno());
+        }
+    }
+}
+
+
+bool LTInterfGraphLSRAChecker::check(LinearScanRA * lsra)
+{
+    //Build the interference graph first.
+    build();
+
+    //Check the LSRA result by the following steps on the interference graph:
+    // 1. Traverse each edge of the interference graph.
+    // 2. If the regsiters assigned to the src node and dst node is the ZERO
+    //    register, check the next edge.
+    // 3. If the prno responding to the src or dst node is not participated
+    //    into the LSRA (e.g: callee saved registers), or the lifetime has
+    //    no def occurence, check the next edge.
+    xcom::EdgeIter it;
+    for (xcom::Edge * e = get_first_edge(it); e != nullptr;
+         e = get_next_edge(it)) {
+        ASSERT0(e->from()->id() != PRNO_UNDEF);
+        ASSERT0(e->to()->id() != PRNO_UNDEF);
+        ASSERT0(e->from() != e->to());
+        if (lsra->getReg(e->from()->id()) == lsra->getZeroScalar() ||
+            lsra->getReg(e->from()->id()) == lsra->getZeroVector() ||
+            lsra->getReg(e->to()->id()) == lsra->getZeroScalar() ||
+            lsra->getReg(e->to()->id()) == lsra->getZeroVector()) {
+           //Implemented the step 2 above.
+           continue;
+        }
+        if (!m_lt_mgr.getLifeTime(e->from()->id()) ||
+            !m_lt_mgr.getLifeTime(e->from()->id())->isOccHasDef() ||
+            !m_lt_mgr.getLifeTime(e->to()->id()) ||
+            !m_lt_mgr.getLifeTime(e->to()->id())->isOccHasDef()) {
+            //Implemented the step 3 above.
+            continue;
+        }
+        ASSERT0(lsra->getReg(e->from()->id()) != lsra->getReg(e->to()->id()));
+    }
+    return true;
+}
+//END LTInterfGraph
+
+
+//
+//START IRGroup
+//
+void IRGroup::modifyIRVar(Var const* v)
+{
+    ASSERT0(v);
+    Var * var = const_cast<Var*>(v);
+    for (UINT i = 0; i < getIRCnt(); i++) {
+        IR * ir = irvec.get(i);
+        if (ir->is_st()) {
+            ir->setIdinfo(var);
+            continue;
+        }
+        ASSERT0(ir->is_stpr());
+        ir->getRHS()->setIdinfo(var);
+    }
+}
+
+
+void IRGroup::renameIRVar()
+{
+    ASSERT0(tmp_var);
+    modifyIRVar(tmp_var);
+}
+
+
+void IRGroup::revertIRVar()
+{
+    ASSERT0(org_var);
+    modifyIRVar(org_var);
+}
+
+
+void IRGroup::dump(Region * rg) const
+{
+    note(rg, "\n    IRGroup:IR num:%u,weight:%u,vid = %u,temp_vid:%u,reg:%u",
+        getIRCnt(), weight, org_var->id(), tmp_var ? tmp_var->id() : 0, reg);
+    note(rg, "[");
+    for (VecIdx j = 0; j < (VecIdx)irvec.get_elem_count(); j++) {
+        note(rg, "id:%u", irvec.get(j)->id());
+        if (irvec.get(j)->is_st()) {
+            note(rg, "(st)");
+        } else if (irvec.get(j)->is_stpr()) {
+            note(rg, "(ld)");
+        } else {
+            ASSERT0(0);
+        }
+        if (j != (VecIdx)irvec.get_elem_count() - 1) {
+            note(rg, ", ");
+        }
+    }
+    note(rg, "]");
+}
+//END IRGroup
+
+
+//
+//START VarGroups
+//
+void VarGroups::dump(Region * rg) const
+{
+    rg->getLogMgr()->incIndent(2);
+    note(rg, "\n===Dump VarGroups===");
+    note(rg, "\nGroup_number = %u, is_full:%d", getGroupNum(),
+         isFullGroup());
+    rg->getLogMgr()->decIndent(2);
+    for (VecIdx i = 0; i < (VecIdx)getGroupNum(); i++) {
+        note(rg, "\n  Sub Group id:%u", i);
+        IRGroup * irgp = m_groups->get(i);
+        irgp->dump(rg);
+    }
+}
+//END VarGroups
+
+
+//
+//START SpillReloadPromote
+//
+SpillReloadPromote::SpillReloadPromote(Region * rg, LinearScanRA * ra,
+    RegSetImpl & rsimpl) : m_rg(rg), m_lsra(ra), m_rsimpl(rsimpl),
+    m_mdssamgr(nullptr), m_var_liveness_mgr(rg, *ra),
+    m_var_ltmgr(rg, *ra, &m_var_liveness_mgr)
+{
+    ASSERT0(rg != nullptr);
+    m_bb_list = m_rg->getBBList();
+}
+
+
+SpillReloadPromote::~SpillReloadPromote()
+{
+    //Free the resources allocated.
+    for (VarGroups * vargps = m_vargroups_list.get_head(); vargps != nullptr;
+         vargps = m_vargroups_list.get_next()) {
+        delete vargps;
+    }
+    for (IRGroup * irgp = m_irgroup_list.get_head(); irgp != nullptr;
+         irgp = m_irgroup_list.get_next()) {
+        delete irgp;
+    }
+}
+
+
+void SpillReloadPromote::dumpFullGroup() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(m_rg, "\n===Dump FULL GROUPS===");
+    note(m_rg, "\nvar number = %u", m_full_groups.get_elem_count());
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    note(m_rg, "\nVar Groups Map:\n");
+    for (Var const* v = m_full_groups.get_first(it, &gps); gps != nullptr;
+         v = m_full_groups.get_next(it, &gps)) {
+        note(m_rg, "\n==Groups for var:[%s,%u]==", v->get_name()->getStr(),
+            v->id());
+        gps->dump(m_rg);
+    }
+}
+
+
+void SpillReloadPromote::dumpPartialGroup() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    note(m_rg, "\n===Dump PART GROUPS===");
+    note(m_rg, "\nvar number = %u", m_part_groups.get_elem_count());
+    note(m_rg, "\nVar Groups Map:\n");
+    for (Var const* v = m_part_groups.get_first(it, &gps); gps != nullptr;
+         v = m_part_groups.get_next(it, &gps)) {
+        note(m_rg, "\n==Groups for var:[%s,%u]==", v->get_name()->getStr(),
+            v->id());
+        gps->dump(m_rg);
+    }
+}
+
+
+void SpillReloadPromote::dumpSingleGroup() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    note(m_rg, "\n===Dump SINGLE GROUPS===");
+    note(m_rg, "\nvar number = %u", m_single_groups.get_elem_count());
+    note(m_rg, "\nVar Groups Map:\n");
+    for (Var const* v = m_single_groups.get_first(it, &gps); gps != nullptr;
+         v = m_single_groups.get_next(it, &gps)) {
+        note(m_rg, "\n==Groups for var:[%s,%u]==", v->get_name()->getStr(),
+            v->id());
+        gps->dump(m_rg);
+    }
+}
+
+
+void SpillReloadPromote::dump() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    dumpFullGroup();
+    dumpPartialGroup();
+    dumpSingleGroup();
+}
+
+
+void SpillReloadPromote::genDUInfo(OptCtx & oc)
+{
+    ASSERT0(m_rg->getCFG()->verifyRPO(oc));
+    ASSERT0(m_rg->getCFG()->verifyDomAndPdom(oc));
+    ASSERT0(oc.is_rpo_valid());
+    ASSERT0L3(m_rg->getCFG()->verifyLoopInfo(oc));
+    ASSERT0(oc.is_loopinfo_valid());
+
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
+        PASS_LOOP_INFO, PASS_UNDEF);
+
+    //FIXME START
+    //Need the previous PASS to revise the following PASS_AA, PASS_MD_REF
+    //information.
+    bool do_aa = g_do_aa;
+    bool do_md_du_analysis = g_do_md_du_analysis;
+    bool compute_pr_du_chain = g_compute_pr_du_chain;
+    bool compute_nonpr_du_chain = g_compute_nonpr_du_chain;
+    bool compute_pr_du_chain_by_prssa = g_compute_pr_du_chain_by_prssa;
+
+    g_do_aa = true;
+    g_do_md_du_analysis = true;
+    g_compute_pr_du_chain = true;
+    g_compute_nonpr_du_chain = false;
+    g_compute_pr_du_chain_by_prssa = true;
+    oc.setInvalidPass(PASS_PRLIVENESS_MGR);
+    oc.setInvalidPass(PASS_AA);
+    oc.setInvalidPass(PASS_MD_REF);
+    m_rg->doAA(oc);
+    m_rg->doMDRefAndClassicDU(oc);
+
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->registerPass(
+        PASS_MDSSA_MGR);
+    m_mdssamgr->destruction(oc);
+    m_mdssamgr->construction(oc);
+    ASSERT0(oc.isPassValid(PASS_MDSSA_MGR));
+    g_do_aa = do_aa;
+    g_do_md_du_analysis = do_md_du_analysis;
+    g_compute_pr_du_chain = compute_pr_du_chain;
+    g_compute_nonpr_du_chain = compute_nonpr_du_chain;
+    g_compute_pr_du_chain_by_prssa = compute_pr_du_chain_by_prssa;
+}
+
+
+void SpillReloadPromote::doFullGroupSpillIR(IR const* ir)
+{
+    ASSERT0(ir);
+    ASSERT0(m_lsra->isSpillOp(ir));
+    Var const* var = ST_idinfo(ir);
+    ASSERT0(var);
+
+    VarGroups * var_groups = getAndGenVarFullGroups(var);
+    IRGroup * irgp = getAndGenIRGroupFromFullGroup(var_groups, var);
+    irgp->addIR(ir);
+}
+
+
+void SpillReloadPromote::doFullGroupReloadIR(IR const* ir)
+{
+    ASSERT0(ir);
+    ASSERT0(m_lsra->isReloadOp(ir));
+    Var const* var = LD_idinfo(ir->getRHS());
+    ASSERT0(var);
+
+    VarGroups * var_groups = getAndGenVarFullGroups(var);
+    IRGroup * irgp = getAndGenIRGroupFromFullGroup(var_groups, var);
+    irgp->addIR(ir);
+}
+
+
+void SpillReloadPromote::groupFully()
+{
+    for (IRBB * bb = m_bb_list->get_head(); bb != nullptr;
+         bb = m_bb_list->get_next()) {
+        for (IR * ir = BB_irlist(bb).get_head();
+             ir != nullptr; ir = BB_irlist(bb).get_next()) {
+            if (!m_lsra->isSpillOp(ir) && !m_lsra->isReloadOp(ir)) { continue; }
+            if (m_lsra->isSpillOp(ir)) {
+                doFullGroupSpillIR(ir);
+                continue;
+            }
+            doFullGroupReloadIR(ir);
+        }
+    }
+}
+
+
+bool SpillReloadPromote::getRegToCoverRange(Range const& tgt_range,
+    Type const* reg_ty, OUT Reg & best_reg, MOD xcom::TTab<Reg> & reg_tab)
+{
+    ASSERT0(reg_ty);
+    //There may be more than one reg that meet the requirements. Thus this
+    //function will find out all RangeInfo which contain resulted reg and
+    //record to the 'reg_tab'.
+    UINT min_dis = m_lsra->getRegLTMgr().getMaxPos();
+
+    //Get the best reg according to specific Range. If all the ranges of the
+    //lifetime of a reg aren't intersect with the 'tgt_range', it represents
+    //this reg could be allocated to the 'tgt_range'. There may be more than
+    //one reg that can allocated to this 'tgt_range' at the same time. Then
+    //the distance between 'tgt_range' and other ranges in the lifetime of the
+    //reg will be used as a decision maker. The shortest distance is regarded
+    //as the best choice.
+    //e.g.:
+    // tgt_range    |            -----                     |
+    // r1 range vec |  ---   ---       -    ---  --   ---  |
+    // r2 range vec | -  --- -               ---- -----    |
+    // r3 range vec | ---                            ----- |
+    // And the best reg is 'r1'.
+
+    //1.Collect all intervals of all regs.
+    PRNO2LT const& reg2lt = m_lsra->getRegLTMgr().getReg2LT();
+    for (Reg r = 0; r < reg2lt .get_elem_count(); r++) {
+        LifeTime * lt = reg2lt.get(r);
+        if (lt == nullptr || !m_rsimpl.isRegTypeMatch(reg_ty, r)) { continue; }
+
+        //2.Find the interval that can hold the 'tgt_range' in the lifetime of
+        //  the reg, and calculate the distance between 'tgt_range' and other
+        //  ranges in the lifetime.
+        for (UINT i = 0; i < lt->getRangeNum(); i++) {
+            Range range = lt->getRange((VecIdx)i);
+            //Case: 'tgt_range.end < range.start', the distance includes two
+            //       parts as below.
+            //  RangeVec:  |          [S E] [S E] |
+            //  tgt_range: |   [S E]              |
+            //               ^       ^
+            //               |       |
+            //             dis_1   dis_2
+            if (i == 0 && (range.start() > tgt_range.end())) {
+                UINT dis = range.start() - tgt_range.end();
+                dis += tgt_range.start() - REGION_START_POS - 1;
+                if (min_dis > dis) {
+                    min_dis = dis;
+                    best_reg = r;
+                }
+                reg_tab.append(r);
+                break;
+            }
+
+            //Case: 'prev_range.end < start tgt_range end < range.start'.
+            //       The distance includes two parts as below:
+            //  prev_range:|[S E]                  |
+            //  tgt_range: |        [S E]          |
+            //  range:     |                 [S E] |
+            //                    ^        ^
+            //                    |        |
+            //                  dis_1    dis_2
+            if (i > 0) {
+                Range prev_range = lt->getRange((VecIdx)(i - 1));
+                if (prev_range.end() < tgt_range.start() &&
+                    range.start() > tgt_range.end()) {
+                    ASSERT0(prev_range.is_less(tgt_range));
+                    UINT dis = tgt_range.start() - prev_range.end();
+                    dis += range.start() - tgt_range.end();
+                    if (min_dis > dis) {
+                        min_dis = dis;
+                        best_reg = r;
+                    }
+                    reg_tab.append(r);
+                    break;
+                }
+            }
+
+            //Case: 'range.end < tgt_range.start', the distance includes two
+            //      parts as below:
+            //  tgt_range: |        [S E]     |
+            //  range    : | [S E]            |
+            //                     ^        ^
+            //                     |        |
+            //                  dis_1    dis_2
+            if (i == (UINT)lt->getLastRangeIdx() &&
+                range.end() < tgt_range.start()) {
+                UINT dis = tgt_range.start() - range.end();
+                dis += m_lsra->getRegLTMgr().getMaxPos() - tgt_range.end();
+                if (min_dis > dis) {
+                    min_dis = dis;
+                    best_reg = r;
+                }
+                reg_tab.append(r);
+                break;
+            }
+        }
+    }
+
+    //3.There isn't any reg that can hold this 'tgt_range'.
+    if (reg_tab.get_elem_count() == 0) { return false; }
+    return true;
+}
+
+
+bool SpillReloadPromote::getBestRegToAccommodateRange(
+    RangeVec const& rv, Type const* ty, OUT Reg & best_reg,
+    MOD xcom::TTab<Reg> & reg_tab)
+{
+    ASSERT0(ty);
+    ASSERT0(rv.get_elem_count() > 0);
+    reg_tab.clean();
+
+    //Construct a range to include the positions in 'rv'.
+    UINT start = rv.get(0).start();
+    UINT end = rv.get(rv.get_last_idx()).end();
+    Range full_range(start, end);
+
+    //First, try to find if there is any register can hold the full range of
+    //the 'rv'.
+    bool find = getRegToCoverRange(full_range, ty, best_reg, reg_tab);
+
+    //Second, find the register can interleaves with the separate
+    //range in the range vector, we will drop the best register found before,
+    //because the 'hole' of resgiter is fully utilized, we have a better usage
+    //of the register.
+    //e.g: r2 is better than r1 to hold the target range vector.
+    // target range vec|            -----       ---           |
+    // r1 range vec    |  ---   ---                      ---  |
+    // r2 range vec    | -  --- -          ---        -----   |
+    PRNO2LT const& reg2lt = m_lsra->getRegLTMgr().getReg2LT();
+    for (Reg r = 0; r < reg2lt.get_elem_count(); r++) {
+        if (reg_tab.find(r)) { continue; }
+        LifeTime * lt = reg2lt.get(r);
+        if (lt == nullptr || !m_rsimpl.isRegTypeMatch(ty, r)) { continue; }
+        if (!lt->is_intersect(rv)) {
+            best_reg = r;
+            return true;
+        }
+    }
+    return find;
+}
+
+
+void SpillReloadPromote::promoteReloadOpByReg(IR * curir, Reg r, PRNO pr)
+{
+    ASSERT0(curir);
+    ASSERT0(m_lsra->isReloadOp(curir));
+    ASSERT0(r != REG_UNDEF);
+    ASSERT0(pr != PRNO_UNDEF);
+    PRNO dstpr = curir->getPrno();
+    IR * stpr = m_rg->getIRMgr()->buildMove(dstpr, pr, curir->getType());
+    m_lsra->setMove(stpr);
+    IRBB * bb = curir->getBB();
+    bb->getIRList().insert_before(stpr, curir);
+    bb->getIRList().remove(curir);
+    m_lsra->removeReloadOp(curir);
+    m_rg->freeIRTree(curir);
+}
+
+
+void SpillReloadPromote::promoteSpillOpByReg(
+    IR * curir, Reg r, PRNO pr, bool remove)
+{
+    ASSERT0(m_lsra->isSpillOp(curir));
+    ASSERT0(r != REG_UNDEF);
+    ASSERT0(pr != PRNO_UNDEF);
+    PRNO srcpr = curir->getRHS()->getPrno();
+    IR * stpr = m_rg->getIRMgr()->buildMove(pr, srcpr, curir->getType());
+    m_lsra->setMove(stpr);
+    IRBB * bb = curir->getBB();
+    bb->getIRList().insert_before(stpr, curir);
+
+    if (!remove) { return; }
+
+    //If this spill is not shared with other reload IR, it should be removed.
+    bb->getIRList().remove(curir);
+    m_lsra->removeSpillOp(curir);
+    m_rg->freeIRTree(curir);
+}
+
+
+UINT SpillReloadPromote::calcWeightForGroup(IRVec const* irvec) const
+{
+    ASSERT0(irvec);
+    LI<IRBB> const* li = m_rg->getCFG()->getLoopInfo();
+    UINT weight = 0;
+    UINT const reload_wt = getTIMgr()->getLoadOnChipMemCycle();
+    UINT const spill_wt = getTIMgr()->getStoreOnChipMemCycle();
+
+    //Calc the weight of group based on the different wreight of spill/reload
+    //IRs, and also consider the loop level.
+    for (VecIdx i = 0; i < (VecIdx)irvec->get_elem_count(); i++) {
+        IR const* ir = irvec->get(i);
+        UINT nestlevel = 0;
+        if (li != nullptr) {
+            li->isInsideLoopTree(ir->getBB()->id(), nestlevel, true);
+        }
+        nestlevel++;
+        if (m_lsra->isReloadOp(irvec->get(i))) {
+            weight += reload_wt;// * nestlevel;
+            continue;
+        }
+        ASSERT0(m_lsra->isSpillOp(irvec->get(i)));
+        weight += spill_wt;// * nestlevel;
+    }
+    return weight;
+}
+
+
+class GroupSort : public xcom::BubbleSort<IRGroup*> {
+    virtual bool GreatThan(IRGroup * A, IRGroup * B) const override
+    { return IRGROUP_weight(A) < IRGROUP_weight(B); }
+};
+
+
+void SpillReloadPromote::sortFullGroup()
+{
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    for (Var const* v = m_full_groups.get_first(it, &gps); gps != nullptr;
+         v = m_full_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        for(UINT i = 0; i < gps->getGroupNum(); i++) {
+            IRGroup * irgp = gps->getIRGroup(i);
+            ASSERT0(irgp);
+            IRGROUP_weight(irgp) = calcWeightForGroup(irgp->getIRVec());
+            addToFullGroupVec(irgp);
+        }
+    }
+    //Sort the group by the order of weight, because we will assign the
+    //register for the group which has the highest weight..
+    GroupSort group_sort;
+    group_sort.sort(m_full_group_vec);
+}
+
+
+void SpillReloadPromote::sortPartialGroup()
+{
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    for (Var const* v = m_part_groups.get_first(it, &gps); gps != nullptr;
+         v = m_part_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        if (gps->isFullGroup()) { continue; }
+        for(UINT i = 0; i < gps->getGroupNum(); i++) {
+            IRGroup * irgp = gps->getIRGroup(i);
+            ASSERT0(irgp);
+            IRGROUP_weight(irgp) = calcWeightForGroup(irgp->getIRVec());
+            addToValidPartialGroup(irgp);
+        }
+    }
+    //Sort the group by the order of weight, because we will assign the
+    //register for the group which has the highest weight..
+    GroupSort group_sort;
+    group_sort.sort(m_valid_partial_groups);
+}
+
+
+void SpillReloadPromote::sortSingleGroup(UINT id)
+{
+    m_valid_single_groups.clean();
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    for (Var const* v = m_single_groups.get_first(it, &gps); gps != nullptr;
+         v = m_single_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        if (gps->isFullGroup()) { continue; }
+        if (id >= gps->getGroupNum()) { continue; }
+        IRGroup * irgp = gps->getIRGroup(id);
+        ASSERT0(irgp);
+        IRGROUP_weight(irgp) = calcWeightForGroup(irgp->getIRVec());
+        addToValidSingleGroup(irgp);
+    }
+    //Sort the group by the order of weight, because we will assign the
+    //register for the group which has the highest weight.
+    GroupSort group_sort;
+    group_sort.sort(m_valid_single_groups);
+}
+
+
+void SpillReloadPromote::promoteSpillReloadForGroup(
+    IRGroup * gp, bool remove_spill)
+{
+    ASSERT0(gp);
+    Reg r = IRGROUP_reg(gp);
+    ASSERT0(r != REG_UNDEF);
+
+    IRVec const* irvec = gp->getIRVec();
+    ASSERT0(irvec);
+    ASSERT0(irvec->get_elem_count() > 1);
+
+    PRNO pr = m_lsra->buildPrnoAndSetReg(IRGROUP_orgvar(gp)->getType(), r);
+    for (VecIdx i = 0; i < (VecIdx)irvec->get_elem_count(); i++) {
+        IR * ir = irvec->get(i);
+        ASSERT0(ir);
+        ASSERT0(m_lsra->isReloadOp(ir) || m_lsra->isSpillOp(ir));
+        if (m_lsra->isSpillOp(ir)) {
+            promoteSpillOpByReg(ir, r, pr, remove_spill);
+            continue;
+        }
+        promoteReloadOpByReg(ir, r, pr);
+    }
+}
+
+
+void SpillReloadPromote::promoteSpillReloadPartialGroup()
+{
+    for (VecIdx i = 0; i < (VecIdx)m_valid_partial_groups.get_elem_count();
+         i++) {
+        IRGroup * gp = m_valid_partial_groups.get(i);
+        ASSERT0(gp);
+        if (IRGROUP_reg(gp) == REG_UNDEF) { continue; }
+        promoteSpillReloadForGroup(gp, false);
+    }
+}
+
+
+void SpillReloadPromote::promoteSpillReloadSingleGroup()
+{
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    for (Var const* v = m_single_groups.get_first(it, &gps); gps != nullptr;
+         v = m_single_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        //If this group is full group, that means it has been try to promote
+        //in full group mode, so we don't need to try again.
+        if (gps->isFullGroup()) { continue; }
+        for (VecIdx i = 0; i < (VecIdx)gps->getGroupNum(); i++) {
+            IRGroup * gp = gps->getIRGroup(i);
+            ASSERT0(gp);
+            if (IRGROUP_reg(gp) == REG_UNDEF) { continue; }
+
+            //Promote for the groups which have been found a proper register
+            //to do the promotion.
+            promoteSpillReloadForGroup(gp, false);
+        }
+    }
+}
+
+
+void SpillReloadPromote::promoteSpillReloadFullGroup()
+{
+    for (VecIdx i = 0; i < (VecIdx)m_full_group_vec.get_elem_count(); i++) {
+        IRGroup * gp = m_full_group_vec.get(i);
+        ASSERT0(gp);
+        IRVec const* irvec = gp->getIRVec();
+        if (irvec->get_elem_count() == 1) {
+            //If the group has only one IR, that means it is useless.
+            addUnusedIR(irvec->get(0));
+            continue;
+        }
+        if (IRGROUP_reg(gp) == REG_UNDEF) { continue; }
+        promoteSpillReloadForGroup(gp, true);
+    }
+}
+
+
+UINT SpillReloadPromote::getMaxSingleGroupNum()
+{
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+    UINT max = 0;
+    for (Var const* v = m_single_groups.get_first(it, &gps); gps != nullptr;
+         v = m_single_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        //Ignore the group of spill var if it is a full group.
+        if (gps->isFullGroup()) { continue; }
+        if (max < gps->getGroupNum()) { max = gps->getGroupNum(); }
+     }
+     return max;
+}
+
+
+Reg SpillReloadPromote::tryAssignRegForGroup(UINT vid, IRVec const* irvec,
+    MOD xcom::TTab<Reg> & reg_tab)
+{
+    ASSERT0(irvec);
+    VarLifeTime * vlt = getVarLTMgr().getLifeTime(vid);
+    ASSERT0(vlt);
+    //If the current group only has one IR, that means this IR is useless,
+    //it should be removed, so it is not necessary to find a register for
+    //this group.
+    if (irvec->get_elem_count() == 1) { return REG_UNDEF; }
+
+    //Check che current vlt is conflict with the var lifetime assigned with
+    //this reg.
+    RangeVec const& range_vec = vlt->getRangeVec();
+    Reg best_reg = REG_UNDEF;
+    bool find = getBestRegToAccommodateRange(range_vec,
+        irvec->get(0)->getType(), best_reg, reg_tab);
+
+    //If there is no suitable register, return.
+    if (!find) { return REG_UNDEF; }
+
+    //Record the regsiter if it is a callee saved.
+    recordCallee(best_reg);
+
+    //Add the live range of the current group to the lifetime of the register
+    //to be promoted.
+    m_lsra->getRegLTMgr().mergeRegLifetimeWIthRange(best_reg, range_vec);
+    return best_reg;
+}
+
+
+void SpillReloadPromote::findRegForFullGroupVars()
+{
+    xcom::TTab<Reg> reg_tab;
+    for (VecIdx i = 0; i < (VecIdx)m_full_group_vec.get_elem_count();
+         i++) {
+        IRGroup * gp = m_full_group_vec.get(i);
+        ASSERT0(gp);
+        Reg r = tryAssignRegForGroup(IRGROUP_orgvar(gp)->id(),
+            gp->getIRVec(), reg_tab);
+        if (r == REG_UNDEF) { continue; }
+        IRGROUP_reg(gp) = r;
+        m_vartab.append(IRGROUP_orgvar(gp));
+    }
+}
+
+
+void SpillReloadPromote::findRegForPartialGroupVars()
+{
+    xcom::TTab<Reg> reg_tab;
+    for (VecIdx i = 0; i < (VecIdx)m_valid_partial_groups.get_elem_count();
+         i++) {
+        IRGroup * gp = m_valid_partial_groups.get(i);
+        ASSERT0(gp);
+        Reg r = tryAssignRegForGroup(IRGROUP_tmpvar(gp)->id(),
+            gp->getIRVec(), reg_tab);
+        if (r == REG_UNDEF) { continue; }
+        IRGROUP_reg(gp) = r;
+    }
+}
+
+
+void SpillReloadPromote::findRegForSingleGroupVars()
+{
+    xcom::TTab<Reg> reg_tab;
+    for (VecIdx i = 0; i < (VecIdx)m_valid_single_groups.get_elem_count();
+         i++) {
+        IRGroup * gp = m_valid_single_groups.get(i);
+        ASSERT0(gp);
+        Reg r = tryAssignRegForGroup(IRGROUP_tmpvar(gp)->id(),
+            gp->getIRVec(), reg_tab);
+        if (r == REG_UNDEF) { continue; }
+        IRGROUP_reg(gp) = r;
+    }
+}
+
+
+void SpillReloadPromote::genVar2DLifeTime(OptCtx & oc)
+{
+    m_var_liveness_mgr.perform(oc);
+    getVarLTMgr().reset();
+    getVarLTMgr().computeLifeTime();
+}
+
+
+IRGroup * SpillReloadPromote::genIRGroupForVar(
+    MOD VarGroups * var_groups, Var const* var)
+{
+    ASSERT0(var_groups && var);
+
+    //Get the current number of element as the new group id.
+    UINT group_id = var_groups->getGroupNum();
+    IRGroup * ir_group = allocIRGroup();
+    IRGROUP_orgvar(ir_group) = var;
+    var_groups->addGroup(group_id, ir_group);
+    return ir_group;
+}
+
+
+void SpillReloadPromote::groupReloadInUseSet(
+    IRSet const& useset, MOD IRGroup * ir_group)
+{
+    ASSERT0(ir_group);
+    IRSetIter it;
+    for (BSIdx i = useset.get_first(&it);
+         i != BS_UNDEF; i = useset.get_next(i, &it)) {
+        IR * use = m_rg->getIR(i);
+        ASSERT0(use && !use->is_undef());
+
+        //Continue if the use is PHI.
+        if (use->is_id()) { continue; }
+
+        IR const* ref_stmt = use->getStmt();
+        ASSERT0(m_lsra->isReloadOp(ref_stmt));
+        ir_group->addIR(ref_stmt);
+    }
+}
+
+
+void SpillReloadPromote::groupIRPartially(IR const* ir, MOD IRSet & useset)
+{
+    ASSERT0(ir);
+    ASSERT0(m_lsra->isSpillOp(ir));
+    ASSERT0(m_mdssamgr && m_mdssamgr->is_valid());
+
+    Var const* var = ST_idinfo(ir);
+    ASSERT0(var);
+
+    //If this var has already been promoted in the full group mode, so it is
+    //not necessary to do the partial group promotion.
+    if (isPromotedInFullGroup(var)) { return; }
+
+    //Do NOT do collection crossing PHI.
+    m_mdssamgr->collectUseSet(ir, COLLECT_IMM_USE, &useset);
+    ASSERT0(useset.allElemBeExp(m_rg));
+
+    //Generate the groups for  var.
+    VarGroups * var_groups = getAndGenVarPartialGroups(var);
+
+    //Check the define of spill var by this spill IR has wether has the
+    //exclude use IR (reload IR) or not, that means this reload IR only
+    //reloads the data from spill var after this spill IR. Because it
+    //is normal that a reload IR may reload the multiple define of spill
+    //var by different spill IRs due to the join of BBs in CFG.
+    bool has_exclude_use = false;
+    IRSetIter it;
+    for (BSIdx i = useset.get_first(&it);
+         i != BS_UNDEF; i = useset.get_next(i, &it)) {
+        IR * use = m_rg->getIR(i);
+        ASSERT0(use && !use->is_undef());
+        //Continue if the use is PHI.
+        if (!use->is_id()) {
+            ASSERT0(m_lsra->isReloadOp(use->getStmt()));
+            has_exclude_use = true;
+            break;
+        }
+    }
+    if (!has_exclude_use) {
+        VARGROUPS_has_all(var_groups) = false;
+        return;
+    }
+
+    //When goes here, that means this spill IR must be assigned a new
+    //group id with its exclusive uses.
+    IRGroup * ir_group = genIRGroupForVar(var_groups, var);
+    ir_group->addIR(ir);
+
+    //Group the use-exps.
+    groupReloadInUseSet(useset, ir_group);
+}
+
+
+void SpillReloadPromote::groupPartially()
+{
+    DefMiscBitSetMgr sm;
+    IRSet useset(sm.getSegMgr());
+    for (IRBB * bb = m_bb_list->get_head(); bb != nullptr;
+         bb = m_bb_list->get_next()) {
+        for (IR * ir = BB_irlist(bb).get_head();
+             ir != nullptr; ir = BB_irlist(bb).get_next()) {
+            if (!m_lsra->isSpillOp(ir)) { continue; }
+            useset.clean();
+            groupIRPartially(ir, useset);
+        }
+    }
+}
+
+
+void SpillReloadPromote::genSingleVarGroupFromPartialIRGroup(
+    IRGroup * irgp, Var const* v)
+{
+    ASSERT0(irgp && v);
+
+    IRVec const* irvec = irgp->getIRVec();
+    VarGroups * var_groups = getAndGenVarSingleGroups(v);
+    IR * spill_ir = nullptr;
+    for (VecIdx j = 0; j < (VecIdx)irgp->getIRCnt(); j++) {
+        IR * cur_ir = irvec->get(j);
+        if (m_lsra->isSpillOp(cur_ir)) {
+            spill_ir = cur_ir;
+            break;
+        }
+    }
+    for (VecIdx j = 0; j < (VecIdx)irgp->getIRCnt(); j++) {
+        IR * cur_ir = irvec->get(j);
+        if (m_lsra->isSpillOp(cur_ir)) {
+            continue;
+        }
+        IRGroup * ir_group = genIRGroupForVar(var_groups, v);
+        ir_group->addIR(spill_ir);
+        ir_group->addIR(cur_ir);
+    }
+}
+
+
+void SpillReloadPromote::groupSingle()
+{
+    Var2GroupsIter it;
+    VarGroups * gps = nullptr;
+
+    //We get the single group of spill var based on the partial group result.
+    //Because after the partial group mode, only the partial groups which were
+    //not promoted with a proper register need to try in the last single group
+    //mode.
+    for (Var const* v = m_part_groups.get_first(it, &gps); gps != nullptr;
+         v = m_part_groups.get_next(it, &gps)) {
+        ASSERT0(v);
+        //Ignore the group of var if it is a full group, because it has been
+        //promoted in full group mode.
+        if (gps->isFullGroup()) { continue; }
+        for(UINT i = 0; i < gps->getGroupNum(); i++) {
+            IRGroup * irgp = gps->getIRGroup(i);
+            ASSERT0(irgp);
+            if (irgp->getIRCnt() <= 2) {
+                //If the IR number in a group is less than 2, that means the
+                //spill or reload is not paired, it is useless, should be
+                //removed. If it is equal to 2, that means it is same as the
+                //single group, it has been tried on partial group mode.
+                continue;
+            }
+            if (IRGROUP_reg(irgp) != REG_UNDEF) {
+                //If it has been promoted in partial group mode, which means
+                //a proper register has been assigned to this group, we can
+                //ignore this group in single mode.
+                continue;
+             }
+
+            //When goes here, we only process the partial group with IR count
+            //greater than 2.
+            //Gen the groups for the var.
+            genSingleVarGroupFromPartialIRGroup(irgp, v);
+        }
+    }
+}
+
+
+void SpillReloadPromote::renameIRVar()
+{
+    xcom::Vector<IRGroup*> const* ir_gps = getIRGroups();
+    ASSERT0(ir_gps);
+    for (VecIdx i = 0; i < (VecIdx)ir_gps->get_elem_count(); i++) {
+        IRGroup * irgp = ir_gps->get(i);
+        Type const* ty = IRGROUP_orgvar(irgp)->getType();
+        Var const* tmp = m_lsra->genFuncLevelVar(ty,
+            m_rg->getTypeMgr()->getByteSize(ty));
+        IRGROUP_tmpvar(irgp) = tmp;
+        irgp->renameIRVar();
+    }
+}
+
+
+void SpillReloadPromote::revertIRVar()
+{
+    xcom::Vector<IRGroup*> const* ir_gps = getIRGroups();
+    ASSERT0(ir_gps);
+    for (VecIdx i = 0; i < (VecIdx)ir_gps->get_elem_count(); i++) {
+        IRGroup * irgp = ir_gps->get(i);
+        irgp->revertIRVar();
+    }
+}
+
+
+void SpillReloadPromote::destroyTmpVar()
+{
+    for (VecIdx i = 0; i < (VecIdx)m_valid_partial_groups.get_elem_count();
+         i++) {
+        IRGroup const* irgp = m_valid_partial_groups.get(i);
+        Var * tmp = const_cast<Var*>(IRGROUP_tmpvar(irgp));
+        ASSERT0(tmp);
+        m_rg->getVarMgr()->destroyVar(tmp);
+    }
+}
+
+
+void SpillReloadPromote::doPartialGroup(OptCtx & oc)
+{
+    setGroupMode(GROUP_MODE_PART);
+    genDUInfo(oc);
+    groupPartially();
+    sortPartialGroup();
+    renameIRVar();
+    genVar2DLifeTime(oc);
+    findRegForPartialGroupVars();
+    revertIRVar();
+}
+
+
+void SpillReloadPromote::doSingleGroup(OptCtx & oc)
+{
+    setGroupMode(GROUP_MODE_SINGLE);
+    groupSingle();
+    for (UINT id = 0; id < getMaxSingleGroupNum(); id++) {
+        sortSingleGroup(id);
+        renameIRVar();
+        genVar2DLifeTime(oc);
+        findRegForSingleGroupVars();
+        revertIRVar();
+    }
+}
+
+
+void SpillReloadPromote::removeUnusedIR()
+{
+    for(VecIdx i = 0; i < (VecIdx)m_unused_irs.get_elem_count(); i++) {
+        IR * ir = m_unused_irs.get(i);
+        ASSERT0(ir);
+        IRBB * bb = ir->getBB();
+        bb->getIRList().remove(ir);
+        if (m_lsra->isSpillOp(ir)) {
+            m_lsra->removeSpillOp(ir);
+        } else if (m_lsra->isReloadOp(ir)) {
+            m_lsra->removeReloadOp(ir);
+        } else {
+            UNREACHABLE();
+        }
+        m_rg->freeIRTree(ir);
+    }
+}
+
+
+void SpillReloadPromote::doFullGroup(OptCtx & oc)
+{
+    setGroupMode(GROUP_MODE_FULL);
+    groupFully();
+    sortFullGroup();
+    genVar2DLifeTime(oc);
+    findRegForFullGroupVars();
+}
+
+
+bool SpillReloadPromote::perform(OptCtx & oc)
+{
+    START_TIMER(t, "SpillReloadPromote");
+    //Do the group first.
+    doFullGroup(oc);
+    doPartialGroup(oc);
+    doSingleGroup(oc);
+
+    //Do the promote after group.
+    promoteSpillReloadFullGroup();
+    promoteSpillReloadPartialGroup();
+    promoteSpillReloadSingleGroup();
+
+    //Remove the unsed spill or reload IRs.
+    removeUnusedIR();
+    destroyTmpVar();
+    oc.setInvalidPRSSA();
+    oc.setInvalidMDSSA();
+
+    END_TIMER(t, "SpillReloadPromote");
+    ASSERT0L3(m_rg->getCFG()->verifyLoopInfo(oc));
+    ASSERT0(oc.is_loopinfo_valid());
+    return m_unused_irs.get_elem_count() > 0;
+}
+//END SpillReloadPromote
+
+
+//
 //START LinearScanRA
 //
 LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
@@ -1773,26 +2486,31 @@ LinearScanRA::LinearScanRA(Region * rg) : Pass(rg), m_act_mgr(rg)
     m_cfg = nullptr;
     m_bb_list = nullptr;
     m_irmgr = rg->getIRMgr();
-    m_lt_mgr = new LifeTimeMgr(rg);
     m_func_level_var_count = 0;
     m_is_apply_to_region = false;
     m_is_fp_allocable_allowed = true;
+    m_lt_mgr = nullptr;
+
+    //Since some passes, such as ArgPass, might invoke the
+    //APIs of LifeTimeMgr before LSRA's perform(), we initialize the
+    //LifeTimeMgr ahead of time here.
+    initLTMgr();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // DO NOT ALLOCATE CLASS MEMBER HERE. INITIALIZE THEM AFTER ApplyToRegion.//
+    ////////////////////////////////////////////////////////////////////////////
     m_lt_constraints_strategy = nullptr;
     m_lt_constraints_mgr = nullptr;
+    m_fake_irmgr = nullptr;
+    ////////////////////////////////////////////////////////////////////////////
+    // DO NOT ALLOCATE CLASS MEMBER HERE. INITIALIZE THEM AFTER ApplyToRegion.//
+    ////////////////////////////////////////////////////////////////////////////
 }
 
 
 LinearScanRA::~LinearScanRA()
 {
-    delete m_lt_mgr;
-    if (m_lt_constraints_mgr != nullptr) {
-        delete m_lt_constraints_mgr;
-        m_lt_constraints_mgr = nullptr;
-    }
-    if (m_lt_constraints_strategy != nullptr) {
-        delete m_lt_constraints_strategy;
-        m_lt_constraints_strategy = nullptr;
-    }
+    destroy();
 }
 
 
@@ -1808,11 +2526,54 @@ bool LinearScanRA::isCalleePermitted(LifeTime const* lt) const
 }
 
 
+void LinearScanRA::initLocalUsage()
+{
+    initFakeIRMgr();
+}
+
+
+void LinearScanRA::destroy()
+{
+    destroyLocalUsage();
+    if (m_lt_mgr != nullptr) {
+        delete m_lt_mgr;
+        m_lt_mgr = nullptr;
+    }
+    if (m_reg_lt_mgr != nullptr) {
+        delete m_reg_lt_mgr;
+        m_reg_lt_mgr = nullptr;
+    }
+}
+
+
+void LinearScanRA::destroyLocalUsage()
+{
+    //NOTE:Since other passes, such as ProEpiInserter, might invoke the
+    //APIs of LifeTimeMgr, we retain the LifeTimeMgr untill the
+    //pass object destroy.
+    //if (m_lt_mgr != nullptr) {
+    //    delete m_lt_mgr;
+    //    m_lt_mgr = nullptr;
+    //}
+    if (m_fake_irmgr != nullptr) {
+        delete m_fake_irmgr;
+        m_fake_irmgr = nullptr;
+    }
+    if (m_lt_constraints_mgr != nullptr) {
+        delete m_lt_constraints_mgr;
+        m_lt_constraints_mgr = nullptr;
+    }
+    if (m_lt_constraints_strategy != nullptr) {
+        delete m_lt_constraints_strategy;
+        m_lt_constraints_strategy = nullptr;
+    }
+}
+
+
 //Reset all resource before allocation.
 void LinearScanRA::reset()
 {
     getTIMgr().reset();
-    getLTMgr().reset();
     m_prno2reg.clean();
     m_unhandled.clean();
     m_handled.clean();
@@ -1824,22 +2585,22 @@ void LinearScanRA::reset()
     m_move_tab.clean();
     m_prno2var.clean();
     m_act_mgr.clean();
-    m_bb_seqid.clean();
     if (getLTConstraintsMgr() != nullptr) {
         getLTConstraintsMgr()->reset();
     }
-}
-
-
-void LinearScanRA::assignLexSeqIdForBB()
-{
-    //Iterate BB list.
-    BBListIter bbit;
-    UINT id = 0;
-    for (IRBB * bb = m_bb_list->get_head(&bbit); bb != nullptr;
-         bb = m_bb_list->get_next(&bbit)) {
-        m_bb_seqid.set(bb->id(), id++);
+    if (m_lt_mgr != nullptr) {
+        m_lt_mgr->reset();
     }
+    if (m_reg_lt_mgr != nullptr) {
+        m_reg_lt_mgr->reset();
+    }
+
+    //Set attributes obtained from other passes.
+    DynamicStack * dynamic_stack = (DynamicStack*)m_rg->getPassMgr()->
+        queryPass(PASS_DYNAMIC_STACK);
+    ASSERT0(dynamic_stack);
+    m_has_alloca = dynamic_stack->hasAlloca();
+    m_may_need_to_realign_stack = dynamic_stack->mayRealignStack();
 }
 
 
@@ -1881,31 +2642,48 @@ Var * LinearScanRA::getSpillLoc(Type const* ty)
     return v;
 }
 
+//Return physical register by given pre-assigned prno.
+Reg LinearScanRA::getPreAssignedReg(PRNO prno) const
+{
+    Reg r = const_cast<LinearScanRA*>(this)->m_preassigned_mgr.get(prno);
+    if (r != REG_UNDEF) {
+        return r;
+    }
+    return const_cast<LinearScanRA*>(this)->m_dedicated_mgr.get(prno);
+}
+
 
 PRNO LinearScanRA::buildPrnoDedicated(Type const* type, Reg reg)
 {
     ASSERT0(type);
-    ASSERT0(reg != REG_UNDEF);
-    PRNO prno = getSpecialDedicatedPrno(type, reg);
+    ASSERT0(reg != REG_UNDEF && isDedicatedReg(reg));
+    PRNO prno = getDedicatedPRNO(reg);
     if (prno != PRNO_UNDEF) { return prno; }
     ASSERT0(m_irmgr);
     prno = m_irmgr->buildPrno(type);
-    setDedicatedReg(prno, reg);
-    recordSpecialDedicatedPrno(type, reg, prno);
+    setPreAssignedReg(prno, reg);
     return prno;
 }
 
 
-PRNO LinearScanRA::buildPrno(Type const* type, Reg reg)
+PRNO LinearScanRA::buildPrnoPreAssigned(Type const* type, Reg reg)
 {
     ASSERT0(type);
     ASSERT0(reg != REG_UNDEF);
-    PRNO prno = getSpecialDedicatedPrno(type, reg);
-    if (prno != PRNO_UNDEF) { return prno; }
+    ASSERT0(m_irmgr);
+    PRNO prno = m_irmgr->buildPrno(type);
+    setPreAssignedReg(prno, reg);
+    return prno;
+}
 
-    prno = m_irmgr->buildPrno(type);
+
+PRNO LinearScanRA::buildPrnoAndSetReg(Type const* type, Reg reg)
+{
+    ASSERT0(type);
+    ASSERT0(reg != REG_UNDEF);
+    PRNO prno = isDedicatedReg(reg) ? buildPrnoDedicated(type, reg) :
+        buildPrnoPreAssigned(type, reg);
     setReg(prno, reg);
-    recordSpecialDedicatedPrno(type, reg, prno);
     return prno;
 }
 
@@ -2036,6 +2814,28 @@ LifeTime * LinearScanRA::getLT(PRNO prno) const
 }
 
 
+void LinearScanRA::removeOpInPosGapRecord(IR const* ir)
+{
+    ASSERT0(isOpInPosGap(ir));
+    if (isSpillOp(ir)) {
+        removeSpillOp(const_cast<IR*>(ir));
+        return;
+    }
+    if (isMoveOp(ir)) {
+        removeMoveOp(const_cast<IR*>(ir));
+        return;
+    }
+    if (isReloadOp(ir)) {
+        removeReloadOp(const_cast<IR*>(ir));
+        return;
+    }
+    if (isRematOp(ir)) {
+        removeRematOp(const_cast<IR*>(ir));
+        return;
+    }
+}
+
+
 //The function check the uniquenuess of four LT list that used in RA.
 bool LinearScanRA::verify4List() const
 {
@@ -2076,8 +2876,8 @@ bool LinearScanRA::verify4List() const
 
 //The function check whether 'lt' value is simple enough to rematerialize.
 //And return the information through rematctx.
-bool LinearScanRA::checkLTCanBeRematerialized(MOD LifeTime * lt,
-                                              OUT RematCtx & rematctx)
+bool LinearScanRA::checkLTCanBeRematerialized(
+    MOD LifeTime * lt, OUT RematCtx & rematctx)
 {
     //Target Dependent Code.
     ASSERT0(lt);
@@ -2167,6 +2967,37 @@ void LinearScanRA::dump4List() const
 }
 
 
+void LinearScanRA::dumpDOTWithReg() const
+{
+    dumpDOTWithReg((CHAR const*)nullptr, IRCFG::DUMP_COMBINE);
+}
+
+
+void LinearScanRA::dumpDOTWithReg(CHAR const* name, UINT flag) const
+{
+    class DumpPRWithReg : public IRDumpAttrBaseFunc {
+    public:
+        LinearScanRA const* lsra;
+    public:
+        virtual void dumpAttr(
+            OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
+            DumpFlag dumpflag) const override
+        {
+            if (!ir->isPROp()) { return; }
+            Reg r = lsra->getReg(ir->getPrno());
+            if (r == REG_UNDEF) { return; }
+            buf.strcat(" (%s)", lsra->getRegName(r));
+        }
+    };
+    DumpPRWithReg df;
+    df.lsra = this;
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
+    IRDumpCtx<> ctx(4, f, nullptr, &df);
+    ASSERT0(m_cfg && m_cfg->is_valid());
+    m_cfg->dumpDOT(name, flag, &ctx);
+}
+
+
 void LinearScanRA::dumpBBListWithReg() const
 {
     class DumpPRWithReg : public IRDumpAttrBaseFunc {
@@ -2233,7 +3064,7 @@ bool LinearScanRA::dump(bool dumpir) const
     //---------
     LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
     pthis->getTIMgr().dump(m_rg);
-    m_dedicated_mgr.dump(m_rg, pthis->getTIMgr());
+    m_preassigned_mgr.dump(m_rg, pthis->getTIMgr());
     UpdatePos up(this);
     pthis->getLTMgr().dumpAllLT(up, m_bb_list, dumpir);
     dumpPR2Reg();
@@ -2320,7 +3151,7 @@ void LinearScanRA::recalculateSSA(OptCtx & oc) const
 
 
 void LinearScanRA::collectDedicatedPR(BBList const* bblst,
-                                      OUT DedicatedMgr & mgr)
+                                      OUT PreAssignedMgr & mgr)
 {
     //Target Depedent Code.
     //e.g: designate $3 have to be allocate physical register REG-5.
@@ -2352,7 +3183,8 @@ IR * LinearScanRA::doSwapByReg(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
     ASSERT0(ty1_tmp && ty2_tmp);
 
     //Move the data from the reg of src_prno_with_r1 to the reg of temp.
-    PRNO tmpprno = buildPrno(ty1_tmp, getTempReg(ty1_tmp));
+    Reg tr = getTempReg(ty1_tmp);
+    PRNO tmpprno = buildPrnoAndSetReg(ty1_tmp, tr);
     IR * stpr1 = m_irmgr->buildMove(tmpprno, src_prno_with_r1, ty1_tmp);
 
     //Move the data from the reg of src_prno_with_r2 to the reg of
@@ -2468,9 +3300,17 @@ IR * LinearScanRA::insertIRToSwap(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
 PRNO LinearScanRA::getAnctPrno(PRNO prno) const
 {
     ASSERT0(prno != PRNO_UNDEF);
+    ASSERTN(m_lt_mgr, ("LifeTimeMgr is not initialized"));
     LifeTime const* lt = m_lt_mgr->getLifeTime(prno);
     if (lt == nullptr ) { return prno; }
     return lt->getAnctPrno();
+}
+
+
+bool LinearScanRA::isFPAllocable() const
+{
+    return !g_force_use_fp_as_sp && !xoc::g_debug && !hasAlloca() &&
+        canPreservedFPInAlignStack() && isFPAllocableAllowed();
 }
 
 
@@ -2515,33 +3355,12 @@ bool LinearScanRA::performLsraImpl(OptCtx & oc)
 }
 
 
-void LinearScanRA::reuseStackSlot(bool is_vector)
-{
-    VarCheck::setVarCheckCondition(is_vector);
-    LSRAVarLivenessMgr var_liveness_mgr(m_rg, *this);
-    var_liveness_mgr.perform();
-
-    VarLifeTimeMgr var_ltmgr(m_rg, *this, &var_liveness_mgr);
-    var_ltmgr.computeLifeTime();
-    var_ltmgr.computeAccuLifeTime();
-
-    VarInterfGraph interf(m_rg, var_ltmgr);
-    if (xoc::g_interference_graph_stack_slot_color) {
-        interf.color();
-    } else {
-        interf.colorFast();
-    }
-    interf.rewrite();
-}
-
-
 void LinearScanRA::scanIRAndSetConstraints()
 {
     if (m_lt_constraints_strategy == nullptr) {
         ASSERT0(m_lt_constraints_mgr == nullptr);
         return;
     }
-
     BBList * bb_list = this->getBBList();
     ASSERT0(bb_list);
     BBListIter bb_it;
@@ -2661,13 +3480,77 @@ void LinearScanRA::genRematInfo()
 }
 
 
-void LinearScanRA::setAttr()
+void LinearScanRA::generateRegLifeTime(OptCtx & oc)
 {
-    DynamicStack * dynamic_stack = (DynamicStack*)m_rg->getPassMgr()->
-        queryPass(PASS_DYNAMIC_STACK);
-    ASSERT0(dynamic_stack);
-    m_has_alloca = dynamic_stack->hasAlloca();
-    m_may_need_to_realign_stack = dynamic_stack->mayRealignStack();
+    oc.setInvalidPass(PASS_PRLIVENESS_MGR);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_RPO, PASS_DOM, PASS_PRLIVENESS_MGR, PASS_UNDEF);
+
+    //Compute the lifetime firstly.
+    VarUpdatePos up(this);
+    getRegLTMgr().computeLifeTime(up, m_bb_list, m_preassigned_mgr);
+
+    //Save the map between register and it's corresponded lifetime.
+    LTListIter it;
+    LTList const& lt_list = getRegLTMgr().getLTList();
+    for (LifeTime * lt = lt_list.get_head(&it);
+         lt != nullptr; lt = lt_list.get_next(&it)) {
+        Reg reg = getReg(lt->getPrno());
+        getRegLTMgr().mergeReg2LifeTime(reg, lt);
+    }
+}
+
+
+void LinearScanRA::dumpRegLTOverview() const
+{
+    if (!getRegion()->isLogMgrInit()) { return; }
+
+    xoc::note(m_rg, "\n==-- DUMP Reg2LifeTime in Region '%s' --==",
+              m_rg->getRegionName());
+    PRNO2LT const& reg2lt = m_reg_lt_mgr->getReg2LT();
+    for (Reg r = 0; r < reg2lt.get_elem_count(); r++) {
+        LifeTime * lt = reg2lt.get(r);
+        if (lt == nullptr) { continue; }
+        lt->dumpReg2LifeTime(m_rg, this, r);
+    }
+}
+
+
+void LinearScanRA::dumpReg2LT(Pos start, Pos end, bool open_range) const
+{
+    PRNO2LT const& reg2lt = m_reg_lt_mgr->getReg2LT();
+    for (Reg r = 0; r < reg2lt.get_elem_count(); r++) {
+        LifeTime * lt = reg2lt.get(r);
+        if (lt == nullptr) { continue; }
+        lt->dumpReg2LifeTimeWithPos(m_rg, this, r, start, end, open_range);
+    }
+}
+
+
+bool LinearScanRA::promoteSpillReload(OptCtx & oc, RegSetImpl & rsimpl)
+{
+    if (m_rg->getRegionName() == nullptr) { return false; }
+    SpillReloadPromote spill_reload_promote(m_rg, this, rsimpl);
+    return spill_reload_promote.perform(oc);
+}
+
+
+bool LinearScanRA::verifyLSRAByInterfGraph(OptCtx & oc) const
+{
+    START_TIMER(t, "verifyLSRAByInterfGraph");
+    oc.setInvalidPass(PASS_PRLIVENESS_MGR);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_RPO, PASS_DOM, PASS_PRLIVENESS_MGR, PASS_UNDEF);
+
+    VarUpdatePos up(this);
+    LifeTime2DMgr lt2d_mgr(m_rg, const_cast<LinearScanRA*>(this));
+    lt2d_mgr.computeLifeTime(up, m_bb_list, m_preassigned_mgr);
+
+    LTInterfGraphLSRAChecker graph(m_rg, lt2d_mgr);
+    LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
+    ASSERT0(graph.check(pthis));
+    END_TIMER(t, "verifyLSRAByInterfGraph");
+    return true;
 }
 
 
@@ -2675,8 +3558,16 @@ void LinearScanRA::setAttr()
 bool LinearScanRA::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(
-        &oc, PASS_RPO, PASS_DOM, PASS_LIVENESS_MGR, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO,
+        PASS_DOM, PASS_PRLIVENESS_MGR, PASS_LOOP_INFO, PASS_UNDEF);
+
+    //LSRA asks DynamicStack pass to determine whether the region has at least
+    //one ALLOCA, thus the pass object is necesary. However the validation of
+    //the pass is usually confirmed at Pass::perform() which does not only check
+    //ALLOCA, but also supports the ALLOCA operations. Thus we expect that
+    //DynamicAlloca has performed the detection of ALLOCA before entering
+    //LSRA pass.
+    m_rg->getPassMgr()->registerPass(PASS_DYNAMIC_STACK);
     reset();
 
     //Determine whether the PASS apply all modifications of CFG and BB to
@@ -2686,22 +3577,18 @@ bool LinearScanRA::perform(OptCtx & oc)
     ApplyToRegion apply(m_rg);
     checkAndPrepareApplyToRegion(apply);
     if (m_bb_list == nullptr || m_bb_list->get_elem_count() == 0) {
+        set_valid(true);
         return false;
     }
-    setAttr();
+    initLocalUsage();
 
-    //Assign each BB a lexical sequence ID.
-    assignLexSeqIdForBB();
-
-    //Do the backward jump analysis based on the CFG and liveness information.
-    BBPos2Attr pos2attr;
-    FakeVarMgr fake_var_mgr(m_rg);
-    LexBackwardJumpAnalysis back_jump_ana(m_rg, &pos2attr, &fake_var_mgr, this);
-    back_jump_ana.analyze();
+    //Do the backward-jump analysis based on the CFG and liveness.
+    doBackwardJumpAnalysis();
 
     UpdatePos up(this);
-    collectDedicatedPR(m_bb_list, m_dedicated_mgr);
-    getLTMgr().computeLifeTime(up, m_bb_list, m_dedicated_mgr);
+    collectDedicatedPR(m_bb_list, m_preassigned_mgr);
+    ASSERT0(m_lt_mgr);
+    getLTMgr().computeLifeTime(up, m_bb_list, m_preassigned_mgr);
 
     //After the lifetime calculation is completed, begin setting constraint
     //sets for each lifetime.
@@ -2711,41 +3598,29 @@ bool LinearScanRA::perform(OptCtx & oc)
     //computed.
     genRematInfo();
 
-    //Process the lifetime related attributes before register assignment.
-    PosAttrLifeTimeProc lt_proc(m_rg, pos2attr, this);
-    lt_proc.process();
-
     LTPriorityMgr priomgr(m_cfg, getTIMgr());
     priomgr.computePriority(getLTMgr());
     bool changed = performLsraImpl(oc);
-    //Remove the fake-use IR with no code gen attribute after register
-    //assignment.
-    PosAttrNoCodeGenProc no_code_gen_proc(m_rg, pos2attr, this);
-    no_code_gen_proc.process();
-
-    //Color the stack slot and reuse the stack slot.
-    colorStackSlot();
-
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLSRA()) {
         dump(false);
     }
-
+    destroyLocalUsage();
     checkAndApplyToRegion(apply);
     ASSERTN(getRegion()->getCFG()->verifyRPO(oc),
             ("make sure original RPO is legal"));
     ASSERTN(getRegion()->getCFG()->verifyDomAndPdom(oc),
             ("make sure original DOM/PDOM is legal"));
+    set_valid(true);
     if (!changed || !isApplyToRegion()) {
         ASSERT0(m_rg->getBBMgr()->verify());
         END_TIMER(t, getPassName());
         return false;
     }
     recalculateSSA(oc);
+    oc.setInvalidLoopInfo();
     ASSERT0(m_rg->getBBMgr()->verify());
     END_TIMER(t, getPassName());
     return false;
 }
 //END LinearScanRA
-
 } //namespace xoc
-

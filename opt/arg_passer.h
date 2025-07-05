@@ -74,10 +74,8 @@ public:
 //
 class GenListVarOfMap {
     COPY_CONSTRUCTOR(GenListVarOfMap);
-
 public:
     ArgPasserResMgr * m_arg_pass_res_mgr;
-
 public:
     GenListVarOfMap() {}
     ~GenListVarOfMap() {}
@@ -104,7 +102,8 @@ public:
     CallIR2ArgListMap(ArgPasserResMgr * arg_pass_res_mgr)
     {
         ASSERT0(arg_pass_res_mgr);
-        CallIR2ArgListType::m_gm.m_arg_pass_res_mgr = arg_pass_res_mgr;
+        CallIR2ArgListType::getGenMapped().m_arg_pass_res_mgr =
+            arg_pass_res_mgr;
     }
     ~CallIR2ArgListMap() {}
 
@@ -139,70 +138,6 @@ public:
 
 
 //
-//Start RegionParamMgr.
-//
-class RegionParamMgr {
-    COPY_CONSTRUCTOR(RegionParamMgr);
-
-protected:
-    RegionPosParam * m_rg_pos_param;
-
-protected:
-    void allocRegionPosParam()
-    {
-        ASSERT0(m_rg_pos_param == nullptr);
-        m_rg_pos_param = new RegionPosParam();
-    }
-
-    void deleteRegionPosParam()
-    {
-        ASSERT0(m_rg_pos_param);
-        RegionPosParamIter iter;
-        PosParam * pos_param = nullptr;
-        for (m_rg_pos_param->get_first(iter, &pos_param); !iter.end();
-             m_rg_pos_param->get_next(iter, &pos_param)) {
-            ASSERT0(pos_param);
-            delete pos_param;
-        }
-        delete m_rg_pos_param;
-        m_rg_pos_param = nullptr;
-    }
-
-public:
-    //According to the given region and parameter position, return the
-    //parameter variable corresponding to the region.
-    Var * getRegionParam(Region * rg, UINT pos)
-    {
-        ASSERT0(m_rg_pos_param && rg && m_rg_pos_param->get(rg));
-        return (Var*)m_rg_pos_param->get(rg)->get(pos);
-    }
-
-    bool haveCollected(Region * rg) const
-    { return m_rg_pos_param != nullptr && m_rg_pos_param->find(rg); }
-
-    RegionParamMgr() { m_rg_pos_param = nullptr; }
-    ~RegionParamMgr()
-    {
-        if (m_rg_pos_param != nullptr) { deleteRegionPosParam(); }
-    }
-
-    //Record the parameter variables corresponding to a certain region and
-    //a certain parameter position.
-    void setRegionParam(Region * rg, xcom::List<Var const*> & paramlst)
-    {
-        ASSERT0(rg);
-        if (paramlst.get_elem_count() == 0) { return; }
-        if (m_rg_pos_param == nullptr) { allocRegionPosParam(); }
-        if (m_rg_pos_param->find(rg)) { return; } //Already collected.
-        PosParam * pos_param = new PosParam();
-        pos_param->copy(paramlst);
-        m_rg_pos_param->set(rg, pos_param);
-    }
-};
-//End RegionParamMgr.
-
-
-//
 //Start ArgPasser.
 //
 class ArgPasser : public Pass {
@@ -213,7 +148,6 @@ protected:
     RegionMgr * m_rm;
     TypeMgr * m_tm;
     DynamicStack * m_dystack_impl;
-    RegionParamMgr * m_rg_param_mgr;
 
     //Record the IR that obtains the entry function parameter address and use
     //it as a marker so that a spill can be inserted before the callee register
@@ -222,10 +156,13 @@ protected:
 
     // Record register binding info of scalar parameters.
     xgen::RegSet m_avail_param_scalar;
+
     // Record register binding info of vecotor parameters.
     xgen::RegSet m_avail_param_vector;
+
     // Record register binding info of scalar ret values.
     xgen::RegSet m_avail_ret_scalar;
+
     // Record register binding info of vector ret values.
     xgen::RegSet m_avail_ret_vector;
 
@@ -354,10 +291,15 @@ protected:
 
     virtual bool dump() const;
 
+    //Find and set the parameters of the current region.
+    //Due to the return value being treated as a parameter, traverse the exit
+    //BBs to check for it. If present, remove it from the parameter list.
+    virtual void findAndSetFormalParam(OUT ConstVarList & paramlst);
+
     //Return formal parameter variable on given position of callee function
     //called by given ir.
     //Now that we can only process IR_CALL.
-    Var * getCalleeFormalParamVar(IR const* ir, UINT position);
+    Var const* getCalleeFormalParamVar(IR const* ir, UINT position);
 
     //Return the data type of each copy when copying the argument of type MC to
     //the parameter space, and the size of the data copied each time is equal to
@@ -395,22 +337,24 @@ protected:
     //Init registers binding info before allocated for each function.
     virtual void initRegBindInfo();
 
-    //Whether the parameter passer generates LAD operations for function calls.
+    //Whether the parameter passer generates LDA operations for function calls.
     virtual bool isArgPasserExternalCallNeedLda() //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     xgen::Reg pickReg(RegSet & set)
     { return RegSetImpl::pickRegByIncrementalOrder(set); }
 
     //Pick reg according to var.
     virtual xgen::Reg pickParamReg(Var const* v) //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
+
     //Pick reg according to ir.
     virtual xgen::Reg pickParamReg(IR const* ir) //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
+
     //Pick ret reg.
     virtual xgen::Reg pickRetReg(IR const* ir) //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
 
     //1. For parameters that are passed by registers.
     //(1) Assign parameter registers to each parameter.
@@ -467,22 +411,6 @@ protected:
     //        ret;
     //    }
     void preProcessFormalParam(OptCtx & oc);
-
-    //Collect all parameters of all callee functions. Specifically:
-    //
-    //                            ----> .func callee0(.param.u32 param0) {}
-    //                            |
-    //  .func caller()            | --> .func callee1(.param.u64 param0,
-    //  {                         | |                 .param.u64 param1)
-    //      call callee0($0);    -- |   {}
-    //      call callee1($1, $2);----
-    //  }
-    //
-    //After collection, the information in m_rg_pos_param:
-    //
-    // { callee0: { 0: param0 } }, { callee1: { 0: param0, 1: param1 } },
-    //
-    void preProcessFormalParamCallee();
 
     //Process irs that used formal parameters.
     //CASE1:
@@ -664,22 +592,22 @@ public:
     //Different architectures need to overwrite this interface to bind
     //different registers for sclar parameters.
     virtual xgen::RegSet const* getParamRegSetScalar() const //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { return m_rg->getRegionMgr()->getTargInfoMgr()->getParamScalarRegSet(); }
 
     //Different architectures need to overwrite this interface to bind
     //different registers for vector parameters.
     virtual xgen::RegSet const* getParamRegSetVector() const //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { return m_rg->getRegionMgr()->getTargInfoMgr()->getParamVectorRegSet(); }
 
     //Different architectures need to overwrite this interface to bind
     //different registers for scalar return values.
     virtual xgen::RegSet const* getRetRegSetScalar() const //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { return m_rg->getRegionMgr()->getTargInfoMgr()->getRetvalScalarRegSet(); }
 
     //Different architectures need to overwrite this interface to bind
     //different registers for vector return values.
     virtual xgen::RegSet const* getRetRegSetVector() const //GCOVR_EXCL_LINE
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { return m_rg->getRegionMgr()->getTargInfoMgr()->getRetvalVectorRegSet(); }
 
     //Get the arguments of the function call in the current region,
     //and these arguments are passed on the stack.

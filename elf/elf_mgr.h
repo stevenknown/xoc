@@ -33,6 +33,8 @@ namespace elf {
 
 class SymbolInfo;
 class FunctionInfo;
+class LinkerMgr;
+class ELFMgr;
 
 #define ELF_SIZE_4GB            0xFFFFffff
 
@@ -153,6 +155,9 @@ class FunctionInfo;
 //The begin offset of relaplt item in .got section.
 #define ELF_OFFSET_OF_RELA_PLT_IN_GOT_SECT 16
 
+//The first valid shdr in ELF.
+#define ELF_FIRST_VALID_SHDR_IN_ELF    1
+
 #define DEBUG_ABBREV_SH_NAME       ".debug_abbrev"
 #define DEBUG_INFO_SH_NAME         ".debug_info"
 #define DEBUG_RELA_INFO_SH_NAME    ".rela.debug_info"
@@ -170,8 +175,8 @@ class FunctionInfo;
 typedef xcom::Vector<CHAR> CHARVec;
 typedef xcom::Vector<Off> OffVec;
 typedef xcom::Vector<CHAR const*> StringVec;
-typedef xcom::Vector<BYTE> BYTEVec;
 typedef xcom::List<CHAR const*> StringList;
+typedef xcom::List<CHAR const*>::Iter StringListIter;
 typedef xcom::Vector<SWord> SWordVec;
 typedef xcom::Vector<Word> WordVec;
 typedef xcom::Vector<Addr> AddrVec;
@@ -588,17 +593,17 @@ public:
     {
         for (SectionInfo * si = m_list.get_head();
              si != nullptr; si = m_list.get_next()) {
-            if (si != nullptr) { delete si; }
+            delete si;
         }
 
         for (BYTEVec * bv = m_bytevec_list.get_head();
              bv != nullptr; bv = m_bytevec_list.get_next()) {
-            if (bv != nullptr) { delete bv; }
+            delete bv;
         }
 
         for (CHARVec * cv = m_charvec_list.get_head();
              cv != nullptr; cv = m_charvec_list.get_next()) {
-            if (cv != nullptr) { delete cv; }
+            delete cv;
         }
 
         m_list.clean();
@@ -698,6 +703,9 @@ public:
 
     ~FunctionInfo() {}
 
+    //Copy function info
+    void copy(FunctionInfo const* src_func);
+
     //Return binary codes of current function symbol.
     BYTEVec & getCode() { return m_func_code; }
 };
@@ -718,7 +726,7 @@ public:
     {
         for (FunctionInfo * fi = m_list.get_head();
              fi != nullptr; fi = m_list.get_next()) {
-            if (fi != nullptr) { delete fi; }
+            delete fi;
         }
         m_list.clean();
     }
@@ -737,32 +745,34 @@ class RelocInfo;
 //
 //Start SymbolInfo
 //
-#define SYMINFO_name(v)          ((v)->m_sym_name)
-#define SYMINFO_sect_index(v)    ((v)->m_sect_index)
-#define SYMINFO_sect_type(v)     ((v)->m_sect_type)
-#define SYMINFO_sect_name(v)     ((v)->m_sect_name_sym)
-#define SYMINFO_sym(v)           ((v)->m_sym_elfsym)
-#define SYMINFO_index(v)         ((v)->m_sym_index)
-#define SYMINFO_size(v)          ((v)->m_sym_size)
-#define SYMINFO_func(v)          ((v)->m_func_info)
-#define SYMINFO_reloc(v)         ((v)->m_sym_reloc_vec)
-#define SYMINFO_func_name(v)     ((v)->m_func_name)
-#define SYMINFO_is_func(v)       ((v)->m_sym_is_func)
-#define SYMINFO_is_extern(v)     ((v)->m_sym_is_extern)
-#define SYMINFO_is_weak(v)       ((v)->m_sym_is_weak)
-#define SYMINFO_is_visible(v)    ((v)->m_sym_is_visible)
-#define SYMINFO_is_init(v)       ((v)->m_sym_is_init)
-#define SYMINFO_is_global(v)     ((v)->m_sym_is_global)
-#define SYMINFO_is_dynsym(v)     ((v)->m_sym_is_dynsym)
-#define SYMINFO_is_label(v)      ((v)->m_sym_is_label)
-#define SYMINFO_is_debug(v)      ((v)->m_sym_is_debug)
-#define SYMINFO_file_name(v)     ((v)->m_sym_file_name)
-#define SYMINFO_ofst(v)          ((v)->m_sym_offset)
-#define SYMINFO_align(v)         ((v)->m_sym_align)
-#define SYMINFO_is_byte(v)       ((v)->m_sym_is_byte)
-#define SYMINFO_data_byte(v)     ((v)->m_data_byte)
-#define SYMINFO_data_word(v)     ((v)->m_data_binword)
-#define SYMINFO_dynsym_idx(v)    ((v)->m_dynsym_index)
+#define SYMINFO_name(v)                ((v)->m_sym_name)
+#define SYMINFO_sect_index(v)          ((v)->m_sect_index)
+#define SYMINFO_sect_type(v)           ((v)->m_sect_type)
+#define SYMINFO_sect_name(v)           ((v)->m_sect_name_sym)
+#define SYMINFO_sym(v)                 ((v)->m_sym_elfsym)
+#define SYMINFO_index(v)               ((v)->m_sym_index)
+#define SYMINFO_size(v)                ((v)->m_sym_size)
+#define SYMINFO_func(v)                ((v)->m_func_info)
+#define SYMINFO_reloc(v)               ((v)->m_sym_reloc_vec)
+#define SYMINFO_func_name(v)           ((v)->m_func_name)
+#define SYMINFO_is_func(v)             ((v)->m_sym_is_func)
+#define SYMINFO_is_extern(v)           ((v)->m_sym_is_extern)
+#define SYMINFO_is_weak(v)             ((v)->m_sym_is_weak)
+#define SYMINFO_is_visible(v)          ((v)->m_sym_is_visible)
+#define SYMINFO_is_init(v)             ((v)->m_sym_is_init)
+#define SYMINFO_is_global(v)           ((v)->m_sym_is_global)
+#define SYMINFO_is_dynsym(v)           ((v)->m_sym_is_dynsym)
+#define SYMINFO_is_label(v)            ((v)->m_sym_is_label)
+#define SYMINFO_is_debug(v)            ((v)->m_sym_is_debug)
+#define SYMINFO_is_user_def_func(v)    ((v)->m_sym_is_user_def_func)
+#define SYMINFO_file_name(v)           ((v)->m_sym_file_name)
+#define SYMINFO_ofst(v)                ((v)->m_sym_offset)
+#define SYMINFO_align(v)               ((v)->m_sym_align)
+#define SYMINFO_is_byte(v)             ((v)->m_sym_is_byte)
+#define SYMINFO_data_byte(v)           ((v)->m_data_byte)
+#define SYMINFO_data_word(v)           ((v)->m_data_binword)
+#define SYMINFO_dynsym_idx(v)          ((v)->m_dynsym_index)
+#define SYMINFO_attach_list(v)         ((v)->m_sym_attach_list)
 //The class describes the basic info of a symbol. These info came from xoc::Var
 //or collected from .symtab of ELF. SymbolInfo is core data that will be used
 //to generate section content and construct ELF. Map & Vector will be generated
@@ -799,6 +809,9 @@ public:
 
     //Record whether it is label symbol.
     bool m_sym_is_label;
+
+    //Record whether it is a user defined function for linker relaxation.
+    bool m_sym_is_user_def_func;
 
     //Record the index of related section.
     UINT m_sect_index;
@@ -851,6 +864,10 @@ public:
 
     //Record all relocation info of current symbol.
     xcom::Vector<RelocInfo*> m_sym_reloc_vec;
+
+    //Record all attach SymbolInfo of current symbol.
+    xcom::List<SymbolInfo*> m_sym_attach_list;
+
 public:
     SymbolInfo()
     {
@@ -863,6 +880,7 @@ public:
         m_sym_is_init = false;
         m_sym_is_global = false;
         m_sym_is_label = false;
+        m_sym_is_user_def_func = false;
         m_sect_type = SH_TYPE_UNDEF;
         m_sect_index = 0;
         m_sym_align = 0;
@@ -880,6 +898,9 @@ public:
     }
 
     ~SymbolInfo() {}
+
+    //Copy symbol info
+    void copy(SymbolInfo const* src_symbol_info);
 
     //Return binary codes of current symbol.
     BYTEVec & getSymbolCode() const
@@ -905,7 +926,7 @@ public:
     {
         for (SymbolInfo * si = m_list.get_head();
              si != nullptr; si = m_list.get_next()) {
-            if (si != nullptr) { delete si; }
+            delete si;
         }
         m_list.clean();
     }
@@ -1028,7 +1049,7 @@ public:
 
 
 //The class manages RelocInfo object resources. It creates RelocInfo
-//object and uses xoc::List 'm_list' to record. These resources whould
+//object and uses xoc::List 'm_list' to record. These resources should
 //be freed when the destructor is called.
 class RelocInfoMgr {
     COPY_CONSTRUCTOR(RelocInfoMgr);
@@ -1042,7 +1063,7 @@ public:
     {
         for (RelocInfo * ri = m_list.get_head();
              ri != nullptr; ri = m_list.get_next()) {
-            if (ri != nullptr) { delete ri; }
+            delete ri;
         }
         m_list.clean();
     }
@@ -1124,7 +1145,7 @@ public:
     {
         for (RelaDynInfo * rdi = m_list.get_head();
              rdi != nullptr; rdi = m_list.get_next()) {
-            if (rdi != nullptr) { delete rdi; }
+            delete rdi;
         }
         m_list.clean();
     }
@@ -1219,7 +1240,7 @@ public:
     {
         for (PltInfo * pi = m_list.get_head();
              pi != nullptr; pi = m_list.get_next()) {
-            if (pi != nullptr) { delete pi; }
+            delete pi;
         }
         m_list.clean();
     }
@@ -1270,8 +1291,6 @@ public:
 };
 
 
-class ELFMgr;
-
 class GenMappedOfSectInfoMap {
     COPY_CONSTRUCTOR(GenMappedOfSectInfoMap);
 public:
@@ -1306,14 +1325,21 @@ public:
     ~SectionInfoMap() {}
 };
 
+
 class ELFARMgr;
 
-//SymbolInfo.
-typedef xcom::Vector<SymbolInfo*> SymbolInfoVec;
-typedef xcom::Vector<SymbolInfoVec*> SymtabInfoVec;
+//SymbolInfoList.
+typedef xcom::List<SymbolInfo*> SymbolInfoList;
+typedef xcom::List<SymbolInfo*>::Iter SymbolInfoListIter;
+//SymbolInfoMap.
 typedef xcom::TMap<Sym const*, SymbolInfo*> SymbolInfoMap;
 typedef xcom::TMapIter<Sym const*, SymbolInfo*> SymbolInfoMapIter;
-//RelocInfo.
+//SymtabInfoList.
+typedef xcom::List<SymbolInfoList*> SymtabInfoList;
+//ELFMgrList.
+typedef xcom::List<ELFMgr*> ELFMgrList;
+typedef xcom::List<ELFMgr*>::Iter ELFMgrListIter;
+//RelocInfoVec.
 typedef xcom::Vector<RelocInfo*> RelocInfoVec;
 //SectionInfoMap.
 typedef xcom::TMapIter<Sym const*, SectionInfo*> SectionInfoMapIter;
@@ -1332,16 +1358,21 @@ typedef xcom::TMap<Sym const*, PltInfo*> PltInfoMap;
 typedef xcom::Vector<RelaDynInfo*> RelaPltInfoVec;
 //The vector of PltInfo.
 typedef xcom::Vector<PltInfo*> PltInfoVec;
+//RelaxBrInfo map.
+typedef xcom::TMap<IR const*, RelaxBrInfo*> RelaxBrInfoMap;
+typedef xcom::TMapIter<IR const*, RelaxBrInfo*> RelaxBrInfoMapIter;
+
+
 //
 //Start ELFMgr.
 //
 //Record symbols and their information.
-#define ELFMGR_symbol_info(e) ((e)->m_symbol_info)
-#define ELFMGR_symtab_vec(e)  ((e)->m_symtab_info_vec)
-#define ELFMGR_symbol_vec(e)  ((e)->m_symbol_info_vec)
-#define ELFMGR_symbol_map(e)  ((e)->m_symbol_info_map)
-#define ELFMGR_reloc_vec(e)   ((e)->m_reloc_info)
-#define ELFMGR_alias_map(e)   ((e)->m_alias_symbol_map)
+#define ELFMGR_symbol_info(e)      ((e)->m_symbol_info)
+#define ELFMGR_symbol_list(e)      ((e)->m_symbol_info_list)
+#define ELFMGR_symbol_map(e)       ((e)->m_symbol_info_map)
+#define ELFMGR_reloc_vec(e)        ((e)->m_reloc_info)
+#define ELFMGR_relax_br_map(e)     ((e)->m_relax_br_map)
+#define ELFMGR_alias_map(e)        ((e)->m_alias_symbol_map)
 class ELFMgr {
     friend class ELFTargInfo;
 protected:
@@ -1526,7 +1557,7 @@ public:
     //  offset:  Location where the relocation occurs on current.
     //  addend:  Addend value of symbol relocated to.
     void addCallRelocation(Sym const* current, Sym const* other, UINT type,
-                           UINT offset, UINT addend)
+                           TMWORD offset, UINT addend)
     {
         ASSERT0(current && other && m_symbol_info.find(current));
         addSymRelocInfo(m_symbol_info.get(current),
@@ -1551,7 +1582,11 @@ public:
 
     //Allocate and set RelocInfo of 'symbol_info'.
     void addSymRelocInfo(MOD SymbolInfo * symbol_info,
-        Sym const* other, UINT type, UINT offset, UINT addend);
+        Sym const* other, UINT type, TMWORD offset, UINT addend);
+
+    //Allocate and set RelaxBrInfo.
+    void addRelaxBrInfo(Addr pc, Addr offset, FunctionInfo const* fi,
+                        IR const* ir);
 
     //Add the final relocation entry for a certain fixup.
     void addRelocForElfSymbol(MCFixup * fixup_entry, MCSymbol const* mc_symbol,
@@ -1559,12 +1594,6 @@ public:
                               Sym const* callee);
 
     void allocSectHeaderTab(UINT shnum);
-
-    //Assemble init value of symbol to .data, .sdata, .const or SPM section.
-    //This function will use the size of the symbol to represent the initial
-    //value and write it into content_desc_vec.
-    void assembleInitValToContent(OUT AssembleBinDescVec & content_desc_vec,
-                                  SymbolInfo const* sym_info);
 
     //Assemble pad zero to .data, .sdata, or .const or SPM section.
     //This function will pad pad_size zeros in the gap between two symbols.
@@ -1640,6 +1669,10 @@ public:
     virtual Half getEHMachine() const
     { ASSERTN(0, ("Target Dependent Code")); return ET_NONE; }
 
+    //Get the section type of kernel symbol
+    virtual SECTION_TYPE getKernelSectionType() const
+    { ASSERTN(0, ("Target Dependent Code")); return SH_TYPE_UNDEF; }
+
     //Return endian name.
     CHAR const* getEndianName() const;
 
@@ -1671,10 +1704,6 @@ public:
     //This function should return the type `R_SWAI_64_REFLONG`.
     virtual UINT get32BitReferRelocType() const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
-
-    //Get r_sym value of relocation entry.
-    virtual Word getRelocSymValue(RelocInfo const* reloc_info)
-    { return SYMINFO_index(m_symbol_info.get(RELOCINFO_name(reloc_info))); }
 
     //Get region mgr.
     RegionMgr * getRegionMgr() const
@@ -1743,7 +1772,7 @@ public:
     virtual Addr getTextSectAlign() const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
-    UINT getRelTypeFromDwarf(MCFixupKind kind);
+    UINT getRelTypeFromDwarf(MC_FIXUP_KIND kind);
 
     //Initialize dump file info. 'filename' is the name of dump file.
     //The flag of 'is_del' indicates whether 'UNLINK()' function will
@@ -1764,7 +1793,10 @@ public:
     //outside the ELFMgr module.
     void initSymbol(xoc::Var const* var, Sym const* func_name = nullptr,
         SECTION_TYPE sect_type = SH_TYPE_UNDEF, UINT sect_ofst = 0,
-        UCHAR symbol_type = STT_NOTYPE);
+        UCHAR symbol_type = STT_NOTYPE, bool is_external = false);
+
+    //Initialize SymbolInfo with external attribute.
+    void initExternalSymbol(xoc::Var const* var);
 
     //Initialize the section's symbol information based on
     //the section var passed from the frontend, such as debug_line.
@@ -1949,6 +1981,9 @@ protected:
     //RelocInfo Mgr. Create and free RelocInfo resources.
     RelocInfoMgr m_reloc_mgr;
 
+    //RelaxBrInfo Mgr. Create and free RelaxBrInfo resources.
+    RelaxBrInfoMgr m_relax_br_mgr;
+
     //RelaDynInfo Mgr. Create and free ReladynInfo resources.
     RelaDynInfoMgr m_reladyn_mgr;
 
@@ -1984,6 +2019,9 @@ public:
     //Record the file name of ELFMgr.
     CHAR const* m_file_name;
 
+    //Record the LinkerMgr to which ELFMgr belong.
+    LinkerMgr * m_linker_mgr;
+
     //Record SymbolInfo collected from xoc::Var.
     SymMap m_symbol_info;
 
@@ -1991,13 +2029,13 @@ public:
     SymbolInfoMap m_symbol_info_map;
 
     //Record SymbolInfo collected from ELF and xoc::Var.
-    SymbolInfoVec m_symbol_info_vec;
+    SymbolInfoList m_symbol_info_list;
 
     //Record RelocInfo.
     RelocInfoVec m_reloc_info;
 
-    //Record all 'm_symbol_info_vec'.
-    SymtabInfoVec m_symtab_info_vec;
+    //Record all 'm_symbol_info_list'.
+    SymtabInfoList m_symtab_info_list;
 
     //Record phdr.
     PhdrVec m_phdr_vec;
@@ -2061,9 +2099,16 @@ public:
     //Record the map of section name and section type.
     SectionNameAndTypeMap m_sect_name_type_map;
 
+    //Record RelaxBrInfo.
+    RelaxBrInfoMap m_relax_br_map;
+
     //Add 's' into 'm_sym_tab'.
     Sym const* addToSymTab(CHAR const* s)
     { ASSERT0(s && m_sym_tab); return m_sym_tab->add(s); }
+
+    //Add SymbolInfo into the 'm_symbol_info_list'.
+    void addToSymbolList(MOD SymbolInfo * s)
+    { ASSERT0(s); ELFMGR_symbol_list(this).append_tail(s); }
 
     //Allocate SectionInfoMgr object according to different architecture.
     virtual SectionInfoMgr * allocSectionInfoMgr()
@@ -2163,6 +2208,13 @@ public:
     //Construct symbol of '.symtab' and '.dynsym'.
     void constructSymbolUnull();
 
+    //Delete info within function. The size of the function will be unchanged
+    //and the end of the function will be set to '0'.
+    //'rela_ofst': relative offset from function start address.
+    //'length': length of info to be deleted.
+    void deleteFunctionContent(FunctionInfo const* fi, Addr rela_ofst,
+                               Word length);
+
     //A helper function to extract info from 'abdv' and save it into
     //section content buffer 'bytevec'.
     void extractAssBinDescVec(OUT BYTEVec * bytevec,
@@ -2245,6 +2297,15 @@ public:
 
     //Get SymbolInfo from 'm_symbol_info_map'.
     SymbolInfo * getSymbolInfo(Sym const* symbol_name);
+
+    //Get SymbolInfoMgr from 'ELFMGgr object'.
+    SymbolInfoMgr & getSymbolInfoMgr() { return m_sym_mgr; }
+
+    //Get FunctionInfoMgr from 'ELFMGgr object'.
+    FunctionInfoMgr & getFunctionInfoMgr() { return m_func_mgr; }
+
+    //Get RelocInfoMgr from 'ELFMGgr object'.
+    RelocInfoMgr & getRelocInfoMgr() { return m_reloc_mgr; }
 
     size_t getELFFileOffset() { return (size_t)m_file_base_offset; }
 
@@ -2416,10 +2477,6 @@ public:
     //Get program header index according to the 'ph_type'.
     UINT getProgramHeaderIdxInPHdr(UINT ph_type);
 
-    //Get the number of program header.
-    virtual UINT getProgramHeaderNum() const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
-
     //Get function name from 'text_shdr_name'.
     //e.g.: 1.given ".text1" and return ".text1".
     //      2.given ".text.func_name" and return "func_name".
@@ -2427,7 +2484,7 @@ public:
 
     //Get symbol address.
     //This function must be called after section addr have been set.
-    Addr getSymbolAddr(SymbolInfo const* symbol_info);
+    virtual Addr getSymbolAddr(SymbolInfo const* symbol_info);
 
     //Get section header type.
     //e.g.: given ".text1.func_name" and return Sym of ".text1".
@@ -2527,13 +2584,6 @@ public:
     //Refer to the file 'elf_header.h' for more detailed about ELF type.
     UINT getELFType();
 
-    //Get the index of program header according to the 'ph_type'.
-    virtual size_t getPhdrIndex(PROGRAM_HEADER ph_type);
-
-    //Get program header index table according to different architecture.
-    virtual PROGRAM_HEADER const* getPhdrIndexTable() const
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
-
     //Get the align of Phdr with PH_TYPE_CODE type.
     virtual Word32 getPhdrCodeAlign() const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
@@ -2615,6 +2665,11 @@ public:
     //There are two type of RelapltInfo: local and global type. This function
     //will count and return the number of RelaPltInfo with global type.
     UINT getGlobalRelaPltElemNum();
+
+    //Get all the attach symbols for the current symbol.
+    void getSymbolInfoAttachInfo(MOD SymbolInfo * cur_symbol_info);
+
+    LinkerMgr * getLinkerMgr() { return m_linker_mgr; }
 
     //Check whether there is specific section in ELFMgr.
     bool hasSection(SECTION_TYPE sect_type)
@@ -2737,6 +2792,9 @@ public:
     //data of SymbolInfo will be copied to corresponded section content.
     void mergeUnullData(MOD SymbolInfo * symbol_info);
 
+    //Malloc memory from mempool according to the 'size'.
+    CHAR * mallocFromMempool(size_t size) { return (CHAR*)xmalloc(size); }
+
     //Post process specific info after setting
     //all section info for different architecture.
     virtual void postProcessAfterSettingSectionInfo() { return; }
@@ -2841,6 +2899,10 @@ public:
     BYTE readByteFromSectionContent(Sym const* sect_name, Addr addr)
     { return readValueFromSectionContent<BYTE>(sect_name, addr); }
 
+    //Read 'Word32' value from section content via 'sect_name' and 'addr'.
+    Word32 readWord32FromSectionContent(Sym const* sect_name, Addr addr)
+    { return readValueFromSectionContent<Word32>(sect_name, addr); }
+
     //Read value from section content via 'sect_name' and 'addr'.
     template <class ValueType>
     ValueType readValueFromSectionContent(Sym const* sect_name, Addr addr)
@@ -2865,6 +2927,9 @@ public:
     { ASSERTN(0, ("Target Dependent Code")); return; }
 
     void resetFileObj() { m_file = nullptr; }
+
+    //Re-grow the capacity of 'm_reloc_info' via 'additional_size'.
+    void reGrowRelocInfoVecCapacity(UINT additional_size);
 
     //Set the ELFHdr.e_type field.
     void setELFType(UINT elf_type);
@@ -2924,6 +2989,8 @@ public:
 
     void setRecordedInfoOfCurrentELFMgr(bool v)
     { m_has_recorded_in_linkermgr = v; }
+
+    void setLinkerMgr(MOD LinkerMgr * lk) { m_linker_mgr = lk; }
 
     //Record SymbolInfo into 'm_symbol_info_map' and 'm_symbol_info_vec'.
     virtual void setSymbolInfo(MOD SymbolInfo * sym_info);
@@ -3004,28 +3071,32 @@ class ELFOpt {
 public:
     //-elf-device option: Output relocatable file (ET_REL type) that need
     //to be relocated with other device file.
-    bool m_is_device_elf;
+    bool m_is_gen_device_elf;
     //-elf-fatbin option: Output shared object file (ET_DYN type) that direct
     //execute on device. It will linked multi-file and other external .so file.
-    bool m_is_fatbin_elf;
+    bool m_is_gen_fatbin_elf;
     //-elf-dumplink option: Dump info during link process.
     bool m_is_dump_link_info;
+    //-elf-symbol-ordering-file option: Order Symbolinfo in section in ELF.
+    bool m_is_symbol_ordering_file;
 public:
     ELFOpt()
     {
         //FIXME: Now default ELF output format is 'is_device_elf = true'.
         //Removed it after modified testcases CMakefile.
-        m_is_device_elf = true;
-        m_is_fatbin_elf = false;
+        m_is_gen_device_elf = true;
+        m_is_gen_fatbin_elf = false;
         m_is_dump_link_info = false;
+        m_is_symbol_ordering_file = false;
     }
 
-    bool isDeviceELF() const { return m_is_device_elf; }
-    bool isFatbinELF() const { return m_is_fatbin_elf; }
+    bool isGenerateDeviceELF() const { return m_is_gen_device_elf; }
+    bool isGenerateFatbinELF() const { return m_is_gen_fatbin_elf; }
     //Use '-elf-dumplink' option to dump linker info.
     //The default log file is 'dump.log'.
     //e.g.: pcxac.exe xxx.pcx -O0 -elf-fatbin -elf-dumplink
     bool isDumpLink() const { return m_is_dump_link_info; }
+    bool isSymbolOrderFile() const { return m_is_symbol_ordering_file; }
 };
 
 extern ELFOpt g_elf_opt;
@@ -3137,6 +3208,7 @@ public:
 //
 //Start ELFARMgr.
 //
+typedef xcom::List<CHAR const*> LibPathList;
 typedef xcom::Vector<ELFARInfo*> ELFARInfoVec;
 typedef xcom::TMap<Sym const*, ELFARInfo*> SymbolARInfoMap;
 typedef xcom::TMap<ELFAR const*, ELFARInfoVec*> ARInfoMap;
@@ -3149,7 +3221,7 @@ class ELFARMgr {
     COPY_CONSTRUCTOR(ELFARMgr);
 
     //Record ARFile path/name with list.
-    xcom::List<CHAR const*> * m_ar_file_list;
+    LibPathList const* m_ar_file_list;
 
     //Record all ELFAR object that generated by 'allocELFAR' function.
     xcom::List<ELFAR*> m_ar_list;
@@ -3248,7 +3320,7 @@ public:
     //return ELFAR.
     ELFAR * processARFile();
 
-    void setLibFileList(MOD xcom::List<CHAR const*> * lib_path_list)
+    void setLibFileList(LibPathList const* lib_path_list)
     {
         ASSERT0(lib_path_list);
         m_ar_file_list = lib_path_list;
@@ -3265,741 +3337,6 @@ public:
     //'symbol_name': the name of symbol in the global symtab of AR file.
     //'idx': the index of ELF to which 'symbol_name' belong in AR file.
     void saveSymbolARInfo(MOD ELFAR * ar, Sym const* symbol_name, UINT64 idx);
-};
-
-
-//
-//Start LinkerInfoMgr
-//
-
-//The type is used for recording the index of unresolved
-//RelocInfo in the vector of 'm_reloc_sym_vec'.
-typedef xcom::Vector<UINT> UnresolvedRelocIdxVec;
-
-//A class manages linker info that is used in linker process.
-class LinkerInfoMgr {
-    COPY_CONSTRUCTOR(LinkerInfoMgr);
-
-    //Record the index vector that is used to
-    //record RelocInfo index in 'm_reloc_info'.
-    xcom::List<UnresolvedRelocIdxVec*> m_vector_int_meta_list;
-public:
-    LinkerInfoMgr() {}
-
-    ~LinkerInfoMgr()
-    {
-        for (xcom::Vector<UINT> * vec = m_vector_int_meta_list.get_head();
-             vec != nullptr; vec = m_vector_int_meta_list.get_next()) {
-            if (vec != nullptr) { delete vec; }
-        }
-    }
-
-    UnresolvedRelocIdxVec * allocUnresolvedRelocIdxVec()
-    {
-        UnresolvedRelocIdxVec * vec = new UnresolvedRelocIdxVec();
-        ASSERT0(vec);
-
-        m_vector_int_meta_list.append_tail(vec);
-        return vec;
-    }
-};
-
-
-//The class describes generated mapped of SameNameNumMap.
-class GenMappedOfSameNameNumMap {
-    COPY_CONSTRUCTOR(GenMappedOfSameNameNumMap);
-public:
-    GenMappedOfSameNameNumMap() {}
-
-    UINT createMapped(Sym const* s) const { return 0; }
-};
-
-
-//
-//Start LinkerMgr.
-//
-//LinkerMgr manages all ELFMgr resources and controls the linking process.
-//It will output a target ELFMgr which its type is ET_REL(relocatable file),
-//ET_EXEC(executable file) or ET_DYN(shared object file) according to the
-//required.
-//
-//The input info of LinkerMgr include 'library path list', 'objfile path list'
-//and 'ELFMgr list'. 'library path list' record all library files path. These
-//library files path will be read as ELFAR object and managed by ELFARMgr during
-//linking process. 'objfile path list' record all object files path. These
-//object files will be read as ELFMgr object directly when linking process
-//starts. 'ELFMgr list' record ELFMgr that colleted from xoc::Var. xoc::Var is
-//provided by user.
-//
-//When linking process starts, there are some initialization operations that
-//need to be handled.
-//  a.'m_elf_mgr_list' record all ELFMgr that may be used in link process. Thus
-//    ELFMgr in 'ELFMgr list' and generated from 'objfile path list' will be
-//    appended to it directly. And ELFMgr from 'library path list' will be
-//    generated and appended to 'm_elf_mgr_list' as needed.
-//  b.'m_reloc_symbol_vec' record all RelocInfo that need to be resolved in the
-//    linking process. It will be initialied by the RelocInfo collected from
-//    'ELFMgr list' in the beginning and constantly updated after a new ELFMgr
-//    generated from 'library path list' during the linking process.
-//  c.'m_unresolved_reloc_idx_map' and 'm_resolved_reloc_idx_map' are used for
-//    the processing of resolved. They record the index of RelocInfo in
-//    'm_reloc_symbol_vec' and will be constantly updated too.
-//
-//Handle SymbolInfo with same name in different ELFMgr. e.g.: There may be lots
-//of 'str' with local attribute that come from 'printf' statement in different
-//ELFMgr. The solution to this is rename these 'str'. The format of new name is
-//'str.xxx' with integer suffix. e.g.: 'str.R_1', 'str.R_2', 'str.R_3', ...
-//
-//Resolve operation. One of the most important operations in linking procss.
-//When output shared object file, the RelocInfo need to be resolved via finding
-//target SymbolInfo from different ELFMgr. These ELFMgr mainly collected from
-//xoc::Var, object file and AR file.
-//  a.Firstly, SymbolInfo will be found in ELFMgr that collected from xoc::Var.
-//    xoc::Var ELFMgr is directly generated from compile file. These files have
-//    the highest priority during the processing of finding target SymbolInfo.
-//  b.Then other SymbolInfo of unresolved RelocInfo will be found in ELFMgr that
-//    collected from AR file. AR file that read from library file path is sorted
-//    in the order they were read in. Thus if there is more than one target
-//    SymbolInfo of unresolved RelocInfo in different AR file, the SymbolInfo
-//    that found from the first AR file will be used to resolve RelocInfo. And
-//    other SymbolInfo are not in use.
-//More detailed steps can be found in the description of 'doResolve()' function.
-//
-//Process output ELF. NOTE: Now LinkerMgr can only output ET_DYN ELF(shared
-//object file) and ET_EXEC(executable file). ET_REL ELF needs to be supported
-//in the future. After completing resolved, all SymbolInfo, RelocInfo and ELFMgr
-//have been collected into LinkerMgr object, the output ELF can be generated
-//according to these sufficient information. In order to manage output ELF, an
-//output ELFMgr object will be created.
-//  a.Merge ELFMgr. Section with same name in different ELFMgr need to be merged
-//into a section in output ELFMgr. After merged, the offset of SymbolInfo and
-//RelocInfo in corresponded section need to be updated.
-//  e.g.: merge section in different ELFMgr and update the offset of SymbolInfo.
-//    |-------------|              |-------------|               |-------------|
-//    |    ELFMgr   |              |Output ELFMgr|               |    ELFMgr   |
-//    |-------------|              |-------------|               |-------------|
-//    |     ...     |              |     ...     |               |     ...     |
-//    |-------------|              |-------------|               |-------------|
-//    |DATA SECTION |              |DATA SECTION |               |DATA SECTION |
-//    | | SymbolInfo|<-- 0x0070 -->| | SymbolInfo|   -- 0x0020 ->| | SymbolInfo|
-//    | | SymbolInfo|<-- 0x0078 -->| | SymbolInfo|   |  0x0028 ->| | SymbolInfo|
-//    | |   ...     |              | | SymbolInfo|<---     |     | |   ...     |
-//    |-------------|              | | SymbolInfo|<---------     |-------------|
-//    |BSS SECTION  |              | |   ...     |               |BSS SECTION  |
-//    | | SymbolInfo|<-- 0x0080 -- |-------------|    ---0x0030->| | SymbolInfo|
-//    | | SymbolInfo|<-- 0x0088  | | |BSS SECTION|    | -0x0038->| | SymbolInfo|
-//    | |   ...     |       |    ->| | SymbolInfo|    | |        | |   ...     |
-//    |-------------|       ------>| | SymbolInfo|    | |        |-------------|
-//    |     ...     |              | | SymbolInfo|<---  |        |     ...     |
-//    |-------------|              | | SymbolInfo|<-----         |-------------|
-//                                 | |   ...     |
-//                                 |-------------|
-//                                 |     ...     |
-//                                 |-------------|
-//  b.Generate SectionInfo and sort these SectionInfo according to the section
-//    index. The index of section may be different in different architecture.
-//    e.g.: the layout of shdr and phdr type of the section of output ELF.
-//            |------------------|-----------------|
-//            |     SHdr type    |    PHdr type    |
-//            |------------------|-----------------|
-//            | SH_TYPE_INTERP   |                 |
-//            | SH_TYPE_RELA_DYN |                 |
-//            | SH_TYPE_DYNSYM   |   PH_TYPE_CODE  |
-//            | SH_TYPE_TEXT1    |                 |
-//            | SH_TYPE_TEXT     |                 |
-//            |       ...        |                 |
-//            |------------------|-----------------|
-//            | SH_TYPE_GOT      |                 |
-//            | SH_TYPE_BSS      |                 |
-//            | SH_TYPE_DATA     |   PH_TYPE_DATA  |
-//            |       ...        |                 |
-//            |------------------------------------|
-//            | SH_TYPE_DYNAMIC  | PH_TYPE_DYNAMIC |
-//            |       ...        |                 |
-//            |------------------------------------|
-//            | SH_TYPE_SYMTAB   |                 |
-//            | SH_TYPE_SHSTR    | PH_TYPE_UNDEF   |
-//            | SH_TYPE_SYMSTR   |                 |
-//            |       ...        |                 |
-//            |------------------------------------
-//  c.Generate SectionInfo content. After completing section merged in 'step a',
-//    Data and code have been written into the corresponded section of output
-//    ELFMgr. But there are still other section content need to be generated
-//    according to the SymbolInfo or RelocInfo. e.g: .rela_dyn section, .dynamic
-//    section, .got section and .symtab section. Though these section content
-//    can be generated in this step, some info about section address(e.g. s_addr
-//    in ELFSHdr) is unkown until all section address have been set in 'step e'.
-//    Thus these section content need to be refilled later.
-//  d.Process section address and offset in ELF. This step must come after the
-//    generated SectionInfo content step. Otherwise the section content size
-//    can't be known, and the address and offset of section can't be calculated.
-//  e.Refill address to specific section content. st_value of ELFSym, r_offset
-//    of ELFRela and d_val of ELFDyn are need to be refilled actual address.
-//  f.Relocate. One of the most important operations in linking procss. After
-//    resolved RelocInfo, merged EFLMgr and set section address operations, the
-//    empty location of relocatable RelocInfo need to be refilled by the actual
-//    address of target SymbolInfo. The target address will be caculated
-//    according to the different relocating type in specific architecture.
-//    e.g.: Given '.rela.debug_info' section, the 'Offset' represents the offset
-//          in 'debug_info' section needs to be refilled by an acutal address
-//          that can be caculated by the address of 'var_1'. And the formula is
-//          determined by the 'Type'.
-//    |------------------------------------------------------------------------|
-//    |Relocation section '.rela.debug_info' at offset 0x08 contains 6 entries:|
-//    |------------------------------------------------------------------------|
-//    |    Offset           Info       Type  Sym.  Value    Sym. Name + Addend |
-//    | 000000000010    001300000001    1    000000000000       var_1 + 0      |
-//    | 000000000020    001300000002    2    000000000000       var_2 + 2      |
-//    |                                ...                                     |
-//    |------------------------------------------------------------------------|
-//  g.Generated ELFSHdr info of output ELFMgr.
-//  h.Output ELFMgr to disk.
-#define LINKERMGR_OUTPUT_FILE_NAME   "mi.test.elf"
-#define LINKERMGR_DUMP_LOG_FILE_NAME "dump.log"
-
-typedef xcom::TMap<Sym const*, Vector<UINT>*> RelocSymbolIdxMap;
-typedef xcom::TMapIter<Sym const*, Vector<UINT>*> RelocSymbolIdxMapIter;
-
-typedef xcom::TMap<Sym const*, UINT, CompareKeyBase<Sym const*>,
-    GenMappedOfSameNameNumMap> SameNameNumMap;
-
-//The class manages all linking processes. These processes contain merge
-//multi-ELFMgr, resolve undefined symbols, relocate symbols and output
-//target ELF.
-class LinkerMgr {
-    COPY_CONSTRUCTOR(LinkerMgr);
-
-protected:
-    //File name of output ELF.
-    CHAR const* m_output_file_name;
-
-    //Manage dump file.
-    FileObj * m_dump;
-
-    //ELFMgr to which the output ELF belong.
-    ELFMgr * m_output_elf_mgr;
-
-    //Record the string name of SymbolInfo, RelocInfo, FunctionInfo and other
-    //info that may be used in linking process. A Sym object will be generated
-    //that contains the string name and recorded into SymTab. It can decrease
-    //lookup time by changing from comparing characters to comparing pointers.
-    //There is 'm_sym_tab' in ELFMgr too. But the Sym element in 'm_sym_tab'
-    //in different ELFMgr can't be directly used in LinkerMgr. Since string
-    //with same name in different ELFMgr may be generated Sym object element
-    //with different pointers. Thus all string name that may be used in linking
-    //process need to be generated a new Sym object element and recorded into
-    //'m_sym_tab' in Linkermgr object.
-    SymTab m_sym_tab;
-
-    //Record ELFMgr object. The List contains all ELFMgr objects that would
-    //be used in LinkerMgr. It includes the element in 'm_elf_mgr_meta_list'
-    //and ELFMgr objects that generated by other module.
-    xcom::List<ELFMgr*> m_elf_mgr_list;
-
-    //Record ELFMgr object that generated by LinkerMgr. Some ELFMgr objects
-    //that generated in other module don't be recorded in this List.
-    xcom::List<ELFMgr*> m_elf_mgr_meta_list;
-
-    //Record relocated symbol.
-    RelocInfoVec m_reloc_symbol_vec;
-
-    //Record the index of unresolved relocated symbol in 'm_reloc_symbol_vec'.
-    //            key                     value
-    //'resolved_reloc_symbol_name' <-> 'Vector<UINT>'.
-    RelocSymbolIdxMap m_unresolved_reloc_idx_map;
-
-    //Record the index of resolved relocated symbol in 'm_reloc_symbol_vec'.
-    //            key                     value
-    //'unresolved_reloc_symbol_name' <-> 'Vector<UINT>'.
-    RelocSymbolIdxMap m_resolved_reloc_idx_map;
-
-    //Record the number of symbols with same name.
-    SameNameNumMap m_same_name_num_map;
-
-    //Manage ELFARMgr object.
-    ELFARMgr m_armgr;
-
-    //Manage Linker info object.
-    LinkerInfoMgr m_infomgr;
-
-    //Manage log file.
-    LogMgr m_logmgr;
-public:
-    LinkerMgr();
-
-    virtual ~LinkerMgr();
-
-    //Allocate ELFMgr during linker.
-    virtual ELFMgr * allocELFMgr()
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
-
-    //Allocate output ELFMgr.
-    virtual ELFMgr * allocOutputELFMgr()
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
-
-    //Allocate vector to record the unresolved RelocInfo.
-    //'reloc_info': unresolved RelocInfo.
-    //'idx': the index of 'reloc_info' in 'm_reloc_sym_vec'.
-    void allocUnresolvedRelocSymbol(RelocInfo const* reloc_info, UINT idx);
-
-    //Close dump log file.
-    void closeDump();
-
-    //Check whether the SymbolInfo with the name of
-    //'symbol_name' has been used to resolve RelocInfo.
-    bool checkHasBeenResolvedReloc(Sym const* symbol_name);
-
-    //Collect alias info from each ELFMgr in 'elf_mgr_list'.
-    void collectAliasInfo(MOD xcom::List<ELFMgr*> * elf_mgr_list);
-
-    //Resolve 'reloc_info' if the RelocInfo with the same name
-    //has been resolved.
-    //'elf_mgr': ELFMgr to which target resolved SymbolInfo belong.
-    //'reloc_info': RelocInfo needs to be resolved.
-    //'reloc_index': the index of 'reloc_info' in 'm_reloc_sym_vec'.
-    bool checkCurrentRelocInfoHasBeenResolved(MOD ELFMgr * elf_mgr,
-        MOD RelocInfo * reloc_info, UINT reloc_index);
-
-    //It is entry function of resolving RelocInfo. When output shared object
-    //file, the RelocInfo need to be resolved via finding target SymbolInfo from
-    //different ELFMgr. These ELFMgr mainly collected from xoc::Var, object file
-    //and AR file. Firstly, SymbolInfo will be found in ELFMgr that collected
-    //from xoc::Var. xoc::Var ELFMgr is directly generated from compile file.
-    //These files have the highest priority during finding target SymbolInfo.
-    //Then other SymbolInfo of unresolved RelocInfo will be found from ELFMgr
-    //that collected from AR file. AR file that read from library file path is
-    //sorted in the order they were read in. Thus if there are more than one
-    //target SymbolInfo of unresolved RelocInfo in different AR file, the
-    //SymbolInfo that found from the first AR file will be used to resolve
-    //RelocInfo. And other target SymbolInfo are not in use.
-    //  a.In the beginning, RelocInfo that collected from xoc::Var have been
-    //recorded into 'm_reloc_symbol_vec'. 'm_reloc_symbol_vec' record all
-    //RelocInfo that need to be resolved. But it will be constantly updated
-    //during the processing of resolving. Since except for collecting the target
-    //SymbolInfo into LinkerMgr that has been found in AR file, ELFMgr to which
-    //SymbolInfo and RelocInfo belong will be collected too.
-    //  b.'m_unresolved_reloc_idx_map' record the index of unresolved RelocInfo
-    //in 'm_reloc_symbol_vec'. 'm_resolved_reloc_idx_map' record the index of
-    //resolved RelocInfo in 'm_reloc_symbol_vec'. 'm_unresolved_reloc_idx_map'
-    //will be initialised before the processing of resolving starts.
-    //  c.Found target SymbolInfo from ELFMgr collected from xoc::Var. It will
-    //iterate over all SymbolInfo in all xoc::Var ELFMgr, and check whether the
-    //name of SymbolInfo existed in 'm_unresolved_reloc_dix_map'. RelocInfo will
-    //be resolved if target SymbolInfo has been found.
-    //  d.Found target SymbolInfo from ELFMgr collected from AR file. It will
-    //enter 'while' statement until all unresolved RelocInfo are resovlved or
-    //all AR files have been found. In 'while' statement, each AR file will get
-    //from 'm_ar_file_stack' in the order their read in. And a 'for' statement
-    //is used to iterate over the global symtab in this AR file. Each symbol
-    //name getting from global symtab will be used to find unresolved RelocInfo
-    //from 'm_unresolved_reloc_idx_map'. If there is unresolved RelocInfo, the
-    //symbol will be read in.
-    //  e.|     AR file   |    |      global symtab    |    | ELFMgr object |
-    //    |---------------|    |-----------------------|    |---------------|
-    //    | global symtab |    | symbol(name, ELF idx) |    |  SymbolInfo   |
-    //    |      ELF      |    | symbol(name, ELF idx) |    |  RelocInfo    |
-    //    |      ELF      |    | symbol(name, ELF idx) |    | FunctionInfo  |
-    //    |      ...      |    |         ... ...       |    |               |
-    //   If a 'symbol' has been found from AR file to resolve RelocInfo, it
-    //needs to generate a 'ELFMgr' that collected from ELF info in AR file via
-    //the ELF index of 'symbol'. And a 'SymbolInfo' will be generated aoocrding
-    //to 'symbol' info. The 'ELFMgr' to which 'SymbolInfo' belong contains other
-    //SymbolInfo, RelocInfo and FunctionInfo. These info need to be used to
-    //update info in LinkerMgr. e.g.: 'ELFMgr' will be appended to
-    //'m_elf_mgr_meta_list'. RelocInfo will be appended to 'm_reloc_sym_vec'
-    //and 'm_unresolved_reloc_idx_map'.
-    //  f.Break out 'while' statement until all RelocInfo have been resolved
-    //or AR file have been found.
-    void doResolve();
-
-    //Dump library file path.
-    //'lib_path_list': List that record all library files path.
-    void dumpLibPathList(xcom::List<CHAR const*> * lib_path_list) const;
-
-    //If there is unresolved RelocInfo after doResolve() function has
-    //been called. These unresolved RelocInfo will be dumped to log file.
-    void dumpLinkResolve() const;
-
-    //Dump RelocInfo during relocate.
-    //'index': the index of 'reloc_info' in 'm_reloc_symbol_vec'.
-    void dumpLinkRelocate(RelocInfo const* reloc_info, UINT index) const;
-
-    //It is entry function of relocating. After completing resolved RelocInfo,
-    //merged ELFMgr and setting section address operations, the empty location
-    //of relocatable RelocInfo need to be refilled by the actual address of
-    //target SymbolInfo. The target address will be calculated according to
-    //the different relocating type in specific architecture.
-    //e.g.: Given a RelocInfo that has been resolved by SymbolInfo. The
-    //      RELOCINFO_called_loc(RelocInfo) needs to be refilled by a actual
-    //      address. And the formula of this autual address:
-    //        'address = address of SymbolInfo + RELOCINFO_addend(RelocInfo)'
-    //      Different formula will be chosen according to the different
-    //      RELOCINFO_type(RelocInfo).
-    //'elf_mgr': the output ELFMgr.
-    virtual void doRelocate(MOD ELFMgr * elf_mgr)
-    { ASSERTN(0, ("Target Dependent Code")); return; }
-
-    //Generate ELFMgr object.
-    ELFMgr * genELFMgr();
-
-    //Get target ELF info from AR file via 'index'.
-    //And collect SymbolInfo and RelocInfo from this target ELF.
-    //'ar': AR file.
-    //'index': the index of target ELF info in AR file.
-    //return target ELFMgr.
-    ELFMgr * getELFMgrFromARViaIdx(MOD ELFAR * ar, UINT64 index);
-
-    //Get target ELF info from AR file according to 'index'.
-    //It will try to find from 'm_ar_info_map' firstly.
-    //'ar': AR file.
-    //'index': the index of target ELF info in AR file.
-    //return target ELFMgr.
-    ELFMgr * getELFMgrWhichSymbolBelongTo(MOD ELFAR * ar, UINT64 index);
-
-    //Get the number of 'symbol_info' with same name.
-    UINT getSameNameNum(SymbolInfo const* symbol_info);
-
-    //Process SymbolInfo with the same name in different ELFMgr. It will keep
-    //track of how many times this SymbolInfo has the same name. And the number
-    //will be added to the original SymbolInfo name as a suffix. Thus the new
-    //name foramt is "original_name + number suffix".
-    //e.g.: given three SymbolInfo with the same name 'str'. The new name of
-    //      these SymbolInfo are 'str', 'str.R_1', and 'str.R_2'.
-    //'elf_mgr': ELFMgr currently being operated on.
-    //'is_special_elf_mgr': There is special handling for specific ELFMgr
-    //formed by symbol, relocation and other standard format info of ELF that
-    //directly generated by upper compiler. SymbolInfo to which belong this
-    //ELFMgr needs to be renamed later.
-    void handleSameNameInDiffFile(MOD ELFMgr * elf_mgr,
-                                  bool is_special_elf_mgr);
-
-    //Check whether there is still unresolved RelocInfo.
-    //'is_notype_as_resolved': SymbolInfo with STT_NOTYPE attribute also
-    //can be used to resolve RelocInfo. The flag dedicated whether these
-    //RelocInfos need to be counted. 'true': RelocInfo that resoved by
-    //SymbolInfo with STT_NOTYPE doesn't need to be counted as unresolved
-    //RelocInfo. 'false': RelocInfo that resolved by SymbolInfo with
-    //STT_NOTYPE needs to be counted as unresolved RelocInfo.
-    bool hasUnResolvedRelocSymbol(bool is_notype_as_resolved) const;
-
-    //Check whether there is another SymbolInfo in ELFMgr that recorded
-    //in 'm_elf_mgr_list' with the same name as 'symbol_info' in 'elf_mgr'.
-    //'is_special_elf_mgr': There is special handling for specific ELFMgr
-    //formed by symbol, relocation and other standard format info of ELF that
-    //directly generated by upper compiler. SymbolInfo to which belong this
-    //ELFMgr needs to be renamed later.
-    bool hasSameSymbol(ELFMgr const* elf_mgr, SymbolInfo const* symbol_info,
-                       bool is_special_elf_mgr);
-
-    //Initialize the info of LinkerMgr. The name of output ELFMgr
-    //can be set by 'output_name' that provided by outside user or
-    //the default value will be used.
-    void initLinkerMgr(CHAR const* output_name, UINT elf_type);
-
-    //Initialize 'm_unresolved_reloc_idx_map'.
-    void initUnResolveSymbol();
-
-    //Initialize dump file info.
-    //'filename': the name of dump file.
-    EM_STATUS initDumpFile(CHAR const* filename);
-
-    //Skip some reladyn items that don't need to be processed.
-    //'elf_mgr': the output ELFMgr.
-    //'reloc_info': RelocInfo.
-    bool skipSpecificRelaDyn(MOD ELFMgr * elf_mgr,
-                             RelocInfo const* reloc_info) const;
-
-    //A helper function of merged section from different ELFMgr.
-    void mergeELFMgrHelper();
-
-    //Record code and data info in different ELFMgr into the
-    //corresponded section of output ELFMgr. The function
-    //mainly process ELFMgr that collected from object ELF.
-    void mergeELFMgr();
-
-    //Record code and data info in different ELFMgr into the
-    //corresponded section of output ELFMgr. The function
-    //mainly process ELFMgr that collected from xoc::Var.
-    void mergeELFMgrCollectedFromVar();
-
-    //The implement function of recording code and data
-    //info into the corresponded section of output ELFMgr.
-    //'elf_mgr': ELFMgr currently being operated on.
-    //'shdr': ELFSHdr currently being operated on.
-    //'shdr_name': the name of 'shdr'.
-    //'shdr_idx': the index of 'shdr' in ELF.
-    virtual void mergeELFMgrImpl(MOD ELFMgr * elf_mgr,
-        ELFSHdr const* shdr, CHAR const* shdr_name, UINT shdr_idx);
-
-    //The implement function of merged the shdr of ELFMgr to output
-    //ELFMgr section. BSS section needs to be assigned 0 after merged.
-    //Section content with progbits type needs to be copied to output
-    //ELFMgr section.
-    //'shdr': shdr that needs to be merged.
-    //'shdr_name': the name of 'shdr'.
-    //'is_bss_shdr': whether the shdr is BSS section.
-    void mergeShdrImpl(ELFSHdr const* shdr,
-        Sym const* shdr_name, bool is_bss_shdr);
-
-    //Merge ELFSHdr with no-bits type to the
-    //corresponded section of output ELFMgr.
-    //'elf_mgr': ELFMgr that is currently being merged.
-    //'shdr': ELFSHdr with no-bits type.
-    //'shdr_idx': the index of 'shdr' in ELF.
-    //'shdr_subname': the name of 'shdr'.
-    virtual void mergedShdrWithNoBitsType(MOD ELFMgr * elf_mgr,
-        ELFSHdr const* shdr, UINT shdr_idx, Sym const* shdr_subname);
-
-    //Merge ELFShdr with prog-bits type to the
-    //corresponded section of output ELFMgr.
-    //'shdr': ELFMgr with prog-bits type.
-    //'shdr_subname': the name of 'shdr'.
-    virtual void mergedShdrWithProgBitsType(
-        ELFSHdr const* shdr, Sym const* shdr_subname);
-
-    //The helper section of merged code in 'symbol_info'
-    //into .text section of output ELFMgr.
-    void mergeCodeHelper(MOD SymbolInfo * symbol_info);
-
-    //Merge code in 'symbol_info' into .text
-    //Section of ET_DYN type output ELFMgr.
-    virtual void mergeDynTypeCodeImpl(MOD SymbolInfo * symbol_info);
-
-    //Merge code in 'symbol_info' into .text
-    //Section of ET_REL type output ELFMgr.
-    virtual void mergeRelTypeCodeImpl(MOD SymbolInfo * symbol_info);
-
-    //Merge data in 'symbol_info' into .data section of output ELFMgr.
-    virtual void mergeData(MOD SymbolInfo * symbol_info);
-
-    //SymbolInfo with SHN_COMMON attribute needs to be allocated memory space
-    //and assigned 0 in .bss merged section. And the st_shndx field of ELFSym
-    //of SymbolInfo needs to be set to .bss shdr of 'elf_mgr'.
-    //'elf_mgr': ELFMgr to which SymbolInfo belong.
-    //'shdr_idx': the index of .bss shdr of 'elf_mgr'.
-    //'shdr_subname': the name of .bss shdr.
-    void mergeSymbolInfoWithCOMAttr(MOD ELFMgr * elf_mgr, UINT shdr_idx,
-                                    Sym const* shdr_subname);
-
-    //It is entry function of output shared object ELF file.
-    //It will be called if the command option is '-elf-fatbin'.
-    //'elf_mgr_list': List that recorded all ELFMgr.
-    void outputSharedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list);
-
-    //It is entry function of output relocated object ELF file.
-    void outputRelocatedObjFile(MOD xcom::List<ELFMgr*> * elf_mgr_list);
-
-    //Count the number of element of '.plt' section and
-    //generate '.plt' section content.
-    void preProcessPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
-
-    //It is entry function of generating output executed ELF.
-    void processOutputExeELF();
-
-    //'lib_path_list' contains all the path of library files.
-    //These files need to be recorded to 'm_armgr' object.
-    //'m_armgr' manages all library files.
-    void processLibPathList(MOD xcom::List<CHAR const*> * lib_path_list);
-
-    //Before linking process, it needs to collect valid info from all files.
-    //The function will generate ELFMgr and read ELF info for each file.
-    //'obj_file_list': files come from object file.
-    //'elf_mgr_list': files come from xoc::Var.
-    void processOBJFileList(MOD xcom::List<CHAR const*> * obj_file_list,
-                            OUT xcom::List<ELFMgr*> * elf_mgr_list);
-
-    //There is the meaning of special reloc_type of specific 'reloc_info' that
-    //depended on the reloc_type of other related RelocInfo. Thus it needs to
-    //be processed according to different architecture.
-    //'index': the index of 'reloc_info' in 'm_reloc_symbol_vec'.
-    virtual void processRelateRelocInfo(MOD RelocInfo * reloc_info, UINT index)
-    { ASSERTN(0, ("Target Dependent Code")); return; }
-
-    //Create reladyn item of .reladyn section. Since the address of all
-    //sections have not been set, the value of r_offset filed of ELFRela
-    //can't be determined. Now it just allocates memory space and records
-    //the number of reladyn item. After setting the address of sections,
-    //the value of r_offset will be refilled.
-    //'elf_mgr': output ELFMgr.
-    void preProcessRelaDynSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
-
-    //Create relaplt item of .relaplt section. Since the address of all
-    //sections have not been set, the value of r_offset filed of ELFRela
-    //can't be determined. Now it just allocates memory space and records
-    //the number of reladyn item. After setting the address of sections,
-    //the value of r_offset will be refilled.
-    //'elf_mgr': output ELFMgr.
-    void preProcessRelaPltSectBeforeSetSectAddr(MOD ELFMgr * elf_mgr);
-
-    //There is post-processing operation after ELFMgr that collected from
-    //xoc::Var has been merged according to different architecture.
-    //e.g.: Some variables need to be sorted before written into section
-    //      content. Thus these variables need to be collected to Vector
-    //      or Map during the processing of merged ELFMgr firstly. Then
-    //      their will be written into section content after completing
-    //      the sorting operation in this post-processing function.
-    virtual void postMergeELFMgrCollectedFromVar() { return; }
-
-    //Process RelocInfo after new ELFMgr is read. These RelocInfo need to
-    //be recorded to 'm_reloc_info_vec'. And their index will be updated
-    //to 'm_resolved_idx_map' or 'm_unresolved_idx_map' according to this
-    //RelocInfo whether has been resolved.
-    //'ar': AR file to which 'elf_mgr' belong.
-    //'elf_mgr': ELFMgr to which RelocInfo belong.
-    //'idx': the index of ELF in AR file.
-    void processRelocInfo(ELFAR const* ar, MOD ELFMgr * elf_mgr, UINT64 idx);
-
-    //Record debug infomation into the corresponded section of output ELFMgr.
-    //These debug infomation mainly come from ELFMgr collected from xoc::Var.
-    //'elf_mgr': ELFMgr to which debug info belong.
-    //'symbol_info': SymbolInfo currently being operated on.
-    void processDebugInfo(MOD ELFMgr * elf_mgr, MOD SymbolInfo * symbol_info);
-
-    //Found target SymbolInfo from ELFMgr that collected from xoc::Var. These
-    //ELFMgr mainly come from compile files that directly provided by user.
-    //These compile files have the highest priority during the processing of
-    //found target SymbolInfo. The function will iterate over all SymbolInfo
-    //in all xoc::Var ELFMgr, and check whether the name of SymbolInfo existed
-    //in 'm_unresolved_reloc_idx_map'. RelocInfo will be resolved if target
-    //SymbolInfo has been found.
-    void resolveRelocInfoViaVar();
-
-    //The function is used to find target SymbolInfo from ELFMgr that collected
-    //from AR file. AR file is packaged with numerous ELF. If target symbol has
-    //been found, a new ELFMgr will be created according to the ELF info to
-    //which this target symbol belong.
-    //1.Enter 'while' statement until all unresolved RelocInfo are resovlved or
-    //  all AR file have been found. In 'while' statement, AR file is popped
-    //  from 'm_ar_file_stack' and a 'for' statement is used to iterate over
-    //  global symtab in the AR file.
-    //2.'symbol' getting from global symtab will be used to find unresolved
-    //  RelocInfo from 'm_unresolved_reloc_idx_map'.
-    //3.Skipped if RelocInfo with the same name as 'symbol' has been resolved.
-    //  Thus if there are more than one target 'symbol' with the same name as
-    //  RelocInfo, only the first target 'symbol' will be used to resolve.
-    //4.If there isn't unresolved RelocInfo with the same name as 'symbol' in
-    //  'm_unresolved_reloc_idx_map', the 'symbol' still needs to be recorded.
-    //  Since RelocInfo in 'm_reloc_sym_vec' is constantly updated according to
-    //  the situation, there may be RelocInfo updated later needs this 'symbol'
-    //  to resolve. Thus ELFARInfo is used to record the relationship between
-    //  the name and index of 'symbol' and AR file, and this ELFARInfo object
-    //  will be recorded into 'm_symbol_ar_info_map'.
-    //5.If there is unresolved RelocInfo with the same name as 'symbol' in
-    //  'm_unresolved_reloc_idx_map', ELFMgr to which 'symbol' belong will be
-    //  got by 'findELFMgr' function or generated from AR file according to
-    //  ELFARInfo. If a new ELFMgr is generated, SymbolInfo and RelocInfo which
-    //  are belong to this ELFMgr need to be recorded into the Linkermgr.
-    //6.RelocInfo will be resolved by this tharget 'symbol'.
-    void resolveRelocInfoViaARFile();
-
-    //Resolve RelocInfo. 'is_notype' dedicated whether 'symbol_info' is
-    //with 'STT_NOTYPE' attribute. Since the 'STT_NOTYPE' symbol can be
-    //used to resolve RelocInfo too.
-    //'sym_name': the name of RelocInfo and SymbolInfo.
-    //'is_notype': whether the SymbolInfo is with 'STT_NOTYPE' attribute.
-    void resolveRelocInfo(Sym const* sym_name,
-        MOD SymbolInfo * symbol_info, bool is_notype = false);
-
-    //Resolve RelocInfo with SymbolInfo that comes from 'elf_mgr'.
-    //'symbol_name': the name of RelocInfo and SymbolInfo.
-    void resolveRelocInfoWithELFMgr(MOD ELFMgr * elf_mgr,
-                                    Sym const* symbol_name);
-
-    //SymbolInfo with 'STT_NOTYPE' attribute can be used to resolve RelocInfo
-    //too. But it needs to be replaced if there is another SymbolInfo with the
-    //same name and no 'STT_NOTYPE' attribute.
-    //'sym_name": the name of RelocInfo and SymbolInfo.
-    void resolveRelocInfoReplaceNoType(Sym const* sym_name,
-                                       MOD SymbolInfo * symbol_info);
-
-    //RelocInfo with the same name as 'reloc_info' has been resolved.
-    //Thus it just needs to get target resolved SymbolInfo from
-    //'m_resolved_reloc_idx_map' to resolve the 'reloc_info'.
-    //'reloc_info': RelocInfo needs to be resolved.
-    //'index': the index of 'reloc_info' in 'm_reloc_sym_vec'.
-    void relocInfoHasBeenResolved(MOD RelocInfo * reloc_info, UINT index);
-
-    //The RelocInfo has been recorded. The function will try to
-    //find target SymbolInfo from 'elf_mgr' to resolve it.
-    //'ar': AR file to which SymbolInfo may belong.
-    //'elf_mgr': ELFMgr to which SymbolInfo may belong.
-    //'reloc_info': RelocInfo needs to be resolved.
-    //'idx': the index of 'elf_mgr' in 'ar'.
-    void relocInfoHasBeenRecorded(ELFAR const* ar, MOD ELFMgr * elf_mgr,
-                                  RelocInfo const* reloc_info, UINT64 idx);
-
-    //Rename SymbolInfo and RelocInfo in 'elf_mgr'.
-    //'elf_mgr': ELFMgr to which SymbolInfo and RelocInfo belong.
-    //'target_symbol_info': get old name from this SymbolInfo.
-    //'new_name': new name of SymbolInfo and RelocInfo.
-    void renameSymbolName(MOD ELFMgr * elf_mgr,
-        SymbolInfo const* target_symbol_info, CHAR const* new_name);
-
-    //Set the number of SymbolInfo with the same name.
-    //'symbol_info': SymbolInfo with the same name.
-    //'v': the number.
-    void setSameNameNum(SymbolInfo const* symbol_info, UINT v)
-    {
-        ASSERT0(symbol_info);
-        m_same_name_num_map.setIfFind(SYMINFO_name(symbol_info), v);;
-    }
-
-    //Target resolved SymbolInfo exists in 'elf_mgr'. RelocInfo will be
-    //resolved by the SymbolInfo.
-    //'elf_mgr': ELFMgr to which SymbolInfo belong.
-    //'reloc_info': RelocInfo that needs to be resolved.
-    void targetSymbolInfoFoundInCurrentELFMgr(
-        MOD ELFMgr * elf_mgr, RelocInfo const* reloc_info);
-
-    //Try to find target resolved SymbolInfo of 'reloc_info' from 'elf_mgr'.
-    //'ar': AR file to which target SymbolInfo may belong.
-    //'idx': the index of 'elf_mgr' in 'ar'.
-    //'ar_info': AR info that record the index of ELFMgr in AR file.
-    //'elf_mgr': ELFMgr to which target SymbolInfo may belong.
-    //'reloc_info': RelocInfo that needs to be resolved.
-    bool targetSymbolInTheSameELFMgr(ELFAR const* ar, UINT64 idx,
-        ELFARInfo const* ar_info, MOD ELFMgr * elf_mgr,
-        RelocInfo const* reloc_info);
-
-    //Try to find target resolved SymbolInfo of 'reloc_info' from other ELFMgr.
-    //'ar_info': AR info that record the index of ELFMgr in AR file.
-    //'reloc_info': RelocInfo that needs to be resolved.
-    bool targetSymbolNoInTheSameELFMgr(
-        ELFARInfo const* ar_info, RelocInfo const* reloc_info);
-
-    //Collect valid info from 'elf_mgr' to LinkerMgr object.
-    //These info mainly contain SymbolInfo and RelocInfo.
-    void updateELFInfo(MOD ELFMgr * elf_mgr);
-
-    //Record RelocInfo in 'elf_mgr' to 'm_reloc_symbol_vec'.
-    void updateRelocInfoVec(ELFMgr const* elf_mgr);
-
-    //Update RelocInfo offset after corresponded section merged.
-    //'elf_mgr': ELFMgr to which RelocInfo belong.
-    //'shdr': ELFSHdr to which RelocInfo belong.
-    //'shdr_name': the name of 'shdr', used for getting corresponded section.
-    //'shdr_idx': the index of 'shdr' in ELFHdr.
-    void updateRelaOfst(MOD ELFMgr * elf_mgr, ELFSHdr const* shdr,
-                        CHAR const* shdr_name, UINT sh_idx);
-
-    //Update RELOCINFO_called_loc(reloc_info) after corresponded section merged.
-    //It will be updated according to the reloc type in different architecture.
-    virtual void updateRelaOfst(MOD RelocInfo * reloc_info);
-
-    //Update SymbolInfo offset after corresponded section merged.
-    //'elf_mgr': ELFMgr to which SymbolInfo belong.
-    //'shdr': ELFSHdr to which SymbolInfo belong.
-    //'sh_idx': the index of 'shdr' in ELFHdr.
-    void updateSymbolOfst(MOD ELFMgr * elf_mgr,
-                          ELFSHdr const* shdr, UINT sh_idx);
-
-    //Record unresolved RelocInfo into 'm_unresolved_reloc_idx_map'.
-    //'elf_mgr': ELFMgr to which RelocInfo belong.
-    //'reloc_info': unresolved RelocInfo.
-    //'idx': the index of 'reloc_info' in 'm_reloc_symbol_vec', it will
-    //       be recorded into 'm_unresolved_reloc_idx_map'.
-    void updateUnresolvedRelocInfo(
-        MOD ELFMgr * elf_mgr, MOD RelocInfo * reloc_info, UINT idx);
 };
 
 }

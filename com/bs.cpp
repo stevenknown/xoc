@@ -217,7 +217,8 @@ void BitSet::rev(BSIdx last_bit_pos)
 //Complement set of s = univers - s.
 void BitSet::complement(BitSet const& univers)
 {
-    BitSet tmp(univers);
+    BitSet tmp;
+    tmp.copy(univers);
     tmp.diff(*this);
     copy(tmp);
 }
@@ -955,7 +956,8 @@ BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
     if (&res == &set1) {
         res.diff(set2);
     } else if (&res == &set2) {
-        BitSet tmp(set1);
+        BitSet tmp;
+        tmp.copy(set1);
         tmp.diff(set2);
         res.copy(tmp);
     } else {

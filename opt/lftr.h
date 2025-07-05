@@ -66,6 +66,7 @@ public:
 class LFAnaCtx {
     LI<IRBB> const* m_li;
     SMemPool * m_pool;
+    OptCtx const& m_oc;
     IRList m_cand_list; //record the IR expression that to be displaced.
     LFRInfoMap m_cand_occ2info;
     TMap<MD const*, IV const*> m_ivmd2ivinfo; //cache IV for next use
@@ -79,7 +80,7 @@ private:
     }
     LFRInfo * allocLFRInfo();
 public:
-    LFAnaCtx(LI<IRBB> const* li);
+    LFAnaCtx(OptCtx const& oc, LI<IRBB> const* li);
     ~LFAnaCtx() { smpoolDelete(m_pool); }
 
     void addCandLF(IR * x) { m_cand_list.append_tail(x); }
@@ -92,6 +93,7 @@ public:
     LFRInfoMap const& getLFRInfoMap() const { return m_cand_occ2info; }
     LFRInfo * getLFRInfo(IR const* exp) const
     { return m_cand_occ2info.get(exp); }
+    OptCtx const& getOptCtx() const { return m_oc; }
 
     void setMapExpToLFRInfo(IR const* exp, LFRInfo * info)
     { m_cand_occ2info.set(exp, info); }
@@ -109,7 +111,6 @@ class LFTR : public Pass {
     MDSSAMgr * m_mdssamgr;
     DUMgr * m_dumgr;
     IRMgr * m_irmgr;
-    OptCtx * m_oc;
     IRIter m_iriter; //for local using
 protected:
     void analyzeBB(LI<IRBB> const* li, IRBB const* bb, MOD LFAnaCtx & ctx);
@@ -132,7 +133,6 @@ protected:
     IR * genNewIVRef(LFRInfo const* info);
     void getLinearRepOfIV(LFAnaCtx const& ctx, IR const* lf_exp,
                           IV const** iv, IR const** coeff);
-    OptCtx * getOptCtx() const { return m_oc; }
     IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Insert PHI at head BB of loop for given reduction operation.
@@ -161,7 +161,6 @@ public:
         ASSERT0(rg != nullptr);
         m_cfg = rg->getCFG();
         m_pool = smpoolCreate(sizeof(LFRInfo) * 4, MEM_COMM);
-        m_oc = nullptr;
         m_dumgr = nullptr;
         m_irmgr = nullptr;
     }

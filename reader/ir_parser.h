@@ -184,18 +184,22 @@ public:
 };
 
 
+typedef xcom::TMap<CHAR const*, X_CODE, CompareStringFunc> String2XCode;
+typedef xcom::TMapIter<CHAR const*, X_CODE> String2XCodeIter;
+
 class IRParser {
+    COPY_CONSTRUCTOR(IRParser);
 protected:
-    TMap<CHAR const*, X_CODE, CompareStringFunc> m_str2xcode;
-    TMap<CHAR const*, X_CODE, CompareStringFunc> m_prop2xcode;
-    TMap<CHAR const*, X_CODE, CompareStringFunc> m_stmt2xcode;
-    TMap<CHAR const*, X_CODE, CompareStringFunc> m_exp2xcode;
-    TMap<CHAR const*, X_CODE, CompareStringFunc> m_type2xcode;
     UINT m_ctx_id; //used to count the number of ParseCtx occurred.
     TypeMgr * m_tm;
     Lexer * m_lexer;
     RegionMgr * m_rm;
     List<ParseErrorMsg*> m_err_list;
+    String2XCode m_str2xcode;
+    String2XCode m_prop2xcode;
+    String2XCode m_stmt2xcode;
+    String2XCode m_exp2xcode;
+    String2XCode m_type2xcode;
 protected:
     //Return true if GRReader allows user defined dedicated PRNO in GR file.
     //e.g: stpr $200 = 0;
@@ -214,6 +218,7 @@ protected:
     bool checkLabel(IR const* irlist, ParseCtx const& ctx);
     //Return false if there is error occur.
     bool constructSSAIfNeed(ParseCtx * ctx);
+    void copyProp(IR * ir, PropertySet & ps, ParseCtx * ctx);
 
     bool declareType(ParseCtx * ctx);
     bool declareVarProperty(Var * var, ParseCtx * ctx);
@@ -234,7 +239,11 @@ protected:
     X_CODE getXCode(TOKEN tok, CHAR const* tok_string);
     X_CODE getCurrentXCode();
 
-    void initKeyWordMap();
+    virtual void initStmtKeyWord();
+    virtual void initExpKeyWord();
+    virtual void initTypeKeyWord();
+    virtual void initPropertyKeyWord();
+    void initStr2KeyWord();
     bool isTooManyError() const { return m_err_list.get_elem_count() > 10; }
     bool isType(X_CODE code) const;
     bool isEndOfScope() const
@@ -247,8 +256,12 @@ protected:
     bool isExp();
     bool isTerminator(TOKEN tok);
 
-    UINT mapIden2Prno(CHAR const* prid, ParseCtx * ctx);
+    PRNO mapIden2Prno(CHAR const* prid, ParseCtx * ctx);
 
+    bool parseTypeWrap(ParseCtx * ctx, OUT Type const*& ty);
+    bool parsePropertyWrap(IR_CODE code, ParseCtx * ctx, OUT PropertySet & ps);
+    bool parseCommaWrap();
+    bool parseExpWrap(ParseCtx * ctx);
     bool parseCustomizedPrno(PRNO * prno, ParseCtx * ctx);
     bool parseStringLiteralPrno(PRNO * prno, CHAR const* str, ParseCtx * ctx);
     bool parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx);
@@ -311,18 +324,16 @@ protected:
     bool parseType(ParseCtx * ctx, Type const** ty);
     bool parseExp(ParseCtx * ctx);
     bool parseExpList(ParseCtx * ctx);
-public:
-    IRParser(RegionMgr * rumgr) : m_lexer(nullptr), m_rm(rumgr)
-    {
-        m_ctx_id = 0;
-        m_tm = rumgr->getTypeMgr();
-        ASSERT0(checkKeyWordMap());
-        initKeyWordMap();
-    }
-    COPY_CONSTRUCTOR(IRParser);
-    ~IRParser();
+    virtual bool parseExtXCode(ParseCtx * ctx);
 
-    bool dump() const;
+    Type const* reviseTypeByCode(IR_CODE code, Type const* ty);
+public:
+    IRParser(RegionMgr * rm);
+    virtual ~IRParser();
+
+    void dumpMiscString2XCode() const;
+    void dumpXCodeInfo() const;
+    void dump() const;
 
     CHAR const* getPassName() const { return "IRParser"; }
     RegionMgr * getRegionMgr() const { return m_rm; }
@@ -330,6 +341,8 @@ public:
     CHAR const* getKeyWordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }
     UINT genParseCtxId() { return ++m_ctx_id; }
+
+    void initMap();
 
     void setLexer(Lexer * l) { m_lexer = l; }
 

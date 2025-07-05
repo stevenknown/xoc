@@ -33,14 +33,15 @@ namespace xoc {
 
 class MDLivenessMgr : public Pass {
     COPY_CONSTRUCTOR(MDLivenessMgr);
+protected:
+    DUMgr * m_dumgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDSetMgr m_mds_mgr;
-    DUMgr * m_dumgr;
     Vector<MDSet*> m_liveout_mds_vec;
     Vector<MDSet*> m_livein_mds_vec;
     Vector<MDSet*> m_def_mds_vec;
     Vector<MDSet*> m_use_mds_vec;
-
+protected:
     //Note this function will not clean 'mayuse', thus the result will blend
     //with original elements.
     void collectMayUseMDS(IR const* ir, OUT MDSet * mayuse);
@@ -52,32 +53,7 @@ class MDLivenessMgr : public Pass {
 public:
     MDLivenessMgr(Region * rg) : Pass(rg), m_mds_mgr(rg, &m_sbs_mgr)
     { m_dumgr = rg->getDUMgr(); }
-    ~MDLivenessMgr()
-    {
-        for (VecIdx i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_livein_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr.free(mds);
-        }
-
-        for (VecIdx i = 0; i <= m_liveout_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_liveout_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr.free(mds);
-        }
-
-        for (VecIdx i = 0; i <= m_def_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_def_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr.free(mds);
-        }
-
-        for (VecIdx i = 0; i <= m_use_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_use_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr.free(mds);
-        }
-    }
+    virtual ~MDLivenessMgr();
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.

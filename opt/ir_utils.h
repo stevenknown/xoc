@@ -43,21 +43,102 @@ typedef xcom::List<IR*> IRIter; //the iter to iterate IR Tree.
 typedef xcom::TMap<IR*, xcom::C<IR*>*> IR2Holder;
 typedef xcom::EList<IR*, IR2Holder> IREList;
 typedef xcom::EList<IR*, IR2Holder>::Iter IREListIter;
-
-typedef xcom::List<IR*> IRList;
-typedef xcom::List<IR*>::Iter IRListIter;
-
-typedef xcom::List<IR const*> ConstIRList;
-typedef xcom::List<IR const*>::Iter ConstIRListIter;
-
 typedef xcom::TTab<IR*> IRTab;
 typedef xcom::TTabIter<IR*> IRTabIter;
-
 typedef xcom::TTab<IR const*> ConstIRTab;
 typedef xcom::TTabIter<IR const*> ConstIRTabIter;
 
 //Type to describe the Prno of PR operation.
-typedef UINT PRNO;
+typedef ULONG PRNO;
+
+typedef xcom::List<IR*>::Iter IRListIter;
+class IRList : public xcom::List<IR*> {
+protected:
+    bool verifyUnique(IR const* ir) const;
+public:
+    IRListIter append_head(IR * ir)
+    {
+        ASSERT0(verifyUnique(ir));
+        return xcom::List<IR*>::append_head(ir);
+    }
+    IRListIter append_tail(IR * ir)
+    {
+        ASSERT0(verifyUnique(ir));
+        return xcom::List<IR*>::append_tail(ir);
+    }
+};
+
+typedef xcom::List<IR const*>::Iter ConstIRListIter;
+class ConstIRList : public xcom::List<IR const*> {
+protected:
+    bool verifyUnique(IR const* ir) const;
+public:
+    ConstIRListIter append_head(IR const* ir)
+    {
+        ASSERT0(verifyUnique(ir));
+        return xcom::List<IR const*>::append_head(ir);
+    }
+    ConstIRListIter append_tail(IR const* ir)
+    {
+        ASSERT0(verifyUnique(ir));
+        return xcom::List<IR const*>::append_tail(ir);
+    }
+};
+
+
+//Mapping between an unsigned long integer and a list of IR.
+//Manage object memory automatically.
+class UINT2ConstIRList : public xcom::TMap<UINT, ConstIRList*> {
+    List<ConstIRList*> m_irlst_lst; //Collect all allocated objects.
+public:
+    virtual ~UINT2ConstIRList()
+    {
+        for (ConstIRList * il = m_irlst_lst.get_head();
+             il != nullptr; il = m_irlst_lst.get_next()) {
+            delete il;
+        }
+    }
+
+    //'u' corresponds to multiple 'ir'.
+    void append(UINT u, IR const* ir)
+    {
+        ASSERT0(u != 0 && ir); //'0' is set as default nullptr
+        ConstIRList * irlst = get(u);
+        if (irlst == nullptr) {
+            set(u, ir);
+        } else {
+            irlst->append_tail(ir);
+        }
+    }
+
+    virtual void clean(UINT u)
+    {
+        ASSERT0(u != 0); //'0' is set as default nullptr
+        ConstIRList * irlst = xcom::TMap<UINT, ConstIRList*>::get(u);
+        if (irlst != nullptr) {
+            irlst->clean();
+        }
+    }
+
+    // Set a single IR for a given key 'u'.
+    // If a list already exists, replace the existing IR with the new one.
+    virtual void set(UINT u, IR const* ir)
+    {
+        ASSERT0(u != 0 && ir); // '0' is set as default nullptr
+        ConstIRList * irlst = get(u);
+        if (irlst == nullptr) {
+            irlst = new ConstIRList();
+            m_irlst_lst.append_tail(irlst);
+            xcom::TMap<UINT, ConstIRList*>::set(u, irlst);
+        } else {
+            // In single IRBB, only record the immediate-dominate DEF IR.
+            ASSERT0(irlst->get_elem_count() <= 1);
+            irlst->remove_head(); // Remove the existing IR.
+        }
+        irlst->append_tail(ir); // Add the new IR.
+    }
+};
+
 
 class IRVec : public xcom::Vector<IR*> {
 public:

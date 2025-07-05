@@ -238,6 +238,26 @@ bool MDSSAInfo::isEqual(MDSSAInfo const& src) const
 }
 
 
+//The function looks for the first MDDef that exactly define 'md'.
+MDDef const* MDSSAInfo::findCoverMDDef(MDSSAMgr const* mgr, MD const* md) const
+{
+    ASSERT0(mgr && md);
+    VOpndSetIter it = nullptr;
+    UseDefMgr const* udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
+    MDSystem const* mdsys = mgr->getMDSystem();
+    for (BSIdx i = readVOpndSet().get_first(&it);
+         i != BS_UNDEF; i = readVOpndSet().get_next(i, &it)) {
+        VMD const* t = (VMD*)udmgr->getVOpnd(i);
+        ASSERT0(t && t->is_md());
+        MDDef const* mddef = t->getDef();
+        if (mddef == nullptr) { continue; }
+        MD const* mddef_md = mddef->getResultMD(mdsys);
+        if (mddef_md->is_exact_cover(md)) { return mddef; }
+    }
+    return nullptr;
+}
+
+
 void MDSSAInfo::copyBySpecificMD(
     MDSSAInfo const& src, MD const* md, UseDefMgr * mgr)
 {
@@ -293,15 +313,16 @@ void MDSSAInfo::removeVOpnd(VOpnd const* vopnd, UseDefMgr * mgr)
 //Return true if there is VMD renamed.
 //Note current MDSSAInfo is the SSA info of 'exp', the VOpndSet will be
 //vmd: intent to be swap-in.
-bool MDSSAInfo::renameSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr)
+bool MDSSAInfo::renameOrAddSpecificUse(
+    IR const* exp, MOD VMD * vmd, UseDefMgr * mgr)
 {
-    bool do_rename = false;
     ASSERT0(exp && exp->is_exp() && mgr);
     ASSERT0(UseDefMgr::getMDSSAInfo(exp) == this);
     VOpndSet * vopndset = getVOpndSet();
     MDIdx vmdid = vmd->mdid();
     VOpndSetIter it = nullptr;
     VOpndSetIter prev_it = nullptr;
+    bool changed = false;
     for (BSIdx i = vopndset->get_first(&it); i != BS_UNDEF;
          prev_it = it, i = vopndset->get_next(i, &it)) {
         VMD * vopnd = (VMD*)mgr->getVOpnd(i);
@@ -312,16 +333,17 @@ bool MDSSAInfo::renameSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr)
             //removeVOpnd to speedup the accessing of bitset.
             //removeVOpnd(vopnd, mgr);
             vopndset->remove(vopnd, prev_it, it, *mgr->getSBSMgr());
-            do_rename = true;
+            changed = true;
             break;
         }
     }
-    if (do_rename) {
+    if (exp->isRefMD(vmdid)) {
         //Note addUse() will build DefUse chain between 'vmd' and 'exp'.
         vmd->addUse(exp);
         addVOpnd(vmd, mgr);
+        changed = true;
     }
-    return do_rename;
+    return changed;
 }
 
 
@@ -517,41 +539,37 @@ void VMD::clean()
 }
 
 
-void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
+static void dumpDefChain(
+    VMD const* vmd, UseDefMgr const* mgr, Region const* rg)
 {
-    if (!rg->isLogMgrInit()) { return; }
-    ASSERT0(is_md() && rg);
-    //prt(rg, "(");
-    prt(rg, "VMD%d:MD%dV%d", id(), mdid(), version());
-
     //Dump Def
-    if (getDef() != nullptr) {
+    MDDef const* mddef = vmd->getDef();
+    if (mddef != nullptr) {
         //TBD: I think MDDef could be PHI.
         //ASSERT0(!getDef()->is_phi());
 
-        if (getDef()->getPrev() != nullptr) {
+        if (mddef->getPrev() != nullptr) {
             prt(rg, ",PrevDEF:MD%dV%d",
-                getDef()->getPrev()->getResult()->mdid(),
-                getDef()->getPrev()->getResult()->version());
+                mddef->getPrev()->getResult()->mdid(),
+                mddef->getPrev()->getResult()->version());
         } else {
             prt(rg, ",-");
         }
-
-        if (getDef()->getNextSet() != nullptr) {
+        if (mddef->getNextSet() != nullptr) {
             MDDefSetIter nit = nullptr;
             bool first = true;
-            for (BSIdx w = getDef()->getNextSet()->get_first(&nit);
-                w != BS_UNDEF; w = getDef()->getNextSet()->get_next(w, &nit)) {
+            for (BSIdx w = mddef->getNextSet()->get_first(&nit);
+                w != BS_UNDEF;
+                w = mddef->getNextSet()->get_next(w, &nit)) {
                 if (first) {
                     first = false;
                 } else {
                     prt(rg, ",");
                 }
-
                 MDDef const* use = mgr->getMDDef(w);
                 ASSERTN(use, ("not such MDDef"));
                 ASSERT0(use->getResult());
-                ASSERTN(use->getPrev() == getDef(), ("insanity relation"));
+                ASSERTN(use->getPrev() == mddef, ("insanity relation"));
                 prt(rg, ",NextDEF:MD%dV%d",
                     use->getResult()->mdid(), use->getResult()->version());
             }
@@ -559,21 +577,35 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
     } else {
         prt(rg, ",-");
     }
+}
 
+
+static void dumpOccSet(VMD const* vmd, Region const* rg)
+{
     //Dump OccSet
     prt(rg, "|USESET:");
     bool first = true;
-    VMD * pthis = const_cast<VMD*>(this);
     VMD::UseSetIter vit;
-    xcom::StrBuf tmp(8);
-    for (UINT i2 = pthis->getUseSet()->get_first(vit);
-         !vit.end(); i2 = pthis->getUseSet()->get_next(vit)) {
+    xcom::DefFixedStrBuf tmp;
+    for (UINT i2 = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
+         !vit.end(); i2 = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         if (first) { first = false; }
         else { prt(rg, ","); }
         IR * use = rg->getIR(i2);
         ASSERT0(use && use->isMemRef());
-        prt(rg, "%s", dumpIRName(use, tmp));
+        prt(rg, "%s", xoc::dumpIRName(use, tmp));
     }
+}
+
+
+void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    ASSERT0(is_md() && rg);
+    //prt(rg, "(");
+    prt(rg, "VMD%d:MD%dV%d", id(), mdid(), version());
+    dumpDefChain(this, mgr, rg);
+    dumpOccSet(this, rg);
 }
 
 
@@ -596,12 +628,13 @@ void VMD::addUseSet(IRSet const& set, Region const* rg)
 void MDPhi::replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd)
 {
     ASSERT0(oldopnd && newopnd);
-    xcom::replace(&MDPHI_opnd_list(this), oldopnd, newopnd);
+    xcom::replace_one(&MDPHI_opnd_list(this), oldopnd, newopnd);
 }
 
 
-IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
-                         OptCtx const& oc, OUT MDSSAStatus & st)
+IR * MDPhi::insertOpndAt(
+    MDSSAMgr * mgr, UINT pos, IRBB const* pred, OptCtx const& oc,
+    OUT MDSSAStatus & st)
 {
     Region * rg = mgr->getRegion();
     UINT i = 0;
@@ -625,13 +658,15 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred,
     MDSSAInfo * mdssainfo = nullptr;
     if (livein_def != nullptr) {
         //Generate MDSSAInfo for new operand.
-        mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, livein_def->version());
+        mdssainfo = mgr->genMDSSAInfoAndSetDedicatedVersionVMD(
+            opnd, livein_def->version());
     } else {
         //Still generate a MDSSAInfo to new operand of PHI even if there is no
         //legal VMD. Because we expect to do error recovery and tolerate more
         //following passes untill the MDSSA reconstruction.
         //Generate MDSSAInfo for new operand.
-        mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, MDSSA_INIT_VERSION);
+        mdssainfo = mgr->genMDSSAInfoAndSetDedicatedVersionVMD(
+            opnd, MDSSA_INIT_VERSION);
     }
     mgr->getUseDefMgr()->setMDSSAInfo(opnd, mdssainfo);
 
@@ -763,16 +798,15 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
     ASSERT0(rg);
     ASSERT0(is_phi());
     if (!rg->isLogMgrInit()) { return; }
-
     List<IRBB*> preds;
     IRCFG * cfg = rg->getCFG();
     ASSERT0(cfg);
     cfg->get_preds(preds, getBB());
     IRBB * pred = preds.get_head();
-
-    ASSERT0(getResult());
-    prt(rg, "MDPhi%u: MD%uV%u <- ", id(), getResult()->mdid(),
-        getResult()->version());
+    VMD const* vmd = getResult();
+    ASSERT0(vmd);
+    prt(rg, "MDPhi%u:VMD%u:MD%uV%u <- ", id(), vmd->id(), vmd->mdid(),
+        vmd->version());
     for (IR const* opnd = getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
@@ -781,7 +815,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
         dumpOpnd(opnd, pred, rg, mgr);
         pred = preds.get_next();
     }
-    dumpUseSet(getResult(), const_cast<Region*>(rg));
+    dumpUseSet(vmd, const_cast<Region*>(rg));
 }
 //END MDPhi
 
@@ -849,23 +883,19 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
             ((VMD*)v)->destroy();
         }
     }
-
     for (VecIdx i = 0; i <= m_def_vec.get_last_idx(); i++) {
         MDDef * d = m_def_vec.get((UINT)i);
         if (d != nullptr && d->getNextSet() != nullptr) {
             d->getNextSet()->clean(*getSBSMgr());
         }
     }
-
     for (VecIdx i = 0; i <= m_mdssainfo_vec.get_last_idx(); i++) {
         MDSSAInfo * info = m_mdssainfo_vec.get((UINT)i);
         if (info != nullptr) {
             info->destroy(*getSBSMgr());
         }
     }
-
     destroyMD2VMDVec();
-
     if (is_reinit) {
         m_map_md2vmd.destroy();
         m_map_md2vmd.init();
@@ -972,8 +1002,8 @@ MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir)
 MDSSAInfo * UseDefMgr::allocMDSSAInfo()
 {
     ASSERT0(m_mdssainfo_pool);
-    MDSSAInfo * p = (MDSSAInfo*)smpoolMallocConstSize(sizeof(MDSSAInfo),
-                                                      m_mdssainfo_pool);
+    MDSSAInfo * p = (MDSSAInfo*)smpoolMallocConstSize(
+        sizeof(MDSSAInfo), m_mdssainfo_pool);
     ASSERT0(p);
     ::memset((void*)p, 0, sizeof(MDSSAInfo));
     p->init();
@@ -1035,8 +1065,8 @@ void UseDefMgr::removeMDDef(MDDef * def)
 
 MDDefStmt * UseDefMgr::allocMDDefStmt()
 {
-    MDDefStmt * def = (MDDefStmt*)smpoolMallocConstSize(sizeof(MDDefStmt),
-                                                        m_defstmt_pool);
+    MDDefStmt * def = (MDDefStmt*)smpoolMallocConstSize(
+        sizeof(MDDefStmt), m_defstmt_pool);
     def->init();
     MDDEF_id(def) = m_def_count++;
     m_def_vec.set(MDDEF_id(def), def);
@@ -1046,8 +1076,8 @@ MDDefStmt * UseDefMgr::allocMDDefStmt()
 
 MDDefSet * UseDefMgr::allocMDDefSet()
 {
-    MDDefSet * defset = (MDDefSet*)smpoolMallocConstSize(sizeof(MDDefSet),
-                                                         m_defset_pool);
+    MDDefSet * defset = (MDDefSet*)smpoolMallocConstSize(
+        sizeof(MDDefSet), m_defset_pool);
     defset->init();
     return defset;
 }
@@ -1060,9 +1090,8 @@ xcom::SC<VOpnd*> * UseDefMgr::allocSCVOpnd(VOpnd * opnd)
         sc->init();
         return sc;
     }
-
-    sc = (xcom::SC<VOpnd*>*)smpoolMallocConstSize(sizeof(xcom::SC<VOpnd*>),
-                                                  m_vopnd_sc_pool);
+    sc = (xcom::SC<VOpnd*>*)smpoolMallocConstSize(
+        sizeof(xcom::SC<VOpnd*>), m_vopnd_sc_pool);
     sc->init();
     SC_val(sc) = opnd;
     return sc;
@@ -1158,7 +1187,6 @@ MDPhiList * UseDefMgr::genBBPhiList(UINT bbid)
 {
     MDPhiList * lst = m_philist_vec.get(bbid);
     if (lst != nullptr) { return lst; }
-
     lst = (MDPhiList*)smpoolMallocConstSize(sizeof(MDPhiList), m_philist_pool);
     ASSERT0(lst);
     lst->init(m_philist_sc_pool);

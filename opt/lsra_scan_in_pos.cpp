@@ -70,7 +70,7 @@ void ScanInPosOrder::collectUnhandledForUse(IR const* ir, ConstIRIter & irit)
 
 void ScanInPosOrder::tryAssignRegForDefPos(Pos curpos, IR const* ir)
 {
-    ASSERT0(!m_ra.isSpillOp(ir) && !m_ra.isReloadOp(ir) && !m_ra.isMoveOp(ir));
+    ASSERT0(!m_ra.isOpInPosGap(ir));
     if (ir->isCallStmt()) {
         m_impl.splitCallerSavedLT(curpos, ir);
         m_impl.splitLinkLT(curpos, ir);
@@ -87,7 +87,7 @@ void ScanInPosOrder::tryAssignRegForDefPos(Pos curpos, IR const* ir)
 void ScanInPosOrder::tryAssignRegForUsePos(Pos curpos, IR const* ir)
 {
     ASSERT0(ir->is_stmt());
-    ASSERT0(!m_ra.isSpillOp(ir) && !m_ra.isReloadOp(ir) && !m_ra.isMoveOp(ir));
+    ASSERT0(!m_ra.isOpInPosGap(ir));
     do {
         IR const* curir = nullptr;
         LifeTime * cand = m_impl.selectAssignUseCand(curpos, ir, &curir);
@@ -108,11 +108,11 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     PRNO prno = res->getPrno();
     ASSERT0(prno != PRNO_UNDEF);
 
-    //Verify dedicated PR.
+    //Verify pre-assigned PR.
     LifeTime * lt = m_ra.getLT(prno);
     ASSERT0(lt);
-    if (lt->isDedicated()) {
-        Reg antireg = m_ra.getDedicatedReg(prno);
+    if (lt->isPreAssigned()) {
+        Reg antireg = m_ra.getPreAssignedReg(prno);
         ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
         ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
     }
@@ -136,11 +136,11 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         PRNO prno = e->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
 
-        //Verify dedicated PR.
+        //Verify pre-assigned PR.
         LifeTime * lt = m_ra.getLT(prno);
         ASSERT0(lt);
-        if (lt->isDedicated()) {
-            Reg antireg = m_ra.getDedicatedReg(prno);
+        if (lt->isPreAssigned()) {
+            Reg antireg = m_ra.getPreAssignedReg(prno);
             ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
             ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
         }
@@ -190,7 +190,7 @@ void ScanInPosOrder::scanIR(IR * ir, UpdatePos & up, ConstIRIter & irit)
     }
     scanRHS(ir, upos, irit);
     scanLHS(ir, dpos);
-    ASSERT0(m_ra.verify4List());
+    ASSERT0L3(m_ra.verify4List());
 }
 
 

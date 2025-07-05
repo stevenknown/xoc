@@ -79,7 +79,7 @@ public:
 //to caller.
 #define CFGOPTCTX_vertex_iter_time(x) ((x)->m_vertex_iter_time)
 
-class CfgOptCtx {
+class CfgOptCtx : public PassCtx {
     CfgOptCtx const& operator = (CfgOptCtx const&);
     void reinit()
     {
@@ -95,10 +95,6 @@ public:
     //This is local used variable to collect information bottom-up from callee
     //to caller.
     UINT m_vertex_iter_time;
-
-    //Record current OptCtx.
-    OptCtx & m_oc;
-    ActMgr * m_am;
     union {
         BYTE m_flags; //union set of optimization flags.
         struct {
@@ -120,13 +116,11 @@ public:
         } s1;
     } common_info;
 public:
-    CfgOptCtx(OptCtx & toc, ActMgr * am = nullptr)
-        : m_oc(toc), m_am(am) { reinit(); }
-    CfgOptCtx(CfgOptCtx const& src) : m_oc(src.m_oc)
-    { reinit(); copyTopDownInfo(src); }
+    CfgOptCtx(OptCtx * toc, ActMgr * am = nullptr);
+    CfgOptCtx(CfgOptCtx const& src);
 
     void copyTopDownInfo(CfgOptCtx const& src)
-    { common_info = src.common_info; m_am = src.m_am; }
+    { common_info = src.common_info; m_oc = src.m_oc; m_am = src.m_am; }
 
     //If it is true, CFG optimizer will attempt to merge label to
     //next BB if current BB is empty. Default is true.
@@ -137,14 +131,14 @@ public:
     bool has_generate_unreach_bb() const
     { return CFGOPTCTX_has_generate_unreach_bb(this); }
 
-    OptCtx & getOptCtx() const { return m_oc; }
+    OptCtx & getOptCtx() const { return *m_oc; }
     ActMgr * getActMgr() const { return m_am; }
 
     //Return true if caller asks CFG optimizer to maintain DomInfo on the fly.
     bool needUpdateDomInfo() const
-    { return CFGOPTCTX_need_update_dominfo(this) && m_oc.is_dom_valid(); }
+    { return CFGOPTCTX_need_update_dominfo(this) && m_oc->is_dom_valid(); }
 
-    void setOptCtx(OptCtx const& loc) { m_oc.copy(loc); }
+    void setOptCtx(OptCtx const& loc) { m_oc->copy(loc); }
 
     //The function unify ctx information that collected by 'src'.
     void unionBottomUpInfo(CfgOptCtx const& src)
@@ -176,8 +170,23 @@ protected:
     xcom::SMemPool * m_pool;
     xcom::List<BB*> m_exit_list; //CFG Graph ENTRY list
     LoopInfoMgr<BB> m_li_mgr;
+    #ifdef _DEBUG_
+    xcom::TTab<CfgOptCtx*> m_ctxtab; //only used for debug. To avoid mem-leak.
+    #endif
 protected:
     RPOVexList * allocRPOVexList() { return new RPOVexList(); }
+    void appendAllocatedCfgOptCtx(CfgOptCtx * ctx)
+    {
+        #ifdef _DEBUG_
+        m_ctxtab.append(ctx);
+        #endif
+    }
+    virtual CfgOptCtx * allocCfgOptCtx(CfgOptCtx const& src)
+    {
+        CfgOptCtx * newctx = new CfgOptCtx(src);
+        appendAllocatedCfgOptCtx(newctx);
+        return newctx;
+    }
 
     //Collect loop info e.g: loop has call, loop has goto.
     void collectLoopInfo() { collectLoopInfoRecur(m_loop_info); }
@@ -188,6 +197,15 @@ protected:
     void computeRPOImpl(xcom::BitSet & is_visited, IN xcom::Vertex * v,
                         OUT INT & order);
     inline void collectLoopInfoRecur(LI<BB> * li);
+
+    void freeCfgOptCtx(CfgOptCtx * ctx)
+    {
+        #ifdef _DEBUG_
+        ASSERT0(m_ctxtab.find(ctx));
+        m_ctxtab.remove(ctx);
+        #endif
+        delete ctx;
+    }
 
     void genRPOVexList()
     { if (m_rpo_vexlst == nullptr) { m_rpo_vexlst = allocRPOVexList(); } }
@@ -234,6 +252,10 @@ public:
         xcom::smpoolDelete(m_pool);
         cleanRPOVexList();
         cleanBBVertex();
+        #ifdef _DEBUG_
+        ASSERTN(m_ctxtab.get_elem_count() == 0,
+                ("Found memory leak of the CfgOptCtx"));
+        #endif
     }
 
     //Add BB which is break-point of loop into loop.
@@ -345,7 +367,7 @@ public:
         //Do not dump if LogMr is not initialized.
         if (!rg->isLogMgrInit()) { return; }
         xcom::StrBuf buf(32);
-        xcom::DGraph::dumpDom(buf);
+        xcom::DGraph::dumpDomAndPdom(buf);
         note(rg, "%s", buf.getBuf());
     }
 
@@ -355,8 +377,8 @@ public:
     {
         //Do not dump if LogMr is not initialized.
         if (!rg->isLogMgrInit()) { return; }
-        xcom::DGraph::dumpDom(rg->getLogMgr()->getFileHandler(),
-                              dump_dom_tree, dump_pdom_tree);
+        xcom::DGraph::dumpDomAndPdom(
+            rg->getLogMgr()->getFileHandler(), dump_dom_tree, dump_pdom_tree);
     }
 
     //Find natural loops.
@@ -427,6 +449,7 @@ public:
 
     //Return the fallthrough BB of 'bb'.
     BB * getFallThroughBB(BB const* bb) const;
+    BB * getFallThroughBB(typename xcom::List<BB*>::Iter ct) const;
 
     //Return the previous BB that fallthrough to 'bb'.
     BB * getFallThroughPrevBB(BB const* bb);
@@ -436,6 +459,11 @@ public:
     {
         ASSERT0(bb);
         XR * xr = get_last_xr(bb);
+        ASSERTN(xr != nullptr, ("bb is empty"));
+        return getTargetBB(xr);
+    }
+    BB * getTargetBB(XR const* xr) const
+    {
         ASSERTN(xr != nullptr, ("bb is empty"));
         LabelInfo const* lab = xr->getLabel();
         ASSERTN(lab != nullptr, ("xr does not correspond to a unqiue label"));
@@ -500,6 +528,14 @@ public:
     //Return true if bb is exit BB of function.
     //In some case, BB is not region-exit even if it is the CFG exit.
     virtual bool isRegionExit(BB *) const = 0;
+
+    //Return true if 'pred' is the unqiue predecessor of 'bb'.
+    bool isUniquePred(BB const* bb, BB const* pred) const
+    { return xcom::Graph::is_unique_pred(bb->getVex(), pred->getVex()); }
+
+    //Return true if 'succ' is the unqiue successor of 'bb'.
+    bool isUniqueSucc(BB const* bb, BB const* succ) const
+    { return xcom::Graph::is_unique_succ(bb->getVex(), succ->getVex()); }
 
     virtual bool isLoopHead(BB const* bb) const
     { return isLoopHeadRecur(m_loop_info, bb); }
@@ -1102,8 +1138,8 @@ void CFG<BB, XR>::dumpRPOVexList(Region const* rg) const
     note(rg, "\n-- DUMP RPO VEX LIST, VEXNUM(%u) --",
          getRPOVexList()->get_elem_count());
     rg->getLogMgr()->incIndent(2);
-    xcom::RPOMgr::dumpRPOVexList(rg->getLogMgr()->getFileHandler(),
-        *getRPOVexList(), rg->getLogMgr()->getIndent());
+    getRPOVexList()->dump(
+        rg->getLogMgr()->getFileHandler(), rg->getLogMgr()->getIndent());
     rg->getLogMgr()->decIndent(2);
 }
 
@@ -1437,6 +1473,14 @@ void CFG<BB, XR>::cleanBBVertex()
         BB * bb = ct->val();
         bb->cleanVex();
     }
+}
+
+
+template <class BB, class XR>
+BB * CFG<BB, XR>::getFallThroughBB(typename xcom::List<BB*>::Iter ct) const
+{
+    ASSERT0(ct);
+    return m_bb_list->get_next(&ct);
 }
 
 

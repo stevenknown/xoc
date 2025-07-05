@@ -122,7 +122,7 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
                 //We need to update the pc of the MCSymbol for the function.
                 Sym const* sym = LABELINFO_pragma(MI_lab(mi));
                 ASSERT0(sym);
-                dm->setFuncLabelOff(offset, sym);
+                dm->setFuncLabelOff((UINT)offset, sym);
             }
             continue;
         }
@@ -136,7 +136,9 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
 
         if (mi->hasLab()) {
             ASSERT0(MI_lab(mi));
-            setValueViaMICode(mi, computeJumpOff(m_mimgr, lab2off, mi));
+            TMWORD m_jump_offset = computeJumpOff(m_mimgr, lab2off, mi);
+            setValueViaMICode(mi, m_jump_offset);
+            m_jump_offset_map.set(mi, m_jump_offset);
         }
 
         if (m_mimgr->isCall(mi)) {
@@ -149,8 +151,8 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
 
             //[BUG_FIX] The offset of the memory access instruction needs to be
             //aligned upward according to the instruction type.
-            var_offset = xcom::ceil_align(var_offset,
-                                          getMInstAlign(mi->getCode()));
+            var_offset = (TMWORD)xcom::ceil_align(
+                var_offset, getMInstAlign(mi->getCode()));
             setValueViaMICode(mi, var_offset);
         }
 
@@ -158,6 +160,14 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
         MI_pc(mi) = offset;
         offset += mi->getWordBufLen();
     }
+}
+
+
+TMWORD MIRelocMgr::getJumpOffset(MInst const* mi) const
+{
+    ASSERT0(mi && mi->hasLab());
+
+    return m_jump_offset_map.get(const_cast<MInst *>(mi));
 }
 
 

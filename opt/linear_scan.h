@@ -76,67 +76,12 @@ public:
 //The attribute flag responding to a POS.
 typedef enum {
     //Undefined value.
-    POS_ATTR_UNDEF            = 0x0,
+    POS_ATTR_UNDEF = 0x0,
 
     //Indicate this IR should not generate the final instruction.
     //If this attribute is set, the IR responding to this POS should be deleted
     //after the register assignment.
-    POS_ATTR_NO_CODE_GEN      = 0x1,
-
-    //Indicate the lifetime of PR should be extended to the next DEF from the
-    //POS where POS_ATTR_LT_NO_TERM_AFTER is set.
-    //e.g: This attribute is set at POS 17.
-    //   Original lifetime: <2-17><34-67>
-    //    | ----------------                ----------------------------------
-    //    |                u                d      u           u             u
-    //                     ^
-    //                     |
-    //                 POS = 17
-    //
-    //   Modified lifetime: <2-33><34-67>
-    //    | ------------------------------------------------------------------
-    //    |                u                d      u           u             u
-    //
-    //   For this example, by giving POS 17, the range of lifetime <2-17> is
-    //   extended to the 33.
-    POS_ATTR_LT_NO_TERM_AFTER = 0x2,
-
-    //Indicate the lifetime of PR should be shrunk from the start of region to
-    //to the POS where POS_ATTR_LT_SHRINK_BEFORE is set.
-    //e.g: This attribute is set at POS 17.
-    //   Original lifetime: <2-17><34-67>
-    //    | ----------------                ----------------------------------
-    //    |                u                d      u           u             u
-    //                     ^
-    //                     |
-    //                 POS = 17
-    //
-    //   Modified lifetime: <17><34-67>
-    //    |                -                ----------------------------------
-    //    |                u                d      u           u             u
-    //
-    //   For this example, by giving POS 17, the range of lifetime <2-17> is
-    //   shrunk from 2 to 17.
-    POS_ATTR_LT_SHRINK_BEFORE   = 0x4,
-
-
-    //Indicate the lifetime of PR should be extended to the end of BB from the
-    //POS where POS_ATTR_LT_EXTEND_BB_END is set.
-    //e.g: This attribute is set at POS 53, and the end of BB is at POS 67.
-    //   Original lifetime: <2-17><34-53>
-    //    | ----------------                --------------------
-    //    |                u                d      u           u
-    //                                                         ^
-    //                                                         |
-    //                                                     POS = 53
-    //
-    //   Modified lifetime: <2-17><34-67>
-    //    | ----------------                ----------------------------------
-    //    |                u                d      u           u             u
-    //
-    //   For this example, by giving POS 53, the range of lifetime <34-53> is
-    //   extended to the end of BB 67.
-    POS_ATTR_LT_EXTEND_BB_END   = 0x8,
+    POS_ATTR_NO_CODE_GEN = 0x1,
 } POS_ATTR_FLAG;
 
 //This enum is used to describe the lexical sequence of BB for the fake-use IRs
@@ -145,7 +90,7 @@ typedef enum {
     BB_SEQ_UNDEF = 0,
 
     //The fake-use IR in this BB is the first in lexical sequence.
-    BB_SEQ_FIRST = 1,
+    BB_SEQ_FIRST,
 } BB_SEQ;
 
 //
@@ -183,25 +128,27 @@ typedef enum {
 
     //Indicate the fake-use IR should be appended at the head of BB.
     // eg.
-    // LABEL: label_XX
-    // ----- BB start ---
-    //                                     <-------- fake IR
-    // stpr $2:u32 id:xx
-    //     xxxx
-    //  goto label xxx id:xx
-    // ----- BB end ---
+    // LABEL: X
+    // -- BB start --
+    //                      <-- Append fake IR here.
+    // add $2:u32
+    // sub $3:u32
+    // mul $4:u32
+    // goto label L
+    // -- BB end --
     INSERT_MODE_HEAD = 1,
 
     //Indicate the fake-use IR should be appended at the end of BB but before
     //the branch IR.
     // eg.
-    // LABEL: label_XX
-    // ----- BB start ---
-    // stpr $2:u32 id:xx
-    //     xxxx
-    //                                     <-------- fake IR
-    //  goto label XXX id:xx
-    // ----- BB end ---
+    // LABEL: X
+    // -- BB start --
+    // add $2:u32
+    // sub $3:u32
+    // mul $4:u32
+    //                      <-- Append fake IR here.
+    //  goto label L
+    // -- BB end --
     INSERT_MODE_TAIL = 2,
 
     //Indicate the fake-use IR should be inserted in the middle of BB, usually a
@@ -382,13 +329,16 @@ protected:
     //Add the backward jump to the set m_backward_edges.
     void addBackwardJump(IRBB const* srcbb, IRBB const* dstbb)
     {
-        LexBackwardJump const* e = m_resource_mgr->genLexBackwardJump(srcbb,
-                                                                      dstbb);
+        LexBackwardJump const* e = m_resource_mgr->genLexBackwardJump(
+            srcbb, dstbb);
         m_backward_edges.append_tail(e);
     }
 
+    //Assign each BB a lexical sequence ID.
+    void assignLexSeqIdForBB(OUT Vector<UINT> & bb_seqid);
+
     //Collect all the backward jumps in the control flow graph.
-    void collectBackwardJumps();
+    void collectBackwardJumps(Vector<UINT> const& bb_seqid);
 
     void generateFakeUse();
 
@@ -426,46 +376,35 @@ protected:
 //END LexBackwardJumpAnalysis
 
 
-//This enum is used to indicate the PR is DEF or USE in an IR.
-typedef enum {
-    //Initial state for a PR.
-    PR_DU_UNDEF = 0,
+//
+//START FakeIRMgr
+//
+class FakeIRMgr {
+    COPY_CONSTRUCTOR(FakeIRMgr);
+    Region * m_rg;
+    LinearScanRA * m_lsra;
+    LexBackwardJumpAnalysis * m_back_jump_ana;
+    FakeVarMgr m_fake_var_mgr;
+    BBPos2Attr m_pos2attr;
+public:
+    FakeIRMgr(Region * rg, LinearScanRA * lsra) : m_rg(rg), m_lsra(lsra),
+        m_fake_var_mgr(rg)
+    {
+        m_back_jump_ana = new LexBackwardJumpAnalysis(m_rg,
+            &m_pos2attr, &m_fake_var_mgr, lsra);
+    }
+    ~FakeIRMgr()
+    {
+        if (m_back_jump_ana) { delete m_back_jump_ana; }
+    }
 
-    //PR is a DEF in an IR.
-    PR_DU_DEFINED = 1,
+    //Do the lexicographic backward jump analysis.
+    void doBackwardJumpAnalysis() { m_back_jump_ana->analyze(); }
 
-    //PR is a USE in an IR.
-    PR_DU_USED = 2,
-} PR_DU_STATE;
-
-//This enum is the check state of a PR in a BB which has multiple predecessors
-//on CFG.
-typedef enum {
-    //Initial state for check state.
-    PR_CHK_UNDEF = 0,
-
-    //This means the PR_DU_STATE of a PR in all predecessors is all
-    //PR_DU_DEFINED or PR_DU_USED.
-    PR_CHK_GOOD = 1,
-
-    //This means the PR_DU_STATE of a PR in some predecessors is PR_DU_DEFINED,
-    //while it is PR_DU_USED in other predecessors.
-    PR_CHK_CONFLICT = 2,
-} PR_CHK_STATE;
-
-//This union is used to describe the PR state, which includes the DU state and
-//the check state.
-typedef union {
-    //The whole data combined with DU state and check state.
-    UINT value;
-    struct {
-        //DEF and USE state of PR, and the value should be from PR_DU_STATE.
-        UINT16 du;
-
-        //The check state of PR, and the value should be from PR_CHK_STATE.
-        UINT16 chk;
-    } state;
-} PRState;
+    //Removed the fake-use IR inserted by the backward jump analysis.
+    void removeFakeUseIR();
+};
+//END FakeIRMgr
 
 
 //
@@ -562,25 +501,11 @@ protected:
     //registers unable to participate in normal register allocation. This
     //interface checks these modules and collects available registers.
     //Note that special handling can be done based on the architecture.
-    virtual void collectOtherAvailableRegister()
-    {
-        //Collect FP register.
-        //If the frame pointer register can be allocated and the dynamic stack
-        //function and prologue&epilogue inserter function have not used this
-        //register during the current compilation process, it can be used to
-        //participate in scalar callee saved register allocation.
-        //In addition, if debug mode is turned on, the frame pointer register
-        //has a special role and cannot participate in allocation. Also, it can
-        //not be used if debugging linear scan register allocation.
-        if (isFPAllocable()) {
-            Reg reg = getTIMgr().getFP();
-            m_avail_callee_scalar.bunion(reg);
-            m_avail_allocable.bunion(reg);
-        }
-    }
+    virtual void collectOtherAvailableRegister();
 
     void destroyDebugRegSet();
     void destroyRegSet();
+
     void initAvailRegSet();
 
     //Init the register set for debug purpose.
@@ -600,17 +525,22 @@ public:
 
     //Free register.
     void freeReg(xgen::Reg reg);
+
     //Free register.
     void freeReg(LifeTime const* lt);
 
     //Free register from alias register set.
     virtual void freeRegisterFromAliasSet(Reg r);
+
     //Free register from all caller alias register set.
     virtual void freeRegisterFromCallerAliasSet(Reg r);
+
     //Free register from all callee alias register set.
     virtual void freeRegisterFromCalleeAliasSet(Reg r);
+
     //Free register from all param alias register set.
     virtual void freeRegisterFromParamAliasSet(Reg r);
+
     //Free register from all return value alias register set.
     virtual void freeRegisterFromReturnValueAliasSet(Reg r);
 
@@ -628,21 +558,21 @@ public:
     UINT const getTotalRegNum() const { return getTIMgr().getNumOfRegister(); }
 
     //Handles the case where both conflict and consistency sets are present.
-    Reg handleConflictsAndConsistency(OUT RegSet & set,
-                                      PRNOConstraintsTab const& conflict_prs,
-                                      PRNOConstraintsTab const& consist_prs);
+    Reg handleConflictsAndConsistency(
+        OUT RegSet & set, PRNOConstraintsTab const& conflict_prs,
+        PRNOConstraintsTab const& consist_prs);
 
     //Handles the case where only conflict set is present.
-    Reg handleOnlyConflicts(OUT RegSet & set,
-                            PRNOConstraintsTab const& conflict_prs);
+    Reg handleOnlyConflicts(
+        OUT RegSet & set, PRNOConstraintsTab const& conflict_prs);
 
     //Handles the case where only consistency set is present.
     //TODO:
     //  Currently, the constraints of the consistency set are not
     //  considered during the register splitting process.
     //  Future implementation needs to support this.
-    Reg handleOnlyConsistency(OUT RegSet & set,
-                              PRNOConstraintsTab const& consist_prs);
+    Reg handleOnlyConsistency(
+        OUT RegSet & set, PRNOConstraintsTab const& consist_prs);
 
     //Init all register sets.
     //Note the function invoked by constructor can not be virtual.
@@ -660,15 +590,7 @@ public:
     //frame pointer register can be used as callee saved register if this
     //register can be allocated and the dynamic stack function has not used it.
     //Note that special handling can be done based on the architecture.
-    virtual bool isCalleeScalar(Reg r) const
-    {
-        bool is_callee_scalar = m_target_callee_scalar != nullptr &&
-            m_target_callee_scalar->is_contain(r);
-        //GCOVR_EXCL_START
-        bool use_fp_as_callee_scalar = isFP(r) && isFPAllocable();
-        //GCOVR_EXCL_STOP
-        return is_callee_scalar || use_fp_as_callee_scalar;
-    }
+    virtual bool isCalleeScalar(Reg r) const;
 
     //True if input reg is callee vector register.
     bool isCalleeVector(Reg r) const
@@ -698,11 +620,6 @@ public:
     //Whether current register "r" is frame pointer register.
     bool isFP(Reg r) const { return r == getTIMgr().getFP(); }
 
-    //Whether the frame pointer register is allocable. If the debug mode is not
-    //turned on, and dynamic stack, prologue/epilogue inserter function not use
-    //this register, it can be used for other purposes.
-    bool isFPAllocable() const;
-
     //True if input reg is param register.
     bool isParam(Reg r) const
     { return isParamScalar(r) || isParamVector(r); }
@@ -727,6 +644,15 @@ public:
     { ASSERTN(0, ("Target Dependent Code")); return false; }
     //GCOVR_EXCL_STOP
 
+    //Return true if register reg1 exactly cover reg2.
+    //e.g: reg1 indicates 32bit physical register eax on x86, and reg2
+    //indicates 8bit physical register ax, the function return true.
+    virtual bool isExactCover(Reg reg1, Reg reg2) const
+    { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Return true if register r1 alias to r2.
+    virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
+
     //True if input reg is return value register.
     bool isReturnValue(Reg r) const
     { return isReturnValueScalar(r) || isReturnValueVector(r); }
@@ -745,19 +671,15 @@ public:
             m_target_return_value_vector->is_contain(r);
     }
 
-    //Special registers represent registers used by dedicate
-    //that do not exist in any regset.
-    bool isSpecialReg(Reg r) const;
-
     //True if reg is a vector register.
     bool isVector(Reg r) const
     { return isCalleeVector(r) || isCallerVector(r); }
 
     //Get used caller regiser regset.
-    RegSet getUsedCaller() const { return m_used_caller; }
+    RegSet & getUsedCaller() { return m_used_caller; }
 
     //Get used callee regiser regset.
-    RegSet getUsedCallee() const { return m_used_callee; }
+    RegSet & getUsedCallee() { return m_used_callee; }
 
     //Pick a callee register, considering lifetime constraints.
     virtual Reg pickCallee(IR const* ir, LTConstraints const* lt_constraints);
@@ -786,16 +708,23 @@ public:
     //If only the conflict set is present, it calls `handleOnlyConflicts()`.
     //If only the consistency set is present,
     //it calls `handleOnlyConsistency()`.
-    Reg pickRegWithConstraints(OUT RegSet & set,
-                               LTConstraints const* lt_constraints);
+    Reg pickRegWithConstraints(
+        OUT RegSet & set, LTConstraints const* lt_constraints);
+
+    //Pick out all registers that alias with 'reg' and record in 'alias_set'.
+    void pickOutAliasRegSet(Reg reg, OUT RegSet & alias_set);
 
     virtual void pickRegisterFromAliasSet(Reg r);
+
     //Pick reg from all caller alias register sets.
     virtual void pickRegisterFromCallerAliasSet(Reg r);
+
     //Pick reg from all callee alias register sets.
     virtual void pickRegisterFromCalleeAliasSet(Reg r);
+
     //Pick register for all param register set.
     virtual void pickRegisterFromParamAliasSet(Reg r);
+
     //Pick register for all return value register set.
     virtual void pickRegisterFromReturnValueAliasSet(Reg r);
 
@@ -804,6 +733,7 @@ public:
 
     //Record the allocation of callee.
     void recordUsedCallee(Reg r);
+
     //Record the allocation of caller.
     void recordUsedCaller(Reg r);
 
@@ -811,9 +741,9 @@ public:
     //if they have been allocated physical registers. If so, it removes
     //those registers from the provided set and stores the removed
     //registers in removed_regs_wrap.
-    void removeConflictingReg(OUT RegSet & set,
-                              PRNOConstraintsTab const& conflict_prs,
-                              OUT RegSetWrap & removed_regs_wrap);
+    void removeConflictingReg(
+        OUT RegSet & set, PRNOConstraintsTab const& conflict_prs,
+        OUT RegSetWrap & removed_regs_wrap);
 };
 //END RegSetImpl
 
@@ -954,8 +884,504 @@ public:
 //END LTConstraintsMgr
 
 
+typedef xcom::List<Reg> RegList;
+typedef xcom::TTab<Var const*> VarPromoteTab;
+
+//
+//START IRGroup
+//
+#define IRGROUP_weight(g) (g->weight)
+#define IRGROUP_reg(g) (g->reg)
+#define IRGROUP_tmpvar(g) (g->tmp_var)
+#define IRGROUP_orgvar(g) (g->org_var)
+class IRGroup {
+    COPY_CONSTRUCTOR(IRGroup);
+public:
+    //Record the weight for the spill and reload IRs in the current group.
+    UINT weight;
+
+    //Record the available register can be used to do the promotion.
+    Reg reg;
+
+    //Record the original var used for the spill and reload IR.
+    Var const* org_var;
+
+    //Record the temp var which used for computing the lifetime of current
+    //group.
+    Var const* tmp_var;
+
+    //The set of reload and spill IRs.
+    IRVec irvec;
+public:
+    IRGroup(): weight(0), reg(REG_UNDEF), org_var(nullptr), tmp_var(REG_UNDEF)
+    {}
+
+    //Add an IR into the current group.
+    void addIR(IR const* ir)
+    {
+        ASSERT0(ir);
+        ASSERT0(ir->is_stpr() || ir->is_st());
+        irvec.append(const_cast<IR*>(ir));
+    }
+
+    void dump(Region * rg) const;
+
+    //Get the number of IR for the current group.
+    UINT getIRCnt() const { return irvec.get_elem_count(); }
+
+    IRVec const* getIRVec() const
+    { return &irvec; }
+
+    //Modify the var of IR in the group by the input var 'v'.
+    void modifyIRVar(Var const* v);
+
+    //Renanem the var of IR to the temp_var.
+    void renameIRVar();
+
+    //recover the original var in the IRs of current group.
+    void revertIRVar();
+};
+//END IRGroup
+
+typedef xcom::Vector<IRGroup*> IRGroups;
+
+//
+//START VarGroups
+//
+#define VARGROUPS_has_all(v) (v->m_has_all)
+class VarGroups {
+    COPY_CONSTRUCTOR(VarGroups);
+public:
+    //Used to indicate the current groups contain all the spill and reload
+    //IRs for the current spill var.
+    bool m_has_all;
+
+    //The groups for the spill var.
+    IRGroups * m_groups;
+public:
+    VarGroups() : m_has_all(true)
+    {
+        m_groups = new IRGroups();
+    }
+    ~VarGroups()
+    {
+        if (m_groups != nullptr) { delete m_groups; }
+    }
+
+    //Add a new group to the spill var.
+    void addGroup(UINT gid, IRGroup * irgp)
+    {
+        ASSERT0(irgp);
+        ASSERT0(m_groups);
+        m_groups->set(gid, irgp);
+    }
+
+    //Add the input ir to the specified group indicated by the group id.
+    void addIRToGroup(UINT gid, IR const* ir)
+    {
+        ASSERT0(ir);
+        ASSERT0(m_groups);
+        ASSERT0(m_groups->get(gid));
+        m_groups->get(gid)->addIR(ir);
+    }
+
+    void dump(Region * rg) const;
+
+    //Get the group number of the spill var.
+    UINT getGroupNum() const
+    {
+        if (m_groups == nullptr) { return 0; }
+        return m_groups->get_elem_count();
+    }
+
+    //Return the goups of the spill var.
+    IRGroup * getIRGroup(UINT idx) const
+    {
+        if (m_groups == nullptr) { return nullptr; }
+        return m_groups->get(idx);
+    }
+
+    //Check the groups of this spill var is full group or not. Return true
+    //if it has all the spill and reload IRs of the spill var, and also has
+    //only one group.
+    bool isFullGroup() const
+    { return m_has_all && m_groups->get_elem_count() == 1; }
+};
+//End VarGroups
+
+typedef xcom::TMap<Var const*, VarGroups*> Var2Groups;
+typedef xcom::TMapIter<Var const*, VarGroups*> Var2GroupsIter;
+typedef xcom::Vector<IRGroup*> IRGroupVec;
+
+//
+//START SpillReloadPromote
+//
+//This class shall promote the spill/reload to the move operation between
+//two registers, which helps to enhance the performance of register allocation.
+//The basic idea of this algorithm is listed below:
+//  1. Group the spill IR and reload IR by a spill var.
+//  2. Construct the var lifetime of each group.
+//  3. Find an available register to which can accomodate the live range of
+//     the spill var for each group by the overview of phisical register
+//     lifetime manager. Becasue all the registers has been assigned to the
+//     prnos during the previous register allocation, we try to find a hole in
+//     the register lifetime to accomodate the liftime of var for each group.
+//     e.g1:REG_1 cannot accomodate the lifetime of VAR_1, but the range of
+//          VAR_1<30-31> fit the hole of REG_2 well, so we can use the REG_2
+//          to replace the spill var VAR_1.
+//     LT:VAR_1,range:<30-31>
+//      |                             --
+//      |                             du
+
+//     LT:REG_1,range:<22-23><24-27><28-43>
+//      |                     ----------------------
+//      |                     dud  udu             u
+//     LT:REG_2,range:<22-23><24-27><35-43>
+//      |                     ------      ----------
+//      |                     dud  u      d        u
+//  4. Use the available physical register to replace the spill/reload IR by
+//     the register move operation.
+//
+//Based on the above idea, in order to decrease the most of the memory access
+//introduced by the spill/reload operation, we group the spill/reload IRs of
+//a spill var three times in three group modes, and try to find a proper
+//register which can eliminate the spill and reload IRs in the group.
+//
+//Let's explain the three group modes.
+//  1. GROUP_MODE_FULL:
+//       Group all the spill and reload IRs of a spill var into a big group,
+//       find an available register which can replace the spill var for all
+//       the spill and reload IRs in the group. That means we can eliminate
+//       all the spill reload IRs for this spill var.
+//
+//  2. GROUP_MOD_PART:
+//       Group some of spill and reload IRs for a spill var. Normally the USE
+//       of a spill var is reload operation, the DEF of a spill var is spill
+//       operation, If we find the USE of a spill var is only from a single
+//       DEF, then we group these spill and reload IRs into a group. That
+//       means the if the USE of a spill var is shared by multiple DEFs, this
+//       reload IR will not be grouped. We use the MDSSA Def-Use chain during
+//       the group process.
+//
+//  3. GROUP_MOD_SINGLE:
+//       Group each single DEF and USE of a spill var into a group, we also
+//       use the MDSSA Def-Use chain during the group process.
+//
+//  For a specific spill var, we do the following three steps:
+//  1. We do the full group for this var, if the full group can be promoted by
+//     register, we will not do the next two steps.
+//  2. We do the partial group for this var, usually there may be more than
+//     one group in the partial group mode. We try to promote some groups if
+//     e. If all these partial groups are promoted, we will not do the
+//     next step. In this step, we replace the reload IRs with move IRs, and
+//     leave the spill IR there because it is may be needed by other reload
+//     IRs.
+//  3. We do the single groups for the spill and reload which are not promoted
+//     in previous two steps. In this step, we replace the reload IRs with
+//     move IRs, and leave the spill IR there because it is may be needed by
+//     other reload IRs.
+//
+//Key data structure used in this class:
+//1. IRGroup: Record the an vector of spill/reload IR of a var, and also
+//            include the weight, the suitable promoted register for the IRs
+//            in the group and var info.
+//2. VarGroup:Record all the IR groups of a var, because we have three modes,
+//            there may be have more than one group is partial and single
+//            group mode.
+//3. Var2Groups:Map a var to it's group information.
+//                          | ID 1: IRGroup: [IR_1, IR2, ...]
+//      var --> VarGroups --| ID 2: IRGroup: [IR_5, IR6, ...]
+//                          | ID 3: IRGroup: [IR_3, IR9, ...]
+//                          | ...
+class SpillReloadPromote {
+    COPY_CONSTRUCTOR(SpillReloadPromote);
+    enum GROUP_MODE {
+        GROUP_MODE_UNDEF = 0,
+        GROUP_MODE_FULL = 1,
+        GROUP_MODE_PART = 2,
+        GROUP_MODE_SINGLE = 3,
+    };
+    GROUP_MODE m_mode;
+    Region * m_rg;
+    BBList * m_bb_list;
+    LinearScanRA * m_lsra;
+    RegSetImpl & m_rsimpl;
+    MDSSAMgr * m_mdssamgr;
+    List<VarGroups*> m_vargroups_list;
+    List<IRGroup*> m_irgroup_list;
+
+    //Full group.
+    Var2Groups m_full_groups;
+    IRGroupVec m_full_group_vec;
+
+    //Record the full group promotion results.
+    VarPromoteTab m_vartab;
+
+    //Single group.
+    Var2Groups m_part_groups;
+    IRGroupVec m_valid_partial_groups;
+
+    //Single Group.
+    Var2Groups m_single_groups;
+    IRGroupVec m_valid_single_groups;
+
+    LSRAVarLivenessMgr m_var_liveness_mgr;
+    VarLifeTimeMgr m_var_ltmgr;
+
+    //Record the unused spill/reload IRs after promoted by register.
+    IRVec m_unused_irs;
+public:
+    SpillReloadPromote(Region * rg, LinearScanRA * ra, RegSetImpl & rsimpl);
+    ~SpillReloadPromote();
+
+    void addToValidPartialGroup(IRGroup * irgp)
+    {  ASSERT0(irgp); m_valid_partial_groups.append(irgp); }
+    void addToFullGroupVec(IRGroup * irgp)
+    {  ASSERT0(irgp); m_full_group_vec.append(irgp); }
+    void addToValidSingleGroup(IRGroup * irgp)
+    {  ASSERT0(irgp); m_valid_single_groups.append(irgp); }
+
+    void addUnusedIR(IR * ir) { ASSERT0(ir); m_unused_irs.append(ir); }
+
+    IRGroup * allocIRGroup()
+    {
+        IRGroup * ir_gp = new IRGroup();
+        m_irgroup_list.append_tail(ir_gp);
+        return ir_gp;
+    }
+
+    VarGroups * allocVarGroups()
+    {
+        VarGroups * var_gps = new VarGroups();
+        m_vargroups_list.append_tail(var_gps);
+        return var_gps;
+    }
+    //Calculate the weight for the group, which can be used as the order
+    //of group to find the register for promotion, becasue the bigger
+    //weight indicates the bigger cost for spill/reload.
+    UINT calcWeightForGroup(IRVec const* irvec) const;
+
+    //Destory the resources allocated for the tmp vars.
+    void destroyTmpVar();
+
+    //Do the full group.
+    void doFullGroup(OptCtx & oc);
+    void doFullGroupReloadIR(IR const* ir);
+    void doFullGroupSpillIR(IR const* ir);
+
+    //Do the partial group.
+    void doPartialGroup(OptCtx & oc);
+
+    //Do the single group.
+    void doSingleGroup(OptCtx & oc);
+
+    void dump() const;
+    void dumpFullGroup() const;
+    void dumpPartialGroup() const;
+    void dumpSingleGroup() const;
+
+    //Find the register for full group var.
+    void findRegForFullGroupVars();
+
+    //Find the register for fpartial group var.
+    void findRegForPartialGroupVars();
+
+    //Find the register for single group var.
+    void findRegForSingleGroupVars();
+
+    void genDUInfo(OptCtx & oc);
+
+    void genVar2DLifeTime(OptCtx & oc);
+
+    //Generate a new IR group for var.
+    //var_groups: point to the var group object.
+    //var: the var of the group.
+    IRGroup * genIRGroupForVar(MOD VarGroups * var_groups, Var const* var);
+
+    //generate the single var group based on IR group of the partial group.
+    //irgp: The IR group of partial group.
+    //v: the var of the group.
+    void genSingleVarGroupFromPartialIRGroup(IRGroup * irgp, Var const* v);
+
+    //Get the best register to accomodate the specified range.
+    //rv: the input range.
+    //ty: the required data type when find a available register.
+    //best_reg: the best register that can hold the 'rv'.
+    //reg_tab: used to store all the availble regs for the 'rv'.
+    //return true if any proper register can be found, or else, retun false.
+    bool getRegToCoverRange(Range const& tar_range, Type const* reg_ty,
+        OUT Reg & best_reg, MOD xcom::TTab<Reg> & reg_tab);
+
+    TargInfoMgr * getTIMgr() const
+    { return m_rg->getRegionMgr()->getTargInfoMgr(); }
+
+    //Group the reload IR based on the use-set.
+    //useset: the use-set of spill IR.
+    //ir_group: the IR group to be filled.
+    void groupReloadInUseSet(IRSet const& useset, MOD IRGroup * ir_group);
+
+    //Group the IR in partial group mode.
+    void groupIRPartially(IR const* ir, MOD IRSet & useset);
+
+    //Group the IR in single group mode.
+    void groupIRSingle(IR const* ir);
+
+    void groupFully();
+    void groupPartially();
+    void groupSingle();
+
+    //Return the IRGroupVec per the different group mode.
+    IRGroupVec * getIRGroups()
+    {
+        switch (m_mode) {
+        case GROUP_MODE_FULL: return &m_full_group_vec;
+        case GROUP_MODE_PART: return &m_valid_partial_groups;
+        case GROUP_MODE_SINGLE: return &m_valid_single_groups;
+        case GROUP_MODE_UNDEF:
+        default: ASSERT0(0); return nullptr;
+        }
+    }
+
+    //Get and generate the IR group in var group for a var.
+    //var_groups: the var group.
+    //var: the var to be grouped.
+    IRGroup * getAndGenIRGroupFromFullGroup(MOD VarGroups * var_groups,
+        Var const* var)
+    {
+        ASSERT0(var_groups);
+        ASSERT0(var_groups->getGroupNum() <= 1);
+        if (var_groups->getGroupNum() == 1) {
+            return var_groups->getIRGroup(0);
+        }
+        IRGroup * irgp = allocIRGroup();
+        IRGROUP_orgvar(irgp) = var;
+        var_groups->addGroup(0, irgp);
+        return irgp;
+    }
+
+    //Return the max group number in all the single groups.
+    UINT getMaxSingleGroupNum();
+
+    VarGroups * getAndGenVarFullGroups(Var const* v)
+    {
+        bool find = false;
+        VarGroups * var_groups = m_full_groups.get(v, &find);
+        if (!find) {
+            var_groups = allocVarGroups();
+            m_full_groups.set(v, var_groups);
+        }
+        return var_groups;
+    }
+    VarGroups * getAndGenVarPartialGroups(Var const* v)
+    {
+        bool find = false;
+        VarGroups * var_groups = m_part_groups.get(v, &find);
+        if (!find) {
+            var_groups = allocVarGroups();
+            m_part_groups.set(v, var_groups);
+        }
+        return var_groups;
+    }
+
+    VarGroups * getAndGenVarSingleGroups(Var const* v)
+    {
+        bool find = false;
+        VarGroups * var_groups = m_single_groups.get(v, &find);
+        if (!find) {
+            var_groups = allocVarGroups();
+            VARGROUPS_has_all(var_groups) = false;
+            m_single_groups.set(v, var_groups);
+        }
+        return var_groups;
+    }
+
+    //Get the best register to accomodate the specified range vector.
+    //rv: the input vector of ranges.
+    //ty: the required data type when find a available register.
+    //best_reg: the best register that can hold the 'rv'.
+    //reg_tab: used to store all the availble regs for the 'rv'.
+    //return true if any proper register can be found, or else, retun false.
+    bool getBestRegToAccommodateRange(RangeVec const& rv, Type const* ty,
+        OUT Reg & best_reg, MOD xcom::TTab<Reg> & reg_tab);
+
+    VarLifeTimeMgr & getVarLTMgr() { return m_var_ltmgr; }
+
+    //Return true if the 'v' has been promoted in full group mode.
+    bool isPromotedInFullGroup(Var const* v) const
+    { return m_vartab.find(v); }
+
+    bool perform(OptCtx & oc);
+
+    //Do the promote for the spill and reload IR for full group mode.
+    void promoteSpillReloadFullGroup();
+
+    //Do the promote for the spill and reload IR for partial group mode.
+    void promoteSpillReloadPartialGroup();
+
+    //Do the promote for the spill and reload IR for single group mode.
+    void promoteSpillReloadSingleGroup();
+
+    //Promote the spill reload for the specified group.
+    //gp: the group to be promoted.
+    //remove_spill: a flag to indicate the spill IR is removed or not.
+    void promoteSpillReloadForGroup(IRGroup * gp, bool remove_spill);
+
+    //Promote the reload IR by a specifed register.
+    //curir: the reload IR to be promoted.
+    //r: the register can be used to do the promotion.
+    //pr:the PRNO which assigned with the register 'r'.
+    void promoteReloadOpByReg(IR * curir, Reg r, PRNO pr);
+
+    //Promote the spill IR by a specifed register.
+    //curir: the spill IR to be promoted.
+    //r: the register can be used to do the promotion.
+    //pr:the PRNO which assigned with the register 'r'.
+    //remove: a flag to indicate the spill IR is removed or not.
+    void promoteSpillOpByReg(IR * curir, Reg r, PRNO pr, bool remove);
+
+    //Record the callee register.
+    void recordCallee(Reg r)
+    {
+        ASSERT0(r != REG_UNDEF);
+        if (!m_rsimpl.isCallee(r)) { return; }
+        RegSet & calleeset = m_rsimpl.getUsedCallee();
+        if (calleeset.is_contain(r)) { return; }
+        m_rsimpl.recordUsedCallee(r);
+    }
+
+    //Removed the unused spill reload IR.
+    void removeUnusedIR();
+
+    //Rename the var of IR for the var liftime computation.
+    void renameIRVar();
+
+    //Recover the var of IR.
+    void revertIRVar();
+
+    //Set the group mode.
+    void setGroupMode(GROUP_MODE mode) { m_mode = mode; }
+
+    //Sort the groups.
+    void sortFullGroup();
+    void sortPartialGroup();
+    void sortSingleGroup(UINT id);
+
+    //Try to assign a register for a group.
+    //vid: the group id.
+    //irvec: the group of spill reload IR.
+    //reg_tab: used to store all the availble regs for a group.
+    //return the best suitable register for the group.
+    Reg tryAssignRegForGroup(UINT vid, IRVec const* irvec,
+        MOD xcom::TTab<Reg> & reg_tab);
+};
+//END SpillReloadPromote
+
+
 typedef xcom::TMap<Type const*, Var *> Ty2Var;
 
+//
+//START LinearScanRA
+//
 //The class represents the basic structure and interface of linear-scan register
 //allocation.
 class LinearScanRA : public Pass {
@@ -969,9 +1395,20 @@ protected:
     //True to indicate that the stack space may need to be realigned.
     bool m_may_need_to_realign_stack;
     LifeTimeMgr * m_lt_mgr;
+
+    //This life time manger is used to store the register lifetime, which can
+    //be used to get the top view usage of the all phisical registers,
+    //which will be used in the spill reload promotion algorithm to find
+    //whether there is a proper register to eliminate the spill/reload in
+    //a certain live range.
+    LifeTimeMgr * m_reg_lt_mgr;
+
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
     BBList * m_bb_list;
+    LTConstraintsMgr * m_lt_constraints_mgr;
+    LTConstraintsStrategy * m_lt_constraints_strategy;
+    FakeIRMgr * m_fake_irmgr;
     UINT m_func_level_var_count;
     LTSet m_unhandled;
     LTSet m_handled;
@@ -984,17 +1421,17 @@ protected:
     IRTab m_move_tab;
     ConstIRTab m_fake_use_head_tab;
     ConstIRTab m_fake_use_tail_tab;
+    ConstBBTab m_hoist_bb_tab; //Store the inserted hoist BB.
+    ConstBBTab m_latch_bb_tab; //Store the inserted latch BB.
+    PreAssignedMgr m_preassigned_mgr;
     DedicatedMgr m_dedicated_mgr;
     PRNO2Var m_prno2var;
     ActMgr m_act_mgr;
-    Vector<UINT> m_bb_seqid;
     Ty2Var m_ty2var;
-    LTConstraintsMgr * m_lt_constraints_mgr;
-    LTConstraintsStrategy * m_lt_constraints_strategy;
 protected:
     LifeTimeMgr * allocLifeTimeMgr(Region * rg)
-    { ASSERT0(rg); return new LifeTimeMgr(rg); }
-
+    { ASSERT0(rg); return new LifeTime2DMgr(rg, this); }
+    FakeIRMgr * allocFakeIRMgr() { return new FakeIRMgr(m_rg, this); }
     virtual RegSetImpl * allocRegSetImpl() { return new RegSetImpl(*this); }
 
     //Allocates an instance of the lifetime constraints strategy.
@@ -1016,13 +1453,13 @@ public:
     void addActive(LifeTime * lt);
     void addInActive(LifeTime * lt);
     void addHandled(LifeTime * lt);
-    void assignLexSeqIdForBB();
 
-    virtual IR * buildRemat(PRNO prno, RematCtx const& rematctx,
-                            Type const* ty);
-    virtual IR * buildSpill(PRNO prno, Type const* ty);
-    virtual IR * buildSpillByLoc(PRNO prno, Var * spill_loc, Type const* ty);
-    virtual IR * buildReload(PRNO prno, Var * spill_loc, Type const* ty);
+    //The function builds PRNO with given 'type', and records the relation
+    //between PRNO and 'reg' in current pass.
+    //When TargInfo enabled, some PR operations might correspond to specific
+    //physical register. In order to preserve this information, passes such
+    //as IR simplification, calls this function.
+    PRNO buildPrnoAndSetReg(Type const* type, Reg reg);
 
     //The function builds PRNO with given 'type', and records the relation
     //between PRNO and 'reg' in current pass. Unlike buildPrno(), the function
@@ -1034,27 +1471,20 @@ public:
     PRNO buildPrnoDedicated(Type const* type, Reg reg);
 
     //The function builds PRNO with given 'type', and records the relation
-    //between PRNO and 'reg' in current pass.
+    //between PRNO and 'reg' in current pass. Unlike buildPrno(), the function
+    //records the generated PRNO as a pre-assigned PRNO which binds a
+    //pre-assigned physical register 'reg'.
     //When TargInfo enabled, some PR operations might correspond to dedicated
     //physical register. In order to preserve this information, passes such
     //as IR simplification, calls this function.
-    PRNO buildPrno(Type const* type, Reg reg);
+    PRNO buildPrnoPreAssigned(Type const* type, Reg reg);
 
-    //This func is used to get the prno assigned to special register can be
-    //avoid to be spilled to improve the performance on specific target.
-    //Normally, if a prno is spilled into memory, that means the value in the
-    //register assigned to the prno will be used again after the split
-    //position, we have to reload the value from the memory before the USE
-    //position. However, on some specific architecture, the value of the
-    //register is automatically kept by the hardware, it can be used as a
-    //special dedicated register.
-    //For example: There is a ZERO register on some architecture, the value in
-    //this register is always zero, it cannot be changed.
-    virtual bool canSpillAvoid(PRNO prno) const
-    {
-        ASSERT0(prno != PRNO_UNDEF);
-        return !getLT(prno)->isOccHasDef() || getReg(prno) == getSP();
-    }
+    virtual IR * buildReload(PRNO prno, Var * spill_loc, Type const* ty);
+    virtual IR * buildRemat(PRNO prno, RematCtx const& rematctx,
+                            Type const* ty);
+    virtual IR * buildSpill(PRNO prno, Type const* ty);
+    virtual IR * buildSpillByLoc(PRNO prno, Var * spill_loc, Type const* ty);
+
     //The function checks whether the register-allocation result should be
     //applied to current region or just an estimiation of register pressure.
     //NOTE: If the register-allocation behaviors applied to current region,
@@ -1068,26 +1498,18 @@ public:
     //register pressure.
     void checkAndPrepareApplyToRegion(OUT ApplyToRegion & apply);
 
-    //This func is used to color the stack slot and reuse the stack slot then.
-    void colorStackSlot()
-    {
-        START_TIMER(t, "colorStackSlot");
-        //Do the stack slot reuse for the scalar var.
-        reuseStackSlot(false);
-
-        //Do the stack slot reuse for the vector var.
-        reuseStackSlot(true);
-        END_TIMER(t, "colorStackSlot");
-    }
-
     //The function check whether 'lt' value is simple enough to rematerialize.
     //And return the information through rematctx.
     virtual bool checkLTCanBeRematerialized(MOD LifeTime * lt,
                                             OUT RematCtx & rematctx);
     virtual void collectDedicatedPR(BBList const* bblst,
-                                    OUT DedicatedMgr & mgr);
+                                    OUT PreAssignedMgr & mgr);
 
-    void dumpBBListWithReg() const;
+    void doBackwardJumpAnalysis()
+    {
+        ASSERT0(m_fake_irmgr);
+        m_fake_irmgr->doBackwardJumpAnalysis();
+    }
 
     //This func shall generate the IRs to swap the data in two registers,
     //and implement the swap by memory as the temp memory location.
@@ -1134,10 +1556,18 @@ public:
        PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
        Type const* ty2, IR const* marker, MOD IRBB * bb);
 
+    void dumpDOTWithReg() const;
+    void dumpDOTWithReg(CHAR const* name, UINT flag) const;
     void dumpPR2Reg(PRNO prno) const;
     void dumpPR2Reg() const;
     void dump4List() const;
     bool dump(bool dumpir = true) const;
+    void dumpRegLTOverview() const;
+    void dumpBBListWithReg() const;
+    void dumpReg2LT(Pos start, Pos end, bool open_range = false) const;
+
+    void destroyLocalUsage();
+    void destroy();
 
     void freeReg(Reg reg);
     void freeReg(LifeTime const* lt);
@@ -1181,12 +1611,24 @@ public:
     TargInfoMgr & getTIMgr() const
     { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LifeTimeMgr & getLTMgr() { return *m_lt_mgr; }
+    LifeTimeMgr & getRegLTMgr() { return *m_reg_lt_mgr; }
     LTConstraintsMgr * getLTConstraintsMgr()
     { return m_lt_constraints_mgr; }
-    Reg getDedicatedReg(LifeTime const* lt) const
-    { return getDedicatedReg(lt->getPrno()); }
-    Reg getDedicatedReg(PRNO prno) const { return m_dedicated_mgr.get(prno); }
-    DedicatedMgr & getDedicatedMgr() { return m_dedicated_mgr; }
+
+    //Return dedicated prno by given physical register.
+    //e.g: given REG_SP, return the $sp as result.
+    PRNO getDedicatedPRNO(Reg reg) const
+    {
+        return const_cast<LinearScanRA*>(this)->
+            m_dedicated_mgr.geti(reg);
+    }
+
+    PreAssignedMgr & getPreAssignedMgr() { return m_preassigned_mgr; }
+    Reg getPreAssignedReg(LifeTime const* lt) const
+    { return getPreAssignedReg(lt->getPrno()); }
+
+    //Return physical register by given pre-assigned prno.
+    Reg getPreAssignedReg(PRNO prno) const;
     ActMgr & getActMgr() { return m_act_mgr; }
     virtual CHAR const* getPassName() const
     { return "Linear Scan Register Allocation"; }
@@ -1210,9 +1652,9 @@ public:
     virtual Type const* getSpillType(Type const* ty) const
     { ASSERT0(ty); return ty; }
 
-    //Get target physical registers.
-    //Get base pointer register.
-    Reg getBP() const { return getTIMgr().getBP(); }
+    //Get the available register for LSRA optimization.
+    //Target dependent code.
+    Reg getAvaiRegForLsraOpt() const { return REG_UNDEF; }
 
     //Get end caller saved scalar register.
     Reg getCallerScalarEnd() const { return getTIMgr().getCallerScalarEnd(); }
@@ -1226,6 +1668,10 @@ public:
 
     //Get global pointer register.
     Reg getGP() const { return getTIMgr().getGP(); }
+
+    //Get number of param passed by register.
+    UINT getNumOfParamByReg() const
+    { return getTIMgr().getNumOfParamByReg(); }
 
     //Get start parameter scalar register.
     xgen::Reg getParamScalarStart() const
@@ -1247,10 +1693,6 @@ public:
     virtual xgen::Reg getTargetPC() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
-    //Used to get the special dedicated prno per the specific arch.
-    virtual PRNO getSpecialDedicatedPrno(Type const* type, Reg reg) const
-    { ASSERTN(0, ("Target Dependent Code")); return PRNO_UNDEF; }
-
     //The temporary register is a reserved register that used to save a
     //temporary value, which is usually used after the register allocation
     //and does not be assigned in the register allocation.
@@ -1266,10 +1708,21 @@ public:
     { ASSERT0(ty);  return getSpillLoc(ty); }
 
     //Get zero register.
-    Reg getZero() const { return getTIMgr().getZero(); }
+    Reg getZero(Type const* ty) const
+    {
+        ASSERT0(ty != nullptr);
+        return getTIMgr().getZero(ty);
+    }
+    Reg getZeroScalar() const { return getTIMgr().getZeroScalar(); }
+    Reg getZeroScalarFP() const { return getTIMgr().getZeroScalarFP(); }
+    Reg getZeroVector() const { return getTIMgr().getZeroVector(); }
 
     bool hasReg(PRNO prno) const;
     bool hasReg(LifeTime const* lt) const;
+
+    //Whether the dynamic stack function has been performed and used frame
+    //pointer register before.
+    bool hasAlloca() const { return m_has_alloca; }
 
     //This func shall generate the IRs to swap the data in two registers, if
     //there is a TMP register reserved on the specific architecture, the
@@ -1315,17 +1768,17 @@ public:
         PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
         Type const* ty2, IR const* marker, MOD IRBB * bb);
 
-    //Return true if register r1 alias to r2.
-    virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
-    //Determine an edge is backward jump or not.
-    bool isBackwardJump(UINT src_bbid, UINT dst_bbid) const
-    { return m_bb_seqid[dst_bbid] <= m_bb_seqid[src_bbid]; }
     virtual bool isCalleePermitted(LifeTime const* lt) const;
-    bool isDedicated(PRNO prno) const
-    { return m_dedicated_mgr.isDedicated(prno); }
+    bool isPreAssigned(PRNO prno) const
+    { return m_preassigned_mgr.isPreAssigned(prno); }
 
     //Check the Frame Pointer Register can be allocable or not.
     bool isFPAllocableAllowed() const { return m_is_fp_allocable_allowed; }
+
+    //Whether the frame pointer register is allocable. If the debug mode is not
+    //turned on, and dynamic stack, prologue/epilogue inserter function not use
+    //this register, it can be used for other purposes.
+    bool isFPAllocable() const;
 
     //Return true if the register-allocation result should be applied to
     //current region's BB list and CFG.
@@ -1383,6 +1836,20 @@ public:
                pthis->getMoveTab().get_elem_count() != 0;
     }
 
+    //Return true if the BB is hoist BB.
+    bool isHoistBB(IRBB const* bb) const
+    {
+        ASSERT0(bb != nullptr);
+        return m_hoist_bb_tab.find(bb);
+    }
+
+    //Return true if the BB is a latch BB.
+    bool isLatchBB(IRBB const* bb) const
+    {
+        ASSERT0(bb != nullptr);
+        return m_latch_bb_tab.find(bb);
+    }
+
     bool isMoveOp(IR const* ir) const
     { return m_move_tab.find(const_cast<IR*>(ir)); }
 
@@ -1405,6 +1872,15 @@ public:
     bool isSpillOp(IR const* ir) const
     { return m_spill_tab.find(const_cast<IR*>(ir)); }
 
+    //If the IR is not encoded with a position, return true. Normally
+    //include the remat/mov/spill/reload IR.
+    bool isOpInPosGap(IR const* ir) const
+    {
+        ASSERT0(ir);
+        return isSpillOp(ir) || isReloadOp(ir) || isRematOp(ir) ||
+            isMoveOp(ir);
+    }
+
     //This function returns true if the full width of the register will be
     //spilled into memory. Or else, returns false if the partial of register
     //will be spilled into memory. It can be overidden by the derived class
@@ -1415,6 +1891,47 @@ public:
     //input type.
     virtual bool isTmpRegAvailable(Type const* ty) const
     { ASSERTN(0, ("Target Dependent Code")); return false; }
+
+    //Return true if the usage of 'reg' is unique, and there is only unique
+    //PRNO corresponds to it.
+    //e.g:During entire LSRA processing, the PRNO of %sp is unique.
+    bool isDedicatedReg(Reg r) const
+    {
+        return getSP() == r || getFP() == r || getGP() == r ||
+               getZeroScalar() == r || getZeroVector() == r;
+    }
+
+    //Return true if the target machine's physical register convention
+    //specifies 'r' has dedicated usage, such as ReturnAddress register.
+    //And the dedicated register does not belong to any aliased register-set.
+    //However, the convention does not constrain that the mapping between
+    //PRNO and 'r' must be unqiue.
+    //e.g: $100 may assigned 'r' and $200 also can be assigned 'r'.
+    bool isPreAssignedReg(Reg r) const
+    {
+        return getSP() == r || getFP() == r || getTA() == r ||
+               getGP() == r || getRA() == r || getZeroScalar() == r ||
+               getZeroVector() == r;
+    }
+
+    //Check the lifetime is use the fake-use IR or not at the first BB in loop.
+    bool isLTWithFakeUseAtLexFirstBBInLoop(LifeTime const* lt) const
+    {
+        ASSERT0(lt);
+        IR * first = const_cast<LifeTime*>(lt)->getFirstOccStmt();
+        return isFakeUseAtLexFirstBBInLoop(first);
+    }
+    void initLTMgr()
+    {
+        if (m_lt_mgr != nullptr) { return; }
+        m_lt_mgr = allocLifeTimeMgr(m_rg);
+        m_reg_lt_mgr = allocLifeTimeMgr(m_rg);
+    }
+    void initFakeIRMgr()
+    {
+        if (m_fake_irmgr != nullptr) { return; }
+        m_fake_irmgr = allocFakeIRMgr();
+    }
 
     //Initialize the allocation strategy for the lifetime constraint set.
     //Note that different architectures have varying strategies.
@@ -1431,38 +1948,55 @@ public:
         if (m_lt_constraints_mgr != nullptr) { return; }
         m_lt_constraints_mgr = allocLTConstraintsMgr();
     }
+    void initLocalUsage();
 
-    //Whether the stack space does not need to be realigned.
-    bool noNeedToAlignStack() const { return !m_may_need_to_realign_stack; }
-
-    //Whether the dynamic stack function has been performed and used frame
-    //pointer register before.
-    bool notHaveAlloca() const { return !m_has_alloca; }
+    //Whether the FP can be preserved when stack aligned.
+    //If FP registers are not required for stack alignment,
+    //FP can be used as normal registers for allocation.
+    bool canPreservedFPInAlignStack() const
+    {
+        if (!m_may_need_to_realign_stack) { return true; }
+        ConstVarList const* lst = m_rg->findAndRecordFormalParamList(true);
+        ASSERT0(lst != nullptr);
+        return !g_force_use_fp_as_sp && !hasAlloca() &&
+            lst->get_elem_count() <= getNumOfParamByReg();
+    }
 
     virtual bool perform(OptCtx & oc);
     virtual bool performLsraImpl(OptCtx & oc);
 
-    //Used to record the special dedicated prno per the specific arch.
-    virtual void recordSpecialDedicatedPrno(Type const* type, Reg reg,
-                                            PRNO prno)
-    { ASSERTN(0, ("Target Dependent Code")); return; }
+    bool promoteSpillReload(OptCtx & oc, RegSetImpl & rsimpl);
 
     void recalculateSSA(OptCtx & oc) const;
 
+    //Removed the fake-use IR inserted before the LSRA.
+    void removeFakeUseIR()
+    { m_fake_irmgr->removeFakeUseIR(); }
+
+    void removeMoveOp(IR const* ir)
+    { ASSERT0(ir); m_move_tab.remove(const_cast<IR*>(ir)); }
+    void removeOpInPosGapRecord(IR const* ir);
+    void removeReloadOp(IR const* ir)
+    { ASSERT0(ir); m_reload_tab.remove(const_cast<IR*>(ir)); }
+    void removeRematOp(IR const* ir)
+    { ASSERT0(ir); m_remat_tab.remove(const_cast<IR*>(ir)); }
+    void removeSpillOp(IR const* ir)
+    { ASSERT0(ir); m_spill_tab.remove(const_cast<IR*>(ir)); }
+
     //Reset all resource before allocation.
     void reset();
-    //Do the stack slot resue per the input var type to save the stack
-    //space after the LSRA.
-    //is_vector: the type of the stack slot. True means do the stack slot
-    //           reuse for vector var; false means do the stack slot
-    //           reuse for the scalar var.
-    void reuseStackSlot(bool is_vector);
+
+    //Save the map of reg and it's corresponded lifetime.
+    void generateRegLifeTime(OptCtx & oc);
 
     void setApplyToRegion(bool doit) { m_is_apply_to_region = doit; }
-
-    //Set attributes obtained from other passes.
-    void setAttr();
-    void setDedicatedReg(PRNO prno, Reg r) { m_dedicated_mgr.add(prno, r); }
+    void setPreAssignedReg(PRNO prno, Reg r)
+    {
+        if (isDedicatedReg(r)) {
+            m_dedicated_mgr.add(prno, r);
+        }
+        m_preassigned_mgr.add(prno, r);
+    }
 
     //Normally m_is_fp_allocable_allowed can be set to false only, because the
     //default value is true, it will be set to false if we find the fp is used
@@ -1476,6 +2010,8 @@ public:
     { m_fake_use_head_tab.append(ir); }
     void setFakeUseAtLexLastBBInLoop(IR * ir)
     { m_fake_use_tail_tab.append(ir); }
+    void setHoistBB(IRBB * bb) { ASSERT0(bb); m_hoist_bb_tab.append(bb); }
+    void setLatchBB(IRBB * bb) { ASSERT0(bb); m_latch_bb_tab.append(bb); }
     void setMove(IR * ir) { m_move_tab.append(ir); }
     void setReg(PRNO prno, Reg reg);
     void setReload(IR * ir) { m_reload_tab.append(ir); }
@@ -1491,7 +2027,37 @@ public:
 
     bool verify4List() const;
     bool verifyAfterRA() const;
+    bool verifyLSRAByInterfGraph(OptCtx & oc) const;
 };
+//END LinearScanRA
+
+//
+//START LTInterfGraph
+//
+class LTInterfGraphLSRAChecker : public Graph {
+    COPY_CONSTRUCTOR(LTInterfGraphLSRAChecker);
+protected:
+    Region * m_rg;
+    LifeTime2DMgr & m_lt_mgr;
+public:
+    LTInterfGraphLSRAChecker(Region * rg, LifeTime2DMgr & mgr)
+        : m_rg(rg), m_lt_mgr(mgr)
+    { set_direction(false); set_dense(false); }
+    ~LTInterfGraphLSRAChecker() {}
+
+    //Build interference graph.
+    void build();
+
+    bool check(LinearScanRA * lsra);
+
+    void dumpGraph(CHAR const* name) const { dumpDOT(name); }
+};
+//END LTInterfGraph
+
+void dumpBBListWithReg(Region const* rg);
+void dumpDOTWithReg(
+    Region const* rg, CHAR const* name = nullptr,
+    UINT flag = IRCFG::DUMP_COMBINE);
 
 } //namespace xoc
 #endif

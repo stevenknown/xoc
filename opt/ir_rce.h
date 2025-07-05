@@ -36,13 +36,11 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class RCECtx {
+class RCECtx : public PassCtx {
 public:
     bool cfg_changed;
-    OptCtx & oc;
 public:
-    RCECtx(OptCtx & t) : cfg_changed(false), oc(t) {}
-    ~RCECtx() {}
+    RCECtx(MOD OptCtx & t, MOD ActMgr * am);
 };
 
 //Perform Redundant Code Elimination.
@@ -60,16 +58,20 @@ protected:
     MDSSAMgr * m_mdssamgr;
     Refine * m_refine;
     ActMgr m_am;
-private:
-    IR * processTruebr(IR * ir, IR * new_det, bool must_true,
-                       bool must_false, bool changed, MOD RCECtx & ctx);
-    IR * processFalsebr(IR * ir, IR * new_det, bool must_true,
-                        bool must_false, bool changed, MOD RCECtx & ctx);
+protected:
+    IR * inferAndReformDet(
+        IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+        MOD RCECtx & ctx);
+
     bool performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx);
-    IR * processStore(IR * ir, RCECtx const& ctx);
-    IR * processStorePR(IR * ir, RCECtx const& ctx);
-    IR * processBranch(IR * ir, MOD RCECtx & ctx);
+    IR * processStoreStmt(IR * ir, RCECtx const& ctx);
+    IR * processBranch(
+        IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+        MOD RCECtx & ctx);
     bool performSimplyRCE(MOD RCECtx & ctx);
+
+    IR * reformToJudgeDet(
+        IR * ir, IR * new_det, bool changed, MOD RCECtx & ctx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -96,16 +98,16 @@ public:
     //Return true if this function is able to determine the result of 'ir',
     //otherwise return false that it does know nothing about ir.
     bool calcCondMustVal(IR const* ir, OUT bool & must_true,
-                         OUT bool & must_false, OptCtx const& oc) const;
+                         OUT bool & must_false, RCECtx const& ctx) const;
 
     //If 'ir' is always true, set 'must_true', or if it is
     //always false, set 'must_false'.
     //Return the changed ir.
     IR * calcCondMustVal(
         MOD IR * ir, OUT bool & must_true, OUT bool & must_false,
-        OUT bool & changed, MOD OptCtx & oc);
+        OUT bool & changed, MOD RCECtx & ctx);
 
-    virtual bool dump() const { return true; }
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
@@ -118,6 +120,12 @@ public:
 
     void set_use_gvn(bool use_gvn) { m_use_gvn = use_gvn; }
 
+    IR * processTruebrWithMustVal(
+        IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
+        MOD IRListIter & ct, MOD RCECtx & ctx);
+    IR * processFalsebrWithMustVal(
+        IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
+        MOD IRListIter & ct, MOD RCECtx & ctx);
     virtual bool perform(OptCtx & oc);
 };
 

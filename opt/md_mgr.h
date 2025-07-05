@@ -44,6 +44,7 @@ protected:
     //This is a helper function to assignMD.
     void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
     MD const* allocSetElemMD(IR * ir);
+    MD const* tryReassignMDByOffsetForPartailPROp(MD const* md, IR * ir);
 public:
     MDMgr(Region * rg);
     ~MDMgr() {}

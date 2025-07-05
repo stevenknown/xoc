@@ -31,7 +31,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 typedef enum {
-    X_CODE_UNDEF,
+    X_CODE_UNDEF = 0,
     X_ID,
     X_LD,
     X_ILD,
@@ -104,6 +104,8 @@ typedef enum {
     X_U64,
     X_I128,
     X_U128,
+    X_F16,
+    X_BF16,
     X_F32,
     X_F64,
     X_F80,
@@ -138,6 +140,12 @@ typedef enum {
     X_UNALLOCABLE,
     X_ALIGN,
     X_DECL,
+
+    #include "xcode_ext.inc"
+
+    ///////////////////////////////////////////////////////////////////////////
+    //DO NOT ADD NEW CODE AFTER X_CODE_LAST.                                 //
+    ///////////////////////////////////////////////////////////////////////////
     X_CODE_LAST,
 } X_CODE;
 

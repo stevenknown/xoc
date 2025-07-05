@@ -112,7 +112,8 @@ bool CfsOpt::transformToDoWhile(IR ** head, IR ** ir)
 
     IR * prev = (*ir)->get_prev();
     UINT num = 0;
-    for (IR * t = *ir; t != nullptr && num < TRY_NUM; t = t->get_next(), num++) {
+    for (IR * t = *ir; t != nullptr && num < TRY_NUM;
+         t = t->get_next(), num++) {
         if (!t->is_if()) { continue; }
 
         if (IF_truebody(t) != nullptr &&
@@ -339,7 +340,6 @@ bool CfsOpt::transformIf2(IR ** head, IR ** ir)
         }
         return true;
     }
-
     return false;
 }
 
@@ -377,7 +377,7 @@ bool CfsOpt::transformIf3(IR ** head, IR ** ir)
             if (IF_falsebody(*ir) != nullptr) {
                 allocir = m_rg->dupIRTree(IF_falsebody(*ir));
             }
-            xcom::replace(head, *ir, allocir);
+            xcom::replace_one(head, *ir, allocir);
 
             if (allocir != nullptr) {
                 IR_parent(allocir) = IR_parent(*ir);
@@ -408,7 +408,7 @@ bool CfsOpt::transformIf3(IR ** head, IR ** ir)
             if (IF_falsebody(*ir) != nullptr) {
                 allocir = m_rg->dupIRTree(IF_falsebody(*ir));
             }
-            xcom::replace(head, *ir, allocir);
+            xcom::replace_one(head, *ir, allocir);
 
             if (allocir != nullptr) {
                 IR_parent(allocir) = IR_parent(*ir);
@@ -431,7 +431,7 @@ bool CfsOpt::transformIf3(IR ** head, IR ** ir)
             if (IF_falsebody(*ir) != nullptr) {
                 allocir = m_rg->dupIRTree(IF_falsebody(*ir));
             }
-            xcom::replace(head, *ir, allocir);
+            xcom::replace_one(head, *ir, allocir);
 
             if (allocir != nullptr) {
                 IR_parent(allocir) = IR_parent(*ir);

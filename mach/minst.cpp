@@ -112,12 +112,12 @@ void MInst::dump(OUT xcom::StrBuf & buf, MInstMgr const& mgr) const
     DbxMgr * dbx_mgr = mgr.getRegion()->getDbxMgr();
     ASSERT0(dbx_mgr);
     ASSERT0(temp);
-    if (temp->getLine(LangInfo::LANG_CPP, dbx_mgr) != DBX_UNDEF) {
+    if (temp->getLine(LANG_CPP, dbx_mgr) != DBX_UNDEF) {
         buf.strcat(" file_index:%d, row: %d, col: %d, flag: %d",
-            temp->getFileIndex(LangInfo::LANG_CPP, dbx_mgr),
-            temp->getLine(LangInfo::LANG_CPP, dbx_mgr),
-            temp->getColOffset(LangInfo::LANG_CPP, dbx_mgr),
-            temp->getFlag(LangInfo::LANG_CPP, dbx_mgr));
+            temp->getFileIndex(LANG_CPP, dbx_mgr),
+            temp->getLine(LANG_CPP, dbx_mgr),
+            temp->getColOffset(LANG_CPP, dbx_mgr),
+            temp->getFlag(LANG_CPP, dbx_mgr));
     }
     for (UINT i = 0; i < m_inst_desc->getFieldNum(); i++) {
         buf.strcat("\n%s:0x%llx", m_inst_desc->getFieldName(i),

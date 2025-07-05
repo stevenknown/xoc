@@ -7,6 +7,7 @@
 //libxcom
 #include <math.h>
 #include "ltype.h"
+#include "spec_type.h"
 #include "diagnostic.h"
 #include "comm_macro.h"
 #include "smempool.h"
@@ -26,6 +27,7 @@ using namespace xcom;
 #include "sgraph.h"
 #include "tree.h"
 #include "domtree.h"
+#include "segtree.h"
 #include "rational.h"
 #include "flty.h"
 #include "bigint.h"

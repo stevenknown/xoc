@@ -64,47 +64,35 @@ public:
 
 class VisitIRFuncBase {
 public:
-    //Inferface that can be overrided by user.
+    //Inferface that should be overrided by user.
     //The function will be invoked by current class object when visiting each
     //IR. User can set visiting status to control whether the IR tree visiting
     //keep going or terminate.
-    //Return true to process the kid IR on tree.
+    //is_terminate: If user set it to true, the visiting will terminate
+    //              immediately.
+    //Return true to keep processing the kid and sibling IR on tree.
+    //
     //e.g: we are going to find LDA operation in IR tree.
-    //  class MyVisit : public VisitIRTree {
+    //  class VisitFunction {
     //  public:
     //    IR * lda;
-    //    virtual bool visitIR(IR * ir) {
+    //    bool visitIR(IR * ir, OUT bool & is_terminate) {
     //      if (ir->is_lda()) {
     //        lda = ir;
-    //        setTerminate();
+    //        is_terminate = true;
     //      }
     //      //Note it is OK to return true of false here, because the
     //      //visiting will terminated immedately.
     //      return true;
     //    }
     //  };
+    //  class MyVisit : public VisitIRTree<VisitFunction> {
+    //  };
+    //  VisitFunction vf;
+    //  MyVisit my(vf);
+    //  my.visit(root_ir);
     bool visitIR(IR const*, OUT bool & is_terminate)
     { ASSERTN(0, ("Target Dependent Code")); return true; }
-
-    //Inferface that can be overrided by user.
-    //The function will be invoked by current class object when visiting each
-    //IR. User can set visiting status to control whether the IR tree visiting
-    //keep going or terminate.
-    //Return true to process the kid IR on tree.
-    //e.g: we are going to find LDA operation in IR tree.
-    //  class MyVisit : public VisitIRTree {
-    //  public:
-    //    IR * lda;
-    //    virtual bool visitIR(IR * ir) {
-    //      if (ir->is_lda()) {
-    //        lda = ir;
-    //        setTerminate();
-    //      }
-    //      //Note it is OK to return true of false here, because the
-    //      //visiting will terminated immedately.
-    //      return true;
-    //    }
-    //  };
     bool visitIR(IR *, OUT bool & is_terminate)
     { ASSERTN(0, ("Target Dependent Code")); return true; }
 };
@@ -120,6 +108,7 @@ protected:
     //Internal function. No user attention required.
     template<class T> void iter(T ir)
     {
+        if (ir == nullptr) { return; }
         if (!m_vf.visitIR(ir, m_is_terminate)) { return; }
         if (is_terminate()) { return; }
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -136,7 +125,10 @@ protected:
     template<class T> void iterWithSibling(T ir)
     {
         for (T t = ir; t != nullptr; t = t->get_next()) {
-            if (!m_vf.visitIR(t, m_is_terminate)) { return; }
+            if (!m_vf.visitIR(t, m_is_terminate)) {
+                if (is_terminate()) { return; }
+                continue;
+            }
             if (is_terminate()) { return; }
             for (UINT i = 0; i < IR_MAX_KID_NUM(t); i++) {
                 T tmplst = t->getKid(i);
@@ -293,6 +285,13 @@ inline bool isUnaryOp(IR_CODE irt)
 //CASE:_$L9 is non-identifier char because of '$'.
 bool isContainNonIdentifierChar(CHAR const* name);
 
+//Return the last IR in given list, and free others.
+//e.g: lst is {add, sub, mul}, the function return mul, and free 'add' and
+//'sub'.
+//change: return true if there is IR freed.
+IR * onlyLeftLast(IR * lst, Region const* rg, OUT bool & change);
+
+//The function set parent pointer for all elements in 'ir_list'.
 void setParentPointerForIRList(IR * ir_list);
 
 //The function is used to verify given IR list sanity and uniqueness.
@@ -305,6 +304,16 @@ bool verifyIRList(IR const* ir, Region const* rg);
 
 //The function is used to verify IR sanity after IR simplified.
 bool verifySimp(IR * ir, SimpCtx & simp);
+
+//The function verifies the consistency of PR operations and related MD
+//reference.
+//e.g: stpr $2:u64 id:1 = ... #S1
+//     ... = $2:u32 id:2 #S2
+//MD system will generate two different MDs to describe the $2 with different
+//size, that will confuse the solver of DUMgr when computing REACH_DEF. And
+//solver will give the wrong result, that is 'stpr $2 id:1' is NOT the DEF
+//of '$2:u32 id:2'.
+bool verifyPROpAndMDConsistency(Region const* rg);
 
 } //namespace xoc
 #endif

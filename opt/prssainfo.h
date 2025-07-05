@@ -36,6 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class VPRSet;
+class VPRSetMgr;
+
 //Initial version is an abstract description to indicate the imported DEF of
 //each PR. Especially for dedicated PR, parameter.
 //PR should have explicitly definition that version must not
@@ -165,7 +168,8 @@ public:
 
 //Record Version related to original PRNO.
 #define VPR_version(v) (((VPR*)v)->m_version)
-
+#define VPR_prev(v) (((VPR*)v)->m_prev)
+#define VPR_nextset(v) (((VPR*)v)->m_nextset)
 class VPR : public SSAInfo {
     COPY_CONSTRUCTOR(VPR);
 public:
@@ -173,6 +177,8 @@ public:
     PRNO m_newprno; //record renamed PRNO after SSA construction.
     PRNO m_orgprno; //record original PRNO before SSA construction.
     Type const* m_orgpr_type; //record original PRNO data type.
+    VPR * m_prev;
+    VPRSet * m_nextset;
 public:
     VPR(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
 
@@ -183,9 +189,14 @@ public:
         m_orgprno = PRNO_UNDEF;
         m_version = PRSSA_INIT_VERSION;
         m_orgpr_type = nullptr;
+        m_prev = nullptr;
+        m_nextset = nullptr;
     }
 
     CHAR const* dumpBuf(OUT StrBuf & buf) const;
+
+    VPR const* getPrev() const { return VPR_prev(this); }
+    VPRSet * getNextSet() const { return VPR_nextset(this); }
 
     void init(DefSegMgr * sm)
     {
@@ -213,6 +224,49 @@ public:
 
     //Find the initial version VPR.
     VPR * getInitVersion() const;
+};
+
+
+//Set of VPR.
+typedef xcom::DefSBitSetIter VPRSetIter;
+class VPRSet : public xcom::DefSBitSetCore {
+    COPY_CONSTRUCTOR(VPRSet);
+public:
+    VPRSet() { xcom::DefSBitSetCore::init(); }
+
+    //Should call clean() before destruction,
+    //otherwise it will incur SegMgr assertion.
+    ~VPRSet() {}
+
+    void append(VPR const* v, MOD VPRSetMgr & mgr);
+
+    bool find(VPR const* v) const
+    {
+        ASSERT0(v);
+        return xcom::DefSBitSetCore::is_contain(v->id());
+    }
+
+    void remove(VPR const* v, MOD VPRSetMgr & mgr);
+};
+
+
+//The class represents memory management of VPRSet.
+class VPRSetMgr {
+    COPY_CONSTRUCTOR(VPRSetMgr);
+    friend class PRSSAMgr;
+protected:
+    xcom::SMemPool * m_set_pool;
+    xcom::List<VPRSet*> m_set_list;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
+protected:
+    void destroy();
+    void init();
+public:
+    VPRSetMgr();
+    ~VPRSetMgr();
+    VPRSet * allocVPRSet();
+    void clean() { destroy(); init(); }
+    xcom::DefMiscBitSetMgr & getSBSMgr() { return m_sbs_mgr;  }
 };
 
 } //namespace xoc

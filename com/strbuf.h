@@ -78,7 +78,8 @@ public:
     UINT getBufLen() const { return buflen; }
 
     //Return the string buffer.
-    CHAR const* getBuf() const { return buf; }
+    //NOTE: the function allows user to modify the buffer.
+    CHAR * getBuf() const { return buf; }
 
     //The function convert string content into binary.
     //Note the content in given buf must be string format of hex, that is the
@@ -118,13 +119,15 @@ public:
         buf[0] = 0;
     }
 
-    //The functions snprintf() and vsnprintf() do not write more than size
-    //bytes (including the terminating null byte ('\0')).
-    //bytesize: the maximum possible byte size of string.
-    void nstrcat(UINT bytesize, CHAR const* format, ...);
-
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
+
+    //Composes a string that formed by 'format'.
+    //bytesize: the maximum possible byte size of string, include the
+    //          terminate null byte ('\0').
+    //          e.g: input string is 'abcdef', and bytesize is 4, the
+    //          formatted string will be 'abc\0'.
+    void sprint(UINT bytesize, CHAR const* format, ...);
 
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
@@ -132,15 +135,17 @@ public:
     //by 'format'.
     void strcat(CHAR const* format, ...);
 
+    //Concatenate original string and new strings.
+    //The function formats string and ensure the output string does not
+    //exceed 'bytesize'.
+    //bytesize: the maximum possible byte size of string, include the
+    //          terminate null byte ('\0').
+    //          e.g: input string is 'abcdef', and bytesize is 4, the
+    //          formatted string will be 'abc\0'.
+    void strcat(UINT bytesize, CHAR const* format, ...);
+
     //Concatenate another string to current string.
     void strcat(StrBuf const& another);
-
-    //Concatenate original string and new strings.
-    //Appends a copy of the source string to the current string buffer,
-    //the new string is consist of original string and the string formed
-    //by 'format'.
-    //bytesize: the maximum possible byte size of string.
-    void strcat(UINT bytesize, CHAR const* format, va_list args);
 
     //Return byte size of current string.
     //Note the size does NOT include the end-character '\0'.
@@ -151,6 +156,16 @@ public:
     //the new string is consist of original string and the string formed
     //by 'args'.
     void vstrcat(CHAR const* format, va_list args);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
+    //bytesize: the maximum possible byte size of string, include the
+    //          terminate null byte ('\0').
+    //          e.g: input string is 'abcdef', and bytesize is 4, the
+    //          formatted string will be 'abc\0'.
+    void vstrcat(UINT bytesize, CHAR const* format, va_list args);
 
     //This function print string according to 'format'.
     //args: a list of argument store in stack.
@@ -218,7 +233,9 @@ protected:
         ASSERT0(m_strbuf);
         ASSERT0(m_strbuf->getBufLen() >= ByteSize);
         ASSERT0(sz < ByteSize);
-        ::memcpy(m_strbuf->buf, m_fixbuf, sz);
+        if (sz != 0) {
+            ::memcpy(m_strbuf->buf, m_fixbuf, sz);
+        }
         m_strbuf->buf[sz] = 0;
     }
 
@@ -258,12 +275,16 @@ public:
     //substring: partial string.
     LONG findSubStr(CHAR const* substring);
 
-    CHAR const* getBuf() const
+    //NOTE: the function allows user to modify the buffer.
+    CHAR * getBuf()
     { return m_strbuf != nullptr ? m_strbuf->getBuf() : m_fixbuf; }
-    CHAR const* getBufLen() const
+
+    //The function returns the byte length of buffer.
+    //NOTE: the buffer length is bigger or equal than string length.
+    UINT getBufLen() const
     { return m_strbuf != nullptr ? m_strbuf->getBufLen() : ByteSize; }
 
-    //Return true if string is empty.
+    //Return true if current string is empty string, namely the "".
     bool is_empty() const
     { return m_strbuf != nullptr ? m_strbuf->is_empty() : m_fixbuf[0] == 0; }
 
@@ -275,15 +296,27 @@ public:
             m_strbuf->is_equal(s) : ::strncmp(m_fixbuf, s, ByteSize) == 0;
     }
 
-    //The functions snprintf() and vsnprintf() do not write more than size
-    //bytes (including the terminating null byte ('\0')).
-    //bytesize: the maximum possible byte size of string.
-    void nstrcat(UINT bytesize, CHAR const* format, ...);
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
+    //bytesize: the maximum possible byte size of string, include the
+    //          terminate null byte ('\0').
+    //          e.g: input string is 'abcdef', and bytesize is 4, the
+    //          formatted string will be 'abc\0'.
+    void strcat(UINT bytesize, CHAR const* format, ...);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
+    void strcat(CHAR const* format, ...);
 
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
-    void strcat(UINT bytesize, CHAR const* format, va_list args);
-    void strcat(CHAR const* format, ...);
+
+    //Composes a string that formed by 'format'.
+    void sprint(UINT bytesize, CHAR const* format, ...);
 
     //The function unbinds StrBuf if exist, and return the unbinded StrBuf
     //object.
@@ -296,6 +329,16 @@ public:
     //the new string is consist of original string and the string formed
     //by 'args'.
     void vstrcat(CHAR const* format, va_list args);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
+    //bytesize: the maximum possible byte size of string, include the
+    //          terminate null byte ('\0').
+    //          e.g: input string is 'abcdef', and bytesize is 4, the
+    //          formatted string will be 'abc\0'.
+    void vstrcat(UINT bytesize, CHAR const* format, va_list args);
 
     //This function print string according to 'format'.
     //args: a list of argument store in stack.
@@ -322,6 +365,20 @@ StrBuf * FixedStrBuf<ByteSize>::unbind()
 
 
 template <UINT ByteSize>
+void FixedStrBuf<ByteSize>::sprint(UINT bytesize, CHAR const* format, ...)
+{
+    clean();
+    va_list args;
+    va_start(args, format);
+    va_list org_args;
+    va_copy(org_args, args);
+    vstrcat(bytesize, format, org_args);
+    va_end(args);
+    va_end(org_args);
+}
+
+
+template <UINT ByteSize>
 void FixedStrBuf<ByteSize>::sprint(CHAR const* format, ...)
 {
     clean();
@@ -330,7 +387,8 @@ void FixedStrBuf<ByteSize>::sprint(CHAR const* format, ...)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
 }
@@ -349,21 +407,29 @@ void FixedStrBuf<ByteSize>::copy(FixedStrBuf const& src)
 
 
 template <UINT ByteSize>
-void FixedStrBuf<ByteSize>::strcat(UINT bytesize, CHAR const* format,
-                                   va_list args)
+void FixedStrBuf<ByteSize>::vstrcat(UINT bytesize, CHAR const* format,
+                                    va_list args)
 {
     if (m_strbuf != nullptr) {
-        return m_strbuf->strcat(bytesize, format, args);
+        return m_strbuf->vstrcat(bytesize, format, args);
     }
     size_t sl = ::strlen(m_fixbuf);
     if (ByteSize - sl <= bytesize) {
         allocStrBuf(ByteSize + bytesize);
         moveToStrBuf(sl);
-        return m_strbuf->strcat(bytesize, format, args);
+        return m_strbuf->vstrcat(bytesize, format, args);
     }
-    UINT k = VSNPRINTF(&m_fixbuf[sl], bytesize + 1, format, args);
-    ASSERT0(k == bytesize);
-    DUMMYUSE(k);
+    UINT k = VSNPRINTF(&m_fixbuf[sl], bytesize, format, args);
+
+    //NOTE:VSNPRINTF return the byte size of the formatted string.
+    //CASE:Some C library returns -1 if 'bytesize' less than the
+    //characters byte length of formatted string.
+    if (k >= bytesize || k == (UINT)-1) {
+        //If k is equal to bytesize, that means the buffer is smaller than
+        //formatted string, set the last charactor of buffer to '0'.
+        bytesize = bytesize - 1;
+    }
+    m_fixbuf[sl + bytesize] = 0;
 }
 
 
@@ -375,7 +441,8 @@ void FixedStrBuf<ByteSize>::strcat(CHAR const* format, ...)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
 }
@@ -387,7 +454,8 @@ void FixedStrBuf<ByteSize>::vstrcat(CHAR const* format, va_list args)
     va_list org_args;
     va_copy(org_args, args);
     UINT l = VSNPRINTF(nullptr, 0, format, args);
-    strcat(l, format, org_args);
+    l++; //Enlarge buffer to hold the end '0'.
+    vstrcat(l, format, org_args);
     va_end(org_args);
 }
 
@@ -406,15 +474,16 @@ void FixedStrBuf<ByteSize>::vsprint(CHAR const* format, va_list args)
 //bytes (including the terminating null byte ('\0')).
 //bytesize: the maximum possible byte size of string.
 template <UINT ByteSize>
-void FixedStrBuf<ByteSize>::nstrcat(UINT bytesize, CHAR const* format, ...)
+void FixedStrBuf<ByteSize>::strcat(UINT bytesize, CHAR const* format, ...)
 {
+    ASSERT0(bytesize > 0);
     va_list args;
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(nullptr, 0, format, args);
-    if (l > bytesize) { l = bytesize; }
-    strcat(l, format, org_args);
+
+    //Should reserve one byte for storing the terminating null byte ('\0').
+    vstrcat(bytesize, format, org_args);
     va_end(args);
     va_end(org_args);
 }

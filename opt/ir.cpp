@@ -217,16 +217,6 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 }
 #endif
 
-//
-//START IRDesc
-//
-bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
-{
-    return HAVE_FLAG(IRDES_kid_map(irc), 1 << kididx);
-}
-//END IRDesc
-
-
 //The function clean the IR_parent for each elements in 'irlst'.
 void cleanParentForIRList(IR * irlst)
 {
@@ -281,6 +271,7 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
 {
     if (!isArrayOp() || ARR_elem_num_buf(this) == nullptr) { return false; }
     TMWORD aggr = 0;
+    TMWORD aggr_dim = 0;
     UINT dim = 0;
     for (IR const* s = ARR_sub_list(this); s != nullptr;
          s = s->get_next(), dim++) {
@@ -304,12 +295,13 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
             //The dimension of dim0 may be zero.
             //e.g: struct { char di[]; } a; ... = a.di[0];
             aggr = (TMWORD)CONST_int_val(s);
+            aggr_dim = ARR_elem_num(this, dim);
         } else {
             ASSERT0(ARR_elem_num(this, dim) != 0);
-            aggr += ARR_elem_num(this, dim - 1) * (TMWORD)CONST_int_val(s);
+            aggr += aggr_dim * (TMWORD)CONST_int_val(s);
+            aggr_dim *= ARR_elem_num(this, dim);
         }
     }
-
     aggr *= tm->getByteSize(ARR_elemtype(this));
     ASSERT0(ofst_val);
     *ofst_val = aggr;
@@ -359,6 +351,33 @@ bool IR::isSameArrayStruct(IR const* ir) const
         }
         dim++;
     }
+    return true;
+}
+
+
+bool IR::isRefMD(MDIdx mdid) const
+{
+    ASSERT0(mdid != MD_UNDEF);
+    MD const* mustref = getMustRef();
+    if (mustref != nullptr && mustref->id() == mdid) { return true; }
+    MDSet const* mayref = getMayRef();
+    if (mayref != nullptr && mayref->is_contain_pure(mdid)) { return true; }
+    return false;
+}
+
+
+bool IR::isMDRefEqual(IR const* src) const
+{
+    ASSERT0(src);
+    MD const* mustref1 = getMustRef();
+    MD const* mustref2 = src->getMustRef();
+    if (mustref1 != mustref2) { return false; }
+    MDSet const* mayref1 = getMayRef();
+    MDSet const* mayref2 = src->getMayRef();
+    if (mayref1 != mayref2) {
+        return false;
+    }
+    ASSERTN(mayref1 == nullptr || mayref1 == mayref2, ("MDSet is unique"));
     return true;
 }
 
@@ -732,64 +751,52 @@ void IR::copyAI(IR const* src, Region const* rg)
 }
 
 
-//Dump IR Tree's MD references, where ir may be stmt or exp.
-//indent: the addend to current indent of LogMgr.
-void IR::dumpRef(Region * rg, UINT indent)
+static void dumpCallRefViaCallGraph(IR const* ir, Region const* rg)
 {
-    if (!rg->isLogMgrInit() || is_const()) { return; }
-    rg->getLogMgr()->incIndent(indent);
-    dumpIR(this, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF));
+    ASSERT0(ir->isCallStmt());
+    CallGraph * callg = rg->getCallGraphPreferProgramRegion();
+    if (callg == nullptr) { return; }
+    Region * callee = callg->getCalleeRegion(ir, rg);
+    if (callee == nullptr || !callee->is_ref_valid()) { return; }
+    callee->dumpRegionMayRef();
+}
 
+
+void IR::dumpRefOnly(Region const* rg) const
+{
     //Dump mustref MD.
-    MD const* md = getRefMD();
-    MDSet const* mds = getRefMDSet();
-
-    //MustDef
+    MD const* md = getMustRef();
+    MDSet const* mds = getMayRef();
     bool prt_mustdef = false;
     if (md != nullptr) {
+        //MustDef
         note(rg, "\n%sMD%d", md->is_exact() ? "E" : "",  md->id());
         prt_mustdef = true;
     }
-
     if (mds != nullptr) {
         //MayDef
         if (!prt_mustdef) {
             note(rg, "\n"); //dump indent blank.
         }
         prt(rg, " : ");
-        if (!isReadOnly()) {
-            if (mds != nullptr && !mds->is_empty()) {
-                mds->dump(rg->getMDSystem(), rg->getVarMgr());
-            }
+        if (mds != nullptr && !mds->is_empty()) {
+            mds->dump(rg->getMDSystem(), rg->getVarMgr());
         }
     }
-
     if (isCallStmt()) {
-        bool doit = false;
-        CallGraph * callg = rg->getCallGraphPreferProgramRegion();
-        if (callg != nullptr) {
-            Region * callee = callg->getCalleeRegion(this, rg);
-            if (callee != nullptr && callee->is_ref_valid()) {
-                MDSet const* muse = callee->getMayUse();
-                //May use
-                prt(rg, " <-- ");
-                if (muse != nullptr && !muse->is_empty()) {
-                    muse->dump(callee->getMDSystem(), rg->getVarMgr());
-                    doit = true;
-                }
-            }
-        }
-        if (!doit) {
-            //MayUse MDSet.
-            //Regard MayDef MDSet as MayUse.
-            prt(rg, " <-- ");
-            MDSet const* x = getRefMDSet();
-            if (x != nullptr && !x->is_empty()) {
-                x->dump(rg->getMDSystem(), rg->getVarMgr());
-            }
-        }
+        dumpCallRefViaCallGraph(this, rg);
     }
+}
 
+
+//Dump IR Tree's MD references, where ir may be stmt or exp.
+//indent: the addend to current indent of LogMgr.
+void IR::dumpRef(Region const* rg, UINT indent) const
+{
+    if (!rg->isLogMgrInit() || is_const()) { return; }
+    rg->getLogMgr()->incIndent(indent);
+    dumpIR(this, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF));
+    dumpRefOnly(rg);
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         for (IR * k = getKid(i); k != nullptr; k = k->get_next()) {
             k->dumpRef(rg, 2);
@@ -1096,6 +1103,38 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 }
 
 
+bool IR::replaceKidWithIRList(IR * oldk, IR * newk_list, bool recur)
+{
+    //Note for the sake of accessing speed, and the function is frequently
+    //used, thus the function does NOT reuse the replaceKid() with
+    //compare-function implementation.
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid == nullptr) { continue; }
+        for (IR * x = kid; x != nullptr; x = x->get_next()) {
+            if (x == oldk) {
+                xcom::replace(&kid, oldk, newk_list);
+                if (IR_prev(newk_list) == nullptr) {
+                    //oldk is the header, and update the kid i.
+                    setKid(i, kid);
+                } else {
+                    for (IR * tmp = newk_list; tmp != nullptr;
+                         tmp = tmp->get_next()) {
+                        IR_parent(tmp) = IR_parent(oldk);
+                    }
+                }
+                IR_parent(oldk) = nullptr;
+                return true;
+            }
+            if (recur && x->replaceKidWithIRList(oldk, newk_list, true)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
 //Find and substitute 'newk' for 'oldk'.
 //Return true if replaced the 'oldk'.
 //'recur': set to true if function recusively perform
@@ -1110,7 +1149,7 @@ bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
         if (kid == nullptr) { continue; }
         for (IR * x = kid; x != nullptr; x = x->get_next()) {
             if (x == oldk) {
-                xcom::replace(&kid, oldk, newk);
+                xcom::replace_one(&kid, oldk, newk);
                 if (IR_prev(newk) == nullptr) {
                     //oldk is the header, and update the kid i.
                     setKid(i, kid);
@@ -1129,8 +1168,8 @@ bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
 }
 
 
-bool IR::replaceKid(bool recur, ReplaceKidCompareFunc const& cmp,
-                    MOD Region * rg)
+bool IR::replaceKid(
+    bool recur, ReplaceKidCompareFunc const& cmp, MOD Region * rg)
 {
     bool replaced = false;
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
@@ -1141,7 +1180,7 @@ bool IR::replaceKid(bool recur, ReplaceKidCompareFunc const& cmp,
             if (cmp.is_replace(x, &anti_ir)) {
                 ASSERT0(anti_ir);
                 IR * dupnewk = rg->dupIRTree(anti_ir);
-                xcom::replace(&kid, x, dupnewk);
+                xcom::replace_one(&kid, x, dupnewk);
                 if (IR_prev(dupnewk) == nullptr) {
                     //oldk is the header, and update the kid i.
                     setKid(i, kid);
@@ -1179,7 +1218,7 @@ bool IR::replaceKid(
         for (IR * x = kid; x != nullptr; x = x->get_next()) {
             if (cmp.is_replace(x, newk)) {
                 IR * dupnewk = rg->dupIRTree(newk);
-                xcom::replace(&kid, x, dupnewk);
+                xcom::replace_one(&kid, x, dupnewk);
                 if (IR_prev(dupnewk) == nullptr) {
                     //oldk is the header, and update the kid i.
                     setKid(i, kid);
@@ -1250,13 +1289,10 @@ bool IR::isReadOnly() const
 
 bool IR::is_volatile() const
 {
-    //Describing if IR's address has been taken.
-    if (is_id()) {
-        Var * id_info = ID_info(this);
-        ASSERT0(id_info != nullptr);
-        return id_info->is_volatile();
-    }
-    return false;
+    if (!hasIdinfo()) { return false; }
+    Var * id_info = getIdinfo();
+    ASSERT0(id_info);
+    return id_info->is_volatile();
 }
 
 
@@ -1339,6 +1375,18 @@ void IR::setIdinfo(Var * idinfo)
 }
 
 
+IR * IR::getOffsetOfPartialPROp() const
+{
+    switch (getCode()) {
+    case IR_SETELEM: return SETELEM_ofst(this);
+    case IR_GETELEM: return GETELEM_ofst(this);
+    default:;
+    }
+    UNREACHABLE();
+    return nullptr;
+}
+
+
 TMWORD IR::getOffset() const
 {
     IRAccOfstFuncType func = IRDES_accofstfunc(getCode());
@@ -1384,6 +1432,12 @@ UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 {
     ASSERT0(is_array() || is_starray());
     return tm->getByteSize(ARR_elemtype(this));
+}
+
+
+bool IR::isImmutExp() const
+{
+    return isConstExp() || (is_cvt() && ((CCvt*)this)->getLeafExp()->is_lda());
 }
 
 
@@ -1730,6 +1784,17 @@ IR * IR::invertIRCode(IR * ir, Region * rg)
     default: ASSERTN(0, ("unsupport"));
     }
     return ir;
+}
+
+
+bool IR::isConstZero() const
+{
+    if (!is_const()) { return false; }
+    IR * tmp = const_cast<IR*>(this);
+    if (isInt()) { return CONST_int_val(tmp) == 0; }
+    ASSERT0(isFP());
+    UINT64 val = *(UINT64*)&CONST_fp_val(tmp);
+    return xcom::isFPConstZeroPositive(val);
 }
 //END IR
 

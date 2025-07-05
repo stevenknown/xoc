@@ -34,7 +34,7 @@ void dumpHostFP(HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
 {
     CHAR fpformat[128];
     ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", mantissa);
-    xcom::StrBuf lbuf(16);
+    xcom::DefFixedStrBuf lbuf;
     buf.sprint(fpformat, rg->getTypeMgr()->dump_type(ty, lbuf), val);
 }
 
@@ -46,7 +46,7 @@ void dumpHostInt(HOST_INT val, Type const* ty, Region const* rg,
     CHAR const* hexintfmt = getHostIntFormat(true);
     StrBuf fmt(16);
     fmt.sprint("intconst:%%s %s|0x%s", intfmt, hexintfmt);
-    xcom::StrBuf lbuf(16);
+    xcom::DefFixedStrBuf lbuf;
     buf.sprint(fmt.buf, rg->getTypeMgr()->dump_type(ty, lbuf), val, val);
 }
 

@@ -37,8 +37,8 @@ class Region;
 
 //Insertion context variable.
 //Set the following options true or false to enable or disable the convertion.
-#define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
-#define RC_optctx(r) ((r).m_oc)
+#define INSCVTCTX_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
+#define INSCVTCTX_optctx(r) ((r).m_oc)
 class InsertCvtCtx {
 public:
     typedef UINT BitUnion;
@@ -56,19 +56,22 @@ public:
 public:
     InsertCvtCtx(OptCtx * oc)
     {
-        RC_stmt_removed(*this) = false;
-        m_oc = oc;
+        INSCVTCTX_stmt_removed(*this) = false;
+        INSCVTCTX_optctx(*this) = oc;
     }
     InsertCvtCtx const& operator = (InsertCvtCtx const&);
 
     //Clean the actions which propagated bottom up during convertment.
-    void cleanBottomUpFlag() { RC_stmt_removed(*this) = false; }
+    void cleanBottomUpFlag() { INSCVTCTX_stmt_removed(*this) = false; }
 
     //Return the OptCtx.
-    OptCtx * getOptCtx() const { return RC_optctx(*this); }
+    OptCtx * getOptCtx() const { return INSCVTCTX_optctx(*this); }
+
+    //Return true if stmt removed during the convertion.
+    bool isStmtRemoved() const { return INSCVTCTX_stmt_removed(*this); }
 
     //Set flag to disable following optimizations.
-    void setUnOptFlag() { RC_stmt_removed(*this) = false; }
+    void setUnOptFlag() { INSCVTCTX_stmt_removed(*this) = false; }
 };
 
 
@@ -126,6 +129,10 @@ class InsertCvt : public Pass {
     //Check and insert data type CVT if it is necessary.
     IR * insertCvtImpl(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOp(IR * ir, bool & change);
+    void insertCvtForOpnd0OfBinaryOp(
+        IR * ir, IR * op0, Type const* hoisted_type, bool & change);
+    void insertCvtForOpnd1OfBinaryOp(
+        IR * ir, IR * op1, Type const* hoisted_type, bool & change);
 
     //Kid is float.
     IR * insertCvtForFloatCase2(IR * parent, IR * kid, bool & change);
@@ -137,6 +144,8 @@ class InsertCvt : public Pass {
     virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOpByPtrType(IR * ir, bool & change);
 
+    //Insert datatypecvt when setelem val src type different from dst type.
+    IR * insertCvtForSetelemVal(IR * ir, IR * val);
     //Whether cvt instruction is needed for stpr.
     virtual bool isNeedInsertCvtForStpr(IR * parent, IR * kid) const
     { return true; }

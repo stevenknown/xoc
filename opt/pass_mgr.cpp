@@ -88,6 +88,11 @@ void PassMgr::destroyAllPass()
             irmgr_pass_lst.append_tail(p);
             continue;
         }
+        if (p->getPassType() == PASS_GVN) {
+            //Because IRMgr dependent on GVN, destroy it at last.
+            irmgr_pass_lst.append_tail(p);
+            continue;
+        }
         delete p;
     }
     for (Pass * p = irmgr_pass_lst.get_head();
@@ -120,6 +125,12 @@ void PassMgr::dump() const
 Pass * PassMgr::allocCopyProp()
 {
     return new CopyProp(m_rg);
+}
+
+
+Pass * PassMgr::allocBrCondProp()
+{
+    return new BrCondProp(m_rg);
 }
 
 
@@ -333,8 +344,12 @@ Pass * PassMgr::allocDynamicStack()
 
 Pass * PassMgr::allocIRReloc()
 {
+    #ifdef REF_TARGMACH_INFO
+    return new IRRelocMgr(m_rg);
+    #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
+    #endif
 }
 
 
@@ -366,6 +381,13 @@ Pass * PassMgr::allocKernelAdjustment()
 Pass * PassMgr::allocTargInfoHandler()
 {
     return new TargInfoHandler(m_rg);
+}
+
+
+Pass * PassMgr::allocInsertVecSet()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
 }
 
 
@@ -444,6 +466,12 @@ Pass * PassMgr::allocLivenessMgr()
 }
 
 
+Pass * PassMgr::allocPRLivenessMgr()
+{
+    return new PRLivenessMgr(m_rg);
+}
+
+
 Pass * PassMgr::allocMDLivenessMgr()
 {
     return new MDLivenessMgr(m_rg);
@@ -462,6 +490,13 @@ Pass * PassMgr::allocInsertCvt()
 }
 
 
+Pass * PassMgr::allocInstSched()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
 Pass * PassMgr::allocCalcDerivative()
 {
     #ifdef FOR_IP
@@ -469,6 +504,19 @@ Pass * PassMgr::allocCalcDerivative()
     #else
     return nullptr;
     #endif
+}
+
+
+Pass * PassMgr::allocIRFusion()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocStackColoring()
+{
+    return new StackColoring(m_rg);
 }
 
 
@@ -498,6 +546,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_CP:
         pass = allocCopyProp();
+        break;
+    case PASS_BCP:
+        pass = allocBrCondProp();
         break;
     case PASS_GCSE:
         pass = allocGCSE();
@@ -564,6 +615,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_MDLIVENESS_MGR:
         pass = allocMDLivenessMgr();
+        break;
+    case PASS_PRLIVENESS_MGR:
+        pass = allocPRLivenessMgr();
         break;
     case PASS_LFTR:
         pass = allocLFTR();
@@ -642,6 +696,12 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_TARGINFO_HANDLER:
         pass = allocTargInfoHandler();
+        break;
+    case PASS_IRFUSION:
+        pass = allocIRFusion();
+        break;
+    case PASS_STACK_COLORING:
+        pass = allocStackColoring();
         break;
     default:
         pass = allocExtPass(passty);
@@ -741,9 +801,10 @@ void PassMgr::checkAndRecomputeAA(
             ("You should make CFG available first."));
     if (aa == nullptr) {
         aa = (AliasAnalysis*)registerPass(PASS_AA);
-        if (!aa->is_init()) {
-            aa->initAliasAnalysis();
-        }
+    }
+    ASSERT0(aa);
+    if (!aa->is_init() || !aa->is_valid()) {
+        aa->initAliasAnalysis();
     }
     UINT numir = 0;
     UINT max_numir_in_bb = 0;
@@ -853,9 +914,7 @@ void PassMgr::checkValidAndRecomputePass(
         }
         break;
     case PASS_EXPR_TAB:
-        if (!oc->isPassValid(PASS_EXPR_TAB) &&
-            m_rg->getBBList() != nullptr &&
-            m_rg->getBBList()->get_elem_count() != 0) {
+        if (!oc->isPassValid(PASS_EXPR_TAB) && !m_rg->getBBList()->is_empty()) {
             ExprTab * exprtab = (ExprTab*)registerPass(PASS_EXPR_TAB);
             ASSERT0(exprtab);
             exprtab->perform(*oc);
@@ -898,7 +957,8 @@ void PassMgr::checkValidAndRecomputePass(
         break;
     default: {
         Pass * pass = registerPass(pt);
-        if (pass != nullptr || !pass->is_valid()) {
+        ASSERT0(pass);
+        if (!pass->is_valid()) {
             pass->perform(*oc);
         }
     }

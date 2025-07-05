@@ -268,7 +268,7 @@ IRDesc g_ir_desc[] = {
       CSetElem::accResultPR,
       CSetElem::accKid,
       CSetElem::accBB,
-      NO_ACC_BASE_FUNC,
+      CSetElem::accBase,
       NO_ACC_LAB_FUNC,
       NO_ACC_DET_FUNC,
       NO_ACC_SS_FUNC,
@@ -288,7 +288,7 @@ IRDesc g_ir_desc[] = {
       CGetElem::accResultPR,
       CGetElem::accKid,
       CGetElem::accBB,
-      NO_ACC_BASE_FUNC,
+      CGetElem::accBase,
       NO_ACC_LAB_FUNC,
       NO_ACC_DET_FUNC,
       NO_ACC_SS_FUNC,
@@ -1544,5 +1544,15 @@ bool checkRoundDesc()
     ASSERTN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
     return true;
 }
+
+
+//
+//START IRDesc
+//
+bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
+{
+    return IRDES_kid_map(irc).have(kididx);
+}
+//END IRDesc
 
 } //namespace xoc

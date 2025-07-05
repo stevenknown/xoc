@@ -90,6 +90,13 @@ void DCECtx::dump(Region const* rg) const
     }
     rg->getLogMgr()->decIndent(2);
 }
+
+
+DCECtx::DCECtx(OptCtx * oc, DefSegMgr & sm, ActMgr * am)
+    : PassCtx(oc, am), m_effect_bb(&sm), m_effect_stmt(sm), m_exclude_stmt(sm)
+{
+    m_is_remove_cfs = true;
+}
 //END DCECtx
 
 
@@ -174,7 +181,7 @@ public:
         ASSERT0(ir->isMemRef());
         MD const* mustref = ir->getMustRef();
         if (mustref != nullptr) {
-            if (dce->is_effect_write(mustref->get_base())) {
+            if (dce->isEffectWrite(mustref->get_base())) {
                 is_terminate = true;
                 is_effect = true;
                 return false;
@@ -190,7 +197,7 @@ public:
              i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
             MD * md = mdsys->getMD(i);
             ASSERT0(md);
-            if (dce->is_effect_write(md->get_base())) {
+            if (dce->isEffectWrite(md->get_base())) {
                 is_terminate = true;
                 is_effect = true;
                 return false;
@@ -208,7 +215,7 @@ public:
         //    while(g); # The stmt has effect.
         MD const* mustref = ir->getMustRef();
         if (mustref != nullptr) {
-            if (dce->is_effect_read(mustref->get_base())) {
+            if (dce->isEffectRead(mustref->get_base())) {
                 is_terminate = true;
                 is_effect = true;
                 return false;
@@ -224,7 +231,7 @@ public:
              i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
             MD * md = mdsys->getMD(i);
             ASSERT0(md != nullptr);
-            if (dce->is_effect_read(md->get_base())) {
+            if (dce->isEffectRead(md->get_base())) {
                 is_terminate = true;
                 is_effect = true;
                 return false;
@@ -853,10 +860,11 @@ static bool removeIneffectIRImpl(
     bool tobecheck = false;
     Region * rg = dce->getRegion();
     IRCFG * cfg = dce->getCFG();
-    for (BB_irlist(bb).get_head(&ctir), next = ctir;
+    BBIRList & lst = bb->getIRList();
+    for (lst.get_head(&ctir), next = ctir;
          ctir != nullptr; ctir = next) {
         IR * stmt = ctir->val();
-        BB_irlist(bb).get_next(&next);
+        lst.get_next(&next);
         if (dcectx.isEffectStmt(stmt)) { continue; }
 
         //Revise DU chains before removing IR stmt.
@@ -873,14 +881,16 @@ static bool removeIneffectIRImpl(
                 //No need to verify PHI here, because SSA mode will be rebuilt
                 //after this function if revising analysis info failed.
             }
-            CfgOptCtx ctx(*dcectx.getOptCtx());
+            IRCfgOptCtx ctx(dcectx.getOptCtx());
             cfg->changeToBeFallthroughBB(bb, bbit, ctx);
         }
+        dcectx.tryInvalidInfoBeforeFreeIR(stmt);
+
         //Now, stmt is safe to free.
         rg->freeIRTree(stmt);
 
         //Remove stmt from BB.
-        BB_irlist(bb).EList<IR*, IR2Holder>::remove(ctir);
+        lst.EList<IR*, IR2Holder>::remove(ctir);
         tobecheck = true;
     }
     return tobecheck;
@@ -981,7 +991,8 @@ bool DeadCodeElim::removeRedundantPhi(MOD OptCtx & oc)
     }
     bool change = false;
     if (usePRSSADU()) {
-        change |= m_prssamgr->refinePhi(oc);
+        PRSSAUpdateCtx ctx(oc);
+        change |= m_prssamgr->refinePhi(ctx);
     }
     if (useMDSSADU()) {
         change |= m_mdssamgr->removeRedundantPhi(oc);
@@ -1024,7 +1035,7 @@ bool DeadCodeElim::iterCollectAndElim(
 
     //Remove dissociated vertex.
     OptCtx * oc = dcectx.getOptCtx();
-    CfgOptCtx coctx(*oc);
+    IRCfgOptCtx coctx(oc);
     if (useMDSSADU()) {
         //CFG opt will attempt to maintain MDSSA information and update DOM
         //info as much as possible.
@@ -1041,8 +1052,8 @@ bool DeadCodeElim::iterCollectAndElim(
     if (!oc->is_dom_valid()) {
         //If DomInfo is invalid, MDSSA info is also not maintained.
         oc->setInvalidMDSSA();
-        m_rg->getPassMgr()->checkValidAndRecompute(oc, PASS_MDSSA_MGR,
-            PASS_DOM, PASS_LOOP_INFO, PASS_CDG, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(
+            oc, PASS_MDSSA_MGR, PASS_DOM, PASS_LOOP_INFO, PASS_CDG, PASS_UNDEF);
     }
     removed |= removeRedundantPhi(*oc);
     ASSERT0(m_dumgr->verifyMDRef());
@@ -1108,7 +1119,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         dumpBeforePass();
     }
     bool remove_branch_stmt = false;
-    DCECtx dcectx(&oc, *getSBSMgr().getSegMgr());
+    DCECtx dcectx(&oc, *getSBSMgr().getSegMgr(), &getActMgr());
     bool change = elimImpl(oc, dcectx, remove_branch_stmt);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();
@@ -1124,7 +1135,8 @@ bool DeadCodeElim::perform(OptCtx & oc)
         oc.setInvalidIfCFGChanged();
     }
     oc.setInvalidIfDUMgrLiveChanged();
-    ASSERT0(verifyMDDUChain(m_rg, oc));
+    ASSERT0(verifyClassicDUChain(m_rg, oc));
+    ASSERT0(xoc::verifyIVR(m_rg));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     ASSERT0(m_cfg->verifyDom());

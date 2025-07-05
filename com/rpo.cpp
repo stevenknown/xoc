@@ -29,6 +29,12 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+static void prtIndent(FILE * h, UINT indent)
+{
+    ASSERT0(h);
+    for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
+}
+
 //
 //START RPOVexList
 //
@@ -46,6 +52,29 @@ bool RPOVexList::isEqual(RPOVexList const& src) const
         }
     }
     return v == srcv;
+}
+
+
+void RPOVexList::dump(FILE * h, UINT indent) const
+{
+    ASSERT0(h);
+    RPOVexListIter it;
+    for (xcom::Vertex const* v = get_head(&it);
+         v != nullptr; v = get_next(&it)) {
+        fprintf(h, "\n");
+        prtIndent(h, indent);
+        fprintf(h, "v%u(rpo:%d)", v->id(), v->rpo());
+    }
+    fflush(h);
+}
+
+
+void RPOVexList::dump(CHAR const* filename) const
+{
+    ASSERT0(filename);
+    FileObj fo(filename);
+    ASSERT0(fo.getFileHandler());
+    dump(fo.getFileHandler(), 0);
 }
 //END RPOVexList
 
@@ -255,6 +284,43 @@ static RPOVal compRPOIfVexPriorMarker(
 }
 
 
+//CASE1: The marker has a unique successor next and next's RPO is less than
+//the marker's RPO.
+//
+//  newvex is V6, marker is V5, next is V2.
+//
+//         V1 rpo:10                             V1 rpo:10
+//         |                                     |
+//         v                                     v
+//         V2 rpo:20  <------                    V2 rpo:20  <------
+//    _____|_____            |              _____|_____            |
+//   |           |           |             |           |           |
+//   v           v        V6 rpo: ? =>     v           v         V6 rpo: 40
+//   V3 rpo:25   V4 rpo:30   ^             V3 rpo:25   V4 rpo:30   ^
+//   |___________|           |             |___________|           |
+//         |                 |                   |                 |
+//         v                 |                   v                 |
+//         V5 rpo:40  -------                    V5 rpo:35  -------
+//
+//Find a possible RPO before the marker and set it as the marker's RPO,
+//the original marker's RPO as the newvex's RPO.
+static RPOVal compRPOIfMarkerPriorVexCase1(
+    Vertex const* newvex, Vertex const* marker, RPOMgr * rpomgr)
+{
+    ASSERT0(marker->getOutDegree() == 1);
+    ASSERT0(marker->getNthOutVertex(0)->rpo() < marker->rpo());
+
+    RPOVal rpo = compRPOIfVexPriorMarker(newvex, marker, rpomgr);
+
+    if (rpo == RPO_UNDEF) { return RPO_UNDEF; }
+
+    RPOVal new_rpo = VERTEX_rpo(marker);
+    VERTEX_rpo(const_cast<Vertex*>(marker)) = rpo;
+
+    return new_rpo;
+}
+
+
 //Note newvex should be the next vertex to marker.
 static RPOVal compRPOIfMarkerPriorVex(
     Vertex const* newvex, Vertex const* marker, RPOMgr * rpomgr)
@@ -313,18 +379,15 @@ static RPOVal compRPOIfMarkerPriorVex(
         //  |          |
         //  v          |
         // V4 rpo:30---
+
+        if (marker->getOutDegree() == 1) {
+            return compRPOIfMarkerPriorVexCase1(newvex, marker, rpomgr);
+        }
         return RPO_UNDEF;
     }
     rpo = rpomgr->tryFindUsableRPO(begin, end);
     #endif
     return rpo;
-}
-
-
-static void prtIndent(FILE * h, UINT indent)
-{
-    ASSERT0(h);
-    for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
 }
 
 
@@ -391,20 +454,6 @@ bool RPOMgr::verifyRPOVexList(Graph const& g, Vertex const* root,
         previous_vex.bunion(v->id());
     }
     return true;
-}
-
-
-void RPOMgr::dumpRPOVexList(FILE * h, RPOVexList const& vlst, UINT indent)
-{
-    ASSERT0(h);
-    RPOVexListIter it;
-    for (xcom::Vertex const* v = vlst.get_head(&it);
-         v != nullptr; v = vlst.get_next(&it)) {
-        fprintf(h, "\n");
-        prtIndent(h, indent);
-        fprintf(h, "v%u(rpo:%d)", v->id(), v->rpo());
-    }
-    fflush(h);
 }
 
 

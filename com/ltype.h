@@ -66,6 +66,7 @@ author: Su Zhenyu
 
     //Use POSIX name "unlink" instead of ISO C++ conformat name "_unlink".
     #define UNLINK   _unlink
+    #define BUILT_IN_IS_TRIVIAL(T) __is_trivial(T)
 #else
     //Default is linux version
     #include "unistd.h" //for UNLINK declaration
@@ -74,6 +75,7 @@ author: Su Zhenyu
     #define VSNPRINTF vsnprintf
     #define RESTRICT __restrict__
     #define UNLINK   unlink
+    #define BUILT_IN_IS_TRIVIAL(T) __is_trivial(T)
 #endif
 
 #include "limits.h"

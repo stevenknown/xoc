@@ -256,7 +256,7 @@ protected:
     DUMgr * m_dumgr;
     OptCtx * m_oc;
     InferEVN * m_infer_evn;
-    LDAActMgr m_act_mgr;
+    LDAActMgr m_am;
 protected:
     void analyzeLinearDep(
         IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
@@ -298,7 +298,7 @@ protected:
     bool useGVN() const
     { return m_gvn != nullptr && m_gvn->is_valid(); }
 public:
-    explicit LoopDepAna(Region * rg, GVN * gvn) : Pass(rg), m_act_mgr(rg)
+    explicit LoopDepAna(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
     {
         m_pool = nullptr;
         m_is_aggressive = true;
@@ -329,7 +329,7 @@ public:
     virtual CHAR const* getPassName() const
     { return "Loop Dependence Analysis"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_DEP_ANA; }
-    LDAActMgr & getActMgr() { return m_act_mgr; }
+    LDAActMgr & getActMgr() { return m_am; }
     InferEVN & getInferEVN() const { return *m_infer_evn; }
 
     //Return true if user ask to perform aggressive optimization that without

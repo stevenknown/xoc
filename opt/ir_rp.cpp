@@ -127,7 +127,8 @@ static IR * dupMemExp(IR const* ir, Region * rg)
 //table. Note, during the IR free processing, the occ should not be
 //freed if it is IR_UNDEF. This is because the occ is one of the kid
 //of some other stmt|exp which has already been freed.
-static void freeExactOccs(IRList & occs, Region * rg, GVN * gvn)
+static void freeExactOccs(
+    IRList & occs, Region * rg, GVN * gvn, RPCtx const& ctx)
 {
     IRListIter irit;
     for (IR * occ = occs.get_head(&irit);
@@ -138,6 +139,7 @@ static void freeExactOccs(IRList & occs, Region * rg, GVN * gvn)
             continue;
         }
         gvn->cleanVNIRTree(occ);
+        ctx.tryInvalidIVRIfIRIsIV(occ);
 
         //Note the delegate is one of references in Occs List.
         rg->freeIRTree(occ);
@@ -147,7 +149,8 @@ static void freeExactOccs(IRList & occs, Region * rg, GVN * gvn)
 
 
 //Note the delegate is one of reference in 'inexact_tab'.
-static void freeInexactOccs(InexactAccTab & tab, Region * rg, GVN * gvn)
+static void freeInexactOccs(
+    InexactAccTab & tab, Region * rg, GVN * gvn, RPCtx const& ctx)
 {
     InexactAccTabIter ti;
     for (IR * occ = tab.get_first(ti);
@@ -158,6 +161,7 @@ static void freeInexactOccs(InexactAccTab & tab, Region * rg, GVN * gvn)
             continue;
         }
         gvn->cleanVNIRTree(occ);
+        ctx.tryInvalidIVRIfIRIsIV(occ);
 
         //Note the delegate is one of elements in 'tab'.
         rg->freeIRTree(occ);
@@ -193,9 +197,44 @@ void RestoreTab::dumpDele2Restore(Region const* rg) const
 //
 //START RPCtx
 //
+static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
+{
+    if (am == nullptr || !rg->isLogMgrInit()) { return; }
+    xcom::DefFixedStrBuf buf;
+    am->dump("'%s' will be removed, however it is IV, "
+             "so IVR will be invalided.",
+             xoc::dumpIRName(ir, buf));
+}
+
+
+RPCtx::RPCtx(OptCtx * t, RPActMgr * am)
+    : m_act_mgr(am), need_rebuild_domtree(false),
+      domtree(nullptr), oc(t), m_li(nullptr), m_ldactx(nullptr)
+{
+    Region const* rg = t->getRegion();
+    m_ivr = (IVR*)rg->getPassMgr()->queryPass(PASS_IVR);
+}
+
+
+bool RPCtx::isIV(IR const* ir) const
+{
+    if (m_ivr == nullptr) { return false; }
+    IV const* iv = nullptr;
+    return m_ivr->isIV(ir, &iv);
+}
+
+
+void RPCtx::tryInvalidIVRIfIRIsIV(IR const* ir) const
+{
+    dumpRemoveIR(oc->getRegion(), m_act_mgr, ir);
+    xoc::tryInvalidIVRIfIRIsIV(m_ivr, ir, getOptCtx(), m_act_mgr);
+}
+
+
 void RPCtx::dumpAct(CHAR const* format, ...) const
 {
     if (m_act_mgr == nullptr) { return; }
+    if (!getOptCtx()->getRegion()->isLogMgrInit()) { return; }
     va_list args;
     va_start(args, format);
     m_act_mgr->dump_args(format, args);
@@ -496,7 +535,7 @@ void RefHashFunc::initMem(GVN * gvn)
 //The function will modify m_iter.
 UINT RefHashFunc::get_hash_value(IR * t, UINT bucket_size) const
 {
-    ASSERT0(bucket_size != 0 && isPowerOf2(bucket_size));
+    ASSERT0(bucket_size != 0 && xcom::isPowerOf2(bucket_size));
     UINT hval = 0;
     ConstIRIter it;
     #define HASHIRCODE(code, x) (UINT)((code << 4) + \
@@ -739,6 +778,7 @@ void DelegateMgr::clean()
     IR * pr;
     for (IR * x = m_dele2pr.get_first(mapit, &pr);
          x != nullptr; x = m_dele2pr.get_next(mapit, &pr)) {
+        ASSERT0(m_gvn == nullptr || m_gvn->getVN(pr) == nullptr);
         m_rg->freeIRTree(pr);
 
         //Note the delegate is one of references in Occs List of
@@ -1685,6 +1725,7 @@ void RegPromot::handleExactAccOcc(
         }
         handleAccessInBody(occ, dele, delemgr, restore2mem,
                            occ2newocc, ctx);
+
         //Each memory reference in the tree has been promoted.
         promoted.addTree(occ, ii);
     }
@@ -1728,7 +1769,7 @@ void RegPromot::promoteExactAccessDelegate(
     //Each delegate has an occ-list for it.
     IRList * occs = exact_tab.getOccs(dele->getMustRef());
     ASSERT0(occs);
-    freeExactOccs(*occs, m_rg, m_gvn);
+    freeExactOccs(*occs, m_rg, m_gvn, ctx);
 }
 
 
@@ -1934,6 +1975,7 @@ void RegPromot::handleStmtInBody(
     IR * occrhs = occ->getRHS();
     occ->setRHS(nullptr); //Do NOT remove the DU chain of RHS of occ.
     xoc::removeStmt(occ, m_rg, *ctx.oc);
+
     //Substitute STPR for writing memory.
     IR * stpr = getIRMgr()->buildStorePR(
         PR_no(delegate_pr), delegate_pr->getType(), occrhs);
@@ -2104,7 +2146,7 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
         m_rg->getPassMgr()->checkValidAndRecompute(
             ctx.oc, PASS_DOM, PASS_UNDEF);
     }
-    ctx.oc->setInvalidLiveness();
+    ctx.oc->setInvalidPRLiveness();
 
     //Infer and add those BBs that should be also handled in PRSSA construction.
     ssarg.inferAndAddRelatedBB();
@@ -2162,7 +2204,7 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
             ("dominfo of preheader must have been maintained"));
     ASSERT0(ctx.domtree);
     ASSERT0(m_prssamgr);
-    ctx.oc->setInvalidLiveness();
+    ctx.oc->setInvalidPRLiveness();
     m_prssamgr->constructDesignatedRegion(ssarg);
     ctx.oc->setInvalidPRDU();
     return true;
@@ -2213,26 +2255,6 @@ void RegPromot::addDUChainForInexactAccDele(
 }
 
 
-void RegPromot::addDUChainForExpTree(
-    IR * root, IR * startir, IRBB * startbb, RPCtx const& ctx)
-{
-    ASSERT0(root->is_exp());
-    bool use_prssa = usePRSSADU();
-    bool use_mdssa = useMDSSADU();
-    if (!use_prssa && !use_mdssa) { return; }
-    IRIter it;
-    MDSSAStatus st;
-    for (IR * x = iterInit(root, it);
-         x != nullptr; x = iterNext(it)) {
-        if (use_mdssa && x->isMemRefNonPR()) {
-            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc, st);
-        } else if (use_prssa && x->isReadPR()) {
-            m_prssamgr->findAndSetLiveinDef(x);
-        }
-    }
-}
-
-
 void RegPromot::addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
                                           RPCtx const& ctx)
 {
@@ -2243,7 +2265,8 @@ void RegPromot::addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt,
             dele->isIsomoTo(init_stmt->getRHS(), getIRMgr(), true));
     IR * startir = init_stmt->getBB()->getPrevIR(init_stmt);
     IRBB * startbb = init_stmt->getBB();
-    addDUChainForExpTree(init_stmt->getRHS(), startir, startbb, ctx);
+    xoc::findAndSetLiveInDefForTree(
+        init_stmt->getRHS(), startir, startbb, m_rg, *ctx.oc);
 }
 
 
@@ -2251,26 +2274,16 @@ void RegPromot::addSSADUChainForExpOfRestoreLHS(
     IR const* dele, DelegateMgr const& delemgr,
     RestoreTab const& restore2mem, RPCtx const& ctx)
 {
-    bool use_prssa = usePRSSADU();
-    bool use_mdssa = useMDSSADU();
-    if (!use_prssa && !use_mdssa) { return; }
+    if (!usePRSSADU() && !useMDSSADU()) { return; }
     IR * restore = restore2mem.getRestore(dele);
     if (restore == nullptr) { return; }
     ASSERT0(restore->is_stmt());
     ASSERT0(restore->getRHS());
     ASSERT0(restore->isMemRefNonPR() && restore->getRHS()->isPROp());
-    IRIter it;
     IR * startir = restore->getBB()->getPrevIR(restore);
     IRBB * startbb = restore->getBB();
-    MDSSAStatus st;
-    for (IR * x = xoc::iterExpOfStmtInit(restore, it);
-         x != nullptr; x = xoc::iterExpOfStmtNext(it)) {
-        if (use_mdssa && x->isMemRefNonPR()) {
-            m_mdssamgr->findAndSetLiveInDef(x, startir, startbb, *ctx.oc, st);
-        } else if (use_prssa && x->isReadPR()) {
-            m_prssamgr->findAndSetLiveinDef(x);
-        }
-    }
+    xoc::findAndSetLiveInDefForExpOfStmt(
+        restore, startir, startbb, m_rg, *ctx.oc);
 }
 
 
@@ -2563,7 +2576,7 @@ void RegPromot::promoteInexactAccess(
                                  inexact_tab, ii, ctx);
     //Note the delegate is one of references in 'inexact_tab'.
     //All delegates are recorded in same one table.
-    freeInexactOccs(inexact_tab, m_rg, m_gvn);
+    freeInexactOccs(inexact_tab, m_rg, m_gvn, ctx);
 }
 
 
@@ -2936,9 +2949,10 @@ bool RegPromot::perform(OptCtx & oc)
     RPCtx ctx(&oc, &getActMgr());
     bool change = EvaluableScalarReplacement(worklst, ctx);
     if (change) {
+        dump();
         //DU reference and du chain has maintained.
         ASSERT0(m_dumgr->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg, oc));
+        ASSERT0(verifyClassicDUChain(m_rg, oc));
 
         //Enforce following pass to recompute gvn.
         getGVN()->set_valid(false);
@@ -2952,7 +2966,6 @@ bool RegPromot::perform(OptCtx & oc)
     } else {
         m_rg->getLogMgr()->cleanBuffer();
     }
-    dump();
     clean();
     END_TIMER(t, getPassName());
     return change;

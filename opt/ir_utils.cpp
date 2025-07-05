@@ -108,6 +108,7 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
+        if (IRDES_is_ter(i)) { checkIRSwitchCaseInterface((IR_CODE)i); }
         if (IRDES_is_bin(i)) {
             switch ((IR_CODE)i) {
             SWITCH_CASE_BIN:
@@ -148,6 +149,33 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
     }
     return true;
 }
+
+//
+//START IRList
+//
+bool IRList::verifyUnique(IR const* ir) const
+{
+    IRListIter it;
+    for (IR const* x = get_head(&it); x != nullptr; x = get_next(&it)) {
+        ASSERTN(x != ir, ("ir is already on the list"));
+    }
+    return true;
+}
+//END IRList
+
+
+//
+//START ConstIRList
+//
+bool ConstIRList::verifyUnique(IR const* ir) const
+{
+    ConstIRListIter it;
+    for (IR const* x = get_head(&it); x != nullptr; x = get_next(&it)) {
+        ASSERTN(x != ir, ("ir is already on the list"));
+    }
+    return true;
+}
+//END ConstIRList
 
 
 //

@@ -131,7 +131,7 @@ public:
 
     UINT get_hash_value(Sym const* s, UINT bs) const
     {
-        ASSERT0(isPowerOf2(bs));
+        ASSERT0(xcom::isPowerOf2(bs));
         UINT v = computeCharSum(SYM_name(s));
         return hash32bit(v) & (bs - 1);
     }
@@ -141,7 +141,7 @@ public:
     {
         ASSERTN(sizeof(OBJTY) == sizeof(CHAR*),
                 ("exception will taken place in type-cast"));
-        ASSERT0(isPowerOf2(bs));
+        ASSERT0(xcom::isPowerOf2(bs));
         UINT n = computeCharSum((CHAR*)v);
         return hash32bit(n) & (bs - 1);
     }
@@ -173,7 +173,7 @@ public:
 
     UINT get_hash_value(Sym const* s, UINT bs) const
     {
-        ASSERT0(isPowerOf2(bs));
+        ASSERT0(xcom::isPowerOf2(bs));
         UINT v = computeCharSum(SYM_name(s));
         return hash32bit(v) & (bs - 1);
     }
@@ -183,7 +183,7 @@ public:
     {
         ASSERTN(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
-        ASSERT0(isPowerOf2(bs));
+        ASSERT0(xcom::isPowerOf2(bs));
         UINT n = computeCharSum((CHAR const*)v);
         return hash32bit(n) & (bs - 1);
     }

@@ -215,7 +215,7 @@ static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     RefineCtx rc(const_cast<OptCtx*>(&mgr.getOptCtx()));
     RC_maintain_du(rc) = false;
     bool change;
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -261,7 +261,7 @@ static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     RefineCtx rc(const_cast<OptCtx*>(&mgr.getOptCtx()));
     RC_maintain_du(rc) = false;
     bool change;
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -288,7 +288,7 @@ static bool doBinOpFP2Int(IR_CODE code, IVVal const& v0, IVVal const& v1,
     RefineCtx rc(const_cast<OptCtx*>(&mgr.getOptCtx()));
     RC_maintain_du(rc) = false;
     bool change;
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -314,7 +314,7 @@ static bool doBinOpInt2FP(IR_CODE code, IVVal const& v0, IVVal const& v1,
     //original IR.
     RefineCtx rc(const_cast<OptCtx*>(&mgr.getOptCtx()));
     RC_maintain_du(rc) = false;
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -373,7 +373,7 @@ static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     RC_maintain_du(rc) = false;
     Refine * refine = (Refine*)pm->registerPass(PASS_REFINE);
     ASSERT0(refine);
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -512,7 +512,7 @@ static bool doSubOrDivFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     RC_maintain_du(rc) = false;
     Refine * refine = (Refine*)pm->registerPass(PASS_REFINE);
     ASSERT0(refine);
-    IR * resir = refine->refineIR(tmpres, change, rc);
+    IR * resir = refine->refineExpression(tmpres, change, rc);
     res.setToExp(resir);
     mgr.record(resir);
     mgr.refine(res);
@@ -911,8 +911,7 @@ bool ChainRec::isEqual(ConstIVValList const& lst, IRMgr const* mgr) const
     UINT i = 0;
     for (lst.get_head(&it); i < lst.get_elem_count();
          it = lst.get_next(it), i++) {
-        ASSERT0(it->val());
-        if (!s->getInit().isEqual(*it->val(), mgr)) { return false; }
+        if (!s->getInit().isEqual(it->val(), mgr)) { return false; }
         if (!s->getStep().is_cr()) {
             break; //meet the last level CR.
         }
@@ -921,8 +920,7 @@ bool ChainRec::isEqual(ConstIVValList const& lst, IRMgr const* mgr) const
     if (i != lst.get_elem_count() - 2) { return false; }
     it = lst.get_next(it);
     ASSERT0(it != lst.end());
-    ASSERT0(it->val());
-    return s->getStep().isEqual(*it->val(), mgr);
+    return s->getStep().isEqual(it->val(), mgr);
 }
 
 
@@ -932,7 +930,7 @@ bool ChainRec::isEqual(IRMgr const* mgr, UINT valnum, ...) const
     va_start(ptr, valnum);
     ConstIVValList vlst;
     for (UINT i = 0; i < valnum; i++) {
-        IVVal const* val = va_arg(ptr, IVVal const*);
+        IVVal val = va_arg(ptr, IVVal);
         vlst.append_tail(val);
     }
     va_end(ptr);

@@ -1690,6 +1690,8 @@ static void initSolveSetVec(
 bool SolveSetMgr::perform(MOD OptCtx & oc, UFlag flag)
 {
     ASSERT0(oc.is_ref_valid());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    ASSERT0(m_cfg->getRPOVexList());
     Vector<MDSet*> * maydef_mds = nullptr;
     Vector<MDSet*> * mustexactdef_mds = nullptr;
     MDSet * mayuse_mds = nullptr;

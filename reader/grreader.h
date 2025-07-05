@@ -38,19 +38,34 @@ class GRReader {
 protected:
     Lexer * m_lexer;
     IRParser * m_parser;
-    RegionMgr * m_rumgr;
+    RegionMgr * m_rm;
+protected:
+    virtual Lexer * allocLexer();
+    virtual IRParser * allocParser();
 public:
-    GRReader(RegionMgr * rumgr);
-    ~GRReader();
+    GRReader(RegionMgr * rm);
+    virtual ~GRReader();
+
+    void destroy();
+    void dump() const;
 
     Lexer * getLexer() { return m_lexer; }
     IRParser * getParser() { return m_parser; }
+    RegionMgr * getRegionMgr() const { return m_rm; }
+
+    void initLexerAndParser();
+
     void setSrcFile(FILE * h);
     bool parse();
 };
 
-//Read IR from gr file.
-bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile);
+//Read IR from GR file.
+//Return true if no error is found.
+bool readGRAndConstructRegion(RegionMgr * rm, CHAR const* grfile);
+
+//Read IR from GR file.
+//Return true if no error is found.
+bool readGRAndConstructRegion(MOD GRReader * reader, CHAR const* grfile);
 
 } //namespace xoc
 #endif

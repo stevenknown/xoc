@@ -31,8 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-//Dump IR list with a logging header-notation.
-//Dump both its kids and siblings.
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
                  DumpFlag dumpflag)
 {
@@ -42,7 +40,38 @@ void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
 }
 
 
-//Dump IR, and both its kids and siblings.
+void dumpIRList(
+    CHAR const* filename, IR const* ir_list, Region const* rg,
+    bool dump_inner_region, IRDumpCtx<> * ctx)
+{
+    ASSERT0(filename);
+    FileObj fo(filename, true, false);
+    FILE * h = fo.getFileHandler();
+    rg->getLogMgr()->push(h, filename);
+    dumpIRList(ir_list, rg, dump_inner_region, ctx);
+    rg->getLogMgr()->pop();
+}
+
+
+void dumpIRList(
+    IR const* ir_list, Region const* rg, bool dump_inner_region,
+    IRDumpCtx<> * ctx)
+{
+    ASSERT0(rg && ir_list);
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "");
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
+        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+    for (; ir_list != nullptr; ir_list = ir_list->get_next()) {
+        if (ctx != nullptr) {
+            xoc::dumpIR(ir_list, rg, *ctx);
+            continue;
+        }
+        xoc::dumpIR(ir_list, rg, nullptr, f);
+    }
+}
+
+
 void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx)
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -53,7 +82,6 @@ void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
-//Dump IR, and both its kids and siblings.
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
                 DumpFlag dumpflag)
 {
@@ -119,24 +147,22 @@ void dumpOffset(IR const* ir, Region const* rg)
 void dumpIdinfo(IR const* ir, Region const* rg)
 {
     if (!ir->hasIdinfo()) { return; }
-    CHAR tt[40];
-    tt[0] = 0;
-    CHAR * name = xstrcat(tt, NUM_ARRELEM(tt), "%s",
-                          ir->getIdinfo()->get_name()->getStr());
-    prt(rg, " '%s'", name);
+    xcom::FixedStrBuf<40> buf;
+    buf.strcat("%s", ir->getIdinfo()->get_name()->getStr());
+    prt(rg, " '%s'", buf.getBuf());
 }
 
 
 static void dumpAbstractIdinfo(IR const* ir, Region const* rg)
 {
-    CHAR tt[44];
-    tt[0] = 0;
     CHAR const* string = ir->getIdinfo()->get_name()->getStr();
-    CHAR * name = xstrcat(tt, NUM_ARRELEM(tt) - 4, "%s", string);
-    if (::strlen(string) > (NUM_ARRELEM(tt) - 4)) {
-        strcat(tt, "...");
+    UINT const sz = 40;
+    xcom::FixedStrBuf<sz> buf;
+    buf.strcat(sz - 4, "%s", string);
+    if (::strlen(string) > (sz - 4)) {
+        buf.strcat("...");
     }
-    prt(rg, " '%s'", name);
+    prt(rg, " '%s'", buf.getBuf());
 }
 
 
@@ -187,7 +213,7 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
     if (li->is_ilabel()) {
         bool non_id = false;
         if (for_gr) {
-            FixedStrBuf<8> buf;
+            xcom::FixedStrBuf<8> buf;
             buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(li));
             if (isContainNonIdentifierChar(buf.getBuf())) {
                 //Some non-identifier character will be recognized as individual
@@ -212,7 +238,7 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
     if (li->is_clabel()) {
         bool non_id = false;
         if (for_gr) {
-            FixedStrBuf<8> buf;
+            xcom::FixedStrBuf<8> buf;
             buf.strcat(CLABEL_STR_FORMAT, CLABEL_CONT(li));
             if (isContainNonIdentifierChar(buf.getBuf())) {
                 //Some non-identifier character will be recognized as individual
@@ -235,7 +261,7 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
         ASSERT0(li->getPragma());
         bool non_id = false;
         if (for_gr) {
-            FixedStrBuf<8> buf;
+            xcom::FixedStrBuf<8> buf;
             if (isContainNonIdentifierChar(li->getPragma()->getStr())) {
                 //Some non-identifier character will be recognized as individual
                 //token.
@@ -340,20 +366,20 @@ static void dumpDbx(OUT StrBufType & buf, Region const* rg,
     ASSERT0(dbx_mgr);
     DbxAttachInfo const* dbx_info = (DbxAttachInfo const*)ac;
     bool is_has_dbg_info = dbx_info->
-        dbx.getLine(LangInfo::LANG_CPP, dbx_mgr) != DBX_UNDEF;
+        dbx.getLine(LANG_CPP, dbx_mgr) != DBX_UNDEF;
     if(!is_has_dbg_info) { return; }
     buf.strcat(" file: ");
     buf.strcat("%d", dbx_info->dbx.
-        getFileIndex(LangInfo::LANG_CPP, dbx_mgr));
+        getFileIndex(LANG_CPP, dbx_mgr));
     buf.strcat(" row: ");
     buf.strcat("%d", dbx_info->dbx.
-        getLine(LangInfo::LANG_CPP, dbx_mgr));
+        getLine(LANG_CPP, dbx_mgr));
     buf.strcat(" col: ");
     buf.strcat("%d", dbx_info->dbx.
-        getColOffset(LangInfo::LANG_CPP, dbx_mgr));
+        getColOffset(LANG_CPP, dbx_mgr));
     buf.strcat(" flag: ");
     buf.strcat("%d", dbx_info->dbx.
-        getFlag(LangInfo::LANG_CPP, dbx_mgr));
+        getFlag(LANG_CPP, dbx_mgr));
 }
 
 
@@ -394,12 +420,10 @@ void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     note(rg, "%s", IRNAME(ir));
     if (REGION_ru(ir)->getRegionVar() != nullptr) {
         Var * var = REGION_ru(ir)->getRegionVar();
-        CHAR tt[40];
-        tt[0] = 0;
-
         //Dump variable info.
-        xstrcat(tt, NUM_ARRELEM(tt), "%s", var->get_name()->getStr());
-        prt(rg, " \'%s\',id:%d", tt, REGION_ru(ir)->id());
+        xcom::FixedStrBuf<40> tt;
+        tt.strcat(40, "%s", var->get_name()->getStr());
+        prt(rg, " \'%s\',id:%d", tt.getBuf(), REGION_ru(ir)->id());
     }
     DUMPADDR(ir); //Dump IR address.
     ASSERT0(ctx.attr);
@@ -419,7 +443,7 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -452,20 +476,19 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 
         //Dump subscript expressions in each dimension.
         UINT dim = 0;
+        xcom::FixedStrBuf<40> tt;
         for (IR const* sub = ARR_sub_list(ir);
              sub != nullptr; sub = sub->get_next()) {
-            CHAR tt[40];
-            sprintf(tt, " dim%d", dim);
-            dumpIR(sub, rg, (CHAR*)tt, ctx.dumpflag);
+            tt.clean();
+            tt.strcat(40, " dim%d", dim);
+            dumpIR(sub, rg, tt.getBuf(), ctx.dumpflag);
             dim++;
         }
         lm->decIndent(ctx.dn);
     }
-
     if (!dump_kid) { return; }
-
     lm->incIndent(ctx.dn);
-    dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", ctx.dumpflag);
+    dumpIRList(ARR_base(ir), rg, (CHAR const*)" array_base", ctx.dumpflag);
     lm->decIndent(ctx.dn);
 }
 
@@ -545,7 +568,7 @@ void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -571,7 +594,7 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -585,11 +608,13 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         lm->decIndent(ctx.dn);
 
         lm->incIndent(ctx.dn);
-        dumpIRList(SELECT_trueexp(ir), rg, (CHAR*)" true_exp", ctx.dumpflag);
+        dumpIRList(SELECT_trueexp(ir), rg, (CHAR const*)" true_exp",
+                   ctx.dumpflag);
         lm->decIndent(ctx.dn);
 
         lm->incIndent(ctx.dn);
-        dumpIRList(SELECT_falseexp(ir), rg, (CHAR*)" false_exp", ctx.dumpflag);
+        dumpIRList(SELECT_falseexp(ir), rg, (CHAR const*)" false_exp",
+                   ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -768,7 +793,7 @@ void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -787,7 +812,7 @@ void dumpBinAndUna(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 void dumpReadPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s%d:%s", PR_TYPE_CHAR, ir->getPrno(), xtm->dump_type(d, buf));
@@ -802,7 +827,7 @@ void dumpGeneral(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -870,7 +895,7 @@ void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -902,19 +927,20 @@ void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 
         //Dump sub exp list.
         dim = 0;
+        xcom::FixedStrBuf<40> tt;
         for (IR const* sub = ARR_sub_list(ir);
              sub != nullptr; sub = sub->get_next()) {
-            CHAR tt[40];
-            sprintf(tt, " dim%d", dim);
-            dumpIR(sub, rg, (CHAR*)tt, ctx.dumpflag);
+            tt.clean();
+            tt.strcat(40, " dim%d", dim);
+            dumpIR(sub, rg, tt.getBuf(), ctx.dumpflag);
             dim++;
         }
         lm->decIndent(ctx.dn);
     }
     if (dump_kid) {
         lm->incIndent(ctx.dn);
-        dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", ctx.dumpflag);
-        dumpIRList(STARR_rhs(ir), rg, (CHAR*)" rhs", ctx.dumpflag);
+        dumpIRList(ARR_base(ir), rg, (CHAR const*)" array_base", ctx.dumpflag);
+        dumpIRList(STARR_rhs(ir), rg, (CHAR const*)" rhs", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -924,7 +950,7 @@ void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s %s%d:%s", IRNAME(ir), PR_TYPE_CHAR, ir->getPrno(),
@@ -943,7 +969,7 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
@@ -973,14 +999,17 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         lm->decIndent(ctx.dn);
     }
 
-    CHAR tmpbuf[30];
+    xcom::FixedStrBuf<30> tmpbuf;
     UINT i = 0;
 
     //Dump argument list.
     for (IR * p2 = CALL_arg_list(ir); p2 != nullptr; p2 = p2->get_next()) {
-        sprintf(tmpbuf, " arg%d", i);
+        tmpbuf.sprint(" arg%d", i);
+        IRDumpCtx<> lctx(ctx);
+        lctx.attr = tmpbuf.getBuf();
         lm->incIndent(ctx.dn);
-        dumpIR(p2, rg, tmpbuf, ctx.dumpflag);
+        dumpIR(p2, rg, lctx);
+        //dumpIR(p2, rg, tmpbuf, ctx.dumpflag);
         lm->decIndent(ctx.dn);
         i++;
     }
@@ -989,9 +1018,12 @@ void dumpCallStmt(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     i = 0;
     for (IR * p2 = CALL_dummyuse(ir);
          p2 != nullptr; p2 = p2->get_next()) {
-        sprintf(tmpbuf, " dummy%d", i);
+        tmpbuf.sprint(" dummy%d", i);
+        IRDumpCtx<> lctx(ctx);
+        lctx.attr = tmpbuf.getBuf();
         lm->incIndent(ctx.dn);
-        dumpIR(p2, rg, tmpbuf, ctx.dumpflag);
+        dumpIR(p2, rg, lctx);
+        //dumpIR(p2, rg, tmpbuf, ctx.dumpflag);
         lm->decIndent(ctx.dn);
         i++;
     }
@@ -1003,7 +1035,7 @@ void dumpLda(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     bool dump_var_decl = ctx.dumpflag.have(IR_DUMP_VAR_DECL);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1049,7 +1081,7 @@ void dumpConst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 
 void dumpConstContent(IR const* ir, Region const* rg)
 {
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     if (ir->is_sint() || ir->is_uint()) {
@@ -1057,10 +1089,9 @@ void dumpConstContent(IR const* ir, Region const* rg)
         return;
     }
     if (ir->is_fp()) {
-        CHAR fpformat[64];
-        ::snprintf(fpformat, sizeof(fpformat) - 1,
-                   "fpconst:%%s %%.%df", CONST_fp_mant(ir));
-        prt(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
+        xcom::FixedStrBuf<64> fpformat;
+        fpformat.sprint("fpconst:%%s %%.%df", CONST_fp_mant(ir));
+        prt(rg, fpformat.getBuf(), xtm->dump_type(d, buf), CONST_fp_val(ir));
         return;
     }
     if (ir->is_bool()) {
@@ -1069,21 +1100,22 @@ void dumpConstContent(IR const* ir, Region const* rg)
     }
     if (ir->is_str()) {
         UINT const tbuflen = 40;
-        CHAR tbuf[tbuflen];
-        tbuf[0] = 0;
-        xstrcat(tbuf, tbuflen, "%s", SYM_name(CONST_str_val(ir)));
+        xcom::FixedStrBuf<tbuflen> tt;
+        tt.strcat(40, "%s", SYM_name(CONST_str_val(ir)));
 
         //Remove \n to show string in one line.
-        for (UINT i = 0; i < tbuflen && tbuf[i] != 0; i++) {
-            if (tbuf[i] == '\n') { tbuf[i] = ' '; }
+        CHAR * tbufptr = tt.getBuf();
+        ASSERT0(tbufptr);
+        for (UINT i = 0; i < tt.getBufLen() && tbufptr[i] != 0; i++) {
+            if (tbufptr[i] == '\n') { tbufptr[i] = ' '; }
         }
 
         if (CONST_str_val(ir)->getLen() < tbuflen) {
             prt(rg, "strconst:%s \\\"%s\\\"",
-                xtm->dump_type(d, buf), tbuf);
+                xtm->dump_type(d, buf), tt.getBufLen());
         } else {
             prt(rg, "strconst:%s \\\"%s...\\\"",
-                xtm->dump_type(d, buf), tbuf);
+                xtm->dump_type(d, buf), tt.getBufLen());
         }
         return;
     }
@@ -1091,7 +1123,7 @@ void dumpConstContent(IR const* ir, Region const* rg)
         //Imm may be MC type.
         CHAR const* intfmt = getHostUIntFormat(false);
         CHAR const* hexintfmt = getHostUIntFormat(true);
-        FixedStrBuf<16> fmt;
+        xcom::FixedStrBuf<16> fmt;
         fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
         prt(rg, fmt.getBuf(), xtm->dump_type(d, buf),
             CONST_int_val(ir), CONST_int_val(ir));
@@ -1161,7 +1193,7 @@ void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
 
     //Record type info and var decl.
     if (rg->getDbxMgr() != nullptr && dump_src_line) {
-        DbxMgr::PrtCtx prtctx(LangInfo::LANG_CPP);
+        DbxMgr::PrtCtx prtctx(LANG_CPP);
         prtctx.logmgr = lm;
         rg->getDbxMgr()->printSrcLine(ir, &prtctx);
     }
@@ -1202,7 +1234,7 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1212,10 +1244,10 @@ void dumpCFIDefCfa(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     if (dump_kid) {
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_CFA_KID(ir, 0), rg, (CHAR*)" reg", ctx.dumpflag);
+        dumpIRList(CFI_CFA_KID(ir, 0), rg, (CHAR const*)" reg", ctx.dumpflag);
         lm->decIndent(ctx.dn);
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_CFA_KID(ir, 1), rg, (CHAR*)" num", ctx.dumpflag);
+        dumpIRList(CFI_CFA_KID(ir, 1), rg, (CHAR const*)" num", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -1225,7 +1257,7 @@ void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1235,7 +1267,8 @@ void dumpCFISameValue(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     if (dump_kid) {
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_SAME_VALUE_kid(ir, 0), rg, (CHAR*)" num", ctx.dumpflag);
+        dumpIRList(CFI_SAME_VALUE_kid(ir, 0), rg,
+                   (CHAR const*)" num", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -1245,7 +1278,7 @@ void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1255,10 +1288,12 @@ void dumpCFIOffset(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     if (dump_kid) {
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_OFFSET_kid(ir, 0), rg, (CHAR*)" reg", ctx.dumpflag);
+        dumpIRList(CFI_OFFSET_kid(ir, 0), rg,
+                   (CHAR const*)" reg", ctx.dumpflag);
         lm->decIndent(ctx.dn);
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_OFFSET_kid(ir, 1), rg, (CHAR*)" num", ctx.dumpflag);
+        dumpIRList(CFI_OFFSET_kid(ir, 1),
+                   rg, (CHAR const*)" num", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -1268,7 +1303,7 @@ void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1278,7 +1313,8 @@ void dumpCFIRestore(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     if (dump_kid) {
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
-        dumpIRList(CFI_RESTORE_kid(ir, 0), rg, (CHAR*)" num", ctx.dumpflag);
+        dumpIRList(CFI_RESTORE_kid(ir, 0), rg,
+                   (CHAR const*)" num", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -1288,7 +1324,7 @@ void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
-    FixedStrBuf<64> buf;
+    xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
@@ -1299,7 +1335,7 @@ void dumpCFIDefCfaOffst(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
         dumpIRList(CFI_DEF_CFA_OFFSET_KID(ir, 0),
-                   rg, (CHAR*)" num", ctx.dumpflag);
+                   rg, (CHAR const*)" num", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }

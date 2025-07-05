@@ -34,6 +34,13 @@ author: Su Zhenyu
 #ifndef _LOOP_H_
 #define _LOOP_H_
 
+//If the macro defined, ConstructLoopTree will construct LoopTree by visiting
+//BB in RPO order. This may cause the constructed LoopTree layout to be
+//inconsistent with the lexicographical order of BB.
+//e.g:compile.gr/loopinfo.gr
+//Otherwise accessing vertex by lexcographical order.
+//#define ACCESS_VERTEX_BY_RPO
+
 namespace xoc {
 
 #define LOOPINFO_UNDEF 0
@@ -156,11 +163,15 @@ public:
     //  BB6: goto loop start bb
     //  BB7: END
     //BB3, BB4, BB5 are loopend BBs.
-    void findAllLoopEndBB(xcom::Graph const* cfg,
-                          OUT List<UINT> & endlst) const;
+    void findAllLoopEndBB(
+        xcom::Graph const* cfg, OUT List<UINT> & endlst) const;
 
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
+
+    //Return the innermost loop that contains the specified basic block 'bbid'.
+    //If the basic block 'bbid' is not in any loop, return nullptr.
+    LI<BB> const* getInnerMostLoopIncludeBB(UINT bbid) const;
 
     //Return the number of loops that rooted by current loop.
     UINT getLoopNum() const;
@@ -228,8 +239,8 @@ public:
     //current loop.
     //bbid: id of BB.
     //access_sibling: if true to compare the sibling LoopInfo as well.
-    bool isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
-                          bool access_sibling) const;
+    bool isInsideLoopTree(
+        UINT bbid, OUT UINT & nestlevel, bool access_sibling) const;
 
     //Clean adjacent relation in loop-tree.
     void cleanAdjRelation()
@@ -239,38 +250,9 @@ public:
         LI_prev(this) = nullptr;
     }
 
-    void dump(Region const* rg) const
-    {
-        note(rg, "\nLOOP%u HEAD:BB%u, BODY:", id(), getLoopHead()->id());
-        if (getBodyBBSet() != nullptr) {
-            for (BSIdx i = getBodyBBSet()->get_first();
-                 i != BS_UNDEF; i = getBodyBBSet()->get_next((UINT)i)) {
-                prt(rg, "%u,", i);
-            }
-        }
-    }
-
+    void dump(Region const* rg) const;
     void dumpLoopTree(LI<BB> const* looplist, MOD LogMgr * lm,
-                      UINT indent) const
-    {
-        if (!lm->is_init()) { return; }
-        while (looplist != nullptr) {
-            note(lm, "\n");
-            for (UINT i = 0; i < indent; i++) { prt(lm, " "); }
-            ASSERT0(looplist->getLoopHead());
-            prt(lm, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
-                looplist->getLoopHead()->id());
-            if (looplist->getBodyBBSet() != nullptr) {
-                for (BSIdx i = looplist->getBodyBBSet()->get_first();
-                     i != BS_UNDEF;
-                     i = looplist->getBodyBBSet()->get_next((UINT)i)) {
-                    prt(lm, "%d,", i);
-                }
-            }
-            dumpLoopTree(looplist->getInnerList(), lm, indent + 2);
-            looplist = looplist->get_next();
-        }
-    }
+                      UINT indent) const;
     void dumpLoopTree(MOD LogMgr * lm, UINT indent = 0) const
     { dumpLoopTree(this, lm, indent); }
 };
@@ -439,6 +421,23 @@ void LI<BB>::findAllLoopEndBB(xcom::Graph const* cfg,
 }
 
 
+template <class BB>
+LI<BB> const* LI<BB>::getInnerMostLoopIncludeBB(UINT bbid) const
+{
+    for (LI<BB> const* li = this; li != nullptr; li = li->get_next()) {
+        if (!li->isInsideLoop(bbid)) { continue; }
+        for (LI<BB> const* cli = li->getInnerList(); cli != nullptr;
+             cli = cli->get_next()) {
+            if (!cli->isInsideLoop(bbid)) { continue; }
+            if (cli->getInnerList() == nullptr) { return cli; }
+            return cli->getInnerMostLoopIncludeBB(bbid);
+        }
+        return li;
+    }
+    return nullptr;
+}
+
+
 //Return true if ir in bbid is at least execute once from loophead,
 //otherwise return false means unknown.
 template <class BB>
@@ -475,6 +474,45 @@ bool LI<BB>::isInsideLoopTree(UINT bbid, OUT UINT & nestlevel,
         if (!access_sibling) { break; }
     }
     return false;
+}
+
+
+template <class BB>
+void LI<BB>::dump(Region const* rg) const
+{
+    note(rg, "\nLOOP%u HEAD:BB%u, BODY", id(), getLoopHead()->id());
+    if (getBodyBBSet() != nullptr) {
+        prt(rg, "(%u):", getBodyBBSet()->get_elem_count());
+        for (BSIdx i = getBodyBBSet()->get_first();
+             i != BS_UNDEF; i = getBodyBBSet()->get_next((UINT)i)) {
+            prt(rg, "%u,", i);
+        }
+    }
+}
+
+
+template <class BB>
+void LI<BB>::dumpLoopTree(
+    LI<BB> const* looplist, MOD LogMgr * lm, UINT indent) const
+{
+    if (!lm->is_init()) { return; }
+    while (looplist != nullptr) {
+        note(lm, "\n");
+        for (UINT i = 0; i < indent; i++) { prt(lm, " "); }
+        ASSERT0(looplist->getLoopHead());
+        prt(lm, "LOOP%u HEAD:BB%u, BODY", looplist->id(),
+            looplist->getLoopHead()->id());
+        if (looplist->getBodyBBSet() != nullptr) {
+            prt(lm, "(%u):", looplist->getBodyBBSet()->get_elem_count());
+            for (BSIdx i = looplist->getBodyBBSet()->get_first();
+                 i != BS_UNDEF;
+                 i = looplist->getBodyBBSet()->get_next((UINT)i)) {
+                prt(lm, "%u,", i);
+            }
+        }
+        dumpLoopTree(looplist->getInnerList(), lm, indent + 2);
+        looplist = looplist->get_next();
+    }
 }
 //END LI<BB>
 
@@ -657,12 +695,20 @@ LI<BB> * ConstructLoopTree<BB, XR>::construct(OptCtx const& oc)
     typename xcom::List<UINT> tmp;
     xcom::TMap<BB const*, LI<BB>*> head2li;
     //typename xcom::List<BB*>::Iter ct;
-    RPOVexListIter ct;
     ASSERT0_DUMMYUSE(oc.is_rpo_valid() && oc.is_dom_valid());
+    #ifdef ACCESS_VERTEX_BY_RPO
+    RPOVexListIter ct;
     RPOVexList const* rpolst = m_cfg->getRPOVexList();
     ASSERT0(rpolst);
     for (xcom::Vertex const* vex = rpolst->get_head(&ct);
          vex != nullptr; vex = rpolst->get_next(&ct)) {
+    #else
+    //ACCESS VEX BY BBLIST ORDER(LEXICAL)
+    typename xcom::List<BB*>::Iter bbit;
+    for (BB const* bb = m_bb_list->get_head(&bbit);
+         bb != nullptr; bb = m_bb_list->get_next(&bbit)) {
+        xcom::Vertex const* vex = bb->getVex();
+    #endif
         ASSERT0(m_cfg->getBB(vex->id()) && m_cfg->isVertex(vex));
 
         //Access each sussessor of vex.
@@ -863,6 +909,10 @@ FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
 //Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
                      InvStmtList const* invariant_stmt, bool check_tree);
+
+//Return true if bbid belongs to the LoopInfo tree.
+//bbid: id of BB.
+bool isInsideLoopTree(UINT bbid, Region const* rg);
 
 //Return true if Phi does NOT have any USE in loop, except itself operand
 //list.

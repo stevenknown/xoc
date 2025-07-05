@@ -50,31 +50,76 @@ protected:
     DefMiscBitSetMgr m_misc_bs_mgr;
 protected:
     IR * hoistCse(IRBB * bb,  IR * ir_pos, ExprRep * ie);
-    bool processUse(IN IRBB * bb, IN IR * ir,
+    virtual IR * hoistCseForExtOp(IN IRBB * bb, IN IR * ir_pos, IN ExprRep * ie)
+    {
+        //Target Dependent Code
+        return nullptr;
+    }
+
+    bool processReturnOp(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD xcom::Vector<IR*> & map_expr2avail_pos,
+        MOD xcom::Vector<IR*> & map_expr2avail_pr);
+    bool processExp(IN IRBB * bb, IN IR * ir,
                     MOD xcom::BitSet & avail_ir_expr,
                     MOD Vector<IR*> & map_expr2avail_pos,
                     MOD Vector<IR*> & map_expr2avail_pr);
-    bool processDef(IN IRBB * bb, IN IR * ir,
-                    MOD xcom::BitSet & avail_ir_expr,
-                    MOD Vector<IR*> & map_expr2avail_pos,
-                    MOD Vector<IR*> & map_expr2avail_pr,
-                    IN MDSet & tmp);
-    bool processBranch(IN IRBB * bb, IN IR * ir,
-                       MOD xcom::BitSet & avail_ir_expr,
-                       MOD Vector<IR*> & map_expr2avail_pos,
-                       MOD Vector<IR*> & map_expr2avail_pr);
-    IR * processExp(IN IRBB * bb, IN ExprRep * ie,
-                    IN IR * stmt, MOD xcom::BitSet & avail_ir_expr,
-                    MOD Vector<IR*> & map_expr2avail_pos,
-                    MOD Vector<IR*> & map_expr2avail_pr);
-    bool processParamList(IN IRBB * bb, IN IR * ir,
-                          MOD xcom::BitSet & avail_ir_expr,
-                          MOD Vector<IR*> & map_expr2avail_pos,
-                          MOD Vector<IR*> & map_expr2avail_pr);
-    bool processRHS(IN IRBB * bb, IN IR * ir,
-                    MOD xcom::BitSet & avail_ir_expr,
-                    MOD Vector<IR*> & map_expr2avail_pos,
-                    MOD Vector<IR*> & map_expr2avail_pr);
+    bool processMultiCondBranchOp(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD xcom::Vector<IR*> & map_expr2avail_pos,
+        MOD xcom::Vector<IR*> & map_expr2avail_pr);
+    bool processStmtHasResult(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr,
+        IN MDSet & tmp);
+    bool processStmt(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr,
+        IN MDSet & tmp);
+    bool processBranch(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr);
+    IR * processExp(
+        IN IRBB * bb, IN ExprRep * ie, IN IR * stmt,
+        MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr);
+    bool processParamList(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr);
+    bool processIndirectMemOp(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD xcom::Vector<IR*> & map_expr2avail_pos,
+        MOD xcom::Vector<IR*> & map_expr2avail_pr);
+    bool processCondBranchOp(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD xcom::Vector<IR*> & map_expr2avail_pos,
+        MOD xcom::Vector<IR*> & map_expr2avail_pr);
+    bool processRHS(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr);
+    virtual bool processExtStmt(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr,
+        IN MDSet & tmp)
+    {
+        //Target Dependent Code.
+        return false;
+    }
+    virtual bool processExtExp(
+        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
+        MOD Vector<IR*> & map_expr2avail_pos,
+        MOD Vector<IR*> & map_expr2avail_pr)
+    {
+        //Target Dependent Code.
+        return false;
+    }
 public:
     explicit LCSE(Region * rg);
     virtual ~LCSE() {}

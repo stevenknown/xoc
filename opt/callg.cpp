@@ -131,7 +131,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag) const
     //Dump graph vertex.
     getRegionMgr()->getLogMgr()->push(h, name);
     VertexIter itv = VERTEX_UNDEF;
-    List<Var const*> formalparamlst;
+    ConstVarList * formalparamlst;
     DumpFlag f = DumpFlag::combineIRID(
         IR_DUMP_KID|(dump_src_line ? IR_DUMP_SRC_LINE : 0)|
                     (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
@@ -154,10 +154,17 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag) const
         fprintf(h, "\n");
         if (dump_ir_detail && cn->region() != nullptr) {
             //Dump formal paramters.
-            formalparamlst.clean();
-            cn->region()->findFormalParam(formalparamlst, true);
-            for (Var const* param = formalparamlst.get_head(); param != nullptr;
-                 param = formalparamlst.get_next()) {
+            formalparamlst = const_cast<ConstVarList*>(
+                cn->region()->getFormalParamList());
+
+            //If the parameter list is not recorded, use findFormalParam to find
+            //it, avoiding modification of the original information in dump.
+            if (formalparamlst == nullptr) {
+                cn->region()->findFormalParam(*formalparamlst, true);
+            }
+
+            for (Var const* param = formalparamlst->get_head();
+                 param != nullptr; param = formalparamlst->get_next()) {
                 param->dump(getVarMgr());
             }
             IR * irs = cn->region()->getIRList();

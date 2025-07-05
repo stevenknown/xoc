@@ -561,6 +561,7 @@ void OptimizedCFG<BB, XR>::removeUnreachSingleBB(
 {
     START_TIMER(t, "Remove Unreach Single BB");
     ASSERT0(bbcontainer);
+
     //EH may be redundant and can be removed.
     //ASSERTN(!bb->isExceptionHandler(),
     //        ("For conservative purpose, "
@@ -571,14 +572,17 @@ void OptimizedCFG<BB, XR>::removeUnreachSingleBB(
     if (unrchctx != nullptr) {
         recordChangedVex(bb->getVex(), unrchctx);
     }
+
     //Unreachable-code will confuse the DomInfo update.
-    CfgOptCtx tctx(ctx);
     OptCtx toc(ctx.getOptCtx());
+
     //Invalid DomInfo to inform CFG related API to stop update.
     toc.setInvalidDom();
-    tctx.setOptCtx(toc);
-    CFGOPTCTX_need_update_dominfo(&tctx) = false;
-    getCFG()->removeBB(bbcontainer, tctx);
+    CfgOptCtx * tctx = this->allocCfgOptCtx(ctx);
+    tctx->setOptCtx(toc);
+    CFGOPTCTX_need_update_dominfo(tctx) = false;
+    getCFG()->removeBB(bbcontainer, *tctx);
+    this->freeCfgOptCtx(tctx);
     END_TIMER(t, "Remove Unreach Single BB");
 }
 

@@ -193,6 +193,22 @@ UINT countLeadingOne(UINT32 a)
 }
 
 
+UINT countOne(UINT64 a)
+{ return ByteOp::get_elem_count((BYTE*)(&a), sizeof(UINT64)); }
+
+
+UINT countOne(UINT32 a)
+{ return ByteOp::get_elem_count((BYTE*)(&a), sizeof(UINT32)); }
+
+
+UINT countOne(UINT16 a)
+{ return ByteOp::get_elem_count((BYTE*)(&a), sizeof(UINT16)); }
+
+
+UINT countOne(UINT8 a)
+{ return ByteOp::get_elem_count((BYTE*)(&a), sizeof(UINT8)); }
+
+
 UINT countLeadingZero(UINT64 a)
 {
     UINT32 hi = a >> (sizeof(UINT32) * BITS_PER_BYTE);
@@ -208,6 +224,32 @@ UINT countLeadingZero(UINT32 a)
     UINT i = 0;
     for (; i < sizeof(UINT32) * BITS_PER_BYTE; i++) {
         if ((marker & a) == marker) { break; }
+        marker = marker >> 1;
+    }
+    return i;
+}
+
+
+UINT countLeadingZero(UINT16 a)
+{
+    UINT16 b = (UINT16)(a & 0xFFFF);
+    UINT16 marker = (UINT16)(1 << (sizeof(UINT16) * BITS_PER_BYTE - 1));
+    UINT i = 0;
+    for (; i < sizeof(UINT16) * BITS_PER_BYTE; i++) {
+        if ((marker & b) == marker) { break; }
+        marker = marker >> 1;
+    }
+    return i;
+}
+
+
+UINT countLeadingZero(UINT8 a)
+{
+    UINT8 b = (UINT8)(a & 0xFF);
+    UINT8 marker = (UINT8)(1 << (sizeof(UINT8) * BITS_PER_BYTE - 1));
+    UINT i = 0;
+    for (; i < sizeof(UINT8) * BITS_PER_BYTE; i++) {
+        if ((marker & b) == marker) { break; }
         marker = marker >> 1;
     }
     return i;
@@ -235,6 +277,36 @@ UINT countTrailingZero(UINT32 val)
     UINT32 trail = 0;
     UINT32 size = sizeof(UINT32) * BITS_PER_BYTE;
     for (UINT32 i = 0; i < size; i++) {
+        if ((val >> i) & 1) {
+            break;
+        }
+        trail++;
+    }
+    return (UINT)trail;
+}
+
+
+UINT countTrailingZero(UINT16 val)
+{
+    if (val & 0x1) { return 0; }
+    UINT16 trail = 0;
+    UINT16 size = sizeof(UINT16) * BITS_PER_BYTE;
+    for (UINT16 i = 0; i < size; i++) {
+        if ((val >> i) & 1) {
+            break;
+        }
+        trail++;
+    }
+    return (UINT)trail;
+}
+
+
+UINT countTrailingZero(UINT8 val)
+{
+    if (val & 0x1) { return 0; }
+    UINT8 trail = 0;
+    UINT8 size = sizeof(UINT8) * BITS_PER_BYTE;
+    for (UINT8 i = 0; i < size; i++) {
         if ((val >> i) & 1) {
             break;
         }
@@ -949,19 +1021,6 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 }
 
 
-ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end)
-{
-    ASSERT0(start < sizeof(ULONGLONG) * BITS_PER_BYTE);
-    ASSERT0(end < sizeof(ULONGLONG) * BITS_PER_BYTE);
-    ASSERT0(start <= end);
-    UINT lastbit = sizeof(ULONGLONG) * BITS_PER_BYTE - 1;
-    UINT size = end - start;
-    val = val << (lastbit - end);
-    val = val >> (lastbit - size);
-    return val;
-}
-
-
 //Extract the left most sub-string which separated by 'separator' from string.
 void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator)
 {
@@ -1049,7 +1108,10 @@ bool isExceedBitWidth(LONGLONG val, UINT bitwidth)
 {
     ASSERTN(bitwidth <= sizeof(LONGLONG) * BITS_PER_BYTE,
             ("bit width is too large"));
-    if (bitwidth == sizeof(LONGLONG) * BITS_PER_BYTE) { return true; }
+
+    //When bitwidth equals the full width of LONGLONG,
+    //any LONGLONG value is within range.
+    if (bitwidth == sizeof(LONGLONG) * BITS_PER_BYTE) { return false; }
     return val < ((LONGLONG)-1 << (bitwidth - 1)) ||
            val > (((LONGLONG)1 << (bitwidth - 1)) - 1);
 }
@@ -1061,7 +1123,10 @@ bool isExceedBitWidth(ULONGLONG val, UINT bitwidth)
 {
     ASSERTN(bitwidth <= sizeof(ULONGLONG) * BITS_PER_BYTE,
             ("bit width is too large"));
-    if (bitwidth == sizeof(ULONGLONG) * BITS_PER_BYTE) { return true; }
+
+    //When bitwidth equals the full width of ULONGLONG,
+    //any ULONGLONG value is within range.
+    if (bitwidth == sizeof(ULONGLONG) * BITS_PER_BYTE) { return false; }
     return val > ((((ULONGLONG)1) << bitwidth) - 1);
 }
 
@@ -1823,6 +1888,68 @@ void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
 }
 
 
+UINT findMostSignificantBit(UINT8 val)
+{
+    UINT pos = 0;
+    if (val & 0xF0) { val >>= 4; pos += 4; }
+    if (val & 0x0C) { val >>= 2; pos += 2; }
+    if (val & 0x02) { val >>= 1; pos += 1; }
+    return pos;
+}
+
+
+UINT findMostSignificantBit(UINT16 val)
+{
+    UINT pos = 0;
+    if (val & 0xFF00) { val >>= 8; pos += 8; }
+    if (val & 0xF0)   { val >>= 4; pos += 4; }
+    if (val & 0x0C)   { val >>= 2; pos += 2; }
+    if (val & 0x02)   { val >>= 1; pos += 1; }
+    return pos;
+}
+
+
+UINT findMostSignificantBit(UINT32 val)
+{
+    UINT pos = 0;
+    if (val & 0xFFFF0000) { val >>= 16; pos += 16; }
+    if (val & 0xFF00)     { val >>= 8;  pos += 8;  }
+    if (val & 0xF0)       { val >>= 4;  pos += 4;  }
+    if (val & 0x0C)       { val >>= 2;  pos += 2;  }
+    if (val & 0x02)       { val >>= 1;  pos += 1;  }
+    return pos;
+}
+
+
+UINT findMostSignificantBit(UINT64 val)
+{
+    UINT pos = 0;
+    if (val & 0xFFFFFFFF00000000ULL) { val >>= 32; pos += 32; }
+    if (val & 0xFFFF0000)            { val >>= 16; pos += 16; }
+    if (val & 0xFF00)                { val >>= 8;  pos += 8;  }
+    if (val & 0xF0)                  { val >>= 4;  pos += 4;  }
+    if (val & 0x0C)                  { val >>= 2;  pos += 2;  }
+    if (val & 0x02)                  { val >>= 1;  pos += 1;  }
+    return pos;
+}
+
+
+UINT findMostSignificantBit(INT8 val)
+{ return val < 0 ? 7 : findMostSignificantBit((UINT8)val); }
+
+
+UINT findMostSignificantBit(INT16 val)
+{ return val < 0 ? 15 : findMostSignificantBit((UINT16)val); }
+
+
+UINT findMostSignificantBit(INT32 val)
+{ return val < 0 ? 31 : findMostSignificantBit((UINT32)val); }
+
+
+UINT findMostSignificantBit(INT64 val)
+{ return val < 0 ? 63 : findMostSignificantBit((UINT64)val); }
+
+
 bool isValidImmForBitsize(UINT bitsize, UINT64 imm)
 {
     UINT64 mask = (((UINT64)1) << bitsize) - 1;
@@ -1965,4 +2092,8 @@ UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os, UINT32 pad_to)
     }
     return count;
 }
+
+
+bool isFPConstZero(UINT64 val) { return (val & ~(1ULL << 63)) == 0; }
+bool isFPConstZeroPositive(UINT64 val) { return val == 0; }
 } //namespace xcom

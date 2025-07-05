@@ -150,8 +150,7 @@ protected:
     Region const* m_rg;
 protected:
     void collectExtOp(IR const* ir, bool comp_pr, DefMiscBitSetMgr & bsmgr,
-                      OUT MDSet & mayuse)
-    { ASSERTN(0, ("Target Dependent Code")); }
+                      OUT MDSet & mayuse);
 public:
     CollectMayUseRecur(Region const* rg) : m_rg(rg) {}
 
@@ -290,8 +289,6 @@ protected:
 
     void freeDUSetForAllIR();
 
-    void genDummyuseForCallStmt(IR * ir, MDSet const* mayref);
-
     inline void * xmalloc(size_t size)
     {
         void * p = smpoolMalloc(size, m_pool);
@@ -309,6 +306,11 @@ protected:
     void inferIndirectMemStmt(IR * ir, DUOptFlag duflag);
     void inferAllKidMDRef(IR * ir, OUT MDSet * ret_mds,
                           CompFlag compflag, DUOptFlag duflag);
+
+    //Regard dummyuse's MD references as the MayRef of CallStmt.
+    void inferDummyuseAndCollectMayRefForCall(
+        IR * ir, DUOptFlag duflag, MDSet const* worst, OUT MDSet & maydefuse);
+    void inferDummyuseForReadOnlyCall(IR * ir, DUOptFlag duflag);
     void inferCallStmtForNonPR(IR * ir, DUOptFlag duflag);
 
     //Return true if the output result has unify call's MayDef.
@@ -324,6 +326,7 @@ protected:
     //Set given set to be more conservative MD reference set.
     void setToConservative(OUT MDSet & maydefuset);
     void setToWorstCase(IR * ir);
+    void setMayRefForDummyuseOfCallStmt(IR * ir, MDSet const* mayref);
     DUMgr * self() { return this; }
 
     void updateDefSetAccordingToMayRef(IR * ir, MD const* mustexact);
@@ -369,8 +372,10 @@ public:
 
     //The function check user command options and determine whether the
     //compiler should perform classic PR DUChain and NonPR DUChain.
+    //NOTE: build classic DU-Chain is costly. Especially compilation speed
+    //is considerable.
     bool checkAndComputeClassicDUChain(MOD OptCtx & oc);
-    void computePRDUChainByPRSSA(MOD OptCtx & oc);
+    void computePRDUChainByPRSSA(MOD OptCtx & oc, bool build_def_chain);
     void computeGenForBB(IN IRBB * bb, OUT SolveSet & expr_univers,
                          DefMiscBitSetMgr & bsmgr);
     void computeMDRefForBB(IRBB * bb, MOD OptCtx & oc, DUOptFlag duflag);
@@ -554,21 +559,21 @@ public:
     //'use': must be expression.
     //'is_recur': true if one intend to compute the mayuse MDSet to walk
     //            through IR tree recusively.
-    bool isStprMayDef(IR const* def, IR const* use, bool is_recur);
+    bool isStprMayDef(IR const* def, IR const* use, bool is_recur) const;
 
     //Return true if 'call' may or must modify MDSet that 'use' referenced.
     //'call': CALL/ICALL stmt.
     //'use': must be expression.
     //'is_recur': true if one intend to compute the mayuse MDSet to walk
     //            through IR tree recusively.
-    bool isCallMayDef(IR const* def, IR const* use, bool is_recur);
+    bool isCallMayDef(IR const* def, IR const* use, bool is_recur) const;
 
     //Return true if 'def' may or must modify MDSet that 'use' referenced.
     //'def': must be stmt.
     //'use': must be expression.
     //'is_recur': true if one intend to compute the mayuse MDSet to walk
     //            through IR tree recusively.
-    bool isMayDef(IR const* def, IR const* use, bool is_recur);
+    bool isMayDef(IR const* def, IR const* use, bool is_recur) const;
 
     //Return true if 'def_stmt' is the exact and unique reach-definition
     //to the operands of 'use_stmt', otherwise return false.
@@ -756,8 +761,8 @@ public:
 
 //Verify DU chain's sanity.
 //Verify if DU chain is correct between each Def and Use of MD.
-bool verifyMDDUChain(Region * rg, DUOptFlag duflag);
-bool verifyMDDUChain(Region * rg, OptCtx const& oc);
+bool verifyClassicDUChain(Region * rg, DUOptFlag duflag);
+bool verifyClassicDUChain(Region * rg, OptCtx const& oc);
 bool verifyMDRef(Region const* rg, OptCtx const& oc);
 
 } //namespace xoc

@@ -63,13 +63,6 @@ void Tree::remove(VexIdx v)
 }
 
 
-void Tree::insertKid(VexIdx v, VexIdx kid)
-{
-    ASSERT0(getVertex(v));
-    addEdge(v, kid);
-}
-
-
 //Dump instruction char.
 static void dumpInst(UINT ind, OUT StrBuf & buf)
 {
@@ -86,16 +79,22 @@ static void dumpPreInd(UINT ind, OUT StrBuf & buf)
 
 
 static void dumpBufRecur(
-    Vertex const* v, UINT preind, UINT inst, OUT StrBuf & buf)
+    Vertex const* v, UINT preind, UINT inst, OUT StrBuf & buf, Tree const* tree)
 {
     dumpPreInd(preind, buf);
     dumpInst(inst, buf);
-    buf.strcat("%u", v->id());
+    tree->dumpNodeBuf(v, buf);
     VexIter it;
     for (Vertex const* k = v->getFirstToVex(&it);
          k != nullptr; k = v->getNextToVex(&it)) {
-        dumpBufRecur(k, preind + inst, inst, buf);
+        dumpBufRecur(k, preind + inst, inst, buf, tree);
     }
+}
+
+
+void Tree::dumpNodeBuf(Vertex const* v, OUT StrBuf & buf) const
+{
+    buf.strcat("%u", v->id());
 }
 
 
@@ -103,12 +102,12 @@ void Tree::dumpBuf(OUT StrBuf & buf) const
 {
     Vertex const* root = getRoot();
     if (root == nullptr) { return; }
-    buf.strcat("%u", root->id());
+    dumpNodeBuf(root, buf);
     UINT inst = 3;
     VexIter it;
     for (Vertex const* k = root->getFirstToVex(&it);
          k != nullptr; k = root->getNextToVex(&it)) {
-        dumpBufRecur(k, 0, inst, buf);
+        dumpBufRecur(k, 0, inst, buf, this);
     }
 }
 

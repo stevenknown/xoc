@@ -90,6 +90,9 @@ public:
     //Return true if 'filename' exist.
     static bool isFileExist(CHAR const* filename);
 
+    //Return true if 'directory' exist.
+    static bool isDirExist(CHAR const* dirname);
+
     void prt(CHAR const* format, ...);
 
     FO_STATUS openWithReadOnly(CHAR const* filename);

@@ -332,10 +332,10 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region,
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() || ir->is_undef());
         if (ctx != nullptr) {
-            dumpIR(ir, rg, *ctx);
+            xoc::dumpIR(ir, rg, *ctx);
             continue;
         }
-        dumpIR(ir, rg, nullptr, f);
+        xoc::dumpIR(ir, rg, nullptr, f);
     }
     rg->getLogMgr()->decIndent(3);
     note(rg, "\n");

@@ -64,13 +64,15 @@ void MIGen::destroy()
 void MIGen::destroyMgr()
 {
     if (m_mfmgr == nullptr) { return; }
-    ASSERT0(m_mimgr && m_ir2minst);
+    ASSERT0(m_mimgr && m_ir2minst && m_relocmgr);
     delete m_mfmgr;
     delete m_mimgr;
     delete m_ir2minst;
+    delete m_relocmgr;
     m_mfmgr = nullptr;
     m_mimgr = nullptr;
     m_ir2minst = nullptr;
+    m_relocmgr = nullptr;
 }
 
 
@@ -167,8 +169,8 @@ void MIGen::dump(MIList const& milst) const
 
 void MIGen::convertIR2MI(OUT MIList & milst, MOD IMCtx * cont)
 {
-    ASSERT0(cont && m_ir2minst && m_ir2minst->getRecycMIListMgr());
-    RecycMIList recycmilst(m_ir2minst->getRecycMIListMgr());
+    ASSERT0(cont && m_ir2minst);
+    RecycMIList recycmilst(&m_ir2minst->getRecycMIListMgr());
     m_ir2minst->convertToMIList(recycmilst, cont);
     milst.move_tail(recycmilst.getList());
     if (xoc::g_dump_opt.isDumpAfterPass()) {
@@ -189,8 +191,8 @@ void MIGen::convertMIListToCode(MIList const& milst)
     ASSERT0(m_em->getSymbolCode(var->get_name()).get_elem_count() == 0);
 
     mach::MIListIter mi_it;
-    for (mach::MInst * mi = milst.get_head(&mi_it); mi != nullptr;
-         mi = milst.get_next(&mi_it)) {
+    for (mach::MInst * mi = milst.get_head(&mi_it);
+         mi != nullptr; mi = milst.get_next(&mi_it)) {
 
         //Skip label.
         if (mi->getCode() == MI_label) { continue; }
@@ -199,9 +201,9 @@ void MIGen::convertMIListToCode(MIList const& milst)
         makeAssembleDesc(mi, asdescvec);
         setMIBinBuf(mi, asdescvec);
 
-        for (UINT i = 0; i < asdescvec.getTotalByteSize(); i++) {
-            m_em->getSymbolCode(var->get_name()).append(MI_wordbuf(mi)[i]);
-        }
+        //Fill the binary buffer of specific ELF section.
+        BYTEVec & binvec = m_em->getSymbolCode(var->get_name());
+        binvec.append(MI_wordbuf(mi), MI_wordbuflen(mi));
     }
 
     //Set size of function symbol.
@@ -217,6 +219,37 @@ void MIGen::performRelocation(MOD MIList & milst, MOD IMCtx * cont)
         xoc::note(m_rg, "\n==---- DUMP AFTER RELOCATION (%d)'%s' ----==",
                   m_rg->id(), m_rg->getRegionName());
         milst.dump(m_rg->getLogMgr(), *m_mimgr);
+    }
+}
+
+
+void MIGen::collectLinkerRelaxBrInfo(MIList const& milst)
+{
+    ASSERT0(m_em);
+    FunctionInfo * fi = SYMINFO_func(ELFMGR_symbol_info(m_em).get(
+        m_rg->getRegionVar()->get_name()));
+
+    MIListIter it;
+    for (MInst * mi = milst.get_head(&it);
+         mi != nullptr; mi = milst.get_next(&it)) {
+        if (m_mimgr->isLabel(mi)) { continue; }
+        IR const* ir = mi->getIR();
+        ASSERT0(ir);
+
+        if (mi->hasLab()) {
+            m_em->addRelaxBrInfo(Addr(MI_pc(mi)),
+                Addr(m_relocmgr->getJumpOffset(mi)), fi, ir);
+            continue;
+        }
+
+        //For case of register indirect jump. Refer to the declaration of
+        //function MIGen::collectLinkerRelaxBrInfo.
+        //Record location and funcinfo of RelaxBrInfo for indirect jump.
+        RelaxBrInfo * relax_br_info = ELFMGR_relax_br_map(m_em).get(ir);
+        if (relax_br_info != nullptr) {
+            RELAXBRINFO_loc(relax_br_info) = MI_pc(mi);
+            RELAXBRINFO_func(relax_br_info) = fi;
+        }
     }
 }
 
@@ -237,9 +270,16 @@ bool MIGen::perform()
     //Convert XIR to MI code. milst_all
     //will include both MI and CFI instructions only if debugging is enabled.
     convertIR2MI(milst_all, &cont);
+    ASSERT0(verifyMIListValid(milst_all));
 
     //Compute and set the offset for stack variables.
     performRelocation(milst_all, &cont);
+
+    //Collect all the calling relocations.
+    collectCallRelocation(milst_all);
+
+    //Collect the RelaxBrInfo for linker relaxation.
+    collectLinkerRelaxBrInfo(milst_all);
 
     //If debugging is enabled, process CFI instructions.
     if (g_debug) {
@@ -305,9 +345,9 @@ void MIGen::genFrameInfo(MIList & mcfi_list)
     LinearScanRA * lsra = (LinearScanRA*)(m_rg->getPassMgr()
         ->registerPass(PASS_LINEAR_SCAN_RA));
     ASSERT0(lsra);
-    frame_info_p->m_fp_reg = xgen::tmMapReg2TMWORD(lsra->getFP());
-    frame_info_p->m_ra_reg = xgen::tmMapReg2TMWORD(lsra->getRA());
-    frame_info_p->m_sp_reg = xgen::tmMapReg2TMWORD(lsra->getSP());
+    frame_info_p->m_fp_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getFP());
+    frame_info_p->m_ra_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getRA());
+    frame_info_p->m_sp_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getSP());
     MCCFIInstructionVec * instructions = dwarf_res_mgr.
         allocCFIInfoVector();
     mach::MIListIter mi_it;
@@ -326,27 +366,31 @@ void MIGen::genFrameInfo(MIList & mcfi_list)
         MCSymbol const* symbol = nullptr;
         switch (code) {
         case MI_cfi_def_cfa:
-            symbol = dm->createVectorMCSymbol(m_rg, pc, cfa_label);
+            symbol = dm->createVectorMCSymbol(m_rg, (UINT)pc, cfa_label);
             instructions->append(dwarf_res_mgr.allocCFIDefCfa(symbol,
                 MI_cfi_def_cfa_register(mi), MI_cfi_def_cfa_offset(mi)));
             break;
         case MI_cfi_same_value:
-            symbol = dm->createVectorMCSymbol(m_rg, pc, same_value_label);
+            symbol = dm->createVectorMCSymbol(
+                m_rg, (UINT)pc, same_value_label);
             instructions->append(dwarf_res_mgr.allocSameValue(symbol,
                 MI_cfi_samevalue_register(mi)));
             break;
         case MI_cfi_offset:
-            symbol = dm->createVectorMCSymbol(m_rg, pc, cfi_offset_label);
+            symbol = dm->createVectorMCSymbol(
+                m_rg, (UINT)pc, cfi_offset_label);
             instructions->append(dwarf_res_mgr.allocOffset(symbol,
                 MI_cfi_offset_register(mi), MI_cfi_offset_offset(mi)));
             break;
         case MI_cfi_restore:
-            symbol = dm->createVectorMCSymbol(m_rg, pc, cfi_restore_label);
+            symbol = dm->createVectorMCSymbol(
+                m_rg, (UINT)pc, cfi_restore_label);
             instructions->append(dwarf_res_mgr.allocRestore(symbol,
                 MI_cfi_restore_register(mi)));
             break;
         case MI_cfi_def_cfa_offset:
-            symbol = dm->createVectorMCSymbol(m_rg, pc, cfa_offset_label);
+            symbol = dm->createVectorMCSymbol(
+                m_rg, (UINT)pc, cfa_offset_label);
             instructions->append(dwarf_res_mgr.allocDefCfaOffset(symbol,
                 MI_cfi_def_cfa_offset_offset(mi)));
             break;
@@ -387,7 +431,7 @@ void MIGen::genLineInfo(MIList & milst)
     ASSERT0(dbx_mgr);
     for (mach::MInst * mi = milst.get_head(&mi_it);
          mi != nullptr; mi = milst.get_next(&mi_it)) {
-        if (MI_dbx(mi).getLine(LangInfo::LANG_CPP, dbx_mgr) == DBX_UNDEF ||
+        if (MI_dbx(mi).getLine(LANG_CPP, dbx_mgr) == DBX_UNDEF ||
             mi->getCode() == MI_label) {
             continue;
         }
@@ -400,32 +444,46 @@ void MIGen::genLineInfo(MIList & milst)
             MCDwarfLineEntry * line_entry = dwarf_res_mgr.
                 allocLineEntry(symbol);
             MCDWARFLOC_file_index(line_entry) = MI_dbx(mi).
-                getFileIndex(LangInfo::LANG_CPP, dbx_mgr);
+                getFileIndex(LANG_CPP, dbx_mgr);
             MCDWARFLOC_line(line_entry) = MI_dbx(mi).
-                getLine(LangInfo::LANG_CPP, dbx_mgr);
+                getLine(LANG_CPP, dbx_mgr);
             MCDWARFLOC_column(line_entry) = MI_dbx(mi).
-                getColOffset(LangInfo::LANG_CPP, dbx_mgr);
+                getColOffset(LANG_CPP, dbx_mgr);
             MCDWARFLOC_flags(line_entry) =
-                MI_dbx(mi).getFlag(LangInfo::LANG_CPP, dbx_mgr);
+                MI_dbx(mi).getFlag(LANG_CPP, dbx_mgr);
             mc_line_entry->append(line_entry);
             continue;
         }
 
         LabelInfo * label = m_rg->genPragmaLabel("loc");
-        MCSymbol const* symbol = dm->createVectorMCSymbol(m_rg,
-            MI_pc(mi), label);
+        MCSymbol const* symbol = dm->createVectorMCSymbol(
+            m_rg, (UINT)MI_pc(mi), label);
         MCDwarfLineEntry * line_entry = dwarf_res_mgr.allocLineEntry(symbol);
         MCDWARFLOC_file_index(line_entry) = MI_dbx(mi).
-            getFileIndex(LangInfo::LANG_CPP, dbx_mgr);
+            getFileIndex(LANG_CPP, dbx_mgr);
         MCDWARFLOC_line(line_entry) = MI_dbx(mi).
-            getLine(LangInfo::LANG_CPP, dbx_mgr);
+            getLine(LANG_CPP, dbx_mgr);
         MCDWARFLOC_column(line_entry) = MI_dbx(mi).
-            getColOffset(LangInfo::LANG_CPP, dbx_mgr);
+            getColOffset(LANG_CPP, dbx_mgr);
         MCDWARFLOC_flags(line_entry) = MI_dbx(mi).
-            getFlag(LangInfo::LANG_CPP, dbx_mgr);
+            getFlag(LANG_CPP, dbx_mgr);
         mc_line_entry->append(line_entry);
     }
     MCDWARFMGR_region_line_info(dm).set(m_rg, mc_line_entry);
+}
+
+
+bool MIGen::verifyMIListValid(MIList & milst) const
+{
+    MIListIter it;
+    for (MInst * mi = milst.get_head(&it);
+         mi != nullptr; mi = milst.get_next(&it)) {
+        //Some MI_label does not have a corresponding IR.
+        if (m_mimgr->isLabel(mi)) { continue; }
+        ASSERT0(mi->getIR() && !mi->getIR()->is_undef());
+    }
+
+    return true;
 }
 
 } //namespace

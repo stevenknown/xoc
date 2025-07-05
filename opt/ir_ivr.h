@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+#define IV_UNDEF 0
+
 class PRSSAMgr;
 class MDSSAMgr;
 class IVBoundInfo;
@@ -43,6 +45,8 @@ class LinearRep;
 class IV;
 class IVR;
 class ChainRec;
+
+typedef xcom::List<IV const*> IVList;
 
 //This class represents linear representation of BIV or DIV that
 //formulated as: a*iv+b, where a is coeff, iv is variable, b is addend.
@@ -80,6 +84,7 @@ public:
 //  L1: ...
 //  L2: ...
 #define IV_is_biv(d) ((d)->m_is_biv)
+#define IV_id(d) ((d)->m_id)
 #define IV_li(d) ((d)->m_li)
 #define IV_reduction_stmt(d) ((d)->m_reduction_stmt)
 #define IV_reduction_exp(d) ((d)->m_reduction_exp)
@@ -95,12 +100,18 @@ public:
         DIR_NEG, //Increasing negative.
     } INCDIR;
 public:
-    BYTE m_is_biv:1; //true if iv is BIV.
+    bool m_is_biv; //true if iv is BIV.
+    UINT m_id; //the unique id.
     LI<IRBB> const* m_li;
 
     //Record the reduction stmt of IV. Note reduction stmt indicates the
     //occrrence of IV in loop body as well.
     //Reduction is the unique stmt that defined IV in loop body.
+    //NOTE: the RHS of red-stmt might not be ADD|SUB liked reducation
+    //operations, because it transfers the ADD|SUB result from previous stmts.
+    //e.g: stpr $1141 = add $1112, #0x1;
+    //     stpr $1113 = $1141;
+    // where stpr $1113 is recognized as reduction stmt.
     IR const* m_reduction_stmt;
 
     //Record the RHS expression of reduction stmt.
@@ -198,6 +209,12 @@ public:
     //  where #S1 is the reduction stmt operation, and both $10 and $8 in #S1
     //  are the IV variables.
     //  The function will return stpr $10.
+    //
+    //NOTE: the RHS of red-stmt might not be ADD|SUB liked reducation
+    //operations, because it transfers the ADD|SUB result from previous stmts.
+    //e.g: stpr $1141 = add $1112, #0x1;
+    //     stpr $1113 = $1141;
+    // where stpr $1113 is recognized as reduction stmt.
     IR const* getRedStmt() const { return IV_reduction_stmt(this); }
 
     //Return the computation expression of reduction operation.
@@ -268,6 +285,9 @@ public:
     //Return true if IV found step-value.
     bool hasStepVal() const { return !IV_stepv(this).is_undef(); }
 
+    //Return the unqiue id.
+    UINT id() const { return m_id; }
+
     //Return true if IV is increasing positive.
     //Otherwise the function know nothing about the direction.
     inline bool isInc() const;
@@ -285,20 +305,45 @@ public:
     //Return true if 'ir' represents the reference of current IV.
     bool isRefIV(IR const* ir) const;
 
+    //Return true if 'ir' references one of information of current IV.
+    //The function will check IV's init, reduce, step stmt and exp.
+    //e.g: given ir is lda X, the step-exp is cvt(lda X), then the function
+    //return true.
+    bool isRefIVInfo(IR const* ir) const;
+
     //Return true if IR tree that rooted by 'ir' represents the reference
     //of current IV.
     //refiv: record the IR that referenced the IV.
     bool isIRTreeRefIV(IR const* ir, OUT IR const** refiv) const;
 
-    //Return true if 'ref' represents the reference of current IV.
+    //Return true if 'ref' represents the reference to any of the IV info
+    //of current IV.
+    //IV info may include init-stmt, init-value, reduce-stmt, reduce-exp.
     bool isRefIV(MD const* ref) const;
+
+    //Return true if 'ref' represents the reference of the init-stmt of IV.
+    bool isRefInitStmtOrExp(MD const* ref) const;
+
+    //Return true if 'ref' represents the reference of the reduce-stmt of IV.
+    bool isRefReduceStmtOrExp(MD const* ref) const;
+
+    //Return true if 'ir' is used by step-stmt or step-exp.
+    bool isRefStepStmtOrExp(IR const* ir) const;
 
     //Return true if step value is integer.
     bool isStepValInt() const { return getStepVal().is_int(); }
     bool isStepValFP() const { return getStepVal().is_fp(); }
     bool isStepValVar() const { return getStepVal().is_var(); }
     bool isStepValExp() const { return getStepVal().is_exp(); }
+
+    //Immut includes const, immutable-exp.
+    bool isStepValImmut() const
+    {
+        return isStepValConst() ||
+               (isStepValExp() && getStepValExp()->isImmutExp());
+    }
     bool isStepValCR() const { return getStepVal().is_cr(); }
+    bool isStepValConst() const { return isStepValInt() || isStepValFP(); }
 };
 
 
@@ -330,7 +375,11 @@ public:
     { return getInitVal().getKind() == IVVal::VAL_IS_VAR; }
 
     bool isInitExp() const
-    { return getInitVal().getKind() == IVVal::VAL_IS_EXP; }
+    {
+        //If the init-value that computed by charin-recur-mgr is EXP, then
+        //it should isomo-equal to the RHS of init-stmt.
+        return getInitVal().getKind() == IVVal::VAL_IS_EXP;
+    }
 
     //Return true if ir represents a reference to current BIV.
     bool isRefBIV(IR const* ir) const { return isRefIV(ir); }
@@ -375,7 +424,7 @@ public:
     }
 
     //Get the expression that represents the initial value of the BIV.
-    //Note not all BIV has an initial stmt, namely initial expression.
+    //Note NOT all BIV has an initial stmt, namely initial expression.
     //e.g: $1 = phi(0, $2), the initial value has embedded in PHI.
     IR const* getInitExp() const
     {
@@ -548,6 +597,11 @@ public:
 };
 
 
+typedef SList<BIV*> BIVList;
+typedef SC<BIV*> * BIVListIter;
+typedef SList<DIV const*> DIVList;
+typedef SC<DIV const*> * DIVListIter;
+
 //Induction Variable Recognization.
 //Note: IV may have multiple upper-bounds,
 //e.g:
@@ -563,18 +617,18 @@ class IVR : public Pass {
     friend class FindBIVByRedOp;
     friend class FindDIV;
 protected:
-    typedef SList<BIV*> BIVList;
-    typedef SC<BIV*> * BIVListIter;
-    typedef SList<DIV const*> DIVList;
-    typedef SC<DIV const*> * DIVListIter;
-
     //True if IVR pass only find BIV and DIV for exact MD.
     //Note if IR_ST, IR_LD, IR_PR, IR_STPR are ANY, the MD is inexact.
-    BYTE m_is_only_handle_exact_md:1;
+    bool m_is_only_handle_exact_md;
 
     //True if user expect that compute IV through more complicated algo and
     //information, e.g: GVN.
-    BYTE m_is_aggressive:1;
+    bool m_is_aggressive;
+
+    //True if CVT can be skipped during the finding of BIV and DIV.
+    //e.g: $x = cvt:i64 ($y
+    bool m_skip_cvt_when_find_iv;
+    UINT m_iv_count;
 
     //True if IV information is available.
     MDSystem * m_mdsys;
@@ -593,13 +647,8 @@ protected:
     Vector<DIVList*> m_li2divlst;
     ChainRecMgr m_crmgr;
 protected:
-    BIV * allocBIV()
-    {
-        BIV * iv = (BIV*)xmalloc(sizeof(BIV));
-        IV_is_biv(iv) = true;
-        return iv;
-    }
-    DIV * allocDIV() { return (DIV*)xmalloc(sizeof(DIV)); }
+    BIV * allocBIV();
+    DIV * allocDIV();
     ChainRec * allocChainRec() { return m_crmgr.allocChainRec(); }
 
     //The function analyze 'ir' and inference the value that can be used to
@@ -620,8 +669,11 @@ protected:
     //Find the loop monotone increasing or decreasing bound stmt and relvant IV.
     //Return the mono-bound stmt and the IV. Otherwise return nullptr if
     //find nothing.
-    IR const* findBIVBoundStmt(LI<IRBB> const* li, OUT BIV const** biv,
-                               IVRCtx const& ivrctx) const;
+    IR const* findBIVBoundStmt(
+        LI<IRBB> const* li, OUT BIV const** biv, IVRCtx const& ivrctx) const;
+
+    //Return true if IVR info changed.
+    bool findInLoopTree(OptCtx & oc);
 
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr; }
     xcom::DefSegMgr * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
@@ -631,14 +683,11 @@ protected:
     //is the BIV reference.
     //compare_exp: the expression that indicates the upper-bound of IV.
     //ivref: IV reference in 'compare_exp'. It must be kid of 'compare_exp'.
-    virtual bool isBIVBoundExp(BIV const* biv, IR const* compare_exp,
-                               IR const* ivref) const;
-    virtual bool isBIVBoundStmt(BIV const* biv, LI<IRBB> const* li,
-                                IR const* stmt) const;
-
-    //Return true if code can be reduction-op code.
-    virtual bool isReductionOpCode(IR_CODE code) const
-    { return code == IR_ADD || code == IR_SUB; }
+    virtual bool isBIVBoundExp(
+        BIV const* biv, IR const* compare_exp, IR const* ivref) const;
+    virtual bool isBIVBoundStmt(
+        BIV const* biv, LI<IRBB> const* li, IR const* stmt) const;
+    void initDepPass(OptCtx & oc);
 
     void * xmalloc(size_t size)
     {
@@ -648,8 +697,9 @@ protected:
         return p;
     }
     void recordBIV(BIV * biv);
-    void recordDIV(LI<IRBB> const* li, IR const* red, ChainRec const* cr,
-                   OptCtx const& oc);
+    void recordDIV(
+        LI<IRBB> const* li, IR const* red, ChainRec const* cr,
+        OptCtx const& oc);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -673,26 +723,30 @@ public:
 
     //The function try to evaluate the constant trip-count for given 'li'.
     //Return true if the function reason out the constant trip-count.
-    bool computeConstIVBound(LI<IRBB> const* li, OUT IVBoundInfo & tc,
-                             MOD IVRCtx & ivrctx) const;
+    bool computeConstIVBound(
+        LI<IRBB> const* li, OUT IVBoundInfo & tc, MOD IVRCtx & ivrctx) const;
 
     //The function try to evaluate the trip-count expression for given 'li'.
     //Return true if the function reason out the trip-count expression.
-    bool computeExpIVBound(LI<IRBB> const* li, OUT IVBoundInfo & bi,
-                           MOD IVRCtx & ivrctx) const;
+    bool computeExpIVBound(
+        LI<IRBB> const* li, OUT IVBoundInfo & bi, MOD IVRCtx & ivrctx) const;
 
     //The function try to evaluate the constant or expression trip-count for
     //given 'li'.
     //Return true if the function reasons out one of constant or expression
     //trip-count.
-    bool computeIVBound(LI<IRBB> const* li, OUT IVBoundInfo & tc,
-                        MOD IVRCtx & ivrctx) const;
+    bool computeIVBound(
+        LI<IRBB> const* li, OUT IVBoundInfo & tc, MOD IVRCtx & ivrctx) const;
+
+    //Return true if CVT can be skipped during finding BIV and DIV.
+    bool canSkipCVTWhenFindIV() const { return m_skip_cvt_when_find_iv; }
 
     bool dump() const;
 
     //Extract IV reference and Bound expression from mono-bound expression.
-    bool extractIVBoundExp(IV const* biv, IR const* compare_exp,
-                           OUT IR const** ivref, OUT IR const** bexp) const;
+    bool extractIVBoundExp(
+        IV const* biv, IR const* compare_exp, OUT IR const** ivref,
+        OUT IR const** bexp) const;
 
     //The function tries to extract IVVal from given 'ir'.
     //Return true if the function extracts value successfully.
@@ -738,14 +792,18 @@ public:
         BIV const* biv, IR const* initexp, IR const* boundexp,
         IR const* stepexp, MOD IVRCtx & ivrctx) const;
 
+    //Return true if code can be reduction-op code.
+    virtual bool isReductionOpCode(IR_CODE code) const
+    { return code == IR_ADD || code == IR_SUB; }
+
     //Return true if ir is expression that represent the multiple of IV.
     //e.g: iv or n*iv
     //li: loop info.
     //ir: the linear-rep candidate.
     //linrep: the output result that record the linear-rep info if 'ir' is.
     //e.g: if i is IV, a*i is the linear-represetation of i.
-    bool isMultipleOfIV(LI<IRBB> const* li, IR const* ir,
-                        OUT IVLinearRep * linrep) const;
+    bool isMultipleOfIV(
+        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const;
 
     //Return true if ir is relaxed linear-representation about IV.
     //The function try to find the standard linear-expression such as: a*i+b,
@@ -774,16 +832,26 @@ public:
     //b can be zero.
     //linrep: optional, if not nullptr, it records the coeff, iv, and addend
     //        of linear-representation if exist.
-    bool isLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
-                         OUT IVLinearRep * linrep) const;
+    bool isLinearRepOfIV(
+        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const;
 
     //Return true if ir is expression that represent the multiple of IV.
-    bool isMultipleOfMD(LI<IRBB> const* li, IR const* ir, MD const* selfmd,
-                        OUT IVLinearRep * linrep) const;
+    bool isMultipleOfMD(
+        LI<IRBB> const* li, IR const* ir, MD const* selfmd,
+        OUT IVLinearRep * linrep) const;
 
     //Return true if ir indicates IV reference.
     //iv: record related IV information if ir is IV.
     bool isIV(IR const* ir, OUT IV const** iv) const;
+
+    //Return true if at least one of IRs in the IR tree that rooted by 'ir'
+    //references IV.
+    //ivlst: it is optional. If it is not NULL, then record all IV
+    //       informations if some IR is IV.
+    //  e.g: given ir is stpr: stpr $x = add ld i, ld j;
+    //       where ld i and ld j are IV, the function return true and record
+    //       IV(i) and IV(j) in 'ivlst'.
+    bool isIVForTree(IR const* ir, OUT IVList * ivlst) const;
 
     //Return true if ir indicates IV reference in given loop 'li'.
     bool isIV(LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const;
@@ -793,6 +861,19 @@ public:
 
     //Return true if ir indicates DIV reference in given loop 'li'.
     bool isDIV(LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const;
+
+    //Return true if 'ir' is used by one of IV.
+    //The function will check IV's init, reduce, step stmt and exp.
+    //e.g: given ir is lda X, the step-exp is cvt(lda X), then the function
+    //return true.
+    bool isRefBIVInfo(
+        LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const;
+    bool isRefDIVInfo(
+        LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const;
+    bool isRefIVInfo(
+        LI<IRBB> const* li, IR const* ir, OUT IV const** iv) const;
+    bool isRefIVInfo(IR const* ir, OUT IV const** iv) const;
+    bool isRefIVInfoForTree(IR const* ir, OUT IVList * ivlst) const;
 
     bool is_aggressive() const { return m_is_aggressive; }
 
@@ -829,6 +910,8 @@ public:
     //The function try to build a stmt by given IVVal that initialize the IV.
     //Return the stmt if successful, otherwise return NULL.
     IR * tryBuildInitStmtByIVVal(IR const* resref, IVVal const& initv) const;
+
+    bool verify() const;
 };
 
 
@@ -846,6 +929,12 @@ inline bool IV::isDec() const
     return is_biv() ? ((BIV*)this)->isDec() : ((DIV*)this)->isDec();
 }
 //END IV
+
+//The function checks and invalid IVR pass if 'ir' references any IVs.
+void tryInvalidIVRIfIRIsIV(
+    IVR * ivr, IR const* ir, OptCtx const* oc, MOD ActMgr * am);
+
+bool verifyIVR(Region const* rg);
 
 } //namespace xoc
 #endif

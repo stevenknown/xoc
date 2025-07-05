@@ -216,6 +216,7 @@ public:
 
 typedef xcom::TTab<IRBB*> BBTab;
 typedef xcom::TTabIter<IRBB*> BBTabIter;
+typedef xcom::TTab<IRBB const*> ConstBBTab;
 typedef xcom::Vector<IRBB*> BBVec;
 
 //
@@ -242,6 +243,7 @@ public:
     //next: next BB.
     bool isPrevBB(IRBB const* prev, IRBB const* next) const;
     bool isPrevBB(IRBB const* prev, BBListIter nextit) const;
+    bool is_empty() const { return get_elem_count() == 0; }
 };
 //END BBList
 
@@ -392,6 +394,18 @@ public:
         return const_cast<IRBB*>(this)->getIRList().getPrevIR(ir, irit);
     }
 
+    IR * getBranchOp() const
+    {
+        IR * lb = getLowerBoundary();
+        return (lb != nullptr && lb->isBranch()) ? lb : nullptr;
+    }
+
+    IR * getLowerBoundary() const
+    {
+        IR * ir = const_cast<BBIRList*>(&BB_irlist(this))->get_tail();
+        return (ir != nullptr && isLowerBoundary(ir)) ? ir : nullptr;
+    }
+
     bool hasMDPhi(CFG<IRBB, IR> const* cfg) const;
     bool hasPRPhi() const;
     bool hasPhi(CFG<IRBB, IR> const* cfg) const
@@ -420,30 +434,25 @@ public:
         return false;
     }
 
+    bool hasLowerBoundary() const { return getLowerBoundary() != nullptr; }
+
     //For some aggressive optimized purposes, call node is not looked as
     //boundary of basic block.
     //So we must bottom-up go through whole bb to find call.
-    inline bool hasCall() const
+    bool hasBranchOp() const
     {
-        BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
-        for (IR * ir = irlst->get_tail();
-             ir != nullptr; ir = irlst->get_prev()) {
-            if (ir->isCallStmt()) {
-                return true;
-            }
-        }
-        return false;
+        IR const* lb;
+        return (lb = getLowerBoundary()) != nullptr ? lb->isBranch() : false;
+    }
+    bool hasCall() const
+    {
+        IR const* lb;
+        return (lb = getLowerBoundary()) != nullptr ? lb->isCallStmt() : false;
     }
     bool hasReturn() const
     {
-        BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
-        for (IR * ir = irlst->get_tail();
-             ir != nullptr; ir = irlst->get_prev()) {
-            if (ir->is_return()) {
-                return true;
-            }
-        }
-        return false;
+        IR const* lb;
+        return (lb = getLowerBoundary()) != nullptr ? lb->is_return() : false;
     }
     //Return true if one of current bb's successors has a phi.
     bool hasPhiInSuccBB(CFG<IRBB, IR> const* cfg) const;
@@ -511,6 +520,15 @@ public:
                 li->is_try_end() || li->is_pragma()) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    inline bool isAttachIRRefedLabel()
+    {
+        for (LabelInfo const* li = getLabelList().get_head();
+             li != nullptr; li = getLabelList().get_next()) {
+            if (li->is_refed_by_ir()) { return true; }
         }
         return false;
     }

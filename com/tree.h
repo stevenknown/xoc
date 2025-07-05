@@ -32,6 +32,7 @@ namespace xcom {
 
 class Tree : public Graph {
     COPY_CONSTRUCTOR(Tree);
+protected:
     Vertex * m_root;
 public:
     Tree() : m_root(nullptr) {}
@@ -41,6 +42,7 @@ public:
     //Return the maximum height of the tree.
     VexIdx computeHeight();
 
+    virtual void dumpNodeBuf(Vertex const* v, OUT StrBuf & buf) const;
     void dumpBuf(OUT StrBuf & buf) const;
 
     //The function get the parent Vertex of tree node.
@@ -57,6 +59,14 @@ public:
         ASSERT0(getVertex(v->id()) == v);
         return v->getNthOutVertex(0);
     }
+    //The function get the kid Vertex of tree node.
+    Vertex * getNthKid(UINT n, Vertex const* v) const
+    {
+        ASSERT0(getVertex(v->id()) == v);
+        return v->getNthOutVertex(n);
+    }
+    Vertex * getLchild(Vertex const* v) const { return getNthKid(0, v); }
+    Vertex * getRchild(Vertex const* v) const { return getNthKid(1, v); }
     Vertex * getRoot() const { return m_root; }
 
     bool hasLowerHeight(Vertex const* a, Vertex const* b) const
@@ -73,23 +83,28 @@ public:
     //  k1   v    k3
     //       |
     //       k2
-    // after inserting a new kid v:
-    //e.g: parent
+    //after inserting a new kid v:
+    //     parent
     //   ___|||___
     //  |    |    |
     //  k1   v    k3
     //       ||__
     //       |   |
     //       k2  kid
-    void insertKid(VexIdx v, VexIdx kid);
+    void insertKid(VexIdx v, VexIdx kid)
+    {
+        ASSERT0(getVertex(v));
+        addEdge(v, kid);
+    }
+    void insertKid(Vertex * v, Vertex * kid) { addEdge(v, kid); }
 
     //The function inserts a new parent tree node to 'v'.
     //e.g: parent
     //   ___|||___
     //  |    |    |
     //  k1   v    k3
-    // after inserting a new parent v:
-    //e.g: parent
+    //after inserting a new parent v:
+    //     parent
     //   ___|||________
     //  |    |         |
     //  k1  newparent  k3

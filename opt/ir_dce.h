@@ -46,11 +46,10 @@ public:
     void bunion(BSIdx elem) { xcom::DefSBitSet::bunion(elem); }
 };
 
-class DCECtx {
+class DCECtx : public PassCtx {
     COPY_CONSTRUCTOR(DCECtx);
 public:
     bool m_is_remove_cfs;
-    OptCtx * m_oc;
 
     //Record if BB is effect. Note the BB effect info is not always
     //identical to Stmt effect info, one BB may be not be marked as Effect even
@@ -59,17 +58,13 @@ public:
     StmtSet m_effect_stmt;
     StmtSet m_exclude_stmt;
 public:
-    DCECtx(OptCtx * oc, DefSegMgr & sm) :
-        m_effect_bb(&sm), m_effect_stmt(sm), m_exclude_stmt(sm)
-    { m_oc = oc; m_is_remove_cfs = true; }
+    DCECtx(OptCtx * oc, DefSegMgr & sm, ActMgr * am);
 
     void addEffectStmt(IR const* stmt) { m_effect_stmt.bunion(stmt->id()); }
     void addEffectBB(IRBB const* bb) { m_effect_bb.bunion(bb->id()); }
     void addExcludeStmt(IR const* stmt) { m_exclude_stmt.bunion(stmt->id()); }
 
     void dump(Region const* rg) const;
-
-    OptCtx * getOptCtx() const { return m_oc; }
 
     bool isRemoveCFS() const { return m_is_remove_cfs; }
     bool isEffectStmt(IR const* ir) const
@@ -137,7 +132,7 @@ protected:
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
     EffectMDDef m_is_mddef_effect;
-    ActMgr m_act_mgr;
+    ActMgr m_am;
     DefMiscBitSetMgr m_sbs_mgr;
 protected:
     void addEffectIRAndBB(ConstIRList const& efflist,
@@ -220,7 +215,7 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    explicit DeadCodeElim(Region * rg) : Pass(rg), m_act_mgr(rg)
+    explicit DeadCodeElim(Region * rg) : Pass(rg), m_am(rg)
     {
         ASSERT0(rg != nullptr);
         m_tm = rg->getTypeMgr();
@@ -248,7 +243,7 @@ public:
     void dump(DCECtx const& dcectx) const;
 
     MDSystem * getMDSystem() const { return m_md_sys; }
-    ActMgr & getActMgr() { return m_act_mgr; }
+    ActMgr & getActMgr() { return m_am; }
     IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
@@ -263,9 +258,9 @@ public:
 
     bool isAggressive() const { return m_is_elim_cfs; }
     bool isCheckMDRef() const { return m_check_md_ref; }
-    bool is_effect_write(Var * v) const
+    bool isEffectWrite(Var * v) const
     { return v->is_global() || v->is_volatile(); }
-    bool is_effect_read(Var * v) const { return v->is_volatile(); }
+    bool isEffectRead(Var * v) const { return v->is_volatile(); }
 
     void setReservePhi(bool reserve) { m_is_reserve_phi = reserve; }
     void setElimCFS(bool doit) { m_is_elim_cfs = doit; }

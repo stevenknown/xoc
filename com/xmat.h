@@ -58,7 +58,7 @@ public:
 
     //DO NOT explicitly initialize the base-class copy-constructor.
     RMat(IMat const& m) { init(m); }
-    RMat(UINT row, UINT col) : Matrix<Rational>(row, col) {}
+    RMat(UINT row, UINT col) : Matrix<Rational>(row, col) { initElem(); }
     ~RMat() { destroy(); }
 
     void adjust() override {}
@@ -85,6 +85,7 @@ public:
     void init(IMat const& m);
     bool is_imat(UINT * row = nullptr, UINT * col = nullptr);
     void intlize(INT row = -1); //Converting rational element to integer.
+    virtual void initElem() override;
 
     RMat & operator = (RMat const& m);
 

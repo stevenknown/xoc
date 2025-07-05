@@ -73,6 +73,17 @@ void MIList::dump(LogMgr * lm, MInstMgr const& mgr) const
     }
     note(lm, "\n");
 }
+
+
+void MIList::setIR(IR const* ir) const
+{
+    if (ir == nullptr) { return; }
+
+    MIListIter it;
+    for (MInst * mi = get_head(&it); mi != nullptr; mi = get_next(&it)) {
+        MI_ir(mi) = ir;
+    }
+}
 //END MIList
 
 
@@ -83,7 +94,7 @@ void MIList::dump(LogMgr * lm, MInstMgr const& mgr) const
 //RecycMIList. Thus we avoid invoking constructor at initializing list in
 //other constructor.
 //e.g:RecycMIList::RecycMIList(IR2MI * ir2mi) :
-//      RecycMIList(ir2or->getRecycMIListMgr())
+//      RecycMIList(&ir2or->getRecycMIListMgr())
 void RecycMIList::init(RecycMIListMgr * mgr)
 {
     m_mgr = mgr;

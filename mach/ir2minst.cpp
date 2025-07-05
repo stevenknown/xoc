@@ -47,10 +47,12 @@ TMWORD IR2MInst::mapReg2TMCode(xgen::Reg r)
 }
 
 
-void IR2MInst::convertLabel(IR const* ir, OUT RecycMIList & mis,
-                            MOD IMCtx * cont)
+void IR2MInst::convertLabel(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     MInst * mi = m_mimgr->buildLabel();
+    ASSERT0(mi);
+    MI_ir(mi) = ir;
     ASSERT0(ir->getLabel());
     MI_lab(mi) = ir->getLabel();
     mis.append_tail(mi);
@@ -59,23 +61,23 @@ void IR2MInst::convertLabel(IR const* ir, OUT RecycMIList & mis,
 
 
 //Process unary operation.
-void IR2MInst::convertUnaryOp(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+void IR2MInst::convertUnaryOp(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERTN(ir->isUnaryOp() && UNA_opnd(ir), ("missing operand"));
 }
 
 
 //Process binary operation.
-void IR2MInst::convertBinaryOp(IR const* ir, OUT RecycMIList & mis,
-                               MOD IMCtx * cont)
+void IR2MInst::convertBinaryOp(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERTN(BIN_opnd0(ir) && BIN_opnd1(ir), ("missing operand"));
 }
 
 
-void IR2MInst::convertFalsebr(IR const* ir, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+void IR2MInst::convertFalsebr(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->is_falsebr());
     IR * newir = m_rg->dupIRTree(ir);
@@ -84,33 +86,20 @@ void IR2MInst::convertFalsebr(IR const* ir, OUT RecycMIList & mis,
             br_det->is_ge() || br_det->is_eq() || br_det->is_ne());
     IR_code(br_det) = IR::invertIRCode(br_det->getCode());
     IR_code(newir) = IR_TRUEBR;
-    convertTruebr(newir, mis, cont);
+
+    RecycMIList tmpmis(&m_recyc_irlist_mgr);
+    convertTruebr(newir, tmpmis, cont);
+
+    //Set the m_ir of each MI in MIList to the original IR.
+    tmpmis.setIR(ir);
+    mis.move_tail(tmpmis);
+
     m_rg->freeIRTree(newir);
 }
 
 
-//Generate compare operations and return the comparation result registers.
-//The output registers in IMCtx are ResultSR,
-//TruePredicatedSR, FalsePredicatedSR.
-//The ResultSR record the boolean value of comparison of relation operation.
-//    e.g:
-//        a - 1 > b + 2
-//    =>
-//        sr0 = a - 1
-//        sr1 = b + 2
-//        sr2 <- cmp.gt sr0, sr1
-//        return sr2
-//   e.g2:
-//is_invert: true if generated inverted operation.
-//  e.g: given a <= b, generate !(a > b)
-void IR2MInst::convertRelationOp(IR const* ir, OUT RecycMIList & mis,
-                                 MOD IMCtx * cont)
-{
-}
-
-
-void IR2MInst::convertBBLabel(IRBB const* bb, OUT RecycMIList & mis,
-                              MOD IMCtx * cont)
+void IR2MInst::convertBBLabel(
+    IRBB const* bb, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(bb);
     LabelInfoListIter it;
@@ -173,7 +162,7 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
         convertICall(ir, mis, cont);
         break;
     case IR_GETELEM:
-        convertExtract(ir, mis, cont);
+        convertGetElem(ir, mis, cont);
         break;
     case IR_SETELEM:
         convertSetElem(ir, mis, cont);
@@ -219,8 +208,8 @@ TMWORD IR2MInst::extractImm(HOST_INT val, FIELD_TYPE ft)
 }
 
 
-void IR2MInst::convertIRListToMIList(OUT RecycMIList & milst,
-                                     MOD IMCtx * cont)
+void IR2MInst::convertIRListToMIList(
+    OUT RecycMIList & milst, MOD IMCtx * cont)
 {
     for (IR * ir = m_rg->getIRList(); ir != nullptr; ir = ir->get_next()) {
         cont->clean();
@@ -229,13 +218,12 @@ void IR2MInst::convertIRListToMIList(OUT RecycMIList & milst,
 }
 
 
-void IR2MInst::convertIRBBListToMIList(OUT RecycMIList & milst,
-                                       MOD IMCtx * cont)
+void IR2MInst::convertIRBBListToMIList(
+    OUT RecycMIList & milst, MOD IMCtx * cont)
 {
     BBList * ir_bb_list = m_rg->getBBList();
     ASSERT0(ir_bb_list);
     BBListIter bbit;
-
     for (IRBB * bb = ir_bb_list->get_head(&bbit);
          bb != nullptr; bb = ir_bb_list->get_next(&bbit)) {
         convertBBLabel(bb, milst, cont);
@@ -261,8 +249,7 @@ void IR2MInst::convertToMIList(OUT RecycMIList & milst, MOD IMCtx * cont)
     ASSERT0(m_rg);
     IR * ir_list = m_rg->getIRList();
     if (ir_list != nullptr) {
-        ASSERT0(m_rg->getBBList() == nullptr ||
-                m_rg->getBBList()->get_elem_count() == 0);
+        ASSERT0(m_rg->getBBList() == nullptr || m_rg->getBBList()->is_empty());
         convertIRListToMIList(milst, cont);
         return;
     }
@@ -271,8 +258,8 @@ void IR2MInst::convertToMIList(OUT RecycMIList & milst, MOD IMCtx * cont)
 }
 
 
-void IR2MInst::convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
+void IR2MInst::convertCFIDefCfa(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir->is_cfi_def_cfa());
     ASSERT0(xoc::g_debug);
@@ -286,6 +273,7 @@ void IR2MInst::convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
 
     MInst * mi = getMIMgr()->buildCFIDefCfa();
     ASSERT0(mi);
+    MI_ir(mi) = ir;
     MI_cfi_def_cfa_offset(mi) = cfa_offset;
     MI_cfi_def_cfa_register(mi) = reg_num;
     mis.append_tail(mi);
@@ -294,8 +282,8 @@ void IR2MInst::convertCFIDefCfa(IR const* ir, OUT RecycMIList & mis,
 }
 
 
-void IR2MInst::convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont)
+void IR2MInst::convertCFISameValue(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir->is_cfi_same_value());
     ASSERT0(xoc::g_debug);
@@ -304,6 +292,7 @@ void IR2MInst::convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
     UINT reg_num = (UINT)((CConst*)rhs0)->getInt();
     MInst * mi = getMIMgr()->buildCFISameValue();
     ASSERT0(mi);
+    MI_ir(mi) = ir;
     MI_cfi_samevalue_register(mi) = reg_num;
 
     mis.append_tail(mi);
@@ -312,8 +301,8 @@ void IR2MInst::convertCFISameValue(IR const* ir, OUT RecycMIList & mis,
 }
 
 
-void IR2MInst::convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
-                                MOD IMCtx * cont)
+void IR2MInst::convertCFIOffset(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir->is_cfi_offset());
     ASSERT0(xoc::g_debug);
@@ -326,6 +315,7 @@ void IR2MInst::convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
     INT offset = (INT)((CConst*)rhs1)->getInt();
     MInst * mi = getMIMgr()->buildCFIOffset();
     ASSERT0(mi);
+    MI_ir(mi) = ir;
 
     MI_cfi_offset_offset(mi) = offset;
     MI_cfi_offset_register(mi)  = reg_num;
@@ -335,8 +325,8 @@ void IR2MInst::convertCFIOffset(IR const* ir, OUT RecycMIList & mis,
 }
 
 
-void IR2MInst::convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
-                                 MOD IMCtx * cont)
+void IR2MInst::convertCFIRestore(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir->is_cfi_restore());
     ASSERT0(xoc::g_debug);
@@ -346,6 +336,7 @@ void IR2MInst::convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
 
     MInst * mi = getMIMgr()->buildCFIRestore();
     ASSERT0(mi);
+    MI_ir(mi) = ir;
     MI_cfi_restore_register(mi) = reg_num;
 
     mis.append_tail(mi);
@@ -354,8 +345,8 @@ void IR2MInst::convertCFIRestore(IR const* ir, OUT RecycMIList & mis,
 }
 
 
-void IR2MInst::convertCFICfaOffset(IR const* ir, OUT RecycMIList & mis,
-                                   MOD IMCtx * cont)
+void IR2MInst::convertCFICfaOffset(
+    IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir->is_cfi_def_cfa_offset());
     ASSERT0(xoc::g_debug);
@@ -365,6 +356,7 @@ void IR2MInst::convertCFICfaOffset(IR const* ir, OUT RecycMIList & mis,
 
     MInst * mi = getMIMgr()->buildCFIDefCfaOffset();
     ASSERT0(mi);
+    MI_ir(mi) = ir;
     MI_cfi_def_cfa_offset_offset(mi) = cfa_offset;
 
     mis.append_tail(mi);

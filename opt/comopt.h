@@ -35,13 +35,13 @@ author: Su Zhenyu
 #include "preana.h"
 #include "apply_to_region.h"
 #include "liveness_mgr.h"
-#include "mdliveness_mgr.h"
+#include "md_liveness_mgr.h"
+#include "pr_liveness_mgr.h"
 #include "ssaregion.h"
 #include "ir_ssa.h"
 #include "ir_mdssa.h"
 #include "mdssalive_mgr.h"
 #include "cfs_mgr.h"
-#include "act_mgr.h"
 #include "cfs_opt.h"
 #include "goto_opt.h"
 #include "ir_refine.h"
@@ -67,8 +67,15 @@ author: Su Zhenyu
 //reference target machine informations, such as Reg, RegFile etc.
 //It looks like backward invoking functions that defined in XGEN.
 #include "../xgen/xgeninc.h"
+
+//xgeninc.h will also include comopt.h that cause forward reference namespace
+//xgen, thus redeclarate namespace xgen here.
+using namespace xgen;
+#include "regssainfo.h"
+#include "ir_regssa.h"
 #include "update_pos.h"
 #include "targinfo_mgr.h"
+#include "range.h"
 #include "lifetime.h"
 #include "var_liveness_mgr.h"
 #include "lsra_var_liveness_mgr.h"
@@ -80,10 +87,20 @@ author: Su Zhenyu
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
 #include "arg_passer.h"
+#include "prologue_epilogue_inserter.h"
 #include "var2offset.h"
 #include "ir_reloc_mgr.h"
+#include "dynamic_stack.h"
+#include "kernel_adjustment.h"
+#include "gp_adjustment.h"
 #include "br_opt.h"
 #include "igoto_opt.h"
+#include "inst_sched.h"
+#include "ir_ddg.h"
+#include "ir_sim.h"
+#include "ir_lis.h"
+#include "local_var_liveness_mgr.h"
+#include "local_var_lifetime_mgr.h"
 #endif
 
 #ifdef FOR_IP
@@ -99,6 +116,7 @@ author: Su Zhenyu
 #endif
 
 #include "ir_cp.h"
+#include "ir_bcp.h"
 #include "ir_rp.h"
 #include "ir_licm.h"
 #include "ir_loop_cvt.h"
@@ -110,3 +128,4 @@ author: Su Zhenyu
 #include "insert_cvt.h"
 #include "invert_brtgt.h"
 #include "targ_opt.inc"
+#include "stack_coloring.h"

@@ -124,6 +124,8 @@ IR * IRMgrExt::buildBroadCast(IR * src, IR * res_list, Type const* ty)
 bool IRMgrExt::hasMultiRes(IR * stmt) const
 {
     switch (stmt->getCode()) {
+    case IR_ATOMCAS:
+    case IR_ATOMINC:
     case IR_BROADCAST: return true;
     default:;
     }
@@ -136,6 +138,10 @@ IR * IRMgrExt::getAlterResDescList(IR * stmt) const
     switch (stmt->getCode()) {
     case IR_BROADCAST:
         return BROADCAST_res_list(stmt);
+    case IR_ATOMCAS:
+        return ATOMCAS_multires(stmt);
+    case IR_ATOMINC:
+        return ATOMINC_multires(stmt);
     default: UNREACHABLE();
     }
     return nullptr;
@@ -148,6 +154,7 @@ IR * IRMgrExt::buildAtomCas(Type const* type, IR * memory, IR * oldval,
     ASSERT0(memory && newval && oldval && reslst);
     ASSERT0(type && (type->is_i32() || type->is_i64()));
     IR * ir = allocIR(IR_ATOMCAS);
+    IR_is_atomic(ir) = true;
     ATOMCAS_memory(ir) = memory;
     ATOMCAS_newval(ir) = newval;
     ATOMCAS_oldval(ir) = oldval;
@@ -155,7 +162,9 @@ IR * IRMgrExt::buildAtomCas(Type const* type, IR * memory, IR * oldval,
     IR_parent(memory) = ir;
     IR_parent(newval) = ir;
     IR_parent(oldval) = ir;
-    IR_parent(reslst) = ir;
+    for (IR * res = reslst; res != nullptr; res = res->get_next()) {
+        IR_parent(res) = ir;
+    }
     IR_dt(ir) = type;
     return ir;
 }
@@ -166,9 +175,13 @@ IR * IRMgrExt::buildAtomInc(Type const* type, IR * memory, IR * reslst,
 {
     ASSERT0(type && memory && reslst);
     IR * ir = allocIR(IR_ATOMINC);
+    IR_is_atomic(ir) = true;
     ATOMINC_memory(ir) = memory;
     ATOMINC_multires(ir) = reslst;
     IR_parent(memory) = ir;
+    for (IR * res = reslst; res != nullptr; res = res->get_next()) {
+        IR_parent(res) = ir;
+    }
 
     //Some architectures require explicit specification, some do not.
     if (addend != nullptr) {

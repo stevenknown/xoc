@@ -358,7 +358,10 @@ public:
 
 #define RPCTX_ldainfo_set(r) ((r).m_ldainfo_set)
 class RPCtx {
+    COPY_CONSTRUCTOR(RPCtx);
+protected:
     RPActMgr * m_act_mgr;
+    IVR * m_ivr;
 public:
     bool need_rebuild_domtree;
     DomTree * domtree;
@@ -367,9 +370,7 @@ public:
     LDACtx * m_ldactx;
     LoopDepInfoSet m_ldainfo_set;
 public:
-    RPCtx(OptCtx * t, RPActMgr * am = nullptr) :
-        m_act_mgr(am), need_rebuild_domtree(false),
-        domtree(nullptr), oc(t), m_li(nullptr), m_ldactx(nullptr) {}
+    RPCtx(OptCtx * t, RPActMgr * am = nullptr);
     ~RPCtx()
     {
         if (domtree != nullptr) {
@@ -405,9 +406,17 @@ public:
     LI<IRBB> const* getLI() const { return m_li; }
     LoopDepInfoSet const& getLDAInfoSet() const { return m_ldainfo_set; }
     LDACtx * getLDACtx() const { return m_ldactx; }
+    OptCtx * getOptCtx() const { return oc; }
+
+    //Return true if ir is BIV or DIV.
+    bool isIV(IR const* ir) const;
 
     void setLI(LI<IRBB> const* li) { m_li = li; }
     void setLDACtx(LDACtx * ldactx) { m_ldactx = ldactx; }
+
+    //The function try to judge if given 'ir' may reference IV. If it is true,
+    //the function will invalid IVR pass because the IV will be modified.
+    void tryInvalidIVRIfIRIsIV(IR const* ir) const;
 };
 
 //Perform Register Promotion.
@@ -439,8 +448,6 @@ protected:
     //Return true if the loop is promotable.
     bool analyzeLoop(LI<IRBB> const* li, ExactAccTab & exact_tab,
                      InexactAccTab & inexact_tab, MOD RPCtx & ctx);
-    void addDUChainForExpTree(
-        IR * root, IR * startir, IRBB * startbb, RPCtx const& ctx);
     void addSSADUChainForExpOfRestoreLHS(
         IR const* dele, DelegateMgr const& delemgr,
         RestoreTab const& restore2mem, RPCtx const& ctx);

@@ -120,23 +120,23 @@ public:
 
 //This class represents broadcast operation that is used to dispatch value in
 //'src' to multiple results in 'res_list'.
-#define BROADCAST_src(ir) BROADCAST_kid(ir, 0)
-#define BROADCAST_res_list(ir) \
-    (((CBroadCast*)CK_IRC(ir, IR_BROADCAST))->res_list)
+#define BROADCAST_src(ir)      BROADCAST_kid(ir, 0)
+#define BROADCAST_res_list(ir) BROADCAST_kid(ir, 1)
 #define BROADCAST_kid(ir, idx) \
     (((CBroadCast*)ir)->opnd[CK_KID_IRC(ir, IR_BROADCAST, idx)])
 class CBroadCast : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CBroadCast);
 public:
-    static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 1;
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
     IR * opnd[kid_num];
-    IR * res_list;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return BROADCAST_kid(ir, idx); }
     static inline IR *& accResList(IR * ir)
     { return BROADCAST_res_list(ir); }
+    IR const* getResList() const { return BROADCAST_res_list(this); }
+    bool isResList(IR const* exp) const;
 };
 
 
@@ -159,13 +159,13 @@ public:
 //"$src", and "res" both.
 
 //Operated memory.
-#define ATOMINC_memory(ir) ATOMINC_kid(ir, 0)
+#define ATOMINC_memory(ir)   ATOMINC_kid(ir, 0)
 
 //The num to add (absent on T1 so it's initialized to nullptr).
-#define ATOMINC_addend(ir) ATOMINC_kid(ir, 1)
+#define ATOMINC_addend(ir)   ATOMINC_kid(ir, 1)
 
 //The multiple result list.
-#define ATOMINC_multires(ir) (((CAtomInc*)CK_IRC(ir, IR_ATOMINC))->res_list)
+#define ATOMINC_multires(ir) ATOMINC_kid(ir, 2)
 
 #define ATOMINC_kid(ir, idx)\
     (((CAtomInc*)ir)->opnd[CK_KID_IRC(ir, IR_ATOMINC, idx)])
@@ -174,14 +174,15 @@ class CAtomInc : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CAtomInc);
 public:
     static BYTE const kid_map = 0x1;
-    static BYTE const kid_num = 2;
+    static BYTE const kid_num = 3;
     IR * opnd[kid_num];
-    IR * res_list;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return ATOMINC_kid(ir, idx); }
     static inline IR *& accResList(IR * ir)
     { return ATOMINC_multires(ir); }
+    IR const* getResList() const { return ATOMINC_multires(this); }
+    bool isResList(IR const* exp) const;
 };
 
 
@@ -208,21 +209,21 @@ public:
 //"$src", and "res" both.
 //
 //Operated memory.
-#define ATOMCAS_memory(ir) ATOMCAS_kid(ir, 0)
+#define ATOMCAS_memory(ir)   ATOMCAS_kid(ir, 0)
 
 //Compared with the value of target operand.
-#define ATOMCAS_oldval(ir) ATOMCAS_kid(ir, 1)
+#define ATOMCAS_oldval(ir)   ATOMCAS_kid(ir, 1)
 
 //Indicate the newval if changed success.
-#define ATOMCAS_newval(ir) ATOMCAS_kid(ir, 2)
+#define ATOMCAS_newval(ir)   ATOMCAS_kid(ir, 2)
 
 //Atomic compare and swap operation may occupy additional resources on
 //different architectures, such as registers, memory, etc. This attribute needs
 //to be explicitly specified to support other modules in allocating resources.
-#define ATOMCAS_occupy(ir) ATOMCAS_kid(ir, 3)
+#define ATOMCAS_occupy(ir)   ATOMCAS_kid(ir, 3)
 
 //Multiple result modified by this operation.
-#define ATOMCAS_multires(ir) (((CAtomCas*)CK_IRC(ir, IR_ATOMCAS))->res_list)
+#define ATOMCAS_multires(ir) ATOMCAS_kid(ir, 4)
 
 #define ATOMCAS_kid(ir, idx)\
     (((CAtomCas*)ir)->opnd[CK_KID_IRC(ir, IR_ATOMCAS, idx)])
@@ -230,15 +231,35 @@ class CAtomCas : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CAtomCas);
 public:
     static BYTE const kid_map = 0x7;
-    static BYTE const kid_num = 4;
+    static BYTE const kid_num = 5;
     IR * opnd[kid_num];
-    IR * res_list;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return ATOMCAS_kid(ir, idx); }
     static inline IR *& accResList(IR * ir)
     { return ATOMCAS_multires(ir); }
+    IR const* getResList() const { return ATOMCAS_multires(this); }
+    bool isResList(IR const* exp) const;
 };
+
+
+#ifdef REF_TARGMACH_INFO
+
+class RegPhi;
+
+//This class represents physical register.
+//It can only be used to in RegPhi operand list in RegSSA mode.
+#define PHYREG_phi(ir) (((CPhyReg*)CK_IRC(ir, IR_PHYREG))->m_phi)
+#define PHYREG_reg(ir) (((CPhyReg*)CK_IRC(ir, IR_PHYREG))->m_reg)
+class CPhyReg : public IR {
+    COPY_CONSTRUCTOR(CPhyReg);
+public:
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
+    RegPhi * m_phi;
+public:
+};
+#endif
 
 } //namespace xoc
 

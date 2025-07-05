@@ -85,6 +85,17 @@ void changeDefForPartialUseSet(IR * olddef, IR * newdef,
 }
 
 
+void addStmtToMDSSAMgr(IR * ir, MDSSAUpdateCtx const& ctx, Region const* rg)
+{
+    ASSERT0(ir && ir->is_stmt());
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        MDSSAMgr::hasMDSSAInfo(ir)) {
+        mdssamgr->addStmtToMDSSAMgr(ir, ctx);
+    }
+}
+
+
 void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
@@ -442,7 +453,7 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
-        MDSSAUpdateCtx ctx(oc);
+        MDSSAUpdateCtx ctx(const_cast<OptCtx&>(oc));
         mdssamgr->removeMDSSAOccForTree(exp, ctx);
         mdssa_changed = true;
     }
@@ -451,7 +462,7 @@ void removeUseForTree(IR const* exp, Region * rg, OptCtx const& oc)
 }
 
 
-void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
+void removeStmt(IR * stmt, Region const* rg, OptCtx const& oc)
 {
     ASSERT0(stmt->is_stmt());
     bool mdssa_changed = false;
@@ -471,7 +482,7 @@ void removeStmt(IR * stmt, Region * rg, OptCtx const& oc)
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Remove stmt and its RHS.
-        MDSSAUpdateCtx ctx(oc);
+        MDSSAUpdateCtx ctx(const_cast<OptCtx&>(oc));
         if (!oc.is_dom_valid()) {
             //Info MDSSAMgr does not need to maintain DU chain.
             MDSSAUPDATECTX_update_duchain(&ctx) = false;
@@ -866,7 +877,7 @@ IR * findKillingDef(IR const* exp, Region const* rg)
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
                     ("exp does not have MDSSAInfo"));
-            return mdssamgr->findKillingDefStmt(exp);
+            return mdssamgr->findKillingDefStmt(exp, true);
         }
         //Try classic DU.
         goto CLASSIC_DU;
@@ -1174,9 +1185,9 @@ IR * findNearestDomDef(IR const* exp, Region const* rg)
         ASSERT0(exp->isMemRefNonPR());
         MDSSAMgr const* mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-            MDDef const* mddef = mdssamgr->findNearestDef(exp);
-            ASSERT0(mddef);
-            return mddef->is_phi() ? nullptr : mddef->getOcc();
+            MDDef const* mddef = mdssamgr->findNearestDef(exp, true);
+            if (mddef == nullptr || mddef->is_phi()) { return nullptr; }
+            return mddef->getOcc();
         }
         //Try classic DU.
         goto CLASSIC_DU;
@@ -1564,8 +1575,8 @@ bool isDependent(IR const* ir, MDPhi const* phi)
 
 //CALL, ICALL may have sideeffect, we are not only check
 //the MustRef, but also consider the overlapping between MayRef.
-static bool isDependentForCallStmt(IR const* ir1, IR const* ir2,
-                                   bool costly_analysis, Region const* rg)
+static bool isDependentForCallStmt(
+    IR const* ir1, IR const* ir2, bool costly_analysis, Region const* rg)
 {
     ASSERT0(ir1->isCallStmt() && !ir2->is_undef());
     MD const* mustdef = ir1->getMustRef();
@@ -1624,6 +1635,9 @@ bool isDependent(IR const* ir1, IR const* ir2, bool costly_analysis,
 {
     ASSERT0(!ir1->is_undef() && !ir2->is_undef());
     if (ir1 == ir2) { return true; }
+    if (ir2->isCallStmt()) {
+        xcom::swap(ir1, ir2);
+    }
     if (ir1->isCallStmt()) {
        return isDependentForCallStmt(ir1, ir2, costly_analysis, rg);
     }
@@ -1680,8 +1694,36 @@ bool isDependentForTree(IR const* ir1, IR const* ir2, bool costly_analysis,
 }
 
 
-void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
-                         OptCtx const& oc)
+void findAndSetLiveInDefForExpOfStmt(
+    IR * stmt, IR * startir, IRBB * startbb, Region * rg, OptCtx const& oc)
+{
+    ASSERT0(stmt->is_stmt());
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    bool use_prssa = prssamgr != nullptr && prssamgr->is_valid();
+    bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
+    if (!use_prssa && !use_mdssa) { return; }
+    IRIter it;
+    MDSSAStatus st;
+    FindAndSetLiveInDef fs(mdssamgr, oc);
+    for (IR * x = xoc::iterExpOfStmtInit(stmt, it);
+         x != nullptr; x = xoc::iterExpOfStmtNext(it)) {
+        if (!x->isMemRef()) { continue; }
+        if (use_mdssa && x->isMemRefNonPR()) {
+            fs.findAndSet(x, startir, startbb, st);
+            continue;
+        }
+        if (use_prssa && x->isReadPR()) {
+            prssamgr->findAndSetLiveinDef(x);
+            continue;
+        }
+        //NOTE classic DU chain does not need to find the live-in DEF.
+    }
+}
+
+
+void findAndSetLiveInDefForTree(
+    IR * root, IR * startir, IRBB * startbb, Region * rg, OptCtx const& oc)
 {
     ASSERT0(root->is_exp());
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
@@ -1691,11 +1733,12 @@ void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
     if (!use_prssa && !use_mdssa) { return; }
     IRIter it;
     MDSSAStatus st;
-    for (IR * x = iterInit(root, it, true);
-         x != nullptr; x = iterNext(it, true)) {
+    FindAndSetLiveInDef fs(mdssamgr, oc);
+    for (IR * x = xoc::iterInit(root, it, true);
+         x != nullptr; x = xoc::iterNext(it, true)) {
         if (!x->isMemRef()) { continue; }
         if (use_mdssa && x->isMemRefNonPR()) {
-            mdssamgr->findAndSetLiveInDef(x, startir, startbb, oc, st);
+            fs.findAndSet(x, startir, startbb, st);
             continue;
         }
         if (use_prssa && x->isReadPR()) {

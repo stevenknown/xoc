@@ -86,21 +86,6 @@ void LabelInfo::dumpName(Region const* rg) const
 }
 
 
-CHAR const* LabelInfo::getName(OUT StrBuf & buf) const
-{
-    if (LABELINFO_type(this) == L_ILABEL) {
-        buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(this));
-    } else if (LABELINFO_type(this) == L_CLABEL) {
-        buf.strcat("%s", SYM_name(LABELINFO_name(this)));
-    } else if (LABELINFO_type(this) == L_PRAGMA) {
-        ASSERT0(LABELINFO_pragma(this));
-        buf.strcat("%s", SYM_name(LABELINFO_pragma(this)));
-    }
-    else { UNREACHABLE(); }
-    return buf.buf;
-}
-
-
 void LabelInfo::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }

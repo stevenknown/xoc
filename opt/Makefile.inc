@@ -10,12 +10,14 @@ ir.o\
 ir_bb.o\
 ir_builder.o\
 ir_du.o\
+ir_ddg.o\
 ir_cfg.o\
 ir_simp.o\
 ir_gvn.o\
 ir_rce.o\
 ir_dce.o\
 ir_cp.o\
+ir_bcp.o\
 ir_lcse.o\
 ir_gcse.o\
 ir_licm.o\
@@ -42,6 +44,7 @@ md.o\
 loop.o\
 cfs_mgr.o\
 pass_mgr.o\
+pass.o\
 inliner.o\
 ipa.o\
 callg.o\
@@ -51,7 +54,8 @@ prssainfo.o\
 scalar_opt.o\
 apply_to_region.o\
 liveness_mgr.o\
-mdliveness_mgr.o\
+md_liveness_mgr.o\
+pr_liveness_mgr.o\
 du_helper.o\
 symtab.o\
 logmgr.o\
@@ -72,6 +76,7 @@ loop_dep_ana.o\
 mdssalive_mgr.o\
 insert_guard_helper.o\
 optctx.o\
+cfg.o\
 ir_dump.o\
 ir_dump_ext.o\
 ir_mgr.o\
@@ -79,6 +84,7 @@ ir_mgr_ext.o\
 ir_verify.o\
 ir_verify_ext.o\
 ir_decl.o\
+ir_decl_ext.o\
 ir_desc.o\
 ir_utils.o\
 multi_res_convert.o\
@@ -121,7 +127,7 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
 endif
 
-ifneq ($(findstring $(TARG), FOR_RISCV),)
+ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
   TARG_DIR_NAME := $(notdir $(TARG_DIR))
   opt_ext_file = $(ROOT_DIR)/$(TARG_DIR_NAME)/Makefile.opt.ext.inc
   ifneq ($(wildcard $(opt_ext_file)),$(opt_ext_file))

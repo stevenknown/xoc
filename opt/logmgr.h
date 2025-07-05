@@ -283,6 +283,10 @@ void note(LogMgr * lm, CHAR const* format, ...);
 //h: file handler.
 void note(FILE * h, UINT indent, CHAR const* format, ...);
 
+//Print string with indent chars.
+//lm: Log manager.
+void note_arg(LogMgr * lm, CHAR const* format, va_list args);
+
 //Helper function to dump formatted string to logfile without indent.
 bool prt(Region const* rg, CHAR const* format, ...);
 

@@ -96,43 +96,52 @@ MD const* MDMgr::allocMDForDirectMemOp(IR * ir, bool clean_mayset)
 }
 
 
+MD const* MDMgr::tryReassignMDByOffsetForPartailPROp(MD const* md, IR * ir)
+{
+    ASSERT0(ir->isPartialPROp());
+    if (!md->is_exact()) { return md; }
+    IR const* ofst = ir->getOffsetOfPartialPROp();
+    ASSERT0(ofst);
+    if (ofst->is_const()) {
+        ASSERTN(ofst->is_int(), ("offset of SETELEM must be integer."));
+
+        //Accumulating offset of identifier.
+        //e.g: struct {int a,b; } s; s.a = 10
+        //generate: st s:offset(4) = 10;
+        MD t(*md);
+        ASSERT0(ir->getTypeSize(m_tm) > 0);
+        MD_ofst(&t) += (UINT)CONST_int_val(ofst);
+        MD_size(&t) = ir->getTypeSize(m_tm);
+        MD const* entry = m_mdsys->registerMD(t);
+        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+        md = entry; //regard MD with offset as return result.
+        return md;
+    }
+    //Offset is variable.
+    //e.g: vector<4xi32> v; v[i] = 34;
+    //will generate:
+    //    st $1 = ld v;
+    //    setelem $1 = 34, ld i;
+    //    st v = $1;
+
+    MD t(*md);
+    ASSERT0(ir->getTypeSize(m_tm) > 0);
+    MD_ty(&t) = MD_RANGE;
+    MD_ofst(&t) = 0;
+    MD_size(&t) = ir->getTypeSize(m_tm);
+    MD const* entry = m_mdsys->registerMD(t);
+    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+    md = entry; //regard MD with range as return result.
+    return md;
+}
+
+
 MD const* MDMgr::allocSetElemMD(IR * ir)
 {
     ASSERT0(ir->is_setelem());
     MD const* md = genMDForPR(ir);
-    IR const* ofst = SETELEM_ofst(ir);
-    ASSERT0(ofst);
-    if (md->is_exact()) {
-        if (ofst->is_const()) {
-            ASSERTN(ofst->is_int(), ("offset of SETELEM must be integer."));
-
-            //Accumulating offset of identifier.
-            //e.g: struct {int a,b; } s; s.a = 10
-            //generate: st s:offset(4) = 10;
-            MD t(*md);
-            ASSERT0(ir->getTypeSize(m_tm) > 0);
-            MD_ofst(&t) += (UINT)CONST_int_val(ofst);
-            MD_size(&t) = ir->getTypeSize(m_tm);
-            MD const* entry = m_mdsys->registerMD(t);
-            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-            md = entry; //regard MD with offset as return result.
-        } else {
-            //Offset is variable.
-            //e.g: vector<4xi32> v; v[i] = 34;
-            //will generate:
-            //    st $1 = ld v;
-            //    setelem $1 = 34, ld i;
-            //    st v = $1;
-
-            MD t(*md);
-            ASSERT0(ir->getTypeSize(m_tm) > 0);
-            MD_ty(&t) = MD_RANGE;
-            MD_ofst(&t) = 0;
-            MD_size(&t) = ir->getTypeSize(m_tm);
-            MD const* entry = m_mdsys->registerMD(t);
-            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-            md = entry; //regard MD with range as return result.
-        }
+    if (g_assign_mdref_with_the_offset_for_prop) {
+        md = tryReassignMDByOffsetForPartailPROp(md, ir);
     }
     ir->setMustRef(md, m_rg);
     ir->cleanRefMDSet();
@@ -168,7 +177,7 @@ MD const* MDMgr::genMDForPR(PRNO prno, Type const* type)
 MD const* MDMgr::allocStringMD(Sym const* string)
 {
     ASSERT0(string);
-    MD const* strmd = m_rm->genDedicateStrMD();
+    MD const* strmd = m_rm->getAndGenDedicateStrMD();
     if (strmd != nullptr) { return strmd; }
 
     Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
@@ -219,6 +228,18 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
     SWITCH_CASE_INDIRECT_MEM_OP:
     SWITCH_CASE_ARRAY_OP:
         break;
+    case IR_LDA: {
+        //Generate MD for LDA's base to provide overlapped MD when
+        //constructing MDSSA.
+        //e.g:ch3_localarraylargeimm.c
+        //starray:i32 (elemtype:i32)
+        //  --DEF:MD14V1,MD15V1
+        //  where MD15 is the MayRef, and describe the base var.
+        MD const* emd = m_rg->getMDMgr()->genMDForVar(
+            LDA_idinfo(x), LDA_ofst(x));
+        ASSERTN_DUMMYUSE(emd && emd->is_effect(), ("expect effect MD"));
+        break;
+    }
     default: ASSERTN(!x->isMemRef(), ("TODO:need to support"));
     }
 }

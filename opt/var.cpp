@@ -365,8 +365,8 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
 
 CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
-    xcom::StrBuf buf2(32);
-    xcom::StrBuf buf3(32);
+    xcom::DefFixedStrBuf buf2;
+    xcom::DefFixedStrBuf buf3;
     buf.strcat("var %s:%s", GRDump::compositeName(VAR_name(this), buf3),
         dm->dump_type(getType(), buf2));
     if (hasGRFlag() || get_align() > 1) {
@@ -497,6 +497,12 @@ Var * VarMgr::findVarByName(Sym const* name)
         }
     }
     return nullptr;
+}
+
+
+Var * VarMgr::findVarByName(CHAR const* name)
+{
+    return findVarByName(m_rm->addToSymbolTab(name));
 }
 
 

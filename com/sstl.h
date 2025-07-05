@@ -309,11 +309,59 @@ inline void swap(T ** pheader, T * t1, T * t2)
 }
 
 
-//The function replaces 'olds' node with 'news' node of the list that lead by
-//'pheader'.
+//The function replaces 'olds' node that is already in the list which
+//leaded by 'pheader' node with a list of node that leading by 'news'.
+//pheader: the header node of the list, it can be NULL if the list is empty.
+//news: a list of node, 'news' is the header of the list.
 //Note the function operates on dual-list.
 template <class T>
 inline void replace(T ** pheader, T * olds, T * news)
+{
+    if (pheader == nullptr || olds == nullptr) { return; }
+    if (olds == news) { return; }
+    if (news == nullptr) {
+        xcom::remove(pheader, olds);
+        return;
+    }
+
+    #ifdef _DEBUG_
+    bool find = false;
+    T * p = *pheader;
+    while (p != nullptr) {
+        if (p == olds) {
+            find = true;
+            break;
+        }
+        p = p->next;
+    }
+    ASSERTN(find, ("'olds' is not inside in the list of pheader"));
+    #endif
+    T * news_tail = news;
+    while (news_tail->next != nullptr) {
+        news_tail = news_tail->next;
+        ASSERTN(news_tail != news, ("find cycle in given list"));
+    }
+    news->prev = olds->prev;
+    news_tail->next = olds->next;
+    if (olds->prev != nullptr) {
+        olds->prev->next = news;
+    }
+    if (olds->next != nullptr) {
+        olds->next->prev = news_tail;
+    }
+    if (olds == *pheader) {
+        *pheader = news;
+    }
+    olds->next = olds->prev = nullptr;
+}
+
+
+//The function replaces 'olds' node that is already in the list which leaded
+//by 'pheader' node with one single element 'news' node.
+//pheader: the header node of the list, it can be NULL if the list is empty.
+//Note the function operates on dual-list.
+template <class T>
+inline void replace_one(T ** pheader, T * olds, T * news)
 {
     if (pheader == nullptr || olds == nullptr) { return; }
     if (olds == news) { return; }
@@ -392,7 +440,7 @@ inline T * removetail(T ** pheader)
 }
 
 
-//The function inserts one elem 't' before 'marker'.
+//The function inserts one single element 't' before 'marker'.
 //Note the function operates on dual-list.
 template <class T>
 inline void insertbefore_one(T ** head, T * marker, T * t)
@@ -577,7 +625,9 @@ public:
     void init()
     {
         prev = next = nullptr;
-        value = T(0); //The default value of container.
+
+        //Leave the initialization of value to the caller.
+        //value = T(0); //The default value of container.
     }
 
     T val() { return value; }
@@ -715,7 +765,7 @@ public:
     //Return the list node container of 't'.
     inline C<T> * append_tail(T t)
     {
-        C<T> * c = newc();
+        C<T> * c = newc_no_init();
         ASSERTN(c != nullptr, ("newc return nullptr"));
         C_val(c) = t;
         append_tail(c);
@@ -748,7 +798,7 @@ public:
         if (t == nullptr) { return; }
 
         if (m_head == nullptr) {
-            C<T> * c  = newc();
+            C<T> * c  = newc_no_init();
             ASSERT0(c);
             C_val(c) = C_val(t);
 
@@ -759,7 +809,7 @@ public:
         }
 
         for (; t != nullptr; t = C_next(t)) {
-            C<T> * c  = newc();
+            C<T> * c  = newc_no_init();
             ASSERT0(c);
             C_val(c) = C_val(t);
             C_prev(c) = m_tail;
@@ -774,7 +824,7 @@ public:
     //Return the list node container of 't'.
     inline C<T> * append_head(T t)
     {
-        C<T> * c  = newc();
+        C<T> * c = newc_no_init();
         ASSERTN(c, ("newc return nullptr"));
         C_val(c) = t;
         append_head(c);
@@ -808,7 +858,7 @@ public:
         if (t == nullptr) { return; }
 
         if (m_head == nullptr) {
-            C<T> * c  = newc();
+            C<T> * c = newc_no_init();
             ASSERT0(c);
             C_val(c) = C_val(t);
             ASSERTN(m_tail == nullptr, ("tail should be nullptr"));
@@ -818,7 +868,7 @@ public:
         }
 
         for (; t != nullptr; t = C_prev(t)) {
-            C<T> * c  = newc();
+            C<T> * c = newc_no_init();
             ASSERT0(c);
             C_val(c) = C_val(t);
             C_next(c) = m_head;
@@ -1193,8 +1243,7 @@ public:
         if (m_head == nullptr || marker == C_val(m_head)) {
             return append_head(t);
         }
-
-        C<T> * c = newc();
+        C<T> * c = newc_no_init();
         ASSERT0(c);
         C_val(c) = t;
 
@@ -1256,7 +1305,7 @@ public:
     //Return the list node container of 't'.
     inline C<T> * insert_before(T t, IN C<T> * marker)
     {
-        C<T> * c = newc();
+        C<T> * c = newc_no_init();
         ASSERTN(c, ("newc return nullptr"));
         C_val(c) = t;
         insert_before(c, marker);
@@ -1352,7 +1401,7 @@ public:
             return m_tail;
         }
         ASSERTN(m_head != nullptr, ("Tail is non empty, but head is nullptr!"));
-        C<T> * c = newc();
+        C<T> * c = newc_no_init();
         ASSERTN(c != nullptr, ("newc return nullptr"));
         C_val(c) = t;
         if (marker == m_head->val()) {
@@ -1410,7 +1459,7 @@ public:
     //Return the list node container of 't'.
     inline C<T> * insert_after(T t, IN C<T> * marker)
     {
-        C<T> * c = newc();
+        C<T> * c = newc_no_init();
         ASSERTN(c != nullptr, ("newc return nullptr"));
         C_val(c) = t;
         insert_after(c, marker);
@@ -1551,6 +1600,17 @@ public:
         src.m_head = nullptr;
         src.m_tail = nullptr;
         src.m_elem_count = 0;
+    }
+
+    //To avoid unnecessary initialization.
+    inline C<T> * newc_no_init()
+    {
+        //allocator<T> p;
+        C<T> * c = m_free_list.get_free_elem();
+        if (c == nullptr) {
+            return new (&pool) C<T>();
+        }
+        return c;
     }
 
     inline C<T> * newc()
@@ -2894,9 +2954,12 @@ template <class T> class Vector {
 protected:
     typedef UINT ElemNumTy;
     bool m_is_init; //To make sure functions are idempotent.
-    ElemNumTy m_elem_num; //The number of element in vector.
-    VecIdx m_last_idx; //Last element index.
+
+    //The total number of elements that the vector can store.
+    ElemNumTy m_elem_num;
+    VecIdx m_last_idx; //The last element index.
     T * m_vec;
+    static UINT const GrowSize = 8;
 public:
     Vector()
     {
@@ -2918,34 +2981,66 @@ public:
     Vector const& operator = (Vector const&); //DISALBE COPY-CONSTRUCTOR.
     ~Vector() { destroy(); }
 
+    //Append an element into current vector.
+    //t: the element to be appended.
+    //NOTE: the function will grow vector if necessary.
     void append(T t)
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
         set(get_elem_count(), t);
     }
 
-    //Append a buffer of elements to the vector.
+    //Append a vector of T into current vector.
+    //src: the source vector of T.
+    //NOTE: the function will grow vector and copy the content of 'src', and
+    //then append them into current vector.
+    void append(Vector<T> const& src)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(src.is_init(), ("VECTOR not yet initialized."));
+        if (src.get_elem_count() == 0) { return; }
+        UINT org_elem_num = get_elem_count();
+
+        //Ensure the vector has enough space to accommodate the new elements.
+        UINT exp_cap = org_elem_num + src.get_elem_count() + GrowSize;
+        if (exp_cap > get_capacity()) {
+            grow(exp_cap);
+        }
+
+        //Copy the elements from the src to the vector.
+        ::memcpy(m_vec + org_elem_num, src.m_vec,
+                 src.get_elem_count() * sizeof(T));
+        m_last_idx += src.get_elem_count();
+    }
+
+    //Append an array of T into current vector.
     //This function adds a continuous buffer of elements
     //to the end of the vector,ensuring that there is
     //enough space to accommodate the new elements.
     //Example:
     //If the vector currently holds 50 UINT elements, appending a buffer of
     //100 UINT elements will increase the total element count to 150.
-    //@param buf The buffer of elements to append.
-    //@param len The number of elements in the buffer.
-    void append(T const* buf, UINT len)
+    //array: the start address of T array.
+    //arrayelemnum: the number of elements in 'array'.
+    //NOTE: the function will grow vector and copy the content of 'src', and
+    //then append them into current vector.
+    void append(T const* array, UINT arrayelemnum)
     {
-        //If the passed length is 0, return immediately without any operation.
-        if (len == 0) { return; }
-        ASSERT0(buf != nullptr);
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        UINT old_element = get_elem_count();
+        //If the passed length is 0, return immediately without any operation.
+        if (arrayelemnum == 0) { return; }
+        ASSERT0(array != nullptr);
+        UINT org_elem_num = get_elem_count();
 
         //Ensure the vector has enough space to accommodate the new elements.
-        set(old_element + len - 1, T());
+        UINT exp_cap = org_elem_num + arrayelemnum + GrowSize;
+        if (exp_cap > get_capacity()) {
+            grow(org_elem_num + arrayelemnum + GrowSize);
+    }
 
         //Copy the elements from the buffer to the vector.
-        ::memcpy(m_vec + old_element, buf, len * sizeof(T));
+        ::memcpy(m_vec + org_elem_num, array, arrayelemnum * sizeof(T));
+        m_last_idx += arrayelemnum;
     }
 
     //Copy each elements of 'list' into vector.
@@ -2999,7 +3094,7 @@ public:
         if (m_last_idx == VEC_UNDEF) {
             return;
         }
-        ASSERT0(idx < (VecIdx)get_elem_count());
+        ASSERT0((idx >= 0) && (idx < (VecIdx)get_elem_count()));
         ::memset((void*)&m_vec[idx], 0, sizeof(T) * (get_elem_count() - idx));
         m_last_idx = idx == 0 ? VEC_UNDEF : idx - 1;
     }
@@ -4833,6 +4928,10 @@ public:
         if (mapped != nullptr) { *mapped = x->mapped; }
         return x->key;
     }
+
+    //Return the GenMapped object.
+    //Usually, user get the object to initialize class members.
+    GenMapped & getGenMapped() { return m_gm; }
 };
 //END RBTNode
 
@@ -4952,8 +5051,10 @@ public:
     //      }
     //  After:
     //      mapped = TMap.getAndGen(t, f);
-    Ttgt getAndGen(Tsrc t, bool * f = nullptr)
+    //f: Set f to true if t is already be mapped.
+    Ttgt getAndGen(Tsrc t, bool * f)
     {
+        ASSERT0(f);
         RBTNType * z = BaseType::insert(t, f);
         ASSERT0(z);
         if (*f) {
@@ -5293,11 +5394,31 @@ public:
 //TMap Iterator based on Double Linked List.
 //The class is used to iterate elements in TMap.
 //You should call clean() to initialize the iterator.
-template <class Tsrc, class Ttgt, class MAP_Tsrc2Ttgt, class MAP_Ttgt2Tsrc>
-class DMapIter : public List<RBTNode<Tsrc, Ttgt>*> {
+template <class Tsrc, class Ttgt, class Tsrc2Ttgt, class Ttgt2Tsrc>
+class DMapIter {
     COPY_CONSTRUCTOR(DMapIter);
+protected:
+    TMapIter<Tsrc, Ttgt> m_src2tgt_iter;
+    TMapIter<Ttgt, Tsrc> m_tgt2src_iter;
 public:
     DMapIter() {}
+    void clean()
+    {
+        m_src2tgt_iter.clean();
+        m_tgt2src_iter.clean();
+    }
+
+    //Return true if the iteration is at the end.
+    bool end() const { return m_src2tgt_iter.get_elem_count() == 0; }
+
+    //Return true if the inverse-iteration is at the end.
+    bool endi() const { return m_tgt2src_iter.get_elem_count() == 0; }
+
+    //Get the key-value map.
+    TMapIter<Tsrc, Ttgt> & getSrc2TgtIter() { return m_src2tgt_iter; }
+
+    //Get the inverse value-key map.
+    TMapIter<Ttgt, Tsrc> & getTgt2SrcIter() { return m_tgt2src_iter; }
 };
 
 
@@ -5328,19 +5449,61 @@ public:
     DMap() {}
     ~DMap() {}
 
-    //Alway overlap the old value by new 'mapped' value.
-    void setAlways(Tsrc t, Ttgt mapped)
-    {
-        if (t == Tsrc(0)) { return; }
-        m_src2tgt_map.setAlways(t, mapped);
-        m_tgt2src_map.setAlways(mapped, t);
-    }
     //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t count = m_src2tgt_map.count_mem();
         count += m_tgt2src_map.count_mem();
         return count;
+    }
+
+    //Get mapped pointer of 't'
+    Ttgt get(Tsrc t) { return m_src2tgt_map.get(t); }
+
+    //Inverse mapping
+    Tsrc geti(Ttgt t) { return m_tgt2src_map.get(t); }
+
+    //Get the number of 'src' that is also the number of <key,value>.
+    UINT get_elem_count() const { return m_src2tgt_map.get_elem_count(); }
+
+    //Return the map bewteen src to tgt.
+    Tsrc2Ttgt & getSrc2Tgt() { return m_src2tgt_map; }
+
+    //Return the inverse-map bewteen tgt to src.
+    Ttgt2Tsrc & getTgt2Src() { return m_tgt2src_map; }
+
+    //The function only get the first key-value and mapped object.
+    Tsrc get_first(DMapIter<Tsrc, Ttgt, Tsrc2Ttgt, Ttgt2Tsrc> & iter,
+                   Ttgt * mapped = nullptr) const
+    { return m_src2tgt_map.get_first(iter.getSrc2TgtIter(), mapped); }
+
+    Tsrc get_next(DMapIter<Tsrc, Ttgt, Tsrc2Ttgt, Ttgt2Tsrc> & iter,
+                  Ttgt * mapped = nullptr) const
+    { return m_src2tgt_map.get_next(iter.getSrc2TgtIter(), mapped); }
+
+    //The function only get the first value-key and src object.
+    Ttgt geti_first(DMapIter<Tsrc, Ttgt, Tsrc2Ttgt, Ttgt2Tsrc> & iter,
+                    Tsrc * src = nullptr) const
+    { return m_tgt2src_map.get_first(iter.getTgt2SrcIter(), src); }
+
+    Ttgt geti_next(DMapIter<Tsrc, Ttgt, Tsrc2Ttgt, Ttgt2Tsrc> & iter,
+                   Tsrc * src = nullptr) const
+    { return m_tgt2src_map.get_next(iter.getTgt2SrcIter(), src); }
+
+    //Find if the dual-map includes 't'.
+    bool find(Tsrc key) const
+    {
+        bool f;
+        m_src2tgt_map.get(key, &f);
+        return f;
+    }
+
+    //Inverse finding if the dual-map has mapped 'mapped_obj'.
+    bool findi(Ttgt mapped_obj) const
+    {
+        bool f;
+        m_tgt2src_map.get(mapped_obj, &f);
+        return f;
     }
 
     //Establishing mapping in between 't' and 'mapped'.
@@ -5351,11 +5514,13 @@ public:
         m_tgt2src_map.set(mapped, t);
     }
 
-    //Get mapped pointer of 't'
-    Ttgt get(Tsrc t) { return m_src2tgt_map.get(t); }
-
-    //Inverse mapping
-    Tsrc geti(Ttgt t) { return m_tgt2src_map.get(t); }
+    //Establishing mapping in between 't' and 'mapped'.
+    void setAlways(Tsrc t, Ttgt mapped)
+    {
+        if (t == Tsrc(0)) { return; }
+        m_src2tgt_map.setAlways(t, mapped);
+        m_tgt2src_map.setAlways(mapped, t);
+    }
 };
 //END DMap
 

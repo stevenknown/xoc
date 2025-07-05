@@ -35,19 +35,63 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-GRReader::GRReader(RegionMgr * rumgr)
+GRReader::GRReader(RegionMgr * rm)
 {
-    m_rumgr = rumgr;
-    m_lexer = new Lexer();
-    m_parser = new IRParser(rumgr);
-    m_parser->setLexer(m_lexer);
+    m_rm = rm;
+    m_lexer = nullptr;
+    m_parser = nullptr;
 }
 
 
 GRReader::~GRReader()
 {
+    destroy();
+}
+
+
+void GRReader::destroy()
+{
+    if (m_lexer == nullptr) { return; }
+    ASSERT0(m_parser != nullptr);
     delete m_lexer;
     delete m_parser;
+}
+
+
+void GRReader::dump() const
+{
+    if (!getRegionMgr()->isLogMgrInit()) { return; }
+    if (m_lexer != nullptr) {
+        m_lexer->dump(getRegionMgr()->getLogMgr()->getFileHandler());
+    }
+    if (m_parser != nullptr) {
+        m_parser->dump();
+    }
+}
+
+
+Lexer * GRReader::allocLexer()
+{
+    return new Lexer();
+}
+
+
+IRParser * GRReader::allocParser()
+{
+    ASSERT0(m_rm);
+    return new IRParser(m_rm);
+}
+
+
+void GRReader::initLexerAndParser()
+{
+    if (m_lexer != nullptr) { return; }
+    ASSERT0(m_parser == nullptr);
+    m_lexer = allocLexer();
+    m_parser = allocParser();
+    ASSERT0(m_lexer && m_parser);
+    m_parser->initMap();
+    m_parser->setLexer(m_lexer);
 }
 
 
@@ -64,24 +108,26 @@ bool GRReader::parse()
 }
 
 
-//Read IR from gr file.
-//Return true if no error find.
-bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
+bool readGRAndConstructRegion(MOD GRReader * reader, CHAR const* grfile)
 {
     START_TIMER(t, "readGRAndConstructRegion");
-    GRReader reader(rumgr);
-
-    //START_TIMER(t, "lexer dump");
-    //reader.getLexer()->dump(grfile, nullptr);
-    //END_TIMER(t, "lexer dump");
-    FO_STATUS st;
+    ASSERT0(reader);
+    reader->initLexerAndParser();
+    xcom::FO_STATUS st;
     xcom::FileObj fo(grfile, false, true, &st);
-    if (st != FO_SUCC) { return false; }
+    if (st != xcom::FO_SUCC) { return false; }
     ASSERT0(fo.getFileHandler());
-    reader.setSrcFile(fo.getFileHandler());
-    bool succ = reader.parse();
+    reader->setSrcFile(fo.getFileHandler());
+    bool succ = reader->parse();
     END_TIMER(t, "readGRAndConstructRegion");
     return succ;
+}
+
+
+bool readGRAndConstructRegion(RegionMgr * rm, CHAR const* grfile)
+{
+    GRReader reader(rm);
+    return readGRAndConstructRegion(&reader, grfile);
 }
 
 } //namespace xoc

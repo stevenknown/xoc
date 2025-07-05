@@ -810,7 +810,6 @@ BYTE const g_last_one[256] = {
   7, //255
 };
 
-
 BSIdx ByteOp::get_first_idx(BYTE const* ptr, UINT bytesize)
 {
     for (UINT i = 0; i < bytesize; i++) {

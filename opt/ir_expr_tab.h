@@ -36,28 +36,49 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define EXPR_id(i) ((i)->id)
-#define EXPR_ir(i) ((i)->ir)
+#define EXPR_UNDEF 0
+
+#define EXPR_id(i) ((i)->m_id)
+#define EXPR_ir(i) ((i)->m_ir)
 #define EXPR_next(i) ((i)->next)
 #define EXPR_prev(i) ((i)->prev)
-#define EXPR_occ_list(i) ((i)->occ_list)
+#define EXPR_occ_list(i) ((i)->m_occ_list)
 class ExprRep {
     COPY_CONSTRUCTOR(ExprRep);
 public:
-    UINT id;
-    IR * ir;
     ExprRep * next;
     ExprRep * prev;
-    IREList occ_list;
+    UINT m_id;
+    IR * m_ir;
+    IREList m_occ_list;
 public:
-    ExprRep() { id = 0; next = prev = nullptr; }
+    ExprRep()
+    {
+        next = nullptr;
+        prev = nullptr;
+        m_id = EXPR_UNDEF;
+        m_ir = nullptr;
+    }
+
     void clean();
+
     void dump(Region const* rg) const;
-    IREList & getOccList() { return occ_list; }
+
+    IREList & getOccList() { return m_occ_list; }
+    ExprRep * get_next() const { return next; }
+    ExprRep * get_prev() const { return prev; }
+    IR const* getIR() const { return m_ir; }
+
+    UINT id() const { return m_id; }
 };
 
 
 typedef BSVec<ExprRep*> ExprRepVec;
+
+class ECCtx {
+public:
+    ConstIRIter it;
+};
 
 //IR Expression Table, scanning statement to
 //evaluate the hash value of expression.
@@ -77,32 +98,32 @@ protected:
     ExprRepVec m_ir_expr_vec;
     //Record allocated object. used by destructor.
     SList<ExprRep*> m_ir_expr_lst;
-    ConstIRIter m_iter; //for tmp use.
     Vector<ExprRep*> m_map_ir2exprep;
     ExprRep ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
 protected:
     ExprRep * allocExprRep();
     void cleanHashTab();
-    HOST_UINT compute_hash_key(IR const* ir) const;
+    void cleanExprRep(ExprRep const* ie)
+    { m_ir_expr_vec.remove(ie->id(), nullptr); }
+    HOST_UINT computeHashKey(IR const* ir) const;
+    HOST_UINT computeHashKeyForTree(IR const* ir, MOD ECCtx & ctx) const;
 
-    //Note m_iter may changed.
-    HOST_UINT compute_hash_key_for_tree(IR const* ir);
-
-    void encodeAllKids(IR const* ir);
-    ExprRep * encodeBaseOfIST(IR * ir)
+    void encodeAllKids(IR const* ir, MOD ECCtx & ctx);
+    ExprRep * encodeBaseOfIST(IR * ir, MOD ECCtx & ctx)
     {
-        ASSERT0(ir->getParent()->is_ist());
+        ASSERT0(ir->getParent()->is_ist() || ir->getParent()->is_vist());
         if (ir->is_array()) { return nullptr; }
-        return encodeExp(ir);
+        return encodeExp(ir, ctx);
     }
-    virtual ExprRep * encodeExtExp(IR * ir);
-    virtual void encodeExtStmt(IR const* ir);
+    virtual ExprRep * encodeExtExp(IR const* ir, MOD ECCtx & ctx);
+    virtual void encodeExtStmt(IR const* ir, MOD ECCtx & ctx);
 
     IRMgr * getIRMgr() const { return m_irmgr; }
 
     void reset();
+    void recordExprRep(ExprRep * e) { m_ir_expr_vec.set(e->id(), e); }
 
-    void * xmalloc(INT size);
+    void * xmalloc(INT size) const;
 public:
     explicit ExprTab(Region * rg);
     virtual ~ExprTab();
@@ -110,27 +131,27 @@ public:
     //Append IR tree expression into HASH table and return the entry-info.
     //If 'ir' has already been inserted in the table with an ExprRep,
     //get that and return.
-    ExprRep * appendExp(IR * ir);
+    ExprRep * appendExp(IR const* ir, MOD ECCtx & ctx);
 
     size_t count_mem() const;
 
     bool dump() const;
 
-    ExprRep * encodeExp(IR * ir);
-    void encodeStmt(IR const* ir);
+    ExprRep * encodeExp(IR const* ir, MOD ECCtx & ctx);
+    void encodeStmt(IR const* ir, MOD ECCtx & ctx);
 
     //Encode expression for single BB.
     //Scan IR statement literally, and encoding it for generating
     //the unique id for each individual expressions, and update
     //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
-    void encodeBB(IRBB const* bb);
+    void encodeBB(IRBB const* bb, MOD ECCtx & ctx);
 
     //Return entry-info if expression has been entered into HASH table,
     //otherwise return nullptr.
-    ExprRep * findExp(IR * ir);
+    ExprRep * findExp(IR const* ir, MOD ECCtx & ctx) const;
 
-    //Return ExprRep by given id.
-    ExprRep * getExp(UINT id) const { return m_ir_expr_vec.get(id); }
+    //Return ExprRep by given an ExprRep's id.
+    ExprRep const* getExprRep(UINT id) const { return m_ir_expr_vec.get(id); }
     ExprRepVec & getExpVec() { return m_ir_expr_vec; }
 
     //If 'ir' has been inserted in the table with an ExprRep,
@@ -145,9 +166,10 @@ public:
 
     //Remove IR tree expression out of HASH table and return the removed
     //entry-info if it was existed.
-    ExprRep * removeExp(IR * ir);
+    ExprRep * removeExp(IR const* ir, MOD ECCtx & ctx);
 
-    void setMapIR2ExprRep(IR const* ir, ExprRep * ie);
+    //NOTE: ie's content, such as occ_list, might be modified by other pass.
+    void setMapIR2ExprRep(IR const* ir, MOD ExprRep * ie);
 
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
     virtual CHAR const* getPassName() const { return "Expr Table"; }

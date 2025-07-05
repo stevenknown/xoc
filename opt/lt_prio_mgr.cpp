@@ -66,8 +66,10 @@ double LTPriorityMgr::computePriority(LifeTime const* lt) const
         }
         prio += tprio;
     }
-    ASSERTN(prio != 0.0, ("empty lt, consider split it in entry and exit"));
-    if (lt->isDedicated()) {
+    //CASE:Since we use the 2D lifetime, some lifetime of caller regs don't have
+    //any occ, so it is reasonable that the prio is zero.
+    //ASSERTN(prio != 0.0, ("empty lt, consider split it in entry and exit"));
+    if (lt->isPreAssigned()) {
         prio += count * 10;
     }
     return prio;

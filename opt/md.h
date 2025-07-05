@@ -799,6 +799,7 @@ public:
         return isLocalDelegate(mdid) || mdid == MD_GLOBAL_VAR ||
                mdid == MD_IMPORT_VAR;
     }
+    static bool isDelegate(MD const* md) { return isDelegate(md->id()); }
 
     MD const* readMD(MDIdx id) const
     {

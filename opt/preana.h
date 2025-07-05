@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class BBList;
+
 //This class represents the preprocessing and analysis before performing
 //optimizations.
 class PreAnaBeforeOpt : public Pass {
@@ -42,21 +44,16 @@ protected:
     MDSystem * m_mdsys;
     VarMgr * m_vm;
 protected:
+    void clean() const;
     bool scanCallStmt(IR const* ir);
+    bool scanCase(IR const* ir);
     bool scanLDA(IR const* ir);
     bool scanID(IR const* ir);
     bool scanReturn(IR const* ir);
     bool scanExtOp(IR const* ir);
     bool scanKid(IR const* ir);
 public:
-    explicit PreAnaBeforeOpt(Region * rg) : Pass(rg), m_rg(rg)
-    {
-        ASSERT0(m_rg != nullptr);
-        m_rm = m_rg->getRegionMgr();
-        m_tm = m_rg->getTypeMgr();
-        m_mdsys = m_rg->getMDSystem();
-        m_vm = m_rg->getVarMgr();
-    }
+    explicit PreAnaBeforeOpt(Region * rg);
     virtual ~PreAnaBeforeOpt() {}
 
     virtual bool dump() const;

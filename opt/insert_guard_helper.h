@@ -111,7 +111,8 @@ private:
         IR * init_stmt = exp->getStmt();
         ASSERT0(init_stmt);
         IRBB * bb = init_stmt->getBB();
-        xoc::findAndSetLiveInDef(exp, bb->getPrevIR(init_stmt), bb, m_rg, oc);
+        xoc::findAndSetLiveInDefForTree(
+            exp, bb->getPrevIR(init_stmt), bb, m_rg, oc);
     }
 
     void updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,

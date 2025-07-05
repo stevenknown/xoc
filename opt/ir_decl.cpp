@@ -31,13 +31,21 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 //
+//START CSetElem
+//
+static BYTE g_csetelem_vbuf[4] = {0x6};
+IRKidMap const CSetElem::kid_map(g_csetelem_vbuf, sizeof(g_csetelem_vbuf));
+//END CSetElem
+
+
+//
 //START CLd
 //
 IR * CLd::dupIRTreeByStmt(IR const* src, Region const* rg)
 {
     ASSERT0(src->is_st());
-    IR * ld = rg->getIRMgr()->buildLoad(ST_idinfo(src), src->getOffset(),
-                                        src->getType());
+    IR * ld = rg->getIRMgr()->buildLoad(
+        ST_idinfo(src), src->getOffset(), src->getType());
     ld->copyRef(src, rg);
     return ld;
 }
@@ -135,6 +143,9 @@ IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 //
 //START CISt
 //
+static BYTE g_cist_vbuf[2] = {0x3};
+IRKidMap const CISt::kid_map(g_cist_vbuf, sizeof(g_cist_vbuf));
+
 IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
 {
     ASSERT0(src->is_ild());
@@ -306,6 +317,40 @@ void CCall::addDummyUse(Region const* rg)
         rg->getIRMgr()->buildImmAny(0), rg->getTypeMgr()->getAny());
     IR_parent(newdummyuse) = this;
     xcom::insertbefore(&CALL_dummyuse(this), CALL_dummyuse(this), newdummyuse);
+}
+
+
+class VFCompareEQ {
+public:
+    bool find;
+    IR const* compared_ir;
+public:
+    VFCompareEQ() { find = false; }
+    bool visitIR(IR const* ir, OUT bool & is_terminate)
+    {
+        if (ir == compared_ir) {
+            //Visiting will terminated immedately.
+            find = true;
+            is_terminate = true;
+            return false;
+        }
+        //Keep visiting the kid and sibling.
+        return true;
+    }
+};
+
+bool CCall::isDummyUse(IR const* exp) const
+{
+    class IterTree : public VisitIRTree<VFCompareEQ> {
+    public:
+        IterTree(VFCompareEQ & vf) : VisitIRTree(vf) {}
+    };
+    ASSERT0(exp && exp->is_exp());
+    VFCompareEQ vf;
+    vf.compared_ir = exp;
+    IterTree it(vf);
+    it.visit(getDummyUse());
+    return vf.find;
 }
 //END CCall
 

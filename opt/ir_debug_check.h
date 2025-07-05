@@ -26,22 +26,29 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#define CASTCONST(ptr) (const_cast<IR*>(static_cast<IR const*>(ptr)))
-#ifdef _DEBUG_
+#ifndef _IR_DEBUG_CHECK_H_
+#define _IR_DEBUG_CHECK_H_
+
+namespace xoc {
+
 class IR;
+
+#define CASTCONST(ptr) (const_cast<IR*>(static_cast<IR const*>(ptr)))
+
+#ifdef _DEBUG_
 INT checkKidNumValid(IR const* ir, UINT n, CHAR const* file, INT lineno);
 INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
-                           INT line);
-INT checkKidNumValidTernary(IR const* ir, UINT n, CHAR const* filename,
-                            INT line);
-INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
-                           INT line);
+INT checkKidNumValidBranch(
+    IR const* ir, UINT n, CHAR const* filename, INT line);
+INT checkKidNumValidTernary(
+    IR const* ir, UINT n, CHAR const* filename, INT line);
+INT checkKidNumValidBinary(
+    IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumIRCode(IR const* ir, UINT n, IR_CODE irc, CHAR const* filename,
-                      INT line);
+INT checkKidNumIRCode(
+    IR const* ir, UINT n, IR_CODE irc, CHAR const* filename, INT line);
 
 //These functions check the consistency of the IR code and misellaneous
 //attributes which corresponding the code.
@@ -55,6 +62,8 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 #endif
 
 #ifdef _DEBUG_
+
+//These macros define check-functions of IR in debug mode.
 #define CK_KID_NUM(ir, n, f, l) (checkKidNumValid(ir, n, f, l))
 #define CK_KID_NUM_IRC(ir, n, irc, f, l) \
     (checkKidNumIRCode(ir, n, irc, f, l))
@@ -72,7 +81,10 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 #define CK_IRC_ONLY_CALL(ir) (checkIRCOnlyCall(CASTCONST(ir)))
 #define CK_IRC_ONLY_ICALL(ir) (checkIRCOnlyICall(CASTCONST(ir)))
 #define CK_ARRAY_DIM(ir, n) (checkArrayDimension(CASTCONST(ir), n))
+
 #else
+
+//These macros undefine check-functions of IR in release mode.
 #define CK_KID_NUM(ir, n, f, l) (n)
 #define CK_KID_NUM_IRC(ir, n, irc, f, l) (n)
 #define CK_KID_NUM_UNA(ir, n, f, l) (n)
@@ -89,6 +101,7 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 #define CK_IRC_ONLY_CALL(ir) (CASTCONST(ir))
 #define CK_IRC_ONLY_ICALL(ir) (CASTCONST(ir))
 #define CK_ARRAY_DIM(ir, n) (n)
+
 #endif
 
 #define CK_KID_IRC(ir, irc, n) CK_KID_NUM_IRC(ir, n, irc, __FILE__, __LINE__)
@@ -111,3 +124,7 @@ UINT checkArrayDimension(IR const* ir, UINT n);
 
 #define CK_FLD_KIND(ir, CLASS, FUNC, FIELD) \
     ((static_cast<CLASS*>FUNC(ir))->FIELD)
+
+} //namespace xoc
+
+#endif

@@ -71,6 +71,7 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
     if (m_pool != nullptr) { return; }
     m_u2.s1b1 = 0;
     m_var = nullptr;
+    m_formal_param_list = nullptr;
     m_pool = smpoolCreate(64, MEM_COMM);
     REGION_type(this) = rt;
     REGION_blackbox_data(this) = nullptr;
@@ -113,6 +114,7 @@ void Region::destroy()
     smpoolDelete(m_pool);
     m_pool = nullptr;
     m_var = nullptr;
+    cleanFormalParamList();
     m_rg_var_tab.destroy();
 }
 
@@ -215,17 +217,6 @@ BBListIter Region::splitIRlistIntoBB(IN IR * irs, OUT BBList * bbl,
         BB_irlist(newbb).append_tail(ir);
     }
     return ctbb;
-}
-
-
-//Register global variable located in program region.
-void Region::registerGlobalVAR()
-{
-    MD const * common_string_var_md = getRegionMgr()->genDedicateStrMD();
-    if (common_string_var_md != nullptr) {
-        ASSERT0(is_program());
-        addToVarTab(common_string_var_md->get_base());
-    }
 }
 
 
@@ -358,7 +349,7 @@ void Region::constructBBList()
 {
     if (getIRList() == nullptr) { return; }
     START_TIMER(t, "Construct IRBB list");
-    ASSERTN(getBBList()->get_elem_count() == 0, ("BB list is not empty"));
+    ASSERTN(getBBList()->is_empty(), ("BB list is not empty"));
     IRBB * cur_bb = nullptr;
     IR * pointer = getIRList();
     while (pointer != nullptr) {
@@ -496,7 +487,7 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
 
     //Create a new PR Var.
     CHAR name[128];
-    ::sprintf(name, "%s%u", VarFlagDesc::getName(VAR_IS_PR), prno);
+    ::sprintf(name, "%s%lu", VarFlagDesc::getName(VAR_IS_PR), prno);
     ASSERT0(::strlen(name) < sizeof(name));
     pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL|VAR_IS_PR);
     setMapPRNO2Var(prno, pr_var);
@@ -655,6 +646,38 @@ Var * Region::findVarViaSymbol(Sym const* sym) const
     return nullptr;
 }
 
+//This function iterates over the Var table of the current region to find all
+//Vars that are formal parameters and records them in the formal parameter list.
+//in_decl_order: if it is true, this function will sort the formal
+//parameters in the Left to Right order according to their declaration.
+ConstVarList const* Region::refindAndRecordFormalParamList(bool in_decl_order)
+{
+    cleanFormalParamList();
+    return findAndRecordFormalParamList(in_decl_order);
+}
+
+
+//Find the formal parameter list. If it has already been recorded, return it
+//directly. Otherwise, iterate the Var table of the current region to find
+//all Vars that are formal parameters.
+ConstVarList const* Region::findAndRecordFormalParamList(bool in_decl_order)
+{
+    if (m_formal_param_list != nullptr) {
+        //Refind if in_decl_order is true and the parameter list is not sorted.
+        if (in_decl_order && !m_formal_param_list->isInDeclOrder()) {
+            return refindAndRecordFormalParamList(in_decl_order);
+        }
+        return m_formal_param_list;
+    }
+
+    m_formal_param_list = new ConstParamVarList();
+
+    findFormalParam(*m_formal_param_list, in_decl_order);
+    m_formal_param_list->setInDeclOrder(in_decl_order);
+
+    return m_formal_param_list;
+}
+
 
 //This function iterate Var table of current region to
 //find all Var which are formal parameter.
@@ -700,13 +723,17 @@ void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
 
 
 //This function find the formal parameter variable by given position.
-Var const* Region::findFormalParam(UINT position) const
+Var const* Region::findFormalParam(UINT position)
 {
-    VarTabIter c;
-    VarTab * vt = const_cast<Region*>(this)->getVarTab();
-    ASSERT0(vt);
-    for (Var const* v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
-        if (v->is_formal_param() && v->getFormalParamPos() == position) {
+    if (m_formal_param_list == nullptr) {
+        findAndRecordFormalParamList(false);
+    }
+    ASSERT0(m_formal_param_list != nullptr);
+
+    ConstVarListIter it;
+    for (Var const* v = m_formal_param_list->get_head(&it); v != nullptr;
+         v = m_formal_param_list->get_next(&it)) {
+        if (v->getFormalParamPos() == position) {
             return v;
         }
     }
@@ -745,7 +772,13 @@ void Region::dumpIRList(UINT dumpflag) const
 }
 
 
-//filename: dump BB list into given filename.
+void Region::dumpIRList(CHAR const* filename, bool dump_inner_region) const
+{
+    if (getIRList() == nullptr) { return; }
+    xoc::dumpIRList(filename, getIRList(), this, dump_inner_region, nullptr);
+}
+
+
 void Region::dumpBBList(CHAR const* filename, bool dump_inner_region) const
 {
     if (getBBList() == nullptr) { return; }
@@ -1016,6 +1049,22 @@ void Region::dumpParameter() const
 }
 
 
+void Region::dumpRegionMayRef() const
+{
+    //Dump imported variables referenced.
+    MDSet * maydef = getMayDef();
+    if (maydef != nullptr) {
+        note(this, "\nRegionMayDef(OuterRegion):");
+        maydef->dump(getMDSystem(), getVarMgr(), true);
+    }
+    MDSet * mayuse = getMayUse();
+    if (mayuse != nullptr) {
+        note(this, "\nRegionMayUse(OuterRegion):");
+        mayuse->dump(getMDSystem(), getVarMgr(), true);
+    }
+}
+
+
 void Region::dump(bool dump_inner_region) const
 {
     if (!isLogMgrInit()) { return; }
@@ -1025,24 +1074,9 @@ void Region::dump(bool dump_inner_region) const
     } else {
         note(this, "\n==---- DUMP REGION(%d): ----==", id());
     }
-
     dumpVARInRegion();
-
-    //Dump imported variables referenced.
-    MDSet * ru_maydef = getMayDef();
-    if (ru_maydef != nullptr) {
-        note(this, "\nRegionMayDef(OuterRegion):");
-        ru_maydef->dump(getMDSystem(), getVarMgr(), true);
-    }
-
-    MDSet * ru_mayuse = getMayUse();
-    if (ru_mayuse != nullptr) {
-        note(this, "\nRegionMayUse(OuterRegion):");
-        ru_mayuse->dump(getMDSystem(), getVarMgr(), true);
-    }
-
+    dumpRegionMayRef();
     if (is_blackbox()) { return; }
-
     IR * irlst = getIRList();
     if (irlst != nullptr) {
         note(this, "\n==---- IR List ----==");
@@ -1496,9 +1530,8 @@ void Region::updateCallAndReturnList(bool scan_inner_region)
 
 bool Region::processBBList(OptCtx & oc)
 {
-    if (getBBList() == nullptr || getBBList()->get_elem_count() == 0) {
-        return true;
-    }
+    ASSERT0(getBBList());
+    if (getBBList()->is_empty()) { return true; }
     PreAnaBeforeOpt preana(this);
     preana.perform(oc);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
@@ -1542,11 +1575,12 @@ bool Region::processIRList(OptCtx & oc)
         dumpIRList();
         getLogMgr()->decIndent(2);
     }
-
     if (!HighProcess(oc)) { return false; }
 
-    //PRSSA destruct classic DU chain.
-    ASSERT0(verifyMDDUChain(this, oc));
+    //PRSSA has destructed classic DU chain.
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(this, oc));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    ASSERT0L3(verifyClassicDUChain(this, oc));
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref and DU chain.
         ASSERT0(getDUMgr() && getDUMgr()->verifyMDRef());
@@ -1689,7 +1723,7 @@ bool Region::process(OptCtx * oc)
 {
     ASSERTN(oc, ("Need OptCtx"));
     ASSERT0(verifyIROwnership());
-    if (getIRList() == nullptr && getBBList()->get_elem_count() == 0) {
+    if (getIRList() == nullptr && getBBList()->is_empty()) {
         return true;
     }
     initPassMgr();

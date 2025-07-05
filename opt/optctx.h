@@ -209,11 +209,13 @@ public:
     void setInvalidNonPRDU() { OC_is_nonpr_du_chain_valid(*this) = false; }
     void setInvalidRPO() { setInvalidPass(PASS_RPO); }
     void setInvalidLoopInfo() { setInvalidPass(PASS_LOOP_INFO); }
+    void setInvalidCFG() { OC_is_cfg_valid(*this) = false; }
     void setInvalidCDG() { setInvalidPass(PASS_CDG); }
     void setInvalidSCC() { setInvalidPass(PASS_SCC); }
     void setInvalidMDSSA() { setInvalidPass(PASS_MDSSA_MGR); }
     void setInvalidPRSSA() { setInvalidPass(PASS_PRSSA_MGR); }
     void setInvalidLiveness() { setInvalidPass(PASS_LIVENESS_MGR); }
+    void setInvalidPRLiveness() { setInvalidPass(PASS_PRLIVENESS_MGR); }
     void setInvalidPass(PASS_TYPE pt);
 
     //The function make all flag invalid.

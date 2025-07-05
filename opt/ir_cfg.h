@@ -36,8 +36,25 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class IVR;
+class GVN;
+
 //Map BB id to IR.
 typedef xcom::TMap<UINT, IR*> Pred2Opnd;
+
+//
+//START IRCfgOptCtx
+//
+class IRCfgOptCtx : public CfgOptCtx {
+    //THE CLASS ALLOWS COPY-CONSTRUCTOR.
+protected:
+    void initPassObj();
+public:
+    IRCfgOptCtx(OptCtx * toc, ActMgr * am = nullptr);
+    IRCfgOptCtx(IRCfgOptCtx const& src);
+};
+//END IRCfgOptCtx
+
 
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
@@ -49,16 +66,18 @@ protected:
     Lab2BB m_lab2bb;
     TypeMgr * m_tm;
 protected:
-    UINT afterReplacePredInCase1(IRBB const* bb, IRBB const* succ,
-                                 List<UINT> const& newpreds,
-                                 OUT CfgOptCtx & ctx,
-                                 UINT orgpos, UINT orgnum,
-                                 UINT newpredstartpos);
-    UINT afterReplacePredInCase2(IRBB const* bb, IRBB const* succ,
-                                 List<UINT> const& newpreds,
-                                 OUT CfgOptCtx & ctx,
-                                 UINT orgpos, UINT orgnum,
-                                 UINT newpredstartpos);
+    virtual CfgOptCtx * allocCfgOptCtx(CfgOptCtx const& src) override
+    {
+        IRCfgOptCtx * newctx = new IRCfgOptCtx((IRCfgOptCtx const&)src);
+        appendAllocatedCfgOptCtx(newctx);
+        return newctx;
+    }
+    UINT afterReplacePredInCase1(
+        IRBB const* bb, IRBB const* succ, List<UINT> const& newpreds,
+        OUT CfgOptCtx & ctx, UINT orgpos, UINT orgnum, UINT newpredstartpos);
+    UINT afterReplacePredInCase2(
+        IRBB const* bb, IRBB const* succ, List<UINT> const& newpreds,
+        OUT CfgOptCtx & ctx, UINT orgpos, UINT orgnum, UINT newpredstartpos);
 
     void dumpGraph(FILE * h) const;
     void dumpGraph() const;
@@ -70,8 +89,7 @@ protected:
 
     //The function will remove given edge from->to while maintaining the
     //DomInfo if 'ctx' asked.
-    void removeEdge(Vertex const* from, Vertex const* to,
-                    OUT CfgOptCtx & ctx);
+    void removeEdge(Vertex const* from, Vertex const* to, OUT CfgOptCtx & ctx);
     void removeAllInEdge(IRBB const* bb, OUT CfgOptCtx & ctx);
     void removeAllOutEdge(IRBB const* bb, OUT CfgOptCtx & ctx);
     void remove_bb_impl(C<IRBB*> * bbct);
@@ -105,8 +123,8 @@ protected:
     //The function remove all MDPhis in 'bb'.
     //Note caller should guarantee phi is useless and removable.
     void removeAllMDPhi(IRBB * bb, CfgOptCtx const& ctx);
-    void removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos,
-                                     CfgOptCtx const& ctx);
+    void removeSuccDesignatedPhiOpnd(
+        IRBB const* succ, UINT pos, CfgOptCtx const& ctx);
 
     //Perform list of light-weight CFG optimizations to improve
     //the CFG's clarity.
@@ -114,8 +132,8 @@ protected:
 
     //Remove bb from LoopInfo tree.
     void removeLoopInfo(IRBB const* bb, CfgOptCtx const& ctx);
-    static void removeLoopInfo(IRBB const* bb, MOD LI<IRBB> * li,
-                               MOD OptCtx & oc);
+    static void removeLoopInfo(
+        IRBB const* bb, MOD LI<IRBB> * li, MOD OptCtx & oc);
 
     //The function will maintain DomInfo.
     bool removeRedundantBranchCase1(
@@ -176,8 +194,8 @@ public:
     //After adding new bb or change bb successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ);
-    void addDomInfoToFallThroughBB(IRBB const* marker, IRBB const* newbb,
-                                   IRBB const* oldnext);
+    void addDomInfoToFallThroughBB(
+        IRBB const* marker, IRBB const* newbb, IRBB const* oldnext);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method
@@ -203,39 +221,50 @@ public:
     //make prev no longer fallthrough to bb.
     //prev: the previous of 'next' BB, note prev must fallthrough to 'next'.
     //next: the next BB in BBList.
-    IRBB * changeFallthroughBBToJumpBB(IRBB * prev, MOD IRBB * next,
-                                       OptCtx * oc);
+    IRBB * changeFallthroughBBToJumpBB(
+        IRBB * prev, MOD IRBB * next, OptCtx * oc);
 
     //The function will remove all out-jump-edges of bb except the fallthrough
     //edge, and try adding fallthrough edge if there is not a fallthrough edge.
     //Fix up out-edges if BB becomes fallthrough BB.
     //Note it is illegal case if an empty BB does not have fallthrough edge.
-    void changeToBeFallthroughBB(IRBB * bb, BBListIter const& bbit,
-                                 OUT CfgOptCtx & ctx);
+    void changeToBeFallthroughBB(
+        IRBB * bb, BBListIter const& bbit, OUT CfgOptCtx & ctx);
 
     //The function insert a tampolining BB bewteen bb and its next BB.
     IRBB * changeFallthroughBBToJumpBB(IRBB * bb, OptCtx * oc);
 
-    void dumpRPOVexList(RPOVexList const& vlst) const;
     void dumpRPO() const;
     void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
+
+    //Dump graph in DOT file with default file name and dump-options.
     void dumpDOT() const { dumpDOT((CHAR const*)nullptr, DUMP_COMBINE); }
-    void dumpDOT(CHAR const* name, UINT flag) const;
+
+    //Dump graph in DOT file with specific file name.
+    void dumpDOT(CHAR const* name, UINT flag = DUMP_COMBINE,
+                 MOD IRDumpCtx<> * ctx = nullptr) const;
+
+    //Dump graph in DOT file without SSA info.
     void dumpDOTNoSSA() const
-    { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH); }
-    void dumpDOT(FILE * h, UINT flag) const;
+    { dumpDOT((CHAR const*)nullptr, DUMP_DETAIL|DUMP_EH, nullptr); }
+
+    //Dump graph in DOT file.
+    void dumpDOT(FILE * h, UINT flag, MOD IRDumpCtx<> * ctx) const;
 
     //The function dump sub-graph that bbid described by 'subset'.
-    void dumpSubGraph(BBSet const& subset, FILE * h, UINT flag) const;
-    void dumpSubGraph(BBSet const& subset, CHAR const* name, UINT flag) const;
-    void dumpSubGraph(BBSet const& subset) const
-    { dumpSubGraph(subset, (CHAR const*)nullptr, DUMP_COMBINE); }
-    void dumpSubGraph(xcom::BitSet const& subset) const
+    void dumpSubGraph(
+        BBSet const& subset, FILE * h, UINT flag, MOD IRDumpCtx<> * ctx) const;
+    void dumpSubGraph(
+        BBSet const& subset, CHAR const* name, UINT flag,
+        MOD IRDumpCtx<> * ctx) const;
+    void dumpSubGraph(BBSet const& subset, MOD IRDumpCtx<> * ctx) const
+    { dumpSubGraph(subset, (CHAR const*)nullptr, DUMP_COMBINE, ctx); }
+    void dumpSubGraph(xcom::BitSet const& subset, MOD IRDumpCtx<> * ctx) const
     {
         DefMiscBitSetMgr bsmgr;
         BBSet bs(bsmgr.getSegMgr());
         bs.copy(subset);
-        dumpSubGraph(bs);
+        dumpSubGraph(bs, ctx);
     }
     void dumpDomSet() const;
     void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg, true, false); }
@@ -249,9 +278,9 @@ public:
     virtual void findTargetBBOfMulticondBranch(IR const*, OUT List<IRBB*>&);
     virtual IRBB * findBBbyLabel(LabelInfo const* lab) const;
     virtual void findTargetBBOfIndirectBranch(IR const*, OUT List<IRBB*>&);
-    void findEHRegion(IRBB const* catch_start,
-                      xcom::BitSet const& mainstreambbs,
-                      OUT xcom::BitSet & ehbbs);
+    void findEHRegion(
+        IRBB const* catch_start, xcom::BitSet const& mainstreambbs,
+        OUT xcom::BitSet & ehbbs);
     void findTryRegion(IRBB const* try_start, OUT xcom::BitSet & ehbbs);
     void findAllTryRegions(OUT xcom::BitSet & trybbs);
 
@@ -278,23 +307,23 @@ public:
     IRBB * insertFallThroughBBAfter(IRBB const* marker, MOD OptCtx * oc);
 
     //The function insert fallthrough newbb after 'marker'.
-    void insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
-                                  MOD OptCtx * oc);
+    void insertFallThroughBBAfter(
+        IRBB const* marker, IRBB * newbb, MOD OptCtx * oc);
 
     //The function insert newbb bewteen 'from' and 'to'. As a result, the
     //function may break up fallthrough edge of 'to' if necessary.
     //Return trampoline BB if the function inserted it before 'to'.
-    IRBB * insertBBBetween(IN IRBB const* from, IN BBListIter from_it,
-                           MOD IRBB * to, IN BBListIter to_it,
-                           IN IRBB * newbb, MOD OptCtx * oc);
+    IRBB * insertBBBetween(
+        IRBB const* from, IN BBListIter from_it, MOD IRBB * to,
+        IN BBListIter to_it, IN IRBB * newbb, MOD OptCtx * oc);
 
     //The function is a simpler version to insert a new BB. It does not check
     //and insert newbb into CFG's BBList. The function is usually used when
     //caller expect to update the related Dom and SSA info exactly by themself.
     //Insert 'newbb' between 'from' and 'to'.
     //e.g: given edge from->to, the result is from->newbb->to.
-    void insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
-                         OUT CfgOptCtx & ctx);
+    void insertBBBetween(
+        IRBB const* from, IRBB * to, IRBB * newbb, OUT CfgOptCtx & ctx);
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
@@ -423,8 +452,8 @@ public:
     //from: the BB contains the label to be replaced.
     //to: the target BB which ponited by the label in BB 'from'.
     //li: the new label.
-    void replaceBranchLabel(IRBB const* from, IRBB const* to,
-                            LabelInfo const* li);
+    void replaceBranchLabel(
+        IRBB const* from, IRBB const* to, LabelInfo const* li);
 
     //The function replaces original predecessor with a list of
     //new predecessors.
@@ -432,13 +461,14 @@ public:
     //succ: the target BB.
     //newpreds: list of new predecessors.
     //Return the position of 'bb' that is in the predecessor list of 'succ'.
-    virtual UINT replacePredWith(IRBB const* bb, IRBB const* succ,
-                                 List<UINT> const& newpreds,
-                                 OUT CfgOptCtx & ctx);
+    virtual UINT replacePredWith(
+        IRBB const* bb, IRBB const* succ, List<UINT> const& newpreds,
+        OUT CfgOptCtx & ctx);
 
     //The function will update the MDSSA version for stmt and phi.
-    void reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root,
-                     MOD CfgOptCtx & ctx);
+    void reviseMDSSA(
+        xcom::VexTab const& vextab, xcom::Vertex const* root,
+        MOD CfgOptCtx & ctx);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
     virtual void setVertex(IRBB * bb, Vertex * v)
@@ -481,8 +511,8 @@ public:
     //marker.
     //Return true if the function find a properly RPO for 'newbb', otherwise
     //return false.
-    bool tryUpdateRPO(IRBB * newbb, IRBB const* marker,
-                      bool newbb_prior_marker);
+    bool tryUpdateRPO(
+        IRBB * newbb, IRBB const* marker, bool newbb_prior_marker);
     bool tryUpdateRPOBeforeCFGChanged(
         IRBB * newbb, IRBB const* marker, bool newbb_prior_marker,
         MOD OptCtx * oc);
@@ -508,7 +538,7 @@ public:
     //PDOM, LOOPINFO, or RPO information.
     bool performMiscOpt(OptCtx & oc)
     {
-        CfgOptCtx ctx(oc);
+        IRCfgOptCtx ctx(&oc);
         return performMiscOpt(ctx);
     }
     bool performMiscOpt(MOD CfgOptCtx & ctx);

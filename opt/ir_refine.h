@@ -49,8 +49,9 @@ class ActMgr;
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 #define RC_maintain_du(r) ((r).u1.s1.maintain_du)
 #define RC_optctx(r) ((r).m_oc)
-class RefineCtx {
-    //The class allows copy-constructor.
+#define RC_stmt_generated(r) ((r).m_stmt_generated)
+class RefineCtx : public PassCtx {
+    COPY_CONSTRUCTOR(RefineCtx);
 public:
     typedef UINT BitUnion;
     union {
@@ -88,43 +89,43 @@ public:
         } s1;
         BitUnion i1;
     } u1;
-    OptCtx * m_oc; //some operations may change flags in OptCtx.
-    ActMgr * m_act_mgr;
+    IRMgr * m_irmgr;
+    TypeMgr * m_tm;
     PRSSAMgr const* m_prssamgr;
     MDSSAMgr const* m_mdssamgr;
+
+    //Record the stmt that generated during the refinement.
+    IRList m_stmt_generated;
 public:
-    RefineCtx(MOD OptCtx * oc)
-    {
-        RC_refine_div_const(*this) = true;
-        RC_refine_mul_const(*this) = false;
-        RC_refine_stmt(*this) = true;
-        RC_do_fold_const(*this) = true;
-        RC_maintain_du(*this) = true;
-        RC_stmt_removed(*this) = false;
-        RC_hoist_to_lnot(*this) = true;
-        m_oc = oc;
-        m_act_mgr = nullptr;
-        ASSERT0(m_oc->getRegion());
-        m_prssamgr = m_oc->getRegion()->getPRSSAMgr();
-        m_mdssamgr = m_oc->getRegion()->getMDSSAMgr();
-    }
-    ~RefineCtx() { m_act_mgr = nullptr; }
-    RefineCtx const& operator = (RefineCtx const&);
+    RefineCtx(MOD OptCtx * oc, ActMgr * am = nullptr);
+    ~RefineCtx();
 
     //Clean the actions which propagated bottom up during refinement.
-    void cleanBottomUpFlag() { RC_stmt_removed(*this) = false; }
+    void cleanBottomUpFlag()
+    {
+        RC_stmt_removed(*this) = false;
+        RC_stmt_generated(*this).clean();
+    }
+    void copyTopDownInfo(RefineCtx const& src)
+    {
+        u1.i1 = src.u1.i1;
+        m_prssamgr = src.m_prssamgr;
+        m_mdssamgr = src.m_mdssamgr;
+        PassCtx::copy(src);
+    }
 
     void dump() const;
 
-    //Return the OptCtx.
-    //Note some operations may change flags in OptCtx.
-    OptCtx * getOptCtx() const { return RC_optctx(*this); }
-    Region * getRegion() const { return getOptCtx()->getRegion(); }
-    ActMgr * getActMgr() const { return m_act_mgr; }
-
-    bool fold_const() const { return RC_do_fold_const(*this); }
+    IRList & getStmtGeneratedList() { return RC_stmt_generated(*this); }
+    GVN * getGVN() const { return m_gvn; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
+    TypeMgr * getTypeMgr() const { return m_tm; }
 
     bool hoist_to_lnot() const { return RC_hoist_to_lnot(*this); }
+
+    //Return true if the original IR stmt removed during the refinement.
+    bool isStmtRemoved() const { return RC_stmt_removed(*this); }
+    bool isGVNValid() const;
 
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
@@ -140,11 +141,26 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
-    void setActMgr(ActMgr * am) { m_act_mgr = am; }
 
     //Return true if refinement need to maintain DefUse chain.
     bool maintainDU() const { return RC_maintain_du(*this); }
 
+    //Return true if user ask the pass to do fold_const.
+    bool needDoFoldConst() const { return RC_do_fold_const(*this); }
+
+    //Unify the actions which propagated bottom up
+    //during processing the refinement.
+    void unionBottomUpInfo(RefineCtx const& src)
+    {
+        IRListIter it;
+        IRList const& srclst = const_cast<RefineCtx&>(src).
+            getStmtGeneratedList();
+        IRList & tgtlst = getStmtGeneratedList();
+        for (IR * ir = srclst.get_head(&it);
+             ir != nullptr; ir = srclst.get_next(&it)) {
+            tgtlst.append_tail(ir);
+        }
+    }
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
@@ -158,20 +174,23 @@ class Refine : public Pass {
 protected:
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
+    xcom::DomTree * m_dom_tree;
 protected:
     //The function try to choose proper data-type for judgement operation.
     //The data type is used to fold-const with specific judge operations.
     virtual Type const* chooseValueIntTypeOfJudgeOp(IR const* exp) const;
+    void cleanDomTree();
 
     //The function prefer to compute ir's const value by float point type.
-    IR * foldConstFloatUnary(IR * ir, bool & change);
+    IR * foldConstFloatUnary(IR * ir, bool & change, RefineCtx const& rc);
 
     //The function prefer to compute ir's const value by float point type.
-    IR * foldConstFloatBinary(IR * ir, bool & change);
-    IR * foldConstFloatBinaryForPow(IR * ir, bool & change);
+    IR * foldConstFloatBinary(IR * ir, bool & change, RefineCtx const& rc);
+    IR * foldConstFloatBinaryForPow(
+        IR * ir, bool & change, RefineCtx const& rc);
 
     //The function prefer to compute ir's const value by integer point type.
-    IR * foldConstIntUnary(IR * ir, bool & change);
+    IR * foldConstIntUnary(IR * ir, bool & change, RefineCtx const& rc);
     IR * foldConstAllKids(IR * ir, bool & change, RefineCtx & rc);
 
     //The function prefer to compute ir's const value by integer point type.
@@ -185,8 +204,6 @@ protected:
     virtual IR * foldConstUnary(IR * ir, bool & change, RefineCtx &);
     virtual IR * foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc);
 
-    IRMgr * getIRMgr() const { return m_irmgr; }
-
     //Peephole optimizations.
     IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
@@ -197,7 +214,7 @@ protected:
     IR * refineLor(IR * ir, bool & change, RefineCtx & rc);
     IR * refineXor(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAdd(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineSub(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineSub(IR * ir, bool & change, RefineCtx & rc);
     IR * refineMul(IR * ir, bool & change, RefineCtx & rc);
     IR * refineRem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDiv(IR * ir, bool & change, RefineCtx & rc);
@@ -214,14 +231,14 @@ protected:
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
     IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineBranch(IR * ir, bool & change);
+    IR * refineBranch(IR * ir, bool & change, RefineCtx & rc);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAbs(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineAsr(IR * ir, bool & change);
-    IR * refineLsl(IR * ir, bool & change);
-    IR * refineLsr(IR * ir, bool & change);
+    IR * refineAsr(IR * ir, bool & change, RefineCtx const& rc);
+    IR * refineLsl(IR * ir, bool & change, RefineCtx const& rc);
+    IR * refineLsr(IR * ir, bool & change, RefineCtx const& rc);
     virtual IR * refineTrigonometric(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
@@ -233,19 +250,21 @@ protected:
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
     IR * refineDirectStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineIStore1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIgoto(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIf(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDoLoop(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNormalLoop(IR * ir, bool & change, RefineCtx & rc);
+
+    //Refine select for different architectures.
+    virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
     bool refineStmtList(MOD BBIRList & ir_list, MOD RefineCtx & rc);
 
     //The function only iteratively perform refinement for kids of given ir.
     //It does not perform refinement between 'ir' and its kids.
     IR * refineAllKids(IR * ir, bool & change, RefineCtx & rc);
-    IR * reassociationCase1(IR * ir, bool & change);
-    IR * reassociation(IR * ir, bool & change);
+    IR * reassociationCase1(IR * ir, bool & change, RefineCtx const& rc);
+    IR * reassociation(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineCompare(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc)
     {
@@ -259,15 +278,13 @@ protected:
         return nullptr;
     }
     IR * refineIRImpl(IR * ir, bool & change, MOD RefineCtx & rc);
+    virtual IR * refineIR(IR * ir, bool & change, MOD RefineCtx & rc);
+    void reset();
 
     IR * StrengthReduce(MOD IR * ir, MOD bool & change, RefineCtx & rc);
-
-    //The function will attempt to recompute the MD reference for given 'ir'.
-    //Note the computation require that DUMgr has been ready.
-    void recomputeMayRef(IR * ir);
 public:
     explicit Refine(Region * rg);
-    virtual ~Refine() {}
+    virtual ~Refine();
 
     //Calculate the value according to given binary code and type.
     HOST_INT calcBinIntVal(IR const* ir, HOST_INT v0, HOST_INT v1);
@@ -285,8 +302,10 @@ public:
     //Return updated ir if optimization performed.
     IR * foldConst(IR * ir, bool & change, RefineCtx & rc);
 
+    xcom::DomTree const& getAndGenDomTree();
     virtual CHAR const* getPassName() const { return "IR Refinement"; }
     virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
 
     //Invert condition for relation operation.
     static void invertCondition(IR ** cond, Region * rg);
@@ -301,13 +320,15 @@ public:
     //Return updated ir_list if optimization performed.
     IR * refineIRList(IR * ir_list, bool & change, MOD RefineCtx & rc);
 
-    //Perform peephole optimization to ir.
+    //Perform peephole optimization to expression.
     //Return updated ir if optimization performed.
-    virtual IR * refineIR(IR * ir, bool & change, MOD RefineCtx & rc);
+    //ir: expression.
+    IR * refineExpression(IR * ir, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to ir over and over again until the result
     //ir do not change any more.
     //Return updated ir if optimization performed.
+    //ir: exp or stmt.
     IR * refineIRUntilUnchange(IR * ir, bool & change, MOD RefineCtx & rc);
 
     //Perform peephole optimization to BB list.
@@ -315,8 +336,9 @@ public:
     //Return true if BB list changed.
     bool refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc);
 
-    //Refine select for different architectures.
-    virtual IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
+    //The function will attempt to recompute the MD reference for given 'ir'.
+    //Note the computation require that DUMgr has been ready.
+    void recomputeMayRef(IR * ir) const;
 
     bool perform(OptCtx & oc, MOD RefineCtx & rc);
     virtual bool perform(OptCtx & oc) override;

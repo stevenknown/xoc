@@ -37,6 +37,86 @@ author: Su Zhenyu
 namespace xoc {
 
 //
+//START Sym2Regions
+//
+RegionTab * GenRegionTab::createMapped(Sym const*)
+{
+    ASSERT0(m_sym2regions);
+    return m_sym2regions->allocRegionTab();
+}
+//END Sym2Regions
+
+
+//
+//START Sym2Regions
+//
+Sym2Regions::Sym2Regions()
+{
+    //xcom::TMap<Sym const*, SymbolInfo*, CompareKeyBase<Sym const*>,
+    //               GenMappedOfSymMap>::getGenMapped().m_sym_mgr = sym_mgr;
+    m_sym2rgt.getGenMapped().m_sym2regions = this;
+}
+
+
+Sym2Regions::~Sym2Regions()
+{
+    for (RegionTab * rgt = m_rgtab_list.get_head();
+         rgt != nullptr; rgt = m_rgtab_list.get_next()) {
+        delete rgt;
+    }
+    m_rgtab_list.clean();
+}
+
+
+Region * Sym2Regions::getUniqueRegion(Sym const* sym) const
+{
+    ASSERT0(sym);
+    RegionTab * rgt = getRegionTab(sym);
+    if (rgt == nullptr) { return nullptr; }
+    ASSERT0(rgt->get_elem_count() == 1);
+    RegionTabIter it;
+    return rgt->get_first(it);
+}
+
+
+RegionTab * Sym2Regions::getRegionTab(Sym const* sym) const
+{
+    ASSERT0(sym);
+    return m_sym2rgt.get(sym);
+}
+
+
+void Sym2Regions::add(Region * rg)
+{
+    Var const* var = rg->getRegionVar();
+    ASSERT0(var);
+    set(var->get_name(), rg);
+}
+
+
+void Sym2Regions::set(Sym const* sym, Region * rg)
+{
+    bool find;
+    RegionTab * rgt = m_sym2rgt.getAndGen(sym, &find);
+    ASSERT0(rgt);
+    ASSERT0(rg->getRegionVar() && rg->getRegionVar()->get_name() == sym);
+    rgt->clean();
+    rgt->append(rg);
+}
+
+
+void Sym2Regions::add(Sym const* sym, Region * rg)
+{
+    bool find;
+    RegionTab * rgt = m_sym2rgt.getAndGen(sym, &find);
+    ASSERT0(rgt);
+    ASSERT0(rg->getRegionVar() && rg->getRegionVar()->get_name() == sym);
+    rgt->append(rg);
+}
+//END Sym2Regions
+
+
+//
 //START RegionMgr
 //
 RegionMgr::RegionMgr() : m_type_mgr(this)
@@ -51,7 +131,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_md_sys = nullptr;
 
     //Set to false by default to get more opportunities to optimizations.
-    m_is_regard_str_as_same_md = false;
+    m_is_regard_all_string_as_same_md = false;
     m_str_md = nullptr;
     m_targinfo = nullptr;
     m_program = nullptr;
@@ -114,6 +194,24 @@ RegionMgr::~RegionMgr()
 }
 
 
+void RegionMgr::addVar2Region(Region * rg)
+{
+    ASSERT0(rg);
+    Var const* var = rg->getRegionVar();
+    ASSERT0(var);
+    m_sym2rg.add(var->get_name(), rg);
+}
+
+
+void RegionMgr::setVar2Region(Region * rg)
+{
+    ASSERT0(rg);
+    Var const* var = rg->getRegionVar();
+    ASSERT0(var);
+    m_sym2rg.set(var->get_name(), rg);
+}
+
+
 void RegionMgr::initIRDescFlagSet()
 {
     //NOTE: If new IR flag value is greater than the bit range that
@@ -154,24 +252,23 @@ OptCtx * RegionMgr::getAndGenOptCtx(Region * rg)
 }
 
 
-MD const* RegionMgr::genDedicateStrMD()
+MD const* RegionMgr::getAndGenDedicateStrMD()
 {
-    if (!m_is_regard_str_as_same_md) { return nullptr; }
+    if (!isRegardAllStringAsSameMD()) { return nullptr; }
 
     //Regard all string variables as same unbound MD.
-    if (m_str_md == nullptr) {
-        Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        Var * sv = getVarMgr()->registerStringVar(DEDICATED_STRING_VAR_NAME, s,
-                                                  MEMORY_ALIGNMENT);
-        sv->setFlag((VAR_FLAG)(VAR_IS_UNALLOCABLE|VAR_ADDR_TAKEN));
-        MD md;
-        MD_base(&md) = sv;
-        MD_ty(&md) = MD_UNBOUND;
-        ASSERT0(MD_base(&md)->is_string());
-        MD const* e = m_md_sys->registerMD(md);
-        ASSERT0(MD_id(e) > 0);
-        m_str_md = e;
-    }
+    if (m_str_md != nullptr) { return m_str_md; }
+    Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
+    Var * sv = getVarMgr()->registerStringVar(
+        DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
+    sv->setFlag((VAR_FLAG)(VAR_IS_UNALLOCABLE|VAR_ADDR_TAKEN));
+    MD md;
+    MD_base(&md) = sv;
+    MD_ty(&md) = MD_UNBOUND;
+    ASSERT0(MD_base(&md)->is_string());
+    MD const* e = m_md_sys->registerMD(md);
+    ASSERT0(MD_id(e) > 0);
+    m_str_md = e;
     return m_str_md;
 }
 
@@ -193,7 +290,7 @@ void RegionMgr::registerGlobalMD()
         //global variable to custmized usage.
         //ASSERT0(!v->is_unallocable());
 
-        if (v->is_string() && genDedicateStrMD() != nullptr) {
+        if (v->is_string() && getAndGenDedicateStrMD() != nullptr) {
             //Treat all string variables as the same one.
             continue;
         }
@@ -283,7 +380,9 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 void RegionMgr::addToRegionTab(Region * rg)
 {
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
-    ASSERT0(getRegion(rg->id()) == nullptr);
+    Region * oldrg = getRegion(rg->id());
+    if (oldrg == rg) { return; }
+    ASSERTN(oldrg == nullptr, ("multiple regions have same ID"));
     ASSERT0(rg->id() < m_rg_count);
     UINT pad = xcom::getNearestPowerOf2(rg->id());
     if (m_id2rg.get_elem_count() < pad) {

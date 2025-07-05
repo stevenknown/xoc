@@ -41,11 +41,12 @@ class ChainRecMgr;
 class IVVal;
 class IVR;
 
-typedef xcom::List<IVVal const*> ConstIVValList;
-typedef xcom::List<IVVal const*>::Iter ConstIVValListIter;
+typedef xcom::List<IVVal> ConstIVValList;
+typedef xcom::List<IVVal>::Iter ConstIVValListIter;
 
 //This class represents value of an IV.
 //The value may be constant and expression.
+//NOTE: the class should be POD type and should NOT declare virtual function.
 #define IVVAL_int(v) ((v).u.m_int)
 #define IVVAL_fp(v) ((v).u.m_fp)
 #define IVVAL_md(v) ((v).u.m_md)
@@ -174,6 +175,15 @@ public:
     bool isEqual(IVVal const& v, IRMgr const* mgr) const;
     bool isEqual(IR const* v, IRMgr const* mgr) const;
 
+    //The function is usually used to be default placeholder in
+    //template function initialization.
+    void setToUndef(HOST_INT val)
+    {
+        IVVAL_kind(*this) = VAL_UNDEF;
+        IVVAL_int(*this) = val;
+        IVVAL_data_type(*this) = nullptr;
+    }
+
     //Set current value to be integer.
     void setToInt(HOST_INT val, Type const* ty)
     {
@@ -276,8 +286,9 @@ public:
 
     //Return true if current chain-rec form is equal to given IV value list.
     //e.g: given CR is {1,+,3}, function call of
-    //     isEqual(2, &IVVal(HOST_INT(1)), &IVVal(HOST_INT(3)));
+    //     isEqual(2, IVVal(HOST_INT(1)), IVVal(HOST_INT(3)));
     //     will return true.
+    //NOTE: the arguments that passed to function should be object.
     bool isEqual(IRMgr const* mgr, UINT num, ...) const;
     bool isEqual(ConstIVValList const& lst, IRMgr const* mgr) const;
 

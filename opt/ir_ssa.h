@@ -59,6 +59,26 @@ public:
     bool is_succ() const { return get_status_num() == 0; }
 };
 
+//PRSSA Update Context
+//The class records and propagates auxiliary information to maintain PRSSA
+//information during miscellaneous optimizations.
+class PRSSAUpdateCtx : public PassCtx {
+    //THE CLASS ALLOWS COPY-CONSTRUCTION.
+public:
+    //Pass info top-down.
+public:
+    PRSSAUpdateCtx(OptCtx & oc, ActMgr * am = nullptr);
+
+    void dump(Region const* rg) const;
+
+    PRSSAUpdateCtx const& operator = (PRSSAUpdateCtx const&);
+
+    void tryInvalidPassInfoBeforeFreeIR() const;
+
+    //Unify the members info which propagated bottom up.
+    void unionBottomUpInfo(PRSSAUpdateCtx const& c) const {}
+};
+
 class BB2PRSet : public xcom::Vector<PRSet*> {
     COPY_CONSTRUCTOR(BB2PRSet);
     DefMiscBitSetMgr * m_sbsmgr;
@@ -211,6 +231,10 @@ public:
 class ConstructCtx {
     COPY_CONSTRUCTOR(ConstructCtx);
 protected:
+    //True to ask PRSSAMgr to build DefDef chain.
+    bool m_need_build_def_chain;
+    PRSSAMgr * m_prssamgr;
+
     //Record version stack during renaming.
     PRNO2VPRStack m_prno2stack;
 
@@ -220,13 +244,17 @@ protected:
     //Record data type for each prno, which is used to generate Phi
     PRNO2Type m_prno2type;
 public:
-    ConstructCtx(Region const* rg) { init(rg); }
+    ConstructCtx(PRSSAMgr * mgr);
     ~ConstructCtx()
     {
         cleanPRNO2VPRStack();
         cleanPRNO2MaxVersion();
         cleanPRNO2Type();
     }
+
+    void addDefChainIfNeed(MOD VPR * prev_def, MOD VPR * newest_def);
+
+    void cutoffDefChain(MOD VPR * curdef);
     void cleanPRNO2VPRStack();
     void cleanPRNO2MaxVersion();
     void cleanPRNO2Type();
@@ -244,10 +272,13 @@ public:
 
     void init(Region const* rg) { m_prno2maxversion.set(rg->getPRCount(), 0); }
 
+    bool needBuildDefChain() const { return m_need_build_def_chain; }
+
     void setMaxVersion(PRNO prno, UINT maxv)
     { m_prno2maxversion.set((VecIdx)prno, maxv); }
     void setPRNOType(PRNO prno, Type const* ty)
     { m_prno2type.set((VecIdx)prno, ty); }
+    void setBuildDefChain(bool doit) { m_need_build_def_chain = doit; }
 };
 
 
@@ -294,6 +325,7 @@ class PRSSAMgr : public Pass {
     friend class SSAGraph;
     friend class PRSSAConstructRenameVisitFunc;
     friend class ReconstructSSA;
+    friend ConstructCtx;
     class PR2DefBBSet {
         COPY_CONSTRUCTOR(PR2DefBBSet);
         //All objects allocated and recorded in pr2defbb are used
@@ -373,6 +405,7 @@ protected:
 
     //Record VPR that indexed by PRNO.
     VPRVec m_prno2vpr;
+    VPRSetMgr m_vprset_mgr;
 protected:
     VPR * allocVPR()
     {
@@ -393,7 +426,8 @@ protected:
 
     //Return true if SSA construction is successful.
     bool constructByDomTree(xcom::DomTree & domtree, OptCtx & oc);
-    bool constructVPRAndPhi(xcom::DomTree & domtree, OptCtx & oc);
+    bool constructVPRAndPhi(
+        xcom::DomTree & domtree, OptCtx & oc, bool build_def_chain);
     void clean();
 
     //Clean VPR info for IR in 'lst'.
@@ -425,6 +459,7 @@ protected:
         //Note the elements in VPRVec are indexed by version.
         return vprvec != nullptr ? vprvec->get(version) : nullptr;
     }
+    VPRSetMgr & getVPRSetMgr() { return m_vprset_mgr; }
 
     //The function retrieves VPRVec by given prno.
     //Map PRNO to VPRVec and record all VPRs allocated during SSA processing.
@@ -475,9 +510,6 @@ protected:
     //ir: may be Phi.
     void renameLHS(MOD IR * ir, PRSet const* prset,
                    MOD ConstructCtx & cstctx);
-    bool refinePhiImpl(
-        MOD IRBB * bb, MOD IR * ir, MOD List<IRBB*> & wl, MOD BitSet & in_list,
-        IRListIter irct, OptCtx const& oc);
     void renameEntireCFG(
         OUT ConstructCtx & cstctx, PRSet const& effect_prs,
         BB2PRSet const& bb2definedprs, xcom::DomTree const& domtree);
@@ -604,7 +636,7 @@ public:
     void construction(OptCtx & oc);
 
     //The function only constructs VPR and inserts PHI, but striping version.
-    void constructVPRAndPhi(OptCtx & oc);
+    void constructVPRAndPhi(OptCtx & oc, bool build_def_chain);
 
     //The old PR may carry dedicated register information, and the new PR needs
     //to retain this information to ensure the correct operation of subsequent
@@ -698,12 +730,13 @@ public:
     //Find the unique DEF of 'exp' that is inside given loop.
     //set: it is optional, if it is not NULL, the function will record all DEF
     //     found into the set as a return result.
-    IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
-                                       Region const* rg, OUT IRSet * set) const;
+    IR * findUniqueDefInLoopForMustRef(
+        IR const* exp, LI<IRBB> const* li, Region const* rg,
+        OUT IRSet * set) const;
 
     //Compute SSAInfo for IRs in region that are in SSA mode.
     //Note the function does NOT maintain Version info for PR.
-    void genSSAInfoForRegion();
+    void genSSAInfoForRegion(MOD OptCtx & oc);
     SSAInfo * genNewVersionSSAInfoForStmt(IR * stmt);
     SSAInfo * genSSAInfo(IR * ir)
     {
@@ -763,8 +796,8 @@ public:
 
     //Return true if ir dominates all its USE expressions which inside loop.
     //In ssa mode, stmt's USE may be placed in operand list of PHI.
-    bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li,
-                                   OptCtx const& oc) const;
+    bool isStmtDomAllUseInsideLoop(
+        IR const* ir, LI<IRBB> const* li, OptCtx const& oc) const;
 
     //Return true if ir can be viewed as operand of PHI.
     static bool isValidPhiOpnd(IR const* ir)
@@ -780,18 +813,16 @@ public:
 
     //This function revise phi data type, and remove redundant phi.
     //Return true if there is phi removed.
-    bool refinePhi(OptCtx const& oc);
+    bool refinePhi(PRSSAUpdateCtx const& ctx);
 
     //Reinitialize SSA manager.
     //This function will clean all informations and recreate them.
-    inline void reinit()
-    {
-        destroy();
-        init();
-    }
+    void reinit(PRSSAUpdateCtx const& ctx);
+
     //Before removing BB or change BB successor,
     //you need remove the related PHI operand if BB successor has PHI.
-    void removeSuccessorDesignatedPhiOpnd(IRBB const* succ, UINT ps);
+    void removeSuccessorDesignatedPhiOpnd(
+        IRBB const* succ, UINT pos, PRSSAUpdateCtx const& ctx);
 
     //Remove PR-SSA Use-Def chain.
     //e.g:ir=...
@@ -838,6 +869,9 @@ public:
     //Note the function does NOT check the consistency of Prno if def or use
     //operate on PR.
     static void removeDUChain(IR * def, IR * use);
+
+    //The function reconstructs entire PRSSA.
+    //NOTE: the PRNO of PR operations will changed.
     bool reconstruction(OptCtx & oc)
     {
         destruction(oc);

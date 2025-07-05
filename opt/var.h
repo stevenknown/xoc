@@ -724,6 +724,7 @@ public:
     //Note there may be multiple variable with same name, this function return
     //the first one.
     Var * findVarByName(Sym const* name);
+    Var * findVarByName(CHAR const* name);
 
     //Return true if the 'name' is the name of recorded unique
     //dedicated string variable.

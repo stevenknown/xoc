@@ -31,6 +31,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class RefineDUCtx {
+    COPY_CONSTRUCTOR(RefineDUCtx);
+protected:
+    OptCtx const& m_oc;
+    Region const* m_rg;
+    ActMgr m_am;
+public:
+    RefineDUCtx(OptCtx const& oc) : m_oc(oc), m_am(oc.getRegion())
+    { m_rg = oc.getRegion(); }
+    OptCtx const& getOptCtx() const { return m_oc; }
+    Region const* getRegion() const { return m_rg; }
+    ActMgr & getActMgr() { return m_am; }
+};
+
 class RefineDUChain : public Pass {
     COPY_CONSTRUCTOR(RefineDUChain);
 protected:
@@ -42,17 +56,22 @@ protected:
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;
 protected:
-    bool processExpViaMDSSA(IR const* exp);
-    bool processNormalExpByClassicDU(IR const* exp);
+    bool processExpViaMDSSA(
+        IR const* exp, BBIRListIter it, RefineDUCtx const& ctx);
+    bool processNormalExpByClassicDU(IR const* exp, RefineDUCtx const& ctx);
     bool processNormalExpByMDSSA(IR const* exp);
-    bool processNormalExp(IR const* exp);
+    bool processNormalExp(IR const* exp, RefineDUCtx const& ctx);
+
     //Return true if DU chain changed.
-    bool processIndirectExpViaGVN(IR const* exp);
-    bool processArrayExpViaGVN(IR const* exp);
-    bool processIndirectExp(IR const* exp);
-    bool processArrayExp(IR const* exp);
-    bool processBB(IRBB const* bb);
-    bool process();
+    //NOTE:The function only use classical DU for now.
+    bool processIndirectExpViaGVN(IR const* exp, RefineDUCtx const& ctx);
+    bool processArrayExpViaGVN(IR const* exp, RefineDUCtx const& ctx);
+    bool processIndirectExp(
+        IR const* exp, BBIRListIter it, RefineDUCtx const& ctx);
+    bool processArrayExp(
+        IR const* exp, BBIRListIter it, RefineDUCtx const& ctx);
+    bool processBB(IRBB const* bb, RefineDUCtx const& ctx);
+    bool process(RefineDUCtx const& ctx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -70,7 +89,7 @@ public:
     }
     virtual ~RefineDUChain() {}
 
-    virtual bool dump() const;
+    virtual bool dump(RefineDUCtx const& ctx) const;
 
     //Return true if indirect operation ir1 has same base expression with ir2.
     //TODO: use gvn to utilize value flow.

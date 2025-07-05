@@ -185,6 +185,8 @@ public:
     UINT lineno;
 };
 
+typedef xcom::TMap<CHAR const*, TOKEN, CompareStringFunc> Str2Token;
+typedef xcom::TMapIter<CHAR const*, TOKEN> Str2TokenIter;
 
 class Lexer {
     COPY_CONSTRUCTOR(Lexer);
@@ -260,7 +262,7 @@ protected:
     CHAR m_file_buf[LEX_MAX_BUF_LINE];
 
     //String2Token m_str2token;
-    TMap<CHAR const*, TOKEN, CompareStringFunc> m_str2token;
+    Str2Token m_str2token;
     List<LexErrorMsg*> m_err_msg_list;
 protected:
     typedef enum tagSTATUS {
@@ -381,10 +383,11 @@ public:
         m_cur_char = 0;
     }
 
-    //Dump token string.
-    //inputfile: input source file
+    //Dump all token string of src file.
     //outputfile: dump token to output file
-    void dump(CHAR const* input, FILE * output);
+    void dumpAllTokens(FILE * h) const;
+    void dumpKeyWordTab(FILE * h) const;
+    void dump(FILE * h) const;
 
     //Get a new token from IO stream or input file.
     TOKEN getNextToken();
@@ -403,13 +406,14 @@ public:
 
     //Get current token.
     TOKEN getCurrentToken() const { return m_cur_token; }
+    FILE * getSrcFile() const { return m_src_file; }
 
     //Get index offset in line table of current line.
     UINT getOffsetTabLineNum() const
     { return m_ofst_tab_byte_size / sizeof(LONG); }
 
     //Get error messages occurred in Lexer.
-    List<LexErrorMsg*> const& getErrMsgLst() const { return m_err_msg_list; }
+    List<LexErrorMsg*> const& getErrorMsgList() const { return m_err_msg_list; }
 
     //Report error with line number.
     void error(UINT line_num, CHAR const* msg, ...);

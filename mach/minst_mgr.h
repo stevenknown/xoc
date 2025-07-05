@@ -67,6 +67,9 @@ public:
     }
 
     void dump(LogMgr * lm, MInstMgr const& mgr) const;
+
+    //Set the m_ir of each MI in MIList to the 'ir'.
+    void setIR(IR const* ir) const;
 };
 
 
@@ -108,6 +111,9 @@ public:
     void dump(LogMgr * lm, MInstMgr const& mgr) { m_entity->dump(lm, mgr); }
 
     MIList & getList() const { return *m_entity; }
+
+    //Set the m_ir of each MI in m_entity to the 'ir'.
+    void setIR(IR const* ir) { m_entity->setIR(ir); }
 };
 
 

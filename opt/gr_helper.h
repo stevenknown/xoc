@@ -59,6 +59,8 @@ class GRDump {
     IRCFG const* m_cfg;
     LogMgr * m_lm; //LogMgr's Buffer may modified.
 private:
+    void dumpAllKids(IR const* ir, DumpGRCtx const* ctx) const;
+    void dumpExtOp(IR const* ir, DumpGRCtx const* ctx) const;
     void dumpOffset(IR const* ir) const;
     void dumpProp(IR const* ir, DumpGRCtx const* ctx) const;
     void dumpArrSubList(IR const* ir, UINT dn, DumpGRCtx const* ctx) const;
@@ -68,7 +70,7 @@ public:
     GRDump(Region const* rg);
     virtual ~GRDump() {}
 
-    static CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
+    static CHAR const* compositeName(Sym const* n, xcom::DefFixedStrBuf & buf);
 
     //ctx: it can be NULL if user is not going to control the dumpping.
     //     But it must be given if 'ir' is PHI because dump PHI will using CFG.

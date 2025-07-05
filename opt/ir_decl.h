@@ -34,6 +34,21 @@ namespace xoc {
 class TenVal {};
 class AnonyVal {};
 
+//
+//START IRKidMap
+//
+typedef UINT64 IRKidMapSeg;
+#define IRKidMapSegNum 1
+
+class IRKidMap : public xcom::FlagSet<IRKidMapSeg, IRKidMapSegNum> {
+    COPY_CONSTRUCTOR(IRKidMap);
+public:
+    IRKidMap(IRKidMapSeg v) : FlagSet<IRKidMapSeg, IRKidMapSegNum>(v) {}
+    IRKidMap(BYTE const* vbuf, UINT vbuflen)
+        : FlagSet<IRKidMapSeg, IRKidMapSegNum>(vbuf, vbuflen) {}
+};
+//END IRKidMap
+
 //Record float point.
 #define CONST_fp_val(ir) \
     (((CConst*)CK_IRC(ir, IR_CONST))->u1.s1.fp_const_value)
@@ -202,7 +217,7 @@ public:
 #define ILD_storage_space(ir) (((CILd*)CK_IRC(ir, IR_ILD))->storage_space)
 #define ILD_align(ir) (((CILd*)CK_IRC(ir, IR_ILD))->alignment)
 #define ILD_is_aligned(ir) (((CILd*)CK_IRC(ir, IR_ILD))->is_aligned)
-#define ILD_is_trivial(ir) (((CILd*)CK_IRC(ir, IR_ILD))->isTrivial())
+
 class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
@@ -223,11 +238,6 @@ public:
 
     IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
     IR * getBase() const { return ILD_base(this); }
-    //An ILD ir is regarded as trivial if it
-    //  1) has load base in PR
-    //  2) has zero load offset
-    bool isTrivial() const
-    { return ILD_base(this)->is_pr() && ILD_ofst(this) == 0; }
 };
 
 
@@ -349,7 +359,7 @@ public:
 class CSetElem : public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CSetElem);
 public:
-    static BYTE const kid_map = 0x6;
+    static IRKidMap const kid_map;
     static BYTE const kid_num = 3;
     PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
@@ -358,12 +368,14 @@ public:
     static inline SSAInfo *& accSSAInfo(IR * ir) { return SETELEM_ssainfo(ir); }
     static inline PRNO & accPrno(IR * ir) { return SETELEM_prno(ir); }
     static inline IR * accResultPR(IR * ir) { return ir; }
+    static inline IR *& accBase(IR * ir) { return SETELEM_base(ir); }
     static inline IR *& accKid(IR * ir, UINT idx)
     { return SETELEM_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return SETELEM_bb(ir); }
 
     IR * getKid(UINT idx) const { return SETELEM_kid(this, idx); }
     IR * getBase() const { return SETELEM_base(this); }
+    IR * getOfst() const { return SETELEM_ofst(this); }
     IR * getVal() const { return SETELEM_val(this); }
 };
 
@@ -402,6 +414,7 @@ public:
 public:
     static inline SSAInfo *& accSSAInfo(IR * ir) { return GETELEM_ssainfo(ir); }
     static inline PRNO & accPrno(IR * ir) { return GETELEM_prno(ir); }
+    static inline IR *& accBase(IR * ir) { return GETELEM_base(ir); }
     static inline IR * accResultPR(IR * ir) { return ir; }
     static inline IR *& accKid(IR * ir, UINT idx)
     { return GETELEM_kid(ir, idx); }
@@ -409,6 +422,7 @@ public:
 
     IR * getKid(UINT idx) const { return GETELEM_kid(this, idx); }
     IR * getBase() const { return GETELEM_base(this); }
+    IR * getOfst() const { return GETELEM_ofst(this); }
 };
 
 
@@ -433,7 +447,7 @@ public:
 class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
 public:
-    static BYTE const kid_map = 0x3;
+    static IRKidMap const kid_map;
     static BYTE const kid_num = 2;
     bool is_aligned;
     UINT alignment;
@@ -587,6 +601,8 @@ public:
     //Return true if current stmt has dummyuse.
     bool hasDummyUse() const { return CALL_dummyuse(this) != nullptr; }
 
+    //Return true if 'exp' is the dummyuse of current call.
+    bool isDummyUse(IR const* exp) const;
     bool is_intrinsic() const { return CALL_is_intrinsic(this); }
     bool is_readonly() const { return CALL_is_readonly(this); }
     bool isMustBBbound()
@@ -816,18 +832,18 @@ public:
 //LOOP-BODY and STEP(Increment or Dcrement) of induction variable.
 //e.g1:
 //    do
-//      ivr: id i
-//      init: 0
-//      det: i <= 10
-//      step: i+1
+//      iv-exp: id i
+//      init-exp: 0
+//      det-exp: i <= 10
+//      step-exp: i+1
 //      body {stmt_list}
 //    enddo
 //e.g2:
 //    do
-//      ivr: $1
-//      init: 0
-//      det: $1 <= 10
-//      step: $1+1
+//      iv-exp: $1
+//      init-exp: 0
+//      det-exp: $1 <= 10
+//      step-exp: $1+1
 //      body {stmt_list}
 //    enddo
 //This class uses LOOP_det access its determinate expression,

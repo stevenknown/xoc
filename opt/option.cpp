@@ -44,6 +44,7 @@ CHAR * g_func_or_bb_option = nullptr;
 INT g_opt_level = OPT_LEVEL0;
 bool g_cst_bb_list = true;
 bool g_enable_local_var_delegate = false;
+bool g_assign_mdref_with_the_offset_for_prop = false;
 bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
@@ -51,6 +52,7 @@ bool g_do_refine_with_host_api = false;
 bool g_insert_cvt = false;
 bool g_calc_derivative = false;
 bool g_do_loop_ana = true;
+bool g_do_cfg_opt = true;
 bool g_do_cfg_remove_redundant_label = true;
 bool g_do_cfg_remove_empty_bb = true;
 UINT g_cfg_remove_empty_bb_maxtimes_to_update_dominfo = 5000;
@@ -73,6 +75,7 @@ bool g_compute_pr_du_chain_by_prssa = true;
 bool g_do_expr_tab = true;
 bool g_do_cp_aggressive = false;
 bool g_do_cp = false;
+bool g_do_bcp = true;
 bool g_do_dce = false;
 bool g_do_dce_aggressive = false;
 bool g_infer_type = true;
@@ -113,13 +116,12 @@ bool g_do_pelog = false;
 bool g_do_scalar_opt = true;
 bool g_do_gp_adjustment = true;
 bool g_do_relaxation = false;
-bool g_do_memcheck = false;
-bool g_do_memcheck_static = false;
 bool g_retain_pass_mgr_for_region = true;
 bool g_is_simplify_parameter = true;
 bool g_is_simplify_array_ingredient = true;
 bool g_is_search_and_copy_dbx = true;
 bool g_generate_var_for_pr = true;
+bool g_strictly_ensure_the_use_of_pointer = false;
 DumpOption g_dump_opt;
 PassOption g_pass_opt;
 ArchOption g_arch;
@@ -131,13 +133,36 @@ UINT g_debug_reg_num = 0;
 bool g_force_use_fp_as_sp = false;
 bool g_do_ir_reloc = false;
 bool g_stack_on_global = false;
-bool g_interference_graph_stack_slot_color = false;
+bool g_do_spill_var_stack_coloring = false;
+bool g_do_stack_var_stack_coloring = false;
+bool g_do_local_var_stack_coloring = true;
 bool g_do_arg_passer = true;
 bool g_recycle_local_id = false;
 bool g_debug = false;
 bool g_debug_cpp = true;
-bool g_debug_pyhton = false;
+bool g_debug_pcx = false;
+bool g_debug_python = false;
+bool g_debug_gr = false;
 bool g_adjust_kernel = true;
+bool g_do_last_simp = true;
+bool g_do_insert_vecset = true;
+bool g_do_memcheck = false;
+bool g_do_memcheck_static = false;
+bool g_do_memcheck_oob = false;
+bool g_do_memcheck_static_oob = false;
+bool g_do_memcheck_stackoverflow = false;
+bool g_do_memcheck_reply_dependency = false;
+bool g_do_memcheck_static_reply_dependency = false;
+bool g_do_ir_fusion = true;
+bool g_do_inst_sched = false;
+bool g_do_stack_coloring = true;
+bool g_vset_insert_consider_first_vir = false;
+
+//Special options for different using of specific architectures.
+#ifdef FOR_TECO_IP
+bool g_do_relaxation2uncondbr = false;
+bool g_do_relaxation2jmp = false;
+#endif
 
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
@@ -224,6 +249,7 @@ void DumpOption::setDumpNothing()
 {
     is_dump_nothing = true;
     is_dump_all = false;
+    is_dump_for_test = false;
     is_dump_before_pass = false;
     is_dump_after_pass = false;
     is_dump_aa = false;
@@ -236,6 +262,7 @@ void DumpOption::setDumpNothing()
     is_dump_cp = false;
     is_dump_rp = false;
     is_dump_dce = false;
+    is_dump_bcp = false;
     is_dump_vrp = false;
     is_dump_lftr = false;
     is_dump_vectorization = false;
@@ -247,7 +274,6 @@ void DumpOption::setDumpNothing()
     is_dump_ivr = false;
     is_dump_licm = false;
     is_dump_exprtab = false;
-    is_dump_gcse = false;
     is_dump_loopcvt = false;
     is_dump_simplification = false;
     is_dump_prssamgr = false;
@@ -260,6 +286,7 @@ void DumpOption::setDumpNothing()
     is_dump_cfgopt = false;
     is_dump_rce = false;
     is_dump_infertype = false;
+    is_dump_inst_sched = false;
     is_dump_invert_brtgt = false;
     is_dump_alge_reasscociate = false;
     is_dump_refine_duchain = false;
@@ -269,6 +296,8 @@ void DumpOption::setDumpNothing()
     is_dump_gscc = false;
     is_dump_cdg = false;
     is_dump_lsra = false;
+    is_dump_linker = false;
+    is_dump_irfusion = false;
 }
 
 
@@ -276,6 +305,12 @@ void DumpOption::setDumpAll()
 {
     is_dump_nothing = false;
     is_dump_all = true;
+    //DumpAll will ask each passes dump complete and verbose information.
+    //The information by DumpAll is far more than the requirement of
+    //DumpForTest. Given the two options are usually alternative in
+    //many passes, thus disable DumpForTest here if DumpAll is enabled.
+    //However, user can enable DumpForTest explicitly at any time.
+    is_dump_for_test = false;
     is_dump_before_pass = true;
     is_dump_after_pass = true;
     is_dump_aa = true;
@@ -288,6 +323,7 @@ void DumpOption::setDumpAll()
     is_dump_cp = true;
     is_dump_rp = true;
     is_dump_dce = true;
+    is_dump_bcp = true;
     is_dump_vrp = true;
     is_dump_lftr = true;
     is_dump_vectorization = true;
@@ -295,7 +331,6 @@ void DumpOption::setDumpAll()
     is_dump_targinfo_handler = true;
     is_dump_loop_dep_ana = true;
     is_dump_gvn = true;
-    is_dump_gcse = true;
     is_dump_ivr = true;
     is_dump_licm = true;
     is_dump_exprtab = true;
@@ -313,6 +348,7 @@ void DumpOption::setDumpAll()
     is_dump_infertype = true;
     is_dump_invert_brtgt = true;
     is_dump_alge_reasscociate = true;
+    is_dump_inst_sched = true;
     is_dump_refine_duchain = true;
     is_dump_refine = true;
     is_dump_insert_cvt = true;
@@ -320,6 +356,8 @@ void DumpOption::setDumpAll()
     is_dump_gscc = true;
     is_dump_cdg = true;
     is_dump_lsra = true;
+    is_dump_linker = true;
+    is_dump_irfusion = true;
 }
 
 
@@ -329,6 +367,15 @@ bool DumpOption::isDumpAll() const
     ASSERT0(!(is_dump_nothing & is_dump_all));
     return is_dump_all;
 }
+
+
+bool DumpOption::isDumpForTest() const
+{
+    //is_dump_all and is_dump_nothing can not all be true.
+    ASSERT0(!(is_dump_nothing & is_dump_all));
+    return is_dump_for_test;
+}
+
 
 
 bool DumpOption::isDumpNothing() const
@@ -417,9 +464,33 @@ bool DumpOption::isDumpInvertBrTgt() const
 }
 
 
+bool DumpOption::isDumpInsertVecSet() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_insert_vecset);
+}
+
+
+bool DumpOption::isDumpInstSched() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_inst_sched);
+}
+
+
+bool DumpOption::isDumpStackColoring() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_stack_coloring);
+}
+
+
 bool DumpOption::isDumpVRP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_vrp);
+}
+
+
+bool DumpOption::isDumpBCP() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_bcp);
 }
 
 
@@ -480,6 +551,12 @@ bool DumpOption::isDumpCDG() const
 bool DumpOption::isDumpGVN() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gvn);
+}
+
+
+bool DumpOption::isDumpMDRef() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_mdref);
 }
 
 
@@ -637,6 +714,24 @@ bool DumpOption::isDumpKernelAdjustment() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_kernel_adjustment);
 }
+
+
+bool DumpOption::isDumpLastSimp() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_last_simp);
+}
+
+
+bool DumpOption::isDumpLinker() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_linker);
+}
+
+
+bool DumpOption::isDumpIRFusion() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_irfusion);
+}
 //END DumpOption
 
 
@@ -715,6 +810,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_expr_tab = %s", g_do_expr_tab ? "true":"false");
     note(lm, "\ng_do_cp_aggressive = %s", g_do_cp_aggressive ? "true":"false");
     note(lm, "\ng_do_cp = %s", g_do_cp ? "true":"false");
+    note(lm, "\ng_do_bcp = %s", g_do_bcp ? "true":"false");
     note(lm, "\ng_do_dce = %s", g_do_dce ? "true":"false");
     note(lm, "\ng_do_dce_aggressive = %s",
          g_do_dce_aggressive ? "true":"false");
@@ -764,6 +860,17 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_memcheck = %s", g_do_memcheck ? "true":"false");
     note(lm, "\ng_do_memcheck_static = %s",
          g_do_memcheck_static ? "true":"false");
+    note(lm, "\ng_do_memcheck_oob = %s",
+         g_do_memcheck_oob ? "true":"false");
+    note(lm, "\ng_do_memcheck_static_oob = %s",
+         g_do_memcheck_static_oob ? "true":"false");
+    note(lm, "\ng_do_memcheck_stackoverflow = %s",
+         g_do_memcheck_stackoverflow ? "true":"false");
+    note(lm, "\ng_do_memcheck_reply_dependency = %s",
+         g_do_memcheck_reply_dependency ? "true":"false");
+    note(lm, "\ng_do_memcheck_static_reply_dependency = %s",
+         g_do_memcheck_static_reply_dependency ? "true":"false");
+    note(lm, "\ng_do_inst_sched = %s", g_do_inst_sched ? "true":"false");
     note(lm, "\ng_retain_pass_mgr_for_region = %s",
          g_retain_pass_mgr_for_region ? "true":"false");
     note(lm, "\ng_is_simplify_parameter = %s",
@@ -774,6 +881,8 @@ void Option::dump(MOD LogMgr * lm)
          g_is_search_and_copy_dbx ? "true":"false");
     note(lm, "\ng_generate_var_for_pr = %s",
          g_generate_var_for_pr ? "true":"false");
+    note(lm, "\ng_strictly_ensure_the_use_of_pointer = %s",
+         g_strictly_ensure_the_use_of_pointer ? "true":"false");
     note(lm, "\ng_redirect_stdout_to_dump_file = %s",
          g_redirect_stdout_to_dump_file ? "true":"false");
     note(lm, "\ng_unique_dumpfile = 0x%x", g_unique_dumpfile);
@@ -791,9 +900,18 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_stack_on_global = %s", g_stack_on_global ? "true":"false");
     note(lm, "\ng_do_arg_passer = %s", g_do_arg_passer ? "true":"false");
     note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
-    note(lm, "\ng_interference_graph_stack_slot_color = %s",
-         g_interference_graph_stack_slot_color ? "true":"false");
+    note(lm, "\ng_do_spill_var_stack_coloring = %s",
+         g_do_spill_var_stack_coloring ? "true":"false");
+    note(lm, "\ng_do_stack_var_stack_coloring = %s",
+         g_do_stack_var_stack_coloring ? "true":"false");
+    note(lm, "\ng_do_local_var_stack_coloring = %s",
+         g_do_local_var_stack_coloring ? "true":"false");
+    note(lm, "\ng_do_stack_coloring = %s",
+         g_do_stack_coloring ? "true":"false");
     note(lm, "\ng_adjust_kernel = %s", g_adjust_kernel ? "true":"false");
+    note(lm, "\ng_do_ir_fusion = %s", g_do_ir_fusion ? "true":"false");
+    note(lm, "\ng_vset_insert_consider_first_vir = %s",
+         g_vset_insert_consider_first_vir ? "true" : "false");
     lm->decIndent(2);
 }
 
@@ -867,6 +985,7 @@ static UINT g_pass_num_in_level2 =
 static PassSwitch g_pass_in_level3[] {
     { &xoc::g_do_cp, },
     { &xoc::g_do_cp_aggressive, },
+    { &xoc::g_do_bcp, },
     { &xoc::g_do_dce, },
     { &xoc::g_do_dce_aggressive, },
     { &xoc::g_do_licm, },

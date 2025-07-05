@@ -258,6 +258,15 @@ void note_arg(Region const* rg, CHAR const* format, va_list args)
 }
 
 
+void note_arg(LogMgr * lm, CHAR const* format, va_list args)
+{
+    va_list targs;
+    va_copy(targs, args);
+    note_helper(lm, format, targs);
+    va_end(targs);
+}
+
+
 //Print string with indent chars.
 void note(RegionMgr const* rm, CHAR const* format, ...)
 {

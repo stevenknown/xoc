@@ -28,10 +28,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "../com/xcominc.h"
 #include "../opt/cominc.h"
+#include "../opt/act_mgr.h"
 #include "elf_header.h"
 #include "elf_targinfo.h"
+#include "linker_relax.h"
 #include "elf_mgr.h"
+#include "elf_option.h"
+#include "linker_pass_mgr.h"
+#include "linker_mgr.h"
 #include "misc_elf_mgr.h"
 #include "../opt/dwarf.h"
+#include "cache_miss.h"
 
 using namespace elf;

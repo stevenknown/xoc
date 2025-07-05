@@ -136,7 +136,7 @@ void IPA::computeCallRefForAllRegion()
         Region * rg = m_rumgr->getRegion(i);
         if (rg == nullptr ||
             (rg->getIRList() == nullptr &&
-             rg->getBBList()->get_elem_count() == 0)) {
+             rg->getBBList()->is_empty())) {
             continue;
         }
         rg->initPassMgr();
@@ -183,7 +183,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     ASSERT0(rg);
     if (rg->getIRList() == nullptr &&
         (rg->getBBList() == nullptr ||
-         rg->getBBList()->get_elem_count() == 0)) {
+         rg->getBBList()->is_empty())) {
         return;
     }
     if (rg->getPassMgr() == nullptr) {

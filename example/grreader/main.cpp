@@ -67,8 +67,8 @@ static bool readGR(CHAR * gr_file_name)
             xoc::prt2C("\noutput is %s\n", b.buf);
         }
         if (rg->getPassMgr() != NULL) {
-            xoc::PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
-                                         PASS_PRSSA_MGR);
+            xoc::PRSSAMgr * ssamgr =
+                (PRSSAMgr*)rg->getPassMgr()->queryPass(PASS_PRSSA_MGR);
             if (ssamgr != NULL && ssamgr->is_valid()) {
                 OptCtx * loc = rm->getAndGenOptCtx(rg);
                 ssamgr->destruction(*loc);

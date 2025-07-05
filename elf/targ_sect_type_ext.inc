@@ -35,6 +35,9 @@ author: Su Zhenyu
 #if defined(FOR_ARM)
 #include "../arm/arm_sect_type_ext.inc"
 
+#elif defined(FOR_TECO)
+#include "../teco/teco_sect_type_ext.inc"
+
 #elif defined(FOR_X86)
 #include "../x86/x86_sect_type_ext.inc"
 

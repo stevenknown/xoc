@@ -45,6 +45,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../x64/x64_elf_targinfo.h"
 #endif
 
+#ifdef FOR_TECO
+#include "../teco/teco_elf_targinfo.h"
+#include "../teco/t2_elf_targinfo.h"
+#endif
+
 namespace elf {
 
 void MiscELFMgr::allocTargInfo()
@@ -62,6 +67,10 @@ void MiscELFMgr::allocTargInfo()
     #endif
     #ifdef FOR_X64
     case EM_X86_64: m_ti = new X64ELFTargInfo(this); break;
+    #endif
+    #ifdef FOR_TECO
+    case EM_RISCV: m_ti = new T2ELFTargInfo(this); break;
+    case EM_SWAI_64: m_ti = new TECOELFTargInfo(this); break;
     #endif
     default:;
     }

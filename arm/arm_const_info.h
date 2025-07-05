@@ -854,24 +854,4 @@ typedef enum _EXTERNAL_CALL_TYPE {
     //EXTERNAL_POWF_T2,
 } EXTERNAL_CALL_TYPE;
 
-//These macros represent various bit size
-//that are used during processing bit width.
-#define VALID_BIT_SIZE_11 11
-#define VALID_BIT_SIZE_12 12
-#define VALID_BIT_SIZE_15 15
-#define VALID_BIT_SIZE_16 16
-
-//These macros represent various valid number
-//that are used during processing bit width.
-#define VALID_NUM_1 1
-#define VALID_NUM_2 2
-#define VALID_NUM_3 3
-#define SHAMT_5     5
-#define SHAMT_6     6
-
-//T2 control and status register (CSR) address map
-#define T2_CSR_ADDR_FFLAGS  0x1 //Floating-point accrued exceptions.
-#define T2_CSR_ADDR_FRM     0x2 //Floating-point dynamic rounding mode.
-#define T2_CSR_ADDR_FCSR    0x3 //fflags (0x1) + frm (0x2).
-
 #endif

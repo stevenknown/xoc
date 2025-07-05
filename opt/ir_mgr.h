@@ -47,6 +47,8 @@ namespace xoc {
 
 #define IRID_UNDEF 0 //The undefined value of IR's id.
 
+#define INIT_STMT_PLACE_HOLDER_NAME "#init_placeholder"
+
 class IRMgr : public Pass {
     COPY_CONSTRUCTOR(IRMgr);
 protected:
@@ -631,6 +633,17 @@ public:
     Var * genInitPlaceHolderVar();
     Var * getInitPlaceHolderVar() const { return m_init_placeholder_var; }
 
+    //The function attempts to generate DummyUse expression of CallStmt.
+    //The DummyUse expression is used to represent the possible memory object
+    //access during the Call processing.
+    //For now, if DUMgr can not infer more precise MayRef of the CallStmt,
+    //for conservative purposes, the worst-case MayRef will be used as the
+    //reference for the DummyUse expression.
+    //e.g: given foo(i:u64), if we do not known where i pointed to and
+    //whether the body of foo will dereference i, the DummyUse of foo will be
+    //the worst-case.
+    void genDummyuseForCallStmt(IR * ir) const;
+
     UINT getIRCount() const { return m_ir_count; }
 
     //Return the vector that record all allocated IRs.
@@ -693,6 +706,10 @@ public:
     //new ir-count.
     void setIRCount(UINT cnt) { m_ir_count = cnt; }
     virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
+
+    bool verify() const;
+    static bool verify(Region const* rg);
+    static bool verifyWhenFreeIR(IR const* ir, Region const* rg);
 };
 
 } //namespace xoc

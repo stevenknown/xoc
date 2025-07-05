@@ -39,22 +39,18 @@ namespace xoc {
 //Record Context info during Copy Propagation.
 #define CPC_change(c) (c).change
 #define CPC_need_recomp_aa(c) (c).need_recompute_alias_info
-class CPCtx {
+class CPCtx : public PassCtx {
 public:
     bool change;
     bool need_recompute_alias_info;
 public:
-    CPCtx()
-    {
-        change = false;
-        need_recompute_alias_info = false;
-    }
+    CPCtx(OptCtx & oc, ActMgr * am);
 
-    //Perform bit or operation.
-    void bor(CPCtx & c)
+    //Perform Bit-OR operation.
+    void bor(CPCtx const& src)
     {
-        change |= c.change;
-        need_recompute_alias_info |= c.need_recompute_alias_info;
+        change |= src.change;
+        need_recompute_alias_info |= src.need_recompute_alias_info;
     }
 };
 
@@ -130,16 +126,20 @@ protected:
     void copyVN(IR const* from, IR const* to) const;
     bool computeUseSet(IR const* def_stmt, OUT IRSet & useset,
                        OUT bool & prssadu, OUT bool & mdssadu);
-    bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
+
+    virtual bool checkPropBenifit(IR const* ir, IR const* cand_exp) const
+    { return true; }
+
+    virtual bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
     bool doPropUseSet(IRSet const& useset, IR const* def_stmt,
                       IR const* prop_value, IRListIter cur_iter,
                       IRListIter * next_iter,
                       bool prssadu, bool mdssadu);
-    bool doPropForMDPhi(IR const* prop_value, MOD IR * use);
+    bool doPropForMDPhi(IR const* def_stmt, IR const* prop_value,
+                        MOD IR * use);
     bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
-                             IR const* prop_value, MOD IR * use,
-                             IRBB * def_bb);
+        IR const* def_stmt, IR const* prop_value, MOD IR * use, IRBB * def_bb);
     //cpop: the copy operation.
     //useset: for local used.
     bool doPropStmt(IR * cpop, MOD IRSet & useset,
@@ -177,6 +177,9 @@ protected:
         UNREACHABLE();
         return false;
     }
+
+    virtual bool initDepPass(MOD OptCtx & oc) { return true; }
+
     //Return true if CVT with simply cvt-exp that can be regard as
     //copy-propagate candidate.
     virtual bool isSimpCVT(IR const* ir) const;
@@ -233,7 +236,8 @@ protected:
                             IRListIter const& next_iter,
                             bool prssadu, bool mdssadu) const;
 
-    void replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
+    void replaceExp(IR const* def_stmt, MOD IR * exp, IR const* cand_exp,
+                    MOD CPCtx & ctx);
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.

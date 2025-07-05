@@ -69,8 +69,8 @@ protected:
     xcom::SMemPool * m_sc_labelinfo_pool;
     //Indicate a list of IR.
     IR * m_ir_list;
-    xcom::List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    xcom::List<IR const*> * m_return_list; //record RETURN in region.
+    ConstIRList * m_call_list; //record CALL/ICALL in region.
+    ConstIRList * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     AttachInfoMgr * m_attachinfo_mgr; //AttachInfo manager.
 

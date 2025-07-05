@@ -54,6 +54,9 @@ void TargInfoMgr::init()
 
     initAllocableScalar();
     initAllocableVector();
+
+    initCaller();
+    initCallee();
 }
 
 

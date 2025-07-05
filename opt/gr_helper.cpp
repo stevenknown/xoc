@@ -164,11 +164,11 @@ void GRDump::dumpProp(IR const* ir, DumpGRCtx const* ctx) const
 }
 
 
-CHAR const* GRDump::compositeName(Sym const* n, xcom::StrBuf & buf)
+CHAR const* GRDump::compositeName(Sym const* n, xcom::DefFixedStrBuf & buf)
 {
     if (xoc::isContainNonIdentifierChar(n->getStr())) {
         buf.sprint("\"%s\"", n->getStr());
-        return buf.buf;
+        return buf.getBuf();
     }
     return n->getStr();
 }
@@ -287,7 +287,7 @@ void GRDump::dumpPhi(IR const* ir, DumpGRCtx const* ctx) const
 {
     TypeMgr * tm = const_cast<TypeMgr*>(m_tm);
     Type const* d = ir->getType();
-    StrBuf buf(64);
+    xcom::DefFixedStrBuf buf;
     note(m_lm, "\n%s %s%d:%s = ", IRNAME(ir), PR_TYPE_CHAR, PHI_prno(ir),
          tm->dump_type(d, buf));
     UINT dn = DUMP_INDENT_NUM;
@@ -326,11 +326,10 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 {
     UINT dn = DUMP_INDENT_NUM;
     if (!m_rg->isLogMgrInit() || ir == nullptr) { return; }
-    StrBuf buf(64);
-    StrBuf buf2(64);
+    xcom::DefFixedStrBuf buf;
     Type const* d = ir->getType();
     switch (ir->getCode()) {
-    case IR_ST:
+    case IR_ST: {
         note(m_lm, "\n%s:%s", IRNAME(ir), m_tm->dump_type(d, buf));
         dumpOffset(ir);
         dumpProp(ir, ctx);
@@ -341,6 +340,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         m_lm->decIndent(dn);
         prt(m_lm, ";");
         break;
+    }
     case IR_STPR:
         note(m_lm, "\n%s", IRNAME(ir));
         prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, STPR_no(ir),
@@ -411,13 +411,14 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         m_lm->decIndent(dn);
         prt(m_lm, ";");
         break;
-    case IR_LD:
+    case IR_LD: {
         note(m_lm, "\n%s:%s", IRNAME(ir), m_tm->dump_type(d, buf));
         dumpOffset(ir);
         dumpProp(ir, ctx);
         buf.clean();
         prt(m_lm, " %s", compositeName(LD_idinfo(ir)->get_name(), buf));
         break;
+    }
     case IR_ILD:
         note(m_lm, "\n%s:%s", IRNAME(ir), m_tm->dump_type(d, buf));
         dumpOffset(ir);
@@ -609,13 +610,13 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpIRList(SELECT_falseexp(ir), ctx);
         m_lm->decIndent(dn);
         break;
-    case IR_LDA:
+    case IR_LDA: {
         note(m_lm, "\n%s", IRNAME(ir));
         dumpOffset(ir);
         dumpProp(ir, ctx);
-        buf.clean();
         prt(m_lm, " %s", compositeName(LDA_idinfo(ir)->get_name(), buf));
         break;
+    }
     case IR_PHI:
         dumpPhi(ir, ctx);
         break;
@@ -671,7 +672,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
 
         dumpArrSubList(ir, dn, ctx);
         break;
-    SWITCH_CASE_CALL:
+    SWITCH_CASE_CALL: {
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
         prt(m_lm, " ");
@@ -700,6 +701,7 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         prt(m_lm, ")");
         prt(m_lm, ";");
         break;
+    }
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         note(m_lm, "\n%s", IRNAME(ir));
         dumpProp(ir, ctx);
@@ -738,9 +740,36 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         note(m_lm, "\nundef!");
         break;
     default:
-        ASSERTN(0, ("unknown IR code:%s", IRNAME(ir)));
-        return ;
+        dumpExtOp(ir, ctx);
+        break;
     }
+}
+
+
+void GRDump::dumpAllKids(IR const* ir, DumpGRCtx const* ctx) const
+{
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * k = ir->getKid(i);
+        if (k == nullptr) { continue; }
+        if (i != 0) {
+            prt(m_lm, ", ");
+        }
+        dumpIRList(k, ctx);
+    }
+}
+
+
+void GRDump::dumpExtOp(IR const* ir, DumpGRCtx const* ctx) const
+{
+    Type const* d = ir->getType();
+    UINT dn = DUMP_INDENT_NUM;
+    xcom::DefFixedStrBuf buf;
+    note(m_lm, "\n%s:%s", IRNAME(ir), m_tm->dump_type(d, buf));
+    dumpProp(ir, ctx);
+    prt(m_lm, " ");
+    m_lm->incIndent(dn);
+    dumpAllKids(ir, ctx);
+    m_lm->decIndent(dn);
 }
 
 
@@ -786,7 +815,8 @@ void GRDump::dumpBBList(BBList const* bblist, DumpGRCtx const* ctx) const
 
 void GRDump::dumpRegion(bool dump_inner_region) const
 {
-    note(m_rg, "\n//==---- DUMP Region '%s' ----==", m_rg->getRegionName());
+    CHAR const* rgn = m_rg->getRegionName();
+    note(m_rg, "\n//==---- DUMP Region '%s' ----==", rgn != nullptr ? rgn : "");
     note(m_rg, "\nregion ");
     switch (m_rg->getRegionType()) {
     case REGION_PROGRAM: prt(m_rg, "program "); break;
@@ -796,7 +826,7 @@ void GRDump::dumpRegion(bool dump_inner_region) const
     default: UNREACHABLE(); //TODO
     }
     if (m_rg->getRegionVar() != nullptr) {
-        xcom::StrBuf buf(32);
+        xcom::DefFixedStrBuf buf;
         prt(m_rg, "%s ", GRDump::compositeName(
                          m_rg->getRegionVar()->get_name(), buf));
     }

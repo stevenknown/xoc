@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "xcominc.h"
+#include "sys/stat.h"
 
 namespace xcom {
 
@@ -132,6 +133,26 @@ void FileObj::destroy()
         ::fclose(m_file_handler);
     }
     m_file_handler = nullptr;
+}
+
+
+bool FileObj::isDirExist(CHAR const* dirname)
+{
+    struct stat statbuf;
+    if (::stat(dirname, &statbuf) != 0) { return false; }
+    #ifdef _ON_WINDOWS_
+    //#define _S_IFMT   0xF000 // File type mask
+    //#define _S_IFDIR  0x4000 // Directory
+    //#define _S_IFCHR  0x2000 // Character special
+    //#define _S_IFIFO  0x1000 // Pipe
+    //#define _S_IFREG  0x8000 // Regular
+    //#define _S_IREAD  0x0100 // Read permission, owner
+    //#define _S_IWRITE 0x0080 // Write permission, owner
+    //#define _S_IEXEC  0x0040 // Execute/search permission, owner
+    return HAVE_FLAG(statbuf.st_mode, _S_IFDIR);
+    #else
+    return S_ISDIR(statbuf.st_mode);
+    #endif
 }
 
 

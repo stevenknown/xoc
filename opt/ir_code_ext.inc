@@ -44,6 +44,10 @@ IR_ATOMINC,
 //Represent atomic cas operation of compare and swap on memory.
 IR_ATOMCAS,
 
+//Represent physical register.
+//NOTE: the IR code is available only when REF_TARGMACH_INFO is enabled.
+IR_PHYREG,
+
 //Placeholder IR code for corresponding SWITCH-CASE entry.
 IR_EXT_UNA_PLACEHOLDER,
 IR_EXT_BIN_PLACEHOLDER,

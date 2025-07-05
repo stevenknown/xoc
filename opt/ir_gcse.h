@@ -38,6 +38,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class GCSE;
+
 class TG : public xcom::DGraph {
     Region * m_rg;
 protected:
@@ -88,6 +90,26 @@ public:
 class CSE2DeleTab : public xcom::TMap<IR const*, IR*> {
 };
 
+class GCSECtx : public PassCtx {
+    COPY_CONSTRUCTOR(GCSECtx);
+protected:
+    IRCFG * m_cfg;
+    TG * m_tg;
+    GCSE * m_gcse;
+protected:
+    TG * allocTG(Region * rg);
+public:
+    GCSECtx(OptCtx & oc, xcom::DomTree const& domtree, ActMgr * am,
+            GCSE * gcse);
+    ~GCSECtx();
+    IRCFG * getCFG() const { return m_cfg; }
+    TG * getTG() const { return m_tg; }
+
+    //The function try to judge if given 'ir' may reference IV, GVN etc.
+    //If it is true, the function will invalidate related passes to avoid
+    //inconsistent access of these informations.
+    void tryInvalidInfoBeforeFreeIR(IR const* ir) const;
+};
 
 //The class performs global common subexpression recognization and replacement.
 //Note the CSE recognization and replacement only apply to the entire RHS of
@@ -124,7 +146,6 @@ private:
     TypeMgr * m_tm;
     GVN * m_gvn;
     TG * m_tg;
-    OptCtx const* m_oc;
     InferEVN * m_infer_evn;
     DefMiscBitSetMgr m_misc_bs_mgr;
     CSE2DeleTab m_exp2pr;
@@ -133,40 +154,43 @@ private:
     List<IR*> m_newst_lst;
     ActMgr m_am;
 protected:
-    void cleanVNForIRTree(IR const* ir);
     void copyVN(IR const* newir, IR const* oldir);
+    bool canElimCVT(IR const* exp, IR const* gen) const;
 
-    bool doPropVNDirectStmt(IR * ir);
-    bool doPropVNIndirectStmt(IR * ir);
-    bool doPropVNCallStmt(IR * ir);
-    bool doPropVNBrStmt(IR * ir);
-    bool doPropVNRetStmt(IR * ir);
-    bool doPropVNStmt(IR * ir);
-    bool doPropBranch(IR * ir, MOD List<IR*> & livexp);
-    bool doPropCall(IR * ir, MOD List<IR*> & livexp);
-    bool doPropAssign(IR * ir, MOD List<IR*> & livexp);
-    bool doPropReturn(IR * ir, MOD List<IR*> & livexp);
-    virtual bool doPropStmt(IR * ir, List<IR*> & livexp);
-    bool doPropExp(IRBB * bb, List<IR*> & livexp);
-    bool doPropVN(IRBB * bb);
-    bool doPropVNInDomTreeOrder(xcom::DomTree const& domtree);
-    bool doPropExpInDomTreeOrder(xcom::DomTree const& domtree);
-    void dumpAct(IR const* oldexp, IR const* genexp, IR const* newexp);
+    bool doPropVNDirectStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropVNIndirectStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropVNCallStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropVNBrStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropVNRetStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropVNStmt(IR * ir, GCSECtx const& ctx);
+    bool doPropBranch(IR * ir, MOD List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropCall(IR * ir, MOD List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropAssign(IR * ir, MOD List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropReturn(IR * ir, MOD List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropStmt(IR * ir, List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropExp(IRBB * bb, List<IR*> & livexp, GCSECtx const& ctx);
+    bool doPropVN(IRBB * bb, GCSECtx const& ctx);
+    bool doPropVNInDomTreeOrder(
+        xcom::DomTree const& domtree, GCSECtx const& ctx);
+    bool doPropExpInDomTreeOrder(
+        xcom::DomTree const& domtree, GCSECtx const& ctx);
 
-    bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
+    bool elim(IR * use, IR * use_stmt, IR * gen,
+              IR * gen_stmt, GCSECtx const& ctx);
 
     // If find 'exp' is CSE, replace it with related PR.
     //NOTE: exp should be freed.
-    bool findAndElim(IR * exp, IR * gen);
+    bool findAndElim(IR * exp, IR * gen, GCSECtx const& ctx);
 
-    OptCtx const* getOptCtx() const { return m_oc; }
+    //Generate delegate-PR of CSE at generation point.
+    IR * genDelegatePR(IR const* gen, IR const* gen_stmt);
 
-    bool handleCandidate(IR * exp, IRBB * bb);
-    bool handleCandidateByExprRep(IR * exp);
+    bool handleCandidate(IR * exp, IRBB * bb, GCSECtx const& ctx);
+    bool handleCandidateByExprRep(IR * exp, GCSECtx const& ctx);
     bool hasSideEffect(IR const* ir) const;
 
     virtual bool isCseCandidate(IR const* ir) const;
-    bool isDom(IR const* exp_stmt, IR const* gen_stmt) const;
+    bool initDepPass(MOD OptCtx & oc);
 
     //Replace 'use' CSE with PR that related to 'gen' CSE.
     //e.g: ...=a+b <--generate CSE
@@ -178,9 +202,16 @@ protected:
     //gen: the referrence of CSE.
     //NOTE: 'use' should be freed.
     //      'use' must be rhs of 'use_stmt'.
-    void elimCse(IR * use, IR * use_stmt, IR const* gen);
-    void elimCseOfBranch(IR * use, IR * use_stmt, IR * gen);
-    void elimCseOfAssignment(IR * use, IR * use_stmt, IR * gen);
+    //Return true if 'use' is replaced.
+    bool elimCSE(IR * use, IR * use_stmt, IR const* gen, GCSECtx const& ctx);
+
+    //Return true if 'use' is replaced.
+    bool elimCseOfBranch(
+        IR * use, IR * use_stmt, IR * gen, GCSECtx const& ctx);
+
+    //Return true if 'use' is replaced.
+    bool elimCseOfAssignment(
+        IR * use, IR * use_stmt, IR * gen, GCSECtx const& ctx);
 
     //Reset local used data.
     void reset();
@@ -191,13 +222,14 @@ protected:
     //     ...
     //     ...=a+b <--use CSE
     //gen: generated CSE.
-    void processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change);
+    void processCseGen(MOD IR * gen, MOD IR * gen_stmt, bool & change,
+                       GCSECtx const& ctx);
 
     //If find 'exp' is CSE, replace it with related pr.
     //NOTE: exp should be freed.
-    bool processCse(MOD IR * ir, List<IR*> & livexp);
+    bool processCSE(MOD IR * ir, List<IR*> & livexp, GCSECtx const& ctx);
 
-    virtual bool shouldBeCse(IR const* det) const;
+    virtual bool shouldBeCSE(IR const* det) const;
 
     void removeMayKill(IR * ir, MOD List<IR*> & livexp);
 
@@ -221,9 +253,10 @@ public:
     void dumpEVN() const;
 
     virtual CHAR const* getPassName() const
-    { return "Global Command Subexpression Elimination"; }
+    { return "Global Common Subexpression Elimination"; }
     PASS_TYPE getPassType() const { return PASS_GCSE; }
     ActMgr const& getActMgr() const { return m_am; }
+    InferEVN * getInferEVN() const { return m_infer_evn; }
 
     bool perform(OptCtx & oc);
 };

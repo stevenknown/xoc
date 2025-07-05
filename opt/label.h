@@ -36,6 +36,11 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class LabelInfo;
+
+typedef xcom::List<LabelInfo const*> LabelList;
+typedef xcom::List<LabelInfo const*>::Iter LabelListIter;
+
 typedef enum {
     L_UNDEF = 0,
     L_CLABEL, //customer defined label
@@ -70,6 +75,7 @@ typedef enum {
 #define LABELINFO_is_try_start(l) ((l)->u2.s1.is_try_start)
 #define LABELINFO_is_try_end(l) ((l)->u2.s1.is_try_end)
 #define LABELINFO_is_terminate(l) ((l)->u2.s1.is_terminate)
+#define LABELINFO_is_refed_by_ir(l) ((l)->u2.s1.is_refed_by_ir)
 #define LABELINFO_is_pragma(l) (LABELINFO_type(l) == L_PRAGMA)
 #define LABELINFO_b1(l) ((l)->u2.b1)
 class LabelInfo {
@@ -99,6 +105,9 @@ public:
             //Set true if current label is a placeholer to indicate that
             //program control flow is terminate here.
             BYTE is_terminate:1;
+
+            //Set true if current label is referenced by other IRs.
+            BYTE is_refed_by_ir:1;
         } s1;
         BYTE b1;
     } u2;
@@ -116,7 +125,8 @@ public:
     void dumpName(Region const* rg) const;
 
     //Format and return label name which is usually used to dump.
-    CHAR const* getName(OUT StrBuf & buf) const;
+    template<class StrBufType>
+    CHAR const* getName(OUT StrBufType & buf) const;
 
     //Return the original label name without pretty formatting.
     Sym const* getOrgName() const { return LABELINFO_name(this); }
@@ -144,6 +154,7 @@ public:
     bool is_try_start() const { return LABELINFO_is_try_start(this); }
     bool is_try_end() const { return LABELINFO_is_try_end(this); }
     bool is_terminate() const { return LABELINFO_is_terminate(this); }
+    bool is_refed_by_ir() const { return LABELINFO_is_refed_by_ir(this); }
 };
 
 
@@ -166,6 +177,20 @@ inline UINT computeLabelHashValue(LabelInfo const* li)
     return (UINT)v;
 }
 
+template<class StrBufType>
+CHAR const* LabelInfo::getName(OUT StrBufType & buf) const
+{
+    if (LABELINFO_type(this) == L_ILABEL) {
+        buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(this));
+    } else if (LABELINFO_type(this) == L_CLABEL) {
+        buf.strcat("%s", SYM_name(LABELINFO_name(this)));
+    } else if (LABELINFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(this));
+        buf.strcat("%s", SYM_name(LABELINFO_pragma(this)));
+    }
+    else { UNREACHABLE(); }
+    return buf.getBuf();
+}
 
 LabelInfo * allocLabel(SMemPool * pool);
 LabelInfo * allocInternalLabel(SMemPool * pool);

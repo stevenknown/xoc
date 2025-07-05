@@ -35,7 +35,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-void setLineNum(IR * ir, UINT lineno, Region * rg, LangInfo::LANG language)
+void setLineNum(IR * ir, UINT lineno, Region * rg, LANG_TYPE language)
 {
     ASSERT0(ir && rg);
     DbxAttachInfo * da = nullptr;
@@ -72,7 +72,7 @@ void setLineNum(IR * ir, UINT lineno, Region * rg, LangInfo::LANG language)
 
 
 void setLoc(IR * ir, Region * rg, UINT lineno, UINT col,
-            UINT file_index, LangInfo::LANG language)
+            UINT file_index, LANG_TYPE language)
 {
     DbxAttachInfo * da = nullptr;
     ASSERT0(rg && ir);
@@ -112,7 +112,7 @@ void setLoc(IR * ir, Region * rg, UINT lineno, UINT col,
 
 
 //Get line number in source code that corresponding to the IR.
-UINT getLineNum(IR const* ir, LangInfo::LANG language, DbxMgr * dbx_mgr)
+UINT getLineNum(IR const* ir, LANG_TYPE language, DbxMgr * dbx_mgr)
 {
     if (IR_ai(ir) == nullptr || !IR_ai(ir)->is_init()) { return 0; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
@@ -122,9 +122,33 @@ UINT getLineNum(IR const* ir, LangInfo::LANG language, DbxMgr * dbx_mgr)
 
 
 //Get line number in source code.
-UINT getLineNum(Dbx const* dbx, LangInfo::LANG language, DbxMgr * dbx_mgr)
+UINT getLineNum(Dbx const* dbx, LANG_TYPE language, DbxMgr * dbx_mgr)
 {
     return dbx->getLine(language, dbx_mgr);
+}
+
+
+UINT getLineNumOfGR(Dbx const* dbx, Region const* rg)
+{
+    ASSERT0(dbx && rg);
+    ASSERT0(rg->getDbxMgr());
+    return getLineNum(dbx, LANG_GR, rg->getDbxMgr());
+}
+
+
+UINT getLineNumOfPython(Dbx const* dbx, Region const* rg)
+{
+    ASSERT0(dbx && rg);
+    ASSERT0(rg->getDbxMgr());
+    return getLineNum(dbx, LANG_PYTHON, rg->getDbxMgr());
+}
+
+
+UINT getLineNumOfCPP(Dbx const* dbx, Region const* rg)
+{
+    ASSERT0(dbx && rg);
+    ASSERT0(rg->getDbxMgr());
+    return getLineNum(dbx, LANG_CPP, rg->getDbxMgr());
 }
 
 
@@ -133,6 +157,15 @@ void copyDbxForList(IR * tgt_list, IR const* src, Region * rg)
 {
     for (IR * tgt = tgt_list; tgt != nullptr; tgt = tgt->get_next()) {
         copyDbx(tgt, src, rg);
+    }
+}
+
+
+//Copy dbx from 'dbx' to each element in 'tgt_list'.
+void copyDbxForList(IR * tgt_list, Dbx const* dbx, Region * rg)
+{
+    for (IR * tgt = tgt_list; tgt != nullptr; tgt = tgt->get_next()) {
+        copyDbx(tgt, dbx, rg);
     }
 }
 
@@ -172,7 +205,8 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
 {
     ASSERT0(tgt && src && rg);
     DbxMgr * dbx_mgr = rg->getDbxMgr();
-    ASSERT0(dbx_mgr);
+    if (dbx_mgr == nullptr) { return; }
+    ASSERT0(!src->is_undef() && !tgt->is_undef());
     if (src->getAI() == nullptr) {
         if (g_is_search_and_copy_dbx && src->is_exp() &&
             src->getParent() != nullptr) {
@@ -224,6 +258,37 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
 }
 
 
+//Copy Dbx information from 'dbx' to 'tgt'.
+void copyDbx(IR * tgt, Dbx const* dbx, Region * rg)
+{
+    ASSERT0(tgt && dbx && rg);
+    ASSERT0(!tgt->is_undef());
+    DbxMgr * dbx_mgr = rg->getDbxMgr();
+    if (dbx_mgr == nullptr) { return; }
+    if (tgt->getAI() == nullptr) {
+        IR_ai(tgt) = rg->allocAIContainer();
+    } else {
+        IR_ai(tgt)->init();
+    }
+    ASSERT0(IR_ai(tgt));
+    DbxAttachInfo * tgt_da = nullptr;
+    if (tgt->getAI()->is_init()) {
+        tgt_da = (DbxAttachInfo*)tgt->getAI()->get(AI_DBX);
+    }
+    if (tgt_da == nullptr) {
+        tgt_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
+                                              rg->getCommPool());
+        ASSERT0(tgt_da);
+
+        //This is the memory allocation for the various attributes of dbx,
+        //which is dbx's own memory allocator.
+        tgt_da->init(dbx_mgr);
+        IR_ai(tgt)->set((BaseAttachInfo*)tgt_da, rg);
+    }
+    tgt_da->dbx.copy(*dbx, dbx_mgr);
+}
+
+
 Dbx * getDbx(IR const* ir)
 {
     if (IR_ai(ir) == nullptr || !IR_ai(ir)->is_init()) { return nullptr; }
@@ -243,7 +308,7 @@ void Dbx::init(DbxMgr * dbx_mgr)
 void Dbx::clean(DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx_mgr && m_debug_infos);
-    ASSERT0(DBXMGR_lang_info(dbx_mgr).getLangNum() < MAX_FRONTEND_LANGUAGES);
+    ASSERT0(DBXMGR_lang_info(dbx_mgr).getLangNum() < LANG_NUM);
     ::memset(m_debug_infos, 0, sizeof(DebugInfo) *
         DBXMGR_lang_info(dbx_mgr).getLangNum());
 }
@@ -252,13 +317,13 @@ void Dbx::clean(DbxMgr * dbx_mgr)
 void Dbx::copy(Dbx const& dbx, DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx.m_debug_infos && this->m_debug_infos && dbx_mgr);
-    ASSERT0(DBXMGR_lang_info(dbx_mgr).getLangNum() < MAX_FRONTEND_LANGUAGES);
+    ASSERT0(DBXMGR_lang_info(dbx_mgr).getLangNum() < LANG_NUM);
     ::memcpy((*this).m_debug_infos, dbx.m_debug_infos, (sizeof(DebugInfo) *
         DBXMGR_lang_info(dbx_mgr).getLangNum()));
 }
 
 
-UINT32 Dbx::getLine(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
+UINT32 Dbx::getLine(LANG_TYPE lang, DbxMgr * dbx_mgr) const
 {
     ASSERT0(dbx_mgr);
     return m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -266,7 +331,7 @@ UINT32 Dbx::getLine(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
 }
 
 
-UINT32 Dbx::getColOffset(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
+UINT32 Dbx::getColOffset(LANG_TYPE lang, DbxMgr * dbx_mgr) const
 {
     ASSERT0(dbx_mgr);
     return m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -274,7 +339,7 @@ UINT32 Dbx::getColOffset(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
 }
 
 
-UINT32 Dbx::getFileIndex(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
+UINT32 Dbx::getFileIndex(LANG_TYPE lang, DbxMgr * dbx_mgr) const
 {
     ASSERT0(dbx_mgr);
     return m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -282,7 +347,7 @@ UINT32 Dbx::getFileIndex(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
 }
 
 
-UINT8 Dbx::getFlag(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
+UINT8 Dbx::getFlag(LANG_TYPE lang, DbxMgr * dbx_mgr) const
 {
     ASSERT0(dbx_mgr);
     return m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -290,7 +355,7 @@ UINT8 Dbx::getFlag(LangInfo::LANG lang, DbxMgr * dbx_mgr) const
 }
 
 
-void Dbx::setLine(LangInfo::LANG lang, UINT32 line, DbxMgr * dbx_mgr)
+void Dbx::setLine(LANG_TYPE lang, UINT32 line, DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx_mgr);
     m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -298,7 +363,7 @@ void Dbx::setLine(LangInfo::LANG lang, UINT32 line, DbxMgr * dbx_mgr)
 }
 
 
-void Dbx::setColOffset(LangInfo::LANG lang, UINT32 col_offset,
+void Dbx::setColOffset(LANG_TYPE lang, UINT32 col_offset,
                        DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx_mgr);
@@ -307,7 +372,7 @@ void Dbx::setColOffset(LangInfo::LANG lang, UINT32 col_offset,
 }
 
 
-void Dbx::setFileIndex(LangInfo::LANG lang, UINT32 file_index,
+void Dbx::setFileIndex(LANG_TYPE lang, UINT32 file_index,
                        DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx_mgr);
@@ -316,7 +381,7 @@ void Dbx::setFileIndex(LangInfo::LANG lang, UINT32 file_index,
 }
 
 
-void Dbx::setFlag(LangInfo::LANG lang, UINT8 flag, DbxMgr * dbx_mgr)
+void Dbx::setFlag(LANG_TYPE lang, UINT8 flag, DbxMgr * dbx_mgr)
 {
     ASSERT0(dbx_mgr);
     m_debug_infos[DBXMGR_lang_info(dbx_mgr).
@@ -326,14 +391,14 @@ void Dbx::setFlag(LangInfo::LANG lang, UINT8 flag, DbxMgr * dbx_mgr)
 //
 //START LangInfo
 //
-void LangInfo::setLangIndex(LangInfo::LANG lang, UINT8 index)
+void LangInfo::setLangIndex(LANG_TYPE lang, UINT8 index)
 {
     ASSERT0(!m_frontend_lang_to_index.find(lang));
     m_frontend_lang_to_index.set(lang, index);
 }
 
 
-UINT8 LangInfo::getLangIndex(LangInfo::LANG lang) const
+UINT8 LangInfo::getLangIndex(LANG_TYPE lang) const
 {
     ASSERT0(m_frontend_lang_to_index.find(lang));
     return m_frontend_lang_to_index.get(lang);
@@ -350,20 +415,17 @@ UINT8 LangInfo::getLangNum() const
 //
 void DbxMgr::init()
 {
-    if (m_pool == nullptr) {
-        m_pool = smpoolCreate(64, MEM_COMM);
-    }
+    if (m_pool != nullptr) { return; }
+    m_pool = smpoolCreate(64, MEM_COMM);
     ASSERT0(m_pool);
 }
 
 
 void DbxMgr::destroy()
 {
-    if (m_pool != nullptr) {
-        smpoolDelete(m_pool);
-        m_pool = nullptr;
-    }
-
+    if (m_pool == nullptr) { return; }
+    smpoolDelete(m_pool);
+    m_pool = nullptr;
     Lang2FileIdx2FileNameIter iter;
     FileIdx2FileName * file_vec;
     for (m_lang2fi2fn.get_first(iter, &file_vec); !iter.end();
@@ -371,6 +433,7 @@ void DbxMgr::destroy()
         if (file_vec == nullptr) { continue; }
         delete file_vec;
     }
+    m_lang2fi2fn.clean();
 }
 
 
@@ -413,23 +476,25 @@ FileIdx2FileName * DbxMgr::allocFileVec()
 
 void DbxMgr::setLangInfo()
 {
-    UINT8 index_lang_num = 0;
     if (g_debug_cpp) {
-        m_lang_info.setLangIndex(LangInfo::LANG_CPP, index_lang_num++);
+        m_lang_info.setLangIndex(LANG_CPP, m_lang_info.getLangNum());
     }
-    if (g_debug_pyhton) {
-        m_lang_info.setLangIndex(LangInfo::LANG_PYTHON, index_lang_num++);
+    if (g_debug_python) {
+        m_lang_info.setLangIndex(LANG_PYTHON, m_lang_info.getLangNum());
+    }
+    if (g_debug_gr) {
+        m_lang_info.setLangIndex(LANG_GR, m_lang_info.getLangNum());
     }
 }
 
 
-void DbxMgr::setFileName(LangInfo::LANG lang, UINT fileidx, xoc::Sym const* s)
+void DbxMgr::setFileName(LANG_TYPE lang, UINT fileidx, xoc::Sym const* s)
 {
     ASSERT0(s);
     ASSERTN(fileidx < MAX_FILE_INDEX,
             ("m_fi2fn may be better when using TMap compared to using"
                 " Vector if fileindex is sparse"));
-    ASSERTN(lang < MAX_FRONTEND_LANGUAGES,
+    ASSERTN(lang < LANG_NUM,
             ("The number of supported languages has been exceeded."));
     FileIdx2FileName * file2_file_name = m_lang2fi2fn.get(lang);
     if (file2_file_name == nullptr) {
@@ -441,9 +506,9 @@ void DbxMgr::setFileName(LangInfo::LANG lang, UINT fileidx, xoc::Sym const* s)
 }
 
 
-xoc::Sym const* DbxMgr::getFileName(LangInfo::LANG lang, UINT fileidx) const
+xoc::Sym const* DbxMgr::getFileName(LANG_TYPE lang, UINT fileidx) const
 {
-    ASSERTN(m_lang_info.getLangNum() < MAX_FRONTEND_LANGUAGES,
+    ASSERTN(m_lang_info.getLangNum() < LANG_NUM,
             ("The number of supported languages has been exceeded."));
     ASSERTN(fileidx < MAX_FILE_INDEX,
             ("m_fi2fn may be better when using TMap compared to using"

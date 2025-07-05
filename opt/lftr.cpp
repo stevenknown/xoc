@@ -34,7 +34,7 @@ namespace xoc {
 //
 //START LFAnaCtx
 //
-LFAnaCtx::LFAnaCtx(LI<IRBB> const* li)
+LFAnaCtx::LFAnaCtx(OptCtx const& oc, LI<IRBB> const* li) : m_oc(oc)
 {
     m_li = li;
     m_pool = smpoolCreate(sizeof(LFRInfo) * 4, MEM_COMM);
@@ -154,7 +154,7 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
     for (LI<IRBB> * tli = li; tli != nullptr; tli = tli->get_next()) {
         changed |= doLoopTree(tli->getInnerList(), du_set_info_changed,
                               insert_bb, oc);
-        LFAnaCtx ctx(tli);
+        LFAnaCtx ctx(oc, tli);
         analysis(tli, ctx);
         if (ctx.getCandList().get_elem_count() == 0) { continue; }
         if (g_dump_opt.isDumpAfterPass()) {
@@ -527,7 +527,7 @@ bool LFTR::replaceCandByIV(LFAnaCtx const& ctx)
         ASSERT0(info->lf_exp->is_exp());
         info->lf_exp->getStmt()->replaceKid(info->lf_exp, genNewIVRef(info),
                                             true);
-        xoc::removeUseForTree(info->lf_exp, m_rg, *getOptCtx());
+        xoc::removeUseForTree(info->lf_exp, m_rg, ctx.getOptCtx());
         changed = true;
     }
     return changed;
@@ -581,10 +581,9 @@ bool LFTR::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
-                                               PASS_IVR, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_LOOP_INFO, PASS_IVR, PASS_UNDEF);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
     ASSERT0(m_ivr && m_ivr->is_valid());
 
@@ -593,8 +592,9 @@ bool LFTR::perform(OptCtx & oc)
 
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
-    bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
-                             insert_bb, oc);
+    ASSERT0(xoc::verifyIVR(m_rg));
+    bool change = doLoopTree(
+        m_cfg->getLoopInfo(), du_set_info_changed, insert_bb, oc);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();
         END_TIMER(t, getPassName());
@@ -603,7 +603,7 @@ bool LFTR::perform(OptCtx & oc)
     //This pass does not devastate IVR information. However, new IV might be
     //inserted.
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_dumgr->verifyMDRef() && verifyMDDUChain(m_rg, oc));
+    ASSERT0(m_dumgr->verifyMDRef() && verifyClassicDUChain(m_rg, oc));
     oc.setInvalidIfDUMgrLiveChanged();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));

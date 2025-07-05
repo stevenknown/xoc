@@ -43,12 +43,15 @@ namespace xcom {
 //The height of root is 0.
 #define HEIGHT_INIT_VAL 0
 
+#define GRAPH_REACHIN_MAX_TRY_LIMIT ((UINT)-1)
+
 class Vertex;
 class Edge;
 class EdgeC;
 class Graph;
 class BMat;
 class DomTree;
+class MST;
 
 //Adjacent Vertex Iterator.
 typedef EdgeC const* AdjVertexIter;
@@ -57,6 +60,8 @@ typedef EdgeC const* AdjVertexIter;
 //Adjacent Vertex Iterator.
 typedef EdgeC const* AdjEdgeIter;
 typedef EdgeC const* AdjEdgeIter;
+typedef void* EdgeInfoType;
+typedef void* VertexInfoType;
 
 #define EDGE_next(e) ((e)->next)
 #define EDGE_prev(e) ((e)->prev)
@@ -65,11 +70,11 @@ typedef EdgeC const* AdjEdgeIter;
 #define EDGE_info(e) ((e)->m_info)
 class Edge {
 public:
-    Edge * prev; //used by FreeList
-    Edge * next; //used by FreeList
-    Vertex * m_from;
-    Vertex * m_to;
-    void * m_info;
+    Edge * prev; //Only used by FreeList
+    Edge * next; //Only used by FreeList
+    Vertex * m_from; //Describes the 'from' vertex of the edge.
+    Vertex * m_to; //Describes the 'to' vertex of the edge.
+    EdgeInfoType m_info; //Records the auxiliary info that attached by user.
 public:
     void copyEdgeInfo(Edge const* src) { EDGE_info(this) = src->info(); }
 
@@ -105,12 +110,12 @@ class Vertex {
 public:
     VexIdx m_id; //Vertex id must be unique.
     VexIdx m_height; //Only useful if current vertex is a tree node.
-    RPOVal m_rpo;
+    RPOVal m_rpo; //Describes RPO of the vertex.
     Vertex * prev; //Only can be used by FreeList and HASH.
     Vertex * next; //Only can be used by FreeList and HASH.
     EdgeC * m_in_list; //Describes incoming edge list.
     EdgeC * m_out_list; //Describes outgoing edge list.
-    void * m_info; //Records the auxiliary info that attached by user.
+    VertexInfoType m_info; //Records the auxiliary info that attached by user.
 public:
     void clone(Vertex const* src)
     { m_height = src->m_height; m_rpo = src->m_rpo; }
@@ -525,6 +530,12 @@ public:
     virtual void dumpVertexDesc(
         Vertex const* v, OUT DefFixedStrBuf & buf) const;
 
+    //User interface.
+    //Dump the description of given edge.
+    //e.g: a edge's description could just be the edge's info.
+    virtual void dumpEdgeDesc(
+        xcom::Edge const* e, OUT DefFixedStrBuf & buf) const;
+
     //Dump vertex into buffer.
     CHAR const* dumpVertex(Vertex const* v, OUT DefFixedStrBuf & buf) const;
 
@@ -550,22 +561,35 @@ public:
     bool is_dense() const { return m_dense_vertex != nullptr; }
 
     //Return true if 'succ' is successor of 'v'.
-    bool is_succ(Vertex * v, Vertex * succ) const
+    bool is_succ(Vertex const* v, Vertex const* succ) const
     {
         ASSERT0(v && succ);
-        for (EdgeC * e = v->getOutList(); e != nullptr; e = EC_next(e)) {
-            if (EDGE_to(EC_edge(e)) == succ) {
+        for (EdgeC const* e = v->getOutList();
+             e != nullptr; e = e->get_next()) {
+            if (e->getTo() == succ) {
                 return true;
             }
         }
         return false;
     }
 
+    //Return true if 'succ' is the unqiue successor of 'v'.
+    bool is_unique_succ(Vertex const* v, Vertex const* succ) const
+    {
+        ASSERT0(v && succ);
+        EdgeC const* e = v->getOutList();
+        if (e == nullptr || e->getTo() != succ || e->get_next() != nullptr) {
+            return false;
+        }
+        return true;
+    }
+
     //Return true if 'pred' is predecessor of 'v'.
     bool is_pred(Vertex const* v, Vertex const* pred) const
     {
         ASSERT0(v && pred);
-        for (EdgeC const* e = v->getInList(); e != nullptr; e = EC_next(e)) {
+        for (EdgeC const* e = v->getInList();
+             e != nullptr; e = e->get_next()) {
             if (e->getFrom() == pred) {
                 return true;
             }
@@ -573,6 +597,16 @@ public:
         return false;
     }
 
+    //Return true if 'pred' is the unqiue predecessor of 'v'.
+    bool is_unique_pred(Vertex const* v, Vertex const* pred) const
+    {
+        ASSERT0(v && pred);
+        EdgeC const* e = v->getInList();
+        if (e == nullptr || e->getFrom() != pred || e->get_next() != nullptr) {
+            return false;
+        }
+        return true;
+    }
     bool is_equal(Graph & g) const;
     bool is_unique() const { return m_is_unique; }
     bool is_direction() const { return m_is_direction; }
@@ -587,18 +621,24 @@ public:
     }
     bool is_livein_from(Vertex const* v, Vertex const* pred,
                         Vertex const* start) const;
-    void insertVertexBetween(IN Vertex * v1, IN Vertex * v2, IN Vertex * newv,
-                             OUT Edge ** e1 = nullptr,
-                             OUT Edge ** e2 = nullptr,
-                             bool sort = true);
-    void insertVertexBetween(VexIdx v1, VexIdx v2, VexIdx newv,
-                             OUT Edge ** e1 = nullptr,
-                             OUT Edge ** e2 = nullptr,
-                             bool sort = true);
+
+    //The function inserts vertex 'newv' between edge 'v1'<->'v2'.
+    //NOTE: the newv should have been added to current graph.
+    void insertVertexBetween(
+        IN Vertex * v1, IN Vertex * v2, IN Vertex * newv,
+        OUT Edge ** e1 = nullptr, OUT Edge ** e2 = nullptr, bool sort = true);
+
+    //The function inserts vertex 'newv' between edge 'v1'<->'v2'.
+    //The function will add vertex if there is no 'newv' before.
+    void insertVertexBetween(
+        VexIdx v1, VexIdx v2, VexIdx newv, OUT Edge ** e1 = nullptr,
+        OUT Edge ** e2 = nullptr, bool sort = true);
+
+    //Return true if 'v' is the entry of current graph.
     bool is_graph_entry(Vertex const* v) const
     { ASSERT0(v); return v->getInList() == nullptr; }
 
-    //Return true if vertex is exit node of graph.
+    //Return true if vertex is the exit of current graph.
     bool is_graph_exit(Vertex const* v) const
     { ASSERT0(v); return v->getOutList() == nullptr; }
 
@@ -632,19 +672,38 @@ public:
     bool isEdge(Vertex const* from, Vertex const* to) const
     { return isEdge(from->id(), to->id()); }
 
-    //The function try to answer whether 'reachin' can reach 'start' from one of
-    //in-vertexs of 'start'. Return false if it is not or unknown.
+    //The function try to answer whether 'reachin' can reach 'vex' from one of
+    //in-vertexs of 'vex'. Return false if it is not or unknown.
+    //e.g:a      b->c
+    //    |__   _|
+    //       | |
+    //       V V
+    //        d
+    //Suppose 'vex' is d, if 'reachin' is a OR b, the function return true.
+    //and if 'reachin' is c, the function return false.
+    //
     //try_limit: the maximum time to try.
     //try_failed: return true if the function running exceed the try_limit.
-    static bool isReachIn(Vertex const* start, Vertex const* reachin,
-                          UINT try_limit, OUT bool & try_failed);
+    //terminate_Vex_tab: optional, if it is not NULL, it contains the
+    //  boundary vertex, that the function will stop processing when meeting
+    //  the boundary vertex.
+    //  e.g:a->b->c
+    //            |
+    //       -----
+    //      |
+    //      V
+    //      d---->e
+    //  if 'vex' is d, 'reachin' is a, terminate_vex_tab contains c, there is
+    //  nothing to do in the function, and the function return false.
+    static bool isReachIn(
+        Vertex const* vex, Vertex const* reachin, UINT try_limit,
+        OUT bool & try_failed, VexTab const* terminate_vex_tab = nullptr);
 
     //Return true if vex can reach graph exit.
     //Note the function is costly and use with caution.
     //try_limit: the maximum time to try.
     //try_failed: return true if the function running exceed the try_limit.
-    bool isReachExit(Vertex const* vex, UINT try_limit,
-                     OUT bool & try_failed);
+    bool isReachExit(Vertex const* vex, UINT try_limit, OUT bool & try_failed);
 
     //Erasing graph, include all nodes and edges,
     //except for EdgeInfo and VertexInfo.
@@ -708,6 +767,10 @@ public:
     //The function will iterate all out-edge of successors of 'vex'.
     static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
     static Edge * get_next_out_edge(AdjEdgeIter & it);
+
+    //The function will iterate all in-edge of predecessors of 'vex'.
+    static Edge * get_first_in_edge(Vertex const* vex, AdjEdgeIter & it);
+    static Edge * get_next_in_edge(AdjEdgeIter & it);
 
     //Reconstruct vertex hash table, and edge hash table with new bucket size.
     //vertex_hash_sz: new vertex table size to be resized.
@@ -827,46 +890,79 @@ public:
     DGraph const& operator = (DGraph const&);
 
     //The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
-    //update the related info for 'vex'.
-    //vex: a marker vertex.
-    //newsucc: the vertex that must be immediate successor of 'vex'.
-    //e.g: given edge vex->oldsucc, after insert newsucc, the graph will be:
-    //     vex->newsucc->oldsucc, where there is only ONE predecessor to
+    //update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newsucc: the vertex that must be immediate successor of 'marker'.
+    //         The function will check the relation.
+    //oldsucc: the vertex that must be immediate successor of 'marker' before
+    //         graph changed.
+    //         NOTE: user has to guarrantee the relation of 'marker' and
+    //         'oldsucc' because the function could not check the relation.
+    //e.g: given edge marker->oldsucc, after insert newsucc, the graph will be:
+    //     marker->newsucc->oldsucc, where there is only ONE predecessor to
     //     newsucc.
-    void addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
+    void addDomInfoToImmediateSucc(Vertex const* marker, Vertex const* newsucc,
                                    Vertex const* oldsucc);
 
     //The function adds Dom and IDom information for newsucc, whereas
     //update the related info for 'oldsucc'. The newsucc is a new insert BB,
     //and has one input edge and one output edge.
-    //vex: a marker vertex.
-    //newsucc: the vertex that must be immediate successor of 'vex'.
-    //e.g: vex->oldsucc, after insert newsucc, the graph will be:
-    //     vex->newsucc->oldsucc, where there is only ONE edge between
-    //     vex->newsucc, and newsucc->oldsucc.
-    void addDomToNewSingleInOutBB(Vertex const* vex, Vertex const* newsucc,
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newsucc: the vertex that must be immediate successor of 'marker'.
+    //e.g: marker->oldsucc, after insert newsucc, the graph will be:
+    //     marker->newsucc->oldsucc, where there is only ONE edge between
+    //     marker->newsucc, and newsucc->oldsucc.
+    void addDomToNewSingleInOutBB(Vertex const* marker, Vertex const* newsucc,
                                   Vertex const* oldsucc);
 
     //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
-    //update the related info for 'vex'.
-    //vex: a marker vertex.
-    //newidom: the vertex that must be idom of 'vex'.
+    //update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newidom: the vertex that must be idom of 'marker'.
     //add_pdom_failed: return true if the function add PDomInfo failed.
-    void addDomInfoToNewIDom(Vertex const* vex, Vertex const* newidom,
+    void addDomInfoToNewIDom(Vertex const* marker, Vertex const* newidom,
                              OUT bool & add_pdom_failed);
-    void addDomInfoToNewIDom(Vertex const* vex, VexIdx newidom,
-                             OUT bool & add_pdom_failed)
-    { addDomInfoToNewIDom(vex, addVertex(newidom), add_pdom_failed); }
 
-    void addDomInfoToNewIDom(VexIdx vex, VexIdx newidom,
+    //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
+    //update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newidom: the vertex that must be idom of 'marker'.
+    //add_pdom_failed: return true if the function add PDomInfo failed.
+    void addDomInfoToNewIDom(Vertex const* marker, VexIdx newidom,
+                             OUT bool & add_pdom_failed)
+    { addDomInfoToNewIDom(marker, addVertex(newidom), add_pdom_failed); }
+
+    //The function adds Dom, Pdom, IDom, IPDom information for newidom, whereas
+    //update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newidom: the vertex that must be idom of 'marker'.
+    //add_pdom_failed: return true if the function add PDomInfo failed.
+    void addDomInfoToNewIDom(VexIdx marker, VexIdx newidom,
                              OUT bool & add_pdom_failed)
     {
-        addDomInfoToNewIDom(getVertex(vex), addVertex(newidom),
+        addDomInfoToNewIDom(getVertex(marker), addVertex(newidom),
                             add_pdom_failed);
     }
-    void addDomInfoToNewIPDom(Vertex const* vex, Vertex const* newipdom);
-    void addDomInfoToNewIPDom(VexIdx vex, VexIdx newipdom)
-    { addDomInfoToNewIPDom(getVertex(vex), addVertex(newipdom)); }
+
+    //The function adds Dom, Pdom, IDom, IPDom information for newipdom,
+    //whereas update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newipdom: the vertex that must be idom of 'marker'.
+    void addDomInfoToNewIPDom(Vertex const* marker, Vertex const* newipdom);
+
+    //The function adds Dom, Pdom, IDom, IPDom information for newipdom,
+    //whereas update the related info for 'marker'.
+    //NOTE: the function maintains the Dom and PDom info after graph changed.
+    //marker: a marker vertex.
+    //newipdom: the vertex that must be idom of 'marker'.
+    void addDomInfoToNewIPDom(VexIdx marker, VexIdx newipdom)
+    { addDomInfoToNewIPDom(getVertex(marker), addVertex(newipdom)); }
 
     //The function clones graph by given graph.
     //clone_edge_info: true to clone EdgeInfo of g.
@@ -889,7 +985,7 @@ public:
     //Vertices should have been sorted in topological order.
     //And we access them by reverse-topological order.
     //vlst: compute dominator for vertices in vlst if it
-    //    is not empty or else compute all graph.
+    //      is not empty or else compute all vertices of graph.
     //uni: universe.
     bool computeDom3(List<Vertex const*> const* vlst, DomSet const* uni);
     bool computeDom2(List<Vertex const*> const& vlst);
@@ -897,7 +993,7 @@ public:
     //Vertices should have been sorted in topological order.
     //And we access them by reverse-topological order.
     //vlst: compute dominator for vertices in vlst if it is not empty or else
-    //      compute all graph.
+    //      compute all vertices of graph.
     //uni: universe.
     bool computeDom(List<Vertex const*> const* vlst = nullptr,
                     DomSet const* uni = nullptr);
@@ -957,11 +1053,12 @@ public:
     //Dump dom set, pdom set, idom, ipdom.
     //dump_dom_tree: set to be true to dump dominate
     //               tree, and post dominate Tree.
-    void dumpDom(FILE * h, bool dump_dom_tree = true,
-                 bool dump_pdom_tree = true) const;
-    void dumpDom(CHAR const* name = nullptr, bool dump_dom_tree = true,
-                 bool dump_pdom_tree = true) const;
-    CHAR const* dumpDom(OUT StrBuf & buf) const;
+    void dumpDomAndPdom(
+        FILE * h, bool dump_dom_tree = true, bool dump_pdom_tree = true) const;
+    void dumpDomAndPdom(
+        CHAR const* name = nullptr, bool dump_dom_tree = true,
+        bool dump_pdom_tree = true) const;
+    CHAR const* dumpDomAndPdom(OUT StrBuf & buf) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.
@@ -1041,11 +1138,25 @@ public:
         return get_dom_set(v2)->is_contain((BSIdx)v1);
     }
 
+    //Return true if 'v1' immediate-dominate 'v2'.
+    bool is_idom(VexIdx v1, VexIdx v2) const
+    {
+        ASSERT0(v1 != VERTEX_UNDEF);
+        return get_idom(v2) == ((BSIdx)v1);
+    }
+
     //Return true if 'v1' post dominate 'v2'.
     bool is_pdom(VexIdx v1, VexIdx v2) const
     {
         ASSERTN(get_pdom_set(v2), ("no PDOM info about vertex%d", v2));
         return get_pdom_set(v2)->is_contain((BSIdx)v1);
+    }
+
+    //Return true if 'v1' immediate-post-dominate 'v2'.
+    bool is_ipdom(VexIdx v1, VexIdx v2) const
+    {
+        ASSERT0(v1 != VERTEX_UNDEF);
+        return get_ipdom(v2) == ((BSIdx)v1);
     }
 
     //Sort node on graph in bfs-order.
@@ -1098,6 +1209,11 @@ public:
                        OUT UINT & iter_time);
     void removeDomInfo(VexIdx vex, bool iter_pred_succ, OUT UINT & iter_time)
     { removeDomInfo(getVertex(vex), iter_pred_succ, iter_time); }
+
+    void try_union_dom_set(VexIdx vex, VexIdx newdomvex);
+    void try_union_dom_set(VexIdx vex, BitSet const* newset);
+    void try_union_pdom_set(VexIdx vex, VexIdx newpdomvex);
+    void try_union_pdom_set(VexIdx vex, BitSet const* newset);
 
     bool verifyDom() const;
     bool verifyPdom() const;
@@ -1155,6 +1271,51 @@ public:
     GraphIterOutEdge(Graph const& g, Vertex const* start);
     Edge * get_first();
     Edge * get_next(Edge const* t);
+};
+
+
+//The class represents the computation of Minimum Spanning Tree.
+//Note that the edge weight can NOT be negative.
+#define MST_WEIGHT_UNDEF 0
+typedef UINT MSTWeightType;
+typedef TMap<Edge const*, MSTWeightType> Edge2Weight;
+
+typedef List<Edge const*>::Iter MSTPathIter;
+class MSTPath : public List<Edge const*> {
+public:
+    void dump(FILE * h, MST const& mst) const;
+    void dumpDOT(MST const& mst, CHAR const* name = nullptr) const;
+};
+
+class MST {
+    COPY_CONSTRUCTOR(MST);
+    friend class MSTPath;
+protected:
+    Graph const& m_g;
+    Edge2Weight & m_e2w;
+protected:
+    Edge const* findMinWeightEdge(
+        Vertex const* v, TTab<Vertex const*> const& visited,
+        OUT MSTWeightType & minw, OUT Vertex const** newvex);
+    Edge const* findMinWeightEdgeForVisited(
+        MOD List<Vertex const*> & wl, TTab<Vertex const*> const& visited,
+        OUT MSTWeightType & minw, OUT Vertex const** newvex);
+
+    MSTWeightType getMaxWeight() const { return (MSTWeightType)-1; }
+    MSTWeightType getWeight(Edge const* e) const { return m_e2w.get(e); }
+
+    bool LessOrEqualThan(MSTWeightType curw, MSTWeightType outew) const
+    { return curw <= outew; }
+public:
+    MST(Graph const& g, Edge2Weight & e2w) : m_g(g), m_e2w(e2w) {}
+
+    //Return the minimum weight of MST.
+    MSTWeightType build(Vertex const* root, OUT MSTPath & path);
+    MSTWeightType build(OUT MSTPath & path)
+    {
+        VertexIter it;
+        return build(m_g.get_first_vertex(it), path);
+    }
 };
 
 } //namespace xcom

@@ -341,6 +341,13 @@ public:
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
     VOpnd * getVOpndForMD(UINT mdid, MDSSAMgr const* mgr) const;
+    VOpnd * getUniqueVOpnd(MDSSAMgr const* mgr) const
+    { return readVOpndSet().get_unique(mgr); }
+    UINT getVOpndNum() const { return readVOpndSet().get_elem_count(); }
+
+    //The function looks for the first MDDef that exactly define 'md' in
+    //current VOpndSet.
+    MDDef const* findCoverMDDef(MDSSAMgr const* mgr, MD const* md) const;
 
     //If MDSSAInfo is allocated in mempool, the function needs to be invoked
     //to initialize base class object.
@@ -379,10 +386,10 @@ public:
     //exp: IR expression to be removed.
     void removeSpecificUse(IR const* exp, MDIdx mdid, UseDefMgr * mgr);
 
-    //Return true if there is VMD renamed.
-    //Note current MDSSAInfo is the SSA info of 'exp', the VOpndSet will be
+    //Note current MDSSAInfo is the SSA info of 'exp'.
     //vmd: intent to be swap-in.
-    bool renameSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr);
+    //Return true if exp's VOpndSet info changed.
+    bool renameOrAddSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr);
 
     //Remove vopnd from current MDSSAInfo.
     void removeVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
@@ -405,7 +412,7 @@ class MDDef {
         VMD_def(getResult()) = nullptr;
     }
 public:
-    BYTE m_is_phi:1; //true if MDDef indicates MDPhi.
+    bool m_is_phi; //true if MDDef indicates MDPhi.
     UINT m_id; //the unique ID.
     VMD * m_result; //the VMD defined.
 
@@ -470,7 +477,7 @@ public:
 typedef xcom::DefSBitSetIter MDDefSetIter;
 
 //Set of MDDef.
-class MDDefSet : public DefSBitSetCore {
+class MDDefSet : public xcom::DefSBitSetCore {
     COPY_CONSTRUCTOR(MDDefSet);
 public:
     MDDefSet() { xcom::DefSBitSetCore::init(); }
@@ -612,7 +619,7 @@ typedef xcom::Vector<VOpnd*> VOpndVec;
 //This class manages MDSSAInfo object allocation and destroy.
 class UseDefMgr {
     COPY_CONSTRUCTOR(UseDefMgr);
-friend class MDSSAMgr;
+    friend class MDSSAMgr;
 protected:
     UINT m_def_count;
     UINT m_vopnd_count;
@@ -634,7 +641,7 @@ protected:
     xcom::Vector<MDSSAInfo*> m_mdssainfo_vec;
     xcom::Vector<VOpnd*> m_vopnd_vec;
     xcom::Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
-    MDDefVec m_def_vec;
+    MDDefVec m_def_vec; //map from id to a MDDef object.
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
 protected:
     void buildMDPhiOpnd(MDPhi * phi, UINT mdid, UINT num_operands);

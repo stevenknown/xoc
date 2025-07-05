@@ -49,30 +49,30 @@ namespace xoc {
 INT64 MCExpr::evaluateAsAbsolute(MCExpr const* expr)
 {
     ASSERT0(expr);
-    if (MCEXPR_kind(expr) == MCExpr::BINARY) {
+    if (MCEXPR_kind(expr) == EK_BINARY) {
         MCBinaryExpr const* expr_b = (MCBinaryExpr const*)expr;
         MCExpr const* lhs_value = MCBINARYEXPR_lhs(expr_b);
         MCExpr const* rhs_value = MCBINARYEXPR_rhs(expr_b);
-        MCBinaryExpr::Opcode kind = MCBINARYEXPR_opcode(expr_b);
+        MCBIN_OP_CODE kind = MCBINARYEXPR_opcode(expr_b);
         switch (kind) {
-        case MCBinaryExpr::ADD:
+        case BIN_ADD:
             return evaluateAsAbsolute(lhs_value) +
                    evaluateAsAbsolute(rhs_value);
-        case MCBinaryExpr::SUB:
+        case BIN_SUB:
             return evaluateAsAbsolute(lhs_value) -
                    evaluateAsAbsolute(rhs_value);
         default: UNREACHABLE();
         }
     }
-    if (MCEXPR_kind(expr) == MCExpr::CONSTANT) {
+    if (MCEXPR_kind(expr) == EK_CONSTANT) {
         return MCCONSTANTEXPR_value((MCConstantExpr const*)expr);
     }
-    if (MCEXPR_kind(expr) == MCExpr::SYMBOLREF) {
+    if (MCEXPR_kind(expr) == EK_SYMBOLREF) {
         MCSymbolRefExpr const* expr_r = (MCSymbolRefExpr const*)expr;
         MCSymbol const* mc_symbol = MCSYMBOLREFEXPR_mc_symbol(expr_r);
         ASSERT0(MCSYMBOL_is_registered(mc_symbol));
-        ASSERT0(MCSYMBOL_type(mc_symbol) == MCSymbol::SECTION_LABEL ||
-                MCSYMBOL_type(mc_symbol) == MCSymbol::FUNC_LABEL);
+        ASSERT0(MCSYMBOL_type(mc_symbol) == ST_SECTION_LABEL ||
+                MCSYMBOL_type(mc_symbol) == ST_FUNC_LABEL);
         return MCSYMBOL_region_offset(mc_symbol);
     }
     UNREACHABLE();
@@ -170,7 +170,8 @@ void MCDwarfMgr::recordFileInfo(UINT32 file_num, xoc::Sym const* all_file_name)
 }
 
 
-void MCDwarfMgr::setSpecialTagLabel(LabelInfo * label, MCSymbol * mc_symbol_ptr)
+void MCDwarfMgr::setSpecialTagLabel(LabelInfo const* label,
+                                    MCSymbol * mc_symbol_ptr)
 {
     Sym const* sym = LABELINFO_pragma(label);
     ASSERT0(sym);
@@ -210,7 +211,7 @@ MCSymbol const* MCDwarfMgr::createVectorMCSymbol(Region const* region,
     MCSYMBOL_region(mc_symbol_ptr) = region;
     MCSYMBOL_region_offset(mc_symbol_ptr) = region_offset;
     MCSYMBOL_label(mc_symbol_ptr) = label;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::SECTION_LABEL;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_SECTION_LABEL;
     return mc_symbol_ptr;
 }
 
@@ -225,7 +226,7 @@ MCSymbol * MCDwarfMgr::createVectorMCSymbol(Region const* region,
     MCSYMBOL_region(mc_symbol_ptr) = region;
     MCSYMBOL_region_offset(mc_symbol_ptr) = 0;
     MCSYMBOL_label(mc_symbol_ptr) = label;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::SECTION_LABEL;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_SECTION_LABEL;
     return mc_symbol_ptr;
 }
 
@@ -242,7 +243,7 @@ void MCDwarfMgr::createMCSymbol(Region const* region, UINT region_offset,
     MCSYMBOL_region(mc_symbol_ptr) = region;
     MCSYMBOL_region_offset(mc_symbol_ptr) = region_offset;
     MCSYMBOL_label(mc_symbol_ptr) = label;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::SECTION_LABEL;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_SECTION_LABEL;
     m_map_symbol.set(prag_sym, mc_symbol_ptr);
 }
 
@@ -258,7 +259,7 @@ void MCDwarfMgr::setFuncLabelOff(UINT offset, Sym const* name)
 }
 
 
-void MCDwarfMgr::createMCSymbol(Region const* region, LabelInfo * label)
+void MCDwarfMgr::createMCSymbol(Region const* region, LabelInfo const* label)
 {
     ASSERT0(region && label);
     Sym const* prag_sym = label->getPragma();
@@ -270,7 +271,7 @@ void MCDwarfMgr::createMCSymbol(Region const* region, LabelInfo * label)
     MCSYMBOL_region_offset(mc_symbol_ptr) = 0;
     MCSYMBOL_label(mc_symbol_ptr) = label;
     setSpecialTagLabel(label, mc_symbol_ptr);
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::FUNC_LABEL;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_FUNC_LABEL;
     m_map_symbol.set(prag_sym, mc_symbol_ptr);
 }
 
@@ -313,7 +314,7 @@ void MCDwarfMgr::createMCSymbol(Region const* region, LabelInfo const* label,
     MCSYMBOL_region(mc_symbol_ptr) = region;
     MCSYMBOL_region_offset(mc_symbol_ptr) = off;
     MCSYMBOL_label(mc_symbol_ptr) = label;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::SECTION_LABEL;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_SECTION_LABEL;
 }
 
 
@@ -337,7 +338,7 @@ MCSymbol * MCDwarfMgr::getOrCreateSymbol(Sym const* name)
 
 void MCDwarfMgr::handleGlobalVarSymSingleRefRel(Sym const* name,
                                                 CHAR const* region_name,
-                                                MCFixupKind kind)
+                                                MC_FIXUP_KIND kind)
 {
     ASSERT0(name && region_name);
     MCSymbol * mc_symbol = nullptr;
@@ -370,7 +371,7 @@ void MCDwarfMgr::handleGlobalVarSymSingleRefRel(Sym const* name,
 
 
 void MCDwarfMgr::handleFuncAndSectionLabelSingleRefRel(Sym const* name,
-    CHAR const* region_name, MCFixupKind kind)
+    CHAR const* region_name, MC_FIXUP_KIND kind)
 {
     ASSERT0(name && region_name);
 
@@ -410,7 +411,7 @@ void MCDwarfMgr::handleFuncAndSectionLabelSingleRefRel(Sym const* name,
 
 
 void MCDwarfMgr::createSingleRefRel(Sym const* name, CHAR const* region_name,
-                                    MCFixupKind kind)
+                                    MC_FIXUP_KIND kind)
 {
     ASSERT0(name);
 
@@ -434,8 +435,8 @@ void MCDwarfMgr::createSingleRefRel(Sym const* name, CHAR const* region_name,
 
 void MCDwarfMgr::createBinaryExprRef(Sym const* name0, Sym const* name1,
                                      CHAR const* region_name,
-                                     MCBinaryExpr::Opcode op_type,
-                                     MCFixupKind kind)
+                                     MCBIN_OP_CODE op_type,
+                                     MC_FIXUP_KIND kind)
 {
     ASSERT0(name0 && name1);
     getOrCreateSymbol(name0);
@@ -478,7 +479,7 @@ void MCDwarfMgr::createBinaryExprRef(Sym const* name0, Sym const* name1,
 void MCDwarfMgr::createVarRefRel(Region const* func_region,
                                  Sym const* var_name,
                                  CHAR const* region_name,
-                                 MCFixupKind kind)
+                                 MC_FIXUP_KIND kind)
 {
     ASSERTN(isVarSymbolFound(var_name, func_region),
             ("Var has not been registered previously. "
@@ -520,7 +521,7 @@ void MCDwarfMgr::setVarFinalValue(INT64 fp_offset, Var const* var, UINT fp,
     if (MCSYMBOL_is_registered(mc_symbol)) {
         return;
     }
-    ASSERT0(MCSYMBOL_type(mc_symbol) == MCSymbol::FUNC_VAR);
+    ASSERT0(MCSYMBOL_type(mc_symbol) == ST_FUNC_VAR);
     MCDWARFMGR_char_out_stream(this).clean();
     xcom::encodeSLEB128(fp_offset, MCDWARFMGR_char_out_stream(this),
                         MCSYMBOL_VAR_STACK_OFF_SIZE);
@@ -575,7 +576,7 @@ void MCDwarfMgr::createNewVarSymbol(Region const* region,
     MCSYMBOL_region(mc_symbol_ptr) = var->is_global() ? nullptr : region;
     MCSYMBOL_value(mc_symbol_ptr)[0] = 0;
     MCSYMBOL_var(mc_symbol_ptr) = var;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::FUNC_VAR;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_FUNC_VAR;
     sym_v->set(region, mc_symbol_ptr);
     m_map_symbol_var.set(name, sym_v);
 
@@ -604,7 +605,7 @@ void MCDwarfMgr::updateExistingVarSymbol(Region const* region,
     MCSYMBOL_region(mc_symbol_ptr) = region;
     MCSYMBOL_value(mc_symbol_ptr)[0] = 0;
     MCSYMBOL_var(mc_symbol_ptr) = var;
-    MCSYMBOL_type(mc_symbol_ptr) = MCSymbol::FUNC_VAR;
+    MCSYMBOL_type(mc_symbol_ptr) = ST_FUNC_VAR;
     m_map_symbol_var.get(name)->set(region, mc_symbol_ptr);
 
     ASSERT0(region->getRegionVar()->get_name());
@@ -638,11 +639,11 @@ void MCDwarfMgr::createVarOrUpdateSymbol(Region const* region, Var * var)
 }
 
 
-Region const* MCDwarfMgr::findRegionByName(Sym const* name,
-                                           xoc::RegionMgr * region_mgr)
+Region const* MCDwarfMgr::findRegionByName(
+    Sym const* name, xoc::RegionMgr * region_mgr)
 {
     ASSERT0(name && region_mgr);
-    RegionMgr::RegionTab & region_tab = region_mgr->getRegionTab();
+    RegionVec & region_tab = region_mgr->getRegionVec();
     SymbolHashFunc c;
     Region const* region_out = nullptr;
     for (UINT i = 0; i < region_tab.get_elem_count(); i++) {
@@ -793,11 +794,11 @@ inline static MCExpr const* makeEndMinusStartExpr(MCSymbol const* start,
     MCExpr const* rhs = MCDWARFMGR_dwarf_res_mgr(dm).
         allocMCSymbolRefExpr(start);
     MCExpr const* res1 = MCDWARFMGR_dwarf_res_mgr(dm).
-        allocMCBinaryExpr(MCBinaryExpr::SUB, res, rhs);
+        allocMCBinaryExpr(BIN_SUB, res, rhs);
     MCExpr const* res2 = MCDWARFMGR_dwarf_res_mgr(dm).
         allocMCConstantExpr(int_val);
     MCExpr const* res3 = MCDWARFMGR_dwarf_res_mgr(dm).
-        allocMCBinaryExpr(MCBinaryExpr::SUB, res1, res2);
+        allocMCBinaryExpr(BIN_SUB, res1, res2);
     return res3;
 }
 
@@ -807,13 +808,13 @@ Region const* MCDwarfMgr::getRegionByName(RegionMgr * rm, CHAR const* name)
     ASSERT0(rm && name);
     Region const* region_out = nullptr;
     for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
-        Region * rg = rm->getRegionTab().get(i);
+        Region * rg = rm->getRegionVec().get(i);
         if (rg == nullptr) { continue; }
-        Var * var = rm->getRegionTab().get(i)->getRegionVar();
+        Var * var = rm->getRegionVec().get(i)->getRegionVar();
         if (var == nullptr) { continue; }
         CHAR const* region_name = var->get_name()->getStr();
         if (::strcmp(region_name, name) == 0) {
-            region_out = rm->getRegionTab().get(i);
+            region_out = rm->getRegionVec().get(i);
         }
     }
     ASSERT0(region_out);
@@ -918,7 +919,7 @@ MCSymbol const* MCDwarfMgr::genFrameCIE(Region * region_ptr)
 }
 
 
-void MCDwarfMgr::encodeAdvanceLoc(OUT Vector<BYTE> & os, UINT64 addr_delta)
+void MCDwarfMgr::encodeAdvanceLoc(OUT BYTEVec & os, UINT64 addr_delta)
 {
     UINT64 const mask_0 = (UINT64)0x1 << 6;
     UINT64 const mask_1 = (UINT64)0x1 << 8;
@@ -939,15 +940,13 @@ void MCDwarfMgr::encodeAdvanceLoc(OUT Vector<BYTE> & os, UINT64 addr_delta)
 
     if (addr_delta <= mask_2) {
         os.append(DW_CFA_advance_loc2);
-        appendBytesFromValue(os, addr_delta,
-                             getSizeForFixupKind(FK_DATA_2));
+        appendBytesFromValue(os, addr_delta, getSizeForFixupKind(FK_DATA_2));
         return;
     }
 
     if (addr_delta <= mask_3) {
         os.append(DW_CFA_advance_loc4);
-        appendBytesFromValue(os, addr_delta,
-                             getSizeForFixupKind(FK_DATA_4));
+        appendBytesFromValue(os, addr_delta, getSizeForFixupKind(FK_DATA_4));
         return;
     }
 
@@ -985,7 +984,7 @@ void MCDwarfMgr::genCFIInstruction(MCCFIInstruction * ins)
 {
     ASSERT0(ins);
     switch (ins->getOperation()) {
-    case MCCFIInstruction::OPDEFCFA: {
+    case CFI_OPDEFCFA: {
         UINT reg = ins->getRegister();
         MCDWARFMGR_debug_frame_code(this).append(DW_CFA_def_cfa);
         genULEB128AndToV(reg, MCDWARFMGR_debug_frame_code(this));
@@ -993,13 +992,13 @@ void MCDwarfMgr::genCFIInstruction(MCCFIInstruction * ins)
         genULEB128AndToV(offset, MCDWARFMGR_debug_frame_code(this));
         return;
     }
-    case MCCFIInstruction::OPSAMEVALUE: {
+    case CFI_OPSAMEVALUE: {
         UINT reg = ins->getRegister();
         MCDWARFMGR_debug_frame_code(this).append(DW_CFA_same_value);
         genULEB128AndToV(reg, MCDWARFMGR_debug_frame_code(this));
         return;
     }
-    case MCCFIInstruction::OPOFFSET: {
+    case CFI_OPOFFSET: {
         UINT reg = ins->getRegister();
         INT offset = getCFIInstOffsetOffByFactor(ins);
         MCDWARFMGR_debug_frame_code(this).append(DW_CFA_offset_extended);
@@ -1007,13 +1006,13 @@ void MCDwarfMgr::genCFIInstruction(MCCFIInstruction * ins)
         genULEB128AndToV(offset, MCDWARFMGR_debug_frame_code(this));
         return;
     }
-    case MCCFIInstruction::OPRESTORE: {
+    case CFI_OPRESTORE: {
         UINT reg = ins->getRegister();
         MCDWARFMGR_debug_frame_code(this).append(DW_CFA_restore_extended);
         genULEB128AndToV(reg, MCDWARFMGR_debug_frame_code(this));
         return;
     }
-    case MCCFIInstruction::OPDEFCFAOFFSET: {
+    case CFI_OPDEFCFAOFFSET: {
         MCDWARFMGR_debug_frame_code(this).append(DW_CFA_def_cfa_offset);
         INT offset = ins->getOffset();
         genULEB128AndToV(offset, MCDWARFMGR_debug_frame_code(this));
@@ -1050,9 +1049,9 @@ void MCDwarfMgr::genCFIInstructions(
 }
 
 
-void MCDwarfMgr::genFrameFDE(MCSymbol const* cie_mc_symbol,
-                             MCDwarfFrameRegionInfo * region_frame_info,
-                             Region * region)
+void MCDwarfMgr::genFrameFDE(
+    MCSymbol const* cie_mc_symbol, MCDwarfFrameRegionInfo * region_frame_info,
+    Region * region)
 {
     ASSERT0(cie_mc_symbol && region_frame_info && region);
     UINT size_before = MCDWARFMGR_debug_frame_code(this).get_elem_count();
@@ -1081,8 +1080,7 @@ void MCDwarfMgr::genFrameFDE(MCSymbol const* cie_mc_symbol,
     MCDWARFMGR_debug_frame_fixups(this).append(fix_fde_len);
 
     //Length size: 4byte.
-    appendBytes(0, DEBUG_FRAME_SH_NAME,
-                getSizeForFixupKind(FK_DATA_4));
+    appendBytes(0, DEBUG_FRAME_SH_NAME, getSizeForFixupKind(FK_DATA_4));
 
     //CIE Pointer size: 4byte.
     src_section_off = MCDWARFMGR_debug_frame_code(this).get_elem_count();
@@ -1091,8 +1089,7 @@ void MCDwarfMgr::genFrameFDE(MCSymbol const* cie_mc_symbol,
     MCFixup * fix_cie =  MCDWARFMGR_dwarf_res_mgr(this)
         .allocFixup(src_section_off, cie_exp, FK_DATA_4);
     MCDWARFMGR_debug_frame_fixups(this).append(fix_cie);
-    appendBytes(0, DEBUG_FRAME_SH_NAME,
-                getSizeForFixupKind(FK_DATA_4));
+    appendBytes(0, DEBUG_FRAME_SH_NAME, getSizeForFixupKind(FK_DATA_4));
 
     //PC Begin size: 8byte
     //In the future,
@@ -1104,8 +1101,7 @@ void MCDwarfMgr::genFrameFDE(MCSymbol const* cie_mc_symbol,
     MCFixup * fix_pc_begin = MCDWARFMGR_dwarf_res_mgr(this).
         allocFixup(src_section_off, pc_begin, FK_DATA_8);
     MCDWARFMGR_debug_frame_fixups(this).append(fix_pc_begin);
-    appendBytes(0, DEBUG_FRAME_SH_NAME,
-                getSizeForFixupKind(FK_DATA_8));
+    appendBytes(0, DEBUG_FRAME_SH_NAME, getSizeForFixupKind(FK_DATA_8));
 
     //PC Range size: 8byte
     ASSERT0(MCSYMBOL_is_registered(region_frame_info->m_end) &&
@@ -1296,10 +1292,9 @@ void MCDwarfMgr::genDwarfSetLineAddr(INT64 line_delta, MCSymbol const* label,
 }
 
 
-void MCDwarfMgr::genDwarfAdvanceLineAddr(INT64 line_delta,
-                                         MCSymbol const* last_label,
-                                         MCSymbol const* label,
-                                         UINT pointer_size)
+void MCDwarfMgr::genDwarfAdvanceLineAddr(
+    INT64 line_delta, MCSymbol const* last_label, MCSymbol const* label,
+    UINT pointer_size)
 {
     ASSERT0(label);
     if (last_label == nullptr) {
@@ -1561,9 +1556,8 @@ void * DwarfResMgr::xmalloc(size_t size)
 }
 
 
-MCExpr const* DwarfResMgr::allocMCBinaryExpr(MCBinaryExpr::Opcode op,
-                                             MCExpr const* lhs,
-                                             MCExpr const* rhs)
+MCExpr const* DwarfResMgr::allocMCBinaryExpr(
+    MCBIN_OP_CODE op, MCExpr const* lhs, MCExpr const* rhs)
 {
     ASSERT0(lhs && rhs);
     MCBinaryExpr * expr = (MCBinaryExpr*)xmalloc(sizeof(MCBinaryExpr));
@@ -1571,7 +1565,7 @@ MCExpr const* DwarfResMgr::allocMCBinaryExpr(MCBinaryExpr::Opcode op,
     MCBINARYEXPR_lhs(expr) = lhs;
     MCBINARYEXPR_rhs(expr) = rhs;
     MCBINARYEXPR_opcode(expr) = op;
-    MCEXPR_kind(expr) = MCExpr::BINARY;
+    MCEXPR_kind(expr) = EK_BINARY;
     return (MCExpr const*)expr;
 }
 
@@ -1582,7 +1576,7 @@ MCExpr const* DwarfResMgr::allocMCSymbolRefExpr(MCSymbol const* mc_symbol)
     MCSymbolRefExpr * expr = (MCSymbolRefExpr*)xmalloc(sizeof(MCSymbolRefExpr));
     ASSERT0(expr);
     MCSYMBOLREFEXPR_mc_symbol(expr) = mc_symbol;
-    MCEXPR_kind(expr) = MCExpr::SYMBOLREF;
+    MCEXPR_kind(expr) = EK_SYMBOLREF;
     return (MCExpr const*)expr;
 }
 
@@ -1592,13 +1586,13 @@ MCExpr const* DwarfResMgr::allocMCConstantExpr(INT64 value) {
     MCConstantExpr * expr = (MCConstantExpr*)xmalloc(sizeof(MCConstantExpr));
     MCCONSTANTEXPR_value(expr) = value;
     ASSERT0(expr);
-    MCEXPR_kind(expr) = MCExpr::CONSTANT;
+    MCEXPR_kind(expr) = EK_CONSTANT;
     return (MCExpr const*)expr;
 }
 
 
 MCFixup * DwarfResMgr::allocFixup(UINT offset, MCExpr const* value,
-                                  MCFixupKind kind)
+                                  MC_FIXUP_KIND kind)
 {
     MCFixup * fixup_p = (MCFixup*)xmalloc(sizeof(MCFixup));
     ASSERT0(fixup_p && value);
@@ -1617,13 +1611,13 @@ MCSymbol * DwarfResMgr::allocMCSymbol()
 }
 
 
-MCCFIInstruction * DwarfResMgr::allocCFIDefCfa(MCSymbol const* l, UINT r,
-                                               INT offset)
+MCCFIInstruction * DwarfResMgr::allocCFIDefCfa(
+    MCSymbol const* l, UINT r, INT offset)
 {
     MCCFIInstruction * cfi_ins_p = (MCCFIInstruction*)xmalloc
         (sizeof(MCCFIInstruction));
     ASSERT0(cfi_ins_p);
-    MCCFIINSTRUCTION_operation(cfi_ins_p) = MCCFIInstruction::OPDEFCFA;
+    MCCFIINSTRUCTION_operation(cfi_ins_p) = CFI_OPDEFCFA;
     MCCFIINSTRUCTION_label(cfi_ins_p) = l;
     MCCFIINSTRUCTION_register(cfi_ins_p) = r;
     MCCFIINSTRUCTION_offset(cfi_ins_p) = offset;
@@ -1636,7 +1630,7 @@ MCCFIInstruction * DwarfResMgr::allocSameValue(MCSymbol const* l, UINT r)
     MCCFIInstruction * cfi_ins_p = (MCCFIInstruction*)xmalloc
         (sizeof(MCCFIInstruction));
     ASSERT0(cfi_ins_p);
-    MCCFIINSTRUCTION_operation(cfi_ins_p) = MCCFIInstruction::OPSAMEVALUE;
+    MCCFIINSTRUCTION_operation(cfi_ins_p) = CFI_OPSAMEVALUE;
     MCCFIINSTRUCTION_label(cfi_ins_p) = l;
     MCCFIINSTRUCTION_register(cfi_ins_p) = r;
     MCCFIINSTRUCTION_offset(cfi_ins_p) = 0;
@@ -1644,13 +1638,12 @@ MCCFIInstruction * DwarfResMgr::allocSameValue(MCSymbol const* l, UINT r)
 }
 
 
-MCCFIInstruction * DwarfResMgr::allocOffset(MCSymbol const* l, UINT r,
-                                            INT o)
+MCCFIInstruction * DwarfResMgr::allocOffset(MCSymbol const* l, UINT r, INT o)
 {
     MCCFIInstruction * cfi_ins_p = (MCCFIInstruction*)xmalloc
         (sizeof(MCCFIInstruction));
     ASSERT0(cfi_ins_p);
-    MCCFIINSTRUCTION_operation(cfi_ins_p) = MCCFIInstruction::OPOFFSET;
+    MCCFIINSTRUCTION_operation(cfi_ins_p) = CFI_OPOFFSET;
     MCCFIINSTRUCTION_label(cfi_ins_p) = l;
     MCCFIINSTRUCTION_register(cfi_ins_p) = r;
     MCCFIINSTRUCTION_offset(cfi_ins_p) = o;
@@ -1663,7 +1656,7 @@ MCCFIInstruction * DwarfResMgr::allocRestore(MCSymbol const* l, UINT r)
     MCCFIInstruction * cfi_ins_p = (MCCFIInstruction*)xmalloc
         (sizeof(MCCFIInstruction));
     ASSERT0(cfi_ins_p);
-    MCCFIINSTRUCTION_operation(cfi_ins_p) = MCCFIInstruction::OPRESTORE;
+    MCCFIINSTRUCTION_operation(cfi_ins_p) = CFI_OPRESTORE;
     MCCFIINSTRUCTION_label(cfi_ins_p) = l;
     MCCFIINSTRUCTION_register(cfi_ins_p) = r;
     MCCFIINSTRUCTION_offset(cfi_ins_p) = 0;
@@ -1671,13 +1664,12 @@ MCCFIInstruction * DwarfResMgr::allocRestore(MCSymbol const* l, UINT r)
 }
 
 
-MCCFIInstruction * DwarfResMgr::allocDefCfaOffset(MCSymbol const* l,
-                                                  INT o)
+MCCFIInstruction * DwarfResMgr::allocDefCfaOffset(MCSymbol const* l, INT o)
 {
     MCCFIInstruction * cfi_ins_p = (MCCFIInstruction*)xmalloc
         (sizeof(MCCFIInstruction));
     ASSERT0(cfi_ins_p);
-    MCCFIINSTRUCTION_operation(cfi_ins_p) = MCCFIInstruction::OPDEFCFAOFFSET;
+    MCCFIINSTRUCTION_operation(cfi_ins_p) = CFI_OPDEFCFAOFFSET;
     MCCFIINSTRUCTION_label(cfi_ins_p) = l;
     MCCFIINSTRUCTION_register(cfi_ins_p) = 0;
     MCCFIINSTRUCTION_offset(cfi_ins_p) = o;

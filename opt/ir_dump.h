@@ -105,15 +105,41 @@ void dumpIRCodeName(IR_CODE code, Region const* rg);
 //The function dump IR info into given buffer.
 CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
                         DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
+
+//Dump IR info with a headline.
+//Dump both its kids and siblings.
 void dumpIRListH(IR const* ir_list, Region const* rg,
                  CHAR const* attr = nullptr,
                  DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
+
+//Dump IR info with a postfix-attribute-string.
 void dumpIRList(IR const* ir_list, Region const* rg,
                 CHAR const* attr = nullptr,
                 DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE));
+
+//Dump IR list.
 void dumpIRList(IRList const& ir_list, Region const* rg);
+
+//Dump Const IR list.
 void dumpIRList(ConstIRList const& ir_list, Region const* rg);
+
+//Dump IR, and both its kids and siblings.
+//ctx: pass the dump options top down.
 void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx);
+
+//Dump IR, and both its kids and siblings.
+//filename: dump IR list into given filename.
+//ctx: optional.
+void dumpIRList(
+    CHAR const* filename, IR const* ir_list, Region const* rg,
+    bool dump_inner_region, IRDumpCtx<> * ctx);
+
+//Dump IR, and both its kids and siblings.
+//ctx: optional.
+void dumpIRList(
+    IR const* ir_list, Region const* rg, bool dump_inner_region,
+    IRDumpCtx<> * ctx);
+
 void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 

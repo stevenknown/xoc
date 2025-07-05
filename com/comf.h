@@ -140,6 +140,8 @@ BYTE charToHex(CHAR c);
 //high to low side about given number.
 UINT countLeadingZero(UINT64 a);
 UINT countLeadingZero(UINT32 a);
+UINT countLeadingZero(UINT16 a);
+UINT countLeadingZero(UINT8 a);
 
 //Return true if found leading one.
 //pos: record the bit position of the leading one.
@@ -149,10 +151,27 @@ UINT countLeadingZero(UINT32 a);
 UINT countLeadingOne(UINT64 a);
 UINT countLeadingOne(UINT32 a);
 
+//Count the one of val using `ByteOp::get_elem_count()`.
+//e.g. given the value 0x1111 1111 1111 1111, the results are:
+//countOne(UINT64) = 16
+//countOne(UINT32) = 8
+//countOne(UINT64) = 4
+//countOne(UINT64) = 2
+UINT countOne(UINT64 a);
+UINT countOne(UINT32 a);
+UINT countOne(UINT16 a);
+UINT countOne(UINT8 a);
+
 //Count the trailing zeros of val.
-//e.g: given 0b1011000, the number of trailing zeros is 3.
+//e.g. given the value 0x1 0000 0000 0000, the results are:
+//countTrailingZero(UINT64) = 48
+//countTrailingZero(UINT64) = 32
+//countTrailingZero(UINT64) = 16
+//countTrailingZero(UINT64) = 8
 UINT countTrailingZero(UINT64 val);
 UINT countTrailingZero(UINT32 val);
+UINT countTrailingZero(UINT16 val);
+UINT countTrailingZero(UINT8 val);
 
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
@@ -169,8 +188,23 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 //Extract the bit value from 'val' by given range that between 'start' bit
 //position and 'end' bit position.
 //The bit position start at 0.
-//e.g: Given start is 2, end is 4, val is 0b110101111, return 0b010.
-ULONGLONG extractBitRangeValue(ULONGLONG val, UINT start, UINT end);
+//e.g: Given start is 4, end is 6, val is 0b110101111(0x03AF), return 0b010.
+//       0b110101111
+//     |end <-- start|
+//NOTE: 'T' must be unsigned type.
+template <typename T>
+T extractBitRangeValue(T val, UINT start, UINT end)
+{
+    ASSERT0(start < sizeof(T) * BITS_PER_BYTE);
+    ASSERT0(end < sizeof(T) * BITS_PER_BYTE);
+    ASSERT0(start <= end);
+    UINT lastbit = sizeof(T) * BITS_PER_BYTE - 1;
+    UINT size = end - start;
+    val = val << (lastbit - end);
+    val = val >> (lastbit - size);
+    return val;
+}
+
 
 //Extract the valid value according to the bitwidth.
 //e.g: given value is 7 and bitwidth is 2, return 3 as result.
@@ -227,14 +261,6 @@ UINT32 encodeULEB128(UINT64 value, OUT Vector<CHAR> & os,
 //Similar to the encodeULEB128 function.
 UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os,
                      UINT32 pad_to = 0);
-
-//Extract bits from 'v' according to the 'begin' index and 'end' index.
-//e.g.: Given v = '0x12345678', beign = 4 and end  = 7. it return 7.
-inline UINT64 extractBits(UINT64 v, UINT32 begin, UINT32 end)
-{
-    ASSERT0(begin < 64 && end < 64 && begin <= end);
-    return (v & computeMaxValueFromByteWidth<UINT64>(begin + 1)) >> end;
-}
 
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
@@ -478,6 +504,25 @@ bool isExceedBitWidth(LONGLONG val, UINT bitwidth);
 //Return true if *unsigned* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(ULONGLONG val, UINT bitwidth);
 
+//Insert 'in' value that from 'in_start' to 'in_end' index into the target
+//position of value 'out' that determined by 'out_start' and 'out_end' index.
+//e.g.: given out is '0x00F000F0', out_start is '12', out_end is '15';
+//      in is '0x0F0', in_start is '4', in_end is '7';
+//      and the result is '0x00F0F0F0'.
+template <typename T>
+void insertBitRangeValue(OUT T & out, T in, UINT out_start,
+                         UINT out_end, UINT in_start, UINT in_end)
+{
+    UINT32 width = sizeof(T) * BITS_PER_BYTE;
+    ASSERT0(!isExceedBitWidth((ULONGLONG)in, width));
+    ASSERT0(out_start <= out_end && out_start < width && out_end < width);
+    ASSERT0(in_start <= in_end && in_start < width && in_end < width);
+    ASSERT0((in_end - in_start) <= (out_end - out_start));
+
+    in = xcom::extractBitRangeValue(in, in_start, in_end);
+    out |= (in << out_start);
+}
+
 //Return true if 'c' is an extended character.
 //
 //For example:
@@ -560,12 +605,35 @@ inline CHAR lower(CHAR n)
 void replaceFileNameSuffix(CHAR const* org_file_name, CHAR const* new_suffix,
                            OUT StrBuf & new_file_name);
 
-//Set nbitnum consecutive bits starting at bit position mbitoffset
-//in orgval to bitval.
+//Find the most significant bit (MSB) of given value with different types.
+//e.g.: 0x4000 0000 4000 4040
+//                |
+//                V
+//0b 01000000 00000000 00000000 00000000 01000000 00000000 01000000 01000000
+//    ^                                   ^                 ^        ^
+// UINT64                              UINT32            UINT16    UINT8
+//findMostSignificantBit(UINT64) = 62
+//findMostSignificantBit(UINT32) = 30
+//findMostSignificantBit(UINT16) = 14
+//findMostSignificantBit(UINT8) = 6
+//Note: If the given value is negative, the result will be the sign bit
+//corresponding to that type.
+UINT findMostSignificantBit(UINT8 val);
+UINT findMostSignificantBit(UINT16 val);
+UINT findMostSignificantBit(UINT32 val);
+UINT findMostSignificantBit(UINT64 val);
+UINT findMostSignificantBit(INT8 val);
+UINT findMostSignificantBit(INT16 val);
+UINT findMostSignificantBit(INT32 val);
+UINT findMostSignificantBit(INT64 val);
+
+//Set nbitnum consecutive bits starting at bit position mbitoffset in orgval
+//to bitval. The bitval can only be 0 or 1. If bitval is 1, the specified
+//bits are set to all 1; if bitval is 0, they are set to all 0.
 //a.given orgval: 0x12345678, nbitnum: 4, mbitoffset: 8 and bitval: 0,
 //  The value of orgval will be set to 0x12345078.
 //b.given orgval: 0x12345678, nbitnum: 8, mbitoffset: 8 and bitval: 1,
-//  The value of orgval will be set to 0x12341178.
+//  The value of orgval will be set to 0x1234FF78.
 inline void setNBitValueAtMBitOffset(OUT UINT64 * orgval, UINT nbitnum,
                                      UINT mbitoffset, UINT64 bitval)
 {
@@ -777,6 +845,18 @@ double xlog(double x, double y);
 //Return true if the imm is valid for the limited bitsize.
 bool isValidImmForBitsize(UINT bitsize, UINT64 imm);
 
+//[IEEE 754] +0.0 == -0.0 are all floating-point zeros.
+//+0.0: 0x0000000000000000
+//-0.0: 0x8000000000000000
+//Ignore the sign bit and only check if both the mantissa and exponent are
+//zeros using bitwise operation.
+bool isFPConstZero(UINT64 val);
+
+//[IEEE 754] +0.0: 0x0000000000000000
+//Therefore, floating-point values with all elements being zero belong to the
+//category of positive floating-point numbers.
+bool isFPConstZeroPositive(UINT64 val);
+
 //Exported Data Structures
 class ASCII {
 public:
@@ -784,6 +864,15 @@ public:
     CHAR ch;
 };
 extern ASCII g_asc1[];
+
+//Return true if the addr is bytesize-byte aligned.
+//e.g: given addr is 0x8, bytesize is 4, the function will return true.
+//e.g2:given addr is 0xc, bytesize is 8, the function will return false.
+inline bool checkAligned(ULONGLONG addr, size_t bytesize)
+{
+    ASSERT0(bytesize > 0 && isPowerOf2((ULONGLONG)bytesize));
+    return (addr & (bytesize - 1)) == 0;
+}
 
 } //namespace xcom
 

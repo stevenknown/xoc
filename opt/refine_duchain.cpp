@@ -31,38 +31,44 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-bool RefineDUChain::dump() const
+static void dumpRemovedDU(RefineDUCtx const& ctx, IR const* def, IR const* use)
+{
+    Region const* rg = ctx.getRegion();
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRefineDUChain()) { return; }
+    ASSERT0(def && use);
+    DefFixedStrBuf buf1;
+    DefFixedStrBuf buf2;
+    const_cast<RefineDUCtx&>(ctx).getActMgr().dump("REMOVE DU:%s -> %s",
+        xoc::dumpIRName(def, buf1), xoc::dumpIRName(use, buf2));
+}
+
+
+bool RefineDUChain::dump(RefineDUCtx const& ctx) const
 {
     if (!getRegion()->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
          m_rg->getRegionName());
-    if (m_is_use_gvn) {
-        ASSERT0(m_du);
-        m_rg->getLogMgr()->incIndent(2);
-        m_du->dumpDUChainDetail();
-        m_rg->getLogMgr()->decIndent(2);
-    } else {
-        ASSERT0(m_mdssamgr);
-        m_rg->getLogMgr()->incIndent(2);
-        m_mdssamgr->dumpDUChain();
-        m_rg->getLogMgr()->decIndent(2);
-    }
+    getRegion()->getLogMgr()->incIndent(2);
+    const_cast<RefineDUCtx&>(ctx).getActMgr().dump();
+    getRegion()->getLogMgr()->decIndent(2);
     return Pass::dump();
 }
 
 
-bool RefineDUChain::processArrayExp(IR const* exp)
+bool RefineDUChain::processArrayExp(
+    IR const* exp, BBIRListIter it, RefineDUCtx const& ctx)
 {
     ASSERT0(exp->is_exp() && exp->isArrayOp());
     if (m_is_use_gvn) {
-        return processArrayExpViaGVN(exp);
+        return processArrayExpViaGVN(exp, ctx);
     }
     //Use MDSSA.
-    return processExpViaMDSSA(exp);
+    return processExpViaMDSSA(exp, it, ctx);
 }
 
 
-bool RefineDUChain::processNormalExpByClassicDU(IR const* exp)
+bool RefineDUChain::processNormalExpByClassicDU(
+    IR const* exp, RefineDUCtx const& ctx)
 {
     if (!exp->isMemRefNonPR()) { return false; }
     MD const* mustuse = exp->getMustRef();
@@ -93,6 +99,7 @@ bool RefineDUChain::processNormalExpByClassicDU(IR const* exp)
         if (maydef != nullptr && maydef->is_contain(mustuse, m_rg)) {
             continue;
         }
+        dumpRemovedDU(ctx, stmt, exp);
         m_du->removeDUChain(stmt, exp);
         change = true;
     }
@@ -110,48 +117,49 @@ bool RefineDUChain::processNormalExpByMDSSA(IR const* exp)
 }
 
 
-bool RefineDUChain::processNormalExp(IR const* exp)
+bool RefineDUChain::processNormalExp(IR const* exp, RefineDUCtx const& ctx)
 {
     if (useMDSSADU()) {
         return processNormalExpByMDSSA(exp);
     }
-    return processNormalExpByClassicDU(exp);
+    return processNormalExpByClassicDU(exp, ctx);
 }
 
 
-bool RefineDUChain::processIndirectExp(IR const* exp)
+bool RefineDUChain::processIndirectExp(
+    IR const* exp, BBIRListIter it, RefineDUCtx const& ctx)
 {
     ASSERT0(exp->is_exp() && exp->isIndirectMemOp());
     if (m_is_use_gvn) {
-        return processIndirectExpViaGVN(exp);
+        return processIndirectExpViaGVN(exp, ctx);
     }
-    return processExpViaMDSSA(exp);
+    return processExpViaMDSSA(exp, it, ctx);
 }
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processBB(IRBB const* bb)
+bool RefineDUChain::processBB(IRBB const* bb, RefineDUCtx const& ctx)
 {
     ASSERT0(bb);
-    BBIRListIter ct = nullptr;
+    BBIRListIter it = nullptr;
     ConstIRIter ii;
     bool change = false;
-    for (IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
+    for (IR * ir = BB_irlist(bb).get_head(&it);
+         ir != nullptr; ir = BB_irlist(bb).get_next(&it)) {
         ii.clean();
         for (IR const* exp = iterExpInitC(ir, ii);
              exp != nullptr; exp = iterExpNextC(ii)) {
             if (exp->isIndirectMemOp()) {
-                change |= processIndirectExp(exp);
+                change |= processIndirectExp(exp, it, ctx);
                 if (!change) {
-                    change |= processNormalExp(exp);
+                    change |= processNormalExp(exp, ctx);
                 }
                 continue;
             }
             if (exp->is_array()) {
-                change |= processArrayExp(exp);
+                change |= processArrayExp(exp, it, ctx);
                 if (!change) {
-                    change |= processNormalExp(exp);
+                    change |= processNormalExp(exp, ctx);
                 }
                 continue;
             }
@@ -197,11 +205,11 @@ bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
     }
 
     //Check whether the MD has different version.
-    VMD const* basevmd1 = (VMD const*)basemdssa1->getVOpndForMD(basemd1->id(),
-                                                                m_mdssamgr);
+    VMD const* basevmd1 = (VMD const*)basemdssa1->getVOpndForMD(
+        basemd1->id(), m_mdssamgr);
     if (basevmd1 == nullptr) { return false; }
-    VMD const* basevmd2 = (VMD const*)basemdssa2->getVOpndForMD(basemd2->id(),
-                                                                m_mdssamgr);
+    VMD const* basevmd2 = (VMD const*)basemdssa2->getVOpndForMD(
+        basemd2->id(), m_mdssamgr);
     if (basevmd2 == nullptr) { return false; }
     if (basevmd1 == basevmd2) { return true; }
     return false;
@@ -209,7 +217,8 @@ bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processExpViaMDSSA(IR const* exp)
+bool RefineDUChain::processExpViaMDSSA(
+    IR const* exp, BBIRListIter it, RefineDUCtx const& ctx)
 {
     ASSERT0(exp);
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
@@ -238,24 +247,42 @@ bool RefineDUChain::processExpViaMDSSA(IR const* exp)
         if (!hasSameBase(exp, defstmt)) {
             continue;
         }
-
-        if (exp->isNotOverlap(defstmt, m_rg)) {
-            //Remove DU chain if we can guarantee ILD and its DEF stmt
-            //are independent.
-            m_mdssamgr->removeDUChain(defstmt, exp);
-
-            //removeDUChain may remove VOpnd that indicated by 'next_i'.
-            //We have to recompute next_i to avoid redundnant iteration.
-            next_i = mdssainfo->readVOpndSet().get_first(&iter);
-            change = true;
+        if (!exp->isNotOverlap(defstmt, m_rg)) {
+            //defstmt is overlapped to exp.
+            continue;
         }
+
+        //Remove DU chain if we can guarantee ILD and its DEF stmt
+        //are independent.
+        dumpRemovedDU(ctx, defstmt, exp);
+        m_mdssamgr->removeDUChain(defstmt, exp);
+
+        //removeDUChain may remove VOpnd that indicated by 'next_i'.
+        //We have to update next_i immediately to avoid redundnant
+        //loop iteration.
+        next_i = mdssainfo->readVOpndSet().get_first(&iter);
+        change = true;
     }
-    return change;
+    if (!change) { return false; }
+    if (mdssainfo->isEmptyVOpndSet()) {
+        //In MDSSA mode, any Memory Referrences should have VOpnd, at least
+        //the init-verison VMD if it is the region live-in MD.
+        //e.g:compile/struct_decl.c
+        m_mdssamgr->setInitVersionVMD(const_cast<IR*>(exp), mdssainfo);
+        return change;
+    }
+    IRBB * startbb = exp->getStmt()->getBB();
+    BBIRListIter pit = startbb->getIRList().get_prev(it);
+    IR const* startir = pit != nullptr ? pit->val() : nullptr;
+    MDSSAStatus st;
+    FindAndSetLiveInDef fs(m_mdssamgr, ctx.getOptCtx());
+    fs.findAndSet(const_cast<IR*>(exp), startir, startbb, st);
+    return true;
 }
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processArrayExpViaGVN(IR const*)
+bool RefineDUChain::processArrayExpViaGVN(IR const*, RefineDUCtx const&)
 {
     //TODO:remove DUChain if subexp's GVN is not the same.
     return false;
@@ -263,9 +290,15 @@ bool RefineDUChain::processArrayExpViaGVN(IR const*)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
+bool RefineDUChain::processIndirectExpViaGVN(
+    IR const* exp, RefineDUCtx const& ctx)
 {
     ASSERT0(exp->is_exp() && exp->isIndirectMemOp());
+    if (!ctx.getOptCtx().is_nonpr_du_chain_valid()) {
+        //The function only use classical DU for now.
+        return false;
+    }
+
     //Find the base expression that is not ILD.
     //e.g: given ILD(ILD(ILD(p))), the following loop will
     //reason out 'p'.
@@ -277,7 +310,10 @@ bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
     }
 
     DUSet const* defset = exp->getDUSet();
-    if (defset == nullptr) { return false; }
+    if (defset == nullptr) {
+        ASSERTN(0, ("classical DU is invalid"));
+        return false;
+    }
 
     //Iterate each DEF stmt of 'exp'.
     bool change = false;
@@ -287,7 +323,8 @@ bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
         next_i = defset->get_next(i, &di);
         IR const* stmt = m_rg->getIR(i);
         ASSERT0(stmt->is_stmt());
-        //Only deal with IR_IST.
+
+        //Only deal IR_IST.
         if (!stmt->is_ist()) { continue; }
         if (m_tm->getByteSize(exp->getType()) != 1 ||
             m_tm->getByteSize(stmt->getType()) != 1) {
@@ -302,8 +339,8 @@ bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
 
         //Get VN of IST's base expression.
         UINT ist_star_level = 0;
-        VN const* vn_of_ist_base = getVNOfIndirectOp(stmt, &ist_star_level,
-                                                     m_gvn);
+        VN const* vn_of_ist_base = getVNOfIndirectOp(
+            stmt, &ist_star_level, m_gvn);
         if (vn_of_ist_base == nullptr) {
             //No need to analyze DEF stmt with have no VN.
             continue;
@@ -316,6 +353,7 @@ bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
             //VN is same, accessing same place.
             continue;
         }
+        dumpRemovedDU(ctx, stmt, exp);
         m_du->removeDUChain(stmt, exp);
         change = true;
     }
@@ -324,14 +362,14 @@ bool RefineDUChain::processIndirectExpViaGVN(IR const* exp)
 
 
 //Return true if DU chain changed.
-bool RefineDUChain::process()
+bool RefineDUChain::process(RefineDUCtx const& ctx)
 {
-    BBList * bbl = m_rg->getBBList();
-    C<IRBB*> * ctbb = nullptr;
+    BBList const* bbl = m_rg->getBBList();
+    BBListIter ctbb = nullptr;
     bool change = false;
     for (IRBB * bb = bbl->get_head(&ctbb);
          bb != nullptr; bb = bbl->get_next(&ctbb)) {
-        change |= processBB(bb);
+        change |= processBB(bb, ctx);
     }
     return change;
 }
@@ -355,7 +393,6 @@ bool RefineDUChain::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
     if (m_is_use_gvn) {
         m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (m_gvn == nullptr || !m_gvn->is_valid()) {
@@ -364,15 +401,18 @@ bool RefineDUChain::perform(OptCtx & oc)
     } else {
         //Use MDSSA.
     }
-
     START_TIMER(t, getPassName());
-    bool change = process();
+    RefineDUCtx ctx(oc);
+    bool change = process(ctx);
     END_TIMER(t, getPassName());
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefineDUChain()) {
-        dump();
+        dump(ctx);
     }
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0L3(verifyClassicDUChain(m_rg, oc));
 
-    //This pass does not affect IR stmt/exp, but DU chain may be changed.
+    //This pass does not modify any IR stmts/exps, but DU chain may be changed.
     return change;
 }
 

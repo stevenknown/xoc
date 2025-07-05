@@ -39,6 +39,14 @@ namespace xoc {
 class Type;
 class TypeMgr;
 
+class BYTEVec : public xcom::Vector<BYTE> {
+    COPY_CONSTRUCTOR(BYTEVec);
+public:
+    BYTEVec() {}
+    BYTEVec(UINT size) : xcom::Vector<BYTE>(size) {}
+    void dump(Region const* rg) const;
+};
+
 //Dump host-machine integer value.
 void dumpHostInteger(HOST_UINT intval, Type const* ty, Region const* rg,
                      TypeMgr const* tm, bool is_sign);

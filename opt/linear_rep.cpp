@@ -272,7 +272,7 @@ IR const* LinearRepMgr::buildBinOp(IR_CODE code, IR const* c0, IR const* c1)
     tmpoc.copy(m_oc);
     RefineCtx refinectx(&tmpoc);
     bool change;
-    res = m_refine->refineIR(res, change, refinectx);
+    res = m_refine->refineExpression(res, change, refinectx);
     add(res);
     return res;
 }

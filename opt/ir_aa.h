@@ -132,8 +132,8 @@ class PtPairMgr {
 
     inline PtPair * xmalloc_pt_pair()
     {
-        PtPair * p = (PtPair*)smpoolMallocConstSize(sizeof(PtPair),
-                                                    m_pool_pt_pair);
+        PtPair * p = (PtPair*)smpoolMallocConstSize(
+            sizeof(PtPair), m_pool_pt_pair);
         ASSERT0(p);
         ::memset((void*)p, 0, sizeof(PtPair));
         return p;
@@ -163,8 +163,8 @@ public:
         if (m_pool_pt_pair != nullptr) { return; }
         m_pp_count = 1;
         m_pool_pt_pair = smpoolCreate(sizeof(PtPair), MEM_CONST_SIZE);
-        m_pool_tmap = smpoolCreate(sizeof(TMap<UINT, PtPair*>),
-                                   MEM_CONST_SIZE);
+        m_pool_tmap = smpoolCreate(
+            sizeof(TMap<UINT, PtPair*>), MEM_CONST_SIZE);
     }
 
     void destroy()
@@ -306,6 +306,10 @@ typedef TMap<IR const*, MD const*> IR2Heapobj;
 //HEAP is modified/referrenced if a LOAD/STORE operates
 //MD that describes variable belongs to HEAP.
 class AliasAnalysis : public Pass {
+    friend class VFToInit;
+    friend class PrnoVarPtrCand;
+    typedef xcom::TTab<PRNO> PrnoTab;
+    typedef xcom::TTab<Var const*> ConstVarTab;
 protected:
     //If the flag is true, flow sensitive analysis is performed.
     //Or perform flow insensitive.
@@ -340,27 +344,34 @@ protected:
 
     //Analysis context. Record MD->MDSet for each BB.
     Vector<MD2MDSet*> m_md2mds_vec;
+
+    //This two variables record the PRNOs and variables using pointer types.
+    PrnoTab m_prno_ptr_cand;
+    ConstVarTab m_var_ptr_cand;
 protected:
     MD const* allocHeapobj(IR * ir);
     MD const* assignIdMD(IN IR * ir, MOD MDSet * mds, MOD AACtx * ic);
-    MD const* assignLoadMD(IN IR * ir, MOD MDSet * mds, MOD AACtx * ic,
-                           MOD MD2MDSet * mx);
+    MD const* assignLoadMD(
+        IN IR * ir, MOD MDSet * mds, MOD AACtx * ic, MOD MD2MDSet * mx);
 
     //The function unites POINT-TO set into 'output' for each element in 'mds'.
-    void collectPointToForElem(MDSet const& mds, MD2MDSet const* mx,
-                               OUT MDSet * united, OUT MDSet const** hashed);
-    void computeResultSet(MDSet const& input_mds, MDSet const* input_hashed,
-                          OUT MDSet & output_mds, OUT AACtx * output_ic);
+    void collectPointToForElem(
+        MDSet const& mds, MD2MDSet const* mx, OUT MDSet * united,
+        OUT MDSet const** hashed);
+    void computeResultSet(
+        MDSet const& input_mds, MDSet const* input_hashed,
+        OUT MDSet & output_mds, OUT AACtx * output_ic);
+
     //Return false if flow sensitive analysis is inproperly.
-    bool computeFlowSensitiveBB(IRBB const* bb, PPSetMgr & ppsetmgr,
-                                DefMiscBitSetMgr * sbsmgr,
-                                BitSet & is_bb_changed,
-                                PtPairSet * tmp, bool first,
-                                OUT bool & change);
-    void convertPT2MD2MDSet(PtPairSet const& pps, PtPairMgr const& ppmgr,
-                            MOD MD2MDSet * ctx);
-    bool convertMD2MDSet2PT(OUT PtPairSet * pps, IN PtPairMgr & ppmgr,
-                            IN PPSetMgr & ppsetmgr, IN MD2MDSet * mx);
+    bool computeFlowSensitiveBB(
+        IRBB const* bb, PPSetMgr & ppsetmgr, DefMiscBitSetMgr * sbsmgr,
+        BitSet & is_bb_changed, PtPairSet * tmp, bool first,
+        OUT bool & change);
+    void convertPT2MD2MDSet(
+        PtPairSet const& pps, PtPairMgr const& ppmgr, MOD MD2MDSet * ctx);
+    bool convertMD2MDSet2PT(
+        OUT PtPairSet * pps, IN PtPairMgr & ppmgr, IN PPSetMgr & ppsetmgr,
+        IN MD2MDSet * mx);
     void convertExact2Unbound(MDSet const& src, MDSet * tgt);
     void computeStmt(MOD IR * ir, MOD MD2MDSet * mx);
     virtual void computeExtStmt(MOD IR * ir, MOD MD2MDSet * mx);
@@ -415,19 +426,20 @@ protected:
     //Note May-POINT-TO set must be available before call this function.
     void initPTS(Var * var, MD2MDSet * mx);
     void initPTSForRegisterMD(MDTab * mdt, MD const* dmd, MD2MDSet * mx);
-    void inferPointerArithByHashedPTS(IR const* ir, OUT MDSet & mds,
-                                      MOD AACtx * opnd0_ic);
-    void inferPointerArithByUnHashedPTS(IR const* ir, OUT MDSet & mds,
-                                        MDSet const& opnd0_mds);
-    void inferPointerArith(IR const* ir, OUT MDSet & mds,
-                           MDSet const& opnd0_mds, MOD AACtx * opnd0_ic,
-                           MOD MD2MDSet * mx);
+    void inferPointerArithByHashedPTS(
+        IR const* ir, OUT MDSet & mds, MOD AACtx * opnd0_ic);
+    void inferPointerArithByUnHashedPTS(
+        IR const* ir, OUT MDSet & mds, MDSet const& opnd0_mds);
+    void inferPointerArith(
+        IR const* ir, OUT MDSet & mds, MDSet const& opnd0_mds,
+        MOD AACtx * opnd0_ic, MOD MD2MDSet * mx);
+
     //rhs: RHS of ir, ir should be stmt. It's reference MD will be computed.
-    void inferRHSAndUpdateLHS(IR const* ir, IR * rhs, MD const* mustref,
-                              MDSet const* mayref, AACtx const* ic,
-                              MOD MD2MDSet * mx);
-    void inferStoreValue(IR const* ir, IR * rhs,
-                         AACtx const* ic, IN MD2MDSet * mx);
+    void inferRHSAndUpdateLHS(
+        IR const* ir, IR * rhs, MD const* mustref, MDSet const* mayref,
+        AACtx const* ic, MOD MD2MDSet * mx);
+    void inferStoreValue(
+        IR const* ir, IR * rhs, AACtx const* ic, IN MD2MDSet * mx);
 
     //The function compute may memory address or point-to set for
     //array operation.
@@ -436,55 +448,72 @@ protected:
     //ir: array|starray operator.
     //is_ofst_predicable: true if array element offset is constant.
     //This function will set the Ref MD and Ref MD set of array operation.
-    void inferArrayExpBaseHashedMDSet(IR * ir, MDSet const* hashed_mds,
-                                      OUT MDSet & mds, OUT AACtx * ic);
-    void inferArrayInfinite(INT ofst, bool is_ofst_pred, UINT md_size,
-                            MDSet const& in, OUT MDSet & out);
-    MD const* inferArrayLdabase(MOD IR * ir, IR * array_base, bool is_ofst_pred,
-                                UINT ofst, MOD AACtx * ic);
-    virtual void inferExtExp(IR * ir, MOD MDSet & mds,
-                             MOD AACtx * ic, MOD MD2MDSet * mx);
+    void inferArrayExpBaseHashedMDSet(
+        IR * ir, MDSet const* hashed_mds, OUT MDSet & mds, OUT AACtx * ic);
+    void inferArrayInfinite(
+        INT ofst, bool is_ofst_pred, UINT md_size, MDSet const& in,
+        OUT MDSet & out);
+    MD const* inferArrayLdabase(
+        MOD IR * ir, IR * array_base, bool is_ofst_pred, UINT ofst,
+        MOD AACtx * ic);
+    virtual void inferExtExp(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     void inferExpGeneralAndSetWorstCase(
         IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     void inferExp(IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
-    void inferArrayExpBase(IR * ir, IR * array_base, bool is_ofst_predicable,
-                           UINT ofst, OUT MDSet & mds,
-                           MOD AACtx * ic, MOD MD2MDSet * mx);
+    void inferExpList(
+        IR * expr_list, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void inferArrayExpBase(
+        IR * ir, IR * array_base, bool is_ofst_predicable, UINT ofst,
+        OUT MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
 
     void processDirectMemOp(IR const* ir, MOD MD2MDSet * mx);
     void processIndirectMemOp(MOD IR * ir, IN MD2MDSet * mx);
-    MD const* processPR(IN IR * ir, MOD MDSet * mds, MOD AACtx * ic,
-                        MOD MD2MDSet * mx);
+    MD const* processPR(
+        IN IR * ir, MOD MDSet * mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     MD const* processLda(IR * ir, MOD AACtx * ic);
-    void processCvt(IR const* ir, MOD MDSet & mds, MOD AACtx * ic,
-                    MOD MD2MDSet * mx);
-    void processGetelem(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
-                        MOD MD2MDSet * mx);
+    void processCvt(
+        IR const* ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void processGetelem(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     void processGetElem(IR * ir, MOD MD2MDSet * mx);
     void processSetElem(IR * ir, MOD MD2MDSet * mx);
-    void processILoad(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
-                      MOD MD2MDSet * mx);
-    void processAddSub(IR * ir, MOD MDSet & mds,
-                       MOD AACtx * ic, MOD MD2MDSet * mx);
-    void processPointerArith(IR * ir, MOD MDSet & mds, MOD AACtx * ic,
-                             MOD MD2MDSet * mx);
-    void processArray(MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic,
-                      MOD MD2MDSet * mx);
+    void processILoad(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void processAddSub(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void processPointerArith(
+        IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
+    void processArray(
+        MOD IR * ir, MOD MDSet & mds, MOD AACtx * ic, MOD MD2MDSet * mx);
     void processConst(IR const* ir, MOD MDSet & mds, MOD AACtx * ic);
     void processStoreArray(MOD IR * ir, MOD MD2MDSet * mx);
+
     //TODO:compute point-to set through different phi-operand since phi-operand
     //described the direction of each predecessor.
-    void processPhiOpndPTS(IR const* ir, bool phi_pts_is_worst,
-                           MDSet & phi_pts, MOD MD2MDSet * mx);
+    void processPhiOpndPTS(
+        IR const* ir, bool phi_pts_is_worst, MDSet & phi_pts,
+        MOD MD2MDSet * mx);
     void processPhi(IR const* ir, MOD MD2MDSet * mx);
+    void processCallAllocHeap(MOD IR * ir, IN MD2MDSet * mx);
+    void processCallReturnValue(MOD IR * ir, IN MD2MDSet * mx);
     void processCallSideeffect(MOD MD2MDSet & mx, MDSet const& by_addr_mds);
+    void processCallDummyUse(MOD IR * ir, IN MD2MDSet * mx, MOD MDSet & tmp);
+    void processCallArgList(
+        MOD IR * ir, IN MD2MDSet * mx, MOD MDSet & by_addr_mds,
+        MOD MDSet & tmp);
     void processCall(MOD IR * ir, MOD MD2MDSet * mx);
     void processReturn(IR const* ir, MOD MD2MDSet * mx);
     void processRegionSideeffect(MOD MD2MDSet & mx);
     void processRegion(IR const* ir, MOD MD2MDSet * mx);
-    void processArrayHashed(MOD IR * ir, MDSet const* hashed,
-                            MD2MDSet const* mx, OUT MDSet & mds,
-                            MOD AACtx * ic);
+    void processArrayHashed(
+        MOD IR * ir, MDSet const* hashed, MD2MDSet const* mx, OUT MDSet & mds,
+        MOD AACtx * ic);
+
+    //Iterates through all basic blocks and IRs to identify pointer candidates.
+    //This pre-scan step helps resolve type-mixing issues and ensures accurate
+    //pointer analysis later in the process.
+    void scanPointerCand();
 
     //This function set MustAddr or MayAddr of ir by analyszing given MDSet.
     //mds: mds may be the MayAddr MDSet. Note mds should have been hashed.
@@ -495,18 +524,19 @@ protected:
     void setIRRef(IR * ir, MDSet const* mds);
 
     //Return true if new POINT_TO info generated.
-    bool tryToEvaluateConstOffset(IR const* ir, OUT MDSet & mds,
-                                  MDSet const& opnd0_mds,
-                                  MOD AACtx * opnd0_ic);
+    bool tryToEvaluateConstOffset(
+        IR const* ir, OUT MDSet & mds, MDSet const& opnd0_mds,
+        MOD AACtx * opnd0_ic);
+
     //Reshape MD in 'mds' if one of them need to be reshape.
     //Record reshaped MD in 'newmds' and return true.
     //This function will iterate MD in 'mds', new MD will be generated either
     //ir's MD size is different to MD in 'mds' or ir has offset.
     //Return true if new MD generated, and new MD record in 'newmds'.
     bool tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds);
-    bool tryComputeConstOffset(IR const* ir, MDSet const& opnd0_mds,
-                               IR const* opnd1, MOD MDSet & mds,
-                               bool * changed);
+    bool tryComputeConstOffset(
+        IR const* ir, MDSet const& opnd0_mds, IR const* opnd1, MOD MDSet & mds,
+        bool * changed);
 
     void recomputeDataType(IR const* ir, AACtx const& ic, MOD MDSet & pts);
     MD const* reviseMDSize(IR const* ir, MD const* md);
@@ -516,10 +546,8 @@ protected:
     //ir: given indirect operation, such as IST, ILD.
     //comp_ir_pt: true if caller require to compute the POINT-TO set of ir.
     //Return POINT-TO set of ir, if comp_ir_pts is true.
-    MDSet const* updateIndirectOpAddrAndPointToSet(MDSet const* refmds,
-                                                   MOD IR * ir,
-                                                   bool comp_ir_pts,
-                                                   MD2MDSet * mx);
+    MDSet const* updateIndirectOpAddrAndPointToSet(
+        MDSet const* refmds, MOD IR * ir, bool comp_ir_pts, MD2MDSet * mx);
     bool usePRSSADU() const;
 
     inline void * xmalloc(size_t size)
@@ -530,6 +558,7 @@ protected:
         return p;
     }
 
+    bool verifyStrictlyUseOfPointer() const;
     virtual bool verifyExtIR(IR * ir);
     bool verifyIR(IR * ir);
 public:
@@ -551,8 +580,8 @@ public:
     //pointer: IR expression that pointed to memory.
     //point_to_set: POINT_TO set of pointer, genernate new set if TBAA exist.
     //Return true if pointer pointed to MAY-POINT-TO set.
-    MDSet const* computeMayPointToViaTBAA(IR const* pointer,
-                                          MDSet const* point_to_set);
+    MDSet const* computeMayPointToViaTBAA(
+        IR const* pointer, MDSet const* point_to_set);
 
     //The function collects all MDs that ir may pointed to.
     //Return the worst case MDSet if ir may pointed to it. If ir pointed to the
@@ -568,20 +597,23 @@ public:
     void cleanContext();
 
     void destroyContext();
+    void dumpBBIRList(IRBB const* bb, MD2MDSet const* mx) const;
+    void dumpBBPointTo(IRBB const* bb) const;
     void dumpWorstCase() const;
-    void dumpDirectStore(IR const* ir, bool dump_kid,
-                         MD2MDSet const* mx) const;
+    void dumpDirectStore(IR const* ir, bool dump_kid, MD2MDSet const* mx) const;
     void dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const;
     void dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const;
     void dumpIRPointTo(IR const* ir, bool dump_kid, MD2MDSet const* mx) const;
     void dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const;
-    virtual void dumpIRPointToForExtIR(IR const* ir, bool dump_kid,
-                                       MD2MDSet const* mx) const;
-    virtual void dumpIRPointToForIR(IR const* ir, bool dump_kid,
-                                    MD2MDSet const* mx) const;
+    virtual void dumpIRPointToForExtIR(
+        IR const* ir, bool dump_kid, MD2MDSet const* mx) const;
+    virtual void dumpIRPointToForIR(
+        IR const* ir, bool dump_kid, MD2MDSet const* mx) const;
     void dumpIRPointToForRegion(bool dump_kid) const;
     void dumpPtPairSet(PtPairSet const& pps) const;
     void dumpMD2MDSetForRegion(bool dump_pt_graph) const;
+    void dumpBBListWithPointTo() const;
+    bool dumpForTest() const;
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -593,13 +625,13 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    void ElemUnionPointTo(MDSet const& mds, MDSet const& in_set,
-                          IN MD2MDSet * mx);
-    void ElemUnionPointTo(MDSet const& mds, MD const* in_elem,
-                          IN MD2MDSet * mx);
+    void ElemUnionPointTo(
+        MDSet const& mds, MDSet const& in_set, IN MD2MDSet * mx);
+    void ElemUnionPointTo(
+        MDSet const& mds, MD const* in_elem, IN MD2MDSet * mx);
     void ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx);
-    void ElemCopyAndUnionPointTo(MDSet const& mds, MDSet const& pt_set,
-                                 IN MD2MDSet * mx);
+    void ElemCopyAndUnionPointTo(
+        MDSet const& mds, MDSet const& pt_set, IN MD2MDSet * mx);
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
@@ -633,6 +665,9 @@ public:
     //Return true if the set indicates the worst case of MD reference set.
     bool isWorstCase(MDSet const* set) const { return set == getWorstCase(); }
 
+    //Check whether the current IR can be regarded as pointer operation.
+    bool regardAsPtr(IR const* ir) const;
+
     void setMayPointToMDSet(MDSet const* set) { m_maypts = set; }
 
     void setPointTo(MDIdx pointer_md, MDIdx pointed, MOD MD2MDSet & ctx)
@@ -648,8 +683,8 @@ public:
     }
 
     //Set pointer points to 'target'.
-    inline void setPointToUniqueMD(UINT pointer_mdid, MD2MDSet & ctx,
-                                   MD const* target)
+    inline void setPointToUniqueMD(
+        UINT pointer_mdid, MD2MDSet & ctx, MD const* target)
     {
         ASSERT0(target);
         MDSet tmp;
@@ -660,8 +695,8 @@ public:
     }
 
     //Set pointer points to 'target_set' in the context.
-    void setPointToMDSet(UINT pointer_mdid, MD2MDSet & ctx,
-                         MDSet const& target_set)
+    void setPointToMDSet(
+        UINT pointer_mdid, MD2MDSet & ctx, MDSet const& target_set)
     {
         ASSERTN(!m_mds_hash->find(target_set),
                 ("already hashed, there might be redundant function call"));
@@ -671,13 +706,13 @@ public:
 
     //Set pointer points to new MDSet by appending a new element 'newmd'
     //in the context.
-    inline void setPointToMDSetByAddMD(MDIdx pointer_mdid, MD2MDSet & ctx,
-                                       MD const* newmd)
+    void setPointToMDSetByAddMD(
+        MDIdx pointer_mdid, MD2MDSet & ctx, MD const* newmd)
     {
         MDSet tmp;
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
         if (pts != nullptr) {
-            if (pts->is_contain(newmd, m_rg) || isWorstCase(pts)) {
+            if (pts->is_contain(newmd, getRegion()) || isWorstCase(pts)) {
                 ASSERT0(m_mds_hash->find(*pts));
                 return;
             }
@@ -692,8 +727,8 @@ public:
 
     //Set pointer points to MD set by appending a MDSet.
     //pt_set: POINT-TO set that has been hashed.
-    inline void setPointToMDSetByAddMDSet(MDIdx pointer_mdid, MD2MDSet & ctx,
-                                          MDSet const& pt_set)
+    void setPointToMDSetByAddMDSet(
+        MDIdx pointer_mdid, MD2MDSet & ctx, MDSet const& pt_set)
     {
         ASSERT0(m_mds_hash->find(pt_set));
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
@@ -721,8 +756,9 @@ public:
 
     //Set the POINT-TO set of LHS MD and LHS MDSet.
     //pts: POINT-TO set that have been hashed.
-    void setLHSPointToSet(MD const* lhs_mustaddr, MDSet const* lhs_mayaddr,
-                          MDSet const* pts, IN MD2MDSet * mx);
+    void setLHSPointToSet(
+        MD const* lhs_mustaddr, MDSet const* lhs_mayaddr, MDSet const* pts,
+        IN MD2MDSet * mx);
 
     //Function return the POINT-TO pair for each BB.
     //Only used in flow-sensitive analysis.
@@ -739,10 +775,11 @@ public:
     //hashed_mds: record the POINT-TO set of 'rhs' if AC_comp_pts() is true.
     //            Note if AC_comp_pts() is true, the returned POINT-TO set may
     //            be recorded in 'rhsrefmds' or AC_hashed_mds.
-    void updateLHSPointToSet(bool is_lhs_pointer, bool rhs_taken_address,
-                             MD const* lhs_mustaddr, MDSet const* lhs_mayaddr,
-                             IR const* rhs, MDSet & rhsrefmds,
-                             MDSet const* hashed_mds, MD2MDSet * mx);
+    void updateLHSPointToSet(
+        bool is_lhs_pointer, bool rhs_taken_address, MD const* lhs_mustaddr,
+        MDSet const* lhs_mayaddr, IR const* rhs, MDSet & rhsrefmds,
+        MDSet const* hashed_mds, MD2MDSet * mx);
+
     //Union POINT-TO set for each element in 'mds', and hash the unified result
     //return it.
     //mds: represents address of current ILD.

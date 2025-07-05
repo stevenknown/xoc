@@ -35,6 +35,45 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//
+//START BYTEVec
+//
+void BYTEVec::dump(Region const* rg) const
+{
+    ASSERT0(rg);
+    if (!rg->isLogMgrInit()) { return; }
+    static CHAR const* g_char_string [] = {
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+    };
+    note(rg, "\n");
+    for (UINT i = 0; i < get_elem_count(); i++) {
+        BYTE b = get(i);
+        BYTE low = xcom::extractBitRangeValue(b, 0, 3);
+        BYTE high = xcom::extractBitRangeValue(b, 4, 7);
+        ASSERT0(low >= 0 && low <= 15);
+        ASSERT0(high >= 0 && high <= 15);
+        if (i != 0) { note(rg, " "); }
+        prt(rg, "%s%s", g_char_string[high], g_char_string[low]);
+    }
+}
+//END BYTEVec
+
+
 //Print \l as the Carriage Return.
 //bool g_prt_carriage_return_for_dot = false;
 

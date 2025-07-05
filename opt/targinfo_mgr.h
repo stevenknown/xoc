@@ -39,7 +39,6 @@ class TargInfoMgr {
     COPY_CONSTRUCTOR(TargInfoMgr);
 protected:
     Reg m_link;
-
 protected:
     virtual void initAllocableScalar()
     { ASSERTN(0, ("Target Dependent Code")); }
@@ -54,6 +53,13 @@ protected:
     virtual void initRetvalScalar() { ASSERTN(0, ("Target Dependent Code")); }
     virtual void initRetvalVector() { ASSERTN(0, ("Target Dependent Code")); }
 
+    //Initialize total caller-saved register set, includes all kind of
+    //registers of caller.
+    virtual void initCaller() { ASSERTN(0, ("Target Dependent Code")); }
+
+    //Initialize total callee-saved register set, includes all kind of
+    //registers of callee.
+    virtual void initCallee() { ASSERTN(0, ("Target Dependent Code")); }
 public:
     TargInfoMgr() {}
     virtual ~TargInfoMgr() { destroy(); }
@@ -69,15 +75,15 @@ public:
     //Get vector allocable register set of different architectures.
     virtual xgen::RegSet const* getAllocableVectorRegSet() const;
 
-    //Get base pointer register of different architectures.
-    virtual xgen::Reg getBP() const
-    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
-
     //Get scalar callee saved register set of different architectures.
     virtual xgen::RegSet const* getCalleeScalarRegSet() const;
 
     //Get vector callee saved register set of different architectures.
     virtual xgen::RegSet const* getCalleeVectorRegSet() const;
+
+   //Get scalar caller saved register set of different architectures.
+    virtual xgen::RegSet const* getCallerRegSet() const
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     //Get end scalar caller saved register of different architectures.
     virtual xgen::Reg getCallerScalarEnd() const
@@ -101,8 +107,20 @@ public:
     virtual xgen::Reg getGP() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
+    //Get the cycle count of load operation on chip memory.
+    virtual UINT getLoadOnChipMemCycle() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
+    //Get the cycle count of write operation on chip memory.
+    virtual UINT getStoreOnChipMemCycle() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+
     //Get number of registers of different architectures.
     virtual UINT const getNumOfRegister() const;
+
+    //Get number of param passed by register.
+    virtual UINT getNumOfParamByReg() const
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //Get scalar parame register set of different architectures.
     virtual xgen::RegSet const* getParamScalarRegSet() const;
@@ -140,23 +158,50 @@ public:
     virtual xgen::Reg getSP() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
-    //Get target address register of different architectures.
+    //Get target address register of function call.
+    //Some target machine needs a register to record the address of function
+    //when calling a function because the target can not call function via
+    //literal address.
+    //e.g: %r0 = lda 'foo';
+    //     br %r0;
     virtual xgen::Reg getTA() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
     //Get temporary register of different architectures.
     virtual xgen::Reg getTempScalar(Type const* ty) const
-    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+    {
+        ASSERT0(ty->is_scalar() || ty->is_pointer() || ty->is_any());
+        ASSERTN(0, ("Target Dependent Code"));
+        return (xgen::Reg)REG_UNDEF;
+    }
     virtual xgen::Reg getTempVector() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
 
     //Get zero register of different architectures.
-    virtual xgen::Reg getZero() const
+    Reg getZero(Type const* ty) const
+    {
+        ASSERT0(ty != nullptr);
+        if (ty->isInt() || ty->is_any()) { return getZeroScalar(); }
+        if (ty->is_fp()) { return getZeroScalarFP(); }
+        if (ty->is_vector()) { return getZeroVector(); }
+        ASSERTN(0, ("Target Dependent Code"));
+        return (xgen::Reg)REG_UNDEF;
+    }
+    virtual Reg getZeroScalar() const
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+    virtual Reg getZeroScalarFP() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF; }
+    virtual Reg getZeroVector() const
+    { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF;}
 
     Reg getLink() const { return m_link; }
     virtual CHAR const* getRegName(Reg r) const;
     virtual CHAR const* getRegFileName(REGFILE rf) const;
+
+    virtual UINT getMInstCycle(MI_CODE mi_code)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual UINT getMInstExecUnit(MI_CODE mi_code)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     bool isAllocable(Reg r) const
     {

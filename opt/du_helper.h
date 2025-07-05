@@ -34,6 +34,7 @@ namespace xoc {
 class VN;
 class GVN;
 class LoopDepInfo;
+class MDSSAUpdateCtx;
 
 //The class computes the number of DEF of MustRef and MayRef for each IR
 //in given loop.
@@ -118,6 +119,22 @@ void addUseForTree(IR * to, IR const* from, Region * rg);
 //from: source IR expression.
 //Both 'to' and 'from' must be expression.
 void addUse(IR * to, IR const* from, Region * rg);
+
+//The function manipulates DU chain.
+//The function will add DefDef chain at position marked by 'marker'.
+//e.g:When IST is changed to ST, there might be new MD generated.
+//before refine, ir is:
+//  ist:f32
+//    lda:*<400>:offset(4) 'gf'
+//    RHS
+//  which ist's MustRef are MD10(gf, unbound)
+//after refine, newir is
+//  st:f32 'gf'
+//    RHS
+//  which st's MustRef are MD23(gf, exact)
+//Thus the new generated stmt should be inserted into MDSSA system.
+//ir: stmt that need to insert.
+void addStmtToMDSSAMgr(IR * ir, MDSSAUpdateCtx const& ctx, Region const* rg);
 
 //DU chain operation.
 //The function builds DU chain from stmt 'def' to expression 'use'.
@@ -245,8 +262,25 @@ IR * findUniqueMustDef(IR const* use, Region const* rg);
 //         If it is NULL, the function first finding the Phi list of
 //         'startbb', then keep finding its predecessors until meet CFG entry.
 //startbb: the BB that begin to do searching.
-void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg,
-                         OptCtx const& oc);
+void findAndSetLiveInDefForTree(
+    IR * root, IR * startir, IRBB * startbb, Region * rg, OptCtx const& oc);
+
+//The function will be looking for the correct DEF for each exp of 'stmt' in
+//SSA mode. And the classic DU chain does NOT need to find the live-in DEF.
+//And the looking process will start from 'startir'.
+//NOTE: the function only handles the kid expressions of 'stmt' except the RHS
+//kid expression if exist. This is the main difference from the
+//findAndSetLiveInDefForTree().
+//e.g: given ist (base:$1) = add x, y
+//     The function only handles $1.
+//Note DOM info must be available.
+//stmt: the stmt that expected to start to set livein.
+//startir: the start position in 'startbb', it can be NULL.
+//         If it is NULL, the function first finding the Phi list of
+//         'startbb', then keep finding its predecessors until meet CFG entry.
+//startbb: the BB that begin to do searching.
+void findAndSetLiveInDefForExpOfStmt(
+    IR * stmt, IR * startir, IRBB * startbb, Region * rg, OptCtx const& oc);
 
 //This function try to require VN of base of ir.
 //Return the VN if found, and the indirect operation level.
@@ -313,7 +347,7 @@ bool isRegionLiveIn(IR const* ir, Region const* rg);
 
 //Return true if def is killing-def of use.
 //Note this function does not check if there is DU chain between def and use.
-//gvn: if it is not NULL, the function will attempt to reason out the
+//gvn: Optional. If it is not NULL, the function will attempt to reason out the
 //     relation between 'def' and 'use' through gvn info.
 bool isKillingDef(IR const* def, IR const* use, GVN const* gvn);
 
@@ -459,7 +493,7 @@ void removeUse(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 //Note do NOT remove stmt from BBIRList before call the function.
-void removeStmt(IR * stmt, Region * rg, OptCtx const& oc);
+void removeStmt(IR * stmt, Region const* rg, OptCtx const& oc);
 
 //The function moves IR_PHI and MDPhi from 'from' to 'to'.
 //This function often be used in updating PHI when adding new dominater BB

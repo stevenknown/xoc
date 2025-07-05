@@ -67,54 +67,61 @@ protected:
     virtual Pass * allocCFG();
     virtual Pass * allocCfsMgr();
     virtual Pass * allocCopyProp();
+    virtual Pass * allocBrCondProp();
     virtual Pass * allocDCE();
+    virtual Pass * allocDSE();
     virtual Pass * allocDUMgr();
     virtual Pass * allocDynamicStack();
-    virtual Pass * allocDSE();
     virtual Pass * allocExprTab();
+    virtual Pass * allocExtPass(PASS_TYPE passty)
+    {
+        ASSERTN(0, ("Target Dependent Code."));
+        return nullptr;
+    }
     virtual Pass * allocGCSE();
     virtual Pass * allocGPAdjustment();
     virtual Pass * allocGSCC();
     virtual Pass * allocGVN();
+    virtual Pass * allocStackColoring();
     virtual Pass * allocInferType();
     virtual Pass * allocInliner();
     virtual Pass * allocInsertCvt();
+    virtual Pass * allocInsertVecSet();
+    virtual Pass * allocInstSched();
     virtual Pass * allocInvertBrTgt();
     virtual Pass * allocIPA();
+    virtual Pass * allocIRFusion();
     virtual Pass * allocIRMgr();
     virtual Pass * allocIRReloc();
     virtual Pass * allocIRSimp();
     virtual Pass * allocIVR();
     virtual Pass * allocKernelAdjustment();
     virtual Pass * allocLCSE();
-    virtual Pass * allocLICM();
     virtual Pass * allocLFTR();
+    virtual Pass * allocLICM();
     virtual Pass * allocLinearScanRA();
     virtual Pass * allocLivenessMgr();
     virtual Pass * allocLoopCvt();
     virtual Pass * allocLoopDepAna();
-    virtual Pass * allocMemCheck();
+    virtual Pass * allocPRLivenessMgr();
     virtual Pass * allocMDLivenessMgr();
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocMDSSAMgr();
+    virtual Pass * allocMemCheck();
+    virtual Pass * allocMultiResConvert();
     virtual Pass * allocPRE();
-    virtual Pass * allocPRSSAMgr();
     virtual Pass * allocPrologueEpilogue();
+    virtual Pass * allocPRSSAMgr();
+    virtual Pass * allocRCE();
     virtual Pass * allocRefine();
     virtual Pass * allocRefineDUChain();
-    virtual Pass * allocRCE();
     virtual Pass * allocRP();
     virtual Pass * allocScalarOpt();
+    virtual Pass * allocTargInfoHandler();
     virtual Pass * allocVectorization();
-    virtual Pass * allocMultiResConvert();
     virtual Pass * allocAlgeReasscociate();
     virtual Pass * allocVRP();
-    virtual Pass * allocTargInfoHandler();
-    virtual Pass * allocExtPass(PASS_TYPE passty)
-    {
-        ASSERTN(0, ("Target Dependent Code."));
-        return nullptr;
-    }
+
 protected:
     void checkAndRecomputeDUChain(
         OptCtx * oc, DUMgr * dumgr, BitSet const& opts);

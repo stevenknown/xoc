@@ -338,19 +338,12 @@ size_t IRMgr::count_mem() const
 }
 
 
-bool IRMgr::dump() const
+static void countMember(
+    xcom::Vector<IR*> const& vec, OUT UINT & num_has_du, OUT UINT & num_has_ai)
 {
-    Region const* rg = getRegion();
-    if (!rg->isLogMgrInit()) { return true; }
-    note(rg, "\n==---- DUMP ALL IR INFO ----==");
-    IRMgr * pthis = const_cast<IRMgr*>(this);
-    UINT n = pthis->getIRVec().get_elem_count();
-    rg->getLogMgr()->incIndent(2);
-    UINT num_has_du = 0;
-
-    //Dump which IR has allocate DU structure.
+    UINT n = vec.get_elem_count();
     for (VecIdx i = IRID_UNDEF; ((UINT)i) < n; i++) {
-        IR * ir = pthis->getIRVec().get(i);
+        IR const* ir = vec.get(i);
         //IRMgr may allocate IR id with a given start index.
         //ASSERT0(ir);
         if (ir == nullptr) { continue; }
@@ -358,56 +351,129 @@ bool IRMgr::dump() const
         if (du != nullptr) {
             num_has_du++;
         }
-    }
-    if (n > 0) {
-        note(rg, "\nTotal IR %d, total DU allocated %d, rate:(%.1f)%%",
-             n, num_has_du, (float)num_has_du / (float)n * 100);
-    }
-
-    //Dump IR dispers in free tab.
-    note(rg, "\n==---- DUMP IR DISPERSED IN FREE TAB ----==");
-    for (UINT w = 0; w < MAX_OFFSET_AT_FREE_TABLE + 1; w++) {
-        IR * lst = pthis->getFreeTabIRHead(w);
-        note(rg, "\nbyte(%d)", (INT)(w + sizeof(IR)));
-        if (lst == nullptr) { continue; }
-        UINT num = 0;
-        IR * p = lst;
-        while (p != nullptr) { p = p->get_next(); num++; }
-        prt(rg, ", num%d : ", num);
-        while (lst != nullptr) {
-            prt(rg, "%s", IRNAME(lst));
-            lst = IR_next(lst);
-            if (lst != nullptr) {
-                prt(rg, ", ");
-            }
+        if (ir->getAI() != nullptr) {
+            num_has_ai++;
         }
     }
-    note(rg, "\n==---- DUMP IR ALLOCATED ----==");
-    StrBuf buf(64); //record data-type.
+}
+
+
+static void countAndDumpFreeIR(
+    IRMgr const& mgr, OUT UINT & num_of_freed, StrBuf & buf)
+{
+    class Dump : public xoc::DumpToBuf {
+    public:
+        IRMgr const& mgr;
+        UINT * num_of_freed;
+    public:
+        Dump(IRMgr const& m, xcom::StrBuf & buf, UINT * n)
+            : DumpToBuf(m.getRegion(), buf, 2), mgr(m), num_of_freed(n) {}
+
+        virtual void dumpUserInfo() const override
+        {
+            Region const* rg = getRegion();
+            for (UINT w = 0; w < MAX_OFFSET_AT_FREE_TABLE + 1; w++) {
+                IR const* lst = const_cast<IRMgr&>(mgr).getFreeTabIRHead(w);
+                note(rg, "\nbyte(%u)", (UINT)(w + sizeof(IR)));
+                if (lst == nullptr) { continue; }
+                UINT num = 0;
+                IR const* p = lst;
+                while (p != nullptr) { p = p->get_next(); num++; }
+                prt(rg, ", num%u : ", num);
+                *num_of_freed += num;
+                while (lst != nullptr) {
+                    prt(rg, "%s(id:%u)", IRNAME(lst), lst->id());
+                    lst = lst->get_next();
+                    if (lst != nullptr) {
+                        prt(rg, ", ");
+                    }
+                }
+            }
+        }
+    };
+    Dump d(mgr, buf, &num_of_freed);
+    d.dump();
+}
+
+
+static void dumpFreed(IRMgr const& mgr, MOD StrBuf & buf)
+{
+    UINT num_of_freed = 0;
+    buf.clean();
+    countAndDumpFreeIR(mgr, num_of_freed, buf);
+    //Dump IR dispers in free tab.
+    UINT n = const_cast<IRMgr&>(mgr).getIRVec().get_elem_count();
+    note(mgr.getRegion(),
+         "\n-- IR NUM %u IN FREE TAB AND DISPERSED, RATE:(%.1f)%%  --",
+         num_of_freed, (float)num_of_freed / (float)n * 100);
+    note(mgr.getRegion(), "\n%s", buf.getBuf());
+}
+
+
+static void dumpAllocated(IRMgr const& mgr, MOD StrBuf & buf)
+{
+    buf.clean();
+    xcom::Vector<IR*> const& vec = const_cast<IRMgr&>(mgr).getIRVec();
+    UINT n = vec.get_elem_count();
+    Region const* rg = mgr.getRegion();
+    TypeMgr const* tm = rg->getTypeMgr();
+    note(rg, "\n-- IR ALLOCATED --");
+    rg->getLogMgr()->incIndent(2);
     for (VecIdx i = IRID_UNDEF; ((UINT)i) < n; i++) {
-        IR * ir = pthis->getIRVec().get(i);
+        IR const* ir = vec.get(i);
+
         //IRMgr may allocate IR id with a given start index.
         //ASSERT0(ir);
         if (ir == nullptr) { continue; }
         Type const* d = nullptr;
         if (!ir->is_undef()) {
-            d = IR_dt(ir);
+            d = ir->getType();
             ASSERT0(d);
             if (d == nullptr) {
-                note(rg, "\nid(%d): %s 0x%.8x", ir->id(), IRNAME(ir), ir);
+                note(rg, "\nid:%u %s 0x%.8x", ir->id(), IRNAME(ir), ir);
             } else {
                 buf.clean();
-                note(rg, "\nid(%d): %s r:%s 0x%.8x",
-                     ir->id(), IRNAME(ir), m_tm->dump_type(d, buf), ir);
+                note(rg, "\nid:%u %s ty:%s 0x%.8x",
+                     ir->id(), IRNAME(ir), tm->dump_type(d, buf), ir);
             }
         } else {
-            note(rg, "\nid(%d): undef 0x%.8x", ir->id(), ir);
+            note(rg, "\nid:%u %s 0x%.8x", ir->id(), IRNAME(ir), ir);
         }
-        DU * du = ir->getDU();
-        if (du != nullptr) {
-            prt(rg, " has du");
+        if (ir->getDU() != nullptr) {
+            prt(rg, " HAS_DU");
+        }
+        if (ir->getAI() != nullptr) {
+            prt(rg, " HAS_AI");
         }
     }
+    rg->getLogMgr()->decIndent(2);
+}
+
+
+bool IRMgr::dump() const
+{
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    Region const* rg = getRegion();
+    note(rg, "\n==---- DUMP %s '%s' ----==",
+         getPassName(), rg->getRegionName());
+    IRMgr * pthis = const_cast<IRMgr*>(this);
+    rg->getLogMgr()->incIndent(2);
+
+    //Dump which IR has allocate DU structure.
+    UINT n = pthis->getIRVec().get_elem_count();
+    UINT num_has_du = 0;
+    UINT num_has_ai = 0;
+    countMember(pthis->getIRVec(), num_has_du, num_has_ai);
+    note(rg, "\n-- ALL GENERATED IR NUM: %u --", n);
+    if (n > 0) {
+        note(rg, "\n-- THE NUM OF IR THAT HAS DU:%u, RATE:(%.1f)%% --",
+             num_has_du, (float)num_has_du / (float)n * 100);
+        note(rg, "\n-- THE NUM OF IR THAT HAS AI:%u, RATE:(%.1f)%% --",
+             num_has_ai, (float)num_has_ai / (float)n * 100);
+    }
+    StrBuf buf(64);
+    dumpAllocated(*this, buf);
+    dumpFreed(*this, buf);
     rg->getLogMgr()->decIndent(2);
     return true;
 }
@@ -417,6 +483,7 @@ void IRMgr::freeIR(IR * ir)
 {
     ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
     ASSERTN(!ir->is_undef(), ("ir has been freed"));
+    ASSERT0(IRMgr::verifyWhenFreeIR(ir, getRegion()));
     #ifdef _DEBUG_
     ASSERT0(!m_has_been_freed_irs.is_contain(ir->id()));
     m_has_been_freed_irs.bunion(ir->id());
@@ -516,12 +583,31 @@ void IRMgr::dumpFreeTab() const
         for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
             count++;
         }
-        note(rg, "\nirsize(%d), num(%d):", sz, count);
+        note(rg, "\nirsize(%u), num(%u):", sz, count);
         for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
             ASSERT0(IR::getIRCodeSize(ir) == sz);
-            prt(rg, "ir(%d),", ir->id());
+            prt(rg, "ir(%u),", ir->id());
         }
     }
+}
+
+
+void IRMgr::genDummyuseForCallStmt(IR * ir) const
+{
+    CCall * call = (CCall*)ir;
+    ASSERT0(!call->is_intrinsic());
+
+    //Since dummyuse will be also regarded as MayDef of call, "
+    //readonly call should not have dummyuse.
+    ASSERT0(!call->isReadOnly());
+
+    //Build dummyuse IR expressions for CallStmt.
+    if (!call->hasDummyUse() || !call->getDummyUse()->is_ild()) {
+        //TODO:consider append DefUse info on existed dummyuse.
+        call->addDummyUse(m_rg);
+    }
+    ASSERTN(call->getDummyUse()->is_ild(),
+            ("ILD could be better to present MD that based on different Var"));
 }
 
 
@@ -529,9 +615,8 @@ Var * IRMgr::genInitPlaceHolderVar()
 {
     if (m_init_placeholder_var == nullptr) {
         ASSERT0(m_vm);
-        m_init_placeholder_var = m_vm->registerVar("#init_placeholder",
-                                                   m_tm->getAny(), 1,
-                                                   VAR_LOCAL|VAR_FAKE);
+        m_init_placeholder_var = m_vm->registerVar(
+            INIT_STMT_PLACE_HOLDER_NAME, m_tm->getAny(), 1, VAR_LOCAL|VAR_FAKE);
     }
     return m_init_placeholder_var;
 }
@@ -1980,6 +2065,49 @@ IR * IRMgr::buildDwarfCFICfaOffset(Type const* tp, IR * reg_num)
     //and we want to avoid the CFI instruction being optimized away.
     IR_has_sideeffect(ir) = true;
     return ir;
+}
+
+
+bool IRMgr::verify() const
+{
+    IRMgr * pthis = const_cast<IRMgr*>(this);
+    for (UINT w = 0; w < MAX_OFFSET_AT_FREE_TABLE + 1; w++) {
+        for (IR const* t = pthis->getFreeTabIRHead(w);
+             t != nullptr; t = t->get_next()) {
+            ASSERTN(t->is_undef(), ("IR should have been freed"));
+        }
+    }
+    return true;
+}
+
+
+bool IRMgr::verify(Region const* rg)
+{
+    IRMgr const* mgr = rg->getIRMgr();
+    if (mgr != nullptr) {
+        ASSERT0(rg->getIRMgr()->verify());
+    }
+    return true;
+}
+
+
+static bool verifyGVNExistenceWhenFreeIR(IR const* ir, Region const* rg)
+{
+    PassMgr * pm = rg->getPassMgr();
+    if (pm == nullptr) { return true; }
+    GVN * gvn = (GVN*)pm->queryPass(PASS_GVN);
+    if (gvn == nullptr || !gvn->is_valid()) { return true; }
+    VN const* vn = gvn->getVN(ir);
+    ASSERTN(vn == nullptr, ("VN should be clean before freeing IR"));
+    return true;
+}
+
+
+bool IRMgr::verifyWhenFreeIR(IR const* ir, Region const* rg)
+{
+    ASSERT0(ir && rg && !ir->is_undef());
+    ASSERT0(verifyGVNExistenceWhenFreeIR(ir, rg));
+    return true;
 }
 
 } //namespace xoc

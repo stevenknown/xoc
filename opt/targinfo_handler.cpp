@@ -71,15 +71,15 @@ void TargInfoHandler::tryCopyPhyRegIfAny(PRNO src, PRNO tgt)
     LinearScanRA * lsra = queryLSRA();
     if (lsra == nullptr) { return; }
 
-    //If the original prno is dedicated and might have been bound to
-    //a dedicated physical register, the newly created prno also
-    //needs to be bound to this same physical register as well.
-    //e.g: original PRNO is $1(with r1), the renamed PRNO should be
-    //$2(with r1 too).
-    xgen::Reg phyreg = lsra->getDedicatedReg(src);
+    //If the original prno is pre-assigned and might have been bound to a
+    //specific physical register, the newly created prno also needs to be bound
+    //to this same physical register as well.
+    //e.g: original PRNO is $1(with r1), the renamed PRNO should be $2(with r1
+    //too).
+    xgen::Reg phyreg = lsra->getPreAssignedReg(src);
     if (phyreg != REG_UNDEF) {
-        ASSERT0(!lsra->isDedicated(tgt));
-        lsra->setDedicatedReg(tgt, phyreg);
+        ASSERT0(!lsra->isPreAssigned(tgt));
+        lsra->setPreAssignedReg(tgt, phyreg);
     }
     #endif
 }

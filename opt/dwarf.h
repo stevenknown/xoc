@@ -98,8 +98,8 @@ namespace xoc {
 //  handle references to symbols whose addresses are not known
 //  until link time.
 //
-//- MCFixupKind:
-//  MCFixupKind represents the kind of fixup operation, usually
+//- MC_FIXUP_KIND:
+//  MC_FIXUP_KIND represents the kind of fixup operation, usually
 //  including various data sizes such as 1 byte, 2 bytes, 4 bytes, etc.
 //  Different kinds of fixups are needed to handle different types
 //  of relocations, such as absolute addresses, relative addresses,
@@ -203,6 +203,28 @@ class DwarfResMgr;
 #define DWARF2_FLAG_PROLOGUE_END (1 << 2)
 #define DWARF2_FLAG_EPILOGUE_BEGIN (1 << 3)
 
+//"prologue_end" is used in a .loc directive to indicate that the
+//current location marks the end of the function's prologue.
+//This helps debuggers distinguish between setup code (like saving registers)
+//and the actual function body.
+//
+//Example usage in assembly:
+//  .loc 1 20 7 prologue_end is_stmt 0
+//  Here, "prologue_end" means the instruction at file #1, line 20, column 7
+//  is the final instruction of the function prologue.
+#define DWARF_PROLOGUE_END_STR "prologue_end"
+
+//"is_stmt" is used in a .loc directive to specify whether the current location
+//corresponds to a source-level statement.
+//The value following it is usually 0 or 1.
+//  is_stmt 1: this is a statement location (breakpoint allowed)
+//  is_stmt 0: this is not a statement location (e.g., compiler-injected code)
+//
+//Example usage in assembly:
+//  .loc 1 20 7 prologue_end is_stmt 0
+//  Here, "is_stmt 0" means the location is not a statement boundary.
+#define DWARF_IS_STMT_STR "is_stmt"
+
 #define MCSYMBOL_END_FLAG "end"
 #define MCSYMBOL_START_FLAG "begin"
 
@@ -225,13 +247,34 @@ class DwarfResMgr;
 //it means we need to generate final relocation entries.
 //The following are the types of relocations.
 //Currently, there are only a few scenarios, and more will be added later.
-typedef enum tagMCFixupKind {
-    FK_NONE = 0, //A no-op fixup.
-    FK_DATA_1,   //A one-byte fixup.
-    FK_DATA_2,   //A two-byte fixup.
-    FK_DATA_4,   //A four-byte fixup.
-    FK_DATA_8,   //A eight-byte fixup.
-} MCFixupKind;
+enum MC_FIXUP_KIND {
+    FK_UNDEF = 0,   //A no-op fixup.
+    FK_DATA_1 = 1, //A one-byte fixup.
+    FK_DATA_2 = 2, //A two-byte fixup.
+    FK_DATA_4 = 3, //A four-byte fixup.
+    FK_DATA_8 = 4, //A eight-byte fixup.
+};
+
+
+enum MCSYMBOL_TYPE {
+    ST_UNDEF = 0, //No symbol type.
+
+    //The label representing a function cannot be fully registered
+    //at the frontend syntax level.
+    //It needs to follow the IR to the MI level to be registered
+    //completely.
+    ST_FUNC_LABEL = 1,
+
+    //This label is a label within a section
+    //and it can be fully registered directly.
+    ST_SECTION_LABEL = 2,
+
+    //This represents a variable within a function similar to FUNC_LABEL.
+    //It needs to descend with the IR until reaching
+    //the MI level to register this symbol properly.
+    ST_FUNC_VAR = 3
+};
+
 
 //This is a symbol used to record frontend and
 //debugging-related information,
@@ -246,25 +289,7 @@ typedef enum tagMCFixupKind {
 class MCSymbol {
     COPY_CONSTRUCTOR(MCSymbol);
 public:
-    typedef enum tagSymbolType {
-        NONE,
-
-        //The label representing a function cannot be fully registered
-        //at the frontend syntax level.
-        //it needs to follow the IR to the MI level to be registered
-        //completely.
-        FUNC_LABEL,
-
-        //This label is a label within a section
-        //and it can be fully registered directly.
-        SECTION_LABEL,
-
-        //This represents a variable within a function similar to FUNC_LABEL.
-        //It needs to descend with the IR until reaching
-        //the MI level to register this symbol properly.
-        FUNC_VAR
-    } SymbolType;
-    SymbolType m_type;
+    MCSYMBOL_TYPE m_type;
     bool m_is_registered;
 
     //Who owns this symbol.
@@ -291,8 +316,16 @@ public:
     }
 };
 
+
+enum MCEXPR_KIND {
+    EK_UNDEF = 0,
+    EK_BINARY = 1,    //Binary expressions.
+    EK_SYMBOLREF = 2, //References to labels and assigned expressions.
+    EK_CONSTANT = 3,  //CONSTANT expressions.
+};
+
+
 typedef TMap<Region const*, MCSymbol*> Region2MCSymbol;
-typedef xcom::Vector<BYTE> BYTEVec;
 typedef xcom::TMap<Sym const*, MCSymbol*> Sym2MCSymbol;
 typedef xcom::TMap<Sym const*, Region2MCSymbol*> Sym2Region2MCSymbol;
 typedef xcom::TMapIter<Region const*, MCSymbol*> Region2MCSymbolIter;
@@ -303,18 +336,13 @@ typedef xcom::TMapIter<Region const*, MCSymbol*> Region2MCSymbolIter;
 #define MCEXPR_kind(exp)  ((exp)->m_kind)
 class MCExpr {
 public:
-    enum ExprKind : UINT8 {
-        BINARY, //Binary expressions.
-        SYMBOLREF, //References to labels and assigned expressions.
-        CONSTANT, //CONSTANT expressions.
-    };
-    ExprKind m_kind;
+    MCEXPR_KIND m_kind;
     static INT64 evaluateAsAbsolute(MCExpr const* expr);
 protected:
-    explicit MCExpr(ExprKind kind) : m_kind(kind) {
-        ASSERTN(m_kind == BINARY || m_kind == SYMBOLREF || m_kind == CONSTANT,
-                ("m_kind must be either Binary or SYMBOLREF \
-                  or CONSTANT"));
+    explicit MCExpr(MCEXPR_KIND kind) : m_kind(kind) {
+        ASSERTN(m_kind == EK_BINARY || m_kind == EK_SYMBOLREF ||
+                m_kind == EK_CONSTANT, ("m_kind must be either \
+                Binary or SYMBOLREF or CONSTANT"));
     }
 };
 
@@ -328,7 +356,7 @@ public:
     MCSymbol const* m_mc_symbol;
 public:
     explicit MCSymbolRefExpr(MCSymbol const* mc_symbol):
-        MCExpr(MCExpr::SYMBOLREF), m_mc_symbol(mc_symbol) {
+        MCExpr(EK_SYMBOLREF), m_mc_symbol(mc_symbol) {
         ASSERT0(m_mc_symbol);
     }
 };
@@ -341,7 +369,42 @@ public:
     INT64 m_value;
 public:
     explicit MCConstantExpr(INT64 value):
-        MCExpr(MCExpr::CONSTANT), m_value(value) {}
+        MCExpr(EK_CONSTANT), m_value(value) {}
+};
+
+
+enum MCBIN_OP_CODE {
+    BIN_UNDEF = 0, //No operation.
+    BIN_ADD = 1,  //Addition.
+    BIN_AND = 2,  //Bitwise and.
+    BIN_DIV = 3,  //Signed division.
+    BIN_EQ = 4,   //Equality comparison.
+
+    //Signed greater than comparison
+    //(result is either 0 or some target-specific non-zero value).
+    BIN_GT = 5,
+
+    //Signed greater than or equal comparison
+    //(result is either 0 or some target-specific non-zero value).
+    BIN_GTE = 6,
+    BIN_LAND = 7, //Logical and.
+    BIN_LOR = 8,  //Logical or.
+
+    //Signed less than comparison
+    //(result is either 0 or some target-specific non-zero value).
+    BIN_LT = 9,
+
+    //Signed less than or equal comparison
+    //(result is either 0 or some target-specific non-zero value).
+    BIN_LTE = 10,
+    BIN_MUL = 11,   //Multiplication.
+    BIN_NE = 12,    //Inequality comparison.
+    BIN_OR = 13,    //Bitwise or.
+    BIN_SHL = 14,   //Shift left.
+    BIN_ASHR = 15,  //Arithmetic shift right.
+    BIN_LSHR = 16,  //Logical shift right.
+    BIN_SUB = 17,   //Subtraction.
+    BIN_XOR = 18    //Bitwise exclusive or.
 };
 
 
@@ -351,44 +414,14 @@ public:
 #define MCBINARYEXPR_opcode(e)  ((e)->m_opcode_type)
 class MCBinaryExpr : public MCExpr {
 public:
-    enum Opcode {
-        ADD,  //Addition.
-        AND,  //Bitwise and.
-        DIV,  //Signed division.
-        EQ,   //Equality comparison.
 
-        //Signed greater than comparison
-        //(result is either 0 or some target-specific non-zero value).
-        GT,
-
-        //Signed greater than or equal comparison
-        //(result is either 0 or some target-specific non-zero value).
-        GTE,
-        LAND, //Logical and.
-        LOR,  //Logical or.
-
-        //Signed less than comparison
-        //(result is either 0 or some target-specific non-zero value).
-        LT,
-
-        //Signed less than or equal comparison
-        //(result is either 0 or some target-specific non-zero value).
-        LTE,
-        MUL,  //Multiplication.
-        NE,   //Inequality comparison.
-        OR,   //Bitwise or.
-        SHL,  //Shift left.
-        ASHR, //Arithmetic shift right.
-        LSHR, //Logical shift right.
-        SUB,  //Subtraction.
-        XOR   //Bitwise exclusive or.
-    };
     MCExpr const* m_lhs;
     MCExpr const* m_rhs;
-    Opcode m_opcode_type;
+    MCBIN_OP_CODE m_opcode_type;
 public:
-    explicit MCBinaryExpr(Opcode op, MCExpr const* lhs, MCExpr const* rhs):
-        MCExpr(MCExpr::BINARY), m_lhs(lhs), m_rhs(rhs), m_opcode_type(op) {
+    explicit MCBinaryExpr(MCBIN_OP_CODE op, MCExpr const* lhs,
+                          MCExpr const* rhs):
+        MCExpr(EK_BINARY), m_lhs(lhs), m_rhs(rhs), m_opcode_type(op) {
         ASSERT0(m_lhs && m_rhs);
     }
 };
@@ -413,9 +446,9 @@ public:
 
     //The value of the reference target will need to be modified in the future.
     MCExpr const* m_value;
-    MCFixupKind m_kind;
+    MC_FIXUP_KIND m_kind;
 public:
-    MCFixup(UINT offset, MCExpr const* value, MCFixupKind kind):
+    MCFixup(UINT offset, MCExpr const* value, MC_FIXUP_KIND kind):
         m_offset(offset), m_value(value), m_kind(kind) {
         ASSERT0(m_value);
     }
@@ -500,6 +533,27 @@ public:
 };
 
 
+enum CFI_TYPE {
+    CFI_UNDEF = 0,
+    CFI_OPSAMEVALUE = 1,
+    CFI_OPREMEMBERSTATE = 2,
+    CFI_OPRESTORESTATE = 3,
+    CFI_OPOFFSET = 4,
+    CFI_OPDEFCFAREGISTER = 5,
+    CFI_OPDEFCFAOFFSET = 6,
+    CFI_OPDEFCFA = 7,
+    CFI_OPRELOFFSET = 8,
+    CFI_OPADJUSTCFAOFFSET = 9,
+    CFI_OPESCAPE = 10,
+    CFI_OPRESTORE = 11,
+    CFI_OPUNDEFINED = 12,
+    CFI_OPREGISTER = 13,
+    CFI_OPWINDOWSAVE = 14,
+    CFI_OPNEGATERASTATE = 15,
+    CFI_OPGNUARGSSIZE = 16
+};
+
+
 //Call frame instruction encodings.
 #define DW_CFA_nop 0x00
 #define DW_CFA_advance_loc 0x40
@@ -546,26 +600,7 @@ public:
 #define MCCFIINSTRUCTION_register2(e)  ((e)->m_register2)
 class MCCFIInstruction {
 public:
-    enum OpType {
-        OPSAMEVALUE,
-        OPREMEMBERSTATE ,
-        OPRESTORESTATE,
-        OPOFFSET,
-        OPDEFCFAREGISTER,
-        OPDEFCFAOFFSET,
-        OPDEFCFA,
-        OPRELOFFSET,
-        OPADJUSTCFAOFFSET,
-        OPESCAPE,
-        OPRESTORE,
-        OPUNDEFINED,
-        OPREGISTER,
-        OPWINDOWSAVE,
-        OPNEGATERASTATE,
-        OPGNUARGSSIZE
-    };
-
-    OpType m_operation;
+    CFI_TYPE m_operation;
     MCSymbol const* m_label;
     UINT m_register;
     union {
@@ -573,34 +608,37 @@ public:
         UINT m_register2;
     };
 public:
-    MCCFIInstruction(OpType op, MCSymbol const* l, UINT r, INT o):
+    MCCFIInstruction(CFI_TYPE op, MCSymbol const* l, UINT r, INT o):
         m_operation(op), m_label(l), m_register(r), m_offset(o) {
-        ASSERT0(op != OPREGISTER);
+        ASSERT0(op != CFI_OPREGISTER);
     }
 
-    MCCFIInstruction(OpType op, MCSymbol const* l, UINT r1, UINT r2):
+    MCCFIInstruction(CFI_TYPE op, MCSymbol const* l, UINT r1, UINT r2):
         m_operation(op), m_label(l), m_register(r1), m_register2(r2) {
-        ASSERT0(op == OPREGISTER);
+        ASSERT0(op == CFI_OPREGISTER);
     }
 
-    OpType getOperation() const { return m_operation; }
+    CFI_TYPE getOperation() const { return m_operation; }
     MCSymbol const* getLabel() const { return m_label; }
 
     UINT getRegister() const {
-        ASSERT0(m_operation == OPDEFCFA || m_operation == OPOFFSET ||
-                m_operation == OPRESTORE || m_operation == OPUNDEFINED ||
-                m_operation == OPSAMEVALUE ||
-                m_operation == OPDEFCFAREGISTER ||
-                m_operation == OPRELOFFSET || m_operation == OPREGISTER);
+        ASSERT0(m_operation == CFI_OPDEFCFA || m_operation == CFI_OPOFFSET ||
+                m_operation == CFI_OPRESTORE ||
+                m_operation == CFI_OPUNDEFINED ||
+                m_operation == CFI_OPSAMEVALUE ||
+                m_operation == CFI_OPDEFCFAREGISTER ||
+                m_operation == CFI_OPRELOFFSET ||
+                m_operation == CFI_OPREGISTER);
         return m_register;
     }
 
     INT getOffset() const {
-        ASSERT0(m_operation == OPDEFCFA || m_operation == OPOFFSET ||
-                m_operation == OPRELOFFSET ||
-                m_operation == OPDEFCFAOFFSET ||
-                m_operation == OPADJUSTCFAOFFSET ||
-                m_operation == OPGNUARGSSIZE);
+        ASSERT0(m_operation == CFI_OPDEFCFA ||
+                m_operation == CFI_OPOFFSET ||
+                m_operation == CFI_OPRELOFFSET ||
+                m_operation == CFI_OPDEFCFAOFFSET ||
+                m_operation == CFI_OPADJUSTCFAOFFSET ||
+                m_operation == CFI_OPGNUARGSSIZE);
         return m_offset;
     }
 };
@@ -654,13 +692,13 @@ public:
 public:
     DwarfResMgr() { m_pool = nullptr; init(); }
     ~DwarfResMgr() { destroy(); }
-    MCExpr const* allocMCBinaryExpr(MCBinaryExpr::Opcode op, MCExpr const* lhs,
-                                    MCExpr const* rhs);
+    MCExpr const* allocMCBinaryExpr(MCBIN_OP_CODE op,
+                                    MCExpr const* lhs, MCExpr const* rhs);
     MCExpr const* allocMCSymbolRefExpr(MCSymbol const* mc_symbol);
     MCExpr const* allocMCConstantExpr(INT64 value);
 
     MCFixup * allocFixup(UINT offset, MCExpr const* value,
-                         MCFixupKind kind);
+                         MC_FIXUP_KIND kind);
     MCSymbol * allocMCSymbol();
 
     //Allocate memory for CFI (Call Frame Information).
@@ -753,7 +791,7 @@ protected:
 
     //Temporary buffer for encoding data with BYTE (UINT8) elements.
     //Used to mitigate the overhead of constantly using temporary variables.
-    Vector<BYTE> m_output_byte_buffer;
+    BYTEVec m_output_byte_buffer;
 public:
     //For debug_line
     Vector<StrBuf const*> m_mc_dwarf_dirs;
@@ -849,7 +887,7 @@ public:
     //Because many pieces of information about the
     //function's label are unknown at the frontend syntax level
     //it needs to be passed to the backend at the end of the pass.
-    void createMCSymbol(Region const* region, LabelInfo * label);
+    void createMCSymbol(Region const* region, LabelInfo const* label);
 
     //Create a registered label for vector
     //Currently, symbols are preserved in three ways:
@@ -890,7 +928,7 @@ public:
     //is_registered: Has registration been completed?
     //all symbol information has been transparently provided.
     void createMCSymbol(Region const* region, LabelInfo const* label,
-                        bool is_registered = true);
+                        bool is_registered);
 
     //Create a single reference relocation.
     //In other words, when a MCSymbol exists within
@@ -905,7 +943,7 @@ public:
     //region_name: The region where the single reference will be generated.
     //kind: The type of single reference.
     void createSingleRefRel(Sym const* name, CHAR const* region_name,
-                            MCFixupKind kind);
+                            MC_FIXUP_KIND kind);
 
     //Create a binary expression reference.
     //Similar to a single reference
@@ -922,7 +960,8 @@ public:
     //kind: The type of dual reference.
     void createBinaryExprRef(Sym const* name0, Sym const* name1,
                              CHAR const* region_name,
-                             MCBinaryExpr::Opcode op_type, MCFixupKind kind);
+                             MCBIN_OP_CODE op_type,
+                             MC_FIXUP_KIND kind);
 
     //Create a reference to the variable "var".
     //For local variables,
@@ -944,7 +983,7 @@ public:
     //kind: The type of variable reference. Currently,
     //all variables are of 8-byte type.
     void createVarRefRel(Region const* func_region, Sym const* var_name,
-                         CHAR const* region_name, MCFixupKind kind);
+                         CHAR const* region_name, MC_FIXUP_KIND kind);
 
     //Create or update a var symbol
     //The "var" symbol currently only records global and local variables,
@@ -977,7 +1016,7 @@ public:
     //os: The binary code returned by the encoding.
     //addr_delta: The difference inPC values
     //corresponding to two CFI instructions.
-    void encodeAdvanceLoc(OUT Vector<BYTE> & os, UINT64 addr_delta);
+    void encodeAdvanceLoc(OUT BYTEVec & os, UINT64 addr_delta);
 
     //Retrieves the region object corresponding to
     //the specified symbol name from the region manager.
@@ -1176,7 +1215,7 @@ public:
 
     //Return the size of various types of fixups.
     //Currently, only sizes 1, 2, 4, and 8 are supported.
-    inline static UINT getSizeForFixupKind(MCFixupKind kind)
+    inline static UINT getSizeForFixupKind(MC_FIXUP_KIND kind)
     {
         switch (kind) {
         case FK_DATA_1:
@@ -1204,12 +1243,12 @@ public:
     //to any region, while stack variables must belong to a specific region.
     void handleGlobalVarSymSingleRefRel(Sym const* name,
                                         CHAR const* region_name,
-                                        MCFixupKind kind);
+                                        MC_FIXUP_KIND kind);
 
     //Please refer to the detailed explanation
     //in the function createSingleRefRel().
     void handleFuncAndSectionLabelSingleRefRel(Sym const* name,
-        CHAR const* region_name, MCFixupKind kind);
+        CHAR const* region_name, MC_FIXUP_KIND kind);
 
     //Represents that there is no function region in the current file.
     bool isNullRegion();
@@ -1248,7 +1287,7 @@ public:
     //regardless of whether the same symbol exists in different regions.
     bool isVarSymbolPresent(Sym const* name);
 
-    //For find symbol only for FUNC_LABEL,SECTION_LABEL,FUNC_VAR.
+    //For find symbol only for FUNC_LABEL, SECTION_LABEL, FUNC_VAR.
     inline bool isSymbolfind(Sym const* name)
     {
         return m_map_symbol.find(name);
@@ -1283,7 +1322,7 @@ public:
 
     //Set a special starting tag for the label of function.
     //Such as the starting label and ending label of the region.
-    void setSpecialTagLabel(LabelInfo * label, MCSymbol * mc_symbol_ptr);
+    void setSpecialTagLabel(LabelInfo const* label, MCSymbol * mc_symbol_ptr);
 
     //The minimum alignment size of stack slots for callee-saved
     //registers in bytes.When generating the .debug_frame,

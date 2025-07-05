@@ -73,25 +73,6 @@ typedef enum {
 
 
 //
-//START PostProcessCtx
-//
-class PostProcessCtx {
-public:
-    //Record spilling IRs used to revise lifetime consistency.
-    IRTab m_revise_spill_tab;
-
-public:
-    IRTab const& getReviseSpillTab() const { return m_revise_spill_tab; }
-
-    PostProcessCtx() {}
-    ~PostProcessCtx() {}
-
-    void setReviseSpill(IR * ir) { m_revise_spill_tab.append(ir); }
-};
-//End PostProcessCtx
-
-
-//
 //START VexPair
 //
 class VexPair {
@@ -211,11 +192,11 @@ public:
 //
 //START LTConsistencyMgr
 //
+typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
+typedef TMapIter<VexPair, IRBB*> LatchMapIter;
 class LTConsistencyMgr {
     COPY_CONSTRUCTOR(LTConsistencyMgr);
 protected:
-    typedef TMap<VexPair, IRBB*, CompareVexPair> LatchMap;
-    typedef TMapIter<VexPair, IRBB*> LatchMapIter;
     typedef TTab<VexPair, CompareVexPair> InConsistVexPairTab;
     typedef TTabIter<VexPair> InConsistVexPairTabIter;
     typedef TMap<PRNO, LifeTime const*> PR2LT;
@@ -329,8 +310,6 @@ protected:
         UINT to, LifeTime const* from_lt, LifeTime const* to_lt,
         Var const* spill_loc);
 
-    void dumpBBAfterReorder(IRBB const* bb) const;
-
     //This function generates and inserts a latch BB to hold the IRs for
     //inconsistency recovery.
     //The latch BB is a BB that need to be inserted on an edge in CFG.
@@ -369,53 +348,20 @@ protected:
         return tab->get(prno);
     }
 
+    //Get the first real occ of the lifetime if it is used in the fake-use IR.
+    Occ getFirstRealOccOfFakeUseAtLexFirstBBInLoop(LifeTime * lt);
+
     IRBB * insertLatch(IRBB const* from, MOD IRBB * to,
                        MOD LatchMap & latch_map);
     bool isLatchBBRequired(VexPair const& pair) const
     { return m_inconsist_vexpair_tab.find(pair); }
 
-    //This func will check the reorder for the MOV IRs is required or not in
-    //the specified BB, and also collect some infomations used in the coming
-    //reorder phase.
-    //bb: the specified latch BB.
-    //reg_use_cnt: the register use count for the registers involved in MOV IRs.
-    //move_info: contains the source and destination registers for the MOV IRs.
-    //def_irs: contains the original MOV IR responding to the defined register.
-    //marker: the marker IR indicates where the adjusted IR should be inserted.
-    //return value: true if it is needed to do the reorder; false means don't
-    //              need to do reorder.
-    //For example:
-    //  The group of MOV IRs are in the order below:
-    //    $10 <- MOV $8    #S1
-    //    $7  <- MOV $10   #S2
-    //
-    //  Because $10 is used in #S2, but before it is used, it will be
-    //  overwrote by $8 in #S1, so this two MOV IRs need to be reordered,
-    //  The expected sequence should be:
-    //    $7  <- MOV $10   #S2
-    //    $10 <- MOV $8    #S1
-    //
-    bool isReorderRequired(MOD IRBB * bb, OUT UINT *& reg_use_cnt,
-                           OUT UINT *& move_info, OUT IR **& def_irs,
-                           OUT IR *& marker);
+    bool isLTSplitBetweenLeadingFakeUseAndRealUse(LifeTime const* lt) const
+    {  ASSERT0(lt); return lt->getOccNum() == 1; }
 
-    //This func will reorder the Move IRs inserted at the all latch BBs.
-    void reorderMoveIRInLatchBB(MOD LatchMap & latch_map);
-
-    //This func will do the reorder for the MOV IRs in the latch BB.
-    //bb: the specified latch BB.
-    //reg_use_cnt: the register use count for the registers involved in MOV IRs.
-    //move_info: contains the source and destination registers for the MOV IRs.
-    //def_irs: contains the original MOV IR responding to the defined register.
-    //marker: the marker IR indicates where the adjusted IR should be inserted.
-    void reorderMoveIRForBB(MOD IRBB * bb, MOD UINT *& reg_use_cnt,
-        MOD UINT *& move_info, IN IR ** def_irs, IR const* marker);
-
-    void reviseEdgeConsistency(InConsistPairList const& inconsist_lst,
-                               MOD PostProcessCtx & ctx);
+    void reviseEdgeConsistency(InConsistPairList const& inconsist_lst);
     void reviseTypeMEM2PR(MOD LatchMap & latch_map, InConsistPair const* pair);
-    void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const* pair,
-                          MOD PostProcessCtx & ctx);
+    void reviseTypePR2MEM(MOD LatchMap & latch_map, InConsistPair const* pair);
     void reviseTypePR2PR(MOD LatchMap & latch_map, InConsistPair const* pair);
     void reviseTypeRemat(MOD LatchMap & latch_map, InConsistPair const* pair);
 
@@ -428,6 +374,17 @@ protected:
     //return: true if a lifetime is choosed; false if the lifetime is in the
     //        memory.
     bool selectLifetimeAtPos(LifeTime * anct, Pos pos, OUT LifeTime const*& lt);
+
+    //This func selects the proper lifetime for the lifetime that has been
+    //used in the fake-use IR at the first BB of loop in lexicographical order.
+    //antc: the ancestor lifetime.
+    //pos: the specified position used to determine which descendant lifetime
+    //     will be used.
+    //lt: the output lifetime choosed.
+    //return: true if a lifetime is choosed; false if the lifetime is in the
+    //        memory.
+    bool selectLTAtPosForFakeUseAtLexFirstBBOfLoop(LifeTime * anct, Pos pos,
+                                                   OUT LifeTime const*& lt);
 
     //Try to use the tramp BB as a latch BB if it is inconsistent of a
     //lifetime between the precedessor BB and the successor BB of the
@@ -479,13 +436,6 @@ protected:
     bool verifyLatchBB(IRBB * bb, MOD Vector<BYTE> & use_reg_cnt,
                        MOD Vector<BYTE> & def_reg_cnt) const;
 
-    //This function will verify the reorder result.
-    bool verifyReorderResult(UINT const* move_info, UINT max_reg_num) const;
-
-    //This function will verify the swap condition.
-    bool verifySwapCondition(PRNO prno1, PRNO prno2, Type const* ty1,
-                             Type const* ty2) const;
-
     void * xmalloc(size_t size)
     {
         ASSERTN(m_pool != nullptr, ("pool does not initialized"));
@@ -512,7 +462,7 @@ public:
 
     void dump() const;
 
-    void perform(MOD PostProcessCtx & ctx);
+    void perform();
 };
 //END LTConsistencyMgr
 
@@ -556,6 +506,136 @@ public:
 };
 //END SplitCtx
 
+typedef xcom::List<IR const*> IRLst;
+
+
+//
+//Start GenTabOfMap.
+//
+class GenTabOfMap {
+    COPY_CONSTRUCTOR(GenTabOfMap);
+
+public:
+    GenTabOfMap() {}
+    ~GenTabOfMap() {}
+
+    IRTab * createMapped(LifeTime const* lt)
+    {
+        ASSERT0(lt);
+        return new IRTab();
+    }
+};
+//End GenTabOfMap.
+
+typedef xcom::TMap<LifeTime const*, IRTab*,
+    CompareKeyBase<LifeTime const*>, GenTabOfMap> LT2IRTab;
+typedef xcom::TMapIter<LifeTime const*, IRTab*> LT2IRTabIter;
+
+typedef xcom::TMap<PRNO, IR const*> PR2FakeUseSpill;
+typedef xcom::TMapIter<PRNO, IR const*> PR2FakeUseSpillIter;
+
+typedef struct _IRPair {
+    IR * spill;
+    IR * reload;
+} IRPair;
+typedef xcom::List<IRPair*> IRPairLst;
+
+
+//
+//Start SpillReloadEliminateMgr
+//
+class SpillReloadEliminateMgr{
+    typedef xcom::TTab<IR const*> RemovedIRTab;
+    typedef xcom::TTabIter<IR const*> RemovedIRTabIter;
+private:
+    COPY_CONSTRUCTOR(SpillReloadEliminateMgr);
+    LSRAImpl & m_impl;
+    LinearScanRA & m_ra;
+    Region * m_rg;
+
+    //Record the spilling IRs and splitting position IR when spilling after
+    //definition occurance related to the lifetime in order of occurance.
+    LT2IRTab * m_lt2spill;
+
+    //Record spill and reload IR pairs.
+    IRPairLst * m_spill_reload_pairs;
+
+    //Map a prno to the related spill IR if the prno is used in the fake-use
+    //IR at the first BB of loop in lexicographical order.
+    PR2FakeUseSpill m_pr2fakeuse_spill;
+
+    //Store the IRs removed.
+    RemovedIRTab m_removed_ir_tab;
+protected:
+    IRPair * allocIRPair() { return new IRPair(); }
+    IRPairLst * allocIRPairLst() { return new IRPairLst(); }
+    LT2IRTab * allocLT2IRTab() { return new LT2IRTab(); }
+public:
+    SpillReloadEliminateMgr(LSRAImpl & impl);
+    ~SpillReloadEliminateMgr();
+
+    void addToRemovedIRTab(IR const* ir) { m_removed_ir_tab.append(ir); }
+
+    void freeRemovedIRs();
+
+    LT2IRTab * getLT2Spill() { return m_lt2spill; }
+    IRPairLst * getSpillReloadPairs() { return m_spill_reload_pairs; }
+
+    PR2FakeUseSpill const& getPR2FakeUseSpill() const
+    { return m_pr2fakeuse_spill; }
+
+    IR const* getSpillAtFirstFakeUse(PRNO prno) const
+    {
+        ASSERT0(prno!= PRNO_UNDEF);
+        bool find = false;
+        IR const* spill = m_pr2fakeuse_spill.get(prno, &find);
+        ASSERT0(find);
+        return spill;
+    }
+
+    //Check the IR has been already removed or not.
+    bool isIRRemoved(IR const* ir) const
+    { ASSERT0(ir); return m_removed_ir_tab.find(ir); }
+
+    //Check the prno is spilled due to fake-use IR or not.
+    bool isSpillAtFirstFakeUse(PRNO prno) const
+    {
+        ASSERT0(prno != PRNO_UNDEF);
+        return m_pr2fakeuse_spill.find(prno);
+    }
+
+    //Record the spilling and definition IRs related to the lifetime.
+    void record(LifeTime const* lt, IR * ir);
+
+    //Record the spill and reload IR pairs.
+    void record(IR * spill, IR * reload);
+
+    //Record the spill info generated by fake-use IR.
+    void recordInfoUsedByFakeUseSpillElim(LifeTime const* lt, IR const* spill,
+                                          IR const* split_pos_ir, bool is_def);
+
+    //Record the spill info for one-def spill elimination.
+    void recordInfoUsedByOneDefElim(LifeTime const* lt, IR * spill);
+
+    //Record the inserted latch BBs from LatchMap.
+    //latch_map: save the inserted latch BB.
+    void recordLatchBBTab(LatchMap const& latch_map);
+
+    void recordSpill(LifeTime const* lt, IR * spill, SplitCtx const& ctx,
+                     bool is_def);
+
+    //Record the prno and it's spill IR if the prno is used in the fake-use
+    //IR at the first BB of loop in lexicographical order.
+    void recordSpillAtFirstFakeUse(PRNO prno, IR const* spill)
+    {
+        ASSERT0(spill);
+        ASSERT0(prno != PRNO_UNDEF);
+        m_pr2fakeuse_spill.set(prno, spill);
+    }
+};
+//End SpillReloadEliminateMgr
+
+
 //
 //START SplitMgr
 //
@@ -582,14 +662,10 @@ private:
     //The function inserts spill operation before or after split_pos.
     IR * insertSpillAroundSplitPos(LifeTime * lt, SplitCtx const& ctx);
     void insertSpillDuringSplitting(LifeTime * lt, SplitCtx const& ctx,
-                                    bool canberemat,
-                                    RematCtx const& rematctx,
-                                    OUT IR *& spill);
+        bool canberemat, RematCtx const& rematctx, OUT IR *& spill);
     void insertReloadDuringSplitting(LifeTime * lt, LifeTime * newlt,
-                                     SplitCtx const& ctx,
-                                     bool canberemat,
-                                     RematCtx const& rematctx,
-                                     IR * spill);
+        SplitCtx const& ctx, bool canberemat, RematCtx const& rematctx,
+        IR * spill, OUT IR *& reload);
 
     //Return true if 'stmt' defined the PR that lt represented.
     bool isDefLT(IR const* stmt, LifeTime const* lt) const;
@@ -623,21 +699,30 @@ private:
     LifeTime * selectLTByFurthestNextRange(LTSet const& lst, Pos pos,
                                            OUT Occ & reload_occ);
 
-    //The function selects a lifetime from 'lst' which has the least priority
-    //and the next-occ from given position is the furthest.
-    //e.g: given pos is 10, and two lifetimes with the same priority in 'lst'.
-    //    lt1:  <5-40>, next-occ is in 20
-    //    lt2:  <5-25>, next-occ is in 25
-    // the function return lt2.
-    //Return nullptr if there is no lifetime has next-occ.
-    LifeTime * selectLTByPrioAndNextOcc(LTSet const& lst, Pos pos,
-                                        Vector<SplitCtx> const& ctxvec,
-                                        OUT Occ & reload_occ);
+    //Select the lifetime to be splitted based on multiple strategies.
+    //1. Loop nesting level. Select the lower.
+    //2. Use location. Select the further.
+    //3. Use frequency. Select the lower.
+    //4. Spillage cost. Select the lower.
+    //
+    //[PENDING] Experiments show that the point 5 is not a reasonable
+    //          optimization point and will not be adopted.
+    //5. Lifetime length. Select the higher.
+    LifeTime * selectLTBaseMultiStrategies(LTSet const& lst,
+        Vector<SplitCtx> const& ctxvec, MOD SplitCtx & cur_ctx);
+
+    //Implementation of lifetime selection strategies.
+    void selectLTImpl(OUT Occ & next_occ, OUT LifeTime *& select_lt,
+        IN LifeTime *const cur_lt, SplitCtx const& ctx);
 
     //This function shrinks the split position to the last occ of the lifetime
     //if it is spill only.
     void shrinkSplitPosForSpillOnly(LifeTime * lt, MOD SplitCtx & ctx);
 
+    //This function shrinks the 'lt' forward to the last occ before the
+    //split position when it is spill only.
+    void shrinkLTForSpillOnly(LifeTime * lt, Pos split_pos,
+                              IR const* split_pos_ir);
     //The function splits 'lt' into two lifetimes, lt and newlt, at ctx's
     //reload_pos. The original 'lt' will be termiated at the reload_pos.
     //newlt will start at reload_pos and renamed to new PRNO.
@@ -689,6 +774,7 @@ typedef union {
     } bb;
 } PRSplitBB;
 
+
 //
 //START LSARImpl
 //
@@ -703,6 +789,7 @@ public:
     typedef xcom::TMap<LifeTime const*, REG_PREFER> LT2Prefer;
     typedef xcom::TMapIter<LifeTime const*, REG_PREFER> LT2PreferIter;
     typedef xcom::TMap<PRNO, UINT64> PR2Split;
+    typedef xcom::TMap<IRBB*, IRBB*> BB2BB;
 private:
     COPY_CONSTRUCTOR(LSRAImpl);
 protected:
@@ -719,11 +806,12 @@ protected:
     IRCFG * m_cfg;
     OptCtx * m_oc;
     ArgPasser * m_argpasser;
+    SpillReloadEliminateMgr m_spill_reload_eliminate_mgr;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
 protected:
-    //Dedicated register must be satefied in the highest priority.
-    void assignDedicatedLT(Pos curpos, IR const* ir, LifeTime * lt);
+    //Pre-assigned register must be satefied in the highest priority.
+    void assignPreAssignedLT(Pos curpos, IR const* ir, LifeTime * lt);
 
     //The function assigns lt focibly with given reg.
     void forceAssignRegister(LifeTime const* lt, Reg reg);
@@ -738,79 +826,114 @@ protected:
     IRListIter insertReloadAtBB(IR * reload, IRBB * bb, bool start);
     IR * insertReloadAtBB(PRNO prno, Var * spill_loc, Type const* ty,
                           IRBB * bb, bool start);
+
+    //Try to replace spill and reload IRs into move operations using available
+    //register for different architectures.
+    //
+    //Before:                                      After:
+    //  st:u64:storage_space(stack) 'var'   ---->    stpr $replace:u64
+    //    $0:u64                                       $0:u64
+    //
+    //  ......                                       ......
+    //
+    //  stpr $1:u64                         ---->    stpr $1:u64
+    //    ld:u64:storage_space(stack) 'var'            $replace:u64
+    //
+    //Note that this optimization should be performed in the same basic block.
+    //Since the availabel register may be used for jump operations.
+    bool replaceSpillAndReloadToMov();
 public:
-    LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose = false)
-        : m_is_dominfo_valid(true), m_ra(ra), m_rsimpl(rsimpl)
-    {
-        m_is_insert_bb = false;
-        m_use_expose = use_expose;
-        m_rg = ra.getRegion();
-        m_tm = m_rg->getTypeMgr();
-        m_irmgr = m_rg->getIRMgr();
-        m_cfg = m_ra.getCFG();
-        m_bb_list = m_ra.getBBList();
-        m_live_mgr = nullptr;
-        m_oc = nullptr;
-        m_argpasser = nullptr;
-    }
-    ~LSRAImpl() {}
+    LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose = false);
+    ~LSRAImpl();
 
     //Add liveness info for an new latch BB.
     //latch_bb: the new latch BB.
     //from: the predecessor BB of the new latch_BB.
     void addLivenessForEmptyLatchBB(IRBB const* latch_bb, IRBB const* from);
 
+    //This function determines whether the current IR can be hoisted out of the
+    //given loop, based on the following two conditions:
+    //  1. IRs in the loop header cannot be hoisted.
+    //  2. The current IR has register/stack conflicts with other IRs, or there
+    //     exists call statements that modifie the register in the loop using
+    //     `hasRegOrStackSlotConflictOrCallInLoop()`.
+    bool canBeHoisted(IR const* ir, LI<IRBB> const* li,
+                      MOD ConstIRIter & inneririt);
+
     void computeRAPrefer();
     void computeLTPrefer(LifeTime const* lt);
-
-    //This func will check the force-reload is necessary or not first, and
-    //then insert the reload IR for lt before the curir. Normally, it is
-    //need to do the force reload operation when the lt and cand are both
-    //livein to the entry of the destination BB of backward edge.
-    //lt: the lifetime need to be checked and inserted with the reload IR.
-    //curpos: the position of current IR using the lt.
-    //curir: the IR using the lt.
-    //cand: the candidate lifetime that selected by the process of
-    //      solveConflict when assigned the register for lt.
-    void checkAndDoForceReload(LifeTime * lt, Pos curpos, IR const* curir,
-                               LifeTime const* cand);
 
     void dumpBBList() const;
     void dump() const;
     static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
                            CHAR const* format, ...);
 
-    //Determine whether the current spilling IR can be eliminated based on the
-    //lifetime attributes and perform elimination.
-    bool eliminateSpill(IR * spill);
+    //Eliminate each IR in the `irtab`.
+    bool eliminateIRsInTab(IRTab & irtab);
 
-    //For the lifetime with only one "def", we only need to spill after the
-    //"def" during splitting. For the subsequent "use", we only need to reload
-    //before the "use" without additional spilling.
-    //Refer to the "4.3 Spill Store Elimination" in "Optimized Interval
-    //Splitting in a Linear Scan Register Allocator".
-    //Note that if the current splitting is implemented based on the caller IR,
-    //spilling is necessary.
-    //Illustration:
-    //
-    //Before splitting: -----------------------------------------------------
-    //                  d                     u        call()               u
-    //
-    //After splitting:  -------  --------------  ------------  --------------
-    //No One-def opt:   d spill  spill reload u  spill call()  spill reload u
-    //
-    //After splitting:  -------  --------------  ------------  --------------
-    //With One-def opt: d spill        reload u  spill call()        reload u
-    //
-    bool eliminateSpillForOneDefLifeTime(IR * spill, LifeTime * lt);
+    //Eliminate the redundant Mov IRs, which have the same source and
+    //destination physical register.
+    bool eliminateRedundantMov();
+
+    //Eliminate redundant spill IRs that follow a reload IR and use
+    //the same stack slot.
+    bool eliminateSameSlotSpillAfterReload();
+
+    //Eliminate single IR.
+    bool eliminateSingleIR(IR const* ir);
+
+    //Eliminate extra spilling IRs for one-def lifetimes. Since the split point
+    //of the one-def lifetime is not strictly after the definition point, the
+    //approach of removing all existing spills and adding a new spill after the
+    //definition point is adopted as a replacement.
+    bool eliminateSpillOfOneDefLifeTime();
+
+    //Find the outermost loop to which an IR can be hoisted. It ensures that
+    //the IR can be safely moved outside the loop without causing register
+    //conflicts, stack slot conflicts, or issues with call operations.
+    //Key Steps:
+    //  1. Retrieve the BB associated with the IR.
+    //  2. Find the innermost loop that includes the BB.
+    //  3. Traverse the loop hierarchy outward, checking for conflicts at each
+    //     level using `canBeHoisted()`.
+    //  4. Return the outermost loop where no conflicts are detected.
+    LI<IRBB> const* findHoistOuterMostLoop(IR const* ir, LI<IRBB> const* li,
+                                           MOD ConstIRIter & inneririt);
 
     static Var * findSpillLoc(IR const* ir);
 
+    //Generate a new basic block before the loop head to store the IRs to be
+    //hoisted outside the loop. The diagram is as follows:
+    //
+    //  BB0                BB0                     BB0                BB0
+    //   |                  |                    ___|___            ___|___
+    //   V                  V                   |       |          |       |
+    //  BB1 <--     -->    BB3 (new)            V       V          V       V
+    //   |    |             |                  BB1     BB2        BB1     BB2
+    //   V    |             V                   |_______|          |_______|
+    //  BB2 __|            BB1 <--      or:         |                  |
+    //                      |    |                  V                  V
+    //                      V    |                 BB3 <--     -->    BB5 (new)
+    //                     BB2 __|                  |    |             |
+    //                                              V    |             V
+    //                                             BB4 __|            BB3 <--
+    //                                                                 |    |
+    //                                                                 V    |
+    //                                                                BB4 __|
+    IRBB * genBBToHoistSpillReloadOutsideLoop(LI<IRBB> const* li,
+        MOD BB2BB & bb2insert, MOD OptCtx & oc);
+
+    //Calculate the number of common IRs at the end of BBs.
+    UINT getCommonIRNumsSuffix(Vector<IRBB*> const& bbvec);
     TargInfoMgr & getTIMgr() const
     { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LivenessMgr * getLiveMgr() const { return m_live_mgr; }
     LinearScanRA & getRA() const { return m_ra; }
     OptCtx * getOptCtx() const { return m_oc; }
+
+    //Find and record the predecessor latch BBs of the current BB.
+    //The return value is the number of predecessor latch BBs.
+    UINT getPredLatchBB(IRBB const* bb, MOD Vector<IRBB*> & latch_vec);
     Region * getRegion() const { return m_rg; }
     LifeTimeMgr & getLTMgr() { return m_ra.getLTMgr(); }
     ActMgr & getActMgr() { return m_ra.getActMgr(); }
@@ -820,8 +943,66 @@ public:
     BBList * getBBList() const { return m_bb_list; }
     IRCFG * getCFG() const { return m_cfg; }
     RegSetImpl & getRegSetImpl() const { return m_rsimpl; }
+    SpillReloadEliminateMgr & getSpillReloadEliminateMgr()
+    { return m_spill_reload_eliminate_mgr; }
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
+
+    //Check whether a given loop contains register conflicts, stack slot
+    //conflicts, or call operations that would prevent hoisting an IR outside
+    //the loop. Key Steps:
+    //  1. Retrieve the register and stack slot information associated with the
+    //     IR.
+    //  2. Iterate through all BBs in the loop.
+    //  3. For each IR in the BBs:
+    //     - Check if it is a call statement that modifies the register.
+    //     - Check if it causes a register conflict with the given IR.
+    //     - Check if it causes a stack slot conflict with the given IR.
+    //  4. Return true if any conflict is found; otherwise, return false.
+    bool hasRegOrStackSlotConflictOrCallInLoop(
+        IR const* ir, LI<IRBB> const* li, MOD ConstIRIter & inneririt);
+    bool hasRegOrStackSlotConflictOrCallInLoopBB(
+        IR const* ir, IRBB * bb, MOD ConstIRIter & inneririt);
+
+    //Check whether the given `ir` has register conflict with given `reg`.
+    //Key steps:
+    //  1. Jugde whether the current IR modifies PR. Exit directly if false.
+    //  2. Get the register allocated to the PRNO and compare it with the given
+    //     register.
+    bool hasRegConflict(IR const* ir, Reg reg);
+
+    //Check whether the given `ir` has stack slot conflict with the given
+    //`var`. Key step:
+    //  1. Traverse the IR tree using an iterator (`ConstIRIter`).
+    //  2. For each inner IR node:
+    //     - Check if the IR has associated variable information (`hasIdinfo`).
+    //     - Retrieve the variable information (`getIdinfo`) and compare it
+    //       with the input variable.
+    //     - If a match is found, return true to indicate a conflict.
+    //  3. If no match is found after traversing the entire IR tree, return
+    //     false.
+    bool hasStackSlotConflict(IR const* ir, Var const* var,
+                              MOD ConstIRIter & it);
+
+    //Hoist reload IRs outside the loop. The diagram is as follows:
+    //
+    //   ...                               ...
+    //    |                                 |
+    //    V            1. generate BB3      V
+    //   BB1 <-------  --------------->    -BB3------
+    //    |         |  2. move spill or    |        |
+    //    V         |     reload from      | Spill/ |
+    //  -BB2------  |     BB2 to BB3       | Reload |
+    //  |        |__|                      |________|
+    //  | Spill/ |                          |
+    //  | Reload |                          V
+    //  |________|                         BB1 <--
+    //                                      |    |
+    //                                      V    |
+    //                                     BB2___|
+    //
+    bool hoistSpillReloadOutsideLoop(OptCtx & oc);
+    bool hoistSpillReloadOutsideLoopImpl(OptCtx & oc, IRTab const& tab);
 
     IR * insertRemat(PRNO to, IR const* exp, Type const* ty, IRBB * bb);
     void insertRematBefore(IR * remat, IR const* marker);
@@ -844,6 +1025,11 @@ public:
     bool isRematLikeOp(IR const* ir) const;
     static bool isSpillLikeOp(IR const* ir);
     static bool isReloadLikeOp(IR const* ir);
+
+    //Check whether the IRs are different.
+    //NOTE: This interface only checks RematOp, ReloadOp, MoveOp, and SpillOp.
+    //Returns true for all other IRs.
+    bool isDifferentIROp(IR const* ir1, IR const* ir2) const;
     bool isDomInfoValid() const { return m_is_dominfo_valid; }
     bool isLTUsedInFakeOp(LifeTime const* lt) const
     {
@@ -883,23 +1069,191 @@ public:
     bool isLtSplitBeforeFakeUseAtLexLastBBInLoop(LifeTime const* lt,
                                                  Pos split_pos) const;
 
+    //Return true if the current BB is a tramp BB.
+    bool isTrampBB(IRBB const* bb) const
+    {
+        return bb->getNumOfIR() == 1 && bb->getNumOfPred() == 1 &&
+            const_cast<IRBB*>(bb)->getLastIR()->is_goto();
+    }
+
+    //Return true if cur_bb is the unique predecessor of succ_bb and succ_bb
+    //is the unique successor of cur_bb.
+    bool isUniquePredSuccPair(IRBB const* cur_bb, IRBB const* succ_bb) const
+    {
+        ASSERT0(cur_bb != nullptr && succ_bb != nullptr);
+        return m_cfg->isUniquePred(succ_bb, cur_bb) &&
+            m_cfg->isUniqueSucc(cur_bb, succ_bb);
+    }
+
+    //Merge common IRs at the end of the given BB set.
+    //latch_vec: the set of BBs that need to be merged.
+    //base_bb: the common successor of all BBs.
+    //com_ir_num: the number of IRs to be merged.
+    //Select a target BB and use its common IRs as the merged BB (preferably one
+    //that fallthrough to the base_bb). Based on the relationship between the
+    //number of IRs in the target BB and com_ir_num, handle two different cases.
+    //
+    //CASE1: the number of IRs in the target BB is greater than com_ir_num.
+    //
+    //    latch bb1      latch bb2          latch bb1      latch bb2
+    //    ---------      ---------          ---------      ---------
+    //    |  IR1  |      |  IR1  |  <--     |  IR1  |      |  IR1  |
+    //    |  IR2  |      |  IR4  |    |     |  IR2  |      ---------
+    //    |  IR4  |      ---------    |     ---------          |
+    //    ---------          |   target bb      |              |
+    //        |              |                  ----------------
+    //        ----------------       ==>               |
+    //               |                                 V
+    //               V                              new bb
+    //            base bb                          ---------
+    //           ---------                         |  IR4  |
+    //           |  ...  |                         ---------
+    //           ---------                             |
+    //                                                 V
+    //                                              base bb
+    //
+    //CASE2: the number of IRs in the target BB is equal to com_ir_num.
+    //
+    //    latch bb1      latch bb2               latch bb1
+    //    ---------      ---------               ---------
+    //    |  IR1  |      |  IR2  |  <--          |  IR1  |
+    //    |  IR2  |      |  IR4  |    |          ---------
+    //    |  IR4  |      ---------    |              |
+    //    ---------          |   target bb           V
+    //        |              |                   latch bb2
+    //        ----------------        ==>        ---------
+    //               |                           |  IR2  |
+    //               V                           |  IR4  |
+    //            base bb                        ---------
+    //           ---------                           |
+    //           |  ...  |                           V
+    //           ---------                        base bb
+    //
+    bool mergeCommonIRAtBlockEnd(Vector<IRBB*> & latch_vec,
+                                 MOD IRBB * base_bb, UINT com_ir_num);
+
+    //When the lifetime split position is inside the loop, the resulting spill
+    //or reload operation will be repeated multiple times, thereby reducing
+    //performance.
+    //Try moving the split position outside the loop so that spill or reload
+    //operation is executed less times to improve performance. For example:
+    //
+    //Lifetime:  occ0----occ1----occ2----occ3----occ4----split pos----occ5
+    //nestlevel:   0       1       0       1       2                    0
+    //
+    //Normally we would select "occ4" as the split position of the lifetime,
+    //but the nest level of "occ4" is 2 and is within the loop. We will try to
+    //find occurrence with smaller nest level backward until we find "occ2".
+    //Note that the nest levels of "occ0" and "occ2" are both 0, and we select
+    //"occ2" which is closer to origin split position.
+    //
+    void moveSplitPosOutsideLoop(LifeTime * lt, MOD SplitCtx & ctx) const;
+
+    //Optimize common IR sequences at basic block boundaries.
+    //When a block has multiple predecessors that all end with the same sequence
+    //of move instructions, the moves can be hoisted and placed once at the
+    //beginning of the block instead of duplicating them in each predecessor.
+    //Similarly, if a block has multiple successors that start with the same
+    //sequence of move instructions, these moves can be sunk and placed once at
+    //the end of the block to avoid duplication.
+    bool optimizeCommonIRAtBBBoundaries();
+
+    //Optimize common IRs at the beginning of multiple successor BBs
+    //of the same BB. Common IRs are those that translate to the same
+    //machine instruction.
+    //e.g:
+    //            base bb                           base bb
+    //           ---------                         ---------
+    //           |  IR0  |                         |  IR0  |
+    //           ---------                         |  IR1  |
+    //               |                             ---------
+    //         --------------        ==>               |
+    //        |              |                   -------------
+    //        |              |                  |             |
+    //        v              v                  v             v
+    //       bb1            bb2                bb1           bb2
+    //    ---------      ---------          ---------      ---------
+    //    |  IR1  |      |  IR1  |          |  IR2  |      |  IR4  |
+    //    |  IR2  |      |  IR4  |          |  IR4  |      ---------
+    //    |  IR4  |      ---------          ---------
+    //    ---------
+    //
+    bool optimizeCommonIRAtBlockBegin();
+
+    //Optimize common IRs from multiple predecessor latch BBs of the same BB.
+    //Common IRs are those that translate to the same machine instruction.
+    //e.g:
+    //    latch bb1      latch bb2          latch bb1      latch bb2
+    //    ---------      ---------          ---------      ---------
+    //    |  IR1  |      |  IR1  |          |  IR1  |      |  IR1  |
+    //    |  IR2  |      |  IR4  |          |  IR2  |      ---------
+    //    |  IR4  |      ---------          ---------          |
+    //    ---------          |                  |              |
+    //        |              |                  ----------------
+    //        ----------------       ==>               |
+    //               |                                 V
+    //               V                              new bb
+    //            base bb                          ---------
+    //           ---------                         |  IR4  |
+    //           |  ...  |                         ---------
+    //           ---------                             |
+    //                                                 V
+    //                                              base bb
+    //
+    //NOTE: Currently, only identical IRs at the end of latch BBs are merged.
+    //This optimization can be extended in two directions:
+    //1.Merge identical IRs at the end of all predecessor BBs and identical
+    //  IRs at the start of all successor BBs.
+    //2.Analyze whether IRs in latch BBs can be reordered to discover more
+    //  opportunities for merging.
+    bool optimizeCommonIRAtLatchBBEnd();
+
+    //When the last instruction of the previous BB is a store and the first
+    //instruction of the current BB is a load, the load instruction can be
+    //weakened to a mov instruction.
+    //e.g:
+    //   BB1:
+    //      ...
+    //      st:u64:storage_space(stack) 'var_47'
+    //          $1810:u64 (r44)
+    //   BB2:
+    //      stpr $2506:u64 (r18)
+    //          ld:u64:storage_space(stack) 'var_47'
+    //      ...
+    // ==>
+    //   BB1:
+    //      ...
+    //      st:u64:storage_space(stack) 'var_47'
+    //          $1810:u64 (r44)
+    //   BB2:
+    //      stpr $2506:u64 (r18)
+    //          $1810:u64 (r44)
+    //      ...
+    bool optimizeCrossBBStoreLoadToMov();
+
     bool perform(OptCtx & oc);
 
-    //Peform the following processing.
-    //1. Revise lifetime consistency.
-    //2. Save callee saved registers.
-    //3. Eliminate extra spilling IRs.
-    bool postProcess();
+    //Peform some optimizations after the register allocation.
+    bool postProcess(OptCtx & oc);
+
+    //Promote for the spill and reload IR by registers.
+    bool promoteSpillReload(OptCtx & oc);
 
     //Record the newlt that generated by SplitMgr.
     void recordSplittedNewLT(LifeTime const* newlt);
+
+    //Remove the redundant pos gap IR.
+    bool removeRedundantPosGapIR(OptCtx & oc);
+
+    //Remove the unnecessary spill IRs inserted due to fake-use IR.
+    void removeSpillIRForFakeUseAtLexFirstBBOfLoop();
 
     //The function check each CFG edge to fixup the lifetime conflict while the
     //linearization allocation flattening the CFG.
     //The function check consistency for each newlt that generated by SplitMgr
     //and insert appropriately store/load/move to guarantee the lifetime
     //consistency.
-    void reviseLTConsistency(MOD PostProcessCtx & ctx);
+    void reviseLTConsistency();
 
     void saveCallee();
 
@@ -912,11 +1266,6 @@ public:
     //curpos: the position that need a register.
     //curir: the stmt/exp that need a register.
     void solveConflict(LifeTime * lt, Pos curpos, IR const* curir);
-
-    //Eliminate extra spilling IRs. Traverse all spilling IRs, find the
-    //corresponding lifetime, and determine whether the current spilling IR
-    //can be eliminated based on the lifetime attributes.
-    bool spillElimination(PostProcessCtx const& ctx);
 
     //The function split all lifetimes in Active LifeTime Set that assigned
     //given register 'r' before 'ir'.
@@ -945,6 +1294,10 @@ public:
     void splitOrSpillOnly(LifeTime * t, Pos split_pos, MOD SplitCtx & ctx,
                           SplitMgr & spltmgr);
 
+    //Optimize the lifetime split position to improve performance. There may
+    //be multiple optimization options possible.
+    void splitPosOpt(LifeTime * lt, MOD SplitCtx & ctx);
+
     void transferActive(Pos curpos);
     void transferInActive(Pos curpos);
 
@@ -967,8 +1320,299 @@ public:
                       bool newbb_prior_marker);
     void tryUpdateDom(IRBB const* from, IRBB const* newbb,
                       IRBB const* to);
+    bool verifyLSRAOverStrict(OptCtx & oc) const;
 };
 //END LSARImpl
+
+
+//
+//START PosGapIROpt
+//
+//The PosGapIROpt removes the dead position gap IRs (spill/reload/move/remat)
+//inserted during the register allocation after the Def-Use chain analysis.
+//The dead spill is a spilling operation which doesn't modify the data of the
+//memory, that means this operation is meaningless. The dead reload operation
+//is a normal reload operation, but the new loaded value in the register is
+//not used by any IR, or a dead spill only, so this reload operation is
+//meaningless as well. The dead remat and move IRs are the defined register
+//is not used by any IR afterwards.
+//
+//e.g1 for the dead spill:
+// $10 <- reload [x]   //reload
+// $12 <- add $10, $1
+// [x] <- spill $10    //dead spill
+//
+//e.g2 for the dead reload:
+// $10 <- reload [x]   //dead reload if the next spill IR is a dead spill.
+// [x] <- spill $10    //dead spill
+//
+//e.g3 for the dead reload:
+// $10 <- reload [x]   //dead reload if the there is no use of $10 afterwards.
+// xx  <- mov $11
+//
+//e.g4 for the dead move:
+// $10 <- mov $30   //dead move if the there is no use of $10 afterwards.
+// xx  <- mov $11
+//
+//e.g5 for the dead remat:
+// $10 <- remat 30   //dead remat if the there is no use of $10 afterwards.
+// xx  <- mov $11
+typedef xcom::TMap<IR const*, bool> IR2BOOL;
+class PosGapIROpt {
+    COPY_CONSTRUCTOR(PosGapIROpt);
+    Region * m_rg;
+    BBList * m_bb_list;
+    LSRAImpl & m_impl;
+
+    //Used to store the dead spill IRs.
+    ConstIRTab m_dead_spill_tab;
+
+    //Used to store the dead reload/remat/mov IRs.
+    ConstIRTab m_dead_misc_tab;
+public:
+    PosGapIROpt(LSRAImpl & impl) : m_impl(impl)
+    {
+        m_rg = impl.getRegion();
+        m_bb_list = m_rg->getBBList();
+    }
+
+    ~PosGapIROpt() {}
+
+    void addDeadMiscIR(IR const* ir)
+    { ASSERT0(ir); m_dead_misc_tab.append(ir); }
+    void addDeadSpillIR(IR const* ir)
+    { ASSERT0(ir); m_dead_spill_tab.append(ir); }
+
+    void collectDeadMiscIR();
+    void collectDeadSpillIR();
+
+    //Generate the Def-Use Info.
+    void genDUInfo(OptCtx & oc);
+
+    LinearScanRA & getRA() const { return m_impl.getRA(); }
+    Region * getRegion() const { return m_rg; }
+
+    //This func perform the optimization by the following 4 steps:
+    //1.Generate the Def-Use infomation.
+    //2.Collect the deal spill IRs.
+    //3.Collect the dead reload/remat/move IRs.
+    //4.Remove the recorded IRs in step 2 and step 3.
+    //Return true if there are some spill/reload/remat/move IRs are removed,
+    //otherwise, return false;
+    bool perform(OptCtx & oc);
+
+    //Remove the recorded spill and reload IRs.
+    void removeDeadIR();
+};
+//END PosGapIROpt
+
+
+//
+//START RegisterVerify
+//
+//
+//This class implements the verification of register allocation algorithms.
+//In register allocation, for variables with conflicting lifecycles,
+//the same register cannot be allocated. This algorithm mainly verifies this
+//and gives warnings for undefined use of variables. The core data of the
+//algorithm is input_state, which is a hash map that stores the allocation
+//relationship between physical registers and pseudo registers/variables.
+//The algorithm starts from the entrance basic block and traverses the entire
+//CFG. When processing each basic block BB, each IR in BB is traversed,
+//and the allocation of input operands in the IR is compared with input_state.
+//If there is inconsistency, it indicates an allocation error.
+//Then, the status of the output operands in the IR is updated to input_state.
+//input_state is a mapping from a physical register to a virtual register.
+//input_state stores the physical register allocation status of the current
+//instruction predecessor, such as {r1->$0}, indicating that the physical
+//register r1 is assigned to the virtual register $0. When iterating to the
+//current instruction, if r1 is assigned to $1, it indicates that the two
+//lifetime conflicting variables are evenly distributed to the same physical
+//register, which is an error.
+//For example:
+//                   BB0
+//                   $a<-1    assume r1->$a (assign physical register r1 to $a)
+//                   $b<-$a*2 assume r2->$b
+//                   |
+//                   | input_state={r1->$a,r2->$b}
+//          -----------------------------
+//          |                           |
+//          |                           V input_state={r1->$a,r2->$b}
+//          |                           BB1
+//          |                           $c<-$b/2 assume r3->$c
+//          |                           |
+//          |                           | $b is the lase occ, so r2->null
+//          |                           | input_state={r1->$a,r3->$c}
+//          |                           |
+//          Vinput_state={r1->$a,r2->$b}|
+//          BB2                         |
+//          $d<-$a*2 assume r4->$d      |
+//          |$a is the last occ         |
+//          |input_state={r2->$b,r4->$d}|
+//          -----------------------------
+//                       |
+//                       V
+//                       BB3
+//                       ret $c+$d
+//  Assuming there are four physical registers r1, r2, r3, r4,
+//  and the processing order is BB0, BB1, BB2, BB3.
+//  (1)At the exit of BB0, input_state is {r1->$a,r2->$b}.
+//  (2)At the exit of BB1, input_state is {r1->$a,r3->$c}.
+//  (3)At the exit of BB2, input_state is {r2->$b,r4->$d}.
+//  (4)When dealing with the successor BB3 of BB2,
+//     because BB1 needs to be processed first, the input_state at the entrance
+//     of BB3 is {r1->$a,r3->$c}. At this point, it is necessary to compare the
+//     state at the BB2 exit with the previously saved state. In this example,
+//     there is no contradiction between the two input_state,
+//     so the test passed.
+//  When processing basic block BB0, ignoring the processing of function
+//  parameter registers, input_state is empty. When encountering "$a<-1",
+//  input_state becomes {r1->$a}. Currently, when encountering "$b<-$a*2",
+//  first check whether the registers assigned in a are consistent with those
+//  in input_state. If they are not consistent, an error will be reported.
+//  At this point, it is correct. Then update the status of the physical
+//  registers allocated by $b to input_state, and input_state
+//  will become {r1->$a,r2->$b}.
+class RegisterVerify {
+    COPY_CONSTRUCTOR(RegisterVerify);
+public:
+    //A map: physical register -> lifetime/virtual register.
+    typedef xcom::Vector<UINT> PhyReg2VirReg;
+    typedef xcom::TMap<IRBB const*, xcom::C<IRBB const*>*> IRBB2Holder;
+private:
+    UINT m_physical_reg_num;
+    LinearScanRA & m_lsra;
+    RegSetImpl & m_reg_set;
+    Region * m_rg;
+    IRCFG * m_cfg;
+
+    //Physical Caller Registers.
+    xcom::Vector<UINT> m_caller_regs;
+
+    //All blocks that must be processed.
+    xcom::EList<IRBB const*, IRBB2Holder> m_work_list;
+
+    //A map: block -> input_state,
+    //'state' is a PhyReg2VirReg object that stores the mapping relationship
+    //between physical registers and pseudo registers.
+    //m_saved_states saves information of previous check.
+    xcom::TMap<IRBB const*, PhyReg2VirReg const*> m_saved_states;
+
+    //A map: prno -> last occurrence of ir.
+    xcom::Vector<IR const*> m_pr2lastocc;
+
+    //A List: save all input_state pointers.
+    xcom::List<PhyReg2VirReg const*> m_input_states;
+protected:
+    PhyReg2VirReg * allocPhyReg2VirReg(UINT size = 0)
+    {
+        PhyReg2VirReg * obj = nullptr;
+        obj = new RegisterVerify::PhyReg2VirReg(size);
+        m_input_states.append_tail(obj);
+        return obj;
+    }
+
+    //If the mapping of reg->prno is consistent with that in input_date,
+    //return false. Otherwise, return true to indicate an error has occurred.
+    bool checkState(PhyReg2VirReg const* input_state, Reg reg, PRNO prno) const;
+
+    //Calculate the location of the last occ of a prno.
+    void computeLastOcc();
+
+    //Create an input_state object.
+    PhyReg2VirReg * createPhyReg2VirReg();
+
+    void dumpInitInfo() const;
+
+    void dumpPhyReg2VirReg(PhyReg2VirReg const* input_state) const;
+
+    //Release the space pointed to by input_state.
+    void destroyPhyReg2VirReg(PhyReg2VirReg const* input_state) const;
+
+    //Free all the space occupied by input_states.
+    void destroyPhyReg2VirRegs() const;
+
+    //Calculate the location of the last occurence of a PR operation on RHS.
+    void genLastOccRHS(IR const* ir);
+
+    //Calculate the location of the last occurence of a PR operation on LHS.
+    void genLastOccLHS(IR const* ir);
+
+    //Perform a deep copy of the input_state object.
+    PhyReg2VirReg * getAndGenPhyReg2VirReg(PhyReg2VirReg const* input_state);
+
+    //Obtain the status at the entrance of the basic block bb.
+    PhyReg2VirReg const* getPhyReg2VirReg(IRBB const* bb) const;
+
+    //Determine if 'input' is the last occurence in 'ir'.
+    bool isLastOcc(IR const* ir, IR const* input) const;
+
+    //Remove some physical registers that do not require verification.
+    bool isPhysicalRegisterNotCheck(Reg reg) const;
+
+    //If work_list is empty, return true.
+    bool isEmptyWorkList() const;
+
+    //Initialize the caller physical register.
+    void initPhysicalRegCaller();
+
+    //Initialize the number of physical registers.
+    void initPhysicalRegNum();
+
+    //Get physical register number.
+    UINT getPhysicalRegNum() const;
+
+    //Retrieve and delete header.
+    IRBB const* popWorkList();
+
+    //Process basic block bb.
+    void processBlock(IRBB const* bb);
+
+    //Verify if the status of each IR in the basic block bb is correct.
+    void processOperations(IRBB const* bb, MOD PhyReg2VirReg * input_state);
+
+    //Process each operand in ir, and if ir is a function call,
+    //update the status of the caller register.
+    bool processOperation(IR const* ir, MOD PhyReg2VirReg * input_state);
+
+    //Process all successors of the basic block bb.
+    void processSuccessor(IRBB const* bb, PhyReg2VirReg const* input_state);
+
+    //Insert a element 'bb' into the end of the list.
+    void pushWorkList(IRBB const* bb);
+
+    //Invalidate all caller save registers.
+    void setAllCallerInvalid(MOD PhyReg2VirReg * input_state) const;
+
+    //Set the state at the entrance of the basic block bb to saved_state.
+    void setPhyReg2VirRegs(IRBB const* bb, IN PhyReg2VirReg * saved_state);
+
+    //Set the status of input_state and update the prno corresponding to reg.
+    void setPhyReg2VirReg(MOD PhyReg2VirReg * input_state, Reg reg, PRNO prno)
+        const;
+
+    //Setup input registers (method arguments) for first block.
+    void setupInputStateForEntryBB(MOD PhyReg2VirReg * input_state) const;
+
+    //Verify register allocation algorithm from BB 'start'.
+    void verify(IRBB const* start);
+public:
+    RegisterVerify(LinearScanRA & lsra, RegSetImpl & reg_set,
+        Region * rg, IRCFG * cfg) : m_lsra(lsra), m_reg_set(reg_set)
+    {
+        ASSERT0(cfg != nullptr);
+        m_cfg = cfg;
+        ASSERT0(rg != nullptr);
+        m_rg = rg;
+        initPhysicalRegNum();
+        initPhysicalRegCaller();
+    }
+
+    ~RegisterVerify() { destroyPhyReg2VirRegs(); m_saved_states.destroy(); }
+
+    bool verify();
+};
+//End RegisterVerify
 
 } //namespace xoc
 #endif

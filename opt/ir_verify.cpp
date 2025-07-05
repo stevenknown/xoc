@@ -250,8 +250,13 @@ bool verifyGetElem(IR const* ir, Region const* rg)
     Type const* basedtd = base->getType();
     if (basedtd->is_vector()) {
         ASSERT0(basedtd->getVectorElemDType() != D_UNDEF);
-        ASSERT0(tm->getDTypeByteSize(basedtd->getVectorElemDType()) >=
-                tm->getByteSize(d));
+        //CASE:We shoudl allow the result data-type bytesize greater
+        //than elements size.
+        //e.g: getelem $121:f32 = $44:vec<bf16*8>, 14;
+        // where extract bf16 and stretch value and store to f32.
+        //ASSERTN(tm->getDTypeByteSize(basedtd->getVectorElemDType()) >=
+        //        tm->getByteSize(d),
+        //        ("element size of base should greater than result."));
     }
     return true;
 }
@@ -285,7 +290,7 @@ bool verifyCall(IR const* ir, Region const* rg)
     Type const* d = ir->getType();
     ASSERT0(CALL_idinfo(ir));
 
-    //result type of call is the type of return value if it exist.
+    //Result type of call is the type of return value if it exist.
     //The result type may be ANY.
     if (CALL_prno(ir) != PRNO_UNDEF) { ASSERT0_DUMMYUSE(d); }
 
@@ -293,6 +298,10 @@ bool verifyCall(IR const* ir, Region const* rg)
     for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         ASSERT0(p->is_exp());
     }
+    if (CALL_dummyuse(ir) == nullptr) { return true; }
+    ASSERTN(!ir->isReadOnly(),
+        ("Since dummyuse will be also regarded as MayDef of call, "
+         "readonly call should not have dummyuse."));
 
     //Dummy uses should be expression.
     for (IR * p = CALL_dummyuse(ir); p != nullptr; p = p->get_next()) {
@@ -687,7 +696,7 @@ bool verifyAtomCas(IR const* ir, Region const* rg)
             (oldval->is_pr() || oldval->is_const()) &&
             (newval->is_pr() || newval->is_const()));
     ASSERT0(memory);
-    if (reslst != nullptr) { ASSERT0(reslst->get_next() == nullptr); }
+    if (reslst != nullptr) { ASSERT0(reslst->is_single()); }
     if (memory->is_ld()) {
         ASSERT0(LD_idinfo(memory) &&
                 LD_idinfo(memory)->getStorageSpace() == SS_GLOBAL);

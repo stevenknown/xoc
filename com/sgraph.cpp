@@ -445,7 +445,7 @@ Edge * Graph::reverseEdge(Edge * e)
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     ASSERTN(m_is_direction, ("graph is indirection"));
-    void * einfo = EDGE_info(e);
+    EdgeInfoType einfo = EDGE_info(e);
     Vertex * from = EDGE_from(e);
     Vertex * to = EDGE_to(e);
     removeEdge(e);
@@ -475,24 +475,24 @@ void Graph::reverseEdges()
 //Insert 'newv' between 'v1' and 'v2'.
 //e.g: given edge v1->v2, the result is v1->newv->v2.
 //Return edge v1->newv, newv->v2.
-void Graph::insertVertexBetween(IN Vertex * v1, IN Vertex * v2,
-                                IN Vertex * newv, OUT Edge ** e1,
-                                OUT Edge ** e2, bool sort)
+void Graph::insertVertexBetween(
+    IN Vertex * v1, IN Vertex * v2, IN Vertex * newv, OUT Edge ** e1,
+    OUT Edge ** e2, bool sort)
 {
+    ASSERT0(v1 && v2 && newv);
     Edge * e = getEdge(v1, v2);
-
     EdgeC * v2pos_in_list = nullptr;
     EdgeC * v1pos_in_list = nullptr;
     if (sort) {
         for (EdgeC * ec = v1->getOutList();
-             ec != nullptr; ec = EC_next(ec)) {
+             ec != nullptr; ec = ec->get_next()) {
             if (ec->getTo() == v2) {
                 break;
             }
             v2pos_in_list = ec;
         }
-
-        for (EdgeC * ec = v2->getInList(); ec != nullptr; ec = EC_next(ec)) {
+        for (EdgeC * ec = v2->getInList();
+             ec != nullptr; ec = ec->get_next()) {
             if (ec->getFrom() == v1) {
                 break;
             }
@@ -506,7 +506,6 @@ void Graph::insertVertexBetween(IN Vertex * v1, IN Vertex * v2,
     Edge * tmpe2 = addEdge(newv, v2);
     if (e1 != nullptr) { *e1 = tmpe1; }
     if (e2 != nullptr) { *e2 = tmpe2; }
-
     if (!sort) { return; }
 
     EdgeC * tmpe1_ec = nullptr;
@@ -553,7 +552,7 @@ void Graph::insertVertexBetween(VexIdx v1, VexIdx v2, VexIdx newv,
 {
     Vertex * pv1 = getVertex(v1);
     Vertex * pv2 = getVertex(v2);
-    Vertex * pnewv = getVertex(newv);
+    Vertex * pnewv = addVertex(newv);
     ASSERT0(pv1 && pv2 && pnewv);
     insertVertexBetween(pv1, pv2, pnewv, e1, e2, sort);
 }
@@ -1160,6 +1159,14 @@ void Graph::dumpVertexDesc(
 }
 
 
+void Graph::dumpEdgeDesc(
+    xcom::Edge const* e, OUT DefFixedStrBuf & buf) const
+{
+    if (e->info() == nullptr) { return; }
+    buf.strcat("%u", e->info());
+}
+
+
 CHAR const* Graph::dumpVertex(Vertex const* v, OUT DefFixedStrBuf & buf) const
 {
     buf.strcat("\nnode%d [shape = Mrecord, label=\"", v->id());
@@ -1194,7 +1201,9 @@ CHAR const* Graph::dumpEdge(Edge const* e, OUT DefFixedStrBuf & buf) const
     {
         //Print label.
         if (prt_comma) { buf.strcat(","); }
-        buf.strcat("label=\"%s\"", "");
+        DefFixedStrBuf descbuf;
+        dumpEdgeDesc(e, descbuf);
+        buf.strcat("label=\"%s\"", descbuf.getBuf());
         prt_comma = true;
     }
     buf.strcat("]");
@@ -1346,22 +1355,22 @@ bool Graph::isReachExit(Vertex const* vex, UINT try_limit,
 }
 
 
-//The function try to answer whether 'reachin' can reach 'start' from one of
-//in-vertexs of 'start'. Return false if it is not or unknown.
-//try_limit: the maximum time to try.
-//try_failed: return true if the function running exceed the try_limit.
-bool Graph::isReachIn(Vertex const* start, Vertex const* reachin,
-                      UINT try_limit, OUT bool & try_failed)
+bool Graph::isReachIn(
+    Vertex const* vex, Vertex const* reachin, UINT try_limit,
+    OUT bool & try_failed, VexTab const* terminate_vex_tab)
 {
-    ASSERT0(start && reachin);
+    ASSERT0(vex && reachin);
     try_failed = false;
     BitSet visited;
     List<Vertex const*> wl;
     AdjVertexIter it;
-    for (Vertex const* in = Graph::get_first_in_vertex(start, it);
+    for (Vertex const* in = Graph::get_first_in_vertex(vex, it);
          in != nullptr; in = Graph::get_next_in_vertex(it)) {
+        if (terminate_vex_tab != nullptr && terminate_vex_tab->find(in->id())) {
+            continue;
+        }
+       visited.bunion(in->id());
         wl.append_tail(in);
-        visited.bunion(in->id());
     }
     xcom::Vertex const* v = nullptr;
     UINT count = 0;
@@ -1371,6 +1380,10 @@ bool Graph::isReachIn(Vertex const* start, Vertex const* reachin,
         AdjVertexIter it;
         for (Vertex const* in = Graph::get_first_in_vertex(v, it);
              in != nullptr; in = Graph::get_next_in_vertex(it)) {
+            if (terminate_vex_tab != nullptr &&
+                terminate_vex_tab->find(in->id())) {
+                continue;
+            }
             if (in == reachin) {
                 return true;
             }
@@ -1455,6 +1468,23 @@ Edge * Graph::get_first_out_edge(Vertex const* vex, AdjEdgeIter & it)
 
 
 Edge * Graph::get_next_out_edge(AdjEdgeIter & it)
+{
+    if (it == nullptr) { return nullptr; }
+    it = it->get_next();
+    return it == nullptr ? nullptr : it->getEdge();
+}
+
+
+Edge * Graph::get_first_in_edge(Vertex const* vex, AdjEdgeIter & it)
+{
+    ASSERT0(vex);
+    it = vex->getInList();
+    if (it == nullptr) { return nullptr; }
+    return it->getEdge();
+}
+
+
+Edge * Graph::get_next_in_edge(AdjEdgeIter & it)
 {
     if (it == nullptr) { return nullptr; }
     it = it->get_next();
@@ -2529,8 +2559,8 @@ void DGraph::genPDomTree(OUT DomTree & pdt) const
 }
 
 
-void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree,
-                     bool dump_pdom_tree) const
+void DGraph::dumpDomAndPdom(
+    CHAR const* name, bool dump_dom_tree, bool dump_pdom_tree) const
 {
     if (name == nullptr) {
         name = "graph_dom.txt";
@@ -2538,15 +2568,16 @@ void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree,
     FileObj fo(name, true, false);
     FILE * h = fo.getFileHandler();
     ASSERTN(h, ("%s create failed!!!",name));
-    dumpDom(h, dump_dom_tree, dump_pdom_tree);
+    dumpDomAndPdom(h, dump_dom_tree, dump_pdom_tree);
 }
 
 
-void DGraph::dumpDom(FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
+void DGraph::dumpDomAndPdom(
+    FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
 {
     if (h == nullptr) { return; }
     StrBuf buf(32);
-    fprintf(h, "%s\n", dumpDom(buf));
+    fprintf(h, "%s\n", dumpDomAndPdom(buf));
     fflush(h);
     if (dump_dom_tree) {
         DomTree dom;
@@ -2562,7 +2593,7 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree, bool dump_pdom_tree) const
 
 
 //Dump dom set, pdom set, idom, ipdom.
-CHAR const* DGraph::dumpDom(OUT StrBuf & buf) const
+CHAR const* DGraph::dumpDomAndPdom(OUT StrBuf & buf) const
 {
     buf.strcat("\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
     VertexIter c = VERTEX_UNDEF;
@@ -2821,8 +2852,8 @@ bool DGraph::changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ)
 
 //Add vertex newid to domset and pdomset for both livein and liveout paths
 //of marker.
-//is_dom: true if newid is new dom of marker, false means newid is new pdom of
-//        marker.
+//is_dom: true if 'newid' is the new Dom of 'marker', false means 'newid' is
+//        the new PDom of 'marker'.
 //CASE:
 //    Ventry
 //  ___| |__
@@ -2883,30 +2914,32 @@ bool DGraph::changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ)
 //          \ |
 //           vv
 //           Vexit
-static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, VexIdx newid,
-                                  bool is_dom)
+static void addVexToDomAndPdomSet(
+    DGraph * g, Vertex const* marker, VexIdx newid, bool is_dom)
 {
-    VexIdx vexid = vex->id();
+    VexIdx markerid = marker->id();
     DomSet visited;
     List<Vertex const*> wl;
-    wl.append_tail(vex);
+    wl.append_tail(marker);
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
         visited.bunion(v->id());
-        if (v->id() != vexid && v->id() != newid) {
+        if (v->id() != markerid && v->id() != newid) {
             DomSet * domset = g->gen_dom_set(v->id());
             DomSet * pdomset = g->gen_pdom_set(v->id());
             if (is_dom) {
-                if (domset->is_contain(vexid)) {
+                //newid is the Dom of marker.
+                if (domset->is_contain(markerid)) {
                     domset->bunion(newid);
-                } else if (g->get_ipdom(v->id()) == vexid) {
+                } else if (g->is_ipdom(markerid, v->id())) {
                     g->set_ipdom(v->id(), newid);
                     pdomset->bunion(newid);
                 }
             } else {
-                if (pdomset->is_contain(vexid)) {
+                //newid is the PDom of marker.
+                if (pdomset->is_contain(markerid)) {
                     pdomset->bunion(newid);
-                } else if (g->get_idom(v->id()) == vexid) {
+                } else if (g->is_idom(markerid, v->id())) {
                     g->set_idom(v->id(), newid);
                     domset->bunion(newid);
                 }
@@ -2922,27 +2955,29 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, VexIdx newid,
         }
     }
 
-    //If the succ of vex is also the pred, then it has been mark visited.
+    //If the succ of 'marker' is also the pred, then it has been mark visited.
     //Unmark the succ in order to handle more subsequent successors.
     visited.clean();
-    wl.append_tail(vex);
+    wl.append_tail(marker);
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
         visited.bunion(v->id());
-        if (v->id() != vexid && v->id() != newid) {
+        if (v->id() != markerid && v->id() != newid) {
             DomSet * domset = g->gen_dom_set(v->id());
             DomSet * pdomset = g->gen_pdom_set(v->id());
             if (is_dom) {
-                if (domset->is_contain(vexid)) {
+                //newid is the Dom of marker.
+                if (domset->is_contain(markerid)) {
                     domset->bunion(newid);
-                } else if (g->get_ipdom(v->id()) == vexid) {
+                } else if (g->is_ipdom(markerid, v->id())) {
                     g->set_ipdom(v->id(), newid);
                     pdomset->bunion(newid);
                 }
             } else {
-                if (pdomset->is_contain(vexid)) {
+                //newid is the PDom of marker.
+                if (pdomset->is_contain(markerid)) {
                     pdomset->bunion(newid);
-                } else if (g->get_idom(v->id()) == vexid) {
+                } else if (g->is_idom(markerid, v->id())) {
                     g->set_idom(v->id(), newid);
                     domset->bunion(newid);
                 }
@@ -2951,10 +2986,9 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, VexIdx newid,
         AdjVertexIter it;
         for (Vertex const* out = Graph::get_first_out_vertex(v, it);
              out != nullptr; out = Graph::get_next_out_vertex(it)) {
-            if (!visited.is_contain(out->id())) {
-                visited.bunion(out->id());
-                wl.append_tail(out);
-            }
+            if (visited.is_contain(out->id())) { continue; }
+            visited.bunion(out->id());
+            wl.append_tail(out);
         }
     }
 }
@@ -3025,80 +3059,130 @@ void DGraph::reviseDomInfoAfterAddOrRemoveEdge(
 }
 
 
-void DGraph::addDomInfoToImmediateSucc(Vertex const* vex, Vertex const* newsucc,
-                                       Vertex const* oldsucc)
+static void reviseIDomAndIPdom(
+    DGraph & g, Vertex const* marker, Vertex const* newsucc,
+    Vertex const* oldsucc)
 {
-    ASSERT0(vex && newsucc && oldsucc);
+    if (g.get_ipdom(marker->id()) != VERTEX_UNDEF) {
+        //ipdom is meanlingless if there is no exit in graph.
+        g.set_ipdom(newsucc->id(), oldsucc->id());
+        if (g.get_ipdom(marker->id()) == oldsucc->id()) {
+            g.set_ipdom(marker->id(), newsucc->id());
+        }
+    }
+    //There is no need to consider the IDom of 'marker'.
+    //idom is meanlingless if there is no entry in graph.
+    g.set_idom(newsucc->id(), marker->id());
+    if (g.get_idom(oldsucc->id()) == marker->id()) {
+        g.set_idom(oldsucc->id(), newsucc->id());
+    }
+}
+
+
+void DGraph::try_union_dom_set(VexIdx vex, VexIdx newdomvex)
+{
+    ASSERT0(vex != VERTEX_UNDEF);
+    ASSERT0(newdomvex != VERTEX_UNDEF);
+    gen_dom_set(vex)->bunion(newdomvex);
+}
+
+
+void DGraph::try_union_dom_set(VexIdx vex, BitSet const* newset)
+{
+    if (newset == nullptr) { return; }
+    gen_dom_set(vex)->bunion(*newset);
+}
+
+
+void DGraph::try_union_pdom_set(VexIdx vex, VexIdx newpdomvex)
+{
+    ASSERT0(vex != VERTEX_UNDEF);
+    ASSERT0(newpdomvex != VERTEX_UNDEF);
+    gen_pdom_set(vex)->bunion(newpdomvex);
+}
+
+
+void DGraph::try_union_pdom_set(VexIdx vex, BitSet const* newset)
+{
+    ASSERT0(vex != VERTEX_UNDEF);
+    if (newset == nullptr) { return; }
+    gen_pdom_set(vex)->bunion(*newset);
+}
+
+
+static void reviseDomAndPdomSet(
+    DGraph & g, Vertex const* marker, Vertex const* newsucc,
+    Vertex const* oldsucc, bool marker_is_idom_of_oldsucc)
+{
+    //Copy Dom Set from marker to newsucc.
+    g.try_union_dom_set(newsucc->id(), g.get_dom_set(marker->id()));
+    g.try_union_dom_set(newsucc->id(), marker->id());
+
+    //Set PDom Set of marker.
+    g.try_union_pdom_set(marker->id(), newsucc->id());
+
+    //Copy PDom Set from oldsucc to newsucc.
+    g.try_union_pdom_set(newsucc->id(), g.get_pdom_set(oldsucc->id()));
+    g.try_union_pdom_set(newsucc->id(), oldsucc->id());
+    if (marker_is_idom_of_oldsucc) {
+        //Maintain domset, pdomset of each vertex that are in the domset
+        //and pdomset of 'marker'.
+        addVexToDomAndPdomSet(&g, oldsucc, newsucc->id(), true);
+    }
+}
+
+
+void DGraph::addDomInfoToImmediateSucc(
+    Vertex const* marker, Vertex const* newsucc, Vertex const* oldsucc)
+{
+    ASSERT0(marker && newsucc && oldsucc);
     ASSERTN(get_idom(newsucc->id()) == VERTEX_UNDEF &&
             get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERTN(get_dom_set(newsucc->id()) == nullptr &&
+            get_pdom_set(newsucc->id()) == nullptr, ("not new vertex"));
     ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
+    ASSERT0(is_unique_succ(marker, newsucc));
 
     //CONFIRMED: No need to care about the in-degree of oldsucc, because once
-    //user guaranteed vex is idom of oldsucc, there is only one CASE to handle.
+    //user guaranteed marker is idom of oldsucc, there is only one CASE to
+    //handle.
     //TBD:Do we have to restrict the in-degree of oldsucc? User has guaranteed
-    //that vex is the idom of oldsucc, and there is only ONE path from vex to
-    //oldsucc.
+    //that marker is the idom of oldsucc, and there is only ONE path from
+    //marker to oldsucc.
     //e.g:licm.gr, LICM insert BB11 between BB10->BB2, BB11 is the fallthrough
     //BB of BB10, and BB2 has more than one predecessors. The case is legal.
     //ASSERT0(oldsucc->getInDegree() == 1);
 
-    if (get_ipdom(vex->id()) != VERTEX_UNDEF) {
-        //ipdom is meanlingless if there is no exit in graph.
-        set_ipdom(newsucc->id(), oldsucc->id());
-        if (get_ipdom(vex->id()) == oldsucc->id()) {
-            set_ipdom(vex->id(), newsucc->id());
-        }
-    }
-    if (get_idom(vex->id()) != VERTEX_UNDEF) {
-        //idom is meanlingless if there is no entry in graph.
-        set_idom(newsucc->id(), vex->id());
-        ASSERT0(get_idom(oldsucc->id()) == vex->id());
-        set_idom(oldsucc->id(), newsucc->id());
-    }
-    if (get_dom_set(newsucc->id()) == nullptr) {
-        //Copy Dom info from vex to newsucc.
-        DomSet const* ds = get_dom_set(vex->id());
-        ASSERT0(ds);
-        if (ds != nullptr) {
-            gen_dom_set(newsucc->id())->bunion(*ds);
-        }
-        gen_dom_set(newsucc->id())->bunion(vex->id());
-
-        //Copy PDom info from oldsucc to newsucc.
-        DomSet const* ds2 = get_pdom_set(oldsucc->id());
-        if (ds2 != nullptr) {
-            gen_pdom_set(newsucc->id())->bunion(*ds2);
-        }
-        gen_pdom_set(newsucc->id())->bunion(oldsucc->id());
-    }
-    //Set domset, pdomset.
-    addVexToDomAndPdomSet(this, oldsucc, newsucc->id(), true);
+    bool marker_is_idom_of_oldsucc = is_idom(marker->id(), oldsucc->id());
+    reviseIDomAndIPdom(*this, marker, newsucc, oldsucc);
+    reviseDomAndPdomSet(*this, marker, newsucc, oldsucc,
+                        marker_is_idom_of_oldsucc);
 }
 
 
-void DGraph::addDomToNewSingleInOutBB(Vertex const* vex,
-    Vertex const* newsucc, Vertex const* oldsucc)
+void DGraph::addDomToNewSingleInOutBB(
+    Vertex const* marker, Vertex const* newsucc, Vertex const* oldsucc)
 {
-    ASSERT0(vex && newsucc && oldsucc);
+    ASSERT0(marker && newsucc && oldsucc);
     ASSERTN(get_idom(newsucc->id()) == VERTEX_UNDEF &&
             get_ipdom(newsucc->id()) == VERTEX_UNDEF, ("not new vertex"));
     ASSERT0(newsucc->getInDegree() == 1 && newsucc->getOutDegree() == 1);
 
     //Set idom info.
-    set_idom(newsucc->id(), vex->id());
+    set_idom(newsucc->id(), marker->id());
     if (oldsucc->getInDegree() == 1 &&
-        get_idom(oldsucc->id()) == vex->id()) {
+        get_idom(oldsucc->id()) == marker->id()) {
         set_idom(oldsucc->id(), newsucc->id());
     }
 
     if (get_dom_set(newsucc->id()) == nullptr) {
-        //Copy Dom info from vex to newsucc.
-        DomSet const* ds = get_dom_set(vex->id());
+        //Copy Dom info from marker to newsucc.
+        DomSet const* ds = get_dom_set(marker->id());
         ASSERT0(ds);
         if (ds != nullptr) {
             gen_dom_set(newsucc->id())->bunion(*ds);
         }
-        gen_dom_set(newsucc->id())->bunion(vex->id());
+        gen_dom_set(newsucc->id())->bunion(marker->id());
     }
 
     //Update the Dom info of oldsucc.
@@ -3126,126 +3210,126 @@ void DGraph::addDomToNewSingleInOutBB(Vertex const* vex,
 
 
 //The function adds Dom, Pdom, IDom, IPDom information for newipdom, whereas
-//update the related info for 'vex'.
-//vex: a marker vertex.
-//newipdom: the vertex that must be ipdom of 'vex'.
-void DGraph::addDomInfoToNewIPDom(Vertex const* vex, Vertex const* newipdom)
+//update the related info for 'marker'.
+//marker: a marker vertex.
+//newipdom: the vertex that must be ipdom of 'marker'.
+void DGraph::addDomInfoToNewIPDom(Vertex const* marker, Vertex const* newipdom)
 {
     ASSERTN(get_idom(newipdom->id()) == VERTEX_UNDEF &&
             get_ipdom(newipdom->id()) == VERTEX_UNDEF, ("not new vertex"));
-    VexIdx vexid = vex->id();
+    VexIdx markerid = marker->id();
     VexIdx newipdomid = newipdom->id();
-    VexIdx ipdom = get_ipdom(vexid);
-    set_ipdom(vexid, newipdomid);
+    VexIdx ipdom = get_ipdom(markerid);
+    set_ipdom(markerid, newipdomid);
     if (ipdom != VERTEX_UNDEF) {
         set_ipdom(newipdomid, ipdom);
         VexIdx idomipdom = get_idom(ipdom);
-        if (idomipdom == vexid) {
+        if (idomipdom == markerid) {
             set_idom(ipdom, newipdomid);
-            set_idom(newipdomid, vexid);
+            set_idom(newipdomid, markerid);
         }
     }
-    if (get_idom(vexid) != VERTEX_UNDEF) {
+    if (get_idom(markerid) != VERTEX_UNDEF) {
         //idom is meanlingless if there is no entry in graph.
-        set_idom(newipdomid, vexid);
+        set_idom(newipdomid, markerid);
     }
     if (get_dom_set(newipdomid) == nullptr) {
-        //Copy Dom, PDom info from vex to newidom.
-        DomSet const* ds = get_dom_set(vexid);
+        //Copy Dom, PDom info from marker to newidom.
+        DomSet const* ds = get_dom_set(markerid);
         ASSERT0(ds);
         gen_dom_set(newipdomid)->bunion(*ds);
-        DomSet const* pds = get_pdom_set(vexid);
+        DomSet const* pds = get_pdom_set(markerid);
         if (pds != nullptr && !pds->is_empty()) {
             gen_pdom_set(newipdomid)->bunion(*pds);
         }
     }
     //Set domset, pdomset.
-    addVexToDomAndPdomSet(this, vex, newipdomid, false);
-    gen_pdom_set(vexid)->bunion(newipdomid);
-    gen_dom_set(newipdomid)->bunion(vexid);
+    addVexToDomAndPdomSet(this, marker, newipdomid, false);
+    gen_pdom_set(markerid)->bunion(newipdomid);
+    gen_dom_set(newipdomid)->bunion(markerid);
 }
 
 
-void DGraph::addDomInfoToNewIDom(Vertex const* vex, Vertex const* newidom,
+void DGraph::addDomInfoToNewIDom(Vertex const* marker, Vertex const* newidom,
                                  bool & add_pdom_failed)
 {
     ASSERTN(get_idom(newidom->id()) == VERTEX_UNDEF &&
             get_ipdom(newidom->id()) == VERTEX_UNDEF, ("not new vertex"));
     add_pdom_failed = false;
-    VexIdx vexid = vex->id();
+    VexIdx markerid = marker->id();
     VexIdx newidomid = newidom->id();
-    VexIdx idom = get_idom(vexid);
-    set_idom(vexid, newidomid);
+    VexIdx idom = get_idom(markerid);
+    set_idom(markerid, newidomid);
     if (idom != VERTEX_UNDEF) {
         set_idom(newidomid, idom);
         VexIdx ipdomidom = get_ipdom(idom);
-        if (ipdomidom == vexid) {
+        if (ipdomidom == markerid) {
             set_ipdom(idom, newidomid);
-            set_ipdom(newidomid, vexid);
+            set_ipdom(newidomid, markerid);
         }
     }
     bool try_failed = false;
-    if (get_ipdom(vexid) != VERTEX_UNDEF ||
-        isReachExit(vex, 200, try_failed)) {
+    if (get_ipdom(markerid) != VERTEX_UNDEF ||
+        isReachExit(marker, 200, try_failed)) {
         //There is no ipdom is meanlingless if there is no exit
         //vertex in graph.
-        set_ipdom(newidomid, vexid);
+        set_ipdom(newidomid, markerid);
     }
     if (try_failed) {
         add_pdom_failed = true;
     }
     if (get_dom_set(newidomid) == nullptr) {
-        //Copy Dom, PDom info from vex to newidom.
-        DomSet const* ds = get_dom_set(vexid);
+        //Copy Dom, PDom info from marker to newidom.
+        DomSet const* ds = get_dom_set(markerid);
         ASSERT0(ds);
         gen_dom_set(newidomid)->bunion(*ds);
-        DomSet const* pds = get_pdom_set(vexid);
+        DomSet const* pds = get_pdom_set(markerid);
         if (pds != nullptr && !pds->is_empty()) {
             gen_pdom_set(newidomid)->bunion(*pds);
         }
     }
     //Set domset, pdomset.
-    addVexToDomAndPdomSet(this, vex, newidomid, true);
-    gen_dom_set(vexid)->bunion(newidomid);
-    gen_pdom_set(newidomid)->bunion(vexid);
+    addVexToDomAndPdomSet(this, marker, newidomid, true);
+    gen_dom_set(markerid)->bunion(newidomid);
+    gen_pdom_set(newidomid)->bunion(markerid);
 }
 
 
-void DGraph::removeDomInfo(Vertex const* vex, bool iter_pred_succ,
+void DGraph::removeDomInfo(Vertex const* marker, bool iter_pred_succ,
                            OUT UINT & iter_time)
 {
     iter_time = 0;
-    ASSERT0(vex && vex->id() != VERTEX_UNDEF);
-    VexIdx vexid = vex->id();
-    freeDomSet(vexid);
-    freePdomSet(vexid);
-    VexIdx vexidom = get_idom(vexid);
-    VexIdx vexipdom = get_ipdom(vexid);
-    set_idom(vexid, VERTEX_UNDEF);
-    set_ipdom(vexid, VERTEX_UNDEF);
+    ASSERT0(marker && marker->id() != VERTEX_UNDEF);
+    VexIdx markerid = marker->id();
+    freeDomSet(markerid);
+    freePdomSet(markerid);
+    VexIdx markeridom = get_idom(markerid);
+    VexIdx vexipdom = get_ipdom(markerid);
+    set_idom(markerid, VERTEX_UNDEF);
+    set_ipdom(markerid, VERTEX_UNDEF);
     if (!iter_pred_succ) { return; }
-    GraphIterIn iterin(*this, vex);
+    GraphIterIn iterin(*this, marker);
     for (Vertex const* t = iterin.get_first();
          t != nullptr; t = iterin.get_next(t)) {
-        gen_dom_set(t->id())->diff(vexid);
-        gen_pdom_set(t->id())->diff(vexid);
-        if (get_idom(t->id()) == vexid) {
-            set_idom(t->id(), vexidom);
+        gen_dom_set(t->id())->diff(markerid);
+        gen_pdom_set(t->id())->diff(markerid);
+        if (get_idom(t->id()) == markerid) {
+            set_idom(t->id(), markeridom);
         }
-        if (get_ipdom(t->id()) == vexid) {
+        if (get_ipdom(t->id()) == markerid) {
             set_ipdom(t->id(), vexipdom);
         }
         iter_time++;
     }
-    GraphIterOut iterout(*this, vex);
+    GraphIterOut iterout(*this, marker);
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
-        gen_dom_set(t->id())->diff(vexid);
-        gen_pdom_set(t->id())->diff(vexid);
-        if (get_idom(t->id()) == vexid) {
-            set_idom(t->id(), vexidom);
+        gen_dom_set(t->id())->diff(markerid);
+        gen_pdom_set(t->id())->diff(markerid);
+        if (get_idom(t->id()) == markerid) {
+            set_idom(t->id(), markeridom);
         }
-        if (get_ipdom(t->id()) == vexid) {
+        if (get_ipdom(t->id()) == markerid) {
             set_ipdom(t->id(), vexipdom);
         }
         iter_time++;
@@ -3404,5 +3488,138 @@ Edge * GraphIterOutEdge::get_next(Edge const* e)
     return m_wl.remove_head();
 }
 //END GraphIterOutEdge
+
+
+//
+//START MST
+//
+void MSTPath::dump(FILE * h, MST const& mst) const
+{
+    ASSERT0(h);
+    MSTPathIter it;
+    bool first = true;
+    fprintf(h, "\n");
+    for (Edge const* e = get_head(&it); e != nullptr; e = get_next(&it)) {
+        if (!first) { fprintf(h, ","); }
+        first = false;
+        fprintf(h, "%u->%u(%u)",
+                e->from()->id(), e->to()->id(), mst.getWeight(e));
+    }
+    fflush(h);
+}
+
+
+void MSTPath::dumpDOT(MST const& mst, CHAR const* name) const
+{
+    Graph g;
+    g.set_direction(false);
+    MSTPathIter it;
+    for (Edge const* e = get_head(&it); e != nullptr; e = get_next(&it)) {
+        Edge * newe = g.addEdge(e->from()->id(), e->to()->id());
+        EDGE_info(newe) = (EdgeInfoType)(ULONGLONG)mst.getWeight(e);
+    }
+    g.dumpDOT(name);
+}
+
+
+Edge const* MST::findMinWeightEdge(
+    Vertex const* v, TTab<Vertex const*> const& visited,
+    OUT MSTWeightType & minw, OUT Vertex const** newvex)
+{
+    ASSERT0(v);
+    MSTWeightType curw = getMaxWeight();
+    Edge const* min = nullptr;
+    AdjEdgeIter it;
+    for (Edge const* out = Graph::get_first_out_edge(v, it);
+         out != nullptr; out = Graph::get_next_out_edge(it)) {
+        Vertex const* succ = out->to();
+        if (visited.find(succ)) { continue; }
+        MSTWeightType outew = getWeight(out);
+        ASSERT0(outew != MST_WEIGHT_UNDEF);
+        if (LessOrEqualThan(curw, outew)) { continue; }
+        curw = outew;
+        minw = outew;
+        min = out;
+        *newvex = succ;
+    }
+    for (Edge const* in = Graph::get_first_in_edge(v, it);
+         in != nullptr; in = Graph::get_next_in_edge(it)) {
+        Vertex const* pred = in->from();
+        if (visited.find(pred)) { continue; }
+        MSTWeightType inw = getWeight(in);
+        ASSERT0(inw != MST_WEIGHT_UNDEF);
+        if (LessOrEqualThan(curw, inw)) { continue; }
+        curw = inw;
+        minw = inw;
+        min = in;
+        *newvex = pred;
+    }
+    return min;
+}
+
+
+Edge const* MST::findMinWeightEdgeForVisited(
+    MOD List<Vertex const*> & wl, TTab<Vertex const*> const& visited,
+    OUT MSTWeightType & minw, OUT Vertex const** newvex)
+{
+    Edge const* cur_mine = nullptr;
+    MSTWeightType cur_minw = getMaxWeight();
+    List<Vertex const*>::Iter it;
+    List<Vertex const*>::Iter nextit;
+    for (wl.get_head(&it); it != nullptr; it = nextit) {
+        nextit = wl.get_next(it);
+        Vertex const* visited_vex = it->val();
+        MSTWeightType lminw;
+        Vertex const* lnewvex = nullptr;
+        Edge const* lmine = findMinWeightEdge(
+            visited_vex, visited, lminw, &lnewvex);
+        if (lmine == nullptr) {
+            //Meet exit vertex or all predecessors and successors
+            //have been visited.
+            wl.remove(it);
+            continue;
+        }
+        if (LessOrEqualThan(cur_minw, lminw)) { continue; }
+        cur_mine = lmine;
+        cur_minw = lminw;
+        ASSERT0(lnewvex);
+        *newvex = lnewvex;
+    }
+    minw = cur_minw;
+    return cur_mine;
+}
+
+
+MSTWeightType MST::build(Vertex const* root, OUT MSTPath & path)
+{
+    if (root == nullptr) { return MST_WEIGHT_UNDEF; }
+    TTab<Vertex const*> visited;
+    List<Vertex const*> wl;
+    visited.append(root);
+    wl.append_tail(root);
+    path.clean();
+    MSTWeightType tot_minw = MST_WEIGHT_UNDEF;
+    for (;;) {
+        MSTWeightType minw;
+        Vertex const* newvex = nullptr;
+        Edge const* mine = findMinWeightEdgeForVisited(
+            wl, visited, minw, &newvex);
+        if (mine == nullptr) {
+            //Meet the exit of graph.
+            break;
+        }
+        ASSERT0(newvex);
+        ASSERT0(newvex == mine->from() || newvex == mine->to());
+        ASSERT0(!visited.find(newvex));
+        ASSERT0(!wl.find(newvex));
+        wl.append_tail(newvex);
+        visited.append(newvex);
+        path.append_tail(mine);
+        tot_minw += minw;
+    }
+    ASSERT0(tot_minw != MST_WEIGHT_UNDEF);
+    return tot_minw;
+}
+//END MST
 
 } //namespace xcom

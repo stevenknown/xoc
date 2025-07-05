@@ -36,7 +36,38 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class SimpCtx;
+class IVR;
+class GVN;
+
+class PassCtx {
+    //THE CLASS ALLOWS PARTIAL COPY-CONSTRUCTOR.
+protected:
+    OptCtx * m_oc;
+    IVR * m_ivr;
+    GVN * m_gvn;
+    ActMgr * m_am;
+    Region * m_rg;
+public:
+    PassCtx(OptCtx * oc, ActMgr * am = nullptr);
+    PassCtx(PassCtx const& src) { copy(src); }
+
+    void copy(PassCtx const& src);
+
+    OptCtx * getOptCtx() const { return m_oc; }
+    Region * getRegion() const { return m_rg; }
+    ActMgr * getActMgr() const { return m_am; }
+
+    //The function try to judge if given 'ir' may reference IV, GVN etc.
+    //If it is true, the function will invalidate related passes to avoid
+    //inconsistent access of these informations.
+    void tryInvalidInfoBeforeFreeIR(IR const* ir) const;
+    void tryInvalidInfoBeforeFreeIRList(IR const* ir) const;
+    void tryInvalidPassInfoBeforeFreeIR(IR const* ir) const;
+
+    PassCtx const& operator = (PassCtx const& src)
+    { copy(src); return *this; }
+};
+
 
 //Basis Class of pass.
 class Pass {

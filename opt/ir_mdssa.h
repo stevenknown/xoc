@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 class ActMgr;
+class MDSSAUpdateCtx;
 
 typedef xcom::TMap<UINT, VMD*> MD2VMD;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
@@ -345,22 +346,22 @@ public:
 };
 
 
-typedef VOpndSetIter LiveSetIter;
-class LiveSet : public VOpndSet {
-    COPY_CONSTRUCTOR(LiveSet);
+typedef VOpndSetIter VMDLiveSetIter;
+class VMDLiveSet : public VOpndSet {
+    COPY_CONSTRUCTOR(VMDLiveSet);
     xcom::DefMiscBitSetMgr * m_sbsmgr;
 public:
-    LiveSet(VMD const* vmd, xcom::DefMiscBitSetMgr * sbsmgr)
+    VMDLiveSet(VMD const* vmd, xcom::DefMiscBitSetMgr * sbsmgr)
     {
         bunion(vmd->id(), *sbsmgr);
         m_sbsmgr = sbsmgr;
     }
-    LiveSet(VOpndSet const& set, xcom::DefMiscBitSetMgr * sbsmgr)
+    VMDLiveSet(VOpndSet const& set, xcom::DefMiscBitSetMgr * sbsmgr)
     {
         VOpndSet::copy(set, *sbsmgr);
         m_sbsmgr = sbsmgr;
     }
-    ~LiveSet()
+    ~VMDLiveSet()
     {
         //Should call clean() before destruction,
         //otherwise it will incur SegMgr assertion.
@@ -369,7 +370,7 @@ public:
 
     bool all_killed() const { return is_empty(); }
 
-    void copy(LiveSet const& src)
+    void copy(VMDLiveSet const& src)
     { VOpndSet::copy((VOpndSet const&)src, *m_sbsmgr); }
     void copy(VOpndSet const& vopndset) { VOpndSet::copy(vopndset, *m_sbsmgr); }
     void clean() { VOpndSet::clean(*m_sbsmgr); }
@@ -382,16 +383,16 @@ public:
 };
 
 
-typedef xcom::TMapIter<UINT, LiveSet*> BBID2LiveSetIter;
-class BBID2LiveSet : public xcom::TMap<UINT, LiveSet*> {
-    COPY_CONSTRUCTOR(BBID2LiveSet);
+typedef xcom::TMapIter<UINT, VMDLiveSet*> BBID2VMDLiveSetIter;
+class BBID2VMDLiveSet : public xcom::TMap<UINT, VMDLiveSet*> {
+    COPY_CONSTRUCTOR(BBID2VMDLiveSet);
     xcom::DefMiscBitSetMgr m_sbsmgr;
 public:
-    BBID2LiveSet() {}
-    ~BBID2LiveSet()
+    BBID2VMDLiveSet() {}
+    ~BBID2VMDLiveSet()
     {
-        BBID2LiveSetIter it;
-        LiveSet * set;
+        BBID2VMDLiveSetIter it;
+        VMDLiveSet * set;
         for (get_first(it, &set); set != nullptr; get_next(it, &set)) {
             delete set;
         }
@@ -400,26 +401,26 @@ public:
 
     void free(UINT bbid)
     {
-        LiveSet * set = remove(bbid);
+        VMDLiveSet * set = remove(bbid);
         if (set != nullptr) { delete set; }
     }
 
-    LiveSet * genAndCopy(UINT bbid, LiveSet const& src)
+    VMDLiveSet * genAndCopy(UINT bbid, VMDLiveSet const& src)
     { return genAndCopy(bbid, (VOpndSet const&)src); }
-    LiveSet * genAndCopy(UINT bbid, VOpndSet const& src)
+    VMDLiveSet * genAndCopy(UINT bbid, VOpndSet const& src)
     {
-        LiveSet * liveset = get(bbid);
+        VMDLiveSet * liveset = get(bbid);
         if (liveset == nullptr) {
-            liveset = new LiveSet(src, &m_sbsmgr);
+            liveset = new VMDLiveSet(src, &m_sbsmgr);
             set(bbid, liveset);
         } else {
             liveset->copy(src);
         }
         return liveset;
     }
-    LiveSet * genAndCopy(UINT bbid, VMD const* vmd)
+    VMDLiveSet * genAndCopy(UINT bbid, VMD const* vmd)
     {
-        LiveSet * liveset = new LiveSet(vmd, &m_sbsmgr);
+        VMDLiveSet * liveset = new VMDLiveSet(vmd, &m_sbsmgr);
         ASSERT0(get(bbid) == nullptr);
         set(bbid, liveset);
         return liveset;
@@ -469,15 +470,15 @@ class RenameDef {
     COPY_CONSTRUCTOR(RenameDef);
     bool m_is_build_ddchain; //Set to true to build DefDef chain by DomTree.
     DomTree const& m_domtree;
-    LiveSet * m_liveset;
+    VMDLiveSet * m_liveset;
     MDSSAMgr * m_mgr;
     UseDefMgr * m_udmgr;
     IRCFG * m_cfg;
     Region * m_rg;
     ActMgr * m_am;
-    BBID2LiveSet m_bbid2liveset;
+    BBID2VMDLiveSet m_bbid2liveset;
 private:
-    void connect(Vertex const* defvex, LiveSet * defliveset,
+    void connect(Vertex const* defvex, VMDLiveSet * defliveset,
                  IRBB const* start_bb, IR const* start_ir);
 
     //stmtbbid: indicates the BB of inserted stmt
@@ -486,13 +487,14 @@ private:
     //dompred: indicates the predecessor of 'bb' in DomTree
     //Note stmtbbid have to dominate 'bb'.
     void connectDefInBBTillPrevDef(
-        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+        IRBB const* bb, BBIRListIter & irlistit, MOD VMDLiveSet & liveset);
     void connectIRTillPrevDef(
-        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+        IRBB const* bb, BBIRListIter & irlistit, MOD VMDLiveSet & liveset);
     void connectPhiTillPrevDef(
-        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+        IRBB const* bb, BBIRListIter & irlistit, MOD VMDLiveSet & liveset);
     void connectDefInterBBTillPrevDef(
-        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb);
+        Vertex const* defvex, MOD VMDLiveSet & stmtliveset,
+        IRBB const* start_bb);
 
     void dumpRenameBB(IRBB const* bb);
     void dumpRenameVMD(IR const* ir, VMD const* vmd);
@@ -500,17 +502,17 @@ private:
     void dumpInsertDDChain(MDPhi const* phi, VMD const* vmd);
     void dumpRenamePhi(MDPhi const* phi, UINT opnd_pos);
 
-    BBID2LiveSet & getBBID2LiveSet() { return m_bbid2liveset; }
+    BBID2VMDLiveSet & getBBID2VMDLiveSet() { return m_bbid2liveset; }
 
-    void iterBBPhiListToKillLivedVMD(IRBB const* bb, LiveSet & liveset);
+    void iterBBPhiListToKillLivedVMD(IRBB const* bb, VMDLiveSet & liveset);
     void iterSuccBBPhiListToRename(
         Vertex const* defvex, IRBB const* succ,
-        UINT opnd_idx, MOD LiveSet & liveset);
+        UINT opnd_idx, MOD VMDLiveSet & liveset);
 
     //defvex: domtree vertex.
-    void iterSuccBB(Vertex const* defvev, MOD LiveSet & liveset);
+    void iterSuccBB(Vertex const* defvev, MOD VMDLiveSet & liveset);
 
-    void killLivedVMD(MDPhi const* phi, MOD LiveSet & liveset);
+    void killLivedVMD(MDPhi const* phi, MOD VMDLiveSet & liveset);
 
     void processStmt(MOD IR * newstmt);
     void processPhi(MDPhi const* newphi);
@@ -520,7 +522,7 @@ private:
     //stmtbb: the BB of inserted stmt
     //newinfo: MDSSAInfo that intent to be swap-in.
     bool renameVMDForDesignatedPhiOpnd(
-        MDPhi * phi, UINT opnd_pos, LiveSet & liveset);
+        MDPhi * phi, UINT opnd_pos, VMDLiveSet & liveset);
 
     //vmd: intent to be swap-in.
     //irtree: may be stmt or exp.
@@ -531,9 +533,9 @@ private:
     //ir: may be stmt or exp
     //irit: for local used.
     void renameLivedVMDForIRTree(
-        IR * ir, MOD IRIter & irit, LiveSet const& liveset);
+        IR * ir, MOD IRIter & irit, VMDLiveSet const& liveset);
     void renameIRTillNextDef(
-        IRBB const* bb, BBIRListIter & irlistit, MOD LiveSet & liveset);
+        IRBB const* bb, BBIRListIter & irlistit, MOD VMDLiveSet & liveset);
 
     //stmtbbid: indicates the BB of inserted stmt
     //bb: the BB that to be renamed
@@ -541,29 +543,39 @@ private:
     //Note stmtbbid have to dominate 'bb'.
     void renameUseInBBTillNextDef(
         Vertex const* defvex, IRBB const* bb, bool include_philist,
-        BBIRListIter & irlistit, OUT LiveSet & liveset);
+        BBIRListIter & irlistit, OUT VMDLiveSet & liveset);
 
     //start_ir: if it is nullptr, the renaming will start at the first IR in bb.
     //          otherwise the renaming will start at the NEXT IR of start_ir.
     void renameFollowUseIntraBBTillNextDef(
-        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb,
-        IR const* start_ir);
+        Vertex const* defvex, MOD VMDLiveSet & stmtliveset,
+        IRBB const* start_bb, IR const* start_ir);
 
     //defvex: root vertex of domtree region that is being renamed.
     void renameFollowUseInterBBTillNextDef(
-        Vertex const* defvex, MOD LiveSet & stmtliveset, IRBB const* start_bb);
-    void rename(Vertex const* defvex, LiveSet * defliveset,
+        Vertex const* defvex, MOD VMDLiveSet & stmtliveset,
+        IRBB const* start_bb);
+    void rename(Vertex const* defvex, VMDLiveSet * defliveset,
                 IRBB const* start_bb, IR const* start_ir);
 
+    //Insert vmd after phi.
+    //Return true if inserted PHI into DD chain.
     bool tryInsertDDChainForDesigatedVMD(
-        MDPhi * phi, VMD * vmd, MOD LiveSet & liveset);
+        MDPhi * phi, VMD * vmd, MOD VMDLiveSet & liveset);
 
+    //Insert vmd after 'ir'.
     //vmd: new generated VMD that to be inserted.
     //before: true to insert 'vmd' in front of 'ir'.
+    //Return true if inserted PHI into DD chain.
     bool tryInsertDDChainForDesigatedVMD(
-        IR * ir, VMD * vmd, bool before, MOD LiveSet & liveset);
-    bool tryInsertDDChainForStmt(IR * ir, bool before, MOD LiveSet & liveset);
-    bool tryInsertDDChainForPhi(MDPhi * phi, MOD LiveSet & liveset);
+        IR * ir, VMD * vmd, bool before, MOD VMDLiveSet & liveset);
+
+    //Return true if inserted 'ir' into DD chain.
+    bool tryInsertDDChainForStmt(
+        IR * ir, bool before, MOD VMDLiveSet & liveset);
+
+    //Return true if inserted PHI into DD chain.
+    bool tryInsertDDChainForPhi(MDPhi * phi, MOD VMDLiveSet & liveset);
 public:
     RenameDef(DomTree const& dt, bool build_ddchain, MDSSAMgr * mgr,
               ActMgr * am);
@@ -624,6 +636,71 @@ public:
 //END RecomputeDefDefAndDefUseChain
 
 
+//
+//START FindAndSetLiveInDef
+//
+class FindAndSetLiveInDef {
+    COPY_CONSTRUCTOR(FindAndSetLiveInDef);
+protected:
+    MDSSAMgr * m_mgr;
+    OptCtx const& m_oc;
+public:
+    FindAndSetLiveInDef(MDSSAMgr * mgr, OptCtx const& oc) :
+        m_mgr(mgr), m_oc(oc) {}
+
+    void findAndSet(
+        MOD IR * exp, IRBB const* startbb, OUT MDSSAStatus & st,
+        MDSSAUpdateCtx const* ctx = nullptr)
+    {
+        findAndSet(exp, const_cast<IRBB*>(startbb)->getLastIR(),
+                   startbb, st, ctx);
+    }
+
+    //Note DOM info must be available.
+    //exp: the expression that expected to set live-in.
+    //startir: the start position in 'startbb', it can be NULL.
+    //         If it is NULL, the function first finding the Phi list of
+    //         'startbb', then keep finding its predecessors until meet the
+    //         CFG entry.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
+    void findAndSet(
+        MOD IR * exp, IR const* startir, IRBB const* startbb,
+        OUT MDSSAStatus & st, MDSSAUpdateCtx const* ctx = nullptr);
+
+    void findAndSetForTree(
+        IR * exp, IRBB const* startbb, OUT MDSSAStatus & st,
+        MDSSAUpdateCtx const* ctx = nullptr)
+    {
+        findAndSetForTree(exp, const_cast<IRBB*>(startbb)->getLastIR(),
+                          startbb, st, ctx);
+    }
+
+    //Note DOM info must be available.
+    //exp: the expression that expected to set live-in.
+    //startir: the start position in 'startbb', it can be NULL.
+    //         If it is NULL, the function first finding the Phi list of
+    //         'startbb', then keep finding its predecessors until meet the
+    //         CFG entry.
+    //startbb: the BB that begin to do searching. It can NOT be NULL.
+    void findAndSetForTree(
+        IR * exp, IR const* startir, IRBB const* startbb, OUT MDSSAStatus & st,
+        MDSSAUpdateCtx const* ctx = nullptr);
+
+    void findAndSet(
+        IR * exp, VMD const* prevdef_res, bool prevdef_is_phi,
+        IRBB const* prevdef_bb, IR const* prevdef_occ,
+        OUT MDSSAStatus & st, MDSSAUpdateCtx const* ctx);
+
+    void findAndSetForLst(
+        IRList const& lst, VMD const* prevdef_res, bool prevdef_is_phi,
+        IRBB const* prevdef_bb, IR const* prevdef_occ,
+        OUT MDSSAStatus & st, MDSSAUpdateCtx const* ctx);
+
+    OptCtx const& getOptCtx() const { return m_oc; }
+};
+//END FindAndSetLiveInDef
+
+
 class ReconstructMDSSAVF : public xcom::VisitTreeFuncBase {
     //Record the vertex on CFG that need to revise.
     xcom::VexTab const& m_vextab;
@@ -676,21 +753,49 @@ public:
 //The class records and propagates auxiliary information to maintain MDSSA
 //information during miscellaneous optimizations.
 #define MDSSAUPDATECTX_update_duchain(x) ((x)->m_update_duchain_by_dominfo)
-class MDSSAUpdateCtx {
+#define MDSSAUPDATECTX_removed_vopnd_list(x) ((x)->m_removed_vopnd_irlist)
+class MDSSAUpdateCtx : public PassCtx {
+    //THE CLASS ALLOWS COPY-CONSTRUCTION.
 public:
     //Pass info top-down.
     //True to ask MDSSAMgr to maintain MDSSA DU chain by DomInfo.
     bool m_update_duchain_by_dominfo;
-    OptCtx const& m_oc;
-public:
-    MDSSAUpdateCtx(OptCtx const& oc) : m_oc(oc)
-    { MDSSAUPDATECTX_update_duchain(this) = true; }
-    MDSSAUpdateCtx const& operator = (MDSSAUpdateCtx const&);
+    xcom::DomTree const* m_dom_tree;
 
-    OptCtx const& getOptCtx() const { return m_oc; }
+    //Pass info top-down.
+    //It is optional. If the member is not NULL, it will record IR stmt|exp
+    //that VOpnd has been removed out from its MDSSAInfo.
+    IRList * m_removed_vopnd_irlist;
+public:
+    MDSSAUpdateCtx(OptCtx & oc, ActMgr * am = nullptr);
+
+    void dump(Region const* rg) const;
+
+    IRList * getRemovedVOpndIRList() const { return m_removed_vopnd_irlist; }
+    xcom::DomTree const* getDomTree() const { return m_dom_tree; }
 
     bool need_update_duchain() const
     { return MDSSAUPDATECTX_update_duchain(this); }
+
+    MDSSAUpdateCtx const& operator = (MDSSAUpdateCtx const&);
+
+    void setRemovedVOpndIRList(IRList * lst)
+    { MDSSAUPDATECTX_removed_vopnd_list(this) = lst; }
+    void setDomTree(xcom::DomTree const* domtree) { m_dom_tree = domtree; }
+
+    //Try to record ir in an user given list if it is not NULL.
+    void tryRecordRemovedVOpndIR(IR * ir) const
+    {
+        ASSERT0(ir);
+        ASSERT0(ir->is_stmt() || ir->is_exp());
+        if (m_removed_vopnd_irlist != nullptr) {
+            //The list will ensure ir is unique in the list.
+            m_removed_vopnd_irlist->append_tail(ir);
+        }
+    }
+
+    //Unify the members info which propagated bottom up.
+    void unionBottomUpInfo(MDSSAUpdateCtx const& c) const {}
 };
 
 
@@ -711,6 +816,7 @@ public:
 class MDSSAMgr : public Pass {
     friend class MDPhi;
     friend class MDSSAConstructRenameVisitVF;
+    friend class LocalMDSSADump;
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     BYTE m_is_semi_pruned:1;
@@ -749,6 +855,8 @@ protected:
     void cleanIRSSAInfo(IRBB * bb);
     void cleanMDSSAInfoAI();
     void cutoffDefChain(MDDef * def);
+    bool canPhiReachRealMDDef(
+        MDSSAInfo const* mdssainfo, MDDef const* realdef) const;
 
     //The function destroy data structures that allocated during SSA
     //construction, and these data structures are only useful in construction.
@@ -765,9 +873,11 @@ protected:
     //traverse dominator tree.
     //Return true if inserting copy at the head of fallthrough BB
     //of current BB's predessor.
-    void destruction(DomTree & domtree);
-    void destructBBSSAInfo(IRBB * bb);
-    void destructionInDomTreeOrder(IRBB * root, DomTree & domtree);
+    void destruction(DomTree & domtree, MDSSAUpdateCtx const* ctx);
+    void destructBBSSAInfo(IRBB * bb, MDSSAUpdateCtx const* ctx);
+    void destructionInDomTreeOrder(
+        IRBB * root, DomTree & domtree, MDSSAUpdateCtx const* ctx);
+
     //The function dump all possible DEF of 'vopnd' by walking through the
     //Def Chain.
     void dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
@@ -780,14 +890,22 @@ protected:
     void dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const;
     void dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
+
+    //Return true if DEF of operands are the same one.
+    //CASE1: if all opnds have same defintion or defined by current phi,
+    //then phi is redundant.
+    //common_def: record the common_def if the definition of all opnd is
+    //            the same. NOTE: common_def is NULL if DEF of all operands
+    //            are the same livein-def.
+    //TODO: p=phi(m,p), if the only use of p is phi, then phi is redundant.
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
     //The function finds DEF for ID of Phi by walking through DomInfo.
     //id: input ID.
-    //ssainfo: MDSSAInfo of id.
     //olddef: old DEF of id.
     void findNewDefForID(
-        IR * id, MDSSAInfo * ssainfo, MDDef * olddef, OptCtx const& oc,
+        IR * id, VMD const* olddef_res, bool olddef_is_phi,
+        IRBB const* olddef_bb, IR const* olddef_occ, OptCtx const& oc,
         OUT MDSSAStatus & st);
 
     //Find live-in VMD through given start IR at start BB.
@@ -800,10 +918,10 @@ protected:
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
     VMD * findLiveInDefFrom(
-        MDIdx mdid, IRBB const* bb, IR const* startir, IRBB const* startbb,
-        VMDVec const* vmdvec) const;
-    void freeBBPhiList(IRBB * bb);
-    void freePhiList();
+        MDIdx mdid, IRBB const* bb, IR const* startir,
+        IRBB const* startbb) const;
+    void freeBBPhiList(IRBB * bb, MDSSAUpdateCtx const* ctx);
+    void freePhiList(MDSSAUpdateCtx const* ctx);
 
     VMD * genVMD(UINT mdid, UINT version)
     { return getUseDefMgr()->allocVMD(mdid, version); }
@@ -939,7 +1057,7 @@ public:
         //CAUTION: If you do not finish out-of-SSA prior to destory(),
         //the reference to IR's MDSSA info will lead to undefined behaviors.
         //ASSERTN(!is_valid(), ("should be destructed"));
-        destroy();
+        destroy(nullptr);
     }
 
     //Add occurence to each vopnd in mdssainfo.
@@ -954,7 +1072,10 @@ public:
     //of the new operand MD of PHI.
     void addSuccessorDesignatedPhiOpnd(
         IRBB * bb, IRBB * succ, OptCtx const& oc, OUT MDSSAStatus & st);
-    void addStmtToMDSSAMgr(IR * ir, IR const* ref);
+
+    //Add stmt 'ir' into MDSSAMgr.
+    //The function will change DD chain that indicated by 'marker'.
+    void addStmtToMDSSAMgr(IR * ir, MDSSAUpdateCtx const& ctx);
 
     //Build DU chain from 'def' to 'exp'.
     //The function will add VOpnd of 'def' to 'exp'.
@@ -963,6 +1084,10 @@ public:
     //Build DU chain from 'def' to each IR in set.
     //The function will add VOpnd of 'def' to 'exp'.
     void buildDUChain(MDDef const* def, IRSet const& set);
+
+    //Build DU chain from 'def' to each IR in lst.
+    //The function will add VOpnd of 'def' to 'exp'.
+    void buildDUChain(MDDef const* def, IRList const& lst);
 
     //Construction of MDSSA form.
     //Note: Non-SSA DU Chains will be maintained after construction.
@@ -1067,7 +1192,7 @@ public:
     bool constructDesignatedRegion(MOD SSARegion & ssarg);
 
     //Destroy all objects in MDSSAMgr.
-    void destroy();
+    void destroy(MDSSAUpdateCtx const* ctx);
 
     //Destruction of MDSSA.
     void destruction(OptCtx & oc);
@@ -1095,6 +1220,12 @@ public:
     //flag: the flag to dump IR.
     void dumpIRWithMDSSA(IR const* ir, DumpFlag flag = IR_DUMP_COMBINE) const;
 
+    //Dump IR tree and MDSSAInfo if any.
+    //NOTE: the function will dump IR with the setting on 'ctx'.
+    //ir: can be stmt or expression.
+    //ctx: the IR dump context that guide how to dump IR.
+    void dumpIRWithMDSSA(IR const* ir, MOD IRDumpCtx<> * ctx) const;
+
     //Duplicate Phi operand that is at the given position, and insert after
     //given position sequently.
     //pos: given position
@@ -1105,6 +1236,10 @@ public:
 
     //Find killing must-def IR stmt for expression ir.
     //Return the IR stmt if found.
+    //aggressive: true to apply a costly and aggressive method to look up
+    //    killing-def. Note the aggressive method will traverse VMD via DefDef
+    //    chain if the cover-def is PHI or nearest def is indepdent to 'ir'
+    //    actually.
     //e.g: g is global variable, it is exact.
     //x is a pointer that we do not know where it pointed to.
     //    1. *x += 1; # *x may overlapped with g
@@ -1113,7 +1248,7 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
-    IR * findKillingDefStmt(IR const* ir) const;
+    IR * findKillingDefStmt(IR const* ir, bool aggressive) const;
 
     //Find killing must-def virtual DEF of ir.
     //Return the MDDef if found.
@@ -1129,7 +1264,9 @@ public:
 
     //Find the nearest virtual DEF of 'ir'.
     //ir: expression.
-    MDDef * findNearestDef(IR const* ir) const;
+    //skip_independent_def: true to ask the function to only look for
+    //                      the may-dependent MDDef.
+    MDDef * findNearestDef(IR const* ir, bool skip_independent_def) const;
 
     //Find the MustDef of 'ir'.
     MDDef * findMustMDDef(IR const* ir) const;
@@ -1144,14 +1281,15 @@ public:
     //Find the unique DEF of 'exp' that is inside given loop.
     //set: it is optional, if it is not NULL, the function will record all DEF
     //     found into the set as a return result.
-    IR * findUniqueDefInLoopForMustRef(IR const* exp, LI<IRBB> const* li,
-                                       Region const* rg, OUT IRSet * set) const;
+    IR * findUniqueDefInLoopForMustRef(
+        IR const* exp, LI<IRBB> const* li, Region const* rg,
+        OUT IRSet * set) const;
 
     //The function try to find the unique MDDef for given def that is outside
     //of the loop.
     //Return the MDDef if found, otherwise nullptr.
-    MDDef const* findUniqueOutsideLoopDef(MDDef const* phi,
-                                          LI<IRBB> const* li) const;
+    MDDef const* findUniqueOutsideLoopDef(
+        MDDef const* phi, LI<IRBB> const* li) const;
 
     //Find live-in def-stmt through given start IR at start BB.
     //Note DOM info must be available.
@@ -1173,41 +1311,7 @@ public:
     VMD * findDomLiveInDefFromIDomOf(
         IRBB const* marker, MDIdx mdid, OptCtx const& oc,
         OUT MDSSAStatus & st) const;
-
-    //Note DOM info must be available.
-    //exp: the expression that expected to set live-in.
-    //startir: the start position in 'startbb', it can be NULL.
-    //         If it is NULL, the function first finding the Phi list of
-    //         'startbb', then keep finding its predecessors until meet the
-    //         CFG entry.
-    //startbb: the BB that begin to do searching. It can NOT be NULL.
-    void findAndSetLiveInDefForTree(
-        IR * exp, IR const* startir, IRBB const* startbb,
-        OptCtx const& oc, OUT MDSSAStatus & st);
-    void findAndSetLiveInDefForTree(
-        IR * exp, IRBB const* startbb, OptCtx const& oc, OUT MDSSAStatus & st)
-    {
-        findAndSetLiveInDefForTree(exp, const_cast<IRBB*>(startbb)->getLastIR(),
-                                   startbb, oc, st);
-    }
-
-    //Note DOM info must be available.
-    //exp: the expression that expected to set live-in.
-    //startir: the start position in 'startbb', it can be NULL.
-    //         If it is NULL, the function first finding the Phi list of
-    //         'startbb', then keep finding its predecessors until meet the
-    //         CFG entry.
-    //startbb: the BB that begin to do searching. It can NOT be NULL.
-    void findAndSetLiveInDef(
-        MOD IR * exp, IR const* startir, IRBB const* startbb, OptCtx const& oc,
-        OUT MDSSAStatus & st);
-    void findAndSetLiveInDef(
-        MOD IR * exp, IRBB const* startbb, OptCtx const& oc,
-        OUT MDSSAStatus & st)
-    {
-        findAndSetLiveInDef(exp, const_cast<IRBB*>(startbb)->getLastIR(),
-                            startbb, oc, st);
-    }
+    MDDef const* findNearestCoverDefThatCanReach(IR const* ir) const;
 
     //Find the VOpnd if 'ir' must OR may referenced 'md'.
     //Return the VMD if found.
@@ -1253,12 +1357,12 @@ public:
 
     //Generate MDSSAInfo and generate VOpnd for referrenced MD that both include
     //must-ref MD and may-ref MDs.
-    MDSSAInfo * genMDSSAInfoAndVOpnd(IR * ir, UINT version);
+    MDSSAInfo * genMDSSAInfoAndSetDedicatedVersionVMD(IR * ir, UINT version);
 
     //Generate MDSSAInfo and generate VOpnd for referrenced MD that both
     //include must-ref MD and may-ref MDs.
     //ir: must be stmt.
-    MDSSAInfo * genMDSSAInfoAndNewVesionVMD(IR * ir);
+    MDSSAInfo * genMDSSAInfoAndSetNewVesionVMD(IR * ir);
 
     //The function is a wrapper of UseDefMgr's function.
     MDSSAInfo * genMDSSAInfo(MOD IR * ir)
@@ -1397,7 +1501,7 @@ public:
 
     //Reinitialize MDSSA manager.
     //The function will clean all informations and recreate them.
-    void reinit();
+    void reinit(OptCtx const& oc);
 
     //Remove MDSSA Use-Def chain.
     //Note the function will remove IR tree from all VOpnds and MDSSAMgr.
@@ -1420,10 +1524,6 @@ public:
     //Remove DU chain from 'def' to 'exp'.
     //The function will add VOpnd of phi to 'exp'.
     void removeDUChain(MDDef const* def, IR * exp);
-
-    //Remove all virtual USEs of 'stmt'.
-    //stmt' will not have any USE expression when function returned.
-    void removeAllUse(IR const* stmt, MDSSAUpdateCtx const& ctx);
 
     //Remove all MDSSAInfo of 'stmt' from MDSSAMgr.
     //The MDSSAInfo includes Def and UseSet info.
@@ -1473,8 +1573,28 @@ public:
     //    D1<->D4
     //    D3<->nullptr
     //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
-    void removeDefFromDDChain(MDDef * mddef);
-    void removePhiFromDDChain(MDPhi * phi, MDDef * prev);
+    void removeDefFromDDChain(MDDef * mddef, MDSSAUpdateCtx const& ctx);
+
+    //Remove MDDef from Def-Def chain.
+    //phi: will be removed from Def-Def chain, and be modified as well.
+    //prev: designated previous DEF.
+    //e.g:D1<->D2
+    //     |<->D3
+    //     |   |<->D5
+    //     |   |<->D6
+    //     |->D4
+    //  where predecessor of D3 is D1, successors of D3 are D5, D6
+    //  After remove D3:
+    //    D1<->D2
+    //     |<->D5
+    //     |<->D6
+    //     |<->D4
+    //    D3<->nullptr
+    //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
+    void removePhiFromDDChain(
+        MDPhi * phi, MDDef * prev, MDSSAUpdateCtx const& ctx);
+    void removeMDDefFromDDChain(
+        MDDef * mddef, MDDef * prev, MDSSAUpdateCtx const& ctx);
     bool removeRedundantPhi(IRBB const* bb, OptCtx const& oc)
     { return prunePhiForBB(bb, nullptr, oc); }
 
@@ -1486,20 +1606,28 @@ public:
     //ctx: pass the update-info top down.
     //NOTE: the function is always successful in maintaining MDSSA info, thus
     //      no need to require MDSSAStatus.
-    void removeSuccessorDesignatedPhiOpnd(IRBB const* succ, UINT pos,
-                                          MDSSAUpdateCtx const& ctx);
+    void removeSuccessorDesignatedPhiOpnd(
+        IRBB const* succ, UINT pos, MDSSAUpdateCtx const& ctx);
 
     //Check each USE of stmt, remove the expired expression which is not
     //reference the memory any more that stmt defined.
     //Return true if DU changed.
     bool removeExpiredDU(IR const* ir);
 
-    //The function handles the DU chain and cuts off the DU chain between Phi
-    //and its USE expressions.
-    //Remove 'phi' from its USE's vopnd-list.
-    //e.g:u1, u2 are its USE expressions.
-    //The function will cut off the DU chain between phi->u1 and phi->u2.
-    void removeDefFromUseSet(MDPhi const* phi, MDSSAUpdateCtx const& ctx);
+    //The function reconstructs entire PRSSA.
+    bool reconstruction(OptCtx & oc)
+    {
+        destruction(oc);
+        construction(oc);
+        return true;
+    }
+
+    void setInitVersionVMD(xcom::List<IR const*> const& lst);
+    void setInitVersionVMD(IR const* ir);
+    void setInitVersionVMD(IR const* ir, OUT MDSSAInfo * mdssainfo);
+    void setNewVesionVMD(IR * ir, OUT MDSSAInfo * mdssainfo);
+    void setDedicatedVersionVMD(
+        IR const* ir, OUT MDSSAInfo * mdssainfo, UINT version);
 
     //The function will attempt to remove the USE that located in outside loop.
     //Note the function will NOT cross MDPHI.

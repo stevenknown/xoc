@@ -187,7 +187,7 @@ void MD2IRSet::dump() const
             note(getRegion(), "\n  ");
             if (d->getMustRef() != nullptr) {
                 //Dump MustDef ref.
-                prt(getRegion(), "MMD%d", d->getMustRef()->id());
+                prt(getRegion(), "MMD%u", d->getMustRef()->id());
             }
 
             MDSet const* ms = d->getMayRef();
@@ -196,7 +196,7 @@ void MD2IRSet::dump() const
                 MDSetIter iter;
                 for (BSIdx j = ms->get_first(&iter);
                      j != BS_UNDEF; j = ms->get_next(j, &iter)) {
-                    prt(getRegion(), " MD%d", j);
+                    prt(getRegion(), " MD%u", j);
                 }
             }
         }
@@ -256,6 +256,7 @@ void CollectMayUseRecur::collect(
     case IR_SELECT:
     case IR_CASE:
     case IR_LABEL:
+    case IR_DUMMYUSE:
     SWITCH_CASE_EXT_EXP:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
@@ -339,6 +340,22 @@ void CollectMayUseRecur::collect(
     default: collectExtOp(ir, comp_pr, bsmgr, mayuse);
     }
 }
+
+
+void CollectMayUseRecur::collectExtOp(
+    IR const* ir, bool comp_pr, DefMiscBitSetMgr & bsmgr, OUT MDSet & mayuse)
+{
+    //Target Dependent Code.
+    if (ir == nullptr) { return; }
+    ASSERT0(ir->isExtOp());
+    ASSERTN(!ir->isMemRef(), ("MemRef operation need to be handled"));
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * k = ir->getKid(i);
+        if (k == nullptr) { continue; }
+        ASSERT0(k->is_exp());
+        collectIRList(k, comp_pr, bsmgr, mayuse);
+    }
+}
 //END CollectMayUseRecur
 
 
@@ -400,9 +417,9 @@ void DUMgr::freeDUSetForAllIR()
 {
     //Free AIContainer's internal structure.
     //The vector of AIContainer must be destroyed explicitly.
-    Vector<IR*> & ir_vec = m_rg->getIRVec();
-    VecIdx l = ir_vec.get_last_idx();
-    for (VecIdx i = IRID_UNDEF + 1; i <= l; i++) {
+    xcom::Vector<IR*> & ir_vec = m_rg->getIRVec();
+    xcom::VecIdx l = ir_vec.get_last_idx();
+    for (xcom::VecIdx i = IRID_UNDEF + 1; i <= l; i++) {
         IR * ir = ir_vec.get(i);
         ASSERT0(ir);
         if (ir->hasDU()) {
@@ -600,28 +617,29 @@ bool DUMgr::hasSingleDefToMD(DUSet const& defset, MD const* md) const
 }
 
 
-bool DUMgr::isStprMayDef(IR const* def, IR const* use, bool is_recur)
+bool DUMgr::isStprMayDef(IR const* def, IR const* use, bool is_recur) const
 {
     ASSERT0(def->is_stpr());
     PRNO prno = STPR_no(def);
+    DUMgr * pthis = const_cast<DUMgr*>(this);
     if (is_recur) {
-        m_citer.clean();
-        for (IR const* x = iterInitC(use, m_citer);
-             x != nullptr; x = iterNextC(m_citer)) {
-            if (!x->is_pr()) { continue; }
-            if (PR_no(x) == prno) { return true; }
+        pthis->m_citer.clean();
+        for (IR const* x = xoc::iterInitC(use, pthis->m_citer);
+             x != nullptr; x = xoc::iterNextC(pthis->m_citer)) {
+            if (!x->isReadPR()) { continue; }
+            if (x->getPrno() == prno) { return true; }
         }
         return false;
     }
-    if (use->is_pr() && PR_no(use) == prno) {
+    if (use->isReadPR() && use->getPrno() == prno) {
         return true;
     }
     return false;
 }
 
 
-static bool is_call_may_def_helper(IR const* call, IR const* use,
-                                   MDSet const* call_maydef, Region const* rg)
+static bool is_call_may_def_helper(
+    IR const* call, IR const* use, MDSet const* call_maydef, Region const* rg)
 {
     //MD of use may be exact or inexact.
     MD const* use_md = use->getMustRef();
@@ -647,17 +665,18 @@ static bool is_call_may_def_helper(IR const* call, IR const* use,
 //'use': must be expression.
 //'is_recur': true if one intend to compute the mayuse MDSet to walk
 //            through IR tree recusively.
-bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur)
+bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur) const
 {
     ASSERT0(call->isCallStmt());
+    DUMgr * pthis = const_cast<DUMgr*>(this);
 
     //MayDef of stmt must involved the overlapped MD with Must Reference,
     //but except Must Reference itself.
     MDSet const* call_maydef = const_cast<IR*>(call)->getMayRef();
     if (is_recur) {
-        m_citer.clean();
-        for (IR const* x = iterInitC(use, m_citer);
-             x != nullptr; x = iterNextC(m_citer)) {
+        pthis->m_citer.clean();
+        for (IR const* x = xoc::iterInitC(use, pthis->m_citer);
+             x != nullptr; x = xoc::iterNextC(pthis->m_citer)) {
             if (!x->isMemOpnd()) { continue; }
             if (is_call_may_def_helper(call, x, call_maydef, m_rg)) {
                 return true;
@@ -665,7 +684,6 @@ bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur)
         }
         return false;
     }
-
     ASSERT0(use->isMemOpnd());
     return is_call_may_def_helper(call, use, call_maydef, m_rg);
 }
@@ -676,7 +694,7 @@ bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur)
 //'use': must be expression.
 //'is_recur': true if one intend to compute the mayuse MDSet to walk
 //            through IR tree recusively.
-bool DUMgr::isMayDef(IR const* def, IR const* use, bool is_recur)
+bool DUMgr::isMayDef(IR const* def, IR const* use, bool is_recur) const
 {
     ASSERT0(def->is_stmt() && use->is_exp());
     if (def->is_stpr()) {
@@ -685,56 +703,24 @@ bool DUMgr::isMayDef(IR const* def, IR const* use, bool is_recur)
     if (def->isCallStmt()) {
         return isCallMayDef(def, use, is_recur);
     }
-    MD const* mustdef = const_cast<IR*>(def)->getMustRef();
-    MDSet const* maydef = const_cast<IR*>(def)->getMayRef();
     if (is_recur) {
-        m_citer.clean();
-        for (IR const* x = iterInitC(use, m_citer);
-             x != nullptr; x = iterNextC(m_citer)) {
+        DUMgr * pthis = const_cast<DUMgr*>(this);
+        pthis->m_citer.clean();
+        for (IR const* x = xoc::iterInitC(use, pthis->m_citer);
+             x != nullptr; x = xoc::iterNextC(pthis->m_citer)) {
             if (!x->isMemOpnd()) { continue; }
-
-            MD const* mustuse = x->getMustRef();
-            if (mustuse != nullptr) {
-                if ((mustdef != nullptr && mustdef == mustuse) ||
-                    (maydef != nullptr && maydef->is_contain(mustuse, m_rg))) {
-                    return true;
-                }
-            }
-
-            MDSet const* mayuse = const_cast<IR*>(x)->getMayRef();
-            if (mayuse != nullptr) {
-                if ((mustdef != nullptr && mayuse->is_contain(mustdef, m_rg)) ||
-                    (maydef != nullptr &&
-                     (maydef == mayuse || mayuse->is_intersect(*maydef)))) {
-                    return true;
-                }
+            if (xoc::isDependent(def, x, true, m_rg)) {
+                return true;
             }
         }
         return false;
     }
-
-    MD const* mustuse = use->getMustRef();
-    if (mustuse != nullptr) {
-        if ((mustdef != nullptr && mustdef == mustuse) ||
-            (maydef != nullptr && maydef->is_contain(mustuse, m_rg))) {
-            return true;
-        }
-    }
-
-    MDSet const* mayuse = const_cast<IR*>(use)->getMayRef();
-    if (mayuse != nullptr) {
-        if ((mustdef != nullptr && mayuse->is_contain(mustdef, m_rg)) ||
-            (maydef != nullptr &&
-             (maydef == mayuse || mayuse->is_intersect(*maydef)))) {
-            return true;
-        }
-    }
-    return false;
+    return xoc::isDependent(def, use, true, m_rg);
 }
 
 
-void DUMgr::computeArrayRef(IR * ir, OUT MDSet * ret_mds, CompFlag compflag,
-                            DUOptFlag duflag)
+void DUMgr::computeArrayRef(
+    IR * ir, OUT MDSet * ret_mds, CompFlag compflag, DUOptFlag duflag)
 {
     ASSERT0(ir->isArrayOp());
     if (duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
@@ -905,8 +891,8 @@ void DUMgr::computeExpression(IR * ir, OUT MDSet * ret_mds,
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
     case IR_SELECT:
-    case IR_DUMMYUSE:
     case IR_CASE:
+    case IR_DUMMYUSE:
         inferAllKidMDRef(ir, ret_mds, compflag, duflag);
         ASSERT0(ir->getDU() == nullptr);
         return;
@@ -946,7 +932,7 @@ void DUMgr::dumpMemUsageForMDRef() const
     ConstIRIter citer;
     xcom::StrBuf tmp(8);
     for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
-        note(getRegion(), "\n--- BB%d ---", bb->id());
+        note(getRegion(), "\n--- BB%u ---", bb->id());
         for (IR * ir = BB_first_ir(bb);
              ir != nullptr; ir = BB_next_ir(bb)) {
             dumpIR(ir, m_rg);
@@ -972,7 +958,7 @@ void DUMgr::dumpMemUsageForMDRef() const
                         else  { n /= 1024*1024; str = "MB"; }
 
                         MDSetIter iter;
-                        prt(getRegion(), "MayDs(%lu%s, %d elems, last %d), ",
+                        prt(getRegion(), "MayDs(%lu%s, %u elems, last %u), ",
                             (ULONG)n, str, mds->get_elem_count(),
                             mds->get_last(&iter));
                         count += n;
@@ -981,7 +967,7 @@ void DUMgr::dumpMemUsageForMDRef() const
                     //MustUse
                     MD const* md = x->getMustRef();
                     if (md != nullptr) {
-                        prt(getRegion(), "MUSTUSE %dB, ", (INT)sizeof(MD));
+                        prt(getRegion(), "MUSTUSE %uB, ", (INT)sizeof(MD));
                         count += sizeof(MD);
                     }
 
@@ -994,7 +980,7 @@ void DUMgr::dumpMemUsageForMDRef() const
                         else { n /= 1024*1024; str = "MB"; }
 
                         MDSetIter iter;
-                        prt(getRegion(), "MAYUSE(%lu%s, %d elems, last %d), ",
+                        prt(getRegion(), "MAYUSE(%lu%s, %u elems, last %u), ",
                             (ULONG)n, str, mds->get_elem_count(),
                             mds->get_last(&iter));
                         count += n;
@@ -1020,7 +1006,7 @@ void DUMgr::dumpBBDUChainDetail(UINT bbid) const
 void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 {
     ASSERT0(bb);
-    note(getRegion(), "\n--- BB%d ---", bb->id());
+    note(getRegion(), "\n--- BB%u ---", bb->id());
 
     //Label Info list.
     LabelInfo const* li = bb->getLabelList().get_head();
@@ -1074,9 +1060,9 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 
             note(getRegion(), "\n\t>>%s", IRNAME(k));
             if (k->is_stpr() || k->is_pr()) {
-                prt(getRegion(), "%d", k->getPrno());
+                prt(getRegion(), "%u", k->getPrno());
             }
-            prt(getRegion(), "(id:%d) ", IR_id(k));
+            prt(getRegion(), "(id:%u) ", IR_id(k));
 
             if (k->is_stmt()) {
                 prt(getRegion(), "DEFREF:");
@@ -1087,7 +1073,7 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
             //Dump Must Ref.
             MD const* md = k->getRefMD();
             if (md != nullptr) {
-                prt(getRegion(), "MMD%d", md->id());
+                prt(getRegion(), "MMD%u", md->id());
             }
 
             //Dump May Ref.
@@ -1098,7 +1084,7 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
                 }
                 MDSetIter iter;
                 for (BSIdx i = mds->get_first(&iter); i != BS_UNDEF; ) {
-                    prt(getRegion(), "MD%d", i);
+                    prt(getRegion(), "MD%u", i);
                     i = mds->get_next(i, &iter);
                     if (i != BS_UNDEF) { prt(getRegion(), ","); }
                 }
@@ -1119,9 +1105,9 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
                 IR const* ref = m_rg->getIR(i);
                 prt(getRegion(), "%s", IRNAME(ref));
                 if (ref->is_stpr() || ref->is_pr()) {
-                    prt(getRegion(), "%d", ref->getPrno());
+                    prt(getRegion(), "%u", ref->getPrno());
                 }
-                prt(getRegion(), "(id:%d)", IR_id(ref));
+                prt(getRegion(), "(id:%u)", IR_id(ref));
 
                 i = set->get_next(i, &di);
                 if (i != BS_UNDEF) { prt(getRegion(), ","); }
@@ -1132,11 +1118,21 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 }
 
 
+static bool dumpForTest(DUMgr const* dumgr)
+{
+    ASSERT0(dumgr);
+    Region const* rg = dumgr->getRegion();
+    rg->dumpRef();
+    return true;
+}
+
+
 bool DUMgr::dump() const
 {
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
          m_rg->getRegionName());
+    if (g_dump_opt.isDumpForTest()) { return dumpForTest(this); }
     m_rg->getLogMgr()->incIndent(2);
     if (g_dump_opt.isDumpMDSetHash()) {
         m_mds_hash->dump(getRegion());
@@ -1222,7 +1218,7 @@ static void dumpDURef(
     bool has_prt_something = false;
     MD const* md = ir->getMustRef();
     if (md != nullptr) {
-        prt(rg, "MMD%d", md->id());
+        prt(rg, "MMD%u", md->id());
         has_prt_something = true;
     }
 
@@ -1236,7 +1232,7 @@ static void dumpDURef(
             }
             MDSetIter iter;
             for (BSIdx i = x->get_first(&iter); i != BS_UNDEF;) {
-                prt(rg, "MD%d", i);
+                prt(rg, "MD%u", i);
                 i = x->get_next(i, &iter);
                 if (i != BS_UNDEF) {
                     prt(rg, ",");
@@ -1285,7 +1281,7 @@ static void dumpDUChainOfBB(IRBB const* bb, MOD xcom::DefMiscBitSetMgr & bsmgr,
                             MOD ConstIRIter & citer, MDSet & mds,
                             StrBuf & tmp, DUMgr const* dumgr)
 {
-    note(dumgr->getRegion(), "\n--- BB%d ---", bb->id());
+    note(dumgr->getRegion(), "\n--- BB%u ---", bb->id());
     BBIRListIter it;
     for (IR * ir = BB_irlist(bb).get_head(&it);
          ir != nullptr; ir = BB_irlist(bb).get_next(&it)) {
@@ -1757,8 +1753,8 @@ void DUMgr::inferStoreArray(IR * ir, DUOptFlag duflag)
 
 void DUMgr::inferIndirectMemStmt(IR * ir, DUOptFlag duflag)
 {
-    ASSERT0(ir->is_ist());
-    computeExpression(IST_base(ir), nullptr, COMP_EXP_RECOMPUTE, duflag);
+    ASSERT0(ir->is_ist() || ir->is_vist());
+    computeExpression(ir->getBase(), nullptr, COMP_EXP_RECOMPUTE, duflag);
 
     //Compute DEF mdset. AA should guarantee either mustdef is not nullptr or
     //maydef not nullptr.
@@ -1831,16 +1827,14 @@ void DUMgr::setToConservative(OUT MDSet & maydefuse)
 }
 
 
-void DUMgr::genDummyuseForCallStmt(IR * ir, MDSet const* mayref)
+void DUMgr::setMayRefForDummyuseOfCallStmt(IR * ir, MDSet const* mayref)
 {
-    //Build dummyuse IR expressions for CallStmt.
-    if (!((CCall*)ir)->hasDummyUse() || !CALL_dummyuse(ir)->is_ild()) {
-        //TODO:consider append DefUse info on existed dummyuse.
-        ((CCall*)ir)->addDummyUse(m_rg);
-    }
-    ASSERTN(CALL_dummyuse(ir)->is_ild(),
+    CCall * call = (CCall*)ir;
+    IR * dummyuse = call->getDummyUse();
+    if (dummyuse == nullptr) { return; }
+    ASSERTN(dummyuse->is_ild(),
             ("ILD could better present MD that based on different Var"));
-    CALL_dummyuse(ir)->setMayRef(mayref, m_rg);
+    dummyuse->setMayRef(mayref, m_rg);
 }
 
 
@@ -1866,6 +1860,38 @@ static MDSet const* collectParamMayPointTo(
 }
 
 
+void DUMgr::inferDummyuseForReadOnlyCall(IR * ir, DUOptFlag duflag)
+{
+    ASSERT0(ir && ir->isCallStmt() && ir->isReadOnly());
+    for (IR * d = CALL_dummyuse(ir); d != nullptr; d = d->get_next()) {
+        computeExpression(d, nullptr, COMP_EXP_RECOMPUTE, duflag);
+    }
+    //Call does not have any MayRef.
+    ir->cleanMayRef();
+}
+
+
+//Regard dummyuse's MD references as the MayRef of CallStmt.
+void DUMgr::inferDummyuseAndCollectMayRefForCall(
+    IR * ir, DUOptFlag duflag, MDSet const* worst, OUT MDSet & maydefuse)
+{
+    ASSERT0(ir && ir->isCallStmt() && !ir->isReadOnly());
+    for (IR * d = CALL_dummyuse(ir); d != nullptr; d = d->get_next()) {
+        computeExpression(d, nullptr, COMP_EXP_RECOMPUTE, duflag);
+        if (worst != nullptr) {
+            //ir's MD ref is already the worst.
+            continue;
+        }
+        if (d->getRefMD() != nullptr) {
+            maydefuse.bunion_pure(d->getRefMD()->id(), *getSBSMgr());
+        }
+        if (d->getRefMDSet() != nullptr && !d->getRefMDSet()->is_empty()) {
+            maydefuse.bunion_pure(*d->getRefMDSet(), *getSBSMgr());
+        }
+    }
+}
+
+
 void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
 {
     //Compute MD Reference for NonPR.
@@ -1880,8 +1906,8 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
     }
 
     //CASE:AA's point-to data structure has been destoried after AA::perform().
-    //Therefore, the MayRef that considered the parameter's point-to has
-    //computed during AA.
+    //Therefore, the MayRef that considered the parameter's point-to should
+    //have been computed during AA.
     //worst = collectParamMayPointTo(
     //  maydefuse, *getSBSMgr(), CALL_arg_list(ir), m_aa);
     DUMMYUSE(collectParamMayPointTo); //to avoid gcc warning complaint.
@@ -1890,28 +1916,20 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
     for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
         computeExpression(p, nullptr, COMP_EXP_RECOMPUTE, duflag);
     }
-
-    //Regard dummyuse's MD references as the MayRef of CallStmt.
-    for (IR * d = CALL_dummyuse(ir); d != nullptr; d = d->get_next()) {
-        computeExpression(d, nullptr, COMP_EXP_RECOMPUTE, duflag);
-        if (worst != nullptr) {
-            //ir's MD ref is already the worst.
-            continue;
-        }
-        if (d->getRefMD() != nullptr) {
-            maydefuse.bunion_pure(d->getRefMD()->id(), *getSBSMgr());
-        }
-        if (d->getRefMDSet() != nullptr && !d->getRefMDSet()->is_empty()) {
-            maydefuse.bunion_pure(*d->getRefMDSet(), *getSBSMgr());
-        }
+    if (ir->isReadOnly()) {
+        maydefuse.clean(*getSBSMgr());
+        inferDummyuseForReadOnlyCall(ir, duflag);
+        return;
     }
-    if (ir->isReadOnly() || inferCallStmtForNonPRViaCallGraph(ir, maydefuse)) {
-        //Regard both USE and DEF as ir's MayRef.
+    //Regard dummyuse's MD references as the MayRef of CallStmt.
+    inferDummyuseAndCollectMayRefForCall(ir, duflag, worst, maydefuse);
+    if (inferCallStmtForNonPRViaCallGraph(ir, maydefuse)) {
+        //Regard both USE and DEF as call's MayRef.
         //TODO:differetiate the USE set and DEF set of CallStmt
         //to get more precise DefUse chain precision.
         xcom::Vector<MD const*> tmp;
-        m_md_sys->computeOverlap(m_rg, maydefuse, tmp,
-                                 m_tab_iter, *getSBSMgr(), true);
+        m_md_sys->computeOverlap(
+            m_rg, maydefuse, tmp, m_tab_iter, *getSBSMgr(), true);
         if (maydefuse.is_empty()) {
             //Call does not have any MayRef.
             ir->cleanMayRef();
@@ -1920,7 +1938,7 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
         //Hash the MDSet and set the hashed MDSet as call's MayRef.
         MDSet const* hashed = m_mds_hash->append(maydefuse);
         ir->setMayRef(hashed, m_rg);
-        genDummyuseForCallStmt(ir, hashed);
+        setMayRefForDummyuseOfCallStmt(ir, hashed);
         maydefuse.clean(*getSBSMgr());
         return;
     }
@@ -1928,8 +1946,8 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
         //ir's MD ref is NOT the worst.
         setToConservative(maydefuse);
         xcom::Vector<MD const*> tmpvec;
-        m_md_sys->computeOverlap(m_rg, maydefuse, tmpvec, m_tab_iter,
-                                 *getSBSMgr(), true);
+        m_md_sys->computeOverlap(
+            m_rg, maydefuse, tmpvec, m_tab_iter, *getSBSMgr(), true);
 
         //Register the MDSet.
         //Regard both USE and DEF as ir's RefMDSet.
@@ -1938,11 +1956,11 @@ void DUMgr::inferCallStmtForNonPR(IR * ir, DUOptFlag duflag)
         MDSet const* hashed = m_mds_hash->append(maydefuse);
         ir->setMayRef(hashed, m_rg);
     } else {
-        //ir's MD ref is the worst.
+        //call's MayRef is the worst.
         ASSERT0(m_aa->isWorstCase(ir->getMayRef()));
         //setToWorstCase(ir);
     }
-    genDummyuseForCallStmt(ir, m_aa->getWorstCase());
+    setMayRefForDummyuseOfCallStmt(ir, m_aa->getWorstCase());
     maydefuse.clean(*getSBSMgr());
 }
 
@@ -1956,8 +1974,8 @@ void DUMgr::inferCallStmt(IR * ir, DUOptFlag duflag)
     ASSERT0(ir->isCallStmt());
     if (ir->is_icall()) {
         //Analysis callee's RefMDSet of IR_ICALL.
-        computeExpression(ICALL_callee(ir), nullptr,
-                          COMP_EXP_RECOMPUTE, duflag);
+        computeExpression(
+            ICALL_callee(ir), nullptr, COMP_EXP_RECOMPUTE, duflag);
     }
     //CASE:Always compute the MD reference for parameters and dummy-use,
     //because even user did not ask to compute NonPR Ref, the MDSSA also need
@@ -2104,13 +2122,13 @@ void DUMgr::computeMDRefForBB(IRBB * bb, MOD OptCtx & oc, DUOptFlag duflag)
             break;
         case IR_SWITCH:
             //Compute USE mdset.
-            computeExpression(SWITCH_vexp(ir), nullptr,
-                              COMP_EXP_RECOMPUTE, duflag);
+            computeExpression(
+                SWITCH_vexp(ir), nullptr, COMP_EXP_RECOMPUTE, duflag);
             break;
         case IR_IGOTO:
             //Compute USE mdset.
-            computeExpression(IGOTO_vexp(ir), nullptr,
-                              COMP_EXP_RECOMPUTE, duflag);
+            computeExpression(
+                IGOTO_vexp(ir), nullptr, COMP_EXP_RECOMPUTE, duflag);
             break;
         case IR_GOTO:
         case IR_REGION:
@@ -3235,6 +3253,7 @@ bool DUMgr::verifyMDRef()
         for (IR * ir = bb->getIRList().get_head(&it);
              ir != nullptr; ir = bb->getIRList().get_next(&it)) {
             cii.clean();
+            ASSERT0(ir->is_stmt());
             verifyMDRefForIR(ir, cii);
         }
     }
@@ -3394,7 +3413,7 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, DUOptFlag duflag)
 }
 
 
-bool verifyMDDUChain(Region * rg, OptCtx const& oc)
+bool verifyClassicDUChain(Region * rg, OptCtx const& oc)
 {
     DUOptFlag flag = DUOPT_UNDEF;
     if (oc.is_pr_du_chain_valid()) {
@@ -3403,12 +3422,12 @@ bool verifyMDDUChain(Region * rg, OptCtx const& oc)
     if (oc.is_nonpr_du_chain_valid()) {
         flag.set(DUOPT_COMPUTE_NONPR_DU);
     }
-    return verifyMDDUChain(rg, flag);
+    return verifyClassicDUChain(rg, flag);
 }
 
 
 //Verify DU chain's sanity.
-bool verifyMDDUChain(Region * rg, DUOptFlag duflag)
+bool verifyClassicDUChain(Region * rg, DUOptFlag duflag)
 {
     if (!duflag.have(DUOPT_COMPUTE_PR_DU) &&
         !duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
@@ -3647,7 +3666,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
 {
     ASSERTN(duflag.have(DUOPT_COMPUTE_PR_DU) ||
             duflag.have(DUOPT_COMPUTE_NONPR_DU), ("at least one kind of IR"));
-    if (m_rg->getBBList()->get_elem_count() == 0) { return; }
+    if (m_rg->getBBList()->is_empty()) { return; }
 
     START_TIMER(t, "Build Classic DU chain");
     ASSERT0(oc.is_cfg_valid());
@@ -3700,7 +3719,8 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         dumpDUChainDetail();
         END_TIMER_FMT(t, ("DUMP DU Chain"));
     }
-    ASSERTN(verifyMDDUChain(m_rg, duflag), ("verifyMDDUChain failed"));
+    ASSERTN(verifyClassicDUChain(m_rg, duflag),
+            ("verifyClassicDUChain failed"));
 }
 
 
@@ -3795,7 +3815,7 @@ public:
             PASS_PRSSA_MGR);
         ASSERT0(m_prssamgr);
     }
-    void compute();
+    void compute(bool build_def_chain);
 };
 
 
@@ -3861,25 +3881,25 @@ void ComputePRDUChainByPRSSA::computeByVPRAndPhi()
 }
 
 
-void ComputePRDUChainByPRSSA::compute()
+void ComputePRDUChainByPRSSA::compute(bool build_def_chain)
 {
     ASSERT0(m_prssamgr);
     if (m_prssamgr->is_valid()) {
         computeByVPRAndPhi();
         return;
     }
-    m_prssamgr->constructVPRAndPhi(m_oc);
+    m_prssamgr->constructVPRAndPhi(m_oc, build_def_chain);
     computeByVPRAndPhi();
     m_prssamgr->destructVPRAndPhi();
     ASSERT0(!m_prssamgr->is_valid());
 }
 
 
-void DUMgr::computePRDUChainByPRSSA(MOD OptCtx & oc)
+void DUMgr::computePRDUChainByPRSSA(MOD OptCtx & oc, bool build_def_chain)
 {
     START_TIMER(t, "Build PRDU Chain By PRSSA");
     ComputePRDUChainByPRSSA comp(oc, m_rg, this);
-    comp.compute();
+    comp.compute(build_def_chain);
     oc.setValidPRDU();
     END_TIMER(t, "Build PRDU Chain By PRSSA");
 }
@@ -3915,7 +3935,7 @@ bool DUMgr::checkAndComputeClassicDUChain(MOD OptCtx & oc)
     }
     if (compute_prdu_by_prssa) {
         //The function computes PRDU chain through PRSSA.
-        computePRDUChainByPRSSA(oc);
+        computePRDUChainByPRSSA(oc, true);
         changed = true;
     }
     return changed;
@@ -3930,7 +3950,7 @@ bool DUMgr::perform(MOD OptCtx & oc, DUOptFlag flag)
     if (bbl->get_elem_count() == 0) { return false; }
     if (bbl->get_elem_count() > g_thres_opt_bb_num) {
         //Adjust g_thres_opt_bb_num to make sure you want to do DU analysis.
-        interwarn("DUMgr::perform() of Region(%d) is not applied.", m_rg->id());
+        interwarn("DUMgr::perform() of Region(%u) is not applied.", m_rg->id());
         return false;
     }
     ASSERT0(oc.is_cfg_valid()); //First of all, only CFG is needed.
@@ -3954,6 +3974,10 @@ bool DUMgr::perform(MOD OptCtx & oc, DUOptFlag flag)
         //checkAndComputeClassicDUChain() after the function returning.
         //CASE:Some target expect to compute PRDU by REACH_DEF and PRSSA both.
         ASSERT0(!g_compute_pr_du_chain_by_prssa);
+
+        //If user expects to compute PRDU by classic method, the PRNO and MD
+        //have to be consistent.
+        ASSERT0(xoc::verifyPROpAndMDConsistency(m_rg));
     }
 
     //Initialize local used resource.
