@@ -117,7 +117,7 @@ bool PreAnaBeforeOpt::scanLDA(IR const* ir)
             return false;
         }
         Var * sv = m_vm->registerStringVar(
-            nullptr, VAR_string(v), MEMORY_ALIGNMENT);
+            nullptr, VAR_string(v), MEMORY_ALIGNMENT, SS_UNDEF);
         ASSERT0(sv);
         sv->setFlag(VAR_ADDR_TAKEN);
         return true;

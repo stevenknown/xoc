@@ -33,13 +33,21 @@ using namespace xgen;
 
 namespace xoc {
 
+class RegDSystem;
+class SRegSet;
+
 //The class represents register set and calling convention information for
 //target machine. It is an wrapper of interfaces under target/precompile.
 class TargInfoMgr {
     COPY_CONSTRUCTOR(TargInfoMgr);
 protected:
     Reg m_link;
+    RegionMgr const* m_rm;
+    RegDSystem * m_rdsys;
 protected:
+    virtual RegDSystem * allocRegDSystem();
+
+    void initRegDSystem();
     virtual void initAllocableScalar()
     { ASSERTN(0, ("Target Dependent Code")); }
     virtual void initAllocableVector()
@@ -60,12 +68,15 @@ protected:
     //Initialize total callee-saved register set, includes all kind of
     //registers of callee.
     virtual void initCallee() { ASSERTN(0, ("Target Dependent Code")); }
+
+    TargInfoMgr const* self() const { return this; }
 public:
-    TargInfoMgr() {}
+    TargInfoMgr(RegionMgr const* rm) : m_rm(rm)
+    { ASSERT0(rm); m_rdsys = nullptr; }
     virtual ~TargInfoMgr() { destroy(); }
 
     virtual void dump(Region const* rg) const;
-    void destroy();
+    virtual void destroy();
 
     virtual REGFILE getRegFile(Reg r) const;
 
@@ -98,6 +109,9 @@ public:
 
     //Get vector caller saved register set of different architectures.
     virtual xgen::RegSet const* getCallerVectorRegSet() const;
+
+    //Get all registers that aliased with 'reg'.
+    virtual SRegSet const* getAliasRegSet(Reg reg) const;
 
     //Get frame pointer register of different architectures.
     virtual xgen::Reg getFP() const
@@ -195,12 +209,23 @@ public:
     { ASSERTN(0, ("Target Dependent Code")); return (xgen::Reg)REG_UNDEF;}
 
     Reg getLink() const { return m_link; }
+    RegionMgr const* getRegionMgr() const { return m_rm; }
     virtual CHAR const* getRegName(Reg r) const;
     virtual CHAR const* getRegFileName(REGFILE rf) const;
+    virtual UINT getBitSize(Reg) const
+    {
+        ASSERTN(0, ("Target Dependent Code"));
+        return WORD_LENGTH_OF_TARGET_MACHINE;
+    }
+    RegDSystem const* getRegDSystem() const { return m_rdsys; }
 
-    virtual UINT getMInstCycle(MI_CODE mi_code)
+    virtual UINT getMInstCycle(MI_CODE)
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
-    virtual UINT getMInstExecUnit(MI_CODE mi_code)
+    virtual UINT getMInstExecUnit(MI_CODE)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual UINT getLoadGlobalMemoryCycle(void)
+    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual UINT getStoreGlobalMemoryCycle(void)
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     bool isAllocable(Reg r) const
@@ -255,6 +280,13 @@ public:
     }
     bool isLink(Reg r) const { return getLink() == r; }
 
+    //Return true if register r1 alias to r2.
+    virtual bool isAlias(Reg r1, Reg r2) const;
+
+    //Return true if register reg1 exactly cover reg2.
+    //e.g: reg1 indicates 32bit physical register eax on x86, and reg2
+    //indicates 8bit physical register ax, the function return true.
+    virtual bool isExactCover(Reg reg1, Reg reg2) const;
     virtual void init();
 
     void reset();

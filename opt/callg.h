@@ -182,6 +182,9 @@ public:
     //        with completely information.
     void dumpVCG(CHAR const* name = nullptr, INT flag = -1) const;
 
+    virtual void dumpVertexDesc(
+        Vertex const* v, OUT DefFixedStrBuf & buf) const;
+
     //Clean entire call-graph.
     void erase()
     {
@@ -222,6 +225,9 @@ public:
         ASSERTN(ir->is_icall(), ("TODO"));
         return nullptr; //TODO: implement icall analysis.
     }
+
+    //Return true if 'rg' does not have an IR.
+    bool isEmptyRegion(Region const* rg);
 
     //Map vertex on call-graph to corresponding CallNode.
     CallNode * mapVertex2CallNode(xcom::Vertex const* v) const

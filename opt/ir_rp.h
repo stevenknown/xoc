@@ -367,7 +367,7 @@ public:
     DomTree * domtree;
     OptCtx * oc;
     LI<IRBB> const* m_li;
-    LDACtx * m_ldactx;
+    LoopDepCtx * m_ldactx;
     LoopDepInfoSet m_ldainfo_set;
 public:
     RPCtx(OptCtx * t, RPActMgr * am = nullptr);
@@ -391,7 +391,7 @@ public:
     }
 
     void cleanLI() { setLI(nullptr); }
-    void cleanLDACtx() { setLDACtx(nullptr); }
+    void cleanLoopDepCtx() { setLoopDepCtx(nullptr); }
 
     void dumpAct(CHAR const* format, ...) const;
 
@@ -405,14 +405,14 @@ public:
 
     LI<IRBB> const* getLI() const { return m_li; }
     LoopDepInfoSet const& getLDAInfoSet() const { return m_ldainfo_set; }
-    LDACtx * getLDACtx() const { return m_ldactx; }
+    LoopDepCtx * getLoopDepCtx() const { return m_ldactx; }
     OptCtx * getOptCtx() const { return oc; }
 
     //Return true if ir is BIV or DIV.
     bool isIV(IR const* ir) const;
 
     void setLI(LI<IRBB> const* li) { m_li = li; }
-    void setLDACtx(LDACtx * ldactx) { m_ldactx = ldactx; }
+    void setLoopDepCtx(LoopDepCtx * ldactx) { m_ldactx = ldactx; }
 
     //The function try to judge if given 'ir' may reference IV. If it is true,
     //the function will invalid IVR pass because the IV will be modified.

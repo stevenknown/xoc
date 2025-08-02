@@ -34,7 +34,6 @@ author: Su Zhenyu
 #ifndef __GRA_H__
 #define __GRA_H__
 
-#define LT_FIRST_POS 0
 #define RG_PAIR_SZ 2
 #define FIRST_PHY_REG 0
 
@@ -326,7 +325,7 @@ protected:
     Vector<IR*> m_pos2ir;
     IG m_ig;
     SMemPool * m_pool;
-    LivenessMgr * m_liveness_mgr;
+    PRLivenessMgr * m_liveness_mgr;
     Prno2Vreg * m_pr2v;
     Vreg2PR * m_v2pr;
     GltMgr * m_gltm;
@@ -372,7 +371,7 @@ protected:
     void dump_allocated(FILE * h, BitSet & visited);
     void dump_unallocated(FILE * h, BitSet & visited);
 public:
-    LTMgr(IRBB * bb, LivenessMgr * prdf, GltMgr * gltm, SMemPool * pool);
+    LTMgr(IRBB * bb, PRLivenessMgr * prdf, GltMgr * gltm, SMemPool * pool);
     COPY_CONSTRUCTOR(LTMgr);
     ~LTMgr() {}
 
@@ -540,7 +539,7 @@ protected:
     RA * m_ra;
     RSC * m_rsc;
     SMemPool * m_pool;
-    LivenessMgr * m_liveness_mgr;
+    PRLivenessMgr * m_liveness_mgr;
     TypeMgr * m_tm;
     UINT m_glt_count;
     bool m_is_consider_local_interf;
@@ -557,7 +556,7 @@ protected:
     }
     bool verify();
 public:
-    GltMgr(Region * rg, LivenessMgr * prdf, RA * ra);
+    GltMgr(Region * rg, PRLivenessMgr * prdf, RA * ra);
     COPY_CONSTRUCTOR(GltMgr);
     ~GltMgr()
     {
@@ -814,7 +813,7 @@ protected:
     friend class LTMgr;
     friend class GltMgr;
 
-    LivenessMgr m_liveness_mgr;
+    PRLivenessMgr m_liveness_mgr;
     GltMgr m_gltm;
     GIG m_ig;
     RSC m_rsc;

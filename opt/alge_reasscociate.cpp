@@ -220,7 +220,7 @@ ReassCtx::ReassCtx(OptCtx & oc, Region const* rg)
 }
 
 
-void ReassCtx::dumpBBListWithRankImpl(MOD IRDumpCtx<> & dumpctx) const
+void ReassCtx::dumpBBListWithRankImpl(MOD IRDumpCtx<> & irdumpctx) const
 {
     ASSERT0(m_rg);
     BBList const* bbl = m_rg->getBBList();
@@ -229,6 +229,7 @@ void ReassCtx::dumpBBListWithRankImpl(MOD IRDumpCtx<> & dumpctx) const
     BBListIter it;
     DefFixedStrBuf buf;
     note(m_rg, "\n\n-- DUMP BBLIST WITH RANK --");
+    BBDumpCtxMgr<> dumpctx(&irdumpctx);
     for (IRBB const* bb = bbl->get_head(&it);
          bb != nullptr; bb = bbl->get_next(&it)) {
         RANK rank = getRank(bb);
@@ -263,34 +264,28 @@ CHAR const* ReassCtx::dumpRank(RANK rank, OUT DefFixedStrBuf & buf) const
 void ReassCtx::dumpBBListWithRank() const
 {
     //The class dumps IR with user defined attributes.
-    class DumpIRWithRank : public IRDumpAttrBaseFunc {
+    class DumpIRWithRank : public IRDumpCustomBaseFunc {
     public:
         ReassCtx const* ctx;
     public:
-        DumpIRWithRank() : ctx(nullptr) {}
-
-        virtual void dumpAttr(
+        virtual void dumpCustomAttr(
             OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
             ASSERT0(ctx);
             RANK rank = ctx->getRank(ir);
             if (rank == RANK_UNDEF) { return; }
-            DefFixedStrBuf tbuf;
+            xcom::DefFixedStrBuf tbuf;
             buf.strcat(" rank:%s", ctx->dumpRank(rank, tbuf));
         }
     };
-    DumpIRWithRank dumper;
-
-    //Defin<F5>]5dump flags.
     DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
+    DumpIRWithRank cf;
 
     //User defined attributes are VN info.
-    dumper.ctx = this;
-
-    //Define dump context.
-    IRDumpCtx<> dumpctx(4, f, nullptr, &dumper);
-    dumpBBListWithRankImpl(dumpctx);
+    cf.ctx = this;
+    IRDumpCtx<> irdumpctx(4, f, nullptr, &cf);
+    dumpBBListWithRankImpl(irdumpctx);
 }
 
 

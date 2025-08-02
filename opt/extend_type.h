@@ -89,18 +89,24 @@ inline bool operator >= (UINT128 const& a, UINT128 const& b)
 { return (a > b) | (a == b); }
 inline UINT128 operator * (UINT128 const& a, UINT128 const& b)
 {
+    DUMMYUSE(a);
+    DUMMYUSE(b);
     UINT128 c;
     ASSERT0(0);
     return c;
 }
 inline UINT128 operator / (UINT128 const& a, UINT128 const& b)
 {
+    DUMMYUSE(a);
+    DUMMYUSE(b);
     UINT128 c;
     ASSERT0(0);
     return c;
 }
 inline UINT128 operator % (UINT128 const& a, UINT128 const& b)
 {
+    DUMMYUSE(a);
+    DUMMYUSE(b);
     UINT128 c;
     ASSERT0(0);
     return c;

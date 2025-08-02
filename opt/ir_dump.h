@@ -84,12 +84,11 @@ CHAR const* dumpIRName(IR const* ir, MOD StrBufType & buf)
 {
     buf.sprint("%s", IRNAME(ir));
     if (g_dump_opt.isDumpIRID()) {
-        buf.strcat("(id:%u)", ir->id());
+        buf.strcat(" id:%u", ir->id());
     }
     return buf.getBuf();
 }
 void dumpIRName(IR const* ir, Region const* rg);
-
 
 //The function dumps IR_CODE's name and id into the given buffer.
 //Return the buffer address.
@@ -143,10 +142,19 @@ void dumpIRList(
 void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 
-class IRDumpAttrBaseFunc {
+//The class represents the default dump-function that includs a list of
+//call-back functions during the BB or IR dump.
+class IRDumpCustomBaseFunc {
 public:
-    virtual void dumpAttr(OUT xcom::DefFixedStrBuf &, Region const*,
-                          IR const*, DumpFlag dumpflag) const
+    //Dump IR customized attribute information into given buffer during
+    //dumping IR.
+    //NOTE:the customized attribute information is usually placed immediately
+    //after IR normal information.
+    //e.g: code:type customized-information id attact_info
+    //NOTE2: The custom function must be virtual.
+    virtual void dumpCustomAttr(
+        OUT xcom::DefFixedStrBuf &, Region const*, IR const*,
+        DumpFlag dumpflag) const
     {
         DUMMYUSE(dumpflag);
         //Target Dependent Code.
@@ -154,24 +162,38 @@ public:
     }
 };
 
-template <class DF>
-class IRDumpCtx {
+//The class represents the context information during IR or BB dump.
+//Note there is a forward declaration of IRDumpCtx placed in ir_desc.h.
+//Change the number of template-parameters should both modify the forward
+//decalaration and the class definition.
+template <class CustomFunc> class IRDumpCtx {
 public:
     UINT dn; //indent
     DumpFlag dumpflag;
     CHAR const* attr;
-    DF const* dump_attr_func;
+
+    //Dump IR attribute information into given buffer during dumping given IR.
+    //NOTE:the attribute information is usually placed immediately after IR
+    //information.
+    //e.g: code:type attribute-information id attact_info
+    //NOTE: The class use class object pointer to dump customized information
+    //rather than using virtual-function. The reason is that dump functions
+    //always defines temparary IRDumpCtx objects via copy-constructor which
+    //input argument is parent IRDumpCtx object passed in their function.
+    //Thus the temparary object can not aware and inherit the
+    //parent object's virtual-function-table.
+    CustomFunc * custom_func;
 public:
     IRDumpCtx(UINT tdn, DumpFlag const& tdumpflag, CHAR const* tattr,
-              DF * tdf = nullptr)
-        : dn(tdn), dumpflag(tdumpflag), attr(tattr), dump_attr_func(tdf) {}
+              CustomFunc * cf = nullptr)
+        : dn(tdn), dumpflag(tdumpflag), attr(tattr), custom_func(cf) {}
 };
 
 class DumpIRName {
     COPY_CONSTRUCTOR(DumpIRName);
-    xcom::StrBuf m_buf;
+    xcom::DefFixedStrBuf m_buf;
 public:
-    DumpIRName(UINT initsize = 8) : m_buf(initsize) {}
+    DumpIRName() {}
     CHAR const* dump(IR const* ir) { return xoc::dumpIRName(ir, m_buf); }
 };
 

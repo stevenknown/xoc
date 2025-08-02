@@ -33,7 +33,8 @@ namespace xoc {
 
 class ActMgr;
 class RegSSAUpdateCtx;
-class RegSetImpl;
+class LinearScanRA;
+class TargInfoMgr;
 
 typedef xcom::TMap<Reg, VReg*> Reg2VReg;
 typedef xcom::TMap<UINT, RegPhiList*> BB2RegPhiList;
@@ -115,8 +116,8 @@ class VRCollectDef {
     COPY_CONSTRUCTOR(VRCollectDef);
     RegSSAMgr const* m_mgr;
     RegSSAInfo const* m_info;
-    CollectCtx const& m_ctx;
-    Reg const* m_ref;
+    VRCollectCtx const& m_ctx;
+    Reg m_ref;
     RegDUMgr const* m_dumgr;
 protected:
     void collect(OUT IRSet * set) const;
@@ -129,7 +130,7 @@ public:
     //     declared in ctx. e.g: do collection by cross PHI operand.
     //set: record the return result.
     VRCollectDef(RegSSAMgr const* mgr, RegSSAInfo const* info,
-               CollectCtx const& ctx, Reg ref, OUT IRSet * set);
+                 VRCollectCtx const& ctx, Reg ref, OUT IRSet * set);
 };
 
 //Collect all USE, where USE is IR expression.
@@ -143,18 +144,18 @@ class VRCollectUse {
         void set_visited(UINT id) { append(id); }
     };
     RegSSAMgr const* m_mgr;
-    CollectCtx const& m_ctx;
+    VRCollectCtx const& m_ctx;
     Reg m_ref;
     RegDUMgr const* m_dumgr;
 protected:
-    void collectForVROpnd(VROpnd const* vopnd, OUT IRSet * set) const;
+    void collectForVROpnd(VROpnd const* vropnd, OUT IRSet * set) const;
     void collectForRegSSAInfo(RegSSAInfo const* info, OUT IRSet * set) const;
     void collectUseCrossPhi(RegPhi const* phi, MOD RegDefVisitor & vis,
                             OUT IRSet * set) const;
     void collectOutsideLoopImmUseForVROpnd(
-        VROpnd const* vopnd, MOD RegDefVisitor & vis, OUT IRSet * set) const;
-    void collectUseForVROpnd(VROpnd const* vopnd, MOD RegDefVisitor & vis,
-                            OUT IRSet * set) const;
+        VROpnd const* vropnd, MOD RegDefVisitor & vis, OUT IRSet * set) const;
+    void collectUseForVROpnd(VROpnd const* vropnd, MOD RegDefVisitor & vis,
+                             OUT IRSet * set) const;
 public:
     //ctx: indicates the terminating condition that the function should
     //     stop and behaviors what the collector should take when encountering
@@ -162,11 +163,11 @@ public:
     //set: record the return result.
     //info: collect USE for each VROpnd of 'info'.
     VRCollectUse(RegSSAMgr const* mgr, RegSSAInfo const* info,
-               CollectCtx const& ctx, OUT IRSet * set);
+                 VRCollectCtx const& ctx, OUT IRSet * set);
 
-    //vopnd: collect USE for 'vopnd'.
+    //vropnd: collect USE for 'vropnd'.
     VRCollectUse(RegSSAMgr const* mgr, VReg const* vreg,
-               CollectCtx const& ctx, OUT IRSet * set);
+                 VRCollectCtx const& ctx, OUT IRSet * set);
 };
 
 
@@ -242,9 +243,9 @@ public:
 class ConstRegSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstRegSSAUSEIRIter);
 public:
-    VROpndSet * vopndset;
-    VROpndSetIter vopndset_iter;
-    BSIdx current_pos_in_vopndset;
+    VROpndSet * vropndset;
+    VROpndSetIter vropndset_iter;
+    BSIdx current_pos_in_vropndset;
     VReg::UseSetIter useset_iter;
     BSIdx current_pos_in_useset;
     VReg::UseSet const* current_useset;
@@ -253,11 +254,10 @@ public:
     Region const* m_rg;
 public:
     ConstRegSSAUSEIRIter(RegSSAMgr const* regssamgr);
-
     void clean()
     {
-        vopndset_iter = nullptr;
-        current_pos_in_vopndset = BS_UNDEF;
+        vropndset_iter = nullptr;
+        current_pos_in_vropndset = BS_UNDEF;
         useset_iter.clean();
         current_pos_in_useset = BS_UNDEF;
         current_useset = nullptr;
@@ -275,7 +275,7 @@ public:
     //     g = b;
     //The RegSSA info of ST is:
     // st:i32 'g'
-    //  --DEFREF:(Reg2V2, PrevDEF:Reg2V1, NextDEF : Reg2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF:(Reg2V2, PrevDEF:Reg2V1, NextDEF : Reg2V3)|UsedBy:ld b(id:15)
     //  --DEFREF : (Reg5V2, PrevDEF:Reg5V1) | UsedBy : ld b(id:15), id(id:23)
     //  ld b is both USE of VROpnd(Reg2V2) and VROpnd(Reg5V2).
     IR const* get_first(IR const* def);
@@ -291,7 +291,7 @@ public:
     //     g = b;
     //The RegSSA info of ST is:
     // st:i32 'g'
-    //  --DEFREF:(Reg2V2, PrevDEF:Reg2V1, NextDEF : Reg2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF:(Reg2V2, PrevDEF:Reg2V1, NextDEF : Reg2V3)|UsedBy:ld b(id:15)
     //  --DEFREF : (Reg5V2, PrevDEF:Reg5V1) | UsedBy : ld b(id:15), id(id:23)
     //  ld b is both USE of VROpnd(Reg2V2) and VROpnd(Reg5V2).
     IR const* get_next();
@@ -332,7 +332,8 @@ public:
     //use: indicate the USE expression of the 'def'.
     //it: iterator. It should be clean already.
     //Readonly function.
-    RegDef const* get_first_untill_killing_def(RegDef const* def, IR const* use);
+    RegDef const* get_first_untill_killing_def(
+        RegDef const* def, IR const* use);
 
     //Iterative access RegDef chain.
     //The function return the next RegDef node according to 'it'.
@@ -373,7 +374,8 @@ public:
 
     void copy(VRegLiveSet const& src)
     { VROpndSet::copy((VROpndSet const&)src, *m_sbsmgr); }
-    void copy(VROpndSet const& vopndset) { VROpndSet::copy(vopndset, *m_sbsmgr); }
+    void copy(VROpndSet const& vropndset)
+    { VROpndSet::copy(vropndset, *m_sbsmgr); }
     void clean() { VROpndSet::clean(*m_sbsmgr); }
 
     void dump(RegSSAMgr const* mgr) const;
@@ -398,7 +400,7 @@ public:
             delete set;
         }
     }
-    void dump(Region const* rg) const;
+    void dump(RegSSAMgr const* mgr) const;
 
     void free(UINT bbid)
     {
@@ -578,8 +580,8 @@ private:
     //Return true if inserted PHI into DD chain.
     bool tryInsertDDChainForPhi(RegPhi * phi, MOD VRegLiveSet & liveset);
 public:
-    VRRenameDef(DomTree const& dt, bool build_ddchain, RegSSAMgr * mgr,
-              ActMgr * am);
+    VRRenameDef(DomTree const& dt, bool build_ddchain,
+                RegSSAMgr * mgr, ActMgr * am);
 
     void clean();
 
@@ -646,8 +648,8 @@ protected:
     RegSSAMgr * m_mgr;
     OptCtx const& m_oc;
 public:
-    VRFindAndSetLiveInDef(RegSSAMgr * mgr, OptCtx const& oc) :
-        m_mgr(mgr), m_oc(oc) {}
+    VRFindAndSetLiveInDef(RegSSAMgr * mgr, OptCtx const& oc)
+        : m_mgr(mgr), m_oc(oc) {}
 
     void findAndSet(
         MOD IR * exp, IRBB const* startbb, OUT RegSSAStatus & st,
@@ -743,8 +745,9 @@ public:
 //The region recorded in 'm_vextab' of ReconstructRegSSAVF.
 class ReconstructRegSSA : public xcom::VisitTree<ReconstructRegSSAVF> {
 public:
-    ReconstructRegSSA(xcom::DomTree const& dt, xcom::Vertex const* root,
-                     ReconstructRegSSAVF & vf)
+    ReconstructRegSSA(
+        xcom::DomTree const& dt, xcom::Vertex const* root,
+        ReconstructRegSSAVF & vf)
         : VisitTree((Tree const&)dt, root->id(), vf) {}
     void reconstruct() { visit(getRoot()); }
 };
@@ -754,7 +757,7 @@ public:
 //The class records and propagates auxiliary information to maintain RegSSA
 //information during miscellaneous optimizations.
 #define RegSSAUPDATECTX_update_duchain(x) ((x)->m_update_duchain_by_dominfo)
-#define RegSSAUPDATECTX_removed_vopnd_list(x) ((x)->m_removed_vopnd_irlist)
+#define RegSSAUPDATECTX_removed_vropnd_list(x) ((x)->m_removed_vropnd_irlist)
 class RegSSAUpdateCtx : public PassCtx {
     //THE CLASS ALLOWS COPY-CONSTRUCTION.
 public:
@@ -766,13 +769,13 @@ public:
     //Pass info top-down.
     //It is optional. If the member is not NULL, it will record IR stmt|exp
     //that VROpnd has been removed out from its RegSSAInfo.
-    IRList * m_removed_vopnd_irlist;
+    IRList * m_removed_vropnd_irlist;
 public:
     RegSSAUpdateCtx(OptCtx & oc, ActMgr * am = nullptr);
 
     void dump(Region const* rg) const;
 
-    IRList * getRemovedVROpndIRList() const { return m_removed_vopnd_irlist; }
+    IRList * getRemovedVROpndIRList() const { return m_removed_vropnd_irlist; }
     xcom::DomTree const* getDomTree() const { return m_dom_tree; }
 
     bool need_update_duchain() const
@@ -781,7 +784,7 @@ public:
     RegSSAUpdateCtx const& operator = (RegSSAUpdateCtx const&);
 
     void setRemovedVROpndIRList(IRList * lst)
-    { RegSSAUPDATECTX_removed_vopnd_list(this) = lst; }
+    { RegSSAUPDATECTX_removed_vropnd_list(this) = lst; }
     void setDomTree(xcom::DomTree const* domtree) { m_dom_tree = domtree; }
 
     //Try to record ir in an user given list if it is not NULL.
@@ -789,14 +792,14 @@ public:
     {
         ASSERT0(ir);
         ASSERT0(ir->is_stmt() || ir->is_exp());
-        if (m_removed_vopnd_irlist != nullptr) {
+        if (m_removed_vropnd_irlist != nullptr) {
             //The list will ensure ir is unique in the list.
-            m_removed_vopnd_irlist->append_tail(ir);
+            m_removed_vropnd_irlist->append_tail(ir);
         }
     }
 
     //Unify the members info which propagated bottom up.
-    void unionBottomUpInfo(RegSSAUpdateCtx const& c) const {}
+    void unionBottomUpInfo(RegSSAUpdateCtx const&) const {}
 };
 
 
@@ -820,14 +823,15 @@ class RegSSAMgr : public Pass {
     friend class LocalRegSSADump;
     COPY_CONSTRUCTOR(RegSSAMgr);
 protected:
-    BYTE m_is_semi_pruned:1;
+    bool m_is_semi_pruned;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::DefSegMgr * m_seg_mgr;
 	LinearScanRA * m_ra;
-	RegSetImpl * m_rsimpl;
+	TargInfoMgr * m_timgr;
+    ActMgr * m_am;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
@@ -837,11 +841,11 @@ protected:
     xcom::Vector<UINT> m_max_version;
 
     RegDUMgr m_dumgr;
-    ActMgr * m_am;
 protected:
     //Add an USE to given regssainfo.
     //use: occurence to be added.
-    //regssainfo: add 'use' to the UseSet of VROpnd that recorded in 'regssainfo'.
+    //regssainfo: add 'use' to the UseSet of VROpnd that recorded
+    //            in 'regssainfo'.
     //Note regssainfo must be unique for each IR.
     void addUseToRegSSAInfo(IR const* use, RegSSAInfo * regssainfo);
     void addUseSetToRegSSAInfo(IRSet const& set, RegSSAInfo * regssainfo);
@@ -855,7 +859,6 @@ protected:
         m_is_semi_pruned = true;
     }
     void cleanIRSSAInfo(IRBB * bb);
-    void cleanRegSSAInfoAI();
     void cutoffDefChain(RegDef * def);
     bool canPhiReachRealRegDef(
         RegSSAInfo const* regssainfo, RegDef const* realdef) const;
@@ -880,17 +883,21 @@ protected:
     void destructionInDomTreeOrder(
         IRBB * root, DomTree & domtree, RegSSAUpdateCtx const* ctx);
 
-    //The function dump all possible DEF of 'vopnd' by walking through the
+    //The function dump all possible DEF of 'vropnd' by walking through the
     //Def Chain.
-    void dumpDefByWalkDefChain(List<RegDef const*> & wl, IRSet & visited,
-                               VReg const* vopnd) const;
+    void dumpDefByWalkDefChain(
+        List<RegDef const*> & wl, IRSet & visited, VReg const* vropnd) const;
     void dumpExpDUChainIter(
         IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const;
     void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
     void dumpDUChainForStmt(IR const* ir, ConstIRIter & it) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
-    void dumpIRWithRegSSAForStmt(IR const* ir, bool & parting_line) const;
-    void dumpIRWithRegSSAForExp(IR const* ir, bool & parting_line) const;
+    void dumpIRWithRegSSAForStmt(IR const* ir) const;
+    void dumpIRWithRegSSAForExpTree(IR const* ir) const;
+    void dumpRegSSAInfoForExp(
+        OUT xcom::DefFixedStrBuf & buf, IR const* ir) const;
+    void dumpRegSSAInfoForStmt(
+        OUT xcom::DefFixedStrBuf & buf, IR const* ir) const;
     bool doOpndHaveValidDef(RegPhi const* phi) const;
 
     //Return true if DEF of operands are the same one.
@@ -955,10 +962,11 @@ protected:
     bool isPhiKillingDef(RegPhi const* phi) const;
 
     //Return true if stmt dominate use's stmt, otherwise return false.
-    bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
-                                LI<IRBB> const* li) const;
+    bool isStmtDomUseInsideLoop(
+        IR const* stmt, IR const* use, LI<IRBB> const* li) const;
     void initVRegStack(
         DefRegSet const& defregs, OUT Reg2VRegStack & reg2verstk);
+    void initDepPass(OptCtx & oc);
 
     void renamePhiOpndInSuccBB(IRBB * bb, Reg2VRegStack & reg2vregstk);
     void renamePhiResult(IN IRBB * bb, Reg2VRegStack & reg2vregstk);
@@ -968,9 +976,9 @@ protected:
                 DomTree const& domtree, MOD Reg2VRegStack & reg2vregstk);
     void renameBB(IRBB * bb, Reg2VRegStack & reg2vregstk);
 
-    //The function removes 'vopnd' from RegSSAInfo of each ir in its UseSet.
+    //The function removes 'vropnd' from RegSSAInfo of each ir in its UseSet.
     //Note the UseSet will be clean.
-    void removeVROpndForAllUse(MOD VReg * vopnd, RegSSAUpdateCtx const& ctx);
+    void removeVROpndForAllUse(MOD VReg * vropnd, RegSSAUpdateCtx const& ctx);
 
     //The function changes VROpnd of 'from' to 'to', for each elements in 'from'
     //UseSet.
@@ -988,14 +996,15 @@ protected:
     //    It is a work-list that is used to drive iterative collection and
     //    elimination of redundant PHI.
     //Return true if phi removed.
-    bool removePhiHasNoValidDef(List<IRBB*> * wl, RegPhi * phi,
-                                OptCtx const& oc);
+    bool removePhiHasNoValidDef(
+        List<IRBB*> * wl, RegPhi * phi, OptCtx const& oc);
 
     //wl: is an optional parameter to record BB which expected to deal with.
     //    It is a work-list that is used to drive iterative collection and
     //    elimination of redundant PHI.
     //Return true if phi removed.
-    bool removePhiHasCommonDef(List<IRBB*> * wl, RegPhi * phi, OptCtx const& oc);
+    bool removePhiHasCommonDef(
+        List<IRBB*> * wl, RegPhi * phi, OptCtx const& oc);
 
     //Remove PHI that without any USE.
     //Return true if any PHI removed, otherwise return false.
@@ -1029,17 +1038,15 @@ protected:
     //Insert PHI for VReg.
     //defbbs: record BBs which defined the VReg identified by 'reg'.
     //visited: record visited BB id
-    void placePhiForReg(Reg reg, List<IRBB*> const* defbbs,
-                       DfMgr const& dfm, xcom::BitSet & visited,
-                       List<IRBB*> & wl,
-                       BB2DefRegSet & defregs_vec);
+    void placePhiForReg(
+        Reg reg, List<IRBB*> const* defbbs, DfMgr const& dfm,
+        xcom::BitSet & visited, List<IRBB*> & wl, BB2DefRegSet & defregs_vec);
 
     //Place phi and assign the v0 for each PR.
     //effect_reg: record the Reg which need to versioning.
-    void placePhi(DfMgr const& dfm, MOD DefRegSet & effect_reg,
-                  DefMiscBitSetMgr & bs_mgr,
-                  BB2DefRegSet & defined_reg_vec,
-                  List<IRBB*> & wl);
+    void placePhi(
+        DfMgr const& dfm, MOD DefRegSet & effect_reg, DefMiscBitSetMgr & bs_mgr,
+        BB2DefRegSet & defined_reg_vec, List<IRBB*> & wl);
 
     //Union successors in NextSet from 'from' to 'to'.
     void unionSuccessors(RegDef const* from, RegDef const* to);
@@ -1047,9 +1054,9 @@ protected:
     bool verifyDUChainAndOccForPhi(RegPhi const* phi) const;
     bool verifyPhiOpndList(RegPhi const* phi, UINT prednum) const;
     bool verifyRegSSAInfoUniqueness() const;
-    void verifyDef(RegDef const* def, VReg const* vopnd) const;
+    void verifyDef(RegDef const* def, VReg const* vropnd) const;
     //Check SSA uses.
-    void verifyUseSet(VReg const* vopnd) const;
+    void verifyUseSet(VReg const* vropnd) const;
     void verifyRegSSAInfoForIR(IR const* ir) const;
     bool verifyRefedVReg() const;
     bool verifyAllVReg() const;
@@ -1063,7 +1070,7 @@ public:
         destroy(nullptr);
     }
 
-    //Add occurence to each vopnd in regssainfo.
+    //Add occurence to each vropnd in regssainfo.
     //ir: occurence to be added.
     //ref: the reference that is isomorphic to 'ir'.
     //     It is used to retrieve RegSSAInfo.
@@ -1116,8 +1123,8 @@ public:
 
     //DU chain operation.
     //Change Defined VReg from 'oldvreg' to 'newvreg'.
-    //Note the function is similar to changeDef(), however it handle VReg rather
-    //than IR.
+    //Note the function is similar to changeDef(), however it handle
+    //VReg rather than IR.
     //oldvreg: original VReg.
     //newvreg: target VReg.
     //e.g: oldvreg:Reg5V1->{USE1,USE2}, newvreg:Reg5V2->{USE3,USE4}
@@ -1159,7 +1166,7 @@ public:
     //     ------ //removed
     //     ... = p0
     void coalesceDUChain(IR const* src, IR const* tgt);
-    void cleanRegSSAInfo(IR * ir) { getRegDUMgr()->cleanRegSSAInfo(ir); }
+    void cleanAllRegSSAInfo();
 
     //The function copy RegSSAInfo from 'src' to tgt.
     void copyRegSSAInfo(IR * tgt, IR const* src);
@@ -1168,11 +1175,11 @@ public:
     //Note src and tgt must be isomorphic.
     void copyRegSSAInfoForTree(IR * tgt, IR const* src);
 
-    //The function copy RegSSAInfo from 'src' to ir. Then add ir as an USE of the
-    //new RegSSAInfo.
+    //The function copy RegSSAInfo from 'src' to ir. Then add ir as an USE
+    //of the new RegSSAInfo.
     RegSSAInfo * copyAndAddRegSSAOcc(IR * ir, RegSSAInfo const* src);
-    void collectDefinedRegForBBList(MOD DefMiscBitSetMgr & bs_mgr,
-                                   OUT BB2DefRegSet & bb2defregs) const;
+    void collectDefinedRegForBBList(
+        MOD DefMiscBitSetMgr & bs_mgr, OUT BB2DefRegSet & bb2defregs) const;
 
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
@@ -1181,8 +1188,8 @@ public:
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
     //li: loopinfo. If 'f' contained loop related flags, li can not be NULL.
-    void collectUseSet(IR const* def, LI<IRBB> const* li,
-                       VRCollectFlag f, OUT IRSet * useset);
+    void collectUseSet(
+        IR const* def, LI<IRBB> const* li, VRCollectFlag f, OUT IRSet * useset);
 
     //The function constructs SSA mode for all NonPR operations that recorded
     //in 'ssarg'.
@@ -1228,6 +1235,7 @@ public:
     //ir: can be stmt or expression.
     //ctx: the IR dump context that guide how to dump IR.
     void dumpIRWithRegSSA(IR const* ir, MOD IRDumpCtx<> * ctx) const;
+    void dumpBBListWithRegSSAInfo() const;
 
     //Duplicate Phi operand that is at the given position, and insert after
     //given position sequently.
@@ -1332,12 +1340,11 @@ public:
     PASS_TYPE getPassType() const { return PASS_REGSSA_MGR; }
 
     //Get the BB for given expression.
-    static IRBB * getExpBB(IR const* ir)
-    { return ir->is_id() ? PHYREG_phi(ir)->getBB() : ir->getStmt()->getBB(); }
+    static IRBB * getExpBB(IR const* ir);
 
     //Get RegSSAInfo if exist.
-    static RegSSAInfo * getRegSSAInfoIfAny(IR const* ir)
-    { return hasRegSSAInfo(ir) ? RegDUMgr::getRegSSAInfo(ir) : nullptr; }
+    RegSSAInfo * getRegSSAInfoIfAny(IR const* ir) const
+    { return hasRegSSAInfo(ir) ? m_dumgr.getRegSSAInfo(ir) : nullptr; }
 
     //Get PhiList if any.
     RegPhiList * getPhiList(UINT bbid) const
@@ -1350,15 +1357,16 @@ public:
     { return m_dumgr.genBBPhiList(bbid); }
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr; }
 
-    //Generate RegSSAInfo and generate VReg for referrenced Reg that both include
+    //Generate RegSSAInfo and generate VReg for referrenced Reg that
+    //both include.
     //The function will generate RegSSAInfo for 'exp' according to the refinfo.
     //that defined inside li. The new info for 'exp' will be VReg that defined
     //outside of li or the initial version of VReg.
-    void genRegSSAInfoToOutsideLoopDef(IR * exp, RegSSAInfo const* refinfo,
-                                      LI<IRBB> const* li);
+    void genRegSSAInfoToOutsideLoopDef(
+        IR * exp, RegSSAInfo const* refinfo, LI<IRBB> const* li);
 
-    //Generate RegSSAInfo and generate VROpnd for referrenced Reg that both include
-    //must-ref Reg and may-ref Regs.
+    //Generate RegSSAInfo and generate VROpnd for referrenced Reg that
+    //both include must-ref Reg and may-ref Regs.
     RegSSAInfo * genRegSSAInfoAndSetDedicatedVersionVReg(IR * ir, UINT version);
 
     //Generate RegSSAInfo and generate VROpnd for referrenced Reg that both
@@ -1402,12 +1410,24 @@ public:
     VReg * genNewVersionVReg(Reg reg)
     { return genVReg(reg, genNewVersion(reg)); }
 
-	LinearScanRA * getRA() const { return m_ra; }
-	RegSetImpl * getRegSetImpl() const { return m_rsimpl; }
+	LinearScanRA const* getRA() const { return m_ra; }
+    Reg getReg(IR const* ir) const;
+    SRegSet const* getAliasRegSet(Reg reg) const;
+	TargInfoMgr * getTIMgr() const { return m_timgr; }
+
+    //Return true if ir has been assigned physical-register.
+    bool hasReg(IR const* ir) const { return getReg(ir) != REG_UNDEF; }
 
     //Return true if ir might have RegSSAInfo.
     static bool hasRegSSAInfo(IR const* ir)
-    { return ir->isMemRefNonPR() || ir->isCallStmt(); }
+    { return ir->isPROp() || ir->getCode() == IR_PHYREG; }
+
+    //Return true if ir might have RegSSAInfo.
+    static bool hasExpRegSSAInfo(IR const* ir)
+    { return ir->is_pr() || ir->getCode() == IR_PHYREG; }
+
+    //Return true if ir might have RegSSAInfo.
+    static bool hasStmtRegSSAInfo(IR const* ir) { return ir->isPROp(); }
 
     //Return true if exist USE to 'ir'.
     //The is a helper function to provid simple query, an example to
@@ -1437,12 +1457,12 @@ public:
 
     //Return true if the value of ir1 and ir2 are definitely same, otherwise
     //return false to indicate unknown.
-    static bool hasSameValue(IR const* ir1, IR const* ir2);
+    bool hasSameValue(IR const* ir1, IR const* ir2) const;
 
     //Return true if VRegs of stmt cross version when moving stmt
     //outside of loop.
-    bool isCrossLoopHeadPhi(IR const* stmt, LI<IRBB> const* li,
-                            OUT bool & cross_nonphi_def) const;
+    bool isCrossLoopHeadPhi(
+        IR const* stmt, LI<IRBB> const* li, OUT bool & cross_nonphi_def) const;
 
     //Return true if the DU chain between 'def' and 'use' can be ignored during
     //DU chain manipulation.
@@ -1450,23 +1470,22 @@ public:
     //exp: expression.
     bool isOverConservativeDUChain(RegDef const* def, IR const* exp) const;
 
-    //Return true if there is at least one USE 'vreg' has been placed in given
-    //IRBB 'bbid'.
-    //vreg: the function will iterate all its USE occurrences.
-    //it: for tmp used.
-    bool isUseWithinBB(VReg const* vreg, MOD VReg::UseSetIter & it,
-                       UINT bbid) const;
-
-    //Initial VReg stack for each Reg in 'bb2defregs'.
-    void initVRegStack(BB2DefRegSet const& bb2defregs,
-                      OUT Reg2VRegStack & reg2verstk);
-
     //Return true if the DU chain between 'def' and 'use' can be ignored during
     //DU chain manipulation.
     //ir1: related DEF or USE to same VReg, can be stmt/exp.
     //ir2: related DEF or USE to same VReg, can be stmt/exp.
-    static bool isOverConservativeDUChain(IR const* ir1, IR const* ir2,
-                                          Region const* rg);
+    bool isOverConservativeDUChain(IR const* ir1, IR const* ir2) const;
+
+    //Return true if there is at least one USE 'vreg' has been placed in given
+    //IRBB 'bbid'.
+    //vreg: the function will iterate all its USE occurrences.
+    //it: for tmp used.
+    bool isUseWithinBB(
+        VReg const* vreg, MOD VReg::UseSetIter & it, UINT bbid) const;
+
+    //Initial VReg stack for each Reg in 'bb2defregs'.
+    void initVRegStack(
+        BB2DefRegSet const& bb2defregs, OUT Reg2VRegStack & reg2verstk);
 
     //Insert a new PHI into bb according to given Reg.
     //Note the operand and PHI's result will be initialized in initial-version.
@@ -1488,8 +1507,16 @@ public:
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
     bool isDom(RegDef const* def1, RegDef const* def2) const;
 
-    //Return true if all vopnds of 'def' can reach 'exp'.
+    //Return true if all vropnds of 'def' can reach 'exp'.
     bool isMustDef(IR const* def, IR const* exp) const;
+    bool isExactCover(Reg reg1, Reg reg2) const;
+    bool isAlias(Reg reg1, Reg reg2) const;
+    bool isAlias(IR const* ir, Reg reg2) const;
+
+    //Return true if ir1's register may overlap to ir2's register.
+    //ir1: stmt or expression.
+    //ir2: stmt or expression.
+    bool isDependent(IR const* ir1, IR const* ir2) const;
 
     //Return true if ir describes a region live-in Reg reference.
     //The function returns true if ir is region live-in in all paths that
@@ -1536,7 +1563,7 @@ public:
     //process its RHS expression.
     void removeStmtRegSSAInfo(IR const* stmt, RegSSAUpdateCtx const& ctx);
 
-    //Remove given IR expression from UseSet of each vopnd in RegSSAInfo.
+    //Remove given IR expression from UseSet of each vropnd in RegSSAInfo.
     //Note current RegSSAInfo is the SSA info of 'exp', the VROpndSet will be
     //emtpy when exp is removed from all VROpnd's useset.
     //exp: IR expression to be removed.
@@ -1557,8 +1584,8 @@ public:
     //phi: to be removed.
     //prev: previous DEF that is used to maintain DefDef chain, and it can be
     //      NULL if there is no previous DEF.
-    void removePhiFromRegSSAMgr(RegPhi * phi, RegDef * prev,
-                                RegSSAUpdateCtx const& ctx);
+    void removePhiFromRegSSAMgr(
+        RegPhi * phi, RegDef * prev, RegSSAUpdateCtx const& ctx);
 
     //The function remove all RegPhis in 'bb'.
     //Note caller should guarantee phi is useless and removable.

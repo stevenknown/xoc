@@ -33,6 +33,8 @@ namespace xoc {
 
 class ActMgr;
 class MDSSAUpdateCtx;
+class VMD;
+class MDDef;
 
 typedef xcom::TMap<UINT, VMD*> MD2VMD;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
@@ -795,7 +797,7 @@ public:
     }
 
     //Unify the members info which propagated bottom up.
-    void unionBottomUpInfo(MDSSAUpdateCtx const& c) const {}
+    void unionBottomUpInfo(MDSSAUpdateCtx const&) const {}
 };
 
 
@@ -887,8 +889,8 @@ protected:
     void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
     void dumpDUChainForStmt(IR const* ir, ConstIRIter & it) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
-    void dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const;
-    void dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const;
+    void dumpIRWithMDSSAForStmt(IR const* ir) const;
+    void dumpIRWithMDSSAForExpTree(IR const* ir) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
 
     //Return true if DEF of operands are the same one.

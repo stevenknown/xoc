@@ -247,6 +247,44 @@ public:
 };
 //END BBList
 
+//The class represents the context information during BB dump.
+template <class DumpTypeName = void>
+class BBDumpCtx {
+public:
+    BBDumpCtx() {}
+
+    //Dump prolog information before dumping BBIR list.
+    virtual void dumpProlog(Region const*, IRBB const*) const
+    {
+        //Target Dependent Code.
+        ASSERT0(0);
+    }
+
+    //Dump epilog information after dumping BBIR list.
+    virtual void dumpEpilog(Region const*, IRBB const*) const
+    {
+        //Target Dependent Code.
+        ASSERT0(0);
+    }
+};
+
+
+//The class represents the context information during IR or BB dump.
+//Note there is a forward declaration of IRDumpCtx placed in ir_desc.h.
+//Change the number of template-parameters should both modify the forward
+//decalaration and the class definition.
+template <class IRDumpCtxTypeName = IRDumpCtx<>,
+          class BBDumpCtxTypeName = BBDumpCtx<> >
+class BBDumpCtxMgr {
+public:
+    IRDumpCtxTypeName * ir_dump_ctx; //context's content may be modified
+    BBDumpCtxTypeName * bb_dump_ctx; //context's content may be modified
+public:
+    //idc: the dump context should contain IR dumping behavior at least.
+    BBDumpCtxMgr(IRDumpCtxTypeName * idc, BBDumpCtxTypeName * bdc = nullptr)
+        : ir_dump_ctx(idc), bb_dump_ctx(bdc) {}
+};
+
 
 //
 //START IRBB
@@ -309,7 +347,7 @@ public:
     }
     ~IRBB() {}
 
-    inline void addLabel(LabelInfo const* li, bool at_head = false)
+    void addLabel(LabelInfo const* li, bool at_head = false)
     {
         ASSERT0(li);
         ASSERTN(!getLabelList().find(li),
@@ -353,13 +391,15 @@ public:
         BB_is_terminate(this) |= LABELINFO_is_terminate(li);
     }
 
+    void dumpEpilog(Region const* rg, BBDumpCtx<> const* ctx) const;
+    void dumpProlog(Region const* rg, BBDumpCtx<> const* ctx) const;
     void dumpDigest(Region const* rg) const;
     void dumpLabelList(Region const* rg) const;
     void dumpAttr(Region const* rg) const;
     void dumpIRList(Region const* rg, bool dump_inner_region,
-                    MOD IRDumpCtx<> * ctx) const;
+                    MOD BBDumpCtxMgr<> * ctx) const;
     void dump(Region const* rg, bool dump_inner_region = false,
-              MOD IRDumpCtx<> * ctx = nullptr) const;
+              MOD BBDumpCtxMgr<> * ctx = nullptr) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     //The function frees all IR in IRList back into IRMgr.
@@ -421,7 +461,7 @@ public:
     { return const_cast<IRBB*>(this)->getLabelList().get_elem_count() != 0; }
 
     //Is bb containing given label.
-    inline bool hasLabel(LabelInfo const* lab) const
+    bool hasLabel(LabelInfo const* lab) const
     {
         LabelInfoListIter it;
         IRBB * pthis = const_cast<IRBB*>(this);
@@ -537,8 +577,8 @@ public:
     bool isTarget(IR const* ir) const
     { ASSERT0(ir->getLabel()); return hasLabel(ir->getLabel()); }
 
-    inline bool is_dom(IR const* ir1, IR const* ir2, IROrder const& order,
-                       bool is_strict) const
+    bool is_dom(IR const* ir1, IR const* ir2, IROrder const& order,
+                bool is_strict) const
     {
         ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
                 ir1->getBB() == this && ir2->getBB() == this);
@@ -558,7 +598,7 @@ public:
     //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
     //is_strict: true if ir1 should not equal to ir2.
-    inline bool is_dom(IR const* ir1, IR const* ir2, bool is_strict) const
+    bool is_dom(IR const* ir1, IR const* ir2, bool is_strict) const
     {
         ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
                 ir1->getBB() == this && ir2->getBB() == this);
@@ -657,14 +697,14 @@ public:
 //Exported Functions
 void dumpBBLabel(LabelInfoList & lablist, Region const* rg);
 void dumpBBList(BBList const* bbl, Region const* rg,
-                bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
+                bool dump_inner_region = true, BBDumpCtxMgr<> * ctx = nullptr);
 
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
-                bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
+                bool dump_inner_region = true, BBDumpCtxMgr<> * ctx = nullptr);
 
 void dumpBBSet(BBSet const& bbs, Region const* rg,
-               bool dump_inner_region = true, IRDumpCtx<> * ctx = nullptr);
+               bool dump_inner_region = true, BBDumpCtxMgr<> * ctx = nullptr);
 
 bool verifyIRandBB(BBList * bbl, Region const* rg);
 

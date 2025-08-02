@@ -54,9 +54,7 @@ public:
     BBSet m_bbset;
 public:
     SSARegion(xcom::DefMiscBitSetMgr * sbs, DomTree const& dt,
-              Region const* rg, OptCtx * oc, ActMgr * am) :
-        m_rg(rg), m_root(nullptr), m_oc(oc), m_am(am), m_domtree(dt),
-        m_bbset(sbs->getSegMgr()) { m_cfg = m_rg->getCFG(); }
+              Region const* rg, OptCtx * oc, ActMgr * am);
 
     //The function will find PR that assigned 'prno' into current
     //SSA construction region.

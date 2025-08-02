@@ -69,7 +69,7 @@ public:
     SegType end;
     SegInfo info;
 public:
-    Seg(UINT c) {} //To avoid sstl template complaint.
+    Seg(UINT) {} //To avoid sstl template complaint.
     Seg(SegType pstart, SegType pend)
         : start(pstart), end(pend) {}
 };

@@ -259,7 +259,7 @@ public:
 //    2. [p + ST_ofst] = rhs if ST_ofst is not 0.
 #define ST_bb(ir) (((CSt*)CK_IRC(ir, IR_ST))->bb)
 #define ST_idinfo(ir) (((CSt*)CK_IRC(ir, IR_ST))->id_info)
-#define ST_align(ir) (((CSt*)CK_IRC(ir, IR_ST))->alignment)
+#define ST_align(ir) (((CSt*)CK_IRC(ir, IR_ST))->align)
 #define ST_is_aligned(ir) (((CSt*)CK_IRC(ir, IR_ST))->is_aligned)
 #define ST_ofst(ir) (((CSt*)CK_IRC(ir, IR_ST))->field_offset)
 
@@ -273,8 +273,6 @@ class CSt : public CLd, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    bool is_aligned;
-    UINT alignment;
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return ST_rhs(ir); }

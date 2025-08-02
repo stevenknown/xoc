@@ -156,6 +156,7 @@ private:
 protected:
     void copyVN(IR const* newir, IR const* oldir);
     bool canElimCVT(IR const* exp, IR const* gen) const;
+    bool canElimRelationOp(IR const* exp, IR const* gen) const;
 
     bool doPropVNDirectStmt(IR * ir, GCSECtx const& ctx);
     bool doPropVNIndirectStmt(IR * ir, GCSECtx const& ctx);
@@ -191,6 +192,9 @@ protected:
 
     virtual bool isCseCandidate(IR const* ir) const;
     bool initDepPass(MOD OptCtx & oc);
+
+    bool isRelationOpCSEConcerned(IR const* exp) const
+    { return exp->is_lt() || exp->is_le() || exp->is_gt() || exp->is_ge(); }
 
     //Replace 'use' CSE with PR that related to 'gen' CSE.
     //e.g: ...=a+b <--generate CSE

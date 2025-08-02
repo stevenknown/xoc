@@ -61,6 +61,10 @@ public:
                      Type const* ty);
     IR * buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse, Type const* ty);
 
+    #ifdef REF_TARGMACH_INFO
+    IR * buildPhyReg(xgen::Reg reg, RegPhi * regphi);
+    #endif
+
     //Return expression list that describe multiple isomorphic result.
     virtual IR * getAlterResDescList(IR * stmt) const;
 

@@ -159,14 +159,14 @@ void LDAActMgr::dumpAct(IR const* ir, CHAR const* format, ...) const
     }
     getRegion()->getLogMgr()->incIndent(4);
     xcom::StrBuf irbuf(64);
-    dumpIRToBuf(ir, getRegion(), irbuf);
+    xoc::dumpIRToBuf(ir, getRegion(), irbuf);
     getRegion()->getLogMgr()->decIndent(4);
     acth.info->strcat(irbuf);
 }
 
 
-void LDAActMgr::dumpLinRepAct(IVLinearRep const& linrep,
-                               CHAR const* format, ...) const
+void LDAActMgr::dumpLinRepAct(
+    IVLinearRep const& linrep, CHAR const* format, ...) const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
     ASSERTN(format, ("no action info"));
@@ -182,9 +182,32 @@ void LDAActMgr::dumpLinRepAct(IVLinearRep const& linrep,
 
 
 //
-//START LDACtx
+//START LoopDepCtx
 //
-LoopDepInfo * LDACtx::allocLoopDepInfo()
+LoopDepCtx::LoopDepCtx(Region const* rg, LI<IRBB> const* li) : m_am(rg)
+{
+    ASSERT0(li);
+    m_li = li;
+    m_pool = smpoolCreate(sizeof(LoopDepInfo) * 4, MEM_COMM);
+    m_firtab_pool = smpoolCreate(
+        FirstTab::getTNodeSize() * 2, MEM_CONST_SIZE);
+    m_ir2ldi_pool = smpoolCreate(
+        IR2LDITab::getTNodeSize() * 2, MEM_CONST_SIZE);
+    m_mddef2ldi_pool = smpoolCreate(
+        MDDef2LDITab::getTNodeSize() * 2, MEM_CONST_SIZE);
+}
+
+
+LoopDepCtx::~LoopDepCtx()
+{
+    smpoolDelete(m_pool);
+    smpoolDelete(m_firtab_pool);
+    smpoolDelete(m_ir2ldi_pool);
+    smpoolDelete(m_mddef2ldi_pool);
+}
+
+
+LoopDepInfo * LoopDepCtx::allocLoopDepInfo()
 {
     LoopDepInfo * p = (LoopDepInfo*)smpoolMalloc(sizeof(LoopDepInfo), m_pool);
     ASSERT0(p);
@@ -193,7 +216,7 @@ LoopDepInfo * LDACtx::allocLoopDepInfo()
 }
 
 
-LDACtx::FirstTab * LDACtx::allocFirstTab()
+LoopDepCtx::FirstTab * LoopDepCtx::allocFirstTab()
 {
     FirstTab * p = (FirstTab*)smpoolMalloc(sizeof(FirstTab), m_pool);
     ASSERT0(p);
@@ -203,7 +226,7 @@ LDACtx::FirstTab * LDACtx::allocFirstTab()
 }
 
 
-LDACtx::SecondTab * LDACtx::allocSecondTab()
+LoopDepCtx::SecondTab * LoopDepCtx::allocSecondTab()
 {
     SecondTab * p = (SecondTab*)smpoolMalloc(sizeof(SecondTab), m_pool);
     ASSERT0(p);
@@ -212,7 +235,7 @@ LDACtx::SecondTab * LDACtx::allocSecondTab()
 }
 
 
-LDACtx::IR2LDITab * LDACtx::allocIR2LDI()
+LoopDepCtx::IR2LDITab * LoopDepCtx::allocIR2LDI()
 {
     IR2LDITab * p = (IR2LDITab*)smpoolMalloc(sizeof(IR2LDITab), m_pool);
     ASSERT0(p);
@@ -222,7 +245,7 @@ LDACtx::IR2LDITab * LDACtx::allocIR2LDI()
 }
 
 
-LDACtx::MDDef2LDITab * LDACtx::allocMDDef2LDI()
+LoopDepCtx::MDDef2LDITab * LoopDepCtx::allocMDDef2LDI()
 {
     MDDef2LDITab * p = (MDDef2LDITab*)smpoolMalloc(
         sizeof(MDDef2LDITab), m_pool);
@@ -233,7 +256,7 @@ LDACtx::MDDef2LDITab * LDACtx::allocMDDef2LDI()
 }
 
 
-LoopDepInfo const* LDACtx::appendLoopDepInfo(LoopDepInfo const& ldi)
+LoopDepInfo const* LoopDepCtx::appendLoopDepInfo(LoopDepInfo const& ldi)
 {
     IR const* src = ldi.getSrc();
     ASSERT0(src);
@@ -279,32 +302,42 @@ LoopDepInfo const* LDACtx::appendLoopDepInfo(LoopDepInfo const& ldi)
     }
     return hashed;
 }
-//END LDACtx
+//END LoopDepCtx
 
 
 //
 //START LoopDepAna
 //
-bool LoopDepAna::isSameMemLocViaEVN(LoopDepInfo const& info)
+LoopDepAna::LoopDepAna(Region * rg, GVN * gvn) : Pass(rg)
+{
+    m_pool = nullptr;
+    m_is_aggressive = true;
+    init(gvn);
+}
+
+
+bool LoopDepAna::isSameMemLocViaEVN(
+    LoopDepInfo const& info, OUT LoopDepCtx * ctx)
 {
     ASSERT0(info.verify());
     if (info.getSrc()->isIndirectMemOp() &&
         info.isTgtIR() &&
         info.getTgtIR()->isIndirectMemOp() &&
         info.getSrc()->getOffset() == info.getTgtIR()->getOffset()) {
-        return isSameMemLocIndirectOp(info);
+        return isSameMemLocIndirectOp(info, ctx);
     }
     if (info.getSrc()->isArrayOp() &&
         info.isTgtIR() &&
         info.getTgtIR()->isArrayOp() &&
         info.getSrc()->getOffset() == info.getTgtIR()->getOffset()) {
-        return isSameMemLocArrayOp(info);
+        return isSameMemLocArrayOp(info, ctx);
     }
     return false;
 }
 
 
-bool LoopDepAna::isSameMemLocArrayOp(LoopDepInfo const& info)
+bool LoopDepAna::isSameMemLocArrayOp(
+    LoopDepInfo const& info, OUT LoopDepCtx * ctx)
 {
     if (info.isTgtMDDef()) { return false; }
     ASSERT0(info.isTgtIR());
@@ -338,7 +371,8 @@ bool LoopDepAna::isSameMemLocArrayOp(LoopDepInfo const& info)
 }
 
 
-bool LoopDepAna::isSameMemLocIndirectOp(LoopDepInfo const& info)
+bool LoopDepAna::isSameMemLocIndirectOp(
+    LoopDepInfo const& info, OUT LoopDepCtx * ctx)
 {
     if (info.isTgtMDDef()) { return false; }
     ASSERT0(info.getSrc()->isIndirectMemOp() &&
@@ -348,7 +382,7 @@ bool LoopDepAna::isSameMemLocIndirectOp(LoopDepInfo const& info)
     ASSERT0(src->getOffset() == tgt->getOffset());
     IR const* srcbase = src->getBase();
     IR const* tgtbase = tgt->getBase();
-    InferCtx ictx;
+    InferCtx ictx(ctx == nullptr ? nullptr : &ctx->getActMgr());
     VN const* srcvn = getInferEVN().inferExp(srcbase, ictx);
     VN const* tgtvn = getInferEVN().inferExp(tgtbase, ictx);
     return srcvn == nullptr || srcvn == tgtvn;
@@ -361,13 +395,13 @@ void LoopDepAna::destroy()
     m_infer_evn = nullptr;
     smpoolDelete(m_pool);
     m_pool = nullptr;
-    m_am.clean();
 }
 
 
 void LoopDepAna::init(GVN * gvn)
 {
     if (m_pool != nullptr) { return; }
+    ASSERT0(gvn);
     ASSERT0(getRegion());
     ASSERTN(gvn, ("LoopDepAna need GVN"));
     m_pool = smpoolCreate(sizeof(LFRInfo) * 4, MEM_COMM);
@@ -410,7 +444,7 @@ bool LoopDepAna::containLoopCarrDep(LoopDepInfoSet const& set)
 
 
 void LoopDepAna::analyzeLinearDep(
-    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     ASSERT0(ir && ctx.getLI());
     ASSERT0(tgt->is_exp() || tgt->is_stmt());
@@ -437,7 +471,7 @@ void LoopDepAna::analyzeLinearDep(
 
 void LoopDepAna::analyzeLinearDep(
     IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
-    MOD LDACtx & ctx)
+    MOD LoopDepCtx & ctx)
 {
     ASSERT0(ir && ctx.getLI());
     xcom::List<IR*>::Iter it;
@@ -450,7 +484,7 @@ void LoopDepAna::analyzeLinearDep(
 
 
 void LoopDepAna::analyzeRedDep(
-    IR const* ir, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     if (!ir->is_exp()) { return; }
     if (!ir->isDirectMemOp() && !ir->isReadPR()) { return; }
@@ -463,7 +497,7 @@ void LoopDepAna::analyzeRedDep(
 
 void LoopDepAna::analyzeDep(
     IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
-    MOD LDACtx & ctx)
+    MOD LoopDepCtx & ctx)
 {
     ctx.add(ir); //setting ir that is already analyzed.
     analyzeLinearDep(ir, lst, set, ctx);
@@ -472,7 +506,7 @@ void LoopDepAna::analyzeDep(
 
 
 void LoopDepAna::analyzeDep(
-    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     ctx.add(ir); //setting ir that is already analyzed.
     analyzeLinearDep(ir, tgt, set, ctx);
@@ -481,7 +515,7 @@ void LoopDepAna::analyzeDep(
 
 
 bool LoopDepAna::transLoopCarrToLoopIndep(
-    IR const* ir, MOD LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, MOD LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     bool changed = false;
     LoopDepInfoSetIter it;
@@ -491,12 +525,12 @@ bool LoopDepAna::transLoopCarrToLoopIndep(
          !it.end(); ldi = set.get_next(it)) {
         ASSERT0(ldi);
         if (!ldi->isLoopCarr()) { continue; }
-        if (!isSameMemLocViaEVN(*ldi)) { continue; }
+        if (!isSameMemLocViaEVN(*ldi, &ctx)) { continue; }
 
         //Revise loop-carried to loop-independent to make loop dependence
         //more precise.
         ASSERT0(ldi->isTgtIR());
-        getActMgr().dumpAct(ir,
+        ctx.getActMgr().dumpAct(ir,
             "%s and %s access same memory location, thus they have "
             "loop-independent dependence",
             DumpIRName().dump(ldi->getSrc()),
@@ -521,7 +555,7 @@ bool LoopDepAna::transLoopCarrToLoopIndep(
 
 
 void LoopDepAna::analyzeDepForIRTree(
-    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     ASSERT0(ir->is_exp() || ir->is_stmt());
     ASSERT0(tgt->is_exp() || tgt->is_stmt());
@@ -536,7 +570,7 @@ void LoopDepAna::analyzeDepForIRTree(
 
 
 void LoopDepAna::analyzeDepAndRefineDep(
-    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LDACtx & ctx)
+    IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx)
 {
     analyzeDep(ir, tgt, set, ctx);
     transLoopCarrToLoopIndep(ir, set, ctx);
@@ -545,7 +579,7 @@ void LoopDepAna::analyzeDepAndRefineDep(
 
 void LoopDepAna::analyzeDepForIRTree(
     IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
-    LDACtx & ctx)
+    LoopDepCtx & ctx)
 {
     ASSERT0(ir->is_exp() || ir->is_stmt());
     ConstIRIter it;
@@ -572,13 +606,15 @@ void LoopDepAna::dumpInferEVN() const
 }
 
 
-bool LoopDepAna::dump() const
+bool LoopDepAna::dump(LoopDepCtx const* ctx) const
 {
     if (!getRegion()->isLogMgrInit()) { return false; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    m_am.dump();
+    if (ctx != nullptr) {
+        ctx->dump();
+    }
     dumpInferEVN();
     bool res = Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
@@ -594,12 +630,10 @@ void LoopDepAna::reset()
 }
 
 
-bool LoopDepAna::perform(OptCtx & oc)
+bool LoopDepAna::initDepPass(MOD OptCtx & oc)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_ref_valid()) { return false; }
-    reset();
+
     //Initialize pass object since they might be destructed at any moment.
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
@@ -615,7 +649,6 @@ bool LoopDepAna::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(
         &oc, PASS_DOM, PASS_LOOP_INFO, PASS_IVR, PASS_UNDEF);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
@@ -633,10 +666,24 @@ bool LoopDepAna::perform(OptCtx & oc)
         //The pass just utilize the analysis ability of GVN.
         return false;
     }
+    return true;
+}
+
+
+bool LoopDepAna::perform(OptCtx & oc)
+{
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    reset();
+    START_TIMER(t, getPassName());
+    if (!initDepPass(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopDepAna()) {
-        dump();
+        dump(nullptr);
     }
     m_rg->getLogMgr()->cleanBuffer();
     END_TIMER(t, getPassName());

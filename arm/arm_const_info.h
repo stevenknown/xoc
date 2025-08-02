@@ -196,11 +196,6 @@ typedef enum _SLOT {
 } SLOT;
 #define SLOT_NAME_MAX_LEN 10
 
-//Machine instruction word length in BYTE of ARM architecture.
-#define MI_WORD_LEN_BYTE 4
-
-#define ARM_GOT_SECTION_ELEM_BYTE_SIZE 8
-
 //Machine function units for all clusters.
 //Note that function unit and issue slot do not have to be one to one mapped.
 //e.g: an instruction that issued at slot-A might occupied unit-1, unit-2.
@@ -304,7 +299,10 @@ typedef enum _REGFILE {
     //LE  Signed less than or equal
     //AL  Always (this is the default)
     RF_P = 10,
-    RF_NUM = 11,
+
+    //Float point register, includes S, D, Q.
+    RF_F = 11,
+    RF_NUM = RF_F + 1,
 } REGFILE;
 
 //Define mnemonic for ARM physical register.
@@ -379,6 +377,7 @@ typedef enum _REGFILE {
 #define REG_TMP 13 //R12, Scratch Register, the synonym is IP register.
 #define REG_ZERO REG_R0
 #define REG_SP 14
+#define REG_RETURN_ADDRESS_REGISTER 15
 #define REG_D0 17
 #define REG_D1 18
 #define REG_D31 48
@@ -404,7 +403,6 @@ typedef enum _REGFILE {
 #define REG_GT_PRED 112
 #define REG_LE_PRED 113
 #define REG_TRUE_PRED 114
-#define REG_RETURN_ADDRESS_REGISTER 15
 #define REG_LAST 114 //The last physical register
 #define REG_NUM (REG_LAST+1) //The number of physical register
 
@@ -417,6 +415,14 @@ typedef enum _REGFILE {
 #define RF_Q_REG_END REG_Q15
 #define RF_S_REG_START REG_S0
 #define RF_S_REG_END REG_S31
+#define RF_F_REG_START RF_D_REG_START
+#define RF_F_REG_END RF_S_REG_END
+#define RF_P_REG_START REG_EQ_PRED
+#define RF_P_REG_END REG_TRUE_PRED
+
+//Status registers
+#define RF_ST_REG_START REG_RFLAG_REGISTER
+#define RF_ST_REG_END REG_RFLAG_REGISTER
 
 //Define reigsters to pass argument.
 #define ARG_REG_START REG_R0
@@ -448,6 +454,9 @@ typedef enum _REGFILE {
 
 //Define the minimum target machine global memory operations alignment.
 #define GLOBAL_MEMORY_ALIGNMENT 4
+
+//Define the cycle to load data from onchip L1 cache.
+#define ARM_LOAD_ONCHIP_CYC  3
 
 //Target.
 typedef enum _TARG {

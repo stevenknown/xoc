@@ -390,6 +390,13 @@ public:
     //Otherwise return false means there is nothing changed.
     bool doSimplyCPByClassicDU(OptCtx & oc);
 
+    //Perform DeadCodeElim using classic DU chain.
+    //The funtion returns true means IR, BBList, MD ref,
+    //DefUse chain or CFG etc informations changed, user should consider
+    //whether other optimizations should be reperform again.
+    //Otherwise return false means there is nothing changed.
+    bool doSimplyDCEByClassicDU(OptCtx & oc);
+
     //The funtion returns true means IR, BBList, MD ref,
     //DefUse chain or CFG etc informations changed, user should consider
     //whether other optimizations should be reperform again.
@@ -401,6 +408,9 @@ public:
     //whether other optimizations should be reperform again.
     //Otherwise return false means there is nothing changed.
     bool doBasicAnalysis(OptCtx & oc);
+
+    //Perform refinement optimization.
+    virtual bool doRefine(OptCtx & oc);
 
     //Duplication all contents of 'src', includes AttachInfo, except DU info,
     //SSA info, kids and siblings IR.
@@ -444,7 +454,7 @@ public:
     void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
 
     //Dump all irs and ordering by IR_id.
-    void dumpAllIR() const { getIRMgr()->dump(); }
+    void dumpAllIR() const;
 
     //Dump each Var in current region's Var table.
     void dumpVARInRegion() const;
@@ -609,12 +619,10 @@ public:
     { return &ANA_INS_mds_hash(getAnalysisInstrument()); }
 
     //Return IR pointer via the unique IR_id.
-    IR * getIR(UINT irid) const
-    { return ANA_INS_ir_vec(getAnalysisInstrument()).get(irid); }
+    IR * getIR(UINT irid) const;
 
     //Return the vector that record all allocated IRs.
-    xcom::Vector<IR*> & getIRVec() const
-    { return ANA_INS_ir_vec(getAnalysisInstrument()); }
+    xcom::Vector<IR*> & getIRVec() const;
 
     //Return IRMgr.
     IRMgr * getIRMgr() const { return ANA_INS_ir_mgr(getAnalysisInstrument()); }

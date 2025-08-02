@@ -35,7 +35,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 
-Var const* IRRelocMgr::getLocalVar(IR * ir, OUT IR ** ir_has_var) const
+Var const* IRRelocMgr::getStackVar(IR * ir, OUT IR ** ir_has_var) const
 {
     ASSERT0(ir);
     ConstIRIter irit;
@@ -49,8 +49,10 @@ Var const* IRRelocMgr::getLocalVar(IR * ir, OUT IR ** ir_has_var) const
 
         Var const* var = inner_ir->getIdinfo();
 
-        if (!inner_ir->getIdinfo()->is_local()) { continue; }
-        if (var->is_unallocable()) { continue; }
+        if (!var->is_local()) { continue; }
+        if (var->is_unallocable() && var->getStorageSpace() != SS_STACK) {
+            continue;
+        }
 
         if (ir->is_call()) { continue; }
 
@@ -117,23 +119,22 @@ void IRRelocMgr::processStoreIR(OUT IRList & irlist, IR const* ir,
                                 HOST_INT offset)
 {
     ASSERT0(ir && ir->is_st());
-    ASSERT0(ir->hasIdinfo() && ir->getIdinfo()->is_local());
+    Type const* tp = ir->getType();
+    ASSERT0(tp);
+    IR const* rhs = ir->getRHS();
+    ASSERT0(rhs);
+    Var const* var = ir->getIdinfo();
+    ASSERT0(var && var->is_local());
 
     //Calculate the address of local var.
     offset += ST_ofst(ir);
-    IR * base = constructAddressIROfLocalVar(irlist, ir->getIdinfo(), offset);
-
-    //Build IR_IST.
+    IR * base = constructAddressIROfLocalVar(irlist, var, offset);
     ST_ofst(ir) = 0;
-    IR * istore = m_irmgr->buildIStore(base,
-        m_irmgr->buildPRdedicated(ir->getRHS()->getPrno(), ir->getType()),
-        ST_ofst(ir), ir->getType());
-
+    IR * istore = m_irmgr->buildIStore(base, m_rg->dupIRTree(rhs),
+        ST_ofst(ir), tp);
     istore->setAligned(ir->isAligned());
     irlist.append_tail(istore);
-    if (xoc::g_debug) {
-        copyDbx(istore, ir, m_rg);
-    }
+    if (xoc::g_debug) { copyDbx(istore, ir, m_rg); }
 }
 
 
@@ -230,7 +231,7 @@ bool IRRelocMgr::verifyLocalVarOffset() const
         for (IR * ir = irlst.get_head(&bbirit); ir != nullptr;
              ir = irlst.get_next(&bbirit)) {
             IR * inner_ir = nullptr;
-            Var const* var = getLocalVar(ir, &inner_ir);
+            Var const* var = getStackVar(ir, &inner_ir);
             if (var == nullptr || var->is_func()) {
                 continue;
             }
@@ -269,7 +270,7 @@ void IRRelocMgr::performRelocForIR(IR * ir, OUT IRList & new_ir_list)
     }
 
     IR * inner_ir = nullptr;
-    Var const* var = getLocalVar(ir, &inner_ir);
+    Var const* var = getStackVar(ir, &inner_ir);
     if (var == nullptr || var->is_func()) {
         new_ir_list.append_tail(ir);
         return;

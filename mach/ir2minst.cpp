@@ -136,6 +136,7 @@ void IR2MInst::processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont)
 void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->verify(m_rg));
+    if (!initDepPass()) { return; }
     switch (ir->getCode()) {
     case IR_ST:
         convertStoreVar(ir, mis, cont);
@@ -192,7 +193,9 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
         convertLabel(ir, mis, cont);
         break;
     //Following IRs do not need to be convert into machine instruction.
-    SWITCH_CASE_EXT_VSTMT: break;
+    SWITCH_CASE_EXT_VSTMT:
+        convertExtVStmt(ir, cont);
+    break;
     default: convertExtStmt(ir, mis, cont);
     }
 }

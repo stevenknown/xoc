@@ -215,9 +215,14 @@ protected:
 
     //Use external function call to copy data with size from source to
     //destination.
-    virtual void buildMemcpy(OUT IRList & irlst, IR const* source,
-                             Var * destination, UINT const size)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    virtual void buildMemcpy(
+        OUT IRList & irlst, IR const* source, Var * destination,
+        UINT const size)
+    {
+        DUMMYUSE(source && size && destination);
+        DUMMYUSE(irlst);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     //GCOVR_EXCL_STOP
 
     //Get the destination address of the IR_CALL/IR_ICALL and put it into the
@@ -331,7 +336,7 @@ protected:
 
     //Determines the argument register type when passing parameters
     //via registers.
-    virtual Type const* getParamRegisterType(Type const* ty, Reg r) const
+    virtual Type const* getParamRegisterType(Type const* ty, Reg) const
     { return ty; }
 
     //Init registers binding info before allocated for each function.
@@ -341,19 +346,22 @@ protected:
     virtual bool isArgPasserExternalCallNeedLda() //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return false; }
 
+    void maintainLoopInfo(IRBB const* orgbb, SplitBBCtx const& sctx,
+        OptCtx const& oc);
+
     xgen::Reg pickReg(RegSet & set)
     { return RegSetImpl::pickRegByIncrementalOrder(set); }
 
     //Pick reg according to var.
-    virtual xgen::Reg pickParamReg(Var const* v) //GCOVR_EXCL_LINE
+    virtual xgen::Reg pickParamReg(Var const*) //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
 
     //Pick reg according to ir.
-    virtual xgen::Reg pickParamReg(IR const* ir) //GCOVR_EXCL_LINE
+    virtual xgen::Reg pickParamReg(IR const*) //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
 
     //Pick ret reg.
-    virtual xgen::Reg pickRetReg(IR const* ir) //GCOVR_EXCL_LINE
+    virtual xgen::Reg pickRetReg(IR const*) //GCOVR_EXCL_LINE
     { ASSERTN(0, ("Target Dependent Code")); return REG_UNDEF; }
 
     //1. For parameters that are passed by registers.

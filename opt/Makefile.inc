@@ -10,7 +10,6 @@ ir.o\
 ir_bb.o\
 ir_builder.o\
 ir_du.o\
-ir_ddg.o\
 ir_cfg.o\
 ir_simp.o\
 ir_gvn.o\

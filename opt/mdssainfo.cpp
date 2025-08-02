@@ -761,8 +761,8 @@ void MDPhi::dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
             MD const* ref = opnd->getRefMD();
             ASSERT0_DUMMYUSE(ref);
             ASSERT0(ref->id() == vopnd->mdid());
-            prt(rg, "ID id:%u MD%uV%u", opnd->id(), vopnd->mdid(),
-                vopnd->version());
+            prt(rg, "ID id:%u VMD%u:MD%uV%u",
+                opnd->id(), vopnd->id(), vopnd->mdid(), vopnd->version());
         }
         break;
     }

@@ -293,6 +293,7 @@ typedef List<LexBackwardJump const*> BackwardEdgeList;
 class LexBackwardJumpAnalysis {
     COPY_CONSTRUCTOR(LexBackwardJumpAnalysis);
     friend class OccRecorderVF;
+protected:
     Region * m_rg;
     BBPos2Attr * m_pos2attr;
     IRMgr * m_irmgr;
@@ -339,6 +340,11 @@ protected:
 
     //Collect all the backward jumps in the control flow graph.
     void collectBackwardJumps(Vector<UINT> const& bb_seqid);
+
+    //Return true if 'prno' has been pre-assigned a physical-register, and
+    //we can neglect the affect of the special 'prno' during
+    //FakeUse generation.
+    bool canSkipPreAssignedReg(PRNO prno) const;
 
     void generateFakeUse();
 
@@ -462,35 +468,35 @@ class RegSetImpl {
 protected:
     LinearScanRA & m_ra;
 
-    //Target scalar register.
+    //Target machine defined scalar register.
     RegSet const* m_target_callee_scalar;
     RegSet const* m_target_caller_scalar;
     RegSet const* m_target_param_scalar;
     RegSet const* m_target_return_value_scalar;
 
-    //Target vector register.
+    //Target machine defined vector register.
     RegSet const* m_target_callee_vector;
     RegSet const* m_target_caller_vector;
     RegSet const* m_target_param_vector;
     RegSet const* m_target_return_value_vector;
 
-    //Target allocable register.
+    //Target machine defined allocable register.
     RegSet const* m_target_allocable_scalar;
     RegSet const* m_target_allocable_vector;
 
-    //Scalar register.
+    //RegSetImpl customized scalar register.
     RegSet m_avail_callee_scalar;
     RegSet m_avail_caller_scalar;
     RegSet m_avail_param_scalar;
     RegSet m_avail_return_value_scalar;
 
-    //Vector register.
+    //RegSetImpl customized vector register.
     RegSet m_avail_callee_vector;
     RegSet m_avail_caller_vector;
     RegSet m_avail_param_vector;
     RegSet m_avail_return_value_vector;
 
-    //Record used register.
+    //Record used register that indicates the allocation behaviors.
     RegSet m_used_callee;
     RegSet m_used_caller;
 
@@ -521,7 +527,10 @@ protected:
 public:
     RegSetImpl(LinearScanRA & ra);
     virtual ~RegSetImpl() { destroyRegSet(); }
+
+    void dump() const;
     void dumpAvailRegSet() const;
+    void dumpUsedRegSet() const;
 
     //Free register.
     void freeReg(xgen::Reg reg);
@@ -549,7 +558,7 @@ public:
 
     //Get the type of callee-save register. This function ensures the
     //correct register type is used when saving callee-saved registers.
-    virtual Type const* getCalleeRegisterType(Reg r, TypeMgr * tm) const
+    virtual Type const* getCalleeRegisterType(Reg, TypeMgr *) const
     { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     TargInfoMgr & getTIMgr() const;
@@ -640,18 +649,19 @@ public:
 
     //GCOVR_EXCL_START
     //Return true if Type matches the register type.
+    //e.g: given 'r' is a scalar register R15, however 'ty' is a vector type
+    //<f32x128>, the function returns false because R15 can not be used as
+    //a <f32x128> vector register.
     virtual bool isRegTypeMatch(Type const* ty, Reg r) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
+    {
+        ASSERT0(ty->is_vector() || ty->is_int() || ty->is_fp() || ty->is_any());
+        ASSERTN(0, ("Target Dependent Code"));
+
+        //The following code implements the default behaviours.
+        return (ty->is_vector() && isVector(r)) ||
+            (!ty->is_vector() && (isCalleeScalar(r) || isCallerScalar(r)));
+    }
     //GCOVR_EXCL_STOP
-
-    //Return true if register reg1 exactly cover reg2.
-    //e.g: reg1 indicates 32bit physical register eax on x86, and reg2
-    //indicates 8bit physical register ax, the function return true.
-    virtual bool isExactCover(Reg reg1, Reg reg2) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
-
-    //Return true if register r1 alias to r2.
-    virtual bool isAlias(Reg r1, Reg r2) const { return r1 == r2; }
 
     //True if input reg is return value register.
     bool isReturnValue(Reg r) const
@@ -785,7 +795,7 @@ public:
 
     //Set the constraints for the current IR's lifetime.
     //Note that the constraints for each IR vary depending on the architecture.
-    virtual void applyConstraints(IR * ir)
+    virtual void applyConstraints(IR *)
     { ASSERTN(0, ("Target Dependent Code")); }
 };
 //END LTConstraintsStrategy
@@ -1401,7 +1411,7 @@ protected:
     //which will be used in the spill reload promotion algorithm to find
     //whether there is a proper register to eliminate the spill/reload in
     //a certain live range.
-    LifeTimeMgr * m_reg_lt_mgr;
+    RegLifeTimeMgr * m_reg_lt_mgr;
 
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
@@ -1430,8 +1440,10 @@ protected:
     Ty2Var m_ty2var;
 protected:
     LifeTimeMgr * allocLifeTimeMgr(Region * rg)
-    { ASSERT0(rg); return new LifeTime2DMgr(rg, this); }
+    { ASSERT0(rg); return new LifeTime2DMgr(rg); }
     FakeIRMgr * allocFakeIRMgr() { return new FakeIRMgr(m_rg, this); }
+    RegLifeTimeMgr * allocRegLifeTimeMgr(Region * rg)
+    { ASSERT0(rg); return new RegLifeTimeMgr(rg, this); }
     virtual RegSetImpl * allocRegSetImpl() { return new RegSetImpl(*this); }
 
     //Allocates an instance of the lifetime constraints strategy.
@@ -1500,61 +1512,14 @@ public:
 
     //The function check whether 'lt' value is simple enough to rematerialize.
     //And return the information through rematctx.
-    virtual bool checkLTCanBeRematerialized(MOD LifeTime * lt,
-                                            OUT RematCtx & rematctx);
-    virtual void collectDedicatedPR(BBList const* bblst,
-                                    OUT PreAssignedMgr & mgr);
+    virtual bool checkLTCanBeRematerialized(
+        MOD LifeTime * lt, OUT RematCtx & rematctx);
 
     void doBackwardJumpAnalysis()
     {
         ASSERT0(m_fake_irmgr);
         m_fake_irmgr->doBackwardJumpAnalysis();
     }
-
-    //This func shall generate the IRs to swap the data in two registers,
-    //and implement the swap by memory as the temp memory location.
-    //src_prno_with_r2: the src prno responding to the second register.
-    //dst_prno_with_r1: the dst prno responding to the first register.
-    //src_prno_with_r1: the src prno responding to the first register.
-    //dst_prno_with_r2: the dst prno responding to the second register.
-    //ty1: the data type of dst_prno_with_r1.
-    //ty2: the data type of dst_prno_with_r2.
-    //marker: the marker IR used to indicate where to insert the generated IRs.
-    //bb: the BB where IRs will be inserted.
-    //retun value: this func will return the last IR in the new generated IRs,
-    //             it can be used as a new marker if user wants to get the tail
-    //             of new IRs.
-    //
-    //There are three steps used to complete the swap operation:
-    //  1. [mem]  <-- spill $src_prno_with_r1
-    //  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
-    //  3. $dst_prno_with_r2 <-- reload [mem]
-    IR * doSwapByMem(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-       PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-       Type const* ty2, IR const* marker, MOD IRBB * bb);
-
-    //This func shall generate the IRs to swap the data in two registers,
-    //and implement the swap by memory as the temp registers.
-    //src_prno_with_r2: the src prno responding to the second register.
-    //dst_prno_with_r1: the dst prno responding to the first register.
-    //src_prno_with_r1: the src prno responding to the first register.
-    //dst_prno_with_r2: the dst prno responding to the second register.
-    //ty1: the data type of dst_prno_with_r1.
-    //ty2: the data type of dst_prno_with_r2.
-    //marker: the marker IR used to indicate where to insert the generated IRs.
-    //bb: the BB where IRs will be inserted.
-    //retun value: this func will return the last IR in the new generated IRs,
-    //             it can be used as a new marker if user wants to get the tail
-    //             of new IRs.
-    //
-    //There are three steps used to complete the swap operation:
-    //  1. $temp  <-- mov $src_prno_with_r1
-    //  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
-    //  3. $dst_prno_with_r2 <-- mov $temp
-
-    IR * doSwapByReg(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-       PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-       Type const* ty2, IR const* marker, MOD IRBB * bb);
 
     void dumpDOTWithReg() const;
     void dumpDOTWithReg(CHAR const* name, UINT flag) const;
@@ -1611,17 +1576,14 @@ public:
     TargInfoMgr & getTIMgr() const
     { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
     LifeTimeMgr & getLTMgr() { return *m_lt_mgr; }
-    LifeTimeMgr & getRegLTMgr() { return *m_reg_lt_mgr; }
+    RegLifeTimeMgr & getRegLTMgr() { return *m_reg_lt_mgr; }
     LTConstraintsMgr * getLTConstraintsMgr()
     { return m_lt_constraints_mgr; }
 
     //Return dedicated prno by given physical register.
     //e.g: given REG_SP, return the $sp as result.
     PRNO getDedicatedPRNO(Reg reg) const
-    {
-        return const_cast<LinearScanRA*>(this)->
-            m_dedicated_mgr.geti(reg);
-    }
+    { return const_cast<LinearScanRA*>(this)->m_dedicated_mgr.geti(reg); }
 
     PreAssignedMgr & getPreAssignedMgr() { return m_preassigned_mgr; }
     Reg getPreAssignedReg(LifeTime const* lt) const
@@ -1642,8 +1604,7 @@ public:
     //This function can be overidden by the derived class if the required
     //spill type is not the original type of the prno.
     //Prno: the input prno.
-    virtual Type const* getSpillType(PRNO prno) const
-    { return getVarTypeOfPRNO(prno); }
+    virtual Type const* getSpillType(PRNO prno) const;
 
     //This function returns the actual type for the input type.
     //This function can be overidden by the derived class if the required
@@ -1724,50 +1685,6 @@ public:
     //pointer register before.
     bool hasAlloca() const { return m_has_alloca; }
 
-    //This func shall generate the IRs to swap the data in two registers, if
-    //there is a TMP register reserved on the specific architecture, the
-    //register will be used as the temp space to finish the swap, or else,
-    //memory location on stack will be adopted to help to complete the data
-    //exchange.
-    //src_prno_with_r2: the src prno responding to the second register.
-    //dst_prno_with_r1: the dst prno responding to the first register.
-    //src_prno_with_r1: the src prno responding to the first register.
-    //dst_prno_with_r2: the dst prno responding to the second register.
-    //ty1: the data type of dst_prno_with_r1.
-    //ty2: the data type of dst_prno_with_r2.
-    //marker: the marker IR used to indicate where to insert the generated IRs.
-    //bb: the BB where IRs will be inserted.
-    //retun value: this func will return the last IR in the new generated IRs,
-    //             it can be used as a new marker if user wants to get the tail
-    //             of new IRs.
-    //e.g:
-    //Original IRs with cyclic MOVs:
-    //    $1(R0) <- $10(R1)
-    //    $2(R1) <- $20(R2)
-    //    $3(R2) <- $30(R0)
-    //
-    //These three IRs are abstracted with the concrete prnos with variable
-    //names:
-    //    $dst_prno_with_r0 <- $src_prno_with_r1
-    //    $dst_prno_with_r1 <- $src_prno_with_r2
-    //    $dst_prno_with_r2 <- $src_prno_with_r0
-    //
-    //There will be two groups of swap per this algorithm:
-    //    Group 1: r = R0, r1 = R1, r2 = R2, and do swap for R1 and R2.
-    //        temp <- $src_prno_with_r1               |  temp <- $10(R1)
-    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $2(R1) <- $20(R2)
-    //        $dst_prno_with_r2 <- temp               |  $3(R2) <- temp
-    //    After the first group swap, R1 contains the final correct data,
-    //    R2 contains the data of R1.
-    //
-    //    Group 2: r = R0, swap r1 = R2, r2 = R0, and do swap for R2 and R0.
-    //        temp <- $src_prno_with_r2               |  temp <- $3(R2)
-    //        $dst_prno_with_r1 <- $src_prno_with_r2  |  $3(R2) <- $30(R0)
-    //        $dst_prno_with_r2 <- temp               |  $1(R0) <- temp
-    virtual IR * insertIRToSwap(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-        PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-        Type const* ty2, IR const* marker, MOD IRBB * bb);
-
     virtual bool isCalleePermitted(LifeTime const* lt) const;
     bool isPreAssigned(PRNO prno) const
     { return m_preassigned_mgr.isPreAssigned(prno); }
@@ -1843,6 +1760,10 @@ public:
         return m_hoist_bb_tab.find(bb);
     }
 
+    //Retun true if the lifetime of prno can overlap with other lifetime
+    //assigned to the same physical register.
+    bool canInterfereWithOtherLT(PRNO prno) const;
+
     //Return true if the BB is a latch BB.
     bool isLatchBB(IRBB const* bb) const
     {
@@ -1881,15 +1802,9 @@ public:
             isMoveOp(ir);
     }
 
-    //This function returns true if the full width of the register will be
-    //spilled into memory. Or else, returns false if the partial of register
-    //will be spilled into memory. It can be overidden by the derived class
-    //on the specific architecture.
-    virtual bool isSpillFullReg() const { return false; }
-
     //This func is used to check the TMP register is available or not for the
     //input type.
-    virtual bool isTmpRegAvailable(Type const* ty) const
+    virtual bool isTmpRegAvailable(Type const*) const
     { ASSERTN(0, ("Target Dependent Code")); return false; }
 
     //Return true if the usage of 'reg' is unique, and there is only unique
@@ -1898,7 +1813,7 @@ public:
     bool isDedicatedReg(Reg r) const
     {
         return getSP() == r || getFP() == r || getGP() == r ||
-               getZeroScalar() == r || getZeroVector() == r;
+            isZeroRegister(r);
     }
 
     //Return true if the target machine's physical register convention
@@ -1910,8 +1825,7 @@ public:
     bool isPreAssignedReg(Reg r) const
     {
         return getSP() == r || getFP() == r || getTA() == r ||
-               getGP() == r || getRA() == r || getZeroScalar() == r ||
-               getZeroVector() == r;
+               getGP() == r || getRA() == r || isZeroRegister(r);
     }
 
     //Check the lifetime is use the fake-use IR or not at the first BB in loop.
@@ -1925,7 +1839,7 @@ public:
     {
         if (m_lt_mgr != nullptr) { return; }
         m_lt_mgr = allocLifeTimeMgr(m_rg);
-        m_reg_lt_mgr = allocLifeTimeMgr(m_rg);
+        m_reg_lt_mgr = allocRegLifeTimeMgr(m_rg);
     }
     void initFakeIRMgr()
     {
@@ -1949,6 +1863,14 @@ public:
         m_lt_constraints_mgr = allocLTConstraintsMgr();
     }
     void initLocalUsage();
+
+    //Return true if the reg is a ZERO register.
+    bool isZeroRegister(Reg r) const
+    {
+        ASSERT0(r != REG_UNDEF);
+        return r == getZeroScalar() || r == getZeroVector() ||
+            r == getZeroScalarFP();
+    }
 
     //Whether the FP can be preserved when stack aligned.
     //If FP registers are not required for stack alignment,
@@ -2039,6 +1961,8 @@ class LTInterfGraphLSRAChecker : public Graph {
 protected:
     Region * m_rg;
     LifeTime2DMgr & m_lt_mgr;
+protected:
+    bool canSkipCheck(LinearScanRA const* lsra, xcom::Edge const* e) const;
 public:
     LTInterfGraphLSRAChecker(Region * rg, LifeTime2DMgr & mgr)
         : m_rg(rg), m_lt_mgr(mgr)

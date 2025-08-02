@@ -325,7 +325,8 @@ void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
 
 
 template <class StrBufType>
-static void dumpAttr(OUT StrBufType & buf, IR const* ir, DumpFlag dumpflag)
+static void dumpInherentAttr(
+    OUT StrBufType & buf, IR const* ir, DumpFlag dumpflag)
 {
     if (g_dump_opt.isDumpIRID() && dumpflag.have(IR_DUMP_IRID)) {
         buf.strcat(" id:%d", ir->id());
@@ -953,7 +954,7 @@ void dumpWritePR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     xcom::FixedStrBuf<64> buf;
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
-    note(rg, "%s %s%d:%s", IRNAME(ir), PR_TYPE_CHAR, ir->getPrno(),
+    note(rg, "%s %s%u:%s", IRNAME(ir), PR_TYPE_CHAR, ir->getPrno(),
          xtm->dump_type(d, buf));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
@@ -1146,9 +1147,9 @@ void dumpIRCodeName(IR_CODE code, Region const* rg)
 
 void dumpIRName(IR const* ir, Region const* rg)
 {
-    prt(rg, "%s", IRNAME(ir));
+    dumpIRCodeName(ir->getCode(), rg);
     if (g_dump_opt.isDumpIRID()) {
-        prt(rg, "(id:%u)", ir->id());
+        prt(rg, " id:%u", ir->id());
     }
 }
 
@@ -1185,9 +1186,9 @@ void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
     if (ctx.attr != nullptr) {
         lattr.strcat("%s", ctx.attr);
     }
-    dumpAttr(lattr, ir, ctx.dumpflag);
-    if (ctx.dump_attr_func != nullptr) {
-        ctx.dump_attr_func->dumpAttr(lattr, rg, ir, ctx.dumpflag);
+    dumpInherentAttr(lattr, ir, ctx.dumpflag);
+    if (ctx.custom_func != nullptr) {
+        ctx.custom_func->dumpCustomAttr(lattr, rg, ir, ctx.dumpflag);
     }
     dumpAttachInfo(lattr, ir, rg, ctx.dumpflag);
 

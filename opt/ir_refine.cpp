@@ -1230,7 +1230,7 @@ IR * Refine::refineAbs(IR * ir, bool & change, RefineCtx & rc)
     bool lchange = false;
     ir = foldConst(ir, lchange, rc);
     change |= lchange;
-    if (!lchange && UNA_opnd(ir)->is_unsigned()) {
+    if (!lchange && UNA_opnd(ir)->isUnsigned()) {
         //abs(unsigned x) => x
         IR * tmp = UNA_opnd(ir);
         UNA_opnd(ir) = nullptr;
@@ -2264,6 +2264,7 @@ IR * Refine::refineSub(IR * ir, bool & change, RefineCtx & rc)
         return ir; //No need to update DU.
     }
     if (op0->is_const() && op0->isInt() && CONST_int_val(op0) == HOST_INT(0)) {
+        if (!rc.refine_sub_to_neg()) { return ir; }
         // 0 - X => -X
         IR * op1 = BIN_opnd1(ir);
         BIN_opnd1(ir) = nullptr;

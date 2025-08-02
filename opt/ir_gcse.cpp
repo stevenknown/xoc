@@ -470,6 +470,10 @@ bool GCSE::findAndElim(IR * exp, IR * gen, GCSECtx const& ctx)
     if ((gen->is_cvt() || exp->is_cvt()) && !canElimCVT(exp, gen)) {
         return false;
     }
+    if (isRelationOpCSEConcerned(exp) && isRelationOpCSEConcerned(gen) &&
+        !canElimRelationOp(exp, gen)) {
+        return false;
+    }
     return elim(exp, exp_stmt, gen, gen_stmt, ctx);
 }
 
@@ -843,6 +847,16 @@ void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
 }
 
 
+bool GCSE::canElimRelationOp(IR const* exp, IR const* gen) const
+{
+    ASSERT0(exp && gen);
+    ASSERT0(isRelationOpCSEConcerned(exp));
+    ASSERT0(isRelationOpCSEConcerned(gen));
+    return BIN_opnd0(gen)->getType() == BIN_opnd0(exp)->getType() &&
+        BIN_opnd1(gen)->getType() == BIN_opnd1(exp)->getType();
+}
+
+
 bool GCSE::canElimCVT(IR const* exp, IR const* gen) const
 {
     ASSERT0(exp && gen);
@@ -868,8 +882,8 @@ bool GCSE::canElimCVT(IR const* exp, IR const* gen) const
         //Result type must be same.
         return false;
     }
-    if (exp->isFP()) {
-        ASSERT0(gen->isFP());
+    if (exp_src_type->isFP()) {
+        ASSERT0(gen_src_type->isFP());
         if (CVT_round(exp) != CVT_round(gen)) {
             //Float type's rounding mode must be same.
             return false;

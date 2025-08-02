@@ -75,6 +75,7 @@ protected:
     virtual Pass * allocExprTab();
     virtual Pass * allocExtPass(PASS_TYPE passty)
     {
+        DUMMYUSE(passty);
         ASSERTN(0, ("Target Dependent Code."));
         return nullptr;
     }
@@ -107,6 +108,7 @@ protected:
     virtual Pass * allocMDLivenessMgr();
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocMDSSAMgr();
+    virtual Pass * allocRegSSAMgr();
     virtual Pass * allocMemCheck();
     virtual Pass * allocMultiResConvert();
     virtual Pass * allocPRE();

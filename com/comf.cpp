@@ -2096,4 +2096,11 @@ UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os, UINT32 pad_to)
 
 bool isFPConstZero(UINT64 val) { return (val & ~(1ULL << 63)) == 0; }
 bool isFPConstZeroPositive(UINT64 val) { return val == 0; }
+
+
+UINT rotateLeft(UINT val0, UINT val1)
+{
+    UINT val2 = val1 & 0x3F; // val1 % 64
+    return (val0 << val2) | (val0 >> (64 - val2));
+}
 } //namespace xcom

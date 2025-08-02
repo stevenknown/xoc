@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "../opt/cominc.h"
-#include "../opt/liveness_mgr.h"
+#include "../opt/comopt.h"
 #include "dex.h"
 #include "gra.h"
 
@@ -911,7 +911,7 @@ void RSC::perform(bool omit_constrain)
 //
 //START GltMgr Global Life Time Manager
 //
-GltMgr::GltMgr(Region * rg, LivenessMgr * mgr, RA * ra)
+GltMgr::GltMgr(Region * rg, PRLivenessMgr * mgr, RA * ra)
 {
     m_glt_count = 1;
     m_rg = rg;
@@ -1624,7 +1624,7 @@ void IG::dumpVCG(CHAR const* name)
 //
 //START LTMgr
 //
-LTMgr::LTMgr(IRBB * bb, LivenessMgr * mgr, GltMgr * gltm, SMemPool * pool)
+LTMgr::LTMgr(IRBB * bb, PRLivenessMgr * mgr, GltMgr * gltm, SMemPool * pool)
 {
     m_bb = bb;
     m_pool = pool;
@@ -2557,7 +2557,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                         }
                         IR * newp = m_rg->dupIR(*newpr);
                         IR_dt(newp) = IR_dt(p);
-                        replace(&CALL_arg_list(ir), p, newp);
+                        xcom::replace_one(&CALL_arg_list(ir), p, newp);
                         IR_parent(newp) = ir;
                         m_rg->freeIR(p);
                     } else if (gr != nullptr && gr->is_member(PR_no(p))) {

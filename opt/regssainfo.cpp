@@ -56,17 +56,6 @@ void VROpndSet::dump(Region const* rg) const
 //
 //START RegDef
 //
-bool RegDef::isRefSameRegWith(IR const* ir) const
-{
-    Reg resreg = getResult()->reg();
-    MD const* md = ir->getMustRef();
-    if (md != nullptr && md->id() == resreg) { return true; }
-    MDSet const* mds = ir->getMayRef();
-    if (mds != nullptr && mds->is_contain_pure(resreg)) { return true; }
-    return false;
-}
-
-
 //Note real-use does not include IR_ID.
 bool RegDef::hasOutsideLoopRealUse(LI<IRBB> const* li, Region const* rg) const
 {
@@ -158,20 +147,15 @@ IRBB * RegDef::getBB() const
 }
 
 
-void RegDef::dump(Region const* rg, RegDUMgr const* dumgr) const
+void RegDef::dump(Region const* rg, RegDUMgr const* mgr) const
 {
     ASSERT0(rg);
     if (is_phi()) {
-        prt(rg, "RegPhi");
+        prt(rg, "RegPhi%u:", id());
     } else {
-        prt(rg, "RegDef");
+        prt(rg, "RegDef%u:", id());
     }
-    Reg r = getResult()->reg();
-    LinearScanRA const* ra = dumgr->getRA();
-    REGFILE rf = ra->getRegFile(r);
-    prt(rg, "%u:%s(%s)V%u",
-        id(), ra->getRegName(r), ra->getRegFileName(rf),
-        getResult()->version());
+    getResult()->dump(mgr->getRA());
 }
 //END RegDef
 
@@ -250,8 +234,6 @@ RegDef const* RegSSAInfo::findCoverRegDef(RegSSAMgr const* mgr, Reg reg) const
     ASSERT0(mgr && reg != REG_UNDEF);
     VROpndSetIter it = nullptr;
     RegDUMgr const* dumgr = const_cast<RegSSAMgr*>(mgr)->getRegDUMgr();
-    RegSetImpl const* rsimpl = mgr->getRegSetImpl();
-    ASSERT0(rsimpl);
     for (BSIdx i = readVROpndSet().get_first(&it);
          i != BS_UNDEF; i = readVROpndSet().get_next(i, &it)) {
         VReg const* t = (VReg*)dumgr->getVROpnd(i);
@@ -259,7 +241,7 @@ RegDef const* RegSSAInfo::findCoverRegDef(RegSSAMgr const* mgr, Reg reg) const
         RegDef const* regdef = t->getDef();
         if (regdef == nullptr) { continue; }
         Reg regdef_reg = regdef->getResultReg();
-        if (rsimpl->isExactCover(regdef_reg, reg)) { return regdef; }
+        if (mgr->isExactCover(regdef_reg, reg)) { return regdef; }
     }
     return nullptr;
 }
@@ -280,7 +262,7 @@ void RegSSAInfo::copyBySpecificReg(
             added = true;
         }
     }
-    ASSERTN(added, ("no VROpnd corresponded to Reg%u",
+    ASSERTN(added, ("no VROpnd corresponded to %s",
             mgr->getRA()->getRegName(reg)));
 }
 
@@ -325,7 +307,7 @@ bool RegSSAInfo::renameOrAddSpecificUse(
     IR const* exp, MOD VReg * vreg, RegDUMgr * mgr)
 {
     ASSERT0(exp && exp->is_exp() && mgr);
-    ASSERT0(RegDUMgr::getRegSSAInfo(exp) == this);
+    ASSERT0(mgr->getRegSSAInfo(exp) == this);
     VROpndSet * vropndset = getVROpndSet();
     Reg vregid = vreg->reg();
     VROpndSetIter it = nullptr;
@@ -333,14 +315,14 @@ bool RegSSAInfo::renameOrAddSpecificUse(
     bool changed = false;
     for (BSIdx i = vropndset->get_first(&it); i != BS_UNDEF;
          prev_it = it, i = vropndset->get_next(i, &it)) {
-        VReg * vropnd = (VReg*)mgr->getVROpnd(i);
-        ASSERT0(vropnd && vropnd->is_reg());
-        if (vropnd->reg() == vregid) {
-            vropnd->removeUse(exp);
+        VReg * vr = (VReg*)mgr->getVROpnd(i);
+        ASSERT0(vr && vr->is_reg());
+        if (vr->reg() == vregid) {
+            vr->removeUse(exp);
             //Note here we use SBitSet::remove() rather than
             //removeVROpnd to speedup the accessing of bitset.
             //removeVROpnd(VROpnd, mgr);
-            vropndset->remove(vropnd, prev_it, it, *mgr->getSBSMgr());
+            vropndset->remove(vr, prev_it, it, *mgr->getSBSMgr());
             changed = true;
             break;
         }
@@ -361,7 +343,7 @@ bool RegSSAInfo::renameOrAddSpecificUse(
 void RegSSAInfo::removeSpecificUse(IR const* exp, Reg reg, RegDUMgr * mgr)
 {
     ASSERT0(exp && exp->is_exp() && mgr);
-    ASSERT0(RegDUMgr::getRegSSAInfo(exp) == this);
+    ASSERT0(mgr->getRegSSAInfo(exp) == this);
     VROpndSet * VROpndSet = getVROpndSet();
     BSIdx nexti;
     VROpndSetIter it = nullptr;
@@ -404,7 +386,7 @@ void RegSSAInfo::addUseSet(IRSet const& set, IN RegDUMgr * mgr)
 //exp: IR expression to be added.
 void RegSSAInfo::addUse(IR const* exp, IN RegDUMgr * mgr)
 {
-    ASSERT0(exp && exp->is_exp() && exp->isMemRefNonPR() && mgr);
+    ASSERT0(exp && exp->is_exp() && RegSSAMgr::hasRegSSAInfo(exp) && mgr);
     if (exp->is_id()) {
         //IR_ID represents an individual versioned Reg, thus each IR_ID only
         //can have one VROpnd.
@@ -420,8 +402,8 @@ void RegSSAInfo::addUse(IR const* exp, IN RegDUMgr * mgr)
 }
 
 
-bool RegSSAInfo::isUse(OUT VReg const** vreg, IR const* ir,
-                      RegSSAMgr const* mgr) const
+bool RegSSAInfo::isUse(
+    OUT VReg const** vreg, IR const* ir, RegSSAMgr const* mgr) const
 {
     //Iterate each VROpnd.
     VROpndSetIter iter = nullptr;
@@ -490,9 +472,9 @@ bool RegSSAInfo::isLiveInVROpndSet(RegDUMgr const* mgr) const
 }
 
 
-void RegSSAInfo::addVROpnd(VROpnd const* VROpnd, RegDUMgr * mgr)
+void RegSSAInfo::addVROpnd(VROpnd const* vr, RegDUMgr * mgr)
 {
-    m_vropnd_set.append(VROpnd, *mgr->getSBSMgr());
+    m_vropnd_set.append(vr, *mgr->getSBSMgr());
 }
 //END RegSSAInfo
 
@@ -528,19 +510,16 @@ void VReg::dump(LinearScanRA const* ra) const
 {
     ASSERT0(ra);
     Region const* rg = ra->getRegion();
-    Reg r = reg();
-    REGFILE rf = ra->getRegFile(r);
-    prt(rg, "%s(%s)V%u", ra->getRegName(r), ra->getRegFileName(rf), version());
+    prt(rg, "VReg%u:", id());
+    VReg::dumpRegAndVer(rg, reg(), version(), ra);
 }
 
 
 CHAR const* VReg::dump(LinearScanRA const* ra, OUT VRegFixedStrBuf & buf) const
 {
     ASSERT0(ra);
-    Reg r = reg();
-    REGFILE rf = ra->getRegFile(r);
-    buf.strcat("%s(%s)V%u", ra->getRegName(r),
-               ra->getRegFileName(rf), version());
+    buf.strcat("VReg%u:", id());
+    VReg::dumpRegAndVer(buf, reg(), version(), ra);
     return buf.getBuf();
 }
 
@@ -572,11 +551,8 @@ static void dumpDefChain(
     if (regdef->getPrev() != nullptr) {
         VReg const* prev_vreg = regdef->getPrev()->getResult();
         ASSERT0(prev_vreg);
-        Reg r = prev_vreg->reg();
-        REGFILE rf = ra->getRegFile(r);
-        prt(rg, ",PrevDEF:%s(%s)V%u",
-            ra->getRegName(r), ra->getRegFileName(rf),
-            prev_vreg->version());
+        prt(rg, ",PrevDEF:");
+        prev_vreg->dump(mgr->getRA());
     } else {
         prt(rg, ",-");
     }
@@ -596,10 +572,8 @@ static void dumpDefChain(
         ASSERTN(use->getPrev() == regdef, ("insanity relation"));
         VReg const* next_vreg = use->getResult();
         ASSERT0(next_vreg);
-        Reg r = next_vreg->reg();
-        REGFILE rf = ra->getRegFile(r);
-        prt(rg, ",NextDEF:%s(%s)V%u",
-            ra->getRegName(r), ra->getRegFileName(rf), next_vreg->version());
+        prt(rg, ",NextDEF:");
+        next_vreg->dump(mgr->getRA());
     }
 }
 
@@ -616,9 +590,36 @@ static void dumpOccSet(VReg const* vreg, Region const* rg)
         if (first) { first = false; }
         else { prt(rg, ","); }
         IR * use = rg->getIR(i2);
-        ASSERT0(use && use->isMemRef());
+        ASSERT0(RegSSAMgr::hasRegSSAInfo(use));
         prt(rg, "%s", xoc::dumpIRName(use, tmp));
     }
+}
+
+
+CHAR const* VReg::dumpRegAndVer(
+    OUT VRegFixedStrBuf & buf, Reg r, UINT ver, LinearScanRA const* ra)
+{
+    REGFILE rf = ra->getRegFile(r);
+    buf.strcat("%s(%s)V%u", ra->getRegName(r), ra->getRegFileName(rf), ver);
+    return buf.getBuf();
+}
+
+
+void VReg::dumpRegAndVer(
+    Region const* rg, Reg r, UINT ver, LinearScanRA const* ra)
+{
+    REGFILE rf = ra->getRegFile(r);
+    prt(rg, "%s(%s)V%u", ra->getRegName(r), ra->getRegFileName(rf), ver);
+}
+
+
+static void dumpVReg(Region const* rg, RegDUMgr const* mgr, VReg const* vr)
+{
+    prt(rg, "VReg%u:", vr->id());
+    VReg::dumpRegAndVer(rg, vr->reg(), vr->version(), mgr->getRA());
+    dumpDefChain(vr, mgr, rg);
+    dumpOccSet(vr, rg);
+
 }
 
 
@@ -626,14 +627,34 @@ void VReg::dump(Region const* rg, RegDUMgr const* mgr) const
 {
     if (!rg->isLogMgrInit()) { return; }
     ASSERT0(is_reg() && rg);
-    //prt(rg, "(");
-    LinearScanRA const* ra = mgr->getRA();
-    Reg r = reg();
-    REGFILE rf = ra->getRegFile(r);
-    prt(rg, "VReg%u:%s(%s)V%u", id(), ra->getRegName(r),
-        ra->getRegFileName(rf), version());
-    dumpDefChain(this, mgr, rg);
-    dumpOccSet(this, rg);
+    dumpVReg(rg, mgr, this);
+}
+
+
+CHAR const* VReg::dumpToBuf(
+    OUT StrBuf & outbuf, Region const* rg, RegDUMgr const* mgr,
+    UINT indent) const
+{
+    ASSERT0(rg);
+    if (!rg->isLogMgrInit()) { return nullptr; }
+    class Dump : public xoc::DumpToBuf {
+    public:
+        VReg const* vreg;
+        RegDUMgr const* mgr;
+    public:
+        Dump(Region const* rg, xcom::StrBuf & buf, UINT indent)
+            : DumpToBuf(rg, buf, indent) {}
+        virtual void dumpUserInfo() const override
+        {
+            ASSERT0(vreg && vreg->is_reg());
+            dumpVReg(getRegion(), mgr, vreg);
+        }
+    };
+    Dump d(rg, outbuf, indent);
+    d.vreg = this;
+    d.mgr = mgr;
+    d.dump();
+    return outbuf.getBuf();
 }
 
 
@@ -737,8 +758,7 @@ IR * RegPhi::getOpnd(UINT idx) const
 VReg * RegPhi::getOpndVReg(IR const* opnd, RegDUMgr const* mgr) const
 {
     ASSERTN(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
-    if (!opnd->is_id() && opnd->isMemOpnd()) { return nullptr; }
-
+    if (opnd->getCode() != IR_PHYREG) { return nullptr; }
     ASSERT0(mgr);
     RegSSAInfo * regssainfo = mgr->getRegSSAInfo(opnd);
     ASSERT0(regssainfo);
@@ -761,36 +781,34 @@ VReg * RegPhi::getOpndVReg(IR const* opnd, RegDUMgr const* mgr) const
         return nullptr;
     }
     VROpndSetIter iter = nullptr;
-    VReg * vropnd = (VReg*)mgr->getVROpnd(regssainfo->getVROpndSet()->
+    VReg * vr = (VReg*)mgr->getVROpnd(regssainfo->getVROpndSet()->
         get_first(&iter));
-    ASSERT0(vropnd->is_reg());
-    return vropnd;
+    ASSERT0(vr->is_reg());
+    return vr;
 }
 
 
-void RegPhi::dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
-                     RegDUMgr const* mgr) const
+void RegPhi::dumpOpnd(
+    IR const* opnd, IRBB const* pred, Region const* rg,
+    RegDUMgr const* mgr) const
 {
     prt(rg, "(");
     switch (opnd->getCode()) {
     case IR_CONST:
-        dumpConstContent(opnd, rg);
+        xoc::dumpConstContent(opnd, rg);
         break;
     case IR_LDA:
-        prt(rg, "LDA");
+        xoc::dumpIRName(opnd, rg);
         break;
-    case IR_ID: {
-        VReg * VROpnd = getOpndVReg(opnd, mgr);
-        if (VROpnd == nullptr) {
-            MD const* ref = opnd->getRefMD();
-            ASSERT0_DUMMYUSE(ref);
-            prt(rg, "ID id:%u ????", opnd->id());
+    case IR_PHYREG: {
+        VReg const* vr = getOpndVReg(opnd, mgr);
+        xoc::dumpIRName(opnd, rg);
+        prt(rg, " ");
+        if (vr == nullptr) {
+            prt(rg, "????");
         } else {
-            MD const* ref = opnd->getRefMD();
-            ASSERT0_DUMMYUSE(ref);
-            ASSERT0(ref->id() == VROpnd->reg());
-            prt(rg, "ID id:%u MD%uV%u", opnd->id(), VROpnd->reg(),
-                VROpnd->version());
+            ASSERT0(mgr->getReg(opnd) == vr->reg());
+            vr->dump(mgr->getRA());
         }
         break;
     }
@@ -811,13 +829,23 @@ static void dumpUseSet(VReg const* vreg, Region * rg)
     ASSERT0(vreg);
     note(rg, "|USESET:");
     VReg::UseSetIter vit;
-    xcom::StrBuf tmp(8);
+    xcom::DefFixedStrBuf tmp;
     for (UINT i = const_cast<VReg*>(vreg)->getUseSet()->get_first(vit);
          !vit.end(); i = const_cast<VReg*>(vreg)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
-        ASSERT0(use && use->isMemRef());
-        prt(rg, "(%s) ", dumpIRName(use, tmp));
+        ASSERT0(RegSSAMgr::hasExpRegSSAInfo(use));
+        prt(rg, "(%s) ", xoc::dumpIRName(use, tmp));
     }
+}
+
+
+void RegPhi::insertOpndAfter(IR * marker, IR * opnd)
+{
+    ASSERT0(marker && opnd && opnd->getCode() == IR_PHYREG);
+    ASSERT0(xcom::in_list(REGPHI_opnd_list(this), marker));
+    ASSERT0(!xcom::in_list(REGPHI_opnd_list(this), opnd));
+    xcom::insertafter(&marker, opnd);
+    PHYREG_phi(opnd) = this; //Record PhyReg's host PHI.
 }
 
 
@@ -830,14 +858,9 @@ void RegPhi::dump(Region const* rg, RegDUMgr const* mgr) const
     IRCFG * cfg = rg->getCFG();
     ASSERT0(cfg);
     cfg->get_preds(preds, getBB());
+    RegDef::dump(rg, mgr);
+    prt(rg, " <- ");
     IRBB * pred = preds.get_head();
-    VReg const* vreg = getResult();
-    ASSERT0(vreg);
-    LinearScanRA const* ra = mgr->getRA();
-    Reg r = vreg->reg();
-    REGFILE rf = ra->getRegFile(r);
-    prt(rg, "RegPhi%u:VReg%u:%s(%s)V%u <- ", id(), vreg->id(),
-        ra->getRegName(r), ra->getRegFileName(rf), vreg->version());
     for (IR const* opnd = getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
@@ -846,7 +869,7 @@ void RegPhi::dump(Region const* rg, RegDUMgr const* mgr) const
         dumpOpnd(opnd, pred, rg, mgr);
         pred = preds.get_next();
     }
-    dumpUseSet(vreg, const_cast<Region*>(rg));
+    dumpUseSet(getResult(), const_cast<Region*>(rg));
 }
 //END RegPhi
 
@@ -867,7 +890,7 @@ RegDUMgr::RegDUMgr(Region * rg, RegSSAMgr * mgr) :
     m_phi_pool = smpoolCreate(sizeof(RegPhi) * 2, MEM_CONST_SIZE);
     m_defstmt_pool = smpoolCreate(sizeof(RegDefStmt) * 2, MEM_CONST_SIZE);
     m_defset_pool = smpoolCreate(sizeof(RegDefSet) * 2, MEM_CONST_SIZE);
-    m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
+    m_vrconst_pool = smpoolCreate(sizeof(VRConst)*2, MEM_CONST_SIZE);
     m_vreg_pool = smpoolCreate(sizeof(VReg)*2, MEM_CONST_SIZE);
     m_philist_pool = smpoolCreate(sizeof(RegPhiList)*2, MEM_CONST_SIZE);
     m_philist_sc_pool = smpoolCreate(
@@ -882,10 +905,10 @@ RegDUMgr::RegDUMgr(Region * rg, RegSSAMgr * mgr) :
 
 bool RegDUMgr::isRefReg(IR const* ir, Reg reg) const
 {
-    ASSERT0(ir->isPROp());
-    Reg irreg = getRA()->getReg(ir->getPrno());
+    ASSERT0(RegSSAMgr::hasRegSSAInfo(ir));
+    Reg irreg = getRegSSAMgr()->getReg(ir);
     ASSERT0(irreg != REG_UNDEF);
-    return getRegSSAMgr()->getRegSetImpl()->isAlias(irreg, reg);
+    return getRegSSAMgr()->isAlias(irreg, reg);
 }
 
 
@@ -900,7 +923,6 @@ void RegDUMgr::destroyReg2VRegVec()
             }
         }
     }
-
     TMap<UINT, VRegVec*> * map = m_map_reg2vreg.getMap();
     if (map != nullptr) {
         TMapIter<UINT, VRegVec*> iter;
@@ -910,6 +932,18 @@ void RegDUMgr::destroyReg2VRegVec()
             delete VRegVec;
         }
     }
+}
+
+
+void RegDUMgr::destroyAllRegSSAInfo()
+{
+    for (VecIdx i = 0; i <= m_regssainfo_vec.get_last_idx(); i++) {
+        RegSSAInfo * info = m_regssainfo_vec.get((UINT)i);
+        if (info != nullptr) {
+            info->destroy(*getSBSMgr());
+        }
+    }
+    m_regssainfo_vec.clean();
 }
 
 
@@ -928,12 +962,7 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
             d->getNextSet()->clean(*getSBSMgr());
         }
     }
-    for (VecIdx i = 0; i <= m_regssainfo_vec.get_last_idx(); i++) {
-        RegSSAInfo * info = m_regssainfo_vec.get((UINT)i);
-        if (info != nullptr) {
-            info->destroy(*getSBSMgr());
-        }
-    }
+    destroyAllRegSSAInfo();
     destroyReg2VRegVec();
     if (is_reinit) {
         m_map_reg2vreg.destroy();
@@ -946,6 +975,8 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
         m_regssainfo_vec.init();
         m_vropnd_vec.destroy();
         m_vropnd_vec.init();
+        m_irid2regssainfo.destroy();
+        m_irid2regssainfo.init();
         m_def_count = REGDEF_UNDEF + 1;
         m_vropnd_count = VROPND_UNDEF + 1;
     }
@@ -965,8 +996,8 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
     ASSERT0(m_vreg_pool);
     smpoolDelete(m_vreg_pool);
 
-    ASSERT0(m_vconst_pool);
-    smpoolDelete(m_vconst_pool);
+    ASSERT0(m_vrconst_pool);
+    smpoolDelete(m_vrconst_pool);
 
     ASSERT0(m_philist_pool);
     smpoolDelete(m_philist_pool);
@@ -984,7 +1015,7 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
         m_defstmt_pool = smpoolCreate(sizeof(RegDefStmt) * 2, MEM_CONST_SIZE);
         m_defset_pool = smpoolCreate(sizeof(RegDefSet) * 2, MEM_CONST_SIZE);
         m_vreg_pool = smpoolCreate(sizeof(VReg) * 2, MEM_CONST_SIZE);
-        m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
+        m_vrconst_pool = smpoolCreate(sizeof(VRConst)*2, MEM_CONST_SIZE);
         m_philist_pool = smpoolCreate(sizeof(RegPhiList)*2, MEM_CONST_SIZE);
         m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<RegPhi*>) * 4,
             MEM_CONST_SIZE);
@@ -993,22 +1024,38 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
 }
 
 
+LinearScanRA const* RegDUMgr::getRA() const
+{
+    return getRegSSAMgr()->getRA();
+}
+
+
+Reg RegDUMgr::getReg(IR const* exp) const
+{
+    ASSERT0(exp && RegSSAMgr::hasRegSSAInfo(exp));
+    return getRegSSAMgr()->getReg(exp);
+}
+
+
 void RegDUMgr::setRegSSAInfo(IR * ir, RegSSAInfo * regssainfo)
 {
     ASSERT0(ir && regssainfo && RegSSAMgr::hasRegSSAInfo(ir));
-    if (ir->getAI() == nullptr) {
-        IR_ai(ir) = m_rg->allocAIContainer();
-    }
-    IR_ai(ir)->set(regssainfo, m_rg);
+    ASSERT0(m_irid2regssainfo.get(ir->id()) == nullptr);
+    m_irid2regssainfo.set(ir->id(), regssainfo);
+}
+
+
+void RegDUMgr::cleanAllRegSSAInfo()
+{
+    m_irid2regssainfo.clean();
+    destroyAllRegSSAInfo();
 }
 
 
 void RegDUMgr::cleanRegSSAInfo(IR * ir)
 {
     ASSERT0(ir);
-    ASSERTN(RegSSAMgr::hasRegSSAInfo(ir), ("make decision early"));
-    if (ir->getAI() == nullptr) { return; }
-    IR_ai(ir)->clean(AI_REG_SSA);
+    m_irid2regssainfo.set(ir->id(), nullptr);
 }
 
 
@@ -1016,28 +1063,22 @@ void RegDUMgr::cleanRegSSAInfo(IR * ir)
 RegSSAInfo * RegDUMgr::genRegSSAInfo(MOD IR * ir)
 {
     ASSERT0(ir && RegSSAMgr::hasRegSSAInfo(ir));
-    if (ir->getAI() == nullptr) {
-        IR_ai(ir) = m_rg->allocAIContainer();
-    }
-    RegSSAInfo * regssainfo = (RegSSAInfo*)ir->getAI()->get(AI_REG_SSA);
+    RegSSAInfo * regssainfo = getRegSSAInfo(ir);
     if (regssainfo == nullptr) {
         regssainfo = allocRegSSAInfo();
-        IR_ai(ir)->init();
-        IR_ai(ir)->set(regssainfo, m_rg);
+        setRegSSAInfo(ir, regssainfo);
     }
     return regssainfo;
 }
 
 
-RegSSAInfo * RegDUMgr::getRegSSAInfo(IR const* ir)
+RegSSAInfo * RegDUMgr::getRegSSAInfo(IR const* ir) const
 {
     ASSERT0(ir && RegSSAMgr::hasRegSSAInfo(ir));
-    if (ir->getAI() == nullptr) { return nullptr; }
-    return (RegSSAInfo*)ir->getAI()->get(AI_REG_SSA);
+    return m_irid2regssainfo.get(ir->id());
 }
 
 
-//Allocate SSAInfo for specified PR indicated by 'reg'.
 RegSSAInfo * RegDUMgr::allocRegSSAInfo()
 {
     ASSERT0(m_regssainfo_pool);
@@ -1056,22 +1097,17 @@ void RegDUMgr::buildRegPhiOpnd(RegPhi * phi, Reg reg, UINT num_operands)
     ASSERT0(reg > REG_UNDEF && num_operands > 0);
     VReg const* vreg = allocVReg(reg, REGSSA_INIT_VERSION);
     ASSERT0(vreg);
-    MD const* md = m_md_sys->getMD(reg);
-    ASSERT0(md);
     IR * last = nullptr;
-    ASSERT0(getSBSMgr());
 
     //Generate operand of PHI.
     for (UINT i = 0; i < num_operands; i++) {
-        IR * opnd = m_irmgr->buildPhyReg(reg, phi);
-        opnd->setRefMD(md, m_rg);
+        IR * opnd = getIRMgrExt()->buildPhyReg(reg, phi);
 
         //Generate RegSSAInfo to ID.
         RegSSAInfo * regssainfo = genRegSSAInfo(opnd);
 
         //Add VROpnd that ID indicated.
         regssainfo->addVROpnd(vreg, this);
-
         xcom::add_next(&REGPHI_opnd_list(phi), &last, opnd);
     }
 }
@@ -1135,12 +1171,13 @@ xcom::SC<VROpnd*> * RegDUMgr::allocSCVROpnd(VROpnd * opnd)
 }
 
 
-VConst * RegDUMgr::allocVConst(IR const* ir)
+VRConst * RegDUMgr::allocVRConst(IR const* ir)
 {
-    ASSERTN(m_vconst_pool, ("not init"));
-    VConst * p = (VConst*)smpoolMallocConstSize(sizeof(VConst), m_vconst_pool);
+    ASSERTN(m_vrconst_pool, ("not init"));
+    VRConst * p = (VRConst*)smpoolMallocConstSize(
+        sizeof(VRConst), m_vrconst_pool);
     ASSERT0(p);
-    ::memset((void*)p, 0, sizeof(VConst));
+    ::memset((void*)p, 0, sizeof(VRConst));
     VROPND_code(p) = VROPND_CONST;
     VROPND_id(p) = m_vropnd_count++;
     VCONST_val(p) = ir;
@@ -1208,7 +1245,7 @@ size_t RegDUMgr::count_mem() const
     count += smpoolGetPoolSize(m_phi_pool);
     count += smpoolGetPoolSize(m_defstmt_pool);
     count += smpoolGetPoolSize(m_defset_pool);
-    count += smpoolGetPoolSize(m_vconst_pool);
+    count += smpoolGetPoolSize(m_vrconst_pool);
     count += smpoolGetPoolSize(m_vreg_pool);
     count += smpoolGetPoolSize(m_philist_pool);
     count += smpoolGetPoolSize(m_philist_sc_pool);

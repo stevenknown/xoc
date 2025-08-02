@@ -83,7 +83,8 @@ UseNewIRMgr::~UseNewIRMgr()
 //
 //START UseNewBBList
 //
-UseNewBBList::UseNewBBList(Region const* rg, BBList * bblst, MOD IRBBMgr * newbbmgr)
+UseNewBBList::UseNewBBList(
+    Region const* rg, BBList * bblst, MOD IRBBMgr * newbbmgr)
 {
     ASSERT0(newbbmgr);
     m_rg = rg;

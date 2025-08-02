@@ -83,15 +83,7 @@ bool verifyConst(IR const* ir, Region const* rg)
     Type const* d = ir->getType();
     ASSERT0_DUMMYUSE(d);
     ASSERTN(d->getDType() != D_UNDEF, ("size of load value cannot be zero"));
-    if (!ir->is_sint() &&
-        !ir->is_uint() &&
-        !ir->is_fp() &&
-        !ir->is_bool() &&
-        !ir->is_mc() &&
-        !ir->is_tensor() &&
-        !ir->is_any() &&
-        !ir->is_ptr() && //immediate can be pointer, e.g: int * p = 0;
-        !ir->is_str()) {
+    if (!IR::canBeTypeOfConstOp(ir->getType())) {
         ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", d->getDType()));
     }
     return true;

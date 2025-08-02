@@ -33,6 +33,8 @@ namespace xoc {
 
 #define MAX_MULTI_RES_DESC_NUM 50
 
+class IRMgrExt;
+
 //This class converts multiple-result operation to normal IR list.
 //Note the class represents two methods to convert multiple-result operation,
 //one is to split origin results into multiple operations, another is to

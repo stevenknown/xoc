@@ -2731,9 +2731,11 @@ IR const* IVR::findBIVBoundStmt(
         //IVR meets a endless loop, such as: while(1) {...}
         //And there is NO loop-end-bb.
         if (biv != nullptr) { *biv = nullptr; }
+        xcom::StrBuf buf(32);
         ivrctx.dumpAct(
-            "BB%u in LOOP%u is an endless loop, can not find loop bound",
-            bbid, li->id());
+            "LOOP%u is an endless loop, can not find loop bound condition, "
+            "thus can not find BIV bound stmt, loopinfo is:%s", li->id(),
+            xoc::dumpLoopTreeToBuf(buf, m_rg, li, 0));
         return nullptr;
     }
     IRBB * bb = m_cfg->getBB(bbid);

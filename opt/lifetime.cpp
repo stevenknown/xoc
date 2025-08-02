@@ -28,14 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
-#include "targinfo_mgr.h"
-#include "lifetime.h"
-#include "lt_interf_graph.h"
-#include "linear_scan.h"
-#include "lsra_impl.h"
-#include "lsra_scan_in_pos.h"
-#include "lt_prio_mgr.h"
-#include "lsra_scan_in_prio.h"
 
 namespace xoc {
 
@@ -570,14 +562,6 @@ LifeTime * LifeTimeMgr::allocLifeTime(PRNO prno)
 }
 
 
-LifeTime * LifeTimeMgr::allocReg2LifeTime(PRNO prno)
-{
-    LifeTime * lt = new LifeTime(prno);
-    m_reg2lt_list.append_tail(lt);
-    return lt;
-}
-
-
 void * LifeTimeMgr::xmalloc(size_t size)
 {
     void * p = smpoolMalloc(size, m_pool);
@@ -606,12 +590,10 @@ void LifeTimeMgr::init(Region * rg)
     m_rg = rg;
     m_max_pos = POS_UNDEF;
     m_lt_list.init();
-    m_reg2lt_list.init();
     m_prno2lt.init();
     #ifdef _DEBUG_
     m_ir2pos.init();
     #endif
-    initReg2LifeTimeInfo();
 }
 
 
@@ -622,14 +604,6 @@ void LifeTimeMgr::destroy()
          lt = m_lt_list.get_next()) {
         delete lt;
     }
-    m_lt_list.destroy();
-
-    for (LifeTime * lt = m_reg2lt_list.get_head(); lt != nullptr;
-         lt = m_reg2lt_list.get_next()) {
-        delete lt;
-    }
-    m_reg2lt_list.destroy();
-
     m_lt_list.destroy();
     m_prno2lt.destroy();
     #ifdef _DEBUG_
@@ -1063,20 +1037,112 @@ bool LifeTimeMgr::canMergeWithPreRange(RangeVec & range_vec, UINT last_idx,
     r_pre.setEnd(cur_range.end());
     return true;
 }
+//END LifeTimeMgr
 
 
-void LifeTimeMgr::mergeRegLifetimeWIthRange(Reg reg, RangeVec const& range_vec)
+//
+//START LifeTime2DMgr
+//
+void LifeTime2DMgr::mergeLiveIn(IRBB const* bb, UpdatePos & up,
+                                Pos dpos_bb_start)
 {
-    ASSERT0(reg != REG_UNDEF);
-    //Insert 'range_vec' into the corresponded position of RangeVec of 'reg'.
-    LifeTime * lt_ori = getRegLifeTime(reg);
-    ASSERT0(lt_ori);
-    //Insert 'range_vec' into the RangeVec of 'lt_ori'.
-    mergeLifeTime(lt_ori->getRangeVec(), range_vec);
+    ASSERT0(bb);
+    PRLiveSet * live_in = m_live_mgr->get_livein(bb->id());
+    ASSERT0(live_in);
+    PRLiveSetIter * iter = nullptr;
+
+    for (UINT id = (UINT)live_in->get_first(&iter);
+         id != BS_UNDEF; id = (UINT)live_in->get_next(id, &iter)) {
+        LifeTime * lt = genLifeTime(id);
+        ASSERT0(lt);
+
+        //Add the exposed-def of current BB to the lifetime if it is the
+        //livein of the current BB.
+        lt->addRange(dpos_bb_start);
+    }
 }
 
 
-void LifeTimeMgr::initReg2LifeTimeInfo()
+void LifeTime2DMgr::mergeLiveOut(IRBB const* bb, UpdatePos & up,
+                                 Pos livein_def, Pos upos_bb_end)
+{
+    ASSERT0(bb);
+    PRLiveSet * live_out = m_live_mgr->get_liveout(bb->id());
+    ASSERT0(live_out);
+    PRLiveSetIter * iter = nullptr;
+
+    for (UINT id = (UINT)live_out->get_first(&iter);
+         id != BS_UNDEF; id = (UINT)live_out->get_next(id, &iter)) {
+        LifeTime * lt = genLifeTime(id);
+        ASSERT0(lt);
+        Range r = lt->getLastRange();
+        ASSERT0(r.start() != POS_UNDEF);
+
+        //Modify the lifetime to extend it to the exposed-use of the current BB
+        //if it is the liveout of the current BB.
+        RG_end(r) = upos_bb_end;
+        lt->setLastRange(r);
+    }
+}
+
+
+void LifeTime2DMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
+                                    PreAssignedMgr const& preassigned_mgr)
+{
+    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(
+        PASS_PRLIVENESS_MGR);
+    ASSERT0(m_live_mgr);
+
+    //Create entry position.
+    Pos dpos_start, upos_start;
+    bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
+    ASSERT0_DUMMYUSE(valid);
+
+    CrossedCallCounter cross_call_counter;
+    Pos livein_def = dpos_start;
+    BBListIter bbit;
+    IRIter irit;
+    for (IRBB * bb = bblst->get_head(&bbit);
+         bb != nullptr; bb = bblst->get_next(&bbit)) {
+        Pos dpos_bb_start = 0, upos_bb_start = 0;
+        Pos dpos_bb_end = 0, upos_bb_end = 0;
+        updateBBEntryPos(bb, up, dpos_bb_start, upos_bb_start);
+
+        //Merge the 2D livein info at the entry of BB.
+        mergeLiveIn(bb, up, dpos_bb_start);
+
+        //Compute the normal 1D lifetime .
+        computeLifeTimeBB(up, bb, preassigned_mgr, livein_def, irit,
+                          cross_call_counter);
+
+        updateBBExitPos(bb, up, dpos_bb_end, upos_bb_end);
+
+        //Merge the 2D liveout info at the exit of BB.
+        mergeLiveOut(bb, up,livein_def, upos_bb_end);
+    }
+    Pos dpos_end, upos_end;
+    bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
+    setMaxPos(upos_end);
+    ASSERT0_DUMMYUSE(valid2);
+    ASSERT0(verify());
+}
+//END LifeTime2DMgr
+
+
+//
+//START RegLifeTimeMgr
+//
+RegLifeTimeMgr::~RegLifeTimeMgr()
+{
+    for (LifeTime * lt = m_reg2lt_list.get_head(); lt != nullptr;
+         lt = m_reg2lt_list.get_next()) {
+        delete lt;
+    }
+    m_reg2lt_list.destroy();
+}
+
+
+void RegLifeTimeMgr::initReg2LifeTimeInfo()
 {
     ASSERT0(m_rg && m_rg->getRegionMgr());
     ASSERT0(m_rg->getRegionMgr()->getTargInfoMgr());
@@ -1096,33 +1162,68 @@ void LifeTimeMgr::initReg2LifeTimeInfo()
 }
 
 
-void LifeTimeMgr::mergeReg2LifeTime(Reg reg, MOD LifeTime * lt_new)
+LifeTime * RegLifeTimeMgr::allocReg2LifeTime(PRNO prno)
+{
+    LifeTime * lt = new LifeTime(prno);
+    m_reg2lt_list.append_tail(lt);
+    return lt;
+}
+
+
+void RegLifeTimeMgr::addCallerLTPos(Pos pos, IR const* ir)
+{
+    ASSERT0(ir);
+    ASSERT0(pos != POS_UNDEF);
+    TargInfoMgr * tg = m_rg->getRegionMgr()->getTargInfoMgr();
+    xgen::RegSet const* caller_set = tg->getCallerRegSet();
+    PRNO pr = CALL_prno(ir);
+    Reg def_reg = REG_UNDEF;
+    if (pr != PRNO_UNDEF) { def_reg = m_lsra->getReg(pr); }
+    for (BSIdx i = caller_set->get_first(); i != BS_UNDEF;
+         i = caller_set->get_next(i)) {
+        if (i == def_reg) { continue; }
+        LifeTime * lt = getRegLifeTime(Reg(i));
+        lt->addRange(pos);
+        lt->addOcc(Occ(true, pos, const_cast<IR*>(ir)));
+    }
+}
+
+
+void RegLifeTimeMgr::mergeRegLifetimeWIthRange(Reg reg,
+    RangeVec const& range_vec)
 {
     ASSERT0(reg != REG_UNDEF);
+    //Insert 'range_vec' into the corresponding position of RangeVec of 'reg'.
+    LifeTime * lt_ori = getRegLifeTime(reg);
+    ASSERT0(lt_ori);
+    //Insert 'range_vec' into the RangeVec of 'lt_ori'.
+    mergeLifeTime(lt_ori->getRangeVec(), range_vec);
+}
+
+
+void RegLifeTimeMgr::mergeRegLifeTimeWithPRLT(MOD LifeTime * lt_new)
+{
     ASSERT0(lt_new && m_rg && m_rg->getRegionMgr());
     ASSERT0(m_rg->getRegionMgr()->getTargInfoMgr());
 
-    TargInfoMgr const* tim = m_rg->getRegionMgr()->getTargInfoMgr();
-    ASSERT0(tim);
-
-    //For zero register. There aren't corresponded lifetime of these register.
-    if (reg == tim->getZeroScalar() ||
-        reg == tim->getZeroVector() ||
-        reg == tim->getZeroScalarFP()) { return; }
-
-    if (!lt_new->isOccHasDef()) { return; }
-
-    //Get original corresponded lifetime of 'reg'.
+    if (m_lsra->canInterfereWithOtherLT(lt_new->getPrno())) {
+        //If prno is expected to interfere with others, so this prno can
+        //not participate the merge process.
+        return;
+    }
+    //Get original corresponding lifetime of 'reg' assigned to 'lt_new'.
+    Reg reg = m_lsra->getReg(lt_new->getPrno());
+    ASSERT0(reg != REG_UNDEF);
     LifeTime * lt_ori = getRegLifeTime(reg);
     ASSERT0(lt_ori);
     mergeLifeTime(lt_ori->getRangeVec(), lt_new->getRangeVec());
 }
 
 
-void LifeTimeMgr::mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new)
+void RegLifeTimeMgr::mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new)
 {
     //Merge 'lt_new' with original lifetime.
-    //1.Compute the total size of these thwo lifetime.
+    //1.Compute the total size of these two lifetime.
     UINT total_size = rv_ori.get_elem_count() + rv_new.get_elem_count();
     RangeVec vec;
     vec.init(total_size);
@@ -1215,136 +1316,6 @@ void LifeTimeMgr::mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new)
     rv_ori.clean();
     rv_ori.copy(vec);
 }
-//END LifeTimeMgr
-
-
-//
-//START LifeTime2DMgr
-//
-void LifeTime2DMgr::initCallerLifeTime()
-{
-    IRMgr * irmgr = m_rg->getIRMgr();
-    TypeMgr * tm = m_rg->getTypeMgr();
-    TargInfoMgr * tg = m_rg->getRegionMgr()->getTargInfoMgr();
-    xgen::RegSet const* caller_set = tg->getCallerRegSet();
-    ASSERT0(caller_set);
-    Type const* caller_type = tm->getTargMachRegisterType();
-    for (BSIdx i = caller_set->get_first(); i != BS_UNDEF;
-         i = caller_set->get_next(i)) {
-        PRNO caller_prno = irmgr->buildPrno(caller_type);
-        LifeTime * lt = allocLifeTime(caller_prno);
-        lt->setOccHasDef();
-        m_caller2lt.set(Reg(i), lt);
-        m_lsra->setReg(caller_prno, Reg(i));
-    }
-}
-
-
-void LifeTime2DMgr::addCallerLTPos(Pos pos, IR const* ir)
-{
-    ASSERT0(ir);
-    ASSERT0(pos != POS_UNDEF);
-    TargInfoMgr * tg = m_rg->getRegionMgr()->getTargInfoMgr();
-    xgen::RegSet const* caller_set = tg->getCallerRegSet();
-    PRNO pr = CALL_prno(ir);
-    Reg def_reg = REG_UNDEF;
-    if (pr != PRNO_UNDEF) { def_reg = m_lsra->getReg(pr); }
-    for (BSIdx i = caller_set->get_first(); i != BS_UNDEF;
-         i = caller_set->get_next(i)) {
-        if (i == def_reg) { continue; }
-        LifeTime * lt = getCallerLT(Reg(i));
-        lt->addRange(pos);
-        lt->addOcc(Occ(true, pos, const_cast<IR*>(ir)));
-    }
-}
-
-
-void LifeTime2DMgr::mergeLiveIn(IRBB const* bb, UpdatePos & up,
-                                Pos dpos_bb_start)
-{
-    ASSERT0(bb);
-    PRLiveSet * live_in = m_live_mgr->get_livein(bb->id());
-    ASSERT0(live_in);
-    PRLiveSetIter * iter = nullptr;
-
-    for (UINT id = (UINT)live_in->get_first(&iter);
-         id != BS_UNDEF; id = (UINT)live_in->get_next(id, &iter)) {
-        LifeTime * lt = genLifeTime(id);
-        ASSERT0(lt);
-
-        //Add the exposed-def of current BB to the lifetime if it is the
-        //livein of the current BB.
-        lt->addRange(dpos_bb_start);
-    }
-}
-
-
-void LifeTime2DMgr::mergeLiveOut(IRBB const* bb, UpdatePos & up,
-                                 Pos livein_def, Pos upos_bb_end)
-{
-    ASSERT0(bb);
-    PRLiveSet * live_out = m_live_mgr->get_liveout(bb->id());
-    ASSERT0(live_out);
-    PRLiveSetIter * iter = nullptr;
-
-    for (UINT id = (UINT)live_out->get_first(&iter);
-         id != BS_UNDEF; id = (UINT)live_out->get_next(id, &iter)) {
-        LifeTime * lt = genLifeTime(id);
-        ASSERT0(lt);
-        Range r = lt->getLastRange();
-        ASSERT0(r.start() != POS_UNDEF);
-
-        //Modify the lifetime to extend it to the exposed-use of the current BB
-        //if it is the liveout of the current BB.
-        RG_end(r) = upos_bb_end;
-        lt->setLastRange(r);
-    }
-}
-
-
-void LifeTime2DMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
-                                    PreAssignedMgr const& preassigned_mgr)
-{
-    m_live_mgr = (LivenessMgr*)m_rg->getPassMgr()->queryPass(
-        PASS_PRLIVENESS_MGR);
-    ASSERT0(m_live_mgr);
-
-    //Init the lifetime of caller register.
-    initCallerLifeTime();
-
-    //Create entry position.
-    Pos dpos_start, upos_start;
-    bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
-    ASSERT0_DUMMYUSE(valid);
-
-    CrossedCallCounter cross_call_counter;
-    Pos livein_def = dpos_start;
-    BBListIter bbit;
-    IRIter irit;
-    for (IRBB * bb = bblst->get_head(&bbit);
-         bb != nullptr; bb = bblst->get_next(&bbit)) {
-        Pos dpos_bb_start = 0, upos_bb_start = 0;
-        Pos dpos_bb_end = 0, upos_bb_end = 0;
-        updateBBEntryPos(bb, up, dpos_bb_start, upos_bb_start);
-
-        //Merge the 2D livein info at the entry of BB.
-        mergeLiveIn(bb, up, dpos_bb_start);
-
-        //Compute the normal 1D lifetime .
-        computeLifeTimeBB(up, bb, preassigned_mgr, livein_def, irit,
-                          cross_call_counter);
-
-        updateBBExitPos(bb, up, dpos_bb_end, upos_bb_end);
-
-        //Merge the 2D liveout info at the exit of BB.
-        mergeLiveOut(bb, up,livein_def, upos_bb_end);
-    }
-    Pos dpos_end, upos_end;
-    bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
-    setMaxPos(upos_end);
-    ASSERT0_DUMMYUSE(valid2);
-    ASSERT0(verify());
-}
-//END LifeTime2DMgr
+//END RegLifeTimeMgr
 
 } //namespace xoc

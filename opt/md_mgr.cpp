@@ -90,7 +90,7 @@ MD const* MDMgr::allocMDForDirectMemOp(IR * ir, bool clean_mayset)
     //Note genMDForLoad has consider the Offset of ir.
     ir->setMustRef(t, m_rg);
     if (clean_mayset) {
-        ir->cleanRefMDSet();
+        ir->cleanMayRef();
     }
     return t;
 }
@@ -180,7 +180,8 @@ MD const* MDMgr::allocStringMD(Sym const* string)
     MD const* strmd = m_rm->getAndGenDedicateStrMD();
     if (strmd != nullptr) { return strmd; }
 
-    Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
+    Var * v = m_vm->registerStringVar(nullptr, string, MEMORY_ALIGNMENT,
+                                      SS_UNDEF);
     //Set string address to be taken only if it is base of LDA.
     //v->setFlag(VAR_ADDR_TAKEN);
 

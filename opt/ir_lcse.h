@@ -50,8 +50,9 @@ protected:
     DefMiscBitSetMgr m_misc_bs_mgr;
 protected:
     IR * hoistCse(IRBB * bb,  IR * ir_pos, ExprRep * ie);
-    virtual IR * hoistCseForExtOp(IN IRBB * bb, IN IR * ir_pos, IN ExprRep * ie)
+    virtual IR * hoistCseForExtOp(IRBB *, IN IR * ir_pos, IN ExprRep *)
     {
+        DUMMYUSE(ir_pos);
         //Target Dependent Code
         return nullptr;
     }
@@ -109,6 +110,12 @@ protected:
         MOD Vector<IR*> & map_expr2avail_pr,
         IN MDSet & tmp)
     {
+        DUMMYUSE(tmp);
+        DUMMYUSE(ir);
+        DUMMYUSE(bb);
+        DUMMYUSE(avail_ir_expr);
+        DUMMYUSE(map_expr2avail_pos);
+        DUMMYUSE(map_expr2avail_pr);
         //Target Dependent Code.
         return false;
     }
@@ -117,6 +124,11 @@ protected:
         MOD Vector<IR*> & map_expr2avail_pos,
         MOD Vector<IR*> & map_expr2avail_pr)
     {
+        DUMMYUSE(ir);
+        DUMMYUSE(bb);
+        DUMMYUSE(avail_ir_expr);
+        DUMMYUSE(map_expr2avail_pos);
+        DUMMYUSE(map_expr2avail_pr);
         //Target Dependent Code.
         return false;
     }

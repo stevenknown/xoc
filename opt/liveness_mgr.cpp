@@ -140,6 +140,43 @@ void AuxLivenessMgr::destroy()
 //
 //START LivenessMgr
 //
+LivenessMgr::LivenessMgr(Region * rg) : Pass(rg)
+{
+    m_md_sys = rg->getMDSystem();
+    m_keep_local = false;
+}
+
+
+void LivenessMgr::add_liveout(IRBB const* bb, PRNO prno)
+{
+    gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr);
+}
+
+
+void LivenessMgr::add_livein(IRBB const* bb, PRNO prno)
+{
+    gen_livein(bb->id())->bunion((BSIdx)prno, m_sbs_mgr);
+}
+
+
+void LivenessMgr::set_liveout(UINT bbid, LiveSet const* live_set)
+{
+    ASSERT0(live_set);
+    ASSERT0(bbid != BBID_UNDEF);
+    LiveSet * liveout = gen_liveout(bbid);
+    liveout->copy(*live_set, m_sbs_mgr);
+}
+
+
+void LivenessMgr::set_livein(UINT bbid, LiveSet const* live_set)
+{
+    ASSERT0(live_set);
+    ASSERT0(bbid != BBID_UNDEF);
+    LiveSet * livein = gen_livein(bbid);
+    livein->copy(*live_set, m_sbs_mgr);
+}
+
+
 void LivenessMgr::cleanGlobal()
 {
     for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {

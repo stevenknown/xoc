@@ -341,17 +341,26 @@ bool Region::doSimplyCPByClassicDU(OptCtx & oc)
     cp->setPropagationKind(CP_PROP_CONST|CP_PROP_PR);
     bool changed = cp->perform(oc);
     if (!changed) { return false; }
-
     ASSERT0(getCFG());
-    if (getCFG()->getLoopInfo() != nullptr) {
-        oc.setInvalidLoopInfo(); //[TODO]: Incremental Maintenance.
-    }
+    oc.setInvalidLoopInfo(); //[TODO]: Incremental Maintenance.
+    return changed;
+}
 
-    //[TODO]: Open DeadCodeElim.
-    //DeadCodeElim * dce = (DeadCodeElim*)getPassMgr()->registerPass(PASS_DCE);
-    //ASSERT0(dce);
-    //dce->setAggressive(false);
-    //changed |= dce->perform(oc);
+
+bool Region::doSimplyDCEByClassicDU(OptCtx & oc)
+{
+    if (!g_compute_pr_du_chain_by_prssa) { return false; }
+    PRSSAMgr * prssa = getPRSSAMgr();
+    if (prssa != nullptr && prssa->is_valid()) {
+        //Do NOT violate PRSSA.
+        return false;
+    }
+    DeadCodeElim * dce = (DeadCodeElim*)getPassMgr()->registerPass(PASS_DCE);
+    ASSERT0(dce);
+    dce->setAggressive(false);
+    bool changed = dce->perform(oc);
+    ASSERT0(getCFG());
+    oc.setInvalidLoopInfo(); //[TODO]: Incremental Maintenance.
     return changed;
 }
 
@@ -551,6 +560,16 @@ bool Region::doBasicAnalysis(OptCtx & oc)
 }
 
 
+bool Region::doRefine(OptCtx & oc)
+{
+    RefineCtx rc(&oc);
+    Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
+    bool changed = refine->perform(oc, rc);
+    if (changed) { ASSERT0L3(verifyClassicDUChain(this, oc)); }
+    return changed;
+}
+
+
 //Perform general optimizaitions.
 //Basis step to do:
 //    1. Build control flow.
@@ -595,15 +614,7 @@ bool Region::MiddleProcess(OptCtx & oc)
         }
     }
     ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
-    if (g_do_refine) {
-        RefineCtx rf(&oc);
-        Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
-        if (refine->refineBBlist(bbl, rf)) {
-            ASSERT0L3(verifyClassicDUChain(this, oc));
-            return true;
-        }
-        return false;
-    }
+    if (g_do_refine) { return doRefine(oc); }
     ASSERT0(verifyIRandBB(bbl, this));
     return true;
 }

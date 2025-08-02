@@ -1053,7 +1053,7 @@ bool RegPromot::isRefSameMemInLoop(
     //same memory in the loop.
     RPCTX_ldainfo_set(ctx).clean();
     getLoopDepAna()->analyzeDepAndRefineDep(
-        ir1, ir2, RPCTX_ldainfo_set(ctx), *ctx.getLDACtx());
+        ir1, ir2, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
     if (RPCTX_ldainfo_set(ctx).isOnlyContainLoopIndep(ir1, ir2)) {
         //Use more aggressive method, say Equivalent-VN, to detect if
         //given two IR reference the same memory location.
@@ -1117,7 +1117,7 @@ bool RegPromot::checkIfExistOverlappedExactAcc(
         }
         RPCTX_ldainfo_set(ctx).clean();
         getLoopDepAna()->analyzeDepAndRefineDep(
-            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLDACtx());
+            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
         if (RPCTX_ldainfo_set(ctx).isAtMostContainLoopIndep(ir, ref)) {
             //Use more aggressive method, say Equivalent-VN, to detect if
             //given two IR reference the same memory location.
@@ -1165,7 +1165,7 @@ bool RegPromot::checkIfExistOverlappedInexactAcc(
         }
         RPCTX_ldainfo_set(ctx).clean();
         getLoopDepAna()->analyzeDepAndRefineDep(
-            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLDACtx());
+            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
         if (RPCTX_ldainfo_set(ctx).isAtMostContainLoopIndep(ir, ref)) {
             //Use more aggressive method, say Equivalent-VN, to detect if
             //given two IR reference the same memory location.
@@ -2780,12 +2780,12 @@ bool RegPromot::EvaluableScalarReplacement(
     bool changed = false;
     while (worklst.get_elem_count() > 0) {
         LI<IRBB> const* x = worklst.remove_head();
-        LDACtx ldactx(x);
+        LoopDepCtx ldactx(getRegion(), x);
         ctx.setLI(x); //record current loop-info in context.
-        ctx.setLDACtx(&ldactx);
+        ctx.setLoopDepCtx(&ldactx);
         changed |= tryPromoteLoop(x, ii, ctx);
         ctx.cleanLI();
-        ctx.cleanLDACtx();
+        ctx.cleanLoopDepCtx();
         x = x->getInnerList();
         while (x != nullptr) {
             worklst.append_tail(x);

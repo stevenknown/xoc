@@ -3,4 +3,5 @@ OPT_OBJS+=\
 ir_vrp.o\
 ir_dse.o\
 ir_vect.o\
-derivative.o
+derivative.o\
+var2offset.o

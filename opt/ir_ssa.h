@@ -41,6 +41,9 @@ namespace xoc {
 class PRSSAMgr;
 class LivenessMgr;
 class TargInfoHandler;
+class VPR;
+class VPRVec;
+typedef xcom::DefSBitSet BBSet;
 
 typedef xcom::TMap<PRNO, VPR*> PRNO2VPR;
 typedef xcom::TMap<UINT, VPR const*> VertexID2VPR;
@@ -76,7 +79,7 @@ public:
     void tryInvalidPassInfoBeforeFreeIR() const;
 
     //Unify the members info which propagated bottom up.
-    void unionBottomUpInfo(PRSSAUpdateCtx const& c) const {}
+    void unionBottomUpInfo(PRSSAUpdateCtx const&) const {}
 };
 
 class BB2PRSet : public xcom::Vector<PRSet*> {
@@ -228,7 +231,7 @@ public:
 };
 
 
-class ConstructCtx {
+class ConstructCtx : public PassCtx {
     COPY_CONSTRUCTOR(ConstructCtx);
 protected:
     //True to ask PRSSAMgr to build DefDef chain.
@@ -244,7 +247,7 @@ protected:
     //Record data type for each prno, which is used to generate Phi
     PRNO2Type m_prno2type;
 public:
-    ConstructCtx(PRSSAMgr * mgr);
+    ConstructCtx(PRSSAMgr * mgr, OptCtx & oc, ActMgr * am = nullptr);
     ~ConstructCtx()
     {
         cleanPRNO2VPRStack();
@@ -279,6 +282,8 @@ public:
     void setPRNOType(PRNO prno, Type const* ty)
     { m_prno2type.set((VecIdx)prno, ty); }
     void setBuildDefChain(bool doit) { m_need_build_def_chain = doit; }
+
+    void tryInvalidPassInfoBeforeFreeIR() const;
 };
 
 
@@ -303,8 +308,8 @@ protected:
     void renameSSARegion(
         OUT ConstructCtx & cstctx, PRSet const& prset,
         BB2PRSet const& bb2definedprs);
-    void reinitVPRForIR(PRSet const& prset, MOD IR * ir,
-                        OUT ConstructCtx & cstctx);
+    void reinitVPRForIR(
+        PRSet const& prset, MOD IR * ir, OUT ConstructCtx & cstctx);
 
     //The function revises PHI data type, and remove redundant PHI.
     void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
@@ -421,8 +426,9 @@ protected:
     //version: current version of Versioned PR
     //orgtype: data type of orginal prno
     VPR * allocVPR(PRNO orgprno, UINT version, Type const* orgtype);
-    VPR * allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
-                       Type const* orgtype, MOD VPRVec * vprvec);
+    VPR * allocVPRImpl(
+        PRNO orgprno, PRNO newprno, UINT version, Type const* orgtype,
+        MOD VPRVec * vprvec);
 
     //Return true if SSA construction is successful.
     bool constructByDomTree(xcom::DomTree & domtree, OptCtx & oc);
@@ -441,13 +447,13 @@ protected:
     void cleanVPR(PRNO prno) { setVPRByPRNO(prno, nullptr); }
 
     //definedprs: record PRs which defined in 'bb'.
-    void collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & mustdef_pr,
-                                  OUT ConstructCtx & cstctx);
+    void collectPRAndInitVPRForBB(
+        IRBB const* bb, OUT PRSet & mustdef_pr, OUT ConstructCtx & cstctx);
     void constructMDDUChainForPR();
 
     void destructBBSSAInfo(MOD IRBB * bb, OptCtx const& oc);
-    void destructionInDomTreeOrder(IRBB * root, xcom::DomTree & domtree,
-                                   OptCtx const& oc);
+    void destructionInDomTreeOrder(
+        IRBB * root, xcom::DomTree & domtree, OptCtx const& oc);
 
     //The function retrieves VPR by its id.
     VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
@@ -476,22 +482,26 @@ protected:
 
     //The function rename PR in BB.
     //defined_prs: record the PR set that defined in 'bb' if exist.
-    void handleBBRename(PRSet const* defined_prs, BBSet const* bbset,
-                        PRSet const* prset, MOD ConstructCtx & cstctx,
-                        MOD IRBB * bb, MOD BB2VPRMap & bb2vpr);
-    void handleSuccOfBB(IRBB * bb, BBSet const* bbset, PRSet const* prset,
-                        ConstructCtx const& cstctx);
+    void handleBBRename(
+        PRSet const* defined_prs, BBSet const* bbset, PRSet const* prset,
+        MOD ConstructCtx & cstctx, MOD IRBB * bb, MOD BB2VPRMap & bb2vpr);
+    void handleSuccOfBB(
+        IRBB * bb, BBSet const* bbset, PRSet const* prset,
+        ConstructCtx const& cstctx);
+
     //idx: index of operand, start from 0.
-    void handlePhiOpndInSucc(IR * ir, UINT idx, PRSet const* prset,
-                             ConstructCtx const& cstctx);
+    void handlePhiOpndInSucc(
+        IR * ir, UINT idx, PRSet const* prset, ConstructCtx const& cstctx);
 
     //The function initialize the PRSSA dependent passes.
     void initDepPass();
     void initTargInfoHandler();
     void init();
-    void initMapInfo(DefMiscBitSetMgr & bs_mgr, OUT BB2PRSet & bb2definedprs,
-                     OUT PRSet & prset, OUT ConstructCtx & cstctx);
+    void initMapInfo(
+        DefMiscBitSetMgr & bs_mgr, OUT BB2PRSet & bb2definedprs,
+        OUT PRSet & prset, OUT ConstructCtx & cstctx);
     void initVPRStack(PRSet const& prset, OUT ConstructCtx & cstctx);
+
     //The function generate Phi with 'prno' and insert into 'bb'.
     //Note the function does not perform renaming of PR.
     IR * insertPhi(PRNO prno, IN IRBB * bb, OUT ConstructCtx & cstctx);
@@ -505,16 +515,17 @@ protected:
 
     //Rename opnd, except PHI.
     //Walk through RHS expression of 'ir' to rename PR's VPR.
-    void renameRHS(MOD IR * ir, PRSet const* prset,
-                   MOD ConstructCtx & cstctx);
+    void renameRHS(
+        MOD IR * ir, PRSet const* prset, MOD ConstructCtx & cstctx);
+
     //ir: may be Phi.
-    void renameLHS(MOD IR * ir, PRSet const* prset,
-                   MOD ConstructCtx & cstctx);
+    void renameLHS(
+        MOD IR * ir, PRSet const* prset, MOD ConstructCtx & cstctx);
     void renameEntireCFG(
         OUT ConstructCtx & cstctx, PRSet const& effect_prs,
         BB2PRSet const& bb2definedprs, xcom::DomTree const& domtree);
-    void renameBB(IRBB const* bb, PRSet const* prset,
-                  MOD ConstructCtx & cstctx);
+    void renameBB(
+        IRBB const* bb, PRSet const* prset, MOD ConstructCtx & cstctx);
 
     //Linear renaming algorithm.
     //bb2definedprs: for each BB, describes PRs which have been defined.
@@ -534,8 +545,8 @@ protected:
     void stripVersionForBBList(BBList const& bblst);
     void stripPhi(IR * phi, IRListIter phict, OptCtx const& oc);
     void stripSpecificVPR(VPR * vpr);
-    void stripStmtVersion(IR * stmt, PRSet const* prset,
-                          xcom::BitSet & visited);
+    void stripStmtVersion(
+        IR * stmt, PRSet const* prset, xcom::BitSet & visited);
 
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
@@ -553,15 +564,16 @@ protected:
 
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
-    void placePhi(OUT ConstructCtx & cstctx,
-                  DfMgr const& dfm, PRSet const& prset,
-                  BBList const& bblist, BB2PRSet const& bb2definedprs);
-    void placePhi(OUT ConstructCtx & cstctx,
-                  DfMgr const& dfm, PRSet const& prset,
-                  BBSet const& bbset, BB2PRSet const& bb2definedprs);
+    void placePhi(
+        OUT ConstructCtx & cstctx, DfMgr const& dfm, PRSet const& prset,
+        BBList const& bblist, BB2PRSet const& bb2definedprs);
+    void placePhi(
+        OUT ConstructCtx & cstctx, DfMgr const& dfm, PRSet const& prset,
+        BBSet const& bbset, BB2PRSet const& bb2definedprs);
 
-    void verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
-                         bool is_vpinfo_avail, bool before_strip_version) const;
+    void verifyPhiResult(
+        IR const* ir, List<IRBB*> const& preds, bool is_vpinfo_avail,
+        bool before_strip_version) const;
     bool verifyPrnoOfVPR() const; //Only used in PRSSAMgr.
     bool verifyVPR() const; //Only used in PRSSAMgr.
     bool verifyMapBetweenPRNOAndVPR() const; //Only used in PRSSAMgr.
@@ -665,8 +677,8 @@ public:
     //olddef: original stmt.
     //newdef: new stmt.
     //e.g: given 'olddef'->USE, the result is 'newdef'->USE.
-    void changeDefForPartialUseSet(IR * olddef, IR * newdef,
-                                   IRSet const& partial_useset);
+    void changeDefForPartialUseSet(
+        IR * olddef, IR * newdef, IRSet const& partial_useset);
 
     //The function destroy all resources that allocated by current pass.
     //The function is usually called when PRSSA info is not in use.

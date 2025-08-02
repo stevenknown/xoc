@@ -92,9 +92,17 @@ public:
     //  MyVisit my(vf);
     //  my.visit(root_ir);
     bool visitIR(IR const*, OUT bool & is_terminate)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
+    {
+        DUMMYUSE(is_terminate);
+        ASSERTN(0, ("Target Dependent Code"));
+        return true;
+    }
     bool visitIR(IR *, OUT bool & is_terminate)
-    { ASSERTN(0, ("Target Dependent Code")); return true; }
+    {
+        DUMMYUSE(is_terminate);
+        ASSERTN(0, ("Target Dependent Code"));
+        return true;
+    }
 };
 
 template <class VF = VisitIRFuncBase>

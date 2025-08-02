@@ -336,8 +336,8 @@ IR * InsertCvt::convertArray(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
-IR * InsertCvt::convertIRUntilUnchange(IR * ir, bool & change,
-                                       InsertCvtCtx & rc)
+IR * InsertCvt::convertIRUntilUnchange(
+    IR * ir, bool & change, InsertCvtCtx & rc)
 {
     bool lchange = true;
     IR * newir = nullptr;
@@ -700,7 +700,8 @@ void InsertCvt::insertCvtForBinaryOp(IR * ir, bool & change)
 
 
 //Kid is float.
-IR * InsertCvt::insertCvtForFloatCase2(IR * parent, IR * kid, bool & change)
+IR * InsertCvt::insertCvtForFloatScalarCase2(
+    IR * parent, IR * kid, bool & change)
 {
     ASSERT0(kid->is_fp());
     UINT tgt_size = parent->getTypeSize(m_tm);
@@ -738,7 +739,8 @@ IR * InsertCvt::insertCvtForFloatCase2(IR * parent, IR * kid, bool & change)
 
 
 //Parent is float.
-IR * InsertCvt::insertCvtForFloatCase1(IR * parent, IR * kid, bool & change)
+IR * InsertCvt::insertCvtForFloatScalarCase1(
+    IR * parent, IR * kid, bool & change)
 {
     ASSERT0(parent->is_fp());
     UINT tgt_size = parent->getTypeSize(m_tm);
@@ -748,7 +750,7 @@ IR * InsertCvt::insertCvtForFloatCase1(IR * parent, IR * kid, bool & change)
         //Build the conversion between float and integer.
         build = true;
     } else if (kid->is_fp()) {
-        if (tgt_size != src_size) {
+        if (tgt_size != src_size && !checkTypeConsistency(parent, kid)) {
             //Build the conversion between different precision float.
             build = true;
         } else {
@@ -765,19 +767,56 @@ IR * InsertCvt::insertCvtForFloatCase1(IR * parent, IR * kid, bool & change)
 }
 
 
-//Insert CVT for float if necessary.
-IR * InsertCvt::insertCvtForFloat(IR * parent, IR * kid, bool & change)
+IR * InsertCvt::insertCvtForFloatScalar(IR * parent, IR * kid, bool & change)
 {
-    //Need to insert CVT between different FP by default.
-    if (parent->is_fp()) {
-        return insertCvtForFloatCase1(parent, kid, change);
-    }
-    ASSERT0(kid->is_fp());
-    return insertCvtForFloatCase2(parent, kid, change);
+    return parent->is_fp() ?
+        insertCvtForFloatScalarCase1(parent, kid, change) :
+        insertCvtForFloatScalarCase2(parent, kid, change);
 }
 
 
-//Insert CVT between 'parent' and 'kid' if need, otherwise return kid.
+IR * InsertCvt::insertCvtForFloatVector(IR * parent, IR * kid, bool & change)
+{
+    ASSERT0(parent && kid && parent->is_vec() && kid->is_vec());
+    ASSERT0(parent == kid->getParent());
+    if (!parent->is_stpr() || !kid->isReadPR()) { return kid; }
+    Type const* tp_parent = parent->getType();
+    Type const* tp_kid = kid->getType();
+    ASSERT0(tp_parent && tp_kid);
+    ASSERT0(tp_parent->is_vector() && tp_kid->is_vector());
+    tp_parent = tp_parent->getVectorElemType(m_tm);
+    tp_kid = tp_kid->getVectorElemType(m_tm);
+    ASSERT0(tp_parent && tp_kid && tp_parent->isFP() && tp_kid->isFP());
+    change = true;
+    IR * newkid = m_rg->getIRMgr()->buildCvt(kid, parent->getType());
+    return newkid;
+}
+
+
+IR * InsertCvt::tryInsertCvtForFloat(IR * parent, IR * kid, bool & change)
+{
+    //Insert CVT for float scalar.
+    if (parent->is_fp() || kid->is_fp()) {
+        return checkTypeConsistency(parent, kid) ? kid :
+            insertCvtForFloatScalar(parent, kid, change);
+    }
+
+    //Insert CVT for float vector.
+    ASSERT0(parent->is_vec() && kid->is_vec());
+    Type const* tp_parent = parent->getType();
+    Type const* tp_kid = kid->getType();
+    ASSERT0(tp_parent && tp_kid);
+    tp_parent = tp_parent->getVectorElemType(m_tm);
+    tp_kid = tp_kid->getVectorElemType(m_tm);
+    ASSERT0(tp_parent && tp_kid);
+    if (tp_parent->is_fp() && tp_kid->is_fp() &&
+        !checkTypeConsistency(parent, kid)) {
+        return insertCvtForFloatVector(parent, kid, change);
+    }
+    return kid;
+}
+
+
 IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
 {
     switch (parent->getCode()) {
@@ -808,17 +847,18 @@ IR * InsertCvt::insertCvtImpl(IR * parent, IR * kid, bool & change)
             //Nothing need to do if converting to ANY.
             return kid;
         }
-        if (parent->is_stpr() && !isNeedInsertCvtForStpr(parent, kid)) {
-            return kid;
+        if (parent->is_vec() && kid->is_vec()) {
+            return tryInsertCvtForFloat(parent, kid, change);
+        }
+        if (parent->is_vec() || kid->is_vec()) {
+            //One of operand is not vector.
+            return tryInsertCvtIfOneOpndIsVector(parent, kid);
+        }
+        if (parent->is_fp() || kid->is_fp()) {
+            return tryInsertCvtForFloat(parent, kid, change);
         }
         UINT tgt_size = parent->getTypeSize(m_tm);
         UINT src_size = kid->getTypeSize(m_tm);
-        if (parent->is_vec() || kid->is_vec()) {
-            return checkSizeForVector(parent, kid);
-        }
-        if (parent->is_fp() || kid->is_fp()) {
-            return insertCvtForFloat(parent, kid, change);
-        }
         if (tgt_size <= src_size) {
             //Do not hoist type.
             return kid;

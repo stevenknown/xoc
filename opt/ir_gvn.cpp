@@ -67,6 +67,37 @@ CHAR const* VNTypeDesc::getVTName(VN_TYPE vt)
 }
 
 
+static void dumpFailedReason(
+    IR const* ir, Region const* rg, InferCtx const& ctx, CHAR const* reason)
+{
+    if (!rg->isLogMgrInit()) { return; }
+    if (ctx.getActMgr() == nullptr) { return; }
+    ASSERT0(reason);
+    xcom::DefFixedStrBuf buf;
+    ctx.getActMgr()->dump(
+        "InferEVN:can not infer out EVN for %s, because %s",
+        xoc::dumpIRName(ir, buf), reason);
+}
+
+
+static void dumpFailedInferEVNForCVT(
+    IR const* ir, InferEVN const* evn, InferCtx const& ctx)
+{
+    ASSERT0(evn);
+    ASSERT0(ir->is_cvt());
+    if (!evn->getRegion()->isLogMgrInit()) { return; }
+    if (ctx.getActMgr() == nullptr) { return; }
+    xcom::DefFixedStrBuf ty1;
+    evn->getTypeMgr()->dump_type(ir->getType(), ty1);
+    xcom::DefFixedStrBuf ty2;
+    evn->getTypeMgr()->dump_type(CVT_exp(ir)->getType(), ty2);
+    xcom::DefFixedStrBuf reason;
+    reason.strcat(
+        "convert %s to %s might change EVN", ty2.getBuf(), ty1.getBuf());
+    dumpFailedReason(ir, evn->getRegion(), ctx, reason.getBuf());
+}
+
+
 //
 //START VN
 //
@@ -546,6 +577,21 @@ VN const* InferEVN::inferDirectExpViaMDPhi(
     IR const* ir, MDDef const* mdssadef, InferCtx & ctx)
 {
     ASSERT0(mdssadef->is_phi());
+    MD const* mustref = ir->getMustRef();
+    ASSERT0(mustref);
+    if (!mustref->is_exact()) { return nullptr; }
+    if (mdssadef->getResult()->mdid() != mustref->id()) {
+        //CASE: MDPhi7:VMD59:MD6V7 <- (ID id:475 MD6V5 BB6),
+        //      (ID id:476 MD6V9 BB14)
+        //      ...=ld:i32:offset(4):storage_space(stack) 'listSmall' MD25
+        //MD6 cover MD25, however in order to infer out the correct EVN,
+        //these two MD must be exactly equal.
+        dumpFailedReason(ir, m_rg, ctx,
+            "the nearest Def is MDPhi whose result-MD is not equal to "
+            "ir's MustRef");
+        return nullptr;
+    }
+
     //Infer Phi.
     VN const* phivn = nullptr;
     if (allowCrossPhi()) {
@@ -664,6 +710,27 @@ VN const* InferEVN::inferDirectExp(IR const* ir, InferCtx & ctx)
         return inferDirectExpViaSSA(ir, ctx);
     }
     ASSERT0(kdef->hasResult());
+    ASSERT0(ir->getMustRef());
+    ASSERT0(kdef->getMustRef());
+    if (ir->getMustRef() != kdef->getMustRef()) {
+        //CASE:ieee/930529-1.c
+        //MD12 -- base:Var14(d):local,align(8),mc,mem_size:8,storage_space:
+        //        stack,decl:'' -- ofst:0 -- size:1
+        //MD13 -- base:Var14(d):local,align(8),mc,mem_size:8,storage_space:
+        //        stack,decl:'' -- ofst:1 -- size:1
+        //stpr $8:u8 id:8 attachinfo:Dbx
+        //    ld:u8:storage_space(stack) 'd' id:7 attachinfo:MDSSA
+        //  ----
+        //  EMD12 : MD11,MD12
+        //stpr $9:u8 id:16 attachinfo:Dbx
+        //    ld:u8:offset(1):storage_space(stack) 'd' id:15 attachinfo:MDSSA
+        //  ----
+        //  EMD13 : MD11,MD13
+        //Because the base is same, but the must ref DM is different due to
+        //different offset, which means these two loads cannot share the
+        //same VN.
+        return nullptr;
+    }
     return inferAndGenVNForKillingDef(ir, kdef, ctx);
 }
 
@@ -790,6 +857,32 @@ VN const* InferEVN::inferIndirectMemExp(IR const* ir, InferCtx & ctx)
         //return inferVNViaBaseAndOfst(ir, ctx);
         return nullptr;
     }
+    ASSERT0(kdef->hasResult());
+    ASSERT0(ir->getMustRef());
+    ASSERT0(kdef->getMustRef());
+    if (ir->getMustRef() != kdef->getMustRef()) {
+        //CASE:exec/pr58726.c
+        //MD10 -- base:Var11(b):global,hasInitVal,array,addr_taken,align(4),
+        //        byte(0x0,0x0,0x0,0x0),mc,mem_size:4,storage_space:global,
+        //        decl:'' -- ofst:0 -- size:4
+        //MD56 -- base:Var11(b):global,hasInitVal,array,addr_taken,align(4),
+        //        byte(0x0,0x0,0x0,0x0),mc,mem_size:4,storage_space:global,
+        //        decl:'' -- ofst:0 -- size:1
+        //ist:u32:storage_space(any) id:10 attachinfo:Dbx,MDSSA
+        //    $14:*<1> id:9
+        //    $5:u32 id:8
+        //  ----
+        //  EMD10 : MD2,MD10,MD15,MD56
+        //stpr $18:u8 id:11 attachinfo:Dbx
+        //    ild:u8:storage_space(any) id:7 attachinfo:MDSSA
+        //        $14:*<1> id:1
+        //  ----
+        //  EMD56 : MD2,MD10,MD15,MD56
+        //Because the base is same, but the must ref DM is different due to
+        //different size, which means these two indirect loads cannot share
+        //the same VN.
+        return nullptr;
+    }
     return inferAndGenVNForKillingDef(ir, kdef, ctx);
 }
 
@@ -847,10 +940,56 @@ VN const* InferEVN::inferVNByIterKid(IR const* ir, InferCtx & ctx)
 }
 
 
+VN const* InferEVN::registerCvtVN(VN const* v0, Type const* srcty,
+    Type const* tgtty)
+{
+    ASSERT0(v0 && srcty && tgtty);
+    ASSERT0(srcty->is_scalar());
+    ASSERT0(tgtty->is_scalar());
+    VN * srctyvn = m_gvn->registerVNviaINT(srcty->getDType());
+    VN * tgttyvn = m_gvn->registerVNviaINT(tgtty->getDType());
+    return registerCvtVN(v0, srctyvn, tgttyvn);
+}
+
+
+VN const* InferEVN::registerCvtVN(VN const* v0, VN const* v1, VN const* v2)
+{
+    ASSERT0(v0 && v1 && v2);
+    return m_ircvnhash.registerVN(IR_CVT, 3, v0->id(), v1->id(), v2->id());
+}
+
+
+VN const* InferEVN::inferCvt(IR const* cvt, InferCtx & ctx)
+{
+    ASSERT0(cvt->is_cvt());
+    VN const* cvtvn = getVN(cvt);
+    if (cvtvn != nullptr) { return cvtvn; }
+    IR const* cvtexp = CVT_exp(cvt);
+    VN const* x = inferExp(cvtexp, ctx);
+    if (!m_gvn->isCvtChangeVN(cvt)) {
+        if (x != nullptr) {
+            setVN(cvt, x);
+        }
+        return x;
+    }
+    if (x == nullptr) { return nullptr; }
+    if (!cvt->getType()->is_scalar() || !cvtexp->getType()->is_scalar()) {
+        dumpFailedInferEVNForCVT(cvt, this, ctx);
+        return nullptr;
+    }
+    VN const* newvn = m_gvn->registerCvtVN(
+        x, cvt->getType(), cvtexp->getType());
+    ASSERT0(newvn);
+    setVN(cvt, newvn);
+    return newvn;
+}
+
+
 VN const* InferEVN::inferExp(IR const* ir, InferCtx & ctx)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_exp());
+    if (ir->is_cvt()) { return inferCvt(ir, ctx); }
     VN const* vn = getVN(ir);
     if (vn != nullptr) { return vn; }
     switch (ir->getCode()) {
@@ -872,6 +1011,7 @@ VN const* InferEVN::inferExp(IR const* ir, InferCtx & ctx)
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
     case IR_SELECT:
+        ASSERTN(!ir->is_cvt(), ("register VN for CVT specially"));
         return inferVNByIterKid(ir, ctx);
     case IR_CASE:
     case IR_DUMMYUSE:
@@ -887,12 +1027,11 @@ VN const* InferEVN::inferExp(IR const* ir, InferCtx & ctx)
 void InferEVN::dumpBBListWithEVN() const
 {
     //The class dumps IR with user defined attributes.
-    class DumpIRWithEVN : public IRDumpAttrBaseFunc {
+    class DumpIRWithEVN : public IRDumpCustomBaseFunc {
     public:
         InferEVN const* infer_evn;
     public:
-        DumpIRWithEVN() : infer_evn(nullptr) {}
-        virtual void dumpAttr(
+        virtual void dumpCustomAttr(
             OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
@@ -904,19 +1043,16 @@ void InferEVN::dumpBBListWithEVN() const
             buf.strcat(" (E%s)", tbuf.getBuf());
         }
     };
-    DumpIRWithEVN dumpwithevn;
+    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
+    DumpIRWithEVN cf;
 
     //User defined attributes are VN info.
-    dumpwithevn.infer_evn = this;
-
-    //Define IR dump flags.
-    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
-
-    //Define dump context.
-    IRDumpCtx<> ctx(4, f, nullptr, &dumpwithevn);
-    ASSERT0(m_rg->getBBList());
+    cf.infer_evn = this;
+    IRDumpCtx<> dumpwithevn(4, f, nullptr, &cf);
 
     //Dump BB list with context.
+    BBDumpCtxMgr<> ctx(&dumpwithevn);
+    ASSERT0(m_rg->getBBList());
     xoc::dumpBBList(m_rg->getBBList(), m_rg, false, &ctx);
 }
 
@@ -2220,7 +2356,9 @@ VN const* GVN::computeCvt(IR const* cvt, bool & change)
         }
         return x;
     }
-    x = registerUnaVN(cvt->getCode(), x);
+    if (!cvt->getType()->is_scalar())  { return nullptr; }
+    if (!cvtexp->getType()->is_scalar())  { return nullptr; }
+    x = registerCvtVN(x, cvt->getType(), cvtexp->getType());
     if (getVN(cvt) != x) {
         setVN(cvt, x);
         change = true;
@@ -2688,10 +2826,28 @@ VN const* GVN::computePhiOpnd(IR const* exp, bool & change)
     SWITCH_CASE_READ_PR: return computePhiPROpnd(exp, change);
     case IR_CONST: return computeConst(exp, change);
     case IR_LDA: return computeLda(exp, change);
-    case IR_CVT: return computeUna(exp, change);
+    case IR_CVT: return computeCvt(exp, change);
     default: UNREACHABLE();
     }
     return nullptr;
+}
+
+
+VN * GVN::registerCvtVN(VN const* v0, Type const* srcty, Type const* tgtty)
+{
+    ASSERT0(v0 && srcty && tgtty);
+    ASSERT0(srcty->is_scalar());
+    ASSERT0(tgtty->is_scalar());
+    VN * srctyvn = registerVNviaINT(srcty->getDType());
+    VN * tgttyvn = registerVNviaINT(tgtty->getDType());
+    return registerCvtVN(v0, srctyvn, tgttyvn);
+}
+
+
+VN * GVN::registerCvtVN(VN const* v0, VN const* v1, VN const* v2)
+{
+    ASSERT0(v0 && v1 && v2);
+    return registerMultiTupleVN(IR_CVT, 3, v0, v1, v2);
 }
 
 
@@ -2832,12 +2988,11 @@ void GVN::dumpIR2VN() const
 void GVN::dumpBBListWithVN() const
 {
     //The class dumps IR with user defined attributes.
-    class DumpIRWithVN : public IRDumpAttrBaseFunc {
+    class DumpIRWithVN : public IRDumpCustomBaseFunc {
     public:
         GVN const* gvn;
     public:
-        DumpIRWithVN() : gvn(nullptr) {}
-        virtual void dumpAttr(
+        virtual void dumpCustomAttr(
             OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
@@ -2849,19 +3004,12 @@ void GVN::dumpBBListWithVN() const
             buf.strcat(" (%s)", tbuf.getBuf());
         }
     };
-    DumpIRWithVN dumpwithvn;
-
-    //User defined attributes are VN info.
-    dumpwithvn.gvn = this;
-
-    //Define IR dump flags.
     DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
-
-    //Define dump context.
-    IRDumpCtx<> ctx(4, f, nullptr, &dumpwithvn);
+    DumpIRWithVN cf;
+    cf.gvn = this;
+    IRDumpCtx<> dumpwithvn(4, f, nullptr, &cf);
     ASSERT0(m_rg->getBBList());
-
-    //Dump BB list with context.
+    BBDumpCtxMgr<> ctx(&dumpwithvn);
     xoc::dumpBBList(m_rg->getBBList(), m_rg, false, &ctx);
 }
 

@@ -147,9 +147,13 @@ void DeadCodeElim::dump(DCECtx const& dcectx) const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    const_cast<DeadCodeElim*>(this)->getActMgr().dump();
-    dcectx.dump(m_rg);
-    Pass::dump();
+    if (g_dump_opt.isDumpForTest()) {
+        const_cast<DeadCodeElim*>(this)->getActMgr().dump();
+    } else {
+        const_cast<DeadCodeElim*>(this)->getActMgr().dump();
+        dcectx.dump(m_rg);
+        Pass::dump();
+    }
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
 }
@@ -383,8 +387,8 @@ void DeadCodeElim::markEffectIRForBBIRList(
 
 
 //Mark effect IRs.
-void DeadCodeElim::markEffectIR(MOD ConstIRList & work_list,
-                                MOD DCECtx & dcectx)
+void DeadCodeElim::markEffectIR(
+    MOD ConstIRList & work_list, MOD DCECtx & dcectx)
 {
     List<IRBB*> * bbl = m_rg->getBBList();
     BBListIter ct;
@@ -674,8 +678,8 @@ bool DeadCodeElim::preserveControlDep(
 }
 
 
-bool DeadCodeElim::collectByPRSSA(IR const* x, MOD ConstIRList * pwlst2,
-                                  MOD DCECtx & dcectx)
+bool DeadCodeElim::collectByPRSSA(
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx)
 {
     ASSERT0(x->isReadPR() && PR_ssainfo(x) && usePRSSADU());
     IR const* d = PR_ssainfo(x)->getDef();
@@ -709,12 +713,8 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
         //mark almost all DEF to be effect. This may lead to
         //traverse the same DEF many times. Apply DP like algo to reduce
         //the traversal time.
-        if (dcectx.isExcluded(stmt)) {
-            continue;
-        }
-        if (dcectx.isEffectStmt(stmt)) {
-            continue; //Check all previous DEF in debug mode.
-        }
+        if (dcectx.isExcluded(stmt)) { continue; }
+        if (dcectx.isEffectStmt(stmt)) { continue; }
         change = true;
         setEffectStmt(stmt, true, pwlst2, dcectx);
     }
@@ -722,8 +722,80 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 }
 
 
-bool DeadCodeElim::collectByMDSSA(IR const* x, MOD ConstIRList * pwlst2,
-                                  MOD DCECtx & dcectx)
+bool DeadCodeElim::collectByMDDef(
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
+    MDDef const* tdef)
+{
+    ASSERT0(x && x->is_exp() && tdef);
+    if (tdef->is_phi()) {
+        //TODO: iter phi.
+        return collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+    }
+    IR const* defstmt = tdef->getOcc();
+    ASSERT0(defstmt);
+    if (defstmt->isCallStmt()) {
+        //CASE:call()  #S1
+        //     ...=USE #S2
+        //Call is the only stmt that need to process specially.
+        //Because it has never been a Killing-Def of any NonPR memory USE.
+        return collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+    }
+    MD const* mustdef = defstmt->getMustRef();
+    MD const* mustuse = x->getMustRef();
+    if (mustuse != nullptr && mustdef != nullptr &&
+        mustuse->is_exact() && mustdef->is_exact()) {
+        return collectByMDDefWithExactMDRef(x, pwlst2, dcectx, tdef);
+    }
+    if (mustuse != nullptr) {
+        //TODO:
+        //CASE1:DEF=
+        //         =USE
+        //CASE2:...=
+        //         =USE
+        //Both cases need to collect all DEFs until meet
+        //the dominated killing-def.
+        return collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+    }
+
+    //CASE1:...=
+    //         =...
+    //CASE2:DEF=
+    //         =...
+    //Both cases need to collect all DEFs through def-chain.
+    return collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+}
+
+
+bool DeadCodeElim::collectByMDDefWithExactMDRef(
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
+    MDDef const* tdef)
+{
+    ASSERT0(x && x->is_exp() && tdef);
+    IR const* defstmt = tdef->getOcc();
+    ASSERT0(defstmt);
+    if (dcectx.isExcluded(defstmt)) { return false; }
+    if (dcectx.isEffectStmt(defstmt)) { return false; }
+    MD const* mustdef = defstmt->getMustRef();
+    MD const* mustuse = x->getMustRef();
+    ASSERT0(mustuse != nullptr && mustdef != nullptr);
+    ASSERT0(mustuse->is_exact() && mustdef->is_exact());
+    if (mustdef != mustuse && !mustdef->is_overlap(mustuse)) {
+        //Do NOT set 'defstmt' to be effect because
+        //the DEF and USE are independent.
+        //e.g:arr[1]=10;     #S1
+        //    return arr[2]; #S2
+        //  where #S1 is absolutely independent with #S2.
+        return false;
+    }
+    setEffectStmt(defstmt, true, pwlst2, dcectx); //Already changed.
+    if (mustdef->is_exact_cover(mustuse)) { return true; }
+    collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+    return true;
+}
+
+
+bool DeadCodeElim::collectByMDSSA(
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx)
 {
     ASSERT0(x->isMemRefNonPR() && useMDSSADU());
     ASSERT0(x->is_exp());
@@ -733,7 +805,6 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD ConstIRList * pwlst2,
     }
     bool change = false;
     VOpndSetIter iter = nullptr;
-    MD const* mustuse = x->getRefMD();
     for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
          i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
         VOpnd const* t = m_mdssamgr->getVOpnd(i);
@@ -744,66 +815,14 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD ConstIRList * pwlst2,
         ASSERT0(t->is_md());
         MDDef * tdef = ((VMD*)t)->getDef();
         if (tdef == nullptr) { continue; }
-        if (tdef->is_phi()) {
-            //TODO: iter phi.
-            change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
-            continue;
-        }
-
-        IR const* defstmt = tdef->getOcc();
-        ASSERT0(defstmt);
-        if (defstmt->isCallStmt()) {
-            //CASE:call()
-            //        =USE
-            //Call is the only stmt that need to process specially.
-            //Because it always is not dominated killing-def.
-            change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
-            continue;
-        }
-
-        MD const* mustdef = defstmt->getRefMD();
-        if (mustuse != nullptr &&
-            mustdef != nullptr &&
-            mustuse->is_exact() &&
-            mustdef->is_exact()) {
-            if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
-                if (dcectx.isExcluded(defstmt)) { continue; }
-                if (dcectx.isEffectStmt(defstmt)) { continue; }
-                setEffectStmt(defstmt, true, pwlst2, dcectx);
-                change = true;
-            }
-            //Do NOT set 'defstmt' to be effect because
-            //the Def and Use are independent.
-            //e.g:arr[1]=10;
-            //    return arr[2];
-            continue;
-        }
-
-        if (mustuse != nullptr) {
-            //TODO:
-            //CASE1:DEF=
-            //         =USE
-            //CASE2:...=
-            //         =USE
-            //Both cases need to collect all DEFs until meet
-            //the dominated killing-def.
-            change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
-            continue;
-        }
-
-        //CASE1:...=
-        //         =...
-        //CASE2:DEF=
-        //         =...
-        //Both cases need to collect all DEFs through def-chain.
-        change |= collectAllDefThroughDefChain(tdef, x, pwlst2, dcectx);
+        change |= collectByMDDef(x, pwlst2, dcectx, tdef);
     }
     return change;
 }
 
 
-bool DeadCodeElim::collectByDUSet(IR const* x, MOD ConstIRList * pwlst2,
-                                  MOD DCECtx & dcectx)
+bool DeadCodeElim::collectByDUSet(
+    IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx)
 {
     ASSERT0(x->is_exp());
     DUSet const* defs = x->readDUSet();
@@ -825,8 +844,8 @@ bool DeadCodeElim::collectByDUSet(IR const* x, MOD ConstIRList * pwlst2,
 
 //Try to revise DomInfo, SSA, etc before removing 'stmt'.
 //Return true if CFG, Dom and SSA are all maintained.
-static bool tryReviseAnaInfo(IR const* stmt, DeadCodeElim const* dce,
-                             DCECtx const& dcectx)
+static bool tryReviseAnaInfo(
+    IR const* stmt, DeadCodeElim const* dce, DCECtx const& dcectx)
 {
     switch (stmt->getCode()) {
     SWITCH_CASE_BRANCH_OP:
@@ -1063,8 +1082,8 @@ bool DeadCodeElim::iterCollectAndElim(
 }
 
 
-bool DeadCodeElim::elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
-                            OUT bool & remove_branch_stmt)
+bool DeadCodeElim::elimImpl(
+    OptCtx & oc, OUT DCECtx & dcectx, OUT bool & remove_branch_stmt)
 {
     bool change = false;
     bool removed = false;

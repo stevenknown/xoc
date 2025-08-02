@@ -845,6 +845,11 @@ void ConstructLoopTree<BB, XR>::identifyNaturalLoop(
 //NOTE: the function also dump the sibling LoopInfos of 'li'.
 void dumpLoopTree(Region const* rg, LI<IRBB> const* li);
 
+//The function dump whole LoopInfo Forest that rooted by 'li'.
+//NOTE: the function also dump the sibling LoopInfos of 'li'.
+CHAR const* dumpLoopTreeToBuf(
+    xcom::StrBuf & buf, Region const* rg, LI<IRBB> const* li, UINT indent);
+
 //Find the bb that is the START of the unqiue backedge of loop.
 //  BB1: loop-start bb
 //  BB2: body
@@ -874,16 +879,17 @@ IRBB * findFirstLoopEndBB(LI<IRBB> const* li, IRCFG * cfg);
 //force the function to insert a new bb.
 //The function try to maintain RPO under some conditions, thus user should
 //check whether preheader's PRO is valid after the function return.
-IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
-                              OUT bool & insert_bb, bool force, OptCtx * oc);
+IRBB * findAndInsertPreheader(
+    LI<IRBB> const* li, Region * rg, OUT bool & insert_bb, bool force,
+    OptCtx * oc);
 
 //Find the bb that is the start of the unqiue backedge of loop.
 //  BB1: loop start bb
 //  BB2: body start bb
 //  BB3: goto loop start bb
 //BB2 is the loop header fallthrough bb.
-bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG const* cfg,
-                                    UINT * succ1, UINT * succ2);
+bool findTwoSuccessorBBOfLoopHeader(
+    LI<IRBB> const* li, IRCFG const* cfg, UINT * succ1, UINT * succ2);
 
 //The function try to answer whether there may exist a cyclic reference
 //that start from 'start' stmt.
@@ -892,8 +898,8 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG const* cfg,
 //  MD10v1 <- PHI(MD10v2, MD10v3)
 //  MD13   <- MD10v1
 //  MD10v3 <- MD13 #start
-FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
-                                Region const* rg);
+FindRedOpResult findRedOpInLoop(
+    LI<IRBB> const* li, IR const* stmt, Region const* rg);
 
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR
@@ -907,8 +913,9 @@ FindRedOpResult findRedOpInLoop(LI<IRBB> const* li, IR const* stmt,
 //    stmt S1 is invariant because b is invariant.
 //    If it is nullptr, the function will reason out conservative answer.
 //Note the function does not check the sibling node of 'ir'.
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
-                     InvStmtList const* invariant_stmt, bool check_tree);
+bool isLoopInvariant(
+    IR const* ir, LI<IRBB> const* li, Region const* rg,
+    InvStmtList const* invariant_stmt, bool check_tree);
 
 //Return true if bbid belongs to the LoopInfo tree.
 //bbid: id of BB.
@@ -943,8 +950,9 @@ bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt);
 //CASE: if we find a preheader, the last IR in it may be CallStmt.
 //So if you are going to insert IR at the tail of preheader, the best choose
 //is force the function to insert a new phreader.
-bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
-                     MOD OptCtx * oc, bool force);
+bool insertPreheader(
+    LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
+    MOD OptCtx * oc, bool force);
 
 //Iterative access LoopInfo tree. This funtion initialize the iterator.
 //li: the root of the LoopInfo tree.
@@ -983,8 +991,8 @@ LI<IRBB> * iterNextLoopInfo(OUT LoopInfoIter & it);
 //bool needInsertPhiToPreheader(LI<IRBB> const* li, IRCFG const* cfg);
 
 //Return true if stmt dominates all USE that are inside loop.
-bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg,
-                               OptCtx const& oc);
+bool isStmtDomAllUseInsideLoop(
+    IR const* stmt, LI<IRBB> const* li, Region * rg, OptCtx const& oc);
 
 //Verify the sanity of LoopInfo structure.
 //Return true if LoopInfo tree is sane.

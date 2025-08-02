@@ -45,7 +45,7 @@ void MDId2MD::dump(Region const* rg) const
         MD * md = Vector<MD*>::get(i);
         if (md == nullptr) { continue; }
         ASSERT0(MD_id(md) == (MDIdx)i);
-        prt(rg, "%d,", i);
+        prt(rg, "%u,", i);
     }
 }
 //END MDID
@@ -138,7 +138,7 @@ bool MD::is_overlap(MD const* m) const
 
 CHAR * MD::dump(StrBuf & buf, VarMgr const* vm) const
 {
-    buf.strcat("MD%d -- base:", MD_id(this));
+    buf.strcat("MD%u -- base:", MD_id(this));
     ASSERT0(MD_base(this) != nullptr);
     MD_base(this)->dump(buf, vm);
     CHAR const* ofstfmt = getHostUIntFormat(false);
@@ -319,8 +319,8 @@ static bool is_contain_by_global_delegate(MDSet const* set, MD const* md)
 }
 
 
-static bool is_contain_by_import_delegate(MDSet const* set, MD const* md,
-                                          Region const* rg)
+static bool is_contain_by_import_delegate(
+    MDSet const* set, MD const* md, Region const* rg)
 {
     ASSERT0(rg);
     if (!set->is_contain_pure(MD_IMPORT_VAR)) { return false; }
@@ -396,8 +396,8 @@ bool MDSet::is_overlap(MD const* md, Region const* current_rg) const
 //Return true if 'md' overlapped with element in current MDSet.
 //Note this function will iterate elements in current MDSet which is costly.
 //Use it carefully.
-bool MDSet::is_overlap_ex(MD const* md, Region const* current_rg,
-                          MDSystem const* mdsys) const
+bool MDSet::is_overlap_ex(
+    MD const* md, Region const* current_rg, MDSystem const* mdsys) const
 {
     ASSERT0(md && mdsys && current_rg);
     if (MDSet::is_overlap(md, current_rg)) { return true; }
@@ -442,8 +442,8 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 //This function will walk through whole current MDSet and differenciate
 //overlapped elements.
 //Note this function is very costly.
-void MDSet::diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m,
-                              MDSystem const* sys)
+void MDSet::diffAllOverlapped(
+    MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys)
 {
     MDSetIter iter;
     MD const* srcmd = const_cast<MDSystem*>(sys)->getMD(id);
@@ -467,23 +467,22 @@ void MDSet::dump(Region * rg) const
 
 void MDSet::dump(MDSystem const* ms, VarMgr const* vm, bool detail) const
 {
-    if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(ms);
+    if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     MDSetIter iter;
     for (BSIdx i = get_first(&iter); i != BS_UNDEF;) {
-        prt(ms->getRegionMgr(), "MD%d", i);
+        prt(ms->getRegionMgr(), "MD%u", i);
         i = get_next(i, &iter);
         if (i != BS_UNDEF) {
             prt(ms->getRegionMgr(), ",");
         }
     }
-    if (detail) {
-        for (BSIdx i = get_first(&iter);
-             i != BS_UNDEF; i = get_next(i, &iter)) {
-            MD const* md = ms->getMD((MDIdx)i);
-            ASSERT0(md);
-            md->dump(vm);
-        }
+    if (!detail) { return; }
+    for (BSIdx i = get_first(&iter);
+         i != BS_UNDEF; i = get_next(i, &iter)) {
+        MD const* md = ms->getMD((MDIdx)i);
+        ASSERT0(md);
+        md->dump(vm);
     }
 }
 
@@ -630,8 +629,8 @@ void MDSetMgr::dump()
     size_t v = lst.get_head();
 
     note(getRegion(),
-         "\n==---- DUMP MDSetMgr: total %d MD_SETs, "
-         "%d MDSet are in free-list, mem usage are:\n",
+         "\n==---- DUMP MDSetMgr: total %u MD_SETs, "
+         "%u MDSet are in free-list, mem usage are:\n",
          m_md_set_list.get_elem_count(), m_free_md_set.get_elem_count());
 
     UINT b = 0;
@@ -655,7 +654,7 @@ void MDSetMgr::dump()
 
 
 //
-//START MD2MD_SET_MAP
+//START MD2MDSet
 //
 //Dump all relations between MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
@@ -674,7 +673,7 @@ void MD2MDSet::dump(Region * rg)
     MD2MDSetIter mxiter;
     MDSet const* pts = nullptr;
     for (MDIdx mdid = get_first(mxiter, &pts);
-         mdid > 0; mdid = get_next(mxiter, &pts)) {
+         mdid > MD_UNDEF; mdid = get_next(mxiter, &pts)) {
         MD const* md = ms->getMD(mdid);
         ASSERT0(md);
 
@@ -724,7 +723,7 @@ void MD2MDSet::dump(Region * rg)
     }
     note(rg, "\n");
 }
-//END MD2MD_SET_MAP
+//END MD2MDSet
 
 
 //
@@ -743,7 +742,7 @@ void MD2MDSet::dump(Region * rg)
 MD const* MDSystem::registerMD(MD const& m)
 {
     ASSERT0(MD_base(&m));
-    if (MD_id(&m) > 0) {
+    if (MD_id(&m) > MD_UNDEF) {
         //Find the entry in MDTab according to m.
         MDTab * mdtab = getMDTab(MD_base(&m));
         ASSERTN(mdtab != nullptr, ("md has not been registered"));
@@ -826,9 +825,9 @@ void MDSystem::initLocalMayAlias(VarMgr * vm)
 {
     m_local_may_alias = nullptr;
     if (vm == nullptr) { return; }
-    Var * v = vm->registerVar((CHAR const*)".local_may_alias",
-                              getTypeMgr()->getMCType(0), 1,
-                              VAR_LOCAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".local_may_alias", getTypeMgr()->getMCType(0), 1,
+        VAR_LOCAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_size(&x) = 0;
@@ -846,9 +845,9 @@ void MDSystem::initLocalMem(VarMgr * vm)
 {
     m_local_mem = nullptr;
     if (vm == nullptr) { return; }
-    Var * v = vm->registerVar((CHAR const*)".local_mem",
-                              getTypeMgr()->getMCType(0), 1,
-                              VAR_LOCAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".local_mem", getTypeMgr()->getMCType(0), 1,
+        VAR_LOCAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_size(&x) = 0;
@@ -866,9 +865,9 @@ void MDSystem::initHeapMem(VarMgr * vm)
 {
     m_heap_mem = nullptr;
     if (vm == nullptr) { return; }
-    Var * v = vm->registerVar((CHAR const*)".heap_mem",
-                              getTypeMgr()->getMCType(0), 1,
-                              VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".heap_mem", getTypeMgr()->getMCType(0), 1,
+        VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_size(&x) = 0;
@@ -886,9 +885,9 @@ void MDSystem::initGlobalMem(VarMgr * vm)
 {
     m_global_mem = nullptr;
     if (vm == nullptr) { return; }
-    Var * v = vm->registerVar((CHAR const*)".global_mem",
-                              getTypeMgr()->getMCType(0), 1,
-                              VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".global_mem", getTypeMgr()->getMCType(0), 1,
+        VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_size(&x) = 0;
@@ -927,9 +926,9 @@ void MDSystem::initImportMem(VarMgr * vm)
     //      }
     //    }
     //  }
-    Var * v = vm->registerVar((CHAR const*)".import_var",
-                              getTypeMgr()->getMCType(0), 1,
-                              VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".import_var", getTypeMgr()->getMCType(0), 1,
+        VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_size(&x) = 0;
@@ -947,9 +946,9 @@ void MDSystem::initFullMem(VarMgr * vm)
 {
     m_full_mem = nullptr;
     if (vm == nullptr) { return; }
-    Var * v = vm->registerVar((CHAR const*)".full_mem",
-                              getTypeMgr()->getMCType(0),
-                              1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    Var * v = vm->registerVar(
+        (CHAR const*)".full_mem", getTypeMgr()->getMCType(0),
+        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE, SS_UNDEF);
     MD x;
     MD_base(&x) = v;
     MD_is_may(&x) = true;  //MD_FULL_MEM can only be May reference.
@@ -1000,8 +999,9 @@ void MDSystem::destroy()
 }
 
 
-void MDSystem::addDelegate(Region const* current_rg, MD const* md,
-                           OUT MDSet & output, DefMiscBitSetMgr & mbsmgr)
+void MDSystem::addDelegate(
+    Region const* current_rg, MD const* md, OUT MDSet & output,
+    DefMiscBitSetMgr & mbsmgr)
 {
     if (md->is_global()) {
         output.bunion_pure(MD_GLOBAL_VAR, mbsmgr);
@@ -1032,9 +1032,9 @@ void MDSystem::addDelegate(Region const* current_rg, MD const* md,
 //strictly: set to true to compute if md may be overlapped
 //            with global variables or import variables.
 //Note this function does NOT clean output, and will append result to output.
-void MDSystem::computeOverlap(Region * current_rg, MD const* md,
-                              OUT MDSet & output, ConstMDIter & tabiter,
-                              DefMiscBitSetMgr & mbsmgr, bool strictly)
+void MDSystem::computeOverlap(
+    Region * current_rg, MD const* md, OUT MDSet & output,
+    ConstMDIter & tabiter, DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(md && current_rg);
     if (strictly) {
@@ -1065,20 +1065,20 @@ void MDSystem::computeOverlap(Region * current_rg, MD const* md,
             find_overlapped = true;
         }
     }
-    if (find_overlapped) {
-        //Add md itself into the output set because the function compute the
-        //overlap-set according to 'md', thus record the causality between
-        //'md' and its overlap-set.
-        output.bunion(md, mbsmgr);
-    }
+    if (!find_overlapped) { return; }
+
+    //Add md itself into the output set because the function compute the
+    //overlap-set according to 'md', thus record the causality between
+    //'md' and its overlap-set.
+    output.bunion(md, mbsmgr);
 }
 
 
 //Compute overlapped Exact MD with x, then add result to output.
 //Note this function does NOT clean output, and will append result to output.
-void MDSystem::computeOverlapExactMD(MD const* md, OUT MDSet * output,
-                                     ConstMDIter & mditer,
-                                     DefMiscBitSetMgr & mbsmgr)
+void MDSystem::computeOverlapExactMD(
+    MD const* md, OUT MDSet * output, ConstMDIter & mditer,
+    DefMiscBitSetMgr & mbsmgr)
 {
     ASSERT0(md && md->is_exact());
     MDTab * mdt = getMDTab(MD_base(md));
@@ -1106,10 +1106,9 @@ void MDSystem::computeOverlapExactMD(MD const* md, OUT MDSet * output,
 //added: records the new MD that added into 'mds'.
 //mditer: for local use.
 //strictly: set to true to compute if md may be overlapped with global memory.
-void MDSystem::computeOverlap(Region * current_rg, MOD MDSet & mds,
-                              MOD Vector<MD const*> & added,
-                              ConstMDIter & mditer,
-                              DefMiscBitSetMgr & mbsmgr, bool strictly)
+void MDSystem::computeOverlap(
+    Region * current_rg, MOD MDSet & mds, MOD Vector<MD const*> & added,
+    ConstMDIter & mditer, DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(current_rg);
     UINT count = 0;
@@ -1218,9 +1217,9 @@ bool MDSystem::isImportVar(MD const* md, Region const* rg)
 //mditer: for local use.
 //strictly: set to true to compute if MD may be overlapped with delegate.
 //Note 'output' do not need to clean before invoke this function.
-void MDSystem::computeOverlap(Region * current_rg, MDSet const& mds,
-                              OUT MDSet & output, ConstMDIter & mditer,
-                              DefMiscBitSetMgr & mbsmgr, bool strictly)
+void MDSystem::computeOverlap(
+    Region * current_rg, MDSet const& mds, OUT MDSet & output,
+    ConstMDIter & mditer, DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(&mds != &output);
     ASSERT0(current_rg);

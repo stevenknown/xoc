@@ -134,7 +134,7 @@ protected:
 
     bool canBeCandStmt(IR const* ir) const;
     virtual bool canBeCandBinOp(IR const* ir) const;
-    virtual RANK computeRankForExtOp(IR const* ir, MOD ReassCtx & ctx) const
+    virtual RANK computeRankForExtOp(IR const*, MOD ReassCtx &) const
     { ASSERTN(0, ("Target Dependent Code")); return RANK_UNDEF; }
     RANK computeConst(IR const* ir, MOD ReassCtx & ctx) const;
     RANK computeBinOp(MOD IR * ir, MOD ReassCtx & ctx) const;

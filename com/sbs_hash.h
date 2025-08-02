@@ -197,37 +197,12 @@ public:
     {
         ASSERT0(allocator);
         m_allocator = allocator;
-        ASSERTN(allocator, ("Parameter can not be nullptr"));
-        m_pool = smpoolCreate(sizeof(B2NType) * 4, MEM_CONST_SIZE);
-
-        #ifdef _DEBUG_
-        m_num_node = 0;
-        #endif
-
-        #ifdef _BIT2NODE_IN_HASH_
-        m_bit2node = new B2NType(MD2NODE2_INIT_SZ);
-        #else
-        m_rbtn_pool = smpoolCreate(
-            sizeof(RBTNode<BSIdx, Bit2NodeT<BitsPerSeg>*>) * 4,
-            MEM_CONST_SIZE);
-        m_bit2node = new B2NType();
-        #endif
+        m_pool = nullptr;
+        init();
     }
-    virtual ~SBitSetCoreHash()
-    {
-        destroy();
+    virtual ~SBitSetCoreHash() { destroy(); }
 
-        #ifdef _BIT2NODE_IN_HASH_
-        //Nothing to do.
-        //Do not detete m_bit2node, it has already been deleted in destroy().
-        #else
-        smpoolDelete(m_rbtn_pool);
-        delete m_bit2node;
-        #endif
-
-        m_bit2node = nullptr;
-        smpoolDelete(m_pool);
-    }
+    void clean() { destroy(); init(); }
 
     #ifdef _BIT2NODE_IN_HASH_
     void destroyBit2NodeH()
@@ -257,7 +232,6 @@ public:
     #else
     void destroyBit2NodeT()
     {
-
         //Destroy the Bit2Node structure, here you do
         //NOT need invoke SBitSetCore's destroy() because they were
         //allocated from set-allocator and will be destroyed by
@@ -298,11 +272,25 @@ public:
 
     void destroy()
     {
+        if (m_pool == nullptr) { return; }
+
         #ifdef _BIT2NODE_IN_HASH_
         destroyBit2NodeH();
         #else
         destroyBit2NodeT();
         #endif
+
+        #ifdef _BIT2NODE_IN_HASH_
+        //Nothing to do.
+        //Do not detete m_bit2node, it has already been deleted in destroy().
+        #else
+        smpoolDelete(m_rbtn_pool);
+        delete m_bit2node;
+        #endif
+
+        m_bit2node = nullptr;
+        smpoolDelete(m_pool);
+        m_pool = nullptr;
     }
 
     inline void checkAndGrow(B2NType * mn)
@@ -358,6 +346,7 @@ public:
         ASSERT0(mn->set == &set || mn->set->is_equal(set));
         return mn->set;
     }
+
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -511,6 +500,25 @@ public:
             return false;
         }
         return mn->set == &set;
+    }
+
+    void init()
+    {
+        if (m_pool != nullptr) { return; }
+        m_pool = smpoolCreate(sizeof(B2NType) * 4, MEM_CONST_SIZE);
+
+        #ifdef _DEBUG_
+        m_num_node = 0;
+        #endif
+
+        #ifdef _BIT2NODE_IN_HASH_
+        m_bit2node = new B2NType(MD2NODE2_INIT_SZ);
+        #else
+        m_rbtn_pool = smpoolCreate(
+            sizeof(RBTNode<BSIdx, Bit2NodeT<BitsPerSeg>*>) * 4,
+            MEM_CONST_SIZE);
+        m_bit2node = new B2NType();
+        #endif
     }
 };
 

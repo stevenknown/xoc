@@ -55,6 +55,19 @@ public:
 };
 //END IRCfgOptCtx
 
+//When splitting BB, it is necessary to maintain loop information
+//simultaneously, so all the newly generated BBs are recorded here.
+//eg. The newly generated BBs can be recorded in the SplitBBCtx object,
+//    which can be passed as a parameter. Such as:
+//  bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc, OUT SplitBBCtx * sctx).
+class SplitBBCtx {
+protected:
+    BBTab m_generated_bb_tab;
+public:
+    void clean() { m_generated_bb_tab.clean(); }
+    BBTab const& getGeneratedBBTab() const { return m_generated_bb_tab; }
+    void recordGeneratedBB(IRBB * bb) { m_generated_bb_tab.append(bb); }
+};
 
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
@@ -500,7 +513,10 @@ public:
     //Some optimizations may append stmt into BB which has already down-boundary
     //stmt. That makes BB invalid. Split such invalid BB into two or more BBs.
     //The function will try to maintain RPO and DOM info.
-    bool splitBBIfNeeded(IRBB * bb, OptCtx & oc);
+    //sctx: Split BB context is optional. If it is not NULL, the context will
+    //record the new generated BB.
+    bool splitBBIfNeeded(
+        IRBB * bb, OptCtx & oc, OUT SplitBBCtx * sctx = nullptr);
 
     //Sort PHI operand in order of predecessors of BB of PHI.
     //pred2opnd: a map between predecessor to operand, used to retrieve info.

@@ -81,17 +81,11 @@ public:
 //insert CVT if necessary.
 class InsertCvt : public Pass {
     COPY_CONSTRUCTOR(InsertCvt);
-
-    //Check size for vector data type.
-    virtual IR * checkSizeForVector(IR * parent, IR * kid) const
-    {
-        ASSERT0(parent && kid);
-        UINT tgt_size = parent->getTypeSize(m_tm);
-        UINT src_size = kid->getTypeSize(m_tm);
-        //Do not do hoisting for vector type.
-        ASSERTN_DUMMYUSE(tgt_size >= src_size, ("size is overflowed"));
-        return kid;
-    }
+protected:
+    TypeMgr * m_tm;
+protected:
+    virtual bool checkTypeConsistency(IR const* parent, IR const* kid) const
+    { return parent->getType() == kid->getType(); }
 
     //The function only iteratively perform CVT insertion for kids of given ir.
     //It does not perform CVT insertion between 'ir' and its kids.
@@ -127,30 +121,55 @@ class InsertCvt : public Pass {
     IR * convertConstIntBinary(IR * ir, bool & change);
 
     //Check and insert data type CVT if it is necessary.
+    //Insert CVT between 'parent' and 'kid' if need, otherwise return kid.
     IR * insertCvtImpl(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOp(IR * ir, bool & change);
+    void insertCvtForBinaryOpByPtrType(IR * ir, bool & change);
     void insertCvtForOpnd0OfBinaryOp(
         IR * ir, IR * op0, Type const* hoisted_type, bool & change);
     void insertCvtForOpnd1OfBinaryOp(
         IR * ir, IR * op1, Type const* hoisted_type, bool & change);
 
-    //Kid is float.
-    IR * insertCvtForFloatCase2(IR * parent, IR * kid, bool & change);
+    //Insert CVT for float scalar if necessary. It will process three cases by
+    //'insertCvtForFloatScalarCase1()' and 'insertCvtForFloatScalarCase2()'.
+    IR * insertCvtForFloatScalar(IR * parent, IR * kid, bool & change);
 
-    //Parent is float.
-    IR * insertCvtForFloatCase1(IR * parent, IR * kid, bool & change);
+    //If the parent is float but the kid is non-float or has inconsistent
+    //precision, the CVT must be inserted.
+    IR * insertCvtForFloatScalarCase1(IR * parent, IR * kid, bool & change);
 
-    //Insert CVT for float if necessary.
-    virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
-    void insertCvtForBinaryOpByPtrType(IR * ir, bool & change);
+    //If the kid is float but the parent is non-float or has inconsistent
+    //precision, the CVT must be inserted.
+    IR * insertCvtForFloatScalarCase2(IR * parent, IR * kid, bool & change);
+
+    //Parent is floating-point vector and kid is floating-point vector and
+    //their types are inconsistent.
+    IR * insertCvtForFloatVector(IR * parent, IR * kid, bool & change);
 
     //Insert datatypecvt when setelem val src type different from dst type.
     IR * insertCvtForSetelemVal(IR * ir, IR * val);
-    //Whether cvt instruction is needed for stpr.
-    virtual bool isNeedInsertCvtForStpr(IR * parent, IR * kid) const
-    { return true; }
-protected:
-    TypeMgr * m_tm;
+
+    //Insert CVT for float if necessary. It will process three cases by
+    //'insertCvtForFloatScalar()' and 'insertCvtForFloatVector()'.
+    virtual IR * tryInsertCvtForFloat(IR * parent, IR * kid, bool & change);
+
+    //Insert CVT for the operation that one of its kid is not vector type.
+    //e.g:For a target support spreading a scalar to vector, the function does
+    //not insert CVT between scalar and vector type.
+    //NOTE: the function should check the legal size for both vector and
+    //non-vector type.
+    virtual IR * tryInsertCvtIfOneOpndIsVector(IR * parent, IR * kid) const
+    {
+        ASSERT0(parent && kid);
+        //Target Dependent Code.
+        ASSERT0(0);
+        UINT tgt_size = parent->getTypeSize(m_tm);
+        UINT src_size = kid->getTypeSize(m_tm);
+        //parent operation permits current kid's type.
+        //Do not do hoisting for vector type.
+        ASSERTN_DUMMYUSE(tgt_size >= src_size, ("size is overflowed"));
+        return kid;
+    }
 public:
     explicit InsertCvt(Region * rg);
     virtual ~InsertCvt() {}

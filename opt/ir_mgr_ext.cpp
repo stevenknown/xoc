@@ -37,8 +37,8 @@ IRMgrExt::IRMgrExt(Region * rg) : IRMgr(rg)
 }
 
 
-IR * IRMgrExt::buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
-                            Type const* ty)
+IR * IRMgrExt::buildVIStore(
+    IR * base, TMWORD ofst, IR * rhs, IR * dummyuse, Type const* ty)
 {
     ASSERT0(ty && base);
     IR * ir = allocIR(IR_VIST);
@@ -61,8 +61,8 @@ IR * IRMgrExt::buildVIStore(IR * base, TMWORD ofst, IR * rhs, IR * dummyuse,
 }
 
 
-IR * IRMgrExt::buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
-                         Type const* ty)
+IR * IRMgrExt::buildVStore(
+    Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse, Type const* ty)
 {
     ASSERT0(ty && lhs);
     IR * ir = allocIR(IR_VST);
@@ -84,8 +84,8 @@ IR * IRMgrExt::buildVStore(Var * lhs, TMWORD ofst, IR * rhs, IR * dummyuse,
 }
 
 
-IR * IRMgrExt::buildVStorePR(PRNO resprno, IR * rhs, IR * dummyuse,
-                             Type const* ty)
+IR * IRMgrExt::buildVStorePR(
+    PRNO resprno, IR * rhs, IR * dummyuse, Type const* ty)
 {
     ASSERT0(resprno != PRNO_UNDEF);
     IR * ir = allocIR(IR_VSTPR);
@@ -148,8 +148,8 @@ IR * IRMgrExt::getAlterResDescList(IR * stmt) const
 }
 
 
-IR * IRMgrExt::buildAtomCas(Type const* type, IR * memory, IR * oldval,
-                            IR * newval, IR * reslst)
+IR * IRMgrExt::buildAtomCas(
+    Type const* type, IR * memory, IR * oldval, IR * newval, IR * reslst)
 {
     ASSERT0(memory && newval && oldval && reslst);
     ASSERT0(type && (type->is_i32() || type->is_i64()));
@@ -170,8 +170,8 @@ IR * IRMgrExt::buildAtomCas(Type const* type, IR * memory, IR * oldval,
 }
 
 
-IR * IRMgrExt::buildAtomInc(Type const* type, IR * memory, IR * reslst,
-                            IR * addend)
+IR * IRMgrExt::buildAtomInc(
+    Type const* type, IR * memory, IR * reslst, IR * addend)
 {
     ASSERT0(type && memory && reslst);
     IR * ir = allocIR(IR_ATOMINC);
@@ -191,5 +191,19 @@ IR * IRMgrExt::buildAtomInc(Type const* type, IR * memory, IR * reslst,
     IR_dt(ir) = type;
     return ir;
 }
+
+#ifdef REF_TARGMACH_INFO
+
+IR * IRMgrExt::buildPhyReg(xgen::Reg reg, RegPhi * regphi)
+{
+    ASSERT0(regphi && reg != REG_UNDEF);
+    IR * ir = allocIR(IR_PHYREG);
+    PHYREG_phi(ir) = regphi;
+    PHYREG_reg(ir) = reg;
+    IR_dt(ir) = m_tm->getTargMachRegisterType();
+    return ir;
+}
+
+#endif
 
 } //namespace xoc

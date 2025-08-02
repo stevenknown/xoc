@@ -274,6 +274,18 @@ Region * CallGraph::addEdgeCaller2Callee(IR * ir, Region * caller_rg)
 }
 
 
+bool CallGraph::isEmptyRegion(Region const* rg)
+{
+    IR * irs = rg->getIRList();
+    if (irs == nullptr) {
+        BBList const* bb_lst = rg->getBBList();
+        if (bb_lst == nullptr || bb_lst->is_empty()) { return true; }
+    }
+
+    return false;
+}
+
+
 bool CallGraph::buildCallGraphForAllRegion(bool scan_call,
                                            bool scan_inner_region)
 {
@@ -287,6 +299,10 @@ bool CallGraph::buildCallGraphForAllRegion(bool scan_call,
     for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
         Region * rg = rm->getRegion(i);
         if (rg == nullptr) { continue; }
+
+        //Skip empty region.
+        if (isEmptyRegion(rg)) { continue; }
+
         if (rg->getParent() != nullptr) {
             SYM2CN * sym2cn = genSym2CallNode(rg->getParent());
             ASSERT0(sym2cn);
@@ -311,6 +327,10 @@ bool CallGraph::buildCallGraphForAllRegion(bool scan_call,
     for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
         Region * rg = rm->getRegion(i);
         if (rg == nullptr) { continue; }
+
+        //Skip empty region.
+        if (isEmptyRegion(rg)) { continue; }
+
         ASSERT0(rg->is_function() || rg->is_program());
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
@@ -354,6 +374,19 @@ void CallGraph::collectInfo(OUT UINT & num_call, OUT UINT & num_ru,
     }
     num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
     num_call = MAX(4, xcom::getNearestPowerOf2(num_call));
+}
+
+
+void CallGraph::dumpVertexDesc(
+    xcom::Vertex const* v, OUT DefFixedStrBuf & buf) const
+{
+    VexIdx id = v->id();
+    CallNode * cn = m_cnid2cn.get(id);
+    ASSERT0(cn != nullptr);
+    CHAR const* cnname = cn->name() != nullptr ?
+                         cn->name()->getStr() : "IndirectCall";
+
+    buf.strcat(cnname);
 }
 
 

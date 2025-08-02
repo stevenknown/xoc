@@ -48,10 +48,9 @@ public:
     static void dumpIRWithMDSSAInfo(
         MDSSAMgr const* mgr, Region const* rg, IR const* ir)
     {
-        bool parting_line = false;
         rg->getLogMgr()->incIndent(2);
-        mgr->dumpIRWithMDSSAForStmt(ir, parting_line);
-        mgr->dumpIRWithMDSSAForExp(ir, parting_line);
+        mgr->dumpIRWithMDSSAForStmt(ir);
+        mgr->dumpIRWithMDSSAForExpTree(ir);
         rg->getLogMgr()->decIndent(2);
     }
 };
@@ -2149,20 +2148,16 @@ void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
 }
 
 
-void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const
+void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir) const
 {
-    if (!ir->is_stmt() || (!ir->isMemRefNonPR() && !ir->isCallStmt())) {
-        return;
-    }
-    if (!parting_line) {
-        note(getRegion(), "\n----");
-        parting_line = true;
-    }
+    if (!ir->is_stmt() || !hasMDSSAInfo(ir)) { return; }
+    note(getRegion(), "\n----"); //Dump partition-line in stmt dumping only
     dumpIR(ir, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF));
     ir->dumpRefOnly(m_rg);
 
     MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(ir);
     if (mdssainfo == nullptr) {
+        //Miss MDSSAInfo.
         note(getRegion(), "\n%s", g_msg_no_mdssainfo);
         return;
     }
@@ -2175,6 +2170,7 @@ void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const
         }
         return;
     }
+    //Dump VOpndSet.
     VOpndSetIter iter = nullptr;
     for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
         i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
@@ -2189,7 +2185,7 @@ void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, bool & parting_line) const
 }
 
 
-void MDSSAMgr::dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const
+void MDSSAMgr::dumpIRWithMDSSAForExpTree(IR const* ir) const
 {
     if (ir->is_undef()) {
         //There might be some error occurred.
@@ -2200,25 +2196,20 @@ void MDSSAMgr::dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const
     List<IR const*> opnd_lst;
     for (IR const* opnd = iterExpInitC(ir, lst);
          opnd != nullptr; opnd = iterExpNextC(lst)) {
-        if (!opnd->isMemRefNonPR() || opnd->is_stmt()) {
-            continue;
-        }
+        ASSERT0(opnd->is_exp());
+        if (!hasMDSSAInfo(opnd)) { continue; }
         VOpndSetIter iter = nullptr;
-        if (!parting_line) {
-            note(getRegion(), "\n----");
-            parting_line = true;
-        }
         dumpIR(opnd, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF));
         opnd->dumpRefOnly(m_rg);
-
         note(getRegion(), "\n--USE:");
-        bool first = true;
         MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(opnd);
         if (mdssainfo == nullptr || mdssainfo->isEmptyVOpndSet()) {
+            //Miss MDSSAInfo.
             prt(getRegion(), "%s", g_msg_no_mdssainfo);
             continue;
         }
-
+        //Dump VOpndSet.
+        bool first = true;
         for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
              i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
             VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
@@ -2228,7 +2219,8 @@ void MDSSAMgr::dumpIRWithMDSSAForExp(IR const* ir, bool & parting_line) const
             } else {
                 prt(getRegion(), ",");
             }
-            prt(getRegion(), "MD%uV%u", vopnd->mdid(), vopnd->version());
+            prt(getRegion(), "VMD%u:MD%uV%u",
+                vopnd->id(), vopnd->mdid(), vopnd->version());
         }
     }
 }
@@ -2925,7 +2917,8 @@ void MDSSAMgr::dumpExpDUChainIter(
              i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
             VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
             ASSERT0(vopnd && vopnd->is_md());
-            note(getRegion(), "\nMD%uV%u:", vopnd->mdid(), vopnd->version());
+            note(getRegion(), "\nVMD%u:MD%uV%u:",
+                 vopnd->id(), vopnd->mdid(), vopnd->version());
             dumpDefByWalkDefChain(wl, visited, vopnd);
         }
         m_rg->getLogMgr()->decIndent(2);
@@ -2987,7 +2980,8 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
         if (vopnd->getDef() != nullptr) {
             ASSERT0(vopnd->getDef()->getOcc() == ir);
         }
-        note(rg, "\nMD%uV%u:", vopnd->mdid(), vopnd->version());
+        note(rg, "\nVMD%u:MD%uV%u:",
+             vopnd->id(), vopnd->mdid(), vopnd->version());
 
         //Dump all USE.
         dumpUseSet(vopnd, rg);
@@ -3195,9 +3189,8 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefMDSet & maydef)
     for (IR * t = xoc::iterExpInit(ir, m_iter);
          t != nullptr; t = xoc::iterExpNext(m_iter)) {
         ASSERT0(t->is_exp());
-        if (t->isMemRefNonPR()) {
-            genMDSSAInfoAndSetDedicatedVersionVMD(t, MDSSA_INIT_VERSION);
-        }
+        if (!t->isMemRefNonPR()) { continue; }
+        genMDSSAInfoAndSetDedicatedVersionVMD(t, MDSSA_INIT_VERSION);
     }
 }
 
@@ -3271,9 +3264,8 @@ void MDSSAMgr::computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md)
         for (IR const* t = iterExpInitC(ir, irit);
              t != nullptr; t = iterExpNextC(irit)) {
             ASSERT0(t->is_exp());
-            if (t->isMemRefNonPR()) {
-                collectUseMD(t, livein_md);
-            }
+            if (!t->isMemRefNonPR()) { continue; }
+            collectUseMD(t, livein_md);
         }
     }
 }

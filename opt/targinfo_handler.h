@@ -53,7 +53,7 @@ public:
     virtual CHAR const* getPassName() const { return "TargInfo Handler"; }
     PASS_TYPE getPassType() const { return PASS_TARGINFO_HANDLER; }
 
-    virtual bool perform(OptCtx & oc) { return false; }
+    virtual bool perform(OptCtx &) { return false; }
 
     //The function try to copy physical register from 'src' to 'tgt' if 'src'
     //has been assigned a physical register.

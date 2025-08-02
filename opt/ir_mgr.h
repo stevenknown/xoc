@@ -675,8 +675,12 @@ public:
                             bool is_cmp_kid, IsomoFlag const& flag) const;
     virtual bool isIRIsomorphicExtOp(
         IR const* ir, IR const* src, bool is_cmp_kid,
-        IsomoFlag const& flag) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
+        IsomoFlag const&) const
+    {
+        DUMMYUSE(ir && src && is_cmp_kid);
+        ASSERTN(0, ("Target Dependent Code"));
+        return false;
+    }
 
 
     //stpr $0:u64

@@ -321,7 +321,7 @@ void IRBB::dumpAttr(Region const* rg) const
 
 
 void IRBB::dumpIRList(Region const* rg, bool dump_inner_region,
-                      MOD IRDumpCtx<> * ctx) const
+                      MOD BBDumpCtxMgr<> * ctx) const
 {
     note(rg, "\nSTMT NUM:%d", getNumOfIR());
     rg->getLogMgr()->incIndent(3);
@@ -331,8 +331,8 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region,
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() || ir->is_undef());
-        if (ctx != nullptr) {
-            xoc::dumpIR(ir, rg, *ctx);
+        if (ctx != nullptr && ctx->ir_dump_ctx != nullptr) {
+            xoc::dumpIR(ir, rg, *ctx->ir_dump_ctx);
             continue;
         }
         xoc::dumpIR(ir, rg, nullptr, f);
@@ -352,6 +352,26 @@ void IRBB::dumpLabelList(Region const* rg) const
 }
 
 
+void IRBB::dumpProlog(Region const* rg, BBDumpCtx<> const* ctx) const
+{
+    if (ctx != nullptr) {
+        rg->getLogMgr()->incIndent(3);
+        ctx->dumpProlog(rg, this);
+        rg->getLogMgr()->decIndent(3);
+    }
+}
+
+
+void IRBB::dumpEpilog(Region const* rg, BBDumpCtx<> const* ctx) const
+{
+    if (ctx != nullptr) {
+        rg->getLogMgr()->incIndent(3);
+        ctx->dumpEpilog(rg, this);
+        rg->getLogMgr()->decIndent(3);
+    }
+}
+
+
 void IRBB::dumpDigest(Region const* rg) const
 {
     note(rg, "\n----- BB%u --- rpo:%d -----", id(),
@@ -362,11 +382,17 @@ void IRBB::dumpDigest(Region const* rg) const
 
 
 void IRBB::dump(Region const* rg, bool dump_inner_region,
-                MOD IRDumpCtx<> * ctx) const
+                MOD BBDumpCtxMgr<> * ctx) const
 {
     if (!rg->isLogMgrInit()) { return; }
     dumpDigest(rg);
+    if (ctx != nullptr) {
+        dumpProlog(rg, ctx->bb_dump_ctx);
+    }
     dumpIRList(rg, dump_inner_region, ctx);
+    if (ctx != nullptr) {
+        dumpEpilog(rg, ctx->bb_dump_ctx);
+    }
 }
 
 
@@ -789,19 +815,19 @@ void dumpBBLabel(LabelInfoList & lablist, Region const* rg)
 
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
-                bool dump_inner_region, IRDumpCtx<> * ctx)
+                bool dump_inner_region, BBDumpCtxMgr<> * ctx)
 {
     ASSERT0(filename);
     FileObj fo(filename, true, false);
     FILE * h = fo.getFileHandler();
     rg->getLogMgr()->push(h, filename);
-    dumpBBList(bbl, rg, dump_inner_region);
+    dumpBBList(bbl, rg, dump_inner_region, ctx);
     rg->getLogMgr()->pop();
 }
 
 
 void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region,
-                IRDumpCtx<> * ctx)
+                BBDumpCtxMgr<> * ctx)
 {
     ASSERT0(rg && bbl);
     if (!rg->isLogMgrInit() || bbl->get_elem_count() == 0) { return; }
@@ -815,7 +841,7 @@ void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region,
 
 
 void dumpBBSet(BBSet const& bbs, Region const* rg, bool dump_inner_region,
-               IRDumpCtx<> * ctx)
+               BBDumpCtxMgr<> * ctx)
 {
     ASSERT0(rg);
     if (!rg->isLogMgrInit() || bbs.get_elem_count() == 0) { return; }

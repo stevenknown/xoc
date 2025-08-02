@@ -58,7 +58,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ir_debug_check.h"
 #include "ir.h"
 #include "ir_decl.h"
-#include "ir_decl_ext.h"
 #include "ir_helper.h"
 #include "ir_dump.h"
 #include "ir_verify.h"
@@ -69,8 +68,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "attachinfo_mgr.h"
 #include "md_mgr.h"
 #include "region_mgr.h"
-#include "ir_mgr.h"
-#include "ir_mgr_ext.h"
 #include "analysis_instr.h"
 #include "region.h"
 #endif

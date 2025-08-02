@@ -63,7 +63,7 @@ static void dumpAct(
         {
             Region const* rg = getRegion();
             note(getRegion(),
-                 "\nPROPAGATING CANDIDATE: %s THAT LOCATED IN STMT:",
+                 "\nPROPAGATING CANDIDATE: %s %s THAT LOCATED IN STMT:",
                  dump_actual ? "ACTUAL" : "CANDIDATE",
                  DumpIRName().dump(prop_value));
             rg->getLogMgr()->incIndent(2);

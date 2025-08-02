@@ -166,7 +166,7 @@ class LifeTime {
     //Used to record the number of calls intersected with the whole lifetime
     //except holes, this is not an accurate number, if this number is greater
     //than the CROSS_CALL_NUM_THRESHOLD, it will not be updated.
-    BYTE m_call_crossed_num;
+    UINT m_call_crossed_num;
 
     //Used to store the attributes of current lifetime.
     LTAttrFlag m_flag;
@@ -291,7 +291,7 @@ public:
     LifeTime const* getAncestor() const { return m_ancestor; }
     PRNO getAnctPrno() const { return m_ancestor->getPrno(); }
     LTAttrFlag getAttrFlag() const { return m_flag; }
-    BYTE getCallCrossedNum() const { return m_call_crossed_num; }
+    UINT getCallCrossedNum() const { return m_call_crossed_num; }
     LTList const& getChild() { return m_child; }
     UINT getRangeNum() const
     { return const_cast<LifeTime*>(this)->getRangeVec().get_elem_count(); }
@@ -643,14 +643,8 @@ protected:
     //Record the Lifetime that allocated in LSRA pass.
     LTList m_lt_list;
 
-    //Record the Lifetime that used for Reg2LifeTime.
-    LTList m_reg2lt_list;
-
-    //Record the corresponded LifeTime info of PRNO.
+    //Record the corresponding LifeTime info of PRNO.
     PRNO2LT m_prno2lt;
-
-    //Record the corresponded LifeTime info of physical register.
-    PRNO2LT m_reg2lt;
 
     xcom::Vector<Pos> m_bb_entry_pos;
     xcom::Vector<Pos> m_bb_exit_pos;
@@ -659,12 +653,10 @@ protected:
     #endif
 protected:
     //This func adds the position of caller register to the lifetime.
-    virtual void addCallerLTPos(Pos pos, IR const* ir) {}
+    virtual void addCallerLTPos(Pos pos, IR const* ir)
+    { DUMMYUSE(ir && pos); }
 
     LifeTime * allocLifeTime(PRNO prno);
-
-    //Allocate the LifeTime for Reg2LifeTime.
-    LifeTime * allocReg2LifeTime(PRNO prno);
 
     void computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                            PreAssignedMgr const& preassigned_mgr,
@@ -706,26 +698,11 @@ public:
 
     LifeTime * genLifeTime(PRNO prno);
     LifeTime * getLifeTime(PRNO prno) const { return m_prno2lt.get(prno); }
-    LifeTime * getRegLifeTime(Reg reg) const { return m_reg2lt.get(reg); }
     LTList const& getLTList() const { return m_lt_list; }
     Pos getBBStartPos(UINT bbid) const { return m_bb_entry_pos.get(bbid); }
     Pos getBBEndPos(UINT bbid) const { return m_bb_exit_pos.get(bbid); }
     Pos getMaxPos() const { return m_max_pos; }
     PRNO2LT const& getPrno2LT() const { return m_prno2lt; }
-    PRNO2LT const& getReg2LT() const { return m_reg2lt; }
-
-    //Initialize Reg2LifeTimeInfo.
-    void initReg2LifeTimeInfo();
-
-    //Insert 'range_vec' into the lifetime of 'reg'.
-    void mergeRegLifetimeWIthRange(Reg reg, RangeVec const& range_vec);
-
-    //Merged two RangeVec 'rv_ori' and 'rv_new'.
-    //Then the new RangeVec will be stored into 'rv_ori'
-    void mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new);
-
-    //Merged the new lifetime 'lt_new' into the RangeVec of 'reg'.
-    void mergeReg2LifeTime(Reg reg, MOD LifeTime * lt_new);
 
     //Clean the lifetime info before computation.
     void reset();
@@ -752,15 +729,55 @@ public:
 //
 //START LifeTime2DMgr
 //
-typedef Vector<IR*> PRNO2IR;
 class LifeTime2DMgr : public LifeTimeMgr {
     COPY_CONSTRUCTOR(LifeTime2DMgr);
 protected:
     LivenessMgr * m_live_mgr;
+protected:
+    //This function adds the position of caller register to the lifetime.
+    //Since the call statement can clober the caller registers, the position
+    //of call statement is added in the caller lifetime in order to indicate
+    //this reg is unavailable at this position.
+    //e.g:
+    //  A call at position 30 is added to the lifetime of REG_1.
+    //  LT:REG_1,range:<22-23><24-27><30><35-43>
+    //   |                     ------  -   ----------
+    //   |                     d    u  ^   d        u
+    //                                 |
+    //                                call
+    virtual void addCallerLTPos(Pos pos, IR const* ir) override
+    { DUMMYUSE(pos &&ir); }
+
+    //Merge the livein of BB info into the lifetime.
+    void mergeLiveIn(IRBB const* bb, UpdatePos & up,
+                     Pos dpos_bb_start);
+
+    //Merge the liveout of BB info into the lifetime.
+    void mergeLiveOut(IRBB const* bb, UpdatePos & up, Pos livein_def,
+                      Pos dpos_bb_end);
+
+public:
+    LifeTime2DMgr(Region * rg) : LifeTimeMgr(rg), m_live_mgr(nullptr) {}
+
+    virtual void computeLifeTime(UpdatePos & up, BBList const* bblst,
+        PreAssignedMgr const& preassigned_mgr) override;
+};
+//END LifeTime2DMgr
+
+
+//
+//START RegLifeTimeMgr
+//
+class RegLifeTimeMgr : public LifeTime2DMgr {
+    COPY_CONSTRUCTOR(RegLifeTimeMgr);
+protected:
     LinearScanRA * m_lsra;
 
-    //Maps from the register of caller to the responding lifetime.
-    PRNO2LT m_caller2lt;
+    //Record the Lifetime that used for Reg2LifeTime.
+    LTList m_reg2lt_list;
+
+    //Record the corresponding LifeTime info of physical register.
+    PRNO2LT m_reg2lt;
 protected:
     //This function adds the position of caller register to the lifetime.
     //Since the call statement can clober the caller registers, the position
@@ -775,27 +792,53 @@ protected:
     //                                call
     virtual void addCallerLTPos(Pos pos, IR const* ir) override;
 
-    LifeTime * getCallerLT(Reg r) const
-    { ASSERT0(r != REG_UNDEF); return m_caller2lt.get(r); }
+    //Allocate the LifeTime for Reg2LifeTime.
+    LifeTime * allocReg2LifeTime(PRNO prno);
 
-    //Merge the livein of BB info into the lifetime.
-    void mergeLiveIn(IRBB const* bb, UpdatePos & up,
-                     Pos dpos_bb_start);
+    //Initialize Reg2LifeTimeInfo.
+    void initReg2LifeTimeInfo();
 
-    void initCallerLifeTime();
-
-    //Merge the liveout of BB info into the lifetime.
-    void mergeLiveOut(IRBB const* bb, UpdatePos & up, Pos livein_def,
-                      Pos dpos_bb_end);
-
+    //Merged two RangeVec 'rv_ori' and 'rv_new'.
+    //Then the new RangeVec will be stored into 'rv_ori'
+    void mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new);
 public:
-    LifeTime2DMgr(Region * rg, LinearScanRA * ra) :
-        LifeTimeMgr(rg), m_lsra(ra) {}
+    RegLifeTimeMgr(Region * rg, LinearScanRA * ra) :
+        LifeTime2DMgr(rg), m_lsra(ra)
+    {
+        m_reg2lt_list.init();
+        initReg2LifeTimeInfo();
+    }
 
-    virtual void computeLifeTime(UpdatePos & up, BBList const* bblst,
-        PreAssignedMgr const& preassigned_mgr) override;
+    virtual ~RegLifeTimeMgr();
+
+    PRNO2LT const& getReg2LT() const { return m_reg2lt; }
+    LifeTime * getRegLifeTime(Reg reg) const { return m_reg2lt.get(reg); }
+
+    //Merge the new lifetime 'lt_new' into the lifetime responding to the
+    //reg: the physical-register which is used as the base lifetime for
+    //     the merge operation.
+    //lt_new: the lifetime of psesudo-register that will be merged into the
+    //        lifetime of physical-register.
+    //
+    //e.g:
+    //  The lifetime of PR1 will be merged into the lifetime of REG1.
+    //  Before Merge:
+    //  LT:REG_1,range:<22-23><24-27><30><35-43>
+    //   |                     ------  -   ----------
+    //
+    //  LT:PR_1,range:<46-49>
+    //   |                     ------  -   ----------  ----
+    //
+    //  After Merge:
+    //  LT:REG_1,range:<22-23><24-27><30><35-43><46-49>
+    //   |                     ------  -   ----------  ----
+    void mergeRegLifeTimeWithPRLT(MOD LifeTime * lt_new);
+
+    //Insert 'range_vec' into the lifetime of 'reg'.
+    void mergeRegLifetimeWIthRange(Reg reg, RangeVec const& range_vec);
 };
-//END LifeTime2DMgr
+//END RegLifeTimeMgr
+
 
 } //namespace xoc
 #endif

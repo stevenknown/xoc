@@ -43,7 +43,8 @@ static void generate_region(RegionMgr * rm)
     toprg->initIRBBMgr();
     rm->addToRegionTab(toprg);
     toprg->setRegionVar(rm->getVarMgr()->registerVar(
-        "program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
+        "program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE,
+        SS_UNDEF));
 
     //Generate region for function.
     Region * func = rm->allocRegion(REGION_FUNC);
@@ -52,7 +53,8 @@ static void generate_region(RegionMgr * rm)
     func->initDbxMgr();
     func->initIRBBMgr();
     func->setRegionVar(rm->getVarMgr()->registerVar(
-        ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
+        ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE,
+        SS_UNDEF));
 
     IR * ir = toprg->getIRMgr()->buildRegion(func);
     toprg->addToIRList(ir);
@@ -71,9 +73,9 @@ static void generate_region(RegionMgr * rm)
     //  }
     //  return g:u32;
     Var * g = rm->getVarMgr()->registerVar("g",
-        rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
+        rm->getTypeMgr()->getI32(), 0, VAR_GLOBAL, SS_UNDEF);
     Var * q = rm->getVarMgr()->registerVar("q",
-            rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
+            rm->getTypeMgr()->getI32(), 0, VAR_GLOBAL, SS_UNDEF);
     Type const* i32ty = rm->getTypeMgr()->getI32();
     Type const* u32ty = rm->getTypeMgr()->getU32();
     IRMgr * irmgr = func->getIRMgr();

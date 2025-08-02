@@ -454,6 +454,12 @@ Pass * PassMgr::allocScalarOpt()
 }
 
 
+Pass * PassMgr::allocRegSSAMgr()
+{
+    return new RegSSAMgr(m_rg);
+}
+
+
 Pass * PassMgr::allocMDSSALiveMgr()
 {
     return new MDSSALiveMgr(m_rg);
@@ -588,6 +594,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_MDSSA_MGR:
         pass = allocMDSSAMgr();
+        break;
+    case PASS_REGSSA_MGR:
+        pass = allocRegSSAMgr();
         break;
     case PASS_CCP:
         pass = allocCCP();

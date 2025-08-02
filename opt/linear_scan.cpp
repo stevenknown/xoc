@@ -270,12 +270,12 @@ Var * FakeVarMgr::genFakeVar(Type const* ty)
     if (ty->is_vector()) {
         if (m_fake_vec_var != nullptr) { return m_fake_vec_var; }
         m_fake_vec_var = REGION_region_mgr(m_rg)->getVarMgr()->registerVar(
-            "fake_vec_var", ty, 1, VAR_LOCAL | VAR_FAKE);
+            "#fake_vec_var", ty, 1, VAR_LOCAL | VAR_FAKE, SS_UNDEF);
         return m_fake_vec_var;
     }
     if (m_fake_scalar_var == nullptr) {
         m_fake_scalar_var = REGION_region_mgr(m_rg)->getVarMgr()->registerVar(
-            "fake_scalar_var", ty, 1, VAR_LOCAL | VAR_FAKE);
+            "#fake_scalar_var", ty, 1, VAR_LOCAL | VAR_FAKE, SS_UNDEF);
     }
     return m_fake_scalar_var;
 }
@@ -653,6 +653,14 @@ void LexBackwardJumpAnalysis::recordFakeUse(
 }
 
 
+bool LexBackwardJumpAnalysis::canSkipPreAssignedReg(PRNO prno) const
+{
+    ASSERT0(m_lsra->isPreAssigned(prno));
+    Reg reg = m_lsra->getPreAssignedReg(prno);
+    return m_lsra->isZeroRegister(reg);
+}
+
+
 void LexBackwardJumpAnalysis::generateFakeUse()
 {
     for (LexBackwardJump const* e = m_backward_edges.get_head();
@@ -686,11 +694,9 @@ void LexBackwardJumpAnalysis::generateFakeUse()
         PRLiveSet const* live_out = m_live_mgr->get_liveout(src_bb->id());
         ASSERT0(live_out);
         PRLiveSetIter * iter = nullptr;
-        for (PRNO pr = (PRNO)live_out->get_first(&iter);
-             pr != BS_UNDEF; pr = (PRNO)live_out->get_next(pr, &iter)) {
-            if (m_lsra->isPreAssigned(pr) &&
-                (m_lsra->getPreAssignedReg(pr) == m_lsra->getZeroScalar() ||
-                m_lsra->getPreAssignedReg(pr) == m_lsra->getZeroVector())) {
+        for (BSIdx pr = (PRNO)live_out->get_first(&iter);
+             pr != BS_UNDEF; pr = live_out->get_next(pr, &iter)) {
+            if (m_lsra->isPreAssigned(pr) && canSkipPreAssignedReg(pr)) {
                 continue;
             }
             Occurence const* occ = m_prno2occ.get(pr);
@@ -1308,28 +1314,67 @@ void RegSetImpl::collectOtherAvailableRegister()
 }
 
 
+void RegSetImpl::dump() const
+{
+    note(m_ra.getRegion(), "\n==-- DUMP RegSetImpl RegisterSet --==");
+    m_ra.getRegion()->getLogMgr()->incIndent(2);
+    dumpAvailRegSet();
+    dumpUsedRegSet();
+    m_ra.getRegion()->getLogMgr()->decIndent(2);
+}
+
+
+void RegSetImpl::dumpUsedRegSet() const
+{
+    note(m_ra.getRegion(), "\n==-- DUMP UsedRegisterSet --==");
+    StrBuf buf(32);
+    m_used_callee.dump(buf);
+    note(m_ra.getRegion(), "\nUSED_CALLEE:%s", buf.getBuf());
+
+    buf.clean();
+    m_used_caller.dump(buf);
+    note(m_ra.getRegion(), "\nUSED_CALLER:%s", buf.getBuf());
+}
+
+
 void RegSetImpl::dumpAvailRegSet() const
 {
-    note(m_ra.getRegion(), "\n==-- DUMP AvaiableRegisterSet  --==");
+    note(m_ra.getRegion(), "\n==-- DUMP AvaiableRegisterSet --==");
     StrBuf buf(32);
+    m_avail_allocable.dump(buf);
+    note(m_ra.getRegion(), "\nAVAIL_ALLOCABLE:%s", buf.getBuf());
+
+    buf.clean();
     m_avail_caller_scalar.dump(buf);
-    note(m_ra.getRegion(), "\nAVAIL_CALLER:%s", buf.buf);
+    note(m_ra.getRegion(), "\nAVAIL_CALLER_SCALAR:%s", buf.getBuf());
 
     buf.clean();
     m_avail_callee_scalar.dump(buf);
-    note(m_ra.getRegion(), "\nAVAIL_CALLEE:%s", buf.buf);
+    note(m_ra.getRegion(), "\nAVAIL_CALLEE_SCALAR:%s", buf.getBuf());
 
     buf.clean();
     m_avail_param_scalar.dump(buf);
-    note(m_ra.getRegion(), "\nAVAIL_PARAM:%s", buf.buf);
+    note(m_ra.getRegion(), "\nAVAIL_PARAM_SCALAR:%s", buf.getBuf());
 
     buf.clean();
     m_avail_return_value_scalar.dump(buf);
-    note(m_ra.getRegion(), "\nAVAIL_RETURN_VALUE:%s", buf.buf);
+    note(m_ra.getRegion(), "\nAVAIL_RETURN_VALUE:%s", buf.getBuf());
 
     buf.clean();
-    m_avail_allocable.dump(buf);
-    note(m_ra.getRegion(), "\nAVAIL_ALLOCABLE:%s", buf.buf);
+    m_avail_caller_vector.dump(buf);
+    note(m_ra.getRegion(), "\nAVAIL_CALLER_VECTOR:%s", buf.getBuf());
+
+    buf.clean();
+    m_avail_callee_vector.dump(buf);
+    note(m_ra.getRegion(), "\nAVAIL_CALLEE_VECTOR:%s", buf.getBuf());
+
+    buf.clean();
+    m_avail_param_vector.dump(buf);
+    note(m_ra.getRegion(), "\nAVAIL_PARAM_VECTOR:%s", buf.getBuf());
+
+    buf.clean();
+    m_avail_return_value_vector.dump(buf);
+    note(m_ra.getRegion(), "\nAVAIL_RETURN_VALUE_VECTOR:%s", buf.getBuf());
 }
 //END RegSetImpl
 
@@ -1440,6 +1485,20 @@ void LTInterfGraphLSRAChecker::build()
 }
 
 
+bool LTInterfGraphLSRAChecker::canSkipCheck(
+    LinearScanRA const* lsra, xcom::Edge const* e) const
+{
+    ASSERT0(lsra && e);
+    if (lsra->canInterfereWithOtherLT(e->from()->id()) ||
+        lsra->canInterfereWithOtherLT(e->to()->id())) {
+        //If any prno of the 'e' is expected to interfere with others, so
+        //this edge can be skipped.
+        return true;
+    }
+    return false;
+}
+
+
 bool LTInterfGraphLSRAChecker::check(LinearScanRA * lsra)
 {
     //Build the interference graph first.
@@ -1448,30 +1507,17 @@ bool LTInterfGraphLSRAChecker::check(LinearScanRA * lsra)
     //Check the LSRA result by the following steps on the interference graph:
     // 1. Traverse each edge of the interference graph.
     // 2. If the regsiters assigned to the src node and dst node is the ZERO
-    //    register, check the next edge.
+    //    register, the edge can be skip.
     // 3. If the prno responding to the src or dst node is not participated
     //    into the LSRA (e.g: callee saved registers), or the lifetime has
-    //    no def occurence, check the next edge.
+    //    no def occurence, the edge can be skip.
     xcom::EdgeIter it;
     for (xcom::Edge * e = get_first_edge(it); e != nullptr;
          e = get_next_edge(it)) {
         ASSERT0(e->from()->id() != PRNO_UNDEF);
         ASSERT0(e->to()->id() != PRNO_UNDEF);
         ASSERT0(e->from() != e->to());
-        if (lsra->getReg(e->from()->id()) == lsra->getZeroScalar() ||
-            lsra->getReg(e->from()->id()) == lsra->getZeroVector() ||
-            lsra->getReg(e->to()->id()) == lsra->getZeroScalar() ||
-            lsra->getReg(e->to()->id()) == lsra->getZeroVector()) {
-           //Implemented the step 2 above.
-           continue;
-        }
-        if (!m_lt_mgr.getLifeTime(e->from()->id()) ||
-            !m_lt_mgr.getLifeTime(e->from()->id())->isOccHasDef() ||
-            !m_lt_mgr.getLifeTime(e->to()->id()) ||
-            !m_lt_mgr.getLifeTime(e->to()->id())->isOccHasDef()) {
-            //Implemented the step 3 above.
-            continue;
-        }
+        if (canSkipCheck(lsra, e)) { continue; }
         ASSERT0(lsra->getReg(e->from()->id()) != lsra->getReg(e->to()->id()));
     }
     return true;
@@ -2595,12 +2641,21 @@ void LinearScanRA::reset()
         m_reg_lt_mgr->reset();
     }
 
-    //Set attributes obtained from other passes.
-    DynamicStack * dynamic_stack = (DynamicStack*)m_rg->getPassMgr()->
-        queryPass(PASS_DYNAMIC_STACK);
-    ASSERT0(dynamic_stack);
-    m_has_alloca = dynamic_stack->hasAlloca();
-    m_may_need_to_realign_stack = dynamic_stack->mayRealignStack();
+    //Detect the alloca and stack realign.
+    StackBehaviorDetector stack_behavior_detector(m_rg);
+    stack_behavior_detector.detect(m_has_alloca, m_may_need_to_realign_stack);
+}
+
+
+Type const* LinearScanRA::getSpillType(PRNO prno) const
+{
+    Type const* var_ty = getVarTypeOfPRNO(prno);
+    ASSERT0(var_ty);
+    if (var_ty->is_any()) {
+        //The spill location type should not less than register type at least.
+        return m_rg->getTypeMgr()->getTargMachRegisterType();
+    }
+    return var_ty;
 }
 
 
@@ -2616,12 +2671,21 @@ Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 {
     prno = getAnctPrno(prno);
     ASSERT0(prno != PRNO_UNDEF);
+    TypeMgr const* tm = m_rg->getTypeMgr();
+    if (ty->is_any()) {
+        //We intend to give the same size as PTR type as the placeholder size
+        //of ANY type, because ANY type always be represented by Object Pointer
+        //in runtime system.
+        ty = tm->getTargMachRegisterType();
+    }
+    //NOTE: ty may be vector type that byte size is greater than register type.
+    ASSERT0(!ty->is_scalar() ||
+            tm->getByteSize(ty) <=
+            tm->getByteSize(tm->getTargMachRegisterType()));
     Var * v = getSpillLoc(prno);
     if (v == nullptr) {
         //The alignment of vector register is greater than STACK_ALIGNMENT.
-        v = genFuncLevelVar(ty, MAX(
-            m_rg->getTypeMgr()->getByteSize(ty), STACK_ALIGNMENT));
-        VAR_storage_space(v) = SS_STACK;
+        v = genFuncLevelVar(ty, MAX(tm->getByteSize(ty), STACK_ALIGNMENT));
         m_prno2var.set(prno, v);
     }
     return v;
@@ -2631,16 +2695,21 @@ Var * LinearScanRA::genSpillLoc(PRNO prno, Type const* ty)
 Var * LinearScanRA::getSpillLoc(Type const* ty)
 {
     ASSERT0(ty);
+    TypeMgr const* tm = m_rg->getTypeMgr();
+
+    //NOTE: ty may be vector type that byte size is greater than register type.
+    ASSERT0(!ty->is_scalar() ||
+            tm->getByteSize(ty) <=
+            tm->getByteSize(tm->getTargMachRegisterType()));
     bool find = false;
     Var * v = m_ty2var.get(ty, &find);
     if (find) { return v; }
     //The alignment of vector register is greater than STACK_ALIGNMENT.
-    v = genFuncLevelVar(ty, MAX(
-        m_rg->getTypeMgr()->getByteSize(ty), STACK_ALIGNMENT));
-    VAR_storage_space(v) = SS_STACK;
+    v = genFuncLevelVar(ty, MAX(tm->getByteSize(ty), STACK_ALIGNMENT));
     m_ty2var.set(ty, v);
     return v;
 }
+
 
 //Return physical register by given pre-assigned prno.
 Reg LinearScanRA::getPreAssignedReg(PRNO prno) const
@@ -2975,11 +3044,11 @@ void LinearScanRA::dumpDOTWithReg() const
 
 void LinearScanRA::dumpDOTWithReg(CHAR const* name, UINT flag) const
 {
-    class DumpPRWithReg : public IRDumpAttrBaseFunc {
+    class DumpPRWithReg : public IRDumpCustomBaseFunc {
     public:
         LinearScanRA const* lsra;
     public:
-        virtual void dumpAttr(
+        virtual void dumpCustomAttr(
             OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
@@ -2989,10 +3058,10 @@ void LinearScanRA::dumpDOTWithReg(CHAR const* name, UINT flag) const
             buf.strcat(" (%s)", lsra->getRegName(r));
         }
     };
-    DumpPRWithReg df;
-    df.lsra = this;
     DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
-    IRDumpCtx<> ctx(4, f, nullptr, &df);
+    DumpPRWithReg cf;
+    cf.lsra = this;
+    IRDumpCtx<> ctx(4, f, nullptr, &cf);
     ASSERT0(m_cfg && m_cfg->is_valid());
     m_cfg->dumpDOT(name, flag, &ctx);
 }
@@ -3000,11 +3069,11 @@ void LinearScanRA::dumpDOTWithReg(CHAR const* name, UINT flag) const
 
 void LinearScanRA::dumpBBListWithReg() const
 {
-    class DumpPRWithReg : public IRDumpAttrBaseFunc {
+    class DumpPRWithReg : public IRDumpCustomBaseFunc {
     public:
         LinearScanRA const* lsra;
     public:
-        virtual void dumpAttr(
+        virtual void dumpCustomAttr(
             OUT xcom::DefFixedStrBuf & buf, Region const* rg, IR const* ir,
             DumpFlag dumpflag) const override
         {
@@ -3014,11 +3083,12 @@ void LinearScanRA::dumpBBListWithReg() const
             buf.strcat(" (%s)", lsra->getRegName(r));
         }
     };
-    DumpPRWithReg df;
-    df.lsra = this;
     DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE);
-    IRDumpCtx<> ctx(4, f, nullptr, &df);
+    DumpPRWithReg cf;
+    cf.lsra = this;
+    IRDumpCtx<> irdumpctx(4, f, nullptr, &cf);
     ASSERT0(m_rg->getBBList());
+    BBDumpCtxMgr<> ctx(&irdumpctx, nullptr);
     xoc::dumpBBList(m_rg->getBBList(), m_rg, false, &ctx);
 }
 
@@ -3112,8 +3182,9 @@ void LinearScanRA::addHandled(LifeTime * lt)
 Var * LinearScanRA::genFuncLevelVar(Type const* type, UINT align)
 {
     xcom::StrBuf name(64);
+    //Spill location should be stack space.
     Var * v = m_rg->getVarMgr()->registerVar(
-        genFuncLevelNewVarName(name), type, align, VAR_LOCAL);
+        genFuncLevelNewVarName(name), type, align, VAR_LOCAL, SS_STACK);
     return v;
 }
 
@@ -3147,153 +3218,6 @@ void LinearScanRA::recalculateSSA(OptCtx & oc) const
         rmnonprdu = true;
     }
     xoc::removeClassicDUChain(m_rg, rmprdu, rmnonprdu);
-}
-
-
-void LinearScanRA::collectDedicatedPR(BBList const* bblst,
-                                      OUT PreAssignedMgr & mgr)
-{
-    //Target Depedent Code.
-    //e.g: designate $3 have to be allocate physical register REG-5.
-    //mgr.add((PRNO)3, (Reg)5);
-    DUMMYUSE(bblst);
-    DUMMYUSE(mgr);
-}
-
-
-//This function implements the swap operation of two prnos through the temp
-//register after the register allocation.
-//  There are three steps used to complete the swap operation:
-//  1. $temp  <-- mov $src_prno_with_r1
-//  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
-//  3. $dst_prno_with_r2 <-- mov $temp
-IR * LinearScanRA::doSwapByReg(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-    Type const* ty2, IR const* marker, MOD IRBB * bb)
-{
-    ASSERT0(bb && ty1 && ty2);
-    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(src_prno_with_r2 != src_prno_with_r1);
-    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
-    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
-
-    Type const* ty1_tmp = getSpillType(ty1);
-    Type const* ty2_tmp = getSpillType(ty2);
-    ASSERT0(ty1_tmp && ty2_tmp);
-
-    //Move the data from the reg of src_prno_with_r1 to the reg of temp.
-    Reg tr = getTempReg(ty1_tmp);
-    PRNO tmpprno = buildPrnoAndSetReg(ty1_tmp, tr);
-    IR * stpr1 = m_irmgr->buildMove(tmpprno, src_prno_with_r1, ty1_tmp);
-
-    //Move the data from the reg of src_prno_with_r2 to the reg of
-    //dst_prno_with_r1.
-    IR * stpr2 = m_irmgr->buildMove(dst_prno_with_r1, src_prno_with_r2,
-                                    ty2_tmp);
-
-    //Move the data from the reg of tmp to the reg of dst_prno_with_r2.
-    IR * stpr3 = m_irmgr->buildMove(dst_prno_with_r2, tmpprno, ty1_tmp);
-
-    if (marker) {
-        IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
-        bb->getIRList().insert_after(stpr1, stmt);
-    } else {
-        bb->getIRList().append_head(stpr1);
-    }
-
-    bb->getIRList().insert_after(stpr2, stpr1);
-    bb->getIRList().insert_after(stpr3, stpr2);
-
-    setMove(stpr2);
-    setMove(stpr1);
-    setMove(stpr3);
-    return stpr3;
-}
-
-
-//This function implements the swap operation of two prnos through the memory
-//allocation after the register allocation.
-//  There are three steps used to complete the swap operation:
-//  1. [mem]  <-- spill $src_prno_with_r1
-//  2. $dst_prno_with_r1 <-- mov $src_prno_with_r2
-//  3. $dst_prno_with_r2 <-- reload [mem]
-IR * LinearScanRA::doSwapByMem(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-    Type const* ty2, IR const* marker, MOD IRBB * bb)
-{
-    ASSERT0(bb && ty1 && ty2);
-    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(src_prno_with_r2 != src_prno_with_r1);
-    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
-    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
-
-    Type const* ty1_tmp = getSpillType(ty1);
-    Type const* ty2_tmp = getSpillType(ty2);
-    ASSERT0(ty1_tmp && ty2_tmp);
-
-    Var * spill_loc = getTempVar(ty1_tmp);
-    ASSERT0(spill_loc);
-
-    //Build the spill IR.
-    IR * spill = buildSpillByLoc(src_prno_with_r1, spill_loc, ty1_tmp);
-    if (marker) {
-        IR const* stmt = marker->is_stmt() ? marker : marker->getStmt();
-        bb->getIRList().insert_after(spill, stmt);
-    } else {
-        bb->getIRList().append_head(spill);
-    }
-    //This data move is always between two registers.
-    IR * stpr = m_irmgr->buildMove(dst_prno_with_r1, src_prno_with_r2, ty2_tmp);
-
-    //Build the reload IR.
-    IR * reload = buildReload(dst_prno_with_r2, spill_loc, ty1_tmp);
-
-    bb->getIRList().insert_after(stpr, spill);
-    bb->getIRList().insert_after(reload, stpr);
-    setSpill(spill);
-    setMove(stpr);
-    setReload(reload);
-    return reload;
-}
-
-
-//This function implements the swap operation of two prnos after the register
-//allocation.
-//  There are two ways to finish this operation:
-//     1. Temp register.
-//     2. Temp memory location.
-//  The principles of the swap operation are listed as below:
-//     1. If the temp register for dst_prno_with_r1 is available, do the swap
-//        operation by the temp register.
-//     2. If the temp register for dst_prno_with_r2 is available, do the swap
-//        operation by the temp register.
-//     3. If the temp register for dst_prno_with_r1 and dst_prno_with_r2 are
-//        not available, do swap operation by the temp memory location.
-IR * LinearScanRA::insertIRToSwap(PRNO src_prno_with_r2, PRNO dst_prno_with_r1,
-    PRNO src_prno_with_r1, PRNO dst_prno_with_r2, Type const* ty1,
-    Type const* ty2, IR const* marker, MOD IRBB * bb)
-{
-    ASSERT0(bb && ty1 && ty2);
-    ASSERT0(src_prno_with_r1 != PRNO_UNDEF && src_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(dst_prno_with_r1 != PRNO_UNDEF && dst_prno_with_r2 != PRNO_UNDEF);
-    ASSERT0(src_prno_with_r1 != src_prno_with_r2);
-    ASSERT0(dst_prno_with_r1 != dst_prno_with_r2);
-    ASSERT0(getReg(src_prno_with_r2) != getReg(src_prno_with_r1));
-
-    if (isTmpRegAvailable(ty1)) {
-        return doSwapByReg(src_prno_with_r2, dst_prno_with_r1,
-            src_prno_with_r1, src_prno_with_r1, ty1, ty2, marker, bb);
-    }
-
-    if (isTmpRegAvailable(ty2)) {
-        return doSwapByReg(src_prno_with_r1, dst_prno_with_r2,
-            src_prno_with_r2, dst_prno_with_r1, ty2, ty1, marker, bb);
-    }
-
-    return doSwapByMem(src_prno_with_r2, dst_prno_with_r1,
-        src_prno_with_r1, dst_prno_with_r2, ty1, ty2, marker, bb);
 }
 
 
@@ -3490,13 +3414,16 @@ void LinearScanRA::generateRegLifeTime(OptCtx & oc)
     VarUpdatePos up(this);
     getRegLTMgr().computeLifeTime(up, m_bb_list, m_preassigned_mgr);
 
-    //Save the map between register and it's corresponded lifetime.
+    //Generate the lifteime of all physical-registers that participated into
+    //the register allocation based on the lifetime of all pseudo-registers.
+    //Normally, we can traverse all the lifetime of pseudo-register, and merge
+    //these lifetimes into the the lifteime of it's responding
+    //physical-registers.
     LTListIter it;
     LTList const& lt_list = getRegLTMgr().getLTList();
     for (LifeTime * lt = lt_list.get_head(&it);
          lt != nullptr; lt = lt_list.get_next(&it)) {
-        Reg reg = getReg(lt->getPrno());
-        getRegLTMgr().mergeReg2LifeTime(reg, lt);
+        getRegLTMgr().mergeRegLifeTimeWithPRLT(lt);
     }
 }
 
@@ -3507,7 +3434,8 @@ void LinearScanRA::dumpRegLTOverview() const
 
     xoc::note(m_rg, "\n==-- DUMP Reg2LifeTime in Region '%s' --==",
               m_rg->getRegionName());
-    PRNO2LT const& reg2lt = m_reg_lt_mgr->getReg2LT();
+    LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
+    PRNO2LT const& reg2lt = pthis->getRegLTMgr().getReg2LT();
     for (Reg r = 0; r < reg2lt.get_elem_count(); r++) {
         LifeTime * lt = reg2lt.get(r);
         if (lt == nullptr) { continue; }
@@ -3543,7 +3471,7 @@ bool LinearScanRA::verifyLSRAByInterfGraph(OptCtx & oc) const
         &oc, PASS_RPO, PASS_DOM, PASS_PRLIVENESS_MGR, PASS_UNDEF);
 
     VarUpdatePos up(this);
-    LifeTime2DMgr lt2d_mgr(m_rg, const_cast<LinearScanRA*>(this));
+    LifeTime2DMgr lt2d_mgr(m_rg);
     lt2d_mgr.computeLifeTime(up, m_bb_list, m_preassigned_mgr);
 
     LTInterfGraphLSRAChecker graph(m_rg, lt2d_mgr);
@@ -3554,6 +3482,31 @@ bool LinearScanRA::verifyLSRAByInterfGraph(OptCtx & oc) const
 }
 
 
+bool LinearScanRA::canInterfereWithOtherLT(PRNO prno) const
+{
+    ASSERT0(prno != PRNO_UNDEF);
+    LinearScanRA * pthis = const_cast<LinearScanRA*>(this);
+
+    Reg r = getReg(prno);
+    ASSERT0(r != REG_UNDEF);
+    if (isZeroRegister(r)) {
+        //If the regsiters assigned to the src node and dst node is the ZERO
+        //register, the lifetime can interfere with other lifetimes assigned
+        //to zero register.
+        return true;
+    }
+
+    LifeTimeMgr const& lt_mgr = pthis->getLTMgr();
+    if (lt_mgr.getLifeTime(prno) == nullptr ||
+        !lt_mgr.getLifeTime(prno)->isOccHasDef()) {
+        //If the lifetime has no def occ, that means the value of the prno
+        //is not important, the value can be anything.
+        return true;
+    }
+    return false;
+}
+
+
 //TODO: rematerialization and spill-store-elimination
 bool LinearScanRA::perform(OptCtx & oc)
 {
@@ -3561,13 +3514,6 @@ bool LinearScanRA::perform(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO,
         PASS_DOM, PASS_PRLIVENESS_MGR, PASS_LOOP_INFO, PASS_UNDEF);
 
-    //LSRA asks DynamicStack pass to determine whether the region has at least
-    //one ALLOCA, thus the pass object is necesary. However the validation of
-    //the pass is usually confirmed at Pass::perform() which does not only check
-    //ALLOCA, but also supports the ALLOCA operations. Thus we expect that
-    //DynamicAlloca has performed the detection of ALLOCA before entering
-    //LSRA pass.
-    m_rg->getPassMgr()->registerPass(PASS_DYNAMIC_STACK);
     reset();
 
     //Determine whether the PASS apply all modifications of CFG and BB to
@@ -3586,7 +3532,6 @@ bool LinearScanRA::perform(OptCtx & oc)
     doBackwardJumpAnalysis();
 
     UpdatePos up(this);
-    collectDedicatedPR(m_bb_list, m_preassigned_mgr);
     ASSERT0(m_lt_mgr);
     getLTMgr().computeLifeTime(up, m_bb_list, m_preassigned_mgr);
 
@@ -3623,4 +3568,5 @@ bool LinearScanRA::perform(OptCtx & oc)
     return false;
 }
 //END LinearScanRA
+
 } //namespace xoc

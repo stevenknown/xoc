@@ -260,7 +260,7 @@ MD const* RegionMgr::getAndGenDedicateStrMD()
     if (m_str_md != nullptr) { return m_str_md; }
     Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
     Var * sv = getVarMgr()->registerStringVar(
-        DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
+        DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT, SS_UNDEF);
     sv->setFlag((VAR_FLAG)(VAR_IS_UNALLOCABLE|VAR_ADDR_TAKEN));
     MD md;
     MD_base(&md) = sv;

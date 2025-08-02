@@ -107,7 +107,7 @@ void MInst::dump(OUT xcom::StrBuf & buf, MInstMgr const& mgr) const
 {
     ASSERT0(m_inst_desc);
     buf.strcat("\nMI_CODE:%s, PC:0x%x", mgr.getMInstName(this),
-                (UINT)MI_pc(this));
+               (UINT)MI_pc(this));
     Dbx const* temp = &m_dbx;
     DbxMgr * dbx_mgr = mgr.getRegion()->getDbxMgr();
     ASSERT0(dbx_mgr);

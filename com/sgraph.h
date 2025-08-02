@@ -881,7 +881,6 @@ protected:
     bool computeIdomForFullGraph(List<Vertex const*> const& vlst);
     void freeDomSet(VexIdx vid);
     void freePdomSet(VexIdx vid);
-    void removeUnreachNodeRecur(VexIdx id, BitSet & visited);
     bool verifyPdom(DGraph & g, RPOVexList const& rpovlst) const;
     bool verifyDom(DGraph & g, RPOVexList const& rpovlst) const;
 public:
@@ -975,6 +974,9 @@ public:
             cloneDomAndPdom(g);
         }
     }
+
+    //Collect the 'id' vertex reaching nodes into 'visited'.
+    void collectReachNodeRecur(VexIdx id, BitSet & visited);
 
     //The function compute the entry vertex.
     void computeEntryList(OUT List<Vertex const*> & lst) const;

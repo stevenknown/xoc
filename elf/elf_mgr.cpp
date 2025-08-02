@@ -46,6 +46,80 @@ typedef struct {
 } TabCol;
 
 
+//
+//START DeleteNotCalledFunc
+//
+//This class will delete the functions in the 'm_func_name_lst' from ELF 'm_em'.
+//These functions are not called in the whole program and should not be linked.
+class DeleteNotCalledFunc {
+    COPY_CONSTRUCTOR(DeleteNotCalledFunc);
+private:
+    ELFMgr * m_em;
+
+    //Record the all the function names to be deleted.
+    SymList const& m_func_name_lst;
+public:
+    DeleteNotCalledFunc(ELFMgr * em, SymList const& func_name_lst) : m_em(em),
+        m_func_name_lst(func_name_lst) {}
+
+    //Delete relax_br_info of the 'func_name' function.
+    void deleteRelaxBrInfoOfFunc(Sym const* func_name);
+
+    //Perform function deleting.
+    bool perform();
+};
+
+
+void DeleteNotCalledFunc::deleteRelaxBrInfoOfFunc(Sym const* func_name)
+{
+    ASSERT0(m_em && func_name);
+
+    SymbolInfo const* symbol_info = ELFMGR_symbol_info(m_em).get(func_name);
+    ASSERT0(symbol_info && SYMINFO_is_func(symbol_info));
+    FunctionInfo const* fi = SYMINFO_func(symbol_info);
+
+    //Collect all the relax_br_info needed to delete.
+    RelaxBrInfo * relax_br_info;
+    RelaxBrInfoMapIter iter;
+    RelaxBrInfoList deleting_relax_br_info_lst;
+    for (ELFMGR_relax_br_map(m_em).get_first(iter, &relax_br_info); !iter.end();
+         ELFMGR_relax_br_map(m_em).get_next(iter, &relax_br_info)) {
+        if (RELAXBRINFO_func(relax_br_info) == fi) {
+            deleting_relax_br_info_lst.append_tail(relax_br_info);
+        }
+    }
+
+    for (RelaxBrInfo const* rbi = deleting_relax_br_info_lst.get_head();
+         rbi != nullptr; rbi = deleting_relax_br_info_lst.get_next()) {
+        ELFMGR_relax_br_map(m_em).remove(rbi->getIR());
+    }
+}
+
+
+bool DeleteNotCalledFunc::perform()
+{
+    ASSERT0(m_em);
+
+    if (m_func_name_lst.get_elem_count() == 0) { return false; }
+
+    SymListIter iter;
+    for (m_func_name_lst.get_head(&iter); iter != nullptr;
+         m_func_name_lst.get_next(&iter)) {
+        Sym const* func_name = iter->val();
+
+        //Delete relax_br_info from ELF for linker relaxation.
+        deleteRelaxBrInfoOfFunc(func_name);
+
+        //Delete function symbol from ELF.
+        ELFMGR_symbol_name_list(m_em).remove(func_name);
+        ELFMGR_symbol_info(m_em).remove(func_name);
+    }
+
+    return true;
+}
+//END DeleteNotCalledFunc
+
+
 static SectionDesc const g_section_desc[] = {
     //Name(enum), Sect type,  Program header,
     //Flags,      Addr align, Entry size,     Name(str)
@@ -2949,7 +3023,7 @@ void ELFMgr::setSymbolValueHelper(MOD SymbolInfo * symbol_info)
 
 void ELFMgr::collectSymtabInfoFromVar()
 {
-    xcom::List<Sym const*>::Iter iter;
+    SymListIter iter;
 
     for (m_symbol_name.get_head(&iter); iter != nullptr;
          m_symbol_name.get_next(&iter)) {
@@ -3096,6 +3170,129 @@ void ELFMgr::initDebugInfo()
     //Generate some debug info.
     dm->genFrameBinary();
     dm->genLineBinary();
+}
+
+
+void ELFMgr::collectCalledFunc(OUT FuncInfoMap & called_func_map)
+{
+    CallGraph * cg = m_rm->getProgramRegion()->getCallGraph();
+    if (cg == nullptr) { return; }
+
+    //Find a kernel function.
+    bool find_kernel = false;
+    BitSet reach;
+    VertexIter c;
+    for (xcom::Vertex const* v = cg->get_first_vertex(c);
+         v != nullptr; v = cg->get_next_vertex(c)) {
+        CallNode const* cn = cg->getCallNode(v->id());
+        ASSERT0(cn != nullptr);
+
+        //Extern callee does not have region, but has a region name.
+        //Indirect callee does not have region and region name.
+        //Not deal with program region.
+        if (cn->region() == nullptr || cn->region()->is_program()) { continue; }
+
+        SymbolInfo const* symbol_info = m_symbol_info.get(cn->name());
+        ASSERT0(symbol_info);
+        if (FUNCINFO_is_entry(SYMINFO_func(symbol_info))) {
+            find_kernel = true;
+            cg->collectReachNodeRecur(cn->id(), reach);
+        }
+    }
+
+    //If there is no kernel function, the called_func_map should be empty.
+    if (!find_kernel) { return; }
+
+    //Remove unreachable function node from call graph.
+    List<xcom::Vertex*> rmlst;
+    for (xcom::Vertex * v = cg->get_first_vertex(c);
+         v != nullptr; v = cg->get_next_vertex(c)) {
+        if (!reach.is_contain(VERTEX_id(v))) {
+            if (cg->is_dense()) {
+                cg->removeVertex(v);
+            } else {
+                rmlst.append_tail(v);
+            }
+        }
+    }
+    for (xcom::Vertex * v = rmlst.get_head();
+         v != nullptr; v = rmlst.get_next()) {
+        cg->removeVertex(v);
+    }
+
+    for (xcom::Vertex const* v = cg->get_first_vertex(c);
+         v != nullptr; v = cg->get_next_vertex(c)) {
+        CallNode const* cn = cg->getCallNode(v->id());
+        ASSERT0(cn);
+
+        //Indirect callee does not have a rg_name.
+        if (cn->hasUnknownCallee()) { continue; }
+
+        SymbolInfo const* symbol_info = m_symbol_info.get(cn->name());
+        ASSERT0(symbol_info);
+        called_func_map.set(cn->name(), SYMINFO_func(symbol_info));
+    }
+}
+
+
+bool ELFMgr::isAliaseeSym(Sym const* sym_name)
+{
+    ASSERT0(sym_name);
+
+    Sym const* v;
+    AliasSymbolMapIter aiter;
+    for (Sym const* k = m_alias_symbol_map.get_first(aiter, &v);
+         !aiter.end(); k = m_alias_symbol_map.get_next(aiter, &v)) {
+        ASSERT0(k && v);
+        if (sym_name == v) { return true; }
+    }
+
+    return false;
+}
+
+
+void ELFMgr::collectNotCalledFuncName(ELFSymTab const& reloc_info_name_tab,
+    OUT SymList & func_name_lst)
+{
+    FuncInfoMap called_func_map;
+    collectCalledFunc(called_func_map);
+
+    SymListIter iter;
+    for (m_symbol_name.get_head(&iter); iter != nullptr;
+         m_symbol_name.get_next(&iter)) {
+        Sym const* sym_name = iter->val();
+        ASSERT0(sym_name);
+        SymbolInfo const* symbol_info = m_symbol_info.get(sym_name);
+        ASSERT0(symbol_info);
+
+        //Do not delete a non-function symbol.
+        if (!SYMINFO_is_func(symbol_info)) { continue; }
+
+        //Do not delete a entry function.
+        if (FUNCINFO_is_entry(SYMINFO_func(symbol_info))) { continue; }
+
+        //Do not delete if found in called_func_map.
+        if (called_func_map.find(sym_name)) { continue; }
+
+        //Do not delete a aliasee.
+        if (isAliaseeSym(sym_name)) { continue; }
+
+        //Do not delete if relocated.
+        if (reloc_info_name_tab.find(sym_name->getStr())) { continue; }
+
+        func_name_lst.append_tail(sym_name);
+    }
+}
+
+
+void ELFMgr::deleteNotCalledFunc(ELFSymTab const& reloc_info_name_tab)
+{
+    SymList deleting_func_name_lst;
+    collectNotCalledFuncName(reloc_info_name_tab, deleting_func_name_lst);
+
+    //Delete necessary info of these functions.
+    DeleteNotCalledFunc dncf(this, deleting_func_name_lst);
+    dncf.perform();
 }
 
 

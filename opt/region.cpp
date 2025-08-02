@@ -89,6 +89,24 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
 }
 
 
+void Region::dumpAllIR() const
+{
+    getIRMgr()->dump();
+}
+
+
+IR * Region::getIR(UINT irid) const
+{
+    return ANA_INS_ir_vec(getAnalysisInstrument()).get(irid);
+}
+
+
+xcom::Vector<IR*> & Region::getIRVec() const
+{
+    return ANA_INS_ir_vec(getAnalysisInstrument());
+}
+
+
 void Region::destroy()
 {
     if (m_pool == nullptr) { return; }
@@ -489,7 +507,8 @@ Var * Region::genVarForPR(PRNO prno, Type const* type)
     CHAR name[128];
     ::sprintf(name, "%s%lu", VarFlagDesc::getName(VAR_IS_PR), prno);
     ASSERT0(::strlen(name) < sizeof(name));
-    pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL|VAR_IS_PR);
+    pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL|VAR_IS_PR,
+                                      SS_UNDEF);
     setMapPRNO2Var(prno, pr_var);
     VAR_prno(pr_var) = prno;
 
@@ -864,7 +883,7 @@ void Region::scanCallAndReturnList(OUT UINT & num_inner_region,
             if (t == nullptr) { continue; }
             ASSERT0(t->isStmtInBB());
             ASSERT0(call_list);
-            if (t != nullptr && t->isCallStmt()) {
+            if (t != nullptr && t->isCallStmt() && !CALL_is_intrinsic(t)) {
                 call_list->append_tail(t);
             } else if (ret_list != nullptr && t->is_return()) {
                 ret_list->append_tail(t);
@@ -1451,7 +1470,7 @@ bool Region::partitionRegion()
     //Generate IR region.
     Type const* type = getTypeMgr()->getMCType(0);
     Var * ruv = getVarMgr()->registerVar("inner_ru",
-        type, 1, VAR_LOCAL|VAR_FAKE);
+        type, 1, VAR_LOCAL|VAR_FAKE, SS_UNDEF);
     ruv->setFlag(VAR_IS_UNALLOCABLE);
     addToVarTab(ruv);
 
@@ -1718,6 +1737,16 @@ ERR_RETURN:
 }
 
 
+static void do_call_graph(Region * rg, OptCtx * oc)
+{
+    if (!oc->is_callgraph_valid()) {
+        ASSERT0(rg->getPassMgr());
+        rg->getPassMgr()->registerPass(PASS_CALL_GRAPH);
+        rg->getCallGraph()->perform(*oc);
+    }
+}
+
+
 //Return true if all passes finished normally, otherwise return false.
 bool Region::process(OptCtx * oc)
 {
@@ -1731,10 +1760,14 @@ bool Region::process(OptCtx * oc)
     initAttachInfoMgr();
     initIRMgr();
     initIRBBMgr();
+
+    if (g_do_call_graph && is_program()) {
+        do_call_graph(this, oc);
+    }
     if (g_do_inline && is_program()) {
         do_inline(this, oc);
     }
-    getPassMgr()->registerPass(PASS_REFINE)->perform(*oc);
+    if (g_do_refine) { doRefine(*oc); }
     if (g_insert_cvt) {
         //Insert CVT if necessary.
         getPassMgr()->registerPass(PASS_INSERT_CVT)->perform(*oc);

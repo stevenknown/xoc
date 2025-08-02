@@ -89,7 +89,11 @@ public:
     //replacer in 'newir'.
     //newir: return as a result that recorded the anticipated IR to replace.
     virtual bool is_replace(IR const* oldir, OUT IR ** newir) const
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
+    {
+        DUMMYUSE(newir && oldir);
+        ASSERTN(0, ("Target Dependent Code"));
+        return false;
+    }
 
     //Return true if the replacement will scan whole IR tree, otherwise the
     //scanning will stopped right after the first replacing happened.
@@ -349,6 +353,9 @@ public:
 
     //The function collects the LabelInfo for each branch-target.
     void collectLabel(OUT List<LabelInfo const*> & lst) const;
+
+    //Return true if 'ty' can be the data type of Const-Op.
+    static bool canBeTypeOfConstOp(Type const* ty);
 
     //Dump MD reference.
     void dumpRefOnly(Region const* rg) const;
@@ -647,6 +654,12 @@ public:
     //Return true if ir data type is unsigned, and the type
     //may be integer, string, vector.
     bool is_unsigned() const { return IR_dt(this)->is_unsigned(); }
+
+    //Return true if the type can be regarded as signed.
+    bool isSigned() const { return IR_dt(this)->isSigned(); }
+
+    //Return true if the type can be regarded as unsigned.
+    bool isUnsigned() const { return IR_dt(this)->isUnsigned(); }
 
     //Return true if ir data type is signed integer.
     bool is_sint() const { return IR_dt(this)->is_sint(); }
@@ -1105,6 +1118,9 @@ public:
     //Return true if ir's data type must be bool.
     bool mustBeBoolType() const { return is_judge(); }
 
+    //Return true if ir's data type must be used to represent constant.
+    bool mustBeConstDataType() const;
+
     //Return true if ir code's data type must be bool.
     static bool mustBeBoolType(IR_CODE c) { return is_judge(c); }
 
@@ -1256,4 +1272,5 @@ public:
 };
 
 } //namespace xoc
+
 #endif

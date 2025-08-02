@@ -39,6 +39,14 @@ namespace xoc {
 //
 //START PRLivenessMgr
 //
+PRLivenessMgr::PRLivenessMgr(Region * rg) : LivenessMgr(rg)
+{
+    m_md_sys = rg->getMDSystem();
+    m_var2pr = nullptr;
+    m_handle_may = false;
+}
+
+
 void PRLivenessMgr::processMay(
     IR const* pr, MOD LiveSet * gen, MOD LiveSet * use, bool is_lhs)
 {

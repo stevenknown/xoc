@@ -161,6 +161,7 @@ typedef UINT MDIdx;
 #define MD_is_may(md) ((md)->u2.s1.is_may_reference)
 
 class MD {
+    //THE CLASS ALLOWS COPY-CONSTRUCTOR.
 public:
     MDIdx uid; //unique id.
     TMWORD ofst; //byte offsets relative to 'base'
@@ -183,13 +184,21 @@ public:
         copy(&md);
     }
 
-    inline void copy(MD const* md)
+    void copy(MD const* md)
     {
         ASSERT0(md && this != md);
         MD_base(this) = MD_base(md);
         MD_ofst(this) = MD_ofst(md);
         MD_size(this) = MD_size(md);
         u2.s1v = md->u2.s1v;
+    }
+    void clean()
+    {
+        MD_id(this) = 0;
+        MD_ofst(this) = 0;
+        MD_size(this) = 0;
+        MD_base(this) = nullptr;
+        u2.s1v = 0;
     }
 
     Var * get_base() const { return MD_base(this); }
@@ -272,7 +281,7 @@ public:
     bool is_taken_addr() const { return get_base()->is_taken_addr(); }
 
     MD const& operator = (MD const&);
-    inline bool operator == (MD const& src) const
+    bool operator == (MD const& src) const
     {
         ASSERT0(this != &src);
         if (MD_base(this) != MD_base(&src)) { return false; }
@@ -280,20 +289,11 @@ public:
         return ofst == src.ofst && size == src.size && u2.s1v == src.u2.s1v;
     }
 
-    //Dump md into 'buf', 'bufl' indicate the byte length of the buffer.
+    //Dump md into 'buf'.
     CHAR * dump(StrBuf & buf, VarMgr const* vm) const;
 
     //Dump md to file.
     void dump(VarMgr const* vm) const;
-
-    inline void clean()
-    {
-        MD_id(this) = 0;
-        MD_ofst(this) = 0;
-        MD_size(this) = 0;
-        MD_base(this) = nullptr;
-        u2.s1v = 0;
-    }
 };
 
 
@@ -531,7 +531,7 @@ public:
     //Get unique MD that is effective, and offset must be valid.
     //Note the MDSet can only contain one element.
     //Return the effect MD if found, otherwise return nullptr.
-    inline MD * get_exact_md(MDSystem * ms) const
+    MD * get_exact_md(MDSystem * ms) const
     {
         MD * md = get_effect_md(ms);
         if (md != nullptr && md->is_exact()) {
@@ -590,7 +590,7 @@ public:
     void free(MDSet * mds);
 
     Region * getRegion() const { return m_rg; }
-    inline MDSet * get_free() { return m_free_md_set.remove_head(); }
+    MDSet * get_free() { return m_free_md_set.remove_head(); }
     UINT get_mdset_count() const { return m_md_set_list.get_elem_count(); }
     UINT get_free_mdset_count() const { return m_free_md_set.get_elem_count(); }
 };
@@ -604,7 +604,7 @@ public:
 
     void remove(MDIdx mdid)
     {
-        ASSERT0(mdid != 0); //0 is illegal mdid.
+        ASSERT0(mdid != MD_UNDEF); //can not be illegal mdid.
         ASSERT0(get(mdid) != nullptr);
         Vector<MD*>::set(mdid, nullptr);
         m_count--;
@@ -678,7 +678,7 @@ protected:
     typedef TMapIter<Var const*, MDTab*> Var2MDTabIter;
     Var2MDTab m_var2mdtab; //map Var to MDTab.
 protected:
-    inline MD * allocMD()
+    MD * allocMD()
     {
         MD * md = m_free_md_list.remove_head();
         if (md == nullptr) {
@@ -717,9 +717,9 @@ public:
                      OUT MDSet & output, DefMiscBitSetMgr & mbsmgr);
 
     void clean();
-    void computeOverlapExactMD(MD const* md, OUT MDSet * output,
-                               ConstMDIter & mditer,
-                               DefMiscBitSetMgr & mbsmgr);
+    void computeOverlapExactMD(
+        MD const* md, OUT MDSet * output, ConstMDIter & mditer,
+        DefMiscBitSetMgr & mbsmgr);
 
     //Compute all other MD which are overlapped with 'md', the output
     //will include 'md' itself if there are overlapped MDs.
@@ -731,9 +731,9 @@ public:
     //            with global variables or import variables.
     //Note this function does NOT clean output, and will append result to
     //output.
-    void computeOverlap(Region * current_rg, MD const* md,
-                        OUT MDSet & output, ConstMDIter & mditer,
-                        DefMiscBitSetMgr & mbsmgr, bool strictly);
+    void computeOverlap(
+        Region * current_rg, MD const* md, OUT MDSet & output,
+        ConstMDIter & mditer, DefMiscBitSetMgr & mbsmgr, bool strictly);
 
     //Compute all other MD which are overlapped with MD in set 'mds'.
     //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
@@ -743,9 +743,9 @@ public:
     //mditer: for local use.
     //strictly: set to true to compute if md may be overlapped with global
     //memory.
-    void computeOverlap(Region * current_rg, MOD MDSet & mds,
-                        OUT Vector<MD const*> & added, ConstMDIter & mditer,
-                        DefMiscBitSetMgr & mbsmgr, bool strictly);
+    void computeOverlap(
+        Region * current_rg, MOD MDSet & mds, OUT Vector<MD const*> & added,
+        ConstMDIter & mditer, DefMiscBitSetMgr & mbsmgr, bool strictly);
 
     //Compute all other MD which are overlapped with MD in set 'mds'.
     //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
@@ -756,9 +756,9 @@ public:
     //strictly: set to true to compute if MD may be overlapped with global
     //memory.
     //Note output do not need to clean before invoke this function.
-    void computeOverlap(Region * current_rg, MDSet const& mds,
-                        OUT MDSet & output, ConstMDIter & mditer,
-                        DefMiscBitSetMgr & mbsmgr, bool strictly);
+    void computeOverlap(
+        Region * current_rg, MDSet const& mds, OUT MDSet & output,
+        ConstMDIter & mditer, DefMiscBitSetMgr & mbsmgr, bool strictly);
 
     //Dump all registered MDs.
     void dump(VarMgr const* vm, bool only_dump_nonpr_md);
@@ -820,7 +820,7 @@ public:
     UINT getNumOfMD() const { return m_id2md_map.get_elem_count(); }
     MDId2MD const* getID2MDMap() const { return &m_id2md_map; }
 
-    inline void freeMD(MD * md)
+    void freeMD(MD * md)
     {
         if (md == nullptr) { return; }
         m_id2md_map.remove(MD_id(md));
@@ -861,9 +861,8 @@ public:
     MD const* createKey(MD const* t) { return t; }
 };
 
-//MD2MD_SET_MAP
-//Record MD->MDS relations.
-//Note MD may mapped to nullptr, means the MD does not point to anything.
+//The class records MD->MDS relations.
+//Note MD may be mapped to nullptr, means the MD does not point to anything.
 class MD2MDSet : public TMap<MDIdx, MDSet const*> {
     COPY_CONSTRUCTOR(MD2MDSet);
 public:
@@ -876,6 +875,7 @@ public:
 
     //Clean each MD->MDSet, but do not free MDSet.
     void clean() { TMap<MDIdx, MDSet const*>::clean(); }
+
     //Compute the number of PtPair that recorded in current MD2MDSet.
     UINT computePtPairNum(MDSystem const& mdsys) const
     {
@@ -884,7 +884,7 @@ public:
         MD2MDSetIter mxiter;
         MDSet const* from_md_pts = nullptr;
         for (MDIdx fromid = get_first(mxiter, &from_md_pts);
-            fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
+            fromid > MD_UNDEF; fromid = get_next(mxiter, &from_md_pts)) {
             ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
             if (from_md_pts == nullptr || from_md_pts->is_contain_fullmem()) {
                 continue;

@@ -40,27 +40,27 @@ class LogMgr;
 
 //Record a variety of symbols such as user defined variables,
 //compiler internal variables, LABEL, ID, TYPE_NAME etc.
-#define SYM_name(sym) ((sym)->s)
+#define SYM_name(sym) ((sym)->m_str)
 class Sym {
     COPY_CONSTRUCTOR(Sym);
 public:
-    CHAR const* s;
+    CHAR const* m_str;
 public:
     Sym() { init(); }
 
     void clean() { SYM_name(this) = nullptr; }
     void dump(MOD LogMgr * lm) const;
-    CHAR const* getStr() const { return s; }
+    CHAR const* getStr() const { return m_str; }
     UINT getLen() const { return (UINT)::strlen(getStr()); }
 
     //The function initializes current Sym by given constant string.
     void initByString(CHAR const* s, UINT slen)
     {
         ASSERT0(s);
-        DUMMYUSE(slen);
+        DUMMYUSE(slen && s);
         SYM_name(this) = s;
     }
-    void init() { s = nullptr; }
+    void init() { m_str = nullptr; }
 };
 
 
@@ -68,18 +68,18 @@ public:
 //e.g: given "ab\0c", the ::strlen() of Sym's string return the byte length 2.
 //Instead, ESym's getLen() will return 4.
 #define CASTCONSTSYM(ptr) (const_cast<Sym*>(static_cast<Sym const*>(ptr)))
-#define ESYM_len(sym) ((sym)->slen)
+#define ESYM_len(sym) ((sym)->m_slen)
 #define ESYM_name(sym) (SYM_name(CASTCONSTSYM(sym)))
 class ESym : public Sym {
     COPY_CONSTRUCTOR(ESym);
 public:
-    UINT slen;
+    UINT m_slen;
 public:
     ESym() { init(); }
 
     void clean() { ESYM_name(this) = nullptr; ESYM_len(this) = 0; }
     void dump(MOD LogMgr * lm) const;
-    UINT getLen() const { return slen; }
+    UINT getLen() const { return m_slen; }
 
     //The function initializes current Sym by given constant string.
     void initByString(CHAR const* s, UINT slen)
@@ -89,7 +89,7 @@ public:
         ASSERT0(slen >= ::strlen(s));
         ESYM_len(this) = slen;
     }
-    void init() { s = nullptr; slen = 0; }
+    void init() { m_str = nullptr; m_slen = 0; }
 
     bool verify() const
     {
@@ -391,6 +391,30 @@ public:
     void dump(MOD LogMgr * lm) const;
 };
 //END SymTab
+
+
+//
+//START SymTabWithoutDupString
+//
+class CompareFuncSymTabWithoutDupString : public CompareFuncSymTab {
+    COPY_CONSTRUCTOR(CompareFuncSymTabWithoutDupString);
+public:
+    CompareFuncSymTabWithoutDupString() {}
+
+    //No need to copy string.
+    Sym * createKey(Sym * t) { return t; }
+};
+
+
+class SymTabWithoutDupStringIter : public SymTabBaseIter<Sym> {};
+class SymTabWithoutDupString
+    : public SymTabBase<Sym, CompareFuncSymTabWithoutDupString> {
+    COPY_CONSTRUCTOR(SymTabWithoutDupString);
+public:
+    SymTabWithoutDupString() {}
+    void dump(MOD LogMgr * lm) const;
+};
+//END SymTabWithoutDupString
 
 
 //The class represents the comparison bewteen two ESym.

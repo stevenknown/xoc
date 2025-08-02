@@ -3897,6 +3897,10 @@ void ComputePRDUChainByPRSSA::compute(bool build_def_chain)
 
 void DUMgr::computePRDUChainByPRSSA(MOD OptCtx & oc, bool build_def_chain)
 {
+    //Clean the DU chains to remove obsolete IR defs/uses and
+    //avoid polluting subsequent analysis passes.
+    removeAllDUChain();
+
     START_TIMER(t, "Build PRDU Chain By PRSSA");
     ComputePRDUChainByPRSSA comp(oc, m_rg, this);
     comp.compute(build_def_chain);

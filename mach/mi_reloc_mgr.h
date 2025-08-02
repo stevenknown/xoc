@@ -65,9 +65,8 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); return true; }
 
     //Whether current jump offset is valid for machine instruction.
-    virtual bool const jumpOffIsValid(INT64 val, MInst const* mi)
-    { ASSERTN(0, ("Target Dependent Code")); return false; }
-
+    virtual bool const jumpOffIsValid(INT64 val, MInst const*)
+    { DUMMYUSE(val);ASSERTN(0, ("Target Dependent Code")); return false; }
 public:
     MIRelocMgr(Region * rg, MInstMgr * imgr, TMWORD align);
     virtual ~MIRelocMgr();
@@ -85,18 +84,23 @@ public:
 
     //Get the alignment value required by the machine instruction.
     virtual UINT getMInstAlign(MI_CODE c) const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    { DUMMYUSE(c); ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //GCOVR_EXCL_START
     //Get the offset of the PC for the instruction.
-    virtual UINT getMInstPcOffset(MIList & milst, MIListIter it,
-                                  MInst * cur) const
-    { ASSERTN(0, ("Target Dependent Code")); return 0; }
+    virtual UINT getMInstPcOffset(
+        MIList & milst, MIListIter it, MInst *) const
+    {
+        DUMMYUSE(milst);
+        DUMMYUSE(it);
+        ASSERTN(0, ("Target Dependent Code"));
+        return 0;
+    }
     //GCOVR_EXCL_STOP
 
     //Set the data or code byte offset according to mi code.
     virtual void setValueViaMICode(OUT MInst * mi, TMWORD offset)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    { DUMMYUSE(mi && offset); ASSERTN(0, ("Target Dependent Code")); }
 
     //Set the code alignment.
     //The byte offset of each Machine Instruction will aligned in 'align'.

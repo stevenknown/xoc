@@ -469,7 +469,7 @@ protected:
     //Some target will define an intrinsic-call to operate target special
     //register, such as IO configure register. The interface is used to
     //determine whether current call-stmt is need to simplify.
-    virtual bool isSpecialRegCall(IR const* ir) const
+    virtual bool isSpecialRegCall(IR const*) const
     {
         //Target Dependent Code
         return false;
@@ -527,7 +527,7 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
-    virtual IR * simplifySpecialRegCall(IR * ir, SimpCtx * ctx)
+    virtual IR * simplifySpecialRegCall(IR * ir, SimpCtx *)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     IR * simplifyDummyUse(IR * ir, SimpCtx *) { return ir; }
 

@@ -397,6 +397,26 @@ void dumpLoopTree(Region const* rg, LI<IRBB> const* li)
 }
 
 
+CHAR const* dumpLoopTreeToBuf(
+    xcom::StrBuf & buf, Region const* rg, LI<IRBB> const* li, UINT indent)
+{
+    if (!rg->isLogMgrInit()) { return nullptr; }
+    class Dump : public xoc::DumpToBuf {
+    public:
+        LI<IRBB> const* li;
+    public:
+        Dump(Region const* rg, xcom::StrBuf & buf, UINT indent)
+            : DumpToBuf(rg, buf, indent) {}
+        virtual void dumpUserInfo() const override
+        { dumpLoopTree(getRegion(), li); }
+    };
+    Dump d(rg, buf, indent);
+    d.li = li;
+    d.dump();
+    return buf.getBuf();
+}
+
+
 //Find the bb that is the start of the unqiue backedge of loop.
 //  BB1: loop start bb
 //  BB2: body start bb
@@ -1030,8 +1050,9 @@ bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg)
 }
 
 
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region const* rg,
-                     InvStmtList const* invariant_stmt, bool check_tree)
+bool isLoopInvariant(
+    IR const* ir, LI<IRBB> const* li, Region const* rg,
+    InvStmtList const* invariant_stmt, bool check_tree)
 {
     ASSERT0(ir && ir->is_exp());
     if (ir->isReadPR() && !ir->isReadOnly()) {

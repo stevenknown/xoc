@@ -135,8 +135,8 @@ protected:
     ActMgr m_am;
     DefMiscBitSetMgr m_sbs_mgr;
 protected:
-    void addEffectIRAndBB(ConstIRList const& efflist,
-                          OUT DCECtx & dcectx) const;
+    void addEffectIRAndBB(
+        ConstIRList const& efflist, OUT DCECtx & dcectx) const;
 
     //Return true if ir is effect.
     bool checkEffectStmt(IR const* ir);
@@ -144,20 +144,42 @@ protected:
     //Return true if ir is effect.
     bool checkCall(IR const* ir) const;
     void checkValidAndRecomputeCDG(DCECtx const& dcectx);
-    bool collectByDU(IR const* x, MOD ConstIRList * pwlst2,
-                     MOD DCECtx & dcectx, bool usemdssa, bool useprssa);
-    bool collectByPRSSA(IR const* x, MOD ConstIRList * pwlst2,
-                        MOD DCECtx & dcectx);
+
+    //Return true if there are new stmts have been set to effect.
+    bool collectByMDDefWithExactMDRef(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
+        MDDef const* tdef);
+
+    //Return true if there are new stmts have been set to effect.
+    bool collectByMDDef(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
+        MDDef const* tdef);
+
+    //Return true if there are new stmts have been set to effect.
+    bool collectByDU(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx,
+        bool usemdssa, bool useprssa);
+
+    //Return true if there are new stmts have been set to effect.
+    bool collectByPRSSA(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx);
+
+    //Return true if there are new stmts have been set to effect.
     bool collectAllDefThroughDefChain(
         MDDef const* tdef, IR const* use, MOD ConstIRList * pwlst2,
         MOD DCECtx & dcectx);
-    bool collectByMDSSA(IR const* x, MOD ConstIRList * pwlst2,
-                        MOD DCECtx & dcectx);
-    bool collectByDUSet(IR const* x, MOD ConstIRList * pwlst2,
-                        MOD DCECtx & dcectx);
 
-    bool elimImpl(OptCtx & oc, OUT DCECtx & dcectx,
-                  OUT bool & remove_branch_stmt);
+    //Return true if there are new stmts have been set to effect.
+    bool collectByMDSSA(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx);
+
+    //Return true if there are new stmts have been set to effect.
+    bool collectByDUSet(
+        IR const* x, MOD ConstIRList * pwlst2, MOD DCECtx & dcectx);
+
+    //Return true if there are new stmts have been set to effect.
+    bool elimImpl(
+        OptCtx & oc, OUT DCECtx & dcectx, OUT bool & remove_branch_stmt);
 
     //Return true if there are effect BBs that controlled by ir's BB.
     //ir: stmt.
@@ -172,8 +194,9 @@ protected:
 
     bool initSSAMgr(OptCtx const& oc);
     void iterCollect(MOD ConstIRList & efflist, MOD DCECtx & dcectx);
-    bool iterCollectAndElim(ConstIRList & efflist, OUT DCECtx & dcectx,
-                            OUT bool & remove_branch_stmt);
+    bool iterCollectAndElim(
+        ConstIRList & efflist, OUT DCECtx & dcectx,
+        OUT bool & remove_branch_stmt);
 
     void markEffectIRForRegion(
         IR const* ir, MOD ConstIRList & work_list, MOD DCECtx & dcectx);
@@ -191,8 +214,8 @@ protected:
 
     bool preserveControlDep(MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
 
-    bool tryMarkBranch(IRBB const* bb, OUT ConstIRList & act_ir_lst,
-                       MOD DCECtx & dcectx);
+    bool tryMarkBranch(
+        IRBB const* bb, OUT ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
     bool tryMarkUnconditionalBranch(
         IRBB const* bb, MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
 
@@ -207,8 +230,9 @@ protected:
         IRBB const* bb, MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
 
     //Set stmt to be effect.
-    void setEffectStmt(IR const* stmt, bool set_bb_effect,
-                       OUT ConstIRList * act_ir_lst, MOD DCECtx & dcectx);
+    void setEffectStmt(
+        IR const* stmt, bool set_bb_effect, OUT ConstIRList * act_ir_lst,
+        MOD DCECtx & dcectx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }

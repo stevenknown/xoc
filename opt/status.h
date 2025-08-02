@@ -39,7 +39,8 @@ public:
     UINT get_status_num() const { return get_flag_num(); }
 
     //Return the name of status.
-    virtual CHAR const* getStatusName(FlagSetIdx s) const { return "NONAME"; }
+    virtual CHAR const* getStatusName(FlagSetIdx s) const
+    { DUMMYUSE(s); return "NONAME"; }
 };
 
 } //namespace xoc

@@ -2758,7 +2758,7 @@ void DGraph::sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst)
 }
 
 
-void DGraph::removeUnreachNodeRecur(VexIdx id, BitSet & visited)
+void DGraph::collectReachNodeRecur(VexIdx id, BitSet & visited)
 {
     visited.bunion(id);
     Vertex * vex = getVertex(id);
@@ -2766,7 +2766,7 @@ void DGraph::removeUnreachNodeRecur(VexIdx id, BitSet & visited)
     for (Vertex const* out = Graph::get_first_out_vertex(vex, it);
          out != nullptr; out = Graph::get_next_out_vertex(it)) {
         if (!visited.is_contain(out->id())) {
-            removeUnreachNodeRecur(out->id(), visited);
+            collectReachNodeRecur(out->id(), visited);
         }
     }
 }
@@ -3344,14 +3344,23 @@ bool DGraph::removeUnreachNode(VexIdx entry_id)
     if (getVertexNum() == 0) { return false; }
     bool removed = false;
     BitSet visited;
-    removeUnreachNodeRecur(entry_id, visited);
+    collectReachNodeRecur(entry_id, visited);
     VertexIter c = VERTEX_UNDEF;
+    List<Vertex*> rmlst;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         if (!visited.is_contain(VERTEX_id(v))) {
-            removeVertex(v);
+            if (is_dense()) {
+                removeVertex(v);
+            } else {
+                rmlst.append_tail(v);
+            }
             removed = true;
         }
+    }
+    for (Vertex * v = rmlst.get_head();
+         v != nullptr; v = rmlst.get_next()) {
+        removeVertex(v);
     }
     return removed;
 }

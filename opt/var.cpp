@@ -507,16 +507,16 @@ Var * VarMgr::findVarByName(CHAR const* name)
 
 
 Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
-                          VarFlag const& flag)
+                          VarFlag const& flag, StorageSpace ss)
 {
     ASSERT0(varname);
     Sym const* sym = m_rm->addToSymbolTab(varname);
-    return registerVar(sym, type, align, flag);
+    return registerVar(sym, type, align, flag, ss);
 }
 
 
 Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
-                          VarFlag const& flag)
+                          VarFlag const& flag, StorageSpace ss)
 {
     ASSERT0(type);
     ASSERTN(var_name, ("variable need a name"));
@@ -529,12 +529,14 @@ Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
     VAR_name(v) = var_name;
     VAR_align(v) = align;
     VAR_flag(v) = flag;
+    VAR_storage_space(v) = ss;
     assignVarId(v);
     return v;
 }
 
 
-Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
+Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align,
+                                StorageSpace ss)
 {
     ASSERT0(s);
     Var * v;
@@ -553,6 +555,7 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
     VAR_type(v) = m_tm->getString();
     VAR_align(v) = align;
     v->setToGlobal(true);
+    VAR_storage_space(v) = ss;
     assignVarId(v);
     m_str_tab.set(s, v);
     return v;

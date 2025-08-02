@@ -6,6 +6,10 @@ lsra_scan_in_pos.o\
 lsra_scan_in_prio.o\
 lt_interf_graph.o\
 lt_prio_mgr.o\
+ir_regssa.o\
+regssainfo.o\
+regd.o\
+range.o\
 lifetime.o\
 targinfo_mgr.o\
 linear_scan.o\
@@ -20,4 +24,6 @@ igoto_opt.o\
 kernel_adjustment.o\
 var_lifetime.o\
 var_liveness_mgr.o\
-lsra_var_liveness_mgr.o
+lsra_var_liveness_mgr.o\
+local_var_liveness_mgr.o\
+local_var_lifetime_mgr.o

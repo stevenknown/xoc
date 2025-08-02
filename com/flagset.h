@@ -37,6 +37,7 @@ typedef BSIdx FlagSetIdx;
 //
 template <class FlagDescSeg, UINT FlagDescNum>
 class FlagSet : public FixedSizeBitSet {
+    //THE CLASS ALLOWS COPY-CONSTRUCTOR.
 protected:
     static UINT const g_flagset_byte_size = sizeof(FlagDescSeg) * FlagDescNum;
     BYTE m_flagbuf[g_flagset_byte_size];

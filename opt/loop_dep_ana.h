@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-class LDACtx;
+class LoopDepCtx;
 class LICM;
 
 typedef enum tagLOOP_DEP_KIND {
@@ -139,8 +139,8 @@ public:
 
 
 //The class represents loop dependence analysis context.
-class LDACtx {
-    COPY_CONSTRUCTOR(LDACtx);
+class LoopDepCtx {
+    COPY_CONSTRUCTOR(LoopDepCtx);
 protected:
     class IR2LDITab : public xcom::TMap<
         IR const*, LoopDepInfo const*, CompareConstIRFunc> {
@@ -182,6 +182,7 @@ protected:
     LI<IRBB> const* m_li;
     ConstIRTab m_analyzed_irs; //record all IRs that has analyzed.
     IR2FirstTab m_ir2firsttab;
+    LDAActMgr m_am;
 protected:
     LoopDepInfo * allocLoopDepInfo();
     FirstTab * allocFirstTab();
@@ -189,25 +190,8 @@ protected:
     MDDef2LDITab * allocMDDef2LDI();
     IR2LDITab * allocIR2LDI();
 public:
-    LDACtx(LI<IRBB> const* li)
-    {
-        ASSERT0(li);
-        m_li = li;
-        m_pool = smpoolCreate(sizeof(LoopDepInfo) * 4, MEM_COMM);
-        m_firtab_pool = smpoolCreate(FirstTab::getTNodeSize() * 2,
-                                     MEM_CONST_SIZE);
-        m_ir2ldi_pool = smpoolCreate(IR2LDITab::getTNodeSize() * 2,
-                                     MEM_CONST_SIZE);
-        m_mddef2ldi_pool = smpoolCreate(MDDef2LDITab::getTNodeSize() * 2,
-                                        MEM_CONST_SIZE);
-    }
-    ~LDACtx()
-    {
-        smpoolDelete(m_pool);
-        smpoolDelete(m_firtab_pool);
-        smpoolDelete(m_ir2ldi_pool);
-        smpoolDelete(m_mddef2ldi_pool);
-    }
+    LoopDepCtx(Region const* rg, LI<IRBB> const* li);
+    ~LoopDepCtx();
 
     //Record 'ir' as the IR that has participated the analysis.
     void add(IR const* ir) { m_analyzed_irs.append(ir); }
@@ -215,7 +199,10 @@ public:
     //The function generates an unqiue LoopDepInfo according to 'ldi'.
     LoopDepInfo const* appendLoopDepInfo(LoopDepInfo const& ldi);
 
+    void dump() const { m_am.dump(); }
+
     LI<IRBB> const* getLI() const { return m_li; }
+    LDAActMgr & getActMgr() { return m_am; }
 
     //Return true 'ir' has analyzed.
     bool is_contain(IR const* ir) const { return m_analyzed_irs.find(ir); }
@@ -256,21 +243,22 @@ protected:
     DUMgr * m_dumgr;
     OptCtx * m_oc;
     InferEVN * m_infer_evn;
-    LDAActMgr m_am;
 protected:
     void analyzeLinearDep(
         IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
-        MOD LDACtx & ctx);
+        MOD LoopDepCtx & ctx);
     void analyzeLinearDep(
         IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
-        MOD LDACtx & ctx);
+        MOD LoopDepCtx & ctx);
     void analyzeRedDep(
-        IR const* ir, OUT LoopDepInfoSet & set, MOD LDACtx & ctx);
+        IR const* ir, OUT LoopDepInfoSet & set, MOD LoopDepCtx & ctx);
 
     void destroy();
 
     OptCtx * getOptCtx() const { return m_oc; }
 
+    //Return true if the dependent passes have all successfully initialized.
+    bool initDepPass(MOD OptCtx & oc);
     void init(GVN * gvn);
 
     //Return true if given two IRs in 'info' are indicates same memory location.
@@ -279,16 +267,17 @@ protected:
     //e.g: ist x VS. ild y, return true if x's EVN is equal to y's EVN.
     //Return true if these two IRs are reference identical memory location,
     //otherwise tell caller 'I KNOW NOTHING ABOUT THAT' by returning false.
-    bool isSameMemLocViaEVN(LoopDepInfo const& info);
-    bool isSameMemLocArrayOp(LoopDepInfo const& info);
-    bool isSameMemLocIndirectOp(LoopDepInfo const& info);
+    //ctx: optional, can be NULL. If it is not NULL, the ctx will record Acts.
+    bool isSameMemLocViaEVN(LoopDepInfo const& info, OUT LoopDepCtx * ctx);
+    bool isSameMemLocArrayOp(LoopDepInfo const& info, OUT LoopDepCtx * ctx);
+    bool isSameMemLocIndirectOp(LoopDepInfo const& info, OUT LoopDepCtx * ctx);
 
     void reset();
 
     //The function try to revise loop-carried to loop-independent to make
     //loop dependence info more precise.
     bool transLoopCarrToLoopIndep(
-        IR const* ir, MOD LoopDepInfoSet & set, MOD LDACtx & ctx);
+        IR const* ir, MOD LoopDepInfoSet & set, MOD LoopDepCtx & ctx);
 
     bool useLICM() const;
     bool useMDSSADU() const
@@ -298,38 +287,34 @@ protected:
     bool useGVN() const
     { return m_gvn != nullptr && m_gvn->is_valid(); }
 public:
-    explicit LoopDepAna(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
-    {
-        m_pool = nullptr;
-        m_is_aggressive = true;
-        init(gvn);
-    }
+    explicit LoopDepAna(Region * rg, GVN * gvn);
     virtual ~LoopDepAna() { destroy(); }
 
     void analyzeDepForIRTree(
         IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
-        MOD LDACtx & ctx);
+        MOD LoopDepCtx & ctx);
     void analyzeDepForIRTree(
         IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
-        MOD LDACtx & ctx);
-    void analyzeDep(IR const* ir, xcom::List<IR*> const& lst,
-                    OUT LoopDepInfoSet & set, MOD LDACtx & ctx);
-    void analyzeDep(IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
-                    MOD LDACtx & ctx);
+        MOD LoopDepCtx & ctx);
+    void analyzeDep(
+        IR const* ir, xcom::List<IR*> const& lst, OUT LoopDepInfoSet & set,
+        MOD LoopDepCtx & ctx);
+    void analyzeDep(
+        IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
+        MOD LoopDepCtx & ctx);
     void analyzeDepAndRefineDep(
         IR const* ir, IR const* tgt, OUT LoopDepInfoSet & set,
-        MOD LDACtx & ctx);
+        MOD LoopDepCtx & ctx);
 
     bool containLoopRedDep(LoopDepInfoSet const& set);
     bool containLoopCarrDep(LoopDepInfoSet const& set);
 
-    virtual bool dump() const;
+    bool dump(LoopDepCtx const* ctx) const;
     void dumpInferEVN() const;
 
     virtual CHAR const* getPassName() const
     { return "Loop Dependence Analysis"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_DEP_ANA; }
-    LDAActMgr & getActMgr() { return m_am; }
     InferEVN & getInferEVN() const { return *m_infer_evn; }
 
     //Return true if user ask to perform aggressive optimization that without

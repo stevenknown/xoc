@@ -32,9 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prssainfo.h"
-#include "ssaregion.h"
-#include "ir_ssa.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -515,6 +513,14 @@ IR * IR::getOpndPR(PRNO prno, IRIter & it) const
         }
     }
     return nullptr;
+}
+
+
+bool IR::canBeTypeOfConstOp(Type const* ty)
+{
+    //immediate can be pointer, e.g: int * p = 0;
+    return ty->isInt() || ty->isPointer() || ty->isFP() || ty->is_mc() ||
+        ty->is_any() || ty->is_string() || ty->is_tensor();
 }
 
 

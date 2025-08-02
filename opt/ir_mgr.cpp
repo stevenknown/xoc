@@ -540,6 +540,9 @@ IR * IRMgr::allocIR(IR_CODE irc, bool lookup)
         #endif
     }
     IR_code(ir) = irc;
+if(ir->id()==467){
+int a=0;;//hack
+}
     return ir;
 }
 
@@ -616,7 +619,8 @@ Var * IRMgr::genInitPlaceHolderVar()
     if (m_init_placeholder_var == nullptr) {
         ASSERT0(m_vm);
         m_init_placeholder_var = m_vm->registerVar(
-            INIT_STMT_PLACE_HOLDER_NAME, m_tm->getAny(), 1, VAR_LOCAL|VAR_FAKE);
+            INIT_STMT_PLACE_HOLDER_NAME, m_tm->getAny(), 1, VAR_LOCAL|VAR_FAKE,
+            SS_UNDEF);
     }
     return m_init_placeholder_var;
 }
@@ -703,7 +707,8 @@ IR * IRMgr::buildLdaString(CHAR const* varname, CHAR const* string)
 IR * IRMgr::buildLdaString(CHAR const* varname, Sym const* string)
 {
     ASSERT0(string);
-    Var * v = m_vm->registerStringVar(varname, string, MEMORY_ALIGNMENT);
+    Var * v = m_vm->registerStringVar(varname, string, MEMORY_ALIGNMENT,
+                                      SS_UNDEF);
     return buildLda(v);
 }
 

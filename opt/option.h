@@ -135,6 +135,7 @@ public:
     bool is_dump_simplification; //Dump IR simplification.
     bool is_dump_prssamgr; //Dump PRSSAMgr.
     bool is_dump_mdssamgr; //Dump MDSSAMgr.
+    bool is_dump_regssamgr; //Dump RegSSAMgr.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_irparser; //Dump IRParser.
@@ -217,6 +218,7 @@ public:
     bool isDumpLSRAReorderMovInLatchBB() const;
     bool isDumpMDSetHash() const;
     bool isDumpMDSSAMgr() const;
+    bool isDumpRegSSAMgr() const;
     bool isDumpMemUsage() const;
     bool isDumpMultiResConvert() const;
     bool isDumpTargInfoHandler() const;
@@ -270,26 +272,6 @@ public:
     void enablePassInLevel2() { setPassInLevel2(true); }
     void enablePassInLevel3() { setPassInLevel3(true); }
     void enablePassInLevelSize() { setPassInLevelSize(true); }
-};
-
-
-class ArchOption {
-public:
-    //Architecture T1.
-    bool is_arch_t1;
-
-    //Architecture T2.
-    bool is_arch_t2;
-
-public:
-    ArchOption();
-    ArchOption const& operator = (ArchOption const&); //Disable operator =.
-
-    bool isArchSpecified() const { return is_arch_t1 || is_arch_t2; }
-
-    bool isArchT1() const { return is_arch_t1; }
-
-    bool isArchT2() const { return is_arch_t2; }
 };
 
 
@@ -776,9 +758,6 @@ extern DumpOption g_dump_opt;
 //Record options for each Pass.
 extern PassOption g_pass_opt;
 
-//Record architecture.
-extern ArchOption g_arch;
-
 //Redirect output information to stdout to dump file if exist.
 extern bool g_redirect_stdout_to_dump_file;
 
@@ -851,6 +830,7 @@ extern bool g_do_stack_var_stack_coloring;
 //Reuse all local variables.
 extern bool g_do_local_var_stack_coloring;
 
+//Enable instruction scheduling
 extern bool g_do_inst_sched;
 
 //stack coloring.

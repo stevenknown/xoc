@@ -256,9 +256,12 @@ class CPhyReg : public IR {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    xgen::Reg m_reg;
     RegPhi * m_phi;
 public:
+    RegPhi * getRegPhi() const { return m_phi; }
 };
+
 #endif
 
 } //namespace xoc

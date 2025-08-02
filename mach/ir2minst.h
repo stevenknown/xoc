@@ -31,6 +31,10 @@ author: Su Zhenyu
 #ifndef _IR2MINST_H_
 #define _IR2MINST_H_
 
+namespace xoc {
+class LinearScanRA;
+}
+
 namespace elf {
 class ELFMgr;
 }
@@ -51,7 +55,7 @@ namespace mach {
 #define IMCTX_int_imm(cont) ((cont)->u1.int_imm)
 #define IMCTX_label_num(cont) ((cont)->m_label_num)
 #define IMCTX_cfi_num(cont) ((cont)->m_cfi_num)
-#define IMCTX_is_build(cont) ((cont)->m_is_build)
+#define IMCTX_need_build_mi(cont) ((cont)->m_is_build)
 class IMCtx {
 public:
     //Is used for instruction scheduling. If it is false, it only
@@ -61,7 +65,6 @@ public:
     //Propagate info bottom up.
     //Used as a result, and record MI_CODE of result if exist.
     MI_CODE micode;
-
     union {
         //Propagate info top down.
         //Used as input parameter, record total size of real
@@ -139,6 +142,7 @@ protected:
     MInstMgr * m_mimgr;
     elf::ELFMgr * m_em;
     RecycMIListMgr m_recyc_irlist_mgr;
+    LinearScanRA * m_lsra;
 protected:
     void convertIRListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
     void convertIRBBListToMIList(OUT RecycMIList & milst, MOD IMCtx * cont);
@@ -177,19 +181,33 @@ public:
     IR2MInst(Region * rg, MInstMgr * mgr, elf::ELFMgr * em);
     virtual ~IR2MInst() {}
 
+    virtual bool initDepPass(void)
+    {ASSERTN(0, ("Target Dependent Code")); return false;}
     virtual void convertLabel(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
     virtual void convertBBLabel(
         IRBB const* bb, OUT RecycMIList & mis, MOD IMCtx * cont);
     virtual void convertStorePR(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertStoreVar(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertIStoreVar(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertUnaryOp(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
     virtual void convertBinaryOp(
@@ -211,27 +229,55 @@ public:
     //  e.g: given a <= b, generate !(a > b)
     virtual void convertRelationOp(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertGoto(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertIgoto(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertTruebr(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertFalsebr(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont);
     virtual void convertReturn(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertCall(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertICall(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertAdd(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     {
@@ -366,17 +412,39 @@ public:
         ASSERTN(ir && ir->is_ne(), ("illegal ir"));
         convertRelationOp(ir, mis, cont);
     }
-    //virtual void convertRegion(IR const* ir, OUT RecycMIList & mis,
-    //                           MOD IMCtx * cont);
+    virtual void convertRegion(
+        IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertSetElem(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertGetElem(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
     virtual void convertExtStmt(
         IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(ir && cont);
+        DUMMYUSE(mis);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
+    virtual void convertExtVStmt(IR const* ir, MOD IMCtx * cont)
+    {
+        DUMMYUSE(ir && cont);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
 
     //The following are operations for converting
     //DWARF-related instructions to MI.
@@ -414,6 +482,7 @@ public:
     virtual void convert(IR const* ir, OUT RecycMIList & mis,
                          MOD IMCtx * cont);
 
+    LinearScanRA * getLsra() const { return m_lsra; }
     MInstMgr * getMIMgr() const { return m_mimgr; }
     TypeMgr const* getTypeMgr() const { return m_tm; }
     RecycMIListMgr & getRecycMIListMgr() { return m_recyc_irlist_mgr; }

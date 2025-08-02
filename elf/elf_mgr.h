@@ -182,8 +182,8 @@ typedef xcom::Vector<Word> WordVec;
 typedef xcom::Vector<Addr> AddrVec;
 typedef xcom::Vector<Sym const*> SymVec;
 typedef xcom::TMapIter<Sym const*, SymbolInfo*> SymbolInfoIter;
-typedef xcom::TMap<Sym const*, Vector<FunctionInfo*>*> FuncInfoMap;
-typedef xcom::TMapIter<Sym const*, Vector<FunctionInfo*>*> FuncInfoIter;
+typedef xcom::TMap<Sym const*, FunctionInfo*> FuncInfoMap;
+typedef xcom::TMapIter<Sym const*, FunctionInfo*> FuncInfoMapIter;
 typedef enum tagEM_STATUS {
     EM_SUCC = 0,
     EM_ERR,
@@ -1361,18 +1361,22 @@ typedef xcom::Vector<PltInfo*> PltInfoVec;
 //RelaxBrInfo map.
 typedef xcom::TMap<IR const*, RelaxBrInfo*> RelaxBrInfoMap;
 typedef xcom::TMapIter<IR const*, RelaxBrInfo*> RelaxBrInfoMapIter;
+typedef xcom::List<Sym const*> SymList;
+typedef xcom::List<Sym const*>::Iter SymListIter;
+typedef xoc::SymTabWithoutDupString ELFSymTab;
 
 
 //
 //Start ELFMgr.
 //
 //Record symbols and their information.
-#define ELFMGR_symbol_info(e)      ((e)->m_symbol_info)
-#define ELFMGR_symbol_list(e)      ((e)->m_symbol_info_list)
-#define ELFMGR_symbol_map(e)       ((e)->m_symbol_info_map)
-#define ELFMGR_reloc_vec(e)        ((e)->m_reloc_info)
-#define ELFMGR_relax_br_map(e)     ((e)->m_relax_br_map)
-#define ELFMGR_alias_map(e)        ((e)->m_alias_symbol_map)
+#define ELFMGR_symbol_info(e)         ((e)->m_symbol_info)
+#define ELFMGR_symbol_list(e)         ((e)->m_symbol_info_list)
+#define ELFMGR_symbol_map(e)          ((e)->m_symbol_info_map)
+#define ELFMGR_symbol_name_list(e)    ((e)->m_symbol_name)
+#define ELFMGR_reloc_vec(e)           ((e)->m_reloc_info)
+#define ELFMGR_relax_br_map(e)        ((e)->m_relax_br_map)
+#define ELFMGR_alias_map(e)           ((e)->m_alias_symbol_map)
 class ELFMgr {
     friend class ELFTargInfo;
 protected:
@@ -1458,10 +1462,6 @@ protected:
 
     //Record all sections that indicate writable data.
     List<ELFSHdr*> m_bss_sect_list;
-
-    //Record all symbol names in the order of local symbols first and global
-    //symbols last.
-    xcom::List<Sym const*> m_symbol_name;
 public:
     //Record name of generated binary file.
     CHAR const* m_output_file_name;
@@ -1611,6 +1611,16 @@ public:
 
     //Construct ELF header based on the section header number.
     void constructELFHeader(UINT sthr_num);
+
+    //Collect functions being called by using callGraph.
+    void collectCalledFunc(OUT FuncInfoMap & called_func_map);
+
+    //Collect not called function name.
+    void collectNotCalledFuncName(ELFSymTab const& reloc_info_name_tab,
+        OUT SymList & func_name_lst);
+
+    //Delete all functions not called.
+    void deleteNotCalledFunc(ELFSymTab const& reloc_info_name_tab);
 
     void dump() const;
     void dumpStrTabContent(CHAR const* strtab, Addr size) const;
@@ -1807,6 +1817,9 @@ public:
 
     bool is64bit() const { return m_elf_hdr.is64bit(); }
     bool is32bit() const { return m_elf_hdr.is32bit(); }
+
+    //Return true if sym_name is a aliaee.
+    bool isAliaseeSym(Sym const* sym_name);
 
     bool isExecutable() const;
 
@@ -2030,6 +2043,10 @@ public:
 
     //Record SymbolInfo collected from ELF and xoc::Var.
     SymbolInfoList m_symbol_info_list;
+
+    //Record all symbol names in the order of local symbols first and global
+    //symbols last.
+    SymList m_symbol_name;
 
     //Record RelocInfo.
     RelocInfoVec m_reloc_info;
@@ -3079,6 +3096,9 @@ public:
     bool m_is_dump_link_info;
     //-elf-symbol-ordering-file option: Order Symbolinfo in section in ELF.
     bool m_is_symbol_ordering_file;
+    //-elf-cache-miss-aggressive option: Do cache miss optimization
+    //even though the total code size greater than the cache size.
+    bool m_is_aggressive_cache_miss;
 public:
     ELFOpt()
     {
@@ -3088,15 +3108,19 @@ public:
         m_is_gen_fatbin_elf = false;
         m_is_dump_link_info = false;
         m_is_symbol_ordering_file = false;
+        //NOTE: Enable aggressive cache miss optimization by default.
+        m_is_aggressive_cache_miss = true;
     }
 
     bool isGenerateDeviceELF() const { return m_is_gen_device_elf; }
     bool isGenerateFatbinELF() const { return m_is_gen_fatbin_elf; }
     //Use '-elf-dumplink' option to dump linker info.
     //The default log file is 'dump.log'.
-    //e.g.: readelf a.asm -O0 -elf-fatbin -elf-dumplink
+    //e.g.: pcxac.exe xxx.pcx -O0 -elf-fatbin -elf-dumplink
     bool isDumpLink() const { return m_is_dump_link_info; }
     bool isSymbolOrderFile() const { return m_is_symbol_ordering_file; }
+    bool isAggressiveCacheMissOptimization() const
+    { return m_is_aggressive_cache_miss; }
 };
 
 extern ELFOpt g_elf_opt;

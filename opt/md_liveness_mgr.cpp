@@ -31,6 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+MDLivenessMgr::MDLivenessMgr(Region * rg) : Pass(rg), m_mds_mgr(rg, &m_sbs_mgr)
+{
+    m_dumgr = rg->getDUMgr();
+}
+
+
 MDLivenessMgr::~MDLivenessMgr()
 {
     for (VecIdx i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {

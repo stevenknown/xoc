@@ -71,6 +71,7 @@ author: Su Zhenyu
 //xgeninc.h will also include comopt.h that cause forward reference namespace
 //xgen, thus redeclarate namespace xgen here.
 using namespace xgen;
+#include "regd.h"
 #include "regssainfo.h"
 #include "ir_regssa.h"
 #include "update_pos.h"
@@ -83,6 +84,7 @@ using namespace xgen;
 #include "lt_interf_graph.h"
 #include "linear_scan.h"
 #include "lsra_impl.h"
+#include "lsra_post_opt.h"
 #include "lsra_scan_in_pos.h"
 #include "lt_prio_mgr.h"
 #include "lsra_scan_in_prio.h"
@@ -115,6 +117,9 @@ using namespace xgen;
 #include "workaround.h"
 #endif
 
+#include "ir_decl_ext.h"
+#include "ir_mgr.h"
+#include "ir_mgr_ext.h"
 #include "ir_cp.h"
 #include "ir_bcp.h"
 #include "ir_rp.h"

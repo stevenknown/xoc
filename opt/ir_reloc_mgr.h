@@ -122,7 +122,7 @@ public:
     virtual bool dump() const;
 
     //Return local var and the corresponding inner_ir which has idinfo.
-    Var const* getLocalVar(IR * ir, OUT IR ** ir_has_var) const;
+    Var const* getStackVar(IR * ir, OUT IR ** ir_has_var) const;
 
     Var2OffsetMgr * getVar2Offset() const { return m_var2offset; }
 
@@ -242,7 +242,11 @@ protected:
     //other operations are needed to calculate the offset.
     virtual IR * computeAddressUseFPAndOffsetDirectly(
         PRNO tmp_prno, PRNO base_prno, HOST_INT offset)
-    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
+    {
+        DUMMYUSE(tmp_prno && base_prno && offset);
+        ASSERTN(0, ("Target Dependent Code"));
+        return nullptr;
+    }
 
     //Determines whether the offset is outside the range of the immediate number
     //of the corresponding instruction.

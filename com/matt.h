@@ -192,7 +192,7 @@ protected:
     //The function is used to compute the sqrt for given element.
     //Here only apply an instantiate that simpliest call C/C++ library.
     //If it is inappropriate, overloading it as your need.
-    virtual T sqrtElem(T t)
+    virtual T sqrtElem(T)
     { ASSERTN(0, ("Target Dependent Code")); return T(0); }
 public:
     bool m_is_init;
@@ -376,12 +376,12 @@ public:
 
     //Print matrix element on screen.
     virtual void dumps() const;
-    virtual void dumpT2S(T const& t) const
+    virtual void dumpT2S(T const&) const
     { ASSERTN(0, ("Target Dependent Code")); }
 
     //The function is used to dump 't' into 'buf'.
     //Note 'buf' can be cleaned entirely.
-    virtual void dumpT2Buf(T const& t, OUT StrBuf & buf) const
+    virtual void dumpT2Buf(T const&, OUT StrBuf &) const
     { ASSERTN(0, ("Target Dependent Code")); }
 
     //Computation of eigenvalues.

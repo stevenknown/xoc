@@ -604,8 +604,9 @@ class InferCtx {
 protected:
     xcom::TTab<UINT> m_mdphi_tab; //temp usage.
     xcom::TTab<UINT> m_irtab; //temp usage.
+    ActMgr * m_am;
 public:
-    InferCtx() {}
+    InferCtx(ActMgr * am = nullptr) : m_am(am) {}
 
     //The function clean the temp variables for next inference.
     void clean()
@@ -613,6 +614,8 @@ public:
         m_mdphi_tab.clean();
         m_irtab.clean();
     }
+
+    ActMgr * getActMgr() const { return m_am; }
 
     //The function is used to avoid accessing MDPhi in a cycle.
     bool isVisited(MDPhi const* phi) const
@@ -673,7 +676,6 @@ protected:
     VN const* getVN(MDDef const* mddef)
     { return m_mdphi2vn.get(mddef->id()); }
     VN const* getVN(VMD const* vmd) { return m_vmd2vn.get(vmd->id()); }
-    Region * getRegion() const { return m_rg; }
 
     //Return true if ir has a valid corresponded VN.
     bool hasVN(IR const* ir) const
@@ -710,10 +712,20 @@ protected:
     VN const* inferAndGenVNForKillingDef(
         IR const* exp, IR const* killdef, InferCtx & ctx);
 
+    //This function infers the VN of cvt IR.
+    VN const* inferCvt(IR const* cvt, InferCtx & ctx);
+
     //The function maps given mddef information into an unique IR_CODE.
     //The mapped ir-code is used to conform the hashing-rules when registers
     //a MDDef and a set of integers.
     IR_CODE mapMDDef2IRCode(MDDef const* mddef) const;
+
+    //Register the VN for CVT via the input vn, and the type of src and the
+    //target for the cvt operation.
+    VN const* registerCvtVN(VN const* v0, Type const* srcty, Type const* tgtty);
+
+    //Register the VN for cvt IR by the three input VNs.
+    VN const* registerCvtVN(VN const* v0, VN const* v1, VN const* v2);
 
     //IR may be set an initial VN through DU chain, then the IR's vn
     //will be re-updated when the recursive processing of its kid IR finished.
@@ -792,6 +804,8 @@ public:
 
     MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
     PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
+    Region * getRegion() const { return m_rg; }
+    TypeMgr * getTypeMgr() const { return m_rg->getTypeMgr(); }
 
     VN const* inferExp(IR const* ir, InferCtx & ctx);
 };
@@ -975,6 +989,8 @@ protected:
         IR_CODE irt, VN const* v0, VN const* v1, VN const* v2);
     VN * registerBinVN(IR_CODE irt, VN const* v0, VN const* v1);
     VN * registerUnaVN(IR_CODE irt, VN const* v0);
+    VN * registerCvtVN(VN const* v0, VN const* v1, VN const* v2);
+    VN * registerCvtVN(VN const* v0, Type const* srcty, Type const* tgtty);
     VN * registerVNviaMD(MD const* md);
     VN * registerVNviaMC(LONGLONG v);
     VN * registerVNviaFP(double v);
@@ -1020,6 +1036,7 @@ public:
     //Compute VN to extend IR expression.
     virtual VN const* computeExtExp(IR const* exp, bool & change)
     {
+        DUMMYUSE(change && exp);
         //Target Dependent Code.
         return nullptr;
     }
@@ -1093,7 +1110,7 @@ public:
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }
 
     //Return true if CVT might change VN.
-    bool isCvtChangeVN(IR const* cvt) const;
+    virtual bool isCvtChangeVN(IR const* cvt) const;
 
     //Get VN of ir.
     VN const* getVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }

@@ -2568,7 +2568,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
     sprintf(name, "heap_obj%u", m_ir2heapobj.get_elem_count());
     ASSERT0(::strlen(name) < 128);
     Var * tv = m_rg->getVarMgr()->registerVar(
-        name, m_tm->getMCType(0), 0, VAR_GLOBAL);
+        name, m_tm->getMCType(0), 0, VAR_GLOBAL, SS_UNDEF);
 
     //Set the var to be unallocable, means do NOT add
     //var immediately as a memory-variable.
@@ -3947,7 +3947,7 @@ MD const* AliasAnalysis::genRestrictDummyVar(Var * var, MD2MDSet * mx)
     SNPRINTF(name, 63, "DummyGlobalVarPointedByVAR%u", var->id());
     ASSERT0(::strlen(name) < 64);
     Var * tv = m_rg->getVarMgr()->registerVar(
-        name, m_tm->getMCType(0), 0, VAR_GLOBAL|VAR_ADDR_TAKEN);
+        name, m_tm->getMCType(0), 0, VAR_GLOBAL|VAR_ADDR_TAKEN, SS_UNDEF);
 
     //Set the var to be unallocable, means do NOT add
     //var immediately as a memory-variable.

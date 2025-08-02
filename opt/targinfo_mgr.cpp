@@ -38,6 +38,7 @@ namespace xoc {
 void TargInfoMgr::init()
 {
     m_link = getRA();
+    initRegDSystem();
 
     //Must keep the regsets related to param and return value before the caller
     //regsets and callee regsets, because the init process of caller and callee
@@ -46,15 +47,12 @@ void TargInfoMgr::init()
     initParamVector();
     initRetvalScalar();
     initRetvalVector();
-
     initCalleeScalar();
     initCalleeVector();
     initCallerScalar();
     initCallerVector();
-
     initAllocableScalar();
     initAllocableVector();
-
     initCaller();
     initCallee();
 }
@@ -62,12 +60,50 @@ void TargInfoMgr::init()
 
 void TargInfoMgr::destroy()
 {
+    ASSERT0(m_rdsys);
+    delete m_rdsys;
+    m_rdsys = nullptr;
+}
+
+
+RegDSystem * TargInfoMgr::allocRegDSystem()
+{
+    return new RegDSystem(getRegionMgr(), this);
 }
 
 
 void TargInfoMgr::reset()
 {
     destroy();
+    init();
+}
+
+
+bool TargInfoMgr::isAlias(Reg r1, Reg r2) const
+{
+    if (r1 == r2) { return true; }
+    SRegSet const* r1_alias_set = getRegDSystem()->getOverlapSRegSet(r1);
+    SRegSet const* r2_alias_set = getRegDSystem()->getOverlapSRegSet(r2);
+    if (r1_alias_set == nullptr || r2_alias_set == nullptr) { return false; }
+    return r1_alias_set->is_intersect(*r2_alias_set);
+}
+
+
+bool TargInfoMgr::isExactCover(Reg reg1, Reg reg2) const
+{
+    RegD const* reg1d = getRegDSystem()->getRegDByReg(reg1);
+    ASSERT0(reg1d && reg1d->getReg() == reg1);
+    RegD const* reg2d = getRegDSystem()->getRegDByReg(reg2);
+    ASSERT0(reg2d && reg2d->getReg() == reg2);
+    return reg1d->is_exact_cover(reg2d);
+}
+
+
+void TargInfoMgr::initRegDSystem()
+{
+    ASSERT0(m_rdsys == nullptr);
+    m_rdsys = allocRegDSystem();
+    m_rdsys->initRegDByTargInfo();
 }
 
 
@@ -110,6 +146,13 @@ RegSet const* TargInfoMgr::getCalleeScalarRegSet() const
 RegSet const* TargInfoMgr::getAllocableVectorRegSet() const
 {
     return xgen::tmGetVectorRegSetAllocable();
+}
+
+
+SRegSet const* TargInfoMgr::getAliasRegSet(Reg reg) const
+{
+    ASSERT0(reg != REG_UNDEF);
+    return getRegDSystem()->getOverlapSRegSet(reg);
 }
 
 
@@ -174,6 +217,10 @@ void TargInfoMgr::dump(Region const* rg) const
 
     note(rg, "\nLINK:%s", getRegName(getLink()));
     rg->getLogMgr()->decIndent(2);
+
+    RegDSystem const* regdsys = getRegDSystem();
+    ASSERT0(regdsys);
+    regdsys->dump();
 }
 
 

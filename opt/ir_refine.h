@@ -48,6 +48,7 @@ class ActMgr;
 #define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 #define RC_maintain_du(r) ((r).u1.s1.maintain_du)
+#define RC_refine_sub_to_neg(r) ((r).u1.s1.refine_sub_to_neg)
 #define RC_optctx(r) ((r).m_oc)
 #define RC_stmt_generated(r) ((r).m_stmt_generated)
 class RefineCtx : public PassCtx {
@@ -86,6 +87,10 @@ public:
             //This flag may prevent the illegal removal when refinement
             //return back from IR expression processing.
             BitUnion stmt_has_been_removed:1;
+
+            //Pass info top-down. True to do following refinement.
+            //e.g: int a; 0-a => neg(a)
+            BitUnion refine_sub_to_neg:1;
         } s1;
         BitUnion i1;
     } u1;
@@ -129,7 +134,8 @@ public:
 
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
-    bool refind_mul_const() const { return RC_refine_mul_const(*this); }
+    bool refine_mul_const() const { return RC_refine_mul_const(*this); }
+    bool refine_sub_to_neg() const { return RC_refine_sub_to_neg(*this); }
 
     //Set flag to disable following optimizations.
     void setUnOptFlag()
@@ -140,6 +146,7 @@ public:
         RC_do_fold_const(*this) = false;
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
+        RC_refine_sub_to_neg(*this) = false;
     }
 
     //Return true if refinement need to maintain DefUse chain.
@@ -196,8 +203,9 @@ protected:
     //The function prefer to compute ir's const value by integer point type.
     IR * foldConstIntBinary(IR * ir, bool & change, RefineCtx & rc);
     IR * foldConstCompareAndShift(IR * ir, bool & change, RefineCtx & rc);
-    virtual IR * foldConstExtExp(IR * ir, bool & change, RefineCtx & rc)
+    virtual IR * foldConstExtExp(IR * ir, bool & change, RefineCtx &)
     {
+        DUMMYUSE(change);
         //Target Dependent Code.
         return ir;
     }
@@ -205,7 +213,7 @@ protected:
     virtual IR * foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc);
 
     //Peephole optimizations.
-    IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBand(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBor(IR * ir, bool & change, RefineCtx & rc);
@@ -213,11 +221,11 @@ protected:
     IR * refineLand(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLor(IR * ir, bool & change, RefineCtx & rc);
     IR * refineXor(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineAdd(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineAdd(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * refineSub(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineMul(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineMul(IR * ir, bool & change, RefineCtx & rc);
     IR * refineRem(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineDiv(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineDiv(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNe(IR * ir, bool & change, RefineCtx & rc);
     IR * refineEq(IR * ir, bool & change, RefineCtx & rc);
     IR * refineMod(IR * ir, bool & change, RefineCtx & rc);
@@ -234,7 +242,7 @@ protected:
     IR * refineBranch(IR * ir, bool & change, RefineCtx & rc);
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAbs(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineNeg(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
     IR * refineAsr(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineLsl(IR * ir, bool & change, RefineCtx const& rc);
@@ -266,8 +274,9 @@ protected:
     IR * reassociationCase1(IR * ir, bool & change, RefineCtx const& rc);
     IR * reassociation(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineCompare(IR * ir, bool & change, RefineCtx & rc);
-    virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx & rc)
+    virtual IR * refineExtOp(IR * ir, bool & change, RefineCtx &)
     {
+        DUMMYUSE(change);
         switch (ir->getCode()) {
         SWITCH_CASE_EXT_STMT:
         SWITCH_CASE_EXT_EXP:

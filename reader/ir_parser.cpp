@@ -1164,7 +1164,8 @@ bool IRParser::parseRegionName(Region * region, UFlag & flag, ParseCtx * ctx)
     }
     if (regionvar == nullptr) {
         regionvar = m_rm->getVarMgr()->registerVar(sym,
-            m_rm->getTypeMgr()->getAny(), CODE_ALIGNMENT, (VarFlag&)flag);
+            m_rm->getTypeMgr()->getAny(), CODE_ALIGNMENT, (VarFlag&)flag,
+            SS_UNDEF);
         regionvar->setFlag((VAR_FLAG)(VAR_IS_DECL|VAR_IS_REGION));
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
@@ -5025,7 +5026,8 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
     } else {
         v = m_rm->getVarMgr()->registerVar(sym, ty,
             1, //default alignment is 1.
-            ctx->current_region->is_program() ? VAR_GLOBAL : VAR_LOCAL);
+            ctx->current_region->is_program() ? VAR_GLOBAL : VAR_LOCAL,
+            SS_UNDEF);
     }
     ctx->current_region->addToVarTab(v);
     *var = v;

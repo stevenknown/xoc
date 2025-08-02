@@ -51,8 +51,7 @@ protected:
     MDSet * getDefMDSet(IRBB * bb);
     MDSet * getUseMDSet(IRBB * bb);
 public:
-    MDLivenessMgr(Region * rg) : Pass(rg), m_mds_mgr(rg, &m_sbs_mgr)
-    { m_dumgr = rg->getDUMgr(); }
+    MDLivenessMgr(Region * rg);
     virtual ~MDLivenessMgr();
 
     //The function dump pass relative information before performing the pass.

@@ -113,7 +113,10 @@ public:
     //relocations could help linker refill the insts with actual addresses in
     //the program instead of '0'.
     virtual void collectCallRelocation(MIList const& milst)
-    { ASSERTN(0, ("Target Dependent Code")); }
+    {
+        DUMMYUSE(milst);
+        ASSERTN(0, ("Target Dependent Code"));
+    }
 
     //Collect the RelaxBrInfo and register indirect jump offset saving info
     //in the whole milst for linker relaxation.

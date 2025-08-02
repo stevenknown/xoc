@@ -33,7 +33,7 @@ namespace xoc {
 IRDesc g_ir_desc[] = {
     { IR_UNDEF, "undef", 0x0, 0,
       0, //size of class object
-      IRDescFlagSeg(0), //attr
+      IRDescFlag(1, (UINT)IRC_MAIN_ATTR_PLACEHOLDER_POS), //attr
       dumpUndef,
       NO_VERIFY_FUNC,
       NO_ACC_RHS_FUNC,
@@ -52,7 +52,7 @@ IRDesc g_ir_desc[] = {
 
     { IR_CONST, "const", CConst::kid_map, CConst::kid_num,
       sizeof(CConst),
-      IRDescFlagSeg(IRC_IS_LEAF),
+      IRDescFlag(1, (UINT)IRC_IS_LEAF_POS),
       dumpConst,
       verifyConst,
       NO_ACC_RHS_FUNC,
@@ -1554,5 +1554,28 @@ bool IRDesc::mustExist(IR_CODE irc, UINT kididx)
     return IRDES_kid_map(irc).have(kididx);
 }
 //END IRDesc
+
+//
+//START IRDescFlag
+//
+IRDescFlag::IRDescFlag(UINT flag_pos_num, ...)
+{
+    UINT num = 0;
+    va_list ptr;
+    va_start(ptr, flag_pos_num);
+
+    //Since the enum-type IRC_ATTR might be promoted to different integer
+    //type depending on the different compiler, we use UINT type as the POD
+    //type in variable-parameter-passing.
+    UINT irc_attr_pos = (UINT)va_arg(ptr, UINT);
+    while (num < flag_pos_num) {
+        ASSERT0(irc_attr_pos <= (UINT)IRC_ATTR_LAST_POS);
+        set(irc_attr_pos);
+        num++;
+        irc_attr_pos = (UINT)va_arg(ptr, UINT);
+    }
+    va_end(ptr);
+}
+//END IRDescFlag
 
 } //namespace xoc

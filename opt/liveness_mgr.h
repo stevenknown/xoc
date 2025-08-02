@@ -101,17 +101,11 @@ protected:
     void updateSetByStmt(BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen);
     void updateSetByExp(BSIdx idx, MOD LiveSet * use);
 public:
-    LivenessMgr(Region * rg) : Pass(rg)
-    {
-        m_md_sys = rg->getMDSystem();
-        m_keep_local = false;
-    }
+    LivenessMgr(Region * rg);
     ~LivenessMgr() { clean(); }
 
-    void add_liveout(IRBB const* bb, PRNO prno)
-    { gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
-    void add_livein(IRBB const* bb, PRNO prno)
-    { gen_livein(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
+    void add_liveout(IRBB const* bb, PRNO prno);
+    void add_livein(IRBB const* bb, PRNO prno);
 
     void computeLocal(IRBB const* bb);
     void computeLocal(BBList const& bblst);
@@ -176,22 +170,8 @@ public:
 
     //Keep local-set information.
     void set_keep_local(bool keep) { m_keep_local = (BYTE)keep; }
-
-    void set_livein(UINT bbid, LiveSet const* live_set)
-    {
-        ASSERT0(live_set);
-        ASSERT0(bbid != BBID_UNDEF);
-        LiveSet * livein = gen_livein(bbid);
-        livein->copy(*live_set, m_sbs_mgr);
-    }
-
-    void set_liveout(UINT bbid, LiveSet const* live_set)
-    {
-        ASSERT0(live_set);
-        ASSERT0(bbid != BBID_UNDEF);
-        LiveSet * liveout = gen_liveout(bbid);
-        liveout->copy(*live_set, m_sbs_mgr);
-    }
+    void set_livein(UINT bbid, LiveSet const* live_set);
+    void set_liveout(UINT bbid, LiveSet const* live_set);
 
     //Set the liveness info for an empty BB.
     //empty_bb: the empty BB.

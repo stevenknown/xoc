@@ -43,6 +43,7 @@ class RegDUMgr;
 class VReg;
 class RegDefSet;
 class RegSSAMgr;
+class RegSSAInfo;
 class RegSSAStatus;
 
 class VRegVec : public Vector<VReg*> {
@@ -54,6 +55,7 @@ public:
     bool hasDefInBB(UINT bbid) const;
 };
 
+typedef xcom::Vector<RegSSAInfo*> UINT2RegSSAInfo;
 
 //Mapping from Reg to vector of VReg.
 class UINT2VRegVec {
@@ -201,15 +203,17 @@ public:
     void clean();
     void cleanUseSet() { VREG_occs(this).clean(); }
 
-    //Return true if ir is an USE of current VReg.
-    bool isUse(IR const* ir) const
-    { return const_cast<VReg*>(this)->getUseSet()->find(ir->id()); }
-    void init() { VREG_occs(this).init(); clean(); }
-
     void destroy() { VREG_occs(this).destroy(); }
     void dump(LinearScanRA const* ra) const; //Concisely dump
     void dump(Region const* rg, RegDUMgr const* mgr) const;
+    CHAR const* dumpToBuf(
+        OUT StrBuf & outbuf, Region const* rg, RegDUMgr const* mgr,
+        UINT indent) const;
     CHAR const* dump(LinearScanRA const* ra, OUT VRegFixedStrBuf & buf) const;
+    static void dumpRegAndVer(
+        Region const* rg, Reg r, UINT ver, LinearScanRA const* ra);
+    static CHAR const* dumpRegAndVer(
+        OUT VRegFixedStrBuf & buf, Reg r, UINT ver, LinearScanRA const* ra);
 
     //Return true 'exp' is in the UseSet.
     //exp: IR expression to be found.
@@ -226,6 +230,11 @@ public:
 
     //Return true if VReg is live-in version to current Region.
     bool isLiveIn() const { return version() == REGSSA_INIT_VERSION; }
+
+    //Return true if ir is an USE of current VReg.
+    bool isUse(IR const* ir) const
+    { return const_cast<VReg*>(this)->getUseSet()->find(ir->id()); }
+    void init() { VREG_occs(this).init(); clean(); }
 
     Reg reg() const
     {
@@ -342,6 +351,8 @@ public:
     //The function looks for the first RegDef that exactly define 'reg' in
     //current VROpndSet.
     RegDef const* findCoverRegDef(RegSSAMgr const* mgr, Reg reg) const;
+
+    void init() { m_vropnd_set.init(); }
 
     //Return true if all definition of vopnds can reach 'exp'.
     bool isMustDef(RegDUMgr const* mgr, IR const* exp) const;
@@ -461,7 +472,6 @@ public:
 
     //Return true if RegDef's result referenced given 'reg'.
     bool isRefReg(Reg reg) const { return getResult()->reg() == reg; }
-    bool isRefSameRegWith(IR const* ir) const;
 };
 
 
@@ -565,14 +575,7 @@ public:
     //Note Phi should not have previous def.
     bool isDefRealStmt() const
     { return getNextSet() != nullptr && !getNextSet()->is_empty(); }
-    void insertOpndAfter(IR * marker, IR * opnd)
-    {
-        ASSERT0(marker && opnd && opnd->getCode() == IR_PHYREG);
-        ASSERT0(xcom::in_list(REGPHI_opnd_list(this), marker));
-        ASSERT0(!xcom::in_list(REGPHI_opnd_list(this), opnd));
-        xcom::insertafter(&marker, opnd);
-        PHYREG_phi(opnd) = this; //Record PhyReg's host PHI.
-    }
+    void insertOpndAfter(IR * marker, IR * opnd);
 
     //Insert operand at given position.
     //pos: position of operand, start at 0.
@@ -603,6 +606,13 @@ public:
     ~RegPhiList();
 };
 
+class CompareConstRegDefFunc {
+public:
+    bool is_less(RegDef const* t1, RegDef const* t2) const
+    { return t1->id() < t2->id(); }
+    bool is_equ(RegDef const* t1, RegDef const* t2) const { return t1 == t2; }
+    RegDef const* createKey(RegDef const* t) { return t; }
+};
 
 typedef xcom::Vector<RegDef*> RegDefVec;
 typedef xcom::Vector<VROpnd*> VROpndVec;
@@ -618,27 +628,28 @@ protected:
     SMemPool * m_defstmt_pool;
     SMemPool * m_defset_pool;
     SMemPool * m_vropnd_sc_pool;
-    SMemPool * m_vconst_pool;
+    SMemPool * m_vrconst_pool;
     SMemPool * m_vreg_pool;
     SMemPool * m_philist_pool;
     SMemPool * m_philist_sc_pool;
     SMemPool * m_regssainfo_pool;
     Region * m_rg;
     IRMgr * m_irmgr;
-    LinearScanRA * m_ra;
     RegSSAMgr * m_regssa_mgr;
     TargInfoMgr * m_timgr;
     xcom::SC<VROpnd*> * m_free_sc_list;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::Vector<RegSSAInfo*> m_regssainfo_vec;
-    xcom::Vector<VROpnd*> m_vopnd_vec;
+    xcom::Vector<VROpnd*> m_vropnd_vec;
     xcom::Vector<RegPhiList*> m_philist_vec; //record the Phi list of BB.
     RegDefVec m_def_vec; //map from id to a RegDef object.
     UINT2VRegVec m_map_reg2vreg; //record version for each Reg.
+    UINT2RegSSAInfo m_irid2regssainfo; //record regssainfo for each IR.
 protected:
     void buildRegPhiOpnd(RegPhi * phi, Reg reg, UINT num_operands);
     void cleanOrDestroy(bool is_reinit);
     void destroyReg2VRegVec();
+    void destroyAllRegSSAInfo();
 public:
     RegDUMgr(Region * rg, RegSSAMgr * mgr);
     ~RegDUMgr() { cleanOrDestroy(false); }
@@ -651,7 +662,7 @@ public:
     RegDefStmt * allocRegDefStmt();
     RegDefSet * allocRegDefSet();
     xcom::SC<VROpnd*> * allocSCVROpnd(VROpnd * opnd);
-    VRConst * allocVConst(IR const* ir);
+    VRConst * allocVRConst(IR const* ir);
     VReg * allocVReg(Reg reg, UINT version);
 
     //Count memory usage for current object.
@@ -659,6 +670,7 @@ public:
 
     //Remove RegSSAInfo of 'ir'.
     void cleanRegSSAInfo(IR * ir);
+    void cleanAllRegSSAInfo();
 
     //Generate RegSSAInfo for individual Non-PR IR stmt/exp since each IR
     //has its own specific RegSSA Memory Reference information.
@@ -668,17 +680,17 @@ public:
     RegSSAInfo * genRegSSAInfo(MOD IR * ir);
 
     //Get RegSSAInfo of 'ir' if any.
-    static RegSSAInfo * getRegSSAInfo(IR const* ir);
+    RegSSAInfo * getRegSSAInfo(IR const* ir) const;
     Region * getRegion() const { return m_rg; }
 
     //Get a cached SC container to manipulate VROpnd.
     xcom::SC<VROpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
 
     //Get a vector that record all VROpnds.
-    VROpndVec * getVROpndVec() { return &m_vopnd_vec; }
+    VROpndVec * getVROpndVec() { return &m_vropnd_vec; }
 
     //Get specific VROpnd.
-    VROpnd * getVROpnd(UINT i) const { return m_vopnd_vec.get(i); }
+    VROpnd * getVROpnd(UINT i) const { return m_vropnd_vec.get(i); }
 
     //Get RegPhi list of specific BB, or generate the list if not exist.
     RegPhiList * genBBPhiList(UINT bbid);
@@ -698,8 +710,11 @@ public:
     VReg * getVReg(Reg reg, UINT version) const;
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr;  }
     RegSSAMgr * getRegSSAMgr() const { return m_regssa_mgr; }
-    LinearScanRA * getRA() const { return m_ra; }
+    LinearScanRA const* getRA() const;
     TargInfoMgr * getTIMgr() const { return m_timgr; }
+    IRMgr * getIRMgr() const { return m_irmgr; }
+    IRMgrExt * getIRMgrExt() const { return (IRMgrExt*)m_irmgr; }
+    Reg getReg(IR const* exp) const;
 
     bool isRefReg(IR const* ir, Reg reg) const;
 
@@ -714,14 +729,6 @@ public:
 
     //Set 'regssainfo' to ir.
     void setRegSSAInfo(IR * ir, RegSSAInfo * regssainfo);
-};
-
-class CompareConstRegDefFunc {
-public:
-    bool is_less(RegDef const* t1, RegDef const* t2) const
-    { return t1->id() < t2->id(); }
-    bool is_equ(RegDef const* t1, RegDef const* t2) const { return t1 == t2; }
-    RegDef const* createKey(RegDef const* t) { return t; }
 };
 
 } //namespace xoc

@@ -1322,7 +1322,7 @@ void IRCFG::preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx)
 //Some optimizations may append stmt into BB which has already down-boundary
 //stmt. That makes BB invalid. Split such invalid BB into two or more BBs.
 //The function will try to maintain RPO and DOM info.
-bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc)
+bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc, OUT SplitBBCtx * sctx)
 {
     ASSERT0(bb);
     IRListIter it;
@@ -1330,6 +1330,9 @@ bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc)
         IRListIter cur = it; bb->getIRList().get_next(&it);
         if (IRBB::isLowerBoundary(cur->val()) && it != nullptr) {
             IRBB * newbb = splitBB(bb, cur, oc);
+            if (sctx != nullptr) {
+                sctx->recordGeneratedBB(newbb);
+            }
             return splitBBIfNeeded(newbb, oc);
         }
     }

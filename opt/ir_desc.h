@@ -34,14 +34,14 @@ namespace xoc {
 class IR;
 class IRBB;
 class DumpFlag;
-class IRDumpAttrBaseFunc;
+class IRDumpCustomBaseFunc;
 class IRKidMap;
 class Region;
 class Var;
 class SSAInfo;
 class LabelInfo;
 
-template <class DF = IRDumpAttrBaseFunc> class IRDumpCtx;
+template <class CustomFunc = IRDumpCustomBaseFunc> class IRDumpCtx;
 
 #define NO_DUMP_FUNC nullptr
 #define NO_VERIFY_FUNC nullptr
@@ -193,8 +193,19 @@ typedef enum tagIRC_ATTR {
     IRC_HAS_RES_LIST_POS = 28,
     IRC_HAS_RES_LIST = 1ULL<<IRC_HAS_RES_LIST_POS,
 
-    IRC_MAIN_ATTR_LAST_POS = IRC_HAS_RES_LIST_POS,
+    //Indicates the operation is placeholder.
+    IRC_MAIN_ATTR_PLACEHOLDER_POS = 100,
+
+    //Indicates the position of the last main attribute.
+    IRC_MAIN_ATTR_LAST_POS = IRC_MAIN_ATTR_PLACEHOLDER_POS,
+
     #include "irc_attr_ext.inc"
+
+    //Indicates the position of the last attribute.
+    IRC_ATTR_LAST_POS,
+
+    //NOTE: THERE IS NO ATTR NUMBER SINCE THE POSITIONS OF ATTR ARE NOT
+    //CONITNUOUS.
 } IRC_ATTR;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -207,16 +218,33 @@ typedef enum tagIRC_ATTR {
 //
 //START IRDescFlag
 //
+//The flag-segment indicates the minimum bytesize simplex type that is used to
+//establish the flag set.
 typedef UINT64 IRDescFlagSeg;
 
 //So far, the number of total flags used to describe IR attributes is
-//not more than one FlagSeg.
-#define IRDescFlagSegNum 1
+//not more than two FlagSeg.
+#define IRDescFlagSegNum 2
 
 class IRDescFlag : public xcom::FlagSet<IRDescFlagSeg, IRDescFlagSegNum> {
+    //THE CLASS ALLOWS COPY-CONSTRUCTOR.
 public:
     IRDescFlag() {}
+
+    //The function constructs flag with a single flag-segement.
     IRDescFlag(IRDescFlagSeg v) : FlagSet<IRDescFlagSeg, IRDescFlagSegNum>(v) {}
+
+    //The function constructs flag with a pre-constructed byte buffer that
+    //record the IRC_ATTR.
+    IRDescFlag(BYTE const* vbuf, UINT vbuflen)
+        : FlagSet<IRDescFlagSeg, IRDescFlagSegNum>(vbuf, vbuflen) {}
+
+    //The function constructs flag with a list of IRC_ATTR.
+    //flag_pos_num: the number of flag-position.
+    //...: a list of flag-positions.
+    //usage:construct with three irc-attr, IRC_X, IRC_Y, IRC_Z
+    //      by IRDescFlag(3, (UINT)IRC_X, (UINT)IRC_Y, (UINT)IRC_Z)
+    IRDescFlag(UINT flag_pos_num, ...);
 };
 //END IRDescFlag
 

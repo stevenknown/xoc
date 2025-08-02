@@ -128,7 +128,7 @@ protected:
                        OUT bool & prssadu, OUT bool & mdssadu);
 
     virtual bool checkPropBenifit(IR const* ir, IR const* cand_exp) const
-    { return true; }
+    { DUMMYUSE(ir && cand_exp); return true; }
 
     virtual bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
@@ -178,7 +178,7 @@ protected:
         return false;
     }
 
-    virtual bool initDepPass(MOD OptCtx & oc) { return true; }
+    virtual bool initDepPass(MOD OptCtx &) { return true; }
 
     //Return true if CVT with simply cvt-exp that can be regard as
     //copy-propagate candidate.

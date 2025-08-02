@@ -242,6 +242,10 @@ public:
     bool is_vector_with_fp_elem_type() const
     { return is_vector() && is_fp(getVectorElemDType()); }
 
+    //Return true if data type is vector and its element type is bool.
+    bool is_vector_with_bool_elem_type() const
+    { return is_vector() && getVectorElemDType() == D_B; }
+
     //Return true if data type is stream.
     bool is_stream() const { return TY_dtype(this) == D_STREAM; }
 
@@ -286,7 +290,7 @@ public:
     bool is_scalar() const
     { return TY_dtype(this) >= D_B && TY_dtype(this) <= D_F128; }
 
-    //Return true if tyid is signed.
+    //Return true if current type is signed.
     inline bool is_signed() const
     {
         if ((TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128) ||
@@ -296,6 +300,7 @@ public:
         return false;
     }
 
+    //Return true if current type is unsigned.
     inline bool is_unsigned() const
     {
         if ((TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128) ||
@@ -308,11 +313,25 @@ public:
         return false;
     }
 
+    //Return true if the type can be regarded as signed.
+    bool isSigned() const
+    {
+        if (is_vector()) { return is_signed(getVectorElemDType()); }
+        return is_signed();
+    }
+
+    //Return true if the type can be regarded as unsigned.
+    bool isUnsigned() const
+    {
+        if (is_vector()) { return is_unsigned(getVectorElemDType()); }
+        return is_unsigned();
+    }
+
     //Return true if data type is signed integer.
     bool is_sint() const
     { return TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128; }
 
-    //Return true if data type is unsgined integer.
+    //Return true if data type is unsigned integer.
     bool is_uint() const
     { return TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128; }
 
@@ -333,6 +352,14 @@ public:
     //Return true if data type is float.
     static bool is_fp(DATA_TYPE dtype)
     { return dtype >= D_BF16 && dtype <= D_F128; }
+
+    //Return true if data type is signed integer.
+    static bool is_signed(DATA_TYPE dtype)
+    { return dtype >= D_I8 && dtype <= D_I128; }
+
+    //Return true if data type is unsigned integer.
+    static bool is_unsigned(DATA_TYPE dtype)
+    { return dtype >= D_U8 && dtype <= D_U128; }
 
     //Return true if data type can be regarded as integer.
     bool isInt() const { return is_int() || is_bool() || is_pointer(); }

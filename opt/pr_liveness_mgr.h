@@ -60,12 +60,7 @@ protected:
                     MOD PRLiveSet * use, bool is_lhs);
     void processMayUse(PRNO prno, MOD PRLiveSet * use);
 public:
-    PRLivenessMgr(Region * rg) : LivenessMgr(rg)
-    {
-        m_md_sys = rg->getMDSystem();
-        m_var2pr = nullptr;
-        m_handle_may = false;
-    }
+    PRLivenessMgr(Region * rg);
     ~PRLivenessMgr() { clean(); }
 
     virtual CHAR const* getPassName() const { return "PRLivenessMgr"; }

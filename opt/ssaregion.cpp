@@ -34,6 +34,15 @@ namespace xoc {
 //
 //START SSARegion
 //
+SSARegion::SSARegion(xcom::DefMiscBitSetMgr * sbs, DomTree const& dt,
+                     Region const* rg, OptCtx * oc, ActMgr * am)
+    : m_rg(rg), m_root(nullptr), m_oc(oc), m_am(am), m_domtree(dt),
+      m_bbset(sbs->getSegMgr())
+{
+    m_cfg = m_rg->getCFG();
+}
+
+
 void SSARegion::add(PRNO prno, IR * start)
 {
     IRIter it;

@@ -580,6 +580,14 @@ inline LONG revlong(LONG d)
 //Reverse the string.
 CHAR * reverseString(CHAR * v);
 
+//Compute the result of "val0 rotateleft val1".
+//For example:
+//val0: 0xFFFFFF0000001111
+//va11: 0x3
+//res:  (0xFFFFFF0000001111 << 3) | (0xFFFFFF0000001111 >> 61) =
+//      0xFFFFF8000000888F
+UINT rotateLeft(UINT val0, UINT val1);
+
 //The function rotates string in buffer.
 //e.g: given string "xyzmn", n is 2, after rotation,
 //the 'str' will be "zmnxy".

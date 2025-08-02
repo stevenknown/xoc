@@ -26,6 +26,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
+#ifndef __IR_CODE_H__
+#define __IR_CODE_H__
+
+namespace xoc {
+
 typedef enum {
     IR_UNDEF = 0,
     IR_CONST, //Constant value: include integer, float, string.
@@ -142,3 +147,7 @@ typedef enum {
     //IR_CODE_BIT_SIZE.                                                      //
     ///////////////////////////////////////////////////////////////////////////
 } IR_CODE;
+
+} //namespace xoc
+
+#endif

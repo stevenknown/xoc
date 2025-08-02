@@ -868,7 +868,7 @@ bool Vectorization::isStmtLegalToVect(
 
 
 bool Vectorization::findSuitableVectOpnd(
-    IR const* start, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* start, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(start && start->is_exp());
@@ -1871,7 +1871,8 @@ void Vectorization::pickOutIrrelevantStmtCand(MOD VectCtx & ctx) const
 
 
 bool Vectorization::checkResultCand(
-    VectCtx const& ctx, LDACtx const& ldactx, LoopDepInfoSet const& set) const
+    VectCtx const& ctx, LoopDepCtx const& ldactx,
+    LoopDepInfoSet const& set) const
 {
     VectCtx::CandList::Iter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
@@ -1892,7 +1893,7 @@ bool Vectorization::checkResultCand(
 
 
 bool Vectorization::checkConst(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isConstExp());
@@ -1901,7 +1902,7 @@ bool Vectorization::checkConst(
 
 
 bool Vectorization::checkUna(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isUnaryOp());
@@ -1910,7 +1911,7 @@ bool Vectorization::checkUna(
 
 
 bool Vectorization::checkArrayOp(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isArrayOp());
@@ -1919,7 +1920,7 @@ bool Vectorization::checkArrayOp(
 
 
 bool Vectorization::checkIndirectOp(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isIndirectMemOp());
@@ -1928,7 +1929,7 @@ bool Vectorization::checkIndirectOp(
 
 
 bool Vectorization::checkReadPR(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isReadPR());
@@ -1937,7 +1938,7 @@ bool Vectorization::checkReadPR(
 
 
 bool Vectorization::checkDirectOp(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isDirectMemOp());
@@ -1946,7 +1947,7 @@ bool Vectorization::checkDirectOp(
 
 
 bool Vectorization::checkBin(
-    IR const* ir, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(ir->isBinaryOp());
@@ -1968,7 +1969,7 @@ bool Vectorization::checkStmt(IR const* stmt, VectCtx const& ctx) const
 //The function checks whether the exp can be regarded as vector-operand of
 //a vector operation.
 bool Vectorization::checkExp(
-    IR const* exp, VectCtx const& ctx, LDACtx const& ldactx,
+    IR const* exp, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
     ASSERT0(exp && exp->is_exp());
@@ -2221,7 +2222,7 @@ void Vectorization::pickOutScalarStmt(MOD VectCtx & ctx) const
 
 
 void Vectorization::analyzeDep(
-    VectCtx const& ctx, OUT LDACtx & ldactx, OUT LoopDepInfoSet & set) const
+    VectCtx const& ctx, OUT LoopDepCtx & ldactx, OUT LoopDepInfoSet & set) const
 {
     VectCtx::CandList::Iter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
@@ -2248,8 +2249,11 @@ bool Vectorization::vectorize(MOD VectCtx & ctx)
         return false;
     }
     LoopDepInfoSet set;
-    LDACtx ldactx(ctx.getLI());
+    LoopDepCtx ldactx(getRegion(), ctx.getLI());
     analyzeDep(ctx, ldactx, set);
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpVectorization()) {
+        ldactx.dump();
+    }
     if (!checkLoopReduceDep(ctx, set)) { return false; }
     if (!checkLoopCarrDep(ctx, set)) { return false; }
     if (!checkScalarStmt(ctx)) { return false; }
@@ -2810,15 +2814,12 @@ bool Vectorization::tryVectorizeLoop(LI<IRBB> * li, MOD OptCtx & oc)
 }
 
 
-//Return true if code changed.
-bool Vectorization::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
-                               OUT bool & insert_bb, OptCtx & oc)
+bool Vectorization::doLoopTree(LI<IRBB> * li, OptCtx & oc)
 {
     if (li == nullptr) { return false; }
     bool changed = false;
     for (LI<IRBB> * tli = li; tli != nullptr; tli = tli->get_next()) {
-        bool lchanged_inner = doLoopTree(
-            tli->getInnerList(), du_set_info_changed, insert_bb, oc);
+        bool lchanged_inner = doLoopTree(tli->getInnerList(), oc);
         changed |= lchanged_inner;
         if (lchanged_inner) {
             //Inner Loop may have been destroied, reperform doLoopTree().
@@ -2864,11 +2865,10 @@ bool Vectorization::dump() const
 }
 
 
-bool Vectorization::perform(OptCtx & oc)
+bool Vectorization::initDepPass(MOD OptCtx & oc)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_ref_valid()) { return false; }
+
     //Initialize pass object since they might be destructed at any moment.
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
@@ -2884,20 +2884,18 @@ bool Vectorization::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
-                                               PASS_IVR, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(
+        &oc, PASS_DOM, PASS_LOOP_INFO, PASS_IVR, PASS_UNDEF);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
     ASSERT0(m_ivr && m_ivr->is_valid());
     m_dce = (DeadCodeElim*)m_rg->getPassMgr()->registerPass(PASS_DCE);
     if (m_dce == nullptr) {
         //Vectorization use DCE to reconstruct loop.
-        END_TIMER(t, getPassName());
         return false;
     }
     m_loopdepana = (LoopDepAna*)m_rg->getPassMgr()->registerPass(
         PASS_LOOP_DEP_ANA);
     if (m_loopdepana == nullptr) {
-        END_TIMER(t, getPassName());
         return false;
     }
     m_rg->getPassMgr()->checkValidAndRecompute(
@@ -2912,16 +2910,26 @@ bool Vectorization::perform(OptCtx & oc)
         ASSERT0(useGVN());
         m_ivr->setAggressive(true);
     }
+    return true;
+}
+
+
+bool Vectorization::perform(OptCtx & oc)
+{
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    START_TIMER(t, getPassName());
+    if (!initDepPass(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     reset();
-    bool du_set_info_changed = false;
-    bool insert_bb = false;
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     bool changed = false;
     bool lchanged = false;
     do {
-        lchanged = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
-                              insert_bb, oc);
+        lchanged = doLoopTree(m_cfg->getLoopInfo(), oc);
         changed |= lchanged;
     } while (lchanged);
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpVectorization()) {

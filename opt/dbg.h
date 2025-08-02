@@ -197,14 +197,14 @@ public:
     virtual void printSrcLine(StrBuf &, IR const*, PrtCtx * ctx);
 
     //Print source code line in internal stream.
-    virtual void printSrcLine(Dbx const*, PrtCtx * ctx)
+    virtual void printSrcLine(Dbx const*, PrtCtx *)
     {
         //Taget Dependent Code
         //Nothing to do.
     }
 
     //Print source code line in StrBuf.
-    virtual void printSrcLine(StrBuf &, Dbx const*, PrtCtx * ctx)
+    virtual void printSrcLine(StrBuf &, Dbx const*, PrtCtx *)
     {
         //Taget Dependent Code
         //Nothing to do.

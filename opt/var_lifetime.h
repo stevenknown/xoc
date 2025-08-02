@@ -43,9 +43,10 @@ class LinearScanRA;
 //
 class VarUpdatePos : public UpdatePos {
 public:
-    virtual bool updateAtIR(IR const* ir, OUT Pos & dpos,
-                            OUT Pos & upos) override
+    virtual bool updateAtIR(
+        IR const* ir, OUT Pos & dpos, OUT Pos & upos) override
     {
+        DUMMYUSE(ir);
         update(dpos, upos);
         return true;
     }

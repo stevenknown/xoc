@@ -74,9 +74,9 @@ bool g_compute_region_imported_defuse_md = false;
 bool g_compute_pr_du_chain_by_prssa = true;
 bool g_do_expr_tab = true;
 bool g_do_cp_aggressive = false;
-bool g_do_cp = false;
+bool g_do_cp = true;
 bool g_do_bcp = true;
-bool g_do_dce = false;
+bool g_do_dce = true;
 bool g_do_dce_aggressive = false;
 bool g_infer_type = true;
 bool g_do_vrp = false;
@@ -278,6 +278,7 @@ void DumpOption::setDumpNothing()
     is_dump_simplification = false;
     is_dump_prssamgr = false;
     is_dump_mdssamgr = false;
+    is_dump_regssamgr = false;
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
@@ -339,6 +340,7 @@ void DumpOption::setDumpAll()
     is_dump_simplification = true;
     is_dump_prssamgr = true;
     is_dump_mdssamgr = true;
+    is_dump_regssamgr = true;
     is_dump_memusage = true;
     is_dump_livenessmgr = true;
     is_dump_irparser = true;
@@ -602,6 +604,12 @@ bool DumpOption::isDumpPRSSAMgr() const
 }
 
 
+bool DumpOption::isDumpRegSSAMgr() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_regssamgr);
+}
+
+
 bool DumpOption::isDumpMDSSAMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdssamgr);
@@ -733,17 +741,6 @@ bool DumpOption::isDumpIRFusion() const
     return is_dump_all || (!is_dump_nothing && is_dump_irfusion);
 }
 //END DumpOption
-
-
-//
-//START ArchOption
-//
-ArchOption::ArchOption()
-{
-    is_arch_t1 = false;
-    is_arch_t2 = false;
-}
-//END ArchOption
 
 
 //

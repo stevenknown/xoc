@@ -205,11 +205,6 @@ public:
     void clean();
     void cleanUseSet() { VMD_occs(this).clean(); }
 
-    //Return true if ir is an USE of current VMD.
-    bool isUse(IR const* ir) const
-    { return const_cast<VMD*>(this)->getUseSet()->find(ir->id()); }
-    void init() { VMD_occs(this).init(); clean(); }
-
     void destroy() { VMD_occs(this).destroy(); }
     void dump(Region const* rg) const; //Concisely dump
     void dump(Region const* rg, UseDefMgr const* udmgr) const;
@@ -232,6 +227,11 @@ public:
 
     //Return true if VMD is live-in version to current Region.
     bool isLiveIn() const { return version() == MDSSA_INIT_VERSION; }
+
+    //Return true if ir is an USE of current VMD.
+    bool isUse(IR const* ir) const
+    { return const_cast<VMD*>(this)->getUseSet()->find(ir->id()); }
+    void init() { VMD_occs(this).init(); clean(); }
 
     UINT mdid() const
     {
