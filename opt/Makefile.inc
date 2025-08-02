@@ -126,7 +126,7 @@ else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
 endif
 
-ifneq ($(findstring $(TARG), FOR_RISCV FOR_TECO),)
+ifneq ($(findstring $(TARG), FOR_RISCV),)
   TARG_DIR_NAME := $(notdir $(TARG_DIR))
   opt_ext_file = $(ROOT_DIR)/$(TARG_DIR_NAME)/Makefile.opt.ext.inc
   ifneq ($(wildcard $(opt_ext_file)),$(opt_ext_file))

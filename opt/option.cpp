@@ -158,12 +158,6 @@ bool g_do_inst_sched = false;
 bool g_do_stack_coloring = true;
 bool g_vset_insert_consider_first_vir = false;
 
-//Special options for different using of specific architectures.
-#ifdef FOR_TECO_IP
-bool g_do_relaxation2uncondbr = false;
-bool g_do_relaxation2jmp = false;
-#endif
-
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
 

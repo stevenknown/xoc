@@ -63,10 +63,6 @@ void MiscELFMgr::allocTargInfo()
     #ifdef FOR_X64
     case EM_X86_64: m_ti = new X64ELFTargInfo(this); break;
     #endif
-    #ifdef FOR_TECO
-    case EM_RISCV: m_ti = new T2ELFTargInfo(this); break;
-    case EM_SWAI_64: m_ti = new TECOELFTargInfo(this); break;
-    #endif
     default:;
     }
 }
