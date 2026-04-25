@@ -39,6 +39,7 @@ class VectCtx;
 class Vectorization;
 class VectOp;
 class VectOpMgr;
+class IfConversion;
 
 #define VECTOP_ID_UNDEF 0
 
@@ -176,6 +177,7 @@ public:
 
     IR_CODE getOccCode() const
     {
+        ASSERT0(!isEmpty());
         ASSERT0(m_occ);
         return m_occ->getCode();
     }
@@ -195,6 +197,14 @@ public:
 
     //Return true if ir is one of the operand of current vector operation.
     bool isOpnd(IR const* ir) const;
+
+    //Return true if specific operand of currenrt vect-op is NULL.
+    //It means the No.idx operand is empty and just a placeholder.
+    bool isEmptyOpnd(UINT idx) const { return getOpndOcc(idx) == nullptr; }
+
+    //Return true if currenrt vect-op is NULL.
+    //It means current operand is empty and just a placeholder.
+    bool isEmpty() const { return getOcc() == nullptr; }
     UINT id() const { return m_id; }
 
     bool verify() const;
@@ -231,19 +241,46 @@ public:
 class VectCtx : public PassCtx {
     COPY_CONSTRUCTOR(VectCtx);
 public:
-    typedef xcom::List<IR*> CandList;
-    typedef xcom::List<IR*>::Iter CandListIter;
-    typedef xcom::EList<IR*, IR2Holder> ResCandList;
+    typedef xcom::EList<IR*, IR2Holder>::Iter CandListIter;
+    class CandList : public xcom::EList<IR*, IR2Holder> {
+    public:
+        void append(IR * ir);
+    };
+
     typedef xcom::EList<IR*, IR2Holder>::Iter ResCandListIter;
-    typedef xcom::EList<IR const*, ConstIR2Holder> ResConstCandList;
+    class ResCandList : public xcom::EList<IR*, IR2Holder> {
+    public:
+        void append(IR * ir);
+    };
+
     typedef xcom::EList<IR const*, ConstIR2Holder>::Iter ResConstCandListIter;
-    typedef xcom::List<VectOp*> VOpList;
+    class ResConstCandList : public xcom::EList<IR const*, ConstIR2Holder> {
+    public:
+        void append(IR const* ir);
+    };
+
     typedef xcom::List<VectOp*>::Iter VOpListIter;
-    typedef xcom::List<IR*> ResOpList;
+    class VOpList : public xcom::List<VectOp*> {
+    public:
+        void append(VectOp * vop);
+    };
+
     typedef xcom::List<IR*>::Iter ResOpListIter;
+    class ResOpList : public xcom::List<IR*> {
+    public:
+        void append(IR * ir);
+    };
+
+    typedef IRListIter GenedStmtListIter;
+    class GenedStmtList : public IRList {
+    public:
+        void append(IR * ir);
+    };
+
+    //Define mandatory path of loop.
+    typedef xcom::BitSet MandaPath;
 public:
     Vectorization * m_vect;
-    Region * m_rg;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
     LI<IRBB> const* m_li;
@@ -254,15 +291,18 @@ public:
     LinearRepMgr * m_lrmgr;
     VectAccDescMgr * m_vectaccdesc_mgr;
     InferEVN * m_infer_evn;
-    GVN * m_gvn;
     VarMgr * m_vm;
     MDSystem * m_mdsys;
+    IfConversion * m_ifcvs;
     IR const* m_epilloop_comp_remain;
-    ResCandList m_rescand;
-    ResConstCandList m_initop_list;
-    ResConstCandList m_prerequisite_list;
-    VOpList m_candvop_list;
-    IRList m_generated_stmt_list;
+    IVRCtx const* m_ivrctx;
+    ResCandList m_rescand; //record the result-candidate vectorizable stmt.
+    ResConstCandList m_initop_list; //record the init-scalar-stmt to IV.
+    ResConstCandList m_prerequisite_list; //record the scalar-prereq-stmt.
+    VOpList m_candvop_list; //record generated VectOp info.
+
+    //Record all generated IRs during the vectorization.
+    GenedStmtList m_generated_stmt_list;
 
     //Propagate information bottom up.
     //Record the generated vectorized operations. These vector operations will
@@ -274,25 +314,25 @@ public:
     //be placed in new generated epilog-loop to compute the remainder data.
     ResOpList m_epilloop_resvop_list;
     ResOpList m_epilloop_maskop_list;
+
+    //Propagate information top down.
+    //The path indicates the mandatory path of loop.
+    MandaPath m_mandatory_path;
 public:
     VectCtx(LI<IRBB> const* li, IVBoundInfo const* bi, OptCtx & oc,
-            Vectorization * vect, GVN * gvn, ActMgr * am);
+            Vectorization * vect, ActMgr * am, IVRCtx const* ivrctx);
     ~VectCtx();
 
     //Add a new vectoized-operation into candidate operation list.
     //Note the vectorized-operation in the candidate operation list will be
     //executed sequentially.
-    void addCandVOp(VectOp * vectop);
-    void addPrerequisiteOp(IR * op);
-    void addStmtCand(IR * ir);
-    void addGeneratedStmt(IR * ir);
     void addGeneratedStmtFromBB(IRBB const* bb);
 
     void cleanAfterLoopReconstruct();
+    void cleanIfVectFailed();
 
     void dump() const;
 
-    Region * getRegion() const { return m_rg; }
     IRCFG * getCFG() const { return m_cfg; }
     CandList & getCandList() { return m_stmt_cand_list; }
     BIV const* getBIV() const;
@@ -301,6 +341,7 @@ public:
     IRMgrExt * getIRMgrExt() const { return (IRMgrExt*)m_irmgr; }
     IVR const* getIVR() const { return m_ivr; }
     MDSystem const* getMDSystem() const { return m_mdsys; }
+    IfConversion * getIfCvs() const { return m_ifcvs; }
     IVBoundInfo const* getIVBoundInfo() const { return m_iv_bound_info; }
     LI<IRBB> const* getLI() const { return m_li; }
     LICMAnaCtx const* getLICMAnaCtx() const { return m_licm_anactx; }
@@ -311,26 +352,28 @@ public:
     ResCandList & getResCandList() { return m_rescand; }
     ResConstCandList & getInitOpList() { return m_initop_list; }
     ResConstCandList & getPrerequisiteOpList() { return m_prerequisite_list; }
-    IRList & getGeneratedStmtList() { return m_generated_stmt_list; }
+    GenedStmtList & getGeneratedStmtList() { return m_generated_stmt_list; }
     LinearRepMgr & getLinearRepMgr() const { return *m_lrmgr; }
     VectAccDescMgr & getVectAccDescMgr() const { return *m_vectaccdesc_mgr; }
     InferEVN & getInferEVN() const { return *m_infer_evn; }
     Vectorization * getVect() const { return m_vect; }
     VectActMgr * getActMgr() const { return (VectActMgr*)PassCtx::getActMgr(); }
     IR const* getEpilLoopCompRemain() const { return m_epilloop_comp_remain; }
+    MandaPath & getMandaPath() { return m_mandatory_path; }
     UINT getCurInd() const;
+    IVRCtx const* getIVRCtx() const { return m_ivrctx; }
 
     bool isIV(IR const* ir) const;
     bool isRedStmt(IR const* ir) const;
     bool isIVEndBoundStmt(IR const* ir) const;
     bool isResCand(IR const* ir) const
     { return m_rescand.find(const_cast<IR*>(ir)); }
+    bool isOnMandaPath(IRBB const* bb) const;
 
     //The function is a wrapper of IVBoundInfo.
     //Return true if trip-count is immediate.
     bool isTCImm() const;
 
-    void removeStmtCand(IR * ir) { m_stmt_cand_list.remove(ir); }
     void recordEpillLoopCompRemain(IR const* comp_remain);
 
     void setLICMAnaCtx(LICMAnaCtx const* anactx) { m_licm_anactx = anactx; }
@@ -435,6 +478,9 @@ protected:
     bool checkReadPR(
         IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
         LoopDepInfoSet const& set) const;
+    bool checkSelect(
+        IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
+        LoopDepInfoSet const& set) const;
     bool checkBin(
         IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
         LoopDepInfoSet const& set) const;
@@ -473,12 +519,6 @@ protected:
     //Check if there is scalar stmt that may prevent vectorization.
     //Return true if both stmt and its RHS can be vectorized.
     bool checkScalarStmt(VectCtx const& ctx) const;
-
-    //The function collect stmt that is suitable to vectorize from
-    //given candidate list.
-    //Return true if find legal stmt that can be vectorized.
-    void collectResultCand(
-        VectCtx const& ctx, OUT VectCtx::ResCandList & rescand) const;
     bool collectStmtCand(MOD VectCtx & ctx) const;
     void collectCandStmtToBeAnalyze(
         OUT IREList & sclst, OUT IRList & veccandlst, VectCtx const& ctx) const;
@@ -527,6 +567,7 @@ protected:
     IR * genRHSByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     IR * genConstByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     IR * genBinByVectOp(VectOp const& vop, OUT VectCtx & ctx);
+    IR * genSelectByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     IR * genUnaByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     IR * genArrayByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     IR * genIndirectByVectOp(VectOp const& vop, OUT VectCtx & ctx);
@@ -537,15 +578,6 @@ protected:
     virtual void genStmtByVectOp(VectOp const& vop, OUT VectCtx & ctx);
     virtual void genIRByVectOp(MOD VectCtx & ctx);
 
-    bool hasUniqueBranchTarget(IR const* ir, LabelInfo const** tgtlab) const;
-
-    //Add BB into SSARegion incrementally to update PRSSA.
-    bool isIncrementalAddBB() const
-    {
-        //TBD:It looks like there is no more benefit to add BB incrementally
-        //when CFG is complicated.
-        return false;
-    }
     bool isLoopInv(IR const* ir, VectCtx const& ctx) const;
     bool isDirectOpLegalToVect(IR const* ir, VectCtx const& ctx) const;
     bool isArrayOpLegalToVect(IR const* ir, VectCtx const& ctx) const;
@@ -567,14 +599,6 @@ protected:
     virtual bool isStrideSuitableToVect(
         VectAccDesc const& linrep, VectCtx const& ctx) const;
 
-    //Return true is ir is legal to vectorize.
-    //ir: stmt.
-    bool isStmtLegalToVect(
-        IR const* ir, LI<IRBB> const* li, IVBoundInfo const& bi,
-        VectCtx const& ctx) const;
-    bool isBranchLegalToVect(
-        IR const* ir, LI<IRBB> const* li, IVBoundInfo const& bi) const;
-
     virtual Type const* makeVectType(Type const* elemty, VectCtx const& ctx);
 
     //The function try to generate vector operation through DefUse chain that
@@ -592,6 +616,8 @@ protected:
     virtual bool makeVectOpnd(
         IR const* exp, MOD VectCtx & ctx, MOD VectOp & vectop);
     virtual bool makeVectOpndByReadPR(
+        IR const* ir, MOD VectCtx & ctx, MOD VectOp & vectop);
+    virtual bool makeVectOpndBySelect(
         IR const* ir, MOD VectCtx & ctx, MOD VectOp & vectop);
     virtual bool makeVectOpndByConst(
         IR const* ir, MOD VectCtx & ctx, MOD VectOp & vectop);

@@ -13,12 +13,14 @@ ir_du.o\
 ir_cfg.o\
 ir_simp.o\
 ir_gvn.o\
+ir_evn.o\
 ir_rce.o\
 ir_dce.o\
 ir_cp.o\
 ir_bcp.o\
 ir_lcse.o\
 ir_gcse.o\
+if_conversion.o\
 ir_licm.o\
 ir_middle_opt.o\
 ir_high_opt.o\
@@ -27,6 +29,7 @@ ir_expr_tab.o\
 cdg.o\
 eval.o\
 ir_refine.o\
+ir_global_refine.o\
 ir_rp.o\
 ir_aa.o\
 ssaregion.o\
@@ -67,7 +70,7 @@ md_mgr.o\
 solve_set.o\
 infer_type.o\
 attachinfo_mgr.o\
-alge_reasscociate.o\
+alge_reassociate.o\
 analysis_instr.o\
 invert_brtgt.o\
 ir_helper.o\

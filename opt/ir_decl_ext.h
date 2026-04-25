@@ -58,6 +58,8 @@ class CVStpr : public DuProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno;
     SSAInfo * ssainfo;
     IR * opnd[kid_num];
@@ -83,6 +85,8 @@ class CVSt : public CLd, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return VST_rhs(ir); }
@@ -108,6 +112,8 @@ class CVISt : public DuProp, public OffsetProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return VIST_rhs(ir); }
@@ -127,14 +133,19 @@ public:
 class CBroadCast : public IR, public MultiResProp {
     COPY_CONSTRUCTOR(CBroadCast);
 public:
-    static BYTE const kid_map = 0x3;
+    //Result list is permitted to be NULL if the broadcast-IR lies on the
+    //child of dummyuse of virtual operations.
+    static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return BROADCAST_kid(ir, idx); }
     static inline IR *& accResList(IR * ir)
     { return BROADCAST_res_list(ir); }
+
     IR const* getResList() const { return BROADCAST_res_list(this); }
     bool isResList(IR const* exp) const;
 };
@@ -175,6 +186,8 @@ class CAtomInc : public IR, public MultiResProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -232,6 +245,8 @@ class CAtomCas : public IR, public MultiResProp {
 public:
     static BYTE const kid_map = 0x7;
     static BYTE const kid_num = 5;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -240,6 +255,107 @@ public:
     { return ATOMCAS_multires(ir); }
     IR const* getResList() const { return ATOMCAS_multires(this); }
     bool isResList(IR const* exp) const;
+};
+
+
+//This IR is used to represent a dynamic length vector operation.
+//By specifying the length, the number of elements in the operation
+//can be controlled. Through the 'tail_strategy' field, the behavior of the
+//tail elements of the vector can be controlled.
+//e.g: For example, specify a length of $len, perform an add operation,
+//and keep the tail element of $res unchanged from its original value.
+//  stpr $res:vec<s32m1x?>
+//    dynlenop:
+//      add:vec<s32m1x?>
+//        $src1:vec<s32m1x?>
+//        $src2:vec<s32m1x?>
+//      $len: u64
+//      tail_strategy(undisturbed)
+//
+//Tail element processing strategy.
+#define DYNLENOP_tail_strategy(ir) \
+    (((CDynLenOp*)ir)->tail_strategy_attr.strategy)
+
+//Dynamic length operation.
+#define DYNLENOP_op(ir) DYNLENOP_kid(ir, 0)
+
+//Operating length.
+#define DYNLENOP_len(ir) DYNLENOP_kid(ir, 1)
+
+#define DYNLENOP_kid(ir, idx) \
+    (((CDynLenOp*)ir)->opnd[CK_KID_IRC(ir, IR_DYNLEN_OP, idx)])
+
+class CDynLenOp : public IR {
+    COPY_CONSTRUCTOR(CDynLenOp);
+public:
+    //Tail strategy (tail agnostic/undisturbed):
+    //  undisturbed: Tail elements (beyond vector element's length)
+    //                  are left undisturbed.
+    //  agnostic: Tail elements may be overwritten with arbitrary values.
+    //For example:
+    //(1)When using the tail 'undisturbed' strategy, the tail element
+    //   maintains its original value after the operation is completed.
+    //   Assuming $len=2, the total element size that the vector register
+    //   can accommodate is 4, and $opnd0 = {1, 2, 3, 4},
+    //   $opnd1 = {1, 2, 3, 4}, $res = {0, 0, 0, 0}.
+    //   running:
+    //    stpr $res:vec<s32m1x?>
+    //      dynlenop:
+    //        add:vec<s32m1x?>
+    //          $opnd0:vec<s32m1x?>
+    //          $opnd1:vec<s32m1x?>
+    //        $len: u64
+    //        tail_strategy(undisturbed)
+    //   result is:
+    //     $res = {2, 4, 0, 0};
+    //   Note that the values of the third and fourth elements of $res
+    //   remain unchanged at 0.
+    //(2)When using the 'agnostic' tail strategy, The tail element does not
+    //   guarantee that the original value will remain unchanged after
+    //   the operation.
+    //   Assuming $len=2, the total element size that the vector register
+    //   can accommodate is 4, and $opnd0 = {1, 2, 3, 4},
+    //   $opnd1 = {1, 2, 3, 4}, $res = {0, 0, 0, 0}.
+    //   running:
+    //    stpr $res:vec<s32m1x?>
+    //      dynlenop:
+    //        add:vec<s32m1x?>
+    //          $opnd0:vec<s32m1x?>
+    //          $opnd1:vec<s32m1x?>
+    //        $len: u64
+    //        tail_strategy(agnostic)
+    //   result may is:
+    //     $res = {2, 4, 6(Or other values), 8(Or other values)};
+    //   Note that the values of the third and fourth elements of $res cannot
+    //   be guaranteed to be 0, they may be 6 or 8.
+    typedef enum TAIL_STRATEGY {
+        UNDEF = 0,
+        UNDISTURBED,
+        AGNOSTIC,
+        TS_NUM,
+    } TAIL_STRATEGY;
+
+    class TailStraAttr {
+    public:
+        CDynLenOp::TAIL_STRATEGY strategy;
+        CHAR const* strategy_name;
+    };
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+
+    //Tail strategy attribute(tail agnostic/undisturbed):
+    //  undisturbed: Tail elements (beyond vector element's length)
+    //                  are left undisturbed.
+    //  agnostic: Tail elements may be overwritten with arbitrary values.
+    TailStraAttr tail_strategy_attr;
+    IR * opnd[kid_num];
+public:
+    static inline IR *& accKid(IR * ir, UINT idx)
+    { return DYNLENOP_kid(ir, idx); }
+
+    static CHAR const* getTailStrategyName(TAIL_STRATEGY ts);
 };
 
 
@@ -256,7 +372,31 @@ public:
 //        $src2:vec<i32x32>
 //      $mask:<boolx32>
 //
-//Normal full-size operation.
+//However, this IR can also represent the use of mask operands to select
+//which positions of elements need to perform operations at a specified
+//length, while specifying the behavior of elements at positions with
+//a mask value of 0.
+//e.g: For example, when the length is '$len', perform an add operation
+//and use '$mask' to control which positions of the add operation need to
+//be executed. For positions that do not perform operations, ensure that their
+//values remain unchanged(this is achieved by
+//specifying mask_strategy is undisturbed).
+//  stpr $res:vec<s32m1x?>
+//    maskop:vec<s32m1x?>
+//      dynlenop:
+//        add:vec<s32m1x?>
+//          $src1:vec<s32m1x?>
+//          $src2:vec<s32m1x?>
+//        $len: u64
+//        tail_strategy(0)
+//      $mask:<bool32x?>
+//      mask_strategy(undisturbed)
+//
+//Mask strategy.
+#define MASKOP_mask_strategy(ir) \
+    (((CMaskOp*)ir)->mask_strategy_attr.strategy)
+
+//Specify size or full length operation.
 #define MASKOP_op(ir) MASKOP_kid(ir, 0)
 
 //Mask operand.
@@ -268,45 +408,164 @@ public:
 class CMaskOp : public IR {
     COPY_CONSTRUCTOR(CMaskOp);
 public:
+    //Mask strategy(mask agnostic/undisturbed):
+    //  undisturbed: Elements with mask=0 are left undisturbed.
+    //  agnostic: Elements with mask=0 may be overwritten with
+    //               arbitrary values.
+    //For example:
+    //(1)When using the 'undisturbed' mask strategy, The element at the position
+    //   where the mask value is 0 can maintain its original value after
+    //   the operation.
+    //   Assuming $len=4, the total element size that the vector register
+    //   can accommodate is 4, and $opnd0 = {1, 2, 3, 4},
+    //   $opnd1 = {1, 2, 3, 4}, $res = {0, 0, 0, 0}, $mask = {0, 1, 0, 1}.
+    //   running:
+    //    maskop:vec<s32m1x?>
+    //      dynlenop:
+    //        add:vec<s32m1x?>
+    //          $opnd0:vec<s32m1x?>
+    //          $opnd1:vec<s32m1x?>
+    //        $len: u64
+    //        tail_strategy(undisturbed)
+    //      $mask:<bool32x?>
+    //      mask_strategy(undisturbed)
+    //   result is:
+    //     $res = {0, 4, 0, 8};
+    //   Note that the values of the first and third elements of $res
+    //   remain unchanged at 0.
+    //(2)When using the 'agnostic' mask strategy, The element at the position
+    //   where the mask value is 0 cannot guarantee that the original value
+    //   remains unchanged after the operation.
+    //   Assuming $len=4, the total element size that the vector register
+    //   can accommodate is 4, and $opnd0 = {1, 2, 3, 4},
+    //   $opnd1 = {1, 2, 3, 4}, $res = {0, 0, 0, 0}, $mask = {0, 1, 0, 1}.
+    //   running:
+    //    maskop:vec<s32m1x?>
+    //      dynlenop:
+    //        add:vec<s32m1x?>
+    //          $opnd0:vec<s32m1x?>
+    //          $opnd1:vec<s32m1x?>
+    //        $len: u64
+    //        tail_strategy(undisturbed)
+    //      $mask:<bool32x?>
+    //      mask_strategy(agnostic)
+    //   result may is:
+    //     $res = {0(Or other values), 4, 0(Or other values), 8};
+    //   Note that the values of the first and third elements of $res cannot
+    //   be guaranteed to be 0, they may be 2 or 6.
+    typedef enum MASK_STRATEGY {
+        UNDEF = 0,
+        UNDISTURBED,
+        AGNOSTIC,
+        MS_NUM,
+    } MASK_STRATEGY;
+
+    class MaskStraAttr {
+    public:
+        CMaskOp::MASK_STRATEGY strategy;
+        CHAR const* strategy_name;
+    };
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+
+    //Mask strategy attribute(mask agnostic/undisturbed):
+    //  undisturbed: Elements with mask=0 are left undisturbed.
+    //  agnostic: Elements with mask=0 may be overwritten with
+    //               arbitrary values.
+    MaskStraAttr mask_strategy_attr;
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
     { return MASKOP_kid(ir, idx); }
+
+    static CHAR const* getMaskStrategyName(MASK_STRATEGY ms);
 };
 
 
 //This class represent operation that perform elements selection according to
-//a mask operand.
+//masks and variable length instructions.
 //NOTE: the operation is always used to describe STMT.
-//This is used to describe specific selection operation, unlike MaskOp, it is
-//primarily used to describe masked-selection, and should be combined with
-//store-stmt to describe a masked-store-operation.
-//e.g: the example stores sparse-data to 'res' according to '$mask'.
-//  st:vec<i32x32> res =
-//    maskselect:vec<i32x32>
-//      ld:vec<i32x32> data;
-//      $mask:<boolx32>
+//This is used to describe specific selection operation, Used to describe
+//the result of placing masked or variable length instructions at certain
+//positions in an operand, i.e. with partially modified semantics.
+//This instruction is usually used in conjunction with mask instructions
+//or variable length instructions.
+//There are two main ways to use this IR:
+//
+//(1)e.g: For example, Used in conjunction with variable length instructions
+//   to describe storing a partial result of an instruction at a specified
+//   length interval in a specific vector register 'base'. Assuming that the
+//   vector register can accommodate four s32 elements, the length of the
+//   variable length instruction is set to 2. After calculation, the result
+//   becomes the result of the first and second positions of the variable
+//   length instruction, concatenated with the result of the third and fourth
+//   positions of the original 'base' register.
+//   Assuming $opnd0 = {1, 2, 3, 4}, $opnd1 = {1, 2, 3, 4},
+//   $res = {0, 0, 1, 1}, $len = 2.
+//   running:
+//     stpr $res:vec<s32m1x?>
+//       select_to_res:vec<s32m1x?>
+//         dynlenop:
+//           add:vec<s32m1x?>
+//             $opnd0:vec<s32m1x?>
+//             $opnd1:vec<s32m1x?>
+//           $len: u64
+//           tail_strategy(undisturbed)
+//         $res
+//   the result is:
+//     $res = {2, 4, 1, 1};
+//   Note that the 'base' operand and result register are usually the same.
+//
+//(2)e.g: For example, Used in conjunction with mask and variable length
+//   instructions to describe storing a partial result of an instruction
+//   at a specified position in a specific vector register 'base'.
+//   Assuming that the vector register can accommodate four s32 elements,
+//   the length of the variable length instruction is set to 2.
+//   After calculation, the result becomes the result of the first position
+//   of the mask instruction, concatenated with the result of the second,
+//   the third and fourth positions of the original 'base' register.
+//   Assuming $opnd0 = {1, 2, 3, 4}, $opnd1 = {1, 2, 3, 4},
+//   $res = {0, 0, 1, 1}, $len = 2, $mask = {1, 0, 0, 0}.
+//   running:
+//     stpr $res:vec<s32m1x?>
+//       select_to_res:vec<s32m1x?>
+//         maskop:
+//           dynlenop:
+//             add:vec<s32m1x?>
+//               $opnd0:vec<s32m1x?>
+//               $opnd1:vec<s32m1x?>
+//             $len: u64
+//             tail_strategy(undisturbed)
+//           $mask:<bool32x?>
+//           mask_strategy(undisturbed)
+//         $res
+//   the result is:
+//     $res = {2, 0, 1, 1};
+//   Note that the 'base' operand and result register are usually the same.
+//
 
-//Normal full-size operation.
-#define MASKSELECTTORES_op(ir) MASKSELECTTORES_kid(ir, 0)
+//Normal mask/dynamic-size operation.
+#define SELECTTORES_op(ir) SELECTTORES_kid(ir, 0)
 
-//Mask operand.
-#define MASKSELECTTORES_mask(ir) MASKSELECTTORES_kid(ir, 1)
+//The operands to be partially modified.
+#define SELECTTORES_base(ir) SELECTTORES_kid(ir, 1)
 
-#define MASKSELECTTORES_kid(ir, idx) \
-    (((CMaskSelectToRes*)ir)->opnd[CK_KID_IRC(ir, IR_MASK_SELECT_TO_RES, idx)])
+#define SELECTTORES_kid(ir, idx) \
+    (((CSelectToRes*)ir)->opnd[CK_KID_IRC(ir, IR_SELECT_TO_RES, idx)])
 
-class CMaskSelectToRes : public IR {
-    COPY_CONSTRUCTOR(CMaskSelectToRes);
+class CSelectToRes : public IR {
+    COPY_CONSTRUCTOR(CSelectToRes);
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
-    { return MASKSELECTTORES_kid(ir, idx); }
+    { return SELECTTORES_kid(ir, idx); }
 };
 
 

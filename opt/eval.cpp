@@ -37,11 +37,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
-EvalConst::EvalConst(Region const* rg) : m_rg(rg)
+EvalConst::EvalConst(Region const* rg, OptCtx const* oc) : m_rg(rg)
 {
     m_prssamgr = rg->getPRSSAMgr();
     m_mdssamgr = rg->getMDSSAMgr();
     m_dumgr = rg->getDUMgr();
+    m_oc = oc;
 }
 
 bool EvalConst::useMDSSADU() const
@@ -151,7 +152,7 @@ bool EvalConst::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
             //There is no any DU info.
             return false;
         }
-        IR * defstmt = xoc::findKillingDef(ir, m_rg);
+        IR * defstmt = xoc::findKillingDef(ir, m_rg, getOptCtx());
         if (defstmt == nullptr || !defstmt->is_stpr()) { return false; }
         if (defstmt == ir->getStmt()) {
             //CASE:PR is self-modified operation, e.g: $1=$1+0x2;

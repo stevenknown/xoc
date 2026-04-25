@@ -125,7 +125,7 @@ bool IVVal::extractFrom(IR const* ir, IVR const* ivr)
     }
     MD const* md = ir->getExactRef();
     if (md != nullptr) {
-        setToVar(md, ir->getType());
+        setToVar(md, ir, ir->getType());
         return true;
     }
     ASSERT0(ir->is_exp());

@@ -1010,4 +1010,10 @@ bool verifyIRandBB(BBList * bbl, Region const* rg)
     return true;
 }
 
+
+bool verifyIRandBB(Region const* rg)
+{
+    return verifyIRandBB(rg->getBBList(), rg);
+}
+
 } //namespace xoc

@@ -1318,9 +1318,30 @@ void MCDwarfMgr::genDwarfLineTable(MCDwarfLineEntryVec * line_entry_v)
     MCSymbol * last_label = nullptr;
     UINT loc_v_num = line_entry_v->get_elem_count();
     CHAR const point_size = 8;
+
+    //Debug prologue/epilogue marker initial value (0 = unset/not defined)
+    //prologue_end: Line number where compiler-generated prologue
+    //(stack frame setup) ends and the actual/normal code begins.
+    //epilogue_begin: Line number where compiler-generated prologue
+    //(stack frame setup) starts, before entering the actual beginning
+    //of the function/code.
+    UINT epilogue_begin_line = EPILOGUE_PROLOGUE_INIT;
+    UINT prologue_end_line = EPILOGUE_PROLOGUE_INIT;
     for (UINT i = 0; i < loc_v_num; ++i) {
         MCDwarfLineEntry * entry = (*line_entry_v)[i];
         INT64 line_delta = MCDWARFLOC_line(entry) - last_line;
+        if (MCDWARFLOC_line(entry) == epilogue_begin_line ||
+            MCDWARFLOC_line(entry) == prologue_end_line) {
+            //According to the GDB calling convention,
+            //epilogue_begin and prologue_end can each generate only one entry.
+            continue;
+        }
+
+        //Per the calling convention, the first entry must always be
+        //epilogue_begin.
+        if (i == getEpilogueBeginIdx()) {
+            epilogue_begin_line = MCDWARFLOC_line(entry);
+        }
         if (file_num != MCDWARFLOC_file_index(entry)) {
             file_num = MCDWARFLOC_file_index(entry);
             MCDWARFMGR_debug_line_code(this).append(DW_LNS_set_file);
@@ -1337,6 +1358,11 @@ void MCDwarfMgr::genDwarfLineTable(MCDwarfLineEntryVec * line_entry_v)
         }
         if (MCDWARFLOC_flags(entry) & DWARF2_FLAG_PROLOGUE_END) {
             MCDWARFMGR_debug_line_code(this).append(DW_LNS_prologue_end);
+
+            //Record the line number of the prologue_end passed down from
+            //the frontend. In the future, there will only be one prologue_end
+            //entry for a region.
+            prologue_end_line = MCDWARFLOC_line(entry);
         }
         MCSymbol const* label = MCDWARFLINEENTRY_label(entry);
         genDwarfAdvanceLineAddr(line_delta, last_label, label, point_size);

@@ -1,6 +1,6 @@
-OPTION="-O0 -g2"
+OPTION="-O0 -g2 -std=c++11"
 FILE="../bs.cpp ../smempool.cpp ../fileobj.cpp
-      ../byteop.cpp ../diagnostic.cpp ../sbs.cpp"
+      ../byteop.cpp ../diagnostic.cpp ../sbs.cpp ../strbuf.cpp ../comf.cpp"
 g++ $OPTION use_bs.cpp $FILE -I.. -o use_bs.exe
 ./use_bs.exe
 g++ $OPTION use_list.cpp $FILE -I.. -o use_list.exe

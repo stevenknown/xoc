@@ -166,9 +166,8 @@ IR * Region::dupIsomoExpTree(IR const* ir)
     case IR_ST:
         return CLd::dupIRTreeByStmt(ir, this);
     case IR_STPR:
-        return CPr::dupIRTreeByRef(ir, this);
     case IR_PHI:
-        return CPhi::dupIRTreeByRef(ir, this);
+        return CPr::dupIRTreeByRef(ir, this);
     case IR_ARRAY:
     case IR_ILD:
     case IR_LD:

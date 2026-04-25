@@ -462,7 +462,7 @@ void Region::constructBBList()
 //         const violate int x,y;
 bool Region::isSafeToOptimize(IR const* ir)
 {
-    if (ir->is_volatile()) {
+    if (ir->isVolatileOp(false)) {
         return false;
     }
 
@@ -1600,13 +1600,18 @@ static void post_process(Region * rg, OptCtx * oc)
     PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
         PASS_PRSSA_MGR);
     if (ssamgr != nullptr && ssamgr->is_valid()) {
+        //CAUTION: You have to finish out-of-SSA prior to destory().
         ssamgr->destruction(*oc);
         rg->getPassMgr()->destroyRegisteredPass(PASS_PRSSA_MGR);
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
         PASS_MDSSA_MGR);
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr) {
+        //CAUTION: You have to destruct MDSSA prior to destory() regardless
+        //of whether MDSSAMgr is valid.
+        //Otherwise the reference to IR's MDSSA info will lead to undefined
+        //behaviors.
         mdssamgr->destruction(*oc);
         rg->getPassMgr()->destroyRegisteredPass(PASS_MDSSA_MGR);
     }
@@ -1614,7 +1619,8 @@ static void post_process(Region * rg, OptCtx * oc)
     if (!oc->is_ref_valid()) {
         //Assign Var for PR.
         //O0 may not assign Var and MD for PR, but CG need PR's Var.
-        rg->getMDMgr()->assignMD(true, false);
+        //CG does not need MayRef set, thus clean it.
+        rg->getMDMgr()->assignMD(true, false, false);
     }
     oc->setInvalidAllFlags();
 
@@ -1754,6 +1760,7 @@ bool Region::process(OptCtx * oc)
     if (g_do_inline && is_program()) {
         do_inline(this, oc);
     }
+    if (g_do_global_refine) { doGlobalRefine(*oc); }
     if (g_do_refine) { doRefine(*oc); }
     if (g_insert_cvt) {
         //Insert CVT if necessary.

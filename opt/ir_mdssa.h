@@ -116,9 +116,10 @@ class CollectDef {
     COPY_CONSTRUCTOR(CollectDef);
     MDSSAMgr const* m_mgr;
     MDSSAInfo const* m_info;
-    CollectCtx const& m_ctx;
     MD const* m_ref;
     UseDefMgr const* m_udmgr;
+    OptCtx const* m_oc;
+    CollectCtx const& m_ctx;
 protected:
     void collect(OUT IRSet * set) const;
     void collectDefThroughDefChain(MDDef const* def, OUT IRSet * set) const;
@@ -130,7 +131,8 @@ public:
     //     declared in ctx. e.g: do collection by cross PHI operand.
     //set: record the return result.
     CollectDef(MDSSAMgr const* mgr, MDSSAInfo const* info,
-               CollectCtx const& ctx, MD const* ref, OUT IRSet * set);
+               CollectCtx const& ctx, MD const* ref, OUT IRSet * set,
+               OptCtx const* oc);
 };
 
 //Collect all USE, where USE is IR expression.
@@ -303,9 +305,11 @@ class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);
 protected:
     MDSSAMgr const* m_mdssamgr;
+    OptCtx const* m_oc;
     xcom::TTab<UINT> m_is_visited;
 public:
-    ConstMDDefIter(MDSSAMgr const* mdssamgr) : m_mdssamgr(mdssamgr) {}
+    ConstMDDefIter(MDSSAMgr const* mdssamgr, OptCtx const* oc)
+        : m_mdssamgr(mdssamgr), m_oc(oc) {}
 
     bool is_visited(MDDef const* def) const
     { return m_is_visited.find(def->id()); }
@@ -343,6 +347,7 @@ public:
     //use: indicate the USE expression of the 'def'.
     //Readonly function.
     MDDef const* get_next_untill_killing_def(IR const* use);
+    OptCtx const* getOptCtx() const { return m_oc; }
 
     void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
 };
@@ -447,6 +452,7 @@ public:
     MDSSAMgr * getMgr() const { return m_mgr; }
     ActMgr * getActMgr() const { return m_am; }
 
+    //The function performs SSA reversioning for given 'root'.
     //root: the root IR that expected to start to set live-in.
     //      Note root can be stmt or expression.
     //startir: the start position in 'startbb', it can be NULL.
@@ -454,6 +460,12 @@ public:
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
+    //e.g: root is LD x:
+    //    st x = 0; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V3
+    //after renaming:
+    //     st x = 0; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V1
     void rename(MOD IR * root, IR const* startir, IRBB const* startbb);
 };
 //END RenameExp
@@ -587,12 +599,26 @@ public:
     MDSSAMgr * getMgr() const { return m_mgr; }
     ActMgr * getActMgr() const { return m_am; }
 
-    //The function will generate MDSSAInfo if it does not have one.
+    //The function performs SSA reversioning for all potential USEs of given
+    //'newstmt'.
+    //NOTE: The function will generate MDSSAInfo if it does not have one.
     //newstmt: record the stmt that inserted.
+    //e.g: st 'x' = 0; #x's VMD is MD10V1
+    //     ... = LD 'x'; #x's VMD is MD10V3
+    //after renaming:
+    //     st 'x' = 0; #x's VMD is MD10V1
+    //     ... = LD 'x'; #x's VMD is MD10V1
     void rename(MOD IR * newstmt);
 
-    //The function will generate MDSSAInfo if it does not have one.
+    //The function performs SSA reversioning for all potential USEs of given
+    //'newphi'.
+    //NOTE: The function will generate MDSSAInfo if it does not have one.
     //newphi: record the phi that inserted.
+    //e.g: MDPhi x = ...; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V3
+    //after renaming:
+    //     st x = 0; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V1
     void rename(MDPhi const* newphi);
 };
 //END RenameDef
@@ -819,6 +845,7 @@ class MDSSAMgr : public Pass {
     friend class MDPhi;
     friend class MDSSAConstructRenameVisitVF;
     friend class LocalMDSSADump;
+    friend class MDSSAMgrIntl;
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     BYTE m_is_semi_pruned:1;
@@ -826,8 +853,6 @@ protected:
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
-    xcom::DefMiscBitSetMgr * m_sbs_mgr;
-    xcom::DefSegMgr * m_seg_mgr;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
@@ -837,7 +862,8 @@ protected:
     xcom::Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
-    ActMgr * m_am;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
+    ActMgr m_am;
 protected:
     //Add an USE to given mdssainfo.
     //use: occurence to be added.
@@ -854,13 +880,13 @@ protected:
         m_is_valid = false;
         m_is_semi_pruned = true;
     }
-    void cleanIRSSAInfo(IRBB * bb);
+    void cleanIRSSAInfo(IRBB * bb, MOD IRIter & irit);
     void cleanMDSSAInfoAI();
     void cutoffDefChain(MDDef * def);
     bool canPhiReachRealMDDef(
         MDSSAInfo const* mdssainfo, MDDef const* realdef) const;
 
-    //The function destroy data structures that allocated during SSA
+    //The function destroy data structures that allocated during MDSSA
     //construction, and these data structures are only useful in construction.
     void cleanLocalUsedData();
     void collectDefinedMD(IRBB const* bb, OUT DefMDSet & maydef) const;
@@ -870,24 +896,19 @@ protected:
     //livein_md: record MDs that defined in 'bb'.
     void computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md);
 
-    //Destruction of MDSSA.
-    //The function perform SSA destruction via scanning BB in preorder
-    //traverse dominator tree.
-    //Return true if inserting copy at the head of fallthrough BB
-    //of current BB's predessor.
-    void destruction(DomTree & domtree, MDSSAUpdateCtx const* ctx);
-    void destructBBSSAInfo(IRBB * bb, MDSSAUpdateCtx const* ctx);
-    void destructionInDomTreeOrder(
-        IRBB * root, DomTree & domtree, MDSSAUpdateCtx const* ctx);
+    void destroyImpl(MDSSAUpdateCtx const* ctx);
 
     //The function dump all possible DEF of 'vopnd' by walking through the
     //Def Chain.
-    void dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
-                               VMD const* vopnd) const;
+    void dumpDefByWalkDefChain(
+        List<MDDef const*> & wl, IRSet & visited, VMD const* vopnd) const;
     void dumpExpDUChainIter(
-        IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const;
-    void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
-    void dumpDUChainForStmt(IR const* ir, ConstIRIter & it) const;
+        IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line,
+        OptCtx const* oc) const;
+    void dumpDUChainForStmt(
+        IR const* ir, bool & parting_line, OptCtx const* oc) const;
+    void dumpDUChainForStmt(
+        IR const* ir, ConstIRIter & it, OptCtx const* oc) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
     void dumpIRWithMDSSAForStmt(IR const* ir) const;
     void dumpIRWithMDSSAForExpTree(IR const* ir) const;
@@ -923,6 +944,8 @@ protected:
         MDIdx mdid, IRBB const* bb, IR const* startir,
         IRBB const* startbb) const;
     void freeBBPhiList(IRBB * bb, MDSSAUpdateCtx const* ctx);
+
+    //Free MDPhi related info and operand of the phi.
     void freePhiList(MDSSAUpdateCtx const* ctx);
 
     VMD * genVMD(UINT mdid, UINT version)
@@ -931,10 +954,9 @@ protected:
 
     //Replace opnd of PHI of 'succ' with top SSA version.
     void handlePhiInSuccBB(IRBB * succ, UINT opnd_idx, MD2VMDStack & md2vmdstk);
-    void handleBBRename(IRBB * bb, DefMDSet const& effect_mds,
-                        DefMDSet const& defed_mds,
-                        MOD BB2VMDMap & bb2vmdmap,
-                        MD2VMDStack & md2vmdstk);
+    void handleBBRename(
+        IRBB * bb, DefMDSet const& effect_mds, DefMDSet const& defed_mds,
+        MOD BB2VMDMap & bb2vmdmap, MD2VMDStack & md2vmdstk);
 
     void init()
     {
@@ -955,8 +977,8 @@ protected:
     bool isPhiKillingDef(MDPhi const* phi) const;
 
     //Return true if stmt dominate use's stmt, otherwise return false.
-    bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
-                                LI<IRBB> const* li) const;
+    bool isStmtDomUseInsideLoop(
+        IR const* stmt, IR const* use, LI<IRBB> const* li) const;
     void initVMDStack(DefMDSet const& defmds, OUT MD2VMDStack & md2verstk);
 
     void renamePhiOpndInSuccBB(IRBB * bb, MD2VMDStack & md2vmdstk);
@@ -987,8 +1009,8 @@ protected:
     //    It is a work-list that is used to drive iterative collection and
     //    elimination of redundant PHI.
     //Return true if phi removed.
-    bool removePhiHasNoValidDef(List<IRBB*> * wl, MDPhi * phi,
-                                OptCtx const& oc);
+    bool removePhiHasNoValidDef(
+        List<IRBB*> * wl, MDPhi * phi, OptCtx const& oc);
 
     //wl: is an optional parameter to record BB which expected to deal with.
     //    It is a work-list that is used to drive iterative collection and
@@ -1028,17 +1050,15 @@ protected:
     //Insert PHI for VMD.
     //defbbs: record BBs which defined the VMD identified by 'mdid'.
     //visited: record visited BB id
-    void placePhiForMD(UINT mdid, List<IRBB*> const* defbbs,
-                       DfMgr const& dfm, xcom::BitSet & visited,
-                       List<IRBB*> & wl,
-                       BB2DefMDSet & defmds_vec);
+    void placePhiForMD(
+        UINT mdid, List<IRBB*> const* defbbs, DfMgr const& dfm,
+        xcom::BitSet & visited, List<IRBB*> & wl, BB2DefMDSet & defmds_vec);
 
     //Place phi and assign the v0 for each PR.
     //effect_md: record the MD which need to versioning.
-    void placePhi(DfMgr const& dfm, MOD DefMDSet & effect_md,
-                  DefMiscBitSetMgr & bs_mgr,
-                  BB2DefMDSet & defined_md_vec,
-                  List<IRBB*> & wl);
+    void placePhi(
+        DfMgr const& dfm, MOD DefMDSet & effect_md, DefMiscBitSetMgr & bs_mgr,
+        BB2DefMDSet & defined_md_vec, List<IRBB*> & wl);
 
     //Union successors in NextSet from 'from' to 'to'.
     void unionSuccessors(MDDef const* from, MDDef const* to);
@@ -1056,9 +1076,11 @@ public:
     explicit MDSSAMgr(Region * rg);
     ~MDSSAMgr()
     {
-        //CAUTION: If you do not finish out-of-SSA prior to destory(),
+        //CAUTION: If you do not destruct MDSSA prior to destory(),
         //the reference to IR's MDSSA info will lead to undefined behaviors.
-        //ASSERTN(!is_valid(), ("should be destructed"));
+        //NOTE:the destruction free all resource to misc mgr, such as
+        //SBitSetMgr.
+        ASSERTN(!is_valid(), ("should be destructed"));
         destroy(nullptr);
     }
 
@@ -1170,8 +1192,8 @@ public:
     //The function copy MDSSAInfo from 'src' to ir. Then add ir as an USE of the
     //new MDSSAInfo.
     MDSSAInfo * copyAndAddMDSSAOcc(IR * ir, MDSSAInfo const* src);
-    void collectDefinedMDForBBList(MOD DefMiscBitSetMgr & bs_mgr,
-                                   OUT BB2DefMDSet & bb2defmds) const;
+    void collectDefinedMDForBBList(
+        MOD DefMiscBitSetMgr & bs_mgr, OUT BB2DefMDSet & bb2defmds) const;
 
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
@@ -1180,8 +1202,8 @@ public:
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
     //li: loopinfo. If 'f' contained loop related flags, li can not be NULL.
-    void collectUseSet(IR const* def, LI<IRBB> const* li,
-                       CollectFlag f, OUT IRSet * useset);
+    void collectUseSet(
+        IR const* def, LI<IRBB> const* li, CollectFlag f, OUT IRSet * useset);
 
     //The function constructs SSA mode for all NonPR operations that recorded
     //in 'ssarg'.
@@ -1206,7 +1228,9 @@ public:
     virtual bool dump() const;
 
     //Dump MDSSA DU chain.
-    void dumpDUChain() const;
+    //oc: optional. Note if user supplies oc, the dump info will be more
+    //    accurate.
+    void dumpDUChain(OptCtx const* oc = nullptr) const;
 
     //Dump MDSSA VOpnd reference.
     void dumpVOpndRef() const;
@@ -1250,7 +1274,9 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
-    IR * findKillingDefStmt(IR const* ir, bool aggressive) const;
+    IR * findKillingDefStmt(
+        IR const* ir, bool aggressive, MOD InferEVN * evn,
+        OptCtx const* oc) const;
 
     //Find killing must-def virtual DEF of ir.
     //Return the MDDef if found.
@@ -1262,7 +1288,7 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
-    MDDef * findKillingMDDef(IR const* ir) const;
+    MDDef * findKillingMDDef(IR const* ir, OptCtx const* oc) const;
 
     //Find the nearest virtual DEF of 'ir'.
     //ir: expression.
@@ -1285,7 +1311,7 @@ public:
     //     found into the set as a return result.
     IR * findUniqueDefInLoopForMustRef(
         IR const* exp, LI<IRBB> const* li, Region const* rg,
-        OUT IRSet * set) const;
+        OptCtx const* oc, OUT IRSet * set) const;
 
     //The function try to find the unique MDDef for given def that is outside
     //of the loop.
@@ -1313,7 +1339,8 @@ public:
     VMD * findDomLiveInDefFromIDomOf(
         IRBB const* marker, MDIdx mdid, OptCtx const& oc,
         OUT MDSSAStatus & st) const;
-    MDDef const* findNearestCoverDefThatCanReach(IR const* ir) const;
+    MDDef const* findNearestCoverDefThatCanReach(
+        IR const* ir, MOD InferEVN * evn, OptCtx const* oc) const;
 
     //Find the VOpnd if 'ir' must OR may referenced 'md'.
     //Return the VMD if found.
@@ -1323,7 +1350,8 @@ public:
     IRCFG * getCFG() const { return m_cfg; }
     IRMgr * getIRMgr() const { return m_irmgr; }
     MDSystem const* getMDSystem() const { return m_md_sys; }
-    ActMgr * getActMgr() { return m_am; }
+    ActMgr & getActMgr() { return m_am; }
+    xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
 
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
@@ -1348,14 +1376,13 @@ public:
     //Gen PhiList for given bbid.
     MDPhiList * genPhiList(UINT bbid)
     { return m_usedef_mgr.genBBPhiList(bbid); }
-    xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr; }
 
     //Generate MDSSAInfo and generate VMD for referrenced MD that both include
     //The function will generate MDSSAInfo for 'exp' according to the refinfo.
     //that defined inside li. The new info for 'exp' will be VMD that defined
     //outside of li or the initial version of VMD.
-    void genMDSSAInfoToOutsideLoopDef(IR * exp, MDSSAInfo const* refinfo,
-                                      LI<IRBB> const* li);
+    void genMDSSAInfoToOutsideLoopDef(
+        IR * exp, MDSSAInfo const* refinfo, LI<IRBB> const* li);
 
     //Generate MDSSAInfo and generate VOpnd for referrenced MD that both include
     //must-ref MD and may-ref MDs.
@@ -1436,10 +1463,20 @@ public:
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);
 
+    //Return true if the DEF set of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
+    static bool hasSameDef(IR const* ir1, IR const* ir2)
+    { return hasSameValue(ir1, ir2); }
+
+    //Return true if ir1 and ir2 have same Memory Ref and both Memory Refs
+    //are region-livein.
+    //Return false to indicate unknown.
+    bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2) const;
+
     //Return true if VMDs of stmt cross version when moving stmt
     //outside of loop.
-    bool isCrossLoopHeadPhi(IR const* stmt, LI<IRBB> const* li,
-                            OUT bool & cross_nonphi_def) const;
+    bool isCrossLoopHeadPhi(
+        IR const* stmt, LI<IRBB> const* li, OUT bool & cross_nonphi_def) const;
 
     //Return true if the DU chain between 'def' and 'use' can be ignored during
     //DU chain manipulation.
@@ -1451,19 +1488,19 @@ public:
     //IRBB 'bbid'.
     //vmd: the function will iterate all its USE occurrences.
     //it: for tmp used.
-    bool isUseWithinBB(VMD const* vmd, MOD VMD::UseSetIter & it,
-                       UINT bbid) const;
+    bool isUseWithinBB(
+        VMD const* vmd, MOD VMD::UseSetIter & it, UINT bbid) const;
 
     //Initial VMD stack for each MD in 'bb2defmds'.
-    void initVMDStack(BB2DefMDSet const& bb2defmds,
-                      OUT MD2VMDStack & md2verstk);
+    void initVMDStack(
+        BB2DefMDSet const& bb2defmds, OUT MD2VMDStack & md2verstk);
 
     //Return true if the DU chain between 'def' and 'use' can be ignored during
     //DU chain manipulation.
     //ir1: related DEF or USE to same VMD, can be stmt/exp.
     //ir2: related DEF or USE to same VMD, can be stmt/exp.
-    static bool isOverConservativeDUChain(IR const* ir1, IR const* ir2,
-                                          Region const* rg);
+    static bool isOverConservativeDUChain(
+        IR const* ir1, IR const* ir2, Region const* rg);
 
     //Insert a new PHI into bb according to given MDIdx.
     //Note the operand and PHI's result will be initialized in initial-version.
@@ -1554,8 +1591,8 @@ public:
     //phi: to be removed.
     //prev: previous DEF that is used to maintain DefDef chain, and it can be
     //      NULL if there is no previous DEF.
-    void removePhiFromMDSSAMgr(MDPhi * phi, MDDef * prev,
-                               MDSSAUpdateCtx const& ctx);
+    void removePhiFromMDSSAMgr(
+        MDPhi * phi, MDDef * prev, MDSSAUpdateCtx const& ctx);
 
     //The function remove all MDPhis in 'bb'.
     //Note caller should guarantee phi is useless and removable.

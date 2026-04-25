@@ -248,10 +248,21 @@ size_t IR::count_mem() const
 }
 
 
+bool IR::verifyTree(Region const* rg) const
+{
+    ConstIRIter it;
+    for (IR const* k = iterInitC(this, it);
+         k != nullptr; k = iterNextC(it)) {
+        ASSERT0(k->verify(rg));
+    }
+    return true;
+}
+
+
 //Check that IR cannot take a UNDEF type.
 bool IR::verify(Region const* rg) const
 {
-    IRVerifyFuncType verifyfunc = IRDES_verifyfunc(getCode());
+    IRVerifyFuncType verifyfunc = (IRVerifyFuncType)IRDES_verifyfunc(getCode());
     ASSERT0(verifyfunc);
     (*verifyfunc)(this, rg);
     return true;
@@ -306,6 +317,18 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
     ASSERT0(ofst_val);
     *ofst_val = aggr;
     return true;
+}
+
+
+bool IR::mustBeBoolType() const
+{
+    if (is_judge()) { return true; }
+    IR const* parent = getParent();
+    if (parent != nullptr && parent->is_select() &&
+        SELECT_det(parent) == this) {
+        return true;
+    }
+    return false;
 }
 
 
@@ -522,7 +545,21 @@ bool IR::canBeTypeOfConstOp(Type const* ty)
 {
     //immediate can be pointer, e.g: int * p = 0;
     return ty->isInt() || ty->isPointer() || ty->isFP() || ty->is_mc() ||
-        ty->is_any() || ty->is_string() || ty->is_tensor();
+        ty->is_any() || ty->is_string() || ty->is_tensor() ||
+        IS_SCALABLE_INT(ty->getDType()) || IS_SCALABLE_FP(ty->getDType());
+}
+
+
+bool IR::isRecipOp(OUT IR ** den) const
+{
+    if (!is_div()) { return false; }
+    IR * op0 = BIN_opnd0(this);
+    IR * op1 = BIN_opnd1(this);
+    if (IRMgr::isConstOne(op0)) {
+        if (den != nullptr) { *den = op1; }
+        return true;
+    }
+    return false;
 }
 
 
@@ -588,22 +625,22 @@ IR * IR::getOpndMem(MD const* md) const
 //This function can not be const because it will return itself.
 IR * IR::getResultPR(PRNO prno)
 {
-    switch (getCode()) {
-    SWITCH_CASE_WRITE_PR:
-    SWITCH_CASE_CALL:
-        return getPrno() == prno ? this : nullptr;
-    SWITCH_CASE_WRITE_ARRAY:
-    SWITCH_CASE_DIRECT_MEM_STMT:
-    SWITCH_CASE_INDIRECT_MEM_STMT:
-    SWITCH_CASE_BRANCH_OP:
-    SWITCH_CASE_CFS_OP:
-    SWITCH_CASE_LOOP_ITER_CFS_OP:
-    case IR_LABEL:
-    case IR_REGION:
-        return nullptr;
-    default: UNREACHABLE();
-    }
-    return nullptr;
+    IR * respr = getResultPR();
+    if (respr == nullptr) { return nullptr; }
+    return getPrno() == prno ? this : nullptr;
+}
+
+
+//Return stmt if it writes PR as result.
+//This function can not be const because it will return itself.
+IR * IR::getResultPR()
+{
+    ASSERT0(is_stmt());
+    IRAccResultPRFuncType func =
+        (IRAccResultPRFuncType)IRDES_accresultprfunc(getCode());
+    //DO NOT ASSERT even if current IR has no related field for
+    //conveninent purpose.
+    return func != nullptr ? (*func)(this) : nullptr;
 }
 
 
@@ -930,7 +967,6 @@ void IR::copyRefForTree(IR const* src, Region const* rg)
         setRefMD(src->getRefMD(), rg);
         setRefMDSet(src->getRefMDSet(), rg);
     }
-
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR * kid = getKid(i);
         if (kid == nullptr) { continue; }
@@ -948,8 +984,9 @@ void IR::copyRefForTree(IR const* src, Region const* rg)
 void IR::setRHS(IR * rhs)
 {
     ASSERT0(hasRHS());
-    ASSERT0(IRDES_accrhsfunc(getCode()));
-    (*IRDES_accrhsfunc(getCode()))(this) = rhs;
+    IRAccRHSFuncType func = (IRAccRHSFuncType)IRDES_accrhsfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = rhs;
     if (rhs != nullptr) {
         IR_parent(rhs) = this;
     }
@@ -978,6 +1015,7 @@ bool IR::isMayThrow(bool recur) const
 bool IR::hasSideEffect(bool recur) const
 {
     if (IR_has_sideeffect(this)) { return true; }
+    if (isVolatileOp(recur)) { return true; }
     if (!recur) { return false; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR const* tmp = getKid(i);
@@ -1158,11 +1196,15 @@ bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
         for (IR * x = kid; x != nullptr; x = x->get_next()) {
             if (x == oldk) {
                 xcom::replace_one(&kid, oldk, newk);
-                if (IR_prev(newk) == nullptr) {
-                    //oldk is the header, and update the kid i.
-                    setKid(i, kid);
+                if (newk != nullptr) {
+                    if (IR_prev(newk) == nullptr) {
+                        //oldk is the header, and update the kid i.
+                        setKid(i, kid);
+                    } else {
+                        IR_parent(newk) = IR_parent(oldk);
+                    }
                 } else {
-                    IR_parent(newk) = IR_parent(oldk);
+                    setKid(i, kid);
                 }
                 IR_parent(oldk) = nullptr;
                 return true;
@@ -1297,20 +1339,35 @@ bool IR::isReadOnly() const
 }
 
 
-bool IR::is_volatile() const
+bool IR::isVolatileOp(bool recur) const
 {
-    if (!hasIdinfo()) { return false; }
-    Var * id_info = getIdinfo();
-    ASSERT0(id_info);
-    return id_info->is_volatile();
+    if (is_volatile()) {
+        IRAccVolatileFuncType func =
+            (IRAccVolatileFuncType)IRDES_accvolatilefunc(getCode());
+        ASSERT0(func);
+        if ((*func)(const_cast<IR*>(this))) { return true; }
+    }
+    if (hasIdinfo()) {
+        Var * id_info = getIdinfo();
+        ASSERT0(id_info);
+        if (id_info->is_volatile()) { return true; }
+    }
+    if (!recur) { return false; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR const* tmp = getKid(i);
+        if (tmp == nullptr) { continue; }
+        if (tmp->isVolatileOp(true)) { return true; }
+    }
+    return false;
 }
 
 
 IR * IR::getRHS() const
 {
     ASSERT0(hasRHS());
-    ASSERT0(IRDES_accrhsfunc(getCode()));
-    return (*IRDES_accrhsfunc(getCode()))(const_cast<IR*>(this));
+    IRAccRHSFuncType func = (IRAccRHSFuncType)IRDES_accrhsfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
@@ -1325,8 +1382,9 @@ bool IR::isArrayBase(IR const* ir) const
 PRNO IR::getPrno() const
 {
     ASSERT0(isPROp());
-    ASSERT0(IRDES_accprnofunc(getCode()));
-    return (*IRDES_accprnofunc(getCode()))(const_cast<IR*>(this));
+    IRAccPrnoFuncType func = (IRAccPrnoFuncType)IRDES_accprnofunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
@@ -1342,46 +1400,55 @@ void IR::cleanSSAInfo()
 
 SSAInfo * IR::getSSAInfo() const
 {
-    ASSERT0(IRDES_accssainfofunc(getCode()));
-    return (*IRDES_accssainfofunc(getCode()))(const_cast<IR*>(this));
+    IRAccSSAInfoFuncType func =
+        (IRAccSSAInfoFuncType)IRDES_accssainfofunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 IR * IR::getKid(UINT idx) const
 {
-    ASSERT0(IRDES_acckidfunc(getCode()));
-    return (*IRDES_acckidfunc(getCode()))(
-        const_cast<IR*>(this), idx);
+    IRAccKidFuncType func = (IRAccKidFuncType)IRDES_acckidfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this), idx);
 }
 
 
 IRBB * IR::getBB() const
 {
-    ASSERT0(IRDES_accbbfunc(getCode()));
-    return (*IRDES_accbbfunc(getCode()))(const_cast<IR*>(this));
+    IRAccBBFuncType func = (IRAccBBFuncType)IRDES_accbbfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 IR * IR::getResList() const
 {
-    ASSERT0(IRDES_accreslistfunc(getCode()));
-    return (*IRDES_accreslistfunc(getCode()))(const_cast<IR*>(this));
+    IRAccResListFuncType func =
+        (IRAccResListFuncType)IRDES_accreslistfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 Var * IR::getIdinfo() const
 {
     ASSERT0(hasIdinfo());
-    ASSERT0(IRDES_accidinfofunc(getCode()));
-    return (*IRDES_accidinfofunc(getCode()))(const_cast<IR*>(this));
+    IRAccIdinfoFuncType func =
+        (IRAccIdinfoFuncType)IRDES_accidinfofunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 void IR::setIdinfo(Var * idinfo)
 {
     ASSERT0(hasIdinfo());
-    ASSERT0(IRDES_accidinfofunc(getCode()));
-    (*IRDES_accidinfofunc(getCode()))(this) = idinfo;
+    IRAccIdinfoFuncType func =
+        (IRAccIdinfoFuncType)IRDES_accidinfofunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = idinfo;
 }
 
 
@@ -1390,16 +1457,15 @@ IR * IR::getOffsetOfPartialPROp() const
     switch (getCode()) {
     case IR_SETELEM: return SETELEM_ofst(this);
     case IR_GETELEM: return GETELEM_ofst(this);
-    default:;
+    default: UNREACHABLE();
     }
-    UNREACHABLE();
     return nullptr;
 }
 
 
 TMWORD IR::getOffset() const
 {
-    IRAccOfstFuncType func = IRDES_accofstfunc(getCode());
+    IRAccOfstFuncType func = (IRAccOfstFuncType)IRDES_accofstfunc(getCode());
     //DO NOT ASSERT even if current IR has no offset for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : 0;
@@ -1408,7 +1474,7 @@ TMWORD IR::getOffset() const
 
 IR * IR::getBase() const
 {
-    IRAccBaseFuncType func = IRDES_accbasefunc(getCode());
+    IRAccBaseFuncType func = (IRAccBaseFuncType)IRDES_accbasefunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : nullptr;
@@ -1418,7 +1484,7 @@ IR * IR::getBase() const
 void IR::setBase(IR * exp)
 {
     ASSERT0(exp && exp->is_exp());
-    IRAccBaseFuncType func = IRDES_accbasefunc(getCode());
+    IRAccBaseFuncType func = (IRAccBaseFuncType)IRDES_accbasefunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     if (func != nullptr) {
@@ -1431,7 +1497,7 @@ void IR::setBase(IR * exp)
 //Return label info if exist.
 LabelInfo const* IR::getLabel() const
 {
-    IRAccLabFuncType func = IRDES_acclabfunc(getCode());
+    IRAccLabFuncType func = (IRAccLabFuncType)IRDES_acclabfunc(getCode());
     //DO NOT ASSERT even if current IR has no related field for
     //conveninent purpose.
     return func != nullptr ? (*func)(const_cast<IR*>(this)) : nullptr;
@@ -1447,7 +1513,8 @@ UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 
 bool IR::isImmutExp() const
 {
-    return isConstExp() || (is_cvt() && ((CCvt*)this)->getLeafExp()->is_lda());
+    return isConstExp() || is_lda() ||
+        (is_cvt() && ((CCvt*)this)->getLeafExp()->is_lda());
 }
 
 
@@ -1467,68 +1534,81 @@ bool IR::isDirectArrayRef() const
 
 void IR::setBB(IRBB * bb)
 {
-    ASSERT0(IRDES_accbbfunc(getCode()));
-    (*IRDES_accbbfunc(getCode()))(this) = bb;
+    IRAccBBFuncType func = (IRAccBBFuncType)IRDES_accbbfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = bb;
 }
 
 
 void IR::setResList(IR * reslist)
 {
-    ASSERT0(IRDES_accreslistfunc(getCode()));
-    (*IRDES_accreslistfunc(getCode()))(this) = reslist;
+    IRAccResListFuncType func =
+        (IRAccResListFuncType)IRDES_accreslistfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = reslist;
 }
 
 
 void IR::setOffset(TMWORD ofst)
 {
     ASSERT0(hasOffset());
-    ASSERT0(IRDES_accofstfunc(getCode()));
-    (*IRDES_accofstfunc(getCode()))(this) = ofst;
+    IRAccOfstFuncType func = (IRAccOfstFuncType)IRDES_accofstfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = ofst;
 }
 
 
 void IR::setSSAInfo(SSAInfo * ssa)
 {
-    ASSERT0(IRDES_accssainfofunc(getCode()));
-    (*IRDES_accssainfofunc(getCode()))(this) = ssa;
+    IRAccSSAInfoFuncType func =
+        (IRAccSSAInfoFuncType)IRDES_accssainfofunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = ssa;
 }
 
 
 void IR::setPrno(PRNO prno)
 {
     ASSERT0(isPROp());
-    ASSERT0(IRDES_accprnofunc(getCode()));
-    (*IRDES_accprnofunc(getCode()))(this) = prno;
+    IRAccPrnoFuncType func = (IRAccPrnoFuncType)IRDES_accprnofunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = prno;
 }
 
 
 void IR::setStorageSpace(StorageSpace ss)
 {
-    ASSERT0(IRDES_accssfunc(getCode()));
-    (*IRDES_accssfunc(getCode()))(this) = ss;
+    IRAccStorageSpaceFuncType func =
+        (IRAccStorageSpaceFuncType)IRDES_accssfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = ss;
 }
 
 
 StorageSpace IR::getStorageSpace() const
 {
-    ASSERT0(IRDES_accssfunc(getCode()));
-    return (*IRDES_accssfunc(getCode()))(const_cast<IR*>(this));
+    IRAccStorageSpaceFuncType func =
+        (IRAccStorageSpaceFuncType)IRDES_accssfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 //Return label or nullptr.
 void IR::setLabel(LabelInfo const* li)
 {
-    ASSERT0(IRDES_acclabfunc(getCode()));
-    (*IRDES_acclabfunc(getCode()))(this) = li;
+    IRAccLabFuncType func = (IRAccLabFuncType)IRDES_acclabfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = li;
 }
 
 
 //Set the No.idx child to be 'kid', and update the IR_parent of kid.
 void IR::setKid(UINT idx, IR * kid)
 {
-    ASSERT0(IRDES_acckidfunc(getCode()));
-    (*IRDES_acckidfunc(getCode()))(this, idx) = kid;
+    IRAccKidFuncType func = (IRAccKidFuncType)IRDES_acckidfunc(getCode());
+    ASSERT0(func);
+    (*func)(this, idx) = kid;
     for (IR * k = kid; k != nullptr; k = IR_next(k)) {
         IR_parent(k) = this;
     }
@@ -1567,27 +1647,12 @@ bool IR::isExtOp() const
 //Set ir DU to be nullptr, return the DU pointer.
 DU * IR::cleanDU()
 {
-    switch (getCode()) {
-    SWITCH_CASE_HAS_DU: {
+    if (hasDU()) {
         DU * du = DUPROP_du(this);
         DUPROP_du(this) = nullptr;
         return du;
     }
-    default:;
-    }
     return nullptr;
-}
-
-
-//Return stmt if it writes PR as result.
-//This function can not be const because it will return itself.
-IR * IR::getResultPR()
-{
-    ASSERT0(is_stmt());
-    IRAccResultPRFuncType func = IRDES_accresultprfunc(getCode());
-    //DO NOT ASSERT even if current IR has no related field for
-    //conveninent purpose.
-    return func != nullptr ? (*func)(this) : nullptr;
 }
 
 
@@ -1621,120 +1686,65 @@ void IR::setDU(DU * du)
 //Return expression if stmt has CASE list.
 IR * IR::getCaseList() const
 {
-    //Both stmt and exp.
-    switch (getCode()) {
-    case IR_SWITCH: return SWITCH_case_list(this);
-    case IR_IGOTO: return IGOTO_case_list(this);
-    default: UNREACHABLE();
-    }
-    return nullptr;
+    IRAccCaseFuncType func = (IRAccCaseFuncType)IRDES_acccasefunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 //The function collects the LabelInfo for each branch-target.
 void IR::collectLabel(OUT List<LabelInfo const*> & lst) const
 {
-    switch (getCode()) {
-    case IR_SWITCH: ((CSwitch*)this)->collectLabel(lst); break;
-    case IR_IGOTO: ((CIGoto*)this)->collectLabel(lst); break;
-    default: UNREACHABLE();
-    }
+    IRAccCollectLabFuncType func =
+        (IRAccCollectLabFuncType)IRDES_acc_collectlab_func(getCode());
+    ASSERT0(func);
+    (*func)(const_cast<IR*>(this), lst);
 }
 
 
 IR * IR::getValExp() const
 {
-    switch (getCode()) {
-    case IR_SWITCH: return SWITCH_vexp(this);
-    case IR_IGOTO: return IGOTO_vexp(this);
-    default: UNREACHABLE();
-    }
-    return nullptr;
+    IRAccValExpFuncType func =
+        (IRAccValExpFuncType)IRDES_acc_valexp_func(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 void IR::setValExp(IR * exp)
 {
-    switch (getCode()) {
-    case IR_SWITCH: SWITCH_vexp(this) = exp; break;
-    case IR_IGOTO: IGOTO_vexp(this) = exp; break;
-    default: UNREACHABLE();
-    }
+    IRAccValExpFuncType func =
+        (IRAccValExpFuncType)IRDES_acc_valexp_func(getCode());
+    ASSERT0(func);
+    (*func)(this) = exp;
     IR_parent(exp) = this;
-}
-
-
-bool IR::hasAlign() const
-{
-    switch (getCode()) {
-    case IR_LD:
-    case IR_ST:
-    case IR_ARRAY:
-    case IR_STARRAY:
-    case IR_ILD:
-    case IR_IST:
-        return true;
-    default: return false;
-    }
-    return false;
 }
 
 
 UINT IR::getAlign() const
 {
-    switch (getCode()) {
-    case IR_LD: return LD_align(this);
-    case IR_ST: return ST_align(this);
-    case IR_ARRAY: return ARR_align(this);
-    case IR_STARRAY: return STARR_align(this);
-    case IR_ILD: return ILD_align(this);
-    case IR_IST: return IST_align(this);
-    default: UNREACHABLE(); //TODO
-    }
-    return false;
+    IRAccAlignFuncType func = (IRAccAlignFuncType)IRDES_accalignfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
 void IR::setAlign(UINT align_bytenum)
 {
-    switch (getCode()) {
-    case IR_LD: LD_align(this) = align_bytenum; return;
-    case IR_ST: ST_align(this) = align_bytenum; return;
-    case IR_ARRAY: ARR_align(this) = align_bytenum; return;
-    case IR_STARRAY: STARR_align(this) = align_bytenum; return;
-    case IR_ILD: ILD_align(this) = align_bytenum; return;
-    case IR_IST: IST_align(this) = align_bytenum; return;
-    default: UNREACHABLE(); //TODO
-    }
+    IRAccAlignFuncType func = (IRAccAlignFuncType)IRDES_accalignfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = align_bytenum;
 }
 
 
-bool IR::hasAlignedAttr() const
+void IR::setVolatileOp(bool is_volatile)
 {
-    switch (getCode()) {
-    case IR_LD: return LD_is_aligned(this);
-    case IR_ST: return ST_is_aligned(this);
-    case IR_ARRAY: return ARR_is_aligned(this);
-    case IR_STARRAY: return STARR_is_aligned(this);
-    case IR_ILD: return ILD_is_aligned(this);
-    case IR_IST: return IST_is_aligned(this);
-    default: return false;
-    }
-    return false;
-}
-
-
-void IR::setAligned(bool is_aligned)
-{
-    switch (getCode()) {
-    case IR_LD: LD_is_aligned(this) = is_aligned; return;
-    case IR_ST: ST_is_aligned(this) = is_aligned; return;
-    case IR_ARRAY: ARR_is_aligned(this) = is_aligned; return;
-    case IR_STARRAY: STARR_is_aligned(this) = is_aligned; return;
-    case IR_ILD: ILD_is_aligned(this) = is_aligned; return;
-    case IR_IST: IST_is_aligned(this) = is_aligned; return;
-    default: return;
-    }
+    //Note that non memory references can also be volatile,
+    //For example, asynchronous reading of IR.
+    IRAccVolatileFuncType func =
+        (IRAccVolatileFuncType)IRDES_accvolatilefunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = is_volatile;
 }
 
 
@@ -1742,8 +1752,9 @@ void IR::setAligned(bool is_aligned)
 IR * IR::getJudgeDet() const
 {
     ASSERT0(hasJudgeDet());
-    ASSERT0(IRDES_accdetfunc(getCode()));
-    return (*IRDES_accdetfunc(getCode()))(const_cast<IR*>(this));
+    IRAccDetFuncType func = (IRAccDetFuncType)IRDES_accdetfunc(getCode());
+    ASSERT0(func);
+    return (*func)(const_cast<IR*>(this));
 }
 
 
@@ -1751,8 +1762,9 @@ void IR::setJudgeDet(IR * det)
 {
     ASSERT0(det && det->is_exp());
     ASSERT0(hasJudgeDet());
-    ASSERT0(IRDES_accdetfunc(getCode()));
-    (*IRDES_accdetfunc(getCode()))(this) = det;
+    IRAccDetFuncType func = (IRAccDetFuncType)IRDES_accdetfunc(getCode());
+    ASSERT0(func);
+    (*func)(this) = det;
     IR_parent(det) = this;
 }
 

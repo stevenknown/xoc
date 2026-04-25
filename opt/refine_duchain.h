@@ -46,6 +46,7 @@ public:
 };
 
 class RefineDUChain : public Pass {
+    friend class RefineDUChainIntl;
     COPY_CONSTRUCTOR(RefineDUChain);
 protected:
     DUMgr * m_du;
@@ -93,8 +94,12 @@ public:
 
     //Return true if indirect operation ir1 has same base expression with ir2.
     //TODO: use gvn to utilize value flow.
-    bool hasSameBase(IR const* ir1, IR const* ir2);
+    bool hasSameBase(IR const* ir1, IR const* ir2) const;
 
+    GVN const* getGVN() const { return m_gvn; }
+    DUMgr * getDUMgr() const { return m_du; }
+    TypeMgr const* getTypeMgr() const { return m_tm; }
+    MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
     virtual CHAR const* getPassName() const
     { return "Refine DefUse Chain"; }
     PASS_TYPE getPassType() const { return PASS_PRE; }

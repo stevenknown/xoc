@@ -36,24 +36,24 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class LinearScanRA;
+class RegAllocMgr;
 
 //The class processes target machine dependent if REF_TARGMACH_INFO enabled.
 class TargInfoHandler : public Pass {
     COPY_CONSTRUCTOR(TargInfoHandler);
 protected:
-    LinearScanRA * m_lsra;
+    RegAllocMgr * m_ramgr;
     PassMgr * m_passmgr;
 protected:
-    LinearScanRA * queryLSRA();
 public:
     explicit TargInfoHandler(Region * rg);
-    virtual ~TargInfoHandler();
+    virtual ~TargInfoHandler() {}
 
     virtual CHAR const* getPassName() const { return "TargInfo Handler"; }
     PASS_TYPE getPassType() const { return PASS_TARGINFO_HANDLER; }
 
     virtual bool perform(OptCtx &) { return false; }
+    RegAllocMgr * queryRegAllocMgr();
 
     //The function try to copy physical register from 'src' to 'tgt' if 'src'
     //has been assigned a physical register.

@@ -538,6 +538,7 @@ void RSC::comp_call_fmt(IR const* ir)
 
 void RSC::comp_ir_fmt(IR const* ir)
 {
+    if (ir == nullptr) { return; }
     switch (ir->getCode()) {
     case IR_CONST:
     case IR_ID:

@@ -56,6 +56,7 @@ public:
 #define CST_EQ 4 //equal to
 
 class Lineq {
+    friend class IntlMethod;
 protected:
     BYTE m_is_init:1; //To make sure functions are idempotent.
     BYTE m_is_dump:1;

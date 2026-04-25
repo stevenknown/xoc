@@ -43,8 +43,9 @@ class CPCtx : public PassCtx {
 public:
     bool change;
     bool need_recompute_alias_info;
+    xcom::DomTree const& domtree;
 public:
-    CPCtx(OptCtx & oc, ActMgr * am);
+    CPCtx(OptCtx & oc, ActMgr * am, xcom::DomTree const& dt);
 
     //Perform Bit-OR operation.
     void bor(CPCtx const& src)
@@ -101,6 +102,8 @@ public:
 //Perform Copy Propagation
 class CopyProp : public Pass {
     friend class PropVisitFunc;
+    friend class CPImplIntl;
+    friend class AnalyzeAvailExpr;
     COPY_CONSTRUCTOR(CopyProp);
 protected:
     MDSystem * m_md_sys;
@@ -124,39 +127,40 @@ protected:
     { return m_prop_kind.have(CP_PROP_CONST_TO_PHI_OPND); }
 
     void copyVN(IR const* from, IR const* to) const;
-    bool computeUseSet(IR const* def_stmt, OUT IRSet & useset,
-                       OUT bool & prssadu, OUT bool & mdssadu);
+    bool computeUseSet(
+        IR const* def_stmt, OUT IRSet & useset, OUT bool & prssadu,
+        OUT bool & mdssadu);
 
     virtual bool checkPropBenifit(IR const* ir, IR const* cand_exp) const
     { DUMMYUSE(ir && cand_exp); return true; }
 
     virtual bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
-    bool doPropUseSet(IRSet const& useset, IR const* def_stmt,
-                      IR const* prop_value, IRListIter cur_iter,
-                      IRListIter * next_iter,
-                      bool prssadu, bool mdssadu);
-    bool doPropForMDPhi(IR const* def_stmt, IR const* prop_value,
-                        MOD IR * use);
-    bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
-        IR const* def_stmt, IR const* prop_value, MOD IR * use, IRBB * def_bb);
+    bool doPropUseSet(
+        IRSet const& useset, IR const* def_stmt, IR const* prop_value,
+        IRListIter cur_iter, IRListIter * next_iter, bool prssadu,
+        bool mdssadu, MOD CPCtx & ctx);
+    bool doPropForMDPhi(
+        IR const* def_stmt, IR const* prop_value, MOD IR * use,
+        MOD CPCtx & ctx);
+
+    //Return true if 'use' replaced by 'prop_value'.
+    //curit: the iter to current IR.
+    //nextit: the iter to next IR in 'bb'. It may be changed.
+    bool doPropForNormalStmt(
+        IRListIter cur_iter, IRListIter* next_iter, IR const* def_stmt,
+        IR const* prop_value, MOD IR * use, IRBB * def_bb, MOD CPCtx & ctx);
+
     //cpop: the copy operation.
     //useset: for local used.
-    bool doPropStmt(IR * cpop, MOD IRSet & useset,
-                    IRListIter cur_iter, IRListIter * next_iter);
-    bool doPropBB(IN IRBB * bb, MOD IRSet & useset);
+    bool doPropStmt(
+        IR * cpop, MOD IRSet & useset, IRListIter cur_iter,
+        IRListIter * next_iter, MOD CPCtx & ctx);
+    bool doPropBB(IN IRBB * bb, MOD IRSet & useset, MOD CPCtx & ctx);
     bool doPropBBInDomTreeOrder();
     void doFinalRefine(OptCtx & oc);
-    void dumpCopyPropAction(IR const* def_stmt, IR const* prop_value,
-                            IR const* use);
-
-    //def_stmt: the stmt of 'prop_value'.
-    //prop_value: the expression to be propagated.
-    //cur_iter: the IR list iter of  'def_stmt'.
-    bool existMayDefTillEndOfCurBB(IR const* def_stmt, IR const* prop_value,
-                                   IRListIter const& cur_iter) const;
-    bool existMayDefTillBB(IR const* exp, IRBB const* start,
-                           IRBB const* meetup) const;
+    void dumpCopyPropAction(
+        IR const* def_stmt, IR const* prop_value, IR const* use);
 
     DefSegMgr * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
@@ -165,6 +169,26 @@ protected:
     //Return the value expression that to be propagated.
     virtual IR * getPropagatedValue(IR * stmt);
 
+    //Return the converted value if the value can be regard as a
+    //copy-propagate candidate.
+    virtual IR const* getCVTValueIfRegardAsSimpCVT(IR const* ir) const;
+
+    //Return true if 'cand_exp' does not be modified till meeting 'use_stmt'.
+    //e.g:xx = cand_exp
+    //    ..
+    //    ..
+    //    use_bb:
+    //    ... = pos  //use_stmt|use_phi
+    //
+    //cand_exp: the expression that expects to analyze whether it can be
+    //          available at 'pos'.
+    //cand_exp_stmt_it: the IR list iter of the stmt of 'cand_exp'.
+    //pos: the IR position that is used to mark the destination of available
+    //     path in dom tree. It can be expression or stmt.
+    //Note either use_phi or use_stmt is nullptr.
+    virtual bool isAvailable(
+        IR const* cand_exp, IR const* pos,
+        IRListIter const& cand_exp_stmt_it, CPCtx const& ctx) const;
     virtual bool isLowCostExp(IR const* ir) const
     {
         switch (ir->getCode()) {
@@ -178,11 +202,7 @@ protected:
         return false;
     }
 
-    virtual bool initDepPass(MOD OptCtx &) { return true; }
-
-    //Return true if CVT with simply cvt-exp that can be regard as
-    //copy-propagate candidate.
-    virtual bool isSimpCVT(IR const* ir) const;
+    virtual bool initDepPass(MOD OptCtx &);
 
     //Return true if CVT with cvt-exp that can be regard as
     //copy-propagate candidate.
@@ -193,27 +213,6 @@ protected:
     //expression. These low-cost always profitable and may bring up new
     //optimization opportunity.
     virtual bool isLowCostCVT(IR const* ir) const;
-
-    //Return true if 'prop_value' does not be modified till meeting 'use_stmt'.
-    //e.g:xx = prop_value //def_stmt
-    //    ..
-    //    ..
-    //    use_bb:
-    //    yy = xx  //use_stmt|use_phi
-    //
-    //def_stmt: ir stmt.
-    //cur_iter: the IR list iter of 'def_stmt'.
-    //prop_value: expression that will be propagated.
-    //Note either use_phi or use_stmt is nullptr.
-    virtual bool isAvailable(IR const* def_stmt, IR const* prop_value,
-                             IR const* repexp,
-                             IRListIter const& cur_iter) const;
-
-    //cur_iter: the IR list iter of 'def_stmt'.
-    //Both def_stmt and use_stmt are in same BB.
-    bool isAvailableInSameBB(IR const* def_stmt, IR const* use_stmt,
-                             IR const* prop_value,
-                             IRListIter const& cur_iter) const;
     virtual bool isCopyOP(IR * ir) const;
     bool isLegalToPhiOpnd(IR const* ir) const
     {
@@ -231,13 +230,24 @@ protected:
     //The layout of parameters is:
     //  def_stmt <- prop_value
     //       ... <- repexp
-    IR const* pickUpCandExp(IR const* prop_value, IR const* repexp,
-                            IR const* def_stmt,
-                            IRListIter const& next_iter,
-                            bool prssadu, bool mdssadu) const;
+    virtual IR const* pickUpCandExp(
+        IR const* prop_value, IR const* repexp, IR const* def_stmt,
+        IRListIter const& next_iter, bool prssadu, bool mdssadu,
+        CPCtx const& ctx) const;
 
-    void replaceExp(IR const* def_stmt, MOD IR * exp, IR const* cand_exp,
-                    MOD CPCtx & ctx);
+    //Check and replace 'exp' with 'cand_exp' if they are
+    //equal, and update DU info. If 'cand_exp' is NOT leaf,
+    //that will create redundant computation, and
+    //depends on later Redundancy Elimination to reverse back.
+    //Return true if 'exp' replaced by 'cand_exp'.
+    //exp: expression that will be replaced.
+    //cand_exp: substitute cand_exp for exp.
+    //  e.g: cand_exp is *p, cand_exp_md is MD3
+    //      *p(MD3) = 10 //p point to MD3
+    //      ...
+    //      g = *q(MD3) //q point to MD3
+    bool replaceExp(
+        IR const* def_stmt, MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.
@@ -251,6 +261,10 @@ protected:
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+    bool useClassicPRDU() const
+    { return getOptCtx()->is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU() const
+    { return getOptCtx()->is_nonpr_du_chain_valid(); }
 public:
     CopyProp(Region * rg);
     virtual ~CopyProp() {}
@@ -262,7 +276,6 @@ public:
 
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
-    IR const* getSimpCVTValue(IR const* ir) const;
     ActMgr & getActMgr() { return m_am; }
 
     bool is_aggressive() const

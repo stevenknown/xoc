@@ -140,7 +140,7 @@ Vertex * BFSTreeIter::get_first()
 
 Vertex * BFSTreeIter::get_next(Vertex const* t)
 {
-    Vertex * v = GraphIterOut::get_next(t);
+    Vertex * v = GraphIterOut<>::get_next(t);
     ASSERT0(v == nullptr || v->getInDegree() <= 1);
     return v;
 }

@@ -34,7 +34,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-class LinearScanRA;
+class RegAllocMgr;
 
 class PrologueEpilogueInserter;
 
@@ -53,13 +53,18 @@ public:
         m_cur_offset(0), m_align(align), m_tm(tm)
     {}
 
+    //Return the Least Common Multiple of align0 and align1.
+    static HOST_UINT computeAlignForTwoAligns(HOST_UINT align0,
+        HOST_UINT align1)
+    { return xcom::slcm((INT)align0, (INT)align1); }
+
     void dump(OUT StrBuf & buf) const;
     void dump(OUT FileObj & fo) const;
 
     //The function tries to retrieve 'v' in the variable layout, return the
     //offset of 'v' if find. Otherwise, the function will compute the layout
     //of 'v' and add 'v' to current variable table.
-    HOST_UINT getOrAddVarOffset(Var const* v);
+    HOST_UINT getOrAddVarOffset(Var const* v, bool * find = nullptr);
 
     HOST_UINT getAlign() const { return m_align; }
 
@@ -90,7 +95,6 @@ protected:
     Region * m_rg;
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
-    LinearScanRA * m_ra;
     PrologueEpilogueInserter * m_pelog;
     ArgPasser * m_arg_passer;
     Var2Offset * m_arg_var2off;
@@ -105,14 +109,13 @@ public:
         m_irmgr = m_rg->getIRMgr();
         m_pelog = (PrologueEpilogueInserter*)m_rg->getPassMgr()->
             registerPass(PASS_PROLOGUE_EPILOGUE);
-        m_ra = m_pelog->getLsra();
         m_arg_passer = (ArgPasser*)rg->getPassMgr()->
             registerPass(PASS_ARGPASSER);
         ASSERT0(m_arg_passer);
         m_local_var2off = new Var2Offset(STACK_ALIGNMENT, m_tm);
         m_special_var2off = new Var2Offset(STACK_ALIGNMENT, m_tm);
         m_arg_var2off = new Var2Offset(STACK_ALIGNMENT, m_tm);
-        m_param_var2off = new Var2Offset(PARAM_ALIGNMENT, m_tm);
+        m_param_var2off = new Var2Offset(STACK_ALIGNMENT, m_tm);
     }
 
     virtual ~Var2OffsetMgr() {
@@ -175,7 +178,7 @@ public:
     //      |              |              |      |   |
     //      |              |              |      |   |
     //      ---------------- --> SP ------------------
-    HOST_INT computeLocalVarOffset(Var const* var);
+    void computeLocalVarOffset(Var const* var);
 
     //This function is used to calculate the offset of a local variable when FP
     //is used as SP.
@@ -233,7 +236,7 @@ public:
     //     (2) The final formula of scenario 2 is:
     //        offset = -(stacksize - var2off.getOrAddVarOffset(var) -
     //                   argument size)
-    HOST_INT computeLocalVarOffsetFromFP(Var const* var);
+    void computeLocalVarOffsetFromFP(Var const* var);
 
     //This function is used to calculate the offset of the spilled variable of
     //$fp or $ra.
@@ -257,10 +260,7 @@ public:
     //      |                  |
     //      |                  |
     //      -------------------- --> SP
-    HOST_UINT computeSpecialVarOffset(Var const* var);
-
-    //Compute the offset of var in argument space.
-    HOST_UINT computeArgVarOffset(Var const* var);
+    void computeSpecialVarOffset(Var const* var);
 
     //This function is used to calculate the offset of a param variable.
     //
@@ -333,6 +333,8 @@ public:
     // +-----------------------+
     void computeArgVarOffset();
 
+    HOST_INT getVarOffset(Var const* var) const;
+
     //True if the input var is an argument variable.
     bool isArgument(Var const* var) const;
 
@@ -342,17 +344,36 @@ public:
     //True if the input var is formal parameter variable.
     bool isParameter(Var const* var) const;
 
-    //Compute the offset of param variable from m_param_var2off.
-    HOST_UINT getParamOffset(Var const* var) const;
-
-    HOST_INT computeVarOffset(Var const* var);
+    void computeVarOffset(Var const* var);
 
     //The argument space can be reused and reset when the function
     //call is finished.
     void resetArgSpaceOffset();
 
-    //Get ra.
-    LinearScanRA * getRa() const { return m_ra; }
+    //When push instructions are used for callee-saved registers, space is
+    //allocated between the parameter region and SP, shifting the parameter
+    //region upward relative to SP:
+    //
+    //   High Address
+    //   +-----------------------+
+    //   |   Caller Frame        |
+    //   +-----------------------+ <-- FP (current function)
+    //   |   Parameter Region    |
+    //   +-----------------------+
+    //   |   PUSH Region         | <-- Space allocated by push instructions
+    //   +-----------------------+
+    //   |   Local Variables     |
+    //   +-----------------------+ <-- SP
+    //   Low Address
+    //
+    //The push region size must be added to all parameter
+    //offsets to correctly access them relative to SP:
+    //
+    // new_param_offset = original_param_offset + push_callee_size
+    //
+    //This adjustment ensures that parameter accesses continue to work correctly
+    //when push/pop optimization is enabled.
+    void reviseParamOffsetByPushPopSize(UINT offset);
 };
 
 } // namespace xoc

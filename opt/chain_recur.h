@@ -49,7 +49,8 @@ typedef xcom::List<IVVal>::Iter ConstIVValListIter;
 //NOTE: the class should be POD type and should NOT declare virtual function.
 #define IVVAL_int(v) ((v).u.m_int)
 #define IVVAL_fp(v) ((v).u.m_fp)
-#define IVVAL_md(v) ((v).u.m_md)
+#define IVVAL_md(v) ((v).u.s1.m_md)
+#define IVVAL_md_occ(v) ((v).u.s1.m_md_occ)
 #define IVVAL_exp(v) ((v).u.m_exp)
 #define IVVAL_cr(v) ((v).u.m_cr)
 #define IVVAL_data_type(v) ((v).m_data_type)
@@ -72,7 +73,12 @@ public:
         HOST_INT m_int; //record value if it is integer.
         HOST_FP m_fp; //record value if it is float.
         //Record value if it is variable. Note IV value must be exact MD.
-        MD const* m_md;
+        struct {
+            MD const* m_md;
+
+            //Optional, record the IR occurrence that referenced 'md'.
+            IR const* m_md_occ;
+        } s1;
         IR const* m_exp; //record value if it is IR expression.
         ChainRec * m_cr; //record value if it is chain-rec.
     } u;
@@ -80,7 +86,7 @@ public:
     IVVal() { clean(); }
     IVVal(HOST_INT v, Type const* ty) { setToInt(v, ty); }
     IVVal(HOST_FP v, Type const* ty) { setToFP(v, ty); }
-    IVVal(MD const* v, Type const* ty) { setToVar(v, ty); }
+    IVVal(MD const* v, IR const* occ, Type const* ty) { setToVar(v, occ, ty); }
     IVVal(IR const* v) { setToExp(v); }
     IVVal(ChainRec * v, Type const* ty) { setToCR(v, ty); }
 
@@ -131,6 +137,14 @@ public:
     {
         ASSERT0(is_var() && IVVAL_md((*this)));
         return IVVAL_md(*this);
+    }
+
+    //Return the IR occurrence of MD if value indicates MD.
+    //NOTE: the occurrence may be NULL.
+    IR const* getMDOcc() const
+    {
+        ASSERT0(is_var() && IVVAL_md((*this)));
+        return IVVAL_md_occ(*this);
     }
 
     //Return IR if value indicates expression.
@@ -204,11 +218,12 @@ public:
     }
 
     //Set current value to be Var.
-    //exp: optional, record the IR occurrence that referenced 'md'.
-    void setToVar(MD const* md, Type const* ty)
+    //occ: optional, record the IR occurrence that referenced 'md'.
+    void setToVar(MD const* md, IR const* occ, Type const* ty)
     {
         ASSERT0(md && ty);
         IVVAL_md(*this) = md;
+        IVVAL_md_occ(*this) = occ;
         IVVAL_data_type(*this) = ty;
         IVVAL_kind(*this) = IVVal::VAL_IS_VAR;
     }
@@ -388,8 +403,9 @@ public:
     { return doAdd(cr1, IVVal(v, cr1.getInit().getDType()), res); }
 
     //Note the function supports in-place operation.
-    bool doAdd(ChainRec const& cr1, MD const* v, OUT ChainRec & res)
-    { return doAdd(cr1, IVVal(v, cr1.getInit().getDType()), res); }
+    bool doAdd(ChainRec const& cr1, MD const* v, IR const* vocc,
+               OUT ChainRec & res)
+    { return doAdd(cr1, IVVal(v, vocc, cr1.getInit().getDType()), res); }
 
     //Substract given two chain-recs, store result in 'res'.
     //Note the function supports in-place operation, 'res' can be identical
@@ -445,15 +461,17 @@ public:
     }
 
     //Note the function supports in-place operation.
-    bool doSub(ChainRec const& cr1, MD const* v, OUT ChainRec & res)
-    { return doSub(cr1, IVVal(v, cr1.getInit().getDType()), res); }
+    bool doSub(ChainRec const& cr1, MD const* v, IR const* vocc,
+               OUT ChainRec & res)
+    { return doSub(cr1, IVVal(v, vocc, cr1.getInit().getDType()), res); }
 
     //Note the function supports in-place operation.
-    bool doSub(MD const* v, ChainRec const& cr1, OUT ChainRec & res)
+    bool doSub(MD const* v, IR const* vocc, ChainRec const& cr1,
+               OUT ChainRec & res)
     {
         bool succ = doMul(cr1, HOST_INT(-1), res);
         if (!succ) { return false; }
-        return doAdd(res, IVVal(v, cr1.getInit().getDType()), res);
+        return doAdd(res, IVVal(v, vocc, cr1.getInit().getDType()), res);
     }
 
     //Multiple given two chain-recs, store result in 'res'.
@@ -491,8 +509,9 @@ public:
     { return doMul(cr1, IVVal(v, cr1.getInit().getDType()), res); }
 
     //Note the function supports in-place operation.
-    bool doMul(ChainRec const& cr1, MD const* v, OUT ChainRec & res)
-    { return doMul(cr1, IVVal(v, cr1.getInit().getDType()), res); }
+    bool doMul(ChainRec const& cr1, MD const* v, IR const* vocc,
+               OUT ChainRec & res)
+    { return doMul(cr1, IVVal(v, vocc, cr1.getInit().getDType()), res); }
 
     OptCtx const& getOptCtx() const { ASSERT0(m_oc); return *m_oc; }
     Region * getRegion() const { return m_rg; }

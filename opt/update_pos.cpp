@@ -136,8 +136,7 @@ bool UpdatePos::updateAtBBExit(OUT Pos & dpos, OUT Pos & upos)
 //indicates ir is not belong to any lifetime.
 bool UpdatePos::updateAtIR(IR const* ir, OUT Pos & dpos, OUT Pos & upos)
 {
-    ASSERT0(m_ra != nullptr);
-    if (m_ra->isOpInPosGap(ir)) {
+    if (m_ramgr->isOpInPosGap(ir)) {
         //No need to handle spill/reload/remat/move.
         //Their occ did not encoded with a position and therefore not
         //resided in any lifetime.

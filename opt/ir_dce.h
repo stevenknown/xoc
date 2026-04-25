@@ -90,6 +90,7 @@ public:
 //Perform dead code and redundant control flow elimination.
 class DeadCodeElim : public Pass {
     COPY_CONSTRUCTOR(DeadCodeElim);
+    friend class DCEImplIntl;
 protected:
     //Set to true to eliminate control flow structure if necessary.
     //The pass will try to fixup DomInfo and related SSA info. However, it is
@@ -234,6 +235,10 @@ protected:
         IR const* stmt, bool set_bb_effect, OUT ConstIRList * act_ir_lst,
         MOD DCECtx & dcectx);
 
+    bool useClassicPRDU(OptCtx const& oc) const
+    { return oc.is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU(OptCtx const& oc) const
+    { return oc.is_nonpr_du_chain_valid(); }
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const

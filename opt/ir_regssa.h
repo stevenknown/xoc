@@ -100,11 +100,17 @@ public:
 class VRCollectCtx {
 public:
     LI<IRBB> const* m_li;
+    OptCtx const* m_oc;
     VRCollectFlag flag;
 public:
-    VRCollectCtx(VRCollectFlag f) : m_li(nullptr), flag(f) {}
+    VRCollectCtx(VRCollectFlag f, OptCtx const* oc)
+        : m_li(nullptr), m_oc(oc), flag(f) {}
+
     LI<IRBB> const* getLI() const { return m_li; }
+    OptCtx const* getOptCtx() const { return m_oc; }
+
     void setLI(LI<IRBB> const* li) { m_li = li; }
+
     bool verify() const;
 };
 
@@ -131,6 +137,7 @@ public:
     //set: record the return result.
     VRCollectDef(RegSSAMgr const* mgr, RegSSAInfo const* info,
                  VRCollectCtx const& ctx, Reg ref, OUT IRSet * set);
+    OptCtx const* getOptCtx() const { return m_ctx.getOptCtx(); }
 };
 
 //Collect all USE, where USE is IR expression.
@@ -168,6 +175,8 @@ public:
     //vropnd: collect USE for 'vropnd'.
     VRCollectUse(RegSSAMgr const* mgr, VReg const* vreg,
                  VRCollectCtx const& ctx, OUT IRSet * set);
+
+    OptCtx const* getOptCtx() const { return m_ctx.getOptCtx(); }
 };
 
 
@@ -302,9 +311,11 @@ class ConstRegDefIter : public xcom::List<RegDef const*> {
     COPY_CONSTRUCTOR(ConstRegDefIter);
 protected:
     RegSSAMgr const* m_regssamgr;
+    OptCtx const* m_oc;
     xcom::TTab<UINT> m_is_visited;
 public:
-    ConstRegDefIter(RegSSAMgr const* regssamgr) : m_regssamgr(regssamgr) {}
+    ConstRegDefIter(RegSSAMgr const* regssamgr, OptCtx const* oc)
+        : m_regssamgr(regssamgr), m_oc(oc) {}
 
     bool is_visited(RegDef const* def) const
     { return m_is_visited.find(def->id()); }
@@ -343,6 +354,7 @@ public:
     //use: indicate the USE expression of the 'def'.
     //Readonly function.
     RegDef const* get_next_untill_killing_def(IR const* use);
+    OptCtx const* getOptCtx() const { return m_oc; }
 
     void set_visited(RegDef const* def) { m_is_visited.append(def->id()); }
 };
@@ -829,8 +841,8 @@ protected:
     IRMgr * m_irmgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::DefSegMgr * m_seg_mgr;
-	LinearScanRA * m_ra;
-	TargInfoMgr * m_timgr;
+	RegAllocMgr * m_ramgr;
+	TargInfoMgr const* m_timgr;
     ActMgr * m_am;
     IRIter m_iter; //for tmp use.
 
@@ -888,9 +900,11 @@ protected:
     void dumpDefByWalkDefChain(
         List<RegDef const*> & wl, IRSet & visited, VReg const* vropnd) const;
     void dumpExpDUChainIter(
-        IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const;
+        IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line,
+        OptCtx const* oc) const;
     void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
-    void dumpDUChainForStmt(IR const* ir, ConstIRIter & it) const;
+    void dumpDUChainForStmt(
+        IR const* ir, ConstIRIter & it, OptCtx const* oc) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
     void dumpIRWithRegSSAForStmt(IR const* ir) const;
     void dumpIRWithRegSSAForExpTree(IR const* ir) const;
@@ -1183,13 +1197,15 @@ public:
 
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
-    void collectUseSet(IR const* def, VRCollectFlag f, OUT IRSet * useset);
+    void collectUseSet(
+        IR const* def, VRCollectFlag f, OUT IRSet * useset, OptCtx const* oc);
 
     //The function collects all USE expressions of 'def' into 'useset'.
     //def: stmt that defined NonPR memory reference.
     //li: loopinfo. If 'f' contained loop related flags, li can not be NULL.
     void collectUseSet(
-        IR const* def, LI<IRBB> const* li, VRCollectFlag f, OUT IRSet * useset);
+        IR const* def, LI<IRBB> const* li, VRCollectFlag f, OUT IRSet * useset,
+        OptCtx const* oc);
 
     //The function constructs SSA mode for all NonPR operations that recorded
     //in 'ssarg'.
@@ -1211,10 +1227,10 @@ public:
     void dumpPhiList(RegPhiList const* philist) const;
 
     //Dump RegSSA reference info.
-    virtual bool dump() const;
+    virtual bool dump(OptCtx const* oc) const;
 
     //Dump RegSSA DU chain.
-    void dumpDUChain() const;
+    void dumpDUChain(OptCtx const* oc) const;
 
     //Dump RegSSA VROpnd reference.
     void dumpVROpndRef() const;
@@ -1259,7 +1275,8 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
-    IR * findKillingDefStmt(IR const* ir, bool aggressive) const;
+    IR * findKillingDefStmt(
+        IR const* ir, bool aggressive, OptCtx const* oc) const;
 
     //Find killing must-def virtual DEF of ir.
     //Return the RegDef if found.
@@ -1271,7 +1288,7 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
-    RegDef * findKillingRegDef(IR const* ir) const;
+    RegDef * findKillingRegDef(IR const* ir, OptCtx const* oc) const;
 
     //Find the nearest virtual DEF of 'ir'.
     //ir: expression.
@@ -1294,7 +1311,7 @@ public:
     //     found into the set as a return result.
     IR * findUniqueDefInLoopForMustRef(
         IR const* exp, LI<IRBB> const* li, Region const* rg,
-        OUT IRSet * set) const;
+        OUT IRSet * set, RegSSAUpdateCtx const* ctx) const;
 
     //The function try to find the unique RegDef for given def that is outside
     //of the loop.
@@ -1410,10 +1427,11 @@ public:
     VReg * genNewVersionVReg(Reg reg)
     { return genVReg(reg, genNewVersion(reg)); }
 
-	LinearScanRA const* getRA() const { return m_ra; }
+	LinearScanRA const* getRA() const;
+	RegAllocMgr const* getRAMgr() const { return m_ramgr; }
     Reg getReg(IR const* ir) const;
     SRegSet const* getAliasRegSet(Reg reg) const;
-	TargInfoMgr * getTIMgr() const { return m_timgr; }
+	TargInfoMgr const* getTIMgr() const { return m_timgr; }
 
     //Return true if ir has been assigned physical-register.
     bool hasReg(IR const* ir) const { return getReg(ir) != REG_UNDEF; }

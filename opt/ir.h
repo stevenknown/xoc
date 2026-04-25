@@ -551,9 +551,6 @@ public:
     //Return true if ir has constant offset.
     bool hasOffset() const { return IRDES_has_offset(getCode()); }
 
-    //Return true if ir has address-alignment property.
-    bool hasAlign() const;
-
     //Return true if ir has idinfo.
     bool hasIdinfo() const { return IRDES_has_idinfo(getCode()); }
 
@@ -765,7 +762,7 @@ public:
     bool isDummyOp() const { return isVirtualOp() || is_dummyuse(); }
 
     //Return true if ir is volatile.
-    bool is_volatile() const;
+    bool isVolatileOp(bool recur) const;
 
     //Return true if given array has same dimension structure with current ir.
     bool isSameArrayStruct(IR const* ir) const;
@@ -789,6 +786,9 @@ public:
     //Return true if current ir is unary operation.
     bool isUnaryOp() const { return IRDES_is_una(getCode()); }
     static bool isUnaryOp(IR_CODE c) { return IRDES_is_una(c); }
+
+    //Return true if current ir is volatile operation.
+    bool is_volatile() const { return IRDES_is_volatile(getCode()); }
 
     //Return true if ir is constant expression.
     bool isConstExp() const;
@@ -896,7 +896,6 @@ public:
     bool is_cfi_def_cfa_offset() const {
         return getCode() == IR_CFI_DEF_CFA_OFFSET;
     }
-
     bool isDwarf() const {
         return is_cfi_def_cfa() || is_cfi_same_value() ||
                is_cfi_offset() || is_cfi_restore() ||
@@ -944,6 +943,7 @@ public:
 
     //Return true if ir is direct memory operation.
     bool isDirectMemOp() const { return IRDES_is_direct_mem_op(getCode()); }
+    static bool isDirectMemOp(IR_CODE c) { return IRDES_is_direct_mem_op(c); }
 
     //Return true if ir is direct-call or indirect-call operation.
     bool isCallStmt() const { return is_call() || is_icall(); }
@@ -969,7 +969,7 @@ public:
 
     //Return true if current stmt partailly modifies the value of PR.
     //e.g:IR_SETELEM may modify part of PR rather than whole IR.
-    bool isWritePartialPR() const { return !isWriteWholePR(); }
+    bool isWritePartialPR() const { return isWritePR() && !isWriteWholePR(); }
 
     //Return true if current stmt may modifies a PR.
     //Note CALL/ICALL may modify PR if it has a return value.
@@ -989,6 +989,32 @@ public:
     //Return true if current stmt/expression operates part of PR.
     bool isPartialPROp() const
     { return isWritePartialPR() || isReadPartialPR(); }
+
+    //Return true if current ir indicates a masked-store stmt that stores
+    //selected elements into result memory or PR according to its mask-kid IR.
+    bool isPartialStoreStmt() const
+    { return isStoreStmt() && getRHS()->is_select_to_res(); }
+
+    //Return true if current stmt modifies entire result.
+    //e.g:Usually IR_ST, IR_IST, IR_STARRAY, IR_STPR modify entire result.
+    //However, if the RHS of these store-stmt is IR_SELECT_TO_RES, they may
+    //modify partial of the result.
+    bool isEntireStoreStmt() const
+    { return isStoreStmt() && !getRHS()->is_select_to_res(); }
+
+    //Return true if current stmt modifies entire result MemRef.
+    //e.g:Usually IR_ST, IR_IST, IR_STARRAY modify entire result MemRef.
+    //However, if the RHS of these store-stmt is IR_SELECT_TO_RES, they may
+    //modify partial of the result MemRef.
+    bool isWriteWholeMemRefNonPR() const
+    { return isMemRefNonPR() && !getRHS()->is_select_to_res(); }
+
+    //Return true if current stmt only modifies partial of result MemRef.
+    //e.g:Usually IR_ST, IR_IST, IR_STARRAY modify entire result MemRef.
+    //If the RHS of these store-stmt is IR_SELECT_TO_RES, then they may
+    //modify partial of the result MemRef.
+    bool isWritePartialMemRefNonPR() const
+    { return isMemRefNonPR() && getRHS()->is_select_to_res(); }
 
     //Return true if ir might be control-flow-structure.
     bool isCFS() const
@@ -1054,16 +1080,15 @@ public:
     bool is_relation() const { return IRDES_is_relation(getCode()); }
 
     //True if ir code is relation operation.
-    static bool is_relation(IR_CODE c)
-    { return IRDES_is_relation(c); }
+    static bool is_relation(IR_CODE c) { return IRDES_is_relation(c); }
 
     //IR meet commutative, e.g: a+b = b+a
-    bool is_commutative() const
-    { return IRDES_is_commutative(getCode()); }
+    bool is_commutative() const { return IRDES_is_commutative(getCode()); }
+    static bool isCommutativeOp(IR_CODE c) { return IRDES_is_commutative(c); }
 
     //IR meet associative, e.g: (a+b)+c = a+(b+c)
-    bool is_associative() const
-    { return IRDES_is_associative(getCode()); }
+    bool is_associative() const { return IRDES_is_associative(getCode()); }
+    static bool isAssociativeOp(IR_CODE c) { return IRDES_is_associative(c); }
 
     //Return true if current ir is leaf node at IR tree.
     //Leaf node must be expression node and it does not have any kids.
@@ -1100,10 +1125,7 @@ public:
 
     //Return true if current ir operates on memory object with alignged address
     //or has the attribute of aligned.
-    bool isAligned() const { return getAlign() != 0 || hasAlignedAttr(); }
-
-    //Return true if current ir has the attribute of aligned.
-    bool hasAlignedAttr() const;
+    bool isAligned() const { return getAlign() > 1; }
 
     //Return true if current stmt must modify 'md'.
     bool isExactDef(MD const* md) const;
@@ -1117,8 +1139,14 @@ public:
     //the function returns true.
     bool isUseIsomoExp(IR const* exp, IRMgr const* mgr) const;
 
+    //Return true if IR tree represent reciprocal operation.
+    //e.g: if given IR exp is 'div (1:i32, ld x:i32), the function returns true.
+    //den: optional, if current IR tree represents reciprocal, den records the
+    //     denominator. e.g: den records 'ld x:i32'.
+    bool isRecipOp(OUT IR ** den = nullptr) const;
+
     //Return true if ir's data type must be bool.
-    bool mustBeBoolType() const { return is_judge(); }
+    bool mustBeBoolType() const;
 
     //Return true if ir's data type must be used to represent constant.
     bool mustBeConstDataType() const;
@@ -1150,7 +1178,7 @@ public:
     void setBase(IR * exp);
     void setJudgeDet(IR * exp);
     void setAlign(UINT align_bytenum);
-    void setAligned(bool is_aligned);
+    void setVolatileOp(bool is_volatile);
 
     //Set 'kid' to be 'idx'th child of current ir.
     void setKid(UINT idx, IR * kid);
@@ -1198,7 +1226,6 @@ public:
         ASSERT0(mds && !mds->is_empty());
         setRefMDSet(mds, rg);
     }
-
     static inline void setIRCodeSize(IR * ir, UINT ircsz)
     {
         #ifdef CONST_IRC_SZ
@@ -1251,7 +1278,14 @@ public:
     //If S1 will be deleted, pr1 should be removed from its SSA_uses.
     void removeSSAUse();
 
+    //Find and remove 'oldk' if it is the kid of current IR.
+    //Return true if the function removed the 'oldk'.
+    //recur: set to true to ask the function remove 'oldk' recusively.
+    bool removeKid(IR * oldk, bool recur)
+    { return replaceKid(oldk, nullptr, recur); }
+
     bool verify(Region const* rg) const;
+    bool verifyTree(Region const* rg) const;
 
     //The file includes the extended APIs and interfaces that defined by user
     //to access IR's miscellaneous attributes and operands.

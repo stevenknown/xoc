@@ -125,7 +125,7 @@ public:
 
 
 //The class represents loop dependence analysis context.
-class LoopDepCtx {
+class LoopDepCtx : public PassCtx {
     COPY_CONSTRUCTOR(LoopDepCtx);
 protected:
     class IR2LDITab : public xcom::TMap<
@@ -166,8 +166,6 @@ protected:
     SMemPool * m_ir2ldi_pool;
     SMemPool * m_mddef2ldi_pool;
     LI<IRBB> const* m_li;
-    ActMgr * m_am;
-    Region const* m_rg;
     ConstIRTab m_analyzed_irs; //record all IRs that has analyzed.
     IR2FirstTab m_ir2firsttab;
 protected:
@@ -177,7 +175,7 @@ protected:
     MDDef2LDITab * allocMDDef2LDI();
     IR2LDITab * allocIR2LDI();
 public:
-    LoopDepCtx(Region const* rg, LI<IRBB> const* li, ActMgr * am);
+    LoopDepCtx(LI<IRBB> const* li, ActMgr * am, OptCtx * oc);
     ~LoopDepCtx();
 
     //Record 'ir' as the IR that has participated the analysis.
@@ -195,8 +193,6 @@ public:
     void dump() const { m_am->dump(); }
 
     LI<IRBB> const* getLI() const { return m_li; }
-    ActMgr * getActMgr() const { return m_am; }
-    Region const* getRegion() const { return m_rg; }
 
     //Return true 'ir' has analyzed.
     bool is_contain(IR const* ir) const { return m_analyzed_irs.find(ir); }

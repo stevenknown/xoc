@@ -129,10 +129,14 @@ public:
                        IN IR * rchild);
     IR * buildBinaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * lchild,
                        IN IR * rchild);
+    //Build reciprocal operation.
+    //den: denominator.
+    //e.g: given den is ld x:i32, the function returns div(1:i32, ld x:i32).
+    IR * buildRecipOp(IR * den, Type const* ty);
 
     //Build binary operation without considering pointer arithmetic.
-    IR * buildBinaryOpSimp(IR_CODE irt, Type const* type, IR * lchild,
-                           IR * rchild);
+    virtual IR * buildBinaryOpSimp(IR_CODE irt, Type const* type,
+                                   IR * lchild, IR * rchild);
 
     //Build IR_TRUEBR or IR_FALSEBR operation.
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
@@ -157,12 +161,12 @@ public:
     IR * buildContinue();
 
     //Build compare operation.
-    IR * buildCmp(IR_CODE irt, IR * lchild, IR * rchild);
+    virtual IR * buildCmp(IR_CODE irt, IR * lchild, IR * rchild);
 
     //Build IR_CVT operation.
     //exp: the expression to be converted.
     //tgt_ty: the target type that you want to convert.
-    IR * buildCvt(IR * exp, Type const* tgt_ty);
+    virtual IR * buildCvt(IR * exp, Type const* tgt_ty);
 
     //Build Do Loop stmt.
     //iv: the induction variable.
@@ -215,16 +219,17 @@ public:
 
     //Build store operation to get value from 'rhs', and store the result PR.
     //type: data type of targe pr.
-    //offset: byte offset to the start of rhs PR.
     //base: hold the value that expected to extract.
+    //offset: byte offset to the start of rhs PR.
     IR * buildGetElem(Type const* type, IR * base, IR * offset);
 
     //Build store operation to get value from 'base', and store the result PR.
     //prno: result prno.
     //type: data type of targe pr.
-    //offset: byte offset to the start of PR.
     //base: hold the value that expected to extract.
-    IR * buildGetElem(PRNO prno, Type const* type, IR * base, IR * offset);
+    //offset: byte offset to the start of PR.
+    virtual IR * buildGetElem(PRNO prno, Type const* type, IR * base,
+        IR * offset);
 
     //Build unconditional GOTO.
     IR * buildGoto(LabelInfo const* li);
@@ -242,6 +247,7 @@ public:
 
     //Build Identifier.
     IR * buildId(Var * var);
+    IR * buildId(Var * var, MDPhi * phi);
 
     //Build IF stmt.
     //det: determinate expression.
@@ -270,20 +276,32 @@ public:
     //   pointer_base_size; or if result is memory chunk, it records
     //   the size of memory chunk.
     //NOTICE: The ofst of ILD requires to maintain when after return.
-    IR * buildILoad(IR * base, Type const* type);
-    IR * buildILoad(IR * base, TMWORD ofst, Type const* type);
+    virtual IR * buildILoad(IR * base, Type const* type);
+    virtual IR * buildILoad(IR * base, TMWORD ofst, Type const* type);
 
     //Build IR to load value from PR.
-    IR * buildIloadFromPR(PRNO prno_base, Type const* tp)
+    IR * buildILoadFromPR(PRNO prno_base, Type const* tp)
     {
         ASSERT0(prno_base != PRNO_UNDEF && tp);
-        return buildIloadFromPR(buildPrno(tp), prno_base, tp);
+        return buildILoadFromPR(buildPrno(tp), prno_base, tp);
     }
-    IR * buildIloadFromPR(PRNO prno_dst, PRNO prno_src, Type const* tp)
+    IR * buildILoadFromPR(PRNO prno_dst, PRNO prno_src, Type const* tp)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && prno_src != PRNO_UNDEF && tp);
         return buildStorePR(prno_dst, tp, buildILoad(
-            buildPRdedicated(prno_src, m_tm->getAny()), tp));
+            buildPRdedicated(prno_src, m_tm->getPointerType(1)), tp));
+    }
+    IR * buildILoadFromPR(PRNO prno_base, Type const* tp, TMWORD ofst)
+    {
+        ASSERT0(prno_base != PRNO_UNDEF && tp);
+        return buildILoadFromPR(buildPrno(tp), prno_base, tp, ofst);
+    }
+    IR * buildILoadFromPR(
+        PRNO prno_dst, PRNO prno_src, Type const* tp, TMWORD ofst)
+    {
+        ASSERT0(prno_dst != PRNO_UNDEF && prno_src != PRNO_UNDEF && tp);
+        return buildStorePR(prno_dst, tp, buildILoad(
+            buildPRdedicated(prno_src, m_tm->getPointerType(1)), ofst, tp));
     }
 
     //Build IR_CONST operation.
@@ -321,8 +339,9 @@ public:
     //rhs: value expected to store.
     //type: result type of indirect memory operation, note type is not the
     //data type of lhs.
-    IR * buildIStore(IR * base, IR * rhs, Type const* type);
-    IR * buildIStore(IR * base, IR * rhs, TMWORD ofst, Type const* type);
+    virtual IR * buildIStore(IR * base, IR * rhs, Type const* type);
+    virtual IR * buildIStore(IR * base, IR * rhs, TMWORD ofst,
+                             Type const* type);
     IR * buildIStoreToPR(PRNO prno_dst, Type const* tp)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && tp);
@@ -336,20 +355,21 @@ public:
     IR * buildIStoreToPR(PRNO prno_dst, IR * ir, Type const* tp)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && ir && ir->is_exp() && tp);
-        return buildIStore(buildPRdedicated(prno_dst, m_tm->getAny()), ir, tp);
+        return buildIStore(
+            buildPRdedicated(prno_dst, m_tm->getPointerType(1)), ir, tp);
     }
-    IR * buildIStoreToPR(PRNO prno_dst, PRNO prno_src, TMWORD ofst,
-                         Type const* tp)
+    IR * buildIStoreToPR(
+        PRNO prno_dst, PRNO prno_src, Type const* tp, TMWORD ofst)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && prno_src != PRNO_UNDEF && tp);
-        return buildIStoreToPR(prno_dst, buildPRdedicated(prno_src, tp), ofst,
-                               tp);
+        return buildIStoreToPR(
+            prno_dst, buildPRdedicated(prno_src, tp), tp, ofst);
     }
-    IR * buildIStoreToPR(PRNO prno_dst, IR * ir, TMWORD ofst, Type const* tp)
+    IR * buildIStoreToPR(PRNO prno_dst, IR * ir, Type const* tp, TMWORD ofst)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && ir && ir->is_exp() && tp);
-        return buildIStore(buildPRdedicated(prno_dst, m_tm->getAny()), ir,
-                           ofst, tp);
+        return buildIStore(
+            buildPRdedicated(prno_dst, m_tm->getPointerType(1)), ir, ofst, tp);
     }
 
     //Build judgement operation.
@@ -373,7 +393,7 @@ public:
     //var: indicates the variable which value will be loaded.
     //ofst: memory byte offset relative to var.
     //type: result type of value.
-    IR * buildLoad(Var * var, TMWORD ofst, Type const* type);
+    virtual IR * buildLoad(Var * var, TMWORD ofst, Type const* type);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
@@ -393,13 +413,13 @@ public:
     IR * buildLoadAddrOfVar(Var * var)
     {
         ASSERT0(var);
-        Type const* tp = m_tm->getTargMachRegisterType();
+        Type const* tp = m_tm->getPointerType(1);
         return buildLoadAddrOfVar(buildPrno(tp), var);
     }
     IR * buildLoadAddrOfVar(PRNO prno, Var * var)
     {
         ASSERT0(prno != PRNO_UNDEF && var);
-        Type const* tp = m_tm->getTargMachRegisterType();
+        Type const* tp = m_tm->getPointerType(1);
         return buildStorePR(prno, tp, buildLda(var));
     }
 
@@ -410,15 +430,15 @@ public:
     IR * buildLogicalOp(IR_CODE irt, IR * opnd0, IR * opnd1);
 
     //Build move operation.
-    IR * buildMove(PRNO prno_dst, PRNO prno_src, Type const* tp)
+    virtual IR * buildMove(PRNO prno_dst, PRNO prno_src, Type const* tp)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && prno_src != PRNO_UNDEF);
         ASSERT0(tp);
         return buildMove(prno_dst, prno_src, tp, tp);
     }
 
-    IR * buildMove(PRNO prno_dst, PRNO prno_src,
-                   Type const* tp_dst, Type const* tp_src)
+    virtual IR * buildMove(PRNO prno_dst, PRNO prno_src,
+                           Type const* tp_dst, Type const* tp_src)
     {
         ASSERT0(prno_dst != PRNO_UNDEF && prno_src != PRNO_UNDEF);
         ASSERT0(tp_dst && tp_src);
@@ -470,11 +490,13 @@ public:
     //The result depends on the predicator's value.
     //e.g: x = a > b ? 10 : 100
     //Note predicator may not be judgement expression.
-    IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
+    virtual IR * buildSelect(IR * det, IR * true_exp, IR * false_exp,
+        Type const* type);
 
     //Build store operation to store 'rhs' to store value to be one of the
     //element of a PR.
     //type: data type of targe pr.
+    //base: base of source.
     //offset: byte offset to the start of result PR.
     //rhs: value expected to store.
     IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
@@ -487,8 +509,8 @@ public:
     //value: value that need to be set.
     //offset: byte offset to the start of result PR.
     //rhs: value expected to store.
-    IR * buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
-                      IR * offset);
+    virtual IR * buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
+        IR * offset);
 
     //Build IR_ST operation.
     //lhs: memory variable, described target memory location.
@@ -499,7 +521,7 @@ public:
     //lhs: target memory location.
     //type: result data type.
     //rhs: value expected to store.
-    IR * buildStore(Var * lhs, Type const* type, IR * rhs);
+    virtual IR * buildStore(Var * lhs, Type const* type, IR * rhs);
 
     //Build IR_ST operation.
     //lhs: target memory location.
@@ -599,11 +621,11 @@ public:
                      LabelInfo const* default_lab);
 
     //Build ternary operation.
-    IR * buildTernaryOp(IR_CODE irt, Type const* type, IN IR * opnd0,
-                        IN IR * opnd1, IN IR * opnd2);
+    virtual IR * buildTernaryOp(IR_CODE irt, Type const* type, IN IR * opnd0,
+                                IN IR * opnd1, IN IR * opnd2);
 
     //Build unary operation.
-    IR * buildUnaryOp(IR_CODE irt, Type const* type, IN IR * opnd);
+    virtual IR * buildUnaryOp(IR_CODE irt, Type const* type, IN IR * opnd);
 
     //Build unary operation.
     IR * buildUnaryOp(IR_CODE irt, DATA_TYPE dt, IN IR * opnd)
@@ -651,6 +673,9 @@ public:
     //Return the vector that record all allocated IRs.
     Vector<IR*> & getIRVec() { return m_ir_vec; }
 
+    //Get the source pr of MOV IR.
+    virtual IR * getMoveSrcPr(IR const* mov) const;
+
     virtual CHAR const* getPassName() const { return "IRMgr"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRMGR; }
 
@@ -660,6 +685,13 @@ public:
         //Target Dependent Code
         return ir->hasRHS() && ir->getRHS()->is_alloca();
     }
+
+    //Return true if ir is a stmt and executes when the predicate condition
+    //is true.
+    static bool isCondExec(IR const* ir);
+
+    //Return true if ir represents immediate integer 1 or approximate float 1.0.
+    static bool isConstOne(IR const* ir);
 
     //Return true if ir tree is isomorphic to src.
     //ir: root of IR tree.
@@ -684,6 +716,15 @@ public:
         return false;
     }
 
+    //true if this instruction is a move (copy-register) operation.
+    //e.g:
+    //    stpr $21:u64
+    //      $19:u64
+    virtual bool isMoveOp(IR const* ir) const
+    {
+        ASSERT0(ir);
+        return ir->is_stpr() && ir->getRHS()->is_pr();
+    }
 
     //stpr $0:u64
     //  case
@@ -699,6 +740,11 @@ public:
         return ir->is_stpr() && ir->getRHS() != nullptr &&
                ir->getRHS()->is_case();
     }
+
+    //If the current store instruction represents a whole
+    //vector store operation, return true.
+    virtual bool isWholeStoreOp(IR const* ir) const
+    { ASSERT0(ir); return false; }
 
     virtual IR * getCaseIRInPCSavingOp(IR const* ir) const
     {

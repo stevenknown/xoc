@@ -34,6 +34,7 @@ namespace xoc {
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
                  DumpFlag dumpflag)
 {
+    ASSERT0(rg);
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==---- DUMP IR List ----==");
     dumpIRList(ir_list, rg, attr, dumpflag);
@@ -44,7 +45,8 @@ void dumpIRList(
     CHAR const* filename, IR const* ir_list, Region const* rg,
     bool dump_inner_region, IRDumpCtx<> * ctx)
 {
-    ASSERT0(filename);
+    if (ir_list == nullptr) { return; }
+    ASSERT0(rg && filename);
     FileObj fo(filename, true, false);
     FILE * h = fo.getFileHandler();
     rg->getLogMgr()->push(h, filename);
@@ -85,7 +87,7 @@ void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx)
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
                 DumpFlag dumpflag)
 {
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() || ir_list == nullptr) { return; }
     note(rg, "");
     bool first_one = true;
     for (; ir_list != nullptr; ir_list = ir_list->get_next()) {
@@ -168,9 +170,18 @@ static void dumpAbstractIdinfo(IR const* ir, Region const* rg)
 
 void dumpAllKids(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
+    bool dump_newline = !ctx.dumpflag.have(IR_DUMP_NO_NEWLINE);
     LogMgr * lm = rg->getLogMgr();
     UINT dn = ctx.dn;
-    lm->incIndent(dn);
+    UINT org_indent = 0;
+    if (dump_newline) {
+        lm->incIndent(dn);
+    } else {
+        org_indent = lm->getIndent();
+        //There is no newline between IR expressions, thus
+        //using one blank to separate different IR exp.
+        lm->setIndent(1);
+    }
     IRDumpCtx<> lctx(ctx);
     lctx.attr = nullptr;
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -178,7 +189,12 @@ void dumpAllKids(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         if (k == nullptr) { continue; }
         dumpIRList(k, rg, lctx);
     }
-    lm->decIndent(dn);
+    if (dump_newline) {
+        lm->decIndent(dn);
+    } else {
+        //Keep user given indent unchanged.
+        lm->setIndent(org_indent);
+    }
 }
 
 
@@ -208,69 +224,87 @@ static void dumpLabelType(LabelInfo const* li, RegionMgr const* rm)
 }
 
 
+static void dumpILabelName(
+    LabelInfo const* li, RegionMgr const* rm, bool for_gr)
+{
+    bool non_id = false;
+    if (for_gr) {
+        xcom::FixedStrBuf<8> buf;
+        buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(li));
+        if (isContainNonIdentifierChar(buf.getBuf())) {
+            //Some non-identifier character will be recognized as individual
+            //token.
+            non_id = true;
+        }
+    }
+    if (for_gr) {
+        xcom::FixedStrBuf<8> buf;
+        buf.strcat(PREFIX_OF_ILABEL_IN_GR);
+        if (isContainNonIdentifierChar(buf.getBuf())) {
+            //Some non-identifier character will be recognized as individual
+            //token.
+            non_id = true;
+        }
+    }
+    if (non_id) { prt(rm, "\""); }
+    if (for_gr) {
+        prt(rm, "%s", PREFIX_OF_ILABEL_IN_GR);
+    }
+    prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
+    if (non_id) { prt(rm, "\""); }
+}
+
+
+static void dumpCLabelName(
+    LabelInfo const* li, RegionMgr const* rm, bool for_gr)
+{
+    bool non_id = false;
+    if (for_gr) {
+        xcom::FixedStrBuf<8> buf;
+        buf.strcat(CLABEL_STR_FORMAT, CLABEL_CONT(li));
+        if (isContainNonIdentifierChar(buf.getBuf())) {
+            //Some non-identifier character will be recognized as individual
+            //token.
+            //prt(rm, "\"" ILABEL_STR_FORMAT "\"", ILABEL_CONT(li));
+            non_id = true;
+        }
+    }
+    if (non_id) { prt(rm, "\""); }
+    prt(rm, CLABEL_STR_FORMAT, CLABEL_CONT(li));
+    if (non_id) { prt(rm, "\""); }
+}
+
+
+static void dumpPragma(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
+{
+    ASSERT0(li->getPragma());
+    bool non_id = false;
+    if (for_gr) {
+        xcom::FixedStrBuf<8> buf;
+        if (isContainNonIdentifierChar(li->getPragma()->getStr())) {
+            //Some non-identifier character will be recognized as individual
+            //token.
+            non_id = true;
+        }
+    }
+    if (non_id) { prt(rm, "\""); }
+    prt(rm, "%s", li->getPragma()->getStr());
+    if (non_id) { prt(rm, "\""); }
+}
+
+
 void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
 {
     if (li->is_ilabel()) {
-        bool non_id = false;
-        if (for_gr) {
-            xcom::FixedStrBuf<8> buf;
-            buf.strcat(ILABEL_STR_FORMAT, ILABEL_CONT(li));
-            if (isContainNonIdentifierChar(buf.getBuf())) {
-                //Some non-identifier character will be recognized as individual
-                //token.
-                //prt(rm, "\"" ILABEL_STR_FORMAT "\"", ILABEL_CONT(li));
-                non_id = true;
-            } else {
-                //prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
-            }
-        } else {
-            //prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
-        }
-
-        if (non_id) { prt(rm, "\""); }
-        if (for_gr) {
-            prt(rm, "%s", PREFIX_OF_ILABEL_IN_GR);
-        }
-        prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
-        if (non_id) { prt(rm, "\""); }
+        dumpILabelName(li, rm, for_gr);
         return;
     }
     if (li->is_clabel()) {
-        bool non_id = false;
-        if (for_gr) {
-            xcom::FixedStrBuf<8> buf;
-            buf.strcat(CLABEL_STR_FORMAT, CLABEL_CONT(li));
-            if (isContainNonIdentifierChar(buf.getBuf())) {
-                //Some non-identifier character will be recognized as individual
-                //token.
-                //prt(rm, "\"" ILABEL_STR_FORMAT "\"", ILABEL_CONT(li));
-                non_id = true;
-            } else {
-                //prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
-            }
-        } else {
-            //prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
-        }
-
-        if (non_id) { prt(rm, "\""); }
-        prt(rm, CLABEL_STR_FORMAT, CLABEL_CONT(li));
-        if (non_id) { prt(rm, "\""); }
+        dumpCLabelName(li, rm, for_gr);
         return;
     }
     if (li->is_pragma()) {
-        ASSERT0(li->getPragma());
-        bool non_id = false;
-        if (for_gr) {
-            xcom::FixedStrBuf<8> buf;
-            if (isContainNonIdentifierChar(li->getPragma()->getStr())) {
-                //Some non-identifier character will be recognized as individual
-                //token.
-                non_id = true;
-            }
-        }
-        if (non_id) { prt(rm, "\""); }
-        prt(rm, "%s", li->getPragma()->getStr());
-        if (non_id) { prt(rm, "\""); }
+        dumpPragma(li, rm, for_gr);
         return;
     }
     ASSERTN(0, ("unknown label type"));
@@ -352,7 +386,7 @@ static void dumpInherentAttr(
     if (ir->isReadOnly()) {
         buf.strcat(" readonly");
     }
-    if (ir->is_volatile()) {
+    if (ir->isVolatileOp(false)) {
         buf.strcat(" volatile");
     }
 }
@@ -537,7 +571,7 @@ void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
 
-    note(rg, "switch");
+    note(rg, "%s", IRNAME(ir));
     if (SWITCH_deflab(ir) != nullptr) {
         prt(rg, ", deflab: ");
         dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
@@ -605,7 +639,7 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     if (dump_kid) {
         LogMgr * lm = rg->getLogMgr();
         lm->incIndent(ctx.dn);
-        dumpIRList(SELECT_det(ir), rg, nullptr, ctx.dumpflag);
+        dumpIRList(SELECT_det(ir), rg, (CHAR const*)" det", ctx.dumpflag);
         lm->decIndent(ctx.dn);
 
         lm->incIndent(ctx.dn);
@@ -672,7 +706,7 @@ void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
-    note(rg, "doloop");
+    note(rg, "%s", IRNAME(ir));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
@@ -712,7 +746,7 @@ void dumpWhileDo(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
-    note(rg, "whiledo");
+    note(rg, "%s", IRNAME(ir));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
@@ -738,7 +772,7 @@ void dumpDoWhile(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
-    note(rg, "dowhile");
+    note(rg, "%s", IRNAME(ir));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
@@ -763,7 +797,7 @@ void dumpIf(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
     LogMgr * lm = rg->getLogMgr();
-    note(rg, "if");
+    note(rg, "%s", IRNAME(ir));
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
@@ -1261,7 +1295,7 @@ void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
 
     //Record type info and var decl.
     if (rg->getDbxMgr() != nullptr && dump_src_line) {
-        DbxMgr::PrtCtx prtctx(LANG_CPP);
+        DbxMgr::PrtCtx prtctx;
         prtctx.logmgr = lm;
         rg->getDbxMgr()->printSrcLine(ir, &prtctx);
     }

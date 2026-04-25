@@ -51,7 +51,7 @@ public:
 //USAGE:
 //  Tree t;
 //  BinLCA s(&t);
-//  s.query(a, b);
+//  VexIdx idx = s.query(a, b);
 class BinLCA {
     COPY_CONSTRUCTOR(BinLCA);
     Tree const* m_tree;
@@ -66,12 +66,18 @@ private:
     VertexVec * allocVertexVec(VexIdx vid);
     VexIdx findMaxHeight() const;
     VertexVec * getVec(VexIdx vid) const;
+
+    //The function finds and returns the ancestor of 'v' whose distance
+    //to 'v' is not more than 'd'.
     //d: distance from v.
     Vertex * getAncestor(Vertex const* v, UINT d) const;
     void initAncestorDisTab();
     VexIdx queryRecur(Vertex const* f, VexIdx a, VexIdx b,
                       TTab<VexIdx> & visited);
     void setVec(VexIdx vid, VertexVec * vec) const;
+
+    //The function sets 'a' to be an ancestor of 'v' whose distance
+    //from 'v' to 'a' is not more than 'd'.
     //d: distance from v.
     void setAncestor(Vertex const* v, UINT d, Vertex * a);
     void standInLine(Vertex const*& av, Vertex const*& bv);
@@ -94,6 +100,29 @@ public:
     //Note the complexity of each query is time O(logn) and spatial O(nlogn).
     VexIdx query(VexIdx a, VexIdx b);
 };
+
+
+//The class computes lowest common ancestor for a set of vertices.
+//USAGE:
+//  Tree t;
+//  LCAOfSet s(&t);
+//  BitSet input_vexset;
+//  VexIdx idx = s.query(input_set);
+class LCAOfSet {
+    COPY_CONSTRUCTOR(LCAOfSet);
+protected:
+    Tree const* m_tree;
+public:
+    LCAOfSet(Tree const* t) { m_tree = t; }
+    ~LCAOfSet() {}
+    Tree const* getTree() const { return m_tree; }
+
+    //Query for lowest common ancestor of a set of vertices.
+    //Return VERTEX_UNDEF if there is no LCA between these vertices.
+    //Note the complexity of each query is time O(N).
+    VexIdx query(DefSBitSet const& vexset) const;
+};
+
 
 } //namespace xcom
 #endif

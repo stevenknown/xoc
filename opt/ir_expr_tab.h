@@ -64,12 +64,12 @@ public:
 
     void dump(Region const* rg) const;
 
-    IREList & getOccList() { return m_occ_list; }
-    ExprRep * get_next() const { return next; }
-    ExprRep * get_prev() const { return prev; }
-    IR const* getIR() const { return m_ir; }
+    IREList & getOccList() { return EXPR_occ_list(this); }
+    ExprRep * get_next() const { return EXPR_next(this); }
+    ExprRep * get_prev() const { return EXPR_prev(this); }
+    IR const* getIR() const { return EXPR_ir(this); }
 
-    UINT id() const { return m_id; }
+    UINT id() const { return EXPR_id(this); }
 };
 
 
@@ -107,6 +107,7 @@ protected:
     { m_ir_expr_vec.remove(ie->id(), nullptr); }
     HOST_UINT computeHashKey(IR const* ir) const;
     HOST_UINT computeHashKeyForTree(IR const* ir, MOD ECCtx & ctx) const;
+    bool canBeExprRepCand(IR const* ir) const;
 
     void encodeAllKids(IR const* ir, MOD ECCtx & ctx);
     ExprRep * encodeBaseOfIST(IR * ir, MOD ECCtx & ctx)
@@ -115,7 +116,6 @@ protected:
         if (ir->is_array()) { return nullptr; }
         return encodeExp(ir, ctx);
     }
-    virtual ExprRep * encodeExtExp(IR const* ir, MOD ECCtx & ctx);
     virtual void encodeExtStmt(IR const* ir, MOD ECCtx & ctx);
 
     IRMgr * getIRMgr() const { return m_irmgr; }
@@ -146,10 +146,6 @@ public:
     //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
     void encodeBB(IRBB const* bb, MOD ECCtx & ctx);
 
-    //Return entry-info if expression has been entered into HASH table,
-    //otherwise return nullptr.
-    ExprRep * findExp(IR const* ir, MOD ECCtx & ctx) const;
-
     //Return ExprRep by given an ExprRep's id.
     ExprRep const* getExprRep(UINT id) const { return m_ir_expr_vec.get(id); }
     ExprRepVec & getExpVec() { return m_ir_expr_vec; }
@@ -175,6 +171,9 @@ public:
     virtual CHAR const* getPassName() const { return "Expr Table"; }
 
     virtual bool perform(MOD OptCtx & oc);
+
+    bool verify(OptCtx const& oc) const;
+    static bool verifyExprTab(Region const* rg, OptCtx const& oc);
 };
 
 } //namespace xoc

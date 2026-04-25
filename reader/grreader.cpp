@@ -55,6 +55,8 @@ void GRReader::destroy()
     ASSERT0(m_parser != nullptr);
     delete m_lexer;
     delete m_parser;
+    m_lexer = nullptr;
+    m_parser = nullptr;
 }
 
 
@@ -108,16 +110,27 @@ bool GRReader::parse()
 }
 
 
-bool readGRAndConstructRegion(MOD GRReader * reader, CHAR const* grfile)
+void GRReader::showError() const
+{
+    IRParser * parser = getParser();
+    ASSERT0(parser);
+    if (parser->getErrorMsgList().get_elem_count() == 0) { return; }
+    xoc::prt2C("\n");
+    for (ParseErrorMsg const* e = parser->getErrorMsgList().get_head();
+         e != nullptr; e = parser->getErrorMsgList().get_next()) {
+        xoc::prt2C("\n%s", e->getMsg());
+    }
+    xoc::prt2C("\n");
+}
+
+
+bool readGRAndConstructRegion(MOD GRReader * reader, xcom::FileObj & grfile)
 {
     START_TIMER(t, "readGRAndConstructRegion");
     ASSERT0(reader);
     reader->initLexerAndParser();
-    xcom::FO_STATUS st;
-    xcom::FileObj fo(grfile, false, true, &st);
-    if (st != xcom::FO_SUCC) { return false; }
-    ASSERT0(fo.getFileHandler());
-    reader->setSrcFile(fo.getFileHandler());
+    ASSERT0(grfile.getFileHandler());
+    reader->setSrcFile(grfile.getFileHandler());
     bool succ = reader->parse();
     END_TIMER(t, "readGRAndConstructRegion");
     return succ;
@@ -127,7 +140,14 @@ bool readGRAndConstructRegion(MOD GRReader * reader, CHAR const* grfile)
 bool readGRAndConstructRegion(RegionMgr * rm, CHAR const* grfile)
 {
     GRReader reader(rm);
-    return readGRAndConstructRegion(&reader, grfile);
+    //Init GR file object.
+    xcom::FO_STATUS st;
+    xcom::FileObj fo(grfile, false, true, &st);
+    if (st != xcom::FO_SUCC) {
+        xoc::prt2C("\nerror: fail read and parse '%s'", grfile);
+        return false;
+    }
+    return readGRAndConstructRegion(&reader, fo);
 }
 
 } //namespace xoc

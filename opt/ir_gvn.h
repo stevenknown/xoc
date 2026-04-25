@@ -37,9 +37,11 @@ author: Su Zhenyu
 #define VNID_UNDEF 0
 
 namespace xoc {
-class VN;
 
-typedef enum _VN_TYPE {
+class VN;
+class InferEVN;
+
+typedef enum _VN_KIND {
     VN_UNKNOWN = 0,
     VN_OP, //The numbered value reasoned from IR stmt or expression.
     VN_MDDEF, //The numbered value reasoned from MDDef.
@@ -55,10 +57,11 @@ typedef enum _VN_TYPE {
     //equal.
     VN_CONST,
     VN_NUM,
-} VN_TYPE;
+} VN_KIND;
 
 
 #define VN_id(v) ((v)->m_id)
+#define VN_kind(v) ((v)->m_vn_kind)
 #define VN_type(v) ((v)->m_vn_type)
 #define VN_int_val(v) ((v)->u1.iv)
 #define VN_fp_val(v) ((v)->u1.dv)
@@ -67,14 +70,15 @@ typedef enum _VN_TYPE {
 #define VN_op(v) ((v)->u1.op)
 #define VN_mddef(v) ((v)->u1.mddef)
 #define VN_vmd(v) ((v)->u1.vmd)
-#define VN_is_cst(v) (VN_type(v) == VN_INT || VN_type(v) == VN_MC_INT || \
-                      VN_type(v) == VN_FP || VN_type(v) == VN_STR || \
-                      VN_type(v) == VN_CONST)
+#define VN_is_cst(v) (VN_kind(v) == VN_INT || VN_kind(v) == VN_MC_INT || \
+                      VN_kind(v) == VN_FP || VN_kind(v) == VN_STR || \
+                      VN_kind(v) == VN_CONST)
 class VN {
     COPY_CONSTRUCTOR(VN);
 public:
     UINT m_id;
-    VN_TYPE m_vn_type; //value type
+    VN_KIND m_vn_kind; //the kind of value
+    Type const* m_vn_type; //the data type of value
     union {
         HOST_INT iv;
         HOST_FP dv;
@@ -90,7 +94,8 @@ public:
     void clean()
     {
         m_id = VNID_UNDEF;
-        m_vn_type = VN_UNKNOWN;
+        m_vn_kind = VN_UNKNOWN;
+        m_vn_type = nullptr;
         u1.iv = 0;
     }
 
@@ -104,28 +109,31 @@ public:
 
     //Return true if VN reasoned from integer value.
     bool is_int() const
-    { return VN_type(this) == VN_INT || VN_type(this) == VN_MC_INT; }
+    { return VN_kind(this) == VN_INT || VN_kind(this) == VN_MC_INT; }
 
     //Return true if VN reasoned from float-point value.
-    bool is_fp() const { return VN_type(this) == VN_FP; }
+    bool is_fp() const { return VN_kind(this) == VN_FP; }
 
     //Return true if VN reasoned from string value.
-    bool is_str() const { return VN_type(this) == VN_STR; }
+    bool is_str() const { return VN_kind(this) == VN_STR; }
 
     //Return true if VN reasoned from MDDef.
-    bool is_mddef() const { return VN_type(this) == VN_MDDEF; }
+    bool is_mddef() const { return VN_kind(this) == VN_MDDEF; }
 
     //Return true if VN reasoned from VMD.
-    bool is_vmd() const { return VN_type(this) == VN_VMD; }
+    bool is_vmd() const { return VN_kind(this) == VN_VMD; }
 
     //Return true if VN reasoned from Var.
-    bool is_var() const { return VN_type(this) == VN_VAR; }
+    bool is_var() const { return VN_kind(this) == VN_VAR; }
 
     //Return true if VN is undetermined.
-    bool is_unknown() const { return VN_type(this) == VN_UNKNOWN; }
+    bool is_unknown() const { return VN_kind(this) == VN_UNKNOWN; }
 
-    //Get the value-number type.
-    VN_TYPE getType() const { return VN_type(this); }
+    //Get the value-number kind.
+    VN_KIND getKind() const { return VN_kind(this); }
+
+    //Get the value-number data-type if any.
+    Type const* getVNType() const { return VN_type(this); }
 
     //Get the value-number type.
     HOST_INT getVNIntVal() const { return VN_int_val(this); }
@@ -554,263 +562,6 @@ public:
     IR2IR() : HMap<IR const*, IR const*, HashFuncBase2<IR const*> >(0) {}
 };
 
-
-template <typename IntType>
-class IntSet2VN : public IntSetMap<IntType, VN*> {
-public:
-    //The target dependent code to dump the content of user defined
-    //MappedObject.
-    virtual void dumpMappedObj(FILE * h, UINT indent, VN * const& mapped) const
-    {
-        if (mapped == nullptr) { return; }
-        xcom::log(h, 0, ":VN%u", mapped->id());
-    }
-};
-
-
-//The class generates an unique VN by registering a leading IR code and
-//a list VN id followed.
-//NOTE the first integer must be IR_CODE, and the following integer must be
-//VN id.
-//e.g: given IR_ADD, VN1, VN2, the class will generate VN3.
-class IRCAndVNHash {
-public:
-    typedef HOST_UINT IntType;
-    typedef xcom::List<IntType> IntList;
-    typedef xcom::List<IntType>::Iter IntListIter;
-    typedef xcom::List<VN const*> VNList;
-    typedef xcom::List<VN const*>::Iter VNListIter;
-protected:
-    GVN * m_gvn;
-    IntSet2VN<IntType> m_intset2vn;
-protected:
-    VN * registerVN(IntList const& ilst);
-public:
-    IRCAndVNHash(GVN * gvn) : m_gvn(gvn) {}
-    ~IRCAndVNHash();
-    void clean();
-    void dump(Region const* rg, UINT indent) const;
-
-    //The function register VN by given a list of VN id.
-    //irt: the operation code.
-    //vnnum: the number of VN id.
-    //...: A variable number of VN id, each VN id's type should be VNHashInt.
-    VN const* registerVN(IR_CODE irt, UINT vnnum, ...);
-    VN const* registerVN(IR_CODE irt, MOD IntList & ilst);
-};
-typedef IRCAndVNHash::IntType VNHashInt;
-
-class InferCtx {
-protected:
-    xcom::TTab<UINT> m_mdphi_tab; //temp usage.
-    xcom::TTab<UINT> m_irtab; //temp usage.
-    ActMgr * m_am;
-public:
-    InferCtx(ActMgr * am = nullptr) : m_am(am) {}
-
-    //The function clean the temp variables for next inference.
-    void clean()
-    {
-        m_mdphi_tab.clean();
-        m_irtab.clean();
-    }
-
-    ActMgr * getActMgr() const { return m_am; }
-
-    //The function is used to avoid accessing MDPhi in a cycle.
-    bool isVisited(MDPhi const* phi) const
-    { return m_mdphi_tab.find(phi->id()); }
-
-    //The function is used to avoid accessing IR in a cycle.
-    bool isVisited(IR const* ir) const
-    { return m_irtab.find(ir->id()); }
-
-    void setVisited(MDPhi const* phi) { m_mdphi_tab.append(phi->id()); }
-    void setVisited(IR const* ir) { m_irtab.append(ir->id()); }
-};
-
-
-//The class inferences Equivalent-VN via walk through DefUse chain.
-//Equivalent-VN describes a kind of VN comparasion strategy when determining
-//whether two given IR exps's value are equal.
-//The passes can reason out that two IR expressions have same runtime value
-//if their Equivalent-VN are the same one.
-//ONE KEY NOTE: the Equivalent-VN is different to the normal VN that GVN
-//computed in usually.
-//If given two IR expressions's Equivalent-VN is different, we can NOT
-//exactly conclude the IR expressions have different runtime value.
-//On the contrary, GVN's VN comparison strategy could exactly say the IR
-//expressions have different runtime value.
-//e.g: given two IR expressions ld x and $y, if InferEVN reasoned out that
-//ld x has EVN1, and $y has EVN2, we just tell user that we have no knowledge
-//about ld x and $y's value.
-//NOTE: the EVN's inference may utilize GVN's VN if exist to infer EVN.
-class InferEVN {
-    COPY_CONSTRUCTOR(InferEVN);
-protected:
-    GVN * m_gvn;
-    Region * m_rg;
-    MDSSAMgr * m_mdssamgr;
-    PRSSAMgr * m_prssamgr;
-    IR2VN m_irid2vn;
-    PRNO2VN m_prno2vn;
-    VMD2VN m_vmd2vn;
-    MDPhi2VN m_mdphi2vn;
-    IRCAndVNHash m_ircvnhash;
-protected:
-    //Return true if the inference will try to infer Phi's EVN via inferring
-    //each operands of Phi respectively.
-    virtual bool allowCrossPhi() { return true; }
-
-    //The function allocates a VN given stmt.
-    VN const* allocVNForStmt(IR const* ir, InferCtx & ctx);
-    VN const* allocVNForMDDef(MDDef const* mddef, InferCtx & ctx);
-    VN const* allocVNForVMD(VMD const* vmd, InferCtx & ctx);
-    VN const* allocVNForPRNO(PRNO prno);
-
-    //The function allocates a VN given extended stmt.
-    virtual VN const* allocVNForExtStmt(IR const* ir, InferCtx & ctx);
-
-    VN const* getVN(IR const* ir) { return m_irid2vn.get(ir->id()); }
-    VN const* getVN(PRNO prno) { return m_prno2vn.get(prno); }
-    VN const* getVN(MDDef const* mddef)
-    { return m_mdphi2vn.get(mddef->id()); }
-    VN const* getVN(VMD const* vmd) { return m_vmd2vn.get(vmd->id()); }
-
-    //Return true if ir has a valid corresponded VN.
-    bool hasVN(IR const* ir) const
-    { return const_cast<InferEVN*>(this)->getVN(ir) != nullptr; }
-
-    VN const* inferIntConst(HOST_INT val);
-    VN const* inferConst(IR const* ir, InferCtx & ctx);
-    virtual VN const* inferExtStmt(IR const* ir, InferCtx & ctx);
-    virtual VN const* inferExtExp(IR const* ir, InferCtx & ctx);
-    VN const* inferDirectStmt(IR const* ir, InferCtx & ctx);
-    VN const* inferIndirectStmt(IR const* ir, InferCtx & ctx);
-    VN const* inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx);
-    VN const* inferVNByIterKid(IR const* ir, InferCtx & ctx);
-    VN const* inferArrayKidOp(IR const* ir, InferCtx & ctx);
-    VN const* inferWriteArray(IR const* ir, InferCtx & ctx);
-    VN const* inferStmt(IR const* ir, InferCtx & ctx);
-    VN const* inferMDPhi(MDPhi const* phi, InferCtx & ctx);
-    VN const* inferVNViaBaseAndOfst(IR const* ir, InferCtx & ctx);
-    VN const* inferVNViaArrayKidAndOfst(IR const* ir, InferCtx & ctx);
-    VN const* inferDirectExp(IR const* ir, InferCtx & ctx);
-    VN const* inferArray(IR const* ir, InferCtx & ctx);
-    VN const* inferIndirectMemExp(IR const* ir, InferCtx & ctx);
-    VN const* inferDirectExpViaMDPhi(
-        IR const* ir, MDDef const* mdssadef, InferCtx & ctx);
-    VN const* inferDirectExpViaMDSSA(IR const* ir, InferCtx & ctx);
-    VN const* inferDirectExpViaPRSSA(IR const* ir, InferCtx & ctx);
-    VN const* inferDirectExpViaSSA(IR const* ir, InferCtx & ctx);
-
-    //The function try to infer VN for given killdef, which is
-    //killing-definition of 'exp'. If there is not an available VN, the
-    //function generates a dedicated VN for 'killdef'.
-    //NOTE: User has to guarantee that 'killdef' must be the killing-def
-    //of 'exp'.
-    VN const* inferAndGenVNForKillingDef(
-        IR const* exp, IR const* killdef, InferCtx & ctx);
-
-    //This function infers the VN of cvt IR.
-    VN const* inferCvt(IR const* cvt, InferCtx & ctx);
-
-    //The function maps given mddef information into an unique IR_CODE.
-    //The mapped ir-code is used to conform the hashing-rules when registers
-    //a MDDef and a set of integers.
-    IR_CODE mapMDDef2IRCode(MDDef const* mddef) const;
-
-    //Register the VN for CVT via the input vn, and the type of src and the
-    //target for the cvt operation.
-    VN const* registerCvtVN(VN const* v0, Type const* srcty, Type const* tgtty);
-
-    //Register the VN for cvt IR by the three input VNs.
-    VN const* registerCvtVN(VN const* v0, VN const* v1, VN const* v2);
-
-    //IR may be set an initial VN through DU chain, then the IR's vn
-    //will be re-updated when the recursive processing of its kid IR finished.
-    //e.g:
-    //  BB2:
-    //  phi $10 = $11, $12;
-    //  falsebr BB3;
-    //  BB3:
-    //  stpr $12 = add $10, 1; #S1
-    //  goto BB2;
-    //At first, the VN of phi is set to VN6(OP) because it is kill-def
-    //of $10 in #S1, then updated to VN8(OP) when all its two operands $11 and
-    //$12's VN are set.
-    void setVNAlways(IR const* ir, VN const* vn)
-    {
-        ASSERT0(vn == nullptr || !vn->is_unknown());
-
-        //NOTE: each IR can be set only once, user has to check VN before
-        //inoke the function.
-        m_irid2vn.setAlways(ir->id(), vn);
-    }
-    void setVN(PRNO prno, VN const* vn)
-    {
-        ASSERT0(vn == nullptr || !vn->is_unknown());
-        //NOTE: each IR can be set only once, user has to check VN before
-        //inoke the function.
-        ASSERT0(getVN(prno) == nullptr || getVN(prno) == vn);
-        m_prno2vn.set(prno, vn);
-    }
-
-    //NOTE ir's VN could be set multiple times but should be unique.
-    void setVN(IR const* ir, VN const* vn)
-    {
-        ASSERT0(vn && !vn->is_unknown());
-        //NOTE: each IR can be set only unique VN, user has to check VN before
-        //inoking the function.
-        ASSERT0(getVN(ir) == nullptr || getVN(ir) == vn);
-        m_irid2vn.setAlways(ir->id(), vn);
-    }
-    void setVN(MDDef const* mddef, VN const* vn)
-    {
-        ASSERT0(!vn->is_unknown());
-        //NOTE: each MDDef can be set only unique VN, user has to check VN
-        //before inoking the function.
-        ASSERT0(getVN(mddef) == nullptr || getVN(mddef) == vn);
-        m_mdphi2vn.setAlways(mddef->id(), vn);
-    }
-    void setVN(VMD const* vmd, VN const* vn)
-    {
-        ASSERT0(!vn->is_unknown());
-        //NOTE: each MDDef can be set only unique VN, user has to check VN
-        //before inoking the function.
-        ASSERT0(getVN(vmd) == nullptr || getVN(vmd) == vn);
-        m_vmd2vn.setAlways(vmd->id(), vn);
-    }
-
-    bool useMDSSADU() const
-    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
-    bool usePRSSADU() const
-    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
-public:
-    InferEVN(GVN * gvn);
-    virtual ~InferEVN() {}
-
-    //Clean ir related VN info.
-    void cleanVN(IR const* ir) { setVNAlways(ir, nullptr); }
-    void cleanVNIRTree(IR const* ir);
-    void clean();
-
-    //filename: dump BB list into given filename.
-    void dumpBBListWithEVN(CHAR const* filename);
-    void dumpBBListWithEVN() const;
-    void dump() const;
-    void dumpIR2VN() const;
-    void dumpForTest() const;
-
-    MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
-    PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
-    Region * getRegion() const { return m_rg; }
-    TypeMgr * getTypeMgr() const { return m_rg->getTypeMgr(); }
-
-    VN const* inferExp(IR const* ir, InferCtx & ctx);
-};
-
-
 typedef xcom::TMapIter<UINT, void*> UINT2PtrIter;
 class UINT2Ptr : public xcom::TMap<UINT, void*> {
 };
@@ -881,7 +632,7 @@ protected:
 protected:
     void assignRHSVN();
     VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
-    virtual InferEVN * allocInferEVN() { return new InferEVN(this); }
+    virtual InferEVN * allocInferEVN();
 
     bool calcCondMustValEQ(
         IR const* ir, bool & must_true, bool & must_false) const;
@@ -896,6 +647,7 @@ protected:
     bool calcCondMustValBin(
         IR const* ir, bool & must_true, bool & must_false) const;
     void cleanIR2VN();
+    VN const* computeIntVNByType(HOST_INT vnintval, Type const* type);
     VN const* computeIntConst(HOST_INT val);
     VN const* computeSelect(IR const* exp, bool & change);
     VN const* computeBin(IR const* exp, bool & change);
@@ -990,6 +742,9 @@ protected:
     virtual void processStmt(IR * ir, bool & change);
     virtual void processExtStmt(IR * ir, bool & change);
 
+    //The function attempts to revise and generate new VN according to the
+    //type of 'ir' and 'rhsvn' that computed by RHS of the stmt.
+    VN const* reviseVNByStmtType(IR const* ir, VN const* rhsvn, bool & change);
     void reset();
     VN * registerTripleVN(
         IR_CODE irt, VN const* v0, VN const* v1, VN const* v2);
@@ -999,7 +754,9 @@ protected:
     VN * registerCvtVN(VN const* v0, Type const* srcty, Type const* tgtty);
     VN * registerVNviaMD(MD const* md);
     VN * registerVNviaMC(LONGLONG v);
+    VN * registerVNviaMC(LONGLONG v, Type const* vty);
     VN * registerVNviaFP(double v);
+    VN * registerVNviaFP(double v, Type const* vty);
     VN * registerVNviaSTR(Sym const* v);
     VN * registerVNviaVar(Var const* v);
 
@@ -1127,6 +884,7 @@ public:
     DUMgr const* getDUMgr() const { return m_du; }
 
     VN * registerVNviaINT(LONGLONG v);
+    VN * registerVNviaINT(LONGLONG v, Type const* vty);
     VN * registerQuadVN(
         IR_CODE irt, VN const* v0, VN const* v1, VN const* v2, VN const* v3);
     VN * registerQuintVN(

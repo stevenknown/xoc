@@ -45,19 +45,6 @@ template <class CustomFunc = IRDumpCustomBaseFunc> class IRDumpCtx;
 
 #define NO_DUMP_FUNC nullptr
 #define NO_VERIFY_FUNC nullptr
-#define NO_ACC_RHS_FUNC nullptr
-#define NO_ACC_IDINFO_FUNC nullptr
-#define NO_ACC_OFST_FUNC nullptr
-#define NO_ACC_SSAINFO_FUNC nullptr
-#define NO_ACC_PRNO_FUNC nullptr
-#define NO_ACC_RESPR_FUNC nullptr
-#define NO_ACC_KID_FUNC nullptr
-#define NO_ACC_BB_FUNC nullptr
-#define NO_ACC_BASE_FUNC nullptr
-#define NO_ACC_LAB_FUNC nullptr
-#define NO_ACC_DET_FUNC nullptr
-#define NO_ACC_SS_FUNC nullptr
-#define NO_ACC_RESLIST_FUNC nullptr
 
 typedef void(*IRDumpFuncType)(
     IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
@@ -75,6 +62,12 @@ typedef LabelInfo const*& (*IRAccLabFuncType)(IR * ir);
 typedef IR *& (*IRAccDetFuncType)(IR * ir);
 typedef StorageSpace & (*IRAccStorageSpaceFuncType)(IR * ir);
 typedef IR *& (*IRAccResListFuncType)(IR * ir);
+typedef bool & (*IRAccVolatileFuncType)(IR * ir);
+typedef IR *& (*IRAccCaseFuncType)(IR * ir);
+typedef void (*IRAccCollectLabFuncType)(
+    IR * ir, OUT List<LabelInfo const*> & lst);
+typedef IR *& (*IRAccValExpFuncType)(IR * ir);
+typedef UINT & (*IRAccAlignFuncType)(IR * ir);
 
 typedef enum tagIRC_ATTR {
     //Describe miscellaneous information for IR.
@@ -193,6 +186,10 @@ typedef enum tagIRC_ATTR {
     IRC_HAS_RES_LIST_POS = 28,
     IRC_HAS_RES_LIST = 1ULL<<IRC_HAS_RES_LIST_POS,
 
+    //Indicates the operation is volatile.
+    IRC_HAS_VOLATILE_POS = 29,
+    IRC_HAS_VOLATILE = 1ULL<<IRC_HAS_VOLATILE_POS,
+
     //Indicates the operation is placeholder.
     IRC_MAIN_ATTR_PLACEHOLDER_POS = 100,
 
@@ -249,14 +246,80 @@ public:
 //END IRDescFlag
 
 
+typedef enum tagIR_ACC_KIND {
+    //Describe miscellaneous information for IR Field Access Kind.
+    IR_ACC_UNDEF = 0,
+    IR_ACC_RHS,
+    IR_ACC_IDINFO,
+    IR_ACC_OFST,
+    IR_ACC_SSAINFO,
+    IR_ACC_PRNO,
+    IR_ACC_RESPR,
+    IR_ACC_KID,
+    IR_ACC_BB,
+    IR_ACC_BASE,
+    IR_ACC_LABEL,
+    IR_ACC_DET,
+    IR_ACC_SS,
+    IR_ACC_RESLIST,
+    IR_ACC_VOLATILE,
+    IR_ACC_CASE,
+    IR_ACC_COLLECT_LAB,
+    IR_ACC_VALEXP,
+    IR_ACC_ALIGN,
+
+    #include "ir_acc_kind_ext.inc"
+
+    IR_ACC_KIND_NUM,
+} IR_ACC_KIND;
+
+
+//
+//START IRFieldAccTab
+//
+#define NUM_OF_ACC_INFO(accinfo_arr) \
+    (sizeof(accinfo_arr) / sizeof(accinfo_arr[0]))
+
+class IRFieldAccTab {
+    //THE CLASS PERMITS COPY-CONSTRUCTOR.
+public:
+    class AccInfo {
+    public:
+        IR_ACC_KIND acc_kind;
+        void * acc_func;
+    public:
+        AccInfo() {}
+        AccInfo(IR_ACC_KIND k, void * f) : acc_kind(k), acc_func(f) {}
+    };
+private:
+    UINT m_acc_info_num;
+    AccInfo m_acc_info_tab[IR_ACC_KIND_NUM];
+public:
+    IRFieldAccTab(UINT num, AccInfo const accinfo_arr[]);
+    IRFieldAccTab() { ::memset(this, 0, sizeof(IRFieldAccTab)); }
+
+    //Get the access function pointer by given ACC KIND.
+    //kind: describe the kind of access to field of specific IR.
+    //The function return NULL if there is no access function.
+    void * getAccFunc(IR_ACC_KIND kind) const;
+    IR_ACC_KIND getAccKind(IR_ACC_KIND kind) const;
+
+    //Represent the number of ACC INFO.
+    //e.g:If current access-table initialized by IR_ACC_RHS and IR_ACC_IDINFO,
+    //and related access-funtions, then the function return 2.
+    UINT getAccInfoNum() const { return m_acc_info_num; }
+};
+//END IRFieldAccTab
+
+
 //
 //START IRDesc
 //
-#define IRDES_code(c) (g_ir_desc[c].code)
-#define IRDES_name(c) (g_ir_desc[c].name)
-#define IRDES_kid_map(c) (g_ir_desc[c].kid_map)
-#define IRDES_kid_num(c) (g_ir_desc[c].kid_num)
-#define IRDES_attr(c) (g_ir_desc[c].attr)
+#define IRDES_code(c) (getIRDesc()[c].code)
+#define IRDES_name(c) (getIRDesc()[c].name)
+#define IRDES_kid_map(c) (getIRDesc()[c].kid_map)
+#define IRDES_kid_num(c) (getIRDesc()[c].kid_num)
+#define IRDES_attr(c) (getIRDesc()[c].attr)
 #define IRDES_is_stmt(c) (IRDES_attr(c).have(IRC_IS_STMT_POS))
 #define IRDES_is_ter(c) (IRDES_attr(c).have(IRC_IS_TER_POS))
 #define IRDES_is_bin(c) (IRDES_attr(c).have(IRC_IS_BIN_POS))
@@ -281,6 +344,8 @@ public:
     (IRDES_attr(c).have(IRC_HAS_JUDGE_TARGET_POS))
 #define IRDES_has_storage_space(c) \
     (IRDES_attr(c).have(IRC_HAS_STORAGE_SPACE_POS))
+#define IRDES_is_volatile(c) \
+    (IRDES_attr(c).have(IRC_HAS_VOLATILE_POS))
 #define IRDES_has_case_list(c) (IRDES_attr(c).have(IRC_HAS_CASE_LIST_POS))
 #define IRDES_is_write_pr(c) (IRDES_attr(c).have(IRC_IS_WRITE_PR_POS))
 #define IRDES_is_write_whole_pr(c) \
@@ -295,22 +360,52 @@ public:
     (IRDES_attr(c).have(IRC_IS_DIRECT_MEM_OP_POS))
 #define IRDES_is_indirect_mem_op(c) \
     (IRDES_attr(c).have(IRC_IS_INDIRECT_MEM_OP_POS))
-#define IRDES_size(c) (g_ir_desc[c].size)
-#define IRDES_dumpfunc(c) (g_ir_desc[c].dumpfunc)
-#define IRDES_verifyfunc(c) (g_ir_desc[c].verifyfunc)
-#define IRDES_accrhsfunc(c) (g_ir_desc[c].accrhsfunc)
-#define IRDES_accidinfofunc(c) (g_ir_desc[c].accidinfofunc)
-#define IRDES_accofstfunc(c) (g_ir_desc[c].accofstfunc)
-#define IRDES_accssainfofunc(c) (g_ir_desc[c].accssainfofunc)
-#define IRDES_accprnofunc(c) (g_ir_desc[c].accprnofunc)
-#define IRDES_accssfunc(c) (g_ir_desc[c].accssfunc)
-#define IRDES_accreslistfunc(c) (g_ir_desc[c].accreslist)
-#define IRDES_accresultprfunc(c) (g_ir_desc[c].accresultprfunc)
-#define IRDES_acckidfunc(c) (g_ir_desc[c].acckidfunc)
-#define IRDES_accbbfunc(c) (g_ir_desc[c].accbbfunc)
-#define IRDES_accbasefunc(c) (g_ir_desc[c].accbasefunc)
-#define IRDES_acclabfunc(c) (g_ir_desc[c].acclabelfunc)
-#define IRDES_accdetfunc(c) (g_ir_desc[c].accjudgedetfunc)
+#define IRDES_size(c) (getIRDesc()[c].size)
+
+//Access IR's dump function.
+#define IRDES_dumpfunc(c) (getIRDesc()[c].dumpfunc)
+
+//Access IR's verification function.
+#define IRDES_verifyfunc(c) (getIRDesc()[c].verifyfunc)
+
+//IRDesc Access Functions.
+#define IRDES_accrhsfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_RHS))
+#define IRDES_accidinfofunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_IDINFO))
+#define IRDES_accofstfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_OFST))
+#define IRDES_accssainfofunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_SSAINFO))
+#define IRDES_accprnofunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_PRNO))
+#define IRDES_accssfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_SS))
+#define IRDES_accvolatilefunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_VOLATILE))
+#define IRDES_accreslistfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_RESLIST))
+#define IRDES_accresultprfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_RESPR))
+#define IRDES_acckidfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_KID))
+#define IRDES_accbbfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_BB))
+#define IRDES_accbasefunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_BASE))
+#define IRDES_acclabfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_LABEL))
+#define IRDES_accdetfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_DET))
+#define IRDES_acccasefunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_CASE))
+#define IRDES_acc_collectlab_func(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_COLLECT_LAB))
+#define IRDES_acc_valexp_func(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_VALEXP))
+#define IRDES_accalignfunc(c) \
+    (getIRDesc()[c].field_acc_tab.getAccFunc(IR_ACC_ALIGN))
+
 #define IRNAME(ir) (IRDES_name(IR_code(ir)))
 #define IRCNAME(irt) (IRDES_name(irt))
 #define IRCSIZE(irt) (IRDES_size(irt))
@@ -340,24 +435,12 @@ public:
 
     //The attributes of IR.
     IRDescFlag attr;
-
-    //Following function pointer record the corresponding the utility function
-    //if exiist for specific IR code.
     IRDumpFuncType dumpfunc; //record the dump function.
     IRVerifyFuncType verifyfunc; //record the verify function.
-    IRAccRHSFuncType accrhsfunc; //record the getRHS function.
-    IRAccIdinfoFuncType accidinfofunc; //record the getIdinfo function.
-    IRAccOfstFuncType accofstfunc; //record the getOfst function.
-    IRAccSSAInfoFuncType accssainfofunc; //record the getSSAInfo function.
-    IRAccPrnoFuncType accprnofunc; //record the getPrno function.
-    IRAccResultPRFuncType accresultprfunc; //record the getResultPR function.
-    IRAccKidFuncType acckidfunc; //record the getKid function.
-    IRAccBBFuncType accbbfunc; //record the getBB function.
-    IRAccBaseFuncType accbasefunc; //record the getBase function.
-    IRAccLabFuncType acclabelfunc; //record the getLabel function.
-    IRAccDetFuncType accjudgedetfunc; //record the getJudgeDet function.
-    IRAccStorageSpaceFuncType accssfunc; //record the getStorageSpace function.
-    IRAccResListFuncType accreslist; //record the getResList function.
+
+    //The field records the corresponding the utility function if exist
+    //for specific IR code.
+    IRFieldAccTab field_acc_tab;
 public:
     //Return true if the No.kididx kid of operation 'irc' can not be NULL.
     static bool mustExist(IR_CODE irc, UINT kididx);
@@ -377,6 +460,9 @@ typedef enum _ROUND_TYPE {
 
     //Rounding towards zero (or truncate, or round away from infinity)
     ROUND_TOWARDS_ZERO,
+
+    //Round to nearest, with ties rounding toward maximum magnitude
+    ROUND_RMM,
 
     //Rounding away from zero (or round towards infinity)
     ROUND_AWAY_FROM_ZERO,
@@ -416,8 +502,8 @@ public:
 };
 
 //Exported Variables.
-extern IRDesc g_ir_desc[]; //May be modified at initialization of flag set.
 extern RoundDesc const g_round_desc[];
+IRDesc * getIRDesc(); //May be modified at initialization of flag set.
 
 bool checkIRDesc();
 bool checkRoundDesc();

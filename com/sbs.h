@@ -436,8 +436,8 @@ public:
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);
-//    x->clean(); //Very Important! User should free resource if without
-//                //explicit deleting or destroy of x.
+//    x->clean(); //VERY IMPORTANT! User should free resource if without
+//                //explicit deletion or destroy of x.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSet : public SBitSetCore<BitsPerSeg> {
     COPY_CONSTRUCTOR(SBitSet);

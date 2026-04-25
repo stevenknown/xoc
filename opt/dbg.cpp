@@ -121,6 +121,30 @@ UINT getLineNum(IR const* ir, LANG_TYPE language, DbxMgr * dbx_mgr)
 }
 
 
+UINT getLineNumOfCPP(IR const* ir, Region const* rg)
+{
+    Dbx * dbx = getDbx(ir);
+    if (dbx == nullptr) { return 0; }
+    return getLineNumOfCPP(dbx, rg);
+}
+
+
+UINT getLineNumOfPython(IR const* ir, Region const* rg)
+{
+    Dbx * dbx = getDbx(ir);
+    if (dbx == nullptr) { return 0; }
+    return getLineNumOfPython(dbx, rg);
+}
+
+
+UINT getLineNumOfGR(IR const* ir, Region const* rg)
+{
+    Dbx * dbx = getDbx(ir);
+    if (dbx == nullptr) { return 0; }
+    return getLineNumOfGR(dbx, rg);
+}
+
+
 //Get line number in source code.
 UINT getLineNum(Dbx const* dbx, LANG_TYPE language, DbxMgr * dbx_mgr)
 {

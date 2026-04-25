@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class HoistCtx {
+class HoistCtx : public PassCtx {
     //THE CLASS ENABLE PARTAIL COPY-CONSTRUCTOR.
     COPY_CONSTRUCTOR_ASSIGN(HoistCtx);
 public:
@@ -64,23 +64,19 @@ public:
     xcom::DomTree * domtree;
 
     //Top-down and bottom-up propagate information.
-    OptCtx * oc;
-
-    //Top-down and bottom-up propagate information.
-    IRCFG const* cfg;
-    MDSSAMgr * mdssamgr;
-    PRSSAMgr * prssamgr;
+    IRCFG * m_cfg;
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
+    LICM * m_licm;
+    Stmt2UseMgr * m_s2u_mgr;
 public:
-    HoistCtx(OptCtx * t, DomTree * dt, IRCFG * g);
-    HoistCtx(HoistCtx const& src) :
-        inserted_guard_bb(false), cfg_changed(false), duset_changed(false),
-        stmt_changed(false)
-    { copyTopDownInfo(src); }
+    HoistCtx(OptCtx & t, DomTree * dt, LICM * licm, Stmt2UseMgr * s2u);
+    HoistCtx(HoistCtx const& src);
     ~HoistCtx() {}
 
     void buildDomTree(IRCFG * c)
     {
-        ASSERT0(oc->is_dom_valid());
+        ASSERT0(getOptCtx()->is_dom_valid());
         ASSERT0(domtree);
         domtree->erase();
         c->genDomTree(*domtree);
@@ -90,12 +86,19 @@ public:
     void copyTopDownInfo(HoistCtx const& src)
     {
         domtree = src.domtree;
-        oc = src.oc;
-        cfg = src.cfg;
-        mdssamgr = src.mdssamgr;
-        prssamgr = src.prssamgr;
+        m_cfg = src.m_cfg;
+        m_mdssamgr = src.m_mdssamgr;
+        m_prssamgr = src.m_prssamgr;
+        m_s2u_mgr = src.m_s2u_mgr;
     }
+    LICM * getLICM() const { return m_licm; }
+    IRCFG * getCFG() const { return m_cfg; }
+    Region * getRegion() const { return m_rg; }
+    MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
+    PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
+    Stmt2UseMgr const& getS2UMgr() const { return *m_s2u_mgr; }
 
+    void recordUseSet(IR const* ir);
     void unionBottomUpInfo(HoistCtx const& src)
     {
         inserted_guard_bb |= src.inserted_guard_bb;
@@ -104,14 +107,14 @@ public:
         stmt_changed |= src.stmt_changed;
     }
     bool useMDSSADU() const
-    { return mdssamgr != nullptr && mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return prssamgr != nullptr && prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
     bool verifyDomTree() const
     {
         ASSERT0(domtree);
-        return domtree->verify(*cfg);
+        return domtree->verify(*getCFG());
     }
 };
 
@@ -121,6 +124,9 @@ class LICMAnaCtx {
 protected:
     LI<IRBB> const* m_li;
     Region const* m_rg;
+    LICM * m_licm;
+    IRCFG const* m_cfg;
+    OptCtx const* m_oc;
 
     //Record if the stmt is loop invariant.
     InvStmtList m_invariant_stmt;
@@ -141,8 +147,8 @@ protected:
     IRTab m_hoist_cand;
     ComputeMD2DefCnt m_md2defcnt;
 public:
-    LICMAnaCtx(Region const* rg, LI<IRBB> const* li) :
-        m_li(li), m_rg(rg), m_md2defcnt(rg, li) {}
+    LICMAnaCtx(Region const* rg, LI<IRBB> const* li, LICM * licm,
+               OptCtx const* oc);
 
     void addInvStmt(IR * stmt)
     {
@@ -161,6 +167,8 @@ public:
     void dump() const;
 
     LI<IRBB> const* getLI() const { return m_li; }
+    LICM * getLICM() const { return m_licm; }
+    IRCFG const* getCFG() const { return m_cfg; }
     Region const* getRegion() const { return m_rg; }
     InvStmtList & getInvStmtList() { return m_invariant_stmt; }
     InvStmtList const& getInvStmtList() const { return m_invariant_stmt; }
@@ -170,6 +178,7 @@ public:
     IRTab const& getConstCandTab() const { return m_hoist_cand; }
     IRList & getAnaStmtList() { return m_analysable_stmt_list; }
     ComputeMD2DefCnt & getMD2DefCnt() { return m_md2defcnt; }
+    OptCtx const* getOptCtx() const { return m_oc; }
 
     //Return true if stmt is marked and collected into invariant-stmt set.
     bool isInvStmt(IR const* stmt) const
@@ -200,6 +209,7 @@ public:
 //Register Promotion.
 class LICM : public Pass {
     friend class InsertPreheaderMgr;
+    friend class LICMIntl;
     class IRListMgr {
         List<IRList*> m_lst;
         List<IRList*> m_free_lst;
@@ -234,7 +244,6 @@ protected:
     COPY_CONSTRUCTOR(LICM);
     BYTE m_is_hoist_stmt:1;
     BYTE m_is_aggressive:1; //true to apply LICM along with RCE
-    DUMgr * m_dumgr;
     IRCFG * m_cfg;
     //LICM use RCE to determine whether a branch must-execute.
     RCE * m_rce;
@@ -247,7 +256,7 @@ protected:
 protected:
     void clean();
     bool chooseConst(
-        IR * ir, OUT bool * all_exp_invariant, OUT LICMAnaCtx & anactx);
+        IR * ir, OUT bool * all_exp_invariant, OUT LICMAnaCtx & anactx) const;
     bool chooseBin(
         IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
         OUT IRList * invlist, OUT LICMAnaCtx & anactx);
@@ -262,10 +271,10 @@ protected:
         OUT IRList * invlist, OUT LICMAnaCtx & anactx);
     bool choosePR(
         IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
-        OUT IRList * invlist, OUT LICMAnaCtx & anactx);
-    bool chooseLD(
+        OUT IRList * invlist, OUT LICMAnaCtx & anactx) const;
+    virtual bool chooseLD(
         IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
-        OUT IRList * invlist, OUT LICMAnaCtx & anactx);
+        OUT IRList * invlist, OUT LICMAnaCtx & anactx) const;
     bool chooseSELECT(
         IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
         OUT IRList * invlist, OUT LICMAnaCtx & anactx);
@@ -280,6 +289,8 @@ protected:
     bool chooseExp(
         IR * ir, IRIter & irit, OUT bool * all_rhs_exp_invariant,
         OUT IRList * invlist, OUT LICMAnaCtx & anactx);
+
+    //The function modify members.
     bool chooseExpList(
         IR * ir, OUT bool & all_exp_invariant, IRIter & irit,
         OUT LICMAnaCtx & anactx);
@@ -293,6 +304,9 @@ protected:
     bool chooseAssign(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx);
     bool chooseBranch(IR * ir,IRIter & irit, OUT LICMAnaCtx & anactx);
     bool chooseSwitch(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx);
+    virtual bool chooseSelectDet(
+        IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
+        OUT IRList * invlist, OUT LICMAnaCtx & anactx);
     virtual bool chooseExtExp(
         IR * ir, IRIter & irit, OUT bool * all_exp_invariant,
         OUT IRList * invlist, OUT LICMAnaCtx & anactx);
@@ -345,11 +359,6 @@ protected:
     bool hoistCand(
         MOD LICMAnaCtx & anactcx, OUT IRBB * prehead, OUT HoistCtx & ctx);
 
-    //Return true if BB or STMT changed.
-    bool hoistCandHelper(
-        LICMAnaCtx const& anactx, OUT IR * cand_exp, OUT IRBB * prehead,
-        OUT HoistCtx & ctx);
-
     bool initSSAMgr(HoistCtx const& ctx);
     bool initDepPass(MOD HoistCtx & ctx);
 
@@ -361,7 +370,7 @@ protected:
     {
         //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
         //but still can be moved.
-        return !ir->isNoMove(true) && !ir->is_volatile();
+        return !ir->isNoMove(true) && !ir->isVolatileOp(true);
     }
 
     //Consider whether variable is worth hoisting.
@@ -383,15 +392,10 @@ protected:
     //Return true if stmt is reduction operation of loop 'li'.
     bool isReduceStmtInSSA(LI<IRBB> const* li, IR const* stmt) const;
 
-    void moveStmtToPreheader(
-        MOD IR * stmt, MOD IRBB * tgtbb, OUT HoistCtx & ctx) const;
-
     //Process a loop.
     //Return true if code motion happened.
     //The funtion will maintain LoopInfo.
     bool processLoop(LI<IRBB> * li, HoistCtx & ctx);
-    void postProcessIfChanged(HoistCtx const& hoistctx, OptCtx & oc);
-    void postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc);
 
     //Return true if some stmts are marked as invariant-stmt.
     bool scanDirectStmt(IR * stmt, LICMAnaCtx & anactx);
@@ -404,29 +408,6 @@ protected:
 
     //Return true if some stmts are marked as invariant-stmt.
     bool scanCallStmt(IR * stmt, LICMAnaCtx & anactx);
-
-    //Scan expression to find invariant candidate.
-    //islegal: set to true if loop is legal to perform invariant motion.
-    //         otherwise set to false to prohibit code motion.
-    //Return true if find loop invariant expression.
-    bool scanLoopBody(bool * islegal, OUT LICMAnaCtx & anactx);
-
-    //Return true if find loop invariant expression.
-    //Note that finding loop invariant does not mean finding hoist candidate.
-    //Note the function try to recognize the loop invariant expression and stmt.
-    //So far, the function only regard whole RHS IR tree as loop invariant ONLY
-    //if all kid IR trees in RHS are loop invariant.
-    //TODO: recognize the partial IR tree that is loop invariant.
-    bool scanBB(IRBB * bb, bool * islegal, OUT LICMAnaCtx & anactx);
-
-    //Propagate invariant property to result.
-    //Return true if some stmts are marked as invariant-stmt.
-    //The function aim is to generate as more as invariants.
-    //The function will modify m_invariant_stmt, record if the result of
-    //stmt become loop invariant.
-    //Note the function assumes whole RHS tree of stmt in m_analysable_stmt_list
-    //are loop invariant-exp.
-    bool scanResult(OUT LICMAnaCtx & anactx);
 
     //The funtion record the LoopInfo status until it get to the entire LICM
     //object is destroyed.
@@ -470,6 +451,11 @@ protected:
     //     2. DomInfo must be avaliable.
     void updateMDSSADUForStmtInLoopBody(MOD IR * stmt, HoistCtx const& ctx);
 
+    //The function will scan and update each IR in given 'exp' IR tree.
+    //NOTE:1. the funtion should be invoked after 'exp' hoisted.
+    //     2. DomInfo must be avaliable.
+    void updateMDSSADUForExpInLoopBody(MOD IR * exp, HoistCtx const& ctx);
+
     void * xmalloc(UINT size)
     {
         ASSERT0(m_pool != nullptr);
@@ -482,11 +468,10 @@ public:
     explicit LICM(Region * rg) : Pass(rg), m_am(rg)
     {
         ASSERT0(rg != nullptr);
-        m_dumgr = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_md_sys = rg->getMDSystem();
-        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm);
+        ASSERT0(m_cfg && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_rce = nullptr;
         m_is_hoist_stmt = true;
@@ -500,7 +485,7 @@ public:
     //Collect and analyse information of invariant-exp and invariant-stmt.
     //Whether a exp/stmt can be hoisted will be determined at
     //hoistCand() finally.
-    bool analysisInvariantOp(OUT LICMAnaCtx & anactx);
+    bool analyszInvariantOp(OUT LICMAnaCtx & anactx);
 
     virtual bool dump() const;
 
@@ -508,6 +493,7 @@ public:
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }
+    RCE * getRCE() const { return m_rce; }
 
     virtual bool perform(OptCtx & oc);
 };

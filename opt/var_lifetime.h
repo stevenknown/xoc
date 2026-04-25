@@ -36,8 +36,6 @@ namespace xoc {
 
 #define LT_ID_UNDEF 0
 
-class LinearScanRA;
-
 //
 //START VarUpdatePos
 //
@@ -51,7 +49,7 @@ public:
         return true;
     }
 
-    VarUpdatePos(LinearScanRA const* ra) : UpdatePos(ra) {}
+    VarUpdatePos(RegAllocMgr const* ramgr) : UpdatePos(ramgr) {}
 };
 //END VarUpdatePos
 
@@ -135,19 +133,20 @@ public:
 typedef xcom::Vector<VarLifeTime*> Var2LT;
 class VarLifeTimeMgr {
     COPY_CONSTRUCTOR(VarLifeTimeMgr);
+protected:
     UINT m_cnt;
     Region * m_rg;
     VarLivenessMgr * m_var_liveness;
-    LinearScanRA & m_ra;
     Var2LT m_var2lt;
     VarLTList m_lt_list;
     xcom::Vector<Pos> m_bb_entry_pos;
     xcom::Vector<Pos> m_bb_exit_pos;
 public:
-    VarLifeTimeMgr(Region * rg, LinearScanRA & ra,
-        VarLivenessMgr * var_liveness) : m_rg(rg),
-        m_var_liveness(var_liveness), m_ra(ra)
-    { init(); }
+    VarLifeTimeMgr(Region * rg, VarLivenessMgr * var_liveness) :
+        m_rg(rg), m_var_liveness(var_liveness)
+    {
+        init();
+    }
     virtual ~VarLifeTimeMgr() { destroy(); }
 
     VarLifeTime * allocLifeTime(UINT var_id)
@@ -163,7 +162,15 @@ public:
     void computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
                            Pos livein_def, IRIter & irit);
     void computeLifeTimeStmt(IR * ir, Pos dpos, Pos upos, Pos livein_pos);
-    void computeStmtLHS(IR * ir, Pos pos);
+
+    //This function can be overwriten if special var need to be computed,
+    //probably the multiple var at the LHS of the statement can also be
+    //supported.
+    //e.g:
+    //  [var_1], [var_2], [var_3] <- st $5
+    //   The lifetime of var_1, var_2 and var_3 in the above statement
+    //   can be computed one time.
+    virtual void computeStmtLHS(IR * ir, Pos pos);
     void computeStmtRHS(IR * ir, Pos pos, Pos livein_def);
 
     void destroy()
@@ -179,7 +186,8 @@ public:
         m_bb_exit_pos.destroy();
     }
 
-    void dump() const;
+    virtual void dump() const;
+    void dumpVarOverView(RegAllocMgr const* ramgr, bool dumpir) const;
 
     VarLifeTime * genLifeTime(UINT var_id)
     {
@@ -191,8 +199,13 @@ public:
         }
         return lt;
     }
+
+    //Return the var of the ir whose lifetime needs to be computed.
+    //Return nullptr if there is none.
+    virtual Var const* getIdinfoNeedToComputeLHS(IR const* ir) const;
+    virtual Var const* getIdinfoNeedToComputeRHS(IR const* ir) const;
+
     VarLifeTime * getLifeTime(UINT varid) const { return m_var2lt.get(varid); }
-    LinearScanRA const& getLSRA() const { return m_ra; }
     VarLTList const& getLTList() const { return m_lt_list; }
 
     void init()
@@ -203,14 +216,6 @@ public:
         m_var2lt.init();
         m_lt_list.init();
     }
-
-    //Return whether the lifetime of the operand on the left needs
-    //to be calculated, and return true if it needs to be calculated.
-    virtual bool isNeedComputeLHS(IR const* ir) const;
-
-    //Return whether the lifetime of the operand on the right needs
-    //to be calculated, and return true if it needs to be calculated.
-    virtual bool isNeedComputeRHS(IR const* ir) const;
 
     void reset()
     { destroy(); init(); }

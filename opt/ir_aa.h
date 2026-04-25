@@ -332,6 +332,7 @@ protected:
     //This class contains those variables that can be referenced by
     //pointers (address-taken variables)
     MDSet const* m_maypts; //initialized by initMayPointToSet()
+    OptCtx const* m_oc;
     DefMiscBitSetMgr m_sbs_mgr;
     IR2Heapobj m_ir2heapobj;
     Vector<PtPairSet*> m_in_pp_set;
@@ -426,6 +427,7 @@ protected:
     //Note May-POINT-TO set must be available before call this function.
     void initPTS(Var * var, MD2MDSet * mx);
     void initPTSForRegisterMD(MDTab * mdt, MD const* dmd, MD2MDSet * mx);
+    void initDepPass(MOD OptCtx & oc);
     void inferPointerArithByHashedPTS(
         IR const* ir, OUT MDSet & mds, MOD AACtx * opnd0_ic);
     void inferPointerArithByUnHashedPTS(
@@ -648,6 +650,7 @@ public:
     MDSet const* getMayPointToMDSet() const { return m_maypts; }
     MDSet const* getWorstCase() const { return getMayPointToMDSet(); }
     MD2MDSet * getUniqueMD2MDSet() { return &m_unique_md2mds; }
+    OptCtx const* getOptCtx() const { return m_oc; }
 
     bool isPointToDedicatedVar(MD const* md, MD2MDSet const& mx);
     void initAliasAnalysis();

@@ -80,6 +80,13 @@ IR * InsertCvt::insertCvtForSetelemVal(IR * ir, IR * val)
     Type const* elemtype;
     if (ir->is_vec()) {
         elemtype = ir->getType()->getVectorElemType(m_tm);
+        //Get basic element type if ir is scalable
+        //vector type.
+        if (elemtype->is_scalable_elem_ty()) {
+            elemtype = m_tm->getSimplexType(
+                m_tm->getBasicDTypeWithDType(
+                ir->getType()->getVectorElemDType()));
+        }
     } else {
         elemtype = ir->getType();
     }
@@ -498,8 +505,8 @@ IR * InsertCvt::convertDet(IR * ir, bool & change, InsertCvtCtx & rc)
 }
 
 
-IR * InsertCvt::convertIRlist(IR * ir_list, bool & change,
-                              MOD InsertCvtCtx & rc)
+IR * InsertCvt::convertIRlist(
+    IR * ir_list, bool & change, MOD InsertCvtCtx & rc)
 {
     bool lchange = true; //local flag
     while (lchange) {

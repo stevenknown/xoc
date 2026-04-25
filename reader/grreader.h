@@ -49,13 +49,14 @@ public:
     void destroy();
     void dump() const;
 
-    Lexer * getLexer() { return m_lexer; }
-    IRParser * getParser() { return m_parser; }
+    Lexer * getLexer() const { return m_lexer; }
+    IRParser * getParser() const { return m_parser; }
     RegionMgr * getRegionMgr() const { return m_rm; }
 
     void initLexerAndParser();
 
     void setSrcFile(FILE * h);
+    void showError() const;
     bool parse();
 };
 
@@ -65,7 +66,7 @@ bool readGRAndConstructRegion(RegionMgr * rm, CHAR const* grfile);
 
 //Read IR from GR file.
 //Return true if no error is found.
-bool readGRAndConstructRegion(MOD GRReader * reader, CHAR const* grfile);
+bool readGRAndConstructRegion(MOD GRReader * reader, xcom::FileObj & grfile);
 
 } //namespace xoc
 #endif

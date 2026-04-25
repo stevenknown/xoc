@@ -37,26 +37,42 @@ IRMgrExt::IRMgrExt(Region * rg) : IRMgr(rg)
 }
 
 
-IR * IRMgrExt::buildMaskStoreStmtViaIsomoIR(
-    IR const* reflhs, IR * op, IR * mask, Type const* ty)
+IR * IRMgrExt::buildSelectStoreStmtViaIsomoIR(
+    IR const* reflhs, IR * op, IR * base, Type const* ty)
 {
     ASSERT0(reflhs->is_exp() || reflhs->is_stmt());
     IR * isomo_stmt = getRegion()->dupIsomoStmtExceptRHS(reflhs);
     ASSERT0(isomo_stmt->is_stmt());
-    IR * masked_sel = buildMaskSelectToRes(op, mask, isomo_stmt->getType());
+    IR * masked_sel = buildSelectToRes(op, base, isomo_stmt->getType());
     ASSERT0(isomo_stmt->hasRHS());
     isomo_stmt->setRHS(masked_sel);
     return isomo_stmt;
 }
 
 
-IR * IRMgrExt::buildMaskSelectToRes(IR * op, IR * mask, Type const* ty)
+IR * IRMgrExt::buildSelectToRes(IR * op, IR * base, Type const* ty)
+{
+    ASSERT0(op && base && ty);
+    ASSERT0(base->is_exp() && op->is_exp());
+    IR * ir = allocIR(IR_SELECT_TO_RES);
+    SELECTTORES_op(ir) = op;
+    SELECTTORES_base(ir) = base;
+    IR_parent(op) = ir;
+    IR_parent(base) = ir;
+    IR_dt(ir) = ty;
+    return ir;
+}
+
+
+IR * IRMgrExt::buildMaskOp(IR * op, IR * mask,
+    CMaskOp::MASK_STRATEGY mask_strategy, Type const* ty)
 {
     ASSERT0(op && mask && ty);
     ASSERT0(mask->is_exp() && op->is_exp());
-    IR * ir = allocIR(IR_MASK_SELECT_TO_RES);
-    MASKSELECTTORES_op(ir) = op;
-    MASKSELECTTORES_mask(ir) = mask;
+    IR * ir = allocIR(IR_MASK_OP);
+    MASKOP_mask_strategy(ir) = mask_strategy;
+    MASKOP_op(ir) = op;
+    MASKOP_mask(ir) = mask;
     IR_parent(op) = ir;
     IR_parent(mask) = ir;
     IR_dt(ir) = ty;
@@ -64,15 +80,17 @@ IR * IRMgrExt::buildMaskSelectToRes(IR * op, IR * mask, Type const* ty)
 }
 
 
-IR * IRMgrExt::buildMaskOp(IR * op, IR * mask, Type const* ty)
+IR * IRMgrExt::buildDynLenOp(IR * op, IR * len,
+    CDynLenOp::TAIL_STRATEGY tail_strategy, Type const* ty)
 {
-    ASSERT0(op && mask && ty);
-    ASSERT0(mask->is_exp() && op->is_exp());
-    IR * ir = allocIR(IR_MASK_OP);
-    MASKOP_op(ir) = op;
-    MASKOP_mask(ir) = mask;
+    ASSERT0(op && len && ty);
+    ASSERT0(len->is_exp() && op->is_exp());
+    IR * ir = allocIR(IR_DYNLEN_OP);
+    DYNLENOP_tail_strategy(ir) = tail_strategy;
+    DYNLENOP_op(ir) = op;
+    DYNLENOP_len(ir) = len;
     IR_parent(op) = ir;
-    IR_parent(mask) = ir;
+    IR_parent(len) = ir;
     IR_dt(ir) = ty;
     return ir;
 }
@@ -163,6 +181,36 @@ IR * IRMgrExt::buildBroadCast(IR * src, IR * res_list, Type const* ty)
 }
 
 
+bool IRMgrExt::isMoveOp(IR const* ir) const
+{
+    ASSERT0(ir);
+    if (IRMgr::isMoveOp(ir)) { return true; }
+    return isRegardAsMoveOp(ir);
+}
+
+
+bool IRMgrExt::isRegardAsMoveOp(IR const* ir) const
+{
+    ASSERT0(ir);
+
+    //TODO:
+    //This class can be extended in the future to recognize additional
+    //move-like operations. For example,
+    //c = a + 0. would also be treated as a move.
+    return false;
+}
+
+
+bool IRMgrExt::isMaskResult(IR const* ir)
+{
+    if (ir->hasResult() && ir->hasRHS() &&
+        ir->getRHS()->is_select_to_res()) {
+        return true;
+    }
+    return false;
+}
+
+
 bool IRMgrExt::hasMultiRes(IR * stmt) const
 {
     switch (stmt->getCode()) {
@@ -247,5 +295,30 @@ IR * IRMgrExt::buildPhyReg(xgen::Reg reg, RegPhi * regphi)
 }
 
 #endif
+
+
+IR const* IRMgrExt::getFullSizeOp(IR const* ir) const
+{
+    ASSERT0(ir && ir->is_vec());
+    IR const* op = ir->hasRHS() ? ir->getRHS() : ir;
+    IR_CODE irc = op->getCode();
+
+    switch (irc) {
+    //If it is a full-size operation, return directly.
+    //If there are new full-size operations, please add them here.
+    case IR_PR:
+    case IR_BAND:
+    case IR_BOR:
+    case IR_XOR:
+    case IR_DIV: return op;
+
+    //If there are other IR operations that are not
+    //full-size, please add this type here.
+    case IR_MASK_OP: return getFullSizeOp(MASKOP_op(op));
+    case IR_DYNLEN_OP: return getFullSizeOp(DYNLENOP_op(op));
+    default: ASSERTN(0, ("Unsupported IR type, please implement it"));
+        return nullptr;
+    }
+}
 
 } //namespace xoc

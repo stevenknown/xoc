@@ -31,12 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-#define CROSS_CALL_NUM_THRESHOLD 2
+#define CROSS_CALL_NUM_THRESHOLD 1
 #define REGION_START_POS 2
 
 class LifeTime;
 class LifeTimeMgr;
-class LinearScanRA;
+class RegAlloc;
 class LTConstraints;
 
 typedef xcom::TMapIter<PRNO, Reg> PRNO2RegIter;
@@ -271,12 +271,11 @@ public:
     void dump(Region const* rg) const;
 
     //Dump Reg2Lifetime info.
-    void dumpReg2LifeTime(
-        Region const* rg, LinearScanRA const* ra, Reg r) const;
+    void dumpReg2LifeTime(Region const* rg, Reg r) const;
 
     //Dump Reg2LifeTime info with specific pos.
-    void dumpReg2LifeTimeWithPos(Region const* rg, LinearScanRA const* ra,
-        Reg r, Pos start, Pos end, bool open_range) const;
+    void dumpReg2LifeTimeWithPos(
+        Region const* rg, Reg r, Pos start, Pos end, bool open_range) const;
 
     //Return true and occ if there is occ at given pos.
     bool findOcc(Pos pos, OUT OccListIter & it) const;
@@ -353,7 +352,6 @@ public:
     void inheritAttrFlag(LifeTime const* lt)
     {
         m_flag.set(lt->getAttrFlag().getFlagSet());
-        updateLTConstraintsForSplit(lt);
 
         //If the lifetime is split, the new lifetime can be rematerialized
         //too, so this remat expression should be inherited from the parent
@@ -503,8 +501,12 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //content of this vector is the position of responding call IR. Some terms
 //will be introduced based on this call vector:
 //  call_id: The index of call vector can be used to indicate which call is.
-//  baseline_call_id: The call_id before the the prevoius occurence of a
-//                    lifetime, it should be recorded for every lifetime.
+//  baseline_call_id: The call_id before the the current occurence of a
+//                    lifetime, it should be recorded for every lifetime. It
+//                    has been already used to determine the lifetime
+//                    intersects with the call responding to the call_id or not,
+//                    and can be used as the start call_id when do the next
+//                    intersection computation.
 //                    It is stored as the value of the map PRNO2CallID.
 //  current_call_id: The max call id in the call vector, which is used to
 //                   describe the newest call ir so far during the traverse of
@@ -512,7 +514,7 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //  call_crossed_num: The number of calls which intersect with a whole lifetime
 //                    excluding the live range holes.
 //
-//Since the complete lifetime normally are consisted by many live ranges,
+//Since the full lifetime normally are consisted by many live ranges,
 //and these live ranges and the position of call are both incremental during
 //the traverse of the wholes IRs in the lexicographical order, so the basic
 //idea of this algorithm is to statistic the number of call of between the
@@ -533,48 +535,40 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //  For each IR of the IRBBlist:
 //    1. Add the position of the call to the call vector if the IR is a call
 //       statement.
-//    2. For all the prnos (lifetime) which are used in the RHS:
+//    2. For all the occurences of the lifetime:
 //       2.1. If the call vector is empty or the call_crossed_num of lifetime
 //            exceeds a predefined threshold, return.
-//       2.2. If the position responding to the current_call_id is less than
-//            the DEF position of current live range, return. This means the
-//            the call position indicated by current call id doesn't
-//            intersects with the current live range. [NOTE1]
-//       2.3. Check the baseline_call_id of the lifetime is not recorded for
-//            the lifetime:
-//            2.3.1. If the baseline_call_id of the lifetime is not recorded,
+//       2.2. Check the baseline_call_id of the lifetime is recorded or not
+//            for the lifetime:
+//            2.2.1. If the baseline_call_id of the lifetime is not recorded,
 //                   that means this lifetime is live from the entry of region.
 //                   and all the number of calls in the call vector should be
 //                   counted as the valid cross call number.
-//              2.3.1.1. call_crossed_num = current_call_id + 1.
-//              2.3.1.2. baseline_call_id = current_call_id.
-//            2.3.2. If the baseline_call_id of the lifetime is recorded, just
-//                   need to count the number calls between baseline_call_id
-//                   and current_call_id as the valid cross call number.
-//              2.3.2.1. If baseline_call_id is less than current_call_id
-//                       call_crossed_num += current_call_id - baseline_call_id.
-//                       baseline_call_id = current_call_id.
-//              2.3.2.2. Return.
-//    3. For the prnos (lifetime) which are defined in the LHS:
-//       3.1. If the call vector is empty or the call_crossed_num of lifetime
-//            exceeds a predefined threshold, return.
-//       3.2. baseline_call_id = current_call_id.
+//            2.2.2. If the baseline_call_id of the lifetime is recorded, just
+//                   increment the baseline_call_id by 1, which means we will
+//                   start to traverse the call from the next call id.
+//            2.2.3. Traverse each call from the baseline_call_id to the
+//                   current_call_id:
+//                   2.2.3.1. If the lifetime contains/intersects the position
+//                            of the call, increment the call number for the
+//                            lifetime.
+//       2.3. baseline_call_id = current_call_id.
 //
 //    [NOTE1]: For the above lifetime, when traverse at the position 37, the
 //             current_call_id is 1 and start of current range is 34, the
 //             position of call responding to current_call_id 1 is 20, which
-//             is less than 34, so the call responding to the call_id 0 should
-//             be excluded when count the call_crossed_num.
+//             is not contained by the lifetime, so the call responding to the
+//             call_id 0 should be excluded when count the call_crossed_num.
 //
 //We will list the detail steps to show how this algorithm works by using
 //the above lifetime example:
 //  1. At pos 2, the call vector Call2PosVec is empty, do nothing
 //        Call2PosVec = []
-//  2. At pos 5, a new call is met, step 2.1 is performed.
+//  2. At pos 5, a new call is met, step 1 is performed.
 //     The related data will be changed as:
 //       Call2PosVec = [5], current_call_id = 0,
 //       baseline_call_id = not recorded
-//  3. At pos 17, it is a use position, step 2.3.1 is performed.
+//  3. At pos 17, it is a use position, step 2.2.1 and 2.2.3 is performed.
 //     The related data will be changed as:
 //       Call2PosVec = [5], current_call_id = 0,
 //       baseline_call_id = 0, call_crossed_num = 1
@@ -582,11 +576,11 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //     The related data will be changed as:
 //       Call2PosVec = [5, 20], current_call_id = 1,
 //       baseline_call_id = 0, call_crossed_num = 1
-//  5. At pos 34, it is a define position,  step 3.2 is performed.
+//  5. At pos 34, it is a define position, step 2.2.2 and 2.2.3 is performed.
 //     The related data will be changed as:
 //       Call2PosVec = [5, 20], current_call_id = 1,
 //       baseline_call_id = 1, call_crossed_num = 1
-//  6. At pos 37, it is a use position, step 2.2 is performed.
+//  6. At pos 37, it is a use position, step 2.2.2 and 2.2.3 is performed.
 //     The related data will not be changed:
 //       Call2PosVec = [5, 20], current_call_id = 1,
 //       baseline_call_id = 1, call_crossed_num = 1
@@ -594,11 +588,11 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //     The related data will be changed as:
 //       Call2PosVec = [5, 20, 41], current_call_id = 2,
 //       baseline_call_id = 1, call_crossed_num = 1
-//  8. At pos 53, it is a use position, step 2.3.2.1 is performed.
+//  8. At pos 53, it is a use position, step 2.2.2 and 2.2.3 is performed.
 //     The related data will be changed as:
 //       Call2PosVec = [5, 20, 41], current_call_id = 2,
 //       baseline_call_id = 2, call_crossed_num = 2
-//  9. At pos 67, it is a use position, step 2.3.2.2 is performed.
+//  9. At pos 67, it is a use position, step 2.2.2 and 2.2.3 is performed.
 //     The related data will not be changed:
 //       Call2PosVec = [5, 20, 41], current_call_id = 2,
 //       baseline_call_id = 2, call_crossed_num = 2
@@ -610,18 +604,28 @@ class CrossedCallCounter {
 public:
     CrossedCallCounter() {}
     void addNewCall(Pos call_pos) { m_call2pos.append(call_pos); }
-    void updateForUse(LifeTime * lt, Pos def_pos);
-    void updateForDef(LifeTime * lt);
+    void update(LifeTime * lt);
 };
 
 typedef Vector<LifeTime*> PRNO2LT;
 
 
-class RegSetImpl;
 class RangeInfo;
 typedef xcom::Vector<LifeTime*> PRNO2LT;
 typedef xcom::Vector<RangeInfo*> RangeInfoVec;
 typedef xcom::TMap<IR const*, Pos> IR2POS;
+
+//Define some register allocation strategies.
+//RA_STRATEGY_UNDEF: Allocate nothing.
+//RA_STRATEGY_FULL: Allocate both vector and scalar registers.
+//RA_STRATEGY_VECTOR: Allocate only vector registers.
+//RA_STRATEGY_SCALAR: Allocate only scalar registers.
+typedef enum _RA_STRATEGY {
+    RA_STRATEGY_UNDEF = 0,
+    RA_STRATEGY_FULL,
+    RA_STRATEGY_VECTOR,
+    RA_STRATEGY_SCALAR,
+} RA_STRATEGY;
 
 
 //
@@ -632,7 +636,10 @@ class LifeTimeMgr {
     COPY_CONSTRUCTOR(LifeTimeMgr);
 protected:
     bool m_use_expose; //true to compute exposed def/use for each BB.
+    RA_STRATEGY m_strategy;
     Region * m_rg;
+    RegAllocMgr * m_ramgr;
+    MDMgr * m_mdmgr;
     SMemPool * m_pool;
 
     //Record the max position of the region when generate the lifetime, and
@@ -668,10 +675,12 @@ protected:
     void * xmalloc(size_t size);
     bool useExpose() const { return m_use_expose; }
 public:
-    LifeTimeMgr(Region * rg)
-    { m_pool = nullptr; m_use_expose = false; init(rg); }
+    LifeTimeMgr(Region * rg);
     virtual ~LifeTimeMgr() { destroy(); }
 
+    //Determine whether to compute the current lifetime based on the type of
+    //the current PRNO and the register allocation strategy.
+    bool canBeCandidate(PRNO prno);
     void computeCrossedCallNum(UpdatePos & up, BBList const* bblst);
     void computeCrossedCallNumBB(UpdatePos & up, IRBB const* bb,
         IRIter & irit, MOD CrossedCallCounter & cross_call_counter);
@@ -703,6 +712,9 @@ public:
     Pos getBBEndPos(UINT bbid) const { return m_bb_exit_pos.get(bbid); }
     Pos getMaxPos() const { return m_max_pos; }
     PRNO2LT const& getPrno2LT() const { return m_prno2lt; }
+    Region * getRegion() const { return m_rg; }
+    MDMgr * getMDMgr() const { return m_mdmgr; }
+    RA_STRATEGY getStrategy() const { return m_strategy; }
 
     //Clean the lifetime info before computation.
     void reset();
@@ -712,6 +724,8 @@ public:
 
     //Rename each occurrences of 'lt' to 'newprno'.
     void renameLifeTimeOcc(LifeTime const* lt, PRNO newprno);
+
+    void setStrategy(RA_STRATEGY strategy) { m_strategy = strategy; }
 
     //Update the position at the BB entry.
     void updateBBEntryPos(IRBB const* bb, MOD UpdatePos & up,
@@ -771,7 +785,7 @@ public:
 class RegLifeTimeMgr : public LifeTime2DMgr {
     COPY_CONSTRUCTOR(RegLifeTimeMgr);
 protected:
-    LinearScanRA * m_lsra;
+    RegAllocMgr * m_ramgr;
 
     //Record the Lifetime that used for Reg2LifeTime.
     LTList m_reg2lt_list;
@@ -797,14 +811,11 @@ protected:
 
     //Initialize Reg2LifeTimeInfo.
     void initReg2LifeTimeInfo();
-
-    //Merged two RangeVec 'rv_ori' and 'rv_new'.
-    //Then the new RangeVec will be stored into 'rv_ori'
-    void mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new);
 public:
-    RegLifeTimeMgr(Region * rg, LinearScanRA * ra) :
-        LifeTime2DMgr(rg), m_lsra(ra)
+    RegLifeTimeMgr(Region * rg) : LifeTime2DMgr(rg)
     {
+        m_ramgr = (RegAllocMgr*)m_rg->getPassMgr()->registerPass(
+            PASS_REGALLOC_MGR);
         m_reg2lt_list.init();
         initReg2LifeTimeInfo();
     }
@@ -814,27 +825,12 @@ public:
     PRNO2LT const& getReg2LT() const { return m_reg2lt; }
     LifeTime * getRegLifeTime(Reg reg) const { return m_reg2lt.get(reg); }
 
-    //Merge the new lifetime 'lt_new' into the lifetime responding to the
-    //physical-register assigned.
-    //lt_new: the lifetime of psesudo-register that will be merged into the
-    //        lifetime of physical-register.
-    //
-    //e.g:
-    //  The lifetime of PR1 will be merged into the lifetime of REG1.
-    //  Before Merge:
-    //  LT:REG_1,range:<22-23><24-27><30><35-43>
-    //   |                     ------  -   ----------
-    //
-    //  LT:PR_1,range:<46-49>
-    //   |                     ------  -   ----------  ----
-    //
-    //  After Merge:
-    //  LT:REG_1,range:<22-23><24-27><30><35-43><46-49>
-    //   |                     ------  -   ----------  ----
-    void mergeRegLifeTimeWithPRLT(MOD LifeTime * lt_new);
-
     //Insert 'range_vec' into the lifetime of 'reg'.
-    void mergeRegLifetimeWIthRange(Reg reg, RangeVec const& range_vec);
+    void mergeRegLifetimeWithRange(Reg reg, RangeVec const& range_vec);
+
+    //Merged two RangeVec 'rv_ori' and 'rv_new'.
+    //Then the new RangeVec will be stored into 'rv_ori'
+    void mergeLifeTime(RangeVec & rv_ori, RangeVec const& rv_new);
 };
 //END RegLifeTimeMgr
 

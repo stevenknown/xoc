@@ -35,100 +35,6 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define REDUCE
-
-Rational::Rational() : m_num(0), m_den(1)
-{}
-
-
-Rational::Rational(INT num, INT den)
-{
-    ASSERTN(den != 0, ("denominator is 0!"));
-    m_num = num, m_den = den;
-}
-
-
-bool Rational::verify() const
-{
-    ASSERTN(m_den != 0, ("denominator is 0!"));
-    return true;
-}
-
-
-void Rational::reduce()
-{
-    if (m_num == 0) {
-        m_den = 1;
-        return;
-    }
-    FType gcd = _gcd(m_num, m_den);
-    if (gcd == 1) {
-        if (m_den < 0) {
-            m_den = -m_den;
-            m_num = -m_num;
-        }
-        return;
-    }
-    m_num = m_num / gcd;
-    m_den = m_den / gcd;
-    if (m_den < 0) {
-        m_den = -m_den;
-        m_num = -m_num;
-    }
-    return;
-}
-
-
-Rational Rational::abs()
-{
-    ASSERTN(m_den != 0, ("denominator is 0!"));
-    Rational b(*this);
-    if (b.m_num < 0) {
-        b.m_num = -b.m_num;
-    }
-    if (b.m_den < 0) {
-        b.m_den = -b.m_den;
-    }
-    return b;
-}
-
-
-Rational::FType Rational::_gcd(FType x, FType y)
-{
-    FType t;
-    if (x < 0) { x = -x; }
-    if (y < 0) { y = -y; }
-    if ( x > y ) {
-        t = x, x = y, y = t;
-    }
-    while (x != 0) {
-        t = x;
-        x = y % x;
-        y = t;
-    }
-    return y;
-}
-
-
-CHAR const* Rational::dump(StrBuf & buf) const
-{
-    if (m_den == 1) {
-        buf.sprint("%d", m_num);
-    } else {
-        buf.sprint("%d/%d", m_num, m_den);
-    }
-    return buf.buf;
-}
-
-
-void Rational::dump() const
-{
-    StrBuf buf(16);
-    dump(buf);
-    fprintf(stdout, "%s", buf.buf);
-}
-
-
 static inline LONGLONG gcdf(LONGLONG x, LONGLONG y)
 {
     LONGLONG t;
@@ -149,7 +55,7 @@ static inline LONGLONG gcdf(LONGLONG x, LONGLONG y)
 
 
 //Reduction of 64bit longlong integer.
-static inline void reduce_ll(LONGLONG & num, LONGLONG & den)
+void reduce_ll(LONGLONG & num, LONGLONG & den)
 {
     if (num == 0) {
         den = 1;
@@ -173,7 +79,7 @@ static inline void reduce_ll(LONGLONG & num, LONGLONG & den)
 
 
 //Calculate the approximate rational number.
-static inline void appro(LONGLONG & num, LONGLONG & den)
+void appro(LONGLONG & num, LONGLONG & den)
 {
     float v = float(num) / float(den);
     if (v < 100.0) {
@@ -209,177 +115,6 @@ static inline void appro(LONGLONG & num, LONGLONG & den)
         den = 1;
     }
     reduce_ll(num, den);
-}
-
-
-bool operator < (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    if ((LONGLONG)a.m_num * (LONGLONG)b.m_den <
-        (LONGLONG)a.m_den * (LONGLONG)b.m_num) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator <= (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) <=
-        ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator > (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) >
-        ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator >= (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) >=
-        ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
-        return true;
-    }
-    return false;
-}
-
-
-Rational operator * (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    LONGLONG rnum = (LONGLONG)(a.m_num) * (LONGLONG)(b.m_num);
-    Rational rat;
-    if (rnum == 0) {
-        rat.m_num = 0;
-        rat.m_den = 1;
-        return rat;
-    }
-    LONGLONG rden = (LONGLONG)(a.m_den) * (LONGLONG)(b.m_den);
-    ASSERTN(rden != 0, ("den is zero"));
-    if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
-    if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
-    if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }
-    #ifdef REDUCE
-    reduce_ll(rnum, rden);
-    #endif
-    ASSERT0(rden > 0);
-    LONGLONG trnum = (LONGLONG)::abs((int)rnum);
-    if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||
-        (rden >= (LONGLONG)(INT_MAX>>2))) {
-        reduce_ll(trnum, rden);
-        if ((trnum >= (LONGLONG)(INT_MAX)) ||
-            (rden >= (LONGLONG)(INT_MAX))) {
-            appro(trnum, rden);
-            ASSERT0((trnum < (LONGLONG)(INT_MAX)) &&
-                     (rden < (LONGLONG)(INT_MAX)));
-        }
-    }
-
-    //Enforce conversion from 'int64' to 'int32',
-    //even if it possible loss of data.
-    rat.m_num = (Rational::FType)(rnum < 0 ? -trnum : trnum);
-    rat.m_den = (Rational::FType)rden;
-    return rat;
-}
-
-
-Rational operator / (Rational const& a, Rational const& b)
-{
-    Rational::FType anum = a.m_num;
-    Rational::FType aden = a.m_den;
-    Rational::FType bnum = b.m_num;
-    Rational::FType bden = b.m_den;
-
-    ASSERTN(aden != 0 && bden != 0, ("denominator is 0"));
-    ASSERTN(bnum != 0, ("'a' divided by 0"));
-
-    Rational rat;
-    if (anum == 0) { rat.m_num = 0; rat.m_den = 1; return rat; }
-    if (anum == aden) {
-        if (bnum < 0) {
-            rat.m_num = -bden;
-            rat.m_den = -bnum;
-        } else {
-            rat.m_num = bden;
-            rat.m_den = bnum;
-        }
-        return rat;
-    }
-
-    LONGLONG ratnum = (LONGLONG)(anum) * (LONGLONG)(bden);
-    LONGLONG ratden = (LONGLONG)(aden) * (LONGLONG)(bnum);
-    if (ratnum == ratden) { rat.m_num = 1; rat.m_den = 1; return rat; }
-    if (ratnum == -ratden) { rat.m_num = -1; rat.m_den = 1; return rat; }
-    if ((ratnum < 0 && ratden < 0) || ratden < 0) {
-        ratnum = -ratnum; ratden = -ratden;
-    }
-    #ifdef REDUCE
-    reduce_ll(ratnum, ratden);
-    #endif
-    ASSERT0(ratden > 0);
-    LONGLONG trnum = (LONGLONG)::abs((int)ratnum);
-    if ((trnum >= (LONGLONG)(INT_MAX >> 2)) ||
-        (ratden >= (LONGLONG)(INT_MAX >> 2))) {
-        reduce_ll(trnum, ratden);
-        if ((trnum >= (LONGLONG)(INT_MAX)) ||
-            (ratden >= (LONGLONG)(INT_MAX))) {
-            appro(trnum, ratden);
-            ASSERT0((trnum < (LONGLONG)(INT_MAX)) &&
-                    (ratden < (LONGLONG)(INT_MAX)));
-        }
-    }
-    rat.m_num = (Rational::FType)(ratnum < 0 ? -trnum : trnum);
-    rat.m_den = (Rational::FType)ratden;
-    return rat;
-}
-
-
-Rational operator + (Rational const& a, Rational const& b)
-{
-    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
-    Rational rat;
-    LONGLONG rnum = (LONGLONG)(a.m_num) * (LONGLONG)(b.m_den) +
-                    (LONGLONG)(a.m_den) * (LONGLONG)(b.m_num);
-    if (rnum == 0) {
-        rat.m_num = 0;
-        rat.m_den = 1;
-        return rat;
-    }
-    LONGLONG rden = (LONGLONG)(a.m_den) * (LONGLONG)(b.m_den);
-    ASSERTN(rden != 0, ("den is 0"));
-    if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
-    if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
-    if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }
-    #ifdef REDUCE
-    reduce_ll(rnum, rden);
-    #endif
-    ASSERT0(rden > 0);
-    LONGLONG trnum = (LONGLONG)::abs((int)rnum);
-    if ((trnum >= (LONGLONG)(INT_MAX>>2)) ||
-        (rden >= (LONGLONG)(INT_MAX>>2))) {
-        reduce_ll(trnum, rden);
-        if ((trnum >= (LONGLONG)(INT_MAX)) ||
-            (rden >= (LONGLONG)(INT_MAX))) {
-            appro(trnum, rden);
-            ASSERT0((trnum < (LONGLONG)(INT_MAX)) &&
-                    (rden < (LONGLONG)(INT_MAX)));
-        }
-    }
-    rat.m_num = (Rational::FType)(rnum < 0 ? -trnum : trnum);
-    rat.m_den = (Rational::FType)rden;
-    return rat;
 }
 
 } //namespace xcom

@@ -315,6 +315,280 @@ void Lineq::ConvexHullUnionAndIntersect(OUT RMat & res,
 }
 
 
+static void removeRedundantIneq(
+    bool someone_removed, BitSet const& removed, MOD RMat & m)
+{
+    //Remove redundant inequalities.
+    if (!someone_removed) { return; }
+    UINT count = 0;
+    for (UINT i = 0; i < m.getRowSize(); i++) {
+        if (removed.is_contain(i)) { continue; }
+        count++;
+    }
+    RMat tmpres(count, m.getColSize());
+    count = 0;
+    for (UINT i = 0; i < m.getRowSize(); i++) {
+        if (removed.is_contain(i)) { continue; }
+        tmpres.setRows(count, count, m, i);
+        count++;
+    }
+    m = tmpres;
+}
+
+
+class IntlMethod {
+public:
+    static bool computeBoundOfIneq(
+        MOD bool & someone_removed, MOD X2V_MAP & x2v, MOD BitSet & removed,
+        MOD RMat & m, Lineq & lineq, UINT cst_col, bool is_intersect);
+    static bool checkLegal(
+        UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+        MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+        bool is_intersect);
+
+    static bool processPosCoeff(
+        UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+        MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+        bool is_intersect);
+    static bool processNegCoeff(
+        UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+        MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+        bool is_intersect);
+};
+
+
+bool IntlMethod::processPosCoeff(
+    UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+    MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+    bool is_intersect)
+{
+    Vector<INT> * poscoeff_eqt = x2v.get_pos_of_var(idx_of_var);
+    if (poscoeff_eqt == nullptr) { return true; }
+
+    Rational one = 1;
+    Rational zero = 0;
+    //Reduction in terms of intersection/union operation on boundary.
+    for (VecIdx k1 = 0; k1 < poscoeff_eqt->get_last_idx(); k1++) {
+        UINT idx_of_ineqt1 = poscoeff_eqt->get(k1);
+        if (removed.is_contain(idx_of_ineqt1)) {
+            continue;
+        }
+        Rational coeff = m.get(idx_of_ineqt1, idx_of_var);
+        ASSERTN(coeff > zero, ("unmatch info"));
+
+        //Reduce coeff of variable to 1.
+        if (coeff != 1) {
+            m.mulOfRow(idx_of_ineqt1, one/coeff);
+        }
+
+        bool ineq1_removed = false;
+        for (VecIdx k2 = k1 + 1;
+             k2 <= poscoeff_eqt->get_last_idx(); k2++) {
+            UINT idx_of_ineqt2 = poscoeff_eqt->get(k2);
+            if (removed.is_contain(idx_of_ineqt2)) {
+                continue;
+            }
+            coeff = m.get(idx_of_ineqt2, idx_of_var);
+            ASSERTN(coeff > 0, ("unmatch info"));
+
+            //Reduce coeff of variable to 1.
+            if (coeff != 1) {
+                m.mulOfRow(idx_of_ineqt2, one/coeff);
+            }
+
+            INT cres = lineq.compareConstIterm(
+                m, cst_col, idx_of_ineqt1, idx_of_ineqt2);
+            if (is_intersect) {
+                //Find minimal coeff
+                //e.g:1. x <= 100
+                //    2. x <= 200
+                //The second inequlity will be marked REMOVE.
+                if (cres == CST_LT || cres == CST_EQ) {
+                    removed.bunion(idx_of_ineqt2);
+                    someone_removed = true;
+                } else if (cres == CST_GT) {
+                    removed.bunion(idx_of_ineqt1);
+                    someone_removed = true;
+                    ineq1_removed = true;
+                }
+            } else {
+                //Find maximal coeff
+                //e.g:1. x <= 100
+                //    2. x <= 200
+                //The first inequlity will be marked REMOVE.
+                if (cres == CST_LT || cres == CST_EQ) {
+                    removed.bunion(idx_of_ineqt1);
+                    someone_removed = true;
+                    ineq1_removed = true;
+                } else if (cres == CST_GT) {
+                    removed.bunion(idx_of_ineqt2);
+                    someone_removed = true;
+                }
+            }
+            if (ineq1_removed) {
+                //Try next ineq represented by 'k1'
+                break;
+            }
+        }
+    }
+    return true;
+}
+
+
+bool IntlMethod::processNegCoeff(
+    UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+    MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+    bool is_intersect)
+{
+    Vector<INT> * negcoeff_eqt = x2v.get_neg_of_var(idx_of_var);
+    if (negcoeff_eqt == nullptr) { return true; }
+    Rational one = 1;
+    for (VecIdx k1 = 0; k1 < negcoeff_eqt->get_last_idx(); k1++) {
+        UINT idx_of_eqt1 = negcoeff_eqt->get(k1);
+        if (removed.is_contain(idx_of_eqt1)) {
+            continue;
+        }
+
+        //Reduce coeff to 1
+        Rational coeff  = m.get(idx_of_eqt1, idx_of_var);
+        ASSERTN(coeff < 0, ("unmatch info"));
+        coeff = -coeff;
+        if (coeff != 1) {
+            m.mulOfRow(idx_of_eqt1, one/coeff);
+        }
+        bool ineq1_removed = false;
+        for (VecIdx k2 = k1 + 1;
+             k2 <= negcoeff_eqt->get_last_idx(); k2++) {
+            UINT idx_of_eqt2 = negcoeff_eqt->get(k2);
+            if (removed.is_contain(idx_of_eqt2)) {
+                continue;
+            }
+
+            //Reduce coeff to 1
+            coeff  = m.get(idx_of_eqt2, idx_of_var);
+            ASSERTN(coeff < 0, ("unmatch info"));
+            coeff = -coeff;
+            if (coeff != 1) {
+                m.mulOfRow(idx_of_eqt2, one/coeff);
+            }
+
+            if (is_intersect) {
+                //Find maximum coeff.
+                //We also compare the minimal value, because
+                //that we represent 'x >= a' as '-x <= -a'
+                //e.g:1. x >= 100
+                //    2. x >= 200
+                //First inequlity marked REMOVE.
+                INT cres = lineq.compareConstIterm(m, cst_col,
+                    idx_of_eqt1, idx_of_eqt2);
+                if (cres == CST_LT || cres == CST_EQ) {
+                    removed.bunion(idx_of_eqt2);
+                    someone_removed = true;
+                } else if (cres == CST_GT) {
+                    removed.bunion(idx_of_eqt1);
+                    someone_removed = true;
+                    ineq1_removed = true;
+                }
+            } else {
+                //Find minimum coeff.
+                //e.g:1. x >= 100
+                //    2. x >= 200
+                //Second inequlity was marked REMOVE.
+                INT cres = lineq.compareConstIterm(m, cst_col,
+                    idx_of_eqt1, idx_of_eqt2);
+                if (cres == CST_LT || cres == CST_EQ) {
+                    removed.bunion(idx_of_eqt1);
+                    someone_removed = true;
+                    ineq1_removed = true;
+                } else if (cres == CST_GT) {
+                    removed.bunion(idx_of_eqt2);
+                    someone_removed = true;
+                }
+            }
+            if (ineq1_removed) {
+                break;
+            }
+        }
+    }
+    return true;
+}
+
+
+bool IntlMethod::checkLegal(
+    UINT idx_of_var, MOD bool & someone_removed, MOD X2V_MAP & x2v,
+    MOD BitSet & removed, MOD RMat & m, Lineq & lineq, UINT cst_col,
+    bool is_intersect)
+{
+    //Verification for legitimate intersection of lower and upper boundary.
+    //e.g: x <= 9 , x >= 10 is inconsistency.
+    Vector<INT> * negcoeff_eqt = x2v.get_neg_of_var(idx_of_var);
+    Vector<INT> * poscoeff_eqt = x2v.get_pos_of_var(idx_of_var);
+    if (!is_intersect || poscoeff_eqt == nullptr || negcoeff_eqt == nullptr) {
+        return true;
+    }
+    Rational one = 1;
+    Rational negone = -1;
+    for (VecIdx i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
+        INT pi = poscoeff_eqt->get(i);
+        Rational coeff = m.get(pi, idx_of_var);
+        if (coeff != 1) { //Reduce coefficent of variable to 1.
+            m.mulOfRow(pi, one/coeff);
+        }
+        for (VecIdx j = 0; j <= negcoeff_eqt->get_last_idx(); j++) {
+            INT ni = negcoeff_eqt->get(j);
+            coeff = m.get(ni, idx_of_var);
+            coeff = -coeff;
+            if (coeff != 1) {
+                m.mulOfRow(ni, negone/coeff);
+            } else {
+                m.mulOfRow(ni, -1);
+            }
+            INT cres = lineq.compareConstIterm(m, cst_col, pi, ni);
+            m.mulOfRow(ni, -1);
+            if (cres == CST_LT) {
+                //Low bound is larger than upper bound!
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
+//Return true if the solution is consistency.
+bool IntlMethod::computeBoundOfIneq(
+    MOD bool & someone_removed, MOD X2V_MAP & x2v, MOD BitSet & removed,
+    MOD RMat & m, Lineq & lineq, UINT cst_col, bool is_intersect)
+{
+    bool consistency = true;
+
+    //Compute the tightest/relaxed bound of inequalities
+    //which only involve single variable.
+    for (UINT idx_of_var = 0; idx_of_var < (UINT)cst_col; idx_of_var++) {
+        //Processing positive coefficent relationship, e.g: x <= N, x <= M.
+        if (!processPosCoeff(
+                idx_of_var, someone_removed, x2v, removed, m, lineq, cst_col,
+                is_intersect)) {
+            return false;
+        }
+        //Compute the tightest/relaxed bound of inequalities
+        //which only involved single variable.
+        //Processing negitive coefficent relationship, e.g: -x <= W, -x <= V.
+        if (!processNegCoeff(
+                idx_of_var, someone_removed, x2v, removed, m, lineq, cst_col,
+                is_intersect)) {
+            return false;
+        }
+        if (!checkLegal(
+                idx_of_var, someone_removed, x2v, removed, m, lineq, cst_col,
+                is_intersect)) {
+            return false;
+        }
+    } //end for each variable
+    return consistency;
+}
+
+
 //Reducing for tightest or most-relaxed bound of each variable,
 //and check for consistency. Return true if system is consistent,
 //otherwise return false.
@@ -349,7 +623,7 @@ bool Lineq::reduce(MOD RMat & m, UINT cst_col, bool is_intersect)
     BitSet removed;
     bool consistency = true;
     bool someone_removed = false;
-    UINT idx_of_var;
+    Rational zero = 0;
 
     //Walk through inequations to construct the mapping.
     //Perform reduction/relaxtion for inequlities which
@@ -379,11 +653,11 @@ bool Lineq::reduce(MOD RMat & m, UINT cst_col, bool is_intersect)
             //value of constant term.
             //e.g: 0 <= -100 + M + N. Is it consistent? What are the value of
             //M and N?
-            INT s = compareConstIterm(m, cst_col, i, (Rational)0);
+            INT s = compareConstIterm(m, cst_col, i, zero);
             switch (s) {
             case CST_LT: //0 <= -100
                 consistency = false;
-                goto FIN;
+                return consistency;
             case CST_EQ: //0 <= 0
             case CST_GT: //0 <= 1
                 someone_removed = true;
@@ -400,201 +674,10 @@ bool Lineq::reduce(MOD RMat & m, UINT cst_col, bool is_intersect)
             x2v.map(single_var_idx, i, m.get(i, single_var_idx));
         }
     }
-
-    //Compute the tightest/relaxed bound of inequalities
-    //which only involve single variable.
-    //Processing positive coefficent relationship, e.g: x <= N, x <= M.
-    for (idx_of_var = 0; idx_of_var < (UINT)cst_col; idx_of_var++) {
-        Vector<INT> * poscoeff_eqt = x2v.get_pos_of_var(idx_of_var);
-        if (poscoeff_eqt != nullptr) {
-            //Reduction in terms of intersection/union operation on boundary.
-            for (VecIdx k1 = 0; k1 < poscoeff_eqt->get_last_idx(); k1++) {
-                UINT idx_of_ineqt1 = poscoeff_eqt->get(k1);
-                if (removed.is_contain(idx_of_ineqt1)) {
-                    continue;
-                }
-                Rational coeff = m.get(idx_of_ineqt1, idx_of_var);
-                ASSERTN(coeff > (Rational)0, ("unmatch info"));
-
-                //Reduce coeff of variable to 1.
-                if (coeff != 1) {
-                    m.mulOfRow(idx_of_ineqt1, 1/coeff);
-                }
-
-                bool ineq1_removed = false;
-                for (VecIdx k2 = k1 + 1;
-                     k2 <= poscoeff_eqt->get_last_idx(); k2++) {
-                    UINT idx_of_ineqt2 = poscoeff_eqt->get(k2);
-                    if (removed.is_contain(idx_of_ineqt2)) {
-                        continue;
-                    }
-                    coeff = m.get(idx_of_ineqt2, idx_of_var);
-                    ASSERTN(coeff > 0, ("unmatch info"));
-
-                    //Reduce coeff of variable to 1.
-                    if (coeff != 1) {
-                        m.mulOfRow(idx_of_ineqt2, 1/coeff);
-                    }
-
-                    INT cres = compareConstIterm(m, cst_col,
-                                            idx_of_ineqt1, idx_of_ineqt2);
-                    if (is_intersect) {
-                        //Find minimal coeff
-                        //e.g:1. x <= 100
-                        //    2. x <= 200
-                        //The second inequlity will be marked REMOVE.
-                        if (cres == CST_LT || cres == CST_EQ) {
-                            removed.bunion(idx_of_ineqt2);
-                            someone_removed = true;
-                        } else if (cres == CST_GT) {
-                            removed.bunion(idx_of_ineqt1);
-                            someone_removed = true;
-                            ineq1_removed = true;
-                        }
-                    } else {
-                        //Find maximal coeff
-                        //e.g:1. x <= 100
-                        //    2. x <= 200
-                        //The first inequlity will be marked REMOVE.
-                        if (cres == CST_LT || cres == CST_EQ) {
-                            removed.bunion(idx_of_ineqt1);
-                            someone_removed = true;
-                            ineq1_removed = true;
-                        } else if (cres == CST_GT) {
-                            removed.bunion(idx_of_ineqt2);
-                            someone_removed = true;
-                        }
-                    }
-                    if (ineq1_removed) {
-                        //Try next ineq represented by 'k1'
-                        break;
-                    }
-                }
-            }
-        }
-
-        //Compute the tightest/relaxed bound of inequalities
-        //which only involved single variable.
-        //Processing negitive coefficent relationship, e.g: -x <= W, -x <= V.
-        Vector<INT> * negcoeff_eqt = x2v.get_neg_of_var(idx_of_var);
-        if (negcoeff_eqt != nullptr) {
-            for (VecIdx k1 = 0; k1 < negcoeff_eqt->get_last_idx(); k1++) {
-                UINT idx_of_eqt1 = negcoeff_eqt->get(k1);
-                if (removed.is_contain(idx_of_eqt1)) {
-                    continue;
-                }
-
-                //Reduce coeff to 1
-                Rational coeff  = m.get(idx_of_eqt1, idx_of_var);
-                ASSERTN(coeff < 0, ("unmatch info"));
-                coeff = -coeff;
-                if (coeff != 1) {
-                    m.mulOfRow(idx_of_eqt1, 1/coeff);
-                }
-                bool ineq1_removed = false;
-                for (VecIdx k2 = k1 + 1;
-                     k2 <= negcoeff_eqt->get_last_idx(); k2++) {
-                    UINT idx_of_eqt2 = negcoeff_eqt->get(k2);
-                    if (removed.is_contain(idx_of_eqt2)) {
-                        continue;
-                    }
-
-                    //Reduce coeff to 1
-                    coeff  = m.get(idx_of_eqt2, idx_of_var);
-                    ASSERTN(coeff < 0, ("unmatch info"));
-                    coeff = -coeff;
-                    if (coeff != 1) {
-                        m.mulOfRow(idx_of_eqt2, 1/coeff);
-                    }
-
-                    if (is_intersect) {
-                        //Find maximum coeff.
-                        //We also compare the minimal value, because
-                        //that we represent 'x >= a' as '-x <= -a'
-                        //e.g:1. x >= 100
-                        //    2. x >= 200
-                        //First inequlity marked REMOVE.
-                        INT cres = compareConstIterm(m, cst_col,
-                            idx_of_eqt1, idx_of_eqt2);
-                        if (cres == CST_LT || cres == CST_EQ) {
-                            removed.bunion(idx_of_eqt2);
-                            someone_removed = true;
-                        } else if (cres == CST_GT) {
-                            removed.bunion(idx_of_eqt1);
-                            someone_removed = true;
-                            ineq1_removed = true;
-                        }
-                    } else {
-                        //Find minimum coeff.
-                        //e.g:1. x >= 100
-                        //    2. x >= 200
-                        //Second inequlity was marked REMOVE.
-                        INT cres = compareConstIterm(m, cst_col,
-                            idx_of_eqt1, idx_of_eqt2);
-                        if (cres == CST_LT || cres == CST_EQ) {
-                            removed.bunion(idx_of_eqt1);
-                            someone_removed = true;
-                            ineq1_removed = true;
-                        } else if (cres == CST_GT) {
-                            removed.bunion(idx_of_eqt2);
-                            someone_removed = true;
-                        }
-                    }
-                    if (ineq1_removed) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        //Verification for legitimate intersection of lower and upper boundary.
-        //e.g: x <= 9 , x >= 10 is inconsistency.
-        if (is_intersect && poscoeff_eqt != nullptr &&
-            negcoeff_eqt != nullptr) {
-            for (VecIdx i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
-                INT pi = poscoeff_eqt->get(i);
-                Rational coeff = m.get(pi, idx_of_var);
-                if (coeff != 1) { //Reduce coefficent of variable to 1.
-                    m.mulOfRow(pi, 1/coeff);
-                }
-                for (VecIdx j = 0; j <= negcoeff_eqt->get_last_idx(); j++) {
-                    INT ni = negcoeff_eqt->get(j);
-                    coeff = m.get(ni, idx_of_var);
-                    coeff = -coeff;
-                    if (coeff != 1) {
-                        m.mulOfRow(ni, -1/coeff);
-                    } else {
-                        m.mulOfRow(ni, -1);
-                    }
-                    INT cres = compareConstIterm(m, cst_col, pi, ni);
-                    m.mulOfRow(ni, -1);
-                    if (cres == CST_LT) {
-                        //Low bound is larger than upper bound!
-                        consistency = false;
-                        goto FIN;
-                    }
-                }
-            }
-        }
-    } //end for each variable
-
-    //Remove redundant inequalities.
-    if (someone_removed) {
-        UINT count = 0;
-        for (UINT i = 0; i < m.getRowSize(); i++) {
-            if (removed.is_contain(i)) { continue; }
-            count++;
-        }
-        RMat tmpres(count, m.getColSize());
-        count = 0;
-        for (UINT i = 0; i < m.getRowSize(); i++) {
-            if (removed.is_contain(i)) { continue; }
-            tmpres.setRows(count, count, m, i);
-            count++;
-        }
-        m = tmpres;
-    }
-FIN:
+    consistency = IntlMethod::computeBoundOfIneq(
+        someone_removed, x2v, removed, m, *this, cst_col, is_intersect);
+    if (!consistency) { return false; }
+    removeRedundantIneq(someone_removed, removed, m);
     return consistency;
 }
 
@@ -655,6 +738,7 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
     RMat tmp = *m_coeff;
     res.reinit(0, 0);
     bool consistency = true;
+    Rational one = 1;
 
     //Perform two of primary operations at first.
     for (UINT i = 0; i < m_coeff->getRowSize(); i++) {
@@ -686,17 +770,17 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
                 pos[poscount] = i;
                 poscount++;
                 if (coeff != 1) {
-                    tmp.mulOfRow(i, 1/coeff);
+                    tmp.mulOfRow(i, one/coeff);
                 }
             } else {
                 negc[negcount] = i;
                 negcount++;
                 if (coeff != -1) {
-                    tmp.mulOfRow(i, 1/(-coeff));
+                    tmp.mulOfRow(i, one/(-coeff));
                 }
                 if (darkshadow) {
                     //-u < f(x) => -u < f(x) - 1
-                    tmp.set(i, m_cst_col, tmp.get(i, m_cst_col) - 1);
+                    tmp.set(i, m_cst_col, tmp.get(i, m_cst_col) - one);
                 }
             }
         } else {
@@ -974,6 +1058,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
             m_coeff->getRowSize() > 0 &&
             m_coeff->getColSize() > 0, ("matrix is empty"));
     ASSERTN((INT)u < m_cst_col, ("not a variable"));
+    Rational one = 1;
 
     ineqt_of_u.reinit(0,0);
 
@@ -1009,7 +1094,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
                 coeff = -coeff;
             }
             if (coeff != 1) {
-                ineqt_of_u.mulOfRow(i, 1/coeff);
+                ineqt_of_u.mulOfRow(i, one/coeff);
             }
 
             //Shift other variables from left to righ of '<='.
@@ -1034,7 +1119,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
                 coeff = -coeff;
             }
             if (coeff != 1) {
-                ineqt_of_u.mulOfRow(i, 1/coeff);
+                ineqt_of_u.mulOfRow(i, one/coeff);
             }
         }
     }
@@ -1156,6 +1241,7 @@ void Lineq::substituteAndExpand(MOD RMat & coeff,
     DUMMYUSE(cst_col);
     ASSERT0(coeff.getColSize() == p.getColSize() && sub_var < cst_col);
     RMat tp;
+    Rational one = 1;
     for (UINT i = 0; i < p.getRowSize(); i++) {
         if (p.get(i, sub_var) == Rational(0)) {
             continue;
@@ -1168,7 +1254,7 @@ void Lineq::substituteAndExpand(MOD RMat & coeff,
             p.innerRow(tp, i, i);
             Rational v1 = tp.get(0, sub_var);
             if (v1 != 1) {
-                tp.mulOfRow(0, 1/v1);
+                tp.mulOfRow(0, one/v1);
             }
             tp.mulOfRow(0, v);
             coeff.set(j, sub_var, Rational(0));

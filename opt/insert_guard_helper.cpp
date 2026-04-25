@@ -59,6 +59,111 @@ static IR const* findLoopHeadPhi(LI<IRBB> const* li, IR const* ir)
 }
 
 
+//Replace the USE of original stmt to PHI.
+//e.g:given guarded stmt in loop body is $15=...
+//  after moving to guarded BB, the layout will be:
+//       GuardBranchCondition
+//      /       |
+//  #GuardBB:   |
+//  $15=...     |
+//      \       |
+//       $45 phi=...
+//  Replace the USE of $15 to $45.
+static void replaceUseOfGuardedStmt(
+    IR * guarded, IRBB const* guarded_bb, IR * phi, Region * rg)
+{
+    ASSERT0(guarded->isPROp());
+    DefMiscBitSetMgr sm;
+    IRSet useset(sm.getSegMgr());
+    xoc::collectUseSet(guarded, rg, &useset);
+    IRSetIter it;
+    BSIdx ni = BS_UNDEF;
+    for (BSIdx i = useset.get_first(&it); it != nullptr; i = ni) {
+        ni = useset.get_next(i, &it);
+        IR * use = rg->getIR(i);
+        ASSERT0(use->isPROp());
+        IR const* stmt = use->getStmt();
+        ASSERT0(stmt && stmt->getBB());
+        if (stmt->getBB() == guarded_bb) {
+            //Some USEs of guarded-stmt have been moved to guarded BB also.
+            //Their DU chain do not need change.
+            //e.g:licm_insert_guard.gr
+            useset.diff(i);
+        }
+    }
+    xoc::changeDefForPartialUseSet(guarded, phi, useset, rg);
+}
+
+
+//
+//START Stmt2UseMgr
+//
+IRSet * Stmt2UseMgr::allocIRSet()
+{
+    return new IRSet(m_sbs_mgr.getSegMgr());
+}
+
+
+Stmt2UseMgr::~Stmt2UseMgr()
+{
+    IR2IRSetIter it1;
+    IRSet * is;
+    for (IR const* ir = m_stmt2iruseset.get_first(it1, &is);
+         ir != nullptr; ir = m_stmt2iruseset.get_next(it1, &is)) {
+        ASSERT0(is);
+        delete is;
+    }
+}
+
+
+void Stmt2UseMgr::recordUse(
+    OUT IRSet * is, MDSSAInfo const* info, MDSSAMgr const* mgr)
+{
+    ASSERT0(is && info && mgr);
+    VOpndSet const& vset = info->readVOpndSet();
+    VOpndSetIter it = nullptr;
+    for (BSIdx i = vset.get_first(&it);
+         i != BS_UNDEF; i = vset.get_next(i, &it)) {
+        VMD * vmd = mgr->getVMD(i);
+        ASSERT0(vmd && vmd->is_md());
+        VMD::UseSetIter vuit;
+        for (UINT i = vmd->getUseSet()->get_first(vuit);
+             !vuit.end(); i = vmd->getUseSet()->get_next(vuit)) {
+            is->bunion(i);
+        }
+    }
+}
+
+
+void Stmt2UseMgr::copyUseSet(IR const* ir)
+{
+    ASSERT0(ir->is_stmt());
+    if (ir->isPROp()) {
+        IRSet * is = m_stmt2iruseset.get(ir);
+        if (is != nullptr) { return; }
+        is = allocIRSet();
+        m_stmt2iruseset.set(ir, is);
+        SSAInfo const* info = ir->getSSAInfo();
+        ASSERT0(info);
+        is->copy(info->getUses());
+        return;
+    }
+    if (ir->isMemRefNonPR()) {
+        IRSet * is = m_stmt2iruseset.get(ir);
+        if (is != nullptr) { return; }
+        is = allocIRSet();
+        m_stmt2iruseset.set(ir, is);
+        MDSSAMgr const* mdssamgr = m_rg->getMDSSAMgr();
+        ASSERT0(mdssamgr);
+        MDSSAInfo const* info = mdssamgr->getMDSSAInfoIfAny(ir);
+        ASSERT0(info);
+        recordUse(is, info, mdssamgr);
+        return;
+    }
+}
+//END Stmt2UseMgr
+
+
 //
 //START MDID2PhiMap
 //
@@ -112,8 +217,8 @@ bool InsertGuardHelper::hasComplicatedDefForPR(
 
 //Return true if the determinate-expression of loop and related DU chain are too
 //complicated to analysz and recompute.
-bool InsertGuardHelper::hasComplicatedDefForNonPR(LI<IRBB> const* li,
-                                                  IR const* ir) const
+bool InsertGuardHelper::hasComplicatedDefForNonPR(
+    LI<IRBB> const* li, IR const* ir) const
 {
     ASSERT0(ir->isMemRefNonPR());
     if (!useMDSSADU()) { return true; }
@@ -146,8 +251,8 @@ bool InsertGuardHelper::hasComplicatedDefForNonPR(LI<IRBB> const* li,
 }
 
 
-bool InsertGuardHelper::hasComplicatedDef(LI<IRBB> const* li,
-                                          IR const* ir) const
+bool InsertGuardHelper::hasComplicatedDef(
+    LI<IRBB> const* li, IR const* ir) const
 {
     ASSERT0(ir->is_exp());
     if (ir->isPROp()) {
@@ -204,9 +309,8 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
 
     //CFG's removeEmptyBB optimization only maintained these frequently
     //used CFG info. Make sure they are maintained well.
-    OptCtx::setInvalidIfCFGChangedExcept(getOptCtx(), PASS_RPO,
-                                         PASS_DOM, PASS_LOOP_INFO,
-                                         PASS_UNDEF);
+    OptCtx::setInvalidIfCFGChangedExcept(
+        getOptCtx(), PASS_RPO, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
     m_cfg->removeRedundantLabel();
 }
 
@@ -222,8 +326,8 @@ bool InsertGuardHelper::needComplicatedGuard(LI<IRBB> const* li) const
     ASSERT0(last->is_single());
     IR const* head_det = BR_det(last);
     ConstIRIter it;
-    for (IR const* x = iterInitC(head_det, it, true);
-         x != nullptr; x = iterNextC(it, true)) {
+    for (IR const* x = xoc::iterInitC(head_det, it, true);
+         x != nullptr; x = xoc::iterNextC(it, true)) {
         if (!x->isPROp() && !x->isMemRefNonPR()) { continue; }
         if (hasComplicatedDef(li, x)) { return true; }
     }
@@ -231,8 +335,8 @@ bool InsertGuardHelper::needComplicatedGuard(LI<IRBB> const* li) const
 }
 
 
-LabelInfo const* InsertGuardHelper::addJumpEdge(IRBB * guard_start,
-                                                IRBB * guard_end)
+LabelInfo const* InsertGuardHelper::addJumpEdge(
+    IRBB * guard_start, IRBB * guard_end)
 {
     //Given guard start, end, guarded, and the next-of-guarded BBs.
     //  BB_guard_start
@@ -274,8 +378,8 @@ LabelInfo const* InsertGuardHelper::addJumpEdge(IRBB * guard_start,
 }
 
 
-IR * InsertGuardHelper::insertGuardIR(IRBB * guard_start, IRBB * nextto_end,
-                                      LabelInfo const* guard_end_lab)
+IR * InsertGuardHelper::insertGuardIR(
+    IRBB * guard_start, IRBB * nextto_end, LabelInfo const* guard_end_lab)
 {
     //-- Build guard-branch stmt of guard_start.
     IR * nextto_br = nextto_end->getLastIR();
@@ -290,8 +394,8 @@ IR * InsertGuardHelper::insertGuardIR(IRBB * guard_start, IRBB * nextto_end,
 
     //-- Set the target label of guard-branch.
     ASSERT0(guard_end_lab);
-    IR * guard_br = m_rg->getIRMgr()->buildBranch(false, newdet,
-                                                  guard_end_lab);
+    IR * guard_br = m_rg->getIRMgr()->buildBranch(
+        false, newdet, guard_end_lab);
 
     //Append the guard-branch into guard_start.
     guard_start->getIRList().append_tail_ex(guard_br);
@@ -303,7 +407,7 @@ void InsertGuardHelper::updateGuardDUChain(
     LI<IRBB> const* li, IR * guard_br, IRBB * guard_end, IR * loophead_br)
 {
     //Assign MD for all generated new IRs.
-    m_rg->getMDMgr()->assignMD(guard_br, true, true);
+    m_rg->getMDMgr()->allocRefForIRTree(guard_br, false);
     if (m_du != nullptr) {
         //Copy the DU chain for generated IR.
         m_du->addUseForTree(BR_det(guard_br), BR_det(loophead_br));
@@ -318,13 +422,13 @@ void InsertGuardHelper::updateGuardDUChain(
 
 
 //Note DOM info must be valid.
-void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(
+void InsertGuardHelper::insertMDPhiForGuardedStmtAtGuardEnd(
     IR * ir, DomTree const& domtree)
 {
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
-    ASSERT0(m_guard_end && m_guard_start && m_guarded_bb);
+    ASSERT0(m_guard_end);
     ASSERT0(useMDSSADU());
-    ASSERT0(m_oc->is_dom_valid());
+    ASSERT0(m_oc->isPassValid(PASS_DOM));
     MDSSAInfo const* mdssainfo = m_mdssa->getMDSSAInfoIfAny(ir);
     ASSERT0(mdssainfo);
     xcom::Vertex * endv = m_cfg->getVertex(m_guard_end->id());
@@ -349,7 +453,7 @@ void InsertGuardHelper::insertMDSSAPhiForGuardedStmt(
 }
 
 
-IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
+IR * InsertGuardHelper::insertPhiForGuardedStmtAtGuardEnd(IR * ir)
 {
     ASSERT0(ir->is_stmt() && ir->isPROp() && !ir->is_phi());
     ASSERT0(m_guard_end && m_guard_start && m_guarded_bb);
@@ -362,8 +466,8 @@ IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
     xcom::add_next(&opnds, placeholder);
 
     //A new USE of guarded stmt.
-    IR * guardpr = m_rg->getIRMgr()->buildPRdedicated(ir->getPrno(),
-                                                      ir->getType());
+    IR * guardpr = m_rg->getIRMgr()->buildPRdedicated(
+        ir->getPrno(), ir->getType());
     xcom::add_next(&opnds, guardpr);
 
     //A phi that merges the dummy livein and guarded PR.
@@ -379,7 +483,7 @@ IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
     m_cfg->sortPhiOpnd(phi, p2o);
 
     //Substitute DU chain of guarded PR.
-    replaceUseOfGuardedStmt(ir, phi);
+    replaceUseOfGuardedStmt(ir, m_guarded_bb, phi, m_rg);
 
     //Complete the guarded PR.
     xoc::buildDUChain(ir, guardpr, m_rg, *getOptCtx());
@@ -387,70 +491,36 @@ IR * InsertGuardHelper::insertPRSSAPhiForGuardedStmt(IR * ir)
 }
 
 
-//Replace the USE of original stmt to PHI.
-//e.g:given guarded stmt in loop body is $15=...
-//  after moving to guarded BB, the layout will be:
-//       GuardBranchCondition
-//      /       |
-//  #GuardBB:   |
-//  $15=...     |
-//      \       |
-//       $45 phi=...
-//  Replace the USE of $15 to $45.
-void InsertGuardHelper::replaceUseOfGuardedStmt(IR * guarded, IR * phi) const
-{
-    ASSERT0(guarded->isPROp());
-    DefMiscBitSetMgr sm;
-    IRSet useset(sm.getSegMgr());
-    xoc::collectUseSet(guarded, m_rg, &useset);
-    IRSetIter it;
-    BSIdx ni = BS_UNDEF;
-    for (BSIdx i = useset.get_first(&it); it != nullptr; i = ni) {
-        ni = useset.get_next(i, &it);
-        IR * use = m_rg->getIR(i);
-        ASSERT0(use->isPROp());
-        IR const* stmt = use->getStmt();
-        ASSERT0(stmt && stmt->getBB());
-        if (stmt->getBB() == m_guarded_bb) {
-            //Some USEs of guarded-stmt have been moved to guarded BB also.
-            //Their DU chain do not need change.
-            //e.g:licm_insert_guard.gr
-            useset.diff(i);
-        }
-    }
-    xoc::changeDefForPartialUseSet(guarded, phi, useset, m_rg);
-}
-
-
-void InsertGuardHelper::insertPhiForGuardedBB(DomTree const& domtree)
+void InsertGuardHelper::insertPhiForGuardedBB(
+    DomTree const& domtree, Stmt2UseMgr const& s2u)
 {
     ASSERT0(m_guarded_bb);
     BBIRListIter it;
     for (IR * ir = m_guarded_bb->getIRList().get_head(&it);
          ir != nullptr; ir = m_guarded_bb->getIRList().get_next(&it)) {
         if (ir->isPROp() && usePRSSADU() &&
-            !haveAllUseMoveToGuardBBInPRSSA(ir)) {
-            insertPRSSAPhiForGuardedStmt(ir);
+            !haveAllUseMoveToGuardBBInPRSSA(ir, s2u)) {
+            insertPhiForGuardedStmtAtGuardEnd(ir);
             continue;
         }
         if (ir->isMemRefNonPR() && useMDSSADU() &&
-            !haveAllUseMoveToGuardBBInMDSSA(ir)) {
-            insertMDSSAPhiForGuardedStmt(ir, domtree);
+            !haveAllUseMoveToGuardBBInMDSSA(ir, s2u)) {
+            insertMDPhiForGuardedStmtAtGuardEnd(ir, domtree);
             continue;
         }
     }
 }
 
 
-bool InsertGuardHelper::haveAllUseMoveToGuardBBInPRSSA(IR const* ir) const
+bool InsertGuardHelper::haveAllUseMoveToGuardBBInPRSSA(
+    IR const* ir, Stmt2UseMgr const& s2u) const
 {
     ASSERT0(ir->is_stmt() && ir->isPROp());
-    ASSERT0(usePRSSADU());
-    SSAInfo const* info = ir->getSSAInfo();
-    ASSERT0(info);
+    IRSet const* useset = s2u.getIRSet(ir);
+    ASSERT0(useset);
     SSAUseIter uit = nullptr;
-    for (BSIdx i = info->getUses().get_first(&uit);
-         uit != nullptr; i = info->getUses().get_next(i, &uit)) {
+    for (BSIdx i = useset->get_first(&uit);
+         uit != nullptr; i = useset->get_next(i, &uit)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use->isReadPR());
         ASSERT0(use->getStmt() && use->getStmt()->getBB());
@@ -462,34 +532,29 @@ bool InsertGuardHelper::haveAllUseMoveToGuardBBInPRSSA(IR const* ir) const
 }
 
 
-bool InsertGuardHelper::haveAllUseMoveToGuardBBInMDSSA(IR const* ir) const
+bool InsertGuardHelper::haveAllUseMoveToGuardBBInMDSSA(
+    IR const* ir, Stmt2UseMgr const& s2u) const
 {
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(useMDSSADU());
-    MDSSAInfo const* mdssainfo = m_mdssa->getMDSSAInfoIfAny(ir);
-    ASSERT0(mdssainfo);
-    VOpndSetIter it = nullptr;
-    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&it);
-        i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &it)) {
-        VMD * vmd = m_mdssa->getVMD(i);
-        ASSERT0(vmd && vmd->is_md());
-        VMD::UseSetIter vuit;
-        for (UINT i = vmd->getUseSet()->get_first(vuit);
-             !vuit.end(); i = vmd->getUseSet()->get_next(vuit)) {
-            IR const* use = m_rg->getIR(i);
-            ASSERT0(use && !use->is_undef());
-            if (use->is_id()) {
-                MDPhi const* phi = ((CId*)use)->getMDPhi();
-                ASSERT0(phi && phi->getBB());
-                if (phi->getBB() != m_guarded_bb) {
-                    return false;
-                }
-                continue;
-            }
-            ASSERT0(use->getStmt() && use->getStmt()->getBB());
-            if (use->getStmt()->getBB() != m_guarded_bb) {
-                return false;
-            }
+    IRSet const* useset = s2u.getIRSet(ir);
+    ASSERT0(useset);
+    SSAUseIter uit = nullptr;
+    for (BSIdx i = useset->get_first(&uit);
+         uit != nullptr; i = useset->get_next(i, &uit)) {
+        IR * use = m_rg->getIR(i);
+        ASSERT0(use->isMemRefNonPR());
+        IRBB const* bb = nullptr;
+        if (use->is_id()) {
+            ASSERT0(ID_phi(use));
+            bb = ID_phi(use)->getBB();
+        } else {
+            ASSERT0(use->getStmt());
+            bb = use->getStmt()->getBB();
+        }
+        ASSERT0(bb);
+        if (bb != m_guarded_bb) {
+            return false;
         }
     }
     return true;
@@ -498,8 +563,8 @@ bool InsertGuardHelper::haveAllUseMoveToGuardBBInMDSSA(IR const* ir) const
 
 //Revise PRSSA for guard branch according to next_to_end BB branch.
 //guard branch should equal to next_to_end branch.
-void InsertGuardHelper::reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
-                                            IRBB * guard_end)
+void InsertGuardHelper::reviseGuardDetPRSSA(
+    LI<IRBB> const* li, IR * guard_br, IRBB * guard_end)
 {
     ASSERTN(usePRSSADU(), ("meaning in PRSSA"));
     ASSERT0(!needComplicatedGuard(li));
@@ -521,14 +586,14 @@ void InsertGuardHelper::reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
     //Thus x and y are no need to be identical totally.
     //ASSERT0(x->isIREqual(y, true));
 
-    IR const* x = iterInitC(BR_det(nextto_br), ith, true);
+    IR const* x = xoc::iterInitC(BR_det(nextto_br), ith, true);
     IR * guard_det = BR_det(guard_br);
-    IR * y = iterInit(guard_det, itg, true);
+    IR * y = xoc::iterInit(guard_det, itg, true);
     IR const* nextx;
     IR * nexty;
     for (; x != nullptr; x = nextx, y = nexty) {
-        nextx = iterNextC(ith, true);
-        nexty = iterNext(itg, true);
+        nextx = xoc::iterNextC(ith, true);
+        nexty = xoc::iterNext(itg, true);
         if (!x->isPROp()) {
             //Only need to fix PRSSA.
             continue;
@@ -588,8 +653,8 @@ IRBB * InsertGuardHelper::insertGuardStart(IRBB * guarded_bb)
 }
 
 
-IRBB * InsertGuardHelper::insertGuardEnd(IRBB * guarded_bb,
-                                         IRBB * next_to_guarded_bb)
+IRBB * InsertGuardHelper::insertGuardEnd(
+    IRBB * guarded_bb, IRBB * next_to_guarded_bb)
 {
     //Add vertex to graph before updating RPO.
     IRBB * guard_end = m_rg->allocBB();
@@ -607,11 +672,12 @@ IRBB * InsertGuardHelper::insertGuardEnd(IRBB * guarded_bb,
         //Just leave RPO-recomputation to next user for now.
         m_oc->setInvalidRPO();
     }
-    m_cfg->insertBBBetween(guarded_bb, guarded_bb_it, next_to_guarded_bb,
-                           next_it, guard_end, m_oc);
+    m_cfg->insertBBBetween(
+        guarded_bb, guarded_bb_it, next_to_guarded_bb, next_it,
+        guard_end, m_oc);
     bool add_pdom_failed = false;
-    m_cfg->addDomInfoToNewIDom(next_to_guarded_bb->id(), guard_end->id(),
-                               add_pdom_failed);
+    m_cfg->addDomInfoToNewIDom(
+        next_to_guarded_bb->id(), guard_end->id(), add_pdom_failed);
     if (add_pdom_failed) {
         m_oc->setInvalidPDom();
     }
@@ -648,7 +714,7 @@ IRBB * InsertGuardHelper::insertGuard(LI<IRBB> const* li, IRBB * prehead)
     IRBB * loophead = li->getLoopHead();
     IRBB * guard_start = insertGuardStart(prehead);
     IRBB * guard_end = insertGuardEnd(prehead, loophead);
-    if (!getOptCtx()->is_rpo_valid()) {
+    if (!getOptCtx()->isPassValid(PASS_RPO)) {
         //Recompute or maintain the DOM need RPO.
         m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_RPO, PASS_UNDEF);
     }
@@ -656,8 +722,8 @@ IRBB * InsertGuardHelper::insertGuard(LI<IRBB> const* li, IRBB * prehead)
 
     //Preheader does not have PDOM any more.
     LabelInfo const* guard_end_lab = addJumpEdge(guard_start, guard_end);
-    if (!m_cfg->changeDomInfoByAddBypassEdge(guard_start->id(), prehead->id(),
-                                             guard_end->id())) {
+    if (!m_cfg->changeDomInfoByAddBypassEdge(
+            guard_start->id(), prehead->id(), guard_end->id())) {
         m_oc->setInvalidDom();
         m_oc->setInvalidPDom();
         m_rg->getPassMgr()->checkValidAndRecompute(m_oc, PASS_DOM, PASS_UNDEF);

@@ -699,7 +699,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 {
     bool change = false;
     ASSERT0(tdef);
-    ConstMDDefIter ii(m_mdssamgr);
+    ConstMDDefIter ii(m_mdssamgr, dcectx.getOptCtx());
     for (MDDef const* def = ii.get_first_untill_killing_def(tdef, use);
          def != nullptr; def = ii.get_next_untill_killing_def(use)) {
         if (def->is_phi()) {
@@ -856,7 +856,10 @@ static bool tryReviseAnaInfo(
     }
     //For now, we can not revise the DomInfo because the controlflow
     //modification is too compilcate to maintain.
-    //e.g:BB1->BB2->BB3
+    //TODO:Recognize those cases that DomInfo can be maintained and avoid
+    //invalid PRSSA and MDSSA info.
+    //e.g:compile.gr/dce_ssa.gr
+    //    BB1->BB2->BB3
     //     |         ^
     //     \________/
     //BB1 is the idom of BB3, after removing BB1->BB3, BB2 is add to the BB3's
@@ -865,7 +868,12 @@ static bool tryReviseAnaInfo(
     //all the necessary data-structure and information which will increase
     //dramatically the compilation time.
     dcectx.getOptCtx()->setInvalidIfCFGChanged();
-    dcectx.getOptCtx()->setInvalidMDSSA();
+    if (!dcectx.getOptCtx()->is_dom_valid()) {
+        //Both PRSSA and MDSSA need DomInfo, thus we have to invalid SSA if
+        //DomInfo is not valid any more.
+        dcectx.getOptCtx()->setInvalidMDSSA();
+        dcectx.getOptCtx()->setInvalidPRSSA();
+    }
     return false;
 }
 
@@ -956,13 +964,23 @@ bool DeadCodeElim::collectByDU(
     bool usemdssa, bool useprssa)
 {
     ASSERT0(x->is_exp());
-    if (x->isReadPR() && useprssa) {
-        return collectByPRSSA(x, pwlst2, dcectx);
+    ASSERT0(x->isMemOpnd());
+    if (x->isReadPR()) {
+        if (useprssa) {
+            return collectByPRSSA(x, pwlst2, dcectx);
+        }
+        ASSERT0(dcectx.getOptCtx()->is_pr_du_chain_valid());
+        return collectByDUSet(x, pwlst2, dcectx);
     }
-    if (x->isMemRefNonPR() && usemdssa) {
-        return collectByMDSSA(x, pwlst2, dcectx);
+    if (x->isMemRefNonPR()) {
+        if (usemdssa) {
+            return collectByMDSSA(x, pwlst2, dcectx);
+        }
+        ASSERT0(dcectx.getOptCtx()->is_nonpr_du_chain_valid());
+        return collectByDUSet(x, pwlst2, dcectx);
     }
-    return collectByDUSet(x, pwlst2, dcectx);
+    UNREACHABLE();
+    return false;
 }
 
 
@@ -1056,7 +1074,7 @@ bool DeadCodeElim::iterCollectAndElim(
     //Remove dissociated vertex.
     OptCtx * oc = dcectx.getOptCtx();
     IRCfgOptCtx coctx(oc);
-    if (useMDSSADU()) {
+    if (useMDSSADU() || usePRSSADU()) {
         //CFG opt will attempt to maintain MDSSA information and update DOM
         //info as much as possible.
         CFGOPTCTX_need_update_dominfo(&coctx) = true;
@@ -1083,6 +1101,27 @@ bool DeadCodeElim::iterCollectAndElim(
 }
 
 
+class DCEImplIntl {
+public:
+    static bool isDUChainValid(
+        bool use_prssa, bool use_mdssa, DeadCodeElim const* dce,
+        OptCtx const& oc)
+    {
+        if (use_prssa) {
+            if (!dce->usePRSSADU()) { return false; }
+        } else {
+            if (!dce->useClassicPRDU(oc)) { return false; }
+        }
+        if (use_mdssa) {
+            if (!dce->useMDSSADU()) { return false; }
+        } else {
+            if (!dce->useClassicNonPRDU(oc)) { return false; }
+        }
+        return true;
+    }
+};
+
+
 bool DeadCodeElim::elimImpl(
     OptCtx & oc, OUT DCECtx & dcectx, OUT bool & remove_branch_stmt)
 {
@@ -1092,7 +1131,12 @@ bool DeadCodeElim::elimImpl(
     ConstIRList effstmtlist;
     UINT const max_iter = 0xFFFF;
     remove_branch_stmt = false;
+    bool use_prssa = usePRSSADU() ? true : false;
+    bool use_mdssa = useMDSSADU() ? true : false;
     do {
+        if (!DCEImplIntl::isDUChainValid(use_prssa, use_mdssa, this, oc)) {
+            return change;
+        }
         dcectx.reinit();
         removed = false;
         count++;
@@ -1124,6 +1168,39 @@ bool DeadCodeElim::initSSAMgr(OptCtx const& oc)
 }
 
 
+//The function attempts to reconstruct PRSSA or MDSSA if they are available
+//before the pass. Note the reconstruction might be costly if the pass can
+//not maintain SSA info.
+static void checkAndRebuildSSA(
+    bool need_rebuild_prssa, bool need_rebuild_mdssa, MOD Region * rg,
+    MOD OptCtx & oc)
+{
+    bool rmprdu = false;
+    bool rmnonprdu = false;
+    if (need_rebuild_mdssa) {
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
+            PASS_MDSSA_MGR);
+        if (mdssamgr != nullptr) {
+            mdssamgr->reconstruction(oc);
+            oc.setInvalidIfMDSSAReconstructed();
+            oc.setInvalidNonPRDU();
+            rmnonprdu = true;
+        }
+    }
+    if (need_rebuild_prssa) {
+        PRSSAMgr * prssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
+            PASS_PRSSA_MGR);
+        if (prssamgr != nullptr) {
+            prssamgr->reconstruction(oc);
+            oc.setInvalidIfPRSSAReconstructed();
+            oc.setInvalidPRDU();
+            rmprdu = true;
+        }
+    }
+    xoc::removeClassicDUChain(rg, rmprdu, rmnonprdu);
+}
+
+
 //An aggressive algo will be used if CDG is avaliable.
 bool DeadCodeElim::perform(OptCtx & oc)
 {
@@ -1140,21 +1217,28 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
     bool remove_branch_stmt = false;
     DCECtx dcectx(&oc, *getSBSMgr().getSegMgr(), &getActMgr());
+    bool org_prssa_is_valid = usePRSSADU();
+    bool org_mdssa_is_valid = useMDSSADU();
     bool change = elimImpl(oc, dcectx, remove_branch_stmt);
     if (!change) {
         m_rg->getLogMgr()->cleanBuffer();
+        ASSERT0(org_prssa_is_valid == usePRSSADU());
+        ASSERT0(org_mdssa_is_valid == useMDSSADU());
         END_TIMER(t, getPassName());
         return false;
     }
     dump(dcectx);
 
-    //DU chain and DU reference should be maintained.
+    //DU chain and MD reference should be maintained.
     ASSERT0(m_dumgr->verifyMDRef());
     if (remove_branch_stmt) {
         //Branch stmt will effect control-flow-data-structure.
         oc.setInvalidIfCFGChanged();
     }
     oc.setInvalidIfDUMgrLiveChanged();
+    checkAndRebuildSSA(
+        org_prssa_is_valid != usePRSSADU(),
+        org_mdssa_is_valid != useMDSSADU(), m_rg, oc);
     ASSERT0(verifyClassicDUChain(m_rg, oc));
     ASSERT0(xoc::verifyIVR(m_rg));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

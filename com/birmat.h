@@ -64,8 +64,8 @@ public:
     void setr(UINT row, UINT col, BigInt const& numer, BigInt const& denom = 1);
     void setr(UINT row, UINT col, BIRational const& rat);
     //Set value to numerator and denomiator.
-    void setr(UINT row, UINT col, Rational::FType numer,
-              Rational::FType denom);
+    void setr(UINT row, UINT col, DefRationalFType numer,
+              DefRationalFType denom);
     void getr(UINT row, UINT col, BigInt * numer, BigInt * denom);
     BIRational getr(UINT row, UINT col);
     void ds(BIRMat const& c);

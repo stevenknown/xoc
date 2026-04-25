@@ -51,13 +51,33 @@ IR_ATOMCAS,
 //  'maskop' turned normal full-size add-operation into a masked-add-operation.
 IR_MASK_OP,
 
-//Represent operation that perform elements selection according to a mask
-//operand.
-//e.g: st:vec<f32x16> x = mask_select:<f32x16> $mask_opernd, $data;
-//  The stmt describes a masked-memory-store.$data is the data to be stored.
-//  $mask_operand is the mask which indicates the select behavior.
-//  'st:vec<f32x16> x' indicates the target memory address.
-IR_MASK_SELECT_TO_RES,
+//This IR is used to represent a scalable vector operation.
+//By specifying the length, the number of elements in the operation
+//can be controlled. Through the 'tail_strategy' field, the behavior of the
+//tail elements of the vector can be controlled.
+IR_DYNLEN_OP,
+
+//This class represent operation that perform elements selection according to
+//masks and variable length instructions.
+//This is used to describe specific selection operation, Used to describe
+//the result of placing masked or variable length instructions at certain
+//positions in an operand, i.e. with partially modified semantics.
+//e.g:
+//st:vec<s32m1x?> x =
+//  select_to_res:vec<s32m1x?>
+//    maskop:vec<s32m1x?>
+//      dynlenop:vec<s32m1x?>
+//        (add:vec<s32m1x?> $a, $b)
+//        $len
+//      $mask
+//    ld:<s32m1> x;
+//The 'select_to_res' operation places the results of activating positions
+//in 'maskop' and 'dynlenop' operations in the corresponding position of ld 'x'.
+//NOTE:The presence of ld:<s32m1> x is used to describe the DU reference to
+//the old  value of 'x'.
+//This instruction is usually used in together with mask instructions
+//or variable length instructions.
+IR_SELECT_TO_RES,
 
 //Represent physical register.
 //NOTE: the IR code is available only when REF_TARGMACH_INFO is enabled.

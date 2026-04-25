@@ -140,8 +140,8 @@ void RMat::destroy()
 }
 
 
-void RMat::getr(UINT row, UINT col, Rational::FType * numer,
-                Rational::FType * denom)
+void RMat::getr(UINT row, UINT col, DefRationalFType * numer,
+                DefRationalFType * denom)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     Rational rat = Matrix<Rational>::get(row, col);
@@ -166,7 +166,7 @@ void RMat::sete(UINT num, ...)
     va_list ptr;
     va_start(ptr, num);
     for (UINT i = 0; i < num; i++) {
-        EType numer = va_arg(ptr, Rational::FType);
+        EType numer = va_arg(ptr, DefRationalFType);
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;
@@ -179,7 +179,7 @@ void RMat::sete(UINT num, ...)
 
 //Set value to numerator and denomiator.
 void RMat::setr(UINT row, UINT col,
-                Rational::FType numer, Rational::FType denom)
+                DefRationalFType numer, DefRationalFType denom)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(denom != 0, ("denominator is 0!"));

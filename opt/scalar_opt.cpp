@@ -138,6 +138,9 @@ bool ScalarOpt::perform(OptCtx & oc)
     if (g_do_gcse) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_GCSE));
     }
+    if (g_do_lcse) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_LCSE));
+    }
     if (g_do_cp || g_do_cp_aggressive) {
         ASSERT0(cp);
         passlist.append_tail(cp);
@@ -160,8 +163,8 @@ bool ScalarOpt::perform(OptCtx & oc)
         if (g_opt_level >= OPT_LEVEL3) { pass->setAggressive(true); }
         passlist.append_tail(pass);
     }
-    if (g_do_alge_reasscociate) {
-        passlist.append_tail(m_pass_mgr->registerPass(PASS_ALGE_REASSCOCIATE));
+    if (g_do_alge_reassociate) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_ALGE_REASSOCIATE));
         if (g_do_gcse) {
             passlist.append_tail(m_pass_mgr->registerPass(PASS_GCSE));
         }
@@ -170,6 +173,9 @@ bool ScalarOpt::perform(OptCtx & oc)
             dce->setElimCFS(g_do_dce_aggressive);
             passlist.append_tail(dce);
         }
+    }
+    if (g_do_if_conversion) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_IF_CONVERSION));
     }
     #endif
     if (g_do_loop_convert) {

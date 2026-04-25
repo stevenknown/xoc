@@ -55,6 +55,7 @@ protected:
     MInstMgr * m_mimgr;
     IR2MInst * m_ir2minst;
     MIRelocMgr * m_relocmgr;
+    TargInfoMgr const* m_timgr;
 protected:
     virtual IR2MInst * allocIR2MInst();
     virtual MFieldMgr * allocMFieldMgr();

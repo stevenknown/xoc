@@ -34,6 +34,7 @@ namespace xoc {
 //The class represents API to manage the allocation of MD.
 class MDMgr {
     COPY_CONSTRUCTOR(MDMgr);
+    friend class MDMgrIntlImpl;
 protected:
     Region * m_rg;
     RegionMgr * m_rm;
@@ -42,8 +43,14 @@ protected:
     VarMgr * m_vm;
 protected:
     //This is a helper function to assignMD.
-    void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
+    //clean_mayset: true to clean MayRefSet of ir before function return.
+    void assignMDForIR(
+        IR * x, bool assign_pr, bool assign_nonpr, bool clean_mayset);
+
+    //Allocate MD according to given IR.
     MD const* allocSetElemMD(IR * ir);
+
+    //Reallocate MD according to given IR and its offset.
     MD const* tryReassignMDByOffsetForPartailPROp(MD const* md, IR * ir);
 public:
     MDMgr(Region * rg);
@@ -65,6 +72,10 @@ public:
     //It should be called if new PR generated in optimzations.
     MD const* allocMDForPROp(IR * ir);
 
+    //The function generates new MD for the returned-value-PR of CallStmt.
+    //It should be called if new PR generated in optimzations.
+    MD const* allocMDForRetValOfCall(IR * call);
+
     //The function generates new MD for the IR tree that rooted by 'root'.
     //sibling: true if the function have to walk the sibling node of 'root'.
     //It should be called if new IR tree generated in optimzations.
@@ -72,54 +83,36 @@ public:
 
     //The function generates new MD for the given IR.
     //NOTE the function will NOT process ir's kids and sibling.
-    MD const* allocRef(IR * ir);
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    MD const* allocRef(IR * ir, bool clean_mayref = false);
 
     //Assign MD for PR operations and NonPR direct memory operations for
     //both IRList and BBList.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    void assignMD(bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for PR operations and NonPR direct memory operations.
-    //irlist: a list of IR to be assigned.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for PR operations and NonPR direct memory operations.
-    //irlist: a list of IR to be assigned.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    //ii: the iterator of IR Tree. Only used as function local variable.
-    void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr,
-                  MOD IRIter & ii);
-    void assignMD(xcom::List<IR*> const& irlist, bool assign_pr,
-                  bool assign_nonpr);
-
-    //Assign MD for PR operations and NonPR direct memory operations.
-    //The function will iterate given bblist.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    void assignMD(BBList * lst, bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for PR operations and NonPR direct memory operations.
-    //The function will iterate ir list in given bb.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    //ii: the iterator of IR Tree. Only used as function local variable.
-    void assignMD(IRBB * bb, bool assign_pr, bool assign_nonpr,
-                  MOD IRIter & ii);
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    void assignMD(bool assign_pr, bool assign_nonpr, bool clean_mayref);
 
     //Assign MD for PR operations and NonPR direct memory operations for
     //both IRList and BBList.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    void assignMD()
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    void assignMD(bool clean_mayref)
     {
         //Assign PR and NonPR Var and MD sperately to make MD id more
         //grouped together.
-        assignMD(false, true);
-        assignMD(true, false);
+        assignMD(false, true, clean_mayref);
+        assignMD(true, false, clean_mayref);
     }
 
     //Allocate MD for PR.

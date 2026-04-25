@@ -54,7 +54,7 @@ Sym2Regions::Sym2Regions()
 {
     //xcom::TMap<Sym const*, SymbolInfo*, CompareKeyBase<Sym const*>,
     //               GenMappedOfSymMap>::getGenMapped().m_sym_mgr = sym_mgr;
-    m_sym2rgt.getGenMapped().m_sym2regions = this;
+    m_sym2rgt.getGenMapped().setSym2Regions(this);
 }
 
 

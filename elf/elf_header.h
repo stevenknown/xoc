@@ -270,7 +270,7 @@ typedef SWord64 SWord; //signed largest word
 
 //These macros are used to define specific flags for the RISC-V ELF (Executable
 //and Linkable Format) headers. These flags provide information about the
-//binary’s code generation and ABI (Application Binary Interface) options:
+//binary's code generation and ABI (Application Binary Interface) options:
 //
 //This flag indicates that the binary contains RISC-V compressed instructions.
 #define EF_RISCV_RVC 0x0001
@@ -694,11 +694,7 @@ public:
     case S_LOUSER:                 \
     case S_HIUSER:                 \
     case S_VERSYM:                 \
-    case S_VERNEED:                \
-    case S_OS_O:                   \
-    case S_IMPORTS_O:              \
-    case S_EXPORTS_O:              \
-    case S_RES_O
+    case S_VERNEED
 
 #define SWITCH_CASE_NONEED_COLLECT \
     SWITCH_CASE_NOT_HANDLE:        \
@@ -706,7 +702,9 @@ public:
     case S_STRTAB:                 \
     case S_NOBITS:                 \
     case S_DYNSYM:                 \
-    case S_DYNAMIC
+    case S_DYNAMIC:                \
+    case S_INIT_ARRAY:             \
+    case S_FINI_ARRAY
 
 //==============================================================================
 //SECTION TYPES
@@ -722,6 +720,9 @@ public:
 #define S_REL 9 //as RELA but no explicit addends
 #define S_SHLIB 10 //reserved but evil
 #define S_DYNSYM 11 //dynamic link symbol table
+#define S_INIT_ARRAY 14 //array of pointers to initialization functions.
+#define S_FINI_ARRAY 15 //array of pointers to termination functions.
+#define S_GROUP 17 //section group.
 #define S_LOOS 0x60000000 //Start OS-specific
 #define S_OS 0x60000001 //info to identify target OS
 #define S_IMPORTS 0x60000002 //info on refs to external symbols
@@ -736,13 +737,6 @@ public:
 #define S_HIUSER 0xffffffff //user defined sections
 #define S_VERSYM 0x6fffffff //gnu version
 #define S_VERNEED 0x6ffffffe //gnu version needed info
-//Legacy section types.
-//Readers should handle these legacy type, writers must use the related news.
-#define S_OS_O 12 //info to identify target OS
-#define S_IMPORTS_O 13 //info on refs to external symbols
-#define S_EXPORTS_O 14 //info on symbols exported by ordinal
-#define S_RES_O 15 //read-only resource data.
-#define S_GROUP 17 //section group.
 
 class ELFSHdr {
 public:

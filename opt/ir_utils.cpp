@@ -139,13 +139,6 @@ bool RegionMgr::checkIRSwitchCaseEntry() const
             default: checkIRSwitchCaseInterface((IR_CODE)i);
             }
         }
-        if (IRDES_has_du(i)) {
-            switch ((IR_CODE)i) {
-            SWITCH_CASE_HAS_DU:
-                break;
-            default: checkIRSwitchCaseInterface((IR_CODE)i);
-            }
-        }
     }
     return true;
 }

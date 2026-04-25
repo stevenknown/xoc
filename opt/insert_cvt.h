@@ -56,6 +56,7 @@ public:
 public:
     InsertCvtCtx(OptCtx * oc)
     {
+        ::memset((void*)&u1, 0, sizeof(u1));
         INSCVTCTX_stmt_removed(*this) = false;
         INSCVTCTX_optctx(*this) = oc;
     }

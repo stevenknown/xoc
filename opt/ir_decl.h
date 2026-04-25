@@ -33,6 +33,7 @@ namespace xoc {
 
 class TenVal {};
 class AnonyVal {};
+class IRCFG;
 
 //
 //START IRKidMap
@@ -150,9 +151,11 @@ public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0x0;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 public:
-    MDPhi * getMDPhi() const { return ID_phi(this); }
     static inline Var *& accIdinfo(IR * ir) { return ID_info(ir); }
+    MDPhi * getMDPhi() const { return ID_phi(this); }
 };
 
 
@@ -183,8 +186,8 @@ public:
 #define LD_ofst(ir) (((CLd*)CK_IRC(ir, IR_LD))->field_offset)
 #define LD_idinfo(ir) (((CLd*)CK_IRC(ir, IR_LD))->id_info)
 #define LD_align(ir) (((CLd*)CK_IRC(ir, IR_LD))->align)
-#define LD_is_aligned(ir) (((CLd*)CK_IRC(ir, IR_LD))->is_aligned)
 #define LD_du(ir) (((CLd*)CK_IRC(ir, IR_LD))->du)
+#define LD_is_volatile(ir) (((CLd*)CK_IRC(ir, IR_LD))->is_volatile)
 
 //Return the storage space if any.
 #define LD_storage_space(ir) VAR_storage_space(LD_idinfo(ir))
@@ -193,12 +196,17 @@ class CLd : public DuProp, public VarProp, public OffsetProp {
 public:
     static BYTE const kid_map = 0;
     static BYTE const kid_num = 0;
-    bool is_aligned;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+    bool is_volatile;
     UINT align;
 public:
     static inline Var *& accIdinfo(IR * ir) { return LD_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LD_ofst(ir); }
     static inline StorageSpace & accSS(IR * ir) { return LD_storage_space(ir); }
+    static inline bool & accVolatile(IR * ir) { return LD_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return LD_align(ir); }
+
     static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 };
 
@@ -216,14 +224,16 @@ public:
 #define ILD_kid(ir, idx) CK_KID(ir, CILd, IR_ILD, idx)
 #define ILD_storage_space(ir) (((CILd*)CK_IRC(ir, IR_ILD))->storage_space)
 #define ILD_align(ir) (((CILd*)CK_IRC(ir, IR_ILD))->alignment)
-#define ILD_is_aligned(ir) (((CILd*)CK_IRC(ir, IR_ILD))->is_aligned)
+#define ILD_is_volatile(ir) (((CILd*)CK_IRC(ir, IR_ILD))->is_volatile)
 
 class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
-    bool is_aligned;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+    bool is_volatile;
     UINT alignment;
     StorageSpace storage_space;
     IR * opnd[kid_num];
@@ -233,6 +243,8 @@ public:
     static inline IR *& accBase(IR * ir) { return ILD_base(ir); }
     static inline StorageSpace & accSS(IR * ir)
     { return ILD_storage_space(ir); }
+    static inline bool & accVolatile(IR * ir) { return ILD_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return ILD_align(ir); }
 
     static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 
@@ -260,8 +272,8 @@ public:
 #define ST_bb(ir) (((CSt*)CK_IRC(ir, IR_ST))->bb)
 #define ST_idinfo(ir) (((CSt*)CK_IRC(ir, IR_ST))->id_info)
 #define ST_align(ir) (((CSt*)CK_IRC(ir, IR_ST))->align)
-#define ST_is_aligned(ir) (((CSt*)CK_IRC(ir, IR_ST))->is_aligned)
 #define ST_ofst(ir) (((CSt*)CK_IRC(ir, IR_ST))->field_offset)
+#define ST_is_volatile(ir) (((CSt*)CK_IRC(ir, IR_ST))->is_volatile)
 
 //Return the storage space if any.
 #define ST_storage_space(ir) VAR_storage_space(ST_idinfo(ir))
@@ -273,6 +285,8 @@ class CSt : public CLd, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 8;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accRHS(IR * ir) { return ST_rhs(ir); }
@@ -281,6 +295,8 @@ public:
     static inline StorageSpace & accSS(IR * ir) { return ST_storage_space(ir); }
     static inline IR *& accKid(IR * ir, UINT idx) { return ST_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return ST_bb(ir); }
+    static inline bool & accVolatile(IR * ir) { return ST_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return ST_align(ir); }
 
     static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 
@@ -303,6 +319,8 @@ class CStpr : public DuProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[kid_num];
@@ -359,6 +377,8 @@ class CSetElem : public DuProp, public StmtProp {
 public:
     static IRKidMap const kid_map;
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[kid_num];
@@ -404,6 +424,8 @@ class CGetElem : public DuProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno; //PR number.
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
@@ -440,14 +462,16 @@ public:
 #define IST_rhs(ir) IST_kid(ir, 1)
 #define IST_storage_space(ir) (((CISt*)CK_IRC(ir, IR_IST))->storage_space)
 #define IST_align(ir) (((CISt*)CK_IRC(ir, IR_IST))->alignment)
-#define IST_is_aligned(ir) (((CISt*)CK_IRC(ir, IR_IST))->is_aligned)
+#define IST_is_volatile(ir) (((CISt*)CK_IRC(ir, IR_IST))->is_volatile)
 #define IST_kid(ir, idx) (((CISt*)ir)->opnd[CK_KID_IRC(ir, IR_IST, idx)])
 class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
 public:
     static IRKidMap const kid_map;
     static BYTE const kid_num = 2;
-    bool is_aligned;
+    static UINT const accinfo_num = 8;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+    bool is_volatile;
     UINT alignment;
     StorageSpace storage_space;
     IR * opnd[kid_num];
@@ -459,6 +483,8 @@ public:
     static inline IR *& accBase(IR * ir) { return IST_base(ir); }
     static inline StorageSpace & accSS(IR * ir)
     { return IST_storage_space(ir); }
+    static inline bool & accVolatile(IR * ir) { return IST_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return IST_align(ir); }
 
     static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 
@@ -483,6 +509,8 @@ class CLda : public IR, public VarProp, public OffsetProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    static UINT const accinfo_num = 3;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 public:
     static inline Var *& accIdinfo(IR * ir) { return LDA_idinfo(ir); }
     static inline TMWORD & accOfst(IR * ir) { return LDA_ofst(ir); }
@@ -543,6 +571,8 @@ class CCall : public DuProp, public VarProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 7;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 
     //True if current call is intrinsic call.
     bool m_is_intrinsic;
@@ -634,6 +664,8 @@ public:
     static BYTE const kid_map = 0x4; //callee must exist
     static BYTE const pad_kid_num = 1;
     static BYTE const kid_num = CCall::kid_num + pad_kid_num;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 
     ////////////////////////////////////////////////////////////////////////////
     //NOTE: 'opnd_pad' must be the first member.                              //
@@ -669,6 +701,8 @@ class CTer : public IR {
 public:
     static BYTE const kid_map = 0x7;
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return TER_kid(ir, idx); }
@@ -694,11 +728,17 @@ public:
 #define BIN_opnd0(ir) BIN_kid(ir, 0)
 #define BIN_opnd1(ir) BIN_kid(ir, 1)
 #define BIN_kid(ir, idx) (((CBin*)ir)->opnd[CK_KID_BIN(ir, idx)])
+#define BIN_is_sat(ir) (((CBin*)ir)->is_sat)
 class CBin : public IR {
     COPY_CONSTRUCTOR(CBin);
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+
+    //Is the result saturated.
+    bool is_sat;
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return BIN_kid(ir, idx); }
@@ -721,6 +761,8 @@ class CUna : public IR {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return UNA_kid(ir, idx); }
@@ -737,6 +779,8 @@ class CGoto : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     LabelInfo const* jump_target_lab;
 public:
     static inline IRBB *& accBB(IR * ir) { return GOTO_bb(ir); }
@@ -763,10 +807,16 @@ class CIGoto : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return IGOTO_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return IGOTO_bb(ir); }
+    static inline void accCollectLab(IR * ir, OUT List<LabelInfo const*> & lst)
+    { ((CIGoto*)ir)->collectLabel(lst); }
+    static inline IR *& accValExp(IR * ir) { return IGOTO_vexp(ir); }
+    static inline IR *& accCase(IR * ir) { return IGOTO_case_list(ir); }
 
     //The function collects the LabelInfo for each branch-target.
     void collectLabel(OUT List<LabelInfo const*> & lst) const;
@@ -782,7 +832,7 @@ public:
 //NOTE:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
-//Determinate expression. It can NOT be nullptr.
+//Determinator expression. It can NOT be nullptr.
 #define LOOP_det(ir) LOOP_kid(ir, 0)
 
 //Record stmt list in loop body of IF. It can be nullptr.
@@ -793,6 +843,8 @@ class CWhileDo : public IR {
 public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 
     ////////////////////////////////////////////////////////////////////////////
     //NOTE: 'opnd' must be the last member of CWhileDo.                       //
@@ -818,6 +870,8 @@ class CDoWhile : public CWhileDo {
 public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return LOOP_kid(ir, idx); }
     static inline IR *& accDet(IR * ir) { return LOOP_det(ir); }
@@ -844,7 +898,7 @@ public:
 //      step-exp: $1+1
 //      body {stmt_list}
 //    enddo
-//This class uses LOOP_det access its determinate expression,
+//This class uses LOOP_det access its determinator expression,
 //and LOOP_body access loop body.
 //NOTE: 'opnd_pad' must be the first member of CDoLoop.
 
@@ -865,6 +919,8 @@ public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const pad_kid_num = 3;
     static BYTE const kid_num = CWhileDo::kid_num + pad_kid_num;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 
     ////////////////////////////////////////////////////////////////////////////
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.                   //
@@ -887,7 +943,7 @@ public:
 //      truebody
 //      falsebody
 //    endif
-//Determinate expression. It can NOT be nullptr.
+//Determinator expression. It can NOT be nullptr.
 #define IF_det(ir) IF_kid(ir, 0)
 
 //Record stmt list in true body of IF. It can be nullptr.
@@ -901,6 +957,8 @@ class CIf : public IR {
 public:
     static BYTE const kid_map = 0x1; //det must exist
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     //num: the number of IR added.
@@ -924,6 +982,8 @@ class CLab : public IR {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     LabelInfo const* label_info;
 public:
     static inline LabelInfo const*& accLab(IR * ir) { return LAB_lab(ir); }
@@ -962,6 +1022,8 @@ class CSwitch : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x1; //value expression must exist
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
     LabelInfo const* default_label;
 public:
@@ -972,6 +1034,10 @@ public:
     static inline IRBB *& accBB(IR * ir) { return SWITCH_bb(ir); }
     static inline LabelInfo const*& accLab(IR * ir)
     { return SWITCH_deflab(ir); }
+    static inline void accCollectLab(IR * ir, OUT List<LabelInfo const*> & lst)
+    { ((CSwitch*)ir)->collectLabel(lst); }
+    static inline IR *& accValExp(IR * ir) { return SWITCH_vexp(ir); }
+    static inline IR *& accCase(IR * ir) { return SWITCH_case_list(ir); }
 
     //The function collects the LabelInfo for each branch-target.
     //Note the default-label is collected too.
@@ -996,6 +1062,8 @@ class CDummyUse : public IR {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1015,6 +1083,8 @@ class CCase : public IR {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num]; //case-value
     LabelInfo const* jump_target_label; //jump lable for case.
 public:
@@ -1044,7 +1114,6 @@ public:
 #define ARR_ofst(ir) (((CArray*)CK_IRC_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRC_ARR(ir))->du)
 #define ARR_align(ir) (((CArray*)CK_IRC_ARR(ir))->alignment)
-#define ARR_is_aligned(ir) (((CArray*)CK_IRC_ARR(ir))->is_aligned)
 
 //Get the number of element in each dimension.
 //ARR_elem_num represents the number of array element in current dimension.
@@ -1074,13 +1143,18 @@ public:
 //Return the storage space if any.
 #define ARR_storage_space(ir) (((CArray*)CK_IRC_ARR(ir))->storage_space)
 
+//Return the volatile atribute.
+#define ARR_is_volatile(ir) (((CArray*)CK_IRC_ARR(ir))->is_volatile)
+
 #define ARR_kid(ir, idx) (((CArray*)ir)->opnd[CK_KID_ARR(ir, idx)])
 class CArray : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CArray);
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
-    bool is_aligned;
+    static UINT const accinfo_num = 6;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
+    bool is_volatile;
     UINT alignment;
 
     //Note that if ARR_ofst is not zero, the IR_dt may not equal to
@@ -1113,6 +1187,8 @@ public:
     static inline IR *& accBase(IR * ir) { return ARR_base(ir); }
     static inline StorageSpace & accSS(IR * ir)
     { return ARR_storage_space(ir); }
+    static inline bool & accVolatile(IR * ir) { return ARR_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return ARR_align(ir); }
 
     static IR * dupIRTreeByStmt(IR const* src, Region const* rg);
 
@@ -1200,7 +1276,6 @@ public:
 #define STARR_elem_type(ir) ARR_elem_type(ir)
 #define STARR_ofst(ir) ARR_ofst(ir)
 #define STARR_align(ir) ARR_align(ir)
-#define STARR_is_aligned(ir) ARR_is_aligned(ir)
 #define STARR_du(ir) ARR_du(ir)
 #define STARR_storage_space(ir) ARR_storage_space(ir)
 #define STARR_elem_num(ir, dim) ARR_elem_num(ir, dim)
@@ -1211,6 +1286,8 @@ public:
     static BYTE const kid_map = 0x7;
     static BYTE const pad_kid_num = 1;
     static BYTE const kid_num = CArray::kid_num + pad_kid_num;
+    static UINT const accinfo_num = 8;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 
     ////////////////////////////////////////////////////////////////////////////
     //NOTE: 'opnd_pad' must be the first member of CStArray.                  //
@@ -1227,6 +1304,8 @@ public:
     static inline IR *& accBase(IR * ir) { return ARR_base(ir); }
     static inline StorageSpace & accSS(IR * ir)
     { return STARR_storage_space(ir); }
+    static inline bool & accVolatile(IR * ir) { return ARR_is_volatile(ir); }
+    static inline UINT & accAlign(IR * ir) { return STARR_align(ir); }
 
     static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg);
 };
@@ -1243,6 +1322,8 @@ class CCvt : public CUna {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     ROUND_TYPE round;
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return CVT_kid(ir, idx); }
@@ -1277,6 +1358,8 @@ class CPr : public DuProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno; //PR number.
 
     //versioned presentation or ssa def and use list in ssa mode.
@@ -1298,7 +1381,7 @@ public:
 #define BR_bb(ir) (((CTruebr*)CK_IRC_BR(ir))->bb)
 #define BR_lab(ir) (((CTruebr*)CK_IRC_BR(ir))->jump_target_lab)
 
-//Determinate expression. It can NOT be nullptr.
+//Determinator expression. It can NOT be nullptr.
 #define BR_det(ir) BR_kid(ir, 0)
 #define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CK_KID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
@@ -1306,6 +1389,8 @@ class CTruebr : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 4;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     LabelInfo const* jump_target_lab; //jump target label.
     IR * opnd[kid_num];
 public:
@@ -1330,6 +1415,8 @@ class CFalsebr : public CTruebr {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 4;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return BR_kid(ir, idx); }
     static inline IRBB *& accBB(IR * ir) { return BR_bb(ir); }
@@ -1349,6 +1436,8 @@ class CRet : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx) { return RET_kid(ir, idx); }
@@ -1365,11 +1454,15 @@ public:
 //    if (a > b) res = 10;
 //    else res = 20;
 //  where a > b is predicator expression.
-//This operation compute the value according to the result of
+//The operation can be also used to represent predicate-operation.
+//usage: res = (pred_value)(a + b);
+//  where the value of (a + b) will be stored to 'res' only if 'pred_value'
+//  is true. Thus SELECT_trueexp and SELECT_falseexp can be NULL.
+//This operation computes the value according to the result of
 //predicator expression, if the result value is true, return
 //SELECT_trueexp, otherwise return SELECT_falseexp.
 
-//Predicator expression.
+//Predicator or determinator expression.
 #define SELECT_det(ir) SELECT_kid(ir, 0)
 
 //True part
@@ -1382,8 +1475,10 @@ public:
 class CSelect : public IR {
     COPY_CONSTRUCTOR(CSelect);
 public:
-    static BYTE const kid_map = 0x7;
+    static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 3;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1394,6 +1489,14 @@ public:
     IR * getPred() const { return SELECT_det(this); }
     IR * getTrueExp() const { return SELECT_trueexp(this); }
     IR * getFalseExp() const { return SELECT_falseexp(this); }
+
+    //Return true if both true-exp and false-exp are available.
+    static bool bothTFExpAvail(IR const* ir)
+    {
+        ASSERT0(ir && ir->is_select());
+        CSelect const* sel = (CSelect const*)ir;
+        return sel->getTrueExp() != nullptr && sel->getFalseExp() != nullptr;
+    }
 };
 
 
@@ -1432,6 +1535,8 @@ class CAlloca : public CUna {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     UINT align;
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1453,6 +1558,8 @@ class CPhi : public DuProp, public StmtProp {
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 5;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[kid_num];
@@ -1485,6 +1592,7 @@ public:
     IR * getKid(UINT idx) const { return PHI_kid(this, idx); }
     //Get the No.idx operand.
     IR * getOpnd(UINT idx) const;
+    IR * getOpndByPred(IRBB const* pred, IRCFG const* cfg) const;
     IR * getOpndList() const { return PHI_opnd_list(this); }
     UINT getOpndNum() const { return xcom::cnt_list(PHI_opnd_list(this)); }
 
@@ -1517,6 +1625,8 @@ class CRegion : public IR, public StmtProp {
 public:
     static BYTE const kid_map = 0x0;
     static BYTE const kid_num = 0;
+    static UINT const accinfo_num = 1;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     Region * rg;
 public:
     static inline IRBB *& accBB(IR * ir) { return REGION_bb(ir); }
@@ -1545,6 +1655,8 @@ class CCFIDefCfa : public IR, public StmtProp{
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1563,6 +1675,8 @@ class CCFISameValue : public IR, public StmtProp{
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1580,6 +1694,8 @@ class CCFIOffset : public IR, public StmtProp{
 public:
     static BYTE const kid_map = 0x3;
     static BYTE const kid_num = 2;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1597,6 +1713,8 @@ class CCFIRestore : public IR, public StmtProp{
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)
@@ -1615,6 +1733,8 @@ class CCFIDefCfaOffset : public IR, public StmtProp{
 public:
     static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 1;
+    static UINT const accinfo_num = 2;
+    static IRFieldAccTab::AccInfo accinfo[accinfo_num];
     IR * opnd[kid_num];
 public:
     static inline IR *& accKid(IR * ir, UINT idx)

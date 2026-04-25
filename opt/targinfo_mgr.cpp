@@ -35,11 +35,8 @@ namespace xoc {
 //
 //START TargInfoMgr
 //
-void TargInfoMgr::init()
+void TargInfoMgr::initRegSet()
 {
-    m_link = getRA();
-    initRegDSystem();
-
     //Must keep the regsets related to param and return value before the caller
     //regsets and callee regsets, because the init process of caller and callee
     //regsets will use the param and return value regsets.
@@ -63,6 +60,11 @@ void TargInfoMgr::destroy()
     ASSERT0(m_rdsys);
     delete m_rdsys;
     m_rdsys = nullptr;
+
+    if (m_targ_interface != nullptr) {
+        delete m_targ_interface;
+        m_targ_interface = nullptr;
+    }
 }
 
 
@@ -85,7 +87,11 @@ bool TargInfoMgr::isAlias(Reg r1, Reg r2) const
     SRegSet const* r1_alias_set = getRegDSystem()->getOverlapSRegSet(r1);
     SRegSet const* r2_alias_set = getRegDSystem()->getOverlapSRegSet(r2);
     if (r1_alias_set == nullptr || r2_alias_set == nullptr) { return false; }
-    return r1_alias_set->is_intersect(*r2_alias_set);
+    if (r1_alias_set->is_contain(r2)) {
+        ASSERT0(r2_alias_set->is_contain(r1));
+        return true;
+    }
+    return false;
 }
 
 
@@ -109,7 +115,7 @@ void TargInfoMgr::initRegDSystem()
 
 RegSet const* TargInfoMgr::getAllocableScalarRegSet() const
 {
-    return xgen::tmGetRegSetAllocable();
+    return m_targ_interface->tmGetRegSetAllocable();
 }
 
 
@@ -121,31 +127,31 @@ UINT const TargInfoMgr::getNumOfRegister() const
 
 RegSet const* TargInfoMgr::getRetvalScalarRegSet() const
 {
-    return xgen::tmGetRegSetOfReturnValue();
+    return m_targ_interface->tmGetRegSetOfReturnValue();
 }
 
 
 RegSet const* TargInfoMgr::getParamScalarRegSet() const
 {
-    return xgen::tmGetRegSetOfArgument();
+    return m_targ_interface->tmGetRegSetOfParameter();
 }
 
 
 RegSet const* TargInfoMgr::getCallerScalarRegSet() const
 {
-    return xgen::tmGetRegSetOfCallerSaved();
+    return m_targ_interface->tmGetRegSetOfCallerSaved();
 }
 
 
 RegSet const* TargInfoMgr::getCalleeScalarRegSet() const
 {
-    return xgen::tmGetRegSetOfCalleeSaved();
+    return m_targ_interface->tmGetRegSetOfCalleeSaved();
 }
 
 
 RegSet const* TargInfoMgr::getAllocableVectorRegSet() const
 {
-    return xgen::tmGetVectorRegSetAllocable();
+    return m_targ_interface->tmGetVectorRegSetAllocable();
 }
 
 
@@ -158,25 +164,25 @@ SRegSet const* TargInfoMgr::getAliasRegSet(Reg reg) const
 
 RegSet const* TargInfoMgr::getRetvalVectorRegSet() const
 {
-    return xgen::tmGetVectorRegSetOfReturnValue();
+    return m_targ_interface->tmGetVectorRegSetOfReturnValue();
 }
 
 
 RegSet const* TargInfoMgr::getParamVectorRegSet() const
 {
-    return xgen::tmGetVectorRegSetOfArgument();
+    return m_targ_interface->tmGetVectorRegSetOfParameter();
 }
 
 
 RegSet const* TargInfoMgr::getCallerVectorRegSet() const
 {
-    return xgen::tmGetVectorRegSetOfCallerSaved();
+    return m_targ_interface->tmGetVectorRegSetOfCallerSaved();
 }
 
 
 RegSet const* TargInfoMgr::getCalleeVectorRegSet() const
 {
-    return xgen::tmGetVectorRegSetOfCalleeSaved();
+    return m_targ_interface->tmGetVectorRegSetOfCalleeSaved();
 }
 
 

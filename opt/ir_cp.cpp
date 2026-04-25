@@ -36,6 +36,99 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//
+//START AnalyzeAvailExpr
+//
+class AnalyzeAvailExpr {
+    COPY_CONSTRUCTOR(AnalyzeAvailExpr);
+protected:
+    bool m_is_aggressive;
+    Region const* m_rg;
+    IRCFG const* m_cfg;
+    PRSSAMgr const* m_prssamgr;
+    MDSSAMgr const* m_mdssamgr;
+    CopyProp const* m_cp;
+    xcom::DomTree const& m_domtree;
+    OptCtx const& m_oc;
+protected:
+    //Return true if 'cand_exp' is always available to anywhere.
+    bool isAlwaysAvailable(IR const* cand_exp) const
+    {
+        if (cand_exp->is_const() || cand_exp->is_lda()) { return true; }
+        return false;
+    }
+    bool isAvailableByPRSSA(
+        IR const* cand_exp, IR const* pos,
+        IRListIter const& cand_exp_stmt_it) const;
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+    bool useClassicPRDU() const
+    { return m_oc.is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU() const
+    { return m_oc.is_nonpr_du_chain_valid(); }
+public:
+    AnalyzeAvailExpr(
+        CopyProp const* cp, Region const* rg, xcom::DomTree const& dt,
+        OptCtx const& oc)
+            : m_rg(rg), m_domtree(dt), m_oc(oc)
+    {
+        ASSERT0(cp);
+        m_cp = cp;
+        m_is_aggressive = true;
+        m_cfg = m_rg->getCFG();
+        m_mdssamgr = m_rg->getMDSSAMgr();
+        m_prssamgr = m_rg->getPRSSAMgr();
+    }
+    //Return true if there exists stmt that is dependent to 'prop_value' from
+    //'def_stmt' to the end of BB, include the 'def_stmt' itself.
+    //def_stmt: the stmt of 'prop_value'.
+    //prop_value: the expression to be propagated.
+    //nextit: the iter of the next IR of 'def_stmt'.
+    bool existMayDefTillEndOfCurBB(
+        IR const* def_stmt, IR const* prop_value,
+        IRListIter const& curit) const;
+
+    //Return true if there exists stmt that is dependent to 'pos' from
+    //the first IR of BB, not include the stmt of 'pos'.
+    //def_stmt: the stmt of 'prop_value'.
+    //prop_value: the expression to be propagated.
+    //nextit: the iter of the next IR of 'def_stmt'.
+    bool existMayDefFromBeginOfCurBB(IR const* prop_value, IR const* pos) const;
+
+    bool existMayDefTillBB(
+        IR const* exp, IRBB const* start, IRBB const* meetup) const;
+
+    CopyProp const* getCP() const { return m_cp; }
+
+    //Both def_stmt and use_stmt are in same BB.
+    //curit: the IR list iter of 'def_stmt'.
+    bool isAvailableInSameBB(
+        IR const* def_stmt, IR const* use_stmt, IR const* cand_exp,
+        IRListIter const& cand_exp_stmt_it) const;
+
+    //Return true if 'cand_exp' does not be modified till meeting 'use_stmt'.
+    //e.g:xx = cand_exp
+    //    ..
+    //    ..
+    //    use_bb:
+    //    ... = pos  //use_stmt|use_phi
+    //
+    //cand_exp: the expression that expects to analyze whether it can be
+    //          available at 'pos'.
+    //cand_exp_stmt_it: the IR list iter of the stmt of 'cand_exp'.
+    //pos: the IR position that is used to mark the destination of available
+    //     path in dom tree. It can be expression or stmt.
+    //Note either use_phi or use_stmt is nullptr.
+    virtual bool isAvailableExpr(
+        IR const* cand_exp, IR const* pos,
+        IRListIter const& cand_exp_stmt_it) const;
+    bool is_aggressive() const { return m_is_aggressive; }
+};
+
+
 //Dump all propagation action candidates.
 //Note: If 'dump_actual' is true, only dump those in propagation action
 //candidates that will actually be performed.
@@ -44,7 +137,7 @@ static void dumpAct(
     bool dump_actual)
 {
     Region const* rg = cp->getRegion();
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLICM()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpCP()) { return; }
     class Dump : public xoc::DumpToBuf {
     public:
         bool dump_actual;
@@ -105,10 +198,12 @@ class PropVisitFunc : public xcom::VisitTreeFuncBase {
     bool m_is_changed;
     IRCFG * m_cfg;
     CopyProp * m_cp;
+    CPCtx & m_ctx;
     IRSet m_useset; //for local used
 public:
-    PropVisitFunc(IRCFG * cfg, CopyProp * cp, DefSegMgr * segmgr)
-        : m_cfg(cfg), m_cp(cp), m_useset(segmgr)
+    PropVisitFunc(IRCFG * cfg, CopyProp * cp, DefSegMgr * segmgr,
+                  MOD CPCtx & ctx)
+        : m_cfg(cfg), m_cp(cp), m_ctx(ctx), m_useset(segmgr)
     { m_is_changed = false; }
 
     bool isChanged() const { return m_is_changed; }
@@ -117,15 +212,12 @@ public:
     {}
     bool visitWhenFirstMeet(Vertex const* v, Stack<Vertex const*> &)
     {
-        m_is_changed |= m_cp->doPropBB(m_cfg->getBB(v->id()), m_useset);
+        m_is_changed |= m_cp->doPropBB(m_cfg->getBB(v->id()), m_useset, m_ctx);
         return true;
     }
 };
 
 
-//
-//START CPCtx
-//
 static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
 {
     if (am == nullptr || !rg->isLogMgrInit()) { return; }
@@ -136,7 +228,11 @@ static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
 }
 
 
-CPCtx::CPCtx(OptCtx & oc, ActMgr * am) : PassCtx(&oc, am)
+//
+//START CPCtx
+//
+CPCtx::CPCtx(OptCtx & oc, ActMgr * am, xcom::DomTree const& dt)
+    : PassCtx(&oc, am), domtree(dt)
 {
     change = false;
     need_recompute_alias_info = false;
@@ -262,25 +358,15 @@ void CopyProp::copyVN(IR const* from, IR const* to) const
 }
 
 
-//Check and replace 'exp' with 'cand_exp' if they are
-//equal, and update DU info. If 'cand_exp' is NOT leaf,
-//that will create redundant computation, and
-//depends on later Redundancy Elimination to reverse back.
-//exp: expression that will be replaced.
-//cand_exp: substitute cand_exp for exp.
-//  e.g: cand_exp is *p, cand_exp_md is MD3
-//      *p(MD3) = 10 //p point to MD3
-//      ...
-//      g = *q(MD3) //q point to MD3
-void CopyProp::replaceExp(
+bool CopyProp::replaceExp(
     IR const* def_stmt, MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_exp);
     ASSERT0(exp->getExactRef() || allowInexactMD() ||
             exp->is_id() || //exp is operand of MD PHI
             exp->is_pr());  //exp is operand of PR PHI
-    if (!checkPropBenifit(exp, cand_exp)) { return; }
-    if (!checkTypeConsistency(exp, cand_exp)) { return; }
+    if (!checkPropBenifit(exp, cand_exp)) { return false; }
+    if (!checkTypeConsistency(exp, cand_exp)) { return false; }
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
         dumpAct(this, def_stmt, cand_exp, exp, true);
     }
@@ -305,7 +391,6 @@ void CopyProp::replaceExp(
     xoc::removeUseForTree(exp, m_rg, *getOptCtx());
     CPC_change(ctx) = true;
     if (newir->mustBePointerType()) { ASSERT0(newir->is_ptr()); }
-    else if (newir->mustBeBoolType()) { ASSERT0(newir->is_bool()); }
     else { newir->setType(exp->getType()); }
 
     if (exp->is_id()) {
@@ -315,6 +400,9 @@ void CopyProp::replaceExp(
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
         DUMMYUSE(doit);
+    }
+    if (newir->mustBeBoolType()) {
+        newir->setType(m_tm->getBool());
     }
     copyVN(cand_exp, newir);
     dumpRemoveIR(ctx.getRegion(), ctx.getActMgr(), exp);
@@ -327,6 +415,7 @@ void CopyProp::replaceExp(
     IRBB * stmtbb = stmt->getBB();
     xoc::findAndSetLiveInDefForTree(
         newir, stmtbb->getPrevIR(stmt), stmtbb, m_rg, *getOptCtx());
+    return true;
 }
 
 
@@ -363,20 +452,48 @@ bool CopyProp::isCopyOP(IR * ir) const
     return false;
 }
 
+class CopyPropGraphIterInCompareFuncBase
+    : public xcom::GraphIterCompareFuncBase {
+protected:
+    xcom::VexIdx m_rootid;
+    IRCFG const* m_cfg;
+public:
+    void init(IRCFG const* cfg, xcom::VexIdx rootid)
+    {
+        ASSERT0(rootid != VERTEX_UNDEF);
+        m_rootid = rootid;
+        m_cfg = cfg;
+    }
+public:
+    CopyPropGraphIterInCompareFuncBase()
+    { m_rootid = VERTEX_UNDEF; m_cfg = nullptr; }
 
-bool CopyProp::existMayDefTillBB(
-    IR const* exp, IRBB const* start, IRBB const* meetup) const
+    //Return true if 'v' need to participate in the iteration.
+    bool isParticipateIn(Vertex const* v) const
+    {
+        ASSERT0(m_cfg);
+        return m_cfg->is_dom(m_rootid, v->id());
+    }
+};
+
+static bool iterByCFG(
+    IRCFG const* cfg, Region const* rg, Graph const* g,
+    xcom::Vertex const* startvex, xcom::VexIdx meetupid, IR const* exp,
+    bool is_aggressive)
 {
-    xcom::GraphIterIn iterin(*m_cfg, start->getVex());
+    ASSERT0(startvex && g);
+    xcom::GraphIterIn<CopyPropGraphIterInCompareFuncBase> iterin(
+        *g, startvex, nullptr);
+    iterin.getCompareFuncObject().init(cfg, meetupid);
     for (Vertex const* t = iterin.get_first();
          t != nullptr; t = iterin.get_next(t)) {
-        if (t == meetup->getVex()) { continue; }
+        if (t->id() == meetupid) { continue; }
         IRListIter irit = nullptr;
-        IRBB * tbb = m_cfg->getBB(t->id());
+        IRBB * tbb = cfg->getBB(t->id());
         ASSERT0(tbb);
         for (IR const* tir = tbb->getIRList().get_head(&irit);
              tir != nullptr; tir = tbb->getIRList().get_next(&irit)) {
-            if (xoc::isDependentForTree(tir, exp, is_aggressive(), m_rg)) {
+            if (xoc::isDependentForTree(tir, exp, is_aggressive, rg)) {
                 return true;
             }
         }
@@ -385,10 +502,50 @@ bool CopyProp::existMayDefTillBB(
 }
 
 
-//def_stmt: the stmt of 'prop_value'.
-//prop_value: the expression to be propagated.
-//nextit: the iter of the next IR of 'def_stmt'.
-bool CopyProp::existMayDefTillEndOfCurBB(
+static bool iterByDomTree(
+    IRCFG const* cfg, Region const* rg, Graph const* g,
+    xcom::Vertex const* startvex, xcom::VexIdx meetupid, IR const* exp,
+    bool is_aggressive)
+{
+    ASSERT0(startvex && g);
+    xcom::GraphIterIn<> iterin(*g, startvex);
+    for (Vertex const* t = iterin.get_first();
+         t != nullptr; t = iterin.get_next(t)) {
+        if (t->id() == meetupid) { return false; }
+        IRListIter irit = nullptr;
+        IRBB * tbb = cfg->getBB(t->id());
+        ASSERT0(tbb);
+        for (IR const* tir = tbb->getIRList().get_head(&irit);
+             tir != nullptr; tir = tbb->getIRList().get_next(&irit)) {
+            if (xoc::isDependentForTree(tir, exp, is_aggressive, rg)) {
+                return true;
+            }
+        }
+    }
+    ASSERTN(0, ("can not meet expected vertex on tree."));
+    return false;
+}
+
+
+bool AnalyzeAvailExpr::existMayDefTillBB(
+    IR const* exp, IRBB const* start, IRBB const* meetup) const
+{
+    //TODO:enable the search on domtree.
+    bool by_dom_tree = false;
+    if (by_dom_tree) {
+        xcom::Vertex const* startvex =
+            m_domtree.getVertex(start->getVex()->id());
+        return iterByDomTree(
+            m_cfg, m_rg, &m_domtree, startvex, meetup->id(), exp,
+            is_aggressive());
+    }
+    return iterByCFG(
+        m_cfg, m_rg, m_cfg, start->getVex(), meetup->id(), exp,
+        is_aggressive());
+}
+
+
+bool AnalyzeAvailExpr::existMayDefTillEndOfCurBB(
     IR const* def_stmt, IR const* prop_value, IRListIter const& curit) const
 {
     ASSERT0(curit);
@@ -406,9 +563,28 @@ bool CopyProp::existMayDefTillEndOfCurBB(
 }
 
 
-//Both def_stmt and use_stmt are in same BB.
-//curit: the IR list iter of 'def_stmt'.
-bool CopyProp::isAvailableInSameBB(
+bool AnalyzeAvailExpr::existMayDefFromBeginOfCurBB(
+    IR const* prop_value, IR const* pos) const
+{
+    ASSERT0(pos && pos->is_exp());
+    IR const* posstmt = pos->getStmt();
+    ASSERT0(posstmt);
+    IRBB * bb = posstmt->getBB();
+    ASSERT0(bb);
+    BBIRListIter irit;
+    IR const* ir;
+    for (ir = bb->getIRList().get_head(&irit);
+         ir != posstmt; ir = bb->getIRList().get_next(&irit)) {
+        if (xoc::isDependentForTree(ir, prop_value, is_aggressive(), m_rg)) {
+            return true;
+        }
+    }
+    ASSERTN(ir != nullptr, ("pos is not belong to bb"));
+    return false;
+}
+
+
+bool AnalyzeAvailExpr::isAvailableInSameBB(
     IR const* def_stmt, IR const* use_stmt, IR const* prop_value,
     IRListIter const& curit) const
 {
@@ -459,43 +635,64 @@ bool CopyProp::canBeCandidate(IR const* ir) const
 }
 
 
-//Return true if 'prop_value' does not be modified till meeting 'use_stmt'.
-//e.g:xx = prop_value //def_stmt
-//    ..
-//    ..
-//    use_bb:
-//    yy = xx  //use_stmt|use_phi
-//
-//def_stmt: ir stmt.
-//curit: the IR list iter of 'def_stmt'.
-//prop_value: expression that will be propagated.
-//Note either use_phi or use_stmt is nullptr.
-bool CopyProp::isAvailable(IR const* def_stmt, IR const* prop_value,
-                           IR const* repexp, IRListIter const& curit) const
+bool AnalyzeAvailExpr::isAvailableByPRSSA(
+    IR const* cand_exp, IR const* pos,
+    IRListIter const& cand_exp_stmt_it) const
 {
-    IR * use_stmt = nullptr;
-    MDPhi * use_phi = nullptr;
-    IRBB * usebb = nullptr;
-    if (repexp->is_id()) {
-        ASSERT0(ID_phi(repexp));
-        usebb = ID_phi(repexp)->getBB();
-        use_phi = ID_phi(repexp);
+    ASSERT0(usePRSSADU());
+    ASSERT0(cand_exp->isPROp());
+    IR const* cand_stmt = cand_exp->getStmt();
+    IR const* pos_stmt = pos->is_exp() ? pos->getStmt() : pos;
+    IRBB const* candbb = cand_stmt->getBB();
+    IRBB const* posbb = pos_stmt->getBB();
+    if (candbb == posbb) { return true; }
+    if (m_cfg->is_dom(candbb->id(), posbb->id())) { return true; }
+
+    //CASE:$11=PHI($10); #S1, $10 is cand_exp.
+    //     ...
+    //     $10 = ...;
+    //     ...
+    //     ... = $11; #S2, here is the pos.
+    //  $10 at #S1 can NOT be available at #S2.
+    return false;
+}
+
+
+bool AnalyzeAvailExpr::isAvailableExpr(
+    IR const* cand_exp, IR const* pos,
+    IRListIter const& cand_exp_stmt_it) const
+{
+    if (cand_exp->isPROp() && usePRSSADU()) {
+        return isAvailableByPRSSA(cand_exp, pos, cand_exp_stmt_it);
+    }
+    IR const* use_stmt = nullptr;
+    MDPhi const* use_phi = nullptr;
+    IRBB const* usebb = nullptr;
+    ASSERT0(pos->is_exp() || pos->is_stmt());
+    if (pos->is_id()) {
+        ASSERT0(ID_phi(pos));
+        usebb = ID_phi(pos)->getBB();
+        use_phi = ID_phi(pos);
         ASSERT0(use_phi && use_phi->is_phi());
-    } else {
-        use_stmt = repexp->getStmt();
+    } if (pos->is_exp()) {
+        use_stmt = pos->getStmt();
         ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
         usebb = use_stmt->getBB();
-        use_phi = nullptr;
+    } else {
+        ASSERT0(pos->is_stmt());
+        use_stmt = pos;
+        usebb = pos->getBB();
     }
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
+    IR const* def_stmt = cand_exp->getStmt();
+    ASSERT0(def_stmt);
     if (def_stmt == use_stmt) { return false; }
-
-    if (isSimpCVT(prop_value)) {
-        prop_value = getSimpCVTValue(prop_value);
-        ASSERT0(prop_value);
+    IR const* simpcvtvalue = getCP()->getCVTValueIfRegardAsSimpCVT(cand_exp);
+    if (simpcvtvalue != nullptr) {
+        cand_exp = simpcvtvalue;
     }
-    if (prop_value->is_const() || prop_value->is_lda()) { return true; }
+    if (isAlwaysAvailable(cand_exp)) { return true; }
 
     //Need to check overlapped MDSet.
     //e.g: Suppose occ is '*p + *q', {p->a}, {q->b}.
@@ -505,22 +702,37 @@ bool CopyProp::isAvailable(IR const* def_stmt, IR const* prop_value,
     if (defbb != usebb && !m_cfg->is_dom(defbb->id(), usebb->id())) {
         return false;
     }
-
     if (defbb == usebb) {
         //Both def_ir and use_ir are in same BB.
-        return isAvailableInSameBB(def_stmt, use_stmt, prop_value, curit);
+        return isAvailableInSameBB(
+            def_stmt, use_stmt, cand_exp, cand_exp_stmt_it);
     }
     if (use_phi != nullptr || use_stmt->is_phi()) {
         //Propagate value to phi operand.
         //Nothing to do.
     }
-    if (existMayDefTillEndOfCurBB(def_stmt, prop_value, curit)) {
+    if (existMayDefTillEndOfCurBB(def_stmt, cand_exp, cand_exp_stmt_it)) {
         return false;
     }
-    if (existMayDefTillBB(prop_value, usebb, defbb)) {
+    if (existMayDefTillBB(cand_exp, usebb, defbb)) {
+        return false;
+    }
+    if (existMayDefFromBeginOfCurBB(cand_exp, pos)) {
         return false;
     }
     return true;
+
+}
+
+//END AnalyzeAvailExpr
+
+
+bool CopyProp::isAvailable(
+    IR const* cand_exp, IR const* pos,
+    IRListIter const& cand_exp_stmt_it, CPCtx const& ctx) const
+{
+    AnalyzeAvailExpr anaexpr(this, m_rg, ctx.domtree, *ctx.getOptCtx());
+    return anaexpr.isAvailableExpr(cand_exp, pos, cand_exp_stmt_it);
 }
 
 
@@ -584,68 +796,26 @@ bool CopyProp::isPRCVT(IR const* ir) const
 }
 
 
-//Return true if CVT with simply cvt-exp that can be regard as
-//copy-propagate candidate.
-bool CopyProp::isSimpCVT(IR const* ir) const
-{
-    ASSERT0(ir);
-    if (!ir->is_cvt()) { return false; }
-    IR const* orgcvt = ir;
-    for (;;) {
-        if (ir->is_cvt()) {
-            ir = CVT_exp(ir);
-            continue;
-        }
-        switch (ir->getCode()) {
-        SWITCH_CASE_READ_PR:
-        SWITCH_CASE_DIRECT_MEM_EXP:
-        case IR_CONST:
-        case IR_LDA:
-            if (orgcvt->is_fp() && ir->is_fp() &&
-                orgcvt->getType() != ir->getType()) {
-                //Different float point type conversion can not be skipped.
-                //CASE: $1:f64 = cvt:fp64 ($2:fp32)
-                //      ... = $1:64 #USE
-                //Where $2:f32 can NOT be propagated to $1 because of type.
-                return false;
-            }
-            return true;
-        default: return false;
-        }
-    }
-    UNREACHABLE();
-    return false;
-}
-
-
-//CVT with simply cvt-exp is copy-propagate candidate.
-IR const* CopyProp::getSimpCVTValue(IR const* ir) const
+IR const* CopyProp::getCVTValueIfRegardAsSimpCVT(IR const* ir) const
 {
     if (!ir->is_cvt()) { return nullptr; }
-    IR const* orgcvt = ir;
-    for (;;) {
-        if (ir->is_cvt()) {
-            ir = CVT_exp(ir);
-            continue;
+    IR const* cvted = ((CCvt*)const_cast<IR*>(ir))->getLeafExp();
+    switch (cvted->getCode()) {
+    SWITCH_CASE_DIRECT_MEM_EXP:
+    SWITCH_CASE_READ_PR:
+    case IR_CONST:
+    case IR_LDA:
+        if (ir->is_fp() && cvted->is_fp() &&
+            ir->getType() != cvted->getType()) {
+            //Different float point type conversion can not be skipped.
+            //CASE: $1:f64 = cvt:fp64 ($2:fp32)
+            //      ... = $1:64 #USE
+            //Where $2:f32 can NOT be propagated to $1 because of type.
+            return nullptr;
         }
-        switch (ir->getCode()) {
-        SWITCH_CASE_DIRECT_MEM_EXP:
-        SWITCH_CASE_READ_PR:
-        case IR_CONST:
-        case IR_LDA:
-            if (orgcvt->is_fp() && ir->is_fp() &&
-                orgcvt->getType() != ir->getType()) {
-                //Different float point type conversion can not be skipped.
-                //CASE: $1:f64 = cvt:fp64 ($2:fp32)
-                //      ... = $1:64 #USE
-                //Where $2:f32 can NOT be propagated to $1 because of type.
-                UNREACHABLE();
-            }
-            return ir;
-        default: return nullptr;
-        }
+        return cvted;
+    default: return nullptr;
     }
-    UNREACHABLE();
     return nullptr;
 }
 
@@ -664,26 +834,24 @@ IR * CopyProp::getPropagatedValue(IR * stmt)
 
 
 bool CopyProp::doPropForMDPhi(
-    IR const* def_stmt, IR const* prop_value, MOD IR * use)
+    IR const* def_stmt, IR const* prop_value, MOD IR * use, MOD CPCtx & ctx)
 {
-    CPCtx lchange(*getOptCtx(), &getActMgr());
-    replaceExp(def_stmt, use, prop_value, lchange);
-    return CPC_change(lchange);
+    bool change = replaceExp(def_stmt, use, prop_value, ctx);
+    return change;
 }
 
 
 bool CopyProp::doPropForNormalStmt(
     IRListIter curit, IRListIter * nextit, IR const* def_stmt,
-    IR const* prop_value, MOD IR * use, IRBB * def_bb)
+    IR const* prop_value, MOD IR * use, IRBB * def_bb, MOD CPCtx & ctx)
 {
     IR * use_stmt = use->getStmt();
     ASSERT0(use_stmt && use_stmt->is_stmt() && use_stmt->getBB());
     IRBB * use_bb = use_stmt->getBB();
-    CPCtx lchange(*getOptCtx(), &getActMgr());
     IR * old_use_stmt = use_stmt;
-    replaceExp(def_stmt, use, prop_value, lchange);
+    bool lchange = replaceExp(def_stmt, use, prop_value, ctx);
     ASSERTN(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
-    if (!CPC_change(lchange)) { return false; }
+    if (!lchange) { return false; }
 
     //Indicate whether use_stmt is the next stmt of def_stmt.
     bool is_next = false;
@@ -716,7 +884,8 @@ bool CopyProp::doPropForNormalStmt(
 
 IR const* CopyProp::pickUpCandExp(
     IR const* prop_value, IR const* repexp, IR const* def_stmt,
-    IRListIter const& curit, bool prssadu, bool mdssadu) const
+    IRListIter const& curit, bool prssadu, bool mdssadu,
+    CPCtx const& ctx) const
 {
     if (repexp->is_id()) {
         if (!prop_value->is_const()) {
@@ -753,13 +922,13 @@ IR const* CopyProp::pickUpCandExp(
             //Do NOT progate value to inexact memory reference, except PR.
             return nullptr;
         }
-        if (!xoc::isKillingDef(def_stmt, repexp, m_gvn)) {
+        if (!xoc::isKillingDef(def_stmt, repexp, m_gvn, getOptCtx())) {
             return nullptr;
         }
-    } else if (!xoc::isKillingDef(def_stmt, repexp, m_gvn)) {
+    } else if (!xoc::isKillingDef(def_stmt, repexp, m_gvn, getOptCtx())) {
         return nullptr;
     }
-    if (!isAvailable(def_stmt, prop_value, repexp, curit)) {
+    if (!isAvailable(prop_value, repexp, curit, ctx)) {
         //The value that will be propagated can
         //not be killed during 'def_stmt' and 'use_stmt'.
         //e.g:
@@ -768,7 +937,7 @@ IR const* CopyProp::pickUpCandExp(
         //        a = ...; //S3
         //    }
         //    ... = g; //S2
-        //g can not be propagted since a is killed by S3.
+        //g can not be propagated since a is killed by S3.
         return nullptr;
     }
     if (!prssadu && !mdssadu &&
@@ -840,8 +1009,31 @@ IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
 }
 
 
-bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
-                             OUT bool & prssadu, OUT bool & mdssadu)
+class CPImplIntl {
+public:
+    //Return true if 'useset' is available, otherwise return false to inform
+    //CopyProp does not propagate value.
+    static bool computeUseSetByClassicDU(
+        IR const* def_stmt, OUT IRSet & useset, CopyProp const* cp)
+    {
+        DUSet const* duset = def_stmt->readDUSet();
+        if (duset == nullptr || duset->is_empty()) { return false; }
+        if (def_stmt->getExactRef() == nullptr && !cp->allowInexactMD()) {
+            //Do NOT progate value through inexact memory reference,
+            //except PR.
+            return false;
+        }
+        //Record use_stmt in another Set to facilitate this function
+        //if it is not in use-list any more after copy-propagation.
+        useset.copy((DefSBitSetCore&)*duset);
+        return true;
+    }
+};
+
+
+bool CopyProp::computeUseSet(
+    IR const* def_stmt, OUT IRSet & useset, OUT bool & prssadu,
+    OUT bool & mdssadu)
 {
     ASSERT0(def_stmt->hasResult());
     prssadu = false;
@@ -863,7 +1055,10 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
             prssadu = true;
             return true;
         }
-        goto TRY_CLASSIC_DU;
+        if (useClassicPRDU()) {
+            return CPImplIntl::computeUseSetByClassicDU(def_stmt, useset, this);
+        }
+        return false;
     }
     ASSERT0(def_stmt->isMemRefNonPR());
     if (useMDSSADU()) {
@@ -877,18 +1072,8 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet & useset,
         mdssadu = true;
         return true;
     }
-TRY_CLASSIC_DU:
-    DUSet const* duset = def_stmt->readDUSet();
-    if (duset != nullptr && !duset->is_empty()) {
-        if (def_stmt->getExactRef() == nullptr && !allowInexactMD()) {
-            //Do NOT progate value through inexact memory reference,
-            //except PR.
-            return false;
-        }
-        //Record use_stmt in another Set to facilitate this function
-        //if it is not in use-list any more after copy-propagation.
-        useset.copy((DefSBitSetCore&)*duset);
-        return true;
+    if (useClassicNonPRDU()) {
+        return CPImplIntl::computeUseSetByClassicDU(def_stmt, useset, this);
     }
     return false;
 }
@@ -898,7 +1083,8 @@ TRY_CLASSIC_DU:
 //nextit: the iter to next IR in 'bb'. It may be changed.
 bool CopyProp::doPropUseSet(
     IRSet const& useset, IR const* def_stmt, IR const* prop_value,
-    IRListIter curit, IRListIter * nextit, bool prssadu, bool mdssadu)
+    IRListIter curit, IRListIter * nextit, bool prssadu, bool mdssadu,
+    MOD CPCtx & ctx)
 {
     bool change = false;
     IRSetIter it;
@@ -912,7 +1098,7 @@ bool CopyProp::doPropUseSet(
             continue;
         }
         IR const* new_prop_value = pickUpCandExp(
-            prop_value, use, def_stmt, curit, prssadu, mdssadu);
+            prop_value, use, def_stmt, curit, prssadu, mdssadu, ctx);
         if (new_prop_value == nullptr) { continue; }
         IR const* nearest_def = xoc::findNearestDomDef(use, m_rg);
         if (nearest_def != def_stmt) { continue; }
@@ -920,7 +1106,8 @@ bool CopyProp::doPropUseSet(
             dumpAct(this, def_stmt, new_prop_value, use, false);
         }
         ASSERT0(use->getStmt());
-        if (!allowPropConstToPhiOpnd() && use->getStmt()->is_phi() &&
+        if (!allowPropConstToPhiOpnd() &&
+            use->getStmt()->is_phi() &&
             prop_value->isConstExp()) {
             continue;
         }
@@ -928,10 +1115,11 @@ bool CopyProp::doPropUseSet(
             continue;
         }
         if (use->is_id()) {
-            change |= doPropForMDPhi(def_stmt, new_prop_value, use);
+            change |= doPropForMDPhi(def_stmt, new_prop_value, use, ctx);
         } else {
-            change |= doPropForNormalStmt(curit, nextit, def_stmt,
-                new_prop_value, use, def_stmt->getBB());
+            change |= doPropForNormalStmt(
+                curit, nextit, def_stmt, new_prop_value, use,
+                def_stmt->getBB(), ctx);
         }
     } //end for each USE in SET
     return change;
@@ -939,8 +1127,9 @@ bool CopyProp::doPropUseSet(
 
 
 //useset: for local used.
-bool CopyProp::doPropStmt(IR * cpop, MOD IRSet & useset,
-                          IRListIter curit, IRListIter * nextit)
+bool CopyProp::doPropStmt(
+    IR * cpop, MOD IRSet & useset, IRListIter curit, IRListIter * nextit,
+    MOD CPCtx & ctx)
 {
     ASSERT0(cpop->is_stmt() && cpop->hasResult());
     if (cpop->getExactRef() == nullptr && !cpop->isWritePR() &&
@@ -962,13 +1151,13 @@ bool CopyProp::doPropStmt(IR * cpop, MOD IRSet & useset,
     if (!computeUseSet(cpop, useset, prssadu, mdssadu)) {
         return false;
     }
-    return doPropUseSet(useset, cpop, prop_value,
-                        curit, nextit, prssadu, mdssadu);
+    return doPropUseSet(
+        useset, cpop, prop_value, curit, nextit, prssadu, mdssadu, ctx);
 }
 
 
 //useset: for local used.
-bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet & useset)
+bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet & useset, MOD CPCtx & ctx)
 {
     bool change = false;
     IRListIter curit;
@@ -978,7 +1167,7 @@ bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet & useset)
         IR * stmt = curit->val();
         BB_irlist(bb).get_next(&nextit);
         if (!isCopyOP(stmt)) { continue; }
-        change |= doPropStmt(stmt, useset, curit, &nextit);
+        change |= doPropStmt(stmt, useset, curit, &nextit, ctx);
     }
     return change;
 }
@@ -1002,8 +1191,9 @@ bool CopyProp::doPropBBInDomTreeOrder()
     UINT const max_try = 50;
     xcom::DomTree domtree;
     m_cfg->genDomTree(domtree);
+    CPCtx ctx(*getOptCtx(), &getActMgr(), domtree);
     do {
-        PropVisitFunc vf(m_cfg, this, getSegMgr());
+        PropVisitFunc vf(m_cfg, this, getSegMgr(), ctx);
         PropVisit visit(entry, domtree, vf);
         visit.visit();
         if (!vf.isChanged()) { break; }
@@ -1033,13 +1223,8 @@ bool CopyProp::dump() const
 }
 
 
-bool CopyProp::perform(OptCtx & oc)
+bool CopyProp::initDepPass(MOD OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    if (!initDepPass(oc)) {
-        END_TIMER(t, getPassName());
-        return false;
-    }
     ASSERTN(oc.is_cfg_valid(), ("CopyProp need CFG info"));
     bool is_org_pr_du_chain_valid = oc.is_pr_du_chain_valid();
     bool is_org_nonpr_du_chain_valid = oc.is_nonpr_du_chain_valid();
@@ -1061,19 +1246,30 @@ bool CopyProp::perform(OptCtx & oc)
     }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
-    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
-    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    if (!useClassicPRDU() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
-        //DCE use either classic MD DU chain or MDSSA.
+    if (!useClassicNonPRDU() && !useMDSSADU()) {
+        //DCE use either classic NonPR DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    return true;
+}
+
+
+bool CopyProp::perform(OptCtx & oc)
+{
+    START_TIMER(t, getPassName());
+    if (!initDepPass(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     bool changed = doPropBBInDomTreeOrder();
@@ -1085,13 +1281,12 @@ bool CopyProp::perform(OptCtx & oc)
     dump();
     oc.setInvalidPass(PASS_EXPR_TAB);
     oc.setInvalidPass(PASS_AA);
-    ASSERT0(verifyMDRef(m_rg, oc));
-    ASSERT0(verifyClassicDUChain(m_rg, oc));
     oc.setValidPass(PASS_MD_REF);
-    ASSERT0(m_dumgr->verifyMDRef());
-    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
-    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0(xoc::verifyMDRef(m_rg, oc));
+    ASSERT0(xoc::verifyClassicDUChain(m_rg, oc));
+    ASSERT0(xoc::verifyIRandBB(m_rg->getBBList(), m_rg));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     return true;
 }
 //END CopyProp

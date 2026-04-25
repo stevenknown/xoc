@@ -182,6 +182,14 @@ namespace xoc {
 //**********************************************************/
 class DwarfResMgr;
 
+ //Debug prologue/epilogue marker initial value (0 = unset/not defined)
+ //prologue_end: Line number where compiler-generated prologue
+ //(stack frame setup) ends and the actual/normal code begins.
+ //epilogue_begin: Line number where compiler-generated prologue
+ //(stack frame setup) starts, before entering the actual beginning
+ //of the function/code.
+#define EPILOGUE_PROLOGUE_INIT 0
+
 //This is the alignment value of debug section, aligned to 1.
 #define DEBUG_SECTION_ALIGN_ONE 1
 
@@ -1234,6 +1242,10 @@ public:
     //name from the region manager. If no region with the given name exists,
     //the function may return nullptr.
     static Region const* getRegionByName(RegionMgr * rm, CHAR const* name);
+
+    //According to the open-source compiler standard, the first entry
+    //in DWARF's debug_line always represents epilogue_begin.
+    UINT getEpilogueBeginIdx() const { return 0; }
 
     //Please refer to the detailed explanation
     //in the function createSingleRefRel().

@@ -166,7 +166,7 @@ public:
     //reconstructed.
     void setInvalidIfMDSSAReconstructed()
     {
-        //GVN or InferEVN might record VMD object if as VN_TYPE is VN_VMD.
+        //GVN or InferEVN might record VMD object if as VN_KIND is VN_VMD.
         //These objects will be invalid after MDSSA reconstructed.
         setInvalidPass(PASS_GVN);
     }
@@ -188,6 +188,8 @@ public:
 
     //The function will invalidate flags which may be affected when control
     //flow changed.
+    //...: the options/passes that anticipated to exclude.
+    //     NOTE: the last option of these various options must be PASS_UNDEF.
     static void setInvalidIfCFGChangedExcept(OptCtx * oc, ...);
     void setInvalidIfCFGChanged()
     {
@@ -205,8 +207,8 @@ public:
     void setInvalidClassicDUChain() { setInvalidPass(PASS_CLASSIC_DU_CHAIN); }
     void setInvalidDom() { setInvalidPass(PASS_DOM); }
     void setInvalidPDom() { setInvalidPass(PASS_PDOM); }
-    void setInvalidPRDU() { OC_is_pr_du_chain_valid(*this) = false; }
-    void setInvalidNonPRDU() { OC_is_nonpr_du_chain_valid(*this) = false; }
+    void setInvalidPRDU();
+    void setInvalidNonPRDU();
     void setInvalidRPO() { setInvalidPass(PASS_RPO); }
     void setInvalidLoopInfo() { setInvalidPass(PASS_LOOP_INFO); }
     void setInvalidCFG() { OC_is_cfg_valid(*this) = false; }

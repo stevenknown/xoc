@@ -46,6 +46,10 @@ public:
     // Return the alignment parameter in memory.
     virtual UINT getAlignMem() const = 0;
 
+    //Get the callee-saved register stack slot size in bytes
+    //of different architectures.
+    virtual UINT getCalleeSaveStackSlotSize() const = 0;
+
     //Return byte size of data cache.
     virtual UINT getDCacheSize() const = 0;
 
@@ -57,6 +61,12 @@ public:
 
     //Return byte size of instruction cache line.
     virtual UINT getICacheLineSize() const = 0;
+
+    //Return the alignment parameter for matrix.
+    virtual UINT getMemAlignOfMatrix() const = 0;
+
+    //Returns the minimum alignment for instructions in the debug section.
+    virtual UINT getMinDebugInstAlign() const = 0;
 
     //Return the number of return-value integer register.
     virtual UINT getNumOfReturnValueRegister() const = 0;
@@ -73,18 +83,8 @@ public:
     //Return the number of thread.
     virtual UINT getNumOfThread() const = 0;
 
-    //Return the alignment parameter for matrix.
-    virtual UINT getMemAlignOfMatrix() const = 0;
-
-    //Returns the minimum alignment for instructions in the debug section.
-    virtual UINT getMinDebugInstAlign() const = 0;
-
     //Return byte size of TLB if any.
     virtual UINT getTLBSize() const = 0;
-
-    //Get the callee-saved register stack slot size in bytes
-    //of different architectures.
-    virtual UINT getCalleeSaveStackSlotSize() const = 0;
 
     //Return true if the stack grows downward, false means growing upward,
     //reflecting the behavior across different architectures.

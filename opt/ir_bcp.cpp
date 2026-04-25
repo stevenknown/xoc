@@ -320,7 +320,7 @@ bool BrCondProp::doProp(MOD BCPCtx & ctx)
 {
     BBList const* bbl = ctx.getRegion()->getBBList();
     BBListIter it;
-    InferCtx ictx;
+    InferCtx ictx(*ctx.getOptCtx());
     VN2IRList vn2irlst;
     GVN * gvn = ctx.getGVN();
     ASSERT0(gvn && gvn->is_valid());

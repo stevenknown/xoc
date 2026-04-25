@@ -46,11 +46,10 @@ protected:
     Region * m_rg;
     TypeMgr * m_tm;
     MInstMgr * m_mimgr;
-    Var2OffsetMgr * m_var2offset;
+    Var2OffsetMgr const* m_var2offset_mgr;
     TMWORD m_code_align;
     TMWORD m_data_align;
     MI2JumpOffset m_jump_offset_map;
-    bool m_has_ir_reloc;
 protected:
     void computeCodeOffset(MOD MIList & milst,
                            OUT Label2Offset & lab2off);
@@ -69,7 +68,7 @@ protected:
     { DUMMYUSE(val);ASSERTN(0, ("Target Dependent Code")); return false; }
 public:
     MIRelocMgr(Region * rg, MInstMgr * imgr, TMWORD align);
-    virtual ~MIRelocMgr();
+    virtual ~MIRelocMgr() {}
 
     void computeDataOffset(MOD MIList & milst,
                            Label2Offset const& lab2off);
@@ -81,10 +80,6 @@ public:
     TMWORD getDataAlign() const { return m_data_align; }
 
     MInstMgr * getMIMgr() const { return m_mimgr; }
-
-    //Get the alignment value required by the machine instruction.
-    virtual UINT getMInstAlign(MI_CODE c) const
-    { DUMMYUSE(c); ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //GCOVR_EXCL_START
     //Get the offset of the PC for the instruction.

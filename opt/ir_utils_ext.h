@@ -44,7 +44,8 @@ namespace xoc {
     SWITCH_CASE_EXT_ATOM: \
     case IR_BROADCAST: \
     case IR_MASK_OP: \
-    case IR_MASK_SELECT_TO_RES: \
+    case IR_DYNLEN_OP: \
+    case IR_SELECT_TO_RES: \
     case IR_PHYREG
 
 //Defined the entry for extended virtual stmt ir code.

@@ -199,6 +199,8 @@ protected:
         return REGION_analysis_instrument(this);
     }
 
+    //Perform high level optmizations.
+    //Return true if processing finish successful, otherwise return false.
     void HighProcessImpl(OptCtx & oc);
 
     void scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
@@ -250,7 +252,7 @@ public:
     } m_u2;
 public:
     explicit Region(REGION_TYPE rt, RegionMgr * rm)
-    { m_pool = nullptr; init(rt, rm); }
+    { m_u2.s1b1 = 0; m_pool = nullptr; init(rt, rm); }
     virtual ~Region() { destroy(); }
 
     //Add var which used inside current or inner Region.
@@ -300,7 +302,7 @@ public:
     //function foo.
     void assignDummyUse();
     void assignDummyUseForIR(IR * ir);
-    virtual void assignDummyUseForIRExt(IR * ir) { return; }
+    virtual void assignDummyUseForIRExt(IR *) {}
 
     //Construct IR list from BB list.
     //clean_ir_list: clean bb's ir list if it is true.
@@ -387,7 +389,7 @@ public:
 
     //The function assigns MD to each direct memory-ref operations that include
     //PR operation and NonPR Direct-Mem-Ref operations.
-    void doAssignDirectRefMD(OptCtx & oc);
+    void doAssignDirectRefMD(OptCtx & oc, bool clean_mayref);
 
     //The funtion returns true means IR, BBList, MD ref,
     //DefUse chain or CFG etc informations changed, user should consider
@@ -413,6 +415,9 @@ public:
     //whether other optimizations should be reperform again.
     //Otherwise return false means there is nothing changed.
     bool doBasicAnalysis(OptCtx & oc);
+
+    //Perform global refinement optimizations.
+    bool doGlobalRefine(OptCtx & oc);
 
     //Perform refinement optimization.
     virtual bool doRefine(OptCtx & oc);
@@ -860,13 +865,14 @@ public:
     DbxMgr * initDbxMgr();
 
     //Allocate and initialize IR manager.
-    IRMgr * initIRMgr();
+    virtual IRMgr * initIRMgr();
 
     //Allocate and initialize IRBB manager.
     IRBBMgr * initIRBBMgr();
 
     //Allocate and initialize attachinfo manager.
     AttachInfoMgr * initAttachInfoMgr();
+
     bool isSafeToOptimize(IR const* ir);
 
     //Return true if ir belongs to current region.
@@ -947,7 +953,11 @@ public:
 
     //Assign variable to given PR.
     void setMapPRNO2Var(PRNO prno, Var * pr_var)
-    { ANA_INS_prno2var(getAnalysisInstrument()).set((VecIdx)prno, pr_var); }
+    {
+        ASSERT0(VAR_prno(pr_var) == PRNO_UNDEF);
+        VAR_prno(pr_var) = prno;
+        ANA_INS_prno2var(getAnalysisInstrument()).set((VecIdx)prno, pr_var);
+    }
 
     //Set the counter of PR.
     //Note 'cnt' will be assigned to next new PR, so it should have not be

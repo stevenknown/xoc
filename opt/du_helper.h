@@ -33,6 +33,7 @@ namespace xoc {
 
 class VN;
 class GVN;
+class InferEVN;
 class LoopDepInfo;
 class MDSSAUpdateCtx;
 
@@ -83,6 +84,8 @@ public:
     //Return the count of definition of 'md' in given loop.
     UINT getMDDefCnt(MD const* md) const;
 
+    bool is_empty() const { return m_md2defcnt.get_elem_count() == 0; }
+
     //Return true if ir is the unqiue DEF stmt of MustRef in the loop.
     bool isUniqueDef(IR const* ir) const;
 
@@ -98,7 +101,7 @@ public:
 //e.g:stpr $1=... #S1
 //    ...=$1 + 1 $S2
 //    ...=$1 - 3 #S3
-//By giving 'from' is $1 in $S2, 'to' is $1 in S3, the function will add $1 in
+//By giving 'from' is $1 in #S2, 'to' is $1 in #S3, the function will add $1 in
 //#S3 to be USE of #S1.
 //to: root expression of target tree.
 //from: root expression of source tree.
@@ -111,9 +114,9 @@ void addUseForTree(IR * to, IR const* from, Region * rg);
 //The function will establish new DU chain between DEF of 'from' and
 //expression 'to'.
 //e.g:stpr $1=... #S1
-//    ...=$1 + 1 $S2
+//    ...=$1 + 1 #S2
 //    ...=$1 - 3 #S3
-//By giving 'from' is $1 in $S2, 'to' is $1 in S3, the function will add $1 in
+//By giving 'from' is $1 in #S2, 'to' is $1 in #S3, the function will add $1 in
 //#S3 to be USE of #S1.
 //to: target IR expression.
 //from: source IR expression.
@@ -215,7 +218,8 @@ void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg);
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
 //The function will keep iterating DEF of PHI operand.
-void collectDefSet(IR const* use, Region const* rg, OUT IRSet * defset);
+void collectDefSet(
+    IR const* use, Region const* rg, OUT IRSet * defset, OptCtx const* oc);
 
 //The function computes MustRef for direct-mem-op and MayRef according to
 //MustRef.
@@ -256,20 +260,26 @@ IR * findNearestDomDef(IR const* exp, Region const* rg);
 //    #4. return g;
 //In the case, the last reference of g in #4 may be defined by
 //#1, #2, #3, thus there is no nearest killing def.
-IR * findKillingDef(IR const* use, Region const* rg);
+IR * findKillingDef(IR const* use, Region const* rg, OptCtx const* oc);
+
+//The function try to find the killing-def for 'use'.
+//NOTE: the function is more aggressive than findKillingDef(), it try to
+//find killing-def through EVN.
+IR * findKillingDefConsiderEVN(
+    IR const* exp, Region const* rg, MOD InferEVN * evn, OptCtx const* oc);
 
 //Find the unique DEF of 'exp' that is inside given loop.
 //set: it is optional, if it is not NULL, the function will record all DEF
 //     found into the set as a return result.
 IR * findUniqueDefInLoopForMustRef(
-    IR const* exp, LI<IRBB> const* li, Region const* rg,
+    IR const* exp, LI<IRBB> const* li, Region const* rg, OptCtx const* oc,
     OUT IRSet * set = nullptr);
 
 //The function try to find the unique must-def for 'use'.
 //Note must-def is the DEF that overlapped with 'use', but may not be
 //killing-def.
 //To find the killing-def, the function prefer use SSA info.
-IR * findUniqueMustDef(IR const* use, Region const* rg);
+IR * findUniqueMustDef(IR const* use, Region const* rg, OptCtx const* oc);
 
 //The function will be looking for the correct DEF for each exp of 'root' in
 //SSA mode. And the classic DU chain does NOT need to find the live-in DEF.
@@ -307,29 +317,51 @@ void findAndSetLiveInDefForExpOfStmt(
 VN const* getVNOfIndirectOp(
     IR const* ir, OUT UINT * indirect_level, GVN const* gvn);
 
+//Return true if both ir1 and ir2 have same DEF set.
+//ir1: expression.
+//ir2: expression.
+bool hasSameDef(
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const& oc);
+
 //Return true if both ir1 and ir2 have same unique def.
 //ir1: expression.
 //ir2: expression.
-bool hasSameUniqueMustDef(IR const* ir1, IR const* ir2, Region const* rg);
+bool hasSameUniqueMustDef(
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
 
 //Return true if both IR tree that start at ir1 and IR tree that start at ir2
 //have same unique def.
 //ir1: root expression.
 //ir2: root expression.
 bool hasSameUniqueMustDefForTree(
-    IR const* ir1, IR const* ir2, Region const* rg);
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
 
 //Return true if all kid of isomorphic IR tree that start at ir1 and ir2
 //have same unique def.
 //ir1: stmt or expression.
 //ir2: stmt or expression.
 bool hasSameUniqueMustDefForIsomoKidTree(
-    IR const* ir1, IR const* ir2, Region const* rg);
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
+
+//Return true if all kid of isomorphic IR tree that start at ir1 and ir2
+//have same EVN.
+//ir1: stmt or expression.
+//ir2: stmt or expression.
+bool hasSameEVNForKidTree(
+    IR const* ir1, IR const* ir2, Region const* rg, MOD InferEVN * evn,
+    OptCtx const* oc);
 
 //Return true if both ir1 and ir2 have region livein def.
 //ir1: expression.
 //ir2: expression.
-bool hasSameRegionLiveIn(IR const* ir1, IR const* ir2, Region const* rg);
+bool hasSameRegionLiveIn(
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
+
+//Return true if entire IR tree that rooted by ir1 and ir2 are isomophic and
+//have same Memory Ref and both Memory Refs are region-livein.
+//Return false to indicate unknown.
+bool hasSameRegionLiveInForIsomoTree(
+    IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
 
 //Return true if there is loop-reduce dependence between 'ir' and its DEF.
 //ir: exp or stmt.
@@ -367,13 +399,14 @@ bool isRegionLiveIn(IR const* ir, Region const* rg);
 //Note this function does not check if there is DU chain between def and use.
 //gvn: Optional. If it is not NULL, the function will attempt to reason out the
 //     relation between 'def' and 'use' through gvn info.
-bool isKillingDef(IR const* def, IR const* use, GVN const* gvn);
+bool isKillingDef(
+    IR const* def, IR const* use, GVN const* gvn, OptCtx const* oc);
 
 //Return true if ir1's MD reference exactly cover ir2's MD reference.
 //Note the function does not check if there is DU chain between ir1 and ir2.
 //gvn:if it is not NULL, the function will attempt to reason out the
 //    relation between 'ir1' and 'ir2' through gvn info.
-bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn);
+bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc);
 
 //Return true if ir1's MD reference exactly cover md2.
 //Note the functin does not check if there is DU chain between ir1 and md2.
@@ -416,7 +449,7 @@ bool isDependent(IR const* ir, MDPhi const* phi);
 //and ir2 are independent.
 bool isLoopIndependent(
     IR const* ir1, IR const* ir2, bool costly_analysis, LI<IRBB> const* li,
-    Region const* rg, GVN const* gvn);
+    Region const* rg, GVN const* gvn, OptCtx const* oc);
 
 //Return true if both ir1 and ir2 are in loop 'li', and there is at least
 //loop-carried dependence between ir1 and ir2.
@@ -429,7 +462,7 @@ bool isLoopIndependent(
 //Note the function does not check PR operation.
 bool isLoopCarried(
     IR const* ir1, IR const* ir2, bool costly_analysis, LI<IRBB> const* li,
-    Region const* rg, GVN const* gvn, OUT LoopDepInfo & info);
+    Region const* rg, GVN const* gvn, OUT LoopDepInfo & info, OptCtx const* oc);
 
 //Return true if there is loop-carried dependence between 'ir' and stmt in loop.
 //ir: exp or stmt.
@@ -439,7 +472,8 @@ bool isLoopCarried(
 //Note the function does not check PR operation.
 bool isLoopCarried(
     IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
-    LI<IRBB> const* li, GVN const* gvn, OUT LoopDepInfo & info);
+    LI<IRBB> const* li, GVN const* gvn, OUT LoopDepInfo & info,
+    OptCtx const* oc);
 
 //Return true if there is loop-carried dependence between 'ir' and elements in
 //'lst'.
@@ -450,7 +484,7 @@ bool isLoopCarried(
 bool isLoopCarried(
     IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
     xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
-    OUT LoopDepInfo & info);
+    OUT LoopDepInfo & info, OptCtx const* oc);
 
 //Return true if there is loop-carried dependence between each IR that rooted
 //by 'ir' and elements in 'lst'.
@@ -461,7 +495,7 @@ bool isLoopCarried(
 bool isLoopCarriedForIRTree(
     IR const* ir, Region const* rg, bool is_aggressive, bool include_itselfstmt,
     xcom::List<IR*> const& lst, LI<IRBB> const* li, GVN const* gvn,
-    OUT LoopDepInfo & info);
+    OUT LoopDepInfo & info, OptCtx const* oc);
 
 //Return true if 'ir' is the unique DEF of its must-ref MD in given loop.
 //The function also consider the MayRef of each stmt in loop 'li'.

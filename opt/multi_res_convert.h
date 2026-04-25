@@ -39,6 +39,11 @@ class IRMgrExt;
 //Note the class represents two methods to convert multiple-result operation,
 //one is to split origin results into multiple operations, another is to
 //extract multiple-result from a fake-result object.
+//NOTE: the behaviours of EXTRACT functions is different from SPLIT
+//funtions. The former keeps input entire IR tree unchanged, whereas the
+//latter is going to SPLIT the multi-result expressions out of the IR's
+//ResList, which is accessed via getResList().
+
 class MultiResConvert : public Pass {
     COPY_CONSTRUCTOR(MultiResConvert);
 protected:
@@ -47,6 +52,10 @@ protected:
     TypeMgr const* m_tm;
     ActMgr m_act_mgr;
 protected:
+    IR * convertMultiResMemMem(IR * stmt, IR * res1);
+    IR * convertMultiResRegMem(IR * stmt, IR * res1);
+    IR * convertMultiResRegReg(IR * stmt, IR * res1);
+
     IR * genPreDefStmt(IR * stmt, IR * res_isomo_list, IR ** predeflst);
     IR * genPostDefStmt(IR * stmt, IR * res_isomo_list);
     IR * genExtractStmtList(IR * stmt, IR * res_isomo_list);
@@ -79,6 +88,7 @@ public:
     //      ld:u32 'res4' multi-res
     //After converting to multiple-result stmts by inserting vdef, the code
     //will be:
+    //  (The example demostrates the pre-generate-vdef.)
     //  vstpr $res1:u8 = broadcast:u8(ld 'src')  #S1
     //  vstpr $res2:u8 = broadcast:u8(ld 'src')  #S2
     //  vst:u32 'res3' = broadcast:u8(ld 'src')  #S3
@@ -111,6 +121,12 @@ public:
 
     //Build a store with a RHS expression which generate multiple results and
     //convert the store to a group stmts by inserting virtual-def.
+    //
+    //NOTE: the behaviours of EXTRACT functions is different from SPLIT
+    //funtions. The former keeps input entire IR tree unchanged, whereas the
+    //latter is going to SPLIT the multi-result expressions out of the IR's
+    //ResList, which is accessed via getResList().
+    //
     //e.g: given RHS expression is: broadcast src, $res1, $res2, res3, res4
     //which spreads 'ld src' to multiple result $res1, $res2, res3 and res4.
     //The generated single store is:
@@ -123,7 +139,8 @@ public:
     //      ld:u32 'res4' multi-res
     //After converting to multiple-result stmts by inserting vdef, the code
     //will be:
-    //  st 'fake-res'                                      #S1
+    //  (The example demostrates the post-generate-vdef.)
+    //  st 'fake-res'          #S1
     //    broadcast:u8
     //      ld:u32 'src'
     //      $res1:u8 multi-res
@@ -141,10 +158,6 @@ public:
     //express multiple-result of broadcast operation.
     IR * buildStoreWithMultiResAndConvertByExtract(
         Var * lhs, IR * rhs);
-
-    IR * convertMultiResMemMem(IR * stmt, IR * res1);
-    IR * convertMultiResRegMem(IR * stmt, IR * res1);
-    IR * convertMultiResRegReg(IR * stmt, IR * res1);
 
     //The function converts a stmt with multi-res-list descriptions, to a list
     //of normtal single-result stmts which are composed of Virtual OP.
@@ -169,7 +182,7 @@ public:
     //      $res2:u8 multi-res
     //      ld:u32 'res3' multi-res
     //where #S1, #S2 and #S3 are Virtual OPs, and #S4 is original stmt.
-    //genpostde: true to generate post virtual-def OP right after real-def stmt
+    //genpostdef: true to generate post virtual-def OP right after real-def stmt
     //  to prevent subsequent stmts from moving over.
     //  e.g: given res1, res2 = src,
     //  after convertion:
@@ -189,6 +202,9 @@ public:
     PASS_TYPE getPassType() const { return PASS_MULTI_RES_CVT; }
     ActMgr const& getActMgr() const { return m_act_mgr; }
     IRMgrExt * getIRMgr() const { return m_irmgr; }
+
+    //Enable or disable the generation of post-virtual-def.
+    void setEnablePostVDef(bool enable) { m_is_enable_post_vdef = enable; }
 };
 
 } //namespace xoc

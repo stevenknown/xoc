@@ -66,7 +66,7 @@ author: Su Zhenyu
 #define BYTE_PER_CHAR 1
 #define BYTE_PER_SHORT 2
 #define BYTE_PER_INT 4
-#define BYTE_PER_LONG 4
+#define BYTE_PER_LONG 8
 #define BYTE_PER_LONGLONG 8
 #define BYTE_PER_FLOAT 4
 #define BYTE_PER_DOUBLE 8

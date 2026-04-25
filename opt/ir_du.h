@@ -188,6 +188,7 @@ protected:
 
     //Used to cache overlapping MDSet for individual MD.
     MD2MDSet * m_cached_overlap_mdset;
+    PassWrap * m_solveset_mgr_wrap;
 
     //Indicate whether MDSet is cached for individual MD.
     DefSBitSetCore * m_is_cached_mdset;
@@ -196,7 +197,6 @@ protected:
     IRIter m_iter; //for tmp use.
     IRIter m_iter2; //for tmp use.
     ConstMDIter m_tab_iter; //for tmp use.
-    SolveSetMgr m_solve_set_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
 protected:
     bool buildLocalDUChain(
@@ -277,6 +277,8 @@ protected:
         OUT MDSet * mayuse, DUOptFlag flag);
 
     void freeDUSetForAllIR();
+    void freeDUSetForPROp();
+    void freeDUSetForNonPROp();
 
     inline void * xmalloc(size_t size)
     {
@@ -314,7 +316,6 @@ protected:
     void solveSet(MOD OptCtx & oc, DUOptFlag flag);
     //Set given set to be more conservative MD reference set.
     void setToConservative(OUT MDSet & maydefuset);
-    void setToWorstCase(IR * ir);
     void setMayRefForDummyuseOfCallStmt(IR * ir, MDSet const* mayref);
     DUMgr * self() { return this; }
 
@@ -375,9 +376,6 @@ public:
     void computeKillSet(
         DefDBitSetCoreReserveTab & dbitsetchash, Vector<MDSet*> const* mustdefs,
         Vector<MDSet*> const* maydefs, DefMiscBitSetMgr & bsmgr);
-    void computeAuxSetForExpression(
-        DefDBitSetCoreReserveTab & dbitsetchash, OUT SolveSet * expr_universe,
-        Vector<MDSet*> const* maydefmds, DefMiscBitSetMgr & bsmgr);
     void computeMDDUChain(
         MOD OptCtx & oc, bool retain_reach_def, DUOptFlag duflag);
     void computeRegionMDDU(
@@ -386,6 +384,8 @@ public:
 
     //The function will free DUSet for all IRs in region.
     void cleanDUSet() { freeDUSetForAllIR(); }
+    void cleanDUSetForPROp() { freeDUSetForPROp(); }
+    void cleanDUSetForNonPROp() { freeDUSetForNonPROp(); }
 
     //The function copy MustUse and MayUse mds from tree 'from' to tree 'to'
     //and build new DU chain for 'to'.
@@ -396,6 +396,13 @@ public:
     //NOTE: IR tree 'to' and 'from' must be isomorphic structure.
     //Both 'to' and 'from' must be expression.
     void addUseForTree(IR * to, IR const* from);
+
+    //The function copy MustUse and MayUse mds from single ir 'from' to single
+    //ir 'to' and build new DU chain for 'to'.
+    //The function will establish new DU chain between the DEF of 'from'
+    //and 'to'.
+    //Both 'to' and 'from' must be expression.
+    void addUse(IR * to, IR const* from);
 
     //Count the memory usage to DUMgr.
     size_t count_mem() const;
@@ -480,7 +487,8 @@ public:
 
     //Get sparse bitset mgr.
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
-    SolveSetMgr * getSolveSetMgr() { return &m_solve_set_mgr; }
+    SolveSetMgr * getSolveSetMgr() const
+    { return (SolveSetMgr*)m_solveset_mgr_wrap->getPass(); }
     IR const* getExactAndUniqueDef(IR const* exp) const;
 
     //Used to cache overlapping MDSet for individual MD.
@@ -498,6 +506,17 @@ public:
     //Return true if exist DEF to 'ir'.
     //ir: must be exp.
     bool hasDef(IR const* ir) const;
+
+    //Return true if both ir1 and ir2 have same DEF set.
+    //ir1: expression.
+    //ir2: expression.
+    bool hasSameDef(IR const* ir1, IR const* ir2, OptCtx const& oc) const;
+
+    //Return true if both ir1 and ir2 have region livein def.
+    //ir1: expression.
+    //ir2: expression.
+    static bool hasSameRegionLiveIn(
+        IR const* ir1, IR const* ir2, Region const* rg, OptCtx const* oc);
 
     //Return true if 'def' may or must modify MDSet that 'use' referenced.
     //'def': STPR stmt.
@@ -571,7 +590,7 @@ public:
     //Find the unique DEF of 'exp' that is inside given loop.
     //Note the DEF may not be killing-def of 'exp'.
     static IR * findUniqueDefInLoopForMustRef(
-        IR const* exp, LI<IRBB> const* li, Region const* rg,
+        IR const* exp, LI<IRBB> const* li, Region const* rg, OptCtx const* oc,
         OUT IRSet * set = nullptr);
 
     //Find all USEs of stmt that is inside the given loop.
@@ -583,6 +602,9 @@ public:
     void setMustKilledDef(UINT bbid, SolveSet * set);
     void setMayKilledDef(UINT bbid, SolveSet * set);
     void setKilledIRExpr(UINT bbid, SolveSet * set);
+
+    //Set MD reference of 'ir' to be more conservative MD reference set.
+    void setToWorstCase(IR * ir);
 
     //DU chain operation.
     //Cut off the chain bewteen 'def' and 'use'.
@@ -599,6 +621,8 @@ public:
 
     //The function will remove DU Chain for all IRs.
     void removeAllDUChain() { cleanDUSet(); }
+    void removePRDUChain() { cleanDUSetForPROp(); }
+    void removeNonPRDUChain() { cleanDUSetForNonPROp(); }
 
     //Check if the DEF of stmt's operands still modify the same memory object.
     //e.g: Revise DU chain if stmt's rhs has been changed.

@@ -1370,6 +1370,18 @@ START:
 }
 
 
+bool Lexer::readMaxSrcLineByLineno(UINT lineno)
+{
+    if (lineno >= getOffsetTabLineNum()) { return false; }
+    ASSERT0(m_src_file);
+    ::fseek(m_src_file, m_ofst_tab[lineno], SEEK_SET);
+    if (::fgets(m_cur_line, m_cur_line_len, m_src_file) != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+
 CHAR const* Lexer::getTokenName(TOKEN tok) const
 {
     return TOKEN_INFO_name(&g_token_info[tok]);

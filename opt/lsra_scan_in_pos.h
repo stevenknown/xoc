@@ -32,13 +32,14 @@ namespace xoc {
 
 class ScanInPosOrder {
     COPY_CONSTRUCTOR(ScanInPosOrder);
+    RegAllocMgr * m_ramgr;
     LSRAImpl & m_impl;
-    LinearScanRA & m_ra;
     BBList * m_bb_list;
     IRCFG * m_cfg;
 public:
-    ScanInPosOrder(LSRAImpl & impl) : m_impl(impl), m_ra(impl.getRA())
+    ScanInPosOrder(LSRAImpl & impl) : m_impl(impl)
     {
+        m_ramgr = impl.getRegAllocMgr();
         m_bb_list = impl.getBBList();
         m_cfg = impl.getCFG();
     }

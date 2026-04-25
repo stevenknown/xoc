@@ -60,14 +60,19 @@ class UINT2VMDVec {
     COPY_CONSTRUCTOR(UINT2VMDVec);
 protected:
     UINT m_threshold;
-    Vector<VMDVec*> m_mdid2vmdvec_vec;
-    TMap<UINT, VMDVec*> m_mdid2vmdvec_map;
-
+    xcom::Vector<VMDVec*> m_mdid2vmdvec_vec;
+    xcom::TMap<UINT, VMDVec*> m_mdid2vmdvec_map;
 public:
     UINT2VMDVec(UINT threshold = 1000) { init(threshold); }
     ~UINT2VMDVec() { destroy(); }
+
     //Count memory usage for current object.
     size_t count_mem() const;
+    void clean()
+    {
+        destroy();
+        init();
+    }
 
     void init(UINT threshold = 1000)
     {
@@ -215,6 +220,7 @@ public:
     bool findUse(IR const* exp) { return VMD_occs(this).find(exp->id()); }
 
     MDDef * getDef() const { return VMD_def(this); }
+    IR * getOcc() const;
     UseSet * getUseSet() { return &VMD_occs(this); }
     MD const* getMD(MDSystem const* sys) const
     { return const_cast<MDSystem*>(sys)->getMD(mdid()); }
@@ -253,7 +259,7 @@ public:
 typedef xcom::DefSEGIter * VOpndSetIter;
 
 //Set of Virtual Operand.
-class VOpndSet : public DefSBitSetCore {
+class VOpndSet : public xcom::DefSBitSetCore {
     COPY_CONSTRUCTOR(VOpndSet);
 public:
     VOpndSet() { xcom::DefSBitSetCore::init(); }
@@ -322,6 +328,7 @@ public:
     void addUseSet(IRSet const& set, IN UseDefMgr * mgr);
     void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
+    void clean(UseDefMgr * mgr) { cleanVOpndSet(mgr); }
     void cleanVOpndSet(UseDefMgr * mgr);
     void copyVOpndSet(VOpndSet const& src, UseDefMgr * mgr);
     void copy(MDSSAInfo const& src, UseDefMgr * mgr)
@@ -544,6 +551,7 @@ public:
         MDPHI_bb(this) = nullptr;
     }
 
+    void dump(MDSSAMgr const* mgr) const;
     void dump(Region const* rg, UseDefMgr const* mgr) const;
 
     //Return true if MDPhi has given number of operand at least.
@@ -560,8 +568,36 @@ public:
     //Get the No.idx operand, start at 0.
     IR * getOpnd(UINT idx) const;
 
+    //Get the operand of Phi by given predecessor BB.
+    //e.g: BB1  BB2
+    //      |    |
+    //      v    v
+    //   ---------------
+    //  |BB3            |
+    //  |phi(id10, id11)|
+    //BB1 and BB2 are predecessors of BB3 in CFG, where BB1 is the 0th pred,
+    //BB2 is the 1th pred.
+    //If parameter 'pred' is BB2, the function returns id11.
+    IR * getOpndByPred(IRBB const* pred, IRCFG const* cfg) const;
+
     //Get the operand list.
     IR * getOpndList() const { return m_opnd_list; }
+
+    //Get the unique DEF OCC of No.n operand of current phi.
+    //e.g:ist(VMD2) = ...
+    //    st(VMD3) = ...
+    //    mdphi(VMD1) = VMD2(ist), VMD3(st);
+    //  input n is 1, the function return 'st'.
+    //Return NULL if there is no such DEF OCC.
+    IR * getDefOccOfNthOpnd(UINT n, MDSSAMgr const* mgr) const;
+
+    //Get the unique VMD of No.n operand of current phi.
+    //e.g:ist(VMD2) = ...
+    //    st(VMD3) = ...
+    //    mdphi(VMD1) = VMD2(ist), VMD3(st);
+    //  input n is 1, the function return 'VMD3'.
+    //Return the VMD.
+    VMD const* getVMDOfNthOpnd(UINT n, MDSSAMgr const* mgr) const;
 
     //Get the number of operands.
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }

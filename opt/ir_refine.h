@@ -49,6 +49,10 @@ class ActMgr;
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 #define RC_maintain_du(r) ((r).u1.s1.maintain_du)
 #define RC_refine_sub_to_neg(r) ((r).u1.s1.refine_sub_to_neg)
+#define RC_refine_branch_lt_1_to_le_0(r) \
+    ((r).u1.s1.refine_branch_lt_1_to_le_0)
+#define RC_refine_branch_gt_neg_1_to_ge_0(r) \
+    ((r).u1.s1.refine_branch_gt_neg_1_to_ge_0)
 #define RC_optctx(r) ((r).m_oc)
 #define RC_stmt_generated(r) ((r).m_stmt_generated)
 class RefineCtx : public PassCtx {
@@ -91,6 +95,14 @@ public:
             //Pass info top-down. True to do following refinement.
             //e.g: int a; 0-a => neg(a)
             BitUnion refine_sub_to_neg:1;
+
+            //Pass info top-down. True to do following refinement.
+            //e.g: int a; if (a < 1) => if (a <= 0)
+            BitUnion refine_branch_lt_1_to_le_0:1;
+
+            //Pass info top-down. True to do following refinement.
+            //e.g: int a; if (a > -1) => if (a >= 0)
+            BitUnion refine_branch_gt_neg_1_to_ge_0:1;
         } s1;
         BitUnion i1;
     } u1;
@@ -132,6 +144,12 @@ public:
     bool isStmtRemoved() const { return RC_stmt_removed(*this); }
     bool isGVNValid() const;
 
+    bool refine_branch_gt_neg_1_to_ge_0() const
+    { return RC_refine_branch_gt_neg_1_to_ge_0(*this); }
+
+    bool refine_branch_lt_1_to_le_0() const
+    { return RC_refine_branch_lt_1_to_le_0(*this); }
+
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
     bool refine_mul_const() const { return RC_refine_mul_const(*this); }
@@ -147,13 +165,15 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
         RC_refine_sub_to_neg(*this) = false;
+        RC_refine_branch_lt_1_to_le_0(*this) = false;
+        RC_refine_branch_gt_neg_1_to_ge_0(*this) = false;
     }
 
     //Return true if refinement need to maintain DefUse chain.
     bool maintainDU() const { return RC_maintain_du(*this); }
 
     //Return true if user ask the pass to do fold_const.
-    bool needDoFoldConst() const { return RC_do_fold_const(*this); }
+    bool needToDoFoldConst() const { return RC_do_fold_const(*this); }
 
     //Unify the actions which propagated bottom up
     //during processing the refinement.
@@ -168,6 +188,13 @@ public:
             tgtlst.append_tail(ir);
         }
     }
+
+    bool useClassicPRDU() const
+    {
+        return getRegion()->getDUMgr() != nullptr &&
+            getOptCtx()->is_pr_du_chain_valid();
+    }
+
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
@@ -212,6 +239,10 @@ protected:
     virtual IR * foldConstUnary(IR * ir, bool & change, RefineCtx &);
     virtual IR * foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc);
 
+    //Return true if ir should be revised to judge-expression.
+    //ir: the IR expression.
+    bool mustReviseToJudge(IR const* ir) const;
+
     //Peephole optimizations.
     virtual IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
@@ -220,7 +251,7 @@ protected:
     virtual IR * refineCvt(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLand(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLor(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineXor(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * refineXor(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * refineAdd(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * refineSub(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * refineMul(IR * ir, bool & change, RefineCtx & rc);
@@ -234,6 +265,8 @@ protected:
     IR * refineLog(IR * ir, bool & change, RefineCtx & rc);
     IR * refineExponent(IR * ir, bool & change, RefineCtx & rc);
     IR * refineCall(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineCallArg(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineCallRet(IR * ir, bool & change, RefineCtx & rc);
     IR * refineICall(IR * ir, bool & change, RefineCtx & rc);
     IR * refineSwitch(IR * ir, bool & change, RefineCtx & rc);
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
@@ -248,6 +281,8 @@ protected:
     IR * refineLsl(IR * ir, bool & change, RefineCtx const& rc);
     IR * refineLsr(IR * ir, bool & change, RefineCtx const& rc);
     virtual IR * refineTrigonometric(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBinaryOpProlog(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBinaryOpEpilog(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);

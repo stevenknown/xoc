@@ -385,7 +385,7 @@ void VectAccDescMgr::clean()
 void VectAccDescMgr::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
-    note(rg, "\n==-- DUMP VectAccDescMgr --==");
+    note(rg, "\n-- VectAccDescMgr --");
     rg->getLogMgr()->incIndent(2);
     note(rg, "\nTHERE ARE %u RECOGNIZED VECTOR OPERATION",
          m_ir2desc.get_elem_count());
@@ -517,10 +517,8 @@ bool VectOp::verify() const
     IR const* occ = getOcc();
     if (occ != nullptr) {
         ASSERT0(getExpectType());
-        if (occ->isBinaryOp()) {
-            ASSERT0(getNumOfOpnd() == 2);
-        } else if (occ->isUnaryOp()) {
-            ASSERT0(getNumOfOpnd() == 1);
+        if (occ->isBinaryOp() || occ->isUnaryOp() || occ->is_select()) {
+            ASSERT0(getNumOfOpnd() == IR_MAX_KID_NUM(occ));
         }
     }
     for (UINT i = 0; i < m_opvec.get_elem_count(); i++) {
@@ -560,24 +558,28 @@ void VectOp::addOpnd(IR const* occ, Type const* expty, MOD VectOpMgr & mgr)
 //START VectCtx
 //
 VectCtx::VectCtx(LI<IRBB> const* li, IVBoundInfo const* bi, OptCtx & oc,
-                 Vectorization * vect, GVN * gvn, ActMgr * am)
-    : PassCtx(&oc, am), m_vect(vect)
+                 Vectorization * vect, ActMgr * am, IVRCtx const* ivrctx)
+    : PassCtx(&oc, am)
 {
     ASSERT0(li && bi);
     m_li = li;
+    m_vect = vect;
     m_ivr = m_vect->getIVR();
-    m_rg = m_vect->getRegion();
-    m_cfg = m_rg->getCFG();
-    m_irmgr = m_rg->getIRMgr();
+    m_cfg = getRegion()->getCFG();
+    m_irmgr = getRegion()->getIRMgr();
     m_iv_bound_info = bi;
     m_licm_anactx = nullptr;
-    m_vm = m_rg->getVarMgr();
-    m_mdsys = m_rg->getMDSystem();
-    m_lrmgr = new LinearRepMgr(m_rg, oc);
+    m_vm = getRegion()->getVarMgr();
+    m_mdsys = getRegion()->getMDSystem();
+    m_ifcvs = (IfConversion*)getRegion()->getPassMgr()->registerPass(
+        PASS_IF_CONVERSION);
+    ASSERT0(m_ifcvs);
+    m_lrmgr = new LinearRepMgr(getRegion(), oc);
     m_vectaccdesc_mgr = new VectAccDescMgr();
-    ASSERT0(gvn);
-    m_infer_evn = gvn->getAndGenInferEVN();
+    ASSERT0(getGVN());
+    m_infer_evn = getGVN()->getAndGenInferEVN();
     m_epilloop_comp_remain = nullptr;
+    m_ivrctx = ivrctx;
 }
 
 
@@ -588,12 +590,56 @@ VectCtx::~VectCtx()
     m_infer_evn = nullptr;
     for (IR const* t = getPrerequisiteOpList().get_head();
          t != nullptr; t = getPrerequisiteOpList().get_next()) {
+        ASSERTN(t->getBB() == nullptr, ("stmt has been inserted into a BB"));
         getRegion()->freeIRTree(const_cast<IR*>(t));
     }
     for (IR const* t = getInitOpList().get_head();
          t != nullptr; t = getInitOpList().get_next()) {
+        ASSERTN(t->getBB() == nullptr, ("stmt has been inserted into a BB"));
         getRegion()->freeIRTree(const_cast<IR*>(t));
     }
+}
+
+
+void VectCtx::CandList::append(IR * ir)
+{
+    if (find(ir)) { return; }
+    xcom::EList<IR*, IR2Holder>::append_tail(ir);
+}
+
+
+void VectCtx::ResCandList::append(IR * ir)
+{
+    if (find(ir)) { return; }
+    xcom::EList<IR*, IR2Holder>::append_tail(ir);
+}
+
+
+void VectCtx::ResConstCandList::append(IR const* ir)
+{
+    if (find(ir)) { return; }
+    xcom::EList<IR const*, ConstIR2Holder>::append_tail(ir);
+}
+
+
+void VectCtx::VOpList::append(VectOp * vop)
+{
+    ASSERT0(!find(vop));
+    xcom::List<VectOp*>::append_tail(vop);
+}
+
+
+void VectCtx::ResOpList::append(IR * ir)
+{
+    ASSERT0(!find(ir));
+    xcom::List<IR*>::append_tail(ir);
+}
+
+
+void VectCtx::GenedStmtList::append(IR * ir)
+{
+    ASSERT0(!find(ir));
+    IRList::append_tail(ir);
 }
 
 
@@ -624,6 +670,20 @@ BIV const* VectCtx::getBIV() const
 }
 
 
+static void dumpMandaPath(VectCtx const& ctx)
+{
+    note(ctx.getRegion(), "\n-- MANDATORY PATH:");
+    VectCtx & pctx = const_cast<VectCtx&>(ctx);
+    for (BSIdx i = pctx.getMandaPath().get_first();
+         i != BS_UNDEF; i = pctx.getMandaPath().get_next(i)) {
+        if (i != pctx.getMandaPath().get_first()) {
+            prt(pctx.getRegion(), ",");
+        }
+        prt(pctx.getRegion(), "%u", i);
+    }
+}
+
+
 void VectCtx::dump() const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
@@ -632,6 +692,7 @@ void VectCtx::dump() const
     if (getLI() != nullptr) {
         getLI()->dump(getRegion());
     }
+    dumpMandaPath(*this);
     if (getIVBoundInfo() != nullptr) {
         getIVBoundInfo()->dump(m_rg);
     }
@@ -641,7 +702,7 @@ void VectCtx::dump() const
         //Dump collected IR stmt that can be vector candidate.
         note(m_rg, "\n-- CAND STMT LIST --");
         m_rg->getLogMgr()->incIndent(2);
-        CandList::Iter it;
+        CandListIter it;
         for (IR * ir = pthis->getCandList().get_head(&it);
              ir != nullptr; ir = pthis->getCandList().get_next(&it)) {
             xoc::dumpIR(ir, m_rg);
@@ -669,7 +730,7 @@ void VectCtx::dump() const
     if (pthis->getResCandList().get_elem_count() > 0) {
         note(m_rg, "\n-- RESULT-CAND STMT LIST --");
         m_rg->getLogMgr()->incIndent(2);
-        VectCtx::ResCandList::Iter it;
+        VectCtx::ResCandListIter it;
         for (pthis->getResCandList().get_head(&it);
              it != nullptr; pthis->getResCandList().get_next(&it)) {
             IR * ir = it->val();
@@ -723,6 +784,9 @@ void VectCtx::dump() const
         }
         m_rg->getLogMgr()->decIndent(2);
     }
+    if (getActMgr() != nullptr) {
+        getActMgr()->dump();
+    }
     m_rg->getLogMgr()->decIndent(2);
 }
 
@@ -731,26 +795,6 @@ bool VectCtx::isIV(IR const* ir) const
 {
     ASSERT0(m_ivr);
     return m_ivr->isIV(m_li, ir, nullptr);
-}
-
-
-void VectCtx::addCandVOp(VectOp * vectop)
-{
-    ASSERT0(!getCandVOpList().find(vectop));
-    getCandVOpList().append_tail(vectop);
-}
-
-
-void VectCtx::addPrerequisiteOp(IR * ir)
-{
-    ASSERT0(!getPrerequisiteOpList().find(ir));
-    getPrerequisiteOpList().append_tail(ir);
-}
-
-
-void VectCtx::addStmtCand(IR * ir)
-{
-    m_stmt_cand_list.append_tail(ir);
 }
 
 
@@ -768,21 +812,26 @@ bool VectCtx::verify() const
 }
 
 
+void VectCtx::cleanIfVectFailed()
+{
+    getCandList().clean();
+    getPrerequisiteOpList().clean();
+}
+
+
 void VectCtx::cleanAfterLoopReconstruct()
 {
     m_li = nullptr;
     m_iv_bound_info = nullptr;
     getVectAccDescMgr().clean();
     getCandList().clean();
-    getPrerequisiteOpList().clean();
+
+    //NOTE: the stmt that recorded in prereq-list should be freed after
+    //new vector operation generated because all vector-op dependent prereq-op
+    //are duplicated from original prereq-op.
+    //getPrerequisiteOpList().clean();
     getResCandList().clean();
     getCandVOpList().clean();
-}
-
-
-void VectCtx::addGeneratedStmt(IR * ir)
-{
-    getGeneratedStmtList().append_tail(ir);
 }
 
 
@@ -792,7 +841,7 @@ void VectCtx::addGeneratedStmtFromBB(IRBB const* bb)
     for (IR * ir = const_cast<IRBB*>(bb)->getIRList().get_head(&it);
          ir != nullptr; ir = const_cast<IRBB*>(bb)->getIRList().get_next(&it)) {
         if (ir->is_label()) { continue; }
-        addGeneratedStmt(ir);
+        getGeneratedStmtList().append(ir);
     }
 }
 
@@ -877,17 +926,18 @@ bool GenerateMask::tryGenerateMaskVectOp(MOD VectCtx & ctx)
     ctx.recordEpillLoopCompRemain(comp_remain);
     ctx.getEpilLoopMaskOpList().append_tail(comp_remain);
     ctx.getEpilLoopMaskOpList().append_tail(comp_mask);
-    IRListIter it;
+    VectCtx::ResOpListIter it;
     for (IR const* vop = ctx.getMainLoopResOpList().get_head(&it);
          vop != nullptr; vop = ctx.getMainLoopResOpList().get_next(&it)) {
         ASSERT0(vop->hasRHS());
         //IR * dup_vop = rg->dupIsomoStmtExceptRHS(vop);
         IR * masked_vop = irmgrext->buildMaskOp(
             rg->dupIRTreeList(vop->getRHS()),
-            rg->dupIsomoExpTree(comp_mask), vop->getType());
-        IR * dup_vop = irmgrext->buildMaskStoreStmtViaIsomoIR(
+            rg->dupIsomoExpTree(comp_mask),
+            CMaskOp::UNDISTURBED, vop->getType());
+        IR * dup_vop = irmgrext->buildSelectStoreStmtViaIsomoIR(
             vop, masked_vop, rg->dupIsomoExpTree(comp_mask), vop->getType());
-        ASSERT0(dup_vop->isMaskStoreStmt());
+        ASSERT0(dup_vop->isPartialStoreStmt());
         ctx.getEpilLoopResOpList().append_tail(dup_vop);
         ctx.getActMgr()->dumpAct(
             "generate mask operation for remain part data:%s\n",
@@ -937,50 +987,177 @@ HOST_UINT Vectorization::getMaxVectorElemNum(
 }
 
 
-bool Vectorization::hasUniqueBranchTarget(
-    IR const* ir, LabelInfo const** tgtlab) const
+static bool isLoopBound(IR const* ir, VectCtx const& ctx)
 {
-    ASSERT0(ir->isBranch() && tgtlab);
-    *tgtlab = nullptr;
-    if (ir->isConditionalBr() || ir->isUnconditionalBr()) {
-        *tgtlab = ir->getLabel();
-        return true;
-    }
-    if (ir->isMultiConditionalBr() || ir->isIndirectBr()) {
-        LabelInfo const* lab = nullptr;
-        ConstIRIter it;
-        for (IR const* x = xoc::iterInitC(ir, it);
-             x != nullptr; x = xoc::iterNextC(it)) {
-            if (x->is_case()) { continue; }
-            if (lab == nullptr) {
-                lab = CASE_lab(x);
-                continue;
-            }
-            if (lab != CASE_lab(x)) {
-                return false;
-            }
+    IVBoundInfo const* bi = ctx.getIVBoundInfo();
+    return ir == bi->getBound();
+}
+
+
+bool VectCtx::isOnMandaPath(IRBB const* bb) const
+{
+    ASSERT0(bb);
+    return const_cast<VectCtx*>(this)->getMandaPath().is_contain(bb->id());
+}
+
+
+static bool isDiamondRegionOnMandatoryPath(
+    DiamondRegion const& dr, VectCtx const& ctx)
+{
+    ASSERT0(dr.verify(ctx.getCFG()));
+    if (!ctx.isOnMandaPath(dr.top)) { return false; }
+    if (!ctx.isOnMandaPath(dr.bottom)) { return false; }
+    if (!dr.isTri()) {
+        if (!ctx.isOnMandaPath(dr.left) && !ctx.isOnMandaPath(dr.right)) {
+            //There are two successors of 'top'.
+            //Thus, there must be at least one successor on the mandatory path.
+            return false;
         }
-        *tgtlab = lab;
+    }
+    return true;
+}
+
+
+static bool isIVRelatedForArrayOp(IR const* ir, VectCtx const& ctx)
+{
+    ASSERT0(ir->isArrayOp());
+    IR const* subexp = ((CArray*)ir)->getSubExpOfLowestDim();
+    ASSERT0(subexp);
+    IVR const* ivr = ctx.getIVR();
+    ASSERT0(ivr);
+    if (ivr->isLinearRepOfIV(ctx.getLI(), subexp, nullptr, *ctx.getIVRCtx())) {
+        dumpActNonLinRep(ctx.getVect(), subexp);
         return true;
     }
-    UNREACHABLE();
     return false;
 }
 
 
-bool Vectorization::isBranchLegalToVect(
-    IR const* ir, LI<IRBB> const* li, IVBoundInfo const& bi) const
+static bool isIVRelatedForIndirectOp(IR const* ir, VectCtx const& ctx)
+{
+    ASSERT0(ir->isIndirectMemOp());
+    IR const* base = ir->getBase();
+    IVR const* ivr = ctx.getIVR();
+    ASSERT0(ivr);
+    if (ivr->isLinearRepOfIV(ctx.getLI(), base, nullptr, *ctx.getIVRCtx())) {
+        dumpActNonLinRep(ctx.getVect(), base);
+        return true;
+    }
+    return false;
+}
+
+
+static bool isIVRelated(IR const* ir, VectCtx const& ctx)
+{
+    if (ctx.isIV(ir)) { return true; }
+    if (ir->isIndirectMemOp()) {
+        return isIVRelatedForIndirectOp(ir, ctx);
+    }
+    if (ir->isArrayOp()) {
+        return isIVRelatedForArrayOp(ir, ctx);
+    }
+    dumpActNonLinRep(ctx.getVect(), ir);
+    return false;
+}
+
+
+static bool isBranchOpndIVRelated(IR const* ir, VectCtx const& ctx)
 {
     ASSERT0(ir->isBranch());
-    if (ir == bi.getBound()) { return true; }
-    LabelInfo const* tgtlab;
-    if (!hasUniqueBranchTarget(ir, &tgtlab)) { return false; }
-    ASSERT0(tgtlab);
-    ASSERT0(li->getLoopHead() && li->getLoopHead()->hasLabel());
-    if (!li->getLoopHead()->hasLabel(tgtlab)) {
-        //ir's branch target is the alternative BB besides loop-head.
+    if (ir->isUnconditionalBr()) { return true; }
+    if (!ir->is_truebr() && !ir->is_falsebr()) { return false; }
+    IR const* opnd0 = BIN_opnd0(BR_det(ir));
+    IR const* opnd1 = BIN_opnd1(BR_det(ir));
+    if (!isIVRelated(opnd0, ctx)) {
         return false;
     }
+    if (!isIVRelated(opnd1, ctx)) {
+        return false;
+    }
+    return true;
+}
+
+
+static bool isDiamondRegionBalancedForVect(
+    DiamondRegion const& dr, VectCtx const& ctx)
+{
+    //Check if there is a large difference in the number of IR stmts
+    //between diamond body of the diamond region. To avoid imbalance.
+    ASSERT0(dr.verify(ctx.getCFG()));
+    UINT truebodynum = dr.left->getNumOfIR();
+    UINT falsebodynum = dr.right->getNumOfIR();
+    ASSERT0(dr.verify(ctx.getCFG()));
+    UINT maxnum = MAX(truebodynum, falsebodynum);
+    UINT minnum = MIN(truebodynum, falsebodynum);
+    if (maxnum >= 2 * minnum) {
+        //TBD:This is a heuristic strategy to determine the balance.
+        return false;
+    }
+    return true;
+}
+
+
+static void addGotoInDiamondRegionToCandList(
+    DiamondRegion const& dr, MOD VectCtx & ctx)
+{
+    ASSERT0(dr.verify(ctx.getCFG()));
+    IR * lastleft = const_cast<IRBB*>(dr.left)->getLastIR();
+    ASSERT0(lastleft);
+    if (lastleft->isUnconditionalBr()) {
+        ctx.getCandList().append(lastleft);
+    }
+    IR * lastright = const_cast<IRBB*>(dr.right)->getLastIR();
+    ASSERT0(lastright);
+    if (lastright->isUnconditionalBr()) {
+        ctx.getCandList().append(lastright);
+    }
+}
+
+
+static bool isCondBranchLegalToVect(IR const* ir, MOD VectCtx & ctx)
+{
+    DiamondRegion dr;
+    IfCvsCtx ifctx(*ctx.getOptCtx(), ctx.getLI(), ctx.getIfCvs(),
+                   ctx.getActMgr());
+    if (!IfConversion::findDiamondRegion(ir, ifctx, dr)) { return false; }
+    if (!isDiamondRegionOnMandatoryPath(dr, ctx)) { return false; }
+    if (!isDiamondRegionBalancedForVect(dr, ctx)) { return false; }
+    if (!isBranchOpndIVRelated(ir, ctx)) { return false; }
+    addGotoInDiamondRegionToCandList(dr, ctx);
+    return true;
+}
+
+
+static bool isUncondBranchLegalToVect(IR const* ir, MOD VectCtx & ctx)
+{
+    ASSERT0(ir->isUnconditionalBr());
+    if (ctx.getCandList().find(const_cast<IR*>(ir))) {
+        return true;
+    }
+    LI<IRBB> const* li = ctx.getLI();
+    IRCFG const* cfg = ctx.getCFG();
+    IRBB * backedge_bb = xoc::findBackEdgeStartBB(li, cfg);
+    if (ir->getBB() == backedge_bb) {
+        //ir's branch target is the loop-head.
+        ASSERT0(cfg->isUniqueSucc(ir->getBB(), li->getLoopHead()));
+        ctx.getCandList().append(const_cast<IR*>(ir));
+        return true;
+    }
+    return false;
+}
+
+
+static bool isBranchLegalToVect(IR const* ir, MOD VectCtx & ctx)
+{
+    ASSERT0(ir->isBranch());
+    if (isLoopBound(ir, ctx)) { return true; }
+    if (ir->isConditionalBr()) {
+        return isCondBranchLegalToVect(ir, ctx);
+    }
+    if (ir->isUnconditionalBr()) {
+        return isUncondBranchLegalToVect(ir, ctx);
+    }
+    UNREACHABLE();
     return true;
 }
 
@@ -1000,31 +1177,34 @@ bool Vectorization::isLoopInv(IR const* ir, VectCtx const& ctx) const
         return false;
     }
     //ir must be exp.
-    return xoc::isLoopInvariant(ir, ctx.getLI(), m_rg, pinvstmtlist, true);
+    return xoc::isLoopInvariant(
+        ir, ctx.getLI(), m_rg, pinvstmtlist, true, ctx.getOptCtx());
 }
 
 
-bool Vectorization::isStmtLegalToVect(
-    IR const* ir, LI<IRBB> const* li, IVBoundInfo const& bi,
-    VectCtx const& ctx) const
+//Return true is ir is legal to vectorize.
+//ir: stmt.
+static bool isStmtLegalToVect(IR const* ir, MOD VectCtx & ctx)
 {
-    ASSERT0(ir && li);
+    ASSERT0(ir);
     if (ir->is_vec()) { return false; }
     if (ir->isNoMove(true) || ir->hasSideEffect(true) || ir->isDummyOp()) {
-        getActMgr().dumpAct(ir, "illegal to be vector operation");
+        ctx.getActMgr()->dumpAct(ir, "illegal to be vector operation");
         return false;
     }
     if (ir->isBranch()) {
-        if (!isBranchLegalToVect(ir, li, bi)) {
-            getActMgr().dumpAct(ir, "it is not a legal branch");
+        if (!isBranchLegalToVect(ir, ctx)) {
+            ctx.getActMgr()->dumpAct(
+                ir, "it is not a suitable branch to be vectorized");
             return false;
         }
         return true;
     }
     if ((ir->isCallStmt() && !ir->isReadOnly()) || ir->is_region()) {
         //TODO: support call/region.
-        getActMgr().dumpAct(
-            ir, "not yet support analyze function that is not read-only");
+        ctx.getActMgr()->dumpAct(
+            ir, "can not vectorize the ir, because there is not yet support"
+                " for analyzing function that is not read-only");
         return false;
     }
     return true;
@@ -1049,7 +1229,7 @@ bool Vectorization::findSuitableVectOpnd(
             " operand, try more analysis through DU chain");
         MD const* mustuse = start->getMustRef();
         if (mustuse == nullptr) { return false; }
-        IR const* killdef = xoc::findKillingDef(start, m_rg);
+        IR const* killdef = xoc::findKillingDef(start, m_rg, ctx.getOptCtx());
         if (killdef == nullptr) { return false; }
         if (killdef->is_phi()) {
             //Usually, if killdef is unsuitable PHI operation, it should be
@@ -1083,7 +1263,7 @@ bool Vectorization::findSuitableVectOpnd(
 
 IR * Vectorization::pickOutRedStmt(MOD VectCtx & ctx) const
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     for (IR * ir = ctx.getCandList().get_head(&it);
          ir != nullptr; ir = ctx.getCandList().get_next(&it)) {
         if (!ctx.isRedStmt(ir)) { continue; }
@@ -1097,7 +1277,7 @@ IR * Vectorization::pickOutRedStmt(MOD VectCtx & ctx) const
 
 IR * Vectorization::pickOutIVEndBoundStmt(MOD VectCtx & ctx) const
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     for (IR * ir = ctx.getCandList().get_head(&it);
          ir != nullptr; ir = ctx.getCandList().get_next(&it)) {
         if (!ctx.isIVEndBoundStmt(ir)) { continue; }
@@ -1115,13 +1295,14 @@ IR * Vectorization::pickOutBackEdgeJumpStmt(MOD VectCtx & ctx) const
     ASSERT0(backedge_bb);
     IR const* jmp = backedge_bb->getLastIR();
     ASSERT0(jmp->isUnconditionalBr());
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     for (IR * ir = ctx.getCandList().get_head(&it);
          ir != nullptr; ir = ctx.getCandList().get_next(&it)) {
-        if (ir == jmp) {
-            ctx.getCandList().remove(it);
-            return ir;
-        }
+        if (ir != jmp) { continue; }
+
+        //Pick out the branch.
+        ctx.getCandList().remove(it);
+        return ir;
     }
     return nullptr;
 }
@@ -1137,8 +1318,9 @@ bool Vectorization::isDirectOpLegalToVect(
     }
     if (isLoopInv(ir, ctx)) { return true; }
     xoc::LoopDepInfo info;
-    if (xoc::isLoopCarried(ir, m_rg, is_aggressive(),
-                           false, ctx.getLI(), m_gvn, info)) {
+    if (xoc::isLoopCarried(
+        ir, m_rg, is_aggressive(), false, ctx.getLI(), m_gvn, info,
+        ctx.getOptCtx())) {
         return false;
     }
     if (xoc::hasLoopReduceDepForIRTree(ir, m_rg, ctx.getLI())) {
@@ -1157,7 +1339,7 @@ bool Vectorization::checkLinRepForIndirectOp(
         return false;
     }
     IR const* base = ir->getBase();
-    if (m_ivr->isLinearRepOfIV(ctx.getLI(), base, &linrep)) {
+    if (m_ivr->isLinearRepOfIV(ctx.getLI(), base, &linrep, *ctx.getIVRCtx())) {
         //CASE:linrep may describe DIV.
         //ASSERTN(linrep.getIV() == ctx.getBIV(),
         //        ("linear-rep is not about to IV"));
@@ -1180,7 +1362,8 @@ bool Vectorization::checkLinRepForArrayOp(
     ASSERT0(ir->isArrayOp());
     IR const* subexp = ((CArray*)ir)->getSubExpOfLowestDim();
     ASSERT0(subexp);
-    if (!m_ivr->isLinearRepOfIV(ctx.getLI(), subexp, &linrep)) {
+    if (!m_ivr->isLinearRepOfIV(
+            ctx.getLI(), subexp, &linrep, *ctx.getIVRCtx())) {
         dumpActNonLinRep(this, subexp);
         return false;
     }
@@ -1192,19 +1375,68 @@ bool Vectorization::checkLinRepForArrayOp(
 }
 
 
-void Vectorization::collectResultCand(
-    VectCtx const& ctx, OUT VectCtx::ResCandList & rescand) const
+static bool tryIfConversion(MOD VectCtx & ctx)
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
+    VectCtx::ResCandList & rescand = pctx.getResCandList();
+    Vectorization const* vect = ctx.getVect();
+    IfCvsCtx ifctx(
+        *ctx.getOptCtx(), ctx.getLI(), ctx.getIfCvs(), ctx.getActMgr());
+AGAIN:
+    for (IR * ir = pctx.getCandList().get_head(&it);
+         ir != nullptr; ir = pctx.getCandList().get_next(&it)) {
+        if (!ir->isBranch()) { continue; }
+        ifctx.getGenedList().clean();
+        DiamondRegion dr;
+        if (!IfConversion::findDiamondRegion(ir, ifctx, dr)) {
+            dumpUnsuitableResCand(vect, ir);
+            rescand.clean();
+            return false;
+        }
+        if (!IfConversion::tryConvertDiamondRegion(dr, ifctx)) {
+            dumpUnsuitableResCand(vect, ir);
+            rescand.clean();
+            return false;
+        }
+        //Remove the original ir out of the candidate-list, because it has been
+        //changed and freed.
+        //ir has been changed or recycled.
+        pctx.getCandList().remove(ir);
+
+        //Append the new generated stmt into result-candidate-list.
+        for (IR * g = ifctx.getGenedList().get_head();
+             g != nullptr; g = ifctx.getGenedList().get_next()) {
+            rescand.append(g);
+        }
+
+        //Rescan candidate-list.
+        goto AGAIN;
+    }
+    return true;
+}
+
+
+//The function collects stmt that is suitable to vectorize from
+//given candidate list.
+//Return true if find legal stmt that can be vectorized.
+static void collectResultCand(VectCtx const& ctx)
+{
+    VectCtx::CandListIter it;
+    VectCtx & pctx = const_cast<VectCtx&>(ctx);
+    VectCtx::ResCandList & rescand = pctx.getResCandList();
+    GVN const* gvn = ctx.getGVN();
+    Vectorization const* vect = ctx.getVect();
+    bool is_aggr = vect->is_aggressive();
+    OptCtx const* oc = ctx.getOptCtx();
     for (IR * ir = pctx.getCandList().get_head(&it);
          ir != nullptr; ir = pctx.getCandList().get_next(&it)) {
         xoc::LoopDepInfo info;
-        if (xoc::isLoopCarried(ir, m_rg, is_aggressive(), true, rescand,
-                               ctx.getLI(), m_gvn, info)) {
+        if (xoc::isLoopCarried(ir, ctx.getRegion(), is_aggr, true, rescand,
+                               ctx.getLI(), gvn, info, oc)) {
             //TODO:Handle overlapped stmt by applying loop peeling or
             //loop fission.
-            dumpLoopCarDep(this, ir, info);
+            dumpLoopCarDep(vect, ir, info);
             rescand.clean();
             return;
         }
@@ -1212,16 +1444,16 @@ void Vectorization::collectResultCand(
             //Usually, array operation and indirect operation have the most
             //opportunity to do vectorization.
             //Leave the legality checking to followed functions.
-            rescand.append_tail(ir);
+            rescand.append(ir);
             continue;
         }
         if (ir->isDirectMemOp() || ir->isPROp()) {
             //Leave the loop reduction checking and array-subscript dependent
             //expresssion checking to followed functions.
-            rescand.append_tail(ir);
+            rescand.append(ir);
             continue;
         }
-        dumpUnsuitableResCand(this, ir);
+        dumpUnsuitableResCand(vect, ir);
         rescand.clean();
         return;
     }
@@ -1352,6 +1584,101 @@ bool Vectorization::makeVectOpndByUna(
 }
 
 
+bool Vectorization::makeVectOpndBySelect(
+    IR const* ir, MOD VectCtx & ctx, MOD VectOp & vectop)
+{
+    ASSERT0(ir->is_select());
+    ASSERT0(!ir->is_vec());
+    Type const* newopndty = makeVectType(ir->getType(), ctx);
+    Type const* newdetty = makeVectType(SELECT_det(ir)->getType(), ctx);
+    ASSERT0(newopndty && newopndty->is_vector());
+    ASSERT0(newdetty && newdetty->is_vector());
+    VECTOP_expected_type(&vectop) = newopndty;
+    VECTOP_occ(&vectop) = ir;
+
+    //Generate the prerequiste vector operation of 'vectop'.
+    VectOp * vop0 = m_vectop_mgr.alloc();
+    VECTOP_expected_type(vop0) = vectop.getExpectType();
+    vectop.addOpnd(vop0);
+    IR const* det = SELECT_det(ir);
+    ASSERT0(det);
+    bool det_is_vec = makeVectOpnd(det, ctx, *vop0);
+
+    //Generate the prerequiste vector operation of 'vectop'.
+    VectOp * vop1 = m_vectop_mgr.alloc();
+    VECTOP_expected_type(vop1) = vectop.getExpectType();
+    vectop.addOpnd(vop1);
+    IR const* trueexp = SELECT_trueexp(ir);
+    bool true_is_vec = false;
+    if (trueexp != nullptr) {
+        true_is_vec = makeVectOpnd(trueexp, ctx, *vop1);
+    }
+
+    //Generate the prerequiste vector operation of 'vectop'.
+    VectOp * vop2 = m_vectop_mgr.alloc();
+    VECTOP_expected_type(vop2) = vectop.getExpectType();
+    vectop.addOpnd(vop2);
+    IR const* falseexp = SELECT_falseexp(ir);
+    bool false_is_vec = false;
+    if (falseexp != nullptr) {
+        false_is_vec = makeVectOpnd(falseexp, ctx, *vop2);
+    }
+
+    //Check if operand has been vectorized.
+    if (det_is_vec && true_is_vec && false_is_vec) { return true; }
+    if (!true_is_vec && !false_is_vec) {
+        getActMgr().dumpAct(ir,
+            "both true and false parts can not be transformed "
+            "to vector operation");
+        return false;
+    }
+    if (det_is_vec) {
+        //Determinator expression should be vectorizable.
+        Type const* newopndty = vectop.getExpectType();
+        ASSERT0(newopndty && newopndty->is_vector());
+        VECTOP_occ(vop0) = det;
+        VECTOP_expected_type(vop0) = newdetty;
+    } else {
+        getActMgr().dumpAct(ir,
+            "determintor expression can not be transformed "
+            "to vector operation");
+        return false;
+    }
+
+    //At least one of operands has been vectorized.
+    if (true_is_vec) {
+        if (falseexp == nullptr) {
+            ASSERT0(vectop.isEmptyOpnd(2));
+            ASSERT0(vop2->isEmpty());
+            return true;
+        } else if (canBeValidOpndInVectOp(falseexp, ctx, vectop)) {
+            Type const* newopndty = vectop.getExpectType();
+            ASSERT0(newopndty && newopndty->is_vector());
+            VECTOP_occ(vop2) = falseexp;
+            VECTOP_expected_type(vop2) = newopndty;
+            return true;
+        }
+    }
+    //At least one of operands has been vectorized.
+    if (false_is_vec) {
+        if (trueexp == nullptr) {
+            ASSERT0(vectop.isEmptyOpnd(1));
+            ASSERT0(vop1->isEmpty());
+            return true;
+        } else if (canBeValidOpndInVectOp(trueexp, ctx, vectop)) {
+            Type const* newopndty = vectop.getExpectType();
+            ASSERT0(newopndty && newopndty->is_vector());
+            VECTOP_occ(vop1) = trueexp;
+            VECTOP_expected_type(vop1) = newopndty;
+            return true;
+        }
+    }
+    getActMgr().dumpAct(ir,
+        "operands can not be transformed to vector operation");
+    return false;
+}
+
+
 bool Vectorization::makeVectOpndByReadPR(
     IR const* ir, MOD VectCtx & ctx, MOD VectOp & vectop)
 {
@@ -1395,7 +1722,7 @@ bool Vectorization::makeVectOpndByDUChain(
     ASSERT0(ir && ir->is_exp());
     MD const* mustuse = ir->getMustRef();
     if (mustuse == nullptr) { return false; }
-    IR const* killdef = xoc::findKillingDef(ir, m_rg);
+    IR const* killdef = xoc::findKillingDef(ir, m_rg, ctx.getOptCtx());
     if (killdef == nullptr) { return false; }
     if (killdef->is_phi()) {
         //If killdef is unsuitable PHI operation, it should be intercepted
@@ -1449,7 +1776,8 @@ bool Vectorization::makeVectOpndByArray(
         IR const* subexp = ((CArray*)ir)->getSubExpOfLowestDim();
         ASSERT0_DUMMYUSE(subexp);
         IVLinearRep linrep;
-        ASSERT0(m_ivr->isMultipleOfIV(ctx.getLI(), subexp, &linrep));
+        ASSERT0(m_ivr->isMultipleOfIV(
+            ctx.getLI(), subexp, &linrep, *ctx.getIVRCtx()));
         ASSERT0(linrep.isCoeffEqualTo(1));
         checkAndRecomputeVectType(ir, ctx, vectop);
 
@@ -1606,6 +1934,9 @@ bool Vectorization::makeVectOpnd(
     if (exp->isReadPR()) {
         return makeVectOpndByReadPR(exp, ctx, vectop);
     }
+    if (exp->is_select()) {
+        return makeVectOpndBySelect(exp, ctx, vectop);
+    }
     UNREACHABLE();
     return false;
 }
@@ -1633,7 +1964,7 @@ bool Vectorization::makeVectOp(MOD VectCtx & ctx)
         //TODO: remove the trip-count zero loop.
         return false;
     }
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     for (IR const* res = ctx.getResCandList().get_head(&it);
          res != nullptr; res = ctx.getResCandList().get_next(&it)) {
         ASSERT0(res->hasRHS());
@@ -1647,7 +1978,7 @@ bool Vectorization::makeVectOp(MOD VectCtx & ctx)
         ASSERT0(vectop->verify());
 
         //NOTE: all allocated vectop will be destructed by VectOpMgr at end.
-        ctx.addCandVOp(vectop);
+        ctx.getCandVOpList().append(vectop);
     }
     return true;
 }
@@ -1726,6 +2057,39 @@ bool Vectorization::needStoreValueToPR(VectOp const& vop) const
 {
     //Target Dependent Code.
     return true;
+}
+
+
+IR * Vectorization::genSelectByVectOp(VectOp const& vop, OUT VectCtx & ctx)
+{
+    ASSERT0(vop.getNumOfOpnd() == 3);
+    ASSERT0(vop.getOpnd(0) && vop.getOpnd(1) && vop.getOpnd(2));
+    VectOp const* vop0 = vop.getOpnd(0);
+    ASSERT0(vop0);
+    ASSERT0(!vop0->isEmpty());
+    IR * det = genExpByVectOp(*vop0, ctx);
+    ASSERT0(det);
+
+    IR * opnd0 = nullptr;
+    VectOp const* vop1 = vop.getOpnd(1);
+    ASSERT0(vop0);
+    if (!vop1->isEmpty()) {
+        opnd0 = genExpByVectOp(*vop1, ctx);
+    }
+    IR * opnd1 = nullptr;
+    VectOp const* vop2 = vop.getOpnd(2);
+    ASSERT0(vop2);
+    if (!vop2->isEmpty()) {
+        opnd1 = genExpByVectOp(*vop2, ctx);
+    }
+    IR * selop = m_irmgr->buildSelect(
+        det, opnd0, opnd1, vop.getExpectType());
+    if (!needStoreValueToPR(vop)) { return selop; }
+    getActMgr().dumpAct(selop,
+        "generate stpr operation to hold the intermediate value:");
+    IR * stpr = m_irmgr->buildStorePR(vop.getExpectType(), selop);
+    ctx.getMainLoopResOpList().append_tail(stpr);
+    return m_rg->dupIsomoExpTree(stpr);
 }
 
 
@@ -1818,6 +2182,7 @@ IR * Vectorization::genExpByVectOp(VectOp const& vop, OUT VectCtx & ctx)
 {
     switch (vop.getOccCode()) {
     case IR_CONST: return genConstByVectOp(vop, ctx);
+    case IR_SELECT: return genSelectByVectOp(vop, ctx);
     SWITCH_CASE_BIN: return genBinByVectOp(vop, ctx);
     SWITCH_CASE_UNA: return genUnaByVectOp(vop, ctx);
     SWITCH_CASE_READ_ARRAY: return genArrayByVectOp(vop, ctx);
@@ -1908,15 +2273,12 @@ bool Vectorization::constructSSARegion(
     };
     ASSERT0(usePRSSADU() || useMDSSADU());
 
-    //Set root of SSARegion.
-    ssarg.setRootBB(ssarg.findRootBB(root));
-
     //Add PR operations which need to transform to PRSSA.
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
 
     //Collect PRNO that defined by new generated stmt.
     xcom::TTab<PRNO> propstmt;
-    IRListIter lstit;
+    VectCtx::GenedStmtListIter lstit;
     for (IR * s = pctx.getGeneratedStmtList().get_head(&lstit);
          s != nullptr; s = pctx.getGeneratedStmtList().get_next(&lstit)) {
         ASSERT0(s->is_stmt());
@@ -1931,13 +2293,10 @@ bool Vectorization::constructSSARegion(
          s != nullptr; s = pctx.getGeneratedStmtList().get_next(&lstit)) {
         it.visit(s);
     }
-    if (isIncrementalAddBB()) {
-        //Infer and add those BBs that should be also handled in
-        //PRSSA construction.
-        ssarg.inferAndAddRelatedBB();
-    } else {
-        ssarg.addAllBBUnderRoot();
-    }
+    //Set root of SSARegion.
+    ssarg.setRootBB(ssarg.findRootBB());
+    ssarg.addAllBBUnderRoot();
+
     //NOTE: SSA region's may contain multiple BB, because if trip-count
     //is NOT immediate, a do-loop will generated, thus there will be a list
     //of newbb inserted into CFG.
@@ -1967,6 +2326,13 @@ bool Vectorization::addDUChainForPROp(
 }
 
 
+static bool collectMandaPath(MOD VectCtx & ctx)
+{
+    LI<IRBB> const* li = ctx.getLI();
+    return li->findMandatoryPath(ctx.getMandaPath(), ctx.getCFG());
+}
+
+
 bool Vectorization::collectStmtCand(MOD VectCtx & ctx) const
 {
     LI<IRBB> const* li = ctx.getLI();
@@ -1985,10 +2351,14 @@ bool Vectorization::collectStmtCand(MOD VectCtx & ctx) const
                 //Phi does not participate in analysis and vectorization.
                 continue;
             }
-            if (!isStmtLegalToVect(ir, li, *ctx.getIVBoundInfo(), ctx)) {
+            if (ctx.getCandList().find(ir)) {
+                //ir has been appended to candidate-list in previous scanning.
+                continue;
+            }
+            if (!isStmtLegalToVect(ir, ctx)) {
                 return false;
             }
-            ctx.addStmtCand(ir);
+            ctx.getCandList().append(ir);
         }
     }
     return true;
@@ -2010,7 +2380,7 @@ bool Vectorization::checkResultCand(
     VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
     for (IR const* res = pctx.getResCandList().get_head(&it);
          res != nullptr; res = pctx.getResCandList().get_next(&it)) {
@@ -2073,6 +2443,35 @@ bool Vectorization::checkReadPR(
 }
 
 
+bool Vectorization::checkSelect(
+    IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
+    LoopDepInfoSet const& set) const
+{
+    ASSERT0(ir->is_select());
+    IR const* det = SELECT_det(ir);
+    if (!findSuitableVectOpnd(det, ctx, ldactx, set)) {
+        getActMgr().dumpAct(det,
+            "determinator expression is unsuitable to be vectorized.");
+        return false;
+    }
+    IR const* trueexp = SELECT_trueexp(ir);
+    if (trueexp != nullptr &&
+        !findSuitableVectOpnd(trueexp, ctx, ldactx, set)) {
+        getActMgr().dumpAct(det,
+            "determinator expression is unsuitable to be vectorized.");
+        return false;
+    }
+    IR const* falseexp = SELECT_falseexp(ir);
+    if (falseexp != nullptr &&
+        !findSuitableVectOpnd(falseexp, ctx, ldactx, set)) {
+        getActMgr().dumpAct(det,
+            "determinator expression is unsuitable to be vectorized.");
+        return false;
+    }
+    return true;
+}
+
+
 bool Vectorization::checkDirectOp(
     IR const* ir, VectCtx const& ctx, LoopDepCtx const& ldactx,
     LoopDepInfoSet const& set) const
@@ -2131,6 +2530,9 @@ bool Vectorization::checkExp(
     if (exp->isReadPR()) {
         return checkReadPR(exp, ctx, ldactx, set);
     }
+    if (exp->is_select()) {
+        return checkSelect(exp, ctx, ldactx, set);
+    }
     dumpActTargUnsupport(this, exp);
     return false;
 }
@@ -2163,7 +2565,7 @@ public:
     bool visitIR(IR const* x, OUT bool & is_terminate)
     {
         if (!x->isMemRef()) { return true; }
-        IR * xdef = xoc::findKillingDef(x, rg);
+        IR * xdef = xoc::findKillingDef(x, rg, ctx.getOptCtx());
         if (xdef == nullptr) { return true; }
         if (xdef->is_phi()) {
             //CASE: the scalar operation might not form a cycle of IV.
@@ -2267,7 +2669,7 @@ void Vectorization::pickOutTransferScalarOpOfVectOp(
 void Vectorization::collectCandStmtToBeAnalyze(
     OUT IREList & sclst, OUT IRList & veccandlst, VectCtx const& ctx) const
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
     //Collect the scalar operations need to analyze.
     for (IR * ir = pctx.getCandList().get_head(&it);
@@ -2276,12 +2678,12 @@ void Vectorization::collectCandStmtToBeAnalyze(
         if (ir->is_phi()) { continue; }
         if (ir->isDirectMemOp() && !ir->is_vec()) {
             sclst.append_tail(ir);
-            pctx.addPrerequisiteOp(ir);
+            pctx.getPrerequisiteOpList().append(ir);
             continue;
         }
         if (ir->isPROp() && !ir->is_vec()) {
             sclst.append_tail(ir);
-            pctx.addPrerequisiteOp(ir);
+            pctx.getPrerequisiteOpList().append(ir);
             continue;
         }
         if (canBeVectCand(ir)) {
@@ -2338,8 +2740,8 @@ bool Vectorization::checkScalarStmt(VectCtx const& ctx) const
 
 void Vectorization::pickOutScalarStmt(MOD VectCtx & ctx) const
 {
-    VectCtx::ResCandList::Iter it;
-    VectCtx::ResCandList::Iter nextit;
+    VectCtx::ResCandListIter it;
+    VectCtx::ResCandListIter nextit;
     for (ctx.getResCandList().get_head(&it); it != nullptr; it = nextit) {
         nextit = it;
         ctx.getResCandList().get_next(&nextit);
@@ -2360,7 +2762,7 @@ void Vectorization::pickOutScalarStmt(MOD VectCtx & ctx) const
 void Vectorization::analyzeDep(
     VectCtx const& ctx, OUT LoopDepCtx & ldactx, OUT LoopDepInfoSet & set) const
 {
-    VectCtx::CandList::Iter it;
+    VectCtx::CandListIter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
     for (IR * ir = pctx.getCandList().get_head(&it);
          ir != nullptr; ir = pctx.getCandList().get_next(&it)) {
@@ -2373,30 +2775,38 @@ void Vectorization::analyzeDep(
 
 bool Vectorization::vectorize(MOD VectCtx & ctx)
 {
-    if (!collectStmtCand(ctx)) { return false; }
+    if (!collectMandaPath(ctx)) { goto FAILED; }
+    if (!collectStmtCand(ctx)) { goto FAILED; }
     pickOutIrrelevantStmtCand(ctx);
-    collectResultCand(ctx, ctx.getResCandList());
+    tryIfConversion(ctx);
+    collectResultCand(ctx);
     if (ctx.getResCandList().get_elem_count() == 0) {
         dumpNoResVect(this);
+
         //There is no need to consider operand candidates when there
         //is no effective and vectorizable output, because illegal result
         //will either lead to loop-carried dependences or loop-reduce
         //dependences to operand candidates, which both prevent vectorization.
-        return false;
+        goto FAILED;
     }
-    LoopDepInfoSet set;
-    LoopDepCtx ldactx(getRegion(), ctx.getLI(), &m_am);
-    analyzeDep(ctx, ldactx, set);
-    if (!checkLoopReduceDep(ctx, set)) { return false; }
-    if (!checkLoopCarrDep(ctx, set)) { return false; }
-    if (!checkScalarStmt(ctx)) { return false; }
-    pickOutScalarStmt(ctx);
-    if (!checkResultCand(ctx, ldactx, set)) { return false; }
-    if (!makeVectOp(ctx)) { return false; }
-    if (!estimateVectOp(ctx)) { return false; }
+    {
+        LoopDepInfoSet set;
+        LoopDepCtx ldactx(ctx.getLI(), &m_am, ctx.getOptCtx());
+        analyzeDep(ctx, ldactx, set);
+        if (!checkLoopReduceDep(ctx, set)) { goto FAILED; }
+        if (!checkLoopCarrDep(ctx, set)) { goto FAILED; }
+        if (!checkScalarStmt(ctx)) { goto FAILED; }
+        pickOutScalarStmt(ctx);
+        if (!checkResultCand(ctx, ldactx, set)) { goto FAILED; }
+    }
+    if (!makeVectOp(ctx)) { goto FAILED; }
+    if (!estimateVectOp(ctx)) { goto FAILED; }
     genIRByVectOp(ctx);
     ASSERT0(ctx.verify());
     return true;
+FAILED:
+    ctx.cleanIfVectFailed();
+    return false;
 }
 
 
@@ -2471,7 +2881,7 @@ static void addPrerequisiteOpToBBAndRecordGeneratedOp(
         xoc::computeMustAndMayRefForDirectOpForTree(
             dupop, ctx.getRegion(), false);
         bb->getIRList().append_tail_ex(dupop);
-        ctx.addGeneratedStmt(dupop);
+        ctx.getGeneratedStmtList().append(dupop);
     }
 }
 
@@ -2484,7 +2894,7 @@ static void addVectOpToBBAndRecordGeneratedOp(MOD VectCtx & ctx, MOD IRBB * bb)
         xoc::computeMustAndMayRefForDirectOpForTree(
             vectop, ctx.getRegion(), false);
         bb->getIRList().append_tail_ex(vectop);
-        ctx.addGeneratedStmt(vectop);
+        ctx.getGeneratedStmtList().append(vectop);
     }
 }
 
@@ -2602,7 +3012,7 @@ public:
     bool visitIR(IR const* ir, OUT bool & is_terminate)
     {
         if (ir->is_stmt() || !ir->isMemRef()) { return true; }
-        IR * kdef = xoc::findKillingDef(ir, rg);
+        IR * kdef = xoc::findKillingDef(ir, rg, ctx->getOptCtx());
         if (kdef == nullptr) { return true; }
         if (!li->isInsideLoop(kdef->getBB()->id())) { return true; }
         if (!kdef->is_phi()) {
@@ -2661,9 +3071,9 @@ static void transferIRToBBAndUpdateCtx(
 }
 
 
-//Pick up label and undef stmt out of effect-list that can not be handled
+//Pick out label and undef stmt from effect-list that can not be handled
 //by DCE.
-static void pickUpBBIllegalStmt(MOD ConstIRList & efflist)
+static void pickOutBBIllegalStmt(MOD ConstIRList & efflist)
 {
     ConstIRListIter it;
     ConstIRListIter nextit;
@@ -2720,7 +3130,7 @@ static IR * simplifyVectLoop(
     VectCtx const& ctx, IR * loop, OUT bool & need_recst_bblst)
 {
     ASSERT0(loop->is_doloop());
-    SimpCtx simpctx(const_cast<OptCtx*>(ctx.getOptCtx()));
+    SimpCtx simpctx(ctx.getOptCtx());
     simpctx.setSimpCFS();
     SIMP_cfs_only(&simpctx) = true;
     IRSimp * simppass = (IRSimp*)ctx.getRegion()->getPassMgr()->
@@ -3055,8 +3465,7 @@ void ReconstructLoopWithVariantTC::constructVectLoopAndUpdateCFG(
 
     //Generate new vectorized loop.
     ConstructLoop cl;
-    IRBB * mainloop_placeholder = cl.constructVectMainLoop(
-        ctx, oc, need_recst_bblst);
+    cl.constructVectMainLoop(ctx, oc, need_recst_bblst);
     IRBB * epilloop_placeholder = cl.constructVectEpilOpOrLoop(
         ctx, oc, need_recst_bblst);
     ASSERT0(need_recst_bblst);
@@ -3087,7 +3496,7 @@ void ReconstructLoopWithVariantTC::constructVectLoopAndUpdateCFG(
     ASSERT0(ctx.getVect()->usePRSSADU() && ctx.getVect()->useMDSSADU());
 
     if (epilloop_placeholder != nullptr) {
-        pickUpBBIllegalStmt(efflst);
+        pickOutBBIllegalStmt(efflst);
         removeDesignatedStmtsByDCE(efflst, ctx, dcectx);
     }
 
@@ -3148,7 +3557,7 @@ bool ReconstructLoopWithImmTC::addReduceIVOpToBBAndRecordGeneratedOp(
     xoc::computeMustAndMayRefForDirectOpForTree(
         redstmt, ctx.getRegion(), false);
     bb->getIRList().append_tail_ex(redstmt);
-    ctx.addGeneratedStmt(redstmt);
+    ctx.getGeneratedStmtList().append(redstmt);
     return true;
 }
 
@@ -3261,12 +3670,12 @@ bool Vectorization::tryVectorizeLoop(LI<IRBB> * li, MOD OptCtx & oc)
         //TODO: Remove the loop which trip-count is zero.
         ASSERTN(0, ("NEED TO BE IMPLEMENTED"));
     }
-    VectCtx vectctx(li, &bi, oc, this, m_gvn, (ActMgr*)&getActMgr());
-    LICMAnaCtx anactx(m_rg, li);
+    VectCtx vectctx(li, &bi, oc, this, (ActMgr*)&getActMgr(), &ivrctx);
+    LICMAnaCtx anactx(m_rg, li, m_licm, &oc);
     if (is_aggressive()) {
         //Use Loop Invariant info to determine whether a variable can be
         //vectorized.
-        m_licm->analysisInvariantOp(anactx);
+        m_licm->analyszInvariantOp(anactx);
         vectctx.setLICMAnaCtx(&anactx);
         dumpVectUseLICM(this);
     }
@@ -3284,6 +3693,7 @@ bool Vectorization::tryVectorizeLoop(LI<IRBB> * li, MOD OptCtx & oc)
         //informations that generated by reconstruction.
         vectctx.dump();
     }
+    ASSERT0(xoc::verifyIRandBB(m_rg));
     return succ ? changed : false;
 }
 
@@ -3296,7 +3706,7 @@ bool Vectorization::doLoopTree(LI<IRBB> * li, OptCtx & oc)
         bool lchanged_inner = doLoopTree(tli->getInnerList(), oc);
         changed |= lchanged_inner;
         if (lchanged_inner) {
-            //Inner Loop may have been destroied, reperform doLoopTree().
+            //Inner Loop may have been destroyed, reperform doLoopTree().
             return changed;
         }
         bool lchanged_cur_loop = tryVectorizeLoop(tli, oc);
@@ -3304,7 +3714,7 @@ bool Vectorization::doLoopTree(LI<IRBB> * li, OptCtx & oc)
         if (lchanged_cur_loop) {
             //CASE:compile.gr/gcse2.gr, LI3 has been vectorized, then
             //loop-tree should be reconstructed.
-            //tli may have been destroied, reperform doLoopTree().
+            //tli may have been destroyed, reperform doLoopTree().
             return changed;
         }
     }

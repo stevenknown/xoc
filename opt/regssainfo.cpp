@@ -155,7 +155,7 @@ void RegDef::dump(Region const* rg, RegDUMgr const* mgr) const
     } else {
         prt(rg, "RegDef%u:", id());
     }
-    getResult()->dump(mgr->getRA());
+    getResult()->dump(mgr->getRAMgr());
 }
 //END RegDef
 
@@ -263,7 +263,7 @@ void RegSSAInfo::copyBySpecificReg(
         }
     }
     ASSERTN(added, ("no VROpnd corresponded to %s",
-            mgr->getRA()->getRegName(reg)));
+            mgr->getTIMgr()->getRegName(reg)));
 }
 
 
@@ -506,20 +506,21 @@ size_t UINT2VRegVec::count_mem() const
 //START VReg
 //
 //Concisely dump.
-void VReg::dump(LinearScanRA const* ra) const
+void VReg::dump(RegAllocMgr const* ramgr) const
 {
-    ASSERT0(ra);
-    Region const* rg = ra->getRegion();
+    ASSERT0(ramgr);
+    Region const* rg = ramgr->getRegion();
     prt(rg, "VReg%u:", id());
-    VReg::dumpRegAndVer(rg, reg(), version(), ra);
+    VReg::dumpRegAndVer(rg, reg(), version(), ramgr);
 }
 
 
-CHAR const* VReg::dump(LinearScanRA const* ra, OUT VRegFixedStrBuf & buf) const
+CHAR const* VReg::dump(
+    RegAllocMgr const* ramgr, OUT VRegFixedStrBuf & buf) const
 {
-    ASSERT0(ra);
+    ASSERT0(ramgr);
     buf.strcat("VReg%u:", id());
-    VReg::dumpRegAndVer(buf, reg(), version(), ra);
+    VReg::dumpRegAndVer(buf, reg(), version(), ramgr);
     return buf.getBuf();
 }
 
@@ -543,8 +544,8 @@ static void dumpDefChain(
         prt(rg, ",-");
         return;
     }
-    LinearScanRA const* ra = mgr->getRA();
-    ASSERT0(ra);
+    RegAllocMgr const* ramgr = mgr->getRAMgr();
+    ASSERT0(ramgr);
 
     //TBD: I think RegDef could be PHI.
     //ASSERT0(!getDef()->is_phi());
@@ -552,7 +553,7 @@ static void dumpDefChain(
         VReg const* prev_vreg = regdef->getPrev()->getResult();
         ASSERT0(prev_vreg);
         prt(rg, ",PrevDEF:");
-        prev_vreg->dump(mgr->getRA());
+        prev_vreg->dump(mgr->getRAMgr());
     } else {
         prt(rg, ",-");
     }
@@ -573,7 +574,7 @@ static void dumpDefChain(
         VReg const* next_vreg = use->getResult();
         ASSERT0(next_vreg);
         prt(rg, ",NextDEF:");
-        next_vreg->dump(mgr->getRA());
+        next_vreg->dump(mgr->getRAMgr());
     }
 }
 
@@ -597,26 +598,29 @@ static void dumpOccSet(VReg const* vreg, Region const* rg)
 
 
 CHAR const* VReg::dumpRegAndVer(
-    OUT VRegFixedStrBuf & buf, Reg r, UINT ver, LinearScanRA const* ra)
+    OUT VRegFixedStrBuf & buf, Reg r, UINT ver, RegAllocMgr const* ramgr)
 {
-    REGFILE rf = ra->getRegFile(r);
-    buf.strcat("%s(%s)V%u", ra->getRegName(r), ra->getRegFileName(rf), ver);
+    REGFILE rf = ramgr->getTIMgr()->getRegFile(r);
+    buf.strcat("%s(%s)V%u", ramgr->getTIMgr()->getRegName(r),
+               ramgr->getTIMgr()->getRegFileName(rf), ver);
     return buf.getBuf();
 }
 
 
 void VReg::dumpRegAndVer(
-    Region const* rg, Reg r, UINT ver, LinearScanRA const* ra)
+    Region const* rg, Reg r, UINT ver, RegAllocMgr const* ramgr)
 {
-    REGFILE rf = ra->getRegFile(r);
-    prt(rg, "%s(%s)V%u", ra->getRegName(r), ra->getRegFileName(rf), ver);
+    REGFILE rf = ramgr->getTIMgr()->getRegFile(r);
+    prt(rg, "%s(%s)V%u", ramgr->getTIMgr()->getRegName(r),
+        ramgr->getTIMgr()->getRegFileName(rf), ver);
 }
 
 
 static void dumpVReg(Region const* rg, RegDUMgr const* mgr, VReg const* vr)
 {
     prt(rg, "VReg%u:", vr->id());
-    VReg::dumpRegAndVer(rg, vr->reg(), vr->version(), mgr->getRA());
+    VReg::dumpRegAndVer(
+        rg, vr->reg(), vr->version(), mgr->getRAMgr());
     dumpDefChain(vr, mgr, rg);
     dumpOccSet(vr, rg);
 
@@ -808,7 +812,7 @@ void RegPhi::dumpOpnd(
             prt(rg, "????");
         } else {
             ASSERT0(mgr->getReg(opnd) == vr->reg());
-            vr->dump(mgr->getRA());
+            vr->dump(mgr->getRAMgr());
         }
         break;
     }
@@ -1024,9 +1028,9 @@ void RegDUMgr::cleanOrDestroy(bool is_reinit)
 }
 
 
-LinearScanRA const* RegDUMgr::getRA() const
+RegAllocMgr const* RegDUMgr::getRAMgr() const
 {
-    return getRegSSAMgr()->getRA();
+    return getRegSSAMgr()->getRAMgr();
 }
 
 

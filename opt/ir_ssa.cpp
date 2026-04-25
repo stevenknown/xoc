@@ -706,34 +706,6 @@ void PRSSAInfoCollect::init(PRSSAMgr * mgr, OptCtx const& oc)
 }
 
 
-bool PRSSAInfoCollect::isDomLiveinBBFromPred(UINT bb, UINT pred, UINT meetup)
-{
-    ASSERT0(bb != BBID_UNDEF && meetup != BBID_UNDEF && pred != BBID_UNDEF);
-    //TODO:Check the algo.
-    //DomSet const* ds = m_cfg->gen_dom_set(pred);
-    //if (ds->is_contain(bb)) { return false; }
-    //if (ds->is_contain(meetup)) { return true; }
-    //return false;
-    xcom::List<UINT> wl;
-    wl.append_tail(pred);
-    xcom::TTab<UINT> visited;
-    while (wl.get_elem_count() != 0) {
-        UINT t = wl.remove_head();
-        if (t == meetup) { return true; }
-        if (t == bb) { return false; }
-        visited.append(t);
-        UINT dom = ((DGraph*)m_cfg)->get_idom(t);
-        if (dom == VERTEX_UNDEF) { continue; }
-
-        ASSERTN(m_cfg->isVertex(dom), ("miss DomInfo"));
-        if (!visited.find(dom)) {
-            wl.append_tail(dom);
-        }
-    }
-    return false;
-}
-
-
 IR const* PRSSAInfoCollect::getLiveinRef(IR const* phi) const
 {
     ASSERT0(phi->is_phi());
@@ -741,9 +713,35 @@ IR const* PRSSAInfoCollect::getLiveinRef(IR const* phi) const
 }
 
 
+IR const* PRSSAMgr::findLiveinDefViaOrgPrno(
+    IRBB const* startbb, PRNO orgprno) const
+{
+    //1. Scan stmt in BB in reverse order. Return the PRNO if its VPR matchs
+    //   'orgprno'.
+    //   Note this check includes PHI as well.
+    //2. The BB of DEF stmt must dominate current BB.
+    //3. Iterate IDOM BB recursively.
+    ASSERT0(startbb && orgprno != PRNO_UNDEF);
+    BBIRListIter it;
+    for (IR const* ir = BB_irlist(startbb).get_tail(&it);
+         ir != nullptr; ir = BB_irlist(startbb).get_prev(&it)) {
+        if (!ir->isPROp()) { continue; }
+        VPR const* vpr = (VPR const*)ir->getSSAInfo();
+        ASSERT0(vpr);
+        PRNO irorgprno = vpr->orgprno();
+        ASSERT0(irorgprno != PRNO_UNDEF);
+        if (irorgprno == orgprno) { return ir; }
+    }
+    IRBB const* newstartbb = m_cfg->get_idom(startbb);
+    if (newstartbb == nullptr) { return nullptr; }
+    return findLiveinDefViaOrgPrno(newstartbb, orgprno);
+}
+
+
 void PRSSAInfoCollect::collect(IRBB const* from, IRBB const* to)
 {
     ASSERT0(m_oc->is_dom_valid());
+    ASSERT0(m_ssamgr);
     BBIRListIter it;
     for (IR const* ir = const_cast<IRBB*>(to)->getIRList().get_head(&it);
          ir != nullptr; ir = const_cast<IRBB*>(to)->getIRList().get_next(&it)) {
@@ -752,18 +750,14 @@ void PRSSAInfoCollect::collect(IRBB const* from, IRBB const* to)
             m_phi2livein.set(ir, ir);
             continue;
         }
-        EdgeC const* ec = to->getVex()->getInList();
-        //In the middle stage of optimization, e.g DCE, may transform the CFG
-        //into a legal but insane CFG. In the case, ec and Phi operand may be
-        //empty.
-        for (IR const* opnd = PHI_opnd_list(ir); opnd != nullptr;
-             opnd = opnd->get_next(), ec = ec->get_next()) {
-            ASSERT0(ec);
-            if (isDomLiveinBBFromPred(to->id(), ec->getFromId(), from->id())) {
-                m_phi2livein.set(ir, opnd);
-                break;
-            }
-        }
+        VPR const* vpr = (VPR const*)ir->getSSAInfo();
+        ASSERT0(vpr);
+        PRNO orgprno = vpr->orgprno();
+        ASSERT0(orgprno != PRNO_UNDEF);
+        IR const* liveindef = m_ssamgr->findLiveinDefViaOrgPrno(
+            from, orgprno);
+        if (liveindef == nullptr) { continue; }
+        m_phi2livein.set(ir, liveindef);
     }
 }
 //END PRSSAInfoCollect
@@ -1309,8 +1303,6 @@ void PRSSAMgr::initDepPass()
     m_irmgr = m_rg->getIRMgr();
     ASSERT0(m_tm && m_vm && m_irmgr);
     ASSERT0(m_rg->getMiscBitSetMgr());
-    m_seg_mgr = m_rg->getMiscBitSetMgr()->getSegMgr();
-    ASSERT0(m_seg_mgr);
     m_cfg = m_rg->getCFG();
     ASSERTN(m_cfg, ("CFG is not available."));
     initTargInfoHandler();
@@ -1335,7 +1327,6 @@ void PRSSAMgr::clean()
     m_vm = nullptr;
     m_irmgr = nullptr;
     m_ti_handler = nullptr;
-    m_seg_mgr = nullptr;
     m_cfg = nullptr;
     m_vpr_count = VPR_UNDEF + 1;
 
@@ -1434,14 +1425,13 @@ VPR * PRSSAMgr::allocVPRImpl(
     PRNO orgprno, PRNO newprno, UINT version, Type const* orgtype,
     MOD VPRVec * vprvec)
 {
-    ASSERTN(m_seg_mgr, ("SSA manager is not initialized"));
     VPR * v = allocVPR();
     if (vprvec != nullptr) {
         //If version is available, establisth the mapping between version and
         //VPR object to enable the retrieve.
         vprvec->set(version, v);
     }
-    v->initNoClean(m_seg_mgr);
+    v->initNoClean(getSegMgr());
 
     //If VPR's original PRNO equals to new PRNO, that means there is no
     //renaming process happened.
@@ -2143,41 +2133,39 @@ void PRSSAMgr::renameRHS(
 }
 
 
-//Remove PR-SSA Use-Def chain for all memory references in IR Tree
-//that rooted by 'exp'.
-//e.g:ir=...
-//    ...=ir //S1
-//If S1 deleted, ir should be removed from its UseSet in SSAInfo.
-//NOTE: If ir is an IR tree, e.g: add(pr1, pr2), removing 'add' means
-//pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
-//updated as well.
+void PRSSAMgr::removeStmtSSAOcc(IR const* ir)
+{
+    ASSERT0(ir->is_stmt());
+    if (!ir->isWritePR() && !ir->isCallStmt()) { return; }
+    SSAInfo * prssainfo = ir->getSSAInfo();
+    if (prssainfo == nullptr) { return; }
+
+    //NOTE:If a stmt removed, in SSA mode, all its USE should be
+    //be removed or renamed at the same time. Therefore, we do
+    //NOT invoke removeUse() for each of ir's USE here since
+    //the USE PR will be handled after while.
+    //Otherwise, it is illegal SSA form if the DEF removed while
+    //at least one USE left, and will cause an assertion during
+    //SSA verification.
+    //e.g:rp7.c
+    //  BB2:
+    //  phi $13 = $12, $9; #S1
+    //  truebr $13 L2;     #S2
+    //  ....
+    //  BB4:L2
+    //  return $13;        #S3
+    //DCE removed #S1 and #S2, left #S3. However #S3 use $13,
+    //that caused an assertion in verification.
+    //User should ensure that #S1, #S2 and #S3 are all removed
+    //before SSA verification.
+    prssainfo->cleanDU();
+}
+
+
 void PRSSAMgr::removePRSSAOcc(IR const* ir)
 {
     if (ir->is_stmt()) {
-        if (ir->isWritePR() || ir->isCallStmt()) {
-            SSAInfo * prssainfo = ir->getSSAInfo();
-            if (prssainfo != nullptr) {
-                //NOTE:If a stmt removed, in SSA mode, all its USE should be
-                //be removed or renamed at the same time. Therefore, we do
-                //NOT invoke removeUse() for each of ir's USE here since
-                //the USE PR will be handled after while.
-                //Otherwise, it is illegal SSA form if the DEF removed while
-                //at least one USE left, and will cause an assertion during
-                //SSA verification.
-                //e.g:rp7.c
-                //  BB2:
-                //  phi $13 = $12, $9; #S1
-                //  truebr $13 L2;     #S2
-                //  ....
-                //  BB4:L2
-                //  return $13;        #S3
-                //DCE removed #S1 and #S2, left #S3. However #S3 use $13,
-                //that caused an assertion in verification.
-                //User should ensure that #S1, #S2 and #S3 are all removed
-                //before SSA verification.
-                prssainfo->cleanDU();
-            }
-        }
+        removeStmtSSAOcc(ir);
     } else if (ir->isPROp()) {
         SSAInfo * prssainfo = ir->getSSAInfo();
         if (prssainfo != nullptr) {
@@ -2194,12 +2182,6 @@ void PRSSAMgr::removePRSSAOcc(IR const* ir)
 }
 
 
-//Remove Use-Def chain.
-//exp: the expression to be removed.
-//e.g: ir = ...
-//    = ir //S1
-//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-//NOTE: the function only process exp itself.
 void PRSSAMgr::removeUse(IR const* ir)
 {
     SSAInfo * info = ir->getSSAInfo();
@@ -2209,12 +2191,6 @@ void PRSSAMgr::removeUse(IR const* ir)
 }
 
 
-//Remove Use-Def chain.
-//exp: the expression to be removed.
-//e.g: ir = ...
-//    = ir //S1
-//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-//NOTE: the function only process exp itself.
 void PRSSAMgr::removeUseForTree(IR const* ir)
 {
     ConstIRIter it;
@@ -2236,8 +2212,6 @@ void PRSSAMgr::removeDUChain(IR * def, IR * use)
 }
 
 
-//Check each USE of stmt, remove the expired one which is not reference
-//the memory any more that stmt defined.
 bool PRSSAMgr::removeExpiredDU(IR const* ir, Region * rg)
 {
     ASSERT0(ir && ir->isPROp());
@@ -2262,8 +2236,6 @@ bool PRSSAMgr::removeExpiredDU(IR const* ir, Region * rg)
 }
 
 
-//Check each USE of stmt, remove the expired one which is not reference
-//the memory any more that stmt defined.
 bool PRSSAMgr::removeExpiredDUForStmt(IR const* stmt, Region * rg)
 {
     ASSERT0(stmt->is_stmt());
@@ -3085,7 +3057,7 @@ bool PRSSAMgr::verifySSAInfo() const
 //Note PRSSA will change PRNO during PRSSA destruction. If classic DU chain
 //is valid meanwhile, it might be disrupted as well. A better way is user
 //maintain the classic DU chain, alternatively a conservative way to
-//avoid subsequent verification complaining is set the prdu invalid.
+//avoid subsequent verification complaining is set the PRDU invalid.
 void PRSSAMgr::destruction(MOD OptCtx & oc)
 {
     PRSSAUpdateCtx ctx(oc);
@@ -3130,9 +3102,23 @@ void PRSSAMgr::cleanPRSSAInfo()
             for (IR * x = xoc::iterInit(ir, m_iter);
                  x != nullptr; x = xoc::iterNext(m_iter)) {
                 ASSERTN(!x->is_phi(), ("phi should have been striped."));
-                if (x->isPROp()) {
-                    x->setSSAInfo(nullptr);
-                }
+                if (!x->isPROp() && !x->isCallStmt()) { continue; }
+                SSAInfo * ssainfo = x->getSSAInfo();
+                if (ssainfo == nullptr) { continue; }
+
+                //NOTE:We evaluate CallStmt individually here, because some
+                //optimizations might eliminate the PRNO of call through
+                //legal analysis. Thus the SSAInfo of these call also
+                //need to be clean even isPROp() return false here.
+                //NOTE:Here we do NOT reuse SSAInfo through invoking
+                //SSAInfo::clean() or VPR::clean(), on the contrary, we
+                //just set SSAInfo of current PR to NULL, and reallocate
+                //new VPR if PRSSA is reconstructed. Since we expect to
+                //retain the record of each renaming from Old PRNO to
+                //New PRNO.
+                //Recycle SBitSet resource to SBitSetMgr.
+                //ssainfo->cleanDU();
+                x->setSSAInfo(nullptr);
             }
         }
     }
@@ -3223,8 +3209,12 @@ static void replaceCommonDef(
             ASSERT0(use->is_pr());
             ASSERT0(PR_ssainfo(use) && PR_ssainfo(use) == curphi_ssainfo);
             PR_ssainfo(use) = def_or_livein_ssainfo;
+
             //Just change PRNO, keep type and other information unchanged.
             PR_no(use) = def_or_livein_prno;
+
+            //Update MD reference if PRNO changed.
+            const_cast<Region*>(rg)->getMDMgr()->allocRef(use);
         }
         for (IR const* opnd = PHI_opnd_list(phi);
              opnd != nullptr; opnd = opnd->get_next()) {
@@ -3991,6 +3981,9 @@ void PRSSAMgr::construction(OptCtx & oc)
     //operand DEF's DUSet.
     //CASE:compiler.gr/alias.loop.gr
     oc.setInvalidPRDU();
+
+    //MD reference should be maintained.
+    ASSERT0(xoc::verifyMDRef(m_rg, oc));
 }
 //END PRSSAMgr
 

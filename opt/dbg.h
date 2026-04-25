@@ -142,26 +142,21 @@ class DbxMgr {
     SMemPool * m_pool;
     Lang2FileIdx2FileName m_lang2fi2fn;
 public:
-    #define PRTCTX_lang(p)  ((p)->m_lang)
     class PrtCtx {
     public:
         //Record the string will be prefix of dbx information.
-        char const* prefix;
+        CHAR const* prefix;
 
         //Record the IO handler.
         LogMgr * logmgr;
-
-        //Required language.
-        xoc::LANG_TYPE m_lang;
     public:
-        PrtCtx(xoc::LANG_TYPE lang)
+        PrtCtx()
         {
             prefix = nullptr;
             logmgr = nullptr;
-            m_lang = lang;
         }
-
         LogMgr * getLogMgr() const { return logmgr; }
+        CHAR const* getPrefix() const { return prefix; }
     };
     LangInfo m_lang_info;
 public:
@@ -231,6 +226,9 @@ void copyDbxForList(IR * tgt_list, Dbx const* dbx, Region * rg);
 
 //Get source file line number of 'ir'.
 UINT getLineNum(IR const* ir, LANG_TYPE language, DbxMgr * dbx_mgr);
+UINT getLineNumOfCPP(IR const* ir, Region const* rg);
+UINT getLineNumOfPython(IR const* ir, Region const* rg);
+UINT getLineNumOfGR(IR const* ir, Region const* rg);
 
 //Get source file line number in 'dbx'.
 UINT getLineNum(Dbx const* dbx, LANG_TYPE language, DbxMgr * dbx_mgr);

@@ -43,12 +43,14 @@ protected:
     PRSSAMgr const* m_prssamgr;
     MDSSAMgr const* m_mdssamgr;
     DUMgr const* m_dumgr;
+    OptCtx const* m_oc;
 protected:
+    OptCtx const* getOptCtx() const { return m_oc; }
     bool useMDSSADU() const;
     bool usePRSSADU() const;
     bool useClassicDU() const { return m_dumgr != nullptr; }
 public:
-    EvalConst(Region const* rg);
+    EvalConst(Region const* rg, OptCtx const* oc);
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 };

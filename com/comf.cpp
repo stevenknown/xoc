@@ -455,6 +455,119 @@ static INT _exgcd(INT a, INT b, OUT INT & x, OUT INT & y)
 }
 
 
+UINT64 double2BF16(UINT64 double_bits)
+{
+    //Algorithm Overview:
+    //(1)Extract the three components of the double-precision floating-point
+    //   number: the sign bit, exponent, and mantissa.
+    //(2)Handle special cases:
+    //   (2.1)If the exponent is all ones:
+    //        (2.1.1)If the mantissa is zero, return signed infinity.
+    //        (2.1.2)Otherwise, it's a NaN: preserve the sign and a portion
+    //               of the payload, ensuring it's a quiet NaN.
+    //   (2.2)If both the exponent and mantissa are zero, return signed zero.
+    //(3)Convert the exponent from the double-precision bias to the
+    //   bfloat16 bias.
+    //(4)Handle overflow and underflow:
+    //   (4.1)If the converted exponent is greater than or equal to the
+    //        maximum bfloat16 exponent, return signed infinity.
+    //   (4.2)If the converted exponent is less than or equal to zero (bfloat16
+    //        does not support subnormal numbers), return signed zero.
+    //(5)Extract the mantissa and perform rounding:
+    //   (5.1)Extract the bfloat16 mantissa bits from the double-precision
+    //        mantissa.
+    //   (5.2)Use the remaining lower bits (round bit, guard bit, and sticky
+    //        bit) to apply round-to-nearest, ties-to-even (banker's rounding)
+    //        to the mantissa.
+    //   (5.3)If rounding causes mantissa overflow, increment the exponent and
+    //        recheck for exponent overflow.
+    //(6)Assemble the bfloat16 result by combining the sign, exponent,
+    //   and mantissa into a 16-bit value, and return it as a 64-bit
+    //   unsigned integer.
+    //Extract double components.
+    UINT64 sign = (double_bits & DOUBLE_SIGN_MASK) >> 63;
+    INT64 exp_raw = (INT64)((double_bits & DOUBLE_EXP_MASK) >>
+        DOUBLE_MANT_BITS) - DOUBLE_EXP_BIAS;
+    UINT64 mant = double_bits & DOUBLE_MANT_MASK;
+
+    //Handle special cases: NaN and Infinity.
+    UINT64 exp_raw_biased = (double_bits & DOUBLE_EXP_MASK) >>
+        DOUBLE_MANT_BITS;
+    if (exp_raw_biased == DOUBLE_EXP_MAX) {
+        if (mant == 0) {
+            //Infinity: preserve sign.
+            return (UINT64)((sign << BF16_SIGN_SHIFT) | BF16_INF);
+        }
+        //NaN: preserve sign and some payload.
+        UINT16 nan_payload = (UINT16)((mant >> GUARD_BIT_SHIFT) &
+            BF16_MANT_MASK);
+
+        //Ensure NaN is quiet (MSB of mantissa = 1) and non-zero.
+        if (nan_payload == 0) {
+            //Default quiet NaN payload.
+            nan_payload = 0x40U;
+        }
+        return (UINT64)((sign << BF16_SIGN_SHIFT) |
+            BF16_QUIET_NAN | nan_payload);
+    }
+
+    //Handle zero (both +0 and -0).
+    if (exp_raw_biased == DOUBLE_EXP_ZERO && mant == 0) {
+        //Signed zero.
+        return (UINT64)(sign << BF16_SIGN_SHIFT);
+    }
+
+    //Convert exponent to BFloat16 bias.
+    INT64 bf16_exp = exp_raw + BF16_EXP_BIAS;
+
+    //Handle overflow: convert to infinity.
+    if (bf16_exp >= BF16_EXP_MAX) {
+        return (UINT64)((sign << BF16_SIGN_SHIFT) | BF16_INF);
+    }
+
+    //Handle underflow: convert to zero.
+    if (bf16_exp <= 0) {
+        //BFloat16 does not support subnormal numbers, so flush to zero.
+        return (UINT64)(sign << BF16_SIGN_SHIFT);
+    }
+
+    //Extract mantissa bits for BFloat16.
+    UINT16 bf16_mant = (UINT16)((mant >> GUARD_BIT_SHIFT) & BF16_MANT_MASK);
+
+    //Extract rounding information.
+    //Bit 44.
+    UINT64 round_bit  = (mant >> ROUND_BIT_SHIFT) & 0x1ULL;
+
+    //Bit 45 (LSB of bf16_mant).
+    UINT64 guard_bit  = (mant >> GUARD_BIT_SHIFT) & 0x1ULL;
+
+    //Bits 0-43.
+    UINT64 sticky_bit = (mant & STICKY_MASK) ? 1ULL : 0ULL;
+
+    //Round to nearest, ties to even (banker's rounding).
+    if (round_bit && (guard_bit || sticky_bit || (bf16_mant & 0x1))) {
+        bf16_mant++;
+
+        //Check for mantissa overflow.
+        if (bf16_mant > BF16_MANT_MASK) {
+            bf16_mant = 0;
+            bf16_exp++;
+
+            //Check for exponent overflow after rounding.
+            if (bf16_exp >= BF16_EXP_MAX) {
+                return (UINT64)((sign << BF16_SIGN_SHIFT) | BF16_INF);
+            }
+        }
+    }
+
+    //Assemble BFloat16: sign(1) | exponent(8) | mantissa(7).
+    UINT16 bf16_result = (UINT16)((sign << BF16_SIGN_SHIFT) |
+        (bf16_exp << BF16_EXP_SHIFT) | bf16_mant);
+
+    return (UINT64)bf16_result;
+}
+
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y)
@@ -480,7 +593,6 @@ UINT fact(UINT n)
     }
     return res;
 }
-
 
 
 //float:
@@ -519,6 +631,133 @@ UINT64 float2ESP64(UINT64 val)
 }
 
 
+//float:
+//sign exponent    mantissa
+//31   30 ~ 23     22 ~ 0
+//x    11111111    xxxxxxxxxxxxxxxxxxxxxxx - special numbers (+/-Inf, NaN)
+//x    1xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers
+//x    0xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers
+//x    00000000    xxxxxxxxxxxxxxxxxxxxxxx - subnormal numbers
+//
+//bfloat16:
+//sign exponent    mantissa
+//15   14 ~ 7      6 ~ 0
+//x    11111111    xxxxxxx - special numbers (+/-Inf, NaN)
+//x    1xxxxxxx    xxxxxxx - normal numbers (exponent biased by 127)
+//x    0xxxxxxx    xxxxxxx - normal numbers (exponent biased by 127)
+//x    00000000    xxxxxxx - zero (subnormals flushed to zero)
+//
+//Conversion rules:
+//1. Sign bit: bit31 -> bit15
+//2. Exponent: Same 8 bits, same bias (127)
+//3. Mantissa: Upper 7 bits of float mantissa, lower 16 bits discarded
+//4. Special cases:
+//   - Zero: same sign, all other bits zero
+//   - Inf/NaN: exponent all 1s, mantissa copied/zeroed
+//   - Subnormals: flushed to zero
+UINT16 float2BF16(UINT32 val)
+{
+    //Zero value.
+    if ((val & 0x7FFFFFFF) == 0) return val >> 16;
+    //Extract exponent.
+    UINT32 exp = val & 0x7F800000;
+    //Infinity/NaN.
+    if (exp == 0x7F800000) {
+        return ((val >> 16) & 0x8000) | 0x7F80 | ((val >> 16) & 0x7F);
+    }
+    //Subnormal numbers -> zero.
+    if (exp == 0) {
+        return (val >> 16) & 0x8000;
+    }
+    //Normal numbers: directly take upper 16 bits.
+    return (val >> 16) & 0xFFFF;
+}
+
+
+// float:
+// sign exponent    mantissa
+// 31   30 ~ 23     22 ~ 0
+// x    11111111    xxxxxxxxxxxxxxxxxxxxxxx - special numbers (+/-Inf, NaN)
+// x    1xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers (bias 127)
+// x    0xxxxxxx    xxxxxxxxxxxxxxxxxxxxxxx - normal numbers (bias 127)
+// x    00000000    xxxxxxxxxxxxxxxxxxxxxxx - subnormal numbers
+//
+// float16 (fp16):
+// sign exponent    mantissa
+// 15   14 ~ 10     9 ~ 0
+// x    11111       xxxxxxxxxx - special numbers (+/-Inf, NaN)
+// x    1xxxx       xxxxxxxxxx - normal numbers (bias 15)
+// x    0xxxx       xxxxxxxxxx - normal numbers (bias 15)
+// x    00000       xxxxxxxxxx - subnormal numbers
+//
+// Conversion rules:
+// 1. Sign bit: bit31 -> bit15
+// 2. Exponent: Convert from bias 127 to bias 15
+// 3. Mantissa: Upper 10 bits of float mantissa
+// 4. Special cases require careful handling
+UINT16 float2FP16(UINT32 val)
+{
+    // Extract components
+    UINT32 sign = val & 0x80000000;
+    UINT32 exp = (val >> 23) & 0xFF;
+    UINT32 mant = val & 0x007FFFFF;
+
+    // 1. Zero
+    if (exp == 0 && mant == 0) {
+        return (sign >> 16);
+    }
+
+    // 2. Infinity or NaN
+    if (exp == 0xFF) {
+        UINT16 fp16_sign = (sign >> 16) & 0x8000;
+        UINT16 fp16_exp = 0x7C00;  // All 1s (5 bits)
+        UINT16 fp16_mant = (mant >> 13) & 0x03FF;  // Upper 10 bits
+        // For NaN, ensure mantissa is non-zero
+        if (mant != 0 && fp16_mant == 0) {
+            fp16_mant = 1;  // Ensure NaN remains NaN
+        }
+        return fp16_sign | fp16_exp | fp16_mant;
+    }
+
+    // 3. Convert exponent from bias 127 to bias 15
+    INT32 exp_val = ((INT32)exp) - 127;
+
+    // 4. Handle out-of-range exponents
+    if (exp_val > 15) {
+        // Overflow -> Infinity
+        return (sign >> 16) | 0x7C00;
+    }
+
+    if (exp_val < -14) {
+        // Underflow -> handle subnormals or zero
+        // For simplicity, flush to zero (or implement subnormal handling)
+        return (sign >> 16);  // Zero with sign
+    }
+
+    // 5. Normal numbers
+    UINT16 fp16_sign = (sign >> 16) & 0x8000;
+    UINT16 fp16_exp = ((exp_val + 15) & 0x1F) << 10;  // 5-bit exponent
+    UINT16 fp16_mant = (mant >> 13) & 0x03FF;         // Upper 10 bits
+
+    // 6. Rounding (simple round-to-nearest-even)
+    UINT32 round_bit = (mant >> 12) & 0x1;
+    UINT32 sticky_bits = mant & 0x0FFF;
+
+    if (round_bit && (fp16_mant & 0x1 || sticky_bits)) {
+        ++fp16_mant;
+        if (fp16_mant > 0x03FF) {  // Mantissa overflow
+            fp16_mant = 0;
+            ++fp16_exp;
+            if (fp16_exp > 0x7C00) {  // Exponent overflow
+                return fp16_sign | 0x7C00;  // Infinity
+            }
+        }
+    }
+
+    return fp16_sign | fp16_exp | fp16_mant;
+}
+
+
 //half:
 //sign exponent    mantissa
 //15   14 ~ 10     9 ~ 0
@@ -551,6 +790,50 @@ UINT64 half2EHP64(UINT64 val)
     }
     //Copy the sign bit.
     ehp64_val |= (val & 0x8000) << 48;
+    return ehp64_val;
+}
+
+
+//bfloat16:
+//sign exponent    mantissa
+//15   14 ~ 7      6 ~ 0
+//x    11111111    xxxxxxx - special numbers (+/-Inf, NaN)
+//x    1xxxxxxx    xxxxxxx - normal numbers (exponent biased by 127)
+//x    0xxxxxxx    xxxxxxx - normal numbers (exponent biased by 127)
+//x    00000000    xxxxxxx - zero (subnormals flushed to zero)
+//
+//EHP64:
+//sign exponent    mantissa with 42 trailing zeros
+//63   62 ~ 52     51 ~ 0
+//x    11111111111 xxxxxxx000000000000000000000000000000000000000000000
+//x    1000xxxxxxx xxxxxxx000000000000000000000000000000000000000000000
+//x    0111xxxxxxx xxxxxxx000000000000000000000000000000000000000000000
+//x    00000000000 xxxxxxx000000000000000000000000000000000000000000000
+UINT64 bf16ToEHP64(UINT64 val)
+{
+    if (val == 0) { return 0; }
+
+    //Copy mantissa bits (7 bits) to the high 7 bits of EHP64 mantissa
+    //Shift left by 45 to place 7-bit mantissa at bits 51-45
+    UINT64 ehp64_val = ((UINT64)(val & 0x007F)) << 45;
+
+    //Extract original exponent bits (bits 14-7)
+    UINT16 orig_exp = val & 0x7F80;
+
+    if (orig_exp == 0x7F80) {
+        //Special numbers (+/-Inf, NaN) - set all exponent bits to 1
+        ehp64_val |= (UINT64)0x7FF0000000000000ULL;
+    } else if (orig_exp != 0) {
+        //Normal numbers - adjust exponent bias
+        //bfloat16: bias 127, EHP64: bias 1023
+        //Need to add (1023-127) = 896 to the exponent
+        UINT16 exp_bits = (orig_exp >> 7) & 0xFF;  // Get 8-bit exponent value
+        ehp64_val |= ((UINT64)(exp_bits + 896)) << 52;
+    }
+
+    //Copy the sign bit (bit 15) to bit 63
+    ehp64_val |= ((UINT64)(val & 0x8000)) << 48;
+
     return ehp64_val;
 }
 
@@ -777,6 +1060,14 @@ CHAR * reverseString(CHAR * v)
 {
     xcom::reverse_buffer(v, ::strlen(v));
     return v;
+}
+
+
+INT64 extendSign64(UINT64 val, UINT n)
+{
+    ASSERT0(n <= 64);
+    if (n == 0) { return 0; }
+    return INT64(val << (64 - n)) >> (64 - n);
 }
 
 
@@ -2125,4 +2416,15 @@ UINT rotateLeft(UINT val0, UINT val1)
     UINT val2 = val1 & 0x3F; // val1 % 64
     return (val0 << val2) | (val0 >> (64 - val2));
 }
+
+
+//Return a mask whose lowest 'bit_width' bits are 1.
+UINT64 getLowBitMask(UINT bit_width)
+{
+    ASSERT0(bit_width <= 64);
+    if (bit_width == 0) { return 0; }
+    if (bit_width == 64) { return ~0ULL; }
+    return (1ULL << bit_width) - 1;
+}
+
 } //namespace xcom

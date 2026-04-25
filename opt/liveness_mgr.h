@@ -148,6 +148,18 @@ public:
     LiveSet * get_livein(UINT bbid) const { return m_livein.get(bbid); }
     LiveSet * get_liveout(UINT bbid) const { return m_liveout.get(bbid); }
 
+    //Handle parameters info in the liveness of entry BB. Though parameters
+    //defined in outside region, they will be treated normally like other info.
+    //The prno of parameters should be added into the livein of entry BB if
+    //there is USE position in the whole region. And the liveout of entry BB
+    //will contain the prno of parameters if there is USE position in other BB.
+    //'old_livein': original livein of entry BB.
+    //'old_liveout': original liveout of entry BB.
+    //'auxmgr': auxiliary livenessMgr for modified liveness info of entry BB.
+    //'entry_id': the id of entry BB.
+    void handleParamInfoInEntryBB(LiveSet & old_livein, LiveSet & old_liveout,
+                                  AuxLivenessMgr & auxmgr, UINT entry_id);
+
     //By default, local set is initialized by computeLocal().
     void initSet(BBList const& bblst);
     void init_livein(UINT bbid);

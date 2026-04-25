@@ -105,6 +105,7 @@ namespace xoc {
     { \
         if (!isKeep##SET_NAME()) { return; } \
         Vector<SolveSet*> & vec = get##SET_NAME##Vec(); \
+        if (!vec.is_init()) { return; } \
         for (VecIdx i = 0; i <= vec.get_last_idx(); i++) { \
             SolveSet * bs = vec.get(i); \
             if (bs == nullptr) { continue; } \
@@ -244,6 +245,31 @@ DEFINE_SOLVESET_OPERATION(MustKilledDef)
 DEFINE_SOLVESET_OPERATION(KilledIRExpr)
 DEFINE_SOLVESET_OPERATION(LiveInBB)
 
+//
+//START SolveSetMgr
+//
+SolveSetMgr::SolveSetMgr(Region * rg) : Pass(rg)
+{
+    m_cfg = rg->getCFG();
+    m_bblst = m_cfg->getBBList();
+    m_md_sys = rg->getMDSystem();
+    setKeepReachDefIn(true);
+
+    //Usually only reach-def-in is useful for computing DU chain.
+    setKeepReachDefOut(false);
+    setKeepAvailReachDefIn(false);
+    setKeepAvailReachDefOut(false);
+    setKeepGenIRExpr(false);
+    setKeepAvailExprIn(false);
+    setKeepAvailExprOut(false);
+    setKeepMayGenDef(false);
+    setKeepMustGenDef(false);
+    setKeepMayKilledDef(false);
+    setKeepMustKilledDef(false);
+    setKeepKilledIRExpr(false);
+    setKeepLiveInBB(false);
+}
+
 
 SolveSetMgr::~SolveSetMgr()
 {
@@ -300,8 +326,8 @@ void SolveSetMgr::resetLocalSet()
 
 
 //This equation needs May Kill Def and Must Gen Def.
-bool SolveSetMgr::ForAvailReachDef(IRBB const* bb, List<IRBB*> * lst,
-                                   DefMiscBitSetMgr & bsmgr)
+bool SolveSetMgr::ForAvailReachDef(
+    IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr)
 {
     DUMMYUSE(lst);
     bool change = false;
@@ -313,12 +339,12 @@ bool SolveSetMgr::ForAvailReachDef(IRBB const* bb, List<IRBB*> * lst,
          in != nullptr; in = Graph::get_next_in_vertex(it)) {
         if (first) {
             first = false;
-            copyAvailReachDefIn(availreachdefin,
-                                *genAvailReachDefOut(in->id()));
-        } else {
-            intersectAvailReachDefIn(availreachdefin,
-                                     *genAvailReachDefOut(in->id()));
+            copyAvailReachDefIn(
+                availreachdefin, *genAvailReachDefOut(in->id()));
+            continue;
         }
+        intersectAvailReachDefIn(
+            availreachdefin, *genAvailReachDefOut(in->id()));
     }
     news.copy(*availreachdefin, bsmgr);
     SolveSet const* killset = getMayKilledDef(bb->id());
@@ -347,8 +373,8 @@ bool SolveSetMgr::ForAvailReachDef(IRBB const* bb, List<IRBB*> * lst,
 }
 
 
-bool SolveSetMgr::ForReachDef(IRBB const* bb, List<IRBB*> * lst,
-                              DefMiscBitSetMgr & bsmgr)
+bool SolveSetMgr::ForReachDef(
+    IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr)
 {
     DUMMYUSE(lst);
     bool change = false;
@@ -404,8 +430,8 @@ bool SolveSetMgr::ForReachDef(IRBB const* bb, List<IRBB*> * lst,
 }
 
 
-bool SolveSetMgr::ForAvailExpression(IRBB const* bb, List<IRBB*> * lst,
-                                     DefMiscBitSetMgr & bsmgr)
+bool SolveSetMgr::ForAvailExpression(
+    IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr)
 {
     DUMMYUSE(lst);
     bool change = false;
@@ -419,9 +445,10 @@ bool SolveSetMgr::ForAvailExpression(IRBB const* bb, List<IRBB*> * lst,
         if (first) {
             first = false;
             copyAvailExprIn(availexprin, *exprout);
-        } else {
-            intersectAvailExprIn(availexprin, *exprout);
+            continue;
         }
+        //intersectAvailExprIn(availexprin, *exprout);
+        bunionAvailExprIn(availexprin, *exprout);
     }
     news.copy(*availexprin, bsmgr);
     SolveSet const* set = getKilledIRExpr(bb->id());
@@ -449,8 +476,8 @@ bool SolveSetMgr::ForAvailExpression(IRBB const* bb, List<IRBB*> * lst,
 }
 
 
-void SolveSetMgr::solveByRPO(RPOVexList const* rpovexlst, UFlag const flag,
-                             MOD DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::solveByRPO(
+    RPOVexList const* rpovexlst, UFlag const flag, MOD DefMiscBitSetMgr & bsmgr)
 {
     bool change;
     UINT count = 0;
@@ -477,8 +504,8 @@ void SolveSetMgr::solveByRPO(RPOVexList const* rpovexlst, UFlag const flag,
 }
 
 
-void SolveSetMgr::solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
-                                  MOD DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::solveByWorkList(
+    List<IRBB*> * tbbl, UFlag const flag, MOD DefMiscBitSetMgr & bsmgr)
 {
     BBListIter ct;
     List<IRBB*> lst;
@@ -509,8 +536,9 @@ void SolveSetMgr::solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
 //Solve reaching definitions problem for IR STMT and
 //computing LIVE IN and LIVE OUT IR expressions.
 //expr_univers: the Universal SET for ExpRep.
-void SolveSetMgr::solve(SolveSet const& expr_univers, UFlag const flag,
-                        MOD DefMiscBitSetMgr & bsmgr)
+void SolveSetMgr::solve(
+    SolveSet const& expr_univers, UFlag const flag,
+    MOD DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t7, "Solve DU set");
     IRBB const* entry = m_cfg->getEntry();
@@ -523,11 +551,9 @@ void SolveSetMgr::solve(SolveSet const& expr_univers, UFlag const flag,
             cleanReachDefIn(genReachDefIn(bbid));
             cleanReachDefOut(genReachDefOut(bbid));
         }
-
         if (flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
             cleanAvailReachDefIn(genAvailReachDefIn(bbid));
         }
-
         if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
             //Initialize available in, available out expression.
             //IN-SET of BB must be universal of all IR-expressions.
@@ -537,15 +563,15 @@ void SolveSetMgr::solve(SolveSet const& expr_univers, UFlag const flag,
                 //AvailIn and AvailOut of entry should be empty.
                 cleanAvailExprIn(availin);
                 cleanAvailExprOut(availout);
-            } else {
-                copyAvailExprIn(availin, expr_univers);
-                copyAvailExprOut(availout, *availin);
-                SolveSet const* set = getKilledIRExpr(bbid);
-                if (set != nullptr) {
-                    diffAvailExprOut(availout, *set);
-                }
-                bunionAvailExprOut(availout, *genGenIRExpr(bbid));
+                continue;
             }
+            copyAvailExprIn(availin, expr_univers);
+            copyAvailExprOut(availout, *availin);
+            SolveSet const* set = getKilledIRExpr(bbid);
+            if (set != nullptr) {
+                diffAvailExprOut(availout, *set);
+            }
+            bunionAvailExprOut(availout, *genGenIRExpr(bbid));
         }
     }
 
@@ -590,20 +616,21 @@ void SolveSetMgr::setKilledIRExpr(UINT bbid, SolveSet * set)
 //mayuse: record may used MD for each bb.
 //        collect mayuse (NOPR-DU) to compute Region referred MD.
 void SolveSetMgr::computeMustExactDefMayDefMayUse(
-    OUT Vector<MDSet*> * mustdefmds,
-    OUT Vector<MDSet*> * maydefmds,
-    OUT MDSet * mayusemds,
-    UFlag flag)
+    OUT Vector<MDSet*> * mustdefmds, OUT Vector<MDSet*> * maydefmds,
+    OUT MDSet * mayusemds, UFlag flag)
 {
     START_TIMER_FMT(t3, ("Build MustDef, MayDef, MayUse: %s",
                          getSolveFlagName(flag)));
     if (flag.have(DUOPT_SOL_REACH_DEF) ||
-        flag.have(DUOPT_SOL_AVAIL_REACH_DEF)) {
+        flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_EXPR)) {
+        //NOTE:The computation of AVAIL_EXPR needs the MustDef MDSet of each BB.
         ASSERT0(mustdefmds);
     }
     if (flag.have(DUOPT_SOL_REACH_DEF) ||
         flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
         flag.have(DUOPT_SOL_AVAIL_EXPR)) {
+        //NOTE:The computation of AVAIL_EXPR needs the MayDef MDSet of each BB.
         ASSERT0(maydefmds);
     }
     if (flag.have(DUOPT_SOL_REGION_REF)) {
@@ -643,6 +670,7 @@ void SolveSetMgr::computeMustExactDefMayDefMayUse(
             cleanMustGenDef(mustgendef);
         }
         if (maydefmds != nullptr) {
+            //The computation of AVAIL_EXPR needs MayDef MDSet of each BB.
             bb_maydefmds = maydefmds->get(bbid);
             maygendef = genMayGenDef(bbid);
             cleanMayGenDef(maygendef);
@@ -674,11 +702,10 @@ void SolveSetMgr::computeMustExactDefMayDefMayUseForBB(
             co.collect(ir, flag.have(DUOPT_COMPUTE_PR_DU), bsmgr, *mayusemds);
             //collectMayUse(ir, *mayusemds, isComputePRDU());
         }
-
         if (!ir->hasResult()) { continue; }
-
-        //Do not compute MustExactDef/MayDef for PR.
         if (ir->isWritePR() && !flag.have(DUOPT_COMPUTE_PR_DU)) {
+            //Do not compute MustExactDef and MayDef for PR operations if user
+            //does not ask the solver to compute them.
             continue;
         }
 
@@ -702,8 +729,8 @@ void SolveSetMgr::computeMustExactDefMayDefMayUseForBB(
             //ASSERT0(flag.have(DUOPT_SOL_AVAIL_REACH_DEF));
 
             ASSERT0(mustgendef);
-            computeMustExactDef(ir, bb_mustdefmds, mustgendef, mditer,
-                                bsmgr, flag);
+            computeMustExactDef(
+                ir, bb_mustdefmds, mustgendef, mditer, bsmgr, flag);
         }
         if (bb_maydefmds != nullptr) {
             computeMayDef(ir, bb_maydefmds, maygendef, bsmgr, flag);
@@ -983,8 +1010,9 @@ void SolveSetMgr::computeKillSetByLiveInBB(
          in != BS_UNDEF; in = liveinbbs->get_next(in, &it)) {
         if (in == (BSIdx)bbid) { continue; }
         ASSERT0(m_cfg->getBB(in));
-        computeKillSetByMayGenDef(in, comp_must, comp_may, bb_mustdefmds,
-                                  bb_maydefmds, bsmgr, output);
+        computeKillSetByMayGenDef(
+            in, comp_must, comp_may, bb_mustdefmds, bb_maydefmds,
+            bsmgr, output);
     }
 }
 
@@ -1031,12 +1059,15 @@ void SolveSetMgr::computeKillSet(
             setMayKilledDef(bbid, nullptr);
             continue;
         }
-        computeKillSetByLiveInBB(bbid, comp_must, comp_may, bb_mustdefmds,
-                                 bb_maydefmds, bsmgr, tmp_must_killed_def);
-        setMustKilledDef(bbid, comp_must ?
-                         dbitsetchash.append(tmp_must_killed_def) : nullptr);
-        setMayKilledDef(bbid, comp_may ?
-                        dbitsetchash.append(tmp_may_killed_def) : nullptr);
+        computeKillSetByLiveInBB(
+            bbid, comp_must, comp_may, bb_mustdefmds, bb_maydefmds, bsmgr,
+            tmp_must_killed_def);
+        setMustKilledDef(
+            bbid, comp_must ?
+                dbitsetchash.append(tmp_must_killed_def) : nullptr);
+        setMayKilledDef(
+            bbid, comp_may ?
+                dbitsetchash.append(tmp_may_killed_def) : nullptr);
         tmp_must_killed_def.clean(bsmgr);
         tmp_may_killed_def.clean(bsmgr);
     }
@@ -1047,7 +1078,7 @@ void SolveSetMgr::computeKillSet(
 
 
 //Return true if ir can be candidate of live-expr.
-static bool canBeLiveExprCand(IR const* ir)
+bool SolveSetMgr::canBeLiveExprCand(IR const* ir) const
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
@@ -1055,6 +1086,8 @@ static bool canBeLiveExprCand(IR const* ir)
     SWITCH_CASE_READ_PR:
     SWITCH_CASE_BITWISE_UNA:
     SWITCH_CASE_LOGIC_UNA:
+    case IR_ARRAY:
+    case IR_ILD:
     case IR_NEG:
     case IR_SELECT:
         return true;
@@ -1074,29 +1107,16 @@ void SolveSetMgr::computeGenExprForMayDef(
     //
     //  lhs 'i' killed the rhs expression: 'i + 1', that means
     //  'i + 1' is dead after S1 statement.
-    MDSet const* maydef = const_cast<IR*>(ir)->getMayRef();
-    MD const* mustdef = ir->getMustRef();
-    if (maydef == nullptr && mustdef == nullptr) { return; }
+    if (!ir->hasResult()) { return; }
     DefSBitSetIter st = nullptr;
-    MDSet tmp;
-    CollectMayUseRecur co(m_rg);
     for (BSIdx j = gen_ir_expr->get_first(&st), nj; j != BS_UNDEF; j = nj) {
         nj = gen_ir_expr->get_next(j, &st);
         IR * tir = m_rg->getIR(j);
         ASSERT0(tir != nullptr);
-        if (tir->is_lda() || tir->is_const()) {
-            continue;
-        }
-        tmp.clean(bsmgr);
-        co.collect(tir, true, bsmgr, tmp);
-        //collectMayUse(tir, tmp, true);
-        if ((maydef != nullptr && maydef->is_intersect(tmp)) ||
-            (mustdef != nullptr && tmp.is_contain(mustdef, m_rg))) {
-            //'ir' killed 'tir'.
-            diffGenIRExpr(gen_ir_expr, j);
-        }
+        if (!xoc::isDependentForTree(ir, tir, true, m_rg)) { continue; }
+        //'ir' might kill 'tir'.
+        diffGenIRExpr(gen_ir_expr, j);
     }
-    tmp.clean(bsmgr);
 }
 
 
@@ -1108,55 +1128,50 @@ void SolveSetMgr::computeGenExprForStmt(
 {
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
-        if (canBeLiveExprCand(ST_rhs(ir))) {
-            //Compute the generated expressions set.
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(ST_rhs(ir)));
-            expr_univers.bunion(IR_id(ST_rhs(ir)), bsmgr);
-        }
-        computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
-        break;
-    case IR_STPR:
-        if (canBeLiveExprCand(STPR_rhs(ir))) {
-            //Compute the generated expressions set.
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(STPR_rhs(ir)));
-            expr_univers.bunion(IR_id(STPR_rhs(ir)), bsmgr);
-        }
-        computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
-        break;
     SWITCH_CASE_WRITE_ARRAY:
-        if (canBeLiveExprCand(STARR_rhs(ir))) {
+    case IR_STPR: {
+        IR const* rhs = ir->getRHS();
+        ASSERT0(rhs);
+        if (canBeLiveExprCand(rhs)) {
             //Compute the generated expressions set.
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(STARR_rhs(ir)));
-            expr_univers.bunion(IR_id(STARR_rhs(ir)), bsmgr);
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)rhs->id());
+            expr_univers.bunion(rhs->id(), bsmgr);
         }
         computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
         break;
-    SWITCH_CASE_INDIRECT_MEM_STMT:
+    }
+    case IR_GETELEM:
+    case IR_SETELEM:
+        computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
+        break;
+    SWITCH_CASE_INDIRECT_MEM_STMT: {
+        IR const* rhs = ir->getRHS();
         //Compute the generated expressions set.
-        if (canBeLiveExprCand(IST_rhs(ir))) {
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(IST_rhs(ir)));
-            expr_univers.bunion(IR_id(IST_rhs(ir)), bsmgr);
+        if (canBeLiveExprCand(rhs)) {
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)rhs->id());
+            expr_univers.bunion(rhs->id(), bsmgr);
         }
-        if (canBeLiveExprCand(IST_base(ir))) {
+        IR const* base = ir->getBase();
+        if (canBeLiveExprCand(base)) {
             //e.g: *(int*)0x1000 = 10, IST_base(ir) is nullptr.
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(IST_base(ir)));
-            expr_univers.bunion(IR_id(IST_base(ir)), bsmgr);
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)base->id());
+            expr_univers.bunion(base->id(), bsmgr);
         }
         computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
         break;
+    }
     SWITCH_CASE_CALL: {
         //Compute the generated expressions set.
         if (ir->is_icall()) {
-            ASSERT0(ICALL_callee(ir)->is_ld());
             if (canBeLiveExprCand(ICALL_callee(ir))) {
-                bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(ICALL_callee(ir)));
-                expr_univers.bunion(IR_id(ICALL_callee(ir)), bsmgr);
+                bunionGenIRExpr(gen_ir_expr, (BSIdx)ICALL_callee(ir)->id());
+                expr_univers.bunion(ICALL_callee(ir)->id(), bsmgr);
             }
         }
         for (IR * p = CALL_arg_list(ir); p != nullptr; p = p->get_next()) {
             if (canBeLiveExprCand(p)) {
-                bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(p));
-                expr_univers.bunion(IR_id(p), bsmgr);
+                bunionGenIRExpr(gen_ir_expr, (BSIdx)p->id());
+                expr_univers.bunion(p->id(), bsmgr);
             }
         }
         computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
@@ -1165,40 +1180,41 @@ void SolveSetMgr::computeGenExprForStmt(
     case IR_IGOTO:
         //Compute the generated expressions.
         if (canBeLiveExprCand(IGOTO_vexp(ir))) {
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(IGOTO_vexp(ir)));
-            expr_univers.bunion(IR_id(IGOTO_vexp(ir)), bsmgr);
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)IGOTO_vexp(ir)->id());
+            expr_univers.bunion(IGOTO_vexp(ir)->id(), bsmgr);
         }
         break;
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
         //Compute the generated expressions.
         if (canBeLiveExprCand(BR_det(ir))) {
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(BR_det(ir)));
-            expr_univers.bunion(IR_id(BR_det(ir)), bsmgr);
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)BR_det(ir)->id());
+            expr_univers.bunion(BR_det(ir)->id(), bsmgr);
         }
         break;
     SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
         //Compute the generated expressions.
         if (canBeLiveExprCand(SWITCH_vexp(ir))) {
-            bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(SWITCH_vexp(ir)));
-            expr_univers.bunion(IR_id(SWITCH_vexp(ir)), bsmgr);
+            bunionGenIRExpr(gen_ir_expr, (BSIdx)SWITCH_vexp(ir)->id());
+            expr_univers.bunion(SWITCH_vexp(ir)->id(), bsmgr);
         }
         break;
     case IR_RETURN:
         if (RET_exp(ir) != nullptr) {
             if (canBeLiveExprCand(RET_exp(ir))) {
-                bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(RET_exp(ir)));
-                expr_univers.bunion(IR_id(RET_exp(ir)), bsmgr);
+                bunionGenIRExpr(gen_ir_expr, (BSIdx)RET_exp(ir)->id());
+                expr_univers.bunion(RET_exp(ir)->id(), bsmgr);
             }
         }
         break;
     case IR_PHI:
-        //Since phis are always at head of BB, no live-expr killed by them.
+        //Since PHI are always at head of BB, no live-expr killed by them.
         for (IR * p = PHI_opnd_list(ir); p != nullptr; p = p->get_next()) {
             if (canBeLiveExprCand(p)) {
-                bunionGenIRExpr(gen_ir_expr, (BSIdx)IR_id(p));
-                expr_univers.bunion(IR_id(p), bsmgr);
+                bunionGenIRExpr(gen_ir_expr, (BSIdx)p->id());
+                expr_univers.bunion(p->id(), bsmgr);
             }
         }
+        computeGenExprForMayDef(ir, gen_ir_expr, bsmgr);
         break;
     case IR_REGION:
     case IR_GOTO:
@@ -1229,7 +1245,8 @@ void SolveSetMgr::computeGenExprForBB(
 //'expr_universe': record the universal of all ir-expr of region.
 void SolveSetMgr::computeAuxSetForExpression(
     DefDBitSetCoreReserveTab & bshash, OUT SolveSet * expr_universe,
-    Vector<MDSet*> const* maydefmds, DefMiscBitSetMgr & bsmgr)
+    Vector<MDSet*> const* mustdefmds, Vector<MDSet*> const* maydefmds,
+    DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t5, "Build AvailableExp");
     ASSERT0(expr_universe && maydefmds);
@@ -1251,6 +1268,8 @@ void SolveSetMgr::computeAuxSetForExpression(
         IRBB * bb = ct->val();
         MDSet const* bb_maydefmds = maydefmds->get(bb->id());
         ASSERT0(bb_maydefmds != nullptr);
+        MDSet const* bb_mustdefmds = mustdefmds->get(bb->id());
+        ASSERT0(bb_mustdefmds != nullptr);
 
         DefSBitSetIter st = nullptr;
         for (BSIdx i = expr_universe->get_first(&st);
@@ -1264,6 +1283,9 @@ void SolveSetMgr::computeAuxSetForExpression(
             //collectMayUse(ir, *tmp, true);
 
             if (bb_maydefmds->is_intersect(tmp)) {
+                tmp_killed_set.bunion(i, bsmgr);
+            }
+            if (bb_mustdefmds->is_intersect(tmp)) {
                 tmp_killed_set.bunion(i, bsmgr);
             }
         }
@@ -1345,8 +1367,8 @@ void SolveSetMgr::computeRegionMDDU(
 
 
 //set: the set of IRBB.
-static void dumpBBSet(Region const* rg, SolveSet const* set,
-                      CHAR const* set_name)
+static void dumpBBSet(
+    Region const* rg, SolveSet const* set, CHAR const* set_name)
 {
     if (set == nullptr) { return; }
     ASSERT0(rg->isLogMgrInit());
@@ -1358,8 +1380,9 @@ static void dumpBBSet(Region const* rg, SolveSet const* set,
 
 
 //set: the set of IR stmt or expression.
-static void dumpIRSet(Region const* rg, SolveSet const* set,
-                      CHAR const* set_name, UINT ind, bool is_dump_bs)
+static void dumpIRSet(
+    Region const* rg, SolveSet const* set, CHAR const* set_name, UINT ind,
+    bool is_dump_bs)
 {
     if (set == nullptr) { return; }
     ASSERT0(rg->isLogMgrInit());
@@ -1373,12 +1396,11 @@ static void dumpIRSet(Region const* rg, SolveSet const* set,
         ASSERT0(ir);
         prt(rg, "%s, ", dumpIRName(ir, buf));
     }
-    if (is_dump_bs) {
-        rg->getLogMgr()->incIndent(ind);
-        note(rg, "\n");
-        set->dump(rg->getLogMgr()->getFileHandler());
-        rg->getLogMgr()->decIndent(ind);
-    }
+    if (!is_dump_bs) { return; }
+    rg->getLogMgr()->incIndent(ind);
+    note(rg, "\n");
+    set->dump(rg->getLogMgr()->getFileHandler());
+    rg->getLogMgr()->decIndent(ind);
 }
 
 
@@ -1395,6 +1417,7 @@ void SolveSetMgr::dump(bool is_dump_bs) const
          bb = m_bblst->get_next(&cb)) {
         UINT bbid = bb->id();
         note(getRegion(), "\n---- BB%d ----", bbid);
+        m_rg->getLogMgr()->incIndent(2);
         dumpIRSet(m_rg, pthis->getReachDefIn(bbid),
                   "REACH-DEF-IN", ind, is_dump_bs);
         dumpIRSet(m_rg, pthis->getReachDefOut(bbid),
@@ -1420,12 +1443,13 @@ void SolveSetMgr::dump(bool is_dump_bs) const
         dumpIRSet(m_rg, pthis->getKilledIRExpr(bbid),
                   "KILLED-IR-EXPR", ind, is_dump_bs);
         dumpBBSet(m_rg, pthis->genLiveInBB(bbid), "LIVE-IN-BB");
+        m_rg->getLogMgr()->decIndent(2);
     }
 }
 
 
-static size_t dumpMemUsageImpl(Region const* rg, SolveSet const* set,
-                               CHAR const* set_name)
+static size_t dumpMemUsageImpl(
+    Region const* rg, SolveSet const* set, CHAR const* set_name)
 {
     if (set == nullptr) { return 0; }
     ASSERT0(rg->isLogMgrInit());
@@ -1458,32 +1482,32 @@ void SolveSetMgr::dumpMemUsage() const
          bb != nullptr; bb = m_bblst->get_next()) {
         note(getRegion(), "\n--- BB%d ---", bb->id());
         UINT bbid = bb->id();
-        count += dumpMemUsageImpl(m_rg, pthis->getReachDefIn(bbid),
-                                  "REACH-DEF-IN");
-        count += dumpMemUsageImpl(m_rg, pthis->getReachDefOut(bbid),
-                                  "REACH-DEF-OUT");
-        count += dumpMemUsageImpl(m_rg, pthis->getAvailReachDefIn(bbid),
-                                  "AVAIL-REACH-DEF-IN");
-        count += dumpMemUsageImpl(m_rg, pthis->getAvailReachDefOut(bbid),
-                                  "AVAIL-REACH-DEF-OUT");
-        count += dumpMemUsageImpl(m_rg, pthis->getMustGenDef(bbid),
-                                  "MUST-GEN-DEF");
-        count += dumpMemUsageImpl(m_rg, pthis->getMayGenDef(bbid),
-                                  "MAY-GEN-DEF");
-        count += dumpMemUsageImpl(m_rg, pthis->getMustKilledDef(bbid),
-                                  "MUST-KILLED-DEF");
-        count += dumpMemUsageImpl(m_rg, pthis->getMayKilledDef(bbid),
-                                  "MAY-KILLED-DEF");
-        count += dumpMemUsageImpl(m_rg, pthis->getAvailExprIn(bbid),
-                                  "AVAIL-EXPR-IN");
-        count += dumpMemUsageImpl(m_rg, pthis->getAvailExprOut(bbid),
-                                  "AVAIL-EXPR-OUT");
-        count += dumpMemUsageImpl(m_rg, pthis->getGenIRExpr(bbid),
-                                  "GEN-IR-EXPR");
-        count += dumpMemUsageImpl(m_rg, pthis->getKilledIRExpr(bbid),
-                                  "KILLED-IR-EXPR");
-        count += dumpMemUsageImpl(m_rg, pthis->getKilledIRExpr(bbid),
-                                  "LIVE-IN-BB");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getReachDefIn(bbid), "REACH-DEF-IN");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getReachDefOut(bbid), "REACH-DEF-OUT");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getAvailReachDefIn(bbid), "AVAIL-REACH-DEF-IN");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getAvailReachDefOut(bbid), "AVAIL-REACH-DEF-OUT");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getMustGenDef(bbid), "MUST-GEN-DEF");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getMayGenDef(bbid), "MAY-GEN-DEF");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getMustKilledDef(bbid), "MUST-KILLED-DEF");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getMayKilledDef(bbid), "MAY-KILLED-DEF");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getAvailExprIn(bbid), "AVAIL-EXPR-IN");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getAvailExprOut(bbid), "AVAIL-EXPR-OUT");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getGenIRExpr(bbid), "GEN-IR-EXPR");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getKilledIRExpr(bbid), "KILLED-IR-EXPR");
+        count += dumpMemUsageImpl(
+            m_rg, pthis->getKilledIRExpr(bbid), "LIVE-IN-BB");
     }
     CHAR const* str = nullptr;
     if (count < 1024) { str = "B"; }
@@ -1608,12 +1632,10 @@ size_t SolveSetMgr::count_mem() const
 }
 
 
-static void finiSolveSetVec(BBList const* bblst,
-                            MDSet *& mds_arr_for_must, MDSet *& mds_arr_for_may,
-                            MDSet *& mayuse_mds,
-                            Vector<MDSet*> *& mustexactdef_mds,
-                            Vector<MDSet*> *& maydef_mds,
-                            DefMiscBitSetMgr * lbsmgr)
+static void finiSolveSetVec(
+    BBList const* bblst, MDSet *& mds_arr_for_must, MDSet *& mds_arr_for_may,
+    MDSet *& mayuse_mds, Vector<MDSet*> *& mustexactdef_mds,
+    Vector<MDSet*> *& maydef_mds, DefMiscBitSetMgr * lbsmgr)
 {
     if (mustexactdef_mds != nullptr) {
         ASSERT0(mds_arr_for_must);
@@ -1655,7 +1677,9 @@ static void initSolveSetVec(
     }
     if (flag.have(DUOPT_SOL_REACH_DEF) ||
         flag.have(DUOPT_SOL_AVAIL_REACH_DEF) ||
+        flag.have(DUOPT_SOL_AVAIL_EXPR) ||
         flag.have(DUOPT_SOL_REGION_REF)) {
+        //NOTE:The computation of AVAIL_EXPR needs the MustDef MDSet of each BB.
         mustexactdef_mds = new Vector<MDSet*>();
     }
     if (flag.have(DUOPT_SOL_REACH_DEF) ||
@@ -1686,22 +1710,36 @@ static void initSolveSetVec(
 }
 
 
+bool SolveSetMgr::initDepPass(MOD OptCtx & oc, UFlag flag)
+{
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    ASSERT0(m_cfg->getRPOVexList());
+    if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
+        ASSERT0(flag.have(DUOPT_COMPUTE_PR_DU) ||
+                flag.have(DUOPT_COMPUTE_NONPR_DU));
+    }
+    return true;
+}
+
+
 //Return true if region status changed.
 bool SolveSetMgr::perform(MOD OptCtx & oc, UFlag flag)
 {
     ASSERT0(oc.is_ref_valid());
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    ASSERT0(m_cfg->getRPOVexList());
+    initDepPass(oc, flag);
     Vector<MDSet*> * maydef_mds = nullptr;
     Vector<MDSet*> * mustexactdef_mds = nullptr;
     MDSet * mayuse_mds = nullptr;
     MDSet * mds_arr_for_must = nullptr;
     MDSet * mds_arr_for_may = nullptr;
-    initSolveSetVec(m_bblst, mds_arr_for_must, mds_arr_for_may, mayuse_mds,
-                    mustexactdef_mds, maydef_mds, flag);
+    initSolveSetVec(
+        m_bblst, mds_arr_for_must, mds_arr_for_may, mayuse_mds,
+        mustexactdef_mds, maydef_mds, flag);
     DefMiscBitSetMgr * lbsmgr = getLocalSBSMgr();
-    computeMustExactDefMayDefMayUse(mustexactdef_mds, maydef_mds,
-                                    mayuse_mds, flag);
+
+    //The computation of AVAIL_EXPR needs MayDef MDSet of each BB.
+    computeMustExactDefMayDefMayUse(
+        mustexactdef_mds, maydef_mds, mayuse_mds, flag);
     DefDBitSetCoreHashAllocator dbitsetchashallocator(lbsmgr);
     DefDBitSetCoreReserveTab * dbitsetchash =
         new DefDBitSetCoreReserveTab(&dbitsetchashallocator);
@@ -1713,8 +1751,9 @@ bool SolveSetMgr::perform(MOD OptCtx & oc, UFlag flag)
     SolveSet tmp_expr_univers(SOL_SET_IS_SPARSE);
     if (flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         //Compute GEN, KILL IR-EXPR.
-        computeAuxSetForExpression(*dbitsetchash, &tmp_expr_univers, maydef_mds,
-                                   *lbsmgr);
+        computeAuxSetForExpression(
+            *dbitsetchash, &tmp_expr_univers, mustexactdef_mds,
+            maydef_mds, *lbsmgr);
     }
     delete dbitsetchash; //destroy useless resource as soon as possible.
     dbitsetchash = nullptr; //destroy useless resource as soon as possible.
@@ -1734,8 +1773,9 @@ bool SolveSetMgr::perform(MOD OptCtx & oc, UFlag flag)
 
     //Free and destroy local used resource.
     tmp_expr_univers.clean(*lbsmgr);
-    finiSolveSetVec(m_bblst, mds_arr_for_must, mds_arr_for_may, mayuse_mds,
-                    mustexactdef_mds, maydef_mds, lbsmgr);
+    finiSolveSetVec(
+        m_bblst, mds_arr_for_must, mds_arr_for_may, mayuse_mds,
+        mustexactdef_mds, maydef_mds, lbsmgr);
     resetLocalSet();
 
     //Set opt-context variables.

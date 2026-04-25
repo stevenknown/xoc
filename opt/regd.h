@@ -353,6 +353,7 @@ public:
 typedef xcom::Vector<RegDSet const*> Reg2RegDSet;
 typedef xcom::Vector<SRegSet const*> Reg2SRegSet;
 typedef xcom::Vector<RegD const*> Reg2RegD; //Map Reg to the unique RegD.
+typedef xcom::Vector<UINT> Reg2RefCnt; //Map Reg to the reference count.
 
 class REGDIdx2RegD : public xcom::Vector<RegD*> {
     COPY_CONSTRUCTOR(REGDIdx2RegD);
@@ -378,6 +379,75 @@ public:
     UINT get_elem_count() const { return m_count; }
     void dump(Region const* rg) const;
 };
+
+
+//
+//START RegRefMgr
+//
+//This class is used as the register reference count manager, and responsible
+//for the increase or decrease the reference count of each physical register
+//during the register allocation process.
+//Normally the physical register is picked from or freed to the responding
+//regset when the lifetime is started or ended, but we cannot do this simply
+//in the alias system, because if the smaller alias register is free when a
+//lifetime ends, and the bigger alias register cannot be freed, since
+//part of it may be assigned to another lifetime, so we have to use the
+//reference count to indicates whether it is really free.
+//CASE:
+//  r7 alias with r1 and r2.
+//  r8 alias with r3 and r4.
+//  r9 alias with r5 and r6.
+//                  r1   r2   r3   r4   r5   r6
+//  regset:       |----|----|----|----|----|----|
+//  refcnt:         1    1    0    1    1     1
+//  lifetime:       $5   $6        $9
+//
+//                    r7         r8       r9
+//  alias_set:    |---------|---------|---------|
+//  refcnt:           2         1         2
+//  lifetime:                            $8
+//
+//  In this example, if the lifetime of $5 ends, we cannot free the alias
+//  physical register r7 to the available regset, because register r2, the
+//  part of r7, is still be used by $6. If we free r7 to the regset, it may be
+//  assigned to a new lifetime, which would overwrite the data in r2. We can
+//  recongnize this situation when introducing the reference count. The r7 can
+//  not be freed because the reference count is 1 after r1 is freed.
+class RegRefMgr {
+    COPY_CONSTRUCTOR(RegRefMgr);
+    RegDSystem * m_rdsys;
+    Reg2RefCnt m_reg2refcnt; //Map Reg to the reference count.
+public:
+    //Decrease the reference count of register 'r'.
+    void decRef(Reg r);
+
+    //Increase the reference count of register 'r'.
+    void incRef(Reg r);
+    RegRefMgr(RegDSystem * rdsys) : m_rdsys(rdsys) { init(); }
+
+    //Return the reference count of register 'r'.
+    UINT getRef(Reg r) const
+    {
+        ASSERT0(r != REG_UNDEF);
+        return m_reg2refcnt.get(r);
+    }
+
+    //Init the reference count of all registers.
+    void init()
+    {
+        m_reg2refcnt.init(REG_NUM);
+    }
+
+    //Set the reference count of register 'r' with specified 'cnt'.
+    void setRegRefCount(Reg r, UINT cnt)
+    {
+        ASSERT0(r != REG_UNDEF);
+        return m_reg2refcnt.set(r, cnt);
+    }
+
+    void reset() { m_reg2refcnt.clean(); }
+};
+//END RegRefMgr
 
 
 //RegD System.
@@ -406,7 +476,7 @@ protected:
     SRegSetHash m_rs_hash; //SRegSet hash table.
     REGDIdx2RegD m_id2regd; //Map RegD id to RegD.
     Reg2RegD m_reg2regd; //Map Reg to the unique RegD.
-
+    RegRefMgr m_refmgr;
     //Map Reg to a RegDSet that record all overlapped RegD.
     Reg2RegDSet m_reg2overlap_rds;
 
@@ -487,6 +557,9 @@ public:
         MOD RegDSet & rds, MOD xcom::Vector<RegD const*> & added,
         ConstRegDIter & rditer, DefMiscBitSetMgr & rbsmgr);
 
+    //Increase the reference count of register 'r'.
+    void decRef(Reg r);
+
     //Dump all registered RegDs.
     void dump() const;
     void destroy();
@@ -499,6 +572,13 @@ public:
         ::memset((void*)rd, 0, sizeof(RegD));
         REGD_id(rd) = idx;
         m_free_rd_list.append_head(rd);
+    }
+
+    //Get the reference count for the register 'r'.
+    UINT getRef(Reg r) const
+    {
+        ASSERT0(r != REG_UNDEF);
+        return m_refmgr.getRef(r);
     }
 
     //Get registered RegD through REGDIdx.
@@ -542,12 +622,30 @@ public:
     SRegSet const* getOverlapSRegSet(Reg reg) const
     { return m_reg2overlap_rs.get(reg); }
 
+    //Increase the reference count of register 'r'.
+    void incRef(Reg r);
+
+    //Get the step of register 'r' due to the different size of
+    //registers. The step is used as the minimum change step when
+    //do the increase or decrease operation in the reference count system.
+    //e.g:
+    //    ----------------------------------------------------
+    //    |        |  old    |     |after incRef|after decRef|
+    //    |register|reference| step|  reference |  reference |
+    //    ----------------------------------------------------
+    //    |  r2    |     4   |   1 |      5     |    3       |
+    //    ----------------------------------------------------
+    UINT getStep(Reg r) const { return 1; };
+
     //The initialization of RegDSystem.
     void init(RegionMgr const* rm, TargInfoMgr const* tim);
     void initRegDByTargInfo();
 
     //Register RegD according to specific m. And return the generated RegD.
     RegD const* registerRegD(RegD const& m);
+
+    //Reset the reference count for the register.
+    void resetRef() { m_refmgr.reset(); }
 
     //Remove all REGDs related to specific regfile 'rf'.
     void removeRegDForRegFile(REGFILE rf, IN ConstRegDIter & iter);

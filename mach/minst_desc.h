@@ -35,23 +35,35 @@ namespace mach {
 
 class MInstDesc {
 public:
+    UINT m_byte_size;
     MInstMgr const& m_inst_mgr;
     xcom::Vector<FIELD_TYPE> m_field_type;
     UINT m_field_idx[FT_NUM];
+
 public:
     MInstDesc(MInstMgr const& im) : m_inst_mgr(im)
     {
         ASSERT0(FT_NUM < MAX_FT_NUM);
         ::memset((void*)m_field_idx, 0, sizeof(m_field_idx));
+        m_byte_size = 0;
     }
     virtual ~MInstDesc() {}
 
     //Perform initialization for target depdendent code.
     void initFieldIdx()
     {
+        UINT bit_size = 0;
+        m_byte_size = 0;
         for (UINT i = 0; i < getFieldNum(); i++) {
             m_field_idx[m_field_type[i]] = i;
+            bit_size += getFieldSizeByIdx(i);
         }
+        m_byte_size = bit_size / BIT_PER_BYTE;
+    }
+
+    UINT getTotalFieldByteSize() const
+    {
+        return m_byte_size;
     }
 
     //Return true if current machine instruction contains field 'ft'.

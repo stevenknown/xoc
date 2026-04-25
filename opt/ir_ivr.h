@@ -272,6 +272,13 @@ public:
         return getStepVal().getMD();
     }
 
+    //Get the occurrence of step memory descriptor if IV is variable.
+    IR const* getStepValMDOcc() const
+    {
+        ASSERT0(isStepValVar());
+        return getStepVal().getMDOcc();
+    }
+
     //Get the step memory descriptor if IV is variable.
     IR const* getStepValExp() const
     {
@@ -336,12 +343,10 @@ public:
     bool isStepValVar() const { return getStepVal().is_var(); }
     bool isStepValExp() const { return getStepVal().is_exp(); }
 
+    //Return true if current step-value is immutable-expression.
     //Immut includes const, immutable-exp.
-    bool isStepValImmut() const
-    {
-        return isStepValConst() ||
-               (isStepValExp() && getStepValExp()->isImmutExp());
-    }
+    //Immutable-exp includes readonly-expression, non-volatile-expression.
+    bool isStepValImmut(Region const* rg) const;
     bool isStepValCR() const { return getStepVal().is_cr(); }
     bool isStepValConst() const { return isStepValInt() || isStepValFP(); }
 };
@@ -659,10 +664,10 @@ protected:
     bool computeConstValOfExp(IR const* exp, OUT HOST_INT & val) const;
 
     //Return true if ir is addend of linear-representation.
-    bool canBeAddend(LI<IRBB> const* li, IR const* ir) const;
+    bool canBeAddend(LI<IRBB> const* li, IR const* ir, IVRCtx const& ctx) const;
 
     //Return true if ir is coefficent of linear-representation.
-    bool canBeCoeff(LI<IRBB> const* li, IR const* ir) const;
+    bool canBeCoeff(LI<IRBB> const* li, IR const* ir, IVRCtx const& ctx) const;
 
     void dump_recur(LI<IRBB> const* li, UINT indent) const;
 
@@ -803,7 +808,8 @@ public:
     //linrep: the output result that record the linear-rep info if 'ir' is.
     //e.g: if i is IV, a*i is the linear-represetation of i.
     bool isMultipleOfIV(
-        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const;
+        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep,
+        IVRCtx const& ctx) const;
 
     //Return true if ir is relaxed linear-representation about IV.
     //The function try to find the standard linear-expression such as: a*i+b,
@@ -833,7 +839,8 @@ public:
     //linrep: optional, if not nullptr, it records the coeff, iv, and addend
     //        of linear-representation if exist.
     bool isLinearRepOfIV(
-        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const;
+        LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep,
+        IVRCtx const& ctx) const;
 
     //Return true if ir is expression that represent the multiple of IV.
     bool isMultipleOfMD(

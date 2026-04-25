@@ -127,9 +127,6 @@ enum VAR_FLAG {
 
     //Variable is entry function.
     VAR_IS_ENTRY = 0x40000,
-
-    //Variable is section.
-    VAR_IS_SECTION = 0x80000,
 };
 
 class VarFlag : public UFlag {
@@ -168,6 +165,8 @@ enum VAR_LINK_ATTR {
     VAR_LINK_ATTR_VISIBLE = 0x2,
     //".extern" modifier.
     VAR_LINK_ATTR_EXTERN  = 0x4,
+    //For debug info in link.
+    VAR_LINK_ATTR_DEBUG   = 0x8,
 };
 
 
@@ -385,13 +384,14 @@ public:
     bool is_taken_addr() const { return varflag.have(VAR_ADDR_TAKEN); }
     bool is_pr() const { return varflag.have(VAR_IS_PR); }
     bool is_region() const { return varflag.have(VAR_IS_REGION); }
-    bool is_section() const { return varflag.have(VAR_IS_SECTION); }
     bool is_restrict() const { return varflag.have(VAR_IS_RESTRICT); }
     bool is_entry() const { return varflag.have(VAR_IS_ENTRY); }
     bool is_weak() const { return var_link_attr.have(VAR_LINK_ATTR_WEAK); }
     bool is_extern() const { return var_link_attr.have(VAR_LINK_ATTR_EXTERN); }
     bool is_visible() const
     { return var_link_attr.have(VAR_LINK_ATTR_VISIBLE); }
+    bool is_debug() const
+    { return var_link_attr.have(VAR_LINK_ATTR_DEBUG); }
     bool is_any() const
     {
         ASSERT0(VAR_type(this));

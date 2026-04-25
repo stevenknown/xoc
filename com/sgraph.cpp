@@ -116,6 +116,26 @@ Vertex * Vertex::getNthOutVertex(UINT n) const
     for (; i < n && ec != nullptr; ec = ec->get_next(), i++) {}
     return ec != nullptr ? ec->getTo() : nullptr;
 }
+
+
+Vertex const* Vertex::getUniqueSucc() const
+{
+    EdgeC const* e = getOutList();
+    if (e == nullptr || e->get_next() != nullptr) {
+        return nullptr;
+    }
+    return e->getTo();
+}
+
+
+Vertex const* Vertex::getUniquePred() const
+{
+    EdgeC const* e = getInList();
+    if (e == nullptr || e->get_next() != nullptr) {
+        return nullptr;
+    }
+    return e->getFrom();
+}
 //END Vertex
 
 
@@ -421,12 +441,10 @@ Edge * Graph::allocEdge(Vertex * from, Vertex * to)
             m_edgetab.getCompareKeyObject()->clean();
             return m_edgetab.append(&placeholder);
         }
-
         Edge * e = m_edgetab.get(&placeholder);
         if (e != nullptr) {
             return e;
         }
-
         //Both check from->to and to->from
         EDGE_from(&placeholder) = to;
         EDGE_to(&placeholder) = from;
@@ -1352,7 +1370,7 @@ bool Graph::isReachExit(
 {
     if (is_graph_exit(vex)) { return true; }
     UINT count = 0;
-    GraphIterOut iterout(*this, vex);
+    GraphIterOut<> iterout(*this, vex);
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
         count++;
@@ -1605,7 +1623,7 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, DomSet const* uni)
     }
 
     //DOM[entry] = {entry}
-    //DOM[n] = {n} กศ { กษ(DOM[pred] of predecessor of 'n') }
+    //DOM[n] = {n} UNION { INTERSECT(DOM[pred] of predecessor of 'n') }
     bool change = true;
     DomSet tmp;
     UINT count = 0;
@@ -1682,7 +1700,7 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, DomSet const* uni)
     }
 
     //DOM[entry] = {entry}
-    //DOM[n] = {n} กศ { กษ(DOM[pred] of predecessor of 'n') }
+    //DOM[n] = {n} UNION { INTERSET(DOM[pred] of predecessor of 'n') }
     bool change = true;
     DomSet tmp;
     UINT count = 0;
@@ -1805,7 +1823,7 @@ bool DGraph::computePdom(List<Vertex const*> const& vlst, DomSet const* uni)
     }
 
     //PDOM[exit] = {exit}
-    //PDOM[n] = {n} U {กษ(PDOM[succ] of each succ of n)}
+    //PDOM[n] = {n} UNION {INTERSECT(PDOM[succ] of each succ of n)}
     bool change = true;
     DomSet tmp;
     UINT count = 0;
@@ -2196,8 +2214,8 @@ bool DGraph::verifyPdom(DGraph & g, RPOVexList const& rpovlst) const
     bool f2 = g.computeIpdom();
     ASSERT0_DUMMYUSE(f2);
     g.revisePdomByIpdom();
-    ASSERT0(g.m_ipdom_set.get_elem_count() == m_ipdom_set.get_elem_count());
-    for (VecIdx i = 0; i <= m_ipdom_set.get_last_idx(); i++) {
+    VecIdx l = MIN(g.m_ipdom_set.get_last_idx(), m_ipdom_set.get_last_idx());
+    for (VecIdx i = 0; i <= l; i++) {
         VexIdx cur = m_ipdom_set.get(i);
         VexIdx anti = g.m_ipdom_set.get(i);
         ASSERTN_DUMMYUSE(cur == anti, ("unmatch ipdom"));
@@ -2492,7 +2510,7 @@ void DGraph::genDomTreeForSubGraph(Vertex const* root, OUT DomTree & dt,
     VexIdx rootid = root->id();
     Vertex * dtv = dt.addVertex(rootid);
     dt.setRoot(dtv);
-    GraphIterOut iterout(*this, root);
+    GraphIterOut<> iterout(*this, root);
     iter_times = 0;
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
@@ -2534,7 +2552,7 @@ static void collectDomTreeCoveredReachableVertex(
     OUT RPOVexList & affectlst, OUT TMap<Vertex const*, VexIdx> & vex2idom,
     OUT UINT & iter_times)
 {
-    GraphIterOut iterout(g, root);
+    GraphIterOut<> iterout(g, root);
     affectlst.append_tail(root);
     VexIdx rootid = root->id();
     for (Vertex const* t = iterout.get_first();
@@ -2829,7 +2847,7 @@ void DGraph::freeDomSet(VexIdx vid)
 //Add vertex to domset and pdomset for both livein and liveout paths.
 static void removeVexFromDomAndPdomSet(DGraph * g, Vertex const* marker)
 {
-    GraphIterIn iterin(*g, marker);
+    GraphIterIn<> iterin(*g, marker);
     VexIdx vexid = marker->id();
     for (Vertex const* t = iterin.get_first();
          t != nullptr; t = iterin.get_next(t)) {
@@ -2838,7 +2856,7 @@ static void removeVexFromDomAndPdomSet(DGraph * g, Vertex const* marker)
         g->gen_pdom_set(t->id())->diff(vexid);
     }
 
-    GraphIterOut iterout(*g, marker);
+    GraphIterOut<> iterout(*g, marker);
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
         if (t->id() == vexid) { continue; }
@@ -3158,6 +3176,12 @@ static void reviseDomAndPdomSet(
     //Copy PDom Set from oldsucc to newsucc.
     g.try_union_pdom_set(newsucc->id(), g.get_pdom_set(oldsucc->id()));
     g.try_union_pdom_set(newsucc->id(), oldsucc->id());
+
+    //If marker dominates oldsucc, then newsucc must also dominate oldsucc.
+    if (g.get_dom_set(oldsucc->id())->is_contain(marker->id())) {
+        const_cast<DomSet*>(g.get_dom_set(oldsucc->id()))->
+            bunion(newsucc->id());
+    }
     if (marker_is_idom_of_oldsucc) {
         //Maintain domset, pdomset of each vertex that are in the domset
         //and pdomset of 'marker'.
@@ -3342,7 +3366,7 @@ void DGraph::removeDomInfo(Vertex const* marker, bool iter_pred_succ,
     set_idom(markerid, VERTEX_UNDEF);
     set_ipdom(markerid, VERTEX_UNDEF);
     if (!iter_pred_succ) { return; }
-    GraphIterIn iterin(*this, marker);
+    GraphIterIn<> iterin(*this, marker);
     for (Vertex const* t = iterin.get_first();
          t != nullptr; t = iterin.get_next(t)) {
         gen_dom_set(t->id())->diff(markerid);
@@ -3355,7 +3379,7 @@ void DGraph::removeDomInfo(Vertex const* marker, bool iter_pred_succ,
         }
         iter_time++;
     }
-    GraphIterOut iterout(*this, marker);
+    GraphIterOut<> iterout(*this, marker);
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
         gen_dom_set(t->id())->diff(markerid);
@@ -3399,99 +3423,6 @@ bool DGraph::removeUnreachNode(VexIdx entry_id)
     return removed;
 }
 //END DGraph
-
-
-//
-//START GraphIterIn
-//
-GraphIterIn::GraphIterIn(Graph const& g, Vertex const* start,
-                         Vertex const* stop) : m_g(g), m_stop(stop)
-{
-    ASSERT0(start);
-    ASSERTN(g.getVertex(start->id()) == start,
-            ("start is not vertex of graph"));
-    if (start == stop) { return; }
-    AdjVertexIter it;
-    for (Vertex * pred = Graph::get_first_in_vertex(start, it);
-         pred != nullptr; pred = Graph::get_next_in_vertex(it)) {
-        m_visited.append(pred->id());
-        m_wl.append_tail(pred);
-    }
-}
-
-
-void GraphIterIn::clean()
-{
-    m_wl.clean();
-    m_visited.clean();
-}
-
-
-Vertex * GraphIterIn::get_first()
-{
-    return m_wl.remove_head();
-}
-
-
-Vertex * GraphIterIn::get_next(Vertex const* t)
-{
-    ASSERT0(t);
-    if (t != m_stop) {
-        AdjVertexIter it;
-        for (Vertex * predv = Graph::get_first_in_vertex(t, it);
-             predv != nullptr; predv = Graph::get_next_in_vertex(it)) {
-            if (m_visited.find(predv->id())) { continue; }
-            m_visited.append(predv->id());
-            m_wl.append_tail(predv);
-        }
-    }
-    return m_wl.remove_head();
-}
-//END GraphIterIn
-
-
-//
-//START GraphIterOut
-//
-GraphIterOut::GraphIterOut(Graph const& g, Vertex const* start) : m_g(g)
-{
-    ASSERTN(g.getVertex(start->id()) == start,
-            ("start is not vertex of graph"));
-    AdjVertexIter it;
-    for (Vertex * succ = Graph::get_first_out_vertex(start, it);
-         succ != nullptr; succ = Graph::get_next_out_vertex(it)) {
-        m_visited.append(succ->id());
-        m_wl.append_tail(succ);
-    }
-}
-
-
-void GraphIterOut::clean()
-{
-    m_wl.clean();
-    m_visited.clean();
-}
-
-
-Vertex * GraphIterOut::get_first()
-{
-    return m_wl.remove_head();
-}
-
-
-Vertex * GraphIterOut::get_next(Vertex const* t)
-{
-    ASSERT0(t);
-    AdjVertexIter it;
-    for (Vertex * succv = Graph::get_first_out_vertex(t, it);
-         succv != nullptr; succv = Graph::get_next_out_vertex(it)) {
-        if (m_visited.find(succv->id())) { continue; }
-        m_visited.append(succv->id());
-        m_wl.append_tail(succv);
-    }
-    return m_wl.remove_head();
-}
-//END GraphIterOut
 
 
 //

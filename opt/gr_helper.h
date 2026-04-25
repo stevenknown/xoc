@@ -49,8 +49,9 @@ public:
     IRCFG const* cfg;
     Region const* rg;
     TypeMgr const* tm;
+    LogMgr * lm;
 public:
-    DumpGRCtx(Region const* r, bool dump_inner);
+    DumpGRCtx(Region const* r, LogMgr * tlm, bool dump_inner);
 };
 
 class GRDump {

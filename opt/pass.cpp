@@ -53,7 +53,11 @@ PassCtx::PassCtx(OptCtx * oc, ActMgr * am)
 
 void PassCtx::copy(PassCtx const& src)
 {
-    ::memcpy(this, &src, sizeof(PassCtx));
+    m_oc = src.m_oc;
+    m_ivr = src.m_ivr;
+    m_gvn = src.m_gvn;
+    m_am = src.m_am;
+    m_rg = src.m_rg;
 }
 
 

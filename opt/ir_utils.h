@@ -91,10 +91,10 @@ public:
 
 //Mapping between an unsigned long integer and a list of IR.
 //Manage object memory automatically.
-class UINT2ConstIRList : public xcom::TMap<UINT, ConstIRList*> {
+class ULONG2ConstIRList : public xcom::TMap<ULONG, ConstIRList*> {
     List<ConstIRList*> m_irlst_lst; //Collect all allocated objects.
 public:
-    virtual ~UINT2ConstIRList()
+    virtual ~ULONG2ConstIRList()
     {
         for (ConstIRList * il = m_irlst_lst.get_head();
              il != nullptr; il = m_irlst_lst.get_next()) {
@@ -103,7 +103,7 @@ public:
     }
 
     //'u' corresponds to multiple 'ir'.
-    void append(UINT u, IR const* ir)
+    void append(ULONG u, IR const* ir)
     {
         ASSERT0(u != 0 && ir); //'0' is set as default nullptr
         ConstIRList * irlst = get(u);
@@ -114,10 +114,10 @@ public:
         }
     }
 
-    virtual void clean(UINT u)
+    virtual void clean(ULONG u)
     {
         ASSERT0(u != 0); //'0' is set as default nullptr
-        ConstIRList * irlst = xcom::TMap<UINT, ConstIRList*>::get(u);
+        ConstIRList * irlst = xcom::TMap<ULONG, ConstIRList*>::get(u);
         if (irlst != nullptr) {
             irlst->clean();
         }
@@ -125,14 +125,14 @@ public:
 
     // Set a single IR for a given key 'u'.
     // If a list already exists, replace the existing IR with the new one.
-    virtual void set(UINT u, IR const* ir)
+    virtual void set(ULONG u, IR const* ir)
     {
         ASSERT0(u != 0 && ir); // '0' is set as default nullptr
         ConstIRList * irlst = get(u);
         if (irlst == nullptr) {
             irlst = new ConstIRList();
             m_irlst_lst.append_tail(irlst);
-            xcom::TMap<UINT, ConstIRList*>::set(u, irlst);
+            xcom::TMap<ULONG, ConstIRList*>::set(u, irlst);
         } else {
             // In single IRBB, only record the immediate-dominate DEF IR.
             ASSERT0(irlst->get_elem_count() <= 1);
@@ -365,13 +365,6 @@ public:
 #define SWITCH_CASE_CFS_OP \
     SWITCH_CASE_LOOP_CFS_OP: \
     case IR_IF
-
-#define SWITCH_CASE_HAS_DU \
-    SWITCH_CASE_MAY_PR_OP: \
-    SWITCH_CASE_DIRECT_MEM_OP: \
-    SWITCH_CASE_INDIRECT_MEM_OP: \
-    SWITCH_CASE_ARRAY_OP: \
-    case IR_ID
 
 #define SWITCH_CASE_MEM_NONPR_OP \
     SWITCH_CASE_DIRECT_MEM_OP: \

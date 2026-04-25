@@ -367,12 +367,15 @@ bool MDSet::is_contain_by_delegate(MD const* md, Region const* rg) const
     }
     ASSERT0(md->is_local());
     if (is_contain_by_local_delegate(this)) {
+        //NOTE: PR is belong to LOCAL_VAR, thus the LOCAL_VAR is the delegate
+        //of PR.
         return true;
     }
-    if (is_contain_by_local_may_alias_delegate(this)) {
-        return true;
+    if (md->is_pr()) {
+        //PR does not alias to any other PR.
+        return false;
     }
-    return false;
+    return is_contain_by_local_may_alias_delegate(this);
 }
 
 

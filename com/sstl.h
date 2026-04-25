@@ -2667,6 +2667,7 @@ public:
     //function.
     C<T> * append_tail(T t)
     {
+        ASSERT0(!find(t));
         C<T> * c = List<T>::append_tail(t);
         m_typename2holder.setAlways(t, c);
         return c;
@@ -2677,6 +2678,7 @@ public:
     //function.
     C<T> * append_head(T t)
     {
+        ASSERT0(!find(t));
         C<T> * c = List<T>::append_head(t);
         m_typename2holder.setAlways(t, c);
         return c;
@@ -2691,6 +2693,7 @@ public:
         C<T> * c;
         for (T t = list.get_head(); i < list.get_elem_count();
              i++, t = list.get_next()) {
+            ASSERT0(!find(t));
             c = List<T>::append_tail(t);
             m_typename2holder.setAlways(t, c);
         }
@@ -2705,6 +2708,7 @@ public:
         C<T> * c;
         for (T t = list.get_tail(); i < list.get_elem_count();
              i++, t = list.get_prev()) {
+            ASSERT0(!find(t));
             c = List<T>::append_head(t);
             m_typename2holder.setAlways(t, c);
         }
@@ -2722,7 +2726,8 @@ public:
         return true;
     }
 
-    MapTypename2Holder * get_holder_map() const { return &m_typename2holder; }
+    MapTypename2Holder const& get_holder_map() const
+    { return m_typename2holder; }
 
     T get_cur() const //Do NOT update 'm_cur'
     { return List<T>::get_cur(); }
@@ -2772,6 +2777,7 @@ public:
     //NOTE: 'marker' should have been in the list.
     C<T> * insert_before(T t, T marker)
     {
+        ASSERT0(!find(t));
         C<T> * marker_holder = m_typename2holder.get(marker);
         if (marker_holder == nullptr) {
             ASSERT0(List<T>::get_elem_count() == 0);
@@ -2788,6 +2794,7 @@ public:
     //and marker will be modified.
     C<T> * insert_before(T t, C<T> * marker)
     {
+        ASSERT0(!find(t));
         ASSERT0(marker && m_typename2holder.get(marker->val()) == marker);
         C<T> * t_holder = List<T>::insert_before(t, marker);
         m_typename2holder.setAlways(t, t_holder);
@@ -2805,6 +2812,7 @@ public:
     //NOTE: 'marker' should have been in the list.
     C<T> * insert_after(T t, T marker)
     {
+        ASSERT0(!find(t));
         C<T> * marker_holder = m_typename2holder.get(marker);
         if (marker_holder == nullptr) {
             ASSERT0(List<T>::get_elem_count() == 0);
@@ -2820,6 +2828,7 @@ public:
     //NOTE: 'marker' should have been in the list.
     C<T> * insert_after(T t, C<T> * marker)
     {
+        ASSERT0(!find(t));
         ASSERT0(marker && m_typename2holder.get(marker->val()) == marker);
         C<T> * marker_holder = marker;
         C<T> * t_holder = List<T>::insert_after(t, marker_holder);
@@ -2854,9 +2863,7 @@ public:
     T remove(T t)
     {
         C<T> * c = m_typename2holder.get(t);
-        if (c == nullptr) {
-            return T(0);
-        }
+        if (c == nullptr) { return T(0); }
         T tt = List<T>::remove(c);
         m_typename2holder.setAlways(t, nullptr);
         return tt;
@@ -2882,6 +2889,17 @@ public:
         T t = List<T>::remove_head();
         m_typename2holder.setAlways(t, nullptr);
         return t;
+    }
+
+    bool verify() const
+    {
+        UINT i = 0;
+        Iter it;
+        for (List<T>::get_head(&it); i < List<T>::get_elem_count();
+             i++, List<T>::get_next(&it)) {
+            ASSERT0(m_typename2holder.get(it->val()) == it);
+        }
+        return true;
     }
 };
 //END EList
@@ -3220,7 +3238,7 @@ public:
 
     //Overloaded [] for CONST array reference create an rvalue.
     //Similar to 'get()', the difference between this operation
-    //and get() is [] opeartion does not allow index is greater than
+    //and get() is [] operation does not allow index is greater than
     //or equal to m_elem_num.
     //Note this operation can not be used to create lvalue.
     //e.g: Vector<int> const v;
@@ -3235,7 +3253,7 @@ public:
 
     //Overloaded [] for non-const array reference create an lvalue.
     //Similar to set(), the difference between this operation
-    //and set() is [] opeartion does not allow index is greater than
+    //and set() is [] operation does not allow index is greater than
     //or equal to m_elem_num.
     inline T & operator[](VecIdx index)
     {
@@ -3532,7 +3550,7 @@ public:
 
     //Overloaded [] for CONST array reference create an rvalue.
     //Similar to 'get()', the difference between this operation
-    //and get() is [] opeartion does not allow index is greater than
+    //and get() is [] operation does not allow index is greater than
     //or equal to m_elem_num.
     //Note this operation can not be used to create lvalue.
     //e.g: SimpleVector<int> const v;
@@ -3547,7 +3565,7 @@ public:
 
     //Overloaded [] for non-const array reference create an lvalue.
     //Similar to set(), the difference between this operation
-    //and set() is [] opeartion does not allow index is greater than
+    //and set() is [] operation does not allow index is greater than
     //or equal to m_elem_num.
     //e.g: SimpleVector<int> v;
     //     v[i] = 20;
@@ -3657,7 +3675,7 @@ public:
 
     //Overloaded [] for CONST array reference create an rvalue.
     //Similar to 'get()', the difference between this operation
-    //and get() is [] opeartion does not allow index is greater than
+    //and get() is [] operation does not allow index is greater than
     //or equal to ElemNum.
     //Note this operation can not be used to create lvalue.
     //e.g: FixSizeVector<int, 4> const v;
@@ -3670,7 +3688,7 @@ public:
 
     //Overloaded [] for non-const array reference create an lvalue.
     //Similar to set(), the difference between this operation
-    //and set() is [] opeartion does not allow index is greater than
+    //and set() is [] operation does not allow index is greater than
     //or equal to ElemNum.
     //e.g: FixSizeVector<int, 4> v;
     //     v[i] = 20;

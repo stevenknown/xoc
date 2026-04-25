@@ -22,6 +22,7 @@ include $(COM_DIR)/Makefile.option
 CFLAGS+=\
   -D$(TARG) \
   -D_SUPPORT_C11_ \
+  -std=c++11 \
   -Wno-unknown-pragmas \
   -Wno-write-strings \
   -Wsign-promo \

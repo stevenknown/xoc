@@ -45,9 +45,7 @@ void VarLivenessMgr::computeExpImpl(
     ASSERT0(exp->is_exp());
     if (!exp->hasIdinfo()) { return; }
     if (!canBeExpCand(exp->getStmt(), exp))  { return; }
-    Var const* v = exp->getIdinfo();
-    ASSERT0(v);
-    updateSetByExp((BSIdx)v->id(), use);
+    updateSetForExp(exp, use);
 }
 
 
@@ -58,6 +56,23 @@ void VarLivenessMgr::computeStmtImpl(
     if (!stmt->hasIdinfo() || !canBeStmtCand(stmt)) {
         return;
     }
+    updateSetForStmt(stmt, use, gen);
+}
+
+
+void VarLivenessMgr::updateSetForExp(IR const* exp, MOD LiveSet * use)
+{
+    ASSERT0(exp->is_exp());
+    Var const* v = exp->getIdinfo();
+    ASSERT0(v);
+    updateSetByExp((BSIdx)v->id(), use);
+}
+
+
+void VarLivenessMgr::updateSetForStmt(IR const* stmt, MOD LiveSet * use,
+    MOD LiveSet * gen)
+{
+    ASSERT0(stmt->is_stmt());
     Var const* v = stmt->getIdinfo();
     ASSERT0(v);
     updateSetByStmt((BSIdx)v->id(), use, gen);

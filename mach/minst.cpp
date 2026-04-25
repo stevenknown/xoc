@@ -165,6 +165,13 @@ void MInst::setFieldValue(FIELD_TYPE ft, TMWORD val)
     UINT idx = m_inst_desc->getFieldIdx(ft);
     m_field_vec[idx].value = val;
 }
+
+
+UINT MInst::getTotalFieldByteSize()
+{
+    ASSERT0(m_inst_desc);
+    return m_inst_desc->getTotalFieldByteSize();
+}
 //END MInst
 
 } //namespace

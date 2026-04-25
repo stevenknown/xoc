@@ -85,10 +85,15 @@ public:
         SSA_uses(this).append(use);
     }
 
-    //This function guarantee all memory resource recycled.
+    //This function guarantees all memory resource recycled.
     void cleanDU()
     {
         SSA_def(this) = nullptr;
+        SSA_uses(this).clean();
+    }
+    void clean()
+    {
+        cleanMember();
         SSA_uses(this).clean();
     }
     void cleanUseSet() { SSA_uses(this).clean(); }
@@ -182,7 +187,12 @@ public:
 public:
     VPR(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
 
-    inline void cleanMember()
+    void clean()
+    {
+        SSAInfo::clean();
+        cleanMember();
+    }
+    void cleanMember()
     {
         SSAInfo::cleanMember();
         m_newprno = PRNO_UNDEF;

@@ -40,7 +40,7 @@ namespace xoc {
 
 class GCSE;
 
-//Temporary Graph. 
+//Temporary Graph.
 class TG : public xcom::DGraph {
     COPY_CONSTRUCTOR(TG);
 protected:
@@ -68,13 +68,52 @@ public:
 };
 
 
-//The class map a VN to its IR expression that generated the VN.
-typedef xcom::TMap<VN const*, IR*> VN2IRTabIter;
-class VN2IRTab : public xcom::TMap<VN const*, IR*> {
+//Generated map of VN2IRTab.
+class GenMappedOfVN2IR {
+    COPY_CONSTRUCTOR(GenMappedOfVN2IR);
 public:
-    void clean(VN const* vn) { setAlways(vn, nullptr); }
-    void clean() { xcom::TMap<VN const*, IR*>::clean(); }
-    void set(VN const* vn, IR * ir) { setAlways(vn, ir); }
+    GCSE * m_gcse;
+
+    GenMappedOfVN2IR() { m_gcse = nullptr; }
+
+    GenMappedOfVN2IR(GCSE * gcse) : m_gcse(gcse) {}
+
+    IRList * createMapped(VN const* s);
+
+    void setGCSE(MOD GCSE * gcse)
+    {
+        ASSERT0(gcse);
+        m_gcse = gcse;
+    }
+};
+
+
+//The class map a VN to its IR expression that generated the VN.
+typedef xcom::TMapIter<VN const*, IRList*> VN2IRTabIter;
+class VN2IRTab : public xcom::TMap<VN const*, IRList*,
+    CompareKeyBase<VN const*>, GenMappedOfVN2IR> {
+public:
+    VN2IRTab(GCSE * gcse)
+    {
+        ASSERT0(gcse);
+
+        GenMappedOfVN2IR & gm = getGenMapped();
+        gm.setGCSE(gcse);
+    }
+    void clean()
+    {
+        xcom::TMap<VN const*, IRList*, CompareKeyBase<VN const*>,
+                   GenMappedOfVN2IR>::clean();
+    }
+    void clean(VN const* vn)
+    {
+        if (vn == nullptr) { return; }
+
+        IRList * lst = get(vn);
+        if (lst == nullptr) { return; }
+
+        lst->clean();
+    }
 };
 
 
@@ -140,14 +179,25 @@ private:
     InferEVN * m_infer_evn;
     DefMiscBitSetMgr m_misc_bs_mgr;
     CSE2DeleTab m_exp2pr;
-    VN2IRTab m_vn2exp;
-    VN2IRTab m_evn2exp;
     List<IR*> m_newst_lst;
+    List<IRList*> m_cse_list;
     ActMgr m_am;
 protected:
+    //Record the mapped info of VN and CSE.
+    VN2IRTab m_vn2exp;
+
+    //Record the mapped info of InferEVN and CSE.
+    VN2IRTab m_evn2exp;
+
     void copyVN(IR const* newir, IR const* oldir);
     bool canElimCVT(IR const* exp, IR const* gen) const;
     bool canElimRelationOp(IR const* exp, IR const* gen) const;
+
+    //There may be more than one corresponded CSE for a given VN if it's
+    //type is considered. Thus the function is used to check whether the
+    //type of 'cse' is same as 'exp' during finding proper CSE.
+    virtual bool canBeCandidateWithType(IR const* cse, IR const* exp) const
+    { ASSERT0(cse && exp); return true; }
 
     bool doPropVNDirectStmt(IR * ir, GCSECtx const& ctx);
     bool doPropVNIndirectStmt(IR * ir, GCSECtx const& ctx);
@@ -167,8 +217,23 @@ protected:
     bool doPropExpInDomTreeOrder(
         xcom::DomTree const& domtree, GCSECtx const& ctx);
 
+    void destoryCSEList()
+    {
+        for (IRList * lst = m_cse_list.get_head();
+             lst != nullptr; lst = m_cse_list.get_next()) {
+            delete lst;
+        }
+        m_cse_list.clean();
+    }
+
     bool elim(IR * use, IR * use_stmt, IR * gen,
               IR * gen_stmt, GCSECtx const& ctx);
+
+    //There may be more than one corresponded CSE for a given 'vn' after
+    //considered type. Thus proper CSE needs to be found according to 'vn'
+    //and 'exp' info from 'vn2exp'.
+    //'exp': ir that used to find proper CSE.
+    IR * findProperCSE(VN2IRTab & vn2exp, VN const* vn, IR const* exp);
 
     // If find 'exp' is CSE, replace it with related PR.
     //NOTE: exp should be freed.
@@ -176,6 +241,7 @@ protected:
 
     //Generate delegate-PR of CSE at generation point.
     IR * genDelegatePR(IR const* gen, IR const* gen_stmt);
+    ExprTab * getExprTab() const { return m_expr_tab; }
 
     bool handleCandidate(IR * exp, IRBB * bb, GCSECtx const& ctx);
     bool handleCandidateByExprRep(IR * exp, GCSECtx const& ctx);
@@ -208,6 +274,14 @@ protected:
     bool elimCseOfAssignment(
         IR * use, IR * use_stmt, IR * gen, GCSECtx const& ctx);
 
+    //This function repalces the kid of a statement with a new kid.
+    //stmt: the statement to be replaced.
+    //kid: the kid of the 'stmt'.
+    //newkid: the new kid will repace the 'kid' in the 'stmt'.
+    //recur: Whether need to find the 'kid' recursively in the 'stmt'.
+    //Return true if 'kid' is replaced.
+    virtual bool replaceStmtKid(IR * stmt, IR * kid, IR * newkid, bool recur);
+
     //Reset local used data.
     void reset();
 
@@ -228,6 +302,9 @@ protected:
 
     void removeMayKill(IR * ir, MOD List<IR*> & livexp);
 
+    //Set 'cse' into 'vn2exp' according to 'vn' info.
+    void setCSE(VN2IRTab & vn2exp, VN const* vn, MOD IR * cse);
+
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
@@ -235,6 +312,13 @@ protected:
 public:
     GCSE(Region * rg, GVN * gvn);
     virtual ~GCSE();
+
+    IRList * allocCSEList()
+    {
+        IRList * lst = new IRList();
+        m_cse_list.append_tail(lst);
+        return lst;
+    }
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -251,6 +335,7 @@ public:
     { return "Global Common Subexpression Elimination"; }
     PASS_TYPE getPassType() const { return PASS_GCSE; }
     ActMgr const& getActMgr() const { return m_am; }
+    GVN * getGVN() const { return m_gvn; }
     InferEVN * getInferEVN() const { return m_infer_evn; }
 
     bool perform(OptCtx & oc);

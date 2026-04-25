@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define PRECISION_TYPE double
+typedef double PRECISION_TYPE;
 #define PRECISION_TYPE_E 2.718281828459045
 
 class Float {

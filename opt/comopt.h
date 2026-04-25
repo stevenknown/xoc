@@ -45,11 +45,13 @@ author: Su Zhenyu
 #include "cfs_opt.h"
 #include "goto_opt.h"
 #include "ir_refine.h"
+#include "ir_global_refine.h"
 #include "if_opt.h"
 #include "linear_rep.h"
 #include "chain_recur.h"
-#include "alge_reasscociate.h"
+#include "alge_reassociate.h"
 #include "ir_gvn.h"
+#include "ir_evn.h"
 #include "ir_ivr.h"
 #include "ir_lcse.h"
 #include "ir_gcse.h"
@@ -63,58 +65,14 @@ author: Su Zhenyu
 #include "targinfo_handler.h"
 
 #ifdef REF_TARGMACH_INFO
-//Header files in XGEN are referred to by the following passes since they
-//reference target machine informations, such as Reg, RegFile etc.
-//It looks like backward invoking functions that defined in XGEN.
-#include "../xgen/xgeninc.h"
-
-//xgeninc.h will also include comopt.h that cause forward reference namespace
-//xgen, thus redeclarate namespace xgen here.
-using namespace xgen;
-#include "regd.h"
-#include "regssainfo.h"
-#include "ir_regssa.h"
-#include "update_pos.h"
-#include "targinfo_mgr.h"
-#include "range.h"
-#include "lifetime.h"
-#include "var_liveness_mgr.h"
-#include "lsra_var_liveness_mgr.h"
-#include "var_lifetime.h"
-#include "lt_interf_graph.h"
-#include "linear_scan.h"
-#include "lsra_impl.h"
-#include "lsra_post_opt.h"
-#include "lsra_scan_in_pos.h"
-#include "lt_prio_mgr.h"
-#include "lsra_scan_in_prio.h"
-#include "arg_passer.h"
-#include "prologue_epilogue_inserter.h"
-#include "var2offset.h"
-#include "ir_reloc_mgr.h"
-#include "dynamic_stack.h"
-#include "gp_adjustment.h"
-#include "br_opt.h"
-#include "igoto_opt.h"
-#include "inst_sched.h"
-#include "ir_ddg.h"
-#include "ir_sim.h"
-#include "ir_lis.h"
-#include "local_var_liveness_mgr.h"
-#include "local_var_lifetime_mgr.h"
+#include "comopt_ref_targmach_info.h"
 #endif
 
 #ifdef FOR_IP
-#include "ir_vect.h"
-#include "derivative.h"
-#include "ir_dse.h"
-#include "scop.h"
-#include "ir_poly.h"
-#include "ir_vrp.h"
-#include "ir_ccp.h"
-#include "ir_pre.h"
+#include "comopt_ip.h"
 #endif
 
+#include "if_conversion.h"
 #include "ir_decl_ext.h"
 #include "ir_mgr.h"
 #include "ir_mgr_ext.h"

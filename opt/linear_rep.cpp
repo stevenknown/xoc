@@ -388,7 +388,7 @@ bool LinearRepMgr::inferLinearRepByDUChain(
     IR const* ir, Var const* var, OUT LinearRep & reslr, OUT LRInferCtx & ctx)
 {
     ASSERT0(ir->is_exp());
-    IR * def = xoc::findKillingDef(ir, m_rg);
+    IR * def = xoc::findKillingDef(ir, m_rg, &getOptCtx());
     if (def == nullptr) { return false; }
     if (ctx.getLI() != nullptr &&
         !ctx.getLI()->isInsideLoop(def->getBB()->id())) {

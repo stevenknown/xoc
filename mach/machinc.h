@@ -46,3 +46,4 @@ author: Su Zhenyu
 #include "ir2minst.h"
 #include "mi_reloc_mgr.h"
 #include "machoption.h"
+#include "mi_desc.h"

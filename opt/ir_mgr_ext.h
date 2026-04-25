@@ -56,24 +56,39 @@ public:
     IR * buildBroadCast(IR * src, IR * res_list, Type const* ty);
 
     //Build mask operation.
-    //op: normal full-size operation.
+    //op: specific-size/full-size operation.
     //mask: the mask operand.
+    //mask_strategy: mask processing strategy. Including two strategies,
+    //               agnostic and undisturbed.
     //ty: the result data type of the mask operation.
-    IR * buildMaskOp(IR * op, IR * mask, Type const* ty);
+    IR * buildMaskOp(IR * op, IR * mask, CMaskOp::MASK_STRATEGY mask_strategy,
+        Type const* ty);
 
-    //Build mask select-to-result operation.
-    //op: normal full-size operation.
-    //mask: the mask operand.
-    IR * buildMaskSelectToRes(IR * op, IR * mask, Type const* ty);
+    //Build dynamic length operation.
+    //op: vector operation.
+    //len: operating length.
+    //tail_strategy: tail element processing strategy. Including two strategies
+    //               , agnostic and undisturbed.
+    //ty: the result data type of the 'op'.
+    IR * buildDynLenOp(IR * op, IR * len,
+        CDynLenOp::TAIL_STRATEGY tail_strategy, Type const* ty);
 
-    //Build masked store stmt.
+    //Build select-to-result operation.
+    //op: normal mask/dynamic-size operation.
+    //base: The operand that needs to be selected as the result is
+    //      both the input operand and the output operand.
+    //ty: the result data type.
+    IR * buildSelectToRes(IR * op, IR * base, Type const* ty);
+
+    //Build select store stmt.
     //reflhs: the function build stmt according to the given reference IR.
     //        the reference IR may be expression or stmt.
     //op: the normal RHS operation.
-    //mask: the mask operation that indicates the computation of mask value.
-    //ty: the result data type of return masked store stmt.
-    IR * buildMaskStoreStmtViaIsomoIR(
-        IR const* reflhs, IR * op, IR * mask, Type const* ty);
+    //base: The operand that needs to be selected as the result is both
+    //      the input operand and the output operand.
+    //ty: the result data type of return slected store stmt.
+    IR * buildSelectStoreStmtViaIsomoIR(
+        IR const* reflhs, IR * op, IR * base, Type const* ty);
 
     IR * buildVIStore(
         IR * base, TMWORD ofst, IR * rhs, IR * dummyuse, Type const* ty);
@@ -87,6 +102,15 @@ public:
 
     //Return expression list that describe multiple isomorphic result.
     virtual IR * getAlterResDescList(IR * stmt) const;
+
+    //This function returns the full-size operation of the IR.
+    virtual IR const* getFullSizeOp(IR const* ir) const;
+
+    //Return true if ir is a stmt and its result is a masked value.
+    static bool isMaskResult(IR const* ir);
+
+    virtual bool isMoveOp(IR const* ir) const override;
+    virtual bool isRegardAsMoveOp(IR const* ir) const;
 
     //Return true if stmt has multiple results.
     virtual bool hasMultiRes(IR * stmt) const;

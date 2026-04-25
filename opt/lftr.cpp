@@ -110,7 +110,8 @@ void LFTR::analyzeBB(LI<IRBB> const* li, IRBB const* bb, MOD LFAnaCtx & ctx)
             }
 
             if ((op1->is_ld() &&
-                xoc::isLoopInvariant(op1, li, m_rg, nullptr, false)) ||
+                xoc::isLoopInvariant(
+                    op1, li, m_rg, nullptr, false, &ctx.getOptCtx())) ||
                 op1->is_const()) {
                 ;
             } else {

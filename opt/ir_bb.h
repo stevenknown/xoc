@@ -616,6 +616,7 @@ void dumpBBSet(
     BBDumpCtxMgr<> * ctx = nullptr);
 
 bool verifyIRandBB(BBList * bbl, Region const* rg);
+bool verifyIRandBB(Region const* rg);
 
 } //namespace xoc
 #endif

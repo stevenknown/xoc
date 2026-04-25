@@ -36,13 +36,19 @@ bool is_vstpr() const { return getCode() == IR_VSTPR; }
 bool is_vist() const { return getCode() == IR_VIST; }
 bool is_broadcast() const { return getCode() == IR_BROADCAST; }
 bool is_maskop() const { return getCode() == IR_MASK_OP; }
-bool is_mask_select_to_res() const
-{ return getCode() == IR_MASK_SELECT_TO_RES; }
+bool is_dynlenop() const { return getCode() == IR_DYNLEN_OP; }
+bool is_select_to_res() const
+{ return getCode() == IR_SELECT_TO_RES; }
 
-//Return true if current ir indicates a masked-store stmt that stores selected
-//elements into result memory or PR according to its mask-kid IR.
-bool isMaskStoreStmt() const
-{ return isStoreStmt() && getRHS()->is_mask_select_to_res(); }
+//Return the 'base' of partial operations.
+IR const* getBaseOfPartialSetOp() const;
+
+//If it is a partial operation on lvalue or rvalue, return true;
+//otherwise, return false.
+bool isPartialSetRHSOp() const { return is_dynlenop() || is_maskop(); }
+bool isParitalSetLHSOp() const { return is_select_to_res(); }
+bool isPartialSetOp() const
+{ return isPartialSetRHSOp() || isParitalSetLHSOp(); }
 
 //Return true if current ir indicates a virtual operation.
 bool isVirtualOp() const;

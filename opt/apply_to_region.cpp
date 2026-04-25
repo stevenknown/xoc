@@ -65,17 +65,20 @@ UseNewIRMgr::UseNewIRMgr(Region const* rg, IRMgr * irmgr)
     m_rg = rg;
     m_org_mgr = irmgr;
     ASSERT0(m_rg->getPassMgr());
-    m_new_mgr = (IRMgr*)m_rg->getPassMgr()->allocPass(PASS_IRMGR);
-    m_new_mgr->setIRCount(m_org_mgr->getIRCount());
-    m_rg->setIRMgr(m_new_mgr);
+    m_new_mgr_wrap = m_rg->getPassMgr()->allocPass(PASS_IRMGR)->getWrap();
+    IRMgr * newmgr = (IRMgr*)m_new_mgr_wrap->getPass();
+    newmgr->setIRCount(m_org_mgr->getIRCount());
+    m_rg->setIRMgr(newmgr);
 }
 
 
 UseNewIRMgr::~UseNewIRMgr()
 {
-    ASSERT0(m_org_mgr && m_new_mgr);
+    ASSERT0(m_org_mgr && m_new_mgr_wrap);
     m_rg->setIRMgr(m_org_mgr);
-    m_rg->getPassMgr()->destroyPass(m_new_mgr);
+    if (m_new_mgr_wrap->getPass() != nullptr) {
+        m_rg->getPassMgr()->destroyPass(m_new_mgr_wrap->getPass());
+    }
 }
 //END UseNewIRMgr
 

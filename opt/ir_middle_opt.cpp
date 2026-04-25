@@ -179,10 +179,6 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
         }
         xoc::removeClassicDUChain(this, rmprdu, rmnonprdu);
     }
-    //////////////////////////////////////////
-    //FIXME: remove the redundant code ASAP. //
-    getMDMgr()->assignMD();                 //
-    //////////////////////////////////////////
     ASSERT0L3(verifyClassicDUChain(this, oc));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
@@ -310,6 +306,7 @@ bool Region::doOnlyClassicNonPRDU(OptCtx & oc)
 
 bool Region::doOnlyClassicPRDU(OptCtx & oc)
 {
+    START_TIMER(t, "doOnlyClassicPRDU");
     bool org_compute_pr_du_chain = g_compute_pr_du_chain;
     bool org_compute_nonpr_du_chain = g_compute_nonpr_du_chain;
     g_compute_pr_du_chain = true;
@@ -321,6 +318,7 @@ bool Region::doOnlyClassicPRDU(OptCtx & oc)
     ASSERT0L3(verifyClassicDUChain(this, oc));
     g_compute_pr_du_chain = org_compute_pr_du_chain;
     g_compute_nonpr_du_chain = org_compute_nonpr_du_chain;
+    END_TIMER(t, "doOnlyClassicPRDU");
     return true;
 }
 
@@ -343,7 +341,9 @@ bool Region::doSimplyCPByClassicDU(OptCtx & oc)
     CopyProp * cp = (CopyProp*)getPassMgr()->registerPass(PASS_CP);
     ASSERT0(cp);
     cp->setPropagationKind(CP_PROP_CONST|CP_PROP_PR);
+    START_TIMER(t, "doSimplyCPByClassicDU");
     bool changed = cp->perform(oc);
+    END_TIMER(t, "doSimplyCPByClassicDU");
     if (!changed) { return false; }
     ASSERT0(getCFG());
     oc.setInvalidLoopInfo(); //[TODO]: Incremental Maintenance.
@@ -434,11 +434,10 @@ void Region::assignDummyUseForIR(IR * ir)
 }
 
 
-void Region::doAssignDirectRefMD(OptCtx & oc)
+void Region::doAssignDirectRefMD(MOD OptCtx & oc, bool clean_mayref)
 {
-    if (!oc.isPassValid(PASS_MD_REF)) {
-        getMDMgr()->assignMD();
-    }
+    if (oc.isPassValid(PASS_MD_REF)) { return; }
+    getMDMgr()->assignMD(clean_mayref);
 }
 
 
@@ -447,7 +446,7 @@ bool Region::doAA(OptCtx & oc)
     if (!g_do_aa || oc.isPassValid(PASS_AA)) { return false; }
     ASSERT0(getPassMgr());
     ASSERT0(g_cst_bb_list && oc.isPassValid(PASS_CFG));
-    doAssignDirectRefMD(oc);
+    doAssignDirectRefMD(oc, true);
     assignDummyUse();
     getPassMgr()->checkValidAndRecompute(
         &oc, PASS_DOM, PASS_LOOP_INFO, PASS_AA, PASS_UNDEF);
@@ -503,7 +502,7 @@ bool Region::doAggressiveAA(OptCtx & oc)
 
     //Recompute and set MD reference to avoid AA's complaint.
     //Compute AA to build coarse-grained DU chain.
-    doAssignDirectRefMD(oc);
+    doAssignDirectRefMD(oc, true);
     if (!aa->is_init() || !aa->is_valid()) {
         aa->initAliasAnalysis();
     }
@@ -516,7 +515,9 @@ bool Region::doAggressiveAA(OptCtx & oc)
         return false;
     }
     //Recompute and set MD reference to avoid AA's complaint.
-    getMDMgr()->assignMD();
+    //MayRef might be set by Classic DU processing, thus clean them to
+    //conform AA's verification.
+    getMDMgr()->assignMD(true);
 
     //Estimate the threshold before performing AA.
     UINT numir = 0;
@@ -601,6 +602,16 @@ bool Region::doRefine(OptCtx & oc)
 }
 
 
+bool Region::doGlobalRefine(OptCtx & oc)
+{
+    GlobalRefine * global_refine =
+        (GlobalRefine*)getPassMgr()->registerPass(PASS_GLOBAL_REFINE);
+    bool changed = global_refine->perform(oc);
+    if (changed) { ASSERT0L3(verifyClassicDUChain(this, oc)); }
+    return changed;
+}
+
+
 //Perform general optimizaitions.
 //Basis step to do:
 //    1. Build control flow.
@@ -645,7 +656,8 @@ bool Region::MiddleProcess(OptCtx & oc)
         }
     }
     ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
-    if (g_do_refine) { return doRefine(oc); }
+    if (g_do_global_refine) { doGlobalRefine(oc); }
+    if (g_do_refine) { doRefine(oc); }
     ASSERT0(verifyIRandBB(bbl, this));
     return true;
 }

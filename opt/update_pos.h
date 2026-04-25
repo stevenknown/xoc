@@ -37,7 +37,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class LinearScanRA;
+class RegAlloc;
 
 #define POS_UNDEF 0
 #define POS_INIT_VAL 1
@@ -47,7 +47,7 @@ typedef UINT32 Pos;
 class UpdatePos {
     bool m_use_expose;
     Pos m_pos;
-    LinearScanRA const* m_ra;
+    RegAllocMgr const* m_ramgr;
 protected:
     //Increase update position while building lifetime.
     void update(OUT Pos & defpos, OUT Pos & usepos)
@@ -56,10 +56,9 @@ protected:
         defpos = m_pos++;
     }
 public:
-    UpdatePos(LinearScanRA const* ra) : m_ra(ra)
+    UpdatePos(RegAllocMgr const* ramgr) : m_ramgr(ramgr)
     { m_use_expose = true; m_pos = POS_INIT_VAL; }
     Pos getPos() const { return m_pos; }
-    LinearScanRA const* getRA() const { return m_ra; }
 
     //Decrease position in step.
     static void dec(MOD Pos & pos) { pos--; }

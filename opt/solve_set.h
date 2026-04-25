@@ -36,7 +36,6 @@ author: Su Zhenyu
 
 namespace xoc {
 
-
 typedef DefSBitSetIter SolveSetIter;
 
 class SolveSet : public DefDBitSetCore {
@@ -139,9 +138,8 @@ public:
     }
 };
 
-class SolveSetMgr {
+class SolveSetMgr : public Pass {
     COPY_CONSTRUCTOR(SolveSetMgr);
-    Region * m_rg;
     IRCFG * m_cfg;
     BBList * m_bblst;
     MDSystem * m_md_sys;
@@ -204,7 +202,7 @@ class SolveSetMgr {
     Vector<SolveSet*> m_may_killed_def; //may-killed def of STMT
     Vector<SolveSet*> m_livein_bb; //live-in BB
     BSVec<SolveSet*> m_killed_ir_exp; //killed EXPR
-private:
+protected:
     //The macro declares a series of functions to operate given SolveSet.
     //Note LocalSet will be destroy and reinialized after perform(), whereas
     //GlobalSet will reserve all information until the manager is destructed.
@@ -285,47 +283,50 @@ private:
         Vector<MDSet*> const* mustexactdefmds, Vector<MDSet*> const* maydefmds,
         DefMiscBitSetMgr & bsmgr);
 
-    void computeGenExprForMayDef(IR const* ir, OUT SolveSet * gen_ir_expr,
-                                 DefMiscBitSetMgr & bsmgr);
+    void computeGenExprForMayDef(
+        IR const* ir, OUT SolveSet * gen_ir_expr, DefMiscBitSetMgr & bsmgr);
 
     //Compute generated-EXPR for BB.
-    void computeGenExprForBB(IRBB * bb, OUT SolveSet & expr_univers,
-                             DefMiscBitSetMgr & bsmgr);
+    void computeGenExprForBB(
+        IRBB * bb, OUT SolveSet & expr_univers, DefMiscBitSetMgr & bsmgr);
 
     //The function collect the IR expression that being the GenExpr.
     //expr_univers: local set.
-    void computeGenExprForStmt(IR const* ir, OUT SolveSet * gen_ir_expr,
-                               OUT SolveSet & expr_univers,
-                               DefMiscBitSetMgr & bsmgr);
+    void computeGenExprForStmt(
+        IR const* ir, OUT SolveSet * gen_ir_expr, OUT SolveSet & expr_univers,
+        DefMiscBitSetMgr & bsmgr);
     void computeLiveInBB(DefMiscBitSetMgr & bsmgr);
 
     //Compute local-gen IR-EXPR set and killed IR-EXPR set.
     //'expr_universe': record the universal of all ir-expr of region.
-    void computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
-                                    OUT SolveSet * expr_universe,
-                                    Vector<MDSet*> const* maydefmds,
-                                    DefMiscBitSetMgr & bsmgr);
+    void computeAuxSetForExpression(
+        DefDBitSetCoreReserveTab & bshash, OUT SolveSet * expr_universe,
+        Vector<MDSet*> const* mustdefmds, Vector<MDSet*> const* maydefmds,
+        DefMiscBitSetMgr & bsmgr);
 
     //Compute maydef, mustdef, mayuse information for current region.
-    void computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
-                           Vector<MDSet*> const* maydef_mds,
-                           MDSet const* mayuse_mds);
+    void computeRegionMDDU(
+        Vector<MDSet*> const* mustexactdef_mds,
+        Vector<MDSet*> const* maydef_mds, MDSet const* mayuse_mds);
 
     void computeMustExactDefMayDefMayUseForBB(IRBB * bb, ConstMDIter & mditer,
         OUT Vector<MDSet*> * mustdefmds, OUT Vector<MDSet*> * maydefmds,
         OUT MDSet * mayusemds, MDSet * bb_mustdefmds, MDSet * bb_maydefmds,
         SolveSet * mustgen_stmt, SolveSet * maygen_stmt,
         UFlag flag, DefMiscBitSetMgr & bsmgr);
-    void collectNonPRMayDef(IR const* ir, DefMiscBitSetMgr & bsmgr,
-                            OUT MDSet * maydefmds) const;
+    void collectNonPRMayDef(
+        IR const* ir, DefMiscBitSetMgr & bsmgr, OUT MDSet * maydefmds) const;
+
+    //Return true if ir can be candidate of live-expr.
+    virtual bool canBeLiveExprCand(IR const* ir) const;
 
     //This equation needs May Kill Def and Must Gen Def.
-    bool ForAvailReachDef(IRBB const* bb, List<IRBB*> * lst,
-                          DefMiscBitSetMgr & bsmgr);
-    bool ForReachDef(IRBB const* bb, List<IRBB*> * lst,
-                     DefMiscBitSetMgr & bsmgr);
-    bool ForAvailExpression(IRBB const* bb, List<IRBB*> * lst,
-                            DefMiscBitSetMgr & bsmgr);
+    bool ForAvailReachDef(
+        IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr);
+    bool ForReachDef(
+        IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr);
+    bool ForAvailExpression(
+        IRBB const* bb, List<IRBB*> * lst, DefMiscBitSetMgr & bsmgr);
 
     Vector<SolveSet*> & getReachDefInVec() { return m_reach_def_in; }
     Vector<SolveSet*> & getReachDefOutVec() { return m_reach_def_out; }
@@ -351,6 +352,7 @@ private:
     //'def1': should be stmt.
     //'def2': should be stmt.
     bool isMayKill(IR const* def1, IR const* def2);
+    bool initDepPass(MOD OptCtx & oc, UFlag flag);
 
     void resetAllKillSet();
     void resetLocalSet();
@@ -358,10 +360,11 @@ private:
     void setKilledIRExpr(UINT bbid, SolveSet * set);
     void setMayKilledDef(UINT bbid, SolveSet * set);
     void setMustKilledDef(UINT bbid, SolveSet * set);
-    void solveByRPO(RPOVexList const* rpovexlst, UFlag const flag,
-                    MOD DefMiscBitSetMgr & bsmgr);
-    void solveByWorkList(List<IRBB*> * tbbl, UFlag const flag,
-                         MOD DefMiscBitSetMgr & bsmgr);
+    void solveByRPO(
+        RPOVexList const* rpovexlst, UFlag const flag,
+        MOD DefMiscBitSetMgr & bsmgr);
+    void solveByWorkList(
+        List<IRBB*> * tbbl, UFlag const flag, MOD DefMiscBitSetMgr & bsmgr);
 
     //Solve reaching definitions problem for IR STMT and
     //computing LIVE IN and LIVE OUT IR expressions.
@@ -369,28 +372,7 @@ private:
     void solve(SolveSet const& expr_universe, UFlag const flag,
                MOD DefMiscBitSetMgr & bsmgr);
 public:
-    SolveSetMgr(Region * rg)
-    {
-        m_rg = rg;
-        m_cfg = rg->getCFG();
-        m_bblst = m_cfg->getBBList();
-        m_md_sys = rg->getMDSystem();
-        setKeepReachDefIn(true);
-
-        //Usually only reach-def-in is useful for computing DU chain.
-        setKeepReachDefOut(false);
-        setKeepAvailReachDefIn(false);
-        setKeepAvailReachDefOut(false);
-        setKeepGenIRExpr(false);
-        setKeepAvailExprIn(false);
-        setKeepAvailExprOut(false);
-        setKeepMayGenDef(false);
-        setKeepMustGenDef(false);
-        setKeepMayKilledDef(false);
-        setKeepMustKilledDef(false);
-        setKeepKilledIRExpr(false);
-        setKeepLiveInBB(false);
-    }
+    SolveSetMgr(Region * rg);
     ~SolveSetMgr();
 
     //Represent reach-def IR stmt information. Each element in the set is IR id.
@@ -441,6 +423,8 @@ public:
     Region * getRegion() const { return m_rg; }
     xcom::DefMiscBitSetMgr * getLocalSBSMgr() { return &m_local_sbs_mgr; }
     xcom::DefMiscBitSetMgr * getGlobalSBSMgr() { return &m_global_sbs_mgr; }
+    virtual CHAR const* getPassName() const { return "SolveSet Manager"; }
+    virtual PASS_TYPE getPassType() const { return PASS_SOLVESET_MGR; }
 
     void resetReachDefInSet();
     void resetGlobalSet();

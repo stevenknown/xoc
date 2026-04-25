@@ -42,4 +42,15 @@ bool IR::isVirtualOp() const
     return false;
 }
 
+//Return the 'base' of partial operations.
+IR const* IR::getBaseOfPartialSetOp() const
+{
+  switch (getCode()) {
+  case IR_SELECT_TO_RES: return SELECTTORES_op(this);
+  case IR_DYNLEN_OP: return DYNLENOP_op(this);
+  case IR_MASK_OP: return MASKOP_op(this);
+  default: UNREACHABLE(); return nullptr;
+  }
+}
+
 } //namespace xoc

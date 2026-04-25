@@ -44,6 +44,11 @@ public:
 public:
     ParseErrorMsg(UINT msglen) { error_msg = new xcom::StrBuf(msglen); }
     ~ParseErrorMsg() { delete error_msg; }
+    CHAR const* getMsg() const
+    {
+        ASSERT0(error_msg);
+        return error_msg->getBuf();
+    }
 };
 
 #define PARSECTX_returned_imm_intval(p) ((p)->s1.u1.returned_imm_intval)
@@ -194,6 +199,7 @@ protected:
     TypeMgr * m_tm;
     Lexer * m_lexer;
     RegionMgr * m_rm;
+    xoc::Var * m_placeholder_undefined;
     List<ParseErrorMsg*> m_err_list;
     String2XCode m_str2xcode;
     String2XCode m_prop2xcode;
@@ -209,6 +215,7 @@ protected:
     //e.g: stpr $200 = 0;
     //          ...  = $xyz;
     bool allowCustomizePrno() { return false; }
+    ParseErrorMsg * allocParseErrorMsg(UINT msglen);
 
     bool checkKeyWordMap();
     bool checkPhiOpndLabel(IR const* ir,
@@ -255,6 +262,7 @@ protected:
     bool isExp(X_CODE code);
     bool isExp();
     bool isTerminator(TOKEN tok);
+    bool isPlaceholderUndefined(IR const* ir) const;
 
     PRNO mapIden2Prno(CHAR const* prid, ParseCtx * ctx);
 
@@ -280,6 +288,7 @@ protected:
     bool parseCase(ParseCtx * ctx);
     bool parseDummyUse(ParseCtx * ctx);
     bool parseId(ParseCtx * ctx);
+    bool parseUndefined(ParseCtx * ctx);
     bool parseLda(ParseCtx * ctx);
     bool parseArrayDimension(List<TMWORD> & elem_dim);
     bool parseArray(ParseCtx * ctx);

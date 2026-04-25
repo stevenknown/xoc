@@ -49,21 +49,58 @@ class RegionMgr;
 #define IS_INT(t) ((t) >= D_I8 && (t) <= D_U128)
 #define IS_SINT(t) ((t) >= D_I8 && (t) <= D_I128)
 #define IS_UINT(t) ((t) >= D_U8 && (t) <= D_U128)
-#define IS_FP(t) ((t) >= D_F8_E4M3 && (t) <= D_F128)
-#define IS_BOOL(t) ((t) == D_B)
+#define IS_FP(t) ((t) >= D_F4X2 && (t) <= D_F128)
+#define IS_BF16(t) ((t) == D_BF16 || ((t) >= D_BF16M1 && (t) <= D_BF16MF4))
+#define IS_F16(t) ((t) == D_F16 || ((t) >= D_F16M1 && (t) <= D_F16MF4))
+#define IS_BOOL(t) ((t) == D_B || ((t) >= D_B1 && (t) <= D_B64))
 #define IS_MC(t) ((t) == D_MC)
 #define IS_VEC(t) ((t) == D_VEC)
 #define IS_STREAM(t) ((t) == D_STREAM)
 #define IS_PTR(t) ((t) == D_PTR)
+#define IS_SCALABLE(t) ((t) >= D_B1 && (t) <= D_F64M8)
+#define IS_SCALABLE_SINT(t) (((t) >= D_I16M1 && (t) <= D_I16MF4) || \
+                             ((t) >= D_I32M1 && (t) <= D_I32MF2)) || \
+                             ((t) >= D_I8M1 && (t) <= D_I8MF8)
+#define IS_SCALABLE_UINT(t) (((t) >= D_B1 && (t) <= D_B64) || \
+                             ((t) >= D_U8M1 && (t) <= D_U8MF8) || \
+                             ((t) >= D_U16M1 && (t) <= D_U16MF4) || \
+                             ((t) >= D_U32M1 && (t) <= D_U32MF2))
+#define IS_SCALABLE_INT(t) (((t) >= D_U16M1 && (t) <= D_U16MF4) || \
+                            ((t) >= D_I16M1 && (t) <= D_I16MF4) || \
+                            ((t) >= D_U32M1 && (t) <= D_U32MF2) || \
+                            ((t) >= D_I32M1 && (t) <= D_I32MF2) || \
+                            ((t) >= D_U64M1 && (t) <= D_U64M8) || \
+                            ((t) >= D_I64M1 && (t) <= D_I64M8)) || \
+                            ((t) >= D_U8M1 && (t) <= D_U8MF8) || \
+                            ((t) >= D_I8M1 && (t) <= D_I8MF8)
+#define IS_SCALABLE_FP(t) (((t) >= D_BF16M1 && (t) <= D_BF16MF4) || \
+                           ((t) >= D_F16M1 && (t) <= D_F16MF4) || \
+                           ((t) >= D_F32M1 && (t) <= D_F32MF2)) || \
+                           ((t) >= D_F64M1 && (t) <= D_F64M8)
+#define IS_SCALABLE_BF16(t) ((t) >= D_BF16M1 && (t) <= D_BF16MF4)
+#define IS_SCALABLE_UNSIGNED(t) (((t) >= D_B1 && (t) <= D_B64) || \
+                                 ((t) >= D_U16M1 && (t) <= D_U16MF4) || \
+                                 ((t) >= D_U32M1 && (t) <= D_U32MF2)) || \
+                                 ((t) >= D_U8M1 && (t) <= D_U8MF8)
+#define IS_SCALABLE_SIGNED(t) (((t) >= D_I16M1 && (t) <= D_I16MF4) || \
+                               ((t) >= D_I32M1 && (t) <= D_I32MF2) || \
+                               ((t) >= D_BF16M1 && (t) <= D_BF16MF4) || \
+                               ((t) >= D_F16M1 && (t) <= D_F16MF4) || \
+                               ((t) >= D_F32M1 && (t) <= D_F32MF2)) || \
+                               ((t) >= D_I8M1 && (t) <= D_I8MF8)
 #define IS_SIMPLEX(t) (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
-                      t == D_STR || t == D_ANY)
+                       t == D_STR || t == D_ANY || IS_SCALABLE(t))
 
 #define SWITCH_CASE_FP_DTYPE \
-    case D_F8_E4M3: \
-    case D_F8_E5M2: \
+    case D_F4X2: \
+    case D_F8: \
+    case D_F8E4M3: \
+    case D_F8E5M2: \
+    case D_F8_MIX: \
     case D_BF16: \
     case D_F16: \
     case D_F32: \
+    case D_TF32: \
     case D_F64: \
     case D_F80: \
     case D_F128
@@ -106,6 +143,80 @@ class RegionMgr;
     case D_I64: \
     case D_U64
 
+#define SWITCH_CASE_SCALABLE_ELEM_DTYPE \
+    case D_B1: \
+    case D_B2: \
+    case D_B4: \
+    case D_B8: \
+    case D_B16: \
+    case D_B32: \
+    case D_B64: \
+    case D_U8M1: \
+    case D_U8M2: \
+    case D_U8M4: \
+    case D_U8M8: \
+    case D_U8MF2: \
+    case D_U8MF4: \
+    case D_U8MF8: \
+    case D_I8M1: \
+    case D_I8M2: \
+    case D_I8M4: \
+    case D_I8M8: \
+    case D_I8MF2: \
+    case D_I8MF4: \
+    case D_I8MF8: \
+    case D_U16M1: \
+    case D_U16M2: \
+    case D_U16M4: \
+    case D_U16M8: \
+    case D_U16MF2: \
+    case D_U16MF4: \
+    case D_I16M1: \
+    case D_I16M2: \
+    case D_I16M4: \
+    case D_I16M8: \
+    case D_I16MF2: \
+    case D_I16MF4: \
+    case D_U32M1: \
+    case D_U32M2: \
+    case D_U32M4: \
+    case D_U32M8: \
+    case D_U32MF2: \
+    case D_I32M1: \
+    case D_I32M2: \
+    case D_I32M4: \
+    case D_I32M8: \
+    case D_I32MF2: \
+    case D_U64M1: \
+    case D_U64M2: \
+    case D_U64M4: \
+    case D_U64M8: \
+    case D_I64M1: \
+    case D_I64M2: \
+    case D_I64M4: \
+    case D_I64M8: \
+    case D_F64M1: \
+    case D_F64M2: \
+    case D_F64M4: \
+    case D_F64M8: \
+    case D_BF16M1: \
+    case D_BF16M2: \
+    case D_BF16M4: \
+    case D_BF16M8: \
+    case D_BF16MF2: \
+    case D_BF16MF4: \
+    case D_F16M1: \
+    case D_F16M2: \
+    case D_F16M4: \
+    case D_F16M8: \
+    case D_F16MF2: \
+    case D_F16MF4: \
+    case D_F32M1: \
+    case D_F32M2: \
+    case D_F32M4: \
+    case D_F32M8: \
+    case D_F32MF2
+
 //Data Type, represented with bit length.
 //
 //Is unsigned type indispensible?
@@ -133,17 +244,114 @@ typedef enum _DATA_TYPE {
     D_U128,
 
     //Float type.
-    D_F8_E4M3, //Float point 8 bit with 1 sign bit, 4 exponent
-               //bits, and 3 mantissa bits
-    D_F8_E5M2, //Float point 8 bit with 1 sign bit, 5 exponent
-               //bits, and 2 mantissa bits
+    D_F4X2, //8-bit container storing two 4-bit FP values (F4).
+
+    //Float point 8 bit with 1 sign bit, 4 exponent bits, and 3 mantissa bits.
+    D_F8E4M3,
+
+    //Float point 8 bit with 1 sign bit, 5 exponent bits, and 2 mantissa bits.
+    D_F8E5M2,
+    D_F8_MIX, //8-bit floating point (mixed precision).
+    D_F8, //8-bit floating point
     D_BF16, //BFloat point 16 bit
     D_F16, //Float point 16 bit
     D_F32, //Float point 32 bit
+
+    //The range of FP32, the precision of FP16, and the acceleration
+    //of Tensor Cores.
+    D_TF32, //32-bit TensorFloat (TF32).
     D_F64, //Float point 64 bit
     D_F80, //Float point 80 bit
     D_F128, //Float point 128 bit
     //NOTE ALL ABOVE TYPES ARE SCALAR.
+
+    //Scalable length data type.
+    //In D_B<n>, n is the ratio of the width of an element to
+    //the number of registers used. D_B<n>expresses using n bits
+    //to represent a BOOL value. For example, if the element
+    //width is 32 bits and the number of registers used is 1,
+    //then n=32/1=32.
+    D_B1,
+    D_B2,
+    D_B4,
+    D_B8,
+    D_B16,
+    D_B32,
+    D_B64,
+
+    //This type of D_U16M1 is an scalable data type, indicating that
+    //the number of vector elements it represents can be scalable.
+    //The M<n> or MF<n> after the basic data type represents the
+    //group multiplication coefficient, which is the number of
+    //physical registers used.
+    //For example, M1 represents using one physical register,
+    //M2 represents using two physical registers, and MF2 represents
+    //using half of one physical register to store data.
+    D_U8M1,
+    D_U8M2,
+    D_U8M4,
+    D_U8M8,
+    D_U8MF2,
+    D_U8MF4,
+    D_U8MF8,
+    D_I8M1,
+    D_I8M2,
+    D_I8M4,
+    D_I8M8,
+    D_I8MF2,
+    D_I8MF4,
+    D_I8MF8,
+    D_U16M1,
+    D_U16M2,
+    D_U16M4,
+    D_U16M8,
+    D_U16MF2,
+    D_U16MF4,
+    D_I16M1,
+    D_I16M2,
+    D_I16M4,
+    D_I16M8,
+    D_I16MF2,
+    D_I16MF4,
+    D_U32M1,
+    D_U32M2,
+    D_U32M4,
+    D_U32M8,
+    D_U32MF2,
+    D_I32M1,
+    D_I32M2,
+    D_I32M4,
+    D_I32M8,
+    D_I32MF2,
+    D_U64M1,
+    D_U64M2,
+    D_U64M4,
+    D_U64M8,
+    D_I64M1,
+    D_I64M2,
+    D_I64M4,
+    D_I64M8,
+    D_BF16M1,
+    D_BF16M2,
+    D_BF16M4,
+    D_BF16M8,
+    D_BF16MF2,
+    D_BF16MF4,
+    D_F16M1,
+    D_F16M2,
+    D_F16M4,
+    D_F16M8,
+    D_F16MF2,
+    D_F16MF4,
+    D_F32M1,
+    D_F32M2,
+    D_F32M4,
+    D_F32M8,
+    D_F32MF2,
+    D_F64M1,
+    D_F64M2,
+    D_F64M4,
+    D_F64M8,
 
     D_MC, //MemoryChunk, used to represent structure/union/block type.
     D_STR, //String
@@ -154,6 +362,23 @@ typedef enum _DATA_TYPE {
     D_STREAM, //Stream
     D_LAST,
 } DATA_TYPE;
+
+
+//LMUL represents the group multiplication coefficient,
+//which is the number of physical registers used.
+//For example, M1 represents using one physical register,
+//M2 represents using two physical registers, and MF2 represents
+//using half of one physical register to store data.
+typedef enum _LMUL {
+    LMUL_UNDEF = 0,
+    LMUL_MF8,
+    LMUL_MF4,
+    LMUL_MF2,
+    LMUL_M1,
+    LMUL_M2,
+    LMUL_M4,
+    LMUL_M8,
+} LMUL;
 
 class TypeDesc {
 public:
@@ -238,8 +463,16 @@ public:
     //Return element type of element.
     inline DATA_TYPE getStreamElemType() const;
 
+    //Return true if data type is scalable type.
+    bool is_scalable_elem_ty() const
+    { return IS_SCALABLE(TY_dtype(this)); }
+
     //Return true if data type is simplex type.
     bool is_simplex() const { return IS_SIMPLEX(TY_dtype(this)); }
+
+    //Return true if data type is scalable vector type.
+    bool is_vector_with_scalable_elem_type() const
+    { return is_vector() && IS_SCALABLE(getVectorElemDType()); }
 
     //Return true if data type is vector.
     bool is_vector() const { return TY_dtype(this) == D_VEC; }
@@ -275,7 +508,7 @@ public:
     { return is_tensor() && is_fp(getTensorElemDType()); }
 
     //Return true if data type is boolean.
-    bool is_bool() const { return TY_dtype(this) == D_B; }
+    bool is_bool() const { return IS_BOOL(TY_dtype(this)); }
     bool is_i8() const { return TY_dtype(this) == D_I8; }
     bool is_i16() const { return TY_dtype(this) == D_I16; }
     bool is_i32() const { return TY_dtype(this) == D_I32; }
@@ -286,23 +519,91 @@ public:
     bool is_u32() const { return TY_dtype(this) == D_U32; }
     bool is_u64() const { return TY_dtype(this) == D_U64; }
     bool is_u128() const { return TY_dtype(this) == D_U128; }
-    bool is_f8_e4m3() const { return TY_dtype(this) == D_F8_E4M3; }
-    bool is_f8_e5m2() const { return TY_dtype(this) == D_F8_E5M2; }
+    bool is_f4x2() const { return TY_dtype(this) == D_F4X2; }
+    bool is_f8() const { return TY_dtype(this) == D_F8; }
+    bool is_f8e4m3() const { return TY_dtype(this) == D_F8E4M3; }
+    bool is_f8e5m2() const { return TY_dtype(this) == D_F8E5M2; }
+    bool is_f8_mix() const { return TY_dtype(this) == D_F8_MIX; }
     bool is_bf16() const { return TY_dtype(this) == D_BF16; }
     bool is_f16() const { return TY_dtype(this) == D_F16; }
     bool is_f32() const { return TY_dtype(this) == D_F32; }
+    bool is_tf32() const { return TY_dtype(this) == D_TF32; }
     bool is_f64() const { return TY_dtype(this) == D_F64; }
     bool is_f128() const { return TY_dtype(this) == D_F128; }
+    bool is_bool1() const { return TY_dtype(this) == D_B1; }
+    bool is_bool2() const { return TY_dtype(this) == D_B2; }
+    bool is_bool4() const { return TY_dtype(this) == D_B4; }
+    bool is_bool8() const { return TY_dtype(this) == D_B8; }
+    bool is_bool16() const { return TY_dtype(this) == D_B16; }
+    bool is_bool32() const { return TY_dtype(this) == D_B32; }
+    bool is_bool64() const { return TY_dtype(this) == D_B64; }
+    bool is_u8m1() const { return TY_dtype(this) == D_U8M1; }
+    bool is_u8m2() const { return TY_dtype(this) == D_U8M2; }
+    bool is_u8m4() const { return TY_dtype(this) == D_U8M4; }
+    bool is_u8m8() const { return TY_dtype(this) == D_U8M8; }
+    bool is_u8mf2() const { return TY_dtype(this) == D_U8MF2; }
+    bool is_u8mf4() const { return TY_dtype(this) == D_U8MF4; }
+    bool is_u8mf8() const { return TY_dtype(this) == D_U8MF8; }
+    bool is_i8m1() const { return TY_dtype(this) == D_I8M1; }
+    bool is_i8m2() const { return TY_dtype(this) == D_I8M2; }
+    bool is_i8m4() const { return TY_dtype(this) == D_I8M4; }
+    bool is_i8m8() const { return TY_dtype(this) == D_I8M8; }
+    bool is_i8mf2() const { return TY_dtype(this) == D_I8MF2; }
+    bool is_i8mf4() const { return TY_dtype(this) == D_I8MF4; }
+    bool is_i8mf8() const { return TY_dtype(this) == D_I8MF8; }
+    bool is_u16m1() const { return TY_dtype(this) == D_U16M1; }
+    bool is_u16m2() const { return TY_dtype(this) == D_U16M2; }
+    bool is_u16m4() const { return TY_dtype(this) == D_U16M4; }
+    bool is_u16m8() const { return TY_dtype(this) == D_U16M8; }
+    bool is_u16mf2() const { return TY_dtype(this) == D_U16MF2; }
+    bool is_u16mf4() const { return TY_dtype(this) == D_U16MF4; }
+    bool is_i16m1() const { return TY_dtype(this) == D_I16M1; }
+    bool is_i16m2() const { return TY_dtype(this) == D_I16M2; }
+    bool is_i16m4() const { return TY_dtype(this) == D_I16M4; }
+    bool is_i16m8() const { return TY_dtype(this) == D_I16M8; }
+    bool is_i16mf2() const { return TY_dtype(this) == D_I16MF2; }
+    bool is_i16mf4() const { return TY_dtype(this) == D_I16MF4; }
+    bool is_u32m1() const { return TY_dtype(this) == D_U32M1; }
+    bool is_u32m2() const { return TY_dtype(this) == D_U32M2; }
+    bool is_u32m4() const { return TY_dtype(this) == D_U32M4; }
+    bool is_u32m8() const { return TY_dtype(this) == D_U32M8; }
+    bool is_u32mf2() const { return TY_dtype(this) == D_U32MF2; }
+    bool is_i32m1() const { return TY_dtype(this) == D_I32M1; }
+    bool is_i32m2() const { return TY_dtype(this) == D_I32M2; }
+    bool is_i32m4() const { return TY_dtype(this) == D_I32M4; }
+    bool is_i32m8() const { return TY_dtype(this) == D_I32M8; }
+    bool is_i32mf2() const { return TY_dtype(this) == D_I32MF2; }
+    bool is_bf16m1() const { return TY_dtype(this) == D_BF16M1; }
+    bool is_bf16m2() const { return TY_dtype(this) == D_BF16M2; }
+    bool is_bf16m4() const { return TY_dtype(this) == D_BF16M4; }
+    bool is_bf16m8() const { return TY_dtype(this) == D_BF16M8; }
+    bool is_bf16mf2() const { return TY_dtype(this) == D_BF16MF2; }
+    bool is_bf16mf4() const { return TY_dtype(this) == D_BF16MF4; }
+    bool is_f16m1() const { return TY_dtype(this) == D_F16M1; }
+    bool is_f16m2() const { return TY_dtype(this) == D_F16M2; }
+    bool is_f16m4() const { return TY_dtype(this) == D_F16M4; }
+    bool is_f16m8() const { return TY_dtype(this) == D_F16M8; }
+    bool is_f16mf2() const { return TY_dtype(this) == D_F16MF2; }
+    bool is_f16mf4() const { return TY_dtype(this) == D_F16MF4; }
+    bool is_f32m1() const { return TY_dtype(this) == D_F32M1; }
+    bool is_f32m2() const { return TY_dtype(this) == D_F32M2; }
+    bool is_f32m4() const { return TY_dtype(this) == D_F32M4; }
+    bool is_f32m8() const { return TY_dtype(this) == D_F32M8; }
+    bool is_f32mf2() const { return TY_dtype(this) == D_F32MF2; }
 
     //Return true if data type is primitive.
     bool is_scalar() const
-    { return TY_dtype(this) >= D_B && TY_dtype(this) <= D_F128; }
+    {
+        return (TY_dtype(this) >= D_B && TY_dtype(this) <= D_F128) ||
+            IS_SCALABLE(TY_dtype(this));
+    }
 
     //Return true if current type is signed.
     inline bool is_signed() const
     {
         if ((TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128) ||
-            (TY_dtype(this) >= D_F8_E4M3 && TY_dtype(this) <= D_F128)) {
+            (TY_dtype(this) >= D_F4X2 && TY_dtype(this) <= D_F128) ||
+            IS_SCALABLE_SIGNED(TY_dtype(this))) {
             return true;
         }
         return false;
@@ -315,7 +616,8 @@ public:
             TY_dtype(this) == D_STR ||
             TY_dtype(this) == D_PTR ||
             TY_dtype(this) == D_VEC ||
-            TY_dtype(this) == D_STREAM) {
+            TY_dtype(this) == D_STREAM ||
+            IS_SCALABLE_UNSIGNED(TY_dtype(this))) {
             return true;
         }
         return false;
@@ -337,15 +639,24 @@ public:
 
     //Return true if data type is signed integer.
     bool is_sint() const
-    { return TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128; }
+    {
+        return (TY_dtype(this) >= D_I8 && TY_dtype(this) <= D_I128) ||
+            IS_SCALABLE_SINT(TY_dtype(this));
+    }
 
     //Return true if data type is unsigned integer.
     bool is_uint() const
-    { return TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128; }
+    {
+        return (TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128) ||
+            IS_SCALABLE_UINT(TY_dtype(this));
+    }
 
     //Return true if data type is integer.
     bool is_int() const
-    { return TY_dtype(this) >= D_B && TY_dtype(this) <= D_U128; }
+    {
+        return (TY_dtype(this) >= D_B && TY_dtype(this) <= D_U128) ||
+            IS_SCALABLE_INT(TY_dtype(this)) || IS_BOOL(TY_dtype(this));
+    }
 
     //Return true if data type is subword integer.
     bool is_subword_int() const
@@ -359,15 +670,24 @@ public:
 
     //Return true if data type is float.
     static bool is_fp(DATA_TYPE dtype)
-    { return dtype >= D_F8_E4M3 && dtype <= D_F128; }
+    {
+        return (dtype >= D_F4X2 && dtype <= D_F128) ||
+            IS_SCALABLE_FP(dtype);
+    }
 
     //Return true if data type is signed integer.
     static bool is_signed(DATA_TYPE dtype)
-    { return dtype >= D_I8 && dtype <= D_I128; }
+    {
+        return (dtype >= D_I8 && dtype <= D_I128) ||
+            IS_SCALABLE_SIGNED(dtype);
+    }
 
     //Return true if data type is unsigned integer.
     static bool is_unsigned(DATA_TYPE dtype)
-    { return dtype >= D_U8 && dtype <= D_U128; }
+    {
+        return (dtype >= D_U8 && dtype <= D_U128) ||
+            IS_SCALABLE_UNSIGNED(dtype);
+    }
 
     //Return true if data type can be regarded as integer.
     bool isInt() const { return is_int() || is_bool() || is_pointer(); }
@@ -755,6 +1075,11 @@ protected:
     Type const* m_any;
     Type const* m_b;
     Type const* m_i8;
+    Type const* m_f4x2;
+    Type const* m_f8;
+    Type const* m_f8e4m3;
+    Type const* m_f8e5m2;
+    Type const* m_f8mix;
     Type const* m_i16;
     Type const* m_i32;
     Type const* m_i64;
@@ -764,17 +1089,100 @@ protected:
     Type const* m_u32;
     Type const* m_u64;
     Type const* m_u128;
-    Type const* m_f8e4m3;
-    Type const* m_f8e5m2;
     Type const* m_bf16;
     Type const* m_f16;
     Type const* m_f32;
+    Type const* m_tf32;
     Type const* m_f64;
     Type const* m_f80;
     Type const* m_f128;
     Type const* m_str;
+    Type const* m_bool1;
+    Type const* m_bool2;
+    Type const* m_bool4;
+    Type const* m_bool8;
+    Type const* m_bool16;
+    Type const* m_bool32;
+    Type const* m_bool64;
+    Type const* m_u8m1;
+    Type const* m_u8m2;
+    Type const* m_u8m4;
+    Type const* m_u8m8;
+    Type const* m_u8mf2;
+    Type const* m_u8mf4;
+    Type const* m_u8mf8;
+    Type const* m_i8m1;
+    Type const* m_i8m2;
+    Type const* m_i8m4;
+    Type const* m_i8m8;
+    Type const* m_i8mf2;
+    Type const* m_i8mf4;
+    Type const* m_i8mf8;
+    Type const* m_u16m1;
+    Type const* m_u16m2;
+    Type const* m_u16m4;
+    Type const* m_u16m8;
+    Type const* m_u16mf2;
+    Type const* m_u16mf4;
+    Type const* m_i16m1;
+    Type const* m_i16m2;
+    Type const* m_i16m4;
+    Type const* m_i16m8;
+    Type const* m_i16mf2;
+    Type const* m_i16mf4;
+    Type const* m_u32m1;
+    Type const* m_u32m2;
+    Type const* m_u32m4;
+    Type const* m_u32m8;
+    Type const* m_u32mf2;
+    Type const* m_i32m1;
+    Type const* m_i32m2;
+    Type const* m_i32m4;
+    Type const* m_i32m8;
+    Type const* m_i32mf2;
+    Type const* m_u64m1;
+    Type const* m_u64m2;
+    Type const* m_u64m4;
+    Type const* m_u64m8;
+    Type const* m_i64m1;
+    Type const* m_i64m2;
+    Type const* m_i64m4;
+    Type const* m_i64m8;
+    Type const* m_bf16m1;
+    Type const* m_bf16m2;
+    Type const* m_bf16m4;
+    Type const* m_bf16m8;
+    Type const* m_bf16mf2;
+    Type const* m_bf16mf4;
+    Type const* m_f16m1;
+    Type const* m_f16m2;
+    Type const* m_f16m4;
+    Type const* m_f16m8;
+    Type const* m_f16mf2;
+    Type const* m_f16mf4;
+    Type const* m_f32m1;
+    Type const* m_f32m2;
+    Type const* m_f32m4;
+    Type const* m_f32m8;
+    Type const* m_f32mf2;
+    Type const* m_f64m1;
+    Type const* m_f64m2;
+    Type const* m_f64m4;
+    Type const* m_f64m8;
 protected:
     SMemPool * get_pool() const { return m_pool; }
+
+    //The function handles cases that at least one of operands
+    //is of Integer type.
+    Type const* hoistDTypeForBinOpWithINTType(Type const* d0, Type const* d1);
+
+    //The function handles cases that at least one of operands
+    //is of FP type.
+    Type const* hoistDTypeForBinOpWithFPType(Type const* d0, Type const* d1);
+
+    //The function handles cases that at least one of operands
+    //is of MC type.
+    Type const* hoistDTypeForBinOpWithMCType(Type const* d0, Type const* d1);
 
     Type * newType() { return (Type*)xmalloc(sizeof(Type)); }
 
@@ -815,12 +1223,25 @@ public:
     CHAR const* dump_type(Type const* ty, OUT StrBufType & buf) const;
     void dump_type(Type const* ty) const;
     void dump_type(UINT tyid) const;
-    void dump_type_tab() const;
+    void dump() const;
 
     DATA_TYPE hoistBSdtype(UINT bit_size, bool is_signed) const;
     DATA_TYPE hoistDtype(UINT bit_size, OUT UINT * hoisted_data_size);
     DATA_TYPE hoistDtype(DATA_TYPE stype) const;
 
+    //The hoisting rules are:
+    //1. Return max bit size of DATA_TYPE between 'opnd0' and 'opnd1',
+    //2. else return SIGNED if one of them is signed;
+    //3. else return FLOAT if one of them is float,
+    //4. else return UNSIGNED.
+    //
+    //The C language rules are:
+    //1. If any operand is of a integral type smaller than int? Convert to int.
+    //2. Is any operand unsigned long? Convert the other to unsigned long.
+    //3. (else) Is any operand signed long? Convert the other to signed long.
+    //4. (else) Is any operand unsigned int? Convert the other to unsigned int.
+    //
+    //NOTE: The function does NOT hoist vector type.
     Type const* hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1);
 
     RegionMgr * getRegionMgr() const { return m_rm; }
@@ -880,6 +1301,33 @@ public:
     virtual Type const* getHostFPType(bool is_bf = false) const
     { return getFPType(sizeof(HOST_FP) * HOST_BIT_PER_BYTE, is_bf); }
 
+    //This function returns the number of bits occupied by a boolean type
+    //in the mask register. res=EW/LMUL=VLEN/VLMAX(EW refers to the width
+    //of elements, LMUL refers to the length of the group multiplication
+    //coefficient, VLEN refers to the length of a vector register, and
+    //VLMAX refers to the maximum number of elements).
+    //For example, for data type D_U32M2 with EW=32 and LMUL=2,
+    //will return is 32/2=16.
+    static UINT getNumbitsOfBoolTypeInMask(DATA_TYPE dt);
+
+    //Return scalable vector element type with lmul = 1 based on
+    //base element dtype.
+    //The output type of reduction operations (e.g., redsum/redmax/redmin)
+    //is M1 vector type regardless of whether the input vector type is
+    //mf8/mf4/mf2/m1/m2/m4/m8. In this case, we need to derive the base data
+    //type and convert it to M1 dtype.
+    //For example: If the vector type of a redmax instruction is v<s16m2x?>,
+    //the inferred output vector type should be v<s16m1x?>.
+    //Here only transfer s16 => s16m1, get the vector type from
+    //getScalableVectorWithDType;
+    static DATA_TYPE getScalableDType(DATA_TYPE src_ty)
+    { return getScalableDType(src_ty, LMUL_M1); }
+
+    //Obtain scalable types using basic data types and composition
+    //coefficients. For example, basic_dt='D_U32' and lmul='LMUL_M2',
+    //will return D_U32M2.
+    static DATA_TYPE getScalableDType(DATA_TYPE basic_dt, LMUL lmul);
+
     //Return Unsigned Integer Data-Type according to given byte size.
     DATA_TYPE getUIntDType(UINT bytesize) const
     { return getIntDType(bytesize * BIT_PER_BYTE, false); }
@@ -924,6 +1372,13 @@ public:
         return TYDES_name(&g_type_desc[dtype]);
     }
 
+    //Return the maximum number of bits in the vector register.
+    virtual UINT getMaxBitSizeOfVectorRegister() const
+    {
+        ASSERTN(0, ("Target Dependent Code"));
+        return 0;
+    }
+
     //Return byte size of a pointer.
     //e.g: 32bit processor return 4, 64bit processor return 8.
     UINT getPointerByteSize() const { return BYTE_PER_POINTER; }
@@ -960,6 +1415,14 @@ public:
     }
 
     //Retrieve Type via 'type-index'.
+    DATA_TYPE getDType(UINT tyid) const
+    {
+        Type const* ty = getType(tyid);
+        ASSERT0(ty);
+        return ty->getDType();
+    }
+
+    //Retrieve Type via 'type-index'.
     Type const* getType(UINT tyid) const
     {
         ASSERT0(tyid != 0);
@@ -974,6 +1437,11 @@ public:
     Type const* getI64() const { return m_i64; }
     Type const* getI128() const { return m_i128; }
     Type const* getU8() const { return m_u8; }
+    Type const* getF4X2() const { return m_f4x2; }
+    Type const* getF8() const { return m_f8; }
+    Type const* getF8E4M3() const { return m_f8e4m3; }
+    Type const* getF8E5M2() const { return m_f8e5m2; }
+    Type const* getF8Mix() const { return m_f8mix; }
     Type const* getU16() const { return m_u16; }
     Type const* getU32() const { return m_u32; }
     Type const* getU64() const { return m_u64; }
@@ -981,11 +1449,89 @@ public:
     Type const* getBF16() const { return m_bf16; }
     Type const* getF16() const { return m_f16; }
     Type const* getF32() const { return m_f32; }
+    Type const* getTF32() const { return m_tf32; }
     Type const* getF64() const { return m_f64; }
     Type const* getF80() const { return m_f80; }
     Type const* getF128() const { return m_f128; }
     Type const* getString() const { return m_str; }
     Type const* getAny() const { return m_any; }
+    Type const* getBool1() const { return m_bool1; }
+    Type const* getBool2() const { return m_bool2; }
+    Type const* getBool4() const { return m_bool4; }
+    Type const* getBool8() const { return m_bool8; }
+    Type const* getBool16() const { return m_bool16; }
+    Type const* getBool32() const { return m_bool32; }
+    Type const* getBool64() const { return m_bool64; }
+    Type const* getU8m1() const { return m_u8m1; }
+    Type const* getU8m2() const { return m_u8m2; }
+    Type const* getU8m4() const { return m_u8m4; }
+    Type const* getU8m8() const { return m_u8m8; }
+    Type const* getU8mf2() const { return m_u8mf2; }
+    Type const* getU8mf4() const { return m_u8mf4; }
+    Type const* getU8mf8() const { return m_u8mf8; }
+    Type const* getI8m1() const { return m_i8m1; }
+    Type const* getI8m2() const { return m_i8m2; }
+    Type const* getI8m4() const { return m_i8m4; }
+    Type const* getI8m8() const { return m_i8m8; }
+    Type const* getI8mf2() const { return m_i8mf2; }
+    Type const* getI8mf4() const { return m_i8mf4; }
+    Type const* getI8mf8() const { return m_i8mf8; }
+    Type const* getU16m1() const { return m_u16m1; }
+    Type const* getU16m2() const { return m_u16m2; }
+    Type const* getU16m4() const { return m_u16m4; }
+    Type const* getU16m8() const { return m_u16m8; }
+    Type const* getU16mf2() const { return m_u16mf2; }
+    Type const* getU16mf4() const { return m_u16mf4; }
+    Type const* getI16m1() const { return m_i16m1; }
+    Type const* getI16m2() const { return m_i16m2; }
+    Type const* getI16m4() const { return m_i16m4; }
+    Type const* getI16m8() const { return m_i16m8; }
+    Type const* getI16mf2() const { return m_i16mf2; }
+    Type const* getI16mf4() const { return m_i16mf4; }
+    Type const* getU32m1() const { return m_u32m1; }
+    Type const* getU32m2() const { return m_u32m2; }
+    Type const* getU32m4() const { return m_u32m4; }
+    Type const* getU32m8() const { return m_u32m8; }
+    Type const* getU32mf2() const { return m_u32mf2; }
+    Type const* getI32m1() const { return m_i32m1; }
+    Type const* getI32m2() const { return m_i32m2; }
+    Type const* getI32m4() const { return m_i32m4; }
+    Type const* getI32m8() const { return m_i32m8; }
+    Type const* getI32mf2() const { return m_i32mf2; }
+    Type const* getU64m1() const { return m_u64m1; }
+    Type const* getU64m2() const { return m_u64m2; }
+    Type const* getU64m4() const { return m_u64m4; }
+    Type const* getU64m8() const { return m_u64m8; }
+    Type const* getI64m1() const { return m_i64m1; }
+    Type const* getI64m2() const { return m_i64m2; }
+    Type const* getI64m4() const { return m_i64m4; }
+    Type const* getI64m8() const { return m_i64m8; }
+    Type const* getBF16m1() const { return m_bf16m1; }
+    Type const* getBF16m2() const { return m_bf16m2; }
+    Type const* getBF16m4() const { return m_bf16m4; }
+    Type const* getBF16m8() const { return m_bf16m8; }
+    Type const* getBF16mf2() const { return m_bf16mf2; }
+    Type const* getBF16mf4() const { return m_bf16mf4; }
+    Type const* getF16m1() const { return m_f16m1; }
+    Type const* getF16m2() const { return m_f16m2; }
+    Type const* getF16m4() const { return m_f16m4; }
+    Type const* getF16m8() const { return m_f16m8; }
+    Type const* getF16mf2() const { return m_f16mf2; }
+    Type const* getF16mf4() const { return m_f16mf4; }
+    Type const* getF32m1() const { return m_f32m1; }
+    Type const* getF32m2() const { return m_f32m2; }
+    Type const* getF32m4() const { return m_f32m4; }
+    Type const* getF32m8() const { return m_f32m8; }
+    Type const* getF32mf2() const { return m_f32mf2; }
+    Type const* getF64m1() const { return m_f64m1; }
+    Type const* getF64m2() const { return m_f64m2; }
+    Type const* getF64m4() const { return m_f64m4; }
+    Type const* getF64m8() const { return m_f64m8; }
+
+    //Return the corresponding basic data type based on the type of
+    //dtype, for example, when dtype is D_U16M1, return D_U16;
+    //When dtype is D_I32M1, return D_I32.
+    static DATA_TYPE getBasicDTypeWithDType(DATA_TYPE dtype);
 
     //Generate and return type according to given DATA_TYPE.
     Type const* getSimplexType(DATA_TYPE dt)
@@ -997,34 +1543,7 @@ public:
     }
 
     //Return existing type according to given DATA_TYPE.
-    inline Type const* getSimplexTypeEx(DATA_TYPE dt) const
-    {
-        switch (dt) {
-        case D_B: return m_b;
-        case D_I8: return m_i8;
-        case D_I16: return m_i16;
-        case D_I32: return m_i32;
-        case D_I64: return m_i64;
-        case D_I128: return m_i128;
-        case D_U8: return m_u8;
-        case D_U16: return m_u16;
-        case D_U32: return m_u32;
-        case D_U64: return m_u64;
-        case D_U128: return m_u128;
-        case D_F8_E4M3: return m_f8e4m3;
-        case D_F8_E5M2: return m_f8e5m2;
-        case D_BF16: return m_bf16;
-        case D_F16: return m_f16;
-        case D_F32: return m_f32;
-        case D_F64: return m_f64;
-        case D_F80: return m_f80;
-        case D_F128: return m_f128;
-        case D_STR: return m_str;
-        case D_ANY: return m_any;
-        default: ASSERTN(0, ("not simplex type")); break;
-        }
-        return 0;
-    }
+    Type const* getSimplexTypeEx(DATA_TYPE dt) const;
 
     //Return the type that represents the general purpose register of
     //target machine.
@@ -1079,6 +1598,32 @@ public:
         return getVectorType(vec_elem_num, vec_elem_ty);
     }
 
+    //Return the corresponding boolean type based on the type of
+    //elem_ty, for example, when elem_ty is D_U16M1, return D_B16;
+    //When elem_ty is D_U16MF2, return D_B32.
+    Type const* getScalableBoolTypeWithNonBool(DATA_TYPE elem_ty) const;
+
+    //Return the maximum number of elements for
+    //each scalable vector element type.
+    UINT getVectorElemNumWithScalableElemType(DATA_TYPE vec_elem_ty);
+
+    //Return scalable vector type.
+    Type const* getVectorWithScalableElemType(DATA_TYPE vec_elem_ty)
+    {
+        ASSERT0(vec_elem_ty != D_UNDEF && isScalableElemType(vec_elem_ty));
+        VectorType d;
+        TY_dtype(&d) = D_VEC;
+
+        //Note that the proportion of Bool types is uncertain.
+        //Although each boolean occupies 1 bit in some architectures,
+        //other architectures may occupy 1 byte. Therefore, 1B is
+        //used here to abstractly represent its occupied space.
+        TY_vec_size(&d) = getVectorElemNumWithScalableElemType(vec_elem_ty) *
+            getDTypeByteSize(vec_elem_ty);
+        TY_vec_ety(&d) = vec_elem_ty;
+        return TC_type(registerVector(&d));
+    }
+
     //Return stream type, which element type is 'elem_ty'.
     //e.g: stream<D_I32> means this is a stream type with each element is I32,
     //and the stream has variable-length.
@@ -1119,6 +1664,10 @@ public:
     //Return byte size according to given Type.
     UINT getByteSize(Type const* ty) const;
 
+    //Return byte size according to given Type.
+    //NOTE: the function returns 0 if ty is D_ANY.
+    UINT getByteSizeIfItExist(Type const* ty) const;
+
     //Return byte size according to given tyid.
     UINT getByteSize(UINT tyid) const { return getByteSize(getType(tyid)); }
 
@@ -1126,7 +1675,14 @@ public:
     UINT getBitSize(Type const* ty) const
     { return getByteSize(ty) * BITS_PER_BYTE; }
 
-    bool is_scalar(UINT tyid) { return tyid >= D_B && tyid <= D_F128; }
+    //Return the corresponding lmul of dtype.
+    //For example:
+    //when dtype is D_I32M1, return LMUL_M1;
+    //When dtype is D_I32MF2, return LMUL_MF2.
+    static LMUL getLmulWithDType(DATA_TYPE dtype);
+
+    bool is_scalar(UINT tyid) const
+    { return getDType(tyid) >= D_B && getDType(tyid) <= D_F128; }
 
     //Return true if tyid is signed.
     bool is_signed(UINT tyid) const { return getType(tyid)->is_signed(); }
@@ -1163,6 +1719,11 @@ public:
     static bool isEqual(HOST_FP a, HOST_FP b, HOST_FP epsilon = EPSILON)
     { return ::fabs(a - b) < epsilon; }
 
+    //Return true if the element type is an element type
+    //of a scalable vector.
+    bool isScalableElemType(DATA_TYPE vec_elem_ty) const
+    { return IS_SCALABLE(vec_elem_ty); }
+
     //Register a memory-chunk data type.
     TypeContainer const* registerMC(Type const* ty);
 
@@ -1198,6 +1759,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBufType & buf) const
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
+    SWITCH_CASE_SCALABLE_ELEM_DTYPE:
     SWITCH_CASE_INT_DTYPE:
     SWITCH_CASE_FP_DTYPE:
     case D_B:

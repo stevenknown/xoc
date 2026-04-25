@@ -278,7 +278,8 @@ static void iterDefCHelper(
         return;
     }
     ASSERT0(def->getOcc());
-    if (use != nullptr && isKillingDef(def->getOcc(), use, nullptr)) {
+    if (use != nullptr &&
+        xoc::isKillingDef(def->getOcc(), use, nullptr, it.getOptCtx())) {
         //Stop the iteration until encounter the killing DEF real stmt.
         return;
     }
@@ -655,7 +656,7 @@ void VRCollectDef::collectDefThroughDefChain(
     RegDef const* def, OUT IRSet * set) const
 {
     ASSERT0(def);
-    ConstRegDefIter it(m_mgr);
+    ConstRegDefIter it(m_mgr, getOptCtx());
     bool must_inside_loop = m_ctx.flag.have(COLLECT_INSIDE_LOOP);
     LI<IRBB> const* li = m_ctx.getLI();
     if (must_inside_loop) { ASSERT0(li); }
@@ -887,7 +888,7 @@ void VRRenameDef::dumpRenameVReg(IR const* ir, VReg const* vreg)
     VRegFixedStrBuf buf1;
     VRegFixedStrBuf buf2;
     am->dump("VRRenameDef:renaming %s with %s",
-             xoc::dumpIRName(ir, buf1), vreg->dump(m_mgr->getRA(), buf2));
+             xoc::dumpIRName(ir, buf1), vreg->dump(m_mgr->getRAMgr(), buf2));
 }
 
 
@@ -899,7 +900,7 @@ void VRRenameDef::dumpInsertDDChain(IR const* ir, VReg const* vreg)
     VRegFixedStrBuf buf1;
     VRegFixedStrBuf buf2;
     am->dump("VRRenameDef:meet %s, the lifetime of %s is stopped here",
-             xoc::dumpIRName(ir, buf2), vreg->dump(m_mgr->getRA(), buf1));
+             xoc::dumpIRName(ir, buf2), vreg->dump(m_mgr->getRAMgr(), buf1));
 }
 
 
@@ -910,7 +911,7 @@ void VRRenameDef::dumpInsertDDChain(RegPhi const* phi, VReg const* vreg)
     if (am == nullptr) { return; }
     VRegFixedStrBuf buf;
     am->dump("VRRenameDef:meet RegPhi%u, the lifetime of %s is stopped here",
-             phi->id(), vreg->dump(m_mgr->getRA(), buf));
+             phi->id(), vreg->dump(m_mgr->getRAMgr(), buf));
 }
 
 
@@ -1554,7 +1555,7 @@ VRRenameExp::VRRenameExp(RegSSAMgr * mgr, OptCtx * oc, ActMgr * am)
 //In C++, local declared class should NOT be used in template parameters of a
 //template class. Because the template class may be instanced outside the
 //function and the local type in function is invisible.
-class VFToRename {
+class VFToRenameRegSSA {
 public:
     bool visitIR(IR * ir, OUT bool & is_term)
     {
@@ -1576,8 +1577,9 @@ public:
     RegSSAStatus * m_st;
 public:
     //startir: may be NULL.
-    VFToRename(IR const* startir, IRBB const* startbb, RegSSAMgr * regssamgr,
-               OptCtx * oc, RegSSAStatus * st)
+    VFToRenameRegSSA(
+        IR const* startir, IRBB const* startbb, RegSSAMgr * regssamgr,
+        OptCtx * oc, RegSSAStatus * st)
     {
         ASSERT0(startbb && regssamgr && oc && st);
         m_startir = startir;
@@ -1591,15 +1593,15 @@ public:
 
 void VRRenameExp::rename(MOD IR * root, IR const* startir, IRBB const* startbb)
 {
-    class IterTree : public VisitIRTree<VFToRename> {
+    class IterTree : public VisitIRTree<VFToRenameRegSSA> {
     public:
-        IterTree(VFToRename & vf) : VisitIRTree(vf) {}
+        IterTree(VFToRenameRegSSA & vf) : VisitIRTree(vf) {}
     };
     ASSERT0(root && (root->is_stmt() || root->is_exp()));
     ASSERT0(startir == nullptr ||
             (startir->is_stmt() && startir->getBB() == startbb));
     RegSSAStatus st;
-    VFToRename vf(startir, startbb, m_mgr, m_oc, &st);
+    VFToRenameRegSSA vf(startir, startbb, m_mgr, m_oc, &st);
     IterTree it(vf);
     it.visit(root);
 }
@@ -1819,7 +1821,7 @@ RegSSAMgr::RegSSAMgr(Region * rg)
     m_cfg = rg->getCFG();
     ASSERTN(m_cfg, ("cfg is not available."));
     m_am = new ActMgr(m_rg);
-    m_ra = nullptr;
+    m_ramgr = nullptr;
     m_timgr = nullptr;
 }
 
@@ -1889,7 +1891,7 @@ void RegSSAMgr::dumpAllVReg() const
     VROpndVec * vec = const_cast<RegSSAMgr*>(this)->getRegDUMgr()->
         getVROpndVec();
     xcom::DefFixedStrBuf tmp;
-    LinearScanRA const* ra = getRA();
+    RegAllocMgr const* ramgr = getRAMgr();
     VRegFixedStrBuf buf;
     for (VecIdx i = 1; i <= vec->get_last_idx(); i++) {
         VReg * v = (VReg*)vec->get(i);
@@ -1899,7 +1901,7 @@ void RegSSAMgr::dumpAllVReg() const
         }
         buf.clean();
         note(rg, "\nVReg%u:%s: ", v->id(),
-             VReg::dumpRegAndVer(buf, v->reg(), v->version(), ra));
+             VReg::dumpRegAndVer(buf, v->reg(), v->version(), ramgr));
         RegDef * regdef = v->getDef();
         //Print DEF.
         if (v->version() != REGSSA_INIT_VERSION) {
@@ -1990,7 +1992,7 @@ bool RegSSAMgr::isExactCover(Reg reg1, Reg reg2) const
 
 IR * RegSSAMgr::findUniqueDefInLoopForMustRef(
     IR const* exp, LI<IRBB> const* li, Region const* rg,
-    OUT IRSet * set) const
+    OUT IRSet * set, RegSSAUpdateCtx const* ctx) const
 {
     ASSERT0(exp && exp->is_exp() && hasExpRegSSAInfo(exp));
     Reg mustuse = getReg(exp);
@@ -2000,9 +2002,10 @@ IR * RegSSAMgr::findUniqueDefInLoopForMustRef(
     xcom::DefMiscBitSetMgr sbsmgr;
     IRSet tmpset(sbsmgr.getSegMgr());
     if (set == nullptr) { set = &tmpset; }
-    VRCollectCtx ctx(COLLECT_CROSS_PHI|COLLECT_INSIDE_LOOP);
-    ctx.setLI(li);
-    VRCollectDef cd(this, regssainfo, ctx, mustuse, set);
+    VRCollectCtx clctx(
+        COLLECT_CROSS_PHI|COLLECT_INSIDE_LOOP, ctx->getOptCtx());
+    clctx.setLI(li);
+    VRCollectDef cd(this, regssainfo, clctx, mustuse, set);
     if (set->get_elem_count() == 1) {
         IRSetIter it;
         return m_rg->getIR(set->get_first(&it));
@@ -2283,7 +2286,7 @@ void RegSSAMgr::dumpRegSSAInfoForExp(
     OUT xcom::DefFixedStrBuf & buf, IR const* ir) const
 {
     if (!ir->is_exp() || !hasExpRegSSAInfo(ir)) { return; }
-    LinearScanRA const* ra = getRA();
+    RegAllocMgr const* ramgr = getRAMgr();
     VROpndSetIter iter = nullptr;
     buf.strcat(" --USE:");
     bool first = true;
@@ -2303,7 +2306,7 @@ void RegSSAMgr::dumpRegSSAInfoForExp(
         else { buf.strcat(","); }
         tmpbuf.clean();
         buf.strcat("VReg%u:%s", vr->id(),
-            VReg::dumpRegAndVer(tmpbuf, vr->reg(), vr->version(), ra));
+            VReg::dumpRegAndVer(tmpbuf, vr->reg(), vr->version(), ramgr));
     }
 }
 
@@ -2318,7 +2321,7 @@ void RegSSAMgr::dumpIRWithRegSSAForExpTree(IR const* ir) const
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     Region const* rg = getRegion();
-    LinearScanRA const* ra = getRA();
+    RegAllocMgr const* ramgr = getRAMgr();
     VRegFixedStrBuf buf;
     for (IR const* opnd = iterExpInitC(ir, lst);
          opnd != nullptr; opnd = iterExpNextC(lst)) {
@@ -2350,7 +2353,7 @@ void RegSSAMgr::dumpIRWithRegSSAForExpTree(IR const* ir) const
             }
             buf.clean();
             prt(rg, "VReg%u:%s", vr->id(),
-                VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ra));
+                VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ramgr));
         }
     }
 }
@@ -2405,7 +2408,7 @@ void RegSSAMgr::dumpVROpndRef() const
 }
 
 
-bool RegSSAMgr::dump() const
+bool RegSSAMgr::dump(OptCtx const* oc) const
 {
     if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) {
         return false;
@@ -2417,7 +2420,7 @@ bool RegSSAMgr::dump() const
     ASSERT0(getTIMgr()->getRegDSystem());
     getTIMgr()->getRegDSystem()->dump();
     dumpVROpndRef();
-    dumpDUChain();
+    dumpDUChain(oc);
     //dumpBBListWithRegSSAInfo();
     getRegion()->getLogMgr()->decIndent(2);
     END_TIMER(t, "RegSSA: Dump After Pass");
@@ -2836,13 +2839,14 @@ RegDef * RegSSAMgr::findNearestDef(
 }
 
 
-IR * RegSSAMgr::findKillingDefStmt(IR const* ir, bool aggressive) const
+IR * RegSSAMgr::findKillingDefStmt(
+    IR const* ir, bool aggressive, OptCtx const* oc) const
 {
     RegDef const* regdef = nullptr;
     if (aggressive) {
         regdef = findNearestCoverDefThatCanReach(ir);
     } else {
-        regdef = findKillingRegDef(ir);
+        regdef = findKillingRegDef(ir, oc);
     }
     if (regdef != nullptr && !regdef->is_phi()) {
         ASSERT0(regdef->getOcc());
@@ -2852,7 +2856,7 @@ IR * RegSSAMgr::findKillingDefStmt(IR const* ir, bool aggressive) const
 }
 
 
-RegDef * RegSSAMgr::findKillingRegDef(IR const* ir) const
+RegDef * RegSSAMgr::findKillingRegDef(IR const* ir, OptCtx const* oc) const
 {
     ASSERT0(ir && ir->is_exp() && hasExpRegSSAInfo(ir));
     Reg opndreg = getReg(ir);
@@ -2864,7 +2868,10 @@ RegDef * RegSSAMgr::findKillingRegDef(IR const* ir) const
     RegDef * def = findNearestDef(ir, false);
     if (def == nullptr || def->is_phi()) { return nullptr; }
     ASSERT0(def->getOcc());
-    return xoc::isKillingDef(def->getOcc(), ir, nullptr) ? def : nullptr;
+    if (xoc::isKillingDef(def->getOcc(), ir, nullptr, oc)) {
+        return def;
+    }
+    return nullptr;
 }
 
 
@@ -3029,14 +3036,15 @@ bool RegSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
 
 //lst: for local used.
 void RegSSAMgr::dumpExpDUChainIter(
-    IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const
+    IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line,
+    OptCtx const* oc) const
 {
     IRSet visited(getSBSMgr()->getSegMgr());
     xcom::List<RegDef const*> wl;
     it.clean();
     xcom::DefFixedStrBuf tmp;
     Region const* rg = getRegion();
-    LinearScanRA const* ra = getRA();
+    RegAllocMgr const* ramgr = getRAMgr();
     VRegFixedStrBuf buf;
     for (IR const* opnd = xoc::iterInitC(const_cast<IR*>(ir), it);
          opnd != nullptr; opnd = xoc::iterNextC(it)) {
@@ -3055,7 +3063,7 @@ void RegSSAMgr::dumpExpDUChainIter(
             prt(rg, g_msg_no_regssainfo);
             continue;
         }
-        RegDef * kdef = findKillingRegDef(opnd);
+        RegDef * kdef = findKillingRegDef(opnd, oc);
         if (kdef != nullptr) {
             prt(rg, " KDEF:%s", xoc::dumpIRName(kdef->getOcc(), tmp));
         }
@@ -3073,7 +3081,7 @@ void RegSSAMgr::dumpExpDUChainIter(
             ASSERT0(vr && vr->is_reg());
             buf.clean();
             note(rg, "\nVReg%u:%s:", vr->id(),
-                 VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ra));
+                 VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ramgr));
             dumpDefByWalkDefChain(wl, visited, vr);
         }
         m_rg->getLogMgr()->decIndent(2);
@@ -3129,7 +3137,7 @@ void RegSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
     rg->getLogMgr()->incIndent(2);
     VROpndSetIter iter = nullptr;
     VRegFixedStrBuf buf;
-    LinearScanRA const* ra = getRA();
+    RegAllocMgr const* ramgr = getRAMgr();
     for (BSIdx i = regssainfo->getVROpndSet()->get_first(&iter);
          i != BS_UNDEF; i = regssainfo->getVROpndSet()->get_next(i, &iter)) {
         VReg * vr = (VReg*)pmgr->getRegDUMgr()->getVROpnd(i);
@@ -3139,7 +3147,7 @@ void RegSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
         }
         buf.clean();
         note(rg, "\nVReg%u:%s:", vr->id(),
-             VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ra));
+             VReg::dumpRegAndVer(buf, vr->reg(), vr->version(), ramgr));
 
         //Dump all USE.
         dumpUseSet(vr, rg);
@@ -3149,7 +3157,8 @@ void RegSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
 }
 
 
-void RegSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
+void RegSSAMgr::dumpDUChainForStmt(
+    IR const* ir, MOD ConstIRIter & it, OptCtx const* oc) const
 {
     ASSERT0(ir->is_stmt());
     dumpIR(ir, getRegion());
@@ -3160,7 +3169,7 @@ void RegSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
         dumpDUChainForStmt(ir, parting_line);
     }
     //Handle expression.
-    dumpExpDUChainIter(ir, it, &parting_line);
+    dumpExpDUChainIter(ir, it, &parting_line, oc);
     if (parting_line) {
         note(getRegion(), "\n%s", g_parting_line_char);
         note(getRegion(), "\n");
@@ -3169,7 +3178,7 @@ void RegSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
 }
 
 
-void RegSSAMgr::dumpDUChain() const
+void RegSSAMgr::dumpDUChain(OptCtx const* oc) const
 {
     Region * rg = getRegion();
     if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
@@ -3180,7 +3189,7 @@ void RegSSAMgr::dumpDUChain() const
         bb->dumpDigest(rg);
         dumpPhiList(getPhiList(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
-            dumpDUChainForStmt(ir, it);
+            dumpDUChainForStmt(ir, it, oc);
         }
     }
 }
@@ -3357,22 +3366,23 @@ void RegSSAMgr::initVReg(IN IR * ir, OUT DefRegSet & maydef)
 
 
 void RegSSAMgr::collectUseSet(
-    IR const* def, LI<IRBB> const* li, VRCollectFlag f, OUT IRSet * useset)
+    IR const* def, LI<IRBB> const* li, VRCollectFlag f, OUT IRSet * useset,
+    OptCtx const* oc)
 {
     RegSSAInfo const* regssainfo = getRegSSAInfoIfAny(def);
     ASSERT0(regssainfo);
-    VRCollectCtx ctx(f);
+    VRCollectCtx ctx(f, oc);
     ctx.setLI(li);
     VRCollectUse cu(this, regssainfo, ctx, useset);
 }
 
 
 void RegSSAMgr::collectUseSet(
-    IR const* def, VRCollectFlag f, OUT IRSet * useset)
+    IR const* def, VRCollectFlag f, OUT IRSet * useset, OptCtx const* oc)
 {
     RegSSAInfo const* regssainfo = getRegSSAInfoIfAny(def);
     ASSERT0(regssainfo);
-    VRCollectCtx ctx(f);
+    VRCollectCtx ctx(f, oc);
     VRCollectUse cu(this, regssainfo, ctx, useset);
 }
 
@@ -5756,9 +5766,14 @@ void RegSSAMgr::removeRegDefFromDDChain(
 Reg RegSSAMgr::getReg(IR const* ir) const
 {
     ASSERT0(ir && hasRegSSAInfo(ir));
-    ASSERT0(getRA());
     if (ir->getCode() == IR_PHYREG) { return PHYREG_reg(ir); }
-    return getRA()->getReg(ir->getPrno());
+    return getRAMgr()->getReg(ir->getPrno());
+}
+
+
+LinearScanRA const* RegSSAMgr::getRA() const
+{
+    return m_ramgr->getLSRA();
 }
 
 
@@ -5975,7 +5990,7 @@ bool RegSSAMgr::removePhiHasNoValidDef(
     }
 
     //Do NOT do collection crossing PHI.
-    VRCollectCtx clctx(COLLECT_IMM_USE);
+    VRCollectCtx clctx(COLLECT_IMM_USE, &oc);
     IRSet useset(getSBSMgr()->getSegMgr());
     if (phi->getPrev() != nullptr) {
         VRCollectUse cu(this, phi->getResult(), clctx, &useset);
@@ -6360,8 +6375,8 @@ bool RegSSAMgr::isOverConservativeDUChain(
 void RegSSAMgr::initDepPass(OptCtx & oc)
 {
     ASSERT0(m_rg);
-    m_ra = (LinearScanRA*)m_rg->getPassMgr()->registerPass(PASS_LINEAR_SCAN_RA);
-    m_timgr = &m_ra->getTIMgr();
+    m_ramgr = (RegAllocMgr*)m_rg->getPassMgr()->registerPass(PASS_REGALLOC_MGR);
+    m_timgr = m_ramgr->getTIMgr();
 }
 
 
@@ -6462,7 +6477,7 @@ bool RegSSAMgr::construction(DomTree & domtree, OptCtx & oc)
     prunePhi(wl, oc);
     cleanLocalUsedData();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRegSSAMgr()) {
-        dump();
+        dump(&oc);
     }
     set_valid(true);
     ASSERT0(verify());

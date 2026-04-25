@@ -32,6 +32,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define PLACEHOLDER_UNDEFINED_NAME "@undefined"
+
 #define XCODEINFO_code(i) (g_xcode_info[i].code)
 #define XCODEINFO_name(i) (g_xcode_info[i].name)
 class XCodeInfo {
@@ -124,7 +126,68 @@ static XCodeInfo g_xcode_info[] = {
     { X_F64, "f64", },
     { X_F80, "f80", },
     { X_F128, "f128", },
+    { X_BOOL1, "bool1", },
+    { X_BOOL2, "bool2", },
+    { X_BOOL4, "bool4", },
+    { X_BOOL8, "bool8", },
+    { X_BOOL16, "bool16", },
+    { X_BOOL32, "bool32", },
+    { X_BOOL64, "bool64", },
+    { X_U8M1, "u8m1", },
+    { X_U8M2, "u8m2", },
+    { X_U8M4, "u8m4", },
+    { X_U8M8, "u8m8", },
+    { X_U8MF2, "u8mf2", },
+    { X_U8MF4, "u8mf4", },
+    { X_U8MF8, "u8mf8", },
+    { X_I8M1, "i8m1", },
+    { X_I8M2, "i8m2", },
+    { X_I8M4, "i8m4", },
+    { X_I8M8, "i8m8", },
+    { X_I8MF2, "i8mf2", },
+    { X_I8MF4, "i8mf4", },
+    { X_I8MF8, "i8mf8", },
+    { X_U16M1, "u16m1", },
+    { X_U16M2, "u16m2", },
+    { X_U16M4, "u16m4", },
+    { X_U16M8, "u16m8", },
+    { X_U16MF2, "u16mf2", },
+    { X_U16MF4, "u16mf4", },
+    { X_I16M1, "i16m1", },
+    { X_I16M2, "i16m2", },
+    { X_I16M4, "i16m4", },
+    { X_I16M8, "i16m8", },
+    { X_I16MF2, "i16mf2", },
+    { X_I16MF4, "i16mf4", },
+    { X_U32M1, "u32m1", },
+    { X_U32M2, "u32m2", },
+    { X_U32M4, "u32m4", },
+    { X_U32M8, "u32m8", },
+    { X_U32MF2, "u32mf2", },
+    { X_I32M1, "i32m1", },
+    { X_I32M2, "i32m2", },
+    { X_I32M4, "i32m4", },
+    { X_I32M8, "i32m8", },
+    { X_I32MF2, "i32mf2", },
+    { X_BF16M1, "bf16m1", },
+    { X_BF16M2, "bf16m2", },
+    { X_BF16M4, "bf16m4", },
+    { X_BF16M8, "bf16m8", },
+    { X_BF16MF2, "bf16mf2", },
+    { X_BF16MF4, "bf16mf4", },
+    { X_F16M1, "f16m1", },
+    { X_F16M2, "f16m2", },
+    { X_F16M4, "f16m4", },
+    { X_F16M8, "f16m8", },
+    { X_F16MF2, "f16mf2", },
+    { X_F16MF4, "f16mf4", },
+    { X_F32M1, "f32m1", },
+    { X_F32M2, "f32m2", },
+    { X_F32M4, "f32m4", },
+    { X_F32M8, "f32m8", },
+    { X_F32MF2, "f32mf2", },
     { X_MC, "mc", },
+    { X_PTR, "ptr", },
     { X_STR, "str", },
     { X_VEC, "vec", },
     { X_BOOL, "bool", },
@@ -144,6 +207,7 @@ static XCodeInfo g_xcode_info[] = {
     { X_PRIVATE, "private", },
     { X_RESTRICT, "restrict", },
     { X_VOLATILE, "volatile", },
+    { X_SAT, "sat", },
     { X_FAKE, "fake", },
     { X_GLOBAL, "global", },
     { X_UNDEFINED, "undefined", },
@@ -243,8 +307,10 @@ static X_CODE g_exp_code [] = {
     X_CVT,
     X_SELECT,
     X_CASE,
-    X_DUMMYUSE
-};
+    X_DUMMYUSE,
+
+    //Undefined Token is always used as a placeholder of NULL pointer.
+    X_UNDEFINED,};
 
 
 static X_CODE g_type_code [] = {
@@ -265,6 +331,7 @@ static X_CODE g_type_code [] = {
     X_F80,
     X_F128,
     X_MC,
+    X_PTR,
     X_STR,
     X_VEC,
     X_BOOL,
@@ -478,6 +545,10 @@ IRParser::IRParser(RegionMgr * rm) : m_lexer(nullptr), m_rm(rm)
 {
     m_ctx_id = 0;
     m_tm = rm->getTypeMgr();
+    xoc::Sym const* sym = rm->addToSymbolTab(PLACEHOLDER_UNDEFINED_NAME);
+    m_placeholder_undefined = rm->getVarMgr()->registerVar(sym,
+        rm->getTypeMgr()->getAny(), 1, VAR_FAKE|VAR_LOCAL|VAR_IS_UNALLOCABLE,
+        SS_UNDEF);
     //NOTE: user has to invoke initMap after allocating a IRParser object.
 }
 
@@ -715,7 +786,11 @@ X_CODE IRParser::getCurrentStmtCode()
 
 X_CODE IRParser::getCurrentExpCode()
 {
-    return m_exp2xcode.get(m_lexer->getCurrentTokenString());
+    X_CODE xcode = m_exp2xcode.get(m_lexer->getCurrentTokenString());
+
+    //NOTE: if the current token-string is not an EXPRESSION, the function
+    //return X_CODE_UNDEF.
+    return xcode;
 }
 
 
@@ -732,6 +807,12 @@ X_CODE IRParser::getCurrentXCode()
 }
 
 
+ParseErrorMsg * IRParser::allocParseErrorMsg(UINT msglen)
+{
+    return  new ParseErrorMsg(msglen);
+}
+
+
 void IRParser::error(UINT lineno, CHAR const* format, ...)
 {
     xcom::DefFixedStrBuf buf;
@@ -741,7 +822,7 @@ void IRParser::error(UINT lineno, CHAR const* format, ...)
     prt2C("\nerror(%d):%s", lineno, buf.getBuf());
     va_end(arg);
 
-    ParseErrorMsg * msg = new ParseErrorMsg(10);
+    ParseErrorMsg * msg = allocParseErrorMsg(10);
     m_err_list.append_tail(msg);
 }
 
@@ -755,14 +836,13 @@ void IRParser::error(CHAR const* format, ...)
     prt2C("\nerror(%d):%s", m_lexer->getCurrentLineNum(), buf.getBuf());
     va_end(arg);
 
-    ParseErrorMsg * msg = new ParseErrorMsg(10);
+    ParseErrorMsg * msg = allocParseErrorMsg(10);
     m_err_list.append_tail(msg);
 }
 
 
 void IRParser::error(TOKEN tok, CHAR const* format, ...)
 {
-    ASSERT0_DUMMYUSE(tok);
     xcom::DefFixedStrBuf buf;
     va_list arg;
     va_start(arg, format);
@@ -771,7 +851,7 @@ void IRParser::error(TOKEN tok, CHAR const* format, ...)
           m_lexer->getCurrentTokenString(), buf.getBuf());
     va_end(arg);
 
-    ParseErrorMsg * msg = new ParseErrorMsg(10);
+    ParseErrorMsg * msg = allocParseErrorMsg(10);
     m_err_list.append_tail(msg);
 }
 
@@ -787,7 +867,7 @@ void IRParser::error(X_CODE xcode, CHAR const* format, ...)
           getKeyWordName(xcode), buf.getBuf());
     va_end(arg);
 
-    ParseErrorMsg * msg = new ParseErrorMsg(10);
+    ParseErrorMsg * msg = allocParseErrorMsg(10);
     m_err_list.append_tail(msg);
 }
 
@@ -896,8 +976,8 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
     ASSERT0(ctx.current_region);
     ASSERT0(ctx.current_region->hasAnaInstrument());
     DbxMgr * dbx_mgr = ctx.current_region->getDbxMgr();
-    for (IR const* ir = iterInitC(irlist, it, true);
-         ir != nullptr; ir = iterNextC(it, true)) {
+    for (IR const* ir = xoc::iterInitC(irlist, it, true);
+         ir != nullptr; ir = xoc::iterNextC(it, true)) {
         if (!ir->is_label()) { continue; }
 
         LabelInfo const* lab = ir->getLabel();
@@ -911,11 +991,13 @@ bool IRParser::checkLabel(IR const* irlist, ParseCtx const& ctx)
                   lab->getName(buf),
                   xoc::getLineNum(mapped, LANG_CPP, dbx_mgr));
             error_occur = true;
+        } else {
+            //No error occur, record label.
+            labtab.set(lab, ir);
         }
-        labtab.set(lab, ir);
     }
-    for (IR const* ir = iterInitC(irlist, it, true);
-         ir != nullptr; ir = iterNextC(it, true)) {
+    for (IR const* ir = xoc::iterInitC(irlist, it, true);
+         ir != nullptr; ir = xoc::iterNextC(it, true)) {
         if (ir->is_label()) { continue; }
         if (ir->is_phi()) {
             if (!checkPhiOpndLabel(ir, labtab, ctx)) {
@@ -1477,6 +1559,7 @@ bool IRParser::parseXOperator(ParseCtx * ctx)
     case X_SELECT: return parseSelect(ctx);
     case X_CASE: return parseCase(ctx);
     case X_DUMMYUSE: return parseDummyUse(ctx);
+    case X_UNDEFINED: return parseUndefined(ctx);
     case X_CODE_UNDEF:
         error(code, "can not recognize current code");
         return false;
@@ -1632,6 +1715,13 @@ bool IRParser::parseDummyUse(ParseCtx * ctx)
 }
 
 
+bool IRParser::isPlaceholderUndefined(IR const* ir) const
+{
+    ASSERT0(ir);
+    return ir->is_id() && ir->getIdinfo() == m_placeholder_undefined;
+}
+
+
 bool IRParser::parseSelect(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_SELECT);
@@ -1687,7 +1777,12 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         error(tok, "select miss false part");
         return false;
     }
-
+    if (isPlaceholderUndefined(truepart)) {
+        truepart = nullptr;
+    }
+    if (isPlaceholderUndefined(falsepart)) {
+        falsepart = nullptr;
+    }
     IR * exp = ctx->current_region->getIRMgr()->buildSelect(det,
         truepart, falsepart, ty == nullptr ? m_tm->getAny() : ty);
     ctx->returned_exp = exp;
@@ -1772,6 +1867,16 @@ bool IRParser::parseArrayDimension(List<TMWORD> & elem_dim)
         error(tok, "miss ']' after array dimension declaration");
         return false;
     }
+    m_lexer->getNextToken();
+    return true;
+}
+
+
+bool IRParser::parseUndefined(ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_UNDEFINED);
+    IR * id = ctx->current_region->getIRMgr()->buildId(m_placeholder_undefined);
+    ctx->returned_exp = id;
     m_lexer->getNextToken();
     return true;
 }
@@ -4646,6 +4751,10 @@ bool IRParser::parseType(ParseCtx * ctx, Type const** ty)
         }
         *ty = m_tm->getMCType(size);
         break;
+    case X_PTR:
+        *ty = m_tm->getPointerType(1);
+        m_lexer->getNextToken();
+        break;
     case X_STR:
         *ty = m_tm->getString();
         m_lexer->getNextToken();
@@ -4730,6 +4839,7 @@ bool IRParser::isType(X_CODE code) const
     case X_F80:
     case X_F128:
     case X_MC:
+    case X_PTR:
     case X_STR:
     case X_VEC:
     case X_ANY:

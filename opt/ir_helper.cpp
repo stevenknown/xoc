@@ -100,9 +100,13 @@ bool verifyPROpAndMDConsistency(Region const* rg)
 {
     xcom::TMap<PRNO, MD const*> prno2md;
     BBList const* bbl = rg->getBBList();
+    TypeMgr const* tm = rg->getTypeMgr();
+    VarMgr const* vm = rg->getVarMgr();
     ConstIRIter cit;
     BBListIter bbit;
-    DefFixedStrBuf buf;
+    xcom::DefFixedStrBuf buf1;
+    xcom::StrBuf buf2(64);
+    xcom::StrBuf buf3(64);
     for (IRBB * bb = bbl->get_head(&bbit);
          bb != nullptr; bb = bbl->get_next(&bbit)) {
         BBIRList const& irlst = bb->getIRList();
@@ -120,10 +124,16 @@ bool verifyPROpAndMDConsistency(Region const* rg)
                     prno2md.set(x->getPrno(), mustref);
                     continue;
                 }
-                ASSERTN(mapped_md == mustref,
-                        ("\n$%u id:%u(MD%u) is inconsistent to mapped MD%u\n",
-                         x->getPrno(), x->id(), mustref->id(),
-                         mapped_md->id()));
+                //x's MD should be identical to 'mapped_md' in type, size,
+                //offset etc.
+                if (mapped_md == mustref) { continue; }
+                CHAR const* ty = tm->dump_type(x->getType(), buf1);
+                CHAR const* md1 = mustref->dump(buf2, vm);
+                CHAR const* md2 = mapped_md->dump(buf3, vm);
+                ASSERTN(0,
+                        ("\n$%u id:%u(%s)(%s) is inconsistent to "
+                         "mapped MD(%s)\n",
+                         x->getPrno(), x->id(), ty, md1, md2));
             }
         }
     }
@@ -133,6 +143,7 @@ bool verifyPROpAndMDConsistency(Region const* rg)
 
 IR * onlyLeftLast(IR * lst, Region const* rg, OUT bool & change)
 {
+    if (lst == nullptr) { return nullptr; }
     ASSERT0(rg);
     IR * t = xcom::removehead(&lst);
     for (; t != nullptr && lst != nullptr;

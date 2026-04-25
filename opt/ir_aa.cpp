@@ -219,6 +219,7 @@ AliasAnalysis::AliasAnalysis(Region * rg) : Pass(rg)
     m_dummy_global = nullptr;
     m_maypts = nullptr;
     m_scc = nullptr;
+    m_oc = nullptr;
     m_prssamgr = nullptr;
 }
 
@@ -773,14 +774,14 @@ MD const* AliasAnalysis::inferArrayLdabase(
 
     //CASE: struct S {int a; int b;} p[10];
     //      int foo(int i) { return p[1].b; }
-    //When processLda() finish, the first iteration of AA
-    //will genrete MD11={ofst=8,size=4}. Therefore caller
-    //will reshape MD11 to be MD12={ofst=12,size=4} and
-    //set MD12 as mustref of 'ir'.
-    //However if at the second iteration of AA, return mustref
-    //directly here, caller will still reshape MD12 to be
-    //MD13={ofst=16,size=4}.
-    //This lead to incorrect MD for the array operation.
+    //When processLda() finished, the first iteration of AA will genrete
+    //MD11={ofst=8,size=4}.
+    //Therefore caller will reshape MD11 to MD12={ofst=12,size=4} and
+    //set MD12 to be MustRef of 'ir'.
+    //However if at the second iteration of AA, the function returns MustRef
+    //directly here, caller will still reshape MD12 to MD13={ofst=16,size=4}.
+    //This will lead to incorrect MD for the array operation.
+    //Thus we should NOT stop recompute MustRef even if AC_is_mds_mod() is
     //Thus we should not stop recompute mustref even if AC_is_mds_mod
     //unchanged.
     //if (!AC_is_mds_mod(&tic)) {
@@ -790,7 +791,7 @@ MD const* AliasAnalysis::inferArrayLdabase(
     //    return x;
     //}
 
-    //Lda's MD changed, thus array base MD have to be recomputed.
+    //LDA's MD is changed, thus array base MD has to be recomputed.
     ir->cleanMayRef();
 
     //Compute the MD size and offset if 'ofst' is constant.
@@ -814,25 +815,25 @@ MD const* AliasAnalysis::inferArrayLdabase(
             changed = true;
         }
     } else {
-        //Set array operation to operate a range type MD.
+        //Make array operation to operate a MD with range type.
         //e.g: array:(dim[80]) (lda x);
-        //Following code will set tmd to MD with range [0~80].
+        //Following code will set 'tmd' to MD with range [0~80].
         changed = true;
         UINT basesz = m_tm->getPointerBaseByteSize(array_base->getType());
         ASSERT0(basesz);
 
-        //The range type MD begin at the byte offset of LDA.
-        //e.g: array (lda x:12) indicate the array begin at
-        //12 bytes offset to x address.
+        //The range-type MD begins at the byte offset of LDA.
+        //e.g:array (lda x:12) indicates that the array begins at
+        //    12 bytes offset to x's start address.
         MD_ofst(&tmd) = LDA_ofst(array_base);
 
-        //The approximate and conservative size of array.
+        //Computes the approximate and conservative size of array.
         //MD_size(&tmd) = basesz - LDA_ofst(array_base);
         MD_size(&tmd) = basesz;
         MD_ty(&tmd) = MD_RANGE;
     }
     if (!changed) {
-        //mds is unchanged.
+        //MustRef is unchanged.
         ir->setMustRef(ldamd, m_rg);
         return ldamd;
     }
@@ -1132,7 +1133,7 @@ bool AliasAnalysis::tryComputeConstOffset(
     if (opnd1->is_const() && opnd1->is_int()) {
         const_offset = CONST_int_val(opnd1);
     } else if (opnd1->is_pr()) {
-        EvalConst eval(m_rg);
+        EvalConst eval(m_rg, getOptCtx());
         if (!eval.evaluateConstInteger(opnd1, (ULONGLONG*)&const_offset)) {
             return false;
         }
@@ -4379,13 +4380,10 @@ void AliasAnalysis::scanPointerCand()
 }
 
 
-//Calculate point-to set.
-bool AliasAnalysis::perform(MOD OptCtx & oc)
+void AliasAnalysis::initDepPass(MOD OptCtx & oc)
 {
-    ASSERTN(getWorstCase(), ("Should invoke initAliasAnalysis() first."));
-    if (m_cfg->getBBList()->is_empty()) { return true; }
     ASSERT0(m_cfg->is_valid());
-    START_TIMER(t, getPassName());
+    m_oc = &oc;
 
     //Initialization.
     m_ppmgr.init();
@@ -4403,6 +4401,16 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
     m_scc = (GSCC*)m_rg->getPassMgr()->queryPass(PASS_SCC);
     m_prssamgr = m_rg->getPRSSAMgr();
     ASSERT0(m_scc);
+}
+
+
+//Calculate point-to set.
+bool AliasAnalysis::perform(MOD OptCtx & oc)
+{
+    ASSERTN(getWorstCase(), ("Should invoke initAliasAnalysis() first."));
+    if (m_cfg->getBBList()->is_empty()) { return true; }
+    START_TIMER(t, getPassName());
+    initDepPass(oc);
 
     //Pre-scan all IRs to identify all pointer type usages for resolving type
     //mixing.

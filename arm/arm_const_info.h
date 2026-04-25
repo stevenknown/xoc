@@ -38,6 +38,8 @@ author: Su Zhenyu
 #define BYTE_PER_CHAR 1
 #define BYTE_PER_SHORT 2
 #define BYTE_PER_INT 4
+
+//NOTE:arm-linux-gnueabi-gcc defines LONG of ARM 32bit should be 4bytes.
 #define BYTE_PER_LONG 4
 #define BYTE_PER_LONGLONG 8
 #define BYTE_PER_FLOAT 4
@@ -104,10 +106,6 @@ author: Su Zhenyu
 //Define the minimum target machine stack variable alignment.
 //The alignment is power of 2 on ARM.
 #define STACK_ALIGNMENT 4
-
-//Define the minimum target machine parameter variable alignment.
-//The alignment is power of 2 on ARM.
-#define PARAM_ALIGNMENT GENERAL_REGISTER_SIZE
 
 //Define the minimum target machine code alignment.
 //The alignment is power of 2 on ARM.
@@ -682,5 +680,14 @@ typedef enum _OR_CODE {
 #define OR_NUM OR_LAST
 
 #include "arm_mach_def.h"
+
+//Use REG_GROUP to identify the different register
+//groups when access the regset.
+typedef enum {
+    REG_GROUP_UNDEF = 0,
+    REG_GROUP_FIRST = REG_GROUP_UNDEF,
+    REG_GROUP_LAST = REG_GROUP_FIRST,
+    REG_GROUP_NUM
+} REG_GROUP;
 
 #endif

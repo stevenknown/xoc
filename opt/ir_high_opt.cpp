@@ -81,7 +81,6 @@ void Region::HighProcessImpl(OptCtx & oc)
     if (g_infer_type) {
         getPassMgr()->registerPass(PASS_INFER_TYPE)->perform(oc);
     }
-
     doBasicAnalysis(oc);
 
     if (g_do_expr_tab) {

@@ -45,6 +45,7 @@ class RegDefSet;
 class RegSSAMgr;
 class RegSSAInfo;
 class RegSSAStatus;
+class RegAllocMgr;
 
 class VRegVec : public Vector<VReg*> {
     COPY_CONSTRUCTOR(VRegVec);
@@ -204,16 +205,16 @@ public:
     void cleanUseSet() { VREG_occs(this).clean(); }
 
     void destroy() { VREG_occs(this).destroy(); }
-    void dump(LinearScanRA const* ra) const; //Concisely dump
+    void dump(RegAllocMgr const* ramgr) const; //Concisely dump
     void dump(Region const* rg, RegDUMgr const* mgr) const;
     CHAR const* dumpToBuf(
         OUT StrBuf & outbuf, Region const* rg, RegDUMgr const* mgr,
         UINT indent) const;
-    CHAR const* dump(LinearScanRA const* ra, OUT VRegFixedStrBuf & buf) const;
+    CHAR const* dump(RegAllocMgr const* ramgr, OUT VRegFixedStrBuf & buf) const;
     static void dumpRegAndVer(
-        Region const* rg, Reg r, UINT ver, LinearScanRA const* ra);
+        Region const* rg, Reg r, UINT ver, RegAllocMgr const* ramgr);
     static CHAR const* dumpRegAndVer(
-        OUT VRegFixedStrBuf & buf, Reg r, UINT ver, LinearScanRA const* ra);
+        OUT VRegFixedStrBuf & buf, Reg r, UINT ver, RegAllocMgr const* ramgr);
 
     //Return true 'exp' is in the UseSet.
     //exp: IR expression to be found.
@@ -710,7 +711,7 @@ public:
     VReg * getVReg(Reg reg, UINT version) const;
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr;  }
     RegSSAMgr * getRegSSAMgr() const { return m_regssa_mgr; }
-    LinearScanRA const* getRA() const;
+    RegAllocMgr const* getRAMgr() const;
     TargInfoMgr * getTIMgr() const { return m_timgr; }
     IRMgr * getIRMgr() const { return m_irmgr; }
     IRMgrExt * getIRMgrExt() const { return (IRMgrExt*)m_irmgr; }

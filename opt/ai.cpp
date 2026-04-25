@@ -33,14 +33,20 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//Store AI in a sparse manner.
+//e.g: By a given AI object of type AI_TBAA, it is stored at the position
+//that indexed by AI_TBAA in the container, regardless of whether the
+//container is empty.
+#define SPARSE_STORE_AI
+
 //
 //START AIContainer
 //
 void AIContainer::copy(AIContainer const* ai, Region * rg)
 {
     ASSERT0(ai && ai->is_init());
-    //Copy of cont will do initialization if needed.
-    cont.copy(ai->cont, rg->getAttachInfoMgr()->get_pool());
+    //Copy of m_cont will do initialization if needed.
+    m_cont.copy(ai->m_cont, rg->getAttachInfoMgr()->get_pool());
 }
 
 
@@ -63,7 +69,101 @@ CHAR const* AIContainer::getAIName(AI_TYPE type) const
 }
 
 
+void AIContainer::cleanBySparse(AI_TYPE type)
+{
+    if (!is_init()) { return; }
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+    if (((UINT)type) >= m_cont.get_capacity()) { return; }
+    m_cont[type] = nullptr;
+}
+
+
+void AIContainer::cleanByDense(AI_TYPE type)
+{
+    if (!is_init()) { return; }
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+    for (UINT i = 0; i < m_cont.get_capacity(); i++) {
+        BaseAttachInfo * ac = m_cont.get(i);
+        if (ac != nullptr && ac->getType() == type) {
+            m_cont[i] = nullptr;
+            return;
+        }
+    }
+}
+
+
+void AIContainer::clean(AI_TYPE type)
+{
+    #ifdef SPARSE_STORE_AI
+    cleanBySparse(type);
+    #else
+    cleanByDense(type);
+    #endif
+}
+
+
+BaseAttachInfo * AIContainer::getBySparse(AI_TYPE type) const
+{
+    if (!is_init()) {
+        //To faciliate the use of getAI(), disable the assertion of init.
+        return nullptr;
+    }
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+    return m_cont.get(type);
+}
+
+
+BaseAttachInfo * AIContainer::getByDense(AI_TYPE type) const
+{
+    if (!is_init()) {
+        //To faciliate the use of getAI(), disable the assertion of init.
+        return nullptr;
+    }
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+    for (UINT i = 0; i < m_cont.get_capacity(); i++) {
+        BaseAttachInfo * ac = m_cont.get(i);
+        if (ac != nullptr && ac->getType() == type) {
+            return ac;
+        }
+    }
+    return nullptr;
+}
+
+
+BaseAttachInfo * AIContainer::get(AI_TYPE type) const
+{
+    #ifdef SPARSE_STORE_AI
+    return getBySparse(type);
+    #else
+    return getByDense(type);
+    #endif
+}
+
+
 void AIContainer::set(BaseAttachInfo * c, Region * rg)
+{
+    #ifdef SPARSE_STORE_AI
+    setBySparse(c, rg);
+    #else
+    setByDense(c, rg);
+    #endif
+}
+
+
+void AIContainer::setBySparse(BaseAttachInfo * c, Region * rg)
+{
+    ASSERTN(c, ("Can not set empty AI"));
+    ASSERT0(is_init());
+    AI_TYPE type = c->getType();
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+
+    //AIContainer buffer will grow bigger.
+    //NOTE: c will override the prior AIContainer that has same type.
+    m_cont.set(type, c, rg->getAttachInfoMgr()->get_pool());
+}
+
+
+void AIContainer::setByDense(BaseAttachInfo * c, Region * rg)
 {
     ASSERTN(c, ("Can not set empty AI"));
     ASSERT0(is_init());
@@ -74,11 +174,13 @@ void AIContainer::set(BaseAttachInfo * c, Region * rg)
     UINT i = 0;
     INT emptyslot = -1;
     INT existslot = -1;
-    for (; i < cont.get_capacity(); i++) {
-        BaseAttachInfo * ac = cont.get(i);
+    for (; i < m_cont.get_capacity(); i++) {
+        BaseAttachInfo * ac = m_cont.get(i);
         if (ac == nullptr) {
             emptyslot = (INT)i;
-        } else if (ac->getType() == type) {
+            continue;
+        }
+        if (ac->getType() == type) {
             existslot = (INT)i;
             break;
         }
@@ -86,17 +188,17 @@ void AIContainer::set(BaseAttachInfo * c, Region * rg)
 
     if (existslot != -1) {
         //Note c will override the prior AIContainer that has same type.
-        cont.set((UINT)existslot, c, rg->getAttachInfoMgr()->get_pool());
+        m_cont.set((UINT)existslot, c, rg->getAttachInfoMgr()->get_pool());
         return;
     }
 
     if (emptyslot != -1) {
-        cont.set((UINT)emptyslot, c, rg->getAttachInfoMgr()->get_pool());
+        m_cont.set((UINT)emptyslot, c, rg->getAttachInfoMgr()->get_pool());
         return;
     }
 
     //AIContainer buffer will grow bigger.
-    cont.set(i, c, rg->getAttachInfoMgr()->get_pool());
+    m_cont.set(i, c, rg->getAttachInfoMgr()->get_pool());
 }
 //END
 

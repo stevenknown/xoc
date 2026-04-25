@@ -122,9 +122,9 @@ public:
 
 
 //BFS iterate tree node.
-class BFSTreeIter : public GraphIterOut {
+class BFSTreeIter : public GraphIterOut<> {
 public:
-    BFSTreeIter(Tree & tree) : GraphIterOut(tree, tree.getRoot()) {}
+    BFSTreeIter(Tree & tree) : GraphIterOut<>(tree, tree.getRoot()) {}
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
     Tree const& getTree() { return (Tree const&)m_g; }

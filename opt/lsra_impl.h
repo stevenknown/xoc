@@ -208,6 +208,7 @@ protected:
     IRCFG * m_cfg;
     OptCtx * m_oc;
     LivenessMgr * m_live_mgr;
+    RegAllocMgr * m_ramgr;
     SMemPool * m_pool;
     LSRAImpl & m_impl;
 
@@ -240,7 +241,6 @@ protected:
         return tab;
     }
 
-
     void addInPR2Lt(PRNO prno, LifeTime const* lt, UINT bbid)
     { genInPR2LT(bbid)->setAlways(prno, lt); }
 
@@ -254,7 +254,7 @@ protected:
         //If the lifetime is not split or spilled or not rematerialized,
         //don't consider the inconsistency.
         LTList const& lt_list = const_cast<LifeTime*>(lt)->getChild();
-        Var const* spill_loc = getRA().getSpillLoc(lt->getPrno());
+        Var const* spill_loc = m_ramgr->getSpillLoc(lt->getPrno());
         return lt_list.get_elem_count() == 0 && spill_loc == nullptr &&
                !lt->isRematerialized();
     }
@@ -328,7 +328,6 @@ protected:
     //       ...
     //
     IRBB * genLatchBB(MOD LatchMap & latch_map, InConsistPair const* pair);
-    LinearScanRA & getRA() const;
     PR2LT * getInPR2Lt(UINT bbid) const
     { return m_pr2lt_in_vec.get(bbid); }
     PR2LT * getOutPR2Lt(UINT bbid) const
@@ -477,10 +476,10 @@ public:
     IN Pos split_pos;
 
     //Top-down propagate information.
-    IN IR const* split_pos_ir;
+    IR const* split_pos_ir;
 
     //Top-down propagate information.
-    IN LifeTime const* alloc_lt;
+    LifeTime const* alloc_lt;
 
     //Bottom-up propagate information.
     OUT Pos reload_pos;
@@ -509,11 +508,24 @@ public:
 
 
 //
+//START SplitAliasRegCtx
+//
+class SplitAliasRegCtx {
+public:
+    //A temp regset for the local usage.
+    RegSet cand_regset;
+};
+//END SplitAliasRegCtx
+
+
+//
 //START SplitMgr
 //
 class SplitMgr {
     COPY_CONSTRUCTOR(SplitMgr);
+    friend class LSRAImpl;
     LSRAImpl & m_impl;
+    RegAllocMgr * m_ramgr;
     LinearScanRA & m_ra;
     Region * m_rg;
     IRMgr * m_irmgr;
@@ -531,6 +543,11 @@ private:
     //The function do all actions for the spill before the split position
     IR * doSpillBeforeSplitPos(LifeTime * lt, SplitCtx const& ctx);
 
+    //Find an alias register with the lowest cost computed by the function
+    //'tryComputeCostForSplitAliasReg'.
+    Reg findBestSplitAliasReg(SplitMgr & spltmgr, SplitCtx const& ctx,
+        MOD SplitAliasRegCtx & alias_reg_ctx);
+
     //The function inserts spill operation before or after split_pos.
     IR * insertSpillAroundSplitPos(LifeTime * lt, SplitCtx const& ctx);
     void insertSpillDuringSplitting(LifeTime * lt, SplitCtx const& ctx,
@@ -544,12 +561,92 @@ private:
 
     bool isUsedBySuccessors(PRNO prno, SplitCtx const& ctx);
 
+    //The function picks up the split candidate alias regset.
+    void pickUpSplitRegCandFromAliasRegSet(SplitCtx const& ctx,
+        MOD SplitAliasRegCtx & alias_reg_ctx);
+
     //The function shrinks lifetime to properly position.
     void shrinkLTToSplitPos(LifeTime * lt, Pos split_pos,
                             IR const* split_pos_ir);
     void selectSplitCandFromSet(LTSet const& set, SplitCtx const& ctx,
-                                OUT LTSet & candlst,
-                                OUT Vector<SplitCtx> & candctxvec);
+        OUT LTSet & candlst, OUT Vector<SplitCtx> & candctxvec);
+
+    //This function selects the alias lifetime candidate if there is no
+    //exact lifetime candidate can be choosed during the conflict resolving
+    //phase.
+    //spltmgr: the split manager.
+    //ctx: the split context for the current split.
+    //candlst: the output alias lifetime candidate list.
+    //candctxvec: the output split context responding to the alias lifetime
+    //    candidate list.
+    void selectAliasSplitCand(SplitMgr & spltmgr, SplitCtx const& ctx,
+        OUT LTSet & candlst, OUT Vector<SplitCtx> & candctxvec,
+        MOD SplitAliasRegCtx & alias_reg_ctx);
+
+    //We use a cost model to evaluate which alias register can be selected,
+    //and the lowest cost alias register will be choosed. we consider the
+    //two conditions below to select the best alias register:
+    //1. The number of lifetimes which have been assigned to the alias
+    //   register, so we use the 'single_lt_cost' to evaluate a single
+    //   lifetime will be spilled and reloaded.
+    //CASE:
+    //  r7 alias with r1 and r2.
+    //  r8 alias with r3 and r4.
+    //  r9 alias with r5 and r6.
+    //                    r1   r2   r3   r4   r5   r6
+    //  alias_regset:   |----|----|----|----|----|----|
+    //  refcnt:            1    1    0    1    1     1
+    //  lifetime:         $5   $6        $9   $1    $2
+    //
+    //                      r         r8       r9
+    //  target_regset:  |---------|---------|---------|
+    //  refcnt:             2         1         2
+    //  lifetime:
+    //
+    //  Analysis: We have to find a best register from target_regset, but all
+    //            the registers (r7/r8/r9) is not available due to the alias
+    //            registers are allocated to other liftimes. We can see the
+    //            it is best to select r8, because its' alias register r3
+    //            is assigned to a single lifetime, and r4 is not assigned
+    //            to any lifetime; while, the alias register of r7 and r9 both
+    //            have two lifetimes to split if it is choosed.
+    //            and r4 are assigned to
+    //2. The size of the alias register, if the size is greater than the
+    //   required physical register, the 'bigger_size_cost' is an extra cost
+    //   for the spill and reload operation.
+    //CASE:
+    //  r9  alias with r1, r2 and r13.
+    //  r10 alias with r3, r4 and r13.
+    //  r11 alias with r5, r6 and r14.
+    //  r12 alias with r7, r8 and r14.
+    //
+    //                    r1   r2   r3   r4   r5   r6   r7   r8
+    //  alias_regset1:  |----|----|----|----|----|----|----|----|
+    //  refcnt:            1    0    1    1    1    1   1    1
+    //  lifetime:         $5        $2   $3
+    //
+    //                      r9         r10      r11       r12
+    //  target_regset:  |---------|---------|---------|---------|
+    //  refcnt:             1         2         2          2
+    //  lifetime:
+    //                           r13                r14
+    //  alias_regset2:  |-------------------|-------------------|
+    //  refcnt:                    3                 4
+    //  lifetime:                                   $8
+    //
+    //  Analysis: We have to find a best register from target_regset. r1, the
+    //            alias register of r9, is assigned with a single lifetime,
+    //            and the alias registers of r10 has been assigned with 2
+    //            lifetimes, the alias register of r11 and r12 has been
+    //            assigned with a single lifetime, but this lifetime has a
+    //            bigger size, so it's cost of spill and reload is greater
+    //            than r9. So r9 will be returned.
+    //
+    //Return false if the input register 'r' is not a suitable to be a
+    //split candidate.
+    bool tryComputeCostForSplitAliasReg(SplitMgr & spltmgr,
+        SplitCtx const& ctx, Reg r, MOD UINT & cur_cost);
+
     LifeTime * selectSplitCandImpl(LTSet & set, LifeTime * lt, bool tryself,
                                    OUT SplitCtx & ctx);
     LifeTime * selectSplitCandByDensity(LTSet & set, LifeTime * lt,
@@ -564,9 +661,11 @@ private:
     //     to spill only. Usually this flag is set to true after the fail to
     //     try to select a candidate for the target lifetime, we need to adopt
     //     this force to spill only strategy during the candidate selection.
+    //check_alias: the flag to indicate the alias register should be
+    //     considered or not.
     //return true if the 'lt' can be used as a candidate, or else return false.
     bool isCandidateForSplit(LifeTime const* lt, MOD SplitCtx & ctx,
-        bool force_spill_only);
+        bool force_spill_only, bool check_alias);
 
     LifeTime * selectSplitCandFromActive(LifeTime * lt, bool tryself,
                                          OUT SplitCtx & ctx);
@@ -691,10 +790,11 @@ protected:
     TypeMgr * m_tm;
     IRMgr * m_irmgr;
     LivenessMgr * m_live_mgr;
+    RegAllocMgr * m_ramgr;
+    TargInfoMgr const* m_timgr;
     BBList * m_bb_list;
     IRCFG * m_cfg;
     OptCtx * m_oc;
-    ArgPasser * m_argpasser;
     LSRAPostOpt * m_post_opt;
     xcom::List<LifeTime const*> m_splitted_newlt_lst;
     LT2Prefer m_lt2prefer;
@@ -709,14 +809,6 @@ protected:
 
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
-    ArgPasser * getArgPasser();
-
-    IR * insertSpillCalleeAtEntry(Reg r);
-    void insertReloadCalleeAtExit(Reg r, Var * spill_loc);
-    IRListIter insertSpillAtBBEnd(IR * spill, IRBB * bb);
-    IRListIter insertReloadAtBB(IR * reload, IRBB * bb, bool start);
-    IR * insertReloadAtBB(PRNO prno, Var * spill_loc, Type const* ty,
-                          IRBB * bb, bool start);
 public:
     LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose = false);
     ~LSRAImpl();
@@ -726,40 +818,60 @@ public:
     //from: the predecessor BB of the new latch_BB.
     void addLivenessForEmptyLatchBB(IRBB const* latch_bb, IRBB const* from);
 
+    //Assigns physical registers to the active PRs at the function entry.
+    //This function ensures that any active PRs, including but not limited to
+    //function parameters, are assigned physical registers at the function
+    //entry point.
+    //
+    //e.g:
+    //    .func .visible foo1(
+    //        .param.u32 param0,
+    //        .param.f64 param1)
+    //Here, param0 and param1 are passed registers and are active at the
+    //function entry. They are prioritized for physical register allocation.
+    void assignRegForRegionLiveinPRs();
+
+    //This function determines whether the physical register has an alias
+    //register or not if it is assigned to a prno with the input data type.
+    bool canAssignRegWithAlias(Type const* ty) const
+    { ASSERT0(ty); return m_rsimpl.hasAliasReg(ty); }
+
     void computeRAPrefer();
     void computeLTPrefer(LifeTime const* lt);
 
+    //This function splits the lifetime candidate list at the split position
+    //when there is a conflict during the normal register allocation.
+    //pos: the current split position.
+    //spltmgr: the split manager which does the split action.
+    //candlst: the candidates list ready for split.
+    //candctxvec: the split context responding to 'candlst';
+    void doSplitForCandidates(Pos pos, SplitMgr & spltmgr,
+        LTSet const& candlst, Vector<SplitCtx> const& candctxvec);
+
     void dumpBBList() const;
     void dump() const;
-    static void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
-                           CHAR const* format, ...);
-
-    static Var * findSpillLoc(IR const* ir);
-    TargInfoMgr & getTIMgr() const
-    { return *(m_rg->getRegionMgr()->getTargInfoMgr()); }
+    void dumpAssign(LSRAImpl & lsra, LifeTime const* lt,
+                    CHAR const* format, ...);
     LivenessMgr * getLiveMgr() const { return m_live_mgr; }
-    LifeTimeMgr & getLTMgr() { return m_ra.getLTMgr(); }
-    LinearScanRA & getRA() const { return m_ra; }
+    LifeTimeMgr & getLTMgr() { return *m_ramgr->getLTMgr(); }
     OptCtx * getOptCtx() const { return m_oc; }
     Region * getRegion() const { return m_rg; }
     ActMgr & getActMgr() { return m_ra.getActMgr(); }
     LSRAPostOpt * getPostOpt() { return m_post_opt; }
-    Reg getReg(PRNO prno) const { return m_ra.getReg(prno); }
-    Reg getReg(LifeTime const* lt) const { return getReg(lt->getPrno()); }
-    CHAR const* getRegName(Reg r) const { return m_ra.getRegName(r); }
     BBList * getBBList() const { return m_bb_list; }
     IRCFG * getCFG() const { return m_cfg; }
+    RegAllocMgr * getRegAllocMgr() const { return m_ramgr; }
     RegSetImpl & getRegSetImpl() const { return m_rsimpl; }
     List<LifeTime const*> const& getSplittedLTList() const
     { return m_splitted_newlt_lst; }
 
+    TargInfoMgr const* getTIMgr() const { return m_timgr; }
     IR * insertRemat(PRNO to, IR const* exp, Type const* ty, IRBB * bb);
     void insertRematBefore(IR * remat, IR const* marker);
     IR * insertRematBefore(PRNO newres, RematCtx const& rematctx,
                            Type const* loadvalty, IR const* marker);
     IR * insertMove(PRNO from, PRNO to, Type const* fromty, Type const* toty,
                     IRBB * bb);
-    IR * insertSpillAtBBEnd(PRNO prno, Type const* ty, IRBB * bb);
     IR * insertSpillAtBBEnd(PRNO prno, Var * var, Type const* ty, IRBB * bb);
     void insertSpillAtHead(IR * spill, MOD IRBB * bb);
     void insertSpillAfter(IR * spill, IR const* marker);
@@ -770,10 +882,6 @@ public:
     void insertReloadBefore(IR * reload, IR const* marker);
     IR * insertReloadBefore(PRNO newres, Var * spill_loc,
                             Type const* ty, IR const* marker);
-
-    bool isRematLikeOp(IR const* ir) const;
-    static bool isSpillLikeOp(IR const* ir);
-    static bool isReloadLikeOp(IR const* ir);
 
     //Check whether the IRs are different.
     //NOTE: This interface only checks RematOp, ReloadOp, MoveOp, and SpillOp.
@@ -790,7 +898,7 @@ public:
         ASSERT0(lt_first);
         IR * lt_stmt = lt_first->is_stmt() ? lt_first : lt_first->getStmt();
         ASSERT0(lt_stmt);
-        return getRA().isFakeUseAtLexFirstBBInLoop(lt_stmt);
+        return m_ra.isFakeUseAtLexFirstBBInLoop(lt_stmt);
     }
     //Check the lifetime whether has an occ in the fake-use IR at the tail of
     //the last BB in a loop by lexicographical order.
@@ -802,7 +910,7 @@ public:
         ASSERT0(lt_tail);
         IR * lt_stmt = lt_tail->is_stmt() ? lt_tail : lt_tail->getStmt();
         ASSERT0(lt_stmt);
-        return getRA().isFakeUseAtLexLastBBInLoop(lt_stmt);
+        return m_ra.isFakeUseAtLexLastBBInLoop(lt_stmt);
     }
 
     //Return true when the lifetime can do spill only for the lifetime has occ
@@ -920,11 +1028,15 @@ public:
     //before call-stmt.
     void splitLinkLT(Pos curpos, IR const* ir);
 
-    //This func will select a strategy for the lifetime based on the split
+    //This function will select a strategy for the lifetime based on the split
     //position. If the split position of the specified lifetime is before
     //the fake-use IR at the last BB of loop by lexicographical order, the
     //lifetime will be spilled only, or else it will be split into two
     //lifetimes.
+    //t: the lifetime need to be split.
+    //split_pos: the current split position.
+    //ctx: the context for the current split.
+    //splimgr: the split manager responsible for the detail split.
     void splitOrSpillOnly(LifeTime * t, Pos split_pos, MOD SplitCtx & ctx,
                           SplitMgr & spltmgr);
 
@@ -1033,10 +1145,10 @@ public:
     typedef xcom::TMap<IRBB const*, xcom::C<IRBB const*>*> IRBB2Holder;
 private:
     UINT m_physical_reg_num;
-    LinearScanRA & m_lsra;
     RegSetImpl & m_reg_set;
     Region * m_rg;
     IRCFG * m_cfg;
+    RegAllocMgr * m_ramgr;
 
     //Physical Caller Registers.
     xcom::Vector<UINT> m_caller_regs;
@@ -1149,8 +1261,8 @@ protected:
     //Verify register allocation algorithm from BB 'start'.
     void verify(IRBB const* start);
 public:
-    RegisterVerify(LinearScanRA & lsra, RegSetImpl & reg_set,
-        Region * rg, IRCFG * cfg) : m_lsra(lsra), m_reg_set(reg_set)
+    RegisterVerify(RegAllocMgr * ramgr, RegSetImpl & reg_set,
+        Region * rg, IRCFG * cfg) : m_reg_set(reg_set), m_ramgr(ramgr)
     {
         ASSERT0(cfg != nullptr);
         m_cfg = cfg;

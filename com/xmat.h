@@ -75,8 +75,8 @@ public:
     void dumpfh(FILE * h) const;
     void ds(RMat const& c);
 
-    void getr(UINT row, UINT col, Rational::FType * numer,
-              Rational::FType * denom);
+    void getr(UINT row, UINT col, DefRationalFType * numer,
+              DefRationalFType * denom);
     Rational getr(UINT row, UINT col);
 
     void init();
@@ -93,8 +93,8 @@ public:
     void reduce();
 
     void sete(UINT num, ...);
-    void setr(UINT row, UINT col, Rational::FType numer,
-              Rational::FType denom = 1);
+    void setr(UINT row, UINT col, DefRationalFType numer,
+              DefRationalFType denom = 1);
     void setr(UINT row, UINT col, Rational rat);
     void substit(RMat const& exp, UINT v, bool is_eq = true,
                  INT cst_col = CST_COL_UNDEF);

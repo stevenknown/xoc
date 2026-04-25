@@ -80,15 +80,30 @@ bool InferType::inferVarTypeByIRCode(IR const* ir) const
     if (ir->is_any()) { return false; }
     Var * var = nullptr;
     switch (ir->getCode()) {
-    SWITCH_CASE_CALL:
     case IR_PHI:
     case IR_STPR:
     SWITCH_CASE_READ_PR: {
-        MD const* ref = ir->getRefMD();
+        MD const* ref = ir->getMustRef();
         if (ref != nullptr) {
             var = ref->get_base();
             break;
         }
+        //The MD reference may still not be computed by pass PASS_MD_REF.
+        //Query the variable from related PRNO.
+        ASSERT0(ir->getPrno() != PRNO_UNDEF);
+        var = m_rg->getVarByPRNO(ir->getPrno());
+        break;
+    }
+    SWITCH_CASE_CALL: {
+        if (!ir->hasReturnValue()) { break; }
+        MD const* ref = ir->getMustRef();
+        if (ref != nullptr) {
+            var = ref->get_base();
+            break;
+        }
+        //The MD reference may still not be computed by pass PASS_MD_REF.
+        //Query the variable from related PRNO.
+        ASSERT0(ir->getPrno() != PRNO_UNDEF);
         var = m_rg->getVarByPRNO(ir->getPrno());
         break;
     }
@@ -169,26 +184,54 @@ bool InferType::inferStmtMemAcc(IR * ir)
 bool InferType::inferLeafExpMemAcc(IR * ir)
 {
     ASSERT0(ir->isMemOpnd() && ir->is_exp() && ir->is_leaf());
-    if (ir->is_any()) {
-        MD const* ref = ir->getRefMD();
-        if (ref != nullptr && !ref->get_base()->is_any()) {
-            IR_dt(ir) = ref->get_base()->getType();
+    if (!ir->is_any()) {
+        return inferVarTypeByIRCode(ir);
+    }
+    //ir's type is ANY.
+    MD const* ref = ir->getMustRef();
+    if (ref != nullptr && !ref->get_base()->is_any()) {
+        Type const* basetype = ref->get_base()->getType();
+        if (shouldBePointerType(ir) && basetype->is_pointer()) {
+            IR_dt(ir) = basetype;
             addDump(ir);
             addChanged(ir);
             return true;
         }
-        Var const* v;
-        if (ir->is_pr() &&
-            (v = m_rg->getVarByPRNO(PR_no(ir))) != nullptr &&
-            !v->is_any()) {
+        //ANY can be regarded as pointer type.
+        return false;
+    }
+    if (!ir->is_pr()) {
+        //We only infer PR's type here.
+        return false;
+    }
+    Var const* v = m_rg->getVarByPRNO(PR_no(ir));
+    if (v == nullptr) {
+        //There is nothing can be referenced.
+        return false;
+    }
+    if (v->is_any()) {
+        //There is nothing can be referenced.
+        return false;
+    }
+    if (shouldBePointerType(ir)) {
+        if (v->getType()->is_pointer()) {
+            //The type of current ir should be pointer type.
             IR_dt(ir) = v->getType();
             addDump(ir);
             addChanged(ir);
             return true;
         }
+        //'ir' still be ANY, however ANY can be regarded as pointer type.
+        //Here we keep ir's type unchanged.
         return false;
     }
-    return inferVarTypeByIRCode(ir);
+    //'ir' still be ANY, however ANY can be regarded as pointer type.
+    //Here we keep ir's type unchanged.
+    //TODO:Infer the type 'ir' through DU chain rather than Var.
+    IR_dt(ir) = v->getType();
+    addDump(ir);
+    addChanged(ir);
+    return true;
 }
 
 
@@ -201,11 +244,35 @@ bool InferType::inferArray(IR * ir) const
 }
 
 
+bool InferType::shouldBePointerType(IR * ir) const
+{
+    ASSERT0(ir);
+    if (ir->mustBePointerType()) { return true; }
+    IR const* parent = ir->getParent();
+    if (parent == nullptr) { return false; }
+    switch (parent->getCode()) {
+    SWITCH_CASE_INDIRECT_MEM_OP:
+        if (ir == parent->getBase()) { return true; }
+        break;
+    case IR_ICALL:
+        if (ir == ICALL_callee(parent)) { return true; }
+        break;
+    default:;
+    }
+    return false;
+}
+
+
 bool InferType::inferIld(IR * ir)
 {
     ASSERT0(ir->is_ild());
     if (!ir->is_any()) { return false; }
 
+    //ir's type is ANY.
+    if (shouldBePointerType(ir)) {
+        //ANY can be regarded as pointer type.
+        return false;
+    }
     IR const* base = ir->getBase();
     ASSERT0(base);
     if (!base->is_ptr()) { return false; }
@@ -237,10 +304,23 @@ bool InferType::inferExpMemAcc(IR * ir)
 bool InferType::inferUnaOP(IR * ir)
 {
     if (!ir->is_any()) { return false; }
+
+    //ir's type is ANY.
     ASSERT0(ir->isUnaryOp());
-    IR * op = UNA_opnd(ir);
-    if (op->is_any()) { return false; }
-    IR_dt(ir) = op->getType();
+    IR * opnd = UNA_opnd(ir);
+    if (opnd->is_any()) { return false; }
+    if (shouldBePointerType(ir)) {
+        if (opnd->is_ptr()) {
+            //Hoist type from ANY to Pointer.
+            IR_dt(ir) = opnd->getType();
+            addDump(ir);
+            addChanged(ir);
+            return true;
+        }
+        //ANY-type can be regarded as pointer type.
+        return false;
+    }
+    IR_dt(ir) = opnd->getType();
     addDump(ir);
     addChanged(ir);
     return true;
@@ -253,6 +333,7 @@ bool InferType::inferSelect(IR * ir)
     ASSERT0(ir->is_select());
     IR * texp = SELECT_trueexp(ir);
     IR * fexp = SELECT_falseexp(ir);
+    if (texp == nullptr || fexp == nullptr) { return false; }
     if (texp->is_any() || fexp->is_any()) { return false; }
 
     Type const* rety = nullptr;
@@ -270,6 +351,18 @@ bool InferType::inferSelect(IR * ir)
         rety = fexp->getType();
     }
     ASSERT0(rety);
+
+    //ir's type is ANY.
+    if (shouldBePointerType(ir)) {
+        if (rety->is_pointer()) {
+            IR_dt(ir) = rety;
+            addDump(ir);
+            addChanged(ir);
+            return true;
+        }
+        //ANY can be regarded as pointer type.
+        return false;
+    }
     IR_dt(ir) = rety;
     addDump(ir);
     addChanged(ir);

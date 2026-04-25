@@ -106,7 +106,7 @@ ActHandler ActMgr::dump(CHAR const* format, ...)
 void ActMgr::dump() const
 {
     if (m_act_list.get_elem_count() == 0) { return; }
-    note(m_rg, "\n==-- DUMP ALL ACT --==");
+    note(m_rg, "\n-- ACTMGR --");
     m_rg->getLogMgr()->incIndent(2);
     xcom::List<xcom::StrBuf*>::Iter it;
     for (xcom::StrBuf * buf = m_act_list.get_head(&it);

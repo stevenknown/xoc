@@ -55,12 +55,12 @@ public:
 //The class switch IRMgr of given region.
 class UseNewIRMgr {
     IRMgr * m_org_mgr;
-    IRMgr * m_new_mgr;
+    PassWrap * m_new_mgr_wrap;
     Region const* m_rg;
 public:
     UseNewIRMgr(Region const* rg, IRMgr * irmgr);
     ~UseNewIRMgr();
-    IRMgr * getNew() const { return m_new_mgr; }
+    IRMgr * getNew() const { return (IRMgr*)m_new_mgr_wrap->getPass(); }
     IRMgr * getOrg() const { return m_org_mgr; }
 };
 

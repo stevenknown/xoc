@@ -55,12 +55,12 @@ class MDSSAInfo;
 //Attach Info Type.
 typedef enum _AI_TYPE {
     AI_UNDEF = 0,
-    AI_DBX,       //Debug Info
-    AI_PROF,      //Profile Info
-    AI_TBAA,      //Type Based AA
-    AI_EH_LABEL,  //Record a list of Labels.
-    AI_USER_DEF,  //User Defined
     AI_MD_SSA,    //MD SSA info
+    AI_DBX,       //Debug Info
+    AI_TBAA,      //Type Based AA
+    AI_USER_DEF,  //User Defined
+    AI_PROF,      //Profile Info
+    AI_EH_LABEL,  //Record a list of Labels.
     AI_TENSOR,    //Tensor Data Info
     AI_LAST,      //The number of ai type.
 } AI_TYPE;
@@ -81,59 +81,41 @@ public:
 
 typedef xcom::SimpleVector<BaseAttachInfo*, 1, 64> AICont;
 
-#define AICT_cont(ai) ((ai)->cont)
+#define AICT_cont(ai) ((ai)->m_cont)
 
 //This class represents container of miscellaneous AttachInfo.
-//The whole object including its field 'cont' are allocated in AttachInfoMgr.
+//The whole object including its field 'm_cont' are allocated in AttachInfoMgr.
 //Note the content which recorded in container should managed by user themself.
 class AIContainer {
     friend class AttachInfoMgr;
     COPY_CONSTRUCTOR(AIContainer);
 protected:
-    AICont cont;
+    AICont m_cont;
+protected:
+    void cleanBySparse(AI_TYPE type);
+    void cleanByDense(AI_TYPE type);
+    BaseAttachInfo * getBySparse(AI_TYPE type) const;
+    BaseAttachInfo * getByDense(AI_TYPE type) const;
+    void setBySparse(BaseAttachInfo * c, Region * rg);
+    void setByDense(BaseAttachInfo * c, Region * rg);
 public:
     AIContainer() { init(); }
     ~AIContainer() {}
 
     void copy(AIContainer const* ai, Region * rg);
-    void cleanContainer() { cont.clean(); }
-    void clean(AI_TYPE type)
-    {
-        if (!is_init()) { return; }
-        ASSERT0(type > AI_UNDEF && type < AI_LAST);
-        for (UINT i = 0; i < cont.get_capacity(); i++) {
-            BaseAttachInfo * ac = cont.get(i);
-            if (ac != nullptr && ac->getType() == type) {
-                cont[i] = nullptr;
-                return;
-            }
-        }
-    }
+    void cleanContainer() { m_cont.clean(); }
+    void clean(AI_TYPE type);
 
-    void destroy() { cont.destroy(); }
+    void destroy() { m_cont.destroy(); }
 
-    void init() { cont.init(); }
-    void init(UINT size, SMemPool * pool) { cont.init(size, pool); }
-    INT is_init() const { return cont.is_init(); }
+    void init() { m_cont.init(); }
+    void init(UINT size, SMemPool * pool) { m_cont.init(size, pool); }
+    INT is_init() const { return m_cont.is_init(); }
 
     //The function formats string name for XOC recognized attach-info.
     CHAR const* getAIName(AI_TYPE type) const;
-    BaseAttachInfo * get(AI_TYPE type) const
-    {
-        if (!is_init()) {
-            //To faciliate the use of getAI(), disable the assertion of init.
-            return nullptr;
-        }
-        for (UINT i = 0; i < cont.get_capacity(); i++) {
-            BaseAttachInfo * ac = cont.get(i);
-            if (ac != nullptr && ac->getType() == type) {
-                return ac;
-            }
-        }
-        return nullptr;
-    }
-
-    AICont const* getContainer() const { return &cont; }
+    BaseAttachInfo * get(AI_TYPE type) const;
+    AICont const* getContainer() const { return &m_cont; }
 
     void set(BaseAttachInfo * c, Region * rg);
 };

@@ -64,6 +64,8 @@ protected:
     bool inferBBList(BBList const* bbl);
     bool inferIRList(IR * irl);
     bool inferChangedList();
+
+    bool shouldBePointerType(IR * ir) const;
 public:
     explicit InferType(Region * rg) : Pass(rg)
     {

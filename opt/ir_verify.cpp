@@ -213,10 +213,17 @@ bool verifySetElem(IR const* ir, Region const* rg)
     if (d->is_vector()) {
         ASSERT0(d->getVectorElemDType() != D_UNDEF);
 
+        IR const* val = SETELEM_val(ir);
+        ASSERT0(val);
+        Type const* val_tp = val->getType();
+        ASSERT0(val_tp);
+        UINT const val_sz = val_tp->is_vector() ?
+            tm->getDTypeByteSize(val_tp->getVectorElemDType()) :
+            tm->getByteSize(val_tp);
+
         //Note if the value size less than elemsize, it will be hoist to
         //elemsize.
-        ASSERT0(tm->getDTypeByteSize(d->getVectorElemDType()) >=
-                tm->getByteSize(SETELEM_val(ir)->getType()));
+        ASSERT0(tm->getDTypeByteSize(d->getVectorElemDType()) >= val_sz);
     }
     ASSERT0(SETELEM_base(ir)->is_exp());
     ASSERT0(SETELEM_base(ir)->is_single());
@@ -382,7 +389,7 @@ bool verifyCompare(IR const* ir, Region const* rg)
     DUMMYUSE(tm);
     Type const* d = ir->getType();
     ASSERT0_DUMMYUSE(d);
-    ASSERT0(ir->is_bool() || d->getVectorElemType(tm) == tm->getBool());
+    ASSERT0(ir->is_bool() || IS_BOOL(d->getVectorElemDType()));
     ASSERT0(BIN_opnd0(ir) && BIN_opnd0(ir)->is_exp() &&
             BIN_opnd1(ir) && BIN_opnd1(ir)->is_exp());
     ASSERT0(((CBin*)ir)->getOpnd0()->is_single());
@@ -502,6 +509,9 @@ bool verifyIF(IR const* ir, Region const* rg)
     TypeMgr const* tm = rg->getTypeMgr();
     ASSERT0(tm);
     DUMMYUSE(tm);
+
+    //NOTE: The IR code of determinator of branch operation MUST be
+    //judge-operation.
     ASSERT0(IF_det(ir) && IF_det(ir)->is_judge());
     ASSERT0(IF_det(ir)->is_single());
     if (IF_truebody(ir)) {
@@ -611,6 +621,9 @@ bool verifyBranch(IR const* ir, Region const* rg)
     ASSERT0(tm);
     DUMMYUSE(tm);
     ASSERT0(BR_lab(ir));
+
+    //NOTE: The IR code of determinator of branch operation MUST be
+    //judge-operation.
     ASSERT0(BR_det(ir) && BR_det(ir)->is_judge());
     ASSERT0(BR_det(ir)->is_single());
     return true;
@@ -640,17 +653,22 @@ bool verifySelect(IR const* ir, Region const* rg)
     //true_exp's type might not equal to false_exp's.
     Type const* d = ir->getType();
     ASSERT0_DUMMYUSE(d && d->getDType() != D_UNDEF);
-    ASSERT0(SELECT_det(ir) &&
-            SELECT_det(ir)->is_bool() &&
-            SELECT_det(ir)->is_single());
 
-    ASSERT0(SELECT_trueexp(ir) &&
-            SELECT_trueexp(ir)->is_exp() &&
-            SELECT_trueexp(ir)->is_single());
-
-    ASSERT0(SELECT_falseexp(ir) &&
-            SELECT_falseexp(ir)->is_exp() &&
-            SELECT_falseexp(ir)->is_single());
+    //NOTE: The IR code of determinator of IR_SELECT does NOT to be
+    //judge-operation.
+    ASSERT0(SELECT_det(ir) && SELECT_det(ir)->is_single());
+    ASSERT0(SELECT_det(ir)->getType()->is_bool() ||
+            SELECT_det(ir)->getType()->is_vector_with_bool_elem_type());
+    ASSERTN(SELECT_trueexp(ir) != nullptr || SELECT_falseexp(ir) != nullptr,
+            ("Trueexp and falseexp can NOT both be NULL"));
+    if (SELECT_trueexp(ir) != nullptr) {
+        ASSERT0(SELECT_trueexp(ir)->is_exp() &&
+                SELECT_trueexp(ir)->is_single());
+    }
+    if (SELECT_falseexp(ir) != nullptr) {
+        ASSERT0(SELECT_falseexp(ir)->is_exp() &&
+                SELECT_falseexp(ir)->is_single());
+    }
     return true;
 }
 
@@ -791,11 +809,19 @@ bool verifyIROwnership(Region const* rg)
 class VerifyIRAttrCtx {
     COPY_CONSTRUCTOR(VerifyIRAttrCtx);
 public:
-    xcom::TTab<MD const*> md_has_def;
+    bool do_verify_readonly;
     Region const* rg;
     MDSystem const* mdsys;
+    xcom::TTab<MD const*> md_has_def;
 public:
-    VerifyIRAttrCtx(Region const* r) { rg = r; mdsys = rg->getMDSystem(); }
+    VerifyIRAttrCtx(Region const* r)
+    {
+        do_verify_readonly = g_verify_ir_attr_readonly;
+        rg = r;
+        mdsys = rg->getMDSystem();
+    }
+    Region const* getRegion() const { return rg; }
+    MDSystem const* getMDSystem() const { return mdsys; }
 };
 
 
@@ -830,6 +856,7 @@ static void collectMDDefSitutation(
 static bool verifyReadOnly(VerifyIRAttrCtx const& ctx, IR const* ir)
 {
     if (!ir->isReadOnly()) { return true; }
+    if (!ctx.do_verify_readonly) { return true; }
     MD const* must = ir->getMustRef();
     if (must != nullptr) {
         ASSERTN(!ctx.md_has_def.find(must), ("can not be readonly"));

@@ -173,6 +173,20 @@ UINT countTrailingZero(UINT32 val);
 UINT countTrailingZero(UINT16 val);
 UINT countTrailingZero(UINT8 val);
 
+//Converts a double-precision floating-point number to BFloat16 format
+//stored as a 16-bit integer in the lower bits of a UINT64.
+//'double_bits': Input double-precision floating-point number.
+//This function handles all edge cases including:
+//- Zero and signed zero
+//- Subnormal numbers (treated as zero for BFloat16)
+//- Infinity (positive and negative)
+//- NaN (with preserved payload in lower 7 bits)
+//- Overflow (clamped to infinity)
+//- Underflow (clamped to zero)
+//Rounding mode: Round to nearest, ties to even (banker's rounding).
+//e.g: Given double_bits is 0, return 0;
+UINT64 double2BF16(UINT64 double_bits);
+
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
@@ -265,8 +279,14 @@ UINT32 encodeSLEB128(INT64 value, OUT Vector<CHAR> & os,
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
 
-//convert float to ESP64(64-bit extended single precision) format.
+//Convert float to ESP64(64-bit extended single precision) format.
 UINT64 float2ESP64(UINT64 val);
+
+//Convert float to BF16 format.
+UINT16 float2BF16(UINT32 val);
+
+//Convert float to FP16 format.
+UINT16 float2FP16(UINT32 val);
 
 //Great common divisor for number of values.
 INT gcdm(UINT num, ...);
@@ -345,6 +365,14 @@ float getclockend(LONG start);
 //Get the index of the first '1' start at most right side.
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
+
+//Return a mask whose lowest 'bit_width' bits are 1.
+//Examples:
+//   getLowBitMask(0)  = 0x0000000000000000
+//   getLowBitMask(8)  = 0x00000000000000FF
+//   getLowBitMask(16) = 0x000000000000FFFF
+//   getLowBitMask(64) = 0xFFFFFFFFFFFFFFFF
+UINT64 getLowBitMask(UINT bit_width);
 
 //Get nbitnum consecutive bits starting at bit position mbitoffset from the val.
 //a.given val: 0x12345678, nbitnum: 4 and mbitoffset: 8, it will return 0x6.
@@ -526,6 +554,9 @@ inline UINT32 hash32bit(UINT32 n)
 //convert half to EHP64(64-bit extended half-precision) format.
 UINT64 half2EHP64(UINT64 val);
 
+//convert bf16 to EHP64(64-bit extended half-precision) format.
+UINT64 bf16ToEHP64(UINT64 val);
+
 //Return true if *signed* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(LONGLONG val, UINT bitwidth);
 
@@ -622,6 +653,11 @@ UINT rotateLeft(UINT val0, UINT val1);
 //str: record the string.
 //n: rotate times.
 CHAR * rotateString(MOD CHAR * str, UINT n);
+
+//Sign-extend the number in the bottom n bits of val to a 64-bit integer.
+//requires n <= 64.
+//e.g: given val "0x800", n is 12, res is "0xFFFFFFFFFFFFF800"
+INT64 extendSign64(UINT64 val, UINT n);
 
 //Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);

@@ -89,6 +89,7 @@ ExprTab::ExprTab(Region * rg) : Pass(rg)
     m_ir_expr_lst.set_pool(m_sc_pool);
     m_md_set_mgr = rg->getMDSetMgr();
     m_bs_mgr = rg->getBitSetMgr();
+    m_irmgr = rg->getIRMgr();
 }
 
 
@@ -133,9 +134,11 @@ void ExprTab::reset()
     for (UINT i = 0; i < m_ir_expr_vec.get_elem_count(); i++) {
         ExprRep * ie = m_ir_expr_vec.get(i);
         if (ie == nullptr) { continue; }
+        //Just clean ie, do not destroy it.
         ie->clean();
     }
     cleanHashTab();
+    m_irmgr = m_rg->getIRMgr();
 }
 
 
@@ -183,18 +186,6 @@ HOST_UINT ExprTab::computeHashKey(IR const* ir) const
         hval += 5 * (UINT)(size_t)var;
     }
     return hval;
-}
-
-
-ExprRep * ExprTab::encodeExtExp(IR const* ir, MOD ECCtx & ctx)
-{
-    ASSERT0(ir->is_exp());
-    switch (ir->getCode()) {
-    SWITCH_CASE_EXT_EXP:
-        return nullptr;
-    default:UNREACHABLE();
-    }
-    return nullptr;
 }
 
 
@@ -405,33 +396,18 @@ ExprRep * ExprTab::removeExp(IR const* ir, MOD ECCtx & ctx)
 }
 
 
-ExprRep * ExprTab::findExp(IR const* ir, MOD ECCtx & ctx) const
+bool ExprTab::canBeExprRepCand(IR const* ir) const
 {
-    if (ir == nullptr) { return nullptr; }
-    HOST_UINT key = computeHashKeyForTree(ir, ctx);
-
-    //First level hashing.
-    UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
-    ExprRep ** level2_hash_tab = m_level1_hash_tab[level1_hashv];
-    if (level2_hash_tab == nullptr) {
-        return nullptr;
+    switch (ir->getCode()) {
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
+    case IR_ILD:
+    case IR_ARRAY:
+    case IR_SELECT:
+        return true;
+    default: return false;
     }
-
-    //Scanning in level2 hash tab.
-    UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
-    ExprRep * ie = level2_hash_tab[level2_hashv];
-    if (ie == nullptr) {
-        return nullptr;
-    }
-
-    //Scanning in ExprRep list in level2 hash tab.
-    while (ie != nullptr) {
-        if (ir->isIREqual(EXPR_ir(ie), getIRMgr())) {
-            return ie;
-        }
-        ie = ie->get_next();
-    }
-    return nullptr;
+    return false;
 }
 
 
@@ -439,29 +415,12 @@ ExprRep * ExprTab::encodeExp(IR const* ir, MOD ECCtx & ctx)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_exp());
-    switch (ir->getCode()) {
-    case IR_ID:
-    case IR_LD:
-    case IR_ILD:
-    case IR_LDA:
-    case IR_CONST:
-    case IR_CASE:
-    case IR_DUMMYUSE:
-    SWITCH_CASE_READ_PR:
-        return nullptr;
-    SWITCH_CASE_BIN:
-    SWITCH_CASE_UNA:
-    case IR_ARRAY:
-    case IR_SELECT: {
-        ExprRep * ie = appendExp(ir, ctx);
-        IR * pir = const_cast<IR*>(ir);
-        ASSERTN(!EXPR_occ_list(ie).find(pir), ("process same IR repeated."));
-        EXPR_occ_list(ie).append_tail(pir);
-        return ie;
-    }
-    default: return encodeExtExp(ir, ctx);
-    }
-    return nullptr;
+    if (!canBeExprRepCand(ir)) { return nullptr; }
+    ExprRep * ie = appendExp(ir, ctx);
+    IR * pir = const_cast<IR*>(ir);
+    ASSERTN(!EXPR_occ_list(ie).find(pir), ("process same IR repeated."));
+    EXPR_occ_list(ie).append_tail(pir);
+    return ie;
 }
 
 
@@ -619,6 +578,34 @@ static void encodeBBList(BBList const* bbl, MOD ExprTab * etab)
 }
 
 
+bool ExprTab::verify(OptCtx const& oc) const
+{
+    if (!is_valid()) { return true; }
+    for (UINT i = 0; i < m_ir_expr_vec.get_elem_count(); i++) {
+        ExprRep const* ie = m_ir_expr_vec.get(i);
+        if (ie == nullptr) { continue; }
+        ASSERT0(ie->id() == (UINT)i);
+        IREListIter eit;
+        for (IR const* occ = EXPR_occ_list(ie).get_head(&eit);
+             occ != nullptr; occ = EXPR_occ_list(ie).get_next(&eit)) {
+            ExprRep const* occie = mapIR2ExprRep(occ);
+            ASSERTN(occie == ie, ("ie and its occ info are not consistent"));
+        }
+    }
+    return true;
+}
+
+
+bool ExprTab::verifyExprTab(Region const* rg, OptCtx const& oc)
+{
+    ExprTab const* exprtab =
+        (ExprTab const*)rg->getPassMgr()->queryPass(PASS_EXPR_TAB);
+    if (exprtab == nullptr || !exprtab->is_valid()) { return true; }
+    ASSERT0(exprtab->verify(oc));
+    return true;
+}
+
+
 //Encode expression for a list of BB.
 //Scan IR statement literally, and encoding it for generating
 //the unique id for each individual expressions, and update
@@ -635,6 +622,7 @@ bool ExprTab::perform(MOD OptCtx & oc)
     if (g_dump_opt.isDumpAfterPass()) {
         dump();
     }
+    ASSERT0(verify(oc));
     return false;
 }
 //END ExprTab

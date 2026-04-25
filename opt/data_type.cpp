@@ -50,14 +50,118 @@ TypeDesc const g_type_desc[] = {
     {D_U64, "u64", 64},
     {D_U128, "u128", 128},
 
-    {D_F8_E4M3, "f8_e4m3", 8},
-    {D_F8_E5M2, "f8_e5m2", 8},
-    {D_BF16, "bf16", 16}, //bfloat point 16 bits
+    {D_F4X2, "f4x2", 8}, //8-bit container storing two 4-bit FP values (F4).
+    {D_F8, "f8", 8}, //8-bit floating point
+    {D_F8E4M3, "f8e4m3", 8}, //8-bit float (E4M3 format)
+    {D_F8E5M2, "f8e5m2", 8}, //8-bit float (E5M2 format)
+    {D_F8_MIX, "f8_mix", 8}, //8-bit float (mixed format).
+    {D_BF16, "bf16", 16}, //bfloat16 (16-bit floating point)
     {D_F16, "f16", 16}, //float point 16 bits
     {D_F32, "f32", 32}, //float point 32 bits
+
+    //TensorFloat-32 (32-bit floating point, reduced precision for tensor ops)
+    {D_TF32, "tf32", 32},
     {D_F64, "f64", 64},
     {D_F80, "f80", 80},
     {D_F128, "f128", 128},
+
+    //In D_B<n>, n is the ratio of the width of an element to
+    //the number of registers used. D_B<n>expresses using n bits
+    //to represent a BOOL value. For example, if the element
+    //width is 32 bits and the number of registers used is 1,
+    //then n=32/1=32.
+    {D_B1, "bool1", 8},
+    {D_B2, "bool2", 8},
+    {D_B4, "bool4", 8},
+    {D_B8, "bool8", 8},
+    {D_B16, "bool16", 8},
+    {D_B32, "bool32", 8},
+    {D_B64, "bool64", 8},
+
+    //This type of D_U16M1 is an scalable data type, indicating that
+    //the number of vector elements it represents can be scalable.
+    //The M<n> or MF<n> after the basic data type represents the
+    //group multiplication coefficient, which is the number of
+    //physical registers used.
+    //For example, M1 represents using one physical register,
+    //M2 represents using two physical registers, and MF2 represents
+    //using half of one physical register to store data.
+    {D_U8M1, "u8m1", 8},
+    {D_U8M2, "u8m2", 8},
+    {D_U8M4, "u8m4", 8},
+    {D_U8M8, "u8m8", 8},
+    {D_U8MF2, "u8mf2", 8},
+    {D_U8MF4, "u8mf4", 8},
+    {D_U8MF8, "u8mf8", 8},
+
+    {D_I8M1, "i8m1", 8},
+    {D_I8M2, "i8m2", 8},
+    {D_I8M4, "i8m4", 8},
+    {D_I8M8, "i8m8", 8},
+    {D_I8MF2, "i8mf2", 8},
+    {D_I8MF4, "i8mf4", 8},
+    {D_I8MF8, "i8mf8", 8},
+
+    {D_U16M1, "u16m1", 16},
+    {D_U16M2, "u16m2", 16},
+    {D_U16M4, "u16m4", 16},
+    {D_U16M8, "u16m8", 16},
+    {D_U16MF2, "u16mf2", 16},
+    {D_U16MF4, "u16mf4", 16},
+
+    {D_I16M1, "i16m1", 16},
+    {D_I16M2, "i16m2", 16},
+    {D_I16M4, "i16m4", 16},
+    {D_I16M8, "i16m8", 16},
+    {D_I16MF2, "i16mf2", 16},
+    {D_I16MF4, "i16mf4", 16},
+
+    {D_U32M1, "u32m1", 32},
+    {D_U32M2, "u32m2", 32},
+    {D_U32M4, "u32m4", 32},
+    {D_U32M8, "u32m8", 32},
+    {D_U32MF2, "u32mf2", 32},
+
+    {D_I32M1, "i32m1", 32},
+    {D_I32M2, "i32m2", 32},
+    {D_I32M4, "i32m4", 32},
+    {D_I32M8, "i32m8", 32},
+    {D_I32MF2, "i32mf2", 32},
+
+    {D_U64M1, "u64m1", 64},
+    {D_U64M2, "u64m2", 64},
+    {D_U64M4, "u64m4", 64},
+    {D_U64M8, "u64m8", 64},
+
+    {D_I64M1, "i64m1", 64},
+    {D_I64M2, "i64m2", 64},
+    {D_I64M4, "i64m4", 64},
+    {D_I64M8, "i64m8", 64},
+
+    {D_BF16M1, "bf16m1", 16},
+    {D_BF16M2, "bf16m2", 16},
+    {D_BF16M4, "bf16m4", 16},
+    {D_BF16M8, "bf16m8", 16},
+    {D_BF16MF2, "bf16mf2", 16},
+    {D_BF16MF4, "bf16mf4", 16},
+
+    {D_F16M1, "f16m1", 16},
+    {D_F16M2, "f16m2", 16},
+    {D_F16M4, "f16m4", 16},
+    {D_F16M8, "f16m8", 16},
+    {D_F16MF2, "f16mf2", 16},
+    {D_F16MF4, "f16mf4", 16},
+
+    {D_F32M1, "f32m1", 32},
+    {D_F32M2, "f32m2", 32},
+    {D_F32M4, "f32m4", 32},
+    {D_F32M8, "f32m8", 32},
+    {D_F32MF2, "f32mf2", 32},
+
+    {D_F64M1, "f64m1", 64},
+    {D_F64M2, "f64m2", 64},
+    {D_F64M4, "f64m4", 64},
+    {D_F64M8, "f64m8", 64},
 
     {D_MC, "mc", 0}, //memory chunk, for structures, default bitsize is 0
     {D_STR, "str", BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
@@ -127,23 +231,314 @@ void TensorType::copy(TensorType const& src, TypeMgr * mgr)
 //END TensorType
 
 
-//The hoisting rules are:
-//1. Return max bit size of DATA_TYPE between 'opnd0' and 'opnd1',
-//2. else return SIGNED if one of them is signed;
-//3. else return FLOAT if one of them is float,
-//4. else return UNSIGNED.
-//
-//The C language rules are:
-//1. If any operand is of a integral type smaller than int? Convert to int.
-//2. Is any operand unsigned long? Convert the other to unsigned long.
-//3. (else) Is any operand signed long? Convert the other to signed long.
-//4. (else) Is any operand unsigned int? Convert the other to unsigned int.
-//
-//NOTE: The function does NOT hoist vector type.
-Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
+UINT TypeMgr::getNumbitsOfBoolTypeInMask(DATA_TYPE dt)
 {
-    Type const* d0 = opnd0->getType();
-    Type const* d1 = opnd1->getType();
+    ASSERT0(IS_SCALABLE(dt));
+    switch (dt) {
+    case D_I8M8:
+    case D_U8M8:
+    case D_B1: return 1;
+    case D_I8M4:
+    case D_U8M4:
+    case D_I16M8:
+    case D_U16M8:
+    case D_F16M8:
+    case D_BF16M8:
+    case D_B2: return 2;
+    case D_I8M2:
+    case D_U8M2:
+    case D_I16M4:
+    case D_U16M4:
+    case D_F16M4:
+    case D_BF16M4:
+    case D_I32M8:
+    case D_U32M8:
+    case D_F32M8:
+    case D_B4: return 4;
+    case D_I8M1:
+    case D_U8M1:
+    case D_I16M2:
+    case D_U16M2:
+    case D_F16M2:
+    case D_BF16M2:
+    case D_I32M4:
+    case D_U32M4:
+    case D_F32M4:
+    case D_I64M8:
+    case D_U64M8:
+    case D_F64M8:
+    case D_B8: return 8;
+    case D_I8MF2:
+    case D_U8MF2:
+    case D_I16M1:
+    case D_U16M1:
+    case D_F16M1:
+    case D_BF16M1:
+    case D_I32M2:
+    case D_U32M2:
+    case D_F32M2:
+    case D_I64M4:
+    case D_U64M4:
+    case D_F64M4:
+    case D_B16: return 16;
+    case D_I8MF4:
+    case D_U8MF4:
+    case D_I16MF2:
+    case D_U16MF2:
+    case D_F16MF2:
+    case D_BF16MF2:
+    case D_I32M1:
+    case D_U32M1:
+    case D_F32M1:
+    case D_I64M2:
+    case D_U64M2:
+    case D_F64M2:
+    case D_B32: return 32;
+    case D_I8MF8:
+    case D_U8MF8:
+    case D_I16MF4:
+    case D_U16MF4:
+    case D_F16MF4:
+    case D_BF16MF4:
+    case D_I32MF2:
+    case D_U32MF2:
+    case D_F32MF2:
+    case D_I64M1:
+    case D_U64M1:
+    case D_F64M1:
+    case D_B64: return 64;
+    default: UNREACHABLE(); break;
+    }
+    return 0;
+}
+
+
+DATA_TYPE TypeMgr::getScalableDType(DATA_TYPE basic_dt, LMUL lmul)
+{
+    switch (basic_dt) {
+    case D_U8: {
+        switch (lmul) {
+        case LMUL_M1: return D_U8M1;
+        case LMUL_M2: return D_U8M2;
+        case LMUL_M4: return D_U8M4;
+        case LMUL_M8: return D_U8M8;
+        case LMUL_MF2: return D_U8MF2;
+        case LMUL_MF4: return D_U8MF4;
+        case LMUL_MF8: return D_U8MF8;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_I8: {
+        switch (lmul) {
+        case LMUL_M1: return D_I8M1;
+        case LMUL_M2: return D_I8M2;
+        case LMUL_M4: return D_I8M4;
+        case LMUL_M8: return D_I8M8;
+        case LMUL_MF2: return D_I8MF2;
+        case LMUL_MF4: return D_I8MF4;
+        case LMUL_MF8: return D_I8MF8;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_U16: {
+        switch (lmul) {
+        case LMUL_M1: return D_U16M1;
+        case LMUL_M2: return D_U16M2;
+        case LMUL_M4: return D_U16M4;
+        case LMUL_M8: return D_U16M8;
+        case LMUL_MF2: return D_U16MF2;
+        case LMUL_MF4: return D_U16MF4;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_I16: {
+        switch (lmul) {
+        case LMUL_M1: return D_I16M1;
+        case LMUL_M2: return D_I16M2;
+        case LMUL_M4: return D_I16M4;
+        case LMUL_M8: return D_I16M8;
+        case LMUL_MF2: return D_I16MF2;
+        case LMUL_MF4: return D_I16MF4;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_F16: {
+        switch (lmul) {
+        case LMUL_M1: return D_F16M1;
+        case LMUL_M2: return D_F16M2;
+        case LMUL_M4: return D_F16M4;
+        case LMUL_M8: return D_F16M8;
+        case LMUL_MF2: return D_F16MF2;
+        case LMUL_MF4: return D_F16MF4;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_BF16: {
+        switch (lmul) {
+        case LMUL_M1: return D_BF16M1;
+        case LMUL_M2: return D_BF16M2;
+        case LMUL_M4: return D_BF16M4;
+        case LMUL_M8: return D_BF16M8;
+        case LMUL_MF2: return D_BF16MF2;
+        case LMUL_MF4: return D_BF16MF4;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_U32: {
+        switch (lmul) {
+        case LMUL_M1: return D_U32M1;
+        case LMUL_M2: return D_U32M2;
+        case LMUL_M4: return D_U32M4;
+        case LMUL_M8: return D_U32M8;
+        case LMUL_MF2: return D_U32MF2;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_I32: {
+        switch (lmul) {
+        case LMUL_M1: return D_I32M1;
+        case LMUL_M2: return D_I32M2;
+        case LMUL_M4: return D_I32M4;
+        case LMUL_M8: return D_I32M8;
+        case LMUL_MF2: return D_I32MF2;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_F32: {
+        switch (lmul) {
+        case LMUL_M1: return D_F32M1;
+        case LMUL_M2: return D_F32M2;
+        case LMUL_M4: return D_F32M4;
+        case LMUL_M8: return D_F32M8;
+        case LMUL_MF2: return D_F32MF2;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_U64: {
+        switch (lmul) {
+        case LMUL_M1: return D_U64M1;
+        case LMUL_M2: return D_U64M2;
+        case LMUL_M4: return D_U64M4;
+        case LMUL_M8: return D_U64M8;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_I64: {
+        switch (lmul) {
+        case LMUL_M1: return D_I64M1;
+        case LMUL_M2: return D_I64M2;
+        case LMUL_M4: return D_I64M4;
+        case LMUL_M8: return D_I64M8;
+        default: UNREACHABLE(); break;
+        }
+    }
+    case D_F64: {
+        switch (lmul) {
+        case LMUL_M1: return D_F64M1;
+        case LMUL_M2: return D_F64M2;
+        case LMUL_M4: return D_F64M4;
+        case LMUL_M8: return D_F64M8;
+        default: UNREACHABLE(); break;
+        }
+    }
+    default: UNREACHABLE(); break;
+    }
+    UNREACHABLE();
+    return D_UNDEF;
+}
+
+
+class TypeMgrIntlImpl {
+public:
+    static Type const* hoistDTypeForSameSize(
+        DATA_TYPE t0, DATA_TYPE t1, MOD TypeMgr * tm)
+    {
+        ASSERT0(IS_INT(t0) || IS_INT(t1));
+        ASSERT0(tm->getDTypeBitSize(t0) == tm->getDTypeBitSize(t1));
+        if (IS_SINT(t0)) {
+            ASSERT0(IS_SIMPLEX(t1));
+            //Prefer USINGED if one of them are UNSINGED.
+            return tm->getSimplexType(t1);
+        }
+        if (IS_SINT(t1)) {
+            ASSERT0(IS_SIMPLEX(t0));
+            //Prefer USINGED if one of them are UNSINGED.
+            return tm->getSimplexType(t0);
+        }
+        //Both of them are UNSIGNED.
+        return tm->getSimplexType(t0);
+    }
+};
+
+
+Type const* TypeMgr::hoistDTypeForBinOpWithINTType(
+    Type const* d0, Type const* d1)
+{
+    ASSERT0(!d0->is_any() && !d1->is_any());
+    ASSERTN(!d0->is_vector() && !d1->is_vector(),
+            ("Can not hoist vector type."));
+    ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
+            ("Can not hoist pointer type."));
+    DATA_TYPE t0 = TY_dtype(d0);
+    DATA_TYPE t1 = TY_dtype(d1);
+    ASSERT0(IS_INT(t0) || IS_INT(t1));
+
+    //Always hoist to longest integer type.
+    //t0 = hoistDtype(t0);
+    //t1 = hoistDtype(t1);
+
+    //Integer Conversion Rank:
+    //1. The greater the bitsize is, the higher the rank is.
+    //2. The bitsize is the same, the rank is the same.
+    //Generic data type.
+    UINT bitsize0 = getDTypeBitSize(t0);
+    UINT bitsize1 = getDTypeBitSize(t1);
+    if (bitsize0 == bitsize1) {
+        return TypeMgrIntlImpl::hoistDTypeForSameSize(t0, t1, this);
+    }
+    UINT maxbitsize = MAX(bitsize0, bitsize1);
+    bool is_signed = false;
+    if (bitsize0 == maxbitsize) {
+        is_signed = IS_SINT(t0);
+    } else {
+        is_signed = IS_SINT(t1);
+    }
+    DATA_TYPE res = getIntDType(maxbitsize, is_signed);
+    ASSERT0(res != D_UNDEF);
+    ASSERT0(IS_SIMPLEX(res));
+    return getSimplexType(res);
+}
+
+
+Type const* TypeMgr::hoistDTypeForBinOpWithFPType(
+    Type const* d0, Type const* d1)
+{
+    ASSERT0(!d0->is_any() && !d1->is_any());
+    ASSERTN(!d0->is_vector() && !d1->is_vector(),
+            ("Can not hoist vector type."));
+    ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
+            ("Can not hoist pointer type."));
+    DATA_TYPE t0 = TY_dtype(d0);
+    DATA_TYPE t1 = TY_dtype(d1);
+    ASSERT0(IS_FP(t0) || IS_FP(t1));
+    //Always hoist to longest integer type.
+    //t0 = hoistDtype(t0);
+    //t1 = hoistDtype(t1);
+
+    //Generic data type.
+    UINT bitsize = MAX(getDTypeBitSize(t0), getDTypeBitSize(t1));
+    DATA_TYPE res = getFPDType(bitsize, false);
+    ASSERT0(res != D_UNDEF);
+    ASSERT0(IS_SIMPLEX(res));
+    return getSimplexType(res);
+}
+
+
+//The function handles cases that at least one of operands
+//is of MC type.
+Type const* TypeMgr::hoistDTypeForBinOpWithMCType(
+    Type const* d0, Type const* d1)
+{
     ASSERT0(!d0->is_any() && !d1->is_any());
     ASSERTN(!d0->is_vector() && !d1->is_vector(),
             ("Can not hoist vector type."));
@@ -153,42 +548,48 @@ Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
     DATA_TYPE t1 = TY_dtype(d1);
     if (t0 == D_MC && t1 == D_MC) {
         ASSERT0(TY_mc_size(d0) == TY_mc_size(d1));
-        return opnd0->getType();
+        return d0;
     }
     if (t0 == D_MC) {
         ASSERT0(TY_mc_size(d0) != 0);
         UINT ty_size = MAX(TY_mc_size(d0), getByteSize(d1));
         if (ty_size == TY_mc_size(d0)) {
-            return opnd0->getType();
+            return d0;
         }
-        return opnd1->getType();
+        return d1;
     }
     if (t1 == D_MC) {
         ASSERT0(TY_mc_size(d1) != 0);
         UINT ty_size = MAX(TY_mc_size(d1), getByteSize(d0));
         if (ty_size == TY_mc_size(d1)) {
-            return opnd1->getType();
+            return d1;
         }
-        return opnd0->getType();
+        return d0;
     }
+    UNREACHABLE();
+    return nullptr;
+}
 
-    //Always hoist to longest integer type.
-    //t0 = hoistDtype(t0);
-    //t1 = hoistDtype(t1);
 
-    //Generic data type.
-    INT bitsize = MAX(getDTypeBitSize(t0), getDTypeBitSize(t1));
-    DATA_TYPE res;
+Type const* TypeMgr::hoistDTypeForBinOp(IR const* opnd0, IR const* opnd1)
+{
+    Type const* d0 = opnd0->getType();
+    Type const* d1 = opnd1->getType();
+    if (d0 == d1) { return d0; }
+    ASSERT0(!d0->is_any() && !d1->is_any());
+    ASSERTN(!d0->is_vector() && !d1->is_vector(),
+            ("Can not hoist vector type."));
+    ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
+            ("Can not hoist pointer type."));
+    DATA_TYPE t0 = TY_dtype(d0);
+    DATA_TYPE t1 = TY_dtype(d1);
+    if (t0 == D_MC || t1 == D_MC) {
+        return hoistDTypeForBinOpWithMCType(d0, d1);
+    }
     if (IS_FP(t0) || IS_FP(t1)) {
-        res = getFPDType(bitsize, false);
-    } else if (IS_SINT(t0) || IS_SINT(t1)) {
-        res = getIntDType(bitsize, true);
-    } else {
-        res = getIntDType(bitsize, false);
+        return hoistDTypeForBinOpWithFPType(d0, d1);
     }
-    ASSERT0(res != D_UNDEF);
-    ASSERT0(IS_SIMPLEX(res));
-    return getSimplexType(res);
+    return hoistDTypeForBinOpWithINTType(d0, d1);
 }
 
 
@@ -511,11 +912,19 @@ Type * TypeMgr::registerType(Type const* type)
 }
 
 
+UINT TypeMgr::getByteSizeIfItExist(Type const* ty) const
+{
+    if (ty->is_any()) { return 0; }
+    return getByteSize(ty);
+}
+
+
 UINT TypeMgr::getByteSize(Type const* type) const
 {
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
+    SWITCH_CASE_SCALABLE_ELEM_DTYPE:
     SWITCH_CASE_INT_DTYPE:
     SWITCH_CASE_FP_DTYPE:
     case D_B:
@@ -551,17 +960,26 @@ void TypeMgr::dump_type(Type const* type) const
 }
 
 
-void TypeMgr::dump_type_tab() const
+void TypeMgr::dump() const
 {
-    StrBuf buf(64);
-    if (!getRegionMgr()->isLogMgrInit()) { return; }
-    note(getRegionMgr(), "\n==---- DUMP Type Table ----==\n");
-    for (VecIdx i = 1; i <= m_type_tab.get_last_idx(); i++) {
+    RegionMgr const* rm = getRegionMgr();
+    ASSERT0(rm);
+    if (!rm->isLogMgrInit()) { return; }
+    xcom::StrBuf buf(64);
+    note(rm, "\n==---- DUMP TypeMgr ----==");
+    for (VecIdx i = UNDEF_TYID + 1; i <= m_type_tab.get_last_idx(); i++) {
         buf.clean();
-        Type * d = m_type_tab.get(i);
+        Type const* d = m_type_tab.get(i);
         ASSERT0(d);
-        prt(getRegionMgr(), "%s tyid:%d", dump_type(d, buf), i);
-        note(getRegionMgr(), "\n");
+        note(rm, "\ntyid:%u %s bytesize:%u ", i,
+             dump_type(d, buf), getByteSizeIfItExist(d));
+        if (d->is_scalar()) { prt(rm, "scalar "); }
+        if (d->is_signed()) { prt(rm, "signed "); }
+        if (d->is_unsigned()) { prt(rm, "unsigned "); }
+        if (d->is_scalable_elem_ty()) { prt(rm, "scalable_elem "); }
+        if (d->is_vector_with_scalable_elem_type()) {
+            prt(rm, "vector_with_scalable_elem ");
+        }
     }
 }
 
@@ -614,6 +1032,11 @@ TypeMgr::TypeMgr(RegionMgr * rm)
     ::memset((void*)m_simplex_type, 0, sizeof(m_simplex_type));
     m_b = getSimplexType(D_B);
     m_i8 = getSimplexType(D_I8);
+    m_f4x2 = getSimplexType(D_F4X2);
+    m_f8 = getSimplexType(D_F8);
+    m_f8e4m3 = getSimplexType(D_F8E4M3);
+    m_f8e5m2 = getSimplexType(D_F8E5M2);
+    m_f8mix = getSimplexType(D_F8_MIX);
     m_i16 = getSimplexType(D_I16);
     m_i32 = getSimplexType(D_I32);
     m_i64 = getSimplexType(D_I64);
@@ -623,16 +1046,517 @@ TypeMgr::TypeMgr(RegionMgr * rm)
     m_u32 = getSimplexType(D_U32);
     m_u64 = getSimplexType(D_U64);
     m_u128 = getSimplexType(D_U128);
-    m_f8e4m3 = getSimplexType(D_F8_E4M3);
-    m_f8e5m2 = getSimplexType(D_F8_E5M2);
     m_bf16 = getSimplexType(D_BF16);
     m_f16 = getSimplexType(D_F16);
     m_f32 = getSimplexType(D_F32);
+    m_tf32 = getSimplexType(D_TF32);
     m_f64 = getSimplexType(D_F64);
     m_f80 = getSimplexType(D_F80);
     m_f128 = getSimplexType(D_F128);
     m_str = getSimplexType(D_STR);
     m_any = getSimplexType(D_ANY);
+    m_bool1 = getSimplexType(D_B1);
+    m_bool2 = getSimplexType(D_B2);
+    m_bool4 = getSimplexType(D_B4);
+    m_bool8 = getSimplexType(D_B8);
+    m_bool16 = getSimplexType(D_B16);
+    m_bool32 = getSimplexType(D_B32);
+    m_bool64 = getSimplexType(D_B64);
+    m_u8m1 = getSimplexType(D_U8M1);
+    m_u8m2 = getSimplexType(D_U8M2);
+    m_u8m4 = getSimplexType(D_U8M4);
+    m_u8m8 = getSimplexType(D_U8M8);
+    m_u8mf2 = getSimplexType(D_U8MF2);
+    m_u8mf4 = getSimplexType(D_U8MF4);
+    m_u8mf8 = getSimplexType(D_U8MF8);
+    m_i8m1 = getSimplexType(D_I8M1);
+    m_i8m2 = getSimplexType(D_I8M2);
+    m_i8m4 = getSimplexType(D_I8M4);
+    m_i8m8 = getSimplexType(D_I8M8);
+    m_i8mf2 = getSimplexType(D_I8MF2);
+    m_i8mf4 = getSimplexType(D_I8MF4);
+    m_i8mf8 = getSimplexType(D_I8MF8);
+    m_u16m1 = getSimplexType(D_U16M1);
+    m_u16m2 = getSimplexType(D_U16M2);
+    m_u16m4 = getSimplexType(D_U16M4);
+    m_u16m8 = getSimplexType(D_U16M8);
+    m_u16mf2 = getSimplexType(D_U16MF2);
+    m_u16mf4 = getSimplexType(D_U16MF4);
+    m_i16m1 = getSimplexType(D_I16M1);
+    m_i16m2 = getSimplexType(D_I16M2);
+    m_i16m4 = getSimplexType(D_I16M4);
+    m_i16m8 = getSimplexType(D_I16M8);
+    m_i16mf2 = getSimplexType(D_I16MF2);
+    m_i16mf4 = getSimplexType(D_I16MF4);
+    m_u32m1 = getSimplexType(D_U32M1);
+    m_u32m2 = getSimplexType(D_U32M2);
+    m_u32m4 = getSimplexType(D_U32M4);
+    m_u32m8 = getSimplexType(D_U32M8);
+    m_u32mf2 = getSimplexType(D_U32MF2);
+    m_i32m1 = getSimplexType(D_I32M1);
+    m_i32m2 = getSimplexType(D_I32M2);
+    m_i32m4 = getSimplexType(D_I32M4);
+    m_i32m8 = getSimplexType(D_I32M8);
+    m_i32mf2 = getSimplexType(D_I32MF2);
+    m_u64m1 = getSimplexType(D_U64M1);
+    m_u64m2 = getSimplexType(D_U64M2);
+    m_u64m4 = getSimplexType(D_U64M4);
+    m_u64m8 = getSimplexType(D_U64M8);
+    m_i64m1 = getSimplexType(D_I64M1);
+    m_i64m2 = getSimplexType(D_I64M2);
+    m_i64m4 = getSimplexType(D_I64M4);
+    m_i64m8 = getSimplexType(D_I64M8);
+    m_bf16m1 = getSimplexType(D_BF16M1);
+    m_bf16m2 = getSimplexType(D_BF16M2);
+    m_bf16m4 = getSimplexType(D_BF16M4);
+    m_bf16m8 = getSimplexType(D_BF16M8);
+    m_bf16mf2 = getSimplexType(D_BF16MF2);
+    m_bf16mf4 = getSimplexType(D_BF16MF4);
+    m_f16m1 = getSimplexType(D_F16M1);
+    m_f16m2 = getSimplexType(D_F16M2);
+    m_f16m4 = getSimplexType(D_F16M4);
+    m_f16m8 = getSimplexType(D_F16M8);
+    m_f16mf2 = getSimplexType(D_F16MF2);
+    m_f16mf4 = getSimplexType(D_F16MF4);
+    m_f32m1 = getSimplexType(D_F32M1);
+    m_f32m2 = getSimplexType(D_F32M2);
+    m_f32m4 = getSimplexType(D_F32M4);
+    m_f32m8 = getSimplexType(D_F32M8);
+    m_f32mf2 = getSimplexType(D_F32MF2);
+    m_f64m1 = getSimplexType(D_F64M1);
+    m_f64m2 = getSimplexType(D_F64M2);
+    m_f64m4 = getSimplexType(D_F64M4);
+    m_f64m8 = getSimplexType(D_F64M8);
+}
+
+
+//Return existing type according to given DATA_TYPE.
+Type const* TypeMgr::getSimplexTypeEx(DATA_TYPE dt) const
+{
+    switch (dt) {
+    case D_B: return m_b;
+    case D_I8: return m_i8;
+    case D_I16: return m_i16;
+    case D_I32: return m_i32;
+    case D_I64: return m_i64;
+    case D_I128: return m_i128;
+    case D_U8: return m_u8;
+    case D_U16: return m_u16;
+    case D_U32: return m_u32;
+    case D_U64: return m_u64;
+    case D_U128: return m_u128;
+    case D_F8E4M3: return m_f8e4m3;
+    case D_F8E5M2: return m_f8e5m2;
+    case D_F4X2: return m_f4x2;
+    case D_BF16: return m_bf16;
+    case D_F16: return m_f16;
+    case D_F32: return m_f32;
+    case D_F64: return m_f64;
+    case D_F80: return m_f80;
+    case D_F128: return m_f128;
+    case D_B1: return m_bool1;
+    case D_B2: return m_bool2;
+    case D_B4: return m_bool4;
+    case D_B8: return m_bool8;
+    case D_B16: return m_bool16;
+    case D_B32: return m_bool32;
+    case D_B64: return m_bool64;
+    case D_U8M1: return m_u8m1;
+    case D_U8M2: return m_u8m2;
+    case D_U8M4: return m_u8m4;
+    case D_U8M8: return m_u8m8;
+    case D_U8MF2: return m_u8mf2;
+    case D_U8MF4: return m_u8mf4;
+    case D_U8MF8: return m_u8mf8;
+    case D_I8M1: return m_i8m1;
+    case D_I8M2: return m_i8m2;
+    case D_I8M4: return m_i8m4;
+    case D_I8M8: return m_i8m8;
+    case D_I8MF2: return m_i8mf2;
+    case D_I8MF4: return m_i8mf4;
+    case D_I8MF8: return m_i8mf8;
+    case D_U16M1: return m_u16m1;
+    case D_U16M2: return m_u16m2;
+    case D_U16M4: return m_u16m4;
+    case D_U16M8: return m_u16m8;
+    case D_U16MF2: return m_u16mf2;
+    case D_U16MF4: return m_u16mf4;
+    case D_I16M1: return m_i16m1;
+    case D_I16M2: return m_i16m2;
+    case D_I16M4: return m_i16m4;
+    case D_I16M8: return m_i16m8;
+    case D_I16MF2: return m_i16mf2;
+    case D_I16MF4: return m_i16mf4;
+    case D_U32M1: return m_u32m1;
+    case D_U32M2: return m_u32m2;
+    case D_U32M4: return m_u32m4;
+    case D_U32M8: return m_u32m8;
+    case D_U32MF2: return m_u32mf2;
+    case D_I32M1: return m_i32m1;
+    case D_I32M2: return m_i32m2;
+    case D_I32M4: return m_i32m4;
+    case D_I32M8: return m_i32m8;
+    case D_I32MF2: return m_i32mf2;
+    case D_U64M1: return m_u64m1;
+    case D_U64M2: return m_u64m2;
+    case D_U64M4: return m_u64m4;
+    case D_U64M8: return m_u64m8;
+    case D_I64M1: return m_i64m1;
+    case D_I64M2: return m_i64m2;
+    case D_I64M4: return m_i64m4;
+    case D_I64M8: return m_i64m8;
+    case D_BF16M1: return m_bf16m1;
+    case D_BF16M2: return m_bf16m2;
+    case D_BF16M4: return m_bf16m4;
+    case D_BF16M8: return m_bf16m8;
+    case D_BF16MF2: return m_bf16mf2;
+    case D_BF16MF4: return m_bf16mf4;
+    case D_F16M1: return m_f16m1;
+    case D_F16M2: return m_f16m2;
+    case D_F16M4: return m_f16m4;
+    case D_F16M8: return m_f16m8;
+    case D_F16MF2: return m_f16mf2;
+    case D_F16MF4: return m_f16mf4;
+    case D_F32M1: return m_f32m1;
+    case D_F32M2: return m_f32m2;
+    case D_F32M4: return m_f32m4;
+    case D_F32M8: return m_f32m8;
+    case D_F32MF2: return m_f32mf2;
+    case D_F64M1: return m_f64m1;
+    case D_F64M2: return m_f64m2;
+    case D_F64M4: return m_f64m4;
+    case D_F64M8: return m_f64m8;
+    case D_STR: return m_str;
+    case D_ANY: return m_any;
+    default: ASSERTN(0, ("not simplex type")); return 0;
+    }
+    return 0;
+}
+
+
+UINT TypeMgr::getVectorElemNumWithScalableElemType(DATA_TYPE vec_elem_ty)
+{
+    switch (vec_elem_ty) {
+    case D_B1: return getMaxBitSizeOfVectorRegister() / 1;
+    case D_B2: return getMaxBitSizeOfVectorRegister() / 2;
+    case D_B4: return getMaxBitSizeOfVectorRegister() / 4;
+    case D_B8: return getMaxBitSizeOfVectorRegister() / 8;
+    case D_B16: return getMaxBitSizeOfVectorRegister() / 16;
+    case D_B32: return getMaxBitSizeOfVectorRegister() / 32;
+    case D_B64: return getMaxBitSizeOfVectorRegister() / 64;
+    case D_U8M1: return getMaxBitSizeOfVectorRegister() / 8;
+    case D_U8M2: return 2 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_U8M4: return 4 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_U8M8: return 8 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_U8MF2: return getMaxBitSizeOfVectorRegister() / 8 / 2;
+    case D_U8MF4: return getMaxBitSizeOfVectorRegister() / 8 / 4;
+    case D_U8MF8: return getMaxBitSizeOfVectorRegister() / 8 / 8;
+    case D_I8M1: return getMaxBitSizeOfVectorRegister() / 8;
+    case D_I8M2: return 2 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_I8M4: return 4 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_I8M8: return 8 * getMaxBitSizeOfVectorRegister() / 8;
+    case D_I8MF2: return getMaxBitSizeOfVectorRegister() / 8 / 2;
+    case D_I8MF4: return getMaxBitSizeOfVectorRegister() / 8 / 4;
+    case D_I8MF8: return getMaxBitSizeOfVectorRegister() / 8 / 8;
+    case D_U16M1: return getMaxBitSizeOfVectorRegister() / 16;
+    case D_U16M2: return 2 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_U16M4: return 4 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_U16M8: return 8 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_U16MF2: return getMaxBitSizeOfVectorRegister() / 16 / 2;
+    case D_U16MF4: return getMaxBitSizeOfVectorRegister() / 16 / 4;
+    case D_I16M1: return getMaxBitSizeOfVectorRegister() / 16;
+    case D_I16M2: return 2 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_I16M4: return 4 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_I16M8: return 8 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_I16MF2: return getMaxBitSizeOfVectorRegister() / 16 / 2;
+    case D_I16MF4: return getMaxBitSizeOfVectorRegister() / 16 / 4;
+    case D_U32M1: return getMaxBitSizeOfVectorRegister() / 32;
+    case D_U32M2: return 2 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_U32M4: return 4 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_U32M8: return 8 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_U32MF2: return getMaxBitSizeOfVectorRegister() / 32 / 2;
+    case D_I32M1: return getMaxBitSizeOfVectorRegister() / 32;
+    case D_I32M2: return 2 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_I32M4: return 4 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_I32M8: return 8 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_I32MF2: return getMaxBitSizeOfVectorRegister() / 32 / 2;
+    case D_U64M1: return getMaxBitSizeOfVectorRegister() / 64;
+    case D_U64M2: return 2 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_U64M4: return 4 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_U64M8: return 8 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_I64M1: return getMaxBitSizeOfVectorRegister() / 64;
+    case D_I64M2: return 2 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_I64M4: return 4 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_I64M8: return 8 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_BF16M1: return getMaxBitSizeOfVectorRegister() / 16;
+    case D_BF16M2: return 2 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_BF16M4: return 4 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_BF16M8: return 8 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_BF16MF2: return getMaxBitSizeOfVectorRegister() / 16 / 2;
+    case D_BF16MF4: return getMaxBitSizeOfVectorRegister() / 16 / 4;
+    case D_F16M1: return getMaxBitSizeOfVectorRegister() / 16;
+    case D_F16M2: return 2 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_F16M4: return 4 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_F16M8: return 8 * getMaxBitSizeOfVectorRegister() / 16;
+    case D_F16MF2: return getMaxBitSizeOfVectorRegister() / 16 / 2;
+    case D_F16MF4: return getMaxBitSizeOfVectorRegister() / 16 / 4;
+    case D_F32M1: return getMaxBitSizeOfVectorRegister() / 32;
+    case D_F32M2: return 2 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_F32M4: return 4 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_F32M8: return 8 * getMaxBitSizeOfVectorRegister() / 32;
+    case D_F32MF2: return getMaxBitSizeOfVectorRegister() / 32 / 2;
+    case D_F64M1: return getMaxBitSizeOfVectorRegister() / 64;
+    case D_F64M2: return 2 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_F64M4: return 4 * getMaxBitSizeOfVectorRegister() / 64;
+    case D_F64M8: return 8 * getMaxBitSizeOfVectorRegister() / 64;
+    default: ASSERTN(0, ("Unsupported data type")); return 0;
+    }
+    return 0;
+}
+
+
+Type const* TypeMgr::getScalableBoolTypeWithNonBool(DATA_TYPE vec_elem_ty)
+    const
+{
+    switch (vec_elem_ty) {
+    case D_U8M1: return m_bool8;
+    case D_U8M2: return m_bool4;
+    case D_U8M8: return m_bool1;
+    case D_U8M4: return m_bool2;
+    case D_U8MF2: return m_bool16;
+    case D_U8MF4: return m_bool32;
+    case D_U8MF8: return m_bool64;
+    case D_I8M1: return m_bool8;
+    case D_I8M2: return m_bool4;
+    case D_I8M4: return m_bool2;
+    case D_I8M8: return m_bool1;
+    case D_I8MF2: return m_bool16;
+    case D_I8MF4: return m_bool32;
+    case D_I8MF8: return m_bool64;
+    case D_U16M1: return m_bool16;
+    case D_U16M2: return m_bool8;
+    case D_U16M4: return m_bool4;
+    case D_U16M8: return m_bool2;
+    case D_U16MF2: return m_bool32;
+    case D_U16MF4: return m_bool64;
+    case D_I16M1: return m_bool16;
+    case D_I16M2: return m_bool8;
+    case D_I16M4: return m_bool4;
+    case D_I16M8: return m_bool2;
+    case D_I16MF2: return m_bool32;
+    case D_I16MF4: return m_bool64;
+    case D_U32M1: return m_bool32;
+    case D_U32M2: return m_bool16;
+    case D_U32M4: return m_bool8;
+    case D_U32M8: return m_bool4;
+    case D_U32MF2: return m_bool64;
+    case D_I32M1: return m_bool32;
+    case D_I32M2: return m_bool16;
+    case D_I32M4: return m_bool8;
+    case D_I32M8: return m_bool4;
+    case D_I32MF2: return m_bool64;
+    case D_U64M1: return m_bool64;
+    case D_U64M2: return m_bool32;
+    case D_U64M4: return m_bool16;
+    case D_U64M8: return m_bool8;
+    case D_I64M1: return m_bool64;
+    case D_I64M2: return m_bool32;
+    case D_I64M4: return m_bool16;
+    case D_I64M8: return m_bool8;
+    case D_BF16M1: return m_bool16;
+    case D_BF16M2: return m_bool8;
+    case D_BF16M4: return m_bool4;
+    case D_BF16M8: return m_bool2;
+    case D_BF16MF2: return m_bool32;
+    case D_BF16MF4: return m_bool64;
+    case D_F16M1: return m_bool16;
+    case D_F16M2: return m_bool8;
+    case D_F16M4: return m_bool4;
+    case D_F16M8: return m_bool2;
+    case D_F16MF2: return m_bool32;
+    case D_F16MF4: return m_bool64;
+    case D_F32M1: return m_bool32;
+    case D_F32M2: return m_bool16;
+    case D_F32M4: return m_bool8;
+    case D_F32M8: return m_bool4;
+    case D_F32MF2: return m_bool64;
+    case D_F64M1: return m_bool64;
+    case D_F64M2: return m_bool32;
+    case D_F64M4: return m_bool16;
+    case D_F64M8: return m_bool8;
+    case D_B1: return m_bool1;
+    case D_B2: return m_bool2;
+    case D_B4: return m_bool4;
+    case D_B8: return m_bool8;
+    case D_B16: return m_bool16;
+    case D_B32: return m_bool32;
+    case D_B64: return m_bool64;
+    default: ASSERTN(0, ("Unsupported data type")); return nullptr;
+    }
+}
+
+
+DATA_TYPE TypeMgr::getBasicDTypeWithDType(DATA_TYPE dtype)
+{
+    if (dtype >= D_B && dtype <= D_F128) { return dtype; }
+    switch (dtype) {
+    case D_B1:
+    case D_B2:
+    case D_B4:
+    case D_B8: return D_U8;
+    case D_B16: return D_U16;
+    case D_B32: return D_U32;
+    case D_B64: return D_U64;
+    case D_U8M1:
+    case D_U8M2:
+    case D_U8M4:
+    case D_U8M8:
+    case D_U8MF2:
+    case D_U8MF4:
+    case D_U8MF8: return D_U8;
+    case D_I8M1:
+    case D_I8M2:
+    case D_I8M4:
+    case D_I8M8:
+    case D_I8MF2:
+    case D_I8MF4:
+    case D_I8MF8: return D_I8;
+    case D_I16M1:
+    case D_I16M2:
+    case D_I16M4:
+    case D_I16M8:
+    case D_I16MF2:
+    case D_I16MF4: return D_I16;
+    case D_U16M1:
+    case D_U16M2:
+    case D_U16M4:
+    case D_U16M8:
+    case D_U16MF2:
+    case D_U16MF4: return D_U16;
+    case D_U32M1:
+    case D_U32M2:
+    case D_U32M4:
+    case D_U32M8:
+    case D_U32MF2: return D_U32;
+    case D_I32M1:
+    case D_I32M2:
+    case D_I32M4:
+    case D_I32M8:
+    case D_I32MF2: return D_I32;
+    case D_U64M1:
+    case D_U64M2:
+    case D_U64M4:
+    case D_U64M8: return D_U64;
+    case D_I64M1:
+    case D_I64M2:
+    case D_I64M4:
+    case D_I64M8: return D_I64;
+    case D_BF16M1:
+    case D_BF16M2:
+    case D_BF16M4:
+    case D_BF16M8:
+    case D_BF16MF2:
+    case D_BF16MF4: return D_BF16;
+    case D_F16M1:
+    case D_F16M2:
+    case D_F16M4:
+    case D_F16M8:
+    case D_F16MF2:
+    case D_F16MF4: return D_F16;
+    case D_F32M1:
+    case D_F32M2:
+    case D_F32M4:
+    case D_F32M8:
+    case D_F32MF2: return D_F32;
+    case D_F64M1:
+    case D_F64M2:
+    case D_F64M4:
+    case D_F64M8: return D_F64;
+    default: UNREACHABLE();
+    }
+    return D_UNDEF;
+}
+
+
+LMUL TypeMgr::getLmulWithDType(DATA_TYPE dtype)
+{
+    if (dtype >= D_B && dtype <= D_F128) { return LMUL_M1; }
+    switch (dtype) {
+    case D_B1: return LMUL_M8;
+    case D_B2: return LMUL_M4;
+    case D_B4: return LMUL_M2;
+    case D_B8:
+    case D_B16:
+    case D_B32:
+    case D_B64: return LMUL_M1;
+    case D_U8M1:
+    case D_I8M1:
+    case D_U16M1:
+    case D_I16M1:
+    case D_BF16M1:
+    case D_F16M1:
+    case D_U32M1:
+    case D_I32M1:
+    case D_U64M1:
+    case D_I64M1:
+    case D_F32M1:
+    case D_F64M1: return LMUL_M1;
+    case D_U8M2:
+    case D_I8M2:
+    case D_U16M2:
+    case D_I16M2:
+    case D_BF16M2:
+    case D_F16M2:
+    case D_U32M2:
+    case D_I32M2:
+    case D_U64M2:
+    case D_I64M2:
+    case D_F32M2:
+    case D_F64M2: return LMUL_M2;
+    case D_U8M4:
+    case D_I8M4:
+    case D_U16M4:
+    case D_I16M4:
+    case D_BF16M4:
+    case D_F16M4:
+    case D_U32M4:
+    case D_I32M4:
+    case D_U64M4:
+    case D_I64M4:
+    case D_F32M4:
+    case D_F64M4: return LMUL_M4;
+    case D_U8M8:
+    case D_I8M8:
+    case D_U16M8:
+    case D_I16M8:
+    case D_BF16M8:
+    case D_F16M8:
+    case D_U32M8:
+    case D_I32M8:
+    case D_U64M8:
+    case D_I64M8:
+    case D_F32M8:
+    case D_F64M8: return LMUL_M8;
+    case D_U8MF2:
+    case D_I8MF2:
+    case D_U16MF2:
+    case D_I16MF2:
+    case D_BF16MF2:
+    case D_F16MF2:
+    case D_U32MF2:
+    case D_I32MF2:
+    case D_F32MF2: return LMUL_MF2;
+    case D_U8MF4:
+    case D_I8MF4:
+    case D_U16MF4:
+    case D_I16MF4:
+    case D_BF16MF4:
+    case D_F16MF4: return LMUL_MF4;
+    case D_U8MF8:
+    case D_I8MF8: return LMUL_MF8;
+    default: UNREACHABLE();
+    }
+    return LMUL_UNDEF;
 }
 
 

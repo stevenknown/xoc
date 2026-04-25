@@ -124,11 +124,13 @@ public:
     bool is_dump_vectorization; //Dump IR Vectorization.
     bool is_dump_multi_res_convert; //Dump Multiple Result Convert.
     bool is_dump_targinfo_handler; //Dump Multiple Result Convert.
-    bool is_dump_alge_reasscociate; //Dump Alge Reasscociation.
+    bool is_dump_alge_reassociate; //Dump Alge Reasscociation.
     bool is_dump_loop_dep_ana; //Dump Loop Dependence Analysis.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
+    bool is_dump_lcse; //Dump Local Common Subexpression Elimination.
     bool is_dump_ivr; //Dump Induction Variable Recognization.
+    bool is_dump_if_conversion; //Dump If Conversion.
     bool is_dump_licm; //Dump Loop Invariant Code Motion.
     bool is_dump_exprtab; //Dump Expr Tab.
     bool is_dump_loopcvt; //Dump Loop Convertion.
@@ -141,6 +143,7 @@ public:
     bool is_dump_irparser; //Dump IRParser.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
+    bool is_dump_global_refine; //Dump Global Refinement.
     bool is_dump_insert_cvt; //Dump InsertCvt.
     bool is_dump_calc_derivative; //Dump Derivative Cacluation.
     bool is_dump_gscc; //Dump GSCC.
@@ -165,6 +168,7 @@ public:
 
     bool isDumpAA() const;
     bool isDumpAfterPass() const;
+    bool isDumpAlgeReassociate() const;
     bool isDumpAll() const;
     bool isDumpForTest() const;
     bool isDumpBeforePass() const;
@@ -182,6 +186,7 @@ public:
     bool isDumpExprTab() const;
     bool isDumpGCSE() const;
     bool isDumpMDRef() const;
+    bool isDumpGlobalRefine() const;
     bool isDumpGSCC() const;
     bool isDumpGVN() const;
     bool isDumpInferType() const;
@@ -190,6 +195,8 @@ public:
     bool isDumpIRID() const;
     bool isDumpIRParser() const;
     bool isDumpIVR() const;
+    bool isDumpLCSE() const;
+    bool isDumpIfConversion() const;
     bool isDumpLICM() const;
     bool isDumpLIS() const;
     bool isDumpLivenessMgr() const;
@@ -204,7 +211,6 @@ public:
     bool isDumpMemUsage() const;
     bool isDumpMultiResConvert() const;
     bool isDumpTargInfoHandler() const;
-    bool isDumpAlgeReasscociate() const;
     bool isDumpNothing() const;
     bool isDumpPRSSAMgr() const;
     bool isDumpRA() const;
@@ -276,6 +282,7 @@ typedef enum _PASS_TYPE {
     PASS_CP,
     PASS_BCP,
     PASS_CCP,
+    PASS_RCP,
     PASS_GCSE,
     PASS_LCSE,
     PASS_RP,
@@ -286,6 +293,7 @@ typedef enum _PASS_TYPE {
     PASS_DCE,
     PASS_INFER_TYPE,
     PASS_INVERT_BRTGT,
+    PASS_IF_CONVERSION,
     PASS_LFTR,
     PASS_DSE,
     PASS_RCE,
@@ -294,6 +302,7 @@ typedef enum _PASS_TYPE {
     PASS_PDOM,
     PASS_MD_REF,
     PASS_LIVE_EXPR,
+    PASS_SOLVESET_MGR,
     PASS_AVAIL_REACH_DEF,
     PASS_REACH_DEF,
     PASS_CLASSIC_DU_CHAIN,
@@ -318,17 +327,30 @@ typedef enum _PASS_TYPE {
     PASS_MDLIVENESS_MGR,
     PASS_MDSSALIVE_MGR,
     PASS_REFINE,
+    PASS_GLOBAL_REFINE,
     PASS_INSERT_CVT,
     PASS_VECT,
     PASS_SCC,
     PASS_IRSIMP,
+    PASS_REGALLOC_MGR,
     PASS_LINEAR_SCAN_RA,
     PASS_IRMGR,
     PASS_CALL_GRAPH,
     PASS_MULTI_RES_CVT,
-    PASS_ALGE_REASSCOCIATE,
+    PASS_ALGE_REASSOCIATE,
     PASS_TARGINFO_HANDLER,
     PASS_LOOP_DEP_ANA,
+    PASS_PROLOGUE_EPILOGUE,
+    PASS_GP_ADJUSTMENT,
+    PASS_BR_OPT,
+    PASS_DYNAMIC_STACK,
+    PASS_IRRELOC,
+    PASS_VARRELOC,
+    PASS_ARGPASSER,
+    PASS_IGOTO_OPT,
+    PASS_INST_SCHED,
+    PASS_STACK_COLORING,
+    PASS_SAVE_CALLEE,
     #include "pass_type_ext.inc"
     PASS_NUM,
 } PASS_TYPE;
@@ -340,6 +362,9 @@ extern INT g_opt_level;
 
 //Perform peephole optimizations.
 extern bool g_do_refine;
+
+//Perform global refinement optimizations.
+extern bool g_do_global_refine;
 
 //Perform more aggressive peephole optimizations.
 //e.g: cos:f64 5.0:f64 will be refined to 0.9961947:f64 directly.
@@ -400,6 +425,9 @@ extern bool g_do_prssa;
 
 //Build Memory SSA and perform optimization based on Memory SSA.
 extern bool g_do_mdssa;
+
+//True to verify readonly attribute of IR.
+extern bool g_verify_ir_attr_readonly;
 
 //Build control flow graph.
 extern bool g_do_cfg;
@@ -539,6 +567,9 @@ extern bool g_do_rp;
 //Perform global common subexpression elimination.
 extern bool g_do_gcse;
 
+//Perform if conversion.
+extern bool g_do_if_conversion;
+
 //Perform local common subexpression elimination.
 extern bool g_do_lcse;
 
@@ -627,7 +658,12 @@ extern bool g_do_poly_tran;
 extern bool g_do_refine_duchain;
 
 //Algebraic Reasscociation.
-extern bool g_do_alge_reasscociate;
+extern bool g_do_alge_reassociate;
+
+//Perform aggressive algebraic reasscociation.
+//It may cause undefined behaviour when the original code has overflow or
+//underflow condition.
+extern bool g_do_alge_reassociate_aggressive;
 
 //Linear Scan Register Allocation.
 extern bool g_do_lsra;
@@ -698,13 +734,14 @@ extern StrTabOption g_include_region;
 extern StrTabOption g_exclude_region;
 
 //Stack is located in SPM by default, which is set to false.
-//If it is located in HBM, it is set to true.
+//If it is located in global memory, it is set to true.
 extern bool g_stack_on_global;
 
-//Used to enable the debug mode for LSRA, and the g_debug_reg_num can be use
-//to control the number of physical register under debug mode.
+
+//Used to enable the debug mode for LSRA, and the g_debug_reg_mod can be use
+//to control the concrete under debug mode.
 extern bool g_do_lsra_debug;
-extern UINT g_debug_reg_num;
+extern UINT g_debug_reg_mod;
 
 //Enable fp as stack pointer.
 extern bool g_force_use_fp_as_sp;

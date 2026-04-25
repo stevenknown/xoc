@@ -679,11 +679,11 @@ UINT IRCFG::afterReplacePredInCase2(
     //Update phi operation.
     //Copy the operand that is in the replacement position. The original
     //livein value of the operand should livein from new predecessors as well.
-    if (usePRSSADU()) {
+    if (usePRSSADU() && ctx.needUpdatePhi()) {
         prssamgr->dupAndInsertPhiOpnd(
             succ, newpredstartpos, newpreds.get_elem_count());
     }
-    if (useMDSSADU()) {
+    if (useMDSSADU() && ctx.needUpdatePhi()) {
         mdssamgr->dupAndInsertPhiOpnd(
             succ, newpredstartpos, newpreds.get_elem_count());
     }
@@ -713,14 +713,14 @@ UINT IRCFG::afterReplacePredInCase1(
     ASSERT0(newpreds.get_elem_count() <= 1);
     if (getPredsNum(succ) != orgnum) {
         ASSERT0(newpredstartpos == orgpos);
-        if (usePRSSADU()) {
+        if (usePRSSADU() && ctx.needUpdatePhi()) {
             PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
             PRSSAUpdateCtx updctx(const_cast<CfgOptCtx&>(ctx).getOptCtx());
             //Remove phi information before modify CFG.
             prssamgr->removeSuccessorDesignatedPhiOpnd(
                 succ, newpredstartpos, updctx);
         }
-        if (useMDSSADU()) {
+        if (useMDSSADU() && ctx.needUpdatePhi()) {
             MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
             //Remove phi information before modify CFG.
             MDSSAUpdateCtx ssactx(const_cast<CfgOptCtx&>(ctx).getOptCtx());
@@ -796,7 +796,7 @@ void IRCFG::initEntryAndExit()
     //If you expect to reconstruct whole CFG, please destroy the PASS_CFG
     //first and then register the CFG pass again.
     m_entry = nullptr;
-    m_exit_list.clean();
+    cleanExitList();
     if (m_bb_list != nullptr && m_bb_list->get_elem_count() == 0) {
         return;
     }
@@ -886,7 +886,8 @@ void IRCFG::removeAllOutEdge(IRBB const* bb, OUT CfgOptCtx & ctx)
     for (Vertex const* out = Graph::get_first_out_vertex(vex, it);
          out != nullptr; out = next) {
         next = Graph::get_next_out_vertex(it);
-        removeEdge(vex, out, ctx);
+        IRBB * outbb = getBB(out->id());
+        removeEdge(const_cast<IRBB*>(bb), outbb, ctx);
     }
 }
 
@@ -899,7 +900,8 @@ void IRCFG::removeAllInEdge(IRBB const* bb, OUT CfgOptCtx & ctx)
     for (Vertex const* in = Graph::get_first_in_vertex(vex, it);
          in != nullptr; in = next) {
         next = Graph::get_next_in_vertex(it);
-        removeEdge(in, vex, ctx);
+        IRBB * inbb = getBB(in->id());
+        removeEdge(inbb, const_cast<IRBB*>(bb), ctx);
     }
 }
 
@@ -966,7 +968,7 @@ bool IRCFG::removeRedundantLabel()
     bool change = false;
     BBListIter it;
     TTab<LabelInfo const*> useful;
-    for (IRBB * bb = getBBList()->get_head(&it); bb != nullptr;
+    for (IRBB const* bb = getBBList()->get_head(&it); bb != nullptr;
          bb = getBBList()->get_next(&it)) {
         IR * last_xr = get_last_xr(bb);
         if (last_xr == nullptr) { continue; }
@@ -1155,14 +1157,12 @@ void IRCFG::findTargetBBOfMulticondBranch(
     ASSERT0(ir->isMultiConditionalBr());
     tgt_bbs.clean();
     if (m_bb_list == nullptr) { return; }
-
     IR * casev_list = SWITCH_case_list(ir);
     if (SWITCH_deflab(ir) != nullptr) {
         IRBB * tbb = findBBbyLabel(SWITCH_deflab(ir));
         ASSERT0(tbb);
         tgt_bbs.append_tail(tbb);
     }
-
     for (IR * casev = casev_list; casev != nullptr; casev = IR_next(casev)) {
         IRBB * tbb = findBBbyLabel(CASE_lab(casev));
         ASSERT0(tbb);
@@ -1311,6 +1311,38 @@ void IRCFG::LoopAnalysis(OUT OptCtx & oc)
 }
 
 
+bool IRCFG::hasUniqueBranchTarget(IR const* ir, LabelInfo const** tgtlab)
+{
+    ASSERT0(ir);
+    if (!ir->isBranch()) { return false; }
+    ASSERT0(tgtlab);
+    *tgtlab = nullptr;
+    if (ir->isConditionalBr() || ir->isUnconditionalBr()) {
+        *tgtlab = ir->getLabel();
+        return true;
+    }
+    if (ir->isMultiConditionalBr() || ir->isIndirectBr()) {
+        LabelInfo const* lab = nullptr;
+        ConstIRIter it;
+        for (IR const* x = xoc::iterInitC(ir, it);
+             x != nullptr; x = xoc::iterNextC(it)) {
+            if (x->is_case()) { continue; }
+            if (lab == nullptr) {
+                lab = CASE_lab(x);
+                continue;
+            }
+            if (lab != CASE_lab(x)) {
+                return false;
+            }
+        }
+        *tgtlab = lab;
+        return true;
+    }
+    UNREACHABLE();
+    return false;
+}
+
+
 //Find bb that 'lab' attouchemented.
 IRBB * IRCFG::findBBbyLabel(LabelInfo const* lab) const
 {
@@ -1349,7 +1381,9 @@ void IRCFG::preprocessBeforeRemoveBB(IRBB * bb, MOD CfgOptCtx & ctx)
 {
     //Remove related PHI operand from successor BB before removing 'bbct'
     //if bbct's successor has PHI.
-    removeSuccPhiOpnd(bb, ctx);
+    //CASE:removeSuccDesignatedPhiOpnd() will be invoked at removeEdge(),
+    //thus there is no need to do it here.
+    //removeSuccPhiOpnd(bb, ctx);
 }
 
 
@@ -1377,7 +1411,7 @@ bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc, OUT SplitBBCtx * sctx)
 bool IRCFG::tryUpdateRPOBeforeCFGChanged(
     IRBB * newbb, IRBB const* marker, bool newbb_prior_marker, MOD OptCtx * oc)
 {
-    if (!oc->is_rpo_valid()) {
+    if (!oc->isPassValid(PASS_RPO)) {
         oc->setInvalidRPO();
         oc->setInvalidCDG();
         return false;
@@ -1498,7 +1532,7 @@ IRBB * IRCFG::changeFallthroughBBToJumpBB(
     addLabel(next, li);
     addBB(tramp_bb);
     tryUpdateRPOBeforeCFGChanged(tramp_bb, prev, false, oc);
-    if (oc->is_dom_valid()) {
+    if (oc->isPassValid(PASS_DOM)) {
         addDomInfoToNewIPDom(prev->id(), tramp_bb->id());
     }
     getBBList()->insert_after(tramp_bb, prev);
@@ -1545,7 +1579,7 @@ void IRCFG::insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
     //Insert newbb that should follow 'marker'.
     bblst->insert_after(newbb, marker_it);
     insertVertexBetween(marker->id(), next->id(), newbb->id());
-    if (oc->is_dom_valid()) {
+    if (oc->isPassValid(PASS_DOM)) {
         addDomInfoToFallThroughBB(marker, newbb, next);
     }
 }
@@ -1562,7 +1596,7 @@ void IRCFG::addDomInfoToFallThroughBB(IRBB const* marker, IRBB const* newbb,
 void IRCFG::replaceBranchLabel(IRBB const* from, IRBB const* to,
                                LabelInfo const* li)
 {
-    IR * last_xr_of_from = get_last_xr(const_cast<IRBB*>(from));
+    IR * last_xr_of_from = get_last_xr(from);
     if (last_xr_of_from->is_igoto()) {
         bool find_label = false;
         CIGoto * igoto = (CIGoto*)last_xr_of_from;
@@ -1666,12 +1700,12 @@ void IRCFG::removeSuccDesignatedPhiOpnd(
 {
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB 'succ' has PHI.
-    if (usePRSSADU()) {
+    if (usePRSSADU() && ctx.needUpdatePhi()) {
         PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
         PRSSAUpdateCtx ssactx(const_cast<CfgOptCtx&>(ctx).getOptCtx());
         prssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos, ssactx);
     }
-    if (useMDSSADU()) {
+    if (useMDSSADU() && ctx.needUpdatePhi()) {
         MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
         MDSSAUpdateCtx ssactx(const_cast<CfgOptCtx&>(ctx).getOptCtx());
         if (!ctx.needUpdateDomInfo()) {
@@ -1741,24 +1775,25 @@ void IRCFG::removeAllMDPhi(IRBB * bb, CfgOptCtx const& ctx)
 }
 
 
-void IRCFG::reviseMDSSA(xcom::VexTab const& vextab, xcom::Vertex const* root,
-                        MOD CfgOptCtx & ctx)
+void IRCFG::reviseMDSSA(
+    xcom::VexTab const& vextab, xcom::Vertex const* root, MOD CfgOptCtx & ctx)
 {
     if (!useMDSSADU()) { return; }
     START_TIMER_FMT(t, ("IRCFG::Revise MDSSA"));
-    ASSERT0(ctx.getOptCtx().is_dom_valid());
+    ASSERT0(ctx.getOptCtx().isPassValid(PASS_DOM));
     xcom::DomTree domtree;
     genDomTree(domtree);
-    ReconstructMDSSAVF vf(vextab, domtree, this, m_rg->getMDSSAMgr(),
-                          &ctx.getOptCtx(), ctx.getActMgr());
+    ReconstructMDSSAVF vf(
+        vextab, domtree, this, m_rg->getMDSSAMgr(), &ctx.getOptCtx(),
+        ctx.getActMgr());
     ReconstructMDSSA recon(domtree, root, vf);
     recon.reconstruct();
     END_TIMER_FMT(t, ("IRCFG::Revise MDSSA"));
 }
 
 
-void IRCFG::insertBBBetween(IRBB const* from, IRBB * to, IRBB * newbb,
-                            OUT CfgOptCtx & ctx)
+void IRCFG::insertBBBetween(
+    IRBB const* from, IRBB * to, IRBB * newbb, OUT CfgOptCtx & ctx)
 {
     xcom::Graph::insertVertexBetween(from->id(), to->id(), newbb->id());
     if (!ctx.needUpdateDomInfo()) { return; }
@@ -1773,7 +1808,7 @@ void IRCFG::tryUpdateDomInfoAndMDSSA(
     //NOTE:We prefer to compute RPO at the beginning of pass.
     //RPO is necessary to compute DomInfo and recompute it is not
     //very costly, thus we prefer to recompute RPO.
-   ASSERT0(ctx.getOptCtx().is_rpo_valid());
+    ASSERT0(ctx.getOptCtx().isPassValid(PASS_RPO));
     tryUpdateDomInfoAndMDSSA(modset, from, to, ctx);
 }
 
@@ -1785,8 +1820,8 @@ void IRCFG::tryUpdateDomInfoAndMDSSA(
 {
     //TBD: the function does NOT need RPO to update DomInfo. It updates
     //DomInfo via current DomInfo incrementally.
-    //ASSERTN(ctx.getOptCtx().is_rpo_valid(), ("compute DOM need RPO"));
-    ASSERTN(ctx.getOptCtx().is_dom_valid(),
+    //ASSERTN(ctx.getOptCtx().isPassValid(PASS_RPO), ("compute DOM need RPO"));
+    ASSERTN(ctx.getOptCtx().isPassValid(PASS_DOM),
             ("DOM has already been corrupted"));
 
     //Note if Dom Info is not maintained, SSA update can not be proven
@@ -1795,6 +1830,7 @@ void IRCFG::tryUpdateDomInfoAndMDSSA(
     //order to tolerate subsequently processing of CFG.
     xcom::Vertex const* root = nullptr;
     UINT iter_time = 0;
+
     //NOTE: the function needs RPO to compute DomInfo.
     reviseDomInfoAfterAddOrRemoveEdge(from, to, &modset, root, iter_time);
 
@@ -1807,29 +1843,25 @@ void IRCFG::tryUpdateDomInfoAndMDSSA(
 }
 
 
-void IRCFG::removeEdge(Vertex const* from, Vertex const* to,
-                       OUT CfgOptCtx & ctx)
-{
-    xcom::Edge * e = xcom::Graph::getEdge(from->id(), to->id());
-    ASSERT0(e != nullptr);
-    xcom::Graph::removeEdge(e);
-    if (!ctx.needUpdateDomInfo()) { return; }
-    tryUpdateDomInfoAndMDSSA(from, to, ctx);
-}
-
-
 void IRCFG::removeEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 {
     bool is_pred;
     UINT npred = WhichPred(from, to, is_pred);
     ASSERTN_DUMMYUSE(is_pred, ("'from' is not predecessor of 'to'"));
     removeSuccDesignatedPhiOpnd(to, npred, ctx);
-    removeEdge(from->getVex(), to->getVex(), ctx);
+    xcom::Edge * e = xcom::Graph::getEdge(
+        from->getVex()->id(), to->getVex()->id());
+    ASSERT0(e != nullptr);
+    xcom::Graph::removeEdge(e);
+    if (!ctx.needUpdateDomInfo()) { return; }
+    tryUpdateDomInfoAndMDSSA(from->getVex(), to->getVex(), ctx);
 }
 
 
 xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 {
+    xcom::Edge * e = xcom::DGraph::getEdge(from->id(), to->id());
+    if (e != nullptr) { return e; }
     PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
     PRSSAInfoCollect col;
     if (usePRSSADU() && ctx.needUpdateDomInfo()) {
@@ -1838,16 +1870,16 @@ xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
         col.init(prssamgr, ctx.getOptCtx());
         col.collect(from, to);
     }
-    xcom::Edge * e = xcom::DGraph::addEdge(from->id(), to->id());
+    e = xcom::DGraph::addEdge(from->id(), to->id());
     setVertex(from, to, e);
 
     //After adding BB or changing BB's successor, you need to add the related
     //PHI operand as well if the successor of BB has a PHI stmt.
-    if (usePRSSADU()) {
+    if (usePRSSADU() && ctx.needUpdatePhi()) {
         ASSERT0(prssamgr);
         prssamgr->addSuccessorDesignatedPhiOpnd(from, to, col);
     }
-    if (useMDSSADU()) {
+    if (useMDSSADU() && ctx.needUpdatePhi()) {
         MDSSAStatus st;
         MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
         mdssamgr->addSuccessorDesignatedPhiOpnd(from, to, ctx.getOptCtx(), st);
@@ -1876,15 +1908,16 @@ xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to, OUT CfgOptCtx & ctx)
 //    ...
 //Remove bb and revise CFG.
 //ct: container in m_bb_list of CFG. It will be updated if related BB removed.
-static bool removeTrampolinBBCase1(IRCFG * cfg, BBListIter * ct,
-                                   OUT CfgOptCtx & ctx)
+static bool removeTrampolinBBCase1(
+    IRCFG * cfg, BBListIter * ct, OUT CfgOptCtx & ctx)
 {
     List<IRBB*> preds;
     IRBB * bb = (*ct)->val();
     ASSERT0(cfg->getSuccsNum(bb) == 1);
-    IRBB const* succ = cfg->get_first_succ(bb);
+    AdjBBIter it;
+    IRBB const* succ = cfg->get_first_succ(bb, it);
     ASSERT0(succ);
-    IR const* uncond_br = cfg->get_first_xr(const_cast<IRBB*>(bb));
+    IR const* uncond_br = cfg->get_first_xr(bb);
     ASSERT0(uncond_br && uncond_br->isUnconditionalBr());
     BBListIter tmp_bb_ct = *ct;
     IRBB * next = cfg->getBBList()->get_next(&tmp_bb_ct);
@@ -1978,7 +2011,7 @@ bool IRCFG::removeTrampolinBB(OUT CfgOptCtx & ctx)
         IRBB const* bb = ct->val();
         if (bb->isExceptionHandler()) { continue; }
 
-        IR const* uncond_br = get_first_xr(const_cast<IRBB*>(bb));
+        IR const* uncond_br = get_first_xr(bb);
         if (uncond_br == nullptr ||
             !uncond_br->isUnconditionalBr() ||
             (uncond_br->isIndirectBr() && uncond_br->hasMultiTarget()) ||
@@ -2159,7 +2192,8 @@ static bool removeTrampolinEdgeCase2(
     bool removed = false;
     List<IRBB*> preds; //record preds in list because CFG may be modified.
     cfg->get_preds(preds, bb);
-    IRBB * succ = cfg->get_first_succ(bb);
+    AdjBBIter it;
+    IRBB * succ = cfg->get_first_succ(bb, it);
     ASSERT0(succ);
     if (succ == bb) {
         //CASE: BB_pred
@@ -2417,12 +2451,12 @@ bool IRCFG::removeRedundantBranch(OUT CfgOptCtx & ctx)
 
 bool IRCFG::verifyDomAndPdom(OptCtx const& oc) const
 {
-    if (oc.is_dom_valid()) {
+    if (oc.isPassValid(PASS_DOM)) {
         if (!DGraph::verifyDom()) {
             return false;
         }
     }
-    if (oc.is_pdom_valid()) {
+    if (oc.isPassValid(PASS_PDOM)) {
         if (!DGraph::verifyPdom()) {
             return false;
         }
@@ -2436,6 +2470,12 @@ bool IRCFG::verifyLoopInfo(OptCtx const& oc) const
     ASSERT0(xoc::verifyLoopInfoTree(getLoopInfo(), oc));
     ASSERT0(xoc::verifyLoopInfoTreeByRecomp(this, getLoopInfo(), oc));
     return true;
+}
+
+
+void IRCFG::dumpDomTree() const
+{
+    CFG<IRBB, IR>::dumpDomTree(m_rg, true, false);
 }
 
 
@@ -2975,25 +3015,30 @@ bool IRCFG::dump() const
 }
 
 
-//Record the Exit BB here.
-void IRCFG::computeExitList()
+//Clean the Exit flag.
+void IRCFG::cleanExitList()
 {
-    //Clean the Exit flag.
     BBListIter ct = nullptr;
     for (m_exit_list.get_head(&ct);
-         ct != m_exit_list.end();
-         ct = m_exit_list.get_next(ct)) {
+         ct != m_exit_list.end(); ct = m_exit_list.get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
         BB_is_exit(bb) = false;
     }
+    m_exit_list.clean();
+}
 
+
+//Record the Exit BB here.
+void IRCFG::computeExitList()
+{
+    cleanExitList();
     CFG<IRBB, IR>::computeExitList();
 
     //Record the Exit flag as BB attribute to speed up accessing.
+    BBListIter ct = nullptr;
     for (m_exit_list.get_head(&ct);
-         ct != m_exit_list.end();
-         ct = m_exit_list.get_next(ct)) {
+         ct != m_exit_list.end(); ct = m_exit_list.get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
         BB_is_exit(bb) = true;
@@ -3482,10 +3527,10 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
             }
         }
         if (g_do_cfg_remove_redundant_branch) {
-            bool is_dom_valid = oc.is_dom_valid();
+            bool is_dom_valid = oc.isPassValid(PASS_DOM);
             bool res = removeRedundantBranch(ctx);
             lchange |= res;
-            ASSERT0(oc.is_dom_valid() == is_dom_valid);
+            ASSERT0(oc.isPassValid(PASS_DOM) == is_dom_valid);
             if (res) {
                 //The function does not change DomInfo.
                 ASSERT0L3(verifyIRandBB(getBBList(), m_rg));

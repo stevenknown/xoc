@@ -166,6 +166,34 @@ public:
     void findAllLoopEndBB(
         xcom::Graph const* cfg, OUT List<UINT> & endlst) const;
 
+    //Find and collect the BB that lie on the Mandatory-Path in
+    //current Loop.
+    //e.g: In the case, bbset contains {BB1,BB2,BB3,BB5,BB6}, but excludes BB4.
+    //  BB1: LOOP_HEAD   <-
+    //  falsebr LOOP_END;  |
+    //    |                |
+    //  BB2: LOOP_BODY     |
+    //  add                |
+    //    |                |
+    //  BB3:               |
+    //  truebr L1----      |
+    //    |          |     |
+    //  BB4:         |     |
+    //    |          |     |
+    //  mul          |     |
+    //    |          |     |
+    //    |          |     |
+    //  BB5: L1 <----      |
+    //  div                |
+    //    |                |
+    //  BB6:               |
+    //  goto LOOP_HEAD;----
+    //
+    //  BB7: LOOP_END
+    //Return true if the function found the path, otherwise return false.
+    bool findMandatoryPath(
+        OUT xcom::BitSet & bbset, xcom::DGraph const* cfg) const;
+
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
 
@@ -514,6 +542,28 @@ void LI<BB>::dumpLoopTree(
         looplist = looplist->get_next();
     }
 }
+
+
+template <class BB>
+bool LI<BB>::findMandatoryPath(
+    OUT xcom::BitSet & bbset, xcom::DGraph const* cfg) const
+{
+    bbset.clean();
+    BitSet const* bodyset = getBodyBBSet();
+    UINT backedge_start = findBackEdgeStartBB(cfg);
+    if (backedge_start == BBID_UNDEF) { return false; }
+    bbset.bunion(backedge_start);
+    UINT loophead = getLoopHead()->id();
+    bbset.bunion(loophead);
+    for (BSIdx i = bodyset->get_first();
+         i != BS_UNDEF; i = bodyset->get_next(i)) {
+        if (i == loophead || i == backedge_start) { continue; }
+        if (!cfg->is_dom(i, backedge_start)) { continue; }
+        ASSERT0(cfg->is_pdom(backedge_start, i));
+        bbset.bunion(i);
+    }
+    return true;
+}
 //END LI<BB>
 
 
@@ -661,7 +711,7 @@ protected:
     bool insertLoopTree(LI<BB> ** lilist, LI<BB> * loop);
 
     bool reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop);
-    void removeLoopInfo(LI<BB> * loop);
+    void removeLoopInfo(LI<BB> ** lilist, LI<BB> * loop);
 public:
     ConstructLoopTree(CFG<BB, XR> const* cfg, LoopInfoMgr<BB> & limgr)
         : m_cfg(cfg), m_bb_list(cfg->getBBList()), m_li_mgr(limgr)
@@ -672,11 +722,25 @@ public:
 
 //Remove 'loop' out of loop tree.
 template <class BB, class XR>
-void ConstructLoopTree<BB, XR>::removeLoopInfo(LI<BB> * loop)
+void ConstructLoopTree<BB, XR>::removeLoopInfo(LI<BB> ** lilist, LI<BB> * loop)
 {
+    ASSERT0(lilist && *lilist);
     ASSERT0(loop != nullptr);
+
     LI<BB> * head = xcom::get_head(loop);
     ASSERT0(head);
+
+    //Note that when the head node of the linked list where the loop is
+    //located is the root node of the loop tree, it is necessary to modify
+    //the root node pointer of the loop tree instead of the head.
+    //In this case, if head == loop, it can ensure that the value pointed
+    //to by the lilist pointer is correct.
+    if (head == *lilist) {
+        xcom::remove(lilist, loop);
+        loop->cleanAdjRelation();
+        return;
+    }
+
     xcom::remove(&head, loop);
     if (loop->getOuter() != nullptr) {
         //Update inner-list for outer-loop of 'loop'.
@@ -757,7 +821,7 @@ template <class BB, class XR>
 bool ConstructLoopTree<BB, XR>::reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
 {
     ASSERT0(lilist != nullptr && loop != nullptr);
-    removeLoopInfo(loop);
+    removeLoopInfo(lilist, loop);
     return insertLoopTree(lilist, loop);
 }
 
@@ -915,7 +979,7 @@ FindRedOpResult findRedOpInLoop(
 //Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(
     IR const* ir, LI<IRBB> const* li, Region const* rg,
-    InvStmtList const* invariant_stmt, bool check_tree);
+    InvStmtList const* invariant_stmt, bool check_tree, OptCtx const* oc);
 
 //Return true if bbid belongs to the LoopInfo tree.
 //bbid: id of BB.

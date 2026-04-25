@@ -39,6 +39,7 @@ static bool readGR(CHAR * gr_file_name)
 {
     ASSERT0(gr_file_name);
     xoc::RegionMgr * rm = new xoc::RegionMgr();
+    rm->initTypeMgr();
     rm->initVarMgr();
     rm->initIRDescFlagSet();
     rm->getLogMgr()->init("tmp.log", true);

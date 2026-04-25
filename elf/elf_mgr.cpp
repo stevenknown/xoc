@@ -252,6 +252,12 @@ static SectionDesc const g_section_desc[] = {
     { SH_TYPE_SRODATA, S_PROGBITS, PH_TYPE_DATA,
       SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".srodata" },
 
+    { SH_TYPE_INIT_ARRAY, S_INIT_ARRAY, PH_TYPE_UNDEF,
+      SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".init_array" },
+
+    { SH_TYPE_FINI_ARRAY, S_FINI_ARRAY, PH_TYPE_UNDEF,
+      SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".fini_array" },
+
     #include "sect_desc_ext.impl"
 
     { SH_TYPE_MAX_NUM, S_UNDEF, PH_TYPE_UNDEF,
@@ -1147,7 +1153,7 @@ CHAR const* ELFMgr::getSectName(size_t idx) const
 bool ELFMgr::isSectionAllocable(size_t sectidx) const
 {
     return sectidx == SHN_COMMON ||
-           (sectidx >= 0 && sectidx < m_elf_hdr.e_shnum &&
+           ((sectidx >= 0) && (sectidx < m_elf_hdr.e_shnum) &&
             HAVE_FLAG(m_elf_sectheader[sectidx].s_flags, SF_ALLOC));
 }
 
@@ -1315,7 +1321,7 @@ CHAR const* ELFMgr::getSymDefinedSectName(ELFSym const& sym) const
 {
     ASSERT0(sym.st_shndx <= SHN_HIRESERVE);
     if (sym.st_shndx == SHN_UNDEF || sym.st_shndx >= SHN_LORESERVE) {
-        return "no-defined-sect";
+        return ELF_UNDEF_NAME_STR;
     }
     return getSectName(sym.st_shndx);
 }
@@ -2044,68 +2050,37 @@ SymbolInfo * ELFMgr::findSymbol(Sym const* symbol_name)
 }
 
 
-void ELFMgr::initSymbol(xoc::Var const* var, Sym const* func_name,
-                        SECTION_TYPE sect_type, UINT sect_ofst,
-                        UCHAR symbol_type, bool is_extern)
+void ELFMgr::initSymbol(xoc::Var const* var,
+    Sym const* func_name, UINT sect_ofst)
 {
     ASSERT0(var && var->get_name() &&
             !m_symbol_info.find(var->get_name()));
 
     SymbolInfo * sym_info = m_sym_mgr.allocSymbolInfo();
     ASSERT0(sym_info);
-    SYMINFO_sym(sym_info).st_type = symbol_type;
 
     if (var->is_func()) {
         FunctionInfo * func_info = m_func_mgr.allocFunctionInfo();
         ASSERT0(func_info);
 
         SYMINFO_func(sym_info) = func_info;
-        SYMINFO_func_name(sym_info) = var->get_name();
-        FUNCINFO_name(SYMINFO_func(sym_info)) = var->get_name();
 
         //Set whether symbol is function.
         SYMINFO_is_func(sym_info) = true;
-
-        //Set whether symbol is a entry function.
-        FUNCINFO_is_entry(SYMINFO_func(sym_info)) = var->is_entry();
     }
 
     //Set function name or related function name.
     SYMINFO_func_name(sym_info) = func_name != nullptr ?
         func_name : SYMINFO_func_name(sym_info);
 
-    //Set symbol name.
-    SYMINFO_name(sym_info) = var->get_name();
-
-    //Set whether symbol is global.
-    SYMINFO_is_global(sym_info) = var->is_global();
-
-    //Set whether symbol is visible.
-    SYMINFO_is_visible(sym_info) = var->is_visible();
-
-    //Set whether symbol is weak.
-    SYMINFO_is_weak(sym_info) = var->is_weak();
-
-    //Set whether symbol is label.
-    SYMINFO_is_label(sym_info) = var->is_label();
-
-    //Set whether symbol is external.
-    SYMINFO_is_extern(sym_info) = is_extern;
-
     //Set symbol section.
-    SYMINFO_sect_type(sym_info) = sect_type != SH_TYPE_UNDEF ?
-        sect_type : judgeSectWhichVarBelongTo(var);
+    SYMINFO_sect_type(sym_info) = judgeSectWhichVarBelongTo(var);
 
     //Set section offset.
     SYMINFO_ofst(sym_info) = sect_ofst != 0 ?
         sect_ofst : SYMINFO_ofst(sym_info);
 
     m_symbol_info.set(var->get_name(), sym_info);
-
-    //The local symbols are in front of the symbol table, and the global
-    //symbols are in the back of the symbol table.
-    if (var->is_global()) { m_symbol_name.append_tail(var->get_name()); }
-    else { m_symbol_name.append_head(var->get_name()); }
 }
 
 
@@ -2115,45 +2090,139 @@ void ELFMgr::initExternalSymbol(xoc::Var const* var)
 
     if (m_symbol_info.find(var->get_name())) { return; }
 
-    //'true' represents this var is with external attribute.
-    initSymbol(var, nullptr, SH_TYPE_UNDEF, 0, STT_NOTYPE, true);
+    initSymbol(var, nullptr, 0);
 }
 
 
-void ELFMgr::initSymSection(xoc::Var const* var)
+void ELFMgr::extractSymbolInfoFromAllVar()
 {
-    ASSERT0(var && var->get_name() &&
-            !m_symbol_info.find(var->get_name()));
+    VarVec const* var_vec = getRegionMgr()->getVarMgr()->getVarVec();
+    ASSERT0(var_vec);
 
-    Sym const* sym = var->get_name();
-    ASSERT0(sym);
-    //Create a new SymbolInfo. Remember to delete it.
-    SymbolInfo * sym_info = m_symbol_info.find(var->get_name()) ?
-        m_symbol_info.get(var->get_name()) : new SymbolInfo();
-    ASSERT0(sym_info);
+    for (UINT i = 0; i < var_vec->get_elem_count(); i++) {
+        xoc::Var * var = var_vec->get(i);
+        if (!isAvailableVar(var)) { continue; }
 
+        bool find = false;
+        SymbolInfo * sym_info = m_symbol_info.getAndGen(var->get_name(), &find);
+        ASSERT0(sym_info);
+
+        //Whether the SymbolInfo had been initialized.
+        if (SYMINFO_is_init(sym_info)) { continue; }
+
+        //Extract SymbolInfo from 'var'.
+        extractSymbolInfoFromVar(var, sym_info);
+    }
+}
+
+
+void ELFMgr::extractSymbolInfoFromVar(Var const* var, MOD SymbolInfo * sym_info)
+{
+    ASSERT0(var && sym_info);
+
+    SYMINFO_is_init(sym_info) = true;
+    //Save sym_info.
+    m_symbol_name.append_tail(var->get_name());
     //Set symbol name.
-    SYMINFO_name(sym_info) = sym;
-
+    SYMINFO_name(sym_info) = var->get_name();
     //Set whether symbol is extern.
     SYMINFO_is_extern(sym_info) = var->is_extern();
-
     //Set whether symbol is weak.
     SYMINFO_is_weak(sym_info) = var->is_weak();
-
     //Set whether symbol is visible.
     SYMINFO_is_visible(sym_info) = var->is_visible();
-
     //Set whether symbol is global.
     SYMINFO_is_global(sym_info) = var->is_global();
-
     //Set whether symbol is function.
     SYMINFO_is_func(sym_info) = var->is_func();
+    //Set whether symbol is label.
+    SYMINFO_is_label(sym_info) = var->is_label();
+    //Set symbol align.
+    SYMINFO_align(sym_info) = var->get_align();
+    //Set ELFSym value in 'sym_info' according to 'var'.
+    processELFSymInSymbolInfo(var, sym_info);
+    //Set symbol section.
+    SYMINFO_sect_type(sym_info) = judgeSectWhichVarBelongTo(var);
+    //Process debug info in variable.
+    extractDebugInfoFromVar(var, sym_info);
 
-    //Set whether symbol is initialized.
-    SYMINFO_is_init(sym_info) = var->hasInitString() || var->hasInitVal();
+    if (var->is_func()) {
+        //Set function info.
+        if (!SYMINFO_func(sym_info)) {
+            SYMINFO_func(sym_info) = m_func_mgr.allocFunctionInfo();
+        }
+        //Record the user defined function for linker relaxation.
+        SYMINFO_is_user_def_func(sym_info) = true;
+        //Set function name.
+        SYMINFO_func_name(sym_info) = var->get_name();
+        //Add FunctionInfo into SymbolInfo.
+        FUNCINFO_name(SYMINFO_func(sym_info)) = var->get_name();
+        //Set whether symbol is a entry function.
+        FUNCINFO_is_entry(SYMINFO_func(sym_info)) = var->is_entry();
+        return;
+    }
 
-    //TODO：Since m_rm is currently empty, this interface
+    //Set the size of object SymbolInfo.
+    //Note: Pay attention to the symbol of the string type. The size
+    //is the length of the string plus one, because the character '\0'
+    //needs to be added to the end of the string.
+    SYMINFO_size(sym_info) = ((var->is_string() && !var->hasInitString()) ||
+        var->is_func()) ? 0 : (var->is_string() && var->hasInitString()) ?
+        ::strlen(VAR_string(var)->getStr()) + 1 : var->getByteSize(m_tm);
+
+    //Set symbol binword or data.
+    if (!var->hasInitVal()) { return; }
+
+    SYMINFO_data_byte(sym_info) = (BYTE*)xmalloc(SYMINFO_size(sym_info));
+    void * src_addr = var->is_string() ?
+        ((void*)(VAR_string(var)->getStr())) :
+        ((void*)(var->getByteValue()->getBuffer()));
+    ::memcpy((void*)(SYMINFO_data_byte(sym_info)),
+        src_addr, SYMINFO_size(sym_info));
+    SYMINFO_is_byte(sym_info) = true;
+}
+
+
+void ELFMgr::processELFSymInSymbolInfo(
+    Var const* var, MOD SymbolInfo * sym_info)
+{
+    ASSERT0(var && sym_info);
+
+    //Set symbol type.
+    SYMINFO_sym(sym_info).st_type = var->is_func() ?
+        STT_FUNC : var->is_label() ? STT_NOTYPE : STT_OBJECT;
+    SYMINFO_sym(sym_info).st_other = var->is_visible() ?
+        STV_DEFAULT : STV_HIDDEN;
+
+    //It it object variable.
+    if (!var->is_func() && var->is_visible()) {
+        SYMINFO_sym(sym_info).st_bind = STB_GLOBAL;
+    }
+
+    //Variable is with extern attribute.
+    if (var->is_extern()) {
+        SYMINFO_sym(sym_info).st_bind = STB_GLOBAL;
+        SYMINFO_sym(sym_info).st_other = STV_HIDDEN;
+    }
+
+    //Variable is with visible attribute.
+    if (var->is_visible()) {
+        SYMINFO_sym(sym_info).st_bind = STB_GLOBAL;
+        //Export the entry symbol.
+        SYMINFO_sym(sym_info).st_other =
+            var->is_entry() ? STV_DEFAULT : STV_HIDDEN;
+    }
+
+    //Variable is with weak attribute.
+    if (var->is_weak()) { SYMINFO_sym(sym_info).st_bind = STB_WEAK; }
+}
+
+
+void ELFMgr::extractDebugInfoFromVar(Var const* var, SymbolInfo * sym_info)
+{
+    ASSERT0(var && sym_info);
+
+    //TODO: Since m_rm is currently empty, this interface
     //(if (VAR_name(var) == m_rm->addToSymbolTab(DEBUG_ABBREV_SH_NAME)))
     //cannot be invoked.
     if (::strcmp(VAR_name(var)->getStr(), DEBUG_ABBREV_SH_NAME) == 0) {
@@ -2215,100 +2284,6 @@ void ELFMgr::initSymSection(xoc::Var const* var)
 
     //Add entry.
     m_symbol_info.setAlways(var->get_name(), sym_info);
-
-    if (SYMINFO_is_global(sym_info)) {
-        m_symbol_name.append_tail(SYMINFO_name(sym_info));
-    } else {
-        m_symbol_name.append_head(SYMINFO_name(sym_info));
-    }
-}
-
-
-void ELFMgr::extractSymbolExceptUserDefFunc()
-{
-    VarVec const* var_vec = getRegionMgr()->getVarMgr()->getVarVec();
-    ASSERT0(var_vec);
-
-    for (UINT i = 0; i < var_vec->get_elem_count(); i++) {
-        xoc::Var * var = var_vec->get(i);
-
-        //Since user-defined functions have been saved in initSymbol(), we
-        //need to extract available variables except them.
-        if (!isVarAvailable(var)) { continue; }
-
-        bool find = false;
-        SymbolInfo * sym_info = m_symbol_info.getAndGen(var->get_name(), &find);
-        ASSERT0(sym_info);
-        if (find && var->is_func()) {
-            //Record the user defined function for linker relaxation.
-            SYMINFO_is_user_def_func(sym_info) = true;
-            if (isRelType()) {
-                SYMINFO_sect_type(sym_info) = judgeSectWhichFuncBelongTo(var);
-            }
-            continue;
-        }
-
-        if (var->is_section()) { continue; }
-        Sym const* sym = var->get_name();
-        ASSERT0(sym);
-
-        //Set symbol name.
-        SYMINFO_name(sym_info) = sym;
-
-        //Set whether symbol is extern.
-        SYMINFO_is_extern(sym_info) = var->is_extern();
-
-        //Set whether symbol is weak.
-        SYMINFO_is_weak(sym_info) = var->is_weak();
-
-        //Set whether symbol is visible.
-        SYMINFO_is_visible(sym_info) = var->is_visible();
-
-        //Set whether symbol is global.
-        SYMINFO_is_global(sym_info) = var->is_global();
-
-        //Set whether symbol is function.
-        SYMINFO_is_func(sym_info) = var->is_func();
-
-        //Set function info.
-        if (SYMINFO_is_func(sym_info)) {
-            SYMINFO_func(sym_info) = m_func_mgr.allocFunctionInfo();
-        }
-
-        //Set whether symbol is initialized.
-        SYMINFO_is_init(sym_info) = var->hasInitString() || var->hasInitVal();
-
-        //Set symbol align.
-        SYMINFO_align(sym_info) = var->get_align();
-
-        //Set symbol section.
-        SYMINFO_sect_type(sym_info) = judgeSectWhichVarBelongTo(var);
-
-        //Set symbol size.
-        //[BUG FIX]: Pay attention to the symbol of the string type. The size
-        //is the length of the string plus one, because the character '\0'
-        //needs to be added to the end of the string.
-        SYMINFO_size(sym_info) = ((var->is_string() && !var->hasInitString()) ||
-            var->is_func()) ? 0 : (var->is_string() && var->hasInitString()) ?
-            ::strlen(VAR_string(var)->getStr()) + 1 : var->getByteSize(m_tm);
-
-        if (SYMINFO_is_global(sym_info) ||
-            SYMINFO_sect_type(sym_info) == SH_TYPE_UNDEF) {
-            m_symbol_name.append_tail(SYMINFO_name(sym_info));
-        } else {
-            m_symbol_name.append_head(SYMINFO_name(sym_info));
-        }
-
-        //Set symbol binword or data.
-        if (!var->hasInitVal()) { continue; }
-        SYMINFO_data_byte(sym_info) = (BYTE*)xmalloc(SYMINFO_size(sym_info));
-        void * src_addr = var->is_string() ?
-            ((void*)(VAR_string(var)->getStr())) :
-            ((void*)(var->getByteValue()->getBuffer()));
-        ::memcpy((void*)(SYMINFO_data_byte(sym_info)),
-            src_addr, SYMINFO_size(sym_info));
-        SYMINFO_is_byte(sym_info) = true;
-    }
 }
 
 
@@ -2412,13 +2387,13 @@ void ELFMgr::genCommonSectionContentHelper()
              symbol_info = symbol_info_list.get_next(&iter)) {
             if (SYMINFO_is_func(symbol_info) &&
                 !SYMINFO_is_extern(symbol_info) &&
-                SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
+                (SYMINFO_reloc(symbol_info).get_elem_count() != 0)) {
                 genRelaTextSectionContent(symbol_info);
                 continue;
             }
 
-            if (SYMINFO_sym(symbol_info).st_type == STT_OBJECT &&
-                SYMINFO_reloc(symbol_info).get_elem_count() != 0) {
+            if ((SYMINFO_sym(symbol_info).st_type == STT_OBJECT) &&
+                (SYMINFO_reloc(symbol_info).get_elem_count() != 0)) {
                 genRelaSectionContent(symbol_info);
                 continue;
             }
@@ -2515,7 +2490,11 @@ bool ELFMgr::isSymbolWithLocalAttr(SymbolInfo const* s)
         return ((SYMINFO_sym(s).st_bind == STB_LOCAL) ||
             (GET_SYM_OTHER_VALUE(SYMINFO_sym(s).st_other) == STV_HIDDEN));
     }
-    return SYMINFO_sym(s).st_bind == STB_LOCAL;
+
+    if (SYMINFO_sym(s).st_bind == STB_GLOBAL ||
+        SYMINFO_sym(s).st_bind == STB_WEAK) { return false; }
+
+    return true;
 }
 
 
@@ -2853,21 +2832,21 @@ Sym const* ELFMgr::getShdrType(CHAR const* shdr_name)
     //              ' ' + 'text'
     //        index: 0      1
     //      3.the function will return '.text'.
-    //e.g.: 1.given ".text1.func_name".
+    //e.g.: 1.given ".text_sect_type.func_name".
     //      2.there are 3 substrs after splited
-    //              ' ' + 'text1' + 'func_name'
-    //        index: 0      1            2
-    //      3.the function will return '.text1'.
+    //              ' ' + 'text_sect_type' + 'func_name'
+    //        index: 0          1                 2
+    //      3.the function will return '.text_sect_type'.
     //e.g.: 1.given ".rodata.str1.1".
     //      2.there are 4 substrs after splited.
     //              ' ' + 'rodata' + 'str1' + '1'
     //        index: 0      1          2       3
     //      3.the function will return '.rodata'.
-    //e.g.: 1.given ".rodata1.slave___GI____assert.str1.1".
+    //e.g.: 1.given ".rodata_sect_type.foo.str1.1".
     //      2.there are 5 substrs after splited.
-    //              ' ' + 'rodata1' + 'slave_xxx' + 'str1' + '1'
-    //        index: 0       1            2           3       4
-    //      3.the function will return '.rodata1'.
+    //              ' ' + 'rodata_sect_type' + 'foo' + 'str1' + '1'
+    //        index: 0       1                   2       3       4
+    //      3.the function will return '.rodata_sect_type'.
     switch (num) {
     case 2:
         ASSERTN(getSectionType(addToSymTab(shdr_name)) < SH_TYPE_MAX_NUM,
@@ -2978,8 +2957,8 @@ CHAR const* ELFMgr::getSubStr(CHAR const* str, CHAR const* exclude_str)
 {
     ASSERT0(str && exclude_str);
 
-    //e.g.: Get substr "func_name" from ".text1.func_name" or ".text.func_name".
-    //      And 'exclude_str' is ".text1." or  ".text.".
+    //e.g.: Get substr "func_name" from ".text.func_name".
+    //      And 'exclude_str' is ".text.".
     UINT exclude_len = (UINT)::strlen(exclude_str);
     UINT len = (UINT)::strlen(str) - exclude_len + 1;
     CHAR const* substr = (CHAR*)xmalloc(len);
@@ -3003,25 +2982,19 @@ CHAR const* ELFMgr::getRelaName(ELFSHdr const* symtab, size_t idx)
 }
 
 
-void ELFMgr::setSymbolValueHelper(MOD SymbolInfo * symbol_info)
+void ELFMgr::setSymbolInfoSymValue(MOD SymbolInfo * symbol_info)
 {
     ASSERT0(symbol_info);
 
-    Word name = ELF_VAL_UNDEF;
-    Addr value = ELF_VAL_UNDEF;
-    Half shndx = getStShndxOfUndefSection();
-    UCHAR type = SYMINFO_is_func(symbol_info) ? STT_FUNC :
-        (SYMINFO_is_label(symbol_info) ? STT_NOTYPE : STT_OBJECT);
-    UCHAR bind = SYMINFO_is_weak(symbol_info) ? STB_WEAK :
-        (SYMINFO_is_global(symbol_info) ? STB_GLOBAL : STB_LOCAL);
-    UCHAR other = SYMINFO_is_visible(symbol_info) ? STV_DEFAULT : STV_HIDDEN;
-    other = SYMINFO_is_func(symbol_info) ? (getSymOtherInfo() | other) : other;
-
-    //Set the value of ELFSym.
-    setSymbolValue(&(SYMINFO_sym(symbol_info)), name, bind,
-        type, other, shndx, value, SYMINFO_size(symbol_info));
     //Update SymbolInfo.
-    SYMINFO_index(symbol_info) = shndx;
+    SYMINFO_index(symbol_info) = getStShndxOfUndefSection();
+    SYMINFO_sym(symbol_info).st_name = ELF_VAL_UNDEF;
+    SYMINFO_sym(symbol_info).st_value = ELF_VAL_UNDEF;
+    SYMINFO_sym(symbol_info).st_shndx = (Half)SYMINFO_index(symbol_info);
+    SYMINFO_sym(symbol_info).st_size = SYMINFO_size(symbol_info);
+    if (SYMINFO_is_func(symbol_info)) {
+        SYMINFO_sym(symbol_info).st_other |= getSymOtherInfo();
+    }
 }
 
 
@@ -3066,8 +3039,8 @@ void ELFMgr::collectSymtabInfoFromVar()
             SYMINFO_sect_name(symbol_info) = nullptr;
         }
 
-        //Set the value of SYMINF_sym(symbol_info).
-        setSymbolValueHelper(symbol_info);
+        //Set the value of SYMINFO_sym(symbol_info).
+        setSymbolInfoSymValue(symbol_info);
 
         //Process FunctionInfo.
         collectFunctionInfo(symbol_info);
@@ -3303,7 +3276,9 @@ void ELFMgr::deleteNotCalledFunc(ELFSymTab const& reloc_info_name_tab)
 void ELFMgr::collectELFInfoFromVar()
 {
     if (xoc::g_debug) { initDebugInfo(); }
-    extractSymbolExceptUserDefFunc();
+
+    //Extract SymbolInfo from variable info.
+    extractSymbolInfoFromAllVar();
 
     //Collected symtab info.
     collectSymtabInfoFromVar();
@@ -3336,23 +3311,39 @@ void ELFMgr::setSymbolInfo(MOD SymbolInfo * target_symbol_info)
     SYMINFO_file_name(target_symbol_info) =
         (m_file_name == nullptr) ? nullptr : addToSymTab(m_file_name);
 
-    //FIXME: Not all symbols recorded into vector/map ?
-    //Check symbol info.
+    //There is SymbolInfo existed in 'm_symbol_inf_map' with the same
+    //name as 'target_symbol_info'.
     if (m_symbol_info_map.find(SYMINFO_name(target_symbol_info))) {
         //'target_symbol_info' is extern symbol and defined symbol has
         //been recorded. Thus 'target_symbol_info' don't need to record.
         if (SYMINFO_sym(target_symbol_info).st_shndx == 0 ||
             SYMINFO_is_extern(target_symbol_info)) { return; }
+
+        bool is_valid = false;
+
+        //Get SymbolInfo that has been stored in 'm_symbol_info_map'.
         SymbolInfo * symbol_info =
             m_symbol_info_map.get(SYMINFO_name(target_symbol_info));
         ASSERT0(symbol_info);
 
+        //Since the SymbolInfo that has been stored in
+        //'m_symbol_info_map' is with extern attribute,
+        //it needs to be replaced by 'target_symbol_info'.
         if (SYMINFO_sym(symbol_info).st_shndx == 0 ||
             SYMINFO_is_extern(symbol_info)) {
             //'symbol_info' is extern symbol. Remove it and re-record
             //'target_symbol_info' into vector/map.
             m_symbol_info_map.remove(SYMINFO_name(symbol_info));
-        } else {
+            is_valid = true;
+        }
+
+        //Whether both 'symbol_info' and 'target_symbol_info'
+        //are with the same valid name.
+        if (handleSameNameSymbolInfo(symbol_info, target_symbol_info)) {
+            is_valid = true;
+        }
+
+        if (!is_valid) {
             prt2C("\nerror: multi definition of '%s'",
                   SYMINFO_name(target_symbol_info)->getStr());
             UNREACHABLE();
@@ -3467,8 +3458,7 @@ bool ELFMgr::isSamePhdrType(ELFPHdr const* phdr, SectionInfo const* sect_info,
 }
 
 
-ELFPHdr * ELFMgr::genAndInitPhdr(PROGRAM_HEADER phdr_type,
-                                 SectionInfo const* sect_info)
+ELFPHdr * ELFMgr::genAndInitPhdr(SectionInfo const* sect_info)
 {
     ASSERT0(sect_info);
 
@@ -3481,7 +3471,18 @@ ELFPHdr * ELFMgr::genAndInitPhdr(PROGRAM_HEADER phdr_type,
     phdr->p_vaddr = getMaxAddrOfELF();
     phdr->p_paddr = getMaxAddrOfELF();
 
-    switch (phdr_type) {
+    processProgramHeader(sect_info, phdr);
+
+    return phdr;
+}
+
+
+void ELFMgr::processProgramHeader(SectionInfo const* sect_info,
+                                  MOD ELFPHdr * phdr)
+{
+    ASSERT0(sect_info && phdr);
+
+    switch (SECTINFO_ph_type(sect_info)) {
     case PH_TYPE_CODE:
         phdr->p_type = PT_LOAD;
         phdr->p_flags = PF_R | PF_X;
@@ -3500,13 +3501,12 @@ ELFPHdr * ELFMgr::genAndInitPhdr(PROGRAM_HEADER phdr_type,
         phdr->p_memsz = phdr->p_filesz;
         phdr->p_align = getPhdrDynamicAlign();
         break;
-    case PH_TYPE_UNDEF:
+    SWITCH_CASE_SKIP_PH_TYPE:
         break;
     default:
-        processExtProgramHeader(sect_info, phdr);
+        UNREACHABLE();
         break;
     }
-    return phdr;
 }
 
 
@@ -3532,7 +3532,7 @@ void ELFMgr::processProgramHeader()
         //CASE:
         //1. It is the first shdr '.sh_name_undef'.
         //2. There are two adjacent shdrs with the PH_TYPE_UNDEF type.
-        if ((phdr_type == PH_TYPE_UNDEF && pre_phdr_type == PH_TYPE_UNDEF)) {
+        if ((phdr_type == PH_TYPE_UNDEF) && (pre_phdr_type == PH_TYPE_UNDEF)) {
             phdr = nullptr;
             pre_phdr_type = phdr_type;
             continue;
@@ -3545,8 +3545,9 @@ void ELFMgr::processProgramHeader()
                 pre_phdr_type = phdr_type;
                 continue;
             }
+
             //Generate new phdr info.
-            phdr = genAndInitPhdr(phdr_type, sect_info);
+            phdr = genAndInitPhdr(sect_info);
             ASSERT0(phdr);
         }
 
@@ -3558,7 +3559,10 @@ void ELFMgr::processProgramHeader()
         phdr->p_offset = MIN(phdr->p_offset, (Off)SECTINFO_ofst(sect_info));
         phdr->p_vaddr = MIN(phdr->p_vaddr, (Off)SECTINFO_addr(sect_info));
         phdr->p_paddr = MIN(phdr->p_paddr, (Off)SECTINFO_addr(sect_info));
-        phdr->p_filesz += (Word32)SECTINFO_size(sect_info);
+
+        //After SECTINFO_size aligned, p_filesz needs to be aligned too.
+        phdr->p_filesz = (Word32)xcom::ceil_align(phdr->p_filesz,
+            SECTINFO_align(sect_info)) + (Word32)SECTINFO_size(sect_info);
         phdr->p_memsz = phdr->p_filesz;
 
         //Reset pre_phdr_type.
@@ -3601,8 +3605,8 @@ bool ELFMgr::hasBeenRecordedRelaPltInfoItem(
         //Check RelocInfo type and other info.
         if ((RELADYNINFO_type(relaplt) == RELOCINFO_type(reloc_info)) &&
             (RELADYNINFO_addend(relaplt) == RELOCINFO_addend(reloc_info)) &&
-            ((RELADYNINFO_caller_sym_name(relaplt) ==
-             (RELOCINFO_sect_name(reloc_info))))) {
+            (RELADYNINFO_caller_sym_name(relaplt) ==
+             RELOCINFO_sect_name(reloc_info))) {
             *out_reloc_info = RELADYNINFO_reloc_info(relaplt);
             return true;
         }
@@ -3631,8 +3635,8 @@ bool ELFMgr::hasBeenRecordedRelaDynInfoItem(
         if ((RELADYNINFO_type(reladyn) == RELOCINFO_type(reloc_info)) &&
             (RELADYNINFO_addend(reladyn) == RELOCINFO_addend(reloc_info)) &&
             (RELADYNINFO_ofst(reladyn) == (RELOCINFO_called_loc(reloc_info))) &&
-            ((RELADYNINFO_caller_sym_name(reladyn) ==
-             (RELOCINFO_sect_name(reloc_info))))) {
+            (RELADYNINFO_caller_sym_name(reladyn) ==
+             RELOCINFO_sect_name(reloc_info))) {
             *out_reloc_info = RELADYNINFO_reloc_info(reladyn);
             return true;
         }
@@ -4164,6 +4168,9 @@ void ELFMgr::processSectionOffset()
         SWITCH_CASE_COMMON_SECT_OFST:
             SECTINFO_ofst(si) =
                 xcom::ceil_align(section_base, SECTINFO_align(si));
+
+            //Update section_base info.
+            section_base = SECTINFO_ofst(si);
             SECTINFO_size(si) = (SECTINFO_ofst(si) - section_base) +
                 getSectionSize(m_sect_layout.get(i));
             break;
@@ -4230,7 +4237,7 @@ void ELFMgr::collectSymbolInfoSectionName(
     ASSERT0(shdr_name);
 
     //If it is function symbol, it need to get corresponded section name.
-    //Now there are two type of function section: .text and .text1.
+    //The mainly function section are '.text' and '.text_sect_type'.
     if (SYMINFO_sym(symbol_info).st_type == STT_FUNC) {
         SYMINFO_is_func(symbol_info) = true;
         //It need to get function name if it is function symbol,
@@ -4258,7 +4265,7 @@ bool ELFMgr::existRelaInfo(ELFHdr & hdr, SymbolInfo const* symbol_info)
     for (UINT i = 0; i < hdr.e_shnum; i++) {
         ELFSHdr * shdr = getSectHeader(i);
         ASSERT0(shdr);
-        if (shdr->s_type == S_RELA &&
+        if ((shdr->s_type == S_RELA) &&
             (shdr->s_info == SYMINFO_sym(symbol_info).st_shndx)) {
             return true;
         }
@@ -4270,7 +4277,7 @@ bool ELFMgr::existRelaInfo(ELFHdr & hdr, SymbolInfo const* symbol_info)
 void ELFMgr::collectFuncInfoForSymbol(
     ELFHdr & hdr, MOD SymbolInfo * symbol_info)
 {
-    ASSERT0(symbol_info && SYMINFO_sym(symbol_info).st_type == STT_FUNC);
+    ASSERT0(symbol_info && (SYMINFO_sym(symbol_info).st_type == STT_FUNC));
     //'symbol_info' is STT_FUNC type. Thus it need to  record the function
     //info into 'symbol_info'
     ELFSHdr * shstrtab_shdr = getSectHeader(hdr.e_shstrndx);
@@ -4306,19 +4313,20 @@ Sym const* ELFMgr::getFunctionName(CHAR const* text_shdr_name)
 
     StrBufVec str_vec;
     UINT num = xcom::xsplit(text_shdr_name, ".", str_vec);
-    //e.g.: 1.given ".text" or ".text1".
+    //e.g.: 1.given ".text" or ".text_sect_name".
     //      2.there are 2 substr after splited: ' ' + 'text'
     //      3.the corresponded index of substr:  0       1
     //      4.it will return '.text'.
     //
-    //e.g.: 1.given ".text1.func_name".
-    //      2.there are 3 substr after splited: ' ' + 'text1' + 'func_name'
+    //e.g.: 1.given ".text_sect_name.func_name".
+    //      2.there are 3 substr after splited:
+    //        ' ' + 'text_sect_name' + 'func_name'
     //      3.the corresponded index of substr:  0       1          2
     //      4.it will return 'func_name'.
     //
-    //e.g.: 1.given ".text1.func_name.part.1".
+    //e.g.: 1.given ".text_sect_name.func_name.part.1".
     //      2.there are 5 substr after splited:
-    //        ' ' + 'text1' + 'func_name' + 'part' + '1'
+    //        ' ' + 'text_sect_name' + 'func_name' + 'part' + '1'
     //      3.the corresponed index of substr:
     //         0       1          2           3       4
     //      4.it will return 'func_name.part.1'.
@@ -4328,7 +4336,7 @@ Sym const* ELFMgr::getFunctionName(CHAR const* text_shdr_name)
     UINT len = (UINT)::strlen(str_vec.getStrBuf(1)->getBuf()) + 3;
     CHAR * exclude_str = (CHAR*)xmalloc(len);
     ASSERT0(exclude_str);
-    //'exclude_str' is '.text.' or '.text1.'.
+    //'exclude_str' is '.text.' or '.text_sect_name.'.
     ::sprintf(exclude_str, ".%s.%c", str_vec.getStrBuf(1)->getBuf(), '\0');
     return addToSymTab(getSubStr(text_shdr_name, exclude_str));
 }
@@ -4371,6 +4379,29 @@ FunctionInfo * ELFMgr::collectTextInfo(ELFSHdr const* shdr,
 }
 
 
+bool ELFMgr::checkWhetherGenSymbolInSymtab(MOD SymbolInfo * symbol_info)
+{
+    ASSERT0(symbol_info);
+
+    //Don't generate element in '.symtab' for SymbolInfo with
+    //label attribute when the type of output ELF is ET_DYN.
+    if (isDynType() && SYMINFO_is_label(symbol_info)) { return false; }
+
+    if (SYMINFO_is_extern(symbol_info) ||
+        (SYMINFO_sym(symbol_info).st_type == STT_SECTION)) {
+        //Don't generate element in '.symbtab' for SymbolInfo
+        //with extern attribute or STT_SECTION type in output
+        //ELF with ET_DYN type.
+        if (isDynType()) { return false; }
+
+        ASSERT0(isRelType());
+        SYMINFO_sym(symbol_info).st_type = STT_NOTYPE;
+    }
+
+    return true;
+}
+
+
 void ELFMgr::constructSymbolUnull()
 {
     BYTEVec * bytevec = getSectionContent(SH_TYPE_SYMTAB);
@@ -4390,9 +4421,12 @@ void ELFMgr::constructSymbolUnull()
     global_bytevec.grow((UINT)getSymbolNum() * sym_size);
 
     ELFSym sym;
+    //Record the byte offset for generated '.symtab' content.
+    UINT local_ofst = 0;
+    UINT global_ofst = 0;
+    //Record the symbol index in the '.symtab' section.
     UINT local_idx = 0;
     UINT global_idx = 0;
-    UINT index = 0;
     BYTEVec space(sym_size);
     ASSERT0(space.get_vec());
 
@@ -4407,46 +4441,16 @@ void ELFMgr::constructSymbolUnull()
              symbol_info != nullptr;
              symbol_info = symbol_info_list.get_next(&iter)) {
             ASSERT0(SYMINFO_sym(symbol_info).st_shndx != SHN_COMMON);
-            SYMINFO_index(symbol_info) = ++index;
+
+            //Check the validity of 'symbol_info'.
+            if (!checkWhetherGenSymbolInSymtab(symbol_info)) { continue; }
 
             space.clean();
-            //Skip extern attribute symbol. Don't record it.
-            if (isDynType() && (SYMINFO_is_extern(symbol_info) ||
-                (SYMINFO_sym(symbol_info).st_type == STT_SECTION))) {
-               continue;
-            }
-
-            if (SYMINFO_is_extern(symbol_info) ||
-                (SYMINFO_sym(symbol_info).st_type == STT_SECTION)) {
-                if (isDynType()) { continue; }
-                ASSERT0(isRelType());
-                SYMINFO_sym(symbol_info).st_type = STT_NOTYPE;
-            }
-
             bool is_local = isSymbolWithLocalAttr(symbol_info);
-            UINT sect_index = 0;
-            if (!SYMINFO_is_extern(symbol_info)) {
-                FunctionInfo * func_info = SYMINFO_func(symbol_info);
-                if (isRelType() && SYMINFO_is_func(symbol_info) &&
-                    FUNCINFO_code(func_info).get_vec() == nullptr) {
-                    //FIXME:
-                    //Function without definition doesn't be created symbol.
-                    sect_index = 0;
-                } else {
-                    sect_index = getSectionIndexViaSymbolInfo(symbol_info);
-                }
-            }
 
-            //For ABS type.
-            if (isDynType() && sect_index == SHN_UNDEF) {
-                sect_index = SYMINFO_sym(symbol_info).st_shndx;
-            }
-            //For extern symbol.
-            if (isRelType() && SYMINFO_is_extern(symbol_info)) {
-                sect_index = SHN_UNDEF;
-                SYMINFO_sym(symbol_info).st_other =
-                    GET_SYM_OTHER_VALUE(SYMINFO_sym(symbol_info).st_other);
-            }
+            //Handle sect_index of 'symbol_info'.
+            UINT sect_index = getSectIdxForConstructSymtab(symbol_info);
+
             //Get symbol offset in corresponded section.
             Addr sect_offset = SYMINFO_is_func(symbol_info) ?
                 FUNCINFO_code_ofst(SYMINFO_func(symbol_info)) :
@@ -4456,21 +4460,18 @@ void ELFMgr::constructSymbolUnull()
             //it 'st_bind' attribute needed to set to 'STB_LOCAL'.
             if (is_local) { SYMINFO_sym(symbol_info).st_bind = STB_LOCAL; }
 
-            setSymbolValue(&sym, SYMINFO_sym(symbol_info).st_name,
-                SYMINFO_sym(symbol_info).st_bind,
-                SYMINFO_sym(symbol_info).st_type,
-                SYMINFO_sym(symbol_info).st_other,
-                sect_index, sect_offset,
-                SYMINFO_sym(symbol_info).st_size);
+            setSymbolValue(sym, symbol_info, sect_index, sect_offset);
+
             sym.insert(space.get_vec(), this);
 
             //Construct symbol content.
             setELFSymToByteVec(&space, symbol_info, &local_bytevec,
-                &global_bytevec, dynsym_bytevec, local_idx, global_idx);
+                &global_bytevec, dynsym_bytevec, local_ofst, global_ofst);
 
             //Update local/global index.
-            local_idx += is_local ? sym_size : 0;
-            global_idx += is_local ? 0 : sym_size;
+            local_ofst += is_local ? sym_size : 0;
+            global_ofst += is_local ? 0 : sym_size;
+            SYMINFO_index(symbol_info) = is_local ? ++local_idx : global_idx++;
         }
     }
 
@@ -4497,13 +4498,72 @@ void ELFMgr::constructSymbolUnull()
     bytevec->set((VecIdx)(total_sz - 1), 0);
     ::memcpy((void*)(bytevec->get_vec() + sym_size + local_sz),
         (void*)(global_bytevec.get_vec()), global_sz);
+
+    //Update SYMINFO_index info after the symbol
+    //order in '.symtab' has been finalized.
+    updateSymbolIndex();
+}
+
+
+UINT ELFMgr::getSectIdxForConstructSymtab(MOD SymbolInfo * symbol_info)
+{
+    ASSERT0(symbol_info);
+
+    UINT sect_index = 0;
+    if (!SYMINFO_is_extern(symbol_info)) {
+        FunctionInfo * func_info = SYMINFO_func(symbol_info);
+        if (isRelType() && SYMINFO_is_func(symbol_info) &&
+            (FUNCINFO_code(func_info).get_vec() == nullptr)) {
+            //Function without definition doesn't be created symbol.
+            sect_index = 0;
+        } else {
+            sect_index = getSectionIndexViaSymbolInfo(symbol_info);
+        }
+    }
+
+    //For ABS type.
+    if (isDynType() && (sect_index == SHN_UNDEF)) {
+        sect_index = SYMINFO_sym(symbol_info).st_shndx;
+    }
+
+    //For extern symbol.
+    if (isRelType() && SYMINFO_is_extern(symbol_info)) {
+        sect_index = SHN_UNDEF;
+        SYMINFO_sym(symbol_info).st_other =
+            GET_SYM_OTHER_VALUE(SYMINFO_sym(symbol_info).st_other);
+    }
+
+    return sect_index;
+}
+
+
+void ELFMgr::updateSymbolIndex()
+{
+    ELFMgrListIter e_iter;
+    SymbolInfoListIter iter;
+    ELFMgrList const& elf_mgr_list = getLinkerMgr()->getELFMgrList();
+
+    for (ELFMgr const* elf_mgr = elf_mgr_list.get_head(&e_iter);
+         elf_mgr != nullptr; elf_mgr = elf_mgr_list.get_next(&e_iter)) {
+        SymbolInfoList const& symbol_info_list = ELFMGR_symbol_list(elf_mgr);
+        for (SymbolInfo * symbol_info = symbol_info_list.get_head(&iter);
+             symbol_info != nullptr;
+             symbol_info = symbol_info_list.get_next(&iter)) {
+            if (isSymbolWithLocalAttr(symbol_info)) { continue; }
+
+            //Symbol with local attribute will be placed in the front of
+            //'.symtab'. And the begin index of symbol with global attribute
+            //has been recored in the 'm_global_symbol_begin_index_of_symtab'.
+            SYMINFO_index(symbol_info) += getGlobalSymbolBeginIndexOfSymtab();
+        }
+    }
 }
 
 
 void ELFMgr::setELFSymToByteVec(MOD BYTEVec * sym_vec,
     MOD SymbolInfo * symbol_info, MOD BYTEVec * local_vec,
     MOD BYTEVec * global_vec, MOD BYTEVec * dynsym_vec,
-    UINT local_idx, UINT global_idx)
+    UINT local_ofst, UINT global_ofst)
 {
     ASSERT0(symbol_info && sym_vec && local_vec && global_vec);
 
@@ -4527,15 +4587,15 @@ void ELFMgr::setELFSymToByteVec(MOD BYTEVec * sym_vec,
 
     //Record to local bytevec.
     if (isSymbolWithLocalAttr(symbol_info)) {
-        local_vec->set(local_idx + sym_size - 1, 0);
-        ::memcpy((void*)(local_vec->get_vec() + local_idx),
+        local_vec->set(local_ofst + sym_size - 1, 0);
+        ::memcpy((void*)(local_vec->get_vec() + local_ofst),
             (void*)(sym_vec->get_vec()), sym_size);
         return;
     }
 
     //Record to global bytevec.
-    global_vec->set(global_idx + sym_size - 1, 0);
-    ::memcpy((void*)(global_vec->get_vec() + global_idx),
+    global_vec->set(global_ofst + sym_size - 1, 0);
+    ::memcpy((void*)(global_vec->get_vec() + global_ofst),
         (void*)(sym_vec->get_vec()), sym_size);
 }
 
@@ -4561,18 +4621,30 @@ void ELFMgr::genSymTabContent()
 }
 
 
-void ELFMgr::setSymbolValue(MOD ELFSym * sym, Word name, xcom::UCHAR bind,
-    xcom::UCHAR type, xcom::UCHAR other, Half shndx, Addr value, Addr size)
+void ELFMgr::initELFSym(MOD ELFSym & sym)
 {
-    ASSERT0(sym);
+    sym.st_shndx = ELF_VAL_UNDEF;
+    sym.st_value = ELF_VAL_UNDEF;
+    sym.st_size = ELF_VAL_UNDEF;
+    sym.st_name = ELF_VAL_UNDEF;
+    sym.st_bind = ELF_VAL_UNDEF;
+    sym.st_type = SYMBOL_NOTYPE;
+    sym.st_other = ELF_VAL_UNDEF;
+}
 
-    sym->st_value = value;
-    sym->st_size = size;
-    sym->st_name = name;
-    sym->st_bind = bind;
-    sym->st_type = type;
-    sym->st_other = other;
-    sym->st_shndx = shndx;
+
+void ELFMgr::setSymbolValue(ELFSym & sym,
+    SymbolInfo const* symbol_info, Half shndx, Addr value)
+{
+    ASSERT0(symbol_info);
+
+    sym.st_shndx = shndx;
+    sym.st_value = value;
+    sym.st_size = SYMINFO_sym(symbol_info).st_size;
+    sym.st_name = SYMINFO_sym(symbol_info).st_name;
+    sym.st_bind = SYMINFO_sym(symbol_info).st_bind;
+    sym.st_type = SYMINFO_sym(symbol_info).st_type;
+    sym.st_other = SYMINFO_sym(symbol_info).st_other;
 }
 
 
@@ -4677,8 +4749,8 @@ void ELFMgr::constructSymbolNull(OUT BYTEVec * bytevec)
     ASSERT0(space.get_vec());
 
     ELFSym sym;
-    setSymbolValue(&sym, ELF_VAL_UNDEF, ELF_VAL_UNDEF, SYMBOL_NOTYPE,
-        ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ELF_VAL_UNDEF);
+
+    initELFSym(sym);
     sym.insert(space.get_vec(), this);
 
     space.set((VecIdx)(elf_sym_size - 1), 0);
@@ -4844,7 +4916,7 @@ bool ELFMgr::processSpecialShndx(ELFHdr & hdr, MOD SymbolInfo * symbol_info)
     UINT sect_num = hdr.e_shnum;
 
     //It is normal shndx.
-    if (shndx > 0 && shndx < sect_num) { return false; }
+    if ((shndx > 0) && (shndx < sect_num)) { return false; }
 
     //It is special shndx.
     switch (shndx) {
@@ -4918,9 +4990,9 @@ void ELFMgr::collectSymtabInfo(ELFHdr & hdr, ELFSHdr const* sym_shdr)
         for (UINT j = 0; j < m_reloc_info.get_elem_count(); j++) {
             RelocInfo * reloc_info = m_reloc_info[j];
             ASSERT0(reloc_info);
-            if (RELOCINFO_shdr_idx(reloc_info) !=
-                SYMINFO_sym(symbol_info).st_shndx &&
-                RELOCINFO_sym_idx(reloc_info) != SYMINFO_index(symbol_info)) {
+            if ((RELOCINFO_shdr_idx(reloc_info) !=
+                 SYMINFO_sym(symbol_info).st_shndx) &&
+                (RELOCINFO_sym_idx(reloc_info) != SYMINFO_index(symbol_info))) {
                 continue;
             }
 
@@ -5039,8 +5111,6 @@ void ELFMgr::collectRelocInfo(ELFHdr & hdr, ELFSHdr const* rela_shdr)
 
         readRelaFromRelaTextSect(rela_shdr, rela_sym, i);
         //Update reloc info.
-        RELOCINFO_name(reloc_info) =
-            addToSymTab(getRelaName(symtab_shdr, rela_sym.r_sym));
         RELOCINFO_called_loc(reloc_info) = rela_sym.r_offset;
         RELOCINFO_type(reloc_info) = (UINT)rela_sym.r_type;
         RELOCINFO_addend(reloc_info) = (UINT)rela_sym.r_addend;
@@ -5050,6 +5120,8 @@ void ELFMgr::collectRelocInfo(ELFHdr & hdr, ELFSHdr const* rela_shdr)
         RELOCINFO_caller_func(reloc_info) = nullptr;
         RELOCINFO_sect_name(reloc_info) =
             addToSymTab(getRelaShdrType(shdr_name));
+        RELOCINFO_name(reloc_info) = handleRelocInfoName(reloc_info,
+            addToSymTab(getRelaName(symtab_shdr, rela_sym.r_sym)), vec_sz + i);
 
         m_reloc_info.set(vec_sz + i, reloc_info);
     }
@@ -5198,8 +5270,8 @@ bool ELFMgr::findSymbolWithNoSectionType(SymbolInfo const* origin_symbol,
          si != nullptr; si = m_symbol_info_list.get_next(&iter)) {
         if (isNullSymbol(si, index++)) { continue; }
 
-        if (SYMINFO_sym(si).st_type != STT_SECTION &&
-            SYMINFO_sym(si).st_type != STT_NOTYPE &&
+        if ((SYMINFO_sym(si).st_type != STT_SECTION) &&
+            (SYMINFO_sym(si).st_type != STT_NOTYPE) &&
             (SYMINFO_sym(origin_symbol).st_shndx == SYMINFO_sym(si).st_shndx) &&
             (SYMINFO_sym(origin_symbol).st_value == SYMINFO_sym(si).st_value)) {
             *target_symbol = si;
@@ -5263,7 +5335,7 @@ void ELFMgr::genSymbolRefReloc(
 
     if (type == ST_FUNC_VAR) {
         //Generate the corresponding relocation entries.
-        //for global var for HBM and SPM
+        //for global var for global memory and SPM
         if (MCSYMBOL_var(mc_symbol)->is_global()) {
             ASSERT0(MCSYMBOL_region(mc_symbol) == nullptr);
             callee = MCSYMBOL_var(mc_symbol)->get_name();
@@ -5417,7 +5489,7 @@ SectionInfo * GenMappedOfSectInfoMap::createMapped(Sym const* s)
 
 
 //
-// =========================== ARFILE Start ========================
+//START ARFILE
 //
 static UINT64 getByteBigEndian(UCHAR const* field, UINT size)
 {
@@ -5438,7 +5510,7 @@ static UINT64 getByteBigEndian(UCHAR const* field, UINT size)
 
 EM_STATUS ELFAR::open(CHAR const* filename, MOD ELFARMgr * elfar_mgr)
 {
-    ASSERT0(filename && elfar_mgr && m_file == nullptr);
+    ASSERT0(filename && elfar_mgr && (m_file == nullptr));
 
     m_file = elfar_mgr->allocFileObj(filename, false, true);
     ASSERT0(m_file);
@@ -5600,9 +5672,11 @@ EM_STATUS ELFAR::readARFile(MOD ELFARMgr * elfar_mgr)
     if ((st = readSymbolIndex()) != EM_SUCC) { return st; }
     return st;
 }
+//END ARFILE
+
 
 //
-// =========================== ELFARMgr Start ========================
+//START ELFARMgr
 //
 ELFARMgr::~ELFARMgr()
 {
@@ -5856,5 +5930,6 @@ void FunctionInfo::copy(FunctionInfo const* src_func)
     FUNCINFO_sect_name(this) = FUNCINFO_sect_name(src_func);
     FUNCINFO_sect_type(this) = FUNCINFO_sect_type(src_func);
 }
+//END ELFARMgr
 
 }

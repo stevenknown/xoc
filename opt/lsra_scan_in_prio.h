@@ -33,15 +33,14 @@ namespace xoc {
 class ScanInPrio {
     COPY_CONSTRUCTOR(ScanInPrio);
     LSRAImpl & m_impl;
-    LinearScanRA & m_ra;
     BBList * m_bb_list;
     IRCFG * m_cfg;
     LTPriorityMgr m_prio_mgr;
     Region * m_rg;
 public:
-    ScanInPrio(LSRAImpl & impl) :
-        m_impl(impl), m_ra(impl.getRA()),
-        m_prio_mgr(impl.getCFG(), impl.getTIMgr())
+    ScanInPrio(LSRAImpl & impl) : m_impl(impl),
+        m_prio_mgr(impl.getCFG(),
+        *(impl.getRegion()->getRegionMgr()->getTargInfoMgr()))
     {
         m_bb_list = impl.getBBList();
         m_cfg = impl.getCFG();

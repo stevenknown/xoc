@@ -162,18 +162,12 @@ public:
 //The informatino will be used to update PRSSA incrmentally.
 class PRSSAInfoCollect {
     COPY_CONSTRUCTOR(PRSSAInfoCollect);
+protected:
     PRSSAMgr * m_ssamgr;
     Region * m_rg;
     IRCFG * m_cfg;
     OptCtx const* m_oc;
     TMap<IR const*, IR const*> m_phi2livein;
-protected:
-    //Find livein BB through given 'pred'.
-    //The function will iterate dom tree bottom up from 'pred' until the
-    //anticipated BB is found.
-    //pred: the predecessor of bb.
-    //Note dom info must be avaiable.
-    bool isDomLiveinBBFromPred(UINT bb, UINT pred, UINT meetup);
 public:
     PRSSAInfoCollect() {}
 
@@ -394,7 +388,6 @@ protected:
     VarMgr * m_vm;
     IRCFG * m_cfg;
     IRMgr * m_irmgr;
-    DefSegMgr * m_seg_mgr;
     LivenessMgr * m_livemgr;
     TargInfoHandler * m_ti_handler;
 
@@ -411,6 +404,7 @@ protected:
     //Record VPR that indexed by PRNO.
     VPRVec m_prno2vpr;
     VPRSetMgr m_vprset_mgr;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
 protected:
     VPR * allocVPR()
     {
@@ -466,6 +460,7 @@ protected:
         return vprvec != nullptr ? vprvec->get(version) : nullptr;
     }
     VPRSetMgr & getVPRSetMgr() { return m_vprset_mgr; }
+    DefSegMgr * getSegMgr() { return m_sbs_mgr.getSegMgr(); }
 
     //The function retrieves VPRVec by given prno.
     //Map PRNO to VPRVec and record all VPRs allocated during SSA processing.
@@ -739,6 +734,15 @@ public:
     //exp: the expression that expected to set livein.
     void findAndSetLiveinDef(IR * exp);
 
+    //Find DEF stmt that modified versioned PRNO that corresponding to
+    //'orgprno' through 'startbb'.
+    //The function will iterate dom vertex bottom up from 'startbb' until the
+    //anticipated BB is found.
+    //startbb: the begin BB that start to search.
+    //orgprno: the original PRNO before SSA versioning.
+    //NOTE: dom info must be avaiable.
+    IR const* findLiveinDefViaOrgPrno(IRBB const* startbb, PRNO orgprno) const;
+
     //Find the unique DEF of 'exp' that is inside given loop.
     //set: it is optional, if it is not NULL, the function will record all DEF
     //     found into the set as a return result.
@@ -793,6 +797,11 @@ public:
     //return false to indicate unknown.
     static bool hasSameValue(IR const* ir1, IR const* ir2);
 
+    //Return true if the DEF set of ir1 and ir2 are definitely same, otherwise
+    //return false to indicate unknown.
+    static bool hasSameDef(IR const* ir1, IR const* ir2)
+    { return hasSameValue(ir1, ir2); }
+
     //Initialize VPR and Type for each PR in the IR tree that rooted by 'ir'.
     //ir can be stmt or expression.
     //Note the function record the type that first met as the initial type of
@@ -836,7 +845,8 @@ public:
     void removeSuccessorDesignatedPhiOpnd(
         IRBB const* succ, UINT pos, PRSSAUpdateCtx const& ctx);
 
-    //Remove PR-SSA Use-Def chain.
+    //Remove PR-SSA Use-Def chain for all memory references in IR Tree
+    //that rooted by 'exp'.
     //e.g:ir=...
     //    ...=ir //S1
     //If S1 deleted, ir should be removed from its UseSet in SSAInfo.
@@ -844,6 +854,10 @@ public:
     //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
     //updated as well.
     static void removePRSSAOcc(IR const* ir);
+
+    //Remove PR-SSA Use-Def chain for given stmt.
+    //NOTE: the function does not process IR tree recursively.
+    static void removeStmtSSAOcc(IR const* ir);
 
     //Remove Use-Def chain.
     //exp: the expression to be removed.

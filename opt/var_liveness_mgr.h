@@ -61,9 +61,22 @@ protected:
         IR const* exp, MOD LiveSet * use, MOD LiveSet * gen) override;
     virtual void computeStmtImpl(
         IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen) override;
+
+    //This function can be overwriten if special var need to be computed.
+    virtual void updateSetForExp(IR const* exp, MOD LiveSet * use);
+
+    //This function can be overwriten if special var need to be computed,
+    //probably the multiple var at the LHS of the statement can also be
+    //supported.
+    //e.g:
+    //  [var_1], [var_2], [var_3] <- st $5
+    //   The liveness info of var_1, var_2 and var_3 in the above statement
+    //   can be computed one time.
+    virtual void updateSetForStmt(IR const* stmt, MOD LiveSet * use,
+        MOD LiveSet * gen);
 public:
     VarLivenessMgr(Region * rg) : LivenessMgr(rg) {}
-    ~VarLivenessMgr() { clean(); }
+    virtual ~VarLivenessMgr() { clean(); }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
 };
 //END VarLivenessMgr

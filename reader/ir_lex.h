@@ -408,6 +408,11 @@ public:
     TOKEN getCurrentToken() const { return m_cur_token; }
     FILE * getSrcFile() const { return m_src_file; }
 
+    //Return the source file buffer.
+    //Note the file buffer records the maximum number of source file characters
+    //that can be recored in a line-buffer.
+    CHAR const* getSrcLine() const { return m_cur_line; }
+
     //Get index offset in line table of current line.
     UINT getOffsetTabLineNum() const
     { return m_ofst_tab_byte_size / sizeof(LONG); }
@@ -417,6 +422,12 @@ public:
 
     //Report error with line number.
     void error(UINT line_num, CHAR const* msg, ...);
+
+    //Read a maximum number of charactors from source file that can be recored
+    //in a line-buffer.
+    //NOTE: user can get the read content via getSrcLine().
+    //Return true if read successful.
+    bool readMaxSrcLineByLineno(UINT lineno);
 
     //Set the input file handler that is ready to parse.
     void setSrcFile(FILE * h) { m_src_file = h; }

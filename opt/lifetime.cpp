@@ -439,12 +439,13 @@ static void dumpRangeVecGWithPos(RangeVec const& rv, Region const* rg,
 }
 
 
-void LifeTime::dumpReg2LifeTime(Region const* rg,
-                                LinearScanRA const* ra, Reg r) const
+void LifeTime::dumpReg2LifeTime(Region const* rg, Reg r) const
 {
-    REGFILE rf = ra->getRegFile(r);
+    TargInfoMgr const* timgr = rg->getRegionMgr()->getTargInfoMgr();
+    ASSERT0(timgr);
+    REGFILE rf = timgr->getRegFile(r);
     ASSERT0(rf != RF_UNDEF);
-    note(rg, "\n%s(%s):", ra->getRegName(r), ra->getRegFileName(rf));
+    note(rg, "\n%s(%s):", timgr->getRegName(r), timgr->getRegFileName(rf));
     dumpRangeVec(m_range_vec, rg);
     DUMMYUSE(dumpOccList);
     note(rg, "\n |");
@@ -454,13 +455,14 @@ void LifeTime::dumpReg2LifeTime(Region const* rg,
 }
 
 
-void LifeTime::dumpReg2LifeTimeWithPos(Region const* rg,
-    LinearScanRA const* ra, Reg r, Pos start, Pos end,
-    bool open_range = false) const
+void LifeTime::dumpReg2LifeTimeWithPos(
+    Region const* rg, Reg r, Pos start, Pos end, bool open_range = false) const
 {
-    REGFILE rf = ra->getRegFile(r);
+    TargInfoMgr const* timgr = rg->getRegionMgr()->getTargInfoMgr();
+    ASSERT0(timgr);
+    REGFILE rf = timgr->getRegFile(r);
     ASSERT0(rf != RF_UNDEF);
-    note(rg, "\n%s(%s):", ra->getRegName(r), ra->getRegFileName(rf));
+    note(rg, "\n%s(%s):", timgr->getRegName(r), timgr->getRegFileName(rf));
     if (open_range) { dumpRangeVec(m_range_vec, rg); }
     DUMMYUSE(dumpOccList);
     note(rg, "\n |");
@@ -536,18 +538,6 @@ bool LifeTime::verify() const
     verifyRangeVec(this);
     return true;
 }
-
-
-void LifeTime::updateLTConstraintsForSplit(LifeTime const* old_lt)
-{
-    ASSERT0(old_lt);
-    if (old_lt->getLTConstraints() == nullptr) { return; }
-    this->setLTConstraints(old_lt->getLTConstraints());
-    PRNO cur_pr = this->getPrno();
-    PRNO old_pr = old_lt->getPrno();
-    ASSERT0(cur_pr != PRNO_UNDEF && old_pr != PRNO_UNDEF);
-    this->getLTConstraints()->updateConflictPR(cur_pr, old_pr);
-}
 //END LifeTime
 
 
@@ -588,9 +578,13 @@ void LifeTimeMgr::init(Region * rg)
     if (m_pool != nullptr) { return; }
     m_pool = smpoolCreate(64, MEM_COMM);
     m_rg = rg;
+    m_mdmgr = rg->getMDMgr();
+    ASSERT0(m_mdmgr);
     m_max_pos = POS_UNDEF;
     m_lt_list.init();
     m_prno2lt.init();
+    m_bb_entry_pos.clean();
+    m_bb_exit_pos.clean();
     #ifdef _DEBUG_
     m_ir2pos.init();
     #endif
@@ -624,12 +618,16 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
     mgr.recordPos(ir, pos);
     if (res == nullptr) { return; }
     PRNO prno = res->getPrno();
+
+    //Call statements must always be considered because they affect both the
+    //splitting of lifetimes and the generation of spill&reload IRs.
+    if (!ir->isCallStmt() && !mgr.canBeCandidate(prno)) { return; }
     LifeTime * lt = mgr.genLifeTime(prno);
     ASSERT0(lt);
     if (preassigned_mgr.isPreAssigned(prno)) { lt->setPreAssigned(); }
     lt->addRange(pos);
     lt->addOcc(Occ(true, pos, ir));
-    cross_call_counter.updateForDef(lt);
+    cross_call_counter.update(lt);
 }
 
 
@@ -653,7 +651,7 @@ static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
     lt->setLastRange(r);
     lt->addOcc(Occ(false, pos, ir));
     mgr.recordPos(ir, pos);
-    cross_call_counter.updateForUse(lt, r.start());
+    cross_call_counter.update(lt);
 }
 
 
@@ -666,7 +664,7 @@ static void computeRHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
     irit.clean();
     for (IR * e = xoc::iterExpInit(ir, irit); e != nullptr;
          e = xoc::iterExpNext(irit)) {
-        if (e->isReadPR()) {
+        if (e->isReadPR() && mgr.canBeCandidate(e->getPrno())) {
             computeUSE(e, mgr, pos, livein_def, preassigned_mgr,
                        cross_call_counter);
         }
@@ -674,10 +672,9 @@ static void computeRHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
 }
 
 
-void CrossedCallCounter::updateForUse(LifeTime * lt, Pos def_pos)
+void CrossedCallCounter::update(LifeTime * lt)
 {
     ASSERT0(lt);
-    ASSERT0(def_pos != POS_UNDEF);
     if (m_call2pos.get_elem_count() == 0 ||
         lt->getCallCrossedNum() >= CROSS_CALL_NUM_THRESHOLD) {
         //Implement the 2.1 of the algorithm.
@@ -687,50 +684,36 @@ void CrossedCallCounter::updateForUse(LifeTime * lt, Pos def_pos)
     }
 
     PRNO prno = lt->getPrno();
-    VecIdx current_call_id = m_call2pos.get_last_idx();
-
-    //If the position of current_call_id is less than the start of a range
-    //(DEF position), that means this call is in the hole of the lifetime,
-    //so it will not impact the call_crossed_num.
-    if (m_call2pos[current_call_id] < def_pos) {
-        //Implement the 2.2 of the algorithm.
-        return;
-    }
-
-    //If the prno cannot find in the map m_prno2callid, that means the
-    //baseline_call_id is not recorded, it needs to be recorded first.
     bool find = false;
     VecIdx baseline_call_id = m_prno2callid.get(prno, &find);
-    if (!find) {
-        //Implement the 2.3.1 of the algorithm.
-        lt->incCallCrossedNum(current_call_id + 1);
-        m_prno2callid.set(prno, current_call_id);
-        return;
-    }
 
-    if (baseline_call_id < current_call_id) {
-        //Implement the 2.3.2 of the algorithm.
-        //Add the call_crossed_num with the number of calls not counted.
-        lt->incCallCrossedNum(current_call_id - baseline_call_id);
-        m_prno2callid.setAlways(prno, current_call_id);
+    //Implement the 2.2.1 and 2.2.2 of the algorithm.
+    //If this prno doesn't record any call id, we have to traverse the call
+    //from the beginning, or else just start to traverse the call from the
+    //baseline call id recorded before.
+    baseline_call_id = find ? baseline_call_id + 1 : 0;
+    VecIdx current_call_id = m_call2pos.get_last_idx();
+
+    //Implement the 2.2.3 of the algorithm.
+    for (VecIdx i = baseline_call_id; i <= current_call_id; i++) {
+        if (!lt->is_contain(m_call2pos[i])) { continue; }
+        //Implement the 2.2.3.1 of the algorithm.
+        lt->incCallCrossedNum(1);
     }
+    m_prno2callid.setAlways(prno, current_call_id);
 }
 
 
-void CrossedCallCounter::updateForDef(LifeTime * lt)
+bool LifeTimeMgr::canBeCandidate(PRNO prno)
 {
-    ASSERT0(lt);
-    if (m_call2pos.get_elem_count() == 0 ||
-        lt->getCallCrossedNum() >= CROSS_CALL_NUM_THRESHOLD) {
-        //Implement the 3.1 of the algorithm.
-        //Don't update the call_crossed_num if there is no call or the
-        //call_crossed_num is greater than the CROSS_CALL_NUM_THRESHOLD.
-        return;
-    }
-    //Implement the 3.2 of the algorithm.
-    //Record the baseline_call_id to current_call_id at the DEF postion,
-    //because this DEF position will start a new range of lifetime.
-    m_prno2callid.setAlways(lt->getPrno(), m_call2pos.get_last_idx());
+    RA_STRATEGY strategy = getStrategy();
+    if (strategy == RA_STRATEGY_FULL) { return true; }
+    Var * var = m_rg->getVarByPRNO(prno);
+    ASSERT0(var);
+    Type const* tp = var->getType();
+    ASSERT0(tp);
+    return tp->is_vector() ? strategy == RA_STRATEGY_VECTOR :
+        strategy == RA_STRATEGY_SCALAR;
 }
 
 
@@ -845,20 +828,22 @@ void LifeTimeMgr::computeLifeTime(UpdatePos & up, BBList const* bblst,
 }
 
 
-static void dumpPhyReg(PRNO prno, LinearScanRA const& ra, Region const* rg)
+static void dumpPhyReg(Region const* rg, RegAllocMgr * ramgr, PRNO prno)
 {
-    Reg r = ra.getReg(prno);
+    Reg r = ramgr->getReg(prno);
     if (r == REG_UNDEF) { return; }
-    REGFILE rf = ra.getRegFile(r);
+    TargInfoMgr const* timgr = rg->getRegionMgr()->getTargInfoMgr();
+    ASSERT0(timgr);
+    REGFILE rf = timgr->getRegFile(r);
     ASSERT0(rf != RF_UNDEF);
-    prt(rg, ":%s(%s)", ra.getRegName(r), ra.getRegFileName(rf));
+    prt(rg, ":%s(%s)", timgr->getRegName(r), timgr->getRegFileName(rf));
 }
 
 
 //in_lt: true if ir is part of a lifetime.
-static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
-                          Pos dpos, Pos upos, LinearScanRA const& ra,
-                          ConstIRIter & irit)
+static void dumpStmtUsage(
+    Region const* rg, RegAllocMgr * ramgr, IR const* ir, bool in_lt, Pos dpos,
+    Pos upos, ConstIRIter & irit)
 {
     note(rg, "\n");
     //Dump LHS.
@@ -870,17 +855,17 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
     IR * res = const_cast<IR*>(ir)->getResultPR();
     if (res != nullptr) {
         prt(rg, "$%u", res->getPrno());
-        dumpPhyReg(res->getPrno(), ra, rg);
+        dumpPhyReg(rg, ramgr, res->getPrno());
     } else { prt(rg, "--"); }
 
     prt(rg, " <= ");
     if (!in_lt) {
-        ASSERT0(ra.isOpInPosGap(ir));
+        ASSERT0(ramgr->isOpInPosGap(ir));
         CHAR const* role = nullptr;
-        if (ra.isSpillOp(ir)) { role = "spill"; }
-        else if (ra.isReloadOp(ir)) { role = "reload"; }
-        else if (ra.isRematOp(ir)) { role = "remat"; }
-        else if (ra.isMoveOp(ir)) { role = "move"; }
+        if (ramgr->isSpillOp(ir)) { role = "spill"; }
+        else if (ramgr->isReloadOp(ir)) { role = "reload"; }
+        else if (ramgr->isRematOp(ir)) { role = "remat"; }
+        else if (ramgr->isMoveOp(ir)) { role = "move"; }
         else { UNREACHABLE(); }
         prt(rg, "%s == ", role);
     }
@@ -896,7 +881,7 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
         }
         find_readpr = true;
         prt(rg, "$%u", e->getPrno());
-        dumpPhyReg(e->getPrno(), ra, rg);
+        dumpPhyReg(rg, ramgr, e->getPrno());
     }
     if (!find_readpr) {
         prt(rg, "--");
@@ -909,8 +894,9 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
 }
 
 
-static void dumpPROverView(Region const* rg, BBList const* bblst,
-                           bool dumpir, UpdatePos & up)
+static void dumpPROverView(
+    Region const* rg, RegAllocMgr * ramgr, BBList const* bblst, bool dumpir,
+    UpdatePos & up)
 {
     note(rg, "\n==-- DUMP %s --==", "PR OverView");
     Pos dpos_start, upos_start;
@@ -934,7 +920,7 @@ static void dumpPROverView(Region const* rg, BBList const* bblst,
              ir != nullptr; ir = irlst.get_next(&bbirit)) {
             Pos upos, dpos;
             bool in_lt = up.updateAtIR(ir, dpos, upos);
-            dumpStmtUsage(ir, rg, in_lt, dpos, upos, *up.getRA(), irit);
+            dumpStmtUsage(rg, ramgr, ir, in_lt, dpos, upos, irit);
             if (dumpir) {
                 rg->getLogMgr()->incIndent(4);
                 xoc::dumpIR(ir, rg);
@@ -970,6 +956,16 @@ void LTList::dump(Region const* rg) const
 //END LTList
 
 
+LifeTimeMgr::LifeTimeMgr(Region * rg)
+{
+    m_pool = nullptr;
+    m_use_expose = false;
+    m_strategy = RA_STRATEGY_UNDEF;
+    m_ramgr = (RegAllocMgr*)rg->getPassMgr()->registerPass(PASS_REGALLOC_MGR);
+    init(rg);
+}
+
+
 void LifeTimeMgr::dump() const
 {
     m_lt_list.dump(m_rg);
@@ -983,7 +979,7 @@ void LifeTimeMgr::dumpAllLT(UpdatePos & up, BBList const* bblst,
     if (m_lt_list.get_elem_count() == 0) { return; }
     note(m_rg, "\n==-- DUMP ALL LifeTime --==");
     m_rg->getLogMgr()->incIndent(2);
-    dumpPROverView(m_rg, bblst, dumpir, up);
+    dumpPROverView(m_rg, m_ramgr, bblst, dumpir, up);
     m_lt_list.dump(m_rg);
     m_rg->getLogMgr()->decIndent(2);
 }
@@ -1012,6 +1008,7 @@ void LifeTimeMgr::renameLifeTimeOcc(LifeTime const* lt, PRNO newprno)
         IR * ir = occ.getIR();
         ASSERT0(ir->isPROp());
         ir->setPrno(newprno);
+        getMDMgr()->allocRef(ir);
     }
 }
 
@@ -1053,6 +1050,7 @@ void LifeTime2DMgr::mergeLiveIn(IRBB const* bb, UpdatePos & up,
 
     for (UINT id = (UINT)live_in->get_first(&iter);
          id != BS_UNDEF; id = (UINT)live_in->get_next(id, &iter)) {
+        if (!canBeCandidate(id)) { continue; }
         LifeTime * lt = genLifeTime(id);
         ASSERT0(lt);
 
@@ -1073,6 +1071,7 @@ void LifeTime2DMgr::mergeLiveOut(IRBB const* bb, UpdatePos & up,
 
     for (UINT id = (UINT)live_out->get_first(&iter);
          id != BS_UNDEF; id = (UINT)live_out->get_next(id, &iter)) {
+        if (!canBeCandidate(id)) { continue; }
         LifeTime * lt = genLifeTime(id);
         ASSERT0(lt);
         Range r = lt->getLastRange();
@@ -1174,11 +1173,11 @@ void RegLifeTimeMgr::addCallerLTPos(Pos pos, IR const* ir)
 {
     ASSERT0(ir);
     ASSERT0(pos != POS_UNDEF);
-    TargInfoMgr * tg = m_rg->getRegionMgr()->getTargInfoMgr();
-    xgen::RegSet const* caller_set = tg->getCallerRegSet();
+    xgen::RegSet const* caller_set = m_rg->getRegionMgr()->getTargInfoMgr()->
+        getCallerRegSet();
     PRNO pr = CALL_prno(ir);
     Reg def_reg = REG_UNDEF;
-    if (pr != PRNO_UNDEF) { def_reg = m_lsra->getReg(pr); }
+    if (pr != PRNO_UNDEF) { def_reg = m_ramgr->getReg(pr); }
     for (BSIdx i = caller_set->get_first(); i != BS_UNDEF;
          i = caller_set->get_next(i)) {
         if (i == def_reg) { continue; }
@@ -1189,7 +1188,7 @@ void RegLifeTimeMgr::addCallerLTPos(Pos pos, IR const* ir)
 }
 
 
-void RegLifeTimeMgr::mergeRegLifetimeWIthRange(Reg reg,
+void RegLifeTimeMgr::mergeRegLifetimeWithRange(Reg reg,
     RangeVec const& range_vec)
 {
     ASSERT0(reg != REG_UNDEF);
@@ -1198,32 +1197,22 @@ void RegLifeTimeMgr::mergeRegLifetimeWIthRange(Reg reg,
     ASSERT0(lt_ori);
     //Insert 'range_vec' into the RangeVec of 'lt_ori'.
     mergeLifeTime(lt_ori->getRangeVec(), range_vec);
-}
 
+    //Consider the alias register.
+    TargInfoMgr * tg = m_rg->getRegionMgr()->getTargInfoMgr();
+    SRegSet const* alias_regset = tg->getAliasRegSet(reg);
+    if (alias_regset == nullptr) { return; }
 
-void RegLifeTimeMgr::mergeRegLifeTimeWithPRLT(MOD LifeTime * lt_new)
-{
-    ASSERT0(lt_new && m_rg && m_rg->getRegionMgr());
-    ASSERT0(m_rg->getRegionMgr()->getTargInfoMgr());
-
-    //Get original corresponding lifetime of 'reg' assigned to 'lt_new'.
-    Reg reg = m_lsra->getReg(lt_new->getPrno());
-    ASSERT0(reg != REG_UNDEF);
-    if (m_lsra->isZeroRegister(reg)) {
-        //If the assigned physical-register is zero register, we should ignore
-        //this lifetime, because the zero regsiter can not be reused.
-        return;
+    //Merge the range into all alias registers.
+    RegDSetIter iter;
+    for (BSIdx i = alias_regset->get_first(&iter); i != BS_UNDEF;
+         i = alias_regset->get_next(i, &iter)) {
+        if (i == reg) { continue; }
+        LifeTime * lt = getRegLifeTime((Reg)i);
+        ASSERT0(lt);
+        //Insert 'range_vec' into the RangeVec of 'lt'.
+        mergeLifeTime(lt->getRangeVec(), range_vec);
     }
-    if (!lt_new->isOccHasDef()) {
-        //If the lifetime 'lt_new' has no define in its occ list, that means
-        //the data of 'lt_new' at the USE position of its occ list can be
-        //any value, it is not be cared. So we should ignore this liftime
-        //during the merge process.
-        return;
-    }
-    LifeTime * lt_ori = getRegLifeTime(reg);
-    ASSERT0(lt_ori);
-    mergeLifeTime(lt_ori->getRangeVec(), lt_new->getRangeVec());
 }
 
 

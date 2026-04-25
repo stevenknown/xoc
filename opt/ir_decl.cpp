@@ -30,12 +30,37 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+IRFieldAccTab::AccInfo CId::accinfo[CId::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_IDINFO, (void*)CId::accIdinfo),
+};
+
+
 //
 //START CSetElem
 //
 static BYTE g_csetelem_vbuf[4] = {0x6};
 IRKidMap const CSetElem::kid_map(g_csetelem_vbuf, sizeof(g_csetelem_vbuf));
+
+
+IRFieldAccTab::AccInfo CSetElem::accinfo[CSetElem::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CSetElem::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CSetElem::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CSetElem::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CSetElem::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CSetElem::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CSetElem::accBB),
+};
 //END CSetElem
+
+
+IRFieldAccTab::AccInfo CGetElem::accinfo[CGetElem::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CGetElem::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CGetElem::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CGetElem::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CGetElem::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CGetElem::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CGetElem::accBB),
+};
 
 
 //
@@ -49,6 +74,15 @@ IR * CLd::dupIRTreeByStmt(IR const* src, Region const* rg)
     ld->copyRef(src, rg);
     return ld;
 }
+
+
+IRFieldAccTab::AccInfo CLd::accinfo[CLd::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_IDINFO, (void*)CLd::accIdinfo),
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CLd::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CLd::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CLd::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CLd::accAlign),
+};
 //END CLd
 
 
@@ -62,7 +96,46 @@ IR * CPr::dupIRTreeByRef(IR const* src, Region const* rg)
     pr->copyRef(src, rg);
     return pr;
 }
+
+
+IRFieldAccTab::AccInfo CPr::accinfo[CPr::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CPr::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CPr::accPrno),
+};
 //END CPr
+
+
+IRFieldAccTab::AccInfo CTruebr::accinfo[CTruebr::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CTruebr::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CTruebr::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CTruebr::accLab),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CTruebr::accDet),
+};
+
+
+IRFieldAccTab::AccInfo CFalsebr::accinfo[CFalsebr::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CFalsebr::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CFalsebr::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CFalsebr::accLab),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CFalsebr::accDet),
+};
+
+
+IRFieldAccTab::AccInfo CRet::accinfo[CRet::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CRet::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CRet::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CSelect::accinfo[CSelect::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CSelect::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CSelect::accDet),
+};
+
+
+IRFieldAccTab::AccInfo CAlloca::accinfo[CAlloca::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CAlloca::accKid),
+};
 
 
 //
@@ -77,6 +150,16 @@ IR * CILd::dupIRTreeByStmt(IR const* src, Region const* rg)
     ILD_base(ild)->copyRefForTree(IST_base(src), rg);
     return ild;
 }
+
+
+IRFieldAccTab::AccInfo CILd::accinfo[CILd::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CILd::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CILd::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CILd::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CILd::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CILd::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CILd::accAlign),
+};
 //END CILd
 
 
@@ -137,6 +220,26 @@ IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
     ARR_sub_list(starr)->copyRefForTree(ARR_sub_list(src), rg);
     return starr;
 }
+
+
+IRFieldAccTab::AccInfo CStArray::accinfo[CStArray::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_RHS, (void*)CStArray::accRHS),
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CStArray::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CStArray::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CStArray::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CStArray::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CStArray::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CStArray::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CStArray::accAlign),
+};
+
+
+IRFieldAccTab::AccInfo CCvt::accinfo[CCvt::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCvt::accKid),
+};
+
+
+
 //END CStArray
 
 
@@ -155,7 +258,26 @@ IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
     IST_base(ist)->copyRefForTree(ILD_base(src), rg);
     return ist;
 }
+
+
+IRFieldAccTab::AccInfo CISt::accinfo[CISt::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_RHS, (void*)CISt::accRHS),
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CISt::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CISt::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CISt::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CISt::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CISt::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CISt::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CISt::accAlign),
+};
 //END CISt
+
+
+IRFieldAccTab::AccInfo CLda::accinfo[CLda::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_IDINFO, (void*)CLda::accIdinfo),
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CLda::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CLda::accSS),
+};
 
 
 //
@@ -169,6 +291,18 @@ IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
     st->copyRef(src, rg);
     return st;
 }
+
+
+IRFieldAccTab::AccInfo CSt::accinfo[CSt::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_RHS, (void*)CSt::accRHS),
+    IRFieldAccTab::AccInfo(IR_ACC_IDINFO, (void*)CSt::accIdinfo),
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CSt::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CSt::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CSt::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CSt::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CSt::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CSt::accAlign),
+};
 //END CSt
 
 
@@ -182,6 +316,16 @@ IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region const* rg)
     stpr->copyRef(src, rg);
     return stpr;
 }
+
+
+IRFieldAccTab::AccInfo CStpr::accinfo[CStpr::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_RHS, (void*)CStpr::accRHS),
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CStpr::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CStpr::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CStpr::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CStpr::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CStpr::accBB),
+};
 //END CStpr
 
 
@@ -238,7 +382,18 @@ void CIf::addToFalseBody(UINT num, ...)
     }
     va_end(ptr);
 }
+
+
+IRFieldAccTab::AccInfo CIf::accinfo[CIf::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CIf::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CIf::accDet),
+};
 //END CIf
+
+
+IRFieldAccTab::AccInfo CLab::accinfo[CLab::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CLab::accLab),
+};
 
 
 //
@@ -258,7 +413,25 @@ void CWhileDo::addToBody(UINT num, ...)
     }
     va_end(ptr);
 }
+
+
+IRFieldAccTab::AccInfo CWhileDo::accinfo[CWhileDo::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CWhileDo::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CWhileDo::accDet),
+};
 //END CWhileDo
+
+
+IRFieldAccTab::AccInfo CDoWhile::accinfo[CDoWhile::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CDoWhile::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CDoWhile::accDet),
+};
+
+
+IRFieldAccTab::AccInfo CDoLoop::accinfo[CDoLoop::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CDoLoop::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_DET, (void*)CDoLoop::accDet),
+};
 
 
 //
@@ -289,7 +462,38 @@ void CSwitch::collectLabel(OUT List<LabelInfo const*> & lst) const
         lst.append_tail(CASE_lab(cs));
     }
 }
+
+
+IRFieldAccTab::AccInfo CSwitch::accinfo[CSwitch::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CSwitch::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CSwitch::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CSwitch::accLab),
+    IRFieldAccTab::AccInfo(IR_ACC_COLLECT_LAB, (void*)CSwitch::accCollectLab),
+    IRFieldAccTab::AccInfo(IR_ACC_VALEXP, (void*)CSwitch::accValExp),
+    IRFieldAccTab::AccInfo(IR_ACC_CASE, (void*)CSwitch::accCase),
+};
 //END CSwitch
+
+
+IRFieldAccTab::AccInfo CDummyUse::accinfo[CDummyUse::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CDummyUse::accKid),
+};
+
+
+IRFieldAccTab::AccInfo CCase::accinfo[CCase::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCase::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CCase::accLab),
+};
+
+
+IRFieldAccTab::AccInfo CArray::accinfo[CArray::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_OFST, (void*)CArray::accOfst),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CArray::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BASE, (void*)CArray::accBase),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CArray::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_VOLATILE, (void*)CArray::accVolatile),
+    IRFieldAccTab::AccInfo(IR_ACC_ALIGN, (void*)CArray::accAlign),
+};
 
 
 //
@@ -302,6 +506,15 @@ void CIGoto::collectLabel(OUT List<LabelInfo const*> & lst) const
         lst.append_tail(CASE_lab(cs));
     }
 }
+
+
+IRFieldAccTab::AccInfo CIGoto::accinfo[CIGoto::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CIGoto::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CIGoto::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_COLLECT_LAB, (void*)CIGoto::accCollectLab),
+    IRFieldAccTab::AccInfo(IR_ACC_VALEXP, (void*)CIGoto::accValExp),
+    IRFieldAccTab::AccInfo(IR_ACC_CASE, (void*)CIGoto::accCase),
+};
 //END CIGoto
 
 
@@ -352,7 +565,48 @@ bool CCall::isDummyUse(IR const* exp) const
     it.visit(getDummyUse());
     return vf.find;
 }
+
+
+IRFieldAccTab::AccInfo CCall::accinfo[CCall::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_IDINFO, (void*)CCall::accIdinfo),
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CCall::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CCall::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_SS, (void*)CCall::accSS),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CCall::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCall::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCall::accBB),
+};
 //END CCall
+
+
+IRFieldAccTab::AccInfo CICall::accinfo[CICall::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CICall::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CICall::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CICall::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CICall::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CICall::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CTer::accinfo[CTer::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CTer::accKid),
+};
+
+
+IRFieldAccTab::AccInfo CBin::accinfo[CBin::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CBin::accKid),
+};
+
+
+IRFieldAccTab::AccInfo CUna::accinfo[CUna::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CUna::accKid),
+};
+
+
+IRFieldAccTab::AccInfo CGoto::accinfo[CGoto::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CGoto::accBB),
+    IRFieldAccTab::AccInfo(IR_ACC_LABEL, (void*)CGoto::accLab),
+};
 
 
 //
@@ -364,6 +618,18 @@ IR * CPhi::getOpnd(UINT idx) const
     IR * x = PHI_opnd_list(this);
     for (; x != nullptr && i < idx; x = x->get_next(), i++) {;}
     return x;
+}
+
+
+IR * CPhi::getOpndByPred(IRBB const* pred, IRCFG const* cfg) const
+{
+    ASSERT0(pred && cfg);
+    ASSERT0(cfg->isVertex(pred->id()));
+    ASSERT0(getBB());
+    bool is_pred = false;
+    UINT pred_pos = cfg->WhichPred(pred, getBB(), is_pred);
+    ASSERT0(is_pred);
+    return getOpnd(pred_pos);
 }
 
 
@@ -402,6 +668,15 @@ void CPhi::insertOpndAt(UINT pos, IR * exp)
     xcom::add_next(&PHI_opnd_list(this), &last, exp);
     setParent(exp);
 }
+
+
+IRFieldAccTab::AccInfo CPhi::accinfo[CPhi::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_SSAINFO, (void*)CPhi::accSSAInfo),
+    IRFieldAccTab::AccInfo(IR_ACC_PRNO, (void*)CPhi::accPrno),
+    IRFieldAccTab::AccInfo(IR_ACC_RESPR, (void*)CPhi::accResultPR),
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CPhi::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CPhi::accBB),
+};
 //END CPhi
 
 
@@ -437,6 +712,42 @@ MDSet * CRegion::genMayUse() const
 {
     return REGION_ru(this)->genMayUse();
 }
+
+
+IRFieldAccTab::AccInfo CRegion::accinfo[CRegion::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CRegion::accBB),
+};
 //END CRegion
+
+
+IRFieldAccTab::AccInfo CCFIDefCfa::accinfo[CCFIDefCfa::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCFIDefCfa::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCFIDefCfa::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CCFISameValue::accinfo[CCFISameValue::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCFISameValue::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCFISameValue::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CCFIOffset::accinfo[CCFIOffset::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCFIOffset::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCFIOffset::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CCFIRestore::accinfo[CCFIRestore::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCFIRestore::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCFIRestore::accBB),
+};
+
+
+IRFieldAccTab::AccInfo CCFIDefCfaOffset::accinfo
+    [CCFIDefCfaOffset::accinfo_num] = {
+    IRFieldAccTab::AccInfo(IR_ACC_KID, (void*)CCFIDefCfaOffset::accKid),
+    IRFieldAccTab::AccInfo(IR_ACC_BB, (void*)CCFIDefCfaOffset::accBB),
+};
 
 } //namespace xoc

@@ -36,14 +36,16 @@ namespace xoc {
 //
 //START Var2Offset
 //
-HOST_UINT Var2Offset::getOrAddVarOffset(xoc::Var const* v)
+HOST_UINT Var2Offset::getOrAddVarOffset(xoc::Var const* v, bool * find_ptr)
 {
     bool find = false;
     HOST_UINT off = get(v, &find);
+    if (find_ptr != nullptr) { *find_ptr = find; }
     if (find) { return off; }
 
-    m_cur_offset = (HOST_UINT)xcom::ceil_align(m_cur_offset,
-        MAX(v->get_align(), getAlign()));
+    HOST_UINT adjust_align =
+        computeAlignForTwoAligns(v->get_align(), getAlign());
+    m_cur_offset = (HOST_UINT)xcom::ceil_align(m_cur_offset, adjust_align);
     off = m_cur_offset;
     set(v, off);
     m_cur_offset += v->getByteSize(m_tm);
@@ -73,11 +75,13 @@ void Var2Offset::dump(OUT FileObj & fo) const
 }
 
 
-HOST_INT Var2OffsetMgr::computeLocalVarOffsetFromFP(Var const* var)
+void Var2OffsetMgr::computeLocalVarOffsetFromFP(Var const* var)
 {
     ASSERT0(var);
     ASSERT0(var != m_pelog->getRAVar() && var != m_pelog->getFPVar());
-    HOST_INT offset = m_local_var2off->getOrAddVarOffset(var);
+    bool find = false;
+    HOST_INT offset = m_local_var2off->getOrAddVarOffset(var, &find);
+    if (find) { return; }
     DynamicStack * m_dystack_impl = (DynamicStack*)m_rg->getPassMgr()->
         queryPass(PASS_DYNAMIC_STACK);
     if (m_dystack_impl == nullptr || !m_dystack_impl->hasAlloca()) {
@@ -88,24 +92,25 @@ HOST_INT Var2OffsetMgr::computeLocalVarOffsetFromFP(Var const* var)
         offset = m_pelog->getStackSpaceSize() - offset -
             xcom::ceil_align(m_arg_passer->getMaxArgSize(),
             m_pelog->getMaxAlignment());
-        return -offset;
+    } else {
+        //Formula: offset = stacksize - var2off.getOrAddVarOffset(var)
+        ASSERT0(m_dystack_impl->hasAlloca());
+        offset = m_pelog->getStackSpaceSize() - offset;
     }
-
-    //Formula: offset = stacksize - var2off.getOrAddVarOffset(var)
-    ASSERT0(m_dystack_impl->hasAlloca());
-    offset = m_pelog->getStackSpaceSize() - offset;
-    return -offset;
+    m_local_var2off->setAlways(var, -offset);
 }
 
 
-HOST_INT Var2OffsetMgr::computeLocalVarOffset(Var const* var)
+void Var2OffsetMgr::computeLocalVarOffset(Var const* var)
 {
     ASSERT0(var);
     ASSERT0(var != m_pelog->getRAVar() && var != m_pelog->getFPVar());
     if (m_pelog->isUsedFPAsSP()) {
         return computeLocalVarOffsetFromFP(var);
     }
-    HOST_UINT off = m_local_var2off->getOrAddVarOffset(var);
+    bool find = false;
+    HOST_UINT off = m_local_var2off->getOrAddVarOffset(var, &find);
+    if (find) { return; }
 
     //NOTE: MaxArgSize is the argument space size, The offset of the
     //local var needs to accumulate the MaxArgSize,
@@ -113,40 +118,21 @@ HOST_INT Var2OffsetMgr::computeLocalVarOffset(Var const* var)
     HOST_UINT offset = off +
         xcom::ceil_align(m_arg_passer->getMaxArgSize(),
         m_pelog->getMaxAlignment());
-    return offset;
+    m_local_var2off->setAlways(var, offset);
 }
 
 
-HOST_UINT Var2OffsetMgr::computeSpecialVarOffset(Var const* var)
+void Var2OffsetMgr::computeSpecialVarOffset(Var const* var)
 {
     ASSERT0(var);
     ASSERT0(var == m_pelog->getRAVar() || var == m_pelog->getFPVar() ||
             var == m_pelog->getSSVar());
-
-    HOST_UINT var_offset = m_special_var2off->getOrAddVarOffset(var);
-
+    bool find = false;
+    HOST_UINT var_offset = m_special_var2off->getOrAddVarOffset(var, &find);
+    if (find) { return; }
     var_offset = m_pelog->getStackSpaceSize() - var_offset -
         var->getByteSize(m_tm) - m_pelog->getSizeOfVaarg();
-    return var_offset;
-}
-
-
-//Compute argument var offset.
-HOST_UINT Var2OffsetMgr::computeArgVarOffset(Var const* var)
-{
-    ASSERT0(var && isArgument(var));
-    return m_arg_var2off->getOrAddVarOffset(var);
-}
-
-
-HOST_UINT Var2OffsetMgr::getParamOffset(Var const* var) const
-{
-    ASSERT0(var);
-    TMWORD offset = (TMWORD)m_param_var2off->get(var);
-    if (m_pelog->isUsedFPAsSP() || m_pelog->isNeedStackRealignment()) {
-        return offset;
-    }
-    return offset + m_pelog->getStackSpaceSize();
+    m_special_var2off->setAlways(var, var_offset);
 }
 
 
@@ -154,9 +140,17 @@ void Var2OffsetMgr::computeParamOffset()
 {
     ParamList * param_list_stack = m_arg_passer->getListOfParamOnStack();
     ASSERT0(param_list_stack);
+    bool find = false;
     for (xoc::Var const* v = param_list_stack->get_head(); v != nullptr;
-         v = param_list_stack->get_next())
-    { m_param_var2off->getOrAddVarOffset(v); }
+         v = param_list_stack->get_next()) {
+        HOST_INT offset = m_param_var2off->getOrAddVarOffset(v, &find);
+        m_param_var2off->setAlways(v, offset);
+        if (find) { continue; }
+        if (m_pelog->isUsedFPAsSP() || m_pelog->isNeedStackRealignment()) {
+            continue;
+        }
+        m_param_var2off->setAlways(v, offset + m_pelog->getStackSpaceSize());
+    }
 }
 
 
@@ -169,7 +163,7 @@ void Var2OffsetMgr::computeArgVarOffset()
          callir2_arg_list->get_next(iter, &callir_param_list)) {
         for (xoc::Var const* v = callir_param_list->get_head();
              v != nullptr; v = callir_param_list->get_next())
-        { computeArgVarOffset(v); }
+        { m_arg_var2off->getOrAddVarOffset(v); }
 
         //The argument space can be reused and reset when the function
         //call is finished.
@@ -208,19 +202,48 @@ void Var2OffsetMgr::resetArgSpaceOffset()
 }
 
 
-HOST_INT Var2OffsetMgr::computeVarOffset(Var const* var)
+void Var2OffsetMgr::reviseParamOffsetByPushPopSize(UINT offset)
+{
+    ParamList * param_list_stack = m_arg_passer->getListOfParamOnStack();
+    ASSERT0(param_list_stack);
+    bool find = false;
+    for (xoc::Var const* v = param_list_stack->get_head(); v != nullptr;
+         v = param_list_stack->get_next()) {
+        HOST_INT offset_new = m_param_var2off->getOrAddVarOffset(v, &find) +
+            offset;
+        m_param_var2off->setAlways(v, offset_new);
+    }
+}
+
+
+void Var2OffsetMgr::computeVarOffset(Var const* var)
 {
     ASSERT0(var);
-    if (isParameter(var)) {
-        return getParamOffset(var);
-    }
-    if (isArgument(var)) {
-        return computeArgVarOffset(var);
-    }
+    ASSERT0(!isParameter(var) && !isArgument(var));
     if (isSpillVarInEntryBB(var)) {
-        return computeSpecialVarOffset(var);
+        computeSpecialVarOffset(var);
+    } else {
+        computeLocalVarOffset(var);
     }
-    return computeLocalVarOffset(var);
+}
+
+
+HOST_INT Var2OffsetMgr::getVarOffset(Var const* var) const
+{
+    ASSERT0(var);
+    bool find = false;
+    HOST_INT offset = 0;
+    if (isParameter(var)) {
+        offset = m_param_var2off->get(var, &find);
+    } else if (isArgument(var)) {
+        offset = m_arg_var2off->get(var, &find);
+    } else if (isSpillVarInEntryBB(var)) {
+        offset = m_special_var2off->get(var, &find);
+    } else {
+        offset = m_local_var2off->get(var, &find);
+    }
+    ASSERT0(find);
+    return offset;
 }
 
 

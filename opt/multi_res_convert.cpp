@@ -298,7 +298,7 @@ IR * MultiResConvert::buildStorePRWithMultiResAndConvertBySplit(
     PRNO prno, Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStorePR(prno, type, rhs);
-    ASSERT0(rhs->getResList());
+    ASSERT0(rhs->hasResList() && rhs->getResList());
     return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
@@ -307,7 +307,7 @@ IR * MultiResConvert::buildStorePRWithMultiResAndConvertBySplit(
     Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStorePR(type, rhs);
-    ASSERT0(rhs->getResList());
+    ASSERT0(rhs->hasResList() && rhs->getResList());
     return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
@@ -316,7 +316,7 @@ IR * MultiResConvert::buildStoreWithMultiResAndConvertBySplit(
     Var * lhs, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStore(lhs, rhs);
-    ASSERT0(rhs->getResList());
+    ASSERT0(rhs->hasResList() && rhs->getResList());
     return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 
@@ -325,7 +325,7 @@ IR * MultiResConvert::buildStoreWithMultiResAndConvertByExtract(
     Var * lhs, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStore(lhs, rhs);
-    ASSERT0(rhs->getResList());
+    ASSERT0(rhs->hasResList() && rhs->getResList());
     return convertMultiResByExtractRes(stmt);
 }
 
@@ -334,7 +334,7 @@ IR * MultiResConvert::buildStoreWithMultiResAndConvertBySplit(
     Var * lhs, Type const* type, IR * rhs)
 {
     IR * stmt = m_irmgr->buildStore(lhs, type, rhs);
-    ASSERT0(rhs->getResList());
+    ASSERT0(rhs->hasResList() && rhs->getResList());
     return convertMultiResBySplitRes(stmt, m_is_enable_post_vdef);
 }
 

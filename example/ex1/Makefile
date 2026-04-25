@@ -5,7 +5,7 @@ endif
 
 EX1_OBJS+=ex1.o
 
-CFLAGS=-DFOR_DEX -D_DEBUG_ -O0 -g2 -D_SUPPORT_C11_
+CFLAGS=-DFOR_DEX -D_DEBUG_ -O0 -g2 -D_SUPPORT_C11_ -std=c++11
 
 ex1: ex1_objs 
 	$(CC) $(EX1_OBJS) $(CFLAGS) -L../.. -lxoc -L../../com -lxcom -o ex1.exe -lstdc++ -lm

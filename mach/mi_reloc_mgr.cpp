@@ -34,13 +34,6 @@ author: Su Zhenyu
 
 namespace mach {
 
-static bool hasLocalVar(mach::MInst const* mi)
-{
-    ASSERT0(mi);
-    return (mi->hasVar() && MEMACCMI_var(mi) != nullptr &&
-            MEMACCMI_var(mi)->is_local());
-}
-
 //
 //START MIRelocMgr
 //
@@ -48,32 +41,10 @@ MIRelocMgr::MIRelocMgr(Region * rg, MInstMgr * imgr, TMWORD align) :
     m_rg(rg), m_mimgr(imgr), m_code_align(align), m_data_align(align)
 {
     m_tm = m_rg->getTypeMgr();
-    IRRelocMgr * ir_reloc_mgr = (IRRelocMgr*)m_rg->getPassMgr()->
-        registerPass(PASS_IRRELOC);
-    if (ir_reloc_mgr != nullptr && ir_reloc_mgr->getVar2Offset() != nullptr) {
-        m_has_ir_reloc = true;
-        m_var2offset = ir_reloc_mgr->getVar2Offset();
-        return;
-    }
-    m_has_ir_reloc = false;
-    m_var2offset = new Var2OffsetMgr(rg);
-}
-
-
-MIRelocMgr::~MIRelocMgr()
-{
-    if (!m_has_ir_reloc) {
-        delete m_var2offset;
-        m_var2offset = nullptr;
-    }
-}
-
-
-//A helper function to judge whether current machine instruction is aligned
-//by word length of machine instruction of current architecture.
-static bool isMIAlignedByWordLength(TMWORD offset, UINT length)
-{
-    return offset % length == 0;
+    VarRelocMgr * var_reloc_mgr =
+        (VarRelocMgr*)rg->getPassMgr()->registerPass(PASS_VARRELOC);
+    m_var2offset_mgr = var_reloc_mgr->getVar2OffsetMgr();
+    ASSERT0(m_var2offset_mgr);
 }
 
 
@@ -86,18 +57,14 @@ TMWORD MIRelocMgr::computeJumpOff(MInstMgr * mimgr,
 {
     TMWORD label_pc = lab2off.get(LABMI_lab(mi));
     TMWORD inst_pc = MI_pc(mi);
-    TMWORD inst_size = mi->getWordBufLen();
-
-    ASSERT0(isMIAlignedByWordLength(label_pc, (UINT)inst_size));
-    ASSERT0(isMIAlignedByWordLength(inst_pc, (UINT)inst_size));
-    ASSERT0(isMIAlignedByWordLength(label_pc - inst_pc, (UINT)inst_size));
+    TMWORD inst_size  = mi->getWordBufLen();
 
     //Note that, For some architectures, it is inconsistent whether the
     //distance between the target label and the current jump instruction needs
     //to be subtracted by 1.
     ASSERT0(lab2off.find(LABMI_lab(mi)));
-    INT64 val = (INT64)(label_pc - inst_pc) / (UINT)inst_size -
-        isDistanceNeedSubOne();
+    INT64 val = (INT64)(label_pc - inst_pc) -
+        isDistanceNeedSubOne() * (UINT)inst_size;
     ASSERT0(jumpOffIsValid(val, mi));
     return (TMWORD)val;
 }
@@ -126,7 +93,6 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
             }
             continue;
         }
-
         //The CFI instruction "pc" maintains the pc of the previous
         //chip instruction.
         if (xoc::g_debug && MInstMgr::isCFIInstruction(mi)) {
@@ -141,22 +107,10 @@ void MIRelocMgr::computeDataOffset(MOD MIList & milst,
             m_jump_offset_map.set(mi, m_jump_offset);
         }
 
-        if (m_mimgr->isCall(mi)) {
-            m_var2offset->resetArgSpaceOffset();
-        }
-
-        if (hasLocalVar(mi)) {
-            TMWORD var_offset = (TMWORD)m_var2offset->
-                computeVarOffset(MEMACCMI_var(mi));
-
-            //[BUG_FIX] The offset of the memory access instruction needs to be
-            //aligned upward according to the instruction type.
-            var_offset = (TMWORD)xcom::ceil_align(
-                var_offset, getMInstAlign(mi->getCode()));
-            setValueViaMICode(mi, var_offset);
-        }
-
-        offset = (TMWORD)xcom::ceil_align(offset, getCodeAlign());
+        ASSERT0(mi->getInstDesc());
+        mach::MInstDesc const* midesc = mi->getInstDesc();
+        MI_wordbuflen(mi) = midesc->getTotalFieldByteSize();
+        setCodeAlign(mi->getWordBufLen());
         MI_pc(mi) = offset;
         offset += mi->getWordBufLen();
     }
@@ -183,8 +137,10 @@ void MIRelocMgr::computeCodeOffset(MOD MIList & milst,
             lab2off.set(LABMI_lab(mi), offset);
             continue;
         }
+        ASSERT0(mi->getInstDesc());
+        mach::MInstDesc const* midesc = mi->getInstDesc();
+        MI_wordbuflen(mi) = midesc->getTotalFieldByteSize();
         setCodeAlign(mi->getWordBufLen());
-        offset = (TMWORD)xcom::ceil_align(offset, getCodeAlign());
         MI_pc(mi) = offset;
         offset += getMInstPcOffset(milst, it, mi);
     }

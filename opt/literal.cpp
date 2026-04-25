@@ -29,8 +29,9 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-void dumpHostFP(HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
-                OUT StrBuf & buf)
+void dumpHostFP(
+    HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
+    OUT StrBuf & buf)
 {
     CHAR fpformat[128];
     ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", mantissa);
@@ -39,8 +40,8 @@ void dumpHostFP(HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
 }
 
 
-void dumpHostInt(HOST_INT val, Type const* ty, Region const* rg,
-                 OUT StrBuf & buf)
+void dumpHostInt(
+    HOST_INT val, Type const* ty, Region const* rg, OUT StrBuf & buf)
 {
     CHAR const* intfmt = getHostIntFormat(false);
     CHAR const* hexintfmt = getHostIntFormat(true);
@@ -74,6 +75,55 @@ void dumpHostInt(HOST_INT val, bool is_signed, bool is_hex, OUT StrBuf & buf)
     }
     CHAR const* fmt = getHostUIntFormat(false);
     buf.strcat(fmt, val);
+}
+
+
+HOST_INT calcLSRIntValByType(
+    HOST_INT val, HOST_INT shift, Type const* type, TypeMgr const* tm)
+{
+    switch (type->getDType()) {
+    case D_B:
+    case D_I8:
+        return (HOST_INT) (((INT8)(UINT8)val) >> shift);
+    case D_U8:
+        return (HOST_INT) (HOST_UINT) (((UINT8)val) >> shift);
+    case D_I16:
+        return (HOST_INT) (((INT16)(UINT16)val) >> shift);
+    case D_U16:
+        return (HOST_INT) (HOST_UINT) (((UINT16)val) >> shift);
+    case D_I32:
+        return (HOST_INT) (((INT32)(UINT32)val) >> shift);
+    case D_U32:
+        return (HOST_INT) (HOST_UINT) (((UINT32)val) >> shift);
+    case D_I64:
+        return (HOST_INT) (((INT64)(UINT64)val) >> shift);
+    case D_U64:
+        return (HOST_INT) (HOST_UINT) (((UINT64)val) >> shift);
+    case D_I128:
+        #ifdef INT128
+        return (HOST_INT) (((INT128)(UINT128)val) >> shift);
+        #else
+        UNREACHABLE();
+        #endif
+    case D_U128:
+        #ifdef UINT128
+        return (HOST_INT) (HOST_UINT) (((UINT128)val) >> shift);
+        #else
+        UNREACHABLE();
+        #endif
+    case D_PTR: {
+        Type const* uintty = tm->getUIntTypeWithSameSize(type);
+        return calcLSRIntValByType(val, shift, uintty, tm);
+    }
+    default: UNREACHABLE();
+    }
+    return 0;
+}
+
+
+HOST_INT convertIntValByType(HOST_INT val, Type const* type, TypeMgr const* tm)
+{
+    return calcLSRIntValByType(val, 0, type, tm);
 }
 
 } //namespace xoc

@@ -250,7 +250,7 @@ public:
         SIMP_need_rebuild_nonpr_du_chain(this) = false;
     }
 
-    void dump(Region const* rg) const;
+    bool dump() const;
 
     //Return the stmt list that recorded in the context.
     IR * getStmtList() { return SIMP_stmtlist(this); }
@@ -407,6 +407,7 @@ public:
 //     stpr $1 = add ($x, $y)
 class IRSimp : public Pass {
     friend class SimpCtxWrap;
+    friend class SimpImpl;
     COPY_CONSTRUCTOR(IRSimp);
 protected:
     TypeMgr * m_tm;
@@ -425,10 +426,15 @@ protected:
         newctx->copyTopDownFlag(src);
         return newctx;
     }
-
-    //Some PRs do not carry dbx information, and this information needs to be
-    //copied from the parent.
-    void copyDbxFromParent(IR * ir);
+    //Return true if target machine supports to generate code for this kind of
+    //incomplete SELECT operation, such as: using predicate register to
+    //determine whether the TrueExp or FalseExp should execute.
+    //e.g: predicates stmt's execution via predicate-register.
+    // (p) stpr $1 = add $2, $3 #S1
+    // (!p) stpr $1 = sub $2, $3 #S2
+    // where if 'p' is true the stmt #S1 will execute, otherwise the stmt #S2
+    // will execute.
+    virtual bool canBeSimpToPrediateOp(IR const* ir) const;
 
     //Free SimpCtx.
     void freeSimpCtx(SimpCtx * ctx)
@@ -465,24 +471,6 @@ protected:
 
     //At lowest mode, the array base, array subscript-expression must be leaf.
     bool isLowestHeightArrayOp(IR const* ir) const;
-
-    //Check the call is used for special register or not.
-    //Some target will define an intrinsic-call to operate target special
-    //register, such as IO configure register. The interface is used to
-    //determine whether current call-stmt is need to simplify.
-    virtual bool isSpecialRegCall(IR const*) const
-    {
-        //Target Dependent Code
-        return false;
-    }
-
-    //Return true if IST/ILD need to be simplified.
-    //Parameter 'ir' should be an IST/ILD.
-    virtual bool isSimplifyIstIldNeeded(IR const* ir, SimpCtx const* ctx) const
-    {
-        ASSERT0(ir && (ir->is_ist() || ir->is_ild()));
-        return SIMP_ild_ist(ctx);
-    }
 
     //Return true if current simplification should maintain the DU chain as
     //much as possible, otherwise the function have to inform the PRSSAMgr,
@@ -523,13 +511,11 @@ protected:
     IR * simplifyDoWhileSelfBody(
         IR * ir, IR * det, LabelInfo const* startl, LabelInfo const* endl,
         LabelInfo const* det_startl, SimpCtx * ctx);
-    IR * simplifyAllKidsExpression(IR * ir, SimpCtx * ctx);
+    virtual IR * simplifyAllKidsExpression(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyCallPlaceholder(IR * ir, SimpCtx *)
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
-    virtual IR * simplifySpecialRegCall(IR * ir, SimpCtx *)
-    { ASSERTN(0, ("Target Dependent Code")); return ir; }
     IR * simplifyDummyUse(IR * ir, SimpCtx *) { return ir; }
 
     bool useMDSSADU() const;
@@ -594,6 +580,7 @@ public:
     virtual IR * simplifyStmtList(IR * ir, SimpCtx * ctx);
     virtual void simplifyBB(IRBB * bb, SimpCtx * ctx);
     virtual void simplifyBBlist(BBList * bbl, SimpCtx * ctx);
+    void simplifyBBlist(SimpCtx * ctx);
     virtual void simplifyIRList(SimpCtx * ctx);
     virtual IR * simplifyLogicalNot(IN IR * ir, SimpCtx * ctx);
     virtual IR * simplifyLogicalOrAtFalsebr(
@@ -617,6 +604,7 @@ public:
     //Simplify ir to PR mode.
     virtual IR * simplifyToPR(IR * ir, SimpCtx * ctx);
 
+    virtual bool perform(SimpCtx & ctx);
     virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 };
 

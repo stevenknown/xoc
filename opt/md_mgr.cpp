@@ -30,6 +30,90 @@ USE OF m_rg SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class MDMgrIntlImpl {
+public:
+    //Assign MD for PR operations and NonPR direct memory operations.
+    //irlist: a list of IR to be assigned.
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //ii: the iterator of IR Tree. Only used as function local variable.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    static void assignMDForIRListHelper(
+        MDMgr * mdmgr, IR * irlist, bool assign_pr, bool assign_nonpr,
+        MOD IRIter & ii, bool clean_mayref)
+    {
+        ii.clean();
+        for (IR * x = xoc::iterInit(irlist, ii, true);
+             x != nullptr; x = xoc::iterNext(ii, true)) {
+            mdmgr->assignMDForIR(x, assign_pr, assign_nonpr, clean_mayref);
+        }
+    }
+
+    //Assign MD for PR operations and NonPR direct memory operations.
+    //irlist: a list of IR to be assigned.
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    static void assignMDForIRList(
+        MDMgr * mdmgr, IR * irlist, bool assign_pr, bool assign_nonpr,
+        bool clean_mayref)
+    {
+        IRIter ii;
+        assignMDForIRListHelper(
+            mdmgr, irlist, assign_pr, assign_nonpr, ii, clean_mayref);
+    }
+
+    //Assign MD for PR operations and NonPR direct memory operations.
+    //The function will iterate ir list in given bb.
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //ii: the iterator of IR Tree. Only used as function local variable.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    static void assignMDForBB(
+        MDMgr * mdmgr, IRBB * bb, bool assign_pr, bool assign_nonpr,
+        MOD IRIter & ii, bool clean_mayref)
+    {
+        BBIRListIter ct;
+        for (xoc::IR * ir = bb->getIRList().get_head(&ct);
+             ir != nullptr; ir = bb->getIRList().get_next(&ct)) {
+            ii.clean();
+            for (IR * x = xoc::iterInit(ir, ii, true);
+                 x != nullptr; x = xoc::iterNext(ii, true)) {
+               mdmgr->assignMDForIR(x, assign_pr, assign_nonpr, clean_mayref);
+            }
+        }
+    }
+
+    //Assign MD for PR operations and NonPR direct memory operations.
+    //The function will iterate given bblist.
+    //assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //assign_nonpr: true if assign MD for each Non-PR memory operations.
+    //clean_mayref: set true to clean MayRef if user is going to recompute
+    //  both MustRef and MayRef.
+    //  By default, we do NOT clean MaySet because transformations may
+    //  combine ILD(LDA) into LD and carry MDSet from ILD.
+    static void assignMDForBBList(
+        MDMgr * mdmgr, BBList * lst, bool assign_pr, bool assign_nonpr,
+        bool clean_mayref)
+    {
+        ASSERT0(lst);
+        IRIter ii;
+        for (IRBB * bb = lst->get_head(); bb != nullptr; bb = lst->get_next()) {
+            assignMDForBB(mdmgr, bb, assign_pr, assign_nonpr, ii, clean_mayref);
+        }
+    }
+};
+
+
 MDMgr::MDMgr(Region * rg) :
     m_rg(rg), m_rm(rg->getRegionMgr()), m_mdsys(rg->getMDSystem()),
     m_tm(rg->getTypeMgr()), m_vm(rg->getVarMgr())
@@ -59,11 +143,27 @@ MD const* MDMgr::genMDForVar(Var * var, Type const* type, TMWORD offset)
 }
 
 
+//The function generates new MD for the returned-value-PR of CallStmt.
+//It should be called if new PR generated in optimzations.
+MD const* MDMgr::allocMDForRetValOfCall(IR * call)
+{
+    ASSERT0(call->isCallStmt());
+    MD const* md = genMDForPR(call);
+    call->setMustRef(md, m_rg);
+
+    //NOTE: Do NOT clean CallStmt's MayRef information since Call's MayRef
+    //also contain NonPR memory refernce.
+    //call->cleanRefMDSet();
+    return md;
+}
+
+
 //The function generates new MD for given PR.
 //It should be called if new PR generated in optimzations.
 MD const* MDMgr::allocMDForPROp(IR * pr)
 {
     ASSERT0(pr->isPROp());
+    ASSERTN(!pr->isCallStmt(), ("use allocMDForRetValOfCall()"));
     if (pr->is_setelem()) { return allocSetElemMD(pr); }
     MD const* md = genMDForPR(pr);
     pr->setMustRef(md, m_rg);
@@ -198,7 +298,8 @@ MD const* MDMgr::allocStringMD(Sym const* string)
 }
 
 
-void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
+void MDMgr::assignMDForIR(
+    IR * x, bool assign_pr, bool assign_nonpr, bool clean_mayref)
 {
     ASSERT0(x);
     switch (x->getCode()) {
@@ -209,12 +310,17 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
         break;
     SWITCH_CASE_CALL:
         if (assign_pr && x->hasReturnValue()) {
-            allocMDForPROp(x);
+            allocMDForRetValOfCall(x);
+        }
+        if (assign_nonpr) {
+            //Nothing to do because CallStmt does NOT have any direct
+            //memory references.
+            ;
         }
         break;
     SWITCH_CASE_DIRECT_MEM_OP:
         if (assign_nonpr) {
-            allocMDForDirectMemOp(x, true);
+            allocMDForDirectMemOp(x, clean_mayref);
         }
         break;
     case IR_ID:
@@ -246,71 +352,16 @@ void MDMgr::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
 }
 
 
-//Assign MD for ST/LD/ReadPR/WritePR operations.
-//is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-void MDMgr::assignMD(bool assign_pr, bool assign_nonpr)
+void MDMgr::assignMD(bool assign_pr, bool assign_nonpr, bool clean_mayref)
 {
     if (m_rg->getIRList() != nullptr) {
-        assignMD(m_rg->getIRList(), assign_pr, assign_nonpr);
+        MDMgrIntlImpl::assignMDForIRList(
+            this, m_rg->getIRList(), assign_pr, assign_nonpr, clean_mayref);
         return;
     }
     if (m_rg->getBBList() != nullptr) {
-        assignMD(m_rg->getBBList(), assign_pr, assign_nonpr);
-    }
-}
-
-
-void MDMgr::assignMD(IR * irlist, bool assign_pr, bool assign_nonpr,
-                     MOD IRIter & ii)
-{
-    ii.clean();
-    for (IR * x = xoc::iterInit(irlist, ii, true);
-         x != nullptr; x = xoc::iterNext(ii, true)) {
-        assignMDImpl(x, assign_pr, assign_nonpr);
-    }
-}
-
-
-void MDMgr::assignMD(IR * irlist, bool assign_pr, bool assign_nonpr)
-{
-    IRIter ii;
-    assignMD(irlist, assign_pr, assign_nonpr, ii);
-}
-
-
-void MDMgr::assignMD(xcom::List<IR*> const& irlist, bool assign_pr,
-                     bool assign_nonpr)
-{
-    IRIter ii;
-    xcom::List<IR*>::Iter ct;
-    for (xoc::IR * ir = irlist.get_head(&ct);
-         ir != nullptr; ir = irlist.get_next(&ct)) {
-        assignMD(ir, assign_pr, assign_nonpr, ii);
-    }
-}
-
-
-void MDMgr::assignMD(BBList * lst, bool assign_pr, bool assign_nonpr)
-{
-    ASSERT0(lst);
-    IRIter ii;
-    for (IRBB * bb = lst->get_head(); bb != nullptr; bb = lst->get_next()) {
-        assignMD(bb, assign_pr, assign_nonpr, ii);
-    }
-}
-
-
-void MDMgr::assignMD(IRBB * bb, bool assign_pr, bool assign_nonpr,
-                     MOD IRIter & ii)
-{
-    BBIRListIter ct;
-    for (xoc::IR * ir = bb->getIRList().get_head(&ct);
-         ir != nullptr; ir = bb->getIRList().get_next(&ct)) {
-        ii.clean();
-        for (IR * x = xoc::iterInit(ir, ii, true);
-             x != nullptr; x = xoc::iterNext(ii, true)) {
-           assignMDImpl(x, assign_pr, assign_nonpr);
-        }
+        MDMgrIntlImpl::assignMDForBBList(
+            this, m_rg->getBBList(), assign_pr, assign_nonpr, clean_mayref);
     }
 }
 
@@ -343,15 +394,17 @@ void MDMgr::allocRefForIRTree(IR * root, bool sibling)
 }
 
 
-MD const* MDMgr::allocRef(IR * ir)
+MD const* MDMgr::allocRef(IR * ir, bool clean_mayref)
 {
     switch (ir->getCode()) {
-    SWITCH_CASE_MAY_PR_OP:
+    SWITCH_CASE_CALL:
+        return allocMDForRetValOfCall(ir);
+    SWITCH_CASE_PR_OP:
         return allocMDForPROp(ir);
     SWITCH_CASE_DIRECT_MEM_OP:
         //Do NOT clean MaySet because transformation may combine ILD(LDA)
         //into LD and carry MDSet from ILD.
-        return allocMDForDirectMemOp(ir, false);
+        return allocMDForDirectMemOp(ir, clean_mayref);
     case IR_ID: return allocIdMD(ir);
     default: UNREACHABLE();
     }

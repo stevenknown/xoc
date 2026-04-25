@@ -171,14 +171,13 @@ bool RefineDUChain::processBB(IRBB const* bb, RefineDUCtx const& ctx)
 
 //Return true if indirect operation ir1 has same base expression with ir2.
 //TODO: use gvn to utilize value flow.
-bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
+bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2) const
 {
     ASSERT0(ir1 && ir2);
     if (!ir1->isIndirectMemOp() || !ir2->isIndirectMemOp()) {
         //TODO: support more complex patterns.
         return false;
     }
-
     IR const* base1 = ir1->getBase();
     IR const* base2 = ir2->getBase();
     MD const* basemd1 = base1->getRefMD();
@@ -216,54 +215,130 @@ bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
 }
 
 
+class RefineDUChainIntl {
+public:
+    static bool iterEachDefOfIndirectExp(
+        IR const* exp, UINT ild_star_level, VN const* vn_of_ild_base,
+        RefineDUCtx const& ctx, RefineDUChain const* rdc)
+    {
+        DUSet const* defset = exp->getDUSet();
+        if (defset == nullptr) {
+            ASSERTN(0, ("classical DU is invalid"));
+            return false;
+        }
+        TypeMgr const* tm = rdc->getTypeMgr();
+        DUMgr * dumgr = rdc->getDUMgr();
+        Region const* rg = rdc->getRegion();
+        GVN const* gvn = rdc->getGVN();
+
+        //Iterate each DEF stmt of 'exp'.
+        bool change = false;
+        DUSetIter di = nullptr;
+        BSIdx next_i = BS_UNDEF;
+        for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = next_i) {
+            next_i = defset->get_next(i, &di);
+            IR const* stmt = rg->getIR(i);
+            ASSERT0(stmt->is_stmt());
+
+            //Only deal IR_IST|IR_VIST.
+            if (!stmt->isIndirectMemOp()) { continue; }
+            if (tm->getByteSize(exp->getType()) != 1 ||
+                tm->getByteSize(stmt->getType()) != 1) {
+                //ist and ild may be overlapp.
+                //e.g:refine_duchain2.c
+                // ist(p): |----|
+                // ild(q):  |----|
+                //  even if p and q have different VN, the ist and ild are
+                //  dependent.
+                continue;
+            }
+
+            //Get VN of IST's base expression.
+            UINT ist_star_level = 0;
+            VN const* vn_of_ist_base = xoc::getVNOfIndirectOp(
+                stmt, &ist_star_level, gvn);
+            if (vn_of_ist_base == nullptr) {
+                //No need to analyze DEF stmt with have no VN.
+                continue;
+            }
+            if (ild_star_level != ist_star_level) {
+                //Indirect level is not match.
+                continue;
+            }
+            if (vn_of_ist_base == vn_of_ild_base) {
+                //VN is same, accessing same place.
+                continue;
+            }
+            dumpRemovedDU(ctx, stmt, exp);
+            dumgr->removeDUChain(stmt, exp);
+            change = true;
+        }
+        return change;
+    }
+
+    static bool iterEachMDSSADefOfExp(
+        IR const* exp, RefineDUCtx const& ctx, RefineDUChain const* rdc)
+    {
+        ASSERT0(rdc->useMDSSADU());
+        MDSSAMgr * mdssamgr = rdc->getMDSSAMgr();
+        ASSERT0(mdssamgr);
+        Region const* rg = rdc->getRegion();
+        MDSSAInfo * mdssainfo = mdssamgr->getMDSSAInfoIfAny(exp);
+        if (mdssainfo == nullptr) { return false; }
+
+        //Iterate each VOpnd.
+        VOpndSetIter iter = nullptr;
+        BSIdx next_i = BS_UNDEF;
+        bool change = false;
+        for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
+             i != BS_UNDEF; i = next_i) {
+            next_i = mdssainfo->readVOpndSet().get_next(i, &iter);
+            VMD const* t = (VMD const*)mdssamgr->getUseDefMgr()->getVOpnd(i);
+            ASSERT0(t && t->is_md());
+            if (t->getDef() == nullptr) {
+                ASSERTN(t->version() == MDSSA_INIT_VERSION,
+                        ("Only zero version MD has no DEF"));
+                continue;
+            }
+            if (t->getDef()->is_phi()) {
+                //TODO: Do PHI transferring to handle more cases.
+                continue;
+            }
+            IR const* defstmt = t->getDef()->getOcc();
+            ASSERT0(defstmt);
+            if (!rdc->hasSameBase(exp, defstmt)) {
+                continue;
+            }
+            if (!exp->isNotOverlap(defstmt, rg)) {
+                //defstmt is overlapped to exp.
+                continue;
+            }
+
+            //Remove DU chain if we can guarantee ILD and its DEF stmt
+            //are independent.
+            dumpRemovedDU(ctx, defstmt, exp);
+            mdssamgr->removeDUChain(defstmt, exp);
+
+            //removeDUChain may remove VOpnd that indicated by 'next_i'.
+            //We have to update next_i immediately to avoid redundnant
+            //loop iteration.
+            next_i = mdssainfo->readVOpndSet().get_first(&iter);
+            change = true;
+        }
+        return change;
+    }
+};
+
+
 //Return true if DU chain changed.
 bool RefineDUChain::processExpViaMDSSA(
     IR const* exp, BBIRListIter it, RefineDUCtx const& ctx)
 {
     ASSERT0(exp);
-    MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
-    if (mdssainfo == nullptr) { return false; }
-
-    //Iterate each VOpnd.
-    VOpndSetIter iter = nullptr;
-    BSIdx next_i = BS_UNDEF;
-    bool change = false;
-    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
-         i != BS_UNDEF; i = next_i) {
-        next_i = mdssainfo->readVOpndSet().get_next(i, &iter);
-        VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
-        ASSERT0(t && t->is_md());
-        if (t->getDef() == nullptr) {
-            ASSERTN(t->version() == MDSSA_INIT_VERSION,
-                    ("Only zero version MD has no DEF"));
-            continue;
-        }
-        if (t->getDef()->is_phi()) {
-            //TODO: Do PHI transferring to handle more cases.
-            continue;
-        }
-        IR const* defstmt = t->getDef()->getOcc();
-        ASSERT0(defstmt);
-        if (!hasSameBase(exp, defstmt)) {
-            continue;
-        }
-        if (!exp->isNotOverlap(defstmt, m_rg)) {
-            //defstmt is overlapped to exp.
-            continue;
-        }
-
-        //Remove DU chain if we can guarantee ILD and its DEF stmt
-        //are independent.
-        dumpRemovedDU(ctx, defstmt, exp);
-        m_mdssamgr->removeDUChain(defstmt, exp);
-
-        //removeDUChain may remove VOpnd that indicated by 'next_i'.
-        //We have to update next_i immediately to avoid redundnant
-        //loop iteration.
-        next_i = mdssainfo->readVOpndSet().get_first(&iter);
-        change = true;
-    }
+    bool change = RefineDUChainIntl::iterEachMDSSADefOfExp(exp, ctx, this);
     if (!change) { return false; }
+    MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
+    ASSERT0(mdssainfo);
     if (mdssainfo->isEmptyVOpndSet()) {
         //In MDSSA mode, any Memory Referrences should have VOpnd, at least
         //the init-verison VMD if it is the region live-in MD.
@@ -295,7 +370,7 @@ bool RefineDUChain::processIndirectExpViaGVN(
 {
     ASSERT0(exp->is_exp() && exp->isIndirectMemOp());
     if (!ctx.getOptCtx().is_nonpr_du_chain_valid()) {
-        //The function only use classical DU for now.
+        //The function only optimizes classical DU for now.
         return false;
     }
 
@@ -303,61 +378,14 @@ bool RefineDUChain::processIndirectExpViaGVN(
     //e.g: given ILD(ILD(ILD(p))), the following loop will
     //reason out 'p'.
     UINT ild_star_level = 0;
-    VN const* vn_of_ild_base = getVNOfIndirectOp(exp, &ild_star_level, m_gvn);
+    VN const* vn_of_ild_base = xoc::getVNOfIndirectOp(
+        exp, &ild_star_level, m_gvn);
     if (vn_of_ild_base == nullptr) {
         //No need to analyze DEF set if there is no VN provided.
         return false;
     }
-
-    DUSet const* defset = exp->getDUSet();
-    if (defset == nullptr) {
-        ASSERTN(0, ("classical DU is invalid"));
-        return false;
-    }
-
-    //Iterate each DEF stmt of 'exp'.
-    bool change = false;
-    DUSetIter di = nullptr;
-    BSIdx next_i = BS_UNDEF;
-    for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = next_i) {
-        next_i = defset->get_next(i, &di);
-        IR const* stmt = m_rg->getIR(i);
-        ASSERT0(stmt->is_stmt());
-
-        //Only deal IR_IST.
-        if (!stmt->is_ist()) { continue; }
-        if (m_tm->getByteSize(exp->getType()) != 1 ||
-            m_tm->getByteSize(stmt->getType()) != 1) {
-            //ist and ild may be overlapp.
-            //e.g:refine_duchain2.c
-            // ist(p): |----|
-            // ild(q):  |----|
-            //  even if p and q have different VN, the ist and ild are
-            //  dependent.
-            continue;
-        }
-
-        //Get VN of IST's base expression.
-        UINT ist_star_level = 0;
-        VN const* vn_of_ist_base = getVNOfIndirectOp(
-            stmt, &ist_star_level, m_gvn);
-        if (vn_of_ist_base == nullptr) {
-            //No need to analyze DEF stmt with have no VN.
-            continue;
-        }
-        if (ild_star_level != ist_star_level) {
-            //Indirect level is not match.
-            continue;
-        }
-        if (vn_of_ist_base == vn_of_ild_base) {
-            //VN is same, accessing same place.
-            continue;
-        }
-        dumpRemovedDU(ctx, stmt, exp);
-        m_du->removeDUChain(stmt, exp);
-        change = true;
-    }
-    return change;
+    return RefineDUChainIntl::iterEachDefOfIndirectExp(
+        exp, ild_star_level, vn_of_ild_base, ctx, this);
 }
 
 

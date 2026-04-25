@@ -36,107 +36,161 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class LCSE;
+
+class LCSECtx : public PassCtx {
+    COPY_CONSTRUCTOR(LCSECtx);
+protected:
+    LCSE * m_lcse;
+    MDMgr * m_mdmgr;
+public:
+    //Record lived expression during analysis.
+    xcom::BitSet avail_ir_expr;
+
+    //Record the stmt as the position where the CSE begins to be available.
+    //e.g:original code:
+    //  ...=a+b  #S0
+    //  .......
+    //  ...=a+b  #S1
+    //  .......
+    //  ...=a+b  #S2
+    //where a+b is CSE. However, there are three CSEs.
+    //The object records the map between CSE and stmt at #S0.
+    xcom::Vector<IR*> map_ie2avail_pos;
+    xcom::Vector<IR*> map_ie2avail_exp_in_pos;
+
+    //Record statement that computes the CSE.
+    //e.g:original code:
+    //  ...=a+b  #S1
+    //where a+b is CSE, after hoisting the CSE,
+    //  $t=a+b #S0
+    //  ...=$t #S1
+    //#S0 is the stmt that computes the CSE.
+    //The object records the map between CSE and #S0.
+    //NOTE: #S1 is the avail_pos of CSE.
+    xcom::Vector<IR*> map_ie2avail_cse_comp_stmt;
+    MDSet tmp; //for temp usage.
+public:
+    LCSECtx(OptCtx & oc, ActMgr * am, LCSE * lcse);
+    ~LCSECtx();
+    void clean();
+    void dump() const;
+    LCSE * getLCSE() const { return m_lcse; }
+    MDMgr * getMDMgr() const { return m_mdmgr; }
+    DefMiscBitSetMgr & getSBSMgr();
+
+    //Return the avail_pos stmt if exist.
+    IR * getAvailPos(ExprRep const* ie) const
+     { return map_ie2avail_pos.get(ie->id()); }
+
+    //Return the IR expression in avail_pos stmt if exist.
+    IR * getAvailExpInPos(ExprRep const* ie) const
+    { return map_ie2avail_exp_in_pos.get(ie->id()); }
+
+    void invalidAvailPosAndComp(ExprRep const* ie);
+
+    IR * recordAvailCseComp(ExprRep const* ie, IR * avail_cse_stmt)
+    {
+        ASSERT0(avail_cse_stmt && avail_cse_stmt->is_stmt());
+        map_ie2avail_cse_comp_stmt.set(ie->id(), avail_cse_stmt);
+        return avail_cse_stmt;
+    }
+    IR * recordAvailPos(
+        ExprRep const* ie, IR * avail_pos_stmt, IR * avail_exp_in_pos)
+    {
+        ASSERT0(avail_exp_in_pos && avail_pos_stmt);
+        ASSERT0(avail_exp_in_pos->is_exp());
+        ASSERT0(avail_exp_in_pos->getParent() == avail_pos_stmt);
+        map_ie2avail_pos.set(ie->id(), avail_pos_stmt);
+        map_ie2avail_exp_in_pos.set(ie->id(), avail_exp_in_pos);
+        return avail_pos_stmt;
+    }
+};
+
+
 //LCSE
 //Perform Local Common Subexpression Elimination.
 class LCSE : public Pass {
+    friend class LCSECtx;
+    friend class LCSEIntlImpl;
     COPY_CONSTRUCTOR(LCSE);
 protected:
     bool m_enable_filter; //filter determines which expression can be CSE.
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     TypeMgr * m_tm;
     ExprTab * m_expr_tab;
     DUMgr * m_du;
     DefMiscBitSetMgr m_misc_bs_mgr;
+    ActMgr m_am;
 protected:
-    IR * hoistCse(IRBB * bb,  IR * ir_pos, ExprRep * ie);
-    virtual IR * hoistCseForExtOp(IRBB *, IN IR * ir_pos, IN ExprRep *)
+    DefMiscBitSetMgr & getSBSMgr() { return m_misc_bs_mgr; }
+
+    bool initDepPass(OptCtx const& oc);
+    bool isAvailable(IR * def_stmt, IR * use_exp) const;
+
+    //If there exists other IRs between 'def_stmt' and 'use_exp' within the
+    //same basic block that may redefine or impact 'use_exp', then 'use_exp'
+    //cannot be replaced by the common subexpression from 'def_stmt'.
+    //E.g. BB1
+    //  c = a + b #S1
+    //  ...
+    //  a = 1     #S2  ==> #S2 should block #S1 and #S3 from CSE because the
+    //  ...                value of 'a' has changed.
+    //  d = a + b #S3
+    //Parameters:
+    //  def_stmt: the statement that holds the common subexpression (c in #S1).
+    //  use_exp: the expression that is to be replaced (a + b in #S3).
+    bool isAvailableInSameBB(IR * def_stmt, IR * use_exp) const;
+
+    bool processExpTreeOfReturnOp(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTree(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTreeList(
+        MOD IRBB * bb, MOD IR * ir, IR * explist, MOD LCSECtx & ctx);
+    bool processExpTreeOfMultiCondBranchOp(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    void processResult(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processStmt(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTreeOfCallStmt(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTreeOfDirectMemOp(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTreeOfIndirectMemOp(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    virtual bool processExpTreeOfCondBranchOp(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processRHS(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processBase(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    bool processExpTreeOfWriteArray(
+        MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx);
+    virtual void processExtStmt(MOD IRBB *, MOD IR * ir, MOD LCSECtx &)
     {
-        DUMMYUSE(ir_pos);
-        //Target Dependent Code
-        return nullptr;
+        //Target Dependent Code.
+        ASSERT0(ir->is_stmt());
+        ASSERT0(ir->isExtOp());
+    }
+    virtual bool processExpTreeOfExtOp(MOD IRBB *, MOD IR * ir, MOD LCSECtx &)
+    {
+        //Target Dependent Code.
+        ASSERT0(ir->is_stmt());
+        ASSERT0(ir->isExtOp());
+        return false;
     }
 
-    bool processReturnOp(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD xcom::Vector<IR*> & map_expr2avail_pos,
-        MOD xcom::Vector<IR*> & map_expr2avail_pr);
-    bool processExp(IN IRBB * bb, IN IR * ir,
-                    MOD xcom::BitSet & avail_ir_expr,
-                    MOD Vector<IR*> & map_expr2avail_pos,
-                    MOD Vector<IR*> & map_expr2avail_pr);
-    bool processMultiCondBranchOp(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD xcom::Vector<IR*> & map_expr2avail_pos,
-        MOD xcom::Vector<IR*> & map_expr2avail_pr);
-    bool processStmtHasResult(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr,
-        IN MDSet & tmp);
-    bool processStmt(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr,
-        IN MDSet & tmp);
-    bool processBranch(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr);
-    IR * processExp(
-        IN IRBB * bb, IN ExprRep * ie, IN IR * stmt,
-        MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr);
-    bool processParamList(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr);
-    bool processIndirectMemOp(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD xcom::Vector<IR*> & map_expr2avail_pos,
-        MOD xcom::Vector<IR*> & map_expr2avail_pr);
-    bool processCondBranchOp(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD xcom::Vector<IR*> & map_expr2avail_pos,
-        MOD xcom::Vector<IR*> & map_expr2avail_pr);
-    bool processRHS(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr);
-    virtual bool processExtStmt(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr,
-        IN MDSet & tmp)
-    {
-        DUMMYUSE(tmp);
-        DUMMYUSE(ir);
-        DUMMYUSE(bb);
-        DUMMYUSE(avail_ir_expr);
-        DUMMYUSE(map_expr2avail_pos);
-        DUMMYUSE(map_expr2avail_pr);
-        //Target Dependent Code.
-        return false;
-    }
-    virtual bool processExtExp(
-        IN IRBB * bb, IN IR * ir, MOD xcom::BitSet & avail_ir_expr,
-        MOD Vector<IR*> & map_expr2avail_pos,
-        MOD Vector<IR*> & map_expr2avail_pr)
-    {
-        DUMMYUSE(ir);
-        DUMMYUSE(bb);
-        DUMMYUSE(avail_ir_expr);
-        DUMMYUSE(map_expr2avail_pos);
-        DUMMYUSE(map_expr2avail_pr);
-        //Target Dependent Code.
-        return false;
-    }
+    //Return true if common expression has been substituted.
+    bool processBB(MOD IRBB * bb, MOD LCSECtx & ctx);
+    bool processBBList(OptCtx & oc);
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit LCSE(Region * rg);
     virtual ~LCSE() {}
 
-    bool canBeCandidate(IR * ir);
+    virtual bool canBeCandidate(IR * ir);
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -146,11 +200,13 @@ public:
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.
-    virtual bool dump() const { return Pass::dump(); }
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
     { return "Local Command Subexpression Elimination"; }
     PASS_TYPE getPassType() const { return PASS_LCSE; }
+    ExprTab * getExprTab() const { return m_expr_tab; }
+    ActMgr & getActMgr() { return m_am; }
 
     void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
     bool perform(OptCtx & oc);

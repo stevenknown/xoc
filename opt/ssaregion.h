@@ -41,8 +41,10 @@ class ActMgr;
 class SSARegion {
     COPY_CONSTRUCTOR(SSARegion);
 protected:
+    IRCFG const* getCFG() const { return m_cfg; }
+    void judgeAndAddIdomOfRoot();
     bool verifyRootDom() const;
-public:
+protected:
     Region const* m_rg;
     IRBB * m_root;
     OptCtx * m_oc;
@@ -77,23 +79,16 @@ public:
     //The construction will not exceed these BBs.
     void add(BitSet const& bbset) { getBBSet().bunion(bbset); }
 
-    //Walk through each predecessors from 'start' to guarantee all vertexs in
-    //path from root to start have been added.
-    void addPredBBTillRoot(IRBB const* start);
-
     //Walk through DomTree start from root and add BB into SSARegion.
     //Note root must be set first.
     void addAllBBUnderRoot();
-
-    //Return true if bb can be regarded as the root of SSA region.
-    bool canBeRoot(IRBB const* bb) const;
 
     void dump() const;
 
     //The function attempt to find properly root BB of SSA region.
     //A properly root BB either does not have any PHI operation, or all
     //predecessors of root BBs are located within current SSA region.
-    IRBB * findRootBB(IRBB * start);
+    IRBB * findRootBB();
 
     //Get the bbset of region.
     BBSet & getBBSet() { return m_bbset; }
@@ -106,22 +101,17 @@ public:
     OptCtx * getOptCtx() const { return m_oc; }
     DomTree const& getDomTree() const { return m_domtree; }
     ActMgr * getActMgr() const { return m_am; }
+    Region const* getRegion() const { return m_rg; }
 
     //Return true if BB id is in the SSA region.
     //id: the BB id.
     bool isInRegion(UINT id) const { return m_bbset.is_contain(id); }
-
-    //Return true if all predecessors of 'bb' are located in SSA region.
-    bool isAllPredInRegion(IRBB const* bb) const;
-
-    //Infer and add those BBs that should be also handled in PRSSA
-    //construction.
-    void inferAndAddRelatedBB();
+    void inferAndAddNecessaryBB();
 
     //Set the root BB of current SSA construction region.
     //root: root BB for CFG region that is consisted of BB which is
     //in SSA construction region.
-    void setRootBB(IRBB * root) { add(root); m_root = root; }
+    void setRootBB(IRBB * root) { ASSERT0(root); add(root); m_root = root; }
 
     //Verify whether the SSA region is legal enough to construct.
     bool verify() const;

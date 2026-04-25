@@ -48,6 +48,7 @@ bool g_assign_mdref_with_the_offset_for_prop = false;
 bool g_do_cfg = true;
 bool g_do_rpo = true;
 bool g_do_refine = true;
+bool g_do_global_refine = true;
 bool g_do_refine_with_host_api = false;
 bool g_insert_cvt = false;
 bool g_calc_derivative = false;
@@ -84,26 +85,32 @@ bool g_do_invert_brtgt = true;
 bool g_do_lftr = false;
 bool g_do_dse = false;
 bool g_do_gcse = true;
+bool g_do_if_conversion = true;
 bool g_do_ipa = false;
 bool g_do_call_graph = false;
 bool g_show_time = false;
 bool g_do_inline = false;
 UINT g_inline_threshold = 10;
 bool g_do_ivr = false;
-bool g_do_lcse = false;
-bool g_do_licm = false;
+bool g_do_lcse = true;
+bool g_do_licm = true;
 bool g_do_licm_no_guard = false;
 bool g_do_gvn = true;
 bool g_do_pre = false;
-bool g_do_rce = false;
+bool g_do_rce = true;
 bool g_do_vect = true;
 bool g_do_multi_res_convert = true;
 bool g_do_targinfo_handler = true;
-bool g_do_alge_reasscociate = true;
+bool g_do_alge_reassociate = true;
+bool g_do_alge_reassociate_aggressive = true;
 bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
 bool g_do_mdssa = false;
+
+//Set default value to false because some target machines use
+//IR_ST as initialization of a Variable.
+bool g_verify_ir_attr_readonly = false;
 UINT g_thres_opt_bb_num = 100000;
 UINT g_thres_ptpair_num = 10000;
 UINT g_thres_opt_ir_num = 30000;
@@ -125,7 +132,7 @@ bool g_redirect_stdout_to_dump_file = false;
 FILE * g_unique_dumpfile = nullptr;
 CHAR const* g_unique_dumpfile_name = nullptr;
 bool g_do_lsra_debug = false;
-UINT g_debug_reg_num = 0;
+UINT g_debug_reg_mod = 0;
 bool g_force_use_fp_as_sp = false;
 bool g_stack_on_global = false;
 bool g_recycle_local_id = false;
@@ -241,7 +248,9 @@ void DumpOption::setDumpNothing()
     is_dump_loop_dep_ana = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
+    is_dump_lcse = false;
     is_dump_ivr = false;
+    is_dump_if_conversion = false;
     is_dump_licm = false;
     is_dump_exprtab = false;
     is_dump_loopcvt = false;
@@ -253,15 +262,15 @@ void DumpOption::setDumpNothing()
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
     is_dump_ir_id = false; //Do not dump IR's id by default.
-    is_dump_lsra_reorder_mov_in_latch_BB = false;
     is_dump_to_buffer = false;
     is_dump_cfgopt = false;
     is_dump_rce = false;
     is_dump_infertype = false;
     is_dump_invert_brtgt = false;
-    is_dump_alge_reasscociate = false;
+    is_dump_alge_reassociate = false;
     is_dump_refine_duchain = false;
     is_dump_refine = false;
+    is_dump_global_refine = false;
     is_dump_insert_cvt = false;
     is_dump_calc_derivative = false;
     is_dump_gscc = false;
@@ -302,9 +311,11 @@ void DumpOption::setDumpAll()
     is_dump_loop_dep_ana = true;
     is_dump_gvn = true;
     is_dump_ivr = true;
+    is_dump_if_conversion = true;
     is_dump_licm = true;
     is_dump_exprtab = true;
     is_dump_gcse = true;
+    is_dump_lcse = true;
     is_dump_loopcvt = true;
     is_dump_simplification = true;
     is_dump_prssamgr = true;
@@ -318,9 +329,10 @@ void DumpOption::setDumpAll()
     is_dump_rce = true;
     is_dump_infertype = true;
     is_dump_invert_brtgt = true;
-    is_dump_alge_reasscociate = true;
+    is_dump_alge_reassociate = true;
     is_dump_refine_duchain = true;
     is_dump_refine = true;
+    is_dump_global_refine = true;
     is_dump_insert_cvt = true;
     is_dump_calc_derivative = true;
     is_dump_gscc = true;
@@ -481,9 +493,9 @@ bool DumpOption::isDumpMultiResConvert() const
 }
 
 
-bool DumpOption::isDumpAlgeReasscociate() const
+bool DumpOption::isDumpAlgeReassociate() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_alge_reasscociate);
+    return is_dump_all || (!is_dump_nothing && is_dump_alge_reassociate);
 }
 
 
@@ -517,9 +529,21 @@ bool DumpOption::isDumpGCSE() const
 }
 
 
+bool DumpOption::isDumpLCSE() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_lcse);
+}
+
+
 bool DumpOption::isDumpIVR() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_ivr);
+}
+
+
+bool DumpOption::isDumpIfConversion() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_if_conversion);
 }
 
 
@@ -619,6 +643,12 @@ bool DumpOption::isDumpRefine() const
 }
 
 
+bool DumpOption::isDumpGlobalRefine() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_global_refine);
+}
+
+
 bool DumpOption::isDumpGSCC() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gscc);
@@ -663,6 +693,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_cfg = %s", g_do_cfg ? "true":"false");
     note(lm, "\ng_do_rpo = %s", g_do_rpo ? "true":"false");
     note(lm, "\ng_do_refine = %s", g_do_refine ? "true":"false");
+    note(lm, "\ng_do_global_refine = %s", g_do_global_refine ? "true":"false");
     note(lm, "\ng_do_refine_with_host_api = %s",
          g_do_refine_with_host_api ? "true":"false");
     note(lm, "\ng_insert_cvt = %s",
@@ -712,6 +743,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_invert_brtgt = %s",
          g_do_invert_brtgt ? "true":"false");
     note(lm, "\ng_do_lftr = %s", g_do_lftr ? "true":"false");
+    note(lm, "\ng_do_if_conversion = %s", g_do_if_conversion ? "true":"false");
     note(lm, "\ng_do_dse = %s", g_do_dse ? "true":"false");
     note(lm, "\ng_do_gcse = %s", g_do_gcse ? "true":"false");
     note(lm, "\ng_do_ipa = %s", g_do_ipa ? "true":"false");
@@ -731,12 +763,16 @@ void Option::dump(MOD LogMgr * lm)
          g_do_multi_res_convert ? "true":"false");
     note(lm, "\ng_do_targinfo_handler = %s",
          g_do_targinfo_handler ? "true":"false");
-    note(lm, "\ng_do_alge_reasscociate = %s",
-         g_do_alge_reasscociate ? "true":"false");
+    note(lm, "\ng_do_alge_reassociate = %s",
+         g_do_alge_reassociate ? "true":"false");
+    note(lm, "\ng_do_alge_reassociate_aggressive = %s",
+         g_do_alge_reassociate_aggressive ? "true":"false");
     note(lm, "\ng_do_loop_dep_ana = %s", g_do_loop_dep_ana ? "true":"false");
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
     note(lm, "\ng_do_mdssa = %s", g_do_mdssa ? "true":"false");
+    note(lm, "\ng_verify_ir_attr_readonly = %s",
+         g_verify_ir_attr_readonly ? "true":"false");
     note(lm, "\ng_thres_opt_bb_num = %u", g_thres_opt_bb_num);
     note(lm, "\ng_thres_ptpair_num = %u", g_thres_ptpair_num);
     note(lm, "\ng_thres_opt_ir_num = %u", g_thres_opt_ir_num);
@@ -769,7 +805,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_exclude_option =");
     g_exclude_region.dump(lm);
     note(lm, "\ng_do_lsra_debug = %s", g_do_lsra_debug ? "true":"false");
-    note(lm, "\ng_debug_reg_num = %u", g_debug_reg_num);
+    note(lm, "\ng_debug_reg_mod = %u", g_debug_reg_mod);
     note(lm, "\ng_force_use_fp_as_stack_pointer = %s",
          g_force_use_fp_as_sp ? "true":"false");
     note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
@@ -852,12 +888,16 @@ static PassSwitch g_pass_in_level3[] {
     { &xoc::g_do_dce_aggressive, },
     { &xoc::g_do_licm, },
     { &xoc::g_do_gcse, },
+    { &xoc::g_do_gvn, },
+    { &xoc::g_do_alge_reassociate, },
+    { &xoc::g_do_alge_reassociate_aggressive, },
     { &xoc::g_do_rce, },
     { &xoc::g_do_rp, },
     { &xoc::g_do_lftr, },
     { &xoc::g_do_prssa, },
     { &xoc::g_do_mdssa, },
     { &xoc::g_infer_type, },
+    { &xoc::g_do_if_conversion, },
     { &xoc::g_do_vect, },
     { &xoc::g_do_cfg_remove_empty_bb, },
     { &xoc::g_do_cfg_remove_unreach_bb, },

@@ -129,6 +129,17 @@ void TG::pickOutEH()
 
 
 //
+//START GenMappedOfVN2IR
+//
+IRList * GenMappedOfVN2IR::createMapped(VN const* s)
+{
+    ASSERT0(m_gcse);
+    return m_gcse->allocCSEList();
+}
+//END GenMappedOfVN2IR
+
+
+//
 //START GCSECtx
 //
 GCSECtx::GCSECtx(OptCtx & oc, ActMgr * am, GCSE * gcse)
@@ -231,7 +242,8 @@ public:
 //
 //START GCSE
 //
-GCSE::GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
+GCSE::GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg),
+    m_vn2exp(this), m_evn2exp(this)
 {
     ASSERT0(rg);
     ASSERT0(gvn);
@@ -252,6 +264,7 @@ GCSE::GCSE(Region * rg, GVN * gvn) : Pass(rg), m_am(rg)
 
 GCSE::~GCSE()
 {
+    destoryCSEList();
 }
 
 
@@ -277,6 +290,16 @@ void GCSE::copyVN(IR const* newir, IR const* oldir)
 }
 
 
+bool GCSE::replaceStmtKid(IR * stmt, IR * kid, IR * newkid, bool recur)
+{
+    ASSERT0(stmt && kid && newkid);
+    ASSERT0(stmt->is_stmt());
+    ASSERT0(kid->is_exp());
+    ASSERT0(newkid->is_exp());
+    return stmt->replaceKid(kid, newkid, recur);
+}
+
+
 bool GCSE::elimCSE(IR * use, IR * use_stmt, IR const* gen, GCSECtx const& ctx)
 {
     ASSERT0(use != gen);
@@ -284,19 +307,19 @@ bool GCSE::elimCSE(IR * use, IR * use_stmt, IR const* gen, GCSECtx const& ctx)
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //gen_pr hold the CSE value come from gen-stmt.
-    //We eliminate the redundant computation via replace use by gen_pr.
+    //We eliminate the redundant computation via replacing 'use' by 'gen_pr'.
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr && gen_pr->is_pr());
     IR * new_pr = m_rg->dupIRTree(gen_pr);
     dumpAct(use, gen, new_pr, ctx);
-    bool f = use_stmt->replaceKid(use, new_pr, true);
-    ASSERT0_DUMMYUSE(f);
 
     //Assign MD to new_pr.
     m_rg->getMDMgr()->allocMDForPROp(new_pr);
 
     //Set identical VN to new_pr with CSE.
     copyVN(new_pr, gen);
+    bool f = replaceStmtKid(use_stmt, use, new_pr, true);
+    ASSERT0_DUMMYUSE(f);
 
     //Add DU chain from gen_pr's stmt to new_pr.
     IR * gen_stmt = gen->getStmt();
@@ -325,7 +348,7 @@ bool GCSE::elimCseOfBranch(
     //Det of branch stmt have to be judgement operation.
     ASSERT0(use == BR_det(use_stmt));
     IR * newdet = m_rg->getIRMgr()->buildJudge(new_pr);
-    bool f = use_stmt->replaceKid(use, newdet, true);
+    bool f = replaceStmtKid(use_stmt, use, newdet, true);
     ASSERT0_DUMMYUSE(f);
     IR_may_throw(use_stmt) = false;
 
@@ -386,6 +409,7 @@ void GCSE::processCseGen(
     //Set mapping between delegate-PR and 'gen' expression.
     m_exp2pr.set(gen, dele_pr);
     m_rg->getMDMgr()->allocMDForPROp(dele_pr);
+    copyVN(dele_pr, gen);
 
     //Relpace GEN that is in original gen-stmt with DelegatePR.
     IR * newkid = dele_pr;
@@ -394,7 +418,7 @@ void GCSE::processCseGen(
         newkid = m_rg->getIRMgr()->buildJudge(dele_pr);
         copyDbx(newkid, dele_pr, m_rg);
     }
-    bool v = gen_stmt->replaceKid(gen, newkid, false);
+    bool v = replaceStmtKid(gen_stmt, gen, newkid, false);
     ASSERT0_DUMMYUSE(v);
 
     //Generate STPR operation to store GEN to delegate-PR.
@@ -542,7 +566,10 @@ bool GCSE::handleCandidateByExprRep(IR * exp, GCSECtx const& ctx)
         ASSERT0(occ_stmt && occ_stmt->is_stmt());
         ASSERT0(exp_stmt && exp_stmt->is_stmt());
         if (!isDom(occ_stmt, exp_stmt, ctx)) { continue; }
-        if (!xoc::hasSameUniqueMustDefForTree(exp, occ, m_rg)) { continue; }
+        if (!xoc::hasSameUniqueMustDefForTree(
+                exp, occ, m_rg, ctx.getOptCtx())) {
+            continue;
+        }
         changed |= findAndElim(occ, exp, ctx);
         e->getOccList().remove(it);
     }
@@ -552,11 +579,11 @@ bool GCSE::handleCandidateByExprRep(IR * exp, GCSECtx const& ctx)
 
 bool GCSE::handleCandidate(IR * exp, IRBB * bb, GCSECtx const& ctx)
 {
-    InferCtx ictx;
+    InferCtx ictx(*ctx.getOptCtx());
     ASSERT0(m_infer_evn);
     VN const* evn = m_infer_evn->inferExp(exp, ictx);
     if (evn != nullptr) {
-        IR * gen = m_evn2exp.get(evn);
+        IR * gen = findProperCSE(m_evn2exp, evn, exp);
         if (gen != nullptr) {
             //Clean exp info out of VN2IR tab.
             VN const* vn = m_gvn->getVN(exp);
@@ -567,11 +594,11 @@ bool GCSE::handleCandidate(IR * exp, IRBB * bb, GCSECtx const& ctx)
             //Found CSE and replaced it with pr.
             return findAndElim(exp, gen, ctx);
         }
-        m_evn2exp.set(evn, exp);
+        setCSE(m_evn2exp, evn, exp);
     }
     VN const* vn = m_gvn->getVN(exp);
     if (vn != nullptr) {
-        IR * gen = m_vn2exp.get(vn);
+        IR* gen = findProperCSE(m_vn2exp, vn, exp);
         if (gen != nullptr) {
             //Clean exp info out of VN2IR tab.
             m_evn2exp.clean(evn);
@@ -579,7 +606,7 @@ bool GCSE::handleCandidate(IR * exp, IRBB * bb, GCSECtx const& ctx)
             //Found CSE and replaced it with pr.
             return findAndElim(exp, gen, ctx);
         }
-        m_vn2exp.set(vn, exp);
+        setCSE(m_vn2exp, vn, exp);
     }
     return handleCandidateByExprRep(exp, ctx);
 }
@@ -865,6 +892,7 @@ void GCSE::removeMayKill(IR * ir, MOD List<IR*> & livexp)
 bool GCSE::canElimRelationOp(IR const* exp, IR const* gen) const
 {
     ASSERT0(exp && gen);
+    ASSERT0(exp->isBinaryOp() && gen->isBinaryOp());
     ASSERT0(isRelationOpCSEConcerned(exp));
     ASSERT0(isRelationOpCSEConcerned(gen));
     return BIN_opnd0(gen)->getType() == BIN_opnd0(exp)->getType() &&
@@ -992,6 +1020,34 @@ bool GCSE::doPropExp(IRBB * bb, List<IR*> & livexp, GCSECtx const& ctx)
 }
 
 
+IR * GCSE::findProperCSE(VN2IRTab & vn2exp, VN const* vn, IR const* exp)
+{
+    ASSERT0(vn && exp);
+
+    IRList * lst = vn2exp.get(vn);
+    if (lst == nullptr) { return nullptr; }
+
+    for (IR const* cse = lst->get_head();
+         cse != nullptr; cse = lst->get_next()) {
+        //Find proper CSE after considered type.
+        if (canBeCandidateWithType(cse, exp)) { return const_cast<IR*>(cse); }
+    }
+    return nullptr;
+}
+
+
+void GCSE::setCSE(VN2IRTab & vn2exp, VN const* vn, MOD IR * cse)
+{
+    ASSERT0(vn && cse);
+
+    bool find = false;
+    IRList * lst = vn2exp.getAndGen(vn, &find);
+    ASSERT0(lst);
+
+    lst->append_tail(cse);
+}
+
+
 void GCSE::dumpEVN() const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
@@ -1045,6 +1101,7 @@ void GCSE::reset()
     ASSERT0(m_infer_evn);
     m_infer_evn->clean();
     m_am.clean();
+    destoryCSEList();
 }
 
 

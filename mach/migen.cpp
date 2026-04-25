@@ -49,6 +49,8 @@ MIGen::MIGen(Region * rg, elf::ELFMgr * em) : m_rg(rg), m_em(em)
     m_mimgr = nullptr;
     m_ir2minst = nullptr;
     m_relocmgr = nullptr;
+    m_timgr = rg->getRegionMgr()->getTargInfoMgr();
+    ASSERT0(m_timgr);
 }
 
 
@@ -107,7 +109,9 @@ void MIGen::initMgr()
     m_mimgr = allocMInstMgr();
     m_ir2minst = allocIR2MInst();
     m_relocmgr = allocMIRelocMgr();
-    ASSERT0(!ELFMGR_symbol_info(m_em).find(m_rg->getRegionVar()->get_name()));
+    ASSERTN(!ELFMGR_symbol_info(m_em).find(m_rg->getRegionVar()->get_name()),
+            ("\nMaybe defined a function with the same name as the external "
+            "symbol '%s'.\n", m_rg->getRegionVar()->get_name()->getStr()));
     m_em->initSymbol(m_rg->getRegionVar());
     ASSERT0(m_mfmgr);
 }
@@ -341,13 +345,9 @@ void MIGen::genFrameInfo(MIList & mcfi_list)
     ASSERT0(!MCDWARFMGR_region_frame_info(dm).find(m_rg));
     MCDwarfFrameRegionInfo * frame_info_p = dwarf_res_mgr.
         allocFrameRegionInfo();
-
-    LinearScanRA * lsra = (LinearScanRA*)(m_rg->getPassMgr()
-        ->registerPass(PASS_LINEAR_SCAN_RA));
-    ASSERT0(lsra);
-    frame_info_p->m_fp_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getFP());
-    frame_info_p->m_ra_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getRA());
-    frame_info_p->m_sp_reg = (UINT)xgen::tmMapReg2TMWORD(lsra->getSP());
+    frame_info_p->m_fp_reg = (UINT)xgen::tmMapReg2TMWORD(m_timgr->getFP());
+    frame_info_p->m_ra_reg = (UINT)xgen::tmMapReg2TMWORD(m_timgr->getRA());
+    frame_info_p->m_sp_reg = (UINT)xgen::tmMapReg2TMWORD(m_timgr->getSP());
     MCCFIInstructionVec * instructions = dwarf_res_mgr.
         allocCFIInfoVector();
     mach::MIListIter mi_it;

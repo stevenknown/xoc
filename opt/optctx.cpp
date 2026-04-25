@@ -31,6 +31,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+static void invalidBothPRDUAndNonPRDU(OptCtx * oc, DUMgr * dumgr)
+{
+    OC_is_pr_du_chain_valid(*oc) = false;
+    OC_is_nonpr_du_chain_valid(*oc) = false;
+    if (dumgr == nullptr) { return; }
+    dumgr->cleanDUSet();
+}
+
+
 void OptCtx::setValidPass(PASS_TYPE pt)
 {
     switch (pt) {
@@ -58,6 +67,25 @@ void OptCtx::setValidPass(PASS_TYPE pt)
 }
 
 
+class OptCtxIntl {
+public:
+    static void invalidRPO(OptCtx * oc)
+    {
+        OC_is_rpo_valid(*oc) = false;
+        IRCFG * cfg = oc->getRegion()->getCFG();
+        if (cfg == nullptr) { return; }
+        cfg->cleanRPOVexList();
+    }
+    static void invalidCFG(OptCtx * oc)
+    {
+        OC_is_cfg_valid(*oc) = false;
+        IRCFG * cfg = oc->getRegion()->getCFG();
+        if (cfg == nullptr) { return; }
+        cfg->cleanExitList();
+    }
+};
+
+
 void OptCtx::setInvalidPass(PASS_TYPE pt)
 {
     PassMgr * pm = m_rg->getPassMgr();
@@ -65,14 +93,7 @@ void OptCtx::setInvalidPass(PASS_TYPE pt)
     switch (pt) {
     case PASS_DOM: OC_is_dom_valid(*this) = false; break;
     case PASS_PDOM: OC_is_pdom_valid(*this) = false; break;
-    case PASS_RPO: {
-        OC_is_rpo_valid(*this) = false;
-        IRCFG * cfg = m_rg->getCFG();
-        if (cfg != nullptr) {
-            cfg->cleanRPOVexList();
-        }
-        break;
-    }
+    case PASS_RPO: OptCtxIntl::invalidRPO(this); break;
     case PASS_LOOP_INFO: OC_is_loopinfo_valid(*this) = false; break;
     case PASS_LIVE_EXPR: OC_is_live_expr_valid(*this) = false; break;
     case PASS_REACH_DEF: OC_is_reach_def_valid(*this) = false; break;
@@ -80,11 +101,10 @@ void OptCtx::setInvalidPass(PASS_TYPE pt)
         OC_is_avail_reach_def_valid(*this) = false;
         break;
     case PASS_CLASSIC_DU_CHAIN:
-        setInvalidPRDU();
-        setInvalidNonPRDU();
+        invalidBothPRDUAndNonPRDU(this, m_rg->getDUMgr());
         break;
     case PASS_MD_REF: OC_is_ref_valid(*this) = false; break;
-    case PASS_CFG: OC_is_cfg_valid(*this) = false; break;
+    case PASS_CFG: OptCtxIntl::invalidCFG(this); break;
     case PASS_AA: OC_is_aa_valid(*this) = false; break;
     default: break; //to invalid pass object.
     }
@@ -131,6 +151,24 @@ void OptCtx::setInvalidAllFlags()
          p != nullptr; passtab.get_next(tabiter, &p)) {
         p->set_valid(false);
     }
+}
+
+
+void OptCtx::setInvalidPRDU()
+{
+    OC_is_pr_du_chain_valid(*this) = false;
+    DUMgr * dumgr = m_rg->getDUMgr();
+    if (dumgr == nullptr) { return; }
+    dumgr->cleanDUSetForPROp();
+}
+
+
+void OptCtx::setInvalidNonPRDU()
+{
+    OC_is_nonpr_du_chain_valid(*this) = false;
+    DUMgr * dumgr = m_rg->getDUMgr();
+    if (dumgr == nullptr) { return; }
+    dumgr->cleanDUSetForNonPROp();
 }
 
 

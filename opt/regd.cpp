@@ -247,11 +247,52 @@ RegD const* RegDSet::get_unique_rd(RegDSystem const* sys) const
 
 
 //
+//START RegRefMgr
+//
+void RegRefMgr::decRef(Reg r)
+{
+    ASSERT0(r != REG_UNDEF);
+    ASSERT0(m_rdsys);
+    SRegSet const* alias_set = m_rdsys->getOverlapSRegSet(r);
+    ASSERT0(alias_set);
+    UINT step = m_rdsys->getStep(r);
+    ASSERT0(step > 0);
+    RegDSetIter iter;
+    for (BSIdx i = alias_set->get_first(&iter); i != BS_UNDEF;
+         i = alias_set->get_next(i, &iter)) {
+        UINT cnt = getRef(i);
+        cnt -= step;
+        setRegRefCount(i, cnt);
+    }
+}
+
+
+void RegRefMgr::incRef(Reg r)
+{
+    ASSERT0(r != REG_UNDEF);
+    ASSERT0(m_rdsys);
+    SRegSet const* alias_set = m_rdsys->getOverlapSRegSet(r);
+    ASSERT0(alias_set);
+    UINT step = m_rdsys->getStep(r);
+    ASSERT0(step > 0);
+    RegDSetIter iter;
+    for (BSIdx i = alias_set->get_first(&iter); i != BS_UNDEF;
+         i = alias_set->get_next(i, &iter)) {
+        UINT cnt = getRef(i);
+        cnt += step;
+        setRegRefCount(i, cnt);
+    }
+}
+//END RegRefMgr
+
+
+//
 //START RegDSystem
 //
 RegDSystem::RegDSystem(RegionMgr const* rm, TargInfoMgr const* tim)
     : m_rds_hash_allocator(&m_sbsmgr), m_rds_hash(&m_rds_hash_allocator),
-      m_rs_hash_allocator(&m_sbsmgr), m_rs_hash(&m_rs_hash_allocator)
+      m_rs_hash_allocator(&m_sbsmgr), m_rs_hash(&m_rs_hash_allocator),
+      m_refmgr(this)
 {
     init(rm, tim);
 }
@@ -409,7 +450,7 @@ void RegDSystem::initOverlapSetForAllReg()
         m_reg2overlap_rs.set(r, hashed_rs);
     }
     rds.clean(rdsmgr);
-    rs.clean(rdsmgr);
+    rs.clean(*m_rs_hash.getBsMgr());
 }
 
 
@@ -554,6 +595,7 @@ void RegDSystem::clean()
     m_rds_hash.clean();
     m_rs_hash.clean();
     m_rd_count = REGD_UNDEF + 1;
+    resetRef();
 }
 
 
@@ -634,6 +676,23 @@ void RegDSystem::removeRegDForRegFile(REGFILE rf, ConstRegDIter & iter)
         delete rdtab;
     }
     m_rf2rdtab.remove(rf);
+}
+
+
+void RegDSystem::decRef(Reg r)
+{
+    ASSERT0(r != REG_UNDEF);
+
+    //FIXME: some test cases will trigger this assertion.
+    //ASSERT0(m_refmgr.getRef(r) > 0);
+    m_refmgr.decRef(r);
+}
+
+
+void RegDSystem::incRef(Reg r)
+{
+    ASSERT0(r != REG_UNDEF);
+    m_refmgr.incRef(r);
 }
 //END RegDSystem
 

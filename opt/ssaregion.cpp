@@ -102,45 +102,40 @@ void SSARegion::dump() const
 }
 
 
-IRBB * SSARegion::findRootBB(IRBB * start)
+IRBB * SSARegion::findRootBB()
 {
-    ASSERT0(start);
-    while (!canBeRoot(start)) {
-        xcom::Vertex const* treev = m_domtree.getVertex(start->id());
-        ASSERT0(treev);
-        xcom::Vertex const* idomv = m_domtree.getParent(treev);
-        if (idomv != nullptr) {
-            start = m_rg->getBB(idomv->id());
-            ASSERT0(start);
-            continue;
-        }
-        return nullptr;
-    }
-    return start;
+    LCAOfSet lcaofset(&getDomTree());
+    VexIdx rootvexid = lcaofset.query(getBBSet());
+    ASSERT0(rootvexid != VERTEX_UNDEF);
+    return getRegion()->getBB(rootvexid);
 }
 
 
-bool SSARegion::isAllPredInRegion(IRBB const* bb) const
+void SSARegion::judgeAndAddIdomOfRoot()
 {
-    xcom::Vertex const* bbv = bb->getVex();
-    ASSERT0(bbv);
-    xcom::AdjVertexIter itv;
-    for (xcom::Vertex const* pred = Graph::get_first_in_vertex(bbv, itv);
-         pred != nullptr; pred = Graph::get_next_in_vertex(itv)) {
-        //If bb has PHI, its predecessor must have to be in SSA
-        //region too, because the rename of operand of PHI start from its
-        //predecessors.
-        if (!isInRegion(pred->id())) { return false; }
-    }
-    return true;
+    IRBB * root = getRootBB();
+    ASSERT0(root && root->getVex());
+    if (!root->hasPhi(getCFG())) { return; }
+    IRBB * idom = getCFG()->get_idom(root);
+    if (idom == nullptr) { return; }
+    add(idom->id());
+    setRootBB(idom);
+
+    //NOTE:There is no need to find a non-phi BB to serve as the root.
+    //for (IRBB * idom = getCFG()->get_idom(root);
+    //     idom != nullptr; idom = getCFG()->get_idom(idom)) {
+    //    add(idom->id());
+    //    setRootBB(idom);
+    //    if (!idom->hasPhi(getCFG())) { return; }
+    //}
+    //UNREACHABLE();
 }
 
 
-bool SSARegion::canBeRoot(IRBB const* bb) const
+void SSARegion::inferAndAddNecessaryBB()
 {
-    ASSERT0(bb);
-    if (!bb->hasPRPhi()) { return true; }
-    return isAllPredInRegion(bb);
+    addAllBBUnderRoot();
+    judgeAndAddIdomOfRoot();
 }
 
 
@@ -149,39 +144,13 @@ void SSARegion::addAllBBUnderRoot()
     IRBB const* root = getRootBB();
     ASSERT0(root && root->getVex());
     DomTree const& dt = getDomTree();
-    xcom::GraphIterOut iterout(dt, dt.getVertex(root->id()));
+    xcom::GraphIterOut<> iterout(dt, dt.getVertex(root->id()));
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
-        add(t->id());
-    }
-}
-
-
-void SSARegion::addPredBBTillRoot(IRBB const* start)
-{
-    IRBB const* root = getRootBB();
-    ASSERT0(root && root->getVex());
-    ASSERT0(m_cfg);
-    xcom::GraphIterIn iterin(*m_cfg, start->getVex(), root->getVex());
-    for (Vertex const* t = iterin.get_first();
-         t != nullptr; t = iterin.get_next(t)) {
         if (isInRegion(t->id())) { continue; }
         ASSERTN(m_cfg->is_dom(root->id(), t->id()),
                 ("root must dominate all other vertex in SSA region"));
         add(t->id());
-    }
-}
-
-
-void SSARegion::inferAndAddRelatedBB()
-{
-    BBSetIter bbit;
-    for (BSIdx i = getBBSet().get_first(&bbit);
-         i != BS_UNDEF; i = getBBSet().get_next(i, &bbit)) {
-        IRBB const* bb = m_rg->getBB(i);
-        ASSERT0(bb);
-        if (!bb->hasPRPhi()) { continue; }
-        addPredBBTillRoot(bb);
     }
 }
 
@@ -191,7 +160,6 @@ bool SSARegion::verifyRootDom() const
     SSARegion * pthis = const_cast<SSARegion*>(this);
     //Root must dominate all other BBs.
     IRBB const* root = getRootBB();
-    ASSERT0(canBeRoot(root));
     ASSERT0(root && root->getVex());
     DomTree const& domtree = getDomTree();
     BBSetIter bbit;

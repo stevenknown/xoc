@@ -43,6 +43,32 @@ PassMgr::PassMgr(Region * rg)
     m_rumgr = rg->getRegionMgr();
     m_tm = rg->getTypeMgr();
     ASSERT0(m_tm);
+    m_pool = smpoolCreate(64, MEM_COMM);
+    m_pass_count = PASS_ID_UNDEF + 1;
+}
+
+
+PassMgr::~PassMgr()
+{
+    destroyAllPass();
+    smpoolDelete(m_pool);
+}
+
+
+void * PassMgr::xmalloc(UINT size)
+{
+    ASSERTN(m_pool != nullptr, ("pool does not initialized"));
+    void * p = smpoolMalloc(size, m_pool);
+    ASSERT0(p != nullptr);
+    ::memset((void*)p, 0, size);
+    return p;
+}
+
+
+PassWrap * PassMgr::allocPassWrap()
+{
+    PassWrap * pw = (PassWrap*)xmalloc(sizeof(PassWrap));
+    return pw;
 }
 
 
@@ -51,8 +77,12 @@ void PassMgr::destroyPass(Pass * pass)
 {
     ASSERT0(pass);
     ASSERT0(pass->getPassType() != PASS_UNDEF);
-    m_allocated_pass.remove(pass);
-    delete pass;
+    PassWrap * wrap = pass->getWrap();
+    ASSERT0(wrap);
+    m_allocated_pass.remove(wrap);
+    ASSERT0(wrap->getPass());
+    delete wrap->getPass();
+    wrap->clean();
 }
 
 
@@ -78,10 +108,28 @@ Pass * PassMgr::replacePass(PASS_TYPE passty, Pass * newpass)
 
 void PassMgr::destroyAllPass()
 {
+    xcom::List<PassWrap*> pwlist;
     xcom::List<Pass*> irmgr_pass_lst;
-    xcom::TTabIter<Pass*> it;
-    for (Pass * p = m_allocated_pass.get_first(it);
-         p != nullptr; p = m_allocated_pass.get_next(it)) {
+
+    //Because some passes may destroy private pass in their destructor,
+    //the m_allocated_pass will be updated many times at any time. We record
+    //the Wrap in list first.
+    PassWrapTabIter it;
+    for (PassWrap * pw = m_allocated_pass.get_first(it);
+         pw != nullptr; pw = m_allocated_pass.get_next(it)) {
+        pwlist.append_tail(pw);
+    }
+    for (PassWrap * pw = pwlist.get_head();
+         pw != nullptr; pw = pwlist.get_next()) {
+        Pass * p = pw->getPass();
+        if (p == nullptr) {
+            //CASE:The pass object has been destroyed by other Pass.
+            //e.g: PassA allocates PassB in its constructor, both PassA and
+            //PassB recorded in PassWrapTab. When the destructor of PassA is
+            //invoked, PassB object is also destroyed, therefore 'p' will be
+            //NULL when the PassB object wrapper is iterated.
+            continue;
+        }
         if (p->getPassType() == PASS_IRMGR) {
             //Because some passes dependent on IRMgr, destroy it at last.
             //Note user may allocate multiple IRMgrs for dedicated usage.
@@ -94,9 +142,11 @@ void PassMgr::destroyAllPass()
             continue;
         }
         delete p;
+        pw->clean();
     }
     for (Pass * p = irmgr_pass_lst.get_head();
          p != nullptr; p = irmgr_pass_lst.get_next()) {
+        p->getWrap()->clean();
         delete p;
     }
     m_allocated_pass.clean();
@@ -111,11 +161,24 @@ void PassMgr::dump() const
     note(m_rg, "\n==---- DUMP %s '%s' ----==", "PassMgr",
          m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
+
+    PassWrapTabIter it;
+    note(m_rg, "\n-- DUMP ALLOCATED PASS, PASS NUM:%u --",
+         m_allocated_pass.get_elem_count());
+    for (PassWrap const* pw = m_allocated_pass.get_first(it);
+         pw != nullptr; pw = m_allocated_pass.get_next(it)) {
+        Pass const* p = pw->getPass();
+        ASSERT0(p);
+        note(m_rg, "\nPASS(id:%u):%s", p->id(), p->getPassName());
+    }
+
+    note(m_rg, "\n\n-- DUMP REGISTERED PASS, PASS NUM:%u --",
+         m_registered_pass.get_elem_count());
     PassTabIter tabiter;
     Pass * p;
     for (m_registered_pass.get_first(tabiter, &p);
          p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
-        note(m_rg, "\nPASS:%s", p->getPassName());
+        note(m_rg, "\nPASS(id:%u):%s", p->id(), p->getPassName());
     }
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER(t, "PassMgr");
@@ -128,6 +191,17 @@ Pass * PassMgr::allocCopyProp()
 }
 
 
+Pass * PassMgr::allocRegCopyProp()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new RegCopyProp(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocBrCondProp()
 {
     return new BrCondProp(m_rg);
@@ -136,11 +210,7 @@ Pass * PassMgr::allocBrCondProp()
 
 Pass * PassMgr::allocGCSE()
 {
-    #ifdef FOR_IP
     return new GCSE(m_rg, (GVN*)registerPass(PASS_GVN));
-    #else
-    return nullptr;
-    #endif
 }
 
 
@@ -196,6 +266,16 @@ Pass * PassMgr::allocInferType()
 Pass * PassMgr::allocInvertBrTgt()
 {
     return new InvertBrTgt(m_rg);
+}
+
+
+Pass * PassMgr::allocIfConversion()
+{
+    #ifdef FOR_IP
+    return new IfConversion(m_rg);
+    #else
+    return nullptr;
+    #endif
 }
 
 
@@ -295,9 +375,9 @@ Pass * PassMgr::allocMultiResConvert()
 }
 
 
-Pass * PassMgr::allocAlgeReasscociate()
+Pass * PassMgr::allocAlgeReassociate()
 {
-    return new AlgeReasscociate(m_rg);
+    return new AlgeReassociate(m_rg);
 }
 
 
@@ -307,10 +387,82 @@ Pass * PassMgr::allocLoopDepAna()
 }
 
 
+Pass * PassMgr::allocRegAllocMgr()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new RegAllocMgr(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
 Pass * PassMgr::allocLinearScanRA()
 {
     #ifdef REF_TARGMACH_INFO
     return new LinearScanRA(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocPrologueEpilogue()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocGPAdjustment()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocBROpt()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocDynamicStack()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocIRReloc()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new IRRelocMgr(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocVarRelocMgr()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new VarRelocMgr(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocArgPasser()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new ArgPasser(m_rg);
     #else
     ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
@@ -387,11 +539,18 @@ Pass * PassMgr::allocScalarOpt()
 }
 
 
+Pass * PassMgr::allocSolveSetMgr()
+{
+    return new SolveSetMgr(m_rg);
+}
+
+
 Pass * PassMgr::allocRegSSAMgr()
 {
-    #ifdef FOR_IP
+    #ifdef REF_TARGMACH_INFO
     return new RegSSAMgr(m_rg);
     #else
+    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }
@@ -427,9 +586,29 @@ Pass * PassMgr::allocRefine()
 }
 
 
+Pass * PassMgr::allocGlobalRefine()
+{
+    return new GlobalRefine(m_rg);
+}
+
+
 Pass * PassMgr::allocInsertCvt()
 {
     return new InsertCvt(m_rg);
+}
+
+
+Pass * PassMgr::allocInstSched()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+}
+
+
+Pass * PassMgr::allocSaveCallee()
+{
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
 }
 
 
@@ -438,6 +617,28 @@ Pass * PassMgr::allocCalcDerivative()
     #ifdef FOR_IP
     return new CalcDerivative(m_rg);
     #else
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocIGotoOpt()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new IGotoOpt(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
+    return nullptr;
+    #endif
+}
+
+
+Pass * PassMgr::allocStackColoring()
+{
+    #ifdef REF_TARGMACH_INFO
+    return new StackColoring(m_rg);
+    #else
+    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }
@@ -453,6 +654,7 @@ Pass * PassMgr::registerPass(PASS_TYPE passty)
     m_registered_pass.set(passty, pass);
     return pass;
 }
+
 
 Pass * PassMgr::allocPass(PASS_TYPE passty)
 {
@@ -472,6 +674,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_BCP:
         pass = allocBrCondProp();
+        break;
+    case PASS_RCP:
+        pass = allocRegCopyProp();
         break;
     case PASS_GCSE:
         pass = allocGCSE();
@@ -536,6 +741,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_REFINE_DUCHAIN:
         pass = allocRefineDUChain();
         break;
+    case PASS_SOLVESET_MGR:
+        pass = allocSolveSetMgr();
+        break;
     case PASS_SCALAR_OPT:
         pass = allocScalarOpt();
         break;
@@ -554,6 +762,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_INVERT_BRTGT:
         pass = allocInvertBrTgt();
         break;
+    case PASS_IF_CONVERSION:
+        pass = allocIfConversion();
+        break;
     case PASS_VRP:
         pass = allocVRP();
         break;
@@ -562,6 +773,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_REFINE:
         pass = allocRefine();
+        break;
+    case PASS_GLOBAL_REFINE:
+        pass = allocGlobalRefine();
         break;
     case PASS_INSERT_CVT:
         pass = allocInsertCvt();
@@ -574,6 +788,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_IRMGR:
         pass = allocIRMgr();
+        break;
+    case PASS_REGALLOC_MGR:
+        pass = allocRegAllocMgr();
         break;
     case PASS_LINEAR_SCAN_RA:
         pass = allocLinearScanRA();
@@ -590,21 +807,59 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
     case PASS_MULTI_RES_CVT:
         pass = allocMultiResConvert();
         break;
-    case PASS_ALGE_REASSCOCIATE:
-        pass = allocAlgeReasscociate();
+    case PASS_ALGE_REASSOCIATE:
+        pass = allocAlgeReassociate();
         break;
     case PASS_LOOP_DEP_ANA:
         pass = allocLoopDepAna();
         break;
+    case PASS_PROLOGUE_EPILOGUE:
+        pass = allocPrologueEpilogue();
+        break;
+    case PASS_GP_ADJUSTMENT:
+        pass = allocGPAdjustment();
+        break;
+    case PASS_BR_OPT:
+        pass = allocBROpt();
+        break;
+    case PASS_DYNAMIC_STACK:
+        pass = allocDynamicStack();
+        break;
+    case PASS_IRRELOC:
+        pass = allocIRReloc();
+        break;
+    case PASS_VARRELOC:
+        pass = allocVarRelocMgr();
+        break;
+    case PASS_ARGPASSER:
+        pass = allocArgPasser();
+        break;
     case PASS_TARGINFO_HANDLER:
         pass = allocTargInfoHandler();
+        break;
+    case PASS_INST_SCHED:
+        pass = allocInstSched();
+        break;
+    case PASS_STACK_COLORING:
+        pass = allocStackColoring();
+        break;
+    case PASS_IGOTO_OPT:
+        pass = allocIGotoOpt();
+        break;
+    case PASS_SAVE_CALLEE:
+        pass = allocSaveCallee();
         break;
     default:
         pass = allocExtPass(passty);
         break;
     }
     ASSERT0(pass);
-    m_allocated_pass.append(pass);
+    PASS_id(pass) = m_pass_count;
+    m_pass_count++;
+    PassWrap * wrap = allocPassWrap();
+    wrap->setPass(pass);
+    pass->setWrap(wrap);
+    m_allocated_pass.append(wrap);
     return pass;
 }
 

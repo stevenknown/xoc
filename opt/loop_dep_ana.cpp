@@ -135,7 +135,7 @@ void LoopDepCtx::dumpAct(CHAR const* format, ...) const
     ASSERT0(format);
     va_list args;
     va_start(args, format);
-    m_am->dump_args(format, args);
+    getActMgr()->dump_args(format, args);
     va_end(args);
 }
 
@@ -151,7 +151,7 @@ void LoopDepCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
         tmpbuf.vstrcat(format, args);
         va_end(args);
     }
-    ActHandler acth = m_am->dump("Found Loop Dependence:");
+    ActHandler acth = getActMgr()->dump("Found Loop Dependence:");
     if (format != nullptr) {
         acth.info->strcat("reason:%s", tmpbuf.getBuf());
     }
@@ -173,16 +173,16 @@ void LoopDepCtx::dumpLinRepAct(
     va_start(args, format);
     tmpbuf.vstrcat(format, args);
     va_end(args);
-    m_am->dump("LinearRepAct:%s", tmpbuf.buf);
+    getActMgr()->dump("LinearRepAct:%s", tmpbuf.buf);
 }
 
 
-LoopDepCtx::LoopDepCtx(Region const* rg, LI<IRBB> const* li, ActMgr * am)
+LoopDepCtx::LoopDepCtx(
+    LI<IRBB> const* li, ActMgr * am, OptCtx * oc)
+    : PassCtx(oc, am)
 {
     ASSERT0(li && am);
     m_li = li;
-    m_am = am;
-    m_rg = rg;
     m_pool = smpoolCreate(sizeof(LoopDepInfo) * 4, MEM_COMM);
     m_firtab_pool = smpoolCreate(
         FirstTab::getTNodeSize() * 2, MEM_CONST_SIZE);
@@ -345,7 +345,7 @@ bool LoopDepAna::isSameMemLocArrayOp(
     }
     IR const* srcbase = src->getBase();
     IR const* tgtbase = tgt->getBase();
-    InferCtx ictx;
+    InferCtx ictx(*ctx->getOptCtx());
     VN const* srcvn = getInferEVN().inferExp(srcbase, ictx);
     VN const* tgtvn = getInferEVN().inferExp(tgtbase, ictx);
     if (srcvn == nullptr || srcvn != tgtvn) { return false; }
@@ -377,7 +377,8 @@ bool LoopDepAna::isSameMemLocIndirectOp(
     ASSERT0(src->getOffset() == tgt->getOffset());
     IR const* srcbase = src->getBase();
     IR const* tgtbase = tgt->getBase();
-    InferCtx ictx(ctx == nullptr ? nullptr : ctx->getActMgr());
+    InferCtx ictx(
+        *ctx->getOptCtx(), ctx == nullptr ? nullptr : ctx->getActMgr());
     VN const* srcvn = getInferEVN().inferExp(srcbase, ictx);
     VN const* tgtvn = getInferEVN().inferExp(tgtbase, ictx);
     return srcvn == nullptr || srcvn == tgtvn;
@@ -445,8 +446,9 @@ void LoopDepAna::analyzeLinearDep(
     ASSERT0(tgt->is_exp() || tgt->is_stmt());
     if (tgt == ir) { return; }
     if (!xoc::isDependent(ir, tgt, is_aggressive(), m_rg)) { return; }
-    if (xoc::isLoopIndependent(ir, tgt, is_aggressive(), ctx.getLI(),
-                               m_rg, m_gvn)) {
+    if (xoc::isLoopIndependent(
+            ir, tgt, is_aggressive(), ctx.getLI(), m_rg,
+            m_gvn, ctx.getOptCtx())) {
         LoopDepInfo tmp;
         LDI_kind(&tmp) = LOOP_DEP_INDEPENDENT;
         LDI_src(&tmp) = ir;

@@ -38,6 +38,7 @@ namespace xoc {
 
 class IVR;
 class GVN;
+class Pass;
 
 class PassCtx {
     //THE CLASS ALLOWS PARTIAL COPY-CONSTRUCTOR.
@@ -56,6 +57,7 @@ public:
     OptCtx * getOptCtx() const { return m_oc; }
     Region * getRegion() const { return m_rg; }
     ActMgr * getActMgr() const { return m_am; }
+    GVN * getGVN() const { return m_gvn; }
 
     //The function try to judge if given 'ir' may reference IV, GVN etc.
     //If it is true, the function will invalidate related passes to avoid
@@ -69,14 +71,29 @@ public:
 };
 
 
+class PassWrap {
+protected:
+    Pass * m_pass;
+public:
+    void clean() { setPass(nullptr); }
+    Pass * getPass() const { return m_pass; }
+    void setPass(Pass * pass) { m_pass = pass; }
+};
+
+
 //Basis Class of pass.
+#define PASS_id(p) ((p)->m_id)
 class Pass {
     COPY_CONSTRUCTOR(Pass);
+    friend class PassMgr;
 protected:
     bool m_is_valid; //True if current pass information is available.
     Region * m_rg;
+    PassWrap * m_wrap;
 public:
-    Pass() : m_is_valid(false), m_rg(nullptr) {}
+    UINT m_id; //the unique id of pass.
+public:
+    Pass() : m_is_valid(false), m_rg(nullptr), m_wrap(nullptr) {}
     Pass(Region * rg) : m_is_valid(false), m_rg(rg) {}
     virtual ~Pass() {}
 
@@ -102,6 +119,7 @@ public:
         return true;
     }
 
+    PassWrap * getWrap() const { return m_wrap; }
     Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     {
@@ -115,9 +133,11 @@ public:
         return PASS_UNDEF;
     }
 
+    UINT id() const { return m_id; }
     virtual bool is_valid() const { return m_is_valid; }
 
     virtual void set_valid(bool valid) { m_is_valid = valid; }
+    void setWrap(PassWrap * wrap) { m_wrap = wrap; }
 
     //Return true means IR status changed, caller should consider whether
     //other optimizations should be reperform again. Otherwise return false.

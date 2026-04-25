@@ -353,7 +353,6 @@ static IR * removeBranch(
     xoc::removeStmt(ir, rcectx.getRegion(), *rcectx.getOptCtx());
 
     //Revise the PHI operand to target successor.
-    dumpRemovedEdge(from, to, rcectx);
     dumpChangedIR(ir, nullptr, rcectx);
 
     //Remove optimization related info.
@@ -364,6 +363,30 @@ static IR * removeBranch(
     ir_list->remove(ct);
     rg->freeIRTree(ir);
 
+    //If there is only one edge between 'to' and 'from',
+    //it will not be deleted.
+    //eg:
+    //f() {
+    //  int f2 = 0;
+    //  if (f2 == 0)
+    //    ;
+    //  g();
+    //  return 0;
+    //}
+    //log:
+    //truebr label label_BB1_2
+    //    ne:bool
+    //       $n
+    //       0
+    //LABEL: label_BB1_1 label_BB1_2
+    //  call 'g'
+    //There only one edge from truebr to g(), if delete it,
+    //g() will be delete too.
+    if (cfg->isUniquePred(to, from) && cfg->isUniqueSucc(from, to)) {
+        return nullptr;
+    }
+
+    dumpRemovedEdge(from, to, rcectx);
     //Reivse CFG.
     IRCfgOptCtx coctx(rcectx.getOptCtx());
     cfg->removeEdge(from, to, coctx);

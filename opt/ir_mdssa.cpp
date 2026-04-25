@@ -280,7 +280,8 @@ static void iterDefCHelper(
         return;
     }
     ASSERT0(def->getOcc());
-    if (use != nullptr && xoc::isKillingDef(def->getOcc(), use, nullptr)) {
+    if (use != nullptr &&
+        xoc::isKillingDef(def->getOcc(), use, nullptr, it.getOptCtx())) {
         //Stop the iteration until encounter the killing DEF real stmt.
         return;
     }
@@ -578,9 +579,10 @@ void CollectUse::collectForMDSSAInfo(
 //
 //START CollectDef
 //
-CollectDef::CollectDef(MDSSAMgr const* mgr, MDSSAInfo const* info,
-                       CollectCtx const& ctx, MD const* ref, OUT IRSet * set)
-    : m_mgr(mgr), m_info(info), m_ctx(ctx), m_ref(ref)
+CollectDef::CollectDef(
+    MDSSAMgr const* mgr, MDSSAInfo const* info,
+    CollectCtx const& ctx, MD const* ref, OUT IRSet * set, OptCtx const* oc)
+    : m_mgr(mgr), m_info(info), m_ref(ref), m_oc(oc), m_ctx(ctx)
 {
     m_udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
     ASSERT0(set);
@@ -658,7 +660,7 @@ void CollectDef::collectDefThroughDefChain(
     MDDef const* def, OUT IRSet * set) const
 {
     ASSERT0(def);
-    ConstMDDefIter it(m_mgr);
+    ConstMDDefIter it(m_mgr, m_oc);
     bool must_inside_loop = m_ctx.flag.have(COLLECT_INSIDE_LOOP);
     LI<IRBB> const* li = m_ctx.getLI();
     if (must_inside_loop) { ASSERT0(li); }
@@ -1553,7 +1555,7 @@ RenameExp::RenameExp(MDSSAMgr * mgr, OptCtx * oc, ActMgr * am) :
 //In C++, local declared class should NOT be used in template parameters of a
 //template class. Because the template class may be instanced outside the
 //function and the local type in function is invisible.
-class VFToRename {
+class VFToRenameMDSSA {
 public:
     bool visitIR(IR * ir, OUT bool & is_term)
     {
@@ -1575,8 +1577,9 @@ public:
     MDSSAStatus * m_st;
 public:
     //startir: may be NULL.
-    VFToRename(IR const* startir, IRBB const* startbb, MDSSAMgr * mdssamgr,
-               OptCtx * oc, MDSSAStatus * st)
+    VFToRenameMDSSA(
+        IR const* startir, IRBB const* startbb, MDSSAMgr * mdssamgr,
+        OptCtx * oc, MDSSAStatus * st)
     {
         ASSERT0(startbb && mdssamgr && oc && st);
         m_startir = startir;
@@ -1590,15 +1593,15 @@ public:
 
 void RenameExp::rename(MOD IR * root, IR const* startir, IRBB const* startbb)
 {
-    class IterTree : public VisitIRTree<VFToRename> {
+    class IterTree : public VisitIRTree<VFToRenameMDSSA> {
     public:
-        IterTree(VFToRename & vf) : VisitIRTree(vf) {}
+        IterTree(VFToRenameMDSSA & vf) : VisitIRTree(vf) {}
     };
     ASSERT0(root && (root->is_stmt() || root->is_exp()));
     ASSERT0(startir == nullptr ||
             (startir->is_stmt() && startir->getBB() == startbb));
     MDSSAStatus st;
-    VFToRename vf(startir, startbb, m_mgr, m_oc, &st);
+    VFToRenameMDSSA vf(startir, startbb, m_mgr, m_oc, &st);
     IterTree it(vf);
     it.visit(root);
 }
@@ -1795,37 +1798,45 @@ size_t MDSSAMgr::count_mem() const
 
 
 MDSSAMgr::MDSSAMgr(Region * rg) :
-    Pass(rg),
-    m_sbs_mgr(rg->getMiscBitSetMgr()),
-    m_seg_mgr(rg->getMiscBitSetMgr()->getSegMgr()),
-    m_usedef_mgr(rg, this)
+    Pass(rg), m_usedef_mgr(rg, this), m_am(rg)
 {
     cleanInConstructor();
     ASSERT0(rg);
     m_tm = rg->getTypeMgr();
     m_irmgr = rg->getIRMgr();
     ASSERT0(m_tm);
-    ASSERT0(rg->getMiscBitSetMgr());
-    ASSERT0(m_seg_mgr);
     m_cfg = rg->getCFG();
     ASSERTN(m_cfg, ("cfg is not available."));
     m_md_sys = rg->getMDSystem();
-    m_am = new ActMgr(m_rg);
 }
 
 
 void MDSSAMgr::destroy(MDSSAUpdateCtx const* ctx)
 {
-    if (m_usedef_mgr.m_mdssainfo_pool == nullptr) { return; }
-
+    if (m_usedef_mgr.m_mdssainfo_pool == nullptr) {
+        //There is no need to invoke clean or destroy related functions again
+        //because these resource have already clean.
+        //Moreover, these functions will iterate BB and IR list.
+        return;
+    }
     //CAUTION: If you do not finish out-of-SSA prior to destory(),
     //the reference to IR's MDSSA info will lead to undefined behaviors.
+    //Here we just invoke clean and destroy MDSSA related data structure to
+    //avoid the unnecessary memory waste.
     //ASSERTN(!is_valid(),
     //        ("Still in SSA mode, you should do out-of-SSA before destroy"));
+    destroyImpl(ctx);
+    set_valid(false);
+}
 
-    freePhiList(ctx);
-    delete m_am;
-    m_am = nullptr;
+
+static void cleanMDSSAInfoForLeafIRList(MDSSAMgr * mgr, IR * lst)
+{
+    for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
+        ASSERT0(ir->is_leaf());
+        if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
+        mgr->cleanMDSSAInfo(ir);
+    }
 }
 
 
@@ -1840,6 +1851,7 @@ void MDSSAMgr::freeBBPhiList(IRBB * bb, MDSSAUpdateCtx const* ctx)
         if (ctx != nullptr) {
             ctx->tryInvalidInfoBeforeFreeIRList(phi->getOpndList());
         }
+        cleanMDSSAInfoForLeafIRList(this, phi->getOpndList());
         m_rg->freeIRTreeList(phi->getOpndList());
         MDPHI_opnd_list(phi) = nullptr;
     }
@@ -1857,15 +1869,13 @@ void MDSSAMgr::freePhiList(MDSSAUpdateCtx const* ctx)
 }
 
 
-//The function destroy data structures that allocated during SSA
-//construction, and these data structures are only useful in construction.
 void MDSSAMgr::cleanLocalUsedData()
 {
-    //Do NOT clean max_version of each MD, because some passes will generate
-    //DEF stmt for individual MD, which need new version of the MD.
+    //Do NOT reset max_version of each MD, because some passes will generate
+    //DEF stmt for individual MD, which need to reference old maximum version
+    //and generate new version of the MD.
     //MD's max verison is often used to update MDSSAInfo incrementally.
-    //m_max_version.destroy();
-    //m_max_version.init();
+    //m_max_version.clean();
 }
 
 
@@ -1945,6 +1955,7 @@ void MDSSAMgr::removeSuccessorDesignatedPhiOpnd(
             continue;
         }
         IR * opnd = phi->getOpnd(pos);
+        ASSERTN(opnd, ("there is no %uth operand in the MDPhi."));
         removeMDSSAOccForTree(opnd, ctx);
         phi->removeOpnd(opnd);
         ctx.tryInvalidInfoBeforeFreeIR(opnd);
@@ -1955,7 +1966,7 @@ void MDSSAMgr::removeSuccessorDesignatedPhiOpnd(
 
 IR * MDSSAMgr::findUniqueDefInLoopForMustRef(
     IR const* exp, LI<IRBB> const* li, Region const* rg,
-    OUT IRSet * set) const
+    OptCtx const* oc, OUT IRSet * set) const
 {
     ASSERT0(exp && exp->isMemRefNonPR());
     MD const* mustuse = exp->getMustRef();
@@ -1967,7 +1978,7 @@ IR * MDSSAMgr::findUniqueDefInLoopForMustRef(
     if (set == nullptr) { set = &tmpset; }
     CollectCtx ctx(COLLECT_CROSS_PHI|COLLECT_INSIDE_LOOP);
     ctx.setLI(li);
-    CollectDef cd(this, mdssainfo, ctx, mustuse, set);
+    CollectDef cd(this, mdssainfo, ctx, mustuse, set, oc);
     if (set->get_elem_count() == 1) {
         IRSetIter it;
         return m_rg->getIR(set->get_first(&it));
@@ -2555,7 +2566,75 @@ bool MDSSAMgr::canPhiReachRealMDDef(
 }
 
 
-MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(IR const* ir) const
+class MDSSAMgrIntl {
+public:
+    static MDDef const* findReachedCoverDefViaMDPhi(
+        MDSSAInfo const* mdssainfo,
+        MDDef const* covermddef, MDDef const* nearestmddef,
+        MDSSAMgr const* mgr, IR const* ir)
+    {
+        if (mgr->canPhiReachRealMDDef(mdssainfo, covermddef)) {
+            return covermddef;
+        }
+        return nullptr;
+    }
+
+
+    static MDDef const* findReachedCoverDefViaMDDef(
+        MDSSAInfo const* mdssainfo,
+        MDDef const* covermddef, MDDef const* nearestmddef,
+        MDSSAMgr const* mgr, IR const* ir, MOD InferEVN * evn, OptCtx const* oc)
+    {
+        IR const* covermddef_occ = covermddef->getOcc();
+        ASSERT0(covermddef_occ);
+        IR const* nearest_occ = nearestmddef->getOcc();
+        ASSERT0(nearest_occ);
+        if (covermddef_occ != nearest_occ) {
+            //The nearest DEF is not the covermddef.
+            //e.g: union { int a; char b; } S;
+            //     s = ...;
+            //     s.b = 10; <-- cannot act as coverdef.
+            //     ... = s.a;
+            return nullptr;
+        }
+        MD const* mustref_of_cover_and_nearest = covermddef_occ->getMustRef();
+        ASSERT0(mustref_of_cover_and_nearest);
+        if (mustref_of_cover_and_nearest->is_exact()) {
+            //CASE:The NonPRMemRef operation with exact-MD can act as
+            //a killing-def.
+            return covermddef;
+        }
+        //CASE:There is still opportunity to determine whether the covermddef
+        //can act as killing-def even if MustRef is inexact.
+        //e.g: g[m] =  <-- MustRef is inexact.
+        //      ... = g[m]
+        if (covermddef_occ->isIsomoTo(ir, mgr->getIRMgr(), true,
+                IsomoFlag(ISOMO_UNDEF))) {
+            if (xoc::hasSameUniqueMustDefForIsomoKidTree(
+                    covermddef_occ, ir, mgr->getRegion(), oc)) {
+                return covermddef;
+            }
+            return nullptr;
+        }
+        if (evn != nullptr && evn->is_valid()) {
+            //Try to detect the coverability even if they are not isomo.
+            if (xoc::hasSameEVNForKidTree(
+                    covermddef_occ, ir, mgr->getRegion(), evn, oc)) {
+                return covermddef;
+            }
+        }
+        //There is at least one overlapped-def that is in the path from
+        //'ir' to its cover-def.
+        //e.g: s.a = 10;
+        //     s = ...;
+        //     ... = s.a;
+        return nullptr;
+    }
+};
+
+
+MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(
+    IR const* ir, MOD InferEVN * evn, OptCtx const* oc) const
 {
     ASSERT0(ir && ir->is_exp() && ir->isMemOpnd());
     MD const* mustuse = ir->getMustRef();
@@ -2581,7 +2660,8 @@ MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(IR const* ir) const
     }
     IR const* covermddef_occ = covermddef->getOcc();
     ASSERT0(covermddef_occ);
-    if (covermddef_occ->getMustRef() == nullptr) {
+    MD const* mustref_of_covermddef_occ = covermddef_occ->getMustRef();
+    if (mustref_of_covermddef_occ == nullptr) {
         //For the conservative purpose, CoverDef that does not have MustRef
         //should not be killing-def of 'ir'.
         //CASE:compile.gr/no_classic_prdu/killingdef.gr
@@ -2589,25 +2669,15 @@ MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(IR const* ir) const
     }
     //The def is the potentail real-def of ir.
     MDDef const* nearest = findNearestDef(ir, false);
-    if (!nearest->is_phi()) {
-        if (covermddef == nearest) {
-            //The nearest DEF is the covermddef.
-            //e.g: s = ...;
-            //     s.a = 10;
-            //     ... = s.a;
-            return covermddef;
-        }
-        //There is at least one overlapped-def that is in the path from
-        //'ir' to its cover-def.
-        //e.g: s.a = 10;
-        //     s = ...;
-        //     ... = s.a;
-        return nullptr;
+    ASSERT0(nearest);
+    if (nearest->is_phi()) {
+        return MDSSAMgrIntl::findReachedCoverDefViaMDPhi(
+            mdssainfo, covermddef, nearest, this, ir);
     }
-    if (canPhiReachRealMDDef(mdssainfo, covermddef)) {
-        return covermddef;
-    }
-    return nullptr;
+    //NOTE:The MustRef of NonPRMemRef operation may be inexact, we try to
+    //make a decision according to separate strategy.
+    return MDSSAMgrIntl::findReachedCoverDefViaMDDef(
+        mdssainfo, covermddef, nearest, this, ir, evn, oc);
 }
 
 
@@ -2695,13 +2765,14 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir, bool skip_independent_def) const
 }
 
 
-IR * MDSSAMgr::findKillingDefStmt(IR const* ir, bool aggressive) const
+IR * MDSSAMgr::findKillingDefStmt(
+    IR const* ir, bool aggressive, MOD InferEVN * evn, OptCtx const* oc) const
 {
     MDDef const* mddef = nullptr;
     if (aggressive) {
-        mddef = findNearestCoverDefThatCanReach(ir);
+        mddef = findNearestCoverDefThatCanReach(ir, evn, oc);
     } else {
-        mddef = findKillingMDDef(ir);
+        mddef = findKillingMDDef(ir, oc);
     }
     if (mddef != nullptr && !mddef->is_phi()) {
         ASSERT0(mddef->getOcc());
@@ -2711,7 +2782,7 @@ IR * MDSSAMgr::findKillingDefStmt(IR const* ir, bool aggressive) const
 }
 
 
-MDDef * MDSSAMgr::findKillingMDDef(IR const* ir) const
+MDDef * MDSSAMgr::findKillingMDDef(IR const* ir, OptCtx const* oc) const
 {
     ASSERT0(ir && ir->is_exp() && ir->isMemOpnd());
     MD const* opndmd = ir->getMustRef();
@@ -2723,7 +2794,7 @@ MDDef * MDSSAMgr::findKillingMDDef(IR const* ir) const
     MDDef * def = findNearestDef(ir, false);
     if (def == nullptr || def->is_phi()) { return nullptr; }
     ASSERT0(def->getOcc());
-    return xoc::isKillingDef(def->getOcc(), ir, nullptr) ? def : nullptr;
+    return xoc::isKillingDef(def->getOcc(), ir, nullptr, oc) ? def : nullptr;
 }
 
 
@@ -2886,9 +2957,11 @@ bool MDSSAMgr::constructDesignatedRegion(MOD SSARegion & ssarg)
 
 //lst: for local used.
 void MDSSAMgr::dumpExpDUChainIter(
-    IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line) const
+    IR const* ir, MOD ConstIRIter & it, OUT bool * parting_line,
+    OptCtx const* oc) const
 {
-    IRSet visited(getSBSMgr()->getSegMgr());
+    xcom::DefMiscBitSetMgr sbsmgr;
+    IRSet visited(sbsmgr.getSegMgr());
     xcom::List<MDDef const*> wl;
     it.clean();
     xcom::StrBuf tmp(8);
@@ -2909,7 +2982,7 @@ void MDSSAMgr::dumpExpDUChainIter(
             prt(getRegion(), g_msg_no_mdssainfo);
             continue;
         }
-        MDDef * kdef = findKillingMDDef(opnd);
+        MDDef * kdef = findKillingMDDef(opnd, oc);
         if (kdef != nullptr) {
             prt(getRegion(), " KDEF:%s", dumpIRName(kdef->getOcc(), tmp));
         }
@@ -2949,7 +3022,8 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
 }
 
 
-void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
+void MDSSAMgr::dumpDUChainForStmt(
+    IR const* ir, bool & parting_line, OptCtx const* oc) const
 {
     ASSERT0(ir->is_stmt());
     ASSERT0(ir->isMemRefNonPR() || ir->isCallStmt());
@@ -2998,7 +3072,8 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, bool & parting_line) const
 }
 
 
-void MDSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
+void MDSSAMgr::dumpDUChainForStmt(
+    IR const* ir, MOD ConstIRIter & it, OptCtx const* oc) const
 {
     ASSERT0(ir->is_stmt());
     dumpIR(ir, getRegion());
@@ -3006,10 +3081,10 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
     bool parting_line = false;
     //Handle stmt.
     if (ir->isMemRefNonPR() || ir->isCallStmt()) {
-        dumpDUChainForStmt(ir, parting_line);
+        dumpDUChainForStmt(ir, parting_line, oc);
     }
     //Handle expression.
-    dumpExpDUChainIter(ir, it, &parting_line);
+    dumpExpDUChainIter(ir, it, &parting_line, oc);
     if (parting_line) {
         note(getRegion(), "\n%s", g_parting_line_char);
         note(getRegion(), "\n");
@@ -3018,7 +3093,7 @@ void MDSSAMgr::dumpDUChainForStmt(IR const* ir, MOD ConstIRIter & it) const
 }
 
 
-void MDSSAMgr::dumpDUChain() const
+void MDSSAMgr::dumpDUChain(OptCtx const* oc) const
 {
     Region * rg = getRegion();
     if (!rg->isLogMgrInit() || !g_dump_opt.isDumpMDSSAMgr()) { return; }
@@ -3029,7 +3104,7 @@ void MDSSAMgr::dumpDUChain() const
         bb->dumpDigest(rg);
         dumpPhiList(getPhiList(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
-            dumpDUChainForStmt(ir, it);
+            dumpDUChainForStmt(ir, it, oc);
         }
     }
 }
@@ -3119,17 +3194,16 @@ void MDSSAMgr::setDedicatedVersionVMD(
         mdssainfo->addVOpnd(vmd, getUseDefMgr());
     }
     MDSet const* refset = ir->getMayRef();
-    if (refset != nullptr) {
-        MDSetIter iter;
-        for (BSIdx i = refset->get_first(&iter);
-             i != BS_UNDEF; i = refset->get_next((UINT)i, &iter)) {
-            MD * md = m_md_sys->getMD(i);
-            ASSERTN(md && !md->is_pr(), ("PR should not in MaySet"));
-            ASSERT0(md->id() == i);
-            VMD const* vmd = genVMD(i, version);
-            ASSERT0(getSBSMgr());
-            mdssainfo->addVOpnd(vmd, getUseDefMgr());
-        }
+    if (refset == nullptr) { return; }
+    MDSetIter iter;
+    for (BSIdx i = refset->get_first(&iter);
+         i != BS_UNDEF; i = refset->get_next((UINT)i, &iter)) {
+        MD * md = m_md_sys->getMD(i);
+        ASSERTN(md && !md->is_pr(), ("PR should not in MaySet"));
+        ASSERT0(md->id() == i);
+        VMD const* vmd = genVMD(i, version);
+        ASSERT0(getSBSMgr());
+        mdssainfo->addVOpnd(vmd, getUseDefMgr());
     }
 }
 
@@ -3951,83 +4025,18 @@ void MDSSAMgr::rename(DefMDSet const& effect_mds, BB2DefMDSet & bb2defmds,
 }
 
 
-void MDSSAMgr::cleanIRSSAInfo(IRBB * bb)
+void MDSSAMgr::cleanIRSSAInfo(IRBB * bb, MOD IRIter & irit)
 {
     IRListIter lit;
-    IRIter it;
     for (IR * ir = BB_irlist(bb).get_head(&lit);
          ir != nullptr; ir = BB_irlist(bb).get_next(&lit)) {
-        it.clean();
-        for (IR * k = xoc::iterInit(ir, it);
-             k != nullptr; k = xoc::iterNext(it)) {
-            if (hasMDSSAInfo(k)) {
-                cleanMDSSAInfo(k);
-            }
+        irit.clean();
+        for (IR * k = xoc::iterInit(ir, irit, false);
+             k != nullptr; k = xoc::iterNext(irit, true)) {
+            if (!hasMDSSAInfo(k)) { continue; }
+            cleanMDSSAInfo(k);
         }
     }
-}
-
-
-void MDSSAMgr::destructBBSSAInfo(IRBB * bb, MDSSAUpdateCtx const* ctx)
-{
-    cleanIRSSAInfo(bb);
-    freeBBPhiList(bb, ctx);
-}
-
-
-void MDSSAMgr::destructionInDomTreeOrder(
-    IRBB * root, DomTree & domtree, MDSSAUpdateCtx const* ctx)
-{
-    xcom::Stack<IRBB*> stk;
-    UINT n = m_rg->getBBList()->get_elem_count();
-    xcom::BitSet visited(n / BIT_PER_BYTE);
-    BB2VMDMap bb2vmdmap(n);
-    IRBB * v = nullptr;
-    stk.push(root);
-    while ((v = stk.get_top()) != nullptr) {
-        if (!visited.is_contain(v->id())) {
-            visited.bunion(v->id());
-            destructBBSSAInfo(v, ctx);
-        }
-
-        xcom::Vertex const* bbv = domtree.getVertex(v->id());
-        ASSERTN(bbv, ("dom tree is invalid."));
-        xcom::EdgeC const* c = bbv->getOutList();
-        bool all_visited = true;
-        while (c != nullptr) {
-            xcom::Vertex const* dom_succ = c->getTo();
-            if (dom_succ == bbv) { continue; }
-            if (!visited.is_contain(dom_succ->id())) {
-                ASSERT0(m_cfg->getBB(dom_succ->id()));
-                all_visited = false;
-                stk.push(m_cfg->getBB(dom_succ->id()));
-                break;
-            }
-            c = c->get_next();
-        }
-        if (all_visited) {
-            stk.pop();
-            //Do post-processing while all kids of BB has been processed.
-        }
-    }
-}
-
-
-//Destruction of MDSSA.
-//The function perform SSA destruction via scanning BB in preorder
-//traverse dominator tree.
-//Return true if inserting copy at the head of fallthrough BB
-//of current BB's predessor.
-void MDSSAMgr::destruction(DomTree & domtree, MDSSAUpdateCtx const* ctx)
-{
-    START_TIMER(t, "MDSSA: destruction in dom tree order");
-    if (!is_valid()) { return; }
-    BBList * bblst = m_rg->getBBList();
-    if (bblst->get_elem_count() == 0) { return; }
-    ASSERT0(m_cfg->getEntry());
-    destructionInDomTreeOrder(m_cfg->getEntry(), domtree, ctx);
-    set_valid(false);
-    END_TIMER(t, "MDSSA: destruction in dom tree order");
 }
 
 
@@ -4471,7 +4480,26 @@ bool MDSSAMgr::verifyVMD(VMD const* vmd, BitSet * defset) const
 }
 
 
-static bool verifyExistenceOfVMD(IR const* ir, MDSSAMgr const* mgr)
+static bool verifyMapVMDToMDRef(IR const* ir, MDSSAMgr const* mgr)
+{
+    ASSERT0(ir && ir->isMemRefNonPR());
+    MDSSAInfo * ssainfo = mgr->getMDSSAInfoIfAny(ir);
+    ASSERT0(ssainfo && !ssainfo->isEmptyVOpndSet());
+    VOpndSet const& vopndset = ssainfo->readVOpndSet();
+    VOpndSetIter it = nullptr;
+    for (BSIdx i = vopndset.get_first(&it);
+         i != BS_UNDEF; i = vopndset.get_next(i, &it)) {
+        VMD const* vmd = (VMD const*)mgr->getVOpnd(i);
+        ASSERT0(vmd && vmd->is_md());
+        ASSERTN(ir->isRefMD(vmd->mdid()),
+                ("IR does not ref MD%u, the VMD should not belong"
+                 " to current ir", vmd->mdid()));
+    }
+    return true;
+}
+
+
+static bool verifyMapMDRefToVMD(IR const* ir, MDSSAMgr const* mgr)
 {
     ASSERT0(ir && ir->isMemRefNonPR());
     MDSSAInfo const* mdssainfo = MDSSAMgr::getMDSSAInfoIfAny(ir);
@@ -4493,6 +4521,14 @@ static bool verifyExistenceOfVMD(IR const* ir, MDSSAMgr const* mgr)
         VMD const* mayref_vmd = (VMD*)mdssainfo->getVOpndForMD(i, mgr);
         ASSERTN(mayref_vmd, ("ir miss MayRef VMD"));
     }
+    return true;
+}
+
+
+static bool verifyExistenceOfVMD(IR const* ir, MDSSAMgr const* mgr)
+{
+    verifyMapVMDToMDRef(ir, mgr);
+    verifyMapMDRefToVMD(ir, mgr);
     return true;
 }
 
@@ -4551,7 +4587,7 @@ static void verifyPhiListVMD(
 
 bool MDSSAMgr::verifyRefedVMD() const
 {
-    TTab<VMD const*> visited;
+    xcom::TTab<VMD const*> visited;
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         verifyPhiListVMD(getPhiList(bb), this, visited);
@@ -5722,22 +5758,19 @@ void MDSSAMgr::removePhiFromDDChain(
 }
 
 
+void MDSSAMgr::destroyImpl(MDSSAUpdateCtx const* ctx)
+{
+    cleanMDSSAInfoAI();
+    freePhiList(ctx);
+    m_usedef_mgr.cleanOrDestroy(false);
+}
+
+
 //This function perform SSA destruction via scanning BB in sequential order.
 void MDSSAMgr::destruction(MOD OptCtx & oc)
 {
-    BBList * bblst = m_rg->getBBList();
-    if (bblst->get_elem_count() == 0) { return; }
-    UINT bbnum = bblst->get_elem_count();
-    BBListIter bbct;
-    MDSSAUpdateCtx ctx(oc);
-    for (bblst->get_head(&bbct);
-         bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
-        ASSERT0(bbct->val());
-        destructBBSSAInfo(bbct->val(), &ctx);
-    }
-    if (bbnum != bblst->get_elem_count()) {
-        oc.setInvalidIfCFGChanged();
-    }
+    MDSSAUpdateCtx ctx(const_cast<OptCtx&>(oc));
+    destroyImpl(&ctx);
     set_valid(false);
 }
 
@@ -5939,8 +5972,7 @@ void MDSSAMgr::cleanMDSSAInfoAI()
 {
     for (VecIdx i = 0; i <= m_rg->getIRVec().get_last_idx(); i++) {
         IR * ir = m_rg->getIR(i);
-        if (ir != nullptr && ir->getAI() != nullptr &&
-            ir->getAI()->is_init()) {
+        if (ir != nullptr && ir->getAI() != nullptr && ir->getAI()->is_init()) {
             IR_ai(ir)->clean(AI_MD_SSA);
         }
     }
@@ -6124,6 +6156,20 @@ void MDSSAMgr::movePhi(IRBB * from, IRBB * to)
 }
 
 
+bool MDSSAMgr::hasSameRegionLiveIn(IR const* ir1, IR const* ir2) const
+{
+    ASSERT0(ir1->is_exp() && ir2->is_exp());
+    ASSERT0(ir1->isMemRefNonPR() && ir2->isMemRefNonPR());
+    if (!isRegionLiveIn(ir1) || !isRegionLiveIn(ir2)) {
+        return false;
+    }
+    MDSSAInfo const* si1 = this->getMDSSAInfoIfAny(ir1);
+    MDSSAInfo const* si2 = this->getMDSSAInfoIfAny(ir2);
+    ASSERT0(si1 && si2);
+    return si1->readVOpndSet().is_equal(si2->readVOpndSet());
+}
+
+
 //Return true if the value of ir1 and ir2 are definitely same, otherwise
 //return false to indicate unknown.
 bool MDSSAMgr::hasSameValue(IR const* ir1, IR const* ir2)
@@ -6134,9 +6180,6 @@ bool MDSSAMgr::hasSameValue(IR const* ir1, IR const* ir2)
     ASSERT0(info1 && info2);
     return info1->isEqual(*info2);
 }
-
-
-
 
 
 //Return true if there is at least one USE 'vmd' has been placed in given

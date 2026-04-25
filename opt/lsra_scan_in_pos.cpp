@@ -36,10 +36,16 @@ void ScanInPosOrder::collectUnhandledForDef(IR const* ir)
     IR * res = const_cast<IR*>(ir)->getResultPR();
     if (res == nullptr) { return; }
     PRNO prno = res->getPrno();
-    LifeTime * lt = m_ra.getLT(prno);
+
+    //Call statements must always be considered because they affect both the
+    //splitting of lifetimes and the generation of spill&reload IRs.
+    if (!ir->isCallStmt() && !m_ramgr->getLTMgr()->canBeCandidate(prno)) {
+        return;
+    }
+    LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
     ASSERT0(lt);
-    if (m_ra.hasReg(lt)) { return; }
-    m_ra.addUnhandled(lt);
+    if (m_ramgr->hasReg(lt->getPrno())) { return; }
+    m_ramgr->getLSRA()->addUnhandled(lt);
 }
 
 
@@ -52,17 +58,18 @@ void ScanInPosOrder::collectUnhandledForUse(IR const* ir, ConstIRIter & irit)
         if (!e->isReadPR()) { continue; }
         PRNO prno = e->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
-        if (m_ra.hasReg(prno)) { continue; }
-        LifeTime * lt = m_ra.getLT(prno);
+        if (m_ramgr->hasReg(prno)) { continue; }
+        if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { continue; }
+        LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
         ASSERT0(lt);
-        m_ra.addUnhandled(lt);
+        m_ramgr->getLSRA()->addUnhandled(lt);
     }
 }
 
 
 void ScanInPosOrder::tryAssignRegForDefPos(Pos curpos, IR const* ir)
 {
-    ASSERT0(!m_ra.isOpInPosGap(ir));
+    ASSERT0(!m_ramgr->isOpInPosGap(ir));
     if (ir->isCallStmt()) {
         m_impl.splitCallerSavedLT(curpos, ir);
         m_impl.splitLinkLT(curpos, ir);
@@ -79,7 +86,7 @@ void ScanInPosOrder::tryAssignRegForDefPos(Pos curpos, IR const* ir)
 void ScanInPosOrder::tryAssignRegForUsePos(Pos curpos, IR const* ir)
 {
     ASSERT0(ir->is_stmt());
-    ASSERT0(!m_ra.isOpInPosGap(ir));
+    ASSERT0(!m_ramgr->isOpInPosGap(ir));
     do {
         IR const* curir = nullptr;
         LifeTime * cand = m_impl.selectAssignUseCand(curpos, ir, &curir);
@@ -99,12 +106,13 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     if (res == nullptr) { return true; }
     PRNO prno = res->getPrno();
     ASSERT0(prno != PRNO_UNDEF);
+    if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { return true; }
 
     //Verify pre-assigned PR.
-    LifeTime * lt = m_ra.getLT(prno);
+    LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
     ASSERT0(lt);
     if (lt->isPreAssigned()) {
-        Reg antireg = m_ra.getPreAssignedReg(prno);
+        Reg antireg = m_ramgr->getPreAssignedReg(prno);
         ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
         ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
     }
@@ -127,17 +135,18 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         if (!e->isReadPR()) { continue; }
         PRNO prno = e->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
+        if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { return true; }
 
         //Verify pre-assigned PR.
-        LifeTime * lt = m_ra.getLT(prno);
+        LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
         ASSERT0(lt);
         if (lt->isPreAssigned()) {
-            Reg antireg = m_ra.getPreAssignedReg(prno);
+            Reg antireg = m_ramgr->getPreAssignedReg(prno);
             ASSERT0_DUMMYUSE(antireg != REG_UNDEF);
             ASSERT0(m_impl.getRegSetImpl().isAvailAllocable(antireg));
         }
 
-        Reg r = m_ra.getReg(prno);
+        Reg r = m_ramgr->getReg(prno);
         if (r != REG_UNDEF) {
             //An IR tree may have multiple occurrences for same PR.
             regmap.setAlways(prno, r);
@@ -182,7 +191,7 @@ void ScanInPosOrder::scanIR(IR * ir, UpdatePos & up, ConstIRIter & irit)
     }
     scanRHS(ir, upos, irit);
     scanLHS(ir, dpos);
-    ASSERT0L3(m_ra.verify4List());
+    ASSERT0L3(m_ramgr->getLSRA()->verify4List());
 }
 
 
@@ -201,7 +210,7 @@ void ScanInPosOrder::scanBBList(BBList * bblst)
 {
     ASSERT0(bblst);
     //Create entry position.
-    UpdatePos up(&m_ra);
+    UpdatePos up(m_ramgr);
     Pos dpos_start, upos_start;
     bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
     ASSERT0_DUMMYUSE(valid);

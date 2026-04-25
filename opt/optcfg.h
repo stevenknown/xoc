@@ -625,7 +625,7 @@ bool OptimizedCFG<BB, XR>::removeUnreachBB(
     visited.diff(getCFG()->getBBList()->get_elem_count());
     ASSERT0(getCFG()->getEntry());
     visited.bunion(getCFG()->getEntry()->id());
-    GraphIterOut iterout(*this, getCFG()->getEntry()->getVex());
+    xcom::GraphIterOut<> iterout(*this, getCFG()->getEntry()->getVex());
     for (Vertex const* t = iterout.get_first();
          t != nullptr; t = iterout.get_next(t)) {
         visited.bunion(t->id());

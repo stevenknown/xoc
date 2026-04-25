@@ -40,23 +40,23 @@ class Type;
 //is_siged: expect val to be signed integer number.
 //is_hex: expect val to be hexadecimal number.
 //buf: output string buffer.
-void dumpHostInt(HOST_INT val, bool is_signed, bool is_hex,
-                 OUT StrBuf & buf);
+void dumpHostInt(
+    HOST_INT val, bool is_signed, bool is_hex, OUT StrBuf & buf);
 
 //The function dump Host Machine Integer number into given buffer.
 //val: integer value that can be represented with HOST_INT.
 //ty: the data-type of 'val'.
 //buf: output string buffer.
-void dumpHostInt(HOST_INT intval, Type const* ty, Region const* rg,
-                 OUT StrBuf & buf);
+void dumpHostInt(
+    HOST_INT intval, Type const* ty, Region const* rg, OUT StrBuf & buf);
 
 //The function dump Host Machine Float Point number into given buffer.
 //val: float-pointe number that can be represented with HOST_INT.
 //buf: output string buffer.
 //mantissa: the number of float mantissa in output buffer.
 //          e.g:given 1.123456, if mantissa is 3, the output is 1.123.
-void dumpHostFP(HOST_FP val, OUT StrBuf & buf,
-                BYTE mantissa = DEFAULT_MANTISSA_NUM);
+void dumpHostFP(
+    HOST_FP val, OUT StrBuf & buf, BYTE mantissa = DEFAULT_MANTISSA_NUM);
 
 //The function dump Host Machine Float Point number into given buffer.
 //val: float-pointe number that can be represented with HOST_INT.
@@ -64,8 +64,26 @@ void dumpHostFP(HOST_FP val, OUT StrBuf & buf,
 //mantissa: the number of float mantissa in output buffer.
 //          e.g:given 1.123456, if mantissa is 3, the output is 1.123.
 //buf: output string buffer.
-void dumpHostFP(HOST_FP val, Type const* ty, BYTE mantissa,
-                Region const* rg, OUT StrBuf & buf);
+void dumpHostFP(
+    HOST_FP val, Type const* ty, BYTE mantissa, Region const* rg,
+    OUT StrBuf & buf);
+
+//The function converts integer value according to 'type'.
+//NOTE: the function may narrow or widden value.
+//val: integer value.
+//type: destination type.
+//e.g:given val is -2, type is 'u16', the function will return 0xfffe.
+HOST_INT convertIntValByType(HOST_INT val, Type const* type, TypeMgr const* tm);
+
+//The function performs logical-shift-right to 'val' by 'shift' bits.
+//NOTE: the function may narrow or widden value according to 'type'.
+//val: integer value.
+//shift: the number of bits that expects to shift.
+//type: destination type.
+//e.g:given val is -1, shift is 4, type is 'u16', the function will
+//return 0x0fff.
+HOST_INT calcLSRIntValByType(
+    HOST_INT val, HOST_INT shift, Type const* type, TypeMgr const* tm);
 
 } //namespace xoc
 #endif

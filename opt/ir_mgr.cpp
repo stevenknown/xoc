@@ -90,7 +90,7 @@ static bool checkLogicalOp(IR_CODE irc, Type const* type, TypeMgr * tm)
     case IR_LAND:
     case IR_LOR:
         ASSERT0(type == tm->getBool() ||
-                type->getVectorElemType(tm) == tm->getBool());
+                IS_BOOL(type->getVectorElemDType()));
         break;
     default:;
     }
@@ -177,6 +177,26 @@ bool IRMgr::isIRListIsomorphic(
 }
 
 
+static bool isCondExecExp(IR const* ir)
+{
+    if (ir->is_select() && !CSelect::bothTFExpAvail(ir)) {
+        return true;
+    }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR const* kid = ir->getKid(i);
+        if (isCondExecExp(kid)) { return true; }
+    }
+    return false;
+}
+
+
+bool IRMgr::isCondExec(IR const* ir)
+{
+    if (!ir->hasResult() || !ir->hasRHS()) { return false; }
+    return isCondExecExp(ir->getRHS());
+}
+
+
 //Return true if ir tree is isomorphic to src.
 //ir: root of IR tree.
 //src: root of IR tree to be compared.
@@ -197,11 +217,13 @@ bool IRMgr::isIRIsomorphic(
             CONST_int_val(ir) != CONST_int_val(src)) {
             return false;
         }
-        break;
+        ASSERT0(ir->is_leaf());
+        return true;
     case IR_ID:
         if (ir->getCode() != src->getCode()) { return false; }
         if (ID_info(ir) != ID_info(src)) { return false; }
-        break;
+        ASSERT0(ir->is_leaf());
+        return true;
     SWITCH_CASE_DIRECT_MEM_OP:
         if (!ir->isDirectMemOp()) { return false; }
         if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
@@ -217,7 +239,8 @@ bool IRMgr::isIRIsomorphic(
         if (ir->getOffset() != src->getOffset()) {
             return false;
         }
-        break;
+        ASSERT0(ir->is_leaf());
+        return true;
     SWITCH_CASE_INDIRECT_MEM_OP:
         if (!ir->isIndirectMemOp()) { return false; }
         if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
@@ -230,7 +253,11 @@ bool IRMgr::isIRIsomorphic(
             return false;
         }
         ASSERT0(ir->getBase() && src->getBase());
-        return isIRIsomorphic(ir->getBase(), src->getBase(), is_cmp_kid, flag);
+        if (is_cmp_kid) {
+            return isIRIsomorphic(
+                ir->getBase(), src->getBase(), is_cmp_kid, flag);
+        }
+        return true;
     SWITCH_CASE_PR_OP:
         if (!ir->isPROp()) { return false; }
         if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
@@ -257,7 +284,8 @@ bool IRMgr::isIRIsomorphic(
             LDA_ofst(ir) != LDA_ofst(src)) {
             return false;
         }
-        break;
+        ASSERT0(ir->is_leaf());
+        return true;
     case IR_CALL:
         if (ir->getCode() != src->getCode()) { return false; }
         if (CALL_idinfo(ir) != CALL_idinfo(src)) { return false; }
@@ -271,7 +299,8 @@ bool IRMgr::isIRIsomorphic(
     case IR_LABEL:
         if (ir->getCode() != src->getCode()) { return false; }
         if (LAB_lab(ir) != LAB_lab(src)) { return false; }
-        break;
+        ASSERT0(ir->is_leaf());
+        return true;
     case IR_TRUEBR:
     case IR_FALSEBR:
     case IR_SELECT:
@@ -696,6 +725,15 @@ IR * IRMgr::buildId(Var * var)
 }
 
 
+//Build IR_ID operation.
+IR * IRMgr::buildId(Var * var, MDPhi * phi)
+{
+    IR * ir = buildId(var);
+    ID_phi(ir) = phi;
+    return ir;
+}
+
+
 IR * IRMgr::buildLdaString(CHAR const* varname, CHAR const* string)
 {
     return buildLdaString(varname, m_rm->addToSymbolTab(string));
@@ -748,9 +786,7 @@ IR * IRMgr::buildSelect(
     IR * pred, IR * true_exp, IR * false_exp, Type const* type)
 {
     ASSERT0(type);
-    ASSERT0(pred && pred->is_single() && true_exp && false_exp);
-    ASSERT0(true_exp->is_exp() && true_exp->is_single());
-    ASSERT0(false_exp->is_exp() && false_exp->is_single());
+    ASSERT0(pred && pred->is_single());
 
     //Type of true exp may be not equal to false exp.
     //ASSERT0(true_exp->getType() == false_exp->getType());
@@ -759,10 +795,15 @@ IR * IRMgr::buildSelect(
     SELECT_det(ir) = pred;
     SELECT_trueexp(ir) = true_exp;
     SELECT_falseexp(ir) = false_exp;
-
     IR_parent(pred) = ir;
-    IR_parent(true_exp) = ir;
-    IR_parent(false_exp) = ir;
+    if (true_exp != nullptr) {
+        ASSERT0(true_exp->is_exp() && true_exp->is_single());
+        IR_parent(true_exp) = ir;
+    }
+    if (false_exp != nullptr) {
+        ASSERT0(false_exp->is_exp() && false_exp->is_single());
+        IR_parent(false_exp) = ir;
+    }
     return ir;
 }
 
@@ -958,6 +999,13 @@ IR * IRMgr::buildLoad(Var * var, TMWORD ofst, Type const* type)
     IR * ir = allocIR(IR_LD);
     LD_idinfo(ir) = var;
     LD_ofst(ir) = ofst;
+
+    //Assign default alignment to 1 byte for LD operation with type ANY. In
+    //most programming languages and architectures, the default alignment for
+    //LD operations is 1 byte.
+    //Some reference materials: "Hindley-Milner (HM) type inference".
+    UINT const align_with_any = 1;
+    LD_align(ir) = type->is_any() ? align_with_any : m_tm->getByteSize(type);
     IR_dt(ir) = type;
     if (!g_is_hoist_type) { return ir; }
 
@@ -986,6 +1034,11 @@ IR * IRMgr::buildILoad(IR * base, Type const* type)
     IR * ir = allocIR(IR_ILD);
     IR_dt(ir) = type;
     ILD_base(ir) = base;
+
+    //Assign default alignment to 1 byte for ILD operation with type ANY.
+    //Some reference materials: "Hindley-Milner (HM) type inference".
+    UINT const align_with_any = 1;
+    ILD_align(ir) = type->is_any() ? align_with_any : m_tm->getByteSize(type);
     IR_parent(base) = ir;
     return ir;
 }
@@ -1131,6 +1184,13 @@ IR * IRMgr::buildStore(Var * lhs, Type const* type, IR * rhs)
     IR * ir = allocIR(IR_ST);
     ST_idinfo(ir) = lhs;
     ST_rhs(ir) = rhs;
+
+    //Assign default alignment to 1 byte for ST operation with type ANY. In
+    //most programming languages and architectures, the default alignment for
+    //ST operations is 1 byte.
+    //Some reference materials: "Hindley-Milner (HM) type inference".
+    UINT const align_with_any = 1;
+    ST_align(ir) = type->is_any() ? align_with_any : m_tm->getByteSize(type);
     IR_dt(ir) = type;
     IR_parent(rhs) = ir;
     return ir;
@@ -1175,6 +1235,13 @@ IR * IRMgr::buildIStore(IR * base, IR * rhs, Type const* type)
     IR_dt(ir) = type;
     IST_base(ir) = base;
     IST_rhs(ir) = rhs;
+
+    //Assign default alignment to 1 byte for ST operation with type ANY. In
+    //most programming languages and architectures, the default alignment for
+    //ST operations is 1 byte.
+    //Some reference materials: "Hindley-Milner (HM) type inference".
+    UINT const align_with_any = 1;
+    IST_align(ir) = type->is_any() ? align_with_any : m_tm->getByteSize(type);
     IR_parent(base) = ir;
     IR_parent(rhs) = ir;
     return ir;
@@ -1847,10 +1914,21 @@ IR * IRMgr::buildCmp(IR_CODE irc, IR * lchild, IR * rchild)
         return buildCmp(irc, rchild, lchild);
     }
 
+    //For vector operations, the type of the result needs to be set
+    //to the bool type of the vector.
+    Type const* resty = m_tm->getSimplexTypeEx(D_B);
+    if (lchild->is_vec()) {
+        resty = m_tm->getVectorType(
+            lchild->getType()->getVectorElemNum(m_tm), D_B);
+    } else if (rchild->is_vec()) {
+        resty = m_tm->getVectorType(
+            rchild->getType()->getVectorElemNum(m_tm), D_B);
+    }
+
     IR * ir = allocIR(irc);
     BIN_opnd0(ir) = lchild;
     BIN_opnd1(ir) = rchild;
-    IR_dt(ir) = m_tm->getSimplexTypeEx(D_B);
+    IR_dt(ir) = resty;
     IR_parent(lchild) = ir;
     IR_parent(rchild) = ir;
     return ir;
@@ -1891,11 +1969,22 @@ IR * IRMgr::buildBinaryOpSimp(
     ASSERT0(lchild && rchild && lchild->is_exp() && rchild->is_exp());
     ASSERT0(checkLogicalOp(irc, type, m_tm));
     IR * ir = allocIR(irc);
+    BIN_is_sat(ir) = false;
     BIN_opnd0(ir) = lchild;
     BIN_opnd1(ir) = rchild;
     IR_parent(lchild) = ir;
     IR_parent(rchild) = ir;
     IR_dt(ir) = type;
+    return ir;
+}
+
+
+IR * IRMgr::buildRecipOp(IR * den, Type const* ty)
+{
+    ASSERT0(ty && den);
+    IR * num = ty->is_fp() ?
+        buildImmFP(HOST_FP(1), ty) : buildImmInt(1, ty);
+    IR * ir = buildBinaryOpSimp(IR_DIV, ty, num, den);
     return ir;
 }
 
@@ -2104,6 +2193,27 @@ bool IRMgr::verifyWhenFreeIR(IR const* ir, Region const* rg)
     ASSERT0(ir && rg && !ir->is_undef());
     ASSERT0(verifyGVNExistenceWhenFreeIR(ir, rg));
     return true;
+}
+
+
+bool IRMgr::isConstOne(IR const* ir)
+{
+    if (!ir->is_const()) { return false; }
+    if (ir->is_int()) {
+        return CONST_int_val(ir) == HOST_INT(1);
+    }
+    if (ir->is_fp()) {
+        return xcom::Float::isApproEq(
+                (PRECISION_TYPE)CONST_fp_val(ir), (PRECISION_TYPE)1.0);
+    }
+    return false;
+}
+
+
+IR * IRMgr::getMoveSrcPr(IR const* mov) const
+{
+    ASSERT0(mov && isMoveOp(mov));
+    return mov->getRHS();
 }
 
 } //namespace xoc

@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "comopt.h"
 #include "liveness_mgr.h"
 
 namespace xoc {
@@ -711,10 +712,14 @@ void LivenessMgr::eliminateRedundantLiveness(IRCFG const* cfg)
     UINT count = 0;
     bool change = false;
     UINT entry_id = cfg->getEntry()->id();
-    LiveSet entry_use, entry_def, redundant_live;
+    LiveSet entry_use, entry_def, old_livein, old_liveout, redundant_live;
 
     //The livein of entry_id is the full set of redundant live.
-    redundant_live.copy(*get_livein(cfg->getEntry()->id()), auxmgr.getSBSMgr());
+    redundant_live.copy(*get_livein(entry_id), auxmgr.getSBSMgr());
+
+    //Record the original livein and liveout info of entry BB.
+    old_livein.copy(*get_livein(entry_id), auxmgr.getSBSMgr());
+    old_liveout.copy(*get_liveout(entry_id), auxmgr.getSBSMgr());
 
     //Re-compute livein and liveout of entry_bb.
     entry_use.copy(*get_use(entry_id), auxmgr.getSBSMgr());
@@ -722,14 +727,17 @@ void LivenessMgr::eliminateRedundantLiveness(IRCFG const* cfg)
 
     //livein(new) = livein(old) intersect 'use info'.
     //e.g: [23] = [20, 23] intersect [23].
-    entry_use.intersect(*get_livein(entry_id), auxmgr.getSBSMgr());
+    entry_use.intersect(old_livein, auxmgr.getSBSMgr());
     //liveout(new) = liveout(old) intersect 'def info'.
     //e.g: [25] = [20, 25] intersect [24, 25].
-    entry_def.intersect(*get_liveout(entry_id), auxmgr.getSBSMgr());
+    entry_def.intersect(old_liveout, auxmgr.getSBSMgr());
 
     //Reset liveness info of entry bb.
     get_livein(entry_id)->copy(entry_use, m_sbs_mgr);
     get_liveout(entry_id)->copy(entry_def, m_sbs_mgr);
+
+    //Handle parameters info in the liveness of entry BB.
+    handleParamInfoInEntryBB(old_livein, old_liveout, auxmgr,entry_id);
 
     //Compute new livein and new liveout.
     do {
@@ -743,7 +751,47 @@ void LivenessMgr::eliminateRedundantLiveness(IRCFG const* cfg)
 
     entry_use.clean(auxmgr.getSBSMgr());
     entry_def.clean(auxmgr.getSBSMgr());
+    old_livein.clean(auxmgr.getSBSMgr());
+    old_liveout.clean(auxmgr.getSBSMgr());
     redundant_live.clean(auxmgr.getSBSMgr());
+}
+
+
+void LivenessMgr::handleParamInfoInEntryBB(LiveSet & old_livein,
+    LiveSet & old_liveout, AuxLivenessMgr & auxmgr, UINT entry_id)
+{
+    #ifdef REF_TARGMACH_INFO
+    //Handle parameters info in the liveness of entry BB. Though parameters
+    //defined in outside region, they will be treated normally like other info.
+    //The prno of parameters should be added into the livein of entry BB if
+    //there is USE position in the whole region. And the liveout of entry BB
+    //will contains the prno of parameters if there is USE position in other BB.
+    //e.g:
+    //  -- entry BB --
+    //  LIVE-IN: [param_info]  <- USE position exists in entry BB or other BB.
+    //  LIVE-OUT: [param_info] <- USE position exists in other BB.
+    //  DEF:
+    //  USE:
+
+    ArgPasser * argpass =
+        (ArgPasser*)m_rg->getPassMgr()->queryPass(PASS_ARGPASSER);
+    if (argpass == nullptr) {
+        //There is no information about how to pass parameters through PR.
+        return;
+    }
+
+    //Get param prno info from ArgPasser.
+    DefSBitSetCore const& param_prno_set = argpass->getParamPrno();
+
+    //There is no need to contain param prno info if they
+    //do not exist in the 'old_livein' and 'old_liveout'.
+    old_livein.intersect(param_prno_set, auxmgr.getSBSMgr());
+    old_liveout.intersect(param_prno_set, auxmgr.getSBSMgr());
+
+    //Add param prno into the livein and liveout of entry BB.
+    get_livein(entry_id)->bunion(old_livein, m_sbs_mgr);
+    get_liveout(entry_id)->bunion(old_liveout, m_sbs_mgr);
+    #endif
 }
 
 

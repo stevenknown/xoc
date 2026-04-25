@@ -41,24 +41,20 @@ namespace xoc {
 //
 TargInfoHandler::TargInfoHandler(Region * rg) : Pass(rg)
 {
-    m_lsra = nullptr;
+    m_ramgr = nullptr;
     m_passmgr = m_rg->getPassMgr();
 }
 
 
-TargInfoHandler::~TargInfoHandler()
-{
-}
 
-
-LinearScanRA * TargInfoHandler::queryLSRA()
+RegAllocMgr * TargInfoHandler::queryRegAllocMgr()
 {
     #ifdef REF_TARGMACH_INFO
-    if (m_lsra == nullptr) {
-        m_lsra = (LinearScanRA*)m_passmgr->queryPass(PASS_LINEAR_SCAN_RA);
+    if (m_ramgr == nullptr) {
+        m_ramgr = (RegAllocMgr*)m_passmgr->queryPass(PASS_REGALLOC_MGR);
     }
     #endif
-    return m_lsra;
+    return m_ramgr;
 }
 
 
@@ -68,18 +64,18 @@ void TargInfoHandler::tryCopyPhyRegIfAny(PRNO src, PRNO tgt)
         return;
     }
     #ifdef REF_TARGMACH_INFO
-    LinearScanRA * lsra = queryLSRA();
-    if (lsra == nullptr) { return; }
+    RegAllocMgr * ramgr = queryRegAllocMgr();
+    if (ramgr == nullptr) { return; }
 
     //If the original prno is pre-assigned and might have been bound to a
     //specific physical register, the newly created prno also needs to be bound
     //to this same physical register as well.
     //e.g: original PRNO is $1(with r1), the renamed PRNO should be $2(with r1
     //too).
-    xgen::Reg phyreg = lsra->getPreAssignedReg(src);
+    xgen::Reg phyreg = ramgr->getPreAssignedReg(src);
     if (phyreg != REG_UNDEF) {
-        ASSERT0(!lsra->isPreAssigned(tgt));
-        lsra->setPreAssignedReg(tgt, phyreg);
+        ASSERT0(!ramgr->isPreAssigned(tgt));
+        ramgr->setPreAssignedReg(tgt, phyreg);
     }
     #endif
 }

@@ -53,7 +53,7 @@ typedef enum {
 #define PREFIX_OF_CLABEL() ""
 #define POSTFIX_OF_CLABEL() ""
 #define PREFIX_OF_PRAGMA() "_PRAGMA"
-#define PREFIX_OF_ILABEL_IN_GR "_GR_"
+#define PREFIX_OF_ILABEL_IN_GR "_@GR_"
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
@@ -112,7 +112,7 @@ public:
         BYTE b1;
     } u2;
 public:
-    LabelInfo() {}
+    LabelInfo() { u2.b1 = 0; }
     void copy(LabelInfo const& li)
     {
         ltype = li.ltype;

@@ -39,6 +39,28 @@ public:
 };
 
 
+class Stmt2UseMgr {
+    COPY_CONSTRUCTOR(Stmt2UseMgr);
+public:
+    Region * m_rg;
+    typedef xcom::TMap<IR const*, IRSet*> IR2IRSet;
+    typedef xcom::TMapIter<IR const*, IRSet*> IR2IRSetIter;
+    IR2IRSet m_stmt2iruseset;
+    DefMiscBitSetMgr m_sbs_mgr;
+public:
+    IRSet * allocIRSet();
+    void recordUse(
+        OUT IRSet * is, MDSSAInfo const* info, MDSSAMgr const* mgr);
+public:
+    Stmt2UseMgr(Region * rg) { ASSERT0(rg); m_rg = rg; }
+    ~Stmt2UseMgr();
+    void copyUseSet(IR const* ir);
+
+    IRSet const* getIRSet(IR const* ir) const
+    { return m_stmt2iruseset.get(ir); }
+};
+
+
 class InsertGuardHelper {
     COPY_CONSTRUCTOR(InsertGuardHelper);
     bool m_usemdssa;
@@ -57,12 +79,15 @@ class InsertGuardHelper {
 private:
     LabelInfo const* addJumpEdge(IRBB * guard_start, IRBB * guard_end);
 
-    void chooseTargetBBOfGuard(LI<IRBB> const* li, IRCFG * cfg, IRBB * guard,
-                               OUT IRBB ** target, OUT LabelInfo const** lab);
+    void chooseTargetBBOfGuard(
+        LI<IRBB> const* li, IRCFG * cfg, IRBB * guard, OUT IRBB ** target,
+        OUT LabelInfo const** lab);
 
     //Return true if all USE expression of 'ir' have been move to guard-BB.
-    bool haveAllUseMoveToGuardBBInPRSSA(IR const* ir) const;
-    bool haveAllUseMoveToGuardBBInMDSSA(IR const* ir) const;
+    bool haveAllUseMoveToGuardBBInPRSSA(
+        IR const* ir, Stmt2UseMgr const& s2u) const;
+    bool haveAllUseMoveToGuardBBInMDSSA(
+        IR const* ir, Stmt2UseMgr const& s2u) const;
 
     //Return true if the determinate-expression of loop and related DU chain
     //are too complicated to analysz and recompute.
@@ -76,7 +101,7 @@ private:
     IRBB * insertGuardEnd(IRBB * guarded_bb, IRBB * next_to_guarded_bb);
 
     //Note DOM info must be valid.
-    void insertMDSSAPhiForGuardedStmt(IR * ir, DomTree const& domtree);
+    void insertMDPhiForGuardedStmtAtGuardEnd(IR * ir, DomTree const& domtree);
 
     //e.g:given guarded stmt in loop body is $15=...
     //  after moving to guarded BB, the layout will be:
@@ -86,21 +111,10 @@ private:
     //  $15=...     |
     //      \       |
     //       $45 phi=...
-    IR * insertPRSSAPhiForGuardedStmt(IR * ir);
+    IR * insertPhiForGuardedStmtAtGuardEnd(IR * ir);
 
-    //Replace the USE of original stmt to PHI.
-    //e.g:given guarded stmt in loop body is $15=...
-    //  after moving to guarded BB, the layout will be:
-    //       GuardBranchCondition
-    //      /       |
-    //  #GuardBB:   |
-    //  $15=...     |
-    //      \       |
-    //       $45 phi=...
-    //  Replace the USE of $15 to $45.
-    void replaceUseOfGuardedStmt(IR * guarded, IR * phi) const;
-    void reviseGuardDetPRSSA(LI<IRBB> const* li, IR * guard_br,
-                             IRBB * guard_end);
+    void reviseGuardDetPRSSA(
+        LI<IRBB> const* li, IR * guard_br, IRBB * guard_end);
 
     //Maintaining the DU chain of generated IR.
     void setSSALiveInDef(IR * exp, OptCtx const& oc)
@@ -115,8 +129,8 @@ private:
             exp, bb->getPrevIR(init_stmt), bb, m_rg, oc);
     }
 
-    void updateGuardDUChain(LI<IRBB> const* li, IR * guard_br,
-                            IRBB * guard_end, IR * loophead_br);
+    void updateGuardDUChain(
+        LI<IRBB> const* li, IR * guard_br, IRBB * guard_end, IR * loophead_br);
     bool useMDSSADU() const { return m_usemdssa; }
     bool usePRSSADU() const { return m_useprssa; }
 public:
@@ -165,7 +179,7 @@ public:
     //  $15=...     |
     //      \       |
     //       $45 phi=...
-    void insertPhiForGuardedBB(DomTree const& domtree);
+    void insertPhiForGuardedBB(DomTree const& domtree, Stmt2UseMgr const& s2u);
 
     //Return true if the determinate expression in guard will be too
     //complicated.

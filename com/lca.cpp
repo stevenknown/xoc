@@ -291,4 +291,41 @@ void BinLCA::dump(FILE * h) const
 }
 //END BinLCA
 
+
+//
+//START LCAOfSet
+//
+static VexIdx queryRecur(
+    Vertex const* t, DefSBitSet const& vexset, UINT vexsetnum,
+    OUT UINT * visited_vexnum)
+{
+    AdjVertexIter oit;
+    UINT t_vexnum = 0;
+    for (Vertex const* kid = Graph::get_first_out_vertex(t, oit);
+         kid != nullptr; kid = Graph::get_next_out_vertex(oit)) {
+        UINT kid_vexnum = 0;
+        VexIdx vidx = queryRecur(kid, vexset, vexsetnum, &kid_vexnum);
+        if (vidx != VERTEX_UNDEF) {
+            //Find LCA of all vertices in the 'vexset'.
+            return vidx;
+        }
+        t_vexnum += kid_vexnum;
+        if (t_vexnum == vexsetnum) { return t->id(); }
+    }
+    if (vexset.is_contain(t->id())) {
+        t_vexnum++;
+    }
+    *visited_vexnum = t_vexnum;
+    return VERTEX_UNDEF;
+}
+
+
+VexIdx LCAOfSet::query(DefSBitSet const& vexset) const
+{
+    UINT visited_vexnum = 0;
+    return queryRecur(
+        getTree()->getRoot(), vexset, vexset.get_elem_count(), &visited_vexnum);
+}
+//END LCAOfSet
+
 } //namespace xcom

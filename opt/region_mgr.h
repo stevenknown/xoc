@@ -64,12 +64,13 @@ protected:
 public:
     GenRegionTab() { m_sym2regions = nullptr; }
     RegionTab * createMapped(Sym const*);
+    void setSym2Regions(Sym2Regions * s2r) { m_sym2regions = s2r; }
 };
 
 typedef xcom::TMapIter<Sym const*, RegionTab*> Sym2RegionTabIter;
 typedef xcom::TMap<
-    Sym const*, RegionTab*, CompareKeyBase<Sym const*>,
-    GenRegionTab> Sym2RegionTab;
+    Sym const*, RegionTab*, CompareKeyBase<Sym const*>, GenRegionTab>
+    Sym2RegionTab;
 
 class Sym2Regions {
     friend class GenRegionTab;

@@ -203,6 +203,7 @@ public:
     void findByMDSSA();
     void findByPRSSA();
     void find();
+    OptCtx * getOptCtx() { return m_ivrctx.getOptCtx(); }
 };
 
 
@@ -262,7 +263,7 @@ bool FindBIVByChainRec::computeStepByMemOp(IR const* ir, OUT ChainRec & cr)
         //Step has already been assigned value.
         return false;
     }
-    CR_step(&cr).setToVar(ir->getMustRef(), ir->getType());
+    CR_step(&cr).setToVar(ir->getMustRef(), ir, ir->getType());
     return true;
 }
 
@@ -422,7 +423,7 @@ bool FindBIVByChainRec::computeCR(
         return true;
     }
     if (!is_valid_cr) { return false; }
-    if (xoc::isLoopInvariant(ir, m_li, m_rg, nullptr, true)) {
+    if (xoc::isLoopInvariant(ir, m_li, m_rg, nullptr, true, getOptCtx())) {
         if (ir->is_id()) {
             //There is no other real DEF to ir's MD. And ID should NOT be
             //regard as IV.
@@ -435,7 +436,7 @@ bool FindBIVByChainRec::computeCR(
         //ir is symbol constant.
         return computeStepByMemOp(ir, cr);
     }
-    IR const* def = xoc::findKillingDef(ir, m_rg);
+    IR const* def = xoc::findKillingDef(ir, m_rg, getOptCtx());
     if (def == nullptr) {
         //If ivocc is equal to 'ir', that means there are
         //multiple DEFs of ivocc in the loop. Otherwise, ir may have
@@ -472,7 +473,7 @@ bool FindBIVByChainRec::findBIVImpl(
     ASSERT0(init && step);
     IVVal val;
     if (init->isMemOpnd()) {
-        *initstmt = xoc::findKillingDef(init, m_rg);
+        *initstmt = xoc::findKillingDef(init, m_rg, getOptCtx());
         if (*initstmt == nullptr) { return false; }
         if (!m_ivr->computeInitVal(*initstmt, val)) { return false; }
     } else {
@@ -705,6 +706,8 @@ public:
     }
     //Find Basic IV.
     void find();
+    IVRCtx const& getIVRCtx() const { return m_ivrctx; }
+    OptCtx const* getOptCtx() const { return m_ivrctx.getOptCtx(); }
 };
 
 
@@ -729,7 +732,7 @@ IR const* FindBIVByRedOp::findInitStmtByMDSSA(
     if (opnd->isConstExp() || opnd->is_lda()) { return opnd; }
     ASSERTN(opnd->is_id(), ("phi opnd must be PR"));
     //Note if opnd's def is NULL, means it is region livein PR.
-    MDDef const* opnddef = m_mdssamgr->findKillingMDDef(opnd);
+    MDDef const* opnddef = m_mdssamgr->findKillingMDDef(opnd, getOptCtx());
     if (opnddef == nullptr || opnddef->is_phi()) { return nullptr; }
     return opnddef->getOcc();
 }
@@ -811,8 +814,8 @@ bool FindBIVByRedOp::findInitValByRedOp(
 {
     IR const* def = nullptr;
     ASSERT0(ir->isMemRef());
-    if (ir->isPROp() && usePRSSADU()) {
-        def = findInitStmtByPRSSA(ir, li);
+    if (ir->isPROp()) {
+        if (usePRSSADU()) { def = findInitStmtByPRSSA(ir, li); }
     } else if (useMDSSADU()) {
         def = findInitStmtByMDSSA(ir, li);
     } else {
@@ -849,7 +852,7 @@ bool FindBIVByRedOp::isReductionOpByMDSSA(
     if (op0->isMemRefNonPR()) { kdef0 = m_mdssamgr->findMustMDDef(op0); }
     if (kdef0 != nullptr && kdef0->is_phi() && kdef0->getBB() == head &&
         isRelateToMDPhiOpnd(ir, (MDPhi const*)kdef0) &&
-        m_ivr->canBeAddend(li, op1)) {
+        m_ivr->canBeAddend(li, op1, getIVRCtx())) {
         if (lr != nullptr) {
             lr->coeff = nullptr;
             lr->var_exp = op0;
@@ -862,7 +865,7 @@ bool FindBIVByRedOp::isReductionOpByMDSSA(
     if (op1->isMemRefNonPR()) { kdef1 = m_mdssamgr->findMustMDDef(op1); }
     if (kdef1 != nullptr && kdef1->is_phi() && kdef1->getBB() == head &&
         isRelateToMDPhiOpnd(ir, (MDPhi const*)kdef1) &&
-        m_ivr->canBeAddend(li, op0)) {
+        m_ivr->canBeAddend(li, op0, getIVRCtx())) {
         if (lr != nullptr) {
             lr->coeff = nullptr;
             lr->var_exp = op1;
@@ -906,7 +909,7 @@ bool FindBIVByRedOp::extractBIV(
     }
     IR const* addend = lr.addend;
     if (addend->is_int()) {
-        ASSERT0(m_ivr->canBeAddend(li, addend));
+        ASSERT0(m_ivr->canBeAddend(li, addend, getIVRCtx()));
     } else if (g_is_support_dynamic_type && addend->is_const()) {
         //TODO: support dynamic const type as the addend of ADD/SUB.
         dumpNotFindAddend(ctx, addend);
@@ -935,7 +938,7 @@ bool FindBIVByRedOp::isMultipleOfMD(
     if (ir->is_mul()) {
         //IVLinearRep of IV:a*i.
         if (isMDEqual(selfmd, BIN_opnd0(ir)) &&
-            m_ivr->canBeCoeff(li, BIN_opnd1(ir))) {
+            m_ivr->canBeCoeff(li, BIN_opnd1(ir), getIVRCtx())) {
             if (linrep != nullptr) {
                 linrep->coeff = BIN_opnd1(ir);
                 linrep->var_exp = BIN_opnd0(ir);
@@ -943,7 +946,7 @@ bool FindBIVByRedOp::isMultipleOfMD(
             return true;
         }
         if (isMDEqual(selfmd, BIN_opnd1(ir)) &&
-            m_ivr->canBeCoeff(li, BIN_opnd0(ir))) {
+            m_ivr->canBeCoeff(li, BIN_opnd0(ir), getIVRCtx())) {
             if (linrep != nullptr) {
                 linrep->coeff = BIN_opnd0(ir);
                 linrep->var_exp = BIN_opnd1(ir);
@@ -973,7 +976,7 @@ bool FindBIVByRedOp::isLinearRepOfMD(
     }
     //May be linear-rep that form is: a*i+b or b+a*i.
     if (isMultipleOfMD(li, BIN_opnd0(ir), selfmd, linrep) &&
-        m_ivr->canBeAddend(li, BIN_opnd1(ir))) {
+        m_ivr->canBeAddend(li, BIN_opnd1(ir), getIVRCtx())) {
         if (linrep != nullptr) {
             linrep->addend = BIN_opnd1(ir);
             linrep->addend_sign = ADDEND_SIGN_POS;
@@ -981,7 +984,7 @@ bool FindBIVByRedOp::isLinearRepOfMD(
         return true;
     }
     if (isMultipleOfMD(li, BIN_opnd1(ir), selfmd, linrep) &&
-        m_ivr->canBeAddend(li, BIN_opnd0(ir))) {
+        m_ivr->canBeAddend(li, BIN_opnd0(ir), getIVRCtx())) {
         if (linrep != nullptr) {
             linrep->addend = BIN_opnd0(ir);
             linrep->addend_sign = ADDEND_SIGN_POS;
@@ -1033,10 +1036,12 @@ bool FindBIVByRedOp::isReductionOpByPRSSA(
     IRBB const* head = li->getLoopHead();
     ASSERT0(head);
     IR const* kdef0 = nullptr;
-    if (op0->isMemRef()) { kdef0 = xoc::findKillingDef(op0, m_rg); }
+    if (op0->isMemRef()) {
+        kdef0 = xoc::findKillingDef(op0, m_rg, getOptCtx());
+    }
     if (kdef0 != nullptr && kdef0->is_phi() && kdef0->getBB() == head &&
         isRelateToPhiOpnd(ir, kdef0) &&
-        m_ivr->canBeAddend(li, op1)) {
+        m_ivr->canBeAddend(li, op1, getIVRCtx())) {
         if (lr != nullptr) {
             lr->coeff = nullptr;
             lr->var_exp = op0;
@@ -1046,10 +1051,12 @@ bool FindBIVByRedOp::isReductionOpByPRSSA(
         return true;
     }
     IR const* kdef1 = nullptr;
-    if (op1->isMemRef()) { kdef1 = xoc::findKillingDef(op1, m_rg); }
+    if (op1->isMemRef()) {
+        kdef1 = xoc::findKillingDef(op1, m_rg, getOptCtx());
+    }
     if (kdef1 != nullptr && kdef1->is_phi() && kdef1->getBB() == head &&
         isRelateToPhiOpnd(ir, kdef1) &&
-        m_ivr->canBeAddend(li, op0)) {
+        m_ivr->canBeAddend(li, op0, getIVRCtx())) {
         if (lr != nullptr) {
             lr->coeff = nullptr;
             lr->var_exp = op1;
@@ -1100,12 +1107,14 @@ bool FindBIVByRedOp::isReductionOp(
     //The coefficient and addend should be loop-invariant.
     ASSERT0(linrep.is_valid());
     if (!linrep.hasAddend() || linrep.getAddend()->is_const() ||
-        xoc::isLoopInvariant(linrep.getAddend(), li, m_rg, nullptr, true)) {
+        xoc::isLoopInvariant(
+            linrep.getAddend(), li, m_rg, nullptr, true, getOptCtx())) {
         ; //nothing to do
     } else { return false; }
 
     if (!linrep.hasCoeff() || linrep.getCoeff()->is_const() ||
-        xoc::isLoopInvariant(linrep.getCoeff(), li, m_rg, nullptr, true)) {
+        xoc::isLoopInvariant(
+            linrep.getCoeff(), li, m_rg, nullptr, true, getOptCtx())) {
         ; //nothing to do
     } else { return false; }
 
@@ -1208,6 +1217,7 @@ protected:
                     OUT IRSet & set);
 
     OptCtx const* getOptCtx() const { return m_ivrctx.getOptCtx(); }
+    IVRCtx const& getIVRCtx() const { return m_ivrctx; }
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -1242,13 +1252,14 @@ bool FindDIV::findByCRRecur(IR const* ir, OUT ChainRec & cr)
             cr.extractFrom(iv);
             return true;
         }
-        IR const* def = xoc::findKillingDef(ir, m_rg);
+        IR const* def = xoc::findKillingDef(ir, m_rg, getOptCtx());
         if (def == nullptr || def->is_phi() || def->isCallStmt()) {
             //TODO:call may be intrinsic stmt that can be reduction stmt.
             return false;
         }
         if (!m_li->isInsideLoop(def->getBB()->id())) {
-            if (xoc::isLoopInvariant(ir, m_li, m_rg, nullptr, true)) {
+            if (xoc::isLoopInvariant(
+                    ir, m_li, m_rg, nullptr, true, getOptCtx())) {
                 cr.extractFromLoopInvariant(ir, *m_crmgr);
                 m_crmgr->refine(cr);
                 return true;
@@ -1339,7 +1350,7 @@ bool FindDIV::findByLinRep(IR const* ir)
     ASSERT0(ir && ir->is_exp());
     IVLinearRep lr;
     xcom::StrBuf tmp(8);
-    if (!m_ivr->isLinearRepOfIV(m_li, ir, &lr)) {
+    if (!m_ivr->isLinearRepOfIV(m_li, ir, &lr, getIVRCtx())) {
         m_ivrctx.dumpAct(
             "FIND_DIV:%s in LOOP%u is not linear-rep of any IV",
             dumpIRName(ir, tmp), m_li->id());
@@ -1952,6 +1963,30 @@ CHAR const* IV::dump(VarMgr const* vm, OUT xcom::StrBuf & buf) const
     buf.strcat("expocc:(%s)", expvar->dump(tmp, vm));
     return buf.buf;
 }
+
+
+bool IV::isStepValImmut(Region const* rg) const
+{
+    if (isStepValConst()) { return true; }
+    if (isStepValExp()) {
+        ASSERT0(rg);
+        IR const* stepvalexp = getStepValExp();
+        ASSERT0(stepvalexp);
+        if (stepvalexp->isImmutExp()) { return true; }
+        if (stepvalexp->isVolatileOp(true)) { return false; }
+        if (xoc::isRegionLiveIn(stepvalexp, rg)) { return true; }
+        return false;
+    }
+    if (isStepValVar()) {
+        IR const* occ = getStepValMDOcc();
+        if (occ != nullptr && !occ->isVolatileOp(true) &&
+            xoc::isRegionLiveIn(occ, rg)) {
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
 //END IV
 
 
@@ -2053,7 +2088,7 @@ static bool verifyDIVList(IVR const* ivr, LI<IRBB> const* li)
 }
 
 
-static bool verifyBIV(BIV const* iv)
+static bool verifyBIV(BIV const* iv, Region const* rg)
 {
     ASSERT0(iv->is_biv());
     IR const* init = iv->getInitStmt();
@@ -2082,7 +2117,7 @@ static bool verifyBIV(BIV const* iv)
         //CASE:Exp Occ may be NULL if IV is DIV or IV's step is 0.
         //e.g:compile/ivr_div5.c
         //The IV is $16, however its reduce-exp-occ is NULL because
-        //the IV's step is 0.
+        //the IV's step-val is 0.
         //  BIV(STMTOCC:MD30,'$16')(EXPOCC:--)
         //    INIT-VAL:VAR:'s'(MD7)
         //    STEP-VAL:INT:0
@@ -2094,6 +2129,7 @@ static bool verifyBIV(BIV const* iv)
         //      stpr $15:mc<8> id:52
         //        ld:mc<8> 's' id:19 attachinfo:MDSSA
         //e.g2:lsra_bug.gr
+        //The IV step-val should be immutable expression:
         //  BIV(STMTOCC:MD6311,'$5895')(EXPOCC:--)
         //    INIT-VAL:EXP: lda:*<48> 'x'
         //    STEP-VAL:EXP: //stepval is immutable-exp.
@@ -2108,7 +2144,18 @@ static bool verifyBIV(BIV const* iv)
         //      stpr $5856:u64
         //        cvt:u64
         //          lda:*<48> 'x'
-        ASSERT0(iv->isStepValImmut());
+        //e.g3:ivr_invariant_step.gr
+        //The step-val expression might loop invariant expression:
+        //In the case, IV's step-val is 'add n+8', where 'n' is loop-invariant.
+        //However, we could not judge whether 'add n+8' is a loop-invariant
+        //expression here just through isStepValImmut(), and we believe the
+        //algorithm has detected the correct loop-invariant step-expression.
+        //Thus we just check whether the step is either normal expression or
+        //immutable-expression.
+        //e.g4:cfg_opt3_tramp.gr
+        //The step-val expression is region-livein expression, thus it is also
+        //the immutable-expression.
+        ASSERT0(iv->isStepValImmut(rg) || iv->isStepValExp());
 
         //NOTE:iv's step-value may be inferred by chain-recur-mgr, thus
         //the RHS of redstmt may be any kinds of IR exp.
@@ -2122,11 +2169,12 @@ static bool verifyBIVList(IVR const* ivr, LI<IRBB> const* li)
     ASSERT0(li);
     BIVList const* bivlst = ivr->getBIVList(li);
     if (bivlst == nullptr) { return true; }
+    Region const* rg = ivr->getRegion();
     for (BIVListIter it = bivlst->get_head();
          it != bivlst->end(); it = bivlst->get_next(it)) {
         BIV const* iv = it->val();
         ASSERT0(iv);
-        ASSERT0(verifyBIV(iv));
+        ASSERT0(verifyBIV(iv, rg));
     }
     return true;
 }
@@ -2491,16 +2539,17 @@ bool IVR::isIVForTree(IR const* ir, OUT IVList * ivlst) const
 
 
 //Return true if ir is coefficent of linear-representation.
-bool IVR::canBeCoeff(LI<IRBB> const* li, IR const* ir) const
+bool IVR::canBeCoeff(
+    LI<IRBB> const* li, IR const* ir, IVRCtx const& ctx) const
 {
-    return xoc::isLoopInvariant(ir, li, m_rg, nullptr, true);
+    return xoc::isLoopInvariant(ir, li, m_rg, nullptr, true, ctx.getOptCtx());
 }
 
 
 //Return true if ir is addend of linear-representation.
-bool IVR::canBeAddend(LI<IRBB> const* li, IR const* ir) const
+bool IVR::canBeAddend(LI<IRBB> const* li, IR const* ir, IVRCtx const& ctx) const
 {
-    return xoc::isLoopInvariant(ir, li, m_rg, nullptr, true);
+    return xoc::isLoopInvariant(ir, li, m_rg, nullptr, true, ctx.getOptCtx());
 }
 
 
@@ -2564,7 +2613,8 @@ bool IVR::isRelaxLinearRepOfIV(
 
 
 bool IVR::isMultipleOfIV(
-    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const
+    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep,
+    IVRCtx const& ctx) const
 {
     ASSERT0(ir->is_exp());
     IV const* iv = nullptr;
@@ -2579,7 +2629,7 @@ bool IVR::isMultipleOfIV(
     }
     if (ir->is_mul()) {
         if (isIV(li, BIN_opnd0(ir), &iv) &&
-            canBeCoeff(li, BIN_opnd1(ir))) {
+            canBeCoeff(li, BIN_opnd1(ir), ctx)) {
             if (linrep != nullptr) {
                 linrep->coeff = BIN_opnd1(ir);
                 linrep->var_exp = BIN_opnd0(ir);
@@ -2588,7 +2638,7 @@ bool IVR::isMultipleOfIV(
             return true;
         }
         if (isIV(li, BIN_opnd1(ir), &iv) &&
-            canBeCoeff(li, BIN_opnd0(ir))) {
+            canBeCoeff(li, BIN_opnd0(ir), ctx)) {
             if (linrep != nullptr) {
                 linrep->coeff = BIN_opnd0(ir);
                 linrep->var_exp = BIN_opnd1(ir);
@@ -2602,15 +2652,16 @@ bool IVR::isMultipleOfIV(
 
 
 bool IVR::isLinearRepOfIV(
-    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep) const
+    LI<IRBB> const* li, IR const* ir, OUT IVLinearRep * linrep,
+    IVRCtx const& ctx) const
 {
     ASSERT0(ir->is_exp());
     if (!ir->is_add() && !ir->is_sub()) {
         //May be linear-rep that form is: a*i.
-        return isMultipleOfIV(li, ir, linrep);
+        return isMultipleOfIV(li, ir, linrep, ctx);
     }
-    if (isMultipleOfIV(li, BIN_opnd0(ir), linrep) &&
-        canBeAddend(li, BIN_opnd1(ir))) {
+    if (isMultipleOfIV(li, BIN_opnd0(ir), linrep, ctx) &&
+        canBeAddend(li, BIN_opnd1(ir), ctx)) {
         //May be linear-rep that form is: a*i+b.
         if (linrep != nullptr) {
             ASSERT0(linrep->getIV());
@@ -2619,8 +2670,8 @@ bool IVR::isLinearRepOfIV(
         }
         return true;
     }
-    if (isMultipleOfIV(li, BIN_opnd1(ir), linrep) &&
-        canBeAddend(li, BIN_opnd0(ir))) {
+    if (isMultipleOfIV(li, BIN_opnd1(ir), linrep, ctx) &&
+        canBeAddend(li, BIN_opnd0(ir), ctx)) {
         //May be linear-rep that form is: b+a*i.
         if (linrep != nullptr) {
             ASSERT0(linrep->getIV());
@@ -2922,7 +2973,7 @@ bool IVR::computeConstValOfExp(IR const* exp, OUT HOST_INT & val) const
             //We know nothing about value of exp.
             return false;
         }
-        if (vn->getType() != VN_INT) {
+        if (vn->getKind() != VN_INT) {
             return false;
         }
         val = VN_int_val(vn);
@@ -2943,7 +2994,7 @@ bool IVR::computeConstInitValOfBIV(BIV const* biv, OUT HOST_INT & val) const
             //We know nothing about initial value of IV.
             return false;
         }
-        if (vn->getType() != VN_INT) {
+        if (vn->getKind() != VN_INT) {
             return false;
         }
         val = VN_int_val(vn);

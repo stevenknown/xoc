@@ -226,6 +226,9 @@ public:
 
     //Record the Exit BB here.
     virtual void computeExitList();
+
+    //Clean the Exit flag.
+    void cleanExitList();
     void cloneLab2BB(Lab2BB const& src);
     void clone(IRCFG const& src, bool clone_edge_info, bool clone_vex_info);
     void computeDomAndIdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
@@ -284,7 +287,7 @@ public:
         dumpSubGraph(bs, ctx);
     }
     void dumpDomSet() const;
-    void dumpDomTree() const { CFG<IRBB, IR>::dumpDomTree(m_rg, true, false); }
+    void dumpDomTree() const;
     void dumpPDomTree() const
     { CFG<IRBB, IR>::dumpDomTree(m_rg, false, true); }
     void dumpLoopInfo() const { CFG<IRBB, IR>::dumpLoopInfo(m_rg); }
@@ -300,6 +303,12 @@ public:
         OUT xcom::BitSet & ehbbs);
     void findTryRegion(IRBB const* try_start, OUT xcom::BitSet & ehbbs);
     void findAllTryRegions(OUT xcom::BitSet & trybbs);
+
+    //Return true if ir has an unique branch target, and records the
+    //target BB's label in 'tgtlab'.
+    //e.g: igoto case 0xA,_L1_;
+    //     the function returns true and 'tgtlab' is _L1_.
+    static bool hasUniqueBranchTarget(IR const* ir, LabelInfo const** tgtlab);
 
     //Allocate and initialize control flow graph.
     void initCFG(OptCtx & oc);
@@ -342,17 +351,17 @@ public:
         IRBB const* from, IRBB * to, IRBB * newbb, OUT CfgOptCtx & ctx);
 
     //Return the first operation of 'bb'.
-    IR * get_first_xr(IRBB * bb)
+    IR * get_first_xr(IRBB const* bb)
     {
         ASSERT0(bb);
-        return BB_first_ir(bb);
+        return BB_first_ir(const_cast<IRBB*>(bb));
     }
 
     //Return the last operation of 'bb'.
-    IR * get_last_xr(IRBB * bb)
+    IR * get_last_xr(IRBB const* bb)
     {
         ASSERT0(bb);
-        return BB_last_ir(bb);
+        return BB_last_ir(const_cast<IRBB*>(bb));
     }
     UINT getNumOfBB() const
     { return const_cast<IRCFG*>(this)->getBBList()->get_elem_count(); }
@@ -375,7 +384,10 @@ public:
     //is_pred: set to true if 'pred' is one of predecessor of 'vex',
     //         otherwise set false.
     UINT WhichPred(IRBB const* pred, IRBB const* bb, OUT bool & is_pred) const
-    { return Graph::WhichPred(pred->id(), bb->getVex(), is_pred); }
+    {
+        ASSERT0(pred && bb);
+        return Graph::WhichPred(pred->id(), bb->getVex(), is_pred);
+    }
 
     //Note maintain DomInfo may be costly.
     virtual void removeDomInfo(C<IRBB*> * bbct, MOD CfgOptCtx & ctx);

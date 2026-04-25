@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "../../opt/cominc.h"
+#include "../../opt/comopt.h"
 #include "ex1.h"
 
 static void generate_region(RegionMgr * rm)
@@ -147,6 +148,7 @@ int main(int argc, char * argv[])
 {
     RegionMgr * rm = new RegionMgr();
     rm->getLogMgr()->init("ex.tmp", true);
+    rm->initTypeMgr();
     rm->initVarMgr();
 
     printf("\nGENERATE REGION");

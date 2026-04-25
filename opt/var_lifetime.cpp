@@ -44,9 +44,9 @@ static void dumpRangeVec(RangeVec const& rv, Region const* rg)
 
 
 //in_lt: true if ir is part of a lifetime.
-static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
-                          Pos dpos, Pos upos, LinearScanRA const& ra,
-                          ConstIRIter & irit)
+static void dumpStmtUsage(
+    Region * rg, RegAllocMgr const* ramgr, IR const* ir, bool in_lt, Pos dpos,
+    Pos upos, ConstIRIter & irit)
 {
     ASSERT0(ir);
     note(rg, "\n");
@@ -56,7 +56,7 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
     } else {
         prt(rg, "[?] ");
     }
-    if (ra.isSpillOp(ir)) {
+    if (ramgr != nullptr && ramgr->isSpillOp(ir)) {
         Var const* v = ir->getIdinfo();
         ASSERT0(v);
         prt(rg, "V%u,%s", v->id(), v->get_name()->getStr());
@@ -65,21 +65,21 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
     }
 
     prt(rg, " <-- ");
-    if (!in_lt) {
+    if (!in_lt && ramgr != nullptr) {
         ASSERT0(0);
-        ASSERT0(ra.isOpInPosGap(ir));
+        ASSERT0(ramgr->isOpInPosGap(ir));
         CHAR const* role = nullptr;
-        if (ra.isSpillOp(ir)) { role = "spill"; }
-        else if (ra.isReloadOp(ir)) { role = "reload"; }
-        else if (ra.isRematOp(ir)) { role = "remat"; }
-        else if (ra.isMoveOp(ir)) { role = "move"; }
+        if (ramgr->isSpillOp(ir)) { role = "spill"; }
+        else if (ramgr->isReloadOp(ir)) { role = "reload"; }
+        else if (ramgr->isRematOp(ir)) { role = "remat"; }
+        else if (ramgr->isMoveOp(ir)) { role = "move"; }
         else { UNREACHABLE(); }
         prt(rg, "%s == ", role);
     }
 
     //Dump RHS.
-    if (ra.isReloadOp(ir)) {
-        Var const* v = ir->getRHS()->getIdinfo();
+    if (ramgr != nullptr && ramgr->isReloadOp(ir)) {
+        Var const* v = ramgr->getReloadLoc(ir);
         ASSERT0(v);
         prt(rg, "V%u,%s", v->id(), v->get_name()->getStr());
     } else {
@@ -90,52 +90,6 @@ static void dumpStmtUsage(IR const* ir, Region const* rg, bool in_lt,
         prt(rg, " [%u]", upos);
     } else {
         prt(rg, " [?]");
-    }
-}
-
-
-static void dumpVarOverView(Region const* rg, BBList const* bblst,
-                            bool dumpir, VarUpdatePos & up)
-{
-    note(rg, "\n==-- DUMP %s --==", "Var OverView");
-    Pos dpos_start, upos_start;
-    bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
-    if (valid) {
-        note(rg, "\n[%u] RegionExposedDef <= -- [%u]", dpos_start, upos_start);
-    }
-    BBListIter bbit;
-    ConstIRIter irit;
-    for (IRBB * bb = bblst->get_head(&bbit);
-         bb != nullptr; bb = bblst->get_next(&bbit)) {
-        BBIRList & irlst = bb->getIRList();
-        BBIRListIter bbirit;
-        bb->dumpDigest(rg);
-        Pos dpos_bb_start, upos_bb_start;
-        if (up.updateAtBBEntry(dpos_bb_start, upos_bb_start)) {
-            note(rg, "\n[%u] ExposedDef <= -- [%u]",
-                 dpos_bb_start, upos_bb_start);
-        }
-        for (IR * ir = irlst.get_head(&bbirit);
-             ir != nullptr; ir = irlst.get_next(&bbirit)) {
-            Pos upos, dpos;
-            bool in_lt = up.updateAtIR(ir, dpos, upos);
-            dumpStmtUsage(ir, rg, in_lt, dpos, upos, *up.getRA(), irit);
-            if (dumpir) {
-                rg->getLogMgr()->incIndent(4);
-                xoc::dumpIR(ir, rg);
-                rg->getLogMgr()->decIndent(4);
-            }
-        }
-        Pos dpos_bb_end, upos_bb_end;
-        if (up.updateAtBBExit(dpos_bb_end, upos_bb_end)) {
-            note(rg, "\n[%u] -- <= ExposedUse [%u]", dpos_bb_end, upos_bb_end);
-        }
-        note(rg, "\n");
-    }
-    Pos dpos_end, upos_end;
-    bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
-    if (valid2) {
-        note(rg, "\n[%u] RegionExposedUse <= -- [%u]", dpos_end, upos_end);
     }
 }
 
@@ -194,12 +148,62 @@ bool VarLifeTime::isIntersect(RangeVec const* rv1, RangeVec const* rv2)
 //
 //START VarLifeTimeMgr
 //
+void VarLifeTimeMgr::dumpVarOverView(RegAllocMgr const* ramgr,
+    bool dumpir) const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(m_rg, "\n==-- DUMP %s --==", "Var OverView");
+    VarUpdatePos up(ramgr);
+    BBList const* bblst = m_rg->getBBList();
+    Pos dpos_start, upos_start;
+    bool valid = up.updateAtRegionEntry(dpos_start, upos_start);
+    if (valid) {
+        note(m_rg, "\n[%u] RegionExposedDef <= -- [%u]", dpos_start,
+            upos_start);
+    }
+    BBListIter bbit;
+    ConstIRIter irit;
+    for (IRBB * bb = bblst->get_head(&bbit);
+         bb != nullptr; bb = bblst->get_next(&bbit)) {
+        BBIRList & irlst = bb->getIRList();
+        BBIRListIter bbirit;
+        bb->dumpDigest(m_rg);
+        Pos dpos_bb_start, upos_bb_start;
+        if (up.updateAtBBEntry(dpos_bb_start, upos_bb_start)) {
+            note(m_rg, "\n[%u] ExposedDef <= -- [%u]",
+                 dpos_bb_start, upos_bb_start);
+        }
+        for (IR * ir = irlst.get_head(&bbirit);
+             ir != nullptr; ir = irlst.get_next(&bbirit)) {
+            Pos upos, dpos;
+            bool in_lt = up.updateAtIR(ir, dpos, upos);
+            dumpStmtUsage(m_rg, ramgr, ir, in_lt, dpos, upos, irit);
+            if (dumpir) {
+                m_rg->getLogMgr()->incIndent(4);
+                xoc::dumpIR(ir, m_rg);
+                m_rg->getLogMgr()->decIndent(4);
+            }
+        }
+        Pos dpos_bb_end, upos_bb_end;
+        if (up.updateAtBBExit(dpos_bb_end, upos_bb_end)) {
+            note(m_rg, "\n[%u] -- <= ExposedUse [%u]", dpos_bb_end,
+                upos_bb_end);
+        }
+        note(m_rg, "\n");
+    }
+    Pos dpos_end, upos_end;
+    bool valid2 = up.updateAtRegionExit(dpos_end, upos_end);
+    if (valid2) {
+        note(m_rg, "\n[%u] RegionExposedUse <= -- [%u]", dpos_end, upos_end);
+    }
+}
+
+
 void VarLifeTimeMgr::dump() const
 {
+    if (!m_rg->isLogMgrInit()) { return; }
     m_lt_list.dump(m_rg);
-    BBList const* bblst = m_rg->getBBList();
-    VarUpdatePos up(&const_cast<VarLifeTimeMgr*>(this)->getLSRA());
-    dumpVarOverView(m_rg, bblst, false, up);
+    dumpVarOverView(nullptr, false);
 }
 
 
@@ -286,12 +290,40 @@ void VarLifeTimeMgr::computeLifeTimeStmt(IR * ir, Pos dpos, Pos upos,
 }
 
 
+Var const* VarLifeTimeMgr::getIdinfoNeedToComputeLHS(IR const* ir) const
+{
+    ASSERT0(ir);
+    if (!ir->hasIdinfo()) { return nullptr; }
+    return ir->getIdinfo();
+}
+
+
+Var const* VarLifeTimeMgr::getIdinfoNeedToComputeRHS(IR const* ir) const
+{
+    ASSERT0(ir);
+    if (!ir->hasRHS()) { return nullptr; }
+    IR const* rhs = ir->getRHS();
+    if (rhs->hasIdinfo()) { return rhs->getIdinfo(); }
+
+    //Find var info from all the kids of RHS.
+    for (UINT i = 0; i < IR_MAX_KID_NUM(rhs); i++) {
+        IR const* kid = rhs->getKid(i);
+        if (kid != nullptr) {
+            //Only return the first var for reload op by now.
+            if (kid->hasIdinfo()) { return kid->getIdinfo(); }
+        }
+    }
+
+    return nullptr;
+}
+
+
 void VarLifeTimeMgr::computeStmtLHS(IR * ir, Pos pos)
 {
     ASSERT0(ir && ir->is_stmt());
-    if (!isNeedComputeLHS(ir)) { return; }
-    Var const* v = ir->getIdinfo();
-    ASSERT0(v);
+
+    Var const* v = getIdinfoNeedToComputeLHS(ir);
+    if (v == nullptr) { return; }
     VarLifeTime * var_lt = genLifeTime(v->id());
     var_lt->addRange(pos);
 }
@@ -300,9 +332,9 @@ void VarLifeTimeMgr::computeStmtLHS(IR * ir, Pos pos)
 void VarLifeTimeMgr::computeStmtRHS(IR * ir, Pos pos, Pos livein_def)
 {
     ASSERT0(ir && ir->is_stmt());
-    if (!isNeedComputeRHS(ir)) { return; }
-    Var const* v = ir->getRHS()->getIdinfo();
-    ASSERT0(v);
+
+    Var const* v = getIdinfoNeedToComputeRHS(ir);
+    if (v == nullptr) { return; }
     VarLifeTime * var_lt = genLifeTime(v->id());
     Range r = var_lt->getLastRange();
     if (r.start() == POS_UNDEF) {
@@ -313,18 +345,6 @@ void VarLifeTimeMgr::computeStmtRHS(IR * ir, Pos pos, Pos livein_def)
         RG_end(r) = pos;
     }
     var_lt->setLastRange(r);
-}
-
-
-bool VarLifeTimeMgr::isNeedComputeLHS(IR const* ir) const
-{
-    return getLSRA().isSpillOp(ir);
-}
-
-
-bool VarLifeTimeMgr::isNeedComputeRHS(IR const* ir) const
-{
-    return getLSRA().isReloadOp(ir);
 }
 //END VarLifeTimeMgr
 

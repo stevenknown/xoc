@@ -176,6 +176,8 @@ protected:
         IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
         OUT LinearRep & reslr, OUT LRInferCtx & ctx);
 
+    OptCtx const& getOptCtx() const { return m_oc; }
+
     //Return true if the operation of two linear-rep still be linear-rep.
     //e.g:given two linear-rep: a*x+b, c*x+d, the ADD operation of them is
     //(a+c)*x+(b+d) which still be linear-rep.

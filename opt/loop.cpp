@@ -50,8 +50,8 @@ class InsertPhiHelper {
     MDSystem * m_mdsys;
     Vector<UINT> m_pred_order;
     Vector<UINT> m_pred_pos;
-    List<IR*> m_prssa_phis;
-    List<MDPhi*> m_mdssa_phis;
+    List<IR*> m_prssa_preheader_phis; //record the Phi list of preheader.
+    List<MDPhi*> m_mdssa_preheader_phis; //record the MDPhi list of preheader.
     PassCtx m_passctx;
 private:
     void dumpOrder() const;
@@ -65,7 +65,11 @@ private:
 
     void makePRSSAPhiForPreheader(IRBB const* head);
     void makeMDSSAPhiForPreheader(IRBB * head);
+
+    //Make Phi for preheader according to loophead's Phi.
     void makePRSSAPhi(IR const* phi);
+
+    //Make MDPhi for preheader according to loophead's MDPhi.
     void makeMDSSAPhi(MDPhi const* phi);
 
     void replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos);
@@ -84,7 +88,7 @@ public:
         m_mdsys = m_rg->getMDSystem();
     }
 
-    void insertPhiAtPreheader(IRBB * preheader);
+    void insertPhiAtPreheaderAndRevisePhiAtLoophead(IRBB * preheader);
     void dump() const;
     bool preparePhiForPreheader();
     bool verify() const;
@@ -95,14 +99,14 @@ bool InsertPhiHelper::verifyPhi() const
 {
     UINT pred_num = m_pred_order.get_elem_count();
     List<IR*>::Iter it1;
-    for (IR const* ir = m_prssa_phis.get_head(&it1);
-         ir != nullptr; ir = m_prssa_phis.get_next(&it1)) {
+    for (IR const* ir = m_prssa_preheader_phis.get_head(&it1);
+         ir != nullptr; ir = m_prssa_preheader_phis.get_next(&it1)) {
         UINT opnd_num = xcom::cnt_list(PHI_opnd_list(ir));
         ASSERT0(opnd_num == pred_num);
     }
     List<MDPhi*>::Iter it2;
-    for (MDPhi const* phi = m_mdssa_phis.get_head(&it2);
-         phi != nullptr; phi = m_mdssa_phis.get_next(&it2)) {
+    for (MDPhi const* phi = m_mdssa_preheader_phis.get_head(&it2);
+         phi != nullptr; phi = m_mdssa_preheader_phis.get_next(&it2)) {
         UINT opnd_num = xcom::cnt_list(phi->getOpndList());
         ASSERT0(opnd_num == pred_num);
     }
@@ -135,15 +139,15 @@ void InsertPhiHelper::dumpOrder() const
 void InsertPhiHelper::dumpPhi() const
 {
     List<IR*>::Iter it;
-    for (IR * ir = m_prssa_phis.get_head(&it); ir != nullptr;
-         ir = m_prssa_phis.get_next(&it)) {
+    for (IR * ir = m_prssa_preheader_phis.get_head(&it); ir != nullptr;
+         ir = m_prssa_preheader_phis.get_next(&it)) {
         dumpIR(ir, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_KID));
     }
 
     note(getRegion(), "\n");
     C<MDPhi*> * it2;
-    for (MDPhi * phi = m_mdssa_phis.get_head(&it2); phi != nullptr;
-         phi = m_mdssa_phis.get_next(&it2)) {
+    for (MDPhi * phi = m_mdssa_preheader_phis.get_head(&it2); phi != nullptr;
+         phi = m_mdssa_preheader_phis.get_next(&it2)) {
         phi->dump(m_rg, m_mdssamgr->getUseDefMgr());
     }
 }
@@ -166,7 +170,7 @@ void InsertPhiHelper::dump() const
 
 //Return true if need to insert PHI into preheader if there are multiple
 //loop outside predecessor BB of loophead, whereas loophead has PHI.
-//e.g: If insert a preheader before BB_loophead, one have to insert PHI at
+//e.g: If insert a preheader before BB_loophead, you have to insert PHI at
 //     preheader if loophead has PHI.
 //   BB_2---
 //   |     |
@@ -236,11 +240,11 @@ void InsertPhiHelper::makeMDSSAPhi(MDPhi const* phi)
     ASSERT0(c == m_pred_pos.get_elem_count());
 
     //Generate new PHI.
-    //Note BB of MDPhi have to be set at insertPhiAtPreheader() after
-    //preheader generated.
+    //Note BB of MDPhi have to be set at
+    //insertPhiAtPreheaderAndRevisePhiAtLoophead() after preheader generated.
     MDPhi * newphi = m_mdssamgr->genMDPhi(
         phi->getResult()->mdid(), new_opnd_list, nullptr);
-    m_mdssa_phis.append_tail(newphi);
+    m_mdssa_preheader_phis.append_tail(newphi);
 }
 
 
@@ -252,7 +256,7 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     IR * newphi = m_irmgr->buildPhi(
         m_irmgr->buildPrno(phi->getType()), phi->getType(), (IR*)nullptr);
     m_rg->getMDMgr()->allocRef(newphi);
-    m_prssa_phis.append_tail(newphi);
+    m_prssa_preheader_phis.append_tail(newphi);
     //BB_irlist(preheader).append_head(phi);
     IR * new_opnd_list = nullptr;
     IR * last = nullptr;
@@ -305,8 +309,8 @@ void InsertPhiHelper::insertPRSSAPhi(IRBB * preheader)
 {
     List<IR*>::Iter it;
     BBIRList & irlst = preheader->getIRList();
-    for (IR * phi = m_prssa_phis.get_tail(&it);
-         phi != nullptr; phi = m_prssa_phis.get_prev(&it)) {
+    for (IR * phi = m_prssa_preheader_phis.get_tail(&it);
+         phi != nullptr; phi = m_prssa_preheader_phis.get_prev(&it)) {
         irlst.append_head(phi);
     }
 }
@@ -316,8 +320,8 @@ void InsertPhiHelper::insertMDSSAPhi(IRBB * preheader)
 {
     C<MDPhi*> * it;
     MDPhiList * philst = m_mdssamgr->genPhiList(preheader->id());
-    for (MDPhi * phi = m_mdssa_phis.get_tail(&it);
-         phi != nullptr; phi = m_mdssa_phis.get_prev(&it)) {
+    for (MDPhi * phi = m_mdssa_preheader_phis.get_tail(&it);
+         phi != nullptr; phi = m_mdssa_preheader_phis.get_prev(&it)) {
         philst->append_head(phi);
     }
 }
@@ -353,8 +357,8 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
     BBIRList const& lhirlst = loophead->getIRList();
     BBIRList const& preirlst = preheader->getIRList();
     IR * ir_pre = preirlst.get_head(&itpre);
-    for (IR * ir_lh = lhirlst.get_head(&itlh); ir_lh != nullptr;
-         ir_lh = lhirlst.get_next(&itlh),
+    for (IR * ir_lh = lhirlst.get_head(&itlh);
+         ir_lh != nullptr; ir_lh = lhirlst.get_next(&itlh),
          ir_pre = preirlst.get_next(&itpre)) {
         if (!ir_lh->is_phi()) { break; }
         ASSERT0(ir_pre);
@@ -376,7 +380,8 @@ void InsertPhiHelper::replacePRSSASuccOpnd(IRBB * preheader, UINT prehead_pos)
 
 
 //The new PHI will be inserted to preheader.
-void InsertPhiHelper::insertPhiAtPreheader(IRBB * preheader)
+void InsertPhiHelper::insertPhiAtPreheaderAndRevisePhiAtLoophead(
+    IRBB * preheader)
 {
     IRBB * loophead = m_li->getLoopHead();
     bool is_pred;
@@ -441,9 +446,10 @@ bool findTwoSuccessorBBOfLoopHeader(
 
 
 //Append GOTO to 'from' BB, in order to it can jump to 'to' BB.
-static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
+static IR * tryAppendGotoToJumpToBB(LI<IRBB> const* li, IRBB * from, IRBB * to,
+    Region * rg, OptCtx * oc)
 {
-    ASSERT0(from && to && rg);
+    ASSERT0(li && from && to && rg);
     IR const* last = from->getLastIR();
     if (last == nullptr || !IRBB::isLowerBoundary(last)) {
         //CASE:'from' is fallthrough to 'to'.
@@ -458,9 +464,116 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
         from->getIRList().append_tail(gotoir);
         return gotoir;
     }
-    if (last->isUnconditionalBr() || last->isConditionalBr()) {
-        ASSERTN(last->getLabel() && to->hasLabel(last->getLabel()),
-                ("There is not any valid label can be used as a target"));
+
+    if (last->isConditionalBr()) {
+        ASSERT0(from->is_fallthrough());
+        LabelInfo const* label = last->getLabel();
+        if (label != nullptr && to->hasLabel(label)) {
+            //CASE: It is not need to insert the goto IR if the 'to' BB is the
+            //  jump target of 'from' BB.
+            //  BB0 is the 'from' BB, and the last IR of BB0 goes to label0.
+            //  BB1 is the BB fall through from BB0.
+            //  BB2 is the 'to' BB with label0.
+            //  BB3 is the preheader BB.
+            //
+            //e.g:
+            //  BB0
+            //    ...
+            //    condbr label0 ---  ==> last IR of BB0
+            //   |                |
+            //   | Fall Through   |
+            //   V                |
+            //  BB1               |
+            //   |                |
+            //   V                |
+            //  ...               |
+            //  BB3 --------------
+            //   | |
+            //   V V
+            //  BB2 label list: label0
+            //  NOTE: the edge BB0->BB2 doesn't need insert goto IR.
+            return nullptr;
+        }
+        //CASE: It is need to insert a tramp BB if the 'to' BB is not the
+        //  jump target of 'from' BB. Since the 'to' BB is falled through
+        //  from the 'from' BB, so we have to insert a tramp BB to jump
+        //  to the 'to' BB after the preheader BB is inserted before 'to' BB.
+        //  BB0 is the 'from' BB, and the last IR of BB0 goes to label0.
+        //  BB1 is the 'to' BB fall through from BB0 in original CFG.
+        //  BB2 is the BB with label0.
+        //  BB3 is the preheader BB.
+        //
+        //e.g:
+        //  Before insert the preheader:
+        //    BB0
+        //      ...
+        //      condbr label0  ==> last IR of BB0
+        //     |
+        //     | Fall Through
+        //     V
+        //    BB1
+        //     |
+        //     V
+        //    ...
+        //    BB2 label list: label0
+        //
+        //  After insert the preheader BB3:
+        //    BB0
+        //      ...
+        //      condbr label0  ==> last IR of BB0
+        //     |
+        //     | Fall Through
+        //     V
+        //    BB3
+        //     |
+        //     V
+        //    BB1
+        //     |
+        //     V
+        //    ...
+        //    BB2 label list: label0
+        //    NOTE: BB3 is insert before BB1 in the BB list, which make BB3 is
+        //          can be fallen through from BB0, which is unexpected and
+        //          totally wrong.
+        //
+        //  After fixup by inserting tramp BB BB4:
+        //    BB0
+        //      ...
+        //      condbr label0  ==> last IR of BB0
+        //     |
+        //     | Fall Through
+        //     V
+        //    BB4 -----
+        //            |
+        //            |
+        //    BB3     |
+        //     |      |
+        //     V      |
+        //    BB1 <----
+        //     |
+        //     V
+        //    ...
+        //    BB2 label list: label0
+        //    NOTE: BB4 is inserted from BB0 to BB1 as the tramp BB to fixup
+        //          the error introduced by the perheader insertion.
+        IRBB * tramp = rg->getCFG()->changeFallthroughBBToJumpBB(from, to, oc);
+        ASSERT0(tramp);
+        li->addBBToLoopAndAllOuterLoop(tramp->id());
+        return nullptr;
+    }
+
+    if (last->isUnconditionalBr()) {
+        //Note that: This 'ASSERT' is overly strict. The IR allows the label of
+        //the last IR in a BB to differ from that of its fallthrough BB. E.g.
+        //
+        //  BB0
+        //    ...
+        //    uncondbr label0  ==> last IR of BB0
+        //
+        //  BB1 label list: label1 label2
+        //
+        //ASSERTN(last->getLabel() && to->hasLabel(last->getLabel()),
+        //        ("There is not any valid label can be used as a target"));
         return nullptr;
     }
     UNREACHABLE();
@@ -473,7 +586,7 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 //the loop body BB must jump to head explicitly.
 //pred: predecessor of head which is inside loop body.
 static void fixupInnerLoopEdgeBetweenHeadAndPreheader(
-    LI<IRBB> const* li, Region * rg, IRBB * pred)
+    LI<IRBB> const* li, Region * rg, IRBB * pred, OptCtx * oc)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -522,7 +635,7 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(
         lab = rg->genILabel();
         cfg->addLabel(head, lab);
     }
-    tryAppendGotoToJumpToBB(pred, head, rg);
+    tryAppendGotoToJumpToBB(li, pred, head, rg, oc);
 }
 
 
@@ -547,6 +660,7 @@ static void updatePredAndPreheaderEdge(
 
 //Return true if the function matches the CASE and has completed the
 //processing procedure.
+//Note the function does not maintain DOM info and SSA info.
 static bool insertAndUpdateEdgeForCase1(
     IRBB * pred, IRBB * head, IRBB * preheader, bool inserted_by_cur_time,
     IRCFG * cfg, OptCtx * oc)
@@ -607,6 +721,7 @@ static bool insertAndUpdateEdgeForCase2(
 
 //Return true if inserted a new BB.
 //insert_preheader: true if preheader has been inserted, otherwise do insertion.
+//Note the function does not maintain DOM info and SSA info.
 static void insertAndUpdateOutterLoopEdge(
     LI<IRBB> const* li, Region * rg, IRBB * pred, BBListIter head_it,
     IRBB * preheader, MOD LabelInfo const** preheader_lab,
@@ -667,6 +782,7 @@ static void insertAndUpdateOutterLoopEdge(
 //The function will insert 'preheader' and update all in-edges of loop-head.
 //Return true if inserted a new preheader, otherwise there is no loop-outside
 //BB.
+//Note the function does not maintain DOM info and SSA info.
 static bool insertAndUpdateEdge(
     LI<IRBB> const* li, Region * rg, BBListIter head_it, IRBB * preheader,
     OptCtx * oc)
@@ -681,7 +797,7 @@ static bool insertAndUpdateEdge(
         if (li->isInsideLoop(p->id())) {
             ASSERTN(preheader->getVex(),
                     ("vex should have been added before current function"));
-            fixupInnerLoopEdgeBetweenHeadAndPreheader(li, rg, p);
+            fixupInnerLoopEdgeBetweenHeadAndPreheader(li, rg, p, oc);
             continue;
         }
         insertAndUpdateOutterLoopEdge(
@@ -826,7 +942,10 @@ static IRBB * findAppropriatePreheader(
                 //  |      |
                 //  |      v
                 //   ---BB_end
-                ASSERT0(head->isTarget(last_ir_of_pred));
+                //Note that igoto has no labels.
+                ASSERT0(last_ir_of_pred->is_igoto() ||
+                        (last_ir_of_pred->is_goto() &&
+                         head->isTarget(last_ir_of_pred)));
                 if (appropriate_bb == nullptr && outsidebbnum <= 1) {
                     appropriate_bb = cfg->getBB(pred);
                 } else {
@@ -849,6 +968,7 @@ static IRBB * findAppropriatePreheader(
 }
 
 
+//Note the function does not maintain DOM info and SSA info.
 IRBB * findAndInsertPreheader(
     LI<IRBB> const* li, Region * rg, OUT bool & insert_bb, bool force,
     OptCtx * oc)
@@ -940,10 +1060,11 @@ static bool isRealMDDefInvariant(
 //the DEF's BB is inside the loop, because PHI is not real DEF.
 static bool isMDPhiInvariant(
     MDDef const* start, IR const* use, LI<IRBB> const* li,
-    InvStmtList const* invariant_stmt, MDSSAMgr const* mdssamgr)
+    InvStmtList const* invariant_stmt, MDSSAMgr const* mdssamgr,
+    OptCtx const* oc)
 {
     ASSERT0(start && start->is_phi() && mdssamgr);
-    ConstMDDefIter ii(mdssamgr);
+    ConstMDDefIter ii(mdssamgr, oc);
     for (MDDef const* def = ii.get_first_untill_killing_def(start, use);
          def != nullptr; def = ii.get_next_untill_killing_def(use)) {
         if (def->is_phi() || def == start) {
@@ -962,7 +1083,7 @@ static bool isMDPhiInvariant(
 
 static bool isLoopInvariantInMDSSA(
     IR const* ir, LI<IRBB> const* li, InvStmtList const* invariant_stmt,
-    MDSSAMgr const* mdssamgr)
+    MDSSAMgr const* mdssamgr, OptCtx const* oc)
 {
     ASSERT0(ir->isMemRefNonPR());
     MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
@@ -979,7 +1100,8 @@ static bool isLoopInvariantInMDSSA(
         if (mddef->is_phi()) {
             //If ir's DEF is a PHI, we will not simply just check whether
             //the DEF's BB is inside the loop, because PHI is not real DEF.
-            if (!isMDPhiInvariant(mddef, ir, li, invariant_stmt, mdssamgr)) {
+            if (!isMDPhiInvariant(
+                    mddef, ir, li, invariant_stmt, mdssamgr, oc)) {
                 return false;
             }
             //PHI just indicates the JOIN point of other definitions, we do
@@ -1052,7 +1174,7 @@ bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg)
 
 bool isLoopInvariant(
     IR const* ir, LI<IRBB> const* li, Region const* rg,
-    InvStmtList const* invariant_stmt, bool check_tree)
+    InvStmtList const* invariant_stmt, bool check_tree, OptCtx const* oc)
 {
     ASSERT0(ir && ir->is_exp());
     if (ir->isReadPR() && !ir->isReadOnly()) {
@@ -1067,7 +1189,7 @@ bool isLoopInvariant(
     } else if (ir->isMemRefNonPR() && !ir->isReadOnly()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-            if (!isLoopInvariantInMDSSA(ir, li, invariant_stmt, mdssamgr)) {
+            if (!isLoopInvariantInMDSSA(ir, li, invariant_stmt, mdssamgr, oc)) {
                 return false;
             }
         } else if (!isLoopInvariantInDUMgr(ir, li, invariant_stmt, rg)) {
@@ -1079,7 +1201,7 @@ bool isLoopInvariant(
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid == nullptr) { continue; }
-        if (!isLoopInvariant(kid, li, rg, invariant_stmt, check_tree)) {
+        if (!isLoopInvariant(kid, li, rg, invariant_stmt, check_tree, oc)) {
             return false;
         }
     }
@@ -1099,6 +1221,7 @@ bool isInsideLoopTree(UINT bbid, Region const* rg)
 
 
 //The functin will insert PHI after inserting preheader.
+//Note the function does not maintain DOM info and SSA info.
 static bool forceInsertPreheader(
     LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader, OptCtx * oc)
 {
@@ -1109,7 +1232,7 @@ static bool forceInsertPreheader(
     *preheader = findAndInsertPreheader(li, rg, inserted, true, oc);
     ASSERT0(inserted);
     if (need_phi) {
-        helper.insertPhiAtPreheader(*preheader);
+        helper.insertPhiAtPreheaderAndRevisePhiAtLoophead(*preheader);
     }
     //Do not mark PASS changed if just inserted some BBs rather than
     //code motion, because post CFG optimization will removed the
@@ -1772,6 +1895,7 @@ void FindRedOp::checkOpRHS()
 
 class MemRefVisitFunc {
 public:
+    bool m_meet_memref; //set to true if the visit-func meet MemRef IR.
     FindRedOp & m_findredop;
 public:
     bool visitIR(IR const* ir, OUT bool & is_terminate)
@@ -1781,6 +1905,7 @@ public:
             //Return true to keep visiting kid of 'ir'.
             return true;
         }
+        m_meet_memref = true;
         m_findredop.checkExp(ir);
         if (m_findredop.getResult() == OP_UNDEF) {
             //Return true to keep processing the next kid.
@@ -1791,7 +1916,11 @@ public:
         is_terminate = true;
         return false;
     }
-    MemRefVisitFunc(FindRedOp & findredop) : m_findredop(findredop) {}
+    MemRefVisitFunc(FindRedOp & findredop)
+        : m_findredop(findredop) { m_meet_memref = false; }
+
+    //Return true if the visit-function has already met MemRef IR.
+    bool meetMemRef() const { return m_meet_memref; }
 };
 
 
@@ -1808,6 +1937,11 @@ void FindRedOp::iterIRTreeList(IR const* exp_list)
     ASSERT0(exp_list && exp_list->is_exp());
     MemRefVisitFunc vf(*this);
     IterIRTreeForMemRef iterirtree(exp_list, vf);
+    if (!vf.meetMemRef() && getResult() == OP_UNDEF) {
+        //Means the exp_list does not contain any MemRef IR, thus
+        //it is impossible to be reduce-operation.
+        m_res = OP_IS_NOT_RED;
+    }
 }
 //END FindRedOp
 

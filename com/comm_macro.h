@@ -121,11 +121,35 @@ namespace xcom {
                        ((i & 0xF0000000000000) << 6) | \
                        ((i & 0xFFC0000000000) << 6)) >> 48
 
-#define DOUBLE2BF16(i) ( \
-    (((i >> 48) & 0x8000)) | \
-    (((((i >> 52) & 0x7FF) - 1023 + 127) << 7) & 0x7F80) | \
-    (((i >> 45) & 0x007F)) \
-)
+//Double precision floating-point constants.
+#define DOUBLE_EXP_BIAS 1023
+#define DOUBLE_EXP_BITS 11
+#define DOUBLE_MANT_BITS 52
+#define DOUBLE_EXP_MASK 0x7FF0000000000000ULL
+#define DOUBLE_MANT_MASK 0x000FFFFFFFFFFFFFULL
+#define DOUBLE_SIGN_MASK 0x8000000000000000ULL
+#define DOUBLE_EXP_MAX 0x7FF
+#define DOUBLE_EXP_ZERO 0x000
+
+//BFloat16 constants.
+#define BF16_EXP_BIAS 127
+#define BF16_EXP_BITS 8
+#define BF16_MANT_BITS 7
+#define BF16_SIGN_SHIFT 15
+#define BF16_EXP_SHIFT 7
+#define BF16_EXP_MASK 0x7F80U
+#define BF16_MANT_MASK 0x007FU
+#define BF16_SIGN_MASK 0x8000U
+#define BF16_EXP_MAX 0xFF
+#define BF16_INF 0x7F80U
+#define BF16_QUIET_NAN 0x7FC0U
+#define BF16_SIGN_BIT 0x8000U
+
+//Rounding constants.
+#define ROUND_TO_NEAREST_EVEN 1
+#define GUARD_BIT_SHIFT 45
+#define ROUND_BIT_SHIFT 44
+#define STICKY_MASK 0x00000FFFFFFFFFFFULL
 
 typedef UINT BSIdx;
 #define BS_UNDEF ((BSIdx)-1) //The maximum unsigned integer

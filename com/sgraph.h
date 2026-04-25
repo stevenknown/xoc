@@ -55,10 +55,8 @@ class MST;
 
 //Adjacent Vertex Iterator.
 typedef EdgeC const* AdjVertexIter;
-typedef EdgeC const* AdjVertexIter;
 
 //Adjacent Vertex Iterator.
-typedef EdgeC const* AdjEdgeIter;
 typedef EdgeC const* AdjEdgeIter;
 typedef void* EdgeInfoType;
 typedef void* VertexInfoType;
@@ -136,6 +134,8 @@ public:
     VexIdx id() const { return VERTEX_id(this); }
     void * info() const { return VERTEX_info(this); }
 
+    Vertex const* getUniqueSucc() const;
+    Vertex const* getUniquePred() const;
     UINT getInDegree() const { return xcom::cnt_list(VERTEX_in_list(this)); }
     UINT getOutDegree() const { return xcom::cnt_list(VERTEX_out_list(this)); }
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
@@ -364,7 +364,7 @@ protected:
     FreeList<Vertex> m_v_free_list; //record freed Vertex for reuse.
 protected:
     //Add 'e' into out-edges of 'vex'
-    inline EdgeC * addOutList(Vertex * vex, Edge * e)
+    EdgeC * addOutList(Vertex * vex, Edge * e)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         ASSERT0(vex && e);
@@ -380,7 +380,7 @@ protected:
     }
 
     //Add 'e' into in-edges of 'vex'
-    inline EdgeC * addInList(Vertex * vex, Edge * e)
+    EdgeC * addInList(Vertex * vex, Edge * e)
     {
         ASSERTN(m_ec_pool, ("not yet initialized."));
         ASSERT0(vex && e);
@@ -431,7 +431,7 @@ protected:
         return allocEdge(fp, tp);
     }
     Edge * allocEdge(Vertex * from, Vertex * to);
-    inline EdgeC * allocEdgeC(Edge * e)
+    EdgeC * allocEdgeC(Edge * e)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         if (e == nullptr) { return nullptr; }
@@ -465,12 +465,12 @@ public:
 
     void init();
     void destroy();
-    inline Edge * addEdge(VexIdx from, VexIdx to)
+    Edge * addEdge(VexIdx from, VexIdx to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return allocEdge(from, to);
     }
-    inline Edge * addEdge(Vertex * from, Vertex * to)
+    Edge * addEdge(Vertex * from, Vertex * to)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return allocEdge(from, to);
@@ -481,7 +481,7 @@ public:
     //     thus the pos should not greater than the number of predecessors + 1.
     //     e.g: there are 2 predecessors of 'to', pos can not greater than 2.
     void addEdgeAtPos(List<VexIdx> const& fromlist, Vertex * to, UINT pos);
-    inline Vertex * addVertex(VexIdx vid)
+    Vertex * addVertex(VexIdx vid)
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         if (is_dense()) {
@@ -558,6 +558,73 @@ public:
 
     //Dump graph to VCG file scripts.
     void dumpVCG(CHAR const* name = nullptr) const;
+
+    //Erasing graph, include all nodes and edges,
+    //except for EdgeInfo and VertexInfo.
+    void erase();
+
+    bool getNeighborList(MOD List<VexIdx> & ni_list, VexIdx vid) const;
+    bool getNeighborSet(OUT DefSBitSet & niset, VexIdx vid) const;
+    UINT getDegree(VexIdx vid) const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return getDegree(getVertex(vid));
+    }
+    UINT getDegree(Vertex const* vex) const;
+    UINT getVertexNum() const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        if (is_dense()) {
+            return m_dense_vex_num;
+        }
+        return m_sparse_vertex->get_elem_count();
+    }
+    UINT getEdgeNum() const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_elem_count();
+    }
+    Vertex * getVertex(VexIdx vid) const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        ASSERT0(vid != VERTEX_UNDEF);
+        if (is_dense()) {
+            return m_dense_vertex->get((VecIdx)vid);
+        }
+        return (Vertex*)m_sparse_vertex->find((OBJTY)(size_t)vid);
+    }
+    Edge * getEdge(VexIdx from, VexIdx to) const;
+    Edge * getEdge(Vertex const* from, Vertex const* to) const;
+    Edge * get_first_edge(EdgeIter & it) const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_first(it);
+    }
+    Edge * get_next_edge(EdgeIter & it) const
+    {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_next(it);
+    }
+    Vertex * get_first_vertex(VertexIter & it) const;
+    Vertex * get_next_vertex(VertexIter & it) const;
+    Vertex * get_last_vertex(VertexIter & it) const;
+    Vertex * get_prev_vertex(VertexIter & it) const;
+
+    //The function will iterate all predecessors vertex of 'vex'.
+    static Vertex * get_first_in_vertex(Vertex const* vex, AdjVertexIter & it);
+    static Vertex * get_next_in_vertex(AdjVertexIter & it);
+
+    //The function will iterate all successors vertex of 'vex'.
+    static Vertex * get_first_out_vertex(Vertex const* vex, AdjVertexIter & it);
+    static Vertex * get_next_out_vertex(AdjVertexIter & it);
+
+    //The function will iterate all out-edge of successors of 'vex'.
+    static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
+    static Edge * get_next_out_edge(AdjEdgeIter & it);
+
+    //The function will iterate all in-edge of predecessors of 'vex'.
+    static Edge * get_first_in_edge(Vertex const* vex, AdjEdgeIter & it);
+    static Edge * get_next_in_edge(AdjEdgeIter & it);
 
     //Return true if graph vertex id is dense.
     bool is_dense() const { return m_dense_vertex != nullptr; }
@@ -710,73 +777,6 @@ public:
     //try_limit: the maximum time to try.
     //try_failed: return true if the function running exceed the try_limit.
     bool isReachExit(Vertex const* vex, UINT try_limit, OUT bool & try_failed);
-
-    //Erasing graph, include all nodes and edges,
-    //except for EdgeInfo and VertexInfo.
-    void erase();
-
-    bool getNeighborList(MOD List<VexIdx> & ni_list, VexIdx vid) const;
-    bool getNeighborSet(OUT DefSBitSet & niset, VexIdx vid) const;
-    UINT getDegree(VexIdx vid) const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return getDegree(getVertex(vid));
-    }
-    UINT getDegree(Vertex const* vex) const;
-    UINT getVertexNum() const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        if (is_dense()) {
-            return m_dense_vex_num;
-        }
-        return m_sparse_vertex->get_elem_count();
-    }
-    UINT getEdgeNum() const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return m_edgetab.get_elem_count();
-    }
-    inline Vertex * getVertex(VexIdx vid) const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        ASSERT0(vid != VERTEX_UNDEF);
-        if (is_dense()) {
-            return m_dense_vertex->get((VecIdx)vid);
-        }
-        return (Vertex*)m_sparse_vertex->find((OBJTY)(size_t)vid);
-    }
-    Edge * getEdge(VexIdx from, VexIdx to) const;
-    Edge * getEdge(Vertex const* from, Vertex const* to) const;
-    Edge * get_first_edge(EdgeIter & it) const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return m_edgetab.get_first(it);
-    }
-    Edge * get_next_edge(EdgeIter & it) const
-    {
-        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-        return m_edgetab.get_next(it);
-    }
-    Vertex * get_first_vertex(VertexIter & it) const;
-    Vertex * get_next_vertex(VertexIter & it) const;
-    Vertex * get_last_vertex(VertexIter & it) const;
-    Vertex * get_prev_vertex(VertexIter & it) const;
-
-    //The function will iterate all predecessors vertex of 'vex'.
-    static Vertex * get_first_in_vertex(Vertex const* vex, AdjVertexIter & it);
-    static Vertex * get_next_in_vertex(AdjVertexIter & it);
-
-    //The function will iterate all successors vertex of 'vex'.
-    static Vertex * get_first_out_vertex(Vertex const* vex, AdjVertexIter & it);
-    static Vertex * get_next_out_vertex(AdjVertexIter & it);
-
-    //The function will iterate all out-edge of successors of 'vex'.
-    static Edge * get_first_out_edge(Vertex const* vex, AdjEdgeIter & it);
-    static Edge * get_next_out_edge(AdjEdgeIter & it);
-
-    //The function will iterate all in-edge of predecessors of 'vex'.
-    static Edge * get_first_in_edge(Vertex const* vex, AdjEdgeIter & it);
-    static Edge * get_next_in_edge(AdjEdgeIter & it);
 
     //Reconstruct vertex hash table, and edge hash table with new bucket size.
     //vertex_hash_sz: new vertex table size to be resized.
@@ -1101,7 +1101,7 @@ public:
 
     //Get vertices who dominate vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
-    inline DomSet * gen_dom_set(VexIdx id)
+    DomSet * gen_dom_set(VexIdx id)
     {
         ASSERT0(m_bs_mgr != nullptr);
         DomSet * set = m_dom_set.get((VecIdx)id);
@@ -1125,7 +1125,7 @@ public:
 
     //Get vertices who post dominated by vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
-    inline DomSet * gen_pdom_set(VexIdx id)
+    DomSet * gen_pdom_set(VexIdx id)
     {
         ASSERT0(m_bs_mgr != nullptr);
         DomSet * set = m_pdom_set.get((VecIdx)id);
@@ -1234,41 +1234,163 @@ public:
 };
 
 
+class GraphIterCompareFuncBase {
+public:
+    //Return true if 'v' need to participate in the iteration.
+    bool isParticipateIn(Vertex const* v) const { return true; }
+};
+
+
+//
+//START GraphIterIn
+//
 //The class provides helper functions to convenient iterate vertex on graph.
 //If 'start' vertex is given, the class will visit all predecessors start from
 //'start' until reach one of entries of graph.
+template <class CompareFunc = GraphIterCompareFuncBase>
 class GraphIterIn {
+protected:
     COPY_CONSTRUCTOR(GraphIterIn);
     Graph const& m_g;
+    Vertex const* m_start;
     Vertex const* m_stop;
     List<Vertex*> m_wl;
     TTab<VexIdx> m_visited;
+    CompareFunc m_cf;
 public:
     //stop: if stop vertex is given, the iterator will not iterate
     //      stop's in-vertex.
     GraphIterIn(Graph const& g, Vertex const* start,
                 Vertex const* stop = nullptr);
     void clean();
+    CompareFunc & getCompareFuncObject() { return m_cf; }
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
 };
 
 
+template <class CompareFunc>
+GraphIterIn<CompareFunc>::GraphIterIn(
+    Graph const& g, Vertex const* start, Vertex const* stop)
+        : m_g(g), m_start(start), m_stop(stop)
+{
+    ASSERT0(start);
+    ASSERTN(g.getVertex(start->id()) == start,
+            ("start is not vertex of graph"));
+}
+
+
+template <class CompareFunc>
+void GraphIterIn<CompareFunc>::clean()
+{
+    m_wl.clean();
+    m_visited.clean();
+}
+
+
+template <class CompareFunc>
+Vertex * GraphIterIn<CompareFunc>::get_first()
+{
+    if (m_start == m_stop) { return nullptr; }
+    AdjVertexIter it;
+    for (Vertex * pred = Graph::get_first_in_vertex(m_start, it);
+         pred != nullptr; pred = Graph::get_next_in_vertex(it)) {
+        if (!m_cf.isParticipateIn(pred)) { continue; }
+        m_visited.append(pred->id());
+        m_wl.append_tail(pred);
+    }
+    return m_wl.remove_head();
+}
+
+
+template <class CompareFunc>
+Vertex * GraphIterIn<CompareFunc>::get_next(Vertex const* t)
+{
+    ASSERT0(t);
+    if (t != m_stop) {
+        AdjVertexIter it;
+        for (Vertex * predv = Graph::get_first_in_vertex(t, it);
+             predv != nullptr; predv = Graph::get_next_in_vertex(it)) {
+            if (!m_cf.isParticipateIn(predv)) { continue; }
+            if (m_visited.find(predv->id())) { continue; }
+            m_visited.append(predv->id());
+            m_wl.append_tail(predv);
+        }
+    }
+    return m_wl.remove_head();
+}
+//END GraphIterIn
+
+
+//
+//START GraphIterOut
+//
 //The class provides helper functions to convenient iterate vertex on graph.
 //If 'start' vertex is given, the class will visit all successors start from
 //'start' until reach one of exit of graph.
+template <class CompareFunc = GraphIterCompareFuncBase>
 class GraphIterOut {
     COPY_CONSTRUCTOR(GraphIterOut);
+    Vertex const* m_start;
     List<Vertex*> m_wl;
     TTab<VexIdx> m_visited;
+    CompareFunc m_cf;
 protected:
     Graph const& m_g;
 public:
     GraphIterOut(Graph const& g, Vertex const* start);
     void clean();
+    CompareFunc & getCompareFuncObject() { return m_cf; }
     Vertex * get_first();
     Vertex * get_next(Vertex const* t);
 };
+
+template <class CompareFunc>
+GraphIterOut<CompareFunc>::GraphIterOut(
+    Graph const& g, Vertex const* start) : m_start(start), m_g(g)
+{
+    ASSERTN(g.getVertex(start->id()) == start,
+            ("start is not vertex of graph"));
+}
+
+
+template <class CompareFunc>
+void GraphIterOut<CompareFunc>::clean()
+{
+    m_wl.clean();
+    m_visited.clean();
+}
+
+
+template <class CompareFunc>
+Vertex * GraphIterOut<CompareFunc>::get_first()
+{
+    AdjVertexIter it;
+    for (Vertex * succ = Graph::get_first_out_vertex(m_start, it);
+         succ != nullptr; succ = Graph::get_next_out_vertex(it)) {
+        if (!m_cf.isParticipateIn(succ)) { continue; }
+        m_visited.append(succ->id());
+        m_wl.append_tail(succ);
+    }
+    return m_wl.remove_head();
+}
+
+
+template <class CompareFunc>
+Vertex * GraphIterOut<CompareFunc>::get_next(Vertex const* t)
+{
+    ASSERT0(t);
+    AdjVertexIter it;
+    for (Vertex * succv = Graph::get_first_out_vertex(t, it);
+         succv != nullptr; succv = Graph::get_next_out_vertex(it)) {
+        if (!m_cf.isParticipateIn(succv)) { continue; }
+        if (m_visited.find(succv->id())) { continue; }
+        m_visited.append(succv->id());
+        m_wl.append_tail(succv);
+    }
+    return m_wl.remove_head();
+}
+//END GraphIterOut
 
 
 //The class provides helper functions to convenient iterate edge on graph.

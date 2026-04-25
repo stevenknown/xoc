@@ -39,6 +39,8 @@ namespace xoc {
 class CDG;
 class ActMgr;
 
+typedef xcom::AdjVertexIter AdjBBIter;
+
 //Sort Sequence
 typedef enum {
     SEQ_UNDEF = 0,
@@ -67,6 +69,11 @@ public:
 //on the fly.
 #define CFGOPTCTX_need_update_dominfo(x) ((x)->common_info.s1.m_update_dominfo)
 
+//The field transfers information top-down.
+//Set to true if caller asks CFG optimizer to maintain PHI and
+//MDPHI if SSA info is valid.
+#define CFGOPTCTX_need_update_phi(x) ((x)->common_info.s1.m_update_phi)
+
 //The field transfers information bottom-up.
 //If it is true, there is at least one unreach-BB after CFG optimization.
 //Default is false.
@@ -85,6 +92,7 @@ class CfgOptCtx : public PassCtx {
     {
         common_info.m_flags = 0;
         CFGOPTCTX_need_update_dominfo(this) = true;
+        CFGOPTCTX_need_update_phi(this) = true;
         CFGOPTCTX_do_merge_label(this) = true;
         CFGOPTCTX_vertex_iter_time(this) = 0;
         CFGOPTCTX_has_generate_unreach_bb(this) = false;
@@ -102,6 +110,11 @@ public:
             //Set to true if caller asks CFG optimizer to maintain DomInfo
             //on the fly.
             BYTE m_update_dominfo:1;
+
+            //The field transfers information top-down.
+            //Set to true if caller asks CFG optimizer to maintain PHI and
+            //MDPHI if SSA info is valid.
+            BYTE m_update_phi:1;
 
             //The field transfers information top-down.
             //If it is true, CFG optimizer will attempt to merge label to
@@ -137,6 +150,19 @@ public:
     //Return true if caller asks CFG optimizer to maintain DomInfo on the fly.
     bool needUpdateDomInfo() const
     { return CFGOPTCTX_need_update_dominfo(this) && m_oc->is_dom_valid(); }
+
+    //Return true if caller asks CFG optimizer to maintain PHI and MDPHI
+    //on the fly if SSA info is valid.
+    bool needUpdatePhi() const
+    {
+        //CASE:There is no need to check DOM info validation in this API.
+        //Because if user wants to remove Phi's operand, it is independent on
+        //DOM info. Even if user wants to add a Phi's operand, then user
+        //should query DOM info rather than this API.
+        //e.g: user can set needUpdatePhi to true, but set needUpdateDom to
+        //false.
+        return CFGOPTCTX_need_update_phi(this);
+    }
 
     void setOptCtx(OptCtx const& loc) { m_oc->copy(loc); }
 
@@ -194,8 +220,8 @@ protected:
     void cloneExitList(CFG<BB, XR> const& src);
     void cloneEntry(CFG<BB, XR> const& src);
     void cloneLoopInfo(CFG<BB, XR> const& src);
-    void computeRPOImpl(xcom::BitSet & is_visited, IN xcom::Vertex * v,
-                        OUT INT & order);
+    void computeRPOImpl(
+        xcom::BitSet & is_visited, IN xcom::Vertex * v, OUT INT & order);
     inline void collectLoopInfoRecur(LI<BB> * li);
 
     void freeCfgOptCtx(CfgOptCtx * ctx)
@@ -393,8 +419,22 @@ public:
 
     //Find the single exit BB if exist for given loop.
     //li: represents a loop.
-    //exitedge: return the exitedge if needed. It can be NULL.
-    BB * findSingleExitBB(LI<BB> const* li, Edge const** exitedge = nullptr);
+    //exitedgelist: return all exitedges if needed. It can be NULL.
+    //NOTE: there might be multiple exit-edge for the same single exit BB.
+    //e.g: |
+    //     v
+    //   --BB4<-
+    //  |  |    |
+    //  |  v    |
+    //  |--BB8  |
+    //  |  |    |
+    //  |  v    |
+    //  |  BB5--
+    //  v
+    //  BB6
+    //There are two exit-edge: BB4->BB6, BB8->BB6 for the single exit BB6.
+    BB * findSingleExitBB(
+        LI<BB> const* li, xcom::List<Edge const*> * exitedgelist = nullptr);
 
     //Find the target bb list.
     //2th parameter records a list of bb have found.
@@ -431,6 +471,16 @@ public:
         xcom::Vertex const* vex = bb->getVex()->getNthInVertex(n);
         ASSERT0(vex);
         return getBB(vex->id());
+    }
+    BB * getUniqueSucc(BB const* bb) const
+    {
+        xcom::Vertex const* vex = bb->getVex()->getUniqueSucc();
+        return vex != nullptr ? getBB(vex->id()) : nullptr;
+    }
+    BB * getUniquePred(BB const* bb) const
+    {
+        xcom::Vertex const* vex = bb->getVex()->getUniquePred();
+        return vex != nullptr ? getBB(vex->id()) : nullptr;
     }
 
     //Get the number of successors of bb.
@@ -473,14 +523,19 @@ public:
     }
 
     //Get the first successor of bb.
-    BB * get_first_succ(BB const* bb) const;
-    BB * get_idom(BB * bb)
+    BB * get_first_succ(BB const* bb, AdjBBIter & it);
+    BB * get_next_succ(AdjBBIter & it);
+
+    //Get the first predecessor of bb.
+    BB * get_first_pred(BB const* bb, AdjBBIter & it);
+    BB * get_next_pred(AdjBBIter & it);
+    BB * get_idom(BB const* bb) const
     {
         ASSERT0(bb != nullptr);
         return getBB(xcom::DGraph::get_idom(bb->id()));
     }
 
-    BB * get_ipdom(BB * bb)
+    BB * get_ipdom(BB const* bb) const
     {
         ASSERT0(bb != nullptr);
         return getBB(xcom::DGraph::get_ipdom(bb->id()));
@@ -490,10 +545,10 @@ public:
     LI<BB> * getLoopInfo() const { return m_loop_info; }
 
     //Return the last instruction of BB.
-    virtual XR * get_last_xr(BB *) = 0;
+    virtual XR * get_last_xr(BB const*) = 0;
 
     //Return the first instruction of BB.
-    virtual XR * get_first_xr(BB *) = 0;
+    virtual XR * get_first_xr(BB const*) = 0;
     virtual BB * getBB(UINT id) const = 0;
 
     //True if current CFG has exception-handler edge.
@@ -565,11 +620,11 @@ public:
     virtual void remove_xr(BB *, XR *, CfgOptCtx const& ctx) = 0;
 
     //You should clean the relation between Label and BB before remove BB.
-    virtual void removeDomInfo(xcom::C<BB*> * bbcontainer,
-                               MOD CfgOptCtx & ctx) = 0;
+    virtual void removeDomInfo(
+        xcom::C<BB*> * bbcontainer, MOD CfgOptCtx & ctx) = 0;
     virtual void removeBB(BB * bb, OUT CfgOptCtx & ctx) = 0;
-    virtual void removeBB(xcom::C<BB*> * bbcontainer,
-                          OUT CfgOptCtx & ctx) = 0;
+    virtual void removeBB(
+        xcom::C<BB*> * bbcontainer, OUT CfgOptCtx & ctx) = 0;
     virtual void removeMapBetweenLabelAndBB(BB * bb) = 0;
 
     //Rebuild CFG.
@@ -695,8 +750,8 @@ bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::sortByDFSRecur(List<BB*> & new_bbl, BB * bb,
-                                 Vector<bool> & visited)
+void CFG<BB, XR>::sortByDFSRecur(
+    List<BB*> & new_bbl, BB * bb, Vector<bool> & visited)
 {
     if (bb == nullptr) { return; }
     visited.set(bb->id(), true);
@@ -1058,9 +1113,7 @@ void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
         UINT c = 0;
         while (out != nullptr) {
             c++;
-            if (c >= 2) {
-                break;
-            }
+            if (c >= 2) { break; }
             out = EC_next(out);
         }
         if (c < 2) { continue; }
@@ -1082,9 +1135,23 @@ void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
 
 //Find the single exit BB if exist for given loop.
 //li: represents a loop.
-//exitedge: return the exitedge if needed. It can be NULL.
+//exitedgelist: return all exitedges if needed. It can be NULL.
+//NOTE: there might be multiple exit-edge for the same single exit BB.
+//e.g: |
+//     v
+//   --BB4<-
+//  |  |    |
+//  |  v    |
+//  |--BB8  |
+//  |  |    |
+//  |  v    |
+//  |  BB5--
+//  v
+//  BB6
+//There are two exit-edge: BB4->BB6, BB8->BB6 for the single exit BB6.
 template <class BB, class XR>
-BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
+BB * CFG<BB, XR>::findSingleExitBB(
+    LI<BB> const* li, xcom::List<Edge const*> * exitedgelist)
 {
     //A BB Set is used in the LoopInfo to describing the loop body BB set.
     xcom::BitSet * bbset = li->getBodyBBSet();
@@ -1096,18 +1163,25 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
         ASSERT0(vex);
         for (EdgeC const* ec = vex->getOutList(); ec != nullptr;
              ec = ec->get_next()) {
-            UINT succ = ec->getTo()->id();
-            if (!bbset->is_contain(succ)) {
-                if (exit == BS_UNDEF) {
-                    //Record the exit BB has been found.
-                    exit = succ;
-                    if (exitedge != nullptr) {
-                        *exitedge = ec->getEdge();
-                    }
-                } else if ((UINT)exit != succ) {
-                    //There are more than one exit BB for current loop.
-                    return nullptr;
+            VexIdx succ = ec->getTo()->id();
+            if (bbset->is_contain(succ)) { continue; }
+            if (exit == BS_UNDEF) {
+                //The first meet of exit-BB.
+                //Record the exit-BB has been found.
+                exit = succ;
+                if (exitedgelist != nullptr) {
+                    ASSERT0(!exitedgelist->find(ec->getEdge()));
+                    exitedgelist->append_tail(ec->getEdge());
                 }
+                continue;
+            }
+            if (((VexIdx)exit) != succ) {
+                //There are more than one exit BB for current loop.
+                return nullptr;
+            }
+            if (exitedgelist != nullptr) {
+                ASSERT0(!exitedgelist->find(ec->getEdge()));
+                exitedgelist->append_tail(ec->getEdge());
             }
         }
     }
@@ -1238,7 +1312,7 @@ void CFG<BB, XR>::computeRPOImpl(MOD xcom::BitSet & is_visited,
                                  IN xcom::Vertex * v, MOD INT & order)
 {
     is_visited.bunion(v->id());
-    xcom::AdjVertexIter it;
+    AdjBBIter it;
     for (xcom::Vertex * succ = Graph::get_first_out_vertex(v, it);
          succ != nullptr; succ = Graph::get_next_out_vertex(it)) {
         ASSERTN(getBB(succ->id()), ("without bb corresponded"));
@@ -1398,18 +1472,41 @@ void CFG<BB, XR>::clone(CFG<BB, XR> const& src, bool clone_edge_info,
 }
 
 
-//Get the first successor of bb.
 template <class BB, class XR>
-BB * CFG<BB, XR>::get_first_succ(BB const* bb) const
+BB * CFG<BB, XR>::get_first_pred(BB const* bb, AdjBBIter & it)
 {
     ASSERT0(bb);
-    xcom::Vertex * vex = bb->getVex();
-    ASSERT0(vex);
-    xcom::EdgeC * ec = vex->getOutList();
-    if (ec == nullptr) { return nullptr; }
-    BB * succ = getBB(ec->getToId());
-    ASSERT0(succ);
-    return succ;
+    Vertex const* bbvex = bb->getVex();
+    ASSERT0(bbvex);
+    Vertex const* p = Graph::get_first_in_vertex(bbvex, it);
+    return p != nullptr ? getBB(p->id()) : nullptr;
+}
+
+
+template <class BB, class XR>
+BB * CFG<BB, XR>::get_next_pred(AdjBBIter & it)
+{
+    Vertex const* p = Graph::get_next_in_vertex(it);
+    return p != nullptr ? getBB(p->id()) : nullptr;
+}
+
+
+template <class BB, class XR>
+BB * CFG<BB, XR>::get_first_succ(BB const* bb, AdjBBIter & it)
+{
+    ASSERT0(bb);
+    Vertex const* bbvex = bb->getVex();
+    ASSERT0(bbvex);
+    Vertex const* p = Graph::get_first_out_vertex(bbvex, it);
+    return p != nullptr ? getBB(p->id()) : nullptr;
+}
+
+
+template <class BB, class XR>
+BB * CFG<BB, XR>::get_next_succ(AdjBBIter & it)
+{
+    Vertex const* p = Graph::get_next_out_vertex(it);
+    return p != nullptr ? getBB(p->id()) : nullptr;
 }
 
 

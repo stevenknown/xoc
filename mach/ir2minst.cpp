@@ -37,6 +37,9 @@ IR2MInst::IR2MInst(Region * rg, MInstMgr * mgr, elf::ELFMgr * em)
     m_rg = rg;
     m_mimgr = mgr;
     m_tm = m_rg->getTypeMgr();
+    m_ramgr = (RegAllocMgr*)rg->getPassMgr()->registerPass(PASS_REGALLOC_MGR);
+    m_timgr = m_rg->getRegionMgr()->getTargInfoMgr();
+    ASSERT0(m_timgr);
     m_em = em;
 }
 
@@ -56,7 +59,6 @@ void IR2MInst::convertLabel(
     ASSERT0(ir->getLabel());
     LABMI_lab(mi) = ir->getLabel();
     mis.append_tail(mi);
-    IMCTX_label_num(cont)++;
 }
 
 
@@ -110,7 +112,6 @@ void IR2MInst::convertBBLabel(
         ASSERT0(mi && li);
         LABMI_lab(mi) = li;
         mis.append_tail(mi);
-        IMCTX_label_num(cont)++;
     }
 }
 
@@ -128,7 +129,6 @@ void IR2MInst::processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont)
         ASSERT0(mi && li);
         LABMI_lab(mi) = li;
         mis.append_tail(mi);
-        IMCTX_label_num(cont)++;
     }
 }
 
@@ -136,7 +136,6 @@ void IR2MInst::processHintOfAfterRet(OUT RecycMIList & mis, MOD IMCtx * cont)
 void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
 {
     ASSERT0(ir && ir->verify(m_rg));
-    if (!initDepPass()) { return; }
     switch (ir->getCode()) {
     case IR_ST:
         convertStoreVar(ir, mis, cont);
@@ -195,7 +194,10 @@ void IR2MInst::convert(IR const* ir, OUT RecycMIList & mis, MOD IMCtx * cont)
     //Following IRs do not need to be convert into machine instruction.
     SWITCH_CASE_EXT_VSTMT:
         convertExtVStmt(ir, cont);
-    break;
+        break;
+    case IR_REGION:
+        convertRegion(ir, mis, cont);
+        break;
     default: convertExtStmt(ir, mis, cont);
     }
 }
@@ -208,6 +210,28 @@ TMWORD IR2MInst::extractImm(HOST_INT val, FIELD_TYPE ft)
     UINT start = 0;
     UINT end = getMIMgr()->getFieldSize(ft) - 1;
     return (TMWORD)xcom::extractBitRangeValue((ULONGLONG)val, start, end);
+}
+
+
+UINT IR2MInst::computeRelocLocation(RecycMIList const& mis, IMCtx const* cont)
+{
+    MIList & milst = mis.getList();
+    MIListIter it;
+    UINT reloc_val = 0;
+    for (MInst * mi = milst.get_head(&it);
+        mi != nullptr; mi = milst.get_next(&it)) {
+        MI_CODE mi_code = mi->getCode();
+        if (mi_code == MI_label ||
+            mi_code == MI_cfi_def_cfa ||
+            mi_code == MI_cfi_same_value ||
+            mi_code == MI_cfi_offset ||
+            mi_code == MI_cfi_restore ||
+            mi_code == MI_cfi_def_cfa_offset) {
+            ASSERT0(mi->getTotalFieldByteSize() == 0);
+        }
+        reloc_val += mi->getTotalFieldByteSize();
+    }
+    return reloc_val;
 }
 
 
@@ -281,7 +305,6 @@ void IR2MInst::convertCFIDefCfa(
     CFIDEFCFAMI_register(mi) = reg_num;
     mis.append_tail(mi);
     mis.copyDbx(ir, getDbxMgr());
-    IMCTX_cfi_num(cont)++;
 }
 
 
@@ -300,7 +323,6 @@ void IR2MInst::convertCFISameValue(
 
     mis.append_tail(mi);
     mis.copyDbx(ir, getDbxMgr());
-    IMCTX_cfi_num(cont)++;
 }
 
 
@@ -324,7 +346,6 @@ void IR2MInst::convertCFIOffset(
     CFIOFFSETMI_register(mi)  = reg_num;
     mis.append_tail(mi);
     mis.copyDbx(ir, getDbxMgr());
-    IMCTX_cfi_num(cont)++;
 }
 
 
@@ -344,7 +365,6 @@ void IR2MInst::convertCFIRestore(
 
     mis.append_tail(mi);
     mis.copyDbx(ir, getDbxMgr());
-    IMCTX_cfi_num(cont)++;
 }
 
 
@@ -364,6 +384,5 @@ void IR2MInst::convertCFICfaOffset(
 
     mis.append_tail(mi);
     mis.copyDbx(ir, getDbxMgr());
-    IMCTX_cfi_num(cont)++;
 }
 } //namespace

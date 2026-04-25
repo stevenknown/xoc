@@ -138,7 +138,7 @@ void dumpMaskOp(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
-void dumpMaskSelectToRes(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+void dumpSelectToRes(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
@@ -151,8 +151,27 @@ void dumpMaskSelectToRes(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(MASKSELECTTORES_op(ir), rg, nullptr, ctx.dumpflag);
-    dumpIRList(MASKSELECTTORES_mask(ir), rg, (CHAR*)" mask", ctx.dumpflag);
+    dumpIRList(SELECTTORES_op(ir), rg, nullptr, ctx.dumpflag);
+    dumpIRList(SELECTTORES_base(ir), rg, (CHAR*)" base", ctx.dumpflag);
+    lm->decIndent(ctx.dn);
+}
+
+
+void dumpDynlenOp(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+{
+    bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
+    bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", ctx.attr);
+    if (!dump_kid) { return; }
+    lm->incIndent(ctx.dn);
+    dumpIRList(DYNLENOP_op(ir), rg, nullptr, ctx.dumpflag);
+    dumpIRList(DYNLENOP_len(ir), rg, (CHAR*)" len", ctx.dumpflag);
     lm->decIndent(ctx.dn);
 }
 

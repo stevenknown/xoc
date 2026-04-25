@@ -41,9 +41,12 @@ static bool hasProp(IR const* ir)
 //
 //START DumpGRCtx
 //
-DumpGRCtx::DumpGRCtx(Region const* r, bool dump_inner)
+DumpGRCtx::DumpGRCtx(Region const* r, LogMgr * tlm, bool dump_inner)
 {
-    rg = r; cfg = r->getCFG(); tm = r->getTypeMgr();
+    rg = r;
+    cfg = r->getCFG();
+    tm = r->getTypeMgr();
+    lm = tlm;
     dump_inner_region = dump_inner;
 }
 //END DumpGRCtx
@@ -68,7 +71,8 @@ void GRDump::dumpOffset(IR const* ir) const
         ir->getOffset() != 0 ||
         ((ir->is_array() || ir->is_starray()) &&
          ARR_elem_num_buf(ir) != nullptr)) {
-        prt(m_lm, ":%d", ir->getOffset());
+        //NOTE: the offset of every memory operation must be positive.
+        prt(m_lm, ":%u", ir->getOffset());
     }
 }
 
@@ -606,6 +610,12 @@ void GRDump::dumpLabel(IR const* ir, DumpGRCtx const* ctx) const
 }
 
 
+static void dumpUndefined(DumpGRCtx const* ctx)
+{
+    prt(ctx->lm, "undefined");
+}
+
+
 void GRDump::dumpSelect(IR const* ir, DumpGRCtx const* ctx) const
 {
     //Formulized log_OR_exp?exp:cond_exp
@@ -623,12 +633,20 @@ void GRDump::dumpSelect(IR const* ir, DumpGRCtx const* ctx) const
     m_lm->decIndent(dn);
 
     m_lm->incIndent(dn);
-    dumpIRList(SELECT_trueexp(ir), ctx);
+    if (SELECT_trueexp(ir) != nullptr) {
+        dumpIRList(SELECT_trueexp(ir), ctx);
+    } else {
+        dumpUndefined(ctx);
+    }
     prt(m_lm, ",");
     m_lm->decIndent(dn);
 
     m_lm->incIndent(dn);
-    dumpIRList(SELECT_falseexp(ir), ctx);
+    if (SELECT_falseexp(ir) != nullptr) {
+        dumpIRList(SELECT_falseexp(ir), ctx);
+    } else {
+        dumpUndefined(ctx);
+    }
     m_lm->decIndent(dn);
 }
 
@@ -637,7 +655,7 @@ void GRDump::dumpLda(IR const* ir, DumpGRCtx const* ctx) const
 {
     ASSERT0(m_rg->isLogMgrInit());
     xcom::DefFixedStrBuf buf;
- 
+
     note(m_lm, "\n%s", IRNAME(ir));
     dumpOffset(ir);
     dumpProp(ir, ctx);
@@ -1041,7 +1059,7 @@ void GRDump::dumpRegion(bool dump_inner_region) const
     m_lm->incIndent(DUMP_INDENT_NUM);
     m_rg->dumpVarTab();
     if (!m_rg->is_blackbox()) {
-        DumpGRCtx ctx(m_rg, dump_inner_region);
+        DumpGRCtx ctx(m_rg, m_lm, dump_inner_region);
         if (m_rg->getIRList() != nullptr) {
             dumpIRList(m_rg->getIRList(), &ctx);
         } else {
