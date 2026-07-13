@@ -34,15 +34,31 @@ The main documentation is in doc/Manual.txt.
 Build libxoc.a on Linux:
 Default build host is Linux
 ```cmd
-	cd xoc
-	make -f Makefile.xoc
+	./build_xoc.sh
 ```
 
 Build libxoc.a on Windows:
 ```cmd
-	cd xoc
-	make -f Makefile.xoc WIN=1
+	make -f Makefile.xoc WIN=1 TARG=FOR_DEX TARG_DIR=dex 
 ```
+
+Build libxcom.a on Linux:
+```cmd
+	./build_xcom.sh
+```
+
+Test libxoc.a
+```cmd
+	./test_xoc.sh
+```
+
+Test libxcom.a
+```cmd
+	./test_xcom.sh
+```
+
+To demonstrate the usage of XOC, the example directory contains numerous samples 
+illustrating how to flexibly leverage XOC’s rich and diverse compilation features.
 
 How to Contribute :
 	All contributors should own the rights to any code you contribute, and
