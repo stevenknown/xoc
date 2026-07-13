@@ -18,9 +18,9 @@ of xoc.
 3. Copy the entire xgen, xocc and arm directory to the root directory of xoc.
 ```cmd
     cd xoc
-    cp -rf <THE-PATH-OF-XOCFE>/xgen/arm ./
-    cp -rf <THE-PATH-OF-XOCFE>/xgen/xgen ./
-    cp -rf <THE-PATH-OF-XOCFE>/xgen/xocc ./
+    cp -rf <THE-PATH-OF-XGEN>/xgen/arm ./
+    cp -rf <THE-PATH-OF-XGEN>/xgen/xgen ./
+    cp -rf <THE-PATH-OF-XGEN>/xgen/xocc ./
 ```
 
 4. Navigate into the xocc directory and run build_xocc.sh.
