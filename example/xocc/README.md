@@ -8,7 +8,8 @@ The compilation steps are as follows:
     git clone https://github.com/stevenknown/xocfe.git
 ```
 
-2. Copy the C frontend xocfe folder located under xocfe/src to the root directory of xoc.
+2. Copy the C frontend xocfe folder located under xocfe/src to the root directory
+of xoc.
 ```cmd
     cd xoc
     cp -rf <THE-PATH-OF-XOCFE>/xocfe/src/cfe ./
