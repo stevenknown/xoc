@@ -4,11 +4,11 @@ The compilation steps are as follows:
 
 1. First, download the xgen and xocfe modules.
 ```cmd
-    git clone https://github.com/stevenknown/xoc.git
+    git clone https://github.com/stevenknown/xgen.git
     git clone https://github.com/stevenknown/xocfe.git
 ```
 
-2. Copy the C frontend xocfe folder located under xocfe\src to the root directory of xoc.
+2. Copy the C frontend xocfe folder located under xocfe/src to the root directory of xoc.
 ```cmd
     cd xoc
     cp -rf <THE-PATH-OF-XOCFE>/xocfe/src/cfe ./
