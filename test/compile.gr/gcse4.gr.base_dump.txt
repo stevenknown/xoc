@@ -1,0 +1,7 @@
+CHECKEXIST:add id:42 is CSE of add id:38 and will be replaced by pr id:102
+CHECKNEXT:stpr $15:i32 id:101 attachinfo:Dbx
+    add:i32 id:38
+        $13:i32 id:36
+        intconst:i32 -1|0xffffffffffffffff id:37
+CHECKNEXT:stpr $12:i32 id:39 attachinfo:Dbx
+    $15:i32 id:100

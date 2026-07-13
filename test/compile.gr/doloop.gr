@@ -1,0 +1,12 @@
+region program "program" () {
+    region func main () {
+        var i:i32:(align(4)); //induction variable can not be readonly
+        var N:i32:(readonly, align(4));
+        doloop (id i, (add $4:f64, 20), le ld i, ld:i32 N, (add ld:i32 i, 1:i32)) {
+            //Do parallel operation in doloop.
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+            }
+        }
+        return $ret:i32;
+    };
+}

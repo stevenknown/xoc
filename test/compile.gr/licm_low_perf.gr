@@ -1,0 +1,919 @@
+//==---- DUMP Region '.program' ----==
+region program ".program" () {
+    var malloc:any:(func,align(8));
+    var _ZN4sdaa11matmul_initERNS_12MatmulHandleENS_14MatmulDataTypeE:any:(func,align(8));
+    var _ZN4sdaa18matmul_load_weightERNS_12MatmulHandleEPvNS_11MatmulKSizeENS_11MatmulNSizeEj:any:(func,align(8));
+    var _ZN4sdaa14matmul_computeERNS_12MatmulHandleEPvjNS_11MatmulKSizeEj:any:(func,align(8));
+    var _ZN4sdaa12matmul_storeERNS_12MatmulHandleEPvjNS_11MatmulNSizeE:any:(func,align(8));
+    var _ZN4sdaa11matmul_waitERNS_12MatmulHandleE:any:(func,align(8));
+    var _ZN4sdaa26matmul_set_updating_weightERNS_12MatmulHandleERKb:any:(func,align(8));
+    var free:any:(func,align(8));
+    var ai_printf:any:(func,align(8));
+    var memset:any:(func,align(8));
+    var _str:mc<37>:(array,byte(0x73,0x74,0x61,0x72,0x74,0x3a,0x20,0x25,0x6c,0x75,0x2c,0x20,0x65,0x6e,0x64,0x3a,0x20,0x25,0x6c,0x75,0x2c,0x20,0x64,0x75,0x72,0x61,0x74,0x69,0x6f,0x6e,0x3a,0x20,0x25,0x6c,0x75,0xa,0x0),align(8));
+    var test:any:(func,align(8));
+    //==---- DUMP Region 'test' ----==
+    region func test(var _Z4testPi_param0:u64:(align(8))) {
+        var start:u64:(align(8));
+        var handle:mc<120>:(align(8));
+        var end:u64:(align(8));
+        stpr $125:u64 = 
+            neg:u64 
+                $126:u64;
+        stpr $78:u64 = 
+            band:u64 
+                $125:u64, 15:u64;
+        truebr (
+            ne:bool 
+                $78:i64, 0:i64), label_BB0_22;
+        label label_BB0_1;
+        stpr $77:*<1> = 
+            ld:u64 _Z4testPi_param0;
+        stpr $20:i32 = 0:i32;
+        stpr $81:u64 = 
+            xor:u64 
+                $126:u64, 8:u64;
+        ist:u32 = 
+            $77:*<1>,
+            $20:u32;
+        call:(use(
+            ild:any 0:any)) $50:u64 = malloc(
+            $81:u64,
+            $20:u32);
+        stpr $82:u64 = 
+            xor:u64 
+                $126:u64, 11:u64;
+        call:(use(
+            ild:any 0:any)) $52:u64 = malloc(
+            $82:u64,
+            $20:u32);
+        stpr $83:u64 = 
+            xor:u64 
+                $126:u64, 2:u64;
+        call:(use(
+            ild:any 0:any)) $53:u64 = malloc(
+            $83:u64,
+            $20:u32);
+        stpr $79:u64 = 
+            bnot:u64 3072:u32;
+        stpr $117:u8 = 0:i32;
+        st:u64:0:(sideeffect) start = 
+            $79:u64;
+        call:(use(
+            ild:any 0:any)) $84:u64 = memset(
+            $53:u64,
+            $117:u8,
+            $83:u64);
+        stpr $106:*<1> = 
+            add:i64 
+                $50:i64, 32:i64;
+        stpr $107:i32 = 0:i32;
+        label label_BB0_2;
+        stpr $1:f16 = 
+            cvt:f16 
+                $107:u64;
+        ist:f16:4294967264 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967266 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967268 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967270 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967272 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967274 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967276 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967278 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967280 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967282 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967284 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967286 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967288 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967290 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967292 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4294967294 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:2 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:4 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:6 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:8 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:10 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:12 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:14 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:16 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:18 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:20 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:22 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:24 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:26 = 
+            $106:*<1>,
+            $1:f16;
+        stpr $107:i64 = 
+            add:i64 
+                $107:i64, 1:i64;
+        ist:f16:28 = 
+            $106:*<1>,
+            $1:f16;
+        ist:f16:30 = 
+            $106:*<1>,
+            $1:f16;
+        stpr $106:*<1> = 
+            add:i64 
+                $106:*<1>, 64:i64;
+        stpr $127:i32 = 512:i32;
+        truebr (
+            ne:bool 
+                $107:i64, 
+                $127:i64), label_BB0_2;
+        label label_BB0_3;
+        stpr $108:i32 = 0:i32;
+        label label_BB0_4;
+        stpr $86:*<1> = 
+            add:i64 
+                $52:i64, 
+                $108:i64;
+        stpr $128:i32 = 
+            xor:u64 
+                $126:u64, 4:u64;
+        stpr $128:i32 = 
+            add:i32 
+                $128:i32, -1024:i32;
+        stpr $2:f16 = 
+            neg:f16 
+                $128:i32;
+        ist:f16 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:2 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:4 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:6 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:8 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:10 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:12 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:14 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:16 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:18 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:20 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:22 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:24 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:26 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:28 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:30 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:32 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:34 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:36 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:38 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:40 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:42 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:44 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:46 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:48 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:50 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:52 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:54 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:56 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:58 = 
+            $86:*<1>,
+            $2:f16;
+        stpr $108:i64 = 
+            add:i64 
+                $108:i64, 64:i64;
+        ist:f16:60 = 
+            $86:*<1>,
+            $2:f16;
+        ist:f16:62 = 
+            $86:*<1>,
+            $2:f16;
+        stpr $129:u64 = 
+            xor:u64 
+                $126:u64, 11:u64;
+        truebr (
+            ne:bool 
+                $108:i64, 
+                $129:i64), label_BB0_4;
+        label label_BB0_5;
+        stpr $21:u64:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        st:u32 handle = 
+            $21:u64;
+        stpr $22:i32 = 
+            add:i32 
+                $21:u64, 1:i32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $22:i32;
+        stpr $175:u64 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $175:i32 = 
+            add:i32 
+                $175:i32, -1:i32;
+        stpr $130:u64 = 
+            band:u64 
+                $20:u32, 
+                $175:u64;
+        stpr $131:u64 = 
+            band:u64 
+                $21:u64, 63:u64;
+        stpr $132:u64 = 
+            lsl:u64 
+                $131:u64, 32:u64;
+        stpr $133:u64 = 
+            bor:u64 
+                $132:u64, 
+                $130:u64;
+        stpr $134:u64 = 
+            $133:u64;
+        stpr $21:u64 = 
+            bnot:u32
+                $134:u32;
+        stpr $23:u32:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        st:u32:4 handle = 
+            $23:u32;
+        stpr $24:u64 = 
+            add:i32 
+                $23:i32, 1:i32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $24:u64;
+        stpr $176:u32 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $176:i32 = 
+            add:i32 
+                $176:i32, -1:i32;
+        stpr $135:u64 = 
+            band:u64 
+                $20:u32, 
+                $176:u64;
+        stpr $136:u64 = 
+            band:u64 
+                $23:u32, 63:u64;
+        stpr $137:u64 = 
+            lsl:u64 
+                $136:u64, 32:u64;
+        stpr $138:u64 = 
+            bor:u64 
+                $137:u64, 
+                $135:u64;
+        stpr $139:u64 = 
+            $138:u64;
+        stpr $23:u32 = 
+            bnot:u32
+                $139:u32;
+        stpr $25:u32:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        st:u32:8 handle = 
+            $25:u32;
+        stpr $26:u64 = 
+            add:i32 
+                $25:i32, 1:i32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $26:u64;
+        stpr $177:u64 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $177:i32 = 
+            add:i32 
+                $177:i32, -1:i32;
+        stpr $140:u64 = 
+            band:u64 
+                $20:u32, 
+                $177:u64;
+        stpr $141:u64 = 
+            band:u64 
+                $25:u32, 63:u64;
+        stpr $142:u64 = 
+            lsl:u64 
+                $141:u64, 32:u64;
+        stpr $143:u64 = 
+            bor:u64 
+                $142:u64, 
+                $140:u64;
+        stpr $144:u64 = 
+            $143:u64;
+        stpr $25:u32 = 
+            bnot:u32
+                $144:u32;
+        stpr $27:u32:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        st:u32:12 handle = 
+            $27:u32;
+        stpr $28:u64 = 
+            add:i32 
+                $27:i32, 1:i32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $28:u64;
+        stpr $178:u32 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $178:i32 = 
+            add:i32 
+                $178:i32, -1:i32;
+        stpr $145:u64 = 
+            band:u64 
+                $20:u32, 
+                $178:u32;
+        stpr $146:u64 = 
+            band:u64 
+                $27:u32, 63:u64;
+        stpr $147:u64 = 
+            lsl:u64 
+                $146:u64, 32:u64;
+        stpr $148:u64 = 
+            bor:u64 
+                $147:u64, 
+                $145:u64;
+        stpr $149:u32 = 
+            $148:u64;
+        stpr $27:u32 = 
+            bnot:u32
+                $149:u32;
+        stpr $29:u32:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        st:u32:16 handle = 
+            $29:u32;
+        stpr $30:u64 = 
+            add:i32 
+                $29:i32, 1:i32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $30:u64;
+        stpr $179:u64 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $179:i32 = 
+            add:i32 
+                $179:i32, -1:i32;
+        stpr $150:u64 = 
+            band:u64 
+                $20:u32, 
+                $179:u64;
+        stpr $151:u64 = 
+            band:u64 
+                $29:u32, 63:u64;
+        stpr $152:u64 = 
+            lsl:u64 
+                $151:u64, 32:u64;
+        stpr $153:u64 = 
+            bor:u64 
+                $152:u64, 
+                $150:u64;
+        stpr $154:u64 = 
+            $153:u64;
+        stpr $29:u32 = 
+            bnot:u32
+                $154:u32;
+        stpr $31:u32:(sideeffect) = 
+            neg:u64 
+                $124:u64;
+        stpr $32:u64 = 
+            add:i32 
+                $31:i32, 1:i32;
+        st:u32:20 handle = 
+            $31:u32;
+        stpr $124:u64:(sideeffect) = 
+            xor:u64 
+                $124:u64, 
+                $32:u64;
+        stpr $88:u64 = 
+            xor:u64 
+                $126:u64, 32:u64;
+        stpr $180:u64 = 
+            xor:u64 
+                $126:u64, 16:u64;
+        stpr $180:i32 = 
+            add:i32 
+                $180:i32, -1:i32;
+        stpr $155:u64 = 
+            band:u64 
+                $20:u32, 
+                $180:u64;
+        stpr $156:u64 = 
+            band:u64 
+                $31:u32, 63:u64;
+        stpr $157:u64 = 
+            lsl:u64 
+                $156:u64, 32:u64;
+        stpr $158:u64 = 
+            bor:u64 
+                $157:u64, 
+                $155:u64;
+        stpr $159:u64 = 
+            $158:u64;
+        stpr $31:u32 = 
+            bnot:u32
+                $159:u32;
+        st:u64:24 handle = 
+            $88:u64;
+        stpr $18:u16 = 257:i32;
+        st:u32:32 handle = 
+            $20:u32;
+        stpr $118:u8 = 1:i32;
+        st:u16:36 handle = 
+            $18:u16;
+        stpr $87:u64 = 0:i32;
+        st:u8:38 handle = 
+            $118:u8;
+        stpr $19:u16 = 0:i32;
+        st:u64:40 handle = 
+            $87:u64;
+        st:u16:48 handle = 
+            $19:u16;
+        st:u64:56 handle = 
+            $87:u64;
+        st:u64:64 handle = 
+            $87:u64;
+        st:u8:72 handle = 
+            $117:u8;
+        st:u32:76 handle = 
+            $20:u32;
+        st:u32:80 handle = 
+            $20:u32;
+        st:u32:84 handle = 
+            $20:u32;
+        st:u32:88 handle = 
+            $20:u32;
+        st:u16:92 handle = 
+            $19:u16;
+        st:u8:94 handle = 
+            $117:u8;
+        st:u8:104 handle = 
+            $117:u8;
+        st:u64:96 handle = 
+            $87:u64;
+        st:u32:116 handle = 
+            $20:u32;
+        st:u32:112 handle = 
+            $20:u32;
+        st:u32:108 handle = 
+            $20:u32;
+        stpr $89:*<1> = 
+            lda handle;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa11matmul_initERNS_12MatmulHandleENS_14MatmulDataTypeE(
+            $89:u64,
+            $20:u32);
+        stpr $34:i32 = 32:i32;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa18matmul_load_weightERNS_12MatmulHandleEPvNS_11MatmulKSizeENS_11MatmulNSizeEj(
+            $89:u64,
+            $52:u64,
+            $34:u32,
+            $34:u32,
+            $20:u32);
+        stpr $35:i32 = 128:i32;
+        stpr $36:i32 = 1:i32;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa14matmul_computeERNS_12MatmulHandleEPvjNS_11MatmulKSizeEj(
+            $89:u64,
+            $50:u64,
+            $35:u32,
+            $34:u32,
+            $36:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa12matmul_storeERNS_12MatmulHandleEPvjNS_11MatmulNSizeE(
+            $89:u64,
+            $53:u64,
+            $35:u32,
+            $34:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa11matmul_waitERNS_12MatmulHandleE(
+            $89:u64);
+        stpr $61:u64 = 
+            $53:u64;
+        stpr $62:u64 = 
+            $87:u64;
+        label label_BB0_6;
+        stpr $8:f64 = 
+            cvt:f64 
+                $62:u64;
+        stpr $9:f64 = 
+            add:f64 
+                $8:f64, 
+                $8:f64;
+        stpr $111:u64 = 
+            $87:u64;
+        stpr $161:u64 = 
+            xor:u64 
+                $126:u64, 263168:u64;
+        stpr $161:u64 = 
+            lsl:u64 
+                $161:u64, 32:u64;
+        stpr $160:f64 = 
+            neg:f64 
+                $161:u64;
+        stpr $6:f64 = 
+            mul:f64 
+                $9:f64, 
+                $160:f64;
+        goto label_BB0_9;
+        label label_BB0_10;
+        stpr $37:u32 = 
+            ild:u32 
+                $77:*<1>;
+        stpr $38:i32 = 
+            add:i32 
+                $37:i32, 1:i32;
+        ist:u32 = 
+            $77:*<1>,
+            $38:u32;
+        label label_BB0_11;
+        stpr $111:i64 = 
+            add:i64 
+                $111:i64, 2:i64;
+        stpr $162:i32 = 64:i32;
+        truebr (
+            eq:bool 
+                $111:i64, 
+                $162:i64), label_BB0_8;
+        label label_BB0_9;
+        stpr $91:*<1> = 
+            add:i64 
+                $61:i64, 
+                $111:i64;
+        stpr $3:f16 = 
+            ild:f16 
+                $91:*<1>;
+        stpr $10:f64 = 
+            cvt:f64 
+                $3:f16;
+        truebr (
+            eq:bool 
+                $6:f64, 
+                $10:f64), label_BB0_11;
+        goto label_BB0_10;
+        label label_BB0_8;
+        stpr $62:i64 = 
+            add:i64 
+                $62:i64, 1:i64;
+        stpr $61:i64 = 
+            add:i64 
+                $61:i64, 64:i64;
+        stpr $163:i32 = 128:i32;
+        truebr (
+            ne:bool 
+                $62:i64, 
+                $163:i64), label_BB0_6;
+        label label_BB0_7;
+        st:u8 end = 
+            $117:u8;
+        stpr $93:*<1> = 
+            lda handle;
+        stpr $94:*<1> = 
+            lda end;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa26matmul_set_updating_weightERNS_12MatmulHandleERKb(
+            $93:u64,
+            $94:u64);
+        stpr $41:i32 = 2:i32;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa14matmul_computeERNS_12MatmulHandleEPvjNS_11MatmulKSizeEj(
+            $93:u64,
+            $50:u64,
+            $35:u32,
+            $34:u32,
+            $41:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa12matmul_storeERNS_12MatmulHandleEPvjNS_11MatmulNSizeE(
+            $93:u64,
+            $53:u64,
+            $35:u32,
+            $34:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa11matmul_waitERNS_12MatmulHandleE(
+            $93:u64);
+        stpr $113:i32 = 0:i32;
+        stpr $112:*<1> = 
+            $53:u64;
+        goto label_BB0_13;
+        label label_BB0_14;
+        stpr $42:u32 = 
+            ild:u32 
+                $77:*<1>;
+        stpr $43:i32 = 
+            add:i32 
+                $42:i32, 1:i32;
+        ist:u32 = 
+            $77:*<1>,
+            $43:u32;
+        label label_BB0_15;
+        stpr $113:i64 = 
+            add:i64 
+                $113:i64, 1:i64;
+        stpr $112:*<1> = 
+            add:i64 
+                $112:*<1>, 64:i64;
+        stpr $164:i32 = 128:i32;
+        truebr (
+            eq:bool 
+                $113:i64, 
+                $164:i64), label_BB0_12;
+        label label_BB0_13;
+        stpr $12:f64 = 
+            cvt:f64 
+                $113:u64;
+        stpr $166:u64 = 
+            xor:u64 
+                $126:u64, 262272:u64;
+        stpr $166:u64 = 
+            lsl:u64 
+                $166:u64, 32:u64;
+        stpr $165:f64 = 
+            neg:f64 
+                $166:u64;
+        stpr $13:f64 = 
+            mul:f64 
+                $12:f64, 
+                $165:f64;
+        stpr $4:f16 = 
+            ild:f16 
+                $112:*<1>;
+        stpr $168:u64 = 
+            xor:u64 
+                $126:u64, 263168:u64;
+        stpr $168:u64 = 
+            lsl:u64 
+                $168:u64, 32:u64;
+        stpr $167:f64 = 
+            neg:f64 
+                $168:u64;
+        stpr $14:f64 = 
+            mul:f64 
+                $13:f64, 
+                $167:f64;
+        stpr $11:f64 = 
+            cvt:f64 
+                $4:f16;
+        truebr (
+            eq:bool 
+                $14:f64, 
+                $11:f64), label_BB0_15;
+        goto label_BB0_14;
+        label label_BB0_12;
+        stpr $96:*<1> = 
+            lda handle;
+        stpr $46:i32 = 3:i32;
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa14matmul_computeERNS_12MatmulHandleEPvjNS_11MatmulKSizeEj(
+            $96:u64,
+            $50:u64,
+            $35:u32,
+            $34:u32,
+            $46:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa12matmul_storeERNS_12MatmulHandleEPvjNS_11MatmulNSizeE(
+            $96:u64,
+            $53:u64,
+            $35:u32,
+            $34:u32);
+        call:(use(
+            ild:any 0:any)) _ZN4sdaa11matmul_waitERNS_12MatmulHandleE(
+            $96:u64);
+        stpr $95:u64 = 0:i32;
+        stpr $71:u64 = 
+            $53:u64;
+        stpr $72:u64 = 
+            $95:u64;
+        goto label_BB0_16;
+        label label_BB0_18;
+        stpr $72:i64 = 
+            add:i64 
+                $72:i64, 1:i64;
+        stpr $71:i64 = 
+            add:i64 
+                $71:i64, 64:i64;
+        stpr $169:i32 = 128:i32;
+        truebr (
+            eq:bool 
+                $72:i64, 
+                $169:i64), label_BB0_17;
+        label label_BB0_16;
+        stpr $15:f64 = 
+            cvt:f64 
+                $72:u64;
+        stpr $171:u64 = 
+            xor:u64 
+                $126:u64, 262400:u64;
+        stpr $171:u64 = 
+            lsl:u64 
+                $171:u64, 32:u64;
+        stpr $170:f64 = 
+            neg:f64 
+                $171:u64;
+        stpr $16:f64 = 
+            mul:f64 
+                $15:f64, 
+                $170:f64;
+        stpr $116:u64 = 
+            $95:u64;
+        stpr $173:u64 = 
+            xor:u64 
+                $126:u64, 263168:u64;
+        stpr $173:u64 = 
+            lsl:u64 
+                $173:u64, 32:u64;
+        stpr $172:f64 = 
+            neg:f64 
+                $173:u64;
+        stpr $7:f64 = 
+            mul:f64 
+                $16:f64, 
+                $172:f64;
+        goto label_BB0_19;
+        label label_BB0_20;
+        stpr $47:u32 = 
+            ild:u32 
+                $77:*<1>;
+        stpr $48:i32 = 
+            add:i32 
+                $47:i32, 1:i32;
+        ist:u32 = 
+            $77:*<1>,
+            $48:u32;
+        label label_BB0_21;
+        stpr $116:i64 = 
+            add:i64 
+                $116:i64, 2:i64;
+        stpr $174:i32 = 64:i32;
+        truebr (
+            eq:bool 
+                $116:i64, 
+                $174:i64), label_BB0_18;
+        label label_BB0_19;
+        stpr $98:*<1> = 
+            add:i64 
+                $71:i64, 
+                $116:i64;
+        stpr $5:f16 = 
+            ild:f16 
+                $98:*<1>;
+        stpr $17:f64 = 
+            cvt:f64 
+                $5:f16;
+        truebr (
+            eq:bool 
+                $7:f64, 
+                $17:f64), label_BB0_21;
+        goto label_BB0_20;
+        label label_BB0_17;
+        call:(use(
+            ild:any 0:any)) free(
+            $53:u64);
+        call:(use(
+            ild:any 0:any)) free(
+            $52:u64);
+        call:(use(
+            ild:any 0:any)) free(
+            $50:u64);
+        stpr $99:u64 = 
+            bnot:u64 3072:u32;
+        st:u64:0:(sideeffect) end = 
+            $99:u64;
+        stpr $100:u64 = 
+            ld:u64:0:(sideeffect) start;
+        stpr $101:u64 = 
+            ld:u64:0:(sideeffect) end;
+        stpr $102:u64 = 
+            ld:u64:0:(sideeffect) end;
+        stpr $103:u64 = 
+            ld:u64:0:(sideeffect) start;
+        stpr $105:*<1> = 
+            lda _str;
+        stpr $104:i64 = 
+            sub:i64 
+                $102:i64, 
+                $103:i64;
+        call:(use(
+            ild:any 0:any)) $49:u32 = ai_printf(
+            $105:u64,
+            $100:u64,
+            $101:u64,
+            $104:u64);
+        label label_BB0_22;
+        return ;
+    };
+}

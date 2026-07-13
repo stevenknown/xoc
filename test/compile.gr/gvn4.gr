@@ -1,0 +1,18 @@
+region program "program" () {
+    region func main () {
+        if (eq $3:i32, $4) {
+    	    stpr $8 = 20;
+        } else {
+    	    stpr $8 = 10;
+        }
+        stpr $9 = sub $8, 1;
+
+        if (eq $1:u16, $2:i32) {
+    	    stpr $7 = $4;
+        } else {
+    	    stpr $7 = $3;
+        }
+        stpr $7 = add $7, 1;
+        return $7;
+    };
+}

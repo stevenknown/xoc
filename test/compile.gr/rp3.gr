@@ -1,0 +1,33 @@
+//CHECK: RP will insert guard BB for preheader BB.
+region program program() {
+region func s81 () {
+    var k:i32:(align(4));
+    var rc:i32:(align(4));
+    var j:i32:(align(4));
+    var crc:i32:(align(4));
+    var nrint:i32:(align(4));
+    label "_$L6";
+    falsebr (lt ld j, 50:i32), "_$L1";
+
+    label "_$L4";
+    st k = 1:i32;
+    st j = 0:i32;
+    st nrint = ld k;
+
+    label "_$L1";
+    phi $2:i32 = ($1:i32,"_$L4"),($3:i32,"_$L5"),($1:i32,"_$L6");
+    falsebr (lt ld:i32 j, 50:i32), "_$L2";
+
+    label "_$L5";
+    stpr $3:i32 = ld j;
+    st j = add ld j, 1:i32;
+    goto "_$L1";
+
+    label "_$L2";
+    falsebr (ne ld crc, 0:i32), "_$L3";
+
+    st rc = add ld rc, 1:i32;
+    label "_$L3";
+    return ld:i32 rc;
+}
+}

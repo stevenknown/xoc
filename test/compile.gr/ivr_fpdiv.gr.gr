@@ -1,0 +1,60 @@
+
+//==---- DUMP Region '.program' ----==
+region program ".program" () {
+
+    var load_elim3:any:(func,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4));
+    //==---- DUMP Region 'load_elim3' ----==
+    region func load_elim3 () {
+
+        var d:i32:(align(4));
+        var i:i32:(align(4));
+        var x:mc<80>:(array,align(4));
+        label "_GR__$L3";
+        st:i32 d = 1:i32;
+        stpr $1:i32 = 
+            ld:i32 i;
+        stpr $2:f64 = 
+            ld:f64:32 x;
+        stpr $3:i32 = 1:i32;
+        stpr $4:f64 = 
+            ld:f64:16 x;
+        label "_GR__$L1";
+        phi $5:i32 = (1:i32,"_GR__$L3"),(
+            $6:i32,"_GR__$L4");
+        stpr $7:i32 = 
+            $5:i32;
+        stpr $8:i32 = 
+            $1:i32;
+        falsebr (
+            le:bool 
+                $5:i32, 
+                $1:i32), "_GR__$L2";
+        label "_GR__$L4";
+        stpr $9:*<80> = 
+            lda x;
+        stpr $10:u32 = 32:u32;
+        stpr $11:*<8> = 
+            lda:32 x;
+        stpr $12:f64 = 
+            $2:f64;
+        stpr $13:f64 = 
+            mul:f64 
+                $2:f64, 0.400000:f64 ;
+        stpr $14:*<80> = 
+            lda x;
+        stpr $15:u32 = 16:u32;
+        stpr $16:f64 = 
+            $13:f64;
+        stpr $17:i32 = 
+            $5:i32;
+        stpr $18:i32 = 
+            add:i32 
+                $5:i32, 1:i32;
+        stpr $6:i32 = 
+            $18:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return ;
+    };
+}

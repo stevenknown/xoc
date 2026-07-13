@@ -1,0 +1,15 @@
+region program program() {
+    var g:i32:(align(4));
+    var m:i32:(align(4));
+    var n:i32:(align(4));
+    region func bar() {
+        label L1;
+    	st g = add $1:i32, $2:i64;
+        falsebr (eq $1, $2), L2;
+        goto L1;
+    	stpr $8 = xor $9, $4; //unreachable code
+        label L2;
+    	stpr $7 = xor $7, $3;
+        return;
+    };
+}

@@ -1,0 +1,24 @@
+region program ".program" () {
+    var foo:any:(func,align(4));
+    //==---- DUMP Region 'foo' ----==
+    region func foo () {
+        var s:mc<48>:(align(4));
+        var a:i32:(align(4));
+        var p:*<4>:(align(4));
+        st:i32:44 s = 0:i32;
+        label "_GR__$L1";
+        falsebr (
+            lt:bool 
+                ld:i32:44 s, 100:i32), "_GR__$L2";
+        stpr $2:i32 = 
+            ld:mc<48> s;
+        st:i32:44 s = 
+            cvt:i32 
+                add:i32 
+                    ld:i32:44 s, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return 
+            ld:i32 a;
+    };
+}

@@ -1,0 +1,26 @@
+
+==---- DUMP Branch Condition Propagation 'foo' ----==
+
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:
+        eq:bool attachinfo:Dbx        
+            ld:i32 'i' attachinfo:Dbx,MDSSA        
+            intconst:i32 0|0x0
+      WILL BE REPLACED BY
+        ne:bool        
+            intconst:i32 1|0x1        
+            intconst:i32 0|0x0
+
+==---- DUMP Redundant Code Elimination 'foo' ----==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID2:
+    REMOVE EDGE: BB5->BB6
+    ACT2:GID3:
+      CHANGE:
+        OLD:
+        truebr label _$L4 attachinfo:Dbx        
+            ne:bool            
+                intconst:u32 1|0x1 attachinfo:Dbx            
+                intconst:u32 0|0x0
+        NEW:
+        goto label _$L4 attachinfo:Dbx

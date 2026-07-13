@@ -1,0 +1,5 @@
+data:
+1 3 2 3 3 4 3 
+n = 7
+
+candidate: 3, count: 4 is MAJORITY

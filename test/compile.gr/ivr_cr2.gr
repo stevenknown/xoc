@@ -1,0 +1,29 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var foo:any:(func,align(4));
+    region func foo (undefined,var n:i32:(align(4)),var h:i32:(align(4)),var u:i32:(align(4)),var a:i32:(align(4)),var b:i32:(align(4))) {
+        var j:i32:(align(4));
+        var k:i32:(align(4));
+        var i:i32:(align(4));
+        label "_GR__$L3";
+        st:i32 i = 0:i32;
+        stpr $5:i32 = ld:i32 n;
+        stpr $6:i32 = ld:i32 j;
+        stpr $8:i32 = ld:i32 i;
+        stpr $11:i32 = ld:i32 k;
+        label "_GR__$L1";
+
+        //There is no BIV.
+        //$10 is NOT biv, $10's coeff is 2, not linear
+        phi $9 = ($8,"_GR__$L3"), ($10,"_GR__$L4");
+        falsebr (lt $9, $5), "_GR__$L2";
+        label "_GR__$L4";
+        stpr $7 = add $9, 1;
+        stpr $12 = add $7, 2;
+        stpr $10 = $12;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        st i = $9;
+        return ld i;
+    };
+}

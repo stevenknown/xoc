@@ -1,0 +1,38 @@
+region program program() {
+region func s81 () {
+    var k:i32:(align(4));
+    var rc:i32:(align(4));
+    var j:i32:(align(4));
+    var crc:i32:(align(4));
+    var nrint:i32:(align(4));
+    label "(GR)_$L4";
+    st:i32 k = 1:i32;
+    st:i32 j = 0:i32;
+    label "(GR)_$L1";
+    phi $2:i32 = (
+        $1:i32,"(GR)_$L4"),(
+        $3:i32,"(GR)_$L5");
+    falsebr (
+        lt:bool
+            ld:i32 j, 50:i32), "(GR)_$L2";
+    label "(GR)_$L5";
+    st:i32 nrint =
+        ld:i32 k;
+    stpr $3:i32 =
+        ld:i32 j;
+    st:i32 j =
+        add:i32
+            ld:i32 j, 1:i32;
+    goto "(GR)_$L1";
+    label "(GR)_$L2";
+    falsebr (
+        ne:bool
+            ld:i32 crc, 0:i32), "(GR)_$L3";
+    st:i32 rc =
+        add:i32
+            ld:i32 rc, 1:i32;
+    label "(GR)_$L3";
+    return
+        ld:i32 rc;
+}
+}

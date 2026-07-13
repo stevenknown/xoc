@@ -1,0 +1,166 @@
+
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: array(id:6) THAT LOCATED IN STMT:
+    starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+        elem_num[13]
+        intconst:i32 8|0x8 dim0 attachinfo:Dbx        
+        lda:*<52> 'arr' decl:int  arr [13] array_base attachinfo:Dbx        
+        array:i32 (elemtype:i32) rhs attachinfo:Dbx,MDSSA
+            elemnum[13]
+            intconst:i32 4|0x4 dim0 attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] array_base attachinfo:Dbx
+WILL REPLACE array THAT LOCATED IN STMT:
+    starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+        elem_num[13]
+        intconst:i32 1|0x1 dim0 attachinfo:Dbx        
+        lda:*<52> 'arr' decl:int  arr [13] array_base attachinfo:Dbx        
+        array:i32 (elemtype:i32) rhs attachinfo:Dbx,MDSSA
+            elemnum[13]
+            intconst:i32 8|0x8 dim0 attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] array_base attachinfo:Dbx
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:71) THAT LOCATED IN STMT:
+    stpr $1:u32 attachinfo:Dbx        
+        $13:u32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $14:*<4> attachinfo:Dbx        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $1:u32 attachinfo:Dbx
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:74) THAT LOCATED IN STMT:
+    stpr $2:*<4> attachinfo:Dbx        
+        $14:*<4>
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $15:i32 attachinfo:Dbx        
+        ild:i32 attachinfo:MDSSA,Dbx            
+            $2:*<4> attachinfo:Dbx
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:42) THAT LOCATED IN STMT:
+    stpr $3:i32 attachinfo:Dbx        
+        $15:i32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $4:u32 attachinfo:Dbx        
+        $3:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:78) THAT LOCATED IN STMT:
+    stpr $7:i32 attachinfo:Dbx        
+        $15:i32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $8:u32 attachinfo:Dbx        
+        $7:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:44) THAT LOCATED IN STMT:
+    stpr $8:u32 attachinfo:Dbx        
+        $16:u32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $8:u32 attachinfo:Dbx        
+        $15:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: pr(id:80) THAT LOCATED IN STMT:
+    stpr $12:u32 attachinfo:Dbx        
+        $16:u32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $12:u32 attachinfo:Dbx        
+        $11:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:66) THAT LOCATED IN STMT:
+    stpr $13:u32 attachinfo:Dbx        
+        intconst:u32 16|0x10 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $1:u32 attachinfo:Dbx        
+        $13:u32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:66) THAT LOCATED IN STMT:
+    stpr $13:u32 attachinfo:Dbx        
+        intconst:u32 16|0x10 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $5:u32 attachinfo:Dbx        
+        $13:u32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:66) THAT LOCATED IN STMT:
+    stpr $13:u32 attachinfo:Dbx        
+        intconst:u32 16|0x10 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $14:*<4> attachinfo:Dbx        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $13:u32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:13) THAT LOCATED IN STMT:
+    stpr $4:u32 attachinfo:Dbx        
+        intconst:u32 32|0x20 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $4:u32 attachinfo:Dbx        
+        $15:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:8) THAT LOCATED IN STMT:
+    stpr $16:u32 attachinfo:Dbx        
+        intconst:u32 4|0x4 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $8:u32 attachinfo:Dbx        
+        $16:u32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:8) THAT LOCATED IN STMT:
+    stpr $16:u32 attachinfo:Dbx        
+        intconst:u32 4|0x4 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $16:u32        
+        $15:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:8) THAT LOCATED IN STMT:
+    stpr $16:u32 attachinfo:Dbx        
+        intconst:u32 4|0x4 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:i32 attachinfo:Dbx,MDSSA        
+        add:*<4> attachinfo:Dbx            
+            lda:*<52> 'arr' decl:int  arr [13] attachinfo:Dbx            
+            $16:u32        
+        $11:i32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: const(id:8) THAT LOCATED IN STMT:
+    stpr $16:u32 attachinfo:Dbx        
+        intconst:u32 4|0x4 attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $12:u32 attachinfo:Dbx        
+        $16:u32
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: lda(id:4) THAT LOCATED IN STMT:
+    stpr $14:*<4> attachinfo:Dbx        
+        lda:*<4>:offset(16) 'arr' decl:int  arr [13] attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $15:i32 attachinfo:Dbx        
+        ild:i32 attachinfo:MDSSA,Dbx            
+            $14:*<4>
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: lda(id:4) THAT LOCATED IN STMT:
+    stpr $14:*<4> attachinfo:Dbx        
+        lda:*<4>:offset(16) 'arr' decl:int  arr [13] attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $2:*<4> attachinfo:Dbx        
+        $14:*<4>
+==---- DUMP Copy Propagation 'intrapred' ----==
+PROPAGATING CANDIDATE: lda(id:4) THAT LOCATED IN STMT:
+    stpr $14:*<4> attachinfo:Dbx        
+        lda:*<4>:offset(16) 'arr' decl:int  arr [13] attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $6:*<4> attachinfo:Dbx        
+        $14:*<4>

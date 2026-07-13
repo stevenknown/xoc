@@ -1,0 +1,72 @@
+region program ".program" () {
+    var a:i32:(align(4));
+    var ad:f64:(align(4));
+    var b:i32:(align(4));
+    var c:i32:(align(4));
+    var foo:any:(func,align(4));
+    var bar:any:(func,align(4));
+    var bar2:any:(func,align(4));
+    var zoo:any:(func,align(4));
+    var zoo2:any:(func,align(4));
+    region func bar () {
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            eq:bool 
+                    gt:bool 
+                        ld:i32 a, 5:i32,
+                    0:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        if (
+            eq:bool 
+                    gt:bool 
+                        ld:i32 a, 5:i32,
+                    1:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+
+    region func zoo () {
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            eq:bool 
+                    le:bool 
+                        ld:f64 ad, 5.000000:f64 ,
+                    0.0:f64)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        if (
+            eq:bool 
+                    le:bool 
+                        ld:f64 ad, 5.000000:f64 ,
+                    1.0:f64)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+}

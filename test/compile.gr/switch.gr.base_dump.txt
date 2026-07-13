@@ -1,0 +1,199 @@
+
+==---- DUMP CFG 'main' ----==
+  ==---- DUMP IRBBList 'main' ----==
+  ----- BB61 --- rpo:-1 -----
+  ATTR:entry_bb fall_through
+  STMT NUM:0
+
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through
+  STMT NUM:2
+     stpr $3:i64
+         ld:i64 'i'
+     truebr label _$L4
+         eq:bool
+             $3:i64 attachinfo:Dbx
+             intconst:i64 33|0x21
+
+  ----- BB8 --- rpo:-1 -----
+  LABEL:_$L2 _$L3 _$L1
+  ATTR:fall_through branch_target
+  STMT NUM:2
+     stpr $6:i64
+         ld:i64 'i'
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             intconst:i64 1|0x1
+
+  ----- BB12 --- rpo:-1 -----
+  LABEL:_$L5
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             strconst:str \"H\"
+
+  ----- BB16 --- rpo:-1 -----
+  LABEL:_$L7
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             fpconst:f64 3.450000
+
+  ----- BB20 --- rpo:-1 -----
+  LABEL:_$L9
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             intconst:u64 65500|0xffdc
+
+  ----- BB24 --- rpo:-1 -----
+  LABEL:_$L11
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             boolconst:bool 0
+
+  ----- BB46 --- rpo:-1 -----
+  LABEL:_L1
+  ATTR:fall_through branch_target
+  STMT NUM:2
+     stpr $7:i64
+         ld:i64 'i'
+     truebr label _$L4
+         eq:bool
+             $7:i64 attachinfo:Dbx
+             intconst:i64 2|0x2
+
+  ----- BB59 --- rpo:-1 -----
+  LABEL:_$L4 ENDL
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     return attachinfo:Dbx
+         $2:u8
+
+node1 [shape = Mrecord, label="{V1}"];
+node8 [shape = Mrecord, label="{V8}"];
+node12 [shape = Mrecord, label="{V12}"];
+node16 [shape = Mrecord, label="{V16}"];
+node20 [shape = Mrecord, label="{V20}"];
+node24 [shape = Mrecord, label="{V24}"];
+node46 [shape = Mrecord, label="{V46}"];
+node59 [shape = Mrecord, label="{V59}"];
+node61 [shape = Mrecord, label="{V61}"];
+node16->node20[label=""]
+node24->node46[label=""]
+node8->node12[label=""]
+node46->node59[label=""]
+node20->node24[label=""]
+node12->node16[label=""]
+node1->node8[label=""]
+node61->node1[label=""]
+node24->node59[label=""]
+node20->node59[label=""]
+node16->node59[label=""]
+node12->node59[label=""]
+node8->node59[label=""]
+node1->node59[label=""]
+==---- DUMP CFG 'main' ----==
+  ==---- DUMP IRBBList 'main' ----==
+  ----- BB61 --- rpo:-1 -----
+  ATTR:entry_bb fall_through
+  STMT NUM:0
+
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through
+  STMT NUM:2
+     stpr $3:i64
+         ld:i64 'i'
+     truebr label _$L4
+         eq:bool
+             $3:i64 attachinfo:Dbx
+             intconst:i64 33|0x21
+
+  ----- BB8 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:2
+     stpr $6:i64
+         ld:i64 'i'
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             intconst:i64 1|0x1
+
+  ----- BB12 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             strconst:str \"H\"
+
+  ----- BB16 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             fpconst:f64 3.450000
+
+  ----- BB20 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             intconst:u64 65500|0xffdc
+
+  ----- BB24 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4
+         eq:bool
+             $6:i64 attachinfo:Dbx
+             boolconst:bool 0
+
+  ----- BB46 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     stpr $7:i64
+         ld:i64 'i'
+
+  ----- BB59 --- rpo:-1 -----
+  LABEL:_$L4
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     return attachinfo:Dbx
+         $2:u8
+
+node1 [shape = Mrecord, label="{V1}"];
+node8 [shape = Mrecord, label="{V8}"];
+node12 [shape = Mrecord, label="{V12}"];
+node16 [shape = Mrecord, label="{V16}"];
+node20 [shape = Mrecord, label="{V20}"];
+node24 [shape = Mrecord, label="{V24}"];
+node46 [shape = Mrecord, label="{V46}"];
+node59 [shape = Mrecord, label="{V59}"];
+node61 [shape = Mrecord, label="{V61}"];
+node16->node20[label=""]
+node24->node46[label=""]
+node8->node12[label=""]
+node46->node59[label=""]
+node20->node24[label=""]
+node12->node16[label=""]
+node1->node8[label=""]
+node61->node1[label=""]
+node24->node59[label=""]
+node20->node59[label=""]
+node16->node59[label=""]
+node12->node59[label=""]
+node8->node59[label=""]
+node1->node59[label=""]

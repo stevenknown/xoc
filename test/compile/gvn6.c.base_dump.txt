@@ -1,0 +1,171 @@
+
+==---- DUMP Global Value Numbering 'dgesl' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [5]  for (kb = 0; kb < n; kb++) {
+  
+  st:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA          
+          ld:i32 'n' decl:int  n  attachinfo:Dbx,MDSSA
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	ld id:5 --
+   }
+  -- BB3 
+  
+
+  [6]    k = kb;
+  
+  st:i32 'k' decl:int  k  attachinfo:Dbx,MDSSA      
+      ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA
+  vn2 <- {
+  	ld id:8 vn2
+   }
+
+  [7]    b[k] = a[k][k]; //S1
+  
+  starray:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+      elem_num[1]
+      ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA      
+      ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA      
+      array:f64 (elemtype:f64) rhs attachinfo:Dbx,MDSSA
+          elemnum[201,1]
+          ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA
+          ld:i32 'k' decl:int  k  dim1 attachinfo:Dbx,MDSSA          
+          ld:*<1608> 'a' decl:double (( *  a )[1])[201] array_base attachinfo:Dbx,MDSSA
+  vn3 <- {
+  	ld id:10 --
+  	ld id:11 vn2
+  	array id:16 vn3
+  	ld id:13 --
+  	ld id:14 vn2
+  	ld id:15 vn2
+   }
+
+  [8]    t = -b[k]; //S2, Note S1's b[k] is the killing-def of S2's b[k], even if it
+  
+  st:f64 't' decl:double  t  attachinfo:Dbx,MDSSA      
+      neg:f64 attachinfo:Dbx          
+          array:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+              elemnum[1]
+              ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA              
+              ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA
+  vn4 <- {
+  	neg id:25 vn4
+  	array id:24 --
+  	ld id:22 --
+  	ld id:23 vn2
+   }
+
+  [5]  for (kb = 0; kb < n; kb++) {
+  
+  stpr $2:i32 attachinfo:Dbx      
+      ld:i32 'kb' decl:int  kb  attachinfo:MDSSA
+  vn5 <- {
+  	ld id:33 vn5
+   }
+  st:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+  vn7 <- {
+  	add id:32 vn7
+  	ld id:30 --
+  	const id:31 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB5   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Copy Propagation 'dgesl' ----==
+PROPAGATING CANDIDATE: ld(id:8) THAT LOCATED IN STMT:
+    st:i32 'k' decl:int  k  attachinfo:Dbx,MDSSA        
+        ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA
+WILL REPLACE ld THAT LOCATED IN STMT:
+    starray:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+        elem_num[1]
+        ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA        
+        ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA        
+        array:f64 (elemtype:f64) rhs attachinfo:Dbx,MDSSA
+            elemnum[201,1]
+            ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA
+            ld:i32 'k' decl:int  k  dim1 attachinfo:Dbx,MDSSA            
+            ld:*<1608> 'a' decl:double (( *  a )[1])[201] array_base attachinfo:Dbx,MDSSA
+==---- DUMP Copy Propagation 'dgesl' ----==
+PROPAGATING CANDIDATE: ld(id:8) THAT LOCATED IN STMT:
+    st:i32 'k' decl:int  k  attachinfo:Dbx,MDSSA        
+        ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA
+WILL REPLACE ld THAT LOCATED IN STMT:
+    starray:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+        elem_num[1]
+        ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx        
+        ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA        
+        array:f64 (elemtype:f64) rhs attachinfo:Dbx,MDSSA
+            elemnum[201,1]
+            ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA
+            ld:i32 'k' decl:int  k  dim1 attachinfo:Dbx,MDSSA            
+            ld:*<1608> 'a' decl:double (( *  a )[1])[201] array_base attachinfo:Dbx,MDSSA
+==---- DUMP Copy Propagation 'dgesl' ----==
+PROPAGATING CANDIDATE: ld(id:8) THAT LOCATED IN STMT:
+    st:i32 'k' decl:int  k  attachinfo:Dbx,MDSSA        
+        ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA
+WILL REPLACE ld THAT LOCATED IN STMT:
+    starray:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+        elem_num[1]
+        ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx        
+        ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA        
+        array:f64 (elemtype:f64) rhs attachinfo:Dbx,MDSSA
+            elemnum[201,1]
+            ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx
+            ld:i32 'k' decl:int  k  dim1 attachinfo:Dbx,MDSSA            
+            ld:*<1608> 'a' decl:double (( *  a )[1])[201] array_base attachinfo:Dbx,MDSSA
+==---- DUMP Copy Propagation 'dgesl' ----==
+PROPAGATING CANDIDATE: ld(id:8) THAT LOCATED IN STMT:
+    st:i32 'k' decl:int  k  attachinfo:Dbx,MDSSA        
+        ld:i32 'kb' decl:int  kb  attachinfo:Dbx,MDSSA
+WILL REPLACE ld THAT LOCATED IN STMT:
+    st:f64 't' decl:double  t  attachinfo:Dbx,MDSSA        
+        neg:f64 attachinfo:Dbx            
+            array:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+                elemnum[1]
+                ld:i32 'k' decl:int  k  dim0 attachinfo:Dbx,MDSSA                
+                ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA
+==---- DUMP Copy Propagation 'dgesl' ----==
+PROPAGATING CANDIDATE: array(id:16) THAT LOCATED IN STMT:
+    starray:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+        elem_num[1]
+        ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx        
+        ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA        
+        array:f64 (elemtype:f64) rhs attachinfo:Dbx,MDSSA
+            elemnum[201,1]
+            ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx
+            ld:i32 'kb' decl:int  kb  dim1 attachinfo:MDSSA,Dbx            
+            ld:*<1608> 'a' decl:double (( *  a )[1])[201] array_base attachinfo:Dbx,MDSSA
+WILL REPLACE array THAT LOCATED IN STMT:
+    st:f64 't' decl:double  t  attachinfo:Dbx,MDSSA        
+        neg:f64 attachinfo:Dbx            
+            array:f64 (elemtype:f64) attachinfo:Dbx,MDSSA
+                elemnum[1]
+                ld:i32 'kb' decl:int  kb  dim0 attachinfo:MDSSA,Dbx                
+                ld:*<8> 'b' decl:double ( *  b )[1] array_base attachinfo:Dbx,MDSSA
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'dgesl',id:2
+   <- { }

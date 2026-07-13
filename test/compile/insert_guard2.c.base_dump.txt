@@ -1,0 +1,129 @@
+
+==---- DUMP Loop Invariant Code Motion 'itrans_2' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'itrans_2' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP2 HEAD:BB2, BODY:2,3,4,5,7,
+  LOOP1 HEAD:BB4, BODY:4,5,
+-- INVARIANT EXP (NUM=3) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+       elemnum[4]
+       ld:i32 'j' dim0 attachinfo:Dbx,MDSSA       
+       lda:*<16> 'M6' array_base attachinfo:Dbx
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+
+-- HOIST CAND EXP (NUM=2) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+       elemnum[4]
+       ld:i32 'j' dim0 attachinfo:Dbx,MDSSA       
+       lda:*<16> 'M6' array_base attachinfo:Dbx
+-- HOISTED IR: --
+  array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'itrans_2' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP2 HEAD:BB2, BODY:2,3,4,5,7,12,
+  LOOP1 HEAD:BB4, BODY:4,5,
+-- INVARIANT EXP (NUM=4) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+       elemnum[4]
+       ld:i32 'j' dim0 attachinfo:Dbx,MDSSA       
+       lda:*<16> 'M6' array_base attachinfo:Dbx
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   $5:i32
+-- INVARIANT STMT (NUM=1) -- :
+   stpr $5:i32       
+       array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+           elemnum[4]
+           ld:i32 'j' decl:int  j  dim0 attachinfo:Dbx,MDSSA           
+           lda:*<16> 'M6' decl:int  M6 [4] array_base attachinfo:Dbx
+-- HOIST CAND EXP (NUM=2) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+       elemnum[4]
+       ld:i32 'j' dim0 attachinfo:Dbx,MDSSA       
+       lda:*<16> 'M6' array_base attachinfo:Dbx
+-- HOISTED IR: --
+  stpr $5:i32
+==---- DUMP Loop Invariant Code Motion 'itrans_2' ----==
+==---- DUMP LICM Analysis Result : LoopInfo3 : 'itrans_2' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,7,12,
+  LOOP3 HEAD:BB4, BODY:4,5,
+-- INVARIANT EXP (NUM=8) -- :
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:u32 16|0x10
+   $14:u32 attachinfo:Dbx
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   $15:u32 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       $14:u32 attachinfo:Dbx       
+       $15:u32 attachinfo:Dbx
+   $7:i32
+   add:u32 attachinfo:       
+       intconst:i32 0|0x0 attachinfo:Dbx       
+       intconst:u32 0|0x0
+   $16:u32 attachinfo:Dbx
+-- INVARIANT STMT (NUM=3) -- :
+   stpr $14:u32       
+       add:u32 attachinfo:           
+           intconst:i32 0|0x0 attachinfo:Dbx           
+           intconst:u32 0|0x0
+
+   [10]      cof[i1][j][0][0]=M6[i]-M6[j];
+   
+   stpr $15:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA           
+           intconst:u32 16|0x10
+   stpr $16:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           $14:u32 attachinfo:Dbx           
+           $15:u32 attachinfo:Dbx
+-- HOIST CAND EXP (NUM=3) -- :
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:u32 16|0x10
+   add:u32 attachinfo:Dbx       
+       $14:u32 attachinfo:Dbx       
+       $15:u32 attachinfo:Dbx
+   add:u32 attachinfo:       
+       intconst:i32 0|0x0 attachinfo:Dbx       
+       intconst:u32 0|0x0
+-- HOISTED IR: --
+  stpr $15:u32 attachinfo:Dbx
+-- HOISTED IR: --
+  stpr $14:u32
+-- HOISTED IR: --
+  stpr $16:u32 attachinfo:Dbx
+==---- DUMP LICM Analysis Result : LoopInfo4 : 'itrans_2' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,7,12,20,21,22,
+  LOOP3 HEAD:BB4, BODY:4,5,
+-- INVARIANT EXP (NUM=4) -- :
+   $7:i32
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:u32 16|0x10
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   add:u32 attachinfo:       
+       intconst:i32 0|0x0 attachinfo:Dbx       
+       intconst:u32 0|0x0
+
+-- HOIST CAND EXP (NUM=2) -- :
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:u32 16|0x10
+   add:u32 attachinfo:       
+       intconst:i32 0|0x0 attachinfo:Dbx       
+       intconst:u32 0|0x0
+-- HOISTED IR: --
+  mul:u32 attachinfo:Dbx
+-- HOISTED IR: --
+  add:u32 attachinfo:

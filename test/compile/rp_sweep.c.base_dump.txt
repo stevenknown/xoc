@@ -1,0 +1,52 @@
+
+==---- DUMP Register Promotion 'load_elim3' ----==
+  ==-- DUMP Dont Promotion Table --==
+  
+  st:i32 'this' attachinfo:Dbx,MDSSA
+  st:f64:offset(24) 'this' attachinfo:Dbx,MDSSA
+  ist:f64 attachinfo:Dbx,MDSSA
+  ld:i32 'this' attachinfo:Dbx,MDSSA
+  ==-- DUMP ALL ACT --==
+    ACT1:ld is swept out by ist, because:not-covered but overlapped with memory references in exact-tab
+    ACT2:ld is swept out by ist, because:not-covered but overlapped with memory references in exact-tab
+    ACT3:ld is swept out by ist, because:not-covered but overlapped with memory references in exact-tab
+    ACT4:st is swept out by ist, because:not-covered but overlapped with memory references in exact-tab
+    ACT5:ist is clobbered by ld, because:ist overlapped with exact acessing delegate ld
+    ACT6:ist is clobbered by ld, because:ist overlapped with exact acessing delegate ld
+    ACT7:ist is clobbered by ld, because:ist overlapped with exact acessing delegate ld
+    ACT8:ist is clobbered by st, because:ist overlapped with exact acessing delegate st
+    ACT9:st is swept out by ist, because:prevent by element in DontPromoteTab
+    ACT10:st is swept out by ist, because:prevent by element in DontPromoteTab
+    ACT11:ld is swept out by st, because:prevent by element in DontPromoteTab
+==-- DUMP LoopInfo --==
+  LOOP1 HEAD:BB2, BODY:2,3,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD15 -- base:Var69(wild):local,align(4),pointer,pt_base_sz:8,*,mem_size:4,decl:'double  *  wild ' -- ofst:0 -- size:4
+    ld:*<8> 'wild' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:*<8> 'wild' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==---- DUMP DelegateMgr 'load_elim3' ----==
+  ==-- Dele2PR --==
+  
+  DELE:  ld:*<8> 'wild' attachinfo:Dbx,MDSSA
+  PR:  $5:*<8>
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+  
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  
+
+  ==-- Dele2RestoreStmt --==

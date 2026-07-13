@@ -1,0 +1,531 @@
+region program ".program" () {
+var byte:u8:(align(4));
+var word:u32:(align(4));
+var aes_ret:i16:(align(4));
+var aes:mc<524>:(align(4));
+var set_key:i16:(func,align(4));
+var encrypt:i16:(func,align(4));
+var decrypt:i16:(func,align(4));
+var set_blk:i16:(func,align(4));
+var s_box:mc<256>:(array,align(4));
+var inv_s_box:mc<256>:(array,align(4));
+var rcon_tab:mc<116>:(array,align(4));
+var ft_tab:mc<4096>:(array,align(4));
+var it_tab:mc<4096>:(array,align(4));
+var fl_tab:mc<4096>:(array,align(4));
+var il_tab:mc<4096>:(array,align(4));
+var im_tab:mc<4096>:(array,align(4));
+var encrypt:i16:(func,align(4));
+var set_key:i16:(func,align(4));
+var decrypt:i16:(func,align(4));
+var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+region func encrypt (undefined,var in_blk:*<1>:(align(4)),var out_blk:*<1>:(align(4)),var cx:*<524>:(align(4))) {
+    var b1:mc<16>:(array,align(4));
+    var b0:mc<16>:(array,align(4));
+    var kp:*<4>:(align(4));
+    stpr $3:u8 =
+        ild:u8:520
+            ld:*<524> cx;
+    stpr $4:i32 =
+        band:i32
+            $3:u8, 0x1:i32;
+    truebr (
+        ne:bool
+            $4:i32, 0x0:i32), _L10;
+    return 0x0:i32;
+    label _L10;
+    stpr $5:*<4> =
+        cvt:*<4>
+            ld:*<1> in_blk;
+    stpr $6:u32 =
+        ild:u32
+            $5:*<4>;
+    stpr $7:u32 =
+        ild:u32
+            ld:*<4> kp;
+    stpr $8:u32 =
+        mul:u32 0x0:i32, 4:u32;
+    ist:u32 =
+        add:*<4>
+            lda b0,
+            $8:u32,
+        xor:u32
+            $6:u32,
+            $7:u32;
+    stpr $9:*<1> =
+        add:*<1>
+            ld:*<1> in_blk, 0x4:i32;
+    stpr $10:*<4> =
+        cvt:*<4>
+            $9:*<1>;
+    stpr $11:u32 =
+        ild:u32
+            $10:*<4>;
+    stpr $12:*<4> =
+        add:*<4>
+            ld:*<4> kp, 0x4:i32;
+    stpr $13:u32 =
+        ild:u32
+            $12:*<4>;
+    stpr $14:u32 =
+        mul:u32 0x1:i32, 4:u32;
+    ist:u32 =
+        add:*<4>
+            lda b0,
+            $14:u32,
+        xor:u32
+            $11:u32,
+            $13:u32;
+    stpr $15:*<1> =
+        add:*<1>
+            ld:*<1> in_blk, 0x8:i32;
+    stpr $16:*<4> =
+        cvt:*<4>
+            $15:*<1>;
+    stpr $17:u32 =
+        ild:u32
+            $16:*<4>;
+    stpr $18:*<4> =
+        add:*<4>
+            ld:*<4> kp, 0x8:i32;
+    stpr $19:u32 =
+        ild:u32
+            $18:*<4>;
+    stpr $20:u32 =
+        mul:u32 0x2:i32, 4:u32;
+    ist:u32 =
+        add:*<4>
+            lda b0,
+            $20:u32,
+        xor:u32
+            $17:u32,
+            $19:u32;
+    stpr $21:*<1> =
+        add:*<1>
+            ld:*<1> in_blk, 0xc:i32;
+    stpr $22:*<4> =
+        cvt:*<4>
+            $21:*<1>;
+    stpr $23:u32 =
+        ild:u32
+            $22:*<4>;
+    stpr $24:*<4> =
+        add:*<4>
+            ld:*<4> kp, 0xc:i32;
+    stpr $25:u32 =
+        ild:u32
+            $24:*<4>;
+    stpr $26:u32 =
+        mul:u32 0x3:i32, 4:u32;
+    ist:u32 =
+        add:*<4>
+            lda b0,
+            $26:u32,
+        xor:u32
+            $23:u32,
+            $25:u32;
+    st:*<4> kp =
+        add:*<4>
+            ld:*<4> kp, 0x10:i32;
+    stpr $2:u32 =
+        ild:u32:4
+            ld:*<524> cx;
+    truebr (
+        eq:bool
+            $2:u32, 0xe:i64), _L1;
+    label _L12;
+    truebr (
+        eq:bool
+            $2:u32, 0xc:i64), _L2;
+    label _L14;
+    falsebr (
+        eq:bool
+            $2:u32, 0xa:i64), _L11;
+    goto _L3;
+    label _L17;
+    label _L15;
+    label _L13;
+    label _L1;
+    stpr $27:i32 =
+        mul:i32 0x0:i32, 0x4:i32;
+    stpr $28:*<4> =
+        add:*<4>
+            ld:*<4> kp,
+            $27:i32;
+    stpr $29:u32 =
+        ild:u32
+            $28:*<4>;
+    stpr $30:bool =
+        eq:bool 0x0:i32, 0x0:i32;
+    stpr $32:bool =
+        eq:bool 0x0:i32, 0x0:i32;
+    stpr $34:u32 =
+        mul:u32 0x0:i32, 4:u32;
+    stpr $35:*<4> =
+        add:*<4>
+            lda b0,
+            $34:u32;
+    stpr $36:u32 =
+        ild:u32
+            $35:*<4>;
+    stpr $37:bool =
+        eq:bool 0x0:i32, 0x1:i32;
+    stpr $39:u32 =
+        mul:u32 0x1:i32, 4:u32;
+    stpr $40:*<4> =
+        add:*<4>
+            lda b0,
+            $39:u32;
+    stpr $41:u32 =
+        ild:u32
+            $40:*<4>;
+    stpr $42:bool =
+        eq:bool 0x0:i32, 0x2:i32;
+    stpr $44:u32 =
+        mul:u32 0x2:i32, 4:u32;
+    stpr $45:*<4> =
+        add:*<4>
+            lda b0,
+            $44:u32;
+    stpr $46:u32 =
+        ild:u32
+            $45:*<4>;
+    stpr $47:bool =
+        eq:bool 0x0:i32, 0x3:i32;
+    stpr $49:u32 =
+        mul:u32 0x3:i32, 4:u32;
+    stpr $50:*<4> =
+        add:*<4>
+            lda b0,
+            $49:u32;
+    stpr $51:u32 =
+        ild:u32
+            $50:*<4>;
+    stpr $52:bool =
+        eq:bool 0x0:i32, 0x4:i32;
+    stpr $54:u32 =
+        mul:u32 0x4:i32, 4:u32;
+    stpr $55:*<4> =
+        add:*<4>
+            lda b0,
+            $54:u32;
+    stpr $56:u32 =
+        ild:u32
+            $55:*<4>;
+    stpr $57:bool =
+        eq:bool 0x0:i32, 0x5:i32;
+    stpr $59:u32 =
+        mul:u32 0x5:i32, 4:u32;
+    stpr $60:*<4> =
+        add:*<4>
+            lda b0,
+            $59:u32;
+    stpr $61:u32 =
+        ild:u32
+            $60:*<4>;
+    stpr $62:bool =
+        eq:bool 0x0:i32, 0x6:i32;
+    stpr $64:u32 =
+        mul:u32 0x6:i32, 4:u32;
+    stpr $65:*<4> =
+        add:*<4>
+            lda b0,
+            $64:u32;
+    stpr $66:u32 =
+        ild:u32
+            $65:*<4>;
+    stpr $67:u32 =
+        mul:u32 0x7:i32, 4:u32;
+    stpr $68:*<4> =
+        add:*<4>
+            lda b0,
+            $67:u32;
+    stpr $69:u32 =
+        ild:u32
+            $68:*<4>;
+    falsebr (
+        ne:bool
+            $62:bool, 0:bool), _L31;
+    stpr $63:u32 =
+        $66:u32;
+    goto _L32;
+    label _L31;
+    stpr $63:u32 =
+        $69:u32;
+    label _L32;
+    falsebr (
+        ne:bool
+            $57:bool, 0:bool), _L29;
+    stpr $58:u32 =
+        $61:u32;
+    goto _L30;
+    label _L29;
+    stpr $58:u32 =
+        $63:u32;
+    label _L30;
+    falsebr (
+        ne:bool
+            $52:bool, 0:bool), _L27;
+    stpr $53:u32 =
+        $56:u32;
+    goto _L28;
+    label _L27;
+    stpr $53:u32 =
+        $58:u32;
+    label _L28;
+    falsebr (
+        ne:bool
+            $47:bool, 0:bool), _L25;
+    stpr $48:u32 =
+        $51:u32;
+    goto _L26;
+    label _L25;
+    stpr $48:u32 =
+        $53:u32;
+    label _L26;
+    falsebr (
+        ne:bool
+            $42:bool, 0:bool), _L23;
+    stpr $43:u32 =
+        $46:u32;
+    goto _L24;
+    label _L23;
+    stpr $43:u32 =
+        $48:u32;
+    label _L24;
+    falsebr (
+        ne:bool
+            $37:bool, 0:bool), _L21;
+    stpr $38:u32 =
+        $41:u32;
+    goto _L22;
+    label _L21;
+    stpr $38:u32 =
+        $43:u32;
+    label _L22;
+    falsebr (
+        ne:bool
+            $32:bool, 0:bool), _L19;
+    stpr $33:u32 =
+        $36:u32;
+    goto _L20;
+    label _L19;
+    stpr $33:u32 =
+        $38:u32;
+    label _L20;
+    stpr $70:bool =
+        eq:bool 0x0:i32, 0x1:i32;
+    stpr $72:bool =
+        eq:bool 0x0:i32, 0x0:i32;
+    stpr $74:u32 =
+        mul:u32 0x1:i32, 4:u32;
+    stpr $75:*<4> =
+        add:*<4>
+            lda b0,
+            $74:u32;
+    stpr $76:u32 =
+        ild:u32
+            $75:*<4>;
+    stpr $77:bool =
+        eq:bool 0x0:i32, 0x1:i32;
+    stpr $79:u32 =
+        mul:u32 0x2:i32, 4:u32;
+    stpr $80:*<4> =
+        add:*<4>
+            lda b0,
+            $79:u32;
+    stpr $81:u32 =
+        ild:u32
+            $80:*<4>;
+    stpr $82:bool =
+        eq:bool 0x0:i32, 0x2:i32;
+    stpr $84:u32 =
+        mul:u32 0x3:i32, 4:u32;
+    stpr $85:*<4> =
+        add:*<4>
+            lda b0,
+            $84:u32;
+    stpr $86:u32 =
+        ild:u32
+            $85:*<4>;
+    stpr $87:bool =
+        eq:bool 0x0:i32, 0x3:i32;
+    stpr $89:bool =
+        eq:bool 0x4:i32, 0x4:i32;
+    stpr $91:u32 =
+        mul:u32 0x0:i32, 4:u32;
+    stpr $92:*<4> =
+        add:*<4>
+            lda b0,
+            $91:u32;
+    stpr $93:u32 =
+        ild:u32
+            $92:*<4>;
+    stpr $94:u32 =
+        mul:u32 0x4:i32, 4:u32;
+    stpr $95:*<4> =
+        add:*<4>
+            lda b0,
+            $94:u32;
+    stpr $96:u32 =
+        ild:u32
+            $95:*<4>;
+    falsebr (
+        ne:bool
+            $89:bool, 0:bool), _L42;
+    stpr $90:u32 =
+        $93:u32;
+    goto _L43;
+    label _L42;
+    stpr $90:u32 =
+        $96:u32;
+    label _L43;
+    stpr $97:bool =
+        eq:bool 0x0:i32, 0x4:i32;
+    stpr $99:u32 =
+        mul:u32 0x5:i32, 4:u32;
+    stpr $100:*<4> =
+        add:*<4>
+            lda b0,
+            $99:u32;
+    stpr $101:u32 =
+        ild:u32
+            $100:*<4>;
+    stpr $102:bool =
+        eq:bool 0x0:i32, 0x5:i32;
+    stpr $104:bool =
+        eq:bool 0x4:i32, 0x8:i32;
+    stpr $106:u32 =
+        mul:u32 0x6:i32, 4:u32;
+    stpr $107:*<4> =
+        add:*<4>
+            lda b0,
+            $106:u32;
+    stpr $108:u32 =
+        ild:u32
+            $107:*<4>;
+    stpr $109:u32 =
+        mul:u32 0x0:i32, 4:u32;
+    stpr $110:*<4> =
+        add:*<4>
+            lda b0,
+            $109:u32;
+    stpr $111:u32 =
+        ild:u32
+            $110:*<4>;
+    falsebr (
+        ne:bool
+            $104:bool, 0:bool), _L48;
+    stpr $105:u32 =
+        $108:u32;
+    goto _L49;
+    label _L48;
+    stpr $105:u32 =
+        $111:u32;
+    label _L49;
+    stpr $112:bool =
+        eq:bool 0x0:i32, 0x6:i32;
+    stpr $114:u32 =
+        mul:u32 0x7:i32, 4:u32;
+    stpr $115:*<4> =
+        add:*<4>
+            lda b0,
+            $114:u32;
+    stpr $116:u32 =
+        ild:u32
+            $115:*<4>;
+    stpr $117:u32 =
+        mul:u32 0x0:i32, 4:u32;
+    stpr $118:*<4> =
+        add:*<4>
+            lda b0,
+            $117:u32;
+    stpr $119:u32 =
+        ild:u32
+            $118:*<4>;
+    falsebr (
+        ne:bool
+            $112:bool, 0:bool), _L51;
+    stpr $113:u32 =
+        $116:u32;
+    goto _L52;
+    label _L51;
+    stpr $113:u32 =
+        $119:u32;
+    label _L52;
+    falsebr (
+        ne:bool
+            $102:bool, 0:bool), _L47;
+    stpr $103:u32 =
+        $105:u32;
+    goto _L50;
+    label _L47;
+    stpr $103:u32 =
+        $113:u32;
+    label _L50;
+    falsebr (
+        ne:bool
+            $97:bool, 0:bool), _L45;
+    stpr $98:u32 =
+        $101:u32;
+    goto _L46;
+    label _L45;
+    stpr $98:u32 =
+        $103:u32;
+    label _L46;
+//start
+
+   stpr $2375:*<4> =
+        add:*<4>
+            lda b0,
+            $2374:u32;
+    stpr $2376:u32 =
+        ild:u32
+            $2375:*<4>;
+    falsebr (
+        ne:bool
+            $2369:bool, 0:bool), _L916;
+    stpr $2370:u32 =
+        $2373:u32;
+    goto _L917;
+    label _L916;
+    stpr $2370:u32 =
+        $2376:u32;
+    label _L917;
+    falsebr (
+        ne:bool
+            $2359:bool, 0:bool), _L912;
+    stpr $2360:u32 =
+        $2362:u32;
+    goto _L915;
+    label _L912;
+    stpr $2360:u32 =
+        $2370:u32;
+    label _L915;
+    falsebr (
+        ne:bool
+            $2349:bool, 0:bool), _L908;
+    stpr $2350:u32 =
+        $2352:u32;
+    goto _L911;
+    label _L908;
+    stpr $2350:u32 =
+        $2360:u32;
+    label _L911;
+    falsebr (
+        ne:bool
+            $2334:bool, 0:bool), _L902;
+    stpr $2335:u32 =
+        $2337:u32;
+    goto _L907;
+    label _L902;
+    stpr $2335:u32 =
+        $2350:u32;
+    label _L907;
+    label _L11;
+    label _L2;
+    label _L3;
+    label _L110;
+    return 0x1:i32;
+}; //end function region.
+} //end program region.

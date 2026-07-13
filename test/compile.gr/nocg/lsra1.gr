@@ -1,0 +1,26 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var f:i32:(align(4));
+    var g:i32:(align(4));
+    var h:i32:(align(4));
+    var normal_allocation:*<4>:(func,align(4));
+    region func normal_allocation() {
+        stpr $r1 = lda c;
+        st a     = $r1;
+        stpr $r2 = lda d;
+        st b     = $r1;
+
+        //There is no spilling because $r3 can be allocated in the HOLE of
+        //lifetime $r2.
+        stpr $r3 = $r2;
+        st d     = $r3;
+        st e     = $r1;
+        stpr $r2 = $r3;
+        st g     = $r1;
+        st h     = $r2;
+    };
+}

@@ -1,0 +1,74 @@
+
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+
+  array:i32 (elemtype:i32) attachinfo:MDSSA
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB1, BODY:1,2,3,4,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD5 -- base:Var60(in):local,restrict,align(64),mc,mem_size:256,decl:'' -- ofst:0 -- size:4
+    ld:*<4> 'in' attachinfo:MDSSA
+
+    OCCLIST:
+      ld:*<4> 'in' attachinfo:MDSSA
+
+
+==-- DUMP InexactAccessTab --==
+
+==---- DUMP DelegateMgr 'main' ----==
+  ==-- Dele2PR --==
+
+  DELE:  ld:*<4> 'in' attachinfo:MDSSA
+  PR:  $8:*<4>
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+
+  ==---- DUMP Delegate Table ----==
+
+
+==-- Dele2RestoreStmt --==
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+
+  ist:i32 attachinfo:Dbx,MDSSA
+  ild:i32 attachinfo:MDSSA
+  ild:i32 attachinfo:MDSSA
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB1, BODY:1,2,3,4,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD5 -- base:Var60(in):local,restrict,align(64),mc,mem_size:256,decl:'' -- ofst:0 -- size:4
+    ld:*<4> 'in' attachinfo:MDSSA
+
+    OCCLIST:
+      ld:*<4> 'in' attachinfo:MDSSA
+      ld:*<4> 'in' attachinfo:MDSSA
+
+
+==-- DUMP InexactAccessTab --==
+
+==---- DUMP DelegateMgr 'main' ----==
+  ==-- Dele2PR --==
+
+  DELE:  ld:*<4> 'in' attachinfo:MDSSA
+  PR:  $37:*<4>
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+
+  ==---- DUMP Delegate Table ----==
+
+
+==-- Dele2RestoreStmt --==

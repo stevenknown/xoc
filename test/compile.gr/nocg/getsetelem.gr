@@ -1,0 +1,27 @@
+region program "program" () {
+    region func main () {
+        var a:i32:(readonly, align(4));
+        var b:i32:(readonly, align(4));
+        var c:i32:(readonly, align(4));
+        var d:i32:(readonly, align(4));
+        var p:i32:(readonly, align(4));
+        var q:i32:(readonly, align(4));
+
+        setelem $1:i32:(nomove) = ld:i32 a, 0, 0;
+        setelem $1:i16 = ld:i32 b, 20, 2;
+        setelem $2:u8 = ld:u16 c, 24, 1;
+        setelem $3:u8:(throw()) = ld d, 0, 0;
+        setelem $4:u8 = ld p, 20, 20;
+        setelem $9 = select gt ld p, ld c, lda a, lda b, 20, 20;
+        setelem $10 = lda a, 3, 3;
+        setelem $1000 = ld q, 24, 8;
+    	setelem $77:vec<f128*8> = $7:f128, $4:u8, 8;
+        getelem $78:mc<16> = $77:vec<f128*8>, 0;
+    	getelem $7:i32 = $78:mc<16>, 20;
+    	getelem $3:i32 = $78:mc<16>, 24;
+    	stpr $79:u32:(throw()) = add:i32 $7:i32, $3:i32;
+    	getelem $7:f128 = $77:vec<f128*8>, (add $3:i32, 3:i64);
+    	setelem $77:vec<f128*8> = $7:f128, $4:u8, 8;
+        return $ret;
+    };
+}

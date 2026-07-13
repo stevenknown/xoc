@@ -1,0 +1,9 @@
+
+==---- DUMP Dead Code Eliminiation 'foo1' ----==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:removed ineffect IR:
+      stpr $9:u64 attachinfo:Dbx      
+          intconst:u64 4|0x4
+    ACT2:GID2:removed ineffect IR:
+      st:u64 'stackvar' attachinfo:Dbx,MDSSA      
+          $9:u64

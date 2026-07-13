@@ -1,0 +1,31 @@
+region program program() {
+    var a:u64:(align(4));
+    var b:u64:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var z:i32:(align(4));
+    var w:i32:(align(4));
+    var u:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    var foo:any:(func, align(4));
+    var bar:any:(func, align(4));
+    region func main() {
+        stpr $2:u64 = lda c;
+        stpr $3 = lda d;
+        st x = $2;
+        st y = $3;
+        truebr (gt ld c, ld d), L1;
+
+        call $5 = foo(); 
+
+        stpr $2:u64 = ld a;
+        st w = $2:u64;
+        call bar($2:u64);
+
+        label L1;
+        st u = $2:u64;
+        return $2:u64;
+    };
+}

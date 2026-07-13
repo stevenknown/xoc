@@ -1,0 +1,56 @@
+region program ".program" () {
+    var gd:mc<800>:(array,align(4));
+    var gf:mc<800>:(array,align(4));
+    var foo:any:(func,decl,align(4));
+    var printf:any:(func,decl,align(4));
+    var exit:any:(func,decl,align(4));
+    var main:any:(func,align(4));
+    var _const_string_1:str:(align(4));
+    region func main () {
+        var i:i32:(align(4));
+        label "_GR__$L9";
+        st:i32 i = 0:i32;
+        stpr $29:i32 = 0:i32;
+        stpr $30:i32 = 0:i32;
+        label "_GR__$L1";
+        phi $31:i32 = (
+            $30:i32,"_GR__$L9"),(
+            $32:i32,"_GR__$L10");
+        phi $33:i32 = (
+            $25:i32,"_GR__$L9"),(
+            $34:i32,"_GR__$L10");
+        stpr $34:i32 = 
+            $31:i32;
+        label "_GR__$L10";
+        stpr $35:u32 = 
+            mul:u32 
+                $31:i32, 8:u32;
+        stpr $56:*<8> = 
+            add:*<8> 
+                lda gd, 
+                $35:u32;
+        ist:f64 = 
+            $56:*<8>,
+            cvt:f64 
+                $31:i32;
+        stpr $36:u32 = 
+            mul:u32 
+                $31:i32, 8:u32;
+        stpr $57:*<8> = 
+            add:*<8> 
+                lda gf, 
+                $36:u32;
+        ist:f64 = 
+            $57:*<8>,
+            cvt:f64 
+                $31:i32;
+        stpr $37:i32 = 
+            $31:i32;
+        stpr $38:i32 = 
+            add:i32 
+                $31:i32, 1:i32;
+        stpr $32:i32 = 
+            $38:i32;
+        goto "_GR__$L1";
+    };
+}

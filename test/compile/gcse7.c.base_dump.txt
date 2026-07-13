@@ -1,0 +1,34 @@
+
+==---- DUMP Global Command Subexpression Elimination 'test_qsort2' ----==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:mul is CSE of mul and will be replaced by pr
+    ACT2:GID2:mul is CSE of mul and will be replaced by pr
+    ACT3:GID3:mul is CSE of mul and will be replaced by pr
+    ACT4:GID4:mul is CSE of mul and will be replaced by pr
+    ACT5:GID5:mul is CSE of mul and will be replaced by pr
+    ACT6:GID6:mul is CSE of mul and will be replaced by pr
+    ACT7:GID7:mul is CSE of mul and will be replaced by pr
+    ACT8:GID8:mul is CSE of mul and will be replaced by pr
+    ACT9:GID9:mul is CSE of mul and will be replaced by pr
+    ACT10:GID10:mul is CSE of mul and will be replaced by pr
+    ACT11:GID11:mul is CSE of mul and will be replaced by pr
+    ACT12:GID12:mul is CSE of mul and will be replaced by pr
+    ACT13:GID13:mul is CSE of mul and will be replaced by pr
+    ACT14:GID14:mul is CSE of mul and will be replaced by pr
+    ACT15:GID15:mul is CSE of mul and will be replaced by pr
+    ACT16:GID16:add is CSE of add and will be replaced by pr
+    ACT17:GID17:add is CSE of add and will be replaced by pr
+    ACT18:GID18:add is CSE of add and will be replaced by pr
+    ACT19:GID19:add is CSE of add and will be replaced by pr
+    ACT20:GID20:add is CSE of add and will be replaced by pr
+    ACT21:GID21:add is CSE of add and will be replaced by pr
+    ACT22:GID22:add is CSE of add and will be replaced by pr
+    ACT23:GID23:add is CSE of add and will be replaced by pr
+    ACT24:GID24:add is CSE of add and will be replaced by pr
+    ACT25:GID25:add is CSE of add and will be replaced by pr
+    ACT26:GID26:add is CSE of add and will be replaced by pr
+    ACT27:GID27:add is CSE of add and will be replaced by pr
+    ACT28:GID28:add is CSE of add and will be replaced by pr
+    ACT29:GID29:add is CSE of add and will be replaced by pr
+    ACT30:GID30:add is CSE of add and will be replaced by pr
+    ACT31:GID31:mul is CSE of mul and will be replaced by pr

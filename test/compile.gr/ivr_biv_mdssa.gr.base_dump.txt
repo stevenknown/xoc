@@ -1,0 +1,103 @@
+
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR ild id:11 in LOOP1 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR ild id:11 in LOOP1 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR ld id:13 in LOOP1 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR ld id:13 in LOOP1 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR add id:21 in LOOP1 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR add id:21 in LOOP1 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR ld id:23 in LOOP1 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR ld id:23 in LOOP1 is not chain-rec of any IV
+  ACT9:FIND_DIV:IR add id:30 in LOOP1 is not linear-rep of any IV
+  ACT10:FIND_DIV:IR add id:30 in LOOP1 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'swap' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB2,BODY:2,3,
+BIV(STMTOCC:MD9,'width')(EXPOCC:MD9,'width')
+  INIT-VAL:EXP:
+    sub:i32        
+        ld:i32 'width' attachinfo:MDSSA        
+        intconst:i32 1|0x1
+  STEP-VAL:INT:-1
+  REDUCTION-STMT:
+    st:i32 'width' attachinfo:Dbx,MDSSA        
+        sub:i32            
+            ld:i32 'width' attachinfo:MDSSA            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    ld:i32 'width' attachinfo:MDSSA
+  INIT-STMT:
+    st:i32 'width' attachinfo:Dbx,MDSSA        
+        sub:i32            
+            ld:i32 'width' attachinfo:MDSSA            
+            intconst:i32 1|0x1
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    sub:i32        
+        ld:i32 'width' attachinfo:        
+        intconst:i32 1|0x1
+  STEP-VAL:INT:-1
+  REDUCTION-STMT:
+    stpr $6:i32 attachinfo:Dbx        
+        ld:i32 'width' attachinfo:MDSSA
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      sub:i32          
+          ld:i32 'width' attachinfo:          
+          intconst:i32 1|0x1
+      CODE:sub
+      STEP:INT:-1
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR ild id:11 in LOOP1 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR ild id:11 in LOOP1 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR ld id:13 in LOOP1 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR ld id:13 in LOOP1 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR add id:21 in LOOP1 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR add id:21 in LOOP1 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR ld id:23 in LOOP1 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR ld id:23 in LOOP1 is not chain-rec of any IV
+  ACT9:FIND_DIV:IR add id:30 in LOOP1 is not linear-rep of any IV
+  ACT10:FIND_DIV:IR add id:30 in LOOP1 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'swap' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB2,BODY:2,3,
+BIV(STMTOCC:MD9,'width')(EXPOCC:MD9,'width')
+  INIT-VAL:EXP:
+    sub:i32        
+        ld:i32 'width' attachinfo:MDSSA        
+        intconst:i32 1|0x1
+  STEP-VAL:INT:-1
+  REDUCTION-STMT:
+    st:i32 'width' attachinfo:Dbx,MDSSA        
+        sub:i32            
+            ld:i32 'width' attachinfo:MDSSA            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    ld:i32 'width' attachinfo:MDSSA
+  INIT-STMT:
+    st:i32 'width' attachinfo:Dbx,MDSSA        
+        sub:i32            
+            ld:i32 'width' attachinfo:MDSSA            
+            intconst:i32 1|0x1
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    sub:i32        
+        ld:i32 'width' attachinfo:        
+        intconst:i32 1|0x1
+  STEP-VAL:INT:-1
+  REDUCTION-STMT:
+    stpr $6:i32 attachinfo:Dbx        
+        ld:i32 'width' attachinfo:MDSSA
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      sub:i32          
+          ld:i32 'width' attachinfo:          
+          intconst:i32 1|0x1
+      CODE:sub
+      STEP:INT:-1

@@ -1,0 +1,27 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var e:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main() {
+        stpr $2:u32 = ld a;
+        st e = sub $2:u32, 1;
+
+        stpr $3:u32 = ld b;
+        st e = xor $3:u32, 2;
+
+        stpr $2:u32 = ld e;
+        st c = lt $2, 3;
+        st c = lt $2, 4;
+
+    	if (gt $2:u32, $3:u32) {
+            stpr $1:u32 = add:u32 $2:u32, $3:u32;
+            setelem $1:u32 = ld:i8 b, 20, 2;
+            setelem $2:u32 = ld:u32 c, 24, 1;
+    	} else {
+            getelem $1:u32 = ld:i32 e, $2:u32;
+        }
+        return add $3:u32, $2:u32;
+    };
+}

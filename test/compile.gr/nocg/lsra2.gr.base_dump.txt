@@ -1,0 +1,86 @@
+
+==-- DUMP ALL ACT --==
+ACT:ASSIGN:$1 with r4
+ACT:ASSIGN:$2 with r5
+ACT:SEL_SPLIT_CAND:$2 is split-candidate at pos:12
+ACT:SEL_SPLIT_CAND:$3 is split-candidate at pos:12, reason:$3 has furthest next range
+ACT:SPLIT:$3 into $3 and $4 at pos:24, $4 start from pos:24
+ACT:SEL_SPLIT_CAND:$2 is split-candidate at pos:12
+ACT:SEL_SPLIT_CAND:$2 is split-candidate at pos:12, reason:$2 has furthest next range
+ACT:SEL_SPLIT_CAND:$2 is split-candidate at pos:12, reason:prefer reselecting except $3 itself
+ACT:SPLIT:$2 into $2 and $5 at pos:18, $5 start from pos:18
+ACT:ASSIGN:$3 with r5
+ACT:ASSIGN:$5 with r5
+ACT:ASSIGN:$4 with r4
+==---- DUMP Linear Scan Register Allocation 'spltting_current' ----==
+==-- DUMP TargInfoMgr --==
+ALLOCABLE:r4,r5
+==-- DUMP ALL LifeTime --==
+==-- DUMP PR OverView --==
+[2] RegionExposedDef <= [1] --
+----- BB2 --- rpo:0 -----
+ATTR:entry_bb fall_through 
+
+----- BB1 --- rpo:10 -----
+ATTR:fall_through 
+[4] $1 <= [3] --
+[6] -- <= [5] $1
+[8] $2 <= [7] --
+[10] -- <= [9] $1
+[12] $3 <= [11] $2
+[14] -- <= [13] $3
+[16] -- <= [15] $1
+[18] $5 <= [17] $3
+[20] -- <= [19] $1
+[22] -- <= [21] $5
+[24] $4 <= [23] $5
+[26] -- <= [25] $4
+
+[28] RegionExposedUse <= [27] --
+==-- DUMP LTList --==
+LT:$1:<4-19>
+ |   ----------------
+ |   du   u     u   u
+LT:$2:<8-11>
+ |       ----
+ |       d  u
+LT:$3:<12-17>
+ |           ------
+ |           du   u
+LT:$4:<24-25>
+ |                       --
+ |                       du
+LT:$5:<18-23>
+ |                 ------
+ |                 d  u u
+==-- DUMP PR2Reg --==
+LT:$1:r4(RF_R)
+LT:$2:r5(RF_R)
+LT:$3:r5(RF_R)
+LT:$4:r4(RF_R)
+LT:$5:r5(RF_R)
+==-- DUMP 4LIST --==
+UNHANDLED:
+HANDLED:
+ LT:$2:r5(RF_R)
+ LT:$2:<8-11>
+  |       ----
+  |       d  u
+ LT:$3:r5(RF_R)
+ LT:$3:<12-17>
+  |           ------
+  |           du   u
+ LT:$1:r4(RF_R)
+ LT:$1:<4-19>
+  |   ----------------
+  |   du   u     u   u
+ LT:$5:r5(RF_R)
+ LT:$5:<18-23>
+  |                 ------
+  |                 d  u u
+ LT:$4:r4(RF_R)
+ LT:$4:<24-25>
+  |                       --
+  |                       du
+ACTIVE:
+INACTIVE:

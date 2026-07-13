@@ -1,0 +1,73 @@
+
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB1, BODY:1,2,3,4,
+==-- DUMP ExactAccessTab --==
+
+==-- DUMP InexactAccessTab --==
+  starray:i32 (elemtype:u64) attachinfo:Dbx,MDSSA
+      elem_num[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+      intconst:i32 20|0x14 rhs
+
+  array:i32 (elemtype:u64) attachinfo:MDSSA
+      elemnum[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+
+  array:i32 (elemtype:u64) attachinfo:MDSSA
+      elemnum[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+
+
+==---- DUMP DelegateMgr 'main' ----==
+  ==-- Dele2PR --==
+
+  DELE:  starray:i32 (elemtype:u64) attachinfo:Dbx,MDSSA
+  PR:  $11:i32
+
+  DELE:  array:i32 (elemtype:u64) attachinfo:MDSSA
+  PR:  $12:i32
+
+  DELE:  array:i32 (elemtype:u64) attachinfo:MDSSA
+  PR:  $13:i32
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+
+  ==---- DUMP Delegate Table ----==
+  starray:i32 (elemtype:u64) attachinfo:Dbx,MDSSA
+      elem_num[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+      intconst:i32 20|0x14 rhs
+  array:i32 (elemtype:u64) attachinfo:MDSSA
+      elemnum[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+  array:i32 (elemtype:u64) attachinfo:MDSSA
+      elemnum[1]
+      $4:u32 dim0
+      add:*<1> array_base
+          $3:*<4>
+          intconst:i32 10|0xa
+

@@ -1,0 +1,146 @@
+
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=8) -- :
+   ld:i32 'k' attachinfo:Dbx,MDSSA
+   ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'a' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           ld:i32 'j' attachinfo:Dbx,MDSSA       
+       ld:i32 'k' attachinfo:Dbx,MDSSA
+
+-- Hoist Cand Expression (num=2) -- :
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           ld:i32 'j' attachinfo:Dbx,MDSSA       
+       ld:i32 'k' attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=6) -- :
+   ld:i32 'b' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'a' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'j' attachinfo:Dbx,MDSSA
+
+-- Hoist Cand Expression (num=2) -- :
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'j' attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo3 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=4) -- :
+   ld:i32 'b' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'a' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+
+-- Hoist Cand Expression (num=2) -- :
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo4 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=3) -- :
+   ld:i32 'b' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'a' attachinfo:Dbx,MDSSA
+
+-- Hoist Cand Expression (num=1) -- :
+   add:i32 attachinfo:Dbx       
+       ld:i32 'a' attachinfo:Dbx,MDSSA       
+       ld:i32 'b' attachinfo:Dbx,MDSSA
+==---- DUMP Loop Invariant Code Motion 'foo' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=2) -- :
+   $18:i32
+   $19:i32
+
+
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=2) -- :
+   $20:i32
+   $21:i32
+
+
+==---- DUMP LICM Analysis Result : LoopInfo3 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=2) -- :
+   $22:i32
+   $23:i32
+
+
+==---- DUMP LICM Analysis Result : LoopInfo4 : 'foo' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,11,13,15,
+  LOOP3 HEAD:BB4, BODY:4,5,6,7,8,9,11,13,
+    LOOP2 HEAD:BB6, BODY:6,7,8,9,11,
+      LOOP1 HEAD:BB8, BODY:8,9,
+-- Invariant Expression (num=1) -- :
+   $24:i32
+

@@ -1,0 +1,31 @@
+region program ".program" () {
+    var foo:*<4>:(func,align(4));
+    region func foo (undefined,
+                     var count:i32:(align(4)),
+                     var to:*<2>:(align(4)),
+                     var from:*<2>:(align(4))) {
+        label "_GR__$L6";
+        stpr $p = 0;
+
+        label "_GR__$L1";
+        phi $2:*<2> = ($1:*<2>,"_GR__$L6"),($3:*<2>,"_GR__$L7");
+        falsebr (ne:bool 1:i32, 0:i32), "_GR__$L2";
+
+        label "_GR__$L3";
+        phi $4:*<2> = ($2:*<2>,"_GR__$L1"),($3:*<2>,"_GR__$L8");
+        stpr $3:*<2> = ld:*<2> from;
+        ist:i16 = ld:*<2> to,
+            ild:i16 $3:*<2>;
+        st:*<2> from = add:*<2>
+            ld:*<2> from, 2:u32;
+
+        label "_GR__$L8";
+        truebr (gt:bool ld:i32 count, 0:i32), "_GR__$L3";
+
+        label "_GR__$L7";
+        goto "_GR__$L1";
+
+        label "_GR__$L2";
+        return ;
+    };
+}

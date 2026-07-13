@@ -1,0 +1,80 @@
+region program foo_2 () {
+    var foo:any:(align(4),func);
+    var foo_2:any:(align(4),func);
+    var globalval0:u32:(align(4));
+    var zoo:any:(func,align(4));
+    region func zoo(var _Z6doing0Pj_param0:u64:(align(8))) {
+        var c_addr:u64:(align(8));
+        var __pen__:u64:(align(8));
+        var tmp:u64:(align(8));
+        var temp1:u32:(align(4));
+        var temp2:u32:(align(4));
+        stpr $7:u64 = 
+            ld:u64 _Z6doing0Pj_param0;
+        st:u64 c_addr = 
+            $7:u64;
+        stpr $16:u32 = 
+            band:u32 
+                $16:u32, 31:u32;
+        stpr $8:u32 = 
+            $16:u32;
+        st:u64 __pen__ = 
+            $8:u64;
+        stpr $9:u64 = 
+            ld:u64 __pen__;
+        stpr $10:u64 = 
+            band:u64 
+                $9:u64, 31:u64;
+        st:u64 tmp = 
+            $10:u64;
+        stpr $11:u64 = 
+            ld:u64 tmp;
+        stpr $17:bool = 
+            eq:bool 
+                $11:i64, 9:i64;
+        truebr (
+            eq:bool 
+                $17:bool, 0:bool), label_BB0_2;
+        label label_BB0_1;
+        stpr $1:u64 = 
+            add:u64 
+                $18:u64, 0:u64;
+        st:u32 temp1 = 
+            $1:u32;
+        st:u32 temp2 = 
+            $1:u32;
+        call:(use(ild:any 0:any)) foo();
+        stpr $12:u64 = 
+            lda globalval0;
+
+        //ild can not be CSE, it's base changed by foo_2().
+        stpr $2:i32 = 
+            ild:i32
+               $12:*<1>;
+        st:u32 temp1 = 
+            $2:u32;
+        call:(use(ild:any 0:any)) foo_2();
+
+        //ild can not be CSE, it's base changed by foo_2().
+        stpr $3:i32 = 
+            ild:i32 
+                $12:*<1>;
+        st:u32 temp2 = 
+            $3:u32;
+        stpr $4:i32 = 
+            ld:i32 temp1;
+        stpr $5:i32 = 
+            ld:i32 temp2;
+        stpr $6:i32 = 
+            add:i32 
+                $4:i32, 
+                $5:i32;
+        stpr $13:u64 = 
+            ld:u64 c_addr;
+        ist:u32 = 
+            $13:*<1>,
+            $6:u32;
+        label label_BB0_2;
+        return ;
+    };
+}

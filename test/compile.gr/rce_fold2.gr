@@ -1,0 +1,122 @@
+region program ".program" () {
+    var a:i32:(align(4));
+    var ad:f64:(align(4));
+    var b:i32:(align(4));
+    var c:i32:(align(4));
+    var foo:any:(func,align(4));
+    var bar:any:(func,align(4));
+    var bar2:any:(func,align(4));
+    var zoo:any:(func,align(4));
+    var zoo2:any:(func,align(4));
+    //==---- DUMP Region 'foo' ----==
+    region func foo () {
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        falsebr (
+            ne:bool 
+                bor:i32 
+                    cvt:i32 
+                        eq:bool 
+                            ld:i32 a, 
+                            ld:i32 a, 
+                    band:i32 
+                        ld:i32 b, 
+                        ld:i32 c, 0:i32), "_GR__$L1";
+        stpr $2:i32 = 
+            ld:i32 cnt;
+        st:i32 cnt = 
+            add:i32 
+                ld:i32 cnt, 1:i32;
+        label "_GR__$L1";
+        return 
+            ld:i32 cnt;
+    };
+    //==---- DUMP Region 'bar' ----==
+    region func bar () {
+
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            ne:bool 
+                band:u8 
+                    gt:bool 
+                        ld:i32 a, 1:i32, 
+                    gt:bool 
+                        ld:i32 a, 5:i32, 0:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+    //==---- DUMP Region 'bar2' ----==
+    region func bar2 () {
+
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            ne:bool 
+                band:u8 
+                    lt:bool 
+                        ld:i32 a, 1:i32, 
+                    lt:bool 
+                        ld:i32 a, 5:i32, 0:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+    //==---- DUMP Region 'zoo' ----==
+    region func zoo () {
+
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            ne:bool 
+                band:u8 
+                    gt:bool 
+                        ld:f64 ad, 1.000000:f64 , 
+                    gt:bool 
+                        ld:f64 ad, 5.000000:f64 , 0:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+    //==---- DUMP Region 'zoo2' ----==
+    region func zoo2 () {
+
+        var cnt:i32:(align(4));
+        st:i32 cnt = 0:i32;
+        if (
+            ne:bool 
+                band:u8 
+                    lt:bool 
+                        ld:f64 ad, 1.000000:f64 , 
+                    lt:bool 
+                        ld:f64 ad, 5.000000:f64 , 0:u8)
+        {
+            stpr $1:i32 = 
+                ld:i32 cnt;
+            st:i32 cnt = 
+                add:i32 
+                    ld:i32 cnt, 1:i32;
+        };
+        return 
+            ld:i32 cnt;
+    };
+}

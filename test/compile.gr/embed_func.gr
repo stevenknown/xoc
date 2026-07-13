@@ -1,0 +1,35 @@
+region program "myprogram" () {
+    var g:i32:(align(4));
+    region func main () {
+        var p1:i32:(align(4));
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        st:i32 p1 = 0x1:i32;
+        if (gt ld i, ld j) {
+            st p1 = 2;
+        } else {
+            st p1 = 3;
+        };
+
+        region func foo () {
+            var p2:i32:(align(4));
+            st p2 = 5;
+            region func bar (var dummy:i32:(align(4))) {
+                st p1 = 1;
+                st p2 = 1;
+            };
+
+            //Invoke inner function, callee have to
+            //pass the address of inner variable to
+            //guide DU analysis that inner function
+            //modified current region variable.
+            call bar(lda p2);
+
+            //bar() defined p2.
+            st p2 = add:i32 ld p1, ld p2;
+            st p2 = ld g;
+        };
+        call foo();
+        return ld p1;
+    };
+}

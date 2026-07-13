@@ -1,0 +1,43 @@
+region program ".program" () {
+    var case10_help:*<4>:(func,align(4));
+    var case10:*<4>:(func,align(4));
+    region func case10 (undefined,var p:*<4>:(align(4)),var b:i32:(align(4))) {
+        var a:mc<400>:(array,align(4));
+        label "_GR__$L3";
+        ist:i32 =
+            ld:*<4> p,10:i32;
+        stpr $3:i32 =
+            ld:i32 b;
+        st:i32 b =
+            sub:i32
+                ld:i32 b, 1:i32;
+        label "_GR__$L1";
+        phi $4:i32 = (
+            $3:i32,"_GR__$L3"),(
+            $5:i32,"_GR__$L4");
+        falsebr (
+            gt:bool
+                $4:i32, 0:i32), "_GR__$L2";
+        label "_GR__$L4";
+        starray:i32:0:(dim[100]) =
+            lda a, (100:i32),
+            ild:i32
+                ld:*<4> p;
+        ist:i32 =
+            ld:*<4> p,
+            array:i32:0:(dim[100])
+                lda a, (100:i32);
+        stpr $5:i32 =
+            ld:i32 b;
+        st:i32 b =
+            sub:i32
+                ld:i32 b, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        call:(use(
+            ild:any 0:any)) $6:i32 = case10_help(
+            ld:*<4> p);
+        return
+            ld:i32 b;
+    };
+}

@@ -1,0 +1,47 @@
+region program program() {
+    region func main() {
+        var x:mc<256>:(align(4));
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        var N:i32:(readonly, align(4));
+        region func inner_region() {
+            var i:i32:(readonly, align(4));
+            var w:i32:(align(4));
+            if eq $8:i8, $6:i64 {
+                st w = 20;
+            }
+            if (le $77:u32, $7:i16) {
+                st w = 10:i64;
+                label L1;
+            } else {
+                stpr $3:i32 = ld:i32 w;
+                label L2;
+            }
+            return;
+        }
+        call $101:bool = inner_region();
+        doloop (id i, (add $4:u32, 20), (le ld i, ld N), (add ld i, 1)) {
+            doloop (id j, (add $4, 40), (le (ld j), ld N), (add ld j, 1)) {
+                st:mc<256> x = 0;
+                region inner codeblock(var len:i32:(align(4))) {
+                    var k:i32:(align(4));
+                    st k = ld len;
+                    if (le ld i, ld j) {
+                        st:i16:192 x = ld k;
+                    } else {
+                        st:i16:96 x = ld k;
+                    }
+                }
+                st:mc<256> x = 1;
+                call codeblock($101);
+                st:mc<256> x = 2;
+                call codeblock($101);
+                st:mc<256> x = 3;
+                call codeblock($101);
+                st:mc<256> x = 4;
+                call codeblock($101);
+            }
+        }
+        return $101:bool;
+    };
+}

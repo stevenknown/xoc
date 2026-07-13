@@ -1,0 +1,42 @@
+//Test compile-region for PRSSA.
+region program x() {
+//==---- DUMP Region 'foo' ----==
+region func foo (undefined,var a:*<4>:(restrict,align(4)),var b:*<4>:(restrict,align(4)),var start:i32:(align(4)),var end:i32:(align(4))) {
+    var i:i32:(align(4));
+    var DummyGlobalVarPointedByVAR63:mc<0>:(unallocable);
+    var DummyGlobalVarPointedByVAR64:mc<0>:(unallocable);
+    st:i32 i = 0:i32;
+    label "_GR__$L3";
+    falsebr (
+        lt:bool 
+            ld:i32 i, 
+            $1:i32), "_GR__$L4";
+    stpr $8:vec<f32*128> = 
+        add:vec<f32*128> 
+            ild:vec<f32*128> 
+                add:*<4> 
+                    $4:*<4>, 
+                    mul:i32 
+                        ld:i32 i, 4:i32, 
+            $6:f32;
+    ist:vec<f32*128> = 
+        add:*<4> 
+            $7:*<4>, 
+            mul:i32 
+                ld:i32 i, 4:i32,
+        mul:vec<f32*128> 
+            ild:vec<f32*128> 
+                add:*<4> 
+                    $3:*<4>, 
+                    mul:i32 
+                        ld:i32 i, 4:i32, 
+            $8:vec<f32*128>;
+    label "_GR__$L5";
+    st:i32 i = 
+        add:i32 
+            ld:i32 i, 128:i32;
+    goto "_GR__$L3";
+    label "_GR__$L4";
+    return;
+}
+}

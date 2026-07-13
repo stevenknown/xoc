@@ -1,0 +1,800 @@
+
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB5, BODY:5,6,
+LOOP3 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   intconst:i32 1|0x1
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+
+-- HOIST CAND (NUM=1) -- :
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB5, BODY:5,6,
+LOOP3 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=8) -- :
+   ld:*<8> 's' attachinfo:Dbx,MDSSA
+   intconst:i32 1|0x1
+   ld:*<8> 's' attachinfo:Dbx,MDSSA
+   $9:i32 attachinfo:Dbx
+   intconst:i32 3|0x3 attachinfo:Dbx
+   ild:i32 attachinfo:Dbx,MDSSA       
+       ld:*<8> 's' attachinfo:Dbx,MDSSA
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   add:i32       
+       $9:i32 attachinfo:Dbx       
+       intconst:i32 3|0x3 attachinfo:Dbx
+-- INVARIANT STMT (NUM=2) -- :
+
+   [11]        s->x+=3;
+   
+   stpr $9:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:Dbx,MDSSA           
+           ld:*<8> 's' decl:struct (id:1)  *  s  attachinfo:Dbx,MDSSA
+   ist:i32 attachinfo:Dbx,MDSSA       
+       ld:*<8> 's' decl:struct (id:1)  *  s  attachinfo:Dbx,MDSSA       
+       add:i32           
+           $9:i32 attachinfo:Dbx           
+           intconst:i32 3|0x3 attachinfo:Dbx
+-- HOIST CAND (NUM=6) -- :
+   ild:i32 attachinfo:Dbx,MDSSA       
+       ld:*<8> 's' attachinfo:Dbx,MDSSA
+   add:i32       
+       $9:i32 attachinfo:Dbx       
+       intconst:i32 3|0x3 attachinfo:Dbx
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   stpr $9:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:Dbx,MDSSA           
+           ld:*<8> 's' attachinfo:Dbx,MDSSA
+   ld:*<8> 's' attachinfo:Dbx,MDSSA
+   ist:i32 attachinfo:Dbx,MDSSA       
+       ld:*<8> 's' attachinfo:Dbx,MDSSA       
+       add:i32           
+           $9:i32 attachinfo:Dbx           
+           intconst:i32 3|0x3 attachinfo:Dbx
+==---- DUMP LICM Analysis Result : LoopInfo3 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB5, BODY:5,6,
+LOOP3 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=31) -- :
+   intconst:i32 5|0x5 attachinfo:Dbx
+   intconst:u32 100|0x64
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   intconst:u32 4|0x4
+   $10:u32 attachinfo:Dbx
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   $15:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       intconst:u32 100|0x64
+   $12:u32 attachinfo:Dbx
+   intconst:i32 1|0x1
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   lda:*<40000> 'g' attachinfo:Dbx
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       intconst:u32 100|0x64
+   $16:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $16:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   add:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       $15:u32 attachinfo:Dbx
+   $13:*<4> attachinfo:Dbx
+   $11:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $12:u32 attachinfo:Dbx
+   ild:i32 attachinfo:MDSSA,Dbx       
+       $13:*<4> attachinfo:Dbx
+   lda:*<40000> 'g' attachinfo:Dbx
+   intconst:u32 100|0x64
+   intconst:u32 4|0x4
+   $17:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $17:u32 attachinfo:Dbx
+   $14:i32
+   add:i32 attachinfo:Dbx       
+       $14:i32       
+       intconst:i32 5|0x5 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       $10:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $11:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+-- INVARIANT STMT (NUM=9) -- :
+
+   [14]        g[i][i] = g[i][i] + 5;
+   
+   stpr $10:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA           
+           intconst:u32 100|0x64
+   stpr $15:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA           
+           intconst:u32 100|0x64
+   stpr $11:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA           
+           $10:u32 attachinfo:Dbx
+   stpr $16:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA           
+           $15:u32 attachinfo:Dbx
+   stpr $12:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $11:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   stpr $17:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $16:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   stpr $13:*<4> attachinfo:Dbx       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' decl:int  g [100][100] attachinfo:Dbx           
+           $12:u32 attachinfo:Dbx
+   stpr $14:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:MDSSA,Dbx           
+           $13:*<4> attachinfo:Dbx
+   ist:i32 attachinfo:Dbx,MDSSA       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' decl:int  g [100][100] attachinfo:Dbx           
+           $17:u32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           $14:i32           
+           intconst:i32 5|0x5 attachinfo:Dbx
+-- HOIST CAND (NUM=24) -- :
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       intconst:u32 100|0x64
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   stpr $15:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           intconst:u32 100|0x64
+   stpr $10:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           intconst:u32 100|0x64
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   add:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       $10:u32 attachinfo:Dbx
+   stpr $17:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $16:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   mul:u32 attachinfo:Dbx       
+       $16:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   stpr $12:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $11:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   ild:i32 attachinfo:MDSSA,Dbx       
+       $13:*<4> attachinfo:Dbx
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   mul:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       intconst:u32 100|0x64
+   ist:i32 attachinfo:Dbx,MDSSA       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' attachinfo:Dbx           
+           $17:u32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           $14:i32           
+           intconst:i32 5|0x5 attachinfo:Dbx
+   stpr $16:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           $15:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $17:u32 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       $15:u32 attachinfo:Dbx
+   stpr $13:*<4> attachinfo:Dbx       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' attachinfo:Dbx           
+           $12:u32 attachinfo:Dbx
+   stpr $11:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           $10:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $12:u32 attachinfo:Dbx
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   mul:u32 attachinfo:Dbx       
+       $11:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   stpr $14:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:MDSSA,Dbx           
+           $13:*<4> attachinfo:Dbx
+   add:i32 attachinfo:Dbx       
+       $14:i32       
+       intconst:i32 5|0x5 attachinfo:Dbx
+==---- DUMP Loop Invariant Code Motion 'inc' ----==
+==-- DUMP ALL ACT --==
+  ACT1:insert preheader BB11 of LOOP1
+  ACT2:maintain DomTree: set BB11 dominates BB2
+  ACT3:hoisted IR to BB11:
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+  ACT4:insert preheader BB13 of LOOP2
+  ACT5:insert guard BB14 before preheader BB13
+  ACT6:maintain DomTree: set BB15 dominates BB5
+  ACT7:maintain DomTree: set BB14 dominates BB15
+  ACT8:maintain DomTree: set BB13 dominates BB14
+  ACT9:hoisted IR to BB13:
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+  ACT10:hoisted IR to BB13:
+    ld:*<8> 's' attachinfo:Dbx,MDSSA
+  ACT11:hoisted IR to BB13:
+    ld:*<8> 's' attachinfo:Dbx,MDSSA
+  ACT12:stpr executes at least once, thus it should be moved from BB13 to BB14
+  ACT13:stpr executes at least once, thus it should be moved from BB13 to BB14
+  ACT14:stpr executes at least once, thus it should be moved from BB13 to BB14
+  ACT15:moved IR from BB13 to BB14:
+    stpr $19:i32
+  ACT16:moved IR from BB13 to BB14:
+    stpr $20:*<8>
+  ACT17:moved IR from BB13 to BB14:
+    stpr $21:*<8>
+  ACT18:insert preheader BB16 of LOOP3
+  ACT19:insert guard BB17 before preheader BB16
+  ACT20:maintain DomTree: set BB18 dominates BB8
+  ACT21:maintain DomTree: set BB17 dominates BB18
+  ACT22:maintain DomTree: set BB16 dominates BB17
+  ACT23:hoisted IR to BB16:
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+  ACT24:stpr executes at least once, thus it should be moved from BB16 to BB17
+  ACT25:moved IR from BB16 to BB17:
+    stpr $22:i32
+==-- DUMP LoopInfo --==
+  LOOP4 HEAD:BB2, BODY:2,3,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD13 -- base:Var70(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD9 -- base:Var63(p):global,addr_taken,align(4),i32,decl:'int  p ' -- ofst:0 -- size:4
+    ld:i32 'p' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'p' attachinfo:Dbx,MDSSA
+      st:i32 'p' attachinfo:Dbx,MDSSA
+      ld:i32 'p' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $23:i32
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    PR:    $24:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    OutsideUseSet:      id:mc<0> '.global_mem' attachinfo:MDSSA
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+  DELE2RESTORE:
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    RESTORE:
+      st:i32 'p' attachinfo:Dbx,MDSSA          
+          $28:i32
+==-- DUMP LoopInfo --==
+  LOOP5 HEAD:BB5, BODY:5,6,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD15 -- base:Var71(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  ild:i32 attachinfo:Dbx,MDSSA      
+      $21:*<8>
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      $20:*<8>      
+      add:i32          
+          $9:i32 attachinfo:Dbx          
+          intconst:i32 3|0x3 attachinfo:Dbx
+  
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $31:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    PR:    $35:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'p' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    OutsideUseSet:      id:mc<0> '.global_mem' attachinfo:MDSSA
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  REF:ild -> DELE:ild
+  REF:ist -> DELE:ild
+  ==---- DUMP DELEGATE TABLE ----==
+  ild:i32 attachinfo:Dbx,MDSSA      
+      $21:*<8>
+  DELE2RESTORE:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    RESTORE:
+      ist:i32 attachinfo:Dbx,MDSSA          
+          $21:*<8>          
+          $36:i32
+==-- DUMP LoopInfo --==
+  LOOP6 HEAD:BB8, BODY:8,9,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD17 -- base:Var72(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD8 -- base:Var62(i):global,addr_taken,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $39:i32
+    --
+    DELE:    ld:i32 'i' attachinfo:Dbx,MDSSA
+    PR:    $40:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+    --
+    DELE:    ld:i32 'i' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'p' attachinfo:Dbx,MDSSA      ist:i32 attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+  DELE2RESTORE:
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+    ild:i32 attachinfo:MDSSA,Dbx
+    ist:i32 attachinfo:Dbx,MDSSA
+==---- DUMP LICM Analysis Result : LoopInfo4 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,
+LOOP5 HEAD:BB5, BODY:5,6,
+LOOP6 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $18:i32
+   intconst:i32 1|0x1
+
+
+==---- DUMP LICM Analysis Result : LoopInfo5 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,
+LOOP5 HEAD:BB5, BODY:5,6,
+LOOP6 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $19:i32
+   intconst:i32 3|0x3 attachinfo:Dbx
+
+
+==---- DUMP LICM Analysis Result : LoopInfo6 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP4 HEAD:BB2, BODY:2,3,
+LOOP5 HEAD:BB5, BODY:5,6,
+LOOP6 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=31) -- :
+   intconst:u32 100|0x64
+   $22:i32
+   lda:*<40000> 'g' attachinfo:Dbx
+   $44:i32 attachinfo:Dbx
+   intconst:u32 4|0x4
+   intconst:i32 1|0x1
+   intconst:u32 100|0x64
+   $44:i32 attachinfo:Dbx
+   $44:i32 attachinfo:Dbx
+   $15:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       intconst:u32 100|0x64
+   $11:u32 attachinfo:Dbx
+   add:i32 attachinfo:Dbx       
+       $14:i32       
+       intconst:i32 5|0x5 attachinfo:Dbx
+   lda:*<40000> 'g' attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       intconst:u32 100|0x64
+   $44:i32 attachinfo:Dbx
+   $16:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $16:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   add:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       $15:u32 attachinfo:Dbx
+   $13:*<4> attachinfo:Dbx
+   $10:u32 attachinfo:Dbx
+   ild:i32 attachinfo:MDSSA,Dbx       
+       $13:*<4> attachinfo:Dbx
+   intconst:i32 5|0x5 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       $10:u32 attachinfo:Dbx
+   intconst:u32 4|0x4
+   $17:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $17:u32 attachinfo:Dbx
+   $14:i32
+   $12:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $12:u32 attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $11:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+-- INVARIANT STMT (NUM=9) -- :
+
+   [14]        g[i][i] = g[i][i] + 5;
+   
+   stpr $10:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           intconst:u32 100|0x64
+   stpr $15:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           intconst:u32 100|0x64
+   stpr $11:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           $10:u32 attachinfo:Dbx
+   stpr $16:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           $15:u32 attachinfo:Dbx
+   stpr $12:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $11:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   stpr $17:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $16:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   stpr $13:*<4> attachinfo:Dbx       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' decl:int  g [100][100] attachinfo:Dbx           
+           $12:u32 attachinfo:Dbx
+   stpr $14:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:MDSSA,Dbx           
+           $13:*<4> attachinfo:Dbx
+   ist:i32 attachinfo:Dbx,MDSSA       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' decl:int  g [100][100] attachinfo:Dbx           
+           $17:u32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           $14:i32           
+           intconst:i32 5|0x5 attachinfo:Dbx
+-- HOIST CAND (NUM=19) -- :
+   mul:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       intconst:u32 100|0x64
+   stpr $15:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           intconst:u32 100|0x64
+   stpr $10:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           intconst:u32 100|0x64
+   stpr $17:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $16:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   mul:u32 attachinfo:Dbx       
+       $16:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   stpr $12:u32 attachinfo:Dbx       
+       mul:u32 attachinfo:Dbx           
+           $11:u32 attachinfo:Dbx           
+           intconst:u32 4|0x4
+   mul:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       intconst:u32 100|0x64
+   ist:i32 attachinfo:Dbx,MDSSA       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' attachinfo:Dbx           
+           $17:u32 attachinfo:Dbx       
+       add:i32 attachinfo:Dbx           
+           $14:i32           
+           intconst:i32 5|0x5 attachinfo:Dbx
+   stpr $16:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           $15:u32 attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $17:u32 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       $15:u32 attachinfo:Dbx
+   stpr $13:*<4> attachinfo:Dbx       
+       add:*<4> attachinfo:Dbx           
+           lda:*<40000> 'g' attachinfo:Dbx           
+           $12:u32 attachinfo:Dbx
+   stpr $11:u32 attachinfo:Dbx       
+       add:u32 attachinfo:Dbx           
+           $44:i32 attachinfo:Dbx           
+           $10:u32 attachinfo:Dbx
+   ild:i32 attachinfo:MDSSA,Dbx       
+       $13:*<4> attachinfo:Dbx
+   mul:u32 attachinfo:Dbx       
+       $11:u32 attachinfo:Dbx       
+       intconst:u32 4|0x4
+   stpr $14:i32 attachinfo:Dbx       
+       ild:i32 attachinfo:MDSSA,Dbx           
+           $13:*<4> attachinfo:Dbx
+   add:*<4> attachinfo:Dbx       
+       lda:*<40000> 'g' attachinfo:Dbx       
+       $12:u32 attachinfo:Dbx
+   add:u32 attachinfo:Dbx       
+       $44:i32 attachinfo:Dbx       
+       $10:u32 attachinfo:Dbx
+   add:i32 attachinfo:Dbx       
+       $14:i32       
+       intconst:i32 5|0x5 attachinfo:Dbx
+==---- DUMP Loop Invariant Code Motion 'inc' ----==
+==-- DUMP ALL ACT --==
+  ACT1:insert preheader BB16 of LOOP6
+  ACT2:insert guard BB13 before preheader BB16
+  ACT3:maintain DomTree: set BB19 dominates BB8
+  ACT4:maintain DomTree: set BB13 dominates BB19
+  ACT5:maintain DomTree: set BB16 dominates BB13
+  ACT6:hoisted IR to BB16:
+    stpr $15:u32 attachinfo:Dbx
+  ACT7:hoisted IR to BB16:
+    stpr $16:u32 attachinfo:Dbx
+  ACT8:hoisted IR to BB16:
+    stpr $17:u32 attachinfo:Dbx
+  ACT9:hoisted IR to BB16:
+    stpr $10:u32 attachinfo:Dbx
+  ACT10:hoisted IR to BB16:
+    add:*<4> attachinfo:Dbx
+  ACT11:hoisted IR to BB16:
+    stpr $11:u32 attachinfo:Dbx
+  ACT12:hoisted IR to BB16:
+    stpr $12:u32 attachinfo:Dbx
+  ACT13:hoisted IR to BB16:
+    stpr $13:*<4> attachinfo:Dbx
+  ACT14:hoisted IR to BB16:
+    $13:*<4> attachinfo:Dbx
+  ACT15:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT16:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT17:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT18:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT19:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT20:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT21:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT22:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT23:stpr executes at least once, thus it should be moved from BB16 to BB13
+  ACT24:moved IR from BB16 to BB13:
+    stpr $15:u32 attachinfo:Dbx
+  ACT25:moved IR from BB16 to BB13:
+    stpr $16:u32 attachinfo:Dbx
+  ACT26:moved IR from BB16 to BB13:
+    stpr $17:u32 attachinfo:Dbx
+  ACT27:moved IR from BB16 to BB13:
+    stpr $10:u32 attachinfo:Dbx
+  ACT28:moved IR from BB16 to BB13:
+    stpr $45:*<4>
+  ACT29:moved IR from BB16 to BB13:
+    stpr $11:u32 attachinfo:Dbx
+  ACT30:moved IR from BB16 to BB13:
+    stpr $12:u32 attachinfo:Dbx
+  ACT31:moved IR from BB16 to BB13:
+    stpr $13:*<4> attachinfo:Dbx
+  ACT32:moved IR from BB16 to BB13:
+    stpr $46:*<4>
+==-- DUMP LoopInfo --==
+  LOOP9 HEAD:BB8, BODY:8,9,
+==-- DUMP ExactAccessTab --==
+  
+==-- DUMP InexactAccessTab --==
+  ild:i32 attachinfo:MDSSA,Dbx      
+      $46:*<4>
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      $45:*<4>      
+      add:i32 attachinfo:Dbx          
+          $14:i32          
+          intconst:i32 5|0x5 attachinfo:Dbx
+  
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ild:i32 attachinfo:MDSSA,Dbx
+    PR:    $47:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ild:i32 attachinfo:MDSSA,Dbx
+    OutsideDefSet:      st:i32 'p' attachinfo:Dbx,MDSSA      ist:i32 attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  REF:ild -> DELE:ild
+  REF:ist -> DELE:ild
+  ==---- DUMP DELEGATE TABLE ----==
+  ild:i32 attachinfo:MDSSA,Dbx      
+      $46:*<4>
+  DELE2RESTORE:
+    --
+    DELE:    ild:i32 attachinfo:MDSSA,Dbx
+    RESTORE:
+      ist:i32 attachinfo:MDSSA          
+          $46:*<4>          
+          $48:i32
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP LICM Analysis Result : LoopInfo7 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $18:i32
+   intconst:i32 1|0x1
+
+
+==---- DUMP LICM Analysis Result : LoopInfo8 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $19:i32
+   intconst:i32 3|0x3 attachinfo:Dbx
+
+
+==---- DUMP LICM Analysis Result : LoopInfo9 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $22:i32
+   intconst:i32 5|0x5 attachinfo:Dbx
+
+
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP LICM Analysis Result : LoopInfo7 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $18:i32
+   intconst:i32 1|0x1
+
+
+==---- DUMP LICM Analysis Result : LoopInfo8 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $19:i32
+   intconst:i32 3|0x3 attachinfo:Dbx
+
+
+==---- DUMP LICM Analysis Result : LoopInfo9 : 'inc' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP7 HEAD:BB2, BODY:2,3,
+LOOP8 HEAD:BB5, BODY:5,6,
+LOOP9 HEAD:BB8, BODY:8,9,
+-- INVARIANT EXP (NUM=3) -- :
+   intconst:i32 1|0x1
+   $22:i32
+   intconst:i32 5|0x5 attachinfo:Dbx
+
+
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP Register Promotion '.program' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP Register Promotion '.program' ----==
+  ==-- DUMP Dont Promotion Table --==

@@ -1,0 +1,55 @@
+==---- DUMP Induction Variable Recogization 'foo' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB2,BODY:2,3,
+BIV(STMTOCC:MD12,'j')(EXPOCC:MD12,'j')
+  INIT-VAL:1
+  STEP-VAL:1
+  REDUCTION-STMT:
+    st:i32 'j' id:35 attachinfo:Dbx,MDSSA        
+        add:i32 id:32            
+            ld:i32 'j' id:30 attachinfo:Dbx,MDSSA            
+            intconst:i32 1|0x1 id:31
+  REDUCTION-EXP:
+    ld:i32 'j' id:30 attachinfo:Dbx,MDSSA
+  INIT-STMT:
+    st:i32 'j' id:3 attachinfo:Dbx,MDSSA        
+        intconst:i32 1|0x1 id:2 attachinfo:Dbx
+BIV(STMTOCC:MD13,'i')(EXPOCC:MD13,'i')
+  INIT-VAL:7
+  STEP-VAL:3
+  REDUCTION-STMT:
+    st:i32 'i' id:26 attachinfo:Dbx,MDSSA        
+        add:i32 id:25            
+            ld:i32 'i' id:23 attachinfo:Dbx,MDSSA            
+            intconst:i32 3|0x3 id:24 attachinfo:Dbx
+  REDUCTION-EXP:
+    ld:i32 'i' id:23 attachinfo:Dbx,MDSSA
+  INIT-STMT:
+    st:i32 'i' id:6 attachinfo:Dbx,MDSSA        
+        intconst:i32 7|0x7 id:5 attachinfo:Dbx
+DIV(STMTOCC:MD18,'pr2')
+  INIT-VAL:INT:1
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $2:i32 id:34 attachinfo:Dbx        
+        ld:i32 'j' id:33 attachinfo:MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:1
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD15,'k')
+  INIT-VAL:INT:8
+  STEP-VAL:INT:4
+  REDUCTION-STMT:
+    st:i32 'k' id:14 attachinfo:Dbx,MDSSA        
+        add:i32 id:13 attachinfo:Dbx            
+            ld:i32 'i' id:11 attachinfo:Dbx,MDSSA            
+            ld:i32 'j' id:12 attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:8
+      CODE:add
+      STEP:INT:4

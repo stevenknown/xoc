@@ -1,0 +1,12 @@
+//This file demostrate BIV non-const initial value.
+region program ".program" () {
+    var qsort:i8:(func,align(4));
+    region func qsort(undefined,var nleft:i32:(align(4)),var nright:i32:(align(4))) {
+        var i:i32:(align(4));
+        st:i32 i = add:i32 ld:i32 nleft, 1;
+        while (le ld:i32 i, ld:i32 nright) {
+            st:i32 i = add:i32 ld:i32 i, 0x1:i32;
+        };
+        return;
+    };
+}

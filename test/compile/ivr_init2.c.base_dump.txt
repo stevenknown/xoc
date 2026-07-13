@@ -1,0 +1,125 @@
+
+==---- DUMP Vectorization 'itrans_sp_chroma' ----==
+  ==-- DUMP VectCtx --==
+    ==-- DUMP IVBoundInfo --==
+      BIV(STMTOCC:MD23,'$10')(EXPOCC:MD21,'$8')
+        INIT-VAL:INT:0
+        STEP-VAL:INT:1
+        REDUCTION-STMT:
+          stpr $10:i32 attachinfo:Dbx              
+              add:i32                  
+                  $8:i32 attachinfo:Dbx                  
+                  intconst:i32 1|0x1
+        REDUCTION-EXP:
+          $8:i32 attachinfo:Dbx
+        INIT-STMT:
+          stpr $9:i32              
+              intconst:i32 0|0x0 attachinfo:Dbx
+      TRIPCOUNT IS IMM:8
+      INIT_VAL IS IMM:0
+      END_VAL IS IMM:8
+      STEP IS IMM:1
+    ==-- DUMP VectAccDescMgr --==
+      THERE ARE 1 RECOGNIZED VECTOR OPERATION
+      ----
+
+      [7]    g[j][i]=0;
+      
+      ist:i32 attachinfo:Dbx,MDSSA          
+          add:*<4> attachinfo:Dbx              
+              lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx              
+              $5:u32 attachinfo:Dbx          
+          intconst:i32 0|0x0 attachinfo:Dbx
+        -- VectAccDesc --
+          OCC:
+            ist:i32 attachinfo:Dbx,MDSSA                
+                add:*<4> attachinfo:Dbx                    
+                    lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx                    
+                    $5:u32 attachinfo:Dbx                
+                intconst:i32 0|0x0 attachinfo:Dbx
+          LINEARREP:
+            IV:
+              DIV(STMTOCC:MD18,'$5')
+                INIT-VAL:EXP:
+                  mul:u32                      
+                      $3:u32                      
+                      intconst:u32 4|0x4
+                STEP-VAL:INT:4
+                REDUCTION-STMT:
+                  stpr $5:u32 attachinfo:Dbx                      
+                      mul:u32 attachinfo:Dbx                          
+                          $4:u32 attachinfo:Dbx                          
+                          intconst:u32 4|0x4
+                LINEAR-REP:
+                  ChainRec(id:7):
+                    INIT:EXP:
+                    mul:u32                        
+                        $3:u32                        
+                        intconst:u32 4|0x4
+                    CODE:add
+                    STEP:INT:4
+            COEFF:
+              intconst:i32 1|0x1
+            VAR:
+              $5:u32 attachinfo:Dbx
+            + ADDEND:
+              lda:*<400> 'g' attachinfo:Dbx
+    -- CAND STMT LIST --
+      phi $8:i32 = 
+          $9:i32
+          $10:i32
+      stpr $4:u32 attachinfo:Dbx          
+          add:u32 attachinfo:Dbx              
+              $8:i32 attachinfo:Dbx              
+              $3:u32 attachinfo:Dbx
+      stpr $5:u32 attachinfo:Dbx          
+          mul:u32 attachinfo:Dbx              
+              $4:u32 attachinfo:Dbx              
+              intconst:u32 4|0x4
+      ist:i32 attachinfo:Dbx,MDSSA          
+          add:*<4> attachinfo:Dbx              
+              lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx              
+              $5:u32 attachinfo:Dbx          
+          intconst:i32 0|0x0 attachinfo:Dbx
+    -- PREREQUISITE STMT LIST --
+      phi $8:i32 = 
+          $9:i32
+          $10:i32
+      stpr $4:u32 attachinfo:Dbx          
+          add:u32 attachinfo:Dbx              
+              $8:i32 attachinfo:Dbx              
+              $3:u32 attachinfo:Dbx
+      stpr $5:u32 attachinfo:Dbx          
+          mul:u32 attachinfo:Dbx              
+              $4:u32 attachinfo:Dbx              
+              intconst:u32 4|0x4
+    -- RESULT-CAND STMT LIST --
+      ist:i32 attachinfo:Dbx,MDSSA          
+          add:*<4> attachinfo:Dbx              
+              lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx              
+              $5:u32 attachinfo:Dbx          
+          intconst:i32 0|0x0 attachinfo:Dbx
+    -- MADE CAND VECT-OP DESCRIPTOR --
+      -- DUMP VectOp --
+        VECTOPCODE:const
+        RESULT_DESC:
+          ist:i32 attachinfo:Dbx,MDSSA              
+              add:*<4> attachinfo:Dbx                  
+                  lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx                  
+                  $5:u32 attachinfo:Dbx              
+              intconst:i32 0|0x0 attachinfo:Dbx
+        EXPECTED_RESULT_TYPE:
+          vec<i32*8>
+        OPND_DESC_AND_TYPE:
+          -- OPND0_DESC --
+            intconst:i32 0|0x0 attachinfo:Dbx
+          -- EXPECTED_OPND0_TYPE --
+            i32
+    -- GENERATED VECTOR STMT LIST --
+      ist:vec<i32*8> attachinfo:Dbx          
+          add:*<4> attachinfo:Dbx              
+              lda:*<400> 'g' decl:int  g [10][10] attachinfo:Dbx              
+              $5:u32 attachinfo:Dbx          
+          intconst:i32 0|0x0 attachinfo:Dbx
+==-- DUMP ALL ACT --==
+  ACT1:Vectorization uses LICM info to determine whether an operation can be vectorized.

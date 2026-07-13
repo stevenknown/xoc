@@ -1,0 +1,28 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var foo:any:(func,align(4));
+    region func foo (undefined,var n:i32:(align(4)),var h:i32:(align(4)),var u:i32:(align(4)),var a:i32:(align(4)),var b:i32:(align(4))) {
+        var j:i32:(align(4));
+        var k:i32:(align(4));
+        var i:i32:(align(4));
+        label "_GR__$L1";
+        st:i32 i = 0:i32;
+        stpr $1:i32 = ld:i32 n;
+        stpr $2:i32 = ld:i32 j;
+        stpr $3:i32 = 0:i32;
+        stpr $4:i32 = ld:i32 k;
+        label _GR_L1;
+        phi $5:i32 = ($3:i32,"_GR__$L1"),($6:i32,"_GR__$L2");
+        falsebr (lt:bool $5:i32, ld:i32 n), _GR_L2;
+        label "_GR__$L2";
+        stpr $7:i32 = add:i32 $5:i32, 1:i32;
+        st:i32 h = 8:i32;
+        stpr $8:i32 = add:i32 ld:i32 h, $7:i32;
+        //stpr $8:i32 = add:i32 ld:i32 h, ld:i32 n;
+        stpr $6:i32 = $8:i32;
+        goto _GR_L1;
+        label _GR_L2;
+        st:i32 i = $5:i32;
+        return $5:i32;
+    };
+}

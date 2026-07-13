@@ -1,0 +1,5 @@
+region program ".program" () {
+    var a:str:(align(4));
+    st a = true;
+    st a = false;
+}

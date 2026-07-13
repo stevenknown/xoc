@@ -79,9 +79,13 @@ IR_DYNLEN_OP,
 //or variable length instructions.
 IR_SELECT_TO_RES,
 
+#ifdef REF_TARGMACH_INFO
+
 //Represent physical register.
 //NOTE: the IR code is available only when REF_TARGMACH_INFO is enabled.
 IR_PHYREG,
+
+#endif
 
 //Placeholder IR code for corresponding SWITCH-CASE entry.
 IR_EXT_UNA_PLACEHOLDER,

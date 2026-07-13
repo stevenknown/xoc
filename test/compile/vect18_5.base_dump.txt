@@ -1,0 +1,281 @@
+
+==---- DUMP Vectorization 'bar' ----==
+  ==-- DUMP VectCtx --==
+    LOOP1 HEAD:BB2, BODY(2):2,3,
+    ==-- DUMP IVBoundInfo --==
+      BIV1(STMTOCC:MD17,'j')(EXPOCC:MD17,'j')
+        INIT-VAL:INT:0
+        STEP-VAL:INT:1
+        REDUCTION-STMT:
+          st:i32 'j' attachinfo:Dbx,MDSSA              
+              add:i32                  
+                  ld:i32 'j' attachinfo:Dbx,MDSSA                  
+                  intconst:i32 1|0x1
+        REDUCTION-EXP:
+          ld:i32 'j' attachinfo:Dbx,MDSSA
+        INIT-STMT:
+          st:i32 'j' attachinfo:Dbx,MDSSA              
+              intconst:i32 0|0x0 attachinfo:Dbx
+      TRIPCOUNT IS IMM:10
+      INIT_VAL IS IMM:0
+      END_VAL IS IMM:10
+      STEP IS:INT:1
+    ==-- DUMP VectAccDescMgr --==
+      THERE ARE 2 RECOGNIZED VECTOR OPERATION
+      ----
+
+      [8]        arr[m*7+61*x*y+2*j/2+19*y-z*11-3] = arr[m*7+61*x*y+2*j/2+19*y-z*11-3] + sum;
+      
+      starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+          elem_num[10]
+          $43:i32 dim0          
+          lda:*<40> 'arr' array_base attachinfo:Dbx          
+          add:i32 rhs attachinfo:Dbx              
+              array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                  elemnum[10]
+                  $43:i32 dim0                  
+                  lda:*<40> 'arr' array_base attachinfo:Dbx              
+              ld:i32 'sum' attachinfo:MDSSA,Dbx
+        -- VectAccDesc --
+          OCC:
+            starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                elem_num[10]
+                $43:i32 dim0                
+                lda:*<40> 'arr' array_base attachinfo:Dbx                
+                add:i32 rhs attachinfo:Dbx                    
+                    array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                        elemnum[10]
+                        $43:i32 dim0                        
+                        lda:*<40> 'arr' array_base attachinfo:Dbx                    
+                    ld:i32 'sum' attachinfo:MDSSA,Dbx
+          LINEARREP:
+            IV:
+              DIV5(STMTOCC:MD61,'$43')
+                INIT-VAL:EXP:
+                  add:i32                      
+                      add:i32                          
+                          $34:i32                          
+                          add:i32                              
+                              $35:i32                              
+                              $39:i32                      
+                      intconst:i32 3|0x3
+                STEP-VAL:INT:1
+                REDUCTION-STMT:
+                  stpr $43:i32 attachinfo:Dbx                      
+                      sub:i32 attachinfo:Dbx                          
+                          $42:i32                          
+                          intconst:i32 3|0x3 attachinfo:Dbx
+                LINEAR-REP:
+                  ChainRec(id:4):
+                    INIT:EXP:
+                    add:i32                        
+                        add:i32                            
+                            $34:i32                            
+                            add:i32                                
+                                $35:i32                                
+                                $39:i32                        
+                        intconst:i32 3|0x3
+                    CODE:add
+                    STEP:INT:1
+            COEFF:
+              intconst:i32 1|0x1
+            VAR:
+              $43:i32
+            NOADDEND
+      ----
+      array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+          elemnum[10]
+          $43:i32 dim0          
+          lda:*<40> 'arr' array_base attachinfo:Dbx
+        -- VectAccDesc --
+          OCC:
+            array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                elemnum[10]
+                $43:i32 dim0                
+                lda:*<40> 'arr' array_base attachinfo:Dbx
+          LINEARREP:
+            IV:
+              DIV5(STMTOCC:MD61,'$43')
+                INIT-VAL:EXP:
+                  add:i32                      
+                      add:i32                          
+                          $34:i32                          
+                          add:i32                              
+                              $35:i32                              
+                              $39:i32                      
+                      intconst:i32 3|0x3
+                STEP-VAL:INT:1
+                REDUCTION-STMT:
+                  stpr $43:i32 attachinfo:Dbx                      
+                      sub:i32 attachinfo:Dbx                          
+                          $42:i32                          
+                          intconst:i32 3|0x3 attachinfo:Dbx
+                LINEAR-REP:
+                  ChainRec(id:4):
+                    INIT:EXP:
+                    add:i32                        
+                        add:i32                            
+                            $34:i32                            
+                            add:i32                                
+                                $35:i32                                
+                                $39:i32                        
+                        intconst:i32 3|0x3
+                    CODE:add
+                    STEP:INT:1
+            COEFF:
+              intconst:i32 1|0x1
+            VAR:
+              $43:i32
+            NOADDEND
+    -- CAND STMT LIST --
+      stpr $40:i32 attachinfo:Dbx          
+          add:i32 attachinfo:Dbx              
+              $39:i32              
+              ld:i32 'j' attachinfo:Dbx,MDSSA
+      stpr $41:i32 attachinfo:Dbx          
+          add:i32 attachinfo:Dbx              
+              $40:i32              
+              $35:i32
+      stpr $42:i32 attachinfo:Dbx          
+          sub:i32 attachinfo:Dbx              
+              $41:i32              
+              $34:i32
+      stpr $43:i32 attachinfo:Dbx          
+          sub:i32 attachinfo:Dbx              
+              $42:i32              
+              intconst:i32 3|0x3 attachinfo:Dbx
+      starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+          elem_num[10]
+          $43:i32 dim0          
+          lda:*<40> 'arr' array_base attachinfo:Dbx          
+          add:i32 rhs attachinfo:Dbx              
+              array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                  elemnum[10]
+                  $43:i32 dim0                  
+                  lda:*<40> 'arr' array_base attachinfo:Dbx              
+              ld:i32 'sum' attachinfo:MDSSA,Dbx
+    -- PREREQUISITE STMT LIST --
+      stpr $40:i32 attachinfo:Dbx          
+          add:i32 attachinfo:Dbx              
+              $39:i32              
+              ld:i32 'j' attachinfo:Dbx,MDSSA
+      stpr $41:i32 attachinfo:Dbx          
+          add:i32 attachinfo:Dbx              
+              $40:i32              
+              $35:i32
+      stpr $42:i32 attachinfo:Dbx          
+          sub:i32 attachinfo:Dbx              
+              $41:i32              
+              $34:i32
+      stpr $43:i32 attachinfo:Dbx          
+          sub:i32 attachinfo:Dbx              
+              $42:i32              
+              intconst:i32 3|0x3 attachinfo:Dbx
+    -- RESULT-CAND STMT LIST --
+      starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+          elem_num[10]
+          $43:i32 dim0          
+          lda:*<40> 'arr' array_base attachinfo:Dbx          
+          add:i32 rhs attachinfo:Dbx              
+              array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                  elemnum[10]
+                  $43:i32 dim0                  
+                  lda:*<40> 'arr' array_base attachinfo:Dbx              
+              ld:i32 'sum' attachinfo:MDSSA,Dbx
+    -- MADE CAND VECT-OP DESCRIPTOR --
+      VECTOP id:1
+        VECTOPCODE:starray
+        OCC:
+          starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+              elem_num[10]
+              $43:i32 dim0              
+              lda:*<40> 'arr' array_base attachinfo:Dbx              
+              add:i32 rhs attachinfo:Dbx                  
+                  array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                      elemnum[10]
+                      $43:i32 dim0                      
+                      lda:*<40> 'arr' array_base attachinfo:Dbx                  
+                  ld:i32 'sum' attachinfo:MDSSA,Dbx
+        EXPECTED_TYPE:
+          vec<i32*10>
+        OPND:
+          VECTOP id:2
+            VECTOPCODE:add
+            OCC:
+              add:i32 attachinfo:Dbx                  
+                  array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                      elemnum[10]
+                      $43:i32 dim0                      
+                      lda:*<40> 'arr' array_base attachinfo:Dbx                  
+                  ld:i32 'sum' attachinfo:MDSSA,Dbx
+            EXPECTED_TYPE:
+              vec<i32*10>
+            OPND:
+              VECTOP id:3
+                VECTOPCODE:array
+                OCC:
+                  array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+                      elemnum[10]
+                      $43:i32 dim0                      
+                      lda:*<40> 'arr' array_base attachinfo:Dbx
+                EXPECTED_TYPE:
+                  vec<i32*10>
+                OPND:
+              VECTOP id:4
+                VECTOPCODE:ld
+                OCC:
+                  ld:i32 'sum' attachinfo:MDSSA,Dbx
+                EXPECTED_TYPE:
+                  vec<i32*10>
+                OPND:
+    -- GENERATED VECTOR STMT LIST --
+      stpr $44:vec<i32*10>          
+          add:vec<i32*10>              
+              array:vec<i32*10> (elemtype:i32) attachinfo:Dbx
+                  elemnum[10]
+                  $43:i32 dim0                  
+                  lda:*<40> 'arr' array_base attachinfo:Dbx              
+              ld:i32 'sum' attachinfo:Dbx
+      starray:vec<i32*10> (elemtype:i32)
+          elem_num[10]
+          $43:i32 dim0          
+          lda:*<40> 'arr' array_base attachinfo:Dbx          
+          $44:vec<i32*10> rhs
+==-- DUMP ALL ACT --==
+  ACT1:GID20:Find IV boundary of LOOP1 is:
+    ==-- DUMP IVBoundInfo --==
+      BIV1(STMTOCC:MD17,'j')(EXPOCC:MD17,'j')
+        INIT-VAL:INT:0
+        STEP-VAL:INT:1
+        REDUCTION-STMT:
+          st:i32 'j' attachinfo:Dbx,MDSSA            
+              add:i32                
+                  ld:i32 'j' attachinfo:Dbx,MDSSA                
+                  intconst:i32 1|0x1
+        REDUCTION-EXP:
+          ld:i32 'j' attachinfo:Dbx,MDSSA
+        INIT-STMT:
+          st:i32 'j' attachinfo:Dbx,MDSSA            
+              intconst:i32 0|0x0 attachinfo:Dbx
+      TRIPCOUNT IS IMM:10
+      INIT_VAL IS IMM:0
+      END_VAL IS IMM:10
+      STEP IS:INT:1
+  ACT2:GID21:Vectorization uses LICM info to determine whether an operation can be vectorized.
+  ACT3:GID22:VECTORIZE:findSuitableVectOpnd:find the appropriate vector operand
+      array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+          elemnum[10]
+          $43:i32 dim0        
+          lda:*<40> 'arr' array_base attachinfo:Dbx
+  ACT4:GID23:VECTORIZE:findSuitableVectOpnd:find the appropriate vector operand
+      ld:i32 'sum' attachinfo:MDSSA,Dbx
+  ACT5:GID24:VECTORIZE:scalar operation has been regarded as vector operand
+      ld:i32 'sum' attachinfo:Dbx
+  ACT6:GID25:VECTORIZE:generate stpr operation to hold the intermediate value:
+      add:vec<i32*10>        
+          array:vec<i32*10> (elemtype:i32) attachinfo:Dbx
+              elemnum[10]
+              $43:i32 dim0            
+              lda:*<40> 'arr' array_base attachinfo:Dbx        
+          ld:i32 'sum' attachinfo:Dbx
+  ACT7:GID26:'falsebr' will be changed, however it is IV, so IVR will be invalided.

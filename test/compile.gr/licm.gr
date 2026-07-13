@@ -1,0 +1,37 @@
+region program "program" () {
+    var foo:any:(readonly, func, align(4));
+    var bar:any:(readonly, func, align(4));
+    var zoo:any:(readonly, func, align(4));
+
+    region func case1 () {
+        var m:mc<191>:(align(16));
+        var hx:mc<191>:(align(16));
+        while (eq 1, 1) {
+    	    call:(readonly) $ret:u64 = foo(ld m, ld hx); //should be hoisted
+            if (eq $a:i16, $b:f64) {
+                starray:i32:2:(dim[1], elemtype:mc<6>) =
+                  add:*<1> $sp:*<4>, 10,
+                  ($e:u64), //subexp
+                  add $ret, ld:i32 m; //rhs
+            }
+        }
+        return $a;
+    };
+
+    region func case2 () {
+        var m:mc<191>:(align(16));
+        while (eq 1, 1) {
+    	    call:(readonly) $ret = bar(ld m); //should be hoisted
+            stpr $i = add $ret, ld:i64 m;
+        }
+        return $a:i16;
+    };
+
+    region func case3 () {
+        while (eq 1, 1) {
+    	    call:(readonly) $ret = zoo(); //should be hoisted
+            stpr $i = $ret;
+        }
+        return $a:i8;
+    };
+}

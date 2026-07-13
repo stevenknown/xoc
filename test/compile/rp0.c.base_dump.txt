@@ -1,0 +1,228 @@
+
+==-- DUMP LoopInfo --==
+  LOOP1 HEAD:BB2, BODY:2,3,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD13 -- base:Var70(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD14 -- base:Var67(n):local,formal_param,align(4),i32,decl:'int  n ' -- ofst:0 -- size:4
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'n' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD9 -- base:Var63(p):global,addr_taken,align(4),i32,decl:'int  p ' -- ofst:0 -- size:4
+    ld:i32 'p' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'p' attachinfo:Dbx,MDSSA
+      st:i32 'p' attachinfo:Dbx,MDSSA
+      ld:i32 'p' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'n' attachinfo:Dbx,MDSSA
+    PR:    $28:i32
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    PR:    $29:i32
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $27:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    OutsideUseSet:      id:mc<0> '.global_mem' attachinfo:MDSSA
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+  DELE2RESTORE:
+  DELE2RESTORE:
+    --
+    DELE:    ld:i32 'p' attachinfo:Dbx,MDSSA
+    RESTORE:
+      st:i32 'p' attachinfo:Dbx,MDSSA          
+          $35:i32
+==-- DUMP LoopInfo --==
+  LOOP2 HEAD:BB5, BODY:5,6,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD15 -- base:Var71(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD14 -- base:Var67(n):local,formal_param,align(4),i32,decl:'int  n ' -- ofst:0 -- size:4
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'n' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  ild:i32 attachinfo:Dbx,MDSSA      
+      ld:*<8> 's' attachinfo:Dbx,MDSSA
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      ld:*<8> 's' attachinfo:Dbx,MDSSA      
+      add:i32          
+          $13:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+  
+  ild:i32 attachinfo:Dbx,MDSSA      
+      ld:*<8> 's' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $37:i32
+    --
+    DELE:    ld:i32 'n' attachinfo:Dbx,MDSSA
+    PR:    $38:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+  DELE2RESTORE:
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    PR:    $43:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'p' attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    OutsideUseSet:      id:mc<0> '.global_mem' attachinfo:MDSSA
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  REF:ild -> DELE:ild
+  REF:ild -> DELE:ild
+  REF:ild -> DELE:ild
+  ==---- DUMP DELEGATE TABLE ----==
+  ild:i32 attachinfo:Dbx,MDSSA      
+      ld:*<8> 's' attachinfo:Dbx,MDSSA
+  DELE2RESTORE:
+    --
+    DELE:    ild:i32 attachinfo:Dbx,MDSSA
+    RESTORE:
+      ist:i32 attachinfo:Dbx,MDSSA          
+          ld:*<8> 's' attachinfo:MDSSA,Dbx          
+          $45:i32
+==-- DUMP LoopInfo --==
+  LOOP3 HEAD:BB8, BODY:8,9,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD14 -- base:Var67(n):local,formal_param,align(4),i32,decl:'int  n ' -- ofst:0 -- size:4
+    ld:i32 'n' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'n' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD17 -- base:Var72(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD8 -- base:Var62(i):global,addr_taken,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==-- DUMP DelegateMgr 'inc' --==
+  DELE2PR:
+    --
+    DELE:    ld:i32 'n' attachinfo:Dbx,MDSSA
+    PR:    $47:i32
+    --
+    DELE:    ld:i32 'i' attachinfo:Dbx,MDSSA
+    PR:    $49:i32
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    PR:    $48:i32
+  DELE2INITSTPR:
+  DELE2OutsideDefSet:
+    --
+    DELE:    ld:i32 'j' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'j' attachinfo:Dbx,MDSSA
+    --
+    DELE:    ld:i32 'i' attachinfo:Dbx,MDSSA
+    OutsideDefSet:      st:i32 'p' attachinfo:Dbx,MDSSA      ist:i32 attachinfo:Dbx,MDSSA
+  DELE2OutsideUseSet:
+  ==---- DUMP REF TO DELEGATE TABLE ----==
+  ==---- DUMP DELEGATE TABLE ----==
+  DELE2RESTORE:
+  DELE2RESTORE:
+  DELE2RESTORE:
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+    ild:i32 attachinfo:Dbx,MDSSA
+    ist:i32 attachinfo:Dbx,MDSSA
+    ild:i32 attachinfo:Dbx,MDSSA
+  ==-- DUMP ALL ACT --==
+    ACT1:ild is swept out by ild, because:prevent by element in DontPromoteTab
+    ACT2:ist is swept out by ild, because:prevent by element in DontPromoteTab
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+    ild:i32 attachinfo:Dbx,MDSSA
+    ist:i32 attachinfo:Dbx,MDSSA
+  ==-- DUMP ALL ACT --==
+    ACT1:ist is swept out by ild, because:prevent by element in DontPromoteTab
+==---- DUMP Register Promotion 'inc' ----==
+  ==-- DUMP Dont Promotion Table --==
+    ild:i32 attachinfo:Dbx,MDSSA
+    ist:i32 attachinfo:Dbx,MDSSA
+  ==-- DUMP ALL ACT --==
+    ACT1:ist is swept out by ild, because:prevent by element in DontPromoteTab
+==---- DUMP Register Promotion '.program' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP Register Promotion '.program' ----==
+  ==-- DUMP Dont Promotion Table --==

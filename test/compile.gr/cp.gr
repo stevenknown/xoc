@@ -1,0 +1,8 @@
+region program "myprogram" () {
+    var g:i32:(align(4));
+    region func main () {
+        var a:mc<128>:(align(4));
+        stpr $11:*<1> = lda a;
+        stpr $14:i32:(throw()) = ild:i32:0 $11:*<16>;
+    };
+}

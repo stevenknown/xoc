@@ -1,0 +1,104 @@
+region program ".program" () {
+    var globalval0:u32:(align(4));
+    var globalvala:u32:(align(4));
+    var globalvalb:u32:(align(4));
+    var testv:any:(func,align(4));
+    var slave_my_entry_1:any:(func,align(4));
+    region func slave_my_entry_1 () {
+
+        var func_level_var_1:u64:(align(8));
+        var func_level_var_2:u64:(align(8));
+        stpr $5:*<1> =
+            lda globalvala;
+        stpr $1:i32 =
+            ild:i32
+                $5:*<1>;
+        stpr $1:u32 =
+            add:u32
+                $1:u32, 15:u32;
+        stpr $6:*<1> =
+            lda globalvalb;
+        stpr $2:i32 =
+            ild:i32
+                $6:*<1>;
+        stpr $2:u32 =
+            add:u32
+                $2:u32, 15:u32;
+        stpr $1:u32 =
+            add:u32
+                $1:u32, 15:u32;
+        stpr $2:u32 =
+            add:u32
+                $2:u32, 15:u32;
+        stpr $7:bool =
+            lt:bool
+                $1:u32,
+                $2:u32;
+        truebr (
+            eq:bool
+                $7:bool, 0:bool), depth_1_true;
+        goto "_GR__$L2";
+        label depth_1_true;
+        st:u32 func_level_var_2 =
+            $2:u32;
+        stpr $3:u32 =
+            div:u32
+                $2:u32, 8:u32;
+        stpr $3:u32 =
+            mod:u32
+                $3:u32, 15:u32;
+        stpr $1:u32 =
+            mod:u32
+                $1:u32, 15:u32;
+        st:u32 func_level_var_1 =
+            $1:u32;
+        stpr $8:bool =
+            lt:bool
+                $3:u32,
+                $1:u32;
+        truebr (
+            eq:bool
+                $8:bool, 0:bool), depth_2_true;
+        goto depth_2_false;
+        label depth_2_false;
+        goto "_GR__$L3";
+        label depth_2_true;
+        stpr $10:u32 =
+            lda testv;
+        call $11:u32 = testv();
+        stpr $4:u32 =
+            $11:u32;
+        stpr $12:u32 =
+            ld:u32 func_level_var_1;
+        stpr $12:u32 =
+            add:u32
+                $12:u32,
+                $4:u32;
+        goto end;
+        label "_GR__$L3";
+        stpr $12:u32 =
+            ld:u32 func_level_var_1;
+        label end;
+        goto fin;
+        label "_GR__$L2";
+        st:u32 func_level_var_2 =
+            $2:u32;
+        stpr $12:u32 =
+            $1:i32;
+        label depth_1_false;
+        goto fin;
+        label fin;
+        stpr $13:u32 =
+            ld:u32 func_level_var_2;
+        stpr $12:u32 =
+            add:u32
+                $13:u32,
+                $12:u32;
+        stpr $9:*<1> =
+            lda globalval0;
+        ist:u32 =
+            $9:*<1>,
+            $12:u32;
+        return ;
+    };
+}

@@ -1,0 +1,26 @@
+region program "myprogram" () {
+    var g:i32:(align(4));
+    var N1:mc<6000>:(align(4));
+    var N2:mc<6000>:(align(4));
+    var N3:mc<6000>:(align(4));
+    var N4:mc<6000>:(align(4));
+    var N5:mc<6000>:(align(4));
+    region func foo () {
+      stpr $r0 = lda N1;
+      stpr $r0 = add $r0, -64:i32; //signed, negative-offset, unbound
+
+      stpr $r3 = lda:4096 N2;
+      stpr $r3 = add $r3, -64:u32; //unsigned, overflow, and unbound
+
+      stpr $r13 = lda N3;
+      stpr $r13 = add $r13, -64:u32; //unsigend, not overflow, exact PTS.
+
+      stpr $r23 = lda:32 N4;
+      stpr $r23 = sub $r23, 128:u32; //unsigend, not overflow
+
+      stpr $r33 = lda:64 N5;
+      stpr $r33 = sub $r33, 32:u32; //unsigend, not overflow
+
+      return eq $r33, eq $r23, eq $r13, eq $r0, $r3;
+    };
+}

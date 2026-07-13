@@ -1,0 +1,44 @@
+region program ".program" () {
+    var gg:i32:(align(4));
+    var s81:*<4>:(func,align(4));
+    var goodtest:mc<1>:(private,array,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+    region func s81() {
+        var k:i32:(align(4));
+        var rc:i32:(align(4));
+        var j:i32:(align(4));
+        var prc:i32:(align(4));
+        var rchar:u8:(align(4));
+        label "_GR__$L4";
+        starray:u8:0:(dim[1]) =
+            lda goodtest, (0:i32), 114:u32;
+        starray:u8:0:(dim[1]) =
+            lda goodtest, (1:i32), 0:u32;
+        st:i32 k = 1:i32;
+        st:i32 j = 0:i32;
+        label "_GR__$L1";
+        phi $2:i32 = (
+            $1:i32,"_GR__$L4"),(
+            $3:i32,"_GR__$L5");
+        falsebr (
+            lt:bool
+                ld:i32 j, 50:i32), "_GR__$L2";
+        label "_GR__$L5";
+        st:u8 rchar =
+            ld:i32 k;
+        stpr $3:i32 =
+            ld:i32 j;
+        st:i32 j =
+            add:i32
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        falsebr (
+            ne:bool
+                ld:i32 gg, 0:i32), "_GR__$L3";
+        st:i32 rc = 88:i32;
+        label "_GR__$L3";
+        return
+            ld:i32 rc;
+    };
+}

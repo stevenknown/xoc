@@ -1,0 +1,523 @@
+
+==---- DUMP MDSSA Manager 'foo' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var65(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:40
+  MD9 -- base:Var62(sum):global,addr_taken,align(4),i32,decl:'int  sum ' -- ofst:0 -- size:4
+  MD10 -- base:Var63(foo):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'void  foo ()' -- ofst:unbound
+  MD11 -- base:Var66(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD12 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:4
+  MD13 -- base:Var64(i):local,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+  MD14 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- start:0 -- end:40 -- range
+  ==-- DUMP MDSSAMgr VOpndRef 'foo' --==
+  
+  --- BB7 ---
+  --- BB1 ---
+  
+
+  [5]    for (int i = 0; i < 10; i += 1) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD7:MD13V1,-|USESET:id(id:40)
+  --- BB2 ---
+  MDPhi6: MD14V1 <- (ID id:42 MD14V0 BB1), (ID id:43 MD14V2 BB3)  |USESET:(array id:11) 
+  MDPhi5: MD13V2 <- (ID id:40 MD13V1 BB1), (ID id:41 MD13V3 BB3)  |USESET:(ld id:10) (ld id:19) (ld id:1) (ld id:24) 
+  MDPhi4: MD12V1 <- (ID id:38 MD12V0 BB1), (ID id:39 MD12V2 BB3)  |USESET:(array id:11) 
+  MDPhi3: MD9V1 <- (ID id:36 MD9V0 BB1), (ID id:37 MD9V2 BB3)  |USESET:(ld id:8) 
+  MDPhi2: MD8V1 <- (ID id:7 MD8V0 BB1), (ID id:35 MD8V2 BB3)  |USESET:(array id:11) 
+  MDPhi1: MD2V1 <- (ID id:23 MD2V0 BB1), (ID id:17 MD2V3 BB3)  |USESET:(ld id:8) (array id:11) 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 10|0xa attachinfo:Dbx
+    ----
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  --- BB3 ---
+  
+
+  [6]        sum = sum + arr[i];
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      add:i32 attachinfo:Dbx          
+          ld:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA          
+          array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+              elemnum[10]
+              ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA              
+              lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx
+    ----
+    st:i32 'sum' attachinfo:Dbx,MDSSA
+    --DEF:VMD14:MD9V2,PrevDEF:MD9V1|USESET:ld(id:21),id(id:37)
+    --DEF:VMD15:MD2V2,PrevDEF:MD2V1,NextDEF:MD2V3|USESET:ld(id:21)
+    ld:i32 'sum' attachinfo:Dbx,MDSSA
+    --USE:MD9V1,MD2V1
+    array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+    --USE:MD14V1,MD12V1,MD8V1,MD2V1
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  
+
+  [7]        arr[i] = sum;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[10]
+      ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA      
+      lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx      
+      ld:i32 'sum' decl:int  sum  rhs attachinfo:Dbx,MDSSA
+    ----
+    starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+    --DEF:VMD16:MD2V3,PrevDEF:MD2V2|USESET:id(id:17)
+    --DEF:VMD17:MD14V2,PrevDEF:MD14V1|USESET:id(id:43)
+    --DEF:VMD18:MD8V2,PrevDEF:MD8V1|USESET:id(id:35)
+    --DEF:VMD19:MD12V2,PrevDEF:MD12V1|USESET:id(id:39)
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+    ld:i32 'sum' attachinfo:Dbx,MDSSA
+    --USE:MD9V2,MD2V2
+  
+
+  [5]    for (int i = 0; i < 10; i += 1) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1 attachinfo:Dbx
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD20:MD13V3,PrevDEF:MD13V2|USESET:id(id:41)
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  
+  goto label _$L1
+  --- BB5 ---
+  
+  return
+  ==-- DUMP MDSSAMgr DU CHAIN 'foo' --==
+  
+  ----- BB7 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----------------
+    st(id:3)
+      USESET:
+        MD13V1:(id id:40) 
+    ----------------
+    
+  ----- BB2 --- rpo:20 -----
+  LABEL:  _$L1 
+  ATTR:fall_through branch_target 
+  MDPhi6: MD14V1 <- (ID id:42 MD14V0 BB1), (ID id:43 MD14V2 BB3)  |USESET:(array id:11) 
+  MDPhi5: MD13V2 <- (ID id:40 MD13V1 BB1), (ID id:41 MD13V3 BB3)  |USESET:(ld id:10) (ld id:19) (ld id:1) (ld id:24) 
+  MDPhi4: MD12V1 <- (ID id:38 MD12V0 BB1), (ID id:39 MD12V2 BB3)  |USESET:(array id:11) 
+  MDPhi3: MD9V1 <- (ID id:36 MD9V0 BB1), (ID id:37 MD9V2 BB3)  |USESET:(ld id:8) 
+  MDPhi2: MD8V1 <- (ID id:7 MD8V0 BB1), (ID id:35 MD8V2 BB3)  |USESET:(array id:11) 
+  MDPhi1: MD2V1 <- (ID id:23 MD2V0 BB1), (ID id:17 MD2V3 BB3)  |USESET:(ld id:8) (array id:11) 
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 10|0xa attachinfo:Dbx
+    ----------------
+    ld(id:1)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+  ----- BB3 --- rpo:40 -----
+  ATTR:
+
+  [6]        sum = sum + arr[i];
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      add:i32 attachinfo:Dbx          
+          ld:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA          
+          array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+              elemnum[10]
+              ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA              
+              lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx
+    ----------------
+    st(id:13)
+      USESET:
+        MD9V2:(ld id:21) (id id:37) 
+        MD2V2:(ld id:21) 
+    ld(id:8)
+      DEFSET:
+        MD9V1:(mdphi3) (st id:13)
+        MD2V1:(mdphi1) (starray id:22)
+    array(id:11)
+      DEFSET:
+        MD14V1:(mdphi6) (starray id:22)
+        MD12V1:(mdphi4)
+        MD8V1:(mdphi2)
+        MD2V1:(mdphi1) (st id:13)
+    ld(id:10)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+
+  [7]        arr[i] = sum;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[10]
+      ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA      
+      lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx      
+      ld:i32 'sum' decl:int  sum  rhs attachinfo:Dbx,MDSSA
+    ----------------
+    starray(id:22)
+      USESET:
+        MD2V3:(id id:17) 
+        MD14V2:(id id:43) 
+        MD8V2:(id id:35) 
+        MD12V2:(id id:39) 
+    ld(id:19)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ld(id:21) KDEF:st(id:13)
+      DEFSET:
+        MD9V2:(st id:13)
+        MD2V2:(mdphi1) (starray id:22)
+    ----------------
+    
+
+  [5]    for (int i = 0; i < 10; i += 1) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1 attachinfo:Dbx
+    ----------------
+    st(id:27)
+      USESET:
+        MD13V3:(id id:41) 
+    ld(id:24)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+  goto label _$L1
+  ----- BB5 --- rpo:30 -----
+  LABEL:  _$L2 
+  ATTR:fall_through branch_target 
+  return
+==---- DUMP MDSSA Manager 'foo' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var65(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:40
+  MD9 -- base:Var62(sum):global,addr_taken,align(4),i32,decl:'int  sum ' -- ofst:0 -- size:4
+  MD10 -- base:Var63(foo):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'void  foo ()' -- ofst:unbound
+  MD11 -- base:Var66(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD12 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:4
+  MD13 -- base:Var64(i):local,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+  MD14 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- start:0 -- end:40 -- range
+  ==-- DUMP MDSSAMgr VOpndRef 'foo' --==
+  
+  --- BB7 ---
+  --- BB1 ---
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD7:MD13V1,-|USESET:id(id:41)
+  --- BB2 ---
+  MDPhi6: MD14V1 <- (ID id:43 MD14V0 BB1), (ID id:42 MD14V2 BB3)  |USESET:(array id:11) 
+  MDPhi5: MD13V2 <- (ID id:41 MD13V1 BB1), (ID id:40 MD13V3 BB3)  |USESET:(ld id:10) (ld id:19) (ld id:1) (ld id:24) 
+  MDPhi4: MD12V1 <- (ID id:39 MD12V0 BB1), (ID id:38 MD12V2 BB3)  |USESET:(array id:11) 
+  MDPhi3: MD9V1 <- (ID id:37 MD9V0 BB1), (ID id:36 MD9V2 BB3)  |USESET:(ld id:8) 
+  MDPhi2: MD8V1 <- (ID id:35 MD8V0 BB1), (ID id:7 MD8V2 BB3)  |USESET:(array id:11) 
+  MDPhi1: MD2V1 <- (ID id:17 MD2V0 BB1), (ID id:23 MD2V3 BB3)  |USESET:(ld id:8) (array id:11) 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 10|0xa attachinfo:Dbx
+    ----
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  --- BB3 ---
+  
+
+  [6]        sum = sum + arr[i];
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      add:i32 attachinfo:Dbx          
+          ld:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA          
+          array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+              elemnum[10]
+              ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA              
+              lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx
+    ----
+    st:i32 'sum' attachinfo:Dbx,MDSSA
+    --DEF:VMD14:MD9V2,PrevDEF:MD9V1|USESET:ld(id:21),id(id:36)
+    --DEF:VMD15:MD2V2,PrevDEF:MD2V1,NextDEF:MD2V3|USESET:ld(id:21)
+    ld:i32 'sum' attachinfo:Dbx,MDSSA
+    --USE:MD9V1,MD2V1
+    array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+    --USE:MD14V1,MD12V1,MD8V1,MD2V1
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  
+
+  [7]        arr[i] = sum;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[10]
+      ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA      
+      lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx      
+      ld:i32 'sum' decl:int  sum  rhs attachinfo:Dbx,MDSSA
+    ----
+    starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+    --DEF:VMD16:MD2V3,PrevDEF:MD2V2|USESET:id(id:23)
+    --DEF:VMD17:MD14V2,PrevDEF:MD14V1|USESET:id(id:42)
+    --DEF:VMD18:MD8V2,PrevDEF:MD8V1|USESET:id(id:7)
+    --DEF:VMD19:MD12V2,PrevDEF:MD12V1|USESET:id(id:38)
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+    ld:i32 'sum' attachinfo:Dbx,MDSSA
+    --USE:MD9V2,MD2V2
+  
+
+  [5]    for (int i = 0; i < 10; i += 1) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1 attachinfo:Dbx
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD20:MD13V3,PrevDEF:MD13V2|USESET:id(id:40)
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+    --USE:MD13V2
+  
+  goto label _$L1
+  --- BB5 ---
+  
+  return
+  ==-- DUMP MDSSAMgr DU CHAIN 'foo' --==
+  
+  ----- BB7 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----------------
+    st(id:3)
+      USESET:
+        MD13V1:(id id:41) 
+    ----------------
+    
+  ----- BB2 --- rpo:20 -----
+  LABEL:  _$L1 
+  ATTR:fall_through branch_target 
+  MDPhi6: MD14V1 <- (ID id:43 MD14V0 BB1), (ID id:42 MD14V2 BB3)  |USESET:(array id:11) 
+  MDPhi5: MD13V2 <- (ID id:41 MD13V1 BB1), (ID id:40 MD13V3 BB3)  |USESET:(ld id:10) (ld id:19) (ld id:1) (ld id:24) 
+  MDPhi4: MD12V1 <- (ID id:39 MD12V0 BB1), (ID id:38 MD12V2 BB3)  |USESET:(array id:11) 
+  MDPhi3: MD9V1 <- (ID id:37 MD9V0 BB1), (ID id:36 MD9V2 BB3)  |USESET:(ld id:8) 
+  MDPhi2: MD8V1 <- (ID id:35 MD8V0 BB1), (ID id:7 MD8V2 BB3)  |USESET:(array id:11) 
+  MDPhi1: MD2V1 <- (ID id:17 MD2V0 BB1), (ID id:23 MD2V3 BB3)  |USESET:(ld id:8) (array id:11) 
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 10|0xa attachinfo:Dbx
+    ----------------
+    ld(id:1)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+  ----- BB3 --- rpo:40 -----
+  ATTR:
+
+  [6]        sum = sum + arr[i];
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      add:i32 attachinfo:Dbx          
+          ld:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA          
+          array:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+              elemnum[10]
+              ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA              
+              lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx
+    ----------------
+    st(id:13)
+      USESET:
+        MD9V2:(ld id:21) (id id:36) 
+        MD2V2:(ld id:21) 
+    ld(id:8)
+      DEFSET:
+        MD9V1:(mdphi3) (st id:13)
+        MD2V1:(mdphi1) (starray id:22)
+    array(id:11)
+      DEFSET:
+        MD14V1:(mdphi6) (starray id:22)
+        MD12V1:(mdphi4)
+        MD8V1:(mdphi2)
+        MD2V1:(mdphi1) (st id:13)
+    ld(id:10)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+
+  [7]        arr[i] = sum;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[10]
+      ld:i32 'i' decl:int  i  dim0 attachinfo:Dbx,MDSSA      
+      lda:*<40> 'arr' decl:int  arr [10] array_base attachinfo:Dbx      
+      ld:i32 'sum' decl:int  sum  rhs attachinfo:Dbx,MDSSA
+    ----------------
+    starray(id:22)
+      USESET:
+        MD2V3:(id id:23) 
+        MD14V2:(id id:42) 
+        MD8V2:(id id:7) 
+        MD12V2:(id id:38) 
+    ld(id:19)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ld(id:21) KDEF:st(id:13)
+      DEFSET:
+        MD9V2:(st id:13)
+        MD2V2:(mdphi1) (starray id:22)
+    ----------------
+    
+
+  [5]    for (int i = 0; i < 10; i += 1) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1 attachinfo:Dbx
+    ----------------
+    st(id:27)
+      USESET:
+        MD13V3:(id id:40) 
+    ld(id:24)
+      DEFSET:
+        MD13V2:(mdphi5) (st id:3) (st id:27)
+    ----------------
+    
+  goto label _$L1
+  ----- BB5 --- rpo:30 -----
+  LABEL:  _$L2 
+  ATTR:fall_through branch_target 
+  return
+==---- DUMP MDSSA Manager '.program' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var65(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:40
+  MD9 -- base:Var62(sum):global,addr_taken,align(4),i32,decl:'int  sum ' -- ofst:0 -- size:4
+  MD10 -- base:Var63(foo):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'void  foo ()' -- ofst:unbound
+  MD11 -- base:Var66(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD12 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:4
+  MD13 -- base:Var64(i):local,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+  MD14 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- start:0 -- end:40 -- range
+  ==-- DUMP MDSSAMgr VOpndRef '.program' --==
+  
+  --- BB3 ---
+  --- BB1 ---
+  
+  region 'foo',id:2
+  --- BB2 ---
+  
+
+  [2]int sum = 0;
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----
+    st:i32 'sum' attachinfo:Dbx,MDSSA
+    --DEF:VMD3:MD9V1,-|USESET:
+    --DEF:VMD4:MD2V1,-|USESET:
+  ==-- DUMP MDSSAMgr DU CHAIN '.program' --==
+  
+  ----- BB3 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  region 'foo',id:2
+  ----- BB2 --- rpo:20 -----
+  ATTR:fall_through 
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----------------
+    st(id:4)
+      USESET:
+        MD9V1:
+        MD2V1:
+    ----------------
+    
+==---- DUMP MDSSA Manager '.program' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var65(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:40
+  MD9 -- base:Var62(sum):global,addr_taken,align(4),i32,decl:'int  sum ' -- ofst:0 -- size:4
+  MD10 -- base:Var63(foo):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'void  foo ()' -- ofst:unbound
+  MD11 -- base:Var66(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD12 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- ofst:0 -- size:4
+  MD13 -- base:Var64(i):local,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+  MD14 -- base:Var61(arr):global,array,addr_taken,align(4),mc,mem_size:40,decl:'int  arr [10]' -- start:0 -- end:40 -- range
+  ==-- DUMP MDSSAMgr VOpndRef '.program' --==
+  
+  --- BB3 ---
+  --- BB1 ---
+  
+  region 'foo',id:2
+  --- BB2 ---
+  
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----
+    st:i32 'sum' attachinfo:Dbx,MDSSA
+    --DEF:VMD3:MD9V1,-|USESET:
+    --DEF:VMD4:MD2V1,-|USESET:
+  ==-- DUMP MDSSAMgr DU CHAIN '.program' --==
+  
+  ----- BB3 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  region 'foo',id:2
+  ----- BB2 --- rpo:20 -----
+  ATTR:fall_through 
+  st:i32 'sum' decl:int  sum  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+    ----------------
+    st(id:4)
+      USESET:
+        MD9V1:
+        MD2V1:
+    ----------------
+    

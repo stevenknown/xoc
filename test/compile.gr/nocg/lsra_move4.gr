@@ -1,0 +1,32 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var f:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var m:i32:(align(4));
+    var n:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main() {
+        stpr $r1 = lda a;
+
+        label AAA;
+        st d = 100;
+
+        label DDD;
+        st c = add $r1, 1;
+        truebr (gt ld x, ld y), CCC;
+
+        label BBB;
+        stpr $r1 = lda e;
+        stpr $r2 = lda f;
+        st b = sub $r1, 2;
+
+        label CCC;
+        truebr (gt ld m, ld n), AAA;
+        return $r1;
+    };
+}

@@ -1,0 +1,7 @@
+
+==---- DUMP Global Command Subexpression Elimination 'foo_restrict' ----==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:ild is CSE of ild and will be replaced by pr
+==---- DUMP Global Command Subexpression Elimination 'foo_restrict' ----==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID2:ild is CSE of ild and will be replaced by pr

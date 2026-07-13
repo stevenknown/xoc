@@ -1,0 +1,27 @@
+region program ".program" () {
+    var s72:any:(func,align(4));
+    region func s72 () {
+        var rc:i32:(align(4));
+        var k:i32:(align(4));
+        var lrc:i32:(align(4));
+        var l:i32:(align(4));
+        st:i32 rc = 0:i32;
+        st:i32 k = 5:i32;
+        st:i32 k = 6:i32;
+        st:i32 lrc = 0:i32;
+        truebr (
+            eq:bool 
+                ld:i32 l, 26:i32), "_GR__$L2";
+        st:i32 lrc = 16:i32;
+        label "_GR__$L2";
+        truebr (
+            eq:bool 
+                ld:i32 lrc, 0:i32), "_GR__$L3";
+        st:i32 rc = 
+            add:i32 
+                ld:i32 rc, 16:i32;
+        label "_GR__$L3";
+        return 
+            ld:i32 rc;
+    };
+}

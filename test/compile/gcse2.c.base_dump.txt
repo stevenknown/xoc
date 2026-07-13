@@ -1,0 +1,16 @@
+
+==---- DUMP Global Command Subexpression Elimination 'mat' ----==
+NumOfEliminatedCSE:3
+ELIMINATED IR: id:47,id:49,id:50
+==---- DUMP Global Command Subexpression Elimination 'mat' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination 'mat' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 

@@ -1,0 +1,410 @@
+
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR mul id:47 in LOOP2 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR mul id:47 in LOOP2 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR add id:48 in LOOP2 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR add id:48 in LOOP2 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR mul id:50 in LOOP2 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR mul id:50 in LOOP2 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR add id:22 in LOOP2 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR add id:22 in LOOP2 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'itrans_sp_chroma' ----==
+
+==-- LOOP INFO --==
+
+LI2:BB2,BODY:2,4,5,7,12,
+BIV(STMTOCC:MD28,'$16')(EXPOCC:MD26,'$14')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $16:i32 attachinfo:Dbx        
+        add:i32            
+            $14:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $14:i32 attachinfo:Dbx
+DIV(STMTOCC:MD20,'$8')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $8:i32        
+        $14:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+
+==-- LOOP INFO --==
+
+LI1:BB4,BODY:4,5,
+BIV(STMTOCC:MD33,'$21')(EXPOCC:MD31,'$19')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $21:i32 attachinfo:Dbx        
+        add:i32            
+            $19:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $19:i32 attachinfo:Dbx
+DIV(STMTOCC:MD19,'$7')
+  INIT-VAL:EXP:
+    mul:u32        
+        ld:i32 '$8'        
+        intconst:u32 4|0x4
+  STEP-VAL:INT:64
+  REDUCTION-STMT:
+    stpr $7:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $6:u32 attachinfo:Dbx            
+            intconst:u32 4|0x4
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      mul:u32          
+          ld:i32 '$8'          
+          intconst:u32 4|0x4
+      CODE:add
+      STEP:INT:64
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    ld:i32 '$8'
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $6:u32 attachinfo:Dbx        
+        add:u32 attachinfo:Dbx            
+            $8:i32            
+            $5:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      ld:i32 '$8'
+      CODE:add
+      STEP:INT:16
+DIV(STMTOCC:MD17,'$5')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $5:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $19:i32 attachinfo:Dbx            
+            intconst:u32 16|0x10
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:16
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR mul id:47 in LOOP4 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR mul id:47 in LOOP4 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR add id:48 in LOOP4 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR add id:48 in LOOP4 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR mul id:50 in LOOP4 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR mul id:50 in LOOP4 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR add id:22 in LOOP4 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR add id:22 in LOOP4 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'itrans_sp_chroma' ----==
+
+==-- LOOP INFO --==
+
+LI4:BB2,BODY:2,4,5,7,12,
+BIV(STMTOCC:MD28,'$16')(EXPOCC:MD26,'$14')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $16:i32 attachinfo:Dbx        
+        add:i32            
+            $14:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $14:i32 attachinfo:Dbx
+DIV(STMTOCC:MD20,'$8')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $8:i32        
+        $14:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+
+==-- LOOP INFO --==
+
+LI3:BB4,BODY:4,5,
+BIV(STMTOCC:MD33,'$21')(EXPOCC:MD31,'$19')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $21:i32 attachinfo:Dbx        
+        add:i32            
+            $19:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $19:i32 attachinfo:Dbx
+DIV(STMTOCC:MD19,'$7')
+  INIT-VAL:EXP:
+    mul:u32        
+        ld:i32 '$8'        
+        intconst:u32 4|0x4
+  STEP-VAL:INT:64
+  REDUCTION-STMT:
+    stpr $7:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $6:u32 attachinfo:Dbx            
+            intconst:u32 4|0x4
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      mul:u32          
+          ld:i32 '$8'          
+          intconst:u32 4|0x4
+      CODE:add
+      STEP:INT:64
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    ld:i32 '$8'
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $6:u32 attachinfo:Dbx        
+        add:u32 attachinfo:Dbx            
+            $8:i32            
+            $5:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      ld:i32 '$8'
+      CODE:add
+      STEP:INT:16
+DIV(STMTOCC:MD17,'$5')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $5:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $19:i32 attachinfo:Dbx            
+            intconst:u32 16|0x10
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:16
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR mul id:47 in LOOP4 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR mul id:47 in LOOP4 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR add id:48 in LOOP4 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR add id:48 in LOOP4 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR mul id:50 in LOOP4 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR mul id:50 in LOOP4 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR add id:22 in LOOP4 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR add id:22 in LOOP4 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'itrans_sp_chroma' ----==
+
+==-- LOOP INFO --==
+
+LI4:BB2,BODY:2,4,5,7,12,
+BIV(STMTOCC:MD28,'$16')(EXPOCC:MD26,'$14')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $16:i32 attachinfo:Dbx        
+        add:i32            
+            $14:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $14:i32 attachinfo:Dbx
+DIV(STMTOCC:MD20,'$8')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $8:i32        
+        $14:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+
+==-- LOOP INFO --==
+
+LI3:BB4,BODY:4,5,
+BIV(STMTOCC:MD33,'$21')(EXPOCC:MD31,'$19')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $21:i32 attachinfo:Dbx        
+        add:i32            
+            $19:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $19:i32 attachinfo:Dbx
+DIV(STMTOCC:MD19,'$7')
+  INIT-VAL:EXP:
+    mul:u32        
+        ld:i32 '$8'        
+        intconst:u32 4|0x4
+  STEP-VAL:INT:64
+  REDUCTION-STMT:
+    stpr $7:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $6:u32 attachinfo:Dbx            
+            intconst:u32 4|0x4
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      mul:u32          
+          ld:i32 '$8'          
+          intconst:u32 4|0x4
+      CODE:add
+      STEP:INT:64
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    ld:i32 '$8'
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $6:u32 attachinfo:Dbx        
+        add:u32 attachinfo:Dbx            
+            $8:i32            
+            $5:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      ld:i32 '$8'
+      CODE:add
+      STEP:INT:16
+DIV(STMTOCC:MD17,'$5')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $5:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $19:i32 attachinfo:Dbx            
+            intconst:u32 16|0x10
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:16
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR mul id:47 in LOOP4 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR mul id:47 in LOOP4 is not chain-rec of any IV
+  ACT3:FIND_DIV:IR add id:48 in LOOP4 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR add id:48 in LOOP4 is not chain-rec of any IV
+  ACT5:FIND_DIV:IR mul id:50 in LOOP4 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR mul id:50 in LOOP4 is not chain-rec of any IV
+  ACT7:FIND_DIV:IR add id:51 in LOOP4 is not linear-rep of any IV
+  ACT8:FIND_DIV:IR add id:51 in LOOP4 is not chain-rec of any IV
+  ACT9:FIND_DIV:IR add id:22 in LOOP4 is not linear-rep of any IV
+  ACT10:FIND_DIV:IR add id:22 in LOOP4 is not chain-rec of any IV
+==---- DUMP Induction Variable Recogization 'itrans_sp_chroma' ----==
+
+==-- LOOP INFO --==
+
+LI4:BB2,BODY:2,4,5,7,12,
+BIV(STMTOCC:MD28,'$16')(EXPOCC:MD26,'$14')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $16:i32 attachinfo:Dbx        
+        add:i32            
+            $14:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $14:i32 attachinfo:Dbx
+DIV(STMTOCC:MD20,'$8')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $8:i32        
+        $14:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+
+==-- LOOP INFO --==
+
+LI3:BB4,BODY:4,5,
+BIV(STMTOCC:MD33,'$21')(EXPOCC:MD31,'$19')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $21:i32 attachinfo:Dbx        
+        add:i32            
+            $19:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  REDUCTION-EXP:
+    $19:i32 attachinfo:Dbx
+DIV(STMTOCC:MD34,'$22')
+  INIT-VAL:EXP:
+    add:u32        
+        ld:*<1024> '$9'        
+        mul:u32            
+            ld:i32 '$8'            
+            intconst:u32 4|0x4
+  STEP-VAL:INT:64
+  REDUCTION-STMT:
+    stpr $22:*<4> attachinfo:Dbx        
+        add:*<4> attachinfo:Dbx            
+            $9:*<1024>            
+            $7:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      add:u32          
+          ld:*<1024> '$9'          
+          mul:u32              
+              ld:i32 '$8'              
+              intconst:u32 4|0x4
+      CODE:add
+      STEP:INT:64
+DIV(STMTOCC:MD19,'$7')
+  INIT-VAL:EXP:
+    mul:u32        
+        ld:i32 '$8'        
+        intconst:u32 4|0x4
+  STEP-VAL:INT:64
+  REDUCTION-STMT:
+    stpr $7:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $6:u32 attachinfo:Dbx            
+            intconst:u32 4|0x4
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      mul:u32          
+          ld:i32 '$8'          
+          intconst:u32 4|0x4
+      CODE:add
+      STEP:INT:64
+DIV(STMTOCC:MD18,'$6')
+  INIT-VAL:EXP:
+    ld:i32 '$8'
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $6:u32 attachinfo:Dbx        
+        add:u32 attachinfo:Dbx            
+            $8:i32            
+            $5:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      ld:i32 '$8'
+      CODE:add
+      STEP:INT:16
+DIV(STMTOCC:MD17,'$5')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:16
+  REDUCTION-STMT:
+    stpr $5:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $19:i32 attachinfo:Dbx            
+            intconst:u32 16|0x10
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:16

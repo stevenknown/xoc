@@ -1,0 +1,21 @@
+region program "program" () {
+    region func main () {
+        //3 array operations can be promoted by RP.
+        while (eq 1, 1) {
+            stpr $w = 1000;
+            stpr $v = array:i32:0:(elemtype:u64,dim[1])
+                        add:*<1> $sp:*<4>, 10, //base
+                        ($e:u32); //subexp
+            if (eq $a:u64, $b:i64) {
+                starray:i32:0:(elemtype:u64,dim[1]) =
+                  add:*<1> $sp:*<4>, 10, //base
+                  ($e:u32), //subexp
+                  20; //rhs
+            }
+            stpr $y = array:i32:0:(elemtype:u64,dim[1])
+                         add:*<1> $sp:*<4>, 10, //base
+                         ($e:u32); //subexp;
+        }
+        return $v;
+    };
+}

@@ -1,0 +1,19 @@
+region program ".program" () {
+    var foo:*<4>:(func,align(4));
+    region func foo (undefined,
+                     var count:i32:(align(4)),
+                     var to:f64:(align(4)),
+                     var from:f64:(align(4))) {
+        stpr $p = 0:i32;
+        stpr $i = 0:i32;
+        st to = 2.2:f64;
+        st from = 2.2:f64;
+        while (lt $i, ld count) {
+            stpr $p = add $i, mul ld to, ld from;
+            stpr $i = add $i, 1;
+            st to = add ld to, 4.1:f64;
+            st from = add ld from, 5.7:f64;
+        }
+        return add $p, div ld to, ld from;
+    };
+}

@@ -1,0 +1,24 @@
+region program "myprogram" () {
+    var g:i32:(align(4));
+
+    region func main () {
+        var a:mc<128>:(align(4));
+        var b:mc<256>:(align(4));
+        var c:mc<512>:(align(4));
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+
+        stpr $11:*<1> = lda a;
+        stpr $11:*<1> = lda a;
+        stpr $7:i8 = ld:i8 j;
+        stpr $14:i16:(throw()) = array:i32:0:(dim[30]) $11:*<16>, ($13:u32);
+
+        starray:i8:3:(elemtype:i64, dim[4,5]) = lda b, (ld i, ld j), $14:i16;
+    	starray:u16:3:(throw(), elemtype:mc<33>) = $11:*<4>, (ld i), $14:i16;
+    	starray:*<4>:0:(sideeffect, nomove) = $11:*<200>, (ld:u16 i), $14:i16;
+    	ist:i8 = (array:*<1>:12:(elemtype:mc<48>) lda:32 c, (9:u16)), $14:i16;
+    	ist:i8 = (array:*<2>:18:(elemtype:mc<26>,dim[52,38]) lda c, (9:u16, $7:i8)), $14:i16;
+        return array:i8:18:(dim[10], elemtype:mc<19>) $11:*<16>, ($13:i32);
+        return array:i8:18:(dim[20], elemtype:mc<19>) $11:*<16>, ($13:u32);
+    };
+}

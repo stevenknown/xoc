@@ -1,0 +1,32 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var foo:any:(func,align(4));
+    region func foo (undefined,var n:i32:(align(4)),var h:i32:(align(4)),var u:i32:(align(4)),var a:i32:(align(4)),var b:i32:(align(4))) {
+        var j:i32:(align(4));
+        var k:i32:(align(4));
+        var i:i32:(align(4));
+        label "_GR_L3";
+        st:i32 i = 0:i32;
+        stpr $5:i32 = ld:i32 n;
+        stpr $6:i32 = ld:i32 j;
+        stpr $8:i32 = ld:i32 i;
+        stpr $11:i32 = ld:i32 k;
+
+        //Loop start
+        label "_GR_L1";
+        //$10 is biv, its init value is i, step value is 'n+8'.
+        phi $9 = ($8,"_GR_L3"), ($10,"_GR_L4");
+        falsebr (lt $9, $5), "_GR_L2";
+        label "_GR_L4";
+        stpr $7 = add $9, 1;
+        st h = add $7, 7
+        stpr $12 = add ld h, ld n;
+        stpr $10 = $12;
+        goto "_GR_L1";
+        //Loop end
+
+        label "_GR_L2";
+        st i = $9;
+        return ld i;
+    };
+}

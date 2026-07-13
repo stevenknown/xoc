@@ -1,0 +1,23 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var z:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main() {
+        stpr $r1 = lda c;
+        truebr (gt ld x, ld y), L2;
+
+        label L1;
+        stpr $r1 = lda x;
+        stpr $r2 = lda d;
+        stpr $r3 = lda y;
+        st b = $r3;
+
+        label L2;
+        return $r3;
+    };
+}

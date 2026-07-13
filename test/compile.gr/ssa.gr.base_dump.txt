@@ -1,0 +1,124 @@
+
+==---- DUMP PRSSA Manager 'main' ----==
+==---- DUMP PRSSAMgr:VPR 'main' ----==
+VPR1:$1v0--: DEF:-- USE:id:1,id:18
+VPR2:$2v0--: DEF:-- USE:id:2,id:16
+VPR3:$3v0--: DEF:-- USE:--
+VPR4:$4v0--: DEF:-- USE:--
+VPR5:$6v0--: DEF:-- USE:id:14
+VPR6:$5v0--: DEF:-- USE:id:13
+VPR7:$7v0--: DEF:-- USE:--
+VPR8:$3v1$8: DEF:stpr($8,id:5) USE:id:42
+VPR9:$3v2$9: DEF:stpr($9,id:7) USE:id:37
+VPR10:$3v3$10: DEF:phi($10,id:36) USE:id:9
+VPR11:$4v1$11: DEF:stpr($11,id:12) USE:--
+VPR12:$7v1$12: DEF:stpr($12,id:17) USE:id:38
+VPR13:$7v2$13: DEF:stpr($13,id:19) USE:id:40
+VPR14:$7v3$14: DEF:phi($14,id:39) USE:id:21
+VPR15:$7v4$15: DEF:stpr($15,id:24) USE:id:25
+==---- DUMP PRSSAMgr:VPR REF 'main' ----==
+----- BB11 --- rpo:0 -----
+ATTR:entry_bb fall_through
+----- BB1 --- rpo:5 -----
+ATTR:fall_through
+    ------------------
+    falsebr label _$L1
+        eq:bool
+            $1:i32
+            $2:any
+    VP:-- <= $1v0$0,$2v0$0
+----- BB2 --- rpo:15 -----
+ATTR:
+    ------------------
+    stpr $8:i32 attachinfo:Dbx
+        intconst:i32 20|0x14
+    VP:$3v1$8  <= --
+    ------------------
+    goto label _$L2
+    VP:-- <= --
+----- BB4 --- rpo:10 -----
+LABEL:_$L1
+ATTR:fall_through branch_target
+    ------------------
+    stpr $9:i32 attachinfo:Dbx
+        intconst:i32 10|0xa
+    VP:$3v2$9  <= --
+----- BB5 --- rpo:20 -----
+LABEL:_$L2
+ATTR:fall_through branch_target
+    ------------------
+    phi $10:i32 =
+        $8:i32
+        $9:i32
+    VP:$3v3$10  <= $3v1$8,$3v2$9
+    ------------------
+    stpr $11:i32 attachinfo:Dbx
+        sub:i32
+            $10:i32
+            intconst:i32 1|0x1
+    VP:$4v1$11  <= $3v3$10
+    ------------------
+    falsebr label _$L3
+        eq:bool
+            cvt:i32
+                $5:u16
+            $6:i32
+    VP:-- <= $6v0$0,$5v0$0
+----- BB6 --- rpo:30 -----
+ATTR:
+    ------------------
+    stpr $12:any attachinfo:Dbx
+        $2:any
+    VP:$7v1$12  <= $2v0$0
+    ------------------
+    goto label _$L4
+    VP:-- <= --
+----- BB8 --- rpo:25 -----
+LABEL:_$L3
+ATTR:fall_through branch_target
+    ------------------
+    stpr $13:i32 attachinfo:Dbx
+        $1:i32
+    VP:$7v2$13  <= $1v0$0
+----- BB9 --- rpo:35 -----
+LABEL:_$L4
+ATTR:fall_through branch_target
+    ------------------
+    phi $14:i32 =
+        $12:any
+        $13:i32
+    VP:$7v3$14  <= $7v1$12,$7v2$13
+    ------------------
+    stpr $15:i32 attachinfo:Dbx
+        add:i32
+            $14:i32
+            intconst:i32 1|0x1
+    VP:$7v4$15  <= $7v3$14
+    ------------------
+    return attachinfo:Dbx
+        $15:i32
+    VP:-- <= $7v4$15
+==---- DUMP Dominator Frontier Control Set ----==
+
+BB1 DF set:
+BB2 DF set:5,
+BB4 DF set:5,
+BB5 DF set:
+BB6 DF set:9,
+BB8 DF set:9,
+BB9 DF set:
+BB11 DF set:
+==---- DUMP PRSSA Manager 'program' ----==
+==---- DUMP PRSSAMgr:VPR 'program' ----==
+==---- DUMP PRSSAMgr:VPR REF 'program' ----==
+----- BB3 --- rpo:0 -----
+ATTR:entry_bb fall_through
+----- BB1 --- rpo:5 -----
+ATTR:fall_through
+    ------------------
+    region 'main',id:2 attachinfo:Dbx
+    VP:-- <= --
+==---- DUMP Dominator Frontier Control Set ----==
+
+BB1 DF set:
+BB3 DF set:

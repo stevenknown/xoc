@@ -1,0 +1,34 @@
+
+==---- DUMP Loop Invariant Code Motion 'guard' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'guard' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB1, BODY:1,2,
+-- INVARIANT EXP (NUM=5) -- :
+   intconst:i32 0|0x0
+   intconst:i32 1|0x1
+   ld:i32 'cond' attachinfo:MDSSA
+   ld:i32 'pp' attachinfo:MDSSA
+   gt:bool       
+       ld:i32 'cond' attachinfo:MDSSA       
+       intconst:i32 0|0x0
+-- INVARIANT STMT (NUM=2) -- :
+   st:i32 'pp' attachinfo:Dbx,MDSSA       
+       intconst:i32 1|0x1
+   stpr $2:any attachinfo:Dbx       
+       ld:i32 'pp' attachinfo:MDSSA
+-- HOIST CAND (NUM=4) -- :
+   st:i32 'pp' attachinfo:Dbx,MDSSA       
+       intconst:i32 1|0x1
+   ld:i32 'pp' attachinfo:MDSSA
+   gt:bool       
+       ld:i32 'cond' attachinfo:MDSSA       
+       intconst:i32 0|0x0
+   stpr $2:any attachinfo:Dbx       
+       ld:i32 'pp' attachinfo:MDSSA
+-- HOISTED IR: --
+  st:i32 'pp' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  stpr $2:any attachinfo:Dbx
+-- HOISTED IR: --
+  gt:bool

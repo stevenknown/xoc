@@ -1,0 +1,245 @@
+
+==---- DUMP Global Value Numbering 's757' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [5]  if (rc != 0)
+  
+  falsebr label _$L1 attachinfo:Dbx      
+      ne:bool attachinfo:Dbx          
+          ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA          
+          intconst:i32 0|0x0 attachinfo:Dbx
+   <- {
+  	ne id:3 --
+  	ld id:1 --
+  	const id:2 vn1
+   }
+  -- BB2 
+  
+
+  [6]    rc = 16;
+  
+  st:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA      
+      intconst:i32 16|0x10 attachinfo:Dbx
+  vn2 <- {
+  	const id:5 vn2
+   }
+  -- BB3   _$L1 
+  
+
+  [7]  p = 0;
+  
+  st:*<4> 'p' decl:int  *  p  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:9 vn1
+   }
+
+  [8]  if (p != 0)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      ne:bool attachinfo:Dbx          
+          ld:*<4> 'p' decl:int  *  p  attachinfo:Dbx,MDSSA          
+          intconst:i32 0|0x0 attachinfo:Dbx
+   <- {
+  	ne id:13 vn3
+  	ld id:4 vn1
+  	const id:12 vn1
+   }
+  -- BB4 
+  
+
+  [9]    rc = 32;
+  
+  st:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA      
+      intconst:i32 32|0x20 attachinfo:Dbx
+  vn4 <- {
+  	const id:15 vn4
+   }
+  -- BB5   _$L2 
+  
+
+  [10]  return rc;
+  
+  return attachinfo:Dbx      
+      ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:14 --
+   }
+==---- DUMP Global Value Numbering 's757' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [5]  if (rc != 0)
+  
+  falsebr label _$L1 attachinfo:Dbx      
+      ne:bool attachinfo:Dbx          
+          ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA          
+          intconst:i32 0|0x0 attachinfo:Dbx
+   <- {
+  	ne id:3 --
+  	ld id:1 --
+  	const id:2 vn1
+   }
+  -- BB2 
+  
+
+  [6]    rc = 16;
+  
+  st:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA      
+      intconst:i32 16|0x10 attachinfo:Dbx
+  vn2 <- {
+  	const id:5 vn2
+   }
+  -- BB3   _$L1 
+  
+
+  [7]  p = 0;
+  
+  st:*<4> 'p' decl:int  *  p  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:9 vn1
+   }
+  goto label _$L2
+   <- { }
+  -- BB5   _$L2 
+  
+
+  [10]  return rc;
+  
+  return attachinfo:Dbx      
+      ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:14 --
+   }
+==---- DUMP Global Value Numbering 's757' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [5]  if (rc != 0)
+  
+  truebr label _$L1 attachinfo:Dbx      
+      eq:bool attachinfo:Dbx          
+          ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA          
+          intconst:i32 0|0x0 attachinfo:Dbx
+   <- {
+  	eq id:3 --
+  	ld id:1 --
+  	const id:2 vn1
+   }
+  -- BB2 
+  
+
+  [6]    rc = 16;
+  
+  st:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA      
+      intconst:i32 16|0x10 attachinfo:Dbx
+  vn2 <- {
+  	const id:5 vn2
+   }
+  -- BB3   _$L1 
+  
+
+  [7]  p = 0;
+  
+  st:*<4> 'p' decl:int  *  p  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:9 vn1
+   }
+  goto label _$L2
+   <- { }
+  -- BB5   _$L2 
+  
+
+  [10]  return rc;
+  
+  return attachinfo:Dbx      
+      ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:14 --
+   }
+==---- DUMP Global Value Numbering 's757' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [5]  if (rc != 0)
+  
+  truebr label _$L1 attachinfo:Dbx      
+      eq:bool attachinfo:Dbx          
+          ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA          
+          intconst:i32 0|0x0 attachinfo:Dbx
+   <- {
+  	eq id:3 --
+  	ld id:1 --
+  	const id:2 vn1
+   }
+  -- BB2 
+  
+
+  [6]    rc = 16;
+  
+  st:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA      
+      intconst:i32 16|0x10 attachinfo:Dbx
+  vn2 <- {
+  	const id:5 vn2
+   }
+  -- BB3   _$L1 
+  
+
+  [7]  p = 0;
+  
+  st:*<4> 'p' decl:int  *  p  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:9 vn1
+   }
+  goto label _$L2
+   <- { }
+  -- BB5   _$L2 
+  
+
+  [10]  return rc;
+  
+  return attachinfo:Dbx      
+      ld:i32 'rc' decl:int  rc  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:14 --
+   }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 's757',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 's757',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 's757',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 's757',id:2
+   <- { }

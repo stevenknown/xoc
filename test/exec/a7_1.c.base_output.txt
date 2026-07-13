@@ -1,0 +1,6 @@
+String a:
+xyxxzxyzxy
+String b:
+zxzyyzxxyxxz
+LEN: 6
+x, y, x, x, x, z, 

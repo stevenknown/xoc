@@ -1,0 +1,101 @@
+
+==---- DUMP Loop Invariant Code Motion 'crashIt' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'crashIt' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB6, BODY:6,7,
+-- INVARIANT EXP (NUM=4) -- :
+   gt:bool attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 0|0x0 attachinfo:Dbx
+   ld:*<1> 'rp' attachinfo:MDSSA
+   ld:i32 'id' attachinfo:Dbx,MDSSA
+   $3:*<1> attachinfo:Dbx
+-- INVARIANT STMT (NUM=2) -- :
+
+   [8]      *rp++ = id;
+   
+   stpr $3:*<1> attachinfo:Dbx       
+       ld:*<1> 'rp' decl:unsigned char  *  rp  attachinfo:MDSSA
+
+   [9]      id = 7;
+   
+   stpr $11:i32 attachinfo:Dbx       
+       intconst:i32 7|0x7 attachinfo:Dbx
+-- HOIST CAND EXP (NUM=2) -- :
+   gt:bool attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 0|0x0 attachinfo:Dbx
+   ld:*<1> 'rp' attachinfo:MDSSA
+-- HOISTED IR: --
+  gt:bool attachinfo:Dbx
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'crashIt' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB6, BODY:6,7,
+-- INVARIANT EXP (NUM=3) -- :
+   ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ild:u8 attachinfo:Dbx,MDSSA       
+       ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ld:i16 'count' attachinfo:MDSSA
+-- INVARIANT STMT (NUM=2) -- :
+
+   [12]      *bp = *rp;
+   
+   stpr $18:u8 attachinfo:Dbx       
+       ild:u8 attachinfo:Dbx,MDSSA           
+           ld:*<1> 'rp' decl:unsigned char  *  rp  attachinfo:Dbx,MDSSA
+
+   [11]  while ((count--) > 1)
+   
+   stpr $6:i16 attachinfo:Dbx       
+       ld:i16 'count' decl:short int  count  attachinfo:MDSSA
+-- HOIST CAND EXP (NUM=2) -- :
+   ild:u8 attachinfo:Dbx,MDSSA       
+       ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ld:i16 'count' attachinfo:MDSSA
+==---- DUMP Loop Invariant Code Motion 'crashIt' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'crashIt' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB6, BODY:6,7,
+-- INVARIANT EXP (NUM=2) -- :
+   $24:bool
+   eq:bool       
+       $24:bool       
+       boolconst:bool 0
+
+
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'crashIt' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+LOOP2 HEAD:BB6, BODY:6,7,
+-- INVARIANT EXP (NUM=3) -- :
+   ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ild:u8 attachinfo:Dbx,MDSSA       
+       ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ld:i16 'count' attachinfo:MDSSA
+-- INVARIANT STMT (NUM=2) -- :
+
+   [12]      *bp = *rp;
+   
+   stpr $18:u8 attachinfo:Dbx       
+       ild:u8 attachinfo:Dbx,MDSSA           
+           ld:*<1> 'rp' decl:unsigned char  *  rp  attachinfo:Dbx,MDSSA
+
+   [11]  while ((count--) > 1)
+   
+   stpr $6:i16 attachinfo:Dbx       
+       ld:i16 'count' decl:short int  count  attachinfo:MDSSA
+-- HOIST CAND EXP (NUM=2) -- :
+   ild:u8 attachinfo:Dbx,MDSSA       
+       ld:*<1> 'rp' attachinfo:Dbx,MDSSA
+   ld:i16 'count' attachinfo:MDSSA
+-- HOISTED IR: --
+  stpr $18:u8 attachinfo:Dbx
+-- HOISTED IR: --
+  ld:i16 'count' attachinfo:MDSSA

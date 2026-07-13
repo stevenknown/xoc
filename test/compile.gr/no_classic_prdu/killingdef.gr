@@ -1,0 +1,551 @@
+region program x() {
+    var EXITFLAG:u32:(align(4));
+    var i16_b:mc<32>:(array,align(32),byte(0x1,0x0,0x17,0x0,0x59,0x1,0x85,0x1a,0xf3,0x3,0xf4,0xff,0x22,0x5,0x14,0xfa,0x14,0xfa,0x22,0x5,0xf4,0xff,0xf3,0x3,0x85,0x1a,0x59,0x1,0x17,0x0,0x1,0x0));
+    var i16_c:mc<32>:(array,align(32),byte(0x2,0x0,0x4f,0x7b,0x58,0x4,0xd,0x0,0xe,0x0,0xf,0x0,0xf0,0xff,0x11,0x0,0x2,0x0,0x4f,0x7b,0x58,0x4,0xd,0x0,0xe,0x0,0xf,0x0,0xf0,0xff,0x11,0x0));
+    var i32_sa:mc<64>:(array,align(32),byte(0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0));
+    var slave_originfunc:any:(func,align(4));
+    var corefunc:any:(align(4),func);
+    //==---- DUMP Region 'slave_originfunc' ----==
+    region func slave_originfunc (var func_retval0:u32:(align(4))) {
+        stpr $81:*<1> = 
+            lda i32_sa;
+        stpr $82:u64 = 
+            add:u64 
+                $85:u64, 0:u64;
+
+        //Loop Start
+        label label_BB0_1;
+        stpr $45:*<1> = 
+            lda i16_b;
+        stpr $47:*<1> = 
+            lda i16_c;
+        stpr $46:i64 = 
+            add:i64 
+                $45:i64, 
+                $82:i64;
+        stpr $1:u16 = 
+            ild:u16 
+                $46:*<1>;
+        stpr $48:i64 = 
+            add:i64 
+                $47:i64, 
+                $82:i64;
+        stpr $3:u16 = 
+            ild:u16 
+                $48:*<1>;
+        stpr $2:i32 = 
+            cvt:i32 
+                $1:i16;
+        stpr $4:i32 = 
+            cvt:i32 
+                $3:i16;
+        stpr $5:i32 = 
+            mul:i32 
+                $4:i32, 
+                $2:i32;
+        stpr $82:i64 = 
+            add:i64 
+                $82:i64, 2:i64;
+        ist:u32 = 
+            $81:*<1>,
+            $5:u32;
+        stpr $81:*<1> = 
+            add:*<1> 
+                $81:*<1>, 4:i64;
+        stpr $86:bool = 
+            eq:bool 
+                $82:i64, 32:i64;
+        truebr (
+            eq:bool 
+                $86:bool, 0:bool), label_BB0_1;
+        label label_BB0_2;
+        stpr $49:*<1> = 
+            lda i32_sa;
+        stpr $6:i32 = 
+            ild:i32 
+                $49:*<1>;
+        stpr $103:i64 = 
+            cvt:i64 
+                $6:i32;
+        stpr $87:bool = 
+            eq:bool 
+                $103:i64, 2:i64;
+        truebr (
+            ne:bool 
+                $87:bool, 0:bool), label_BB0_4;
+        label label_BB0_3;
+        stpr $50:*<1> = 
+            lda EXITFLAG;
+        stpr $7:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $50:*<1>,
+            $7:u32;
+        label label_BB0_4;
+        stpr $51:*<1> = 
+            lda i32_sa;
+        stpr $8:i32 = 
+            ild:i32:4 
+                $51:*<1>;
+        stpr $104:u64 = 
+            add:u64 
+                $85:u64, 726041:u64;
+        stpr $105:i64 = 
+            cvt:i64 
+                $8:i32;
+        stpr $106:i64 = 
+            cvt:i64 
+                $104:i32;
+        stpr $88:bool = 
+            eq:bool 
+                $105:i64, 
+                $106:i64;
+        truebr (
+            ne:bool 
+                $88:bool, 0:bool), label_BB0_7;
+        label label_BB0_6;
+        stpr $52:*<1> = 
+            lda EXITFLAG;
+        stpr $9:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $52:*<1>,
+            $9:u32;
+        label label_BB0_7;
+        stpr $53:*<1> = 
+            lda i32_sa;
+        stpr $10:i32 = 
+            ild:i32:8 
+                $53:*<1>;
+        stpr $107:u64 = 
+            add:u64 
+                $85:u64, 383640:u64;
+        stpr $108:i64 = 
+            cvt:i64 
+                $10:i32;
+        stpr $109:i64 = 
+            cvt:i64 
+                $107:i32;
+        stpr $89:bool = 
+            eq:bool 
+                $108:i64, 
+                $109:i64;
+        truebr (
+            ne:bool 
+                $89:bool, 0:bool), label_BB0_9;
+        label label_BB0_8;
+        stpr $54:*<1> = 
+            lda EXITFLAG;
+        stpr $11:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $54:*<1>,
+            $11:u32;
+        label label_BB0_9;
+        stpr $55:*<1> = 
+            lda i32_sa;
+        stpr $12:i32 = 
+            ild:i32:12 
+                $55:*<1>;
+        stpr $110:u64 = 
+            add:u64 
+                $85:u64, 88257:u64;
+        stpr $111:i64 = 
+            cvt:i64 
+                $12:i32;
+        stpr $112:i64 = 
+            cvt:i64 
+                $110:i32;
+        stpr $90:bool = 
+            eq:bool 
+                $111:i64, 
+                $112:i64;
+        truebr (
+            ne:bool 
+                $90:bool, 0:bool), label_BB0_11;
+        label label_BB0_10;
+        stpr $56:*<1> = 
+            lda EXITFLAG;
+        stpr $13:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $56:*<1>,
+            $13:u32;
+        label label_BB0_11;
+        stpr $57:*<1> = 
+            lda i32_sa;
+        stpr $14:i32 = 
+            ild:i32:16 
+                $57:*<1>;
+        stpr $113:u64 = 
+            add:u64 
+                $85:u64, 14154:u64;
+        stpr $114:i64 = 
+            cvt:i64 
+                $14:i32;
+        stpr $115:i64 = 
+            cvt:i64 
+                $113:i32;
+        stpr $91:bool = 
+            eq:bool 
+                $114:i64, 
+                $115:i64;
+        truebr (
+            ne:bool 
+                $91:bool, 0:bool), label_BB0_13;
+        label label_BB0_12;
+        stpr $58:*<1> = 
+            lda EXITFLAG;
+        stpr $15:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $58:*<1>,
+            $15:u32;
+        label label_BB0_13;
+        stpr $59:*<1> = 
+            lda i32_sa;
+        stpr $16:i32 = 
+            ild:i32:20 
+                $59:*<1>;
+        stpr $116:u64 = 
+            add:u64 
+                $85:u64, 18446744073709551436:u64;
+        stpr $117:i64 = 
+            cvt:i64 
+                $16:i32;
+        stpr $118:i64 = 
+            cvt:i64 
+                $116:i32;
+        stpr $92:bool = 
+            eq:bool 
+                $117:i64, 
+                $118:i64;
+        truebr (
+            ne:bool 
+                $92:bool, 0:bool), label_BB0_15;
+        label label_BB0_14;
+        stpr $60:*<1> = 
+            lda EXITFLAG;
+        stpr $17:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $60:*<1>,
+            $17:u32;
+        label label_BB0_15;
+        stpr $61:*<1> = 
+            lda i32_sa;
+        stpr $18:i32 = 
+            ild:i32:24 
+                $61:*<1>;
+        stpr $119:u64 = 
+            add:u64 
+                $85:u64, 18446744073709530592:u64;
+        stpr $120:i64 = 
+            cvt:i64 
+                $18:i32;
+        stpr $121:i64 = 
+            cvt:i64 
+                $119:i32;
+        stpr $93:bool = 
+            eq:bool 
+                $120:i64, 
+                $121:i64;
+        truebr (
+            ne:bool 
+                $93:bool, 0:bool), label_BB0_17;
+        label label_BB0_16;
+        stpr $62:*<1> = 
+            lda EXITFLAG;
+        stpr $19:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $62:*<1>,
+            $19:u32;
+        label label_BB0_17;
+        stpr $63:*<1> = 
+            lda i32_sa;
+        stpr $20:i32 = 
+            ild:i32:28 
+                $63:*<1>;
+        stpr $122:u64 = 
+            add:u64 
+                $85:u64, 18446744073709525844:u64;
+        stpr $123:i64 = 
+            cvt:i64 
+                $20:i32;
+        stpr $124:i64 = 
+            cvt:i64 
+                $122:i32;
+        stpr $94:bool = 
+            eq:bool 
+                $123:i64, 
+                $124:i64;
+        truebr (
+            ne:bool 
+                $94:bool, 0:bool), label_BB0_19;
+        label label_BB0_18;
+        stpr $64:*<1> = 
+            lda EXITFLAG;
+        stpr $21:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $64:*<1>,
+            $21:u32;
+        label label_BB0_19;
+        stpr $65:*<1> = 
+            lda i32_sa;
+        stpr $22:i32 = 
+            ild:i32:32 
+                $65:*<1>;
+        stpr $125:u64 = 
+            add:u64 
+                $85:u64, 18446744073709548584:u64;
+        stpr $126:i64 = 
+            cvt:i64 
+                $22:i32;
+        stpr $127:i64 = 
+            cvt:i64 
+                $125:i32;
+        stpr $95:bool = 
+            eq:bool 
+                $126:i64, 
+                $127:i64;
+        truebr (
+            ne:bool 
+                $95:bool, 0:bool), label_BB0_21;
+        label label_BB0_20;
+        stpr $66:*<1> = 
+            lda EXITFLAG;
+        stpr $23:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $66:*<1>,
+            $23:u32;
+        label label_BB0_21;
+        stpr $67:*<1> = 
+            lda i32_sa;
+        stpr $24:i32 = 
+            ild:i32:36 
+                $67:*<1>;
+        stpr $128:u64 = 
+            add:u64 
+                $85:u64, 41479038:u64;
+        stpr $129:i64 = 
+            cvt:i64 
+                $24:i32;
+        stpr $130:i64 = 
+            cvt:i64 
+                $128:i32;
+        stpr $96:bool = 
+            eq:bool 
+                $129:i64, 
+                $130:i64;
+        truebr (
+            ne:bool 
+                $96:bool, 0:bool), label_BB0_23;
+        label label_BB0_22;
+        stpr $68:*<1> = 
+            lda EXITFLAG;
+        stpr $25:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $68:*<1>,
+            $25:u32;
+        label label_BB0_23;
+        stpr $69:*<1> = 
+            lda i32_sa;
+        stpr $26:i32 = 
+            ild:i32:40 
+                $69:*<1>;
+        stpr $131:u64 = 
+            add:u64 
+                $85:u64, 18446744073709538272:u64;
+        stpr $132:i64 = 
+            cvt:i64 
+                $26:i32;
+        stpr $133:i64 = 
+            cvt:i64 
+                $131:i32;
+        stpr $97:bool = 
+            eq:bool 
+                $132:i64, 
+                $133:i64;
+        truebr (
+            ne:bool 
+                $97:bool, 0:bool), label_BB0_25;
+        label label_BB0_24;
+        stpr $70:*<1> = 
+            lda EXITFLAG;
+        stpr $27:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $70:*<1>,
+            $27:u32;
+        label label_BB0_25;
+        stpr $71:*<1> = 
+            lda i32_sa;
+        stpr $28:i32 = 
+            ild:i32:44 
+                $71:*<1>;
+        stpr $134:u64 = 
+            add:u64 
+                $85:u64, 13143:u64;
+        stpr $135:i64 = 
+            cvt:i64 
+                $28:i32;
+        stpr $136:i64 = 
+            cvt:i64 
+                $134:i32;
+        stpr $98:bool = 
+            eq:bool 
+                $135:i64, 
+                $136:i64;
+        truebr (
+            ne:bool 
+                $98:bool, 0:bool), label_BB0_27;
+        label label_BB0_26;
+        stpr $72:*<1> = 
+            lda EXITFLAG;
+        stpr $29:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $72:*<1>,
+            $29:u32;
+        label label_BB0_27;
+        stpr $73:*<1> = 
+            lda i32_sa;
+        stpr $30:i32 = 
+            ild:i32:48 
+                $73:*<1>;
+        stpr $137:u64 = 
+            add:u64 
+                $85:u64, 95046:u64;
+        stpr $138:i64 = 
+            cvt:i64 
+                $30:i32;
+        stpr $139:i64 = 
+            cvt:i64 
+                $137:i32;
+        stpr $99:bool = 
+            eq:bool 
+                $138:i64, 
+                $139:i64;
+        truebr (
+            ne:bool 
+                $99:bool, 0:bool), label_BB0_29;
+        label label_BB0_28;
+        stpr $74:*<1> = 
+            lda EXITFLAG;
+        stpr $31:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $74:*<1>,
+            $31:u32;
+        label label_BB0_29;
+        stpr $75:*<1> = 
+            lda i32_sa;
+        stpr $32:i32 = 
+            ild:i32:52 
+                $75:*<1>;
+        stpr $140:u64 = 
+            add:u64 
+                $85:u64, 5175:u64;
+        stpr $141:i64 = 
+            cvt:i64 
+                $32:i32;
+        stpr $142:i64 = 
+            cvt:i64 
+                $140:i32;
+        stpr $100:bool = 
+            eq:bool 
+                $141:i64, 
+                $142:i64;
+        truebr (
+            ne:bool 
+                $100:bool, 0:bool), label_BB0_31;
+        label label_BB0_30;
+        stpr $76:*<1> = 
+            lda EXITFLAG;
+        stpr $33:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $76:*<1>,
+            $33:u32;
+        label label_BB0_31;
+        stpr $77:*<1> = 
+            lda i32_sa;
+        stpr $34:i32 = 
+            ild:i32:56 
+                $77:*<1>;
+        stpr $143:u64 = 
+            add:u64 
+                $85:u64, 18446744073709551248:u64;
+        stpr $144:i64 = 
+            cvt:i64 
+                $34:i32;
+        stpr $145:i64 = 
+            cvt:i64 
+                $143:i32;
+        stpr $101:bool = 
+            eq:bool 
+                $144:i64, 
+                $145:i64;
+        truebr (
+            ne:bool 
+                $101:bool, 0:bool), label_BB0_33;
+        label label_BB0_32;
+        stpr $78:*<1> = 
+            lda EXITFLAG;
+        stpr $35:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $78:*<1>,
+            $35:u32;
+        label label_BB0_33;
+        stpr $79:*<1> = 
+            lda i32_sa;
+        stpr $36:i32 = 
+            ild:i32:60 
+                $79:*<1>;
+        stpr $146:i64 = 
+            cvt:i64 
+                $36:i32;
+        stpr $102:bool = 
+            eq:bool 
+                $146:i64, 17:i64;
+        truebr (
+            ne:bool 
+                $102:bool, 0:bool), label_BB0_5;
+        label label_BB0_34;
+        stpr $80:*<1> = 
+            lda EXITFLAG;
+        stpr $37:u64 = 
+            add:u64 
+                $85:u64, 1:u64;
+        ist:u32 = 
+            $80:*<1>,
+            $37:u32;
+        label label_BB0_5;
+        stpr $38:u64 = 
+            add:u64 
+                $85:u64, 0:u64;
+        st:u32 func_retval0 = 
+            $38:u32;
+        return ;
+    };
+}

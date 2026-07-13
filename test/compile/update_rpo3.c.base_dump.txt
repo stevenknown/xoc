@@ -1,0 +1,220 @@
+
+==---- DUMP CFG 'foo' ----==
+  ==---- DUMP IRBBList 'foo' ----==
+  ----- BB15 --- rpo:-1 -----
+  ATTR:entry_bb fall_through 
+  STMT NUM:0
+  
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through 
+  STMT NUM:2
+
+     [6]  switch (ioff) {
+     
+     stpr $2:i32 attachinfo:Dbx         
+         ld:i32 'ioff' attachinfo:Dbx
+     falsebr label _$L2         
+         eq:bool             
+             $2:i32 attachinfo:Dbx             
+             intconst:i32 0|0x0
+  
+  ----- BB8 --- rpo:-1 -----
+  LABEL:_$L4 _$L1 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+
+     [8]    for(j=0;j<4;j++)
+     
+     st:i32 'j' attachinfo:Dbx         
+         intconst:i32 0|0x0 attachinfo:Dbx
+  
+  ----- BB9 --- rpo:-1 -----
+  LABEL:_$L5 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+     falsebr label _$L6 attachinfo:Dbx         
+         lt:bool attachinfo:Dbx             
+             ld:i32 'j' attachinfo:Dbx             
+             intconst:i32 4|0x4 attachinfo:Dbx
+  
+  ----- BB10 --- rpo:-1 -----
+  ATTR:
+  STMT NUM:4
+
+     [9]        mpr[j]=pos;
+     
+     starray:i32 (elemtype:i32) attachinfo:Dbx
+         elem_num[16]
+         ld:i32 'j' dim0 attachinfo:Dbx         
+         lda:*<64> 'mpr' array_base attachinfo:Dbx         
+         ld:i32 'pos' rhs attachinfo:Dbx
+
+     [8]    for(j=0;j<4;j++)
+     
+     stpr $1:i32 attachinfo:Dbx         
+         ld:i32 'j'
+     st:i32 'j' attachinfo:Dbx         
+         add:i32             
+             ld:i32 'j' attachinfo:Dbx             
+             intconst:i32 1|0x1
+     goto label _$L5
+  
+  ----- BB13 --- rpo:-1 -----
+  LABEL:_$L6 _$L2 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+
+     [11]  return 0;
+     
+     return attachinfo:Dbx
+         intconst:i32 0|0x0 attachinfo:Dbx
+  
+node1 [shape = Mrecord, label="{V1}"];
+node8 [shape = Mrecord, label="{V8}"];
+node9 [shape = Mrecord, label="{V9}"];
+node10 [shape = Mrecord, label="{V10}"];
+node13 [shape = Mrecord, label="{V13}"];
+node15 [shape = Mrecord, label="{V15}"];
+node9->node10[label=""]
+node10->node9[label=""]
+node1->node13[label=""]
+node15->node1[label=""]
+node9->node13[label=""]
+node8->node9[label=""]
+node1->node8[label=""]
+==---- DUMP CFG 'foo' ----==
+  ==---- DUMP IRBBList 'foo' ----==
+  ----- BB15 --- rpo:-1 -----
+  ATTR:entry_bb fall_through 
+  STMT NUM:0
+  
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through 
+  STMT NUM:2
+
+     [6]  switch (ioff) {
+     
+     stpr $2:i32 attachinfo:Dbx         
+         ld:i32 'ioff' attachinfo:Dbx
+     falsebr label _$L6         
+         eq:bool             
+             $2:i32 attachinfo:Dbx             
+             intconst:i32 0|0x0
+  
+  ----- BB8 --- rpo:-1 -----
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+
+     [8]    for(j=0;j<4;j++)
+     
+     st:i32 'j' attachinfo:Dbx         
+         intconst:i32 0|0x0 attachinfo:Dbx
+  
+  ----- BB9 --- rpo:-1 -----
+  LABEL:_$L5 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+     falsebr label _$L6 attachinfo:Dbx         
+         lt:bool attachinfo:Dbx             
+             ld:i32 'j' attachinfo:Dbx             
+             intconst:i32 4|0x4 attachinfo:Dbx
+  
+  ----- BB10 --- rpo:-1 -----
+  ATTR:
+  STMT NUM:4
+
+     [9]        mpr[j]=pos;
+     
+     starray:i32 (elemtype:i32) attachinfo:Dbx
+         elem_num[16]
+         ld:i32 'j' dim0 attachinfo:Dbx         
+         lda:*<64> 'mpr' array_base attachinfo:Dbx         
+         ld:i32 'pos' rhs attachinfo:Dbx
+
+     [8]    for(j=0;j<4;j++)
+     
+     stpr $1:i32 attachinfo:Dbx         
+         ld:i32 'j'
+     st:i32 'j' attachinfo:Dbx         
+         add:i32             
+             ld:i32 'j' attachinfo:Dbx             
+             intconst:i32 1|0x1
+     goto label _$L5
+  
+  ----- BB13 --- rpo:-1 -----
+  LABEL:_$L6 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+
+     [11]  return 0;
+     
+     return attachinfo:Dbx
+         intconst:i32 0|0x0 attachinfo:Dbx
+  
+node1 [shape = Mrecord, label="{V1}"];
+node8 [shape = Mrecord, label="{V8}"];
+node9 [shape = Mrecord, label="{V9}"];
+node10 [shape = Mrecord, label="{V10}"];
+node13 [shape = Mrecord, label="{V13}"];
+node15 [shape = Mrecord, label="{V15}"];
+node9->node10[label=""]
+node10->node9[label=""]
+node1->node13[label=""]
+node15->node1[label=""]
+node9->node13[label=""]
+node8->node9[label=""]
+node1->node8[label=""]
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB9, BODY:9,10,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD12 -- base:Var64(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD5 -- base:Var58(pos):global,,addr_taken,align(4),i32,decl:'int  pos ' -- ofst:0 -- size:4
+    ld:i32 'pos' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'pos' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==---- DUMP DelegateMgr 'foo' ----==
+  ==-- Dele2PR --==
+  
+  DELE:  ld:i32 'j' attachinfo:Dbx,MDSSA
+  PR:  $5:i32
+  
+  DELE:  ld:i32 'pos' attachinfo:Dbx,MDSSA
+  PR:  $6:i32
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+  
+  DELE:  ld:i32 'j' attachinfo:Dbx,MDSSA
+  OutsideDefSet:    st:i32 'j' attachinfo:Dbx,MDSSA
+
+  ==-- Dele2OutsideUseSet --==
+  
+  ==---- DUMP Delegate Table ----==
+  
+
+==-- Dele2RestoreStmt --==
+
+==-- Dele2RestoreStmt --==
+==---- DUMP Register Promotion 'foo' ----==
+  ==-- DUMP Dont Promotion Table --==
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA

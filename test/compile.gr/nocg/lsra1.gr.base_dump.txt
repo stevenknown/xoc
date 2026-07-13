@@ -1,0 +1,62 @@
+==---- DUMP Linear Scan Register Allocation 'normal_allocation' ----==
+==-- DUMP TargInfoMgr --==
+ALLOCABLE:r4,r5
+==-- DUMP ALL LifeTime --==
+==-- DUMP PR OverView --==
+[2] RegionExposedDef <= [1] --
+----- BB2 --- rpo:0 -----
+ATTR:entry_bb fall_through 
+
+----- BB1 --- rpo:10 -----
+ATTR:fall_through 
+[4] $1 <= [3] --
+[6] -- <= [5] $1
+[8] $2 <= [7] --
+[10] -- <= [9] $1
+[12] $3 <= [11] $2
+[14] -- <= [13] $3
+[16] -- <= [15] $1
+[18] $4 <= [17] $3
+[20] -- <= [19] $1
+[22] -- <= [21] $4
+
+[24] RegionExposedUse <= [23] --
+==-- DUMP LTList --==
+LT:$1:<4-19>
+ |   ----------------
+ |   du   u     u   u
+LT:$2:<8-11>
+ |       ----
+ |       d  u
+LT:$3:<12-17>
+ |           ------
+ |           du   u
+LT:$4:<18-21>
+ |                 ----
+ |                 d  u
+==-- DUMP PR2Reg --==
+LT:$1:r4(RF_R)
+LT:$2:r5(RF_R)
+LT:$3:r5(RF_R)
+LT:$4:r5(RF_R)
+==-- DUMP 4LIST --==
+UNHANDLED:
+HANDLED:
+ LT:$2:r5(RF_R)
+ LT:$2:<8-11>
+  |       ----
+  |       d  u
+ LT:$3:r5(RF_R)
+ LT:$3:<12-17>
+  |           ------
+  |           du   u
+ LT:$1:r4(RF_R)
+ LT:$1:<4-19>
+  |   ----------------
+  |   du   u     u   u
+ LT:$4:r5(RF_R)
+ LT:$4:<18-21>
+  |                 ----
+  |                 d  u
+ACTIVE:
+INACTIVE:

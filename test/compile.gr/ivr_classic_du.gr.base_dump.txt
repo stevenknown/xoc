@@ -1,0 +1,27 @@
+
+==-- DUMP ALL ACT --==
+  ACT1:FIND_BIV:IR st id:4 in LOOP1 is not reduction-op
+  ACT2:FIND_BIV:IR stpr id:6 in LOOP1 is not reduction-op
+  ACT3:FIND_BIV:IR ist id:10 in LOOP1 is not reduction-op
+  ACT4:FIND_BIV_INIT_VAL:IR ld id:11 is BIV, however can not find its initial value
+  ACT5:FIND_BIV:IR stpr id:16 in LOOP1 is not reduction-op
+  ACT6:FIND_BIV:IR ist id:19 in LOOP1 is not reduction-op
+  ACT7:FIND_BIV_INIT_VAL:IR ld id:20 is BIV, however can not find its initial value
+==---- DUMP Induction Variable Recogization 'swap' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB1,BODY:1,
+==-- DUMP ALL ACT --==
+  ACT1:FIND_BIV:IR st id:4 in LOOP1 is not reduction-op
+  ACT2:FIND_BIV:IR stpr id:6 in LOOP1 is not reduction-op
+  ACT3:FIND_BIV:IR ist id:10 in LOOP1 is not reduction-op
+  ACT4:FIND_BIV_INIT_VAL:IR ld id:11 is BIV, however can not find its initial value
+  ACT5:FIND_BIV:IR stpr id:16 in LOOP1 is not reduction-op
+  ACT6:FIND_BIV:IR ist id:19 in LOOP1 is not reduction-op
+  ACT7:FIND_BIV_INIT_VAL:IR ld id:20 is BIV, however can not find its initial value
+==---- DUMP Induction Variable Recogization 'swap' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB1,BODY:1,

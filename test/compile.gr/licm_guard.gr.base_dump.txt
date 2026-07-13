@@ -1,0 +1,56 @@
+
+==---- DUMP Loop Invariant Code Motion 'guard' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'guard' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB1, BODY:1,2,
+-- INVARIANT EXP (NUM=9) -- :
+   band:i32       
+       ld:i32 'pp' attachinfo:MDSSA       
+       intconst:i32 127|0x7f
+   add:*<1>       
+       lda:*<4> 'buff'       
+       ld:i32 'pp' attachinfo:MDSSA
+   gt:bool       
+       ld:i32 'pp' attachinfo:MDSSA       
+       intconst:i32 0|0x0
+   cvt:u8       
+       $2:i32
+   ld:i32 'pp' attachinfo:MDSSA
+   ld:i32 'pp' attachinfo:MDSSA
+   ld:i32 'pp' attachinfo:MDSSA
+   $3:*<1> attachinfo:Dbx
+   $2:i32
+-- INVARIANT STMT (NUM=3) -- :
+   stpr $2:i32 attachinfo:Dbx       
+       band:i32           
+           ld:i32 'pp' attachinfo:MDSSA           
+           intconst:i32 127|0x7f
+   stpr $3:*<1>       
+       add:*<1>           
+           lda:*<4> 'buff'           
+           ld:i32 'pp' attachinfo:MDSSA
+   ist:u8 attachinfo:Dbx,MDSSA       
+       $3:*<1> attachinfo:Dbx       
+       cvt:u8           
+           $2:i32
+-- HOIST CAND EXP (NUM=4) -- :
+   band:i32       
+       ld:i32 'pp' attachinfo:MDSSA       
+       intconst:i32 127|0x7f
+   add:*<1>       
+       lda:*<4> 'buff'       
+       ld:i32 'pp' attachinfo:MDSSA
+   gt:bool       
+       ld:i32 'pp' attachinfo:MDSSA       
+       intconst:i32 0|0x0
+   cvt:u8       
+       $2:i32
+-- HOISTED IR: --
+  stpr $2:i32 attachinfo:Dbx
+-- HOISTED IR: --
+  stpr $3:*<1>
+-- HOISTED IR: --
+  gt:bool
+-- HOISTED IR: --
+  ist:u8 attachinfo:Dbx,MDSSA

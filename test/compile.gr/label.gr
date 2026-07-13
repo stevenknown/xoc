@@ -1,0 +1,52 @@
+//Test how irparser parse the GR file.
+region program ")(*&^%$#@!~"() {
+    var bar:*<4>:(func,align(4));
+    var foo:*<4>:(func,align(4));
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var d:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main (undefined,var argc:i32:(align(4)),var argv:*<4>:(align(4))) {
+        var c:i32:(align(4));
+        st d = 1;
+        call:(use(ild:any 0:any)) $4:i32 = foo(ld argc, ld argv);
+        label "_$L19";
+        st c = $4;
+        label "_$L6";
+        phi $5:i32 = ($4,"_$L19"),($6,"_$L20");
+        falsebr (ne $5, -1), "_$L7";
+        stpr $7:i32 = ld c;
+        falsebr (eq $7, 115), "_$L9";
+        goto "_$L1";
+        label "_$L9";
+        falsebr (eq $7, 99), "_$L11";
+        goto "_$L2";
+        label "_$L11";
+        falsebr (eq $7, 102), "_$L13";
+        goto "_$L3";
+        label "_$L13";
+        falsebr (eq $7, 118), "_$L15";
+        goto "_$L4";
+        label "_$L15";
+        falsebr (eq $7, 86), "_$L8";
+        goto "_$L5";
+        label "_$L1";
+        label "_$L2";
+        label "_$L3";
+        st a = ld b;
+        goto "_$L8";
+        label "_$L4";
+        st d = 1:i32;
+        goto "_$L8";
+        label "_$L5";
+        st d = 0:i32;
+        label "_$L8";
+        call:(use(ild:any 0:any)) $6:i32 = foo(ld argc, ld argv);
+        label "_$L20";
+        st c = $6;
+        goto "_$L6";
+        label "_$L7";
+        call:(use(ild:any 0:any)) $8:i32 = bar();
+        return 0:i32;
+    };
+}

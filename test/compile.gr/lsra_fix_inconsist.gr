@@ -1,0 +1,62 @@
+region program program () {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var f:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var m:i32:(align(4));
+    var n:i32:(align(4));
+    var func_level_var_1:u32:(align(4));
+    var func_level_var_2:u32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main () {
+        stpr $3:i32 = 
+            lda a;
+        stpr $8:i32 = 
+            $3:i32;
+        label AAA;
+        stpr $4:i32 = 
+            $8:i32;
+        st:i32 d = 100:i32;
+        st:i32 c = 
+            add:i32 
+                $4:i32, 1:i32;
+        stpr $9:i32 = 
+            $4:i32;
+        truebr (
+            gt:bool 
+                ld:i32 x, 
+                ld:i32 y), CCC;
+        stpr $6:i32 = 
+            lda e;
+        st:i32 func_level_var_1 = 
+            $6:i32;
+        stpr $7:i32 = 
+            lda f;
+        stpr $12:i32 = 
+            ld:i32 func_level_var_1;
+        st:*<1> b = 
+            sub:i32 
+                $12:i32, 2:i32;
+        stpr $11:i32 = 
+            $12:i32;
+        label CCC;
+        stpr $5:i32 = 
+            $11:i32;
+        st:i32 func_level_var_2 = 
+            $5:i32;
+        stpr $10:i32 = 
+            $5:i32;
+        truebr (
+            gt:bool 
+                ld:i32 m, 
+                ld:i32 n), AAA;
+        stpr $13:i32 = 
+            ld:i32 func_level_var_2;
+        return 
+            $13:i32;
+    };
+}

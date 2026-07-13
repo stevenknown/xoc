@@ -1,0 +1,60 @@
+region program ".program" () {
+
+    var strcmp:i32:(func,align(4));
+    var printf:i8:(func,align(4));
+    var hook_cmp:i32:(func,align(4));
+    var hook_cmp2:i32:(func,align(4));
+    var swap:i8:(func,align(4));
+    var qsort:i8:(func,align(4));
+    var Node:mc<8>:(align(4));
+    var qsort:i8:(func,align(4));
+    var test_qsort1:i8:(func,align(4));
+    var test_qsort2:i8:(func,align(4));
+    var main:i32:(func,align(4));
+    var swap:i8:(func,align(4));
+    var hook_cmp:i32:(func,align(4));
+    var hook_cmp2:i32:(func,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+    var _const_string_1:str:(align(4),string("%d "));
+    var _const_string_2:str:(align(4),string("
+    After qsort 1
+    "));
+    var _const_string_3:str:(align(4),string("xkey"));
+    var _const_string_4:str:(align(4),string("color"));
+    var _const_string_5:str:(align(4),string("void"));
+    var _const_string_6:str:(align(4),string("static"));
+    var _const_string_7:str:(align(4),string("while"));
+    var _const_string_8:str:(align(4),string("%s, %d
+    "));
+    var _const_string_9:str:(align(4),string("
+    After qsort 2
+    "));
+    var _const_string_10:str:(align(4),string("
+    Main returned
+    "));
+    region func swap (undefined,var a:*<1>:(align(4)),var b:*<1>:(align(4)),var width:i32:(align(4))) {
+        var temp:i8:(align(4));
+        label "_GR__$L9";
+        st:i8 temp = 
+            ild:i8 
+                ld:*<1> a;
+        stpr $2:*<1> = 
+            ld:*<1> a;
+        ist:i8 = 
+            $2:*<1>,
+            ild:i8 
+                ld:*<1> b;
+        st:*<1> a = 
+            add:*<1> 
+                ld:*<1> a, 1:u32;
+        stpr $3:*<1> = 
+            ld:*<1> b;
+        ist:i8 = 
+            $3:*<1>,
+            ld:i8 temp;
+        st:*<1> b = 
+            add:*<1> 
+                ld:*<1> b, 1:u32;
+        goto "_GR__$L9";
+    };
+}

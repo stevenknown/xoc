@@ -1,0 +1,23 @@
+region program ".program" ()
+{
+    var lsra_impl_bug:any:(func,align(8));
+    region func lsra_impl_bug ()
+    {
+        var j:i32:(align(8));
+        var svtest:any:(func,decl,align(8));
+        var zero:any:(func,decl,align(8));
+        st:i32 j = 0;
+        label "__$L1";
+        falsebr (lt ld:i32 j, 3:i32), "__$L2";
+        call $4:i32 = svtest();
+        call $5:i32 = zero();
+        truebr (eq $4:i32, $5:i32), "__$L3";
+        st:i32 j = 1:i32;
+        label "__$L3";
+        stpr $6:i32 = ld:i32 j;
+        st:i32 j = add:i32 ld:i32 j, 1:i32;
+        goto "__$L1";
+        label "__$L2";
+        return ld:i32 j;
+    };
+}

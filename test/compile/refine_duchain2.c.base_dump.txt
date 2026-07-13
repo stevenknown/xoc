@@ -1,0 +1,209 @@
+
+==---- DUMP Refine DefUse Chain 'foo' ----==
+
+  ==---- DUMP DUMgr DU CHAIN DETAIL 'foo' ----==
+  
+  --- BB3 ---
+  --- BB1 ---
+
+  [4]    pchar = 100;
+  
+  st:*<1> 'pchar' decl:unsigned char  *  pchar  attachinfo:Dbx      
+      intconst:i32 100|0x64 attachinfo:Dbx
+  
+  	>>st(id:3) DEFREF:MMD8,MD4
+  	  USE-EXP LIST:ld(id:9),ld(id:20)
+  
+
+  [5]    qchar = 101;
+  
+  st:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx      
+      intconst:i32 101|0x65 attachinfo:Dbx
+  
+  	>>st(id:6) DEFREF:MMD9,MD4
+  	  USE-EXP LIST:ld(id:1),ld(id:16)
+  
+
+  [8]    *pchar = 300; //S1, USE is S4.
+  
+  ist:u8 attachinfo:Dbx      
+      ld:*<1> 'pchar' decl:unsigned char  *  pchar  base attachinfo:Dbx      
+      intconst:i32 300|0x12c attachinfo:Dbx
+  
+  	>>ist(id:11) DEFREF:MD2
+  	  USE-EXP LIST:ild(id:24)
+  	>>ld(id:9) USEREF:MMD8,MD4
+  	  DEF-STMT LIST:st(id:3)
+  
+
+  [10]    res = *qchar; //S2, HAS NO DEF.
+  
+  st:i32 'res' decl:int  res  attachinfo:Dbx      
+      cvt:i32 attachinfo:Dbx          
+          ild:u8 attachinfo:Dbx              
+              ld:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx
+  
+  	>>st(id:14) DEFREF:MMD10,MD4
+  	  USE-EXP LIST:ld(id:28)
+  	>>ild(id:13) USEREF:MD2
+  	  DEF-STMT LIST:
+  	>>ld(id:1) USEREF:MMD9,MD4
+  	  DEF-STMT LIST:st(id:6)
+  
+
+  [13]    *(int*)pchar = 400; //S3, USE is S4.
+  
+  ist:i32 attachinfo:Dbx      
+      cvt:*<4> base attachinfo:Dbx          
+          ld:*<1> 'pchar' decl:unsigned char  *  pchar  attachinfo:Dbx      
+      intconst:i32 400|0x190 attachinfo:Dbx
+  
+  	>>ist(id:22) DEFREF:MD2
+  	  USE-EXP LIST:ild(id:24)
+  	>>ld(id:20) USEREF:MMD8,MD4
+  	  DEF-STMT LIST:st(id:3)
+  
+
+  [15]    res2 = *(short*)qchar; //S4, DEF is {S1,S3}.
+  
+  st:i32 'res2' decl:int  res2  attachinfo:Dbx      
+      cvt:i32 attachinfo:Dbx          
+          ild:i16 attachinfo:Dbx              
+              cvt:*<2> attachinfo:Dbx                  
+                  ld:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx
+  
+  	>>st(id:25) DEFREF:MMD11,MD4
+  	  USE-EXP LIST:ld(id:29)
+  	>>ild(id:24) USEREF:MD2
+  	  DEF-STMT LIST:ist(id:11),ist(id:22)
+  	>>ld(id:16) USEREF:MMD9,MD4
+  	  DEF-STMT LIST:st(id:6)
+  
+
+  [17]    return res+res2; 
+  
+  return attachinfo:Dbx
+      add:i32 attachinfo:Dbx          
+          ld:i32 'res' decl:int  res  attachinfo:Dbx          
+          ld:i32 'res2' decl:int  res2  attachinfo:Dbx
+  
+  	>>ld(id:28) USEREF:MMD10,MD4
+  	  DEF-STMT LIST:st(id:14)
+  	>>ld(id:29) USEREF:MMD11,MD4
+  	  DEF-STMT LIST:st(id:25)
+  
+==---- DUMP Refine DefUse Chain 'foo' ----==
+
+  ==---- DUMP DUMgr DU CHAIN DETAIL 'foo' ----==
+  
+  --- BB3 ---
+  --- BB1 ---
+
+  [4]    pchar = 100;
+  
+  st:*<1> 'pchar' decl:unsigned char  *  pchar  attachinfo:Dbx      
+      intconst:i32 100|0x64 attachinfo:Dbx
+  
+  	>>st(id:3) DEFREF:MMD8,MD4
+  	  USE-EXP LIST:ld(id:9),ld(id:20)
+  
+
+  [5]    qchar = 101;
+  
+  st:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx      
+      intconst:i32 101|0x65 attachinfo:Dbx
+  
+  	>>st(id:6) DEFREF:MMD9,MD4
+  	  USE-EXP LIST:ld(id:1),ld(id:16)
+  
+
+  [8]    *pchar = 300; //S1, USE is S4.
+  
+  ist:u8 attachinfo:Dbx      
+      ld:*<1> 'pchar' decl:unsigned char  *  pchar  base attachinfo:Dbx      
+      intconst:i32 300|0x12c attachinfo:Dbx
+  
+  	>>ist(id:11) DEFREF:MD2
+  	  USE-EXP LIST:ild(id:24)
+  	>>ld(id:9) USEREF:MMD8,MD4
+  	  DEF-STMT LIST:st(id:3)
+  
+
+  [10]    res = *qchar; //S2, HAS NO DEF.
+  
+  st:i32 'res' decl:int  res  attachinfo:Dbx      
+      cvt:i32 attachinfo:Dbx          
+          ild:u8 attachinfo:Dbx              
+              ld:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx
+  
+  	>>st(id:14) DEFREF:MMD10,MD4
+  	  USE-EXP LIST:ld(id:28)
+  	>>ild(id:13) USEREF:MD2
+  	  DEF-STMT LIST:
+  	>>ld(id:1) USEREF:MMD9,MD4
+  	  DEF-STMT LIST:st(id:6)
+  
+
+  [13]    *(int*)pchar = 400; //S3, USE is S4.
+  
+  ist:i32 attachinfo:Dbx      
+      cvt:*<4> base attachinfo:Dbx          
+          ld:*<1> 'pchar' decl:unsigned char  *  pchar  attachinfo:Dbx      
+      intconst:i32 400|0x190 attachinfo:Dbx
+  
+  	>>ist(id:22) DEFREF:MD2
+  	  USE-EXP LIST:ild(id:24)
+  	>>ld(id:20) USEREF:MMD8,MD4
+  	  DEF-STMT LIST:st(id:3)
+  
+
+  [15]    res2 = *(short*)qchar; //S4, DEF is {S1,S3}.
+  
+  st:i32 'res2' decl:int  res2  attachinfo:Dbx      
+      cvt:i32 attachinfo:Dbx          
+          ild:i16 attachinfo:Dbx              
+              cvt:*<2> attachinfo:Dbx                  
+                  ld:*<1> 'qchar' decl:unsigned char  *  qchar  attachinfo:Dbx
+  
+  	>>st(id:25) DEFREF:MMD11,MD4
+  	  USE-EXP LIST:ld(id:29)
+  	>>ild(id:24) USEREF:MD2
+  	  DEF-STMT LIST:ist(id:11),ist(id:22)
+  	>>ld(id:16) USEREF:MMD9,MD4
+  	  DEF-STMT LIST:st(id:6)
+  
+
+  [17]    return res+res2; 
+  
+  return attachinfo:Dbx
+      add:i32 attachinfo:Dbx          
+          ld:i32 'res' decl:int  res  attachinfo:Dbx          
+          ld:i32 'res2' decl:int  res2  attachinfo:Dbx
+  
+  	>>ld(id:28) USEREF:MMD10,MD4
+  	  DEF-STMT LIST:st(id:14)
+  	>>ld(id:29) USEREF:MMD11,MD4
+  	  DEF-STMT LIST:st(id:25)
+  
+==---- DUMP Refine DefUse Chain '.program' ----==
+
+  ==---- DUMP DUMgr DU CHAIN DETAIL '.program' ----==
+  
+  --- BB3 ---
+  --- BB1 ---
+  region 'foo',id:2
+  
+  	>>region(id:1) DEFREF:
+  	  USE-EXP LIST:
+  
+==---- DUMP Refine DefUse Chain '.program' ----==
+
+  ==---- DUMP DUMgr DU CHAIN DETAIL '.program' ----==
+  
+  --- BB3 ---
+  --- BB1 ---
+  region 'foo',id:2
+  
+  	>>region(id:1) DEFREF:
+  	  USE-EXP LIST:
+  

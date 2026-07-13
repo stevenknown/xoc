@@ -1,0 +1,19 @@
+region program ".program" () {
+    var printf:i8:(func,align(4));
+    var qsort:i8:(func,align(4));
+    var qsort:i8:(func,align(4));
+    var test_qsort1:i8:(func,align(4));
+    var _const_string_1:str:(align(4),string("%d "));
+    var _const_string_2:str:(align(4),string("After qsort 1"));
+    region func test_qsort1 () {
+        var a:mc<40>:(array,align(4));
+        var i:i32:(align(4));
+        st:i32 i = 0x0:i32;
+        while (lt ld:i32 i, 0xa:i32) {
+            call $2:i8 = printf(lda _const_string_1,
+                array:i32:0:(dim[10]) lda a, (ld:i32 i));
+        };
+        call $4 = printf(lda _const_string_2);
+        return;
+    };
+}

@@ -1,0 +1,39 @@
+
+//====---- Dump region '.program' ----====
+region program ".program" () {
+
+    //entry:
+    //  %g = alloca float, align 4
+    //  %h = alloca float, align 4
+    //  br label %for.body
+    //
+    //for.body:                                         ; preds = %for.body, %entry
+    //  %p = phi float* [ %g, %entry ], [ %q, %for.body ]
+    //  %q = phi float* [ %h, %entry ], [ %p, %for.body ]
+    //  %0 = load float, float* %p, align 4
+    //  store float undef, float* %q, align 4
+    //  %branch_cond = fcmp ugt float %0, 0.0
+    //  br i1 %branch_cond, label %for.cond.cleanup, label %for.body
+    //
+    //for.cond.cleanup:                                 ; preds = %for.body
+    //  ret float undef
+
+    region func main () {
+        label ENTRY;
+        goto FOR_BODY;
+
+        //%p -> $1
+        //%q -> $2
+        //%undef -> $3
+        //%g -> $4
+        //%h -> $5
+
+        label FOR_BODY;
+        phi $1 = ($4, ENTRY), ($2, FOR_BODY);
+        phi $2 = ($5, ENTRY), ($1, FOR_BODY);
+        stpr $10 = ild:f32 ($1:*<1>);
+        ist:*<1> = $2:*<1>, $3; //$3 is RHS
+        truebr (gt $10:u32, 0:f32), FOR_BODY;
+        return 0;
+    };
+}

@@ -1,0 +1,82 @@
+
+==---- DUMP Register Promotion 'test' ----==
+  ==-- DUMP Dont Promotion Table --==
+  
+==-- DUMP LoopInfo --==
+LOOP2 HEAD:BB1, BODY:1,2,3,4,6,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD8 -- base:Var64(src):local,restrict,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'unsigned int const restrict *  src ' -- ofst:0 -- size:4
+    st:*<4> 'src' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      st:*<4> 'src' attachinfo:Dbx,MDSSA
+      ld:*<4> 'src' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD9 -- base:Var65(i):local,align(4),u32,decl:'unsigned int  i ' -- ofst:0 -- size:4
+    st:u32 'i' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      st:u32 'i' attachinfo:Dbx,MDSSA
+      ld:u32 'i' attachinfo:Dbx,MDSSA
+      ld:u32 'i' attachinfo:Dbx,MDSSA
+      ld:u32 'i' attachinfo:Dbx,MDSSA
+      st:u32 'i' attachinfo:Dbx,MDSSA
+      ld:u32 'i' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD7 -- base:Var62(section):local,formal_param,align(4),pointer,pt_base_sz:12,*,mem_size:4,decl:'struct (id:1)  *  section ' -- ofst:0 -- size:4
+    ld:*<12> 'section' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:*<12> 'section' attachinfo:Dbx,MDSSA
+      ld:*<12> 'section' attachinfo:Dbx,MDSSA
+      ld:*<12> 'section' attachinfo:Dbx,MDSSA
+      ld:*<12> 'section' attachinfo:Dbx,MDSSA
+      st:*<12> 'section' attachinfo:Dbx,MDSSA
+      ld:*<12> 'section' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD10 -- base:Var63(dst):local,formal_param,restrict,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'unsigned int restrict *  dst ' -- ofst:0 -- size:4
+    ld:*<4> 'dst' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:*<4> 'dst' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==---- DUMP DelegateMgr 'test' ----==
+  ==-- Dele2PR --==
+  
+  DELE:  st:*<4> 'src' attachinfo:Dbx,MDSSA
+  PR:  $1:*<4>
+  
+  DELE:  st:u32 'i' attachinfo:Dbx,MDSSA
+  PR:  $2:u32
+  
+  DELE:  ld:*<12> 'section' attachinfo:Dbx,MDSSA
+  PR:  $3:*<12>
+  
+  DELE:  ld:*<4> 'dst' attachinfo:Dbx,MDSSA
+  PR:  $4:*<4>
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+  
+  ==---- DUMP Delegate Table ----==
+  
+
+==-- Dele2RestoreStmt --==
+
+==-- Dele2RestoreStmt --==
+
+==-- Dele2RestoreStmt --==
+
+==-- Dele2RestoreStmt --==

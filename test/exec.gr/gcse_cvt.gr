@@ -1,0 +1,40 @@
+region program ".program" () {
+    var abort:any:(func,decl,align(4));
+    var exit:any:(func,decl,align(4));
+    var printf:any:(func,decl,align(4));
+    var u2f:any:(func,align(4));
+    var s2f:any:(func,align(4));
+    var main:any:(func,align(4));
+
+    var _const_string_fp:str:(align(4),string("%f, %f
+"));
+    var _const_string_u32:str:(align(4),string("%x, %x
+"));
+
+    //==---- DUMP Region 'u2f' ----==
+    region func u2f (undefined,var u:u32:(align(4))) {
+        return 
+            cvt:f32 
+                ld:u32 u;
+    };
+    //==---- DUMP Region 's2f' ----==
+    region func s2f (undefined,var s:i32:(align(4))) {
+        return 
+            cvt:f32 
+                ld:i32 s;
+    };
+    //==---- DUMP Region 'main' ----==
+    region func main () {
+        call:(use(ild:any 0:any)) $5:f32 = u2f(2147483648:u32);
+        stpr $9:f32 = cvt:f32 2147483648:u32; //NOTE:the cvt can NOT be GCSE because the type
+        falsebr (ne:bool $5:f32, $9:f32), "_GR__$L1";
+        call:(use(ild:any 0:any)) $6:i32 = exit(3:i32);
+        label "_GR__$L1";
+        call:(use(ild:any 0:any)) $7:f32 = s2f(-2147483648:i32);
+        stpr $10:f32 = cvt:f32 2147483648:i32;
+        falsebr (ne:bool $7:f32, $10:f32), "_GR__$L2";
+        call:(use(ild:any 0:any)) $8:i32 = exit(2:i32);
+        label "_GR__$L2";
+        return 0:i32;
+    };
+}

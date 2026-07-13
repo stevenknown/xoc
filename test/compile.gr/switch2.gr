@@ -1,0 +1,22 @@
+region program ".program" () {
+    var byte:u8:(align(4));
+    var word:u32:(align(4));
+    var switch_key:i16:(func,align(4));
+    var switch_key:i16:(func,align(4));
+
+    region func switch_key (undefined,var in_key:*<1>:(align(4)),var n_bytes:u32:(align(4)),var f:i32:(align(4)),var cx:*<524>:(align(4))) {
+        var kf:*<4>:(align(4));
+        var kt:*<4>:(align(4));
+        var rci:u32:(align(4));
+
+        switch (ld cx)
+        case 6, _L5,
+        {
+            label _L5;
+            do {
+                stpr $3 = ld rci;
+            } while (lt ld kf, ld kt);
+        };
+        return 1;
+    };
+}

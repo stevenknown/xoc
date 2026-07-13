@@ -1,0 +1,1036 @@
+
+==---- DUMP PRSSA Manager 's86' ----==
+==---- DUMP PRSSAMgr:VPR 's86' ----==
+VPR1:$1v1$1: DEF:phi($1,id:7) USE:--
+VPR2:$3v1$3: DEF:stpr($3,id:16) USE:id:6
+VPR3:$4v1$4: DEF:phi($4,id:28) USE:--
+VPR4:$7v1$7: DEF:phi($7,id:31) USE:id:40
+VPR5:$9v1$9: DEF:phi($9,id:42) USE:id:30
+VPR6:$10v1$10: DEF:stpr($10,id:58) USE:id:41
+VPR7:$6v1$6: DEF:stpr($6,id:66) USE:id:27
+VPR8:$11v1$11: DEF:phi($11,id:78) USE:--
+VPR9:$13v1$13: DEF:stpr($13,id:87) USE:id:77
+VPR10:$2v1$2: DEF:-- USE:id:5
+VPR11:$5v1$5: DEF:-- USE:id:26
+VPR12:$8v1$8: DEF:-- USE:id:29
+VPR13:$12v1$12: DEF:-- USE:id:76
+==---- DUMP PRSSAMgr:VPR REF 's86' ----==
+----- BB24 --- rpo:-1 -----
+ATTR:entry_bb fall_through
+----- BB1 --- rpo:-1 -----
+LABEL:_GR__$L10
+ATTR:fall_through branch_target
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        intconst:i32 0|0x0
+    VP:-- <= --
+----- BB2 --- rpo:-1 -----
+LABEL:_GR__$L1
+ATTR:fall_through branch_target
+    ------------------
+    phi $1:i32 attachinfo:Dbx =
+        $2:i32
+        $3:i32
+    VP:$1v1$1  <= $2v1$2,$3v1$3
+    ------------------
+    falsebr label _GR__$L2 attachinfo:Dbx
+        lt:bool
+            ld:i32 'j'
+            intconst:i32 10|0xa
+    VP:-- <= --
+----- BB4 --- rpo:-1 -----
+LABEL:_GR__$L11
+ATTR:branch_target
+    ------------------
+    st:i32 'lrc' attachinfo:Dbx
+        intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    stpr $3:i32 attachinfo:Dbx
+        ld:i32 'j'
+    VP:$3v1$3  <= --
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        add:i32
+            ld:i32 'j'
+            intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    goto label _GR__$L1 attachinfo:Dbx
+    VP:-- <= --
+----- BB6 --- rpo:-1 -----
+LABEL:_GR__$L2
+ATTR:fall_through branch_target
+    ------------------
+    st:i32 'i' attachinfo:Dbx
+        intconst:i32 0|0x0
+    VP:-- <= --
+----- BB7 --- rpo:-1 -----
+LABEL:_GR__$L3
+ATTR:fall_through branch_target
+    ------------------
+    phi $4:i32 attachinfo:Dbx =
+        $5:i32
+        $6:i32
+    VP:$4v1$4  <= $5v1$5,$6v1$6
+    ------------------
+    phi $7:i32 attachinfo:Dbx =
+        $8:i32
+        $9:i32
+    VP:$7v1$7  <= $8v1$8,$9v1$9
+    ------------------
+    falsebr label _GR__$L4 attachinfo:Dbx
+        lt:bool
+            ld:i32 'i'
+            intconst:i32 4|0x4
+    VP:-- <= --
+----- BB9 --- rpo:-1 -----
+LABEL:_GR__$L12
+ATTR:fall_through branch_target
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        intconst:i32 0|0x0
+    VP:-- <= --
+----- BB10 --- rpo:-1 -----
+LABEL:_GR__$L5
+ATTR:fall_through branch_target
+    ------------------
+    phi $9:i32 attachinfo:Dbx =
+        $7:i32
+        $10:i32
+    VP:$9v1$9  <= $7v1$7,$10v1$10
+    ------------------
+    falsebr label _GR__$L6 attachinfo:Dbx
+        lt:bool
+            ld:i32 'j'
+            intconst:i32 3|0x3
+    VP:-- <= --
+----- BB11 --- rpo:-1 -----
+ATTR:fall_through
+    ------------------
+    falsebr label _GR__$L7 attachinfo:Dbx
+        ne:bool
+            ld:i32 'g'
+            array (i32, ety:i32)
+                elemnum[3,4]
+                ld:i32 'j' dim0
+                ld:i32 'i' dim1
+                lda:*<48> 'y2' array_base
+    VP:-- <= --
+----- BB12 --- rpo:-1 -----
+ATTR:fall_through
+    ------------------
+    st:i32 'lrc' attachinfo:Dbx
+        intconst:i32 1|0x1
+    VP:-- <= --
+----- BB13 --- rpo:-1 -----
+LABEL:_GR__$L7
+ATTR:branch_target
+    ------------------
+    stpr $10:i32 attachinfo:Dbx
+        ld:i32 'j'
+    VP:$10v1$10  <= --
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        add:i32
+            ld:i32 'j'
+            intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    goto label _GR__$L5 attachinfo:Dbx
+    VP:-- <= --
+----- BB15 --- rpo:-1 -----
+LABEL:_GR__$L6
+ATTR:branch_target
+    ------------------
+    stpr $6:i32 attachinfo:Dbx
+        ld:i32 'i'
+    VP:$6v1$6  <= --
+    ------------------
+    st:i32 'i' attachinfo:Dbx
+        add:i32
+            ld:i32 'i'
+            intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    goto label _GR__$L3 attachinfo:Dbx
+    VP:-- <= --
+----- BB17 --- rpo:-1 -----
+LABEL:_GR__$L4
+ATTR:fall_through branch_target
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        intconst:i32 0|0x0
+    VP:-- <= --
+----- BB18 --- rpo:-1 -----
+LABEL:_GR__$L8
+ATTR:fall_through branch_target
+    ------------------
+    phi $11:i32 attachinfo:Dbx =
+        $12:i32
+        $13:i32
+    VP:$11v1$11  <= $12v1$12,$13v1$13
+    ------------------
+    falsebr label _GR__$L9 attachinfo:Dbx
+        lt:bool
+            ld:i32 'j'
+            intconst:i32 4|0x4
+    VP:-- <= --
+----- BB20 --- rpo:-1 -----
+LABEL:_GR__$L13
+ATTR:branch_target
+    ------------------
+    st:i32 'lrc' attachinfo:Dbx
+        intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    stpr $13:i32 attachinfo:Dbx
+        ld:i32 'j'
+    VP:$13v1$13  <= --
+    ------------------
+    st:i32 'j' attachinfo:Dbx
+        add:i32
+            ld:i32 'j'
+            intconst:i32 1|0x1
+    VP:-- <= --
+    ------------------
+    goto label _GR__$L8 attachinfo:Dbx
+    VP:-- <= --
+----- BB22 --- rpo:-1 -----
+LABEL:_GR__$L9
+ATTR:fall_through branch_target
+    ------------------
+    return attachinfo:Dbx
+        ld:i32 'lrc'
+    VP:-- <= --
+==---- DUMP MDSSA Manager 's86' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.all_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var62(#DedicatedStringVar):global,,addr_taken,has_init_val,unallocable,align(4),string("DedicatedVarBeRegardedAsString"),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD5 -- base:Var58(.program):global,func,any,mem_size:ANY,decl:'' -- ofst:unbound
+  MD6 -- base:Var59(g):global,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD7 -- base:Var60(s86):global,func,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:48
+  MD9 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:4
+  MD10 -- base:Var65(j):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD14 -- base:Var63(lrc):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD15 -- base:Var64(i):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- start:0 -- end:48 -- range
+  ==-- DUMP MDSSAMgr VOpndRef 's86' --==
+
+  --- BB24 ---
+  --- BB1 ---
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD9:MD10V1,-|USESET:id(id:96)
+  --- BB2 ---
+  MDPhi5: MD14V1 <- (ID id:104 MD14V0 BB1), (ID id:105 MD14V2 BB4)  |USESET:(id id:112)
+  MDPhi1: MD10V2 <- (ID id:96 MD10V1 BB1), (ID id:97 MD10V3 BB4)  |USESET:(ld id:15) (ld id:17) (ld id:8)
+
+  phi $1:i32 attachinfo:Dbx =
+      $2:i32
+      $3:i32
+
+  falsebr label _GR__$L2 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 10|0xa
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V2
+  --- BB4 ---
+
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----
+    st:i32 'lrc' attachinfo:Dbx,MDSSA
+    --DEF:VMD12:MD14V2,PrevDEF:MD14V1|USESET:id(id:105)
+
+  stpr $3:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V2
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD13:MD10V3,PrevDEF:MD10V2|USESET:id(id:97)
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V2
+
+  goto label _GR__$L1 attachinfo:Dbx
+  --- BB6 ---
+
+  st:i32 'i' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD14:MD15V1,-|USESET:id(id:114)
+  --- BB7 ---
+  MDPhi10: MD15V2 <- (ID id:114 MD15V1 BB6), (ID id:115 MD15V3 BB15)  |USESET:(ld id:50) (ld id:65) (ld id:32) (ld id:67)
+  MDPhi9: MD14V3 <- (ID id:112 MD14V1 BB6), (ID id:113 MD14V4 BB15)  |USESET:(id id:110) (id id:108)
+
+  phi $4:i32 attachinfo:Dbx =
+      $5:i32
+      $6:i32
+
+  phi $7:i32 attachinfo:Dbx =
+      $8:i32
+      $9:i32
+
+  falsebr label _GR__$L4 attachinfo:Dbx
+      lt:bool
+          ld:i32 'i' attachinfo:MDSSA
+          intconst:i32 4|0x4
+    ----
+    ld:i32 'i' attachinfo:MDSSA
+    --USE:MD15V2
+  --- BB9 ---
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD18:MD10V5,-|USESET:id(id:100)
+  --- BB10 ---
+  MDPhi8: MD14V4 <- (ID id:110 MD14V3 BB9), (ID id:111 MD14V6 BB13)  |USESET:(id id:106) (id id:113)
+  MDPhi3: MD10V6 <- (ID id:100 MD10V5 BB9), (ID id:101 MD10V7 BB13)  |USESET:(ld id:49) (ld id:59) (ld id:43) (ld id:57)
+
+  phi $9:i32 attachinfo:Dbx =
+      $7:i32
+      $10:i32
+
+  falsebr label _GR__$L6 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 3|0x3
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V6
+  --- BB11 ---
+
+  truebr label _GR__$L7 attachinfo:Dbx
+      eq:bool
+          ld:i32 'g' attachinfo:MDSSA
+          array (i32, ety:i32) attachinfo:MDSSA
+              elemnum[3,4]
+              ld:i32 'j' dim0 attachinfo:MDSSA
+              ld:i32 'i' dim1 attachinfo:MDSSA
+              lda:*<48> 'y2' array_base
+    ----
+    ld:i32 'g' attachinfo:MDSSA
+    --USE:MD6V0,MD2V0
+    array (i32, ety:i32) attachinfo:MDSSA
+    --USE:MD2V0,MD26V0,MD8V0,MD9V0
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V6
+    ld:i32 'i' attachinfo:MDSSA
+    --USE:MD15V2
+  --- BB12 ---
+
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----
+    st:i32 'lrc' attachinfo:Dbx,MDSSA
+    --DEF:VMD21:MD14V5,PrevDEF:MD14V4|USESET:id(id:107)
+  --- BB13 ---
+  MDPhi6: MD14V6 <- (ID id:106 MD14V4 BB11), (ID id:107 MD14V5 BB12)  |USESET:(id id:111)
+
+  stpr $10:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V6
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD23:MD10V7,PrevDEF:MD10V6|USESET:id(id:101)
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V6
+
+  goto label _GR__$L5 attachinfo:Dbx
+  --- BB15 ---
+
+  stpr $6:i32 attachinfo:Dbx
+      ld:i32 'i' attachinfo:MDSSA
+    ----
+    ld:i32 'i' attachinfo:MDSSA
+    --USE:MD15V2
+
+  st:i32 'i' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'i' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----
+    st:i32 'i' attachinfo:Dbx,MDSSA
+    --DEF:VMD24:MD15V3,PrevDEF:MD15V2|USESET:id(id:115)
+    ld:i32 'i' attachinfo:MDSSA
+    --USE:MD15V2
+
+  goto label _GR__$L3 attachinfo:Dbx
+  --- BB17 ---
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD25:MD10V8,-|USESET:id(id:102)
+  --- BB18 ---
+  MDPhi7: MD14V7 <- (ID id:108 MD14V3 BB17), (ID id:109 MD14V8 BB20)  |USESET:(ld id:94)
+  MDPhi4: MD10V9 <- (ID id:102 MD10V8 BB17), (ID id:103 MD10V10 BB20)  |USESET:(ld id:86) (ld id:88) (ld id:79)
+
+  phi $11:i32 attachinfo:Dbx =
+      $12:i32
+      $13:i32
+
+  falsebr label _GR__$L9 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 4|0x4
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V9
+  --- BB20 ---
+
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----
+    st:i32 'lrc' attachinfo:Dbx,MDSSA
+    --DEF:VMD28:MD14V8,PrevDEF:MD14V7|USESET:id(id:109)
+
+  stpr $13:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V9
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----
+    st:i32 'j' attachinfo:Dbx,MDSSA
+    --DEF:VMD29:MD10V10,PrevDEF:MD10V9|USESET:id(id:103)
+    ld:i32 'j' attachinfo:MDSSA
+    --USE:MD10V9
+
+  goto label _GR__$L8 attachinfo:Dbx
+  --- BB22 ---
+
+  return attachinfo:Dbx
+      ld:i32 'lrc' attachinfo:MDSSA
+    ----
+    ld:i32 'lrc' attachinfo:MDSSA
+    --USE:MD14V7
+  ==-- DUMP MDSSAMgr DU CHAIN 's86' --==
+
+  ----- BB24 --- rpo:0 -----
+  ATTR:entry_bb fall_through
+  ----- BB1 --- rpo:5 -----
+  LABEL:_GR__$L10
+  ATTR:fall_through branch_target
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----------------
+    st(id:3)
+      USESET:
+        MD10V1:(id id:96)
+    ----------------
+
+  ----- BB2 --- rpo:10 -----
+  LABEL:_GR__$L1
+  ATTR:fall_through branch_target
+  MDPhi5: MD14V1 <- (ID id:104 MD14V0 BB1), (ID id:105 MD14V2 BB4)  |USESET:(id id:112)
+  MDPhi1: MD10V2 <- (ID id:96 MD10V1 BB1), (ID id:97 MD10V3 BB4)  |USESET:(ld id:15) (ld id:17) (ld id:8)
+  phi $1:i32 attachinfo:Dbx =
+      $2:i32
+      $3:i32
+  falsebr label _GR__$L2 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 10|0xa
+    ----------------
+    ld(id:8)
+      DEFSET:
+        MD10V2:mdphi1 (st id:3) (st id:20)
+    ----------------
+
+  ----- BB4 --- rpo:15 -----
+  LABEL:_GR__$L11
+  ATTR:branch_target
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----------------
+    st(id:14)
+      USESET:
+        MD14V2:(id id:105)
+    ----------------
+
+  stpr $3:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----------------
+    ld(id:15)
+      DEFSET:
+        MD10V2:mdphi1 (st id:3) (st id:20)
+    ----------------
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----------------
+    st(id:20)
+      USESET:
+        MD10V3:(id id:97)
+    ld(id:17)
+      DEFSET:
+        MD10V2:mdphi1 (st id:3) (st id:20)
+    ----------------
+
+  goto label _GR__$L1 attachinfo:Dbx
+  ----- BB6 --- rpo:20 -----
+  LABEL:_GR__$L2
+  ATTR:fall_through branch_target
+  st:i32 'i' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----------------
+    st(id:24)
+      USESET:
+        MD15V1:(id id:114)
+    ----------------
+
+  ----- BB7 --- rpo:25 -----
+  LABEL:_GR__$L3
+  ATTR:fall_through branch_target
+  MDPhi10: MD15V2 <- (ID id:114 MD15V1 BB6), (ID id:115 MD15V3 BB15)  |USESET:(ld id:50) (ld id:65) (ld id:32) (ld id:67)
+  MDPhi9: MD14V3 <- (ID id:112 MD14V1 BB6), (ID id:113 MD14V4 BB15)  |USESET:(id id:110) (id id:108)
+  phi $4:i32 attachinfo:Dbx =
+      $5:i32
+      $6:i32
+  phi $7:i32 attachinfo:Dbx =
+      $8:i32
+      $9:i32
+  falsebr label _GR__$L4 attachinfo:Dbx
+      lt:bool
+          ld:i32 'i' attachinfo:MDSSA
+          intconst:i32 4|0x4
+    ----------------
+    ld(id:32)
+      DEFSET:
+        MD15V2:mdphi10 (st id:24) (st id:70)
+    ----------------
+
+  ----- BB9 --- rpo:30 -----
+  LABEL:_GR__$L12
+  ATTR:fall_through branch_target
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----------------
+    st(id:38)
+      USESET:
+        MD10V5:(id id:100)
+    ----------------
+
+  ----- BB10 --- rpo:35 -----
+  LABEL:_GR__$L5
+  ATTR:fall_through branch_target
+  MDPhi8: MD14V4 <- (ID id:110 MD14V3 BB9), (ID id:111 MD14V6 BB13)  |USESET:(id id:106) (id id:113)
+  MDPhi3: MD10V6 <- (ID id:100 MD10V5 BB9), (ID id:101 MD10V7 BB13)  |USESET:(ld id:49) (ld id:59) (ld id:43) (ld id:57)
+  phi $9:i32 attachinfo:Dbx =
+      $7:i32
+      $10:i32
+  falsebr label _GR__$L6 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 3|0x3
+    ----------------
+    ld(id:43)
+      DEFSET:
+        MD10V6:mdphi3 (st id:38) (st id:62)
+    ----------------
+
+  ----- BB11 --- rpo:45 -----
+  ATTR:fall_through
+  truebr label _GR__$L7 attachinfo:Dbx
+      eq:bool
+          ld:i32 'g' attachinfo:MDSSA
+          array (i32, ety:i32) attachinfo:MDSSA
+              elemnum[3,4]
+              ld:i32 'j' dim0 attachinfo:MDSSA
+              ld:i32 'i' dim1 attachinfo:MDSSA
+              lda:*<48> 'y2' array_base
+    ----------------
+    ld(id:47)
+      DEFSET:
+        MD6V0:
+        MD2V0:
+    array(id:51)
+      DEFSET:
+        MD2V0:
+        MD26V0:
+        MD8V0:
+        MD9V0:
+    ld(id:49)
+      DEFSET:
+        MD10V6:mdphi3 (st id:38) (st id:62)
+    ld(id:50)
+      DEFSET:
+        MD15V2:mdphi10 (st id:24) (st id:70)
+    ----------------
+
+  ----- BB12 --- rpo:50 -----
+  ATTR:fall_through
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----------------
+    st(id:55)
+      USESET:
+        MD14V5:(id id:107)
+    ----------------
+
+  ----- BB13 --- rpo:55 -----
+  LABEL:_GR__$L7
+  ATTR:branch_target
+  MDPhi6: MD14V6 <- (ID id:106 MD14V4 BB11), (ID id:107 MD14V5 BB12)  |USESET:(id id:111)
+  stpr $10:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----------------
+    ld(id:57)
+      DEFSET:
+        MD10V6:mdphi3 (st id:38) (st id:62)
+    ----------------
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----------------
+    st(id:62)
+      USESET:
+        MD10V7:(id id:101)
+    ld(id:59)
+      DEFSET:
+        MD10V6:mdphi3 (st id:38) (st id:62)
+    ----------------
+
+  goto label _GR__$L5 attachinfo:Dbx
+  ----- BB15 --- rpo:40 -----
+  LABEL:_GR__$L6
+  ATTR:branch_target
+  stpr $6:i32 attachinfo:Dbx
+      ld:i32 'i' attachinfo:MDSSA
+    ----------------
+    ld(id:65)
+      DEFSET:
+        MD15V2:mdphi10 (st id:24) (st id:70)
+    ----------------
+
+  st:i32 'i' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'i' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----------------
+    st(id:70)
+      USESET:
+        MD15V3:(id id:115)
+    ld(id:67)
+      DEFSET:
+        MD15V2:mdphi10 (st id:24) (st id:70)
+    ----------------
+
+  goto label _GR__$L3 attachinfo:Dbx
+  ----- BB17 --- rpo:60 -----
+  LABEL:_GR__$L4
+  ATTR:fall_through branch_target
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      intconst:i32 0|0x0
+    ----------------
+    st(id:74)
+      USESET:
+        MD10V8:(id id:102)
+    ----------------
+
+  ----- BB18 --- rpo:65 -----
+  LABEL:_GR__$L8
+  ATTR:fall_through branch_target
+  MDPhi7: MD14V7 <- (ID id:108 MD14V3 BB17), (ID id:109 MD14V8 BB20)  |USESET:(ld id:94)
+  MDPhi4: MD10V9 <- (ID id:102 MD10V8 BB17), (ID id:103 MD10V10 BB20)  |USESET:(ld id:86) (ld id:88) (ld id:79)
+  phi $11:i32 attachinfo:Dbx =
+      $12:i32
+      $13:i32
+  falsebr label _GR__$L9 attachinfo:Dbx
+      lt:bool
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 4|0x4
+    ----------------
+    ld(id:79)
+      DEFSET:
+        MD10V9:mdphi4 (st id:74) (st id:91)
+    ----------------
+
+  ----- BB20 --- rpo:70 -----
+  LABEL:_GR__$L13
+  ATTR:branch_target
+  st:i32 'lrc' attachinfo:Dbx,MDSSA
+      intconst:i32 1|0x1
+    ----------------
+    st(id:85)
+      USESET:
+        MD14V8:(id id:109)
+    ----------------
+
+  stpr $13:i32 attachinfo:Dbx
+      ld:i32 'j' attachinfo:MDSSA
+    ----------------
+    ld(id:86)
+      DEFSET:
+        MD10V9:mdphi4 (st id:74) (st id:91)
+    ----------------
+
+  st:i32 'j' attachinfo:Dbx,MDSSA
+      add:i32
+          ld:i32 'j' attachinfo:MDSSA
+          intconst:i32 1|0x1
+    ----------------
+    st(id:91)
+      USESET:
+        MD10V10:(id id:103)
+    ld(id:88)
+      DEFSET:
+        MD10V9:mdphi4 (st id:74) (st id:91)
+    ----------------
+
+  goto label _GR__$L8 attachinfo:Dbx
+  ----- BB22 --- rpo:75 -----
+  LABEL:_GR__$L9
+  ATTR:fall_through branch_target
+  return attachinfo:Dbx
+      ld:i32 'lrc' attachinfo:MDSSA
+    ----------------
+    ld(id:94)
+      DEFSET:
+        MD14V7:mdphi7 mdphi9 (st id:85) mdphi5 mdphi8 (st id:14) mdphi6 (st id:55)
+    ----------------
+
+==---- DUMP MDSSA Manager 's86' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.all_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var62(#DedicatedStringVar):global,,addr_taken,has_init_val,unallocable,align(4),string("DedicatedVarBeRegardedAsString"),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD5 -- base:Var58(.program):global,func,any,mem_size:ANY,decl:'' -- ofst:unbound
+  MD6 -- base:Var59(g):global,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD7 -- base:Var60(s86):global,func,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:48
+  MD9 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:4
+  MD10 -- base:Var65(j):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD14 -- base:Var63(lrc):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD15 -- base:Var64(i):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- start:0 -- end:48 -- range
+  ==-- DUMP MDSSAMgr VOpndRef 's86' --==
+
+  --- BB24 ---
+  --- BB1 ---
+
+  stpr $19:i32 attachinfo:Dbx
+      ld:i32 'lrc' attachinfo:MDSSA
+    ----
+    ld:i32 'lrc' attachinfo:MDSSA
+    --USE:MD14V0
+  --- BB2 ---
+
+  phi $20:i32 =
+      $19:i32
+      intconst:i32 1|0x1
+
+  phi $17:i32 =
+      intconst:i32 0|0x0
+      $18:i32
+
+  falsebr label _GR__$L2 attachinfo:Dbx
+      lt:bool
+          $17:i32 attachinfo:
+          intconst:i32 10|0xa
+  --- BB4 ---
+
+  stpr $18:i32 attachinfo:Dbx
+      add:i32
+          $17:i32 attachinfo:
+          intconst:i32 1|0x1
+
+  goto label _GR__$L1 attachinfo:Dbx
+  --- BB6 ---
+  --- BB7 ---
+
+  phi $31:i32 =
+      intconst:i32 0|0x0
+      $32:i32
+
+  phi $26:i32 =
+      $20:i32
+      $27:i32
+
+  falsebr label _GR__$L4 attachinfo:Dbx
+      lt:bool
+          $31:i32 attachinfo:
+          intconst:i32 4|0x4
+  --- BB9 ---
+  --- BB10 ---
+
+  phi $35:i32 =
+      intconst:i32 0|0x0
+      $37:i32
+
+  phi $27:i32 =
+      $26:i32
+      intconst:i32 1|0x1
+
+  falsebr label _GR__$L6 attachinfo:Dbx
+      lt:bool
+          $35:i32 attachinfo:
+          intconst:i32 3|0x3
+  --- BB11 ---
+  --- BB12 ---
+  --- BB13 ---
+
+  stpr $37:i32 attachinfo:Dbx
+      add:i32
+          $35:i32 attachinfo:
+          intconst:i32 1|0x1
+
+  goto label _GR__$L5 attachinfo:Dbx
+  --- BB15 ---
+
+  stpr $32:i32 attachinfo:Dbx
+      add:i32
+          $31:i32 attachinfo:
+          intconst:i32 1|0x1
+
+  goto label _GR__$L3 attachinfo:Dbx
+  --- BB17 ---
+  --- BB18 ---
+
+  phi $44:i32 =
+      $26:i32
+      intconst:i32 1|0x1
+
+  phi $41:i32 =
+      intconst:i32 0|0x0
+      $42:i32
+
+  falsebr label _GR__$L9 attachinfo:Dbx
+      lt:bool
+          $41:i32 attachinfo:
+          intconst:i32 4|0x4
+  --- BB20 ---
+
+  stpr $42:i32 attachinfo:Dbx
+      add:i32
+          $41:i32 attachinfo:
+          intconst:i32 1|0x1
+
+  goto label _GR__$L8 attachinfo:Dbx
+  --- BB22 ---
+
+  return attachinfo:Dbx
+      $44:i32
+  ==-- DUMP MDSSAMgr DU CHAIN 's86' --==
+
+  ----- BB24 --- rpo:0 -----
+  ATTR:entry_bb fall_through
+  ----- BB1 --- rpo:5 -----
+  LABEL:_GR__$L10
+  ATTR:fall_through branch_target
+  stpr $19:i32 attachinfo:Dbx
+      ld:i32 'lrc' attachinfo:MDSSA
+    ----------------
+    ld(id:17)
+      DEFSET:
+        MD14V0:
+    ----------------
+
+  ----- BB2 --- rpo:10 -----
+  LABEL:_GR__$L1
+  ATTR:fall_through branch_target
+  phi $20:i32 =
+      $19:i32
+      intconst:i32 1|0x1
+  phi $17:i32 =
+      intconst:i32 0|0x0
+      $18:i32
+  falsebr label _GR__$L2 attachinfo:Dbx
+      lt:bool
+          $17:i32 attachinfo:
+          intconst:i32 10|0xa
+  ----- BB4 --- rpo:15 -----
+  LABEL:_GR__$L11
+  ATTR:branch_target
+  stpr $18:i32 attachinfo:Dbx
+      add:i32
+          $17:i32 attachinfo:
+          intconst:i32 1|0x1
+  goto label _GR__$L1 attachinfo:Dbx
+  ----- BB6 --- rpo:20 -----
+  LABEL:_GR__$L2
+  ATTR:fall_through branch_target
+  ----- BB7 --- rpo:25 -----
+  LABEL:_GR__$L3
+  ATTR:fall_through branch_target
+  phi $31:i32 =
+      intconst:i32 0|0x0
+      $32:i32
+  phi $26:i32 =
+      $20:i32
+      $27:i32
+  falsebr label _GR__$L4 attachinfo:Dbx
+      lt:bool
+          $31:i32 attachinfo:
+          intconst:i32 4|0x4
+  ----- BB9 --- rpo:30 -----
+  LABEL:_GR__$L12
+  ATTR:fall_through branch_target
+  ----- BB10 --- rpo:35 -----
+  LABEL:_GR__$L5
+  ATTR:fall_through branch_target
+  phi $35:i32 =
+      intconst:i32 0|0x0
+      $37:i32
+  phi $27:i32 =
+      $26:i32
+      intconst:i32 1|0x1
+  falsebr label _GR__$L6 attachinfo:Dbx
+      lt:bool
+          $35:i32 attachinfo:
+          intconst:i32 3|0x3
+  ----- BB11 --- rpo:45 -----
+  ATTR:fall_through
+  ----- BB12 --- rpo:50 -----
+  ATTR:fall_through
+  ----- BB13 --- rpo:55 -----
+  LABEL:_GR__$L7
+  ATTR:branch_target
+  stpr $37:i32 attachinfo:Dbx
+      add:i32
+          $35:i32 attachinfo:
+          intconst:i32 1|0x1
+  goto label _GR__$L5 attachinfo:Dbx
+  ----- BB15 --- rpo:40 -----
+  LABEL:_GR__$L6
+  ATTR:branch_target
+  stpr $32:i32 attachinfo:Dbx
+      add:i32
+          $31:i32 attachinfo:
+          intconst:i32 1|0x1
+  goto label _GR__$L3 attachinfo:Dbx
+  ----- BB17 --- rpo:60 -----
+  LABEL:_GR__$L4
+  ATTR:fall_through branch_target
+  ----- BB18 --- rpo:65 -----
+  LABEL:_GR__$L8
+  ATTR:fall_through branch_target
+  phi $44:i32 =
+      $26:i32
+      intconst:i32 1|0x1
+  phi $41:i32 =
+      intconst:i32 0|0x0
+      $42:i32
+  falsebr label _GR__$L9 attachinfo:Dbx
+      lt:bool
+          $41:i32 attachinfo:
+          intconst:i32 4|0x4
+  ----- BB20 --- rpo:70 -----
+  LABEL:_GR__$L13
+  ATTR:branch_target
+  stpr $42:i32 attachinfo:Dbx
+      add:i32
+          $41:i32 attachinfo:
+          intconst:i32 1|0x1
+  goto label _GR__$L8 attachinfo:Dbx
+  ----- BB22 --- rpo:75 -----
+  LABEL:_GR__$L9
+  ATTR:fall_through branch_target
+  return attachinfo:Dbx
+      $44:i32
+==---- DUMP PRSSA Manager '.program' ----==
+==---- DUMP PRSSAMgr:VPR '.program' ----==
+==---- DUMP PRSSAMgr:VPR REF '.program' ----==
+----- BB3 --- rpo:0 -----
+ATTR:entry_bb fall_through
+----- BB1 --- rpo:5 -----
+ATTR:fall_through
+    ------------------
+    region 's86',id:2 attachinfo:Dbx
+    VP:-- <= --
+==---- DUMP Dominator Frontier Control Set ----==
+
+BB1 DF set:
+BB3 DF set:
+==---- DUMP MDSSA Manager '.program' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.all_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var62(#DedicatedStringVar):global,,addr_taken,has_init_val,unallocable,align(4),string("DedicatedVarBeRegardedAsString"),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD5 -- base:Var58(.program):global,func,any,mem_size:ANY,decl:'' -- ofst:unbound
+  MD6 -- base:Var59(g):global,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD7 -- base:Var60(s86):global,func,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:48
+  MD9 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:4
+  MD10 -- base:Var65(j):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD14 -- base:Var63(lrc):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD15 -- base:Var64(i):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- start:0 -- end:48 -- range
+  ==-- DUMP MDSSAMgr VOpndRef '.program' --==
+
+  --- BB3 ---
+  --- BB1 ---
+
+  region 's86',id:2 attachinfo:Dbx
+  ==-- DUMP MDSSAMgr DU CHAIN '.program' --==
+
+  ----- BB3 --- rpo:0 -----
+  ATTR:entry_bb fall_through
+  ----- BB1 --- rpo:5 -----
+  ATTR:fall_through
+  region 's86',id:2 attachinfo:Dbx
+==---- DUMP MDSSA Manager '.program' ----==
+  ==---- DUMP NON-PR MD ----==
+  MD1 -- base:Var1(.all_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,unallocable,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var62(#DedicatedStringVar):global,,addr_taken,has_init_val,unallocable,align(4),string("DedicatedVarBeRegardedAsString"),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD5 -- base:Var58(.program):global,func,any,mem_size:ANY,decl:'' -- ofst:unbound
+  MD6 -- base:Var59(g):global,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD7 -- base:Var60(s86):global,func,align(4),pointer,pt_base_sz:4,*,mem_size:4,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:48
+  MD9 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- ofst:0 -- size:4
+  MD10 -- base:Var65(j):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD14 -- base:Var63(lrc):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD15 -- base:Var64(i):local,align(4),i32,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var61(y2):global,private,array,align(4),mc,mem_size:48,decl:'' -- start:0 -- end:48 -- range
+  ==-- DUMP MDSSAMgr VOpndRef '.program' --==
+
+  --- BB3 ---
+  --- BB1 ---
+
+  region 's86',id:2 attachinfo:Dbx
+  ==-- DUMP MDSSAMgr DU CHAIN '.program' --==
+
+  ----- BB3 --- rpo:0 -----
+  ATTR:entry_bb fall_through
+  ----- BB1 --- rpo:5 -----
+  ATTR:fall_through
+  region 's86',id:2 attachinfo:Dbx

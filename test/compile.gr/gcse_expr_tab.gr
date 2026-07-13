@@ -1,0 +1,29 @@
+region program "x"() {
+    var array:mc<128>:(align(4));
+    var foo:any:(func,align(4));
+    region func foo() {
+        stpr $arrptr:*<1> = lda array;
+        stpr $x:i32 = 62:i32;
+        stpr $y:i32 = 83:i32;
+
+        label L1;
+        ist:u32:32 = $arrptr:*<1>, $x:i32; //S1
+
+        label L2;
+        stpr $31:u32 = ild:u32:32 $arrptr:*<1>; //S2
+
+        label L3;
+        ist:u64:30 = $arrptr:*<1>, $y:i32; //S3, NOTE The IST is aliased with S1
+
+        label L4;
+        stpr $66:u32 = ild:u32:32 $arrptr:*<1>; //S4. The DEF of ILD is actually
+                                                //S2. Thus even if the VN of
+                                                //$arrptr is same with ild in
+                                                //S2, we can not regard ILD in
+                                                //S2 is CSE of ILD in S4.
+
+        label L5;
+        return add $31, $66;
+    }
+}
+

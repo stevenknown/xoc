@@ -1,0 +1,77 @@
+
+==---- DUMP Loop Invariant Code Motion 'itrans_sp_chroma' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'itrans_sp_chroma' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+-- INVARIANT EXP (NUM=5) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'qp_rem' attachinfo:Dbx,MDSSA
+   ld:i32 'qp_per' attachinfo:Dbx,MDSSA
+
+-- HOIST CAND EXP (NUM=5) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'qp_rem' attachinfo:Dbx,MDSSA
+   ld:i32 'qp_per' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:i32 'qp_rem' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:i32 'qp_per' attachinfo:Dbx,MDSSA
+
+==---- DUMP Redundant Code Elimination ----==
+  REMOVE EDGE: BB1->BB12
+  CHANGE:
+  OLD:
+  falsebr label _$L3 attachinfo:Dbx
+  NEW:
+  REMOVE EDGE: BB13->BB16
+  CHANGE:
+  OLD:
+  falsebr label _$L5 attachinfo:Dbx
+  NEW:
+==---- DUMP Loop Invariant Code Motion 'itrans_sp_chroma' ----==
+==---- DUMP LICM Analysis Result : LoopInfo2 : 'itrans_sp_chroma' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP2 HEAD:BB2, BODY:2,3,
+-- INVARIANT EXP (NUM=7) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   mul:u32       
+       $51:i32       
+       intconst:u32 16|0x10
+   $51:i32
+   $64:u32
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   $52:i32
+-- INVARIANT STMT (NUM=1) -- :
+   stpr $64:u32       
+       mul:u32           
+           $51:i32           
+           intconst:u32 16|0x10
+-- HOIST CAND EXP (NUM=4) -- :
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   mul:u32       
+       $51:i32       
+       intconst:u32 16|0x10
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:i32 'j' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  stpr $64:u32
+-- HOISTED IR: --
+  ld:i32 'j' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:i32 'j' attachinfo:Dbx,MDSSA
+
+==---- DUMP Redundant Code Elimination ----==
+  REMOVE EDGE: BB19->BB20
+  CHANGE:
+  OLD:
+  falsebr label _$L7
+  NEW:

@@ -1,0 +1,13 @@
+
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:45) THAT LOCATED IN STMT:
+    stpr $4:f64 attachinfo:Dbx        
+        cvt:f64 attachinfo:Dbx            
+            $9:f32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    $5:i32 = call 'printf' decl:void  printf (unsigned char const * ,...,)  attachinfo:Dbx,MDSSA
+        lda:*<4> '_const_string_1' param0 attachinfo:Dbx
+        $12:f64 param1
+        $4:f64 param2 attachinfo:Dbx
+        ild:any dummy0 attachinfo:MDSSA            
+            intconst:any 0|0x0

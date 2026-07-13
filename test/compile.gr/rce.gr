@@ -1,0 +1,20 @@
+region program "program" () {
+    region func main () {
+        var b1:mc<16>:(array,align(4));
+        var b0:mc<16>:(array,align(4));
+        starray:u32:0:(dim[4]) =
+            lda b1, (0x0:i32),
+            cvt:u8
+               select:u32
+                   eq:bool 0x0:i32, 0x0:i32,
+                   array:u32:0:(dim[4])
+                       lda b0, (6),
+                   select:u32
+                       eq:bool 0x0:i32, 0x0:i32,
+                       array:u32:0:(dim[4])
+                           lda b0, (6),
+                       array:u32:0:(dim[4])
+                           lda b0, (7);;
+        return $105:u64;
+    };
+}

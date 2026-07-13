@@ -1,0 +1,135 @@
+
+==---- DUMP Loop Invariant Code Motion 'scalar' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'scalar' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB2, BODY:2,3,
+-- INVARIANT EXP (NUM=31) -- :
+   mul:i32       
+       add:i32 attachinfo:Dbx           
+           mul:i32 attachinfo:Dbx               
+               ld:i32 'i' attachinfo:Dbx,MDSSA               
+               ld:i32 'n' attachinfo:Dbx,MDSSA           
+           ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:i32 8|0x8
+   intconst:i32 8|0x8
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       ld:i32 'm' attachinfo:Dbx,MDSSA
+   ld:*<8> 'a' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:*<8> 'c' attachinfo:Dbx,MDSSA
+   ld:*<8> 'c' attachinfo:Dbx,MDSSA
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   add:*<8>       
+       ld:*<8> 'c' attachinfo:Dbx,MDSSA       
+       mul:i32           
+           add:i32 attachinfo:Dbx               
+               mul:i32 attachinfo:Dbx                   
+                   ld:i32 'i' attachinfo:Dbx,MDSSA                   
+                   ld:i32 'n' attachinfo:Dbx,MDSSA               
+               ld:i32 'j' attachinfo:Dbx,MDSSA           
+           intconst:i32 8|0x8
+   add:i32 attachinfo:Dbx       
+       mul:i32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           ld:i32 'n' attachinfo:Dbx,MDSSA       
+       ld:i32 'j' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'n' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   ld:i32 'o' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   intconst:i32 1|0x1
+   ld:i32 'm' attachinfo:Dbx,MDSSA
+   ld:*<8> 'b' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'n' attachinfo:Dbx,MDSSA
+   ld:i32 'i' attachinfo:Dbx,MDSSA
+   ild:f64 attachinfo:Dbx,MDSSA       
+       add:*<8>           
+           ld:*<8> 'c' attachinfo:Dbx,MDSSA           
+           mul:i32               
+               add:i32 attachinfo:Dbx                   
+                   mul:i32 attachinfo:Dbx                       
+                       ld:i32 'i' attachinfo:Dbx,MDSSA                       
+                       ld:i32 'n' attachinfo:Dbx,MDSSA                   
+                   ld:i32 'j' attachinfo:Dbx,MDSSA               
+               intconst:i32 8|0x8
+   intconst:i32 8|0x8
+   ld:i32 'j' attachinfo:Dbx,MDSSA
+   add:i32 attachinfo:Dbx       
+       mul:i32 attachinfo:Dbx           
+           ld:i32 'i' attachinfo:Dbx,MDSSA           
+           ld:i32 'n' attachinfo:Dbx,MDSSA       
+       ld:i32 'j' attachinfo:Dbx,MDSSA
+   add:*<8>       
+       ld:*<8> 'c' attachinfo:Dbx,MDSSA       
+       mul:i32           
+           add:i32 attachinfo:Dbx               
+               mul:i32 attachinfo:Dbx                   
+                   ld:i32 'i' attachinfo:Dbx,MDSSA                   
+                   ld:i32 'n' attachinfo:Dbx,MDSSA               
+               ld:i32 'j' attachinfo:Dbx,MDSSA           
+           intconst:i32 8|0x8
+   intconst:i32 8|0x8
+   intconst:i32 8|0x8
+   ld:i32 'n' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'n' attachinfo:Dbx,MDSSA
+   mul:i32       
+       add:i32 attachinfo:Dbx           
+           mul:i32 attachinfo:Dbx               
+               ld:i32 'i' attachinfo:Dbx,MDSSA               
+               ld:i32 'n' attachinfo:Dbx,MDSSA           
+           ld:i32 'j' attachinfo:Dbx,MDSSA       
+       intconst:i32 8|0x8
+
+-- HOIST CAND (NUM=7) -- :
+   ld:*<8> 'a' attachinfo:Dbx,MDSSA
+   ld:*<8> 'b' attachinfo:Dbx,MDSSA
+   ld:i32 'o' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'j' attachinfo:Dbx,MDSSA       
+       ld:i32 'm' attachinfo:Dbx,MDSSA
+   mul:i32 attachinfo:Dbx       
+       ld:i32 'i' attachinfo:Dbx,MDSSA       
+       ld:i32 'n' attachinfo:Dbx,MDSSA
+   ild:f64 attachinfo:Dbx,MDSSA       
+       add:*<8>           
+           ld:*<8> 'c' attachinfo:Dbx,MDSSA           
+           mul:i32               
+               add:i32 attachinfo:Dbx                   
+                   mul:i32 attachinfo:Dbx                       
+                       ld:i32 'i' attachinfo:Dbx,MDSSA                       
+                       ld:i32 'n' attachinfo:Dbx,MDSSA                   
+                   ld:i32 'j' attachinfo:Dbx,MDSSA               
+               intconst:i32 8|0x8
+   add:*<8>       
+       ld:*<8> 'c' attachinfo:Dbx,MDSSA       
+       mul:i32           
+           add:i32 attachinfo:Dbx               
+               mul:i32 attachinfo:Dbx                   
+                   ld:i32 'i' attachinfo:Dbx,MDSSA                   
+                   ld:i32 'n' attachinfo:Dbx,MDSSA               
+               ld:i32 'j' attachinfo:Dbx,MDSSA           
+           intconst:i32 8|0x8
+-- HOISTED IR: --
+  ld:*<8> 'a' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:*<8> 'b' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  ld:i32 'o' attachinfo:Dbx,MDSSA
+-- HOISTED IR: --
+  mul:i32 attachinfo:Dbx
+-- HOISTED IR: --
+  mul:i32 attachinfo:Dbx
+-- HOISTED IR: --
+  add:*<8>
+-- HOISTED IR: --
+  add:*<8>

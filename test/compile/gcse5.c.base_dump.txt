@@ -1,0 +1,16 @@
+
+==---- DUMP Global Command Subexpression Elimination 'dgefa' ----==
+NumOfEliminatedCSE:1
+ELIMINATED IR: id:28
+==---- DUMP Global Command Subexpression Elimination 'dgefa' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination 'dgefa' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 

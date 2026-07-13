@@ -1,0 +1,18 @@
+region program program() {
+    var g1:*<1>:(align(4));
+    var g2:i32:(align(4));
+    region func main () {
+        truebr (eq ld g1, ld g2), L2;
+            label L1;
+    	    st g1 = 20;
+            goto IF_END;
+
+        label L2;
+    	    st g2 = 10;
+            goto IF_END;
+
+        label IF_END;
+        phi $1:i32 = ($3, L1), ($3, L2); //redundant phi
+        return add $1:i32, (add ld g1, ld g2);
+    };
+}

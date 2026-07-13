@@ -1,0 +1,25 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var z:i32:(align(4));
+    var w:i32:(align(4));
+    var u:i32:(align(4));
+    var main:*<4>:(func,align(4));
+    var foo:any:(func, align(4));
+    var bar:any:(func, align(4));
+    region func main() {
+        truebr (gt ld c, ld d), L2;
+
+        stpr $5:f64 = 3.14;
+
+        label L1;
+        st u = $2;
+
+        label L2;
+        return $5:f64;
+    };
+}

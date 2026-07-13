@@ -1,0 +1,59 @@
+
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: lda(id:6) THAT LOCATED IN STMT:
+    stpr $7:*<256> attachinfo:Dbx        
+        lda:*<256> 'in0'
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $8:*<1> attachinfo:Dbx        
+        $7:u64
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: lda(id:6) THAT LOCATED IN STMT:
+    stpr $7:*<256> attachinfo:Dbx        
+        lda:*<256> 'in0'
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:mc<64> attachinfo:Dbx,MDSSA        
+        $1:*<1>        
+        ild:mc<64> attachinfo:MDSSA            
+            $7:*<1>
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: lda(id:10) THAT LOCATED IN STMT:
+    stpr $8:*<1> attachinfo:Dbx        
+        lda:*<256> 'in0'
+WILL REPLACE pr THAT LOCATED IN STMT:
+    phi $9:any = 
+        $8:*<1>
+        $10:*<1>
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: lda(id:10) THAT LOCATED IN STMT:
+    stpr $8:*<1> attachinfo:Dbx        
+        lda:*<256> 'in0'
+WILL REPLACE pr THAT LOCATED IN STMT:
+    phi $10:u64 = 
+        $8:*<1>
+        $13:*<1>
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:48) THAT LOCATED IN STMT:
+    phi $9:any = 
+        $10:*<1>
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $13:*<1> attachinfo:Dbx        
+        add:u64            
+            $9:any            
+            intconst:u64 4|0x4
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:57) THAT LOCATED IN STMT:
+    phi $11:u32 = 
+        $12:u32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:u32 attachinfo:Dbx,MDSSA        
+        $13:*<1>        
+        $11:u32
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:57) THAT LOCATED IN STMT:
+    phi $11:u32 = 
+        $12:u32
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $14:u32 attachinfo:Dbx        
+        add:u32            
+            $11:u32            
+            intconst:i32 1|0x1

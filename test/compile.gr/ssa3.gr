@@ -1,0 +1,24 @@
+region program program() {
+    var g:*<1>:(align(4));
+    var g2:*<1>:(align(4));
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var e:i32:(align(4));
+    var main:*<4>:(func,align(4));
+
+    region func main() {
+        falsebr (eq $1:u16, 1), "$ELSE";
+        st:i32 g = ld c;
+        goto "$END";
+        label "$ELSE";
+        st:i32 g = ld b;
+        label "$END";
+        st:i32 g2 = ld e;
+        label "$PHIBBSTART";
+        phi $2:i32 = (0x10, "$END"); //redundant phi
+        st:i32 a = ld e;
+        label "$NEW";
+        return $2; //should be inferred type to i32
+    };
+}

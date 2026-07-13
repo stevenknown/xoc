@@ -1,0 +1,424 @@
+
+==-- START readGRAndConstructRegion
+==-- START IR Parser
+==-- START Parse Region(1):.program
+==-- START Parse Region(2):encrypt
+==-- END  Time:0.147000sec
+==-- START Parse Region(3):set_key
+==-- END  Time:0.001000sec
+==-- START Parse Region(4):decrypt
+==-- END  Time:0.298000sec
+==-- END  Time:0.447000sec
+==-- END IR Parser Time:0.447000sec
+==-- END readGRAndConstructRegion Time:0.447000sec
+==-- START Generate and Print Global Variable
+==-- END Generate and Print Global Variable Time:0.000000sec
+
+==== Start Process Region(id:2)'encrypt' ====
+
+==-- START PreScan
+==-- END PreScan Time:0.003000sec
+==-- START Construct IRBB list
+==-- END Construct IRBB list Time:0.037000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:2.114000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.001000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.002000sec
+==-- START Compute Dom, IDom
+==-- START Compute Rpo
+==-- END Compute Rpo Time:0.008000sec
+==-- END Compute Dom, IDom Time:0.109000sec
+==-- START CFG Optimizations
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.001000sec
+==-- START Remove Redundant Branch
+==-- END Remove Redundant Branch Time:0.003000sec
+==-- END CFG Optimizations Time:0.012000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.068000sec
+==-- END Alias Analysis Time:0.068000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.004000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.003000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF Time:0.008000sec
+==-- START Build Region DefUse MDSet
+==-- END Build Region DefUse MDSet Time:0.001000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.699000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.892000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.646000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.870000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.028000sec
+==-- START Reconstruct IRBB list
+==-- END Reconstruct IRBB list Time:0.003000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.010000sec
+==-- START Compute PDom,IPDom
+==-- END Compute PDom,IPDom Time:0.333000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.038000sec
+==-- END Alias Analysis Time:0.039000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.651000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.900000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.038000sec
+==-- END Alias Analysis Time:0.039000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.005000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.003000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU Time:0.053000sec
+==-- START Build KillSet
+==-- END Build KillSet Time:98.098999sec
+==-- START Solve DU set
+==-- END Solve DU set Time:7.930000sec
+==-- START Build DU-CHAIN
+==-- END Build DU-CHAIN Time:626.607971sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.625000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:1.066000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.017000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.158000sec
+==-- START Reconstruct IRBB list
+==-- END Reconstruct IRBB list Time:0.003000sec
+
+==== Start Process Region(id:3)'set_key' ====
+
+==-- START PreScan
+==-- END PreScan Time:0.001000sec
+==-- START Construct IRBB list
+==-- END Construct IRBB list Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.001000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Compute Dom, IDom
+==-- START Compute Rpo
+==-- END Compute Rpo Time:0.000000sec
+==-- END Compute Dom, IDom Time:0.000000sec
+==-- START CFG Optimizations
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Remove Redundant Branch
+==-- END Remove Redundant Branch Time:0.000000sec
+==-- END CFG Optimizations Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow sensitive analysis
+==-- END Alias Analysis:flow sensitive analysis Time:0.002000sec
+==-- END Alias Analysis Time:0.002000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.001000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.000000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF Time:0.000000sec
+==-- START Build Region DefUse MDSet
+==-- END Build Region DefUse MDSet Time:0.000000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.000000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.000000sec
+==-- START PRSSA: Place phi
+==-- END PRSSA: Place phi Time:0.001000sec
+==-- START PRSSA: Rename
+==-- END PRSSA: Rename Time:0.001000sec
+==-- START PRSSA: Refine phi
+==-- END PRSSA: Refine phi Time:0.001000sec
+==-- START PRSSA: Strip version
+==-- END PRSSA: Strip version Time:0.000000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.000000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.000000sec
+==-- START MDSSA: Place phi
+==-- END MDSSA: Place phi Time:0.001000sec
+==-- START MDSSA: Rename
+==-- END MDSSA: Rename Time:0.000000sec
+==-- START MDSSA: Prune phi
+==-- END MDSSA: Prune phi Time:0.000000sec
+==-- END MDSSA: Construction Time:0.001000sec
+==-- START Refine DefUse Chain
+==-- END Refine DefUse Chain Time:0.000000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.000000sec
+==-- START Compute PDom,IPDom
+==-- END Compute PDom,IPDom Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.000000sec
+==-- END Alias Analysis Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.000000sec
+==-- END Alias Analysis Time:0.000000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.000000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.000000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU Time:0.002000sec
+==-- START Build KillSet
+==-- END Build KillSet Time:0.000000sec
+==-- START Solve DU set
+==-- END Solve DU set Time:0.000000sec
+==-- START Build DU-CHAIN
+==-- END Build DU-CHAIN Time:0.002000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.000000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.000000sec
+==-- START MDSSA: Place phi
+==-- END MDSSA: Place phi Time:0.001000sec
+==-- START MDSSA: Rename
+==-- END MDSSA: Rename Time:0.000000sec
+==-- START MDSSA: Prune phi
+==-- END MDSSA: Prune phi Time:0.000000sec
+==-- END MDSSA: Construction Time:0.001000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.000000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.000000sec
+==-- START Reconstruct IRBB list
+==-- END Reconstruct IRBB list Time:0.000000sec
+
+==== Start Process Region(id:4)'decrypt' ====
+
+==-- START PreScan
+==-- END PreScan Time:0.036000sec
+==-- START Construct IRBB list
+==-- END Construct IRBB list Time:0.022000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:2.194000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.001000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.001000sec
+==-- START Compute Dom, IDom
+==-- START Compute Rpo
+==-- END Compute Rpo Time:0.006000sec
+==-- END Compute Dom, IDom Time:0.116000sec
+==-- START CFG Optimizations
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.002000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.002000sec
+==-- START Remove Redundant Branch
+==-- END Remove Redundant Branch Time:0.003000sec
+==-- END CFG Optimizations Time:0.012000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.070000sec
+==-- END Alias Analysis Time:0.070000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.005000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.003000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF Time:0.009000sec
+==-- START Build Region DefUse MDSet
+==-- END Build Region DefUse MDSet Time:0.002000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.696000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.889000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.615000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.858000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.024000sec
+==-- START Reconstruct IRBB list
+==-- END Reconstruct IRBB list Time:0.002000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.011000sec
+==-- START Compute PDom,IPDom
+==-- END Compute PDom,IPDom Time:0.299000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.046000sec
+==-- END Alias Analysis Time:0.047000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.620000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.866000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.045000sec
+==-- END Alias Analysis Time:0.046000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.004000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.002000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU Time:0.056000sec
+==-- START Build KillSet
+==-- END Build KillSet Time:100.620003sec
+==-- START Solve DU set
+==-- END Solve DU set Time:7.871000sec
+==-- START Build DU-CHAIN
+==-- END Build DU-CHAIN Time:615.715027sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.608000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.856000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.009000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.024000sec
+==-- START Reconstruct IRBB list
+==-- END Reconstruct IRBB list Time:0.003000sec
+==-- START PreScan
+==-- END PreScan Time:0.000000sec
+==-- START Construct IRBB list
+==-- END Construct IRBB list Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Compute Dom, IDom
+==-- START Compute Rpo
+==-- END Compute Rpo Time:0.000000sec
+==-- END Compute Dom, IDom Time:0.000000sec
+==-- START CFG Optimizations
+==-- START Remove Unreach BB
+==-- END Remove Unreach BB Time:0.000000sec
+==-- START Remove Empty BB
+==-- END Remove Empty BB Time:0.000000sec
+==-- START Remove Redundant Branch
+==-- END Remove Redundant Branch Time:0.000000sec
+==-- END CFG Optimizations Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow sensitive analysis
+==-- END Alias Analysis:flow sensitive analysis Time:0.000000sec
+==-- END Alias Analysis Time:0.000000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.000000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.000000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REGION_REF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF Time:0.000000sec
+==-- START Build Region DefUse MDSet
+==-- END Build Region DefUse MDSet Time:0.000000sec
+==-- START PRSSA: Extract Dom Tree
+==-- END PRSSA: Extract Dom Tree Time:0.000000sec
+==-- START PRSSA: Build dominance frontier
+==-- END PRSSA: Build dominance frontier Time:0.000000sec
+==-- START PRSSA: Place phi
+==-- END PRSSA: Place phi Time:0.000000sec
+==-- START PRSSA: Rename
+==-- END PRSSA: Rename Time:0.000000sec
+==-- START PRSSA: Refine phi
+==-- END PRSSA: Refine phi Time:0.000000sec
+==-- START PRSSA: Strip version
+==-- END PRSSA: Strip version Time:0.000000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.000000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.000000sec
+==-- START MDSSA: Place phi
+==-- END MDSSA: Place phi Time:0.000000sec
+==-- START MDSSA: Rename
+==-- END MDSSA: Rename Time:0.000000sec
+==-- START MDSSA: Prune phi
+==-- END MDSSA: Prune phi Time:0.000000sec
+==-- END MDSSA: Construction Time:0.000000sec
+==-- START Refine DefUse Chain
+==-- END Refine DefUse Chain Time:0.000000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.000000sec
+==-- START Compute PDom,IPDom
+==-- END Compute PDom,IPDom Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.000000sec
+==-- END Alias Analysis Time:0.000000sec
+==-- START Alias Analysis
+==-- START Alias Analysis:flow insensitive analysis
+==-- END Alias Analysis:flow insensitive analysis Time:0.000000sec
+==-- END Alias Analysis Time:0.000000sec
+==-- START Build DU ref
+==-- END Build DU ref Time:0.000000sec
+==-- START Allocate May/Must MDS table
+==-- END Allocate May/Must MDS table Time:0.000000sec
+==-- START Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU
+==-- END Build MustDef, MayDef, MayUse: DUOPT_SOL_REACH_DEF, DUOPT_COMPUTE_PR_REF, DUOPT_COMPUTE_NONPR_REF, DUOPT_COMPUTE_PR_DU, DUOPT_COMPUTE_NONPR_DU Time:0.000000sec
+==-- START Build KillSet
+==-- END Build KillSet Time:0.000000sec
+==-- START Solve DU set
+==-- END Solve DU set Time:0.000000sec
+==-- START Build DU-CHAIN
+==-- END Build DU-CHAIN Time:0.000000sec
+==-- START MDSSA: Construction
+==-- START MDSSA: Extract Dom Tree
+==-- END MDSSA: Extract Dom Tree Time:0.000000sec
+==-- START MDSSA: Build dominance frontier
+==-- END MDSSA: Build dominance frontier Time:0.000000sec
+==-- START MDSSA: Place phi
+==-- END MDSSA: Place phi Time:0.000000sec
+==-- START MDSSA: Rename
+==-- END MDSSA: Rename Time:0.000000sec
+==-- START MDSSA: Prune phi
+==-- END MDSSA: Prune phi Time:0.000000sec
+==-- END MDSSA: Construction Time:0.000000sec
+==-- START Refine IRBB list
+==-- END Refine IRBB list Time:0.000000sec
+==-- START Simplify IRBB list
+==-- END Simplify IRBB list Time:0.000000sec
+==-- END Total Time To Compile 'd:\x\test\compile.gr\array_and_compute_sensitive_code.pr_mode.gr' Time:1564.407959sec
+==-- START Delete Region1
+==-- END Delete Region Time:0.013000sec
+==-- START Delete Region2
+==-- END Delete Region Time:0.634000sec
+==-- START Delete Region3
+==-- END Delete Region Time:0.004000sec
+==-- START Delete Region4
+==-- END Delete Region Time:0.288000sec
+==-- START Compile GR File

@@ -1,0 +1,25 @@
+region program "program" ()
+{
+    var foo:any:(func,align(4));
+    region func foo (undefined,var a:*<1024>:(align(4)))
+    {
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        stpr $6:i32 = ld j;
+        stpr $7:i32 = ld:*<1024> a;
+        stpr $13:i32 = 0;
+        label "$L1";
+        stpr $9:vec<f32*4> = $13:vec<f32*4>;
+        falsebr (lt $9, 16), "$L2";
+        stpr $3:vec<f32*4> = mul $9:vec<f32*4>, 16;
+        stpr $4:vec<f32*4> = add $6, $3:vec<f32*4>;
+        stpr $5:vec<f32*4> = mul $4:vec<f32*4>, 4;
+        stpr $12:vec<f16*4> = add:vec<f16*4> $7:i32, $5:vec<f32*4>;
+        ist:vec<f16*4> = $7:*<4>, $12;
+        stpr $11:i32 = add $9, 1;
+        stpr $13 = $11;
+        goto "$L1";
+        label "$L2";
+        return;
+    };
+}

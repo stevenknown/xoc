@@ -1,0 +1,26 @@
+region program "program" () {
+    region func main () {
+        var x:u8:(align(4));
+        var y:u8:(align(4));
+        var z:u8:(align(4));
+        if (eq $3:i8, $4:u64) {
+    	    st x = 100; //x is local to BB, def at BB, use at BB
+    	    stpr $1 = ld x;
+    	    st y = 300; //y is global to BB, def at BB, use at other BB
+    	    st z = 400; //z is global to BB, def at BB, use at other BB
+
+            label TEST1;
+    	    stpr $10 = ld y;
+        } else {
+    	    st x = 10;
+    	    stpr $2 = ld x;
+    	    st y = 500; //y is global to BB, def at BB, use at other BB
+    	    st z = 600; //z is global to BB, def at BB, use at other BB
+
+            label TEST2;
+    	    stpr $10 = ld y;
+        }
+        stpr $9 = sub $10, ld z;
+        return $9;
+    };
+}

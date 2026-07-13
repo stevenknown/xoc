@@ -1,0 +1,14 @@
+region program program () {
+    var g:i32:(align(4));
+    var m:i32:(align(4));
+    var n:i32:(align(4));
+    region func foo() {
+        truebr (eq ld m, ld n), L2;
+        goto L1;
+    	st g = add $1, $2; //unreachable
+        label L1;
+        goto L1; //a dead-cycle loop that have NO effect, can be removed.
+        label L2;
+    	return $3:bool;
+    };
+}

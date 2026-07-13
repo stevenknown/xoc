@@ -1,0 +1,27 @@
+region program program() {
+    var g:i32:(align(4));
+    var m:f64:(align(4));
+    var main:i32:(func,align(4));
+    var printf:i8:(func,align(4));
+    var _const_string_1:str:(align(4),string("
+i=%d,g=%d
+"));
+    region func foo(var base:*<1>:(align(4))) {
+        var i:i8:(align(4));
+        st i = 0;
+        label LOOP_START;
+            ist = ld base, ld i;
+            st i = add ld i, 1;
+            truebr eq ld i, 100, L1; 
+            goto LOOP_START;
+
+        label L1; 
+        call printf(lda _const_string_1, ld:i8 i, ld:i32 g);
+        return sub ld:i8 i, 100;
+    };
+    region func main() {
+        stpr $addr:*<1> = lda g;
+        call $ret:u32 = foo($addr);
+        return $ret;
+    }
+}

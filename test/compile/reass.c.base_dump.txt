@@ -1,0 +1,53 @@
+
+==---- DUMP Alge Reasscociation 'foo' ----==
+-- ACTMGR --
+  ACT1:GID1:REASS:fold 'mul' 
+    div:i32      
+        intconst:i32 1|0x1      
+        intconst:i32 20|0x14 attachinfo:Dbx,
+    intconst:i32 40|0x28 attachinfo:Dbx 
+    into
+    intconst:i32 2|0x2
+  ACT2:GID2:REASS:replace 
+    div:i32 attachinfo:Dbx      
+        $1:i32 attachinfo:Dbx      
+        intconst:i32 20|0x14 attachinfo:Dbx 
+    with 
+    mul:i32      
+        ld:i32 'g' attachinfo:Dbx      
+        intconst:i32 2|0x2
+  ACT3:GID3:REASS:simplify 
+
+    [39]    int c = g * 40 / 20;
+    
+    st:i32 'c' attachinfo:Dbx,MDSSA      
+        mul:i32          
+            ld:i32 'g' attachinfo:MDSSA,Dbx          
+            intconst:i32 2|0x2 
+    to lowest height.
+==---- DUMP Alge Reasscociation 'bar' ----==
+-- ACTMGR --
+  ACT1:GID4:REASS:fold 'mul' 
+    intconst:i32 40|0x28 attachinfo:Dbx,
+    div:i32      
+        intconst:i32 1|0x1      
+        intconst:i32 20|0x14 attachinfo:Dbx 
+    into
+    intconst:i32 2|0x2
+  ACT2:GID5:REASS:replace 
+    mul:i32 attachinfo:Dbx      
+        $1:i32 attachinfo:Dbx      
+        intconst:i32 40|0x28 attachinfo:Dbx 
+    with 
+    mul:i32      
+        ld:i32 'g' attachinfo:Dbx      
+        intconst:i32 2|0x2
+  ACT3:GID6:REASS:simplify 
+
+    [44]    int c = g / 20 * 40;
+    
+    st:i32 'c' attachinfo:Dbx,MDSSA      
+        mul:i32          
+            ld:i32 'g' attachinfo:MDSSA,Dbx          
+            intconst:i32 2|0x2 
+    to lowest height.

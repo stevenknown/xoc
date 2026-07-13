@@ -1,0 +1,39 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var s81:any:(func,align(4));
+    region func s81 () {
+        var k:i32:(align(4));
+        var j:i32:(align(4));
+        var prc:i32:(align(4));
+        var rptr:*<4>:(align(4));
+        var nrptr:*<4>:(align(4));
+        st:i32 prc = 0:i32;
+        st:i32 k = 1:i32;
+        st:i32 j = 0:i32;
+
+        label "_GR__$L1";
+        falsebr (
+            lt:bool 
+                ld:i32 j, 50:i32), "_GR__$L2";
+        st:*<4> rptr = 
+            lda k;
+        st:*<4> nrptr = 
+            lda k;
+        st:i32 k = 
+            lsl:i32 
+                ld:i32 k, 1:i32;
+        stpr $2:i32 = 
+            ld:i32 j;
+        st:i32 j = 
+            add:i32 
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        falsebr (
+            ne:bool 
+                ld:i32 prc, 0:i32), "_GR__$L4";
+        st:i32 g = 1:i32;
+        label "_GR__$L4";
+        return ;
+    };
+}

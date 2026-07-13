@@ -1,0 +1,16 @@
+region program ".program" () {
+    var p:*<4>:(align(4));
+    var q:*<40>:(align(4));
+    var foo:*<4>:(func,align(4));
+
+    region func foo () {
+        var a:mc<40>:(array,align(4));
+        st:*<4> p = lda a;
+        ist:i32 = (add:*<4> (ld:*<4> p), 4),  20;
+        st:*<40> q = lda a;
+        starray:i32:0:(dim[10]) = (ld:*<40> q), (2), 40;
+        return add:i32 //after opt, will be: return 60;
+                 ild:i32:4 (ld:*<4> p),
+                 array:i32:0:(dim[10]) (ld:*<40> q), (2:i32);
+    };
+}

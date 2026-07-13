@@ -1,0 +1,21 @@
+region program zoo () {
+region func foo (undefined,var count:i32:(align(4)),var to:*<2>:(align(4)),var from:*<2>:(align(4))) {
+
+    stpr $6:bool = 
+        gt:bool 
+            ld:i32 count, 0:i32;
+    stpr $5:*<2> = 
+        ld:*<2> to;
+    label "_GR__$L3";
+    stpr $3:*<2> = 
+        ld:*<2> from;
+    ist:i16 = 
+        $5:*<2>,
+        ild:i16 
+            $3:*<2>;
+    st:*<2> from = 
+        add:*<2> 
+            ld:*<2> from, 2:u32;
+    goto "_GR__$L3";
+}
+}

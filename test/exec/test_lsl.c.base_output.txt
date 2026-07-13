@@ -1,0 +1,3 @@
+
+ --- test_16bit_lsl ()
+res=0,x=ffffffff

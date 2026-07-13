@@ -1,0 +1,22 @@
+
+==---- DUMP Global Command Subexpression Elimination 'itrans_sp' ----==
+NumOfEliminatedCSE:3
+ELIMINATED IR: id:232,id:162,id:199
+==---- DUMP Global Command Subexpression Elimination 'itrans_sp' ----==
+NumOfEliminatedCSE:3
+ELIMINATED IR: id:152,id:153,id:158
+==---- DUMP Global Command Subexpression Elimination 'itrans_sp' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination 'itrans_sp' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination 'itrans_sp' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 
+==---- DUMP Global Command Subexpression Elimination '.program' ----==
+NumOfEliminatedCSE:0
+ELIMINATED IR: 

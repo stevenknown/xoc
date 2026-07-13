@@ -1,0 +1,27 @@
+region program "x"() {
+    var array:mc<128>:(align(4));
+    var foo:any:(func,align(4));
+    var zoo:any:(func,align(4),readonly);
+    region func foo() {
+        stpr $arrptr:*<1> = lda array;
+        stpr $x:i32 = 62:i32;
+        stpr $y:i32 = 83:i32;
+
+        label L1;
+        ist:u32:32 = $arrptr:*<1>, $x:i32; //S1
+
+        label L2;
+        stpr $31:u32 = ild:u32:32 $arrptr:*<1>; //S2
+
+        label L3;
+        call:(readonly) zoo();
+
+        label L4;
+        //ILD in S2 is CSE of ILD in S4.
+        stpr $66:u32 = ild:u32:32 $arrptr:*<1>; //S4
+
+        label L5;
+        return add $31, $66;
+    }
+}
+

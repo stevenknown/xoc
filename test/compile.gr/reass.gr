@@ -1,0 +1,2135 @@
+region program ".program" () {
+    var printf:any:(func,decl,align(4));
+    var exit:any:(func,decl,align(4));
+    var malloc:any:(func,decl,align(4));
+    var memset:any:(func,decl,align(4));
+    var memcmp:any:(func,decl,align(4));
+    var open:any:(func,decl,align(4));
+    var read:any:(func,decl,align(4));
+    var close:any:(func,decl,align(4));
+    var p:*<1>:(align(4));
+    var lp:*<1>:(align(4));
+    var data:*<1>:(align(4));
+    var e:*<4>:(align(4));
+    var le:*<4>:(align(4));
+    var id:*<4>:(align(4));
+    var sym:*<4>:(align(4));
+    var tk:i32:(align(4));
+    var ival:i32:(align(4));
+    var ty:i32:(align(4));
+    var loc:i32:(align(4));
+    var line:i32:(align(4));
+    var src:i32:(align(4));
+    var debug:i32:(align(4));
+    var next:any:(func,decl,align(4));
+    var expr:any:(func,align(4));
+    var _const_string_1:str:(align(4),string("aaa"));
+    var _const_string_2:str:(align(4),string("bbb"));
+    var _const_string_3:str:(align(4),string("bbb"));
+    var _const_string_4:str:(align(4),string("bbb"));
+    var _const_string_5:str:(align(4),string("bbb"));
+    var _const_string_6:str:(align(4),string("bbb"));
+    var _const_string_7:str:(align(4),string("bbb"));
+    var _const_string_8:str:(align(4),string("bbb"));
+    var _const_string_9:str:(align(4),string("bbb"));
+    var _const_string_10:str:(align(4),string("bbb"));
+    var _const_string_11:str:(align(4),string("bbb"));
+    var _const_string_12:str:(align(4),string("bbb"));
+    var _const_string_13:str:(align(4),string("bbb"));
+    var _const_string_14:str:(align(4),string("bbb"));
+    var _const_string_15:str:(align(4),string("bbb"));
+    var _const_string_16:str:(align(4),string("bbb"));
+    var _const_string_17:str:(align(4),string("bbb"));
+    region func expr (undefined,var lev:i32:(align(4))) {
+        var t:i32:(align(4));
+        var d:*<4>:(align(4));
+        truebr (
+            ne:bool 
+                ld:i32 tk, 0:i32), "_GR__$L1";
+        call:(use(
+            ild:any 0:any)) $822:i32 = printf(
+            lda _const_string_1,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $823:i32 = exit(-1:i32);
+        goto "_GR__$L71";
+        label "_GR__$L1";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 128:i32), "_GR__$L3";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ld:i32 ival;
+        call:(use(
+            ild:any 0:any)) $838:i32 = next();
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L3";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 34:i32), "_GR__$L5";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ld:i32 ival;
+        call:(use(
+            ild:any 0:any)) $853:i32 = next();
+        label "_GR__$L6";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 34:i32), "_GR__$L7";
+        call:(use(
+            ild:any 0:any)) $854:i32 = next();
+        goto "_GR__$L6";
+        label "_GR__$L7";
+        stpr $855:i32 = 
+            cvt:i32 
+                ld:*<1> data;
+        stpr $856:u32 = 
+            add:u32 
+                $855:i32, 4:u32;
+        stpr $857:u32 = 
+            band:u32 
+                $856:u32, 4294967292:u32;
+        st:*<1> data = 
+            cvt:*<1> 
+                $857:u32;
+        st:i32 ty = 2:i32;
+        goto "_GR__$L71";
+        label "_GR__$L5";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 140:i32), "_GR__$L9";
+        call:(use(
+            ild:any 0:any)) $872:i32 = next();
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 40:i32), "_GR__$L10";
+        call:(use(
+            ild:any 0:any)) $873:i32 = next();
+        goto "_GR__$L11";
+        label "_GR__$L10";
+        call:(use(
+            ild:any 0:any)) $874:i32 = printf(
+            lda _const_string_2,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $875:i32 = exit(-1:i32);
+        label "_GR__$L11";
+        st:i32 ty = 1:i32;
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 138:i32), "_GR__$L12";
+        call:(use(
+            ild:any 0:any)) $876:i32 = next();
+        goto "_GR__$L14";
+        label "_GR__$L12";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 134:i32), "_GR__$L14";
+        call:(use(
+            ild:any 0:any)) $877:i32 = next();
+        st:i32 ty = 0:i32;
+        label "_GR__$L14";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 159:i32), "_GR__$L16";
+        call:(use(
+            ild:any 0:any)) $878:i32 = next();
+        st:i32 ty = 
+            add:i32 
+                ld:i32 ty, 2:i32;
+        goto "_GR__$L14";
+        label "_GR__$L16";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 41:i32), "_GR__$L17";
+        call:(use(
+            ild:any 0:any)) $879:i32 = next();
+        goto "_GR__$L18";
+        label "_GR__$L17";
+        call:(use(
+            ild:any 0:any)) $880:i32 = printf(
+            lda _const_string_3,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $881:i32 = exit(-1:i32);
+        label "_GR__$L18";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 16:u32;
+        stpr $882:bool = 
+            eq:bool 
+                ld:i32 ty, 0:i32;
+        stpr $883:bool = 
+            eq:bool 
+                $882:bool, 0:bool;
+        stpr $884:bool = 
+            ne:bool 
+                $883:bool, 0:bool;
+        stpr $885:u32 = 
+            select:u32
+                ne:bool 
+                    $884:bool, 0:bool,4:u32,
+                                      undefined;
+        stpr $886:bool = 
+            ne:bool 
+                $883:bool, 0:bool;
+        stpr $887:u32 = 
+            select:u32
+                ne:bool 
+                    $886:bool, 0:bool, undefined,1:u32;
+        stpr $888:bool = 
+            ne:bool 
+                $883:bool, 0:bool;
+        stpr $1821:bool = 
+            eq:bool 
+                $888:bool, 0:bool;
+        stpr $890:u32 = 
+            select:u32
+                ne:bool 
+                    $1821:bool, 0:bool,
+                $887:u32,undefined;
+        stpr $889:u32 = 
+            select:u32
+                ne:bool 
+                    $1821:bool, 0:bool, undefined,
+                $885:u32;
+        stpr $1822:u32 = 
+            select:u32
+                ne:bool 
+                    $1821:bool, 0:bool,
+                $890:u32,
+                $889:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1822:u32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L9";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 133:i32), "_GR__$L20";
+        st:*<4> d = 
+            ld:*<4> id;
+        call:(use(
+            ild:any 0:any)) $907:i32 = next();
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 40:i32), "_GR__$L21";
+        call:(use(
+            ild:any 0:any)) $908:i32 = next();
+        st:i32 t = 0:i32;
+        label "_GR__$L22";
+        truebr (
+            eq:bool 
+                ld:i32 tk, 41:i32), "_GR__$L23";
+        call:(use(
+            ild:any 0:any)) $909:i32 = expr(142:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:i32 t = 
+            add:i32 
+                ld:i32 t, 1:i32;
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 44:i32), "_GR__$L22";
+        call:(use(
+            ild:any 0:any)) $910:i32 = next();
+        goto "_GR__$L22";
+        label "_GR__$L23";
+        call:(use(
+            ild:any 0:any)) $911:i32 = next();
+        stpr $912:i32 = 
+            ild:i32:12 
+                ld:*<4> d;
+        falsebr (
+            eq:bool 
+                $912:i32, 130:i32), "_GR__$L25";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ild:i32:20 
+                ld:*<4> d;
+        goto "_GR__$L28";
+        label "_GR__$L25";
+        stpr $913:i32 = 
+            ild:i32:12 
+                ld:*<4> d;
+        falsebr (
+            eq:bool 
+                $913:i32, 129:i32), "_GR__$L27";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,3:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ild:i32:20 
+                ld:*<4> d;
+        goto "_GR__$L28";
+        label "_GR__$L27";
+        call:(use(
+            ild:any 0:any)) $914:i32 = printf(
+            lda _const_string_4,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $915:i32 = exit(-1:i32);
+        label "_GR__$L28";
+        stpr $916:bool = 
+            eq:bool 
+                ld:i32 t, 0:i32;
+        stpr $917:bool = 
+            ne:bool 
+                $916:bool, 0:bool;
+        stpr $918:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $917:bool, 0:bool, undefined,
+                $918:*<4>;
+        stpr $919:bool = 
+            ne:bool 
+                $916:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:i32
+                ne:bool 
+                    $919:bool, 0:bool, undefined,7:i32;
+        stpr $920:bool = 
+            ne:bool 
+                $916:bool, 0:bool;
+        stpr $921:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $920:bool, 0:bool, undefined,
+                $921:*<4>;
+        stpr $922:bool = 
+            ne:bool 
+                $916:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:i32
+                ne:bool 
+                    $922:bool, 0:bool, undefined,
+                ld:i32 t;
+        st:i32 ty = 
+            ild:i32:16 
+                ld:*<4> d;
+        goto "_GR__$L71";
+        label "_GR__$L21";
+        stpr $937:i32 = 
+            ild:i32:12 
+                ld:*<4> d;
+        falsebr (
+            eq:bool 
+                $937:i32, 128:i32), "_GR__$L31";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ild:i32:20 
+                ld:*<4> d;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L31";
+        stpr $952:i32 = 
+            ild:i32:12 
+                ld:*<4> d;
+        falsebr (
+            eq:bool 
+                $952:i32, 132:i32), "_GR__$L33";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,0:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $953:i32 = 
+            ild:i32:20 
+                ld:*<4> d;
+        ist:i32 = 
+            ld:*<4> e,
+            sub:i32 
+                ld:i32 loc, 
+                $953:i32;
+        goto "_GR__$L36";
+        label "_GR__$L33";
+        stpr $954:i32 = 
+            ild:i32:12 
+                ld:*<4> d;
+        falsebr (
+            eq:bool 
+                $954:i32, 131:i32), "_GR__$L35";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            ild:i32:20 
+                ld:*<4> d;
+        goto "_GR__$L36";
+        label "_GR__$L35";
+        call:(use(
+            ild:any 0:any)) $955:i32 = printf(
+            lda _const_string_5,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $956:i32 = exit(-1:i32);
+        label "_GR__$L36";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:i32 ty = 
+            ild:i32:16 
+                ld:*<4> d;
+        stpr $957:i32 = 
+            ild:i32:16 
+                ld:*<4> d;
+        stpr $958:bool = 
+            eq:bool 
+                $957:i32, 0:i32;
+        stpr $959:bool = 
+            eq:bool 
+                $958:bool, 0:bool;
+        stpr $960:bool = 
+            ne:bool 
+                $959:bool, 0:bool;
+        stpr $961:i32 = 
+            select:i32
+                ne:bool 
+                    $960:bool, 0:bool,9:i32, undefined;
+        stpr $962:bool = 
+            ne:bool 
+                $959:bool, 0:bool;
+        stpr $963:i32 = 
+            select:i32
+                ne:bool 
+                    $962:bool, 0:bool, undefined,10:i32;
+        stpr $964:bool = 
+            ne:bool 
+                $959:bool, 0:bool;
+        stpr $1823:bool = 
+            eq:bool 
+                $964:bool, 0:bool;
+        stpr $966:i32 = 
+            select:i32
+                ne:bool 
+                    $1823:bool, 0:bool,
+                $963:i32, undefined;
+        stpr $965:i32 = 
+            select:i32
+                ne:bool 
+                    $1823:bool, 0:bool, undefined,
+                $961:i32;
+        stpr $1824:i32 = 
+            select:i32
+                ne:bool 
+                    $1823:bool, 0:bool,
+                $966:i32,
+                $965:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1824:i32;
+        goto "_GR__$L71";
+        label "_GR__$L20";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 40:i32), "_GR__$L38";
+        call:(use(
+            ild:any 0:any)) $983:i32 = next();
+        truebr (
+            eq:bool 
+                ld:i32 tk, 138:i32), "_GR__$L140";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 134:i32), "_GR__$L39";
+        label "_GR__$L140";
+        stpr $984:bool = 
+            eq:bool 
+                ld:i32 tk, 138:i32;
+        stpr $985:bool = 
+            eq:bool 
+                $984:bool, 0:bool;
+        stpr $986:bool = 
+            ne:bool 
+                $985:bool, 0:bool;
+        stpr $987:i32 = 
+            select:i32
+                ne:bool 
+                    $986:bool, 0:bool,0:i32, undefined;
+        stpr $988:bool = 
+            ne:bool 
+                $985:bool, 0:bool;
+        stpr $989:i32 = 
+            select:i32
+                ne:bool 
+                    $988:bool, 0:bool, undefined,1:i32;
+        stpr $990:bool = 
+            ne:bool 
+                $985:bool, 0:bool;
+        stpr $1825:bool = 
+            eq:bool 
+                $990:bool, 0:bool;
+        stpr $992:i32 = 
+            select:i32
+                ne:bool 
+                    $1825:bool, 0:bool,
+                $989:i32, undefined;
+        stpr $991:i32 = 
+            select:i32
+                ne:bool 
+                    $1825:bool, 0:bool, undefined,
+                $987:i32;
+        stpr $1826:i32 = 
+            select:i32
+                ne:bool 
+                    $1825:bool, 0:bool,
+                $992:i32,
+                $991:i32;
+        st:i32 t = 
+            $1826:i32;
+        call:(use(
+            ild:any 0:any)) $995:i32 = next();
+        label "_GR__$L40";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 159:i32), "_GR__$L41";
+        call:(use(
+            ild:any 0:any)) $996:i32 = next();
+        st:i32 t = 
+            add:i32 
+                ld:i32 t, 2:i32;
+        goto "_GR__$L40";
+        label "_GR__$L41";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 41:i32), "_GR__$L42";
+        call:(use(
+            ild:any 0:any)) $997:i32 = next();
+        goto "_GR__$L43";
+        label "_GR__$L42";
+        call:(use(
+            ild:any 0:any)) $998:i32 = printf(
+            lda _const_string_6,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $999:i32 = exit(-1:i32);
+        label "_GR__$L43";
+        call:(use(
+            ild:any 0:any)) $1000:i32 = expr(162:i32);
+        st:i32 ty = 
+            ld:i32 t;
+        goto "_GR__$L71";
+        label "_GR__$L39";
+        call:(use(
+            ild:any 0:any)) $1015:i32 = expr(142:i32);
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 41:i32), "_GR__$L45";
+        call:(use(
+            ild:any 0:any)) $1016:i32 = next();
+        goto "_GR__$L71";
+        label "_GR__$L45";
+        call:(use(
+            ild:any 0:any)) $1031:i32 = printf(
+            lda _const_string_7,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1032:i32 = exit(-1:i32);
+        goto "_GR__$L71";
+        label "_GR__$L38";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 159:i32), "_GR__$L48";
+        call:(use(
+            ild:any 0:any)) $1047:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1048:i32 = expr(162:i32);
+        falsebr (
+            gt:bool 
+                ld:i32 ty, 1:i32), "_GR__$L49";
+        st:i32 ty = 
+            sub:i32 
+                ld:i32 ty, 2:i32;
+        goto "_GR__$L50";
+        label "_GR__$L49";
+        call:(use(
+            ild:any 0:any)) $1049:i32 = printf(
+            lda _const_string_8,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1050:i32 = exit(-1:i32);
+        label "_GR__$L50";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1051:bool = 
+            eq:bool 
+                ld:i32 ty, 0:i32;
+        stpr $1052:bool = 
+            eq:bool 
+                $1051:bool, 0:bool;
+        stpr $1053:bool = 
+            ne:bool 
+                $1052:bool, 0:bool;
+        stpr $1054:i32 = 
+            select:i32
+                ne:bool 
+                    $1053:bool, 0:bool,9:i32, undefined;
+        stpr $1055:bool = 
+            ne:bool 
+                $1052:bool, 0:bool;
+        stpr $1056:i32 = 
+            select:i32
+                ne:bool 
+                    $1055:bool, 0:bool, undefined,10:i32;
+        stpr $1057:bool = 
+            ne:bool 
+                $1052:bool, 0:bool;
+        stpr $1827:bool = 
+            eq:bool 
+                $1057:bool, 0:bool;
+        stpr $1059:i32 = 
+            select:i32
+                ne:bool 
+                    $1827:bool, 0:bool,
+                $1056:i32, undefined;
+        stpr $1058:i32 = 
+            select:i32
+                ne:bool 
+                    $1827:bool, 0:bool, undefined,
+                $1054:i32;
+        stpr $1828:i32 = 
+            select:i32
+                ne:bool 
+                    $1827:bool, 0:bool,
+                $1059:i32,
+                $1058:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1828:i32;
+        goto "_GR__$L71";
+        label "_GR__$L48";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 148:i32), "_GR__$L52";
+        call:(use(
+            ild:any 0:any)) $1076:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1077:i32 = expr(162:i32);
+        stpr $1078:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        truebr (
+            eq:bool 
+                $1078:i32, 10:i32), "_GR__$L145";
+        stpr $1079:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1079:i32, 9:i32), "_GR__$L53";
+        label "_GR__$L145";
+        st:*<4> e = 
+            sub:*<4> 
+                ld:*<4> e, 4:u32;
+        goto "_GR__$L54";
+        label "_GR__$L53";
+        call:(use(
+            ild:any 0:any)) $1080:i32 = printf(
+            lda _const_string_9,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1081:i32 = exit(-1:i32);
+        label "_GR__$L54";
+        st:i32 ty = 
+            add:i32 
+                ld:i32 ty, 2:i32;
+        goto "_GR__$L71";
+        label "_GR__$L52";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 33:i32), "_GR__$L56";
+        call:(use(
+            ild:any 0:any)) $1096:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1097:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,0:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,17:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L56";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 126:i32), "_GR__$L58";
+        call:(use(
+            ild:any 0:any)) $1112:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1113:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,-1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,15:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L58";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 157:i32), "_GR__$L60";
+        call:(use(
+            ild:any 0:any)) $1128:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1129:i32 = expr(162:i32);
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L60";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 158:i32), "_GR__$L62";
+        call:(use(
+            ild:any 0:any)) $1144:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 128:i32), "_GR__$L63";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            neg:i32 
+                ld:i32 ival;
+        call:(use(
+            ild:any 0:any)) $1145:i32 = next();
+        goto "_GR__$L64";
+        label "_GR__$L63";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,-1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1146:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,27:i32;
+        label "_GR__$L64";
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L62";
+        truebr (
+            eq:bool 
+                ld:i32 tk, 162:i32), "_GR__$L146";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 163:i32), "_GR__$L66";
+        label "_GR__$L146";
+        st:i32 t = 
+            ld:i32 tk;
+        call:(use(
+            ild:any 0:any)) $1161:i32 = next();
+        call:(use(
+            ild:any 0:any)) $1162:i32 = expr(162:i32);
+        stpr $1163:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1163:i32, 10:i32), "_GR__$L67";
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,10:i32;
+        goto "_GR__$L70";
+        label "_GR__$L67";
+        stpr $1164:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1164:i32, 9:i32), "_GR__$L69";
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,9:i32;
+        goto "_GR__$L70";
+        label "_GR__$L69";
+        call:(use(
+            ild:any 0:any)) $1165:i32 = printf(
+            lda _const_string_10,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1166:i32 = exit(-1:i32);
+        label "_GR__$L70";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1167:bool = 
+            gt:bool 
+                ld:i32 ty, 2:i32;
+        stpr $1168:bool = 
+            eq:bool 
+                $1167:bool, 0:bool;
+        stpr $1169:bool = 
+            ne:bool 
+                $1168:bool, 0:bool;
+        stpr $1170:u32 = 
+            select:u32
+                ne:bool 
+                    $1169:bool, 0:bool,1:u32, undefined;
+        stpr $1171:bool = 
+            ne:bool 
+                $1168:bool, 0:bool;
+        stpr $1172:u32 = 
+            select:u32
+                ne:bool 
+                    $1171:bool, 0:bool, undefined,4:u32;
+        stpr $1173:bool = 
+            ne:bool 
+                $1168:bool, 0:bool;
+        stpr $1829:bool = 
+            eq:bool 
+                $1173:bool, 0:bool;
+        stpr $1175:u32 = 
+            select:u32
+                ne:bool 
+                    $1829:bool, 0:bool,
+                $1172:u32, undefined;
+        stpr $1174:u32 = 
+            select:u32
+                ne:bool 
+                    $1829:bool, 0:bool, undefined,
+                $1170:u32;
+        stpr $1830:u32 = 
+            select:u32
+                ne:bool 
+                    $1829:bool, 0:bool,
+                $1175:u32,
+                $1174:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1830:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1178:bool = 
+            eq:bool 
+                ld:i32 t, 162:i32;
+        stpr $1179:bool = 
+            eq:bool 
+                $1178:bool, 0:bool;
+        stpr $1180:bool = 
+            ne:bool 
+                $1179:bool, 0:bool;
+        stpr $1181:i32 = 
+            select:i32
+                ne:bool 
+                    $1180:bool, 0:bool,26:i32, undefined;
+        stpr $1182:bool = 
+            ne:bool 
+                $1179:bool, 0:bool;
+        stpr $1183:i32 = 
+            select:i32
+                ne:bool 
+                    $1182:bool, 0:bool, undefined,25:i32;
+        stpr $1184:bool = 
+            ne:bool 
+                $1179:bool, 0:bool;
+        stpr $1831:bool = 
+            eq:bool 
+                $1184:bool, 0:bool;
+        stpr $1186:i32 = 
+            select:i32
+                ne:bool 
+                    $1831:bool, 0:bool,
+                $1183:i32, undefined;
+        stpr $1185:i32 = 
+            select:i32
+                ne:bool 
+                    $1831:bool, 0:bool, undefined,
+                $1181:i32;
+        stpr $1832:i32 = 
+            select:i32
+                ne:bool 
+                    $1831:bool, 0:bool,
+                $1186:i32,
+                $1185:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1832:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1189:bool = 
+            eq:bool 
+                ld:i32 ty, 0:i32;
+        stpr $1190:bool = 
+            eq:bool 
+                $1189:bool, 0:bool;
+        stpr $1191:bool = 
+            ne:bool 
+                $1190:bool, 0:bool;
+        stpr $1192:i32 = 
+            select:i32
+                ne:bool 
+                    $1191:bool, 0:bool,11:i32, undefined;
+        stpr $1193:bool = 
+            ne:bool 
+                $1190:bool, 0:bool;
+        stpr $1194:i32 = 
+            select:i32
+                ne:bool 
+                    $1193:bool, 0:bool, undefined,12:i32;
+        stpr $1195:bool = 
+            ne:bool 
+                $1190:bool, 0:bool;
+        stpr $1833:bool = 
+            eq:bool 
+                $1195:bool, 0:bool;
+        stpr $1197:i32 = 
+            select:i32
+                ne:bool 
+                    $1833:bool, 0:bool,
+                $1194:i32, undefined;
+        stpr $1196:i32 = 
+            select:i32
+                ne:bool 
+                    $1833:bool, 0:bool, undefined,
+                $1192:i32;
+        stpr $1834:i32 = 
+            select:i32
+                ne:bool 
+                    $1833:bool, 0:bool,
+                $1197:i32,
+                $1196:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1834:i32;
+        goto "_GR__$L71";
+        label "_GR__$L66";
+        call:(use(
+            ild:any 0:any)) $1214:i32 = printf(
+            lda _const_string_11,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1215:i32 = exit(-1:i32);
+        label "_GR__$L71";
+        falsebr (
+            ge:bool 
+                ld:i32 tk, 
+                ld:i32 lev), "_GR__$L73";
+        st:i32 t = 
+            ld:i32 ty;
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 142:i32), "_GR__$L74";
+        call:(use(
+            ild:any 0:any)) $1685:i32 = next();
+        stpr $1686:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        truebr (
+            eq:bool 
+                $1686:i32, 10:i32), "_GR__$L153";
+        stpr $1687:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1687:i32, 9:i32), "_GR__$L75";
+        label "_GR__$L153";
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        goto "_GR__$L76";
+        label "_GR__$L75";
+        call:(use(
+            ild:any 0:any)) $1688:i32 = printf(
+            lda _const_string_12,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1689:i32 = exit(-1:i32);
+        label "_GR__$L76";
+        call:(use(
+            ild:any 0:any)) $1690:i32 = expr(142:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:i32 ty = 
+            ld:i32 t;
+        stpr $1691:bool = 
+            eq:bool 
+                ld:i32 t, 0:i32;
+        stpr $1692:bool = 
+            eq:bool 
+                $1691:bool, 0:bool;
+        stpr $1693:bool = 
+            ne:bool 
+                $1692:bool, 0:bool;
+        stpr $1621:i32 = 
+            select:i32
+                ne:bool 
+                    $1693:bool, 0:bool,11:i32, undefined;
+        stpr $1694:bool = 
+            ne:bool 
+                $1692:bool, 0:bool;
+        stpr $1619:i32 = 
+            select:i32
+                ne:bool 
+                    $1694:bool, 0:bool, undefined,12:i32;
+        stpr $1695:bool = 
+            ne:bool 
+                $1692:bool, 0:bool;
+        stpr $1835:bool = 
+            eq:bool 
+                $1695:bool, 0:bool;
+        stpr $1697:i32 = 
+            select:i32
+                ne:bool 
+                    $1835:bool, 0:bool,
+                $1619:i32, undefined;
+        stpr $1696:i32 = 
+            select:i32
+                ne:bool 
+                    $1835:bool, 0:bool, undefined,
+                $1621:i32;
+        stpr $1836:i32 = 
+            select:i32
+                ne:bool 
+                    $1835:bool, 0:bool,
+                $1697:i32,
+                $1696:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1836:i32;
+        goto "_GR__$L71";
+        label "_GR__$L74";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 143:i32), "_GR__$L78";
+        call:(use(
+            ild:any 0:any)) $1699:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,4:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> d = 
+            ld:*<4> e;
+        call:(use(
+            ild:any 0:any)) $1700:i32 = expr(142:i32);
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 58:i32), "_GR__$L79";
+        call:(use(
+            ild:any 0:any)) $1701:i32 = next();
+        goto "_GR__$L80";
+        label "_GR__$L79";
+        call:(use(
+            ild:any 0:any)) $1702:i32 = printf(
+            lda _const_string_13,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1703:i32 = exit(-1:i32);
+        label "_GR__$L80";
+        stpr $1704:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 12:i32;
+        ist:i32 = 
+            ld:*<4> d,
+            cvt:i32 
+                $1704:*<4>;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,2:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> d = 
+            ld:*<4> e;
+        call:(use(
+            ild:any 0:any)) $1705:i32 = expr(143:i32);
+        stpr $1706:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:i32;
+        ist:i32 = 
+            ld:*<4> d,
+            cvt:i32 
+                $1706:*<4>;
+        goto "_GR__$L71";
+        label "_GR__$L78";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 144:i32), "_GR__$L82";
+        call:(use(
+            ild:any 0:any)) $1707:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,5:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> d = 
+            ld:*<4> e;
+        call:(use(
+            ild:any 0:any)) $1708:i32 = expr(145:i32);
+        stpr $1709:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:i32;
+        ist:i32 = 
+            ld:*<4> d,
+            cvt:i32 
+                $1709:*<4>;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L82";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 145:i32), "_GR__$L84";
+        call:(use(
+            ild:any 0:any)) $1710:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,4:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> d = 
+            ld:*<4> e;
+        call:(use(
+            ild:any 0:any)) $1711:i32 = expr(146:i32);
+        stpr $1712:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:i32;
+        ist:i32 = 
+            ld:*<4> d,
+            cvt:i32 
+                $1712:*<4>;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L84";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 146:i32), "_GR__$L86";
+        call:(use(
+            ild:any 0:any)) $1713:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1714:i32 = expr(147:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,14:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L86";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 147:i32), "_GR__$L88";
+        call:(use(
+            ild:any 0:any)) $1715:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1716:i32 = expr(148:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,15:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L88";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 148:i32), "_GR__$L90";
+        call:(use(
+            ild:any 0:any)) $1717:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1718:i32 = expr(149:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,16:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L90";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 149:i32), "_GR__$L92";
+        call:(use(
+            ild:any 0:any)) $1719:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1720:i32 = expr(151:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,17:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L92";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 150:i32), "_GR__$L94";
+        call:(use(
+            ild:any 0:any)) $1721:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1722:i32 = expr(151:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,18:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L94";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 151:i32), "_GR__$L96";
+        call:(use(
+            ild:any 0:any)) $1723:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1724:i32 = expr(155:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,19:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L96";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 152:i32), "_GR__$L98";
+        call:(use(
+            ild:any 0:any)) $1725:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1726:i32 = expr(155:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,20:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L98";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 153:i32), "_GR__$L100";
+        call:(use(
+            ild:any 0:any)) $1727:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1728:i32 = expr(155:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,21:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L100";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 154:i32), "_GR__$L102";
+        call:(use(
+            ild:any 0:any)) $1729:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1730:i32 = expr(155:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,22:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L102";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 155:i32), "_GR__$L104";
+        call:(use(
+            ild:any 0:any)) $1731:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1732:i32 = expr(157:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,23:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L104";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 156:i32), "_GR__$L106";
+        call:(use(
+            ild:any 0:any)) $1733:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1734:i32 = expr(157:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,24:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L106";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 157:i32), "_GR__$L108";
+        call:(use(
+            ild:any 0:any)) $1735:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1736:i32 = expr(159:i32);
+        st:i32 ty = 
+            ld:i32 t;
+        stpr $1737:bool = 
+            gt:bool 
+                ld:i32 t, 2:i32;
+        stpr $1738:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        stpr $1739:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $1738:bool, 0:bool,
+                $1739:*<4>, undefined;
+        stpr $1740:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:i32
+                ne:bool 
+                    $1740:bool, 0:bool,13:i32, undefined;
+        stpr $1741:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        stpr $1742:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $1741:bool, 0:bool,
+                $1742:*<4>, undefined;
+        stpr $1743:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:i32
+                ne:bool 
+                    $1743:bool, 0:bool,1:i32, undefined;
+        stpr $1744:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        stpr $1745:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $1744:bool, 0:bool,
+                $1745:*<4>, undefined;
+        stpr $1746:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:u32
+                ne:bool 
+                    $1746:bool, 0:bool,4:u32, undefined;
+        stpr $1747:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        stpr $1748:*<4> = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:*<4> e = 
+            select:*<4>
+                ne:bool 
+                    $1747:bool, 0:bool,
+                $1748:*<4>, undefined;
+        stpr $1749:bool = 
+            ne:bool 
+                $1737:bool, 0:bool;
+        ist:i32 = 
+            ld:*<4> e,
+            select:i32
+                ne:bool 
+                    $1749:bool, 0:bool,27:i32, undefined;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,25:i32;
+        goto "_GR__$L71";
+        label "_GR__$L108";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 158:i32), "_GR__$L111";
+        call:(use(
+            ild:any 0:any)) $1750:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1751:i32 = expr(159:i32);
+        falsebr (
+            gt:bool 
+                ld:i32 t, 2:i32), "_GR__$L112";
+        falsebr (
+            eq:bool 
+                ld:i32 t, 
+                ld:i32 ty), "_GR__$L112";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,26:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,4:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,28:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L112";
+        st:i32 ty = 
+            ld:i32 t;
+        falsebr (
+            gt:bool 
+                ld:i32 t, 2:i32), "_GR__$L114";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,4:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,27:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,26:i32;
+        goto "_GR__$L71";
+        label "_GR__$L114";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,26:i32;
+        goto "_GR__$L71";
+        label "_GR__$L111";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 159:i32), "_GR__$L117";
+        call:(use(
+            ild:any 0:any)) $1752:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1753:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,27:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L117";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 160:i32), "_GR__$L119";
+        call:(use(
+            ild:any 0:any)) $1754:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1755:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,28:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L119";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 161:i32), "_GR__$L121";
+        call:(use(
+            ild:any 0:any)) $1756:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1757:i32 = expr(162:i32);
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,29:i32;
+        st:i32 ty = 1:i32;
+        goto "_GR__$L71";
+        label "_GR__$L121";
+        truebr (
+            eq:bool 
+                ld:i32 tk, 162:i32), "_GR__$L156";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 163:i32), "_GR__$L123";
+        label "_GR__$L156";
+        stpr $1758:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1758:i32, 10:i32), "_GR__$L124";
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,10:i32;
+        goto "_GR__$L127";
+        label "_GR__$L124";
+        stpr $1759:i32 = 
+            ild:i32 
+                ld:*<4> e;
+        falsebr (
+            eq:bool 
+                $1759:i32, 9:i32), "_GR__$L126";
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,9:i32;
+        goto "_GR__$L127";
+        label "_GR__$L126";
+        call:(use(
+            ild:any 0:any)) $1760:i32 = printf(
+            lda _const_string_14,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1761:i32 = exit(-1:i32);
+        label "_GR__$L127";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1762:bool = 
+            gt:bool 
+                ld:i32 ty, 2:i32;
+        stpr $1763:bool = 
+            eq:bool 
+                $1762:bool, 0:bool;
+        stpr $1764:bool = 
+            ne:bool 
+                $1763:bool, 0:bool;
+        stpr $1617:u32 = 
+            select:u32
+                ne:bool 
+                    $1764:bool, 0:bool,1:u32, undefined;
+        stpr $1765:bool = 
+            ne:bool 
+                $1763:bool, 0:bool;
+        stpr $1615:u32 = 
+            select:u32
+                ne:bool 
+                    $1765:bool, 0:bool, undefined,4:u32;
+        stpr $1766:bool = 
+            ne:bool 
+                $1763:bool, 0:bool;
+        stpr $1837:bool = 
+            eq:bool 
+                $1766:bool, 0:bool;
+        stpr $1768:u32 = 
+            select:u32
+                ne:bool 
+                    $1837:bool, 0:bool,
+                $1615:u32, undefined;
+        stpr $1767:u32 = 
+            select:u32
+                ne:bool 
+                    $1837:bool, 0:bool, undefined,
+                $1617:u32;
+        stpr $1838:u32 = 
+            select:u32
+                ne:bool 
+                    $1837:bool, 0:bool,
+                $1768:u32,
+                $1767:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1838:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1770:bool = 
+            eq:bool 
+                ld:i32 tk, 162:i32;
+        stpr $1771:bool = 
+            eq:bool 
+                $1770:bool, 0:bool;
+        stpr $1772:bool = 
+            ne:bool 
+                $1771:bool, 0:bool;
+        stpr $1613:i32 = 
+            select:i32
+                ne:bool 
+                    $1772:bool, 0:bool,26:i32, undefined;
+        stpr $1773:bool = 
+            ne:bool 
+                $1771:bool, 0:bool;
+        stpr $1611:i32 = 
+            select:i32
+                ne:bool 
+                    $1773:bool, 0:bool, undefined,25:i32;
+        stpr $1774:bool = 
+            ne:bool 
+                $1771:bool, 0:bool;
+        stpr $1839:bool = 
+            eq:bool 
+                $1774:bool, 0:bool;
+        stpr $1776:i32 = 
+            select:i32
+                ne:bool 
+                    $1839:bool, 0:bool,
+                $1611:i32, undefined;
+        stpr $1775:i32 = 
+            select:i32
+                ne:bool 
+                    $1839:bool, 0:bool, undefined,
+                $1613:i32;
+        stpr $1840:i32 = 
+            select:i32
+                ne:bool 
+                    $1839:bool, 0:bool,
+                $1776:i32,
+                $1775:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1840:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1778:bool = 
+            eq:bool 
+                ld:i32 ty, 0:i32;
+        stpr $1779:bool = 
+            eq:bool 
+                $1778:bool, 0:bool;
+        stpr $1780:bool = 
+            ne:bool 
+                $1779:bool, 0:bool;
+        stpr $1609:i32 = 
+            select:i32
+                ne:bool 
+                    $1780:bool, 0:bool,11:i32, undefined;
+        stpr $1781:bool = 
+            ne:bool 
+                $1779:bool, 0:bool;
+        stpr $1607:i32 = 
+            select:i32
+                ne:bool 
+                    $1781:bool, 0:bool, undefined,12:i32;
+        stpr $1782:bool = 
+            ne:bool 
+                $1779:bool, 0:bool;
+        stpr $1841:bool = 
+            eq:bool 
+                $1782:bool, 0:bool;
+        stpr $1784:i32 = 
+            select:i32
+                ne:bool 
+                    $1841:bool, 0:bool,
+                $1607:i32, undefined;
+        stpr $1783:i32 = 
+            select:i32
+                ne:bool 
+                    $1841:bool, 0:bool, undefined,
+                $1609:i32;
+        stpr $1842:i32 = 
+            select:i32
+                ne:bool 
+                    $1841:bool, 0:bool,
+                $1784:i32,
+                $1783:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1842:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1786:bool = 
+            gt:bool 
+                ld:i32 ty, 2:i32;
+        stpr $1787:bool = 
+            eq:bool 
+                $1786:bool, 0:bool;
+        stpr $1788:bool = 
+            ne:bool 
+                $1787:bool, 0:bool;
+        stpr $1605:u32 = 
+            select:u32
+                ne:bool 
+                    $1788:bool, 0:bool,1:u32, undefined;
+        stpr $1789:bool = 
+            ne:bool 
+                $1787:bool, 0:bool;
+        stpr $1603:u32 = 
+            select:u32
+                ne:bool 
+                    $1789:bool, 0:bool, undefined,4:u32;
+        stpr $1790:bool = 
+            ne:bool 
+                $1787:bool, 0:bool;
+        stpr $1843:bool = 
+            eq:bool 
+                $1790:bool, 0:bool;
+        stpr $1792:u32 = 
+            select:u32
+                ne:bool 
+                    $1843:bool, 0:bool,
+                $1603:u32, undefined;
+        stpr $1791:u32 = 
+            select:u32
+                ne:bool 
+                    $1843:bool, 0:bool, undefined,
+                $1605:u32;
+        stpr $1844:u32 = 
+            select:u32
+                ne:bool 
+                    $1843:bool, 0:bool,
+                $1792:u32,
+                $1791:u32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1844:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        stpr $1794:bool = 
+            eq:bool 
+                ld:i32 tk, 162:i32;
+        stpr $1795:bool = 
+            eq:bool 
+                $1794:bool, 0:bool;
+        stpr $1796:bool = 
+            ne:bool 
+                $1795:bool, 0:bool;
+        stpr $1601:i32 = 
+            select:i32
+                ne:bool 
+                    $1796:bool, 0:bool,25:i32, undefined;
+        stpr $1797:bool = 
+            ne:bool 
+                $1795:bool, 0:bool;
+        stpr $1599:i32 = 
+            select:i32
+                ne:bool 
+                    $1797:bool, 0:bool, undefined,26:i32;
+        stpr $1798:bool = 
+            ne:bool 
+                $1795:bool, 0:bool;
+        stpr $1845:bool = 
+            eq:bool 
+                $1798:bool, 0:bool;
+        stpr $1800:i32 = 
+            select:i32
+                ne:bool 
+                    $1845:bool, 0:bool,
+                $1599:i32, undefined;
+        stpr $1799:i32 = 
+            select:i32
+                ne:bool 
+                    $1845:bool, 0:bool, undefined,
+                $1601:i32;
+        stpr $1846:i32 = 
+            select:i32
+                ne:bool 
+                    $1845:bool, 0:bool,
+                $1800:i32,
+                $1799:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1846:i32;
+        call:(use(
+            ild:any 0:any)) $1802:i32 = next();
+        goto "_GR__$L71";
+        label "_GR__$L123";
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 164:i32), "_GR__$L129";
+        call:(use(
+            ild:any 0:any)) $1803:i32 = next();
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        call:(use(
+            ild:any 0:any)) $1804:i32 = expr(142:i32);
+        falsebr (
+            eq:bool 
+                ld:i32 tk, 93:i32), "_GR__$L130";
+        call:(use(
+            ild:any 0:any)) $1805:i32 = next();
+        goto "_GR__$L131";
+        label "_GR__$L130";
+        call:(use(
+            ild:any 0:any)) $1806:i32 = printf(
+            lda _const_string_15,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1807:i32 = exit(-1:i32);
+        label "_GR__$L131";
+        falsebr (
+            gt:bool 
+                ld:i32 t, 2:i32), "_GR__$L132";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,13:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,1:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,4:u32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,27:i32;
+        goto "_GR__$L134";
+        label "_GR__$L132";
+        falsebr (
+            lt:bool 
+                ld:i32 t, 2:i32), "_GR__$L134";
+        call:(use(
+            ild:any 0:any)) $1808:i32 = printf(
+            lda _const_string_16,
+            ld:i32 line);
+        call:(use(
+            ild:any 0:any)) $1809:i32 = exit(-1:i32);
+        label "_GR__$L134";
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        ist:i32 = 
+            ld:*<4> e,25:i32;
+        st:*<4> e = 
+            add:*<4> 
+                ld:*<4> e, 4:u32;
+        st:i32 ty = 
+            sub:i32 
+                ld:i32 t, 2:i32;
+        stpr $1810:i32 = 
+            sub:i32 
+                ld:i32 t, 2:i32;
+        stpr $1811:bool = 
+            eq:bool 
+                $1810:i32, 0:i32;
+        stpr $1812:bool = 
+            eq:bool 
+                $1811:bool, 0:bool;
+        stpr $1813:bool = 
+            ne:bool 
+                $1812:bool, 0:bool;
+        stpr $1597:i32 = 
+            select:i32
+                ne:bool 
+                    $1813:bool, 0:bool,9:i32, undefined;
+        stpr $1814:bool = 
+            ne:bool 
+                $1812:bool, 0:bool;
+        stpr $1595:i32 = 
+            select:i32
+                ne:bool 
+                    $1814:bool, 0:bool, undefined,10:i32;
+        stpr $1815:bool = 
+            ne:bool 
+                $1812:bool, 0:bool;
+        stpr $1847:bool = 
+            eq:bool 
+                $1815:bool, 0:bool;
+        stpr $1817:i32 = 
+            select:i32
+                ne:bool 
+                    $1847:bool, 0:bool,
+                $1595:i32, undefined;
+        stpr $1816:i32 = 
+            select:i32
+                ne:bool 
+                    $1847:bool, 0:bool, undefined,
+                $1597:i32;
+        stpr $1848:i32 = 
+            select:i32
+                ne:bool 
+                    $1847:bool, 0:bool,
+                $1817:i32,
+                $1816:i32;
+        ist:i32 = 
+            ld:*<4> e,
+            $1848:i32;
+        goto "_GR__$L71";
+        label "_GR__$L129";
+        call:(use(
+            ild:any 0:any)) $1819:i32 = printf(
+            lda _const_string_17,
+            ld:i32 line,
+            ld:i32 tk);
+        call:(use(
+            ild:any 0:any)) $1820:i32 = exit(-1:i32);
+        goto "_GR__$L71";
+        label "_GR__$L73";
+        return ;
+    };
+}

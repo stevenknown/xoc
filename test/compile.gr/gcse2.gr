@@ -1,0 +1,203 @@
+region program ".program" () {
+    var sign:any:(func,decl,align(4));
+    var quant_coef:mc<384>:(private,array,align(4));
+    var itrans_sp:any:(func,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4));
+    region func itrans_sp (undefined,var img:*<1536>:(align(4))) {
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        var m5:mc<16>:(array,align(4));
+        var predicted_block:mc<64>:(array,align(4));
+        st:i32 j = 0:i32;
+        label "_GR__$L10";
+        falsebr (
+            lt:bool 
+                ld:i32 j, 4:i32), "_GR__$L7";
+        label "_GR__$L9";
+        stpr $9:u32 = 
+            mul:u32 3:i32, 4:u32;
+        stpr $10:*<4> = 
+            add:*<4> 
+                lda m5, 
+                $9:u32;
+        stpr $11:i32 = 
+            ild:i32 
+                $10:*<4>;
+        label "_GR__$L7";
+        phi $41:i32 = (
+            $11:i32,"_GR__$L9"),(
+            $40:i32,"_GR__$L10");
+        label "_GR__$L1";
+        falsebr (
+            lt:bool 
+                ld:i32 j, 4:i32), "_GR__$L2";
+        stpr $12:u32 = 
+            add:u32 
+                ld:i32 j, 12:u32;
+        stpr $13:u32 = 
+            mul:u32 
+                $12:u32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda predicted_block, 
+                $13:u32,
+            $41:i32;
+        stpr $5:i32 = 
+            ld:i32 j;
+        st:i32 j = 
+            add:i32 
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        st:i32 i = 0:i32;
+        label "_GR__$L12";
+        falsebr (
+            lt:bool 
+                ld:i32 i, 4:i32), "_GR__$L8";
+        label "_GR__$L11";
+        stpr $20:u32 = 
+            mul:u32 3:i32, 4:u32;
+        stpr $19:u32 = 
+            mul:u32 
+                ld:i32 j, 4:u32;
+        stpr $21:*<4> = 
+            add:*<4> 
+                lda m5, 
+                $20:u32;
+        stpr $42:i32 = 
+            ld:i32 j;
+        stpr $43:*<4> = 
+            add:*<4> 
+                lda m5, 
+                $19:u32;
+        stpr $44:*<4> = 
+            $21:*<4>;
+        label "_GR__$L8";
+        phi $50:*<4> = (
+            $44:*<4>,"_GR__$L11"),(
+            $49:*<4>,"_GR__$L12");
+        phi $48:*<4> = (
+            $43:*<4>,"_GR__$L11"),(
+            $47:*<4>,"_GR__$L12");
+        phi $46:i32 = (
+            $42:i32,"_GR__$L11"),(
+            $45:i32,"_GR__$L12");
+        label "_GR__$L3";
+        falsebr (
+            lt:bool 
+                ld:i32 i, 4:i32), "_GR__$L4";
+        stpr $14:u32 = 
+            mul:u32 
+                ld:i32 i, 4:u32;
+        stpr $15:u32 = 
+            add:u32 
+                $46:i32, 
+                $14:u32;
+        stpr $16:u32 = 
+            mul:u32 
+                $15:u32, 4:u32;
+        stpr $17:*<4> = 
+            add:*<4> 
+                lda predicted_block, 
+                $16:u32;
+        stpr $18:i32 = 
+            ild:i32 
+                $17:*<4>;
+        ist:i32 = 
+            $48:*<4>,
+            $18:i32;
+        stpr $22:i32 = 
+            ild:i32 
+                $50:*<4>;
+        stpr $23:u32 = 
+            mul:u32 
+                ld:i32 i, 4:u32;
+        stpr $24:u32 = 
+            add:u32 
+                $23:u32, 3:i32;
+        stpr $25:u32 = 
+            mul:u32 
+                $24:u32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda predicted_block, 
+                $25:u32,
+            $22:i32;
+        stpr $6:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        goto "_GR__$L3";
+        label "_GR__$L4";
+        st:i32 i = 0:i32;
+        label "_GR__$L5";
+        falsebr (
+            lt:bool 
+                ld:i32 i, 4:i32), "_GR__$L6";
+        stpr $26:u32 = 
+            mul:u32 
+                ld:i32 i, 4:u32;
+        stpr $27:u32 = 
+            add:u32 
+                ld:i32 j, 
+                $26:u32;
+        stpr $28:u32 = 
+            mul:u32 
+                ld:i32 i, 16:u32;
+        stpr $29:u32 = 
+            add:u32 
+                $27:u32, 
+                $28:u32;
+        stpr $30:u32 = 
+            mul:u32 
+                $29:u32, 4:u32;
+        stpr $31:*<4> = 
+            add:*<4> 
+                lda quant_coef, 
+                $30:u32;
+        stpr $32:i32 = 
+            ild:i32 
+                $31:*<4>;
+        call:(use(
+            ild:any 0:any)) $7:i32 = sign(
+            $32:i32);
+        stpr $33:u32 = 
+            mul:u32 
+                ld:i32 i, 4:u32;
+        stpr $34:u32 = 
+            add:u32 
+                ld:i32 j, 
+                $33:u32;
+        stpr $35:u32 = 
+            mul:u32 
+                ld:i32 j, 16:u32;
+        stpr $36:u32 = 
+            add:u32 
+                $34:u32, 
+                $35:u32;
+        stpr $37:u32 = 
+            mul:u32 
+                ld:i32 i, 96:u32;
+        stpr $38:u32 = 
+            add:u32 
+                $36:u32, 
+                $37:u32;
+        stpr $39:u32 = 
+            mul:u32 
+                $38:u32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                ld:*<1536> img, 
+                $39:u32,
+            $7:i32;
+        stpr $8:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        goto "_GR__$L5";
+        label "_GR__$L6";
+        return ;
+    };
+}

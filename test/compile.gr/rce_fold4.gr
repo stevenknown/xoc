@@ -1,0 +1,36 @@
+  region program ".program" () {
+      var main:any:(func,align(4));
+      region func main () {
+          var x:u64:(align(4));
+          var i:i32:(align(4));
+          st:u64 x = -1:i32;
+          st:i32 i = -1:i32;
+          st:u64 x = 
+              add:u64 
+                  ld:u64 x, 
+                  cvt:u64 
+                      ld:i32 i;
+          st:u64 x = 
+              sub:u64 
+                  ld:u64 x, 
+                  cvt:u64 
+                      ld:i32 i;
+          st:u64 x = 
+              mul:u64 
+                  ld:u64 x, 
+                  cvt:u64 
+                      ld:i32 i;
+          st:u64 x = 
+              div:u64 
+                  ld:u64 x, 
+                  cvt:u64 
+                      ld:i32 i;
+          falsebr (
+              ne:bool 
+                  ld:u64 x, 
+                  cvt:i64 0:i32), "_GR__$L1";
+          return -1:i32;
+          label "_GR__$L1";
+          return 0:i32;
+      };
+  }

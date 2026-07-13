@@ -1,0 +1,24 @@
+region program "program" () {
+    region func main () {
+        //Testing restrict var should not alias with other var.
+        var in:mc<256>:(align(64), restrict);
+
+        //All array operations can be promoted by RP.
+        //The OFFSET is not overlapped.
+        while (eq 1, 1) {
+            stpr $v = array:i32:4:(elemtype:u64,dim[1])
+                        add:*<1> ld:*<4> in, 10, //base
+                        ($e:u32); //subexp
+            if (eq $a:u64, $b:i64) {
+                starray:i32:4:(elemtype:u64,dim[1]) =
+                  add:*<1> ld:*<4> in, 10, //base
+                  ($e:u32), //subexp
+                  20; //rhs
+            }
+            stpr $y = array:i32:0:(dim[1])
+                        add:*<1> ld:*<4> in, 10, //base
+                        ($e:u32); //subexp;
+        }
+        return $v;
+    };
+}

@@ -1,0 +1,15 @@
+region program x() {
+region func guard (undefined,var pp:i32:(align(4))) {
+    var buff:mc<4>:(array,align(4));
+    var cond:i32:(align(4));
+    label "_GR__$L1";
+    falsebr (
+        gt:bool 
+            ld:i32 cond, 0:i32), "_GR__$L2";
+    st:i32 pp = 1:i32;
+    stpr $fir = ld:i32 pp;
+    goto "_GR__$L1";
+    label "_GR__$L2";
+    return ;
+}
+}

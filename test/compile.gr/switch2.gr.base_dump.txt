@@ -1,0 +1,131 @@
+
+==---- DUMP CFG 'switch_key' ----==
+  ==---- DUMP IRBBList 'switch_key' ----==
+  ----- BB15 --- rpo:-1 -----
+  ATTR:entry_bb fall_through
+  STMT NUM:0
+
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through
+  STMT NUM:2
+     stpr $2:*<524>
+         ld:*<524> 'cx'
+     falsebr label _$L1
+         eq:bool
+             $2:*<524> attachinfo:Dbx
+             intconst:i64 6|0x6
+
+  ----- BB2 --- rpo:-1 -----
+  ATTR:
+  STMT NUM:1
+     goto label _L5
+
+  ----- BB9 --- rpo:-1 -----
+  LABEL:_$L3 _L5 _$L4
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     stpr $1:any attachinfo:Dbx
+         ld:u32 'rci'
+
+  ----- BB10 --- rpo:-1 -----
+  LABEL:_$L6
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L4 attachinfo:Dbx
+         gt:bool
+             ld:*<4> 'kt'
+             ld:*<4> 'kf'
+
+  ----- BB13 --- rpo:-1 -----
+  LABEL:_$L5 _$L1
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     return attachinfo:Dbx
+         intconst:i32 1|0x1
+
+node1 [shape = Mrecord, label="{V1}"];
+node2 [shape = Mrecord, label="{V2}"];
+node9 [shape = Mrecord, label="{V9}"];
+node10 [shape = Mrecord, label="{V10}"];
+node13 [shape = Mrecord, label="{V13}"];
+node15 [shape = Mrecord, label="{V15}"];
+node9->node10[label=""]
+node10->node13[label=""]
+node1->node13[label=""]
+node15->node1[label=""]
+node10->node9[label=""]
+node2->node9[label=""]
+node1->node2[label=""]
+==---- DUMP CFG 'switch_key' ----==
+  ==---- DUMP IRBBList 'switch_key' ----==
+  ----- BB15 --- rpo:-1 -----
+  ATTR:entry_bb fall_through
+  STMT NUM:0
+
+  ----- BB1 --- rpo:-1 -----
+  ATTR:fall_through
+  STMT NUM:2
+     stpr $2:*<524>
+         ld:*<524> 'cx'
+     falsebr label _$L5
+         eq:bool
+             $2:*<524> attachinfo:Dbx
+             intconst:i64 6|0x6
+
+  ----- BB9 --- rpo:-1 -----
+  LABEL:_$L3
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     stpr $1:any attachinfo:Dbx
+         ld:u32 'rci'
+
+  ----- BB10 --- rpo:-1 -----
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     truebr label _$L3 attachinfo:Dbx
+         gt:bool
+             ld:*<4> 'kt'
+             ld:*<4> 'kf'
+
+  ----- BB13 --- rpo:-1 -----
+  LABEL:_$L5
+  ATTR:fall_through branch_target
+  STMT NUM:1
+     return attachinfo:Dbx
+         intconst:i32 1|0x1
+
+node1 [shape = Mrecord, label="{V1}"];
+node9 [shape = Mrecord, label="{V9}"];
+node10 [shape = Mrecord, label="{V10}"];
+node13 [shape = Mrecord, label="{V13}"];
+node15 [shape = Mrecord, label="{V15}"];
+node9->node10[label=""]
+node10->node13[label=""]
+node1->node9[label=""]
+node15->node1[label=""]
+node10->node9[label=""]
+node1->node13[label=""]
+==---- DUMP Loop Invariant Code Motion 'switch_key' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'switch_key' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB9, BODY:9,10,
+-- Invariant Expression (num=4) -- :
+   ld:*<4> 'kf' attachinfo:MDSSA
+   ld:*<4> 'kt' attachinfo:MDSSA
+   ld:u32 'rci' attachinfo:MDSSA
+   gt:bool
+       ld:*<4> 'kt' attachinfo:MDSSA
+       ld:*<4> 'kf' attachinfo:MDSSA
+
+-- Hoist Cand Expression (num=2) -- :
+   ld:u32 'rci' attachinfo:MDSSA
+   gt:bool
+       ld:*<4> 'kt' attachinfo:MDSSA
+       ld:*<4> 'kf' attachinfo:MDSSA
+==---- DUMP InsertPhiHelper 'switch_key' ----==
+  ==-- InsertPhiHelper:PredOrder --==
+  1
+  ==-- InsertPhiHelper:PredPos --==
+  0
+

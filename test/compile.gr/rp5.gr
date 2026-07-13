@@ -1,0 +1,20 @@
+region program "program" () {
+    region func main () {
+        while (eq 1, 1) {
+            //No array operation can be promoted because p,q,w are alias.
+            stpr $v = array:i32:2:(elemtype:u64,dim[1])
+                        add:*<1> $p:*<4>, 10, //base
+                        ($e:u32); //subexp
+            if (eq $a:u64, $b:i64) {
+                starray:i32:2:(elemtype:u64,dim[1]) =
+                  add:*<1> $q, 10, //base
+                  ($e:u32), //subexp
+                  20; //rhs
+            }
+            stpr $y = array:i32:0:(dim[1])
+                         add:*<1> $w, 10, //base
+                         ($e:u32); //subexp;
+        }
+        return $v;
+    };
+}

@@ -1,0 +1,49 @@
+
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB1, BODY:1,2,3,4,
+==-- DUMP ExactAccessTab --==
+
+==-- DUMP InexactAccessTab --==
+  ist:any:offset(10) attachinfo:Dbx,MDSSA
+      $2:any base
+      intconst:i32 20|0x14
+
+  ild:any:offset(10) attachinfo:MDSSA
+      $2:any
+
+  ild:any:offset(10) attachinfo:MDSSA
+      $2:*<4>
+
+
+==---- DUMP DelegateMgr 'main' ----==
+  ==-- Dele2PR --==
+
+  DELE:  ist:any:offset(10) attachinfo:Dbx,MDSSA
+  PR:  $8:any
+
+  DELE:  ild:any:offset(10) attachinfo:MDSSA
+  PR:  $9:any
+
+  DELE:  ild:any:offset(10) attachinfo:MDSSA
+  PR:  $10:any
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+
+  ==-- Dele2OutsideUseSet --==
+
+  ==---- DUMP Delegate Table ----==
+  ist:any:offset(10) attachinfo:Dbx,MDSSA
+      $2:any base
+      intconst:i32 20|0x14
+  ild:any:offset(10) attachinfo:MDSSA
+      $2:any
+  ild:any:offset(10) attachinfo:MDSSA
+      $2:*<4>
+

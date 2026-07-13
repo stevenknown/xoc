@@ -1,0 +1,4 @@
+
+==---- DUMP Global Common Subexpression Elimination 'foo' ----==
+  -- ACTMGR --
+    ACT1:GID1:ild is CSE of ild and will be replaced by pr

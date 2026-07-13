@@ -1,0 +1,12 @@
+region program "program" () {
+    region func main () {
+        while (eq 1, 1) {
+            stpr $v = ild add:*<1> $sp:*<4>, 10; //the ILD should be promoted.
+            if (eq $a, $b) {
+                ist = add:*<1> $sp, 10, 20; //the IST also can be promoted.
+            }
+            stpr $y = ild add:*<1> $sp, 10; //the ILD should be promoted.
+        }
+        return $v;
+    };
+}

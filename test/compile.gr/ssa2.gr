@@ -1,0 +1,23 @@
+region program "program" () {
+    region func main (var retbuf:mc<512>:(align(4))) {
+        if (eq $3:i8, $4:u8) {
+    	    stpr $x = 100;
+    	    stpr $100 = $x;
+    	    stpr $y = 300; //y is global to BB, def at BB, use at other BB
+    	    stpr $z = 400:u16; //z is global to BB, def at BB, use at other BB
+
+            label TEST1;
+    	    stpr $104 = $y;
+        } else {
+    	    stpr $x = 10;
+    	    stpr $101 = $x;
+    	    stpr $y = 500:u16; //y is global to BB, def at BB, use at other BB
+    	    stpr $z = 600; //z is global to BB, def at BB, use at other BB
+
+            label TEST2;
+    	    stpr $103 = $y;
+        }
+        stpr $zzz:u128 = sub $w:i32, add 0xffab0, $z;
+        return $zzz:u128;
+    };
+}

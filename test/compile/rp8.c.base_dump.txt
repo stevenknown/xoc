@@ -1,0 +1,85 @@
+
+==---- DUMP Register Promotion 'rp_loop' ----==
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB2, BODY:2,3,4,5,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD9 -- base:Var62(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD10 -- base:Var60(s2):local,align(4),pointer,pt_base_sz:1,*,mem_size:4,decl:'unsigned char  *  s2 ' -- ofst:0 -- size:4
+    ld:*<1> 's2' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:*<1> 's2' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD7 -- base:Var59(s):local,align(4),pointer,pt_base_sz:1,*,mem_size:4,decl:'unsigned char  *  s ' -- ofst:0 -- size:4
+    ld:*<1> 's' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      ld:*<1> 's' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD8 -- base:Var61(lrc):local,align(4),i32,decl:'int  lrc ' -- ofst:0 -- size:4
+    st:i32 'lrc' attachinfo:Dbx,MDSSA
+    
+    OCCLIST:
+      st:i32 'lrc' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==---- DUMP DelegateMgr 'rp_loop' ----==
+  ==-- Dele2PR --==
+  
+  DELE:  ld:*<1> 's' attachinfo:Dbx,MDSSA
+  PR:  $5:*<1>
+  
+  DELE:  ld:*<1> 's2' attachinfo:Dbx,MDSSA
+  PR:  $4:*<1>
+  
+  DELE:  ld:i32 'j' attachinfo:Dbx,MDSSA
+  PR:  $3:i32
+  
+  DELE:  st:i32 'lrc' attachinfo:Dbx,MDSSA
+  PR:  $6:i32
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+  
+  DELE:  ld:i32 'j' attachinfo:Dbx,MDSSA
+  OutsideDefSet:    st:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELE:  ld:*<1> 's' attachinfo:Dbx,MDSSA
+  OutsideDefSet:    st:*<1> 's' attachinfo:Dbx,MDSSA
+
+  ==-- Dele2OutsideUseSet --==
+  
+  ==---- DUMP Delegate Table ----==
+  
+==---- DUMP Register Promotion 'rp_loop' ----==
+  ==-- DUMP Dont Promotion Table --==
+  
+  ild:u8 attachinfo:Dbx,MDSSA
+  ild:u8 attachinfo:Dbx,MDSSA
+
+==---- DUMP Register Promotion 'rp_loop' ----==
+==-- DUMP LoopInfo --==
+LOOP1 HEAD:BB2, BODY:2,3,4,5,
+==-- DUMP ExactAccessTab --==
+  
+==-- DUMP InexactAccessTab --==
+  

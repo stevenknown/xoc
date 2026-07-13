@@ -1,0 +1,85 @@
+==---- DUMP Induction Variable Recogization 'itrans_sp_chroma' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB2,BODY:2,4,
+BIV(STMTOCC:MD14,'pr3')(EXPOCC:MD13,'pr2')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    stpr $3:i32 id:33 attachinfo:Dbx        
+        add:i32 id:32            
+            $2:i32 id:30            
+            intconst:i32 1|0x1 id:31
+  REDUCTION-EXP:
+    $2:i32 id:30
+DIV(STMTOCC:MD19,'pr7')
+  INIT-VAL:EXP:
+    add:u32 id:88        
+        lda:*<400> 'g' id:83        
+        mul:u32 id:85            
+            ld:i32 'pr1' id:87            
+            intconst:u32 4|0x4 id:84
+  STEP-VAL:INT:40
+  REDUCTION-STMT:
+    stpr $7:*<4> id:56        
+        add:*<4> id:27            
+            lda:*<400> 'g' id:25            
+            $6:u32 id:26
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      add:u32 id:88          
+          lda:*<400> 'g' id:83          
+          mul:u32 id:85              
+              ld:i32 'pr1' id:87              
+              intconst:u32 4|0x4 id:84
+      CODE:add
+      STEP:INT:40
+DIV(STMTOCC:MD17,'pr6')
+  INIT-VAL:EXP:
+    mul:u32 id:77        
+        ld:i32 'pr1' id:79        
+        intconst:u32 4|0x4 id:78
+  STEP-VAL:INT:40
+  REDUCTION-STMT:
+    stpr $6:u32 id:24 attachinfo:Dbx        
+        mul:u32 id:23            
+            $5:u32 id:21            
+            intconst:u32 4|0x4 id:22
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      mul:u32 id:77          
+          ld:i32 'pr1' id:79          
+          intconst:u32 4|0x4 id:78
+      CODE:add
+      STEP:INT:40
+DIV(STMTOCC:MD16,'pr5')
+  INIT-VAL:EXP:
+    ld:i32 'pr1' id:76
+  STEP-VAL:INT:10
+  REDUCTION-STMT:
+    stpr $5:u32 id:20 attachinfo:Dbx        
+        add:u32 id:19            
+            $1:i32 id:17            
+            $4:u32 id:18
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      ld:i32 'pr1' id:76
+      CODE:add
+      STEP:INT:10
+DIV(STMTOCC:MD15,'pr4')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:10
+  REDUCTION-STMT:
+    stpr $4:u32 id:16 attachinfo:Dbx        
+        mul:u32 id:15            
+            $2:i32 id:13            
+            intconst:u32 10|0xa id:14
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:10

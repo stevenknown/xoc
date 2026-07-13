@@ -1,0 +1,16 @@
+region program ".program" () {
+    var a:i32:(align(4));
+    var b:i32:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    region func main (undefined,var argc:i32:(align(4)),var argv:*<4>:(align(4))) {
+        stpr $17 = lda c;
+        ist = add $17, 10, 0xFF;
+        if (ne $16:u16, $15:u16) {
+            st a = ild add $17, 10;
+        } else {
+            st b = ild add $17, 10;
+        }
+        return add ld a, ld b;
+    };
+}

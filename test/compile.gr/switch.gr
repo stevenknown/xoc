@@ -1,0 +1,34 @@
+region program "program" () {
+    region func main () {
+        var i:mc<128>:(align(4));
+        var n:mc<128>:(align(4));
+
+        switch:() (ld:i64 i) case 33,_LC1, ;
+        switch:() (ld:i64 i) , ;
+        switch:() (ld:i64 i);
+        switch:(throw()) (ld:i64 i)
+        default _L1,
+        (case 1,_LC1),
+        case "H",_LC2,
+        (case 3.45:f64,_LC4),
+        (case 0xffDc:u64,_LC4),
+        (case 0:bool,_LC3), {
+          label _LC3; break;
+            igoto $5 case 1,_LC1, case 3,_LC2;
+          label _LC4; break;
+          label _LC0; break;
+          label _LC1; break;
+          label _LC2; break;
+          label _L1;
+            switch ld:i64 i case 2,_L100, default ENDL {
+              label _L100;  goto _LC1; break;
+            }
+            switch ld:i64 n {
+              label _L300; continue;
+            }
+            break;
+        }
+        label ENDL;
+        return $ret:u8;
+    };
+}

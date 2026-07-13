@@ -1,0 +1,34 @@
+region program "program" () {
+    region func main () {
+        truebr (eq $1:bool, $2:bool), L2;
+        goto L1;  //goto is actually fallthrough to label L1.
+                  //So it can be removed.
+        label L1;
+        label L10;  //redundant label
+        goto L2;
+        label L2;
+    	stpr $7 = xor $7:u32, $3:f32;
+        label L11;  //redundant label
+
+        igoto $5 case 3,_L4, case 4,_L5;
+        label _L4;
+    	stpr $8 = $3;
+        label _L5;
+    	stpr $9 = $4;
+        label _L6;
+    	stpr $10 = $5;
+
+        switch $6 case 1,_L7,case 2,_L8 {
+            label _L9;
+            break;
+        }
+        label _L10;
+    	stpr $9:i16 = $6;
+        label _L11(try_end);
+    	stpr $10:i32 = $7;
+
+        label _L7;
+        label _L8;
+        return add $8, $9;
+    };
+}

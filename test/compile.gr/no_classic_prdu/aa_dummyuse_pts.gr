@@ -1,0 +1,201 @@
+region program "xx" () {
+    var EXITFLAG:u32:(align(4));
+    var slave_foozero:any:(align(4),func);
+    var slave_foo1:any:(align(4),func);
+    var slave_foo2:any:(align(4),func);
+    var slave_originfunc:any:(align(4),func);
+    region func slave_originfunc (var func_retval0:u32:(align(4))) {
+        var b1:mc<12>:(align(4));
+        stpr $8:u64 = 
+            lda b1;
+        call:(use(ild:any 0:any)) slave_foozero($8:u64);
+        call:(use(ild:any 0:any)) slave_foo1($8:u64);
+        stpr $12:u8 = 
+            ld:u8:4 b1;
+        stpr $12:i64 = 
+            cvt:i64 
+                $12:i8;
+        stpr $21:bool = 
+            eq:bool 
+                $12:i64, 1:i64;
+        truebr (
+            eq:bool 
+                $21:bool, 0:bool), label_BB3_7;
+        label label_BB3_1;
+        stpr $3:i32 = 
+            ld:i32 b1;
+        stpr $3:i64 = 
+            cvt:i64 
+                $3:i32;
+        stpr $22:bool = 
+            eq:bool 
+                $3:i64, 2:i64;
+        truebr (
+            eq:bool 
+                $22:bool, 0:bool), label_BB3_7;
+        label label_BB3_2;
+        stpr $13:u8 = 
+            ld:u8:5 b1;
+        stpr $13:i64 = 
+            cvt:i64 
+                $13:i8;
+        stpr $23:bool = 
+            eq:bool 
+                $13:i64, 3:i64;
+        truebr (
+            eq:bool 
+                $23:bool, 0:bool), label_BB3_7;
+        label label_BB3_3;
+        stpr $1:u16 = 
+            ld:u16:6 b1;
+        stpr $1:i64 = 
+            cvt:i64 
+                $1:i16;
+        stpr $24:bool = 
+            eq:bool 
+                $1:i64, 4:i64;
+        truebr (
+            eq:bool 
+                $24:bool, 0:bool), label_BB3_7;
+        label label_BB3_4;
+        stpr $14:u8 = 
+            ld:u8:8 b1;
+        stpr $14:i64 = 
+            cvt:i64 
+                $14:i8;
+        stpr $25:bool = 
+            eq:bool 
+                $14:i64, 5:i64;
+        truebr (
+            eq:bool 
+                $25:bool, 0:bool), label_BB3_7;
+        label label_BB3_5;
+        stpr $15:u8 = 
+            ld:u8:9 b1;
+        truebr (
+            ne:bool 
+                $15:i8, 0:i8), label_BB3_7;
+        label label_BB3_6;
+        stpr $16:u8 = 
+            ld:u8:10 b1;
+        stpr $32:u64 = 
+            xor:u64 
+                $27:u64, 18446744073709551615:u64;
+        stpr $16:i64 = 
+            cvt:i64 
+                $16:i8;
+        stpr $32:i64 = 
+            cvt:i64 
+                $32:i8;
+        stpr $26:bool = 
+            eq:bool 
+                $16:i64, 
+                $32:i64;
+        truebr (
+            ne:bool 
+                $26:bool, 0:bool), label_BB3_8;
+        label label_BB3_7;
+        stpr $9:u64 = 
+            lda EXITFLAG;
+        stpr $4:u64 = 
+            xor:u64 
+                $27:u64, 1:u64;
+        ist:u32 = 
+            $9:*<1>,
+            $4:u32;
+        label label_BB3_8;
+        stpr $10:u64 = 
+            lda b1;
+        call:(use(
+            ild:any 0:any)) slave_foozero(
+            $10:u64);
+        call:(use(
+            ild:any 0:any)) slave_foo2(
+            $10:u64,
+            $10:u64);
+        stpr $17:u8 = 
+            ld:u8:4 b1;
+        stpr $17:i64 = 
+            cvt:i64 
+                $17:i8;
+        stpr $28:bool = 
+            eq:bool 
+                $17:i64, 10:i64;
+        truebr (
+            eq:bool 
+                $28:bool, 0:bool), label_BB3_12;
+        label label_BB3_9;
+        stpr $5:i32 = 
+            ld:i32 b1;
+        stpr $33:u64 = 
+            xor:u64 
+                $27:u64, 1048575:u64;
+        stpr $5:i64 = 
+            cvt:i64 
+                $5:i32;
+        stpr $33:i64 = 
+            cvt:i64 
+                $33:i32;
+        stpr $29:bool = 
+            eq:bool 
+                $5:i64, 
+                $33:i64;
+        truebr (
+            eq:bool 
+                $29:bool, 0:bool), label_BB3_12;
+        label label_BB3_10;
+        stpr $18:u8 = 
+            ld:u8:5 b1;
+        stpr $34:u64 = 
+            xor:u64 
+                $27:u64, 18446744073709551615:u64;
+        stpr $18:i64 = 
+            cvt:i64 
+                $18:i8;
+        stpr $34:i64 = 
+            cvt:i64 
+                $34:i8;
+        stpr $30:bool = 
+            eq:bool 
+                $18:i64, 
+                $34:i64;
+        truebr (
+            eq:bool 
+                $30:bool, 0:bool), label_BB3_12;
+        label label_BB3_11;
+        stpr $2:u16 = 
+            ld:u16:6 b1;
+        stpr $35:u64 = 
+            xor:u64 
+                $27:u64, 4095:u64;
+        stpr $2:i64 = 
+            cvt:i64 
+                $2:i16;
+        stpr $35:i64 = 
+            cvt:i64 
+                $35:i16;
+        stpr $31:bool = 
+            eq:bool 
+                $2:i64, 
+                $35:i64;
+        truebr (
+            ne:bool 
+                $31:bool, 0:bool), label_BB3_13;
+        label label_BB3_12;
+        stpr $11:u64 = 
+            lda EXITFLAG;
+        stpr $6:u64 = 
+            xor:u64 
+                $27:u64, 1:u64;
+        ist:u32 = 
+            $11:*<1>,
+            $6:u32;
+        label label_BB3_13;
+        stpr $7:u64 = 
+            xor:u64 
+                $27:u64, 0:u64;
+        st:u32 func_retval0 = 
+            $7:u32;
+        return ;
+    };
+}

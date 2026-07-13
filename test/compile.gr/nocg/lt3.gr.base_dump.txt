@@ -1,0 +1,42 @@
+
+==-- DUMP InConsistPairList --==
+NEED insert bb between BB1 and BB4, and copy:$func_level_var_1->$22
+NEED insert bb between BB1 and BB4, and copy:$func_level_var_2->$23
+NEED insert bb between BB1 and BB4, and copy:$func_level_var_3->$24
+==-- DUMP ALL ACT --==
+  ACT1:GID1:ASSIGN:$11 with r0
+  ACT2:GID2:ASSIGN:$4 with r1
+  ACT3:GID3:ASSIGN:$12 with r1
+  ACT4:GID4:ASSIGN:$20 with r1
+  ACT5:GID5:ASSIGN:$8 with r2
+  ACT6:GID6:ASSIGN:$21 with r2
+  ACT7:GID7:ASSIGN:$13 with r3
+  ACT8:GID8:ASSIGN:$14 with r3
+  ACT9:GID9:ASSIGN:$15 with r4
+  ACT10:GID10:SELECT_SPLIT_CAND:$11 is split-candidate at pos:34
+  ACT11:GID11:SELECT_SPLIT_CAND:$11 is split-candidate at pos:34, reason:split $11 that assigned r0
+  ACT12:GID12:SPLIT:$11 into $11 and $22, $11 end at pos:34, $22 start from pos:39
+  ACT13:GID13:SPILL:insert spill ir id:103 after ir id:55 while splitting $11
+  ACT14:GID14:RELOAD:insert reload ir id:105 before ir id:82 while splitting $11, $11 rename to $22
+  ACT15:GID15:SELECT_SPLIT_CAND:$20 is split-candidate at pos:34
+  ACT16:GID16:SELECT_SPLIT_CAND:$20 is split-candidate at pos:34, reason:split $20 that assigned r1
+  ACT17:GID17:SPLIT:$20 into $20 and $23, $20 end at pos:34, $23 start from pos:44
+  ACT18:GID18:SPILL:insert spill ir id:107 after ir id:59 while splitting $20
+  ACT19:GID19:SELECT_SPLIT_CAND:$21 is split-candidate at pos:34
+  ACT20:GID20:SELECT_SPLIT_CAND:$21 is split-candidate at pos:34, reason:split $21 that assigned r2
+  ACT21:GID21:SPLIT:$21 into $21 and $24, $21 end at pos:34, $24 start from pos:46
+  ACT22:GID22:SPILL:insert spill ir id:109 after ir id:61 while splitting $21
+  ACT23:GID23:ASSIGN:$22 with r0
+  ACT24:GID24:ASSIGN:$16 with r1
+  ACT25:GID25:ASSIGN:$23 with r1
+  ACT26:GID26:ASSIGN:$24 with r2
+  ACT27:GID27:ASSIGN:$17 with r1
+  ACT28:GID28:ASSIGN:$18 with r2
+  ACT29:GID29:ASSIGN:$19 with r1
+  ACT30:GID30:INSERT_BB:insert BB7 between BB1 and BB4, reason:fix lifetime consistency
+  ACT31:GID31:RELOAD:insert reload ir id:112 at BB7 to remat r0, reason:fix lifetime consistency memory to pr func_level_var_1->$22
+  ACT32:GID32:RELOAD:insert reload ir id:114 at BB7 to remat r1, reason:fix lifetime consistency memory to pr func_level_var_2->$23
+  ACT33:GID33:RELOAD:insert reload ir id:116 at BB7 to remat r2, reason:fix lifetime consistency memory to pr func_level_var_3->$24
+  ACT34:GID34:SPILL:insert spill ir id:118 at BB6 to spill r4, reason:spill callee-saved at entry
+  ACT35:GID35:RELOAD:insert reload ir id:120 at BB4 to remat r4, reason:reload callee-saved at exit
+==-- DUMP InConsistPairList --==

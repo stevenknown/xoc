@@ -1,0 +1,341 @@
+
+==---- DUMP Global Value Numbering 'main' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  falsebr label _$L1      
+      eq:bool          
+          $2:any          
+          $1:i32
+   <- {
+  	eq id:3 --
+  	$2 id:2 --
+  	$1 id:1 --
+   }
+  -- BB2 
+  
+  stpr $8:any attachinfo:Dbx      
+      intconst:i32 20|0x14
+  vn2 <- {
+  	const id:4 vn2
+   }
+  goto label _$L2
+   <- { }
+  -- BB4   _$L1 
+  
+  stpr $9:any attachinfo:Dbx      
+      intconst:i32 10|0xa
+  vn1 <- {
+  	const id:6 vn1
+   }
+  -- BB5   _$L2 
+  
+  phi $10:any = 
+      $8:any
+      $9:any
+   <- {
+  	$8 id:42 --
+  	$9 id:37 --
+   }
+  stpr $11:any attachinfo:Dbx      
+      sub:any          
+          $10:any          
+          intconst:i32 1|0x1
+  vn4 <- {
+  	sub id:11 vn4
+  	$10 id:9 --
+  	const id:10 vn3
+   }
+  falsebr label _$L3      
+      eq:bool          
+          cvt:i32              
+              $5:u16          
+          $6:i32
+   <- {
+  	eq id:15 --
+  	cvt id:27 --
+  	$6 id:14 --
+  	$5 id:13 --
+   }
+  -- BB6 
+  
+  stpr $12:any attachinfo:Dbx      
+      $2:any
+  vn6 <- {
+  	$2 id:16 vn6
+   }
+  goto label _$L4
+   <- { }
+  -- BB8   _$L3 
+  
+  stpr $13:any attachinfo:Dbx      
+      $1:any
+  vn5 <- {
+  	$1 id:18 vn5
+   }
+  -- BB9   _$L4 
+  
+  phi $14:any = 
+      $12:any
+      $13:any
+   <- {
+  	$12 id:38 --
+  	$13 id:40 --
+   }
+  stpr $15:any attachinfo:Dbx      
+      add:any          
+          $14:any          
+          intconst:i32 1|0x1
+  vn7 <- {
+  	add id:23 vn7
+  	$14 id:21 --
+  	const id:22 vn3
+   }
+  return attachinfo:Dbx      
+      $15:any
+   <- {
+  	$15 id:25 vn7
+   }
+==---- DUMP Global Value Numbering 'main' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  falsebr label _$L1      
+      eq:bool          
+          $2:any          
+          $1:i32
+   <- {
+  	eq id:3 --
+  	$2 id:2 --
+  	$1 id:1 --
+   }
+  -- BB2 
+  
+  stpr $8:any attachinfo:Dbx      
+      intconst:i32 20|0x14
+  vn2 <- {
+  	const id:4 vn2
+   }
+  goto label _$L2
+   <- { }
+  -- BB4   _$L1 
+  
+  stpr $9:any attachinfo:Dbx      
+      intconst:i32 10|0xa
+  vn1 <- {
+  	const id:6 vn1
+   }
+  -- BB5   _$L2 
+  
+  phi $10:any = 
+      $8:any
+      $9:any
+   <- {
+  	$8 id:42 --
+  	$9 id:37 --
+   }
+  stpr $11:any attachinfo:Dbx      
+      sub:any          
+          $10:any          
+          intconst:i32 1|0x1
+  vn4 <- {
+  	sub id:11 vn4
+  	$10 id:9 --
+  	const id:10 vn3
+   }
+  falsebr label _$L3      
+      eq:bool          
+          cvt:i32              
+              $5:u16          
+          $6:i32
+   <- {
+  	eq id:15 --
+  	cvt id:27 --
+  	$6 id:14 --
+  	$5 id:13 --
+   }
+  -- BB6 
+  
+  stpr $12:any attachinfo:Dbx      
+      $2:any
+  vn6 <- {
+  	$2 id:16 vn6
+   }
+  goto label _$L4
+   <- { }
+  -- BB8   _$L3 
+  
+  stpr $13:any attachinfo:Dbx      
+      $1:any
+  vn5 <- {
+  	$1 id:18 vn5
+   }
+  -- BB9   _$L4 
+  
+  phi $14:any = 
+      $12:any
+      $13:any
+   <- {
+  	$12 id:38 --
+  	$13 id:40 --
+   }
+  stpr $15:any attachinfo:Dbx      
+      add:any          
+          $14:any          
+          intconst:i32 1|0x1
+  vn7 <- {
+  	add id:23 vn7
+  	$14 id:21 --
+  	const id:22 vn3
+   }
+  return attachinfo:Dbx      
+      $15:any
+   <- {
+  	$15 id:25 vn7
+   }
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:13) THAT LOCATED IN STMT:
+    stpr $16:i32        
+        cvt:i32            
+            $5:u16
+WILL REPLACE pr THAT LOCATED IN STMT:
+    falsebr label _$L3        
+        eq:bool            
+            $16:i32            
+            $6:i32
+==---- DUMP Global Value Numbering 'main' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  falsebr label _$L1      
+      eq:bool          
+          $2:any          
+          $1:i32
+   <- {
+  	eq id:3 --
+  	$2 id:2 --
+  	$1 id:1 --
+   }
+  -- BB2 
+  
+  stpr $8:any attachinfo:Dbx      
+      intconst:i32 20|0x14
+  vn2 <- {
+  	const id:4 vn2
+   }
+  goto label _$L2
+   <- { }
+  -- BB4   _$L1 
+  
+  stpr $9:any attachinfo:Dbx      
+      intconst:i32 10|0xa
+  vn1 <- {
+  	const id:6 vn1
+   }
+  -- BB5   _$L2 
+  
+  phi $10:any = 
+      $8:any
+      $9:any
+   <- {
+  	$8 id:42 --
+  	$9 id:37 --
+   }
+  stpr $11:any attachinfo:Dbx      
+      sub:any          
+          $10:any          
+          intconst:i32 1|0x1
+  vn4 <- {
+  	sub id:11 vn4
+  	$10 id:9 --
+  	const id:10 vn3
+   }
+  stpr $16:i32      
+      cvt:i32          
+          $5:u16
+  vn5 <- {
+  	cvt id:27 vn5
+  	$5 id:13 --
+   }
+  falsebr label _$L3      
+      eq:bool          
+          $16:i32          
+          $6:i32
+   <- {
+  	eq id:15 --
+  	$16 id:41 vn5
+  	$6 id:14 --
+   }
+  -- BB6 
+  
+  stpr $12:any attachinfo:Dbx      
+      $2:any
+  vn7 <- {
+  	$2 id:16 vn7
+   }
+  goto label _$L4
+   <- { }
+  -- BB8   _$L3 
+  
+  stpr $13:any attachinfo:Dbx      
+      $1:any
+  vn6 <- {
+  	$1 id:18 vn6
+   }
+  -- BB9   _$L4 
+  
+  phi $14:any = 
+      $12:any
+      $13:any
+   <- {
+  	$12 id:38 --
+  	$13 id:40 --
+   }
+  stpr $15:any attachinfo:Dbx      
+      add:any          
+          $14:any          
+          intconst:i32 1|0x1
+  vn8 <- {
+  	add id:23 vn8
+  	$14 id:21 --
+  	const id:22 vn3
+   }
+  return attachinfo:Dbx      
+      $15:any
+   <- {
+  	$15 id:25 vn8
+   }
+==---- DUMP Copy Propagation 'main' ----==
+PROPAGATING CANDIDATE: pr(id:13) THAT LOCATED IN STMT:
+    stpr $16:i32        
+        cvt:i32            
+            $5:u16
+WILL REPLACE pr THAT LOCATED IN STMT:
+    falsebr label _$L3        
+        eq:bool            
+            $16:i32            
+            $6:i32
+==---- DUMP Global Value Numbering 'program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'main',id:2 attachinfo:Dbx
+   <- { }
+==---- DUMP Global Value Numbering 'program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'main',id:2 attachinfo:Dbx
+   <- { }
+==---- DUMP Global Value Numbering 'program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'main',id:2 attachinfo:Dbx
+   <- { }

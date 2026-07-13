@@ -1,0 +1,25 @@
+region program program() {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var f:i32:(align(4));
+    var g:i32:(align(4));
+    var h:i32:(align(4));
+    var i:i32:(align(4));
+    var spltting_current:*<4>:(func,align(4));
+    var foo:any:(readonly, func, align(4));
+    region func spltting_current() {
+        stpr $r1:i8 = lda a;
+        stpr $r2:i8 = lda b;
+        stpr $r3:i8 = lda c;
+        st a     = $r1:i8;
+        //call:(readonly) $r4 = foo($r1, $r2);
+        call:(readonly) $r4:i8 = foo($r1:i8);
+        st b     = neg:i64 $r1:i8;
+        st c     = neg:u32 $r2:i8;
+        st d     = $r4:i8;
+        st e     = $r3:i8;
+    };
+}

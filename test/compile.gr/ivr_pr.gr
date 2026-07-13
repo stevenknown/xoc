@@ -1,0 +1,59 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var scalar:any:(func,align(4));
+    region func scalar (undefined,var i:i32:(align(4)),var j:i32:(align(4)),var a:*<8>:(restrict,align(4)),var b:*<8>:(restrict,align(4)),var c:*<8>:(restrict,align(4)),var n:i32:(align(4)),var m:i32:(align(4)),var o:i32:(align(4))) {
+        var w:i32:(align(4));
+        var u:i32:(align(4));
+        var k:i32:(align(4));
+        var t1:i32:(align(4));
+        var t2:i32:(align(4));
+        var t3:i32:(align(4));
+        var t4:i32:(align(4));
+        var DummyGlobalVarPointedByVAR65:mc<0>:(unallocable);
+        var DummyGlobalVarPointedByVAR66:mc<0>:(unallocable);
+        label "_GR__$L3";
+        st:i32 t2 =
+            mul:i32
+                ld:i32 j,
+                ld:i32 m;
+        st:i32 t1 =
+            mul:i32
+                ld:i32 i,
+                ld:i32 n;
+        stpr $1:*<8> =
+            ld:*<8> a;
+        stpr $2:i32 =
+            ld:i32 o;
+        stpr $3:i32 =
+            ld:i32 o;
+        stpr $4:*<8> =
+            ld:*<8> b;
+        st:i32 t4 =
+            mul:i32
+                ld:i32 t2,
+                ld:i32 u;
+        st:i32 t3 =
+            sub:i32
+                ld:i32 t1,
+                $2:i32;
+        stpr $5:i32 =
+            ld:i32 t4;
+        stpr $6:i32 =
+            ld:i32 t3;
+        label "_GR__$L1";
+        phi $8 = (0,"_GR__$L3"),($10:i32,"_GR__$L4");
+        falsebr (
+            lt:bool
+                $8:i32,
+                $3:i32), "_GR__$L2";
+        label "_GR__$L4";
+        ist:f64 = add $1:*<8>,
+                      mul:i32 add:i32 $6:i32, $8:i32, 8,
+            ild:f64 add $4:*<8>,
+                        mul:i32 add:i32 $5:i32, $8:i32, 8;
+        stpr $10:i32 = add:i32 1, $8;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return ;
+    };
+}

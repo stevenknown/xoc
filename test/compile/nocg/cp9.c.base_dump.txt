@@ -1,0 +1,47 @@
+
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: lda(id:2) THAT LOCATED IN STMT:
+    st:*<4> 'ptr' decl:unsigned int  *  ptr  attachinfo:Dbx,MDSSA        
+        lda:*<4> 'x' decl:unsigned int  x  attachinfo:Dbx
+WILL REPLACE ld THAT LOCATED IN STMT:
+    stpr $4:*<4>        
+        ld:*<4> 'ptr' decl:unsigned int  *  ptr  attachinfo:MDSSA
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: lda(id:35) THAT LOCATED IN STMT:
+    stpr $4:*<4>        
+        lda:*<4> 'x' decl:unsigned int  x  attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    phi $3:*<4> = 
+        $4:*<4>
+        $5:*<4>
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: pr(id:29) THAT LOCATED IN STMT:
+    st:*<4> 'ptr' decl:unsigned int  *  ptr  attachinfo:Dbx,MDSSA        
+        $3:*<4>
+WILL REPLACE ld THAT LOCATED IN STMT:
+    ist:u32 attachinfo:Dbx,MDSSA        
+        ld:*<4> 'ptr' decl:unsigned int  *  ptr  attachinfo:Dbx,MDSSA        
+        ld:u32 'x' decl:unsigned int  x  attachinfo:Dbx,MDSSA
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: lda(id:36) THAT LOCATED IN STMT:
+    phi $3:*<4> = 
+        lda:*<4> 'x' decl:unsigned int  x  attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    stpr $6:u32 attachinfo:Dbx        
+        ild:u32 attachinfo:Dbx,MDSSA            
+            $3:*<4> attachinfo:Dbx
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: lda(id:36) THAT LOCATED IN STMT:
+    phi $3:*<4> = 
+        lda:*<4> 'x' decl:unsigned int  x  attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    st:*<4> 'ptr' decl:unsigned int  *  ptr  attachinfo:Dbx,MDSSA        
+        $3:*<4>
+==---- DUMP Copy Propagation 'nconc' ----==
+PROPAGATING CANDIDATE: lda(id:36) THAT LOCATED IN STMT:
+    phi $3:*<4> = 
+        lda:*<4> 'x' decl:unsigned int  x  attachinfo:Dbx
+WILL REPLACE pr THAT LOCATED IN STMT:
+    ist:u32 attachinfo:Dbx,MDSSA        
+        $3:*<4>        
+        ld:u32 'x' decl:unsigned int  x  attachinfo:Dbx,MDSSA

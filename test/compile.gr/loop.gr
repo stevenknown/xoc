@@ -1,0 +1,19 @@
+region program "program" () {
+    region func main () {
+        while:(sideeffect) lt $1, $2 {}
+        do:(nomove) {} while (lt $1, $2);
+        while (gt $3, $8) {
+            if (le $3, 23) {
+                break;
+            }
+            continue;
+        }
+        do {
+            if (le $3, 23) {
+                break;
+            }
+            continue;
+        } while (gt $3, $8);
+        return $ret:i8;
+    };
+}

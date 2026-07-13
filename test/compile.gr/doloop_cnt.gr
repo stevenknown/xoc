@@ -1,0 +1,29 @@
+region program "program" () {
+    var g:i32:(align(4));
+    var u:i32:(align(4));
+    var w:i32:(align(4));
+    region func main () {
+        var i:i32:(align(4)); //induction variable can not be readonly
+        var j:i32:(align(4)); //induction variable can not be readonly
+        var N:i32:(readonly, align(4));
+        var M:i32:(readonly, align(4));
+        doloop (
+            id i/*IV*/,
+            (20)/*INIT*/,
+            le ld i, 0x5/*DET*/,
+            (add ld i, 1)/*STEP*/) {
+
+            //Do parallel operation in doloop.
+            doloop (id j, (add $4:f64, 20), le ld j, ld M, (add ld j, 1)) {
+                if (eq ld i, ld j) {
+                    st u = 0x88;
+                    continue;
+                }
+                st w = 0xFF;
+                continue;
+                continue;
+            }
+        }
+        return $ret:i32;
+    };
+}

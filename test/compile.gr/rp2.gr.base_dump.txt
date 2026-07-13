@@ -1,0 +1,14 @@
+
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:GVN is inavailable
+==---- DUMP Register Promotion 'main' ----==
+  ==-- DUMP Dont Promotion Table --==
+  ==-- DUMP ALL ACT --==
+    ACT1:GID1:GVN is inavailable
+    ACT2:GID2:GVN is inavailable
+==---- DUMP Register Promotion 'program' ----==
+  ==-- DUMP Dont Promotion Table --==
+==---- DUMP Register Promotion 'program' ----==
+  ==-- DUMP Dont Promotion Table --==

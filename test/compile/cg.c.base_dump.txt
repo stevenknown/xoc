@@ -1,0 +1,55 @@
+
+==---- DUMP Register Promotion 'dgefa' ----==
+  ==-- DUMP Dont Promotion Table --==
+  
+  $4:i32 = call 'daxpy'  attachinfo:Dbx,MDSSA
+==-- DUMP LoopInfo --==
+LOOP4 HEAD:BB2, BODY:2,3,4,5,6,7,8,9,12,
+==-- DUMP ExactAccessTab --==
+  DELEGATE:
+    MD17 -- base:Var69(j):local,align(4),i32,decl:'int  j ' -- ofst:0 -- size:4
+    ld:i32 'j' attachinfo:MDSSA
+    
+    OCCLIST:
+      ld:i32 'j' attachinfo:MDSSA
+      st:i32 'j' attachinfo:Dbx,MDSSA
+      ld:i32 'j' attachinfo:Dbx,MDSSA
+  
+  DELEGATE:
+    MD12 -- base:Var70(k):local,align(4),i32,decl:'int  k ' -- ofst:0 -- size:4
+    ld:i32 'k' attachinfo:MDSSA
+    
+    OCCLIST:
+      ld:i32 'k' attachinfo:MDSSA
+      st:i32 'k' attachinfo:Dbx,MDSSA
+      ld:i32 'k' attachinfo:Dbx,MDSSA
+  
+  
+==-- DUMP InexactAccessTab --==
+  
+==---- DUMP DelegateMgr 'dgefa' ----==
+  ==-- Dele2PR --==
+  
+  DELE:  ld:i32 'j' attachinfo:MDSSA
+  PR:  $7:i32
+  
+  DELE:  ld:i32 'k' attachinfo:MDSSA
+  PR:  $8:i32
+
+  ==-- Dele2InitSTPR --==
+
+  ==-- Dele2RestoreStmt --==
+
+  ==-- Dele2OutsideDefSet --==
+  
+  DELE:  ld:i32 'k' attachinfo:MDSSA
+  OutsideDefSet:    st:i32 'k' attachinfo:Dbx,MDSSA
+
+  ==-- Dele2OutsideUseSet --==
+  
+  ==---- DUMP Delegate Table ----==
+  
+
+==-- Dele2RestoreStmt --==
+
+==-- Dele2RestoreStmt --==

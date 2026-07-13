@@ -1,0 +1,15 @@
+region program "program" () {
+    var swap:i8:(func,align(4));
+    region func swap (undefined,
+                      var a:*<1>:(align(4)), var b:*<1>:(align(4)),
+                      var width:i32:(align(4))) {
+        var temp:i8:(align(4));
+        stpr $1:i32 = ld:i32 width;
+        stpr $3:*<1> = ld:*<1> b;
+        while (ne $1:i32, 0x0:i32) {
+            st:i8 temp = ild:i8 ld:*<1> a;
+            ist:i8 = $3:*<1>, ld:i8 temp;
+        };
+        return;
+    };
+}

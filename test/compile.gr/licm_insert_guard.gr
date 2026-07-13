@@ -1,0 +1,62 @@
+region program program () {
+    var a:*<1>:(align(4));
+    var b:*<1>:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var f:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var m:i32:(align(4));
+    var n:i32:(align(4));
+    var func_level_var_1:u32:(align(4));
+    var func_level_var_2:u32:(align(4));
+    var main:*<4>:(func,align(4));
+    region func main () {
+        stpr $3:any = 
+            lda a;
+        stpr $8:any = 
+            $3:any;
+        label AAA;
+        stpr $4:any = 
+            $8:any;
+        st:i32 d = 100:i32;
+        st:i32 c = 
+            add:any 
+                $4:any, 1:i32;
+        stpr $9:any = 
+            $4:any;
+        truebr (
+            gt:bool 
+                ld:i32 x, 
+                ld:i32 y), CCC;
+        stpr $6:any = 
+            lda e;
+        st:any func_level_var_1 = 
+            $6:any;
+        stpr $7:any = 
+            lda f;
+        stpr $12:any = 
+            ld:any func_level_var_1;
+        st:*<1> b = 
+            sub:any 
+                $12:any, 2:i32;
+        stpr $11:any = 
+            $12:any;
+        label CCC;
+        stpr $5:any = 
+            $11:any;
+        st:any func_level_var_2 = 
+            $5:any;
+        stpr $10:any = 
+            $5:any;
+        truebr (
+            gt:bool 
+                ld:i32 m, 
+                ld:i32 n), AAA;
+        stpr $13:any = 
+            ld:any func_level_var_2;
+        return 
+            $13:any;
+    };
+}

@@ -1,0 +1,73 @@
+region program ".program" () {
+    var LCS:any:(func,align(4));
+    region func LCS (undefined,var a:*<1>:(align(4)),var b:*<1>:(align(4)),var lcs:*<572>:(align(4))) {
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        label "_GR__$L7";
+        stpr $19:*<1> = 
+            ld:*<1> a;
+        stpr $20:*<572> = 
+            ld:*<572> lcs;
+        label "_GR__$L1";
+        phi $23:i32 = (1:i32,"_GR__$L7"),(
+            $25:i32,"_GR__$L4");
+        falsebr (
+            le:bool 
+                $23:i32, 10:i32), "_GR__$L2";
+        label "_GR__$L8";
+        stpr $5:*<1> = 
+            add:*<1> 
+                $19:*<1>, 
+                $23:i32;
+        stpr $10:u32 = 
+            mul:u32 
+                $23:i32, 13:u32;
+        stpr $11:*<572> = 
+            $20:*<572>;
+        stpr $12:*<1> = 
+            $5:*<1>;
+        label "_GR__$L9";
+        phi $18:*<1> = (
+            $12:*<1>,"_GR__$L8");
+        phi $16:*<572> = (
+            $11:*<572>,"_GR__$L8");
+        phi $14:u32 = (
+            $10:u32,"_GR__$L8");
+        label "_GR__$L3";
+        phi $28:i32 = (1:i32,"_GR__$L9"),(
+            $30:i32,"_GR__$L5");
+        falsebr (
+            le:bool 
+                $28:i32, 12:i32), "_GR__$L4";
+        stpr $6:u8 = 
+            ild:u8 
+                $18:*<1>;
+        falsebr (
+            eq:bool 
+                $6:u8, 
+                $28:i32), "_GR__$L5";
+        stpr $8:u32 = 
+            add:u32 
+                $28:i32, 
+                $14:u32;
+        stpr $9:u32 = 
+            mul:u32 
+                $8:u32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                $16:*<572>, 
+                $9:u32,1:i32;
+        label "_GR__$L5";
+        stpr $30:i32 = 
+            add:i32 
+                $28:i32, 1:i32;
+        goto "_GR__$L3";
+        label "_GR__$L4";
+        stpr $25:i32 = 
+            add:i32 
+                $23:i32, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return ;
+    };
+}

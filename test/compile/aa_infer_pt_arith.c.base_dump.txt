@@ -1,0 +1,942 @@
+
+==---- DUMP Alias Analysis 's22' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  ==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) 's22' ----==
+  --- BB3 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  --- BB1 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+
+    [3]  static char qs22[8] = "s22";
+    
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+        elem_num[8]
+        intconst:i32 0|0x0 dim0 attachinfo:Dbx        
+        lda:*<8> 'qs22' array_base attachinfo:Dbx        
+        intconst:u32 115|0x73 rhs attachinfo:Dbx
+    LHS:
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+      MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+        elem_num[8]
+        intconst:i32 1|0x1 dim0 attachinfo:Dbx        
+        lda:*<8> 'qs22' array_base attachinfo:Dbx        
+        intconst:u32 50|0x32 rhs attachinfo:Dbx
+    LHS:
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+      MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+        elem_num[8]
+        intconst:i32 2|0x2 dim0 attachinfo:Dbx        
+        lda:*<8> 'qs22' array_base attachinfo:Dbx        
+        intconst:u32 50|0x32 rhs attachinfo:Dbx
+    LHS:
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+      MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+        elem_num[8]
+        intconst:i32 3|0x3 dim0 attachinfo:Dbx        
+        lda:*<8> 'qs22' array_base attachinfo:Dbx        
+        intconst:u32 0|0x0 rhs attachinfo:Dbx
+    LHS:
+    starray:u8 (elemtype:u8) attachinfo:Dbx
+      MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+
+    [4]  return 0;
+    
+    return attachinfo:Dbx        
+        intconst:i32 0|0x0 attachinfo:Dbx
+    
+    >> MDSet DETAIL:
+==---- DUMP Alias Analysis 's22' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  MD16 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:4
+  MD17 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:4
+  MD18 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:4
+  ==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) 's22' ----==
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+
+    [3]  static char qs22[8] = "s22";
+    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 0|0x0 attachinfo:Dbx        
+        intconst:u32 115|0x73 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 1|0x1 attachinfo:Dbx        
+        intconst:u32 50|0x32 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 2|0x2 attachinfo:Dbx        
+        intconst:u32 50|0x32 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 3|0x3 attachinfo:Dbx        
+        intconst:u32 0|0x0 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+
+    [4]  return 0;
+    
+    return attachinfo:Dbx        
+        intconst:i32 0|0x0 attachinfo:Dbx
+    
+    >> MDSet DETAIL:
+==---- DUMP Alias Analysis 's22' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  MD16 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:4
+  MD17 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:4
+  MD18 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:4
+  ==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) 's22' ----==
+  --- BB3 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  --- BB1 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+
+    [3]  static char qs22[8] = "s22";
+    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 0|0x0 attachinfo:Dbx        
+        intconst:u32 115|0x73 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 1|0x1 attachinfo:Dbx        
+        intconst:u32 50|0x32 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 2|0x2 attachinfo:Dbx        
+        intconst:u32 50|0x32 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+    ist:u8 attachinfo:Dbx,MDSSA        
+        add:*<1> attachinfo:Dbx            
+            lda:*<8> 'qs22' attachinfo:Dbx            
+            intconst:i32 3|0x3 attachinfo:Dbx        
+        intconst:u32 0|0x0 attachinfo:Dbx
+    LHS:
+    ist:u8 attachinfo:Dbx,MDSSA
+      MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+        POINT TO:--
+    RHS:
+    >> MDSet DETAIL:
+    ---------------------------------    
+
+    [4]  return 0;
+    
+    return attachinfo:Dbx        
+        intconst:i32 0|0x0 attachinfo:Dbx
+    
+    >> MDSet DETAIL:
+==---- DUMP Alias Analysis '.program' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  MD16 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:4
+  MD17 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:4
+  MD18 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:4
+  MD19 -- base:Var65($1):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD20 -- base:Var66($2):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD21 -- base:Var67($3):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD22 -- base:Var68($4):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD23 -- base:Var69($5):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD24 -- base:Var70($6):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD25 -- base:Var71($7):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var72($8):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD27 -- base:Var73($9):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD28 -- base:Var74($10):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD29 -- base:Var75($11):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD30 -- base:Var76($12):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  ==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) '.program' ----==
+  --- BB3 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  MD19 -- NO PT
+  MD20 -- NO PT
+  MD21 -- NO PT
+  MD22 -- NO PT
+  MD23 -- NO PT
+  MD24 -- NO PT
+  MD25 -- NO PT
+  MD26 -- NO PT
+  MD27 -- NO PT
+  MD28 -- NO PT
+  MD29 -- NO PT
+  MD30 -- NO PT
+  --- BB1 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- PT_SET: MD2,
+  MD10 -- NO PT
+  MD11 -- PT_SET: MD2,
+  MD12 -- PT_SET: MD2,
+  MD13 -- PT_SET: MD2,
+  MD14 -- PT_SET: MD2,
+  MD15 -- PT_SET: MD2,
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  MD19 -- NO PT
+  MD20 -- NO PT
+  MD21 -- NO PT
+  MD22 -- NO PT
+  MD23 -- NO PT
+  MD24 -- NO PT
+  MD25 -- NO PT
+  MD26 -- NO PT
+  MD27 -- NO PT
+  MD28 -- NO PT
+  MD29 -- NO PT
+  MD30 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- PT_SET: MD2,
+    MD10 -- NO PT
+    MD11 -- PT_SET: MD2,
+    MD12 -- PT_SET: MD2,
+    MD13 -- PT_SET: MD2,
+    MD14 -- PT_SET: MD2,
+    MD15 -- PT_SET: MD2,
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+    region 's22',id:2
+    
+==---- DUMP Alias Analysis '.program' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  MD16 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:4
+  MD17 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:4
+  MD18 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:4
+  MD19 -- base:Var65($1):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD20 -- base:Var66($2):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD21 -- base:Var67($3):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD22 -- base:Var68($4):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD23 -- base:Var69($5):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD24 -- base:Var70($6):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD25 -- base:Var71($7):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var72($8):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD27 -- base:Var73($9):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD28 -- base:Var74($10):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD29 -- base:Var75($11):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD30 -- base:Var76($12):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  ==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '.program' ----==
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- PT_SET: MD2,
+  MD10 -- NO PT
+  MD11 -- PT_SET: MD2,
+  MD12 -- PT_SET: MD2,
+  MD13 -- PT_SET: MD2,
+  MD14 -- PT_SET: MD2,
+  MD15 -- PT_SET: MD2,
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  MD19 -- NO PT
+  MD20 -- NO PT
+  MD21 -- NO PT
+  MD22 -- NO PT
+  MD23 -- NO PT
+  MD24 -- NO PT
+  MD25 -- NO PT
+  MD26 -- NO PT
+  MD27 -- NO PT
+  MD28 -- NO PT
+  MD29 -- NO PT
+  MD30 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- PT_SET: MD2,
+    MD10 -- NO PT
+    MD11 -- PT_SET: MD2,
+    MD12 -- PT_SET: MD2,
+    MD13 -- PT_SET: MD2,
+    MD14 -- PT_SET: MD2,
+    MD15 -- PT_SET: MD2,
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- PT_SET: MD2,
+    MD10 -- NO PT
+    MD11 -- PT_SET: MD2,
+    MD12 -- PT_SET: MD2,
+    MD13 -- PT_SET: MD2,
+    MD14 -- PT_SET: MD2,
+    MD15 -- PT_SET: MD2,
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+    region 's22',id:2
+    
+==---- DUMP Alias Analysis '.program' ----==
+  ==---- DUMP ALL MD ----==
+  MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD7 -- base:Var63(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),str,str,mem_size:31,decl:'' -- ofst:unbound
+  MD8 -- base:Var61(s22):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  s22 ()' -- ofst:unbound
+  MD9 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:8
+  MD10 -- base:Var64(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+  MD11 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:4
+  MD12 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:0 -- size:1
+  MD13 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:1
+  MD14 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:1
+  MD15 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:1
+  MD16 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:1 -- size:4
+  MD17 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:2 -- size:4
+  MD18 -- base:Var62(qs22):global,private,array,addr_taken,align(4),mc,mem_size:8,decl:'static unsigned char  qs22 [8]' -- ofst:3 -- size:4
+  MD19 -- base:Var65($1):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD20 -- base:Var66($2):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD21 -- base:Var67($3):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD22 -- base:Var68($4):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD23 -- base:Var69($5):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD24 -- base:Var70($6):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD25 -- base:Var71($7):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD26 -- base:Var72($8):local,$,unallocable,pointer,pt_base_sz:1,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD27 -- base:Var73($9):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD28 -- base:Var74($10):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD29 -- base:Var75($11):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  MD30 -- base:Var76($12):local,$,unallocable,pointer,pt_base_sz:8,*,mem_size:4,decl:'' -- ofst:0 -- size:4
+  ==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) '.program' ----==
+  --- BB3 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- NO PT
+  MD10 -- NO PT
+  MD11 -- NO PT
+  MD12 -- NO PT
+  MD13 -- NO PT
+  MD14 -- NO PT
+  MD15 -- NO PT
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  MD19 -- NO PT
+  MD20 -- NO PT
+  MD21 -- NO PT
+  MD22 -- NO PT
+  MD23 -- NO PT
+  MD24 -- NO PT
+  MD25 -- NO PT
+  MD26 -- NO PT
+  MD27 -- NO PT
+  MD28 -- NO PT
+  MD29 -- NO PT
+  MD30 -- NO PT
+  --- BB1 ---
+  MD1 -- PT_SET: MD1,
+  MD2 -- PT_SET: MD2,
+  MD3 -- NO PT
+  MD4 -- PT_SET: MD2,
+  MD5 -- NO PT
+  MD6 -- PT_SET: MD2,
+  MD7 -- NO PT
+  MD8 -- NO PT
+  MD9 -- PT_SET: MD2,
+  MD10 -- NO PT
+  MD11 -- PT_SET: MD2,
+  MD12 -- PT_SET: MD2,
+  MD13 -- PT_SET: MD2,
+  MD14 -- PT_SET: MD2,
+  MD15 -- PT_SET: MD2,
+  MD16 -- NO PT
+  MD17 -- NO PT
+  MD18 -- NO PT
+  MD19 -- NO PT
+  MD20 -- NO PT
+  MD21 -- NO PT
+  MD22 -- NO PT
+  MD23 -- NO PT
+  MD24 -- NO PT
+  MD25 -- NO PT
+  MD26 -- NO PT
+  MD27 -- NO PT
+  MD28 -- NO PT
+  MD29 -- NO PT
+  MD30 -- NO PT
+  -- DUMP WORSTCASE POINT-TO --
+  MD2
+  MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+  -- DUMP IR POINT-TO FOR BB --
+
+   -- BB3 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- NO PT
+    MD10 -- NO PT
+    MD11 -- NO PT
+    MD12 -- NO PT
+    MD13 -- NO PT
+    MD14 -- NO PT
+    MD15 -- NO PT
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+   -- BB1 --
+    -- MD2MDSet: --
+    MD1 -- PT_SET: MD1,
+    MD2 -- PT_SET: MD2,
+    MD3 -- NO PT
+    MD4 -- PT_SET: MD2,
+    MD5 -- NO PT
+    MD6 -- PT_SET: MD2,
+    MD7 -- NO PT
+    MD8 -- NO PT
+    MD9 -- PT_SET: MD2,
+    MD10 -- NO PT
+    MD11 -- PT_SET: MD2,
+    MD12 -- PT_SET: MD2,
+    MD13 -- PT_SET: MD2,
+    MD14 -- PT_SET: MD2,
+    MD15 -- PT_SET: MD2,
+    MD16 -- NO PT
+    MD17 -- NO PT
+    MD18 -- NO PT
+    MD19 -- NO PT
+    MD20 -- NO PT
+    MD21 -- NO PT
+    MD22 -- NO PT
+    MD23 -- NO PT
+    MD24 -- NO PT
+    MD25 -- NO PT
+    MD26 -- NO PT
+    MD27 -- NO PT
+    MD28 -- NO PT
+    MD29 -- NO PT
+    MD30 -- NO PT
+
+    -- IR POINT-TO: --
+    ---------------------------------    
+    region 's22',id:2
+    

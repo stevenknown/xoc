@@ -1,0 +1,250 @@
+
+==---- DUMP Dead Code Eliminiation 'main' ----==
+  ==-- Ineffect BB --==
+  --0- BB5		ineffect BB!
+  --0- BB1		ineffect BB!
+  --0- BB2		ineffect BB!
+  --0- BB3		ineffect BB!
+  
+  ==---- DUMP IRBBList 'main' ----==
+  ----- BB5 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  STMT NUM:0
+  
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  STMT NUM:3
+
+     [5]    char * p = (char*)&a;
+     
+     st:*<1> 'p' attachinfo:Dbx,MDSSA         
+         cvt:*<1> attachinfo:Dbx             
+             lda:*<4> 'a' attachinfo:Dbx
+
+     [7]    a = 10;
+     
+     st:i32 'a' attachinfo:Dbx,MDSSA         
+         intconst:i32 10|0xa attachinfo:Dbx
+
+     [8]    if (i > 0) {
+     
+     falsebr label _$L1 attachinfo:Dbx         
+         gt:bool attachinfo:Dbx             
+             ld:i32 'i' attachinfo:Dbx,MDSSA             
+             intconst:i32 0|0x0 attachinfo:Dbx
+  
+  ----- BB2 --- rpo:20 -----
+  ATTR:fall_through 
+  STMT NUM:1
+
+     [9]       p[3] = 20; //S1:mustdef MD15,maydef MD6(local_may_alias)
+     
+     ist:u8:offset(3) attachinfo:Dbx,MDSSA         
+         cvt:*<1> base attachinfo:Dbx             
+             lda:*<4> 'a' attachinfo:Dbx         
+         intconst:i32 20|0x14 attachinfo:Dbx
+  
+  ----- BB3 --- rpo:30 -----
+  LABEL:  _$L1 
+  ATTR:fall_through branch_target 
+  STMT NUM:1
+
+     [13]    return *q; //S2
+     
+     return attachinfo:Dbx
+         ild:u8 attachinfo:Dbx,MDSSA             
+             ld:*<1> 'q' attachinfo:Dbx,MDSSA
+  
+  ==---- DUMP BRIEF PRSSA Manager 'main' ----==
+  ==---- DUMP PRSSAMgr:VPR 'main' ----==
+  VPR1:$1v0--: DEF:-- USE:--
+  VPR2:$1v1$2: DEF:-- USE:--
+  ==---- DUMP PRSSAMgr:VPR REF 'main' ----==
+  ----- BB5 --- rpo:0 -----
+  ATTR:entry_bb fall_through 
+  ----- BB1 --- rpo:10 -----
+  ATTR:fall_through 
+  -- <= --
+  -- <= --
+  -- <= --
+  ----- BB2 --- rpo:20 -----
+  ATTR:fall_through 
+  -- <= --
+  ----- BB3 --- rpo:30 -----
+  LABEL:  _$L1 
+  ATTR:fall_through branch_target 
+  -- <= --
+  ==---- DUMP MDSSA Manager 'main' ----==
+    ==---- DUMP NON-PR MD ----==
+    MD1 -- base:Var1(.full_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD2 -- base:Var2(.global_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD3 -- base:Var3(.import_var):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD4 -- base:Var4(.local_mem):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD5 -- base:Var5(.heap_mem):global,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD6 -- base:Var6(.local_may_alias):local,fake,unallocable,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD7 -- base:Var67(#DedicatedStringVar):global,local,addr_taken,unallocable,align(4),string("DedicatedVarBeRegardedAsString"),str,str,mem_size:31,decl:'' -- ofst:unbound
+    MD8 -- base:Var61(main):global,func,addr_taken,align(4),any,mem_size:ANY,decl:'int  main (int  i ,)' -- ofst:unbound
+    MD9 -- base:Var68(.program):global,fake,mc,mem_size:0,decl:'' -- ofst:unbound
+    MD10 -- base:Var63(a):local,addr_taken,align(4),i32,decl:'int  a ' -- ofst:0 -- size:4
+    MD11 -- base:Var65(p):local,align(4),pointer,pt_base_sz:1,*,mem_size:4,decl:'unsigned char  *  p ' -- ofst:0 -- size:4
+    MD12 -- base:Var62(i):local,formal_param,align(4),i32,decl:'int  i ' -- ofst:0 -- size:4
+    MD13 -- base:Var66(q):local,align(4),pointer,pt_base_sz:1,*,mem_size:4,decl:'unsigned char  *  q ' -- ofst:0 -- size:4
+    MD14 -- base:Var63(a):local,addr_taken,align(4),i32,decl:'int  a ' -- ofst:0 -- size:1
+    MD15 -- base:Var63(a):local,addr_taken,align(4),i32,decl:'int  a ' -- ofst:3 -- size:1
+    ==-- DUMP MDSSAMgr VOpndRef 'main' --==
+    
+    --- BB5 ---
+    --- BB1 ---
+    
+
+    [5]    char * p = (char*)&a;
+    
+    st:*<1> 'p' decl:unsigned char  *  p  attachinfo:Dbx,MDSSA        
+        cvt:*<1> attachinfo:Dbx            
+            lda:*<4> 'a' decl:int  a  attachinfo:Dbx
+      ----
+      st:*<1> 'p' attachinfo:Dbx,MDSSA
+      --DEF:VMD10:MD11V1,-|USESET:
+      --DEF:VMD11:MD4V1,-,NextDEF:MD4V2|USESET:
+    
+
+    [7]    a = 10;
+    
+    st:i32 'a' decl:int  a  attachinfo:Dbx,MDSSA        
+        intconst:i32 10|0xa attachinfo:Dbx
+      ----
+      st:i32 'a' attachinfo:Dbx,MDSSA
+      --DEF:VMD12:MD4V2,PrevDEF:MD4V1,NextDEF:MD4V3|USESET:ld(id:1),id(id:28)
+      --DEF:VMD13:MD10V1,-,NextDEF:MD10V2|USESET:
+      --DEF:VMD14:MD6V1,-,NextDEF:MD6V2|USESET:id(id:30)
+      --DEF:VMD15:MD14V1,-|USESET:
+      --DEF:VMD16:MD15V1,-,NextDEF:MD15V2|USESET:
+    
+
+    [8]    if (i > 0) {
+    
+    falsebr label _$L1 attachinfo:Dbx        
+        gt:bool attachinfo:Dbx            
+            ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA            
+            intconst:i32 0|0x0 attachinfo:Dbx
+      ----
+      ld:i32 'i' attachinfo:Dbx,MDSSA
+      --USE:MD12V0,MD4V2
+    --- BB2 ---
+    
+
+    [9]       p[3] = 20; //S1:mustdef MD15,maydef MD6(local_may_alias)
+    
+    ist:u8:offset(3) attachinfo:Dbx,MDSSA        
+        cvt:*<1> base attachinfo:Dbx            
+            lda:*<4> 'a' decl:int  a  attachinfo:Dbx        
+        intconst:i32 20|0x14 attachinfo:Dbx
+      ----
+      ist:u8:offset(3) attachinfo:Dbx,MDSSA
+      --DEF:VMD17:MD4V3,PrevDEF:MD4V2|USESET:id(id:29)
+      --DEF:VMD18:MD10V2,PrevDEF:MD10V1|USESET:
+      --DEF:VMD19:MD6V2,PrevDEF:MD6V1|USESET:id(id:31)
+      --DEF:VMD20:MD15V2,PrevDEF:MD15V1|USESET:
+    --- BB3 ---
+    MDPhi2: MD6V3 <- (ID id:30 MD6V1 BB1), (ID id:31 MD6V2 BB2)    |USESET:(ild id:25) 
+    MDPhi1: MD4V4 <- (ID id:28 MD4V2 BB1), (ID id:29 MD4V3 BB2)    |USESET:(ld id:12) 
+    
+
+    [13]    return *q; //S2
+    
+    return attachinfo:Dbx
+        ild:u8 attachinfo:Dbx,MDSSA            
+            ld:*<1> 'q' decl:unsigned char  *  q  attachinfo:Dbx,MDSSA
+      ----
+      ild:u8 attachinfo:Dbx,MDSSA
+      --USE:MD2V0,MD6V3
+      ld:*<1> 'q' attachinfo:Dbx,MDSSA
+      --USE:MD13V0,MD4V4
+    ==-- DUMP MDSSAMgr DU CHAIN 'main' --==
+    
+    ----- BB5 --- rpo:0 -----
+    ATTR:entry_bb fall_through 
+    ----- BB1 --- rpo:10 -----
+    ATTR:fall_through 
+
+    [5]    char * p = (char*)&a;
+    
+    st:*<1> 'p' decl:unsigned char  *  p  attachinfo:Dbx,MDSSA        
+        cvt:*<1> attachinfo:Dbx            
+            lda:*<4> 'a' decl:int  a  attachinfo:Dbx
+      ----------------
+      st(id:4)
+        USESET:
+          MD11V1:
+          MD4V1:
+      ----------------
+      
+
+    [7]    a = 10;
+    
+    st:i32 'a' decl:int  a  attachinfo:Dbx,MDSSA        
+        intconst:i32 10|0xa attachinfo:Dbx
+      ----------------
+      st(id:8)
+        USESET:
+          MD4V2:(ld id:1) (id id:28) 
+          MD10V1:
+          MD6V1:(id id:30) 
+          MD14V1:
+          MD15V1:
+      ----------------
+      
+
+    [8]    if (i > 0) {
+    
+    falsebr label _$L1 attachinfo:Dbx        
+        gt:bool attachinfo:Dbx            
+            ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA            
+            intconst:i32 0|0x0 attachinfo:Dbx
+      ----------------
+      ld(id:1)
+        DEFSET:
+          MD12V0:
+          MD4V2:(st id:8) (st id:4)
+      ----------------
+      
+    ----- BB2 --- rpo:20 -----
+    ATTR:fall_through 
+
+    [9]       p[3] = 20; //S1:mustdef MD15,maydef MD6(local_may_alias)
+    
+    ist:u8:offset(3) attachinfo:Dbx,MDSSA        
+        cvt:*<1> base attachinfo:Dbx            
+            lda:*<4> 'a' decl:int  a  attachinfo:Dbx        
+        intconst:i32 20|0x14 attachinfo:Dbx
+      ----------------
+      ist(id:24)
+        USESET:
+          MD4V3:(id id:29) 
+          MD10V2:
+          MD6V2:(id id:31) 
+          MD15V2:
+      ----------------
+      
+    ----- BB3 --- rpo:30 -----
+    LABEL:    _$L1 
+    ATTR:fall_through branch_target 
+    MDPhi2: MD6V3 <- (ID id:30 MD6V1 BB1), (ID id:31 MD6V2 BB2)    |USESET:(ild id:25) 
+    MDPhi1: MD4V4 <- (ID id:28 MD4V2 BB1), (ID id:29 MD4V3 BB2)    |USESET:(ld id:12) 
+
+    [13]    return *q; //S2
+    
+    return attachinfo:Dbx
+        ild:u8 attachinfo:Dbx,MDSSA            
+            ld:*<1> 'q' decl:unsigned char  *  q  attachinfo:Dbx,MDSSA
+      ----------------
+      ild(id:25)
+        DEFSET:
+          MD2V0:
+          MD6V3:(mdphi2) (st id:8) (ist id:24)
+      ld(id:12)
+        DEFSET:
+          MD13V0:
+          MD4V4:(mdphi1) (st id:8) (ist id:24) (st id:4)
+      ----------------
+      

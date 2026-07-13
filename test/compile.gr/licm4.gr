@@ -1,0 +1,22 @@
+region program "program" () {
+    region func main () {
+        //ONLY one 'add' can be licmed to outside loop at the first call
+        //of LICM on higher ARRAY level IR.
+        //After lower ARRAY, a lot of ADD should be licmed.
+        while (eq 1, 1) {
+            stpr $v = array:i32:2:(elemtype:u64,dim[1])
+                        add:*<1> $sp:*<4>, 10, //base
+                        ($e:u32); //subexp
+            if (eq $a:u64, $b:i64) {
+                starray:i32:2:(elemtype:u64,dim[1]) =
+                  add:*<1> $sp, 10, //base
+                  ($e:u32), //subexp
+                  20; //rhs
+            }
+            stpr $y = array:i32:0:(dim[1])
+                         add:*<1> $sp, 10, //base
+                         ($e:u32); //subexp;
+        }
+        return $v;
+    };
+}

@@ -1,0 +1,35 @@
+region program ".program" () {
+    var printf:i8:(func,align(4));
+    var qsort:i8:(func,align(4));
+    var test_qsort1:i8:(func,align(4));
+    var hook_cmp:i32:(func,align(4));
+    var _const_string_1:str:(align(4),string("%d "));
+    var _const_string_2:str:(align(4),string("
+After qsort 1
+"));
+    region func test_qsort1 () {
+        var a:mc<40>:(array,align(4));
+        var i:i32:(align(4));
+        starray:i32:0:(dim[10]) = lda a, (0), 1;
+        starray:i32:0:(dim[10]) = lda a, (1), 2;
+        starray:i32:0:(dim[10]) = lda a, (2), 3;
+        starray:i32:0:(dim[10]) = lda a, (3), 4;
+        starray:i32:0:(dim[10]) = lda a, (4), 5;
+        starray:i32:0:(dim[10]) = lda a, (5), 6;
+        starray:i32:0:(dim[10]) = lda a, (6), 7;
+        starray:i32:0:(dim[10]) = lda a, (7), 8;
+        starray:i32:0:(dim[10]) = lda a, (8), 9;
+        starray:i32:0:(dim[10]) = lda a, (9), 10;
+        call $1:i8 = qsort(lda a,0x0:i32,0x9:i32,4:u32, lda hook_cmp);
+        st:i32 i = 0x0:i32;
+        while (lt ld:i32 i, 0xa:i32) {
+            call $2:i8 = printf(lda _const_string_1,
+                array:i32:0:(dim[10])
+                             lda a, (ld:i32 i));
+            stpr $3:i32 = ld:i32 i;
+            st:i32 i = add:i32 ld:i32 i, 0x1:i32;
+        };
+        call $4:i8 = printf(lda _const_string_2);
+        return;
+    };
+}

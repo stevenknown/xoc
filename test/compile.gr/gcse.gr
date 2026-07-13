@@ -1,0 +1,19 @@
+region program ".program" () {
+    var sign:any:(func,decl,align(4));
+    var quant_coef:mc<384>:(private,array,align(4));
+    var itrans_sp:any:(func,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4));
+    region func main(undefined,var img:*<1536>:(align(4))) {
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        var m5:mc<16>:(array,align(4));
+        var predicted_block:mc<64>:(array,align(4));
+        st:i32 j = 0:i32;
+        stpr $1 = ild $sp;
+        stpr $2 = ild $sp;
+        stpr $3 = ild $sp;
+        stpr $4 = ild $sp;
+        stpr $5 = ild $sp;
+        return ;
+    };
+}

@@ -1,0 +1,210 @@
+
+==-- DUMP InConsistPairList --==
+==---- DUMP Linear Scan Register Allocation 'main' ----==
+==-- DUMP TargInfoMgr --==
+ALLOCABLE:r4,r5,r6,r7,r8,r9,r10,r11,r14
+CALLER:r0,r1,r2,r3
+CALLEE:r4,r5,r6,r7,r8,r9,r10,r11,r14
+PARAM:r0,r1,r2,r3
+RETURN_VALUE:r0,r1,r2,r3
+LINK:r14
+==-- DUMP DedicatedMgr --==
+==-- DUMP ALL LifeTime --==
+==-- DUMP PR OverView --==
+[2] RegionExposedDef <= -- [1]
+----- BB7 --- rpo:0 -----
+ATTR:entry_bb fall_through 
+[4] ExposedDef <= -- [3]
+[?] =========== [?]
+[6] -- <= ExposedUse [5]
+
+----- BB1 --- rpo:10 -----
+ATTR:fall_through 
+[8] ExposedDef <= -- [7]
+[10] $1 <= -- [9]
+[12] $2 <= $1 [11]
+[14] -- <= ExposedUse [13]
+
+----- BB2 --- rpo:20 -----
+LABEL:AAA 
+ATTR:fall_through branch_target 
+[16] ExposedDef <= -- [15]
+[18] $3 <= $2 [17]
+[20] -- <= -- [19]
+[22] -- <= $3 [21]
+[24] $4 <= $3 [23]
+[26] -- <= -- [25]
+[28] -- <= ExposedUse [27]
+
+----- BB3 --- rpo:30 -----
+ATTR:fall_through 
+[30] ExposedDef <= -- [29]
+[32] $5 <= -- [31]
+[34] -- <= $5 [33]
+[36] $6 <= -- [35]
+[38] $7 <= -- [37]
+[40] -- <= $7 [39]
+[42] $8 <= $7 [41]
+[44] -- <= ExposedUse [43]
+
+----- BB4 --- rpo:40 -----
+LABEL:CCC 
+ATTR:fall_through branch_target 
+[46] ExposedDef <= -- [45]
+[48] $9 <= $8 [47]
+[50] -- <= $9 [49]
+[52] $10 <= $9 [51]
+[54] -- <= -- [53]
+[56] -- <= ExposedUse [55]
+
+----- BB5 --- rpo:50 -----
+ATTR:fall_through 
+[58] ExposedDef <= -- [57]
+[60] $11 <= -- [59]
+[?] =========== [?]
+[62] -- <= $11 [61]
+[64] -- <= ExposedUse [63]
+
+[66] RegionExposedUse <= -- [65]
+==-- DUMP LTList --==
+LT:$1,prio:2.00:<10-11>
+ |         --
+ |         du
+LT:$2,prio:2.00:<12-17>
+ |           ------
+ |           d    u
+LT:$3,prio:3.00:<18-23>
+ |                 ------
+ |                 d  u u
+LT:$4,prio:1.00:<24>
+ |                       -
+ |                       d
+LT:$5,prio:2.00:<32-33>
+ |                               --
+ |                               du
+LT:$6,prio:1.00:<36>
+ |                                   -
+ |                                   d
+LT:$7,prio:3.00:<38-41>
+ |                                     ----
+ |                                     du u
+LT:$8,prio:2.00:<42-47>
+ |                                         ------
+ |                                         d    u
+LT:$9,prio:3.00:<48-51>
+ |                                               ----
+ |                                               du u
+LT:$10,prio:1.00:<52>
+ |                                                   -
+ |                                                   d
+LT:$11,prio:2.00:<60-61>
+ |                                                           --
+ |                                                           du
+==-- DUMP PR2Reg --==
+LT:$1:r4(RF_R)
+LT:$2:r4(RF_R)
+LT:$3:r4(RF_R)
+LT:$4:r4(RF_R)
+LT:$5:r4(RF_R)
+LT:$6:r4(RF_R)
+LT:$7:r4(RF_R)
+LT:$8:r4(RF_R)
+LT:$9:r4(RF_R)
+LT:$10:r4(RF_R)
+LT:$11:r4(RF_R)
+==-- DUMP 4LIST --==
+UNHANDLED:
+HANDLED:
+ LT:$1:r4(RF_R)
+ LT:$1,prio:2.00:<10-11>
+  |         --
+  |         du
+ LT:$2:r4(RF_R)
+ LT:$2,prio:2.00:<12-17>
+  |           ------
+  |           d    u
+ LT:$3:r4(RF_R)
+ LT:$3,prio:3.00:<18-23>
+  |                 ------
+  |                 d  u u
+ LT:$4:r4(RF_R)
+ LT:$4,prio:1.00:<24>
+  |                       -
+  |                       d
+ LT:$5:r4(RF_R)
+ LT:$5,prio:2.00:<32-33>
+  |                               --
+  |                               du
+ LT:$6:r4(RF_R)
+ LT:$6,prio:1.00:<36>
+  |                                   -
+  |                                   d
+ LT:$7:r4(RF_R)
+ LT:$7,prio:3.00:<38-41>
+  |                                     ----
+  |                                     du u
+ LT:$8:r4(RF_R)
+ LT:$8,prio:2.00:<42-47>
+  |                                         ------
+  |                                         d    u
+ LT:$9:r4(RF_R)
+ LT:$9,prio:3.00:<48-51>
+  |                                               ----
+  |                                               du u
+ LT:$10:r4(RF_R)
+ LT:$10,prio:1.00:<52>
+  |                                                   -
+  |                                                   d
+ LT:$11:r4(RF_R)
+ LT:$11,prio:2.00:<60-61>
+  |                                                           --
+  |                                                           du
+ACTIVE:
+INACTIVE:
+==-- DUMP ALL ACT --==
+ACT1:ASSIGN:$1 with r4
+ACT2:ASSIGN:$2 with r4
+ACT3:ASSIGN:$3 with r4
+ACT4:ASSIGN:$4 with r4
+ACT5:ASSIGN:$5 with r4
+ACT6:ASSIGN:$6 with r4
+ACT7:ASSIGN:$7 with r4
+ACT8:ASSIGN:$8 with r4
+ACT9:ASSIGN:$9 with r4
+ACT10:ASSIGN:$10 with r4
+ACT11:ASSIGN:$11 with r4
+ACT12:SPILL:insert spill ir id:50 at BB7 to spill r4, reason:spill callee-saved at entry
+ACT13:RELOAD:insert reload ir id:52 at BB5 to reload r4, reason:reload callee-saved at exit
+==-- DUMP InConsistPairList --==
+==---- DUMP Linear Scan Register Allocation 'program' ----==
+==-- DUMP TargInfoMgr --==
+ALLOCABLE:r4,r5,r6,r7,r8,r9,r10,r11,r14
+CALLER:r0,r1,r2,r3
+CALLEE:r4,r5,r6,r7,r8,r9,r10,r11,r14
+PARAM:r0,r1,r2,r3
+RETURN_VALUE:r0,r1,r2,r3
+LINK:r14
+==-- DUMP DedicatedMgr --==
+==-- DUMP ALL LifeTime --==
+==-- DUMP PR OverView --==
+[2] RegionExposedDef <= -- [1]
+----- BB3 --- rpo:0 -----
+ATTR:entry_bb fall_through 
+[4] ExposedDef <= -- [3]
+[6] -- <= ExposedUse [5]
+
+----- BB1 --- rpo:10 -----
+ATTR:fall_through 
+[8] ExposedDef <= -- [7]
+[10] -- <= -- [9]
+[12] -- <= ExposedUse [11]
+
+[14] RegionExposedUse <= -- [13]
+==-- DUMP LTList --==
+==-- DUMP PR2Reg --==
+==-- DUMP 4LIST --==
+UNHANDLED:
+HANDLED:
+ACTIVE:
+INACTIVE:
+==-- DUMP ALL ACT --==

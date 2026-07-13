@@ -1,0 +1,3589 @@
+
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB4   _$L3 
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	ld id:7 --
+  	const id:11 vn3
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      ld:i32 'j' decl:int  j  dim0 attachinfo:Dbx,MDSSA
+      ld:i32 'i1' decl:int  i1  dim1 attachinfo:Dbx,MDSSA      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  rhs attachinfo:Dbx,MDSSA
+   <- {
+  	lda id:13 vn6
+  	ld id:14 --
+  	ld id:17 --
+  	ld id:15 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $3:i32 attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+   <- {
+  	ld id:23 --
+   }
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	ld id:20 --
+  	const id:21 vn4
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  stpr $4:i32 attachinfo:Dbx      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+   <- {
+  	ld id:31 --
+   }
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	ld id:28 --
+  	const id:29 vn4
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB4   _$L3 
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	ld id:7 --
+  	const id:11 vn3
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      ld:i32 'j' decl:int  j  dim0 attachinfo:Dbx,MDSSA
+      ld:i32 'i1' decl:int  i1  dim1 attachinfo:Dbx,MDSSA      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  rhs attachinfo:Dbx,MDSSA
+   <- {
+  	lda id:13 vn6
+  	ld id:14 --
+  	ld id:17 --
+  	ld id:15 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $3:i32 attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+   <- {
+  	ld id:23 --
+   }
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	ld id:20 --
+  	const id:21 vn4
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  stpr $4:i32 attachinfo:Dbx      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+   <- {
+  	ld id:31 --
+   }
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	ld id:28 --
+  	const id:29 vn4
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB4   _$L3 
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	ld id:7 --
+  	const id:11 vn3
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      ld:i32 'j' decl:int  j  dim0 attachinfo:Dbx,MDSSA
+      ld:i32 'i1' decl:int  i1  dim1 attachinfo:Dbx,MDSSA      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  rhs attachinfo:Dbx,MDSSA
+   <- {
+  	lda id:13 vn6
+  	ld id:14 --
+  	ld id:17 --
+  	ld id:15 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $3:i32 attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+   <- {
+  	ld id:23 --
+   }
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	ld id:20 --
+  	const id:21 vn4
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  stpr $4:i32 attachinfo:Dbx      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+   <- {
+  	ld id:31 --
+   }
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	ld id:28 --
+  	const id:29 vn4
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  falsebr label _$L5      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:MDSSA,Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:53 vn3
+  	ld id:19 vn1
+  	const id:54 vn2
+   }
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  phi $8:i32 = 
+      $6:i32
+      $7:i32
+   <- {
+  	$6 id:57 --
+  	$7 id:56 --
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB12 
+  
+  stpr $5:i32      
+      ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:14 --
+   }
+  -- BB4   _$L3 
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	ld id:7 --
+  	const id:11 vn4
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $8:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  rhs attachinfo:Dbx,MDSSA
+   <- {
+  	lda id:13 vn7
+  	$5 id:48 --
+  	ld id:17 --
+  	$8 id:47 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $3:i32 attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+   <- {
+  	ld id:23 --
+   }
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	ld id:20 --
+  	const id:21 vn5
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  stpr $4:i32 attachinfo:Dbx      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+   <- {
+  	ld id:31 --
+   }
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	ld id:28 --
+  	const id:29 vn5
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  falsebr label _$L5      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'j' decl:int  j  attachinfo:MDSSA,Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:53 vn3
+  	ld id:19 vn1
+  	const id:54 vn2
+   }
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  phi $8:i32 = 
+      $6:i32
+      $7:i32
+   <- {
+  	$6 id:57 --
+  	$7 id:56 --
+   }
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  stpr $15:i32      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+   <- {
+  	ld id:14 --
+   }
+  -- BB2   _$L1 
+  
+  phi $14:i32 = 
+      $15:i32
+      $16:i32
+   <- {
+  	$15 id:84 --
+  	$16 id:83 --
+   }
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $8:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn5
+  	$5 id:59 --
+  	$8 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $3:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:
+   <- {
+  	$16 id:75 --
+   }
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $8:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn5
+  	$5 id:90 --
+  	$20 id:88 --
+  	$8 id:91 --
+   }
+  stpr $4:i32 attachinfo:Dbx      
+      $11:i32 attachinfo:
+   <- {
+  	$11 id:64 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  phi $8:i32 = 
+      $6:i32
+   <- {
+  	$6 id:57 --
+   }
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $8:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn4
+  	$5 id:59 --
+  	$8 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn5
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn6
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $8:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn4
+  	$5 id:90 --
+  	$20 id:88 --
+  	$8 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  phi $8:i32 = 
+      $6:i32
+   <- {
+  	$6 id:57 --
+   }
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  falsebr label _$L6      
+      lt:bool attachinfo:Dbx          
+          $12:i32          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:54 vn3
+  	$12 id:64 vn1
+  	const id:13 vn2
+   }
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  phi $24:i32 = 
+      $17:i32
+      $23:i32
+   <- {
+  	$17 id:75 vn1
+  	$23 id:55 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $8:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn5
+  	$5 id:59 --
+  	$8 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $24:i32
+      $18:i32
+   <- {
+  	$24 id:79 --
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $8:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn5
+  	$5 id:90 --
+  	$20 id:88 --
+  	$8 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  phi $8:i32 = 
+      $6:i32
+   <- {
+  	$6 id:57 --
+   }
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  falsebr label _$L6      
+      lt:bool attachinfo:Dbx          
+          $12:i32          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:54 vn3
+  	$12 id:64 vn1
+  	const id:13 vn2
+   }
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  phi $24:i32 = 
+      $17:i32
+      $23:i32
+   <- {
+  	$17 id:75 vn1
+  	$23 id:55 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $8:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn5
+  	$5 id:59 --
+  	$8 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $24:i32
+      $18:i32
+   <- {
+  	$24 id:79 --
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $8:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn5
+  	$5 id:90 --
+  	$20 id:88 --
+  	$8 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  phi $24:i32 = 
+      $17:i32
+  vn1 <- {
+  	$17 id:75 vn1
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $6:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn4
+  	$5 id:59 --
+  	$6 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $24:i32
+      $18:i32
+   <- {
+  	$24 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn5
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn6
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $6:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn4
+  	$5 id:90 --
+  	$20 id:88 --
+  	$6 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  phi $24:i32 = 
+      $17:i32
+  vn1 <- {
+  	$17 id:75 vn1
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $6:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn4
+  	$5 id:59 --
+  	$6 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $24:i32
+      $18:i32
+   <- {
+  	$24 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn5
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn6
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $6:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn4
+  	$5 id:90 --
+  	$20 id:88 --
+  	$6 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $6:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn4
+  	$5 id:59 --
+  	$6 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn5
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn6
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $6:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn4
+  	$5 id:90 --
+  	$20 id:88 --
+  	$6 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $21:i32      
+      array:i32 (elemtype:i32) attachinfo:MDSSA
+          elemnum[6,4]
+          $5:i32 dim0
+          $6:i32 dim1          
+          lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx
+   <- {
+  	array id:16 --
+  	lda id:85 vn4
+  	$5 id:59 --
+  	$6 id:80 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn5
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn6
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+
+  [6]  for (j=0;j<4;j++)
+  
+  starray:i32 (elemtype:i32) attachinfo:Dbx,MDSSA
+      elem_num[6,4]
+      $5:i32 dim0
+      $6:i32 dim1      
+      lda:*<96> 'cof' decl:int  cof [4][6] array_base attachinfo:Dbx      
+      $20:i32 rhs
+   <- {
+  	lda id:89 vn4
+  	$5 id:90 --
+  	$20 id:88 --
+  	$6 id:91 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn6
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn3
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $25:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$25 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn2
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn5
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn3
+   }
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $30:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$30 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn2
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn5
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  falsebr label _$L7      
+      lt:bool attachinfo:Dbx          
+          $12:i32          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:111 vn3
+  	$12 id:114 vn1
+  	const id:112 vn2
+   }
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn4
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn4
+   }
+  -- BB21   _$L7 
+  
+  phi $36:u32 = 
+      $25:u32
+      $35:u32
+   <- {
+  	$25 id:118 --
+  	$35 id:117 --
+   }
+  phi $34:u32 = 
+      $30:u32
+      $33:u32
+   <- {
+  	$30 id:115 --
+  	$33 id:95 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $36:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$36 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn2
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn6
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn7
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn8
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $34:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$34 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn2
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn6
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn8
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  falsebr label _$L7      
+      lt:bool attachinfo:Dbx          
+          $12:i32          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:111 vn3
+  	$12 id:114 vn1
+  	const id:112 vn2
+   }
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn4
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn4
+   }
+  -- BB21   _$L7 
+  
+  phi $36:u32 = 
+      $25:u32
+      $35:u32
+   <- {
+  	$25 id:118 --
+  	$35 id:117 --
+   }
+  phi $34:u32 = 
+      $30:u32
+      $33:u32
+   <- {
+  	$30 id:115 --
+  	$33 id:95 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $36:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$36 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn2
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn6
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn7
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn8
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $34:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$34 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn2
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn6
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn8
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn2
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn2
+   }
+  -- BB21   _$L7 
+  
+  phi $36:u32 = 
+      $25:u32
+   <- {
+  	$25 id:118 --
+   }
+  phi $34:u32 = 
+      $30:u32
+   <- {
+  	$30 id:115 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn3
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $36:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$36 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn3
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn5
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $34:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$34 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn3
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn5
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn2
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn2
+   }
+  -- BB21   _$L7 
+  
+  phi $36:u32 = 
+      $25:u32
+   <- {
+  	$25 id:118 --
+   }
+  phi $34:u32 = 
+      $30:u32
+   <- {
+  	$30 id:115 --
+   }
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn3
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $36:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$36 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn3
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn5
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $34:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$34 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn3
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn5
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn2
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn2
+   }
+  -- BB21   _$L7 
+  
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn3
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $25:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$25 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn3
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn5
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $30:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$30 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn3
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn5
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'itrans_2' ----==
+  -- BB11 
+  
+  -- BB1 
+  
+  st:i32 'j' decl:int  j  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB14 
+  
+  -- BB13 
+  
+  stpr $6:i32      
+      ld:i32 'i1' decl:int  i1  attachinfo:Dbx,MDSSA
+   <- {
+  	ld id:15 --
+   }
+  -- BB15   _$L5 
+  
+  stpr $12:i32      
+      ld:i32 'j' decl:int  j  attachinfo:MDSSA
+  vn1 <- {
+  	ld id:61 vn1
+   }
+  -- BB17 
+  
+  -- BB16 
+  
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $17:i32 attachinfo:Dbx      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:8 vn1
+   }
+  -- BB18   _$L6 
+  
+  -- BB20 
+  
+  -- BB19 
+  
+  stpr $30:u32      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:103 --
+  	$6 id:91 --
+  	const id:102 vn2
+   }
+  stpr $25:u32 attachinfo:      
+      mul:u32          
+          $6:i32          
+          intconst:u32 6|0x6
+   <- {
+  	mul id:97 --
+  	$6 id:80 --
+  	const id:13 vn2
+   }
+  -- BB21   _$L7 
+  
+  -- BB2   _$L1 
+  
+  phi $11:i32 = 
+      $12:i32
+      $13:i32
+   <- {
+  	$12 id:71 vn1
+  	$13 id:69 --
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 4|0x4 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	$11 id:63 --
+  	const id:5 vn3
+   }
+  -- BB3 
+  
+  -- BB12 
+  
+  stpr $5:i32      
+      $11:i32 attachinfo:Dbx
+   <- {
+  	$11 id:67 --
+   }
+  stpr $26:u32      
+      add:u32          
+          $5:i32          
+          $25:u32
+   <- {
+  	add id:98 --
+  	$5 id:59 --
+  	$25 id:49 --
+   }
+  stpr $27:u32 attachinfo:      
+      mul:u32          
+          $26:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:100 --
+  	$26 id:46 --
+  	const id:99 vn3
+   }
+  stpr $28:*<4>      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $27:u32
+   <- {
+  	add id:101 --
+  	lda id:85 vn5
+  	$27 id:45 --
+   }
+  stpr $29:i32      
+      ild:i32 attachinfo:MDSSA          
+          $28:*<4>
+   <- {
+  	ild id:19 --
+  	$28 id:83 --
+   }
+  stpr $21:i32      
+      $29:i32
+   <- {
+  	$29 id:84 --
+   }
+  -- BB4   _$L3 
+  
+  phi $20:i32 = 
+      $21:i32
+      $22:i32
+   <- {
+  	$21 id:96 --
+  	$22 id:94 --
+   }
+  phi $16:i32 = 
+      $17:i32
+      $18:i32
+   <- {
+  	$17 id:79 vn1
+  	$18 id:82 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  falsebr label _$L4 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 2|0x2 attachinfo:Dbx
+   <- {
+  	lt id:12 --
+  	$16 id:70 --
+  	const id:11 vn6
+   }
+  -- BB5 
+  
+
+  [8]      cof[i1][j]=i;
+  
+  stpr $22:i32 attachinfo:Dbx      
+      $16:i32 attachinfo:Dbx
+   <- {
+  	$16 id:74 --
+   }
+
+  [7]    for (i=0;i<2;i++)
+  
+  stpr $18:i32 attachinfo:Dbx      
+      add:i32          
+          $16:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:22 --
+  	$16 id:77 --
+  	const id:21 vn7
+   }
+  goto label _$L3
+   <- { }
+  -- BB7   _$L4 
+  
+  stpr $31:u32      
+      add:u32          
+          $5:i32          
+          $30:u32
+   <- {
+  	add id:104 --
+  	$5 id:90 --
+  	$30 id:60 --
+   }
+  stpr $32:u32      
+      mul:u32          
+          $31:u32          
+          intconst:u32 4|0x4
+   <- {
+  	mul id:106 --
+  	$31 id:47 --
+  	const id:105 vn3
+   }
+
+  [6]  for (j=0;j<4;j++)
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          lda:*<96> 'cof' decl:int  cof [4][6] attachinfo:Dbx          
+          $32:u32      
+      $20:i32
+   <- {
+  	add id:107 --
+  	$20 id:88 --
+  	lda id:89 vn5
+  	$32 id:48 --
+   }
+  stpr $13:i32 attachinfo:Dbx      
+      add:i32          
+          $11:i32 attachinfo:Dbx          
+          intconst:i32 1|0x1
+   <- {
+  	add id:30 --
+  	$11 id:66 --
+  	const id:29 vn7
+   }
+  goto label _$L1
+   <- { }
+  -- BB9   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'itrans_2',id:2
+   <- { }

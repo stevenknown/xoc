@@ -1,0 +1,115 @@
+region program ".program" () {
+    var arr:mc<40>:(array,align(4));
+    var sum:i32:(align(4));
+    var n:i32:(align(4));
+    var m:i32:(align(4));
+    var x:i32:(align(4));
+    var y:i32:(align(4));
+    var z:i32:(align(4));
+    var foo:any:(func,align(4));
+    region func foo () {
+        var j:i32:(align(4));
+        st:i32 j = 0:i32;
+        label "_GR__$L1";
+        falsebr (
+            lt:bool 
+                ld:i32 j, 10:i32), "_GR__$L2";
+        stpr $3:i32 = 
+            mul:i32 
+                ld:i32 m, 7:i32;
+        stpr $4:i32 = 
+            mul:i32 
+                ld:i32 x, 61:i32;
+        stpr $5:i32 = 
+            mul:i32 
+                $4:i32, 
+                ld:i32 y;
+        stpr $6:i32 = 
+            sub:i32 
+                $3:i32, 
+                $5:i32;
+        stpr $7:i32 = 
+            add:i32 
+                $6:i32, 
+                ld:i32 j;
+        stpr $8:i32 = 
+            mul:i32 
+                ld:i32 y, 19:i32;
+        stpr $9:i32 = 
+            add:i32 
+                $7:i32, 
+                $8:i32;
+        stpr $10:i32 = 
+            mul:i32 
+                ld:i32 z, 11:i32;
+        stpr $11:i32 = 
+            sub:i32 
+                $9:i32, 
+                $10:i32;
+        stpr $12:i32 = 
+            sub:i32 
+                $11:i32, 3:i32;
+        stpr $13:u32 = 
+            mul:u32 
+                $12:i32, 4:u32;
+        stpr $14:*<4> = 
+            add:*<4> 
+                lda arr, 
+                $13:u32;
+        stpr $15:i32 = 
+            ild:i32 
+                $14:*<4>;
+        stpr $16:i32 = 
+            mul:i32 
+                ld:i32 m, 7:i32;
+        stpr $17:i32 = 
+            mul:i32 
+                ld:i32 x, 61:i32;
+        stpr $18:i32 = 
+            mul:i32 
+                $17:i32, 
+                ld:i32 y;
+        stpr $19:i32 = 
+            sub:i32 
+                $16:i32, 
+                $18:i32;
+        stpr $20:i32 = 
+            add:i32 
+                $19:i32, 
+                ld:i32 j;
+        stpr $21:i32 = 
+            mul:i32 
+                ld:i32 y, 19:i32;
+        stpr $22:i32 = 
+            add:i32 
+                $20:i32, 
+                $21:i32;
+        stpr $23:i32 = 
+            mul:i32 
+                ld:i32 z, 11:i32;
+        stpr $24:i32 = 
+            sub:i32 
+                $22:i32, 
+                $23:i32;
+        stpr $25:i32 = 
+            sub:i32 
+                $24:i32, 3:i32;
+        stpr $26:u32 = 
+            mul:u32 
+                $25:i32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda arr, 
+                $26:u32,
+            add:i32 
+                $15:i32, 
+                ld:i32 sum;
+        st:i32 j = 
+            add:i32 
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return ;
+    };
+    st:i32 sum = 0:i32;
+}

@@ -1,0 +1,56 @@
+
+==---- DUMP Loop Invariant Code Motion 'guard' ----==
+==---- DUMP LICM Analysis Result : LoopInfo1 : 'guard' ----==
+
+==---- DUMP Natural Loop Info ----==
+LOOP1 HEAD:BB1, BODY:1,2,
+-- INVARIANT EXP (NUM=8) -- :
+   ld:i32 'id' attachinfo:Dbx,MDSSA
+   add:*<1> attachinfo:Dbx       
+       lda:*<4> 'buff' attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA
+   gt:bool attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 0|0x0 attachinfo:Dbx
+   $1:i32 attachinfo:Dbx
+   band:i32 attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 127|0x7f attachinfo:Dbx
+   ld:i32 'id' attachinfo:Dbx,MDSSA
+   ld:i32 'id' attachinfo:Dbx,MDSSA
+   cvt:u8 attachinfo:Dbx       
+       $1:i32 attachinfo:Dbx
+-- INVARIANT STMT (NUM=2) -- :
+
+   [5]    buff[id] = (unsigned char)(id&0x7F);
+   
+   stpr $1:i32 attachinfo:Dbx       
+       band:i32 attachinfo:Dbx           
+           ld:i32 'id' decl:int  id  attachinfo:Dbx,MDSSA           
+           intconst:i32 127|0x7f attachinfo:Dbx
+   ist:u8 attachinfo:Dbx,MDSSA       
+       add:*<1> attachinfo:Dbx           
+           lda:*<4> 'buff' decl:unsigned char  buff [4] attachinfo:Dbx           
+           ld:i32 'id' decl:int  id  attachinfo:Dbx,MDSSA       
+       cvt:u8 attachinfo:Dbx           
+           $1:i32 attachinfo:Dbx
+-- HOIST CAND EXP (NUM=4) -- :
+   band:i32 attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 127|0x7f attachinfo:Dbx
+   add:*<1> attachinfo:Dbx       
+       lda:*<4> 'buff' attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA
+   gt:bool attachinfo:Dbx       
+       ld:i32 'id' attachinfo:Dbx,MDSSA       
+       intconst:i32 0|0x0 attachinfo:Dbx
+   cvt:u8 attachinfo:Dbx       
+       $1:i32 attachinfo:Dbx
+-- HOISTED IR: --
+  stpr $1:i32 attachinfo:Dbx
+-- HOISTED IR: --
+  add:*<1> attachinfo:Dbx
+-- HOISTED IR: --
+  gt:bool attachinfo:Dbx
+-- HOISTED IR: --
+  ist:u8 attachinfo:Dbx,MDSSA

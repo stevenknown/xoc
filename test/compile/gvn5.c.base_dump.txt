@@ -1,0 +1,291 @@
+
+==---- DUMP Global Value Numbering 'foo' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+
+  [3]    for (int i=0;i<100;i++) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 100|0x64 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn2
+   }
+  -- BB3 
+  
+
+  [4]        m[i]=n[i]+7; //ld m, ld n should have different livein VN.
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          ld:*<4> 'm' decl:int restrict *  m  attachinfo:Dbx,MDSSA          
+          mul:i32              
+              ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA              
+              intconst:i32 4|0x4      
+      add:i32 attachinfo:Dbx          
+          ild:i32 attachinfo:Dbx,MDSSA              
+              add:*<4>                  
+                  ld:*<4> 'n' decl:int restrict *  n  attachinfo:Dbx,MDSSA                  
+                  mul:i32                      
+                      ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA                      
+                      intconst:i32 4|0x4          
+          intconst:i32 7|0x7 attachinfo:Dbx
+  vn7 <- {
+  	add id:13 --
+  	add id:25 vn7
+  	ld id:14 vn3
+  	mul id:15 --
+  	ild id:23 --
+  	const id:24 vn6
+  	ld id:16 --
+  	const id:17 vn4
+  	add id:22 --
+  	ld id:18 vn5
+  	mul id:20 --
+  	ld id:19 --
+  	const id:21 vn4
+   }
+
+  [3]    for (int i=0;i<100;i++) {
+  
+  stpr $2:i32 attachinfo:Dbx      
+      ld:i32 'i' decl:int  i  attachinfo:MDSSA
+  vn8 <- {
+  	ld id:32 vn8
+   }
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+  vn10 <- {
+  	add id:31 vn10
+  	ld id:29 --
+  	const id:30 vn9
+   }
+  goto label _$L1
+   <- { }
+  -- BB5   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'foo' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB8 
+  
+  stpr $3:*<4>      
+      ld:*<4> 'm' decl:int restrict *  m  attachinfo:Dbx,MDSSA
+  vn2 <- {
+  	ld id:14 vn2
+   }
+  stpr $4:*<4>      
+      ld:*<4> 'n' decl:int restrict *  n  attachinfo:Dbx,MDSSA
+  vn3 <- {
+  	ld id:18 vn3
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 100|0x64 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn4
+   }
+  -- BB3 
+  
+
+  [4]        m[i]=n[i]+7; //ld m, ld n should have different livein VN.
+  
+  ist:i32 attachinfo:Dbx,MDSSA      
+      add:*<4>          
+          $3:*<4>          
+          mul:i32              
+              ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA              
+              intconst:i32 4|0x4      
+      add:i32 attachinfo:Dbx          
+          ild:i32 attachinfo:Dbx,MDSSA              
+              add:*<4>                  
+                  $4:*<4>                  
+                  mul:i32                      
+                      ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA                      
+                      intconst:i32 4|0x4          
+          intconst:i32 7|0x7 attachinfo:Dbx
+  vn7 <- {
+  	add id:13 --
+  	add id:25 vn7
+  	$3 id:42 vn2
+  	mul id:15 --
+  	ild id:23 --
+  	const id:24 vn6
+  	ld id:16 --
+  	const id:17 vn5
+  	add id:22 --
+  	$4 id:44 vn3
+  	mul id:20 --
+  	ld id:19 --
+  	const id:21 vn5
+   }
+
+  [3]    for (int i=0;i<100;i++) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+  vn9 <- {
+  	add id:31 vn9
+  	ld id:29 --
+  	const id:30 vn8
+   }
+  goto label _$L1
+   <- { }
+  -- BB5   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering 'foo' ----==
+  -- BB7 
+  
+  -- BB1 
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      intconst:i32 0|0x0 attachinfo:Dbx
+  vn1 <- {
+  	const id:2 vn1
+   }
+  -- BB8 
+  
+  stpr $3:*<4>      
+      ld:*<4> 'm' decl:int restrict *  m  attachinfo:Dbx,MDSSA
+  vn2 <- {
+  	ld id:14 vn2
+   }
+  stpr $4:*<4>      
+      ld:*<4> 'n' decl:int restrict *  n  attachinfo:Dbx,MDSSA
+  vn3 <- {
+  	ld id:18 vn3
+   }
+  -- BB2   _$L1 
+  
+  falsebr label _$L2 attachinfo:Dbx      
+      lt:bool attachinfo:Dbx          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 100|0x64 attachinfo:Dbx
+   <- {
+  	lt id:6 --
+  	ld id:1 --
+  	const id:5 vn4
+   }
+  -- BB3 
+  
+  stpr $5:i32 attachinfo:      
+      mul:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4
+  vn6 <- {
+  	mul id:15 vn6
+  	ld id:16 --
+  	const id:17 vn5
+   }
+  stpr $6:*<4>      
+      add:*<4>          
+          $3:*<4>          
+          $5:i32 attachinfo:Dbx
+  vn7 <- {
+  	add id:13 vn7
+  	$3 id:42 vn2
+  	$5 id:32 vn6
+   }
+  stpr $7:i32      
+      mul:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 4|0x4
+  vn8 <- {
+  	mul id:20 vn8
+  	ld id:19 --
+  	const id:21 vn5
+   }
+  stpr $8:*<4>      
+      add:*<4>          
+          $4:*<4>          
+          $7:i32 attachinfo:Dbx
+  vn9 <- {
+  	add id:22 vn9
+  	$4 id:44 vn3
+  	$7 id:48 vn8
+   }
+
+  [4]        m[i]=n[i]+7; //ld m, ld n should have different livein VN.
+  
+  stpr $9:i32 attachinfo:Dbx      
+      ild:i32 attachinfo:Dbx,MDSSA          
+          $8:*<4> attachinfo:Dbx
+  vn10 <- {
+  	ild id:23 vn10
+  	$8 id:50 vn9
+   }
+  ist:i32 attachinfo:Dbx,MDSSA      
+      $6:*<4> attachinfo:Dbx      
+      add:i32 attachinfo:Dbx          
+          $9:i32 attachinfo:Dbx          
+          intconst:i32 7|0x7 attachinfo:Dbx
+  vn12 <- {
+  	$6 id:46 vn7
+  	add id:25 vn12
+  	$9 id:52 vn10
+  	const id:24 vn11
+   }
+
+  [3]    for (int i=0;i<100;i++) {
+  
+  st:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA      
+      add:i32          
+          ld:i32 'i' decl:int  i  attachinfo:Dbx,MDSSA          
+          intconst:i32 1|0x1
+  vn14 <- {
+  	add id:31 vn14
+  	ld id:29 --
+  	const id:30 vn13
+   }
+  goto label _$L1
+   <- { }
+  -- BB5   _$L2 
+  
+  return
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'foo',id:2
+   <- { }
+==---- DUMP Global Value Numbering '.program' ----==
+  -- BB3 
+  
+  -- BB1 
+  
+  region 'foo',id:2
+   <- { }

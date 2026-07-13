@@ -1,0 +1,28 @@
+region program ".program" () {
+    var e:*<4>:(align(4));
+    var tk:i32:(align(4));
+    var expr:any:(func,align(4));
+    region func expr (undefined,var lev:i32:(align(4))) {
+        var t:i32:(align(4));
+        var d:*<4>:(align(4));
+        label "_@GR__$L1";
+        stpr $1:i32 = ld:i32 lev;
+        truebr (eq:bool ld:i32 lev, 0:i32), "_@GR__$L2";
+        stpr $2:i32 = ld:i32 tk;
+        truebr (eq:bool ld:i32 tk, 0:i32), "_@GR__$L1";
+        stpr $3:*<4> = ld:*<4> e;
+        stpr $4:*<4> = add:*<4> ld:*<4> e, 4:u32;
+        st:*<4> e = $4:*<4>;
+        stpr $5:*<4> = $4:*<4>;
+        ist:i32 = $4:*<4>,10:i32;
+        stpr $6:*<4> = ld:*<4> d;
+        stpr $7:*<4> = ld:*<4> e;
+        stpr $8:*<4> = add:*<4> $4:*<4>, 16:u32;
+        ist:i32 = ld:*<4> d, add:*<4> ld:*<4> e, 92:u32;
+        stpr $9:*<4> = ld:*<4> e;
+        st:*<4> d = $4:*<4>;
+        goto "_@GR__$L1";
+        label "_@GR__$L2";
+        return ;
+    };
+}

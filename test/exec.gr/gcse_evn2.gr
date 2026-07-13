@@ -1,0 +1,37 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var exit:any:(func,decl,align(4));
+    var printf:any:(func,decl,align(4));
+    var foo:any:(readonly, func, align(4));
+    var main:any:(func,align(4));
+    var _const_string_u32:str:(align(4),string("%x, %x
+"));
+    region func foo () {
+        return 0;
+    }
+    region func main () {
+        var p:*<1>:(align(4));
+        var m:i32:(align(4));
+        var t1:*<1>:(align(4));
+        var t2:*<1>:(align(4));
+        var t3:*<1>:(align(4));
+
+        st g = 100:i32;
+        st p = lda g;
+
+        //e.g: *p = 111;
+        ist:i32 = ld p, 111:i32;
+
+        st:i32 m = ild:*<1> ld p;
+
+        st g = 222:i32; //g is alias with *p.
+        call:(readonly) $r4:i32 = foo(); //g is unchanged.
+
+        stpr $x:i32 = ild:*<1> ld p;
+
+        truebr (eq:bool $x:i32, 222:i32), "_$SUCC";
+        call:(use(ild:any 0:any)) $8:i32 = exit(2:i32);
+        label "_$SUCC";
+        return 0;
+    };
+}

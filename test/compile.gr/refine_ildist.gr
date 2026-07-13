@@ -1,0 +1,17 @@
+region program ".program" () {
+    var p:*<4>:(align(4));
+    var q:*<40>:(align(4));
+    var foo:*<4>:(func,align(4));
+
+    region func foo () {
+        var a:mc<40>:(array,align(4));
+
+        //refine ist(add p,4) to ist:4(p)
+        ist:i32 = (add:*<4> (ld:*<4> p), 4),  20;
+
+        //refine ild(add p,4) to ild:4(p)
+        return add:i32
+                 ild:i32:4 (add:*<4> (ld:*<4> p), 4),
+                 array:i32:0:(dim[10]) (ld:*<40> q), (2:i32);
+    };
+}

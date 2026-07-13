@@ -1,0 +1,53 @@
+region program ".program" () {
+    var printf:any:(func,decl,align(4));
+    var A:i32:(align(4));
+    var B:i32:(align(4));
+    var C:i32:(align(4));
+    var foo:any:(func,align(4));
+    var main:any:(func,align(4));
+    var _const_string_1:str:(string("\n >>%d,%d<< \n"),align(4));
+    region func foo (undefined,var i:i32:(align(4))) {
+        falsebr (gt:bool ld:i32 A, ld:i32 B), "_GR__$L1";
+
+        label L_LEFT;
+
+        //A is 1, B is 2, $1 is 3.
+        stpr $1:i32 = add:i32 ld:i32 A, ld:i32 B;
+
+        //C is 8.
+        st:i32 C = add:i32 $1:i32, 5:i32;
+        goto "_GR__$L2";
+
+        label "_GR__$L1";
+        label L_RIGHT;
+
+        //A is 1, B is 2, $2 is -1.
+        stpr $2:i32 = sub:i32 ld:i32 A, ld:i32 B;
+
+        //$2 is -1, C is -6.
+        st:i32 C = sub:i32 $2:i32, 5:i32;
+
+        label "_GR__$L2";
+
+        //$1 is 3, $2 is -1
+        phi $4:u32 = ($1:u32, L_LEFT), ($2:u32, L_RIGHT);
+
+        //C is -6, $4 is -1, return -7
+        return add ld:i32 C, $4;
+    };
+    region func main () {
+        var w:i32:(align(4));
+        st:i32 A = 1:i32;
+        st:i32 B = 2:i32;
+        st:i32 C = 100:i32;
+        call $1:i32 = foo(1:i32);
+        call printf(lda _const_string_1, ld:i32 C, $1:i32);
+        if (ne:bool ld:i32 C, -6:i32) {
+            return 1:i32;
+        };
+        if (ne:bool $1:i32, -7:i32) {
+            return 2:i32;
+        };
+        return 0:i32;
+    };
+}

@@ -1,0 +1,24 @@
+region program mykernel () {
+    var word:u32:(align(4));
+    var switch_key:any:(func, align(4));
+    region func switch_key(undefined, var in_key:*<1>:(align(4)), var n_bytes:u32:(align(4)),
+                           var f:i32:(align(4)), var cx:*<524>:(align(4))) {
+        var kf:*<4>:(align(4));
+        var kt:*<4>:(align(16));
+        var rci:u32:(align(8));
+        var a:u8:(align(8));
+        var b:any:(align(8));
+        var c:i16:(align(8));
+        var d:i16:(align(8));
+        var key:any:(func, align(4));
+
+        region func key (undefined, var in_key:*<1>:(align(4)), var n_bytes:u32:(align(4))) {
+            if (eq ld a, ld d) {
+                stpr $4 = 1:bool;
+            }
+            return $4;
+        };
+
+        return 1;
+    };
+}

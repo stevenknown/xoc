@@ -1,0 +1,37 @@
+region program ".program" () {
+    var strcmp:i32:(func,align(4));
+    var printf:i8:(func,align(4));
+    var hook_cmp:i32:(func,align(4));
+    var hook_cmp2:i32:(func,align(4));
+    var swap:i8:(func,align(4));
+    var qsort:i8:(func,align(4));
+    var Node:mc<8>:(align(4));
+    var qsort:i8:(func,align(4));
+    var test_qsort1:i8:(func,align(4));
+    var test_qsort2:i8:(func,align(4));
+    var main:i32:(func,align(4));
+    var swap:i8:(func,align(4));
+    var hook_cmp:i32:(func,align(4));
+    var hook_cmp2:i32:(func,align(4));
+    var _const_string_1:str:(align(4),string("%d "));
+    var _const_string_3:str:(align(4),string("xkey"));
+    var _const_string_4:str:(align(4),string("color"));
+    var _const_string_5:str:(align(4),string("void"));
+    var _const_string_6:str:(align(4),string("static"));
+    var _const_string_7:str:(align(4),string("while"));
+    region func qsort (undefined,var base:*<1>:(align(4)),var nleft:i32:(align(4)),var nright:i32:(align(4)),var width:i32:(align(4)),var fhook_cmp:*<4>:(align(4))) {
+        var lo:*<1>:(align(4));
+        var hi:*<1>:(align(4));
+        var x:i32:(align(4));
+        var i:i32:(align(4));
+        var ll:*<1>:(align(4));
+        st:i32 i = add:i32 ld:i32 nleft, 1;
+        while (le ld:i32 i, ld:i32 nright) {
+            if (lt $2:i32, 0x0:i32) {
+                call swap();
+            };
+            st:i32 i = add:i32 ld:i32 i, 0x1:i32;
+        };
+        return;
+    };
+}

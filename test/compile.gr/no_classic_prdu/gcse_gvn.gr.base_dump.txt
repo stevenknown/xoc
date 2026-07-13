@@ -1,0 +1,54 @@
+
+==---- DUMP Global Value Numbering 'zoo' ----==
+const:VN3,INT:intconst:i64 0|0x0
+lda:VN5,CONST
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+cvt:VN5,CONST
+const:VN2,INT:intconst:i64 9|0x9
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+stpr:VN5,CONST
+pr:VN5,CONST
+==---- DUMP Global Value Numbering 'zoo' ----==
+const:VN3,INT:intconst:i64 0|0x0
+lda:VN5,CONST
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+cvt:VN5,CONST
+const:VN2,INT:intconst:i64 9|0x9
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+stpr:VN5,CONST
+pr:VN5,CONST
+==-- DUMP InferEVN --==
+==---- DUMP Global Value Numbering 'zoo' ----==
+const:VN3,INT:intconst:i64 0|0x0
+lda:VN5,CONST
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+cvt:VN5,CONST
+const:VN2,INT:intconst:i64 9|0x9
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+stpr:VN5,CONST
+pr:VN5,CONST
+==-- DUMP InferEVN --==
+==---- DUMP Global Value Numbering 'zoo' ----==
+const:VN3,INT:intconst:i64 0|0x0
+lda:VN5,CONST
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+cvt:VN5,CONST
+const:VN2,INT:intconst:i64 9|0x9
+const:VN1,INT:intconst:i64 31|0x1f
+pr:VN5,CONST
+stpr:VN5,CONST
+==-- DUMP InferEVN --==
+==---- DUMP Global Value Numbering 'foo_2' ----==
+==---- DUMP Global Value Numbering 'foo_2' ----==
+==-- DUMP InferEVN --==
+==---- DUMP Global Value Numbering 'foo_2' ----==
+==-- DUMP InferEVN --==
+==---- DUMP Global Value Numbering 'foo_2' ----==
+==-- DUMP InferEVN --==

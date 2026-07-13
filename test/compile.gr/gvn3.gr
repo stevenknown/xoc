@@ -1,0 +1,33 @@
+//====---- Dump region '.program' ----====
+region program ".program" () {
+    var in1:mc<256>:(align(64));
+    var in0:mc<256>:(align(64));
+    var out:mc<256>:(align(64));
+    var out2:mc<256>:(align(64));
+    var out3:mc<256>:(align(64));
+    var out4:mc<256>:(align(64));
+    region func main () {
+        //START BB1
+        st:mc<256> in1 = ild:mc<256> $1:*<1>;
+        stpr $6:u32 = ld:u32 in1;
+        stpr $7:*<256> = lda in0;
+        stpr $8:*<1> = add:u64 $7:u32, 0;
+        truebr ne:bool $6:u32, 5:u32, L2;
+
+        //START BB3
+        label L1;
+        stpr $8:*<1> = add:u64 $8:*<1>, 4; //regard $8 as u64
+        ist:u32 = $8:*<1>, $6:u32; //regard $8 as pointer
+        stpr $6:u32 = add:u32 $6:u32, 1;
+
+        //START BB4
+        label L2;
+        stpr $9:*<1> = add:u64 $8:*<1>, 8;
+        ist:u32 = $9:*<1>, $6:u32;
+        truebr lt $6:u32, 5, L1;
+
+        //START BB5
+        ist:mc<64> = $1:*<1>, (ild:mc<64> $7:*<1>);
+        return 0;
+    };
+}

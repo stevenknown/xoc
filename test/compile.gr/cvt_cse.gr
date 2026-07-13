@@ -1,0 +1,23 @@
+region program ".program" () {
+    var ap:mc<8>:(private,array,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+    var _const_string_1:str:(align(4),string("float"));
+    var _const_string_2:str:(align(4),string("double"));
+    var _const_string_3:str:(align(4),string("%s%d"));
+    region func ss88 () {
+        var j:i32:(align(4));
+        var s3:mc<4>:(align(4));
+        label "_$L3";
+        starray:*<1>:0:(dim[2]) = lda ap, (0:i32), lda _const_string_1;
+        st:i64 j = cvt:i64 $x:i32;
+        stpr $i:i64 = cvt:i64 $y:i32;
+        label "_$L1";
+        falsebr (lt:bool $t:i32, 5:i32), "_$L2";
+        stpr $m:i64 = cvt:i64 $x:i32;
+        st:i32 j = add ld:i32 j, $i:i64;
+        goto "_$L1";
+        label "_$L2";
+        st:i64:4 s3 = cvt:i64 $y:i32;
+        return ld:i64 s3;
+    };
+}

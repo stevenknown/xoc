@@ -1,0 +1,30 @@
+region program ".program" () {
+    var g:i64:(align(4));
+    var exit:any:(func,decl,align(4));
+    var printf:any:(func,decl,align(4));
+    var bar:any:(readonly, func, align(4));
+    var main:any:(func,align(4));
+    var _const_string_u32:str:(align(4),string("%x, %x
+"));
+    region func bar (var p:*<4>:(align(4))) {
+        stpr $tp:*<4> = ld:*<4> p;
+        stpr $t1:i32 = ild:*<1> $tp;
+        stpr $tp:i32 = add:i32 $tp:i32, 4:i32;
+        stpr $t2:i32 = ild:*<1> $tp;
+
+        truebr (eq:bool $t1:i32, 0xccccCCCC:i32), "_$SUCC";
+        call:(use(ild:any 0:any)) $8:i32 = exit(2:i32);
+        label "_$SUCC";
+        truebr (eq:bool $t2:i32, 0xffffFFFF:i32), "_$SUCC2";
+        call:(use(ild:any 0:any)) $8:i32 = exit(3:i32);
+        label "_$SUCC2";
+        return 0;
+    };
+    region func main () {
+        var zp:*<1>:(align(4));
+        st g = 0xffffFFFFccccCCCC:i64;
+        st zp = lda g;
+        call bar(ld zp);
+        return 0;
+    }
+}

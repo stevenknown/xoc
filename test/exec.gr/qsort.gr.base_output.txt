@@ -1,0 +1,11 @@
+10 9 8 7 6 5 4 3 2 1 
+After qsort 1
+xkey, 10
+while, 2
+void, 4
+static, 5
+color, 3
+
+After qsort 2
+
+Main returned

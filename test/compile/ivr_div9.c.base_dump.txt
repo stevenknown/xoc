@@ -1,0 +1,370 @@
+
+==-- DUMP ALL ACT --==
+  ACT1:FIND_DIV:IR mul id:12 in LOOP1 is not linear-rep of any IV
+  ACT2:FIND_DIV:IR mul id:14 in LOOP1 is not linear-rep of any IV
+  ACT3:FIND_DIV:IR mul id:19 in LOOP1 is not linear-rep of any IV
+  ACT4:FIND_DIV:IR add id:20 in LOOP1 is not linear-rep of any IV
+  ACT5:FIND_DIV:IR add id:24 in LOOP1 is not linear-rep of any IV
+  ACT6:FIND_DIV:IR add id:41 in LOOP1 is not linear-rep of any IV
+==---- DUMP Induction Variable Recogization 'foo' ----==
+
+==-- LOOP INFO --==
+
+LI1:BB2,BODY:2,3,
+BIV(STMTOCC:MD12,'i')(EXPOCC:MD12,'i')
+  INIT-VAL:0
+  STEP-VAL:1
+  REDUCTION-STMT:
+    st:i32 'i' attachinfo:Dbx,MDSSA        
+        $25:i32 attachinfo:Dbx
+  REDUCTION-EXP:
+    ld:i32 'i' attachinfo:Dbx,MDSSA
+  INIT-STMT:
+    st:i32 'i' attachinfo:Dbx,MDSSA        
+        intconst:i32 0|0x0 attachinfo:Dbx
+DIV(STMTOCC:MD40,'$25')
+  INIT-VAL:INT:1
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $25:i32        
+        add:i32            
+            $24:i32 attachinfo:Dbx            
+            intconst:i32 1|0x1
+  LINREP:
+    ChainRec:
+      INIT:INT:1
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD39,'$24')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $24:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD16,'$2')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $2:i32 attachinfo:Dbx        
+        $23:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD38,'$23')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $23:i32        
+        ld:i32 'i' attachinfo:MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD37,'$22')
+  INIT-VAL:INT:7
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:6
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:10
+        CODE:add
+        STEP:INT:6
+  REDUCTION-STMT:
+    stpr $22:i32 attachinfo:Dbx        
+        add:i32 attachinfo:Dbx            
+            $9:i32 attachinfo:Dbx            
+            intconst:i32 7|0x7 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:7
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:6
+        CODE:add
+        STEP:
+        ChainRec:
+          INIT:INT:10
+          CODE:add
+          STEP:INT:6
+DIV(STMTOCC:MD36,'$21')
+  INIT-VAL:EXP:
+    lda:*<400> 'a' attachinfo:Dbx
+  STEP-VAL:INT:4
+  REDUCTION-STMT:
+    stpr $21:*<4> attachinfo:Dbx        
+        add:*<4> attachinfo:Dbx            
+            $20:*<400> attachinfo:Dbx            
+            $10:u32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:EXP:
+      lda:*<400> 'a' attachinfo:Dbx
+      CODE:add
+      STEP:INT:4
+DIV(STMTOCC:MD24,'$10')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:4
+  REDUCTION-STMT:
+    stpr $10:u32 attachinfo:Dbx        
+        mul:u32 attachinfo:Dbx            
+            $19:i32 attachinfo:Dbx            
+            intconst:u32 4|0x4
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:4
+DIV(STMTOCC:MD34,'$19')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $19:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD23,'$9')
+  INIT-VAL:INT:0
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:6
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:10
+        CODE:add
+        STEP:INT:6
+  REDUCTION-STMT:
+    stpr $9:i32 attachinfo:Dbx        
+        add:i32 attachinfo:Dbx            
+            $7:i32 attachinfo:Dbx            
+            $8:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:6
+        CODE:add
+        STEP:
+        ChainRec:
+          INIT:INT:10
+          CODE:add
+          STEP:INT:6
+DIV(STMTOCC:MD22,'$8')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:3
+  REDUCTION-STMT:
+    stpr $8:i32 attachinfo:Dbx        
+        mul:i32 attachinfo:Dbx            
+            $18:i32 attachinfo:Dbx            
+            intconst:i32 3|0x3 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:3
+DIV(STMTOCC:MD33,'$18')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $18:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD21,'$7')
+  INIT-VAL:INT:0
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:3
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:10
+        CODE:add
+        STEP:INT:6
+  REDUCTION-STMT:
+    stpr $7:i32 attachinfo:Dbx        
+        add:i32 attachinfo:Dbx            
+            $4:i32 attachinfo:Dbx            
+            $6:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:3
+        CODE:add
+        STEP:
+        ChainRec:
+          INIT:INT:10
+          CODE:add
+          STEP:INT:6
+DIV(STMTOCC:MD20,'$6')
+  INIT-VAL:INT:0
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:2
+      CODE:add
+      STEP:INT:4
+  REDUCTION-STMT:
+    stpr $6:i32 attachinfo:Dbx        
+        mul:i32 attachinfo:Dbx            
+            $5:i32 attachinfo:Dbx            
+            $17:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:2
+        CODE:add
+        STEP:INT:4
+DIV(STMTOCC:MD32,'$17')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $17:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD19,'$5')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:2
+  REDUCTION-STMT:
+    stpr $5:i32 attachinfo:Dbx        
+        mul:i32 attachinfo:Dbx            
+            $16:i32 attachinfo:Dbx            
+            intconst:i32 2|0x2 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:2
+DIV(STMTOCC:MD31,'$16')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $16:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD18,'$4')
+  INIT-VAL:INT:0
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:1
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:6
+        CODE:add
+        STEP:INT:6
+  REDUCTION-STMT:
+    stpr $4:i32 attachinfo:Dbx        
+        mul:i32 attachinfo:Dbx            
+            $3:i32 attachinfo:Dbx            
+            $15:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:1
+        CODE:add
+        STEP:
+        ChainRec:
+          INIT:INT:6
+          CODE:add
+          STEP:INT:6
+DIV(STMTOCC:MD30,'$15')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $15:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD17,'$3')
+  INIT-VAL:INT:0
+  STEP-VAL:
+    ChainRec:
+      INIT:INT:1
+      CODE:add
+      STEP:INT:2
+  REDUCTION-STMT:
+    stpr $3:i32 attachinfo:Dbx        
+        mul:i32 attachinfo:Dbx            
+            $13:i32 attachinfo:Dbx            
+            $14:i32 attachinfo:Dbx
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:
+      ChainRec:
+        INIT:INT:1
+        CODE:add
+        STEP:INT:2
+DIV(STMTOCC:MD29,'$14')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $14:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD28,'$13')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $13:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1
+DIV(STMTOCC:MD26,'$11')
+  INIT-VAL:INT:0
+  STEP-VAL:INT:1
+  REDUCTION-STMT:
+    stpr $11:i32 attachinfo:Dbx        
+        ld:i32 'i' attachinfo:Dbx,MDSSA
+  LINREP:
+    ChainRec:
+      INIT:INT:0
+      CODE:add
+      STEP:INT:1

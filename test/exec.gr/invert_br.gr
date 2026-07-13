@@ -1,0 +1,18 @@
+region program program() {
+    var g:i32:(align(4));
+    var m:f64:(align(4));
+    var main:i32:(func,align(4));
+    region func main() {
+        var i:i8:(align(4));
+        st i = 0;
+        label LOOP_START;
+            st g = add ld g, ld i;
+            st i = add ld i, 1;
+            truebr eq ld i, 100, L1; 
+            goto LOOP_START;
+
+        st m = 10;
+        label L1; 
+        return sub ld i, 100;
+    };
+}

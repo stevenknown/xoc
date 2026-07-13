@@ -1,0 +1,66 @@
+region program ".program" () {
+    var printf:*<4>:(func,align(4));
+    var s81:*<4>:(func,align(4));
+    var s81er:mc<1>:(private,array,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+    region func s81 () {
+        var k:i32:(align(4));
+        var rc:i32:(align(4));
+        var j:i32:(align(4));
+        var crc:i32:(align(4));
+        var nrptr:*<4>:(align(4));
+        var rint:i32:(align(4));
+        var nrint:i32:(align(4));
+        label "_GR__$L6";
+        starray:u8:0:(dim[1]) =
+            lda s81er, (0:i32), 115:u32;
+        starray:u8:0:(dim[1]) =
+            lda s81er, (1:i32), 0:u32;
+        st:i32 j = 0:i32;
+        label "_GR__$L1";
+        phi $3:i32 = (
+            $1:i32,"_GR__$L6"),(
+            $4:i32,"_GR__$L3");
+        falsebr (
+            lt:bool
+                ld:i32 j, 50:i32), "_GR__$L2";
+        st:*<4> nrptr =
+            lda k;
+        falsebr (
+            ne:bool
+                ld:i32 rint,
+                ld:i32 nrint), "_GR__$L3";
+        st:i32 k =
+            lsl:i32
+                ld:i32 k, 1:i32;
+        label "_GR__$L3";
+        stpr $4:i32 =
+            ld:i32 j;
+        st:i32 j =
+            add:i32
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+
+        falsebr (
+            ne:bool
+                ld:i32 crc, 0:i32), "_GR__$L5";
+        label "_GR__$L7";
+        falsebr (
+            ne:bool
+                ld:i32 rc, 0:i32), "_GR__$L5";
+        label "_GR__$L8";
+        call:(use(
+            ild:any 0:any)) $5:i32 = printf(
+            lda s81er,1:i32);
+
+        //liveset should be copied before each accessing to following BB.
+        label "_GR__$L5";
+        phi $6:i32 = (
+            $2:i32,"_GR__$L2"),(
+            $2:i32,"_GR__$L7"),(
+            $5:i32,"_GR__$L8");
+        return
+            ld:i32 rc;
+    };
+}
