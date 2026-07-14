@@ -172,7 +172,7 @@ void MD2IRSet::dump() const
     note(getRegion(), "\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
-        MD const * md = m_md_sys->getMD(mdid);
+        MD const* md = m_md_sys->getMD(mdid);
         md->dump(vm);
 
         DefSBitSetCore * irs = get(mdid);
@@ -3758,6 +3758,33 @@ bool verifyClassicDUChain(Region * rg, DUOptFlag duflag)
 }
 
 
+//Find the avilable dominated DEF stmt of 'exp'.
+//'exp': expression
+IR * DUMgr::findDomAvailDef(IR const* exp) const
+{
+    ASSERT0(exp && exp->is_exp());
+
+    DUSet const* defset = exp->getDUSet();
+    if (defset == nullptr) { return nullptr; }
+    ASSERT0(const_cast<IR*>(exp)->getMayRef() ||
+            const_cast<IR*>(exp)->getMustRef());
+    IR * last = nullptr;
+    DUSetIter di = nullptr;
+    for (BSIdx i = defset->get_first(&di);
+         i != BS_UNDEF; i = defset->get_next(i, &di)) {
+        IR * d = m_rg->getIR(i);
+        ASSERT0(d->is_stmt());
+        if (!const_cast<DUMgr*>(this)->isMayDef(d, exp, false)) { continue; }
+        if (last == nullptr) {
+            last = d;
+            continue;
+        }
+        if (last != d) { return nullptr; }
+    }
+    return last;
+}
+
+
 //Find the nearest dominated DEF stmt of 'exp'.
 //NOTE: RPO of bb of stmt must be available.
 //'exp': expression
@@ -4023,7 +4050,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         oc.setValidNonPRDU();
     }
     END_TIMER(t, "Build Classic DU chain");
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDUMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_DU_MGR)) {
         START_TIMER_FMT(t, ("DUMP DU Chain"));
         note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
              m_rg->getRegionName());
@@ -4302,7 +4329,7 @@ bool DUMgr::perform(MOD OptCtx & oc, DUOptFlag flag)
         flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         solveSet(oc, flag);
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDUMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_DU_MGR)) {
         dump();
     }
     return true;

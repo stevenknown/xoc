@@ -39,6 +39,13 @@ namespace xoc {
 //
 //START PassCtx
 //
+PassCtx::PassCtx(ActMgr * am)
+{
+    clean();
+    m_am = am;
+}
+
+
 PassCtx::PassCtx(OptCtx * oc, ActMgr * am)
 {
     ASSERT0(oc);
@@ -48,6 +55,16 @@ PassCtx::PassCtx(OptCtx * oc, ActMgr * am)
     ASSERT0(m_rg);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
     m_gvn = (GVN*)m_rg->getPassMgr()->queryPass(PASS_GVN);
+}
+
+
+void PassCtx::clean()
+{
+    m_oc = nullptr;
+    m_ivr = nullptr;
+    m_gvn = nullptr;
+    m_am = nullptr;
+    m_rg = nullptr;
 }
 
 
@@ -79,5 +96,49 @@ void PassCtx::tryInvalidPassInfoBeforeFreeIR(IR const* ir) const
 {
 }
 //END PassCtx
+
+
+//
+//START Pass
+//
+bool Pass::dumpBeforePass() const
+{
+    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpBeforePass()) { return true; }
+    if (!g_dump_opt.isDumpPass(getPassType())) { return true; }
+    START_TIMER_FMT(t, ("DUMP BEFORE PASS '%s'", getPassName()));
+    xoc::note(
+        m_rg, "\n==---- DUMP BEFORE '%s' '%s' ----==",
+        getPassName(), m_rg->getRegionName());
+    m_rg->dump(false);
+    END_TIMER_FMT(t, ("DUMP BEFORE PASS '%s'", getPassName()));
+    return true;
+}
+
+
+bool Pass::dumpAfterPass() const
+{
+    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpAfterPass()) { return true; }
+    if (!g_dump_opt.isDumpPass(getPassType())) { return true; }
+    START_TIMER_FMT(t, ("DUMP AFTER PASS '%s'", getPassName()));
+    xoc::note(
+        m_rg, "\n==---- DUMP AFTER '%s' '%s' ----==",
+        getPassName(), m_rg->getRegionName());
+    m_rg->dump(false);
+    END_TIMER_FMT(t, ("DUMP AFTER PASS '%s'", getPassName()));
+    return true;
+}
+
+
+bool Pass::dump() const
+{
+    //Optimization Dependent Code.
+    //The recommended dump headline format is:
+    //\n==---- DUMP PassName 'RegionName' ----==
+    return dumpAfterPass();
+}
+
+//END Pass
 
 } //namespace xoc

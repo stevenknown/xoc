@@ -45,7 +45,8 @@ void InvertBrTgt::addDump(IR const* ir) const
 
 void InvertBrTgt::dumpInit()
 {
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_INVERT_BRTGT)) {
         ASSERT0(m_changed_irlist == nullptr);
         m_changed_irlist = new ConstIRList();
     }
@@ -63,7 +64,8 @@ void InvertBrTgt::dumpFini()
 
 bool InvertBrTgt::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_INVERT_BRTGT)) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     ASSERT0(m_changed_irlist);
@@ -245,9 +247,7 @@ bool InvertBrTgt::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
-        dump();
-    }
+    dump();
     oc.setInvalidIfCFGChanged();
     dumpFini();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

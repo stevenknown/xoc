@@ -59,7 +59,7 @@ void CDG::dumpVCG(CHAR const* name) const
 
 bool CDG::dump() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCDG()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CDG)) {
         return  true;
     }
     START_TIMER(t, "Build CDG:dump");

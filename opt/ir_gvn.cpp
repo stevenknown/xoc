@@ -55,6 +55,7 @@ static VNKindDesc g_vntype_desc[] = {
     { VN_FP, "FP", },
     { VN_STR, "STR", },
     { VN_MC_INT, "MC_INT", },
+    { VN_VEC_INT, "VEC_INT", },
     { VN_CONST, "CONST", },
     { VN_NUM, "", },
 };
@@ -95,6 +96,7 @@ void VN::dump(Region const* rg) const
     switch (getKind()) {
     case VN_OP:
     case VN_MC_INT:
+    case VN_VEC_INT:
     case VN_CONST:
         break;
     case VN_MDDEF: {
@@ -241,7 +243,7 @@ void GVN::init()
     }
     m_stmt2domdef.init(MAX(4, xcom::getNearestPowerOf2(n/2)));
     m_pool = smpoolCreate(sizeof(VN) * 4, MEM_COMM);
-    if (g_dump_opt.isDumpGVN()) {
+    if (g_dump_opt.isDumpPass(PASS_GVN)) {
         m_vn_vec = new xcom::Vector<VN const*>(32);
     } else {
         m_vn_vec = nullptr;
@@ -370,7 +372,7 @@ void GVN::dumpAllVN() const
 
 void GVN::dumpMiscMap() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpGVN()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_GVN)) { return; }
     note(getRegion(), "\n==-- DUMP IR2VN --==");
     {
         m_rg->getLogMgr()->incIndent(2);
@@ -415,6 +417,17 @@ void GVN::dumpMiscMap() const
         LonglongMC2VNIter it;
         for (VN const* vn = m_llmc2vn.get_first_elem(it);
              vn != nullptr; vn = m_llmc2vn.get_next_elem(it)) {
+            note(m_rg, "\n");
+            vn->dump(m_rg);
+        }
+        m_rg->getLogMgr()->decIndent(2);
+    }
+    note(getRegion(), "\n==-- DUMP LonglongVec2VN --==");
+    if (m_llvec2vn.is_init()) {
+        m_rg->getLogMgr()->incIndent(2);
+        LonglongVec2VNIter it;
+        for (VN const* vn = m_llvec2vn.get_first_elem(it);
+             vn != nullptr; vn = m_llvec2vn.get_next_elem(it)) {
             note(m_rg, "\n");
             vn->dump(m_rg);
         }
@@ -508,6 +521,36 @@ VN * GVN::registerVNviaINT(LONGLONG v, Type const* vty)
 VN * GVN::registerVNviaMC(LONGLONG v)
 {
     return registerVNviaMC(v, nullptr);
+}
+
+
+VN * GVN::registerVNviaVec(LONGLONG v, Type const* vty)
+{
+    if (v == 0) {
+        if (m_vec_zero_vn == nullptr) {
+            m_vec_zero_vn = allocVN();
+            VN_kind(m_vec_zero_vn) = VN_VEC_INT;
+            VN_type(m_vec_zero_vn) = vty;
+            VN_int_val(m_vec_zero_vn) = 0;
+        }
+        return m_vec_zero_vn;
+    }
+
+    if (m_llvec2vn.get_bucket_size() == 0) {
+        m_llvec2vn.init(10/*TO reevaluate*/);
+    }
+
+    VN * vn = m_llvec2vn.get(v);
+    if (vn != nullptr) {
+        return vn;
+    }
+
+    vn = allocVN();
+    VN_kind(vn) = VN_VEC_INT;
+    VN_type(vn) = vty;
+    VN_int_val(vn) = v;
+    m_llvec2vn.set(v, vn);
+    return vn;
 }
 
 
@@ -1424,7 +1467,9 @@ VN const* GVN::computeConst(IR const* exp, bool & change)
         x = registerVNviaSTR(CONST_str_val(exp));
     } else if (exp->is_any()) {
         return nullptr;
-    } else  {
+    } else if (exp->is_vec()) {
+        x = registerVNviaVec(CONST_int_val(exp), exp->getType());
+    } else {
         ASSERTN(0, ("unsupport const type"));
     }
     ASSERT0(x);
@@ -2244,7 +2289,8 @@ bool GVN::dumpForTest() const
 
 bool GVN::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpGVN()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_GVN))
+    { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     if (g_dump_opt.isDumpForTest()) { return dumpForTest(); }
@@ -2252,6 +2298,7 @@ bool GVN::dump() const
     getRegion()->getLogMgr()->incIndent(2);
     dumpAllVN();
     dumpBBListWithVN();
+    Pass::dump();
     getRegion()->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
@@ -2591,15 +2638,14 @@ bool GVN::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     reset();
     initDepPass(oc);
     processBBListInRPO();
     assignRHSVN();
     destroyLocalUsed();
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass()) {
-       dump();
-    }
+    dump();
     set_valid(true);
     return true;
 }

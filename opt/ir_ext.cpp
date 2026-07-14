@@ -45,12 +45,44 @@ bool IR::isVirtualOp() const
 //Return the 'base' of partial operations.
 IR const* IR::getBaseOfPartialSetOp() const
 {
-  switch (getCode()) {
-  case IR_SELECT_TO_RES: return SELECTTORES_op(this);
-  case IR_DYNLEN_OP: return DYNLENOP_op(this);
-  case IR_MASK_OP: return MASKOP_op(this);
-  default: UNREACHABLE(); return nullptr;
-  }
+    switch (getCode()) {
+    case IR_SELECT_TO_RES: return SELECTTORES_op(this);
+    case IR_DYNLEN_OP: return DYNLENOP_op(this);
+    case IR_MASK_OP: return MASKOP_op(this);
+    default: UNREACHABLE(); return nullptr;
+    }
+}
+
+//Return the 'len' of partial operations.
+IR const* IR::getLenOfPartialSetOp() const
+{
+    IR const* len = nullptr;
+    IR const* rhs = this;
+    if (is_select_to_res()) {
+        rhs = getBaseOfPartialSetOp();
+    }
+    if (rhs->is_dynlenop()) {
+        len = DYNLENOP_len(rhs);
+    } else if (rhs->is_maskop()) {
+        len = DYNLENOP_len(rhs->getBaseOfPartialSetOp());
+    }
+    ASSERT0(len);
+    return len;
+}
+
+//Return the 'mask' of partial operations.
+IR const* IR::getMaskOfPartialSetOp() const
+{
+    IR const* mask = nullptr;
+    IR const* rhs = this;
+    if (is_select_to_res()) {
+        rhs = getBaseOfPartialSetOp();
+    }
+    if (rhs->is_maskop()) {
+        mask = MASKOP_mask(rhs);
+    }
+    ASSERT0(mask);
+    return mask;
 }
 
 } //namespace xoc

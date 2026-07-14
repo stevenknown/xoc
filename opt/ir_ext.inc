@@ -43,6 +43,12 @@ bool is_select_to_res() const
 //Return the 'base' of partial operations.
 IR const* getBaseOfPartialSetOp() const;
 
+//Return the 'len' of partial operations.
+IR const* getLenOfPartialSetOp() const;
+
+//Return the 'mask' of partial operations.
+IR const* getMaskOfPartialSetOp() const;
+
 //If it is a partial operation on lvalue or rvalue, return true;
 //otherwise, return false.
 bool isPartialSetRHSOp() const { return is_dynlenop() || is_maskop(); }

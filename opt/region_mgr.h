@@ -285,6 +285,7 @@ public:
         ASSERT0(m_var_mgr);
 
         ASSERTN(m_md_sys == nullptr, ("MDSystem already initialized"));
+        ASSERTN(m_type_mgr, ("MDSystem needs TypeMgr"));
         m_md_sys = new MDSystem(m_var_mgr);
         ASSERT0(m_md_sys);
     }

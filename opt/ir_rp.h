@@ -41,6 +41,7 @@ class ExactAccTab;
 class InexactAccTab;
 class RegPromot;
 class RPCtx;
+class LICMAnaCtx;
 
 //
 //START MDLT
@@ -359,37 +360,27 @@ public:
 };
 
 
-#define RPCTX_ldainfo_set(r) ((r).m_ldainfo_set)
-class RPCtx {
+class RPCtx  : public PassCtx {
     COPY_CONSTRUCTOR(RPCtx);
-protected:
-    RPActMgr * m_act_mgr;
-    IVR * m_ivr;
 public:
     //Propagate information bottom up.
     //The flag is used to indicate information when the callee
     //function returns.
     bool need_rebuild_domtree;
     DomTree * domtree;
-    OptCtx * oc;
     LI<IRBB> const* m_li;
     LoopDepCtx * m_ldactx;
     IRCFG * m_cfg;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
     LoopDepInfoSet m_ldainfo_set;
+    LICMAnaCtx const* m_licmanactx;
 public:
     RPCtx(OptCtx * t, RPActMgr * am = nullptr);
-    ~RPCtx()
-    {
-        if (domtree != nullptr) {
-            delete domtree;
-            domtree = nullptr;
-        }
-    }
+    ~RPCtx();
     void buildDomTree(IRCFG * cfg)
     {
-        ASSERT0(oc->is_dom_valid());
+        ASSERT0(getOptCtx()->is_dom_valid());
         if (domtree == nullptr) {
             domtree = new DomTree();
         } else {
@@ -402,8 +393,6 @@ public:
     void cleanLI() { setLI(nullptr); }
     void cleanLoopDepCtx() { setLoopDepCtx(nullptr); }
 
-    void dumpAct(CHAR const* format, ...) const;
-
     //ACT:ir1 is swept out by ir2.
     //format: the reason.
     void dumpSweepOut(IR const* ir1, IR const* ir2, CHAR const* format, ...);
@@ -411,11 +400,13 @@ public:
     //ACT:ir1 is clobbered by ir2.
     //format: the reason.
     void dumpClobber(IR const* ir1, IR const* ir2, CHAR const* format, ...);
+    void dump() const;
 
     LI<IRBB> const* getLI() const { return m_li; }
-    LoopDepInfoSet const& getLDAInfoSet() const { return m_ldainfo_set; }
+    LoopDepInfoSet & getLDAInfoSet() { return m_ldainfo_set; }
     LoopDepCtx * getLoopDepCtx() const { return m_ldactx; }
-    OptCtx * getOptCtx() const { return oc; }
+    LICMAnaCtx const* getLICMAnaCtx() const { return m_licmanactx; }
+    InvStmtList const* getInvStmtList() const;
     IRCFG * getCFG() const { return m_cfg; }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
     PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
@@ -425,6 +416,7 @@ public:
 
     void setLI(LI<IRBB> const* li) { m_li = li; }
     void setLoopDepCtx(LoopDepCtx * ldactx) { m_ldactx = ldactx; }
+    void setLICMAnaCtx(LICMAnaCtx const* anactx) { m_licmanactx = anactx; }
 
     //The function try to judge if given 'ir' may reference IV. If it is true,
     //the function will invalid IVR pass because the IV will be modified.
@@ -647,23 +639,21 @@ protected:
     //to the sebsequent function, it will be done at
     //buildDUChainForDeleRelatedPR().
     void handlePrologForExp(
-        IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr,
-        IR * rhs, IRBB * preheader);
+        IR const* dele, DelegateMgr & delemgr, IR * rhs, IRBB * preheader);
 
     //The function generates iniailization code of promoted PR.
     //Note the function leaves the work that to build DU chain of PR and STPR
     //to the sebsequent function, it will be done at
     //buildDUChainForDeleRelatedPR().
     void handlePrologForStmt(
-        IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr,
-        IR * rhs, IRBB * preheader);
+        IR const* dele, DelegateMgr & delemgr, IR * rhs, IRBB * preheader);
 
     //The function generates iniailization code of promoted PR.
     //Note the function leaves the work which building DU chain of PR and STPR
     //to the sebsequent functions, and that work will be done at
     //buildDUChainForDeleRelatedPR() later.
     void handleProlog(
-        IR const* dele, IR const* pr, DelegateMgr & delemgr, IRBB * preheader);
+        IR const* dele, DelegateMgr & delemgr, IRBB * preheader);
 
     //Return true if the caller can keep doing the analysis.
     //That means there are no memory referrences clobbered the

@@ -25,28 +25,14 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-author: Su Zhenyu
 @*/
-#include "cominc.h"
-#include "comopt.h"
 
-namespace xoc {
+#if defined(FOR_JS)
+#include "../js/js_dump_opt_desc_ext.impl"
 
-//
-//START CfgOptCtx
-//
-CfgOptCtx::CfgOptCtx(OptCtx * toc, ActMgr * am) : PassCtx(toc, am)
-{
-    reinit();
-}
+#elif defined(FOR_ARM)
+#include "../arm/arm_dump_opt_desc_ext.impl"
 
-
-CfgOptCtx::CfgOptCtx(CfgOptCtx const& src) : PassCtx(src)
-{
-    reinit();
-    copyTopDownInfo(src);
-}
-//END CfgOptCtx
-
-} //namespace xoc
+#else
+//No target ir desc.
+#endif

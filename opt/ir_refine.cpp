@@ -39,7 +39,7 @@ namespace xoc {
 static void dumpRefine(IR const* ir, RefineCtx & rc, CHAR const* reason)
 {
     Region const* rg = rc.getRegion();
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRefine() ||
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REFINE) ||
         rc.getActMgr() == nullptr) {
         return;
     }
@@ -2445,6 +2445,18 @@ IR * Refine::refineBand(IR * ir, bool & change, RefineCtx & rc)
         change = true;
         return op0;
     }
+    if (op1->isConstZero()) {
+        //BAND xxx, 0 => 0.
+        IR_parent(op1) = nullptr;
+        BIN_opnd1(ir) = nullptr;
+        if (rc.maintainDU()) {
+            xoc::removeUseForTree(ir, rc.getRegion(), *rc.getOptCtx());
+        }
+        rc.tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        change = true;
+        return op1;
+    }
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == -1) {
         //BAND X,-1 => X
         IR * tmp = ir;
@@ -2467,7 +2479,7 @@ IR * Refine::refineBand(IR * ir, bool & change, RefineCtx & rc)
         if (op10->is_const() || op11->is_const()) {
             IR * op_pr = op10->is_const() ? op11 : op10;
             IR * op_val = op10->is_const() ? op10 : op11;
-            UINT const val = CONST_int_val(op0) & CONST_int_val(op_val);
+            HOST_UINT const val = CONST_int_val(op0) & CONST_int_val(op_val);
             IR_parent(op_pr) = nullptr;
             Type const* tp = ir->getType();
             rc.tryInvalidInfoBeforeFreeIR(ir);
@@ -2484,7 +2496,7 @@ IR * Refine::refineBand(IR * ir, bool & change, RefineCtx & rc)
         if (op00->is_const() || op01->is_const()) {
             IR * op_pr = op00->is_const() ? op01 : op00;
             IR * op_val = op00->is_const() ? op00 : op01;
-            UINT const val = CONST_int_val(op1) & CONST_int_val(op_val);
+            HOST_UINT const val = CONST_int_val(op1) & CONST_int_val(op_val);
             IR_parent(op_pr) = nullptr;
             Type const* tp = ir->getType();
             rc.tryInvalidInfoBeforeFreeIR(ir);
@@ -2721,6 +2733,15 @@ IR * Refine::refineXor(IR * ir, bool & change, RefineCtx & rc)
         m_rg->freeIRTree(tmp);
         change = true;
         return ir; //No need to update DU.
+    }
+    if (op1->isConstZero()) {
+        //b = a xor 0 = > b = a
+        change = true;
+        IR_parent(op0) = nullptr;
+        BIN_opnd0(ir) = nullptr;
+        rc.tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        return op0;
     }
     return ir;
 }
@@ -4246,7 +4267,7 @@ void Refine::invertCondition(IR ** cond, Region * rg)
 
 bool Refine::dump() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRefine()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REFINE)) {
         return false;
     }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",

@@ -41,7 +41,7 @@ static void dumpRemovedIneffectIR(
 {
     ASSERT0(dce);
     if (ir == nullptr || !dce->getRegion()->isLogMgrInit() ||
-        !g_dump_opt.isDumpDCE()) { return; }
+        !g_dump_opt.isDumpPass(PASS_DCE)) { return; }
     xcom::StrBuf buf(32);
     dce->getRegion()->getLogMgr()->incIndent(2);
     xoc::dumpIRToBuf(ir, dce->getRegion(), buf,
@@ -57,7 +57,7 @@ static void dumpRemovedIneffectIR(
 //
 void DCECtx::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpDCE()) {
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_DCE)) {
         return;
     }
     note(rg, "\n==-- DUMP DCECtx --==");
@@ -120,7 +120,7 @@ void DeadCodeElim::setEffectStmt(
 
 bool DeadCodeElim::dumpBeforePass() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpDCE()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_DCE)) {
         return false;
     }
     START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
@@ -142,18 +142,15 @@ bool DeadCodeElim::dumpBeforePass() const
 
 void DeadCodeElim::dump(DCECtx const& dcectx) const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpDCE()) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_DCE)) { return; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    if (g_dump_opt.isDumpForTest()) {
-        const_cast<DeadCodeElim*>(this)->getActMgr().dump();
-    } else {
-        const_cast<DeadCodeElim*>(this)->getActMgr().dump();
-        dcectx.dump(m_rg);
-        Pass::dump();
-    }
+    const_cast<DeadCodeElim*>(this)->getActMgr().dump();
+    dcectx.dump(m_rg);
+    Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
 }
@@ -1212,9 +1209,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
-    if (g_dump_opt.isDumpBeforePass()) {
-        dumpBeforePass();
-    }
+    dumpBeforePass();
     bool remove_branch_stmt = false;
     DCECtx dcectx(&oc, *getSBSMgr().getSegMgr(), &getActMgr());
     bool org_prssa_is_valid = usePRSSADU();

@@ -145,9 +145,9 @@ void dumpIRList(
     bool dump_inner_region, IRDumpCtx<> * ctx);
 
 //Dump IR, and both its kids and siblings.
-//ctx: optional.
+//ctx: pass the dump options top down.
 void dumpIRList(
-    IR const* ir_list, Region const* rg, bool dump_inner_region,
+    IR const* ir_list, Region const* rg, CHAR const* attr,
     IRDumpCtx<> * ctx);
 
 void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);

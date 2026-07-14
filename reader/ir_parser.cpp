@@ -1184,6 +1184,29 @@ static bool verifyPRSSA(Region const* rg, PassMgr * pm, OptCtx & oc)
 }
 
 
+static bool completePartialSelectOp(MOD IR * ir, IRMgrExt * irmgr)
+{
+    if (!ir->isStoreStmt()) { return false; }
+    ASSERT0(ir->hasRHS());
+    IR * rhs = ir->getRHS();
+    if (!rhs->is_select()) { return false; }
+    if (!CSelect::isPartialSelect(rhs)) { return false; }
+    ir->setRHS(irmgr->buildSelectToRes(rhs, nullptr, rhs->getType()));
+    return true;
+}
+
+
+void IRParser::completeReadModWrite(ParseCtx const* ctx) const
+{
+    Region * rg = ctx->current_region;
+    if (!rg->hasAnaInstrument()) { return; }
+    IRMgrExt * irmgr = (IRMgrExt*)rg->getIRMgr();
+    for (IR * ir = ctx->stmt_list; ir != nullptr; ir = ir->get_next()) {
+        completePartialSelectOp(ir, irmgr);
+    }
+}
+
+
 //Return false if there is error occur.
 bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
 {
@@ -1227,7 +1250,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     DUMMYUSE(verifyPRSSA);
     prssamgr->refinePhi(*oc);
 
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_PRSSA_MGR)) {
         START_TIMER(tdump, "IRParser: PRSSA: Dump After Pass");
         prssamgr->dump();
         END_TIMER(tdump, "IRParser: PRSSA: Dump After Pass");
@@ -1291,11 +1314,11 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         return false;
     }
     ASSERT0(region);
-    //Region name
+
+    //Region Name
     if (!parseRegionName(region, flag, ctx)) {
         return false;
     }
-
     if (region->is_program()) {
         if (m_rm->getProgramRegion() != nullptr) {
             error(m_lexer->getCurrentLineNum(),
@@ -1306,7 +1329,6 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         }
         m_rm->setProgramRegion(region);
     }
-
     ParseCtx newctx(this);
     newctx.current_region = region;
     newctx.cleanRegionUniqueInfo();
@@ -1330,11 +1352,10 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     if (!checkLabel(newctx.stmt_list, newctx)) {
         return false;
     }
-
+    completeReadModWrite(&newctx);
     if (!constructSSAIfNeed(&newctx)) {
         return false;
     }
-
     if (!newctx.current_region->is_blackbox()) {
         ASSERT0(verifyIRList(newctx.current_region->getIRList(),
                              nullptr, newctx.current_region));

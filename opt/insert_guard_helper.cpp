@@ -106,13 +106,7 @@ IRSet * Stmt2UseMgr::allocIRSet()
 
 Stmt2UseMgr::~Stmt2UseMgr()
 {
-    IR2IRSetIter it1;
-    IRSet * is;
-    for (IR const* ir = m_stmt2iruseset.get_first(it1, &is);
-         ir != nullptr; ir = m_stmt2iruseset.get_next(it1, &is)) {
-        ASSERT0(is);
-        delete is;
-    }
+    clean();
 }
 
 
@@ -132,6 +126,20 @@ void Stmt2UseMgr::recordUse(
             is->bunion(i);
         }
     }
+}
+
+
+void Stmt2UseMgr::clean()
+{
+    IR2IRSetIter it1;
+    IRSet * is;
+    for (IR const* ir = m_stmt2iruseset.get_first(it1, &is);
+         ir != nullptr; ir = m_stmt2iruseset.get_next(it1, &is)) {
+        ASSERT0(is);
+        delete is;
+    }
+    m_stmt2iruseset.clean();
+    m_sbs_mgr.clean();
 }
 
 
@@ -538,7 +546,10 @@ bool InsertGuardHelper::haveAllUseMoveToGuardBBInMDSSA(
     ASSERT0(ir->is_stmt() && ir->isMemRefNonPR());
     ASSERT0(useMDSSADU());
     IRSet const* useset = s2u.getIRSet(ir);
-    ASSERT0(useset);
+    if (useset == nullptr) {
+        //There is no USE of ir.
+        return true;
+    }
     SSAUseIter uit = nullptr;
     for (BSIdx i = useset->get_first(&uit);
          uit != nullptr; i = useset->get_next(i, &uit)) {

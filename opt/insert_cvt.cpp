@@ -993,7 +993,8 @@ bool InsertCvt::perform(OptCtx & oc, MOD InsertCvtCtx & rc)
         IR * irs = convertIRlist(m_rg->getIRList(), change, rc);
         ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
         m_rg->setIRList(irs);
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInsertCvt()) {
+        if (g_dump_opt.isDumpAfterPass() &&
+            g_dump_opt.isDumpPass(PASS_INSERT_CVT)) {
             dump();
         }
         END_TIMER(t, "Do InsertCvt");
@@ -1001,7 +1002,8 @@ bool InsertCvt::perform(OptCtx & oc, MOD InsertCvtCtx & rc)
     }
     START_TIMER(t, "Do InsertCvt");
     change = convertBBlist(m_rg->getBBList(), rc);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInsertCvt()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_INSERT_CVT)) {
         dump();
     }
     END_TIMER(t, "Do InsertCvt");

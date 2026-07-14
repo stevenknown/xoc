@@ -610,8 +610,8 @@ void LifeTimeMgr::destroy()
 
 
 static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
-                       PreAssignedMgr const& preassigned_mgr,
-                       MOD CrossedCallCounter & cross_call_counter)
+    PreAssignedMgr const& preassigned_mgr,
+    MOD CrossedCallCounter & cross_call_counter, RegAllocMgr * ramgr)
 {
     ASSERT0(ir && ir->is_stmt());
     IR const* res = const_cast<IR*>(ir)->getResultPR();
@@ -621,7 +621,7 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
 
     //Call statements must always be considered because they affect both the
     //splitting of lifetimes and the generation of spill&reload IRs.
-    if (!ir->isCallStmt() && !mgr.canBeCandidate(prno)) { return; }
+    if (!ir->isCallStmt() && !ramgr->canBeCandidate(prno)) { return; }
     LifeTime * lt = mgr.genLifeTime(prno);
     ASSERT0(lt);
     if (preassigned_mgr.isPreAssigned(prno)) { lt->setPreAssigned(); }
@@ -632,8 +632,8 @@ static void computeLHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
 
 
 static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
-                       PreAssignedMgr const& preassigned_mgr,
-                       MOD CrossedCallCounter & cross_call_counter)
+    PreAssignedMgr const& preassigned_mgr,
+    MOD CrossedCallCounter & cross_call_counter)
 {
     ASSERT0(ir && ir->isPROp());
     PRNO prno = ir->getPrno();
@@ -656,15 +656,14 @@ static void computeUSE(IR * ir, LifeTimeMgr & mgr, Pos pos, Pos livein_def,
 
 
 static void computeRHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
-                       Pos livein_def, IRIter & irit,
-                       PreAssignedMgr const& preassigned_mgr,
-                       MOD CrossedCallCounter & cross_call_counter)
+    Pos livein_def, IRIter & irit, PreAssignedMgr const& preassigned_mgr,
+    MOD CrossedCallCounter & cross_call_counter, RegAllocMgr const* ramgr)
 {
     ASSERT0(ir && ir->is_stmt());
     irit.clean();
     for (IR * e = xoc::iterExpInit(ir, irit); e != nullptr;
          e = xoc::iterExpNext(irit)) {
-        if (e->isReadPR() && mgr.canBeCandidate(e->getPrno())) {
+        if (e->isReadPR() && ramgr->canBeCandidate(e->getPrno())) {
             computeUSE(e, mgr, pos, livein_def, preassigned_mgr,
                        cross_call_counter);
         }
@@ -675,8 +674,7 @@ static void computeRHS(IR * ir, LifeTimeMgr & mgr, Pos pos,
 void CrossedCallCounter::update(LifeTime * lt)
 {
     ASSERT0(lt);
-    if (m_call2pos.get_elem_count() == 0 ||
-        lt->getCallCrossedNum() >= CROSS_CALL_NUM_THRESHOLD) {
+    if (m_call2pos.get_elem_count() == 0) {
         //Implement the 2.1 of the algorithm.
         //Don't update the call_crossed_num if there is no call or the
         //call_crossed_num is greater than the CROSS_CALL_NUM_THRESHOLD.
@@ -696,24 +694,13 @@ void CrossedCallCounter::update(LifeTime * lt)
 
     //Implement the 2.2.3 of the algorithm.
     for (VecIdx i = baseline_call_id; i <= current_call_id; i++) {
-        if (!lt->is_contain(m_call2pos[i])) { continue; }
-        //Implement the 2.2.3.1 of the algorithm.
-        lt->incCallCrossedNum(1);
+        if (lt->is_contain(m_call2pos[i])) {
+            //Implement the 2.2.3.1 of the algorithm.
+            lt->incCallCrossedNum(1);
+            break;
+        }
     }
     m_prno2callid.setAlways(prno, current_call_id);
-}
-
-
-bool LifeTimeMgr::canBeCandidate(PRNO prno)
-{
-    RA_STRATEGY strategy = getStrategy();
-    if (strategy == RA_STRATEGY_FULL) { return true; }
-    Var * var = m_rg->getVarByPRNO(prno);
-    ASSERT0(var);
-    Type const* tp = var->getType();
-    ASSERT0(tp);
-    return tp->is_vector() ? strategy == RA_STRATEGY_VECTOR :
-        strategy == RA_STRATEGY_SCALAR;
 }
 
 
@@ -768,9 +755,8 @@ void LifeTimeMgr::updateBBEntryPos(IRBB const* bb, MOD UpdatePos & up,
 
 
 void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
-                                    PreAssignedMgr const& preassigned_mgr,
-                                    Pos livein_def, IRIter & irit,
-                                    MOD CrossedCallCounter & cross_call_counter)
+    PreAssignedMgr const& preassigned_mgr, Pos livein_def, IRIter & irit,
+    MOD CrossedCallCounter & cross_call_counter)
 {
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter bbirit;
@@ -786,8 +772,9 @@ void LifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
             addCallerLTPos(dpos, ir);
         }
         computeRHS(ir, *this, upos, livein_def, irit, preassigned_mgr,
-                   cross_call_counter);
-        computeLHS(ir, *this, dpos, preassigned_mgr, cross_call_counter);
+                   cross_call_counter, m_ramgr);
+        computeLHS(ir, *this, dpos, preassigned_mgr, cross_call_counter,
+                   m_ramgr);
     }
 }
 
@@ -960,7 +947,6 @@ LifeTimeMgr::LifeTimeMgr(Region * rg)
 {
     m_pool = nullptr;
     m_use_expose = false;
-    m_strategy = RA_STRATEGY_UNDEF;
     m_ramgr = (RegAllocMgr*)rg->getPassMgr()->registerPass(PASS_REGALLOC_MGR);
     init(rg);
 }
@@ -1046,12 +1032,13 @@ void LifeTime2DMgr::mergeLiveIn(IRBB const* bb, UpdatePos & up,
     ASSERT0(bb);
     PRLiveSet * live_in = m_live_mgr->get_livein(bb->id());
     ASSERT0(live_in);
-    PRLiveSetIter * iter = nullptr;
-
-    for (UINT id = (UINT)live_in->get_first(&iter);
-         id != BS_UNDEF; id = (UINT)live_in->get_next(id, &iter)) {
-        if (!canBeCandidate(id)) { continue; }
-        LifeTime * lt = genLifeTime(id);
+    PRLiveSetIter iter = nullptr;
+    for (BSIdx id = live_in->get_first(&iter);
+         id != BS_UNDEF; id = live_in->get_next(id, &iter)) {
+        PRNO pr = (PRNO)id;
+        ASSERT0(pr != PRNO_UNDEF);
+        if (!m_ramgr->canBeCandidate(pr)) { continue; }
+        LifeTime * lt = genLifeTime(pr);
         ASSERT0(lt);
 
         //Add the exposed-def of current BB to the lifetime if it is the
@@ -1067,12 +1054,13 @@ void LifeTime2DMgr::mergeLiveOut(IRBB const* bb, UpdatePos & up,
     ASSERT0(bb);
     PRLiveSet * live_out = m_live_mgr->get_liveout(bb->id());
     ASSERT0(live_out);
-    PRLiveSetIter * iter = nullptr;
-
-    for (UINT id = (UINT)live_out->get_first(&iter);
-         id != BS_UNDEF; id = (UINT)live_out->get_next(id, &iter)) {
-        if (!canBeCandidate(id)) { continue; }
-        LifeTime * lt = genLifeTime(id);
+    PRLiveSetIter iter = nullptr;
+    for (BSIdx id = live_out->get_first(&iter);
+         id != BS_UNDEF; id = live_out->get_next(id, &iter)) {
+        PRNO pr = (PRNO)id;
+        ASSERT0(pr != PRNO_UNDEF);
+        if (!m_ramgr->canBeCandidate(pr)) { continue; }
+        LifeTime * lt = genLifeTime(pr);
         ASSERT0(lt);
         Range r = lt->getLastRange();
         ASSERT0(r.start() != POS_UNDEF);

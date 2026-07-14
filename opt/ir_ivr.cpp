@@ -881,7 +881,8 @@ bool FindBIVByRedOp::isReductionOpByMDSSA(
 static void dumpNotFindDef(
     IVRCtx const& ctx, IR const* def, LI<IRBB> const* li)
 {
-    if (!ctx.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
+    if (!ctx.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return; }
     ctx.dumpAct("FIND_BIV:%s in LOOP%u does not have exact MD",
                 DumpIRName().dump(def), li->id());
 }
@@ -889,7 +890,8 @@ static void dumpNotFindDef(
 
 static void dumpNotFindAddend(IVRCtx const& ctx, IR const* addend)
 {
-    if (!ctx.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
+    if (!ctx.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return; }
     ctx.dumpAct("FIND_BIV:Addend %s is ANY-type", DumpIRName().dump(addend));
 }
 
@@ -1434,7 +1436,8 @@ void IVRCtx::dumpAct(CHAR const* format, ...) const
 
 void IVRCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return; }
     ASSERT0(m_am);
     ASSERT0(ir);
     xcom::StrBuf tmpbuf(64);
@@ -1458,7 +1461,8 @@ void IVRCtx::dumpAct(IR const* ir, CHAR const* format, ...) const
 
 void IVRCtx::dumpAct(BIV const* biv, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return; }
     ASSERT0(m_am);
     ASSERT0(biv);
     xcom::StrBuf tmpbuf(64);
@@ -2728,7 +2732,8 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
 //Dump IVR info for loop.
 bool IVR::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpIVR()) { return true; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
@@ -3114,6 +3119,20 @@ bool IVR::computeExpIVBound(
 }
 
 
+bool IVR::extractIVValFromVec(MOD IVVal * val, IR const* ir) const
+{
+    ASSERT0(ir->is_vec());
+    VectorType const* ty = (VectorType const*)ir->getType();
+    if (ty->is_vector_with_scalable_elem_type()) { return false; }
+    if (ty->getByteSize() <= sizeof(HOST_UINT)) {
+        //Regard Vector typed value as integer value.
+        val->setToInt(CONST_int_val(ir), m_tm->getHostUIntType());
+        return true;
+    }
+    return false;
+}
+
+
 bool IVR::extractIVValFromMC(MOD IVVal * val, IR const* ir) const
 {
     ASSERT0(ir->is_mc());
@@ -3123,7 +3142,6 @@ bool IVR::extractIVValFromMC(MOD IVVal * val, IR const* ir) const
         val->setToInt(CONST_int_val(ir), m_tm->getHostUIntType());
         return true;
     }
-    ASSERTN(0, ("Target Dependent Code"));
     return false;
 }
 
@@ -3133,7 +3151,10 @@ bool IVR::extractIVValFrom(MOD IVVal * val, IR const* ir) const
     if (ir->is_mc()) {
         return extractIVValFromMC(val, ir);
     }
-    ASSERTN(0, ("Target Dependent Code"));
+    if (ir->is_vec()) {
+        return extractIVValFromVec(val, ir);
+    }
+    ASSERTN(0, ("TODO:support the type."));
     return false;
 }
 
@@ -3273,13 +3294,12 @@ bool IVR::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     clean();
     initDepPass(oc);
     findInLoopTree(oc);
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIVR()) {
-        dump();
-    }
+    dump();
     set_valid(true);
     ASSERT0(verify());
     return false;
@@ -3295,6 +3315,7 @@ void tryInvalidIVRIfIRIsIV(
         //IVR already invalid.
         return;
     }
+    ASSERT0(ir && oc);
     //if (!ivr->isIVForTree(ir, nullptr)) { return; }
     if (!ivr->isRefIVInfoForTree(ir, nullptr)) { return; }
     dumpChangedIR(oc, am, ir);

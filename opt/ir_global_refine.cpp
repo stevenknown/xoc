@@ -107,7 +107,7 @@ IR * GlobalRefine::refineIRList(IR * ir_list, bool & change, MOD OptCtx & oc)
 
 bool GlobalRefine::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpGlobalRefine()) {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_GLOBAL_REFINE)) {
         return false;
     }
     note(m_rg, "\n==---- DUMP %s '%s' ----==",

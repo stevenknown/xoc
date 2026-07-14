@@ -54,10 +54,13 @@ public:
 public:
     Stmt2UseMgr(Region * rg) { ASSERT0(rg); m_rg = rg; }
     ~Stmt2UseMgr();
+
+    void clean();
     void copyUseSet(IR const* ir);
 
     IRSet const* getIRSet(IR const* ir) const
     { return m_stmt2iruseset.get(ir); }
+    IR2IRSet const& getStmt2UseSet() const { return m_stmt2iruseset; }
 };
 
 

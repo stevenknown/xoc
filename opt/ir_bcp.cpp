@@ -36,7 +36,8 @@ static void dumpAct(IR const* oldexp, IR const* newexp, BCPCtx const& ctx)
     Region const* rg = ctx.getRegion();
     ActMgr * am = ctx.getActMgr();
     ASSERT0(rg);
-    if (am == nullptr || !rg->isLogMgrInit() || !g_dump_opt.isDumpBCP()) {
+    if (am == nullptr || !rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_BCP)) {
         return;
     }
     class Dump : public xoc::DumpToBuf {

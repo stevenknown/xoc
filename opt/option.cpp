@@ -107,6 +107,7 @@ bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
 bool g_do_mdssa = false;
+bool g_reuse_ir = false;
 
 //Set default value to false because some target machines use
 //IR_ST as initialization of a Variable.
@@ -143,6 +144,90 @@ bool g_debug_python = false;
 
 StrTabOption g_include_region;
 StrTabOption g_exclude_region;
+
+static DumpOption::OptionDesc g_dump_opt_desc [] = {
+  { PASS_UNDEF, "PASS_UNDEF", false, },
+  { PASS_CFG, "PASS_CFG", false, },
+  { PASS_AA, "PASS_AA", false, },
+  { PASS_DU_MGR, "PASS_DU_MGR", false, },
+  { PASS_CP, "PASS_CP", false, },
+  { PASS_BCP, "PASS_BCP", false, },
+  { PASS_CCP, "PASS_CCP", false, },
+  { PASS_RCP, "PASS_RCP", false, },
+  { PASS_RRCP, "PASS_RRCP", false, },
+  { PASS_GCSE, "PASS_GCSE", false, },
+  { PASS_LCSE, "PASS_LCSE", false, },
+  { PASS_RP, "PASS_RP", false, },
+  { PASS_PRE, "PASS_PRE", false, },
+  { PASS_IVR, "PASS_IVR", false, },
+  { PASS_SCEV, "PASS_SCEV", false, },
+  { PASS_LICM, "PASS_LICM", false, },
+  { PASS_DCE, "PASS_DCE", false, },
+  { PASS_INFER_TYPE, "PASS_INFER_TYPE", false, },
+  { PASS_INVERT_BRTGT, "PASS_INVERT_BRTGT", false, },
+  { PASS_IF_CONVERSION, "PASS_IF_CONVERSION", false, },
+  { PASS_LFTR, "PASS_LFTR", false, },
+  { PASS_DSE, "PASS_DSE", false, },
+  { PASS_RCE, "PASS_RCE", false, },
+  { PASS_GVN, "PASS_GVN", false, },
+  { PASS_DOM, "PASS_DOM", false, },
+  { PASS_PDOM, "PASS_PDOM", false, },
+  { PASS_MD_REF, "PASS_MD_REF", false, },
+  { PASS_LIVE_EXPR, "PASS_LIVE_EXPR", false, },
+  { PASS_SOLVESET_MGR, "PASS_SOLVESET_MGR", false, },
+  { PASS_AVAIL_REACH_DEF, "PASS_AVAIL_REACH_DEF", false, },
+  { PASS_REACH_DEF, "PASS_REACH_DEF", false, },
+  { PASS_CLASSIC_DU_CHAIN, "PASS_CLASSIC_DU_CHAIN", false, },
+  { PASS_EXPR_TAB, "PASS_EXPR_TAB", false, },
+  { PASS_LOOP_INFO, "PASS_LOOP_INFO", false, },
+  { PASS_CDG, "PASS_CDG", false, },
+  { PASS_LOOP_CVT, "PASS_LOOP_CVT", false, },
+  { PASS_RPO, "PASS_RPO", false, },
+  { PASS_POLY, "PASS_POLY", false, },
+  { PASS_LIVENESS_MGR, "PASS_LIVENESS_MGR", false, },
+  { PASS_VRP, "PASS_VRP", false, },
+  { PASS_PRSSA_MGR, "PASS_PRSSA_MGR", false, },
+  { PASS_MDSSA_MGR, "PASS_MDSSA_MGR", false, },
+  { PASS_REGSSA_MGR, "PASS_REGSSA_MGR", false, },
+  { PASS_CFS_MGR, "PASS_CFS_MGR", false, },
+  { PASS_POLY_TRAN, "PASS_POLY_TRAN", false, },
+  { PASS_IPA, "PASS_IPA", false, },
+  { PASS_INLINER, "PASS_INLINER", false, },
+  { PASS_REFINE_DUCHAIN, "PASS_REFINE_DUCHAIN", false, },
+  { PASS_SCALAR_OPT, "PASS_SCALAR_OPT", false, },
+  { PASS_PRLIVENESS_MGR, "PASS_PRLIVENESS_MGR", false, },
+  { PASS_MDLIVENESS_MGR, "PASS_MDLIVENESS_MGR", false, },
+  { PASS_VMDLIVENESS_MGR, "PASS_VMDLIVENESS_MGR", false, },
+  { PASS_MDSSALIVE_MGR, "PASS_MDSSALIVE_MGR", false, },
+  { PASS_REFINE, "PASS_REFINE", false, },
+  { PASS_GLOBAL_REFINE, "PASS_GLOBAL_REFINE", false, },
+  { PASS_INSERT_CVT, "PASS_INSERT_CVT", false, },
+  { PASS_VECT, "PASS_VECT", false, },
+  { PASS_SCC, "PASS_SCC", false, },
+  { PASS_IRSIMP, "PASS_IRSIMP", false, },
+  { PASS_COMPRESS, "PASS_COMPRESS", false, },
+  { PASS_REGALLOC_MGR, "PASS_REGALLOC_MGR", false, },
+  { PASS_LINEAR_SCAN_RA, "PASS_LINEAR_SCAN_RA", false, },
+  { PASS_IRMGR, "PASS_IRMGR", false, },
+  { PASS_CALL_GRAPH, "PASS_CALL_GRAPH", false, },
+  { PASS_MULTI_RES_CVT, "PASS_MULTI_RES_CVT", false, },
+  { PASS_ALGE_REASSOCIATE, "PASS_ALGE_REASSOCIATE", false, },
+  { PASS_TARGINFO_HANDLER, "PASS_TARGINFO_HANDLER", false, },
+  { PASS_LOOP_DEP_ANA, "PASS_LOOP_DEP_ANA", false, },
+  { PASS_PROLOGUE_EPILOGUE, "PASS_PROLOGUE_EPILOGUE", false, },
+  { PASS_GP_ADJUSTMENT, "PASS_GP_ADJUSTMENT", false, },
+  { PASS_BR_OPT, "PASS_BR_OPT", false, },
+  { PASS_DYNAMIC_STACK, "PASS_DYNAMIC_STACK", false, },
+  { PASS_IRRELOC, "PASS_IRRELOC", false, },
+  { PASS_VARRELOC, "PASS_VARRELOC", false, },
+  { PASS_ARGPASSER, "PASS_ARGPASSER", false, },
+  { PASS_IGOTO_OPT, "PASS_IGOTO_OPT", false, },
+  { PASS_INST_SCHED, "PASS_INST_SCHED", false, },
+  { PASS_STACK_COLORING, "PASS_STACK_COLORING", false, },
+  { PASS_SAVE_CALLEE, "PASS_SAVE_CALLEE", false, },
+  #include "dump_opt_desc_ext.impl"
+  { PASS_NUM, "PASS_NUM", false, },
+};
 
 //
 //START StrTabOption
@@ -212,6 +297,7 @@ void StrTabOption::dump(RegionMgr * rm) const
 //
 DumpOption::DumpOption()
 {
+    m_pool = smpoolCreate(64, MEM_COMM);
     setDumpNothing();
 
     //No dump-options are disabled by default.
@@ -222,68 +308,67 @@ DumpOption::DumpOption()
 }
 
 
+DumpOption::~DumpOption()
+{
+    ASSERT0(m_pool);
+    smpoolDelete(m_pool);
+    m_pool = nullptr;
+}
+
+
+void * DumpOption::xmalloc(UINT size)
+{
+    ASSERTN(m_pool != nullptr, ("pool does not initialized"));
+    void * p = smpoolMalloc(size, m_pool);
+    ASSERT0(p != nullptr);
+    ::memset((void*)p, 0, size);
+    return p;
+}
+
+
 void DumpOption::setDumpNothing()
 {
+    for (PASS_TYPE pt = (PASS_TYPE)(PASS_UNDEF + 1);
+         pt < PASS_NUM; pt = (PASS_TYPE)(pt + 1)) {
+        OptionDesc * oi = getOptionDesc(pt);
+        ASSERT0(oi);
+        oi->is_dump = false;
+    }
     is_dump_nothing = true;
     is_dump_all = false;
     is_dump_for_test = false;
     is_dump_before_pass = false;
     is_dump_after_pass = false;
-    is_dump_aa = false;
-    is_dump_dumgr = false;
     is_dump_mdref = false;
     is_dump_mdset_hash = false;
-    is_dump_cfg = false;
-    is_dump_dom = false;
-    is_dump_rpo = false;
-    is_dump_cp = false;
-    is_dump_rp = false;
-    is_dump_dce = false;
-    is_dump_bcp = false;
-    is_dump_vrp = false;
-    is_dump_lftr = false;
-    is_dump_vectorization = false;
-    is_dump_multi_res_convert = false;
-    is_dump_targinfo_handler = false;
-    is_dump_loop_dep_ana = false;
-    is_dump_gvn = false;
-    is_dump_gcse = false;
-    is_dump_lcse = false;
-    is_dump_ivr = false;
-    is_dump_if_conversion = false;
-    is_dump_licm = false;
-    is_dump_exprtab = false;
-    is_dump_loopcvt = false;
-    is_dump_simplification = false;
-    is_dump_prssamgr = false;
-    is_dump_mdssamgr = false;
-    is_dump_regssamgr = false;
     is_dump_memusage = false;
-    is_dump_livenessmgr = false;
     is_dump_irparser = false;
     is_dump_ir_id = false; //Do not dump IR's id by default.
     is_dump_to_buffer = false;
     is_dump_cfgopt = false;
-    is_dump_rce = false;
-    is_dump_infertype = false;
-    is_dump_invert_brtgt = false;
-    is_dump_alge_reassociate = false;
-    is_dump_refine_duchain = false;
-    is_dump_refine = false;
-    is_dump_global_refine = false;
-    is_dump_insert_cvt = false;
-    is_dump_calc_derivative = false;
-    is_dump_gscc = false;
-    is_dump_cdg = false;
-    is_dump_lsra = false;
     is_dump_linker = false;
+}
+
+
+void DumpOption::setDumpPass(PASS_TYPE passty, bool is_dump)
+{
+    DumpOption::OptionDesc * od = DumpOption::getOptionDesc(passty);
+    ASSERT0(od);
+    od->is_dump = is_dump;
 }
 
 
 void DumpOption::setDumpAll()
 {
+    for (PASS_TYPE pt = (PASS_TYPE)(PASS_UNDEF + 1);
+         pt < PASS_NUM; pt = (PASS_TYPE)(pt + 1)) {
+        OptionDesc * oi = getOptionDesc(pt);
+        ASSERT0(oi);
+        oi->is_dump = true;
+    }
     is_dump_nothing = false;
     is_dump_all = true;
+
     //DumpAll will ask each passes dump complete and verbose information.
     //The information by DumpAll is far more than the requirement of
     //DumpForTest. Given the two options are usually alternative in
@@ -291,53 +376,13 @@ void DumpOption::setDumpAll()
     //However, user can enable DumpForTest explicitly at any time.
     is_dump_for_test = false;
     is_dump_before_pass = true;
-    is_dump_after_pass = true;
-    is_dump_aa = true;
-    is_dump_dumgr = true;
     is_dump_mdref = true;
+    is_dump_after_pass = true;
     is_dump_mdset_hash = true;
-    is_dump_cfg = true;
-    is_dump_dom = true;
-    is_dump_rpo = true;
-    is_dump_cp = true;
-    is_dump_rp = true;
-    is_dump_dce = true;
-    is_dump_bcp = true;
-    is_dump_vrp = true;
-    is_dump_lftr = true;
-    is_dump_vectorization = true;
-    is_dump_multi_res_convert = true;
-    is_dump_targinfo_handler = true;
-    is_dump_loop_dep_ana = true;
-    is_dump_gvn = true;
-    is_dump_ivr = true;
-    is_dump_if_conversion = true;
-    is_dump_licm = true;
-    is_dump_exprtab = true;
-    is_dump_gcse = true;
-    is_dump_lcse = true;
-    is_dump_loopcvt = true;
-    is_dump_simplification = true;
-    is_dump_prssamgr = true;
-    is_dump_mdssamgr = true;
-    is_dump_regssamgr = true;
     is_dump_memusage = true;
-    is_dump_livenessmgr = true;
     is_dump_irparser = true;
     is_dump_ir_id = true;
     is_dump_cfgopt = true;
-    is_dump_rce = true;
-    is_dump_infertype = true;
-    is_dump_invert_brtgt = true;
-    is_dump_alge_reassociate = true;
-    is_dump_refine_duchain = true;
-    is_dump_refine = true;
-    is_dump_global_refine = true;
-    is_dump_insert_cvt = true;
-    is_dump_calc_derivative = true;
-    is_dump_gscc = true;
-    is_dump_cdg = true;
-    is_dump_lsra = true;
     is_dump_linker = true;
 }
 
@@ -379,27 +424,9 @@ bool DumpOption::isDumpAfterPass() const
 }
 
 
-bool DumpOption::isDumpAA() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_aa);
-}
-
-
-bool DumpOption::isDumpDUMgr() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_dumgr);
-}
-
-
 bool DumpOption::isDumpMDSetHash() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdset_hash);
-}
-
-
-bool DumpOption::isDumpCFG() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_cfg);
 }
 
 
@@ -409,183 +436,9 @@ bool DumpOption::isDumpCFGOpt() const
 }
 
 
-bool DumpOption::isDumpDOM() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_dom);
-}
-
-
-bool DumpOption::isDumpRPO() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_rpo);
-}
-
-
-bool DumpOption::isDumpCP() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_cp);
-}
-
-
-bool DumpOption::isDumpRP() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_rp);
-}
-
-
-bool DumpOption::isDumpInferType() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_infertype);
-}
-
-
-bool DumpOption::isDumpInvertBrTgt() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_invert_brtgt);
-}
-
-
-bool DumpOption::isDumpVRP() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_vrp);
-}
-
-
-bool DumpOption::isDumpBCP() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_bcp);
-}
-
-
-bool DumpOption::isDumpDCE() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_dce);
-}
-
-
-bool DumpOption::isDumpRCE() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_rce);
-}
-
-
-bool DumpOption::isDumpLFTR() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_lftr);
-}
-
-
-bool DumpOption::isDumpVectorization() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_vectorization);
-}
-
-
-bool DumpOption::isDumpTargInfoHandler() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_targinfo_handler);
-}
-
-
-bool DumpOption::isDumpMultiResConvert() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_multi_res_convert);
-}
-
-
-bool DumpOption::isDumpAlgeReassociate() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_alge_reassociate);
-}
-
-
-bool DumpOption::isDumpLoopDepAna() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_loop_dep_ana);
-}
-
-
-bool DumpOption::isDumpCDG() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_cdg);
-}
-
-
-bool DumpOption::isDumpGVN() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_gvn);
-}
-
-
 bool DumpOption::isDumpMDRef() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdref);
-}
-
-
-bool DumpOption::isDumpGCSE() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_gcse);
-}
-
-
-bool DumpOption::isDumpLCSE() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_lcse);
-}
-
-
-bool DumpOption::isDumpIVR() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_ivr);
-}
-
-
-bool DumpOption::isDumpIfConversion() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_if_conversion);
-}
-
-
-bool DumpOption::isDumpLICM() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_licm);
-}
-
-
-bool DumpOption::isDumpExprTab() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_exprtab);
-}
-
-
-bool DumpOption::isDumpLoopCVT() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_loopcvt);
-}
-
-
-bool DumpOption::isDumpSimp() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_simplification);
-}
-
-
-bool DumpOption::isDumpPRSSAMgr() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_prssamgr);
-}
-
-
-bool DumpOption::isDumpRegSSAMgr() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_regssamgr);
-}
-
-
-bool DumpOption::isDumpMDSSAMgr() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_mdssamgr);
 }
 
 
@@ -595,21 +448,9 @@ bool DumpOption::isDumpMemUsage() const
 }
 
 
-bool DumpOption::isDumpLivenessMgr() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_livenessmgr);
-}
-
-
 bool DumpOption::isDumpIRParser() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irparser);
-}
-
-
-bool DumpOption::isDumpLSRA() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_lsra);
 }
 
 
@@ -619,39 +460,9 @@ bool DumpOption::isDumpIRID() const
 }
 
 
-bool DumpOption::isDumpRefineDUChain() const
+bool DumpOption::isDumpLinker() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_refine_duchain);
-}
-
-
-bool DumpOption::isDumpInsertCvt() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_insert_cvt);
-}
-
-
-bool DumpOption::isDumpCalcDerivative() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_calc_derivative);
-}
-
-
-bool DumpOption::isDumpRefine() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_refine);
-}
-
-
-bool DumpOption::isDumpGlobalRefine() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_global_refine);
-}
-
-
-bool DumpOption::isDumpGSCC() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_gscc);
+    return is_dump_all || (!is_dump_nothing && is_dump_linker);
 }
 
 
@@ -665,6 +476,39 @@ bool DumpOption::isDumpLSRAReorderMovInLatchBB() const
 {
     return is_dump_all ||
         (!is_dump_nothing && is_dump_lsra_reorder_mov_in_latch_BB);
+}
+
+
+bool DumpOption::isDumpPass(PASS_TYPE pt) const
+{
+    if (is_dump_all) { return true; }
+    if (is_dump_nothing) { return false; }
+    OptionDesc const* od = getOptionDesc(pt);
+    ASSERT0(od);
+    return od->is_dump;
+}
+
+
+DumpOption::OptionDesc * DumpOption::getOptionDesc(PASS_TYPE pt)
+{
+    ASSERT0(pt < PASS_NUM);
+    return &g_dump_opt_desc[pt];
+}
+
+
+void DumpOption::dump(RegionMgr const* rm) const
+{
+    ASSERT0(rm);
+    if (!rm->isLogMgrInit()) { return; }
+    note(rm, "\n==---- DUMP DumpOptions ----==");
+    for (PASS_TYPE pt = (PASS_TYPE)(PASS_UNDEF + 1);
+         pt < PASS_NUM; pt = (PASS_TYPE)(pt + 1)) {
+        OptionDesc const* oi = getOptionDesc(pt);
+        ASSERT0(oi);
+        note(rm, "\n%s:", oi->getPassTypeName());
+        prt(rm, "is_dump:%s", oi->is_dump ? "true" : "false");
+    }
+    note(rm, "\n");
 }
 //END DumpOption
 
@@ -771,6 +615,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
     note(lm, "\ng_do_mdssa = %s", g_do_mdssa ? "true":"false");
+    note(lm, "\ng_reuse_ir = %s", g_reuse_ir ? "true":"false");
     note(lm, "\ng_verify_ir_attr_readonly = %s",
          g_verify_ir_attr_readonly ? "true":"false");
     note(lm, "\ng_thres_opt_bb_num = %u", g_thres_opt_bb_num);
@@ -960,5 +805,17 @@ void PassOption::setPassInLevelSize(bool enable)
     }
 }
 //END PassOption
+
+
+bool checkDumpOptionDesc()
+{
+    for (PASS_TYPE pt = (PASS_TYPE)(PASS_UNDEF + 1);
+         pt < PASS_NUM; pt = (PASS_TYPE)(pt + 1)) {
+        DumpOption::OptionDesc const* oi = DumpOption::getOptionDesc(pt);
+        ASSERT0(oi);
+        ASSERTN(oi->pt == pt, ("pass type unmatched, pass may be missed"));
+    }
+    return true;
+}
 
 } //namespace xoc

@@ -5028,6 +5028,20 @@ public:
         }
     }
 
+    //Append <key, mapped> pair of 'src' to current object.
+    //NOTE:the function will enforce mapping between key and mapped object
+    //even if the key has been mapped.
+    void appendAlways(TMap<Tsrc, Ttgt, CompareKey> const& src)
+    {
+        ASSERT0(this != &src);
+        TMapIter<Tsrc, Ttgt> iter;
+        Ttgt val;
+        for (Tsrc key = src.get_first(iter, &val);
+             !iter.end(); key = src.get_next(iter, &val)) {
+            setAlways(key, val);
+        }
+    }
+
     void copy(TMap<Tsrc, Ttgt, CompareKey> const& src)
     {
         ASSERT0(this != &src);
@@ -5200,6 +5214,12 @@ public:
         #endif
         return BaseTMap::setAlways(t, t);
     }
+
+    //Add a table of elements into current table.
+    //src: a table of elements.
+    //Note: the element in the table must be unqiue.
+    void append(TTab<T, CompareKey> const& src)
+    { BaseTMap::appendAlways(src); }
 
     //Add element into table, if it is exist, return the exist one.
     T append_and_retrieve(T t)

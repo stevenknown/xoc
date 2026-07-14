@@ -554,6 +554,14 @@ bool Region::doClassicDU(OptCtx & oc)
     DUMgr * dumgr = (DUMgr*)getPassMgr()->registerPass(PASS_DU_MGR);
     ASSERT0(dumgr);
     bool changed = dumgr->checkAndComputeClassicDUChain(oc);
+    if (g_compute_pr_du_chain && oc.is_pr_du_chain_valid()) {
+        //If classic DU is enabled, disable PRSSA.
+        oc.setInvalidPRSSA();
+    }
+    if (g_compute_nonpr_du_chain && oc.is_nonpr_du_chain_valid()) {
+        //If classic DU is enabled, disable PRSSA.
+        oc.setInvalidMDSSA();
+    }
     return changed;
 }
 

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR const* attr,
-                 DumpFlag dumpflag)
+    DumpFlag dumpflag)
 {
     ASSERT0(rg);
     if (!rg->isLogMgrInit()) { return; }
@@ -50,26 +50,23 @@ void dumpIRList(
     FileObj fo(filename, true, false);
     FILE * h = fo.getFileHandler();
     rg->getLogMgr()->push(h, filename);
-    dumpIRList(ir_list, rg, dump_inner_region, ctx);
+    ctx->dumpflag.combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
+        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+    dumpIRList(ir_list, rg, nullptr, ctx);
     rg->getLogMgr()->pop();
 }
 
 
 void dumpIRList(
-    IR const* ir_list, Region const* rg, bool dump_inner_region,
-    IRDumpCtx<> * ctx)
+    IR const* ir_list, Region const* rg, CHAR const* attr, IRDumpCtx<> * ctx)
 {
-    ASSERT0(rg && ir_list);
+    if (ir_list == nullptr) { return; }
+    ASSERT0(rg && ctx);
     if (!rg->isLogMgrInit()) { return; }
+    ctx->attr = attr;
     note(rg, "");
-    DumpFlag f = DumpFlag::combineIRID(IR_DUMP_KID | IR_DUMP_SRC_LINE |
-        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     for (; ir_list != nullptr; ir_list = ir_list->get_next()) {
-        if (ctx != nullptr) {
-            xoc::dumpIR(ir_list, rg, *ctx);
-            continue;
-        }
-        xoc::dumpIR(ir_list, rg, nullptr, f);
+        xoc::dumpIR(ir_list, rg, *ctx);
     }
 }
 
@@ -89,13 +86,7 @@ void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
 {
     if (!rg->isLogMgrInit() || ir_list == nullptr) { return; }
     note(rg, "");
-    bool first_one = true;
     for (; ir_list != nullptr; ir_list = ir_list->get_next()) {
-        if (first_one) {
-            first_one = false;
-            dumpIR(ir_list, rg, attr, dumpflag);
-            continue;
-        }
         dumpIR(ir_list, rg, attr, dumpflag);
     }
 }
@@ -172,10 +163,10 @@ void dumpAllKids(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_newline = !ctx.dumpflag.have(IR_DUMP_NO_NEWLINE);
     LogMgr * lm = rg->getLogMgr();
-    UINT dn = ctx.dn;
+    UINT incdn = ctx.dn; //increase indent to incdn + LogMgr's indent.
     UINT org_indent = 0;
     if (dump_newline) {
-        lm->incIndent(dn);
+        lm->incIndent(incdn);
     } else {
         org_indent = lm->getIndent();
         //There is no newline between IR expressions, thus
@@ -190,7 +181,7 @@ void dumpAllKids(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         dumpIRList(k, rg, lctx);
     }
     if (dump_newline) {
-        lm->decIndent(dn);
+        lm->decIndent(incdn);
     } else {
         //Keep user given indent unchanged.
         lm->setIndent(org_indent);
@@ -474,6 +465,42 @@ void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
+void dumpArraySubList(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+{
+    ASSERT0(ir->isArrayOp());
+    if (ARR_sub_list(ir) == nullptr) { return; }
+
+    LogMgr * lm = rg->getLogMgr();
+    //Dump element number.
+    lm->incIndent(ctx.dn);
+    if (ARR_elem_num_buf(ir) != nullptr) {
+        UINT dim = 0;
+        note(rg, "\nelemnum[");
+        for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
+            prt(rg, "%u", ((CArray*)ir)->getElementNumOfDim(dim));
+            sub = sub->get_next();
+            if (sub != nullptr) {
+                prt(rg, ",");
+            }
+            dim++;
+        }
+        prt(rg, "]");
+    } else { note(rg, "\nelemnum[--]"); }
+
+    //Dump subscript expressions in each dimension.
+    UINT dim = 0;
+    xcom::FixedStrBuf<40> tt;
+    for (IR const* sub = ARR_sub_list(ir);
+         sub != nullptr; sub = sub->get_next()) {
+        tt.clean();
+        tt.strcat(40, " dim%d", dim);
+        dumpIR(sub, rg, tt.getBuf(), ctx.dumpflag);
+        dim++;
+    }
+    lm->decIndent(ctx.dn);
+}
+
+
 void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
@@ -491,35 +518,8 @@ void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
-    if (ARR_sub_list(ir) != nullptr && dump_kid) {
-        //Dump element number if it exist.
-        lm->incIndent(ctx.dn);
-
-        if (ARR_elem_num_buf(ir) != nullptr) {
-            UINT dim = 0;
-            note(rg, "\nelemnum[");
-            for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
-                prt(rg, "%d", ARR_elem_num(ir, dim));
-                sub = sub->get_next();
-                if (sub != nullptr) {
-                    prt(rg, ",");
-                }
-                dim++;
-            }
-            prt(rg, "]");
-        } else { note(rg, "\nelemnum[--]"); }
-
-        //Dump subscript expressions in each dimension.
-        UINT dim = 0;
-        xcom::FixedStrBuf<40> tt;
-        for (IR const* sub = ARR_sub_list(ir);
-             sub != nullptr; sub = sub->get_next()) {
-            tt.clean();
-            tt.strcat(40, " dim%d", dim);
-            dumpIR(sub, rg, tt.getBuf(), ctx.dumpflag);
-            dim++;
-        }
-        lm->decIndent(ctx.dn);
+    if (dump_kid) {
+        dumpArraySubList(ir, rg, ctx);
     }
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
@@ -943,41 +943,12 @@ void dumpStArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
-    if (ARR_sub_list(ir) != nullptr && dump_kid) {
-        //Dump elem number.
-        lm->incIndent(ctx.dn);
-        UINT dim = 0;
-        if (ARR_elem_num_buf(ir) != nullptr) {
-            note(rg, "\nelem_num[");
-            for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
-                prt(rg, "%d", ((CArray*)ir)->getElementNumOfDim(dim));
-                sub = sub->get_next();
-                if (sub != nullptr) {
-                    prt(rg, ",");
-                }
-                dim++;
-            }
-            prt(rg, "]");
-        } else { note(rg, "\nelem_num[--]"); }
-
-        //Dump sub exp list.
-        dim = 0;
-        xcom::FixedStrBuf<40> tt;
-        for (IR const* sub = ARR_sub_list(ir);
-             sub != nullptr; sub = sub->get_next()) {
-            tt.clean();
-            tt.strcat(40, " dim%d", dim);
-            dumpIR(sub, rg, tt.getBuf(), ctx.dumpflag);
-            dim++;
-        }
-        lm->decIndent(ctx.dn);
-    }
-    if (dump_kid) {
-        lm->incIndent(ctx.dn);
-        dumpIRList(ARR_base(ir), rg, (CHAR const*)" array_base", ctx.dumpflag);
-        dumpIRList(STARR_rhs(ir), rg, (CHAR const*)" rhs", ctx.dumpflag);
-        lm->decIndent(ctx.dn);
-    }
+    if (!dump_kid) { return; }
+    dumpArraySubList(ir, rg, ctx);
+    lm->incIndent(ctx.dn);
+    dumpIRList(ARR_base(ir), rg, (CHAR const*)" array_base", ctx.dumpflag);
+    dumpIRList(STARR_rhs(ir), rg, (CHAR const*)" rhs", ctx.dumpflag);
+    lm->decIndent(ctx.dn);
 }
 
 
@@ -1269,6 +1240,7 @@ void dumpIRCombine(IR const* ir, Region const* rg)
 
 void dumpIR(IR const* ir, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
 {
+    //We prefer to indent 4 spaces to dump kids.
     UINT dn = 4; //default indent number.
     IRDumpCtx<> ctx(dn, dumpflag, attr);
     dumpIR(ir, rg, ctx);
@@ -1319,10 +1291,16 @@ CHAR const* dumpIRToBuf(IR const* ir, Region const* rg, OUT StrBuf & outbuf,
     public:
         IR const* ir;
         DumpFlag const& dumpflag;
-        Dump(Region const* rg, DumpFlag const& df, xcom::StrBuf & buf,
-             UINT indent) : DumpToBuf(rg, buf, indent), dumpflag(df) {}
+    public:
+        Dump(Region const* rg, DumpFlag const& df,
+             xcom::StrBuf & buf, UINT indent)
+            : DumpToBuf(rg, buf, indent), dumpflag(df)
+        {}
         virtual void dumpUserInfo() const override
-        { xoc::dumpIR(ir, getRegion(), nullptr, dumpflag); }
+        {
+            IRDumpCtx<> ctx(m_indent, dumpflag, nullptr, nullptr);
+            xoc::dumpIR(ir, m_rg, ctx);
+        }
     };
     if (!rg->isLogMgrInit()) { return nullptr; }
     Dump d(rg, dumpflag, outbuf, indent);

@@ -494,7 +494,7 @@ protected:
     IR * simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx);
     IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
-    bool simplifyCallArgList(
+    virtual bool simplifyCallArgList(
         IR * ir, IR ** ret_list, IR ** last, SimpCtx * ctx);
     IR * simplifyDoLoopSelfInit(IR * ir, IR * iv, SimpCtx * ctx);
     IR * simplifyDoLoopSelfDet(IR * ir, LabelInfo const* endl, SimpCtx * ctx);

@@ -1035,6 +1035,7 @@ public:
     //allocSBitSetCore() and allocDBitSetCore(). You should count these
     //objects additionally.
     size_t count_mem(FILE * h = nullptr) const;
+    void clean() { destroy(); init(); }
 
     //free bs for next use.
     inline void freeSBitSet(SBitSet<BitsPerSeg> * bs)

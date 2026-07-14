@@ -52,13 +52,16 @@ IR * IRMgrExt::buildSelectStoreStmtViaIsomoIR(
 
 IR * IRMgrExt::buildSelectToRes(IR * op, IR * base, Type const* ty)
 {
-    ASSERT0(op && base && ty);
-    ASSERT0(base->is_exp() && op->is_exp());
+    ASSERT0(op && ty);
+    ASSERT0(op->is_exp());
+    ASSERT0(base == nullptr || base->is_exp());
     IR * ir = allocIR(IR_SELECT_TO_RES);
     SELECTTORES_op(ir) = op;
     SELECTTORES_base(ir) = base;
     IR_parent(op) = ir;
-    IR_parent(base) = ir;
+    if (base != nullptr) {
+        IR_parent(base) = ir;
+    }
     IR_dt(ir) = ty;
     return ir;
 }
@@ -93,6 +96,21 @@ IR * IRMgrExt::buildDynLenOp(IR * op, IR * len,
     IR_parent(len) = ir;
     IR_dt(ir) = ty;
     return ir;
+}
+
+
+IR * IRMgrExt::buildStorePRWithTailAndMaskStrategy(PRNO prno, Type const* type,
+    IR * rhs, CDynLenOp::TAIL_STRATEGY ts, CMaskOp::MASK_STRATEGY ms)
+{
+    ASSERT0(prno != PRNO_UNDEF && type && rhs && rhs->is_exp());
+
+    //Need build a select_to_res.
+    if (ts == CDynLenOp::TAIL_STRATEGY::UNDISTURBED ||
+        ms == CMaskOp::MASK_STRATEGY::UNDISTURBED) {
+        IR * ir_pr = buildPRdedicated(prno, type);
+        return buildSelectStoreStmtViaIsomoIR(ir_pr, rhs, ir_pr, type);
+    }
+    return buildStorePR(prno, type, rhs);
 }
 
 

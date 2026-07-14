@@ -1491,11 +1491,11 @@ public:
     IR * getFalseExp() const { return SELECT_falseexp(this); }
 
     //Return true if both true-exp and false-exp are available.
-    static bool bothTFExpAvail(IR const* ir)
+    static bool isPartialSelect(IR const* ir)
     {
         ASSERT0(ir && ir->is_select());
         CSelect const* sel = (CSelect const*)ir;
-        return sel->getTrueExp() != nullptr && sel->getFalseExp() != nullptr;
+        return sel->getTrueExp() == nullptr || sel->getFalseExp() == nullptr;
     }
 };
 

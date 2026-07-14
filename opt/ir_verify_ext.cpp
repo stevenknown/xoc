@@ -139,14 +139,23 @@ bool verifySelectToRes(IR const* ir, Region const* rg)
     DUMMYUSE(tm);
     Type const* d = ir->getType();
     ASSERT0_DUMMYUSE(d);
-
-    //The ir type of the reduce operation can be scalar.
-    ASSERTN(ir->is_scalar() || ir->is_vec() || ir->is_tensor() || ir->is_any(),
-            ("select operation should be scalar, vector or tensor type."));
     IR const* op = SELECTTORES_op(ir);
     ASSERT0(op);
-    ASSERTN(op->is_scalar() || op->is_vec() || op->is_tensor() || op->is_any(),
-            ("select operation should be scalar, vector or tensor type."));
+
+    //CASE:Usually, ir and op type can be all kind of type.
+    //e.g:select_to_res:*<1>
+    //      select:*<1>
+    //          $494:bool det
+    //          $268:*<1> true_exp
+    //ir and op type are both D_PTR.
+    //The ir type of the reduce operation can be scalar.
+    //ASSERTN(ir->is_scalar() || ir->is_vec() ||
+    //        ir->is_tensor() || ir->is_any(),
+    //        ("select operation should be scalar, vector or tensor type."));
+    //ASSERTN(op->is_scalar() || op->is_vec() ||
+    //        op->is_tensor() || op->is_any(),
+    //        ("select operation should be scalar, vector or tensor type."));
+
     if (ir->getParent() != nullptr) {
         ASSERTN(ir->getParent()->isStoreStmt() ||
                 ir->getParent()->isVirtualOp(),

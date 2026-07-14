@@ -344,7 +344,7 @@ public:
 
     //Perform const-folding.
     //Return updated ir if optimization performed.
-    IR * foldConst(IR * ir, bool & change, RefineCtx & rc);
+    virtual IR * foldConst(IR * ir, bool & change, RefineCtx & rc);
 
     xcom::DomTree const& getAndGenDomTree();
     virtual CHAR const* getPassName() const { return "IR Refinement"; }

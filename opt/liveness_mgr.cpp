@@ -218,39 +218,39 @@ void LivenessMgr::cleanLocal()
 
 bool LivenessMgr::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return true; }
-    note(getRegion(),
-         "\n==---- DUMP LivenessMgr : liveness of each BB ----==\n");
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_LIVENESS_MGR))
+    { return true; }
+    note(m_rg, "\n==---- DUMP LivenessMgr : liveness of each BB ----==\n");
     List<IRBB*> * bbl = m_rg->getBBList();
-    FILE * file = getRegion()->getLogMgr()->getFileHandler();
-    getRegion()->getLogMgr()->incIndent(2);
+    FILE * file = m_rg->getLogMgr()->getFileHandler();
+    m_rg->getLogMgr()->incIndent(2);
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        note(getRegion(), "\n-- BB%d --", bb->id());
+        note(m_rg, "\n-- BB%d --", bb->id());
         LiveSet * live_in = get_livein(bb->id());
         LiveSet * live_out = get_liveout(bb->id());
         LiveSet * def = get_def(bb->id());
         LiveSet * use = get_use(bb->id());
-        note(getRegion(), "\nLIVE-IN: ");
+        note(m_rg, "\nLIVE-IN: ");
         if (live_in != nullptr) {
             live_in->dump(file);
         }
 
-        note(getRegion(), "\nLIVE-OUT: ");
+        note(m_rg, "\nLIVE-OUT: ");
         if (live_out != nullptr) {
             live_out->dump(file);
         }
 
-        note(getRegion(), "\nDEF: ");
+        note(m_rg, "\nDEF: ");
         if (def != nullptr) {
             def->dump(file);
         }
 
-        note(getRegion(), "\nUSE: ");
+        note(m_rg, "\nUSE: ");
         if (use != nullptr) {
             use->dump(file);
         }
     }
-    getRegion()->getLogMgr()->decIndent(2);
+    m_rg->getLogMgr()->decIndent(2);
     return Pass::dump();
 }
 
@@ -380,7 +380,7 @@ void LivenessMgr::computeLocal(BBList const& bblst)
 }
 
 
-void LivenessMgr::updateSetByExp(BSIdx idx, MOD LiveSet * use)
+void LivenessMgr::updateSetByRHS(BSIdx idx, MOD LiveSet * use)
 {
     ASSERT0(use);
     ASSERT0(idx != BS_UNDEF);
@@ -388,7 +388,7 @@ void LivenessMgr::updateSetByExp(BSIdx idx, MOD LiveSet * use)
 }
 
 
-void LivenessMgr::updateSetByStmt(
+void LivenessMgr::updateSetByLHS(
     BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen)
 {
     ASSERT0(gen && use);
@@ -398,18 +398,26 @@ void LivenessMgr::updateSetByStmt(
 }
 
 
-void LivenessMgr::computeLocal(IRBB const* bb)
+void LivenessMgr::computeLocalIterBBIRList(
+    IRBB const* bb, LiveSet * use, LiveSet * gen)
 {
-    LiveSet * use = gen_use(bb->id());
-    LiveSet * gen = gen_def(bb->id());
-    use->clean(m_sbs_mgr);
-    gen->clean(m_sbs_mgr);
+    ASSERT0(gen && use);
     BBIRList const& irlst = const_cast<IRBB*>(bb)->getIRList();
     BBIRListIter irit;
     for (IR * x = irlst.get_tail(&irit);
          x != nullptr; x = irlst.get_prev(&irit)) {
         computeStmt(x, use, gen);
     }
+}
+
+
+void LivenessMgr::computeLocal(IRBB const* bb)
+{
+    LiveSet * use = gen_use(bb->id());
+    LiveSet * gen = gen_def(bb->id());
+    use->clean(m_sbs_mgr);
+    gen->clean(m_sbs_mgr);
+    computeLocalIterBBIRList(bb, use, gen);
 }
 
 
@@ -967,9 +975,7 @@ bool LivenessMgr::perform(BBList const* bblst, IRCFG const* cfg, OptCtx & oc)
     initSet(*bblst);
     computeGlobal(cfg);
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLivenessMgr()) {
-        dump();
-    }
+    dump();
     if (!m_keep_local) {
         cleanLocal();
     }

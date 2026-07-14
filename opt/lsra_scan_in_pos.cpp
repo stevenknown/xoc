@@ -39,7 +39,7 @@ void ScanInPosOrder::collectUnhandledForDef(IR const* ir)
 
     //Call statements must always be considered because they affect both the
     //splitting of lifetimes and the generation of spill&reload IRs.
-    if (!ir->isCallStmt() && !m_ramgr->getLTMgr()->canBeCandidate(prno)) {
+    if (!ir->isCallStmt() && !m_ramgr->canBeCandidate(prno)) {
         return;
     }
     LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
@@ -59,7 +59,7 @@ void ScanInPosOrder::collectUnhandledForUse(IR const* ir, ConstIRIter & irit)
         PRNO prno = e->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
         if (m_ramgr->hasReg(prno)) { continue; }
-        if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { continue; }
+        if (!m_ramgr->canBeCandidate(prno)) { continue; }
         LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
         ASSERT0(lt);
         m_ramgr->getLSRA()->addUnhandled(lt);
@@ -106,7 +106,7 @@ bool ScanInPosOrder::verifyResourceForDefPos(IR const* ir) const
     if (res == nullptr) { return true; }
     PRNO prno = res->getPrno();
     ASSERT0(prno != PRNO_UNDEF);
-    if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { return true; }
+    if (!m_ramgr->canBeCandidate(prno)) { return true; }
 
     //Verify pre-assigned PR.
     LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);
@@ -135,7 +135,7 @@ bool ScanInPosOrder::verifyResourceForUsePos(IR const* ir) const
         if (!e->isReadPR()) { continue; }
         PRNO prno = e->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
-        if (!m_ramgr->getLTMgr()->canBeCandidate(prno)) { return true; }
+        if (!m_ramgr->canBeCandidate(prno)) { return true; }
 
         //Verify pre-assigned PR.
         LifeTime * lt = m_ramgr->getLSRA()->getLT(prno);

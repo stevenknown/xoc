@@ -36,6 +36,105 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class CopyProp;
+
+//
+//START AnalyzeAvailExpr
+//
+class AnalyzeAvailExpr {
+    COPY_CONSTRUCTOR(AnalyzeAvailExpr);
+protected:
+    bool m_is_aggressive;
+    Region const* m_rg;
+    IRCFG const* m_cfg;
+    PRSSAMgr const* m_prssamgr;
+    MDSSAMgr const* m_mdssamgr;
+    UseDefMgr const* m_mdssaudmgr;
+    CopyProp const* m_cp;
+    xcom::DomTree const& m_domtree;
+    OptCtx & m_oc;
+    VMDLivenessMgr m_vmdliveness_mgr;
+protected:
+    bool canExpLiveBetweenBB(
+        IR const* exp, IRBB const* start, IRBB const* meetup) const;
+    bool canExpTreeLiveBetweenBB(
+        IR const* exp, IRBB const* start, IRBB const* meetup) const;
+    bool canExpLiveBetweenBBByMDSSA(
+        IR const* exp, IRBB const* start, IRBB const* meetup) const;
+
+    //Return true if 'cand_exp' is always available to anywhere.
+    bool isAlwaysAvailable(IR const* cand_exp) const
+    {
+        if (cand_exp->is_const() || cand_exp->is_lda()) { return true; }
+        return false;
+    }
+    bool isAvailableByPRSSA(
+        IR const* cand_exp, IR const* pos,
+        IRListIter const& cand_exp_stmt_it) const;
+    bool isAllVOpndLiveInAtBB(IR const* exp, IRBB const* start) const;
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+    bool useClassicPRDU() const
+    { return m_oc.is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU() const
+    { return m_oc.is_nonpr_du_chain_valid(); }
+public:
+    AnalyzeAvailExpr(
+        CopyProp const* cp, Region * rg, xcom::DomTree const& dt, OptCtx & oc);
+
+    //Return true if there exists stmt that is dependent to 'prop_value' from
+    //'def_stmt' to the end of BB, include the 'def_stmt' itself.
+    //def_stmt: the stmt of 'prop_value'.
+    //prop_value: the expression to be propagated.
+    //nextit: the iter of the next IR of 'def_stmt'.
+    bool existMayDefTillEndOfCurBB(
+        IR const* def_stmt, IR const* prop_value,
+        IRListIter const& curit) const;
+
+    //Return true if there exists stmt that is dependent to 'pos' from
+    //the first IR of BB, not include the stmt of 'pos'.
+    //def_stmt: the stmt of 'prop_value'.
+    //prop_value: the expression to be propagated.
+    //nextit: the iter of the next IR of 'def_stmt'.
+    bool existMayDefFromBeginOfCurBB(IR const* prop_value, IR const* pos) const;
+
+    bool existMayDefTillBB(
+        IR const* exp, IRBB const* start, IRBB const* meetup) const;
+
+    CopyProp const* getCP() const { return m_cp; }
+
+    void init();
+
+    //Both def_stmt and use_stmt are in same BB.
+    //curit: the IR list iter of 'def_stmt'.
+    bool isAvailableInSameBB(
+        IR const* def_stmt, IR const* use_stmt, IR const* cand_exp,
+        IRListIter const& cand_exp_stmt_it) const;
+
+    //Return true if 'cand_exp' does not be modified till meeting 'use_stmt'.
+    //e.g:xx = cand_exp
+    //    ..
+    //    ..
+    //    use_bb:
+    //    ... = pos  //use_stmt|use_phi
+    //
+    //cand_exp: the expression that expects to analyze whether it can be
+    //          available at 'pos'.
+    //cand_exp_stmt_it: the IR list iter of the stmt of 'cand_exp'.
+    //pos: the IR position that is used to mark the destination of available
+    //     path in dom tree. It can be expression or stmt.
+    //Note either use_phi or use_stmt is nullptr.
+    virtual bool isAvailableExpr(
+        IR const* cand_exp, IR const* pos,
+        IRListIter const& cand_exp_stmt_it) const;
+    bool is_aggressive() const { return m_is_aggressive; }
+};
+//END AnalyzeAvailExpr
+
+
 //Record Context info during Copy Propagation.
 #define CPC_change(c) (c).change
 #define CPC_need_recomp_aa(c) (c).need_recompute_alias_info
@@ -44,8 +143,10 @@ public:
     bool change;
     bool need_recompute_alias_info;
     xcom::DomTree const& domtree;
+    AnalyzeAvailExpr const& anaexpr;
 public:
-    CPCtx(OptCtx & oc, ActMgr * am, xcom::DomTree const& dt);
+    CPCtx(OptCtx & oc, ActMgr * am, xcom::DomTree const& dt,
+          AnalyzeAvailExpr const& ae);
 
     //Perform Bit-OR operation.
     void bor(CPCtx const& src)
@@ -248,6 +349,21 @@ protected:
     //      g = *q(MD3) //q point to MD3
     bool replaceExp(
         IR const* def_stmt, MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
+
+    //Revise the type of 'newir' base IR type and 'exp'.
+    virtual void reviseType(IR * newir, IR const* exp)
+    {
+        ASSERT0(newir != nullptr && exp != nullptr);
+        if (newir->mustBePointerType()) {
+            ASSERT0(newir->is_ptr());
+            return;
+        }
+        if (newir->mustBeBoolType()) {
+            ASSERT0(newir->is_bool());
+            return;
+        }
+        newir->setType(exp->getType());
+    }
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.

@@ -744,7 +744,7 @@ public:
     //This function shall force to select a candidate if there is no available
     //register to assign to 'lt'. Normally this function will be called after
     //the call of function 'selectSplitCand' if there is no candidate found.
-    LifeTime * forceSelectSplitCand(LifeTime * lt, OUT SplitCtx & ctx);
+    LifeTime * forceSelectSplitCand(OUT SplitCtx & ctx);
 };
 //END SplitMgr
 
@@ -809,6 +809,12 @@ protected:
 
     REG_PREFER const getLTPrefer(LifeTime const* lt) const
     { return m_lt2prefer.get(lt); }
+
+    void judgeOrMandateSplitCand(
+        LifeTime * exact_cand, MOD SplitMgr & spltmgr, MOD SplitCtx & ctx,
+        LifeTime const* lt, IR const* curir,
+        SplitAliasRegCtx & alias_reg_ctx,
+        OUT LTSet & alias_cands, OUT Vector<SplitCtx> & split_ctx_vec);
 public:
     LSRAImpl(LinearScanRA & ra, RegSetImpl & rsimpl, bool use_expose = false);
     ~LSRAImpl();

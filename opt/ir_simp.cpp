@@ -176,12 +176,21 @@ bool IRSimp::isLowest(IR const* ir) const
     if (ir->is_leaf()) { return true; }
     IR * parent = ir->getParent();
     if (parent == nullptr) { return true; }
+    if (parent->is_select_to_res()) {
+        //SELECT_TO_RES is an IR which is used to describe property info,
+        //it only abstracts the SELECTION effect for the STMT. Therefore we
+        //do not count it towards the actual height of the IR tree.
+        parent = parent->getParent();
+    }
+    if (parent == nullptr) { return true; }
     if (!parent->is_stmt()) {
         //tree height is more than 2.
         return false;
     }
     if (parent->is_setelem() || parent->is_getelem()) {
-        //tree height is more than 2.
+        //The lowest height kid of SETELEM and GETELEM could be PR or any other
+        //leaf IR.
+        //Thus tree height is more than 2.
         return false;
     }
     if (parent->isCallStmt()) {
@@ -190,11 +199,11 @@ bool IRSimp::isLowest(IR const* ir) const
         return false;
     }
     if (parent->is_ist() && ir == IST_base(parent)) {
-        //At lowest mode, IST's base expression must be leaf.
+        //At the lowest mode, IST's base expression must be leaf.
         return false;
     }
     if (parent->is_starray() && ir == ARR_base(parent)) {
-        //At lowest mode, STARRAY's base and sublist must be leaf.
+        //At the lowest mode, STARRAY's base and sublist must be leaf.
         return false;
     }
     return true;
@@ -1520,13 +1529,13 @@ public:
         IR * ir, IRSimp * simp, SimpCtx * ctx)
     {
         if (simp->canBeSimpToPrediateOp(ir)) {
-            return simplifySelectToBranchByIF(ir, simp, ctx);
+            return simp->simplifyAllKidsExpression(ir, ctx);
         }
         //Target machine does not support to generate code for this kind of
         //incomplete SELECT operation, such as: using predicate register to
         //determine whether the TrueExp or FalseExp should execute.
         //Thus, we only simplify SELECT's kids here.
-        return simp->simplifyAllKidsExpression(ir, ctx);
+        return simplifySelectToBranchByIF(ir, simp, ctx);
     }
 };
 
@@ -1548,10 +1557,10 @@ IR * IRSimp::simplifySelect(IR * ir, SimpCtx * ctx)
     //One is to simplify SELECT to conditional-branch-operation directly, the
     //other is to simplify SELCT to IF operation, then simplify IF to
     //conditional-branch-operation.
-    if (CSelect::bothTFExpAvail(ir)) {
-        return simplifySelectToBranchDirectly(ir, this, ctx);
+    if (CSelect::isPartialSelect(ir)) {
+        return SimpImpl::trySimplifyIncompleteSelect(ir, this, ctx);
     }
-    return SimpImpl::trySimplifyIncompleteSelect(ir, this, ctx);
+    return simplifySelectToBranchDirectly(ir, this, ctx);
 }
 
 
@@ -3078,7 +3087,7 @@ IR * IRSimp::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
             ret_list = nullptr;
         }
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpSimp()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_IRSIMP)) {
         note(m_rg, "\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
         m_rg->getLogMgr()->incIndent(2);
         xoc::dumpIRList(ret_list, m_rg);

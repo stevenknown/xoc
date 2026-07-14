@@ -392,7 +392,6 @@ Pass * PassMgr::allocRegAllocMgr()
     #ifdef REF_TARGMACH_INFO
     return new RegAllocMgr(m_rg);
     #else
-    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }
@@ -547,10 +546,9 @@ Pass * PassMgr::allocSolveSetMgr()
 
 Pass * PassMgr::allocRegSSAMgr()
 {
-    #ifdef REF_TARGMACH_INFO
+    #if defined REF_TARGMACH_INFO || defined FOR_IP
     return new RegSSAMgr(m_rg);
     #else
-    ASSERTN(0, ("Target Dependent Code"));
     return nullptr;
     #endif
 }

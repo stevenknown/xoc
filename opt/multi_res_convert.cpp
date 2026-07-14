@@ -341,7 +341,10 @@ IR * MultiResConvert::buildStoreWithMultiResAndConvertBySplit(
 
 bool MultiResConvert::dump() const
 {
+    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_MULTI_RES_CVT)) { return true; }
     m_act_mgr.dump();
+    Pass::dump();
     return true;
 }
 

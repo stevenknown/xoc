@@ -605,7 +605,8 @@ void LoopDepAna::dumpInferEVN() const
 
 bool LoopDepAna::dump(LoopDepCtx const* ctx) const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_LOOP_DEP_ANA)) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
@@ -671,17 +672,16 @@ bool LoopDepAna::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
-    reset();
     START_TIMER(t, getPassName());
+    dumpBeforePass();
+    reset();
     if (!initDepPass(oc)) {
         END_TIMER(t, getPassName());
         return false;
     }
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopDepAna()) {
-        dump(nullptr);
-    }
+    dump(nullptr);
     m_rg->getLogMgr()->cleanBuffer();
     END_TIMER(t, getPassName());
     return false;

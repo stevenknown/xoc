@@ -580,6 +580,24 @@ void Graph::insertVertexBetween(
 }
 
 
+void Graph::removeEdge(VexIdx from, VexIdx to)
+{
+    Vertex * fromv = getVertex(from);
+    Vertex * tov = getVertex(to);
+    ASSERT0(fromv && tov);
+    removeEdge(fromv, tov);
+}
+
+
+void Graph::removeEdge(Vertex * from, Vertex * to)
+{
+    ASSERT0(from && to);
+    ASSERT0(isVertex(from));
+    ASSERT0(isVertex(to));
+    removeEdgeBetween(from, to);
+}
+
+
 //pos_in_outlist: optional, record the position in outlist of 'from' of 'e'
 //pos_in_inlist: optional, record the position in inlist of 'to' of 'e'
 Edge * Graph::removeEdge(
@@ -1526,6 +1544,7 @@ Edge * Graph::get_next_in_edge(AdjEdgeIter & it)
 //
 DGraph::DGraph(UINT vex_hash_size) : Graph(vex_hash_size)
 {
+    //Since DGraph generates DomInfo, the vertex storage has to be dense.
     set_dense(true);
     m_bs_mgr = nullptr;
 }
@@ -2501,8 +2520,8 @@ bool DGraph::computeIpdom()
 }
 
 
-void DGraph::genDomTreeForSubGraph(Vertex const* root, OUT DomTree & dt,
-                                   OUT UINT & iter_times) const
+void DGraph::genDomTreeForSubGraph(
+    Vertex const* root, OUT DomTree & dt, OUT UINT & iter_times) const
 {
     ASSERT0(root && isVertex(root));
     dt.erase();
@@ -2546,7 +2565,7 @@ static void collectDomTreeCoveredVertex(
 }
 
 
-//Collect the vertex by DFS whereas dominated by 'root'.
+//Collect the vertex by BFS whereas dominated by 'root'.
 static void collectDomTreeCoveredReachableVertex(
     Vertex const* root, DGraph const& g, VexTab const* modset,
     OUT RPOVexList & affectlst, OUT TMap<Vertex const*, VexIdx> & vex2idom,
@@ -2726,8 +2745,8 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 //'order_buf': record the bfs-order for each vertex.
 //NOTE: BFS does NOT keep the sequence if you are going to
 //access vertex in lexicographic order.
-void DGraph::sortInBfsOrder(Vector<VexIdx> & order_buf, Vertex * root,
-                            BitSet & visit)
+void DGraph::sortInBFSOrder(
+    Vector<VexIdx> & order_buf, Vertex * root, BitSet & visit)
 {
     List<Vertex*> worklst;
     worklst.append_tail(root);
@@ -2904,8 +2923,8 @@ bool DGraph::changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ)
 
 //Add vertex newid to domset and pdomset for both livein and liveout paths
 //of marker.
-//is_dom: true if 'newid' is the new Dom of 'marker', false means 'newid' is
-//        the new PDom of 'marker'.
+//is_idom:true if 'newid' is the new Immediate-Dom of 'marker',
+//        false means 'newid' is the new Immediate-Post-Dom of 'marker'.
 //CASE:
 //    Ventry
 //  ___| |__
@@ -2966,34 +2985,49 @@ bool DGraph::changeDomInfoByAddBypassEdge(VexIdx pred, VexIdx vex, VexIdx succ)
 //          \ |
 //           vv
 //           Vexit
-static void addVexToDomAndPdomSet(
-    DGraph * g, Vertex const* marker, VexIdx newid, bool is_dom)
+static void addVexToDomAndPDomSet(
+    DGraph * g, Vertex const* marker, VexIdx newid, bool is_idom)
 {
     VexIdx markerid = marker->id();
     DomSet visited;
     List<Vertex const*> wl;
     wl.append_tail(marker);
+    ASSERT0(g->isVertex(marker));
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != markerid && v->id() != newid) {
-            DomSet * domset = g->gen_dom_set(v->id());
-            DomSet * pdomset = g->gen_pdom_set(v->id());
-            if (is_dom) {
-                //newid is the Dom of marker.
-                if (domset->is_contain(markerid)) {
-                    domset->bunion(newid);
+            DomSet * vdomset = g->gen_dom_set(v->id());
+            DomSet * vpdomset = g->gen_pdom_set(v->id());
+            if (is_idom) {
+                //newid is the IDom of marker.
+                if (vdomset->is_contain(markerid)) {
+                    //Add newid to the DomSet of 'v' because v dominates
+                    //marker.
+                    vdomset->bunion(newid);
                 } else if (g->is_ipdom(markerid, v->id())) {
+                    //Add newid to the PDomSet of 'v' because newid
+                    //immediate-post-dominates marker.
+                    //e.g:v->marker
+                    //After graph changed:
+                    //    v->newid->marker
                     g->set_ipdom(v->id(), newid);
-                    pdomset->bunion(newid);
+                    vpdomset->bunion(newid);
                 }
             } else {
-                //newid is the PDom of marker.
-                if (pdomset->is_contain(markerid)) {
-                    pdomset->bunion(newid);
+                //newid is the IPDom of marker.
+                if (vpdomset->is_contain(markerid)) {
+                    //Add newid to the PDomSet of 'v' because v post-dominates
+                    //marker.
+                    vpdomset->bunion(newid);
                 } else if (g->is_idom(markerid, v->id())) {
+                    //Add newid to the DomSet of 'v' because newid
+                    //post-immediate-post-dominates marker.
+                    //e.g:marker->v
+                    //After graph changed:
+                    //    marker->newid->v
                     g->set_idom(v->id(), newid);
-                    domset->bunion(newid);
+                    vdomset->bunion(newid);
                 }
             }
         }
@@ -3015,23 +3049,23 @@ static void addVexToDomAndPdomSet(
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != markerid && v->id() != newid) {
-            DomSet * domset = g->gen_dom_set(v->id());
-            DomSet * pdomset = g->gen_pdom_set(v->id());
-            if (is_dom) {
+            DomSet * vdomset = g->gen_dom_set(v->id());
+            DomSet * vpdomset = g->gen_pdom_set(v->id());
+            if (is_idom) {
                 //newid is the Dom of marker.
-                if (domset->is_contain(markerid)) {
-                    domset->bunion(newid);
+                if (vdomset->is_contain(markerid)) {
+                    vdomset->bunion(newid);
                 } else if (g->is_ipdom(markerid, v->id())) {
                     g->set_ipdom(v->id(), newid);
-                    pdomset->bunion(newid);
+                    vpdomset->bunion(newid);
                 }
             } else {
                 //newid is the PDom of marker.
-                if (pdomset->is_contain(markerid)) {
-                    pdomset->bunion(newid);
+                if (vpdomset->is_contain(markerid)) {
+                    vpdomset->bunion(newid);
                 } else if (g->is_idom(markerid, v->id())) {
                     g->set_idom(v->id(), newid);
-                    domset->bunion(newid);
+                    vdomset->bunion(newid);
                 }
             }
         }
@@ -3041,6 +3075,85 @@ static void addVexToDomAndPdomSet(
             if (visited.is_contain(out->id())) { continue; }
             visited.bunion(out->id());
             wl.append_tail(out);
+        }
+    }
+}
+
+
+//Add newid to the DomSet that vertex dominated by root.
+//e.g:newid
+//     |      v6
+//    root    |
+//     ||     v
+//     | ---->v4
+//     v1     |
+//    /  |    v5
+//   v2  v3
+//given newid, the function only add newid to the DomSet of v1, v2, v3.
+//Because root isn't the Dominator of v6, v4, v5.
+static void addVexToDomSet(
+    DGraph * g, Vertex const* root, BitSet const& newidset)
+{
+    ASSERT0(g->isVertex(root));
+    DomSet visited;
+    List<Vertex const*> wl;
+    wl.append_tail(root);
+    VexIdx rootid = root->id();
+    for (Vertex const* v = wl.remove_head(); v != nullptr;
+         v = wl.remove_head()) {
+        visited.bunion(v->id());
+        if (v->id() != rootid && !newidset.is_contain(v->id())) {
+            DomSet * vdomset = g->gen_dom_set(v->id());
+            if (vdomset->is_contain(rootid)) {
+                vdomset->bunion(newidset);
+            }
+        }
+        AdjVertexIter it;
+        for (Vertex const* out = Graph::get_first_out_vertex(v, it);
+             out != nullptr; out = Graph::get_next_out_vertex(it)) {
+            if (visited.is_contain(out->id())) { continue; }
+            visited.bunion(out->id());
+            wl.append_tail(out);
+        }
+    }
+}
+
+
+//Add newid to the PDomSet that vertex post-dominated by root.
+//     v1
+//    /  |
+//   v2  v3
+//   |   |
+//   --  -
+//     ||
+//    root
+//     |
+//    newid
+//given newid, the function add newid to the PDomSet of v1, v2, v3.
+//root is the PDom of v1, v2, v3.
+static void addVexToPDomSet(
+    DGraph * g, Vertex const* root, BitSet const& newidset)
+{
+    ASSERT0(g->isVertex(root));
+    DomSet visited;
+    List<Vertex const*> wl;
+    wl.append_tail(root);
+    VexIdx rootid = root->id();
+    for (Vertex const* v = wl.remove_head(); v != nullptr;
+         v = wl.remove_head()) {
+        visited.bunion(v->id());
+        if (v->id() != rootid && !newidset.is_contain(v->id())) {
+            DomSet * vpdomset = g->gen_pdom_set(v->id());
+            if (vpdomset->is_contain(rootid)) {
+                vpdomset->bunion(newidset);
+            }
+        }
+        AdjVertexIter it;
+        for (Vertex const* in = Graph::get_first_in_vertex(v, it);
+             in != nullptr; in = Graph::get_next_in_vertex(it)) {
+            if (visited.is_contain(in->id())) { continue; }
+            visited.bunion(in->id());
+            wl.append_tail(in);
         }
     }
 }
@@ -3185,8 +3298,103 @@ static void reviseDomAndPdomSet(
     if (marker_is_idom_of_oldsucc) {
         //Maintain domset, pdomset of each vertex that are in the domset
         //and pdomset of 'marker'.
-        addVexToDomAndPdomSet(&g, oldsucc, newsucc->id(), true);
+        addVexToDomAndPDomSet(&g, oldsucc, newsucc->id(), true);
     }
+}
+
+
+static bool isDiamondRegion(
+    Vertex const* top, Vertex const* left,
+    Vertex const* right, Vertex const* bottom, Graph const& g)
+{
+    if (!g.is_unique_pred(left, top)) { return false; }
+    if (!g.is_unique_pred(right, top)) { return false; }
+    if (!g.is_unique_succ(left, bottom)) { return false; }
+    if (!g.is_unique_succ(right, bottom)) { return false; }
+    return true;
+}
+
+
+void DGraph::addDomInfoToImmediateSuccDiamondRegion(
+    Vertex const* marker, Vertex const* top, Vertex const* left,
+    Vertex const* right, Vertex const* bottom, Vertex const* oldsucc)
+{
+    //CASE:
+    //  marker
+    //    |
+    //    v
+    // -top-
+    // |    |
+    // left right
+    // |_  _|
+    //   ||
+    //   vv
+    //   bottom
+    //   |
+    //   v
+    //   oldsucc
+    ASSERT0(marker && oldsucc);
+    ASSERT0(top && left && right && bottom);
+    ASSERTN(get_idom(top->id()) == VERTEX_UNDEF &&
+            get_ipdom(top->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERTN(get_dom_set(top->id()) == nullptr &&
+            get_pdom_set(top->id()) == nullptr, ("not new vertex"));
+    ASSERTN(get_idom(left->id()) == VERTEX_UNDEF &&
+            get_ipdom(left->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERTN(get_dom_set(left->id()) == nullptr &&
+            get_pdom_set(left->id()) == nullptr, ("not new vertex"));
+    ASSERTN(get_idom(right->id()) == VERTEX_UNDEF &&
+            get_ipdom(right->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERTN(get_dom_set(right->id()) == nullptr &&
+            get_pdom_set(right->id()) == nullptr, ("not new vertex"));
+     ASSERTN(get_idom(bottom->id()) == VERTEX_UNDEF &&
+            get_ipdom(bottom->id()) == VERTEX_UNDEF, ("not new vertex"));
+    ASSERTN(get_dom_set(bottom->id()) == nullptr &&
+            get_pdom_set(bottom->id()) == nullptr, ("not new vertex"));
+    ASSERT0(top->getInDegree() == 1 && bottom->getOutDegree() == 1);
+    ASSERT0(is_unique_succ(marker, top));
+    ASSERT0(is_unique_pred(oldsucc, bottom));
+    ASSERT0(isDiamondRegion(top, left, right, bottom, *this));
+
+    //Maintain IDom and IPDom.
+    reviseIDomAndIPdom(*this, marker, top, oldsucc);
+    reviseIDomAndIPdom(*this, top, bottom, oldsucc);
+    set_idom(left->id(), top->id());
+    set_idom(right->id(), top->id());
+    set_ipdom(left->id(), bottom->id());
+    set_ipdom(right->id(), bottom->id());
+
+    //Maintain DomSet and PDomSet of top and bottom.
+    try_union_dom_set(top->id(), get_dom_set(marker->id()));
+    try_union_dom_set(top->id(), marker->id());
+    try_union_pdom_set(top->id(), get_pdom_set(oldsucc->id()));
+    try_union_pdom_set(top->id(), bottom->id());
+    try_union_pdom_set(top->id(), oldsucc->id());
+    try_union_dom_set(bottom->id(), get_dom_set(top->id()));
+    try_union_dom_set(bottom->id(), top->id());
+    try_union_pdom_set(bottom->id(), get_pdom_set(oldsucc->id()));
+    try_union_pdom_set(bottom->id(), oldsucc->id());
+
+    //Iterate DomSet and PDomSet of all vertice to update them.
+    BitSet bs;
+    bs.bunion(top->id());
+    bs.bunion(bottom->id());
+    addVexToDomSet(this, oldsucc, bs);
+    addVexToPDomSet(this, marker, bs);
+    try_union_pdom_set(marker->id(), &bs);
+    try_union_dom_set(oldsucc->id(), &bs);
+
+    //Generate Dom And PDom Set to left according to top and bottom.
+    try_union_dom_set(left->id(), get_dom_set(top->id()));
+    try_union_dom_set(left->id(), top->id());
+    try_union_pdom_set(left->id(), get_pdom_set(bottom->id()));
+    try_union_pdom_set(left->id(), bottom->id());
+
+    //Generate Dom And PDom Set to right according to top and bottom.
+    try_union_dom_set(right->id(), get_dom_set(top->id()));
+    try_union_dom_set(right->id(), top->id());
+    try_union_pdom_set(right->id(), get_pdom_set(bottom->id()));
+    try_union_pdom_set(right->id(), bottom->id());
 }
 
 
@@ -3211,14 +3419,19 @@ void DGraph::addDomInfoToImmediateSucc(
     //BB of BB10, and BB2 has more than one predecessors. The case is legal.
     //ASSERT0(oldsucc->getInDegree() == 1);
 
+    //Record the judgement of IDOM before DomInfo changed.
     bool marker_is_idom_of_oldsucc = is_idom(marker->id(), oldsucc->id());
+
+    //Maintain IDom and IPDom, DomInfo will be changed.
     reviseIDomAndIPdom(*this, marker, newsucc, oldsucc);
-    reviseDomAndPdomSet(*this, marker, newsucc, oldsucc,
-                        marker_is_idom_of_oldsucc);
+
+    //Maintain DomSet and PDomSet, DomInfo will be changed.
+    reviseDomAndPdomSet(
+        *this, marker, newsucc, oldsucc, marker_is_idom_of_oldsucc);
 }
 
 
-void DGraph::addDomToNewSingleInOutBB(
+void DGraph::addDomInfoToNewSingleInOutBB(
     Vertex const* marker, Vertex const* newsucc, Vertex const* oldsucc)
 {
     ASSERT0(marker && newsucc && oldsucc);
@@ -3302,7 +3515,7 @@ void DGraph::addDomInfoToNewIPDom(Vertex const* marker, Vertex const* newipdom)
         }
     }
     //Set domset, pdomset.
-    addVexToDomAndPdomSet(this, marker, newipdomid, false);
+    addVexToDomAndPDomSet(this, marker, newipdomid, false);
     gen_pdom_set(markerid)->bunion(newipdomid);
     gen_dom_set(newipdomid)->bunion(markerid);
 }
@@ -3347,7 +3560,7 @@ void DGraph::addDomInfoToNewIDom(Vertex const* marker, Vertex const* newidom,
         }
     }
     //Set domset, pdomset.
-    addVexToDomAndPdomSet(this, marker, newidomid, true);
+    addVexToDomAndPDomSet(this, marker, newidomid, true);
     gen_dom_set(markerid)->bunion(newidomid);
     gen_pdom_set(newidomid)->bunion(markerid);
 }
@@ -3595,5 +3808,89 @@ MSTWeightType MST::build(Vertex const* root, OUT MSTPath & path)
     return tot_minw;
 }
 //END MST
+
+
+//
+//START DFN
+//
+//The class represents the Depth First Number of graph.
+void DFN::compute()
+{
+    UINT cnt = 0;
+}
+//END DFN
+
+
+//
+//START GraphIterOutDFS
+//
+void GraphIterOutDFS::set_visited(VexIdx id)
+{
+    if (is_dense()) { m_visitedset.bunion(id); }
+    else { m_visitedtab.append(id); }
+}
+
+
+bool GraphIterOutDFS::is_visited(VexIdx id) const
+{
+    if (is_dense()) { return m_visitedset.is_contain(id); }
+    return m_visitedtab.find(id);
+}
+
+
+Vertex const* GraphIterOutDFS::get_first()
+{
+    set_visited(m_start->id());
+    EdgeC const* el = m_start->getOutList();
+    if (el != nullptr) {
+        m_est.push(el);
+    }
+    return m_start;
+}
+
+
+//Non-recursive DFS iteration.
+Vertex const* GraphIterOutDFS::get_next()
+{
+    EdgeC const* out_el = m_est.pop();
+    if (out_el == nullptr) { return nullptr; }
+    Vertex const* to = out_el->getTo();
+    if (!is_visited(to->id())) {
+        //The TO vertex is not visited yet, thus all its out-edge should be
+        //the access candidate.
+        set_visited(to->id());
+        m_est.push(out_el);
+        for (EdgeC const* succ_out_el = to->getOutList();
+             succ_out_el != nullptr; succ_out_el = succ_out_el->get_next()) {
+            Vertex const* succ_out_el_to = succ_out_el->getTo();
+            ASSERT0(succ_out_el_to);
+            if (!is_visited(succ_out_el_to->id())) {
+                m_est.push(succ_out_el);
+            }
+        }
+        return to;
+    }
+    for (EdgeC const* el = m_est.pop();
+         el != nullptr; el = m_est.pop()) {
+        Vertex const* to = el->getTo();
+        if (is_visited(to->id())) { continue; }
+
+        //The TO vertex is not visited yet, thus all its out-edge should be
+        //the access candidate.
+        set_visited(to->id());
+        m_est.push(el);
+        for (EdgeC const* succ_out_el = to->getOutList();
+             succ_out_el != nullptr; succ_out_el = succ_out_el->get_next()) {
+            Vertex const* succ_out_el_to = succ_out_el->getTo();
+            ASSERT0(succ_out_el_to);
+            if (!is_visited(succ_out_el_to->id())) {
+                m_est.push(succ_out_el);
+            }
+        }
+        return to;
+    }
+    return nullptr;
+}
+//END GraphIterOutDFS
 
 } //namespace xcom

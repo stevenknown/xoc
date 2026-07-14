@@ -36,13 +36,13 @@ author: Su Zhenyu
 
 namespace xoc {
 
-static void dumpTab(Region const* rg, LI<IRBB> const* li,
-                    ExactAccTab & etab, InexactAccTab & inetab)
+static void dumpTab(
+    Region const* rg, LI<IRBB> const* li, ExactAccTab & etab,
+    InexactAccTab & inetab)
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
-    if (!g_dump_opt.isDumpAfterPass()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
     rg->getLogMgr()->incIndent(2);
-    note(rg, "\n==-- DUMP LoopInfo --==");
+    xoc::note(rg, "\n==-- DUMP LoopInfo --==");
     rg->getLogMgr()->incIndent(2);
     li->dump(rg);
     rg->getLogMgr()->decIndent(2);
@@ -52,12 +52,23 @@ static void dumpTab(Region const* rg, LI<IRBB> const* li,
 }
 
 
+static void dumpRestore2Mem(Region const* rg, RestoreTab const& restore2mem)
+{
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    //Note some members of delemgr will be free after a while.
+    //Dump info before that happen.
+    rg->getLogMgr()->incIndent(2);
+    restore2mem.dumpDele2Restore(rg);
+    rg->getLogMgr()->decIndent(2);
+}
+
+
 static void dumpDeleMgr(DelegateMgr const& delemgr)
 {
-    if (!delemgr.getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
+    if (!delemgr.getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_RP)) {
         return;
     }
-    if (!g_dump_opt.isDumpAfterPass()) { return; }
     //Note some members of delemgr will be free after a while.
     //Dump info before that happened.
     delemgr.getRegion()->getLogMgr()->incIndent(2);
@@ -66,8 +77,8 @@ static void dumpDeleMgr(DelegateMgr const& delemgr)
 }
 
 
-static inline IR * genDirectMemAccess(IR const* ir, Region * rg, bool is_load,
-                                      IR * rhs)
+static inline IR * genDirectMemAccess(
+    IR const* ir, Region * rg, bool is_load, IR * rhs)
 {
     //Replace original ir with a direct memory access to avoid the
     //unnecesary promotion of the kid-expression's DEF.
@@ -123,6 +134,30 @@ static IR * dupMemExp(IR const* ir, Region * rg)
 }
 
 
+static void dumpReasonPreventRP(
+    RPCtx const& ctx, IR const* ir, CHAR const* format, ...)
+{
+    ActMgr * am = ctx.getActMgr();
+    if (am == nullptr) { return; }
+    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    xcom::StrBuf reasonbuf(64);
+    if (format != nullptr) {
+        va_list args;
+        va_start(args, format);
+        reasonbuf.vstrcat(format, args);
+        va_end(args);
+    }
+    xcom::StrBuf tmp(8);
+    ActHandler ach = am->dump("%s prevents register-promotion",
+        xoc::dumpIRName(ir, tmp));
+    if (format != nullptr) {
+        ASSERT0(ach.info);
+        ach.info->strcat(", the reason is:%s", reasonbuf.getBuf());
+    }
+}
+
+
 //Note the delegate is one of references in Occs List of exact delegate
 //table. Note, during the IR free processing, the occ should not be
 //freed if it is IR_UNDEF. This is because the occ is one of the kid
@@ -174,17 +209,17 @@ static void freeInexactOccs(
 //
 void RestoreTab::dumpDele2Restore(Region const* rg) const
 {
-    note(rg, "\nDELE2RESTORE:");
+    xoc::note(rg, "\nDELE2RESTORE:");
     xcom::TMapIter<IR*, IR*> it;
     IR * restore;
     rg->getLogMgr()->incIndent(2);
     for (IR * dele = m_dele2restore.get_first(it, &restore); dele != nullptr;
          dele = m_dele2restore.get_next(it, &restore)) {
-        note(rg, "\n--");
-        note(rg, "\nDELE:");
-        xoc::dumpIR(dele, rg, nullptr,
-                    DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
-        note(rg, "\nRESTORE:");
+        xoc::note(rg, "\n--");
+        xoc::note(rg, "\nDELE:");
+        xoc::dumpIR(
+            dele, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
+        xoc::note(rg, "\nRESTORE:");
         rg->getLogMgr()->incIndent(2);
         xoc::dumpIR(restore, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_KID));
         rg->getLogMgr()->decIndent(2);
@@ -201,57 +236,55 @@ static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
 {
     if (am == nullptr || !rg->isLogMgrInit()) { return; }
     xcom::DefFixedStrBuf buf;
-    am->dump("'%s' will be removed, however it is IV, "
-             "so IVR will be invalided.",
-             xoc::dumpIRName(ir, buf));
+    am->dump(
+        "'%s' will be removed, however it is IV, so IVR will be invalided.",
+        xoc::dumpIRName(ir, buf));
 }
 
 
-RPCtx::RPCtx(OptCtx * t, RPActMgr * am)
-    : m_act_mgr(am), need_rebuild_domtree(false),
-      domtree(nullptr), oc(t), m_li(nullptr), m_ldactx(nullptr)
+RPCtx::RPCtx(OptCtx * oc, RPActMgr * am)
+    : PassCtx(oc, am), need_rebuild_domtree(false),
+      domtree(nullptr), m_li(nullptr), m_ldactx(nullptr)
 {
-    Region const* rg = t->getRegion();
-    m_ivr = (IVR*)rg->getPassMgr()->queryPass(PASS_IVR);
+    Region const* rg = oc->getRegion();
     m_cfg = rg->getCFG();
     m_mdssamgr = rg->getMDSSAMgr();
     m_prssamgr = rg->getPRSSAMgr();
+    m_licmanactx = nullptr;
+}
+
+
+RPCtx::~RPCtx()
+{
+    if (domtree != nullptr) {
+        delete domtree;
+        domtree = nullptr;
+    }
 }
 
 
 bool RPCtx::isIV(IR const* ir) const
 {
-    if (m_ivr == nullptr) { return false; }
+    if (getIVR() == nullptr) { return false; }
     IV const* iv = nullptr;
-    return m_ivr->isIV(ir, &iv);
+    return getIVR()->isIV(ir, &iv);
 }
 
 
 void RPCtx::tryInvalidIVRIfIRIsIV(IR const* ir) const
 {
-    dumpRemoveIR(oc->getRegion(), m_act_mgr, ir);
-    xoc::tryInvalidIVRIfIRIsIV(m_ivr, ir, getOptCtx(), m_act_mgr);
+    dumpRemoveIR(getRegion(), getActMgr(), ir);
+    xoc::tryInvalidIVRIfIRIsIV(getIVR(), ir, getOptCtx(), getActMgr());
 }
 
 
-void RPCtx::dumpAct(CHAR const* format, ...) const
+void RPCtx::dumpSweepOut(
+    IR const* ir1, IR const* ir2, CHAR const* format, ...)
 {
-    if (m_act_mgr == nullptr) { return; }
-    if (!getOptCtx()->getRegion()->isLogMgrInit()) { return; }
-    va_list args;
-    va_start(args, format);
-    m_act_mgr->dump_args(format, args);
-    va_end(args);
-}
-
-
-void RPCtx::dumpSweepOut(IR const* ir1, IR const* ir2,
-                         CHAR const* format, ...)
-{
-    if (m_act_mgr == nullptr) { return; }
-    if (!m_act_mgr->getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
-        return;
-    }
+    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    ActMgr * am = getActMgr();
+    if (am == nullptr) { return; }
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
         va_list args;
@@ -259,7 +292,7 @@ void RPCtx::dumpSweepOut(IR const* ir1, IR const* ir2,
         tmpbuf.vstrcat(format, args);
         va_end(args);
     }
-    ActHandler ach = m_act_mgr->dump("%s is swept out by %s",
+    ActHandler ach = am->dump("%s is swept out by %s",
         DumpIRName().dump(ir1), DumpIRName().dump(ir2));
     if (format != nullptr) {
         ASSERT0(ach.info);
@@ -268,13 +301,22 @@ void RPCtx::dumpSweepOut(IR const* ir1, IR const* ir2,
 }
 
 
-void RPCtx::dumpClobber(IR const* ir1, IR const* ir2,
-                        CHAR const* format, ...)
+InvStmtList const* RPCtx::getInvStmtList() const
 {
-    if (m_act_mgr == nullptr) { return; }
-    if (!m_act_mgr->getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
-        return;
-    }
+    LICMAnaCtx const* licmanactx = getLICMAnaCtx();
+    InvStmtList const* invlst = licmanactx != nullptr
+        ? &licmanactx->getInvStmtList() : nullptr;
+    return invlst;
+}
+
+
+void RPCtx::dumpClobber(
+    IR const* ir1, IR const* ir2, CHAR const* format, ...)
+{
+    ActMgr * am = getActMgr();
+    if (am == nullptr) { return; }
+    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RP)) { return; }
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
         va_list args;
@@ -282,15 +324,33 @@ void RPCtx::dumpClobber(IR const* ir1, IR const* ir2,
         tmpbuf.vstrcat(format, args);
         va_end(args);
     }
-    StrBuf tmp1(8), tmp2(8);
-    ActHandler ach = m_act_mgr->dump("%s is clobbered by %s",
+    xcom::StrBuf tmp1(8), tmp2(8);
+    ActHandler ach = am->dump("%s is clobbered by %s",
         dumpIRName(ir1, tmp1), dumpIRName(ir2, tmp2));
     if (format != nullptr) {
         ASSERT0(ach.info);
         ach.info->strcat(", because:%s", tmpbuf.getBuf());
     }
 }
-//END IVRCtx
+
+
+void RPCtx::dump() const
+{
+    Region const* rg = getRegion();
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    note(rg, "\n-- DUMP RPCtx --", rg->getRegionName());
+    rg->getLogMgr()->incIndent(2);
+    note(rg, "\nneed_rebuild_domtree=%s",
+         need_rebuild_domtree ? "true":"false");
+    xcom::StrBuf buf(32);
+    note(rg, "\n-- LoopDepInfo --");
+    rg->getLogMgr()->incIndent(2);
+    const_cast<RPCtx*>(this)->getLDAInfoSet().dump(rg);
+    rg->getLogMgr()->decIndent(2);
+    rg->getLogMgr()->decIndent(2);
+
+}
+//END RPCtx
 
 
 //
@@ -311,9 +371,10 @@ bool DontPromoteTab::is_overlap(IR const* ir, MOD RPCtx & ctx) const
 
 bool DontPromoteTab::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP))
+    { return false; }
     if (get_elem_count() == 0) { return false; }
-    note(m_rg, "\n==-- DUMP Dont Promotion Table --==");
+    xoc::note(m_rg, "\n==-- DUMP Dont Promotion Table --==");
     m_rg->getLogMgr()->incIndent(2);
     xcom::TTabIter<IR const*> it;
     DumpFlag f(IR_DUMP_DEF);
@@ -333,14 +394,14 @@ bool DontPromoteTab::dump() const
 void Ref2DeleTab::dump(Region const* rg) const
 {
     ASSERT0(rg);
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
-    note(rg, "\n==---- DUMP REF TO DELEGATE TABLE ----==");
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    xoc::note(rg, "\n==---- DUMP REF TO DELEGATE TABLE ----==");
     Ref2DeleTabIter it;
     IR * dele = nullptr;
     StrBuf tmp1(8), tmp2(8);
     for (IR * ir = get_first(it, &dele); !it.end(); ir = get_next(it, &dele)) {
         //Dump IR tree for complex delegate.
-        note(rg, "\nREF:%s -> DELE:%s",
+        xoc::note(rg, "\nREF:%s -> DELE:%s",
              dumpIRName(ir, tmp1), dumpIRName(dele, tmp2));
     }
 }
@@ -352,7 +413,7 @@ void Ref2DeleTab::dump(Region const* rg) const
 //
 void DeleTab::dump(Region const* rg) const
 {
-    note(rg, "\n==---- DUMP DELEGATE TABLE ----==");
+    xoc::note(rg, "\n==---- DUMP DELEGATE TABLE ----==");
     DeleTabIter dit;
     for (IR * dele = get_first(dit); !dit.end(); dele = get_next(dit)) {
         //Dump IR tree for complex delegate.
@@ -367,9 +428,9 @@ void DeleTab::dump(Region const* rg) const
 //START ExactAccTab
 //
 //Collect outside loop DefUse information.
-void ExactAccTab::collectOutsideLoopDU(MD const* md, IR const* dele,
-                                       LI<IRBB> const* li,
-                                       MOD DelegateMgr & delemgr)
+void ExactAccTab::collectOutsideLoopDU(
+    MD const* md, IR const* dele, LI<IRBB> const* li,
+    MOD DelegateMgr & delemgr)
 {
     IRListIter it;
     IRList * occs = getOccs(md);
@@ -383,24 +444,24 @@ void ExactAccTab::collectOutsideLoopDU(MD const* md, IR const* dele,
 
 void ExactAccTab::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
-    note(rg, "\n==-- DUMP ExactAccessTab --==");
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    xoc::note(rg, "\n==-- DUMP ExactAccessTab --==");
     rg->getLogMgr()->incIndent(2);
     ExactAccTabIter it;
-    IR * dele;
+    IR * dele = nullptr;
     for (MD const* md = get_first(it, &dele);
          md != nullptr; md = get_next(it, &dele)) {
-        note(rg, "\nDELEGATE:");
+        xoc::note(rg, "\nDELEGATE:");
         rg->getLogMgr()->incIndent(2);
         md->dump(rg->getVarMgr());
 
         if (dele == nullptr) {
             //There is not delegate corresponding to md.
-            note(rg, "\n--");
+            xoc::note(rg, "\n--");
         } else {
             dumpIR(dele, rg, nullptr, IR_DUMP_DEF);
         }
-        note(rg, "\n");
+        xoc::note(rg, "\n");
         rg->getLogMgr()->decIndent(2);
 
         if (dele == nullptr) {
@@ -413,7 +474,7 @@ void ExactAccTab::dump(Region const* rg) const
         rg->getLogMgr()->incIndent(2);
 
         //Dump occ list.
-        note(rg, "\nOCCLIST:");
+        xoc::note(rg, "\nOCCLIST:");
         rg->getLogMgr()->incIndent(2);
         IRListIter irit;
         for (IR const* occ = occlst->get_head(&irit); occ != nullptr;
@@ -423,9 +484,9 @@ void ExactAccTab::dump(Region const* rg) const
         rg->getLogMgr()->decIndent(2);
 
         rg->getLogMgr()->decIndent(2);
-        note(rg, "\n");
+        xoc::note(rg, "\n");
     }
-    note(rg, "\n");
+    xoc::note(rg, "\n");
     rg->getLogMgr()->decIndent(2);
 }
 
@@ -509,8 +570,8 @@ void ExactAccTab::remove(MD const* md)
 //
 void InexactAccTab::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return; }
-    note(rg, "\n==-- DUMP InexactAccessTab --==");
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    xoc::note(rg, "\n==-- DUMP InexactAccessTab --==");
     rg->getLogMgr()->incIndent(2);
     InexactAccTabIter it;
     for (IR const* ir = get_first(it);
@@ -518,9 +579,9 @@ void InexactAccTab::dump(Region const* rg) const
         //InexactAcc always has complex IR tree.
         xoc::dumpIR(
             ir, rg, nullptr, DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_KID));
-        note(rg, "\n");
+        xoc::note(rg, "\n");
     }
-    note(rg, "\n");
+    xoc::note(rg, "\n");
     rg->getLogMgr()->decIndent(2);
 }
 //END InexactAccTab
@@ -617,8 +678,8 @@ public:
 //
 //START DelegateMgr
 //
-void DelegateMgr::collectOutsideLoopUse(IR const* dele, IRSet const& set,
-                                        LI<IRBB> const* li)
+void DelegateMgr::collectOutsideLoopUse(
+    IR const* dele, IRSet const& set, LI<IRBB> const* li)
 {
     DUSet * useset = nullptr;
     IRSetIter di = nullptr;
@@ -646,8 +707,8 @@ void DelegateMgr::collectOutsideLoopUse(IR const* dele, IRSet const& set,
 }
 
 
-void DelegateMgr::collectOutsideLoopDef(IR const* dele, IRSet const& set,
-                                        LI<IRBB> const* li)
+void DelegateMgr::collectOutsideLoopDef(
+    IR const* dele, IRSet const& set, LI<IRBB> const* li)
 {
     DUSet * defset = nullptr;
     IRSetIter di = nullptr;
@@ -668,8 +729,8 @@ void DelegateMgr::collectOutsideLoopDef(IR const* dele, IRSet const& set,
 //The function collects the outside loop DEF|USE for 'delegate'.
 //Note the function does NOT build any DU chain for any IR, it is just
 //do collection.
-void DelegateMgr::collectOutsideLoopDefUse(IR const* occ, IR const* dele,
-                                           LI<IRBB> const* li)
+void DelegateMgr::collectOutsideLoopDefUse(
+    IR const* occ, IR const* dele, LI<IRBB> const* li)
 {
     ASSERT0(occ->isMemRefNonPR());
     IRSet irset(getSegMgr());
@@ -778,7 +839,7 @@ void DelegateMgr::clean()
         }
     }
 
-    TMapIter<IR*, IR*> mapit;
+    xcom::TMapIter<IR*, IR*> mapit;
     IR * pr;
     for (IR * x = m_dele2pr.get_first(mapit, &pr);
          x != nullptr; x = m_dele2pr.get_next(mapit, &pr)) {
@@ -798,55 +859,56 @@ void DelegateMgr::clean()
 
 bool DelegateMgr::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
-    note(m_rg, "\n==-- DUMP DelegateMgr '%s' --==",
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP))
+    { return false; }
+    xoc::note(m_rg, "\n==-- DUMP DelegateMgr '%s' --==",
          m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     DelegateMgr * pthis = const_cast<DelegateMgr*>(this);
-    note(m_rg, "\nDELE2PR:");
+    xoc::note(m_rg, "\nDELE2PR:");
     xcom::TMapIter<IR*, IR*> it;
     IR * pr;
     m_rg->getLogMgr()->incIndent(2);
     for (IR * dele = m_dele2pr.get_first(it, &pr); dele != nullptr;
          dele = m_dele2pr.get_next(it, &pr)) {
-        note(m_rg, "\n--");
-        note(m_rg, "\nDELE:");
+        xoc::note(m_rg, "\n--");
+        xoc::note(m_rg, "\nDELE:");
         xoc::dumpIR(
             dele, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
-        note(m_rg, "\nPR:");
+        xoc::note(m_rg, "\nPR:");
         xoc::dumpIR(
             pr, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
     }
     m_rg->getLogMgr()->decIndent(2);
 
-    note(m_rg, "\nDELE2INITSTPR:");
+    xoc::note(m_rg, "\nDELE2INITSTPR:");
     it.clean();
     IR * stpr;
     m_rg->getLogMgr()->incIndent(2);
     for (IR * dele = m_dele2init.get_first(it, &stpr); dele != nullptr;
          dele = m_dele2init.get_next(it, &stpr)) {
-        note(m_rg, "\n--");
-        note(m_rg, "\nDELE:");
+        xoc::note(m_rg, "\n--");
+        xoc::note(m_rg, "\nDELE:");
         xoc::dumpIR(
             dele, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
-        note(m_rg, "\nINITSTPR:");
+        xoc::note(m_rg, "\nINITSTPR:");
         xoc::dumpIR(
             stpr, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_KID));
     }
     m_rg->getLogMgr()->decIndent(2);
 
-    note(m_rg, "\nDELE2OutsideDefSet:");
+    xoc::note(m_rg, "\nDELE2OutsideDefSet:");
     TMapIter<IR const*, DUSet*> it3;
     DUSet * set;
     m_rg->getLogMgr()->incIndent(2);
     for (IR const* dele = m_dele2outsidedefset.get_first(it3, &set);
          dele != nullptr;
          dele = m_dele2outsidedefset.get_next(it3, &set)) {
-        note(m_rg, "\n--");
-        note(m_rg, "\nDELE:");
+        xoc::note(m_rg, "\n--");
+        xoc::note(m_rg, "\nDELE:");
         dumpIR(dele, m_rg, nullptr,
                DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
-        note(m_rg, "\nOutsideDefSet:");
+        xoc::note(m_rg, "\nOutsideDefSet:");
         m_rg->getLogMgr()->incIndent(2);
         DUSetIter di = nullptr;
         for (BSIdx i = set->get_first(&di); i != BS_UNDEF;
@@ -860,19 +922,19 @@ bool DelegateMgr::dump() const
     }
     m_rg->getLogMgr()->decIndent(2);
 
-    note(m_rg, "\nDELE2OutsideUseSet:");
-    TMapIter<IR const*, DUSet*> it4;
+    xoc::note(m_rg, "\nDELE2OutsideUseSet:");
+    xcom::TMapIter<IR const*, DUSet*> it4;
     DUSet * set2;
     m_rg->getLogMgr()->incIndent(2);
     for (IR const* dele = m_dele2outsideuseset.get_first(it4, &set2);
          dele != nullptr;
          dele = m_dele2outsideuseset.get_next(it4, &set2)) {
-        note(m_rg, "\n--");
-        note(m_rg, "\nDELE:");
+        xoc::note(m_rg, "\n--");
+        xoc::note(m_rg, "\nDELE:");
         xoc::dumpIR(
             dele, m_rg, nullptr, DumpFlag::combineIRID(IR_DUMP_NO_NEWLINE));
 
-        note(m_rg, "\nOutsideUseSet:");
+        xoc::note(m_rg, "\nOutsideUseSet:");
         m_rg->getLogMgr()->incIndent(2);
         DUSetIter di = nullptr;
         for (BSIdx i = set2->get_first(&di); i != BS_UNDEF;
@@ -944,12 +1006,27 @@ bool RegPromot::checkArrayIsLoopInvariant(
 {
     ASSERT0(ir->isArrayOp() && li);
     OptCtx const* oc = ctx.getOptCtx();
+
+    //CASE:Do not refer to InvStmtList information of LICM to determine whether
+    //an IR can be promoted, because the dependent stmts may still not be
+    //LICMed, and that will incur incorrect DU chain.
+    //e.g:compile.gr/rp6.gr
+    //InvStmtList const* invlst = ctx.getInvStmtList();
+    InvStmtList const* invlst = nullptr;
+
     for (IR * s = ARR_sub_list(ir); s != nullptr; s = s->get_next()) {
-        if (!xoc::isLoopInvariant(s, li, m_rg, nullptr, true, oc)) {
+        if (!xoc::isLoopInvariant(s, li, m_rg, invlst, true, oc)) {
+            dumpReasonPreventRP(
+                ctx, s,
+                "it is not loop-invariant, user should perform LICM before RP");
             return false;
         }
     }
-    if (!xoc::isLoopInvariant(ARR_base(ir), li, m_rg, nullptr, true, oc)) {
+    if (!xoc::isLoopInvariant(
+            ir->getBase(), li, m_rg, invlst, true, oc)) {
+        dumpReasonPreventRP(
+            ctx, ir->getBase(),
+            "it is not loop-invariant, user should perform LICM before RP");
         return false;
     }
     return true;
@@ -1057,10 +1134,10 @@ bool RegPromot::isRefSameMemInLoop(
 {
     //Use LoopAnaDep pass to detect if ir1 and ir2 are accessing
     //same memory in the loop.
-    RPCTX_ldainfo_set(ctx).clean();
+    ctx.getLDAInfoSet().clean();
     getLoopDepAna()->analyzeDepAndRefineDep(
-        ir1, ir2, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
-    if (RPCTX_ldainfo_set(ctx).isOnlyContainLoopIndep(ir1, ir2)) {
+        ir1, ir2, ctx.getLDAInfoSet(), *ctx.getLoopDepCtx());
+    if (ctx.getLDAInfoSet().isOnlyContainLoopIndep(ir1, ir2)) {
         //Use more aggressive method, say Equivalent-VN, to detect if
         //given two IR reference the same memory location.
         return true;
@@ -1122,10 +1199,10 @@ bool RegPromot::checkIfExistOverlappedExactAcc(
             //be hoisted.
             continue;
         }
-        RPCTX_ldainfo_set(ctx).clean();
+        ctx.getLDAInfoSet().clean();
         getLoopDepAna()->analyzeDepAndRefineDep(
-            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
-        if (RPCTX_ldainfo_set(ctx).isAtMostContainLoopIndep(ir, ref)) {
+            ir, ref, ctx.getLDAInfoSet(), *ctx.getLoopDepCtx());
+        if (ctx.getLDAInfoSet().isAtMostContainLoopIndep(ir, ref)) {
             //Use more aggressive method, say Equivalent-VN, to detect if
             //given two IR reference the same memory location.
             continue;
@@ -1171,10 +1248,10 @@ bool RegPromot::checkIfExistOverlappedInexactAcc(
             //be hoisted.
             continue;
         }
-        RPCTX_ldainfo_set(ctx).clean();
+        ctx.getLDAInfoSet().clean();
         getLoopDepAna()->analyzeDepAndRefineDep(
-            ir, ref, RPCTX_ldainfo_set(ctx), *ctx.getLoopDepCtx());
-        if (RPCTX_ldainfo_set(ctx).isAtMostContainLoopIndep(ir, ref)) {
+            ir, ref, ctx.getLDAInfoSet(), *ctx.getLoopDepCtx());
+        if (ctx.getLDAInfoSet().isAtMostContainLoopIndep(ir, ref)) {
             //Use more aggressive method, say Equivalent-VN, to detect if
             //given two IR reference the same memory location.
             continue;
@@ -1399,8 +1476,8 @@ bool RegPromot::sweepOutAccess(
 }
 
 
-void RegPromot::clobberExactAccess(IR const* ir, MOD ExactAccTab & exact_tab,
-                                   MOD RPCtx & ctx)
+void RegPromot::clobberExactAccess(
+    IR const* ir, MOD ExactAccTab & exact_tab, MOD RPCtx & ctx)
 {
     ExactAccTabIter it;
     Vector<MD const*> need_to_be_removed;
@@ -1488,8 +1565,22 @@ bool RegPromot::checkIndirectAccessIsLoopInvariant(
     //  other may-alias memory operation.
     ASSERT0(li);
     ASSERT0(ir->isIndirectMemOp());
-    return xoc::isLoopInvariant(
-        ir->getBase(), li, m_rg, nullptr, true, ctx.getOptCtx());
+
+    //CASE:Do not refer to InvStmtList information of LICM to determine whether
+    //an IR can be promoted, because the dependent stmts may still not be
+    //LICMed, and that will incur incorrect DU chain.
+    //e.g:compile.gr/rp6.gr
+    //InvStmtList const* invlst = ctx.getInvStmtList();
+    InvStmtList const* invlst = nullptr;
+
+    bool is_inv = xoc::isLoopInvariant(
+        ir->getBase(), li, m_rg, invlst, true, ctx.getOptCtx());
+    if (!is_inv) {
+        dumpReasonPreventRP(
+            ctx, ir->getBase(),
+            "it is not loop-invariant, user should perform LICM before RP");
+    }
+    return is_inv;
 }
 
 
@@ -1673,7 +1764,7 @@ void RegPromot::handleEpilog(
     MOD RPCtx & ctx)
 {
     RecomputeDefDefAndDefUseChain recomp(
-        *ctx.domtree, m_mdssamgr, *ctx.oc, &getActMgr());
+        *ctx.domtree, m_mdssamgr, *ctx.getOptCtx(), &getActMgr());
     RestoreTabIter ti;
     for (IR const* dele = restore2mem.get_first(ti);
          dele != nullptr; dele = restore2mem.get_next(ti)) {
@@ -1736,8 +1827,8 @@ void RegPromot::handleExactAccOcc(
             occs->remove(irit);
             continue;
         }
-        handleAccessInBody(occ, dele, delemgr, restore2mem,
-                           occ2newocc, ctx);
+        handleAccessInBody(
+            occ, dele, delemgr, restore2mem, occ2newocc, ctx);
 
         //Each memory reference in the tree has been promoted.
         promoted.addTree(occ, ii);
@@ -1750,28 +1841,20 @@ void RegPromot::promoteExactAccessDelegate(
     IRBB * preheader, IRBB * exit_bb, ExactAccTab & exact_tab, MOD RPCtx & ctx)
 {
     ASSERT0(!dele->isPROp());
-    IR const* promoted_pr = delemgr.getPR(dele);
-    ASSERT0(promoted_pr);
-    handleProlog(dele, promoted_pr, delemgr, preheader);
+    handleProlog(dele, delemgr, preheader);
 
     //The IR table records delegates that need to restore dele-PR to memory
     //at loop epilog BB.
     RestoreTab restore2mem;
     Occ2Occ occ2newocc;
-    handleExactAccOcc(dele, delemgr, li, restore2mem,
-                      occ2newocc, ii, exact_tab, ctx);
+    handleExactAccOcc(
+        dele, delemgr, li, restore2mem, occ2newocc, ii, exact_tab, ctx);
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     //Generate code to fulfill epilog of delegate.
     handleEpilog(restore2mem, delemgr, exit_bb, ctx);
-    addDUChainForExactAccDele(dele, occ2newocc, delemgr, restore2mem,
-                              exact_tab, ctx, preheader, li);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        //Note some members of delemgr will be free after a while.
-        //Dump info before that happen.
-        m_rg->getLogMgr()->incIndent(2);
-        restore2mem.dumpDele2Restore(m_rg);
-        m_rg->getLogMgr()->decIndent(2);
-    }
+    addDUChainForExactAccDele(
+        dele, occ2newocc, delemgr, restore2mem, exact_tab, ctx, preheader, li);
+    dumpRestore2Mem(getRegion(), restore2mem);
     removeDUChainForOrgOcc(occ2newocc, ctx);
 
     //CASE: Do not remove outside loop USE, because that will incur
@@ -1861,10 +1944,10 @@ void RegPromot::removeDUChainForOrgOcc(Occ2Occ & occ2newocc, RPCtx const& ctx)
          occ != nullptr; occ = occ2newocc.get_next(it, nullptr)) {
         ASSERT0(occ->isMemRefNonPR());
         if (occ->is_exp()) {
-            xoc::removeUseForTree(occ, m_rg, *ctx.oc);
+            xoc::removeUseForTree(occ, m_rg, *ctx.getOptCtx());
             continue;
         }
-        xoc::removeStmt(occ, m_rg, *ctx.oc);
+        xoc::removeStmt(occ, m_rg, *ctx.getOptCtx());
     }
 }
 
@@ -1910,7 +1993,7 @@ void RegPromot::handleExpInBody(
     OUT Occ2Occ & occ2newocc, RPCtx const& ctx)
 {
     ASSERT0(isExpCand(occ));
-    xoc::removeUseForTree(occ, m_rg, *ctx.oc);
+    xoc::removeUseForTree(occ, m_rg, *ctx.getOptCtx());
     ASSERT0_DUMMYUSE(occ->getStmt());
 
     IR * pr = m_rg->dupIR(delemgr.getPR(dele));
@@ -1987,7 +2070,7 @@ void RegPromot::handleStmtInBody(
     findAndRecordRestore(occ, dele, delemgr, restore2mem);
     IR * occrhs = occ->getRHS();
     occ->setRHS(nullptr); //Do NOT remove the DU chain of RHS of occ.
-    xoc::removeStmt(occ, m_rg, *ctx.oc);
+    xoc::removeStmt(occ, m_rg, *ctx.getOptCtx());
 
     //Substitute STPR for writing memory.
     IR * stpr = getIRMgr()->buildStorePR(
@@ -2024,8 +2107,7 @@ void RegPromot::handleAccessInBody(
 
 
 void RegPromot::handlePrologForStmt(
-    IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr, IR * rhs,
-    IRBB * preheader)
+    IR const* dele, DelegateMgr & delemgr, IR * rhs, IRBB * preheader)
 {
     ASSERT0(dele->is_stmt());
     ASSERT0(rhs && rhs->is_exp());
@@ -2057,8 +2139,7 @@ void RegPromot::handlePrologForStmt(
 
 
 void RegPromot::handlePrologForExp(
-    IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr, IR * rhs,
-    IRBB * preheader)
+    IR const* dele, DelegateMgr & delemgr, IR * rhs, IRBB * preheader)
 {
     ASSERT0(dele->is_exp());
     ASSERT0(rhs && rhs->is_exp());
@@ -2082,8 +2163,7 @@ void RegPromot::handlePrologForExp(
 
 
 void RegPromot::handleProlog(
-    IR const* dele, IR const* promoted_pr, DelegateMgr & delemgr,
-    IRBB * preheader)
+    IR const* dele, DelegateMgr & delemgr, IRBB * preheader)
 {
     IR * rhs = nullptr; //record the initial value of dele.
     if (isExactMemDelegate(dele)) {
@@ -2095,12 +2175,12 @@ void RegPromot::handleProlog(
     SWITCH_CASE_DIRECT_MEM_STMT:
     SWITCH_CASE_INDIRECT_MEM_STMT:
     SWITCH_CASE_WRITE_ARRAY:
-        handlePrologForStmt(dele, promoted_pr, delemgr, rhs, preheader);
+        handlePrologForStmt(dele, delemgr, rhs, preheader);
         return;
     SWITCH_CASE_DIRECT_MEM_EXP:
     SWITCH_CASE_INDIRECT_MEM_EXP:
     SWITCH_CASE_READ_ARRAY:
-        handlePrologForExp(dele, promoted_pr, delemgr, rhs, preheader);
+        handlePrologForExp(dele, delemgr, rhs, preheader);
         return;
     default: UNREACHABLE(); //unsupport.
     }
@@ -2113,7 +2193,8 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
     IRBB * preheader, MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc, &getActMgr());
+    SSARegion ssarg(
+        getSBSMgr(), *ctx.domtree, m_rg, ctx.getOptCtx(), &getActMgr());
 
     //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
@@ -2152,15 +2233,15 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(
     ssarg.setRootBB(ssarg.findRootBB());
     if (m_cfg->get_dom_set(preheader->id()) == nullptr) {
         //preheader is just inserted, SSA needs its domset, recompute them.
-        ctx.oc->setInvalidDom();
-        ctx.oc->setInvalidPDom();
+        ctx.getOptCtx()->setInvalidDom();
+        ctx.getOptCtx()->setInvalidPDom();
     }
     m_rg->getPassMgr()->checkValidAndRecompute(
-        ctx.oc, PASS_DOM, PASS_UNDEF);
-    ctx.oc->setInvalidPRLiveness();
+        ctx.getOptCtx(), PASS_DOM, PASS_UNDEF);
+    ctx.getOptCtx()->setInvalidPRLiveness();
     ssarg.inferAndAddNecessaryBB();
     m_prssamgr->constructDesignatedRegion(ssarg);
-    ctx.oc->setInvalidPRDU();
+    ctx.getOptCtx()->setInvalidPRDU();
     return true;
 }
 
@@ -2173,7 +2254,8 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
     MOD RPCtx & ctx)
 {
     if (!usePRSSADU()) { return false; }
-    SSARegion ssarg(getSBSMgr(), *ctx.domtree, m_rg, ctx.oc, &getActMgr());
+    SSARegion ssarg(
+        getSBSMgr(), *ctx.domtree, m_rg, ctx.getOptCtx(), &getActMgr());
 
     //Add all BB of loop to SSARegion.
     ssarg.add(*li->getBodyBBSet());
@@ -2209,11 +2291,11 @@ bool RegPromot::buildPRSSADUChainForExactAcc(
             ("dominfo of preheader must have been maintained"));
     ASSERT0(ctx.domtree);
     m_rg->getPassMgr()->checkValidAndRecompute(
-        ctx.oc, PASS_DOM, PASS_UNDEF);
+        ctx.getOptCtx(), PASS_DOM, PASS_UNDEF);
     ASSERT0(m_prssamgr);
-    ctx.oc->setInvalidPRLiveness();
+    ctx.getOptCtx()->setInvalidPRLiveness();
     m_prssamgr->constructDesignatedRegion(ssarg);
-    ctx.oc->setInvalidPRDU();
+    ctx.getOptCtx()->setInvalidPRDU();
     return true;
 }
 
@@ -2273,7 +2355,7 @@ void RegPromot::addDUChainForRHSOfInitDef(
     IR * startir = init_stmt->getBB()->getPrevIR(init_stmt);
     IRBB * startbb = init_stmt->getBB();
     xoc::findAndSetLiveInDefForTree(
-        init_stmt->getRHS(), startir, startbb, m_rg, *ctx.oc);
+        init_stmt->getRHS(), startir, startbb, m_rg, *ctx.getOptCtx());
 }
 
 
@@ -2290,7 +2372,7 @@ void RegPromot::addSSADUChainForExpOfRestoreLHS(
     IR * startir = restore->getBB()->getPrevIR(restore);
     IRBB * startbb = restore->getBB();
     xoc::findAndSetLiveInDefForExpOfStmt(
-        restore, startir, startbb, m_rg, *ctx.oc);
+        restore, startir, startbb, m_rg, *ctx.getOptCtx());
 }
 
 
@@ -2387,7 +2469,7 @@ void RegPromot::buildDUChainOnDemandForPROp(
         //buildPRSSADUChainForExactAcc().
         return;
     }
-    xoc::buildDUChain(def, use, m_rg, *ctx.oc);
+    xoc::buildDUChain(def, use, m_rg, *ctx.getOptCtx());
 }
 
 
@@ -2397,7 +2479,7 @@ void RegPromot::buildDUChainOnDemand(IR * def, IR * use, RPCtx const& ctx)
         buildDUChainOnDemandForPROp(def, use, ctx);
         return;
     }
-    xoc::buildDUChain(def, use, m_rg, *ctx.oc);
+    xoc::buildDUChain(def, use, m_rg, *ctx.getOptCtx());
 }
 
 
@@ -2418,8 +2500,8 @@ void RegPromot::addDUChainForRestoreToOutsideUse(
          i != BS_UNDEF; i = useset->get_next(i, &it)) {
         IR * u = m_rg->getIR(i);
         ASSERT0(u->is_exp());
-        xoc::removeUseForTree(u, m_rg, *ctx.oc);
-        xoc::buildDUChain(restore, u, m_rg, *ctx.oc);
+        xoc::removeUseForTree(u, m_rg, *ctx.getOptCtx());
+        xoc::buildDUChain(restore, u, m_rg, *ctx.getOptCtx());
     }
 }
 
@@ -2531,9 +2613,7 @@ bool RegPromot::promoteInexactAccessDelegate(
             //next.
             continue;
         }
-        IR const* pr = delemgr.getPR(dele);
-        ASSERT0(pr);
-        handleProlog(dele, pr, delemgr, preheader);
+        handleProlog(dele, delemgr, preheader);
     }
     //Generate code to fulfill initialization of delegate.
 
@@ -2548,13 +2628,7 @@ bool RegPromot::promoteInexactAccessDelegate(
     handleEpilog(restore2mem, delemgr, exit_bb, ctx);
     addDUChainForInexactAcc(
         delemgr, restore2mem, occ2newocc, inexact_tab, li, preheader, ctx);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
-        //Note some members of delemgr will be free after a while.
-        //Dump info before that happen.
-        m_rg->getLogMgr()->incIndent(2);
-        restore2mem.dumpDele2Restore(m_rg);
-        m_rg->getLogMgr()->decIndent(2);
-    }
+    dumpRestore2Mem(getRegion(), restore2mem);
     removeRedundantDUForInexactAcc(occ2newocc, delemgr, inexact_tab, li, ctx);
     return true;
 }
@@ -2705,17 +2779,18 @@ bool RegPromot::tryPromoteLoop(
 
     //Insert a preheader BB before Loop.
     IRBB * preheader = nullptr;
-    bool change_cfg = xoc::insertPreheader(li, m_rg, &preheader, ctx.oc, false);
+    bool change_cfg = xoc::insertPreheader(
+        li, m_rg, &preheader, ctx.getOptCtx(), false);
     bool rebuilddomtree = change_cfg || ctx.domtree == nullptr ||
                           ctx.need_rebuild_domtree;
     if (rebuilddomtree && (useMDSSADU() || usePRSSADU())) {
-        if (!ctx.oc->isPassValid(PASS_DOM)) {
+        if (!ctx.getOptCtx()->isPassValid(PASS_DOM)) {
             //Original loophead's PHI info might not be maintained.
-            //HACK ctx.oc.setInvalidPass(PASS_MDSSA_MGR);
+            //HACK ctx.getOptCtx()->setInvalidPass(PASS_MDSSA_MGR);
         }
         //DomTree needs DomInfo to be available.
         m_rg->getPassMgr()->checkValidAndRecompute(
-            ctx.oc, PASS_DOM, PASS_UNDEF);
+            ctx.getOptCtx(), PASS_DOM, PASS_UNDEF);
         ctx.buildDomTree(m_cfg);
     }
     exit_bb = tryInsertStubExitBB(exit_bb, preheader, exitedgelist, ctx);
@@ -2727,8 +2802,8 @@ bool RegPromot::tryPromoteLoop(
         li, exit_bb, preheader, ii, exact_tab, inexact_tab, ctx);
 
     //promote() should maintaind PRSSA and MDSSA.
-    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *ctx.oc));
-    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *ctx.oc));
+    ASSERT0(!usePRSSADU() || PRSSAMgr::verifyPRSSAInfo(m_rg, *ctx.getOptCtx()));
+    ASSERT0(!useMDSSADU() || MDSSAMgr::verifyMDSSAInfo(m_rg, *ctx.getOptCtx()));
     return change_cfg || change_ir;
 }
 
@@ -2782,7 +2857,7 @@ IRBB * RegPromot::tryInsertStubExitBB(
     m_cfg->addBB(stub);
 
     //Update RPO before inserting BB since the update need original CFG info.
-    m_cfg->tryUpdateRPOBeforeCFGChanged(stub, exit_bb, true, ctx.oc);
+    m_cfg->tryUpdateRPOBeforeCFGChanged(stub, exit_bb, true, ctx.getOptCtx());
 
     //Insert stub BB before original exit BB.
     //NOTE: the stub BB will become the IDom of original exit BB.
@@ -2800,17 +2875,17 @@ IRBB * RegPromot::tryInsertStubExitBB(
     //if needed.
     //TODO:Revise DomInfo incrementally.
     OptCtx::setInvalidIfCFGChangedExcept(
-        ctx.oc, PASS_RPO, PASS_LOOP_INFO, PASS_UNDEF);
+        ctx.getOptCtx(), PASS_RPO, PASS_LOOP_INFO, PASS_UNDEF);
 
     //The following processing procedure needs DomInfo, thus we ensure DomInfo
     //to be valid after inserting stub-BB.
     m_cfg->getRegion()->getPassMgr()->checkValidAndRecompute(
-        ctx.oc, PASS_DOM, PASS_UNDEF);
+        ctx.getOptCtx(), PASS_DOM, PASS_UNDEF);
 
     //Inform RP to rebuild Dom Tree before invoke promote() because we
     //recompute DomInfo.
     ctx.need_rebuild_domtree = true;
-    ASSERT0(m_cfg->verifyLoopInfo(*ctx.oc));
+    ASSERT0(m_cfg->verifyLoopInfo(*ctx.getOptCtx()));
     return stub;
 }
 
@@ -2837,6 +2912,8 @@ bool RegPromot::analyzeLoop(
 bool RegPromot::EvaluableScalarReplacement(
     List<LI<IRBB> const*> & worklst, MOD RPCtx & ctx)
 {
+    LICM * licm = (LICM*)(m_rg->getPassMgr()->registerPass(PASS_LICM));
+    ASSERT0(licm);
     IRIter ii;
     bool changed = false;
     while (worklst.get_elem_count() > 0) {
@@ -2844,6 +2921,9 @@ bool RegPromot::EvaluableScalarReplacement(
         LoopDepCtx ldactx(x, &getActMgr(), ctx.getOptCtx());
         ctx.setLI(x); //record current loop-info in context.
         ctx.setLoopDepCtx(&ldactx);
+        LICMAnaCtx licmanactx(getRegion(), x, licm, ctx.getOptCtx());
+        licm->analyszInvariantOp(licmanactx);
+        ctx.setLICMAnaCtx(&licmanactx);
         changed |= tryPromoteLoop(x, ii, ctx);
         ctx.cleanLI();
         ctx.cleanLoopDepCtx();
@@ -2859,12 +2939,12 @@ bool RegPromot::EvaluableScalarReplacement(
 
 bool RegPromot::dumpBeforePass() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpRP()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) {
         return false;
     }
     if (!g_dump_opt.isDumpBeforePass()) { return false; }
     START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
-    note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
+    xoc::note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     dumpBBList(m_rg->getBBList(), m_rg);
@@ -2875,12 +2955,24 @@ bool RegPromot::dumpBeforePass() const
 }
 
 
+static void dumpAct(RegPromot const* rp, RPCtx const& ctx)
+{
+    Region const* rg = ctx.getRegion();
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP)) { return; }
+    xoc::note(rg, "\n==---- DUMP %s '%s' ----==",
+         rp->getPassName(), rg->getRegionName());
+    rg->getLogMgr()->incIndent(2);
+    ctx.getActMgr()->dump();
+    rg->getLogMgr()->decIndent(2);
+}
+
+
 bool RegPromot::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRP()) { return false; }
-    if (!g_dump_opt.isDumpAfterPass()) { return true; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_RP))
+    { return false; }
     m_rg->getLogMgr()->pauseBuffer();
-    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+    xoc::note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     Pass::dump();
@@ -3024,6 +3116,7 @@ bool RegPromot::perform(OptCtx & oc)
         ASSERT0(m_cfg->verifyLoopInfo(oc));
         ASSERT0(m_cfg->verifyDomAndPdom(oc));
     } else {
+        dumpAct(this, ctx);
         m_rg->getLogMgr()->cleanBuffer();
     }
     clean();

@@ -44,12 +44,12 @@ void dumpATOMINC(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(ATOMINC_memory(ir), rg, (CHAR*)" memory", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(ATOMINC_memory(ir), rg, (CHAR*)" memory", &lctx);
     if (ATOMINC_addend(ir) != nullptr) {
-        dumpIRList(ATOMINC_addend(ir), rg, (CHAR*)" addend", ctx.dumpflag);
+        dumpIRList(ATOMINC_addend(ir), rg, (CHAR*)" addend", &lctx);
     }
-    dumpIRList(ATOMINC_multires(ir), rg, (CHAR*)" multi-res",
-               ctx.dumpflag);
+    dumpIRList(ATOMINC_multires(ir), rg, (CHAR*)" multi-res", &lctx);
     lm->decIndent(ctx.dn);
 }
 
@@ -67,14 +67,14 @@ void dumpATOMCAS(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(ATOMCAS_memory(ir), rg, (CHAR*)" memory", ctx.dumpflag);
-    dumpIRList(ATOMCAS_oldval(ir), rg, (CHAR*)" oldval", ctx.dumpflag);
-    dumpIRList(ATOMCAS_newval(ir), rg, (CHAR*)" newval", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(ATOMCAS_memory(ir), rg, (CHAR*)" memory", &lctx);
+    dumpIRList(ATOMCAS_oldval(ir), rg, (CHAR*)" oldval", &lctx);
+    dumpIRList(ATOMCAS_newval(ir), rg, (CHAR*)" newval", &lctx);
     if (ATOMCAS_occupy(ir) != nullptr) {
-        dumpIRList(ATOMCAS_occupy(ir), rg, (CHAR*)" occupy", ctx.dumpflag);
+        dumpIRList(ATOMCAS_occupy(ir), rg, (CHAR*)" occupy", &ctx);
     }
-    dumpIRList(ATOMCAS_multires(ir), rg, (CHAR*)" multi-res",
-               ctx.dumpflag);
+    dumpIRList(ATOMCAS_multires(ir), rg, (CHAR*)" multi-res", &ctx);
     lm->decIndent(ctx.dn);
 }
 
@@ -92,9 +92,9 @@ void dumpBROADCAST(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(BROADCAST_src(ir), rg, (CHAR*)" src", ctx.dumpflag);
-    dumpIRList(BROADCAST_res_list(ir), rg, (CHAR*)" multi-res",
-               ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(BROADCAST_src(ir), rg, (CHAR*)" src", &lctx);
+    dumpIRList(BROADCAST_res_list(ir), rg, (CHAR*)" multi-res", &lctx);
     lm->decIndent(ctx.dn);
 }
 
@@ -113,8 +113,9 @@ void dumpVSTPR(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(VSTPR_rhs(ir), rg, nullptr, ctx.dumpflag);
-    dumpIRList(VSTPR_dummyuse(ir), rg, (CHAR*)" dummyuse", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(VSTPR_rhs(ir), rg, nullptr, &lctx);
+    dumpIRList(VSTPR_dummyuse(ir), rg, (CHAR*)" dummyuse", lctx.dumpflag);
     lm->decIndent(ctx.dn);
 }
 
@@ -132,8 +133,9 @@ void dumpMaskOp(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(MASKOP_op(ir), rg, nullptr, ctx.dumpflag);
-    dumpIRList(MASKOP_mask(ir), rg, (CHAR*)" mask", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(MASKOP_op(ir), rg, nullptr, &lctx);
+    dumpIRList(MASKOP_mask(ir), rg, (CHAR*)" mask", &lctx);
     lm->decIndent(ctx.dn);
 }
 
@@ -151,8 +153,9 @@ void dumpSelectToRes(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(SELECTTORES_op(ir), rg, nullptr, ctx.dumpflag);
-    dumpIRList(SELECTTORES_base(ir), rg, (CHAR*)" base", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(SELECTTORES_op(ir), rg, nullptr, &lctx);
+    dumpIRList(SELECTTORES_base(ir), rg, (CHAR*)" base", &lctx);
     lm->decIndent(ctx.dn);
 }
 
@@ -170,8 +173,9 @@ void dumpDynlenOp(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     prt(rg, "%s", ctx.attr);
     if (!dump_kid) { return; }
     lm->incIndent(ctx.dn);
-    dumpIRList(DYNLENOP_op(ir), rg, nullptr, ctx.dumpflag);
-    dumpIRList(DYNLENOP_len(ir), rg, (CHAR*)" len", ctx.dumpflag);
+    IRDumpCtx<> lctx(ctx);
+    dumpIRList(DYNLENOP_op(ir), rg, nullptr, &lctx);
+    dumpIRList(DYNLENOP_len(ir), rg, (CHAR*)" len", &lctx);
     lm->decIndent(ctx.dn);
 }
 

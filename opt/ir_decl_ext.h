@@ -558,7 +558,7 @@ public:
 class CSelectToRes : public IR {
     COPY_CONSTRUCTOR(CSelectToRes);
 public:
-    static BYTE const kid_map = 0x3;
+    static BYTE const kid_map = 0x1;
     static BYTE const kid_num = 2;
     static UINT const accinfo_num = 1;
     static IRFieldAccTab::AccInfo accinfo[accinfo_num];

@@ -74,21 +74,28 @@ public:
         CDynLenOp::TAIL_STRATEGY tail_strategy, Type const* ty);
 
     //Build select-to-result operation.
-    //op: normal mask/dynamic-size operation.
+    //op: the normal mask/dynamic-size operation.
     //base: The operand that needs to be selected as the result is
     //      both the input operand and the output operand.
+    //      If it is NULL, that means the selection does not depend on
+    //      any other old value.
     //ty: the result data type.
     IR * buildSelectToRes(IR * op, IR * base, Type const* ty);
 
     //Build select store stmt.
-    //reflhs: the function build stmt according to the given reference IR.
-    //        the reference IR may be expression or stmt.
+    //reflhs: the function builds isomorphic stmt according to the given
+    //        reference IR. The reference IR may be expression or stmt.
     //op: the normal RHS operation.
     //base: The operand that needs to be selected as the result is both
     //      the input operand and the output operand.
-    //ty: the result data type of return slected store stmt.
+    //ty: the result data type of returned selected store stmt.
     IR * buildSelectStoreStmtViaIsomoIR(
         IR const* reflhs, IR * op, IR * base, Type const* ty);
+
+    //Insert a select_to_res to IR tree if tail or mask strategy requires
+    //while building a stpr.
+    IR * buildStorePRWithTailAndMaskStrategy(PRNO prno, Type const* type,
+        IR * rhs, CDynLenOp::TAIL_STRATEGY ts, CMaskOp::MASK_STRATEGY ms);
 
     IR * buildVIStore(
         IR * base, TMWORD ofst, IR * rhs, IR * dummyuse, Type const* ty);

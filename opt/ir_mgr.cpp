@@ -179,7 +179,7 @@ bool IRMgr::isIRListIsomorphic(
 
 static bool isCondExecExp(IR const* ir)
 {
-    if (ir->is_select() && !CSelect::bothTFExpAvail(ir)) {
+    if (ir->is_select() && CSelect::isPartialSelect(ir)) {
         return true;
     }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -194,6 +194,18 @@ bool IRMgr::isCondExec(IR const* ir)
 {
     if (!ir->hasResult() || !ir->hasRHS()) { return false; }
     return isCondExecExp(ir->getRHS());
+}
+
+
+bool IRMgr::isContainIndirectMemOp(IR const* ir)
+{
+    ASSERT0(ir);
+    IRIter irit;
+    for (IR * e = xoc::iterInit(const_cast<IR*>(ir), irit); e != nullptr;
+         e = xoc::iterNext(irit)) {
+        if (e->isIndirectMemOp()) { return true; }
+    }
+    return false;
 }
 
 
@@ -239,8 +251,7 @@ bool IRMgr::isIRIsomorphic(
         if (ir->getOffset() != src->getOffset()) {
             return false;
         }
-        ASSERT0(ir->is_leaf());
-        return true;
+        break; //ir may be ST.
     SWITCH_CASE_INDIRECT_MEM_OP:
         if (!ir->isIndirectMemOp()) { return false; }
         if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
@@ -253,11 +264,7 @@ bool IRMgr::isIRIsomorphic(
             return false;
         }
         ASSERT0(ir->getBase() && src->getBase());
-        if (is_cmp_kid) {
-            return isIRIsomorphic(
-                ir->getBase(), src->getBase(), is_cmp_kid, flag);
-        }
-        return true;
+        break;
     SWITCH_CASE_PR_OP:
         if (!ir->isPROp()) { return false; }
         if (flag.have(ISOMO_CK_CODE) && ir->getCode() != src->getCode()) {
@@ -324,6 +331,18 @@ bool IRMgr::isIRIsomorphic(
     case IR_BREAK:
     case IR_CONTINUE:
         break;
+    case IR_SELECT_TO_RES:
+        return ir->is_select_to_res() &&
+            isIRIsomorphic(SELECTTORES_op(ir), SELECTTORES_op(src),
+            is_cmp_kid, flag) &&
+            isIRIsomorphic(SELECTTORES_base(ir), SELECTTORES_base(src),
+            is_cmp_kid, flag);
+    case IR_DYNLEN_OP:
+        return ir->is_dynlenop() &&
+            isIRIsomorphic(DYNLENOP_op(ir), DYNLENOP_op(src),
+            is_cmp_kid, flag) &&
+            isIRIsomorphic(DYNLENOP_len(ir), DYNLENOP_len(src),
+            is_cmp_kid, flag);
     default:
         return isIRIsomorphicExtOp(ir, src, is_cmp_kid,  flag);
     }
@@ -555,7 +574,10 @@ IR * IRMgr::allocIR(IR_CODE irc, bool lookup)
 {
     UINT idx = IRCSIZE(irc) - sizeof(IR);
     ASSERTN(idx < 1000, ("weird index"));
-    IR * ir = pickFreeIR(idx, lookup);
+    IR * ir = nullptr;
+    if (g_reuse_ir) {
+        ir = pickFreeIR(idx, lookup);
+    }
     if (ir == nullptr) {
         ir = xmalloc(IRCSIZE(irc));
         IR_id(ir) = m_ir_count;
@@ -1692,6 +1714,8 @@ IR * IRMgr::buildImmInt(HOST_INT v, Type const* type)
         //Make sure value is sign-extended.
         switch (TY_dtype(type)) {
         case D_B:
+            CONST_int_val(imm) = v == 0 ? 0 : 1;
+            break;
         case D_I8:
         case D_U8: {
             UINT8 uv = (UINT8)v;
@@ -2210,7 +2234,14 @@ bool IRMgr::isConstOne(IR const* ir)
 }
 
 
-IR * IRMgr::getMoveSrcPr(IR const* mov) const
+IR * IRMgr::getMoveDstPR(IR * mov) const
+{
+    ASSERT0(mov && isMoveOp(mov) && mov->isPROp());
+    return mov;
+}
+
+
+IR * IRMgr::getMoveSrcPR(IR const* mov) const
 {
     ASSERT0(mov && isMoveOp(mov));
     return mov->getRHS();

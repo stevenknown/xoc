@@ -761,6 +761,10 @@ public:
     //Return true if the function extracts value successfully.
     bool extractIVValFromMC(MOD IVVal * val, IR const* ir) const;
 
+    //The function tries to extract IVVal from given 'ir' which is Vector type.
+    //Return true if the function extracts value successfully.
+    bool extractIVValFromVec(MOD IVVal * val, IR const* ir) const;
+
     //Extract IV reference and Bound expression from mono-bound expression.
     //is_closed_range:
     //  true to indicate the value of IV include the

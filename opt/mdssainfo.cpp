@@ -168,6 +168,54 @@ void MDDef::dump(Region const* rg) const
     }
     prt(rg, "%u:MD%uV%u", id(), getResult()->mdid(), getResult()->version());
 }
+
+
+static void dumpDefDefChainRecur(
+    MDDef const* mddef, UseDefMgr const* mgr, Region const* rg)
+{
+    ASSERT0(mddef);
+    note(rg, "\n");
+    mddef->dump(rg);
+    if (mddef->is_phi()) {
+        prt(rg, " <- ");
+        MDPhi const* phi = (MDPhi const*)mddef;
+        for (IR const* opnd = phi->getOpndList();
+             opnd != nullptr; opnd = opnd->get_next()) {
+            if (opnd != phi->getOpndList()) { prt(rg, ", "); }
+            MDSSAInfo const* opndssainfo = MDSSAMgr::getMDSSAInfoIfAny(opnd);
+            ASSERT0(opndssainfo);
+            VMD const* opndvmd = (VMD const*)opndssainfo->getUniqueVOpnd(
+                mgr->getMDSSAMgr());
+            if (opndvmd == nullptr) {
+                prt(rg, "NOVOPND");
+                continue;
+            }
+            if (opndvmd->isLiveIn()) {
+                prt(rg, "MD%uV%u", opndvmd->mdid(), opndvmd->version());
+                continue;
+            }
+            ASSERT0(opndvmd->getDef());
+            opndvmd->getDef()->dump(rg);
+        }
+    }
+    MDDefSet const* nextset = mddef->getNextSet();
+    if (nextset == nullptr) { return; }
+    MDDefSetIter nit = nullptr;
+    bool first = true;
+    rg->getLogMgr()->incIndent(2);
+    for (BSIdx w = nextset->get_first(&nit);
+        w != BS_UNDEF; w = nextset->get_next(w, &nit)) {
+        MDDef const* next = mgr->getMDDef(w);
+        dumpDefDefChainRecur(next, mgr, rg);
+    }
+    rg->getLogMgr()->decIndent(2);
+}
+
+
+void MDDef::dumpDefDefChain(UseDefMgr const* mgr, Region const* rg) const
+{
+    dumpDefDefChainRecur(this, mgr, rg);
+}
 //END MDDef
 
 
@@ -339,8 +387,7 @@ bool MDSSAInfo::renameOrAddSpecificUse(
     }
     if (exp->isRefMD(vmdid)) {
         //Note addUse() will build DefUse chain between 'vmd' and 'exp'.
-        vmd->addUse(exp);
-        addVOpnd(vmd, mgr);
+        addVOpndAndUse(exp, vmd, mgr);
         changed = true;
     }
     return changed;
@@ -485,6 +532,17 @@ bool MDSSAInfo::isLiveInVOpndSet(UseDefMgr const* mgr) const
 void MDSSAInfo::addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr)
 {
     m_vopnd_set.append(vopnd, *mgr->getSBSMgr());
+}
+
+
+void MDSSAInfo::addVOpndAndUse(
+    IR const* exp, VOpnd const* vopnd, UseDefMgr * mgr)
+{
+    ASSERT0(exp && exp->is_exp());
+    VMD * vmd = (VMD*)vopnd;
+    ASSERT0(vmd->is_md());
+    vmd->addUse(exp);
+    addVOpnd(vmd, mgr);
 }
 //END MDSSAInfo
 
@@ -729,6 +787,29 @@ IR * MDPhi::insertOpndAt(
 }
 
 
+UINT MDPhi::WhichOpnd(IR const* opnd, OUT bool & is_opnd) const
+{
+    UINT idx = 0;
+    is_opnd = false;
+    for (IR const* x = getOpndList();
+         x != nullptr; x = x->get_next(), idx++) {
+        if (opnd == x) { is_opnd = true; return idx; }
+    }
+    return idx;
+}
+
+
+IRBB * MDPhi::getPredByOpnd(IR const* opnd, IRCFG const* cfg) const
+{
+    bool is_opnd = false;
+    UINT idx = WhichOpnd(opnd, is_opnd);
+    ASSERT0(is_opnd);
+    IRBB * pred = cfg->getNthPred(getBB(), idx);
+    ASSERT0(pred);
+    return pred;
+}
+
+
 IR * MDPhi::getOpndByPred(IRBB const* pred, IRCFG const* cfg) const
 {
     ASSERT0(pred && cfg);
@@ -856,8 +937,38 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
     IRBB * pred = preds.get_head();
     VMD const* vmd = getResult();
     ASSERT0(vmd);
-    prt(rg, "MDPhi%u:VMD%u:MD%uV%u <- ", id(), vmd->id(), vmd->mdid(),
+    prt(rg, "MDPhi%u:VMD%u:MD%uV%u", id(), vmd->id(), vmd->mdid(),
         vmd->version());
+    if (getPrev() != nullptr) {
+        //CASE:There are DefDef chain between MDPhis if current MDPhi dominates
+        //the next-one.
+        //e.g:
+        //          BB1
+        //         _| | _
+        //        |      |
+        //       g1<-   g2<-
+        //        |      |
+        //        --    --
+        //         |    |
+        //         v    v
+        // g3<-Phi(g1, g2)
+        //          |
+        //          v
+        //          BB2
+        //         _| |_
+        //        |     |
+        //       g5<-  g6<-
+        //        |     |
+        //        --   --
+        //         |   |
+        //         v   v
+        // g7<-Phi(g5, g6)
+        // Where g3 is the prev-def of g7.
+        prt(rg, ",PrevDEF:MD%dV%d",
+            getPrev()->getResult()->mdid(),
+            getPrev()->getResult()->version());
+    }
+    prt(rg, " <- ");
     for (IR const* opnd = getOpndList();
          opnd != nullptr; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
@@ -925,6 +1036,18 @@ void UseDefMgr::destroyMD2VMDVec()
 }
 
 
+void UseDefMgr::dumpDefDefChainForAllMDDef() const
+{
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(m_rg, "\n-- DUMP DefDefChain For All MDDef --");
+    for (VecIdx i = 0; i <= m_def_vec.get_last_idx(); i++) {
+        MDDef * d = m_def_vec.get((UINT)i);
+        if (d == nullptr) { continue; }
+        d->dumpDefDefChain(this, m_rg);
+    }
+}
+
+ 
 void UseDefMgr::cleanOrDestroy(bool is_reinit)
 {
     ASSERT0(m_rg);
@@ -1081,7 +1204,7 @@ void UseDefMgr::buildMDPhiOpnd(MDPhi * phi, UINT mdid, UINT num_operands)
     //Generate operand of PHI.
     for (UINT i = 0; i < num_operands; i++) {
         IR * opnd = m_irmgr->buildId(md->get_base(), phi);
-        opnd->setRefMD(md, m_rg);
+        opnd->setMustRef(md, m_rg);
 
         //Generate MDSSAInfo to ID.
         MDSSAInfo * mdssainfo = genMDSSAInfo(opnd);

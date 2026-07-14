@@ -65,7 +65,7 @@ void VarLivenessMgr::updateSetForExp(IR const* exp, MOD LiveSet * use)
     ASSERT0(exp->is_exp());
     Var const* v = exp->getIdinfo();
     ASSERT0(v);
-    updateSetByExp((BSIdx)v->id(), use);
+    updateSetByRHS((BSIdx)v->id(), use);
 }
 
 
@@ -75,7 +75,7 @@ void VarLivenessMgr::updateSetForStmt(IR const* stmt, MOD LiveSet * use,
     ASSERT0(stmt->is_stmt());
     Var const* v = stmt->getIdinfo();
     ASSERT0(v);
-    updateSetByStmt((BSIdx)v->id(), use, gen);
+    updateSetByLHS((BSIdx)v->id(), use, gen);
 }
 //END VarLivenessMgr
 

@@ -31,46 +31,53 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef __PR_LIVENESS_MGR_H__
-#define __PR_LIVENESS_MGR_H__
+#ifndef __VMD_LIVENESS_MGR_H__
+#define __VMD_LIVENESS_MGR_H__
 
 namespace xoc {
 
-//Map between Var and PRNO.
-class Var2PR : public TMap<Var const*, PRNO, CompareConstVar> {
+typedef LiveSetIter VMDLivenessSetIter;
+class VMDLivenessSet : public LiveSet {
 };
 
-typedef LiveSet PRLiveSet;
-typedef LiveSetIter PRLiveSetIter;
-
-class PRLivenessMgr : public LivenessMgr {
-    COPY_CONSTRUCTOR(PRLivenessMgr);
+class VMDLivenessMgr : public LivenessMgr {
+    COPY_CONSTRUCTOR(VMDLivenessMgr);
 protected:
-    BYTE m_handle_may:1; //true if consider maydef/mayuse info.
-    Var2PR * m_var2pr;
+    MDSSAMgr * m_mdssamgr;
+    UseDefMgr * m_mdssaudmgr;
+    Vector<LiveSet*> m_livethrough;
 protected:
     virtual void computeExpImpl(
         IR const* exp, MOD LiveSet * use, MOD LiveSet * gen) override;
     virtual void computeStmtImpl(
         IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen) override;
+    void computeMDPhiOpndList(MDPhi const* mdphi, MOD LiveSet * use);
+    void computeMDPhi(MDPhi const* mdphi, MOD LiveSet * use, MOD LiveSet * gen);
+    void computeLocalIterMDPhiList(
+        IRBB const* bb, LiveSet * use, LiveSet * gen);
+    virtual void computeLocal(IRBB const* bb) override;
 
-    void processMayDef(PRNO prno, MOD PRLiveSet * gen,
-                       MOD PRLiveSet * use);
-    void processMay(IR const* pr, MOD PRLiveSet * gen,
-                    MOD PRLiveSet * use, bool is_lhs);
-    void processMayUse(PRNO prno, MOD PRLiveSet * use);
+    virtual void computeGlobal(IRCFG const* cfg);//hack
+
+    void dumpVMDLivenessSet(VMDLivenessSet const* set, bool detail) const;
+    void dumpAllSet() const;
+
+    LiveSet * get_livethrough(UINT bbid) const
+    { return m_livethrough.get(bbid); }
+    LiveSet * gen_livethrough(UINT bbid);
+
+    bool initDepPass();
+    bool useMDSSADU() const;
+    virtual void updateSetByLHS(
+        BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen) override;
+    virtual void updateSetByRHS(BSIdx idx, MOD LiveSet * use) override;
 public:
-    PRLivenessMgr(Region * rg);
-    ~PRLivenessMgr() { clean(); }
-
-    virtual CHAR const* getPassName() const { return "PRLivenessMgr"; }
-    PASS_TYPE getPassType() const { return PASS_PRLIVENESS_MGR; }
-
-    //Set true to handle maydef and mayuse MDSet.
-    void set_handle_may(bool handle) { m_handle_may = (BYTE)handle; }
-
-    //Set map structure which used during the processing of maydef and mayuse.
-    void setVar2PR(Var2PR * v2p) { m_var2pr = v2p; }
+    VMDLivenessMgr(Region * rg);
+    ~VMDLivenessMgr() { clean(); }
+    bool dump() const;
+    virtual CHAR const* getPassName() const { return "VMDLivenessMgr"; }
+    PASS_TYPE getPassType() const { return PASS_VMDLIVENESS_MGR; }
+    virtual bool perform(OptCtx & oc) override;
 };
 
 } //namespace xoc

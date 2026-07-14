@@ -145,7 +145,8 @@ void ExprTab::reset()
 //Dump all IR expressions of region and its used MDs.
 bool ExprTab::dump() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpExprTab()) { return true; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_EXPR_TAB))
+    { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);

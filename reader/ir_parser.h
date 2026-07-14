@@ -217,6 +217,7 @@ protected:
     bool allowCustomizePrno() { return false; }
     ParseErrorMsg * allocParseErrorMsg(UINT msglen);
 
+    void completeReadModWrite(ParseCtx const* ctx) const;
     bool checkKeyWordMap();
     bool checkPhiOpndLabel(IR const* ir,
         xcom::TMap<LabelInfo const*, IR const*> const& labtab,

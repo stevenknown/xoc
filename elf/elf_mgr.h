@@ -991,6 +991,7 @@ public:
 #define RELOCINFO_is_object(v)       ((v)->m_reloc_is_object)
 #define RELOCINFO_is_func(v)         ((v)->m_reloc_is_func)
 #define RELOCINFO_name(v)            ((v)->m_reloc_name)
+#define RELOCINFO_pre(v)             ((v)->m_reloc_pre)
 #define RELOCINFO_next(v)            ((v)->m_reloc_next)
 #define RELOCINFO_sect_ofst(v)       ((v)->m_reloc_sect_location)
 #define RELOCINFO_sym_idx(v)         ((v)->m_reloc_sym_idx)
@@ -1020,11 +1021,6 @@ public:
     //Record a constant addend that used to compute the
     //value to be stored into the relocatable field.
     UINT m_reloc_addend;
-
-    //Record the index of related RelocInfo in 'm_reloc_symbol_vec'.
-    //Since what exactly relocation type means may be dependented
-    //by the type of related RelocInfo.
-    UINT m_reloc_next;
 
     //Record the section index in ELF to which the relocated symbol belong.
     UINT m_reloc_shdr_idx;
@@ -1065,6 +1061,13 @@ public:
     //       relocated symbol_2 position
     //         ...
     FunctionInfo * m_reloc_caller_func;
+
+    //There may be more than one RelocInfo to complete a location relocated.
+    //And these RelocInfo may not be adjacent in 'm_reloc_symbol_vec' vector.
+    //Thus this 'm_reloc_pre' and 'm_reloc_next' are used to record previous
+    //and next related RelocInfo in 'm_reloc_symbol_vec'.
+    RelocInfo * m_reloc_pre;
+    RelocInfo * m_reloc_next;
 public:
     RelocInfo()
     {
@@ -1075,7 +1078,6 @@ public:
         m_reloc_called_location = 0;
         m_reloc_type = S_UNDEF;
         m_reloc_addend = 0;
-        m_reloc_next = 0;
         m_reloc_shdr_idx = 0;
         m_reloc_sect_location = 0;
         m_reloc_sym_idx = 0;
@@ -1084,6 +1086,8 @@ public:
         m_reloc_symbol_info = nullptr;
         m_reloc_caller_symbol = nullptr;
         m_reloc_caller_func = nullptr;
+        m_reloc_pre = nullptr;
+        m_reloc_next = nullptr;
     }
 
     ~RelocInfo() {}
@@ -1910,9 +1914,6 @@ public:
     void initSymbol(xoc::Var const* var,
         Sym const* func_name = nullptr, UINT sect_ofst = 0);
 
-    //Initialize SymbolInfo with external attribute.
-    void initExternalSymbol(xoc::Var const* var);
-
     //Initialize the section's symbol information based on
     //the section var passed from the frontend, such as debug_line.
     void initSymSection(xoc::Var const* var);
@@ -2463,7 +2464,7 @@ public:
     UINT getDynSymItemNum() const;
 
     //Get relocation addend value of relocation type for different arch.
-    virtual UINT getRelocAddend(Word reloc_type)
+    virtual UINT getRelocAddend(Word reloc_type) const
     { ASSERTN(0, ("Target Dependent Code")); return 0; }
 
     //Get the number of subtext(e.g. .text.xxx).
@@ -2988,6 +2989,15 @@ public:
                   !list->find(inserted_symbol));
         return;
     }
+
+    //There may be more than one RelocInfo to complete a location relocated.
+    //If these RelocInfo aren't adjacent in the 'reloc_symbol_vec' vector,
+    //we need to make contact between these RelocInfo via RELOCINFO_pre and
+    //RELOCINFO_next field.
+    //'reloc_symbol_vec': vector that records all RelocInfo.
+    virtual void linkMultiRelatedRelocInfo(
+        RelocInfoVec const& reloc_symbol_vec, LinkerCtx & linkerctx)
+    { ASSERTN(0, ("Target Dependent Code")); return; }
 
     //Merge BSS SymbolInfo into the corresponded section of output ELF.
     //The BSS SymbolInfo needs to be allocated memory space and assigned

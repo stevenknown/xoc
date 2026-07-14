@@ -405,6 +405,7 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
+    checkDumpOptionDesc();
     checkIRCodeBitSize();
     checkMaxIRCode();
     checkIRDesc();

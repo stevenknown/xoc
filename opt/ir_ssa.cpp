@@ -118,7 +118,8 @@ void PRSSAUpdateCtx::tryInvalidPassInfoBeforeFreeIR() const
 
 void PRSSAUpdateCtx::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPRSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_PRSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP PRSSAUpdateCtx --==");
     rg->getLogMgr()->incIndent(2);
     //Nothing to dump.
@@ -1629,6 +1630,12 @@ void PRSSAMgr::dumpVPRRef() const
             dumpBriefStmt(ir, getRegion());
         }
     }
+}
+
+
+void PRSSAMgr::dumpBBList() const
+{
+    dumpVPRRefDetail();
 }
 
 
@@ -3925,7 +3932,7 @@ bool PRSSAMgr::constructByDomTree(xcom::DomTree & domtree, OptCtx & oc)
     copyPRAttrForAllVPR();
     PRSSAUpdateCtx ctx(oc);
     refinePhi(ctx);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_PRSSA_MGR)) {
         START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
         END_TIMER(tdump, "PRSSA: Dump After Pass");

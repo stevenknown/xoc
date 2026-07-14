@@ -2226,8 +2226,8 @@ void AliasAnalysis::updateLHSPointToSet(
         //=> q=0x1000, and q is pointer, so q may point to anywhere.
         //
         // *p = q, if p->{x}, q->{a}, add {x}->{a}
-        // *p = q, if p->{x}, q->{Ø}, add {x}->{Ø}
-        // *p = q, if p->{Ø}, q->{x}, add {all mem}->{x}
+        // *p = q, if p->{x}, q->{NULL}, add {x}->{NULL}
+        // *p = q, if p->{NULL}, q->{x}, add {all mem}->{x}
         //
         //Update the POINT-TO of elems in p's point-to set.
         //Aware of whether if the result of IST is pointer.
@@ -3406,15 +3406,6 @@ void AliasAnalysis::dumpBBListWithPointTo() const
 }
 
 
-bool AliasAnalysis::dumpForTest() const
-{
-    m_rg->getLogMgr()->incIndent(2);
-    dumpBBListWithPointTo();
-    m_rg->getLogMgr()->decIndent(2);
-    return true;
-}
-
-
 //Dump all relations between IR, MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
 void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
@@ -3463,11 +3454,11 @@ void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid) const
 
 bool AliasAnalysis::dump() const
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
+    if (!m_rg->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_AA)) { return true; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
          m_rg->getRegionName());
-    if (g_dump_opt.isDumpForTest()) { return dumpForTest(); }
     m_rg->getLogMgr()->incIndent(2);
     m_md_sys->dump(m_vm, false);
     dumpWorstCase();
@@ -4190,7 +4181,7 @@ void AliasAnalysis::initEntryPTS(PPSetMgr & ppsetmgr)
 
 //This function initialize May Point-To set.
 //Note that this function should only be invoked once.
-void AliasAnalysis::initMayPointToSet()
+void AliasAnalysis::computeMayPointToSet()
 {
     //Record MDs whose address have been takens or it is global variable.
     Region * rg = m_rg;
@@ -4251,7 +4242,7 @@ void AliasAnalysis::initAliasAnalysis()
     //Reset info and try redo AA.
     //ASSERTN(!is_init(), ("already initialized"));
     setMayPointToMDSet(nullptr);
-    initMayPointToSet();
+    computeMayPointToSet();
     set_flow_sensitive(true);
 }
 
@@ -4448,9 +4439,7 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
     }
     oc.setValidPass(PASS_AA);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAA()) {
-        dump();
-    }
+    dump();
     ASSERT0(verify());
 
     //DU info does not depend on these data structures.

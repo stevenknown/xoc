@@ -669,8 +669,9 @@ class RegLTBuilder {
 public:
     RegLTBuilder(Region * rg) : m_rg(rg), m_reg_lt_mgr(m_rg)
     {
-        m_ramgr = (RegAllocMgr*)rg->getPassMgr()->registerPass(
+        m_ramgr = (RegAllocMgr*)rg->getPassMgr()->queryPass(
             PASS_REGALLOC_MGR);
+        ASSERT0(m_ramgr);
     }
 
     void dumpRegLTOverview() const;

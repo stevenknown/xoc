@@ -39,6 +39,7 @@ namespace xoc {
 class PassMgr;
 class LogMgr;
 class RegionMgr;
+class Region;
 
 #define OPT_LEVEL0 0
 #define OPT_LEVEL1 1
@@ -49,6 +50,91 @@ class RegionMgr;
 #define VERIFY_LEVEL_1 1 //only perform basic verifications.
 #define VERIFY_LEVEL_2 2 //do more aggressive check.
 #define VERIFY_LEVEL_3 3 //do all verifications.
+
+//Declare the optimization.
+typedef enum _PASS_TYPE {
+    PASS_UNDEF = 0,
+    PASS_CFG,
+    PASS_AA,
+    PASS_DU_MGR,
+    PASS_CP,
+    PASS_BCP,
+    PASS_CCP,
+    PASS_RCP,
+    PASS_RRCP,
+    PASS_GCSE,
+    PASS_LCSE,
+    PASS_RP,
+    PASS_PRE,
+    PASS_IVR,
+    PASS_SCEV,
+    PASS_LICM,
+    PASS_DCE,
+    PASS_INFER_TYPE,
+    PASS_INVERT_BRTGT,
+    PASS_IF_CONVERSION,
+    PASS_LFTR,
+    PASS_DSE,
+    PASS_RCE,
+    PASS_GVN,
+    PASS_DOM,
+    PASS_PDOM,
+    PASS_MD_REF,
+    PASS_LIVE_EXPR,
+    PASS_SOLVESET_MGR,
+    PASS_AVAIL_REACH_DEF,
+    PASS_REACH_DEF,
+    PASS_CLASSIC_DU_CHAIN,
+    PASS_EXPR_TAB,
+    PASS_LOOP_INFO,
+    PASS_CDG,
+    PASS_LOOP_CVT,
+    PASS_RPO,
+    PASS_POLY,
+    PASS_LIVENESS_MGR,
+    PASS_VRP,
+    PASS_PRSSA_MGR,
+    PASS_MDSSA_MGR,
+    PASS_REGSSA_MGR,
+    PASS_CFS_MGR,
+    PASS_POLY_TRAN,
+    PASS_IPA,
+    PASS_INLINER,
+    PASS_REFINE_DUCHAIN,
+    PASS_SCALAR_OPT,
+    PASS_PRLIVENESS_MGR,
+    PASS_MDLIVENESS_MGR,
+    PASS_VMDLIVENESS_MGR,
+    PASS_MDSSALIVE_MGR,
+    PASS_REFINE,
+    PASS_GLOBAL_REFINE,
+    PASS_INSERT_CVT,
+    PASS_VECT,
+    PASS_SCC,
+    PASS_IRSIMP,
+    PASS_COMPRESS,
+    PASS_REGALLOC_MGR,
+    PASS_LINEAR_SCAN_RA,
+    PASS_IRMGR,
+    PASS_CALL_GRAPH,
+    PASS_MULTI_RES_CVT,
+    PASS_ALGE_REASSOCIATE,
+    PASS_TARGINFO_HANDLER,
+    PASS_LOOP_DEP_ANA,
+    PASS_PROLOGUE_EPILOGUE,
+    PASS_GP_ADJUSTMENT,
+    PASS_BR_OPT,
+    PASS_DYNAMIC_STACK,
+    PASS_IRRELOC,
+    PASS_VARRELOC,
+    PASS_ARGPASSER,
+    PASS_IGOTO_OPT,
+    PASS_INST_SCHED,
+    PASS_STACK_COLORING,
+    PASS_SAVE_CALLEE,
+    #include "pass_type_ext.inc"
+    PASS_NUM,
+} PASS_TYPE;
 
 class StrTabOption : public SymTab {
     COPY_CONSTRUCTOR(StrTabOption);
@@ -86,6 +172,18 @@ public:
 //The class represents dump-options for miscellaneous dump behaviours.
 class DumpOption {
 public:
+    //The class represents the miscellaneous informations about pass dump.
+    typedef struct tagOptionDesc {
+        PASS_TYPE pt;
+        CHAR const* ptname;
+        bool is_dump; //True to dump pass information.
+        CHAR const* getPassTypeName() const { return ptname; }
+    } OptionDesc;
+protected:
+    SMemPool * m_pool;
+protected:
+    void * xmalloc(UINT size);
+public:
     //Dump all information.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_all;
@@ -103,52 +201,12 @@ public:
     //Do not dump anything.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
-    bool is_dump_aa; //Dump Alias Analysis information.
-    bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.
     bool is_dump_mdref; //Dump MD Def-Use reference built both
                         //by AA and DU Manager.
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.
-    bool is_dump_cfg; //Dump CFG.
     bool is_dump_cfgopt; //Dump CFG after CFG optimizations.
-    bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
-    bool is_dump_rpo; //Dump RPO.
-    bool is_dump_cp; //Dump Copy Propagation.
-    bool is_dump_rp; //Dump Register Promotion.
-    bool is_dump_rce; //Dump light weight Redundant Code Elimination.
-    bool is_dump_dce; //Dump Dead Code Elimination.
-    bool is_dump_bcp; //Dump Branch Condition Propagation.
-    bool is_dump_vrp; //Dump Value Range Propagation.
-    bool is_dump_infertype; //Dump Infer Type.
-    bool is_dump_invert_brtgt; //Dump Invert Branch Target.
-    bool is_dump_lftr; //Dump Linear Function Test Replacement.
-    bool is_dump_vectorization; //Dump IR Vectorization.
-    bool is_dump_multi_res_convert; //Dump Multiple Result Convert.
-    bool is_dump_targinfo_handler; //Dump Multiple Result Convert.
-    bool is_dump_alge_reassociate; //Dump Alge Reasscociation.
-    bool is_dump_loop_dep_ana; //Dump Loop Dependence Analysis.
-    bool is_dump_gvn; //Dump Global Value Numbering.
-    bool is_dump_gcse; //Dump Global Common Subexpression Elimination.
-    bool is_dump_lcse; //Dump Local Common Subexpression Elimination.
-    bool is_dump_ivr; //Dump Induction Variable Recognization.
-    bool is_dump_if_conversion; //Dump If Conversion.
-    bool is_dump_licm; //Dump Loop Invariant Code Motion.
-    bool is_dump_exprtab; //Dump Expr Tab.
-    bool is_dump_loopcvt; //Dump Loop Convertion.
-    bool is_dump_simplification; //Dump IR simplification.
-    bool is_dump_prssamgr; //Dump PRSSAMgr.
-    bool is_dump_mdssamgr; //Dump MDSSAMgr.
-    bool is_dump_regssamgr; //Dump RegSSAMgr.
     bool is_dump_memusage; //Dump memory usage.
-    bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_irparser; //Dump IRParser.
-    bool is_dump_refine_duchain; //Dump RefineDUChain.
-    bool is_dump_refine; //Dump Refinement.
-    bool is_dump_global_refine; //Dump Global Refinement.
-    bool is_dump_insert_cvt; //Dump InsertCvt.
-    bool is_dump_calc_derivative; //Dump Derivative Cacluation.
-    bool is_dump_gscc; //Dump GSCC.
-    bool is_dump_cdg; //Dump Control Dependence Graph.
-    bool is_dump_lsra; //Dump LinearScanRA
 
     //Used to dump the reorder functionality result in the LSRA PASS to verify
     //the reorder result for the multiple MOV IRs if the reorder is required
@@ -165,67 +223,42 @@ public:
 public:
     DumpOption();
     DumpOption const& operator = (DumpOption const&); //Disable operator =.
+    ~DumpOption();
 
-    bool isDumpAA() const;
+    void dump(RegionMgr const* rm) const;
+
+    //Get the description of dump options of specific Pass.
+    static DumpOption::OptionDesc * getOptionDesc(PASS_TYPE pt);
+
+    bool isDumpPass(PASS_TYPE pt) const;
+    void isDumpBeforePass(PASS_TYPE pt) const;
+    void isDumpAfterPass(PASS_TYPE pt) const;
     bool isDumpAfterPass() const;
     bool isDumpAlgeReassociate() const;
     bool isDumpAll() const;
     bool isDumpForTest() const;
     bool isDumpBeforePass() const;
-    bool isDumpBROpt() const;
-    bool isDumpCalcDerivative() const;
-    bool isDumpCDG() const;
-    bool isDumpCFG() const;
     bool isDumpCFGOpt() const;
     bool isDumpCG() const;
-    bool isDumpCP() const;
-    bool isDumpBCP() const;
-    bool isDumpDCE() const;
-    bool isDumpDOM() const;
-    bool isDumpDUMgr() const;
-    bool isDumpExprTab() const;
-    bool isDumpGCSE() const;
     bool isDumpMDRef() const;
-    bool isDumpGlobalRefine() const;
-    bool isDumpGSCC() const;
-    bool isDumpGVN() const;
-    bool isDumpInferType() const;
-    bool isDumpInsertCvt() const;
-    bool isDumpInvertBrTgt() const;
     bool isDumpIRID() const;
     bool isDumpIRParser() const;
-    bool isDumpIVR() const;
-    bool isDumpLCSE() const;
-    bool isDumpIfConversion() const;
-    bool isDumpLICM() const;
-    bool isDumpLIS() const;
-    bool isDumpLivenessMgr() const;
-    bool isDumpLFTR() const;
-    bool isDumpLoopCVT() const;
-    bool isDumpLoopDepAna() const;
-    bool isDumpLSRA() const;
     bool isDumpLSRAReorderMovInLatchBB() const;
     bool isDumpMDSetHash() const;
-    bool isDumpMDSSAMgr() const;
-    bool isDumpRegSSAMgr() const;
     bool isDumpMemUsage() const;
     bool isDumpMultiResConvert() const;
-    bool isDumpTargInfoHandler() const;
     bool isDumpNothing() const;
-    bool isDumpPRSSAMgr() const;
-    bool isDumpRA() const;
-    bool isDumpRCE() const;
-    bool isDumpRefine() const;
-    bool isDumpRefineDUChain() const;
-    bool isDumpRP() const;
-    bool isDumpRPO() const;
-    bool isDumpSimp() const;
     bool isDumpToBuffer() const;
-    bool isDumpVectorization() const;
-    bool isDumpVRP() const;
+    bool isDumpLinker() const;
 
+    //Disable the dump function for all passes.
     void setDumpNothing();
+
+    //Enable the dump function for all passes.
     void setDumpAll();
+
+    //Enable or disable the dump function for the given pass.
+    void setDumpPass(PASS_TYPE passty, bool is_dump);
 };
 
 
@@ -272,88 +305,6 @@ public:
     //The function return the string name of given verification level.
     static CHAR const* getVerifyLevelName(UINT verifylevel);
 };
-
-//Declare the optimization.
-typedef enum _PASS_TYPE {
-    PASS_UNDEF = 0,
-    PASS_CFG,
-    PASS_AA,
-    PASS_DU_MGR,
-    PASS_CP,
-    PASS_BCP,
-    PASS_CCP,
-    PASS_RCP,
-    PASS_GCSE,
-    PASS_LCSE,
-    PASS_RP,
-    PASS_PRE,
-    PASS_IVR,
-    PASS_SCEV,
-    PASS_LICM,
-    PASS_DCE,
-    PASS_INFER_TYPE,
-    PASS_INVERT_BRTGT,
-    PASS_IF_CONVERSION,
-    PASS_LFTR,
-    PASS_DSE,
-    PASS_RCE,
-    PASS_GVN,
-    PASS_DOM,
-    PASS_PDOM,
-    PASS_MD_REF,
-    PASS_LIVE_EXPR,
-    PASS_SOLVESET_MGR,
-    PASS_AVAIL_REACH_DEF,
-    PASS_REACH_DEF,
-    PASS_CLASSIC_DU_CHAIN,
-    PASS_EXPR_TAB,
-    PASS_LOOP_INFO,
-    PASS_CDG,
-    PASS_LOOP_CVT,
-    PASS_RPO,
-    PASS_POLY,
-    PASS_LIVENESS_MGR,
-    PASS_VRP,
-    PASS_PRSSA_MGR,
-    PASS_MDSSA_MGR,
-    PASS_REGSSA_MGR,
-    PASS_CFS_MGR,
-    PASS_POLY_TRAN,
-    PASS_IPA,
-    PASS_INLINER,
-    PASS_REFINE_DUCHAIN,
-    PASS_SCALAR_OPT,
-    PASS_PRLIVENESS_MGR,
-    PASS_MDLIVENESS_MGR,
-    PASS_MDSSALIVE_MGR,
-    PASS_REFINE,
-    PASS_GLOBAL_REFINE,
-    PASS_INSERT_CVT,
-    PASS_VECT,
-    PASS_SCC,
-    PASS_IRSIMP,
-    PASS_REGALLOC_MGR,
-    PASS_LINEAR_SCAN_RA,
-    PASS_IRMGR,
-    PASS_CALL_GRAPH,
-    PASS_MULTI_RES_CVT,
-    PASS_ALGE_REASSOCIATE,
-    PASS_TARGINFO_HANDLER,
-    PASS_LOOP_DEP_ANA,
-    PASS_PROLOGUE_EPILOGUE,
-    PASS_GP_ADJUSTMENT,
-    PASS_BR_OPT,
-    PASS_DYNAMIC_STACK,
-    PASS_IRRELOC,
-    PASS_VARRELOC,
-    PASS_ARGPASSER,
-    PASS_IGOTO_OPT,
-    PASS_INST_SCHED,
-    PASS_STACK_COLORING,
-    PASS_SAVE_CALLEE,
-    #include "pass_type_ext.inc"
-    PASS_NUM,
-} PASS_TYPE;
 
 extern CHAR * g_func_or_bb_option;
 
@@ -425,6 +376,9 @@ extern bool g_do_prssa;
 
 //Build Memory SSA and perform optimization based on Memory SSA.
 extern bool g_do_mdssa;
+
+//Reuse IR object to reduce memory footprint.
+extern bool g_reuse_ir;
 
 //True to verify readonly attribute of IR.
 extern bool g_verify_ir_attr_readonly;
@@ -737,7 +691,6 @@ extern StrTabOption g_exclude_region;
 //If it is located in global memory, it is set to true.
 extern bool g_stack_on_global;
 
-
 //Used to enable the debug mode for LSRA, and the g_debug_reg_mod can be use
 //to control the concrete under debug mode.
 extern bool g_do_lsra_debug;
@@ -760,6 +713,9 @@ extern bool g_debug_python;
 
 //The front end is in debug_gr mode.
 extern bool g_debug_gr;
+
+
+extern bool checkDumpOptionDesc();
 
 } //namespace xoc
 

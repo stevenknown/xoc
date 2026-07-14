@@ -1133,7 +1133,7 @@ void IRCFG::initCFG(OptCtx & oc)
     build(oc);
     buildEHEdge();
     ASSERT0L3(verifyIRandBB(getBBList(), m_rg));
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFG()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_CFG)) {
         dump();
     }
     //Rebuild CFG may generate redundant empty BB which disturbs the
@@ -1145,7 +1145,8 @@ void IRCFG::initCFG(OptCtx & oc)
     removeEmptyBB(rmctx);
     computeExitList();
     bool change = refineCFG(ctx);
-    if (change && g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
+    if (change && g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_CFG)) {
         dump();
     }
 }
@@ -1585,11 +1586,21 @@ void IRCFG::insertFallThroughBBAfter(IRBB const* marker, IRBB * newbb,
 }
 
 
-void IRCFG::addDomInfoToFallThroughBB(IRBB const* marker, IRBB const* newbb,
-                                      IRBB const* oldnext)
+void IRCFG::addDomInfoToFallThroughDiamondRegion(
+    IRBB const* marker, IRBB const* top, IRBB const* left,
+    IRBB const* right, IRBB const* bottom, IRBB const* oldsucc)
 {
-    addDomInfoToImmediateSucc(marker->getVex(), newbb->getVex(),
-                              oldnext->getVex());
+    addDomInfoToImmediateSuccDiamondRegion(
+        marker->getVex(), top->getVex(), left->getVex(),
+        right->getVex(), bottom->getVex(), oldsucc->getVex());
+}
+
+
+void IRCFG::addDomInfoToFallThroughBB(
+    IRBB const* marker, IRBB const* newbb, IRBB const* oldnext)
+{
+    addDomInfoToImmediateSucc(
+        marker->getVex(), newbb->getVex(), oldnext->getVex());
 }
 
 
@@ -2481,7 +2492,7 @@ void IRCFG::dumpDomTree() const
 
 void IRCFG::dumpDomSet() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpCFG()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CFG)) { return; }
     note(m_rg, "\n==-- DUMP DOM&IDOM PDOM&IPDOM IN IRCFG --==");
     m_rg->getLogMgr()->incIndent(2);
     CFG<IRBB, IR>::dumpDomSet(m_rg);
@@ -2492,7 +2503,7 @@ void IRCFG::dumpDomSet() const
 void IRCFG::dumpSubGraph(
     BBSet const& subset, FILE * h, UINT flag, MOD IRDumpCtx<> * ctx) const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCFG() ||
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CFG) ||
         h == nullptr) {
         return;
     }
@@ -2540,7 +2551,9 @@ void IRCFG::dumpSubGraph(
     MOD IRDumpCtx<> * ctx) const
 {
      //Do not dump if LogMr is not initialized.
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCFG()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CFG)) {
+        return;
+    }
 
     //Note this function does not use LogMgr as output.
     //So it is dispensable to check LogMgr.
@@ -2566,7 +2579,8 @@ void IRCFG::dumpDOT() const
 void IRCFG::dumpDOT(CHAR const* name, UINT flag, MOD IRDumpCtx<> * ctx) const
 {
     //Do not dump if LogMr is not initialized.
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpCFG()) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CFG))
+    { return; }
 
     //Note this function does not use LogMgr as output.
     //So it is dispensable to check LogMgr.
@@ -2683,7 +2697,7 @@ static void dumpDotEdge(FILE * h, UINT flag, IRCFG const* cfg)
 
 void IRCFG::dumpDOT(FILE * h, UINT flag, MOD IRDumpCtx<> * ctx) const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpCFG()) {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_CFG)) {
         return;
     }
     ASSERT0(h);
@@ -2985,30 +2999,26 @@ void IRCFG::dumpGraph() const
 }
 
 
-void IRCFG::dumpForTest(UINT flag) const
-{
-    if (!getRegion()->isLogMgrInit()) { return; }
-    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
-    if (detail) {
-        dumpBBList((BBList*)m_bb_list, m_rg);
-    }
-    dumpGraph();
-}
-
-
 bool IRCFG::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_CFG)) { return true; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     //dumpDOT(getRegion()->getLogMgr()->getFileHandler(), DUMP_COMBINE);
-    dumpForTest(DUMP_COMBINE);
+    UINT flag = DUMP_COMBINE;
+    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
+    if (detail) {
+        dumpBBList((BBList*)m_bb_list, m_rg);
+    }
+    dumpGraph();
     m_lab2bb.dump(m_rg);
-    if (g_dump_opt.isDumpDOM()) {
+    if (g_dump_opt.isDumpPass(PASS_DOM)) {
         dumpDomSet();
     }
+    Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
@@ -3127,7 +3137,7 @@ void IRCFG::dumpRPO() const
 void IRCFG::computeRPO(OptCtx & oc)
 {
     CFG<IRBB, IR>::computeRPO(oc);
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRPO()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_RPO)) {
         dumpRPO();
     }
 }
@@ -3579,9 +3589,7 @@ AGAIN:
         //CFG optimization should maintain Phi information.
         ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(m_rg, ctx.getOptCtx()));
         ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(m_rg, ctx.getOptCtx()));
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
-            dump();
-        }
+        dump();
     }
     ASSERT0(verifyIRandBB(getBBList(), m_rg));
     ASSERT0(verifyRPO(ctx.getOptCtx()));

@@ -268,6 +268,13 @@ public:
     //while src will be <1-3><10-18>.
     void moveFrom(LifeTime * src, Pos pos);
 
+    //This function decrment the cross call number.
+    void decCallCrossedNum()
+    {
+        if (m_call_crossed_num < 1) { return; }
+        m_call_crossed_num--;
+    }
+
     void dump(Region const* rg) const;
 
     //Dump Reg2Lifetime info.
@@ -551,7 +558,7 @@ typedef xcom::TMap<PRNO, VecIdx> PRNO2CallID;
 //                   current_call_id:
 //                   2.2.3.1. If the lifetime contains/intersects the position
 //                            of the call, increment the call number for the
-//                            lifetime.
+//                            lifetime, and exit the traverse process.
 //       2.3. baseline_call_id = current_call_id.
 //
 //    [NOTE1]: For the above lifetime, when traverse at the position 37, the
@@ -615,19 +622,6 @@ typedef xcom::Vector<LifeTime*> PRNO2LT;
 typedef xcom::Vector<RangeInfo*> RangeInfoVec;
 typedef xcom::TMap<IR const*, Pos> IR2POS;
 
-//Define some register allocation strategies.
-//RA_STRATEGY_UNDEF: Allocate nothing.
-//RA_STRATEGY_FULL: Allocate both vector and scalar registers.
-//RA_STRATEGY_VECTOR: Allocate only vector registers.
-//RA_STRATEGY_SCALAR: Allocate only scalar registers.
-typedef enum _RA_STRATEGY {
-    RA_STRATEGY_UNDEF = 0,
-    RA_STRATEGY_FULL,
-    RA_STRATEGY_VECTOR,
-    RA_STRATEGY_SCALAR,
-} RA_STRATEGY;
-
-
 //
 //START LifeTimeMgr
 //
@@ -636,7 +630,6 @@ class LifeTimeMgr {
     COPY_CONSTRUCTOR(LifeTimeMgr);
 protected:
     bool m_use_expose; //true to compute exposed def/use for each BB.
-    RA_STRATEGY m_strategy;
     Region * m_rg;
     RegAllocMgr * m_ramgr;
     MDMgr * m_mdmgr;
@@ -678,9 +671,6 @@ public:
     LifeTimeMgr(Region * rg);
     virtual ~LifeTimeMgr() { destroy(); }
 
-    //Determine whether to compute the current lifetime based on the type of
-    //the current PRNO and the register allocation strategy.
-    bool canBeCandidate(PRNO prno);
     void computeCrossedCallNum(UpdatePos & up, BBList const* bblst);
     void computeCrossedCallNumBB(UpdatePos & up, IRBB const* bb,
         IRIter & irit, MOD CrossedCallCounter & cross_call_counter);
@@ -714,7 +704,6 @@ public:
     PRNO2LT const& getPrno2LT() const { return m_prno2lt; }
     Region * getRegion() const { return m_rg; }
     MDMgr * getMDMgr() const { return m_mdmgr; }
-    RA_STRATEGY getStrategy() const { return m_strategy; }
 
     //Clean the lifetime info before computation.
     void reset();
@@ -724,8 +713,6 @@ public:
 
     //Rename each occurrences of 'lt' to 'newprno'.
     void renameLifeTimeOcc(LifeTime const* lt, PRNO newprno);
-
-    void setStrategy(RA_STRATEGY strategy) { m_strategy = strategy; }
 
     //Update the position at the BB entry.
     void updateBBEntryPos(IRBB const* bb, MOD UpdatePos & up,

@@ -328,6 +328,10 @@ public:
     void addUseSet(IRSet const& set, IN UseDefMgr * mgr);
     void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
+    //Add vopnd to MDSSAInfo and add given IR expression to occurence set.
+    //exp: IR expression to be added.
+    void addVOpndAndUse(IR const* exp, VOpnd const* vopnd, UseDefMgr * mgr);
+
     void clean(UseDefMgr * mgr) { cleanVOpndSet(mgr); }
     void cleanVOpndSet(UseDefMgr * mgr);
     void copyVOpndSet(VOpndSet const& src, UseDefMgr * mgr);
@@ -441,6 +445,8 @@ public:
     }
     void cleanNextSet(UseDefMgr * mgr);
 
+    //The function dumps DefDef chain that started at current MDDef.
+    void dumpDefDefChain(UseDefMgr const* mgr, Region const* rg) const;
     void dump(Region const* rg) const;
 
     IRBB * getBB() const;
@@ -580,6 +586,9 @@ public:
     //If parameter 'pred' is BB2, the function returns id11.
     IR * getOpndByPred(IRBB const* pred, IRCFG const* cfg) const;
 
+    //Get the predecessor BB according to given operand of Phi.
+    IRBB * getPredByOpnd(IR const* opnd, IRCFG const* cfg) const;
+
     //Get the operand list.
     IR * getOpndList() const { return m_opnd_list; }
 
@@ -604,6 +613,8 @@ public:
 
     //Get VMD for given operand. Note 'opnd' must belong to current phi.
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
+
+    bool hasNoOpnd() const { return getOpndList() == nullptr; }
 
     //Return true if Phi defined real stmt at DefDef chain.
     //Note Phi should not have previous def.
@@ -634,8 +645,9 @@ public:
         ASSERT0(xcom::in_list(getOpndList(), ir));
         xcom::remove(&MDPHI_opnd_list(this), ir);
     }
-
-    bool hasNoOpnd() const { return getOpndList() == nullptr; }
+    //Return the index of opnd in the OpndList of current MDPhi.
+    //The index begins at 0.
+    UINT WhichOpnd(IR const* opnd, OUT bool & is_opnd) const;
 };
 
 
@@ -703,6 +715,8 @@ public:
 
     //Remove MDSSAInfo of 'ir'.
     void cleanMDSSAInfo(IR * ir);
+
+    void dumpDefDefChainForAllMDDef() const;
 
     //Generate MDSSAInfo for individual Non-PR IR stmt/exp since each IR
     //has its own specific MDSSA Memory Reference information.

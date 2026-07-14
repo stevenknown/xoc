@@ -954,7 +954,8 @@ bool AlgeReassociate::canBeCandStmt(IR const* ir) const
 
 bool AlgeReassociate::dump() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpAlgeReassociate()) {
+    if (!getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE)) {
         return true;
     }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
@@ -1837,6 +1838,7 @@ bool AlgeReassociate::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     reset();
     initDepPass(oc);
     ReassCtx ctx(oc, this);
@@ -1845,9 +1847,7 @@ bool AlgeReassociate::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAlgeReassociate()) {
-        dump();
-    }
+    dump();
     if (ctx.needRecompGVN()) {
         oc.setInvalidPass(PASS_GVN);
     }

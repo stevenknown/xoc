@@ -707,6 +707,7 @@ public:
     void dumpVPRRef() const;
     void dumpVPRRefDetail() const;
     void dumpSSAGraph(CHAR const* name = nullptr) const;
+    void dumpBBList() const;
 
     //Duplicate Phi operand that is at the given position, and insert after
     //given position sequently.
@@ -766,7 +767,7 @@ public:
     IRMgr * getIRMgr() const { return m_irmgr; }
     UINT getVPRCount() const { return m_vpr_count; }
     TargInfoHandler * getTIHandler() const { return m_ti_handler; }
-    VPRVec const * getVPRVec() const { return &m_vpr_vec; }
+    VPRVec const* getVPRVec() const { return &m_vpr_vec; }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.

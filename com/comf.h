@@ -513,8 +513,23 @@ inline UINT64 get64BitValueLowNBit(UINT64 val, UINT bitnum)
 //given val: 0x1234 and bitnum: 8, it will return 0x123400.
 inline UINT64 get64BitValueLeftShift(UINT64 val, UINT bitnum)
 {
+    ASSERT0(bitnum <= 64);
     if (bitnum == 0) { return val; }
     return val << bitnum;
+}
+
+// Get unsigned bits value from start bit with specified length.
+// For example:
+// given val: 0x1234, start: 4, len: 8, it will return 0x23.
+// (0x1234 = 0b0001_0010_0011_0100, bit4~bit11 = 0x23)
+// given val: 0x12345678, start: 8, len: 16, it will return 0x3456.
+// given val: 0xFFFF, start: 0, len: 16, it will return 0xFFFF.
+// given val: 0xFFFF, start: 4, len: 0, it will return 0.
+inline UINT64 get64BitValueBits(UINT64 val, UINT start, UINT len)
+{
+    ASSERT0((start + len) <= 64);
+    if (len == 0) { return 0; }
+    return (val >> start) & ((1ULL << len) - 1);
 }
 
 //Get unsigned right shift value of unsigned 64bit value.
@@ -523,6 +538,7 @@ inline UINT64 get64BitValueLeftShift(UINT64 val, UINT bitnum)
 //given val: 0xffeeddccbbaa1200 and bitnum: 16, it will return 0xffeeddccbbaa.
 inline UINT64 get64BitValueRightShift(UINT64 val, UINT bitnum)
 {
+    ASSERT0(bitnum <= 64);
     if (bitnum == 0) { return val; }
     return val >> bitnum;
 }
@@ -560,6 +576,12 @@ UINT64 bf16ToEHP64(UINT64 val);
 //Return true if *signed* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(LONGLONG val, UINT bitwidth);
 
+//Return true if the signed number with original bit width 'type_size'
+//overflows 'bitwith'.
+//Return false if the value is negative at the same time.
+//type_size: Actual bit width of val.
+bool isSignedValueOutOfBitWidth(LONGLONG val, UINT bitwidth, UINT type_size);
+
 //Return true if *unsigned* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(ULONGLONG val, UINT bitwidth);
 
@@ -585,8 +607,8 @@ void insertBitRangeValue(OUT T & out, T in, UINT out_start,
 //Return true if 'c' is an extended character.
 //
 //For example:
-//  The special character "À" is expressed in unicode form as: \u00C0.
-//  According to the following rules:
+//  The special character "Latin Capital Letter A with Grave" is expressed in
+//  unicode form as: \u00C0. According to the following rules:
 //
 //  ---------------------------------------------------------------
 //  |  Unicode hexadecimal  |            UTF-8 binary             |
@@ -597,7 +619,8 @@ void insertBitRangeValue(OUT T & out, T in, UINT out_start,
 //  | 0001 0000 ~ 0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx |
 //  ---------------------------------------------------------------
 //
-//  The special character "À" is expressed in UTF-8 form as: "0xC3 0x80".
+//  The special character "Latin Capital Letter A with Grave" is expressed in
+//  UTF-8 form as: "0xC3 0x80".
 inline bool xisextchar(CHAR c) { return (c & 0x80) != 0; }
 
 //Judge if 'f' is integer conform to IEEE754 spec.
@@ -645,7 +668,7 @@ CHAR * reverseString(CHAR * v);
 //va11: 0x3
 //res:  (0xFFFFFF0000001111 << 3) | (0xFFFFFF0000001111 >> 61) =
 //      0xFFFFF8000000888F
-UINT rotateLeft(UINT val0, UINT val1);
+UINT64 rotateLeft(UINT64 val0, UINT val1);
 
 //The function rotates string in buffer.
 //e.g: given string "xyzmn", n is 2, after rotation,

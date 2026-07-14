@@ -1053,14 +1053,13 @@ bool isKillingDef(
         //Can not determine whether call-stmt must def 'use'.
         return false;
     }
+    if (def->isPartialStoreStmt()) {
+        return false;
+    }
     return isCoverExcludeCallStmt(def, use, gvn, oc);
 }
 
 
-//Return true if ir1's MD reference exactly cover ir2's MD reference.
-//Note the function does not check if there is DU chain between ir1 and ir2.
-//gvn:if it is not NULL, the function will attempt to reason out the
-//    relation between 'ir1' and 'ir2' through gvn info.
 bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc)
 {
     if (ir1 == ir2) { return true; }
@@ -1081,7 +1080,17 @@ bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc)
         //Only return-value of call-stmt may generate covering info.
         return false;
     }
+    if (ir1->isPartialStoreStmt()) {
+        return false;
+    }
     return isCoverExcludeCallStmt(ir1, ir2, gvn, oc);
+}
+
+
+bool isExactEqual(
+    IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc)
+{
+    return isCover(ir1, ir2, gvn, oc) && isCover(ir2, ir1, gvn, oc);
 }
 
 
@@ -1307,6 +1316,36 @@ IR * findNearestDomDef(IR const* exp, Region const* rg)
 CLASSIC_DU:
     ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
     return rg->getDUMgr()->findNearestDomDef(exp);
+}
+
+
+IR * findDomAvailDef(IR const* exp, Region const* rg)
+{
+    ASSERT0(exp && rg);
+
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            ASSERT0(exp->getSSAInfo());
+            return exp->getSSAInfo()->getDef();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemRefNonPR()) {
+        MDSSAMgr const* mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            MDDef const* mddef = mdssamgr->findAvailDef(exp);
+            if (mddef == nullptr || mddef->is_phi()) { return nullptr; }
+            return mddef->getOcc();
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    return rg->getDUMgr()->findDomAvailDef(exp);
 }
 
 
@@ -1920,6 +1959,57 @@ bool isDependent(
 }
 
 
+//Check whether two indirect-mem ops are independent.
+static bool isIndependentForIndirectMemOp(IR const* ir1, IR const* ir2,
+    Region const* rg)
+{
+    ASSERT0(ir1 && ir2 && !ir1->is_undef() && !ir2->is_undef());
+    ASSERT0(rg);
+
+    if (ir1 == ir2) { return false; }
+
+    //Check two indirect-mem ops are independent by not using DU.
+    //e.g:
+    //ir1:
+    //  ist:u8:offset(37):storage_space(any)
+    //      $22:*<1>
+    //      $28:u8
+    //ir2 is a mem opnd of a stmt. It is the ild here:
+    //  stpr $37:u8
+    //      cvt:u64
+    //          ild:u8:offset(94):storage_space(any)
+    //              $22:u64
+    //Though the result is dependent from isDependent() which determined by
+    //mayDef, they are actually independent since the mems are not overlapped.
+    if (!ir1->isIndirectMemOp() || !ir2->isIndirectMemOp()) { return false; }
+
+    //Only deal with single pr bases.
+    IR const* ir1_base = ir1->getBase();
+    ASSERT0(ir1_base);
+    if (!ir1_base->is_pr()) { return false; }
+    IR const* ir2_base = ir2->getBase();
+    ASSERT0(ir2_base);
+    if (!ir2_base->is_pr()) { return false; }
+
+    //Only deal with same prno bases.
+    if (ir1_base->getPrno() != ir2_base->getPrno()) { return false; }
+
+    //Only deal with non-nullptr killing-def bases.
+    IR const* kd1 = xoc::findKillingDef(ir1_base, rg, nullptr);
+    if (kd1 == nullptr) { return false; }
+    IR const* kd2 = xoc::findKillingDef(ir2_base, rg, nullptr);
+    if (kd2 == nullptr) { return false; }
+
+    //Same base prno, killing-def, type but different offsets means independent
+    //assuming the data is aligned.
+    if (kd1 == kd2 && ir1->getType() == ir2->getType() &&
+        ir1->getOffset() != ir2->getOffset()) {
+        return true;
+    }
+    return false;
+}
+
+
 bool isDependentForTree(
     IR const* ir1, IR const* ir2, bool costly_analysis, Region const* rg)
 {
@@ -1930,6 +2020,10 @@ bool isDependentForTree(
          x != nullptr; x = iterNextC(it, true)) {
         if (!x->isMemOpnd()) { continue; }
         if (x == ir1) { return true; }
+        if (isIndependentForIndirectMemOp(ir1, x, rg)) {
+            //In the case, the function guarrantees ir1 is independent to x.
+            continue;
+        }
         if (isDependent(ir1, x, costly_analysis, rg)) { return true; }
     }
     return false;

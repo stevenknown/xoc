@@ -245,6 +245,11 @@ void computeMayRef(IR * ir, Region const* rg);
 IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg);
 IR * findNearestDomDef(IR const* exp, Region const* rg);
 
+//The function finds the domimated available DEF stmt of 'exp', and
+//the user needs to consider the detail cover information of the MD
+//ref according to the concrete scenario.
+IR * findDomAvailDef(IR const* exp, Region const* rg);
+
 //The function try to find the killing-def for 'use'.
 //To find the killing-def, the function prefer use SSA info.
 //e.g: stpr $1 = ...;
@@ -404,6 +409,8 @@ bool isKillingDef(
 
 //Return true if ir1's MD reference exactly cover ir2's MD reference.
 //Note the function does not check if there is DU chain between ir1 and ir2.
+//ir1:stmt or expression.
+//ir2:stmt or expression.
 //gvn:if it is not NULL, the function will attempt to reason out the
 //    relation between 'ir1' and 'ir2' through gvn info.
 bool isCover(IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc);
@@ -416,7 +423,17 @@ bool isCover(IR const* ir1, MD const* md2);
 //Note the functin does not check if there is DU chain between md1 and md2.
 bool isCover(MD const* md1, MD const* md2);
 
+//Return true if ir1's MD reference exactly equal to ir2's MD reference.
+//Note the function does not check if there is DU chain between ir1 and ir2.
+//ir1:stmt or expression.
+//ir2:stmt or expression.
+//gvn:if it is not NULL, the function will attempt to reason out the
+//    relation between 'ir1' and 'ir2' through gvn info.
+bool isExactEqual(
+    IR const* ir1, IR const* ir2, GVN const* gvn, OptCtx const* oc);
+
 //Return true if ir1 reference is may overlap to ir2.
+//Return false if the function reason out that ir1 and ir2 have no dependencies.
 //ir1: stmt or expression.
 //ir2: stmt or expression.
 //costly_analysis: set to true if caller expect to compute overlap for
@@ -426,6 +443,7 @@ bool isDependent(
     IR const* ir1, IR const* ir2, bool costly_analysis, Region const* rg);
 
 //Return true if ir1 reference is may overlap to whole IR tree that root at ir2.
+//Return false if the function reason out that ir1 and ir2 have no dependencies.
 //ir1: stmt or expression.
 //ir2: the root stmt or expression of IR tree.
 //costly_analysis: set to true if caller expect to compute overlap for
@@ -435,6 +453,7 @@ bool isDependentForTree(
     IR const* ir1, IR const* ir2, bool costly_analysis, Region const* rg);
 
 //Return true if ir1 is may overlap to phi.
+//Return false if the function reason out that ir1 and phi have no dependencies.
 bool isDependent(IR const* ir, MDPhi const* phi);
 
 //Return true if both ir1 and ir2 are in loop 'li', and there is only

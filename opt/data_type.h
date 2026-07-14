@@ -1554,6 +1554,15 @@ public:
         return ty;
     }
 
+    //Return the signed type corresponding to the type that represents the
+    //general purpose register of target machine.
+    Type const* getTargMachRegisterSignedType() const
+    {
+        DATA_TYPE dt = getAlignedDType(WORD_LENGTH_OF_TARGET_MACHINE, true);
+        Type const* ty = getSimplexTypeEx(dt);
+        return ty;
+    }
+
     //Return the type that represents the maximum byte size of vector register
     //of target machine.
     virtual Type const* getTargMachMaxVectorRegisterType()

@@ -199,7 +199,8 @@ bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst, OptCtx & oc)
 
 bool LoopCvt::dump() const
 {
-    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpLoopCVT()) {
+    if (!g_dump_opt.isDumpAfterPass() ||
+        !g_dump_opt.isDumpPass(PASS_LOOP_CVT)) {
         return true;
     }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",

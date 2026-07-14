@@ -215,7 +215,7 @@ void VarLifeTimeMgr::computeLifeTimeBB(UpdatePos & up, IRBB const* bb,
     VarLiveSet * live_out = m_var_liveness->get_liveout(bb->id());
     ASSERT0(live_in && live_out);
 
-    VarLiveSetIter * iter = nullptr;
+    VarLiveSetIter iter = nullptr;
     Pos dpos_bb_start = 0, upos_bb_start = 0;
     up.updateAtBBEntry(dpos_bb_start, upos_bb_start);
     m_bb_entry_pos.set(bb->id(), dpos_bb_start);

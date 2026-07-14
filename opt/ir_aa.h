@@ -331,7 +331,7 @@ protected:
 
     //This class contains those variables that can be referenced by
     //pointers (address-taken variables)
-    MDSet const* m_maypts; //initialized by initMayPointToSet()
+    MDSet const* m_maypts; //initialized by computeMayPointToSet()
     OptCtx const* m_oc;
     DefMiscBitSetMgr m_sbs_mgr;
     IR2Heapobj m_ir2heapobj;
@@ -585,6 +585,9 @@ public:
     MDSet const* computeMayPointToViaTBAA(
         IR const* pointer, MDSet const* point_to_set);
 
+    //Return true if the MD of each PR corresponded is unique.
+    void computeMayPointToSet();
+
     //The function collects all MDs that ir may pointed to.
     //Return the worst case MDSet if ir may pointed to it. If ir pointed to the
     //worst case, the content of 'set' is meaningless, thus can be ignored.
@@ -615,7 +618,6 @@ public:
     void dumpPtPairSet(PtPairSet const& pps) const;
     void dumpMD2MDSetForRegion(bool dump_pt_graph) const;
     void dumpBBListWithPointTo() const;
-    bool dumpForTest() const;
 
     //The function dump pass relative information before performing the pass.
     //The dump information is always used to detect what the pass did.
@@ -662,8 +664,6 @@ public:
       DUMMYUSE(mdid);
       return false;
     }
-    //Return true if the MD of each PR corresponded is unique.
-    void initMayPointToSet();
 
     //Return true if the set indicates the worst case of MD reference set.
     bool isWorstCase(MDSet const* set) const { return set == getWorstCase(); }

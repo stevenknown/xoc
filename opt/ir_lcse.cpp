@@ -43,7 +43,8 @@ static void dumpAct(
     Region const* rg = ctx.getRegion();
     ASSERT0(rg);
     ActMgr * am = ctx.getActMgr();
-    if (am == nullptr || !rg->isLogMgrInit() || !g_dump_opt.isDumpLCSE()) {
+    if (am == nullptr || !rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_LCSE)) {
         return;
     }
     am->dump("%s is CSE of %s and will be replaced by %s",
@@ -601,7 +602,7 @@ bool LCSE::processStmt(MOD IRBB * bb, MOD IR * ir, MOD LCSECtx & ctx)
 
 bool LCSE::dump() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpLCSE()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_LCSE)) {
         return true;
     }
     note(m_rg, "\n==---- DUMP %s '%s' ----==",
@@ -681,6 +682,7 @@ bool LCSE::perform(OptCtx & oc)
     if (m_rg->getBBList()->get_elem_count() == 0) { return false; }
     if (!initDepPass(oc)) { return false; }
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);

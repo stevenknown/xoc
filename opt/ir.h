@@ -369,7 +369,7 @@ public:
     IR_CODE getCode() const { return (IR_CODE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
-    IR * getBase() const; //Get base expression if exist.
+    IR * getBase() const; //Get base expression if it exists.
     TMWORD getOffset() const; //Get byte offset if any.
     IR * getOffsetOfPartialPROp() const; //Get byte offset if any.
     Var * getIdinfo() const; //Get idinfo if any.
@@ -379,7 +379,7 @@ public:
     IRBB * getBB() const;
     DU * getDU() const;
 
-    //Return rest part of multip-result list if exist.
+    //Return rest part of multip-result list if it exists.
     //e.g:some IR may have multiple-results, e.g: broadcast. the result IR
     //list is stpr $1, stpr $2, stpr $3, the function will return stpr $2 and
     //stpr $3, whereas stpr $1 will be the result IR of broadcast's parent stmt.
@@ -408,7 +408,7 @@ public:
         return (IR*)ir;
     }
 
-    //Return label info if exist.
+    //Return label info if it exists.
     LabelInfo const* getLabel() const;
 
     //Return the byte size of array element.
@@ -429,17 +429,31 @@ public:
 
     AIContainer const* getAI() const { return IR_ai(this); }
 
-    //Return rhs if exist. Some stmt has rhs,
+    //Return RHS if it exists. Some stmts have RHS,
     //such as IR_ST, IR_STPR and IR_IST.
     IR * getRHS() const;
 
-    //Return the PRNO if exist.
+    //Return pure RHS if it exists. Some stmts have RHS,
+    //such as IR_ST, IR_STPR and IR_IST.
+    //NOTE: the function returns the pure RHS, which skips the LHS
+    //description IR that is used to describe the selection operation on the
+    //stmt's result.
+    //e.g:current IR is
+    //  st 'res':bool
+    //     select_to_res:bool
+    //         select:bool
+    //             $10:bool det
+    //             ld:i32 'var' true_exp
+    //  The function returns 'select' IR.
+    IR * getPureRHS() const;
+
+    //Return the PRNO if it exists.
     PRNO getPrno() const;
 
-    //Return the storage space if exist.
+    //Return the storage space if it exists.
     StorageSpace getStorageSpace() const;
 
-    //Return the SSAInfo if exist.
+    //Return the SSAInfo if it exists.
     SSAInfo * getSSAInfo() const;
 
     //Return stmt if it writes PR as result. Otherwise return nullptr.
@@ -965,7 +979,13 @@ public:
     //CALL/ICALL may modify PR if it has a return value.
     //IR_SETELEM may modify part of PR rather than whole IR.
     //IR_GETELEM may get part of PR rather than whole IR.
-    bool isWriteWholePR() const { return IRDES_is_write_whole_pr(getCode()); }
+    //IR_STPR and RHS is SELECT_TO_RES may get part of PR rather than whole IR.
+    bool isWriteWholePR() const
+    {
+        if (!IRDES_is_write_whole_pr(getCode())) { return false; }
+        if (hasRHS() && getRHS()->is_select_to_res()) { return false; }
+        return true;
+    }
 
     //Return true if current stmt partailly modifies the value of PR.
     //e.g:IR_SETELEM may modify part of PR rather than whole IR.
@@ -993,28 +1013,30 @@ public:
     //Return true if current ir indicates a masked-store stmt that stores
     //selected elements into result memory or PR according to its mask-kid IR.
     bool isPartialStoreStmt() const
-    { return isStoreStmt() && getRHS()->is_select_to_res(); }
+    { return isStoreStmt() && (isWritePartialNonPR() || isWritePartialPR()); }
 
     //Return true if current stmt modifies entire result.
-    //e.g:Usually IR_ST, IR_IST, IR_STARRAY, IR_STPR modify entire result.
+    //e.g:Usually IR_ST, IR_IST, IR_STARRAY, IR_STPR, IR_VST, IR_VIST,
+    //IR_VSTPR modify entire result.
     //However, if the RHS of these store-stmt is IR_SELECT_TO_RES, they may
     //modify partial of the result.
     bool isEntireStoreStmt() const
-    { return isStoreStmt() && !getRHS()->is_select_to_res(); }
+    { return isStoreStmt() && (isWriteWholeNonPR() || isWriteWholePR()); }
 
     //Return true if current stmt modifies entire result MemRef.
-    //e.g:Usually IR_ST, IR_IST, IR_STARRAY modify entire result MemRef.
+    //e.g:Usually IR_ST, IR_IST, IR_STARRAY, IR_STPR, IR_VST, IR_VIST,
+    //IR_VSTPR modify entire result.
     //However, if the RHS of these store-stmt is IR_SELECT_TO_RES, they may
     //modify partial of the result MemRef.
-    bool isWriteWholeMemRefNonPR() const
-    { return isMemRefNonPR() && !getRHS()->is_select_to_res(); }
+    bool isWriteWholeNonPR() const
+    { return is_stmt() && isMemRefNonPR() && !getRHS()->is_select_to_res(); }
 
     //Return true if current stmt only modifies partial of result MemRef.
     //e.g:Usually IR_ST, IR_IST, IR_STARRAY modify entire result MemRef.
     //If the RHS of these store-stmt is IR_SELECT_TO_RES, then they may
     //modify partial of the result MemRef.
-    bool isWritePartialMemRefNonPR() const
-    { return isMemRefNonPR() && getRHS()->is_select_to_res(); }
+    bool isWritePartialNonPR() const
+    { return is_stmt() && isMemRefNonPR() && getRHS()->is_select_to_res(); }
 
     //Return true if ir might be control-flow-structure.
     bool isCFS() const
@@ -1042,7 +1064,7 @@ public:
     bool isMemRef() const { return IRDES_is_mem_ref(getCode()); }
 
     //Return true if current operation references memory, and
-    //it is the rhs of stmt.
+    //it is the RHS of stmt.
     //These kinds of operation always use MD.
     bool isMemOpnd() const { return IRDES_is_mem_opnd(getCode()); }
 

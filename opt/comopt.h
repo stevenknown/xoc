@@ -36,6 +36,7 @@ author: Su Zhenyu
 #include "apply_to_region.h"
 #include "liveness_mgr.h"
 #include "md_liveness_mgr.h"
+#include "vmd_liveness_mgr.h"
 #include "pr_liveness_mgr.h"
 #include "ssaregion.h"
 #include "ir_ssa.h"

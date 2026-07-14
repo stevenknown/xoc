@@ -60,7 +60,7 @@ static void dumpReasonAndIR(
 
 
 static void dumpGenedIRList(
-    IRList const& converted_stmt_list, MOD IfCvsCtx & ctx,
+    IfCvsCtx::GenedList const& converted_stmt_list, MOD IfCvsCtx & ctx,
     CHAR const* format, ...)
 {
     Region const* rg = ctx.getRegion();
@@ -77,11 +77,12 @@ static void dumpGenedIRList(
 
     xcom::StrBuf irbuf(64);
     IRListIter it;
+    UINT const incdn = 4;
     for (IR * c = converted_stmt_list.get_head(&it);
          c != nullptr; c = converted_stmt_list.get_next(&it)) {
         //Dump IR info to buffer.
         ASSERT0(c);
-        xoc::dumpIRToBuf(c, rg, irbuf);
+        xoc::dumpIRToBuf(c, rg, irbuf, DumpFlag(IR_DUMP_COMBINE), incdn);
     }
 
     //Dump to action.
@@ -112,6 +113,30 @@ static void dumpDR(
     //Dump to action.
     ctx.getActMgr()->dump("%s:%s",
         tmpbuf.getBuf(), drbuf.getBuf());
+}
+
+
+static void dumpReverseIfCvs(
+    IR const* selop, IR const* newstmtlist, IfCvsCtx const& ctx)
+{
+    Region const* rg = ctx.getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+
+    //Dump IR info to buffer.
+    xcom::StrBuf buf1(64);
+    ASSERT0(selop);
+    xoc::dumpIRToBuf(selop, rg, buf1);
+
+    xcom::StrBuf buf2(64);
+    for (IR const* t = newstmtlist; t != nullptr; t = t->get_next()) {
+        xcom::StrBuf buf3(64);
+        xoc::dumpIRToBuf(t, rg, buf3);
+        buf2.strcat(buf3);
+    }
+
+    //Dump to action.
+    ctx.getActMgr()->dump("REVERSE IF CVS, CONVERT %s TO %s",
+        buf1.getBuf(), buf2.getBuf());
 }
 //END DUMP
 
@@ -211,7 +236,19 @@ IfCvsCtx::~IfCvsCtx()
 
 void IfCvsCtx::unionBottomUpInfo(IfCvsCtx const& src)
 {
-    m_gened_list.append_tail(const_cast<IfCvsCtx&>(src).getGenedList());
+    m_truepart_gened_list.append_tail(
+        const_cast<IfCvsCtx&>(src).getTruePartGenedList());
+    m_falsepart_gened_list.append_tail(
+        const_cast<IfCvsCtx&>(src).getFalsePartGenedList());
+}
+
+
+void IfCvsCtx::clean()
+{
+    m_truepart_gened_list.clean();
+    m_falsepart_gened_list.clean();
+    m_bottom_gened_list.clean();
+    m_top_gened_list.clean();
 }
 
 
@@ -236,7 +273,6 @@ void IfCvsCtx::dump() const
     if (getActMgr() != nullptr) {
         getActMgr()->dump();
     }
-    note(m_rg, "\n-- GenedList --");
     DumpFlag dumpflag = DumpFlag(IR_DUMP_COMBINE);
 
     //Set the flag to true if user expect to dump whole
@@ -246,8 +282,37 @@ void IfCvsCtx::dump() const
     if (dump_ir_in_one_line) {
         dumpflag.set(IR_DUMP_NO_NEWLINE);
     }
-    for (IR * g = pthis->getGenedList().get_head();
-         g != nullptr; g = pthis->getGenedList().get_next()) {
+
+    note(m_rg, "\n-- TopGenedList --");
+    for (IR * g = pthis->getTopGenedList().get_head();
+         g != nullptr; g = pthis->getTopGenedList().get_next()) {
+        if (dump_ir_in_one_line) {
+            xoc::note(getRegion(), "\n");
+        }
+        xoc::dumpIR(g, getRegion(), dumpflag);
+    }
+
+    note(m_rg, "\n-- TruePartGenedList --");
+    for (IR * g = pthis->getTruePartGenedList().get_head();
+         g != nullptr; g = pthis->getTruePartGenedList().get_next()) {
+        if (dump_ir_in_one_line) {
+            xoc::note(getRegion(), "\n");
+        }
+        xoc::dumpIR(g, getRegion(), dumpflag);
+    }
+
+    note(m_rg, "\n-- FalsePartGenedList --");
+    for (IR * g = pthis->getFalsePartGenedList().get_head();
+         g != nullptr; g = pthis->getFalsePartGenedList().get_next()) {
+        if (dump_ir_in_one_line) {
+            xoc::note(getRegion(), "\n");
+        }
+        xoc::dumpIR(g, getRegion(), dumpflag);
+    }
+
+    note(m_rg, "\n-- BottomGenedList --");
+    for (IR * g = pthis->getBottomGenedList().get_head();
+         g != nullptr; g = pthis->getBottomGenedList().get_next()) {
         if (dump_ir_in_one_line) {
             xoc::note(getRegion(), "\n");
         }
@@ -255,13 +320,6 @@ void IfCvsCtx::dump() const
     }
 }
 
-
-void IfCvsCtx::addToGenedList(IR * ir)
-{
-    for (IR * t = ir; t != nullptr; t = t->get_next()) {
-        getGenedList().append(t);
-    }
-}
 
 void IfCvsCtx::GenedList::append(IRList const& irlst)
 {
@@ -284,8 +342,16 @@ void IfCvsCtx::GenedList::append(IR * ir)
 bool IfCvsCtx::verify() const
 {
     IfCvsCtx * pthis = const_cast<IfCvsCtx*>(this);
-    for (IR * ir = pthis->getGenedList().get_head();
-         ir != nullptr; ir = pthis->getGenedList().get_next()) {
+    for (IR * ir = pthis->getTruePartGenedList().get_head();
+         ir != nullptr; ir = pthis->getTruePartGenedList().get_next()) {
+        ASSERT0(ir->is_stmt());
+
+        //NOTE:Some stmts, such as stpr, do not need to be conditionally
+        //executed.
+        //ASSERT0(IRMgr::isCondExec(ir));
+    }
+    for (IR * ir = pthis->getFalsePartGenedList().get_head();
+         ir != nullptr; ir = pthis->getFalsePartGenedList().get_next()) {
         ASSERT0(ir->is_stmt());
 
         //NOTE:Some stmts, such as stpr, do not need to be conditionally
@@ -471,15 +537,12 @@ void IfConversion::reset()
 bool IfConversion::dump() const
 {
     if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!g_dump_opt.isDumpPass(PASS_IF_CONVERSION)) { return false; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
-    if (g_dump_opt.isDumpForTest()) {
-        m_am.dump();
-    } else {
-        m_am.dump();
-        Pass::dump();
-    }
+    m_am.dump();
+    Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     return true;
 }
@@ -492,9 +555,9 @@ bool IfConversion::initDepPass(MOD OptCtx & oc)
 
 
 static bool verifyTreeForStmtList(
-    Region const* rg, IRList const& converted_stmt_list)
+    Region const* rg, IfCvsCtx::GenedList const& converted_stmt_list)
 {
-    IRListIter it;
+    IfCvsCtx::GenedListIter it;
     for (IR * c = converted_stmt_list.get_head(&it);
          c != nullptr; c = converted_stmt_list.get_next(&it)) {
         ASSERT0(c->verifyTree(rg));
@@ -504,8 +567,8 @@ static bool verifyTreeForStmtList(
 
 
 static void convertStmtToSelectOp(
-    bool is_true_part, OUT IRList & converted_stmt_list, MOD IR * compdet,
-    MOD IR * converted, IfCvsCtx const& ctx)
+    bool is_true_part, OUT IfCvsCtx::GenedList & converted_stmt_list,
+    MOD IR * compdet, MOD IR * converted, IfCvsCtx const& ctx)
 {
     ASSERT0(converted->is_stmt() && !converted->isBranch());
     ASSERT0(compdet && compdet->is_stmt() && compdet->is_stpr());
@@ -520,7 +583,7 @@ static void convertStmtToSelectOp(
 
         //NOTE: we move the expresions directly to aviod building and adding
         //DU chain for the expressions.
-        truepart = converted->getRHS();
+        truepart = converted->getPureRHS();
         parttype = truepart->getType();
         converted->setRHS(nullptr);
     } else {
@@ -528,7 +591,7 @@ static void convertStmtToSelectOp(
 
         //NOTE: we move the expresions directly to aviod building and adding
         //DU chain for the expressions.
-        falsepart = converted->getRHS();
+        falsepart = converted->getPureRHS();
         parttype = falsepart->getType();
         converted->setRHS(nullptr);
     }
@@ -544,9 +607,14 @@ static void convertStmtToSelectOp(
     //Generate the select.
     IR * select = rg->getIRMgr()->buildSelect(
         det, truepart, falsepart, parttype);
+    IR * rhs = select;
+    if (CSelect::isPartialSelect(select)) {
+        rhs = ((IRMgrExt*)rg->getIRMgr())->
+            buildSelectToRes(select, nullptr, parttype);
+    }
 
     //Update the original stmt.
-    converted->setRHS(select);
+    converted->setRHS(rhs);
     converted_stmt_list.append_tail(converted);
 
     //There is no need to maintain DU chain for true-or-false part because
@@ -555,9 +623,10 @@ static void convertStmtToSelectOp(
 }
 
 
+//Return false if if-conversion may be illegal.
+//The reason is given bb may contain stmts that prevent if-conversion.
 static bool checkCondExecBBCanBeConvertToSelectOp(
-    OUT IRList & converted_stmt_list, IRBB const* bb,
-    MOD IfCvsCtx & ctx, bool is_true_part)
+    IRBB const* bb, MOD IfCvsCtx & ctx, bool is_true_part)
 {
     ASSERT0(bb);
     BBIRListIter it;
@@ -578,8 +647,8 @@ static bool checkCondExecBBCanBeConvertToSelectOp(
 
 //Return true if there exist IR in BB that cannot be converted.
 static void convertBBToSelectOp(
-    OUT IRList & converted_stmt_list, IRBB const* bb, MOD IR * compdet,
-    MOD IfCvsCtx & ctx, bool is_true_part)
+    OUT IfCvsCtx::GenedList & converted_stmt_list, IRBB const* bb,
+    MOD IR * compdet, MOD IfCvsCtx & ctx, bool is_true_part)
 {
     ASSERT0(bb && compdet);
     BBIRListIter it;
@@ -596,15 +665,92 @@ static void convertBBToSelectOp(
 }
 
 
-//Return true if there exist IR in given BB that cannot be converted.
+static bool isTruePartSelectOp(IR const* stmt, IR ** trueexp = nullptr)
+{
+    if (!stmt->isPartialStoreStmt()) { return false; }
+    ASSERT0(stmt->hasRHS());
+    IR const* purerhs = stmt->getPureRHS();
+    ASSERT0(purerhs && !purerhs->is_select_to_res());
+    if (!purerhs->is_select()) { return false; }
+    CSelect const* sel = (CSelect const*)purerhs;
+    if (sel->getTrueExp() != nullptr && sel->getFalseExp() == nullptr) {
+        if (trueexp != nullptr) {
+            *trueexp = sel->getTrueExp();
+        }
+        return true;
+    }
+    return false;
+}
+
+
+static bool isFalsePartSelectOp(IR const* stmt, IR ** falseexp = nullptr)
+{
+    if (!stmt->isPartialStoreStmt()) { return false; }
+    ASSERT0(stmt->hasRHS());
+    IR const* purerhs = stmt->getPureRHS();
+    ASSERT0(purerhs && !purerhs->is_select_to_res());
+    if (!purerhs->is_select()) { return false; }
+    CSelect const* sel = (CSelect const*)purerhs;
+    if (sel->getTrueExp() == nullptr && sel->getFalseExp() != nullptr) {
+        if (falseexp != nullptr) {
+            *falseexp = sel->getFalseExp();
+        }
+        return true;
+    }
+    return false;
+}
+
+
+static bool allBeTruePartSelectOp(IfCvsCtx::GenedList const& stmtlist)
+{
+    IRListIter it;
+    for (IR const* stmt = stmtlist.get_head(&it);
+         stmt != nullptr; stmt = stmtlist.get_next(&it)) {
+        ASSERT0(isTruePartSelectOp(stmt));
+    }
+    return true;
+}
+
+
+static bool allBeFalsePartSelectOp(IfCvsCtx::GenedList const& stmtlist)
+{
+    IRListIter it;
+    for (IR const* stmt = stmtlist.get_head(&it);
+         stmt != nullptr; stmt = stmtlist.get_next(&it)) {
+        ASSERT0(isFalsePartSelectOp(stmt));
+    }
+    return true;
+}
+
+
+static bool checkCanBeConvertToSelectOp(
+    IRBB * truepart, IRBB * falsepart, DiamondRegion const& dr,
+    MOD IfCvsCtx & ctx)
+{
+    ASSERT0(truepart || falsepart);
+    ASSERT0(truepart != falsepart);
+    IRBB * top = dr.top;
+    IR * condbr = top->getLastIR();
+    ASSERT0(condbr->isConditionalBr());
+    if (truepart != nullptr &&
+        !checkCondExecBBCanBeConvertToSelectOp(truepart, ctx, true)) {
+        return false;
+    }
+    if (falsepart != nullptr &&
+        !checkCondExecBBCanBeConvertToSelectOp(falsepart, ctx, false)) {
+        return false;
+    }
+    return true;
+}
+
+
+//Return false if there exist IR in given BB that cannot be converted.
 static bool genTrueAndFalsePartWithSelectOp(
     OUT IR ** compdet, IRBB * truepart, IRBB * falsepart,
     DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 {
     ASSERT0(truepart || falsepart);
     ASSERT0(truepart != falsepart);
-    IRList truepart_converted_stmt_list;
-    IRList falsepart_converted_stmt_list;
     IRBB * top = dr.top;
     IR * condbr = top->getLastIR();
     ASSERT0(condbr->isConditionalBr());
@@ -614,16 +760,6 @@ static bool genTrueAndFalsePartWithSelectOp(
     //DU chain for the expressions.
     Region const* rg = ctx.getRegion();
     IRMgr * irmgr = ctx.getIRMgr();
-    if (truepart != nullptr &&
-        !checkCondExecBBCanBeConvertToSelectOp(
-            truepart_converted_stmt_list, truepart, ctx, true)) {
-        return false;
-    }
-    if (falsepart != nullptr &&
-        !checkCondExecBBCanBeConvertToSelectOp(
-            falsepart_converted_stmt_list, falsepart, ctx, false)) {
-        return false;
-    }
 
     //Use original det-expression directly to avoid update DU info.
     IR * detpart_org = BR_det(condbr);
@@ -633,29 +769,27 @@ static bool genTrueAndFalsePartWithSelectOp(
     ctx.getMDMgr()->allocRef(*compdet);
     if (truepart != nullptr) {
         convertBBToSelectOp(
-            truepart_converted_stmt_list, truepart, *compdet, ctx, true);
+            ctx.getTruePartGenedList(), truepart, *compdet, ctx, true);
     }
     if (falsepart != nullptr) {
         convertBBToSelectOp(
-            falsepart_converted_stmt_list, falsepart, *compdet, ctx, false);
+            ctx.getFalsePartGenedList(), falsepart, *compdet, ctx, false);
     }
-
     //Append stmt to generated-stmt-list.
-    ASSERT0(verifyTreeForStmtList(rg, truepart_converted_stmt_list));
-    ASSERT0(verifyTreeForStmtList(rg, falsepart_converted_stmt_list));
-    ctx.getGenedList().append(*compdet);
-    ctx.getGenedList().append(truepart_converted_stmt_list);
-    ctx.getGenedList().append(falsepart_converted_stmt_list);
+    ASSERT0(verifyTreeForStmtList(rg, ctx.getTruePartGenedList()));
+    ASSERT0(verifyTreeForStmtList(rg, ctx.getFalsePartGenedList()));
     dumpGenedIRList(
-        truepart_converted_stmt_list, ctx,
+        ctx.getTruePartGenedList(), ctx,
         "convert truepart of control-flow to cond-exec-op");
     dumpGenedIRList(
-        falsepart_converted_stmt_list, ctx,
+        ctx.getFalsePartGenedList(), ctx,
         "convert falsepart of control-flow to cond-exec-op");
     return true;
 }
 
 
+//The function extracts TRUE and FALSE BB of diamond region, and record them
+//in the ctx.
 static void extractTrueAndFalsePartForDiamond(
     OUT IRBB ** truepart, OUT IRBB ** falsepart, DiamondRegion const& dr,
     MOD IfCvsCtx & ctx)
@@ -701,23 +835,113 @@ static bool removeCondBrInTop(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 }
 
 
-//The function will maintain DU.
-static bool moveGenedStmtToTop(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
+//CASE:the complete select-op should have both true and false expression.
+//e.g: $9 = select $8, 10 #true_exp : 20 #false_exp;
+static bool isCompleteSelectOp(
+    IR * ir, OUT IR ** trueexp, OUT IR ** falseexp)
+{
+    if (!ir->isStoreStmt()) { return false; }
+    ASSERT0(ir->hasRHS());
+    IR * rhs = ir->getRHS();
+    if (!rhs->is_select()) { return false; }
+    ASSERT0(trueexp && falseexp);
+    *trueexp = SELECT_trueexp(rhs);
+    *falseexp = SELECT_falseexp(rhs);
+    ASSERT0(*trueexp && *falseexp);
+    return true;
+}
+
+
+static bool mergeTruePartSelectOpIntoOne(
+    IR * complete_select_op, IR * trueexp,
+    DiamondRegion const& dr, MOD IfCvsCtx & ctx)
+{
+    if (!trueexp->isMemOpnd()) { return false; }
+    Region * rg = ctx.getRegion();
+    OptCtx const* oc = ctx.getOptCtx();
+    IR const* trueexp_def = xoc::findDomAvailDef(trueexp, rg);
+    if (trueexp_def == nullptr) { return false; }
+    IR * partial_trueexp = nullptr;
+    if (!isTruePartSelectOp(trueexp_def, &partial_trueexp)) { return false; }
+    ASSERT0(partial_trueexp);
+    IR * new_trueexp = ctx.getRegion()->dupIRTree(partial_trueexp);
+    complete_select_op->replaceKid(trueexp, new_trueexp, true);
+    xoc::addUseForTree(new_trueexp, partial_trueexp, rg);
+    xoc::removeUseForTree(trueexp, rg, *oc);
+    return true;
+}
+
+
+//Return true if IR changed.
+static bool mergeFalsePartSelectOpIntoOne(
+    IR * complete_select_op, IR * falseexp,
+    DiamondRegion const& dr, MOD IfCvsCtx & ctx)
+{
+    if (!falseexp->isMemOpnd()) { return false; }
+    Region * rg = ctx.getRegion();
+    OptCtx const* oc = ctx.getOptCtx();
+    IR const* falseexp_def = xoc::findDomAvailDef(falseexp, rg);
+    if (falseexp_def == nullptr) { return false; }
+    IR * partial_falseexp = nullptr;
+    if (!isFalsePartSelectOp(falseexp_def, &partial_falseexp)) { return false; }
+    ASSERT0(partial_falseexp);
+    IR * new_falseexp = ctx.getRegion()->dupIRTree(partial_falseexp);
+    complete_select_op->replaceKid(falseexp, new_falseexp, true);
+    xoc::addUseForTree(new_falseexp, partial_falseexp, rg);
+    xoc::removeUseForTree(falseexp, rg, *oc);
+    return true;
+}
+
+
+//Return true if IR changed.
+static bool tryMergePartialSelectOpIntoCompleteOp(
+    MOD IRBB * truepart, MOD IRBB * falsepart,
+    DiamondRegion const& dr, MOD IfCvsCtx & ctx)
+{
+    //CASE:merge the first two select-op into the third-one.
+    //  $5 = select_to_res (select $8, 10 #true_exp : NULL #false_exp)
+    //  $6 = select_to_res (select $8, NULL #true_exp : 20 #false_exp)
+    //  $9 = select $8, $5 #true_exp : $6 #false_exp
+    //Into:
+    //  $9 = select $8, 10 #true_exp : 20 #false_exp
+    IRBB * top = dr.top;
+    ASSERT0(top);
+    bool changed = false;
+    BBIRListIter it;
+    for (top->getIRList().get_head(&it);
+         it != nullptr; top->getIRList().get_next(&it)) {
+        IR * ir = it->val();
+        IR * trueexp;
+        IR * falseexp;
+        if (!isCompleteSelectOp(ir, &trueexp, &falseexp)) { continue; }
+        ASSERT0(trueexp && falseexp);
+        changed |= mergeTruePartSelectOpIntoOne(ir, trueexp, dr, ctx);
+        changed |= mergeFalsePartSelectOpIntoOne(ir, falseexp, dr, ctx);
+    }
+    return changed;
+}
+
+
+static void removeOrgStmtFromTrueAndFalsePart(
+    DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 {
     IRBB * left = dr.left;
     IRBB * right = dr.right;
     IRBB * top = dr.top;
     ASSERT0(left && right && top);
     Region * rg = ctx.getRegion();
+
+    //First of all, remove if-converted storestmts from original IRBB.
     IfCvsCtx::GenedListIter it;
     IfCvsCtx::GenedListIter nextit;
-    IfCvsCtx::GenedList & genlst = ctx.getGenedList();
+    IfCvsCtx::GenedList & tplst = ctx.getTruePartGenedList();
+    IfCvsCtx::GenedList & fplst = ctx.getFalsePartGenedList();
     for (left->getIRList().get_head(&it); it != nullptr; it = nextit) {
         nextit = it;
         left->getIRList().get_next(&nextit);
         IR * c = it->val();
-        if (genlst.find(c)) {
-            //Generated Stmt will be move to other BB.
+        if (tplst.find(c) || fplst.find(c)) {
+            //Generated Stmt will be move to top BB.
             left->getIRList().remove(it);
             continue;
         }
@@ -730,8 +954,8 @@ static bool moveGenedStmtToTop(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
         nextit = it;
         right->getIRList().get_next(&nextit);
         IR * c = it->val();
-        if (genlst.find(c)) {
-            //Generated Stmt will be move to other BB.
+        if (tplst.find(c) || fplst.find(c)) {
+            //Generated Stmt will be move to top BB.
             right->getIRList().remove(it);
             continue;
         }
@@ -740,10 +964,38 @@ static bool moveGenedStmtToTop(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
         right->getIRList().remove(it);
         rg->freeIRTree(c);
     }
-    BBIRList & irlst = top->getIRList();
-    for (IR * t = ctx.getGenedList().get_head();
-         t != nullptr; t = ctx.getGenedList().get_next()) {
-        irlst.append_tail(t);
+}
+
+
+//The function will maintain DU.
+static bool moveGenedStmtToTop(
+    IR * compdet, DiamondRegion const& dr, MOD IfCvsCtx & ctx)
+{
+    IRBB * left = dr.left;
+    IRBB * right = dr.right;
+    IRBB * top = dr.top;
+    ASSERT0(left && right && top);
+
+    //First of all, remove if-converted storestmts from original IRBB.
+    removeOrgStmtFromTrueAndFalsePart(dr, ctx);
+
+    ASSERT0(ctx.getTopGenedList().get_elem_count() == 0);
+    BBIRList & topirlst = top->getIRList();
+
+    //First, add determinate-computation OP.
+    topirlst.append_tail(compdet);
+    ctx.getTopGenedList().append_tail(compdet);
+
+    //Sencond, the truepart partial-storestmt-op.
+    for (IR * t = ctx.getTruePartGenedList().get_head();
+         t != nullptr; t = ctx.getTruePartGenedList().get_next()) {
+        topirlst.append_tail(t);
+    }
+
+    //Third, the falsepart partial-storestmt-op.
+    for (IR * t = ctx.getFalsePartGenedList().get_head();
+         t != nullptr; t = ctx.getFalsePartGenedList().get_next()) {
+        topirlst.append_tail(t);
     }
     return true;
 }
@@ -1027,7 +1279,6 @@ static bool isDefOfMDPhiOpndInDistinctPartForPhiList(
         ASSERT0(phi && phi->is_phi());
         ASSERTN(isDefOfMDPhiOpndInDistinctBB(phi, dr, ctx),
                 ("redundant or illegal phi"));
-
     }
     return true;
 }
@@ -1114,7 +1365,12 @@ static IR * replacePhiWithSelectOp(
     //Generate the select.
     IR * select = rg->getIRMgr()->buildSelect(
         det, trueexp, falseexp, parttype);
-    IR * stpr = rg->getIRMgr()->buildStorePR(phi->getType(), select);
+    IR * rhs = select;
+    if (CSelect::isPartialSelect(select)) {
+        rhs = ((IRMgrExt*)rg->getIRMgr())->
+            buildSelectToRes(select, nullptr, parttype);
+    }
+    IR * stpr = rg->getIRMgr()->buildStorePR(phi->getType(), rhs);
     ctx.getMDMgr()->allocRef(stpr);
     return stpr;
 }
@@ -1142,7 +1398,7 @@ static bool replacePhiListWithSelectOp(
             compdet, t, truepart, falsepart, ctx);
         ASSERT0(stpr && stpr->is_stpr());
         top->getIRList().append_tail(stpr);
-        ctx.getGenedList().append(stpr);
+        ctx.getBottomGenedList().append(stpr);
         xoc::changeDef(t, stpr, rg);
         xoc::removeStmt(t, rg, *oc);
         ctx.tryInvalidInfoBeforeFreeIR(t);
@@ -1157,6 +1413,7 @@ static bool reconstructPhiInBottom(
     MOD IR * compdet, IRBB const* truepart, IRBB const* falsepart,
     DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 {
+    //NOTE:There is no need to replace MDPhi.
     if (!ctx.usePRSSADU()) { return true; }
     replacePhiListWithSelectOp(compdet, truepart, falsepart, dr, ctx);
     return true;
@@ -1179,23 +1436,55 @@ static void updateMDSSADUForDefDefChainInTop(
     //Build DomTree because CFG changed.
     xcom::DomTree domtree;
     ctx.getCFG()->genDomTree(domtree);
-    for (IR * ir = ctx.getGenedList().get_head();
-         ir != nullptr; ir = ctx.getGenedList().get_next()) {
+    MDSSAMgr * mgr = ctx.getMDSSAMgr();
+    OptCtx const* oc = ctx.getOptCtx();
+    ActMgr * am = ctx.getActMgr();
+    for (IR * ir = ctx.getTopGenedList().get_head();
+         ir != nullptr; ir = ctx.getTopGenedList().get_next()) {
         ASSERT0(ir->is_stmt());
         if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
 
         //Update the stmt's MDSSAInfo which include DefDef chain and
         //DefUse chain.
-        RecomputeDefDefAndDefUseChain recomp(
-            domtree, ctx.getMDSSAMgr(), *ctx.getOptCtx(),
-            ctx.getActMgr());
-        recomp.recompute(ir);
+        xoc::recomputeDefUseChainForAllExp(ir, domtree, mgr, *oc, am);
+        xoc::recomputeDefDefAndDefUseChain(ir, domtree, mgr, *oc, am);
+    }
+    for (IR * ir = ctx.getTruePartGenedList().get_head();
+         ir != nullptr; ir = ctx.getTruePartGenedList().get_next()) {
+        ASSERT0(ir->is_stmt());
+        if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
+
+        //Update the stmt's MDSSAInfo which include DefDef chain and
+        //DefUse chain.
+        xoc::recomputeDefUseChainForAllExp(ir, domtree, mgr, *oc, am);
+        xoc::recomputeDefDefAndDefUseChain(ir, domtree, mgr, *oc, am);
+    }
+    for (IR * ir = ctx.getFalsePartGenedList().get_head();
+         ir != nullptr; ir = ctx.getFalsePartGenedList().get_next()) {
+        ASSERT0(ir->is_stmt());
+        if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
+
+        //Update the stmt's MDSSAInfo which include DefDef chain and
+        //DefUse chain.
+        xoc::recomputeDefUseChainForAllExp(ir, domtree, mgr, *oc, am);
+        xoc::recomputeDefDefAndDefUseChain(ir, domtree, mgr, *oc, am);
+    }
+    for (IR * ir = ctx.getBottomGenedList().get_head();
+         ir != nullptr; ir = ctx.getBottomGenedList().get_next()) {
+        ASSERT0(ir->is_stmt());
+        if (!MDSSAMgr::hasMDSSAInfo(ir)) { continue; }
+
+        //Update the stmt's MDSSAInfo which include DefDef chain and
+        //DefUse chain.
+        xoc::recomputeDefUseChainForAllExp(ir, domtree, mgr, *oc, am);
+        xoc::recomputeDefDefAndDefUseChain(ir, domtree, mgr, *oc, am);
     }
 }
 
 
 static void updateDU(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 {
+    //DU chains of PROP are not changed.
     updateMDSSADUForDefDefChainInTop(dr, ctx);
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
@@ -1213,8 +1502,9 @@ static bool reconstructDiamondRegionCase(
         ASSERT0(!ctx.useMDSSADU() ||
                 isDefOfMDPhiOpndInDistinctPartForPhiList(dr, ctx));
     }
+    //TODO:tryMergePartialSelectOpIntoCompleteOp(truepart, falsepart, dr, ctx);
     removeCondBrInTop(dr, ctx);
-    moveGenedStmtToTop(dr, ctx);
+    moveGenedStmtToTop(compdet, dr, ctx);
     reconstructPhiInBottom(compdet, truepart, falsepart, dr, ctx);
     removeEmptyTrueAndFalsePart(truepart, falsepart, dr, ctx);
     updateDU(dr, ctx);
@@ -1242,7 +1532,10 @@ static bool tryConvertDiamondRegionCase(
     IR * compdet = nullptr;
     dumpDR(dr, ctx, "find diamond region");
     extractTrueAndFalsePartForDiamond(&truepart, &falsepart, dr, ctx);
-    ASSERT0(truepart && falsepart);
+    ASSERTN(truepart && falsepart, ("both true and false part be avail"));
+    if (!checkCanBeConvertToSelectOp(truepart, falsepart, dr, ctx)) {
+        return false;
+    }
     if (!genTrueAndFalsePartWithSelectOp(
             &compdet, truepart, falsepart, dr, ctx)) {
         return false;
@@ -1289,6 +1582,9 @@ static bool tryConvertTriangleRegionCase(
     extractTrueAndFalsePartForDiamond(&truepart, &falsepart, dr, ctx);
     ASSERTN(truepart == nullptr || falsepart == nullptr,
             ("at least one part is NULL"));
+    if (!checkCanBeConvertToSelectOp(truepart, falsepart, dr, ctx)) {
+        return false;
+    }
     if (!genTrueAndFalsePartWithSelectOp(
             &compdet, truepart, falsepart, dr, ctx)) {
         return false;
@@ -1323,12 +1619,12 @@ bool IfConversion::tryConvertDiamondRegion(
 }
 
 
-bool IfConversion::convertSelectToBranch(IR const* ir, MOD IfCvsCtx & ctx)
+IR * IfConversion::convertSelectToBranch(IR const* ir, MOD IfCvsCtx & ctx)
 {
     ASSERT0(ir->is_stmt() && ir->hasRHS());
     IR * rhs = ir->getRHS();
     ASSERT0(rhs->is_select());
-    Region * rg = getRegion();
+    Region * rg = ctx.getRegion();
     IRMgr * irmgr = rg->getIRMgr();
 
     //Build IF det expression.
@@ -1358,8 +1654,8 @@ bool IfConversion::convertSelectToBranch(IR const* ir, MOD IfCvsCtx & ctx)
     SimpCtx simpctx(ctx.getOptCtx());
     simpctx.setSimpCFS();
     IR * stmtlist = simp->simplifyStmt(ifop, &simpctx);
-    ctx.addToGenedList(stmtlist);
-    return true;
+    dumpReverseIfCvs(ifop, stmtlist, ctx);
+    return stmtlist;
 }
 
 
@@ -1389,7 +1685,8 @@ bool IfConversion::tryBBList(MOD OptCtx & oc)
 {
     IfCvsCtx ctx(oc, nullptr, this, &getActMgr());
     if (!tryBBListImpl(ctx)) { return false; }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIfConversion()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_IF_CONVERSION)) {
         ctx.dump();
     }
     return true;
@@ -1422,7 +1719,8 @@ bool IfConversion::tryLoop(MOD LI<IRBB> * li, MOD OptCtx & oc)
     if (!tryLoopImpl(ctx)) {
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIfConversion()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_IF_CONVERSION)) {
         ctx.dump();
     }
     return true;
@@ -1481,9 +1779,7 @@ bool IfConversion::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIfConversion()) {
-        dump();
-    }
+    dump();
 
     //The pass does not devastate IVR information. However, new IV might be
     //inserted.

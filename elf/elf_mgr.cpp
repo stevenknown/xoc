@@ -193,10 +193,10 @@ static SectionDesc const g_section_desc[] = {
       SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".dl_tdata" },
 
     { SH_TYPE_RODATA, S_PROGBITS, PH_TYPE_CODE,
-      SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".rodata" },
+      SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".rodata" },
 
     { SH_TYPE_RODATA1, S_PROGBITS, PH_TYPE_CODE,
-      SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".rodata1" },
+      SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".rodata1" },
 
     { SH_TYPE_LDM, S_PROGBITS, PH_TYPE_DATA,
       SF_WRITE|SF_ALLOC, ELF_VAL_UNDEF, ELF_VAL_UNDEF, ".ldm" },
@@ -355,7 +355,7 @@ SECTION_TYPE ELFMgr::judgeSectWhichVarBelongTo(Var const* var)
         return SH_TYPE_TEXT;
     }
 
-    if (var->is_readonly()) { return SH_TYPE_CONST; }
+    if (var->is_readonly()) { return SH_TYPE_RODATA; }
 
     if (var->is_vector() || var->is_string() || var->is_mc()) {
         return var->hasInitVal() ? SH_TYPE_DATA : SH_TYPE_BSS;
@@ -1661,7 +1661,7 @@ void ELFMgr::dumpRelaTabContent(ELFSHdr const* sh) const
     static TabCol tabcol[] = {
         { "No.", "%%-10u", 10, },
         { "Offset", "0x%%-12llx", 14, },
-        { "Type", "%%-18s", 18, },
+        { "Type", "%%-25s ", 25, },
         { "SymIdx", "0x%%-18llx", 20, },
         { "Sym + Addend", "%%-32s", 32, },
     };
@@ -2079,18 +2079,9 @@ void ELFMgr::initSymbol(xoc::Var const* var,
     //Set section offset.
     SYMINFO_ofst(sym_info) = sect_ofst != 0 ?
         sect_ofst : SYMINFO_ofst(sym_info);
+    SYMINFO_sym(sym_info).st_value = SYMINFO_ofst(sym_info);
 
     m_symbol_info.set(var->get_name(), sym_info);
-}
-
-
-void ELFMgr::initExternalSymbol(xoc::Var const* var)
-{
-    ASSERT0(var);
-
-    if (m_symbol_info.find(var->get_name())) { return; }
-
-    initSymbol(var, nullptr, 0);
 }
 
 
@@ -2988,8 +2979,6 @@ void ELFMgr::setSymbolInfoSymValue(MOD SymbolInfo * symbol_info)
 
     //Update SymbolInfo.
     SYMINFO_index(symbol_info) = getStShndxOfUndefSection();
-    SYMINFO_sym(symbol_info).st_name = ELF_VAL_UNDEF;
-    SYMINFO_sym(symbol_info).st_value = ELF_VAL_UNDEF;
     SYMINFO_sym(symbol_info).st_shndx = (Half)SYMINFO_index(symbol_info);
     SYMINFO_sym(symbol_info).st_size = SYMINFO_size(symbol_info);
     if (SYMINFO_is_func(symbol_info)) {

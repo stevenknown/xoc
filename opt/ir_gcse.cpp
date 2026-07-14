@@ -59,7 +59,8 @@ static void dumpAct(
     Region const* rg = ctx.getRegion();
     ASSERT0(rg);
     ActMgr * am = ctx.getActMgr();
-    if (am == nullptr || !rg->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) {
+    if (am == nullptr || !rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_GCSE)) {
         return;
     }
     am->dump("%s is CSE of %s and will be replaced by %s",
@@ -1060,28 +1061,10 @@ void GCSE::dumpEVN() const
 }
 
 
-static bool dumpForTest(GCSE const* gcse)
-{
-    if (gcse->getActMgr().getActNum() == 0) { return true; }
-    Region const* rg = gcse->getRegion();
-    ASSERT0(rg->isLogMgrInit());
-    note(rg, "\n==---- DUMP %s '%s' ----==",
-         gcse->getPassName(), rg->getRegionName());
-    rg->getLogMgr()->incIndent(2);
-    gcse->getActMgr().dump();
-    rg->getLogMgr()->decIndent(2);
-    return true;
-}
-
-
 bool GCSE::dump() const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpGCSE()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_GCSE)) {
         return true;
-    }
-    if (!g_dump_opt.isDumpAfterPass()) { return true; }
-    if (g_dump_opt.isDumpForTest()) {
-        return dumpForTest(this);
     }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
@@ -1147,6 +1130,7 @@ bool GCSE::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
+    dumpBeforePass();
     reset();
     bool change = false;
     IRBB * entry = m_cfg->getEntry();

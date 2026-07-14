@@ -501,7 +501,8 @@ bool InferType::inferChangedList()
 
 void InferType::dumpInit()
 {
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_INFER_TYPE)) {
         ASSERT0(m_changed_irlist == nullptr);
         m_changed_irlist = new ConstIRList();
         ASSERT0(m_changed_varlist == nullptr);
@@ -525,7 +526,8 @@ void InferType::dumpFini()
 
 bool InferType::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return false; }
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    if (!g_dump_opt.isDumpPass(PASS_INFER_TYPE)) { return true; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);
@@ -558,6 +560,7 @@ bool InferType::perform(OptCtx & oc)
     IR * irl = m_rg->getIRList();
     BBList * bbl = m_rg->getBBList();
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpInit();
@@ -580,9 +583,7 @@ bool InferType::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
-        dump();
-    }
+    dump();
     dumpFini();
     END_TIMER(t, getPassName());
     return true;

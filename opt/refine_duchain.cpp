@@ -34,7 +34,8 @@ namespace xoc {
 static void dumpRemovedDU(RefineDUCtx const& ctx, IR const* def, IR const* use)
 {
     Region const* rg = ctx.getRegion();
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRefineDUChain()) { return; }
+    if (!rg->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_REFINE_DUCHAIN)) { return; }
     ASSERT0(def && use);
     DefFixedStrBuf buf1;
     DefFixedStrBuf buf2;
@@ -433,7 +434,8 @@ bool RefineDUChain::perform(OptCtx & oc)
     RefineDUCtx ctx(oc);
     bool change = process(ctx);
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefineDUChain()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_REFINE_DUCHAIN)) {
         dump(ctx);
     }
     ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

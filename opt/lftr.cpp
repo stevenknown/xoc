@@ -70,7 +70,7 @@ LFRInfo * LFAnaCtx::genLFRInfo(IR const* lf_exp)
 
 void LFAnaCtx::dump(Region * rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpLFTR()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_LFTR)) { return; }
     note(rg, "\n==-- LINEAR FUNC CAND LIST of LI%d --==", m_li->id());
     IRListIter it;
     for (IR const* x = getCandList().get_head(&it); x != nullptr;
@@ -552,13 +552,13 @@ bool LFTR::doReplacement(OUT IRBB * preheader, OUT LI<IRBB> * li,
 
 bool LFTR::dump(LI<IRBB> const* li, LFAnaCtx const& ctx) const
 {
-    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpLFTR()) {
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_LFTR)) {
         return true;
     }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     ctx.dump(getRegion());
-    return Pass::dump();
+    return true;
 }
 
 
@@ -583,6 +583,7 @@ bool LFTR::perform(OptCtx & oc)
         return false;
     }
     START_TIMER(t, getPassName());
+    dumpBeforePass();
     m_rg->getPassMgr()->checkValidAndRecompute(
         &oc, PASS_DOM, PASS_LOOP_INFO, PASS_IVR, PASS_UNDEF);
     m_ivr = (IVR*)m_rg->getPassMgr()->queryPass(PASS_IVR);
@@ -601,6 +602,7 @@ bool LFTR::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
+    Pass::dump();
     //This pass does not devastate IVR information. However, new IV might be
     //inserted.
     //DU chain and DU reference should be maintained.

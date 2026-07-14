@@ -1430,6 +1430,33 @@ bool isExceedBitWidth(LONGLONG val, UINT bitwidth)
 }
 
 
+//If judged to exceed the bit-field range, perform
+//an additional check for negative value.
+//For example:
+// Case1: Regard val as negative, return false.
+// bitwidth: 12  type_size: 32
+// val: 0xffff ff80
+// neg_mask: 0xffff f800
+// 0xffff ff80 & 0xffff f800 = 0xffff f800
+//
+// Case2: Regard val as positive, return true.
+// bitwidth: 12  type_size: 16
+// val: 0b0010 0111 1111 1101
+// neg_mask: 0b1111 1000 0000 0000
+// 0b0010 0111 1111 1101 & 0b1111 1000 0000 0000 = 0b0010 0000 0000 0000
+bool isSignedValueOutOfBitWidth(LONGLONG val, UINT bitwidth, UINT type_size)
+{
+    ASSERTN(type_size <= sizeof(LONGLONG) * BITS_PER_BYTE,
+            ("type_size is too large"));
+    bool small = isExceedBitWidth(val, bitwidth);
+    if (!small) { return small; }
+    ASSERT0(type_size >= bitwidth);
+    LONGLONG neg_mask =
+        getLowBitMask(type_size - bitwidth + 1) << (bitwidth - 1);
+    return (val & neg_mask) != neg_mask;
+}
+
+
 //Unsigned value "val" exceeds bit width "n" if and only if
 //  val > 2^n - 1
 bool isExceedBitWidth(ULONGLONG val, UINT bitwidth)
@@ -2411,9 +2438,9 @@ bool isFPConstZero(UINT64 val) { return (val & ~(1ULL << 63)) == 0; }
 bool isFPConstZeroPositive(UINT64 val) { return val == 0; }
 
 
-UINT rotateLeft(UINT val0, UINT val1)
+UINT64 rotateLeft(UINT64 val0, UINT val1)
 {
-    UINT val2 = val1 & 0x3F; // val1 % 64
+    UINT64 val2 = val1 & 0x3F; // val1 % 64
     return (val0 << val2) | (val0 >> (64 - val2));
 }
 

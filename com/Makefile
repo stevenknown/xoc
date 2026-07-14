@@ -50,16 +50,26 @@ $(info "CFLAGS:$(CFLAGS)")
 $(info "DEBUG:$(DEBUG)")
 $(info "THREAD_NUM:$(THREAD_NUM)")
 
+#Here, we always regenerate libxcom.a even if it exist.
 $(COM_OUTPUT): build_com_objs
 	@echo "IN COM MAKEFILE: START BUILD $(COM_OUTPUT)!!"
-	@if [ ! -f "$@" ] || [ "$<" -nt "$@" ]; then \
-      echo "EXEC:"; \
-      ar -rvscT $(COM_OUTPUT) \
+	@ echo "EXEC:"; \
+      ar -rcsvT $(COM_OUTPUT) \
         $(COM_OBJS); \
-      echo "SUCCESS TO GENERATE $(COM_OUTPUT)!!"; \
-    else \
-      echo "$(COM_OUTPUT) ALREADY EXISTS!!"; \
-    fi
+      echo "SUCCESS TO GENERATE $(COM_OUTPUT)!!";
+
+##NOTE:The compilation of libxcom.a may failed sometime if we don't
+##always regenerate it.
+#$(COM_OUTPUT): build_com_objs
+#	@echo "IN COM MAKEFILE: START BUILD $(COM_OUTPUT)!!"
+#	@if [ ! -f "$@" ] || [ "$<" -nt "$@" ]; then \
+#      echo "EXEC:"; \
+#      ar -rvscT $(COM_OUTPUT) \
+#        $(COM_OBJS); \
+#      echo "SUCCESS TO GENERATE $(COM_OUTPUT)!!"; \
+#    else \
+#      echo "$(COM_OUTPUT) ALREADY EXISTS!!"; \
+#    fi
 
 print_time = $(shell stat --format=%y "$1")
 

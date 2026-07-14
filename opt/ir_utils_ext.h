@@ -37,6 +37,7 @@ namespace xoc {
     case IR_ATOMINC: \
     case IR_ATOMCAS
 
+#ifdef REF_TARGMACH_INFO
 //Defined the entry for extended expression ir code.
 #define SWITCH_CASE_EXT_EXP \
     SWITCH_CASE_EXT_UNA: \
@@ -47,6 +48,17 @@ namespace xoc {
     case IR_DYNLEN_OP: \
     case IR_SELECT_TO_RES: \
     case IR_PHYREG
+#else
+//Defined the entry for extended expression ir code.
+#define SWITCH_CASE_EXT_EXP \
+    SWITCH_CASE_EXT_UNA: \
+    SWITCH_CASE_EXT_BIN: \
+    SWITCH_CASE_EXT_ATOM: \
+    case IR_BROADCAST: \
+    case IR_MASK_OP: \
+    case IR_DYNLEN_OP: \
+    case IR_SELECT_TO_RES
+#endif
 
 //Defined the entry for extended virtual stmt ir code.
 #define SWITCH_CASE_EXT_VSTMT \

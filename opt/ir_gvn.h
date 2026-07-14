@@ -51,6 +51,7 @@ typedef enum _VN_KIND {
     VN_FP, //The numbered value reasoned from Float-Point.
     VN_STR, //The numbered value reasoned from String.
     VN_MC_INT, //The numbered value reasoned from MC typed value.
+    VN_VEC_INT, //The numbered value reasoned from Vec typed value.
 
     //The numbered value reasoned from IR, Var, MD or constant which is unique.
     //When we compare two VNs which both are CONST, they are absolutely not
@@ -70,9 +71,13 @@ typedef enum _VN_KIND {
 #define VN_op(v) ((v)->u1.op)
 #define VN_mddef(v) ((v)->u1.mddef)
 #define VN_vmd(v) ((v)->u1.vmd)
-#define VN_is_cst(v) (VN_kind(v) == VN_INT || VN_kind(v) == VN_MC_INT || \
-                      VN_kind(v) == VN_FP || VN_kind(v) == VN_STR || \
-                      VN_kind(v) == VN_CONST)
+#define VN_is_cst(v) \
+    (VN_kind(v) == VN_INT || \
+     VN_kind(v) == VN_MC_INT || \
+     VN_kind(v) == VN_VEC_INT || \
+     VN_kind(v) == VN_FP || \
+     VN_kind(v) == VN_STR || \
+     VN_kind(v) == VN_CONST)
 class VN {
     COPY_CONSTRUCTOR(VN);
 public:
@@ -109,7 +114,10 @@ public:
 
     //Return true if VN reasoned from integer value.
     bool is_int() const
-    { return VN_kind(this) == VN_INT || VN_kind(this) == VN_MC_INT; }
+    {
+        return VN_kind(this) == VN_INT || VN_kind(this) == VN_MC_INT ||
+               VN_kind(this) == VN_VEC_INT;
+    }
 
     //Return true if VN reasoned from float-point value.
     bool is_fp() const { return VN_kind(this) == VN_FP; }
@@ -167,6 +175,9 @@ typedef xcom::HMap<LONGLONG, VN*> Longlong2VN;
 
 typedef VecIdx LonglongMC2VNIter;
 typedef xcom::HMap<LONGLONG, VN*> LonglongMC2VN;
+
+typedef VecIdx LonglongVec2VNIter;
+typedef xcom::HMap<LONGLONG, VN*> LonglongVec2VN;
 
 typedef VecIdx MD2VNIter;
 typedef xcom::HMap<MD const*, VN*> MD2VN;
@@ -609,6 +620,7 @@ protected:
     Refine * m_refine;
     VN * m_zero_vn;
     VN * m_mc_zero_vn;
+    VN * m_vec_zero_vn;
     xcom::SMemPool * m_pool;
     xcom::Vector<VN const*> * m_vn_vec; //optional, usually used to dump.
     OptCtx * m_oc;
@@ -618,6 +630,7 @@ protected:
     MDPhi2VN m_mdphi2vn;
     Longlong2VN m_ll2vn;
     LonglongMC2VN m_llmc2vn;
+    LonglongVec2VN m_llvec2vn;
     FP2VN m_fp2vn;
     Sym2VN m_str2vn;
     Var2VN m_var2vn;
@@ -755,6 +768,7 @@ protected:
     VN * registerVNviaMD(MD const* md);
     VN * registerVNviaMC(LONGLONG v);
     VN * registerVNviaMC(LONGLONG v, Type const* vty);
+    VN * registerVNviaVec(LONGLONG v, Type const* vty);
     VN * registerVNviaFP(double v);
     VN * registerVNviaFP(double v, Type const* vty);
     VN * registerVNviaSTR(Sym const* v);

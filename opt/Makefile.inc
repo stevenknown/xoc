@@ -58,6 +58,7 @@ scalar_opt.o\
 apply_to_region.o\
 liveness_mgr.o\
 md_liveness_mgr.o\
+vmd_liveness_mgr.o\
 pr_liveness_mgr.o\
 du_helper.o\
 symtab.o\

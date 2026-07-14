@@ -70,7 +70,8 @@ RegSSAUpdateCtx::RegSSAUpdateCtx(OptCtx & oc, ActMgr * am) : PassCtx(&oc, am)
 void RegSSAUpdateCtx::dump(Region const* rg) const
 {
     ASSERT0(rg);
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP RegSSAUpdateCtx --==");
     note(rg, "\nNEED_UPDATE_DUCHAIN:%s",
          need_update_duchain() ? "true" : "false");
@@ -873,7 +874,8 @@ void VRRenameDef::clean()
 
 void VRRenameDef::dumpRenameBB(IRBB const* bb)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     am->dump("VRRenameDef:renaming BB%u", bb->id());
@@ -882,7 +884,8 @@ void VRRenameDef::dumpRenameBB(IRBB const* bb)
 
 void VRRenameDef::dumpRenameVReg(IR const* ir, VReg const* vreg)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     VRegFixedStrBuf buf1;
@@ -894,7 +897,8 @@ void VRRenameDef::dumpRenameVReg(IR const* ir, VReg const* vreg)
 
 void VRRenameDef::dumpInsertDDChain(IR const* ir, VReg const* vreg)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     VRegFixedStrBuf buf1;
@@ -906,7 +910,8 @@ void VRRenameDef::dumpInsertDDChain(IR const* ir, VReg const* vreg)
 
 void VRRenameDef::dumpInsertDDChain(RegPhi const* phi, VReg const* vreg)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     VRegFixedStrBuf buf;
@@ -917,7 +922,8 @@ void VRRenameDef::dumpInsertDDChain(RegPhi const* phi, VReg const* vreg)
 
 void VRRenameDef::dumpRenamePhi(RegPhi const* phi, UINT opnd_pos)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
     am->dump("VRRenameDef:rename RegPhi%u with No.%u operand",
@@ -1694,7 +1700,8 @@ void VRegLiveSet::dump(RegSSAMgr const* mgr) const
 //
 void VReg::UseSet::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     VReg::UseSetIter it;
     note(rg, "\nVReg::UseSet:");
     xcom::StrBuf tmp(8);
@@ -1712,7 +1719,8 @@ void VReg::UseSet::dump(Region const* rg) const
 //
 void BB2DefRegSet::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP BB2DefRegSet --==");
     BBList * bbl = rg->getBBList();
     for (IRBB const* bb = bbl->get_head();
@@ -1731,7 +1739,8 @@ void BB2DefRegSet::dump(Region const* rg) const
 //
 void Reg2VRegStack::dump(Region const* rg) const
 {
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP Reg2VRegStack --==");
     for (VecIdx i = REG_UNDEF + 1; i <= get_last_idx(); i++) {
         VRegStack * s = get(i);
@@ -1884,7 +1893,8 @@ void RegSSAMgr::cleanLocalUsedData()
 //This function dumps VReg structure and SSA DU info.
 void RegSSAMgr::dumpAllVReg() const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     Region const* rg = getRegion();
     note(rg, "\n\n==---- DUMP RegSSAMgr: ALL VReg '%s'----==",
          rg->getRegionName());
@@ -2361,7 +2371,8 @@ void RegSSAMgr::dumpIRWithRegSSAForExpTree(IR const* ir) const
 
 void RegSSAMgr::dumpIRWithRegSSA(IR const* ir, MOD IRDumpCtx<> * ctx) const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ASSERT0(ir);
     xoc::dumpIR(ir, m_rg, *ctx);
     LocalRegSSADump::dumpIRWithRegSSAInfo(this, m_rg, ir);
@@ -2373,7 +2384,8 @@ void RegSSAMgr::dumpIRWithRegSSA(IR const* ir, MOD IRDumpCtx<> * ctx) const
 //flag: the flag to dump IR.
 void RegSSAMgr::dumpIRWithRegSSA(IR const* ir, DumpFlag flag) const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     ASSERT0(ir);
     xoc::dumpIR(ir, m_rg, nullptr, flag);
     LocalRegSSADump::dumpIRWithRegSSAInfo(this, m_rg, ir);
@@ -2393,7 +2405,8 @@ void RegSSAMgr::dumpBBList() const
 void RegSSAMgr::dumpVROpndRef() const
 {
     Region * rg = getRegion();
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP RegSSAMgr VROpndRef '%s' --==\n",
          rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
@@ -2410,7 +2423,7 @@ void RegSSAMgr::dumpVROpndRef() const
 
 bool RegSSAMgr::dump(OptCtx const* oc) const
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR)) {
         return false;
     }
     START_TIMER(t, "RegSSA: Dump After Pass");
@@ -3181,7 +3194,8 @@ void RegSSAMgr::dumpDUChainForStmt(
 void RegSSAMgr::dumpDUChain(OptCtx const* oc) const
 {
     Region * rg = getRegion();
-    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpRegSSAMgr()) { return; }
+    if (!rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_REGSSA_MGR))
+    { return; }
     note(rg, "\n==-- DUMP RegSSAMgr DU CHAIN '%s' --==\n", rg->getRegionName());
     BBList * bbl = rg->getBBList();
     ConstIRIter it;
@@ -6476,7 +6490,8 @@ bool RegSSAMgr::construction(DomTree & domtree, OptCtx & oc)
     ASSERT0(verifyPhi());
     prunePhi(wl, oc);
     cleanLocalUsedData();
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRegSSAMgr()) {
+    if (g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpPass(PASS_REGSSA_MGR)) {
         dump(&oc);
     }
     set_valid(true);

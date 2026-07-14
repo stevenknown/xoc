@@ -86,7 +86,11 @@ public:
         void append(IR * ir);
     };
 protected:
-    GenedList m_gened_list;
+    //The list records all generated SELECT operations that are converted.
+    GenedList m_truepart_gened_list;
+    GenedList m_falsepart_gened_list;
+    GenedList m_bottom_gened_list;
+    GenedList m_top_gened_list;
 public:
     LI<IRBB> const* m_li;
     IRCFG * m_cfg;
@@ -102,11 +106,8 @@ public:
     IfCvsCtx(IfCvsCtx const& src) : PassCtx(src) { copyTopDownInfo(src); }
     ~IfCvsCtx();
 
-    //Add new generated IR stmt into the generated-stmt-list.
-    //The list is regarded as the output of If-Conversion.
-    //ir: the IR stmt list.
-    void addToGenedList(IR * ir);
     void copyTopDownInfo(IfCvsCtx const& src);
+    void clean();
     void dump() const;
 
     LI<IRBB> const* getLI() const { return m_li; }
@@ -116,7 +117,10 @@ public:
     MDMgr * getMDMgr() const { return m_mdmgr; }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
     PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
-    GenedList & getGenedList() { return m_gened_list; }
+    GenedList & getTruePartGenedList() { return m_truepart_gened_list; }
+    GenedList & getFalsePartGenedList() { return m_falsepart_gened_list; }
+    GenedList & getBottomGenedList() { return m_bottom_gened_list; }
+    GenedList & getTopGenedList() { return m_top_gened_list; }
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -152,7 +156,20 @@ public:
     virtual ~IfConversion();
 
     bool canBeConverted(IR const* comp, IfCvsCtx const& ctx) const;
-    bool convertSelectToBranch(IR const* ir, MOD IfCvsCtx & ctx);
+
+    //The function is the reverse operation of if-conversion.
+    //It converts SELECT to CONDITIONAL-BRANCH stmt.
+    //Return true if new stmts generated, and the new stmts will be recorded
+    //in ctx.
+    //e.g: given $x = select $m, 1, 2;
+    //the new generated stmts are:
+    //  truebr eq $m, 0, TRUE;
+    //  $x = 2;
+    //  goto END;
+    //  label TRUE;
+    //  $x = 1;
+    //  label END;
+    static IR * convertSelectToBranch(IR const* ir, MOD IfCvsCtx & ctx);
 
     virtual bool dump() const;
 
@@ -160,6 +177,9 @@ public:
     //region in 'dr' as return result.
     static bool findDiamondRegion(
         IR const* ir, IfCvsCtx const& ctx, OUT DiamondRegion & dr);
+
+    //Return true if the function finds a diamond region and record the
+    //region in 'dr' as return result.
     static bool findDiamondRegion(
         IRBB const* bb, IfCvsCtx const& ctx, OUT DiamondRegion & dr);
 
@@ -179,4 +199,5 @@ public:
 };
 
 } //namespace xoc
+
 #endif

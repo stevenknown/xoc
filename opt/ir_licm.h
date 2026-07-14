@@ -69,10 +69,15 @@ public:
     PRSSAMgr * m_prssamgr;
     LICM * m_licm;
     Stmt2UseMgr * m_s2u_mgr;
+
+    //Record all hoisted stmt. It is usually used in dump.
+    IRTab m_hoisted_stmt;
 public:
     HoistCtx(OptCtx & t, DomTree * dt, LICM * licm, Stmt2UseMgr * s2u);
     HoistCtx(HoistCtx const& src);
     ~HoistCtx() {}
+
+    void addHoistedStmt(IR * ir) { m_hoisted_stmt.append(ir); }
 
     void buildDomTree(IRCFG * c)
     {
@@ -82,21 +87,26 @@ public:
         c->genDomTree(*domtree);
     }
 
-    void cleanAfterLoop() { inserted_guard_bb = false; }
+    void cleanAfterLoop() { inserted_guard_bb = false; m_s2u_mgr->clean(); }
     void copyTopDownInfo(HoistCtx const& src)
     {
         domtree = src.domtree;
         m_cfg = src.m_cfg;
         m_mdssamgr = src.m_mdssamgr;
         m_prssamgr = src.m_prssamgr;
+        m_licm = src.m_licm;
         m_s2u_mgr = src.m_s2u_mgr;
     }
+
+    void dump() const;
+
     LICM * getLICM() const { return m_licm; }
     IRCFG * getCFG() const { return m_cfg; }
     Region * getRegion() const { return m_rg; }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
     PRSSAMgr * getPRSSAMgr() const { return m_prssamgr; }
     Stmt2UseMgr const& getS2UMgr() const { return *m_s2u_mgr; }
+    IRTab & getHoistedStmtTab() { return m_hoisted_stmt; }
 
     void recordUseSet(IR const* ir);
     void unionBottomUpInfo(HoistCtx const& src)
@@ -105,6 +115,7 @@ public:
         cfg_changed |= src.cfg_changed;
         duset_changed |= src.duset_changed;
         stmt_changed |= src.stmt_changed;
+        m_hoisted_stmt.append(src.m_hoisted_stmt);
     }
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -139,12 +150,15 @@ protected:
     //It is used for temporary purpose.
     IRList m_analysable_stmt_list;
 
-    //Record if the expression is hoist-candidate.
+    //Record IR if the stmt or expression is hoist-candidate.
     //Note hoist-candidate is not always can be hoisted legally at last. It
     //depends on other conditions, such like the inside-loop DEF stmt has to
-    //be hoisted first. Whether a exp/stmt can be hoisted will be determined
-    //at hoistCand() finally.
+    //be hoisted first or stmt may be executed conditionally.
+    //Thus, whether a hoist-candidate can be hoisted will be determined at
+    //hoistCand() finally.
     IRTab m_hoist_cand;
+
+    //Record the number of DEF for each distinct MD.
     ComputeMD2DefCnt m_md2defcnt;
 public:
     LICMAnaCtx(Region const* rg, LI<IRBB> const* li, LICM * licm,
@@ -316,6 +330,9 @@ protected:
     virtual bool chooseExtStmt(IR * ir, IRIter & irit, OUT LICMAnaCtx & anactx);
     bool canBeRegardAsInvExp(IR const* ir, LICMAnaCtx const& anactx) const;
     bool canBeRegardAsInvExpList(IR const* ir, LICMAnaCtx const& anactx) const;
+    bool canHoistStmtByMDSSA(
+        LICMAnaCtx const& anactx, IR const* stmt, HoistCtx const& ctx) const;
+    void cleanMDSSADUForStmt(MOD IR * stmt, HoistCtx const& ctx);
 
     //Return true if code motion happened.
     //The funtion will maintain LoopInfo.

@@ -37,7 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 typedef DefSBitSetCore LiveSet;
-typedef DefSEGIter LiveSetIter;
+typedef DefSEGIter * LiveSetIter;
 typedef Vector<LiveSet*> LivenessVec;
 
 //Auxiliary livenessMgr that used to remove redundant liveness info.
@@ -92,14 +92,17 @@ protected:
         IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
     void computeExp(IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
     void computeStmt(IR const* stmt, MOD LiveSet * use, MOD LiveSet * gen);
+    void computeLocalIterBBIRList(
+        IRBB const* bb, LiveSet * use, LiveSet * gen);
 
     LiveSet * gen_liveout(UINT bbid);
     LiveSet * gen_livein(UINT bbid);
     LiveSet * gen_def(UINT bbid);
     LiveSet * gen_use(UINT bbid);
 protected:
-    void updateSetByStmt(BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen);
-    void updateSetByExp(BSIdx idx, MOD LiveSet * use);
+    virtual void updateSetByLHS(
+        BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen);
+    virtual void updateSetByRHS(BSIdx idx, MOD LiveSet * use);
 public:
     LivenessMgr(Region * rg);
     ~LivenessMgr() { clean(); }
@@ -107,9 +110,9 @@ public:
     void add_liveout(IRBB const* bb, PRNO prno);
     void add_livein(IRBB const* bb, PRNO prno);
 
-    void computeLocal(IRBB const* bb);
+    virtual void computeLocal(IRBB const* bb);
     void computeLocal(BBList const& bblst);
-    void computeGlobal(IRCFG const* cfg);
+    virtual void computeGlobal(IRCFG const* cfg);
     size_t count_mem() const;
     void clean() { cleanGlobal(); cleanLocal(); }
 

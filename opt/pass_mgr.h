@@ -189,7 +189,7 @@ public:
         return registerPass(passty);
     }
 
-    virtual Pass * queryPass(PASS_TYPE passty)
+    virtual Pass * queryPass(PASS_TYPE passty) const
     { return m_registered_pass.get(passty); }
 
     virtual Pass * replacePass(PASS_TYPE passty, Pass * newpass);

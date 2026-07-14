@@ -244,6 +244,8 @@ void InsertPhiHelper::makeMDSSAPhi(MDPhi const* phi)
     //insertPhiAtPreheaderAndRevisePhiAtLoophead() after preheader generated.
     MDPhi * newphi = m_mdssamgr->genMDPhi(
         phi->getResult()->mdid(), new_opnd_list, nullptr);
+
+    //Record the generated MDPhi into a list for subsequent processing.
     m_mdssa_preheader_phis.append_tail(newphi);
 }
 
@@ -1017,9 +1019,9 @@ static bool isLoopInvariantInPRSSA(
     //if it's operand is invariant.
     IRBB * defbb = def->getBB();
     ASSERT0(defbb);
-    if (!li->isInsideLoop(defbb->id()) ||
-        (invariant_stmt != nullptr &&
-         invariant_stmt->find(const_cast<IR*>(def)))) {
+    if (!li->isInsideLoop(defbb->id())) { return true; }
+    if (invariant_stmt != nullptr &&
+        invariant_stmt->find(const_cast<IR*>(def))) {
         return true;
     }
     return false;
@@ -1238,7 +1240,7 @@ static bool forceInsertPreheader(
     //code motion, because post CFG optimization will removed the
     //redundant BB.
     ASSERT0(helper.verify());
-    if (g_dump_opt.isDumpCFGOpt()) {
+    if (g_dump_opt.isDumpPass(PASS_CFG)) {
         helper.dump();
     }
     return need_phi;

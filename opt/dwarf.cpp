@@ -926,31 +926,33 @@ void MCDwarfMgr::encodeAdvanceLoc(OUT BYTEVec & os, UINT64 addr_delta)
     UINT64 const mask_2 = (UINT64)0x1 << 16;
     UINT64 const mask_3 = (UINT64)0x1 << 32;
 
-    if (addr_delta <= mask_0) {
+    if (addr_delta < mask_0) {
+        ASSERT0(addr_delta < DW_CFA_advance_loc);
         BYTE opcode = (BYTE)(DW_CFA_advance_loc | addr_delta);
         os.append(opcode);
         return;
     }
 
-    if (addr_delta <= mask_1) {
+    if (addr_delta < mask_1) {
+        ASSERT0(BYTE(addr_delta) == addr_delta);
         os.append(DW_CFA_advance_loc1);
         os.append(BYTE(addr_delta));
         return;
     }
 
-    if (addr_delta <= mask_2) {
+    if (addr_delta < mask_2) {
         os.append(DW_CFA_advance_loc2);
         appendBytesFromValue(os, addr_delta, getSizeForFixupKind(FK_DATA_2));
         return;
     }
 
-    if (addr_delta <= mask_3) {
+    if (addr_delta < mask_3) {
         os.append(DW_CFA_advance_loc4);
         appendBytesFromValue(os, addr_delta, getSizeForFixupKind(FK_DATA_4));
         return;
     }
 
-    ASSERT0(!(addr_delta > mask_3));
+    ASSERT0(!(addr_delta >= mask_3));
 }
 
 

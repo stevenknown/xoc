@@ -1,5 +1,6 @@
-This example implements a C compiler named xocc. It requires both the xgen and xocfe
-modules to participate in the XOC compilation process to build the xocc compiler.
+This example implements a C compiler named xocc. It requires both the xgen and
+xocfe modules to participate in the XOC compilation process to build the xocc
+compiler.
 The compilation steps are as follows:
 
 1. First, download the xgen and xocfe modules.
@@ -8,8 +9,8 @@ The compilation steps are as follows:
     git clone https://github.com/stevenknown/xocfe.git
 ```
 
-2. Copy the C frontend xocfe folder located under xocfe/src to the root directory
-of xoc.
+2. Copy the C frontend xocfe folder located under xocfe/src to the root
+directory of xoc.
 ```cmd
     cd xoc
     cp -rf <THE-PATH-OF-XOCFE>/xocfe/src/cfe ./
@@ -29,8 +30,10 @@ of xoc.
     ./build_xocc.sh
 ```
 
-5. There are plenty of test files under the `xoc/test` directory. Try compiling `xoc/test/hello.c`
-with the built `xocc.exe`; this will generate assembly code targeting the ARM architecture.
+5. There are plenty of test files under the `xoc/test` directory.
+Try compiling `xoc/test/hello.c`
+with the built `xocc.exe`; this will generate assembly code targeting the
+ARM architecture.
 ```cmd
     cd xoc
     xocc/xocc.exe test/compile/hello.c -O3 -o hello.s

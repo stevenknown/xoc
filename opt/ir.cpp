@@ -1371,6 +1371,16 @@ IR * IR::getRHS() const
 }
 
 
+IR * IR::getPureRHS() const
+{
+    IR * rhs = getRHS();
+    if (rhs != nullptr && rhs->is_select_to_res()) {
+        return SELECTTORES_op(rhs);
+    }
+    return rhs;
+}
+
+
 //Return true if ir is base expression of array operation.
 bool IR::isArrayBase(IR const* ir) const
 {

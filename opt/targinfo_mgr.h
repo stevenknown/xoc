@@ -453,6 +453,11 @@ public:
     }
     virtual void initRegSet();
 
+    //Map a compiler-internal Reg to the target-machine-word (TMWORD) used in
+    //assembly or machine code generation.
+    TMWORD mapRegToTargMachineReg(Reg r) const
+    { ASSERT0(r != REG_UNDEF); return xgen::tmMapReg2TMWORD(r); }
+
     void resetRef()
     {
         if (m_rdsys == nullptr) { return; }

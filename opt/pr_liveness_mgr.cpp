@@ -88,7 +88,7 @@ void PRLivenessMgr::processMayDef(
 void PRLivenessMgr::processMayUse(PRNO prno, MOD PRLiveSet * use)
 {
     ASSERT0(use);
-    updateSetByExp((BSIdx)prno, use);
+    updateSetByRHS((BSIdx)prno, use);
 }
 
 
@@ -97,7 +97,7 @@ void PRLivenessMgr::computeExpImpl(
 {
     ASSERT0(exp->is_exp());
     if (!exp->isReadPR()) { return; }
-    updateSetByExp((BSIdx)exp->getPrno(), use);
+    updateSetByRHS((BSIdx)exp->getPrno(), use);
     processMay(exp, gen, use, false);
 }
 
@@ -113,7 +113,7 @@ void PRLivenessMgr::computeStmtImpl(
     if (result != nullptr) {
         PRNO prno = result->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
-        updateSetByStmt((BSIdx)prno, use, gen);
+        updateSetByLHS((BSIdx)prno, use, gen);
     }
     processMay(stmt, gen, use, true);
 }

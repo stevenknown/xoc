@@ -238,7 +238,7 @@ static void postProcessAfterRemoveEdge(
 
 static void dumpRemovedIR(IR const* ir, RCECtx const& ctx)
 {
-    if (!g_dump_opt.isDumpRCE()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RCE)) { return; }
     Region * rg = ctx.getRegion();
     if (!rg->isLogMgrInit()) { return; }
     ActMgr * am = ctx.getActMgr();
@@ -253,7 +253,7 @@ static void dumpRemovedIR(IR const* ir, RCECtx const& ctx)
 
 static void dumpRemovedEdge(IRBB const* from, IRBB const* to, RCECtx const& ctx)
 {
-    if (!g_dump_opt.isDumpRCE()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RCE)) { return; }
     Region * rg = ctx.getRegion();
     if (!rg->isLogMgrInit()) { return; }
     ActMgr * am = ctx.getActMgr();
@@ -264,13 +264,12 @@ static void dumpRemovedEdge(IRBB const* from, IRBB const* to, RCECtx const& ctx)
 
 static void dumpChangedIR(IR const* oldir, IR const* newir, RCECtx const& ctx)
 {
-    if (!g_dump_opt.isDumpRCE()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_RCE)) { return; }
     Region const* rg = ctx.getRegion();
-    ActMgr * am = ctx.getActMgr();
     ASSERT0(rg);
-    if (am == nullptr || !rg->isLogMgrInit() || !g_dump_opt.isDumpBCP()) {
-        return;
-    }
+    if (!rg->isLogMgrInit()) { return; }
+    ActMgr * am = ctx.getActMgr();
+    if (am == nullptr) { return; }
     class Dump : public xoc::DumpToBuf {
     public:
         xcom::StrBuf buf;
@@ -894,7 +893,7 @@ bool RCE::performSimplyRCE(MOD RCECtx & ctx)
 
 bool RCE::dump() const
 {
-    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpRCE()) {
+    if (!g_dump_opt.isDumpAfterPass() || !g_dump_opt.isDumpPass(PASS_RCE)) {
         return true;
     }
     Region * rg = getRegion();
@@ -932,6 +931,8 @@ bool RCE::perform(OptCtx & oc)
         //GVN is not ready.
         return false;
     }
+    dumpBeforePass();
+
     //Incremental update DOM need RPO.
     m_rg->getPassMgr()->checkValidAndRecompute(
         &oc, PASS_RPO, PASS_DOM, PASS_GVN, PASS_UNDEF);

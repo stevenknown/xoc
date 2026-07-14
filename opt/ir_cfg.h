@@ -94,7 +94,6 @@ protected:
 
     void dumpGraph(FILE * h) const;
     void dumpGraph() const;
-    void dumpForTest(UINT flag) const;
 
     void initEntryAndExit();
 
@@ -212,6 +211,37 @@ public:
     void addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ);
     void addDomInfoToFallThroughBB(
         IRBB const* marker, IRBB const* newbb, IRBB const* oldnext);
+
+    //The function adds Dom, Pdom, IDom, IPDom information for each IRBB
+    //in a subsequent Diamond Region, whereas
+    //update the related info for 'marker'.
+    //e.g:given Diamond Region top=V3, left=V4, right=V5, bottom=V6, after
+    //inserting the diamond region between edge V1->V2, the graph will be:
+    //    V1
+    //    |
+    //    v
+    //  -v3-
+    // |    |
+    // V4   V5
+    // |_  _|
+    //   ||
+    //   vv
+    //   V6
+    //   |
+    //   v
+    //   V2
+    //NOTE:the function maintains the Dom and PDom info after graph changed.
+    //marker:a marker vertex.
+    //top,left,right,bottom:these vertice constructs a Diamond Region that
+    //  is an immediate successor region of 'marker'.
+    //  The function will check the relation.
+    //oldsucc:the vertex that must be immediate successor of 'marker' before
+    //  graph changed.
+    //  NOTE: user has to guarrantee the relation of 'marker' and
+    //  'oldsucc' because the function could not check the relation.
+    void addDomInfoToFallThroughDiamondRegion(
+        IRBB const* marker, IRBB const* top, IRBB const* left,
+        IRBB const* right, IRBB const* bottom, IRBB const* oldsucc);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method

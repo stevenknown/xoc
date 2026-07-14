@@ -673,8 +673,11 @@ public:
     //Return the vector that record all allocated IRs.
     Vector<IR*> & getIRVec() { return m_ir_vec; }
 
+    //Get the destination pr of MOV IR.
+    IR * getMoveDstPR(IR * mov) const;
+
     //Get the source pr of MOV IR.
-    virtual IR * getMoveSrcPr(IR const* mov) const;
+    virtual IR * getMoveSrcPR(IR const* mov) const;
 
     virtual CHAR const* getPassName() const { return "IRMgr"; }
     virtual PASS_TYPE getPassType() const { return PASS_IRMGR; }
@@ -692,6 +695,9 @@ public:
 
     //Return true if ir represents immediate integer 1 or approximate float 1.0.
     static bool isConstOne(IR const* ir);
+
+    //Return true if ir contains the indirect Mem Op in the kids.
+    static bool isContainIndirectMemOp(IR const* ir);
 
     //Return true if ir tree is isomorphic to src.
     //ir: root of IR tree.

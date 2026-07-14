@@ -131,6 +131,10 @@ public:
 };
 
 
+//
+//START VisitTree
+//
+//The class represents the access-function of tree.
 class VisitTreeFuncBase {
 public:
     //The function is a callback interface.
@@ -258,6 +262,7 @@ void VisitTree<VF>::visit(Vertex const* start)
         }
     }
 }
+//END VisitTree
 
 } //namespace xcom
 #endif

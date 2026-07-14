@@ -240,7 +240,7 @@ public:
 };
 
 
-//The class define the iterator that used to iterate IR occurrence for
+//The class define the iterator that is used to iterate IR occurrence for
 //each VOpnd in MDSSA mode.
 class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
@@ -301,6 +301,29 @@ public:
 };
 
 
+//The class defines the iterator that is used to iterate MDDef.
+//The class supplies the following iteration:
+//1. given expression, the class iterates all DEF stmt and phi to the
+//   expression.
+//   e.g:given ld x, the iterator will iterate phi, st1 and st2.
+//        st1 x=1  st2 x=2
+//           |     |
+//           v     v
+//     mdphi(st1,  st2)
+//       |_______
+//               |
+//               v
+//              =ld x
+//2. given MDDef, the class iterates all previous MDDefs throught Def-Def
+//   chain.
+//   e.g:given st3, the iterator will iterate phi, st1 and st2.
+//        st1 x=1  st2 x=2
+//           |     |
+//           v     v
+//     mdphi(st1,  st2)
+//       |
+//       v
+//       st3=3
 class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);
 protected:
@@ -314,23 +337,22 @@ public:
     bool is_visited(MDDef const* def) const
     { return m_is_visited.find(def->id()); }
 
-    //Iterative access MDDef chain.
-    //The funtion initialize the iterator.
+    //The function will iterate the Def-Def chain.
+    //The funtion initializes the iterator.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
     //def: the beginning MDDef of the chain.
     //it: iterator. It should be clean already.
     MDDef const* get_first(MDDef const* def);
 
-    //Iterative access MDDef chain.
-    //The function return the next MDDef node according to 'it'.
+    //The function will iterate the Def-Def chain.
+    //The function returns the next MDDef node according to 'it'.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
-    //it: iterator.
     MDDef const* get_next();
 
-    //Iterative access MDDef chain.
-    //The funtion initialize the iterator.
+    //The function will iterate the Def-Use chain and the Def-Def chain.
+    //The funtion initializes the iterator.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
     //def: the beginning MDDef of the chain.
@@ -339,8 +361,8 @@ public:
     //Readonly function.
     MDDef const* get_first_untill_killing_def(MDDef const* def, IR const* use);
 
-    //Iterative access MDDef chain.
-    //The function return the next MDDef node according to 'it'.
+    //The function will iterate the Def-Use chain and the Def-Def chain.
+    //The function returns the next MDDef node according to 'it'.
     //When the iterator meets MDPhi, it will keep iterating the DEF of each
     //operand of MDPhi.
     //it: iterator.
@@ -350,6 +372,48 @@ public:
     OptCtx const* getOptCtx() const { return m_oc; }
 
     void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
+};
+
+
+//The class defines the iterator that is used to iterate MDDef.
+//For given MDDef, the class iterates all next MDDefs throught Def-Def.
+class ConstNextMDDefIter : public xcom::List<MDDef const*> {
+    COPY_CONSTRUCTOR(ConstNextMDDefIter);
+protected:
+    MDSSAMgr const* m_mdssamgr;
+    OptCtx const* m_oc;
+    #ifdef _DEBUG_
+    xcom::TTab<UINT> m_is_visited; //only for verification.
+    #endif
+public:
+    ConstNextMDDefIter(MDSSAMgr const* mdssamgr, OptCtx const* oc)
+        : m_mdssamgr(mdssamgr), m_oc(oc) {}
+
+    #ifdef _DEBUG_
+    bool is_visited(MDDef const* def) const
+    { return m_is_visited.find(def->id()); }
+    void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
+    #endif
+
+    //If user expects to stop iterating 'mddef' and all its Next-Def,
+    //return true.
+    //By default, the class iterates Def-Def chain until the end.
+    virtual bool doStopAccess(MDDef const* mddef) const { return false; }
+
+    //The function will iterate the Def-Def chain.
+    //The funtion initializes the iterator.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //def: the beginning MDDef of the chain.
+    //it: iterator. It should be clean already.
+    MDDef const* get_first(MDDef const* def);
+
+    //The function will iterate the Def-Def chain.
+    //The function returns the next MDDef node according to 'it'.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    MDDef const* get_next();
+    OptCtx const* getOptCtx() const { return m_oc; }
 };
 
 
@@ -452,14 +516,16 @@ public:
     MDSSAMgr * getMgr() const { return m_mgr; }
     ActMgr * getActMgr() const { return m_am; }
 
-    //The function performs SSA reversioning for given 'root'.
+    //The function performs MDSSA reversioning for given 'root'.
     //root: the root IR that expected to start to set live-in.
     //      Note root can be stmt or expression.
     //startir: the start position in 'startbb', it can be NULL.
-    //         If it is NULL, the function first finding the Phi list of
+    //         If it is NULL, the function first finding the MDPhi list of
     //         'startbb', then keep finding its predecessors until meet the
     //         CFG entry.
     //startbb: the BB that begin to do searching. It can NOT be NULL.
+    //    NOTE:the search begins at the end of startbb, and scan each stmt
+    //    backwards.
     //e.g: root is LD x:
     //    st x = 0; #x's VMD is MD10V1
     //     ... = LD x; #x's VMD is MD10V3
@@ -467,6 +533,21 @@ public:
     //     st x = 0; #x's VMD is MD10V1
     //     ... = LD x; #x's VMD is MD10V1
     void rename(MOD IR * root, IR const* startir, IRBB const* startbb);
+
+    //The function performs MDSSA reversioning for given 'root'.
+    //root:the root IR that expected to start to set live-in.
+    //    Note root can be stmt or expression.
+    //    The function begins renaming at the previous stmt or MDPhi of the
+    //    stmt or MDPhi that contains 'root'.
+    //    If 'root' is already the first stmt or the first MDPhi of BB, the
+    //    function will begin renaming at the predecessors of BB of 'root'.
+    //e.g: root is LD x:
+    //    st x = 0; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V3
+    //after renaming:
+    //     st x = 0; #x's VMD is MD10V1
+    //     ... = LD x; #x's VMD is MD10V1
+    void rename(MOD IR * root);
 };
 //END RenameExp
 
@@ -574,22 +655,22 @@ private:
 
     //Insert vmd after phi.
     //Return true if inserted PHI into DD chain.
-    bool tryInsertDDChainForDesigatedVMD(
+    bool tryInsertDesigatedVMDIntoDDChain(
         MDPhi * phi, VMD * vmd, MOD VMDLiveSet & liveset);
 
     //Insert vmd after 'ir'.
     //vmd: new generated VMD that to be inserted.
     //before: true to insert 'vmd' in front of 'ir'.
     //Return true if inserted PHI into DD chain.
-    bool tryInsertDDChainForDesigatedVMD(
+    bool tryInsertDesigatedVMDIntoDDChain(
         IR * ir, VMD * vmd, bool before, MOD VMDLiveSet & liveset);
 
     //Return true if inserted 'ir' into DD chain.
-    bool tryInsertDDChainForStmt(
+    bool tryInsertStmtIntoDDChain(
         IR * ir, bool before, MOD VMDLiveSet & liveset);
 
     //Return true if inserted PHI into DD chain.
-    bool tryInsertDDChainForPhi(MDPhi * phi, MOD VMDLiveSet & liveset);
+    bool tryInsertMDPhiIntoDDChain(MDPhi * phi, MOD VMDLiveSet & liveset);
 public:
     RenameDef(DomTree const& dt, bool build_ddchain, MDSSAMgr * mgr,
               ActMgr * am);
@@ -1240,6 +1321,11 @@ public:
 
     //The function dumps VMD structure and SSA DU info.
     void dumpAllVMD() const;
+    void dumpDefDefChain() const;
+
+    //The function dumps VMD for all stmts and expressions.
+    //The traversal order of BBs follows DomTree.
+    void dumpVMDInDomTreeOrder() const;
 
     //Dump IR tree and MDSSAInfo if any.
     //ir: can be stmt or expression.
@@ -1289,6 +1375,9 @@ public:
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 1, 2, 3, there is no nearest killing def.
     MDDef * findKillingMDDef(IR const* ir, OptCtx const* oc) const;
+
+    //The function finds the available DEF exp of 'ir'.
+    MDDef * findAvailDef(IR const* ir) const;
 
     //Find the nearest virtual DEF of 'ir'.
     //ir: expression.
@@ -1356,6 +1445,7 @@ public:
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
     VMD * getVMD(UINT i) const { return (VMD*)getVOpnd(i); }
+    MDDef * getMDDef(UINT id) const { return m_usedef_mgr.getMDDef(id); }
     virtual CHAR const* getPassName() const { return "MDSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MDSSA_MGR; }
 
@@ -1688,6 +1778,30 @@ public:
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
+
+//The funtion recompute the DefDef and DefUse chain for stmt.
+//e.g:given stmt is st u = ...;
+//  The function will recompute the DEF of all expressions that may defined
+//  by 'st u', and insert the stmt into the DefDef chain of 'st u'.
+void recomputeDefDefAndDefUseChain(
+    MOD IR * ir, xcom::DomTree const& domtree, MOD MDSSAMgr * mgr,
+    OptCtx const& oc, MOD ActMgr * am);
+
+//The funtion recompute the DefUse chain for each expressions of 'stmt'.
+//e.g:given stmt is stpr $x = add ld m, ld n;
+//  The function will recompute the DEF of 'ld m' and 'ld n'.
+void recomputeDefUseChain(
+    MOD IR * exp, IRBB const* bb, IR const* startstmt,
+    xcom::DomTree const& domtree, MOD MDSSAMgr * mgr,
+    OptCtx const& oc, MOD ActMgr * am);
+
+//The funtion recompute the DefUse chain for given expression.
+//NOTE: the function will NOT iterate IR tree for 'exp'.
+//e.g:given exp 'ild (ld p)'
+//  The function will recompute the DEF of 'ild', but not that of 'ld p'.
+void recomputeDefUseChainForAllExp(
+    MOD IR * stmt, xcom::DomTree const& domtree, MOD MDSSAMgr * mgr,
+    OptCtx const& oc, MOD ActMgr * am);
 
 } //namespace xoc
 #endif
