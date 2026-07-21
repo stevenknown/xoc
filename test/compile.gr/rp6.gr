@@ -10,7 +10,7 @@ region program "program" () {
                 starray:i32:0:(elemtype:u64,dim[1]) =
                   add:*<1> $sp:*<4>, 10, //base
                   ($e:u32), //subexp
-                  20; //rhs
+                  29999; //rhs
             }
             stpr $y = array:i32:0:(elemtype:u64,dim[1])
                          add:*<1> $sp:*<4>, 10, //base

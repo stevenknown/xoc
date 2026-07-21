@@ -1,0 +1,93 @@
+//Check the restore stmt inserted by RP will insert correct MDSSA DefDef chain.
+region program ".program" () {
+    var g:i32:(align(4));
+    var s86:*<4>:(func,align(4));
+    var y2:mc<48>:(private,array,align(4));
+    var "#DedicatedStringVar":str:(unallocable,align(4),string("DedicatedVarBeRegardedAsString"));
+    region func s86 () {
+        var lrc:i32:(align(4));
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        var k:i32:(align(4));
+        label "_GR__$L10";
+        st:i32 j = 0:i32;
+        label "_GR__$L1";
+        phi $5:i32 = (
+            $1:i32,"_GR__$L10"),(
+            $6:i32,"_GR__$L11");
+        falsebr (
+            lt:bool
+                ld:i32 j, 10:i32), "_GR__$L2";
+        label "_GR__$L11";
+        st:i32 lrc = 1:i32;
+        stpr $6:i32 =
+            ld:i32 j;
+        st:i32 j =
+            add:i32
+                ld:i32 j, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        st:i32 i = 0:i32;
+        label "_GR__$L3";
+        phi $7:i32 = (
+            $3:i32,"_GR__$L2"),(
+            $8:i32,"_GR__$L6");
+        phi $9:i32 = (
+            $2:i32,"_GR__$L2"),(
+            $10:i32,"_GR__$L6");
+        falsebr (
+            lt:bool
+                ld:i32 i, 4:i32), "_GR__$L4";
+        label "_GR__$L12";
+        st:i32 j = 0:i32;
+        label "_GR__$L5";
+        phi $10:i32 = (
+            $9:i32,"_GR__$L12"),(
+            $11:i32,"_GR__$L7");
+        falsebr (
+            lt:bool
+                ld:i32 j, 3:i32), "_GR__$L6";
+        falsebr (
+            ne:bool
+                ld:i32 g,
+                array:i32:0:(dim[3,4])
+                    lda y2, (
+                    ld:i32 j,
+                    ld:i32 i)), "_GR__$L7";
+        st:i32 lrc = 1:i32;
+        label "_GR__$L7";
+        stpr $11:i32 =
+            ld:i32 j;
+        st:i32 j =
+            add:i32
+                ld:i32 j, 1:i32;
+        goto "_GR__$L5";
+        label "_GR__$L6";
+        stpr $8:i32 =
+            ld:i32 i;
+        st:i32 i =
+            add:i32
+                ld:i32 i, 1:i32;
+        goto "_GR__$L3";
+        label "_GR__$L4";
+        st:i32 j = 0:i32;
+        label "_GR__$L8";
+        phi $12:i32 = (
+            $4:i32,"_GR__$L4"),(
+            $13:i32,"_GR__$L13");
+        falsebr (
+            lt:bool
+                ld:i32 j, 4:i32), "_GR__$L9";
+        label "_GR__$L13";
+        st:i32 lrc = 1:i32;
+        stpr $13:i32 =
+            ld:i32 j;
+        st:i32 j =
+            add:i32
+                ld:i32 j, 1:i32;
+        goto "_GR__$L8";
+        label "_GR__$L9";
+        return
+            ld:i32 lrc;
+    };
+}

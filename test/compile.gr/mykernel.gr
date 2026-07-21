@@ -7,7 +7,7 @@ region program mykernel () {
         var kt:*<4>:(align(16));
         var rci:u32:(align(8));
         var a:u8:(align(8));
-        var b:any:(align(8));
+        var b:i16:(align(8));
         var c:i16:(align(8));
         var d:i16:(align(8));
         var key:any:(func, align(4));

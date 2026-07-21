@@ -11,14 +11,20 @@ region program ".program" () {
         stpr $y:i32 = lda:4 ap;
         label "_$L3";
         starray:*<1>:0:(dim[2]) = lda ap, (0:i32), lda _const_string_1;
+
+        //NOTE: cvt does not change VN.
         stpr $j:i64 = cvt:i64 $x:i32;
         stpr $i:i64 = cvt:i64 $y:i32;
         label "_$L1";
         falsebr (lt:bool $t:i32, 5:i32), "_$L2";
+
+        //NOTE: cvt does not change VN.
         stpr $m:i16 = cvt:i16 $x:i64;
         stpr $j:i32 = add $j:i32, $i:i64;
         goto "_$L1";
         label "_$L2";
+
+        //NOTE: cvt does not change VN.
         stpr $s3:u32 = cvt:u32 $y:i32;
         return $s3:i32 ;
     };

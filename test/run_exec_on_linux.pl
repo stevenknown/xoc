@@ -49,6 +49,7 @@ sub buildBuiltIn
         }
         chdir ".."; #back to parent directory
 	}
+    print "\n\n\nALL TESTCASES FINISH!!!\n";
     return 0;
 }
 
@@ -81,9 +82,10 @@ sub main
     buildBuiltIn();
     $g_is_quit_early = 0;
     if (runAllCases() ne $g_succ) {
-        return 1;
+        exit(1);
     }
-    return 0;
+    print "\n\n\nRUN EXEC ALL TESTCASES FINISH!!!\n";
+    exit(0);
 }
 
 sub execScript

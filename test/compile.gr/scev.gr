@@ -17,14 +17,22 @@ region func mat (undefined,var a:*<8>:(align(4)),var b:*<8>:(align(4)),var c:*<8
     //    }
     //}
     var i1:i32:(align(4));
-    var i2:i32:(align(4));
     var n1:i32:(align(4));
-    var n2:i32:(align(4));
     var j1:i32:(align(4));
+    var i2:i32:(align(4));
+    var n2:i32:(align(4));
     var j2:i32:(align(4));
     var i:i32:(align(4));
     var j:i32:(align(4));
     var k:i32:(align(4));
+
+    st:i32 i1 = 10;
+    st:i32 n1 = 11;
+    st:i32 j1 = 12;
+    st:i32 i2 = 10;
+    st:i32 n2 = 11;
+    st:i32 j2 = 12;
+ 
     st:i32 k = 0;
     label "_GR__$L1";
     falsebr (lt ld:i32 k, ld:i32 o), "_GR__$L2";

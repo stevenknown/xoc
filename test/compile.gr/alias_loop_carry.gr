@@ -29,8 +29,8 @@ region program ".program" () {
         //%h -> $5
 
         label FOR_BODY;
-        phi $1 = ($4, ENTRY), ($2, FOR_BODY);
-        phi $2 = ($5, ENTRY), ($1, FOR_BODY);
+        phi $1:*<1> = ($4, ENTRY), ($2:*<1>, FOR_BODY);
+        phi $2:*<1> = ($5, ENTRY), ($1:*<1>, FOR_BODY);
         stpr $10 = ild:f32 ($1:*<1>);
         ist:*<1> = $2:*<1>, $3; //$3 is RHS
         truebr (gt $10:u32, 0:f32), FOR_BODY;

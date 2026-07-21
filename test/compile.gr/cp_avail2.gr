@@ -1,0 +1,49 @@
+region program ".program" () {
+    var bcmp:any:(func,align(4));
+    var EXITFLAG:u32:(align(4));
+    var __const_originfunc_s:mc<7>:(align(4),array,byte(0x39,0x39,0x39,0x39,0x39,0x39,0x0));
+    var _str:mc<7>:(align(4),array,byte(0x31,0x39,0x39,0x39,0x39,0x39,0x0));
+    var sf:any:(align(4),func);
+    var xxx:i32:(align(4),func);
+    var yyy:i32:(align(4),func);
+    region func sf (var sf_param0:u64:(align(8)),var sf_param1:u64:(align(8)),var func_retval0:u64:(volatile,align(8))) {
+        //BB1:
+        stpr $4:u64 = ld:u64 sf_param1;
+        st:*<1> yyy = ld:u64 sf_param0;
+
+        //BB2:
+        label label_BB0_1;
+        st:*<1> xxx = ld:*<1> yyy; //yyy can't be propagated, because it will be modified during the path.
+        stpr $6:i64 = ild:u8:444 ld:*<1> xxx;
+        stpr $13:i64 = 57:i8;
+        truebr (
+            ne:bool 
+                $6:i64, 
+                $13:i64), label_BB0_4;
+
+        //BB3:
+        label label_BB0_2;
+        st:*<1> yyy = add:i64 ld:*<1> xxx, -1:i64; //yyy is modified here.
+        truebr (
+            ne:bool 
+                $4:i64, 
+                $yy:*<1>), label_BB0_1;
+
+        //BB4:
+        label label_BB0_3;
+        stpr $7:u8 = 48:u8;
+        ist:u8 = 
+            ld:*<1> yyy,
+            $7:u8;
+
+        //BB5:
+        label label_BB0_4;
+        stpr $8:u8 = 
+            ild:u8:888 
+                ld:*<1> xxx; //yyy can not be propagated here.
+        stpr $9:i8 = add:i8 $8:i8, 1:i8;
+        ist:u8:888 = ld:*<1> xxx, $9:u8;
+        st:u64:0:(sideeffect) func_retval0 = ld:*<1> yyy;
+        return ;
+    };
+}

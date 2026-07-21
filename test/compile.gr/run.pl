@@ -29,6 +29,8 @@ our $g_error_count;
 our $g_single_directory; #record the single directory
 our $g_succ;
 our $g_fail;
+our $g_true;
+our $g_false;
 require "../util.pl";
 prolog();
 main();
@@ -138,7 +140,8 @@ sub compileAsmLinkRunCompareMove
 
         #Compare the new dump file.
         if ($g_is_compare_dump == 1) {
-            compareDumpFile($fullpath, $xocc_dump_file);
+            #compareDumpFile($fullpath, $xocc_dump_file, $g_false);
+            checkRuleOfDumpFile($fullpath, $xocc_dump_file, $g_false);
             if ($g_error_count > 0) { next; }
         }
 

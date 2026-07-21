@@ -176,6 +176,7 @@ CopyProp::CopyProp(Region * rg) :
     m_oc = nullptr;
     m_mdssamgr = nullptr;
     m_prssamgr = nullptr;
+    m_analyze_avail_exp_by_du_chain = false;
     ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm && m_md_set_mgr);
     UINT flag = CP_PROP_CONST|CP_PROP_PR|CP_PROP_NONPR;
 
@@ -461,12 +462,32 @@ void AnalyzeAvailExpr::init()
 }
 
 
+bool AnalyzeAvailExpr::isOnlyContainUniqueVMDForSameMD(
+    VMD const* vmd, LiveSet const* set) const
+{
+    LiveSetIter vit;
+    UINT count = 0;
+    MDIdx vmdmdid = vmd->mdid();
+    for (BSIdx i = set->get_first(&vit);
+         i != BS_UNDEF; i = set->get_next(i, &vit)) {
+        VMD const* t = m_mdssamgr->getVMD(i);
+        ASSERT0(t);
+        ASSERT0(t->is_md());
+        if (t->mdid() != vmdmdid) { continue; }
+        count++;
+        if (t != vmd) { return false; }
+    }
+    return count == 1;
+}
+
+
 bool AnalyzeAvailExpr::isAllVOpndLiveInAtBB(
     IR const* exp, IRBB const* start) const
 {
     ASSERT0(exp && exp->is_exp() && exp->isMemRefNonPR());
     ASSERT0(m_vmdliveness_mgr.is_valid());
-    LiveSet const* livein = m_vmdliveness_mgr.get_livein(start->id());
+    LiveSet const* livein =
+        m_vmdliveness_mgr.get_livein(start->id());
     ASSERT0(livein);
     MDSSAInfo const* info = m_mdssamgr->getMDSSAInfoIfAny(exp);
     ASSERT0(info);
@@ -476,7 +497,22 @@ bool AnalyzeAvailExpr::isAllVOpndLiveInAtBB(
          i != BS_UNDEF; i = set.get_next(i, &vit)) {
         VMD const* vmd = (VMD const*)m_mdssaudmgr->getVOpnd(i);
         ASSERT0(vmd && vmd->is_md());
-        if (!livein->is_contain(vmd->id())) { return false; }
+        if (!isOnlyContainUniqueVMDForSameMD(vmd, livein)) {
+             //NOTE: this is a relatively conservative conditional judgement.
+            //The DEF of VMD may reach 'start' even if the VMD does not be
+            //contained in livein.
+            //e.g: compile.gr/cp_avail3.gr
+            //There are no USE OCC in 'start' BB. The live-in info
+            //does not contain MD16V2. However, MD16V2 can reach BB 'start'.
+            //BB2:
+            //  MD16V2 <- ...
+            //  ...    <- MD16V2
+            //  |
+            //  v
+            //BB 'start':
+            //  return;
+            return false;
+        }
     }
     return true;
 }
@@ -534,7 +570,7 @@ bool AnalyzeAvailExpr::canExpLiveBetweenBB(
 }
 
 
-//Return true if the function can guarrantee 'exp' lives at the BB between
+//Return true if the function guarrantees 'exp' lives at the BB between
 //'start' and 'meetup'. Otherwise return false, and we can't give a certain
 //answer.
 bool AnalyzeAvailExpr::canExpTreeLiveBetweenBB(
@@ -557,8 +593,7 @@ bool AnalyzeAvailExpr::existMayDefTillBB(
             m_cfg, m_rg, &m_domtree, startvex, meetup->id(), exp,
             is_aggressive());
     }
-    bool by_du_chain = false;
-    if (by_du_chain) {
+    if (getCP()->shouldAnalyzeAvailExpByDUChain()) {
         return canExpTreeLiveBetweenBB(exp, start, meetup);
     }
     return iterByCFG(
@@ -747,6 +782,9 @@ bool AnalyzeAvailExpr::isAvailableExpr(
 //END AnalyzeAvailExpr
 
 
+//
+//START CopyProp
+//
 bool CopyProp::isAvailable(
     IR const* cand_exp, IR const* pos,
     IRListIter const& cand_exp_stmt_it, CPCtx const& ctx) const
@@ -1282,9 +1320,13 @@ bool CopyProp::doPropBBInDomTreeOrder()
     UINT const max_try = 50;
     xcom::DomTree domtree;
     m_cfg->genDomTree(domtree);
+
+    //Define avail-exp analyzor to analyze available-exp.
     AnalyzeAvailExpr anaexpr(this, m_rg, domtree, *getOptCtx());
-    //hack
-    //anaexpr.init();
+    if (shouldAnalyzeAvailExpByDUChain()) {
+        //DU chain based analysis needs more info than other methods.
+        anaexpr.init();
+    }
     CPCtx ctx(*getOptCtx(), &getActMgr(), domtree, anaexpr);
     do {
         PropVisitFunc vf(m_cfg, this, getSegMgr(), ctx);

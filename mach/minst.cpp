@@ -167,7 +167,7 @@ void MInst::setFieldValue(FIELD_TYPE ft, TMWORD val)
 }
 
 
-UINT MInst::getTotalFieldByteSize()
+UINT MInst::getTotalFieldByteSize() const
 {
     ASSERT0(m_inst_desc);
     return m_inst_desc->getTotalFieldByteSize();

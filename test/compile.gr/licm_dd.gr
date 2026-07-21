@@ -1,0 +1,216 @@
+region program ".program" () {
+    var EXITFLAG:u32:(align(4));
+    var A:u8:(align(4),byte(0x41));
+    var u:mc<32>:(array,align(8),byte(0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0));
+    var reset:any:(func,align(8));
+    var check:any:(func,align(8));
+    var originfunc:any:(func,align(8));
+    var corefunc:any:(func,align(8));
+    region func originfunc (var func_retval0:u32:(volatile,align(4))) {
+        label "_@GR__$L16";
+        stpr $70:u64 = 0:u64;
+
+
+        label label_BB2_1;
+        phi $71:i64 = ($70:u64,"_@GR__$L16"),($72:i64,label_BB2_22);
+        stpr $77:*<1> = lda u;
+        stpr $78:u64 = 7016996765293437281:u64;
+
+        //The ist is INV STMT. However it can't be hoisted.
+        //Because its modified value will be used over MDSSA NEXT-DEF.
+        //This is #S1
+        ist:u64    = $77:*<1>, $78:u64;
+        ist:u64:8  = $77:*<1>, $78:u64;
+        ist:u64:16 = $77:*<1>, $78:u64;
+
+        stpr $79:i32 = 1633771873:i32;
+        ist:u32:24 = $77:*<1>, $79:u32;
+
+        stpr $80:u16 = 24929:u16;
+        ist:u16:28 = $77:*<1>, $80:u16;
+
+        stpr $81:u8 = 97:u8;
+        ist:u8:30 = $77:*<1>, $81:u8;
+
+
+        //Increase induction variable.
+        stpr $74:*<1> = add:i64 $77:*<1>, $71:i64;
+
+        //The IST is the MDSSA NEXT-DEF of #S1.
+        stpr $82:u8 = 0:u8;
+        ist:u8 = $74:*<1>, $82:u8;
+        stpr $76:i32 = 1:i32;
+        truebr (
+            eq:bool 
+                $71:i64, 0:i64), label_BB2_6;
+
+        label label_BB2_2;
+        stpr $83:u64 = 0:u64;
+        label label_BB2_3;
+        phi $84:i64 = (
+            $83:u64,label_BB2_2),(
+            $85:i64,label_BB2_5);
+        stpr $86:*<1> = 
+            lda u;
+        stpr $87:*<1> = 
+            add:i64 
+                $86:*<1>, 
+                $84:i64;
+        stpr $88:i64 = 
+            ild:u8 
+                $87:*<1>;
+        stpr $89:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $88:i64, 
+                $89:i64), label_BB2_5;
+        label label_BB2_4;
+        stpr $90:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $90:*<1>,
+            $76:u32;
+        label label_BB2_5;
+        stpr $85:i64 = 
+            add:i64 
+                $84:i64, 1:i64;
+        truebr (
+            ne:bool 
+                $71:i64, 
+                $85:i64), label_BB2_3;
+        label label_BB2_6;
+        stpr $92:i64 = 
+            ild:u8:1 
+                $74:*<1>;
+        stpr $93:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $92:i64, 
+                $93:i64), label_BB2_8;
+        label label_BB2_7;
+        stpr $94:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $94:*<1>,
+            $76:u32;
+        label label_BB2_8;
+        stpr $95:i64 = 
+            ild:u8:2 
+                $74:*<1>;
+        stpr $96:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $95:i64, 
+                $96:i64), label_BB2_10;
+        label label_BB2_9;
+        stpr $97:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $97:*<1>,
+            $76:u32;
+        label label_BB2_10;
+        stpr $98:i64 = 
+            ild:u8:3 
+                $74:*<1>;
+        stpr $99:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $98:i64, 
+                $99:i64), label_BB2_12;
+        label label_BB2_11;
+        stpr $100:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $100:*<1>,
+            $76:u32;
+        label label_BB2_12;
+        stpr $101:i64 = 
+            ild:u8:4 
+                $74:*<1>;
+        stpr $102:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $101:i64, 
+                $102:i64), label_BB2_14;
+        label label_BB2_13;
+        stpr $103:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $103:*<1>,
+            $76:u32;
+        label label_BB2_14;
+        stpr $104:i64 = 
+            ild:u8:5 
+                $74:*<1>;
+        stpr $105:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $104:i64, 
+                $105:i64), label_BB2_16;
+        label label_BB2_15;
+        stpr $106:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $106:*<1>,
+            $76:u32;
+        label label_BB2_16;
+        stpr $107:i64 = 
+            ild:u8:6 
+                $74:*<1>;
+        stpr $108:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $107:i64, 
+                $108:i64), label_BB2_18;
+        label label_BB2_17;
+        stpr $109:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $109:*<1>,
+            $76:u32;
+        label label_BB2_18;
+        stpr $110:i64 = 
+            ild:u8:7 
+                $74:*<1>;
+        stpr $111:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $110:i64, 
+                $111:i64), label_BB2_20;
+        label label_BB2_19;
+        stpr $112:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $112:*<1>,
+            $76:u32;
+        label label_BB2_20;
+        stpr $113:i64 = 
+            ild:u8:8 
+                $74:*<1>;
+        stpr $114:i64 = 97:i8;
+        truebr (
+            eq:bool 
+                $113:i64, 
+                $114:i64), label_BB2_22;
+        label label_BB2_21;
+        stpr $115:*<1> = 
+            lda EXITFLAG;
+        ist:u32 = 
+            $115:*<1>,
+            $76:u32;
+        label label_BB2_22;
+        stpr $72:i64 = 
+            add:i64 
+                $71:i64, 1:i64;
+        stpr $116:i64 = 4:i64;
+        truebr (
+            ne:bool 
+                $72:i64, 
+                $116:i64), label_BB2_1;
+        label label_BB2_23;
+        stpr $117:i32 = 0:i32;
+        st:u32:0:(sideeffect) func_retval0 = 
+            $117:u32;
+        return ;
+    };
+}

@@ -386,72 +386,51 @@ MDDef const* ConstMDDefIter::get_next_untill_killing_def(IR const* use)
 //
 //START ConstNextMDDefIter
 //
-static void iterNextDefCHelperPhi(
+void ConstNextMDDefIter::tryCrossPhi(
     MDDef const* def, MDSSAMgr const* mgr, OUT ConstNextMDDefIter & it)
 {
-    //Iter phi's opnd
-    ASSERT0(def->is_phi());
-    for (IR const* opnd = MDPHI_opnd_list(def);
-         opnd != nullptr; opnd = opnd->get_next()) {
-        if (opnd->is_const()) {
-            //CONST does not have VMD info.
-            continue;
-        }
-        VMD const* vmd = ((MDPhi const*)def)->getOpndVMD(opnd,
-            const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
-       if (vmd == nullptr) {
-            //Note VOpndSet of 'opnd' may be empty after some optimization.
-            //It does not happen when MDSSA just constructed. The USE that
-            //without real-DEF will have a virtual-DEF that version is 0.
-            //During some increment-maintaining of MDSSA, VOpnd may be removed,
-            //and VOpndSet become empty.
-            //This means the current USE, 'opnd', does not have real-DEF stmt,
-            //the value of 'opnd' always coming from parameter of global value.
-            //The ID of PHI should not be removed, because it is be regarded
-            //as a place-holder of PHI, and the place-holder indicates the
-            //position of related predecessor of current BB of PHI in CFG.
-            continue;
-        }
-
-        MDDef * vmd_tdef = vmd->getDef();
-        if (vmd_tdef == nullptr || vmd_tdef == def) {
-            ASSERT0(it.is_visited(vmd_tdef));
-            continue;
-        }
-        #ifdef _DEBUG_
-        it.set_visited(vmd_tdef);
-        #endif
-        it.append_tail(vmd_tdef);
+    Region const* rg = mgr->getRegion();
+    VMD::UseSet const* useset = def->getResult()->getUseSet();
+    ASSERT0(useset);
+    VMD::UseSetIter useset_iter;
+    BSIdx pos_in_useset;
+    for (pos_in_useset = useset->get_first(useset_iter);
+         !useset_iter.end(); pos_in_useset = useset->get_next(useset_iter)) {
+        IR * use = rg->getIR(pos_in_useset);
+        ASSERT0(use && !use->isReadPR());
+        if (!use->is_id()) { continue; }
+        MDPhi const* mdphi = ID_phi(use);
+        ASSERT0(mdphi && mdphi->is_phi());
+        //iterNextDefCHelper(mdphi, mgr, it);
+        if (it.isStopAccess(mdphi)) { continue; }
+        if (it.is_visited(mdphi)) { continue; }
+        it.set_visited(mdphi);
+        it.append_tail(mdphi);
     }
 }
 
 
-static void iterNextDefCHelper(
+void ConstNextMDDefIter::iterNextDefCHelper(
     MDDef const* def, MDSSAMgr const* mgr, OUT ConstNextMDDefIter & it)
 {
     ASSERT0(def);
-    if (def->is_phi()) {
-        ASSERT0(0); //TODO:
-        //iterNextDefCHelperPhi(def, mgr, it);
-        return;
-    }
     MDDefSet const* nextdefset = def->getNextSet();
-    if (nextdefset == nullptr) { return; }
-    ASSERT0(def->getOcc());
-    MDDefSetIter nit = nullptr;
-    UseDefMgr const* udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
-    for (BSIdx w = nextdefset->get_first(&nit);
-         w != BS_UNDEF; w = nextdefset->get_next(w, &nit)) {
-        MDDef const* nextdef = udmgr->getMDDef(w);
-        if (it.doStopAccess(nextdef)) { continue; }
-        ASSERT0(nextdef);
-        ASSERTN(nextdef->getPrev() == def, ("insanity DD chain"));
-        #ifdef _DEBUG_
-        ASSERT0(!it.is_visited(nextdef));
-        it.set_visited(nextdef);
-        #endif
-        it.append_tail(nextdef);
+    if (nextdefset != nullptr) {
+        MDDefSetIter nit = nullptr;
+        UseDefMgr const* udmgr = const_cast<MDSSAMgr*>(mgr)->getUseDefMgr();
+        for (BSIdx w = nextdefset->get_first(&nit);
+             w != BS_UNDEF; w = nextdefset->get_next(w, &nit)) {
+            MDDef const* nextdef = udmgr->getMDDef(w);
+            if (it.isStopAccess(nextdef)) { continue; }
+            ASSERT0(nextdef);
+            ASSERTN(nextdef->getPrev() == def, ("insanity DD chain"));
+            if (it.is_visited(nextdef)) { continue; }
+            it.set_visited(nextdef);
+            it.append_tail(nextdef);
+        }
     }
+    if (!it.isCrossPhi()) { return; }
+    tryCrossPhi(def, mgr, it);
 }
 
 

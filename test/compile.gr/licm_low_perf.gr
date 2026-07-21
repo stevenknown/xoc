@@ -706,7 +706,7 @@ region program ".program" () {
         call:(use(
             ild:any 0:any)) _ZN4sdaa11matmul_waitERNS_12MatmulHandleE(
             $93:u64);
-        stpr $113:i32 = 0:i32;
+        stpr $113:i64 = 0:i32;
         stpr $112:*<1> = 
             $53:u64;
         goto label_BB0_13;
@@ -735,7 +735,7 @@ region program ".program" () {
         label label_BB0_13;
         stpr $12:f64 = 
             cvt:f64 
-                $113:u64;
+                $113:i64;
         stpr $166:u64 = 
             xor:u64 
                 $126:u64, 262272:u64;

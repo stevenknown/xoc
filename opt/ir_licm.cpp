@@ -172,12 +172,13 @@ protected:
     LICMAnaCtx const& m_anactx;
     IR const* m_stmt;
 protected:
-    virtual bool doStopAccess(MDDef const* mddef) const override
+    virtual bool isStopAccess(MDDef const* mddef) const override
     {
-        ASSERT0(!mddef->is_phi());
-        IR const* occ = mddef->getOcc();
-        ASSERT0(occ);
-        if (!m_anactx.getLI()->isInsideLoop(occ->getBB()->id())) {
+        IRBB const* bb = nullptr;
+        if (mddef->is_phi()) { bb = ((MDPhi const*)mddef)->getBB(); }
+        else { bb = mddef->getOcc()->getBB(); }
+        ASSERT0(bb);
+        if (!m_anactx.getLI()->isInsideLoop(bb->id())) {
             //There is no need to access outside MDDef.
             return true;
         }
@@ -194,8 +195,9 @@ protected:
 public:
     LICMConstNextMDDefIter(
         LICMAnaCtx const& anactx, MDSSAMgr const* mdssamgr, OptCtx const* oc,
-        IR const* stmt)
-        : ConstNextMDDefIter(mdssamgr, oc), m_anactx(anactx) { m_stmt = stmt; }
+        bool is_cross_phi, IR const* stmt)
+            : ConstNextMDDefIter(mdssamgr, oc, is_cross_phi), m_anactx(anactx)
+        { m_stmt = stmt; }
 };
 
 
@@ -518,8 +520,11 @@ void MoveStmtBetweenBB::moveStmtListToTgtBB(
     MOD IRBB * tgtbb) const
 {
     xcom::List<BBIRListIter>::Iter lit;
-    for (BBIRListIter irit = itlst.get_head(&lit);
-         irit != nullptr; irit = itlst.get_next(&lit)) {
+    xcom::List<BBIRListIter>::Iter nextlit;
+    for (itlst.get_head(&lit); lit != nullptr; lit = nextlit) {
+        BBIRListIter irit = lit->val();
+        nextlit = lit;
+        itlst.get_next(&nextlit);
         IR * ir = irit->val();
         if (!needToMove(ir, srcbb)) { continue; }
         moveDependentStmtInBB(ir, srcbb, tgtbb);
@@ -2260,14 +2265,11 @@ static bool hasMultiDefInLoopByMDSSA(
             continue;
         }
         MDDef const* vmddef = vmd->getDef();
-        LICMConstNextMDDefIter it(anactx, mgr, oc, stmt);
+        LICMConstNextMDDefIter it(anactx, mgr, oc, true, stmt);
         MDDef const* nd = it.get_first(vmddef);
         ASSERT0(nd == vmddef);
         for (nd = it.get_next(); nd != nullptr; nd = it.get_next()) {
-            if (nd->is_phi()) {
-                //We don't know the exact results.
-                return false;
-            }
+            if (nd->is_phi()) { continue; }
             IR const* ndocc = nd->getOcc();
             if (!xoc::isDependent(stmt, ndocc, costly_analysis, rg)) {
                 //stmt and ndocc are unrelated.
@@ -2376,7 +2378,7 @@ static bool canBeCoverByNextDef(
             continue;
         }
         MDDef const* vmddef = vmd->getDef();
-        LICMConstNextMDDefIter it(anactx, mgr, oc, stmt);
+        LICMConstNextMDDefIter it(anactx, mgr, oc, true, stmt);
         MDDef const* nd = it.get_first(vmddef);
         ASSERT0(nd == vmddef);
         for (nd = it.get_next(); nd != nullptr; nd = it.get_next()) {

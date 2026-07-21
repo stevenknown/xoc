@@ -380,6 +380,16 @@ void LivenessMgr::computeLocal(BBList const& bblst)
 }
 
 
+void LivenessMgr::computeLocal(IRBB const* bb)
+{
+    LiveSet * use = gen_use(bb->id());
+    LiveSet * gen = gen_def(bb->id());
+    use->clean(m_sbs_mgr);
+    gen->clean(m_sbs_mgr);
+    computeLocalIterBBIRList(bb, use, gen);
+}
+
+
 void LivenessMgr::updateSetByRHS(BSIdx idx, MOD LiveSet * use)
 {
     ASSERT0(use);
@@ -408,16 +418,6 @@ void LivenessMgr::computeLocalIterBBIRList(
          x != nullptr; x = irlst.get_prev(&irit)) {
         computeStmt(x, use, gen);
     }
-}
-
-
-void LivenessMgr::computeLocal(IRBB const* bb)
-{
-    LiveSet * use = gen_use(bb->id());
-    LiveSet * gen = gen_def(bb->id());
-    use->clean(m_sbs_mgr);
-    gen->clean(m_sbs_mgr);
-    computeLocalIterBBIRList(bb, use, gen);
 }
 
 
@@ -971,6 +971,8 @@ bool LivenessMgr::perform(BBList const* bblst, IRCFG const* cfg, OptCtx & oc)
     START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     if (bblst->get_elem_count() == 0) { return false; }
+
+    //NOTE:livein set needs local-use info, thus we initialize local fristly.
     computeLocal(*bblst);
     initSet(*bblst);
     computeGlobal(cfg);

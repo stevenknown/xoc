@@ -107,6 +107,7 @@ protected:
     virtual Pass * allocRegSSAMgr();
     virtual Pass * allocSolveSetMgr();
     virtual Pass * allocPRLivenessMgr();
+    virtual Pass * allocVMDLivenessMgr();
     virtual Pass * allocMDLivenessMgr();
     virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocMDSSAMgr();

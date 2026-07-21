@@ -121,7 +121,7 @@ public:
     //e.g: If an instruction contains two fields, FT_A and FT_B,
     //     with FT_A occupying 16 bits and FT_B occupying 8 bits,
     //     it returns 3.
-    UINT getTotalFieldByteSize();
+    UINT getTotalFieldByteSize() const;
 
     //Return the abstract code descriptor.
     MI_CODE getCode() const { return m_code; }

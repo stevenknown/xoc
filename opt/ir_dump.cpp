@@ -132,7 +132,7 @@ void dumpAlign(UINT align, Region const* rg)
 void dumpOffset(IR const* ir, Region const* rg)
 {
     if (ir->getOffset() != 0) {
-        prt(rg, ":offset(%d)", ir->getOffset());
+        prt(rg, ":offset(%u)", ir->getOffset());
     }
 }
 

@@ -32,7 +32,7 @@ region program ".program" () {
         call:(use(
             ild:any 0:any)) $6:i32 = printf(
             lda _const_string_3,
-            array:*<1>:0:(dim[2])
+            array:*<1>:0:(dim[2])  //points to dedicated-strint-var.
                 lda type, (0:i32),
             array:i32:0:(dim[7])
                 lda diff, (0:i32));

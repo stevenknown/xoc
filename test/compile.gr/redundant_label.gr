@@ -12,9 +12,9 @@ region program "program" () {
 
         igoto $5 case 3,_L4, case 4,_L5;
         label _L4;
-    	stpr $8 = $3;
+    	stpr $8:i16 = $3;
         label _L5;
-    	stpr $9 = $4;
+    	stpr $9:i16 = $4;
         label _L6;
     	stpr $10 = $5;
 
@@ -29,6 +29,6 @@ region program "program" () {
 
         label _L7;
         label _L8;
-        return add $8, $9;
+        return add $8:i16, $9:i16;
     };
 }

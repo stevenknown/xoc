@@ -43,10 +43,14 @@ class VMDLivenessSet : public LiveSet {
 class VMDLivenessMgr : public LivenessMgr {
     COPY_CONSTRUCTOR(VMDLivenessMgr);
 protected:
+    bool m_need_reach_def;
     MDSSAMgr * m_mdssamgr;
     UseDefMgr * m_mdssaudmgr;
-    Vector<LiveSet*> m_livethrough;
+    Vector<LiveSet*> m_livein_reach;
+    Vector<LiveSet*> m_liveout_reach;
+    Vector<LiveSet*> m_kill;
 protected:
+    void cleanReachSet();
     virtual void computeExpImpl(
         IR const* exp, MOD LiveSet * use, MOD LiveSet * gen) override;
     virtual void computeStmtImpl(
@@ -56,27 +60,50 @@ protected:
     void computeLocalIterMDPhiList(
         IRBB const* bb, LiveSet * use, LiveSet * gen);
     virtual void computeLocal(IRBB const* bb) override;
-
-    virtual void computeGlobal(IRCFG const* cfg);//hack
+    virtual void computeGlobal(IRCFG const* cfg) override;
+    void computeKillReach(IRCFG const* cfg);
+    void computeGlobalLive(IRCFG const* cfg);
+    void computeGlobalReach(IRCFG const* cfg);
 
     void dumpVMDLivenessSet(VMDLivenessSet const* set, bool detail) const;
     void dumpAllSet() const;
 
-    LiveSet * get_livethrough(UINT bbid) const
-    { return m_livethrough.get(bbid); }
-    LiveSet * gen_livethrough(UINT bbid);
+    LiveSet * get_kill(UINT bbid) const { return m_kill.get(bbid); }
+    LiveSet * gen_livein_reach(UINT bbid);
+    LiveSet * gen_liveout_reach(UINT bbid);
+    LiveSet * gen_kill(UINT bbid);
 
     bool initDepPass();
+    virtual void initSet(BBList const& bblst) override;
+
+    void mergeMDPhiOpndToLiveIn();
+    void mergeMDPhiOpndList(MDPhi const* mdphi, MOD LiveSet * livein);
+
+    bool needReachDef() const { return m_need_reach_def; }
+
     bool useMDSSADU() const;
     virtual void updateSetByLHS(
         BSIdx idx, MOD LiveSet * use, MOD LiveSet * gen) override;
     virtual void updateSetByRHS(BSIdx idx, MOD LiveSet * use) override;
+    void updateSetByLHSAndConsiderVersion(
+        VMD const* lhsvmd, MOD LiveSet * use, MOD LiveSet * gen);
 public:
     VMDLivenessMgr(Region * rg);
-    ~VMDLivenessMgr() { clean(); }
+    virtual ~VMDLivenessMgr() { cleanReachSet(); }
     bool dump() const;
+
+    LiveSet * get_livein_reach(UINT bbid) const
+    { return m_livein_reach.get(bbid); }
+    LiveSet * get_liveout_reach(UINT bbid) const
+    { return m_liveout_reach.get(bbid); }
     virtual CHAR const* getPassName() const { return "VMDLivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_VMDLIVENESS_MGR; }
+    MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }
+
+    //Ask the Mgr to compute Reach-Def-VMD while computing liveness info.
+    void setCompReachDef(bool need_reach_def)
+    { m_need_reach_def = need_reach_def; }
+
     virtual bool perform(OptCtx & oc) override;
 };
 

@@ -54,6 +54,7 @@ namespace mach {
 #define IMCTX_mem_byte_size(cont) ((cont)->u1.mem_byte_size)
 #define IMCTX_int_imm(cont) ((cont)->u1.int_imm)
 #define IMCTX_need_build_mi(cont) ((cont)->m_is_build)
+#define IMCTX_inst_can_be_compressed(cont) ((cont)->m_is_compressed)
 #define IMCTX_is_mask(cont) ((cont)->m_is_mask)
 #define IMCTX_is_whole_ld_st(cont) ((cont)->m_is_whole_ld_st)
 class IMCtx {
@@ -61,6 +62,9 @@ public:
     //Is used for instruction scheduling. If it is false, it only
     //returns the MI code without actually building the MI.
     bool m_is_build;
+
+    //True means inst can be compressed.
+    bool m_is_compressed;
 
     //When m_is_mask is true, it indicates that the current
     //instruction is a mask instruction.
@@ -108,6 +112,7 @@ public:
         ::memset((void*)&u2, 0, sizeof(u2));;
         micode = MI_UNDEF;
         m_is_build = true;
+        m_is_compressed = false;
         m_is_mask = false;
         m_is_whole_ld_st = false;
     }

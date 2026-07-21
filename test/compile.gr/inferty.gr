@@ -1,6 +1,6 @@
 region program ".program" () {
     var a:u8:(align(4));
-    var b::(align(4));
+    var b:u16:(align(4));
     var c:i16:(func,align(4));
     var d:i16:(func,align(4));
     region func foo (undefined,var in_key:*<1>:(align(4)),var n_bytes:u32:(align(4)),var f:i32:(align(4)),var cx:*<524>:(align(4))) {

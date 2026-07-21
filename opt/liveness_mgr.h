@@ -164,7 +164,7 @@ public:
                                   AuxLivenessMgr & auxmgr, UINT entry_id);
 
     //By default, local set is initialized by computeLocal().
-    void initSet(BBList const& bblst);
+    virtual void initSet(BBList const& bblst);
     void init_livein(UINT bbid);
     bool is_livein(UINT bbid, PRNO prno) const
     {

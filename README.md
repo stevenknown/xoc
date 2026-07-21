@@ -58,7 +58,7 @@ Test libxcom.a
 ```
 
 To demonstrate the usage of XOC, the example directory contains numerous samples 
-illustrating how to flexibly leverage XOC’s rich and diverse compilation features.
+illustrating how to flexibly leverage XOC'rich and diverse compilation features.
 
 How to Contribute :
 	All contributors should own the rights to any code you contribute, and

@@ -1,0 +1,26 @@
+region program ".program" () {
+    var g:i32:(align(4));
+    var foo:any:(func,align(4));
+    var main:any:(func,align(4));
+    region func foo (undefined,var a:i32:(align(4)),var b:i32:(align(4))) {
+        stpr $4:bool = gt:bool ld:i32 a, ld:i32 b;
+        falsebr (ne:bool $4:bool, 0:bool), "__$L3";
+
+        label "__$L5";
+        stpr $5:i32 = 0:i32;
+        goto "__$L4";
+
+        label "__$L3";
+        stpr $6:i32 = 1:i32;
+
+        label "__$L4";
+        phi $7:i32 = ($5:i32,"__$L5"),($6:i32,"__$L3");
+        st:i32 g = $7:i32;
+        return ld:i32 g;
+    };
+    region func main () {
+        st:i32 g = 3:i32;
+        call $1:i32 = foo(3:i32,1:i32);
+        return ld:i32 g;
+    };
+}

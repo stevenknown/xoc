@@ -377,28 +377,45 @@ public:
 
 //The class defines the iterator that is used to iterate MDDef.
 //For given MDDef, the class iterates all next MDDefs throught Def-Def.
+//Users can invoke MDSSAMgr::dumpDefDefChain() to get an overview of the
+//entire layout of the DefDef chains for all VMDs.
 class ConstNextMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstNextMDDefIter);
 protected:
+    bool m_is_cross_phi;
     MDSSAMgr const* m_mdssamgr;
     OptCtx const* m_oc;
-    #ifdef _DEBUG_
     xcom::TTab<UINT> m_is_visited; //only for verification.
-    #endif
+protected:
+    static void iterNextDefCHelper(
+        MDDef const* def, MDSSAMgr const* mgr, OUT ConstNextMDDefIter & it);
+    static void tryCrossPhi(
+        MDDef const* def, MDSSAMgr const* mgr, OUT ConstNextMDDefIter & it);
 public:
-    ConstNextMDDefIter(MDSSAMgr const* mdssamgr, OptCtx const* oc)
-        : m_mdssamgr(mdssamgr), m_oc(oc) {}
+    ConstNextMDDefIter(
+        MDSSAMgr const* mdssamgr, OptCtx const* oc, bool is_cross_phi)
+        { m_mdssamgr = mdssamgr; m_oc = oc; m_is_cross_phi = is_cross_phi; }
 
-    #ifdef _DEBUG_
     bool is_visited(MDDef const* def) const
     { return m_is_visited.find(def->id()); }
     void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
-    #endif
 
     //If user expects to stop iterating 'mddef' and all its Next-Def,
     //return true.
     //By default, the class iterates Def-Def chain until the end.
-    virtual bool doStopAccess(MDDef const* mddef) const { return false; }
+    virtual bool isStopAccess(MDDef const* mddef) const { return false; }
+
+    //Return true if user expects to not only accessing MDDef through DefDef
+    //chain but also accessing MDPhi through DefUse chain.
+    //e.g:After invoke dumpDefDefChain, the VMD DefDef chain is:
+    //  MDPhi8:MD19V2 <- MDPhi10:MD19V1, MDPhi9:MD19V4
+    //    MDDef14:MD19V3
+    //  MDPhi9:MD19V4 <- MDDef14:MD19V3, MDDef16:MD19V5
+    //    MDDef16:MD19V5
+    //Where MD19V3 does not have any next-def, however user expects to
+    //keep iterating the MD19V4 by accessing the DefUse chain of MD19V3
+    //because there is an USE-OCC of MD19V3 that is the phi-opnd of MD19V4.
+    bool isCrossPhi() const { return m_is_cross_phi; }
 
     //The function will iterate the Def-Def chain.
     //The funtion initializes the iterator.

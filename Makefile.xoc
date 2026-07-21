@@ -100,22 +100,38 @@ $(info "REF_TARGMACH_INFO:$(REF_TARGMACH_INFO)")
 
 .PHONY: build_tmp_opt_objs build_tmp_reader_objs build_tmp_mach_objs
 
+##NOTE:The compilation of libxoc.a may failed sometime if we don't
+##always regenerate it.
+#$(XOC_OUTPUT): $(COM_OUTPUT) \
+#               build_tmp_opt_objs \
+#               build_tmp_reader_objs \
+#               build_tmp_mach_objs
+#	@echo "==-- IN Makefile.xoc: START BUILD $(XOC_OUTPUT) --=="
+#	@if [ ! -f "$@" ] || [ "$<" -nt "$@" ]; then \
+#       echo "EXEC:"; \
+#       ar -rvscT $(XOC_OUTPUT) \
+#         $(COM_DIR)/$(COM_OUTPUT) \
+#         $(TMP_OPT_OBJS) \
+#         $(TMP_READER_OBJS) \
+#         $(TMP_MACH_OBJS); \
+#       echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"; \
+#     else \
+#       echo "$(XOC_OUTPUT) ALREADY EXISTS!!"; \
+#     fi
+
+#Here, we always regenerate libxgen.a even if it exist.
 $(XOC_OUTPUT): $(COM_OUTPUT) \
                build_tmp_opt_objs \
                build_tmp_reader_objs \
                build_tmp_mach_objs
 	@echo "==-- IN Makefile.xoc: START BUILD $(XOC_OUTPUT) --=="
-	@if [ ! -f "$@" ] || [ "$<" -nt "$@" ]; then \
-       echo "EXEC:"; \
+	@echo "EXEC:"; \
        ar -rvscT $(XOC_OUTPUT) \
          $(COM_DIR)/$(COM_OUTPUT) \
          $(TMP_OPT_OBJS) \
          $(TMP_READER_OBJS) \
          $(TMP_MACH_OBJS); \
-       echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!"; \
-     else \
-       echo "$(XOC_OUTPUT) ALREADY EXISTS!!"; \
-     fi
+       echo "SUCCESS TO GENERATE $(XOC_OUTPUT)!!";
 
 %.o:%.cpp
 	@echo "BUILD $<"

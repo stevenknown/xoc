@@ -1,9 +1,0 @@
-
-==---- DUMP Copy Propagation 'main' ----==
-PROPAGATING CANDIDATE: lda(id:1) THAT LOCATED IN STMT:
-    stpr $3:*<1> attachinfo:Dbx
-        lda:*<128> 'a'
-WILL REPLACE pr(id:3) THAT LOCATED IN STMT:
-    stpr $4:i32 throw attachinfo:Dbx
-        ild:i32 attachinfo:MDSSA
-            $3:*<16>

@@ -572,6 +572,12 @@ Pass * PassMgr::allocPRLivenessMgr()
 }
 
 
+Pass * PassMgr::allocVMDLivenessMgr()
+{
+    return new VMDLivenessMgr(m_rg);
+}
+
+
 Pass * PassMgr::allocMDLivenessMgr()
 {
     return new MDLivenessMgr(m_rg);
@@ -750,6 +756,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_PRLIVENESS_MGR:
         pass = allocPRLivenessMgr();
+        break;
+    case PASS_VMDLIVENESS_MGR:
+        pass = allocVMDLivenessMgr();
         break;
     case PASS_LFTR:
         pass = allocLFTR();

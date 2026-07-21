@@ -23,6 +23,7 @@ our @EXPORT_OK = qw(
     computeRelatedPathToXocRootDir
     computeAbsolutePathToXocRootDir
     compareDumpFile
+    checkRuleOfDumpFile
     clean
     extractPostfixName
     getCurDir
@@ -31,6 +32,7 @@ our @EXPORT_OK = qw(
     getOutputFilePath
     getBaseOutputFilePath
     getFileNameFromPath
+    getOSPathSeparator
     generateGR
     findCurrent
     findFfileCurrent
@@ -751,13 +753,24 @@ sub checkEnvValid
         push(@filelist, $g_simulator);
     }
     foreach (@filelist) {
-        if (!is_exist($_) && !isExistInEnvPath($_)) {
+        if (is_exist($_)  == $g_false && isExistInEnvPath($_) == $g_false) {
+            my $env_content = $ENV{'PATH'};
+            print "\nCURRENT ENV CONTENT IS: $env_content\n";
             print "\n$_ DOES NOT EXIST!\n";
             if ($g_is_quit_early) {
                 abort();
             }
         }
     }
+}
+
+# Return the split character according the operating system.
+sub getOSPathSeparator
+{
+    if ($g_osname eq 'MSWin32') {
+        return ';'; # Windows
+    }
+    return ':'; # Linux, macOS, and other Unix-Like system.
 }
 
 sub isInEnv
@@ -774,11 +787,12 @@ sub isInEnv
 sub isExistInEnvPath
 {
     my $software = $_[0];
-    my @path_dirs = split /:/, $ENV{'PATH'};
+    my $sep = getOSPathSeparator();
+    my @path_dirs = split /\Q$sep\E/, $ENV{'PATH'};
     foreach my $dir (@path_dirs) {
         #my $exec_path = File::Spec->catfile($dir, $software);
         my $exec_path = "$dir/$software";
-        if (is_exist($exec_path)) {
+        if (is_exist($exec_path) == $g_true) {
             return $g_true;
         }
     }
@@ -1354,18 +1368,32 @@ sub extractAndSetCflag
     if (!-e $configure_file_path) {
         return;
     }
-    my $pattern = qr/^#/;
+    my $pattern = qr/^#/; # '#' is the the leading-char of comments.
     # read file content
     open my $file, '<', $configure_file_path or
         abortex("FAILED! -- ERROR OPENNING FILE: $!\n");
+    my @cflag_arr;
     while (defined(my $line = <$file>)) {
         chomp $line;
         #Match the pattern with the content in each line of file
         if ($line =~ /$pattern/) {
-           next;
+            #Skip the comments.
+            next;
         }
-        $g_cflags = $g_cflags." ".$line;
+        if ($line =~ /^\s*CFLAG:\s*(.*)$/) {
+            push @cflag_arr, {
+                type    => 'CFLAG',
+                content => $1,
+            };
+        }
     }
+
+    foreach my $elem (@cflag_arr) {
+        my $type = $elem->{type};
+        my $content = $elem->{content};
+        $g_cflags = $g_cflags." ".$content;
+    }
+
     close ($file);
 }
 
@@ -1406,6 +1434,56 @@ sub getBaseResultDumpFilePath
     my $fullpath = $_[0]; #path to src file.
     my $dumpfilepath = $fullpath.".base_dump.txt";
     return $dumpfilepath;
+}
+
+#This function checks rules declared in the conf file and check the dump
+#file according to these rules.
+sub checkRuleOfDumpFile
+{
+    #Execute check_rule.pl with -conf and -input parameters
+    #$fullpath: path to source code file
+    #$dump_file: path to input file
+    #Return true check_rule.pl return success.
+    my ($fullpath, $dump_file, $is_conffile_must_exist) = @_;
+
+    #$fullpath is the path to src file.
+    my $configure_file_path = $fullpath.".conf";
+    if (!-e $configure_file_path) {
+        if ($is_conffile_must_exist) {
+            #Baseline dump file does not exist.
+            abortex("$configure_file_path DOES NOT EXIST.");
+            return $g_fail; #No need execute the following code.
+        } else {
+            print "\nPASS! NOTE:CONFIG FILE '$configure_file_path' NOT EXIST.\n";
+            return $g_succ; #No need execute the following code.
+        }
+    }
+
+    #Build command: perl ./check_rule.pl -conf <conf> -input <input>
+    my $script_path = "$g_xoc_root_path/test/check_rule.pl";
+    my @command = (
+        "perl",
+        $script_path,
+        "-conf",  $configure_file_path,
+        "-input", $dump_file
+    );
+
+    #Execute the command and get exit code
+    my $cmdline = "perl $script_path -conf $configure_file_path -input $dump_file";
+    print("\nCMD>>$cmdline\n");
+    my $retval = systemx($cmdline);
+
+    #Check result
+    if ($retval == 0) {
+        print "\nPASS!\n";
+    } else {
+        #Not equal
+        #New result is incorrect!
+        print "\nFAILED! -- CHECK RULE OF DUMP OF $fullpath FAILED!\n";
+        abortex();
+        return $g_fail; #No need execute the following code.
+    }
+    return $g_succ;
 }
 
 #This function compare the dump file and base file.

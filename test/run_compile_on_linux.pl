@@ -53,8 +53,8 @@ sub main
         'compile',
         'chibicc-main',
         'builtin',
+        'api',
         #'compile.gr.pcx',
-        #'api',
         #'xcom',
         #'tutorial_input',
         #'llm.c-master',
@@ -62,16 +62,16 @@ sub main
     foreach my $subdir (@subdirlist) {
         print "\nENTER DIRECTORY>>$subdir\n";
         chdir $subdir;
-        if (execPerl() ne $g_succ) {
-            return 1;    
+        if (execScript() ne $g_succ) {
+            exit(1);    
         }
         chdir ".."; #back to parent directory
 	}
-    print "\n\n\nALL TESTCASES FINISH!!!\n";
-    return 0;
+    print "\n\n\nRUN COPMILE ALL TESTCASES FINISH!!!\n";
+    exit(0);
 }
 
-sub execPerl
+sub execScript
 {
     my $curdir = getCurDir();
     #my $cmdline = "sh run.sh";

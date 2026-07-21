@@ -53,7 +53,6 @@ public:
     void initFieldIdx()
     {
         UINT bit_size = 0;
-        m_byte_size = 0;
         for (UINT i = 0; i < getFieldNum(); i++) {
             m_field_idx[m_field_type[i]] = i;
             bit_size += getFieldSizeByIdx(i);

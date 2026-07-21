@@ -42,6 +42,7 @@ class CopyProp;
 //START AnalyzeAvailExpr
 //
 class AnalyzeAvailExpr {
+    friend class CopyProp;
     COPY_CONSTRUCTOR(AnalyzeAvailExpr);
 protected:
     bool m_is_aggressive;
@@ -72,6 +73,8 @@ protected:
         IR const* cand_exp, IR const* pos,
         IRListIter const& cand_exp_stmt_it) const;
     bool isAllVOpndLiveInAtBB(IR const* exp, IRBB const* start) const;
+    bool isOnlyContainUniqueVMDForSameMD(
+        VMD const* vmd, LiveSet const* set) const;
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -207,6 +210,7 @@ class CopyProp : public Pass {
     friend class AnalyzeAvailExpr;
     COPY_CONSTRUCTOR(CopyProp);
 protected:
+    bool m_analyze_avail_exp_by_du_chain;
     MDSystem * m_md_sys;
     DUMgr * m_dumgr;
     IRCFG * m_cfg;
@@ -364,6 +368,12 @@ protected:
         }
         newir->setType(exp->getType());
     }
+
+    //Return true if user expects to analyz Avail-Expression via DU chain.
+    bool shouldAnalyzeAvailExpByDUChain() const
+    { return m_analyze_avail_exp_by_du_chain; }
+    void setAnalyzeAvailExpByDUChain(bool by_du_chain)
+    { m_analyze_avail_exp_by_du_chain = by_du_chain; }
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.
