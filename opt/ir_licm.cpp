@@ -172,7 +172,7 @@ protected:
     LICMAnaCtx const& m_anactx;
     IR const* m_stmt;
 protected:
-    virtual bool isStopAccess(MDDef const* mddef) const override
+    virtual bool isStopAccess(MDDef const* mddef) override
     {
         IRBB const* bb = nullptr;
         if (mddef->is_phi()) { bb = ((MDPhi const*)mddef)->getBB(); }

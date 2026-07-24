@@ -403,7 +403,7 @@ public:
     //If user expects to stop iterating 'mddef' and all its Next-Def,
     //return true.
     //By default, the class iterates Def-Def chain until the end.
-    virtual bool isStopAccess(MDDef const* mddef) const { return false; }
+    virtual bool isStopAccess(MDDef const* mddef) { return false; }
 
     //Return true if user expects to not only accessing MDDef through DefDef
     //chain but also accessing MDPhi through DefUse chain.

@@ -1382,8 +1382,8 @@ bool CopyProp::initDepPass(MOD OptCtx & oc)
     }
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
-    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
     if (!useClassicPRDU() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.

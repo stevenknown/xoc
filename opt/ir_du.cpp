@@ -1234,51 +1234,12 @@ void DUMgr::dumpBBDUChainDetail(UINT bbid) const
 void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 {
     ASSERT0(bb);
-    note(getRegion(), "\n--- BB%u ---", bb->id());
-
-    //Label Info list.
-    LabelInfo const* li = bb->getLabelList().get_head();
-    if (li != nullptr) {
-        note(getRegion(), "\nLABEL:");
-    }
-    for (; li != nullptr; li = bb->getLabelList().get_next()) {
-        switch (LABELINFO_type(li)) {
-        case L_CLABEL:
-            note(getRegion(), CLABEL_STR_FORMAT, CLABEL_CONT(li));
-            break;
-        case L_ILABEL:
-            note(getRegion(), ILABEL_STR_FORMAT, ILABEL_CONT(li));
-            break;
-        case L_PRAGMA:
-            ASSERT0(LABELINFO_pragma(li));
-            note(getRegion(), "%s", SYM_name(LABELINFO_pragma(li)));
-            break;
-        default: UNREACHABLE();
-        }
-
-        if (LABELINFO_is_try_start(li) || LABELINFO_is_try_end(li) ||
-            LABELINFO_is_catch_start(li)) {
-            prt(getRegion(), "(");
-            if (LABELINFO_is_try_start(li)) {
-                prt(getRegion(), "try_start,");
-            }
-            if (LABELINFO_is_try_end(li)) {
-                prt(getRegion(), "try_end,");
-            }
-            if (LABELINFO_is_catch_start(li)) {
-                prt(getRegion(), "catch_start");
-            }
-            prt(getRegion(), ")");
-        }
-
-        prt(getRegion(), " ");
-    }
-
+    note(getRegion(), "\n-- BB%u --", bb->id());
+    bb->dumpDigest(m_rg);
     for (IR * ir = BB_irlist(bb).get_head();
          ir != nullptr; ir = BB_irlist(bb).get_next()) {
         dumpIR(ir, m_rg);
         note(getRegion(), "\n");
-
         IRIter ii;
         for (IR * k = xoc::iterInit(ir, ii);
              k != nullptr; k = xoc::iterNext(ii)) {
@@ -1320,14 +1281,13 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 
             //Dump DEF/USE list.
             if (k->is_stmt() || ir->is_lhs(k)) {
-                note(getRegion(), "\n\t  USE-EXP LIST:");
+                note(getRegion(), "\n\t  USE-LIST:");
             } else {
-                note(getRegion(), "\n\t  DEF-STMT LIST:");
+                note(getRegion(), "\n\t  DEF-LIST:");
             }
 
             DUSet const* set = k->readDUSet();
             if (set == nullptr) { continue; }
-
             DUSetIter di = nullptr;
             for (BSIdx i = set->get_first(&di); i != BS_UNDEF; ) {
                 IR const* ref = m_rg->getIR(i);
@@ -1357,6 +1317,8 @@ static bool dumpForTest(DUMgr const* dumgr)
 
 bool DUMgr::dump() const
 {
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_DU_MGR))
+    { return true; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
          m_rg->getRegionName());
@@ -1383,7 +1345,7 @@ void DUMgr::dumpDUChainDetail() const
 {
     if (!m_rg->isLogMgrInit()) { return; }
     START_TIMER_FMT(t, ("DUMP DUMgr DUChain %s", getPassName()));
-    note(getRegion(), "\n\n==---- DUMP DUMgr DU CHAIN DETAIL '%s' ----==\n",
+    note(getRegion(), "\n\n==-- DUMP DUMgr DU CHAIN DETAIL '%s' --==\n",
          m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
@@ -4329,9 +4291,7 @@ bool DUMgr::perform(MOD OptCtx & oc, DUOptFlag flag)
         flag.have(DUOPT_SOL_AVAIL_EXPR)) {
         solveSet(oc, flag);
     }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_DU_MGR)) {
-        dump();
-    }
+    dump();
     return true;
 }
 //END DUMgr

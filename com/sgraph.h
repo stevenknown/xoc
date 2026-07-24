@@ -1242,6 +1242,8 @@ public:
     //        changed by the function.
     //root: record the root vertex the of subgraph that affected by adding
     //      or removing edge.
+    //iter_times: record the number of time that iterate graph when updating
+    //            Dom.
     void reviseDomInfoAfterAddOrRemoveEdge(
         Vertex const* from, Vertex const* to, OUT VexTab * modset,
         OUT Vertex const*& root, OUT UINT & iter_time);
@@ -1252,6 +1254,7 @@ public:
     //Note the RPO must be available.
     //modset: if it is not null, means user asked to collect vertex that idom
     //        changed by the function.
+    //iter_times: record the number of time that iterate 'g' when updating Dom.
     bool recomputeDomInfoForSubGraph(
         Vertex const* root, OUT VexTab * modset, OUT UINT & iter_time);
     bool removeUnreachNode(VexIdx entry_id);

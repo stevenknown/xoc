@@ -926,6 +926,8 @@ IR * IRSimp::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
 
+    //Since the simplification only modifies PROp, thus only PR du chain need
+    //to rebuild.
     //Use the option to inform PRSSA rebuild when function returned.
     SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return pr;
@@ -978,6 +980,8 @@ IR * IRSimp::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
 
+    //Since the simplification only modifies PROp, thus only PR du chain need
+    //to rebuild.
     //Note the function generated more than two STPR to write to same PR.
     //If PRSSA is constructed, a PHI need to be inserted to make SSA form
     //legal. Thus the function ask to rebuild PRSSA later.
@@ -1220,6 +1224,8 @@ IR * IRSimp::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     //when function returned.
     SIMP_need_recon_bblist(ctx) = true;
 
+    //Since the simplification only modifies PROp, thus only PR du chain need
+    //to rebuild.
     //Use the option to inform PRSSA rebuild when function returned.
     SIMP_need_rebuild_pr_du_chain(ctx) = true;
     return pr;
@@ -1408,6 +1414,7 @@ static IR * simplifySelectToBranchByIF(
     }
     //Use the option to inform PRSSA rebuild when function returned.
     SIMP_need_rebuild_pr_du_chain(ctx) = true;
+    SIMP_need_rebuild_nonpr_du_chain(ctx) = true;
     return respr;
 }
 
@@ -1511,6 +1518,7 @@ static IR * simplifySelectToBranchDirectly(
     }
     //Use the option to inform PRSSA rebuild when function returned.
     SIMP_need_rebuild_pr_du_chain(ctx) = true;
+    SIMP_need_rebuild_nonpr_du_chain(ctx) = true;
     return res;
 }
 

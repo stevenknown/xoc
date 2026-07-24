@@ -2566,6 +2566,7 @@ static void collectDomTreeCoveredVertex(
 
 
 //Collect the vertex by BFS whereas dominated by 'root'.
+//iter_times: record the number of time that iterate 'g' when updating Dom.
 static void collectDomTreeCoveredReachableVertex(
     Vertex const* root, DGraph const& g, VexTab const* modset,
     OUT RPOVexList & affectlst, OUT TMap<Vertex const*, VexIdx> & vex2idom,

@@ -27,7 +27,8 @@ Truly open.
 XOC is a compiler infrastructure that provides multi-level IR operations,
 flexibility, and the capability of representing almost all popular languages.
 There are two level IR representations used throughout all phases of the
-compilation. You can use XOC to perform optimization, program analysis or build diagnostic tools.
+compilation. You can use XOC to perform optimization, program analysis or
+build diagnostic tools.
 
 The main documentation is in doc/Manual.txt.
 
@@ -39,7 +40,7 @@ Default build host is Linux
 
 Build libxoc.a on Windows:
 ```cmd
-	make -f Makefile.xoc WIN=1 TARG=FOR_DEX TARG_DIR=dex 
+	make -f Makefile.xoc WIN=1 TARG=FOR_DEX TARG_DIR=dex
 ```
 
 Build libxcom.a on Linux:
@@ -57,7 +58,7 @@ Test libxcom.a
 	./test_xcom.sh
 ```
 
-To demonstrate the usage of XOC, the example directory contains numerous samples 
+To demonstrate the usage of XOC, the example directory contains numerous samples
 illustrating how to flexibly leverage XOC'rich and diverse compilation features.
 
 How to Contribute :

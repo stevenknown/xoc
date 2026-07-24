@@ -203,12 +203,12 @@ protected:
     //Return true if processing finish successful, otherwise return false.
     void HighProcessImpl(OptCtx & oc);
 
+    void rebuildCFGAndDUChainIfNeeded(MOD SimpCtx & simp, MOD OptCtx & oc);
+
     void scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
                           OUT List<IR const*> * call_list,
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
-
-    virtual void postSimplify(MOD SimpCtx & simp, MOD OptCtx & oc);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
     bool partitionRegion();

@@ -83,7 +83,7 @@ bool g_infer_type = true;
 bool g_do_vrp = false;
 bool g_do_invert_brtgt = true;
 bool g_do_lftr = false;
-bool g_do_dse = false;
+bool g_do_dse = true;
 bool g_do_gcse = true;
 bool g_do_if_conversion = true;
 bool g_do_ipa = false;
@@ -627,6 +627,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_refine_duchain = %s",
          g_do_refine_duchain ? "true":"false");
     note(lm, "\ng_do_lsra = %s", g_do_lsra ? "true":"false");
+    note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
     note(lm, "\ng_do_scalar_opt = %s", g_do_scalar_opt ? "true":"false");
     note(lm, "\ng_retain_pass_mgr_for_region = %s",
          g_retain_pass_mgr_for_region ? "true":"false");
@@ -653,7 +654,6 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_debug_reg_mod = %u", g_debug_reg_mod);
     note(lm, "\ng_force_use_fp_as_stack_pointer = %s",
          g_force_use_fp_as_sp ? "true":"false");
-    note(lm, "\ng_recycle_local_id = %s", g_recycle_local_id ? "true":"false");
     note(lm, "\ng_do_invert_brtgt = %s", g_do_invert_brtgt ? "true":"false");
     lm->decIndent(2);
 }

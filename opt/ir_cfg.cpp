@@ -1829,20 +1829,22 @@ void IRCFG::tryUpdateDomInfoAndMDSSA(
     MOD xcom::VexTab & modset, Vertex const* from, Vertex const* to,
     MOD CfgOptCtx & ctx)
 {
-    //TBD: the function does NOT need RPO to update DomInfo. It updates
+    //TBD:the function does NOT need RPO to update DomInfo. It updates
     //DomInfo via current DomInfo incrementally.
     //ASSERTN(ctx.getOptCtx().isPassValid(PASS_RPO), ("compute DOM need RPO"));
     ASSERTN(ctx.getOptCtx().isPassValid(PASS_DOM),
             ("DOM has already been corrupted"));
 
-    //Note if Dom Info is not maintained, SSA update can not be proven
+    //NOTE:If DomInfo is not maintained, SSA update can not be proven
     //to be correct. However, for now we except to keep updating to
-    //generate MDSSAInfo (even if version is incorrect) for ID of MDPHI in
-    //order to tolerate subsequently processing of CFG.
+    //generate MDSSAInfo (even if its version is incorrect) for operand of
+    //MDPhi in order to tolerate subsequently processing of CFG.
+    //Of course, the correct MDSSA info will be computed when CFG optimization
+    //is finished.
     xcom::Vertex const* root = nullptr;
     UINT iter_time = 0;
 
-    //NOTE: the function needs RPO to compute DomInfo.
+    //NOTE:the function needs RPO to compute DomInfo.
     reviseDomInfoAfterAddOrRemoveEdge(from, to, &modset, root, iter_time);
 
     //Since PDom info is not important as Dom info, recompute PDom

@@ -16,6 +16,7 @@ ir_gvn.o\
 ir_evn.o\
 ir_rce.o\
 ir_dce.o\
+ir_dse.o\
 ir_cp.o\
 ir_bcp.o\
 ir_lcse.o\
