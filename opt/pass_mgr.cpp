@@ -291,11 +291,7 @@ Pass * PassMgr::allocVRP()
 
 Pass * PassMgr::allocDSE()
 {
-    #ifdef FOR_IP
     return new DSE(m_rg);
-    #else
-    return nullptr;
-    #endif
 }
 
 
