@@ -42,14 +42,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         ASSERT0(g_cst_bb_list);
         getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
 
-        //Remove empty bb when cfg rebuilted because
+        //Remove empty bb when CFG rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
         IRCfgOptCtx ctx(&oc);
         RemoveEmptyBBCtx rmctx(ctx);
         getCFG()->removeEmptyBB(rmctx);
 
-        //Compute exit bb while cfg rebuilt.
+        //Compute exit bb while CFG rebuilt.
         getCFG()->computeExitList();
         ASSERT0(getCFG()->verify());
 

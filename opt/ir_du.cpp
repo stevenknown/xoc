@@ -3722,10 +3722,10 @@ bool verifyClassicDUChain(Region * rg, DUOptFlag duflag)
 
 //Find the avilable dominated DEF stmt of 'exp'.
 //'exp': expression
-IR * DUMgr::findDomAvailDef(IR const* exp) const
+IR * DUMgr::findDomAvailDef(IR const* exp, OptCtx const* oc) const
 {
     ASSERT0(exp && exp->is_exp());
-
+    ASSERT0(oc->isPassValid(PASS_CLASSIC_DU_CHAIN));
     DUSet const* defset = exp->getDUSet();
     if (defset == nullptr) { return nullptr; }
     ASSERT0(const_cast<IR*>(exp)->getMayRef() ||

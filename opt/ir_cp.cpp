@@ -128,6 +128,7 @@ public:
 static void dumpRemoveIR(Region const* rg, MOD ActMgr * am, IR const* ir)
 {
     if (am == nullptr || !rg->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_CP)) { return; }
     xcom::DefFixedStrBuf buf;
     am->dump("'%s' will be removed, however it is IV, "
              "so IVR will be invalided.",
@@ -277,9 +278,7 @@ bool CopyProp::replaceExp(
             exp->is_pr());  //exp is operand of PR PHI
     if (!checkPropBenifit(exp, cand_exp)) { return false; }
     if (!checkTypeConsistency(exp, cand_exp)) { return false; }
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_CP)) {
-        dumpAct(this, def_stmt, cand_exp, exp, true);
-    }
+    dumpAct(this, def_stmt, cand_exp, exp, true);
 
     //The memory that 'exp' pointed to is same to 'cand_exp' because
     //cand_exp has been garanteed that will not change in propagation
@@ -1229,11 +1228,9 @@ bool CopyProp::doPropUseSet(
         //      VMD79:MD198V1:(st id:18)
         //      VMD80:MD1010V1:
         //      VMD484:MD6V133:(st id:3849) (mdphi54), ...
-        IR const* avail_def = xoc::findDomAvailDef(use, m_rg);
+        IR const* avail_def = xoc::findDomAvailDef(use, m_rg, ctx.getOptCtx());
         if (avail_def != def_stmt) { continue; }
-        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPass(PASS_CP)) {
-            dumpAct(this, def_stmt, new_prop_value, use, false);
-        }
+        dumpAct(this, def_stmt, new_prop_value, use, false);
         ASSERT0(use->getStmt());
         if (!allowPropConstToPhiOpnd() &&
             use->getStmt()->is_phi() &&
@@ -1399,6 +1396,12 @@ bool CopyProp::initDepPass(MOD OptCtx & oc)
 }
 
 
+void CopyProp::reset()
+{
+    m_am.clean();
+}
+
+
 bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
@@ -1406,6 +1409,7 @@ bool CopyProp::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
+    reset();
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     dumpBeforePass();
@@ -1416,6 +1420,7 @@ bool CopyProp::perform(OptCtx & oc)
         return false;
     }
     dump();
+    reset();
     oc.setInvalidPass(PASS_EXPR_TAB);
     oc.setInvalidPass(PASS_AA);
     oc.setValidPass(PASS_MD_REF);

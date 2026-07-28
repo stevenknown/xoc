@@ -39,6 +39,7 @@ namespace xoc {
 static void dumpChangedIR(OptCtx const* oc, MOD ActMgr * am, IR const* ir)
 {
     if (am == nullptr || !oc->getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_IVR)) { return; }
     xcom::DefFixedStrBuf buf;
     am->dump(
         "'%s' will be changed, however it is IV, so IVR will be invalided.",
@@ -1427,6 +1428,8 @@ void FindDIV::find()
 void IVRCtx::dumpAct(CHAR const* format, ...) const
 {
     if (m_am == nullptr) { return; }
+    if (!getRegion()->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_IVR))
+    { return; }
     va_list args;
     va_start(args, format);
     m_am->dump_args(format, args);
@@ -2019,7 +2022,7 @@ static bool isIVInfoRecur(
 }
 
 
-IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr, this)
+IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr, this), m_am(rg)
 {
     ASSERT0(rg != nullptr);
     m_mdsys = rg->getMDSystem();
@@ -2036,7 +2039,6 @@ IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr, this)
     m_mdssamgr = nullptr;
     m_gvn = nullptr;
     m_sbs_mgr = new DefMiscBitSetMgr();
-    m_act_mgr = new ActMgr(rg);
     clean();
 }
 
@@ -2381,7 +2383,7 @@ IR * IVR::buildLoadIV(IV const* iv, Type const* ty) const
     if (ivvar->is_pr()) {
         return m_irmgr->buildPRdedicated(ivvar->getPrno(), ty);
     }
-    return m_irmgr->buildId(ivvar);
+    return m_irmgr->buildLoad(ivvar, ty);
 }
 
 
@@ -2738,7 +2740,7 @@ bool IVR::dump() const
          getPassName(), m_rg->getRegionName());
     m_rg->getLogMgr()->incIndent(2);
     dump_recur(m_cfg->getLoopInfo(), 0);
-    getActMgr()->dump();
+    const_cast<IVR*>(this)->getActMgr()->dump();
     bool succ = Pass::dump();
     m_rg->getLogMgr()->decIndent(2);
     return succ;
@@ -3259,6 +3261,12 @@ bool IVR::findInLoopTree(OptCtx & oc)
 }
 
 
+void IVR::reset()
+{
+    m_am.clean();
+}
+
+
 void IVR::initDepPass(OptCtx & oc)
 {
     m_rg->getPassMgr()->checkValidAndRecompute(
@@ -3301,6 +3309,7 @@ bool IVR::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
     dump();
     set_valid(true);
+    reset();
     ASSERT0(verify());
     return false;
 }

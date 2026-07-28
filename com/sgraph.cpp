@@ -800,9 +800,8 @@ bool Graph::isOutDegreeEqualTo(Vertex const* vex, UINT num) const
 Edge * Graph::getEdge(Vertex const* from, Vertex const* to) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
-    ASSERT0(isVertex(from) && isVertex(to));
     if (from == nullptr || to == nullptr) { return nullptr; }
-
+    ASSERT0(isVertex(from) && isVertex(to));
     EdgeC * el = from->getOutList();
     while (el != nullptr) {
         Edge * e = EC_edge(el);
@@ -1546,23 +1545,35 @@ DGraph::DGraph(UINT vex_hash_size) : Graph(vex_hash_size)
 {
     //Since DGraph generates DomInfo, the vertex storage has to be dense.
     set_dense(true);
-    m_bs_mgr = nullptr;
 }
 
 
 DGraph::DGraph(DGraph const& g) : Graph(g)
 {
     ASSERTN(g.is_dense(), ("Dominate Graph have to be dense graph"));
-    m_bs_mgr = g.m_bs_mgr;
-    if (m_bs_mgr != nullptr) {
-        cloneDomAndPdom(g);
+    cloneDomAndPdom(g);
+}
+
+
+DGraph::~DGraph()
+{
+    freeDomAndPdomSet();
+}
+
+
+void DGraph::freeDomAndPdomSet()
+{
+    VertexIter c = VERTEX_UNDEF;
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
+        freeDomSet(v->id());
+        freePdomSet(v->id());
     }
 }
 
 
 void DGraph::cloneDomAndPdom(DGraph const& src)
 {
-    ASSERT0(m_bs_mgr != nullptr);
     ASSERTN(src.is_dense(), ("Dominate Graph have to be dense graph"));
     VertexIter c = VERTEX_UNDEF;
     for (Vertex * srcv = src.get_first_vertex(c);
@@ -1592,7 +1603,7 @@ size_t DGraph::count_mem() const
     count += m_pdom_set.count_mem(); //record post-dominator-set of each vertex.
     count += m_idom_set.count_mem(); //immediate dominator.
     count += m_ipdom_set.count_mem(); //immediate post dominator.
-    count += sizeof(m_bs_mgr); //Do NOT count up the bitset in BS_MGR.
+    count += m_bs_mgr.count_mem();
     return count;
 }
 
@@ -2848,7 +2859,7 @@ void DGraph::freePdomSet(VexIdx vid)
 {
     DomSet * pdomset = m_pdom_set.get(vid);
     if (pdomset != nullptr) {
-        m_bs_mgr->free(pdomset);
+        m_bs_mgr.free(pdomset);
         m_pdom_set.set(vid, nullptr);
     }
 }
@@ -2858,7 +2869,7 @@ void DGraph::freeDomSet(VexIdx vid)
 {
     DomSet * domset = m_dom_set.get(vid);
     if (domset != nullptr) {
-        m_bs_mgr->free(domset);
+        m_bs_mgr.free(domset);
         m_dom_set.set(vid, nullptr);
     }
 }

@@ -59,6 +59,7 @@ protected:
     Refine * m_refine;
     ActMgr m_am;
 protected:
+    bool initDepPass(MOD OptCtx & oc);
     IR * inferAndReformDet(
         IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
         MOD RCECtx & ctx);
@@ -70,6 +71,7 @@ protected:
         MOD RCECtx & ctx);
     bool performSimplyRCE(MOD RCECtx & ctx);
 
+    void reset();
     IR * reformToJudgeDet(
         IR * ir, IR * new_det, bool changed, MOD RCECtx & ctx);
 

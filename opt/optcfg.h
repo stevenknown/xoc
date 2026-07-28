@@ -165,6 +165,9 @@ protected:
 
     //Remove empty bb, and merger label info.
     //Return true if changed.
+    //NOTE:the function could remove empty BB even if CFG is not built yet, the
+    //OptCfg object only handle BBList and maintain related info in this
+    //situation.
     bool removeEmptyBBHelper(
         BB * bb, BB * next_bb, C<BB*> * bbct, C<BB*> * next_ct,
         MOD RemoveEmptyBBCtx & rmctx);
@@ -186,6 +189,9 @@ public:
     //Note removing BB does NOT affect RPO.
     //bblst: if it is not NULL, record the removed BB.
     //Return true if there are BBs removed.
+    //NOTE:the function could remove empty BB even if CFG is not built yet, the
+    //OptCfg object only handle BBList and maintain related info in this
+    //situation.
     bool removeEmptyBB(OUT RemoveEmptyBBCtx & rmbbctx);
 
     //Try to remove empty bb, and merger label info.
@@ -345,7 +351,8 @@ bool OptimizedCFG<BB, XR>::removeEmptyBBHelper(
     if (!rmctx.chooseCtx().do_merge_label() && bb->hasLabel()) {
         return false;
     }
-    ASSERT0(getCFG()->getSuccsNum(bb) == 1);
+    ASSERTN(getCFG()->getSuccsNum(bb) == 1,
+            ("Weired CFG, CFG should be sane if PASS_CFG is set"));
     if (!rmctx.isForceRemove() && !isValidToKeepSSAIfRemoveBB(bb)) {
         return false;
     }
@@ -378,6 +385,8 @@ bool OptimizedCFG<BB, XR>::removeSingleEmptyBB(
     BB * bb, MOD RemoveEmptyBBCtx & ctx)
 {
     START_TIMER(t, "Remove Single Empty BB");
+    ASSERTN(ctx.getOptCtx().isPassValid(PASS_CFG),
+            ("CFG has to be valid firstly"));
     if (!getCFG()->isEmptyBB(bb) || getCFG()->isRegionEntry(bb) ||
         bb->isExceptionHandler()) {
         return false;
@@ -413,6 +422,13 @@ template <class BB, class XR>
 bool OptimizedCFG<BB, XR>::removeEmptyBB(OUT RemoveEmptyBBCtx & rmctx)
 {
     START_TIMER(t, "Remove Empty BB");
+
+    //NOTE:the function could remove empty BB even if CFG is not built yet, the
+    //OptimizedCFG object only handle BBList and maintain related info in this
+    //situation.
+    //ASSERTN(rmctx.getOptCtx().isPassValid(PASS_CFG),
+    //        ("CFG has to be valid firstly"));
+
     if (rmctx.chooseCtx().needUpdateDomInfo()) {
         //Since RPO is necessary to compute DomInfo and recompute it is not
         //very costly, thus we prefer to recompute RPO.

@@ -1,0 +1,58 @@
+region program ".program" () {
+    var t1:i32:(align(4));
+    var t2:i32:(align(4));
+    var t3:i32:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var k:i32:(align(4));
+    var p:*<4>:(align(4));
+    var foo4:any:(func,align(4));
+    var foo3:any:(func,align(4));
+    var foo1:any:(func,align(4));
+    var foo2:any:(func,align(4));
+    //==---- DUMP Region 'foo4' ----==
+    region func foo4 (undefined,var i:i32:(align(4))) {
+        /*
+        int foo3(int i)
+        {
+            d = 20;
+            while (i++ > 0) {
+                p = 10;
+                e++;
+            }
+            return d; 
+        }
+        */
+        label "_GR__$L3";
+        st:i32 d = 20:i32;
+        stpr $3:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        label "_GR__$L1";
+        phi $4:i32 = (
+            $3:i32,"_GR__$L3"),(
+            $5:i32,"_GR__$L4");
+        falsebr (
+            gt:bool 
+                $4:i32, 0:i32), "_GR__$L2";
+        label "_GR__$L4";
+        st:*<4> p = 10:i32;
+        stpr $6:i32 = 
+            ld:i32 e;
+        st:i32 e = 
+            add:i32 
+                ld:i32 e, 1:i32;
+        stpr $5:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        return 
+            ld:i32 d;
+    };
+}

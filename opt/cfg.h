@@ -192,7 +192,6 @@ protected:
 
     //Cache and record Vertex in reverse-post-order.
     xcom::RPOVexList * m_rpo_vexlst;
-    xcom::BitSetMgr * m_bs_mgr;
     xcom::SMemPool * m_pool;
     xcom::List<BB*> m_exit_list; //CFG Graph ENTRY list
     LoopInfoMgr<BB> m_li_mgr;
@@ -266,7 +265,6 @@ public:
         ASSERTN(bb_list, ("CFG requires BB list"));
         m_bb_list = bb_list;
         m_loop_info = nullptr;
-        m_bs_mgr = nullptr;
         m_has_eh_edge = false;
         m_rpo_vexlst = nullptr;
         m_entry = nullptr; //entry will be computed during CFG::build().
@@ -449,7 +447,6 @@ public:
 
     LoopInfoMgr<BB> & getLoopInfoMgr() { return m_li_mgr; }
     xcom::List<BB*> * getBBList() const { return m_bb_list; }
-    xcom::BitSetMgr * getBitSetMgr() const { return m_bs_mgr; }
     void get_preds(MOD List<BB*> & preds, BB const* bb) const;
     void get_preds(MOD List<BB const*> & preds, BB const* bb) const;
     void get_preds(MOD List<UINT> & predid, BB const* bb) const;
@@ -649,11 +646,6 @@ public:
     void sortByBFS();
     void sortByTopological();
     void setBBVertex();
-    void setBitSetMgr(xcom::BitSetMgr * bs_mgr)
-    {
-        m_bs_mgr = bs_mgr;
-        xcom::DGraph::setBitSetMgr(bs_mgr);
-    }
     void setBBList(List<BB*> * bblst) { m_bb_list = bblst; }
 
     //Return true if find an order of RPO for 'bb' that

@@ -277,6 +277,34 @@ static bool canBeDeadStore(IR const* stmt, DSECtx const& ctx)
 }
 
 
+bool DSE::canBeCandidate(IR const* ir) const
+{
+    ASSERT0(ir && ir->is_stmt());
+    if (ir->isCallStmt()) {
+        //NOTE:Don't regard CallStmt as DSE candidate, because the DEF
+        //of CallStmt contains inexact DEF of each MD. Thus we cannot determine
+        //exactly that the CallStmt is dead-store.
+        //e.g:Both foo and bar defined MD10, we shouldn't say bar
+        //exact-covers foo.
+        //void main() {
+        //  foo(); //DEF:MD10V1
+        //  bar(); //DEF:MD10v2
+        //}
+        return false;
+    }
+    if (ir->isPartialStoreStmt()) {
+        //CASE:Skip partial store since the range of store value may be
+        //dynamic.
+        return false;
+    }
+    if (ir->isVirtualOp()) {
+        return false;
+    }
+    return !ir->isMayThrow(true) && !ir->hasSideEffect(true) &&
+           !ir->isNoMove(true);
+}
+
+
 bool DSE::doStmt(
     IR * ir, MOD BBIRList & irlst, MOD BBIRListIter & it, DSECtx & ctx)
 {
@@ -376,6 +404,12 @@ bool DSE::initDepPass(MOD OptCtx & oc)
 }
 
 
+void DSE::reset()
+{
+    m_am.clean();
+}
+
+
 //Perform Dead Store Elmination.
 //A dead store is a store into a memory location which will later be
 //overwritten by another store without any intervening loads.  In this
@@ -397,6 +431,7 @@ bool DSE::perform(OptCtx & oc)
         return false;
     }
     dump();
+    reset();
     ASSERT0(xoc::verifyMDRef(m_rg, oc));
     ASSERT0(xoc::verifyClassicDUChain(m_rg, oc));
     ASSERT0(xoc::verifyIRandBB(m_rg->getBBList(), m_rg));

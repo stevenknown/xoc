@@ -484,6 +484,12 @@ protected:
     //Note the function only handle ir's RHS, return NULL if there is no
     //stmt generated.
     virtual IR * simplifyRHSInPRMode(IR * ir, SimpCtx * ctx);
+
+    //Simplify RHS of store stmt.
+    IR * simplifyRHSOfStore(IR * ir, SimpCtx * ctx);
+
+    //Simplify base-expression of indirect stmt or expression.
+    IR * simplifyBaseOfIndirectOp(IR * ir, SimpCtx * ctx);
     void simplifyStoreArrayRHS(
         IR * ir, OUT IR ** ret_list, OUT IR ** last, SimpCtx * ctx);
     IR * simplifyStoreArrayAddr(

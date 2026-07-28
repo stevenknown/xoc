@@ -38,7 +38,9 @@ static void dumpReasonAndIR(
     IR const* ir, MOD IfCvsCtx & ctx, CHAR const* format, ...)
 {
     Region const* rg = ctx.getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_IF_CONVERSION))
+    { return; }
 
     //Dump formatted string to buffer.
     xcom::StrBuf reason(64);
@@ -64,7 +66,9 @@ static void dumpGenedIRList(
     CHAR const* format, ...)
 {
     Region const* rg = ctx.getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_IF_CONVERSION))
+    { return; }
 
     //Dump formatted string to buffer.
     xcom::StrBuf tmpbuf(64);
@@ -96,7 +100,9 @@ static void dumpDR(
     CHAR const* format, ...)
 {
     Region const* rg = ctx.getRegion();
-    if (!rg->isLogMgrInit()) { return; }
+    if (!rg->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_IF_CONVERSION))
+    { return; }
 
     //Dump formatted string to buffer.
     xcom::StrBuf tmpbuf(64);
@@ -550,6 +556,18 @@ bool IfConversion::dump() const
 
 bool IfConversion::initDepPass(MOD OptCtx & oc)
 {
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
+    if (!useClassicPRDU(&oc) && !usePRSSADU()) {
+        //use either classic PR DU chain or PRSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    if (!useClassicNonPRDU(&oc) && !useMDSSADU()) {
+        //use either classic NonPR DU chain or MDSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
     return true;
 }
 
@@ -859,7 +877,7 @@ static bool mergeTruePartSelectOpIntoOne(
     if (!trueexp->isMemOpnd()) { return false; }
     Region * rg = ctx.getRegion();
     OptCtx const* oc = ctx.getOptCtx();
-    IR const* trueexp_def = xoc::findDomAvailDef(trueexp, rg);
+    IR const* trueexp_def = xoc::findDomAvailDef(trueexp, rg, oc);
     if (trueexp_def == nullptr) { return false; }
     IR * partial_trueexp = nullptr;
     if (!isTruePartSelectOp(trueexp_def, &partial_trueexp)) { return false; }
@@ -880,7 +898,7 @@ static bool mergeFalsePartSelectOpIntoOne(
     if (!falseexp->isMemOpnd()) { return false; }
     Region * rg = ctx.getRegion();
     OptCtx const* oc = ctx.getOptCtx();
-    IR const* falseexp_def = xoc::findDomAvailDef(falseexp, rg);
+    IR const* falseexp_def = xoc::findDomAvailDef(falseexp, rg, oc);
     if (falseexp_def == nullptr) { return false; }
     IR * partial_falseexp = nullptr;
     if (!isFalsePartSelectOp(falseexp_def, &partial_falseexp)) { return false; }
@@ -1486,8 +1504,8 @@ static void updateDU(DiamondRegion const& dr, MOD IfCvsCtx & ctx)
 {
     //DU chains of PROP are not changed.
     updateMDSSADUForDefDefChainInTop(dr, ctx);
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
-    ASSERT0(MDSSAMgr::verifyMDSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(ctx.getRegion(), *ctx.getOptCtx()));
 }
 
 
@@ -1780,6 +1798,7 @@ bool IfConversion::perform(OptCtx & oc)
         return false;
     }
     dump();
+    reset();
 
     //The pass does not devastate IVR information. However, new IV might be
     //inserted.

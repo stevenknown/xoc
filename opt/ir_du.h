@@ -571,7 +571,7 @@ public:
     { return findNearestDomDef(exp, exp->getDUSet()); }
 
     //Find the available dominated available DEF stmt of 'exp'.
-    IR * findDomAvailDef(IR const* exp) const;
+    IR * findDomAvailDef(IR const* exp, OptCtx const* oc) const;
 
     //Find nearest killing def to expmd in its bb.
     //Here we search exactly killing DEF from current stmt to previous

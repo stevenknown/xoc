@@ -248,7 +248,7 @@ IR * findNearestDomDef(IR const* exp, Region const* rg);
 //The function finds the domimated available DEF stmt of 'exp', and
 //the user needs to consider the detail cover information of the MD
 //ref according to the concrete scenario.
-IR * findDomAvailDef(IR const* exp, Region const* rg);
+IR * findDomAvailDef(IR const* exp, Region const* rg, OptCtx const* oc);
 
 //The function try to find the killing-def for 'use'.
 //To find the killing-def, the function prefer use SSA info.

@@ -362,7 +362,6 @@ IRCFG::IRCFG(BBList * bbl, Region * rg, UINT vertex_hash_size)
 {
     m_tm = rg->getTypeMgr();
     ASSERT0(rg->getBBMgr());
-    setBitSetMgr(rg->getBitSetMgr());
     ASSERT0(getEntry() == nullptr);
     initEntryAndExit();
 }
@@ -3083,7 +3082,10 @@ void IRCFG::clone(IRCFG const& src, bool clone_edge_info, bool clone_vex_info)
 {
     CFG<IRBB, IR>::clone(src, clone_edge_info, clone_vex_info);
     m_tm = src.getRegion()->getTypeMgr();
-    setBitSetMgr(src.getBitSetMgr());
+
+    //NOTE:Use this graph's own BitSetMgr.
+    //setBitSetMgr(src.getBitSetMgr());
+
     cloneLab2BB(src.m_lab2bb);
 }
 
@@ -3486,7 +3488,7 @@ void IRCFG::changeToBeFallthroughBB(IRBB * bb, BBListIter const& bbit,
 bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
 {
     if (!g_do_cfg_opt) { return false; }
-    START_TIMER(t, "CFG Optimizations");
+    START_TIMER(t, "IRCFG Misc Optimizations");
     bool change = false;
     bool lchange = false;
     UINT count = 0;
@@ -3496,6 +3498,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
     ASSERT0L3(verifyLoopInfo(ctx.getOptCtx()));
     ASSERT0L3(verifyDomAndPdom(ctx.getOptCtx()));
     do {
+        START_TIMER_FMT(t, ("IRCFG::performMiscOpt::No.%u iteration", count));
         lchange = false;
         if (g_do_cfg_remove_unreach_bb) {
             bool res = removeUnreachBB(ctx, nullptr);
@@ -3579,6 +3582,7 @@ bool IRCFG::performMiscOpt(MOD CfgOptCtx & ctx)
                 goto AGAIN;
             }
         }
+        END_TIMER_FMT(t, ("IRCFG::performMiscOpt::No.%u iteration", count));
 AGAIN:
         change |= lchange;
         count++;
@@ -3597,7 +3601,7 @@ AGAIN:
     ASSERT0(verifyRPO(ctx.getOptCtx()));
     ASSERT0(verifyLoopInfo(ctx.getOptCtx()));
     ASSERT0(verifyDomAndPdom(ctx.getOptCtx()));
-    END_TIMER(t, "CFG Optimizations");
+    END_TIMER(t, "IRCFG Misc Optimizations");
     return change;
 }
 

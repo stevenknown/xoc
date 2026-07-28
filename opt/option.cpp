@@ -96,6 +96,7 @@ bool g_do_lcse = true;
 bool g_do_licm = true;
 bool g_do_licm_no_guard = false;
 bool g_do_gvn = true;
+bool g_do_evn = true;
 bool g_do_pre = false;
 bool g_do_rce = true;
 bool g_do_vect = true;
@@ -170,6 +171,7 @@ static DumpOption::OptionDesc g_dump_opt_desc [] = {
   { PASS_DSE, "PASS_DSE", false, },
   { PASS_RCE, "PASS_RCE", false, },
   { PASS_GVN, "PASS_GVN", false, },
+  { PASS_EVN, "PASS_EVN", false, },
   { PASS_DOM, "PASS_DOM", false, },
   { PASS_PDOM, "PASS_PDOM", false, },
   { PASS_MD_REF, "PASS_MD_REF", false, },
@@ -600,6 +602,7 @@ void Option::dump(MOD LogMgr * lm)
     note(lm, "\ng_do_licm = %s", g_do_licm ? "true":"false");
     note(lm, "\ng_do_licm_no_guard = %s", g_do_licm_no_guard ? "true":"false");
     note(lm, "\ng_do_gvn = %s", g_do_gvn ? "true":"false");
+    note(lm, "\ng_do_evn = %s", g_do_evn ? "true":"false");
     note(lm, "\ng_do_pre = %s", g_do_pre ? "true":"false");
     note(lm, "\ng_do_rce = %s", g_do_rce ? "true":"false");
     note(lm, "\ng_do_vect = %s", g_do_vect ? "true":"false");
@@ -734,6 +737,7 @@ static PassSwitch g_pass_in_level3[] {
     { &xoc::g_do_licm, },
     { &xoc::g_do_gcse, },
     { &xoc::g_do_gvn, },
+    { &xoc::g_do_evn, },
     { &xoc::g_do_alge_reassociate, },
     { &xoc::g_do_alge_reassociate_aggressive, },
     { &xoc::g_do_rce, },

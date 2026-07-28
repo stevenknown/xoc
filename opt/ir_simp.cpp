@@ -2620,22 +2620,31 @@ IR * IRSimp::simplifyIndirectExp(IR * ir, SimpCtx * ctx)
 }
 
 
-IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
+IR * IRSimp::simplifyBaseOfIndirectOp(IR * ir, SimpCtx * ctx)
 {
-    ASSERT0(ir->is_stmt());
-    //Do simplification to stmt itself at first.
+    ASSERT0(ir->isIndirectMemOp());
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     IR * ret_list = nullptr;
     IR * last = nullptr;
-    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SimpCtxWrap tw(*ctx, this);
     SimpCtx & basectx = tw.ctx();
     SIMP_ret_array_val(&basectx) = true;
 
+    //Reduce the tree height.
+    ir->setBase(simplifyExpression(ir->getBase(), &basectx));
+    ctx->unionBottomUpInfo(basectx);
     if (SIMP_stmtlist(&basectx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&basectx));
     }
+    return ret_list;
+}
 
-    //Then, simplify its RHS.
+
+IR * IRSimp::simplifyRHSOfStore(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->is_stmt() && ir->hasRHS());
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
     SimpCtxWrap tw2(*ctx, this);
     SimpCtx & rhsctx = tw2.ctx();
     ASSERT0(SIMP_stmtlist(ctx) == nullptr);
@@ -2649,6 +2658,29 @@ IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
         //We allow the simplest PR write operation in LHS.
         IR * retlst2 = simplifyRHSInPRMode(ir, ctx);
         xcom::add_next(&ret_list, &last, retlst2);
+    }
+    return ret_list;
+}
+
+
+IR * IRSimp::simplifyIndirectStmt(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->is_stmt());
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+
+    //Do simplification to stmt itself at first.
+    //Simplify its BASE.
+    IR * base_ret_list = simplifyBaseOfIndirectOp(ir, ctx);
+    if (base_ret_list != nullptr) {
+        xcom::add_next(&ret_list, &last, base_ret_list);
+    }
+
+    //Then, simplify its RHS.
+    IR * rhs_ret_list = simplifyRHSOfStore(ir, ctx);
+    if (rhs_ret_list != nullptr) {
+        xcom::add_next(&ret_list, &last, rhs_ret_list);
     }
 
     //Add original stmt IR as the last new IR at the result-list.

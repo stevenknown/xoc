@@ -885,12 +885,15 @@ typedef BitSet DomSet;
 //
 class DGraph : public Graph {
 protected:
-    BitSetMgr * m_bs_mgr;
     Vector<BitSet*> m_dom_set; //record dominator-set of each vertex.
     Vector<BitSet*> m_pdom_set; //record post-dominator-set of each vertex.
     Vector<VexIdx> m_idom_set; //immediate dominator.
     Vector<VexIdx> m_ipdom_set; //immediate post dominator.
     RPOMgr m_rpomgr;
+
+    //The DGraph will allocate misc BitSet, such as Dom, PDom.
+    //Manage these BitSet by its own BitSetMgr.
+    xcom::BitSetMgr m_bs_mgr;
 protected:
     //The function will compute idom for subgraph that rooted by 'entry'.
     //NOTE: the function needs RPO to compute DomInfo.
@@ -903,12 +906,14 @@ protected:
     bool computeIdomForFullGraph(List<Vertex const*> const& vlst);
     void freeDomSet(VexIdx vid);
     void freePdomSet(VexIdx vid);
+    void freeDomAndPdomSet();
     bool verifyPdom(DGraph & g, RPOVexList const& rpovlst) const;
     bool verifyDom(DGraph & g, RPOVexList const& rpovlst) const;
 public:
     DGraph(UINT vex_hash_size = 64);
     DGraph(DGraph const& g);
     DGraph const& operator = (DGraph const&);
+    virtual ~DGraph();    
 
     //The function adds Dom, Pdom, IDom, IPDom information for newsucc, whereas
     //update the related info for 'marker'.
@@ -1025,10 +1030,7 @@ public:
     void clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
     {
         Graph::clone(g, clone_edge_info, clone_vex_info);
-        m_bs_mgr = g.m_bs_mgr;
-        if (m_bs_mgr != nullptr) {
-            cloneDomAndPdom(g);
-        }
+        cloneDomAndPdom(g);
     }
 
     //Collect the 'id' vertex reaching nodes into 'visited'.
@@ -1143,15 +1145,15 @@ public:
     { return m_dom_set.get((VecIdx)id); }
 
     RPOMgr & getRPOMgr() { return m_rpomgr; }
+    BitSetMgr & getBitSetMgr() { return m_bs_mgr; }
 
     //Get vertices who dominate vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
     DomSet * gen_dom_set(VexIdx id)
     {
-        ASSERT0(m_bs_mgr != nullptr);
         DomSet * set = m_dom_set.get((VecIdx)id);
         if (set == nullptr) {
-            set = m_bs_mgr->create();
+            set = m_bs_mgr.create();
             m_dom_set.set((VecIdx)id, set);
         }
         return set;
@@ -1172,10 +1174,9 @@ public:
     //NOTE: set does NOT include 'v' itself.
     DomSet * gen_pdom_set(VexIdx id)
     {
-        ASSERT0(m_bs_mgr != nullptr);
         DomSet * set = m_pdom_set.get((VecIdx)id);
         if (set == nullptr) {
-            set = m_bs_mgr->create();
+            set = m_bs_mgr.create();
             m_pdom_set.set((VecIdx)id, set);
         }
         return set;
@@ -1229,7 +1230,6 @@ public:
     //order: record the given order of each predecessor. Note the number
     //       of elements have to equal to the number of predecessor of vex.
     void sortPred(MOD Vertex * vex, Vector<VexIdx> const& order);
-    void setBitSetMgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
     void set_idom(VexIdx vid, VexIdx idom)
     { m_idom_set.set((VecIdx)vid, idom); }
     void set_ipdom(VexIdx vid, VexIdx ipdom)

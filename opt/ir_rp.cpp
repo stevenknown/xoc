@@ -2977,7 +2977,7 @@ bool RegPromot::dump() const
     m_rg->getLogMgr()->incIndent(2);
     Pass::dump();
     m_dont_promote.dump();
-    m_act_mgr.dump();
+    m_am.dump();
     m_rg->getLogMgr()->decIndent(2);
     m_rg->getLogMgr()->resumeBuffer();
     return true;
@@ -2986,7 +2986,7 @@ bool RegPromot::dump() const
 
 void RegPromot::reset()
 {
-    m_act_mgr.clean();
+    m_am.clean();
 }
 
 

@@ -1165,6 +1165,12 @@ bool DeadCodeElim::initSSAMgr(OptCtx const& oc)
 }
 
 
+void DeadCodeElim::reset()
+{
+    m_am.clean();
+}
+
+
 //The function attempts to reconstruct PRSSA or MDSSA if they are available
 //before the pass. Note the reconstruction might be costly if the pass can
 //not maintain SSA info.
@@ -1234,6 +1240,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     checkAndRebuildSSA(
         org_prssa_is_valid != usePRSSADU(),
         org_mdssa_is_valid != useMDSSADU(), m_rg, oc);
+    reset();
     ASSERT0(verifyClassicDUChain(m_rg, oc));
     ASSERT0(xoc::verifyIVR(m_rg));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

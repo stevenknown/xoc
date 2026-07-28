@@ -1319,7 +1319,7 @@ CLASSIC_DU:
 }
 
 
-IR * findDomAvailDef(IR const* exp, Region const* rg)
+IR * findDomAvailDef(IR const* exp, Region const* rg, OptCtx const* oc)
 {
     ASSERT0(exp && rg);
 
@@ -1345,7 +1345,7 @@ IR * findDomAvailDef(IR const* exp, Region const* rg)
     }
 CLASSIC_DU:
     ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
-    return rg->getDUMgr()->findDomAvailDef(exp);
+    return rg->getDUMgr()->findDomAvailDef(exp, oc);
 }
 
 

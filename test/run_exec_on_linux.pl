@@ -92,7 +92,7 @@ sub execScript
 {
     my $input_cmdline = $_[0];
     my $curdir = getCurDir();
-    my $cmdline = "sh ".$input_cmdline;
+    my $cmdline = "bash ".$input_cmdline;
     my $retval = systemx($cmdline);
     if ($retval != 0) {
         print("\nCURDIR>>", $curdir, "\n");

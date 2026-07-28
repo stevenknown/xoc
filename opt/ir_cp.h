@@ -368,6 +368,7 @@ protected:
         }
         newir->setType(exp->getType());
     }
+    void reset();
 
     //Return true if user expects to analyz Avail-Expression via DU chain.
     bool shouldAnalyzeAvailExpByDUChain() const

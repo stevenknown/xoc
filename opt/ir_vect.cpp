@@ -571,9 +571,12 @@ VectCtx::VectCtx(LI<IRBB> const* li, IVBoundInfo const* bi, OptCtx & oc,
     m_licm_anactx = nullptr;
     m_vm = getRegion()->getVarMgr();
     m_mdsys = getRegion()->getMDSystem();
-    m_ifcvs = (IfConversion*)getRegion()->getPassMgr()->registerPass(
-        PASS_IF_CONVERSION);
-    ASSERT0(m_ifcvs);
+    m_ifcvs = nullptr;
+    if (g_do_if_conversion) {
+        m_ifcvs = (IfConversion*)getRegion()->getPassMgr()->registerPass(
+            PASS_IF_CONVERSION);
+        ASSERT0(m_ifcvs);
+    }
     m_lrmgr = new LinearRepMgr(getRegion(), oc);
     m_vectaccdesc_mgr = new VectAccDescMgr();
     ASSERT0(getGVN());
@@ -1121,6 +1124,9 @@ static void addGotoInDiamondRegionToCandList(
 
 static bool isCondBranchLegalToVect(IR const* ir, MOD VectCtx & ctx)
 {
+    if (ctx.getIfCvs() == nullptr) {
+        return false; //TODO:handle conditional-branch via mask-op.
+    }
     DiamondRegion dr;
     IfCvsCtx ifctx(*ctx.getOptCtx(), ctx.getLI(), ctx.getIfCvs(),
                    ctx.getActMgr());
@@ -1382,6 +1388,10 @@ bool Vectorization::checkLinRepForArrayOp(
 
 static bool tryIfConversion(MOD VectCtx & ctx)
 {
+    if (ctx.getIfCvs() == nullptr) {
+        //IfConversion isn't available.
+        return false;
+    }
     VectCtx::CandListIter it;
     VectCtx & pctx = const_cast<VectCtx&>(ctx);
     VectCtx::ResCandList & rescand = pctx.getResCandList();
@@ -2744,7 +2754,7 @@ bool Vectorization::checkScalarStmt(VectCtx const& ctx) const
             //  NO USE OF $40;
             //  BB4:
             //  ... = $40;
-            //The loop body does not have any USE of PHI result.
+            //The loop body doesn't have any USE of PHI result.
             continue;
         }
         getActMgr().dumpAct(ir, "the scalar operation can not be vectorized");
@@ -2892,6 +2902,22 @@ static void addPrerequisiteOpToBBAndRecordGeneratedOp(
 {
     for (IR const* op = ctx.getPrerequisiteOpList().get_head();
          op != nullptr; op = ctx.getPrerequisiteOpList().get_next()) {
+        IR * dupop = ctx.getRegion()->dupIRTree(op);
+
+        //Compute MDRef for new dupop.
+        xoc::computeMustAndMayRefForDirectOpForTree(
+            dupop, ctx.getRegion(), false);
+        bb->getIRList().append_tail_ex(dupop);
+        ctx.getGeneratedStmtList().append(dupop);
+    }
+}
+
+
+static void addInitOpToBBAndRecordGeneratedOp(
+    MOD VectCtx & ctx, MOD IRBB * bb)
+{
+    for (IR const* op = ctx.getInitOpList().get_head();
+         op != nullptr; op = ctx.getInitOpList().get_next()) {
         IR * dupop = ctx.getRegion()->dupIRTree(op);
 
         //Compute MDRef for new dupop.
@@ -3629,6 +3655,7 @@ bool ReconstructLoopWithImmTC::addVectOpAndDepOpToBB(
     ASSERT0(bb);
     ConstructLoop cl;
     if (!cl.genDepOpOutsideLoop(ctx)) { return false; }
+    addInitOpToBBAndRecordGeneratedOp(ctx, bb);
     addPrerequisiteOpToBBAndRecordGeneratedOp(ctx, bb);
     addVectOpToBBAndRecordGeneratedOp(ctx, bb);
     return addReduceIVOpToBBAndRecordGeneratedOp(ctx, bb);
@@ -3828,7 +3855,7 @@ bool Vectorization::perform(OptCtx & oc)
         return false;
     }
     dump();
-    cleanAfterPass();
+    reset();
 
     //The pass does not devastate IVR information. However, new IV might be
     //inserted.

@@ -1161,6 +1161,7 @@ bool GCSE::perform(OptCtx & oc)
         //For now, gvn has updated correctly.
         oc.setInvalidPass(PASS_EXPR_TAB);
     }
+    reset();
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     return change;
 }

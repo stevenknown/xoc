@@ -136,6 +136,8 @@ public:
 class IfConversion : public Pass {
     COPY_CONSTRUCTOR(IfConversion);
     bool m_is_try_loop_tree;
+    PRSSAMgr const* m_prssamgr;
+    MDSSAMgr const* m_mdssamgr;
     ActMgr m_am;
 protected:
     bool doLoopTree(MOD LI<IRBB> * li, MOD OptCtx & oc);
@@ -151,6 +153,15 @@ protected:
     bool tryLoop(MOD LI<IRBB> * li, MOD OptCtx & oc);
     bool tryBBListImpl(MOD IfCvsCtx & ctx);
     bool tryBBList(MOD OptCtx & oc);
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
+    bool useClassicPRDU(OptCtx const* oc) const
+    { return oc->is_pr_du_chain_valid(); }
+    bool useClassicNonPRDU(OptCtx const* oc) const
+    { return oc->is_nonpr_du_chain_valid(); }
 public:
     explicit IfConversion(Region * rg);
     virtual ~IfConversion();

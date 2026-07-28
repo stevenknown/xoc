@@ -75,9 +75,9 @@ sub execScript
 {
     my $curdir = getCurDir();
     #my $cmdline = "sh run.sh";
-    my $cmdline = "sh run_no_cg.sh";
+    my $cmdline = "bash run_compile.sh";
     if (!$g_is_debug) {
-        $cmdline = "sh run_release.sh";
+        $cmdline = "bash run_release.sh";
     }
     my $retval = systemx($cmdline);
     if ($retval != 0) {

@@ -38,6 +38,7 @@ static void dumpFailedReason(
 {
     if (!rg->isLogMgrInit()) { return; }
     if (ctx.getActMgr() == nullptr) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_EVN)) { return; }
     ASSERT0(reason);
     xcom::DefFixedStrBuf buf;
     ctx.getActMgr()->dump(
@@ -53,6 +54,7 @@ static void dumpFailedInferEVNForCVT(
     ASSERT0(ir->is_cvt());
     if (!evn->getRegion()->isLogMgrInit()) { return; }
     if (ctx.getActMgr() == nullptr) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_EVN)) { return; }
     xcom::DefFixedStrBuf ty1;
     evn->getTypeMgr()->dump_type(ir->getType(), ty1);
     xcom::DefFixedStrBuf ty2;
@@ -178,6 +180,7 @@ void InferEVN::dumpIR2VN() const
 void InferEVN::dumpForTest() const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_EVN)) { return; }
     note(getRegion(), "\n==-- DUMP InferEVN --==");
     dumpIR2VN();
 }
@@ -186,6 +189,7 @@ void InferEVN::dumpForTest() const
 void InferEVN::dump() const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_EVN)) { return; }
     note(getRegion(), "\n==-- DUMP InferEVN --==");
     m_rg->getLogMgr()->incIndent(2);
     dumpIR2VN();

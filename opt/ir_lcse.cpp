@@ -677,6 +677,12 @@ bool LCSE::initDepPass(OptCtx const& oc)
 }
 
 
+void LCSE::reset()
+{
+    m_am.clean();
+}
+
+
 bool LCSE::perform(OptCtx & oc)
 {
     if (m_rg->getBBList()->get_elem_count() == 0) { return false; }

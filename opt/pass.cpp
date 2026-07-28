@@ -131,6 +131,12 @@ bool Pass::dumpAfterPass() const
 }
 
 
+size_t Pass::count_mem() const
+{
+    return sizeof(*this);
+}
+
+
 bool Pass::dump() const
 {
     //Optimization Dependent Code.

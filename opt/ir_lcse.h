@@ -181,7 +181,7 @@ protected:
     //Return true if common expression has been substituted.
     bool processBB(MOD IRBB * bb, MOD LCSECtx & ctx);
     bool processBBList(OptCtx & oc);
-
+    void reset();
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const

@@ -42,7 +42,9 @@ static void dumpFoldConst(
     AlgeReassociate const* reass)
 {
     AlgeReassociate * pthis = const_cast<AlgeReassociate*>(reass);
-    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    if (!pthis->getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
+    { return; }
     xcom::StrBuf s1(32);
     xcom::StrBuf s2(32);
     xcom::StrBuf s3(32);
@@ -60,7 +62,9 @@ static void dumpReplaceExp(
     IR const* orgrhs, IR const* newrhs, AlgeReassociate const* reass)
 {
     AlgeReassociate * pthis = const_cast<AlgeReassociate*>(reass);
-    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    if (!pthis->getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
+    { return; }
     xcom::StrBuf s1(32), s2(32);
     pthis->getRegion()->getLogMgr()->incIndent(2);
     xoc::dumpIRToBuf(orgrhs, pthis->getRegion(), s1);
@@ -75,7 +79,9 @@ static void dumpSimpStmt(IR const* ir, AlgeReassociate const* reass)
 {
     ASSERT0(ir->is_stmt());
     AlgeReassociate * pthis = const_cast<AlgeReassociate*>(reass);
-    if (!pthis->getRegion()->isLogMgrInit()) { return; }
+    if (!pthis->getRegion()->isLogMgrInit() ||
+        !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
+    { return; }
     xcom::StrBuf s1(32);
     pthis->getRegion()->getLogMgr()->incIndent(2);
     xoc::dumpIRToBuf(ir, pthis->getRegion(), s1);
@@ -361,7 +367,8 @@ ReassExp * ReassExpMgr::genBinReassExp(IR const* ir)
 //
 void ReassActMgr::dumpAct(CHAR const* format, ...)
 {
-    if (!m_rg->isLogMgrInit()) { return; }
+    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
+    { return; }
     va_list args;
     va_start(args, format);
     xcom::DefFixedStrBuf buf;
@@ -1851,6 +1858,7 @@ bool AlgeReassociate::perform(OptCtx & oc)
     if (ctx.needRecompGVN()) {
         oc.setInvalidPass(PASS_GVN);
     }
+    reset();
     //DU chain and DU reference should be maintained.
     ASSERT0(xoc::verifyMDRef(m_rg, oc) && xoc::verifyClassicDUChain(m_rg, oc));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));

@@ -53,6 +53,18 @@ static void dumpAnaCtx(LICM * licm, LICMAnaCtx const& ctx)
 }
 
 
+static void dumpAct(ActMgr * am, CHAR const* format, ...)
+{
+    if (am == nullptr || format == nullptr) { return; }
+    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!g_dump_opt.isDumpPass(PASS_LICM)) { return; }
+    va_list args;
+    va_start(args, format);
+    va_end(args);
+    am->dump_args(format, args);
+}
+
+
 static bool isImmRHS(IR const* exp, IR const* stmt)
 {
     ASSERT0(exp->is_exp() && stmt->is_stmt());
@@ -67,8 +79,8 @@ static void updateDomTreeByPreheader(
     ASSERT0(preheader);
     //Only insert preheader into domtree.
     domtree.insertParent(li->getLoopHead()->id(), preheader->id());
-    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
-                preheader->id(), li->getLoopHead()->id());
+    dumpAct(&actmgr, "maintain DomTree: set BB%u dominates BB%u",
+            preheader->id(), li->getLoopHead()->id());
 }
 
 
@@ -78,17 +90,17 @@ static void updateDomTreeByGuardRegion(
 {
     ASSERT0(help.getGuardEnd());
     domtree.insertParent(li->getLoopHead()->id(), help.getGuardEnd()->id());
-    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
-                help.getGuardEnd()->id(), li->getLoopHead()->id());
+    dumpAct(&actmgr, "maintain DomTree: set BB%u dominates BB%u",
+            help.getGuardEnd()->id(), li->getLoopHead()->id());
 
     domtree.insertParent(help.getGuardEnd()->id(),
                          help.getGuardStart()->id());
-    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
-                help.getGuardStart()->id(), help.getGuardEnd()->id());
+    dumpAct(&actmgr, "maintain DomTree: set BB%u dominates BB%u",
+            help.getGuardStart()->id(), help.getGuardEnd()->id());
 
     domtree.insertKid(help.getGuardStart()->id(), help.getGuardedBB()->id());
-    actmgr.dump("maintain DomTree: set BB%u dominates BB%u",
-                help.getGuardedBB()->id(), help.getGuardStart()->id());
+    dumpAct(&actmgr, "maintain DomTree: set BB%u dominates BB%u",
+            help.getGuardedBB()->id(), help.getGuardStart()->id());
 }
 
 
@@ -807,7 +819,8 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
 
         //Guard BB is necessary.
         IRBB * guard = m_gdhelp.insertGuard(m_li, m_preheader);
-        m_licm->getActMgr().dump("insert guard BB%u before preheader BB%u",
+        dumpAct(&m_licm->getActMgr(),
+            "insert guard BB%u before preheader BB%u",
             guard->id(), m_preheader->id());
 
         //Move PRPHI and MDPHI from original preheader BB to guard BB.
@@ -817,7 +830,7 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
         //again. For the sake of conventional practic, LICM will verify
         //MDSSAInfo after InsertPreheaderMgr::reviseSSADU().
         xoc::movePhi(m_preheader, guard, m_rg);
-        m_licm->getActMgr().dump(
+        dumpAct(&m_licm->getActMgr(),
             "move all IR_PHI and MDPhi from preheader BB%u to guard BB%u",
             m_preheader->id(), guard->id());
         m_licm->setLoopHasBeenGuarded(m_li);
@@ -1147,8 +1160,8 @@ bool InsertPreheaderMgr::perform(IRTab const& irtab, MOD HoistCtx & ctx)
         m_li, m_rg, &m_preheader, m_oc, true);
     ctx.cfg_changed |= insert_prehead;
     if (insert_prehead) {
-        m_licm->getActMgr().dump("insert preheader BB%u of LOOP%u",
-            m_preheader->id(), m_li->id());
+        dumpAct(&m_licm->getActMgr(), "insert preheader BB%u of LOOP%u",
+                m_preheader->id(), m_li->id());
     }
     ASSERT0(!insert_prehead || m_preheader);
     if (!m_oc->is_dom_valid()) {

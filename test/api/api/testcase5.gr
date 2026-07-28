@@ -1,0 +1,60 @@
+region program ".program" () {
+    var t1:i32:(align(4));
+    var t2:i32:(align(4));
+    var t3:i32:(align(4));
+    var c:i32:(align(4));
+    var d:i32:(align(4));
+    var e:i32:(align(4));
+    var k:i32:(align(4));
+    var p:*<4>:(align(4));
+    var a:mc<40>:(array,align(4));
+    var foo3:any:(func,align(4));
+    region func foo3 (undefined,var i:i32:(align(4))) {
+        label "_GR__$L3";
+        stpr $7:u32 = 12:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda a, 
+                $7:u32,20:i32;
+        stpr $3:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        label "_GR__$L1";
+        phi $4:i32 = (
+            $3:i32,"_GR__$L3"),(
+            $5:i32,"_GR__$L4");
+        falsebr (
+            gt:bool 
+                $4:i32, 0:i32), "_GR__$L2";
+        label "_GR__$L4";
+        stpr $8:u32 = 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda a, 
+                $8:u32,10:i32;
+        stpr $6:i32 = 
+            ld:i32 e;
+        st:i32 e = 
+            add:i32 
+                ld:i32 e, 1:i32;
+        stpr $5:i32 = 
+            ld:i32 i;
+        st:i32 i = 
+            add:i32 
+                ld:i32 i, 1:i32;
+        goto "_GR__$L1";
+        label "_GR__$L2";
+        stpr $9:u32 = 12:u32;
+        stpr $10:*<4> = 
+            add:*<4> 
+                lda a, 
+                $9:u32;
+        stpr $11:i32 = 
+            ild:i32 
+                $10:*<4>;
+        return 
+            $11:i32;
+    };
+}

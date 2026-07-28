@@ -100,6 +100,10 @@ public:
     Pass(Region * rg) : m_is_valid(false), m_rg(rg) {}
     virtual ~Pass() {}
 
+    //The function calculates memory usage for current pass object.
+    //Return bytesize of memory usage.
+    virtual size_t count_mem() const;
+
     //The function dump pass relative information.
     //The dump information is always used to detect what the pass did.
     //Return true if dump successed, otherwise false.

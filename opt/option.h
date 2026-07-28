@@ -77,6 +77,7 @@ typedef enum _PASS_TYPE {
     PASS_DSE,
     PASS_RCE,
     PASS_GVN,
+    PASS_EVN,
     PASS_DOM,
     PASS_PDOM,
     PASS_MD_REF,
@@ -556,6 +557,9 @@ extern bool g_do_ivr;
 
 //Perform global value numbering.
 extern bool g_do_gvn;
+
+//Perform global equivalent-value numbering.
+extern bool g_do_evn;
 
 //Perform control flow structure optimizations.
 extern bool g_do_cfs_opt;

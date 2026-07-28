@@ -647,10 +647,10 @@ protected:
     MDSSAMgr * m_mdssamgr;
     DefMiscBitSetMgr * m_sbs_mgr;
     GVN * m_gvn;
-    ActMgr * m_act_mgr;
     Vector<BIVList*> m_li2bivlst;
     Vector<DIVList*> m_li2divlst;
     ChainRecMgr m_crmgr;
+    ActMgr m_am;
 protected:
     BIV * allocBIV();
     DIV * allocDIV();
@@ -701,6 +701,7 @@ protected:
         ::memset((void*)p, 0, size);
         return p;
     }
+    void reset();
     void recordBIV(BIV * biv);
     void recordDIV(
         LI<IRBB> const* li, IR const* red, ChainRec const* cr,
@@ -794,7 +795,7 @@ public:
     virtual CHAR const* getPassName() const
     { return "Induction Variable Recogization"; }
     PASS_TYPE getPassType() const { return PASS_IVR; }
-    ActMgr * getActMgr() const { return m_act_mgr; }
+    ActMgr * getActMgr() { return &m_am; }
 
     //Generate the expression that represents 'biv' trip-count.
     IR * genTripCountExp(

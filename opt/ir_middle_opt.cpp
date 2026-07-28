@@ -77,6 +77,7 @@ void Region::rebuildCFGAndDUChainIfNeeded(MOD SimpCtx & simp, MOD OptCtx & oc)
                 getDUMgr()->verifyMDRef());
         return;
     }
+    START_TIMER(t, "rebuildCFGAndDUChainIfNeeded");
     oc.setInvalidPass(PASS_CFG);
     oc.setInvalidIfCFGChanged();
 
@@ -131,12 +132,27 @@ void Region::rebuildCFGAndDUChainIfNeeded(MOD SimpCtx & simp, MOD OptCtx & oc)
             need_rebuild_mdssa = true;
         }
     }
-    //Before CFG rebuilding.
+    getCFG()->rebuild(oc);
+
+    //Remove empty bb when CFG rebuilted because
+    //rebuilding cfg may generate redundant empty bb.
+    //It disturbs the computation of entry and exit.
     IRCfgOptCtx ctx(&oc);
     RemoveEmptyBBCtx rmctx(ctx);
     getCFG()->removeEmptyBB(rmctx);
-    getCFG()->rebuild(oc);
+
+    //Compute exit bb while cfg rebuilt.
+    getCFG()->computeExitList();
     ASSERT0(getCFG()->verify());
+
+    if (g_do_invert_brtgt) {
+        getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
+    }
+    //NOTE:Since SSA and related info are all invalid, thus there is no need
+    //to maintain DOM info during CFG optimizations.
+    oc.setInvalidDom();
+    oc.setInvalidPDom();
+    getCFG()->performMiscOpt(oc);
     if (need_rebuild_mdssa) {
         mdssamgr->construction(oc);
         oc.setInvalidIfMDSSAReconstructed();
@@ -164,10 +180,7 @@ void Region::rebuildCFGAndDUChainIfNeeded(MOD SimpCtx & simp, MOD OptCtx & oc)
             dumgr->checkAndComputeClassicDUChain(oc);
         }
     }
-    if (g_do_invert_brtgt) {
-        getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
-    }
-    getCFG()->performMiscOpt(oc);
+    END_TIMER(t, "rebuildCFGAndDUChainIfNeeded");
 }
 
 
@@ -194,6 +207,7 @@ bool Region::performSimplifyImpl(MOD SimpCtx & simp, OptCtx & oc)
 
 bool Region::performSimplifyArrayIngredient(OptCtx & oc)
 {
+    START_TIMER(t, "Region::performSimplifyArrayIngredient");
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     SimpCtx simp(&oc);
@@ -206,12 +220,14 @@ bool Region::performSimplifyArrayIngredient(OptCtx & oc)
         note(this, "\n==---- DUMP AFTER SIMPLIFY ARRAY INGREDIENT ----==");
         dumpBBList();
     }
+    END_TIMER(t, "Region::performSimplifyArrayIngredient");
     return change;
 }
 
 
 bool Region::performSimplify(OptCtx & oc)
 {
+    START_TIMER(t, "Region::performSimplify");
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
     SimpCtx simp(&oc);
@@ -230,6 +246,7 @@ bool Region::performSimplify(OptCtx & oc)
     }
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(this, oc));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    END_TIMER(t, "Region::performSimplify");
     return change;
 }
 
@@ -600,18 +617,22 @@ bool Region::doDUAna(OptCtx & oc)
 
 bool Region::doBasicAnalysis(OptCtx & oc)
 {
+    START_TIMER(t, "doBasicAnalysis");
     bool changed = doAA(oc);
     changed |= doDUAna(oc);
+    END_TIMER(t, "doBasicAnalysis");
     return changed;
 }
 
 
 bool Region::doRefine(OptCtx & oc)
 {
+    START_TIMER(t, "doRefine");
     RefineCtx rc(&oc);
     Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
     bool changed = refine->perform(oc, rc);
     if (changed) { ASSERT0L3(verifyClassicDUChain(this, oc)); }
+    END_TIMER(t, "doRefine");
     return changed;
 }
 
@@ -653,6 +674,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 {
     BBList * bbl = getBBList();
     if (bbl->get_elem_count() == 0) { return true; }
+    START_TIMER(t, "MiddleProcess");
     ASSERT0L3(verifyClassicDUChain(this, oc));
     if (g_opt_level > OPT_LEVEL0) {
         //Do analysis before simplification.
@@ -673,6 +695,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (g_do_global_refine) { doGlobalRefine(oc); }
     if (g_do_refine) { doRefine(oc); }
     ASSERT0(verifyIRandBB(bbl, this));
+    END_TIMER(t, "MiddleProcess");
     return true;
 }
 

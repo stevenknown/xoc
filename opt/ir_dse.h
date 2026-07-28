@@ -56,32 +56,15 @@ protected:
     bool doStmt(
         IR * ir, MOD BBIRList & irlst, MOD BBIRListIter & it, DSECtx & ctx);
     bool doBBInDomTreeOrder(OptCtx & oc);
-
     bool initDepPass(MOD OptCtx & oc);
-
+    void reset();
     bool useMDSSADU() const;
 public:
     explicit DSE(Region * rg);
     virtual ~DSE() {}
 
     //Check if ir is appropriate for optimization.
-    virtual bool canBeCandidate(IR const* ir) const
-    {
-        ASSERT0(ir && ir->is_stmt());
-
-        //NOTE:Don't regard CallStmt as DSE candidate, because the DEF
-        //of CallStmt contains inexact DEF of each MD. Thus we cannot determine
-        //exactly that the CallStmt is dead-store.
-        //e.g:Both foo and bar defined MD10, we shouldn't say bar
-        //exact-covers foo.
-        //void main() {
-        //  foo(); //DEF:MD10V1
-        //  bar(); //DEF:MD10v2
-        //}
-        return !ir->isMayThrow(true) && !ir->hasSideEffect(true) &&
-               !ir->isNoMove(true) && !ir->isCallStmt();
-    }
-
+    virtual bool canBeCandidate(IR const* ir) const;
     bool doBB(IRBB * bb, DSECtx & ctx);
 
     //The function dump pass relative information before performing the pass.

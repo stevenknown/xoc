@@ -214,7 +214,7 @@ protected:
     void markEffectIR(MOD ConstIRList & work_list, MOD DCECtx & dcectx);
 
     bool preserveControlDep(MOD ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
-
+    void reset();
     bool tryMarkBranch(
         IRBB const* bb, OUT ConstIRList & act_ir_lst, MOD DCECtx & dcectx);
     bool tryMarkUnconditionalBranch(

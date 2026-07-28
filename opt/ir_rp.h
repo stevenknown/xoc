@@ -456,7 +456,7 @@ protected:
     MDSSAMgr * m_mdssamgr;
     DontPromoteTab m_dont_promote;
     xcom::BitSetMgr m_bs_mgr;
-    RPActMgr m_act_mgr;
+    RPActMgr m_am;
 protected:
     //Return true if the loop is promotable.
     bool analyzeLoop(
@@ -600,7 +600,7 @@ protected:
 
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_misc_bs_mgr; }
     xcom::DefSegMgr * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
-    RPActMgr & getActMgr() { return m_act_mgr; }
+    RPActMgr & getActMgr() { return m_am; }
     LoopDepAna * getLoopDepAna() const { return m_loop_dep_ana; }
     GVN * getGVN() const { return m_gvn; }
     IRMgr * getIRMgr() const { return m_irmgr; }
@@ -834,7 +834,7 @@ protected:
         return p;
     }
 public:
-    RegPromot(Region * rg) : Pass(rg), m_dont_promote(rg), m_act_mgr(rg)
+    RegPromot(Region * rg) : Pass(rg), m_dont_promote(rg), m_am(rg)
     {
         ASSERT0(rg != nullptr);
         m_md_sys = rg->getMDSystem();

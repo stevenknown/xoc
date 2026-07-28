@@ -907,36 +907,53 @@ bool RCE::dump() const
 }
 
 
-bool RCE::perform(OptCtx & oc)
+bool RCE::initDepPass(MOD OptCtx & oc)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_cfg_valid()) { return false; }
     if (!oc.is_ref_valid()) { return false; }
     m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
-        //DCE use either classic PR DU chain or PRSSA.
+        //RCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
-        //DCE use either classic MD DU chain or MDSSA.
+        //RCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    START_TIMER(t, getPassName());
     if (is_use_gvn() && m_gvn == nullptr) {
         //GVN is not ready.
         return false;
     }
-    dumpBeforePass();
-
-    //Incremental update DOM need RPO.
+    //RCE will attempt to incremental update DOM, MDSSA, and PRSSA,
+    //thus need RPO.
     m_rg->getPassMgr()->checkValidAndRecompute(
         &oc, PASS_RPO, PASS_DOM, PASS_GVN, PASS_UNDEF);
     ASSERT0(m_gvn->is_valid());
+    return true;
+}
+
+
+void RCE::reset()
+{
+    m_am.clean();
+}
+
+
+//NOTE:RCE is a time-costly optimization, it will keep maintain DU chain if
+//control-flow changed. Thus user are best advised to perform RCE at the
+//highest OPT_LEVEL.
+bool RCE::perform(OptCtx & oc)
+{
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    START_TIMER(t, getPassName());
+    if (!initDepPass(oc)) { END_TIMER(t, getPassName()); return false; }
+    reset();
+    dumpBeforePass();
     DumpBufferSwitch buff(m_rg->getLogMgr());
     if (!g_dump_opt.isDumpToBuffer()) { buff.close(); }
     RCECtx ctx(oc, &getActMgr());
@@ -983,6 +1000,7 @@ bool RCE::perform(OptCtx & oc)
     } else {
         m_rg->getLogMgr()->cleanBuffer();
     }
+    reset();
     END_TIMER(t, getPassName());
     return change;
 }

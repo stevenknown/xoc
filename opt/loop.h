@@ -559,7 +559,24 @@ bool LI<BB>::findMandatoryPath(
          i != BS_UNDEF; i = bodyset->get_next(i)) {
         if (i == loophead || i == backedge_start) { continue; }
         if (!cfg->is_dom(i, backedge_start)) { continue; }
-        ASSERT0(cfg->is_pdom(backedge_start, i));
+        if (!cfg->is_pdom(backedge_start, i)) {
+            //CASE:the Exit-BB of loop isn't the loophead.
+            //e.g:compile/lftr2.c
+            //  BB5 is loophead, BB8 is backedge_start, i is BB6, and the
+            //  Exit-BB is BB6, its doesn't dominate backedge-start BB8.
+            //    | ___
+            //    ||   |
+            //    vv   |
+            //    BB5  |
+            //    |    |
+            //    v    |
+            // ---BB6  |
+            // |  |    |
+            // v  v    |
+            //    BB8  |
+            //    |____|
+            continue;
+        }
         bbset.bunion(i);
     }
     return true;

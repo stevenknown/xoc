@@ -620,9 +620,7 @@ bool ExprTab::perform(MOD OptCtx & oc)
     encodeBBList(bbl, this);
     set_valid(true);
     END_TIMER(t, getPassName());
-    if (g_dump_opt.isDumpAfterPass()) {
-        dump();
-    }
+    dump();
     ASSERT0(verify(oc));
     return false;
 }
