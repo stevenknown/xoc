@@ -1,0 +1,76 @@
+region program ".program" () {
+    var printf:*<4>:(func,align(4));
+    var g:i32:(align(4));
+    var N:i32:(align(4));
+    var s85:*<4>:(func,align(4));
+    var type:mc<8>:(private,array,align(4));
+    var _const_string_1:str:(align(4),string("float"));
+    var _const_string_2:str:(align(4),string("double"));
+    var _const_string_3:str:(align(4),string("%s%d"));
+    region func s85 () {
+        var i:i32:(align(4));
+        doloop (id i, (add $4:f64, 20), le ld i, ld:i32 N, (add ld:i32 i, 1:i32)) {
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                };
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                    call printf(2);
+                };
+            };
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                call printf();
+                call printf();
+                call printf();
+            };
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                    call printf(2);
+                    call printf(3);
+                    call printf(4);
+                };
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                    call printf(2);
+                    call printf(3);
+                    call printf(4);
+                    call printf(5);
+                };
+            };
+        };
+        doloop (id i, (add $4:f64, 20), le ld i, ld:i32 N, (add ld:i32 i, 1:i32)) {
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                    call printf(2);
+                    call printf(3);
+                    call printf(4);
+                    call printf(5);
+                    call printf(6);
+                };
+                doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                    call printf(1);
+                    call printf(2);
+                    call printf(3);
+                    call printf(4);
+                    call printf(5);
+                    call printf(6);
+                    call printf(7);
+                };
+            };
+            doloop ($90, (add $4:f64, 20), le ld:i32 N, 1, (add ld:i32 i, 1:i32)) {
+                call printf(1);
+                call printf(2);
+                call printf(3);
+                call printf(4);
+                call printf(5);
+                call printf(6);
+                call printf(7);
+                call printf(8);
+            };
+        };
+        return 0:i32;
+    };
+}

@@ -15,8 +15,7 @@ static void test_VMDLiveness()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/testcase5.gr");
+    str.strcat("testcase5.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     Region * rg = rm.getRegion(2);
     ASSERT0(rg && rg->is_function());

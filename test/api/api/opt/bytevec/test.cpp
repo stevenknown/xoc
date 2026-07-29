@@ -16,8 +16,7 @@ static void test1()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/compile.gr/rce_fold.gr");
+    str.strcat("rce_fold.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     ASSERT0(succ);
     Region * rg = rm.getRegion("bar");

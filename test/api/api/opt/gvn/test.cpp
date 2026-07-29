@@ -16,8 +16,7 @@ static void test1()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/compile.gr/no_classic_prdu/isomo.gr");
+    str.strcat("isomo.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     ASSERT0(succ);
     Region * rg = rm.getRegion("foo");

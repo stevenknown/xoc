@@ -46,8 +46,7 @@ static void testcase1()
     //g_dump_opt.is_dump_ir_id = false;
     xoc::g_dump_opt.setDumpPass(PASS_ALGE_REASSOCIATE, true);
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/test_alge_reass.gr");
+    str.strcat("test_alge_reass.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     ASSERT0(succ);
     testcase1_func(rm, "foo", 10);

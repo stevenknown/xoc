@@ -23,8 +23,7 @@ static void test4()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/compile.gr/rce_fold4.gr");
+    str.strcat("rce_fold4.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     ASSERT0(succ);
     Region * rg = rm.getRegion("main");

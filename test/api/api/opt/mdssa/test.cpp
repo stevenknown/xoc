@@ -102,8 +102,7 @@ static void test_findKillingDef_2()
     rm.initTargInfo();
     g_dump_opt.is_dump_ir_id = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/testcase2.gr");
+    str.strcat("testcase2.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     Region * rg = rm.getRegion(2);
     ASSERT0(rg && rg->is_function());
@@ -138,8 +137,7 @@ static void test_findKillingDef_1()
     rm.initTargInfo();
     g_dump_opt.is_dump_ir_id = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/testcase1.gr");
+    str.strcat("testcase1.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     Region * rg = rm.getRegion(2);
     ASSERT0(rg && rg->is_function());
@@ -176,8 +174,7 @@ static void test_findKillingDef_3()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/testcase3.gr");
+    str.strcat("testcase3.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     Region * rg = rm.getRegion(2);
     ASSERT0(rg && rg->is_function());
@@ -214,8 +211,7 @@ static void test_findKillingDef_5()
     g_dump_opt.is_dump_ir_id = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
-    str.strcat("../../../../../test");
-    str.strcat("/api/api/testcase5.gr");
+    str.strcat("testcase5.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
     Region * rg = rm.getRegion(2);
     ASSERT0(rg && rg->is_function());

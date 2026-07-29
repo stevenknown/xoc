@@ -2,7 +2,7 @@
 //build libxoc.a libxgen.a libxcom.a
 #include "../../../opt/targ_const_info.h"
 #include "../../../com/xcominc.h"
-#include "../../../elf/elfinc.h"
+//#include "../../../elf/elfinc.h"
 #include "../../../opt/cominc.h"
 #include "../../../opt/comopt.h"
 #include "../../../xgen/xgeninc.h"

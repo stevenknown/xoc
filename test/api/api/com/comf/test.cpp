@@ -1,5 +1,4 @@
-#include "../../../../../src/opt/targ_const_info.h"
-#include "../../../../../src/com/xcominc.h"
+#include "../../header_for_xgen.h"
 
 static void test_xsplit()
 {
