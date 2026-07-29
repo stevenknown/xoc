@@ -5,7 +5,7 @@
 ret=$?
 
 if [ $ret -ne 0 ]; then
-    echo "run.sh FAILED!!"
+    echo "run_compile.sh FAILED!!"
     exit $ret
 fi
 

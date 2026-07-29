@@ -39,20 +39,19 @@ sub main
 {
     $g_is_quit_early = 0;
     my @subdirlist = (
+        'builtin',
         'compile',
         'compile.gr',
         'exec',
         'exec.gr',
-        'api',
-        'xcom',
-        'tutorial_input',
-        'chibicc-main',
-        '9cc',
-        'builtin',
-        '8cc-master',
     );
     foreach my $subdir (@subdirlist) {
-        print "\nENTER DIRECTORY>>$subdir\n";
+        if (-d $subdir) {
+            print "\nENTER DIRECTORY>>$subdir\n";
+        } else {
+            print "\nWARNING:$subdir DOES NOT EXIST.\n";
+            next;
+        }
         chdir $subdir;
         execPerl();
         chdir ".."; #back to parent directory
