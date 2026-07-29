@@ -1,13 +1,25 @@
 # Introduction
-testsuite of XOCC
+testsuite of XOC
 
 # How to run testcase
+
+## NOTE:source xoc/setenv.sh before running testcases.
+
+## e.g:run both compile and execution testcases.
+   cd test && bash ./run_all.sh
+
+## e.g:run only compile testcases.
+   cd test && bash ./run_compile.sh
+
+## e.g:run only execution testcases.
+   cd test && bash ./run_exec.sh
+
 ## e.g:show help of run.pl
-   cd test/exec && perl ./run.pl 
+   cd test/exec && perl ./run.pl
 
 ## e.g:run testcase under 'exec' and 'compile'.
    cd test/exec && perl ./run.pl arm OverrideXoccPath = ~/yourname/arm/build/xocc.exe OverrideXoccFlag = "-O3 -prssa -mdssa -licm -dce -rp"
-   cd test/compile && perl ./run.pl arm  
+   cd test/compile && perl ./run.pl arm
 
 ## e.g:run single testcase under 'exec'.
    cd test/exec && perl ./run.pl arm Case = hello.c OverrideXoccPath = ~/yourname/arm/build/xocc.exe
