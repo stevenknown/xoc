@@ -1,5 +1,5 @@
 #!/bin/bash
-./run.sh
+./run_compile.sh
 
 #Get the return-result.
 ret=$?
