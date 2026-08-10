@@ -280,7 +280,63 @@ void InsertGuardHelper::removeGuardRegion(MOD DomTree & domtree)
         m_rg->freeIRTree(ir);
     }
     m_guard_start->getIRList().clean();
-    ASSERT0(!useMDSSADU() || !m_mdssa->hasPhi(m_guard_start));
+    if (m_mdssa->hasPhi(m_guard_start)) {
+        //CASE:No need to remove Guard-Start BB if the BB has PHI.
+        //e.g:compile/licm_keep_guard.c
+        //original CFG:
+        // BB18                   BB134
+        // |_______               |
+        //         |              |
+        //         v              v              v--------------
+        // BB21:...                                             |
+        // MD15V5<-(MD15V2,BB18),(MD15V2,BB134),(MD15V6,BB22)   |
+        // |                                                    |
+        // v                                                    |
+        // BB22-------------------------------------------------
+        //
+        //after inserting guard region:
+        // BB18                   BB134
+        // |___________              |
+        //             |             |
+        //             v             v
+        //   BB44:... guard_start
+        //   MD15V42<-(MD15V2,BB18),(MD15V2,BB134)
+        //   |    |
+        //   v    |
+        //  BB26: |
+        //   |    |
+        //   v    v
+        //  BB28:... guard_end
+        //          |
+        //          v             v-------------
+        // BB21:                                |
+        // MD15V5<-(MD15V5,BB44),(MD15V6,BB22)  |
+        // |                                    |
+        // v                                    |
+        // BB22---------------------------------
+        //When removing the guard-region, we keep BB44 unchanged, only remove
+        //BB26 and BB21.
+        //
+        //after removing guard region:
+        // BB18                   BB134
+        // |___________              |
+        //             |             |
+        //             v             v
+        //   BB44:... guard_start
+        //   MD15V42<-(MD15V2,BB18),(MD15V2,BB134)
+        //          |
+        //          v             v-------------
+        // BB21:                                |
+        // MD15V5<-(MD15V42,BB44),(MD15V6,BB22) |
+        // |                                    |
+        // v                                    |
+        // BB22---------------------------------
+        if (m_am != nullptr) {
+            m_am->dump(
+                "retain MDPhi of guard-start BB%u, do not delete, for modeling "
+                "control flow", m_guard_start->id());
+        }
+    }
 
     //Remove stmts in guarded_bb.
     for (IR * ir = m_guarded_bb->getIRList().get_head();

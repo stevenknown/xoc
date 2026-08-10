@@ -51,6 +51,7 @@ sub main
         'exec',
         'exec.gr',
         'builtin',
+        #'api',
     );
     foreach my $subdir (@subdirlist) {
         print "\nENTER DIRECTORY>>$subdir\n";

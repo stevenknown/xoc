@@ -3849,6 +3849,7 @@ bool Vectorization::perform(OptCtx & oc)
         changed |= lchanged;
     } while (lchanged);
     if (!changed) {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
         cleanAfterPass();
         m_rg->getLogMgr()->cleanBuffer();
         END_TIMER(t, getPassName());

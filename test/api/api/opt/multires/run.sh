@@ -1,7 +1,7 @@
 #!/bin/bash
 CHECK_RULE=../../../../check_rule.pl
-./clean.sh
-./build.sh
+bash ./clean.sh
+bash ./build.sh
 ./test.exe &> test.log
 
 #Get the return-result.

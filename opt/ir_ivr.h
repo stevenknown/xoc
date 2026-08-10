@@ -585,11 +585,11 @@ public:
 class IVRCtx {
     COPY_CONSTRUCTOR(IVRCtx);
 public:
-    OptCtx * m_oc;
+    OptCtx const* m_oc;
     ActMgr * m_am;
     Region const* m_rg;
 public:
-    IVRCtx(Region const* rg, OptCtx * oc, ActMgr * am = nullptr)
+    IVRCtx(Region const* rg, OptCtx const* oc, ActMgr * am = nullptr)
     { m_rg = rg; m_oc = oc; m_am = am; }
 
     void dumpAct(CHAR const* format, ...) const;
@@ -597,7 +597,7 @@ public:
     void dumpAct(BIV const* biv, CHAR const* format, ...) const;
 
     Region const* getRegion() const { return m_rg; }
-    OptCtx * getOptCtx() const { return m_oc; }
+    OptCtx const* getOptCtx() const { return m_oc; }
     ActMgr * getActMgr() const { return m_am; }
 };
 

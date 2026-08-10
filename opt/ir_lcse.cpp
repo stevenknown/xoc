@@ -708,6 +708,9 @@ bool LCSE::perform(OptCtx & oc)
         //related passes.
         oc.setInvalidPass(PASS_EXPR_TAB);
         oc.setInvalidPass(PASS_AA);
+    } else {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
+        m_rg->getLogMgr()->cleanBuffer();
     }
     END_TIMER(t, getPassName());
     return change;

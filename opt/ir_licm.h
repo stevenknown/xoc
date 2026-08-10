@@ -261,6 +261,7 @@ protected:
     IRCFG * m_cfg;
     //LICM use RCE to determine whether a branch must-execute.
     RCE * m_rce;
+    IVR * m_ivr;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
@@ -447,7 +448,7 @@ protected:
         LICMAnaCtx const& anactx, IR const* c, IRBB * prehead,
         MOD HoistCtx & ctx);
 
-    //Return true if any stmt is moved outside from loop.
+    //Return true if any stmt is moved outside of the loop.
     bool tryHoistDefStmt(
         LICMAnaCtx const& anactx, MOD IR * def, MOD IRBB * prehead,
         MOD HoistCtx & ctx);
@@ -491,6 +492,7 @@ public:
         ASSERT0(m_cfg && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_rce = nullptr;
+        m_ivr = nullptr;
         m_is_hoist_stmt = true;
         m_is_aggressive = true;
     }
@@ -511,6 +513,7 @@ public:
     { return "Loop Invariant Code Motion"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }
     RCE * getRCE() const { return m_rce; }
+    IVR * getIVR() const { return m_ivr; }
 
     virtual bool perform(OptCtx & oc);
 };

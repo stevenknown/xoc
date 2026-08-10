@@ -204,7 +204,7 @@ public:
     void findByMDSSA();
     void findByPRSSA();
     void find();
-    OptCtx * getOptCtx() { return m_ivrctx.getOptCtx(); }
+    OptCtx const* getOptCtx() { return m_ivrctx.getOptCtx(); }
 };
 
 
@@ -1784,6 +1784,11 @@ static void dumpTC(Region const* rg, IVBoundInfo const* ib)
         lbuf.clean();
         xoc::dumpHostInt(IVBI_tc_end_val_imm(*ib), false, false, lbuf);
         note(rg, "\nEND_VAL IS IMM:%s", lbuf.getBuf());
+        if (ib->isEndBoundClosed()) {
+            note(rg, "\nEND_VAL IS CLOSED-RANGE");
+        } else {
+            note(rg, "\nEND_VAL IS NOT CLOSED-RANGE");
+        }
         return;
     }
     IR const* exp = IVBI_tc_exp(*ib);
@@ -1792,6 +1797,11 @@ static void dumpTC(Region const* rg, IVBoundInfo const* ib)
     rg->getLogMgr()->incIndent(2);
     xoc::dumpIR(exp, rg);
     rg->getLogMgr()->decIndent(2);
+    if (ib->isEndBoundClosed()) {
+        note(rg, "\nEND_VAL IS CLOSED-RANGE");
+    } else {
+        note(rg, "\nEND_VAL IS NOT CLOSED-RANGE");
+    }
 }
 
 
@@ -3062,7 +3072,7 @@ IR * IVR::genTripCountExp(
     if (refine != nullptr) {
         //Perform peephole optimization to ir.
         //Return updated ir if optimization performed.
-        RefineCtx rc(ivrctx.getOptCtx());
+        RefineCtx rc(const_cast<OptCtx*>(ivrctx.getOptCtx()));
         bool change;
         tripcount_exp = refine->refineIRUntilUnchange(
             tripcount_exp, change, rc);
@@ -3207,10 +3217,20 @@ bool IVR::computeConstIVBound(
     //Compute the trip-count.
     HOST_INT trip_count;
     if (biv->isInc()) {
-        trip_count = (iv_endval - iv_initval) / step;
+        HOST_INT delta = iv_endval - iv_initval;
+        ASSERT0(delta >= 0);
+        if (is_closed_range) {
+            delta++;
+        }
+        trip_count = delta / step;
     } else {
         ASSERT0(biv->isDec());
-        trip_count = (iv_initval - iv_endval) / step;
+        HOST_INT delta = iv_initval - iv_endval;
+        ASSERT0(delta >= 0);
+        if (is_closed_range) {
+            delta++;
+        }
+        trip_count = delta / step;
     }
     if (trip_count < 0) { return false; }
 

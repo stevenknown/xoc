@@ -57,7 +57,7 @@ FLAGARR=(
 
 for item in "${FLAGARR[@]}"; do
   echo "FLAGARR=$item"
-  perl run.pl NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${FLAGARR}"
+  perl run.pl NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${item}"
   if [ $? -ne 0 ]; then
     echo "EXECUTE PERL FAILED, ERROR CODE = $?"
     exit 1
@@ -77,7 +77,7 @@ FLAGARR=(
 
 for item in "${FLAGARR[@]}"; do
   echo "FLAGARR=$item"
-  perl run.pl Dir = ${DIR} NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${FLAGARR}"
+  perl run.pl Dir = ${DIR} NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${item}"
   if [ $? -ne 0 ]; then
     echo "EXECUTE PERL FAILED, ERROR CODE = $?"
     exit 1
@@ -102,7 +102,7 @@ FLAGARR=(
 
 for item in "${FLAGARR[@]}"; do
   echo "FLAGARR=$item"
-  perl run.pl Dir = ${DIR} NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${FLAGARR}"
+  perl run.pl Dir = ${DIR} NoAsm NoLink NoRun Targ = arm XoccPath = $xocc_path XoccFlag = "${item}"
   if [ $? -ne 0 ]; then
     echo "EXECUTE PERL FAILED, ERROR CODE = $?"
     exit 1

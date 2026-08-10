@@ -241,6 +241,10 @@ protected:
 
     virtual bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
+    //Return true if protential_killing_def_stmt is the killing-def of 'exp'.
+    bool canBeRegardAsKillingDef(
+        IR const* exp, IR const* stmt, CPCtx const& ctx) const;
+
     bool doPropUseSet(
         IRSet const& useset, IR const* def_stmt, IR const* prop_value,
         IRListIter cur_iter, IRListIter * next_iter, bool prssadu,

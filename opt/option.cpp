@@ -374,9 +374,9 @@ void DumpOption::setDumpAll()
     //DumpAll will ask each passes dump complete and verbose information.
     //The information by DumpAll is far more than the requirement of
     //DumpForTest. Given the two options are usually alternative in
-    //many passes, thus disable DumpForTest here if DumpAll is enabled.
+    //many passes.
     //However, user can enable DumpForTest explicitly at any time.
-    is_dump_for_test = false;
+    //is_dump_for_test = false;
     is_dump_before_pass = true;
     is_dump_mdref = true;
     is_dump_after_pass = true;

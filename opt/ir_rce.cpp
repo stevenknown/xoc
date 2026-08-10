@@ -406,10 +406,6 @@ RCECtx::RCECtx(OptCtx & t, ActMgr * am) : PassCtx(&t, am), cfg_changed(false)
 //
 //START RCE
 //
-//If 'ir' is always true, set 'must_true', or if it is
-//always false, set 'must_false'.
-//Return true if this function is able to determine the result of 'ir',
-//otherwise return false that it does know nothing about ir.
 bool RCE::calcCondMustVal(
     IR const* ir, OUT bool & must_true, OUT bool & must_false,
     RCECtx const& ctx) const

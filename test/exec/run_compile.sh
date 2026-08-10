@@ -55,7 +55,7 @@ FLAGARR=(
 
 for item in "${FLAGARR[@]}"; do
   echo "FLAGARR=$item"
-  perl run.pl NoAsm Targ = arm XoccPath = $xocc_path XoccFlag = "${FLAGARR}"
+  perl run.pl NoAsm Targ = arm XoccPath = $xocc_path XoccFlag = "${item}"
   if [ $? -ne 0 ]; then
     echo "EXECUTE PERL FAILED, ERROR CODE = $?"
     exit 1

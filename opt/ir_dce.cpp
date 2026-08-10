@@ -1222,6 +1222,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     bool org_mdssa_is_valid = useMDSSADU();
     bool change = elimImpl(oc, dcectx, remove_branch_stmt);
     if (!change) {
+        if (g_dump_opt.isDumpForTest()) { dump(dcectx); }
         m_rg->getLogMgr()->cleanBuffer();
         ASSERT0(org_prssa_is_valid == usePRSSADU());
         ASSERT0(org_mdssa_is_valid == useMDSSADU());

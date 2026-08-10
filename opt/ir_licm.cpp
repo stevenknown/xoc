@@ -217,7 +217,7 @@ public:
 //START HoistCtx
 //
 HoistCtx::HoistCtx(OptCtx & oc, DomTree * dt, LICM * licm, Stmt2UseMgr * s2u)
-    : PassCtx(&oc, &licm->getActMgr())
+    : PassCtx(&oc, nullptr)
 {
     ASSERT0(dt && licm);
     ASSERT0(getRegion());
@@ -233,6 +233,11 @@ HoistCtx::HoistCtx(OptCtx & oc, DomTree * dt, LICM * licm, Stmt2UseMgr * s2u)
     ASSERT0(s2u);
     m_s2u_mgr = s2u;
     ASSERT0(m_cfg && m_cfg->is_valid());
+    if (g_dump_opt.isDumpPass(PASS_LICM)) {
+        this->setActMgr(&licm->getActMgr());
+    } else {
+        this->setActMgr(nullptr);
+    }
 }
 
 
@@ -664,7 +669,6 @@ class InsertPreheaderMgr {
     MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
     LICM * m_licm;
-    RCE const* m_rce;
     ActMgr * m_am;
     LICMAnaCtx const& m_anactx;
     HoistCtx const& m_hoistctx;
@@ -708,8 +712,7 @@ private:
     void updateDomTree(DomTree & domtree);
 public:
     InsertPreheaderMgr(
-        LICM * licm, RCE const* rce, LICMAnaCtx const& anactx,
-        HoistCtx const& hctx)
+        LICM * licm, LICMAnaCtx const& anactx, HoistCtx const& hctx)
         : m_anactx(anactx), m_hoistctx(hctx),
           m_gdhelp(hctx.getRegion(), hctx.getOptCtx(), hctx.getActMgr())
     {
@@ -717,7 +720,6 @@ public:
         m_oc = hctx.getOptCtx();
         m_preheader = nullptr;
         m_licm = licm;
-        m_rce = rce;
         m_am = hctx.getActMgr();
         m_mdssamgr = m_rg->getMDSSAMgr();
         m_cfg = m_rg->getCFG();
@@ -776,7 +778,8 @@ bool InsertPreheaderMgr::tryEvalLoopExecCondition(
     OUT bool & must_true, OUT bool & must_false, HoistCtx const& ctx) const
 {
     //rce: RCE object, may be null.
-    if (m_rce == nullptr) { return false; }
+    RCE const* rce = getLICM()->getRCE();
+    if (rce == nullptr) { return false; }
     IRBB const* head = m_li->getLoopHead();
     ASSERT0(head);
     IR const* last = const_cast<IRBB*>(head)->getLastIR();
@@ -784,7 +787,10 @@ bool InsertPreheaderMgr::tryEvalLoopExecCondition(
 
     //Try to evaluate the value of judgement operation.
     RCECtx rcectx(*m_oc, m_am);
-    return m_rce->calcCondMustVal(BR_det(last), must_true, must_false, rcectx);
+    if (rce->calcCondMustVal(BR_det(last), must_true, must_false, rcectx)) {
+        return true;
+    }
+    return false;
 }
 
 
@@ -796,6 +802,11 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
     bool must_true, must_false;
     if (tryEvalLoopExecCondition(must_true, must_false, ctx) && must_true) {
         return; //guard BB is unnecessary
+    }
+    if (xoc::isLoopExecAtLeastOnce(
+        m_li, getLICM()->getIVR(), ctx.getOptCtx(), &getLICM()->getActMgr())) {
+        //guard BB is unnecessary
+        return;
     }
     IRTabIter it;
     for (IR const* c = irtab.get_first(it);
@@ -823,7 +834,7 @@ void InsertPreheaderMgr::checkAndInsertGuardBB(
             "insert guard BB%u before preheader BB%u",
             guard->id(), m_preheader->id());
 
-        //Move PRPHI and MDPHI from original preheader BB to guard BB.
+        //Move PRPHI and MDPHI from original preheader BB to guard-start BB.
         //NOTE:Since the PRPHI and MDPhi's DU chain has been maintained when
         //they are generated, and the moving doesn't change the DOM and DU
         //related properties. Thus there is no need to recompute them here
@@ -1224,6 +1235,7 @@ static void postProcess(HoistCtx const& hoistctx, bool change, OptCtx & oc)
         postProcessIfChanged(hoistctx, oc);
         return;
     }
+    if (g_dump_opt.isDumpForTest()) { hoistctx.getLICM()->dump(); }      
     Region * rg = hoistctx.getRegion();
     rg->getLogMgr()->cleanBuffer();
     if (!hoistctx.cfg_changed) { return; }
@@ -2584,7 +2596,6 @@ bool LICM::tryHoistStmt(
 }
 
 
-//Return true if any stmt is moved outside from loop.
 bool LICM::tryHoistDefStmt(
     LICMAnaCtx const& anactx, MOD IR * def, MOD IRBB * prehead,
     MOD HoistCtx & ctx)
@@ -2841,7 +2852,7 @@ bool LICM::processLoop(LI<IRBB> * li, HoistCtx & ctx)
         //hoist candidate.
         return false;
     }
-    InsertPreheaderMgr insertmgr(this, m_rce, anactx, ctx);
+    InsertPreheaderMgr insertmgr(this, anactx, ctx);
     if (insertmgr.needComplicatedGuard()) { return false; }
 
     //Check whether the LOOP need a preheader BB. And inserting guard region
@@ -2942,6 +2953,12 @@ bool LICM::initDepPass(MOD HoistCtx & ctx)
         if (!gvn->is_valid()) {
             gvn->perform(*ctx.getOptCtx());
         }
+    }
+    m_ivr = (IVR*)m_rg->getPassMgr()->registerPass(PASS_IVR);
+    ASSERT0(m_ivr);
+    if (!m_ivr->is_valid()) {
+        //InsertGuardMgr needs IVR.
+        m_ivr->perform(*ctx.getOptCtx());
     }
     return true;
 }

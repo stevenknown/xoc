@@ -10,7 +10,7 @@ find . -name "run.sh" | grep -v "^./run.sh$" | while read -r file; do
 
     # Execute the script
     echo -e "EXEC:$dir/run.sh"
-    ./run.sh
+    bash ./run.sh
     ret=$?
 
     # Check execution result

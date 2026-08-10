@@ -50,6 +50,7 @@ sub main
         'compile.gr',
         'compile',
         'builtin',
+        'api',
     );
     foreach my $subdir (@subdirlist) {
         print "\nENTER DIRECTORY>>$subdir\n";
@@ -66,7 +67,7 @@ sub main
 sub execScript
 {
     my $curdir = getCurDir();
-    #my $cmdline = "sh run.sh";
+    #my $cmdline = "bash run.sh";
     my $cmdline = "bash run_compile.sh";
     if (!$g_is_debug) {
         $cmdline = "bash run_release.sh";

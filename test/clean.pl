@@ -44,6 +44,7 @@ sub main
         'compile.gr',
         'exec',
         'exec.gr',
+        'api',
     );
     foreach my $subdir (@subdirlist) {
         if (-d $subdir) {

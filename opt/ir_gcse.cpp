@@ -1160,6 +1160,8 @@ bool GCSE::perform(OptCtx & oc)
 
         //For now, gvn has updated correctly.
         oc.setInvalidPass(PASS_EXPR_TAB);
+    } else {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
     }
     reset();
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));

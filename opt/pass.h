@@ -71,6 +71,8 @@ public:
 
     PassCtx const& operator = (PassCtx const& src)
     { copy(src); return *this; }
+
+    void setActMgr(ActMgr * am) { m_am = am; }
 };
 
 

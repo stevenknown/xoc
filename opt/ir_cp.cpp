@@ -938,6 +938,58 @@ bool CopyProp::doPropForNormalStmt(
 }
 
 
+//Return true if protential_killing_def_stmt is the killing-def of 'exp'.
+bool CopyProp::canBeRegardAsKillingDef(
+    IR const* exp, IR const* stmt, CPCtx const& ctx) const
+{
+    InferEVN * evn = m_gvn != nullptr ? m_gvn->getAndGenInferEVN() : nullptr;
+    //--------------------------------------------------------------------------
+    //ORIGINAL CODE:
+    //    //Prefer PRSSA and MDSSA DU.
+    //    if (exp->isReadPR()) {
+    //        PRSSAMgr const* prssamgr = rg->getPRSSAMgr();
+    //        if (prssamgr != nullptr && prssamgr->is_valid()) {
+    //            ASSERT0(exp->getSSAInfo());
+    //            return xoc::isKillingDef(stmt, exp, m_gvn, ctx.getOptCtx());
+    //        }
+    //        //Try classic DU.
+    //        goto CLASSIC_DU;
+    //    }
+    //    if (exp->isMemRefNonPR()) {
+    //        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    //        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    //            ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
+    //                    ("exp does not have MDSSAInfo"));
+    //            return xoc::isKillingDef(stmt, exp, m_gvn, ctx.getOptCtx());
+    //        }
+    //        //Try classic DU.
+    //        goto CLASSIC_DU;
+    //    }
+    //CLASSIC_DU:
+    //    ASSERTN(rg->getDUMgr(), ("DU Chain is not available"));
+    //    IR const* killingdef = xoc::findKillingDefConsiderEVN(
+    //        exp, ctx.getRegion(), evn, ctx.getOptCtx());
+    //    if (killingdef == stmt) {
+    //        return true;
+    //    }
+    //    return false;
+    //--------------------------------------------------------------------------
+
+    //NOTE:If PRSSA and MDSSA is enabled here, we could simply determine
+    //whether def_stmt is the killing-def of repexp via
+    //xoc::isKillingDef(). However, if user prefer to enable classic-DU
+    //chain, we should use xoc::findKillingDefConsiderEVN() to determine
+    //the killing-def. To reduce maintenance complexity of these cases,
+    //we uniformly adopt xoc::findKillingDefConsiderEVN() here.
+    IR const* killingdef = xoc::findKillingDefConsiderEVN(
+        exp, getRegion(), evn, ctx.getOptCtx());
+    if (killingdef == stmt) {
+        return true;
+    }
+    return false;
+}
+
+
 IR const* CopyProp::pickUpCandExp(
     IR const* prop_value, IR const* repexp, IR const* def_stmt,
     IRListIter const& curit, bool prssadu, bool mdssadu,
@@ -978,11 +1030,13 @@ IR const* CopyProp::pickUpCandExp(
             //Do NOT progate value to inexact memory reference, except PR.
             return nullptr;
         }
-        if (!xoc::isKillingDef(def_stmt, repexp, m_gvn, getOptCtx())) {
+        if (!canBeRegardAsKillingDef(repexp, def_stmt, ctx)) {
             return nullptr;
         }
-    } else if (!xoc::isKillingDef(def_stmt, repexp, m_gvn, getOptCtx())) {
-        return nullptr;
+    } else {
+        if (!canBeRegardAsKillingDef(repexp, def_stmt, ctx)) {
+            return nullptr;
+        }
     }
     if (!isAvailable(prop_value, repexp, curit, ctx)) {
         //The value that will be propagated can
@@ -1416,6 +1470,7 @@ bool CopyProp::perform(OptCtx & oc)
     bool changed = doPropBBInDomTreeOrder();
     END_TIMER(t, getPassName());
     if (!changed) {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
         m_rg->getLogMgr()->cleanBuffer();
         return false;
     }

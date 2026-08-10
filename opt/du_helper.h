@@ -251,6 +251,7 @@ IR * findNearestDomDef(IR const* exp, Region const* rg);
 IR * findDomAvailDef(IR const* exp, Region const* rg, OptCtx const* oc);
 
 //The function try to find the killing-def for 'use'.
+//NOTE:this functin will find killing-def according to the DU chain of 'use'.
 //To find the killing-def, the function prefer use SSA info.
 //e.g: stpr $1 = ...;
 //     ...     = $1; stpr is the killing-def of $1
@@ -281,7 +282,8 @@ IR * findUniqueDefInLoopForMustRef(
     OUT IRSet * set = nullptr);
 
 //The function try to find the unique must-def for 'use'.
-//Note must-def is the DEF that overlapped with 'use', but may not be
+//NOTE:this functin will find killing-def according to the DU chain of 'use'.
+//NOTE:must-def is the DEF that overlapped with 'use', but may not be
 //killing-def.
 //To find the killing-def, the function prefer use SSA info.
 IR * findUniqueMustDef(IR const* use, Region const* rg, OptCtx const* oc);
@@ -401,7 +403,9 @@ bool hasMoreThanOneDefInLoopForMustRef(
 bool isRegionLiveIn(IR const* ir, Region const* rg);
 
 //Return true if def is killing-def of use.
-//Note this function does not check if there is DU chain between def and use.
+//NOTE:this function does NOT check if there is DU chain between def and use.
+//     Thus if user intends to find kill-def in the DU chain, they should
+//     invoke findKillingDef().
 //gvn: Optional. If it is not NULL, the function will attempt to reason out the
 //     relation between 'def' and 'use' through gvn info.
 bool isKillingDef(

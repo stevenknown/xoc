@@ -30,9 +30,37 @@ Simulator=qemu-arm
 Targ=arm
 XoccFlag="-O3 -no-vect -no-lsra -no-if_cvs "
 LinkerFlag=" -static "
-perl run.pl Targ = $Targ Simulator = $Simulator AsPath = $AsPath \
-  LinkerPath = $LinkerPath XoccPath = $xocc_path XoccFlag = "$XoccFlag" \
-  LinkerFlag = "$LinkerFlag" ShowOutput CompareResultIfExist CompareDumpIfExist
 
-if [ $? -ne 0 ]; then echo "EXECUTE PERL FAILED, ERROR CODE = $?" exit 1
-fi
+SKIPPED_XOCCFLAG="-no-vect -no-if_cvs -no-lsra "
+
+FLAGARR=(
+  "${SKIPPED_XOCCFLAG}"
+  "-O3 ${SKIPPED_XOCCFLAG}"
+  "-O3 -lowest_height -prmode ${SKIPPED_XOCCFLAG} "
+  "-O3 -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -prmode -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -prmode -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -prmode -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
+)
+
+for item in "${FLAGARR[@]}"; do
+  echo "FLAGARR=$item"
+  perl run.pl Targ = $Targ Simulator = $Simulator AsPath = $AsPath \
+    LinkerPath = $LinkerPath XoccPath = $xocc_path XoccFlag = "${item}" \
+    LinkerFlag = "$LinkerFlag" ShowOutput CompareResultIfExist \
+    CompareDumpIfExist
+
+  if [ $? -ne 0 ]; then
+    echo "EXECUTE PERL FAILED, ERROR CODE = $?"
+    exit 1
+  fi
+done
+
+#============================
+echo "EXECUTE PERL SUCCESS!!"
+exit 0

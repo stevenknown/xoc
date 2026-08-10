@@ -1174,6 +1174,31 @@ bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg)
 }
 
 
+//Return true if the function guarantees the loopbody of 'li' is executed
+//at least once. Otherwise, return false to indicate no knowledge of it.
+bool isLoopExecAtLeastOnce(
+    LI<IRBB> const* li, IVR const* ivr, OptCtx const* oc, MOD ActMgr * am)
+{
+    ASSERT0(li);
+    if (!ivr->is_valid()) { return false; }
+    IVRCtx ivrctx(oc->getRegion(), oc, am);
+    IVBoundInfo bi;
+    if (!ivr->computeIVBound(li, bi, ivrctx)) {
+        return false;
+    }
+    if (bi.isTCImm() && bi.getTCImm() > 1) {
+        if (am != nullptr) {
+            am->dump("find IV and its trip-count is %u.", bi.getTCImm());
+        }
+        return true;
+    }
+    if (am != nullptr) {
+        am->dump("IV isn't immediate trip-count.");
+    }
+    return false;
+}
+
+
 bool isLoopInvariant(
     IR const* ir, LI<IRBB> const* li, Region const* rg,
     InvStmtList const* invariant_stmt, bool check_tree, OptCtx const* oc)

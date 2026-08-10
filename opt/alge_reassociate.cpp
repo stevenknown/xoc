@@ -1851,6 +1851,7 @@ bool AlgeReassociate::perform(OptCtx & oc)
     ReassCtx ctx(oc, this);
     bool change = doReass(ctx);
     if (!change) {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
         END_TIMER(t, getPassName());
         return false;
     }

@@ -1019,6 +1019,11 @@ bool isPhiLoopInvariant(IR const* phi, LI<IRBB> const* li, Region const* rg);
 //loop 'li'.
 bool isBranchTargetOutSideLoop(LI<IRBB> const* li, IRCFG * cfg, IR const* stmt);
 
+//Return true if the function guarantees the loopbody of 'li' is executed
+//at least once. Otherwise, return false to indicate no knowledge of it.
+bool isLoopExecAtLeastOnce(
+    LI<IRBB> const* li, IVR const* ivr, OptCtx const* oc, MOD ActMgr * am);
+
 //Try inserting preheader BB of loop 'li'.
 //The function will try to maintain the RPO, DOM, then
 //updating PHI at loophead and preheader, after inserting preheader.

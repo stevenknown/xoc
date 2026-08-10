@@ -3116,7 +3116,7 @@ bool RegPromot::perform(OptCtx & oc)
         ASSERT0(m_cfg->verifyLoopInfo(oc));
         ASSERT0(m_cfg->verifyDomAndPdom(oc));
     } else {
-        dumpAct(this, ctx);
+        if (g_dump_opt.isDumpForTest()) { dumpAct(this, ctx); }
         m_rg->getLogMgr()->cleanBuffer();
     }
     clean();

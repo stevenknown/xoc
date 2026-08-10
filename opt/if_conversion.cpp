@@ -1793,6 +1793,7 @@ bool IfConversion::perform(OptCtx & oc)
         changed = tryBBList(oc);
     }
     if (!changed) {
+        if (g_dump_opt.isDumpForTest()) { dump(); }
         //m_rg->getLogMgr()->cleanBuffer();
         END_TIMER(t, getPassName());
         return false;
