@@ -3709,9 +3709,10 @@ bool Vectorization::tryVectorizeLoop(LI<IRBB> * li, MOD OptCtx & oc)
         return false;
     }
     dumpIVBound(bi, this, li);
-    if (bi.isTCImm() && bi.getTCImm() == 0) {
+    if (bi.isTCImm() && bi.getTCImm() <= 0) {
         //TODO: Remove the loop which trip-count is zero.
-        ASSERTN(0, ("NEED TO BE IMPLEMENTED"));
+        //ASSERTN(0, ("NEED TO BE IMPLEMENTED"));
+        return false;
     }
     VectCtx vectctx(li, &bi, oc, this, (ActMgr*)&getActMgr(), &ivrctx);
     LICMAnaCtx anactx(m_rg, li, m_licm, &oc);

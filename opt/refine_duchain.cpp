@@ -413,12 +413,12 @@ bool RefineDUChain::perform(OptCtx & oc)
     m_mdssamgr = m_rg->getMDSSAMgr();
     m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
-        //DCE use either classic PR DU chain or PRSSA.
+        //RefineDUChain use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
-        //DCE use either classic MD DU chain or MDSSA.
+        //RefineDUChain use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
@@ -431,6 +431,9 @@ bool RefineDUChain::perform(OptCtx & oc)
         //Use MDSSA.
     }
     START_TIMER(t, getPassName());
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(m_rg, oc));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(m_rg, oc));
+    ASSERT0L3(verifyClassicDUChain(m_rg, oc));
     RefineDUCtx ctx(oc);
     bool change = process(ctx);
     END_TIMER(t, getPassName());

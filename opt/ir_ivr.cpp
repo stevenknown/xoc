@@ -800,8 +800,8 @@ bool FindBIVByRedOp::findInitValByRedOp(
     ASSERT0(redexp);
     ASSERT0(redexp->isMemRef() && redexp->getMustRef());
     ASSERT0(iv && iv->getRedStmt()->is_stmt());
-    return findInitValByRedOp(redexp, li, BIV_initv(iv),
-                              &BIV_init_stmt(iv), ctx);
+    return findInitValByRedOp(
+        redexp, li, BIV_initv(iv), &BIV_init_stmt(iv), ctx);
 }
 
 
@@ -2053,6 +2053,44 @@ IVR::IVR(Region * rg) : Pass(rg), m_crmgr(rg, nullptr, this), m_am(rg)
 }
 
 
+bool IVR::checkTypeConsistency(Type const* dstty, Type const* srcty) const
+{
+    //Do type-convert even if data type is ANY.
+    if (dstty == srcty) { return true; }
+    if (dstty->is_vector() || dstty->is_tensor()) {
+        //Usually, regard tensor, vector or something else user defined type
+        //are not consistent with other type.
+        return false;
+    }
+    if (srcty->is_vector() || srcty->is_tensor()) {
+        //Usually, regard tensor, vector or something else user defined type
+        //are not consistent with other type.
+        return false;
+    }
+    if (dstty->is_scalar() && srcty->is_scalar()) {
+        if (dstty->is_signed() ^ srcty->is_signed()) {
+            //Sign must be consistent.
+            return false;
+        }
+        if (m_tm->getByteSize(dstty) < m_tm->getByteSize(srcty)) {
+            //ir size must be equal or great than cand.
+            return false;
+        }
+        return true;
+    } else {
+        return false;
+    }
+    if (dstty->isPointer() && srcty->isPointer()) {
+        return true;
+    }
+    if (dstty->is_any() || srcty->is_any()) {
+        //ANY is not consistent with other type.
+        return false;
+    }
+    return m_tm->getByteSize(dstty) >= m_tm->getByteSize(srcty);
+}
+
+
 //iv: IV info that will be modified
 bool IVR::computeInitVal(IR const* ir, OUT IVVal & val) const
 {
@@ -2068,7 +2106,11 @@ bool IVR::computeInitVal(IR const* ir, OUT IVVal & val) const
     } else { return false; }
     ASSERT0(v);
     if (v->is_cvt()) {
-        v = ((CCvt*)v)->getLeafExp();
+        IR const* leaf = ((CCvt*)v)->getLeafExp();
+        if (!checkTypeConsistency(v->getType(), leaf->getType())) {
+            return false;
+        }
+        v = leaf;
     }
     return val.extractFrom(v, this);
 }
@@ -3218,7 +3260,13 @@ bool IVR::computeConstIVBound(
     HOST_INT trip_count;
     if (biv->isInc()) {
         HOST_INT delta = iv_endval - iv_initval;
-        ASSERT0(delta >= 0);
+
+        //Trip-count might be negative.
+        //e.g: loop(i=20; i<=5; i++) {...}
+        //trip-count=5-20+1=-14.
+        //Negative-trip-count indicates current loop is a dead-loop.
+        //ASSERT0(delta >= 0);
+
         if (is_closed_range) {
             delta++;
         }
@@ -3226,13 +3274,24 @@ bool IVR::computeConstIVBound(
     } else {
         ASSERT0(biv->isDec());
         HOST_INT delta = iv_initval - iv_endval;
-        ASSERT0(delta >= 0);
+
+        //Trip-count might be negative.
+        //e.g: loop(i=20; i<=5; i++) {...}
+        //trip-count=5-20+1=-14.
+        //Negative-trip-count indicates current loop is a dead-loop.
+        //ASSERT0(delta >= 0);
+
         if (is_closed_range) {
             delta++;
         }
         trip_count = delta / step;
     }
-    if (trip_count < 0) { return false; }
+    if (trip_count < 0) {
+        //Trip-count might be negative.
+        //e.g: loop(i=20; i<=5; i++) {...}
+        //trip-count=5-20+1=-14.
+        //Negative-trip-count indicates current loop is a dead-loop.
+    }
 
     //Fill bound-info with misc info.
     IVBI_is_tc_imm(bi) = true;

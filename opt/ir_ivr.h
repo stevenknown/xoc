@@ -546,6 +546,10 @@ public:
     //    i <  N, is_closed_range is false.
     bool m_is_biv_end_bound_closed;
     union {
+        //Trip-count might be negative.
+        //e.g: loop(i=20; i<=5; i++) {...}
+        //trip-count=5-20+1=-14.
+        //Negative-trip-count indicates current loop is a dead-loop.
         HOST_INT m_tc_imm;
         IR const* m_tc_exp;
     } u1;
@@ -564,6 +568,11 @@ public:
     void dumpBuf(Region const* rg, xcom::StrBuf & buf) const;
 
     IR const* getBound() const { return IVBI_iv_end_bound_stmt(*this); }
+
+    //Trip-count might be negative.
+    //e.g: loop(i=20; i<=5; i++) {...}
+    //trip-count=5-20+1=-14.
+    //Negative-trip-count indicates current loop is a dead-loop.
     HOST_INT getTCImm() const
     {
         ASSERT0(IVBI_is_tc_imm(*this));
@@ -668,6 +677,9 @@ protected:
 
     //Return true if ir is coefficent of linear-representation.
     bool canBeCoeff(LI<IRBB> const* li, IR const* ir, IVRCtx const& ctx) const;
+
+    //Return true if dst type is consistent with src type.
+    bool checkTypeConsistency(Type const* dstty, Type const* srcty) const;
 
     void dump_recur(LI<IRBB> const* li, UINT indent) const;
 

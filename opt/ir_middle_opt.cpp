@@ -574,17 +574,38 @@ bool Region::doMDRef(OptCtx & oc)
 
 bool Region::doClassicDU(OptCtx & oc)
 {
+    if (!g_compute_pr_du_chain && !g_compute_nonpr_du_chain) {
+        //Nothing changed.
+        return false;
+    }
+    if (g_compute_pr_du_chain) {
+        //If user intends to compute classic DU, out of PRSSA and
+        //disable PRSSA.
+        if (oc.isPassValid(PASS_PRSSA_MGR)) {
+            PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
+                PASS_PRSSA_MGR);
+            ASSERT0(prssamgr != nullptr && prssamgr->is_valid());
+            prssamgr->destruction(oc);
+            ASSERT0(!oc.isPassValid(PASS_PRSSA_MGR));
+        }
+    }
+    if (g_compute_nonpr_du_chain) {
+        //If user intends to compute classic DU, out of MDSSA and
+        //disable MDSSA.
+        if (oc.isPassValid(PASS_MDSSA_MGR)) {
+            MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
+                PASS_MDSSA_MGR);
+            ASSERT0(mdssamgr != nullptr && mdssamgr->is_valid());
+            mdssamgr->destruction(oc);
+            ASSERT0(!oc.isPassValid(PASS_MDSSA_MGR));
+        }
+    }
     DUMgr * dumgr = (DUMgr*)getPassMgr()->registerPass(PASS_DU_MGR);
     ASSERT0(dumgr);
     bool changed = dumgr->checkAndComputeClassicDUChain(oc);
-    if (g_compute_pr_du_chain && oc.is_pr_du_chain_valid()) {
-        //If classic DU is enabled, disable PRSSA.
-        oc.setInvalidPRSSA();
-    }
-    if (g_compute_nonpr_du_chain && oc.is_nonpr_du_chain_valid()) {
-        //If classic DU is enabled, disable PRSSA.
-        oc.setInvalidMDSSA();
-    }
+    ASSERT0L3(PRSSAMgr::verifyPRSSAInfo(this, oc));
+    ASSERT0L3(MDSSAMgr::verifyMDSSAInfo(this, oc));
+    ASSERT0L3(verifyClassicDUChain(this, oc));
     return changed;
 }
 
@@ -593,6 +614,9 @@ bool Region::doMDRefAndClassicDU(OptCtx & oc)
 {
     ASSERT0(getPassMgr());
     bool changed = doMDRef(oc);
+
+    //NOTE:Rebuild MD reference may change MDSSA.
+    oc.setInvalidPass(PASS_MDSSA_MGR);
     changed |= doClassicDU(oc);
     return changed;
 }
@@ -603,9 +627,6 @@ bool Region::doDUAna(OptCtx & oc)
     if (!g_do_md_du_analysis) { return false; }
     ASSERT0(g_cst_bb_list && oc.is_cfg_valid() && oc.is_aa_valid());
     doMDRefAndClassicDU(oc);
-
-    //NOTE:MD reference may changed and inform pass-mgr to rebuild MDSSA.
-    oc.setInvalidPass(PASS_MDSSA_MGR);
     bool changed_prssa = doPRSSA(oc);
     bool changed_mdssa = doMDSSA(oc);
     bool remove_prdu = changed_prssa ? true : false;
