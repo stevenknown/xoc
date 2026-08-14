@@ -249,6 +249,16 @@ MD const* MDMgr::allocSetElemMD(IR * ir)
 }
 
 
+MD const* MDMgr::genMDForDirectOp(IR const* ir)
+{
+    ASSERT0(ir->isDirectMemOp() || ir->isPROp());
+    if (ir->isDirectMemOp()) {
+        return genMDForDirectMemOp(ir);
+    }
+    return genMDForPR(ir->getPrno(), ir->getType());
+}
+
+
 //Generate MD corresponding to PR load or write.
 MD const* MDMgr::genMDForPR(PRNO prno, Type const* type)
 {
@@ -379,13 +389,15 @@ void MDMgr::allocRefForIRTree(IR * root, bool sibling)
     SWITCH_CASE_DIRECT_MEM_OP:
         allocMDForDirectMemOp(ir, true);
         break;
+    case IR_ID:
+        allocIdMD(ir);
+        break;
     default:;
     }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
-        if (k != nullptr) {
-            allocRefForIRTree(k, true);
-        }
+        if (k == nullptr) { continue; }
+        allocRefForIRTree(k, true);
     }
     if (!sibling) { return; }
     for (IR * s = ir->get_next(); s != nullptr; s = s->get_next()) {

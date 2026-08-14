@@ -358,7 +358,7 @@ public:
 
     //The function looks for the first MDDef that exactly define 'md' in
     //current VOpndSet.
-    MDDef const* findCoverMDDef(MDSSAMgr const* mgr, MD const* md) const;
+    MDDef const* findFirstCoverMDDef(MDSSAMgr const* mgr, MD const* md) const;
 
     //If MDSSAInfo is allocated in mempool, the function needs to be invoked
     //to initialize base class object.

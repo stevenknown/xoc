@@ -400,6 +400,18 @@ VN const* InferEVN::inferIndirectStmt(IR const* ir, InferCtx & ctx)
 }
 
 
+VN const* InferEVN::inferCallStmt(IR const* ir, InferCtx & ctx)
+{
+    if (ctx.isVisited(ir)) { return getVN(ir); }
+    ctx.setVisited(ir);
+    VN const* vn = getVN(ir);
+    if (vn != nullptr) { return vn; }
+
+    //TODO:infer VN throught call's parameters and callee.
+    return nullptr;
+}
+
+
 VN const* InferEVN::inferDirectStmt(IR const* ir, InferCtx & ctx)
 {
     if (ctx.isVisited(ir)) { return getVN(ir); }
@@ -435,6 +447,7 @@ VN const* InferEVN::inferStmt(IR const* ir, InferCtx & ctx)
     SWITCH_CASE_WRITE_ARRAY:
         return inferWriteArray(ir, ctx);
     SWITCH_CASE_CALL:
+        return inferCallStmt(ir, ctx);
     SWITCH_CASE_CONDITIONAL_BRANCH_OP:
     SWITCH_CASE_MULTICONDITIONAL_BRANCH_OP:
     SWITCH_CASE_UNCONDITIONAL_BRANCH_OP:

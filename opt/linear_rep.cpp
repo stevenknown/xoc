@@ -118,12 +118,15 @@ RESTY calcImm(IR_CODE code, OP0TY a, OP1TY b)
 }
 
 
-LinearRepMgr::LinearRepMgr(Region * rg, OptCtx const& oc) : m_rg(rg), m_oc(oc)
+LinearRepMgr::LinearRepMgr(Region * rg, OptCtx & oc) : m_rg(rg), m_oc(oc)
 {
     m_tm = rg->getTypeMgr();
     m_irmgr = rg->getIRMgr();
     m_refine = rg->getPassMgr() != nullptr ?
         (Refine*)rg->getPassMgr()->registerPass(PASS_REFINE) : nullptr;
+    m_reass = rg->getPassMgr() != nullptr ?
+        (AlgeReassociate*)rg->getPassMgr()->registerPass(
+            PASS_ALGE_REASSOCIATE) : nullptr;
 }
 
 
@@ -149,7 +152,7 @@ IR const* LinearRepMgr::buildConstBinOp(
         IR * res = m_irmgr->buildImmInt(
             calcImm<HOST_INT>(code, CONST_int_val(op0), CONST_int_val(op1)),
             resty);
-        add(res);
+        recordGenedIR(res);
         return res;
     }
     if (op0->is_fp() && op1->is_fp()) {
@@ -158,7 +161,7 @@ IR const* LinearRepMgr::buildConstBinOp(
         IR * res = m_irmgr->buildImmFP(
             calcImm<HOST_FP>(code, CONST_fp_val(op0), CONST_fp_val(op1)),
             resty);
-        add(res);
+        recordGenedIR(res);
         return res;
     }
     if (op0->is_int() && op1->is_fp()) {
@@ -168,7 +171,7 @@ IR const* LinearRepMgr::buildConstBinOp(
             calcImm<HOST_FP>(code,
                 (HOST_FP)CONST_int_val(op0), CONST_fp_val(op1)),
             resty);
-        add(res);
+        recordGenedIR(res);
         return res;
     }
     if (op0->is_fp() && op1->is_int()) {
@@ -178,11 +181,33 @@ IR const* LinearRepMgr::buildConstBinOp(
             calcImm<HOST_FP>(code,
                 CONST_fp_val(op0), (HOST_FP)CONST_int_val(op1)),
             resty);
-        add(res);
+        recordGenedIR(res);
         return res;
     }
     ASSERTN(0, ("TODO"));
     return nullptr;
+}
+
+
+static IR const* simplifyViaAlgeReass(
+    IR const* addend, LinearRepMgr * linrepmgr)
+{
+    AlgeReassociate * reass = linrepmgr->getAlgeReass();
+    if (reass == nullptr) { return addend; }
+    ReassCtx rectx(linrepmgr->getOptCtx(), reass);
+    LinOpVec & linopvec = rectx.getLinOpVec();
+    linopvec.setCode(addend->getCode());
+    for (INT i = 0; i < IR_MAX_KID_NUM(addend); i++) {
+        IR * k = addend->getKid(i);
+        if (k == nullptr) { continue; }
+        linopvec.append(k);
+    }
+    bool succ = AlgeReassociate::combineLikeTerm(rectx);
+    if (!succ) { return addend; }
+    VecIdx last1 = linopvec.get_last_idx();
+    IR const* last1_ir = linopvec.get(last1);
+    linrepmgr->recordGenedIR(const_cast<IR*>(last1_ir));
+    return last1_ir;
 }
 
 
@@ -195,6 +220,7 @@ IR const* LinearRepMgr::constructAddendByMul(
     ASSERT0(a0 && a1);
     IR const* addend = buildBinOp(IR_MUL, a0, a1);
     ASSERT0(addend);
+    addend = simplifyViaAlgeReass(addend, this);
     if (isImmEqualTo(addend, 0)) { return nullptr; }
     LRCTX_is_constructed(ctx) = true;
     return addend;
@@ -243,7 +269,7 @@ IR const* LinearRepMgr::constructCoeffByMul(
     ASSERT0(addend1);
     if (coeff0 == nullptr) {
         coeff0 = m_irmgr->buildImmInt(1, addend1->getType());
-        add(const_cast<IR*>(coeff0));
+        recordGenedIR(const_cast<IR*>(coeff0));
     }
     IR const* coeff = buildBinOp(IR_MUL, coeff0, addend1);
     ASSERT0(coeff);
@@ -273,7 +299,7 @@ IR const* LinearRepMgr::buildBinOp(IR_CODE code, IR const* c0, IR const* c1)
     RefineCtx refinectx(&tmpoc);
     bool change;
     res = m_refine->refineExpression(res, change, refinectx);
-    add(res);
+    recordGenedIR(res);
     return res;
 }
 

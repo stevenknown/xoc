@@ -195,6 +195,9 @@ protected:
     RANK m_cur_rank;
     AlgeReassociate * m_alge_reass;
     IRMgr * m_irmgr;
+    MDMgr * m_mdmgr;
+    TypeMgr * m_tm; //may register new type.
+    Refine * m_refine;
     ReassExpMgr m_reass_exp_mgr;
     LinOpVec m_lin_opvec; //record the linearized operations.
     IRTab m_gened_ir;
@@ -217,6 +220,9 @@ public:
 
     AlgeReassociate * getAlgeReass() const { return m_alge_reass; }
     IRMgr * getIRMgr() const { return m_irmgr; }
+    MDMgr * getMDMgr() const { return m_mdmgr; }
+    TypeMgr * getTypeMgr() const { return m_tm; }
+    Refine * getRefine() const { return m_refine; }
     LinOpVec & getLinOpVec() { return m_lin_opvec; }
     ReassExpMgr & getReassExpMgr() { return m_reass_exp_mgr; }
     RANK getCurRank() const { return m_cur_rank; }
@@ -247,7 +253,6 @@ class AlgeReassociate : public Pass {
 protected:
     bool m_is_aggressive;
     IRCFG * m_cfg;
-    TypeMgr * m_tm;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     IRMgr * m_irmgr;
@@ -279,12 +284,24 @@ protected:
     bool computeRankAndReassForBB(IRBB const* bb, MOD ReassCtx & ctx) const;
     RANK computeRankOfNonAlgeExp(IR const* ir) const;
 
+    //CASE:only handle the case:
+    //Combine const*(coeff*var) to const*coeff*var.
+    static bool combineLastTwoOpByMul(MOD ReassCtx & ctx);
+
+    //CASE:only handle the case:
+    //Combine coeff1*var + coeff2*var to (coeff1+coeff2)*var.
+    static bool combineLastTwoOpByAdd(MOD ReassCtx & ctx);
+    static bool combineLastTwoOp(MOD ReassCtx & ctx);
+
     //The rank of operand can be used to determine the layout order of operand.
     //The operand with a higher rank will be processed preferentially.
     bool doReass(MOD ReassCtx & ctx);
 
-    bool foldConstLastTwoOp(MOD ReassCtx & ctx) const;
-    bool foldConstLast(MOD ReassCtx & ctx) const;
+    static bool extractCoeffAndVar(
+        IR const* ir, OUT IR ** coeff, OUT Var ** var, MOD ReassCtx & ctx);
+
+    static bool foldConstLastTwoOp(MOD ReassCtx & ctx);
+    static bool foldConstLast(MOD ReassCtx & ctx);
 
     RANK getLowestRank() const { return RANK(RANK_UNDEF + 1); }
 
@@ -327,8 +344,8 @@ protected:
     bool linearReassExp(ReassExp const* reassexp, MOD ReassCtx & ctx) const;
     bool linearExpViaStoreStmt(MOD IR * ir, MOD ReassCtx & ctx) const;
     bool linearExpViaPhi(MOD IR * ir, MOD ReassCtx & ctx) const;
-    bool linearConst(IR const* ir, MOD ReassCtx & ctx) const;
     bool linearConstExpTree(IR const* ir, MOD ReassCtx & ctx) const;
+    static bool linearConst(IR const* ir, MOD ReassCtx & ctx);
 
     //The function linearizes and computes the rank for expression.
     bool linearExp(IR const* ir, MOD ReassCtx & ctx) const;
@@ -364,7 +381,6 @@ public:
     {
         ASSERT0(rg != nullptr);
         m_cfg = rg->getCFG();
-        m_tm = rg->getTypeMgr();
         m_irmgr = nullptr;
         m_prssamgr = nullptr;
         m_mdssamgr = nullptr;
@@ -374,6 +390,14 @@ public:
     }
     virtual ~AlgeReassociate() {}
 
+    //Export Functions.
+    //The function simplifies expression by Combining-Like-Terms.
+    //e.g:given ir in linopvec of ctx are: i, 100*i, and the opc is IR_ADD.
+    //the function will generate 101*i;
+    //Return true if the combination succeeded, and the ops that are recorded
+    //in LinOpVec of 'ctx' are changed also.
+    static bool combineLikeTerm(MOD ReassCtx & ctx);
+
     void dumpAllAct() const { m_am.dump(); }
     virtual bool dump() const;
 
@@ -382,6 +406,7 @@ public:
     VarRefMgr & getVarRefMgr() { return m_vr_mgr; }
     PASS_TYPE getPassType() const { return PASS_ALGE_REASSOCIATE; }
     IRSimp * getIRSimp() const { return m_simp; }
+    Refine * getRefine() const { return m_refine; }
 
     //Return true if user ask to perform aggressive optimization that without
     //consideration of compilation time and memory.

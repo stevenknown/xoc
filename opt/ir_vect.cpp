@@ -915,6 +915,9 @@ bool GenerateMask::tryGenerateMaskVectOp(MOD VectCtx & ctx)
     IR * comp_remain = irmgrext->buildStorePR(
         irmgrext->buildBinaryOpSimp(
             IR_SUB, ivty, rg->dupIRTree(upper_bound), iv));
+
+    //Just allocate MD ref stmt.
+    ctx.getRegion()->getMDMgr()->allocRef(comp_remain, false);
     ctx.getActMgr()->dumpAct(
         "the trip-count computation of remain loop is:%s\n"
         "where %s\n is IV",
@@ -927,6 +930,9 @@ bool GenerateMask::tryGenerateMaskVectOp(MOD VectCtx & ctx)
                 irmgrext->buildImmInt(1, ivty),
                 rg->dupIsomoExpTree(comp_remain)),
             irmgrext->buildImmInt(1, ivty)));
+
+    //Just allocate MD ref stmt.
+    ctx.getRegion()->getMDMgr()->allocRef(comp_mask, false);
     ctx.getActMgr()->dumpAct(
         "the mask computation of remain part data is: %s\n",
         DumpIRTree().dump(comp_mask, rg, ctx.getCurInd() + 2));
@@ -1507,6 +1513,9 @@ IR * Vectorization::buildVectPRResult(Type const* restype, IR * rhs, IRBB * bb)
 {
     ASSERT0(restype && bb);
     IR * stmt = m_irmgr->buildStorePR(restype, rhs);
+
+    //Just allocate MD ref for 'stmt'.
+    getRegion()->getMDMgr()->allocRef(stmt, false);
     stmt->setBB(bb);
     return stmt;
 }
@@ -1816,6 +1825,62 @@ bool Vectorization::makeVectOpndByArray(
 }
 
 
+bool Vectorization::isArrayOpSuitableToBeVect(
+    IR const* ir, VectCtx const& ctx) const
+{
+    ASSERT0(ir->isArrayOp());
+    IVLinearRep linrep;
+    if (!checkLinRepForArrayOp(ir, ctx, linrep)) {
+        dumpActNonLinRepBase(this, ir, linrep);
+        return false;
+    }
+    VectAccDesc * accdesc = ctx.getVectAccDescMgr().genDesc(ir);
+    accdesc->set(linrep);
+    if (!isStrideSuitableToVect(*accdesc, ctx)) {
+        return false;
+    }
+    return true;
+}
+
+
+bool Vectorization::isIndirectOpSuitableToBeVect(
+    IR const* ir, VectCtx const& ctx) const
+{
+    ASSERT0(ir->isIndirectMemOp());
+    IVLinearRep linrep;
+    if (!checkLinRepForIndirectOp(ir, ctx, linrep)) {
+        dumpActNonLinRepBase(this, ir, linrep);
+        return false;
+    }
+    VectAccDesc * accdesc = ctx.getVectAccDescMgr().genDesc(ir);
+    accdesc->set(linrep);
+    if (!isStrideSuitableToVect(*accdesc, ctx)) {
+        return false;
+    }
+    return true;
+}
+
+
+bool Vectorization::isMemRefSuitableToBeVect(
+    IR const* ir, VectCtx const& ctx) const
+{
+    //If ir is unsuitable scalar operation, it should be intercepted
+    //at checkScalarStmt().
+    if (ir->is_stmt()) {
+        getActMgr().dumpAct(
+            ir, "isSuitableToBeVect:scalar stmt can not be vectorized");
+        return false;
+    }
+    if (!isLoopInv(ir, ctx)) {
+        getActMgr().dumpAct(ir,
+            "isSuitableToBeVect:scalar expression is loop variant,"
+            " it may prevent vectorization");
+        return false;
+    }
+    return true;
+}
+
+
 bool Vectorization::isSuitableToBeVect(IR const* ir, VectCtx const& ctx) const
 {
     ASSERT0(ir->is_stmt() || ir->is_exp());
@@ -1825,46 +1890,13 @@ bool Vectorization::isSuitableToBeVect(IR const* ir, VectCtx const& ctx) const
     }
     if (ir->isConstExp()) { return true; }
     if (ir->isArrayOp()) {
-        IVLinearRep linrep;
-        if (!checkLinRepForArrayOp(ir, ctx, linrep)) {
-            dumpActNonLinRepBase(this, ir, linrep);
-            return false;
-        }
-        VectAccDesc * accdesc = ctx.getVectAccDescMgr().genDesc(ir);
-        accdesc->set(linrep);
-        if (!isStrideSuitableToVect(*accdesc, ctx)) {
-            return false;
-        }
-        return true;
+        return isArrayOpSuitableToBeVect(ir, ctx);
     }
     if (ir->isIndirectMemOp()) {
-        IVLinearRep linrep;
-        if (!checkLinRepForIndirectOp(ir, ctx, linrep)) {
-            dumpActNonLinRepBase(this, ir, linrep);
-            return false;
-        }
-        VectAccDesc * accdesc = ctx.getVectAccDescMgr().genDesc(ir);
-        accdesc->set(linrep);
-        if (!isStrideSuitableToVect(*accdesc, ctx)) {
-            return false;
-        }
-        return true;
+        return isIndirectOpSuitableToBeVect(ir, ctx);
     }
     if (ir->isMemRef()) {
-        //If ir is unsuitable scalar operation, it should be intercepted
-        //at checkScalarStmt().
-        if (ir->is_stmt()) {
-            getActMgr().dumpAct(
-                ir, "isSuitableToBeVect:scalar stmt can not be vectorized");
-            return false;
-        }
-        if (!isLoopInv(ir, ctx)) {
-            getActMgr().dumpAct(ir,
-                "isSuitableToBeVect:scalar expression is loop variant,"
-                " it may prevent vectorization");
-            return false;
-        }
-        return true;
+        return isMemRefSuitableToBeVect(ir, ctx);
     }
     return false;
 }
@@ -2115,6 +2147,9 @@ IR * Vectorization::genSelectByVectOp(VectOp const& vop, OUT VectCtx & ctx)
     getActMgr().dumpAct(selop,
         "generate stpr operation to hold the intermediate value:");
     IR * stpr = m_irmgr->buildStorePR(vop.getExpectType(), selop);
+
+    //Just allocate MD ref for 'stpr'.
+    ctx.getRegion()->getMDMgr()->allocRef(stpr, false);
     ctx.getMainLoopResOpList().append_tail(stpr);
     return m_rg->dupIsomoExpTree(stpr);
 }
@@ -2132,6 +2167,9 @@ IR * Vectorization::genBinByVectOp(VectOp const& vop, OUT VectCtx & ctx)
     getActMgr().dumpAct(binop,
         "generate stpr operation to hold the intermediate value:");
     IR * stpr = m_irmgr->buildStorePR(vop.getExpectType(), binop);
+
+    //Just allocate MD ref for 'stpr'.
+    ctx.getRegion()->getMDMgr()->allocRef(stpr, false);
     ctx.getMainLoopResOpList().append_tail(stpr);
     return m_rg->dupIsomoExpTree(stpr);
 }
@@ -2148,6 +2186,9 @@ IR * Vectorization::genUnaByVectOp(VectOp const& vop, OUT VectCtx & ctx)
     getActMgr().dumpAct(unaop,
         "generate stpr operation to hold the intermediate value:");
     IR * stpr = m_irmgr->buildStorePR(vop.getExpectType(), unaop);
+
+    //Just allocate MD ref for 'stpr'.
+    ctx.getRegion()->getMDMgr()->allocRef(stpr, false);
     ctx.getMainLoopResOpList().append_tail(stpr);
     return m_rg->dupIsomoExpTree(stpr);
 }
@@ -3021,7 +3062,7 @@ IR * Vectorization::buildRefIV(BIV const* biv, Type const* ty) const
     if (ivvar->is_pr()) {
         return m_irmgr->buildPRdedicated(ivvar->getPrno(), ty);
     }
-    return m_irmgr->buildId(ivvar);
+    return m_irmgr->buildLoad(ivvar, ty);
 }
 
 
@@ -3341,6 +3382,10 @@ IR * ConstructLoop::genVectMainLoop(MOD VectCtx & ctx) const
     IR * det = biv->genBoundExp(
         *boundinfo, ctx.getIVR(), ctx.getIRMgr(), ctx.getRegion());
     IR * doloop = ctx.getIRMgr()->buildDoLoop(iv, init, det, step, nullptr);
+
+    //Allocate MD ref for init, step of doloop.
+    ctx.getRegion()->getMDMgr()->allocRefForIRTree(doloop, false);
+
     if (!genDepOpOutsideLoop(ctx)) { return nullptr; }
     IR * reslst = nullptr;
     IR * last = nullptr;
@@ -3349,7 +3394,7 @@ IR * ConstructLoop::genVectMainLoop(MOD VectCtx & ctx) const
     //Region * rg = ctx.getRegion();
     //dupStmtToList(
     //    &reslst, &last, ctx.getInitOpList(), rg);
-
+    
     IR * bodylast = nullptr;
     dupStmtToList(
         &LOOP_body(doloop), &bodylast, ctx.getPrerequisiteOpList(),

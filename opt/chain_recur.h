@@ -100,8 +100,8 @@ public:
     void copyExclusive(IVVal const& src, MOD ChainRecMgr & mgr);
 
     //The function computes value by substituing src for variable in 'lr'.
-    void computeByLinRep(IVVal const& src, LinearRep const& lr,
-                         MOD ChainRecMgr & mgr);
+    void computeByLinRep(
+        IVVal const& src, LinearRep const& lr, MOD ChainRecMgr & mgr);
 
     //Perform value arithmetics.
     //Return true if the function calculate a correct result value.

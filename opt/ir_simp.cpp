@@ -785,7 +785,7 @@ IR * IRSimp::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     LabelInfo * stepl = m_rg->genILabel();
 
     IR * iv = simplifyExpression(LOOP_iv(ir), &local);
-    ASSERT0(iv->is_id() || iv->is_pr());
+    ASSERT0(CDoLoop::isValidIV(iv));
 
     IR * lst_after_simp_det = simplifyDoLoopSelfDet(ir, endl, ctx);
     ASSERT0(lst_after_simp_det);

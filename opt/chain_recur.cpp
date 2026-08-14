@@ -40,10 +40,15 @@ void IVVal::dump(Region const* rg) const
     case VAL_UNDEF:
         prt(rg, "UNDEF");
         return;
-    case VAL_IS_VAR:
+    case VAL_IS_VAR: {
         prt(rg, "VAR:'%s'(MD%u)", getVar()->get_name()->getStr(),
             getMD()->id());
+        IR const* occ = getMDOcc();
+        if (occ != nullptr) {
+            prt(rg, ",OCC:%s", DumpIRName().dump(occ));
+        }
         return;
+    }
     case VAL_IS_INT:
         prt(rg, "INT:%d", getInt());
         return;
@@ -52,8 +57,8 @@ void IVVal::dump(Region const* rg) const
         return;
     case VAL_IS_EXP: {
         xcom::StrBuf tbuf(32);
-        xoc::dumpIRToBuf(getExp(), rg, tbuf,
-                         DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_KID));
+        xoc::dumpIRToBuf(
+            getExp(), rg, tbuf, DumpFlag::combineIRID(IR_DUMP_DEF|IR_DUMP_KID));
         prt(rg, "EXP:%s", tbuf.getBuf());
         return;
     }
@@ -65,8 +70,8 @@ void IVVal::dump(Region const* rg) const
 }
 
 
-CHAR const* IVVal::dump(Region const* rg, UINT indent,
-                        OUT xcom::StrBuf & buf) const
+CHAR const* IVVal::dump(
+    Region const* rg, UINT indent, OUT xcom::StrBuf & buf) const
 {
     class Dump : public xoc::DumpToBuf {
     public:
@@ -146,8 +151,9 @@ IR * ChainRecMgr::buildVarRef(IVVal const& v) const
 }
 
 
-static bool doBinOpExp2CR(IR_CODE code, IR const* v0, ChainRec const& v1,
-                          OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doBinOpExp2CR(
+    IR_CODE code, IR const* v0, ChainRec const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     switch (code) {
     case IR_ADD: {
@@ -177,8 +183,9 @@ static bool doBinOpExp2CR(IR_CODE code, IR const* v0, ChainRec const& v1,
 }
 
 
-static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                           OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doBinOpVar2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(v0.is_var());
     Region * rg = mgr.getRegion();
@@ -204,8 +211,9 @@ static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     default: UNREACHABLE();
     }
     ASSERT0(IR::isBinaryOp(code));
-    IR * tmpres = rg->getIRMgr()->buildBinaryOpSimp(code, v1.getDType(),
-                                                    op0, op1);
+    IR * tmpres = rg->getIRMgr()->buildBinaryOpSimp(
+        code, v1.getDType(), op0, op1);
+
     //Refinement just performed on new IR, and does not affect
     //original IR.
     PassMgr * pm = rg->getPassMgr();
@@ -223,8 +231,9 @@ static bool doBinOpVar2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                           OUT IVVal & res, ChainRecMgr & mgr)
+static bool doBinOpExp2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    ChainRecMgr & mgr)
 {
     ASSERT0(v0.is_exp());
     Region * rg = mgr.getRegion();
@@ -250,8 +259,9 @@ static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
     default: UNREACHABLE();
     }
     ASSERT0(IR::isBinaryOp(code));
-    IR * tmpres = rg->getIRMgr()->buildBinaryOpSimp(code, v1.getDType(),
-                                                    op0, op1);
+    IR * tmpres = rg->getIRMgr()->buildBinaryOpSimp(
+        code, v1.getDType(), op0, op1);
+
     //Refinement just performed on new IR, and does not affect
     //original IR.
     PassMgr * pm = rg->getPassMgr();
@@ -269,8 +279,9 @@ static bool doBinOpExp2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doBinOpFP2Int(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                          OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doBinOpFP2Int(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(v0.is_fp() && v1.is_int());
     ASSERT0(IR::isBinaryOp(code));
@@ -279,6 +290,7 @@ static bool doBinOpFP2Int(IR_CODE code, IVVal const& v0, IVVal const& v1,
     IR * op1 = rg->getIRMgr()->buildImmInt(v1.getInt(), v1.getDType());
     IR * tmpres = rg->getIRMgr()->buildBinaryOpSimp(
         code, v1.getDType(), op0, op1);
+
     //Refinement just performed on new IR, and does not affect
     //original IR.
     PassMgr * pm = rg->getPassMgr();
@@ -296,8 +308,9 @@ static bool doBinOpFP2Int(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doBinOpInt2FP(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                          OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doBinOpInt2FP(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(IR::isBinaryOp(code));
     Region * rg = mgr.getRegion();
@@ -322,8 +335,9 @@ static bool doBinOpInt2FP(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                              OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doSubOrDivInt2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(code == IR_SUB || code == IR_DIV);
     ASSERT0(v0.is_int());
@@ -381,8 +395,8 @@ static bool doSubOrDivInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doSubCR2Any(IVVal const& v0, IVVal const& v1,
-                        OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doSubCR2Any(
+    IVVal const& v0, IVVal const& v1, OUT IVVal & res, MOD ChainRecMgr & mgr)
 {
     ASSERT0(v0.is_cr());
     ChainRec * rescr = mgr.allocChainRec();
@@ -409,8 +423,9 @@ static bool doSubCR2Any(IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doAddOrMulCR2CR(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                            OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doAddOrMulCR2CR(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(code == IR_ADD || code == IR_MUL);
     ASSERT0(v0.is_cr() && v1.is_cr());
@@ -429,8 +444,9 @@ static bool doAddOrMulCR2CR(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doAddOrMulInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                              OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doAddOrMulInt2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(ChainRec::isLinear(code) || code == IR_MUL);
     ASSERT0(v0.is_int());
@@ -471,8 +487,9 @@ static bool doAddOrMulInt2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doSubOrDivFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                             OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doSubOrDivFP2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(code == IR_SUB || code == IR_DIV);
     ASSERT0(v0.is_fp());
@@ -520,8 +537,9 @@ static bool doSubOrDivFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-static bool doAddOrMulFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
-                             OUT IVVal & res, MOD ChainRecMgr & mgr)
+static bool doAddOrMulFP2Any(
+    IR_CODE code, IVVal const& v0, IVVal const& v1, OUT IVVal & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(code == IR_ADD || code == IR_MUL);
     ASSERT0(v0.is_fp());
@@ -558,8 +576,8 @@ static bool doAddOrMulFP2Any(IR_CODE code, IVVal const& v0, IVVal const& v1,
 }
 
 
-bool IVVal::doMul(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
-                  MOD ChainRecMgr & mgr)
+bool IVVal::doMul(
+    IVVal const& v0, IVVal const& v1, OUT IVVal & res, MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
@@ -580,8 +598,8 @@ bool IVVal::doMul(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
 }
 
 
-bool IVVal::doAdd(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
-                  MOD ChainRecMgr & mgr)
+bool IVVal::doAdd(
+    IVVal const& v0, IVVal const& v1, OUT IVVal & res, MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
@@ -602,8 +620,8 @@ bool IVVal::doAdd(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
 }
 
 
-bool IVVal::doDiv(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
-                  MOD ChainRecMgr & mgr)
+bool IVVal::doDiv(
+    IVVal const& v0, IVVal const& v1, OUT IVVal & res, MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
@@ -621,8 +639,8 @@ bool IVVal::doDiv(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
 }
 
 
-bool IVVal::doSub(IVVal const& v0, IVVal const& v1, OUT IVVal & res,
-                  MOD ChainRecMgr & mgr)
+bool IVVal::doSub(
+    IVVal const& v0, IVVal const& v1, OUT IVVal & res, MOD ChainRecMgr & mgr)
 {
     switch (v0.getKind()) {
     case IVVal::VAL_UNDEF: UNREACHABLE(); return false;
@@ -669,8 +687,8 @@ void IVVal::copyExclusive(IVVal const& src, MOD ChainRecMgr & mgr)
 }
 
 
-void IVVal::computeByLinRep(IVVal const& src, LinearRep const& lr,
-                            MOD ChainRecMgr & mgr)
+void IVVal::computeByLinRep(
+    IVVal const& src, LinearRep const& lr, MOD ChainRecMgr & mgr)
 {
     clean();
     if (lr.hasCoeff()) {
@@ -938,8 +956,8 @@ bool ChainRec::isEqual(IRMgr const* mgr, UINT valnum, ...) const
 }
 
 
-void ChainRec::computeByLinRep(LinearRep const& lr, ChainRec const& src,
-                               MOD ChainRecMgr & mgr)
+void ChainRec::computeByLinRep(
+    LinearRep const& lr, ChainRec const& src, MOD ChainRecMgr & mgr)
 {
     ASSERT0(src.isSanity());
     IVVal coeff;
@@ -1009,8 +1027,8 @@ ChainRec * ChainRecMgr::allocChainRec()
     CR_id(cr) = ++m_cr_count;
     return cr;
 }
-bool ChainRecMgr::doAdd(ChainRec const& cr0, ChainRec const& cr1,
-                        OUT ChainRec & res)
+bool ChainRecMgr::doAdd(
+    ChainRec const& cr0, ChainRec const& cr1, OUT ChainRec & res)
 {
     if (cr0.getCode() != IR_ADD || cr1.getCode() != IR_ADD) { return false; }
     if (!IVVal::doAdd(cr0.getInit(), cr1.getInit(), CR_init(&res), *this)) {
@@ -1025,8 +1043,8 @@ bool ChainRecMgr::doAdd(ChainRec const& cr0, ChainRec const& cr1,
 }
 
 
-bool ChainRecMgr::doAdd(ChainRec const& cr1, IVVal const& val,
-                        OUT ChainRec & res)
+bool ChainRecMgr::doAdd(
+    ChainRec const& cr1, IVVal const& val, OUT ChainRec & res)
 {
     if (!cr1.isLinear()) { return false; }
     if (!IVVal::doAdd(val, cr1.getInit(), CR_init(&res), *this)) {
@@ -1078,8 +1096,8 @@ bool ChainRecMgr::doSub(ChainRec const& cr1, IVVal const& v, OUT ChainRec & res)
 }
 
 
-bool ChainRecMgr::doSub(ChainRec const& cr0, ChainRec const& cr1,
-                        OUT ChainRec & res)
+bool ChainRecMgr::doSub(
+    ChainRec const& cr0, ChainRec const& cr1, OUT ChainRec & res)
 {
     if (cr0.getCode() != IR_ADD || cr1.getCode() != IR_ADD) { return false; }
     if (!IVVal::doSub(cr0.getInit(), cr1.getInit(), CR_init(&res), *this)) {
@@ -1094,8 +1112,9 @@ bool ChainRecMgr::doSub(ChainRec const& cr0, ChainRec const& cr1,
 }
 
 
-static bool doMulByCodeAdd(ChainRec const& cr0, ChainRec const& cr1,
-                           OUT ChainRec & res, MOD ChainRecMgr & mgr)
+static bool doMulByCodeAdd(
+    ChainRec const& cr0, ChainRec const& cr1, OUT ChainRec & res,
+    MOD ChainRecMgr & mgr)
 {
     ASSERT0(cr0.getCode() == IR_ADD && cr1.getCode() == IR_ADD);
     //e.g:{x,+,y}*{a,+,b} ==> {x*a,+,{x,+,y}*b +y*{a,+,b}+y*b}
@@ -1135,8 +1154,9 @@ static bool doMulByCodeAdd(ChainRec const& cr0, ChainRec const& cr1,
 }
 
 
-static bool doMulByCodeMul(ChainRec const& cr0, ChainRec const& cr1,
-                           OUT ChainRec & res, MOD ChainRecMgr & mgr)
+static bool doMulByCodeMul(
+    ChainRec const& cr0, ChainRec const& cr1, OUT ChainRec & res,
+    MOD ChainRecMgr & mgr)
 {
     UNREACHABLE(); //TODO
     mgr.refine(res);
@@ -1144,8 +1164,8 @@ static bool doMulByCodeMul(ChainRec const& cr0, ChainRec const& cr1,
 }
 
 
-bool ChainRecMgr::doMul(ChainRec const& cr0, ChainRec const& cr1,
-                        OUT ChainRec & res)
+bool ChainRecMgr::doMul(
+    ChainRec const& cr0, ChainRec const& cr1, OUT ChainRec & res)
 {
     if (cr0.getCode() == IR_ADD && cr1.getCode() == IR_ADD) {
         return doMulByCodeAdd(cr0, cr1, res, *this);
@@ -1157,8 +1177,8 @@ bool ChainRecMgr::doMul(ChainRec const& cr0, ChainRec const& cr1,
 }
 
 
-bool ChainRecMgr::doMul(ChainRec const& cr1, IVVal const& val,
-                        OUT ChainRec & res)
+bool ChainRecMgr::doMul(
+    ChainRec const& cr1, IVVal const& val, OUT ChainRec & res)
 {
     if (!cr1.isLinear() && cr1.getCode() != IR_MUL) { return false; }
     if (!IVVal::doMul(val, cr1.getInit(), CR_init(&res), *this)) {
@@ -1174,8 +1194,8 @@ bool ChainRecMgr::doMul(ChainRec const& cr1, IVVal const& val,
 }
 
 
-bool ChainRecMgr::computeInit(ChainRec const& cr, UINT num,
-                              OUT IVValVec & valvec)
+bool ChainRecMgr::computeInit(
+    ChainRec const& cr, UINT num, OUT IVValVec & valvec)
 {
     if (cr.getInit().is_cr()) {
         return computeValue(*cr.getInit().getCR(), num, valvec);
@@ -1185,8 +1205,8 @@ bool ChainRecMgr::computeInit(ChainRec const& cr, UINT num,
 }
 
 
-bool ChainRecMgr::computeStepByCR(ChainRec const& cr, UINT num,
-                                  OUT IVValVec & valvec)
+bool ChainRecMgr::computeStepByCR(
+    ChainRec const& cr, UINT num, OUT IVValVec & valvec)
 {
     ASSERT0(cr.getStep().is_cr());
     IVValVec tmpvalvec;
@@ -1219,8 +1239,8 @@ bool ChainRecMgr::computeStepByCR(ChainRec const& cr, UINT num,
 }
 
 
-bool ChainRecMgr::computeStep(ChainRec const& cr, UINT num,
-                              OUT IVValVec & valvec)
+bool ChainRecMgr::computeStep(
+    ChainRec const& cr, UINT num, OUT IVValVec & valvec)
 {
     if (cr.getStep().is_cr()) {
         return computeStepByCR(cr, num, valvec);
@@ -1248,8 +1268,8 @@ bool ChainRecMgr::computeStep(ChainRec const& cr, UINT num,
 }
 
 
-bool ChainRecMgr::computeValue(ChainRec const& cr, UINT num,
-                               OUT IVValVec & valvec)
+bool ChainRecMgr::computeValue(
+    ChainRec const& cr, UINT num, OUT IVValVec & valvec)
 {
     if (!computeInit(cr, num, valvec)) { return false; }
     return computeStep(cr, num, valvec);

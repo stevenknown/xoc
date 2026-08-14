@@ -934,6 +934,9 @@ public:
     IR * getIV() const { return LOOP_iv(this); }
     IR * getInit() const { return LOOP_init(this); }
     IR * getStep() const { return LOOP_step(this); }
+
+    //Return true if ir can be regarded as a valid IV kid of DoLoop.
+    static bool isValidIV(IR const* ir);
 };
 
 

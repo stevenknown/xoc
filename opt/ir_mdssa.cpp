@@ -2964,7 +2964,7 @@ MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(
 
     //There should not exist more than two cover-defs because they should
     //have been versioned.
-    MDDef const* covermddef = mdssainfo->findCoverMDDef(this, mustuse);
+    MDDef const* covermddef = mdssainfo->findFirstCoverMDDef(this, mustuse);
     if (covermddef == nullptr || covermddef->is_phi()) {
         //If covermddef is PHI, that means the value of ir is overlapped
         //with other stmts that more than one, and these stmts merged
@@ -2981,6 +2981,24 @@ MDDef const* MDSSAMgr::findNearestCoverDefThatCanReach(
         //For the conservative purpose, CoverDef that does not have MustRef
         //should not be killing-def of 'ir'.
         //CASE:compile.gr/no_classic_prdu/killingdef.gr
+        return nullptr;
+    }
+    if (!mustref_of_covermddef_occ->is_exact_cover(mustuse)) {
+        //e.g:compile/cp_arr.c
+        //Given ir is ld:i32:offset(16) 'arr' id:115,
+        //the covermddef_occ is stmt id:100, however its MustRef (MD10) isn't
+        //exactly cover the MuseRef (MD13) of exp id:115.
+        //Because the covermddef is the first-cover-mddef of exp id:115, but
+        //it doesn't cover the MustRef of exp id:115.
+        //  st:i32:offset(32) 'arr' id:100 <-- intconst:i32 0xFFEE
+        //    ----
+        //    st:i32:offset(32) 'arr' id:100
+        //    EMD12 : MD10,MD12,MD15
+        //  ...
+        //  ...
+        //  stpr $7 <-- ld:i32:offset(16) 'arr' id:115
+        //    ld:i32:offset(16) 'arr' id:115
+        //    EMD13 : MD10,MD13,MD15
         return nullptr;
     }
     //The def is the potentail real-def of ir.
@@ -6640,6 +6658,7 @@ void MDSSAMgr::construction(OptCtx & oc)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     ASSERT0(oc.is_ref_valid());
     ASSERT0(oc.is_dom_valid());
+    ASSERT0(xoc::verifyMDRef(m_rg, oc));
     reinit(oc);
     //Extract dominate tree of CFG.
     START_TIMER(t1, "MDSSA: Extract Dom Tree");

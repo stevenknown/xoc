@@ -537,7 +537,7 @@ Type const* TypeMgr::hoistDTypeForBinOpWithFPType(
 //The function handles cases that at least one of operands
 //is of MC type.
 Type const* TypeMgr::hoistDTypeForBinOpWithMCType(
-    Type const* d0, Type const* d1)
+    Type const* d0, Type const* d1) const
 {
     ASSERT0(!d0->is_any() && !d1->is_any());
     ASSERTN(!d0->is_vector() && !d1->is_vector(),

@@ -444,8 +444,12 @@ ReassCtx::ReassCtx(OptCtx & oc, AlgeReassociate * algereass)
 {
     m_alge_reass = algereass;
     m_irmgr = oc.getRegion()->getIRMgr();
+    m_mdmgr = oc.getRegion()->getMDMgr();
+    m_tm = oc.getRegion()->getTypeMgr();
     m_ir_rank_range_bitsize = 0;
     m_need_recomp_gvn = false;
+    m_refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
+    ASSERT0(m_refine);
 }
 
 
@@ -982,7 +986,7 @@ bool AlgeReassociate::linearConstExpTree(IR const* ir, MOD ReassCtx & ctx) const
 }
 
 
-bool AlgeReassociate::linearConst(IR const* ir, MOD ReassCtx & ctx) const
+bool AlgeReassociate::linearConst(IR const* ir, MOD ReassCtx & ctx)
 {
     AlgeIntlImpl::computeRankViaConst(ir, ctx);
     ctx.getLinOpVec().append(ir);
@@ -1301,8 +1305,318 @@ bool AlgeReassociate::linearExpViaStoreStmt(
     return succ;
 }
 
+bool AlgeReassociate::extractCoeffAndVar(
+    IR const* ir, OUT IR ** coeff, OUT Var ** var, MOD ReassCtx & ctx)
+{
+    ASSERT0(ir && coeff && var);
+    Region * rg = ctx.getRegion();
+    IRMgr * irmgr = ctx.getIRMgr();
+    MDMgr * mdmgr = ctx.getMDMgr();
+    if (ir->isDirectMemOp() || ir->isPROp()) {
+        *coeff = irmgr->buildImmInt(1, ir->getType());
+        MD const* md = mdmgr->genMDForDirectOp(ir);
+        *var = md->get_base();
+        return true;
+    }
+    if (ir->is_mul()) {
+        IR const* op0 = BIN_opnd0(ir);
+        IR const* op1 = BIN_opnd1(ir);
+        if (op1->isDirectMemOp()) {
+            //Guarrantee the first opnd is Var.
+            xcom::swap(op0, op1);
+        }
+        if (!op0->isDirectMemOp()) {
+            //CASE:we don't handle the fold-const stituation here.
+            return false;
+        }
+        if (!isConstExpTree(op1)) { return false; }
+        *coeff = rg->dupIRTree(op1);
+        MD const* md = mdmgr->genMDForDirectOp(op0);
+        *var = md->get_base();
+        return true;
+    }
+    return false;
+}
 
-bool AlgeReassociate::foldConstLast(MOD ReassCtx & ctx) const
+
+//CASE:only handle the case: CONST*(coeff*var)
+bool AlgeReassociate::combineLastTwoOpByMul(MOD ReassCtx & ctx)
+{
+    LinOpVec & linopvec = ctx.getLinOpVec();
+    IR_CODE opc = linopvec.getCode();
+    ASSERT0(opc != IR_UNDEF);
+    ASSERT0(opc == IR_MUL);
+    ASSERT0(linopvec.get_elem_count() >= 2);
+    AlgeReassociate * reass = ctx.getAlgeReass();
+    Region * rg = ctx.getRegion();
+    TypeMgr * tm = ctx.getTypeMgr();
+    IRMgr * irmgr = ctx.getIRMgr();
+    Refine * refine = ctx.getRefine();
+    ASSERT0(reass->canBeReass(opc));
+    VecIdx last1 = linopvec.get_last_idx();
+    VecIdx last2 = linopvec.get_last_idx() - 1;
+    ASSERT0(last1 != VEC_UNDEF);
+    ASSERT0(last2 != VEC_UNDEF);
+    IR const* last1_ir = linopvec.get(last1);
+    IR const* last2_ir = linopvec.get(last2);
+    if (!last1_ir->isBinaryOp() && !last2_ir->isBinaryOp()) {
+        //CASE:given OP list is already the simplest form.
+        //e.g:If linopvec is:mul (const, ld), there is no operation can be
+        //reassociated.
+        return false;
+    }
+
+    //Recursive combine the operation.
+    {
+        ReassCtx tmpctx1(*ctx.getOptCtx(), ctx.getAlgeReass());
+        LinOpVec & linopvec = tmpctx1.getLinOpVec();
+        for (INT i = 0; i < IR_MAX_KID_NUM(last1_ir); i++) {
+            IR * k = last1_ir->getKid(i);
+            if (k == nullptr) { continue; }
+            linopvec.append(k);
+        }
+        if (linopvec.get_elem_count() > 0) {
+            linopvec.setCode(last1_ir->getCode());
+            bool succ = combineLikeTerm(tmpctx1);
+            if (succ) {
+                VecIdx last1 = linopvec.get_last_idx();
+                IR const* tmp_last1_ir = linopvec.get(last1);
+                last1_ir = tmp_last1_ir;
+            }
+        }
+    }
+
+    //Recursive combine the operation.
+    {
+        ReassCtx tmpctx1(*ctx.getOptCtx(), ctx.getAlgeReass());
+        LinOpVec & linopvec = tmpctx1.getLinOpVec();
+        for (INT i = 0; i < IR_MAX_KID_NUM(last2_ir); i++) {
+            IR * k = last2_ir->getKid(i);
+            if (k == nullptr) { continue; }
+            linopvec.append(k);
+        }
+        if (linopvec.get_elem_count() > 0) {
+            linopvec.setCode(last2_ir->getCode());
+            bool succ = combineLikeTerm(tmpctx1);
+            if (succ) {
+                VecIdx last1 = linopvec.get_last_idx();
+                IR const* tmp_last1_ir = linopvec.get(last1);
+                last2_ir = tmp_last1_ir;
+            }
+        }
+    }
+    if (!isConstExpTree(last1_ir)) {
+        xcom::swap(last1_ir, last2_ir);
+    }
+    if (!isConstExpTree(last1_ir)) {
+        //CASE:only handle the case: CONST*(coeff*var)
+        return false;
+    }
+    //Extract the Coeff and Var.
+    Var * var2;
+    IR * coeff2;
+    if (!extractCoeffAndVar(last2_ir, &coeff2, &var2, ctx)) { return false; }
+    if (var2 == nullptr) {
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+    if (!isConstExpTree(coeff2)) {
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+    if (!reass->isSafeToFoldConstBinOp(IR_MUL, last1_ir, coeff2)) {
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+
+    //Combine the Coeff for the same Var.
+    Type const* coeffty = coeff2->getType();
+    ASSERT0(coeffty);
+    IR * combined_coeff = irmgr->buildBinaryOpSimp(
+        IR_MUL, coeffty, rg->dupIRTree(last1_ir), coeff2);
+    RefineCtx rc(ctx.getOptCtx());
+    bool change = false;
+    ASSERT0(refine);
+    combined_coeff = refine->refineExpression(combined_coeff, change, rc);
+    ASSERT0(combined_coeff->is_const() && change);
+    dumpFoldConst(IR_MUL, last1_ir, coeff2, combined_coeff, reass);
+
+    //Regenerate combined operation and record it in linopvec as result.
+    linopvec.cleanLastFrom(last2);
+    {
+        Type const* regened_ty = last1_ir->getType();
+        IR * load_var = nullptr;
+        if (var2->is_pr()) {
+            load_var = irmgr->buildPRdedicated(
+                var2->getPrno(), last1_ir->getType());
+        } else {
+            load_var = irmgr->buildLoad(var2, regened_ty);
+        }
+        IR * regened_op = irmgr->buildBinaryOpSimp(
+            IR_MUL, regened_ty, load_var, combined_coeff);
+        RefineCtx rc(ctx.getOptCtx());
+        bool change = false;
+        ASSERT0(refine);
+        regened_op = refine->refineExpression(regened_op, change, rc);
+        dumpFoldConst(IR_MUL, load_var, combined_coeff, regened_op, reass);
+        linopvec.append(regened_op);
+    }
+    return true;
+}
+
+
+bool AlgeReassociate::combineLastTwoOpByAdd(MOD ReassCtx & ctx)
+{
+    LinOpVec & linopvec = ctx.getLinOpVec();
+    IR_CODE opc = linopvec.getCode();
+    ASSERT0(opc != IR_UNDEF);
+    ASSERT0(opc == IR_ADD);
+    ASSERT0(linopvec.get_elem_count() >= 2);
+    AlgeReassociate * reass = ctx.getAlgeReass();
+    Region * rg = ctx.getRegion();
+    TypeMgr * tm = ctx.getTypeMgr();
+    IRMgr * irmgr = ctx.getIRMgr();
+    Refine * refine = ctx.getRefine();
+    ASSERT0(reass->canBeReass(opc));
+    VecIdx last1 = linopvec.get_last_idx();
+    VecIdx last2 = linopvec.get_last_idx() - 1;
+    ASSERT0(last1 != VEC_UNDEF);
+    ASSERT0(last2 != VEC_UNDEF);
+    IR const* last1_ir = linopvec.get(last1);
+    IR const* last2_ir = linopvec.get(last2);
+
+    //Recursive combine the operation.
+    {
+        ReassCtx tmpctx1(*ctx.getOptCtx(), ctx.getAlgeReass());
+        LinOpVec & linopvec = tmpctx1.getLinOpVec();
+        for (INT i = 0; i < IR_MAX_KID_NUM(last1_ir); i++) {
+            IR * k = last1_ir->getKid(i);
+            if (k == nullptr) { continue; }
+            linopvec.append(k);
+        }
+        if (linopvec.get_elem_count() > 0) {
+            linopvec.setCode(last1_ir->getCode());
+            bool succ = combineLikeTerm(tmpctx1);
+            if (succ) {
+                VecIdx last1 = linopvec.get_last_idx();
+                IR const* tmp_last1_ir = linopvec.get(last1);
+                last1_ir = tmp_last1_ir;
+            }
+        }
+    }
+
+    //Recursive combine the operation.
+    {
+        ReassCtx tmpctx1(*ctx.getOptCtx(), ctx.getAlgeReass());
+        LinOpVec & linopvec = tmpctx1.getLinOpVec();
+        for (INT i = 0; i < IR_MAX_KID_NUM(last2_ir); i++) {
+            IR * k = last2_ir->getKid(i);
+            if (k == nullptr) { continue; }
+            linopvec.append(k);
+        }
+        if (linopvec.get_elem_count() > 0) {
+            linopvec.setCode(last2_ir->getCode());
+            bool succ = combineLikeTerm(tmpctx1);
+            if (succ) {
+                VecIdx last1 = linopvec.get_last_idx();
+                IR const* tmp_last1_ir = linopvec.get(last1);
+                last2_ir = tmp_last1_ir;
+            }
+        }
+    }
+
+    //Extract the Coeff and Var.
+    Var * var1;
+    Var * var2;
+    IR * coeff1;
+    IR * coeff2;
+    if (!extractCoeffAndVar(last1_ir, &coeff1, &var1, ctx)) { return false; }
+    if (!extractCoeffAndVar(last2_ir, &coeff2, &var2, ctx)) { return false; }
+
+    //Actually, last1_ir and last2_ir can be regarded as MUL operation.
+    //e.g: ld i, can be regarded as mul(ld i, intconst:1).
+    if (var1 == nullptr || var1 != var2) {
+        rg->freeIRTree(coeff1);
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+    if (!isConstExpTree(coeff1) || !isConstExpTree(coeff2)) {
+        rg->freeIRTree(coeff1);
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+    if (!reass->isSafeToFoldConstBinOp(IR_ADD, coeff1, coeff2)) {
+        rg->freeIRTree(coeff1);
+        rg->freeIRTree(coeff2);
+        return false;
+    }
+
+    //Combine the Coeff for the same Var.
+    Type const* opty = tm->hoistDTypeForBinOp(coeff1, coeff2);
+    ASSERT0(opty);
+    IR * combined_coeff = irmgr->buildBinaryOpSimp(
+        IR_ADD, opty, coeff1, coeff2);
+    RefineCtx rc(ctx.getOptCtx());
+    bool change = false;
+    ASSERT0(refine);
+    combined_coeff = refine->refineExpression(combined_coeff, change, rc);
+    ASSERT0(combined_coeff->is_const() && change);
+    dumpFoldConst(opc, coeff1, coeff2, combined_coeff, reass);
+
+    //Regenerate combined operation and record it in linopvec as result.
+    linopvec.cleanLastFrom(last2);
+    {
+        Type const* regened_ty = last1_ir->getType();
+        IR * load_var = nullptr;
+        if (var1->is_pr()) {
+            load_var = irmgr->buildPRdedicated(
+                var1->getPrno(), last1_ir->getType());
+        } else {
+            load_var = irmgr->buildLoad(var1, regened_ty);
+        }
+        IR * regened_op = irmgr->buildBinaryOpSimp(
+            IR_MUL, regened_ty, load_var, combined_coeff);
+        RefineCtx rc(ctx.getOptCtx());
+        bool change = false;
+        ASSERT0(refine);
+        regened_op = refine->refineExpression(regened_op, change, rc);
+        dumpFoldConst(IR_MUL, load_var, combined_coeff, regened_op, reass);
+        linopvec.append(regened_op);
+    }
+    return true;
+}
+
+
+bool AlgeReassociate::combineLastTwoOp(MOD ReassCtx & ctx)
+{
+    LinOpVec & linopvec = ctx.getLinOpVec();
+    IR_CODE opc = linopvec.getCode();
+    ASSERT0(opc != IR_UNDEF);
+    ASSERT0(IR::isBinaryOp(opc));
+    if (linopvec.get_elem_count() < 2) { return false; }
+    switch (opc) {
+    case IR_ADD: return combineLastTwoOpByAdd(ctx);
+    case IR_MUL: return combineLastTwoOpByMul(ctx);
+    default: return false;
+    }
+    return false;
+}
+
+
+bool AlgeReassociate::combineLikeTerm(MOD ReassCtx & ctx)
+{
+    LinOpVec & linopvec = ctx.getLinOpVec();
+    IR_CODE opc = linopvec.getCode();
+    switch (opc) {
+    SWITCH_CASE_BIN:
+        return combineLastTwoOp(ctx);
+    default: ;//TODO:support more opcode.
+    }
+    return false;
+}
+
+
+bool AlgeReassociate::foldConstLast(MOD ReassCtx & ctx)
 {
     LinOpVec & linopvec = ctx.getLinOpVec();
     IR_CODE opc = linopvec.getCode();
@@ -1405,14 +1719,20 @@ bool AlgeReassociate::isSafeToFoldConstBinOpInCase1(
 }
 
 
-bool AlgeReassociate::foldConstLastTwoOp(MOD ReassCtx & ctx) const
+bool AlgeReassociate::foldConstLastTwoOp(MOD ReassCtx & ctx)
 {
     LinOpVec & linopvec = ctx.getLinOpVec();
     IR_CODE opc = linopvec.getCode();
     ASSERT0(opc != IR_UNDEF);
     ASSERT0(IR::isBinaryOp(opc));
     if (linopvec.get_elem_count() < 2) { return false; }
-    ASSERT0(canBeReass(opc));
+
+    AlgeReassociate * reass = ctx.getAlgeReass();
+    Region * rg = ctx.getRegion();
+    TypeMgr * tm = ctx.getTypeMgr();
+    IRMgr * irmgr = ctx.getIRMgr();
+    Refine * refine = ctx.getRefine();
+    ASSERT0(reass->canBeReass(opc));
     VecIdx last1 = linopvec.get_last_idx();
     VecIdx last2 = linopvec.get_last_idx() - 1;
     ASSERT0(last1 != VEC_UNDEF);
@@ -1422,17 +1742,18 @@ bool AlgeReassociate::foldConstLastTwoOp(MOD ReassCtx & ctx) const
     if (!isConstExpTree(last1_ir) || !isConstExpTree(last2_ir)) {
         return false;
     }
-    if (!isSafeToFoldConstBinOp(opc, last1_ir, last2_ir)) { return false; }
-    Type const* opty = m_tm->hoistDTypeForBinOp(last1_ir, last2_ir);
+    if (!reass->isSafeToFoldConstBinOp(opc, last1_ir, last2_ir))
+    { return false; }
+    Type const* opty = tm->hoistDTypeForBinOp(last1_ir, last2_ir);
     ASSERT0(opty);
-    IR * newir = m_irmgr->buildBinaryOpSimp(opc,
-       opty, m_rg->dupIRTree(last1_ir), m_rg->dupIRTree(last2_ir));
-    ASSERT0(m_refine);
+    IR * newir = irmgr->buildBinaryOpSimp(opc,
+        opty, rg->dupIRTree(last1_ir), rg->dupIRTree(last2_ir));
     RefineCtx rc(ctx.getOptCtx());
     bool change = false;
-    newir = m_refine->refineExpression(newir, change, rc);
+    ASSERT0(refine);
+    newir = refine->refineExpression(newir, change, rc);
     ASSERT0(newir->is_const() && change);
-    dumpFoldConst(opc, last1_ir, last2_ir, newir, this);
+    dumpFoldConst(opc, last1_ir, last2_ir, newir, reass);
 
     //Compute the rank for newir.
     linearConst(newir, ctx);

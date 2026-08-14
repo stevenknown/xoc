@@ -132,12 +132,15 @@ public:
     //Generate MD for Var.
     MD const* genMDForVar(Var * var, Type const* type, TMWORD offset);
 
-    //Generate MD for direct memory operation.
+    //Generate MD for direct memory operations.
     MD const* genMDForDirectMemOp(IR const* ir)
     {
         ASSERT0(ir->isDirectMemOp());
         return genMDForVar(ir->getIdinfo(), ir->getType(), ir->getOffset());
     }
+
+    //Generate MD for PR and NonPR-Direct-Mem operations.
+    MD const* genMDForDirectOp(IR const* ir);
 };
 
 } //namespace xoc

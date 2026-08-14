@@ -337,6 +337,9 @@ public:
     //Return true if 'ir' is used by step-stmt or step-exp.
     bool isRefStepStmtOrExp(IR const* ir) const;
 
+    //Return true if 'ir' is used by step-var.
+    bool isRefStepValMD(IR const* ir) const;
+
     //Return true if step value is integer.
     bool isStepValInt() const { return getStepVal().is_int(); }
     bool isStepValFP() const { return getStepVal().is_fp(); }

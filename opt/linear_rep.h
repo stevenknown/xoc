@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class AlgeReassociate;
+
 //The context to infer linear-represetation.
 #define LRCTX_is_constructed(l) ((l).m_is_constructed)
 #define LRCTX_is_transitive(l) ((l).m_is_transitive)
@@ -121,7 +123,7 @@ public:
     bool hasFPCoeff() const;
 
     //Return true if current object represents linear-expression at least
-    //has a variable that formed as: a*var.
+    //has a variable that formed as: coeff*var.
     bool hasVar() const { return var_exp != nullptr; }
 
     //Return true if coeff is integer immediate, and the value is equal to 'v'.
@@ -150,12 +152,11 @@ class LinearRepMgr {
     TypeMgr * m_tm;
     Region * m_rg;
     IRMgr * m_irmgr;
-    OptCtx const& m_oc;
+    OptCtx & m_oc;
     Refine * m_refine;
+    AlgeReassociate * m_reass;
     List<IR*> m_gened_ir_list;
 protected:
-    void add(IR * ir) { m_gened_ir_list.append_tail(ir); }
-
     IR const* buildConstBinOp(IR_CODE code, IR const* op0, IR const* op1);
     IR const* buildBinOp(IR_CODE code, IR const* c0, IR const* c1);
 
@@ -172,11 +173,13 @@ protected:
         OUT LRInferCtx & ctx);
 
     //Combine given two linear-rep that formed as a*x+b and c*x+d.
+    //Return true if combination succeeded, otherwise returns false, meaning
+    //lr0 cannot combine with lr1.
+    //NOTE:even if lr0 or lr1 doesn't have Var, the function also attempt
+    //to combine lr0 and lr1. In this case, the 'addend' will be combined.
     bool combinLinearRep(
         IR_CODE code, LinearRep const& lr0, LinearRep const& lr1,
         OUT LinearRep & reslr, OUT LRInferCtx & ctx);
-
-    OptCtx const& getOptCtx() const { return m_oc; }
 
     //Return true if the operation of two linear-rep still be linear-rep.
     //e.g:given two linear-rep: a*x+b, c*x+d, the ADD operation of them is
@@ -215,8 +218,13 @@ protected:
         return ir->is_const() && ir->is_int() && CONST_int_val(ir) == v;
     }
 public:
-    LinearRepMgr(Region * rg, OptCtx const& oc);
+    LinearRepMgr(Region * rg, MOD OptCtx & oc);
     ~LinearRepMgr() { clean(); }
+
+    OptCtx & getOptCtx() { return m_oc; }
+    Refine * getRefine() const { return m_refine; }
+    AlgeReassociate * getAlgeReass() const { return m_reass; }
+    Region * getRegion() const { return m_rg; }
 
     //The function attempts to deduce linear-representation from given IR.
     //ir: IR expression that to be analyzed.
@@ -226,6 +234,8 @@ public:
     bool inferAndConstructLinearRep(
         IR const* ir, Var const* var, OUT LinearRep & lr,
         OUT LRInferCtx & ctx);
+
+    void recordGenedIR(IR * ir) { m_gened_ir_list.append_tail(ir); }
 };
 
 } //namespace xoc

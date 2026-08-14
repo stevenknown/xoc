@@ -1854,6 +1854,22 @@ bool IV::isRefReduceStmtOrExp(MD const* ref) const
 }
 
 
+bool IV::isRefStepValMD(IR const* ir) const
+{
+    ASSERT0(ir);
+    if (!isStepValVar()) { return false; }
+    MD const* mustref = ir->getMustRef();
+    if (mustref != nullptr && mustref == getStepValMD()) {
+        return true;
+    }
+    if (ir == getStepValMDOcc()) {
+        //NOTE:StepValMDOcc is optional, and might be NULL.
+        return true;
+    }
+    return false;
+}
+
+
 bool IV::isRefStepStmtOrExp(IR const* ir) const
 {
     ASSERT0(getStmtOccMD());
@@ -1918,6 +1934,7 @@ bool IV::isRefIVInfo(IR const* ir) const
 {
     MD const* irref = ir->getMustRef();
     if (irref == nullptr) { return isRefStepStmtOrExp(ir); }
+    if (isRefStepValMD(ir)) { return true; }
     return isRefIV(irref);
 }
 
@@ -2651,6 +2668,7 @@ bool IVR::isRelaxLinearRepOfBIV(
         Var const* iv = tiv->getInitIVVar();
         ASSERTN(iv, ("miss IV var"));
         if (lrmgr.inferAndConstructLinearRep(ir, iv, *linrep, ctx)) {
+            if (!linrep->hasVar()) { continue; }
             IVLR_iv(linrep) = tiv;
             return true;
         }

@@ -435,6 +435,17 @@ IRFieldAccTab::AccInfo CDoLoop::accinfo[CDoLoop::accinfo_num] = {
 
 
 //
+//START CDoLoop
+//
+bool CDoLoop::isValidIV(IR const* ir)
+{
+    return ir->is_id() || (ir->is_ld() && ir->getOffset() == 0) ||
+           ir->is_pr();
+}
+//END CDoLoop
+
+
+//
 //START CSwitch
 //
 void CSwitch::addToBody(UINT num, ...)

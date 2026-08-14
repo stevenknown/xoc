@@ -1497,7 +1497,7 @@ IR * IRMgr::buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body)
     ASSERT0(det &&
             (det->is_lt() || det->is_le() || det->is_gt() || det->is_ge()));
     ASSERT0(init && step && init->is_exp() && step->is_exp());
-    ASSERT0(iv->is_id() || iv->is_pr());
+    ASSERT0(CDoLoop::isValidIV(iv));
     //ASSERT0(isReduction(step));
 
     IR * ir = allocIR(IR_DO_LOOP);

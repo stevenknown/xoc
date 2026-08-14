@@ -594,6 +594,9 @@ protected:
     //         operation description.
     //Note the prerequisite is that 'ir' is legal to vectorize.
     virtual bool isSuitableToBeVect(IR const* ir, VectCtx const& ctx) const;
+    bool isArrayOpSuitableToBeVect(IR const* ir, VectCtx const& ctx) const;
+    bool isIndirectOpSuitableToBeVect(IR const* ir, VectCtx const& ctx) const;
+    bool isMemRefSuitableToBeVect(IR const* ir, VectCtx const& ctx) const;
 
     //Return true if the step of IV of accdesc is suitable to vectorize.
     virtual bool isStrideSuitableToVect(

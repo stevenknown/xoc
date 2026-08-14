@@ -176,6 +176,7 @@ protected:
     VN const* inferConst(IR const* ir, InferCtx & ctx);
     virtual VN const* inferExtStmt(IR const* ir, InferCtx & ctx);
     virtual VN const* inferExtExp(IR const* ir, InferCtx & ctx);
+    VN const* inferCallStmt(IR const* ir, InferCtx & ctx);
     VN const* inferDirectStmt(IR const* ir, InferCtx & ctx);
     VN const* inferIndirectStmt(IR const* ir, InferCtx & ctx);
     VN const* inferLiveinVMDForDirectExp(IR const* ir, InferCtx & ctx);

@@ -287,7 +287,8 @@ bool MDSSAInfo::isEqual(MDSSAInfo const& src) const
 
 
 //The function looks for the first MDDef that exactly define 'md'.
-MDDef const* MDSSAInfo::findCoverMDDef(MDSSAMgr const* mgr, MD const* md) const
+MDDef const* MDSSAInfo::findFirstCoverMDDef(
+    MDSSAMgr const* mgr, MD const* md) const
 {
     ASSERT0(mgr && md);
     VOpndSetIter it = nullptr;
