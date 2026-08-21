@@ -236,6 +236,9 @@ protected:
         //Target Dependent Code.
         return ir;
     }
+    IR * foldConstFPCvt(IR * ir, bool & change, RefineCtx & rc);
+    IR * foldConstIntCvt(IR * ir, bool & change, RefineCtx & rc);
+    IR * foldConstCvt(IR * ir, bool & change, RefineCtx & rc);
     virtual IR * foldConstUnary(IR * ir, bool & change, RefineCtx &);
     virtual IR * foldConstBinary(IR * ir, bool & change, MOD RefineCtx & rc);
 

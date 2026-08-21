@@ -808,7 +808,7 @@ public:
     { return getDIVList(li->id()); }
 
     virtual CHAR const* getPassName() const
-    { return "Induction Variable Recogization"; }
+    { return "Induction Variable Recogization(IVR)"; }
     PASS_TYPE getPassType() const { return PASS_IVR; }
     ActMgr * getActMgr() { return &m_am; }
 

@@ -232,7 +232,7 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
     if (dbx_mgr == nullptr) { return; }
     ASSERT0(!src->is_undef() && !tgt->is_undef());
     if (src->getAI() == nullptr) {
-        if (g_is_search_and_copy_dbx && src->is_exp() &&
+        if (g_is_retrieve_parent_to_find_dbx && src->is_exp() &&
             src->getParent() != nullptr) {
             //Attempt to copy nearest debug-info.
             //IR exp's parent might be nullptr during simplification.
@@ -247,7 +247,8 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
             if (src->is_stmt()) {
                 return;
             }
-            if (g_is_search_and_copy_dbx && src->getParent() != nullptr) {
+            if (g_is_retrieve_parent_to_find_dbx &&
+                src->getParent() != nullptr) {
                 //Attempt to copy nearest debug-info.
                 //IR exp's parent might be nullptr during simplification.
                 copyDbx(tgt, src->getParent(), rg);
@@ -313,12 +314,20 @@ void copyDbx(IR * tgt, Dbx const* dbx, Region * rg)
 }
 
 
-Dbx * getDbx(IR const* ir)
+Dbx * getDbx(IR const* ir, bool retrieve_parent)
 {
-    if (IR_ai(ir) == nullptr || !IR_ai(ir)->is_init()) { return nullptr; }
-    DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
-    if (da == nullptr) { return nullptr; }
-    return &da->dbx;
+    AIContainer const* ai = ir->getAI();
+    DbxAttachInfo * da = nullptr;
+    if (ai != nullptr && ai->is_init()) {
+        da = (DbxAttachInfo*)ai->get(AI_DBX);
+    }
+    if (da != nullptr) {
+        return &da->dbx;
+    }
+    if (retrieve_parent && ir->getParent() != nullptr) {
+        return getDbx(ir->getParent(), true);
+    }
+    return nullptr;
 }
 
 

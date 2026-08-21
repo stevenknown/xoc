@@ -332,7 +332,7 @@ public:
     void dumpEVN() const;
 
     virtual CHAR const* getPassName() const
-    { return "Global Common Subexpression Elimination"; }
+    { return "Global Common Subexpression Elimination(GCSE)"; }
     PASS_TYPE getPassType() const { return PASS_GCSE; }
     ActMgr const& getActMgr() const { return m_am; }
     GVN * getGVN() const { return m_gvn; }

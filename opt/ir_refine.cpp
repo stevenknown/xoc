@@ -2159,6 +2159,7 @@ IR * RefineIntlImpl::refineMulWithOpnd1WithINT(
         //mul X,1 => X
         IR * newir = op0;
         BIN_opnd0(ir) = nullptr;
+        IR_parent(newir) = nullptr;
         //No need revise DU, just keep X original DU info.
         rc.tryInvalidInfoBeforeFreeIR(ir);
         rg->freeIRTree(ir);
@@ -2171,6 +2172,7 @@ IR * RefineIntlImpl::refineMulWithOpnd1WithINT(
             xoc::removeUseForTree(ir, rg, *rc.getOptCtx());
         }
         IR * newir = op1;
+        IR_parent(newir) = nullptr;
         BIN_opnd1(ir) = nullptr;
         rc.tryInvalidInfoBeforeFreeIR(ir);
         rg->freeIRTree(ir);
@@ -2216,6 +2218,12 @@ static IR * refineMulByCombineDivAndMulInCase1(
     if (op0->is_fp() && !g_do_opt_float) { return ir; }
 
     //(x / y) * y => x
+    //If x, y is integer, the DIV operation is actually floor-div.
+    //e.g: x = 7, y = 3, then x/y is 2.
+    //Thus is x is not an integer multiple of y, the result is not equal to
+    //original expression.
+    if (!g_is_ignore_floor_div_effect) { return ir; }
+
     IR * op0_of_op0 = BIN_opnd0(op0);
     IR * op1_of_op0 = BIN_opnd1(op0);
     if (op1_of_op0->isIREqual(op1, rg->getIRMgr(), true)) {
@@ -2268,6 +2276,13 @@ static IR * refineMulByCombineDivAndMulInCase2INT(
         //e.g:(1/20)*40 can be folded into 40/20, however (1/20)*30 cannot.
         return ir;
     }
+
+    //(1 / z) * x => x / z
+    //If z, x is integer, the DIV operation is actually floor-div.
+    //e.g: z = 2, x = 2, then 1/z is 0, and (1/z)*x is 0.
+    //Thus the result is not equal to original expression.
+    if (!g_is_ignore_floor_div_effect) { return ir; }
+
     //No need to update DU.
     IR_code(ir) = IR_DIV;
     BIN_opnd0(ir) = op1;
@@ -3337,14 +3352,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
         if ((ir->is_int() && CVT_exp(ir)->is_int()) ||
             (ir->is_fp() && CVT_exp(ir)->is_fp())) {
             //cvt(i64, const) => const(i64)
-            IR * tmp = CVT_exp(ir);
-            IR_dt(tmp) = ir->getType();
-            IR_parent(tmp) = IR_parent(ir);
-            CVT_exp(ir) = nullptr;
-            rc.tryInvalidInfoBeforeFreeIR(ir);
-            m_rg->freeIRTree(ir);
-            change = true;
-            return tmp;
+            return foldConstCvt(ir, change, rc);
         }
         if (g_do_opt_float && ir->is_fp() && CVT_exp(ir)->is_int()) {
             //cvt(f64, const(i64)) => const(f64)
@@ -3730,6 +3738,69 @@ bool Refine::refineBBlist(MOD BBList * ir_bb_list, MOD RefineCtx & rc)
 }
 
 
+IR * Refine::foldConstFPCvt(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_cvt());
+    ASSERT0(ir->is_fp());
+    IR * kid = CVT_exp(ir);
+    ASSERT0(kid->is_const());
+    ASSERT0(kid->is_fp());
+    Type const* resty = ir->getType();
+    Type const* srcty = kid->getType();
+    IR * ret = ir;
+    if (resty == srcty) {
+        //The type is the same, the rank is the same.
+        IR_dt(kid) = ir->getType();
+        IR_parent(kid) = IR_parent(ir);
+        CVT_exp(ir) = nullptr;
+        rc.tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        ret = kid;
+        change = true;
+    }
+    ASSERT0(ret);
+    return ret;
+}
+
+
+IR * Refine::foldConstIntCvt(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_cvt());
+    ASSERT0(ir->is_int());
+    IR * kid = CVT_exp(ir);
+    ASSERT0(kid->is_const());
+    ASSERT0(kid->is_int());
+    HOST_INT kidval = CONST_int_val(kid);
+    Type const* resty = ir->getType();
+    Type const* srcty = kid->getType();
+    IR * ret = nullptr;
+    //CONST type convert has to obey the integer conversion rank.
+    UINT res_bitsize = m_tm->getBitSize(resty);
+    UINT src_bitsize = m_tm->getBitSize(srcty);
+    if (res_bitsize > src_bitsize) {
+        //1. The greater the bitsize is, the higher the rank is.
+        //Thus the result type has higher rank.
+        HOST_INT converted_kidval = xoc::convertIntValByType(
+            kidval, resty, m_tm);
+        ret = m_irmgr->buildImmInt(converted_kidval, resty);
+        rc.tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        change = true;
+    } else {
+        //2. The bitsize is the same, the rank is the same.
+        IR_dt(kid) = ir->getType();
+        IR_parent(kid) = IR_parent(ir);
+        CVT_exp(ir) = nullptr;
+        rc.tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        ret = kid;
+        change = true;
+    }
+    ASSERT0(ret);
+    return ret;
+}
+
+
 IR * Refine::foldConstIntUnary(IR * ir, bool & change, RefineCtx const& rc)
 {
     ASSERT0(ir->isUnaryOp());
@@ -3985,6 +4056,23 @@ IR * Refine::foldConstFloatBinary(IR * ir, bool & change, RefineCtx const& rc)
 }
 
 
+IR * Refine::foldConstCvt(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_cvt());
+    IR * t = CVT_exp(ir);
+    ASSERT0(t);
+    if (ir->is_int() && t->is_const() && t->is_int()) {
+        //For now, we do nothing if ir's type is Tensor, VEC, or ANY.
+        return foldConstIntCvt(ir, change, rc);
+    }
+    if (ir->is_fp() && t->is_const() && t->is_fp()) {
+        //For now, we do nothing if ir's type is Tensor, VEC, or ANY.
+        return foldConstFPCvt(ir, change, rc);
+    }
+    return ir;
+}
+
+
 IR * Refine::foldConstUnary(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->isUnaryOp());
@@ -4230,6 +4318,9 @@ IR * Refine::foldConst(IR * ir, bool & change, RefineCtx & rc)
     case IR_ABS:
     case IR_NEG:
         ir = foldConstUnary(ir, change, rc);
+        break;
+    case IR_CVT:
+        ir = foldConstCvt(ir, change, rc);
         break;
     SWITCH_CASE_UNA_TRIGONOMETRIC:
         ir = refineTrigonometric(ir, change, rc);

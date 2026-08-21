@@ -77,7 +77,8 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    virtual CHAR const* getPassName() const { return "Dead Store Elimination"; }
+    virtual CHAR const* getPassName() const
+    { return "Dead Store Elimination(DSE)"; }
     virtual PASS_TYPE getPassType() const { return PASS_DSE; }
     ActMgr & getActMgr() { return m_am; }
     MDSSAMgr * getMDSSAMgr() const { return m_mdssamgr; }

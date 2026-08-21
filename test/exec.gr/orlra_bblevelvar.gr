@@ -1,0 +1,76 @@
+region program ".program" () {
+    var printf:any:(func,decl,align(4));
+    var main:any:(func,align(4));
+    var _const_string_1:str:(string("\n%lld\n"),align(4));
+    region func main () {
+        var x:u64:(align(4));
+        var i:i32:(align(4));
+        var y:u64:(align(4));
+        st:u64 x = -1:i32;
+        st:i32 i = -1:i32;
+        stpr $37:u64 = ld:u64 x;
+        stpr $38:i32 = ld:i32 i;
+        stpr $39:u64 = cvt:u64 $38:i32;
+        stpr $40:u64 = $39:u64;
+        stpr $41:u64 = 
+            add:u64 
+                $37:u64, 
+                $40:u64;
+        stpr $42:u64 = $41:u64;
+        st:u64 x = $42:u64;
+        stpr $43:*<4> = lda _const_string_1;
+        stpr $44:u64 = ld:u64 x;
+        call:(use(
+            ild:any 0:any)) printf(
+            $43:*<4>,
+            $44:u64);
+        stpr $45:u64 = ld:u64 x;
+        stpr $46:i32 = ld:i32 i;
+        stpr $47:u64 = $39:u64;
+        stpr $48:u64 = 
+            sub:u64 
+                $45:u64, 
+                $47:u64;
+        st:u64 x = $48:u64;
+        stpr $49:*<4> = lda _const_string_1;
+        stpr $50:u64 = ld:u64 x;
+        call:(use(
+            ild:any 0:any)) printf(
+            $49:*<4>,
+            $50:u64);
+        stpr $51:u64 = ld:u64 x;
+        stpr $52:i32 = ld:i32 i;
+        stpr $53:u64 = cvt:u64 $52:i32;
+        stpr $54:u64 = 
+            mul:u64 
+                $51:u64, 
+                $53:u64;
+        st:u64 x = $54:u64;
+        stpr $55:*<4> = lda _const_string_1;
+        stpr $56:u64 = ld:u64 x;
+        call:(use(
+            ild:any 0:any)) printf(
+            $55:*<4>,
+            $56:u64);
+        st:u64 y = -2:i32;
+        st:u64 x = -2:i32;
+        stpr $57:u64 = ld:u64 x;
+        stpr $58:u64 = ld:u64 y;
+        stpr $59:u64 = 
+          add:u64 
+                $57:u64, 
+                $58:u64;
+        st:u64 x = $59:u64;
+        stpr $60:*<4> = lda _const_string_1;
+        stpr $61:u64 = ld:u64 x;
+        call:(use(
+            ild:any 0:any)) printf(
+            $60:*<4>,
+            $61:u64);
+        stpr $62:u64 = ld:u64 x;
+        stpr $63:u64 = ld:u64 y;
+        stpr $64:u64 = $41:u64;
+        st:u64 x = $64:u64;
+        return 0:i32;
+    };
+}

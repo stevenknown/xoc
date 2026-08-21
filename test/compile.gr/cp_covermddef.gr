@@ -1,0 +1,58 @@
+region program ".program" () {
+    var intrapred:any:(func,align(4));
+    region func intrapred () {
+        var i:i32:(align(4));
+        var j:i32:(align(4));
+        var arr:mc<52>:(array,align(4));
+        stpr $1:u32 = 
+            mul:u32 4:i32, 4:u32;
+        stpr $2:*<4> = 
+            add:*<4> 
+                lda arr, 
+                $1:u32;
+        stpr $3:i32 = 
+            ild:i32 
+                $2:*<4>;
+        stpr $4:u32 = 
+            mul:u32 8:i32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda arr, 
+                $4:u32,
+            $3:i32;
+        stpr $5:u32 = 
+            mul:u32 8:i32, 4:u32;
+        stpr $6:*<4> = 
+            add:*<4> 
+                lda arr, 
+                $5:u32;
+        stpr $7:i32 = 
+            ild:i32 
+                $6:*<4>;
+        stpr $8:u32 = 
+            mul:u32 1:i32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda arr, 
+                $8:u32,
+            $7:i32;
+        stpr $9:u32 = 
+            mul:u32 
+                ld:i32 j, 4:u32;
+        stpr $10:*<4> = 
+            add:*<4> 
+                lda arr, 
+                $9:u32;
+        stpr $11:i32 = 
+            ild:i32 
+                $10:*<4>;
+        stpr $12:u32 = 
+            mul:u32 1:i32, 4:u32;
+        ist:i32 = 
+            add:*<4> 
+                lda arr, 
+                $12:u32,
+            $11:i32;
+        return ;
+    };
+}

@@ -179,10 +179,10 @@ public:
 
 class VarLinkAttrDesc {
 public:
-    ////////////////////////////////////////////////////////////////////
-    //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE//
-    //CORRESPONDING TO THE SPECIAL INITIALIZING VALUE.                //
-    ////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    //NOTE: DO NOT CHANGE THE LAYOUT OF CLASS MEMBERS BECAUSE THEY ARE        //
+    //CORRESPONDING TO THE SPECIAL INITIALIZING VALUE.                        //
+    ////////////////////////////////////////////////////////////////////////////
     VAR_LINK_ATTR attr;
     CHAR const* name;
 public:
@@ -197,10 +197,10 @@ public:
 };
 
 
-////////////////////////////////////////////////////////
-//NOTE: DO *NOT* forget modify the bit-field in Var if//
-//you remove/add flag here.                           //
-////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//NOTE: DO *NOT* FORGET MODIFY THE BIT-FIELD IN VAR IF                        //
+//YOU REMOVE/ADD FLAG HERE.                                                   //
+////////////////////////////////////////////////////////////////////////////////
 //Variable unique id.
 #define VAR_id(v) ((v)->uid)
 
@@ -570,10 +570,13 @@ class LabelReloc {
 public:
     //The position of the relocated symbol.
     UINT m_offset;
+
     //Which symbol needs to be relocated.
     Sym const* m_current;
+
     //Which symbol will be relocated to.
     Sym const* m_other;
+
     //The label defined in the function which is used to calculate the location
     //of the code segment pointed to by the relocation.
     LabelInfo const* m_label;
@@ -600,6 +603,7 @@ protected:
     //Note that RegionMgr will save all information from program region and
     //each function region will extract related information and process it.
     xcom::List<LabelRefill*> m_var_label_refill;
+
     //Stored all entries that use the single label to initialize global
     //variables.
     xcom::List<LabelReloc*> m_var_label_reloc;

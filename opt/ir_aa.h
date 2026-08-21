@@ -639,7 +639,7 @@ public:
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
-    virtual CHAR const* getPassName() const { return "Alias Analysis"; }
+    virtual CHAR const* getPassName() const { return "Alias Analysis(AA)"; }
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
 

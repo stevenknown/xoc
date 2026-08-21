@@ -34,6 +34,9 @@ LinkerFlag=" -static "
 SKIPPED_XOCCFLAG="-no-vect -no-if_cvs -no-lsra "
 
 FLAGARR=(
+  "-O3 -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
+  "-O3 -lowest_height -prmode -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
   "${SKIPPED_XOCCFLAG}"
   "-O3 ${SKIPPED_XOCCFLAG}"
   "-O3 -lowest_height -prmode ${SKIPPED_XOCCFLAG} "
@@ -43,9 +46,6 @@ FLAGARR=(
   "-O3 -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
   "-O3 -lowest_height -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
   "-O3 -lowest_height -prmode -nonprdu -prdu -mdssa -prssa ${SKIPPED_XOCCFLAG} "
-  "-O3 -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
-  "-O3 -lowest_height -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
-  "-O3 -lowest_height -prmode -nonprdu -prdu -no-mdssa -no-prssa ${SKIPPED_XOCCFLAG} "
 )
 
 for item in "${FLAGARR[@]}"; do

@@ -98,7 +98,7 @@ MD2IRSet::MD2IRSet(Region * rg)
     m_tm = rg->getTypeMgr();
     m_du = rg->getDUMgr();
     m_sbs_mgr = m_du->getSBSMgr();
-    m_are_stmts_defed_ineffect_md = false;
+    m_stmt_defined_ineffect_md = false;
 }
 
 
@@ -128,7 +128,7 @@ void MD2IRSet::clean()
     }
 
     m_global_md.clean(*m_sbs_mgr);
-    m_are_stmts_defed_ineffect_md = false;
+    m_stmt_defined_ineffect_md = false;
 
     //Do not clean DefSBitSet* here, it will incur memory leak.
     //TMap<UINT, DefSBitSetCore*>::clean();
@@ -440,7 +440,7 @@ void DUMgr::freeDUSetForAllIR()
 
 static void cleanNonPROpInDUSet(
     MOD IR * ir, DUMgr * dumgr, Region const* rg,
-    xcom::DefMiscBitSetMgr * bsmgr)
+    xcom::DefMiscBitSetMgr * bsmgr, bool free_if_empty)
 {
     DUSet * duset = ir->getDUSet();
     if (duset == nullptr) { return; }
@@ -457,7 +457,7 @@ static void cleanNonPROpInDUSet(
             duset->diff(i, *bsmgr);
         }
     }
-    if (duset->is_empty()) {
+    if (duset->is_empty() && free_if_empty) {
         ir->freeDUset(dumgr);
     }
 }
@@ -465,7 +465,7 @@ static void cleanNonPROpInDUSet(
 
 static void cleanPROpInDUSet(
     MOD IR * ir, DUMgr * dumgr, Region const* rg,
-    xcom::DefMiscBitSetMgr * bsmgr)
+    xcom::DefMiscBitSetMgr * bsmgr, bool free_if_empty)
 {
     DUSet * duset = ir->getDUSet();
     if (duset == nullptr) { return; }
@@ -482,7 +482,7 @@ static void cleanPROpInDUSet(
             duset->diff(i, *bsmgr);
         }
     }
-    if (duset->is_empty()) {
+    if (duset->is_empty() && free_if_empty) {
         ir->freeDUset(dumgr);
     }
 }
@@ -503,7 +503,7 @@ void DUMgr::freeDUSetForPROp()
                 //Do not clean the NonPR reference in call's DUSet.
                 continue;
             }
-            cleanPROpInDUSet(ir, this, m_rg, getSBSMgr());
+            cleanPROpInDUSet(ir, this, m_rg, getSBSMgr(), true);
             continue;
         }
         ir->freeDUset(this);
@@ -522,7 +522,7 @@ void DUMgr::freeDUSetForNonPROp()
         ASSERT0(ir);
         if (!ir->isMemRefNonPR() && !ir->is_undef()) { continue; }
         if (ir->isCallStmt()) {
-            cleanNonPROpInDUSet(ir, this, m_rg, getSBSMgr());
+            cleanNonPROpInDUSet(ir, this, m_rg, getSBSMgr(), true);
             continue;
         }
         ir->freeDUset(this);
@@ -690,7 +690,7 @@ void DUMgr::computeOverlapMDSet(IR * ir, bool recompute)
 
 
 //Try allocate DUSet for memory reference.
-DUSet * DUMgr::genDUSet(IR * ir)
+DUSet * DUMgr::genDUSet(MOD IR * ir)
 {
     ASSERT0(ir->hasDU());
     DU * du = ir->getDU();
@@ -2770,60 +2770,64 @@ void DUMgr::checkAndBuildChainRecursive(
     if (!exp->isMemRef()) { return; }
     if (exp->isPROp() && !flag.have(DUOPT_COMPUTE_PR_DU)) {
         //Free DUSet if we are not going to compute it.
-        exp->freeDUset(this);
+        //CASE:Do NOT free the DUSet if the flag doesn't require computing
+        //DU chain, because user guarantees the PRDU chain is valid.
+        //exp->freeDUset(this);
         return;
     }
     if (exp->isMemRefNonPR() && !flag.have(DUOPT_COMPUTE_NONPR_DU)) {
         //Free DUSet if we are not going to compute it.
-        exp->freeDUset(this);
+        //CASE:Do NOT free the DUSet if the flag doesn't require computing
+        //DU chain, because user guarantees the NonPRDU chain is valid.
+        //exp->freeDUset(this);
         return;
     }
-    checkAndBuildChainForMemOp(bb, exp, ct);
+    checkAndBuildChainForMemOp(bb, exp, ct, flag);
 }
 
 
 //Check memory operand and build DU chain for them.
 //Note we always find the nearest exact def, and build
 //the DU between the def and its use.
-void DUMgr::checkAndBuildChainForMemOp(IRBB * bb, IR * exp, IRListIter ct)
+void DUMgr::checkAndBuildChainForMemOp(
+    IRBB * bb, IR * exp, IRListIter ct, DUOptFlag flag)
 {
     ASSERT0(exp && exp->is_exp() && exp->isMemRef());
     DUSet * expdu = genDUSet(exp);
     cleanDUSet(exp->id(), expdu);
-    MD const* expmd = exp->getMustRef();
+    MD const* mustref = exp->getMustRef();
     bool has_local_killing_def = false;
     bool has_local_nonkilling_def = false;
-    if ((expmd != nullptr && expmd->is_exact()) || exp->isReadPR()) {
+    if ((mustref != nullptr && mustref->is_exact()) || exp->isReadPR()) {
         //Only must-exact USE-ref has qualification to compute killing-def.
         has_local_killing_def = buildLocalDUChain(
-            bb, exp, expmd, expdu, ct, &has_local_nonkilling_def);
+            bb, exp, mustref, expdu, ct, &has_local_nonkilling_def);
     }
-
     if (has_local_killing_def) {
         //Find killing local def.
         return;
     }
-
-    if (expmd != nullptr) {
-        //expmd might be either exact or inexact.
-        //Find non-local/local DEF for exp/expmd.
-        checkMustMDAndBuildDUChainForPotentialDefList(exp, expmd, expdu);
+    if (mustref != nullptr) {
+        //mustref might be either exact or inexact.
+        //Find non-local/local DEF for exp/mustref.
+        checkMustMDAndBuildDUChainForPotentialDefList(
+            exp, mustref, expdu, flag);
         if (has_local_nonkilling_def) {
             //Supplement DU chains for all stmt that overlapped-def exp.
-            buildLocalDUChainForNonKillingDef(bb, ct, exp, expmd, expdu);
+            buildLocalDUChainForNonKillingDef(bb, ct, exp, mustref, expdu);
         }
     }
-
-    if (expmd == nullptr || m_md2irs->hasIneffectDef() ||
+    if (mustref == nullptr || m_md2irs->hasIneffectDef() ||
         has_local_nonkilling_def) {
-        //The following cases requires to scan MayUse:
-        //If there is not MustUse of 'exp', then it is necessary to scan MayUse
+        //The expressoin only has MayRef.
+        //Then the following cases require scanning for MayRef:
+        //If there isn't MustRef of 'exp', then it is necessary to scan MayRef
         //to keep the correctness of DU chain.
         //If has_local_nonkilling_def is true, for the sanity of DU chain,
-        //MayUse of 'exp' should to be scanned.
+        //MayRef of 'exp' should to be scanned.
         MDSet const* expmds = exp->getMayRef();
         if (expmds != nullptr) {
-            checkMDSetAndBuildDUChain(exp, expmd, *expmds, expdu);
+            checkMDSetAndBuildDUChain(exp, mustref, *expmds, expdu, flag);
         }
     }
 }
@@ -2853,7 +2857,9 @@ void DUMgr::checkAndBuildChain(IR * stmt, IRListIter ct, DUOptFlag flag)
             cleanDUSet(stmt->id(), du);
         } else {
             //Free DUSet if we are not going to compute it.
-            stmt->freeDUset(this);
+            //CASE:Do NOT free the DUSet if the flag doesn't require computing
+            //DU chain, because user guarantees the NonPRDU chain is valid.
+            //stmt->freeDUset(this);
         }
         checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
         return;
@@ -2868,7 +2874,9 @@ void DUMgr::checkAndBuildChain(IR * stmt, IRListIter ct, DUOptFlag flag)
             cleanDUSet(stmt->id(), du);
         } else {
             //Free DUSet if we are not going to compute it.
-            stmt->freeDUset(this);
+            //CASE:Do NOT free the DUSet if the flag doesn't require computing
+            //DU chain, because user guarantees the PRDU chain is valid.
+            //stmt->freeDUset(this);
         }
         checkAndBuildChainForAllKid(stmt, stmt->getBB(), ct, flag);
         return;
@@ -2964,84 +2972,97 @@ void DUMgr::checkDefSetToBuildDUChainPR(
 }
 
 
+static void checkDefSetToBuildDUChainNonPRImpl(
+    MOD IR * def, IR const* exp, MD const* expmd, MDSet const* expmds,
+    DUSet * expdu, IRBB * curbb, DUMgr * dumgr, DUOptFlag flag)
+{
+    Region const* rg = dumgr->getRegion();
+    ASSERT0(def && def->is_stmt());
+    bool build_du = false;
+    MD const* mustdef = def->getMustRef();
+    bool consider_maydef = false;
+    if (expmd != nullptr && mustdef != nullptr) {
+        //If def has MustDef (exact|effect) MD, then we do
+        //not consider MayDef MDSet if def is neither CallStmt
+        //nor Region.
+        ASSERTN(!mustdef->is_may(), ("MayMD can not be mustdef."));
+        if (expmd == mustdef || expmd->is_overlap(mustdef)) {
+            if (mustdef->is_exact()) {
+                build_du = true;
+            } else if (def->getBB() == curbb) {
+                //If stmt is at same bb with exp, then
+                //we can not determine whether they are independent,
+                //because if they are, the situation should be processed
+                //in buildLocalDUChain().
+                //Build DU chain for conservative purpose.
+                //Nonkilling Def.
+                build_du = true;
+            } else {
+                UINT result = dumgr->checkIsNonLocalKillingDef(def, exp);
+                if (result == CK_OVERLAP || result == CK_UNKNOWN) {
+                    //Nonkilling Def.
+                    build_du = true;
+                }
+            }
+        } else if (def->isCallStmt()) {
+            //If def is CALL|ICALL which has sideeffect,
+            //then we should consider MayDef MDSet as well.
+            consider_maydef = true;
+        }
+    } else {
+        consider_maydef = true;
+    }
+    if (consider_maydef) {
+        MDSet const* maydef = def->getMayRef();
+        if (maydef != nullptr &&
+            ((maydef == expmds ||
+              (expmds != nullptr && maydef->is_intersect(*expmds))) ||
+             (expmd != nullptr && maydef->is_overlap(expmd, rg)))) {
+            //Nonkilling Def.
+            build_du = true;
+        } else if (mustdef != nullptr && expmds != nullptr &&
+                   expmds->is_overlap(mustdef, rg)) {
+            //Killing Def if mustdef is exact, or else is nonkilling def.
+            build_du = true;
+        }
+    }
+    if (!build_du) { return; }
+    expdu->add((UINT)def->id(), *dumgr->getSBSMgr());
+    DUSet * def_useset = dumgr->genDUSet(def);
+    if (def->isCallStmt()) {
+        dumgr->cleanDUSetForCallByDUOpt(def, flag);
+    } else {
+        dumgr->cleanDUSet(def->id(), def_useset);
+    }
+    ASSERT0(def->getDUSet() == def_useset);
+    def_useset->add(exp->id(), *dumgr->getSBSMgr());
+}
+
+
 void DUMgr::checkDefSetToBuildDUChainNonPR(
     IR const* exp, MD const* expmd, MDSet const* expmds, DUSet * expdu,
-    DefSBitSetCore const* defset, IRBB * curbb)
+    DefSBitSetCore const* defset, IRBB * curbb, DUOptFlag flag)
 {
     DefSBitSetIter sc = nullptr;
     for (BSIdx d = defset->get_first(&sc);
          d != BS_UNDEF; d = defset->get_next(d, &sc)) {
         IR * def = m_rg->getIR(d);
-        ASSERT0(def->is_stmt());
-        bool build_du = false;
-        MD const* mustdef = def->getMustRef();
-        bool consider_maydef = false;
-        if (expmd != nullptr && mustdef != nullptr) {
-            //If def has MustDef (exact|effect) MD, then we do
-            //not consider MayDef MDSet if def is neither CallStmt
-            //nor Region.
-            ASSERTN(!mustdef->is_may(), ("MayMD can not be mustdef."));
-            if (expmd == mustdef || expmd->is_overlap(mustdef)) {
-                if (mustdef->is_exact()) {
-                    build_du = true;
-                } else if (def->getBB() == curbb) {
-                    //If stmt is at same bb with exp, then
-                    //we can not determine whether they are independent,
-                    //because if they are, the situation should be processed
-                    //in buildLocalDUChain().
-                    //Build DU chain for conservative purpose.
-                    //Nonkilling Def.
-                    build_du = true;
-                } else {
-                    UINT result = checkIsNonLocalKillingDef(def, exp);
-                    if (result == CK_OVERLAP || result == CK_UNKNOWN) {
-                        //Nonkilling Def.
-                        build_du = true;
-                    }
-                }
-            } else if (def->isCallStmt()) {
-                //If def is CALL|ICALL which has sideeffect,
-                //then we should consider MayDef MDSet as well.
-                consider_maydef = true;
-            }
-        } else {
-            consider_maydef = true;
-        }
-
-        if (consider_maydef) {
-            MDSet const* maydef = def->getMayRef();
-            if (maydef != nullptr &&
-                ((maydef == expmds ||
-                  (expmds != nullptr && maydef->is_intersect(*expmds))) ||
-                 (expmd != nullptr && maydef->is_overlap(expmd, m_rg)))) {
-                //Nonkilling Def.
-                build_du = true;
-            } else if (mustdef != nullptr && expmds != nullptr &&
-                       expmds->is_overlap(mustdef, m_rg)) {
-                //Killing Def if mustdef is exact, or else is nonkilling def.
-                build_du = true;
-            }
-        }
-
-        if (build_du) {
-            expdu->add((UINT)d, *getSBSMgr());
-            DUSet * def_useset = genDUSet(def);
-            cleanDUSet((UINT)d, def_useset);
-            def_useset->add(IR_id(exp), *getSBSMgr());
-        }
+        checkDefSetToBuildDUChainNonPRImpl(
+            def, exp, expmd, expmds, expdu, curbb, this, flag);
     }
 }
 
 
 void DUMgr::checkDefSetToBuildDUChain(
     IR const* exp, MD const* expmd, MDSet const* expmds, DUSet * expdu,
-    DefSBitSetCore const* defset, IRBB * curbb)
+    DefSBitSetCore const* defset, IRBB * curbb, DUOptFlag flag)
 {
     if (exp->isReadPR()) {
         checkDefSetToBuildDUChainPR(exp, expmd, expmds, expdu, defset, curbb);
         return;
     }
-    checkDefSetToBuildDUChainNonPR(exp, expmd, expmds, expdu, defset, curbb);
+    checkDefSetToBuildDUChainNonPR(
+        exp, expmd, expmds, expdu, defset, curbb, flag);
 }
 
 
@@ -3064,7 +3085,7 @@ bool DUMgr::buildDUChain(MOD IR * def, MOD IR * use, OptCtx const& oc)
 
 //Check and build DU chain to IR Expression according to MustUse MD.
 void DUMgr::checkMustMDAndBuildDUChainForPotentialDefList(
-    IR const* exp, MD const* expmd, DUSet * expdu)
+    IR const* exp, MD const* expmd, DUSet * expdu, DUOptFlag flag)
 {
     ASSERT0(exp && expmd && expdu);
     ASSERT0(expmd == const_cast<IR*>(exp)->getMustRef());
@@ -3072,14 +3093,16 @@ void DUMgr::checkMustMDAndBuildDUChainForPotentialDefList(
     DefSBitSetCore const* defset = m_md2irs->get(expmd->id());
     if (defset == nullptr) { return; }
     IRBB * curbb = exp->getStmt()->getBB();
-    checkDefSetToBuildDUChain(exp, expmd, nullptr, expdu, defset, curbb);
+    checkDefSetToBuildDUChain(
+        exp, expmd, nullptr, expdu, defset, curbb, flag);
     return;
 }
 
 
 //Check and build DU chain to IR Expression according to MDSet.
 void DUMgr::checkMDSetAndBuildDUChain(
-    IR const* exp, MD const* expmd, MDSet const& expmds, DUSet * expdu)
+    IR const* exp, MD const* expmd, MDSet const& expmds, DUSet * expdu,
+    DUOptFlag flag)
 {
     ASSERT0(expdu);
     IRBB * curbb = exp->getStmt()->getBB();
@@ -3088,7 +3111,8 @@ void DUMgr::checkMDSetAndBuildDUChain(
          u != BS_UNDEF; u = expmds.get_next(u, &iter)) {
         DefSBitSetCore const* defset = m_md2irs->get((MDIdx)u);
         if (defset == nullptr) { continue; }
-        checkDefSetToBuildDUChain(exp, expmd, &expmds, expdu, defset, curbb);
+        checkDefSetToBuildDUChain(
+            exp, expmd, &expmds, expdu, defset, curbb, flag);
     }
 }
 
@@ -3147,16 +3171,52 @@ void DUMgr::updateDefWithMustEffectMD(IR * ir, MD const* musteffect)
 }
 
 
+void DUMgr::cleanDUSetForCallByDUOpt(MOD IR * ir, DUOptFlag flag)
+{
+    ASSERT0(ir->isCallStmt());
+    if (flag.have(DUOPT_COMPUTE_NONPR_DU) &&
+        flag.have(DUOPT_COMPUTE_PR_DU)) {
+        cleanDUSet(ir->id(), ir->getDUSet());
+        return;
+    }
+    if (flag.have(DUOPT_COMPUTE_PR_DU)) {
+        cleanPRInDUSet(ir);
+        return;
+    }
+    if (flag.have(DUOPT_COMPUTE_NONPR_DU)) {
+        cleanNonPRInDUSet(ir);
+    }
+}
+
+
+void DUMgr::cleanPRInDUSet(IR * ir)
+{
+    ASSERTN(m_is_init, ("it is allocated at each perform()"));
+    ASSERT0(ir->id() != IRID_UNDEF);
+    if (m_is_init->find(ir->id())) { return; }
+    m_is_init->append(ir->id());
+    cleanPROpInDUSet(ir, this, m_rg, getSBSMgr(), false);
+}
+
+
+void DUMgr::cleanNonPRInDUSet(IR * ir)
+{
+    ASSERTN(m_is_init, ("it is allocated at each perform()"));
+    ASSERT0(ir->id() != IRID_UNDEF);
+    if (m_is_init->find(ir->id())) { return; }
+    m_is_init->append(ir->id());
+    cleanNonPROpInDUSet(ir, this, m_rg, getSBSMgr(), false);
+}
+
+
 void DUMgr::cleanDUSet(UINT irid, DUSet * set)
 {
     ASSERTN(m_is_init, ("it is allocated at each perform()"));
     ASSERT0(irid != IRID_UNDEF);
-    if (!m_is_init->find(irid)) {
-        m_is_init->append(irid);
-        if (set != nullptr) {
-            set->clean(*getSBSMgr());
-        }
-    }
+    if (m_is_init->find(irid)) { return; }
+    m_is_init->append(irid);
+    if (set == nullptr) { return; }
+    set->clean(*getSBSMgr());
 }
 
 
@@ -3226,7 +3286,7 @@ void DUMgr::updateDef(IR * ir, DUOptFlag flag)
         cleanDUSet(ir->id(), ir->getDUSet());
         break;
     SWITCH_CASE_CALL:
-        cleanDUSet(ir->id(), ir->getDUSet());
+        cleanDUSetForCallByDUOpt(ir, flag);
         break;
     default: if (!ir->hasResult()) { return; }
     }
@@ -3245,53 +3305,63 @@ void DUMgr::updateDef(IR * ir, DUOptFlag flag)
 }
 
 
-//Initialize md2maydef_ir_list for given BB according Reach-Def-In.
-//NOTE this function is used for classic data-flow analysis.
+static void setMapMD2IRSet(
+    IR const* stmt, MD2IRSet * md2irs, MDSystem const* mdsys)
+{
+    ASSERT0(stmt->is_stmt());
+    UINT id = stmt->id();
+
+    //'stmt' may be IR_PHI, IR_REGION, IR_CALL.
+    //If stmt is IR_PHI, its maydef is NULL.
+    //If stmt is IR_REGION, its mustdef is NULL, but the maydef
+    //may not be NULL.
+    MD const* mustdef = const_cast<IR*>(stmt)->getMustRef();
+    if (mustdef != nullptr) {
+        //mustdef may be fake object.
+        //ASSERT0(mustdef->is_effect());
+        md2irs->append(mustdef, id);
+    }
+    MDSet const* maydef = const_cast<IR*>(stmt)->getMayRef();
+    if (maydef == nullptr) { return; }
+
+    //Create the map between MD and STMT, and record InEffect
+    //Definition if any.
+    MDSetIter iter = nullptr;
+    for (BSIdx j = maydef->get_first(&iter);
+         j != BS_UNDEF; j = maydef->get_next(j, &iter)) {
+        if (mustdef != nullptr && mustdef->id() == (UINT)j) {
+            continue;
+        }
+        if (!md2irs->hasIneffectDef()) {
+            if (xoc::isGlobalSideEffectMD((MDIdx)j) ||
+                xoc::isLocalSideEffectMD((MDIdx)j)) {
+                //If MayDef set contains GlobaSideEffect MD, to keep the
+                //correctness of DU chain, we set the InEffect flag to
+                //inform the following analysis to establish conservative DU
+                //chain to the first found memory-sideeffect stmt.
+                md2irs->setIneffectDef();
+            }
+        }
+        ASSERT0(mdsys->getMD((MDIdx)j) != nullptr);
+        md2irs->append((MDIdx)j, id);
+    }
+}
+
+
+//Initialize md2maydef irset for given BB according Reach-Def-In.
+//NOTE:the function is used for classic DU analysis.
 void DUMgr::initMD2IRSet(IRBB const* bb)
 {
     SolveSet * reachdef_in = getSolveSetMgr()->getReachDefIn(bb->id());
     if (reachdef_in == nullptr) { return; }
-
     m_md2irs->clean();
 
-    //Record IR STMT that might modify given MD.
+    //Record IR stmt that might modify MustRef and MayRef.
     DefSBitSetIter st = nullptr;
     for (BSIdx i = reachdef_in->get_first(&st);
          i != BS_UNDEF; i = reachdef_in->get_next(i, &st)) {
         IR const* stmt = m_rg->getIR(i);
-
-        //'stmt' may be IR_PHI, IR_REGION, IR_CALL.
-        //If stmt is IR_PHI, its maydef is NULL.
-        //If stmt is IR_REGION, its mustdef is NULL, but the maydef
-        //may not be NULL.
-        MD const* mustdef = const_cast<IR*>(stmt)->getMustRef();
-        if (mustdef != nullptr) {
-            //mustdef may be fake object.
-            //ASSERT0(mustdef->is_effect());
-            m_md2irs->append(mustdef, (UINT)i);
-        }
-        MDSet const* maydef = const_cast<IR*>(stmt)->getMayRef();
-        if (maydef == nullptr) { continue; }
-
-        //Create the map between MD and STMT, and record InEffect
-        //Definition if any.
-        MDSetIter iter = nullptr;
-        for (BSIdx j = maydef->get_first(&iter);
-             j != BS_UNDEF; j = maydef->get_next(j, &iter)) {
-            if (mustdef != nullptr && mustdef->id() == (UINT)j) {
-                continue;
-            }
-            if (!m_md2irs->hasIneffectDef() &&
-                xoc::isGlobalSideEffectMD((MDIdx)j)) {
-                //If MayDef set contains GlobaSideEffect MD, to keep the
-                //correctness of DU chain, we set the InEffect flag to
-                //inform the following analysis to establish conservative DU
-                //chain.
-                m_md2irs->setIneffectDef();
-            }
-            ASSERT0(m_md_sys->getMD((MDIdx)j) != nullptr);
-            m_md2irs->append((MDIdx)j, (UINT)i);
-        }
+        setMapMD2IRSet(stmt, m_md2irs, m_md_sys);
     }
 }
 
@@ -3563,16 +3633,25 @@ static bool verifyMDDUChainForLHS(
     if (ir->isCallStmt()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU) &&
             !duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            ASSERTN(0, ("DUSet should be NULL"));
+            //CASE:If DUSet isn't NULL that means user guarantees
+            //the retained DU chain is valid and doesn't need to
+            //be recomputed.
+            //ASSERTN(0, ("DUSet should be NULL"));
         }
     } else if (ir->isPROp()) {
         if (!duflag.have(DUOPT_COMPUTE_PR_DU)) {
-            ASSERTN(0, ("DUSet should be NULL"));
+            //CASE:If DUSet isn't NULL that means user guarantees
+            //the retained DU chain is valid and doesn't need to
+            //be recomputed.
+            //ASSERTN(0, ("DUSet should be NULL"));
         }
     } else {
         ASSERT0(ir->isMemRefNonPR());
         if (!duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
-            ASSERTN(0, ("DUSet should be NULL"));
+            //CASE:If DUSet isn't NULL that means user guarantees
+            //the retained DU chain is valid and doesn't need to
+            //be recomputed.
+            //ASSERTN(0, ("DUSet should be NULL"));
         }
     }
 
@@ -3628,18 +3707,27 @@ static bool verifyMDDUChainForExp(
             if (!duflag.have(DUOPT_COMPUTE_PR_DU) &&
                 !duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
                 //DUSet should be NULL.
-                ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+                //CASE:If DUSet isn't NULL that means user guarantees
+                //the retained DU chain is valid and doesn't need to
+                //be recomputed.
+                //ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
             }
         } else if (u->isPROp()) {
             if (!duflag.have(DUOPT_COMPUTE_PR_DU)) {
                 //DUSet should be NULL.
-                ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+                //CASE:If DUSet isn't NULL that means user guarantees
+                //the retained DU chain is valid and doesn't need to
+                //be recomputed.
+                //ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
             }
         } else {
             ASSERT0(u->isMemRefNonPR());
             if (!duflag.have(DUOPT_COMPUTE_NONPR_DU)) {
                 //DUSet should be NULL.
-                ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
+                //CASE:If DUSet isn't NULL that means user guarantees
+                //the retained DU chain is valid and doesn't need to
+                //be recomputed.
+                //ASSERTN(0, ("neither PRDU nor NonPRDU is valid"));
             }
         }
 

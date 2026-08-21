@@ -39,12 +39,12 @@ sub main
 {
     $g_is_quit_early = 0;
     my @subdirlist = (
-        'builtin',
         'compile',
         'compile.gr',
         'exec',
         'exec.gr',
         'api',
+        'builtin',
     );
     foreach my $subdir (@subdirlist) {
         if (-d $subdir) {

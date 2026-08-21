@@ -73,7 +73,7 @@ typedef HMap<IR*, DUSet*> IR2DU;
 class MD2IRSet : public TMap<MDIdx, DefSBitSetCore*> {
     COPY_CONSTRUCTOR(MD2IRSet);
     //Indicate if there exist stmt which only have MayDef.
-    BYTE m_are_stmts_defed_ineffect_md:1;
+    bool m_stmt_defined_ineffect_md;
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
@@ -104,10 +104,10 @@ public:
 
     Region * getRegion() const { return m_rg; }
 
-    bool hasIneffectDef() const { return m_are_stmts_defed_ineffect_md; }
+    bool hasIneffectDef() const { return m_stmt_defined_ineffect_md; }
 
     void set(MDIdx mdid, IR * ir);
-    void setIneffectDef() { m_are_stmts_defed_ineffect_md = true; }
+    void setIneffectDef() { m_stmt_defined_ineffect_md = true; }
 };
 
 //Def|Use information computation flag.
@@ -119,6 +119,8 @@ enum DUCOMP_FLAG {
     COMP_EXP_COLLECT_MUST_USE = 0x4,
 };
 
+//Def|Use Options.
+//These options specify the analysis behaviours.
 enum DUOPT_FLAG {
     DUOPT_UNDEF = 0x0,
     DUOPT_SOL_AVAIL_REACH_DEF = 0x1, //compute MustAvailable ReachDefinition.
@@ -138,6 +140,8 @@ public:
     CompFlag(UINT v) : UFlag(v) {}
 };
 
+//The class defines DefUse Option flags.
+//The option flags govern DUMgr's workflow.
 class DUOptFlag : public UFlag {
 public:
     DUOptFlag(UINT v) : UFlag(v) {}
@@ -206,28 +210,27 @@ protected:
         IRBB * bb, xcom::C<IR*> const* ct, IR const* exp, MD const* expmd,
         DUSet * expdu);
 
-    void cleanDUSet(UINT irid, DUSet * set);
     void checkDefSetToBuildDUChainPR(
         IR const* exp, MD const* expmd, MDSet const* expmds,
         DUSet * expdu, DefSBitSetCore const* defset, IRBB * curbb);
     void checkDefSetToBuildDUChainNonPR(
         IR const* exp, MD const* expmd, MDSet const* expmds, DUSet * expdu,
-        DefSBitSetCore const* defset, IRBB * curbb);
+        DefSBitSetCore const* defset, IRBB * curbb, DUOptFlag flag);
     bool checkIsLocalKillingDefForDirectAccess(
         MD const* defmd, MD const* usemd, IR const* stmt,
         bool * has_nonkilling_local_def);
     void checkDefSetToBuildDUChain(
         IR const* exp, MD const* expmd, MDSet const* expmds, DUSet * expdu,
-        DefSBitSetCore const* defset, IRBB * curbb);
+        DefSBitSetCore const* defset, IRBB * curbb, DUOptFlag flag);
     void checkMDSetAndBuildDUChain(
-        IR const* exp, MD const* expmd, MDSet const& expmds, DUSet * expdu);
+        IR const* exp, MD const* expmd, MDSet const& expmds, DUSet * expdu,
+        DUOptFlag flag);
     void checkMustMDAndBuildDUChainForPotentialDefList(
-        IR const* exp, MD const* expmd, DUSet * expdu);
+        IR const* exp, MD const* expmd, DUSet * expdu, DUOptFlag flag);
     bool checkIsLocalKillingDefForDirectAccess(
         MD const* defmd, MD const* usemd, IR const* stmt);
     UINT checkIsLocalKillingDefForIndirectAccess(
         IR const* stmt, IR const* exp, xcom::C<IR*> const* expct);
-    UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeOverlapSetForWorstCase();
     void computeArrayRefAtIStoreBase(IR * ir);
@@ -247,7 +250,8 @@ protected:
     void computeArrayRef(
         IR * ir, OUT MDSet * ret_mds, CompFlag compflag, DUOptFlag duflag);
     void computeLiveInBB(DefMiscBitSetMgr & bsmgr);
-    void checkAndBuildChainForMemOp(IRBB * bb, IR * exp, IRListIter ct);
+    void checkAndBuildChainForMemOp(
+        IRBB * bb, IR * exp, IRListIter ct, DUOptFlag flag);
     void checkAndBuildChainRecursiveIRList(
         IRBB * bb, IR * exp, IRListIter ct, DUOptFlag flag);
     void checkAndBuildChainRecursive(
@@ -365,6 +369,7 @@ public:
     //NOTE: build classic DU-Chain is costly. Especially compilation speed
     //is considerable.
     bool checkAndComputeClassicDUChain(MOD OptCtx & oc);
+    UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     void computePRDUChainByPRSSA(MOD OptCtx & oc, bool build_def_chain);
     void computeGenForBB(
         IN IRBB * bb, OUT SolveSet & expr_univers, DefMiscBitSetMgr & bsmgr);
@@ -384,8 +389,21 @@ public:
 
     //The function will free DUSet for all IRs in region.
     void cleanDUSet() { freeDUSetForAllIR(); }
+
+    //NOTE:the function just clean the given DUSet, and doesn't free it even
+    //if the set is empty.
+    void cleanDUSet(UINT irid, DUSet * set);
+
+    //NOTE:the function just clean the given DUSet, and doesn't free it even
+    //if the set is empty.
+    void cleanPRInDUSet(IR * ir);
+
+    //NOTE:the function just clean the given DUSet, and doesn't free it even
+    //if the set is empty.
+    void cleanNonPRInDUSet(IR * ir);
     void cleanDUSetForPROp() { freeDUSetForPROp(); }
     void cleanDUSetForNonPROp() { freeDUSetForNonPROp(); }
+    void cleanDUSetForCallByDUOpt(MOD IR * ir, DUOptFlag flag);
 
     //The function copy MustUse and MayUse mds from tree 'from' to tree 'to'
     //and build new DU chain for 'to'.

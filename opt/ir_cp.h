@@ -405,7 +405,7 @@ public:
 
     virtual bool dump() const override;
 
-    virtual CHAR const* getPassName() const { return "Copy Propagation"; }
+    virtual CHAR const* getPassName() const { return "Copy Propagation(CP)"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     ActMgr & getActMgr() { return m_am; }
 

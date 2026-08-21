@@ -74,7 +74,7 @@ public:
     bool dump(BCPCtx const& ctx) const;
 
     virtual CHAR const* getPassName() const
-    { return "Branch Condition Propagation"; }
+    { return "Branch Condition Propagation(BCP)"; }
     PASS_TYPE getPassType() const { return PASS_BCP; }
 
     virtual bool perform(OptCtx & oc);

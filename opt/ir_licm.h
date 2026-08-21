@@ -510,7 +510,7 @@ public:
 
     ActMgr & getActMgr() { return m_am; }
     virtual CHAR const* getPassName() const
-    { return "Loop Invariant Code Motion"; }
+    { return "Loop Invariant Code Motion(LICM)"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }
     RCE * getRCE() const { return m_rce; }
     IVR * getIVR() const { return m_ivr; }

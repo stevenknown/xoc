@@ -35,6 +35,8 @@ size_t fwrite(void *ptr, size_t size, size_t nmemb, FILE *stream);
 int fseek(FILE *stream, long int offset, int whence);
 FILE *open_memstream(char **ptr, size_t *sizeloc);
 int fputc(int c, FILE *stream);
+int putc(int c, FILE *stream);
+int putchar(int c);
 int unlink(const char *pathname);
 int fileno(FILE *stream);
 int getc(FILE *stream);

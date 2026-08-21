@@ -169,7 +169,7 @@ public:
     bool dump(LI<IRBB> const* li, LFAnaCtx const& ctx) const;
 
     virtual CHAR const* getPassName() const
-    { return "Linear Function Test Replacement"; }
+    { return "Linear Function Test Replacement(LFTR)"; }
     PASS_TYPE getPassType() const { return PASS_LFTR; }
     virtual bool perform(OptCtx & oc);
 };

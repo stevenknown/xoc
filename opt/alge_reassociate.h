@@ -272,6 +272,7 @@ protected:
     bool canBeReass(IR const* ir) const;
     bool canBeReass(IR_CODE c) const;
     bool canBeCandStmt(IR const* ir) const;
+    bool canBeCandDIV(IR const* ir) const;
     bool canBeCandBinOp(IR const* ir) const;
     bool canBeCandConstOp(IR const* ir) const
     {

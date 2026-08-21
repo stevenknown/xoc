@@ -275,7 +275,7 @@ public:
     ActMgr & getActMgr() { return m_am; }
     IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const
-    { return "Dead Code Eliminiation"; }
+    { return "Dead Code Eliminiation(DCE)"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
     bool hasSideEffect(IR const* ir) const

@@ -10,11 +10,14 @@ region program "program" () {
         doloop (
             id i/*IV*/,
             (20)/*INIT*/,
-            le ld i, 0x5/*DET*/,
+            le ld i, 0x5/*DET, Actually, this is a dead loop*/,
             (add ld i, 1)/*STEP*/) {
 
             //Do parallel operation in doloop.
-            doloop (id j, (add $4:f64, 20), le ld j, ld M, (add ld j, 1)) {
+            doloop (id j, /*IV*/
+                    (add $4:f64, 20), /*INIT*/
+                    le ld j, ld M, /*DET*/
+                    (add ld j, 1) /*STEP*/) {
                 if (eq ld i, ld j) {
                     st u = 0x88;
                     continue;

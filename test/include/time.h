@@ -1,6 +1,20 @@
 #ifndef _TIME_H_
 #define _TIME_H_
 
+typedef long time_t;
+typedef int clockid_t;
+struct timespec {
+    time_t tv_sec;      // seconds
+    long   tv_nsec;     // nanoseconds, [0, 999999999]
+};
+int clock_gettime(clockid_t clk_id, struct timespec *ts);
+
+#define CLOCK_REALTIME              0
+#define CLOCK_MONOTONIC             1
+#define CLOCK_PROCESS_CPUTIME_ID    2
+#define CLOCK_THREAD_CPUTIME_ID     3
+#define CLOCK_MONOTONIC_RAW         4
+
 struct tm {
     int tm_sec;
     int tm_min;

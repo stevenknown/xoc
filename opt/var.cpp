@@ -72,8 +72,8 @@ static VAR_FLAG g_grmode_flag[] = {
     VAR_IS_LABEL,
     VAR_IS_ARRAY,
 };
-static UINT g_grmode_flag_num = sizeof(g_grmode_flag) /
-                                sizeof(g_grmode_flag[0]);
+static UINT g_grmode_flag_num =
+    sizeof(g_grmode_flag) / sizeof(g_grmode_flag[0]);
 
 //
 //START VarFlag
@@ -83,8 +83,8 @@ bool VarFlag::verify() const
     VarFlag::Iter it;
     for (VAR_FLAG v = (VAR_FLAG)get_first_flag(it); !end(it);
          v = (VAR_FLAG)get_next_flag(it)) {
-        ASSERT0_DUMMYUSE(v > VAR_UNDEF &&
-                         VarFlagDesc::getDescIdx(v) < g_varflag_num);
+        ASSERT0_DUMMYUSE(
+            v > VAR_UNDEF && VarFlagDesc::getDescIdx(v) < g_varflag_num);
     }
     return true;
 }
@@ -133,9 +133,8 @@ VarLinkAttrDesc const g_var_link_attr_desc[] = {
     { VAR_LINK_ATTR_EXTERN, "extern", }, //idx3
 };
 
-static UINT g_var_link_attr_num = sizeof(g_var_link_attr_desc) /
-                                  sizeof(g_var_link_attr_desc[0]);
-
+static UINT g_var_link_attr_num =
+    sizeof(g_var_link_attr_desc) / sizeof(g_var_link_attr_desc[0]);
 
 //
 //START VarLinkAttr
@@ -145,9 +144,9 @@ bool VarLinkAttr::verify() const
     VarLinkAttr::Iter it;
     for (VAR_LINK_ATTR attr = (VAR_LINK_ATTR)get_first_flag(it); !end(it);
          attr = (VAR_LINK_ATTR)get_next_flag(it)) {
-        ASSERT0_DUMMYUSE(attr > VAR_LINK_ATTR_UNDEF &&
-                         VarLinkAttrDesc::getDescIdx(attr) <
-                         g_var_link_attr_num);
+        ASSERT0_DUMMYUSE(
+        attr > VAR_LINK_ATTR_UNDEF &&
+        VarLinkAttrDesc::getDescIdx(attr) < g_var_link_attr_num);
     }
     return true;
 }
@@ -280,69 +279,86 @@ void Var::dumpFlag(xcom::StrBuf & buf, bool grmode, bool & first) const
 }
 
 
+static void dumpStringInitVal(
+    Var const* v, bool first, xcom::StrBuf & buf, bool grmode)
+{
+    ASSERT0(v->hasInitString());
+    ASSERT0(v->is_string());
+    if (!first) {
+        buf.strcat(",");
+    }
+    first = false;
+
+    //Add back-slash to translate '"' and '\\'.
+    CHAR const* local_string = v->getString()->getStr();
+    UINT quote_num = 0;
+    UINT len = 0;
+    for (CHAR const* p = local_string; *p != 0; p++, len++) {
+        if (*p == '"' || *p == '\\') {
+            quote_num++;
+        }
+    }
+    CHAR * local_buf = nullptr;
+    if (quote_num != 0) {
+        UINT i = 0;
+        len += quote_num;
+        if (len < HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+            local_buf = (CHAR*)ALLOCA(len + 1);
+        } else {
+            local_buf = (CHAR*)::malloc(len + 1);
+        }
+        for (CHAR const* q = local_string; *q != 0; q++, i++) {
+            if (*q == '"' || *q == '\\') {
+                local_buf[i] = '\\';
+                i++;
+            }
+            local_buf[i] = *q;
+        }
+        local_buf[len] = 0;
+        local_string = local_buf;
+    }
+    buf.strcat("string(\"%s\")", local_string);
+    if (local_buf != nullptr &&
+        len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+        ::free(local_buf);
+    }
+}
+
+
+static void dumpByteInitVal(
+    Var const* v, bool first, xcom::StrBuf & buf, bool grmode)
+{
+    ASSERT0(v->hasInitVal());
+    ASSERTN(!v->is_string(),
+            ("initial string value should be recorded in VAR_string"));
+    ASSERT0(v->getByteValue());
+    //Initial value can NOT be nullptr.
+    if (!first) {
+        buf.strcat(",");
+    }
+    first = false;
+    buf.strcat("byte(");
+    BYTE const* p = v->getByteValue()->getBuffer();
+    UINT size = v->getByteValue()->getSize();
+    ASSERT0(p);
+    buf.strcat("0x%x", (BYTE)*p);
+    UINT i = 1;
+    for (p++; i < size; i++, p++) {
+        buf.strcat(",0x%x", (BYTE)*p);
+    }
+    buf.strcat(")");
+}
+
+
 void Var::dumpInitVal(bool first, xcom::StrBuf & buf, bool grmode) const
 {
     if (hasInitString()) {
-        ASSERT0(is_string());
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-
-        //Add back-slash to translate '"' and '\\'.
-        CHAR const* local_string = getString()->getStr();
-        UINT quote_num = 0;
-        UINT len = 0;
-        for (CHAR const* p = local_string; *p != 0; p++, len++) {
-            if (*p == '"' || *p == '\\') {
-                quote_num++;
-            }
-        }
-        CHAR * local_buf = nullptr;
-        if (quote_num != 0) {
-            UINT i = 0;
-            len += quote_num;
-            if (len < HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
-                local_buf = (CHAR*)ALLOCA(len + 1);
-            } else {
-                local_buf = (CHAR*)::malloc(len + 1);
-            }
-            for (CHAR const* q = local_string; *q != 0; q++, i++) {
-                if (*q == '"' || *q == '\\') {
-                    local_buf[i] = '\\';
-                    i++;
-                }
-                local_buf[i] = *q;
-            }
-            local_buf[len] = 0;
-            local_string = local_buf;
-        }
-        buf.strcat("string(\"%s\")", local_string);
-        if (local_buf != nullptr &&
-            len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
-            ::free(local_buf);
-        }
+        dumpStringInitVal(this, first, buf, grmode);
         return;
     }
     if (hasInitVal()) {
-        ASSERTN(!is_string(),
-                ("initial string value should be recorded in VAR_string"));
-        ASSERT0(getByteValue());
-        //Initial value can NOT be nullptr.
-        if (!first) {
-            buf.strcat(",");
-        }
-        first = false;
-        buf.strcat("byte(");
-        BYTE const* p = getByteValue()->getBuffer();
-        UINT size = getByteValue()->getSize();
-        ASSERT0(p);
-        buf.strcat("0x%x", (BYTE)*p);
-        UINT i = 1;
-        for (p++; i < size; i++, p++) {
-            buf.strcat(",0x%x", (BYTE)*p);
-        }
-        buf.strcat(")");
+        dumpByteInitVal(this, first, buf, grmode);
+        return;
     }
 }
 
@@ -414,7 +430,7 @@ CHAR const* Var::dump(OUT StrBuf & buf, VarMgr const* vm) const
 
     if (getStorageSpace() != SS_UNDEF) {
         buf.strcat(",storage_space:%s",
-                   StorageSpaceDesc::getName(getStorageSpace()));
+            StorageSpaceDesc::getName(getStorageSpace()));
     }
 
     buf.strcat(",decl:'");
@@ -505,8 +521,9 @@ Var * VarMgr::findVarByName(CHAR const* name)
 }
 
 
-Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
-                          VarFlag const& flag, StorageSpace ss)
+Var * VarMgr::registerVar(
+    CHAR const* varname, Type const* type, UINT align,
+    VarFlag const& flag, StorageSpace ss)
 {
     ASSERT0(varname);
     Sym const* sym = m_rm->addToSymbolTab(varname);
@@ -514,13 +531,14 @@ Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
 }
 
 
-Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
-                          VarFlag const& flag, StorageSpace ss)
+Var * VarMgr::registerVar(
+    Sym const* var_name, Type const* type, UINT align,
+    VarFlag const& flag, StorageSpace ss)
 {
     ASSERT0(type);
     ASSERTN(var_name, ("variable need a name"));
 
-    //Var is string type, but not const string.
+    //CASE:Do not assert, because var is string type, but not const string.
     //ASSERTN(!type->is_string(), ("use registerStringVar instead of"));
 
     Var * v = allocVAR();
@@ -534,8 +552,8 @@ Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
 }
 
 
-Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align,
-                                StorageSpace ss)
+Var * VarMgr::registerStringVar(
+    CHAR const* var_name, Sym const* s, UINT align, StorageSpace ss)
 {
     ASSERT0(s);
     Var * v;
@@ -564,7 +582,6 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align,
 void VarMgr::dumpFreeIDList() const
 {
     if (m_freelist_of_varid.is_empty()) { return; }
-
     RegionMgr * rm = m_tm->getRegionMgr();
     prt(rm, "\nVarMgr: FREE VAR ID:");
     DefSBitSetIter iter = nullptr;
@@ -650,9 +667,9 @@ LabelReloc * VarLabelRelationMgr::allocLabelReloc()
 }
 
 
-void VarLabelRelationMgr::addVarLabelRefill(Var const* var, UINT offset,
-    Type const* tp, Sym const* function, LabelInfo const* label0,
-    LabelInfo const* label1)
+void VarLabelRelationMgr::addVarLabelRefill(
+    Var const* var, UINT offset, Type const* tp, Sym const* function,
+    LabelInfo const* label0, LabelInfo const* label1)
 {
     ASSERT0(var && tp && tp->is_scalar() && function && label0 && label1);
 

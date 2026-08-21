@@ -16,6 +16,8 @@ int main ()
 
   x = x / i;
   printf("\n%lld\n",(unsigned long long)x);
+  printf("\n%lld\n",(unsigned long long)(x/i));
+  printf("\n%lld\n",((unsigned long long)-1) / ((int)-1));
 
   unsigned long long y;
   y = -2;

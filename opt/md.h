@@ -898,11 +898,21 @@ public:
     void dump(Region * rg);
 };
 
+
+//Return true if 'id' indicates the GLOBAL program region delegates that
+//may have sideeffect to memory.
 inline bool isGlobalSideEffectMD(MDIdx id)
 {
     return id == MD_GLOBAL_VAR || id == MD_IMPORT_VAR || id == MD_FULL_MEM;
 }
 
+//Return true if 'id' indicates the LOCAL region delegates that may have
+//sideeffect to memory.
+inline bool isLocalSideEffectMD(MDIdx id)
+{ return id == MD_LOCAL_MAY_ALIAS; }
+
+//Return true if 'set' contains the GLOBAL region delegates that may have
+//sideeffect to memory.
 inline bool isContainGlobalSideEffectMD(MDSet const& set)
 {
     DefSBitSetCore const& lset = (DefSBitSetCore const&)set;

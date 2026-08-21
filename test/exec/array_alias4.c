@@ -16,7 +16,7 @@ int main()
     int ** q = &p;
     ga[2][1]=5678;
     ga[9][1]=4321;
-    foo(q);
+    foo(q); //ga has been modifeid in foo(), ga[9][1] cannot be copy-prop.
     x = ga[2][1];
     if (ga[9][1] != 30) { return -1; }
     return 0;

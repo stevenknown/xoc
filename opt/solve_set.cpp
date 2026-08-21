@@ -765,6 +765,9 @@ void SolveSetMgr::computeMayDef(
     IR const* ir, MDSet * bb_maydefmds, SolveSet * maygendef,
     DefMiscBitSetMgr & bsmgr, UFlag flag)
 {
+    //Set true if user requires to compute the MayGenDef stmt set
+    //for NonPR operations, because only NonPR operations have MayGenDef.
+    bool compute_maygen_def = true;
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
     SWITCH_CASE_DIRECT_MEM_STMT:
@@ -773,26 +776,36 @@ void SolveSetMgr::computeMayDef(
         if (flag.have(DUOPT_SOL_REGION_REF)) {
             collectNonPRMayDef(ir, bsmgr, bb_maydefmds);
         }
-        if (!flag.have(DUOPT_COMPUTE_NONPR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_NONPR_DU)) {
+            //There is no need to compute MayGenDef for NonPR operations.
+            compute_maygen_def = false;
+        }
         break;
     SWITCH_CASE_CALL:
         if (flag.have(DUOPT_SOL_REGION_REF)) {
             collectNonPRMayDef(ir, bsmgr, bb_maydefmds);
         }
-        if (!flag.have(DUOPT_COMPUTE_PR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_NONPR_DU)) {
+            //There is no need to compute MayGenDef for NonPR operations.
+            compute_maygen_def = false;
+        }
         break;
     case IR_STPR:
     case IR_SETELEM:
     case IR_GETELEM:
     case IR_PHI:
-        if (!flag.have(DUOPT_COMPUTE_PR_DU)) { return; }
+        if (!flag.have(DUOPT_COMPUTE_PR_DU)) {
+            //There is no need to compute MayGenDef for PR operations.
+            compute_maygen_def = false;
+        }
         break;
     case IR_REGION:
         //Region does not have any def.
         break;
-    default: //Handle general stmt.
+    default: //Miss the processing to memref operations.
         ASSERT0(!ir->isMemRef());
     }
+    if (!compute_maygen_def) { return; }
 
     //Computing May GEN set of reach-definition.
     //The computation of reach-definition problem is conservative.

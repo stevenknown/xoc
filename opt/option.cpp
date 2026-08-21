@@ -125,7 +125,8 @@ bool g_do_scalar_opt = true;
 bool g_retain_pass_mgr_for_region = true;
 bool g_is_simplify_parameter = true;
 bool g_is_simplify_array_ingredient = true;
-bool g_is_search_and_copy_dbx = true;
+bool g_is_retrieve_parent_to_find_dbx = true;
+bool g_is_ignore_floor_div_effect = false;
 bool g_generate_var_for_pr = true;
 bool g_strictly_ensure_the_use_of_pointer = false;
 DumpOption g_dump_opt;
@@ -637,8 +638,10 @@ void Option::dump(MOD LogMgr * lm)
          g_is_simplify_parameter ? "true":"false");
     note(lm, "\ng_is_simplify_array_ingredient = %s",
          g_is_simplify_array_ingredient ? "true":"false");
-    note(lm, "\ng_is_search_and_copy_dbx = %s",
-         g_is_search_and_copy_dbx ? "true":"false");
+    note(lm, "\ng_is_retrieve_parent_to_find_dbx = %s",
+         g_is_retrieve_parent_to_find_dbx ? "true":"false");
+    note(lm, "\ng_is_ignore_floor_div_effect = %s",
+         g_is_ignore_floor_div_effect ? "true":"false");
     note(lm, "\ng_generate_var_for_pr = %s",
          g_generate_var_for_pr ? "true":"false");
     note(lm, "\ng_strictly_ensure_the_use_of_pointer = %s",

@@ -657,7 +657,16 @@ extern bool g_is_simplify_array_ingredient;
 
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
-extern bool g_is_search_and_copy_dbx;
+extern bool g_is_retrieve_parent_to_find_dbx;
+
+//Determine whether performs the integer denominator cancellation.
+//(x / y) * y => x
+//If x, y is integer, the DIV operation is actually floor-div.
+//e.g: x = 7, y = 3, then x/y is 2.
+//Thus is x is not an integer multiple of y, the result is not equal to
+//original expression.
+//Set the flag to true to indicate the cancellation is performed nevertheless.
+extern bool g_is_ignore_floor_div_effect;
 
 //Set true to generate variable when building a PR.
 //Usually, we assign variable to PR to indicate its identity in order to

@@ -237,7 +237,10 @@ UINT getLineNumOfPython(Dbx const* dbx, Region const* rg);
 UINT getLineNumOfGR(Dbx const* dbx, Region const* rg);
 
 //Return the dbx of 'ir'.
-Dbx * getDbx(IR const* ir);
+//retrieve_parent: if the option is true, the function will retrieve ir's
+//parent IR until the Dbx is found.
+Dbx * getDbx(
+    IR const* ir, bool retrieve_parent = g_is_retrieve_parent_to_find_dbx);
 
 //Set source file line number to 'ir'.
 void setLineNum(IR * ir, UINT lineno, Region * rg,

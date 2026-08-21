@@ -203,7 +203,7 @@ public:
     virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
-    { return "Local Command Subexpression Elimination"; }
+    { return "Local Command Subexpression Elimination(LCSE)"; }
     PASS_TYPE getPassType() const { return PASS_LCSE; }
     ExprTab * getExprTab() const { return m_expr_tab; }
     ActMgr & getActMgr() { return m_am; }

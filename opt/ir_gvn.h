@@ -836,7 +836,8 @@ public:
     bool dumpForTest() const;
     void destroy();
 
-    virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
+    virtual CHAR const* getPassName() const
+    { return "Global Value Numbering(GVN)"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
 
     //Return true if the value of ir1 and ir2 are definitely same, otherwise

@@ -449,7 +449,7 @@ sub runCPP
 
     #preprcessing
     unlink($preprocessed_name);
-    $cmdline = "$g_cpp $src_fullpath -o $preprocessed_name -C -E -P -Iinc";
+    $cmdline = "$g_cpp $src_fullpath -o $preprocessed_name -C -E -P -I../include -Iinc";
     print("\nCMD>>", $cmdline, "\n");
     my $retval = systemx($cmdline);
     if ($retval != 0) {

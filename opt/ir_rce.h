@@ -113,7 +113,7 @@ public:
     virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
-    { return "Redundant Code Elimination"; }
+    { return "Redundant Code Elimination(RCE)"; }
     PASS_TYPE getPassType() const { return PASS_RCE; }
     GVN * getGVN() const { return m_gvn; }
     IRCFG * getCFG() const { return m_cfg; }

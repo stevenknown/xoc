@@ -640,6 +640,11 @@ bool AlgeIntlImpl::tryReformDIV(
     MOD IR * ir, ReassExp ** evaled, MOD ReassCtx & ctx)
 {
     ASSERT0(ir->is_div());
+    if (!g_is_ignore_floor_div_effect) {
+        //CASE:1/20*40 cannot be reassociate to 40/20.
+        return false;
+    }
+    //User intends to ressociate DIV and ignore the effect caused by division.
     IR const* op0 = BIN_opnd0(ir);
     IR const* op1 = BIN_opnd1(ir);
     if (!op1->is_const()) { return false; }
@@ -673,7 +678,7 @@ bool AlgeIntlImpl::tryCommutativeBinOp(MOD IR * ir, MOD ReassCtx & ctx)
 bool AlgeIntlImpl::tryReformBinOp(
     MOD IR * ir, ReassExp ** evaled, MOD ReassCtx & ctx)
 {
-    ASSERT0(ir->isBinaryOp());
+    ASSERT0(ir->isBinaryOp());    
     if (ir->is_div()) {
         return tryReformDIV(ir, evaled, ctx);
     }
@@ -931,6 +936,22 @@ bool AlgeReassociate::canBeReass(IR_CODE c) const
 }
 
 
+bool AlgeReassociate::canBeCandDIV(IR const* ir) const
+{
+    ASSERT0(ir->is_div());
+    if (!g_do_alge_reassociate_aggressive) { return false; }
+    if (!g_is_ignore_floor_div_effect) {
+        //CASE:1/20*40 cannot be reassociate to 40/20.
+        return false;
+    }
+    //Reassociate divsion may casuse undefined behaviours.
+    //e.g1:a/b/c can not be reassociated to a/(b/c).
+    //e.g2:a*40/20 is equal to a*40*(1/20), and the pass could
+    //reassociate these two MUL operations.
+    return ir->isRecipOp(nullptr);
+}
+
+
 bool AlgeReassociate::canBeCandBinOp(IR const* ir) const
 {
     ASSERT0(ir->isBinaryOp());
@@ -940,13 +961,8 @@ bool AlgeReassociate::canBeCandBinOp(IR const* ir) const
         return false;
     }
     if (!isTypeSafeToCommutate(ir)) { return false; }
-    if (ir->is_div()) {
-        if (g_do_alge_reassociate_aggressive) {
-            //Reassociate divsion may casuse undefined behaviours.
-            //a/b/c can not be reassociated to a/(b/c).
-            return ir->isRecipOp();
-        }
-        return false;
+    if (ir->is_div() && canBeCandDIV(ir)) {
+        return true;
     }
     return canBeReass(ir);
 }
