@@ -142,6 +142,7 @@ sub findCurrent {
     my $dir = $_[0];
     my $suffix = $_[1];
     my @filelist = ();
+
     # create a list of all files in
     # the current directory
     opendir(DIR, $dir);

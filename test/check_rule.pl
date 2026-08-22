@@ -222,6 +222,11 @@ sub checkNotExist
     my ($rule) = @_;
     my $type = $rule->{type};
     my $content = $rule->{content};
+
+    #Remove the windows /r.
+    $content =~ s/\r//g;
+    chomp $content;
+
     my $conf_line_num = $rule->{line};
     if ($input_content =~ /\Q$content\E/) {
         print "CHECK-NOT line($conf_line_num) FAILED: PATTERN EXISTS IN $input_file\n";
@@ -238,11 +243,15 @@ sub checkExist
     my $type = $rule->{type};
     my $content = $rule->{content};
     my $conf_line_num = $rule->{line};
+
+    #Remove the windows /r.
+    $content =~ s/\r//g;
     chomp $content;
+
     $content =~ s/^[\t ]+|[\t ]+$//g;
     if ($input_content =~ /\Q$content\E/) {
         print "CHECK-EXIST line($conf_line_num) PASSED: '$content'\n";
-        return $g_succ
+        return $g_succ;
     }
     print "CHECK-EXIST line($conf_line_num) FAILED: PATTERN DOES NOT EXIST IN $input_file\n";
     return $g_fail;
@@ -270,7 +279,11 @@ sub checkHead
     #Must striping the newline char at first, otherwise it will disturb the
     #regexp-matching.
     chomp $input_line;
+    
+    #Remove the windows /r.
+    $content =~ s/\r//g;
     chomp $content;
+
     $content =~ s/^[\t ]+|[\t ]+$//g;
     $input_line =~ s/^[\t ]+|[\t ]+$//g;
     if (isFuzzleHead($type)) {
@@ -302,6 +315,8 @@ sub checkNext
             abort();
         }
 
+        #Remove the windows /r.
+        $content =~ s/\r//g;
         chomp $content;
         $content =~ s/^[\t ]+|[\t ]+$//g;
         my $next_line_content = $input_lines[$tmp_input_line_num];

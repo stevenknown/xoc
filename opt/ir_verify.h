@@ -63,7 +63,7 @@ bool verifySetElem(IR const* ir, Region const* rg);
 bool verifyShift(IR const* ir, Region const* rg);
 bool verifySt(IR const* ir, Region const* rg);
 bool verifyStpr(IR const* ir, Region const* rg);
-bool verifySWITCH(IR const* ir, Region const* rg);
+bool verifySwitch(IR const* ir, Region const* rg);
 bool verifyTer(IR const* ir, Region const* rg);
 bool verifyUna(IR const* ir, Region const* rg);
 

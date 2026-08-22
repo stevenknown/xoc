@@ -81,8 +81,8 @@ void dumpIRList(IR const* ir_list, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
-void dumpIRList(IR const* ir_list, Region const* rg, CHAR const* attr,
-                DumpFlag dumpflag)
+void dumpIRList(
+    IR const* ir_list, Region const* rg, CHAR const* attr, DumpFlag dumpflag)
 {
     if (!rg->isLogMgrInit() || ir_list == nullptr) { return; }
     note(rg, "");
@@ -384,8 +384,8 @@ static void dumpInherentAttr(
 
 
 template <class StrBufType>
-static void dumpDbx(OUT StrBufType & buf, Region const* rg,
-                    BaseAttachInfo const* ac)
+static void dumpDbx(
+    OUT StrBufType & buf, Region const* rg, BaseAttachInfo const* ac)
 {
     ASSERT0(rg);
     DbxMgr * dbx_mgr = rg->getDbxMgr();
@@ -410,8 +410,8 @@ static void dumpDbx(OUT StrBufType & buf, Region const* rg,
 
 
 template <class StrBufType>
-static void dumpAttachInfo(OUT StrBufType & buf, IR const* ir,
-                           Region const* rg, DumpFlag dumpflag)
+static void dumpAttachInfo(
+    OUT StrBufType & buf, IR const* ir, Region const* rg, DumpFlag dumpflag)
 {
     ASSERT0(ir && rg);
     bool is_dump_all_dwarf_info = dumpflag.have(IR_DUMP_DWARF) &&
@@ -565,7 +565,7 @@ void dumpCase(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 }
 
 
-void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
+void dumpSwitch(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
 {
     bool dump_addr = ctx.dumpflag.have(IR_DUMP_ADDR);
     bool dump_kid = ctx.dumpflag.have(IR_DUMP_KID);

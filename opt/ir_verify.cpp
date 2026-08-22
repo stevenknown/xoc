@@ -524,7 +524,7 @@ bool verifyIF(IR const* ir, Region const* rg)
 }
 
 
-bool verifySWITCH(IR const* ir, Region const* rg)
+bool verifySwitch(IR const* ir, Region const* rg)
 {
     verifyGeneral(ir, rg);
     TypeMgr const* tm = rg->getTypeMgr();

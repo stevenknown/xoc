@@ -247,7 +247,7 @@ void dumpDoLoop(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpLabel(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpPhi(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
-void dumpSWITCH(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
+void dumpSwitch(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpCase(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpArray(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);
 void dumpRegion(IR const* ir, Region const* rg, IRDumpCtx<> & ctx);

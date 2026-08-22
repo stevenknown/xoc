@@ -395,8 +395,8 @@ IRDesc * getIRDesc()
     { IR_SWITCH, "switch", CSwitch::kid_map, CSwitch::kid_num,
       sizeof(CSwitch),
       IRDescFlagSeg(IRC_IS_STMT|IRC_IS_STMT_IN_BB|IRC_HAS_CASE_LIST),
-      dumpSWITCH,
-      verifySWITCH,
+      dumpSwitch,
+      verifySwitch,
       IRFieldAccTab(NUM_OF_ACC_INFO(CSwitch::accinfo), CSwitch::accinfo), },
 
     { IR_DUMMYUSE, "dummyuse", CDummyUse::kid_map, CDummyUse::kid_num,
