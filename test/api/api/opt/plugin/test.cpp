@@ -11,7 +11,7 @@ static void testLinearRep()
     rm.initTypeMgr();
     rm.initVarMgr();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     Region *rg = rm.newRegion(REGION_FUNC);
     rm.addToRegionTab(rg);
     rg->initPassMgr();
@@ -987,7 +987,7 @@ static void testChainRec()
     rm.initTypeMgr();
     rm.initVarMgr();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     Region *rg = rm.newRegion(REGION_FUNC);
     rm.addToRegionTab(rg);
     rg->initPassMgr();

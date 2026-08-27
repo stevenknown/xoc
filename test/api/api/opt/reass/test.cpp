@@ -43,7 +43,7 @@ static void testcase1()
     rm.initIRDescFlagSet();
     rm.initTargInfo();
     //g_dump_opt.is_dump_all = true;
-    //g_dump_opt.is_dump_ir_id = false;
+    //g_dump_opt.is_dump_irid = false;
     xoc::g_dump_opt.setDumpPass(PASS_ALGE_REASSOCIATE, true);
     xcom::DefFixedStrBuf str;
     str.strcat("test_alge_reass.gr");

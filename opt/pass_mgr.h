@@ -124,6 +124,7 @@ protected:
     virtual Pass * allocTargInfoHandler();
     virtual Pass * allocVectorization();
     virtual Pass * allocAlgeReassociate();
+    virtual Pass * allocAlgeDistributive();
     virtual Pass * allocVRP();
     virtual Pass * allocGPAdjustment();
     virtual Pass * allocStackColoring();

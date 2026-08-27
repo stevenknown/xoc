@@ -348,6 +348,13 @@ public:
     //Perform const-folding.
     //Return updated ir if optimization performed.
     virtual IR * foldConst(IR * ir, bool & change, RefineCtx & rc);
+    
+    //The function extracts coefficent and variable from an expression.
+    //e.g:(a+b)*100, where a+b can be regarded as Var. And the following case
+    //(a+b)*C0 + (a+b)*C1 => (a+b)*(C0+C1).
+    //Return true if the extraction is successful.
+    static bool extractCoeffAndVar(
+        MOD IR * ir, OUT IR *& coeff, OUT IR *& var);
 
     xcom::DomTree const& getAndGenDomTree();
     virtual CHAR const* getPassName() const { return "IR Refinement"; }

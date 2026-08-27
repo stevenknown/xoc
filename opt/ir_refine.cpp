@@ -2000,6 +2000,78 @@ IR * Refine::foldConstCompareAndShift(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
+bool Refine::extractCoeffAndVar(MOD IR * ir, OUT IR *& coeff, OUT IR *& var)
+{
+    if (!ir->is_mul()) { return false; }
+    IR * op0 = BIN_opnd0(ir);
+    IR * op1 = BIN_opnd1(ir);
+    if (op1->isConstExp()) {
+        xcom::swap(op0, op1);
+    }
+    if (!op0->isConstExp()) { return false; }
+
+    //CASE:regard whole expression as Variable, such as:
+    //(a+b)*100, where a+b can be regarded as Var. And the following case
+    //can be refined.
+    //(a+b)*C0 + (a+b)*C1 => (a+b)*(C0+C1).
+    //if (!op1->isMemRef()) { return false; }
+
+    coeff = op0;
+    var = op1;
+    return true;
+}
+
+
+//V*C0 + V*C1 => V*(C0+C1).
+static IR * tryExtractCommonFactor(
+    MOD IR * ir, OUT bool & change, RefineCtx & rc)
+{
+    if (ir->is_fp() && !g_do_opt_float) { return ir; }
+    if (!ir->is_add() && !ir->is_sub()) { return ir; }
+
+    IR * coeff0;
+    IR * coeff1;
+    IR * var0;
+    IR * var1;
+
+    //subexp: V*C0
+    IR * sub0 = BIN_opnd0(ir);
+    if (!Refine::extractCoeffAndVar(sub0, coeff0, var0)) { return ir; }
+    ASSERT0(coeff0->isConstExp());
+
+    //subexp: V*C1
+    IR * sub1 = BIN_opnd1(ir);
+    if (!Refine::extractCoeffAndVar(sub1, coeff1, var1)) { return ir; }
+    ASSERT0(coeff1->isConstExp());
+
+    if (var0->hasSideEffect(true)) { return ir; }
+    if (var1->hasSideEffect(true)) { return ir; }
+    if (!var0->isIREqual(var1, rc.getIRMgr(), true)) { return ir; }
+
+    Region * rg = rc.getRegion();
+    bool succ = ir->removeKid(coeff0, true);
+    ASSERT0(succ);
+    succ = ir->removeKid(coeff1, true);
+    ASSERT0(succ);
+    succ = ir->removeKid(var0, true);
+    ASSERT0(succ);
+    if (rc.maintainDU()) {
+        xoc::removeUseForTree(ir, rg, *rc.getOptCtx());
+    }
+
+    //Combine new expression.
+    IR * newir = rc.getIRMgr()->buildBinaryOpSimp(
+        ir->getCode(), ir->getType(), coeff0, coeff1);
+    newir = rc.getIRMgr()->buildBinaryOpSimp(
+        IR_MUL, ir->getType(), newir, var0);
+    
+    rc.tryInvalidInfoBeforeFreeIR(ir);
+    rg->freeIRTree(ir);
+    change = true;
+    return newir;
+}
+
+
 IR * Refine::refineAdd(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_add());
@@ -2058,6 +2130,13 @@ IR * Refine::refineAdd(IR * ir, bool & change, RefineCtx & rc)
             change = true;
             return op0;
         }
+        return ir;
+    }
+    bool lchange = false;
+    ir = tryExtractCommonFactor(ir, lchange, rc);
+    change |= lchange;
+    if (lchange) {
+        //V*C0 + V*C1 => V*(C0+C1).
         return ir;
     }
     return ir;

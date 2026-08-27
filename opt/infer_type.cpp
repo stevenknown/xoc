@@ -531,17 +531,16 @@ bool InferType::dump() const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);
-    ASSERT0(m_changed_irlist);
-    if (m_changed_irlist->get_elem_count() > 0) {
+    if (m_changed_irlist != nullptr &&
+        m_changed_irlist->get_elem_count() > 0) {
         note(getRegion(), "\n==-- CHANGED IR --==");
         for (IR const* ir = m_changed_irlist->get_head();
              ir != nullptr; ir = m_changed_irlist->get_next()) {
             dumpIR(ir, m_rg);
         }
     }
-
-    ASSERT0(m_changed_varlist);
-    if (m_changed_varlist->get_elem_count() > 0) {
+    if (m_changed_varlist != nullptr &&
+        m_changed_varlist->get_elem_count() > 0) {
         note(getRegion(), "\n==-- CHANGED VAR --==");
         for (Var const* var = m_changed_varlist->get_head();
              var != nullptr; var = m_changed_varlist->get_next()) {

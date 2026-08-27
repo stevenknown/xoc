@@ -51,6 +51,7 @@ author: Su Zhenyu
 #include "linear_rep.h"
 #include "chain_recur.h"
 #include "alge_reassociate.h"
+#include "alge_distributive.h"
 #include "ir_gvn.h"
 #include "ir_evn.h"
 #include "ir_ivr.h"

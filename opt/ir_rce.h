@@ -62,13 +62,20 @@ protected:
     bool initDepPass(MOD OptCtx & oc);
     IR * inferAndReformDet(
         IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
-        MOD RCECtx & ctx);
+        OUT bool & change, MOD RCECtx & ctx);
 
+    IR * performSimplyRCEForStmt(
+        IR * ir, BBIRList * ir_list, IRListIter ct, OUT bool & change,
+        MOD RCECtx & ctx);
     bool performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx);
-    IR * processStoreStmt(IR * ir, RCECtx const& ctx);
+
+    //Perform dead store elmination: x = x;
+    IR * processStoreStmt(
+        IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+        OUT bool & change, MOD RCECtx & ctx);
     IR * processBranch(
         IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
-        MOD RCECtx & ctx);
+        OUT bool & change, MOD RCECtx & ctx);
     bool performSimplyRCE(MOD RCECtx & ctx);
 
     void reset();
@@ -125,10 +132,10 @@ public:
 
     IR * processTruebrWithMustVal(
         IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
-        MOD IRListIter & ct, MOD RCECtx & ctx);
+        MOD IRListIter & ct, OUT bool & change, MOD RCECtx & ctx);
     IR * processFalsebrWithMustVal(
         IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
-        MOD IRListIter & ct, MOD RCECtx & ctx);
+        MOD IRListIter & ct, OUT bool & change, MOD RCECtx & ctx);
     virtual bool perform(OptCtx & oc);
 };
 

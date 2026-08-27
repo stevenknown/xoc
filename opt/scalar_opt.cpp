@@ -174,6 +174,9 @@ bool ScalarOpt::perform(OptCtx & oc)
             passlist.append_tail(dce);
         }
     }
+    if (g_do_alge_distributive) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_ALGE_DISTRIBUTIVE));
+    }
     if (g_do_if_conversion) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_IF_CONVERSION));
     }

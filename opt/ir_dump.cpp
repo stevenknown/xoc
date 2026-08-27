@@ -414,8 +414,9 @@ static void dumpAttachInfo(
     OUT StrBufType & buf, IR const* ir, Region const* rg, DumpFlag dumpflag)
 {
     ASSERT0(ir && rg);
-    bool is_dump_all_dwarf_info = dumpflag.have(IR_DUMP_DWARF) &&
-                                  rg->getDbxMgr() != nullptr;
+    if (!g_dump_opt.isDumpIRAttachInfo()) { return; }
+    bool is_dump_all_dwarf_info =
+        dumpflag.have(IR_DUMP_DWARF) && rg->getDbxMgr() != nullptr;
     AIContainer const* ai = ir->getAI();
     if (ai == nullptr) { return; }
     AICont const* cont = ai->getContainer();
@@ -643,13 +644,13 @@ void dumpSelect(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
         lm->decIndent(ctx.dn);
 
         lm->incIndent(ctx.dn);
-        dumpIRList(SELECT_trueexp(ir), rg, (CHAR const*)" true_exp",
-                   ctx.dumpflag);
+        dumpIRList(
+            SELECT_trueexp(ir), rg, (CHAR const*)" true_exp", ctx.dumpflag);
         lm->decIndent(ctx.dn);
 
         lm->incIndent(ctx.dn);
-        dumpIRList(SELECT_falseexp(ir), rg, (CHAR const*)" false_exp",
-                   ctx.dumpflag);
+        dumpIRList(
+            SELECT_falseexp(ir), rg, (CHAR const*)" false_exp", ctx.dumpflag);
         lm->decIndent(ctx.dn);
     }
 }
@@ -801,26 +802,24 @@ void dumpIf(IR const* ir, Region const* rg, IRDumpCtx<> & ctx)
     DUMPADDR(ir);
     ASSERT0(ctx.attr);
     prt(rg, "%s", ctx.attr);
-    if (dump_kid) {
-        lm->incIndent(ctx.dn);
-        dumpIRList(IF_det(ir), rg, nullptr, ctx.dumpflag);
-        lm->decIndent(ctx.dn);
+    if (!dump_kid) { return; }
+    lm->incIndent(ctx.dn);
+    dumpIRList(IF_det(ir), rg, nullptr, ctx.dumpflag);
+    lm->decIndent(ctx.dn);
 
-        note(rg, "\n{");
-        lm->incIndent(ctx.dn);
-        dumpIRList(IF_truebody(ir), rg, nullptr, ctx.dumpflag);
-        lm->decIndent(ctx.dn);
-        note(rg, "\n}");
+    note(rg, "\n{");
+    lm->incIndent(ctx.dn);
+    dumpIRList(IF_truebody(ir), rg, nullptr, ctx.dumpflag);
+    lm->decIndent(ctx.dn);
+    note(rg, "\n}");
 
-        if (IF_falsebody(ir)) {
-            note(rg, "\nelse");
-            note(rg, "\n{");
-            lm->incIndent(ctx.dn);
-            dumpIRList(IF_falsebody(ir), rg, nullptr, ctx.dumpflag);
-            lm->decIndent(ctx.dn);
-            note(rg, "\n}");
-        }
-    }
+    if (IF_falsebody(ir) == nullptr) { return; }
+    note(rg, "\nelse");
+    note(rg, "\n{");
+    lm->incIndent(ctx.dn);
+    dumpIRList(IF_falsebody(ir), rg, nullptr, ctx.dumpflag);
+    lm->decIndent(ctx.dn);
+    note(rg, "\n}");
 }
 
 
@@ -1266,7 +1265,8 @@ void dumpIR(IR const* ir, Region const* rg, MOD IRDumpCtx<> & ctx)
     dumpAttachInfo(lattr, ir, rg, ctx.dumpflag);
 
     //Record type info and var decl.
-    if (rg->getDbxMgr() != nullptr && dump_src_line) {
+    if (rg->getDbxMgr() != nullptr && dump_src_line &&
+        g_dump_opt.isDumpIRSrcLine()) {
         DbxMgr::PrtCtx prtctx;
         prtctx.logmgr = lm;
         rg->getDbxMgr()->printSrcLine(ir, &prtctx);

@@ -13,7 +13,7 @@ static void test1()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("loopinfo.gr");

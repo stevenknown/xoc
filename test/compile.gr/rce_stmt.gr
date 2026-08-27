@@ -1,0 +1,34 @@
+region program ".program" () {
+    var printf:*<4>:(func,align(4));
+    var a:i32:(align(4));
+    var b:i32:(align(4));
+    region func main () {
+        var x:i32:(align(4));
+        var y:i32:(align(4));
+        //int x = 100 * (a + b) + 2 * (a + b);
+        stpr $111:i32 =
+            add:i32
+                ld:i32 a,
+                ld:i32 b;
+        stpr $222:i32 =
+            mul:i32
+                $111:i32 ,
+                100;
+        stpr $222:i32 = $222:i32;
+        stpr $333:i32 =
+            add:i32
+                ld:i32 a,
+                ld:i32 b;
+        stpr $444:i32 =
+            mul:i32
+                $333:i32,
+                2;
+        st:i32 x =
+            add:i32
+                $222:i32,
+                $444:i32
+        st:i32 x = ld:i32 x;
+        return
+            ld:i32 x;
+    };
+}

@@ -15,7 +15,7 @@ static void testMultiRes1()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     g_do_cg = true;
     Region * rg = rm.newRegion(REGION_FUNC);
     rm.addToRegionTab(rg);
@@ -62,7 +62,7 @@ static void testMultiRes2_2()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     Region *rg = rm.newRegion(REGION_FUNC);
     rg->initPassMgr();
     rg->initIRMgr();
@@ -109,7 +109,7 @@ static void testMultiRes2()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     Region *rg = rm.newRegion(REGION_FUNC);
     rg->initPassMgr();
     rg->initIRMgr();
@@ -154,7 +154,7 @@ static void testMultiRes3()
     rm.initIRDescFlagSet();
     rm.initTargInfo();
     rm.getLogMgr()->init("test.log", false);
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     Region *rg = rm.newRegion(REGION_FUNC);
     rm.addToRegionTab(rg);
     rg->initPassMgr();
@@ -234,7 +234,7 @@ static void testMultiRes4Loop()
     rm.initIRDescFlagSet();
     rm.initTargInfo();
     rm.getLogMgr()->init("test.log", false);
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     xoc::g_do_rp = false;
     xoc::g_do_cp = true;
     xoc::g_do_cp_aggressive = true;
@@ -349,7 +349,7 @@ static void testMultiRes4Loop2()
     rm.initIRDescFlagSet();
     rm.initTargInfo();
     rm.getLogMgr()->init("test.log", false);
-    g_dump_opt.is_dump_ir_id = false;
+    g_dump_opt.is_dump_irid = false;
     xoc::g_do_rp = false;
     xoc::g_do_cp = true;
     xoc::g_do_cp_aggressive = true;

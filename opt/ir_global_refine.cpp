@@ -123,10 +123,21 @@ bool GlobalRefine::dump() const
 }
 
 
+static bool shouldDoGlobalRefine(OptCtx const& oc)
+{
+    //Because global refinement doesn't maintain CFG and DU information,
+    //we intend to don't perform this optimizations.
+    if (oc.isPassValid(PASS_CFG)) { return false; }
+    return true;
+}
+
+
 bool GlobalRefine::perform(OptCtx & oc)
 {
+    START_TIMER(t, "Do Primitive Global Refinement");
+    bool should_do = shouldDoGlobalRefine(oc);
+    if (!should_do) { return false; }
     bool change = false;
-    START_TIMER(t, "Do Primitive Refinement");
     if (m_rg->getIRList() != nullptr) {
         IR * irs = refineIRList(m_rg->getIRList(), change, oc);
         ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
@@ -140,7 +151,7 @@ bool GlobalRefine::perform(OptCtx & oc)
         ASSERT0(m_rg->getCFG()->verifyLoopInfo(oc));
         ASSERT0(m_rg->getCFG()->verifyDomAndPdom(oc));
     }
-    END_TIMER(t, "Do Primitive Refinement");
+    END_TIMER(t, "Do Primitive Global Refinement");
     if (g_dump_opt.isDumpAfterPass()) { dump(); }
     if (change) { oc.setInvalidCFG(); oc.setInvalidIfCFGChanged(); }
     return change;

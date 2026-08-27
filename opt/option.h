@@ -120,6 +120,7 @@ typedef enum _PASS_TYPE {
     PASS_CALL_GRAPH,
     PASS_MULTI_RES_CVT,
     PASS_ALGE_REASSOCIATE,
+    PASS_ALGE_DISTRIBUTIVE,
     PASS_TARGINFO_HANDLER,
     PASS_LOOP_DEP_ANA,
     PASS_PROLOGUE_EPILOGUE,
@@ -186,7 +187,6 @@ protected:
     void * xmalloc(UINT size);
 public:
     //Dump all information.
-    //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_all;
 
     //Dump the properly information to support the extraction and comparasion
@@ -199,11 +199,8 @@ public:
     //Dump before pass.
     bool is_dump_before_pass;
 
-    //Do not dump anything.
-    //Note is_dump_all and is_dump_nothing can not all be true.
-    bool is_dump_nothing;
-    bool is_dump_mdref; //Dump MD Def-Use reference built both
-                        //by AA and DU Manager.
+    //Dump MD Def-Use reference built both by AA and DU Manager.
+    bool is_dump_mdref;
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.
     bool is_dump_cfgopt; //Dump CFG after CFG optimizations.
     bool is_dump_memusage; //Dump memory usage.
@@ -212,15 +209,31 @@ public:
     //Used to dump the reorder functionality result in the LSRA PASS to verify
     //the reorder result for the multiple MOV IRs if the reorder is required
     //due to the USE dependencies problem.
-    bool is_dump_lsra_reorder_mov_in_latch_BB;
+    bool is_dump_lsra_reorder_mov_in_latch_bb;
     bool is_dump_to_buffer; //Dump info to buffer
 
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
     //basedump file in testsuite, because the id may be different in different
     //compilation.
-    bool is_dump_ir_id;
-    bool is_dump_linker; //Dump linker info.
+    bool is_dump_irid;
+
+    //The option determines whether IR dumper dumps the source code line
+    //number of IR when dumpIR() invoked.
+    //It should be set to false when the dump information is used in
+    //basedump file in testsuite, because the id may be different in different
+    //compilation.
+    bool is_dump_ir_srcline;
+
+    //The option determines whether IR dumper dumps the attach-info
+    //of IR when dumpIR() invoked.
+    //It should be set to false when the dump information is used in
+    //basedump file in testsuite, because the id may be different in different
+    //compilation.
+    bool is_dump_ir_attachinfo;
+
+    //Dump linker info.
+    bool is_dump_linker;
 public:
     DumpOption();
     DumpOption const& operator = (DumpOption const&); //Disable operator =.
@@ -243,12 +256,13 @@ public:
     bool isDumpCG() const;
     bool isDumpMDRef() const;
     bool isDumpIRID() const;
+    bool isDumpIRSrcLine() const;
+    bool isDumpIRAttachInfo() const;
     bool isDumpIRParser() const;
     bool isDumpLSRAReorderMovInLatchBB() const;
     bool isDumpMDSetHash() const;
     bool isDumpMemUsage() const;
     bool isDumpMultiResConvert() const;
-    bool isDumpNothing() const;
     bool isDumpToBuffer() const;
     bool isDumpLinker() const;
 
@@ -622,6 +636,9 @@ extern bool g_do_alge_reassociate;
 //It may cause undefined behaviour when the original code has overflow or
 //underflow condition.
 extern bool g_do_alge_reassociate_aggressive;
+
+//Algebraic Distributive Law.
+extern bool g_do_alge_distributive;
 
 //Linear Scan Register Allocation.
 extern bool g_do_lsra;

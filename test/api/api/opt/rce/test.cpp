@@ -20,7 +20,7 @@ static void test4()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("rce_fold4.gr");
@@ -94,7 +94,7 @@ static void test3()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("rce_fold3.gr");
@@ -168,7 +168,7 @@ static void test2()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("rce_fold.gr");
@@ -255,7 +255,7 @@ static void test1()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("rce_fold.gr");

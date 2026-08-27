@@ -104,6 +104,7 @@ bool g_do_multi_res_convert = true;
 bool g_do_targinfo_handler = true;
 bool g_do_alge_reassociate = true;
 bool g_do_alge_reassociate_aggressive = true;
+bool g_do_alge_distributive = true;
 bool g_do_loop_dep_ana = false;
 bool g_do_rp = false;
 bool g_do_prssa = false;
@@ -215,6 +216,7 @@ static DumpOption::OptionDesc g_dump_opt_desc [] = {
   { PASS_CALL_GRAPH, "PASS_CALL_GRAPH", false, },
   { PASS_MULTI_RES_CVT, "PASS_MULTI_RES_CVT", false, },
   { PASS_ALGE_REASSOCIATE, "PASS_ALGE_REASSOCIATE", false, },
+  { PASS_ALGE_DISTRIBUTIVE, "PASS_ALGE_DISTRIBUTIVE", false, },
   { PASS_TARGINFO_HANDLER, "PASS_TARGINFO_HANDLER", false, },
   { PASS_LOOP_DEP_ANA, "PASS_LOOP_DEP_ANA", false, },
   { PASS_PROLOGUE_EPILOGUE, "PASS_PROLOGUE_EPILOGUE", false, },
@@ -303,9 +305,6 @@ DumpOption::DumpOption()
     m_pool = smpoolCreate(64, MEM_COMM);
     setDumpNothing();
 
-    //No dump-options are disabled by default.
-    is_dump_nothing = false;
-
     //In most cases, dump-after-pass is sufficient, thus enable it by default.
     is_dump_after_pass = true;
 }
@@ -337,7 +336,6 @@ void DumpOption::setDumpNothing()
         ASSERT0(oi);
         oi->is_dump = false;
     }
-    is_dump_nothing = true;
     is_dump_all = false;
     is_dump_for_test = false;
     is_dump_before_pass = false;
@@ -346,7 +344,9 @@ void DumpOption::setDumpNothing()
     is_dump_mdset_hash = false;
     is_dump_memusage = false;
     is_dump_irparser = false;
-    is_dump_ir_id = false; //Do not dump IR's id by default.
+    is_dump_irid = false; //Do not dump IR's id by default.
+    is_dump_ir_srcline = false; //Do not dump IR's src line by default.
+    is_dump_ir_attachinfo = false; //Do not dump IR's attachinfo by default.
     is_dump_to_buffer = false;
     is_dump_cfgopt = false;
     is_dump_linker = false;
@@ -369,7 +369,6 @@ void DumpOption::setDumpAll()
         ASSERT0(oi);
         oi->is_dump = true;
     }
-    is_dump_nothing = false;
     is_dump_all = true;
 
     //DumpAll will ask each passes dump complete and verbose information.
@@ -384,7 +383,9 @@ void DumpOption::setDumpAll()
     is_dump_mdset_hash = true;
     is_dump_memusage = true;
     is_dump_irparser = true;
-    is_dump_ir_id = true;
+    is_dump_irid = true;
+    is_dump_ir_srcline = true;
+    is_dump_ir_attachinfo = true;
     is_dump_cfgopt = true;
     is_dump_linker = true;
 }
@@ -392,27 +393,15 @@ void DumpOption::setDumpAll()
 
 bool DumpOption::isDumpAll() const
 {
-    //is_dump_all and is_dump_nothing can not all be true.
-    ASSERT0(!(is_dump_nothing & is_dump_all));
     return is_dump_all;
 }
 
 
 bool DumpOption::isDumpForTest() const
 {
-    //is_dump_all and is_dump_nothing can not all be true.
-    ASSERT0(!(is_dump_nothing & is_dump_all));
     return is_dump_for_test;
 }
 
-
-
-bool DumpOption::isDumpNothing() const
-{
-    //is_dump_all and is_dump_nothing can not all be true.
-    ASSERT0(!(is_dump_nothing & is_dump_all));
-    return is_dump_nothing;
-}
 
 
 bool DumpOption::isDumpBeforePass() const
@@ -429,43 +418,55 @@ bool DumpOption::isDumpAfterPass() const
 
 bool DumpOption::isDumpMDSetHash() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_mdset_hash);
+    return is_dump_all || is_dump_mdset_hash;
 }
 
 
 bool DumpOption::isDumpCFGOpt() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_cfgopt);
+    return is_dump_all || is_dump_cfgopt;
 }
 
 
 bool DumpOption::isDumpMDRef() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_mdref);
+    return is_dump_all || is_dump_mdref;
 }
 
 
 bool DumpOption::isDumpMemUsage() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_memusage);
+    return is_dump_all || is_dump_memusage;
 }
 
 
 bool DumpOption::isDumpIRParser() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_irparser);
+    return is_dump_all || is_dump_irparser;
+}
+
+
+bool DumpOption::isDumpIRAttachInfo() const
+{
+    return is_dump_all || is_dump_ir_attachinfo;
+}
+
+
+bool DumpOption::isDumpIRSrcLine() const
+{
+    return is_dump_all || is_dump_ir_srcline;
 }
 
 
 bool DumpOption::isDumpIRID() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_ir_id);
+    return is_dump_all || is_dump_irid;
 }
 
 
 bool DumpOption::isDumpLinker() const
 {
-    return is_dump_all || (!is_dump_nothing && is_dump_linker);
+    return is_dump_all || is_dump_linker;
 }
 
 
@@ -477,15 +478,13 @@ bool DumpOption::isDumpToBuffer() const
 
 bool DumpOption::isDumpLSRAReorderMovInLatchBB() const
 {
-    return is_dump_all ||
-        (!is_dump_nothing && is_dump_lsra_reorder_mov_in_latch_BB);
+    return is_dump_all || is_dump_lsra_reorder_mov_in_latch_bb;
 }
 
 
 bool DumpOption::isDumpPass(PASS_TYPE pt) const
 {
     if (is_dump_all) { return true; }
-    if (is_dump_nothing) { return false; }
     OptionDesc const* od = getOptionDesc(pt);
     ASSERT0(od);
     return od->is_dump;
@@ -511,6 +510,36 @@ void DumpOption::dump(RegionMgr const* rm) const
         note(rm, "\n%s:", oi->getPassTypeName());
         prt(rm, "is_dump:%s", oi->is_dump ? "true" : "false");
     }
+    note(rm, "\nis_dump_all = %s",
+         is_dump_all ? "true" : "false");
+    note(rm, "\nis_dump_for_test = %s",
+         is_dump_for_test ? "true" : "false");
+    note(rm, "\nis_dump_after_pass = %s",
+         is_dump_after_pass ? "true" : "false");
+    note(rm, "\nis_dump_before_pass = %s",
+         is_dump_before_pass ? "true" : "false");
+    note(rm, "\nis_dump_mdref = %s",
+         is_dump_mdref ? "true" : "false");
+    note(rm, "\nis_dump_mdset_hash = %s",
+         is_dump_mdset_hash ? "true" : "false");
+    note(rm, "\nis_dump_cfgopt = %s",
+         is_dump_cfgopt ? "true" : "false");
+    note(rm, "\nis_dump_memusage = %s",
+         is_dump_memusage ? "true" : "false");
+    note(rm, "\nis_dump_irparser = %s",
+         is_dump_irparser ? "true" : "false");
+    note(rm, "\nis_dump_lsra_reorder_mov_in_latch_bb = %s",
+         is_dump_lsra_reorder_mov_in_latch_bb ? "true" : "false");
+    note(rm, "\nis_dump_to_buffer = %s",
+         is_dump_to_buffer ? "true" : "false");
+    note(rm, "\nis_dump_irid = %s",
+         is_dump_irid ? "true" : "false");
+    note(rm, "\nis_dump_ir_srcline = %s",
+         is_dump_ir_srcline ? "true" : "false");
+    note(rm, "\nis_dump_ir_attachinfo = %s",
+         is_dump_ir_attachinfo ? "true" : "false");
+    note(rm, "\nis_dump_linker = %s",
+         is_dump_linker ? "true" : "false");
     note(rm, "\n");
 }
 //END DumpOption
@@ -615,6 +644,8 @@ void Option::dump(MOD LogMgr * lm)
          g_do_alge_reassociate ? "true":"false");
     note(lm, "\ng_do_alge_reassociate_aggressive = %s",
          g_do_alge_reassociate_aggressive ? "true":"false");
+    note(lm, "\ng_do_alge_distributive = %s",
+         g_do_alge_distributive ? "true":"false");
     note(lm, "\ng_do_loop_dep_ana = %s", g_do_loop_dep_ana ? "true":"false");
     note(lm, "\ng_do_rp = %s", g_do_rp ? "true":"false");
     note(lm, "\ng_do_prssa = %s", g_do_prssa ? "true":"false");
@@ -667,6 +698,7 @@ void Option::dump(MOD LogMgr * lm)
 void Option::dump(RegionMgr * rm)
 {
     dump(rm->getLogMgr());
+    g_dump_opt.dump(rm);
 }
 
 
@@ -742,6 +774,7 @@ static PassSwitch g_pass_in_level3[] {
     { &xoc::g_do_evn, },
     { &xoc::g_do_alge_reassociate, },
     { &xoc::g_do_alge_reassociate_aggressive, },
+    { &xoc::g_do_alge_distributive, },
     { &xoc::g_do_rce, },
     { &xoc::g_do_rp, },
     { &xoc::g_do_lftr, },

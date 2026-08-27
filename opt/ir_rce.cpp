@@ -303,7 +303,7 @@ static void dumpChangedIR(IR const* oldir, IR const* newir, RCECtx const& ctx)
 
 static IR * replaceBranch(
     IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct, RCE * rce,
-    MOD RCECtx & rcectx)
+    OUT bool & change, MOD RCECtx & rcectx)
 {
     Region * rg = rcectx.getRegion();
     IRCFG * cfg = rg->getCFG();
@@ -329,6 +329,7 @@ static IR * replaceBranch(
     ir_list->insert_before(newbr, ct);
     ir_list->remove(ct);
     rg->freeIRTree(ir);
+    change = true;
 
     //Do NOT free old ir here, leave it to the caller.
     //Reivse CFG.
@@ -342,7 +343,7 @@ static IR * replaceBranch(
 
 static IR * removeBranch(
     IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct, RCE * rce,
-    MOD RCECtx & rcectx)
+    OUT bool & change, MOD RCECtx & rcectx)
 {
     Region * rg = rcectx.getRegion();
     IRCFG * cfg = rg->getCFG();
@@ -361,6 +362,7 @@ static IR * removeBranch(
     //Now, stmt is safe to free.
     ir_list->remove(ct);
     rg->freeIRTree(ir);
+    change = true;
 
     //If there is only one edge between 'to' and 'from',
     //it will not be deleted.
@@ -522,21 +524,21 @@ IR * RCE::calcCondMustVal(
 
 IR * RCE::processFalsebrWithMustVal(
     IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
-    MOD IRListIter & ct, MOD RCECtx & ctx)
+    MOD IRListIter & ct, OUT bool & change, MOD RCECtx & ctx)
 {
     if (must_true) {
         //FALSEBR(0x1), never jump.
         //Remove FALSEBR, Revise CFG, Remove branch edge.
-        return removeBranch(ir, ir_list, ct, this, ctx);
+        return removeBranch(ir, ir_list, ct, this, change, ctx);
     }
     ASSERT0(must_false);
     //FALSEBR(0x0), always jump.
-    return replaceBranch(ir, ir_list, ct, this, ctx);
+    return replaceBranch(ir, ir_list, ct, this, change, ctx);
 }
 
 
 static IR * inferAndReformDetCase1(
-    IR * ir, OUT bool & changed, MOD BBIRList * ir_list, MOD IRListIter & ct,
+    IR * ir, OUT bool & change, MOD BBIRList * ir_list, MOD IRListIter & ct,
     MOD RCECtx & ctx, MOD RCE * rce)
 {
     IR * det = BR_det(ir);
@@ -554,18 +556,19 @@ static IR * inferAndReformDetCase1(
     if (!op0_of_eq->isIREqual(op1_of_eq, ctx.getRegion()->getIRMgr(), true)) {
         return ir;
     }
-    changed = true;
+    change = true;
     if (ir->is_truebr()) {
         return rce->processTruebrWithMustVal(
-            ir, true, false, ir_list, ct, ctx);
+            ir, true, false, ir_list, ct, change, ctx);
     }
     ASSERT0(ir->is_falsebr());
-    return rce->processFalsebrWithMustVal(ir, true, false, ir_list, ct, ctx);
+    return rce->processFalsebrWithMustVal(
+        ir, true, false, ir_list, ct, change, ctx);
 }
 
 
 static IR * inferAndReformDetCase2ImplFP(
-    bool comp_greater, IR * det, OUT bool & changed, MOD RCECtx & ctx,
+    bool comp_greater, IR * det, OUT bool & change, MOD RCECtx & ctx,
     MOD RCE * rce)
 {
     IR * op0 = BIN_opnd0(det);
@@ -582,21 +585,21 @@ static IR * inferAndReformDetCase2ImplFP(
             BIN_opnd0(det) = nullptr;
             ctx.tryInvalidInfoBeforeFreeIR(det);
             ctx.getRegion()->freeIRTree(det);
-            changed = true;
+            change = true;
             return op0;
         }
         //Retain lesser operand.
         BIN_opnd1(det) = nullptr;
         ctx.tryInvalidInfoBeforeFreeIR(det);
         ctx.getRegion()->freeIRTree(det);
-        changed = true;
+        change = true;
         return op1;
     }
     if (CONST_fp_val(op1_of_op0) < CONST_fp_val(op1_of_op1)) {
         if (comp_greater) {
             //Retain greater operand.
             BIN_opnd1(det) = nullptr;
-            changed = true;
+            change = true;
             ctx.tryInvalidInfoBeforeFreeIR(det);
             ctx.getRegion()->freeIRTree(det);
             return op1;
@@ -605,7 +608,7 @@ static IR * inferAndReformDetCase2ImplFP(
         BIN_opnd0(det) = nullptr;
         ctx.tryInvalidInfoBeforeFreeIR(det);
         ctx.getRegion()->freeIRTree(det);
-        changed = true;
+        change = true;
         return op0;
     }
     return det;
@@ -722,7 +725,7 @@ static IR * inferAndReformDetCase2(
 
 
 static IR * inferAndReformDetCase3(
-    IR * ir, OUT bool & changed, MOD BBIRList * ir_list, MOD IRListIter & ct,
+    IR * ir, OUT bool & change, MOD BBIRList * ir_list, MOD IRListIter & ct,
     MOD RCECtx & ctx, MOD RCE * rce)
 {
     IR * det = BR_det(ir);
@@ -733,33 +736,43 @@ static IR * inferAndReformDetCase3(
         return ir;
     }
     if (ir->is_truebr()) {
-        return rce->processTruebrWithMustVal(ir, true, false, ir_list, ct, ctx);
+        return rce->processTruebrWithMustVal(
+            ir, true, false, ir_list, ct, change, ctx);
     }
     ASSERT0(ir->is_falsebr());
-    return rce->processFalsebrWithMustVal(ir, true, false, ir_list, ct, ctx);
+    return rce->processFalsebrWithMustVal(
+        ir, true, false, ir_list, ct, change, ctx);
 }
 
 
 IR * RCE::inferAndReformDet(
-    IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct, MOD RCECtx & ctx)
+    IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+    OUT bool & change, MOD RCECtx & ctx)
 {
-    bool changed = false;
-    ir = inferAndReformDetCase1(ir, changed, ir_list, ct, ctx, this);
-    if (changed) { return ir; }
+    bool lchange = false;
+    ir = inferAndReformDetCase1(ir, lchange, ir_list, ct, ctx, this);
+    change |= lchange;
+    if (lchange) { return ir; }
     ASSERT0(ir);
-    ir = inferAndReformDetCase2(ir, changed, ctx, this);
-    if (changed) { return ir; }
-    ir = inferAndReformDetCase3(ir, changed, ir_list, ct, ctx, this);
+
+    lchange = false;
+    ir = inferAndReformDetCase2(ir, lchange, ctx, this);
+    change |= lchange;
+    if (lchange) { return ir; }
+
+    lchange = false;
+    ir = inferAndReformDetCase3(ir, lchange, ir_list, ct, ctx, this);
+    change |= lchange;
     return ir;
 }
 
 
 IR * RCE::reformToJudgeDet(
-    IR * ir, IR * new_det, bool changed, MOD RCECtx & ctx)
+    IR * ir, IR * new_det, bool change, MOD RCECtx & ctx)
 {
     IR * old_det = BR_det(ir);
     BR_det(ir) = nullptr;
-    if (changed) {
+    if (change) {
         if (!new_det->is_judge()) {
             new_det = m_irmgr->buildJudge(new_det);
         }
@@ -777,30 +790,31 @@ IR * RCE::reformToJudgeDet(
 
 IR * RCE::processTruebrWithMustVal(
     IR * ir, bool must_true, bool must_false, MOD BBIRList * ir_list,
-    MOD IRListIter & ct, MOD RCECtx & ctx)
+    MOD IRListIter & ct, OUT bool & change, MOD RCECtx & ctx)
 {
     if (must_true) {
         //TRUEBR(0x1), always jump.
-        return replaceBranch(ir, ir_list, ct, this, ctx);
+        return replaceBranch(ir, ir_list, ct, this, change, ctx);
     }
     ASSERT0(must_false);
     //TRUEBR(0x0), never jump.
     //Remove TRUEBR, Revise CFG. Remove branch edge.
-    return removeBranch(ir, ir_list, ct, this, ctx);
+    return removeBranch(ir, ir_list, ct, this, change, ctx);
 }
 
 
 IR * RCE::processBranch(
-    IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct, MOD RCECtx & ctx)
+    IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+    OUT bool & change, MOD RCECtx & ctx)
 {
     ASSERT0(ir->isConditionalBr());
-    bool must_true, must_false, changed = false;
+    bool must_true, must_false;
     IR * new_det = calcCondMustVal(
-        BR_det(ir), must_true, must_false, changed, ctx);
+        BR_det(ir), must_true, must_false, change, ctx);
     if (new_det != BR_det(ir)) {
         if (!new_det->is_judge()) {
             new_det = m_irmgr->buildJudge(new_det);
-            changed = true;
+            change = true;
         }
         BR_det(ir) = new_det;
         ir->setParentPointer(false);
@@ -808,34 +822,66 @@ IR * RCE::processBranch(
     if (ir->is_truebr()) {
         if (must_true || must_false) {
             return processTruebrWithMustVal(
-                ir, must_true, must_false, ir_list, ct, ctx);
+                ir, must_true, must_false, ir_list, ct, change, ctx);
         }
     } else {
         ASSERT0(ir->is_falsebr());
         if (must_true || must_false) {
             return processFalsebrWithMustVal(
-                ir, must_true, must_false, ir_list, ct, ctx);
+                ir, must_true, must_false, ir_list, ct, change, ctx);
         }
     }
-    ir = reformToJudgeDet(ir, new_det, changed, ctx);
-    return inferAndReformDet(ir, ir_list, ct, ctx);
+    ir = reformToJudgeDet(ir, new_det, change, ctx);
+    return inferAndReformDet(ir, ir_list, ct, change, ctx);
 }
 
 
 //Perform dead store elmination: x = x;
-IR * RCE::processStoreStmt(IR * ir, RCECtx const& ctx)
+IR * RCE::processStoreStmt(
+    IR * ir, MOD BBIRList * ir_list, MOD IRListIter & ct,
+    OUT bool & change, MOD RCECtx & ctx)
 {
     ASSERT0(ir->isStoreStmt());
     if (ir->hasSideEffect(true)) { return ir; }
+    if (ir->getExactRef() == nullptr) { return ir; }
     ASSERT0(ir->hasRHS());
     IR const* rhs = ir->getRHS();
-    if (rhs->getExactRef() == ir->getExactRef()) {
-        //Do dead store elmination: x=x, *x=*x, x[1]=x[1], etc;
-        dumpRemovedIR(ir, ctx);
-        xoc::removeUseForTree(ir, m_rg, *ctx.getOptCtx());
-        return nullptr;
+    if (rhs->getExactRef() != ir->getExactRef()) { return ir; }
+
+    //Do dead store elmination: x=x, *x=*x, x[1]=x[1], etc;
+    dumpRemovedIR(ir, ctx);
+    xoc::removeStmt(ir, m_rg, *ctx.getOptCtx());
+    ctx.tryInvalidInfoBeforeFreeIR(ir);
+
+    //Remove stmt from BB.
+    ir_list->remove(ct);
+
+    //Now, stmt is safe to free.
+    ctx.getRegion()->freeIRTree(ir);
+    change = true;
+    return nullptr;
+}
+
+
+IR * RCE::performSimplyRCEForStmt(
+    IR * ir, BBIRList * ir_list, IRListIter ct, OUT bool & change,
+    MOD RCECtx & ctx)
+{
+    if (ir->hasSideEffect(true) || ir->isDummyOp()) { return ir; }
+    IR * newir = nullptr;
+    switch (ir->getCode()) {
+    SWITCH_CASE_CONDITIONAL_BRANCH_OP:
+        newir = processBranch(ir, ir_list, ct, change, ctx);
+        break;
+    SWITCH_CASE_DIRECT_MEM_STMT:
+        //NOTE:IR Refinement cannot handle inter-stmt optimizations, thus
+        //the redundant-move operation should be handled in RCE.
+        newir = processStoreStmt(ir, ir_list, ct, change, ctx);
+        break;
+    default: newir = ir;
     }
-    return ir;
+    ASSERT0(newir == nullptr || ir_list->find(newir));
+    return newir;
 }
 
 
@@ -849,23 +895,7 @@ bool RCE::performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx)
          ct != nullptr; ct = next_ct) {
         IR * ir = ct->val();
         ir_list->get_next(&next_ct);
-        if (ir->hasSideEffect(true) || ir->isDummyOp()) { continue; }
-        IR * newir = ir;
-        switch (ir->getCode()) {
-        SWITCH_CASE_CONDITIONAL_BRANCH_OP:
-            newir = processBranch(ir, ir_list, ct, ctx);
-            break;
-
-        //This case has been dealt in IR-Refinement.
-        //SWITCH_CASE_DIRECT_MEM_STMT:
-        //    newir = processStoreStmt(ir);
-        //    break;
-        default:;
-        }
-        if (newir == ir) { continue; }
-        ASSERTN(ir->is_undef(), ("old ir should have been removed."));
-        ASSERT0(newir == nullptr || ir_list->find(newir));
-        change = true;
+        performSimplyRCEForStmt(ir, ir_list, ct, change, ctx);
     }
     return change;
 }

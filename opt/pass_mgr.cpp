@@ -371,6 +371,12 @@ Pass * PassMgr::allocMultiResConvert()
 }
 
 
+Pass * PassMgr::allocAlgeDistributive()
+{
+    return new AlgeDistributive(m_rg);
+}
+
+
 Pass * PassMgr::allocAlgeReassociate()
 {
     return new AlgeReassociate(m_rg);
@@ -812,6 +818,9 @@ Pass * PassMgr::allocPass(PASS_TYPE passty)
         break;
     case PASS_ALGE_REASSOCIATE:
         pass = allocAlgeReassociate();
+        break;
+    case PASS_ALGE_DISTRIBUTIVE:
+        pass = allocAlgeDistributive();
         break;
     case PASS_LOOP_DEP_ANA:
         pass = allocLoopDepAna();

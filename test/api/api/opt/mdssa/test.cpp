@@ -12,7 +12,7 @@ static void test_isRegionLiveIn()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     Region * rg = rm.newRegion(REGION_FUNC);
     rm.addToRegionTab(rg);
     rg->initPassMgr();
@@ -100,7 +100,7 @@ static void test_findKillingDef_2()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     xcom::DefFixedStrBuf str;
     str.strcat("testcase2.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
@@ -135,7 +135,7 @@ static void test_findKillingDef_1()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     xcom::DefFixedStrBuf str;
     str.strcat("testcase1.gr");
     bool succ = xoc::readGRAndConstructRegion(&rm, str.getBuf());
@@ -171,7 +171,7 @@ static void test_findKillingDef_3()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("testcase3.gr");
@@ -208,7 +208,7 @@ static void test_findKillingDef_5()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    g_dump_opt.is_dump_ir_id = true;
+    g_dump_opt.is_dump_irid = true;
     g_dump_opt.is_dump_all = true;
     xcom::DefFixedStrBuf str;
     str.strcat("testcase5.gr");

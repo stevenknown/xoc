@@ -73,6 +73,7 @@ solve_set.o\
 infer_type.o\
 attachinfo_mgr.o\
 alge_reassociate.o\
+alge_distributive.o\
 analysis_instr.o\
 invert_brtgt.o\
 ir_helper.o\
