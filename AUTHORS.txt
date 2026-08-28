@@ -1,12 +1,21 @@
-The file lists people who have have contributed to XOC project.
-If you have contributed a patch or made some other contribution to XOC,
-please submit a patch to this file to add yourself, and it will be done!
+# XOC Compiler — AUTHORS
+#
+# This file enumerates individuals who have contributed significant work
+# to the XOC (eXtremely Optimizing Compiler) open‑source project.
+#
+# Conceptual integrity of the XOC system is primarily established by the
+# founding architect. Additional contributors extend the system within
+# this unified architectural vision.
+#
+# If you have submitted patches or made substantial contributions,
+# please open a pull request to add your name and contact information.
 
-Su Zhenyu,    steven.known@gmail.com,   primary architect of XOC
-GongKai,      gong_k@126.com,
-JinYue,       fionaking930@gmail.com,
-Guo XiaoXin,  guonic@gmail.com,
-Zhang Ji Peng,
-Leslie Zhai,
-Yue Yang,
-Alex Cameron,
+Su Zhenyu,    steven.known@gmail.com,   Founding & Primary Architect
+GongKai,      gong_k@126.com
+JinYue,       fionaking930@gmail.com
+Guo XiaoXin,  guonic@gmail.com
+Zhang Ji Peng
+Leslie Zhai
+Yue Yang
+Alex Cameron
+
