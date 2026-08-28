@@ -43,6 +43,7 @@ class ActMgr;
 //Set the following options true or false to enable or disable the refinement.
 #define RC_refine_div_const(r) ((r).u1.s1.refine_div_const)
 #define RC_refine_mul_const(r) ((r).u1.s1.refine_mul_const)
+#define RC_refine_mul_to_shift(r) ((r).u1.s1.refine_mul_to_shift)
 #define RC_do_fold_const(r) ((r).u1.s1.do_fold_const)
 #define RC_hoist_to_lnot(r) ((r).u1.s1.hoist_to_lnot)
 #define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
@@ -62,19 +63,22 @@ public:
     union {
         struct {
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; a/2 => a>>1
+            //e.g:int a; a/2 => a>>1
             BitUnion refine_div_const:1;
 
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; a*2 => a<<1
-            //     int b; b*2 => b+b
+            //e.g:int b; b*2 => b+b
             BitUnion refine_mul_const:1;
+
+            //Pass info top-down. True to do following refinement.
+            //e.g:int a; a*2 => a<<1
+            BitUnion refine_mul_to_shift:1;
 
             //Pass info top-down. True to do following refinement.
             BitUnion refine_stmt:1;
 
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; a=2+3 => a=5
+            //e.g:int a; a=2+3 => a=5
             BitUnion do_fold_const:1;
 
             //Pass info top-down. True to transform comparison stmt to lnot
@@ -93,15 +97,15 @@ public:
             BitUnion stmt_has_been_removed:1;
 
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; 0-a => neg(a)
+            //e.g:int a; 0-a => neg(a)
             BitUnion refine_sub_to_neg:1;
 
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; if (a < 1) => if (a <= 0)
+            //e.g:int a; if (a < 1) => if (a <= 0)
             BitUnion refine_branch_lt_1_to_le_0:1;
 
             //Pass info top-down. True to do following refinement.
-            //e.g: int a; if (a > -1) => if (a >= 0)
+            //e.g:int a; if (a > -1) => if (a >= 0)
             BitUnion refine_branch_gt_neg_1_to_ge_0:1;
         } s1;
         BitUnion i1;
@@ -153,6 +157,7 @@ public:
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
     bool refine_mul_const() const { return RC_refine_mul_const(*this); }
+    bool refine_mul_to_shift() const { return RC_refine_mul_to_shift(*this); }
     bool refine_sub_to_neg() const { return RC_refine_sub_to_neg(*this); }
 
     //Set flag to disable following optimizations.

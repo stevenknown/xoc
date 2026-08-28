@@ -1,7 +1,7 @@
-# XOC Compiler — AUTHORS
+# XOC Compiler - AUTHORS
 #
 # This file enumerates individuals who have contributed significant work
-# to the XOC (eXtremely Optimizing Compiler) open‑source project.
+# to the XOC (eXtremely Optimizing Compiler) open-source project.
 #
 # Conceptual integrity of the XOC system is primarily established by the
 # founding architect. Additional contributors extend the system within
