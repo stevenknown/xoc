@@ -336,6 +336,10 @@ extern bool g_do_global_refine;
 //e.g: cos:f64 5.0:f64 will be refined to 0.9961947:f64 directly.
 extern bool g_do_refine_with_host_api;
 
+//Refine MUL to ADD.
+//e.g:refine a*2 to a+a.
+extern bool g_do_refine_mul_to_add;
+
 //If true to insert IR_CVT if necessary.
 extern bool g_insert_cvt;
 

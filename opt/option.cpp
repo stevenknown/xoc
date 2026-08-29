@@ -50,6 +50,7 @@ bool g_do_rpo = true;
 bool g_do_refine = true;
 bool g_do_global_refine = true;
 bool g_do_refine_with_host_api = false;
+bool g_do_refine_mul_to_add = false;
 bool g_insert_cvt = false;
 bool g_calc_derivative = false;
 bool g_do_loop_ana = true;

@@ -20,7 +20,6 @@ region program ".program" ()
     var foo4:any:(func,align(4));
     var foo5:any:(func,align(4));
     var main:any:(func,align(4));
-    //==---- DUMP Region 'foo' ----==
     region func foo (undefined,var i:i32:(align(4))) {
         var l:i32:(align(4));
         var l2:i32:(align(4));

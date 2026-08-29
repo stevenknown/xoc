@@ -23,7 +23,10 @@ static void testcase1_func(
     rg->doAggressiveAA(*oc);
     rg->doDUAna(*oc);
     Pass * pass = rg->getPassMgr()->registerPass(PASS_ALGE_REASSOCIATE);
-    pass->perform(*oc);
+    bool doit = pass->perform(*oc);
+
+    //Some case doesn't doit.
+    //ASSERT0(doit);
     PRSSAMgr * prssamgr = (PRSSAMgr*)rg->getPassMgr()->
         queryPass(PASS_PRSSA_MGR);
     if (prssamgr != nullptr) { prssamgr->destruction(*oc); }
@@ -42,8 +45,10 @@ static void testcase1()
     rm.initVarMgr();
     rm.initIRDescFlagSet();
     rm.initTargInfo();
-    //g_dump_opt.is_dump_all = true;
-    //g_dump_opt.is_dump_irid = false;
+
+    //ONLY USE FOR DEBUG.
+    //xoc::g_dump_opt.is_dump_all = true;
+    //xoc::g_dump_opt.is_dump_irid = true;
     xoc::g_dump_opt.setDumpPass(PASS_ALGE_REASSOCIATE, true);
     xcom::DefFixedStrBuf str;
     str.strcat("test_alge_reass.gr");

@@ -156,7 +156,7 @@ RefineCtx::RefineCtx(MOD OptCtx * oc, ActMgr * am) : PassCtx(oc, am)
     RC_refine_div_const(*this) = true;
 
     //Heuristic, ADD is always better than MUL.
-    RC_refine_mul_const(*this) = true;
+    RC_refine_mul_const(*this) = xoc::g_do_refine_mul_to_add;
 
     RC_refine_stmt(*this) = true;
     RC_do_fold_const(*this) = true;
