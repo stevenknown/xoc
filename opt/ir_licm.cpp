@@ -56,7 +56,7 @@ static void dumpAnaCtx(LICM * licm, LICMAnaCtx const& ctx)
 static void dumpAct(ActMgr * am, CHAR const* format, ...)
 {
     if (am == nullptr || format == nullptr) { return; }
-    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!am->isLogMgrInit()) { return; }
     if (!g_dump_opt.isDumpPass(PASS_LICM)) { return; }
     va_list args;
     va_start(args, format);

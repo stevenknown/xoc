@@ -367,7 +367,7 @@ ReassExp * ReassExpMgr::genBinReassExp(IR const* ir)
 //
 void ReassActMgr::dumpAct(CHAR const* format, ...)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
+    if (!isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_ALGE_REASSOCIATE))
     { return; }
     va_list args;
     va_start(args, format);

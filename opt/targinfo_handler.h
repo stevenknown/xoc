@@ -38,7 +38,9 @@ namespace xoc {
 
 class RegAllocMgr;
 
-//The class processes target machine dependent if REF_TARGMACH_INFO enabled.
+//The class processes target machine dependent behaviors when
+//REF_TARGMACH_INFO enabled.
+//Usually, PRSSA perform target dependent operations through this pass.
 class TargInfoHandler : public Pass {
     COPY_CONSTRUCTOR(TargInfoHandler);
 protected:

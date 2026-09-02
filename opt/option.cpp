@@ -346,6 +346,7 @@ void DumpOption::setDumpNothing()
     is_dump_memusage = false;
     is_dump_irparser = false;
     is_dump_irid = false; //Do not dump IR's id by default.
+    is_dump_gr = false; //Do not dump GR by default.
     is_dump_ir_srcline = false; //Do not dump IR's src line by default.
     is_dump_ir_attachinfo = false; //Do not dump IR's attachinfo by default.
     is_dump_to_buffer = false;
@@ -459,6 +460,12 @@ bool DumpOption::isDumpIRSrcLine() const
 }
 
 
+bool DumpOption::isDumpGR() const
+{
+    return is_dump_all || is_dump_gr;
+}
+
+
 bool DumpOption::isDumpIRID() const
 {
     return is_dump_all || is_dump_irid;
@@ -535,6 +542,8 @@ void DumpOption::dump(RegionMgr const* rm) const
          is_dump_to_buffer ? "true" : "false");
     note(rm, "\nis_dump_irid = %s",
          is_dump_irid ? "true" : "false");
+    note(rm, "\nis_dump_gr = %s",
+         is_dump_gr ? "true" : "false");
     note(rm, "\nis_dump_ir_srcline = %s",
          is_dump_ir_srcline ? "true" : "false");
     note(rm, "\nis_dump_ir_attachinfo = %s",
@@ -758,6 +767,7 @@ static PassSwitch g_pass_in_level2[] {
     { &xoc::g_do_prssa, },
     { &xoc::g_do_mdssa, },
     { &xoc::g_infer_type, },
+    { &xoc::g_do_cfg_opt, },
 };
 static UINT g_pass_num_in_level2 =
     sizeof(g_pass_in_level2) / sizeof(g_pass_in_level2[0]);
@@ -784,6 +794,7 @@ static PassSwitch g_pass_in_level3[] {
     { &xoc::g_infer_type, },
     { &xoc::g_do_if_conversion, },
     { &xoc::g_do_vect, },
+    { &xoc::g_do_cfg_opt, },
     { &xoc::g_do_cfg_remove_empty_bb, },
     { &xoc::g_do_cfg_remove_unreach_bb, },
     { &xoc::g_do_cfg_remove_trampolin_bb, },
@@ -843,6 +854,18 @@ void PassOption::setPassInLevelSize(bool enable)
     for (UINT i = 0; i < g_pass_num_in_level_size; i++) {
         *g_pass_in_level_size[i].bool_switch = enable;
     }
+}
+
+
+void PassOption::inferOption()
+{
+    xoc::g_do_cfg_remove_empty_bb = xoc::g_do_cfg_opt;
+    xoc::g_do_cfg_remove_unreach_bb = xoc::g_do_cfg_opt;
+    xoc::g_do_cfg_remove_trampolin_bb = xoc::g_do_cfg_opt;
+    xoc::g_do_cfg_remove_redundant_branch = xoc::g_do_cfg_opt;
+    xoc::g_do_cfg_remove_trampolin_branch = xoc::g_do_cfg_opt;
+    xoc::g_do_cfg_remove_redundant_label = xoc::g_do_cfg_opt;
+    //xoc::g_do_invert_brtgt = xoc::g_do_cfg_opt;
 }
 //END PassOption
 

@@ -1263,9 +1263,8 @@ void strshift(MOD CHAR * string, INT ofst)
 }
 
 
-//Extract file name.
-//e.g: Given /xx/yy/zz.foo, return zz.
-CHAR * getFileName(CHAR const* path, OUT CHAR * buf, UINT bufl)
+CHAR * getFileName(
+    CHAR const* path, OUT CHAR * buf, UINT bufl, bool strip_suffix)
 {
     DUMMYUSE(bufl);
     if (path == nullptr) { return nullptr; }
@@ -1286,7 +1285,7 @@ CHAR * getFileName(CHAR const* path, OUT CHAR * buf, UINT bufl)
     else { start = i; }
 
     if (dotpos < 0) { end = l; }
-    else { end = dotpos; }
+    else if (strip_suffix) { end = dotpos; }
 
     UINT len = end - start;
     if (len > 0) {
@@ -1294,6 +1293,30 @@ CHAR * getFileName(CHAR const* path, OUT CHAR * buf, UINT bufl)
     }
     buf[len] = 0;
     return buf;
+}
+
+
+bool isFileSuffix(CHAR const* fn, ...)
+{
+    UINT len = (UINT)::strlen(fn) + 1;
+    CHAR * buf = (CHAR*)ALLOCA(len);
+    xcom::upper(xcom::getFileSuffix(fn, buf, (UINT)len));
+
+    va_list fix_start;
+    va_start(fix_start, fn);
+
+    //Walk through each suffixs.
+    CHAR const* fix = va_arg(fix_start, CHAR const*);
+    bool succ = false;
+    while (fix != nullptr) {
+        if (::strcmp(buf, fix) == 0) {
+            succ = true;
+            break;
+        }
+        fix = va_arg(fix_start, CHAR const*);
+    }
+    va_end(fix_start);
+    return succ;
 }
 
 

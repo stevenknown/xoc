@@ -45,8 +45,10 @@ class IfConversion;
 
 class VectActMgr : public ActMgr {
     COPY_CONSTRUCTOR(VectActMgr);
+protected:
+    Region const* m_rg;
 public:
-    VectActMgr(Region const* rg) : ActMgr(rg) {}
+    VectActMgr(Region const* rg) : ActMgr(rg) { m_rg = rg; }
 
     //Dump misc action that related to given ir.
     //format: the reason.

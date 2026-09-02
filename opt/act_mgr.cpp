@@ -66,9 +66,25 @@ void ActMgr::clean()
 }
 
 
+ActMgr::ActMgr(Region const* rg)
+{
+    ASSERT0(rg);
+    m_lm = rg->getLogMgr();
+    m_cnt = ACT_HANDLER_ID_UNDEF + 1;
+}
+
+
+ActMgr::ActMgr(LogMgr * lm)
+{
+    //NOTE:lm may be NULL.
+    m_lm = lm;
+    m_cnt = ACT_HANDLER_ID_UNDEF + 1;
+}
+
+
 ActHandler ActMgr::dump_args(CHAR const* format, va_list args)
 {
-    if (!m_rg->isLogMgrInit()) { return ActHandler(); }
+    if (!isLogMgrInit()) { return ActHandler(); }
     xcom::StrBuf * buf = allocStrBuf();
 
     //Dump action id.
@@ -94,7 +110,7 @@ ActHandler ActMgr::dump_args(CHAR const* format, va_list args)
 
 ActHandler ActMgr::dump(CHAR const* format, ...)
 {
-    if (!m_rg->isLogMgrInit()) { return ActHandler(); }
+    if (!isLogMgrInit()) { return ActHandler(); }
     va_list args;
     va_start(args, format);
     ActHandler ach = dump_args(format, args);
@@ -106,14 +122,15 @@ ActHandler ActMgr::dump(CHAR const* format, ...)
 void ActMgr::dump() const
 {
     if (m_act_list.get_elem_count() == 0) { return; }
-    note(m_rg, "\n-- ACTMGR --");
-    m_rg->getLogMgr()->incIndent(2);
+    if (!isLogMgrInit()) { return; }
+    note(m_lm, "\n-- ACTMGR --");
+    m_lm->incIndent(2);
     xcom::List<xcom::StrBuf*>::Iter it;
     for (xcom::StrBuf * buf = m_act_list.get_head(&it);
          buf != nullptr; buf = m_act_list.get_next(&it)) {
-        note(m_rg, "\n%s", buf->buf);
+        note(m_lm, "\n%s", buf->buf);
     }
-    m_rg->getLogMgr()->decIndent(2);
+    m_lm->decIndent(2);
 }
 //END ActMgr
 

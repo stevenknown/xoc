@@ -354,8 +354,10 @@ CHAR * getFileSuffix(CHAR const* n, OUT CHAR * buf, UINT bufl);
 CHAR * getFilePath(CHAR const* n, OUT CHAR * buf, UINT bufl);
 
 //Extract file name.
-//e.g: Given /xx/yy/zz.foo, return zz.
-CHAR * getFileName(CHAR const* n, OUT CHAR * buf, UINT bufl);
+//e.g: Given /xx/yy/zz.foo, if strip_suffix is true, then return zz,
+//     otherwise return zz.foo
+CHAR * getFileName(
+    CHAR const* n, OUT CHAR * buf, UINT bufl, bool strip_suffix = true);
 
 //Get current micro-second.
 ULONGLONG getusec();
@@ -572,6 +574,13 @@ UINT64 half2EHP64(UINT64 val);
 
 //convert bf16 to EHP64(64-bit extended half-precision) format.
 UINT64 bf16ToEHP64(UINT64 val);
+
+//Return true if 'fn' contains suffix which listed in variant parameters
+//list '...'.
+//NOTE:... parameters must be terminated with nulllptr.
+//e.g:bool succ = isFileSuffix("test.wf", "c", "cpp", "wf", nullptr);
+//    where the last argument must be nullptr.
+bool isFileSuffix(CHAR const* fn, ...);
 
 //Return true if *signed* val exceeds the range described by 'bitsize'.
 bool isExceedBitWidth(LONGLONG val, UINT bitwidth);

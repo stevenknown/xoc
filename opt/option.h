@@ -218,6 +218,9 @@ public:
     //compilation.
     bool is_dump_irid;
 
+    //The option determines whether to dump GR(the General Representation).
+    bool is_dump_gr;
+
     //The option determines whether IR dumper dumps the source code line
     //number of IR when dumpIR() invoked.
     //It should be set to false when the dump information is used in
@@ -256,6 +259,7 @@ public:
     bool isDumpCG() const;
     bool isDumpMDRef() const;
     bool isDumpIRID() const;
+    bool isDumpGR() const;
     bool isDumpIRSrcLine() const;
     bool isDumpIRAttachInfo() const;
     bool isDumpIRParser() const;
@@ -303,6 +307,9 @@ public:
     void enablePassInLevel2() { setPassInLevel2(true); }
     void enablePassInLevel3() { setPassInLevel3(true); }
     void enablePassInLevelSize() { setPassInLevelSize(true); }
+
+    //The function infers a set of options from a master control option.
+    void inferOption();
 };
 
 

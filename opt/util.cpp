@@ -38,10 +38,9 @@ namespace xoc {
 //
 //START BYTEVec
 //
-void BYTEVec::dump(Region const* rg) const
+void BYTEVec::dump(MOD LogMgr * lm) const
 {
-    ASSERT0(rg);
-    if (!rg->isLogMgrInit()) { return; }
+    if (lm == nullptr || !lm->is_init()) { return; }
     static CHAR const* g_char_string [] = {
         "0",
         "1",
@@ -60,16 +59,23 @@ void BYTEVec::dump(Region const* rg) const
         "E",
         "F",
     };
-    note(rg, "\n");
+    note(lm, "\n");
     for (UINT i = 0; i < get_elem_count(); i++) {
         BYTE b = get(i);
         BYTE low = xcom::extractBitRangeValue(b, 0, 3);
         BYTE high = xcom::extractBitRangeValue(b, 4, 7);
         ASSERT0(low >= 0 && low <= 15);
         ASSERT0(high >= 0 && high <= 15);
-        if (i != 0) { note(rg, " "); }
-        prt(rg, "%s%s", g_char_string[high], g_char_string[low]);
+        if (i != 0) { prt(lm, " "); }
+        prt(lm, "%s%s", g_char_string[high], g_char_string[low]);
     }
+}
+
+
+void BYTEVec::dump(Region const* rg) const
+{
+    ASSERT0(rg);
+    dump(rg->getLogMgr());
 }
 //END BYTEVec
 

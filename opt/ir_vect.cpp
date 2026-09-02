@@ -420,7 +420,7 @@ VectAccDesc * VectAccDescMgr::genDesc(IR const* ir)
 //
 void VectActMgr::dumpAct(CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!isLogMgrInit()) { return; }
     VectActMgr * pthis = const_cast<VectActMgr*>(this);
     ASSERT0(format);
     va_list args;
@@ -432,7 +432,7 @@ void VectActMgr::dumpAct(CHAR const* format, ...) const
 
 void VectActMgr::dumpAct(IR const* ir, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!isLogMgrInit()) { return; }
     ASSERT0(ir);
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
@@ -446,10 +446,10 @@ void VectActMgr::dumpAct(IR const* ir, CHAR const* format, ...) const
     if (format != nullptr) {
         acth.info->strcat("%s", tmpbuf.getBuf());
     }
-    getRegion()->getLogMgr()->incIndent(2);
+    m_lm->incIndent(2);
     xcom::StrBuf irbuf(64);
-    xoc::dumpIRToBuf(ir, getRegion(), irbuf);
-    getRegion()->getLogMgr()->decIndent(2);
+    xoc::dumpIRToBuf(ir, m_rg, irbuf);
+    m_lm->decIndent(2);
     acth.info->strcat(irbuf);
 }
 
@@ -457,7 +457,7 @@ void VectActMgr::dumpAct(IR const* ir, CHAR const* format, ...) const
 void VectActMgr::dumpLinRepAct(
     IVLinearRep const& linrep, CHAR const* format, ...) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!isLogMgrInit()) { return; }
     ASSERTN(format, ("no action info"));
     VectActMgr * pthis = const_cast<VectActMgr*>(this);
     xcom::StrBuf tmpbuf(64);

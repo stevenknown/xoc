@@ -45,6 +45,7 @@ public:
     BYTEVec() {}
     BYTEVec(UINT size) : xcom::Vector<BYTE>(size) {}
     void dump(Region const* rg) const;
+    void dump(MOD LogMgr * lm) const;
 };
 
 //Dump host-machine integer value.

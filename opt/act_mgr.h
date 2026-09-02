@@ -57,7 +57,7 @@ public:
 class ActMgr {
 protected:
     UINT m_cnt;
-    Region const* m_rg;
+    LogMgr * m_lm;
     xcom::List<xcom::StrBuf*> m_act_list;
 protected:
     xcom::StrBuf * allocStrBuf()
@@ -67,7 +67,8 @@ protected:
         return buf;
     }
 public:
-    ActMgr(Region const* rg) : m_rg(rg) { m_cnt = ACT_HANDLER_ID_UNDEF + 1; }
+    ActMgr(Region const* rg);
+    ActMgr(LogMgr * lm);
     ~ActMgr() { clean(); }
     void clean();
 
@@ -80,8 +81,9 @@ public:
 
     //Return the number of actions.
     UINT getActNum() const { return m_act_list.get_elem_count(); }
+    LogMgr const* getLogMgr() const { return m_lm; }
 
-    Region const* getRegion() const { return m_rg; }
+    bool isLogMgrInit() const { return m_lm != nullptr && m_lm->is_init(); }
 };
 
 } //namespace xoc

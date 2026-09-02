@@ -87,6 +87,7 @@ ir_dump.o\
 ir_dump_ext.o\
 ir_mgr.o\
 ir_mgr_ext.o\
+ir_vect.o\
 ir_verify.o\
 ir_verify_ext.o\
 ir_decl.o\
@@ -124,10 +125,13 @@ $(info "CURFILE: $(CURFILE)")
 ifeq ($(FOR_IP), true)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE $(ROOT_DIR)/opt/Makefile.ip.inc")
   include $(ROOT_DIR)/opt/Makefile.ip.inc
-  $(info "INCLUDE: IN $(CURFILE), INCLUDE \
-          $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")
-  include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
-else ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
+
+  #$(info "INCLUDE: IN $(CURFILE), INCLUDE \
+  #        $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")
+  #include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc
+endif
+
+ifneq ($(findstring $(REF_TARGMACH_INFO), true),)
   $(info "INCLUDE: IN $(CURFILE), INCLUDE \
           $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc")
   include $(ROOT_DIR)/opt/Makefile.ref_targmach_info.inc

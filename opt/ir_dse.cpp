@@ -56,7 +56,7 @@ static void dumpReasonPreventDSE(
 {
     ActMgr * am = ctx.getActMgr();
     if (am == nullptr) { return; }
-    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!ctx.getRegion()->isLogMgrInit()) { return; }
     if (!g_dump_opt.isDumpPass(PASS_DSE)) { return; }
     xcom::StrBuf reasonbuf(64);
     if (format != nullptr) {
@@ -80,7 +80,7 @@ static void dumpReasonPreventDSE(
 {
     ActMgr * am = ctx.getActMgr();
     if (am == nullptr) { return; }
-    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!ctx.getRegion()->isLogMgrInit()) { return; }
     if (!g_dump_opt.isDumpPass(PASS_DSE)) { return; }
     xcom::StrBuf reasonbuf(64);
     if (format != nullptr) {

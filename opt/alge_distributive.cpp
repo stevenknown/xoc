@@ -113,7 +113,7 @@ static bool isConstExpTree(IR const* ir)
 //
 void DistActMgr::dumpAct(CHAR const* format, ...)
 {
-    if (!m_rg->isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_ALGE_DISTRIBUTIVE))
+    if (!isLogMgrInit() || !g_dump_opt.isDumpPass(PASS_ALGE_DISTRIBUTIVE))
     { return; }
     va_list args;
     va_start(args, format);

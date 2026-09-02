@@ -271,11 +271,7 @@ Pass * PassMgr::allocInvertBrTgt()
 
 Pass * PassMgr::allocIfConversion()
 {
-    #ifdef FOR_IP
     return new IfConversion(m_rg);
-    #else
-    return nullptr;
-    #endif
 }
 
 
@@ -357,11 +353,7 @@ Pass * PassMgr::allocCallGraph()
 
 Pass * PassMgr::allocVectorization()
 {
-    #ifdef FOR_IP
     return new Vectorization(m_rg);
-    #else
-    return nullptr;
-    #endif
 }
 
 
@@ -548,7 +540,7 @@ Pass * PassMgr::allocSolveSetMgr()
 
 Pass * PassMgr::allocRegSSAMgr()
 {
-    #if defined REF_TARGMACH_INFO || defined FOR_IP
+    #if defined REF_TARGMACH_INFO
     return new RegSSAMgr(m_rg);
     #else
     return nullptr;

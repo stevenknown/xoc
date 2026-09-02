@@ -139,7 +139,7 @@ static void dumpReasonPreventRP(
 {
     ActMgr * am = ctx.getActMgr();
     if (am == nullptr) { return; }
-    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!am->isLogMgrInit()) { return; }
     if (!g_dump_opt.isDumpPass(PASS_RP)) { return; }
     xcom::StrBuf reasonbuf(64);
     if (format != nullptr) {
@@ -315,7 +315,7 @@ void RPCtx::dumpClobber(
 {
     ActMgr * am = getActMgr();
     if (am == nullptr) { return; }
-    if (!am->getRegion()->isLogMgrInit()) { return; }
+    if (!am->isLogMgrInit()) { return; }
     if (!g_dump_opt.isDumpPass(PASS_RP)) { return; }
     xcom::StrBuf tmpbuf(64);
     if (format != nullptr) {
