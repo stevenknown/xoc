@@ -75,6 +75,7 @@ author: Su Zhenyu
 #include "comopt_ip.h"
 #endif
 
+#include "ir_vect.h"
 #include "if_conversion.h"
 #include "ir_decl_ext.h"
 #include "ir_mgr.h"
