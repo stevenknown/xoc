@@ -288,6 +288,12 @@ UINT16 float2BF16(UINT32 val);
 //Convert float to FP16 format.
 UINT16 float2FP16(UINT32 val);
 
+//Convert BF16 to float.
+float bf162float(UINT16 bf16);
+
+//Convert HALF to float.
+float half2float(UINT16 half);
+
 //Great common divisor for number of values.
 INT gcdm(UINT num, ...);
 
@@ -577,9 +583,10 @@ UINT64 bf16ToEHP64(UINT64 val);
 
 //Return true if 'fn' contains suffix which listed in variant parameters
 //list '...'.
-//NOTE:... parameters must be terminated with nulllptr.
-//e.g:bool succ = isFileSuffix("test.wf", "c", "cpp", "wf", nullptr);
-//    where the last argument must be nullptr.
+//NOTE:... parameters must be terminated with nullptr.
+//  e.g:bool succ = isFileSuffix("test.wf", "c", "cpp", "WF", "wf", nullptr);
+//      where the last argument must be nullptr.
+//NOTE:File name suffixes aren't case-sensitive.
 bool isFileSuffix(CHAR const* fn, ...);
 
 //Return true if *signed* val exceeds the range described by 'bitsize'.
@@ -980,4 +987,4 @@ inline bool checkAligned(ULONGLONG addr, size_t bytesize)
 
 } //namespace xcom
 
-#endif  //_COMMON_FUNCTION_H_
+#endif //_COMMON_FUNCTION_H_

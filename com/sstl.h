@@ -3054,7 +3054,7 @@ public:
         UINT exp_cap = org_elem_num + arrayelemnum + GrowSize;
         if (exp_cap > get_capacity()) {
             grow(org_elem_num + arrayelemnum + GrowSize);
-    }
+        }
 
         //Copy the elements from the buffer to the vector.
         ::memcpy(m_vec + org_elem_num, array, arrayelemnum * sizeof(T));
@@ -3208,6 +3208,9 @@ public:
     //e.g: the vector has elements <null, x, y, z>, the function return 4.
     UINT get_elem_count() const { return (UINT)(get_last_idx() + 1); }
 
+    //Return the maximum element index that the vector<T> can hold.
+    UINT get_vector_max_capacity() const { return (((UINT)-1) << 1) >> 1; }
+
     //Growing vector up to hold the most num_of_elem elements.
     //If 'm_elem_num' is 0 , alloc vector to hold num_of_elem elements.
     //Reallocate memory if necessory.
@@ -3224,13 +3227,12 @@ public:
             m_elem_num = (ElemNumTy)num_of_elem;
             return;
         }
-
         ASSERT0((ElemNumTy)num_of_elem > m_elem_num);
         T * tmp = (T*)::malloc(num_of_elem * sizeof(T));
         ASSERT0(tmp);
         ::memcpy((void*)tmp, m_vec, m_elem_num * sizeof(T));
         ::memset((void*)(((CHAR*)tmp) + m_elem_num * sizeof(T)), 0,
-                 (num_of_elem - m_elem_num)* sizeof(T));
+                 (num_of_elem - m_elem_num) * sizeof(T));
         ::free(m_vec);
         m_vec = tmp;
         m_elem_num = num_of_elem;

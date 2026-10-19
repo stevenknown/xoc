@@ -3828,7 +3828,6 @@ MSTWeightType MST::build(Vertex const* root, OUT MSTPath & path)
 //The class represents the Depth First Number of graph.
 void DFN::compute()
 {
-    UINT cnt = 0;
 }
 //END DFN
 

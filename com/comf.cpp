@@ -758,6 +758,54 @@ UINT16 float2FP16(UINT32 val)
 }
 
 
+float bf162float(UINT16 bf16)
+{
+    float fp32;
+    UINT32 * p = (UINT32*)&fp32;
+    *p = ((UINT32)bf16) << 16U;
+    return fp32;
+}
+
+
+float half2float(UINT16 half)
+{
+    UINT32 sign = (static_cast<UINT32>(half) >> 15) & 0x1U;
+    UINT32 exp16 = (half >> 10) & 0x1FU; //5 bits exponent
+    UINT32 mant16 = half & 0x3FFU; //10 bits mantissa
+    UINT32 f_u32;
+    if (exp16 == 0) {
+        if (mant16 == 0) {
+            //+-ZERO
+            f_u32 = sign << 31;
+        } else {
+            //Subnormal FP16: renormalize
+            //find leading 1
+            INT shift = 0;
+            UINT32 m = mant16;
+            while ((m & 0x400U) == 0) {
+                m <<= 1;
+                shift++;
+            }
+            mant16 = (m & 0x3FFU) << 13U;
+            UINT32 exp32 = 1U - shift + 112U;
+            f_u32 = (sign << 31) | (exp32 << 23) | mant16;
+        }
+    } else if (exp16 == 0x1FU) {
+        //Inf|NaN
+        f_u32 = (sign << 31) | (0xFFU << 23) | (mant16 << 13U);
+    } else {
+        //Normal number
+        UINT32 exp32 = exp16 + 112U;
+        UINT32 mant32 = mant16 << 13U; //10->23bit, shift left 13
+        f_u32 = (sign << 31) | (exp32 << 23) | mant32;
+    }
+    float fp32;
+    UINT32 * p = (UINT32*)&fp32;
+    *p = f_u32;
+    return fp32;
+}
+
+
 //half:
 //sign exponent    mantissa
 //15   14 ~ 10     9 ~ 0
@@ -1284,8 +1332,9 @@ CHAR * getFileName(
     if (i < 0) { start = 0; }
     else { start = i; }
 
-    if (dotpos < 0) { end = l; }
+    if (dotpos == -1) { end = l; }
     else if (strip_suffix) { end = dotpos; }
+    else { end = l; }
 
     UINT len = end - start;
     if (len > 0) {
@@ -1308,8 +1357,12 @@ bool isFileSuffix(CHAR const* fn, ...)
     //Walk through each suffixs.
     CHAR const* fix = va_arg(fix_start, CHAR const*);
     bool succ = false;
+    FixedStrBuf<16> fixbuf;
     while (fix != nullptr) {
-        if (::strcmp(buf, fix) == 0) {
+        fixbuf.clean();
+        fixbuf.strcat(fix);
+        xcom::upper(fixbuf.getBuf());
+        if (::strcmp(buf, fixbuf.getBuf()) == 0) {
             succ = true;
             break;
         }

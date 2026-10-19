@@ -1187,6 +1187,10 @@ bool IR::replaceKidWithIRList(IR * oldk, IR * newk_list, bool recur)
 //replacement for 'oldk'.
 bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
 {
+    //NOTE:If oldk has been freed, it will have been linked into free-list.
+    //Thus it is not suitable to call replace_one().
+    ASSERT0(!oldk->is_undef());
+
     //Note for the sake of accessing speed, and the function is frequently
     //used, thus the function does NOT reuse the replaceKid() with
     //compare-function implementation.

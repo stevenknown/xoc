@@ -116,6 +116,9 @@ public:
     //Return true if ir is a stmt and its result is a masked value.
     static bool isMaskResult(IR const* ir);
 
+    //Return true if ir is an expression that compute the partial value.
+    bool isPartialOp(IR const* ir);
+
     virtual bool isMoveOp(IR const* ir) const override;
     virtual bool isRegardAsMoveOp(IR const* ir) const;
 

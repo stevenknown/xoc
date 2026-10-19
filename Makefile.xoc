@@ -126,6 +126,8 @@ $(XOC_OUTPUT): $(COM_OUTPUT) \
                build_tmp_reader_objs \
                build_tmp_mach_objs
 	@echo "==-- IN Makefile.xoc: START BUILD $(XOC_OUTPUT) --=="
+	@echo "EXEC:"
+	rm -f $(XOC_OUTPUT)
 	@echo "EXEC:"; \
        ar -rvscT $(XOC_OUTPUT) \
          $(COM_DIR)/$(COM_OUTPUT) \

@@ -100,6 +100,9 @@ void * smpoolMalloc(size_t size, SMemPool * handle, size_t grow_size = 0);
 
 //The function allocates constant size of memory according to the element size.
 //elem_size: the bytesize of element or a mutiple of the element size.
+//User must ensure each element in const size pool are same size.
+//NOTE: elem_size can be a multiple of the single element size.
+//      e.g:smpoolMallocConstSize(sizeof(UINT) * 100, poolptr);
 void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler);
 
 //Get whole pool size with byte

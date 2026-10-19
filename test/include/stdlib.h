@@ -4,6 +4,8 @@
 #ifndef _STDLIB_H_
 #define _STDLIB_H_
 
+#define RAND_MAX 0x7FFFFFFF //2^31-1, equal to INT_MAX
+
 void * calloc(int);
 extern void abort();
 extern void exit(int);
@@ -20,5 +22,7 @@ void qsort(void *base, size_t num, size_t size,
            int (*compar)(const void *, const void *));
 int mkstemps(char *template, int suffixlen);
 void perror(const char *s);
+int rand(void);
+void srand(unsigned int seed);
 
 #endif

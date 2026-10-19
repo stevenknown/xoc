@@ -219,6 +219,19 @@ bool IRMgrExt::isRegardAsMoveOp(IR const* ir) const
 }
 
 
+bool IRMgrExt::isPartialOp(IR const* ir)
+{
+    switch (ir->getCode()) {
+    case IR_SELECT:
+    case IR_MASK_OP:
+    case IR_DYNLEN_OP:
+        return true;
+    default: return false;
+    }
+    return false;
+}
+
+
 bool IRMgrExt::isMaskResult(IR const* ir)
 {
     if (ir->hasResult() && ir->hasRHS() &&

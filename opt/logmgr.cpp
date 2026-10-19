@@ -97,7 +97,7 @@ static size_t prt_leading_newline(LogMgr * lm, xcom::StrBuf const& buf,
 
 static void prt_indent(LogMgr * lm)
 {
-    ASSERT0(lm->is_init());
+    ASSERT0(lm && lm->is_init());
     UINT indent = lm->getIndent();
     for (; indent > 0; indent--) {
         if (lm->isEnableBuffer()) {
@@ -115,8 +115,7 @@ static void prt_indent(LogMgr * lm)
 
 static void note_helper(LogMgr * lm, xcom::StrBuf const& buf)
 {
-    ASSERT0(lm);
-    if (!lm->is_init()) { return; }
+    if (lm == nullptr || !lm->is_init()) { return; }
     FILE * h = lm->getFileHandler();
     ASSERT0(h || lm->getBuffer());
     UINT const buflen = (UINT)buf.strlen();
@@ -166,7 +165,7 @@ static void note_helper(LogMgr * lm, xcom::StrBuf const& buf)
 
 static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
-    if (!lm->is_init()) { return; }
+    if (lm == nullptr || !lm->is_init()) { return; }
     va_list targs;
     va_copy(targs, args);
     xcom::StrBuf buf(64);
@@ -179,8 +178,7 @@ static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
 //Print string with indent chars.
 static void prt_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
-    ASSERT0(lm);
-    if (!lm->is_init() || format == nullptr) { return; }
+    if (lm == nullptr || !lm->is_init() || format == nullptr) { return; }
     FILE * h = lm->getFileHandler();
     ASSERT0(h || lm->getBuffer());
 
@@ -236,6 +234,24 @@ bool prt(LogMgr * lm, CHAR const* format, ...)
     prt_helper(lm, format, args);
     va_end(args);
     return true;
+}
+
+
+void prt_arg(Region const* rg, CHAR const* format, va_list args)
+{
+    va_list targs;
+    va_copy(targs, args);
+    prt_helper(rg->getLogMgr(), format, targs);
+    va_end(targs);
+}
+
+
+void prt_arg(LogMgr * lm, CHAR const* format, va_list args)
+{
+    va_list targs;
+    va_copy(targs, args);
+    prt_helper(lm, format, targs);
+    va_end(targs);
 }
 
 

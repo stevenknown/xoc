@@ -38,7 +38,7 @@ namespace xoc {
 //
 //START BYTEVec
 //
-void BYTEVec::dump(MOD LogMgr * lm) const
+void BYTEVec::dump(MOD LogMgr * lm, INT dumpnum) const
 {
     if (lm == nullptr || !lm->is_init()) { return; }
     static CHAR const* g_char_string [] = {
@@ -60,7 +60,9 @@ void BYTEVec::dump(MOD LogMgr * lm) const
         "F",
     };
     note(lm, "\n");
-    for (UINT i = 0; i < get_elem_count(); i++) {
+    UINT elemnum =
+        dumpnum < 0 ? get_elem_count() : MIN(get_elem_count(), (UINT)dumpnum);
+    for (UINT i = 0; i < elemnum; i++) {
         BYTE b = get(i);
         BYTE low = xcom::extractBitRangeValue(b, 0, 3);
         BYTE high = xcom::extractBitRangeValue(b, 4, 7);
@@ -72,10 +74,10 @@ void BYTEVec::dump(MOD LogMgr * lm) const
 }
 
 
-void BYTEVec::dump(Region const* rg) const
+void BYTEVec::dump(Region const* rg, INT dumpnum) const
 {
     ASSERT0(rg);
-    dump(rg->getLogMgr());
+    dump(rg->getLogMgr(), dumpnum);
 }
 //END BYTEVec
 

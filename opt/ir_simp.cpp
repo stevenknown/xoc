@@ -2947,12 +2947,74 @@ IR * IRSimp::simplifySwitch(IR * ir, SimpCtx * ctx)
 }
 
 
+IR * IRSimp::simplifyMaskOp(IR * ir, SimpCtx * ctx)
+{
+    return simplifyAllKidsExpression(ir, ctx);
+}
+
+
+IR * IRSimp::simplifyDynLenOp(IR * ir, SimpCtx * ctx)
+{
+    return simplifyAllKidsExpression(ir, ctx);
+}
+
+
+IR * IRSimp::simplifySelectToRes(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->is_select_to_res());
+    ASSERT0(ir->getKidNum() == 2);
+    IR * base = SELECTTORES_base(ir);
+    IR * op = SELECTTORES_op(ir);
+    if (base != nullptr) {
+        base = simplifyExpressionList(base, ctx);
+        SELECTTORES_base(ir) = base;
+        ir->setParent(base);
+    }
+    if (base != nullptr) {
+        //Shouldn't simplify SELECT_TO_RES if base is not empty.
+        return simplifyAllKidsExpression(ir, ctx);
+    }
+    IRMgrExt * irmgrext = (IRMgrExt*)m_irmgr;
+    ASSERT0(irmgrext->isPartialOp(op));
+    ASSERT0(op->is_single());
+    switch (op->getCode()) {
+    case IR_SELECT:
+    case IR_MASK_OP:
+    case IR_DYNLEN_OP: {
+        IR * newop = simplifyExpression(op, ctx);
+        if (irmgrext->isPartialOp(newop)) {
+            SELECTTORES_op(ir) = newop;
+            ir->setParent(newop);
+            return ir;
+        }
+        //OP has been converted to non-partial operations, thus SELECT_TO_RES
+        //isn't necessary.
+        SELECTTORES_op(ir) = nullptr;
+        ctx->tryInvalidInfoBeforeFreeIR(ir);
+        m_rg->freeIRTree(ir);
+        return newop;
+    }
+    default: ASSERT0(0); //TODO:
+    }
+    return ir;
+}
+
+
 IR * IRSimp::simplifyExtExp(IR * ir, SimpCtx * ctx)
 {
     //Target Dependent Code.
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
     SWITCH_CASE_EXT_EXP:
+        if (ir->is_select_to_res()) {
+            return simplifySelectToRes(ir, ctx);
+        }
+        if (ir->getCode() == IR_MASK_OP) {
+            return simplifyMaskOp(ir, ctx);
+        }
+        if (ir->getCode() == IR_DYNLEN_OP) {
+            return simplifyDynLenOp(ir, ctx);
+        }
         return simplifyAllKidsExpression(ir, ctx);
     default: UNREACHABLE();
     }

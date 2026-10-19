@@ -11,12 +11,14 @@
 #include "diagnostic.h"
 #include "comm_macro.h"
 #include "smempool.h"
+#include "mempoolmgr.h"
 using namespace xcom;
 #include "fileobj.h"
 #include "byteop.h"
 #include "flag.h"
 #include "allocator.h"
 #include "comf.h" //used by sstl.h
+#include "unicode.h"
 #include "sstl.h"
 #include "strbuf.h"
 #include "bs.h"

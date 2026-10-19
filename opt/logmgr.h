@@ -296,6 +296,8 @@ bool prt(RegionMgr const* rm, CHAR const* format, ...);
 //Helper function to dump formatted string to logfile without indent.
 //lm: Log manager
 bool prt(LogMgr * lm, CHAR const* format, ...);
+void prt_arg(Region const* rg, CHAR const* format, va_list args);
+void prt_arg(LogMgr * lm, CHAR const* format, va_list args);
 
 //Print indent chars.
 void prtIndent(Region const* rg, UINT indent);

@@ -546,10 +546,11 @@ public:
 //   Note that the 'base' operand and result register are usually the same.
 //
 
-//Normal mask/dynamic-size operation.
+//Normal select/mask/dynamic-size operation.
 #define SELECTTORES_op(ir) SELECTTORES_kid(ir, 0)
 
 //The operands to be partially modified.
+//NOTE:The base can be NULL if SELECTTORES_op produces the first value.
 #define SELECTTORES_base(ir) SELECTTORES_kid(ir, 1)
 
 #define SELECTTORES_kid(ir, idx) \

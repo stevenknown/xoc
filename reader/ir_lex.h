@@ -30,7 +30,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-typedef enum _TOKEN {
+//The enumeration predefines tokens that are frequently used in common cases.
+typedef enum _TOKEN : int {
     T_UNDEF = 0, // NULL
     T_IDENTIFIER, // (A-Z|a-z)(A-Z|a-z|0-9)*
     T_IMM, // 0~9
@@ -86,6 +87,7 @@ typedef enum _TOKEN {
     T_COLON, // :
     T_SEMI, // ;
     T_QUOT, // "
+    T_SINGLE_QUOT, // '
     T_COMMA, // ,
     T_UNDERLINE, // _
     T_LANDSCAPE, // -
@@ -138,6 +140,9 @@ typedef enum _TOKEN {
     T_PRAGMA, // pragma
     T_NEWLINE, // \n
     T_DOLLAR, // $
+    T_BACKTICK, // `
+    T_TAB, // \t
+    T_SPACE, // ' '
     ////////////////////////////////////
     //DO NOT ADD ENUM AFTER THIS LINE.//
     ////////////////////////////////////
@@ -167,8 +172,8 @@ public:
 };
 
 //The maximum byte size for each load from source file.
-#define LEX_MAX_BUF_LINE 4096
-#define LEX_MAX_OFST_BUF_LEN 1024
+#define LEX_MAX_LINE_BUF_SIZE 255
+#define LEX_MAX_STREAM_BUF_SIZE 4096
 
 class String2Token : public HMap<CHAR const*, TOKEN, HashFuncString2> {
 public:
@@ -191,14 +196,32 @@ typedef xcom::TMapIter<CHAR const*, TOKEN> Str2TokenIter;
 class Lexer {
     COPY_CONSTRUCTOR(Lexer);
 protected:
+    //Set true if source line is end with the character '0xd' and '0xa'.
+    bool m_is_dos;
+
     //Set true if need lexer to recognize the true and false token.
     bool m_enable_true_false_token;
 
     //Set true to regard '\n' as token.
     bool m_enable_newline_token;
 
-    //Set true if source line is end with the character '0xd' and '0xa'.
-    bool m_is_dos;
+    //Set true to recognize two double quote "..." to be a string, otherwise
+    //regard quote to specific token.
+    bool m_enable_string_token;
+
+    //Set true to recognize two single quote '...' to be a char-list, otherwise
+    //regard single quote to specific token.
+    bool m_enable_charlist_token;
+
+    //Set true to return the space as normal character.
+    bool m_enable_space_token;
+
+    //Set true to return the tab-char '\t' as normal character.
+    bool m_enable_tab_token;
+
+    //Set true if user is going to retrieve source line speedily through
+    //byte-offset table.
+    bool m_enable_offset_tab;
 
     //Set true to return the newline charactors as normal character.
     bool m_use_newline_char;
@@ -209,16 +232,6 @@ protected:
     //Record current token that has been parsed.
     TOKEN m_cur_token;
 
-    //Record length of current token string that has been parsed.
-    UINT m_cur_token_string_len;
-
-    //Record byte index in token-string-buffer that has been parsed.
-    //for local used.
-    UINT m_cur_token_string_pos;
-
-    //Record the line number that may be backed tracking from the latest line.
-    UINT m_real_line_num;
-
     //Record the latest line number of src file.
     UINT m_src_line_num;
 
@@ -228,23 +241,28 @@ protected:
     //Current position in m_cur_line.
     UINT m_cur_line_pos;
 
-    //Length of m_cur_line.
-    UINT m_cur_line_num;
+    //Length of string in m_cur_line.
+    UINT m_string_len_in_cur_line;
 
-    //Current position in m_file_buf.
-    UINT m_file_buf_pos;
+    //Current position in m_stream_buf.
+    UINT m_stream_buf_pos;
 
     //Record the actually byte size that read from src file.
     UINT m_last_read_num;
 
-    //Length of current parsing line buffer.
+    //Byte length of current parsing line buffer that has been allocated.
     UINT m_cur_line_len;
 
     //Record length of offset table.
     LONG m_ofst_tab_byte_size;
 
+    //Record byte index in token-string-buffer that has been parsed.
+    UINT m_cur_token_string_pos;
+
+    //Byte length of current token string that has been allocated.
+    UINT m_cur_token_string_len;
+
     //Record current token string that has been parsed.
-    //for local used.
     CHAR * m_cur_token_string;
 
     //Record input source file handler.
@@ -259,12 +277,18 @@ protected:
     SMemPool * m_pool;
 
     //Buffer to hold the prefected byte from src file.
-    CHAR m_file_buf[LEX_MAX_BUF_LINE];
+    CHAR m_tmp_file_buf[LEX_MAX_STREAM_BUF_SIZE];
+
+    //A pointer that pointed to a buffer that hold the input
+    //char-stream.
+    CHAR * m_stream_buf;
+    HOST_UINT m_stream_buf_len;
 
     //String2Token m_str2token;
     Str2Token m_str2token;
     List<LexErrorMsg*> m_err_msg_list;
 protected:
+    //The enumeration utilizes non‑printable control characters value.
     typedef enum tagSTATUS {
         LEX_SUCC = 0, //Status if successful.
         LEX_ERR = 1, //Status if error occur.
@@ -291,11 +315,15 @@ protected:
     //t: the latest token that has been parsed by previous functions.
     TOKEN parse_suffix(TOKEN t);
 
-    //Read LEX_MAX_BUF_LINE characters from src file.
+    //Read characters from source file or buffer.
     Lexer::STATUS readLineBuf(bool is_some_chars_in_cur_line);
-    Lexer::STATUS readLine(OUT bool & is_some_chars_in_cur_line,
-                           MOD UINT & pos_in_cur_buf);
+    Lexer::STATUS readLine(
+        OUT bool & is_some_chars_in_cur_line, MOD UINT & pos_in_cur_buf);
+    Lexer::STATUS readLineByIncompleteDOSEnd(MOD UINT & pos_in_cur_buf);
+    Lexer::STATUS readLineByDOSEnd(MOD UINT & pos_in_cur_buf);
+    Lexer::STATUS readLineByUnixEnd(MOD UINT & pos_in_cur_buf);
 
+    void tryConstructOffsetTab();
     //Token dispatch functions.
     TOKEN t_div(CHAR next_char);
     CHAR t_escape_string();
@@ -319,69 +347,12 @@ protected:
     TOKEN t_lead_by_percent();
     TOKEN t_lead_by_add();
     TOKEN t_lead_by_sub();
-
-    void * xmalloc(size_t size)
-    {
-        ASSERTN(m_pool, ("not yet initialized."));
-        void * p = smpoolMallocConstSize(size, m_pool);
-        ASSERTN(p, ("malloc failed"));
-        ::memset((void*)p, 0, size);
-        return p;
-    }
+    void updateOffsetTab();
+    void * xmalloc(size_t size);
 public:
-    Lexer()
-    {
-        m_enable_newline_token = false;
-        m_is_dos = true;
-        m_enable_true_false_token = true;
-        m_use_newline_char = true;
-        m_src_file = nullptr;
-        m_cur_line = nullptr;
-        m_cur_line_len = 0;
-        m_ofst_tab = nullptr;
-        m_ofst_tab_byte_size = 0;
-        m_file_buf_pos = LEX_MAX_BUF_LINE;
-        initKeyWordTab();
-        m_pool = smpoolCreate(0, MEM_COMM);
-        m_cur_token_string = (CHAR*)::malloc(LEX_MAX_BUF_LINE);
-        m_cur_token_string_len = LEX_MAX_BUF_LINE;
-        clean();
-    }
-    ~Lexer()
-    {
-        if (m_ofst_tab != nullptr) {
-            ::free(m_ofst_tab);
-            m_ofst_tab = nullptr;
-        }
-        if (m_cur_line != nullptr) {
-            ::free(m_cur_line);
-            m_cur_line = nullptr;
-        }
-        smpoolDelete(m_pool);
-        ::free(m_cur_token_string);
-        m_cur_token_string_len = 0;
-    }
-
-    void clean()
-    {
-        m_cur_token_string_pos = 0;
-        m_cur_token = T_UNDEF;
-        m_src_line_num = 0;
-        if (m_cur_line != nullptr) {
-            m_cur_line[0] = 0;
-        }
-        if (m_cur_token_string != nullptr) {
-            m_cur_token_string[0] = 0;
-        }
-        m_file_buf[0] = 0;
-        m_real_line_num = 0;
-        m_cur_src_ofst = 0;
-        m_cur_line_pos = 0;
-        m_cur_line_num = 0;
-        m_file_buf_pos = LEX_MAX_BUF_LINE;
-        m_last_read_num = 0;
-        m_cur_char = 0;
-    }
+    Lexer();
+    ~Lexer();
+    void clean();
 
     //Dump all token string of src file.
     //outputfile: dump token to output file
@@ -404,6 +375,11 @@ public:
     //the function return 'foo'.
     CHAR const* getCurrentTokenString() const { return m_cur_token_string; }
 
+    //Get the byte length of the content of current token.
+    //e.g:curent token is T_IDENTIFIER, whereas its content in buffer is 'foo',
+    //the function return 3.
+    UINT getCurrentTokenStringLen() const { return m_cur_token_string_pos; }
+
     //Get current token.
     TOKEN getCurrentToken() const { return m_cur_token; }
     FILE * getSrcFile() const { return m_src_file; }
@@ -420,6 +396,16 @@ public:
     //Get error messages occurred in Lexer.
     List<LexErrorMsg*> const& getErrorMsgList() const { return m_err_msg_list; }
 
+    //Return true if char-stream is coming from file, otherwise is coming from
+    //the prefilled buffer.
+    bool isReadFromFile() const { return m_src_file != nullptr; }
+    bool isEnableOffsetTab() const { return m_enable_offset_tab; }
+    bool isEnableNewLine() const { return m_enable_newline_token; }
+    bool isEnableString() const { return m_enable_string_token; }
+    bool isEnableCharList() const { return m_enable_charlist_token; }
+    bool isEnableSpace() const { return m_enable_space_token; }
+    bool isEnableTab() const { return m_enable_tab_token; }
+
     //Report error with line number.
     void error(UINT line_num, CHAR const* msg, ...);
 
@@ -431,6 +417,27 @@ public:
 
     //Set the input file handler that is ready to parse.
     void setSrcFile(FILE * h) { m_src_file = h; }
+
+    //Set the input char-stream buffer that is ready to parse.
+    void setSrcBuf(CHAR const* buf, HOST_UINT buflen);
+
+    //Enable or disable byte-offset-tab.
+    void setEnableOffsetTab(bool enable) { m_enable_offset_tab = enable; }
+
+    //Enable or disable newline token.
+    void setEnableNewLine(bool enable) { m_enable_newline_token = enable; }
+
+    //Enable or disable string token.
+    void setEnableString(bool enable) { m_enable_string_token = enable; }
+
+    //Enable or disable charlist token.
+    void setEnableCharList(bool enable) { m_enable_charlist_token = enable; }
+
+    //Enable or disable space token.
+    void setEnableSpace(bool enable) { m_enable_space_token = enable; }
+
+    //Enable or disable tab-char token.
+    void setEnableTab(bool enable) { m_enable_tab_token = enable; }
 };
 
 } //namespace xoc

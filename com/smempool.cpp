@@ -361,9 +361,6 @@ bool smpoolIsValidConstPool(size_t elem_size, SMemPool const* handler)
 }
 
 
-//Allocate one element from const size pool.
-//User must ensure each element in const size pool are same size.
-//elem_size: the byte size of each element.
 void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
 {
     ASSERTN(elem_size > 0, ("elem size can not be 0"));

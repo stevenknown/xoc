@@ -143,6 +143,7 @@ static TokenInfo g_token_info[] = {
 
     { T_NEWLINE, "\\n", },
     { T_DOLLAR, "$" , },
+    { T_BACKTICK, "`", },
 
     ///////////////////////////////////
     //DO NOT ADD ENUM AFTER THIS LINE//
@@ -196,6 +197,92 @@ static KeywordInfo g_keyword_info[] = {
 
 static UINT g_keyword_num = sizeof(g_keyword_info)/sizeof(g_keyword_info[0]);
 
+//
+//START Lexer
+//
+Lexer::Lexer()
+{
+    m_is_dos = true;
+    m_enable_newline_token = false;
+    m_enable_string_token = true;
+    m_enable_charlist_token = true;
+    m_enable_space_token = false;
+    m_enable_tab_token = false;
+    m_enable_offset_tab = true;
+    m_enable_true_false_token = true;
+    m_use_newline_char = true;
+    m_src_file = nullptr;
+    m_ofst_tab = nullptr;
+    m_ofst_tab_byte_size = 0;
+    m_stream_buf = &m_tmp_file_buf[0];
+    m_stream_buf_len = LEX_MAX_STREAM_BUF_SIZE;
+    m_stream_buf_pos = 0;
+
+//TBD hack m_stream_buf_pos = m_stream_buf_len;
+
+    initKeyWordTab();
+    m_pool = smpoolCreate(0, MEM_COMM);
+    m_cur_token_string = (CHAR*)::malloc(m_stream_buf_len);
+    m_cur_token_string_len = m_stream_buf_len;
+
+    //NOTE:the line buffer may reallocate during runtime.
+    m_cur_line = (CHAR*)::malloc(LEX_MAX_LINE_BUF_SIZE);
+    m_cur_line_len = LEX_MAX_LINE_BUF_SIZE;
+    ASSERTN(m_cur_line,
+            ("allocate %u bytes line-buffer failed", LEX_MAX_LINE_BUF_SIZE));
+    clean();
+}
+
+
+Lexer::~Lexer()
+{
+    if (m_ofst_tab != nullptr) {
+        ::free(m_ofst_tab);
+        m_ofst_tab = nullptr;
+    }
+    if (m_cur_line != nullptr) {
+        ::free(m_cur_line);
+        m_cur_line = nullptr;
+        m_cur_line_len = 0;
+    }
+    smpoolDelete(m_pool);
+    ::free(m_cur_token_string);
+    m_cur_token_string_len = 0;
+}
+
+
+void Lexer::clean()
+{
+    m_cur_token_string_pos = 0;
+    m_cur_token = T_UNDEF;
+    if (m_cur_line != nullptr) {
+        m_cur_line[0] = 0;
+    }
+    if (m_cur_token_string != nullptr) {
+        m_cur_token_string[0] = 0;
+    }
+    ASSERT0(m_stream_buf);
+    m_stream_buf[0] = 0;
+    m_src_line_num = 0;
+    m_cur_src_ofst = 0;
+    m_cur_line_pos = 0;
+    m_string_len_in_cur_line = 0;
+    m_stream_buf_pos = 0;
+    //m_stream_buf_pos = m_stream_buf_len;
+    m_last_read_num = 0;
+    m_cur_char = 0;
+}
+
+
+void * Lexer::xmalloc(size_t size)
+{
+    ASSERTN(m_pool, ("not yet initialized."));
+    void * p = smpoolMallocConstSize(size, m_pool);
+    ASSERTN(p, ("malloc failed"));
+    ::memset((void*)p, 0, size);
+    return p;
+}
+
 
 //Report error with line number.
 void Lexer::error(UINT line_num, CHAR const* msg, ...)
@@ -215,107 +302,129 @@ void Lexer::error(UINT line_num, CHAR const* msg, ...)
 }
 
 
-//Read LEX_MAX_BUF_LINE characters from src file.
+void Lexer::setSrcBuf(CHAR const* buf, HOST_UINT buflen)
+{
+    ASSERT0(buf && buflen > 0);
+    m_stream_buf = const_cast<CHAR*>(buf);
+    m_stream_buf_len = buflen;
+}
+
+
 Lexer::STATUS Lexer::readLineBuf(bool is_some_chars_in_cur_line)
 {
-    ASSERT0(m_src_file != nullptr);
-    UINT dw = (UINT)::fread(m_file_buf, 1, LEX_MAX_BUF_LINE, m_src_file);
-    if (dw == 0) {
-        if (!is_some_chars_in_cur_line) {
-            //Some characters had been put into 'm_cur_line',
-            //but the last character of 'm_file_buf' is not
-            //'0xD,0xA', so we hould to get there.
-            //However there is nothing more can be read from file,
-            //thus 'dw' is zero. This situation may take place
-            //at that we meet the file that terminate without
-            //'0xD,0xA'.
-            //TODO:Take a consideration of the corner case, we
-            //should process the last characters in 'm_cur_line'
-            //properly and correctly rather than returning 'EOF' directly.
-            return LEX_EOF;
+    if (isReadFromFile()) {
+        ASSERT0(m_src_file != nullptr);
+        UINT dw = (UINT)::fread(m_stream_buf, 1, m_stream_buf_len, m_src_file);
+        if (dw == 0) {
+            if (!is_some_chars_in_cur_line) {
+                //Some characters had been put into 'm_cur_line',
+                //but the last character of 'm_stream_buf' is not
+                //'0xD,0xA', so we should to get there.
+                //However there is nothing more can be read from file,
+                //thus 'dw' is zero. This situation may take place
+                //at that we meet the file that terminate without
+                //'0xD,0xA'.
+                //TODO:Take a consideration of the corner case, we
+                //should process the last characters in 'm_cur_line'
+                //properly and correctly rather than returning 'EOF' directly.
+                return LEX_EOF;
+            }
+            return LEX_SUCC;
         }
-        return LEX_SUCC;
+        m_last_read_num = dw;
+        m_last_read_num = MIN(m_last_read_num, m_stream_buf_len);
+        m_stream_buf_pos = 0;
+        return LEX_NEXT;
     }
-    m_last_read_num = dw;
-    m_last_read_num = MIN(m_last_read_num, LEX_MAX_BUF_LINE);
-    m_file_buf_pos = 0;
+    if (m_stream_buf_pos == m_stream_buf_len) {
+        //We have handled the last char in stream buffer.
+        return LEX_EOF;
+    }
+    //This is the first time to access stream-buffer.
+    m_last_read_num = m_stream_buf_len;
+    m_stream_buf_pos = 0;
     return LEX_NEXT;
 }
 
 
-Lexer::STATUS Lexer::readLine(OUT bool & is_some_chars_in_cur_line,
-                              MOD UINT & pos_in_cur_buf)
+Lexer::STATUS Lexer::readLineByIncompleteDOSEnd(MOD UINT & pos_in_cur_buf)
 {
-    //True to get a line characters from buffer which end up with '0xd,0xa' in
-    //DOS or '0xa' in Linux.
-    bool is_0xd_recog = false;
-    while (m_file_buf_pos < m_last_read_num) {
-        if (m_file_buf[m_file_buf_pos] == 0xd &&
-            m_file_buf[m_file_buf_pos + 1] == 0xa) { //DOS ending characters
-            m_is_dos = true;
-            if (m_use_newline_char) {
-                m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
-                pos_in_cur_buf++;
-                m_file_buf_pos++;
-                m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
-                pos_in_cur_buf++;
-                m_file_buf_pos++;
-            } else {
-                m_file_buf_pos += 2;
-            }
-            m_cur_src_ofst += 2;
-            m_src_line_num++;
-            return LEX_SUCC;
+    //0xd is the last charactor in 'm_stream_buf', thus 0xa
+    //should be recognized in getNextToken() in order to correct
+    //the lex parsing.
+    if (m_use_newline_char) {
+        m_cur_line[pos_in_cur_buf] = m_stream_buf[m_stream_buf_pos];
+        pos_in_cur_buf++;
+        m_stream_buf_pos++;
+    } else {
+        m_stream_buf_pos++;
+    }
+    m_cur_src_ofst++;
+    return LEX_SUCC;
+}
+
+
+Lexer::STATUS Lexer::readLineByDOSEnd(MOD UINT & pos_in_cur_buf)
+{
+    m_is_dos = true; //detect current file is in DOS ending.
+    if (m_use_newline_char) {
+        m_cur_line[pos_in_cur_buf] = m_stream_buf[m_stream_buf_pos];
+        pos_in_cur_buf++;
+        m_stream_buf_pos++;
+        m_cur_line[pos_in_cur_buf] = m_stream_buf[m_stream_buf_pos];
+        pos_in_cur_buf++;
+        m_stream_buf_pos++;
+    } else {
+        m_stream_buf_pos += 2;
+    }
+    m_cur_src_ofst += 2;
+    m_src_line_num++;
+    return LEX_SUCC;
+}
+
+
+Lexer::STATUS Lexer::readLineByUnixEnd(MOD UINT & pos_in_cur_buf)
+{
+    m_is_dos = false; //detect current file is in UNIX ending.
+    if (m_use_newline_char) {
+        m_cur_line[pos_in_cur_buf] = m_stream_buf[m_stream_buf_pos];
+        pos_in_cur_buf++;
+        m_stream_buf_pos++;
+    } else {
+        m_stream_buf_pos++;
+    }
+    m_cur_src_ofst++;
+    m_src_line_num++;
+    return LEX_SUCC;
+}
+
+
+Lexer::STATUS Lexer::readLine(
+    OUT bool & is_some_chars_in_cur_line, MOD UINT & pos_in_cur_buf)
+{
+    //Get a line characters from buffer which may end up with '0xd,0xa' in
+    //DOS|Windows or '0xa' in Linux.
+    while (m_stream_buf_pos < m_last_read_num) {
+        if (m_stream_buf[m_stream_buf_pos] == 0xd &&
+            m_stream_buf[m_stream_buf_pos + 1] == 0xa) {
+            //DOS ending characters.
+            return readLineByDOSEnd(pos_in_cur_buf);
         }
-        if (m_file_buf[m_file_buf_pos] == 0xa) { //UNIX ending
-            if (is_0xd_recog) {
-                //We have met '0xd', the '0xa' is one of
-                //the terminate string '0xd,0xa' under DOS text format.
-                if (m_use_newline_char) {
-                    m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
-                    pos_in_cur_buf++;
-                    m_file_buf_pos++;
-                } else {
-                    m_file_buf_pos++; //omit the terminate charactor '0xa'
-                }
-                is_0xd_recog = false;
-            } else {
-                m_is_dos = false;
-                if (m_use_newline_char) {
-                    m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
-                    pos_in_cur_buf++;
-                    m_file_buf_pos++;
-                } else {
-                    m_file_buf_pos ++;
-                }
-            }
-            m_cur_src_ofst++;
-            m_src_line_num++;
-            return LEX_SUCC;
+        if (m_stream_buf[m_stream_buf_pos] == 0xa) {
+            //UNIX ending characters.
+            return readLineByUnixEnd(pos_in_cur_buf);
         }
-        if (m_file_buf[m_file_buf_pos] == 0xd && m_is_dos) {
-            //0xd is the last charactor in 'm_file_buf', thus 0xa
-            //should be recognized in getNextToken() in order to correct
-            //the lex parsing.
-            is_0xd_recog = 1;
-            if (m_use_newline_char) {
-                m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
-                pos_in_cur_buf++;
-                m_file_buf_pos++;
-            } else {
-                m_file_buf_pos++;
-            }
-            m_cur_src_ofst++;
-            return LEX_SUCC;
+        if (m_stream_buf[m_stream_buf_pos] == 0xd && m_is_dos) {
+            return readLineByIncompleteDOSEnd(pos_in_cur_buf);
         }
         if (pos_in_cur_buf >= m_cur_line_len) {
             //Escalate the line buffer.
-            m_cur_line_len += LEX_MAX_BUF_LINE;
+            m_cur_line_len += m_stream_buf_len;
             m_cur_line = (CHAR*)::realloc(m_cur_line, m_cur_line_len);
         }
-        m_cur_line[pos_in_cur_buf] = m_file_buf[m_file_buf_pos];
+        m_cur_line[pos_in_cur_buf] = m_stream_buf[m_stream_buf_pos];
         pos_in_cur_buf++;
-        m_file_buf_pos++;
+        m_stream_buf_pos++;
         is_some_chars_in_cur_line = true;
         m_cur_src_ofst++;
     }
@@ -323,54 +432,62 @@ Lexer::STATUS Lexer::readLine(OUT bool & is_some_chars_in_cur_line,
 }
 
 
+void Lexer::tryConstructOffsetTab()
+{
+    if (!isEnableOffsetTab()) { return; }
+    //Initializing or realloc offset table.
+    if (m_ofst_tab == nullptr) {
+        m_ofst_tab_byte_size = m_stream_buf_len * sizeof(LONG);
+        m_ofst_tab = (LONG*)::malloc(m_ofst_tab_byte_size);
+        ::memset((void*)m_ofst_tab, 0, m_ofst_tab_byte_size);
+        return;
+    }
+    if (getOffsetTabLineNum() < (m_src_line_num + 10)) {
+        m_ofst_tab = (LONG*)::realloc(m_ofst_tab,
+            m_ofst_tab_byte_size + m_stream_buf_len * sizeof(LONG));
+        ::memset((void*)(((BYTE*)m_ofst_tab) + m_ofst_tab_byte_size),
+                 0, m_stream_buf_len * sizeof(LONG));
+        m_ofst_tab_byte_size += m_stream_buf_len * sizeof(LONG);
+    }
+}
+
+
+void Lexer::updateOffsetTab()
+{
+    if (!isEnableOffsetTab()) { return; }
+    ASSERT0((m_src_line_num + 1) < getOffsetTabLineNum());
+    m_ofst_tab[m_src_line_num + 1] = m_cur_src_ofst;
+}
+
+
 //This function read a line from source code buffer.
 //Return status, which could be LEX_SUCC or LEX_ERR.
 Lexer::STATUS Lexer::getLine()
 {
-    //Initializing or realloc offset table.
-    if (m_ofst_tab == nullptr) {
-        m_ofst_tab_byte_size = LEX_MAX_OFST_BUF_LEN * sizeof(LONG);
-        m_ofst_tab = (LONG*)::malloc(m_ofst_tab_byte_size);
-        ::memset((void*)m_ofst_tab, 0, m_ofst_tab_byte_size);
-    } else if (getOffsetTabLineNum() < (m_src_line_num + 10)) {
-        m_ofst_tab = (LONG*)::realloc(m_ofst_tab,
-            m_ofst_tab_byte_size + LEX_MAX_OFST_BUF_LEN * sizeof(LONG));
-        ::memset((void*)(((BYTE*)m_ofst_tab) + m_ofst_tab_byte_size),
-                 0, LEX_MAX_OFST_BUF_LEN * sizeof(LONG));
-        m_ofst_tab_byte_size += LEX_MAX_OFST_BUF_LEN * sizeof(LONG);
-    }
-    UINT pos_in_cur_buf = 0;
+    tryConstructOffsetTab();
+    UINT pos_in_cur_line = 0;
     bool is_some_chars_in_cur_line = false;
     for (;;) {
-        if (m_cur_line == nullptr) {
-            m_cur_line = (CHAR*)::malloc(LEX_MAX_BUF_LINE);
-            m_cur_line_len = LEX_MAX_BUF_LINE;
-            if (m_cur_line == nullptr) {
-                goto FAILED;
-            }
-        }
-        if (m_file_buf_pos >= m_last_read_num) {
+        ASSERT0(m_cur_line);
+        if (m_stream_buf_pos >= m_last_read_num) {
             Lexer::STATUS st = readLineBuf(is_some_chars_in_cur_line);
             if (st == LEX_EOF) { goto FEOF; }
             if (st == LEX_SUCC) { goto FIN; }
         }
-        Lexer::STATUS st = readLine(is_some_chars_in_cur_line, pos_in_cur_buf);
+        Lexer::STATUS st = readLine(is_some_chars_in_cur_line, pos_in_cur_line);
         if (st == LEX_EOF) { goto FEOF; }
         if (st == LEX_SUCC) { goto FIN; }
     }
 FIN:
-    ASSERT0((m_src_line_num + 1) < getOffsetTabLineNum());
-    m_ofst_tab[m_src_line_num + 1] = m_cur_src_ofst;
-    m_cur_line[pos_in_cur_buf] = 0;
-    m_cur_line_num = (UINT)::strlen(m_cur_line);
+    updateOffsetTab();
+    m_cur_line[pos_in_cur_line] = 0;
+    m_string_len_in_cur_line = pos_in_cur_line;
     m_cur_line_pos = 0;
     return LEX_SUCC;
-FAILED:
-    return LEX_ERR;
 FEOF:
     m_src_line_num++;
-    m_cur_line[pos_in_cur_buf] = 0;
-    m_cur_line_num = 0;
+    m_cur_line[pos_in_cur_line] = 0;
+    m_string_len_in_cur_line = 0;
     m_cur_line_pos = 0;
     return LEX_EOF;
 }
@@ -390,39 +507,31 @@ void Lexer::initKeyWordTab()
 //the return value is -1, otherwise the ASCI charactor.
 CHAR Lexer::getNextChar()
 {
-    CHAR res = '0';
-    STATUS st = LEX_SUCC;
-    if (m_cur_line == nullptr) {
-        if ((st = getLine()) == LEX_SUCC) {
-            res = m_cur_line[m_cur_line_pos];
-            m_cur_line_pos++;
-            return res;
-        }
-        if (st == LEX_EOF) {
-            return LEX_EOF;
-        }
-        return res;
-    }
-    if (m_cur_line_pos < m_cur_line_num) {
-        res = m_cur_line[m_cur_line_pos];
+    ASSERT0(m_cur_line);
+    if (m_cur_line_pos < m_string_len_in_cur_line) {
+        CHAR res = m_cur_line[m_cur_line_pos];
         m_cur_line_pos++;
         return res;
     }
-    st = getLine();
-    if (st == LEX_SUCC) {
-        do {
-            res = m_cur_line[m_cur_line_pos];
-            m_cur_line_pos++;
-            if (m_cur_line_num != 0) {
-                //Skip the empty line.
-                break;
-            }
+    STATUS st = getLine();
+    while (st == LEX_SUCC) {
+        if (m_string_len_in_cur_line == 0) {
+            //Skip the empty line.
             st = getLine();
-        } while (st == LEX_SUCC);
-    } else if (st == LEX_EOF) {
-        res = LEX_EOF;
+            continue;
+        }
+        break;
     }
-    return res;
+    if (st == LEX_SUCC) {
+        CHAR res = m_cur_line[m_cur_line_pos];
+        m_cur_line_pos++;
+        return res;
+    }
+    if (st == LEX_EOF) {
+        return LEX_EOF;
+    }
+    ASSERT0(st == LEX_ERR);
+    return 0;
 }
 
 
@@ -489,7 +598,7 @@ TOKEN Lexer::parse_suffix(TOKEN t)
             return t;
         }
         ASSERT0(t == T_FP);
-        error(m_real_line_num, "invalid suffix \"%c\" on float constant",
+        error(m_src_line_num, "invalid suffix \"%c\" on float constant",
               m_cur_char);
         m_cur_char = getNextChar();
         return t;
@@ -497,7 +606,7 @@ TOKEN Lexer::parse_suffix(TOKEN t)
     if (xcom::upper(m_cur_char) == 'F') {
         //e.g:1.0F, emphasize that immeidate is float rather than double.
         if (t == T_IMM) {
-            error(m_real_line_num, "invalid suffix \"%c\" on integer constant",
+            error(m_src_line_num, "invalid suffix \"%c\" on integer constant",
                   m_cur_char);
             return t;
         }
@@ -677,7 +786,7 @@ CHAR Lexer::t_escape_string()
             c = getNextChar();
         }
         if (n > 2 && only_allow_two_hex) {
-            error(m_real_line_num,
+            error(m_src_line_num,
                   "constant too big, only permit two hex digits");
         }
         return c;
@@ -707,6 +816,10 @@ TOKEN Lexer::t_string(CHAR stop_char)
         }
         checkAndGrowCurTokenString();
     }
+    if (c == LEX_EOF) { m_cur_char = 0; return T_END; }
+    if (c == LEX_ERR) { m_cur_char = 0; return T_UNDEF; }
+
+    //Prepare the next-char for the following parsing.
     m_cur_char = getNextChar();
     m_cur_token_string[m_cur_token_string_pos] = 0;
     ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
@@ -728,8 +841,8 @@ void Lexer::checkAndGrowCurTokenString()
 {
     if (m_cur_token_string_pos + 10 > m_cur_token_string_len) {
         m_cur_token_string_len *= 2;
-        m_cur_token_string = (CHAR*)::realloc(m_cur_token_string,
-                                              m_cur_token_string_len);
+        m_cur_token_string = (CHAR*)::realloc(
+            m_cur_token_string, m_cur_token_string_len);
     }
 }
 
@@ -1156,14 +1269,16 @@ TOKEN Lexer::t_lead_by_sub()
 
 TOKEN Lexer::getNextToken()
 {
-    ASSERT0(m_src_file);
     if (m_cur_token == T_END) {
         return m_cur_token;
     }
     TOKEN token = T_UNDEF;
     m_cur_token_string_pos = 0;
     m_cur_token_string[0] = 0;
-    while (m_cur_char == 0) { m_cur_char = getNextChar(); }
+    while (m_cur_char == 0) {
+        //Skip string terminater.
+        m_cur_char = getNextChar();
+    }
 START:
     switch (m_cur_char) {
     case LEX_EOF:
@@ -1172,25 +1287,41 @@ START:
     case 0xa:
     case 0xd:
         //'\n'
-        if (m_enable_newline_token && m_cur_char == 0xa) {
-            token = T_NEWLINE;
+        if (isEnableNewLine()) {
+            if (m_cur_char == 0xa) {
+                token = T_NEWLINE;
+                m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+                m_cur_token_string[m_cur_token_string_pos] = 0;
+                m_cur_char = getNextChar();
+            }
+            //Return T_UNDEF if meeting 0xd.
+            break;
+        }
+        //CASE: recur_lex.c, Do NOT recursive call into
+        //getNextToken() if meeting end of source code line.
+        //Avoid stack overflow.
+        //token = getNextToken();
+        m_cur_char = getNextChar();
+        goto START;
+    case '\t':
+        if (isEnableTab()) {
+            token = T_TAB;
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_token_string[m_cur_token_string_pos] = 0;
             m_cur_char = getNextChar();
-        } else  {
-            //CASE: recur_lex.c, Do NOT recursive call into
-            //getNextToken() if meeting end of source code line.
-            //Avoid stack overflow.
-            //token = getNextToken();
-            m_cur_char = getNextChar();
-            goto START;
+            break;
         }
-        break;
-    case '\t':
         while ((m_cur_char = getNextChar()) == '\t');
         token = getNextToken();
         break;
     case ' ':
+        if (isEnableSpace()) {
+            token = T_SPACE;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        }
         while((m_cur_char = getNextChar()) == ' ');
         token = getNextToken();
         break;
@@ -1272,11 +1403,31 @@ START:
         m_cur_token_string[m_cur_token_string_pos] = 0;
         m_cur_char = getNextChar();
         break;
+    case '`':
+        token = T_BACKTICK;
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_token_string[m_cur_token_string_pos] = 0;
+        m_cur_char = getNextChar();
+        break;
     case '"': //string
-        token = t_string('"');
+        if (isEnableString()) {
+            token = t_string('"');
+        } else {
+            token = T_QUOT;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+        }
         break;
     case '\'': //char list
-        token = t_char_list();
+        if (isEnableCharList()) {
+            token = t_char_list();
+        } else {
+            token = T_SINGLE_QUOT;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+        }
         break;
     case '-':
         token = t_lead_by_sub();
@@ -1372,8 +1523,11 @@ START:
 
 bool Lexer::readMaxSrcLineByLineno(UINT lineno)
 {
+    if (!isEnableOffsetTab()) { return false; }
     if (lineno >= getOffsetTabLineNum()) { return false; }
-    ASSERT0(m_src_file);
+    ASSERT0(isReadFromFile());
+    ASSERT0(m_ofst_tab);
+    ASSERT0(m_ofst_tab_byte_size > 0);
     ::fseek(m_src_file, m_ofst_tab[lineno], SEEK_SET);
     if (::fgets(m_cur_line, m_cur_line_len, m_src_file) != nullptr) {
         return true;
@@ -1427,5 +1581,6 @@ void Lexer::dumpAllTokens(FILE * output) const
     fprintf(output, "\n");
     fflush(output);
 }
+//END Lexer
 
 } //namespace xoc

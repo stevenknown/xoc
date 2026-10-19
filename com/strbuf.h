@@ -28,8 +28,6 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _STRBUF_H_
 #define _STRBUF_H_
 
-#define MAX_INIT_SIZE 4096
-
 namespace xcom {
 
 class StrBuf {
@@ -44,7 +42,7 @@ public:
     //Note the buffer may be longer than a string needed.
     StrBuf(UINT initsize)
     {
-        ASSERT0(initsize > 0 && initsize < MAX_INIT_SIZE);
+        ASSERT0(initsize > 0);
         buflen = initsize;
         buf = (CHAR*)::malloc(initsize);
         buf[0] = 0;

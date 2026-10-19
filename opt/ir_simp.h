@@ -522,6 +522,9 @@ protected:
     { ASSERTN(0, ("Target Dependent Code")); return ir; }
     virtual IR * simplifyExtStmt(IR * ir, SimpCtx * ctx);
     virtual IR * simplifyExtExp(IR * ir, SimpCtx * ctx);
+    IR * simplifySelectToRes(IR * ir, SimpCtx * ctx);
+    IR * simplifyMaskOp(IR * ir, SimpCtx * ctx);
+    IR * simplifyDynLenOp(IR * ir, SimpCtx * ctx);
     IR * simplifyDummyUse(IR * ir, SimpCtx *) { return ir; }
 
     bool useMDSSADU() const;

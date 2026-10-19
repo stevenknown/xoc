@@ -44,8 +44,11 @@ class BYTEVec : public xcom::Vector<BYTE> {
 public:
     BYTEVec() {}
     BYTEVec(UINT size) : xcom::Vector<BYTE>(size) {}
-    void dump(Region const* rg) const;
-    void dump(MOD LogMgr * lm) const;
+
+    //dumpnum:the number of elements that is expected to dump.
+    //        -1 to dump all elements.
+    void dump(Region const* rg, INT dumpnum = -1) const;
+    void dump(MOD LogMgr * lm, INT dumpnum = -1) const;
 };
 
 //Dump host-machine integer value.

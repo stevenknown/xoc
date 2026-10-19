@@ -4,8 +4,10 @@ COM_OBJS+=\
 ltype.o\
 xmat.o\
 comf.o\
+unicode.o\
 strbuf.o\
 smempool.o\
+mempoolmgr.o\
 agraph.o\
 sgraph.o\
 rational.o\
