@@ -118,13 +118,23 @@ public:
 
 class SymbolHashFunc {
 public:
+    //Use FNV-1a hash.
+    static UINT computeHashValByFNV1A(CHAR const* s)
+    {
+        UINT64 h = 1469598103934665603ULL;
+        UINT i = 0;
+        for (; s[i] != 0; i++) {
+            h ^= (BYTE)s[i];
+            h *= 1099511628211ULL;
+        }
+        return h;
+    }
     UINT computeCharSum(CHAR const* s) const
     {
         UINT v = 0;
-        UINT cnt = 0;
-        while ((*s++ != 0) && (cnt < 20)) {
+        while (*s != 0) {
             v += (UINT)(*s);
-            cnt++;
+            s++;
         }
         return v;
     }
@@ -162,11 +172,10 @@ class ConstSymbolHashFunc {
 public:
     UINT computeCharSum(CHAR const* s) const
     {
-        UINT v = 0 ;
-        UINT cnt = 0;
-        while ((*s++ != 0) && (cnt < 20)) {
+        UINT v = 0;
+        while (*s != 0) {
             v += (UINT)(*s);
-            cnt++;
+            s++;
         }
         return v;
     }

@@ -61,6 +61,10 @@ typedef enum {
 #define RTTENSOR_nemb(rtt) ((rtt)->shape[1])
 
 typedef struct {
+    #ifdef _DEBUG_
+    unsigned int id;
+    #endif
+
     //data:raw pointer to tensor buffer, no memory owned by this struct
     //     data = mmap_base + tensor file offset
     void * data;

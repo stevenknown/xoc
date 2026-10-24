@@ -37,12 +37,18 @@ extern "C" {
 #define UINT32_MAX (4294967295U)
 #endif
 
-#ifdef _GNU_COMPILE_
+#ifdef _DEBUG_
+  //DummyUsed
+  #define ATTRIBUTE_USE
+  #define ATTRIBUTE_INLINE
+#else 
+  #ifdef _USE_GCC_
     #define ATTRIBUTE_USE __attribute__((used))
     #define ATTRIBUTE_INLINE __attribute__((always_inline))
-#else
+  #else
     #define ATTRIBUTE_USE
     #define ATTRIBUTE_INLINE
+  #endif
 #endif
 
 #ifdef __cplusplus

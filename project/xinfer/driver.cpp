@@ -57,9 +57,16 @@ Driver::~Driver()
 
 bool Driver::handleSafeTensorsFileList(OUT SafeTensorsMgr & stmgr)
 {
+    bool map = true;
+    stmgr.setTensorDataMapped(map);
     for (CHAR const* fn = xinfer::g_safetensors_file_list.get_head();
          fn != nullptr; fn = xinfer::g_safetensors_file_list.get_next()) {
-        XI_STATUS stm = stmgr.readSafeTensors(fn);
+        XI_STATUS stm;
+        if (map) {
+            stm = stmgr.mapSafeTensors(fn);
+        } else {
+            stm = stmgr.readSafeTensors(fn);
+        }
         if (stm != XI_SUCC) { return false; }
     }
     return true;
@@ -72,17 +79,11 @@ bool Driver::handleModelName(xoc::RegionMgr * rm, OUT ModelType & mt)
         fprintf(stderr, "error:miss model name");
         return false;
     }
-    if (::strcmp(g_model_name, "distilgpt2") == 0) {
-        mt = MODEL_DISTILGPT2;
-        return true;
-    }
-    if (::strcmp(g_model_name, "gpt2") == 0) {
-        mt = MODEL_GPT2;
-        return true;
-    }
-    if (::strcmp(g_model_name, "qwen2.5_1.5B") == 0) {
-        mt = MODEL_QWEN2D5_1D5B;
-        return true;
+    for (UINT i = 0; i < g_model_attr_num; i++) {
+        if (::strcmp(g_model_name, g_model_attr[i].name) == 0) {
+            mt = g_model_attr[i].mtype;
+            return true;
+        }
     }
     dumpAct(rm->getLogMgr(), "\nunknown model name:%s", g_model_name);
     return false;

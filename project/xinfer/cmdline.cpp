@@ -692,7 +692,7 @@ IntOption::Desc const IntOption::option_desc[] = {
     //  "the maximum limit of the number of IR to perform optimizations", },
     //{ "thres_opt_bb_num", (INT*)&xoc::g_thres_opt_bb_num,
     //  "the maximum limit of the number of IRBB to perform optimizations", }
-    { "max_tensor_data_dum_num", (INT*)&xinfer::g_max_tensor_data_dump_num,
+    { "max_tensor_data_dump_num", (INT*)&xinfer::g_max_tensor_data_dump_num,
       "the maximum limit of the number of tensor data to dump", },
     { "max_seq_len", (INT*)&xinfer::g_max_seq_len,
       "the maximum limit of the number of sequence length", },

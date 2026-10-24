@@ -58,7 +58,7 @@ void SafeTensor::dump(
         prt(lm, "]");
         prt(lm, ",total:%u", getTotalElemNum());
     }
-    note(lm, "\ndata:%u bytes", getByteSize(rm));
+    note(lm, "\ndata:%u bytes", getByteSize());
     if (data.get_elem_count() > 0 && dump_detail) {
         lm->incIndent(2);
         data.dump(lm, dumpnum);
@@ -71,7 +71,7 @@ bool SafeTensor::verify(xoc::RegionMgr const* rm) const
 {
     ASSERT0(off_start <= off_end);
     UINT filebytesize = off_end - off_start;
-    UINT tensorbytesize = getByteSize(rm);
+    UINT tensorbytesize = calcByteSize(rm);
     ASSERT0(filebytesize == tensorbytesize);
     return true;
 }
@@ -84,7 +84,7 @@ UINT SafeTensor::getElemByteSize(xoc::RegionMgr const* rm) const
 }
 
 
-UINT64 SafeTensor::getByteSize(xoc::RegionMgr const* rm) const
+UINT64 SafeTensor::calcByteSize(xoc::RegionMgr const* rm) const
 {
     UINT64 total = getTotalElemNum();
     UINT elem_byte_size = getElemByteSize(rm);
@@ -106,13 +106,23 @@ UINT64 SafeTensor::getTotalElemNum() const
 }
 
 
+void SafeTensor::mapData(
+    xcom::FileMapObj & file, UINT64 fileoffset, xoc::RegionMgr const* rm)
+{
+    UINT64 tensorbytesize = getByteSize();
+    ASSERT0((off_end - off_start) == tensorbytesize);
+    ASSERT0(fileoffset + tensorbytesize <= file.getFileSize());
+    data.set_vec(file.getFileStart() + fileoffset + off_start, tensorbytesize);
+}
+
+
 XI_STATUS SafeTensor::loadData(
     xcom::FileObj & file, UINT64 fileoffset, xoc::RegionMgr const* rm)
 {
     size_t rd = 0;
-    UINT64 tensorbytesize = getByteSize(rm);
+    UINT64 tensorbytesize = getByteSize();
     if (data.get_capacity() < tensorbytesize) {
-        data.set(tensorbytesize, 0);
+        data.set(tensorbytesize - 1, 0);
     }
     ASSERT0((off_end - off_start) == tensorbytesize);
     xcom::FO_STATUS status = file.read(
@@ -160,6 +170,7 @@ SafeTensorsMgr::SafeTensorsMgr(
     m_dtype = addToSymbolTab("dtype");
     m_shape = addToSymbolTab("shape");
     m_data_offsets = addToSymbolTab("data_offsets");
+    m_is_tensor_data_mapped = false;
 }
 
 
@@ -167,9 +178,18 @@ SafeTensorsMgr::~SafeTensorsMgr()
 {
     for (SafeTensor * st = m_st_list.get_head();
          st != nullptr; st = m_st_list.get_next()) {
+        if (m_is_tensor_data_mapped) {
+            st->data.set_vec(nullptr, 0);
+        }
         delete st;
     }
     m_st_list.clean();
+
+    for (xcom::FileMapObj * fmo = m_filemapobj_list.get_head();
+         fmo != nullptr; fmo = m_filemapobj_list.get_next()) {
+        delete fmo;
+    }
+    m_filemapobj_list.clean();
 }
 
 
@@ -224,6 +244,15 @@ bool SafeTensorsMgr::verify(xoc::RegionMgr const* rm) const
 xoc::Sym const* SafeTensorsMgr::addToSymbolTab(CHAR const* s)
 {
     return m_sym_tab.add(s);
+}
+
+
+xcom::FileMapObj * SafeTensorsMgr::allocFileMapObj(
+        CHAR const* filename, xcom::FO_STATUS * st)
+{
+    xcom::FileMapObj * fmo = new xcom::FileMapObj(filename, st);
+    m_filemapobj_list.append_tail(fmo);
+    return fmo;
 }
 
 
@@ -305,6 +334,30 @@ XI_STATUS SafeTensorsMgr::extractShape(
 }
 
 
+XI_STATUS SafeTensorsMgr::mapSafeTensor(
+    xcom::FileMapObj & file, UINT64 fileoffset, JNode const* root)
+{
+    ASSERT0(root);
+    ASSERT0(root->is_obj());
+    for (JNode const* jn = JOBJ_pair_list(root);
+         jn != nullptr; jn = jn->next) {
+        ASSERT0(jn->is_pair());
+        if (JPAIR_key(jn) == m_metadata) { continue; }
+        SafeTensor * st = allocSafeTensor();
+        st->name = JPAIR_key(jn);
+        m_sym2st.set(st->name, st);
+
+        //Load tensor's attributes.
+        XI_STATUS status = extractTensorAttr(JPAIR_val(jn), *st);
+        if (status != XI_SUCC) { return status; }
+
+        //Map tensor's data.
+        st->mapData(file, fileoffset, m_rm);
+    }
+    return XI_SUCC;
+}
+
+
 XI_STATUS SafeTensorsMgr::extractSafeTensor(
     xcom::FileObj & file, UINT64 fileoffset, JNode const* root)
 {
@@ -327,6 +380,37 @@ XI_STATUS SafeTensorsMgr::extractSafeTensor(
         if (status != XI_SUCC) { return status; }
 
     }
+    return XI_SUCC;
+}
+
+
+XI_STATUS SafeTensorsMgr::mapSafeTensors(CHAR const* filename)
+{
+    xcom::FO_STATUS st;
+    xcom::FileMapObj * sftfile = allocFileMapObj(filename, &st);
+    if (st != xcom::FO_SUCC) {
+        xoc::prt2C("error:map \"%s\" failed.", filename);
+        return XI_ERR;
+    }
+    STFileInfo si;
+    UINT64 fileoffset = 0;
+    BYTE * filemap = sftfile->getFileStart();
+
+    //1. json header length
+    sftfile->read(&si.json_header_len, fileoffset, SFT_JSON_HEAD_LEN_SIZE);
+    if (!isValidJsonHeadLen(si.json_header_len)) { return XI_OOM; }
+    fileoffset += SFT_JSON_HEAD_LEN_SIZE;
+
+    JsonParser jp(m_rm->getLogMgr(), getJNodeMgr());
+    JNode const* root = jp.parse(
+        (CHAR const*)filemap + fileoffset, si.json_header_len);
+    if (root == nullptr) { return XI_ERR; }
+    fileoffset += si.json_header_len;
+
+    //3. tensor data content.
+    mapSafeTensor(*sftfile, fileoffset, root);
+    dump();
+    ASSERT0(verify(m_rm));
     return XI_SUCC;
 }
 

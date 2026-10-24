@@ -19,6 +19,7 @@ testops.o\
 model_mgr.o\
 xinfer.o\
 rtarg.o\
+rtmemmgr.o\
 ops/embedding_lookup.o\
 ops/layernorm.o\
 ops/rmsnorm.o\

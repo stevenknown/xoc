@@ -42,31 +42,6 @@ public:
     void * opfunc;
 };
 
-class RTMemMgr {
-protected:
-    xcom::SMemPool * m_pool;
-protected:
-    void * xmalloc(UINT size)
-    {
-        ASSERTN(m_pool != nullptr, ("pool does not initialized"));
-        void * p = xcom::smpoolMalloc(size, m_pool);
-        ASSERT0(p != nullptr);
-        ::memset((void*)p, 0, size);
-        return p;
-    }
-public:
-    RTMemMgr() { m_pool = xcom::smpoolCreate(64, MEM_COMM); }
-    ~RTMemMgr()
-    {
-        xcom::smpoolDelete(m_pool);
-        m_pool = nullptr;
-    }
-    RTTensor * allocRTTensor()
-    { return (RTTensor*)xmalloc(sizeof(RTTensor)); }
-    RTTensor ** allocRTTensorPtr(UINT num)
-    { return (RTTensor**)xmalloc(sizeof(RTTensor*) * num); }
-};
-
 class LLMInfer {
     COPY_CONSTRUCTOR(LLMInfer);
 protected:

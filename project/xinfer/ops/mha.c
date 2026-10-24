@@ -443,8 +443,8 @@ void gqa_bf16(
     RTCtx *restrict ctx)
 {
     float * tmplogits = lock_tmp3(ctx);
+    XASSERT(ctx->tmp3_len >= (pos+1)*sizeof(float));
     unsigned int elemsz = sizeof(uint16_t);
-    XASSERT(ctx->tmp3_len >= (pos+1)*elemsz);
 
     //GQA attention over keys 0..pos (causal)
 

@@ -67,18 +67,18 @@ bool QWEN2D5LLMInfer::verify(RTCtx const& ctx, RTArg const& arg)
 XI_STATUS QWEN2D5LLMInfer::initRTCtxTensorsLayer(
     OUT RTCtx & ctx, MOD RTMemMgr & mgr)
 {
-    ctx.ln_1_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.ln_2_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.q_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.q_proj_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.k_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.k_proj_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.v_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.v_proj_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.o_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_gate_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_up_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_down_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
+    ctx.ln_1_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.ln_2_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.q_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.q_proj_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.k_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.k_proj_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.v_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.v_proj_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.o_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_gate_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_up_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_down_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
 
     //Iter each layer.
     xcom::StrBuf buf(32); //is used to form tensor's name.

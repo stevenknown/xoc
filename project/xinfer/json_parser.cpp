@@ -55,9 +55,8 @@ JNode * JPIntl::convertToJNode(JNodeMgr & jm, cJSON const* cnode)
     if (cJSON_IsArray(cnode)) {
         JArray * array = jm.allocJArray();
         JNode * last = nullptr;
-        UINT sz = cJSON_GetArraySize(cnode);
-        for (UINT i = 0; i < sz; i++) {
-            cJSON const* elem = cJSON_GetArrayItem(cnode, i);
+        cJSON const* elem = nullptr;
+        cJSON_ArrayForEach(elem, cnode) {
             JNode * jelem = convertToJNode(jm, elem);
             xcom::add_next(&array->elem_list, &last, jelem);
         }

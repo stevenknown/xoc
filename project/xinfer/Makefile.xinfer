@@ -48,15 +48,14 @@ ifeq ($(DEBUG), true)
 else
   CFLAGS+=-O3
   CFLAGS+=-flto
-  CLINKFLAGS+=\
-    -fdump-ipa-cgraph \
-    -fdump-ipa-inline
+#  CLINKFLAGS+=\
+#    -fdump-ipa-cgraph \
+#    -fdump-ipa-inline
 endif
 
 CFLAGS+=\
   -D$(TARG) \
   -D_DUMP_BY_LOGMGR_ \
-  -D_GNU_COMPILE_ \
   -Wno-overloaded-virtual\
   -Wno-unknown-pragmas \
   -Wno-write-strings \

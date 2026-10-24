@@ -38,6 +38,12 @@ typedef enum tagModelType {
     MODEL_QWEN2D5_1D5B, //Qwen2.5 1.5B
 } ModelType;
 
+class ModelAttr {
+public:
+    ModelType mtype;
+    CHAR const* name; //Model name
+};
+
 class ModelMgr {
     COPY_CONSTRUCTOR(ModelMgr);
 protected:
@@ -55,6 +61,9 @@ public:
 
     void dump() const;
 };
+
+extern ModelAttr g_model_attr[];
+extern UINT g_model_attr_num;
 
 } //namespace xinfer
 

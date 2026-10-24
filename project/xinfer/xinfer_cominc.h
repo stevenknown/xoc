@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "tokenizer.h"
 #include "safetensors_mgr.h"
 #include "rtarg.h"
+#include "rtmemmgr.h"
 #include "llm_infer.h"
 #include "gpt2_llm_infer.h"
 #include "distilgpt2_llm_infer.h"

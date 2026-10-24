@@ -40,6 +40,9 @@ CHAR const* g_fo_name[] = {
 };
 size_t g_fo_num = sizeof(g_fo_name) / sizeof(g_fo_name[0]);
 
+//
+//START FileObj
+//
 CHAR const* FileObj::getFileStatusName(FO_STATUS st)
 {
     ASSERT0(((size_t)st) < g_fo_num);
@@ -59,6 +62,7 @@ FileObj::FileObj()
 void FileObj::init(CHAR const* filename, bool is_del,
                    bool is_readonly, OUT FO_STATUS * st)
 {
+    ASSERT0(st);
     ASSERT0(filename);
     FO_STATUS tmpst;
     if (st == nullptr) { st = &tmpst; }
@@ -79,7 +83,7 @@ FO_STATUS FileObj::openWithReadOnly(CHAR const* filename)
 {
     ASSERT0(m_is_readonly);
     m_file_handler = ::fopen(filename, "rb");
-    if (m_file_handler == 0) {
+    if (m_file_handler == nullptr) {
         //prejudge the file existence
         return FO_NOT_EXIST;
     }
@@ -132,6 +136,7 @@ void FileObj::destroy()
     } else if (m_is_opened) {
         ::fclose(m_file_handler);
     }
+    m_is_opened = false;
     m_file_handler = nullptr;
 }
 
@@ -234,5 +239,96 @@ FO_STATUS FileObj::write(BYTE const* buf, size_t offset, size_t size,
     if (wr != nullptr) { *wr = actual_wr; }
     return FO_SUCC;
 }
+//END FileObj
+
+
+//
+//START FileMapObj
+//
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+FileMapObj::FileMapObj(CHAR const* filename, OUT FO_STATUS * st)
+{
+    ASSERT0(st);
+    m_file_handler = ::fopen(filename, "rb");
+    if (m_file_handler == nullptr) {
+        //prejudge the file existence
+        *st = FO_NOT_EXIST;
+        return;
+    }
+    m_is_opened = true;
+    m_file_name = filename;
+    #ifdef _ON_WINDOWS_
+    *st = initMapByWin();
+    #else
+    *st = initMapByPosix();
+    #endif
+    if (*st != FO_SUCC) {
+        destroy();
+    }
+}
+
+
+FileMapObj::~FileMapObj()
+{
+    ::munmap(m_map, m_map_size);
+    destroy();
+}
+
+
+void FileMapObj::destroy()
+{
+    if (m_file_handler == nullptr) { return; }
+    if (m_is_opened) {
+        ::fclose(m_file_handler);
+    }
+    m_is_opened = false;
+    m_file_handler = nullptr;
+}
+
+
+//mmap whole file read-only.
+FO_STATUS FileMapObj::initMapByPosix()
+{
+    ASSERT0(m_is_opened);
+    ASSERT0(m_file_handler);
+    struct stat sb;
+    int fd = ::fileno(m_file_handler);
+    if (::fstat(fd, &sb) != 0 || sb.st_size == 0) {
+        ::fclose(m_file_handler);
+        return FO_MAP_FAILED;
+    }
+    size_t bytesize = (size_t)sb.st_size;
+    m_map = (BYTE*)::mmap(nullptr, bytesize, PROT_READ, MAP_PRIVATE, fd, 0);
+
+    //Even it is safe(mmap keeps reference to the file), we still choose to keep the handler.
+    //::fclose(m_file_handler);
+    if (m_map == MAP_FAILED) {
+        ::fclose(m_file_handler);
+        return FO_MAP_FAILED;
+    }
+    m_map_size = bytesize;
+
+    //HINT:user could hint accesseing memory randomly or sequentially.
+    //by MADV_SEQUENTIAL and MADV_RANDOM.
+    ::madvise(m_map, bytesize, MADV_RANDOM);
+    return FO_SUCC;
+}
+
+
+FO_STATUS FileMapObj::initMapByWin()
+{
+    //TODO:Use CreateFileMapping + MapViewOfFile to implement mmap.
+    //Use UnmapViewOfFile + CloseHandle to implement unmmap.
+    //Use OfferVirtualMemory|PrefetchVirtualMemory to implement madvise on
+    //Win11.
+    //However, there might not be a proper API to implement madvise on Win7.
+    ASSERT0(0); //Target Dependent Code.
+    return FO_SUCC;
+}
+//END FileMapObj
 
 } //namespace xcom

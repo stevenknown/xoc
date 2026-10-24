@@ -30,6 +30,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xinfer {
 
+ModelAttr g_model_attr[] = {
+    { MODEL_UNDEF, "", },
+    { MODEL_DISTILGPT2, "distilgpt2", },
+    { MODEL_GPT2, "gpt2", },
+    { MODEL_QWEN2D5_1D5B, "qwen2.5_1.5B", },
+};
+UINT g_model_attr_num = sizeof(g_model_attr) / sizeof(g_model_attr[0]);
+
 //
 //START ModelMgr
 //

@@ -37,6 +37,7 @@ typedef enum {
     FO_EXCEDE_FILE_END,
     FO_NOT_EXIST,
     FO_CAN_NOT_CREATE_NEW_FILE,
+    FO_MAP_FAILED,
 } FO_STATUS;
 
 class FileObj {
@@ -115,6 +116,32 @@ public:
     //wr: optional, it records the actual byte size that has wrote.
     FO_STATUS write(BYTE const* buf, size_t offset, size_t size,
                     OUT size_t * wr = nullptr);
+};
+
+class FileMapObj {
+protected:
+    bool m_is_opened;
+    BYTE * m_map;
+    FILE * m_file_handler;
+    CHAR const* m_file_name;
+    size_t m_map_size;
+protected:
+    void destroy();
+    FO_STATUS initMapByPosix();
+    FO_STATUS initMapByWin();
+public:
+    FileMapObj(CHAR const* filename, OUT FO_STATUS * st = nullptr);
+    ~FileMapObj();
+    BYTE * getFileStart() const { return m_map; }
+    size_t getFileSize() const { return m_map_size; }
+
+    void read(OUT void * buf, size_t offset, size_t size)
+    {
+        ASSERT0(buf && size);
+        ASSERT0(m_map);
+        ASSERT0(offset + size <= m_map_size);
+        memcpy(buf, m_map + offset, size);
+    }
 };
 
 } //namespace xcom

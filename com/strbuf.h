@@ -405,8 +405,8 @@ void FixedStrBuf<ByteSize>::copy(FixedStrBuf const& src)
 
 
 template <UINT ByteSize>
-void FixedStrBuf<ByteSize>::vstrcat(UINT bytesize, CHAR const* format,
-                                    va_list args)
+void FixedStrBuf<ByteSize>::vstrcat(
+    UINT bytesize, CHAR const* format, va_list args)
 {
     if (m_strbuf != nullptr) {
         return m_strbuf->vstrcat(bytesize, format, args);

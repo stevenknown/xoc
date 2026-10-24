@@ -2974,7 +2974,7 @@ protected:
     bool m_is_init; //To make sure functions are idempotent.
 
     //The total number of elements that the vector can store.
-    ElemNumTy m_elem_num;
+    ElemNumTy m_max_elem_num;
     VecIdx m_last_idx; //The last element index.
     T * m_vec;
     static UINT const GrowSize = 8;
@@ -3078,10 +3078,10 @@ public:
 
     void copy(Vector const& vec)
     {
-        ASSERT0(vec.m_elem_num > 0 ||
-                (vec.m_elem_num == 0 && vec.m_last_idx == VEC_UNDEF));
-        ElemNumTy n = vec.m_elem_num;
-        if (m_elem_num < n) {
+        ASSERT0(vec.m_max_elem_num > 0 ||
+                (vec.m_max_elem_num == 0 && vec.m_last_idx == VEC_UNDEF));
+        ElemNumTy n = vec.m_max_elem_num;
+        if (m_max_elem_num < n) {
             destroy();
             init(n);
         }
@@ -3119,12 +3119,12 @@ public:
 
     //Count memory usage for current object.
     size_t count_mem() const
-    { return m_elem_num * sizeof(T) + sizeof(Vector<T>); }
+    { return m_max_elem_num * sizeof(T) + sizeof(Vector<T>); }
 
     void destroy()
     {
         if (!m_is_init) { return; }
-        m_elem_num = 0;
+        m_max_elem_num = 0;
         if (m_vec != nullptr) {
             ::free(m_vec);
         }
@@ -3149,7 +3149,7 @@ public:
     T get(VecIdx index) const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        return (((ElemNumTy)index) >= m_elem_num) ?
+        return (((ElemNumTy)index) >= m_max_elem_num) ?
                T(0) : m_vec[(ElemNumTy)index];
     }
 
@@ -3159,7 +3159,7 @@ public:
     void init()
     {
         if (m_is_init) { return; }
-        m_elem_num = 0;
+        m_max_elem_num = 0;
         m_vec = nullptr;
         m_last_idx = VEC_UNDEF;
         m_is_init = true;
@@ -3171,7 +3171,7 @@ public:
         m_vec = (T*)::malloc(sizeof(T) * size);
         ASSERT0(m_vec);
         ::memset((void*)m_vec, 0, sizeof(T) * size);
-        m_elem_num = (ElemNumTy)size;
+        m_max_elem_num = (ElemNumTy)size;
         m_last_idx = VEC_UNDEF;
         m_is_init = true;
     }
@@ -3191,13 +3191,13 @@ public:
     UINT get_capacity() const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        return m_elem_num;
+        return m_max_elem_num;
     }
 
     VecIdx get_last_idx() const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERTN(IS_VECUNDEF(m_last_idx) || m_last_idx < (VecIdx)m_elem_num,
+        ASSERTN(IS_VECUNDEF(m_last_idx) || m_last_idx < (VecIdx)m_max_elem_num,
                 ("Last index ran over Vector's size."));
         return m_last_idx;
     }
@@ -3212,43 +3212,43 @@ public:
     UINT get_vector_max_capacity() const { return (((UINT)-1) << 1) >> 1; }
 
     //Growing vector up to hold the most num_of_elem elements.
-    //If 'm_elem_num' is 0 , alloc vector to hold num_of_elem elements.
+    //If 'm_max_elem_num' is 0 , alloc vector to hold num_of_elem elements.
     //Reallocate memory if necessory.
     void grow(UINT num_of_elem)
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
         if (num_of_elem == 0) { return; }
-        if (m_elem_num == 0) {
+        if (m_max_elem_num == 0) {
             ASSERTN(m_vec == nullptr,
                     ("vector should be nullptr if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * num_of_elem);
             ASSERT0(m_vec);
             ::memset((void*)m_vec, 0, sizeof(T) * num_of_elem);
-            m_elem_num = (ElemNumTy)num_of_elem;
+            m_max_elem_num = (ElemNumTy)num_of_elem;
             return;
         }
-        ASSERT0((ElemNumTy)num_of_elem > m_elem_num);
+        ASSERT0((ElemNumTy)num_of_elem > m_max_elem_num);
         T * tmp = (T*)::malloc(num_of_elem * sizeof(T));
         ASSERT0(tmp);
-        ::memcpy((void*)tmp, m_vec, m_elem_num * sizeof(T));
-        ::memset((void*)(((CHAR*)tmp) + m_elem_num * sizeof(T)), 0,
-                 (num_of_elem - m_elem_num) * sizeof(T));
+        ::memcpy((void*)tmp, m_vec, m_max_elem_num * sizeof(T));
+        ::memset((void*)(((CHAR*)tmp) + m_max_elem_num * sizeof(T)), 0,
+                 (num_of_elem - m_max_elem_num) * sizeof(T));
         ::free(m_vec);
         m_vec = tmp;
-        m_elem_num = num_of_elem;
+        m_max_elem_num = num_of_elem;
     }
 
     //Overloaded [] for CONST array reference create an rvalue.
     //Similar to 'get()', the difference between this operation
     //and get() is [] operation does not allow index is greater than
-    //or equal to m_elem_num.
+    //or equal to m_max_elem_num.
     //Note this operation can not be used to create lvalue.
     //e.g: Vector<int> const v;
     //    int ex = v[i];
     T const operator[](VecIdx index) const
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERTN(((ElemNumTy)index) < m_elem_num,
+        ASSERTN(((ElemNumTy)index) < m_max_elem_num,
                 ("array subscript over boundary."));
         return m_vec[index];
     }
@@ -3256,11 +3256,11 @@ public:
     //Overloaded [] for non-const array reference create an lvalue.
     //Similar to set(), the difference between this operation
     //and set() is [] operation does not allow index is greater than
-    //or equal to m_elem_num.
+    //or equal to m_max_elem_num.
     inline T & operator[](VecIdx index)
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        ASSERTN(((ElemNumTy)index) < m_elem_num,
+        ASSERTN(((ElemNumTy)index) < m_max_elem_num,
                 ("array subscript over boundary."));
         m_last_idx = MAX((VecIdx)index, m_last_idx);
         return m_vec[index];
@@ -3269,11 +3269,11 @@ public:
     void reinit() { destroy(); init(); }
 
     //Place elem to vector according to index.
-    //Growing vector if 'index' is greater than m_elem_num.
+    //Growing vector if 'index' is greater than m_max_elem_num.
     void set(VecIdx index, T elem)
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        if (((ElemNumTy)index) >= m_elem_num) {
+        if (((ElemNumTy)index) >= m_max_elem_num) {
             grow(getNearestPowerOf2((UINT)index) + 2);
         }
         m_last_idx = MAX((VecIdx)index, m_last_idx);
@@ -3291,7 +3291,9 @@ public:
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
         ASSERT0((vec && elem_num > 0) || (vec == nullptr && elem_num == 0));
         m_vec = vec;
-        m_elem_num = elem_num;
+        m_max_elem_num = elem_num;
+        ASSERT0(VEC_UNDEF == -1);
+        m_last_idx = elem_num - 1;
     }
 };
 //END Vector
@@ -3359,7 +3361,7 @@ public:
     {
         ASSERTN((Vector<T>::is_init()),
                 ("VECTOR not yet initialized."));
-        if (Vector<T>::m_elem_num == 0) {
+        if (Vector<T>::m_max_elem_num == 0) {
             //VECTOR is empty.
             ASSERTN((Vector<T>::m_last_idx == VEC_UNDEF &&
                     Vector<T>::m_vec == nullptr),
@@ -3376,7 +3378,7 @@ public:
         UINT ret = m_free_idx;
 
         //Seaching in second-half Vector to find the next free idx.
-        for (UINT i = m_free_idx + 1; i < Vector<T>::m_elem_num; i++) {
+        for (UINT i = m_free_idx + 1; i < Vector<T>::m_max_elem_num; i++) {
             if (v == Vector<T>::m_vec[i]) {
                 m_free_idx = i;
                 return ret;
@@ -3391,8 +3393,8 @@ public:
             }
         }
 
-        m_free_idx = Vector<T>::m_elem_num;
-        grow(Vector<T>::m_elem_num * 2);
+        m_free_idx = Vector<T>::m_max_elem_num;
+        grow(Vector<T>::m_max_elem_num * 2);
         return ret;
     }
 
@@ -3400,7 +3402,7 @@ public:
     //Reallocate memory if necessory.
     void grow(UINT size)
     {
-        if (Vector<T>::m_elem_num == 0) {
+        if (Vector<T>::m_max_elem_num == 0) {
             m_free_idx = 0;
         }
         Vector<T>::grow(size);

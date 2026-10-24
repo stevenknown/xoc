@@ -118,7 +118,6 @@ static RTTENSOR_DTYPE convertDTypeToRTTENSORDt(xoc::DATA_TYPE dt)
 void LLMInfer::convertSafeTensorToRTTensor(
     OUT RTTensor & rt, SafeTensor const& st)
 {
-    ::memset(&rt, 0, sizeof(RTTensor));
     rt.data = (void*)st.getDataBuf();
 
     //Convert dtype.
@@ -148,18 +147,18 @@ XI_STATUS LLMInfer::initRTTensor(RTTensor * rtt, CHAR const* name)
 XI_STATUS LLMInfer::initRTCtxTensorsLayer(
     OUT RTCtx & ctx, MOD RTMemMgr & mgr)
 {
-    ctx.ln_1_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.ln_1_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.ln_2_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.ln_2_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.c_attn_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.c_attn_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.o_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.o_proj_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_c_fc_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_c_fc_bias = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_down_proj_weight = mgr.allocRTTensorPtr(ctx.n_layer);
-    ctx.mlp_down_proj_bias = mgr.allocRTTensorPtr(ctx.n_layer);
+    ctx.ln_1_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.ln_1_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.ln_2_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.ln_2_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.c_attn_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.c_attn_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.o_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.o_proj_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_c_fc_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_c_fc_bias = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_down_proj_weight = mgr.allocRTTensorArray(ctx.n_layer);
+    ctx.mlp_down_proj_bias = mgr.allocRTTensorArray(ctx.n_layer);
 
     //Iter each layer.
     xcom::StrBuf buf(32); //is used to form tensor's name.

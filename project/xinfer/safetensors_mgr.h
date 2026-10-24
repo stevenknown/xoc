@@ -48,12 +48,19 @@ public:
     xcom::Vector<UINT64> shape;
     xoc::BYTEVec data;
 public:
+    //Calculate the entire tensor bytesize by shapes and elemsize.
+    UINT64 calcByteSize(xoc::RegionMgr const* rm) const;
+
     void dump(xoc::RegionMgr const* rm,
               bool dump_detail = xinfer::g_dump_tensor_data,
               INT dumpnum = 20) const;
 
-    //Return the entire tensor bytesize.
-    UINT64 getByteSize(xoc::RegionMgr const* rm) const;
+    //Get the entire tensor bytesize.
+    UINT64 getByteSize() const
+    {
+        ASSERT0(off_end > off_start);
+        return off_end - off_start;
+    }
 
     //Return the number of all elements in the tensor.
     UINT64 getTotalElemNum() const;
@@ -73,6 +80,9 @@ public:
     //Load tensor data/weight from file.
     XI_STATUS loadData(
         FileObj & file, UINT64 fileoffset, xoc::RegionMgr const* rm);
+
+    void mapData(
+        xcom::FileMapObj & file, UINT64 fileoffset, xoc::RegionMgr const* rm);
 
     bool verify(xoc::RegionMgr const* rm) const;
 };
@@ -94,6 +104,7 @@ typedef xcom::TMap<xoc::Sym const*, SafeTensor*> Sym2SafeTensor;
 class SafeTensorsMgr {
     COPY_CONSTRUCTOR(SafeTensorsMgr);
 protected:
+    bool m_is_tensor_data_mapped;
     xoc::RegionMgr * m_rm;
     xoc::Sym const* m_metadata;
     xoc::Sym const* m_dtype;
@@ -101,16 +112,22 @@ protected:
     xoc::Sym const* m_data_offsets;
     xoc::ESymTab & m_sym_tab;
     JNodeMgr & m_jm;
-    Sym2SafeTensor m_sym2st; 
+    Sym2SafeTensor m_sym2st;
     xcom::List<SafeTensor*> m_st_list;
+    xcom::List<xcom::FileMapObj*> m_filemapobj_list;
 protected:
     SafeTensor * allocSafeTensor();
+    xcom::FileMapObj * allocFileMapObj(
+        CHAR const* filename, xcom::FO_STATUS * st);
 
     XI_STATUS extractTensorAttr(JNode const* jn, OUT SafeTensor & st);
     XI_STATUS extractSafeTensor(
         xcom::FileObj & file, UINT64 fileoffset, JNode const* root);
     XI_STATUS extractDataOffset(JNode const* jn, OUT SafeTensor & st);
     XI_STATUS extractShape(JNode const* jn, OUT SafeTensor & st);
+
+    XI_STATUS mapSafeTensor(
+        xcom::FileMapObj & file, UINT64 fileoffset, JNode const* root);
 
     xoc::DATA_TYPE mapStrToDType(xoc::Sym const* str) const;
 public:
@@ -129,7 +146,9 @@ public:
     { return m_sym2st.get(name); }
 
     XI_STATUS readSafeTensors(CHAR const* filename);
+    XI_STATUS mapSafeTensors(CHAR const* filename);
 
+    void setTensorDataMapped(bool mapped) { m_is_tensor_data_mapped = mapped; }
     bool verify(xoc::RegionMgr const* rm) const;
 };
 

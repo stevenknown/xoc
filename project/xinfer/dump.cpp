@@ -64,7 +64,7 @@ bool dumpTokenVectorToUtf8Buffer(
         TOKID tid = tokvec.get(i);
         infer.getTokenizer().decode(tid, tmp, false);
         output.strcat(tmp);
-    } 
+    }
     return true;
 }
 
@@ -200,6 +200,9 @@ void dumpRTTensor(RTTensor const* rtt, xoc::RegionMgr const* rm)
     case RTTENSOR_DTYPE_F8_E5M2: str = "RTTENSOR_DTYPE_F8_E5M2"; break;
     default: ASSERT0(0);
     }
+    #ifdef _DEBUG_
+    note(lm, "\nid=%u", rtt->id);
+    #endif
     note(lm, "\ndtype=%s", str);
     note(lm, "\nndim=%d", rtt->ndim);
     note(lm, "\nelem_num=%d", rtt->elem_num);
@@ -210,7 +213,7 @@ void dumpRTTensor(RTTensor const* rtt, xoc::RegionMgr const* rm)
     }
     prt(lm, "]");
 
-    note(lm, "\ndata=0x%x,first %d elements:",
+    note(lm, "\ndata=0x%llx,first %d elements:",
          rtt->data, g_max_tensor_data_dump_num);
     lm->incIndent(2);
     dumpRTTensorData(rtt, lm, g_max_tensor_data_dump_num);
