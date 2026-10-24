@@ -5,13 +5,8 @@ XInfer is a LLM inference engine written in C/C++.
 
 It sits on top of the XOC compiler infrastructure.
 The only code dependencies are:
-  1. XOC project internal source (compiler?originated base infrastructure)
+  1. XOC project internal source (compiler originated base infrastructure)
   2. Standard system libc / libm (open, mmap, read, write etc.)
-
-
-No third-party libraries. No PyTorch. No ONNX Runtime. No OpenBLAS.
-No cuBLAS. No HuggingFace transformers. No sentencepiece. No gRPC.
-No protobuf. No Boost. No eigen. No BLAS. Nothing.
 
 The only external dependency is the XOC codebase itself. Everything
 else - the math kernels, the tokenizer, the JSON parser, the safetensors
@@ -23,8 +18,6 @@ line parser - is either part of XOC or written specifically for XInfer.
 The core design principle of XInfer is extensibility. Users can implement
 custom modules by inheriting standard base interfaces to meet domain-specific
 demands.
-
-
 
 Supported models:
     gpt2            GPT-2 (124M)
