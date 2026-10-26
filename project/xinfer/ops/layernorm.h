@@ -19,11 +19,11 @@ extern "C" {
 //Weight w / bias b can be f32 / f16 / bf16, will be converted to
 //float32 on the fly.
 void layernorm(
-    float * out, float const* in, RTTensor const* w, RTTensor const* b,
+    void * out, void const* in, RTTensor const* w, RTTensor const* b,
     unsigned int dim, float eps);
 
 void layernormInplace(
-    float * in_out, RTTensor const* w, RTTensor const* b,
+    void * in_out, RTTensor const* w, RTTensor const* b,
     unsigned int dim, float eps);
 
 void layernormF32(
@@ -35,11 +35,11 @@ void layernormF32Inplace(
     float const* b, unsigned int dim, float eps);
 
 void layernormF16(
-    float * out, float const* in, uint16_t const* w,
+    uint16_t * out, uint16_t const* in, uint16_t const* w,
     uint16_t const* b, unsigned int dim, float eps);
 
 void layernormBF16(
-    float * out, float const* in, uint16_t const* w,
+    uint16_t * out, uint16_t const* in, uint16_t const* w,
     uint16_t const* b, unsigned int dim, float eps);
 
 #ifdef __cplusplus

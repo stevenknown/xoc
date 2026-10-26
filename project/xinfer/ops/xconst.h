@@ -41,7 +41,9 @@ extern "C" {
   //DummyUsed
   #define ATTRIBUTE_USE
   #define ATTRIBUTE_INLINE
+  #define HINT_VECT
 #else 
+  #define HINT_VECT _Pragma("omp simd")
   #ifdef _USE_GCC_
     #define ATTRIBUTE_USE __attribute__((used))
     #define ATTRIBUTE_INLINE __attribute__((always_inline))

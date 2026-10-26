@@ -11,6 +11,7 @@ void rmsnormF32(
 
         //sum of squares.
         float sum = 0.0f;
+        HINT_VECT
         for (unsigned int i = 0; i < dim; i++) {
             float val = inb[i];
             sum = sum + val * val;
@@ -23,10 +24,12 @@ void rmsnormF32(
 
         //scale x and multiply weight.
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 outb[i] = inb[i] * recip_rms * w[i] + b[i];
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 outb[i] = inb[i] * recip_rms * w[i];
             }
@@ -57,10 +60,12 @@ void rmsnormF32Inplace(
 
         //scale x and multiply weight.
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 inoutb[i] = inoutb[i] * recip_rms * w[i] + b[i];
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 inoutb[i] = inoutb[i] * recip_rms * w[i];
             }
@@ -91,6 +96,7 @@ void rmsnormF16(
 
         //compute in fp32, convert back to bf16 for store
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = fp16_to_float(inb[i]);
                 float gw = fp16_to_float(w[i]);
@@ -99,6 +105,7 @@ void rmsnormF16(
                 outb[i] = float_to_fp16(res);
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inb[i]);
                 float gw = bf16_to_float(w[i]);
@@ -131,6 +138,7 @@ void rmsnormF16Inplace(
 
         //compute in fp32, convert back to bf16 for store
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = fp16_to_float(inoutb[i]);
                 float gw = fp16_to_float(w[i]);
@@ -139,6 +147,7 @@ void rmsnormF16Inplace(
                 inoutb[i] = float_to_fp16(res);
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inoutb[i]);
                 float gw = bf16_to_float(w[i]);
@@ -160,6 +169,7 @@ void rmsnormBF16Inplace(
 
         //sum‑of‑squares
         float sum = 0.0f;
+        HINT_VECT
         for (unsigned int i = 0; i < dim; i++) {
             float val = bf16_to_float(inoutb[i]);
             sum += val * val;
@@ -171,6 +181,7 @@ void rmsnormBF16Inplace(
 
         //compute in fp32, convert back to bf16 for store
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inoutb[i]);
                 float gw = bf16_to_float(w[i]);
@@ -179,6 +190,7 @@ void rmsnormBF16Inplace(
                 inoutb[i] = float_to_bf16(res);
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inoutb[i]);
                 float gw = bf16_to_float(w[i]);
@@ -201,6 +213,7 @@ void rmsnormBF16(
 
         //sum‑of‑squares
         float sum_sq = 0.0f;
+        HINT_VECT
         for (unsigned int i = 0; i < dim; i++) {
             float val = bf16_to_float(inb[i]);
             sum_sq += val * val;
@@ -212,6 +225,7 @@ void rmsnormBF16(
 
         //compute in fp32, convert back to bf16 for store
         if (b != NULL) {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inb[i]);
                 float gw = bf16_to_float(w[i]);
@@ -220,6 +234,7 @@ void rmsnormBF16(
                 outb[i] = float_to_bf16(res);
             }
         } else {
+            HINT_VECT
             for (unsigned int i = 0; i < dim; i++) {
                 float x = bf16_to_float(inb[i]);
                 float gw = bf16_to_float(w[i]);

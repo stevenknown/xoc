@@ -8,6 +8,8 @@
 //All buffers are float32, no type conversion.
 void addF32Inplace(float * out, float const* a, float const* b, unsigned int n)
 {
+    //No matter whether a, b, and out are aliased, the loop can be vectorized.
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         out[i] = a[i] + b[i];
     }
@@ -17,6 +19,7 @@ void addF32Inplace(float * out, float const* a, float const* b, unsigned int n)
 void addF16Inplace(
     uint16_t * out, uint16_t const* a, uint16_t const* b, unsigned int n)
 {
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         float ta = fp16_to_float(a[i]);
         float tb = fp16_to_float(b[i]);
@@ -29,6 +32,7 @@ void addF16Inplace(
 void addBF16Inplace(
     uint16_t * out, uint16_t const* a, uint16_t const* b, unsigned int n)
 {
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         float ta = bf16_to_float(a[i]);
         float tb = bf16_to_float(b[i]);

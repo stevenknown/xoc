@@ -56,15 +56,11 @@ protected:
     XI_STATUS autoRegression(
         TOKID token, int64_t pos, MOD RTCtx & ctx, MOD RTArg & arg);
 
-    XI_STATUS generate(char const* prompt, MOD RTArg & arg);
-
     void initRTRand();
-    virtual void initRTArg(RTArg & arg);
     virtual XI_STATUS initRTCtxTensors(
         OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg);
     virtual XI_STATUS initRTCtxTensorsLayer(
         OUT RTCtx & ctx, MOD RTMemMgr & mgr);
-    XI_STATUS initRTCtx(OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg);
     XI_STATUS initRTTensor(RTTensor * rtt, CHAR const* name);
 public:
     LLMInfer(xoc::RegionMgr * rm, SafeTensorsMgr const& stmgr,
@@ -143,6 +139,10 @@ public:
     //Return the model-configuration.
     Config const& getConfig() const { return m_config; }
     Tokenizer & getTokenizer() { return m_tokenizer; }
+    XI_STATUS generate(char const* prompt, MOD RTArg & arg, MOD RTCtx & ctx);
+
+    virtual void initRTArg(RTArg & arg);
+    XI_STATUS initRTCtx(OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg);
 
     void registerOp(XOp const* op) {}
 

@@ -37,12 +37,13 @@ static CHAR const* g_include_string = nullptr;
 static CHAR const* g_exclude_string = nullptr;
 CHAR const* g_prompt = nullptr;
 CHAR const* g_output_file_name = nullptr; //record the output file name.
-CHAR const* g_version = "1.0.0"; //record the exe version.
+CHAR const* g_version = "0.1.0"; //record the exe version.
 CHAR const* g_dump_file_name = nullptr;
 CHAR const* g_model_name = nullptr;
 bool g_dump_tensor_data = false;
 bool g_dump_json_parser = false;
 bool g_continuation = false;
+bool g_chat = false;
 bool g_dump_safetensors_mgr = false;
 bool g_dump_config = false;
 bool g_dump_tokenizer = false;
@@ -275,6 +276,7 @@ public:
 
     static void dump_usage(StrBuf & output)
     {
+        output.clean();
         UINT max_name_len = 0;
         for (UINT i = 0; i < BoolOption::getNumOfOption(); i++) {
             max_name_len =
@@ -301,6 +303,7 @@ public:
 
     static void dump_dump_option(StrBuf & output)
     {
+        output.clean();
         UINT max_name_len = 0;
         for (UINT i = 0; i < BoolOption::getNumOfDumpOption(); i++) {
             max_name_len =
@@ -335,204 +338,14 @@ CHAR const* BoolOption::elf_option_prefix = "elf-";
 BoolOption::Desc const BoolOption::option_desc[] = {
     { "time", &xoc::g_show_time,
       "show infer time", },
-    //{ "licm", &xoc::g_do_licm,
-    //  "enable loop-invariant-code-motion optimization", },
-    //{ "licm_no_guard", &xoc::g_do_licm_no_guard,
-    //  "enable loop-invariant-code-motion optimization "
-    //  "without inserting loop guard", },
-    //{ "if_cvs", &xoc::g_do_if_conversion,
-    //  "enable if-conversion optimization", },
-    //{ "gcse", &xoc::g_do_gcse,
-    //  "enable global-common-subexpression-elimination optimization", },
-    //{ "lcse", &xoc::g_do_lcse,
-    //  "enable local-common-subexpression-elimination optimization", },
-    //{ "exprtab", &xoc::g_do_expr_tab,
-    //  "compute expression table", },
-    //{ "rp", &xoc::g_do_rp,
-    //  "enable register-promotion optimization", },
-    //{ "cp", &xoc::g_do_cp,
-    //  "enable copy-propagation optimization", },
-    //{ "cp_aggr", &xoc::g_do_cp_aggressive,
-    //  "enable aggressive copy-propagation optimization", },
-    //{ "bcp", &xoc::g_do_bcp,
-    //  "enable branch-condition-propagation optimization", },
-    //{ "rce", &xoc::g_do_rce,
-    //  "enable redundant-code-elimination optimization", },
-    //{ "vect", &xoc::g_do_vect,
-    //  "enable auto vectorization", },
-    //{ "dce", &xoc::g_do_dce,
-    //  "enable dead-code-elimination optimization", },
-    //{ "dse", &xoc::g_do_dse,
-    //  "enable dead-store-elimination optimization", },
-    //{ "infer_type", &xoc::g_infer_type,
-    //  "enable type inference", },
-    //{ "vrp", &xoc::g_do_vrp,
-    //  "enable value range propagation", },
-    //{ "dce_aggr", &xoc::g_do_dce_aggressive,
-    //  "enable aggressive-dead-code-elimination optimization", },
-    //{ "lftr", &xoc::g_do_lftr,
-    //  "enable linear-function-test-replacement optimization", },
-    //{ "ivr", &xoc::g_do_ivr,
-    //  "enable induction-variable-recognization", },
-    //{ "gvn", &xoc::g_do_gvn,
-    //  "enable global-value-numbering", },
-    //{ "mdssa", &xoc::g_do_mdssa,
-    //  "enable md-ssa analysis", },
-    //{ "prssa", &xoc::g_do_prssa,
-    //  "enable pr-ssa analysis", },
-    //{ "reuse_ir", &xoc::g_reuse_ir,
-    //  "reuse ir to reduce memory footprint", },
-    //{ "prmode", &xoc::g_is_lower_to_pr_mode,
-    //  "lowering cascading IR mode to pr-transfering mode", },
-    //{ "lowest_height", &xoc::g_is_lower_to_lowest_height,
-    //  "lowering cascading IR to the lowest height", },
-    //{ "prdu", &xoc::g_compute_pr_du_chain,
-    //  "enable classic PR def-use analysis", },
-    //{ "nonprdu", &xoc::g_compute_nonpr_du_chain,
-    //  "enable classic NON-PR def-use analysis", },
-    //{ "fast_prdu", &xoc::g_compute_pr_du_chain_by_prssa,
-    //  "enable classic fast PR def-use analysis", },
-    //{ "redirect_stdout_to_dump_file", &xoc::g_redirect_stdout_to_dump_file,
-    //  "redirect internal compiler output information to given dump file", },
-    //{ "ipa", &xoc::g_do_ipa,
-    //  "enable interprocedual analysis", },
-    //{ "schedule_delay_slot", &xgen::g_enable_schedule_delay_slot,
-    //  "enable scheduling branch-delay-slot", },
-    //{ "cg", &xgen::g_do_cg,
-    //  "enable target code generation", },
-    //{ "gra", &xgen::g_do_gra,
-    //  "enable global-register-allocation", },
-    //{ "lis", &xgen::g_do_lis,
-    //  "enable instruction-scheduling", },
-    //{ "cg_for_inner_region", &xgen::g_is_generate_code_for_inner_region,
-    //  "enable code generation for inner region", },
-    //{ "refine", &xoc::g_do_refine,
-    //  "enable refinement optimization", },
-    //{ "global_refine", &xoc::g_do_global_refine,
-    //  "enable global refinement optimization", },
-    //{ "refine_duchain", &xoc::g_do_refine_duchain,
-    //  "enable refine-duchain optimization", },
-    //{ "lsra", &xoc::g_do_lsra,
-    //  "enable linear-scan-register-allocation", },
-    //{ "reass", &xoc::g_do_alge_reassociate,
-    //  "enable algebraic-reasscociation", },
-    //{ "reass_aggr", &xoc::g_do_alge_reassociate_aggressive,
-    //  "enable aggressive-algebraic-reasscociation", },
-    //{ "dist", &xoc::g_do_alge_distributive,
-    //  "enable algebraic-distributive", },
-    //{ "opt_float", &xoc::g_do_opt_float,
-    //  "enable float optimization", },
-    //#ifdef REF_TARGMACH_INFO
-    //{ "migen", &mach::g_do_migen,
-    //  "enable machine-instruction generation", },
-    //#endif
     { "cont", &xinfer::g_continuation,
       "enable continuation", },
+    { "chat", &xinfer::g_chat,
+      "enable chat mode", },
 };
 
 
 BoolOption::Desc const BoolOption::dump_option_desc[] = {
-    //{ "before-pass", &xoc::g_dump_opt.is_dump_before_pass,
-    //  "dump region before pass is performed", },
-    //{ "after-pass", &xoc::g_dump_opt.is_dump_after_pass,
-    //  "dump region after pass successed", },
-    //{ "cfg", &xoc::DumpOption::getOptionDesc(PASS_CFG)->is_dump,
-    //  "dump control-flow-graph", },
-    //{ "cfgopt", &xoc::g_dump_opt.is_dump_cfgopt,
-    //  "dump control-flow-graph optimizations", },
-    //{ "rpo", &xoc::DumpOption::getOptionDesc(PASS_RPO)->is_dump,
-    //  "dump PRO information", },
-    //{ "dom", &xoc::DumpOption::getOptionDesc(PASS_DOM)->is_dump,
-    //  "dump dominator information", },
-    //{ "pdom", &xoc::DumpOption::getOptionDesc(PASS_PDOM)->is_dump,
-    //  "dump post-dominator information", },
-    //{ "aa", &xoc::DumpOption::getOptionDesc(PASS_AA)->is_dump,
-    //  "dump alias-analysis", },
-    //{ "dce", &xoc::DumpOption::getOptionDesc(PASS_DCE)->is_dump,
-    //  "dump dead-code-elimination", },
-    //{ "dse", &xoc::DumpOption::getOptionDesc(PASS_DSE)->is_dump,
-    //  "dump dead-store-elimination", },
-    //{ "infer_type", &xoc::DumpOption::getOptionDesc(PASS_INFER_TYPE)->is_dump,
-    //  "dump infer-type", },
-    //{ "vrp", &xoc::DumpOption::getOptionDesc(PASS_VRP)->is_dump,
-    //  "dump value-range-propagation", },
-    //{ "invert_brtgt",
-    //  &xoc::DumpOption::getOptionDesc(PASS_INVERT_BRTGT)->is_dump,
-    //  "dump invert-branch-target", },
-    //{ "lftr", &xoc::DumpOption::getOptionDesc(PASS_LFTR)->is_dump,
-    //  "dump linear-function-test-replacement optimization", },
-    //{ "vect", &xoc::DumpOption::getOptionDesc(PASS_VECT)->is_dump,
-    //  "dump loop vectorization", },
-    //{ "ivr", &xoc::DumpOption::getOptionDesc(PASS_IVR)->is_dump,
-    //  "dump induction-variable-recognization", },
-    //{ "rp", &xoc::DumpOption::getOptionDesc(PASS_RP)->is_dump,
-    //  "dump register-promotion", },
-    //{ "licm", &xoc::DumpOption::getOptionDesc(PASS_LICM)->is_dump,
-    //  "dump loop-invariant-code-motion", },
-    //{ "if_cvs", &xoc::DumpOption::getOptionDesc(PASS_IF_CONVERSION)->is_dump,
-    //  "dump if-conversion", },
-    //{ "gcse", &xoc::DumpOption::getOptionDesc(PASS_GCSE)->is_dump,
-    //  "dump global-common-subexpression-elimination", },
-    //{ "lcse", &xoc::DumpOption::getOptionDesc(PASS_LCSE)->is_dump,
-    //  "dump local-common-subexpression-elimination", },
-    //{ "exprtab", &xoc::DumpOption::getOptionDesc(PASS_EXPR_TAB)->is_dump,
-    //  "dump expression table", },
-    //{ "dumgr", &xoc::DumpOption::getOptionDesc(PASS_DU_MGR)->is_dump,
-    //  "dump classic def-use information", },
-    //{ "prssa", &xoc::DumpOption::getOptionDesc(PASS_PRSSA_MGR)->is_dump,
-    //  "dump pr-ssa information", },
-    //{ "mdssa", &xoc::DumpOption::getOptionDesc(PASS_MDSSA_MGR)->is_dump,
-    //  "dump md-ssa information", },
-    //{ "rce", &xoc::DumpOption::getOptionDesc(PASS_RCE)->is_dump,
-    //  "dump redundant-code-elimination", },
-    //{ "bcp", &xoc::DumpOption::getOptionDesc(PASS_BCP)->is_dump,
-    //  "dump redundant-code-elimination", },
-    //{ "cp", &xoc::DumpOption::getOptionDesc(PASS_CP)->is_dump,
-    //  "dump copy-propagation", },
-    //{ "ir2or", &xgen::g_xgen_dump_opt.is_dump_ir2or,
-    //  "dump IR2OR convertion", },
-    //{ "ra", &xgen::g_xgen_dump_opt.is_dump_ra,
-    //  "dump register allocation", },
-    //{ "lis", &xgen::g_xgen_dump_opt.is_dump_lis,
-    //  "dump instruction-scheduling", },
-    //{ "cg", &xgen::g_xgen_dump_opt.is_dump_cg,
-    //  "dump target code generation", },
-    //{ "cdg", &xoc::DumpOption::getOptionDesc(PASS_CDG)->is_dump,
-    //  "dump control-dependent-graph", },
-    //{ "simplification", &xoc::DumpOption::getOptionDesc(PASS_IRSIMP)->is_dump,
-    //  "dump IR simplification", },
-    //{ "refine_duchain",
-    //  &xoc::DumpOption::getOptionDesc(PASS_REFINE_DUCHAIN)->is_dump,
-    //  "dump refine-duchain optimization", },
-    //{ "refine", &xoc::DumpOption::getOptionDesc(PASS_REFINE)->is_dump,
-    //  "dump refine optimization", },
-    //{ "global_refine",
-    //  &xoc::DumpOption::getOptionDesc(PASS_GLOBAL_REFINE)->is_dump,
-    //  "dump global refine optimization", },
-    //{ "gvn", &xoc::DumpOption::getOptionDesc(PASS_GVN)->is_dump,
-    //  "dump global-value-numbering", },
-    //{ "irparser", &xoc::g_dump_opt.is_dump_irparser,
-    //  "dump IR parser", },
-    //{ "all", &xoc::g_dump_opt.is_dump_all,
-    //  "dump all compiler information", },
-    //{ "for_test", &xoc::g_dump_opt.is_dump_for_test,
-    //  "dump compiler information only for test environment usage", },
-    //{ "irid", &xoc::g_dump_opt.is_dump_irid,
-    //  "dump IR's id", },
-    //{ "srcline", &xoc::g_dump_opt.is_dump_ir_srcline,
-    //  "dump IR's src line", },
-    //{ "attachinfo", &xoc::g_dump_opt.is_dump_ir_attachinfo,
-    //  "dump IR's attachinfo", },
-    //{ "lsra", &xoc::DumpOption::getOptionDesc(PASS_LINEAR_SCAN_RA)->is_dump,
-    //  "dump linear-scan-register-allocation", },
-    //{ "reass",
-    //  &xoc::DumpOption::getOptionDesc(PASS_ALGE_REASSOCIATE)->is_dump,
-    //  "dump algebraic-reasscociation", },
-    //{ "dist",
-    //  &xoc::DumpOption::getOptionDesc(PASS_ALGE_DISTRIBUTIVE)->is_dump,
-    //  "dump algebraic-distributive", },
-    //{ "to_buffer", &xoc::g_dump_opt.is_dump_to_buffer,
-    //  "perfer to dump informations to buffer", },
     { "tensor_data", &xinfer::g_dump_tensor_data,
       "dump tensor data even if it might be slow when tensor is large", },
     { "json_parser", &xinfer::g_dump_json_parser, "dump json parser", },
@@ -595,6 +408,7 @@ public:
 
     static void dump_usage(StrBuf & output)
     {
+        output.clean();
         UINT max_name_len = 0;
         for (UINT i = 0; i < FPOption::getNumOfOption(); i++) {
             max_name_len =
@@ -660,6 +474,7 @@ public:
 
     static void dump_usage(StrBuf & output)
     {
+        output.clean();
         UINT max_name_len = 0;
         for (UINT i = 0; i < IntOption::getNumOfOption(); i++) {
             max_name_len =
@@ -688,10 +503,6 @@ public:
 
 
 IntOption::Desc const IntOption::option_desc[] = {
-    //{ "thres_opt_ir_num", (INT*)&xoc::g_thres_opt_ir_num,
-    //  "the maximum limit of the number of IR to perform optimizations", },
-    //{ "thres_opt_bb_num", (INT*)&xoc::g_thres_opt_bb_num,
-    //  "the maximum limit of the number of IRBB to perform optimizations", }
     { "max_tensor_data_dump_num", (INT*)&xinfer::g_max_tensor_data_dump_num,
       "the maximum limit of the number of tensor data to dump", },
     { "max_seq_len", (INT*)&xinfer::g_max_seq_len,
@@ -734,6 +545,7 @@ public:
 
     static void dump_usage(StrBuf & output)
     {
+        output.clean();
         UINT max_name_len = 0;
         for (UINT i = 0; i < StringOption::getNumOfOption(); i++) {
             max_name_len = MAX((UINT)::strlen(
@@ -761,10 +573,6 @@ public:
 
 
 StringOption::Desc const StringOption::option_desc[] = {
-    //{ "include_region", (CHAR*)&xinfer::g_include_string,
-    //   "the list of region that participate in compilation", },
-    //{ "exclude_region", (CHAR*)&xinfer::g_exclude_string,
-    //   "the list of region that will be excluded from compilation", },
     { "prompt", (CHAR*)&xinfer::g_prompt,
        "the prompt that user input", },
     { "model_name", (CHAR*)&xinfer::g_model_name,

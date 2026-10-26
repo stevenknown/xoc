@@ -3,6 +3,7 @@
 float findmaxvalueF32(float const* logits, int64_t elemnum)
 {
     float max_val = logits[0];
+    HINT_VECT
     for (int64_t i = 1; i < elemnum; i++) {
         if (logits[i] > max_val) {
             max_val = logits[i];
@@ -122,6 +123,7 @@ void softmax_inplace_f32(float * logits, int64_t elemnum, float eps)
 
     //Divide sum, get probability.
     float recip_sum = 1.0f / sum;
+    HINT_VECT
     for (int64_t i = 0; i < elemnum; i++) {
         logits[i] = logits[i] * recip_sum;
     }

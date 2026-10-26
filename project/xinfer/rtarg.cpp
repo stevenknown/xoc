@@ -36,7 +36,41 @@ namespace xinfer {
 RTArg::RTArg()
 {
     clean();
+    prompt_tokens.grow(128);
     gened_tokens.grow(128);
+    history_tokens.grow(256);
+}
+
+
+void RTArg::dumpHistoryTokens(LLMInfer & infer, xoc::LogMgr * lm) const
+{
+    note(lm, "\nHISTORY TOKEN:total:%u", history_tokens.get_elem_count());
+    if (history_tokens.get_elem_count() == 0) { return; }
+    lm->incIndent(2);
+    for (UINT i = 0; i < history_tokens.get_elem_count(); i++) {
+        TOKID tid = history_tokens.get(i);
+        dumpToken(infer, tid, i);
+    }
+    xcom::StrBuf utf8buf(128);
+    dumpTokenVectorToUtf8Buffer(utf8buf, infer, history_tokens);
+    note(lm, "\nHISTORY:%s\n", utf8buf.getBuf());
+    lm->decIndent(2);
+}
+
+
+void RTArg::dumpPromptTokens(LLMInfer & infer, xoc::LogMgr * lm) const
+{
+    note(lm, "\nPROMPT TOKEN:total:%u", prompt_tokens.get_elem_count());
+    if (prompt_tokens.get_elem_count() == 0) { return; }
+    lm->incIndent(2);
+    for (UINT i = 0; i < prompt_tokens.get_elem_count(); i++) {
+        TOKID tid = prompt_tokens.get(i);
+        dumpToken(infer, tid, i);
+    }
+    xcom::StrBuf utf8buf(128);
+    dumpTokenVectorToUtf8Buffer(utf8buf, infer, prompt_tokens);
+    note(lm, "\nPROMPT:%s\n", utf8buf.getBuf());
+    lm->decIndent(2);
 }
 
 
@@ -51,9 +85,27 @@ void RTArg::dumpGenedTokens(LLMInfer & infer, xoc::LogMgr * lm) const
     }
     xcom::StrBuf utf8buf(128);
     dumpTokenVectorToUtf8Buffer(utf8buf, infer, gened_tokens);
-    note(lm, "\nUTF8 OUTPUT:%s\n", utf8buf.getBuf());
-    fprintf(stdout, "\nUTF8 OUTPUT:%s\n", utf8buf.getBuf());
+    note(lm, "\nOUTPUT:%s\n", utf8buf.getBuf());
     lm->decIndent(2);
+}
+
+
+void RTArg::outputGenedTokens(LLMInfer & infer, xoc::LogMgr * lm) const
+{
+    if (gened_tokens.get_elem_count() == 0) { return; }
+    xcom::StrBuf utf8buf(128);
+    dumpTokenVectorToUtf8Buffer(utf8buf, infer, gened_tokens);
+    fprintf(stdout, "\nOUTPUT:%s\n", utf8buf.getBuf());
+}
+
+
+void RTArg::reserveGenedToken()
+{
+    if (gened_tokens.get_elem_count() == 0) { return; }
+    for (UINT i = 0; i < gened_tokens.get_elem_count(); i++) {
+        TOKID tid = gened_tokens.get(i);
+        history_tokens.append(tid);
+    }
 }
 
 
@@ -80,7 +132,9 @@ void RTArg::dump(LLMInfer & infer, xoc::LogMgr * lm) const
     note(lm, "\nkcache bytesize:%u", kcache.get_capacity());
     note(lm, "\nvcache bytesize:%u", vcache.get_capacity());
     note(lm, "\ncurrent_pos:%u", current_pos);
+    dumpPromptTokens(infer, lm);
     dumpGenedTokens(infer, lm);
+    dumpHistoryTokens(infer, lm);
     lm->decIndent(2);
 }
 
@@ -92,12 +146,12 @@ void RTArg::addGenedToken(TOKID tokid)
 }
 
 
-void RTArg::addGenedToken(TokenArray const* tokarr)
+void RTArg::addPromptToken(TokenArray const* tokarr)
 {
     ASSERT0(tokarr);
-    ASSERT0(tokarr->array_elem_num <= gened_tokens.get_vector_max_capacity());
+    ASSERT0(tokarr->array_elem_num <= prompt_tokens.get_vector_max_capacity());
     for (int64_t i = 0; i < tokarr->array_elem_num; i++) {
-        gened_tokens.append(tokarr->array[i]);
+        prompt_tokens.append(tokarr->array[i]);
     }
 }
 //END RTArg

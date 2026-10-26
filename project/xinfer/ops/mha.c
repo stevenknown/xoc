@@ -64,6 +64,7 @@ void scaled_dot_attn_decode_bf16(
         for (int64_t t = 0; t < seq_len; t++) {
             uint16_t const* v_t_head = v_cache + t * n_embd + off_in_embd;
             float s = attn_score[t];
+            HINT_VECT
             for (unsigned int d = 0; d < head_dim; d++) {
                 float f32val = bf16_to_float(out_head[d]);
                 f32val = f32val + s * bf16_to_float(v_t_head[d]);
@@ -200,6 +201,7 @@ void scaled_dot_attn_decode_f32(
         for (int64_t t = 0; t < seq_len; t++) {
             float const* k_t_head = k_cache + t * n_embd + off_in_embd;
             float dot = 0.0f;
+            HINT_VECT
             for (unsigned int d = 0; d < head_dim; d++) {
                 dot = dot + q_head[d] * k_t_head[d];
             }
@@ -215,6 +217,7 @@ void scaled_dot_attn_decode_f32(
         for (int64_t t = 0; t < seq_len; t++) {
             float const* v_t_head = v_cache + t * n_embd + off_in_embd;
             float s = attn_score[t];
+            HINT_VECT
             for (unsigned int d = 0; d < head_dim; d++) {
                 out_head[d] = out_head[d] + s * v_t_head[d];
             }
@@ -670,6 +673,7 @@ void gqa_f32(
 
             //Compute dot-product of qhead and khead.
             float dot = 0.0f;
+            HINT_VECT
             for (unsigned int d = 0; d < head_dim; d++) {
                 dot = dot + tmp_qhead_buf[d] * khead[d];
             }
@@ -706,6 +710,7 @@ void gqa_f32(
 
             //vectorizable.
             //Compute the weighted sum of v.
+            HINT_VECT
             for (unsigned int d = 0; d < head_dim; d++) {
                 o_vec[d] = o_vec[d] + w * vhead[d];
             }

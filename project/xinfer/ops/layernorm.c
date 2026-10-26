@@ -6,6 +6,7 @@ void layernormF32Inplace(
 {
     //compute mean.
     float mean = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         mean += in_out[i];
     }
@@ -13,6 +14,7 @@ void layernormF32Inplace(
 
     //compute variance.
     float var = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         float diff = in_out[i] - mean;
         var += diff * diff;
@@ -21,6 +23,7 @@ void layernormF32Inplace(
 
     //perform scale and shift.
     float recip_std = 1.0f / sqrtf(var + eps);
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         float gamma = w[i];
         float beta = b[i];
@@ -30,12 +33,29 @@ void layernormF32Inplace(
 }
 
 
+void layernormF16Inplace(
+    uint16_t * in_out, uint16_t const*restrict w,
+    uint16_t const*restrict b, unsigned int dim, float eps)
+{
+    XASSERT(0); //TODO:
+}
+
+
+void layernormBF16Inplace(
+    uint16_t * in_out, uint16_t const*restrict w,
+    uint16_t const*restrict b, unsigned int dim, float eps)
+{
+    XASSERT(0); //TODO:
+}
+
+
 void layernormF32(
     float * out, float const*restrict in, float const*restrict w,
     float const*restrict b, unsigned int dim, float eps)
 {
     //compute mean.
     float mean = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         mean += in[i];
     }
@@ -43,6 +63,7 @@ void layernormF32(
 
     //Compute variance.
     float var = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         float diff = in[i] - mean;
         var += diff * diff;
@@ -51,6 +72,7 @@ void layernormF32(
 
     //Perform scale and shift.
     float recip_std = 1.0f / sqrtf(var + eps);
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         float gamma = w[i];
         float beta = b[i];
@@ -61,50 +83,59 @@ void layernormF32(
 
 
 void layernormF16(
-    float * out, float const*restrict in, uint16_t const*restrict w,
+    uint16_t * out,  uint16_t const*restrict in, uint16_t const*restrict w,
     uint16_t const*restrict b, unsigned int dim, float eps)
 {
     //Compute mean.
     float mean = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
-        mean += in[i];
+        mean += fp16_to_float(in[i]);
     }
     mean /= (float)dim;
 
     //Compute variance.
     float var = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
-        float diff = in[i] - mean;
+        float diff = fp16_to_float(in[i]) - mean;
         var += diff * diff;
     }
     var /= (float)dim;
 
     //Perform scale and shift.
     float recip_std = 1.0f / sqrtf(var + eps);
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
         float gamma = fp16_to_float(w[i]);
         float beta = fp16_to_float(b[i]);
-        float val = (in[i] - mean) * recip_std; //use MUL rather than DIV.
-        out[i] = val * gamma + beta;
+        float val = fp16_to_float(in[i]);
+
+        //use MUL rather than DIV.
+        val = (val - mean) * recip_std;
+        val = val * gamma + beta;
+        out[i] = float_to_fp16(val);
     }
 }
 
 
 void layernormBF16(
-    float * out, float const*restrict in, uint16_t const*restrict w,
+    uint16_t * out, uint16_t const*restrict in, uint16_t const*restrict w,
     uint16_t const*restrict b, unsigned int dim, float eps)
 {
     //Compute mean.
     float mean = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
-        mean += in[i];
+        mean += bf16_to_float(in[i]);
     }
     mean /= (float)dim;
 
     //Compute variance.
     float var = 0.0f;
+    HINT_VECT
     for (unsigned int i = 0; i < dim; i++) {
-        float diff = in[i] - mean;
+        float diff = bf16_to_float(in[i]) - mean;
         var += diff * diff;
     }
     var /= (float)dim;
@@ -114,14 +145,16 @@ void layernormBF16(
     for (unsigned int i = 0; i < dim; i++) {
         float gamma = bf16_to_float(w[i]);
         float beta = bf16_to_float(b[i]);
-        float val = (in[i] - mean) * recip_std; //use MUL rather than DIV.
-        out[i] = val * gamma + beta;
+        float val = bf16_to_float(in[i]);
+        val = (val - mean) * recip_std; //use MUL rather than DIV.
+        val = val * gamma + beta;
+        out[i] = float_to_bf16(val);
     }
 }
 
 
 void layernormInplace(
-    float * in_out, RTTensor const*restrict w,
+    void * in_out, RTTensor const*restrict w,
     RTTensor const*restrict b, unsigned int dim, float eps)
 {
     switch (w->dtype) {
@@ -132,17 +165,15 @@ void layernormInplace(
         return;
     case RTTENSOR_DTYPE_F16:
         XASSERT(b->dtype == RTTENSOR_DTYPE_F16);
-        XASSERT(0); //TODO:
-        //layernormF16Inplace(
-        //    out, in, (uint16_t const*)w->data, (uint16_t const*)b->data,
-        //    dim, eps);
+        layernormF16Inplace(
+            (uint16_t*)in_out, (uint16_t const*)w->data,
+            (uint16_t const*)b->data, dim, eps);
         return;
     case RTTENSOR_DTYPE_BF16:
         XASSERT(b->dtype == RTTENSOR_DTYPE_BF16);
-        XASSERT(0); //TODO:
-        //layernormBF16Inplace(
-        //    out, in, (uint16_t const*)w->data, (uint16_t const*)b->data,
-        //    dim, eps);
+        layernormBF16Inplace(
+            (uint16_t*)in_out, (uint16_t const*)w->data,
+            (uint16_t const*)b->data, dim, eps);
         return;
     default:
         XASSERT(0);
@@ -152,7 +183,7 @@ void layernormInplace(
 
 
 void layernorm(
-    float * out, float const*restrict in, RTTensor const*restrict w,
+    void * out, void const*restrict in, RTTensor const*restrict w,
     RTTensor const*restrict b, unsigned int dim, float eps)
 {
     switch (w->dtype) {

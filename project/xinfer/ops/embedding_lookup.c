@@ -61,9 +61,7 @@ static void embedding_lookup_f32(
     XASSERT(emb_weight->dtype == RTTENSOR_DTYPE_F32);
     float const* weight_base = (float const*)emb_weight->data;
     float const* src = weight_base + token_id * n_emb;
-    for (int64_t i = 0; i < n_emb; i++) {
-        out[i] = src[i];
-    }
+    memcpy(out, src, n_emb * sizeof(float));
 }
 
 

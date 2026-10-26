@@ -133,6 +133,71 @@ bool Driver::handleJSONFileList(OUT Config & conf, OUT Tokenizer & tokenizer)
 }
 
 
+static void readPrompt(OUT xcom::StrBuf & prompt)
+{
+    size_t curlen = 0;
+    UINT buflen = prompt.getBufLen();
+    CHAR * buf = prompt.getBuf();
+    for (;;) {
+        //NOTE:fgets reads no more than 'buflen' characters.
+        if (::fgets(buf + curlen, (int)(buflen - curlen), stdin) == nullptr) {
+            //Nothing to read
+            return;
+        }
+        size_t read_len = ::strlen(buf + curlen);
+        curlen += read_len;
+
+        //Find the newline in user input.
+        if (buf[curlen - 1] == '\n') {
+            buf[curlen - 1] = 0;
+            return;
+        }
+
+        //User's input exceeds current buffer capacity.
+        buflen *= 2;
+        prompt.reGrowBuf(buflen);
+        buf = prompt.getBuf();
+        ASSERT0(buf);
+    }
+}
+
+
+bool Driver::chat(LLMInfer & infer)
+{
+    RTArg arg;
+    infer.initRTArg(arg);
+    arg.dump(infer, m_rm->getLogMgr());
+
+    RTMemMgr mgr;
+    RTCtx ctx;
+    XI_STATUS status = infer.initRTCtx(ctx, mgr, arg);
+    if (status != XI_SUCC) {
+        return false;
+    }
+    ASSERT0(infer.verify(ctx, arg));
+    dumpRTCtx(&ctx, getRegionMgr());
+
+    xcom::StrBuf buf(128);
+    //xcom::StrBuf buf(arg.getMaxSeqLen());
+    for (;;) {
+        printf("\nINPUT:");
+        buf.clean();
+        readPrompt(buf);
+        if (buf.is_empty()) { return true; }
+        if (infer.generate(buf.getBuf(), arg, ctx) != XI_SUCC) {
+            return false;
+        }
+        arg.outputGenedTokens(infer, m_rm->getLogMgr());
+        if (g_continuation) {
+            arg.reserveGenedToken();
+        }
+        arg.cleanCurChatTokens();
+        infer.dump();
+    }
+    return true;
+}
+
+
 bool Driver::perform()
 {
     xoc::RegionMgr * rm = initRegionMgr();
@@ -162,8 +227,10 @@ bool Driver::perform()
     LLMInfer * infer = mm.allocModel(
         mt, m_rm, stmgr, conf, jm, tokenizer, sym_tab);
     ASSERT0(infer);
-    bool succ = infer->perform();
-    return succ;
+    if (g_chat) {
+        return chat(*infer);
+    }
+    return infer->perform();
 }
 //END Driver
 

@@ -337,6 +337,8 @@ void LLMInfer::initRTRand()
 XI_STATUS LLMInfer::initRTCtx(
     OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg)
 {
+    ::memset(&ctx, 0, sizeof(RTCtx));
+    initRTDump(*this, ctx);
     ctx.n_layer = arg.n_layer;
     ctx.n_embd = arg.n_embd;
     ctx.n_head = arg.n_head;
@@ -375,9 +377,7 @@ XI_STATUS LLMInfer::autoRegression(
     while (pos < maxlen) {
         START_TIMER_FMT(t2, ("%uth regression", pos));
         TOKID next_token = decode(token,  pos, &ctx);
-        if (g_continuation) {
-            arg.addGenedToken(next_token);
-        }
+        arg.addGenedToken(next_token);
         ASSERTN(all_unlocked(&ctx), ("\nruntime resource not yet unlocked"));
         if (next_token == (TOKID)INVALID_TOKEN) {
             dumpAct(getLogMgr(),
@@ -407,20 +407,11 @@ XI_STATUS LLMInfer::autoRegression(
 }
 
 
-XI_STATUS LLMInfer::generate(char const* prompt, MOD RTArg & arg)
+XI_STATUS LLMInfer::generate(
+    CHAR const* prompt, MOD RTArg & arg, MOD RTCtx & ctx)
 {
     START_TIMER(t, "generate");
-    RTMemMgr mgr;
-    RTCtx ctx;
-    ::memset(&ctx, 0, sizeof(RTCtx));
-    initRTDump(*this, ctx);
-    XI_STATUS status = initRTCtx(ctx, mgr, arg);
-    if (status != XI_SUCC) {
-        END_TIMER(t, "generate");
-        return status;
-    }
-    ASSERT0(verify(ctx, arg));
-    dumpRTCtx(&ctx, getRegionMgr());
+    ASSERT0(all_unlocked(&ctx));
     TokenArrayMgr tokarrmgr;
     TokenArray * tokarr = getTokenizer().encode(
         prompt, MAX_VOCAB_SIZE, tokarrmgr);
@@ -435,10 +426,9 @@ XI_STATUS LLMInfer::generate(char const* prompt, MOD RTArg & arg)
     TOKID token = first_next_token;
     ASSERT0(token != (TOKID)INVALID_TOKEN);
     ASSERT0(dumpTokenArr(*this, tokarr));
-    if (g_continuation) {
-        arg.addGenedToken(tokarr);
-    }
-    status = autoRegression(token, pos, ctx, arg);
+    arg.addPromptToken(tokarr);
+    XI_STATUS status = autoRegression(token, pos, ctx, arg);
+    ASSERT0(all_unlocked(&ctx));
     END_TIMER(t, "generate");
     return status;
 }
@@ -459,10 +449,20 @@ bool LLMInfer::perform()
     initRTArg(arg);
     arg.dump(*this, m_rm->getLogMgr());
     if (xinfer::g_prompt == nullptr) { return true; }
-    if (generate(xinfer::g_prompt, arg) != XI_SUCC) {
+
+    RTMemMgr mgr;
+    RTCtx ctx;
+    XI_STATUS status = initRTCtx(ctx, mgr, arg);
+    if (status != XI_SUCC) {
         return false;
     }
-    arg.dumpGenedTokens(*this, m_rm->getLogMgr());
+    ASSERT0(verify(ctx, arg));
+    dumpRTCtx(&ctx, getRegionMgr());
+
+    if (generate(xinfer::g_prompt, arg, ctx) != XI_SUCC) {
+        return false;
+    }
+    arg.outputGenedTokens(*this, m_rm->getLogMgr());
     dump();
     return true;
 }

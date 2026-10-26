@@ -65,10 +65,12 @@ public:
     xoc::BYTEVec kcache;
     xoc::BYTEVec vcache;
     xoc::BYTEVec logits;
+    TokenVec prompt_tokens;
     TokenVec gened_tokens;
+    TokenVec history_tokens;
 public:
     RTArg();
-    void addGenedToken(TokenArray const* tokarr);
+    void addPromptToken(TokenArray const* tokarr);
     void addGenedToken(TOKID tokid);
 
     void clean()
@@ -96,10 +98,19 @@ public:
         vcache.clean();
         logits.clean();
         gened_tokens.clean();
+        prompt_tokens.clean();
+        history_tokens.clean();
+    }
+    void cleanCurChatTokens()
+    {
+        prompt_tokens.clean();
+        gened_tokens.clean();
     }
 
     void dump(LLMInfer & infer, xoc::LogMgr * lm) const;
     void dumpGenedTokens(LLMInfer & infer, xoc::LogMgr * lm) const;
+    void dumpHistoryTokens(LLMInfer & infer, xoc::LogMgr * lm) const;
+    void dumpPromptTokens(LLMInfer & infer, xoc::LogMgr * lm) const;
 
     UINT getMaxSeqLen() const { return n_positions; }
 
@@ -148,6 +159,10 @@ public:
 
     BYTE * getLogitsBuf() { return logits.get_vec(); }
     UINT getLogitsBufLen() { return logits.get_capacity(); }
+
+    void outputGenedTokens(LLMInfer & infer, xoc::LogMgr * lm) const;
+
+    void reserveGenedToken();
 };
 
 } //namespace xinfer

@@ -20,6 +20,7 @@ void matmulTransF32Bias(
 
         //Array version.
         float const* row_of_w = weight + i * n_col;
+        HINT_VECT
         for (unsigned int j = 0; j < n_col; j++) {
             //in * W^T
             sum = sum + in[j] * row_of_w[j];
@@ -48,8 +49,9 @@ void matmulTransF16Bias(
     for (unsigned int i = 0; i < n_row; i++) {
         float sum = fp16_to_float(b[i]); //start with bias.
 
-        //Array version.
         uint16_t const* row_of_w = weight + i * n_col;
+        //NOTE:float-conversion might prevent auto-vect.
+        HINT_VECT
         for (unsigned int j = 0; j < n_col; j++) {
             //in * W^T
             float wval = fp16_to_float(row_of_w[j]);
@@ -81,6 +83,7 @@ void matmulTransBF16Bias(
 
         //Array version.
         uint16_t const* row_of_w = weight + i * n_col;
+        HINT_VECT
         for (unsigned int j = 0; j < n_col; j++) {
             //in * W^T
             float wval = bf16_to_float(row_of_w[j]);
@@ -108,11 +111,12 @@ void matmulF32Bias(
         float sum = b[i]; //start with bias.
 
         //Array version.
+        HINT_VECT
         for (unsigned int j = 0; j < n_row; j++) {
             //in * W
             //NOTE:Since weight is stored in row-major order in memory, the
             //elements that accessed via weight[j * n_col * i] are not
-            //contiguous.
+            //contiguous. Non-one-stride might prevent auto-vect.
             sum = sum + in[j] * weight[j * n_col + i];
         }
         out[i] = sum;
@@ -170,6 +174,7 @@ int matmulTransF32Ptr(
 
         //Array version.
         float const* row_of_w = weight + row_base;
+        HINT_VECT
         for (unsigned int j = 0; j < n_col; j++) {
             sum = sum + in[j] * row_of_w[j];
         }
@@ -256,6 +261,9 @@ void matmulTransF16(
         float sum = 0.0f;
         //byte offset for row j: j * n_col * elemsz
         unsigned int row_base = j * n_col * elemsz;
+
+        //NOTE:function-call might prevent auto-vect.
+        HINT_VECT
         for (unsigned int k = 0; k < n_col; k++) {
             unsigned int elem_off = row_base + k * elemsz;
             float w_val = fp16_to_float(*((uint16_t const*)(ptr + elem_off)));

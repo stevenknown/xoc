@@ -44,6 +44,8 @@ protected:
 public:
     Driver() { m_rm = nullptr; }
     ~Driver();
+    bool chat(LLMInfer & infer);
+    xoc::RegionMgr * getRegionMgr() const { return m_rm ; }
     bool perform();
 };
 

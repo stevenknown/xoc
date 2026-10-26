@@ -42,6 +42,7 @@ extern bool g_dump_tensor_data;
 extern bool g_dump_json_parser;
 extern CHAR const* g_prompt;
 extern bool g_continuation;
+extern bool g_chat;
 extern bool g_dump_safetensors_mgr;
 extern bool g_dump_config;
 extern bool g_dump_tokenizer;

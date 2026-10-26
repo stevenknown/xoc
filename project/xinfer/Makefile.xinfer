@@ -48,9 +48,15 @@ ifeq ($(DEBUG), true)
 else
   CFLAGS+=-O3
   CFLAGS+=-flto
+  CFLAGS+=-ftree-vectorize
+  CFLAGS+=-fopenmp-simd
+
+#  CFLAGS+=-fopt-info-vec-optimized
+#  CFLAGS+=-fopt-info-vec-missed
 #  CLINKFLAGS+=\
 #    -fdump-ipa-cgraph \
 #    -fdump-ipa-inline
+
 endif
 
 CFLAGS+=\

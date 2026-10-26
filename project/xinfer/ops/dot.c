@@ -2,6 +2,8 @@
 
 void dotF32Inplace(float * out, float const* a, float const* b, unsigned int n)
 {
+    //No matter whether a, b, and out are aliased, the loop can be vectorized.
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         out[i] = a[i] * b[i];
     }
@@ -11,6 +13,9 @@ void dotF32Inplace(float * out, float const* a, float const* b, unsigned int n)
 void dotF16Inplace(
     uint16_t * out, uint16_t const* a, uint16_t const* b, unsigned int n)
 {
+    //No matter whether a, b, and out are aliased, the loop can be vectorized.
+    //NOTE:function-call prevents auto-vect.
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         float fa = fp16_to_float(a[i]);
         float fb = fp16_to_float(b[i]);
@@ -23,6 +28,8 @@ void dotF16Inplace(
 void dotBF16Inplace(
     uint16_t * out, uint16_t const* a, uint16_t const* b, unsigned int n)
 {
+    //NOTE:function-call prevents auto-vect.
+    HINT_VECT
     for (unsigned int i = 0; i < n; i++) {
         float fa = bf16_to_float(a[i]);
         float fb = bf16_to_float(b[i]);
