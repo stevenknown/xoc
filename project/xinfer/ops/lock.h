@@ -23,9 +23,6 @@ void unlock_tmp_qkv(RTCtx * ctx);
 void * lock_tmp_fc(RTCtx * ctx);
 void unlock_tmp_fc(RTCtx * ctx);
 
-void * lock_tmp_attn_out(RTCtx * ctx);
-void unlock_tmp_attn_out(RTCtx * ctx);
-
 void * lock_kcache(RTCtx * ctx);
 void unlock_kcache(RTCtx * ctx);
 

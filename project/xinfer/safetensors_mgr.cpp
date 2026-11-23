@@ -59,10 +59,54 @@ void SafeTensor::dump(
         prt(lm, ",total:%u", getTotalElemNum());
     }
     note(lm, "\ndata:%u bytes", getByteSize());
-    if (data.get_elem_count() > 0 && dump_detail) {
-        lm->incIndent(2);
-        data.dump(lm, dumpnum);
-        lm->decIndent(2);
+    if (!dump_detail) { return; }
+    if (data.get_elem_count() == 0) { return; }
+
+    note(lm, "\ndata:%u bytes", getByteSize());
+    lm->incIndent(2);
+    data.dump(lm, dumpnum);
+    dumpNthByDType(rm, dumpnum);
+    lm->decIndent(2);
+}
+
+
+void SafeTensor::dumpNthByDType(
+    xoc::RegionMgr const* rm, UINT dumpnum) const
+{
+    UINT elemsz = getElemByteSize(rm);
+    ASSERT0(elemsz != 0);
+    UINT realelemnum = data.get_elem_count() / elemsz;
+    UINT elemnum = dumpnum < 0 ?
+        realelemnum : MIN(realelemnum, (UINT)dumpnum);
+    switch (dtype) {
+    case xoc::D_F32: {
+        float const* dp = (float const*)data.get_vec();
+        note(rm, "\n");
+        for (UINT i = 0; i < elemnum; i++) {
+            if (i != 0) { prt(rm, " "); }
+            prt(rm, "%g", dp[i]);
+        }
+        return;
+    }
+    case xoc::D_F16: {
+        UINT16 const* dp = (UINT16 const*)data.get_vec();
+        note(rm, "\n");
+        for (UINT i = 0; i < elemnum; i++) {
+            if (i != 0) { prt(rm, " "); }
+            prt(rm, "%g", xcom::half2float(dp[i]));
+        }
+        return;
+    }
+    case xoc::D_BF16: {
+        UINT16 const* dp = (UINT16 const*)data.get_vec();
+        note(rm, "\n");
+        for (UINT i = 0; i < elemnum; i++) {
+            if (i != 0) { prt(rm, " "); }
+            prt(rm, "%g", xcom::bf162float(dp[i]));
+        }
+        return;
+    }
+    default: ASSERT0(0); //Unsupport
     }
 }
 

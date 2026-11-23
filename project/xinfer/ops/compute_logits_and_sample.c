@@ -9,11 +9,11 @@ int64_t compute_logits_and_sample_bf16(
     //LM Head shares weight with wte.
     //hidden is [1*n_embd], logits is [1*vocab_size], wte
     //is [vocab_size*n_embd].
-    //[1*vocab_size] = [1*n_embd]x[vocab_size*n_embd]^T;
+    //[1*vocab_size] = in[1*n_embd]x[vocab_size*n_embd]^T;
     XASSERT(wte->ndim == 2);
     XASSERT(wte->shape[0] == vocab_size);
     XASSERT(wte->shape[1] == n_embd);
-    matmulTransBF16(logits, hidden, wte);
+    matmulTransBF16(logits, hidden, 1, n_embd, wte);
 
     //Apply temperature.
     //Temperature scaling: divide logits by T before softmax.
@@ -64,7 +64,7 @@ int64_t compute_logits_and_sample_f16(
     XASSERT(wte->ndim == 2);
     XASSERT(wte->shape[0] == vocab_size);
     XASSERT(wte->shape[1] == n_embd);
-    matmulTransF16(logits, hidden, wte);
+    matmulTransF16(logits, hidden, 1, n_embd, wte);
 
     //Apply temperature.
     //Temperature scaling: divide logits by T before softmax.
@@ -102,10 +102,12 @@ int64_t compute_logits_and_sample_f16(
 }
 
 
+//logits:[1*vocab_size], the tmp buffer.
+//hidden:[1*n_embd], transformer output hidden vector
 int64_t compute_logits_and_sample_f32(
-    float * logits, float const* hidden, RTTensor const* wte,
-    int64_t n_embd, int64_t vocab_size, float temperature, unsigned int n_topk,
-    float eps)
+    float * logits, float const* hidden,
+    RTTensor const* wte, int64_t n_embd, int64_t vocab_size,
+    float temperature, unsigned int n_topk, float eps)
 {
     //Compute logits by LM Head.
     //LM Head shares weight with wte.
@@ -115,7 +117,12 @@ int64_t compute_logits_and_sample_f32(
     XASSERT(wte->ndim == 2);
     XASSERT(wte->shape[0] == vocab_size);
     XASSERT(wte->shape[1] == n_embd);
-    matmulTrans(logits, hidden, wte);
+    matmulTrans(logits, hidden, 1, n_embd, wte);
+    XASSERT(dump_vec(logits, vocab_size, RTTENSOR_DTYPE_F32,
+        "compute logits wte,output"));
+    XASSERT(dump_l2norm(
+        logits, 1, vocab_size, RTTENSOR_DTYPE_F32,
+        "compute logits wte,output"));
 
     //Apply temperature.
     //Temperature scaling: divide logits by T before softmax.
@@ -128,10 +135,14 @@ int64_t compute_logits_and_sample_f32(
         }
     }
     RTTENSOR_DTYPE dtype = wte->dtype;
-    XASSERT(dump_topn(logits, vocab_size, dtype, n_topk, "computed logits"));
+    XASSERT(dump_topn(logits, vocab_size, dtype, n_topk,
+        "computed logits"));
 
     //Softmax convert logits to probability.
+    //[1*vocab_size] = [1*vocab_size];
     softmax_inplace_f32(logits, vocab_size, eps);
+    XASSERT(dump_vec(logits, vocab_size, RTTENSOR_DTYPE_F32,
+        "softmax,output"));
 
     int64_t result_token = INVALID_TOKEN;
     if (n_topk <= 1) {
@@ -140,35 +151,49 @@ int64_t compute_logits_and_sample_f32(
         XASSERT(dump("argmax to get token:%lld", result_token));
     } else {
         //Select next tokenid by topk.
+        //[1*vocab_size] = [1*vocab_size];
         topkF32(logits, vocab_size, n_topk, eps);
-        XASSERT(dump_topn(logits, vocab_size, dtype, n_topk, "topk output"));
+        XASSERT(dump_topn(logits, vocab_size, dtype, n_topk,
+            "topk output"));
 
         //Random sample next token.
+        //[1*vocab_size] = [1*vocab_size];
         result_token = sample_from_probs_f32(logits, vocab_size, eps);
         XASSERT(dump("sample probability to get token:%lld", result_token));
     }
+    XASSERT(dump_vec(logits, vocab_size, RTTENSOR_DTYPE_F32,
+        "result token:%u,computed logits,output", result_token));
     return result_token;
 }
 
 
 int64_t compute_logits_and_sample(
-    void * logits, void const* hidden, RTTensor const* wte,
+    void const* hidden, RTTensor const* wte,
     int64_t n_embd, int64_t vocab_size, float temperature, unsigned int n_topk,
-    float eps, RTTENSOR_DTYPE dtype)
+    float eps, RTTENSOR_DTYPE dtype, RTCtx const* ctx)
 {
+    //logits:[1*vocab_size], output logits.
+    void * logits = lock_logits(ctx);
+    XASSERT(ctx->logits_len == vocab_size * getRTTensorDTypeByteSize(dtype));
+    int64_t next_token = RTTENSOR_DTYPE_UNDEF;
     switch (dtype) {
     case RTTENSOR_DTYPE_F32:
-        return compute_logits_and_sample_f32(
-            logits, hidden, wte, n_embd, vocab_size, temperature, n_topk, eps);
+        next_token = compute_logits_and_sample_f32(
+            logits, hidden, wte, n_embd, vocab_size,
+            temperature, n_topk, eps);
+        break;
     case RTTENSOR_DTYPE_F16:
-        return compute_logits_and_sample_f16(
-            logits, hidden, wte, n_embd, vocab_size, temperature, n_topk, eps);
+        next_token = compute_logits_and_sample_f16(
+            logits, hidden, wte, n_embd, vocab_size,
+            temperature, n_topk, eps);
+        break;
     case RTTENSOR_DTYPE_BF16:
-        return compute_logits_and_sample_bf16(
-            logits, hidden, wte, n_embd, vocab_size, temperature, n_topk, eps);
-    default:
-        XASSERT(0);
-        return 0;
+        next_token = compute_logits_and_sample_bf16(
+            logits, hidden, wte, n_embd, vocab_size,
+            temperature, n_topk, eps);
+        break;
+    default: XASSERT(0);
     }
-    return 0;
+    unlock_logits(ctx);
+    return next_token;
 }

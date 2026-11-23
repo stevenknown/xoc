@@ -54,13 +54,14 @@ class Tokenizer {
 protected:
     xoc::Sym const* m_added_tokens_decoder;
     xoc::Sym const* m_additional_special_tokens;
+    xoc::Sym const* m_content;
     JNode const* m_tokenizer_root;
     xoc::RegionMgr * m_rm;
     JNodeMgr & m_jm;
     xoc::ESymTab & m_sym_tab;
-    Sym2TokenConf m_sym2specialtoken;
     Sym2TokenConf m_sym2tokenconf;
     Sym2TokenId m_sym2tokenid;
+    Sym2TokenId m_sym2specialtokenid;
     MergesTxtParser m_mtp;
     xcom::Vector<xoc::Sym const*> m_tokenid2sym;
     xcom::Vector<xoc::Sym const*> m_left_txt;
@@ -68,6 +69,9 @@ protected:
 protected:
     xoc::Sym const* addToSymbolTab(CHAR const* s);
 
+    void convertRawByteToUTF8Subword(
+        BYTE byte_val, MOD xcom::MemPoolMgr & poolmgr,
+        OUT xcom::List<CHAR const*> & pieces);
     void convertRawByteStringToUTF8Subword(
         CHAR const* text, MOD xcom::MemPoolMgr & poolmgr,
         OUT xcom::List<CHAR const*> & pieces);
@@ -76,11 +80,36 @@ protected:
     XI_STATUS extractFromObj(xoc::Sym const* key, JNode const* val);
     XI_STATUS extractTokenizerConfig(JNode const* root);
     XI_STATUS extractVocab(JNode const* root);
+
+    void mapSubwordToTokenId(
+        OUT xcom::List<TOKID> & toklist,
+        xcom::List<CHAR const*> const& pieces);
     TokenArray * mapSubwordToTokenId(
         MOD TokenArrayMgr & tokarrmgr, UINT max_token_num,
         xcom::List<CHAR const*> const& pieces);
     void mergeSubwordByBPE(
         MOD xcom::MemPoolMgr & poolmgr, MOD xcom::List<CHAR const*> & pieces);
+    TOKID matchSpecialToken(
+        CHAR const* text, UINT textlen, OUT UINT * toknamelen);
+public:
+    xoc::Sym const* lstrip;
+    xoc::Sym const* normalized;
+    xoc::Sym const* rstrip;
+    xoc::Sym const* single_word;
+    xoc::Sym const* special;
+    xoc::Sym const* im_start;
+    xoc::Sym const* im_end;
+    xoc::Sym const* object_ref_start;
+    xoc::Sym const* object_ref_end;
+    xoc::Sym const* box_start;
+    xoc::Sym const* box_end;
+    xoc::Sym const* quad_start;
+    xoc::Sym const* quad_end;
+    xoc::Sym const* vision_start;
+    xoc::Sym const* vision_end;
+    xoc::Sym const* vision_pad;
+    xoc::Sym const* image_pad;
+    xoc::Sym const* video_pad;
 public:
     Tokenizer(xoc::RegionMgr * rm, JNodeMgr & jm, xoc::ESymTab & sym_tab);
     ~Tokenizer();
@@ -103,6 +132,7 @@ public:
     MergesTxtParser const& getMergesTxtParser() const { return m_mtp; }
     Sym2TokenId const& getSym2TokenId() const { return m_sym2tokenid; }
     TokenId2Sym const& getTokenId2Sym() const { return m_tokenid2sym; }
+    TOKID getSpecialToken(xoc::Sym const* tokname) const;
 
     XI_STATUS readMergesTxt(CHAR const* filename);
     XI_STATUS readConfig(CHAR const* filename);

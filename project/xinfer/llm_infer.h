@@ -45,6 +45,7 @@ public:
 class LLMInfer {
     COPY_CONSTRUCTOR(LLMInfer);
 protected:
+    bool m_is_prefill_seq;
     xoc::RegionMgr * m_rm;
     SafeTensorsMgr const& m_stmgr;
     Config const& m_config;
@@ -67,6 +68,9 @@ public:
              Config const& config, JNodeMgr const& jm, Tokenizer & tokenizer,
              xoc::ESymTab & sym_tab);
     virtual ~LLMInfer();
+
+    virtual CHAR const* applyChatTemplate(
+        OUT xcom::StrBuf & buf, CHAR const* input_str);
 
     static void convertSafeTensorToRTTensor(
         OUT RTTensor & rt, SafeTensor const& st);
@@ -143,6 +147,7 @@ public:
 
     virtual void initRTArg(RTArg & arg);
     XI_STATUS initRTCtx(OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg);
+    bool isPrefillSeq() const { return m_is_prefill_seq; }
 
     void registerOp(XOp const* op) {}
 

@@ -34,6 +34,103 @@ extern "C" {
 
 static UINT g_count = 0;
 
+bool dumpMat(
+    void * lm, void const* h, unsigned int nrow, unsigned int ncol,
+    RTTENSOR_DTYPE dtype, char const* format, va_list args)
+{
+    LogMgr * lmp = (LogMgr*)lm;
+    if (lmp == nullptr || !lmp->is_init()) { return true; }
+    xoc::note(lmp, "\n[%u]", g_count);
+    g_count++;
+    if (format != NULL) {
+        xoc::note_arg(lmp, format, args);
+        xoc::prt(lmp, ",");
+    }
+    switch (dtype) {
+    case RTTENSOR_DTYPE_F32: {
+        float const* vec = (float const*)h;
+        for (unsigned int i = 0; i < nrow; i++) {
+            xoc::note(lmp, "\n");
+            for (unsigned int j = 0; j < ncol; j++) {
+                if (j != 0) { xoc::prt(lmp, ","); }
+                xoc::prt(lmp, "h[%u]=%f", i * ncol + j, vec[i * ncol + j]);
+            }
+        }
+        break;
+    }
+    case RTTENSOR_DTYPE_F16: {
+        uint16_t const* vec = (uint16_t const*)h;
+        for (unsigned int i = 0; i < nrow; i++) {
+            xoc::note(lmp, "\n");
+            for (unsigned int j = 0; j < ncol; j++) {
+                if (j != 0) { xoc::prt(lmp, ","); }
+                xoc::prt(lmp, "h[%u]=%f",
+                    i * ncol + j, xcom::half2float(vec[i * ncol + j]));
+            }
+        }
+        break;
+    }
+    case RTTENSOR_DTYPE_BF16: {
+        uint16_t const* vec = (uint16_t const*)h;
+        for (unsigned int i = 0; i < nrow; i++) {
+            xoc::note(lmp, "\n");
+            for (unsigned int j = 0; j < ncol; j++) {
+                if (j != 0) { xoc::prt(lmp, ","); }
+                xoc::prt(lmp, "h[%u]=%f",
+                    i * ncol + j, xcom::bf162float(vec[i * ncol + j]));
+            }
+        }
+        break;
+    }
+    default: ASSERT0(0);
+    }
+    return true;
+}
+
+
+bool dumpVec(
+    void * lm, void const* h, unsigned int n, RTTENSOR_DTYPE dtype,
+    char const* format, va_list args)
+{
+    LogMgr * lmp = (LogMgr*)lm;
+    if (lmp == nullptr || !lmp->is_init()) { return true; }
+    xoc::note(lmp, "\n[%u]", g_count);
+    g_count++;
+    if (format != NULL) {
+        xoc::note_arg(lmp, format, args);
+        xoc::prt(lmp, ",");
+    }
+    switch (dtype) {
+    case RTTENSOR_DTYPE_F32: {
+        float const* vec = (float const*)h;
+        for (unsigned int i = 0; i < n; i++) {
+            if (i != 0) { xoc::prt(lmp, ","); }
+            xoc::prt(lmp, "h[%u]=%f", i, vec[i]);
+        }
+        break;
+    }
+    case RTTENSOR_DTYPE_F16: {
+        uint16_t const* vec = (uint16_t const*)h;
+        for (unsigned int i = 0; i < n; i++) {
+            if (i != 0) { xoc::prt(lmp, ","); }
+            xoc::prt(lmp, "h[%u]=%f", i, xcom::half2float(vec[i]));
+        }
+        break;
+    }
+    case RTTENSOR_DTYPE_BF16: {
+        uint16_t const* vec = (uint16_t const*)h;
+        for (unsigned int i = 0; i < n; i++) {
+            if (i != 0) { xoc::prt(lmp, ","); }
+            xoc::prt(lmp, "h[%u]=%f", i, xcom::bf162float(vec[i]));
+        }
+        break;
+    }
+    default: ASSERT0(0);
+    }
+    return true;
+}
+
+
 bool dumpF32Vec(
     void * lm, float const* h, unsigned int n, char const* format,
     va_list args)
@@ -55,7 +152,8 @@ bool dumpF32Vec(
 
 
 bool dumpL2Norm(
-    void * lm, void const* h, unsigned int num, RTTENSOR_DTYPE dtype,
+    void * lm, void const* h, unsigned int groupnum,
+    unsigned int elemnum_in_group, RTTENSOR_DTYPE dtype,
     char const* format, va_list args)
 {
     LogMgr * lmp = (LogMgr*)lm;
@@ -66,19 +164,22 @@ bool dumpL2Norm(
         xoc::note_arg(lmp, format, args);
         xoc::prt(lmp, ",");
     }
-    float norm = 0; //The L2 norm.
     unsigned int elemsz = getRTTensorDTypeByteSize(dtype);
     ASSERT0(elemsz != 0);
-    for (unsigned int i = 0; i < num; i++) {
-        float v = tofloat(((unsigned char*)h) + i * elemsz, dtype);
-        norm += v*v;
-    }
-    norm = sqrtf(norm);
-    xoc::prt(lmp, "l2norm=%f", norm);
-    unsigned upper = num > 4 ? 4 : num;
-    for (unsigned int i = 0; i < upper; i++) {
-        xoc::prt(lmp, ",h[%u]=%f",
-            i, tofloat(((unsigned char*)h) + i * elemsz, dtype));
+    for (unsigned int x = 0; x < groupnum;
+         x++, h = ((BYTE*)h) + elemnum_in_group * elemsz) {
+        float norm = 0; //The L2 norm.
+        for (unsigned int i = 0; i < elemnum_in_group; i++) {
+            float v = tofloat(((unsigned char*)h) + i * elemsz, dtype);
+            norm += v*v;
+        }
+        norm = sqrtf(norm);
+        xoc::prt(lmp, "l2norm=%f", norm);
+        unsigned upper = elemnum_in_group > 4 ? 4 : elemnum_in_group;
+        for (unsigned int i = 0; i < upper; i++) {
+            xoc::prt(lmp, ",h[%u]=%f",
+                i, tofloat(((unsigned char*)h) + i * elemsz, dtype));
+        }
     }
     return true;
 }
@@ -90,6 +191,16 @@ bool dumpNormInfoVar(void * lm, char const* format, ...)
     va_start(args, format);
     dumpNormInfo(lm, format, args);
     va_end(args);
+    return true;
+}
+
+
+bool prtNormInfo(void * lm, char const* format, va_list args)
+{
+    LogMgr * lmp = (LogMgr*)lm;
+    if (lmp == nullptr || !lmp->is_init()) { return true; }
+    ASSERT0(format);
+    xoc::prt_arg(lmp, format, args);
     return true;
 }
 

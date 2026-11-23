@@ -114,6 +114,18 @@ JNodeMgr::~JNodeMgr()
 }
 
 
+JNode * JNodeMgr::findPairValByKeyInObj(xoc::Sym const* key, JNode const* obj)
+{
+    ASSERT0(obj->is_obj());
+    for (JNode const* pair = JOBJ_pair_list(obj);
+         pair != nullptr; pair = pair->next) {
+        xoc::Sym const* pair_key = JPAIR_key(pair);
+        if (pair_key == key) { return JPAIR_val(pair); }
+    }
+    return nullptr;
+}
+
+
 XI_STATUS JNodeMgr::extractNumber(JNode const* jn, OUT double & number)
 {
     ASSERT0(jn);

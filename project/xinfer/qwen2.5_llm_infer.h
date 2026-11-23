@@ -36,6 +36,9 @@ class QWEN2D5LLMInfer : public LLMInfer {
 protected:
     UINT m_max_seq_len;
 protected:
+    virtual CHAR const* applyChatTemplate(
+        OUT xcom::StrBuf & buf, CHAR const* input_str) override;
+
     virtual XI_STATUS initRTCtxTensors(
         OUT RTCtx & ctx, RTMemMgr & mgr, MOD RTArg & arg) override;
     virtual void initRTArg(RTArg & arg) override;

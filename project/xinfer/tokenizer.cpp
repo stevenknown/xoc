@@ -67,6 +67,26 @@ Tokenizer::Tokenizer(xoc::RegionMgr * rm, JNodeMgr & jm, xoc::ESymTab & sym_tab)
     m_tokenizer_root = nullptr;
     m_added_tokens_decoder = sym_tab.add("added_tokens_decoder");
     m_additional_special_tokens = sym_tab.add("additional_special_tokens");
+    m_content = sym_tab.add("content");
+
+    im_start = sym_tab.add("<|im_start|>");
+    im_end = sym_tab.add("<|im_end|>");
+    object_ref_start = sym_tab.add("<|object_ref_start|>");
+    object_ref_end = sym_tab.add("<|object_ref_end|>");
+    box_start = sym_tab.add("<|box_start|>");
+    box_end = sym_tab.add("<|box_end|>");
+    quad_start = sym_tab.add("<|quad_start|>");
+    quad_end = sym_tab.add("<|quad_end|>");
+    vision_start = sym_tab.add("<|vision_start|>");
+    vision_end = sym_tab.add("<|vision_end|>");
+    vision_pad = sym_tab.add("<|vision_pad|>");
+    image_pad = sym_tab.add("<|image_pad|>");
+    video_pad = sym_tab.add("<|video_pad|>");
+    lstrip = sym_tab.add("lstrip");
+    normalized = sym_tab.add("normalized");
+    rstrip = sym_tab.add("rstrip");
+    single_word = sym_tab.add("single_word");
+    special = sym_tab.add("special");
 }
 
 
@@ -180,6 +200,55 @@ static void dumpPieces(
 }
 
 
+//text:char stream.
+//textlen:byte length of char stream.
+//e.g:text is "<im_end>aaabbbccc"
+//the function returns the tokenid of <im_end>.
+TOKID Tokenizer::matchSpecialToken(
+    CHAR const* text, UINT textlen, OUT UINT * toknamelen)
+{
+    Sym2TokenIdIter it;
+    TOKID tokid;
+    for (xoc::Sym const* sym = m_sym2specialtokenid.get_first(it, &tokid);
+         sym != nullptr; sym = m_sym2specialtokenid.get_next(it, &tokid)) {
+        CHAR const* tokname = sym->getStr();
+        UINT toklen = ::strlen(tokname);
+        if (toklen > textlen) { continue; }
+        if (::memcmp(text, tokname, toklen) == 0) {
+            *toknamelen = toklen;
+            return tokid;
+        }
+    }
+    return INVALID_TOKEN;
+}
+
+
+void Tokenizer::mapSubwordToTokenId(
+    OUT xcom::List<TOKID> & toklist,
+    xcom::List<CHAR const*> const& pieces)
+{
+    xcom::List<CHAR const*>::Iter it;
+    for (CHAR const* subword = pieces.get_head(&it);
+         subword != nullptr; subword = pieces.get_next(&it)) {
+        //subword is utf8 string.
+        bool found = false;
+        xoc::Sym const* sym = addToSymbolTab(subword);
+
+        //Try to find tokenid from the vocab set that is supplied by the model.
+        TOKID tid = getSym2TokenId().get(sym, &found);
+        if (!found) {
+            //The model doesn't support the merged-subword in vocab.
+            dumpAct(m_rm->getLogMgr(),
+                "\ncannot find subword in sym2tokenid table, "
+                "may be the vocab.json is incomplete.");
+            ASSERT0(0);
+            return;
+        }
+        toklist.append_tail(tid);
+    }
+}
+
+
 TokenArray * Tokenizer::mapSubwordToTokenId(
     MOD TokenArrayMgr & tokarrmgr, UINT max_token_num,
     xcom::List<CHAR const*> const& pieces)
@@ -201,6 +270,7 @@ TokenArray * Tokenizer::mapSubwordToTokenId(
             dumpAct(m_rm->getLogMgr(),
                 "\ncannot find subword in sym2tokenid table, "
                 "may be the vocab.json is incomplete.");
+            ASSERT0(0);
             return nullptr;
         }
         if (token_cnt >= max_token_num) {
@@ -281,6 +351,23 @@ void Tokenizer::mergeSubwordByBPE(
 }
 
 
+void Tokenizer::convertRawByteToUTF8Subword(
+    BYTE byte_val, MOD xcom::MemPoolMgr & poolmgr,
+    OUT xcom::List<CHAR const*> & pieces)
+{
+    //'byte_val' is not only ASCII, but also include utf-8 code,
+    //because the input might contain unicode.
+    //Bytelevel map to utf8-string.
+    CHAR const* subword = xcom::getUTF8ByRawByte(byte_val);
+    size_t subwordlen = ::strlen(subword);
+    CHAR * dup = (CHAR*)poolmgr.alloc(subwordlen + 1);
+    ASSERT0(dup);
+    ::memcpy(dup, subword, subwordlen);
+    dup[subwordlen] = 0;
+    pieces.append_tail(dup);
+}
+
+
 //NOTE:If text is only contain ASCII, the convertion isn't necessary, because
 //it isn't change. The funtion is useful only if text contains Chinese or other
 //UTF code.
@@ -292,15 +379,7 @@ void Tokenizer::convertRawByteStringToUTF8Subword(
         //byte_val is not only ASCII, but also include utf-8 code,
         //because the input might contain unicode.
         BYTE byte_val = *p;
-
-        //Bytelevel map to utf8 string.
-        CHAR const* subword = xcom::getUTF8ByRawByte(byte_val);
-        size_t subwordlen = ::strlen(subword);
-        CHAR * dup = (CHAR*)poolmgr.alloc(subwordlen + 1);
-        ASSERT0(dup);
-        ::memcpy(dup, subword, subwordlen);
-        dup[subwordlen] = 0;
-        pieces.append_tail(dup);
+        convertRawByteToUTF8Subword(byte_val, poolmgr, pieces);
     }
 }
 
@@ -332,20 +411,45 @@ TokenArray * Tokenizer::encode(
     CHAR const* text, UINT max_token_num, TokenArrayMgr & tokarrmgr)
 {
     ASSERT0(text);
-    size_t text_len = ::strlen(text);
-    ASSERT0(text_len > 0);
     xcom::MemPoolMgr poolmgr;
     xcom::List<CHAR const*> pieces; //record merged or orinial utf8 string.
+    size_t textlen = ::xstrlen(text);
+    ASSERT0(textlen > 0);
+    xcom::List<TOKID> toklist;
+    for (size_t i = 0; i < textlen;) {
+        UINT toknamelen = 0;
+        TOKID spectokid = matchSpecialToken(text + i, textlen - i, &toknamelen);
+        if (spectokid != (TOKID)INVALID_TOKEN) {
+            //Map subword string to token id.
+            //mapSubwordToTokenId(tokarrmgr, toklist, pieces);
 
-    //Split input to raw bytes.
-    convertRawByteStringToUTF8Subword(text, poolmgr, pieces);
-
-    //BPE merge.
-    mergeSubwordByBPE(poolmgr, pieces);
-    dumpPieces(pieces, m_rm);
-
-    //Map subword string to token id.
-    return mapSubwordToTokenId(tokarrmgr, max_token_num, pieces);
+            //BPE merge.
+            mergeSubwordByBPE(poolmgr, pieces);
+            dumpPieces(pieces, m_rm);
+            mapSubwordToTokenId(toklist, pieces);
+            pieces.clean();
+            toklist.append_tail(spectokid);
+            i += toknamelen;
+            continue;
+        }
+        //Split input to raw bytes.
+        convertRawByteToUTF8Subword(text[i], poolmgr, pieces);
+        i++;
+    }
+    if (pieces.get_elem_count() != 0) {
+        mergeSubwordByBPE(poolmgr, pieces);
+        dumpPieces(pieces, m_rm);
+        mapSubwordToTokenId(toklist, pieces);
+        pieces.clean();
+    }
+    TokenArray * ta = tokarrmgr.allocTokenArray(toklist.get_elem_count());
+    ASSERT0(ta && ta->array);
+    TOKID tokid = toklist.get_head();
+    for (UINT j = 0; j < toklist.get_elem_count();
+         tokid = toklist.get_next(), j++) {
+        ta->array[j] = tokid;
+    }
+    return ta;
 }
 
 
@@ -427,11 +531,17 @@ XI_STATUS Tokenizer::extractFromArray(
     xoc::Sym const* key, JNode const* val)
 {
     if (key == m_additional_special_tokens) {
-        m_sym2specialtoken.set(key, val);
+        //The information isn't useful.
         return XI_SUCC;
     }
-    ASSERT0(0); //TODO:
     return XI_UNDEF;
+}
+
+
+TOKID Tokenizer::getSpecialToken(xoc::Sym const* tokname) const
+{
+    ASSERT0(tokname);
+    return m_sym2tokenid.get(tokname);
 }
 
 
@@ -445,7 +555,15 @@ XI_STATUS Tokenizer::extractFromObj(
             ASSERT0(x->is_pair());
             xoc::Sym const* key = JPAIR_key(x);
             JNode const* val = JPAIR_val(x);
-            m_sym2specialtoken.set(key, val);
+            UINT tokid = xcom::xatoll(key->getStr());
+            ASSERT0(val->is_obj());
+            JNode const* tokcontent = JNodeMgr::findPairValByKeyInObj(
+                m_content, val);
+            ASSERT0(tokcontent->is_string());
+            xoc::Sym const* tokcontentsym = JNODE_string(tokcontent);
+            m_tokenid2sym.set(tokid, tokcontentsym);
+            m_sym2tokenid.set(tokcontentsym, tokid);
+            m_sym2specialtokenid.set(tokcontentsym, tokid);
         }
         return XI_SUCC;
     }

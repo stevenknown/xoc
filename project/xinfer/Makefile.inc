@@ -33,9 +33,12 @@ ops/decode.o\
 ops/prefill.o\
 ops/transformer_block_gpt2.o\
 ops/transformer_block_rope.o\
+ops/transformer_block.o\
 ops/topk.o\
-ops/mha.o\
+ops/mha_seq.o\
+ops/mha_rope.o\
 ops/mlp.o\
+ops/mlp_seq.o\
 ops/l2norm.o\
 ops/trans.o\
 ops/dump.o\
@@ -46,4 +49,6 @@ ops/compute_logits_and_sample.o\
 ops/rtctx.o\
 ops/dot.o\
 ops/silu.o\
-ops/rttensor.o
+ops/rttensor.o\
+ops/forward_token.o\
+ops/kvcache.o

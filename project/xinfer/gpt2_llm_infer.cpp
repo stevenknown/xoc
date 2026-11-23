@@ -88,32 +88,40 @@ void GPT2LLMInfer::initRTArg(RTArg & arg)
     arg.n_embd = m_config.extractNum(addToSymbolTab("n_embd"));
     arg.n_layer = m_config.extractNum(addToSymbolTab("n_layer"));
     arg.n_head = m_config.extractNum(addToSymbolTab("n_head"));
+    arg.n_kvhead = arg.n_head;
     arg.n_positions = m_config.extractNum(addToSymbolTab("n_positions"));
     arg.layernorm_epsilon = m_config.extractNum(
         addToSymbolTab("layer_norm_epsilon"));
+    arg.softmax_epsilon = (float)g_softmax_epsilon;
     arg.intermediate_size = 4 * arg.n_embd;
     arg.eos_token_id = m_config.extractNum(addToSymbolTab("eos_token_id"));
     arg.vocab_size = m_config.extractNum(addToSymbolTab("vocab_size"));
+    arg.pos_encoding_type = POS_WPE;
 
     ASSERT0(arg.n_head != 0);
-    UINT head_dim = arg.n_embd / arg.n_head;
+    arg.head_dim = arg.n_embd / arg.n_head;
     UINT max_ctx = arg.n_positions;
-
     arg.tensor_dtype = RTTENSOR_DTYPE_F32;
     UINT elemsz = getRTTensorDTypeByteSize(arg.tensor_dtype);
     ASSERT0(elemsz != 0);
     UINT64 sz = arg.n_embd * elemsz;
-
-    arg.hidden.grow(sz);
-    arg.tmp1.grow(sz);
-    arg.tmp2.grow(sz);
-    arg.tmp_qkv_and_fc.grow(4 * sz);
+    if (isPrefillSeq()) {
+        arg.hidden.grow(sz * max_ctx);
+        arg.tmp1.grow(sz * max_ctx);
+        arg.tmp2.grow(sz * max_ctx);
+        arg.tmp_qkv_and_fc.grow(4 * sz * max_ctx);
+    } else {
+        arg.hidden.grow(sz);
+        arg.tmp1.grow(sz);
+        arg.tmp2.grow(sz);
+        arg.tmp_qkv_and_fc.grow(4 * sz);
+    }
     ASSERT0(arg.vocab_size > 0 && arg.vocab_size < MAX_VOCAB_SIZE);
     arg.logits.grow(arg.vocab_size * elemsz);
 
     //KVcache:each layer:[max_ctx, head_dim].
     //In MHA, each head own its dedicated kcache and vcache.
-    UINT64 kv_one_layer = elemsz * max_ctx * arg.n_head * head_dim;
+    UINT64 kv_one_layer = elemsz * max_ctx * arg.n_head * arg.head_dim;
     UINT64 kvsize = arg.n_layer * kv_one_layer;
 
     arg.kcache.grow(kvsize);

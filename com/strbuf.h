@@ -117,6 +117,20 @@ public:
         buf[0] = 0;
     }
 
+    //Grow buffer to the byte length that no less than 'len'.
+    //NOTE:the function is different to 'growBuf()'. The function doesn't
+    //clobber the content in original buffer.
+    void reGrowBuf(UINT len)
+    {
+        if (buflen >= len) { return; }
+        CHAR * tmpbuf = (CHAR*)::malloc(len);
+        ASSERT0(tmpbuf);
+        ::memcpy(tmpbuf, buf, buflen);
+        buflen = len;
+        ::free(buf);
+        buf = tmpbuf;
+    }
+
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
 

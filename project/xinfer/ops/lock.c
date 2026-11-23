@@ -151,26 +151,6 @@ void unlock_tmp_fc(RTCtx * ctx)
 }
 
 
-void * lock_tmp_attn_out(RTCtx * ctx)
-{
-    #ifdef _DEBUG_
-    XASSERT(!ctx->lock_tmp_attn_out);
-    ctx->lock_tmp_attn_out = true;
-    XASSERT(dump("lock tmp_attn_out"));
-    #endif
-    return ctx->tmp_attn_out;
-}
-
-
-void unlock_tmp_attn_out(RTCtx * ctx)
-{
-    #ifdef _DEBUG_
-    ctx->lock_tmp_attn_out = false;
-    XASSERT(dump("unlock tmp_attn_out"));
-    #endif
-}
-
-
 void * lock_kcache(RTCtx * ctx)
 {
     #ifdef _DEBUG_
@@ -218,7 +198,6 @@ bool all_locked(RTCtx const* ctx)
     if (!ctx->lock_tmp2) { return false; }
     if (!ctx->lock_tmp_qkv) { return false; }
     if (!ctx->lock_tmp_fc) { return false; }
-    if (!ctx->lock_tmp_attn_out) { return false; }
     if (!ctx->lock_hidden) { return false; }
     if (!ctx->lock_logits) { return false; }
     if (!ctx->lock_kcache) { return false; }
@@ -235,7 +214,6 @@ bool all_unlocked(RTCtx const* ctx)
     if (ctx->lock_tmp2) { return false; }
     if (ctx->lock_tmp_qkv) { return false; }
     if (ctx->lock_tmp_fc) { return false; }
-    if (ctx->lock_tmp_attn_out) { return false; }
     if (ctx->lock_hidden) { return false; }
     if (ctx->lock_logits) { return false; }
     if (ctx->lock_kcache) { return false; }

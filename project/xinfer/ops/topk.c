@@ -115,6 +115,7 @@ void topkBF16(uint16_t * probs, int64_t vocab_size, int64_t k, float eps)
 }
 
 
+//probs:probablity buffer, the number of elements is 'elemnum'.
 void topkF32(float * probs, int64_t vocab_size, int64_t k, float eps)
 {
     XASSERT(probs && vocab_size > 0 && k > 0);

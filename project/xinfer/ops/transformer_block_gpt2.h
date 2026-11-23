@@ -18,7 +18,7 @@ extern "C" {
 //n_embd:Embedding dimension size
 //n_head:Number of attention heads
 //arg RTArg runtime context, contains kcache, vcache and safetensor manager etc.
-void transformer_blocks_gpt2(int64_t pos, RTCtx * ctx);
+void transformer_blocks_gpt2_seq(int64_t startpos, int64_t endpos, RTCtx * ctx);
 
 #ifdef __cplusplus
 }

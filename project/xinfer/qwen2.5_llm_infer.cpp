@@ -173,6 +173,7 @@ void QWEN2D5LLMInfer::initRTArg(RTArg & arg)
 {
     arg.rmsnorm_epsilon = m_config.extractNum(
         addToSymbolTab("rms_norm_eps"));
+    arg.softmax_epsilon = (float)g_softmax_epsilon;
     arg.n_embd = m_config.extractNum(addToSymbolTab("hidden_size"));
     arg.n_layer = m_config.extractNum(addToSymbolTab("num_hidden_layers"));
     arg.n_head = m_config.extractNum(addToSymbolTab("num_attention_heads"));
@@ -184,6 +185,8 @@ void QWEN2D5LLMInfer::initRTArg(RTArg & arg)
         addToSymbolTab("intermediate_size"));
     arg.n_positions = m_config.extractNum(
         addToSymbolTab("max_position_embeddings"));
+    arg.pos_encoding_type = POS_ROPE;
+
     xoc::Sym const* dtype_str = m_config.extractStr(
         addToSymbolTab("torch_dtype"));
     ASSERT0(dtype_str);
@@ -194,26 +197,43 @@ void QWEN2D5LLMInfer::initRTArg(RTArg & arg)
     ASSERT0(elemsz != 0);
 
     ASSERT0(arg.n_head != 0);
-    UINT head_dim = arg.n_embd / arg.n_head;
+    arg.head_dim = arg.n_embd / arg.n_head;
     UINT max_ctx = arg.n_positions;
     UINT hiddensz = arg.n_embd * elemsz;
-    arg.hidden.grow(hiddensz);
+    UINT qdim = arg.n_embd;
+    UINT oattndim = arg.n_embd;
+    UINT kvdim = arg.n_kvhead * arg.head_dim;
+    UINT qkvdimsz = (qdim + oattndim * 2 * kvdim) * elemsz;
+    UINT fcsz = 2 * arg.intermediate_size * elemsz;
+    if (isPrefillSeq()) {
+        //Used to store the output of W1, W2 of MLP.
+        arg.tmp1.grow(arg.intermediate_size * max_ctx * elemsz);
+        arg.tmp2.grow(arg.intermediate_size * max_ctx * elemsz);
+        arg.tmp3.grow(arg.intermediate_size * max_ctx * elemsz);
+        arg.hidden.grow(hiddensz * max_ctx);
 
-    //Used to store the output of W1, W2 of MLP.
-    arg.tmp1.grow(arg.intermediate_size * elemsz);
-    arg.tmp2.grow(arg.intermediate_size * elemsz);
-    arg.tmp3.grow(arg.intermediate_size * elemsz);
+        //mlp_swigu needs two tmp buffers(gate,up) whose bytesize has to be the
+        //twice value of arg.intermediate_size*elemsz.
+        UINT qkvfcsz = MAX(max_ctx * qkvdimsz, max_ctx * fcsz);
+        arg.tmp_qkv_and_fc.grow(qkvfcsz);
+    } else {
+        //Used to store the output of W1, W2 of MLP.
+        arg.tmp1.grow(arg.intermediate_size * elemsz);
+        arg.tmp2.grow(arg.intermediate_size * elemsz);
+        arg.tmp3.grow(arg.intermediate_size * elemsz);
+        arg.hidden.grow(hiddensz);
 
-    //mlp_swigu needs two tmp buffers(gate,up) whose bytesize has to be the
-    //twice value of arg.intermediate_size*elemsz.
-    UINT qkvfcsz = MAX(4 * hiddensz, 2 * arg.intermediate_size * elemsz);
-    arg.tmp_qkv_and_fc.grow(qkvfcsz);
+        //mlp_swigu needs two tmp buffers(gate,up) whose bytesize has to be the
+        //twice value of arg.intermediate_size*elemsz.
+        UINT qkvfcsz = MAX(qkvdimsz, fcsz);
+        arg.tmp_qkv_and_fc.grow(qkvfcsz);
+    }
     ASSERT0(arg.vocab_size > 0 && arg.vocab_size < MAX_VOCAB_SIZE);
     arg.logits.grow(arg.vocab_size * elemsz);
 
     //KVcache:each layer:[max_ctx, head_dim].
     //In MHA, each head own its dedicated kcache and vcache.
-    UINT64 kv_one_layer = max_ctx * arg.n_head * head_dim * elemsz;
+    UINT64 kv_one_layer = max_ctx * arg.n_head * arg.head_dim * elemsz;
     UINT64 kvsize = arg.n_layer * kv_one_layer;
 
     arg.kcache.grow(kvsize);
@@ -224,6 +244,25 @@ void QWEN2D5LLMInfer::initRTArg(RTArg & arg)
         dumpAct(getLogMgr(), "\nerror:encode prompt failed");
         return;
     }
+    arg.im_end_token_id = getTokenizer().getSpecialToken(getTokenizer().im_end);
+    if (arg.im_end_token_id == (TOKID)INVALID_TOKEN) {
+        dumpAct(getLogMgr(), "\nerror:tokenizer fails to find im_end token");
+        return;
+    }
+}
+
+
+CHAR const* QWEN2D5LLMInfer::applyChatTemplate(
+    OUT xcom::StrBuf & buf, CHAR const* input_str)
+{
+    xcom::StrBuf buf2(128);
+    buf2.strcat(xinfer::g_prompt);
+    xcom::trimTrailNewLine(buf2.getBuf());
+    buf.sprint(
+        "<|im_start|>system\nYou are a helpful assistant."
+        "<|im_end|>\n<|im_start|>user\n%s<|im_end|>\n"
+        "<|im_start|>assistant\n", buf2.getBuf());
+    return buf.getBuf();
 }
 //END QWEN2D5LLMInfer
 

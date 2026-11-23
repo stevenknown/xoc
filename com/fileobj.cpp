@@ -304,7 +304,8 @@ FO_STATUS FileMapObj::initMapByPosix()
     size_t bytesize = (size_t)sb.st_size;
     m_map = (BYTE*)::mmap(nullptr, bytesize, PROT_READ, MAP_PRIVATE, fd, 0);
 
-    //Even it is safe(mmap keeps reference to the file), we still choose to keep the handler.
+    //Even it is safe(mmap keeps reference to the file), we still
+    //choose to keep the handler.
     //::fclose(m_file_handler);
     if (m_map == MAP_FAILED) {
         ::fclose(m_file_handler);

@@ -139,10 +139,13 @@ public:
     JNodeMgr(xoc::ESymTab & sym_tab);
     ~JNodeMgr();
     xoc::Sym const* addToSymbolTab(CHAR const* s);
+
     XI_STATUS extractString(JNode const* jn, OUT xoc::Sym const*& str);
     XI_STATUS extractBool(JNode const* jn, OUT bool & bval);
     XI_STATUS extractNumber(JNode const* jn, OUT double & number);
     XI_STATUS extractDType(JNode const* jn, OUT xoc::DATA_TYPE & dt);
+
+    static JNode * findPairValByKeyInObj(xoc::Sym const* key, JNode const* obj);
 };
 
 } //namespace xinfer

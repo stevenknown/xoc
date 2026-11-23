@@ -41,18 +41,22 @@ class RTArg {
 public:
     TOKID newline_token_id;
     RTTENSOR_DTYPE tensor_dtype;
+    POS_ENCODING_TYPE pos_encoding_type;
     UINT n_embd;
     UINT n_layer;
     UINT n_head;
     UINT n_kvhead;
+    UINT head_dim;
     UINT n_positions;
     UINT intermediate_size;
     UINT64 current_pos;
     UINT64 eos_token_id;
+    UINT64 im_end_token_id;
     UINT64 vocab_size;
     double rope_theta;
     double layernorm_epsilon;
     double rmsnorm_epsilon;
+    double softmax_epsilon;
     xoc::BYTEVec hidden;
 
     //The tmp buffer of attention,mlp,layernorm.
@@ -80,14 +84,17 @@ public:
         n_layer = 0;
         n_head = 0;
         n_kvhead = 0;
+        head_dim = 0;
         n_positions = 0;
         intermediate_size = 0;
         current_pos = 0;
         eos_token_id = 0;
+        im_end_token_id = 0;
         vocab_size = 0;
         rope_theta = 0;
         layernorm_epsilon = 0;
         rmsnorm_epsilon = 0;
+        softmax_epsilon = 0;
 
         hidden.clean();
         tmp1.clean();
@@ -115,50 +122,36 @@ public:
     UINT getMaxSeqLen() const { return n_positions; }
 
     BYTE * getHiddenBuf() { return hidden.get_vec(); }
-    UINT getHiddenBufLen() { return hidden.get_capacity(); }
+    UINT getHiddenBufLen() const { return hidden.get_capacity(); }
 
     BYTE * getTmp1Buf() { return tmp1.get_vec(); }
-    UINT getTmp1BufLen() { return tmp1.get_capacity(); }
+    UINT getTmp1BufLen() const { return tmp1.get_capacity(); }
 
     BYTE * getTmp2Buf() { return tmp2.get_vec(); }
-    UINT getTmp2BufLen() { return tmp2.get_capacity(); }
+    UINT getTmp2BufLen() const { return tmp2.get_capacity(); }
 
     BYTE * getTmp3Buf() { return tmp3.get_vec(); }
-    UINT getTmp3BufLen() { return tmp3.get_capacity(); }
+    UINT getTmp3BufLen() const { return tmp3.get_capacity(); }
 
     BYTE * getTmpFCBuf() { return tmp_qkv_and_fc.get_vec(); }
-    UINT getTmpFCBufLen() { return tmp_qkv_and_fc.get_capacity(); }
-
-    BYTE * getTmpAttnOutBuf()
-    {
-        ASSERT0(tensor_dtype != RTTENSOR_DTYPE_UNDEF);
-        UINT elemsz = getRTTensorDTypeByteSize(tensor_dtype);
-        return getTmpQKVBuf() + n_embd * elemsz;
-    }
-    UINT getTmpAttnOutBufLen()
-    {
-        ASSERT0(tensor_dtype != RTTENSOR_DTYPE_UNDEF);
-        UINT elemsz = getRTTensorDTypeByteSize(tensor_dtype);
-        return n_embd * elemsz;
-    }
+    UINT getTmpFCBufLen() const { return tmp_qkv_and_fc.get_capacity(); }
 
     BYTE * getTmpQKVBuf() { return tmp_qkv_and_fc.get_vec(); }
-    UINT getTmpQKVBufLen()
+    UINT getTmpQKVBufLen() const
     {
-        ASSERT0(tensor_dtype != RTTENSOR_DTYPE_UNDEF);
-        UINT elemsz = getRTTensorDTypeByteSize(tensor_dtype);
         //Maximum size of Q+K+V is three times the hidden-size.
-        return 3 * elemsz * n_embd;
+        ASSERT0(tensor_dtype != RTTENSOR_DTYPE_UNDEF);
+        return tmp_qkv_and_fc.get_capacity();
     }
 
     BYTE * getKCacheBuf() { return kcache.get_vec(); }
-    UINT getKCacheBufLen() { return kcache.get_capacity(); }
+    UINT getKCacheBufLen() const { return kcache.get_capacity(); }
 
     BYTE * getVCacheBuf() { return vcache.get_vec(); }
-    UINT getVCacheBufLen() { return vcache.get_capacity(); }
+    UINT getVCacheBufLen() const { return vcache.get_capacity(); }
 
     BYTE * getLogitsBuf() { return logits.get_vec(); }
-    UINT getLogitsBufLen() { return logits.get_capacity(); }
+    UINT getLogitsBufLen() const { return logits.get_capacity(); }
 
     void outputGenedTokens(LLMInfer & infer, xoc::LogMgr * lm) const;
 

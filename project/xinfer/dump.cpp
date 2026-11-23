@@ -231,7 +231,6 @@ void dumpRTCtxDebug(RTCtx const* ctx, xoc::RegionMgr const* rm)
     note(rm, "\nlock_tmp2=%d", ctx->lock_tmp2);
     note(rm, "\nlock_tmp_qkv=%d", ctx->lock_tmp_qkv);
     note(rm, "\nlock_tmp_fc=%d", ctx->lock_tmp_fc);
-    note(rm, "\nlock_tmp_attn_out=%d", ctx->lock_tmp_attn_out);
     note(rm, "\nlock_hidden=%d", ctx->lock_hidden);
     note(rm, "\nlock_logits=%d", ctx->lock_logits);
     note(rm, "\nlock_kcache=%d", ctx->lock_kcache);
@@ -257,10 +256,11 @@ void dumpRTCtx(RTCtx const* ctx, xoc::RegionMgr const* rm)
     note(rm, "\nn_topk=%d", ctx->n_topk);
     note(rm, "\nvocab_size=%d", ctx->vocab_size);
     note(rm, "\nmax_pos=%d", ctx->max_pos);
-    note(rm, "\nrope_theta=%f", ctx->rope_theta);
-    note(rm, "\nlayer_norm_epsilon=%f", ctx->layernorm_epsilon);
-    note(rm, "\nrms_norm_epsilon=%f", ctx->rmsnorm_epsilon);
-    note(rm, "\ntemperature=%f", ctx->temperature);
+    note(rm, "\nrope_theta=%g", ctx->rope_theta);
+    note(rm, "\nlayernorm_epsilon=%g", ctx->layernorm_epsilon);
+    note(rm, "\nrmsnorm_epsilon=%g", ctx->rmsnorm_epsilon);
+    note(rm, "\nsoftmax_epsilon=%g", ctx->softmax_epsilon);
+    note(rm, "\ntemperature=%g", ctx->temperature);
 
     note(rm, "\ntmp1=0x%x", ctx->tmp1);
     note(rm, "\ntmp1_len=%llu", ctx->tmp1_len);
@@ -273,9 +273,6 @@ void dumpRTCtx(RTCtx const* ctx, xoc::RegionMgr const* rm)
 
     note(rm, "\ntmp_fc=0x%x", ctx->tmp_fc);
     note(rm, "\ntmp_fc_len=%llu", ctx->tmp_fc_len);
-
-    note(rm, "\ntmp_attn_out=0x%x", ctx->tmp_attn_out);
-    note(rm, "\ntmp_attn_out_len=%llu", ctx->tmp_attn_out_len);
 
     note(rm, "\nhidden=0x%x", ctx->hidden);
     note(rm, "\nhidden_len=%llu", ctx->hidden_len);

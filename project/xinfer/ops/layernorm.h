@@ -28,19 +28,7 @@ void layernormInplace(
 
 void layernormF32(
     float * out, float const* in, float const* w,
-    float const* b, unsigned int dim, float eps);
-
-void layernormF32Inplace(
-    float * in_out, float const* w,
-    float const* b, unsigned int dim, float eps);
-
-void layernormF16(
-    uint16_t * out, uint16_t const* in, uint16_t const* w,
-    uint16_t const* b, unsigned int dim, float eps);
-
-void layernormBF16(
-    uint16_t * out, uint16_t const* in, uint16_t const* w,
-    uint16_t const* b, unsigned int dim, float eps);
+    float const* b, unsigned int indim, unsigned int wdim, float eps);
 
 #ifdef __cplusplus
 }

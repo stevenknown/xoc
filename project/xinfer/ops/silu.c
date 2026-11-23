@@ -38,21 +38,37 @@ void siluBF16(uint16_t *restrict inout, unsigned int len)
 }
 
 
-void silu(void *restrict inout, unsigned int len, RTTENSOR_DTYPE dtype)
+void silu(
+    void *restrict inout, unsigned int groupnum,
+    unsigned int elemnum_in_group, RTTENSOR_DTYPE dtype)
 {
+    unsigned int elemsz = getRTTensorDTypeByteSize(dtype);
     switch (dtype) {
-    case RTTENSOR_DTYPE_F32:
-        siluF32(inout, len);
+    case RTTENSOR_DTYPE_F32: {
+        BYTE * tinout = inout;
+        unsigned int groupsz = elemnum_in_group * elemsz;
+        for (unsigned int g = 0; g < groupnum; g++, tinout += groupsz) {
+            siluF32((float*)tinout, elemnum_in_group);
+        }
         return;
-    case RTTENSOR_DTYPE_F16:
-        siluF16(inout, len);
+    }
+    case RTTENSOR_DTYPE_F16: {
+        BYTE * tinout = inout;
+        unsigned int groupsz = elemnum_in_group * elemsz;
+        for (unsigned int g = 0; g < groupnum; g++, tinout += groupsz) {
+            siluF16((uint16_t*)tinout, elemnum_in_group);
+        }
         return;
-    case RTTENSOR_DTYPE_BF16:
-        siluBF16(inout, len);
+    }
+    case RTTENSOR_DTYPE_BF16: {
+        BYTE * tinout = inout;
+        unsigned int groupsz = elemnum_in_group * elemsz;
+        for (unsigned int g = 0; g < groupnum; g++, tinout += groupsz) {
+            siluBF16((uint16_t*)tinout, elemnum_in_group);
+        }
         return;
-    default:
-        XASSERT(0);
-        return;
+    }
+    default: XASSERT(0);
     }
 }
 

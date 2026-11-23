@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ops/xconst.h"
 #include "ops/rttensor.h"
 #include "ops/tokenarray.h"
+#include "ops/transformer_block.h"
 #include "ops/rtctx.h"
 #include "ops/dump.h"
 #include "ops/fpcvt.h"

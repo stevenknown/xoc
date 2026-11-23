@@ -54,6 +54,7 @@ public:
     void dump(xoc::RegionMgr const* rm,
               bool dump_detail = xinfer::g_dump_tensor_data,
               INT dumpnum = 20) const;
+    void dumpNthByDType(xoc::RegionMgr const* rm, UINT dumpnum) const;
 
     //Get the entire tensor bytesize.
     UINT64 getByteSize() const

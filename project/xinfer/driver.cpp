@@ -176,15 +176,16 @@ bool Driver::chat(LLMInfer & infer)
     }
     ASSERT0(infer.verify(ctx, arg));
     dumpRTCtx(&ctx, getRegionMgr());
-
     xcom::StrBuf buf(128);
-    //xcom::StrBuf buf(arg.getMaxSeqLen());
+    xcom::StrBuf buf2(128);
     for (;;) {
         printf("\nINPUT:");
         buf.clean();
         readPrompt(buf);
         if (buf.is_empty()) { return true; }
-        if (infer.generate(buf.getBuf(), arg, ctx) != XI_SUCC) {
+        buf2.clean();
+        CHAR const* input = infer.applyChatTemplate(buf2, buf.getBuf());
+        if (infer.generate(input, arg, ctx) != XI_SUCC) {
             return false;
         }
         arg.outputGenedTokens(infer, m_rm->getLogMgr());

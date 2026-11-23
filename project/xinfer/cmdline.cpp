@@ -37,13 +37,14 @@ static CHAR const* g_include_string = nullptr;
 static CHAR const* g_exclude_string = nullptr;
 CHAR const* g_prompt = nullptr;
 CHAR const* g_output_file_name = nullptr; //record the output file name.
-CHAR const* g_version = "0.1.0"; //record the exe version.
+CHAR const* g_version = "0.2.0"; //record the exe version.
 CHAR const* g_dump_file_name = nullptr;
 CHAR const* g_model_name = nullptr;
 bool g_dump_tensor_data = false;
 bool g_dump_json_parser = false;
 bool g_continuation = false;
 bool g_chat = false;
+bool g_prefill_seq = true;
 bool g_dump_safetensors_mgr = false;
 bool g_dump_config = false;
 bool g_dump_tokenizer = false;
@@ -54,6 +55,7 @@ bool g_dump_act = false;
 bool g_dump_pieces = false;
 bool g_dump_rt_norm = false;
 bool g_dump_rt_vec = false;
+bool g_dump_rt_mat = false;
 bool g_dump_rt = false;
 
 //float eps range:1e-10f ~ 1e-14f
@@ -328,6 +330,14 @@ public:
                 alignbuf, BoolOption::dump_option_desc[i].intro);
         }
     }
+
+    static void enableAllDumpOption()
+    {
+        for (UINT i = 0; i < BoolOption::getNumOfDumpOption(); i++) {
+            bool * boption_ptr = BoolOption::dump_option_desc[i].option;
+            *boption_ptr = true;
+        }
+    }
 };
 
 CHAR const* BoolOption::dump_option_prefix = "dump-";
@@ -342,6 +352,8 @@ BoolOption::Desc const BoolOption::option_desc[] = {
       "enable continuation", },
     { "chat", &xinfer::g_chat,
       "enable chat mode", },
+    { "prefill_seq", &xinfer::g_prefill_seq,
+      "enable prefill the token sequence", },
 };
 
 
@@ -354,8 +366,10 @@ BoolOption::Desc const BoolOption::dump_option_desc[] = {
     { "rtctx", &xinfer::g_dump_rtctx, "dump rtctx", },
     { "rtarg", &xinfer::g_dump_rtarg, "dump rtarg", },
     { "rt_vec", &xinfer::g_dump_rt_vec, "dump rt vector", },
+    { "rt_mat", &xinfer::g_dump_rt_mat, "dump rt matrix", },
     { "act", &xinfer::g_dump_act, "dump action", },
     { "safetensors", &xinfer::g_dump_safetensors_mgr, "dump safetensors", },
+    { "all", &xoc::g_dump_opt.is_dump_all, "dump all info", },
 };
 
 BoolOption::Desc const BoolOption::elf_option_desc[] = {
@@ -903,6 +917,7 @@ static void forceOption()
 static void inferDumpOption(CHAR const* cmdstr)
 {
     if (::strcmp(cmdstr, "all") == 0) {
+        BoolOption::enableAllDumpOption();
         xoc::g_dump_opt.setDumpAll();
 
         //Set XGEN option according to XOC option.

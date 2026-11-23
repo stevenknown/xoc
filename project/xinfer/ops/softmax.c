@@ -39,6 +39,7 @@ float findmaxvalueBF16(uint16_t const* logits, int64_t elemnum)
 }
 
 
+//logits:logits buffer, the number of elements is 'elemnum'.
 void softmax_inplace_f16(uint16_t * logits, int64_t elemnum, float eps)
 {
     XASSERT(elemnum > 0 && logits);
@@ -70,6 +71,7 @@ void softmax_inplace_f16(uint16_t * logits, int64_t elemnum, float eps)
 }
 
 
+//logits:logits buffer, the number of elements is 'elemnum'.
 void softmax_inplace_bf16(uint16_t * logits, int64_t elemnum, float eps)
 {
     XASSERT(elemnum > 0 && logits);
@@ -101,6 +103,7 @@ void softmax_inplace_bf16(uint16_t * logits, int64_t elemnum, float eps)
 }
 
 
+//logits:logits buffer, the number of elements is 'elemnum'.
 void softmax_inplace_f32(float * logits, int64_t elemnum, float eps)
 {
     XASSERT(elemnum > 0 && logits);

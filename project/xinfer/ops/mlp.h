@@ -22,14 +22,15 @@ extern "C" {
 //c_proj_b:Output projection bias tensor, shape [n_embd].
 //ctx:Runtime context RTCtx*, provides scratch temporary buffer for fc
 //    intermediate result.
-void mlp(void * out, void const* in,
-         RTTensor const* c_fc_w, RTTensor const* c_fc_b,
-         RTTensor const* c_proj_w, RTTensor const* c_proj_b,
-         RTCtx * ctx);
+void mlp(
+    void * out, void const* in,
+    RTTensor const* c_fc_w, RTTensor const* c_fc_b,
+    RTTensor const* c_proj_w, RTTensor const* c_proj_b,
+    RTCtx * ctx);
 
 //out = silu(in*gate_proj_w) * (in*up_proj_w)*down_proj_w
-//out:output=[1*n_embd]
-//in:input hidden=[1*n_embd]
+//out:output=[seqlen*n_embd]
+//in:input hidden=[seqlen*n_embd]
 //gate_proj_w:weight gate=[n_embd*inner_dim]
 //up_proj_w:weight up=[n_embd*inner_dim]
 //down_proj_w:weight down=[inner_dim*n_embd]
@@ -37,7 +38,7 @@ void mlp(void * out, void const* in,
 void mlp_swigu(
     void * out, void const* in,
     RTTensor const* gate_proj_w, RTTensor const* up_proj_w,
-    RTTensor const* down_proj_w, RTCtx * ctx);
+    RTTensor const* down_proj_w, int64_t seqlen, RTCtx * ctx);
 
 #ifdef __cplusplus
 }

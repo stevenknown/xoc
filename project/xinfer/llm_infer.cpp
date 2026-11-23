@@ -43,6 +43,7 @@ LLMInfer::LLMInfer(
       m_sym_tab(sym_tab)
 {
     m_rm = rm;
+    m_is_prefill_seq = g_prefill_seq;
 }
 
 
@@ -246,19 +247,13 @@ static void initRTDump(LLMInfer & infer, RTCtx & ctx)
 {
     g_rtctx = nullptr;
     #ifdef _DEBUG_
-    if (xinfer::g_dump_rt_norm) {
-        g_rtctx = &ctx;
-        g_rtctx->dump_l2norm = true;
-    }
-    if (xinfer::g_dump_rt) {
-        g_rtctx = &ctx;
-        g_rtctx->dump = true;
-    }
-    if (xinfer::g_dump_rt_vec) {
-        g_rtctx = &ctx;
-        g_rtctx->dump_vec = true;
-    }
+    g_rtctx = &ctx;
+    g_rtctx->dump = xinfer::g_dump_rt;
+    g_rtctx->dump_l2norm = xinfer::g_dump_rt_norm;
+    g_rtctx->dump_vec = xinfer::g_dump_rt_vec;
+    g_rtctx->dump_mat = xinfer::g_dump_rt_mat;
     #endif
+
     #ifdef _DUMP_BY_LOGMGR_
     if (g_rtctx != nullptr) {
         g_rtctx->lm = infer.getLogMgr();
@@ -287,9 +282,6 @@ static void initRTCtxBuffer(OUT RTCtx & ctx, RTArg & arg)
 
     ctx.tmp_fc = arg.getTmpFCBuf();
     ctx.tmp_fc_len = arg.getTmpFCBufLen();
-
-    ctx.tmp_attn_out = arg.getTmpAttnOutBuf();
-    ctx.tmp_attn_out_len = arg.getTmpAttnOutBufLen();
 
     ctx.logits = arg.getLogitsBuf();
     ctx.logits_len = arg.getLogitsBufLen();
@@ -343,13 +335,15 @@ XI_STATUS LLMInfer::initRTCtx(
     ctx.n_embd = arg.n_embd;
     ctx.n_head = arg.n_head;
     ctx.n_kvhead = arg.n_kvhead;
+    ctx.head_dim = arg.head_dim;
     ctx.max_pos = arg.n_positions;
     ctx.rope_theta = (float)arg.rope_theta;
     ctx.layernorm_epsilon = (float)arg.layernorm_epsilon;
     ctx.rmsnorm_epsilon = (float)arg.rmsnorm_epsilon;
+    ctx.softmax_epsilon = (float)arg.softmax_epsilon;
     ctx.intermediate_size = arg.intermediate_size;
-    ctx.softmax_epsilon = g_softmax_epsilon;
     ctx.tensor_dtype = arg.tensor_dtype;
+    ctx.pos_encoding_type = arg.pos_encoding_type;
 
     ctx.temperature = (float)xinfer::g_temperature;
     ctx.n_topk = xinfer::g_topk;
@@ -373,10 +367,10 @@ XI_STATUS LLMInfer::autoRegression(
     ASSERT0(eos_token_id != (TOKID)INVALID_TOKEN);
     xcom::StrBuf output(256);
     ASSERT0(dumpAct(getLogMgr(), "\nSTART autoRegression"));
-    TOKID prev_token = INVALID_TOKEN;
     while (pos < maxlen) {
         START_TIMER_FMT(t2, ("%uth regression", pos));
         TOKID next_token = decode(token,  pos, &ctx);
+        ASSERT0(dumpToken(*this, next_token, pos));
         arg.addGenedToken(next_token);
         ASSERTN(all_unlocked(&ctx), ("\nruntime resource not yet unlocked"));
         if (next_token == (TOKID)INVALID_TOKEN) {
@@ -384,23 +378,31 @@ XI_STATUS LLMInfer::autoRegression(
                 "\nafter decode, the next_token is -1, where pos=%llu", pos);
             break;
         }
-        if (next_token == prev_token && next_token == arg.newline_token_id) {
+        if (next_token == arg.im_end_token_id) {
             dumpAct(getLogMgr(),
-                "\nafter decode, the prev_token and next_token are both "
+                "\nafter decode, the next_token is im_end, "
+                "where pos=%llu", pos);
+            break;
+        }
+        if (next_token == token && next_token == arg.newline_token_id) {
+            dumpAct(getLogMgr(),
+                "\nafter decode, the token and next_token are both "
                 "newline, where pos=%llu", pos);
             break;
         }
-        ASSERT0(dumpToken(*this, next_token, pos));
         if (next_token == eos_token_id) {
             dumpAct(getLogMgr(),
                 "\nafter decode, the next_token is eos, "
                 "where pos=%llu", pos);
             break;
         }
-        prev_token = token;
         token = next_token;
         pos++;
         END_TIMER_FMT(t2, ("%uth regression", pos));
+    }
+    if (pos >= maxlen) {
+        dumpAct(getLogMgr(),
+            "\ndecoding process exceeds the maximum context,maxlen%u", maxlen);
     }
     END_TIMER(t, "autoRegression");
     return XI_SUCC;
@@ -420,8 +422,15 @@ XI_STATUS LLMInfer::generate(
         END_TIMER(t, "generate");
         return XI_ERR;
     }
+    dumpAct(getLogMgr(), "\nAfter tokenized input string, the token-array:");
+    ASSERT0(dumpTokenArr(*this, tokarr));
     int64_t first_next_token;
-    int64_t pos = prefill(&first_next_token, tokarr, &ctx);
+    int64_t pos;
+    if (isPrefillSeq()) {
+        pos = prefill_seq(&first_next_token, tokarr, &ctx);
+    } else {
+        pos = prefill(&first_next_token, tokarr, &ctx);
+    }
     ASSERT0(pos >= 0);
     TOKID token = first_next_token;
     ASSERT0(token != (TOKID)INVALID_TOKEN);
@@ -439,7 +448,24 @@ bool LLMInfer::verify(RTCtx const& ctx, RTArg const& arg)
     ASSERT0(ctx.wpe);
     UINT maxseqlen = RTTENSOR_max_seq_len(ctx.wpe);
     ASSERT0(maxseqlen == arg.getMaxSeqLen());
+    ASSERT0(ctx.n_layer != 0);
+    ASSERT0(ctx.n_embd != 0);
+    ASSERT0(ctx.n_head != 0);
+    ASSERT0(ctx.n_kvhead != 0);
+    ASSERT0(ctx.head_dim != 0);
+    ASSERT0(ctx.n_topk != 0);
+    ASSERT0(ctx.intermediate_size != 0);
+    ASSERT0(ctx.vocab_size != 0);
+    ASSERT0(ctx.max_pos != 0);
     return true;
+}
+
+
+CHAR const* LLMInfer::applyChatTemplate(
+    OUT xcom::StrBuf & buf, CHAR const* input_str)
+{
+    //Target Dependent Code.
+    return input_str;
 }
 
 
@@ -458,11 +484,13 @@ bool LLMInfer::perform()
     }
     ASSERT0(verify(ctx, arg));
     dumpRTCtx(&ctx, getRegionMgr());
-
-    if (generate(xinfer::g_prompt, arg, ctx) != XI_SUCC) {
+    xcom::StrBuf buf(128);
+    CHAR const* input = applyChatTemplate(buf, xinfer::g_prompt);
+    if (generate(input, arg, ctx) != XI_SUCC) {
         return false;
     }
     arg.outputGenedTokens(*this, m_rm->getLogMgr());
+    arg.dump(*this, m_rm->getLogMgr());
     dump();
     return true;
 }

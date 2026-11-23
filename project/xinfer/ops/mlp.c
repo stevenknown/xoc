@@ -1,9 +1,10 @@
 #include "ops.h"
 
-void mlp(void * out, void const*restrict in,
-         RTTensor const*restrict c_fc_w, RTTensor const*restrict c_fc_b,
-         RTTensor const*restrict c_proj_w, RTTensor const*restrict c_proj_b,
-         RTCtx * ctx)
+void mlp(
+    void * out, void const*restrict in,
+    RTTensor const*restrict c_fc_w, RTTensor const*restrict c_fc_b,
+    RTTensor const*restrict c_proj_w, RTTensor const*restrict c_proj_b,
+    RTCtx * ctx)
 {
     XASSERT(out);
     XASSERT(in);
@@ -45,13 +46,13 @@ void mlp(void * out, void const*restrict in,
     //tmp_fc is [1*inner_dim].
     //in is [1*n_embd]
     //[1*inner_dim] = [1*n_embd] x [n_embd*inner_dim] + [1*inner_dim]
-    matmulBias(tmp_fc, in, c_fc_w, c_fc_b);
-    XASSERT(dump_l2norm(tmp_fc, inner_dim, dtype,
+    matmulBias(tmp_fc, in, 1, n_embd, c_fc_w, c_fc_b);
+    XASSERT(dump_l2norm(tmp_fc, 1, inner_dim, dtype,
             "after increase dim by FC to 1*%u", inner_dim));
 
     //tmp_fc is activated by GELU in-place.
     gelu(tmp_fc, inner_dim, dtype);
-    XASSERT(dump_l2norm(tmp_fc, inner_dim, dtype, "gelu active output"));
+    XASSERT(dump_l2norm(tmp_fc, 1, inner_dim, dtype, "gelu active output"));
 
     //Decrease (project) a dimension.
     //tmp_fc[4*n_embd] to out[n_embd].
@@ -65,8 +66,8 @@ void mlp(void * out, void const*restrict in,
     //tmp_fc is [1*inner_dim], w_proj is [inner_dim*n_embd].
     //out is [1*n_embd], b_proj is [1*n_embd].
     //[1*n_embd] = [1*inner_dim] x [inner_dim*n_embd] + [1*n_embd]
-    matmulBias(out, tmp_fc, c_proj_w, c_proj_b);
-    XASSERT(dump_l2norm(out, n_embd, dtype,
+    matmulBias(out, tmp_fc, 1, inner_dim, c_proj_w, c_proj_b);
+    XASSERT(dump_l2norm(out, 1, n_embd, dtype,
             "after decrease dim by FC to 1*%u", n_embd));
     unlock_tmp_fc(ctx);
 }
@@ -75,7 +76,7 @@ void mlp(void * out, void const*restrict in,
 void mlp_swigu(
     void * out, void const*restrict in,
     RTTensor const*restrict gate_proj_w, RTTensor const*restrict up_proj_w,
-    RTTensor const*restrict down_proj_w, RTCtx * ctx)
+    RTTensor const*restrict down_proj_w, int64_t seqlen, RTCtx * ctx)
 {
     XASSERT(out);
     XASSERT(in);
@@ -94,49 +95,53 @@ void mlp_swigu(
     //tmp_fc overlaps with tmp_qkv.
     BYTE * tmp_buffer_start = lock_tmp_fc(ctx);
     XASSERT(tmp_buffer_start);
-    XASSERT(ctx->tmp_fc_len >= 2 * inner_dim * elemsz);
+    XASSERT(ctx->tmp_fc_len >= seqlen * 2 * inner_dim * elemsz);
     BYTE * tmp_gate = tmp_buffer_start;
-    BYTE * tmp_up = tmp_buffer_start + inner_dim * elemsz;
+    BYTE * tmp_up = tmp_buffer_start + seqlen * inner_dim * elemsz;
     XASSERT(gate_proj_w->data);
     XASSERT(up_proj_w->data);
     XASSERT(down_proj_w->data);
 
     //gate = in*gate_proj_w^T
-    //[1*inner_dim]=[1*n_embd]*[inner_dim*n_embd]^T
+    //[seqlen*inner_dim]=[seqlen*n_embd]*[inner_dim*n_embd]^T
     XASSERT(gate_proj_w->ndim == 2);
     XASSERT(gate_proj_w->shape[0] == inner_dim);
     XASSERT(gate_proj_w->shape[1] == n_embd);
     XASSERT(gate_proj_w->elem_num == inner_dim * n_embd);
-    matmulTrans(tmp_gate, in, gate_proj_w);
-    XASSERT(dump_l2norm(tmp_gate, inner_dim, dtype,
-            "after gate proj to 1*%u", inner_dim));
+    matmulTrans(tmp_gate, in, seqlen, n_embd, gate_proj_w);
+    XASSERT(dump_l2norm(tmp_gate, seqlen, inner_dim, dtype,
+        "after gate proj to %u*%u", seqlen, inner_dim));
 
     //up = in*up_proj_w^T
-    //[1*inner_dim]=[1*n_embd]*[inner_dim*n_embd]^T
+    //[seqlen*inner_dim]=[seqlen*n_embd]*[inner_dim*n_embd]^T
     XASSERT(up_proj_w->ndim == 2);
     XASSERT(up_proj_w->shape[0] == inner_dim);
     XASSERT(up_proj_w->shape[1] == n_embd);
     XASSERT(up_proj_w->elem_num == inner_dim * n_embd);
-    matmulTrans(tmp_up, in, up_proj_w);
-    XASSERT(dump_l2norm(tmp_up, inner_dim, dtype,
-            "after up proj to 1*%u", inner_dim));
+    matmulTrans(tmp_up, in, seqlen, n_embd, up_proj_w);
+    XASSERT(dump_l2norm(tmp_up, seqlen, inner_dim, dtype,
+        "after up proj to %u*%u", seqlen, inner_dim));
 
     //Apply silu activation to gate: silu(x)=x*sigmoid(x)
-    silu(tmp_gate, inner_dim, dtype);
-    XASSERT(dump_l2norm(tmp_gate, inner_dim, dtype, "silu active output"));
+    //tmp_gate=[seqlen*inner_dim]
+    silu(tmp_gate, seqlen, inner_dim, dtype);
+    XASSERT(dump_l2norm(tmp_gate, seqlen, inner_dim, dtype,
+        "silu active output"));
 
     //tmp_gate = element‑wise product tmp_gate,tmp_up.
-    dotInplace(tmp_gate, tmp_gate, tmp_up, inner_dim, dtype);
-    XASSERT(dump_l2norm(tmp_gate, inner_dim, dtype, "dot gate*up output"));
+    dotInplace(tmp_gate, tmp_gate, tmp_up, seqlen * inner_dim, dtype);
+    XASSERT(dump_l2norm(tmp_gate, seqlen, inner_dim, dtype,
+        "dot gate*up output"));
 
     //down: out = tmp_gate*down_proj_w^T
-    //[1*n_embd]=[1*inner_dim]*[n_embd*inner_dim]^T
+    //[seqlen*n_embd]=[seqlen*inner_dim]*[n_embd*inner_dim]^T
     XASSERT(down_proj_w->ndim == 2);
     XASSERT(down_proj_w->shape[0] == n_embd);
     XASSERT(down_proj_w->shape[1] == inner_dim);
     XASSERT(down_proj_w->elem_num == n_embd * inner_dim);
-    matmulTrans(out, tmp_gate, down_proj_w);
-    XASSERT(dump_l2norm(out, n_embd, dtype, "after down proj to 1*%u", n_embd));
+    matmulTrans(out, tmp_gate, seqlen, inner_dim, down_proj_w);
+    XASSERT(dump_l2norm(out, seqlen, n_embd, dtype,
+        "after down proj to %u*%u", seqlen, n_embd));
 
     unlock_tmp_fc(ctx);
 }

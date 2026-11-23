@@ -43,9 +43,10 @@ extern "C" {
 //Position vector for sequence position pos is fetched from wpe[pos].
 //Block input hidden state = wte[token_id] + wpe[pos].
 
-//TODO:batched prefill. For performance-critical scenarios, implement
-//scaled_dot_attn_prefill.
 int64_t prefill(
+    int64_t * first_next_token, TokenArray const* tokarr, RTCtx * ctx);
+
+int64_t prefill_seq(
     int64_t * first_next_token, TokenArray const* tokarr, RTCtx * ctx);
 
 #ifdef __cplusplus
