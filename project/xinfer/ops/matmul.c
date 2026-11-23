@@ -346,7 +346,7 @@ void matmulTransF16(
     XASSERT(w->ndim == 2);
     XASSERT(w->dtype == RTTENSOR_DTYPE_F16);
     unsigned int elemsz = sizeof(uint16_t);
-    uint8_t const* weight = (const uint8_t*)w->data;
+    uint16_t const* weight = (uint16_t const*)w->data;
     unsigned int wrow = w->shape[0];
     unsigned int wcol = w->shape[1];
     XASSERT(incol == wcol);
@@ -360,14 +360,13 @@ void matmulTransF16(
 
             //Element offset for row i: i * wcol.
             //Byte offset for row i: i * wcol * elemsz
-            unsigned int row_base = i * wcol * elemsz;
+            unsigned int row_base = i * wcol;
 
             //NOTE:function-call might prevent auto-vect.
+            uint16_t const* weight_row = weight + row_base;
             HINT_VECT
             for (unsigned int j = 0; j < wcol; j++) {
-                unsigned int elem_off = row_base + j * elemsz;
-                float w_val = fp16_to_float(
-                    *((uint16_t const*)(weight + elem_off)));
+                float w_val = fp16_to_float(weight_row[j]);
                 sum = sum + fp16_to_float(subin[j]) * w_val;
             }
             subout[i] = float_to_fp16(sum);
@@ -377,7 +376,6 @@ void matmulTransF16(
 
 
 void matmulTransBF16(
-
     uint16_t *restrict out, uint16_t const*restrict in,
     unsigned int inrow, unsigned int incol,
     RTTensor const*restrict w)
@@ -386,7 +384,7 @@ void matmulTransBF16(
     XASSERT(w->ndim == 2);
     XASSERT(w->dtype == RTTENSOR_DTYPE_BF16);
     unsigned int elemsz = sizeof(uint16_t);
-    uint8_t const* weight = (const uint8_t*)w->data;
+    uint16_t const* weight = (uint16_t const*)w->data;
     unsigned int wrow = w->shape[0];
     unsigned int wcol = w->shape[1];
     XASSERT(incol == wcol);
@@ -400,14 +398,13 @@ void matmulTransBF16(
 
             //Element offset for row i: i * wcol.
             //Byte offset for row i: i * wcol * elemsz
-            unsigned int row_base = i * wcol * elemsz;
+            unsigned int row_base = i * wcol;
 
             //NOTE:function-call might prevent auto-vect.
+            uint16_t const* weight_row = weight + row_base;
             HINT_VECT
             for (unsigned int j = 0; j < wcol; j++) {
-                unsigned int elem_off = row_base + j * elemsz;
-                float w_val = bf16_to_float(
-                    *((uint16_t const*)(weight + elem_off)));
+                float w_val = bf16_to_float(weight_row[j]);
                 sum = sum + bf16_to_float(subin[j]) * w_val;
             }
             subout[i] = float_to_bf16(sum);

@@ -255,8 +255,9 @@ void QWEN2D5LLMInfer::initRTArg(RTArg & arg)
 CHAR const* QWEN2D5LLMInfer::applyChatTemplate(
     OUT xcom::StrBuf & buf, CHAR const* input_str)
 {
+    ASSERT0(input_str);
     xcom::StrBuf buf2(128);
-    buf2.strcat(xinfer::g_prompt);
+    buf2.strcat(input_str);
     xcom::trimTrailNewLine(buf2.getBuf());
     buf.sprint(
         "<|im_start|>system\nYou are a helpful assistant."
